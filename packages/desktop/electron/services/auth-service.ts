@@ -7,7 +7,6 @@ import type { PiRunnerTarget } from "@stella/runtime/kernel/lifecycle-targets";
 import { readConfiguredBackendUrl } from "@stella/contracts/stella-api";
 import { parsePairingLink } from "@stella/contracts/self-host";
 import {
-  ACCOUNT_DELETE_REAUTH_REQUIRED,
   getAuthSessionIdentityIntent,
   getAuthSnapshotSession,
   isRecognizedAuthRejection,
@@ -928,17 +927,10 @@ export class AuthService {
     const body = (await response.json().catch(() => null)) as {
       success?: unknown;
       message?: unknown;
-      code?: unknown;
     } | null;
-    if (!response.ok) {
-      if (body?.code === "SESSION_EXPIRED" || body?.code === "SESSION_NOT_FRESH") {
-        throw new Error(ACCOUNT_DELETE_REAUTH_REQUIRED);
-      }
+    if (!response.ok || body?.success !== true) {
       const detail = typeof body?.message === "string" && body.message ? ` ${body.message}` : "";
-      throw new Error(`Account deletion failed with HTTP ${response.status}.${detail}`);
-    }
-    if (body?.success !== true || body.message !== "User deleted") {
-      throw new Error("The server did not confirm the account deletion.");
+      throw new Error(`Account deletion was not recorded (HTTP ${response.status}).${detail}`);
     }
     this.setIdentityIntent("anonymous");
     this.clearStoredCredentials();

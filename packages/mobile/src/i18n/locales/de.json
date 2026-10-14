@@ -1403,7 +1403,6 @@
     },
     "settings": {
       "aboutSection": "Über",
-      "accountDeletedTitle": "Konto gelöscht",
       "appearance": {
         "dark": "Dunkel",
         "light": "Hell",
@@ -1440,14 +1439,13 @@
       "computerSection": "Computer",
       "deleteAccount": "Konto löschen",
       "deleteAccountLabel": "Dein Stella-Konto löschen",
-      "deleteConfirmBody": "Dies löscht dein Stella-Konto dauerhaft und entfernt die zugehörigen Cloud-Daten von unseren Servern. Das kann nicht rückgängig gemacht werden.",
+      "deleteConfirmBody": "Du wirst auf allen Geräten abgemeldet, und dein Konto wird sofort deaktiviert. Nach 7 Tagen werden dein Konto und seine Cloud-Daten endgültig gelöscht. Melde dich vorher wieder an, um das abzubrechen.",
       "deleteConfirmTitle": "Konto löschen",
       "deleteFailedBody": "Dein Konto wurde nicht gelöscht, und du bist weiterhin angemeldet.",
       "deleteFailedTitle": "Konto konnte nicht gelöscht werden",
-      "deleteReauthAction": "Erneut anmelden",
-      "deleteReauthBody": "Melde dich zu deiner Sicherheit erneut an und lösche dann dein Konto. Dein Konto wurde nicht gelöscht.",
       "deleteRetry": "Erneut versuchen",
       "deletingAccount": "Konto wird gelöscht…",
+      "deletionScheduledTitle": "Kontolöschung geplant",
       "loadingSession": "Sitzung wird geladen…",
       "notificationsSection": "Benachrichtigungen",
       "openPrivacyLabel": "Datenschutzrichtlinie öffnen",
@@ -1830,7 +1828,7 @@
       },
       "dialog": {
         "deleteAccountButton": "Konto löschen",
-        "deleteAccountDescription": "Dies löscht dein Konto und deine Stella-Daten dauerhaft. Das kann nicht rückgängig gemacht werden.",
+        "deleteAccountDescription": "Du wirst auf allen Geräten abgemeldet, und dein Konto wird sofort deaktiviert. Nach 7 Tagen werden dein Konto und seine Cloud-Daten endgültig gelöscht. Melde dich vorher wieder an, um das abzubrechen.",
         "deleteAccountTitle": "Dein Stella-Konto löschen?",
         "deleteDataButton": "Daten löschen",
         "deleteDataDescription": "Dies löscht deine Konversationen, Erinnerung, Einstellungen und den lokalen Stella-Zustand. Das kann nicht rückgängig gemacht werden.",
@@ -1853,8 +1851,8 @@
         "accountDeleted": "Dein Stella-Konto wurde gelöscht.",
         "dataDeleted": "Deine Stella-Daten wurden gelöscht.",
         "deleteAccountFailed": "Dein Konto konnte nicht gelöscht werden. Bitte versuche es erneut.",
-        "deleteAccountReauth": "Melde dich zu deiner Sicherheit ab und wieder an und lösche dann dein Konto. Dein Konto wurde nicht gelöscht.",
         "deleteDataFailed": "Deine Daten konnten nicht gelöscht werden. Bitte versuche es erneut.",
+        "deletionScheduled": "Dein Konto ist zur Löschung vorgemerkt. Wir schicken dir eine E-Mail, wenn es erledigt ist.",
         "signInBeforeDelete": "Melde dich an, bevor du dein Konto löschst."
       }
     },

@@ -1403,7 +1403,6 @@
     },
     "settings": {
       "aboutSection": "Tietoja",
-      "accountDeletedTitle": "Tili poistettu",
       "appearance": {
         "dark": "Tumma",
         "light": "Vaalea",
@@ -1440,14 +1439,13 @@
       "computerSection": "Tietokone",
       "deleteAccount": "Poista tili",
       "deleteAccountLabel": "Poista Stella-tilisi",
-      "deleteConfirmBody": "Tämä poistaa Stella-tilisi pysyvästi ja poistaa siihen liittyvät pilvitiedot palvelimiltamme. Tätä ei voi kumota.",
+      "deleteConfirmBody": "Sinut kirjataan ulos kaikilta laitteilta ja tilisi poistetaan käytöstä heti. 7 päivän kuluttua tilisi ja sen pilvitiedot poistetaan pysyvästi. Peru kirjautumalla sisään ennen sitä.",
       "deleteConfirmTitle": "Poista tili",
       "deleteFailedBody": "Tiliäsi ei poistettu, ja olet edelleen kirjautuneena.",
       "deleteFailedTitle": "Tiliä ei voitu poistaa",
-      "deleteReauthAction": "Kirjaudu uudelleen",
-      "deleteReauthBody": "Kirjaudu turvallisuussyistä uudelleen sisään ja poista sitten tilisi. Tiliäsi ei poistettu.",
       "deleteRetry": "Yritä uudelleen",
       "deletingAccount": "Poistetaan tiliä…",
+      "deletionScheduledTitle": "Tilin poisto ajoitettu",
       "loadingSession": "Ladataan istuntoa…",
       "notificationsSection": "Ilmoitukset",
       "openPrivacyLabel": "Avaa tietosuojakäytäntö",
@@ -1830,7 +1828,7 @@
       },
       "dialog": {
         "deleteAccountButton": "Poista tili",
-        "deleteAccountDescription": "Tämä poistaa tilisi ja Stella-tietosi pysyvästi. Tätä ei voi kumota.",
+        "deleteAccountDescription": "Sinut kirjataan ulos kaikilta laitteilta ja tilisi poistetaan käytöstä heti. 7 päivän kuluttua tilisi ja sen pilvitiedot poistetaan pysyvästi. Peru kirjautumalla sisään ennen sitä.",
         "deleteAccountTitle": "Poistetaanko Stella-tilisi?",
         "deleteDataButton": "Poista tiedot",
         "deleteDataDescription": "Tämä poistaa keskustelusi, muistisi, asetuksesi ja paikallisen Stella-tilan. Tätä ei voi kumota.",
@@ -1853,8 +1851,8 @@
         "accountDeleted": "Stella-tilisi poistettiin.",
         "dataDeleted": "Stella-tietosi poistettiin.",
         "deleteAccountFailed": "Tiliäsi ei voitu poistaa. Yritä uudelleen.",
-        "deleteAccountReauth": "Kirjaudu turvallisuussyistä ulos ja takaisin sisään ja poista sitten tilisi. Tiliäsi ei poistettu.",
         "deleteDataFailed": "Tietojasi ei voitu poistaa. Yritä uudelleen.",
+        "deletionScheduled": "Tilisi on ajoitettu poistettavaksi. Lähetämme sähköpostia, kun se on valmis.",
         "signInBeforeDelete": "Kirjaudu sisään ennen tilisi poistamista."
       }
     },

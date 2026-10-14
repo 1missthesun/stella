@@ -1411,7 +1411,6 @@
     },
     "settings": {
       "aboutSection": "À propos",
-      "accountDeletedTitle": "Compte supprimé",
       "appearance": {
         "dark": "Sombre",
         "light": "Clair",
@@ -1448,14 +1447,13 @@
       "computerSection": "Ordinateur",
       "deleteAccount": "Supprimer le compte",
       "deleteAccountLabel": "Supprimer votre compte Stella",
-      "deleteConfirmBody": "Cela supprime définitivement votre compte Stella et efface de nos serveurs les données cloud qui lui sont associées. Cette action est irréversible.",
+      "deleteConfirmBody": "Vous serez déconnecté sur tous vos appareils et votre compte sera désactivé immédiatement. Après 7 jours, votre compte et ses données cloud seront définitivement supprimés. Reconnectez-vous avant pour annuler.",
       "deleteConfirmTitle": "Supprimer le compte",
       "deleteFailedBody": "Votre compte n'a pas été supprimé et vous êtes toujours connecté.",
       "deleteFailedTitle": "Impossible de supprimer le compte",
-      "deleteReauthAction": "Se reconnecter",
-      "deleteReauthBody": "Pour votre sécurité, reconnectez-vous, puis supprimez votre compte. Votre compte n'a pas été supprimé.",
       "deleteRetry": "Réessayer",
       "deletingAccount": "Suppression du compte…",
+      "deletionScheduledTitle": "Suppression du compte programmée",
       "loadingSession": "Chargement de la session…",
       "notificationsSection": "Notifications",
       "openPrivacyLabel": "Ouvrir la Politique de confidentialité",
@@ -1838,7 +1836,7 @@
       },
       "dialog": {
         "deleteAccountButton": "Supprimer le compte",
-        "deleteAccountDescription": "Cela supprime définitivement votre compte et vos données Stella. Cette action est irréversible.",
+        "deleteAccountDescription": "Vous serez déconnecté sur tous vos appareils et votre compte sera désactivé immédiatement. Après 7 jours, votre compte et ses données cloud seront définitivement supprimés. Reconnectez-vous avant pour annuler.",
         "deleteAccountTitle": "Supprimer votre compte Stella ?",
         "deleteDataButton": "Supprimer les données",
         "deleteDataDescription": "Cela efface vos conversations, votre mémoire, vos réglages et l'état local de Stella. Cette action est irréversible.",
@@ -1861,8 +1859,8 @@
         "accountDeleted": "Votre compte Stella a été supprimé.",
         "dataDeleted": "Vos données Stella ont été supprimées.",
         "deleteAccountFailed": "Impossible de supprimer votre compte. Veuillez réessayer.",
-        "deleteAccountReauth": "Pour votre sécurité, déconnectez-vous puis reconnectez-vous, puis supprimez votre compte. Votre compte n'a pas été supprimé.",
         "deleteDataFailed": "Impossible de supprimer vos données. Veuillez réessayer.",
+        "deletionScheduled": "La suppression de votre compte est programmée. Nous vous enverrons un e-mail une fois terminée.",
         "signInBeforeDelete": "Connectez-vous avant de supprimer votre compte."
       }
     },

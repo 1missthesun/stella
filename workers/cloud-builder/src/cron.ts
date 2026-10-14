@@ -4,12 +4,20 @@ import { sweepAbuseTables } from "./owner-store/domains/abuse.js";
 import { sweepAnonymousUsers, sweepAuthTables } from "./auth/sweeps.js";
 import { sweepSlackPreviews } from "./slack/previews.js";
 
+const HOURLY_CRON = "41 * * * *";
+
 export async function runScheduled(
-  _controller: ScheduledController,
+  controller: ScheduledController,
   env: Env,
   _ctx: ExecutionContext,
 ): Promise<void> {
-  const sweeps: Array<[string, () => Promise<unknown>]> = [
+  const deletions: [string, () => Promise<unknown>] = [
+    "account deletions",
+    async () =>
+      (await import("./auth/account-deletion.js")).runAccountDeletions(env as unknown as Cloudflare.Env),
+  ];
+  const sweeps: Array<[string, () => Promise<unknown>]> = controller.cron === HOURLY_CRON ? [deletions] : [
+    deletions,
     ["model prices", () => syncModelPrices(env)],
     ["abuse tables", () => sweepAbuseTables(env)],
     ["auth tables", () => sweepAuthTables(env)],

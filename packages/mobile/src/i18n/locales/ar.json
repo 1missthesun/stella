@@ -1435,7 +1435,6 @@
     },
     "settings": {
       "aboutSection": "حول",
-      "accountDeletedTitle": "تم حذف الحساب",
       "appearance": {
         "dark": "داكن",
         "light": "فاتح",
@@ -1472,14 +1471,13 @@
       "computerSection": "الكمبيوتر",
       "deleteAccount": "حذف الحساب",
       "deleteAccountLabel": "حذف حسابك في Stella",
-      "deleteConfirmBody": "سيؤدي هذا إلى حذف حسابك في Stella نهائيًا وإزالة البيانات السحابية المرتبطة به من خوادمنا. لا يمكن التراجع عن ذلك.",
+      "deleteConfirmBody": "سيتم تسجيل خروجك على كل الأجهزة وتعطيل حسابك فورًا. بعد 7 أيام، يُحذف حسابك وبياناته السحابية نهائيًا. سجّل الدخول مرة أخرى قبل ذلك للإلغاء.",
       "deleteConfirmTitle": "حذف الحساب",
       "deleteFailedBody": "لم يتم حذف حسابك، ولا تزال مسجلاً الدخول.",
       "deleteFailedTitle": "تعذّر حذف الحساب",
-      "deleteReauthAction": "تسجيل الدخول مرة أخرى",
-      "deleteReauthBody": "لأمانك، سجّل الدخول مرة أخرى، ثم احذف حسابك. لم يتم حذف حسابك.",
       "deleteRetry": "حاول مرة أخرى",
       "deletingAccount": "جارٍ حذف الحساب…",
+      "deletionScheduledTitle": "تمت جدولة حذف الحساب",
       "loadingSession": "جارٍ تحميل الجلسة…",
       "notificationsSection": "الإشعارات",
       "openPrivacyLabel": "فتح سياسة الخصوصية",
@@ -1862,7 +1860,7 @@
       },
       "dialog": {
         "deleteAccountButton": "حذف الحساب",
-        "deleteAccountDescription": "يؤدي هذا إلى حذف حسابك وبيانات Stella نهائيًا. لا يمكن التراجع عن هذا.",
+        "deleteAccountDescription": "سيتم تسجيل خروجك على كل الأجهزة وتعطيل حسابك فورًا. بعد 7 أيام، يُحذف حسابك وبياناته السحابية نهائيًا. سجّل الدخول مرة أخرى قبل ذلك للإلغاء.",
         "deleteAccountTitle": "حذف حساب Stella الخاص بك؟",
         "deleteDataButton": "حذف البيانات",
         "deleteDataDescription": "يؤدي هذا إلى مسح محادثاتك وذاكرتك وإعداداتك وحالة Stella المحلية. لا يمكن التراجع عن هذا.",
@@ -1885,8 +1883,8 @@
         "accountDeleted": "تم حذف حساب Stella الخاص بك.",
         "dataDeleted": "تم حذف بيانات Stella الخاصة بك.",
         "deleteAccountFailed": "تعذّر حذف حسابك. يرجى المحاولة مرة أخرى.",
-        "deleteAccountReauth": "لأمانك، سجّل الخروج ثم سجّل الدخول مرة أخرى، ثم احذف حسابك. لم يتم حذف حسابك.",
         "deleteDataFailed": "تعذّر حذف بياناتك. يرجى المحاولة مرة أخرى.",
+        "deletionScheduled": "تمت جدولة حذف حسابك. سنرسل إليك بريدًا إلكترونيًا عند الانتهاء.",
         "signInBeforeDelete": "سجّل الدخول قبل حذف حسابك."
       }
     },

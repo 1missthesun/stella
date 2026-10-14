@@ -1403,7 +1403,6 @@
     },
     "settings": {
       "aboutSection": "Hakkında",
-      "accountDeletedTitle": "Hesap silindi",
       "appearance": {
         "dark": "Koyu",
         "light": "Açık",
@@ -1440,14 +1439,13 @@
       "computerSection": "Bilgisayar",
       "deleteAccount": "Hesabı sil",
       "deleteAccountLabel": "Stella hesabınızı silin",
-      "deleteConfirmBody": "Bu işlem Stella hesabınızı kalıcı olarak siler ve sunucularımızdaki ilgili bulut verilerini kaldırır. Bu işlem geri alınamaz.",
+      "deleteConfirmBody": "Tüm cihazlarda oturumunuz kapatılacak ve hesabınız hemen devre dışı bırakılacak. 7 gün sonra hesabınız ve buluttaki verileri kalıcı olarak silinir. İptal etmek için bundan önce yeniden oturum açın.",
       "deleteConfirmTitle": "Hesabı sil",
       "deleteFailedBody": "Hesabınız silinmedi ve oturumunuz hâlâ açık.",
       "deleteFailedTitle": "Hesap silinemedi",
-      "deleteReauthAction": "Yeniden oturum aç",
-      "deleteReauthBody": "Güvenliğiniz için yeniden oturum açın, ardından hesabınızı silin. Hesabınız silinmedi.",
       "deleteRetry": "Tekrar dene",
       "deletingAccount": "Hesap siliniyor…",
+      "deletionScheduledTitle": "Hesap silme planlandı",
       "loadingSession": "Oturum yükleniyor…",
       "notificationsSection": "Bildirimler",
       "openPrivacyLabel": "Gizlilik Politikasını aç",
@@ -1830,7 +1828,7 @@
       },
       "dialog": {
         "deleteAccountButton": "Hesabı sil",
-        "deleteAccountDescription": "Bu işlem hesabınızı ve Stella verilerinizi kalıcı olarak siler. Bu geri alınamaz.",
+        "deleteAccountDescription": "Tüm cihazlarda oturumunuz kapatılacak ve hesabınız hemen devre dışı bırakılacak. 7 gün sonra hesabınız ve buluttaki verileri kalıcı olarak silinir. İptal etmek için bundan önce yeniden oturum açın.",
         "deleteAccountTitle": "Stella hesabınız silinsin mi?",
         "deleteDataButton": "Verileri sil",
         "deleteDataDescription": "Bu işlem konuşmalarınızı, belleğinizi, ayarlarınızı ve yerel Stella durumunuzu siler. Bu geri alınamaz.",
@@ -1853,8 +1851,8 @@
         "accountDeleted": "Stella hesabınız silindi.",
         "dataDeleted": "Stella verileriniz silindi.",
         "deleteAccountFailed": "Hesabınız silinemedi. Lütfen tekrar deneyin.",
-        "deleteAccountReauth": "Güvenliğiniz için oturumu kapatıp yeniden açın, ardından hesabınızı silin. Hesabınız silinmedi.",
         "deleteDataFailed": "Verileriniz silinemedi. Lütfen tekrar deneyin.",
+        "deletionScheduled": "Hesabınız silinmek üzere planlandı. Tamamlandığında size e-posta göndereceğiz.",
         "signInBeforeDelete": "Hesabınızı silmeden önce giriş yapın."
       }
     },

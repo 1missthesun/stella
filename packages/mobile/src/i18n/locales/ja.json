@@ -1395,7 +1395,6 @@
     },
     "settings": {
       "aboutSection": "情報",
-      "accountDeletedTitle": "アカウントを削除しました",
       "appearance": {
         "dark": "ダーク",
         "light": "ライト",
@@ -1432,14 +1431,13 @@
       "computerSection": "コンピュータ",
       "deleteAccount": "アカウントを削除",
       "deleteAccountLabel": "Stella のアカウントを削除",
-      "deleteConfirmBody": "Stella のアカウントを完全に削除し、当社サーバー上の関連するクラウドデータも削除します。この操作は取り消せません。",
+      "deleteConfirmBody": "すべてのデバイスからサインアウトされ、アカウントはすぐに無効になります。7日後、アカウントとそのクラウドデータは完全に削除されます。それまでにもう一度サインインすると取り消せます。",
       "deleteConfirmTitle": "アカウントを削除",
       "deleteFailedBody": "アカウントは削除されておらず、サインインしたままです。",
       "deleteFailedTitle": "アカウントを削除できませんでした",
-      "deleteReauthAction": "もう一度サインイン",
-      "deleteReauthBody": "セキュリティのため、もう一度サインインしてからアカウントを削除してください。アカウントは削除されていません。",
       "deleteRetry": "再試行",
       "deletingAccount": "アカウントを削除しています…",
+      "deletionScheduledTitle": "アカウントの削除を予約しました",
       "loadingSession": "セッションを読み込んでいます…",
       "notificationsSection": "通知",
       "openPrivacyLabel": "プライバシーポリシーを開く",
@@ -1822,7 +1820,7 @@
       },
       "dialog": {
         "deleteAccountButton": "アカウントを削除",
-        "deleteAccountDescription": "これにより、アカウントと Stella のデータが完全に削除されます。これは元に戻せません。",
+        "deleteAccountDescription": "すべてのデバイスからサインアウトされ、アカウントはすぐに無効になります。7日後、アカウントとそのクラウドデータは完全に削除されます。それまでにもう一度サインインすると取り消せます。",
         "deleteAccountTitle": "Stella のアカウントを削除しますか？",
         "deleteDataButton": "データを削除",
         "deleteDataDescription": "これにより、会話・メモリ・設定・Stella のローカル状態が消去されます。これは元に戻せません。",
@@ -1845,8 +1843,8 @@
         "accountDeleted": "Stella のアカウントを削除しました。",
         "dataDeleted": "Stella のデータを削除しました。",
         "deleteAccountFailed": "アカウントを削除できませんでした。もう一度お試しください。",
-        "deleteAccountReauth": "セキュリティのため、サインアウトしてもう一度サインインしてからアカウントを削除してください。アカウントは削除されていません。",
         "deleteDataFailed": "データを削除できませんでした。もう一度お試しください。",
+        "deletionScheduled": "アカウントの削除が予約されました。完了したらメールでお知らせします。",
         "signInBeforeDelete": "アカウントを削除する前にサインインしてください。"
       }
     },

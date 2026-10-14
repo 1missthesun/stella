@@ -1411,7 +1411,6 @@
     },
     "settings": {
       "aboutSection": "אודות",
-      "accountDeletedTitle": "החשבון נמחק",
       "appearance": {
         "dark": "כהה",
         "light": "בהיר",
@@ -1448,14 +1447,13 @@
       "computerSection": "מחשב",
       "deleteAccount": "מחיקת חשבון",
       "deleteAccountLabel": "מחיקת חשבון ה-Stella שלכם",
-      "deleteConfirmBody": "פעולה זו מוחקת לצמיתות את חשבון ה-Stella שלכם ומסירה מהשרתים שלנו את נתוני הענן המשויכים אליו. אי אפשר לבטל אותה.",
+      "deleteConfirmBody": "תנותק בכל המכשירים והחשבון שלך יושבת מיד. לאחר 7 ימים, החשבון והנתונים שלו בענן יימחקו לצמיתות. התחבר שוב לפני כן כדי לבטל.",
       "deleteConfirmTitle": "מחיקת חשבון",
       "deleteFailedBody": "החשבון שלך לא נמחק, ואתה עדיין מחובר.",
       "deleteFailedTitle": "לא ניתן היה למחוק את החשבון",
-      "deleteReauthAction": "התחבר שוב",
-      "deleteReauthBody": "לביטחונך, התחבר שוב ואז מחק את החשבון. החשבון שלך לא נמחק.",
       "deleteRetry": "נסה שוב",
       "deletingAccount": "מוחק חשבון…",
+      "deletionScheduledTitle": "מחיקת החשבון תוזמנה",
       "loadingSession": "טוען התחברות…",
       "notificationsSection": "התראות",
       "openPrivacyLabel": "פתיחת מדיניות הפרטיות",
@@ -1838,7 +1836,7 @@
       },
       "dialog": {
         "deleteAccountButton": "מחק חשבון",
-        "deleteAccountDescription": "פעולה זו מוחקת לצמיתות את החשבון ואת נתוני Stella שלך. לא ניתן לבטל.",
+        "deleteAccountDescription": "תנותק בכל המכשירים והחשבון שלך יושבת מיד. לאחר 7 ימים, החשבון והנתונים שלו בענן יימחקו לצמיתות. התחבר שוב לפני כן כדי לבטל.",
         "deleteAccountTitle": "למחוק את חשבון Stella שלך?",
         "deleteDataButton": "מחק נתונים",
         "deleteDataDescription": "פעולה זו מוחקת את השיחות, הזיכרון, ההגדרות ומצב Stella המקומי שלך. לא ניתן לבטל.",
@@ -1861,8 +1859,8 @@
         "accountDeleted": "חשבון Stella שלך נמחק.",
         "dataDeleted": "נתוני Stella שלך נמחקו.",
         "deleteAccountFailed": "לא ניתן היה למחוק את החשבון שלך. נסה שוב.",
-        "deleteAccountReauth": "לביטחונך, התנתק והתחבר שוב ואז מחק את החשבון. החשבון שלך לא נמחק.",
         "deleteDataFailed": "לא ניתן היה למחוק את הנתונים שלך. נסה שוב.",
+        "deletionScheduled": "החשבון שלך מתוזמן למחיקה. נשלח לך אימייל כשזה יסתיים.",
         "signInBeforeDelete": "התחבר לפני מחיקת החשבון שלך."
       }
     },

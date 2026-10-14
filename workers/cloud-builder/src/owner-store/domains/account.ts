@@ -35,12 +35,18 @@ const ACCOUNT_REVOKED_SESSIONS_MIGRATION = {
   ],
 };
 
+const ACCOUNT_DELETION_HOLD_MIGRATION = {
+  id: "account.3-deletion-hold",
+  statements: ["ALTER TABLE owner_state ADD COLUMN deletion_hold INTEGER NOT NULL DEFAULT 0"],
+};
+
 const REVOKED_SESSION_HOLD_MS = 20 * 60_000;
 
 export type OwnerState = {
   generation: string;
   writable: boolean;
   closed: boolean;
+  deletionHold: boolean;
   identityLevel: IdentityLevel;
   minIatMs: number;
   purge: { requestId: string; mode: OwnerPurgeMode } | null;
@@ -55,6 +61,7 @@ type OwnerStateRow = {
   min_iat_ms: number;
   purge_request_id: string | null;
   purge_mode: string | null;
+  deletion_hold?: number;
 };
 
 const toIdentityLevel = (value: unknown): IdentityLevel =>
@@ -72,8 +79,9 @@ export const readOwnerState = (db: OwnerDb): OwnerState => {
   }
   return {
     generation: row.generation,
-    writable: row.writable === 1,
+    writable: row.writable === 1 && row.deletion_hold !== 1,
     closed: row.closed === 1,
+    deletionHold: row.deletion_hold === 1,
     identityLevel: toIdentityLevel(row.identity_level),
     minIatMs: row.min_iat_ms,
     purge:
@@ -108,6 +116,11 @@ export const callerSessionRevoked = (
       Date.now(),
     ) !== null
   );
+};
+
+export const setDeletionHold = (db: OwnerDb, hold: boolean): void => {
+  readOwnerState(db);
+  db.run("UPDATE owner_state SET deletion_hold = ? WHERE id = 1", hold ? 1 : 0);
 };
 
 export const beginOwnerPurge = (ctx: OwnerContext, mode: OwnerPurgeMode): void => {
@@ -174,7 +187,7 @@ const parseSessionsRevoked = (args: unknown): { minIatMs: number } => {
 
 export const accountDomain: OwnerDomain = {
   name: "account",
-  migrations: [ACCOUNT_MIGRATION, ACCOUNT_REVOKED_SESSIONS_MIGRATION],
+  migrations: [ACCOUNT_MIGRATION, ACCOUNT_REVOKED_SESSIONS_MIGRATION, ACCOUNT_DELETION_HOLD_MIGRATION],
   calls: {
     "account.reset": {
       scope: "owner",

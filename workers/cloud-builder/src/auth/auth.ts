@@ -29,14 +29,6 @@ import { betterAuthCipherKey, betterAuthKeys } from "../secret-rotation.js";
 
 type AuthEnv = Cloudflare.Env;
 
-const isSelfHostOwner = async (env: AuthEnv, userId: string): Promise<boolean> => {
-  if (!ownerModeEnabled(env) || !env.DB) return false;
-  const row = await env.DB.prepare("SELECT 1 AS owner FROM selfhost_server WHERE owner_user_id = ?")
-    .bind(userId)
-    .first<{ owner: number }>();
-  return row !== null;
-};
-
 const DAY_SECONDS = 24 * 60 * 60;
 const APPLE_CLIENT_SECRET_TTL_SECONDS = 180 * DAY_SECONDS;
 const TEST_ACCOUNT_EMAIL_SUFFIX = "@test.stella.local";
@@ -202,6 +194,42 @@ const sendNewSignInAlertEmail = async (
       detail: error instanceof Error ? error.message.slice(0, 300) : null,
     }));
   }
+};
+
+export const sendAccountEmail = async (
+  env: AuthEnv,
+  email: string,
+  build: (logoSrc: string) => { subject: string; html: string },
+  event: string,
+): Promise<void> => {
+  if (testAccountsEnabled(env) && email.endsWith(TEST_ACCOUNT_EMAIL_SUFFIX)) {
+    console.log(JSON.stringify({ event, provider: "test_account_log", subject: build("").subject }));
+    return;
+  }
+  const binding = (env as { EMAIL?: SendEmail }).EMAIL;
+  const cloudflareFrom = binding ? configured(env, "STELLA_EMAIL_FROM") : undefined;
+  const resendKey = configured(env, "RESEND_API_KEY");
+  const resendFrom = resendKey ? configured(env, "RESEND_FROM") ?? configured(env, "STELLA_EMAIL_FROM") : undefined;
+  if (!cloudflareFrom && !resendFrom) throw new Error("Email is not set up on this Stella.");
+  const logo = configured(env, "STELLA_EMAIL_LOGO_URL") ?? `${websiteUrl(env)}/stella-logo.png`;
+  const message = build(escapeHtmlAttribute(logo));
+  if (binding && cloudflareFrom) {
+    try {
+      await binding.send({ from: parseMailbox(cloudflareFrom), to: email, ...message });
+      console.log(JSON.stringify({ event, provider: "cloudflare" }));
+      return;
+    } catch (error) {
+      if (!resendFrom) throw error;
+    }
+  }
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { authorization: `Bearer ${resendKey}`, "content-type": "application/json" },
+    body: JSON.stringify({ from: resendFrom, to: email, ...message }),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!response.ok) throw new Error(`Resend refused the email (${response.status}).`);
+  console.log(JSON.stringify({ event, provider: "resend" }));
 };
 
 const parseMailbox = (value: string): string | { email: string; name: string } => {
@@ -417,20 +445,8 @@ const buildOptions = (env: AuthEnv) => {
         isAnonymous: { type: "boolean", required: false, defaultValue: false, input: false },
         identityLevel: { type: "number", required: false, defaultValue: 0, input: false },
       },
-      deleteUser: {
-        enabled: true,
-        beforeDelete: async (user) => {
-          if (await isSelfHostOwner(env, user.id)) {
-            throw new APIError("FORBIDDEN", {
-              code: "owner_account",
-              message:
-                "This is the account that owns this Stella server, so it can't be deleted here. To remove everything, take the server down with the self-host CLI (selfhost.mjs destroy).",
-            });
-          }
-          const closed = await ownerGateStub(env.OWNER_GATES, user.id).closeOwner();
-          console.log(JSON.stringify({ event: "auth_user_owner_closed", pending: closed.pending }));
-        },
-      },
+      // /delete-user is answered by account-deletion.ts (queued deletion).
+      deleteUser: { enabled: false },
     },
     account: {
       // Desktop starts Google in the app and finishes in the system browser,
@@ -480,6 +496,15 @@ const buildOptions = (env: AuthEnv) => {
       session: {
         create: {
           after: async (session, ctx) => {
+            try {
+              const { cancelAccountDeletion } = await import("./account-deletion.js");
+              await cancelAccountDeletion(env, session.userId);
+            } catch (error) {
+              console.error(JSON.stringify({
+                event: "account_deletion_cancel_failed",
+                message: error instanceof Error ? error.message.slice(0, 300) : String(error),
+              }));
+            }
             try {
               const adapter = ctx?.context.internalAdapter as
                 | {

@@ -1403,7 +1403,6 @@
     },
     "settings": {
       "aboutSection": "About",
-      "accountDeletedTitle": "Account deleted",
       "appearance": {
         "dark": "Dark",
         "light": "Light",
@@ -1440,14 +1439,13 @@
       "computerSection": "Computer",
       "deleteAccount": "Delete account",
       "deleteAccountLabel": "Delete your Stella account",
-      "deleteConfirmBody": "This permanently deletes your Stella account and removes cloud data associated with it on our servers. This cannot be undone.",
+      "deleteConfirmBody": "You'll be signed out on every device and your account will be disabled right away. After 7 days, your account and its cloud data are permanently deleted. Sign in again before then to cancel.",
       "deleteConfirmTitle": "Delete account",
       "deleteFailedBody": "Your account was not deleted, and you're still signed in.",
       "deleteFailedTitle": "Could not delete account",
-      "deleteReauthAction": "Sign in again",
-      "deleteReauthBody": "For your security, sign in again, then delete your account. Your account was not deleted.",
       "deleteRetry": "Try again",
       "deletingAccount": "Deleting account…",
+      "deletionScheduledTitle": "Account deletion scheduled",
       "loadingSession": "Loading session…",
       "notificationsSection": "Notifications",
       "openPrivacyLabel": "Open Privacy Policy",
@@ -1830,7 +1828,7 @@
       },
       "dialog": {
         "deleteAccountButton": "Delete account",
-        "deleteAccountDescription": "This permanently deletes your account and Stella data. This cannot be undone.",
+        "deleteAccountDescription": "You'll be signed out on every device and your account will be disabled right away. After 7 days, your account and its cloud data are permanently deleted. Sign in again before then to cancel.",
         "deleteAccountTitle": "Delete your Stella account?",
         "deleteDataButton": "Delete data",
         "deleteDataDescription": "This erases your conversations, memory, settings, and local Stella state. This cannot be undone.",
@@ -1853,8 +1851,8 @@
         "accountDeleted": "Your Stella account was deleted.",
         "dataDeleted": "Your Stella data was deleted.",
         "deleteAccountFailed": "Could not delete your account. Please try again.",
-        "deleteAccountReauth": "For your security, sign out and sign in again, then delete your account. Your account was not deleted.",
         "deleteDataFailed": "Could not delete your data. Please try again.",
+        "deletionScheduled": "Your account is scheduled for deletion. We'll email you when it's done.",
         "signInBeforeDelete": "Sign in before deleting your account."
       }
     },

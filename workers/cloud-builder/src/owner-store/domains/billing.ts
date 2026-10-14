@@ -935,6 +935,21 @@ export const applyStripeEvent = async (ctx: OwnerContext, event: StripeEvent): P
   ctx.db.run("DELETE FROM billing_stripe_events WHERE created_at < ?", ctx.now - RECEIPT_RETENTION_MS);
 };
 
+export const stopStripeRenewal = async (ctx: OwnerContext): Promise<void> => {
+  const row = readAccount(ctx.db, ctx.now);
+  if (!row.stripe_subscription_id || row.cancel_at_period_end === 1) return;
+  if (!ACTIVE_SUBSCRIPTION_STATUSES.has(row.subscription_status ?? "")) return;
+  try {
+    await stripeRequest(ctx.env, "POST", `/subscriptions/${encodeURIComponent(row.stripe_subscription_id)}`, {
+      cancel_at_period_end: true,
+    });
+  } catch (error) {
+    if (!(error instanceof StripeError && error.status === 404)) throw error;
+    return;
+  }
+  updateAccount(ctx.db, { cancel_at_period_end: 1, updated_at: ctx.now });
+};
+
 export const closeStripeCustomer = async (ctx: OwnerContext): Promise<void> => {
   const row = readAccount(ctx.db, ctx.now);
   if (!row.stripe_customer_id) return;

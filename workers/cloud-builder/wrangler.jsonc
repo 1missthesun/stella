@@ -166,7 +166,7 @@
       "bucket_name": "stella-canvas-shares",
     },
   ],
-  "triggers": { "crons": ["17 3 * * *"] },
+  "triggers": { "crons": ["17 3 * * *", "41 * * * *"] },
   "d1_databases": [
     {
       "binding": "DB",

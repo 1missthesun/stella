@@ -33,7 +33,15 @@ export const handleAuthRoute = async (request: Request, env: Cloudflare.Env): Pr
   try {
     const keys = betterAuthKeys(env);
     const resigned = keys ? await resignLegacySessionCredentials(request, keys) : { request, bearer: null };
-    response = withMigratedBearer(request, await createAuth(env).handler(resigned.request), resigned.bearer);
+    const deleting =
+      request.method === "POST" && new URL(request.url).pathname === "/api/auth/delete-user";
+    response = withMigratedBearer(
+      request,
+      deleting
+        ? await (await import("./account-deletion.js")).requestAccountDeletion(resigned.request, env)
+        : await createAuth(env).handler(resigned.request),
+      resigned.bearer,
+    );
   } catch (error) {
     console.error(
       JSON.stringify({ event: "auth_request_failed", message: error instanceof Error ? error.message : String(error) }),

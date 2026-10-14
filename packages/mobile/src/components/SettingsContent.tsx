@@ -24,7 +24,7 @@ import {
 import { env } from "../config/env";
 import { authClient } from "../lib/auth-client";
 import {
-  deleteAccountOnServer,
+  requestAccountDeletion,
   type AccountDeletionOutcome,
 } from "../lib/account-deletion";
 import { clearAiConsent } from "../lib/ai-consent";
@@ -197,26 +197,12 @@ export function SettingsContent() {
     setIsDeletingAccount(true);
     let outcome: AccountDeletionOutcome;
     try {
-      outcome = await deleteAccountOnServer();
+      outcome = await requestAccountDeletion();
     } catch (e) {
-      outcome = { ok: false, reauth: false, message: userFacingError(e) };
+      outcome = { ok: false, message: userFacingError(e) };
     }
     if (!outcome.ok) {
       setIsDeletingAccount(false);
-      if (outcome.reauth) {
-        Alert.alert(
-          t("mobile.settings.deleteFailedTitle"),
-          t("mobile.settings.deleteReauthBody"),
-          [
-            { text: t("mobile.common.cancel"), style: "cancel" },
-            {
-              text: t("mobile.settings.deleteReauthAction"),
-              onPress: () => void signOut(),
-            },
-          ],
-        );
-        return;
-      }
       Alert.alert(
         t("mobile.settings.deleteFailedTitle"),
         `${t("mobile.settings.deleteFailedBody")}\n\n${outcome.message}`,
@@ -238,8 +224,8 @@ export function SettingsContent() {
     clearAiConsent();
     setIsDeletingAccount(false);
     Alert.alert(
-      t("mobile.settings.accountDeletedTitle"),
-      t("settings.account.toasts.accountDeleted"),
+      t("mobile.settings.deletionScheduledTitle"),
+      t("settings.account.toasts.deletionScheduled"),
     );
   };
 

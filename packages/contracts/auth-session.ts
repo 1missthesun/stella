@@ -1,12 +1,5 @@
 export type AuthIdentityIntent = "anonymous" | "connected";
 
-// Better Auth refuses /delete-user for a session older than its freshAge (1 day)
-// unless the user signs in again; clients map this marker to that instruction.
-export const ACCOUNT_DELETE_REAUTH_REQUIRED = "ACCOUNT_DELETE_REAUTH_REQUIRED";
-
-export const isAccountDeleteReauthError = (error: unknown): boolean =>
-  error instanceof Error && error.message.includes(ACCOUNT_DELETE_REAUTH_REQUIRED);
-
 export type AccountSessionSummary = {
   id: string;
   createdAt: number;

@@ -36,6 +36,7 @@ import {
   callerSessionRevoked,
   noteCallerIdentity,
   readOwnerState,
+  setDeletionHold,
 } from "./owner-store/domains/account.js";
 import type {
   BillingControlResult,
@@ -54,6 +55,7 @@ import {
   type BillingAccess,
   billingPaying,
   closeStripeCustomer,
+  stopStripeRenewal,
   cloudSandboxAccess,
   recordBillingIdentity,
   reserveSessionGrant,
@@ -648,6 +650,19 @@ export class OwnerGate extends OwnerGateCloudDispatch {
       handleUserAskReply(ctx, input),
     );
     return { status: result.status, json: JSON.stringify(result.body) };
+  }
+
+  async setDeletionHold(hold: boolean): Promise<void> {
+    await this.billingWrite((ctx) => setDeletionHold(ctx.db, hold));
+  }
+
+  async deletionStatus(): Promise<{ closed: boolean; purging: boolean }> {
+    const state = readOwnerState(this.ownerStore().context(null).db);
+    return { closed: state.closed, purging: state.purge !== null };
+  }
+
+  async stopRenewal(): Promise<void> {
+    await this.billingWrite((ctx) => stopStripeRenewal(ctx));
   }
 
   async closeOwner(): Promise<{ pending: string[] }> {

@@ -118,3 +118,73 @@ export const buildNewSignInAlertEmail = (
   </table>
 </body>
 </html>`;
+
+const accountNoticeEmail = (logoSrc: string, title: string, paragraphs: string[]): string => `
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin:0;padding:0;background-color:#f2f4f8;font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f2f4f8;padding:64px 24px;">
+    <tr>
+      <td align="center">
+        <table width="100%" cellpadding="0" cellspacing="0" style="max-width:440px;">
+          <tr>
+            <td style="padding-bottom:40px;text-align:center;">
+              <img src="${logoSrc}" alt="Stella" width="48" height="48" style="display:block;margin:0 auto;border:0;">
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color:rgba(255,255,255,0.92);border:1px solid rgba(22,22,22,0.08);border-radius:10px;padding:40px 36px;">
+              <h1 style="margin:0 0 16px;font-size:24px;font-weight:600;color:#161616;">${title}</h1>
+              ${paragraphs
+                .map(
+                  (text) =>
+                    `<p style="margin:0 0 16px;font-size:14px;color:rgba(22,22,22,0.72);line-height:1.55;">${text}</p>`,
+                )
+                .join("\n              ")}
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+export type AccountDeletionEmailKind = "requested" | "canceled" | "completed";
+
+export const buildAccountDeletionEmail = (
+  kind: AccountDeletionEmailKind,
+  logoSrc: string,
+  dueLabel: string,
+): { subject: string; html: string } => {
+  if (kind === "requested") {
+    return {
+      subject: "Your Stella account is scheduled for deletion",
+      html: accountNoticeEmail(logoSrc, "Account deletion scheduled", [
+        "We received a request to delete your Stella account. You have been signed out on every device, and the account is disabled.",
+        `Your account and its data will be deleted after ${dueLabel}. We'll email you when it's done.`,
+        "Changed your mind? Sign in to Stella before then and the deletion is canceled. If you didn't ask for this, sign in now to keep your account, then review your sessions in Settings, Account.",
+      ]),
+    };
+  }
+  if (kind === "canceled") {
+    return {
+      subject: "Your Stella account deletion was canceled",
+      html: accountNoticeEmail(logoSrc, "Deletion canceled", [
+        "You signed in to Stella, so your account will not be deleted and is active again.",
+        "Automatic renewal of any subscription stays off. You can turn it back on in Settings, Account.",
+      ]),
+    };
+  }
+  return {
+    subject: "Your Stella account has been deleted",
+    html: accountNoticeEmail(logoSrc, "Account deleted", [
+      "Your Stella account and the data stored with it on our servers have been deleted, and any subscription was canceled.",
+      "Files on your own devices are not affected. If you sign in again later, you'll start a new, empty account.",
+    ]),
+  };
+};

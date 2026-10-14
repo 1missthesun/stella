@@ -1411,7 +1411,6 @@
     },
     "settings": {
       "aboutSection": "Informazioni",
-      "accountDeletedTitle": "Account eliminato",
       "appearance": {
         "dark": "Scuro",
         "light": "Chiaro",
@@ -1448,14 +1447,13 @@
       "computerSection": "Computer",
       "deleteAccount": "Elimina account",
       "deleteAccountLabel": "Elimina il tuo account Stella",
-      "deleteConfirmBody": "Questo elimina definitivamente il tuo account Stella e rimuove dai nostri server i dati nel cloud associati. Non può essere annullato.",
+      "deleteConfirmBody": "Verrai disconnesso da tutti i dispositivi e il tuo account sarà disattivato subito. Dopo 7 giorni, l'account e i suoi dati cloud verranno eliminati definitivamente. Accedi di nuovo prima di allora per annullare.",
       "deleteConfirmTitle": "Elimina account",
       "deleteFailedBody": "Il tuo account non è stato eliminato e sei ancora connesso.",
       "deleteFailedTitle": "Impossibile eliminare l'account",
-      "deleteReauthAction": "Accedi di nuovo",
-      "deleteReauthBody": "Per sicurezza, accedi di nuovo e poi elimina l'account. Il tuo account non è stato eliminato.",
       "deleteRetry": "Riprova",
       "deletingAccount": "Eliminazione dell'account…",
+      "deletionScheduledTitle": "Eliminazione dell'account programmata",
       "loadingSession": "Caricamento della sessione…",
       "notificationsSection": "Notifiche",
       "openPrivacyLabel": "Apri l'Informativa sulla privacy",
@@ -1838,7 +1836,7 @@
       },
       "dialog": {
         "deleteAccountButton": "Elimina account",
-        "deleteAccountDescription": "Questo elimina definitivamente il tuo account e i tuoi dati Stella. Non può essere annullato.",
+        "deleteAccountDescription": "Verrai disconnesso da tutti i dispositivi e il tuo account sarà disattivato subito. Dopo 7 giorni, l'account e i suoi dati cloud verranno eliminati definitivamente. Accedi di nuovo prima di allora per annullare.",
         "deleteAccountTitle": "Eliminare il tuo account Stella?",
         "deleteDataButton": "Elimina dati",
         "deleteDataDescription": "Questo cancella le conversazioni, la memoria, le impostazioni e lo stato locale di Stella. Non può essere annullato.",
@@ -1861,8 +1859,8 @@
         "accountDeleted": "Il tuo account Stella è stato eliminato.",
         "dataDeleted": "I tuoi dati Stella sono stati eliminati.",
         "deleteAccountFailed": "Impossibile eliminare il tuo account. Riprova.",
-        "deleteAccountReauth": "Per sicurezza, esci e accedi di nuovo, poi elimina l'account. Il tuo account non è stato eliminato.",
         "deleteDataFailed": "Impossibile eliminare i tuoi dati. Riprova.",
+        "deletionScheduled": "L'eliminazione del tuo account è programmata. Ti invieremo un'email quando sarà completata.",
         "signInBeforeDelete": "Accedi prima di eliminare il tuo account."
       }
     },

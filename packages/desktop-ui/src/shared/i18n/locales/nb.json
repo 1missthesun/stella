@@ -1403,7 +1403,6 @@
     },
     "settings": {
       "aboutSection": "Om",
-      "accountDeletedTitle": "Kontoen er slettet",
       "appearance": {
         "dark": "Mørkt",
         "light": "Lyst",
@@ -1440,14 +1439,13 @@
       "computerSection": "Datamaskin",
       "deleteAccount": "Slett konto",
       "deleteAccountLabel": "Slett Stella-kontoen din",
-      "deleteConfirmBody": "Dette sletter Stella-kontoen din permanent og fjerner skydata knyttet til den på serverne våre. Dette kan ikke angres.",
+      "deleteConfirmBody": "Du blir logget ut på alle enheter, og kontoen din deaktiveres med en gang. Etter 7 dager slettes kontoen og skydataene permanent. Logg inn igjen før det for å avbryte.",
       "deleteConfirmTitle": "Slett konto",
       "deleteFailedBody": "Kontoen din ble ikke slettet, og du er fortsatt logget inn.",
       "deleteFailedTitle": "Kunne ikke slette kontoen",
-      "deleteReauthAction": "Logg inn på nytt",
-      "deleteReauthBody": "Av sikkerhetshensyn må du logge inn på nytt og deretter slette kontoen. Kontoen din ble ikke slettet.",
       "deleteRetry": "Prøv igjen",
       "deletingAccount": "Sletter kontoen…",
+      "deletionScheduledTitle": "Sletting av konto planlagt",
       "loadingSession": "Laster økt…",
       "notificationsSection": "Varsler",
       "openPrivacyLabel": "Åpne personvernerklæringen",
@@ -1830,7 +1828,7 @@
       },
       "dialog": {
         "deleteAccountButton": "Slett konto",
-        "deleteAccountDescription": "Dette sletter kontoen og Stella-dataene dine permanent. Dette kan ikke angres.",
+        "deleteAccountDescription": "Du blir logget ut på alle enheter, og kontoen din deaktiveres med en gang. Etter 7 dager slettes kontoen og skydataene permanent. Logg inn igjen før det for å avbryte.",
         "deleteAccountTitle": "Slette Stella-kontoen din?",
         "deleteDataButton": "Slett data",
         "deleteDataDescription": "Dette sletter samtalene, minnet, innstillingene og den lokale Stella-tilstanden din. Dette kan ikke angres.",
@@ -1853,8 +1851,8 @@
         "accountDeleted": "Stella-kontoen din ble slettet.",
         "dataDeleted": "Stella-dataene dine ble slettet.",
         "deleteAccountFailed": "Kunne ikke slette kontoen din. Prøv igjen.",
-        "deleteAccountReauth": "Av sikkerhetshensyn må du logge ut og inn igjen og deretter slette kontoen. Kontoen din ble ikke slettet.",
         "deleteDataFailed": "Kunne ikke slette dataene dine. Prøv igjen.",
+        "deletionScheduled": "Kontoen din er planlagt slettet. Vi sender deg en e-post når det er gjort.",
         "signInBeforeDelete": "Logg på før du sletter kontoen din."
       }
     },

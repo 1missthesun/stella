@@ -1395,7 +1395,6 @@
     },
     "settings": {
       "aboutSection": "关于",
-      "accountDeletedTitle": "账户已删除",
       "appearance": {
         "dark": "深色",
         "light": "浅色",
@@ -1432,14 +1431,13 @@
       "computerSection": "电脑",
       "deleteAccount": "删除账户",
       "deleteAccountLabel": "删除您的 Stella 账户",
-      "deleteConfirmBody": "此操作将永久删除您的 Stella 账户，并移除我们服务器上与之关联的云端数据。无法撤销。",
+      "deleteConfirmBody": "你将在所有设备上退出登录，账户会立即停用。7 天后，你的账户及其云端数据将被永久删除。在此之前重新登录即可取消。",
       "deleteConfirmTitle": "删除账户",
       "deleteFailedBody": "你的账户未被删除，你仍处于登录状态。",
       "deleteFailedTitle": "无法删除账户",
-      "deleteReauthAction": "重新登录",
-      "deleteReauthBody": "为了你的安全，请重新登录，然后再删除账户。你的账户未被删除。",
       "deleteRetry": "重试",
       "deletingAccount": "正在删除账户…",
+      "deletionScheduledTitle": "已安排删除账户",
       "loadingSession": "正在加载会话…",
       "notificationsSection": "通知",
       "openPrivacyLabel": "打开隐私政策",
@@ -1822,7 +1820,7 @@
       },
       "dialog": {
         "deleteAccountButton": "删除账户",
-        "deleteAccountDescription": "这将永久删除你的账户和 Stella 数据。此操作无法撤销。",
+        "deleteAccountDescription": "你将在所有设备上退出登录，账户会立即停用。7 天后，你的账户及其云端数据将被永久删除。在此之前重新登录即可取消。",
         "deleteAccountTitle": "删除你的 Stella 账户？",
         "deleteDataButton": "删除数据",
         "deleteDataDescription": "这将清除你的对话、记忆、设置和本地 Stella 状态。此操作无法撤销。",
@@ -1845,8 +1843,8 @@
         "accountDeleted": "你的 Stella 账户已删除。",
         "dataDeleted": "你的 Stella 数据已删除。",
         "deleteAccountFailed": "无法删除你的账户。请重试。",
-        "deleteAccountReauth": "为了你的安全，请退出并重新登录，然后再删除账户。你的账户未被删除。",
         "deleteDataFailed": "无法删除你的数据。请重试。",
+        "deletionScheduled": "你的账户已安排删除。完成后我们会发邮件通知你。",
         "signInBeforeDelete": "请先登录，然后再删除账户。"
       }
     },

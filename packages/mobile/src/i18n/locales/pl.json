@@ -1419,7 +1419,6 @@
     },
     "settings": {
       "aboutSection": "Informacje",
-      "accountDeletedTitle": "Konto usunięte",
       "appearance": {
         "dark": "Ciemny",
         "light": "Jasny",
@@ -1456,14 +1455,13 @@
       "computerSection": "Komputer",
       "deleteAccount": "Usuń konto",
       "deleteAccountLabel": "Usuń swoje konto Stella",
-      "deleteConfirmBody": "To trwale usuwa twoje konto Stella oraz powiązane z nim dane w chmurze na naszych serwerach. Tej operacji nie można cofnąć.",
+      "deleteConfirmBody": "Zostaniesz wylogowany na wszystkich urządzeniach, a konto zostanie od razu wyłączone. Po 7 dniach konto i jego dane w chmurze zostaną trwale usunięte. Zaloguj się ponownie przed tym terminem, aby anulować.",
       "deleteConfirmTitle": "Usuń konto",
       "deleteFailedBody": "Twoje konto nie zostało usunięte i nadal jesteś zalogowany.",
       "deleteFailedTitle": "Nie udało się usunąć konta",
-      "deleteReauthAction": "Zaloguj się ponownie",
-      "deleteReauthBody": "Ze względów bezpieczeństwa zaloguj się ponownie, a następnie usuń konto. Twoje konto nie zostało usunięte.",
       "deleteRetry": "Spróbuj ponownie",
       "deletingAccount": "Usuwanie konta…",
+      "deletionScheduledTitle": "Usunięcie konta zaplanowane",
       "loadingSession": "Wczytywanie sesji…",
       "notificationsSection": "Powiadomienia",
       "openPrivacyLabel": "Otwórz Politykę prywatności",
@@ -1846,7 +1844,7 @@
       },
       "dialog": {
         "deleteAccountButton": "Usuń konto",
-        "deleteAccountDescription": "To trwale usuwa Twoje konto i dane Stelli. Tego nie można cofnąć.",
+        "deleteAccountDescription": "Zostaniesz wylogowany na wszystkich urządzeniach, a konto zostanie od razu wyłączone. Po 7 dniach konto i jego dane w chmurze zostaną trwale usunięte. Zaloguj się ponownie przed tym terminem, aby anulować.",
         "deleteAccountTitle": "Usunąć konto Stelli?",
         "deleteDataButton": "Usuń dane",
         "deleteDataDescription": "To usuwa Twoje rozmowy, pamięć, ustawienia i lokalny stan Stelli. Tego nie można cofnąć.",
@@ -1869,8 +1867,8 @@
         "accountDeleted": "Twoje konto Stelli zostało usunięte.",
         "dataDeleted": "Twoje dane Stelli zostały usunięte.",
         "deleteAccountFailed": "Nie udało się usunąć konta. Spróbuj ponownie.",
-        "deleteAccountReauth": "Ze względów bezpieczeństwa wyloguj się i zaloguj ponownie, a następnie usuń konto. Twoje konto nie zostało usunięte.",
         "deleteDataFailed": "Nie udało się usunąć danych. Spróbuj ponownie.",
+        "deletionScheduled": "Usunięcie Twojego konta zostało zaplanowane. Wyślemy Ci e-mail, gdy się zakończy.",
         "signInBeforeDelete": "Zaloguj się przed usunięciem konta."
       }
     },

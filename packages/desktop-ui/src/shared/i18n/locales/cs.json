@@ -1419,7 +1419,6 @@
     },
     "settings": {
       "aboutSection": "O aplikaci",
-      "accountDeletedTitle": "Účet smazán",
       "appearance": {
         "dark": "Tmavý",
         "light": "Světlý",
@@ -1456,14 +1455,13 @@
       "computerSection": "Počítač",
       "deleteAccount": "Smazat účet",
       "deleteAccountLabel": "Smazat váš účet Stella",
-      "deleteConfirmBody": "Tímto trvale smažete svůj účet Stella a odstraníte související cloudová data z našich serverů. Tuto akci nelze vrátit zpět.",
+      "deleteConfirmBody": "Budete odhlášeni na všech zařízeních a váš účet bude okamžitě deaktivován. Po 7 dnech budou účet a jeho cloudová data trvale smazána. Chcete-li to zrušit, přihlaste se do té doby znovu.",
       "deleteConfirmTitle": "Smazat účet",
       "deleteFailedBody": "Váš účet nebyl smazán a stále jste přihlášeni.",
       "deleteFailedTitle": "Účet se nepodařilo smazat",
-      "deleteReauthAction": "Znovu se přihlásit",
-      "deleteReauthBody": "Z bezpečnostních důvodů se znovu přihlaste a pak účet smažte. Váš účet nebyl smazán.",
       "deleteRetry": "Zkusit znovu",
       "deletingAccount": "Mazání účtu…",
+      "deletionScheduledTitle": "Smazání účtu naplánováno",
       "loadingSession": "Načítání relace…",
       "notificationsSection": "Oznámení",
       "openPrivacyLabel": "Otevřít Zásady ochrany osobních údajů",
@@ -1846,7 +1844,7 @@
       },
       "dialog": {
         "deleteAccountButton": "Smazat účet",
-        "deleteAccountDescription": "Tímto se trvale smaže váš účet a data Stella. Toto nelze vrátit zpět.",
+        "deleteAccountDescription": "Budete odhlášeni na všech zařízeních a váš účet bude okamžitě deaktivován. Po 7 dnech budou účet a jeho cloudová data trvale smazána. Chcete-li to zrušit, přihlaste se do té doby znovu.",
         "deleteAccountTitle": "Smazat váš účet Stella?",
         "deleteDataButton": "Smazat data",
         "deleteDataDescription": "Tímto se vymažou vaše konverzace, paměť, nastavení a místní stav Stelly. Toto nelze vrátit zpět.",
@@ -1869,8 +1867,8 @@
         "accountDeleted": "Váš účet Stella byl smazán.",
         "dataDeleted": "Vaše data Stella byla smazána.",
         "deleteAccountFailed": "Váš účet se nepodařilo smazat. Zkuste to znovu.",
-        "deleteAccountReauth": "Z bezpečnostních důvodů se odhlaste, znovu přihlaste a pak účet smažte. Váš účet nebyl smazán.",
         "deleteDataFailed": "Vaše data se nepodařilo smazat. Zkuste to znovu.",
+        "deletionScheduled": "Smazání vašeho účtu je naplánováno. Až bude hotovo, pošleme vám e-mail.",
         "signInBeforeDelete": "Před smazáním účtu se přihlaste."
       }
     },

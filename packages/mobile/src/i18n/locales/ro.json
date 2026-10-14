@@ -1411,7 +1411,6 @@
     },
     "settings": {
       "aboutSection": "Despre",
-      "accountDeletedTitle": "Cont șters",
       "appearance": {
         "dark": "Întunecat",
         "light": "Luminos",
@@ -1448,14 +1447,13 @@
       "computerSection": "Computer",
       "deleteAccount": "Șterge contul",
       "deleteAccountLabel": "Șterge contul tău Stella",
-      "deleteConfirmBody": "Aceasta șterge definitiv contul tău Stella și elimină de pe serverele noastre datele din cloud asociate cu el. Această acțiune nu poate fi anulată.",
+      "deleteConfirmBody": "Vei fi deconectat pe toate dispozitivele, iar contul va fi dezactivat imediat. După 7 zile, contul și datele sale din cloud sunt șterse definitiv. Conectează-te din nou înainte pentru a anula.",
       "deleteConfirmTitle": "Șterge contul",
       "deleteFailedBody": "Contul tău nu a fost șters și ești în continuare conectat.",
       "deleteFailedTitle": "Nu am putut șterge contul",
-      "deleteReauthAction": "Conectează-te din nou",
-      "deleteReauthBody": "Pentru siguranța ta, conectează-te din nou, apoi șterge contul. Contul tău nu a fost șters.",
       "deleteRetry": "Încearcă din nou",
       "deletingAccount": "Se șterge contul…",
+      "deletionScheduledTitle": "Ștergerea contului a fost programată",
       "loadingSession": "Se încarcă sesiunea…",
       "notificationsSection": "Notificări",
       "openPrivacyLabel": "Deschide Politica de confidențialitate",
@@ -1838,7 +1836,7 @@
       },
       "dialog": {
         "deleteAccountButton": "Șterge contul",
-        "deleteAccountDescription": "Aceasta șterge definitiv contul tău și datele Stella. Această acțiune nu poate fi anulată.",
+        "deleteAccountDescription": "Vei fi deconectat pe toate dispozitivele, iar contul va fi dezactivat imediat. După 7 zile, contul și datele sale din cloud sunt șterse definitiv. Conectează-te din nou înainte pentru a anula.",
         "deleteAccountTitle": "Ștergi contul tău Stella?",
         "deleteDataButton": "Șterge datele",
         "deleteDataDescription": "Aceasta șterge conversațiile, memoria, setările și starea locală Stella. Această acțiune nu poate fi anulată.",
@@ -1861,8 +1859,8 @@
         "accountDeleted": "Contul tău Stella a fost șters.",
         "dataDeleted": "Datele tale Stella au fost șterse.",
         "deleteAccountFailed": "Nu am putut șterge contul tău. Încearcă din nou.",
-        "deleteAccountReauth": "Pentru siguranța ta, deconectează-te și conectează-te din nou, apoi șterge contul. Contul tău nu a fost șters.",
         "deleteDataFailed": "Nu am putut șterge datele tale. Încearcă din nou.",
+        "deletionScheduled": "Contul tău este programat pentru ștergere. Îți vom trimite un e-mail când este gata.",
         "signInBeforeDelete": "Conectează-te înainte de a-ți șterge contul."
       }
     },

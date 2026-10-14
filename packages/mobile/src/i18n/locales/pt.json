@@ -1411,7 +1411,6 @@
     },
     "settings": {
       "aboutSection": "Sobre",
-      "accountDeletedTitle": "Conta excluída",
       "appearance": {
         "dark": "Escuro",
         "light": "Claro",
@@ -1448,14 +1447,13 @@
       "computerSection": "Computador",
       "deleteAccount": "Excluir conta",
       "deleteAccountLabel": "Excluir sua conta da Stella",
-      "deleteConfirmBody": "Isto exclui permanentemente sua conta da Stella e remove dos nossos servidores os dados na nuvem associados a ela. Isso não pode ser desfeito.",
+      "deleteConfirmBody": "Você será desconectado em todos os dispositivos e sua conta será desativada imediatamente. Após 7 dias, sua conta e os dados dela na nuvem serão excluídos permanentemente. Entre novamente antes disso para cancelar.",
       "deleteConfirmTitle": "Excluir conta",
       "deleteFailedBody": "Sua conta não foi excluída e você continua conectado.",
       "deleteFailedTitle": "Não foi possível excluir a conta",
-      "deleteReauthAction": "Entrar novamente",
-      "deleteReauthBody": "Por segurança, entre novamente e depois exclua sua conta. Sua conta não foi excluída.",
       "deleteRetry": "Tentar novamente",
       "deletingAccount": "Excluindo a conta…",
+      "deletionScheduledTitle": "Exclusão da conta agendada",
       "loadingSession": "Carregando a sessão…",
       "notificationsSection": "Notificações",
       "openPrivacyLabel": "Abrir a Política de Privacidade",
@@ -1838,7 +1836,7 @@
       },
       "dialog": {
         "deleteAccountButton": "Excluir conta",
-        "deleteAccountDescription": "Isto exclui permanentemente sua conta e seus dados da Stella. Isso não pode ser desfeito.",
+        "deleteAccountDescription": "Você será desconectado em todos os dispositivos e sua conta será desativada imediatamente. Após 7 dias, sua conta e os dados dela na nuvem serão excluídos permanentemente. Entre novamente antes disso para cancelar.",
         "deleteAccountTitle": "Excluir sua conta da Stella?",
         "deleteDataButton": "Excluir dados",
         "deleteDataDescription": "Isto apaga suas conversas, memória, configurações e o estado local da Stella. Isso não pode ser desfeito.",
@@ -1861,8 +1859,8 @@
         "accountDeleted": "Sua conta da Stella foi excluída.",
         "dataDeleted": "Seus dados da Stella foram excluídos.",
         "deleteAccountFailed": "Não foi possível excluir sua conta. Tente novamente.",
-        "deleteAccountReauth": "Por segurança, saia e entre novamente e depois exclua sua conta. Sua conta não foi excluída.",
         "deleteDataFailed": "Não foi possível excluir seus dados. Tente novamente.",
+        "deletionScheduled": "A exclusão da sua conta está agendada. Enviaremos um e-mail quando terminar.",
         "signInBeforeDelete": "Entre antes de excluir sua conta."
       }
     },

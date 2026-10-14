@@ -1395,7 +1395,6 @@
     },
     "settings": {
       "aboutSection": "Giới thiệu",
-      "accountDeletedTitle": "Đã xóa tài khoản",
       "appearance": {
         "dark": "Tối",
         "light": "Sáng",
@@ -1432,14 +1431,13 @@
       "computerSection": "Máy tính",
       "deleteAccount": "Xóa tài khoản",
       "deleteAccountLabel": "Xóa tài khoản Stella của bạn",
-      "deleteConfirmBody": "Thao tác này xóa vĩnh viễn tài khoản Stella của bạn và gỡ dữ liệu đám mây liên quan trên máy chủ của chúng tôi. Không thể hoàn tác.",
+      "deleteConfirmBody": "Bạn sẽ bị đăng xuất trên mọi thiết bị và tài khoản bị vô hiệu hóa ngay lập tức. Sau 7 ngày, tài khoản và dữ liệu đám mây của nó sẽ bị xóa vĩnh viễn. Đăng nhập lại trước thời điểm đó để hủy.",
       "deleteConfirmTitle": "Xóa tài khoản",
       "deleteFailedBody": "Tài khoản của bạn chưa bị xóa và bạn vẫn đang đăng nhập.",
       "deleteFailedTitle": "Không thể xóa tài khoản",
-      "deleteReauthAction": "Đăng nhập lại",
-      "deleteReauthBody": "Để bảo mật, hãy đăng nhập lại rồi xóa tài khoản. Tài khoản của bạn chưa bị xóa.",
       "deleteRetry": "Thử lại",
       "deletingAccount": "Đang xóa tài khoản…",
+      "deletionScheduledTitle": "Đã lên lịch xóa tài khoản",
       "loadingSession": "Đang tải phiên…",
       "notificationsSection": "Thông báo",
       "openPrivacyLabel": "Mở Chính sách quyền riêng tư",
@@ -1822,7 +1820,7 @@
       },
       "dialog": {
         "deleteAccountButton": "Xóa tài khoản",
-        "deleteAccountDescription": "Thao tác này xóa vĩnh viễn tài khoản và dữ liệu Stella của bạn. Không thể hoàn tác.",
+        "deleteAccountDescription": "Bạn sẽ bị đăng xuất trên mọi thiết bị và tài khoản bị vô hiệu hóa ngay lập tức. Sau 7 ngày, tài khoản và dữ liệu đám mây của nó sẽ bị xóa vĩnh viễn. Đăng nhập lại trước thời điểm đó để hủy.",
         "deleteAccountTitle": "Xóa tài khoản Stella của bạn?",
         "deleteDataButton": "Xóa dữ liệu",
         "deleteDataDescription": "Thao tác này xóa các cuộc trò chuyện, bộ nhớ, cài đặt và trạng thái Stella cục bộ của bạn. Không thể hoàn tác.",
@@ -1845,8 +1843,8 @@
         "accountDeleted": "Tài khoản Stella của bạn đã được xóa.",
         "dataDeleted": "Dữ liệu Stella của bạn đã được xóa.",
         "deleteAccountFailed": "Không thể xóa tài khoản của bạn. Vui lòng thử lại.",
-        "deleteAccountReauth": "Để bảo mật, hãy đăng xuất và đăng nhập lại rồi xóa tài khoản. Tài khoản của bạn chưa bị xóa.",
         "deleteDataFailed": "Không thể xóa dữ liệu của bạn. Vui lòng thử lại.",
+        "deletionScheduled": "Tài khoản của bạn đã được lên lịch xóa. Chúng tôi sẽ gửi email khi hoàn tất.",
         "signInBeforeDelete": "Đăng nhập trước khi xóa tài khoản của bạn."
       }
     },

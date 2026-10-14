@@ -1395,7 +1395,6 @@
     },
     "settings": {
       "aboutSection": "정보",
-      "accountDeletedTitle": "계정이 삭제됨",
       "appearance": {
         "dark": "다크",
         "light": "라이트",
@@ -1432,14 +1431,13 @@
       "computerSection": "컴퓨터",
       "deleteAccount": "계정 삭제",
       "deleteAccountLabel": "Stella 계정 삭제",
-      "deleteConfirmBody": "Stella 계정을 영구히 삭제하고, 당사 서버에 있는 관련 클라우드 데이터도 제거합니다. 되돌릴 수 없습니다.",
+      "deleteConfirmBody": "모든 기기에서 로그아웃되고 계정이 즉시 비활성화됩니다. 7일 후 계정과 클라우드 데이터가 영구 삭제됩니다. 취소하려면 그 전에 다시 로그인하세요.",
       "deleteConfirmTitle": "계정 삭제",
       "deleteFailedBody": "계정이 삭제되지 않았으며 여전히 로그인되어 있습니다.",
       "deleteFailedTitle": "계정을 삭제할 수 없음",
-      "deleteReauthAction": "다시 로그인",
-      "deleteReauthBody": "보안을 위해 다시 로그인한 후 계정을 삭제하세요. 계정이 삭제되지 않았습니다.",
       "deleteRetry": "다시 시도",
       "deletingAccount": "계정 삭제 중…",
+      "deletionScheduledTitle": "계정 삭제 예약됨",
       "loadingSession": "세션 불러오는 중…",
       "notificationsSection": "알림",
       "openPrivacyLabel": "개인정보 처리방침 열기",
@@ -1822,7 +1820,7 @@
       },
       "dialog": {
         "deleteAccountButton": "계정 삭제",
-        "deleteAccountDescription": "이 작업은 계정과 Stella 데이터를 영구적으로 삭제합니다. 되돌릴 수 없습니다.",
+        "deleteAccountDescription": "모든 기기에서 로그아웃되고 계정이 즉시 비활성화됩니다. 7일 후 계정과 클라우드 데이터가 영구 삭제됩니다. 취소하려면 그 전에 다시 로그인하세요.",
         "deleteAccountTitle": "Stella 계정을 삭제할까요?",
         "deleteDataButton": "데이터 삭제",
         "deleteDataDescription": "이 작업은 대화, 메모리, 설정, 로컬 Stella 상태를 지웁니다. 되돌릴 수 없습니다.",
@@ -1845,8 +1843,8 @@
         "accountDeleted": "Stella 계정이 삭제되었습니다.",
         "dataDeleted": "Stella 데이터가 삭제되었습니다.",
         "deleteAccountFailed": "계정을 삭제할 수 없습니다. 다시 시도하세요.",
-        "deleteAccountReauth": "보안을 위해 로그아웃 후 다시 로그인한 다음 계정을 삭제하세요. 계정이 삭제되지 않았습니다.",
         "deleteDataFailed": "데이터를 삭제할 수 없습니다. 다시 시도하세요.",
+        "deletionScheduled": "계정이 삭제되도록 예약되었습니다. 완료되면 이메일로 알려 드립니다.",
         "signInBeforeDelete": "계정을 삭제하기 전에 로그인하세요."
       }
     },

@@ -1403,7 +1403,6 @@
     },
     "settings": {
       "aboutSection": "Over",
-      "accountDeletedTitle": "Account verwijderd",
       "appearance": {
         "dark": "Donker",
         "light": "Licht",
@@ -1440,14 +1439,13 @@
       "computerSection": "Computer",
       "deleteAccount": "Account verwijderen",
       "deleteAccountLabel": "Je Stella-account verwijderen",
-      "deleteConfirmBody": "Dit verwijdert je Stella-account definitief en wist de bijbehorende clouddata op onze servers. Dit kan niet ongedaan worden gemaakt.",
+      "deleteConfirmBody": "Je wordt op elk apparaat uitgelogd en je account wordt meteen uitgeschakeld. Na 7 dagen worden je account en de clouddata ervan definitief verwijderd. Log daarvoor opnieuw in om te annuleren.",
       "deleteConfirmTitle": "Account verwijderen",
       "deleteFailedBody": "Je account is niet verwijderd en je bent nog steeds ingelogd.",
       "deleteFailedTitle": "Kon account niet verwijderen",
-      "deleteReauthAction": "Opnieuw inloggen",
-      "deleteReauthBody": "Log voor je veiligheid opnieuw in en verwijder daarna je account. Je account is niet verwijderd.",
       "deleteRetry": "Opnieuw proberen",
       "deletingAccount": "Account verwijderen…",
+      "deletionScheduledTitle": "Verwijderen van account gepland",
       "loadingSession": "Sessie laden…",
       "notificationsSection": "Meldingen",
       "openPrivacyLabel": "Privacybeleid openen",
@@ -1830,7 +1828,7 @@
       },
       "dialog": {
         "deleteAccountButton": "Account verwijderen",
-        "deleteAccountDescription": "Dit verwijdert je account en Stella-gegevens definitief. Dit kan niet ongedaan worden gemaakt.",
+        "deleteAccountDescription": "Je wordt op elk apparaat uitgelogd en je account wordt meteen uitgeschakeld. Na 7 dagen worden je account en de clouddata ervan definitief verwijderd. Log daarvoor opnieuw in om te annuleren.",
         "deleteAccountTitle": "Je Stella-account verwijderen?",
         "deleteDataButton": "Gegevens verwijderen",
         "deleteDataDescription": "Dit wist je gesprekken, geheugen, instellingen en de lokale Stella-status. Dit kan niet ongedaan worden gemaakt.",
@@ -1853,8 +1851,8 @@
         "accountDeleted": "Je Stella-account is verwijderd.",
         "dataDeleted": "Je Stella-gegevens zijn verwijderd.",
         "deleteAccountFailed": "Kon je account niet verwijderen. Probeer het opnieuw.",
-        "deleteAccountReauth": "Log voor je veiligheid uit en opnieuw in en verwijder daarna je account. Je account is niet verwijderd.",
         "deleteDataFailed": "Kon je gegevens niet verwijderen. Probeer het opnieuw.",
+        "deletionScheduled": "Je account staat gepland voor verwijdering. We mailen je zodra het klaar is.",
         "signInBeforeDelete": "Meld je aan voordat je je account verwijdert."
       }
     },

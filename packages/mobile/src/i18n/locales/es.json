@@ -1411,7 +1411,6 @@
     },
     "settings": {
       "aboutSection": "Acerca de",
-      "accountDeletedTitle": "Cuenta eliminada",
       "appearance": {
         "dark": "Oscuro",
         "light": "Claro",
@@ -1448,14 +1447,13 @@
       "computerSection": "Ordenador",
       "deleteAccount": "Eliminar cuenta",
       "deleteAccountLabel": "Eliminar tu cuenta de Stella",
-      "deleteConfirmBody": "Esto elimina permanentemente tu cuenta de Stella y borra de nuestros servidores los datos en la nube asociados a ella. Esto no se puede deshacer.",
+      "deleteConfirmBody": "Se cerrará tu sesión en todos los dispositivos y tu cuenta se desactivará de inmediato. Después de 7 días, tu cuenta y sus datos en la nube se eliminarán de forma permanente. Vuelve a iniciar sesión antes para cancelar.",
       "deleteConfirmTitle": "Eliminar cuenta",
       "deleteFailedBody": "Tu cuenta no se eliminó y sigues con la sesión iniciada.",
       "deleteFailedTitle": "No se pudo eliminar la cuenta",
-      "deleteReauthAction": "Volver a iniciar sesión",
-      "deleteReauthBody": "Por tu seguridad, vuelve a iniciar sesión y luego elimina tu cuenta. Tu cuenta no se eliminó.",
       "deleteRetry": "Reintentar",
       "deletingAccount": "Eliminando la cuenta…",
+      "deletionScheduledTitle": "Eliminación de la cuenta programada",
       "loadingSession": "Cargando la sesión…",
       "notificationsSection": "Notificaciones",
       "openPrivacyLabel": "Abrir la Política de privacidad",
@@ -1838,7 +1836,7 @@
       },
       "dialog": {
         "deleteAccountButton": "Eliminar cuenta",
-        "deleteAccountDescription": "Esto elimina permanentemente tu cuenta y tus datos de Stella. Esto no se puede deshacer.",
+        "deleteAccountDescription": "Se cerrará tu sesión en todos los dispositivos y tu cuenta se desactivará de inmediato. Después de 7 días, tu cuenta y sus datos en la nube se eliminarán de forma permanente. Vuelve a iniciar sesión antes para cancelar.",
         "deleteAccountTitle": "¿Eliminar tu cuenta de Stella?",
         "deleteDataButton": "Eliminar datos",
         "deleteDataDescription": "Esto borra tus conversaciones, memoria, ajustes y el estado local de Stella. Esto no se puede deshacer.",
@@ -1861,8 +1859,8 @@
         "accountDeleted": "Se eliminó tu cuenta de Stella.",
         "dataDeleted": "Se eliminaron tus datos de Stella.",
         "deleteAccountFailed": "No se pudo eliminar tu cuenta. Inténtalo de nuevo.",
-        "deleteAccountReauth": "Por tu seguridad, cierra sesión, vuelve a iniciarla y luego elimina tu cuenta. Tu cuenta no se eliminó.",
         "deleteDataFailed": "No se pudieron eliminar tus datos. Inténtalo de nuevo.",
+        "deletionScheduled": "Tu cuenta está programada para eliminarse. Te enviaremos un correo cuando esté hecho.",
         "signInBeforeDelete": "Inicia sesión antes de eliminar tu cuenta."
       }
     },

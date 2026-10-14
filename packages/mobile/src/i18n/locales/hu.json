@@ -1403,7 +1403,6 @@
     },
     "settings": {
       "aboutSection": "Névjegy",
-      "accountDeletedTitle": "Fiók törölve",
       "appearance": {
         "dark": "Sötét",
         "light": "Világos",
@@ -1440,14 +1439,13 @@
       "computerSection": "Számítógép",
       "deleteAccount": "Fiók törlése",
       "deleteAccountLabel": "A Stella-fiókod törlése",
-      "deleteConfirmBody": "Ez véglegesen törli a Stella-fiókodat, és eltávolítja a hozzá tartozó felhőadatokat a szervereinkről. Ezt nem lehet visszavonni.",
+      "deleteConfirmBody": "Minden eszközön kijelentkeztetünk, és a fiókodat azonnal letiltjuk. 7 nap után a fiókod és a felhőben tárolt adatai véglegesen törlődnek. A visszavonáshoz jelentkezz be addig újra.",
       "deleteConfirmTitle": "Fiók törlése",
       "deleteFailedBody": "A fiókod nem lett törölve, és továbbra is be vagy jelentkezve.",
       "deleteFailedTitle": "A fiókot nem sikerült törölni",
-      "deleteReauthAction": "Bejelentkezés újra",
-      "deleteReauthBody": "Biztonsági okokból jelentkezz be újra, majd töröld a fiókodat. A fiókod nem lett törölve.",
       "deleteRetry": "Újra",
       "deletingAccount": "Fiók törlése…",
+      "deletionScheduledTitle": "Fióktörlés ütemezve",
       "loadingSession": "Munkamenet betöltése…",
       "notificationsSection": "Értesítések",
       "openPrivacyLabel": "Adatvédelmi szabályzat megnyitása",
@@ -1830,7 +1828,7 @@
       },
       "dialog": {
         "deleteAccountButton": "Fiók törlése",
-        "deleteAccountDescription": "Ez véglegesen törli a fiókodat és a Stella-adataidat. Ez nem vonható vissza.",
+        "deleteAccountDescription": "Minden eszközön kijelentkeztetünk, és a fiókodat azonnal letiltjuk. 7 nap után a fiókod és a felhőben tárolt adatai véglegesen törlődnek. A visszavonáshoz jelentkezz be addig újra.",
         "deleteAccountTitle": "Törlöd a Stella-fiókodat?",
         "deleteDataButton": "Adatok törlése",
         "deleteDataDescription": "Ez törli a beszélgetéseidet, a memóriádat, a beállításaidat és a helyi Stella-állapotot. Ez nem vonható vissza.",
@@ -1853,8 +1851,8 @@
         "accountDeleted": "A Stella-fiókodat töröltük.",
         "dataDeleted": "A Stella-adataidat töröltük.",
         "deleteAccountFailed": "Nem sikerült törölni a fiókodat. Próbáld újra.",
-        "deleteAccountReauth": "Biztonsági okokból jelentkezz ki, majd be újra, és töröld a fiókodat. A fiókod nem lett törölve.",
         "deleteDataFailed": "Nem sikerült törölni az adataidat. Próbáld újra.",
+        "deletionScheduled": "A fiókod törlése ütemezve van. E-mailt küldünk, ha kész.",
         "signInBeforeDelete": "Jelentkezz be a fiókod törlése előtt."
       }
     },

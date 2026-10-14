@@ -28,7 +28,6 @@ import { RpcError } from "../errors.js";
 import { ownerKekFor, ownerKeks, type OwnerKekTag } from "../../secret-rotation.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
 import type { OwnerContext, OwnerDbReader, OwnerDomain } from "../registry.js";
-import { readOrDefault } from "../schema.js";
 import { resetExecutionForProvider } from "./engines.js";
 
 export const PROVIDERS_MIGRATION = {
@@ -301,10 +300,7 @@ const connectionOf = (row: CredentialRow): ProviderConnection => ({
 
 const readSettings = (db: OwnerDbReader): ProviderSettings => {
   const rows = new Map(
-    readOrDefault(
-      () => db.all<CredentialRow>(`SELECT ${COLUMNS} FROM provider_credentials`),
-      [] as CredentialRow[],
-    ).map((row) => [row.provider, row]),
+    db.all<CredentialRow>(`SELECT ${COLUMNS} FROM provider_credentials`).map((row) => [row.provider, row]),
   );
   return {
     providers: CATALOG.map((entry): AccountProvider => {

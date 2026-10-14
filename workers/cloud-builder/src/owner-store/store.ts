@@ -32,6 +32,7 @@ const CLOCK_VIEW_REFRESH_MS = 30_000;
 const FLUSH_LOG_ROWS = 1_000;
 const QUERY_TABLES_CACHE_MAX = 4_096;
 const JOB_DEFAULT_MAX_ATTEMPTS = 20;
+const CONTRACTING_STATEMENT = /\bDROP\s+(?:TABLE|COLUMN)\b|\bRENAME\b/i;
 const JOB_MAX_BACKOFF_MS = 60 * 60_000;
 
 const PLATFORM_DDL = [
@@ -191,21 +192,36 @@ export class OwnerStore {
   ensureSchema(): void {
     if (this.schemaReady) return;
     for (const statement of PLATFORM_DDL) this.sql.exec(statement);
-    const applied = new Set(
-      this.sql
-        .exec<{ id: string }>("SELECT id FROM _owner_migrations")
-        .toArray()
-        .map((row) => row.id),
-    );
+    const ledgerColumns = this.sql
+      .exec<{ name: string }>("SELECT name FROM pragma_table_info('_owner_migrations')")
+      .toArray();
+    if (!ledgerColumns.some((column) => column.name === "contracts")) {
+      this.sql.exec("ALTER TABLE _owner_migrations ADD COLUMN contracts INTEGER NOT NULL DEFAULT 0");
+    }
+    const ledger = this.sql
+      .exec<{ id: string; contracts: number }>("SELECT id, contracts FROM _owner_migrations")
+      .toArray();
+    const known = new Set(this.registry.migrations.map((migration) => migration.id));
+    const unknownContractions = ledger
+      .filter((row) => row.contracts === 1 && !known.has(row.id))
+      .map((row) => row.id);
+    if (unknownContractions.length > 0) {
+      throw new Error(
+        `This Worker predates owner schema migrations that dropped or renamed what it reads (${unknownContractions.join(", ")}); deploy a version that includes them.`,
+      );
+    }
+    const applied = new Set(ledger.map((row) => row.id));
     for (const migration of this.registry.migrations) {
       if (applied.has(migration.id)) continue;
+      const contracts = migration.statements.some((statement) => CONTRACTING_STATEMENT.test(statement));
       this.transaction(() => {
         for (const statement of migration.statements) this.sql.exec(statement);
         this.forgetSchema();
         this.sql.exec(
-          "INSERT INTO _owner_migrations (id, applied_at) VALUES (?, ?)",
+          "INSERT INTO _owner_migrations (id, applied_at, contracts) VALUES (?, ?, ?)",
           migration.id,
           Date.now(),
+          contracts ? 1 : 0,
         );
       });
     }

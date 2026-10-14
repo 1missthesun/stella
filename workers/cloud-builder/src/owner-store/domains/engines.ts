@@ -69,7 +69,6 @@ import { RpcError } from "../errors.js";
 import { ownerKekFor, ownerKeks, type OwnerKekTag } from "../../secret-rotation.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
 import type { OwnerContext, OwnerDbReader, OwnerDomain } from "../registry.js";
-import { readOrDefault } from "../schema.js";
 import { DEFAULT_CLOUD_ANTHROPIC_EXECUTION, DEFAULT_CLOUD_CODEX_EXECUTION } from "../../cloud-spawn-model.js";
 
 export const ENGINES_MIGRATION = {
@@ -542,11 +541,11 @@ const readConnections = (db: OwnerDbReader): EngineConnection[] => {
 };
 
 const readSettings = (db: OwnerDbReader): EngineSettings => {
-  const claude = readOrDefault<ClaudeOverview | null>(() => readClaudeOverview(db), null);
+  const claude = readClaudeOverview(db);
   return {
     ...readSelection(db),
-    connections: readOrDefault(() => readConnections(db), []),
-    chatGptRegistrations: readOrDefault(() => readRegistrations(db), []),
+    connections: readConnections(db),
+    chatGptRegistrations: readRegistrations(db),
     ...(claude ? { claude } : {}),
   };
 };
@@ -584,8 +583,8 @@ export const snapshotEngines = (
   db: OwnerDbReader,
   options: { ownerMode?: boolean; managedModels?: boolean } = {},
 ): Pick<OwnerSnapshot, "execution" | "connectedEngines" | "connectedProviders"> => {
-  const connectedEngines = readOrDefault(() => connectedEnginesOf(db), []);
-  const connectedProviders = readOrDefault(() => connectedProvidersOf(db), [] as string[]);
+  const connectedEngines = connectedEnginesOf(db);
+  const connectedProviders = connectedProvidersOf(db);
   const { selection } = readSelection(db);
   const runnable =
     selection.engine === "stella" ||

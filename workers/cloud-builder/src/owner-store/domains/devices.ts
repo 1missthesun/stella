@@ -17,7 +17,6 @@ import { array, boolean, empty, literal, nullable, object, optional, string } fr
 import { RpcError } from "../errors.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
 import type { OwnerCaller, OwnerContext, OwnerDbReader, OwnerDomain } from "../registry.js";
-import { readOrDefault } from "../schema.js";
 
 const MAX_DEVICES = 64;
 const MAX_SUCCESSION_HOPS = 8;
@@ -504,30 +503,24 @@ export const snapshotDevices = (
         ...(capabilities.length > 0 ? { capabilities } : {}),
       };
     }),
-  pairedDevices: readOrDefault(
-    () =>
-      db
-        .all<PairedPhoneRow>("SELECT * FROM paired_phones WHERE revoked_at IS NULL")
-        .map((row) => ({
-          mobileDeviceId: row.mobile_device_id,
-          desktopDeviceId: row.desktop_device_id,
-          pairingKey: row.pair_secret_hash as PairingHmacKey,
-        })),
-    [],
-  ),
+  pairedDevices: db
+    .all<PairedPhoneRow>("SELECT * FROM paired_phones WHERE revoked_at IS NULL")
+    .map((row) => ({
+      mobileDeviceId: row.mobile_device_id,
+      desktopDeviceId: row.desktop_device_id,
+      pairingKey: row.pair_secret_hash as PairingHmacKey,
+    })),
 });
 
 const devicesList = (db: OwnerDbReader): DevicesResponse => {
   const presence = new Map(
-    readOrDefault(
-      () =>
-        db.all<PresenceRow>(
-          `SELECT device_id, presence_session_id, connection_id, connected, ready,
-                  chat_slots, agent_slots, capabilities, protocol_version, last_seen_at
-             FROM device_presence`,
-        ),
-      [],
-    ).map((row) => [row.device_id, presenceState(row)] as const),
+    db
+      .all<PresenceRow>(
+        `SELECT device_id, presence_session_id, connection_id, connected, ready,
+                chat_slots, agent_slots, capabilities, protocol_version, last_seen_at
+           FROM device_presence`,
+      )
+      .map((row) => [row.device_id, presenceState(row)] as const),
   );
   return {
     protocol: PLACEMENT_PROTOCOL,

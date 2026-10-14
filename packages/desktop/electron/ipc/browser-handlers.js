@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { clipboard, ClipboardItem, nativeImage } from "electron";
-import { normalizeUrlForPrivilegedRendererFetch, PRIVILEGED_RENDERER_FETCH_TIMEOUT_MS, } from "./renderer-safe-url.js";
+import { fetchPublicUrl, normalizeSafeExternalUrl } from "@stella/runtime/kernel/tools/network-guards";
 import { IPC_MEDIA_COPY_ATTACHMENT, IPC_MEDIA_COPY_IMAGE, IPC_MEDIA_SAVE_OUTPUT, } from "@stella/contracts/desktop/ipc-channels";
 import { decodeAndValidateImage, decodeBase64ImageBounded, readResponseBodyBounded, validateDecodedImageFile, } from "@stella/runtime/kernel/tools/image-decode-validation";
 import { materializeMediaArtifact } from "@stella/runtime/kernel/tools/media-artifact-store";
@@ -9,6 +9,7 @@ import {
   handleIpc,
 } from "./typed-ipc.js";
 // Electron 44's clipboard takes W3C-style ClipboardItems; images go on as PNG.
+const MEDIA_FETCH_TIMEOUT_MS = 30_000;
 const writeImageToClipboard = (image) => clipboard.write([
     new ClipboardItem({
         "image/png": new Blob([image.toPNG()], { type: "image/png" }),
@@ -100,12 +101,11 @@ export const registerBrowserHandlers = (options) => {
                 });
                 return { ok: true, path: saved.path };
             }
-            const safeUrl = await normalizeUrlForPrivilegedRendererFetch(payload.url);
+            const safeUrl = normalizeSafeExternalUrl(payload.url);
             if (payload.kind === "image") {
-                const signal = AbortSignal.timeout(PRIVILEGED_RENDERER_FETCH_TIMEOUT_MS);
-                const response = await globalThis.fetch(safeUrl, {
+                const signal = AbortSignal.timeout(MEDIA_FETCH_TIMEOUT_MS);
+                const response = await fetchPublicUrl(safeUrl, {
                     headers: { "User-Agent": "StellaDesktop/1.0" },
-                    redirect: "follow",
                     signal,
                 });
                 if (!response.ok) {
@@ -127,12 +127,11 @@ export const registerBrowserHandlers = (options) => {
             const saved = await materializeMediaArtifact({
                 filePath: destPath,
                 ...(validateExisting ? { validateExisting } : {}),
-                producerTimeoutMs: PRIVILEGED_RENDERER_FETCH_TIMEOUT_MS,
+                producerTimeoutMs: MEDIA_FETCH_TIMEOUT_MS,
                 producer: async (signal) => {
-                    const res = await globalThis.fetch(safeUrl, {
+                    const res = await fetchPublicUrl(safeUrl, {
                         headers: { "User-Agent": "StellaDesktop/1.0" },
-                        redirect: "follow",
-                        signal,
+                            signal,
                     });
                     if (!res.ok) {
                         throw new Error(`Download failed (${res.status})`);

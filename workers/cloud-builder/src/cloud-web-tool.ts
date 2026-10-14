@@ -51,7 +51,7 @@ export const createCloudWebTool = (context: {
       const text = await fetchReadableText(
         { url, ...(prompt ? { prompt } : {}) },
         {
-          guardUrl: (candidate) => normalizeSafePublicUrl(candidate),
+          guardUrl: async (candidate) => normalizeSafePublicUrl(candidate),
           checkSecretLikeToken: containsSecretLikeToken,
           sanitize: sanitizeToolVisibleText,
           userAgent: "Stella/1.0 (Cloud)",

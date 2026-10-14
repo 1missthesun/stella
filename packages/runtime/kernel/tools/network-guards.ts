@@ -1,44 +1,18 @@
-/**
- * SSRF guard for every outbound fetch of a model- or user-supplied URL.
- *
- * Two halves, and both have to hold:
- *
- * 1. LITERAL classification — what the hostname says it is. The WHATWG URL
- *    parser already canonicalizes exotic IPv4 spellings (decimal
- *    `2130706433`, hex `0x7f000001`, octal `0177.0.0.1`, short `127.1`) into
- *    dotted-quad before this module sees them. IPv6 needs real parsing:
- *    IPv4-mapped (`::ffff:127.0.0.1`), IPv4-COMPATIBLE (`::7f00:1`), and
- *    NAT64 (`64:ff9b::/96`) all embed a v4 address that must be classified as
- *    v4. Prefix string matching misses every one of them.
- *
- * 2. RESOLVED classification — what the hostname actually points at. A name
- *    the attacker controls can resolve anywhere, so without this the literal
- *    checks are close to decorative.
- *
- * Historically the resolved half was disabled wholesale whenever
- * `NODE_ENV === "development"`, which meant a dev-mode Stella — the way this
- * app is normally run — had no protection beyond a six-entry hostname set.
- * It is now always on, with a NAMED-HOST escape hatch instead of a blanket
- * off switch, so a split-DNS setup can be accommodated without disarming the
- * guard for every other host. See `STELLA_ALLOW_PRIVATE_HOSTS`.
- *
- * Known limit, stated rather than implied: this is resolve-then-fetch, and
- * `fetch` performs its own lookup. A rebinding record (TTL 0, second answer
- * private) is not fully closed by any check expressible through the fetch
- * API. Callers that follow redirects MUST re-run this on every hop.
- */
+import dns from "node:dns";
+import https from "node:https";
+import type { LookupFunction } from "node:net";
+import { Readable } from "node:stream";
+import zlib from "node:zlib";
+import {
+  isBlockedIpAddress,
+  isLocalHostname,
+  normalizeHostForClassification,
+  normalizeSafePublicUrl,
+} from "./url-guard.js";
 
-import dns from "dns/promises";
+const MAX_PUBLIC_REDIRECTS = 5;
 
-const BLOCKED_HOSTNAMES = new Set([
-  "localhost",
-  "localhost.localdomain",
-  "0.0.0.0",
-  "127.0.0.1",
-  "::1",
-  "host.docker.internal",
-]);
-
+/** Split-DNS escape hatch: hostnames that may resolve to private addresses. */
 const allowedPrivateHosts = (): Set<string> =>
   new Set(
     (process.env.STELLA_ALLOW_PRIVATE_HOSTS ?? "")
@@ -47,176 +21,149 @@ const allowedPrivateHosts = (): Set<string> =>
       .filter((entry) => entry.length > 0),
   );
 
-const normalizeHostForClassification = (host: string): string =>
-  host
-    .trim()
-    .toLowerCase()
-    .replace(/^\[|\]$/g, "")
-    .replace(/\.$/, "");
-
-const parseDottedQuad = (host: string): number[] | null => {
-  const parts = host.split(".");
-  if (parts.length !== 4) return null;
-  const bytes: number[] = [];
-  for (const part of parts) {
-    if (!/^\d{1,3}$/.test(part)) return null;
-    const value = Number(part);
-    if (value > 255) return null;
-    bytes.push(value);
-  }
-  return bytes;
-};
-
-const isBlockedIpv4Bytes = (bytes: number[]): boolean => {
-  const [a, b] = bytes;
-  return (
-    a === 0 ||
-    a === 10 ||
-    a === 127 ||
-    (a === 100 && b >= 64 && b <= 127) ||
-    (a === 169 && b === 254) ||
-    (a === 172 && b >= 16 && b <= 31) ||
-    (a === 192 && b === 168) ||
-    a >= 240
-  );
-};
-
-const parseIpv6Groups = (host: string): number[] | null => {
-  let input = host;
-  const v4TailMatch = input.match(/^(.*:)(\d{1,3}(?:\.\d{1,3}){3})$/);
-  if (v4TailMatch) {
-    const bytes = parseDottedQuad(v4TailMatch[2]);
-    if (!bytes) return null;
-    input =
-      v4TailMatch[1] +
-      ((bytes[0] << 8) | bytes[1]).toString(16) +
-      ":" +
-      ((bytes[2] << 8) | bytes[3]).toString(16);
-  }
-  const doubleColonSplits = input.split("::");
-  if (doubleColonSplits.length > 2) return null;
-  const parseGroups = (section: string): number[] | null => {
-    if (section === "") return [];
-    const groups: number[] = [];
-    for (const raw of section.split(":")) {
-      if (!/^[0-9a-fA-F]{1,4}$/.test(raw)) return null;
-      groups.push(Number.parseInt(raw, 16));
-    }
-    return groups;
-  };
-  if (doubleColonSplits.length === 1) {
-    const groups = parseGroups(input);
-    return groups && groups.length === 8 ? groups : null;
-  }
-  const head = parseGroups(doubleColonSplits[0]);
-  const tail = parseGroups(doubleColonSplits[1]);
-  if (!head || !tail || head.length + tail.length > 7) return null;
-  return [
-    ...head,
-    ...new Array(8 - head.length - tail.length).fill(0),
-    ...tail,
-  ];
-};
-
-const isBlockedIpv6Groups = (groups: number[]): boolean => {
-  const isZeroThrough = (count: number) =>
-    groups.slice(0, count).every((group) => group === 0);
-  if (isZeroThrough(7) && (groups[7] === 0 || groups[7] === 1)) return true;
-  if ((groups[0] & 0xfe00) === 0xfc00) return true;
-  if ((groups[0] & 0xffc0) === 0xfe80) return true;
-  const embeddedV4 =
-    (isZeroThrough(5) && groups[5] === 0xffff) ||
-    (isZeroThrough(4) && groups[4] === 0xffff && groups[5] === 0) ||
-    (groups[0] === 0x64 &&
-      groups[1] === 0xff9b &&
-      groups[2] === 0 &&
-      groups[3] === 0 &&
-      groups[4] === 0 &&
-      groups[5] === 0) ||
-    (isZeroThrough(6) && (groups[6] !== 0 || groups[7] !== 0));
-  if (embeddedV4) {
-    return isBlockedIpv4Bytes([
-      groups[6] >> 8,
-      groups[6] & 0xff,
-      groups[7] >> 8,
-      groups[7] & 0xff,
-    ]);
-  }
-  return false;
-};
-
-export const isBlockedIpAddress = (ip: string): boolean => {
-  const trimmed = normalizeHostForClassification(ip);
-  const v4 = parseDottedQuad(trimmed);
-  if (v4) return isBlockedIpv4Bytes(v4);
-  if (trimmed.includes(":")) {
-    const groups = parseIpv6Groups(trimmed);
-    if (!groups) return true;
-    return isBlockedIpv6Groups(groups);
-  }
-  return false;
-};
-
 const privateTargetError = (detail: string) =>
-  new Error(
-    `Private and local network targets are blocked.${detail} If this host is genuinely safe, add it to STELLA_ALLOW_PRIVATE_HOSTS (comma-separated hostnames).`,
+  Object.assign(
+    new Error(
+      `Private and local network targets are blocked.${detail} If this host is genuinely safe, add it to STELLA_ALLOW_PRIVATE_HOSTS (comma-separated hostnames).`,
+    ),
+    { code: "ESTELLAPRIVATE" },
   );
 
-const assertPublicHostname = async (hostname: string) => {
-  const normalized = normalizeHostForClassification(hostname);
-  if (!normalized) {
-    throw new Error("URL hostname is required.");
+/** http(s) only, no credentials, no local or private literal target; http becomes https. */
+export const normalizeSafeExternalUrl = (inputUrl: string): string => {
+  let parsed: URL | null = null;
+  try {
+    parsed = new URL(inputUrl.trim());
+  } catch {
+    parsed = null;
   }
-  if (allowedPrivateHosts().has(normalized)) {
-    return;
+  const hostname = parsed ? normalizeHostForClassification(parsed.hostname) : "";
+  if (parsed && hostname && allowedPrivateHosts().has(hostname)) {
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+      throw new Error("Only HTTP and HTTPS URLs are supported.");
+    }
+    if (parsed.username || parsed.password) {
+      throw new Error("Embedded URL credentials are not allowed.");
+    }
+    parsed.protocol = "https:";
+    return parsed.toString();
   }
-  if (
-    BLOCKED_HOSTNAMES.has(normalized) ||
-    normalized.endsWith(".localhost") ||
-    normalized.endsWith(".local")
-  ) {
-    throw privateTargetError("");
-  }
-  if (isBlockedIpAddress(normalized)) {
-    throw privateTargetError("");
-  }
-
-  const results = await dns.lookup(normalized, { all: true });
-  if (results.length === 0) {
-    throw new Error(`Could not resolve hostname "${normalized}".`);
-  }
-  if (results.some((result) => isBlockedIpAddress(result.address))) {
-    const addrs = results.map((r) => r.address).join(", ");
-    throw privateTargetError(
-      ` "${normalized}" resolved to: ${addrs}. Check hosts file, VPN, or DNS if this should be a public site.`,
-    );
+  try {
+    return normalizeSafePublicUrl(inputUrl);
+  } catch (error) {
+    if (hostname && (isLocalHostname(hostname) || isBlockedIpAddress(hostname))) {
+      throw privateTargetError("");
+    }
+    throw error;
   }
 };
 
-export const normalizeSafeExternalUrl = async (inputUrl: string) => {
-  const trimmed = inputUrl.trim();
-  if (!trimmed) {
-    throw new Error("URL is required.");
-  }
+/**
+ * The lookup every public request dials with: the addresses it resolves are
+ * the ones connected to, so a name cannot pass a check and then resolve
+ * somewhere private for the connection itself.
+ */
+const publicLookup: LookupFunction = (hostname, options, callback) => {
+  dns.lookup(hostname, { ...options, all: true }, (error, addresses) => {
+    if (error) {
+      callback(error, "", 4);
+      return;
+    }
+    const normalized = normalizeHostForClassification(hostname);
+    if (
+      !allowedPrivateHosts().has(normalized) &&
+      addresses.some((entry) => isBlockedIpAddress(entry.address))
+    ) {
+      callback(
+        privateTargetError(
+          ` "${normalized}" resolved to: ${addresses.map((entry) => entry.address).join(", ")}. Check hosts file, VPN, or DNS if this should be a public site.`,
+        ),
+        "",
+        4,
+      );
+      return;
+    }
+    if (options.all) {
+      callback(null, addresses);
+      return;
+    }
+    const first = addresses[0];
+    if (!first) {
+      callback(new Error(`Could not resolve hostname "${normalized}".`), "", 4);
+      return;
+    }
+    callback(null, first.address, first.family);
+  });
+};
 
-  let parsed: URL;
-  try {
-    parsed = new URL(trimmed);
-  } catch {
-    throw new Error("Invalid URL.");
+const decodedBody = (response: import("node:http").IncomingMessage): Readable => {
+  switch ((response.headers["content-encoding"] ?? "").toString().trim().toLowerCase()) {
+    case "gzip":
+    case "x-gzip":
+      return response.pipe(zlib.createGunzip());
+    case "deflate":
+      return response.pipe(zlib.createInflate());
+    case "br":
+      return response.pipe(zlib.createBrotliDecompress());
+    default:
+      return response;
   }
+};
 
-  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
-    throw new Error("Only HTTP and HTTPS URLs are supported.");
-  }
-  if (parsed.username || parsed.password) {
-    throw new Error("Embedded URL credentials are not allowed.");
-  }
+/** One request to an already-normalized public URL; never follows redirects. */
+export const requestPublicUrl = (
+  url: string,
+  init: { headers?: Record<string, string>; signal?: AbortSignal } = {},
+): Promise<Response> =>
+  new Promise<Response>((resolve, reject) => {
+    const request = https.request(
+      url,
+      {
+        method: "GET",
+        lookup: publicLookup,
+        headers: { "accept-encoding": "gzip, deflate, br", ...init.headers },
+      },
+      (incoming) => {
+        const status = incoming.statusCode ?? 502;
+        const headers = new Headers();
+        for (const [name, value] of Object.entries(incoming.headers)) {
+          if (value === undefined) continue;
+          for (const item of Array.isArray(value) ? value : [value]) headers.append(name, item);
+        }
+        const encoded = headers.has("content-encoding");
+        headers.delete("content-encoding");
+        if (encoded) headers.delete("content-length");
+        const body =
+          status === 204 || status === 304
+            ? null
+            : (Readable.toWeb(decodedBody(incoming)) as ReadableStream<Uint8Array>);
+        resolve(new Response(body, { status, statusText: incoming.statusMessage ?? "", headers }));
+      },
+    );
+    request.on("error", reject);
+    const signal = init.signal;
+    if (signal) {
+      const abort = () => request.destroy(signal.reason instanceof Error ? signal.reason : new Error("Aborted."));
+      if (signal.aborted) abort();
+      else signal.addEventListener("abort", abort, { once: true });
+    }
+    request.end();
+  });
 
-  if (parsed.protocol === "http:") {
-    parsed.protocol = "https:";
+/** GET a model- or user-supplied URL, re-checking every redirect hop at dial time. */
+export const fetchPublicUrl = async (
+  inputUrl: string,
+  init: { headers?: Record<string, string>; signal?: AbortSignal } = {},
+): Promise<Response> => {
+  let target = normalizeSafeExternalUrl(inputUrl);
+  for (let hop = 0; ; hop += 1) {
+    const response = await requestPublicUrl(target, init);
+    const location = response.headers.get("location");
+    if (response.status < 300 || response.status >= 400 || !location) return response;
+    await response.body?.cancel().catch(() => {});
+    if (hop >= MAX_PUBLIC_REDIRECTS) {
+      throw new Error(`Too many redirects (limit ${MAX_PUBLIC_REDIRECTS}).`);
+    }
+    target = normalizeSafeExternalUrl(new URL(location, target).toString());
   }
-
-  await assertPublicHostname(parsed.hostname);
-  return parsed.toString();
 };

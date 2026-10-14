@@ -1,36 +1,12 @@
 /**
- * SSRF guard shared by every host that fetches a model- or user-supplied
- * URL: the desktop runtime, the cloud orchestrator DO (workerd), and the
- * sandbox executor. Pure — no node builtins — so workerd can import it.
- *
- * The WHATWG URL parser already canonicalizes exotic IPv4 spellings
- * (decimal `2130706433`, hex `0x7f000001`, octal `0177.0.0.1`, short forms
- * `127.1`) into dotted-quad before this module sees them, so classification
- * here works on canonical hostnames. IPv6 needs real handling: IPv4-mapped
- * (`::ffff:127.0.0.1`), IPv4-translated (`::ffff:0:x`), and NAT64
- * (`64:ff9b::/96`) forms embed a v4 address that must be checked as v4 —
- * prefix string checks alone let `http://[::ffff:127.0.0.1]/` through.
- *
- * DNS is a capability, not an import: hosts with a resolver (node) pass
- * `resolveHost` so names are checked against what they actually resolve to.
- *
- * KNOWN LIMITS, stated plainly rather than implied by omission:
- *
- * 1. Without `resolveHost` (workerd — no resolver API) this guard classifies
- *    IP LITERALS ONLY. A hostname whose A record points at 169.254.169.254
- *    or any internal address passes it. The cloud `web` tool is in exactly
- *    that position, and since the model chooses the URL, a prompt injection
- *    can aim it. The only real control there is network egress policy at the
- *    platform edge — treat this function as defense in depth on that path,
- *    not as the boundary.
- * 2. Even WITH `resolveHost` the check is resolve-then-fetch: `fetch` does
- *    its own lookup, so a rebinding record (TTL 0, second answer private) or
- *    a round-robin set with one private address is not fully closed. Pinning
- *    the connection to the validated address is the only complete fix and is
- *    not expressible through the fetch API.
+ * SSRF classification shared by every host that fetches a model- or
+ * user-supplied URL; pure so workerd can import it. IPv6 forms that embed an
+ * IPv4 address (mapped, translated, NAT64) are classified as that IPv4.
+ * Where no resolver is available (workerd), only literal addresses are
+ * checked here and private-network denial is the platform's egress policy.
  */
 
-const BLOCKED_HOSTNAMES = new Set([
+export const BLOCKED_HOSTNAMES = new Set([
   "localhost",
   "localhost.localdomain",
   "0.0.0.0",
@@ -39,7 +15,7 @@ const BLOCKED_HOSTNAMES = new Set([
   "host.docker.internal",
 ]);
 
-const normalizeHostForClassification = (host: string): string =>
+export const normalizeHostForClassification = (host: string): string =>
   host
     .trim()
     .toLowerCase()
@@ -149,31 +125,17 @@ export const isBlockedIpAddress = (ip: string): boolean => {
   return false;
 };
 
-export type NormalizeSafePublicUrlOptions = {
-  /**
-   * Resolve a hostname to the addresses a fetch would actually dial, so
-   * DNS names pointing into blocked space are refused. Hosts without a
-   * resolver (workerd) omit it and rely on literal checks plus platform
-   * egress policy.
-   */
-  resolveHost?: (hostname: string) => Promise<string[]>;
-  /**
-   * When true, only the hostname string is validated (no DNS check). Used
-   * in development when VPN/DNS maps public names to private IPs.
-   */
-  skipResolvedAddressCheck?: boolean;
-};
+export const isLocalHostname = (hostname: string): boolean =>
+  BLOCKED_HOSTNAMES.has(hostname) ||
+  hostname.endsWith(".localhost") ||
+  hostname.endsWith(".local");
 
 /**
  * Validate and canonicalize an outbound URL: http(s) only, no embedded
- * credentials, no private/local targets (literal or resolved), http
- * upgraded to https. Throws on refusal; returns the canonical URL string.
- * Callers following redirects MUST re-run this on every hop.
+ * credentials, no local or private literal target, http upgraded to https.
+ * Callers following redirects re-run it on every hop.
  */
-export const normalizeSafePublicUrl = async (
-  inputUrl: string,
-  options?: NormalizeSafePublicUrlOptions,
-): Promise<string> => {
+export const normalizeSafePublicUrl = (inputUrl: string): string => {
   const trimmed = inputUrl.trim();
   if (!trimmed) {
     throw new Error("URL is required.");
@@ -200,27 +162,8 @@ export const normalizeSafePublicUrl = async (
   if (!hostname) {
     throw new Error("URL hostname is required.");
   }
-  if (
-    BLOCKED_HOSTNAMES.has(hostname) ||
-    hostname.endsWith(".localhost") ||
-    hostname.endsWith(".local")
-  ) {
+  if (isLocalHostname(hostname) || isBlockedIpAddress(hostname)) {
     throw new Error("Private and local network targets are blocked.");
-  }
-  if (isBlockedIpAddress(hostname)) {
-    throw new Error("Private and local network targets are blocked.");
-  }
-
-  if (options?.resolveHost && !options.skipResolvedAddressCheck) {
-    const addresses = await options.resolveHost(hostname);
-    if (addresses.length === 0) {
-      throw new Error(`Could not resolve hostname "${hostname}".`);
-    }
-    if (addresses.some((address) => isBlockedIpAddress(address))) {
-      throw new Error(
-        `Private and local network targets are blocked. "${hostname}" resolved to: ${addresses.join(", ")}. Check hosts file, VPN, or DNS if this should be a public site.`,
-      );
-    }
   }
 
   return parsed.toString();

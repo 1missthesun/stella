@@ -1,4 +1,4 @@
-import { normalizeSafeExternalUrl } from "./network-guards.js";
+import { normalizeSafeExternalUrl, requestPublicUrl } from "./network-guards.js";
 import { containsSecretLikeToken, sanitizeToolVisibleText } from "./safety.js";
 
 export const MAX_FETCH_BODY_CHARS = 24_000;
@@ -199,7 +199,7 @@ export const localWebFetch = async (args: {
   else args.signal?.addEventListener("abort", stop, { once: true });
 
   try {
-    let targetUrl = await normalizeSafeExternalUrl(args.url);
+    let targetUrl = normalizeSafeExternalUrl(args.url);
 
     let response: Response | null = null;
     for (
@@ -207,9 +207,8 @@ export const localWebFetch = async (args: {
       redirectCount <= MAX_FETCH_REDIRECTS;
       redirectCount += 1
     ) {
-      response = await fetch(targetUrl, {
+      response = await requestPublicUrl(targetUrl, {
         signal: controller.signal,
-        redirect: "manual",
         headers: {
           "User-Agent": "Stella/1.0 (Desktop Assistant)",
           Accept:
@@ -220,7 +219,7 @@ export const localWebFetch = async (args: {
       const location = response.headers.get("location");
       if (response.status >= 300 && response.status < 400 && location) {
         await response.body?.cancel().catch(() => {});
-        targetUrl = await normalizeSafeExternalUrl(
+        targetUrl = normalizeSafeExternalUrl(
           new URL(location, targetUrl).toString(),
         );
         continue;

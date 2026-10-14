@@ -163,7 +163,7 @@ export const handleDeviceRequestRoute = async (
     );
     const verified = await verifyMobilePairingProof({
       headers: request.headers,
-      publicKey: pairing?.mobilePublicKey,
+      pairingKey: pairing?.pairingKey,
       expectedChallenge: buildDeviceRequestChallenge({
         requestId,
         method,

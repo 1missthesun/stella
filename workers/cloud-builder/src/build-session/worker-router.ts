@@ -551,7 +551,7 @@ const handleDispatchSubmitRoute = async (
     );
     const verified = await verifyMobilePairingProof({
       fields,
-      publicKey: pairing?.mobilePublicKey,
+      pairingKey: pairing?.pairingKey,
       expectedChallenge: buildMobilePairingChallenge({
         idempotencyKey: submitted.idempotencyKey,
         conversationId: submitted.conversationId,

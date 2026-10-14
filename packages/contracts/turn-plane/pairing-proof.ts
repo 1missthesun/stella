@@ -187,6 +187,9 @@ export const readMobilePairingProofHeaders = (
   };
 };
 
+/** `sha256hex(pairSecret)`: the secret HMAC key of a pairing's proofs. */
+export type PairingHmacKey = string & { readonly __brand: "PairingHmacKey" };
+
 export type MobilePairingProofRejection =
   | "missing"
   | "malformed"
@@ -206,9 +209,8 @@ export type MobilePairingProofResult =
   | { ok: false; reason: MobilePairingProofRejection };
 
 /**
- * Verify a phone's proof. `publicKey` is the pairing key the owner snapshot
- * carries for this (mobile, desktop) pair — absent means "not paired", which
- * is refused before any HMAC work so an unpaired phone learns nothing.
+ * Verify a phone's proof. `pairingKey` is absent for an unpaired phone, which
+ * is refused before any HMAC work so it learns nothing.
  *
  * `expectedChallenge` is the challenge the server derived from the request it
  * is about to act on, so a proof minted for one payload never authorizes
@@ -217,7 +219,7 @@ export type MobilePairingProofResult =
 export const verifyMobilePairingProof = async (input: {
   headers?: Headers;
   fields?: MobilePairingProofFields | null;
-  publicKey?: string | null;
+  pairingKey?: PairingHmacKey | null;
   expectedChallenge: string;
   now?: number;
   maxSkewMs?: number;
@@ -234,7 +236,7 @@ export const verifyMobilePairingProof = async (input: {
           : "missing",
     };
   }
-  const pairingKey = input.publicKey?.trim() ?? "";
+  const pairingKey = input.pairingKey?.trim() ?? "";
   if (!pairingKey) return { ok: false, reason: "unpaired" };
   const now = input.now ?? Date.now();
   const skew = input.maxSkewMs ?? MOBILE_PAIRING_PROOF_MAX_SKEW_MS;

@@ -5,6 +5,7 @@ import type { IdentityLevel } from "../gateway/api.js";
 import type { CloudSandboxAccess } from "../backend/billing.js";
 import type { ExecutionCapability } from "./placement.js";
 import type { StellaUsageLimit } from "../stella-usage-limit.js";
+import type { PairingHmacKey } from "./pairing-proof.js";
 
 export const OWNER_SNAPSHOT_VERSION = 1 as const;
 
@@ -29,18 +30,11 @@ export type OwnerSnapshot = {
   billingUnavailable?: true;
   execution: CloudExecutionSelection;
   timeZone?: string;
-  /**
-   * Paired mobile devices allowed to submit against this owner's desktops
-   * (Stage 3 placement). `mobilePublicKey` is the phone's pairing key so the
-   * worker can verify its proof headers without another round trip: the
-   * pairing proof is an HMAC-SHA256, and this value is its key —
-   * `sha256hex(pairSecret)`, the same `pairSecretHash` the devices domain
-   * stores on the grant. Only active (non-revoked) grants appear.
-   */
+  /** Active phone pairings; `pairingKey` is the secret HMAC key of each one's proofs. */
   pairedDevices?: Array<{
     mobileDeviceId: string;
     desktopDeviceId: string;
-    mobilePublicKey?: string;
+    pairingKey?: PairingHmacKey;
   }>;
   /**
    * The owner's execution devices (desktops) for placement: their device

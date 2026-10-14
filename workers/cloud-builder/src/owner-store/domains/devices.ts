@@ -3,7 +3,7 @@ import type {
   ActivityNotificationKind,
   DeviceCalls,
 } from "@stella/contracts/backend/devices";
-import { sha256Hex } from "@stella/contracts/turn-plane/pairing-proof";
+import { sha256Hex, type PairingHmacKey } from "@stella/contracts/turn-plane/pairing-proof";
 import type { OwnerSnapshot } from "@stella/contracts/turn-plane/owner-snapshot";
 import {
   CLOUD_CAPABILITIES,
@@ -511,7 +511,7 @@ export const snapshotDevices = (
         .map((row) => ({
           mobileDeviceId: row.mobile_device_id,
           desktopDeviceId: row.desktop_device_id,
-          mobilePublicKey: row.pair_secret_hash,
+          pairingKey: row.pair_secret_hash as PairingHmacKey,
         })),
     [],
   ),

@@ -21,7 +21,7 @@ export const builderServiceSecret = (env: unknown): string =>
   raw(env, BUILDER_SERVICE_SECRET_V2) ?? raw(env, "BUILDER_SERVICE_SECRET") ?? "";
 
 export const builderServiceSecrets = (env: unknown): string[] =>
-  distinct([raw(env, BUILDER_SERVICE_SECRET_V2), raw(env, "BUILDER_SERVICE_SECRET")]);
+  distinct([builderServiceSecret(env)]);
 
 export type BetterAuthKeys = { current: string; previous: string | undefined; versioned: boolean };
 

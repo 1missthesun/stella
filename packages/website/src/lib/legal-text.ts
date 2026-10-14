@@ -5,8 +5,8 @@ export const LEGAL_TITLES: Record<LegalDocument, string> = {
   privacy: "Privacy Policy",
 };
 
-export const LEGAL_LAST_UPDATED = "September 10, 2026";
-export const PRIVACY_LAST_UPDATED = "October 12, 2026";
+export const LEGAL_LAST_UPDATED = "October 13, 2026";
+export const PRIVACY_LAST_UPDATED = "October 13, 2026";
 
 export const TERMS_OF_SERVICE = `Stella — FromYou LLC
 Last updated: ${LEGAL_LAST_UPDATED}
@@ -28,11 +28,9 @@ You must be at least 13 years of age to use the Service. If you are under 18, yo
 
 3. Accounts and Authentication
 
-Anonymous Use — Stella can be used without creating an account. Anonymous users receive access to core functionality subject to rate limits.
+Account Required — You need a Stella account to use the Service.
 
-Registered Accounts — You may optionally create an account using magic-link email authentication or Google sign-in. If you create an account, you are responsible for maintaining the security of your login credentials and for all activity that occurs under your account.
-
-Account Linking — If you upgrade from anonymous use to a registered account, any anonymous session data may be linked to your new account.
+Registered Accounts — You create an account using magic-link email authentication or Google sign-in. You are responsible for maintaining the security of your login credentials and for all activity that occurs under your account.
 
 
 4. Description of the Service
@@ -197,7 +195,7 @@ The applications may keep caches, preferences, credentials, and workspace files 
 
 Depending on the features you use, our backend may process or store:
 
-Stella Provider (Managed LLM Inference) — When you use managed AI, your prompt, attachments, relevant conversation context, tool definitions or results, and model output pass through our infrastructure to the provider selected for the request. Depending on the model and routing path, providers may include OpenAI, Anthropic, Google, xAI, OpenRouter, or Fireworks. We record usage and operational metadata such as owner or anonymous identifier, model, agent type, token counts, duration, estimated cost, plan, timestamp, and success or failure. We do not intentionally retain provider request content as a model-training product. We may temporarily buffer plaintext response text, reasoning, and tool arguments for stream recovery; current relay access expires after brief inactivity and has a hard ten-minute lifetime, while cleanup and security records may persist longer. When a BYOK call goes directly from your device to your selected provider, FromYou's managed model relay is not involved, but the provider still processes the request under its own terms.
+Stella Provider (Managed LLM Inference) — When you use managed AI, your prompt, attachments, relevant conversation context, tool definitions or results, and model output pass through our infrastructure to the provider selected for the request. Depending on the model and routing path, providers may include OpenAI, Anthropic, Google, xAI, OpenRouter, or Fireworks. We record usage and operational metadata such as owner identifier, model, agent type, token counts, duration, estimated cost, plan, timestamp, and success or failure. We do not intentionally retain provider request content as a model-training product. We may temporarily buffer plaintext response text, reasoning, and tool arguments for stream recovery; current relay access expires after brief inactivity and has a hard ten-minute lifetime, while cleanup and security records may persist longer. When a BYOK call goes directly from your device to your selected provider, FromYou's managed model relay is not involved, but the provider still processes the request under its own terms.
 
 Mobile and Connector Delivery — When you interact through the mobile app or a connected messaging service, our backend may store request text or references, delivery and routing metadata, request state, stream state, and response delivery data so a desktop or service can claim, cancel, complete, and deliver the work. Records are deleted or expire according to operational cleanup rules, which vary by record type.
 
@@ -236,7 +234,7 @@ When your desktop registers with our backend (for mobile bridge or connector fun
 
 9. Anonymous Device Usage
 
-If you use Stella without an account, we track: an anonymous device identifier (for rate limiting) and request count and timestamps (for enforcing fair-use limits). This data is not linked to any personal identity.
+Stella no longer offers use without an account. Usage records from earlier anonymous use are deleted along with those anonymous accounts.
 
 
 10. Website Advertising Measurement
@@ -299,7 +297,6 @@ Limited Use — Stella's use and transfer to any other app of information receiv
 • Temporary relay buffers — brief operational windows for stream recovery, subject to cleanup and hard lifetime limits
 • Mobile and connector delivery records — retained according to operational delivery, deduplication, and cleanup periods that vary by record type
 • Media inputs, outputs, and job records — retained as needed to submit, deliver, manage, and clean up media jobs; third-party copies follow provider policies
-• Anonymous device usage — retained for rate-limiting purposes; periodically pruned
 • Telemetry — metadata only, as described above; collection stops entirely when you turn it off
 • Support access log — grants, revocations, and uses of support access, kept with your account preferences until account deletion
 • Google Ads attribution flag — stored in your browser for up to 30 days
@@ -322,8 +319,6 @@ Telemetry Opt-Out — Settings, Privacy turns telemetry off for your device and 
 Data Export — Settings, Privacy downloads your conversations, memory files, and account preferences as JSON.
 
 Sessions — Settings, Account lists every device signed in to your account and can sign any of them out. We email you when a new device signs in.
-
-Anonymous Use — You can use Stella's core features without creating an account or providing any personal information.
 
 BYOK — You can provide your own AI provider API keys where supported. Direct provider calls may bypass our managed model relay, but conversation and task content is still stored by Stella as described above.
 

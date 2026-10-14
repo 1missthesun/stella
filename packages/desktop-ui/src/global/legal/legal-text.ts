@@ -1,6 +1,6 @@
 export type LegalDocument = "terms" | "privacy";
 
-const LEGAL_LAST_UPDATED = "October 12, 2026";
+const LEGAL_LAST_UPDATED = "October 13, 2026";
 
 export const TERMS_OF_SERVICE = `Stella — FromYou LLC
 Last updated: ${LEGAL_LAST_UPDATED}
@@ -22,11 +22,9 @@ You must be at least 13 years of age to use the Service. If you are under 18, yo
 
 3. Accounts and Authentication
 
-Anonymous Use — Stella can be used without creating an account. Anonymous users receive access to core functionality subject to rate limits.
+Account Required — You need a Stella account to use the Service.
 
-Registered Accounts — You may optionally create an account using magic-link email authentication or Google sign-in. If you create an account, you are responsible for maintaining the security of your login credentials and for all activity that occurs under your account.
-
-Account Linking — If you upgrade from anonymous use to a registered account, any anonymous session data may be linked to your new account.
+Registered Accounts — You create an account using magic-link email authentication or Google sign-in. You are responsible for maintaining the security of your login credentials and for all activity that occurs under your account.
 
 
 4. Description of the Service
@@ -180,7 +178,6 @@ Stella combines local execution with hosted services:
 
 • Stella's hosted services maintain the authoritative copy of conversations, event transcripts, tool outputs, activity records, and saved memory. That service data is encrypted in transit and at rest.
 • The desktop app may keep a rebuildable SQLite cache and device-local execution data. Removing that cache does not delete the cloud-authoritative copy.
-• No account is required. You can use Stella anonymously without providing any personal information.
 • The platform is open source. You can inspect exactly how your data is handled.
 
 
@@ -225,7 +222,7 @@ Stella Provider (Managed LLM Inference) — The Stella Provider is our managed L
 
 The Stella Provider forwards model response bytes as they arrive. Conversation events and model or tool results accepted into Stella's cloud journal become part of the cloud-authoritative record; upstream providers may separately store or retain request and response data under their own policies.
 
-We separately log usage metadata for billing, security, and rate limiting: timestamp, model, token count, duration, success or failure, safe upstream request identifiers, and your owner ID or anonymous device identifier. We do not put prompt or response bodies in those diagnostics. Supported BYOK model routes may send the model request directly to the provider, which remains subject to that provider's policies; the cloud-authoritative conversation record remains in Stella's hosted services.
+We separately log usage metadata for billing, security, and rate limiting: timestamp, model, token count, duration, success or failure, safe upstream request identifiers, and your owner ID. We do not put prompt or response bodies in those diagnostics. Supported BYOK model routes may send the model request directly to the provider, which remains subject to that provider's policies; the cloud-authoritative conversation record remains in Stella's hosted services.
 
 Cloud Agent and Mobile Processing — Messages submitted from supported clients and cloud agent work are processed by Stella's hosted services. Accepted messages, responses, event transcripts, tool outputs, and activity records are written to the cloud-authoritative conversation history.
 
@@ -269,7 +266,7 @@ When your desktop registers with our backend (for mobile bridge or connector fun
 
 9. Anonymous Device Usage
 
-If you use Stella without an account, we track: an anonymous device identifier (for rate limiting) and request count and timestamps (for enforcing fair-use limits). This data is not linked to any personal identity.
+Stella no longer offers use without an account. Usage records from earlier anonymous use are deleted along with those anonymous accounts.
 
 
 10. Third-Party Services
@@ -288,7 +285,6 @@ Retention depends on the data category, the feature used, legal requirements, av
 • Usage metadata — rolling windows (5-hour, weekly, monthly); aggregates retained for billing reconciliation
 • Responses API request and response records — retained by the selected AI provider under its retention and deletion policies
 • Connector and integration data — retention depends on Stella's service operation and the connected provider's policies
-• Anonymous device usage — retained for service operation, security, and rate limiting
 • Telemetry — metadata only, as described above; collection stops entirely when you turn it off
 • Support access log — grants, revocations, and uses of support access, kept with your account preferences until account deletion
 
@@ -311,8 +307,6 @@ Data Export — Settings, Privacy downloads your conversations, memory files, an
 Sessions — Settings, Account lists every device signed in to your account and can sign any of them out. We email you when a new device signs in.
 
 No Sale, Advertising, or Training — We do not sell your personal information, use your conversations to serve advertising, or use your conversation content to train models.
-
-Anonymous Use — You can use Stella's core features without creating an account or providing any personal information.
 
 BYOK — You can provide your own AI provider API keys for supported direct model routes. This avoids the Stella Provider for those model calls, but does not remove the cloud-authoritative conversation record from Stella's hosted services.
 

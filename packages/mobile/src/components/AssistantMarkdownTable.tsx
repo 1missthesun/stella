@@ -3,11 +3,11 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
-  Text,
   View,
   type StyleProp,
   type TextStyle,
 } from "react-native";
+import { Text } from "./Text";
 import type {
   MarkdownNode,
   NodeRendererProps,

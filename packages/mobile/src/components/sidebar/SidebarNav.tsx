@@ -1,5 +1,6 @@
 import { useMemo, type ReactNode } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
+import { Text } from "../Text";
 import Animated, {
   Extrapolation,
   interpolate,
@@ -9,7 +10,7 @@ import Animated, {
 import { useT } from "../../i18n";
 import { drawerProgress } from "../../lib/drawer";
 import type { MainTabId } from "../../lib/last-main-tab";
-import { CONTENT_MAX_FONT_SCALE } from "../../lib/setup-text-defaults";
+import { CONTENT_MAX_FONT_SCALE } from "../../lib/font-scale";
 import type { Colors } from "../../theme/colors";
 import { fonts } from "../../theme/fonts";
 import { useColors } from "../../theme/theme-context";

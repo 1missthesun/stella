@@ -1,5 +1,6 @@
 import { useMemo } from "react";
-import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
+import { Linking, Pressable, StyleSheet, View } from "react-native";
+import { Text } from "./Text";
 import { WebView } from "react-native-webview";
 import { utf8ToBytes } from "@noble/hashes/utils.js";
 import { Icon } from "./Icon";
@@ -8,7 +9,7 @@ import { useServerFeatures } from "../lib/server-features";
 import type { MobileDisplayPayload } from "../types";
 import { bytesToBase64Url } from "../lib/base64url";
 import { artifactSubtitle, artifactTitle } from "../lib/mobile-artifacts";
-import { CONTENT_MAX_FONT_SCALE } from "../lib/setup-text-defaults";
+import { CONTENT_MAX_FONT_SCALE } from "../lib/font-scale";
 import type { Colors } from "../theme/colors";
 import { useTheme } from "../theme/theme-context";
 import { fonts } from "../theme/fonts";

@@ -1,5 +1,6 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
-import { Animated, Easing, StyleSheet, Text, View } from "react-native";
+import { Animated, Easing, StyleSheet, View } from "react-native";
+import { Text } from "./Text";
 import Reanimated, {
   Easing as ReanimatedEasing,
   cancelAnimation,
@@ -8,7 +9,7 @@ import Reanimated, {
   withTiming,
 } from "react-native-reanimated";
 import { TextShimmer } from "./TextShimmer";
-import { CONTENT_MAX_FONT_SCALE } from "../lib/setup-text-defaults";
+import { CONTENT_MAX_FONT_SCALE } from "../lib/font-scale";
 import { StellaMarkIndicator } from "./stella-mark/StellaMarkIndicator";
 import { enterEase, exitEase } from "./stella-mark/rig-math";
 import {

@@ -4,9 +4,9 @@ import {
   AppState,
   Pressable,
   StyleSheet,
-  Text,
   View,
 } from "react-native";
+import { Text } from "../../src/components/Text";
 import { useIsFocused } from "expo-router";
 import { authClient } from "../../src/lib/auth-client";
 import {

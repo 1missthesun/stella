@@ -3,12 +3,12 @@ import {
   ActivityIndicator,
   Pressable,
   StyleSheet,
-  Text,
   TextInput,
   View,
   type TextInputProps,
 } from "react-native";
-import { CONTENT_MAX_FONT_SCALE } from "../../lib/setup-text-defaults";
+import { Text } from "../Text";
+import { CONTENT_MAX_FONT_SCALE } from "../../lib/font-scale";
 import type { Colors } from "../../theme/colors";
 import { fonts } from "../../theme/fonts";
 import { useColors } from "../../theme/theme-context";

@@ -4,17 +4,17 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   View,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
+import { Text } from "../Text";
 import { Image } from "expo-image";
 import type { EvidenceCard } from "@stella/contracts/chat-evidence";
 import { Icon, type IconName } from "../Icon";
-import { CONTENT_MAX_FONT_SCALE } from "../../lib/setup-text-defaults";
+import { CONTENT_MAX_FONT_SCALE } from "../../lib/font-scale";
 import {
   evidenceCardWidth,
   useChatEvidence,

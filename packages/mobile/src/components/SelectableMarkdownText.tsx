@@ -1,5 +1,6 @@
 import { memo, useMemo } from "react";
-import { Platform, StyleSheet, Text, View, useWindowDimensions, type StyleProp, type TextStyle } from "react-native";
+import { Platform, StyleSheet, View, useWindowDimensions, type StyleProp, type TextStyle } from "react-native";
+import { Text } from "./Text";
 import { requireNativeViewManager, requireOptionalNativeModule } from "expo-modules-core";
 import type { MarkdownNode } from "react-native-nitro-markdown";
 import { fonts } from "../theme/fonts";

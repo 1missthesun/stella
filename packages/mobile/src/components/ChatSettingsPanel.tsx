@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
+import { Text } from "./Text";
 import Animated, {
   FadeInLeft,
   FadeInRight,
@@ -29,7 +30,7 @@ import { authClient } from "../lib/auth-client";
 import { useDrawerOpen, useDrawerSide } from "../lib/drawer";
 import { tapLight } from "../lib/haptics";
 import { useComputerControl } from "../lib/main-shell-store";
-import { CONTENT_MAX_FONT_SCALE } from "../lib/setup-text-defaults";
+import { CONTENT_MAX_FONT_SCALE } from "../lib/font-scale";
 import { useT } from "../i18n";
 import type { Colors } from "../theme/colors";
 import { fonts } from "../theme/fonts";

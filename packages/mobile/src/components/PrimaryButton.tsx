@@ -1,5 +1,6 @@
 import { useMemo } from "react";
-import { Pressable, StyleSheet, Text, type ViewStyle } from "react-native";
+import { Pressable, StyleSheet, type ViewStyle } from "react-native";
+import { Text } from "./Text";
 import { type Colors } from "../theme/colors";
 import { useColors } from "../theme/theme-context";
 import { fonts } from "../theme/fonts";

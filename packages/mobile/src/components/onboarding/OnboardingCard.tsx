@@ -2,11 +2,11 @@ import { useMemo, type ReactNode } from "react";
 import {
   ActivityIndicator,
   StyleSheet,
-  Text,
   View,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
+import { Text } from "../Text";
 import Animated from "react-native-reanimated";
 import { Icon, type IconName } from "../Icon";
 import { type Colors } from "../../theme/colors";

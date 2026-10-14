@@ -3,9 +3,9 @@ import {
   ActivityIndicator,
   Pressable,
   StyleSheet,
-  Text,
   View,
 } from "react-native";
+import { Text } from "../Text";
 import type {
   EngineConnection,
   EngineProvider,
@@ -13,7 +13,7 @@ import type {
 import { isEngineConnectionUsable } from "@stella/contracts/backend/engines";
 import { useBackendView } from "../../lib/backend";
 import { tapLight } from "../../lib/haptics";
-import { CONTENT_MAX_FONT_SCALE } from "../../lib/setup-text-defaults";
+import { CONTENT_MAX_FONT_SCALE } from "../../lib/font-scale";
 import { useT } from "../../i18n";
 import { REASONING_OPTIONS } from "../../lib/stella-model-catalog";
 import type { Brain, ModelSettings } from "../../lib/use-cloud-model-settings";

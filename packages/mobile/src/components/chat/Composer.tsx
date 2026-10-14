@@ -17,18 +17,18 @@ import {
   Platform,
   Pressable,
   StyleSheet,
-  Text,
   TextInput,
   type TextInputProps,
   View,
 } from "react-native";
+import { Text } from "../Text";
 import { useT } from "../../i18n";
 import { type ComposerAttachment } from "../../lib/chat-attachments";
 import { useChatDraft, type ChatDraftStore } from "../../lib/chat-draft-store";
 import { resolveComposerExpanded } from "../../lib/composer-model-layout";
 import type { DictationStatus } from "../../lib/dictation";
 import { tapLight } from "../../lib/haptics";
-import { CONTENT_MAX_FONT_SCALE } from "../../lib/setup-text-defaults";
+import { CONTENT_MAX_FONT_SCALE } from "../../lib/font-scale";
 import { type Colors } from "../../theme/colors";
 import { fadeHex } from "../../theme/oklch";
 import { fonts } from "../../theme/fonts";

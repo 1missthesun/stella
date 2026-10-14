@@ -2,15 +2,15 @@ import { useMemo, useState } from "react";
 import {
   Pressable,
   StyleSheet,
-  Text,
   TextInput,
   View,
   type NativeSyntheticEvent,
   type TextInputSelectionChangeEventData,
 } from "react-native";
+import { Text } from "./Text";
 import * as Clipboard from "expo-clipboard";
 import { notifySuccess, tapLight } from "../lib/haptics";
-import { CONTENT_MAX_FONT_SCALE } from "../lib/setup-text-defaults";
+import { CONTENT_MAX_FONT_SCALE } from "../lib/font-scale";
 import { fonts } from "../theme/fonts";
 import type { Colors } from "../theme/colors";
 

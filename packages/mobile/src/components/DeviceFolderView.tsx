@@ -3,10 +3,10 @@ import {
   FlatList,
   Pressable,
   StyleSheet,
-  Text,
   View,
   type ListRenderItemInfo,
 } from "react-native";
+import { Text } from "./Text";
 import type {
   DeviceFolderEntry,
   DeviceFolderListing,
@@ -14,7 +14,7 @@ import type {
 import { Icon, type IconName } from "./Icon";
 import { useT } from "../i18n";
 import { formatTimestampHeader } from "../lib/message-time-labels";
-import { CONTENT_MAX_FONT_SCALE } from "../lib/setup-text-defaults";
+import { CONTENT_MAX_FONT_SCALE } from "../lib/font-scale";
 import type { Colors } from "../theme/colors";
 import { fonts } from "../theme/fonts";
 import { fadeHex } from "../theme/oklch";

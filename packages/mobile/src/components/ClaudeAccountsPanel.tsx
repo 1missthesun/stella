@@ -1,5 +1,6 @@
 import { useMemo } from "react";
-import { Alert, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Platform, Pressable, StyleSheet, View } from "react-native";
+import { Text } from "./Text";
 import type {
   ClaudePlaceStatus,
   EngineConnection,

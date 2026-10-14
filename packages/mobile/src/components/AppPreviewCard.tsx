@@ -1,9 +1,10 @@
 import { memo, useEffect, useMemo, useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, StyleSheet, View } from "react-native";
+import { Text } from "./Text";
 import { Image } from "expo-image";
 import { getAuthToken } from "../lib/auth-token";
 import { tapLight } from "../lib/haptics";
-import { CONTENT_MAX_FONT_SCALE } from "../lib/setup-text-defaults";
+import { CONTENT_MAX_FONT_SCALE } from "../lib/font-scale";
 import {
   requestOpenApp,
   useWorkspaceApp,

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import * as Clipboard from "expo-clipboard";
-import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
+import { Linking, Pressable, StyleSheet, View } from "react-native";
+import { Text } from "./Text";
 import {
   useCloudBrowserActions,
   useCurrentConversationBrowserInteraction,

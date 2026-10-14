@@ -1,9 +1,10 @@
 import { memo, useMemo, useState } from "react";
-import { ActionSheetIOS, Alert, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActionSheetIOS, Alert, Platform, Pressable, StyleSheet, View } from "react-native";
+import { Text } from "../Text";
 import { tomorrowMorningMinutes, type ReminderMark } from "@stella/contracts/reminders";
 import { markReminderDone, snoozeReminder, useReminderFires } from "../../lib/reminders";
 import { tapMedium } from "../../lib/haptics";
-import { CONTENT_MAX_FONT_SCALE } from "../../lib/setup-text-defaults";
+import { CONTENT_MAX_FONT_SCALE } from "../../lib/font-scale";
 import type { Colors } from "../../theme/colors";
 import { fonts } from "../../theme/fonts";
 import { useT } from "../../i18n";

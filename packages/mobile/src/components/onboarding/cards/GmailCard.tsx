@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Linking, StyleSheet, Text, View } from "react-native";
+import { Linking, StyleSheet, View } from "react-native";
+import { Text } from "../../Text";
 import Animated from "react-native-reanimated";
 import Svg, { G, Path } from "react-native-svg";
 import { useT } from "../../../i18n";

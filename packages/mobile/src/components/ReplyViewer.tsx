@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Text } from "./Text";
 import type { ReplyRef } from "@stella/contracts/reply-refs";
 import type { ChatMessage } from "../types";
 import type { Colors } from "../theme/colors";

@@ -4,8 +4,8 @@ import {
   Animated,
   Pressable,
   StyleSheet,
-  Text,
 } from "react-native";
+import { Text } from "../Text";
 import { GlassSurface, glassAncestorOpacity } from "../glass";
 import { Icon } from "../Icon";
 import { type Colors } from "../../theme/colors";

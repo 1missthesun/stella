@@ -4,10 +4,10 @@ import {
   type ListRenderItemInfo,
   Pressable,
   StyleSheet,
-  Text,
   useWindowDimensions,
   View,
 } from "react-native";
+import { Text } from "../Text";
 import { GlassSurface } from "../glass";
 import { Icon } from "../Icon";
 import {
@@ -15,7 +15,7 @@ import {
   foldQueryTerms,
   foldText,
 } from "../../lib/chat-search-match";
-import { CONTENT_MAX_FONT_SCALE } from "../../lib/setup-text-defaults";
+import { CONTENT_MAX_FONT_SCALE } from "../../lib/font-scale";
 import { type Colors } from "../../theme/colors";
 import { fadeHex } from "../../theme/oklch";
 import { fonts } from "../../theme/fonts";

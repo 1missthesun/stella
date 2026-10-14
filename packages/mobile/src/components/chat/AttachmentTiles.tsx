@@ -2,15 +2,15 @@ import { useMemo, useState, type ReactNode } from "react";
 import {
   Pressable,
   StyleSheet,
-  Text,
   View,
   type LayoutChangeEvent,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
+import { Text } from "../Text";
 import { Image } from "expo-image";
 import { Icon } from "../Icon";
-import { CONTENT_MAX_FONT_SCALE } from "../../lib/setup-text-defaults";
+import { CONTENT_MAX_FONT_SCALE } from "../../lib/font-scale";
 import type { Colors } from "../../theme/colors";
 import { fonts } from "../../theme/fonts";
 import { fadeHex } from "../../theme/oklch";

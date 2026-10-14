@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef } from "react";
-import { Animated, Easing, Text, type TextStyle } from "react-native";
+import { Animated, Easing, type TextStyle } from "react-native";
+import { Text } from "./Text";
 import { useReducedMotion } from "react-native-reanimated";
-import { CONTENT_MAX_FONT_SCALE } from "../lib/setup-text-defaults";
+import { CONTENT_MAX_FONT_SCALE } from "../lib/font-scale";
 import { shouldRunContinuousAnimation } from "../lib/continuous-animation";
 import { useAppVisible } from "../lib/use-app-visible";
 

@@ -18,6 +18,22 @@ module.exports = defineConfig([
       "react-hooks/purity": "off",
       "react-hooks/refs": "off",
       "react-hooks/set-state-in-effect": "off",
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "react-native",
+              importNames: ["Text"],
+              message: "Import Text from src/components/Text, which applies the Dynamic Type cap.",
+            },
+          ],
+        },
+      ],
     },
-  }
+  },
+  {
+    files: ["src/components/Text.tsx"],
+    rules: { "no-restricted-imports": "off" },
+  },
 ]);

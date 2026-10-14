@@ -3,10 +3,10 @@ import {
   BackHandler,
   Pressable,
   StyleSheet,
-  Text,
   View,
   useWindowDimensions,
 } from "react-native";
+import { Text } from "./Text";
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -21,7 +21,7 @@ import { GlassIconButton } from "./GlassIconButton";
 import type { IconName } from "./Icon";
 import { useColors } from "../theme/theme-context";
 import { fonts } from "../theme/fonts";
-import { CONTENT_MAX_FONT_SCALE } from "../lib/setup-text-defaults";
+import { CONTENT_MAX_FONT_SCALE } from "../lib/font-scale";
 import { useBottomObstruction } from "../lib/use-bottom-obstruction";
 import { useHoldDrawer } from "../lib/drawer";
 

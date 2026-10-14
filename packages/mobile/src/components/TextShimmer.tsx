@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo } from "react";
 import {
   StyleSheet,
-  Text,
   View,
   type LayoutChangeEvent,
   type TextStyle,
 } from "react-native";
+import { Text } from "./Text";
 import MaskedView from "@react-native-masked-view/masked-view";
 import { LinearGradient } from "expo-linear-gradient";
 import Animated, {
@@ -19,7 +19,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { withAlpha } from "@stella/theme";
-import { CONTENT_MAX_FONT_SCALE } from "../lib/setup-text-defaults";
+import { CONTENT_MAX_FONT_SCALE } from "../lib/font-scale";
 import { shouldRunContinuousAnimation } from "../lib/continuous-animation";
 import { useAppVisible } from "../lib/use-app-visible";
 

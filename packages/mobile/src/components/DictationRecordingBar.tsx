@@ -2,11 +2,11 @@ import { memo, useEffect, useMemo, useState } from "react";
 import {
   Pressable,
   StyleSheet,
-  Text,
   View,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
+import { Text } from "./Text";
 import { Icon } from "./Icon";
 import { useColors } from "../theme/theme-context";
 import { fonts } from "../theme/fonts";

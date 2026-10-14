@@ -1,7 +1,8 @@
-import { Pressable, StyleSheet, Text } from "react-native";
+import { Pressable, StyleSheet } from "react-native";
+import { Text } from "./Text";
 import { Icon, type IconName } from "./Icon";
 import type { MobileSchedule } from "../lib/schedules";
-import { CONTENT_MAX_FONT_SCALE } from "../lib/setup-text-defaults";
+import { CONTENT_MAX_FONT_SCALE } from "../lib/font-scale";
 import type { Colors } from "../theme/colors";
 import { fonts } from "../theme/fonts";
 

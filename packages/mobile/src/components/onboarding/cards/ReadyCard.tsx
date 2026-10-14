@@ -1,5 +1,6 @@
 import { useMemo } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { Text } from "../../Text";
 import Animated from "react-native-reanimated";
 import { useT } from "../../../i18n";
 import { type Colors } from "../../../theme/colors";

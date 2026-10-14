@@ -1,5 +1,6 @@
 import { useEffect, useId, useMemo } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
+import { Text } from "./Text";
 import Animated, {
   Easing,
   FadeIn,
@@ -23,7 +24,7 @@ import Svg, {
 } from "react-native-svg";
 import { useAppVisible } from "../lib/use-app-visible";
 import { tapLight } from "../lib/haptics";
-import { CONTENT_MAX_FONT_SCALE } from "../lib/setup-text-defaults";
+import { CONTENT_MAX_FONT_SCALE } from "../lib/font-scale";
 import type { Colors } from "../theme/colors";
 import { fonts } from "../theme/fonts";
 import { fadeHex } from "../theme/oklch";

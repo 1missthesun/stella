@@ -44,11 +44,11 @@ import {
   Keyboard,
   Pressable,
   StyleSheet,
-  Text,
   TextInput,
   View,
   useWindowDimensions,
 } from "react-native";
+import { Text } from "../../src/components/Text";
 import Animated, {
   Extrapolation,
   interpolate,

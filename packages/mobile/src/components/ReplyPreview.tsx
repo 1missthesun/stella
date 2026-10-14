@@ -1,5 +1,6 @@
 import { useMemo } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
+import { Text } from "./Text";
 import type { ReplyRef } from "@stella/contracts/reply-refs";
 import type { Colors } from "../theme/colors";
 import { fonts } from "../theme/fonts";

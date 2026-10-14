@@ -4,10 +4,10 @@ import {
   PanResponder,
   Pressable,
   StyleSheet,
-  Text,
   View,
   type LayoutChangeEvent,
 } from "react-native";
+import { Text } from "./Text";
 import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import { LinearGradient } from "expo-linear-gradient";
 import { Icon } from "./Icon";

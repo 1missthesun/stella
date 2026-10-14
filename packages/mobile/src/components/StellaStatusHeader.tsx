@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   StyleSheet,
-  Text,
   View,
   useWindowDimensions,
   type LayoutChangeEvent,
 } from "react-native";
+import { Text } from "./Text";
 import Animated, {
   Easing,
   FadeIn,

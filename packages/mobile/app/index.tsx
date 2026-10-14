@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { StyleSheet, Text } from "react-native";
+import { StyleSheet } from "react-native";
+import { Text } from "../src/components/Text";
 import { hasMobileConfig } from "../src/config/env";
 import { type Colors } from "../src/theme/colors";
 import { useColors } from "../src/theme/theme-context";

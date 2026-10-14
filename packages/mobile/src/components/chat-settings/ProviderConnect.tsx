@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, StyleSheet, View } from "react-native";
+import { Text } from "../Text";
 import * as Clipboard from "expo-clipboard";
 import * as WebBrowser from "expo-web-browser";
 import type {
@@ -9,7 +10,7 @@ import type {
 } from "@stella/contracts/backend/providers";
 import { getBackendClient } from "../../lib/backend";
 import { notifyError, notifySuccess, tapLight } from "../../lib/haptics";
-import { CONTENT_MAX_FONT_SCALE } from "../../lib/setup-text-defaults";
+import { CONTENT_MAX_FONT_SCALE } from "../../lib/font-scale";
 import { userFacingError } from "../../lib/user-facing-error";
 import type { Colors } from "../../theme/colors";
 import { fonts } from "../../theme/fonts";

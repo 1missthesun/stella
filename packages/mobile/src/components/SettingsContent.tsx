@@ -5,9 +5,9 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   View,
 } from "react-native";
+import { Text } from "./Text";
 import { useRouter } from "expo-router";
 import { GlassToggle } from "./glass";
 import { Icon, type IconName } from "./Icon";

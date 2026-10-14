@@ -4,12 +4,12 @@ import {
   Animated as RNAnimated,
   ScrollView,
   StyleSheet,
-  Text,
   View,
   type LayoutChangeEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from "react-native";
+import { Text } from "../src/components/Text";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, {

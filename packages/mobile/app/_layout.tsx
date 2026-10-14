@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
+import { Text } from "../src/components/Text";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   Stack,
@@ -24,7 +25,6 @@ import {
   registerForPushNotifications,
   setPushDeliveryOwner,
 } from "../src/lib/notifications";
-import { installTextDefaults } from "../src/lib/setup-text-defaults";
 import { selfHostServersAvailable } from "../src/lib/native-capabilities";
 import { isSelfHostedLaunch } from "../src/lib/server-registry";
 import { currentServerFeatures } from "../src/lib/server-features";
@@ -35,7 +35,6 @@ import {
   useMainChatRequested,
 } from "../src/lib/main-chat-request";
 
-installTextDefaults();
 import { clearLegacyGuestMode } from "../src/lib/guest-mode";
 import { loadAiConsent } from "../src/lib/ai-consent";
 import { loadNotificationsMuted } from "../src/lib/notifications-prefs";

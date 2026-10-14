@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
-import { Alert, Pressable, Text, View } from "react-native";
+import { Alert, Pressable, View } from "react-native";
+import { Text } from "../Text";
 import { useFocusEffect, useRouter } from "expo-router";
 import { Icon } from "../Icon";
 import type { SettingsStyles } from "./settings-styles";

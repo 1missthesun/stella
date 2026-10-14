@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
+import { Text } from "./Text";
 import type { Colors } from "../theme/colors";
 import { fonts } from "../theme/fonts";
 import { fadeHex } from "../theme/oklch";

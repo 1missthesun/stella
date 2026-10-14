@@ -5,16 +5,16 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   View,
 } from "react-native";
+import { Text } from "./Text";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { EmailDigest } from "@stella/contracts/backend/email-digest";
 import { useLocale, useT } from "../i18n";
 import { authClient } from "../lib/auth-client";
 import { getBackendClient, useBackendView } from "../lib/backend";
 import { tapLight } from "../lib/haptics";
-import { CONTENT_MAX_FONT_SCALE } from "../lib/setup-text-defaults";
+import { CONTENT_MAX_FONT_SCALE } from "../lib/font-scale";
 import { useAppVisible } from "../lib/use-app-visible";
 import type { Colors } from "../theme/colors";
 import { fonts } from "../theme/fonts";

@@ -6,10 +6,10 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   TextInput,
   View,
 } from "react-native";
+import { Text } from "./Text";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Constants from "expo-constants";
 import { FEEDBACK_MAX_CHARS } from "@stella/contracts/backend/preferences";

@@ -16,11 +16,11 @@ import {
   NativeSyntheticEvent,
   Pressable,
   StyleSheet,
-  Text,
   type TextLayoutEventData,
   useWindowDimensions,
   View,
 } from "react-native";
+import { Text } from "../Text";
 import { Image } from "expo-image";
 import { extractPlainText } from "react-native-nitro-markdown";
 import type { ReplyRef } from "@stella/contracts/reply-refs";
@@ -70,7 +70,7 @@ import {
 } from "../../lib/desktop-artifact-data";
 import { isDeviceOfflineError } from "../../lib/device-requests";
 import { tapMedium } from "../../lib/haptics";
-import { CONTENT_MAX_FONT_SCALE } from "../../lib/setup-text-defaults";
+import { CONTENT_MAX_FONT_SCALE } from "../../lib/font-scale";
 import {
   isUserMessageTruncatable,
   shouldRemeasureUserMessageWidth,

@@ -5,10 +5,10 @@ import {
   Platform,
   Pressable,
   ScrollView,
-  Text,
   TextInput,
   View,
 } from "react-native";
+import { Text } from "../src/components/Text";
 import { StatusBar } from "expo-status-bar";
 import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";

@@ -1,5 +1,6 @@
 import { useMemo } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
+import { Text } from "./Text";
 import { Icon, type IconName } from "./Icon";
 import { GlassToggle } from "./glass";
 import type { AddContextSheetProps } from "./AddContextSheet.types";

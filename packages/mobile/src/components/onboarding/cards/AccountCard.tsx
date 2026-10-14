@@ -3,10 +3,10 @@ import {
   ActivityIndicator,
   Pressable,
   StyleSheet,
-  Text,
   TextInput,
   View,
 } from "react-native";
+import { Text } from "../../Text";
 import Animated from "react-native-reanimated";
 import {
   isEngineConnectionUsable,

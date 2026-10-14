@@ -6,18 +6,18 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   View,
   useWindowDimensions,
   type PanResponderGestureState,
 } from "react-native";
+import { Text } from "../Text";
 import type { CatchUp, CatchUpItem, CatchUpLink } from "@stella/contracts/backend/catch-ups";
 import { CATCH_UP_MIN_NEW_MESSAGES, catchUpOffer, catchUpRows } from "@stella/contracts/catch-up";
 import { useLocale, useT } from "../../i18n";
 import { getBackendClient, useBackendView } from "../../lib/backend";
 import { useHoldDrawer } from "../../lib/drawer";
 import { tapLight } from "../../lib/haptics";
-import { CONTENT_MAX_FONT_SCALE } from "../../lib/setup-text-defaults";
+import { CONTENT_MAX_FONT_SCALE } from "../../lib/font-scale";
 import type { Colors } from "../../theme/colors";
 import { fonts } from "../../theme/fonts";
 import { fadeHex } from "../../theme/oklch";

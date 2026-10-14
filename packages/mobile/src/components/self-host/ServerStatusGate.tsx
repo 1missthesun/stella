@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { AppState, Linking, Platform, Pressable, ScrollView, Text, View } from "react-native";
+import { AppState, Linking, Platform, Pressable, ScrollView, View } from "react-native";
+import { Text } from "../Text";
 import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
 import { SafeAreaView } from "react-native-safe-area-context";

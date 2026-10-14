@@ -35,11 +35,11 @@ import {
   Pressable,
   Share,
   StyleSheet,
-  Text,
   TextInput,
   useWindowDimensions,
   View,
 } from "react-native";
+import { Text } from "./Text";
 import {
   LegendList,
   type LegendListRenderItemProps,
@@ -166,7 +166,7 @@ import {
   getReadAloudPlaybackState,
   useReadAloudPreference,
 } from "../lib/read-aloud";
-import { CONTENT_MAX_FONT_SCALE } from "../lib/setup-text-defaults";
+import { CONTENT_MAX_FONT_SCALE } from "../lib/font-scale";
 import { type Colors } from "../theme/colors";
 import { useColors } from "../theme/theme-context";
 import { fonts } from "../theme/fonts";

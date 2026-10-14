@@ -5,9 +5,9 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   View,
 } from "react-native";
+import { Text } from "../Text";
 import { GlassSurface } from "../glass";
 import { Icon, type IconName } from "../Icon";
 import { type Colors } from "../../theme/colors";

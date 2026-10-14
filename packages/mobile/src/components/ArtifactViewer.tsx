@@ -6,9 +6,9 @@ import {
   ScrollView,
   Share,
   StyleSheet,
-  Text,
   View,
 } from "react-native";
+import { Text } from "./Text";
 import * as Clipboard from "expo-clipboard";
 import { AudioPlayerView } from "./AudioPlayerView";
 import { PosterCover, VideoPlayerView } from "./VideoPlayerView";

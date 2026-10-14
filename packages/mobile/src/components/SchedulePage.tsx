@@ -9,9 +9,9 @@ import {
   Alert,
   Platform,
   StyleSheet,
-  Text,
   View,
 } from "react-native";
+import { Text } from "./Text";
 import { useRouter } from "expo-router";
 import { useT } from "../i18n";
 import {
@@ -24,7 +24,7 @@ import {
 } from "../lib/schedules";
 import { tapLight } from "../lib/haptics";
 import { timeOfDay, upcomingSection } from "../lib/list-sections";
-import { CONTENT_MAX_FONT_SCALE } from "../lib/setup-text-defaults";
+import { CONTENT_MAX_FONT_SCALE } from "../lib/font-scale";
 import { authClient } from "../lib/auth-client";
 import { startChatWith } from "../lib/ask-stella";
 import { useSafeAreaInsets } from "react-native-safe-area-context";

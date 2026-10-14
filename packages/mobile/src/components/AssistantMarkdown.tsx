@@ -1,5 +1,6 @@
 import { memo, useCallback, useMemo, type ReactNode } from "react";
-import { Alert, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Linking, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Text } from "./Text";
 import {
   Markdown,
   List,
@@ -22,7 +23,7 @@ import type { Colors } from "../theme/colors";
 import { SelectableMarkdownText, nativeMarkdownSelectionAvailable } from "./SelectableMarkdownText";
 import { AssistantMarkdownTable } from "./AssistantMarkdownTable";
 import { useT } from "../i18n";
-import { CONTENT_MAX_FONT_SCALE } from "../lib/setup-text-defaults";
+import { CONTENT_MAX_FONT_SCALE } from "../lib/font-scale";
 
 const BASE_FONT_SIZE = 17;
 

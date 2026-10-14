@@ -9,10 +9,10 @@ import {
   ActivityIndicator,
   Pressable,
   StyleSheet,
-  Text,
   TextInput,
   View,
 } from "react-native";
+import { Text } from "./Text";
 import { KeyboardStickyView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useT } from "../i18n";
@@ -38,7 +38,7 @@ import {
   artifactTitle,
 } from "../lib/mobile-artifacts";
 import type { StoredPhoneAccess } from "../lib/phone-access";
-import { CONTENT_MAX_FONT_SCALE } from "../lib/setup-text-defaults";
+import { CONTENT_MAX_FONT_SCALE } from "../lib/font-scale";
 import { useConversationFiles } from "../lib/use-conversation-files";
 import type { Colors } from "../theme/colors";
 import { fonts } from "../theme/fonts";

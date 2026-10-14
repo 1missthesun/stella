@@ -540,6 +540,16 @@ export class SessionStore {
       : null;
   }
 
+  hasComputerAgentCloudOutbox(threadId: string): boolean {
+    return Boolean(
+      this.cached
+        .prepare(
+          `SELECT 1 FROM computer_agent_cloud_outbox WHERE thread_id = ? LIMIT 1`,
+        )
+        .get(threadId),
+    );
+  }
+
   hasUnscopedComputerAgentCloudOutbox(threadId: string): boolean {
     return Boolean(
       this.cached

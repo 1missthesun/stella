@@ -96,6 +96,7 @@ export type OpenStellaHarness = {
         stopped?: true;
         agentStatus: StellaAgentRecord["agentStatus"];
         attempt: number;
+        lastText?: string;
       }
     | undefined
   >;

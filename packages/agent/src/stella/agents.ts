@@ -44,7 +44,7 @@ import {
   type AgentStatus,
 } from "@stella/contracts/agent-status";
 import { isPlacementThreadId, placementRemoteThreadAgentId } from "@stella/contracts/placement-thread-id";
-import { AGENT_REPORT_MAX_CHARS, parseAgentReportId } from "@stella/contracts/backend/agent-reports";
+import { AGENT_REPORT_MAX_CHARS, parseAgentReportId, silentRunReport } from "@stella/contracts/backend/agent-reports";
 import { CLAUDE_CODE_PROVIDER_ID, engineExtensionChange, onClaudeCode } from "../engine/selection.ts";
 import { parseStellaModelId, stellaModelId, STELLA_PROVIDER_ID } from "../provider/stella.ts";
 import { MAX_AGENT_DEPTH, StellaAgentDoc, type StellaAgentRole, type StellaPendingNote } from "./agent-doc.ts";
@@ -342,6 +342,10 @@ const mintAgentId = (description: string, taken: Readonly<Record<string, unknown
 const textOf = (message: AssistantMessage | undefined): string =>
   (message?.content ?? []).map((part) => (part.type === "text" ? part.text : "")).join("").trim();
 
+// A run still going after ours settled serves a newer input, not ours.
+const workingPast = (live: { run?: { inputs: readonly unknown[] } } | undefined, own: unknown): boolean =>
+  own !== undefined && live?.run !== undefined && !live.run.inputs.includes(own);
+
 const stoppedShort = (entries: readonly { kind: string; model?: readonly unknown[] }[]): boolean => {
   const newest = entries.find((entry) => entry.kind === "pi.assistant" || entry.kind === "pi.tool-result");
   if (!newest) return false;
@@ -610,6 +614,7 @@ export function stellaAgents(host: StellaAgentsHost) {
         let refused: string | undefined;
         let end: AgentRunEnd = {};
         let submitted = false;
+        let ownSubmission: unknown;
         try {
           try {
             await host.beginAgentRun?.(run, context);
@@ -635,6 +640,7 @@ export function stellaAgents(host: StellaAgentsHost) {
               context,
             );
             submitted = true;
+            ownSubmission = submission.id;
             settled = await submission.wait(context);
           } catch (error) {
             if (context.abortSignal?.aborted) throw error;
@@ -711,6 +717,10 @@ export function stellaAgents(host: StellaAgentsHost) {
             }, context);
             return;
           }
+          const stillWorking = workingPast(
+            await runtime.snapshot(LiveDoc, agentConversationId, context).catch(() => undefined),
+            ownSubmission,
+          );
           await runtime.commit(async (tx) => {
             const finished =
               settled?.status === "done" && settled.type === "input" && !busy ? settled.answer : undefined;
@@ -748,7 +758,16 @@ export function stellaAgents(host: StellaAgentsHost) {
             if (settled.type !== "input" || !agent) return next();
             const answer = (await tx.entry(AssistantEntry, settled.answer))?.model?.[0] as AssistantMessage | undefined;
             const failed = answer?.stopReason === "error";
-            const result = failed ? textOf(answer) : withClosingNotes(notes.closing.map((note) => note.message), textOf(answer));
+            const said = failed ? textOf(answer) : withClosingNotes(notes.closing.map((note) => note.message), textOf(answer));
+            const result =
+              failed || said.trim()
+                ? said
+                : await silentRunText(
+                    tx,
+                    agentConversationId,
+                    settled.answer,
+                    stillWorking,
+                  );
             end = {
               answer: result,
               ...(failed ? { error: answer?.errorMessage ?? "The agent failed." } : {}),
@@ -1314,6 +1333,31 @@ export function stellaAgents(host: StellaAgentsHost) {
 
   const withClosingNotes = (closing: string[], answer: string): string => [...closing, answer].filter((part) => part.trim()).join("\n\n");
 
+  // A run can end on a tool call, an empty message or a split turn. Its report
+  // then carries the agent's newest words instead of arriving empty.
+  const silentRunText = async (tx: Tx, conversationId: ConversationId, answer: EntryId | undefined, stillWorking: boolean): Promise<string> => {
+    let lastTools: string[] | undefined;
+    let cursor: Parameters<Tx["scanEntries"]>[2];
+    for (let pages = 0; pages < 10; pages += 1) {
+      const page = await tx.scanEntries(
+        { conversationId, ...(answer === undefined ? {} : { maxEntryId: answer }), order: "descending" },
+        50,
+        cursor,
+      );
+      for (const entry of page.items) {
+        if (entry.kind !== "pi.assistant") continue;
+        const message = entry.model?.[0] as AssistantMessage | undefined;
+        const text = textOf(message);
+        if (text) return silentRunReport({ lastMessage: text, ...(lastTools ? { lastTools } : {}), stillWorking });
+        lastTools ??= (message?.content ?? []).flatMap((part) => (part.type === "toolCall" ? [part.name] : []));
+        if (lastTools.length === 0) lastTools = undefined;
+      }
+      cursor = page.next;
+      if (cursor === undefined) break;
+    }
+    return silentRunReport({ ...(lastTools ? { lastTools } : {}), stillWorking });
+  };
+
   const sendMessage = defineTool({
     name: "send_message",
     description:
@@ -1844,7 +1888,7 @@ export function stellaAgents(host: StellaAgentsHost) {
     threadId: string,
     context: Context,
   ): Promise<
-    | { status: StellaAgentRecord["status"]; stopped?: true; agentStatus: AgentStatus; attempt: number }
+    | { status: StellaAgentRecord["status"]; stopped?: true; agentStatus: AgentStatus; attempt: number; lastText?: string }
     | undefined
   > => {
     const found = await treeAgent(harness, threadId, context);
@@ -1863,6 +1907,10 @@ export function stellaAgents(host: StellaAgentsHost) {
       harness.commit(async (tx) => (await tx.scanEntries({ conversationId, order: "descending" }, 40)).items, context),
     ]);
     const latest = recent.find((entry) => entry.kind === "pi.assistant")?.model?.[0] as AssistantMessage | undefined;
+    const lastText = recent
+      .filter((entry) => entry.kind === "pi.assistant")
+      .map((entry) => textOf(entry.model?.[0] as AssistantMessage | undefined))
+      .find((text) => text.length > 0);
     const idleStopped = live?.run === undefined && (wasStopped(found.record) || stoppedShort(recent));
     const running =
       live?.run !== undefined ||
@@ -1873,6 +1921,7 @@ export function stellaAgents(host: StellaAgentsHost) {
       ...(stopped ? { stopped: true as const } : {}),
       agentStatus: running ? "running" : stopped ? "canceled" : latest?.stopReason === "error" ? "failed" : "completed",
       attempt,
+      ...(lastText ? { lastText } : {}),
     };
   };
 
@@ -2176,7 +2225,14 @@ export function stellaAgents(host: StellaAgentsHost) {
         await settle();
         return { threadId, status: "error", error: message.errorMessage ?? "The agent failed." };
       }
-      return { threadId, status: "ok", finalText: withClosingNotes(await settle(settled.answer), textOf(message)) };
+      const finalText = withClosingNotes(await settle(settled.answer), textOf(message));
+      if (finalText.trim()) return { threadId, status: "ok", finalText };
+      const stillWorking = workingPast(await harness.snapshot(LiveDoc, agent.id, context), submission.id);
+      return {
+        threadId,
+        status: "ok",
+        finalText: await harness.commit((tx) => silentRunText(tx, agent.id, settled.answer, stillWorking), context),
+      };
     }
   };
 

@@ -23,6 +23,13 @@ type ComputerAgentTerminalPayload = {
   status: LocalTerminalStatus;
   result?: string;
   error?: string;
+  fallback?: UnrecordedReport;
+};
+
+/** The report a root agent's terminal stands for, delivered from here when the cloud cannot record it. */
+export type UnrecordedReport = {
+  conversationId: string;
+  report: string;
 };
 
 type ComputerAgentCancelPayload = {
@@ -38,6 +45,7 @@ type ComputerAgentCloudOutboxStore = Pick<
   | "resumeComputerAgentCloudOutbox"
   | "getComputerAgentCloudThreadAuthority"
   | "hasUnscopedComputerAgentCloudOutbox"
+  | "hasComputerAgentCloudOutbox"
   | "isComputerAgentCloudGenerationRetired"
   | "bindComputerAgentCloudThreadAuthority"
   | "retireComputerAgentCloudGeneration"
@@ -67,6 +75,7 @@ export type ComputerAgentCloudRecords = {
     result?: string;
     error?: string;
     ownerGeneration: string;
+    fallback?: UnrecordedReport;
   }) => Promise<void>;
   get: (agentId: string) => Promise<AgentToolSnapshot | null>;
   cancel: (
@@ -74,6 +83,7 @@ export type ComputerAgentCloudRecords = {
     reason?: string,
   ) => Promise<{ canceled: boolean }>;
   pending: () => number;
+  hasPending: (threadId: string) => boolean;
   resume: () => void;
   stop: () => void;
 };
@@ -88,6 +98,10 @@ type ComputerAgentCloudRecordOptions = {
     cancel: (args: Record<string, unknown>) => Promise<unknown>;
     get: (args: Record<string, unknown>) => Promise<unknown>;
   };
+  onTerminalUnrecorded?: (args: {
+    threadId: string;
+    attemptGeneration: number;
+  } & UnrecordedReport) => void;
 };
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
@@ -321,6 +335,25 @@ export const createComputerAgentCloudRecords = (
       : null;
   };
 
+  // The cloud has no thread to end for this terminal (an agent it knows only
+  // as a placement, or one whose binding here is gone), so the ledger will
+  // never report it: its report goes to Stella from here instead.
+  const unrecorded = (entry: { kind: string; threadId: string; attemptGeneration: number; payloadJson: string }): void => {
+    if (entry.kind !== "terminal" || !options.onTerminalUnrecorded) return;
+    let fallback: UnrecordedReport | undefined;
+    try {
+      fallback = parsePayload<ComputerAgentTerminalPayload>(entry.payloadJson).fallback;
+    } catch {
+      return;
+    }
+    if (!fallback?.report.trim()) return;
+    options.onTerminalUnrecorded({
+      threadId: entry.threadId,
+      attemptGeneration: entry.attemptGeneration,
+      ...fallback,
+    });
+  };
+
   const scheduleDrain = (delayMs = 0): void => {
     if (stopped) return;
     if (cancelRetryDelay) cancelRetryDelay();
@@ -437,6 +470,7 @@ export const createComputerAgentCloudRecords = (
             }),
           );
         }
+        unrecorded(entry);
         if (entry.ownerGeneration) {
           options.store.retireComputerAgentCloudGeneration({
             threadId: entry.threadId,
@@ -544,6 +578,7 @@ export const createComputerAgentCloudRecords = (
           continue;
         }
         if (entry.kind !== "start" && asRecord(error)?.code === "NOT_FOUND") {
+          unrecorded(entry);
           options.store.deleteComputerAgentCloudOutbox(entry.id);
           continue;
         }
@@ -586,12 +621,23 @@ export const createComputerAgentCloudRecords = (
     ownerGeneration: string;
     payload: unknown;
   }): Promise<void> => {
+    // A terminal may bind a thread whose start never reached this store (a
+    // restart between the two); dropping it would lose the agent's report.
     const authority = authorityForThread(
       args.threadId,
       args.ownerGeneration,
-      args.kind === "start",
+      args.kind !== "cancel",
     );
     const ownerScope = currentOwnerScope() ?? lastKnownOwnerScope;
+    if (!authority && args.kind === "terminal" && (args.payload as ComputerAgentTerminalPayload).fallback) {
+      unrecorded({
+        kind: "terminal",
+        threadId: args.threadId,
+        attemptGeneration: args.attemptGeneration,
+        payloadJson: JSON.stringify(args.payload),
+      });
+      return;
+    }
     if (!authority && (ownerScope || args.kind !== "start")) {
       const message = `OWNER_DATA_GENERATION_STALE: ${args.kind} was rejected for a retired or mismatched computer-agent generation.`;
       throw args.kind === "start"
@@ -702,6 +748,7 @@ export const createComputerAgentCloudRecords = (
           status: args.status,
           ...(args.result ? { result: args.result } : {}),
           ...(args.error ? { error: args.error } : {}),
+          ...(args.fallback ? { fallback: args.fallback } : {}),
         } satisfies ComputerAgentTerminalPayload,
       });
     },
@@ -748,6 +795,7 @@ export const createComputerAgentCloudRecords = (
     },
 
     pending: () => options.store.countComputerAgentCloudOutbox(),
+    hasPending: (threadId) => options.store.hasComputerAgentCloudOutbox(threadId),
     resume: () => {
       stopped = false;
       const ownerScope = currentOwnerScope();

@@ -82,3 +82,39 @@ export type AgentReportViews = {
     result: DeviceAgentReport[];
   };
 };
+
+export const AGENT_NO_FINAL_MESSAGE =
+  "The agent's run ended without a closing message.";
+
+export const silentRunReport = (args: {
+  lastMessage?: string;
+  lastTools?: readonly string[];
+  stillWorking?: boolean;
+}): string => {
+  const last = args.lastMessage?.trim();
+  return [
+    AGENT_NO_FINAL_MESSAGE,
+    last
+      ? `Its last message was:\n\n${last}`
+      : args.lastTools?.length
+        ? `It wrote no message; its last step called ${args.lastTools.join(", ")}.`
+        : "It wrote no message at all.",
+    args.stillWorking
+      ? "It is still working on a newer message; its next report follows."
+      : "Check its work (agent_status, or message it) before relying on this.",
+  ].join("\n\n");
+};
+
+// An empty result, or the stand-in a silent run reports, which a later
+// result for the same attempt may replace before the report is delivered.
+export const isPlaceholderAgentResult = (resultJson: string | null | undefined): boolean => {
+  if (!resultJson?.trim()) return true;
+  let text: unknown = resultJson;
+  try {
+    const parsed = JSON.parse(resultJson) as { finalText?: unknown };
+    if (parsed && typeof parsed === "object" && "finalText" in parsed) text = parsed.finalText;
+  } catch {
+    text = resultJson;
+  }
+  return typeof text !== "string" || !text.trim() || text.trim().startsWith(AGENT_NO_FINAL_MESSAGE);
+};

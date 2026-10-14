@@ -1976,7 +1976,7 @@ export function desktopChats(options: DesktopChatsOptions) {
     async agentStatus(
       threadId: string,
     ): Promise<
-      { conversationId: string; status: "running" | "completed" | "error" | "canceled"; attempt: number } | undefined
+      { conversationId: string; status: "running" | "completed" | "error" | "canceled"; attempt: number; lastText?: string } | undefined
     > {
       const conversationId = (await threadIndex())[threadId];
       if (!conversationId) return undefined;
@@ -1992,6 +1992,7 @@ export function desktopChats(options: DesktopChatsOptions) {
               ? record.agentStatus
               : record.status,
         attempt: record.attempt,
+        ...(record.lastText ? { lastText: record.lastText } : {}),
       };
     },
     busy(): boolean {

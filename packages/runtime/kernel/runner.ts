@@ -6,7 +6,7 @@ import {
   resolveAgentModelRoute,
 } from "./runner/context.js";
 import type { WebSearchResult } from "@stella/contracts/backend/search";
-import { raceWithTimeoutError } from "./runner/cloud-effect-runtime.js";
+import { forkDelayedCall, raceWithTimeoutError } from "./runner/cloud-effect-runtime.js";
 import { scheduleRemotePromptRevalidation } from "./prompts/remote-prompts.js";
 import { createRunnerPiTools } from "./runner/pi-tools.js";
 import { pushedDevices } from "./runner/execution-context.js";
@@ -208,6 +208,26 @@ export const createStellaHostRunner = (
         await context.backend.require().call("computerThreads.cancel", args as never),
       get: async (args) =>
         await context.backend.require().call("computerThreads.get", args as never),
+    },
+    onTerminalUnrecorded: (unrecorded) => {
+      const note = {
+        conversationId: unrecorded.conversationId,
+        requestId: `agent-report-local:${unrecorded.threadId}:${unrecorded.attemptGeneration}`,
+        text: unrecorded.report,
+      };
+      const attempt = (left: number): void => {
+        const deliver = context.state.piReportDelivery;
+        void (deliver ? deliver(note) : Promise.reject(new Error("Stella's chat is not ready.")))
+          .then(() => console.info("[computer-agents] delivered a report the cloud could not record", unrecorded.threadId))
+          .catch((error: unknown) => {
+            if (left <= 0) {
+              console.warn("[computer-agents] a report the cloud could not record was not delivered", unrecorded.threadId, error);
+              return;
+            }
+            forkDelayedCall(5_000, () => attempt(left - 1));
+          });
+      };
+      attempt(60);
     },
   });
   resumeComputerAgentCloudRecords = computerAgentCloudRecords.resume;
@@ -441,6 +461,7 @@ export const createStellaHostRunner = (
           cancel: async (input) =>
             await backend.call("computerThreads.cancel", { ...fence, ...input }),
           standing: elsewhere,
+          pending: (threadId) => computerAgentCloudRecords.hasPending(threadId),
         });
       },
     },

@@ -468,6 +468,7 @@ export const piChatsFor = (
             status,
             ownerGeneration: await runner.cloudJournal.ownerGeneration(),
             ...(body ? (status === "completed" ? { result: body } : { error: body }) : {}),
+            fallback: { conversationId: agent.conversationId, report: agent.report },
           });
         })().catch((error) => console.warn("[pi-chat] computer thread completion failed", error));
       },
@@ -539,7 +540,14 @@ const piAgentStanding = async (
     return undefined;
   }
   const status = await (await piChatsFor(session, hostBus)).agentStatus(threadId);
-  return status && { status: status.status, attempt: status.attempt, ...(status.status === "canceled" ? { error: AGENT_STOPPED_REASON } : {}) };
+  return (
+    status && {
+      status: status.status,
+      attempt: status.attempt,
+      ...(status.status === "canceled" ? { error: AGENT_STOPPED_REASON } : {}),
+      ...(status.lastText ? { lastText: status.lastText } : {}),
+    }
+  );
 };
 
 const reconciling = new WeakMap<OpenSession, Promise<void>>();

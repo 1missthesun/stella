@@ -3,7 +3,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { systemPreferences } from "electron";
 import { resolveNativeHelperPath } from "../native-helper-path.js";
-import { reapPidfileDaemon } from "./helper-pid-guard.js";
+import { pidIsAlive, terminateOwnedProcess } from "./process-identity.js";
 import { hasMacPermission, requestMacPermission } from "../utils/macos-permissions.js";
 
 /**
@@ -60,14 +60,7 @@ export type MeetingStatus = {
   micPermission: boolean;
 };
 
-// The daemon is spawned detached + unref'd and the in-memory child handle is
-// dropped on spawn error, so on quit we can't rely on `this.child` alone to
-// reap it (orphan risk). Persist the pid to a file at spawn time and, if the
-// socket `shutdown` didn't confirm exit, SIGTERM/SIGKILL the pidfile pid — the
-// same belt-and-suspenders teardown as desktop-automation-cleanup.ts. The
-// socket shutdown stays the primary path.
-const meetingPidFile = (stellaDataDir: string): string =>
-  path.join(stellaDataDir, "meetings", "meeting_capture.pid");
+const CHILD_EXIT_GRACE_MS = 500;
 
 export class MeetingCaptureController {
   private child: ChildProcess | null = null;
@@ -155,16 +148,6 @@ export class MeetingCaptureController {
       env: { ...process.env, STELLA_PARENT_PID: String(process.pid) },
     });
     this.child = child;
-    // Persist the pid so quit can reap the daemon even after the in-memory
-    // handle is dropped (spawn error / process restart). Best-effort: a missing
-    // pidfile just falls back to the socket shutdown.
-    if (typeof child.pid === "number") {
-      try {
-        await fs.writeFile(meetingPidFile(this.stellaDataDir), String(child.pid));
-      } catch {
-        // ignored — socket shutdown remains the primary teardown path
-      }
-    }
     let spawnErrorMessage: string | null = null;
     child.on("error", (error) => {
       spawnErrorMessage = error.message;
@@ -340,25 +323,13 @@ export class MeetingCaptureController {
 
   /** Finalize any active recording and stop the daemon. Used on app quit. */
   async shutdown(): Promise<void> {
-    // Primary path: ask the daemon to finalize + shut itself down over the
-    // socket.
     await this.runCommand(["shutdown"]);
-    if (this.child && !this.child.killed) {
-      try {
-        this.child.kill("SIGTERM");
-      } catch {
-        // already stopped
-      }
-    }
+    const child = this.child;
     this.child = null;
-
-    // Fallback: if the socket shutdown didn't actually take the process down
-    // (e.g. the daemon was orphaned across a restart, so `this.child` is null),
-    // reap the persisted pid — guarded against pid reuse and always dropping the
-    // pidfile afterwards. See reapPidfileDaemon.
-    await reapPidfileDaemon(meetingPidFile(this.stellaDataDir), this.resolveBin(), [
-      "--root",
-      this.stellaDataDir,
-    ]);
+    const pid = child?.pid;
+    if (!child || pid === undefined) return;
+    const exited = () =>
+      child.exitCode !== null || child.signalCode !== null || !pidIsAlive(pid);
+    await terminateOwnedProcess(pid, () => !exited(), CHILD_EXIT_GRACE_MS);
   }
 }

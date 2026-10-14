@@ -14,6 +14,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { isInstalledProduct } from "../app-identity.js";
 import { resolveDesktopStellaDataDirForInstall } from "../data-paths.js";
+import { processIdentityIsLive } from "./process-identity.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -225,7 +226,9 @@ export type BrowserBridgeOwnerRecord = Readonly<{
   instanceId: string;
   /** The owning Electron main process. */
   ownerPid: number;
+  ownerStartedAtMs?: number | null;
   daemonPid: number | null;
+  daemonStartedAtMs?: number | null;
   mode: BrowserBridgeMode;
   claim: boolean;
   packaged: boolean;
@@ -241,16 +244,18 @@ const LAUNCH_GRACE_MS = 60_000;
 const ownerRecordPath = (socketDir: string, session: string) =>
   path.join(socketDir, `${session}.owner.json`);
 
-export const pidIsAlive = (pid: number | null | undefined): boolean => {
-  if (!pid || !Number.isInteger(pid) || pid <= 0) return false;
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    // EPERM: alive, owned by someone else.
-    return (error as NodeJS.ErrnoException).code === "EPERM";
-  }
-};
+export const recordedOwnerIsLive = (record: BrowserBridgeOwnerRecord) =>
+  processIdentityIsLive({
+    pid: record.ownerPid,
+    startedAtMs: record.ownerStartedAtMs ?? null,
+  });
+
+export const recordedDaemonIsLive = (record: BrowserBridgeOwnerRecord) =>
+  record.daemonPid !== null &&
+  processIdentityIsLive({
+    pid: record.daemonPid,
+    startedAtMs: record.daemonStartedAtMs ?? null,
+  });
 
 export const readBrowserBridgeOwner = (
   socketDir: string,
@@ -305,7 +310,7 @@ export const releaseBrowserBridgeOwner = (
 /**
  * Whether the recorded owner is a different, still-running instance: its
  * Electron process is alive and either its daemon is alive or it is still
- * launching one. (A reused owner pid with a dead daemon ages out.)
+ * launching one.
  */
 export const isLiveForeignOwner = (
   record: BrowserBridgeOwnerRecord | null,
@@ -315,8 +320,8 @@ export const isLiveForeignOwner = (
     record &&
       record.instanceId !== BROWSER_BRIDGE_INSTANCE_ID &&
       record.ownerPid !== process.pid &&
-      pidIsAlive(record.ownerPid) &&
-      (pidIsAlive(record.daemonPid) || now - record.recordedAtMs < LAUNCH_GRACE_MS),
+      recordedOwnerIsLive(record) &&
+      (recordedDaemonIsLive(record) || now - record.recordedAtMs < LAUNCH_GRACE_MS),
   );
 
 /** Opted-in dev claim > installed app > unclaimed dev checkout. */

@@ -11,6 +11,7 @@ import path from "node:path";
 import { resolveStatePath } from "@stella/runtime/kernel/cli/shared";
 import { resolveAutomationSocketPath } from "@stella/runtime/kernel/computer-use/automation-socket-paths";
 import { resolveNativeHelperPath } from "../native-helper-path.js";
+import { pidRunsExecutable, terminateOwnedProcess } from "./process-identity.js";
 
 const stellaComputerStateRoot = () =>
   path.join(resolveStatePath(), "stella-computer");
@@ -32,32 +33,7 @@ const readPidFile = (filePath: string): number | null => {
   }
 };
 
-const isProcessAlive = (pid: number): boolean => {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "EPERM") {
-      // Process exists but we can't signal it; treat as alive so we
-      // still attempt SIGTERM (which may still be permitted) and let
-      // the kill fail loudly if not.
-      return true;
-    }
-    return false;
-  }
-};
-
-const trySignal = (pid: number, signal: NodeJS.Signals): boolean => {
-  try {
-    process.kill(pid, signal);
-    return true;
-  } catch {
-    return false;
-  }
-};
-
-const sleep = (ms: number) =>
-  new Promise<void>((resolve) => setTimeout(resolve, ms));
+const TERM_GRACE_MS = 150;
 
 const parsePsRows = (
   output: string,
@@ -105,27 +81,29 @@ const findOrphanedDesktopAutomationPids = (): number[] => {
   }
 };
 
-// Stops every long-lived stella-computer daemon. macOS stores
-// `desktop_automation` pids under
-// `<stateDir>/stella-computer/sessions/<id>/automation.pid` plus sockets under
-// `~/.stella/computer-sockets/<sha>.sock` (home-anchored so the path stays
-// inside the 104-byte macOS Unix-socket cap); Windows stores
-// `stella-computer-helper.exe` pids under
-// `~/.stella/stella-computer/sessions/<id>/windows-daemon/helper.pid`.
-// We SIGTERM the pids, give them a moment to exit cleanly, then SIGKILL
-// anything that didn't, and finally clean up pid/socket state so the next
-// boot doesn't trip over stale entries.
-//
-// The reason this matters: macOS does not reload an executable under a
-// running process. If you rebuild `desktop_automation` and a daemon is
-// already alive, the old code stays mapped in. Killing on quit means
-// the next Stella launch always spawns a fresh daemon from the
-// on-disk binary.
+/**
+ * Stops every stella-computer daemon on quit so the next launch spawns a fresh
+ * one from the on-disk binary: macOS keeps the old code mapped under a running
+ * process.
+ */
 export const stopAllDesktopAutomationDaemons = async (): Promise<void> => {
   const root = stellaComputerStateRoot();
   const sessions = sessionsDir(root);
+  const macHelperPath =
+    process.platform === "win32"
+      ? null
+      : resolveNativeHelperPath("desktop_automation");
+  const windowsHelperPath =
+    process.platform === "win32"
+      ? resolveNativeHelperPath("stella-computer-helper")
+      : null;
 
-  const targetedPids = new Set<number>(findOrphanedDesktopAutomationPids());
+  const targets = new Map<number, () => boolean>();
+  if (macHelperPath) {
+    for (const pid of findOrphanedDesktopAutomationPids()) {
+      targets.set(pid, () => pidRunsExecutable(pid, macHelperPath, ["daemon"]));
+    }
+  }
   const pidFiles: string[] = [];
   const sessionNames: string[] = [];
 
@@ -148,33 +126,31 @@ export const stopAllDesktopAutomationDaemons = async (): Promise<void> => {
       if (!isDir) continue;
       sessionNames.push(name);
 
-      const sessionPidFiles = [
-        path.join(sessionPath, "automation.pid"),
-        path.join(sessionPath, "windows-daemon", "helper.pid"),
-      ];
-      for (const pidFile of sessionPidFiles) {
-        const pid = readPidFile(pidFile);
-        if (pid !== null && isProcessAlive(pid)) {
-          targetedPids.add(pid);
-        }
-        if (existsSync(pidFile)) {
-          pidFiles.push(pidFile);
-        }
+      const macPidFile = path.join(sessionPath, "automation.pid");
+      const windowsPidFile = path.join(sessionPath, "windows-daemon", "helper.pid");
+      const macPid = readPidFile(macPidFile);
+      if (macPid !== null && macHelperPath) {
+        targets.set(macPid, () =>
+          pidRunsExecutable(macPid, macHelperPath, ["--pid-file", macPidFile]),
+        );
+      }
+      const windowsPid = readPidFile(windowsPidFile);
+      if (windowsPid !== null && windowsHelperPath) {
+        targets.set(windowsPid, () =>
+          pidRunsExecutable(windowsPid, windowsHelperPath),
+        );
+      }
+      for (const pidFile of [macPidFile, windowsPidFile]) {
+        if (existsSync(pidFile)) pidFiles.push(pidFile);
       }
     }
   }
 
-  for (const pid of targetedPids) {
-    trySignal(pid, "SIGTERM");
-  }
-  if (targetedPids.size > 0) {
-    await sleep(150);
-    for (const pid of targetedPids) {
-      if (isProcessAlive(pid)) {
-        trySignal(pid, "SIGKILL");
-      }
-    }
-  }
+  await Promise.all(
+    Array.from(targets, ([pid, stillOwned]) =>
+      terminateOwnedProcess(pid, stillOwned, TERM_GRACE_MS),
+    ),
+  );
 
   // Drop the pidfiles + per-session sockets so the next launch never
   // mistakes a dead pid for a live daemon.

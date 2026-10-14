@@ -24,7 +24,6 @@ import {
   decideBrowserBridgeTakeover,
   getBrowserBridgeNamespace,
   pickFreeLoopbackPort,
-  pidIsAlive,
   readBrowserBridgeBinaryIdentity,
   readBrowserBridgeDaemonPid,
   readBrowserBridgeOwner,
@@ -32,7 +31,16 @@ import {
   writeBrowserBridgeOwner,
   type BrowserBridgeBinaryIdentity,
   type BrowserBridgeNamespace,
+  type BrowserBridgeOwnerRecord,
 } from "./stella-browser-bridge-namespace.js";
+import {
+  pidCommandLine,
+  pidRunsExecutable,
+  processIdentityIsLive,
+  processStartedAtMs,
+  terminateOwnedProcess,
+  type ProcessIdentity,
+} from "./process-identity.js";
 import {
   activateStagedStellaBrowserBinary,
   resolveLegacyStellaBrowserBinaryPath,
@@ -42,6 +50,19 @@ import {
 import { stopChildProcessTree } from "../process-runtime.js";
 
 const execFileAsync = promisify(execFile);
+
+let ownProcessStartedAtMs: number | null | undefined;
+const ownStartedAtMs = () =>
+  ownProcessStartedAtMs === undefined
+    ? (ownProcessStartedAtMs = processStartedAtMs(process.pid))
+    : ownProcessStartedAtMs;
+
+const recordedDaemonIdentity = (
+  record: BrowserBridgeOwnerRecord,
+): ProcessIdentity | null =>
+  record.daemonPid === null
+    ? null
+    : { pid: record.daemonPid, startedAtMs: record.daemonStartedAtMs ?? null };
 
 const DAEMON_READY_TIMEOUT_MS = 10_000;
 const COMMAND_TIMEOUT_MS = 10_000;
@@ -154,36 +175,34 @@ const findOrphanedBundledDaemonPids = async (): Promise<number[]> => {
 export const stopOrphanedStellaBrowserDaemons = async () => {
   const pids = await findOrphanedBundledDaemonPids();
   if (pids.length === 0) return;
-  for (const pid of pids) {
-    if (process.platform === "win32") {
-      try {
-        await execFileAsync("taskkill", ["/pid", String(pid), "/T", "/F"], {
+  if (process.platform === "win32") {
+    await Promise.all(
+      pids.map((pid) =>
+        execFileAsync("taskkill", ["/pid", String(pid), "/T", "/F"], {
           windowsHide: true,
-        });
-        continue;
-      } catch {
-        // Fall through to a direct kill attempt below.
-      }
-    }
-    try {
-      process.kill(pid, "SIGTERM");
-    } catch {
-      // Already stopped.
-    }
+        }).catch(() => undefined),
+      ),
+    );
+    return;
   }
-  await delay(150);
-  for (const pid of pids) {
-    try {
-      process.kill(pid, 0);
-    } catch {
-      continue;
-    }
-    try {
-      process.kill(pid, "SIGKILL");
-    } catch {
-      // Best-effort stale daemon cleanup.
-    }
-  }
+  const binaryPaths = [
+    resolveStellaBrowserBinaryPath(),
+    resolveLegacyStellaBrowserBinaryPath(),
+  ].filter((value): value is string => Boolean(value));
+  await Promise.all(
+    pids.map((pid) =>
+      terminateOwnedProcess(
+        pid,
+        () => {
+          const command = pidCommandLine(pid);
+          return Boolean(
+            command && binaryPaths.some((binary) => command.includes(binary)),
+          );
+        },
+        150,
+      ),
+    ),
+  );
 };
 
 type StellaBrowserBridgeServiceOptions = {
@@ -581,7 +600,7 @@ export class StellaBrowserBridgeService {
       // already completed its process sweep.
       if (this.stopped) return;
 
-      await this.closeExistingSession(takeover.replaceDaemonPid);
+      await this.closeExistingSession(takeover.replaceDaemon);
       if (this.stopped) return;
       const extPort = this.namespace.extPort ?? (await pickFreeLoopbackPort());
       if (this.stopped) return;
@@ -612,7 +631,9 @@ export class StellaBrowserBridgeService {
    * it with equal or higher priority, or when replacing it would downgrade
    * the bridge binary; nothing is closed or killed in that case.
    */
-  private async claimNamespace(): Promise<{ replaceDaemonPid: number | null }> {
+  private async claimNamespace(): Promise<{
+    replaceDaemon: ProcessIdentity | null;
+  }> {
     const stellaBrowserRoot = resolveStellaBrowserRoot();
     activateStagedStellaBrowserBinary(stellaBrowserRoot);
     const binaryPath = resolveStellaBrowserBinaryPath(stellaBrowserRoot);
@@ -636,16 +657,19 @@ export class StellaBrowserBridgeService {
       console.warn(
         `[stella-browser-bridge] Claiming the shared browser bridge from pid ${decision.owner.ownerPid} (${decision.owner.packaged ? "installed app" : "dev checkout"}).`,
       );
-      return { replaceDaemonPid: decision.owner.daemonPid };
+      return { replaceDaemon: recordedDaemonIdentity(decision.owner) };
     }
     // Our own previous daemon, or an orphan whose owner is gone.
     return {
-      replaceDaemonPid:
-        decision.replacing === "orphan" ? (owner?.daemonPid ?? null) : null,
+      replaceDaemon:
+        decision.replacing === "orphan" && owner
+          ? recordedDaemonIdentity(owner)
+          : null,
     };
   }
 
   private recordOwnership() {
+    const daemonPid = this.daemonProcess?.pid ?? null;
     try {
       writeBrowserBridgeOwner(
         this.namespace.socketDir,
@@ -654,7 +678,10 @@ export class StellaBrowserBridgeService {
           version: 1,
           instanceId: BROWSER_BRIDGE_INSTANCE_ID,
           ownerPid: process.pid,
-          daemonPid: this.daemonProcess?.pid ?? null,
+          ownerStartedAtMs: ownStartedAtMs(),
+          daemonPid,
+          daemonStartedAtMs:
+            daemonPid === null ? null : processStartedAtMs(daemonPid),
           mode: this.namespace.mode,
           claim: this.namespace.claim,
           packaged: this.namespace.packaged,
@@ -988,14 +1015,16 @@ export class StellaBrowserBridgeService {
    * `claimNamespace` allowed it: the daemon there is this instance's own, an
    * orphan, a pre-ownership one, or one an opted-in claim replaces.
    */
-  private async closeExistingSession(replaceDaemonPid: number | null = null) {
+  private async closeExistingSession(
+    replaceDaemon: ProcessIdentity | null = null,
+  ) {
     const daemonPort = getPortForSession(STELLA_BROWSER_BRIDGE_SESSION);
 
     if (
-      replaceDaemonPid != null &&
-      replaceDaemonPid !== this.daemonProcess?.pid
+      replaceDaemon !== null &&
+      replaceDaemon.pid !== this.daemonProcess?.pid
     ) {
-      await this.stopRecordedDaemon(replaceDaemonPid);
+      await this.stopRecordedDaemon(replaceDaemon);
     }
 
     await this.sendCommand(
@@ -1019,38 +1048,15 @@ export class StellaBrowserBridgeService {
 
   /**
    * Stop a daemon named by an ownership record. Its control token is another
-   * instance's, so `close` would be refused; signal it directly after
-   * checking the pid still runs a bridge daemon (pids are reused). Windows
+   * instance's, so `close` would be refused; signal it directly. Windows
    * daemons are cleared by their control port instead.
    */
-  private async stopRecordedDaemon(pid: number) {
-    if (process.platform === "win32" || !pidIsAlive(pid)) return;
-    try {
-      const { stdout } = await execFileAsync(
-        "ps",
-        ["-o", "command=", "-p", String(pid)],
-        { encoding: "utf8" },
-      );
-      if (!stdout.includes("service run")) return;
-    } catch {
-      return;
-    }
-    try {
-      process.kill(pid, "SIGTERM");
-    } catch {
-      return;
-    }
-    const deadline = Date.now() + DAEMON_SHUTDOWN_TIMEOUT_MS;
-    while (Date.now() < deadline && pidIsAlive(pid)) {
-      await delay(100);
-    }
-    if (pidIsAlive(pid)) {
-      try {
-        process.kill(pid, "SIGKILL");
-      } catch {
-        // Already gone.
-      }
-    }
+  private async stopRecordedDaemon(daemon: ProcessIdentity) {
+    if (process.platform === "win32") return;
+    const stillOwned = () =>
+      processIdentityIsLive(daemon) &&
+      Boolean(pidCommandLine(daemon.pid)?.includes("service run"));
+    await terminateOwnedProcess(daemon.pid, stillOwned, DAEMON_SHUTDOWN_TIMEOUT_MS);
   }
 
   private sendCommand(
@@ -1284,26 +1290,33 @@ export class StellaBrowserBridgeService {
   }
 
   private async killProcessListeningOnPort(port: number) {
+    const binaryPath = resolveStellaBrowserBinaryPath();
+    const isBridgeDaemon = (pid: number) =>
+      process.platform === "win32"
+        ? binaryPath !== null && pidRunsExecutable(pid, binaryPath)
+        : Boolean(pidCommandLine(pid)?.includes("service run"));
     const pids = await this.getListeningProcessesForPort(port);
-
-    for (const pid of pids) {
-      if (process.platform === "win32") {
-        try {
+    await Promise.all(
+      pids.map(async (pid) => {
+        if (!isBridgeDaemon(pid)) {
+          console.warn(
+            `[stella-browser-bridge] Port ${port} is held by pid ${pid}, which is not a browser bridge daemon; leaving it running.`,
+          );
+          return;
+        }
+        if (process.platform === "win32") {
           await execFileAsync("taskkill", ["/pid", String(pid), "/T", "/F"], {
             windowsHide: true,
-          });
-          continue;
-        } catch {
-          // Fall through to a direct kill attempt below.
+          }).catch(() => undefined);
+          return;
         }
-      }
-
-      try {
-        process.kill(pid, "SIGTERM");
-      } catch {
-        // Best-effort cleanup for stale daemon listeners.
-      }
-    }
+        await terminateOwnedProcess(
+          pid,
+          () => isBridgeDaemon(pid),
+          DAEMON_SHUTDOWN_TIMEOUT_MS,
+        );
+      }),
+    );
   }
 }
 

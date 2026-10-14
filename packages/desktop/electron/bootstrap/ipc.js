@@ -17,7 +17,7 @@ import { app, BrowserWindow, shell } from "electron";
 import { toggleRealtimeVoice, } from "../services/realtime-voice-control.js";
 import { WakewordService } from "../services/wakeword-service.js";
 import { loadLocalPreferences, saveLocalPreferences, } from "@stella/runtime/kernel/preferences/local-preferences";
-import { IPC_APP_SOURCE_STATE, IPC_BROWSER_VIEW_STATE, IPC_PREFERENCES_GET_WAKE_WORD, IPC_PREFERENCES_SET_WAKE_WORD, } from "@stella/contracts/desktop/ipc-channels";
+import { IPC_APP_SOURCE_STATE, IPC_BROWSER_VIEW_STATE, IPC_PREFERENCES_GET_WAKE_WORD, IPC_PREFERENCES_SET_WAKE_WORD, IPC_PREFERENCES_WAKE_WORD_CHANGED, } from "@stella/contracts/desktop/ipc-channels";
 import { registerOfficePreviewHandlers } from "../ipc/office-preview-handlers.js";
 import { registerChatEvidenceHandlers } from "../ipc/chat-evidence-handlers.js";
 import { createCloudConversationFileGrants } from "../services/cloud-conversation-file-grants.js";
@@ -553,11 +553,12 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
             prefs.wakeWordEnabled = next;
             saveLocalPreferences(root, prefs);
         }
-        // Null-safe: the listener is now constructed in a deferred post-registration
-        // task. The persisted preference above is the source of truth, so a toggle
-        // that lands before construction is honored when the deferred setEnabled
-        // runs; `?.` only guards the (renderer-not-yet-painted) startup race.
         wakeword?.setEnabled(next);
+        for (const window of BrowserWindow.getAllWindows()) {
+            if (!window.isDestroyed()) {
+                window.webContents.send(IPC_PREFERENCES_WAKE_WORD_CHANGED, next);
+            }
+        }
         return { enabled: next };
     });
     state.deviceRequestHandlers = {

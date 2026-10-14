@@ -189,21 +189,10 @@ export function VoiceRuntimeRoot() {
     });
   }, []);
 
-  // The wake-word IPC isn't broadcast on toggle today — re-read the
-  // setting whenever the window regains focus. That's enough to pick
-  // up settings-panel changes without adding a dedicated push channel.
-  useEffect(() => {
-    const refresh = () => {
-      void window.electronAPI?.system
-        ?.getWakeWordEnabled?.()
-        .then(setWakeWordEnabled)
-        .catch(() => undefined);
-    };
-    window.addEventListener("focus", refresh);
-    return () => {
-      window.removeEventListener("focus", refresh);
-    };
-  }, []);
+  useEffect(
+    () => window.electronAPI?.system?.onWakeWordEnabledChanged?.(setWakeWordEnabled),
+    [],
+  );
 
   const stopRuntimeSession = () => {
     if (levelTimerRef.current) {

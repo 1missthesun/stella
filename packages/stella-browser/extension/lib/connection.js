@@ -80,24 +80,21 @@ export function send(message) {
 }
 
 /**
- * Check whether the Stella daemon is listening on the bridge port.
- * Any HTTP response means it's up. An abort (something accepted the
- * connection but never spoke HTTP) is treated as up too — that's an older
- * daemon build that predates the health endpoint. A fast network error
- * means nothing is listening (Stella is closed).
+ * Check whether the Stella daemon is listening on the bridge port. It answers
+ * the health probe with 204; anything else, including a timeout, is not up.
  * @returns {Promise<boolean>}
  */
 async function isDaemonUp() {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT);
   try {
-    await fetch(BRIDGE_HEALTH_URL, {
+    const response = await fetch(BRIDGE_HEALTH_URL, {
       signal: controller.signal,
       cache: "no-store",
     });
-    return true;
-  } catch (err) {
-    return err?.name === "AbortError";
+    return response.status === 204;
+  } catch {
+    return false;
   } finally {
     clearTimeout(timer);
   }

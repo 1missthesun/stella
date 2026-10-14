@@ -32,13 +32,11 @@ import {
   Linking,
   NativeScrollEvent,
   NativeSyntheticEvent,
-  Platform,
   Pressable,
   Share,
   StyleSheet,
   Text,
   TextInput,
-  UIManager,
   useWindowDimensions,
   View,
 } from "react-native";
@@ -179,14 +177,6 @@ import type {
   ComposerQuote,
   MobileTask,
 } from "../types";
-
-// Required for LayoutAnimation on Android.
-if (
-  Platform.OS === "android" &&
-  UIManager.setLayoutAnimationEnabledExperimental
-) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 /**
  * Quiet window after the footer stops shrinking before we commit the smaller

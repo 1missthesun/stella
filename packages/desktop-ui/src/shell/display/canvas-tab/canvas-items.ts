@@ -187,8 +187,8 @@ export const loadCanvasHtmlHistory = async (): Promise<void> => {
         changed = true;
       }
       if (changed) emit();
-    } catch {
-      // Keep the list usable even if filesystem enumeration is unavailable.
+    } catch (error) {
+      console.warn("[canvas] listing saved canvases failed", error);
     } finally {
       historyLoadInFlight = null;
     }

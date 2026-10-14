@@ -267,12 +267,8 @@ export function AskStellaSelectionChip() {
       pendingClickRef.current = true;
       setChip(null);
 
-      try {
-        window.getSelection()?.removeAllRanges();
-        chip.source?.postMessage({ type: "stella:canvas-selection-clear" }, "*");
-      } catch {
-        /* selection may not be removable in some hosts */
-      }
+      window.getSelection()?.removeAllRanges();
+      chip.source?.postMessage({ type: "stella:canvas-selection-clear" }, "*");
 
       const electronApi = window.electronAPI;
       const capture = electronApi?.capture;

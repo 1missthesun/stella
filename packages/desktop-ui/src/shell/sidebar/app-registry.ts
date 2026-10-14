@@ -29,12 +29,6 @@ if (import.meta.hot) {
     ).getSnapshot?.();
     if (!next) return;
     cachedSnapshot = next;
-    for (const cb of subscribers) {
-      try {
-        cb();
-      } catch {
-        // Subscribers throwing should never break the registry.
-      }
-    }
+    for (const cb of subscribers) cb();
   });
 }

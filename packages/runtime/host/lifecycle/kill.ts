@@ -43,8 +43,10 @@ const waitForPidExit = (
 export const killWorkerProcess = (
   pid: number,
   graceMs: number,
+  stillOwned: () => boolean = () => true,
 ): Effect.Effect<KillResult> =>
   Effect.gen(function* () {
+    if (!stillOwned()) return { stopped: false, escalatedToSigkill: false };
     try {
       process.kill(pid, "SIGTERM");
     } catch {
@@ -53,6 +55,7 @@ export const killWorkerProcess = (
     if (yield* waitForPidExit(pid, graceMs)) {
       return { stopped: true, escalatedToSigkill: false };
     }
+    if (!stillOwned()) return { stopped: true, escalatedToSigkill: false };
     try {
       process.kill(pid, "SIGKILL");
     } catch {

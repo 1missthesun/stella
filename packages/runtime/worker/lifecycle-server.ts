@@ -1,11 +1,10 @@
+import { createWriteStream, promises as fsPromises, type WriteStream } from "node:fs";
 import {
-  closeSync,
-  createWriteStream,
-  existsSync,
-  openSync,
-  promises as fsPromises,
-  type WriteStream,
-} from "node:fs";
+  type LockOwner,
+  readLiveLockOwner,
+  releaseOwnerLock,
+  tryAcquireOwnerLock,
+} from "../host/lifecycle/owner-lock.js";
 import { getFileLogger } from "../observability/file-logger.js";
 import { forkDelayed, type WorkerTimerHandle } from "./effect-runtime.js";
 import {
@@ -27,29 +26,9 @@ export type LifecycleServerOptions = {
 const DEFAULT_IDLE_SHUTDOWN_MS = 10_000;
 const INTERRUPT_WORK_TIMEOUT_MS = 4_000;
 
-const pidIsAlive = (pid: number): boolean => {
-  if (!Number.isInteger(pid) || pid <= 0) return false;
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
-};
-
-const readPidFile = async (pidFile: string): Promise<number | null> => {
-  try {
-    const raw = await fsPromises.readFile(pidFile, "utf-8");
-    const pid = Number.parseInt(raw.trim(), 10);
-    return Number.isInteger(pid) && pid > 0 ? pid : null;
-  } catch {
-    return null;
-  }
-};
-
 export class WorkerLifecycleServer {
   readonly paths: RuntimePaths;
-  private lockFd: number | null = null;
+  private lockOwner: LockOwner | null = null;
   private logStream: WriteStream | null = null;
   private idleTimer: WorkerTimerHandle | null = null;
   private clientCount = 0;
@@ -67,37 +46,14 @@ export class WorkerLifecycleServer {
     await ensureRuntimeIpcDir(this.paths);
     await fsPromises.mkdir(this.paths.logDir, { recursive: true });
 
-    // Stale lock cleanup: if the lock file exists but the recorded pid
-    // is dead, take ownership. This avoids the "crashed worker leaves
-    // a lock file behind, every subsequent start fails" problem.
-    if (existsSync(this.paths.lockFile)) {
-      const stalePid = await readPidFile(this.paths.lockFile);
-      if (stalePid != null && !pidIsAlive(stalePid)) {
-        await fsPromises.unlink(this.paths.lockFile).catch(() => undefined);
-        getFileLogger()?.process("worker.stale-lock-cleared", {
-          stalePid,
-          rootHash: this.paths.rootHash,
-        });
-      }
+    const lock = tryAcquireOwnerLock(this.paths.lockFile);
+    if (!lock.acquired) {
+      throw new Error(
+        `Another runtime worker is already running for ${this.options.stellaAppDir} (pid ${lock.holder?.pid ?? "unknown"}, lock at ${this.paths.lockFile}).`,
+      );
     }
+    this.lockOwner = lock.owner;
 
-    try {
-      this.lockFd = openSync(this.paths.lockFile, "wx");
-    } catch (error) {
-      const code = (error as NodeJS.ErrnoException).code;
-      if (code === "EEXIST") {
-        throw new Error(
-          `Another runtime worker is already running for ${this.options.stellaAppDir} (lock at ${this.paths.lockFile}).`,
-        );
-      }
-      throw error;
-    }
-
-    await fsPromises.writeFile(
-      this.paths.lockFile,
-      String(process.pid),
-      "utf-8",
-    );
     await fsPromises.writeFile(
       this.paths.pidFile,
       String(process.pid),
@@ -261,28 +217,23 @@ export class WorkerLifecycleServer {
   }
 
   private async releaseFiles() {
-    if (this.lockFd != null) {
-      try {
-        closeSync(this.lockFd);
-      } catch {
-        // Ignore close errors during shutdown.
-      }
-      this.lockFd = null;
+    if (this.lockOwner) {
+      releaseOwnerLock(this.paths.lockFile, this.lockOwner);
+      this.lockOwner = null;
     }
-    await fsPromises.unlink(this.paths.lockFile).catch(() => undefined);
     await fsPromises.unlink(this.paths.pidFile).catch(() => undefined);
   }
 }
 
+export const probeRunningWorkerOwner = async (
+  stellaAppDir: string,
+): Promise<LockOwner | null> =>
+  readLiveLockOwner(resolveRuntimePaths(stellaAppDir).lockFile);
+
 export const probeRunningWorker = async (
   stellaAppDir: string,
-): Promise<number | null> => {
-  const paths = resolveRuntimePaths(stellaAppDir);
-  if (!existsSync(paths.pidFile)) return null;
-  const pid = await readPidFile(paths.pidFile);
-  if (pid == null || !pidIsAlive(pid)) return null;
-  return pid;
-};
+): Promise<number | null> =>
+  (await probeRunningWorkerOwner(stellaAppDir))?.pid ?? null;
 
 export const removeStaleRuntimeArtifacts = async (
   stellaAppDir: string,

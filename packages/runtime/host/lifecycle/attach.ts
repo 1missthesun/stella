@@ -8,6 +8,7 @@ import {
 } from "../../worker/runtime-paths.js";
 import {
   probeRunningWorker,
+  probeRunningWorkerOwner,
   removeStaleRuntimeArtifacts,
 } from "../../worker/lifecycle-server.js";
 import { getFileLogger } from "../../observability/file-logger.js";
@@ -21,6 +22,7 @@ import { acquireHostLock } from "./lock.js";
 import { pollWithDeadline } from "./poll.js";
 import { connectReadySocket } from "./socket.js";
 import { spawnAdoptedWorker } from "./spawn.js";
+import { processIdentityIsLive } from "../../kernel/shared/process-identity.js";
 import { findSameRootWorkerPids, killWorkerProcess, stopPids } from "./kill.js";
 import {
   defaultLifecycleBudgets,
@@ -284,10 +286,15 @@ export const stopRunningWorkerEffect = (
   options?: { graceMs?: number },
 ): Effect.Effect<{ stopped: boolean; pid: number | null }> =>
   Effect.gen(function* () {
-    const pid = yield* Effect.promise(() => probeRunningWorker(stellaAppDir));
-    if (pid == null) return { stopped: false, pid: null };
+    const owner = yield* Effect.promise(() =>
+      probeRunningWorkerOwner(stellaAppDir),
+    );
+    if (owner == null) return { stopped: false, pid: null };
+    const pid = owner.pid;
     const startedAt = Date.now();
-    const result = yield* killWorkerProcess(pid, options?.graceMs ?? 1_500);
+    const result = yield* killWorkerProcess(pid, options?.graceMs ?? 1_500, () =>
+      processIdentityIsLive(owner.pid, owner.identity),
+    );
     getFileLogger()?.process("worker.kill-latency", {
       pid,
       ms: Date.now() - startedAt,

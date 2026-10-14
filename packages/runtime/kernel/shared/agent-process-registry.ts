@@ -1,5 +1,4 @@
 import type { ChildProcess } from "node:child_process";
-import { execFileSync } from "node:child_process";
 import {
   mkdirSync,
   readFileSync,
@@ -9,6 +8,7 @@ import {
 } from "node:fs";
 import path from "node:path";
 import { terminateProcessTree } from "./process-tree.js";
+import { pidIsAlive as isAlive, readProcessIdentity } from "./process-identity.js";
 
 export type AgentProcessRecord = {
   pid: number;
@@ -22,34 +22,6 @@ export type AgentProcessRecord = {
 
 const live = new Map<number, AgentProcessRecord>();
 let registryFile: string | null = null;
-
-const readProcessIdentity = (pid: number): string | null => {
-  try {
-    if (process.platform === "linux") {
-      const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
-      const fields = stat.slice(stat.lastIndexOf(")") + 2).split(" ");
-      return fields[19] ?? null;
-    }
-    if (process.platform === "win32") return null;
-    const started = execFileSync("ps", ["-o", "lstart=", "-p", String(pid)], {
-      encoding: "utf8",
-      timeout: 2_000,
-      stdio: ["ignore", "pipe", "ignore"],
-    }).trim();
-    return started || null;
-  } catch {
-    return null;
-  }
-};
-
-const isAlive = (pid: number): boolean => {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    return (error as NodeJS.ErrnoException)?.code === "EPERM";
-  }
-};
 
 const persist = () => {
   if (!registryFile) return;

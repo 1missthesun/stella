@@ -193,8 +193,8 @@ const renderToolBlock = (tool: DemotedToolCatalogEntry): CatalogBlock => {
  * falling back to the `<prefix>` of `<prefix>_rest` names). Within each
  * namespace the cheapest signatures are preferred; namespaces are drained
  * round-robin against one shared budget so a single verbose namespace cannot
- * starve the rest. Namespace stub lines and the header are free — only tool
- * comment+signature blocks count against the budget.
+ * starve the rest. Every namespace stub line is always shown and charged
+ * first; tool blocks share what is left. Only the header is uncharged.
  */
 export const buildCatalogSection = (
   demoted: readonly DemotedToolCatalogEntry[],
@@ -231,10 +231,6 @@ export const buildCatalogSection = (
     let remaining = Number.isFinite(budgetTokens)
       ? Math.max(0, budgetTokens)
       : DEFAULT_CATALOG_TOKEN_BUDGET;
-    // Stub lines are always rendered (they are the map of what exists), but
-    // they still consume the shared budget so the section cannot grow
-    // unboundedly with namespace count. Estimated with the widest "shown"
-    // variant; only the header stays free.
     for (const name of namespaceNames) {
       const total = namespaces.get(name)?.length ?? 0;
       const stubEstimate = estimateTokens(

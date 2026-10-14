@@ -3,19 +3,9 @@ import { app as electronApp } from 'electron';
 import { runNativeHelper, runNativeHelperDetailed } from './native-helper.js';
 import { requestRecentAppsDaemon } from './native-helper-daemon.js';
 const HELPER_NAME = 'home_apps';
-// Perf: the dominant CPU win is the renderer-side focus/visibility gate, which
-// stops the ~5s poll entirely while Stella is hidden/blurred. This cache only
-// dedupes redundant spawns from concurrent callers (e.g. multiple surfaces) or
-// timer jitter. Keep the TTL BELOW the ~5s poll interval (POLL_INTERVAL_MS) so
-// each foreground poll still refetches and a real foreground-app change shows
-// up on the very next poll — a TTL >= the interval would make alternate polls
-// serve stale data and double the visible refresh latency.
-const RECENT_APPS_CACHE_MS = 2_500;
-const WINDOWS_RECENT_APPS_CACHE_MS = 10_000;
 const WINDOWS_NATIVE_HELPER_TIMEOUT_MS = 1_000;
 const WINDOWS_NATIVE_SLOW_SUCCESS_THRESHOLD_MS = 750;
 const WINDOWS_NATIVE_SLOW_SUCCESS_BACKOFF_MS = 60_000;
-const recentAppsCache = new Map();
 const recentAppsInFlight = new Map();
 const NOISE_NAMES = new Set([
     'finder',
@@ -403,13 +393,8 @@ const buildRecentAppsFromWinProcesses = async (parsed, limit) => {
 };
 export const listRecentApps = async (limit = 6) => {
     const normalizedLimit = Math.max(0, Math.floor(limit));
-    const cacheKey = `${process.platform}:${normalizedLimit}`;
-    const now = Date.now();
-    const cached = recentAppsCache.get(cacheKey);
-    if (cached && cached.expiresAt > now) {
-        return cached.value;
-    }
-    const inFlight = recentAppsInFlight.get(cacheKey);
+    const key = `${process.platform}:${normalizedLimit}`;
+    const inFlight = recentAppsInFlight.get(key);
     if (inFlight) {
         return await inFlight;
     }
@@ -420,19 +405,11 @@ export const listRecentApps = async (limit = 6) => {
             return await listRecentAppsWindows(normalizedLimit);
         return null;
     })();
-    recentAppsInFlight.set(cacheKey, promise);
+    recentAppsInFlight.set(key, promise);
     try {
-        const value = await promise;
-        const cacheTtlMs = process.platform === 'win32'
-            ? WINDOWS_RECENT_APPS_CACHE_MS
-            : RECENT_APPS_CACHE_MS;
-        recentAppsCache.set(cacheKey, {
-            expiresAt: Date.now() + cacheTtlMs,
-            value,
-        });
-        return value;
+        return await promise;
     }
     finally {
-        recentAppsInFlight.delete(cacheKey);
+        recentAppsInFlight.delete(key);
     }
 };

@@ -63,6 +63,7 @@ import {
 import {
   handleCookiesGet,
   handleCookiesExportAll,
+  regularCookieStoreIds,
   handleCookiesSet,
   handleCookiesClear,
 } from "./commands/cookies.js";
@@ -402,46 +403,31 @@ const COOKIE_EVENT_MAX_BATCH = 200;
 let pendingCookieChanges = [];
 let cookieFlushTimer = null;
 
-// Known incognito cookie-store ids. cookies_export_all deliberately excludes
-// incognito stores; the real-time push must match that so a private-window
-// session never leaks into the in-app browser. Refreshed from
-// getAllCookieStores (best-effort; default extensions can't see incognito at
-// all, so this is belt-and-suspenders).
-let incognitoStoreIds = new Set();
-function refreshCookieStores() {
-  try {
-    const result = chrome.cookies.getAllCookieStores();
-    if (result && typeof result.then === "function") {
-      result
-        .then((stores) => {
-          incognitoStoreIds = new Set(
-            stores.filter((s) => s.incognito === true).map((s) => s.id),
-          );
-        })
-        .catch(() => {});
-    }
-  } catch {
-    // cookies API unavailable; leave the set empty.
-  }
-}
-refreshCookieStores();
+let regularStoreIds = null;
 
-function flushCookieChanges() {
+async function forwardableCookieChanges(changes) {
+  if (!regularStoreIds) {
+    regularStoreIds = await regularCookieStoreIds().catch(() => null);
+  }
+  const allowed = regularStoreIds;
+  return allowed ? changes.filter((change) => allowed.has(change.cookie.storeId)) : [];
+}
+
+async function flushCookieChanges() {
   cookieFlushTimer = null;
   if (pendingCookieChanges.length === 0) return;
   if (!isConnected()) {
     pendingCookieChanges = [];
     return;
   }
-  const changes = pendingCookieChanges;
-  pendingCookieChanges = [];
+  const changes = await forwardableCookieChanges(pendingCookieChanges.splice(0));
+  if (changes.length === 0 || !isConnected()) return;
   send({ type: "event", event: "cookies_changed", changes });
 }
 
 function queueCookieChange(changeInfo) {
   const cookie = changeInfo?.cookie;
   if (!cookie || !cookie.name) return;
-  if (cookie.storeId && incognitoStoreIds.has(cookie.storeId)) return;
   pendingCookieChanges.push({
     removed: changeInfo.removed === true,
     cause: changeInfo.cause,
@@ -452,7 +438,7 @@ function queueCookieChange(changeInfo) {
       clearTimeout(cookieFlushTimer);
       cookieFlushTimer = null;
     }
-    flushCookieChanges();
+    void flushCookieChanges();
     return;
   }
   if (!cookieFlushTimer) {

@@ -57,11 +57,25 @@ export async function handleCookiesGet(command) {
  * such as hostOnly, session, storeId, and partitionKey that cookies_get's
  * compatibility shape intentionally omits.
  */
-export async function handleCookiesExportAll(command) {
+async function isIncognitoStore(store) {
+  if (store.incognito === true) return true;
+  const tabs = await Promise.all(
+    (store.tabIds ?? []).map(tabId => chrome.tabs.get(tabId).catch(() => null)),
+  );
+  return tabs.some(tab => tab?.incognito === true);
+}
+
+/** Ids of the profile's non-incognito cookie stores; private-window cookies never leave the browser. */
+export async function regularCookieStoreIds() {
   const stores = await chrome.cookies.getAllCookieStores();
-  const regularStores = stores.filter(store => store.incognito !== true);
+  const incognito = await Promise.all(stores.map(isIncognitoStore));
+  return new Set(stores.filter((_, index) => !incognito[index]).map(store => store.id));
+}
+
+export async function handleCookiesExportAll(command) {
+  const storeIds = await regularCookieStoreIds();
   const cookiesByStore = await Promise.all(
-    regularStores.map(store => chrome.cookies.getAll({ storeId: store.id })),
+    [...storeIds].map(storeId => chrome.cookies.getAll({ storeId })),
   );
 
   return {

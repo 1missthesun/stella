@@ -63,6 +63,46 @@ final class OutputCapture {
     func close() { try? file?.close() }
 }
 
+final class OutputPipe {
+    private let lock = NSLock()
+    private let fd: Int32
+    private let output: OutputCapture
+    private var open = true
+
+    init(fd: Int32, output: OutputCapture) {
+        self.fd = fd
+        self.output = output
+        _ = fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK)
+    }
+
+    func readUntilEOF() {
+        var poller = pollfd(fd: fd, events: Int16(POLLIN), revents: 0)
+        while true {
+            if poll(&poller, 1, -1) < 0 && errno != EINTR { return }
+            if !readAvailable() { return }
+        }
+    }
+
+    func readAvailable() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        guard open else { return false }
+        var buffer = [UInt8](repeating: 0, count: 16384)
+        while true {
+            let count = read(fd, &buffer, buffer.count)
+            if count > 0 {
+                output.append(Data(buffer[0..<count]))
+                continue
+            }
+            if count < 0 && errno == EINTR { continue }
+            if count < 0 && errno == EAGAIN { return true }
+            open = false
+            close(fd)
+            return false
+        }
+    }
+}
+
 /// One Electron process: spawned with responsibility disclaimed (so Stella.app,
 /// not the launcher, owns its TCC prompts), fd 3 a socketpair for the
 /// launcher channel, stdout/stderr captured.
@@ -80,6 +120,7 @@ final class ElectronProcess {
     private let writeLock = NSLock()
     private let reapLock = NSLock()
     private var reaped = false
+    private let outputPipe: OutputPipe
 
     init(executable: URL, args: [String], cwd: URL, env: [String: String], logFile: URL) throws {
         output = OutputCapture(logFile: logFile)
@@ -139,17 +180,9 @@ final class ElectronProcess {
         pid = child
         log("supervisor: spawned Electron pid \(child)")
 
-        let readFd = pipeFds[0]
-        let output = self.output
-        Thread.detachNewThread {
-            var buffer = [UInt8](repeating: 0, count: 16384)
-            while true {
-                let count = read(readFd, &buffer, buffer.count)
-                if count <= 0 { break }
-                output.append(Data(buffer[0..<count]))
-            }
-            close(readFd)
-        }
+        let outputPipe = OutputPipe(fd: pipeFds[0], output: output)
+        self.outputPipe = outputPipe
+        Thread.detachNewThread { outputPipe.readUntilEOF() }
 
         let events = self.events
         let fd = channelFd
@@ -210,6 +243,11 @@ final class ElectronProcess {
     func after(_ seconds: TimeInterval, _ name: String) {
         let events = self.events
         DispatchQueue.global().asyncAfter(deadline: .now() + seconds) { events.post(.timer(name)) }
+    }
+
+    /// False when processes Electron started still hold the pipe open.
+    func drainOutputAfterExit() -> Bool {
+        !outputPipe.readAvailable()
     }
 
     private func markReaped() {

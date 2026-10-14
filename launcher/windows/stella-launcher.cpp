@@ -3142,7 +3142,7 @@ static Outcome supervise(const wstring &electron) {
     bool ready = false;
     ULONGLONG readyAt = 0;
     string pendingReason;
-    bool pending = false, quitRequested = false, announced = false;
+    bool pending = false, quitRequested = false, announced = false, teardownForced = false;
     DWORD announcedCode = 0;
     for (;;) {
         Event event = process->events.next();
@@ -3208,6 +3208,7 @@ static Outcome supervise(const wstring &electron) {
                 process->terminate();
             } else if (name == "exit-grace") {
                 LOG("supervisor: Electron's teardown is still running 10s after it announced its exit; terminating");
+                teardownForced = true;
                 process->forceKill();
             }
         } else {
@@ -3216,7 +3217,9 @@ static Outcome supervise(const wstring &electron) {
             string detail = format("exit %lu", event.code);
             LOG("supervisor: Electron exited (%s)", detail.c_str());
             if (pending) return {OutcomeKind::Failed, 0, detail, pendingReason, output};
-            // A hung teardown killed after the announcement counts as the announced exit.
+            if (announced && teardownForced)
+                LOG("supervisor: Electron's teardown did not finish; its announced exit %lu stands but cleanup is incomplete",
+                    announcedCode);
             DWORD code = announced ? announcedCode : event.code;
             if (code == kRelaunchExitCode) return {OutcomeKind::Relaunch, 0, detail, string(), output};
             if (quitRequested && code != 0)

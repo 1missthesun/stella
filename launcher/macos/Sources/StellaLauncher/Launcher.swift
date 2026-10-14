@@ -381,8 +381,8 @@ final class Launcher {
         var pending: (String, [String])?
         lastHold = nil
         var quitRequested = false
-        /// The clean exit Electron announced; used if its teardown hangs.
         var announcedExit: Int32?
+        var teardownForced = false
         while let event = process.events.next(until: nil) {
             switch event {
             case let .message(message):
@@ -451,19 +451,22 @@ final class Launcher {
                     process.terminate()
                 case "exit-grace":
                     log("supervisor: Electron's teardown is still running 10s after it announced its exit; terminating")
+                    teardownForced = true
                     process.terminate()
                 default:
                     break
                 }
             case let .exited(code, signal):
-                // Give the output reader a moment to drain the pipe.
-                Thread.sleep(forTimeInterval: 0.3)
+                if !process.drainOutputAfterExit() {
+                    log("supervisor: Electron's output pipe is still held open by processes it started")
+                }
                 let output = process.output.lastLines
                 let detail = signal != 0 ? "signal \(signal)" : "exit \(code)"
                 log("supervisor: Electron exited (\(detail))")
                 if let pending { return .failed(pending.0, output) }
-                // A hung teardown killed after the announcement counts as the
-                // announced exit.
+                if let announcedExit, teardownForced {
+                    log("supervisor: Electron's teardown did not finish; its announced exit \(announcedExit) stands but cleanup is incomplete")
+                }
                 let code = announcedExit ?? (signal == 0 ? code : -1)
                 let signal = announcedExit != nil ? 0 : signal
                 if signal == 0 && code == Launcher.relaunchExitCode { return .relaunch }

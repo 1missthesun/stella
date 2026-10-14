@@ -2279,6 +2279,7 @@ typedef enum { OUT_QUIT, OUT_RELAUNCH, OUT_CRASHED, OUT_FAILED } OutcomeKind;
 typedef struct {
     OutcomeKind kind;
     double since_ready;
+    int teardown_forced;
     char *detail;
     char *reason;
     StrList output;
@@ -2481,6 +2482,7 @@ static Outcome supervise(const char *electron_bin) {
                 break;
             case T_EXIT_GRACE:
                 LOG("supervisor: Electron's teardown is still running 10s after it announced its exit; terminating");
+                result.teardown_forced = 1;
                 electron_terminate(e);
                 break;
             }
@@ -2488,20 +2490,19 @@ static Outcome supervise(const char *electron_bin) {
         if (e->kill_at && now > e->kill_at && !e->reaped) {
             kill(e->pid, SIGKILL);
             e->kill_at = 0;
+            result.teardown_forced = 1;
         }
 
         w = waitpid(e->pid, &e->status, WNOHANG);
         if (w == e->pid) {
-            double drain_until = now_seconds() + 0.3;
             e->reaped = 1;
             exited = 1;
-            /* Give the output reader a moment to drain the pipe. */
-            if (e->out >= 0) fcntl(e->out, F_SETFL, O_NONBLOCK);
-            while (e->out >= 0 && now_seconds() < drain_until) {
-                ssize_t n = read(e->out, buf, sizeof(buf));
-                if (n > 0) output_append(e, buf, (size_t)n);
-                else if (n == 0) break;
-                else usleep(20 * 1000);
+            if (e->out >= 0) {
+                ssize_t n;
+                fcntl(e->out, F_SETFL, O_NONBLOCK);
+                while ((n = read(e->out, buf, sizeof(buf))) > 0 || (n < 0 && errno == EINTR))
+                    if (n > 0) output_append(e, buf, (size_t)n);
+                if (n < 0) LOG("supervisor: Electron's output pipe is still held open by processes it started");
             }
         }
     }
@@ -2521,7 +2522,10 @@ static Outcome supervise(const char *electron_bin) {
             result.reason = pending_reason;
             goto done;
         }
-        /* A hung teardown killed after the announcement counts as the announced exit. */
+        if (announced && result.teardown_forced) {
+            LOG("supervisor: Electron's teardown did not finish; its announced exit %d stands but cleanup is incomplete",
+                announced_code);
+        }
         if (announced) { code = announced_code; sig = 0; }
         if (sig == 0 && code == RELAUNCH_EXIT_CODE) { result.kind = OUT_RELAUNCH; goto done; }
         if (quit_requested && !(sig == 0 && code == 0)) {
@@ -2995,12 +2999,14 @@ static int launcher_run(void) {
             free(electron);
             switch (outcome.kind) {
             case OUT_QUIT:
-                LOG("launcher: Stella quit; exiting");
+                LOG(outcome.teardown_forced ? "launcher: Stella quit after a forced teardown; exiting"
+                                            : "launcher: Stella quit; exiting");
                 sl_free(&outcome.output);
                 free(outcome.detail);
                 return 0;
             case OUT_RELAUNCH:
-                LOG("launcher: relaunch requested");
+                LOG(outcome.teardown_forced ? "launcher: relaunch requested after a forced teardown"
+                                            : "launcher: relaunch requested");
                 sl_free(&outcome.output);
                 free(outcome.detail);
                 hand_over_if_updated(0);

@@ -1,4 +1,10 @@
-import { useEffect, useLayoutEffect, useRef } from "react";
+import {
+  useEffect,
+  useEffectEvent,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   createStellaMark,
   type CreateStellaMarkOptions,
@@ -37,46 +43,49 @@ export function StellaCharacter({
   handleRef,
 }: StellaCharacterProps) {
   const hostRef = useRef<HTMLSpanElement | null>(null);
-  const markRef = useRef<StellaMarkHandle | null>(null);
+  const [mark, setMark] = useState<StellaMarkHandle | null>(null);
+  const readMotion = useEffectEvent(() => ({ state, shape, paused }));
 
   useLayoutEffect(() => {
     const host = hostRef.current;
     if (!host) return;
     const opts: CreateStellaMarkOptions = {
       size,
-      state,
-      shape,
       ink,
       glow,
-      paused,
       followPointer,
+      ...readMotion(),
     };
     if (eyeColor) opts.eyeColor = eyeColor;
-    const mark = createStellaMark(host, opts);
-    markRef.current = mark;
-    if (handleRef) handleRef.current = mark;
+    const created = createStellaMark(host, opts);
+    setMark(created);
     return () => {
-      markRef.current = null;
-      if (handleRef) handleRef.current = null;
-      mark.destroy();
+      setMark(null);
+      created.destroy();
     };
-    // `state`, `shape`, and `paused` seed the initial mark but must not
-    // remount it — the effects below drive them through the handle so the rig
-    // eases into the change instead of restarting mid-animation.
   }, [size, ink, glow, eyeColor, followPointer]);
 
-  useEffect(() => {
-    markRef.current?.setState(state);
-  }, [state]);
+  useLayoutEffect(() => {
+    if (!handleRef || !mark) return;
+    handleRef.current = mark;
+    return () => {
+      handleRef.current = null;
+    };
+  }, [handleRef, mark]);
 
   useEffect(() => {
-    markRef.current?.setShape(shape);
-  }, [shape]);
+    mark?.setState(state);
+  }, [mark, state]);
 
   useEffect(() => {
-    if (paused) markRef.current?.pause();
-    else markRef.current?.resume();
-  }, [paused]);
+    mark?.setShape(shape);
+  }, [mark, shape]);
+
+  useEffect(() => {
+    if (!mark) return;
+    if (paused) mark.pause();
+    else mark.resume();
+  }, [mark, paused]);
 
   return (
     <span

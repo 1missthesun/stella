@@ -1,12 +1,3 @@
-/**
- * Legal text for the mobile app.
- *
- * Source of truth: ../stella-website/src/lib/legal-text.ts
- * Desktop copy: desktop/src/global/legal/legal-text.ts
- *
- * When updating, keep all three in sync.
- */
-
 export type LegalDocument = "terms" | "privacy";
 
 export const LEGAL_TITLES: Record<LegalDocument, string> = {

@@ -24,6 +24,12 @@
  * and sends the browser back here with it. Without
  * `CANVAS_SHARE_VIEW_SECRET` no private canvas opens here at all. Objects
  * written before visibility existed carry none and stay public.
+ *
+ * Shared drive files: `GET /f/:slug/:name` serves `files/<slug>` with the
+ * content type and disposition the backend stored on it (media, PDFs and
+ * plain text inline, everything else as a download), under a scriptless
+ * sandbox. Range requests are honoured so videos play and seek. File links
+ * are always public; the trailing name is cosmetic.
  */
 
 import {
@@ -178,6 +184,77 @@ const parseSlug = (pathname: string): string | null => {
   return SLUG_PATTERN.test(slug) ? slug : null;
 };
 
+/** No scripts at all for a shared file, unlike a canvas. */
+const FILE_CSP = "sandbox; default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'";
+
+const parseFileSlug = (pathname: string): string | null => {
+  const match = /^\/f\/([^/]+)(?:\/[^/]*)?$/.exec(pathname);
+  if (!match) return null;
+  let slug: string;
+  try {
+    slug = decodeURIComponent(match[1]);
+  } catch {
+    return null;
+  }
+  return SLUG_PATTERN.test(slug) ? slug : null;
+};
+
+const serveFile = async (
+  request: Request,
+  env: Env,
+  ctx: ExecutionContext,
+  slug: string,
+): Promise<Response> => {
+  const key = `files/${slug}`;
+  const head = await env.SHARES_BUCKET.head(key);
+  if (!head) return notFound();
+  const expiresAt = Number(head.customMetadata?.["expires-at"]);
+  if (Number.isFinite(expiresAt) && expiresAt <= Date.now()) {
+    ctx.waitUntil(env.SHARES_BUCKET.delete(key).catch(() => {}));
+    return notFound();
+  }
+  if (head.customMetadata?.visibility === "private") return notFound();
+
+  const headers = new Headers({
+    "x-content-type-options": "nosniff",
+    "x-robots-tag": "noindex, nofollow",
+    "referrer-policy": "no-referrer",
+    "cache-control": "public, max-age=60",
+    "content-security-policy": FILE_CSP,
+    "accept-ranges": "bytes",
+  });
+  head.writeHttpMetadata(headers);
+  headers.set("cache-control", "public, max-age=60");
+  headers.set("etag", head.httpEtag);
+
+  if (request.method === "HEAD") {
+    headers.set("content-length", String(head.size));
+    return new Response(null, { status: 200, headers });
+  }
+  const object = await env.SHARES_BUCKET.get(key, {
+    range: request.headers,
+    onlyIf: request.headers,
+  });
+  if (!object) return notFound();
+  if (!("body" in object)) {
+    return new Response(null, { status: 304, headers });
+  }
+  const range = object.range as { offset?: number; length?: number; suffix?: number } | undefined;
+  if (range && request.headers.has("range")) {
+    const offset =
+      range.suffix !== undefined ? Math.max(0, object.size - range.suffix) : (range.offset ?? 0);
+    const length =
+      range.suffix !== undefined
+        ? Math.min(range.suffix, object.size)
+        : (range.length ?? object.size - offset);
+    headers.set("content-range", `bytes ${offset}-${offset + length - 1}/${object.size}`);
+    headers.set("content-length", String(length));
+    return new Response(object.body, { status: 206, headers });
+  }
+  headers.set("content-length", String(object.size));
+  return new Response(object.body, { status: 200, headers });
+};
+
 export default {
   async fetch(
     request: Request,
@@ -193,6 +270,9 @@ export default {
     if (request.method !== "GET" && request.method !== "HEAD") {
       return textResponse(405, "Method not allowed");
     }
+
+    const fileSlug = parseFileSlug(url.pathname);
+    if (fileSlug) return serveFile(request, env, ctx, fileSlug);
 
     const slug = parseSlug(url.pathname);
     if (!slug) return notFound();

@@ -28,10 +28,15 @@ import {
   SHARE_MAX_TITLE_CHARS,
   type PublishedShare,
   type SavedCanvasShare,
+  type SharedFileLink,
   type ShareLink,
   type ShareVisibility,
 } from "@stella/contracts/backend/shares";
-import { buildCanvasShareUrl, readCanvasShareBaseUrl } from "@stella/contracts/canvas-share";
+import {
+  buildCanvasShareUrl,
+  buildFileShareUrl,
+  readCanvasShareBaseUrl,
+} from "@stella/contracts/canvas-share";
 import {
   CANVAS_VIEW_GRANT_PARAM,
   CANVAS_VIEW_GRANT_TTL_MS,
@@ -41,6 +46,7 @@ import {
 import { empty, literal, object, optional, string } from "../args.js";
 import { RpcError } from "../errors.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
+import { getFile, normalizeDrivePath } from "./drive.js";
 import type { OwnerContext, OwnerDbReader, OwnerDomain } from "../registry.js";
 
 const SHARE_TTL_MS = 90 * 24 * 60 * 60 * 1000;
@@ -74,6 +80,19 @@ export const SHARES_CANVAS_MIGRATION = {
   ],
 };
 
+/** A shared drive file: the drive path it copies and the drive object it copied. */
+export const SHARES_FILE_MIGRATION = {
+  id: "shares.3-files",
+  statements: [
+    "ALTER TABLE shares ADD COLUMN file_path TEXT",
+    "ALTER TABLE shares ADD COLUMN file_source_key TEXT",
+    "CREATE UNIQUE INDEX shares_by_file ON shares (file_path) WHERE file_path IS NOT NULL",
+  ],
+};
+
+/** Largest drive file `shares.shareFile` copies to a public link. */
+const SHARE_FILE_MAX_BYTES = 500 * 1024 * 1024;
+
 type ShareRow = {
   slug: string;
   title: string | null;
@@ -82,6 +101,8 @@ type ShareRow = {
   expires_at: number;
   canvas: string | null;
   visibility: string;
+  file_path: string | null;
+  file_source_key: string | null;
 };
 
 const unavailable = () =>
@@ -160,14 +181,20 @@ const putObject = async (
   });
 };
 
+const shareUrlOf = (base: string, row: ShareRow): string =>
+  row.file_path
+    ? buildFileShareUrl(base, row.slug, row.title ?? "file")
+    : buildCanvasShareUrl(base, row.slug);
+
 const toLink = (base: string, row: ShareRow): ShareLink => ({
   slug: row.slug,
-  url: buildCanvasShareUrl(base, row.slug),
+  url: shareUrlOf(base, row),
   title: row.title,
   createdAt: row.created_at,
   expiresAt: row.expires_at,
   visibility: visibilityOf(row),
   canvas: row.canvas,
+  file: row.file_path,
 });
 
 /** 128 bits of CSPRNG as base64url (22 characters): public and unguessable. */
@@ -364,6 +391,9 @@ const setVisibility = async (
     ctx.now,
   );
   if (!row) throw new RpcError("NOT_FOUND", "Share not found.");
+  if (row.file_path) {
+    throw new RpcError("BAD_REQUEST", "A shared file's link is always public. Revoke it to stop sharing.");
+  }
   const result = (visibility: ShareVisibility): SavedCanvasShare => ({
     url: buildCanvasShareUrl(base, row.slug),
     slug: row.slug,
@@ -404,7 +434,7 @@ const viewLink = async (ctx: OwnerContext, args: { slug: string }): Promise<{ ur
     ctx.now,
   );
   if (!row) throw new RpcError("NOT_FOUND", "Share not found.");
-  const url = buildCanvasShareUrl(base, row.slug);
+  const url = shareUrlOf(base, row);
   if (visibilityOf(row) === "public") return { url };
   const secret = viewSecretOf(ctx.env);
   if (!secret) throw unavailable();
@@ -415,6 +445,109 @@ const viewLink = async (ctx: OwnerContext, args: { slug: string }): Promise<{ ur
     e: ctx.now + CANVAS_VIEW_GRANT_TTL_MS,
   });
   return { url: `${url}?${CANVAS_VIEW_GRANT_PARAM}=${encodeURIComponent(grant)}` };
+};
+
+const fileKeyForSlug = (slug: string): string => `files/${slug}`;
+
+const inlineContentType = (contentType: string): boolean =>
+  /^(?:image\/(?!svg)|video\/|audio\/|application\/pdf$|text\/plain$)/i.test(contentType);
+
+/**
+ * A public link to one of the owner's drive files. The file is copied to the
+ * shares bucket, which the serving worker reads; the drive object it copied
+ * is remembered, so sharing an unchanged file again hands back the same link
+ * and sharing a changed one refreshes the copy behind it.
+ */
+const shareFile = async (
+  ctx: OwnerContext,
+  args: { path: string },
+): Promise<SharedFileLink> => {
+  const shares = bucketOf(ctx.env);
+  const base = baseUrlOf(ctx.env);
+  const path = normalizeDrivePath(args.path);
+  const file = getFile(ctx.db, path);
+  if (!file) throw new RpcError("NOT_FOUND", "That file is not in your drive.");
+  const existing = ctx.db.one<ShareRow>(
+    "SELECT * FROM shares WHERE file_path = ? AND expires_at > ?",
+    path,
+    ctx.now,
+  );
+  if (existing && existing.file_source_key === file.r2_key && existing.title === file.name) {
+    return {
+      url: shareUrlOf(base, existing),
+      slug: existing.slug,
+      expiresAt: existing.expires_at,
+    };
+  }
+  if (file.size_bytes > SHARE_FILE_MAX_BYTES) {
+    throw new RpcError(
+      "BAD_REQUEST",
+      `Files over ${SHARE_FILE_MAX_BYTES / (1024 * 1024)} MB can't be shared by link.`,
+    );
+  }
+  enforceOwnerRateLimit(
+    ctx.db,
+    ctx.now,
+    "shares.shareFile",
+    RATE_LIMIT,
+    "Too many shares. Please wait a moment.",
+  );
+  const drive = ctx.env.DRIVE;
+  if (!drive) throw unavailable();
+  const source = await drive.get(file.r2_key);
+  if (!source) throw new RpcError("NOT_FOUND", "That file is not in your drive.");
+
+  const stale = ctx.db.one<ShareRow>("SELECT * FROM shares WHERE file_path = ?", path);
+  const slug = stale?.slug ?? generateSlug();
+  const key = fileKeyForSlug(slug);
+  const expiresAt = ctx.now + SHARE_TTL_MS;
+  if (stale) {
+    ctx.db.run(
+      "UPDATE shares SET title = ?, expires_at = ?, visibility = 'public' WHERE slug = ?",
+      file.name,
+      expiresAt,
+      slug,
+    );
+  } else {
+    ctx.db.run(
+      `INSERT INTO shares (slug, title, r2_key, created_at, expires_at, visibility, file_path)
+         VALUES (?, ?, ?, ?, ?, 'public', ?)`,
+      slug,
+      file.name,
+      key,
+      ctx.now,
+      expiresAt,
+      path,
+    );
+  }
+  ctx.jobs.schedule(EXPIRE_JOB, expiresAt, { slug }, { id: expireJobId(slug) });
+  const contentType = file.content_type || "application/octet-stream";
+  try {
+    await shares.put(key, source.body, {
+      httpMetadata: {
+        contentType,
+        contentDisposition: `${inlineContentType(contentType) ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(file.name)}`,
+        cacheControl: "public, max-age=300",
+      },
+      customMetadata: {
+        "expires-at": String(expiresAt),
+        visibility: "public",
+        owner: await canvasOwnerTag(ctx.ownerId),
+      },
+    });
+  } catch (error) {
+    if (stale) {
+      console.error(JSON.stringify({
+        event: "share_file_failed",
+        message: error instanceof Error ? error.message : String(error),
+      }));
+    } else {
+      await forgetFailedPut(ctx, slug, key, error);
+    }
+    throw unavailable();
+  }
+  ctx.db.run("UPDATE shares SET file_source_key = ? WHERE slug = ?", file.r2_key, slug);
+  return { url: buildFileShareUrl(base, slug, file.name), slug, expiresAt };
 };
 
 const saveArgs = object({
@@ -467,7 +600,7 @@ const purgeShares = async (ctx: OwnerContext): Promise<{ pending: boolean }> => 
 
 export const sharesDomain = {
   name: "shares",
-  migrations: [SHARES_MIGRATION, SHARES_CANVAS_MIGRATION],
+  migrations: [SHARES_MIGRATION, SHARES_CANVAS_MIGRATION, SHARES_FILE_MIGRATION],
   calls: {
     "shares.publish": {
       scope: "owner",
@@ -501,6 +634,12 @@ export const sharesDomain = {
       requireAccount: true,
       parse: object({ slug: string({ min: 1, max: 128 }) }),
       handler: viewLink,
+    },
+    "shares.shareFile": {
+      scope: "owner",
+      requireAccount: true,
+      parse: object({ path: string({ min: 1, max: 4_000 }) }),
+      handler: shareFile,
     },
     "shares.revoke": {
       scope: "owner",

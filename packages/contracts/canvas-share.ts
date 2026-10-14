@@ -52,6 +52,16 @@ export const canvasSharePathForSlug = (slug: string): string =>
 export const buildCanvasShareUrl = (baseUrl: string, slug: string): string =>
   `${trimTrailingSlashes(baseUrl)}${canvasSharePathForSlug(slug)}`;
 
+/** Path segment that scopes a single shared drive file under the base URL. */
+export const FILE_SHARE_PATH_PREFIX = "/f/";
+
+/**
+ * A shared drive file: `<baseUrl>/f/<slug>/<name>`. The name is only there so
+ * the link reads well and saves under the right name; the slug finds the file.
+ */
+export const buildFileShareUrl = (baseUrl: string, slug: string, name: string): string =>
+  `${trimTrailingSlashes(baseUrl)}${FILE_SHARE_PATH_PREFIX}${slug}/${encodeURIComponent(name || "file")}`;
+
 /**
  * Extract the slug from a canvas-share URL when it matches
  * `<baseUrl>/c/<slug>` on the same origin. Returns `null` on any mismatch,

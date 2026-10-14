@@ -363,7 +363,7 @@ const signGet = async (
 
 // ── Rows ─────────────────────────────────────────────────────────────────
 
-const getFile = (db: OwnerDbReader, path: string): FileRow | null =>
+export const getFile = (db: OwnerDbReader, path: string): FileRow | null =>
   db.one<FileRow>("SELECT * FROM drive_files WHERE path = ?", path);
 
 const NOT_THUMBNAIL = `path NOT LIKE '${EVIDENCE_THUMBNAIL_DRIVE_ROOT}/%'`;

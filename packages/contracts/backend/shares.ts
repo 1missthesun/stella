@@ -12,6 +12,10 @@
  *
  * `shares.publish` is the older, one-off public snapshot with no canvas
  * behind it, kept for app versions that still call it.
+ *
+ * A drive file is shared with `shares.shareFile`: a public copy of the file at
+ * `<CANVAS_SHARE_BASE_URL>/f/<slug>/<name>`. Sharing the same file again
+ * answers with the same link, refreshed if the file changed since.
  */
 
 /** Largest document `shares.publish` and `shares.save` accept, in UTF-8 bytes. */
@@ -48,6 +52,15 @@ export type ShareLink = {
   visibility?: ShareVisibility;
   /** The canvas slug behind the link; null for a one-off `shares.publish`. */
   canvas?: string | null;
+  /** The drive path behind a shared file's link. */
+  file?: string | null;
+};
+
+/** A drive file's public link as `shares.shareFile` returns it. */
+export type SharedFileLink = {
+  url: string;
+  slug: string;
+  expiresAt: number;
 };
 
 export type ShareCalls = {
@@ -81,6 +94,15 @@ export type ShareCalls = {
   "shares.viewLink": {
     args: { slug: string };
     result: { url: string };
+  };
+  /**
+   * A public link to one of the owner's drive files (a copy of it, so moving
+   * or deleting the drive file leaves the link as it was). The file's existing
+   * link when it has one.
+   */
+  "shares.shareFile": {
+    args: { path: string };
+    result: SharedFileLink;
   };
   /** Take one of the caller's links down. `NOT_FOUND` for any other slug. */
   "shares.revoke": {

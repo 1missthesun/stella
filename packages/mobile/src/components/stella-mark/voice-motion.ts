@@ -1,4 +1,4 @@
-import { BREATHE_AMPLITUDE, BREATHE_MS } from "./motion";
+import { BREATHE_AMPLITUDE, BREATHE_MS, clamp01 } from "./motion";
 
 export type VoiceCharacterPhase =
   | "connecting"
@@ -29,18 +29,7 @@ export function voiceBodyMotion(
   energy: number,
 ): VoiceBodyMotion {
   "worklet";
-  // The level gain and talk pulse are inlined here rather than called: the iOS
-  // worklet serializer has left same-file helper references undefined on the
-  // UI thread, which takes the app down
-  // the first time the rig mounts.
-  const clampedEnergy = !Number.isFinite(energy)
-    ? 0
-    : energy <= 0
-      ? 0
-      : energy >= 1
-        ? 1
-        : energy;
-  const gain = 0.6 + 0.4 * clampedEnergy;
+  const gain = 0.6 + 0.4 * clamp01(energy);
   const breathe = BREATHE_AMPLITUDE * Math.sin((timeMs / BREATHE_MS) * TAU);
   if (phase === "connecting") {
     const slow = 0.5 + 0.5 * Math.sin((timeMs / 2600) * TAU);
@@ -89,8 +78,7 @@ export function voiceBodyMotion(
   const syllable = 0.5 + 0.5 * Math.sin((timeMs / TALK_SYLLABLE_MS) * TAU);
   const phrase = 0.55 + 0.45 * Math.sin((timeMs / TALK_PHRASE_MS) * TAU);
   const jitter = 0.85 + 0.15 * Math.sin(timeMs * 0.0071);
-  const rawPulse = syllable * phrase * jitter;
-  const pulse = (rawPulse <= 0 ? 0 : rawPulse >= 1 ? 1 : rawPulse) * gain;
+  const pulse = clamp01(syllable * phrase * jitter) * gain;
   const sway = Math.sin((timeMs / 900) * TAU);
   return {
     translateX: sway * 0.01,

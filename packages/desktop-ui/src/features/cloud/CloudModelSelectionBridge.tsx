@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
-import { useAuthState } from "@/global/auth/BackendAuthProvider";
+import { useEffect, useMemo } from "react";
+import { useDesktopAuthSession } from "@/global/auth/services/auth-session";
 import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
 import {
   cloudEnginesApi,
@@ -19,101 +19,131 @@ const LOCAL_PREFERENCES_CHANGED_EVENT = "stella:local-model-preferences-changed"
 const readLocal = async (): Promise<MirroredModelPreferences | null> =>
   (await window.electronAPI?.system?.getLocalModelPreferences?.()) ?? null;
 
-/**
- * Keeps the desktop's local model preferences in step with the account's
- * server selection, which phone and web pickers write. A server change is
- * applied locally; a local pick is saved to the server. Before the account has
- * ever saved one, the desktop's current choice seeds it.
- *
- * Only a real local change is saved: the bridge remembers the local selection
- * it last reconciled (`reconciledRef`, read back after every apply and set on
- * every save) and saves only when the local preferences have moved away from
- * it. Applying a server selection never saves, so a server that stores a
- * selection differently from how this computer stores it (an older server
- * keeping "default" effort, say) can never start a save loop.
- */
+type ServerSelection = {
+  execution: CloudExecutionSelection;
+  selectedAt: number | null | undefined;
+};
+
+const createSelectionController = () => {
+  let reconciled: CloudExecutionSelection | null = null;
+  let accountProviders: ReadonlySet<string> = new Set();
+  let lastServer: ServerSelection | null = null;
+  let queue: Promise<void> = Promise.resolve();
+  let disposed = false;
+
+  const enqueue = (step: () => Promise<void>) => {
+    queue = queue
+      .then(() => (disposed ? undefined : step()))
+      .catch(() => undefined);
+  };
+
+  const derive = (local: MirroredModelPreferences) =>
+    cloudExecutionFromLocal(local, accountProviders);
+
+  const pushLocal = async (local: MirroredModelPreferences) => {
+    const derived = derive(local);
+    if (!derived || disposed) return;
+    if (reconciled && sameCloudExecution(derived, reconciled)) return;
+    reconciled = derived;
+    publishCloudExecutionSelection(derived);
+    await cloudEnginesApi.setExecution(derived);
+  };
+
+  const applyServer = async ({ execution, selectedAt }: ServerSelection) => {
+    const local = await readLocal();
+    if (!local || disposed) return;
+    if (selectedAt === null) {
+      await pushLocal(local);
+      return;
+    }
+    const current = derive(local);
+    const patch = localPatchForCloudExecution(local, execution);
+    const target = derive({ ...local, ...patch });
+    if (current && target && sameCloudExecution(current, target)) {
+      reconciled = current;
+      return;
+    }
+    await window.electronAPI?.system?.setLocalModelPreferences?.(patch);
+    const applied = await readLocal();
+    reconciled = (applied && derive(applied)) ?? target;
+    window.dispatchEvent(new CustomEvent(LOCAL_PREFERENCES_CHANGED_EVENT));
+  };
+
+  return {
+    setAccountProviders(next: ReadonlySet<string>) {
+      accountProviders = next;
+    },
+    serverSelection(next: ServerSelection) {
+      if (
+        lastServer &&
+        lastServer.selectedAt === next.selectedAt &&
+        sameCloudExecution(lastServer.execution, next.execution)
+      ) {
+        return;
+      }
+      lastServer = next;
+      enqueue(() => applyServer(next));
+    },
+    localChanged() {
+      enqueue(async () => {
+        const local = await readLocal();
+        if (local) await pushLocal(local);
+      });
+    },
+    dispose() {
+      disposed = true;
+    },
+  };
+};
+
 export function CloudModelSelectionBridge() {
-  const { isAuthenticated } = useAuthState();
+  const session = useDesktopAuthSession();
+  const accountId =
+    (session.data as { user?: { id?: string } } | null | undefined)?.user?.id?.trim() ||
+    null;
   const hasLocalRuntime = Boolean(
     window.electronAPI?.system?.setLocalModelPreferences,
   );
-  const connections = useCloudEngines(isAuthenticated && hasLocalRuntime);
-  const providers = useAccountProviders(isAuthenticated && hasLocalRuntime);
-  const reconciledRef = useRef<CloudExecutionSelection | null>(null);
-  const accountProvidersRef = useRef<ReadonlySet<string>>(new Set());
-  accountProvidersRef.current = new Set(
-    (providers?.providers ?? [])
-      .filter((provider) => provider.connection?.status === "ok")
-      .map((provider) => provider.id),
+  const enabled = accountId !== null && hasLocalRuntime;
+  const connections = useCloudEngines(enabled);
+  const providers = useAccountProviders(enabled);
+
+  const controller = useMemo(
+    () => (accountId ? createSelectionController() : null),
+    [accountId],
   );
-  const queue = useRef<Promise<void>>(Promise.resolve());
+  useEffect(() => () => controller?.dispose(), [controller]);
+
+  const providerList = providers?.providers;
+  const connectedProviders = useMemo(
+    () =>
+      new Set(
+        (providerList ?? [])
+          .filter((provider) => provider.connection?.status === "ok")
+          .map((provider) => provider.id),
+      ),
+    [providerList],
+  );
+  useEffect(() => {
+    controller?.setAccountProviders(connectedProviders);
+  }, [controller, connectedProviders]);
 
   const execution = connections?.selection ?? connections?.execution;
   const selectedAt = connections?.selectedAt;
   const loaded = connections !== undefined;
 
-  const enqueue = (step: () => Promise<void>) => {
-    queue.current = queue.current.then(step).catch(() => undefined);
-  };
-
-  const derive = (local: MirroredModelPreferences) =>
-    cloudExecutionFromLocal(local, accountProvidersRef.current);
-
-  const pushLocal = async (local: MirroredModelPreferences) => {
-    const derived = derive(local);
-    if (!derived) return;
-    const reconciled = reconciledRef.current;
-    if (reconciled && sameCloudExecution(derived, reconciled)) return;
-    reconciledRef.current = derived;
-    publishCloudExecutionSelection(derived);
-    await cloudEnginesApi.setExecution(derived);
-  };
+  useEffect(() => {
+    if (!controller || !loaded || !execution) return;
+    controller.serverSelection({ execution, selectedAt });
+  }, [controller, loaded, execution, selectedAt]);
 
   useEffect(() => {
-    if (!loaded || !execution) return;
-    enqueue(async () => {
-      const local = await readLocal();
-      if (!local) return;
-      if (selectedAt === null) {
-        await pushLocal(local);
-        return;
-      }
-      const current = derive(local);
-      const patch = localPatchForCloudExecution(local, execution);
-      const target = derive({ ...local, ...patch });
-      if (current && target && sameCloudExecution(current, target)) {
-        reconciledRef.current = current;
-        return;
-      }
-      await window.electronAPI?.system?.setLocalModelPreferences?.(patch);
-      const applied = await readLocal();
-      reconciledRef.current = (applied && derive(applied)) ?? target;
-      window.dispatchEvent(new CustomEvent(LOCAL_PREFERENCES_CHANGED_EVENT));
-    });
-    // The selection's identity is the trigger; helpers read refs.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    loaded,
-    selectedAt,
-    execution?.engine,
-    execution?.provider,
-    execution?.model,
-    execution?.reasoningEffort,
-  ]);
-
-  useEffect(() => {
-    if (!loaded) return;
-    const onLocalChange = () => {
-      enqueue(async () => {
-        const local = await readLocal();
-        if (local) await pushLocal(local);
-      });
-    };
+    if (!controller || !loaded) return;
+    const onLocalChange = () => controller.localChanged();
     window.addEventListener(LOCAL_PREFERENCES_CHANGED_EVENT, onLocalChange);
     return () =>
       window.removeEventListener(LOCAL_PREFERENCES_CHANGED_EVENT, onLocalChange);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loaded]);
+  }, [controller, loaded]);
 
   return null;
 }

@@ -3850,6 +3850,10 @@ final class PersistentOverlayController {
         setTarget(cursorPoint, viewportFrame: viewportFrame)
     }
 
+    var needsTicks: Bool {
+        window != nil || pendingShow != nil
+    }
+
     func tickPendingShow() {
         guard let pending = pendingShow else { return }
         if isBusy(at: CACurrentMediaTime()) { return }
@@ -4122,10 +4126,20 @@ final class UnifiedAutomationOverlayService {
         try? FileManager.default.removeItem(atPath: busyUntilPath)
     }
 
-    func start() {
-        timer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
+    // The 60 Hz tick only runs while an overlay is showing or waiting to
+    // show; an idle daemon has no timer, so it costs no CPU between actions.
+    private func startTicking() {
+        guard timer == nil else { return }
+        let next = Timer(timeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
             self?.tick()
         }
+        RunLoop.main.add(next, forMode: .default)
+        timer = next
+    }
+
+    private func stopTicking() {
+        timer?.invalidate()
+        timer = nil
     }
 
     func perform<T>(
@@ -4137,6 +4151,7 @@ final class UnifiedAutomationOverlayService {
             return body()
         }
 
+        startTicking()
         waitUntilIdle()
         lastActivity = Date()
         hasVisibleOverlay = true
@@ -4162,6 +4177,7 @@ final class UnifiedAutomationOverlayService {
     func hide() {
         controller.hide()
         hasVisibleOverlay = false
+        if !controller.needsTicks { stopTicking() }
     }
 
     private func tick() {
@@ -4169,6 +4185,8 @@ final class UnifiedAutomationOverlayService {
         controller.tickPendingShow()
         if hasVisibleOverlay, Date().timeIntervalSince(lastActivity) > overlayIdleTimeout {
             hide()
+        } else if !hasVisibleOverlay, !controller.needsTicks {
+            stopTicking()
         }
     }
 
@@ -11743,7 +11761,6 @@ final class AutomationDaemon {
             .appendingPathComponent("overlay-busy-until.json")
             .path
         let overlayService = UnifiedAutomationOverlayService(busyUntilPath: overlayBusyUntilPath)
-        overlayService.start()
         currentAutomationOverlayService = overlayService
         let lockedUseStateDir = ProcessInfo.processInfo.environment["STELLA_COMPUTER_STATE_DIR"]
             ?? URL(fileURLWithPath: options.pidFile)
@@ -11762,6 +11779,9 @@ final class AutomationDaemon {
         serverQueue.async { [weak self] in
             self?.acceptLoop()
         }
+        // Keeps the main run loop blocking when no overlay timer is
+        // scheduled; a run loop with no sources returns at once and spins.
+        RunLoop.current.add(Port(), forMode: .default)
         while true {
             RunLoop.current.run(mode: .default, before: Date(timeIntervalSinceNow: 0.25))
         }

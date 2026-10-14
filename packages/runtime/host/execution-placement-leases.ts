@@ -10,6 +10,7 @@ const PRESENCE_SOCKET_RECONNECT_MAX_MS = 30_000;
 const EXECUTION_LEASE_RENEWAL_FAILSAFE_MS = 2 * 60_000;
 const CLAIM_ACK_RETRY_BASE_MS = 1_000;
 const CLAIM_ACK_RETRY_MAX_MS = 15_000;
+export const CANCELLATION_MAX_ATTEMPTS = 5;
 
 /**
  * The execution placement bridge's timing and retry state: the heartbeat that
@@ -29,6 +30,7 @@ export class ExecutionPlacementLeases {
     { attempts: number; nextAt: number }
   >();
   private readonly cancellationInFlight = new Map<string, Promise<boolean>>();
+  private readonly cancellationFailures = new Map<string, number>();
 
   constructor(
     private readonly options: {
@@ -174,6 +176,16 @@ export class ExecutionPlacementLeases {
     };
     void pending.then(clear, clear);
     return pending;
+  }
+
+  noteCancellationFailure(dispatchId: string): number {
+    const attempts = (this.cancellationFailures.get(dispatchId) ?? 0) + 1;
+    this.cancellationFailures.set(dispatchId, attempts);
+    return attempts;
+  }
+
+  clearCancellationFailure(dispatchId: string) {
+    this.cancellationFailures.delete(dispatchId);
   }
 
   cancellationsInFlight(): Promise<boolean>[] {

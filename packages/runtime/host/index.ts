@@ -869,6 +869,7 @@ export class StellaRuntimeHost {
         // must finish its durable cancellation/drain barrier before it
         // can establish a replacement proof sequence.
         this.hostExecutionPlacementBridge = previous;
+        this.scheduleHostExecutionPlacementRetry();
         throw error;
       }
     }
@@ -1281,6 +1282,7 @@ export class StellaRuntimeHost {
         await bridge.stop();
       } catch (stopError) {
         this.hostExecutionPlacementBridge = bridge;
+        this.scheduleHostExecutionPlacementRetry();
         throw new Error(
           "Execution placement startup cleanup did not reach its cancellation/drain barrier.",
           { cause: stopError },

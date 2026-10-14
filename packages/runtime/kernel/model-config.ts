@@ -233,11 +233,6 @@ const compatSchema = {
     sendSessionIdHeader: booleanSchema,
     supportsLongCacheRetention: booleanSchema,
     supportsEagerToolInputStreaming: booleanSchema,
-    // dormant: nothing reads these since tool_search removal; kept only so
-    // generated model catalogs (contracts/models.generated.ts) still validate.
-    supportsToolReferences: booleanSchema,
-    supportsToolSearch: booleanSchema,
-    deferredToolsMode: { const: "kimi", type: "string" },
   },
 } as const;
 const costSchema = {

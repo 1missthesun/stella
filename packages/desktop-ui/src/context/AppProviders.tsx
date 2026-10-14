@@ -3,7 +3,7 @@ import { ThemeProvider } from "./theme-context";
 import { UiStateProvider } from "./ui-state";
 import { ToastProvider } from "@/ui/toast";
 import { BootstrapStateProvider } from "@/bootstrap/bootstrap-state";
-import { I18nProvider } from "@/shared/i18n";
+import { I18nProvider } from "@/shared/i18n/RemoteI18nProvider";
 import { VoiceErrorToastListener } from "@/features/voice/runtime/VoiceErrorToastListener";
 import { CaptureErrorToastListener } from "@/shell/CaptureErrorToastListener";
 import { CanvasShareProvider } from "@/features/canvas-share/canvas-share-context";

@@ -1,11 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { backendClient } from "@/platform/backend/backend-client";
 import { useBackendValue } from "@/platform/backend/use-backend-view";
-// Imported from the module rather than the `@/shared/i18n` barrel on
-// purpose: the barrel re-exports `RemoteI18nProvider`, which pulls in
-// the backend client and the auth provider. This component only needs the
-// active locale string, and the deep import keeps that dependency out.
-import { useLocale, useT } from "@/shared/i18n/I18nProvider";
+import { useLocale, useT } from "@/shared/i18n";
 import { useAuthSessionState } from "@/global/auth/hooks/use-auth-session-state";
 import { openExternalUrl } from "@/platform/electron/open-external";
 import { Check } from "@/ui/icons";

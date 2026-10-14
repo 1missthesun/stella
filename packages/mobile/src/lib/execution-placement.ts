@@ -7,7 +7,7 @@ import {
   type DeviceDestination,
 } from "@stella/contracts/turn-plane/placement";
 import { phonePairingProofHeaders } from "./phone-pair-proof";
-import { getJson, postJson } from "./http";
+import { getJson, HttpRequestError, postJson } from "./http";
 import { ensurePhoneAccess, type StoredPhoneAccess } from "./phone-access";
 import { env } from "../config/env";
 import { getBackendClient } from "./backend";
@@ -74,19 +74,12 @@ const EXECUTION_PLACEMENT_ERROR_MESSAGES: Readonly<Record<string, string>> = {
   owner_suspended: "This account can't use Stella's cloud right now.",
 };
 
-/**
- * Replace the server's terse message for the codes above. The error is the
- * `HttpRequestError` the http helper just built for this request, so its
- * message is rewritten in place (status and code stay) rather than re-created,
- * which keeps this module free of the class import test harnesses mock out.
- */
 const mapExecutionPlacementError = (error: unknown): unknown => {
-  if (!(error instanceof Error)) return error;
-  const code = Reflect.get(error, "code");
-  if (typeof code !== "string") return error;
-  const message = EXECUTION_PLACEMENT_ERROR_MESSAGES[code];
-  if (message) error.message = message;
-  return error;
+  if (!(error instanceof HttpRequestError) || error.code === null) return error;
+  const message = EXECUTION_PLACEMENT_ERROR_MESSAGES[error.code];
+  return message
+    ? new HttpRequestError(message, error.status, error.code)
+    : error;
 };
 
 const executionPlacementRequest = async <T>(

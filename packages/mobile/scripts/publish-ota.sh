@@ -40,8 +40,6 @@ if [[ -n "$(git status --porcelain)" ]]; then
   exit 1
 fi
 
-# The export bakes EXPO_PUBLIC_* in at bundle time; a missing env produced
-# the first broken OTA of 2026-07-02. Expo CLI auto-loads .env.local.
 if [[ ! -f .env.local ]] && [[ -z "${EXPO_PUBLIC_STELLA_BACKEND_URL:-}" ]]; then
   echo "REFUSING to publish: no .env.local and EXPO_PUBLIC_STELLA_BACKEND_URL unset." >&2
   exit 1
@@ -99,7 +97,5 @@ for EXPORT_PLATFORM in "${PLATFORMS[@]}"; do
 done
 
 echo "Publishing ${PLATFORM} to channel '${CHANNEL}' as: ${SHA} ${SUBJECT}"
-# Channels here (development/preview/production) map 1:1 to the default EAS
-# environments; --environment is mandatory in --non-interactive mode.
 bunx eas-cli update --channel "${CHANNEL}" --environment "${CHANNEL}" \
   --platform "${PLATFORM}" --message "${SHA} ${SUBJECT}" --non-interactive

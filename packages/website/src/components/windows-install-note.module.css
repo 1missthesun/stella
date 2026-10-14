@@ -1,6 +1,3 @@
-/* Windows-only install-warning helper shown near download CTAs. Colors are
- * derived from the surrounding text color (currentColor) so it reads correctly
- * on both the light hero and any darker CTA sections. */
 .note {
   margin-top: 0.85rem;
   max-width: 34rem;
@@ -24,7 +21,6 @@
   display: none;
 }
 
-/* Rotating caret cue. */
 .summary::before {
   content: "";
   width: 0.42rem;

@@ -1,6 +1,3 @@
-/* Invite handoff pages (/join/<code>, /add-friend/<username>).
-   Same visual language as the auth callback handoff. */
-
 .page {
   min-height: 100vh;
   display: grid;

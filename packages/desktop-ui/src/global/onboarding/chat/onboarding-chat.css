@@ -1,14 +1,3 @@
-/* ──────────────────────────────────────────────────────────────────────
- * Chat-style onboarding.
- *
- * The transcript borrows the real chat's row classes (`.event-row`,
- * `.event-item`, `.assistant-message-text`) so Stella's onboarding messages
- * are pixel-identical to her replies later. This file only adds the
- * surface frame, the hero, and the interactive cards that sit inside the
- * assistant rows. Every card uses the composer's own material
- * (`--panel-surface-*`) so the two ends of the screen read as one thing.
- * ────────────────────────────────────────────────────────────────────── */
-
 .obc-surface {
   position: relative;
   flex: 1;
@@ -26,7 +15,6 @@
   pointer-events: none;
 }
 
-/* Frameless window: the top strip is the drag handle; its controls opt out. */
 .obc-dragbar {
   position: absolute;
   top: 0;
@@ -64,15 +52,11 @@
   scrollbar-width: none;
 }
 
-/* The real chat's viewport region is a block (its timeline sizes itself);
- * the onboarding transcript needs it to hand its height to the scroller. */
 .obc-surface .chat-viewport-region {
   display: flex;
   flex-direction: column;
 }
 
-/* Rows fade out under the drag strip instead of colliding with it (beats
- * the chat column's own shorter fade). */
 .session-content.obc-scroll {
   mask-image: linear-gradient(180deg, transparent 0, black 72px);
 }
@@ -89,12 +73,6 @@
   display: flex;
   flex-direction: column;
 }
-
-/* ── The mark ─────────────────────────────────────────────────────
- * Absolutely positioned in the column and moved by `top`, so it glides
- * to whichever row Stella is "at": the typing indicator, then the reply
- * that lands there. Assistant rows sit left and user rows right, so the
- * space it floats in is always empty. */
 
 .obc-mark {
   position: absolute;
@@ -123,8 +101,6 @@
   height: 40px;
 }
 
-/* ── Rows ─────────────────────────────────────────────────────────── */
-
 .obc-row + .obc-row {
   margin-top: 30px;
 }
@@ -145,7 +121,6 @@
   min-height: 48px;
 }
 
-/* Small print under the very first message. */
 .obc-legal {
   margin-top: 10px;
   font-size: var(--font-size-xs);
@@ -168,8 +143,6 @@
 .obc-legal__link:hover {
   color: var(--text-strong);
 }
-
-/* ── Card ─────────────────────────────────────────────────────────── */
 
 .obc-card {
   position: relative;
@@ -259,8 +232,6 @@
   color: var(--text-weak);
 }
 
-/* ── Actions ──────────────────────────────────────────────────────── */
-
 .obc-actions {
   display: flex;
   align-items: center;
@@ -276,8 +247,6 @@
   font-size: var(--font-size-xs);
   color: var(--text-weaker);
 }
-
-/* ── Pills / chips ────────────────────────────────────────────────── */
 
 .obc-pills {
   display: flex;
@@ -389,8 +358,6 @@
   }
 }
 
-/* ── Facts (the consent block) ────────────────────────────────────── */
-
 .obc-facts {
   display: flex;
   flex-direction: column;
@@ -421,8 +388,6 @@
   font-weight: var(--weight-medium);
   color: var(--text-base);
 }
-
-/* ── Status pill (discovery progress) ─────────────────────────────── */
 
 .obc-status {
   display: inline-flex;
@@ -478,8 +443,6 @@
   cursor: default;
 }
 
-/* ── Capabilities ─────────────────────────────────────────────────── */
-
 .obc-cap-frame {
   position: relative;
   width: 100%;
@@ -526,8 +489,6 @@
   opacity: 1;
 }
 
-/* Only the active chapter is mounted. Keeping inactive demo trees out of the
- * DOM prevents their shimmer and caret animations from consuming frames. */
 .obc-cap-chapter {
   grid-row: 1;
   grid-column: 1;
@@ -609,8 +570,6 @@
   background: color-mix(in oklch, var(--foreground) 22%, transparent);
 }
 
-/* Keyed per play in JS (`playNonce`), with `animationDuration` set to
- * the chapter's script length, so the fill always tracks the run. */
 .obc-cap-words__fill {
   position: absolute;
   inset: 0;
@@ -649,8 +608,6 @@
   min-height: 2.9em;
   animation: obcChipIn 320ms ease both;
 }
-
-/* ── Theme ────────────────────────────────────────────────────────── */
 
 .obc-segment {
   display: inline-flex;
@@ -765,7 +722,6 @@
   padding: clamp(12px, 1.5vw, 20px);
 }
 
-/* Films bring their own 16:9 canvas and frame. */
 .obc-cap-stage--film {
   aspect-ratio: 16 / 9;
 }
@@ -791,8 +747,6 @@
   color: var(--text-base);
   font-weight: var(--weight-medium);
 }
-
-/* ── Extras rows ──────────────────────────────────────────────────── */
 
 .obc-rows {
   display: flex;
@@ -856,8 +810,6 @@
   font-size: var(--font-size-sm);
   color: var(--text-weak);
 }
-
-/* ── Ready (finale) ───────────────────────────────────────────────── */
 
 .obc-starters {
   display: grid;
@@ -975,7 +927,6 @@
   color: var(--text-weaker);
 }
 
-/* Loading placeholders for the finale while synthesis is still running. */
 .obc-skeleton {
   height: 12px;
   border-radius: 6px;
@@ -997,8 +948,6 @@
     background-position: -200% 0;
   }
 }
-
-/* ── Reduced motion ───────────────────────────────────────────────── */
 
 @media (prefers-reduced-motion: reduce) {
   .obc-mark {
@@ -1024,10 +973,6 @@
     transition: none;
   }
 }
-
-/* ── Progress ─────────────────────────────────────────────────────
- * One segment per step, centered in the drag strip. Segments fill on a
- * spring as steps are answered; the current one breathes. */
 
 .obc-dragbar > .obc-progress {
   -webkit-app-region: drag;
@@ -1079,8 +1024,6 @@
     opacity: 0.9;
   }
 }
-
-/* ── Self-modification: the three beats under the film ──────────── */
 
 .obc-steps {
   margin: 0;
@@ -1143,10 +1086,6 @@
   line-height: 1.45;
   color: var(--text-weak);
 }
-
-/* ── Sign in ──────────────────────────────────────────────────────
- * Three rows, one lens. The lens is a single element that glides to the
- * row in use, so changing engines reads as one thing moving. */
 
 .obc-signin {
   position: relative;
@@ -1379,8 +1318,6 @@
   color: var(--danger);
 }
 
-/* ── Quickstart ───────────────────────────────────────────────────── */
-
 .obc-quickstart__eyebrow {
   align-self: flex-start;
   padding: 3px 9px;
@@ -1422,7 +1359,6 @@
   gap: 4px;
 }
 
-/* Three motes orbiting at different speeds: busy, not anxious. */
 .obc-quickstart__orbit {
   position: relative;
   width: 52px;

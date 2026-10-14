@@ -1,7 +1,3 @@
-/* Hero — editorial layout ported from the fromyou-ai landing page. A single
- * left-aligned content block (headline, body, download) is vertically centered
- * over a vivid aurora that pours in from the right. Sized so the desktop mock
- * below peeks into the bottom of the first screen. */
 .hero {
   grid-column: 1 / -1;
   position: relative;
@@ -19,19 +15,10 @@
   z-index: 0;
   display: block;
   width: 100%;
-  /* Fixed visual height, independent of hero height, so the aurora never
-   * squishes; the band it draws lives in the upper-right and flows behind the
-   * desktop mock below. */
   height: 100svh;
   pointer-events: none;
-  /* Dissolve toward the left so the copy reads on clean white. */
   -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 42%);
   mask-image: linear-gradient(to right, transparent 0%, #000 42%);
-  /* Fallback gradient — replaced by the shader once WebGL is live. Approximates
-   * the shader's resting look: a soft rainbow band hugging the right edge and
-   * pouring left, hue ramping top→bottom (rose → violet → cyan → teal) to match
-   * the shader's vertical palette. Wide, overlapping transparent stops keep it
-   * soft rather than the sharp blobs of the old fallback. */
   background:
     radial-gradient(
       130% 78% at 118% 12%,
@@ -55,9 +42,6 @@
     );
 }
 
-/* A live reflection of the WebGL canvas forces Chromium to composite another
- * full-viewport GPU surface every frame. This static gradient keeps the soft
- * lower echo without coupling its cost to the shader animation. */
 .auroraReflection {
   position: absolute;
   top: 84svh;
@@ -99,10 +83,6 @@
   mask-composite: intersect;
 }
 
-/* When WebGL isn't driving the canvas (no GPU / software renderer / unreliable
- * precision), keep the fallback gently alive with a compositor-only opacity
- * breathe so the hero never looks frozen. The shader sets `data-webgl="on"` to
- * opt out. Opacity is cheap enough to run even on low-power devices. */
 .aurora:not([data-webgl="on"]) {
   animation: auroraDrift 14s ease-in-out infinite alternate;
 }
@@ -126,8 +106,6 @@
   margin-inline: auto;
 }
 
-/* The whole content block reveals as one piece on landing: a soft blur + rise,
- * synced with the desktop mock below. */
 .content {
   display: flex;
   flex-direction: column;

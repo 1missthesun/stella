@@ -1,7 +1,3 @@
--- Stella previews for Slack workspaces: static sites agents build and Stella
--- hosts (src/slack/previews.ts). Files live in APP_BUILDS under
--- slack-previews/<id>/; a row is the link. A link expires ttl_days (the
--- workspace's current setting) after created_at.
 CREATE TABLE IF NOT EXISTS slack_previews (
   id TEXT PRIMARY KEY,
   team_id TEXT NOT NULL,

@@ -1,27 +1,8 @@
-/* Full-window top bar — see `ShellTopBarFull.tsx`.
-
-   Transparent 38px strip positioned against `.full-body`, spanning the whole
-   shell. When the display panel opens, its right edge follows the main column
-   while the panel owns its own strip.
-
-   It sits above the content (which reserves `--shell-topbar-height` of
-   padding) rather than floating over it, because with the left sidebar gone
-   there is no other chrome keeping the traffic lights and the nav clear of the
-   chat surface. */
-
 .shell-topbar-full {
   position: absolute;
   inset: 0 0 auto 0;
   height: var(--shell-topbar-height, 38px);
   z-index: 80;
-  /* Three slots: nav, activity, right cluster. The side tracks are equal
-     shares of what the activity leaves, so the activity sits on the bar's
-     midline (padding included, which flex would not do), and each is floored
-     at its own content, so the traffic-light inset, the update pill and the
-     account are never squeezed. The activity track (up to 30rem) is the only
-     one that gives as the window narrows: once the right cluster is wider
-     than its share the mark slides left rather than truncating beside empty
-     space, then the label ellipsizes; see `shell-topbar-activity.css`. */
   display: grid;
   grid-template-columns:
     minmax(max-content, 1fr)
@@ -52,16 +33,12 @@
   pointer-events: none;
 }
 
-/* The panel width variable is written once per drag frame. Remove the
-   open/close easing while that live gesture is active so the account cluster
-   follows the panel edge on the same frame instead of trailing behind it. */
 body[data-display-resizing="true"] .shell-topbar-full,
 body[data-display-expanding="true"] .shell-topbar-full,
 :root[data-shell-window-resizing="true"] .shell-topbar-full {
   transition: none;
 }
 
-/* Holds only the nav; with the right cluster it is the bar's drag region. */
 .shell-topbar-full__left {
   min-width: 0;
   height: 100%;
@@ -74,9 +51,6 @@ body[data-display-expanding="true"] .shell-topbar-full,
   -webkit-app-region: drag;
 }
 
-/* Clears the macOS traffic lights. 84px matches `.shell-topbar-left` and
-   `.shell-edge-toggle--left` so every left-anchored control in the app lines
-   up on the same inset. */
 .shell-topbar-full[data-platform="mac"] .shell-topbar-full__left {
   padding-left: 84px;
 }
@@ -104,15 +78,6 @@ body[data-display-expanding="true"] .shell-topbar-full,
   padding-right: 0;
 }
 
-/* The Windows window controls only render while the display panel is closed
-   (`isWin && !panelOpen` in `ShellTopBarFull`), and they must hug the window's
-   right edge — hence the flush `padding-right: 0` above. When the panel opens
-   those controls are gone and the account button becomes the right-most control,
-   so the flush padding leaves it pressed against the panel seam. macOS keeps its
-   traffic lights in the left cluster and never zeroes this padding, so restore
-   the same right-edge gap here. The extra `[data-display-open]` attribute lifts
-   this above the flush rule's specificity (an earlier fix that only padded the
-   sign-in button's interior never moved the button off the seam). */
 .shell-topbar-full[data-platform="win"][data-display-open="true"]
   .shell-topbar-full__right {
   padding-right: 10px;
@@ -135,9 +100,6 @@ body[data-display-expanding="true"] .shell-topbar-full,
   padding-right: 8px;
 }
 
-/* The sidebar header remains mounted at its resolved width, then clip-reveals
-   from the right alongside the panel. Closed controls live in
-   `.shell-topbar-full__right`; this header is inert until the panel opens. */
 .display-panel-topbar {
   position: absolute;
   top: 0;
@@ -175,16 +137,6 @@ body[data-display-expanding="true"] .shell-topbar-full,
     var(--shell-junction-border, var(--border-base));
 }
 
-/*
- * The panel seam is one continuous line, but it is drawn by two elements:
- * this header's left border across the topbar row, and the aside's resize
- * handle below it. The handle can't reach up here — the aside starts at
- * `margin-top: var(--shell-topbar-height)` and clips its overflow — so
- * hovering the handle used to light only the part of the line below the
- * topbar. This overlay mirrors the handle's 2px `--border-strong` bar and
- * lights with it. It never takes pointer events: the drag target is still
- * the handle alone, since this row is a window-drag region.
- */
 .display-panel-topbar[data-display-open="true"][data-display-expanded="false"]::before {
   content: "";
   position: absolute;
@@ -257,9 +209,6 @@ body[data-display-expanding="true"] .display-panel-topbar,
   padding-left: 84px;
 }
 
-/* At narrow widths the panel replaces the main content, so its external
-   header spans the same full-view frame. Resize/expand is meaningless in this
-   mode; closing returns to the regular shell. */
 :root[data-display-panel-takeover="true"]
   .display-panel-topbar[data-display-open="true"] {
   left: 6px;
@@ -269,10 +218,6 @@ body[data-display-expanding="true"] .display-panel-topbar,
   transition: none;
 }
 
-/* A takeover is full-width without setting the panel's persisted "expanded"
-   state, so it does not match the expanded macOS traffic-light inset above.
-   Reserve that same native-button gap on desktop, while leaving the mobile
-   WebView flush because it has no Electron traffic lights. */
 :root:not([data-platform="mobile"])[data-display-panel-takeover="true"]
   .display-panel-topbar[data-display-open="true"][data-platform="mac"] {
   padding-left: 84px;
@@ -285,8 +230,6 @@ body[data-display-expanding="true"] .display-panel-topbar,
   }
 }
 
-/* Tooltips on right-cluster controls anchor to their right edge so they never
-   spill past the window corner — mirrors `.shell-topbar-right`. */
 .shell-topbar-full__right .shell-topbar-icon-btn::after,
 .shell-topbar-full__right .shell-topbar-wc-btn::after {
   left: auto;
@@ -301,7 +244,6 @@ body[data-display-expanding="true"] .display-panel-topbar,
   transform: translateY(0);
 }
 
-/* The nav's own tooltips anchor left for the same reason, mirrored. */
 .shell-topbar-full__left .shell-topbar-icon-btn::after {
   left: 0;
   transform: translateY(-2px);

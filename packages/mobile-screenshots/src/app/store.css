@@ -77,7 +77,6 @@
 .device-ipad.scene-browser .supporting-artifact { left:25%; top:61%; }
 .device-ipad.scene-shopping .supporting-artifact { top:60%; }
 
-/* iPhone 17 chassis: native 388x800 frame, 354x770 screen aperture. */
 .device-iphone .capture-frame { padding:0; border:0; border-radius:17% / 8.25%; background:transparent; aspect-ratio:388 / 800; box-shadow:none; filter:drop-shadow(calc(20 * var(--u)) calc(28 * var(--u)) calc(30 * var(--u)) #0005); }
 .device-iphone .capture-frame img[data-native-capture] { position:absolute; left:4.38%; top:1.875%; width:91.24%; height:auto; border-radius:12.5% / 5.75%; }
 .device-iphone .capture-frame .iphone-hardware { position:absolute; inset:0; z-index:2; width:100%; height:100%; border-radius:0; }
@@ -111,7 +110,6 @@
 .capability-computer .capability-icon { width:calc(85 * var(--u)); height:calc(85 * var(--u)); border-radius:calc(22 * var(--u)); box-shadow:0 calc(10 * var(--u)) calc(20 * var(--u)) #252a2425; }
 .device-ipad .capability-computer { top:36%; }
 
-/* Quiet neutral canvas: brand color stays in the character and real content. */
 .scene-light, .scene-orbit { display:none; }
 
 .slide-aura { position:absolute; inset:23% 0 -32%; z-index:-1; pointer-events:none; }

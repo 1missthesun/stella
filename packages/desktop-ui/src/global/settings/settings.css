@@ -1,5 +1,3 @@
-/* ---- Shell ---- */
-
 .settings-screen {
   display: flex;
   flex-direction: column;
@@ -13,8 +11,6 @@
   flex: 1;
   min-height: 0;
 }
-
-/* ---- Wide: left rail + panel ---- */
 
 .settings-layout--rail {
   flex-direction: row;
@@ -33,7 +29,6 @@
   background: color-mix(in oklch, var(--foreground) 2.5%, transparent);
 }
 
-/* The dialog's close button sits over the panel's top-right corner. */
 .settings-layout--rail .settings-panel {
   padding: 48px 32px 32px;
 }
@@ -95,8 +90,6 @@
   color: currentColor;
 }
 
-/* ---- Narrow: search + tab row above the panel ---- */
-
 .settings-layout--bar {
   flex-direction: column;
 }
@@ -106,7 +99,6 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  /* Right inset clears the dialog's close button beside the search. */
   padding: 14px 52px 10px 16px;
   border-bottom: 1px solid var(--border-weak);
 }
@@ -117,8 +109,6 @@
 
 .settings-bar-nav-wrap {
   position: relative;
-  /* Clips the off-screen measuring row without becoming scrollable, so
-     focusing a tab can't shift the row. The More menu is portaled. */
   overflow: clip;
   margin-right: -36px;
 }
@@ -177,8 +167,6 @@
   font-weight: var(--weight-semibold);
 }
 
-/* ---- Settings search input ---- */
-
 .settings-search {
   position: relative;
   display: flex;
@@ -233,7 +221,6 @@
   font-weight: var(--weight-medium);
 }
 
-/* Hide the default WebKit/UA "x" on type=search — we render our own. */
 .settings-search-input::-webkit-search-cancel-button,
 .settings-search-input::-webkit-search-decoration {
   -webkit-appearance: none;
@@ -262,8 +249,6 @@
   color: var(--text-strong);
 }
 
-/* ---- Panel Content ---- */
-
 .settings-panel-wrap {
   flex: 1;
   min-width: 0;
@@ -280,8 +265,6 @@
 .settings-panel {
   flex: 1;
   min-height: 0;
-  /* Containing block for absolutely positioned descendants (sr-only
-     labels), so they scroll with the panel instead of overflowing it. */
   position: relative;
   overflow-y: auto;
   scrollbar-width: none;
@@ -303,17 +286,11 @@
   flex-direction: column;
   gap: 28px;
   max-width: 720px;
-  /* Centered within the panel — the panel itself is the anchored
-     column, so cards line up at the same x-position across tabs. */
   margin-left: auto;
   margin-right: auto;
   width: 100%;
 }
 
-/* ---- Scroll-target highlight ----
-   When the user picks a search result, the matching card briefly flashes
-   so the eye can land on it inside a long settings tab. The pulse fades
-   on its own — JS toggles `data-search-target` for ~1.8s. */
 .settings-card[data-search-target="true"] {
   animation: settings-search-target-pulse 1600ms ease-out 1;
   border-radius: var(--radius-lg, 10px);
@@ -336,8 +313,6 @@
       color-mix(in oklch, var(--interactive) 0%, transparent);
   }
 }
-
-/* ---- Section Card ---- */
 
 .settings-card {
   background: none;
@@ -362,8 +337,6 @@
 }
 
 .settings-card-title {
-  /* Section heading: bold sans, prominent. The row labels below are
-     the small-caps eyebrows that group each individual setting. */
   font-size: var(--font-size-xl);
   font-weight: var(--weight-bold);
   letter-spacing: -0.01em;
@@ -379,9 +352,6 @@
 .settings-card-desc {
   font-size: var(--font-size-base);
   line-height: 1.55;
-  /* Halfway between base and weak — readable without competing with
-     the title above it. The old `--text-weak` made body copy hard to
-     read on lighter themes. */
   color: color-mix(in oklch, var(--text-base) 65%, var(--text-weak));
   margin: 0 0 16px;
 }
@@ -389,8 +359,6 @@
 .settings-card-desc--error {
   color: var(--destructive);
 }
-
-/* ---- Rows (inside cards) ---- */
 
 .settings-row {
   display: flex;
@@ -403,8 +371,6 @@
   border-top: 1px solid color-mix(in oklch, var(--foreground) 7%, transparent);
 }
 
-/* Account & Legal reads as short lists; cards already separate the sections,
-   so rows inside them go without hairlines. */
 .settings-tab-content--account .settings-row + .settings-row {
   border-top: none;
 }
@@ -423,8 +389,6 @@
 }
 
 .settings-row-label {
-  /* Primary row label — visually dominant. The sublabel below is the
-     supporting description, not the headline. */
   font-size: var(--font-size-base);
   font-weight: var(--weight-semibold);
   letter-spacing: -0.005em;
@@ -460,15 +424,6 @@
 }
 
 
-/* ---- Model Controls ---- */
-
-/* Selects auto-size to their content with a sensible floor so very
-   short labels ("On" / "Off") still have a tappable trigger, and a
-   ceiling so a long device name doesn't sprawl across the row. The
-   trigger renders the selected label, so the natural width tracks
-   whatever the user actually picked. Scoped to the settings rail
-   (`.settings-row-control`) so it doesn't leak to other Selects in
-   the app. */
 .settings-row-control [data-component="select"] {
   width: fit-content;
   min-width: 120px;
@@ -481,8 +436,6 @@
   max-width: 240px;
   border-radius: var(--radius-full);
 }
-
-/* ---- Buttons ---- */
 
 .settings-confirm-actions {
   display: flex;
@@ -514,8 +467,6 @@
   line-height: 1.55;
   letter-spacing: -0.01em;
 }
-
-/* ---- Global search results view ---- */
 
 .settings-search-results {
   display: flex;
@@ -653,7 +604,6 @@
   color: var(--text-base);
 }
 
-/* In-text match highlight (rendered by SettingsSearchResults). */
 .settings-search-match {
   background: color-mix(in oklch, var(--interactive) 22%, transparent);
   color: inherit;
@@ -661,8 +611,6 @@
   border-radius: 3px;
   font-weight: inherit;
 }
-
-/* ---- Global search results: empty state ---- */
 
 .settings-search-results--empty {
   align-items: center;

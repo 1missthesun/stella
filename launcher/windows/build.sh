@@ -1,8 +1,4 @@
 #!/bin/bash
-# Cross-compiles build/Stella.exe (x86_64) with MinGW-w64 (GCC 13+): a static,
-# GUI-subsystem binary with the icon, the Common Controls 6 manifest and the
-# launcher page (launcher/common/launcher.html) embedded.
-#   macOS: brew install mingw-w64    Debian/Ubuntu: apt install g++-mingw-w64-x86-64 curl unzip
 set -euo pipefail
 cd "$(dirname "$0")"
 triple="${MINGW_TRIPLE:-x86_64-w64-mingw32}"
@@ -30,17 +26,12 @@ fi
 printf '%s\n' '#pragma once' 'typedef struct EventRegistrationToken { __int64 value; } EventRegistrationToken;' \
   > build/include/EventToken.h
 
-# The build number (CI passes the workflow's run number); the launcher
-# updates itself to a published build with a higher one, and 0 never updates.
 version="${STELLA_LAUNCHER_VERSION:-0}"
 case "$version" in
   '' | *[!0-9]*) echo "STELLA_LAUNCHER_VERSION must be a whole number, not '$version'" >&2; exit 1 ;;
 esac
 version=$((10#$version))
 
-# A self-hosted build sets STELLA_BACKEND_URL (its prod backend),
-# STELLA_RELEASES_URL (its releases bucket's public base) and
-# STELLA_UPDATE_SIGNER (its Authenticode signer); see SELF_HOSTING.md.
 defaults=()
 if [ -n "${STELLA_BACKEND_URL:-}" ]; then defaults+=("-DSTELLA_DEFAULT_BACKEND_URL=\"$STELLA_BACKEND_URL\""); fi
 if [ -n "${STELLA_RELEASES_URL:-}" ]; then defaults+=("-DSTELLA_RELEASES_URL=\"${STELLA_RELEASES_URL%/}\""); fi

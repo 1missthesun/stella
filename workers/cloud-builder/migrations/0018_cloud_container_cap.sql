@@ -1,7 +1,3 @@
--- The cloud agents spending cap (`src/container-cap.ts`): running containers
--- and container-seconds per UTC month. Used only when a cap is configured
--- (owner-mode servers by default).
-
 CREATE TABLE cloud_container_runs (
   sandbox TEXT PRIMARY KEY,
   started_at INTEGER NOT NULL,

@@ -1,4 +1,3 @@
--- Compare event volume and error volume for a bounded time range.
 WITH deduped AS (
   SELECT DISTINCT
     event_id,

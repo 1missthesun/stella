@@ -1,11 +1,3 @@
-/* Per-message action control (see MessageActions.jsx).
- *
- * One 24px ellipsis button that lives in the message's horizontal line, to the
- * side of the bubble — NOT below it. Nothing here may introduce vertical
- * footprint: the old action ROW reserved 24px under every message, and that
- * reserved strip was the vertical gap people saw between messages. Visibility
- * is purely an opacity fade, so revealing the button never changes row
- * geometry (the virtualized timeline keys on stable row heights). */
 .message-actions {
   flex: none;
   display: inline-flex;
@@ -83,15 +75,10 @@
   box-shadow: var(--focus-ring);
 }
 
-/* Active read-aloud reads as "on" even before the menu is opened again. */
 .message-actions[data-active="true"] {
   color: var(--primary);
 }
 
-/* Muted created-time header at the top of the menu. The per-message stamp
-   under the bubble is gone; the periodic centered divider
-   (`.chat-time-divider`) carries the conversation's time, and this keeps the
-   exact minute of one message one click away. */
 .message-actions-menu__time {
   letter-spacing: 0.04em;
   font-variant-numeric: tabular-nums;

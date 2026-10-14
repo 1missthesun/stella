@@ -1,23 +1,7 @@
-/* Companion — floating desktop Stella.
- *
- * Two windows share these styles: the mark window (`.companion-mark-root`,
- * the mark alone, never resized) and the panel window (`.companion-root`,
- * the arc, composer, and bubbles behind it).
- *
- * In the panel, everything is positioned off two variables:
- *   --companion-anchor-x : horizontal center of the mark, window px
- *   --companion-anchor-y : bottom edge of the mark, window px
- * Both are `calc(100% - …)` or fixed px relative to the two window edges the
- * box grows away from (see CompanionRoot `anchorVars`), so the mark holds its
- * screen position through every resize without a round-trip to main.
- */
-
 .companion-root {
   position: fixed;
   inset: 0;
   overflow: hidden;
-  /* Transparent areas must never take the pointer: only the pieces that opt
-     in below are hit targets. */
   pointer-events: none;
   user-select: none;
   -webkit-user-select: none;
@@ -32,8 +16,6 @@
   --companion-stack-lift: 150px;
 }
 
-/* ── Mark window ────────────────────────────────────────────────────────── */
-
 .companion-mark-root {
   position: fixed;
   inset: 0;
@@ -43,8 +25,6 @@
   --companion-mark-size: 84px;
 }
 
-/* The mark sits where the panel expects it: centered horizontally, 14px up
-   from the bottom (see COMPANION_MARK_* in the contracts). */
 .companion-mark-root .companion-mark {
   left: 50%;
   top: calc(100% - 14px);
@@ -60,8 +40,6 @@
   transform: translate(-50%, -100%) scale(0.96);
 }
 
-/* ── Hull: the hover disc that holds the arc + mark ─────────────────────── */
-
 .companion-hull {
   --hull-size: 208px;
   position: absolute;
@@ -73,9 +51,6 @@
       var(--hull-size) / 2
   );
   border-radius: 50%;
-  /* Idle: only the mark inside is a hit target. Active: the whole disc is,
-     so the pointer can travel mark → button across "empty" space without
-     the hover ending. */
   pointer-events: none;
 }
 
@@ -120,8 +95,6 @@
   pointer-events: none;
 }
 
-/* Panel-side twin of the mark's hit target (see use-mark-press). Invisible,
-   sits exactly where the mark window draws, above the arc. */
 .companion-mark-hit {
   position: absolute;
   left: 50%;
@@ -148,7 +121,6 @@
   cursor: grabbing;
 }
 
-/* Running-agent count, tucked onto the mark's top-right shoulder. */
 .companion-badge {
   position: absolute;
   top: 2px;
@@ -181,8 +153,6 @@
     transform: scale(1);
   }
 }
-
-/* ── Arc of buttons ─────────────────────────────────────────────────────── */
 
 .companion-arc {
   position: absolute;
@@ -266,8 +236,6 @@
   }
 }
 
-/* ── Stack: bubbles + composer above the mark ───────────────────────────── */
-
 .companion-stack {
   position: absolute;
   width: var(--companion-stack-width);
@@ -281,8 +249,6 @@
     top 220ms cubic-bezier(0.32, 0.72, 0, 1);
 }
 
-/* The stack hugs the anchored side edge and extends toward the screen
-   center — a speech bubble reaching out from the mark. */
 .companion-root[data-edge-h="right"] .companion-stack {
   right: 8px;
 }
@@ -307,8 +273,6 @@
 .companion-root[data-dragging] .companion-stack {
   visibility: hidden;
 }
-
-/* ── Composer pill ──────────────────────────────────────────────────────── */
 
 .companion-composer {
   display: flex;
@@ -356,7 +320,6 @@
   flex: 0 0 auto;
 }
 
-/* Same footprint as the main composer's send / stop buttons. */
 .companion-composer__icon {
   width: 34px;
   height: 34px;
@@ -382,8 +345,6 @@
     transform: translateY(0) scale(1);
   }
 }
-
-/* ── Bubbles ────────────────────────────────────────────────────────────── */
 
 .companion-bubbles {
   display: flex;

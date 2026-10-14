@@ -1,10 +1,3 @@
-/* Working indicator — the character mark plus, while a tool runs, its label.
-   It wears the assistant bubble's own fill and radius so thinking and tool states read as an incoming message rather
-   than as separate chrome sitting under the conversation. */
-/* The indicator is a one-line reply bubble: the same padding, radius, text
-   size and line height as `.assistant-message-text`, with the mark sized to
-   that line, so it is exactly as tall and as round as the reply that takes
-   its place. */
 .working-indicator {
   --working-indicator-line: calc(
     var(--chat-text-size, var(--font-size-lg)) *
@@ -23,8 +16,6 @@
   animation: stream-fade-in 0.4s ease-out both;
 }
 
-/* Thinking has no label, so the bubble closes up around the mark alone
-   instead of leaving a gap where the status text would have gone. */
 .working-indicator[data-mode="thinking"] {
   gap: 0;
 }
@@ -39,11 +30,6 @@
   flex: 1;
 }
 
-/* Working status text — shimmer handled by TextShimmer component */
-
-/* SwapText: crossfades + slides between status strings so transitions
-   like Working → Updating → Working, multi-agent rotation row swaps,
-   and same-agent description changes animate instead of snapping. */
 .swap-text {
   display: inline-grid;
   grid-template-areas: "stack";
@@ -63,8 +49,6 @@
   animation: swap-text-in 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-/* Some surfaces animate their whole container on mount. Keep the initial
- * text in that single entrance while retaining SwapText for later updates. */
 .swap-text__layer--initial-static {
   animation: none;
 }
@@ -96,28 +80,10 @@
   }
 }
 
-/* Inline working indicator — Claude-style. Rendered as a keyed `ChatTimeline`
- * item (`.event-list-working-indicator`), so it reads as the line directly
- * below the last assistant message, with queued items beneath it.
- *
- * It is NOT pinned to the viewport: the footer's bottom-floor reading area
- * follows the indicator, so it scrolls with content (the user can
- * scroll up past it) rather than floating over the chat. When the runtime
- * reports work, `active` is true and the indicator is shown; when there is
- * no work at all it plays the hold + grow-out exit and then collapses to
- * nothing (see `.event-list-working-indicator:has(--vacated)`), re-entering
- * under the next pending turn.
- *
- * The legacy floating `thinking-footer-overlay` / `sticky-thinking-footer`
- * surfaces and the composer-context-row placement are both gone. */
 .inline-working-indicator {
   display: flex;
   align-items: center;
   width: 100%;
-  /* Reserve a stable row height equal to a normal `.working-indicator`
-   * pill so the indicator's line doesn't jitter while the label/shimmer
-   * swaps. The collapse-to-nothing on idle is handled by the footer
-   * wrapper's `:has(--vacated)` rule below, not here. */
   min-height: calc(
     var(--chat-text-size, var(--font-size-lg)) *
       var(--chat-text-line-height, 1.5) + 16px
@@ -125,38 +91,25 @@
   pointer-events: none;
 }
 
-/* Apply the entrance only for a real idle -> visible transition. Keeping it
- * off the base class prevents a canceled exit from replaying the entrance
- * when `--leaving` is removed. */
 .inline-working-indicator--entering {
   animation: inline-indicator-in 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .chat-viewport-region--sidebar .inline-working-indicator,
 .chat-viewport-region--orb .inline-working-indicator {
-  /* Compact-pill height + tighter density in the sidebar/orb,
-   * matching the smaller `--compact-chat-item-padding`. */
   min-height: 30px;
   padding: 0;
 }
 
-/* Timeline slot for the indicator: a small line of breathing room above so
- * it sits a touch below the assistant message rather than flush against
- * it. When the inner indicator has fully exited (`--vacated`) the slot is
- * removed from flow entirely so an idle chat carries no ghost gutter. */
 .event-list-working-indicator {
   padding-top: 4px;
 }
 
-/* The slot's own breathing room is part of what the exit has to clear, so it
- * eases away alongside the indicator rather than snapping shut after it. */
 .event-list-working-indicator:has(.inline-working-indicator--leaving) {
   padding-top: 0;
   transition: padding-top 220ms cubic-bezier(0.4, 0, 0.7, 1);
 }
 
-/* The handoff is the exception: the reply lands in this row, so the spacing
- * it will sit under has to stay exactly where it is. */
 .event-list-working-indicator:has(.inline-working-indicator--handoff) {
   padding-top: 4px;
   transition: none;
@@ -166,29 +119,20 @@
   display: none;
 }
 
-/* Once the inner content has been removed (post grow-out), the wrapper
- * goes inert. */
 .inline-working-indicator--vacated {
   animation: none;
 }
 
-/* Inline it keeps its bubble chrome — that IS the treatment now — so only the
- * entrance is dropped: the wrapper's `inline-indicator-in` already animates it,
- * and the pill's own `stream-fade-in` would stack into a doubled entrance. */
 .inline-working-indicator__indicator {
   animation: none;
 }
 
-/* Ordinary exit: the row collapses to nothing as it fades, so idle chat is
- * left with no gutter. The scale pulls toward the top edge so it reads as
- * tucking up under the message rather than drifting off below. */
 .inline-working-indicator--leaving {
   animation: inline-indicator-out 220ms cubic-bezier(0.4, 0, 0.7, 1) both;
   transform-origin: left top;
   overflow: hidden;
 }
 
-/* Handoff exit. Duration matches `WORKING_INDICATOR_HANDOFF_MS`. */
 .inline-working-indicator--leaving.inline-working-indicator--handoff {
   animation: inline-indicator-handoff-out 240ms cubic-bezier(0.4, 0, 0.7, 1)
     both;
@@ -225,8 +169,6 @@
     filter: blur(0);
     max-height: 48px;
   }
-  /* Fade out well before the height finishes collapsing: a pill still faintly
-     visible while its row shrinks under it reads as a glitch. */
   60% {
     opacity: 0;
   }
@@ -238,11 +180,6 @@
   }
 }
 
-/* Inline Stella — the character mark at its indicator size. The rig draws
-   plain SVG at the slot's own dimensions, so there's no backing buffer to
-   size and no compositor layer for chat-layout ancestors to clip: the slot is
-   simply 30px and the mark fills it. `overflow: visible` on the svg lets the
-   rig's glow and sparkles reach past the box without widening the row. */
 .indicator-stella {
   width: 24px;
   height: var(--working-indicator-line, 24px);
@@ -257,7 +194,6 @@
   overflow: visible;
 }
 
-/* Core fade entrance (no filter:blur — GPU-friendly) */
 @keyframes stream-fade-in {
   from {
     opacity: 0;
@@ -269,7 +205,6 @@
   }
 }
 
-/* Respect reduced motion preference */
 @media (prefers-reduced-motion: reduce) {
   .working-indicator {
     animation: none;

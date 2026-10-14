@@ -1,12 +1,3 @@
--- Replace the two timestamps before running. Filtering on __ingest_ts enables
--- Iceberg partition pruning; occurred_at_ms preserves client event-time.
--- Clients are at-least-once. Deduplicate by the stable event id before
--- counting tokens or cost so a lost HTTP acknowledgement cannot double bill
--- an analytical report.
---
--- cloud-builder's billing ledger is authoritative for Stella-managed inference. Runtime
--- observations for provider='stella' describe the same managed call and are
--- excluded here; non-managed/BYOK runtime observations remain included.
 WITH deduped AS (
   SELECT DISTINCT
     event_id,

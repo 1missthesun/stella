@@ -1,15 +1,7 @@
-/* ──────────────────────────────────────────────────────────────────────
- * Self-modification film: the draft, the preview, and the focus pull.
- * The pull mirrors the app's update transition (update-transition.ts):
- * the changed region comes in from a 12px blur on a spring.
- * ────────────────────────────────────────────────────────────────────── */
-
 .ofilm-stella--wide .odemo-chat {
   width: 480px;
   margin: 0 auto;
 }
-
-/* ── The pill the change adds ────────────────────────────────────── */
 
 .osm-pill {
   display: inline-flex;
@@ -84,7 +76,6 @@
   }
 }
 
-/* A soft bloom marks the one place that changed. */
 .osm-cover {
   position: absolute;
   left: 50%;
@@ -121,8 +112,6 @@
   }
 }
 
-/* ── The Update card inside the film ─────────────────────────────── */
-
 .osm-card {
   align-self: flex-start;
   width: 88%;
@@ -141,8 +130,6 @@
 .osm-card .app-update-card {
   margin: 0;
 }
-
-/* ── Draft diff ──────────────────────────────────────────────────── */
 
 .osm-diff {
   position: absolute;
@@ -208,8 +195,6 @@
   opacity: 1;
   transform: none;
 }
-
-/* ── Live preview of the draft ───────────────────────────────────── */
 
 .osm-preview {
   position: absolute;

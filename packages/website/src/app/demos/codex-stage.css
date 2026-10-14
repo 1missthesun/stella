@@ -84,8 +84,6 @@
   text-align: left;
 }
 
-/* Title: tighter and smaller than the original hero size so it wraps
-   to 2–3 short lines beside the mock, matching Codex's compact column. */
 .codex-stage__copy .ob-section-title,
 .codex-stage__copy .radial-hero__title,
 .codex-stage__copy .canvas-hero__title,
@@ -115,20 +113,12 @@
   text-align: left;
 }
 
-/* ── Mock column ───────────────────────────────────────────────────── */
-
 .codex-stage__mock {
   position: relative;
   width: 100%;
   min-width: 0;
 }
 
-/* ── The gradient "frame" around the mock ────────────────────────── */
-
-/* Gradient palette mirrors the Stella logo (sky-cyan → accent blue) and
-   the body's `--page-glow-cyan` / `--page-glow-blue` background washes,
-   so the frame feels like a saturated extension of the page itself
-   instead of a foreign violet card. Squared corners by request. */
 .codex-frame {
   position: relative;
   border-radius: 0;
@@ -174,11 +164,6 @@
   z-index: 1;
 }
 
-/* ── Per-section adjustments inside the frame ─────────────────────── */
-
-/* Radial hero stage: was a 2-col dial+mock grid filling the page width.
-   Inside the frame we keep the side-by-side relationship but tighten
-   spacing and let the dial scale relative to the column, not viewport. */
 .codex-frame .radial-hero__stage {
   width: 100%;
   max-width: none;
@@ -210,8 +195,6 @@
   min-height: clamp(260px, 32vw, 420px);
 }
 
-/* Canvas hero stage: tabs above mock — keep that vertical stack but
-   centered inside the frame. */
 .codex-frame .canvas-hero__stage {
   width: 100%;
   max-width: none;
@@ -244,8 +227,6 @@
   min-height: clamp(320px, 38vw, 480px);
 }
 
-/* Mobile hero stage: was channels-list + phones grid. Inside the frame
-   keep that grid, but compress the right column width. */
 .codex-frame .mobile-hero__stage {
   width: 100%;
   max-width: none;
@@ -283,8 +264,6 @@
   color: rgba(255, 255, 255, 0.86);
 }
 
-/* ob-* sections: their existing __stage already has a max-width — let
-   it fill the frame instead. */
 .codex-frame .ob-memory__stage,
 .codex-frame .ob-together__stage,
 .codex-frame .ob-actions__stage,
@@ -295,8 +274,6 @@
   padding: 0;
   margin: 0;
 }
-
-/* ── Mobile / narrow layout ───────────────────────────────────────── */
 
 @media (max-width: 719px) {
   .codex-stage__copy {

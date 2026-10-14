@@ -14,7 +14,6 @@
   overflow: visible;
 }
 
-/* ---- Stage: one phone, four guises ------------------------------------- */
 .stage {
   --phone-w: clamp(13rem, 19vw, 15.5rem);
   position: relative;
@@ -41,9 +40,6 @@
   transform: none;
 }
 
-/* Messages land one by one whenever the phone takes the stage (each row
-   carries its landing time in --t, ms); toggling data-active off resets them
-   so each return replays the thread. */
 .slot [data-beat] {
   opacity: 0;
 }
@@ -64,7 +60,6 @@
   }
 }
 
-/* ---- Platform switcher --------------------------------------------------- */
 .switcher {
   display: flex;
   flex-wrap: wrap;
@@ -104,8 +99,6 @@
   background: rgba(255, 255, 255, 0.92);
 }
 
-/* Quiet progress: a hairline filling along the bottom of the active pill
-   for exactly as long as its thread plays. */
 .pill::after {
   content: "";
   position: absolute;
@@ -141,7 +134,6 @@
   height: 100%;
 }
 
-/* ---- iPhone frame ------------------------------------------------------ */
 .phone {
   position: relative;
   width: 100%;
@@ -317,27 +309,19 @@
   background: rgba(8, 19, 38, 0.32);
 }
 
-/* ---- App container ----------------------------------------------------- */
 .app {
   display: flex;
   height: 100%;
   flex-direction: column;
 }
 
-/* ================================================================== */
-/*  Stella app — faithful to stella-mobile on the default Pearl theme  */
-/*  (white flat canvas, Manrope, accent #2563eb). Every dimension is   */
-/*  expressed in --u = 1pt of a 393pt iPhone screen, so the type scale */
-/*  and spacing match a real screenshot shrunk to the phone frame.     */
-/* ================================================================== */
 .stella {
-  /* 393pt logical width; the frame's 0.42rem bezel sits on each side. */
   --u: calc((var(--phone-w) - 0.84rem) / 393);
   --st-bg: #ffffff;
   --st-text: #111111;
   --st-muted: #737373;
   --st-accent: #2563eb;
-  --st-accent-soft: #ebedf8; /* soften(accent, bg, 0.12) */
+  --st-accent-soft: #ebedf8;
   --st-border: #e8e8e8;
   --st-border-strong: #dcdcdc;
   position: relative;
@@ -348,8 +332,6 @@
   -webkit-font-smoothing: antialiased;
 }
 
-/* Top bar: safe-area inset (59pt) + 36pt bar; hamburger in a 44pt hit box,
-   4pt from the left edge. Cloud chat shows nothing centered. */
 .stTopBar {
   display: flex;
   flex: none;
@@ -371,8 +353,6 @@
   height: calc(22 * var(--u));
 }
 
-/* Message list: 12pt gutters, 80pt top pad (+4pt content pad), 20pt gaps.
-   Short threads read top-down (no end alignment), as in the app. */
 .stThread {
   display: flex;
   flex: 1;
@@ -383,8 +363,6 @@
   overflow: hidden;
 }
 
-/* User bubble: accentSoft fill, hairline borderStrong, 18pt radius with a
-   4pt bottom-right corner, 12pt padding, 17pt/1.52 Manrope. */
 .stYou {
   align-self: flex-end;
   max-width: 92%;
@@ -399,7 +377,6 @@
   line-height: 1.52;
 }
 
-/* Assistant reply: bubble-less prose, same 17pt/1.52 scale, 4pt row pad. */
 .stAssistant {
   margin: 0;
   padding: calc(4 * var(--u)) 0;
@@ -409,8 +386,6 @@
   line-height: 1.52;
 }
 
-/* Fixed-height chat tail that hosts the working indicator
-   (WORKING_INDICATOR_SLOT_HEIGHT = 34pt viewport, + 12pt, 4pt top pad). */
 .stTail {
   flex: none;
   min-height: calc(46 * var(--u));
@@ -425,11 +400,6 @@
   opacity: 0;
 }
 
-/* Working-indicator star (stella-v2 aurora "star-spin"): 30pt canvas centred
-   in a 34pt viewport — no circular crop, the shader's frame fade keeps the
-   fringes soft. Geometry in pt × --u: STAR_SCALE 0.42 × 15pt half-canvas =
-   6.3pt arm reach; horizontal arms 0.95 long, half-width 0.31 at the root
-   (STAR_GIRTH 1.55, taper (1-t)^1.7); axis 1.0 up / 0.95 down; hub r 0.18. */
 .stStar {
   position: relative;
   flex: none;
@@ -443,7 +413,6 @@
   left: 50%;
 }
 
-/* Ambient bloom: exp(-rad·2.4) × ~0.11 — the star sits in light. */
 .stStarBloom {
   width: calc(24 * var(--u));
   height: calc(24 * var(--u));
@@ -457,10 +426,6 @@
   );
 }
 
-/* One opposite pair of horizontal arms as a double wedge, 12pt tip to tip
-   and 3.9pt across at the root; the keyframes rotate it to the projected
-   direction (atan2(sin a·0.30, cos a)) and foreshorten it by the projected
-   length, exactly as the shader's starArm() does per frame. */
 .stStarArms {
   width: calc(12 * var(--u));
   height: calc(3.9 * var(--u));
@@ -485,7 +450,6 @@
     37.5% 19.2%
   );
   transform-origin: 50% 50%;
-  /* Resting pose (an eighth turn, arms on the diagonals). */
   transform: rotate(-16.7deg) scale(0.702, 0.882);
 }
 
@@ -493,8 +457,6 @@
   transform: rotate(-163.3deg) scale(0.702, 0.882);
 }
 
-/* Upright axis (up 6.3pt, down 6pt) + hub, ramped teal-ish low → rose-ish
-   high like the shader's height-weighted hue axis. */
 .stStarAxis {
   width: calc(30 * var(--u));
   height: calc(30 * var(--u));
@@ -502,8 +464,6 @@
   overflow: visible;
 }
 
-/* ShimmerText: glyphs stay fully inked while a dim trough (alpha 0.15, 10 %
-   of a 3×-wide strip) sweeps left → right once every 1.6 s, linear. */
 .stStatus {
   font-size: calc(14 * var(--u));
   font-weight: 500;
@@ -525,7 +485,6 @@
   -webkit-text-fill-color: transparent;
 }
 
-/* Composer: 12pt gutters, 12pt top / 6pt bottom pad + 34pt home inset. */
 .stComposerWrap {
   display: flex;
   flex: none;
@@ -534,8 +493,6 @@
   padding: calc(12 * var(--u)) calc(12 * var(--u)) calc(40 * var(--u));
 }
 
-/* Glass pill: surface tint, hairline border at 60 %, 0 8 24 @ 8 % shadow,
-   50pt min height, 8pt padding and gaps. */
 .stComposer {
   display: flex;
   width: 100%;
@@ -607,9 +564,6 @@
   height: calc(19 * var(--u));
 }
 
-/* Working indicator choreography: enters ~0.7s after the user sends, holds
-   while Stella "thinks" (~2.5s), then fades as the final reply lands
-   (exitImmediately in the app). Runs only while the slot is active. */
 .slot[data-active] .stWorking {
   animation: workingBeat 2900ms cubic-bezier(0.22, 1, 0.36, 1) both;
   animation-delay: calc(var(--t) * 1ms);
@@ -619,9 +573,6 @@
   animation: statusShimmer 1600ms linear infinite;
 }
 
-/* The staged turn: STAR_CYCLE 3.2s, one revolution per cycle, keyframes
-   sampled from starTurn() (dense through the whip and the sprung landing),
-   linear between samples so the easing is the curve's own. */
 .slot[data-active] .stStarArmsA {
   animation: starArmsA 3200ms linear infinite;
 }
@@ -809,8 +760,6 @@
 }
 
 
-/* Hairlines: 0.5px reads as a true hairline on retina; fall back to a full
-   device pixel on low-density screens so the edges never vanish. */
 @media (max-resolution: 1.5dppx) {
   .stYou {
     box-shadow: 0 0 0 1px var(--st-border-strong);
@@ -823,9 +772,6 @@
   }
 }
 
-/* ---- Mobile app downloads ----------------------------------------------- */
-/* Same voice as `.button--download` (display type, glow wash, quiet
-   border) but shaped like store badges: platform mark + two-line label. */
 .storeLinks {
   display: flex;
   flex-wrap: wrap;
@@ -910,8 +856,6 @@
   letter-spacing: -0.005em;
 }
 
-/* Desktop download dialog. It is portaled to the body so reveal transforms
-   on the homepage section cannot change the fixed-position containing block. */
 .qrBackdrop {
   position: fixed;
   z-index: 2000;
@@ -1056,7 +1000,6 @@
   }
 }
 
-/* ---- Responsive -------------------------------------------------------- */
 @media (max-width: 900px) {
   .stage {
     --phone-w: 13rem;
@@ -1074,7 +1017,6 @@
     opacity: 1;
   }
 
-  /* Static mock: thread fully shown, no "thinking" choreography. */
   .stWorking,
   .slot[data-active] .stWorking,
   .slot[data-active] .stStatus,

@@ -1,7 +1,3 @@
--- Self-hosted servers (STELLA_OWNER_MODE): the server's identity and its one
--- owner (`src/selfhost/owner.ts`), and one-time device pairings
--- (`src/selfhost/pairing.ts`). Unused on hosted Stella.
-
 CREATE TABLE selfhost_server (
   id INTEGER PRIMARY KEY CHECK (id = 1),
   server_id TEXT NOT NULL,
@@ -11,8 +7,6 @@ CREATE TABLE selfhost_server (
   updated_at INTEGER NOT NULL
 );
 
--- The secret is stored as its SHA-256 only. A pairing is claimed once, within
--- its TTL, and locks after too many wrong secrets.
 CREATE TABLE device_pairings (
   id TEXT PRIMARY KEY,
   owner_user_id TEXT NOT NULL,
@@ -29,7 +23,6 @@ CREATE TABLE device_pairings (
 );
 CREATE INDEX device_pairings_expiry ON device_pairings (expires_at);
 
--- Fixed-window counters for unauthenticated pairing claims, per hashed IP.
 CREATE TABLE device_pairing_rate (
   key TEXT PRIMARY KEY,
   window_start INTEGER NOT NULL,

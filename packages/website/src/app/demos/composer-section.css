@@ -1,21 +1,7 @@
-/* ──────────────────────────────────────────────────────────────────
-   Composer section — interactive replica of the real Stella composer.
-
-   Color tokens are scoped to `.cmock` so the section can sit inside
-   the blue codex-frame without leaking into other demos. Visual
-   styling mirrors `desktop/src/app/chat/full-shell.composer.css` +
-   `composer-primitives.css` + `composer-context.css` + the dictation
-   recording bar — pill shell, expand-on-content, dashed suggestion
-   chips, filled-thumb attached chips, glass add-menu.
-   ────────────────────────────────────────────────────────────────── */
-
 .composer-hero {
   /* Standard codex-section vertical rhythm — same as other demos. */
 }
 
-/* Inherit the site's dark text colors — the section header sits ABOVE
-   the blue codex-frame card, not inside it, so the page background
-   (cream/white) shows through. */
 .composer-hero__eyebrow {
   font-family: var(--font-display), system-ui, sans-serif;
   font-style: normal;
@@ -39,9 +25,7 @@
   max-width: 38rem;
 }
 
-/* ─── Token scope ─────────────────────────────────────────────── */
 .cmock {
-  /* Light surface — easy to read on top of the blue gradient. */
   --cmock-bg: rgba(255, 255, 255, 0.96);
   --cmock-border: rgba(38, 60, 96, 0.18);
   --cmock-border-strong: rgba(38, 60, 96, 0.28);
@@ -68,15 +52,9 @@
   padding: 0 8px;
   font-family: var(--font-sans), "Manrope", system-ui, sans-serif;
   color: var(--cmock-text-base);
-  /* Reserve enough vertical room for the composer's expanded state
-     (suggestions row + attached chip + a few lines of textarea +
-     toolbar) so attaching a chip or typing doesn't grow the
-     surrounding codex-frame and shift the page. Anything that
-     overflows past this still pushes the card naturally. */
   min-height: 200px;
 }
 
-/* ─── Suggestion chips row (action zero) ─────────────────────── */
 .cmock__suggestions {
   display: flex;
   flex-wrap: wrap;
@@ -147,10 +125,6 @@
   text-overflow: ellipsis;
 }
 
-/* ─── Hover preview card ─────────────────────────────────────── */
-/* Mounted via portal to <body> with inline `position: fixed` + computed
-   `top` / `left` so the codex-frame's clip can't crop it. Style here
-   covers everything else (chrome, animation, hover-card internals). */
 .cmock__hover-card {
   background: white;
   border-radius: 12px;
@@ -233,12 +207,6 @@
   text-overflow: ellipsis;
 }
 
-/* ─── Shell ──────────────────────────────────────────────────── */
-/* The shell's height is driven imperatively by a ResizeObserver in
-   the React component (see `useEffect` on `shellContentRef`). The
-   transition here is what makes the chip-attach / textarea-grow /
-   dictation-row-appear changes animate smoothly instead of snapping —
-   port of `useAnimatedComposerShell` on the desktop. */
 .cmock__shell {
   position: relative;
   width: 100%;
@@ -263,9 +231,6 @@
     0 0 0 2px color-mix(in oklch, var(--cmock-primary) 28%, transparent);
 }
 
-/* Inner content wrapper — its natural height is what the ResizeObserver
-   measures and writes back onto the shell. Keep it as a simple block
-   so the measurement equals the sum of its children. */
 .cmock__shell-content {
   display: flex;
   flex-direction: column;
@@ -278,7 +243,6 @@
   }
 }
 
-/* ─── Attached chip strip ────────────────────────────────────── */
 .cmock__attached-strip {
   display: flex;
   flex-wrap: wrap;
@@ -372,7 +336,6 @@
   line-height: 1;
 }
 
-/* ─── Form (pill mode) ───────────────────────────────────────── */
 .cmock__form {
   display: flex;
   flex-direction: row;
@@ -422,8 +385,6 @@
   color: var(--cmock-text-weaker);
 }
 
-/* In pill mode, the toolbar is `display: contents` so its children sit
-   inline next to the input. */
 .cmock__toolbar,
 .cmock__toolbar-left,
 .cmock__toolbar-right {
@@ -467,7 +428,6 @@
   opacity: 0.92;
 }
 
-/* ─── Form (expanded mode) ───────────────────────────────────── */
 .cmock__form--expanded {
   flex-direction: column;
   align-items: stretch;
@@ -514,11 +474,6 @@
   display: inline-flex;
 }
 
-/* ─── Dictation bar (voice mode) ─────────────────────────────── */
-/* Inline mode (no text): the bar's children are direct flex children
-   of the pill .cmock__form, so the waveform absorbs the remaining
-   space and the controls sit on the right — same layout the real
-   DictationRecordingBar uses inside .composer-form. */
 .cmock__waveform {
   flex: 1 1 auto;
   min-width: 0;
@@ -557,9 +512,6 @@
   color: var(--cmock-primary);
 }
 
-/* "Below" mode (voice + text): dictation bar renders as its own row
-   beneath the toolbar inside the expanded composer, with a soft top
-   divider — mirrors `.composer-dictation-row` in the desktop CSS. */
 .cmock__dictation-row {
   display: flex;
   align-items: center;
@@ -568,8 +520,6 @@
   border-top: 1px solid rgba(38, 60, 96, 0.08);
 }
 
-/* Mic gets the active treatment while voice is on so it's visibly the
-   way to toggle it off (matches the real composer's mic styling). */
 .cmock__mic--active {
   background: color-mix(in oklch, var(--cmock-primary) 14%, transparent);
   color: var(--cmock-primary);
@@ -580,10 +530,6 @@
   color: var(--cmock-primary);
 }
 
-/* ─── Add menu popover ───────────────────────────────────────── */
-/* Portaled to <body> with inline `position: fixed` + computed top/left
-   so the codex-frame can't crop it. Everything else (chrome,
-   animation, items) stays here. */
 .cmock__menu {
   padding: 6px;
   background: white;
@@ -672,7 +618,6 @@
   text-overflow: ellipsis;
 }
 
-/* ─── Narrow / mobile collapse ──────────────────────────────── */
 @media (max-width: 640px) {
   .cmock {
     padding: 0 4px;

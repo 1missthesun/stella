@@ -14,9 +14,6 @@
   min-width: 0;
 }
 
-/* Many parallel requests funnel into one chat. The window column is a
-   fixed track — never content-sized — so the mock holds its position
-   while text types and bubbles land inside it. */
 .diagram {
   position: relative;
   display: grid;
@@ -106,7 +103,6 @@
   transition: opacity 420ms ease;
 }
 
-/* The active request's thread pulses toward the chat. */
 .connectors path[data-firing] {
   opacity: 1;
   stroke-dasharray: 6 9;
@@ -119,7 +115,6 @@
   }
 }
 
-/* Convergence point where every thread meets the one chat. */
 .merge {
   position: absolute;
   left: 0;

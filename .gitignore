@@ -12,12 +12,9 @@ docs/
 !.codex/config.toml
 DEV-CONTEXT.md
 
-# Local diagnostic logs (primary location is ~/.stella/logs, already ignored
-# via .stella/ above; this covers any repo-relative fallback).
 /state/logs/
 **/state/logs/
 
-# Workspace installs
 /node_modules/
 /packages/*/node_modules/
 /workers/*/.dev.vars
@@ -74,7 +71,6 @@ DEV-CONTEXT.md
 /.stella-dev-splash.html
 /.stella-dev-splash-main.cjs
 /.stella-dev-splash.lock
-# V8 compile cache for the dev Electron main process (machine-specific bytecode).
 /.stella-dev/
 /.stella-dev-user-quit-request
 /.stella-launch.log
@@ -87,20 +83,14 @@ DEV-CONTEXT.md
 /stella-install.log
 /stella-release.json
 
-# TypeScript incremental build artifacts (machine-generated; never commit).
 *.tsbuildinfo
 
-# TanStack Router temporary files (machine-generated).
 /.tanstack/
 
-# Exec worker fallback CJS cache (Node-test runtime only; Bun loads .ts directly).
 packages/runtime/kernel/exec/.exec-worker-cache/
 
 
-# Local strategy notes (never commit).
 /strategy/
 
-# Nothing named .env.local is tracked; this only guards against one being
-# committed later.
 .env.local
 /.selfhost/

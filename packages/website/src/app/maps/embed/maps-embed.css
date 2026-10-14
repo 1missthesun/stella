@@ -1,6 +1,3 @@
-/* /maps/embed — fills whatever frame hosts it (desktop iframe card, mobile
-   WebView). No site chrome; the map is the whole page. */
-
 .maps-embed-root,
 .maps-embed-fallback {
   position: fixed;
@@ -37,7 +34,6 @@
   color: #9aa4b2;
 }
 
-/* Marker info window content (injected as HTML by the client). */
 .maps-embed-info {
   max-width: 220px;
   font-family: var(--font-sans, system-ui, sans-serif);

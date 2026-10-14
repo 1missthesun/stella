@@ -1,10 +1,3 @@
-/*
- * A small JSON reader and string escaper shared by the Windows and Linux
- * launchers. They only read short documents (channel messages from Electron,
- * the app-source bootstrap response, launcher.json, launcher-state.json), so
- * this favors being small and dependency-free over speed. Header-only; every
- * function is static. Compiles as C99 and C++.
- */
 #ifndef STELLA_MINI_JSON_H
 #define STELLA_MINI_JSON_H
 
@@ -17,10 +10,10 @@ typedef struct mj_value {
     mj_type type;
     int boolean;
     double number;
-    char *string;            /* MJ_STRING, UTF-8, NUL-terminated */
-    size_t count;            /* MJ_ARRAY / MJ_OBJECT */
-    struct mj_value *items;  /* count values */
-    char **keys;             /* MJ_OBJECT: count keys */
+    char *string;
+    size_t count;
+    struct mj_value *items;
+    char **keys;
 } mj_value;
 
 typedef struct {
@@ -85,7 +78,6 @@ static size_t mj_put_utf8(char *dst, unsigned cp) {
 }
 
 static char *mj_parse_string_raw(mj_parser *ps) {
-    /* ps->p is just past the opening quote. Output is never longer than input. */
     const char *start = ps->p;
     char *out = (char *)malloc((size_t)(ps->end - start) + 1);
     size_t n = 0;
@@ -212,7 +204,6 @@ static int mj_parse_value(mj_parser *ps, mj_value *v) {
     return 1;
 }
 
-/* Parse a whole document; NULL when it isn't valid JSON. */
 static mj_value *mj_parse(const char *text, size_t len) {
     mj_parser ps;
     mj_value *v = (mj_value *)calloc(1, sizeof(mj_value));
@@ -244,7 +235,6 @@ static int mj_get_number(const mj_value *obj, const char *key, double *out) {
     return 1;
 }
 
-/* A malloc'd JSON string literal (with quotes) for `s`. */
 static char *mj_quote(const char *s) {
     size_t len = s ? strlen(s) : 0, i, n = 0;
     char *out = (char *)malloc(len * 6 + 3);

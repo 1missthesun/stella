@@ -10,11 +10,8 @@ CREATE TABLE slack_repos (
   id TEXT NOT NULL,
   full_name TEXT NOT NULL,
   branch TEXT NOT NULL DEFAULT '',
-  -- A token pasted before GitHub connections existed, sealed like the bot token.
   token_enc TEXT,
-  -- The owner's rules for work in this repository (workspace rules still apply).
   rules TEXT NOT NULL DEFAULT '',
-  -- Stella previews made from this repository; NULL falls back to the workspace's.
   preview_access TEXT,
   preview_ttl_days INTEGER,
   created_at INTEGER NOT NULL,
@@ -30,9 +27,6 @@ FROM slack_workspace_settings s
 LEFT JOIN slack_preview_settings p ON p.team_id = s.team_id
 WHERE s.repo_full_name IS NOT NULL AND s.repo_full_name != '';
 
--- GitHub accounts the workspace connected through the Stella Crew GitHub App:
--- several, so repositories of different owners (clients' organizations) can
--- sit side by side. A repository uses the connection whose account owns it.
 CREATE TABLE slack_github_connections (
   team_id TEXT NOT NULL,
   installation_id TEXT NOT NULL,
@@ -50,8 +44,6 @@ SELECT team_id, github_installation_id, COALESCE(github_account, ''), COALESCE(g
 FROM slack_workspace_settings
 WHERE github_installation_id IS NOT NULL;
 
--- Environments are per repository now. `repo_id` '' is the environment of
--- work that isn't about any repository.
 CREATE TABLE slack_environments_v2 (
   team_id TEXT NOT NULL,
   repo_id TEXT NOT NULL DEFAULT '',
@@ -84,8 +76,6 @@ UPDATE slack_environment_secrets
 SET repo_id = COALESCE((SELECT r.id FROM slack_repos r WHERE r.team_id = slack_environment_secrets.team_id LIMIT 1), '');
 CREATE INDEX slack_environment_secrets_repo ON slack_environment_secrets (team_id, repo_id);
 
--- Which repository a Slack conversation (thread or DM) works in, chosen by
--- Stella with `slack_repo`. `repo_id` '' means none on purpose.
 CREATE TABLE slack_conversation_repos (
   conversation_id TEXT PRIMARY KEY,
   team_id TEXT NOT NULL,
@@ -94,7 +84,6 @@ CREATE TABLE slack_conversation_repos (
 );
 CREATE INDEX slack_conversation_repos_team ON slack_conversation_repos (team_id);
 
--- A channel's (or DM's) default repository, used by threads that haven't chosen one.
 CREATE TABLE slack_channel_repos (
   team_id TEXT NOT NULL,
   channel_id TEXT NOT NULL,

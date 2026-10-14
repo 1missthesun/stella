@@ -94,8 +94,6 @@
   flex: none;
 }
 
-/* Compact sidebar variant: tighter paddings, stacked actions never
-   overflow the narrow column. */
 .connector-connect-card--compact {
   width: 100%;
   gap: 9px;

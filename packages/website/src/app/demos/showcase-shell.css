@@ -9,7 +9,6 @@
   font-weight: 600;
   line-height: 0.96;
   letter-spacing: -0.05em;
-  /* Reserve ~2 lines so display font swap / wrap doesnâ€™t collapse panel headers */
   min-height: calc(2 * 0.96 * clamp(1.6rem, 2.8vw, 2.5rem));
 }
 
@@ -64,7 +63,6 @@
   min-height: 52rem;
 }
 
-/* DeferInView wrapper: same inner inset as self-mod / radial / canvas */
 .demo-panel--portrait > div {
   padding: var(--demo-panel-inner-padding);
   box-sizing: border-box;

@@ -33,8 +33,6 @@
   flex: 1 1 auto;
 }
 
-/* Shared list/viewer scaffolding used by Files, Home activity and Apps. */
-
 .sidebar-section__scroll {
   flex: 1 1 auto;
   min-height: 0;
@@ -43,10 +41,6 @@
   padding: 8px 10px 14px;
 }
 
-/* One empty-state pattern for every section (Work, Apps, Browser): icon
-   chip, short strong title, weak body, optional pill action. Sections that
-   only have a sentence still center it through the same block, so "empty"
-   reads identically wherever it appears. */
 .sidebar-section__empty {
   display: flex;
   flex: 1 1 auto;
@@ -93,9 +87,6 @@
   margin-top: 8px;
 }
 
-/* Header shown above a section's viewer, carrying the back affordance that
-   returns the section to its list. This is the only route back to a list —
-   re-selecting the tab closes the panel instead. */
 .sidebar-section__viewer-head {
   display: flex;
   align-items: center;

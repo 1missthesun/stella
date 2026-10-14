@@ -21,16 +21,12 @@
   min-height: 0 !important;
 }
 
-/* Live conversation inside the mini window. */
 .liveChat {
   position: absolute;
   inset: 32px 0 0;
   display: grid;
   flex: 1;
   grid-template-rows: minmax(0, 1fr) auto;
-  /* Pin the single column to the window width. Without an explicit column the
-     implicit track is content-sized, so the nowrap typed request in the
-     composer would stretch it — and the composer pill — as it grows. */
   grid-template-columns: minmax(0, 1fr);
   width: 100%;
   min-width: 0;
@@ -56,9 +52,6 @@
   -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 14%);
 }
 
-/* The track starts at the top while the conversation is short. Once it is
-   taller than the viewport, useMiniChatScroll moves this whole layer toward
-   one continuously updated target, matching the desktop's scroll-follow. */
 .messageTrack {
   display: flex;
   flex-direction: column;
@@ -68,30 +61,22 @@
   will-change: transform;
 }
 
-/* The whole conversation breathes out before the loop restarts. */
 .liveTranscript[data-clearing] {
   opacity: 0;
 }
 
-/* Rows keep ordinary flow inside the moving track; each arriving turn uses
-   the same opacity/transform pattern as the desktop chat. */
 .entry {
   flex: 0 0 auto;
   min-width: 0;
   contain: paint;
 }
 
-/* Mirrors the real chat's trailing response region. The newest user message,
-   thinking row, and assistant reply all keep breathing room below them while
-   older turns leave through the masked top edge. */
 .responseSpacer {
   flex: 0 0 clamp(5.5rem, 20vw, 7rem);
   width: 100%;
   pointer-events: none;
 }
 
-/* The composer owns the fixed auto-sized grid row. Transcript overflow can
-   only clip at the top; it can never grow or shove this row down. */
 .composerDock {
   position: relative;
   z-index: 2;
@@ -121,9 +106,6 @@
   position: relative;
 }
 
-/* The full reply participates in layout from the send frame onward. The
-   thinking indicator and streamed text are painted on top of that invisible
-   sizer, so neither can move the transcript when it appears or wraps. */
 .assistantSizer {
   visibility: hidden;
   pointer-events: none;
@@ -169,7 +151,6 @@
   }
 }
 
-/* Assistant "thinking" dots. */
 .thinking {
   display: inline-flex;
   gap: 4px;

@@ -1,12 +1,4 @@
 #!/bin/bash
-# Builds build/stella-launcher. Needs a C compiler, pkg-config, GTK 3,
-# WebKitGTK 4.1 and OpenSSL 3 headers (Debian: libgtk-3-dev
-# libwebkit2gtk-4.1-dev libssl-dev; Arch: gtk3 webkit2gtk-4.1 openssl).
-# libsecret is loaded at runtime when present, so it isn't a build dependency.
-# The window's page, ../common/launcher.html, is embedded in the binary.
-# STELLA_LAUNCHER_VERSION (CI's run number) is the version the updater compares.
-# A self-hosted build sets STELLA_BACKEND_URL (its prod backend) and
-# STELLA_RELEASES_URL (its releases bucket's public base); see SELF_HOSTING.md.
 set -euo pipefail
 cd "$(dirname "$0")"
 mkdir -p build

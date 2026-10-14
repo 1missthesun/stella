@@ -1,15 +1,3 @@
-/* ──────────────────────────────────────────────────────────────────
-   Single-chat section — text on the left, mini-window mock on the
-   right. The mock includes the Stella sidebar inside the window
-   alongside the chat column. The inline working indicator lives in
-   the context-chip bar above the composer.
-
-   Theme is "dusk" — deep plum surface, warm cream text, rose accent.
-   All tokens scoped to .mini-window so nothing leaks.
-   ────────────────────────────────────────────────────────────────── */
-
-/* Hero copy sits next to the codex-frame on the page background, not
-   on top of it — keep the text in the site's default dark color. */
 .single-chat-hero__eyebrow {
   font-family: var(--font-display), system-ui, sans-serif;
   font-style: normal;
@@ -38,8 +26,6 @@
   opacity: 0.78;
 }
 
-/* Side-by-side layout: copy on the left, mock-in-codex-frame on the
-   right. Stacks under 880px. */
 .single-chat-stage {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -57,10 +43,6 @@
   align-items: center;
 }
 
-/* Codex-frame wrapper around the mini window — matches the blue
-   gradient card used by the other sections. The frame hugs the
-   mini-window with comfortable inner padding, and centers it inside
-   the right column. */
 .single-chat-hero__frame {
   width: 100%;
   display: flex;
@@ -81,7 +63,6 @@
   }
 }
 
-/* ─── Mini window — dusk theme ───────────────────────────────── */
 .mini-window {
   --mini-bg: #1f1828;
   --mini-bg-top: #271e30;
@@ -114,7 +95,6 @@
   font-family: var(--font-sans), "Manrope", system-ui, sans-serif;
 }
 
-/* ─── Title bar ──────────────────────────────────────────────── */
 .mini-window__titlebar {
   display: flex;
   align-items: center;
@@ -146,7 +126,6 @@
   flex: 1;
 }
 
-/* ─── Body row: sidebar + main column ────────────────────────── */
 .mini-window__body {
   flex: 1 1 auto;
   display: grid;
@@ -161,7 +140,6 @@
   background: linear-gradient(180deg, var(--mini-bg-top) 0%, var(--mini-bg) 100%);
 }
 
-/* ─── Sidebar ────────────────────────────────────────────────── */
 .mini-sidebar {
   display: flex;
   flex-direction: column;
@@ -343,9 +321,6 @@
   flex-shrink: 0;
 }
 
-/* Narrow viewport: collapse the in-window sidebar to an icon rail,
-   matching the desktop app's mobile persistent rail. Scoped to the
-   single-chat mock so it doesn't fight `.mini-window__body--solo`. */
 @media (max-width: 640px) {
   .single-chat-hero__frame .mini-window__body {
     grid-template-columns: 44px minmax(0, 1fr);
@@ -392,7 +367,6 @@
   }
 }
 
-/* ─── Chat body ──────────────────────────────────────────────── */
 .mini-window__chat {
   flex: 1 1 auto;
   min-height: 0;
@@ -428,7 +402,6 @@
   align-items: flex-start;
 }
 
-/* ─── Bubbles ────────────────────────────────────────────────── */
 .mini-chat__bubble {
   font-size: 13.5px;
   line-height: 1.55;
@@ -454,7 +427,6 @@
   max-width: 95%;
 }
 
-/* Just-sent entry animation — mirrors `user-message-enter` on desktop. */
 .mini-chat__row--just-sent .mini-chat__bubble--user {
   animation: mini-chat-user-enter 360ms cubic-bezier(0.16, 1, 0.3, 1) both;
   transform-origin: right bottom;
@@ -490,7 +462,6 @@
   }
 }
 
-/* ─── Composer wrap ──────────────────────────────────────────── */
 .mini-window__composer-wrap {
   display: flex;
   flex-direction: column;
@@ -498,11 +469,6 @@
   padding: 4px 12px 12px;
 }
 
-/* ─── Context-chip bar above the composer ──────────────────── */
-/* Working indicator slot sits on the LEFT, chips on the right. When
-   the indicator is active the chips shift right and collapse their
-   labels — exact behaviour of .composer-context-actions--suggestions
-   on desktop. */
 .mini-context-bar {
   position: relative;
   display: flex;
@@ -542,15 +508,12 @@
     transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* When work is in flight, hide the chips outright — keeps the bar
-   focused on the working indicator. */
 .mini-context-bar[data-working] .mini-context-bar__chips {
   opacity: 0;
   transform: translateX(8px);
   pointer-events: none;
 }
 
-/* ─── Suggestion chip ──────────────────────────────────────── */
 .mini-context-chip {
   display: inline-flex;
   align-items: center;
@@ -611,7 +574,6 @@
     margin-left 320ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* ─── Working indicator (no bubble around the orb) ───────────── */
 .mini-working {
   display: inline-flex;
   align-items: center;
@@ -697,7 +659,6 @@
   to { opacity: 0; transform: translateY(-6px); }
 }
 
-/* ─── Composer pill ──────────────────────────────────────────── */
 .mini-composer {
   display: flex;
   align-items: center;

@@ -1,18 +1,7 @@
-/* ================================================================
-   Mobile WebView overrides
-   Active when data-platform="mobile" is set on <html> by the
-   mobile bridge shim.
-   ================================================================ */
-
-/* ── Mobile-friendly spacing ──────────────────────────────────── */
-
 [data-platform="mobile"] .session-messages {
   padding: 24px 16px 16px;
 }
 
-/* The WebView has no Electron traffic lights even when it is connected to a
-   Mac desktop. Keep the shared full-shell topbar, but use its normal content
-   inset instead of reserving the desktop's native-button gap. */
 [data-platform="mobile"]
   .shell-topbar-full[data-platform="mac"]
   .shell-topbar-full__left {

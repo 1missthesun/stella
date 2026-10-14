@@ -1,4 +1,3 @@
-/* Product demos — split for maintainability; order matches former monolith. */
 @import "./demos/showcase-shell.css";
 @import "./demos/stella-shell.css";
 @import "./demos/selfmod-shell.css";

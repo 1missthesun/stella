@@ -5,11 +5,9 @@
   "preview_urls": false,
   "routes": [{ "pattern": "auth-dev.stella.sh", "custom_domain": true }],
   "main": ".wrangler/worker-build/index.js",
-  // Preserve lazy SDK/tool modules instead of parsing them on every wake.
   "no_bundle": true,
   "find_additional_modules": true,
   "base_dir": ".wrangler/worker-build",
-  // The build emits minified modules with sibling .map files.
   "upload_source_maps": true,
   "rules": [
     { "type": "ESModule", "globs": ["**/*.js"], "fallthrough": true },
@@ -33,12 +31,6 @@
       "../../packages/runtime/observability",
     ],
   },
-  // Stella's code for sandbox containers (src/sandbox-code.ts). The build
-  // writes `sandbox-code/<sha256>.tar.gz` here and compiles the hash into the
-  // Worker, so a version and its bundle always deploy together. Only the
-  // Sandbox object reads it, through the binding: run_worker_first keeps the
-  // Worker in front of every request, so the asset is never served publicly.
-  // Inherited by every environment.
   "assets": {
     "directory": ".wrangler/sandbox-code",
     "binding": "ASSETS",
@@ -69,14 +61,8 @@
     "TELEMETRY_ENVIRONMENT": "development",
     "TURN_TIMEOUT_MS": "900000",
     "SANDBOX_IDLE_TIMEOUT_MS": "600000",
-    // A container only a prewarm started keeps capacity this long; the turn
-    // that attaches raises it to SANDBOX_IDLE_TIMEOUT_MS.
     "SANDBOX_PREWARM_IDLE_TIMEOUT_MS": "90000",
-    // The orchestrator's container stops this long after its last turn;
-    // the next turn admitted to the conversation wakes it.
     "ORCHESTRATOR_IDLE_TIMEOUT_MS": "120000",
-    // Snapshot a world container when its turn releases it and start the
-    // next cold container from that snapshot. "0" always starts from the image.
     "SANDBOX_SNAPSHOTS": "1",
     "APPS_HOST_BASE_URL": "https://stella-v2-apps-host-dev.fromyou.workers.dev",
     "TRUSTED_APPS_HOST_BASE_URL": "https://stella-v2-apps-auth-dev.fromyou.workers.dev",
@@ -90,56 +76,26 @@
     // default network and the settings page hides the section.
     "SLACK_ENVIRONMENTS": "1",
     "STELLA_DEPLOYMENT_IDENTITY": "dev:outgoing-bulldog-865",
-    // Public origin of the model gateway. Durable Objects reach it through the
-    // MODEL_GATEWAY service binding (the hostname only has to parse there);
-    // sandboxes use this origin directly with their turn capability.
     "MODEL_GATEWAY_URL": "https://stella-v2-model-gateway-dev.fromyou.workers.dev",
-    // Key id under which the gateway's JWKS holds this Worker's public key.
     "CAPABILITY_SIGNING_KID": "builder-1",
-    // This Worker's own public origin. Durable Objects need it to hand a
-    // spawned agent's sandbox the turn-broker endpoint; a DO has no request
-    // origin to derive it from.
     "CLOUD_BUILDER_PUBLIC_URL": "https://stella-v2-cloud-builder-dev.fromyou.workers.dev",
-    // S3 API origin of the account that owns the DRIVE bucket, for presigned
-    // drive uploads and downloads.
     "R2_S3_ENDPOINT": "https://f34b91c9c7dc22f0aef0ba855a9f026f.r2.cloudflarestorage.com",
-    // The DRIVE binding's bucket, by name, for the presigned URLs above.
     "R2_DRIVE_BUCKET": "stella-v2-drive-dev",
-    // The MEDIA binding's bucket, by name, for presigned media reads.
     "R2_MEDIA_BUCKET": "stella-v2-media-dev",
-    // The BACKUP_BUCKET binding's bucket, by name: the owner's container
-    // uploads and restores its own opaque Claude Code login backup there with
-    // presigned URLs, so the Worker never carries those bytes.
     "R2_BACKUP_BUCKET": "stella-v2-app-builds-dev",
-    // Public origin of workers/canvas-share; share URLs are `<this>/c/<slug>`.
     "CANVAS_SHARE_BASE_URL": "https://stellashare.app",
-    // The website a private canvas's "private" page sends its owner to, to
-    // sign in and come back with a grant (its `/canvas/open` page). Written
-    // into each canvas object, since every environment shares canvas-share.
     "CANVAS_OWNER_SITE_URL": "https://stella-website-dev.fromyou.workers.dev",
-    // Stella sites (src/slack/previews.ts), served by workers/sites-host on
-    // its route. SITES_HOST is that route's host, `*` being the site id; with
-    // it empty, every site shares SITES_SHARED_ORIGIN (self-hosting without a
-    // wildcard domain).
     "SITES_HOST": "*-dev.stellasites.app",
     "SITES_SHARED_ORIGIN": "",
-    // Magic-link sender; its domain is enabled for Email Sending.
     "STELLA_EMAIL_FROM": "Stella <noreply@stella.sh>",
   },
   "secrets": {
-    // CAPABILITY_SIGNING_KEY is the PKCS8 PEM of the ES256 private key that
-    // signs turn capabilities; it never leaves this Worker.
-    // BETTER_AUTH_SECRET signs sessions. Every other secret is optional and
-    // turns its feature on (SELF_HOSTING.md lists them). R2_ACCESS_KEY_ID and
-    // R2_SECRET_ACCESS_KEY presign drive and media URLs straight to R2;
-    // without them files go through this Worker (src/r2-proxy.ts).
     "required": [
       "BUILDER_SERVICE_SECRET",
       "BETTER_AUTH_SECRET",
       "CAPABILITY_SIGNING_KEY",
     ],
   },
-  // The app's source: one upstream repo and a fork per owner (v3).
   "artifacts": [
     {
       "binding": "ARTIFACTS",
@@ -150,7 +106,6 @@
   // (or RESEND_FROM) and its domain must be enabled for Email Sending.
   "send_email": [{ "name": "EMAIL" }],
   "ai": { "binding": "AI" },
-  // Read fits an oversized image to the model's limits (cloud-image-fit.ts).
   "images": { "binding": "IMAGES" },
   "worker_loaders": [
     {
@@ -164,15 +119,10 @@
       "entrypoint": "TelemetryService",
     },
     {
-      // Browser Run, reusable website state, and Live View capabilities stay
-      // behind a private Worker boundary. Builder receives only this fetcher.
       "binding": "BROWSER_GATEWAY",
       "service": "stella-v2-browser-gateway-dev",
     },
     {
-      // Model gateway. Durable Objects send model traffic through this
-      // binding with a turn capability as the bearer; sandboxes reach the
-      // same Worker at MODEL_GATEWAY_URL.
       "binding": "MODEL_GATEWAY",
       "service": "stella-v2-model-gateway-dev",
     },
@@ -196,9 +146,6 @@
       "bucket_name": "stella-v2-agent-home-dev",
     },
     {
-      // Rolled-over conversation segments and oversize-row spills.
-      // Deliberately NOT AGENT_HOME: different retention, and a prefix delete
-      // during account deletion must not be able to reach memory documents.
       "binding": "CONVERSATION_ARCHIVE",
       "bucket_name": "stella-v2-conversation-archive-dev",
     },
@@ -207,25 +154,19 @@
       "bucket_name": "stella-v2-worlds-dev",
     },
     {
-      // The owner's drive. Clients upload and download with presigned URLs.
       "binding": "DRIVE",
       "bucket_name": "stella-v2-drive-dev",
     },
     {
-      // Generated media and TTS segments. A lifecycle rule deletes tts/ after
-      // a day.
       "binding": "MEDIA",
       "bucket_name": "stella-v2-media-dev",
     },
     {
-      // Published canvas documents, served by workers/canvas-share.
       "binding": "CANVAS_SHARES",
       "bucket_name": "stella-canvas-shares",
     },
   ],
-  // One Cron Trigger; src/cron.ts runs every global sweep.
   "triggers": { "crons": ["17 3 * * *"] },
-  // Global data (feedback first; later auth, routing indexes and catalogs).
   "d1_databases": [
     {
       "binding": "DB",
@@ -240,18 +181,12 @@
       "id": "dc5c7bac2bd04ec7bbd6a89f18a04ee7",
     },
     {
-      // Create one namespace per environment, then replace this id. Keys are
-      // decimal ASN numbers and values are NetworkClass strings.
       "binding": "ASN_POLICY",
       "id": "a255c73f45c94af094c46f604aaa50e8",
     },
   ],
   "containers": [
     {
-      // Durable Object scheduling: the Sandbox object picks the image, the
-      // instance size (standard-2 small, standard-4 large), and whether the
-      // container may reach the Internet each time it starts one. This
-      // policy has no max_instances; account limits apply.
       "class_name": "Sandbox",
       "name": "stella-v2-cloud-builder-dev-sandbox-do",
       "scheduling_policy": "durable_object",
@@ -275,7 +210,6 @@
         "class_name": "OrchestratorSession",
       },
       {
-        // One object per owner: plan snapshot and running-turn replay registry.
         "name": "OWNER_GATES",
         "class_name": "OwnerGate",
       },
@@ -289,13 +223,10 @@
         "class_name": "WorldStore",
       },
       {
-        // One object: the latest published app version and every desktop's
-        // release socket (src/app-source-releases.ts).
         "name": "APP_RELEASES",
         "class_name": "AppReleaseChannel",
       },
       {
-        // One object per Worker preview database or KV namespace (src/slack/preview-worker.ts).
         "name": "SLACK_PREVIEW_DATA",
         "class_name": "SlackPreviewData",
       },
@@ -331,8 +262,6 @@
       "new_sqlite_classes": ["OwnerGate"],
     },
     {
-      // Device presence moved into the owner gate: one object per owner
-      // holding presence, offers, and claims together.
       "tag": "v8",
       "deleted_classes": ["DevicePresence"],
     },
@@ -341,12 +270,10 @@
       "new_sqlite_classes": ["WorldStore"],
     },
     {
-      // One Sandbox class serves both sizes and both workloads.
       "tag": "v10",
       "deleted_classes": ["SandboxSmall", "AppBuildSandbox"],
     },
     {
-      // Owner transfer is gone.
       "tag": "v11",
       "deleted_classes": ["OwnerTransferCoordinator"],
     },
@@ -374,8 +301,6 @@
       "TURN_TIMEOUT_MS": "900000",
       "SANDBOX_IDLE_TIMEOUT_MS": "600000",
       "SANDBOX_PREWARM_IDLE_TIMEOUT_MS": "90000",
-      // The orchestrator's container stops this long after its last turn;
-      // the next turn admitted to the conversation wakes it.
       "ORCHESTRATOR_IDLE_TIMEOUT_MS": "120000",
       "SANDBOX_SNAPSHOTS": "1",
       "APPS_HOST_BASE_URL": "https://stella-v2-apps-host-dev.fromyou.workers.dev",
@@ -384,7 +309,6 @@
       "STELLA_LOCAL_DEV_ORIGINS": "1",
       "STELLA_DEPLOYMENT_IDENTITY": "dev:outgoing-bulldog-865",
       "MODEL_GATEWAY_URL": "https://stella-v2-model-gateway-dev.fromyou.workers.dev",
-      // The dev model gateway trusts this key id (its CAPABILITY_JWKS).
       "CAPABILITY_SIGNING_KID": "builder-preview-1",
       "R2_S3_ENDPOINT": "https://f34b91c9c7dc22f0aef0ba855a9f026f.r2.cloudflarestorage.com",
       "R2_DRIVE_BUCKET": "stella-v2-drive-preview",
@@ -417,7 +341,6 @@
     ],
     "send_email": [{ "name": "EMAIL" }],
     "ai": { "binding": "AI" },
-    // Read fits an oversized image to the model's limits (cloud-image-fit.ts).
     "images": { "binding": "IMAGES" },
     "worker_loaders": [
       {
@@ -492,7 +415,6 @@
         "id": "fe8608f6b0b84b069c414d65b2721a3b",
       },
       {
-        // Read-only network policy, shared with the dev model gateway.
         "binding": "ASN_POLICY",
         "id": "a255c73f45c94af094c46f604aaa50e8",
       },
@@ -533,7 +455,6 @@
           "class_name": "AppReleaseChannel",
         },
         {
-          // One object per Worker preview database or KV namespace (src/slack/preview-worker.ts).
           "name": "SLACK_PREVIEW_DATA",
           "class_name": "SlackPreviewData",
         },
@@ -550,14 +471,8 @@
         "STELLA_LOCAL_DEV_ORIGINS": "1",
         "TURN_TIMEOUT_MS": "900000",
         "SANDBOX_IDLE_TIMEOUT_MS": "600000",
-        // A container only a prewarm started keeps capacity this long; the turn
-        // that attaches raises it to SANDBOX_IDLE_TIMEOUT_MS.
         "SANDBOX_PREWARM_IDLE_TIMEOUT_MS": "90000",
-        // The orchestrator's container stops this long after its last turn;
-        // the next turn admitted to the conversation wakes it.
         "ORCHESTRATOR_IDLE_TIMEOUT_MS": "120000",
-        // Snapshot a world container when its turn releases it and start the
-        // next cold container from that snapshot. "0" always starts from the image.
         "SANDBOX_SNAPSHOTS": "1",
         "APPS_HOST_BASE_URL": "https://stella-v2-apps-host-basic-nightingale-118.fromyou.workers.dev",
         "TRUSTED_APPS_HOST_BASE_URL": "https://stella-v2-apps-auth-basic-nightingale-118.fromyou.workers.dev",
@@ -582,7 +497,6 @@
       ],
       "send_email": [{ "name": "EMAIL" }],
       "ai": { "binding": "AI" },
-      // Read fits an oversized image to the model's limits (cloud-image-fit.ts).
       "images": { "binding": "IMAGES" },
       "worker_loaders": [
         {
@@ -643,10 +557,6 @@
       ],
       "containers": [
         {
-          // Durable Object scheduling: the Sandbox object picks the image, the
-          // instance size (standard-2 small, standard-4 large), and whether the
-          // container may reach the Internet each time it starts one. This
-          // policy has no max_instances; account limits apply.
           "class_name": "Sandbox",
           "name": "stella-v2-cloud-builder-basic-nightingale-118-sandbox-do",
           "scheduling_policy": "durable_object",
@@ -687,7 +597,6 @@
             "class_name": "AppReleaseChannel",
           },
           {
-            // One object per Worker preview database or KV namespace (src/slack/preview-worker.ts).
             "name": "SLACK_PREVIEW_DATA",
             "class_name": "SlackPreviewData",
           },
@@ -731,12 +640,10 @@
           "new_sqlite_classes": ["WorldStore"],
         },
         {
-          // One Sandbox class serves both sizes and both workloads.
           "tag": "v10",
           "deleted_classes": ["SandboxSmall", "AppBuildSandbox"],
         },
         {
-          // Owner transfer is gone.
           "tag": "v11",
           "deleted_classes": ["OwnerTransferCoordinator"],
         },
@@ -773,14 +680,8 @@
         "TELEMETRY_ENVIRONMENT": "production",
         "TURN_TIMEOUT_MS": "900000",
         "SANDBOX_IDLE_TIMEOUT_MS": "600000",
-        // A container only a prewarm started keeps capacity this long; the turn
-        // that attaches raises it to SANDBOX_IDLE_TIMEOUT_MS.
         "SANDBOX_PREWARM_IDLE_TIMEOUT_MS": "90000",
-        // The orchestrator's container stops this long after its last turn;
-        // the next turn admitted to the conversation wakes it.
         "ORCHESTRATOR_IDLE_TIMEOUT_MS": "120000",
-        // Snapshot a world container when its turn releases it and start the
-        // next cold container from that snapshot. "0" always starts from the image.
         "SANDBOX_SNAPSHOTS": "1",
         "APPS_HOST_BASE_URL": "https://stella-v2-apps-host-prod.fromyou.workers.dev",
         "TRUSTED_APPS_HOST_BASE_URL": "https://stella-v2-apps-auth-prod.fromyou.workers.dev",
@@ -798,8 +699,6 @@
         "SITES_SHARED_ORIGIN": "",
         "SLACK_ENVIRONMENTS": "1",
         "STELLA_EMAIL_FROM": "Stella <noreply@stella.sh>",
-        // /api/admin also needs a Cloudflare Access JWT for this app
-        // (src/admin/access.ts). Unset fails closed; "off" for both is bearer-only.
         "ADMIN_ACCESS_TEAM_DOMAIN": "fromyou.cloudflareaccess.com",
         "ADMIN_ACCESS_AUD": "fc47bb85d7a88032bd25e910c3212ca1f7049d0c2f7c4dad4b2e367b65e16614",
       },
@@ -820,7 +719,6 @@
       ],
       "send_email": [{ "name": "EMAIL" }],
       "ai": { "binding": "AI" },
-      // Read fits an oversized image to the model's limits (cloud-image-fit.ts).
       "images": { "binding": "IMAGES" },
       "worker_loaders": [
         {
@@ -901,10 +799,6 @@
       ],
       "containers": [
         {
-          // Durable Object scheduling: the Sandbox object picks the image, the
-          // instance size (standard-2 small, standard-4 large), and whether the
-          // container may reach the Internet each time it starts one. This
-          // policy has no max_instances; account limits apply.
           "class_name": "Sandbox",
           "name": "stella-v2-cloud-builder-prod-sandbox-do",
           "scheduling_policy": "durable_object",
@@ -945,7 +839,6 @@
             "class_name": "AppReleaseChannel",
           },
           {
-            // One object per Worker preview database or KV namespace (src/slack/preview-worker.ts).
             "name": "SLACK_PREVIEW_DATA",
             "class_name": "SlackPreviewData",
           },
@@ -989,12 +882,10 @@
           "new_sqlite_classes": ["WorldStore"],
         },
         {
-          // One Sandbox class serves both sizes and both workloads.
           "tag": "v10",
           "deleted_classes": ["SandboxSmall", "AppBuildSandbox"],
         },
         {
-          // Owner transfer is gone.
           "tag": "v11",
           "deleted_classes": ["OwnerTransferCoordinator"],
         },

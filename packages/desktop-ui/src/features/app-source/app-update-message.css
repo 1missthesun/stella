@@ -1,5 +1,3 @@
-/* A change waiting to be added, said by Stella in the chat: the assistant's
-   own bubble (`.assistant-message-text`), with one button under the words. */
 .app-update-messages {
   display: flex;
   flex-direction: column;
@@ -46,10 +44,7 @@
   opacity: 0.6;
 }
 
-/* On Home there is no transcript yet: the message sits just above the
-   composer, lined up with its left edge. */
 .composer-wrap > .app-update-messages {
-  /* The composer's side padding plus its shell's inset. */
   padding: 0 48px;
   margin-bottom: 12px;
 }

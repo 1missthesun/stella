@@ -1,11 +1,3 @@
--- Identity (src/auth/). The first six tables are Better Auth's own schema,
--- generated with its migration compiler for the options in src/auth/auth.ts
--- (bearer, one-time token, anonymous, magic link, captcha, JWT, database rate
--- limiting, user.identityLevel). Regenerate them when a plugin or field
--- changes. The rest belong to the stellaHandoff plugin (src/auth/handoff.ts)
--- and app integrity (src/auth/integrity.ts). The Cron Trigger deletes expired
--- rows (src/cron.ts).
-
 create table "user" ("id" text not null primary key, "name" text not null, "email" text not null unique, "emailVerified" integer not null, "image" text, "createdAt" date not null, "updatedAt" date not null, "isAnonymous" integer, "identityLevel" integer);
 
 create table "session" ("id" text not null primary key, "expiresAt" date not null, "token" text not null unique, "createdAt" date not null, "updatedAt" date not null, "ipAddress" text, "userAgent" text, "userId" text not null references "user" ("id") on delete cascade);
@@ -24,17 +16,10 @@ create index "account_userId_idx" on "account" ("userId");
 
 create index "verification_identifier_idx" on "verification" ("identifier");
 
--- The anonymous cleanup reads stale anonymous users; the TTL sweep reads
--- expired verification rows.
 create index "user_isAnonymous_updatedAt_idx" on "user" ("isAnonymous", "updatedAt");
 
 create index "verification_expiresAt_idx" on "verification" ("expiresAt");
 
--- A browser-to-app sign-in handoff (magic link, desktop social). The app sends
--- only SHA-256(claimSecret); the completed session token is stored encrypted
--- under BETTER_AUTH_SECRET and released once to whoever presents the secret.
--- `from_user_id` is the anonymous user a magic link or social sign-in
--- upgrades in place.
 CREATE TABLE auth_link_requests (
   request_id TEXT PRIMARY KEY,
   email TEXT NOT NULL,
@@ -50,8 +35,6 @@ CREATE TABLE auth_link_requests (
 );
 CREATE INDEX auth_link_requests_expires ON auth_link_requests (expires_at);
 
--- A browser social sign-in's single-use return target. The provider callback
--- carries only the request id; the target is fixed here at start.
 CREATE TABLE auth_browser_handoffs (
   request_id TEXT PRIMARY KEY,
   provider TEXT NOT NULL,
@@ -65,7 +48,6 @@ CREATE TABLE auth_browser_handoffs (
 );
 CREATE INDEX auth_browser_handoffs_expires ON auth_browser_handoffs (expires_at);
 
--- One-time challenges for mobile app integrity proofs. Burned on first use.
 CREATE TABLE integrity_nonces (
   nonce TEXT PRIMARY KEY,
   purpose TEXT NOT NULL,
@@ -75,8 +57,6 @@ CREATE TABLE integrity_nonces (
 );
 CREATE INDEX integrity_nonces_expires ON integrity_nonces (expires_at);
 
--- iOS App Attest keys registered by an attestation, with the assertion
--- counter that must only move forward.
 CREATE TABLE app_attest_keys (
   key_id TEXT PRIMARY KEY,
   public_key TEXT NOT NULL,

@@ -35,7 +35,6 @@
     0 36px 90px -58px rgba(12, 22, 38, 0.48);
 }
 
-/* The request Stella was asked — files deal out from underneath it. */
 .request {
   position: absolute;
   top: 1.1rem;
@@ -109,7 +108,6 @@
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.82) inset,
     0 28px 70px -42px rgba(12, 22, 38, 0.58);
-  /* Undealt: tucked behind the request pill, waiting. */
   opacity: 0;
   transform: translate(-50%, -46%) scale(0.84);
   transition:
@@ -119,13 +117,11 @@
   transition-delay: calc(var(--i) * 110ms);
 }
 
-/* Dealt out into the fan. */
 .docPreview[data-dealt] {
   opacity: 1;
   transform: translate(-50%, -50%) translateX(var(--x));
 }
 
-/* Focus pass: each file takes the front in turn. */
 .docPreview[data-focused] {
   z-index: 8;
   transform: translate(-50%, -50%) translateX(var(--x)) translateY(-0.55rem)

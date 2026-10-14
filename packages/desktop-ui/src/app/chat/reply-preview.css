@@ -1,9 +1,3 @@
-/* iMessage-style reply preview: a stack of small muted bubbles quoting what
-   the reply is about, joined to the assistant bubble below by a thin
-   connector that curls out of the preview's left edge. Whether a bubble
-   appears at all is decided by the shared reply-context rule; see
-   `@stella/contracts/reply-context`. */
-
 .reply-preview {
   position: relative;
   display: flex;
@@ -77,10 +71,6 @@
   opacity: 0.8;
 }
 
-/* Agent previews are a compact task row: status glyph, a title that
-   opens the full report, and a Replies action that opens the focused chain. When the
-   bubble quotes a completed task, its produced files hang under that row
-   as pills, inside the same bubble. */
 .reply-preview__bubble--agent {
   flex-direction: column;
   align-items: stretch;
@@ -174,9 +164,6 @@
   color: var(--foreground);
 }
 
-/* The full report opens in a floating panel anchored under the bubble. It
-   is portaled, so opening it never reflows the timeline; the body scrolls
-   on its own and the panel keeps a comfortable reading width. */
 [data-component="popover-content"].reply-preview-report-popover {
   width: min(36rem, calc(100vw - 32px));
   max-width: none;
@@ -197,8 +184,6 @@
   min-width: 0;
 }
 
-/* The close button stays in the popover's corner; each report's title row
-   leaves room for it, so one report looks exactly like a lone report. */
 .reply-preview-report__head {
   display: flex;
   align-items: center;
@@ -207,7 +192,6 @@
   box-sizing: border-box;
 }
 
-/* Several reports behind one Show more: titled sections in one scroll. */
 .reply-preview-report--multiple .reply-preview-report__sections {
   max-height: min(60vh, 32rem);
   overflow: auto;
@@ -218,7 +202,6 @@
   overflow: visible;
 }
 
-/* Text scrolls under the close button; it keeps the popover's top fill. */
 .reply-preview-report--multiple .reply-preview-report__close:not(:hover) {
   background-color: var(--background);
   background-image: linear-gradient(
@@ -325,8 +308,6 @@
   width: 100%;
 }
 
-/* The reply's "Show more" sits where a user message's toggle does: its own
-   row under the text, at the bubble's trailing edge, in the same type. */
 .reply-report-links {
   display: flex;
   justify-content: flex-end;

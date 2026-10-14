@@ -20,11 +20,8 @@
   --page-glow-mint: rgba(123, 245, 219, 0.16);
 
   --page-max-width: 2560px;
-  /* Single text / control width for `.section-kicker` and matching blocks */
   --section-kicker-measure: 22rem;
-  /* Shared chrome for `.demo-panel` (full + portrait) */
   --demo-panel-padding: 1.5rem;
-  /* Inset for demo visuals inside the panel — matches `.selfmod-layout` */
   --demo-panel-inner-padding: 0.9rem 1.3rem 1.3rem;
   --page-margin: clamp(1rem, 4.098vw, 6.5rem);
   --page-cell-padding: clamp(0.8rem, 1.6vw, 1.5rem);
@@ -57,22 +54,13 @@
 
 html {
   scroll-behavior: smooth;
-  /* Reserve gutter so `100vw` / layout don’t jump when the scrollbar appears */
   scrollbar-gutter: stable;
 }
 
-/* While Lenis drives scrolling, native smooth scrolling must not fight its
-   per-frame positioning. Lenis only mounts outside reduced-motion, so users
-   who opt out keep the native smooth behavior above. */
 html.lenis.lenis-smooth {
   scroll-behavior: auto !important;
 }
 
-/* The site sits on a flat `--page-background` color; ambient
- * decoration lives in `<PageBackground />` at the top of the document,
- * which paints a top blue wash + three blurred elongated triangles.
- * Per-page wrappers (`.stella-page`, `.legal-doc-page`, etc.) stay
- * transparent so the body color + PageBackground show through. */
 body {
   position: relative;
   margin: 0;
@@ -103,9 +91,6 @@ body {
   overflow: hidden;
 }
 
-/* Soft blue wash anchored to the top of the page. Fades out partway
- * down the first screen, then disappears entirely before the page mock
- * below it. */
 .page-background__wash {
   position: absolute;
   top: 0;
@@ -120,9 +105,6 @@ body {
   );
 }
 
-/* Three rounded-triangle blurs that drift across the upper band of
- * the page. Sized to roughly the same vertical region as the wash so
- * the whole composition reads as one cohesive band of color. */
 .page-background__blurs {
   position: absolute;
   top: 0;
@@ -155,15 +137,6 @@ select {
   overflow-x: clip;
 }
 
-/* ── Embedded mode ──
- * When the website is loaded inside Stella's desktop `WebContentsView`
- * (Store, Billing, etc.) the view is kept OPAQUE on the desktop side — a
- * translucent web layer is a major scroll/interaction lag source on Windows
- * (Chromium falls off the Direct Composition fast path). So instead of
- * letting the desktop's gradient canvas show through a transparent body, we
- * recreate that soft gradient here, painted inside the webview from the
- * theme tokens the desktop pushes in via URL params (initial paint) or the
- * `stellaDesktopStore.onThemeChanged` bridge (live updates). */
 html[data-embedded="true"] {
   background: var(--embedded-bg, #f2f4f8) !important;
 }
@@ -193,9 +166,6 @@ html[data-embedded="true"] .page-background {
   display: none;
 }
 
-/* When the Stella desktop app embeds /billing or /store inside its own
-   chrome, hide the marketing site header — the desktop already provides
-   navigation, and the duplicated brand/nav looks broken. */
 html[data-embedded="true"] .site-header {
   display: none;
 }
@@ -434,7 +404,6 @@ html[data-embedded="true"] .site-header {
   background: rgba(18, 18, 15, 0.05);
 }
 
-/* Hover-revealed category menus in the desktop top bar. */
 .site-nav__group {
   position: relative;
   display: inline-flex;
@@ -476,7 +445,6 @@ html[data-embedded="true"] .site-header {
   top: 100%;
   left: 50%;
   transform: translateX(-50%);
-  /* Transparent bridge keeps the hover path continuous across the gap. */
   padding-top: 0.45rem;
   z-index: 60;
   opacity: 0;
@@ -536,7 +504,6 @@ html[data-embedded="true"] .site-header {
   color: var(--page-foreground);
 }
 
-/* Right-anchored popover variant for the account menu at the header's edge. */
 .site-nav__menu--end {
   left: auto;
   right: 0;
@@ -641,12 +608,6 @@ html[data-embedded="true"] .site-header {
   transform: translateY(-1px);
 }
 
-/* Primary CTAs wear the landing hero's "Download Stella" treatment: a pale
-   glass chip lit by the page's cyan/blue/mint glows, accent-blue display type,
-   hairline border, no drop shadow. `.button--download` is the same recipe —
-   kept as its own selector so the hero markup is unchanged — and every other
-   primary/accent CTA inherits it verbatim so the site has exactly one
-   primary button. */
 .button--primary,
 .button--accent,
 .button--download {
@@ -942,7 +903,6 @@ html[data-embedded="true"] .site-header {
 .section-kicker__concept-meta h3 {
   margin: 0 0 0.35rem;
   font-family: var(--font-display), system-ui, sans-serif;
-  /* Small display heading scale. */
   font-size: clamp(0.98rem, 1.7vw, 1.15rem);
   font-weight: 600;
   letter-spacing: -0.04em;
@@ -1036,9 +996,6 @@ html[data-embedded="true"] .site-header {
   min-height: 0;
 }
 
-/* Homepage post-hero story sections, modeled on the Atlas-style rhythm:
-   oversized headline above, side-anchored media with a soft fade, and one
-   compact explanatory copy block beside the mock. */
 .grid-shell.home-atlas-section {
   --atlas-ink: #0c111d;
   --atlas-muted: #283344;
@@ -1116,12 +1073,6 @@ html[data-embedded="true"] .site-header {
   justify-self: end;
 }
 
-/* Site-wide kicker / eyebrow system: the small line that introduces a
-   section heading. Display type, quiet ink, no badge chrome — the same
-   display voice as the hero and the download button, one step below the H2
-   it sits above. Page-level variants (.learn-eyebrow, .fix-eyebrow,
-   .go-eyebrow, the agents/voice module eyebrows) share these rules;
-   only margins differ. */
 .site-kicker,
 .home-atlas-kicker {
   display: block;
@@ -1277,9 +1228,6 @@ html[data-embedded="true"] .site-header {
   animation-delay: 220ms;
 }
 
-/* Shared loading primitives. Content-shaped placeholders that mirror
-   real layout exactly, with a single calm opacity pulse instead of a
-   gradient shimmer (reads as template UI). Reduced-motion safe. */
 @keyframes loading-pulse {
   0%,
   100% {
@@ -1326,12 +1274,6 @@ html[data-embedded="true"] .site-header {
   }
 }
 
-/* ---------------------------------------------------------------- */
-/* Apple-style scroll-triggered section reveal.                      */
-/* Activated only after the client mounts and adds `has-reveal` to   */
-/* <html>, so SSR / no-JS / reduced-motion users see content as-is.  */
-/* ---------------------------------------------------------------- */
-
 .has-reveal [data-reveal] {
   opacity: 0;
   transform: translate3d(0, 18px, 0) scale(0.992);
@@ -1349,9 +1291,6 @@ html[data-embedded="true"] .site-header {
   filter: none;
 }
 
-/* Children inside a revealed section cascade in slightly behind the
-   parent for a layered, considered feel. Index is set per-child via
-   `--reveal-index` so the order is intentional, not source-order. */
 .has-reveal [data-reveal] [data-reveal-child] {
   opacity: 0;
   transform: translate3d(0, 14px, 0);
@@ -1364,9 +1303,6 @@ html[data-embedded="true"] .site-header {
   transition-delay: calc(110ms + var(--reveal-index, 0) * 60ms);
 }
 
-/* Product sections hold their position — the section and its mock fade
-   in place rather than sliding up, so a window never reads as drifting
-   around the page (the section slide + child slide used to compound). */
 .has-reveal .home-atlas-section[data-reveal] {
   transform: none;
 }
@@ -1381,8 +1317,6 @@ html[data-embedded="true"] .site-header {
   filter: none;
 }
 
-/* Once revealed, drop the GPU promotion so static sections don't
-   keep an extra compositor layer around. */
 .has-reveal [data-reveal][data-revealed],
 .has-reveal [data-reveal][data-revealed] [data-reveal-child] {
   will-change: auto;
@@ -1398,9 +1332,6 @@ html[data-embedded="true"] .site-header {
   }
 }
 
-/* Low-power devices keep the reveal motion but drop the blur — animating
-   `filter: blur()` is the single most expensive part of the scroll.
-   Opacity + transform stay on the compositor and remain smooth. */
 html[data-low-power] .has-reveal [data-reveal],
 html[data-low-power] .has-reveal [data-reveal] [data-reveal-child] {
   filter: none !important;
@@ -1422,8 +1353,6 @@ html[data-low-power] .has-reveal [data-reveal] [data-reveal-child] {
     transform: scale(1);
   }
 }
-
-/* ── Download password modal ─────────────────────────────── */
 
 .dl-modal-overlay {
   position: fixed;

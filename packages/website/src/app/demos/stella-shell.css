@@ -1,9 +1,3 @@
-/* ────────────────────────────────────────────────────────────────────
- * Canonical Stella sidebar — mirrors `desktop/src/shell/sidebar/
- * sidebar.css`. Used by `<StellaSidebar />` and any mock that drops
- * the component in without inheriting selfmod/radial-specific styles.
- * ──────────────────────────────────────────────────────────────────── */
-
 .stella-sidebar {
   --stella-sidebar-icon-box: 20px;
   --stella-sidebar-icon-glyph: 18px;
@@ -201,7 +195,6 @@
   letter-spacing: 0.04em;
 }
 
-/* Icon rail — labels hide; icons stay centered. */
 .stella-sidebar[data-rail="true"] .stella-sidebar__brand {
   justify-content: center;
   padding: 18px 0 8px;

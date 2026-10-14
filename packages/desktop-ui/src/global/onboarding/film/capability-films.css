@@ -1,10 +1,3 @@
-/* ──────────────────────────────────────────────────────────────────────
- * Capability films: the set dressing inside each agent window.
- * Canvas pixels throughout (the film scales the whole canvas), and every
- * state change is a transform, opacity or color transition.
- * ────────────────────────────────────────────────────────────────────── */
-
-/* Stella's own window, fixed to canvas pixels instead of viewport units. */
 .ofilm-stella {
   border-radius: 14px;
   box-shadow:
@@ -24,8 +17,6 @@
   width: 100%;
   padding: 0 4px;
 }
-
-/* ── Approval card (in the chat) ─────────────────────────────────── */
 
 .ofc-approve {
   display: flex;
@@ -126,8 +117,6 @@
   color: white;
 }
 
-/* ── Shared: CTA button that morphs into its result ──────────────── */
-
 .ofc-cta {
   position: relative;
   display: inline-grid;
@@ -180,8 +169,6 @@
   opacity: 1;
   transform: none;
 }
-
-/* ── Errands: results → booking form ─────────────────────────────── */
 
 .ofc-results {
   position: absolute;
@@ -374,7 +361,6 @@
   transform: none;
 }
 
-/* Calendar */
 .ofc-cal {
   position: absolute;
   inset: 0;
@@ -463,8 +449,6 @@
   opacity: 1;
   transform: none;
 }
-
-/* ── Shopping ────────────────────────────────────────────────────── */
 
 .ofc-shop {
   position: absolute;
@@ -630,8 +614,6 @@
   }
 }
 
-/* ── Work: sheet, deck and the chart between them ────────────────── */
-
 .ofc-sheet {
   position: absolute;
   left: 12px;
@@ -697,7 +679,6 @@
   }
 }
 
-/* The empty frame the chart leaves behind in the sheet. */
 .ofc-sheet__chart-slot {
   position: absolute;
   left: 196px;
@@ -721,8 +702,6 @@
   transform-origin: 0 0;
 }
 
-/* Horizontal leg eases in and out; the vertical leg leads, so the path
- * arcs up and over instead of sliding diagonally. */
 .ofc-flight-x {
   transition: transform 880ms cubic-bezier(0.55, 0, 0.25, 1);
 }
@@ -862,8 +841,6 @@
   opacity: 1;
   transform: none;
 }
-
-/* ── Build ───────────────────────────────────────────────────────── */
 
 .ofc-code {
   position: absolute;
@@ -1094,8 +1071,6 @@
   opacity: 1;
   transform: none;
 }
-
-/* ── Routines: night passes, the brief arrives ───────────────────── */
 
 .ofc-sky,
 .ofc-sky i {

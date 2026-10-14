@@ -21,9 +21,6 @@
   border: 0;
 }
 
-/* ---- Heading + act strip ------------------------------------------------- */
-/* The headline stays; beneath it a single line of three quiet act labels
-   tells you which part of the story is playing. No paragraph copy. */
 .heading {
   margin-bottom: clamp(1.6rem, 3vw, 2.4rem);
 }
@@ -56,9 +53,6 @@
     opacity 420ms ease;
 }
 
-/* Quiet pointer to /fix beneath the act strip: the gym-cancellation beat above
-   is literally Stella fixing something, and that page has a dozen more. Same
-   serif italic voice as the acts, accent blue, arrow nudges on hover. */
 .fixLink {
   display: inline-flex;
   align-items: center;
@@ -120,15 +114,12 @@
   color: var(--ink);
 }
 
-/* ---- Media / frame ------------------------------------------------------- */
 .media {
   width: min(100%, 74rem);
   min-width: 0;
   margin-inline: auto;
 }
 
-/* Same soft panel the sibling sections set their windows on, now the
-   full-width hero of the section. */
 .frame {
   position: relative;
   width: 100%;
@@ -156,10 +147,6 @@
     0 40px 90px -52px rgba(12, 22, 38, 0.5);
 }
 
-/* ---- Stage --------------------------------------------------------------- */
-/* A fixed design-pixel composition scaled to the width it gets. The
-   aspect-ratio box reserves height before the scale is measured, so nothing
-   shifts. --design-w/-h and --stage-scale are set from JS per layout. */
 .stage {
   --design-w: 1120;
   --design-h: 600;
@@ -228,9 +215,6 @@
   }
 }
 
-/* Stacked layout (narrow): action window first, chat beneath, both full
-   width of the design box. The frame clips so a pointer label hugging the
-   right edge can never widen the page. */
 .frame[data-layout="stacked"] {
   overflow: clip;
 }
@@ -249,7 +233,6 @@
   height: 400px !important;
 }
 
-/* ---- Live conversation --------------------------------------------------- */
 .liveChat {
   position: absolute;
   inset: 32px 0 0;
@@ -286,8 +269,6 @@
   min-width: 0;
 }
 
-/* A user turn with something pasted along: the chip rides above the bubble
-   the way attachments do in the app. */
 .userStack {
   display: flex;
   flex-direction: column;
@@ -316,7 +297,6 @@
   white-space: nowrap;
 }
 
-/* ---- Grow-in wrapper ----------------------------------------------------- */
 .grow {
   display: grid;
   grid-template-rows: 0fr;
@@ -353,7 +333,6 @@
   }
 }
 
-/* ---- Background-work rows ----------------------------------------------- */
 .workGroup {
   display: flex;
   flex-direction: column;
@@ -475,7 +454,6 @@
   }
 }
 
-/* ---- Inline connect card ------------------------------------------------- */
 .connectCard {
   display: flex;
   flex-wrap: wrap;
@@ -593,7 +571,6 @@
   filter: brightness(0.88);
 }
 
-/* ---- Page chip ----------------------------------------------------------- */
 .pagePill {
   display: inline-flex;
   align-items: center;
@@ -634,7 +611,6 @@
   font-size: 11px;
 }
 
-/* ---- Composer activity pill ---------------------------------------------- */
 .pillRow {
   display: flex;
   align-items: center;
@@ -677,12 +653,6 @@
   }
 }
 
-/* ========================================================================== */
-/*  App windows                                                                */
-/* ========================================================================== */
-/* Shared macOS window chrome, the same family as the computer-use desktop:
-   hairline edge, a tight contact shadow and one deep ambient shadow. Inside,
-   each app sets its own palette. Everything is design pixels. */
 .app {
   --ui-ink: #1b2433;
   --ui-text: #2b3648;
@@ -716,8 +686,6 @@
   flex: none;
 }
 
-/* Headings inside other people's apps are their headings, not the site's
-   display serif. */
 .app h4 {
   font-family: inherit;
   font-weight: 600;
@@ -852,12 +820,6 @@
   border-radius: 3px;
 }
 
-/* ========================================================================== */
-/*  Act 1 — Gmail                                                              */
-/* ========================================================================== */
-/* Gmail and Chrome are other people's products: they get the platform UI
-   face, not the site's Manrope. (The page Stella made keeps Manrope — it is
-   hers.) */
 .app[data-kind="mail"],
 .app[data-kind="browser"] {
   font-family:
@@ -1308,7 +1270,6 @@
   font-weight: 700;
 }
 
-/* Thread view */
 .gmailThread {
   position: absolute;
   inset: 0;
@@ -1337,8 +1298,6 @@
   padding: 4px 20px 14px 24px;
 }
 
-/* Gmail keeps the composer in view: once the reply opens, the thread sits
-   bottom-aligned so the card (and later the sent message) is what you see. */
 .gmailThread[data-reply] .gmailThreadScroll {
   justify-content: flex-end;
   mask-image: linear-gradient(180deg, transparent 0, #000 22px);
@@ -1634,9 +1593,6 @@
   color: #e8eaed;
 }
 
-/* ========================================================================== */
-/*  Act 2 — the page Stella made                                               */
-/* ========================================================================== */
 .pageBody {
   display: flex;
   flex: 1;
@@ -1966,9 +1922,6 @@
   line-height: 1.4;
 }
 
-/* ========================================================================== */
-/*  Act 3 — your browser                                                       */
-/* ========================================================================== */
 .app[data-kind="browser"] {
   background: #f6f7f8;
 }
@@ -2681,7 +2634,6 @@
   align-self: stretch;
 }
 
-/* ---- Chrome new tab page ------------------------------------------------- */
 .ntp {
   position: relative;
   display: flex;
@@ -2788,7 +2740,6 @@
   box-shadow: 0 0 0 0.5px rgba(16, 26, 44, 0.2);
 }
 
-/* ---- Google consent page --------------------------------------------------- */
 .consent {
   display: flex;
   flex: 1;
@@ -2946,9 +2897,6 @@
   font-size: 11px;
 }
 
-/* ---- Stella's cursor ----------------------------------------------------- */
-/* One pointer, glided between targets; the tip lands on --cx/--cy which the
-   component measures from the target's box in design pixels. */
 .cursor {
   --cx: 300px;
   --cy: 250px;
@@ -3049,9 +2997,6 @@
   }
 }
 
-/* ---- Narrow action windows (stacked layout) ------------------------------ */
-/* The window is a container; below ~600 design px the side rails fold away
-   and dense rows simplify, the way the real apps do at narrow widths. */
 @container (max-width: 600px) {
   .gmailNav,
   .gmailTopRight svg,
@@ -3226,7 +3171,6 @@
   }
 }
 
-/* ---- Reduced motion ------------------------------------------------------ */
 @media (prefers-reduced-motion: reduce) {
   .working {
     animation: none;
@@ -3272,7 +3216,6 @@
     transition: none;
   }
 
-  /* No work ever runs in the static frame, so the tally row is dead space. */
   .pillRow {
     display: none;
   }
@@ -3285,7 +3228,6 @@
   }
 }
 
-/* Phones: only the playing act's label fits on one line. */
 @media (max-width: 640px) {
   .acts[data-live] li:not([data-active]) {
     display: none;

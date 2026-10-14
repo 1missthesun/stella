@@ -18,7 +18,6 @@
    * `height: 100%` keeps the frame stable across tabs; taller tabs scroll
    * internally via `.settings-panel` (`overflow-y: auto`) instead. */
   height: 100%;
-  /* Clip the rail's tinted background to the dialog's rounded corners. */
   overflow: hidden;
 }
 
@@ -42,8 +41,6 @@
   z-index: 1;
 }
 
-/* Settings appears and disappears instantly: no open animation on the
- * content or its scrim (other dialogs keep theirs). */
 [data-component="dialog"]:has(.shell-settings-dialog)
   [data-slot="dialog-content"][data-state],
 [data-component="dialog-overlay"]:has(+ [data-component="dialog"] .shell-settings-dialog) {

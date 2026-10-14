@@ -1,4 +1,3 @@
-/* A focused reply chain stays in the chat column, above the shared composer. */
 .conversation-focus {
   position: absolute;
   inset: 0;

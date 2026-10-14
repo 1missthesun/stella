@@ -1,6 +1,3 @@
-/* Status screen the `/apps/$slug` deep link shows while it hands the cloud app
-   to the Apps sidebar section. */
-
 .apps-screen {
   display: flex;
   flex-direction: column;
@@ -21,7 +18,6 @@
   text-align: center;
 }
 
-/* Mobile WebView (~390px). Active when the mobile bridge shim tags <html>. */
 [data-platform="mobile"] .apps-screen {
   padding: 16px;
   gap: 1rem;

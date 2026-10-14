@@ -1,5 +1,3 @@
-/* App card under a reply that links a cloud app: still on top, then the
-   app's tile, name and "App", with a menu button over the footer's end. */
 .app-preview-card {
   position: relative;
   width: min(100%, 440px);

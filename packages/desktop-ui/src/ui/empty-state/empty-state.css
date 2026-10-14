@@ -1,12 +1,3 @@
-/* Illustrated empty, unavailable and error states. One pattern everywhere:
-   a calm motif with Stella's star, a few large words, an optional line of
-   subtext and the next action. Shares the mobile set's drawing language
-   (paper cards on the surface colour, brand-gradient accents).
-
-   Motion is CSS on HTML layers (transform/opacity only, so it composites
-   without repainting the SVGs), slow, and stops under reduced motion or
-   while the window is in the background. */
-
 .empty-state {
   --es-art: 148px;
   display: flex;
@@ -82,8 +73,6 @@
   animation: es-peek 6s ease-in-out infinite;
 }
 
-/* ── Drawing tokens ─────────────────────────────────────────────────── */
-
 .empty-state .es-card {
   fill: var(--card);
   stroke: var(--border);
@@ -130,8 +119,6 @@
 .empty-state .es-tick--major {
   fill: color-mix(in oklch, var(--text-weak) 55%, transparent);
 }
-
-/* ── Copy and actions ───────────────────────────────────────────────── */
 
 .empty-state__copy {
   display: flex;
@@ -203,8 +190,6 @@
 .empty-state__action > svg {
   color: var(--text-weak);
 }
-
-/* ── Motion ─────────────────────────────────────────────────────────── */
 
 .empty-state .es-float {
   animation: es-float 7s ease-in-out var(--es-delay, 0s) infinite;

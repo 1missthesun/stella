@@ -1,12 +1,4 @@
-/* ──────────────────────────────────────────────────────────────────────
- * Memory step mocks: the chatbot everyone knows, then Stella's one
- * conversation looking back. Visibility is driven by `use-choreography`
- * cues through data attributes; this file only describes the states.
- * ────────────────────────────────────────────────────────────────────── */
 
-
-
-/* ── Chatbot vs Stella ───────────────────────────────────────────── */
 
 .ochatbot,
 .ostella {
@@ -89,8 +81,6 @@
   opacity: 0.55;
 }
 
-/* The recall card: a memory being pulled up. While searching, a light
-   sweeps across the head; once found, the quote unfolds beneath it. */
 .orecall {
   align-self: flex-start;
   max-width: 88%;
@@ -215,8 +205,6 @@
   color: color-mix(in oklch, var(--foreground) 45%, transparent);
 }
 
-/* The chatbot → Stella morph: the old window fades and shrinks out while
-   the new one rises into the same slot. */
 .omorph {
   position: relative;
   width: 100%;

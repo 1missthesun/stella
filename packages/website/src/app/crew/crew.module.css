@@ -38,8 +38,6 @@
   margin: 0 auto;
 }
 
-/* Title row */
-
 .pageHead {
   display: flex;
   flex-wrap: wrap;
@@ -69,8 +67,6 @@
   display: flex;
   gap: 8px;
 }
-
-/* Buttons and links */
 
 .primary,
 .secondary,
@@ -194,8 +190,6 @@
   flex: 0 0 auto;
 }
 
-/* States */
-
 .loading {
   display: flex;
   align-items: center;
@@ -295,8 +289,6 @@
   color: var(--danger);
 }
 
-/* Workspace bar */
-
 .workspaceBar {
   display: flex;
   flex-wrap: wrap;
@@ -373,8 +365,6 @@
   font-size: 13.5px;
   color: var(--faint);
 }
-
-/* Section list + sections */
 
 .layout {
   display: grid;
@@ -513,8 +503,6 @@
   color: var(--muted);
 }
 
-/* One setting per row: label left, control right */
-
 .row {
   display: grid;
   grid-template-columns: minmax(0, 200px) minmax(0, 1fr);
@@ -590,8 +578,6 @@
   font-size: 13px;
   color: var(--danger);
 }
-
-/* Controls */
 
 .input,
 .select,
@@ -686,8 +672,6 @@
   color: var(--danger);
 }
 
-/* Radio list: one bordered group, options separated by hairlines */
-
 .radioList {
   display: grid;
   border: 1px solid var(--line-strong);
@@ -767,8 +751,6 @@
   color: var(--muted);
 }
 
-/* Segmented control and switch */
-
 .segmented {
   display: inline-flex;
   flex-wrap: wrap;
@@ -843,8 +825,6 @@
   outline: none;
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
-
-/* GitHub connection */
 
 .connection {
   display: grid;
@@ -932,8 +912,6 @@
   gap: 8px;
   margin-top: 8px;
 }
-
-/* Bordered lists: secrets, GitHub account choices */
 
 .table {
   display: grid;
@@ -1100,8 +1078,6 @@
 }
 
 
-/* Repositories: a bordered list to pick one, then its settings below */
-
 .main .sectionEyebrow {
   margin: 0 0 2px;
   font-family: var(--l-mono), ui-monospace, monospace;
@@ -1188,8 +1164,6 @@
   text-overflow: ellipsis;
 }
 
-/* GitHub accounts */
-
 .account {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -1220,8 +1194,6 @@
 .choices {
   margin-top: 12px;
 }
-
-/* Channel defaults */
 
 .chips {
   display: flex;
@@ -1295,8 +1267,6 @@
   opacity: 0.45;
 }
 
-/* Domains */
-
 .details {
   font-size: 13.5px;
   color: var(--muted);
@@ -1329,8 +1299,6 @@
   font-size: 12.5px;
   line-height: 1.7;
 }
-
-/* Setup script editor + last run */
 
 .editor {
   border: 1px solid var(--line-strong);
@@ -1429,8 +1397,6 @@
   word-break: break-word;
 }
 
-/* Preview storage */
-
 .usage {
   display: grid;
   gap: 8px;
@@ -1464,8 +1430,6 @@
   border-radius: inherit;
   background: var(--accent);
 }
-
-/* Combobox (repository) */
 
 .combo {
   position: relative;
@@ -1526,8 +1490,6 @@
   font-size: 13.5px;
   color: var(--faint);
 }
-
-/* Save bar: appears once something changes and floats over the page bottom */
 
 .saveBar {
   position: sticky;
@@ -1592,8 +1554,6 @@
 .saveBar .primary:hover:not(:disabled) {
   background: #ececf0;
 }
-
-/* Narrow screens */
 
 @media (max-width: 900px) {
   .layout {

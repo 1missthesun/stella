@@ -29,9 +29,6 @@
   min-width: 0;
 }
 
-/* ---- Mock frame ---------------------------------------------------------- */
-/* Same soft panel the one-chat section sets its window on, so the two
-   conversation mocks read as one family. */
 .frame {
   position: relative;
   display: flex;
@@ -62,10 +59,6 @@
   min-height: 0 !important;
 }
 
-/* ---- Live conversation --------------------------------------------------- */
-/* Pinned to the window (below the 32px titlebar) so the grid has a definite
-   height: the transcript track can then clip instead of pushing the
-   composer out of the frame as the conversation grows. */
 .liveChat {
   position: absolute;
   inset: 32px 0 0;
@@ -77,8 +70,6 @@
   padding: 10px 18px 16px;
 }
 
-/* The nested message track starts at the top and follows the newest turn
-   only after it grows beyond this fixed viewport. */
 .transcript {
   position: relative;
   width: 100%;
@@ -105,7 +96,6 @@
   min-width: 0;
 }
 
-/* Centered time marker between turns that happened apart. */
 .timeDivider {
   align-self: center;
   padding: 2px 0;
@@ -116,10 +106,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* ---- Background-work rows ----------------------------------------------- */
-/* The app's chrome-less in-chat work row: a leading glyph that doubles as
-   the status tell (spinner arc while running, quiet grey check once done), the
-   description, an optional trailing status, and a chevron. */
 .workGroup {
   display: flex;
   flex-direction: column;
@@ -127,8 +113,6 @@
   max-width: 100%;
 }
 
-/* Rows grow in from zero height so the thread above glides up rather
-   than jumping. */
 .workEnter {
   display: grid;
   grid-template-rows: 0fr;
@@ -242,8 +226,6 @@
   opacity: 0.7;
 }
 
-/* Running titles: light sweeping across dimmed text — the row's only
-   motion. Settled rows are plain. */
 .shimmer {
   display: inline-block;
   max-width: 100%;
@@ -275,8 +257,6 @@
   }
 }
 
-/* Produced files return as pill chips directly under a finished row,
-   indented to the title's left edge (glyph 16px + 8px gap). */
 .filePills {
   display: flex;
   flex-wrap: wrap;
@@ -301,9 +281,6 @@
   white-space: nowrap;
 }
 
-/* ---- Schedule card ------------------------------------------------------- */
-/* Quiet card chrome from the app's schedule rows: name, cadence · next
-   run, and pill actions. */
 .scheduleCard {
   display: flex;
   flex-direction: column;
@@ -361,9 +338,6 @@
   line-height: 1.4;
 }
 
-/* ---- Composer activity pill ---------------------------------------------- */
-/* The ambient tally that leads the composer while work is in flight.
-   The row keeps its height even when empty so nothing shifts. */
 .pillRow {
   display: flex;
   align-items: center;
@@ -409,7 +383,6 @@
   }
 }
 
-/* ---- Copy: three beats that follow the conversation --------------------- */
 .beats {
   display: flex;
   flex-direction: column;
@@ -432,8 +405,6 @@
   line-height: 1.4;
 }
 
-/* While the mock plays, the beat it's on holds full ink and the others
-   sit back; at rest (and under reduced motion) every beat reads fully. */
 .beats[data-live] .beat:not([data-active]) {
   opacity: 0.42;
 }
@@ -461,7 +432,6 @@
     transition: none;
   }
 
-  /* No work ever runs in the static frame, so the tally row is dead space. */
   .pillRow {
     display: none;
   }

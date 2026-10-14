@@ -1,30 +1,3 @@
-// Stella's Windows launcher: installs Stella's runtimes and source, verifies
-// the signed tree, supervises Electron and rolls back to the last working
-// version. A port of launcher/macos (same contract, same install layout, same
-// health rules); see packages/desktop/electron/launcher-client.ts for
-// Electron's side of the channel, which on Windows is the named pipe whose
-// name is passed in STELLA_LAUNCHER_PIPE.
-//
-// Install root: %STELLA_LAUNCHER_ROOT%, else %LOCALAPPDATA%\Stella:
-//   app\                      the checkout
-//   runtimes\bun-<v>\bun.exe  pinned Bun
-//   runtimes\git-<v>\         PortableGit
-//   signing.key               the DPAPI-protected signing key
-//   signing.pub, launcher-state.json, logs\{launcher,electron,install}.log
-// On first run the launcher copies itself to %LOCALAPPDATA%\Programs\Stella
-// and adds a Start Menu shortcut carrying Stella's AppUserModelID, which is
-// how Windows gives Electron's windows the Stella name and icon.
-//
-// The launcher updates itself from launcher/stable/ on R2 (see "update"):
-// a newer Stella.exe is verified and renamed over the installed copy, and
-// takes over when Start is pressed or at the next app update.
-//
-// WinHTTP downloads, BCrypt SHA-256 and ECDSA P-256, DPAPI for the key,
-// WinVerifyTrust for the launcher's own updates, tar.exe for zips. The
-// window is launcher/common/launcher.html in WebView2 (found without
-// WebView2Loader.dll); without a WebView2 runtime, TaskDialogs show progress
-// and recovery instead.
-
 #ifndef UNICODE
 #define UNICODE
 #endif
@@ -51,7 +24,7 @@
 #include <wintrust.h>
 #include <softpub.h>
 
-#include "WebView2.h"  // fetched by build.sh
+#include "WebView2.h"
 
 #include <algorithm>
 #include <atomic>
@@ -72,8 +45,6 @@
 
 #include "../common/mini_json.h"
 
-// The build number (CI's run number, from build.sh); 0 for a local build,
-// which never updates itself.
 #ifndef STELLA_LAUNCHER_VERSION
 #define STELLA_LAUNCHER_VERSION 0
 #endif
@@ -86,12 +57,7 @@ using std::string;
 using std::vector;
 using std::wstring;
 
-// ------------------------------------------------------------------ pins
-
 static const char *kBunVersion = "1.4.0";
-// A fork builds its own defaults: build.sh passes STELLA_BACKEND_URL,
-// STELLA_RELEASES_URL (the public base of its releases bucket) and
-// STELLA_UPDATE_SIGNER (the Authenticode signer of its own builds).
 #ifndef STELLA_DEFAULT_BACKEND_URL
 #define STELLA_DEFAULT_BACKEND_URL "https://stella-v2-cloud-builder-prod.fromyou.workers.dev"
 #endif
@@ -110,7 +76,7 @@ static const char *kKnownGoodRef = "refs/stella/known-good";
 static const char *kNotesRef = "stella-signed";
 static const DWORD kRelaunchExitCode = 75;
 static const size_t kOutputLines = 40;
-static const wchar_t *kAppUserModelID = L"com.stella.app";  // STELLA_WINDOWS_APP_USER_MODEL_ID
+static const wchar_t *kAppUserModelID = L"com.stella.app";
 static const unsigned long long kLauncherVersion = STELLA_LAUNCHER_VERSION;
 static const wchar_t *kDefaultUpdateURL = STELLA_WIDEN(STELLA_RELEASES_URL "/launcher/stable");
 static const wchar_t *kUpdateSigner = STELLA_WIDEN(STELLA_UPDATE_SIGNER);
@@ -132,9 +98,6 @@ static const Asset kBunAssets[] = {
      "f473bfe2df73ee770548c93dd5d380aea7120c218ec2aa1afdd0bbba7bf18c47", "bun-windows-aarch64/bun.exe"},
 };
 
-// PortableGit from the managed git-runtime manifest on R2
-// (git-runtime/versions/2.53.0/manifest.json, windowsDistribution), pinned so
-// a tampered manifest can't swap the binary.
 static const char *kGitVersion = "2.53.0";
 static const Asset kGitAssets[] = {
     {"x64", "https://github.com/git-for-windows/git/releases/download/v2.53.0.windows.3/PortableGit-2.53.0.3-64-bit.7z.exe",
@@ -156,8 +119,6 @@ static string bunPlatformKey() {
     // Bun's default x64 build needs AVX2.
     return IsProcessorFeaturePresent(PF_AVX2_INSTRUCTIONS_AVAILABLE) ? "win-x64" : "win-x64-baseline";
 }
-
-// ------------------------------------------------------------- strings
 
 static wstring wide(const string &s) {
     if (s.empty()) return wstring();
@@ -233,8 +194,6 @@ struct LauncherError {
     string message;
 };
 [[noreturn]] static void fail(const string &message) { throw LauncherError{message}; }
-
-// ----------------------------------------------------------------- files
 
 static bool exists(const wstring &path) { return GetFileAttributesW(path.c_str()) != INVALID_FILE_ATTRIBUTES; }
 
@@ -331,8 +290,6 @@ static wstring modulePath() {
     return wstring(buf, n);
 }
 
-// ------------------------------------------------------------------- log
-
 static std::mutex gLogLock;
 static HANDLE gLogFile = INVALID_HANDLE_VALUE;
 static HANDLE gConsole = nullptr;
@@ -346,13 +303,9 @@ static void logLine(const string &message) {
 }
 #define LOG(...) logLine(format(__VA_ARGS__))
 
-// ----------------------------------------------------------------- paths
-
 struct Paths {
     wstring root;
     bool isolated = false;
-    // A self-hosted server from server.json: its checkout and state live in
-    // servers\<serverId>\, so the stella.sh install stays as it was.
     wstring serverId;
     wstring installRoot() const { return serverId.empty() ? root : root + L"\\servers\\" + serverId; }
     wstring serverFile() const { return root + L"\\server.json"; }
@@ -389,10 +342,6 @@ struct Paths {
 
 static Paths P;
 
-// ---------------------------------------------------------------- server
-
-// A self-hosted Stella server from server.json ({origin, serverId, name}),
-// written by the app's "Connect to your own server".
 struct Server {
     string origin, serverId, name;
     bool operator==(const Server &o) const { return origin == o.origin && serverId == o.serverId; }
@@ -401,7 +350,6 @@ struct Server {
 static bool gHasServer = false;
 static Server gServer;
 
-// https://host[:port] (http only for localhost), lowercased; empty when invalid.
 static string normalizeOrigin(const string &raw) {
     string t = trim(raw);
     for (auto &c : t) c = (char)tolower((unsigned char)c);
@@ -427,7 +375,6 @@ static bool validServerId(const char *id) {
     return n > 0 && n <= 64;
 }
 
-// False for none, the compiled default, or anything malformed.
 static bool loadServer(Server &out) {
     string data;
     if (!readFile(P.serverFile(), data)) return false;
@@ -448,8 +395,6 @@ static bool loadServer(Server &out) {
     mj_free(json);
     return ok;
 }
-
-// ----------------------------------------------------------------- state
 
 struct State {
     string bunLockHash, preparedHead, installedAt;
@@ -486,8 +431,6 @@ struct State {
 
 static State S;
 
-// --------------------------------------------------------------- options
-
 enum class Choice { None, Return, Reinstall, Retry, Quit };
 
 static const char *choiceName(Choice c) {
@@ -508,32 +451,29 @@ static double envSeconds(const wchar_t *name, double fallback) {
 
 struct Options {
     bool selfTest = false;
-    bool start = false;      // start right away, without waiting for Start
+    bool start = false;
     bool show = false;
-    DWORD after = 0;         // wait for this launcher (handing over) to exit first
-    bool backendArg = false; // --backend was given (passed on at a handover)
-    bool backendOverride = false; // --backend or STELLA_LAUNCHER_BACKEND_URL: wins over server.json
-    string source;      // a local path or git URL instead of the upstream bootstrap
+    DWORD after = 0;
+    bool backendArg = false;
+    bool backendOverride = false;
+    string source;
     string sourceRef;
     wstring backend;
-    wstring localBun;   // adopt this Bun instead of downloading
-    double hold = 0;    // self-test: stay up this long after ready
+    wstring localBun;
+    double hold = 0;
     Choice recoveryChoice = Choice::None;
-    wstring captureDir; // self-test: save PNGs of the launcher's window here
+    wstring captureDir;
     double readyTimeout = envSeconds(L"STELLA_LAUNCHER_READY_TIMEOUT_SECONDS", 90);
     double stableSeconds = envSeconds(L"STELLA_LAUNCHER_STABLE_SECONDS", 60);
 };
 
 static Options O;
 
-// The backend Stella installs from and talks to.
 static wstring backendURL() {
     if (O.backendOverride) return O.backend;
     return gHasServer ? wide(gServer.origin) : kDefaultBackendURL;
 }
 
-// Stella may have picked another server (or gone back to the default) before
-// asking to relaunch: follow server.json to that install.
 static void followServerFile() {
     if (O.backendOverride) return;
     Server next;
@@ -602,8 +542,6 @@ static void parseOptions() {
     LocalFree(argv);
 }
 
-// ----------------------------------------------------------- environment
-
 struct CaseInsensitiveLess {
     bool operator()(const wstring &a, const wstring &b) const { return _wcsicmp(a.c_str(), b.c_str()) < 0; }
 };
@@ -634,8 +572,6 @@ static vector<wchar_t> environmentBlock(const Env &env) {
     return block;
 }
 
-// --------------------------------------------------------------- process
-
 // Quote one argument by the rules CommandLineToArgvW and the MSVC runtime use.
 static wstring quoteArg(const wstring &arg) {
     if (!arg.empty() && arg.find_first_of(L" \t\n\v\"") == wstring::npos) return arg;
@@ -663,7 +599,7 @@ static wstring commandLine(const vector<wstring> &argv) {
 struct CmdResult {
     DWORD code = 0;
     string out;
-    string err;  // with an output file: that file's tail
+    string err;
     bool timedOut = false;
 };
 
@@ -679,7 +615,6 @@ static void drainPipe(HANDLE h, string *into) {
     while (ReadFile(h, buf, sizeof(buf), &n, nullptr) && n > 0) into->append(buf, n);
 }
 
-// Creates a process with exactly the given handles inheritable.
 static bool createProcess(const wstring &exe, wstring cmdline, const wstring &cwd, const Env &env, HANDLE in, HANDLE out,
                           HANDLE err, DWORD flags, PROCESS_INFORMATION *pi) {
     vector<HANDLE> handles;
@@ -713,9 +648,6 @@ static HANDLE openNul() {
     return CreateFileW(L"NUL", GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, &sa, OPEN_EXISTING, 0, nullptr);
 }
 
-// Run a console program without a window. With outputFile, stdout and stderr
-// are appended there. The child runs in a job object, so a timeout kills its
-// whole tree. A raw `cmdline` overrides the quoted argv (7-Zip SFX switches).
 static CmdResult runCmd(const vector<wstring> &argv, const wstring &cwd, const Env &env, const wstring &outputFile = L"",
                         double timeoutSeconds = 0, const wstring &rawCmdline = L"") {
     CmdResult r;
@@ -728,7 +660,6 @@ static CmdResult runCmd(const vector<wstring> &argv, const wstring &cwd, const E
         string header = "\r\n$ " + utf8(rawCmdline.empty() ? commandLine(argv) : rawCmdline) + "\r\n";
         DWORD n;
         if (logH != INVALID_HANDLE_VALUE) WriteFile(logH, header.data(), (DWORD)header.size(), &n, nullptr);
-        // An unopenable log must not put an invalid handle in the inherit list.
         outWrite = errWrite = logH != INVALID_HANDLE_VALUE ? logH : nul;
     } else {
         CreatePipe(&outRead, &outWrite, &sa, 0);
@@ -776,7 +707,6 @@ static CmdResult runCmd(const vector<wstring> &argv, const wstring &cwd, const E
     }
     GetExitCodeProcess(pi.hProcess, &r.code);
     CloseHandle(pi.hProcess);
-    // Closing the job kills any grandchild still holding our pipes open.
     CloseHandle(job);
     if (outThread.joinable()) outThread.join();
     if (errThread.joinable()) errThread.join();
@@ -785,8 +715,6 @@ static CmdResult runCmd(const vector<wstring> &argv, const wstring &cwd, const E
     if (!outputFile.empty()) r.err = fileTail(outputFile, 4000);
     return r;
 }
-
-// ----------------------------------------------------------------- crypto
 
 static string hexOf(const unsigned char *data, size_t len) {
     static const char *digits = "0123456789abcdef";
@@ -897,11 +825,6 @@ static const unsigned char kP256SpkiPrefix[] = {0x30, 0x59, 0x30, 0x13, 0x06, 0x
                                                 0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07, 0x03, 0x42, 0x00};
 static const unsigned char kP256CurveOidDer[] = {0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07};
 
-// Signs and verifies the app tree: ECDSA P-256 / SHA-256 over
-// `stella-tree-v1\n<HEAD^{tree}>\n`, DER, base64, as a git note under
-// refs/notes/stella-signed. The private key is a DPAPI-protected (current
-// user) BCRYPT_ECCPRIVATE_BLOB in signing.key; STELLA_LAUNCHER_KEY_FILE points
-// at a PKCS#8 PEM instead, for testing.
 class TreeSigner {
 public:
     TreeSigner() {
@@ -921,7 +844,6 @@ public:
         if (alg_) BCryptCloseAlgorithmProvider(alg_, 0);
     }
 
-    // Base64 SPKI DER: STELLA_LAUNCHER_PUBKEY for Electron.
     string publicKeySPKIBase64() const { return base64(spki()); }
 
     static string message(const string &tree) { return "stella-tree-v1\n" + tree + "\n"; }
@@ -1091,15 +1013,11 @@ private:
     }
 };
 
-// ------------------------------------------------------------------- net
-
 struct HttpResponse {
     DWORD status = 0;
     string body;
 };
 
-// GET (to a file, or into memory) or POST through WinHTTP, following redirects
-// and using the system proxy settings.
 static HttpResponse http(const wstring &url, const wchar_t *method, const string &body, const wstring &toFile) {
     URL_COMPONENTS parts;
     ZeroMemory(&parts, sizeof(parts));
@@ -1172,7 +1090,6 @@ static HttpResponse http(const wstring &url, const wchar_t *method, const string
     return response;
 }
 
-// Download to `dest`, refusing anything whose sha256 differs.
 static void download(const string &url, const wstring &dest, const string &sha256) {
     wstring staging = dest + L".download";
     DeleteFileW(staging.c_str());
@@ -1189,8 +1106,6 @@ static void download(const string &url, const wstring &dest, const string &sha25
     MoveFileExW(staging.c_str(), dest.c_str(), MOVEFILE_REPLACE_EXISTING);
 }
 
-// ------------------------------------------------------------------- git
-
 static Env baseEnvironment();
 
 static const vector<std::pair<wstring, wstring>> kIdentityEnv = {
@@ -1200,8 +1115,6 @@ static const vector<std::pair<wstring, wstring>> kIdentityEnv = {
     {L"GIT_COMMITTER_EMAIL", L"stella@localhost"},
 };
 
-// PortableGit under runtimes\git-<v>, with the environment it needs; the same
-// variables go to Electron, matching bundled-runtime-environment.ts.
 struct GitTool {
     wstring root;
     wstring bin() const { return root + L"\\cmd\\git.exe"; }
@@ -1247,10 +1160,6 @@ static std::unique_ptr<TreeSigner> gSigner;
 static wstring gBunBin;
 static string gBunVersion;
 
-// ------------------------------------------------------------ environments
-
-// The environment for git, bun and Electron: the managed runtimes first on
-// PATH, and none of the launcher's own secrets.
 static Env baseEnvironment() {
     Env env = currentEnvironment();
     bool usesTestKey = !trim(utf8(envVar(L"STELLA_LAUNCHER_KEY_FILE"))).empty();
@@ -1260,8 +1169,6 @@ static Env baseEnvironment() {
           L"STELLA_DEV_USER_QUIT_REQUEST_FILE", L"STELLA_ELECTRON_DEV_RUNNER_PID", L"STELLA_ELECTRON_READY_FILE",
           L"NODE_OPTIONS", L"STELLA_LAUNCHER_PIPE"})
         env.erase(key);
-    // The dev harness opens Electron to debugging, so it passes through only
-    // for a test root signed with a test key file.
     if (!(P.isolated && usesTestKey))
         for (const wchar_t *key : {L"STELLA_DEV_HARNESS", L"STELLA_DEV_HARNESS_STORAGE_KEY", L"STELLA_V2_DEV_USER_DATA_DIR",
                                    L"STELLA_REMOTE_DEBUG_PORT", L"STELLA_DEV_HARNESS_SESSION_TOKEN"})
@@ -1285,9 +1192,7 @@ static Env baseEnvironment() {
 static Env electronEnvironment(const wstring &pipeName) {
     Env env = baseEnvironment();
     env[L"STELLA_LAUNCHER"] = L"1";
-    // The backend this launcher installs from is the one the app talks to.
     env[L"VITE_STELLA_BACKEND_URL"] = backendURL();
-    // Where Stella writes server.json; also tells it this launcher reads one.
     env[L"STELLA_LAUNCHER_DATA_DIR"] = P.root;
     env.erase(L"STELLA_LAUNCHER_SERVER_ID");
     env.erase(L"STELLA_LAUNCHER_SERVER_NAME");
@@ -1301,7 +1206,6 @@ static Env electronEnvironment(const wstring &pipeName) {
         for (auto &kv : gGit->runtimeEnv()) env[kv.first] = kv.second;
     if (gSigner) env[L"STELLA_LAUNCHER_PUBKEY"] = wide(gSigner->publicKeySPKIBase64());
     if (P.isolated) {
-        // A test root never touches the real profile or Stella home.
         env[L"STELLA_LAUNCHER_USER_DATA_DIR"] = P.isolatedUserData();
         env[L"STELLA_DATA_DIR"] = P.isolatedHome();
         env[L"STELLA_V2_DEV_DATA_DIR"] = P.isolatedHome();
@@ -1309,16 +1213,11 @@ static Env electronEnvironment(const wstring &pipeName) {
     return env;
 }
 
-// -------------------------------------------------------------------- UI
-
-// What the work loop needs from a UI. WebUi (launcher/common/launcher.html in
-// WebView2) is the normal one; DialogUi, TaskDialogs, stands in when no
-// WebView2 runtime is installed. Every call comes from the work thread.
 struct Recovery {
     string reason;
     vector<string> output;
     bool hasKnownGood = false;
-    Choice automation = Choice::None;  // self-test: choose this after automationDelay
+    Choice automation = Choice::None;
     double automationDelay = 0;
     wstring capturePath;
 };
@@ -1326,24 +1225,15 @@ struct Recovery {
 class Ui {
 public:
     virtual ~Ui() {}
-    // Idle: wait for Start (Retry), Return, Reinstall or Quit.
     virtual Choice idle() = 0;
-    // Starting: what is happening now; `show` brings a hidden window up.
-    // Starting: what is happening in plain words, and the part of setup it
-    // covers (from..to, 0..1; the window's bar eases between them).
     virtual void starting(const string &status, double from, double to, bool show) = 0;
-    // Electron is ready.
     virtual void running() = 0;
-    // Failed: show why, then wait for a choice.
     virtual Choice failed(const Recovery &recovery) = 0;
-    // Settings' Version and Return to last working version.
     virtual void installInfo(const string &version, bool hasKnownGood) {}
 };
 
 static Ui *gUi = nullptr;
 
-// A step worth telling the user about; like the old progress dialog, it
-// brings the window up.
 static void progress(const string &status, double from, double to) {
     LOG("progress: %s", status.c_str());
     gUi->starting(status, from, to, true);
@@ -1351,9 +1241,6 @@ static void progress(const string &status, double from, double to) {
 
 static void requestShutdown();
 
-// ------------------------------------------------- UI: TaskDialog fallback
-
-// The install/prepare progress panel: a marquee TaskDialog on its own thread.
 class ProgressWindow {
 public:
     void show(const string &status) {
@@ -1403,7 +1290,6 @@ private:
         case TDN_BUTTON_CLICKED: {
             std::lock_guard<std::mutex> lock(self->mutex_);
             if (!self->closing_) {
-                // Cancel during install quits the launcher.
                 LOG("launcher: install cancelled");
                 ExitProcess(1);
             }
@@ -1440,8 +1326,6 @@ private:
 
 static ProgressWindow gProgress;
 
-// "Stella couldn't start": the reason, the last 40 lines Electron wrote, and
-// Return to last working / Try again / Quit. Blocks until a choice is made.
 struct RecoveryDialog {
     const Recovery &recovery;
     bool clicked = false;
@@ -1455,7 +1339,6 @@ struct RecoveryDialog {
             SetForegroundWindow(hwnd);
         } else if (msg == TDN_TIMER && !self->clicked && r.automation != Choice::None && wParam > r.automationDelay * 1000) {
             self->clicked = true;
-            // "return" means the primary button, "Reinstall" without a known-good version.
             int id = r.automation == Choice::Return ? (r.hasKnownGood ? kReturn : kReinstall)
                      : r.automation == Choice::Retry ? kRetry
                                                      : kQuit;
@@ -1512,7 +1395,6 @@ struct RecoveryDialog {
 
 class DialogUi : public Ui {
 public:
-    // No Start button here: start right away, as the launcher always did.
     Choice idle() override { return Choice::Retry; }
     void starting(const string &status, double, double, bool show) override {
         if (show) gProgress.show(status);
@@ -1525,15 +1407,13 @@ public:
     }
 };
 
-// ------------------------------------------------------- UI: WebView2 loader
-
 // Stella.exe ships no WebView2Loader.dll; it does the loader's job for the
 // installed Evergreen runtime. EdgeUpdate records the runtime's directory
 // under ClientState\{stable channel} (EBWebView) and its version under
 // Clients\{stable channel} (pv); the runtime's EmbeddedBrowserWebView.dll
 // exports the factory that CreateCoreWebView2EnvironmentWithOptions calls.
 typedef HRESULT(STDMETHODCALLTYPE *CreateWebViewEnvironmentFn)(
-    bool checkRunningInstance, int runtimeType /* 0: installed */, PCWSTR userDataFolder, IUnknown *options,
+    bool checkRunningInstance, int runtimeType , PCWSTR userDataFolder, IUnknown *options,
     ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler *handler);
 
 static wstring registryString(HKEY root, const wstring &key, const wchar_t *name) {
@@ -1556,7 +1436,6 @@ static CreateWebViewEnvironmentFn loadWebView2(string &dllPath) {
     for (HKEY root : {HKEY_LOCAL_MACHINE, HKEY_CURRENT_USER}) {
         wstring dir = registryString(root, L"SOFTWARE\\Microsoft\\EdgeUpdate\\ClientState\\" + kStableChannel, L"EBWebView");
         if (!dir.empty()) dirs.push_back(dir);
-        // Per-machine installs live under Program Files (x86), per-user ones under LocalAppData.
         wstring pv = registryString(root, L"SOFTWARE\\Microsoft\\EdgeUpdate\\Clients\\" + kStableChannel, L"pv");
         if (!pv.empty() && pv != L"0.0.0.0")
             dirs.push_back((root == HKEY_LOCAL_MACHINE ? envVar(L"ProgramFiles(x86)") : knownFolder(FOLDERID_LocalAppData)) +
@@ -1617,10 +1496,6 @@ private:
     std::atomic<ULONG> refs_{1};
 };
 
-// --------------------------------------------------------- UI: the window
-
-// The page, embedded as RCDATA (stella-launcher.rc), so the window never
-// depends on the checkout the launcher may be recovering.
 static string launcherPage() {
     HRSRC res = FindResourceW(nullptr, L"LAUNCHER_HTML", RT_RCDATA);
     HGLOBAL data = res ? LoadResource(nullptr, res) : nullptr;
@@ -1642,13 +1517,10 @@ static string jsonString(const string &s) {
     return out;
 }
 
-// A second Stella.exe finds the running launcher's window by its class and a
-// property naming the install root.
 static const wchar_t *kWindowClass = L"StellaLauncherWindow";
 static const wchar_t *kRootProperty = L"StellaLauncherRoot";
 
 static ULONG_PTR rootTag() {
-    // FNV-1a over the lowercased root.
     uint32_t h = 2166136261u;
     for (wchar_t c : P.root) {
         h ^= (uint32_t)towlower(c);
@@ -1658,21 +1530,16 @@ static ULONG_PTR rootTag() {
 }
 
 enum : UINT {
-    WM_UI_RENDER = WM_APP + 1,  // the state changed
-    WM_UI_VISIBLE,              // show or hide, as wantVisible_ says
-    WM_UI_SCRIPT,               // lParam: a new'd wstring of script to run
-    WM_UI_CAPTURE,              // wParam: request id; lParam: a new'd wstring PNG path
-    WM_UI_DONE,                 // the work loop returned
-    WM_UI_ACTIVATE,             // show the window (a second Stella.exe sends this)
+    WM_UI_RENDER = WM_APP + 1,
+    WM_UI_VISIBLE,
+    WM_UI_SCRIPT,
+    WM_UI_CAPTURE,
+    WM_UI_DONE,
+    WM_UI_ACTIVATE,
 };
 
-// One window with the shared page in WebView2. The UI thread owns the window
-// and the WebView; the work thread changes the state under mutex_ and posts
-// WM_UI_* messages, and blocks on cond_ for the user's commands.
 class WebUi : public Ui {
 public:
-    // UI thread: create the window and the WebView, pumping messages until
-    // the WebView is ready. False: use the fallback.
     bool create() {
         string dll;
         CreateWebViewEnvironmentFn createEnvironment = loadWebView2(dll);
@@ -1695,8 +1562,6 @@ public:
         wc.lpszClassName = kWindowClass;
         RegisterClassExW(&wc);
 
-        // 380x460 client at 96 DPI, scaled for and centered on the monitor
-        // under the pointer. Hidden until the page has rendered.
         POINT cursor = {0, 0};
         GetCursorPos(&cursor);
         MONITORINFO monitor;
@@ -1745,7 +1610,6 @@ public:
         return false;
     }
 
-    // UI thread: run the work loop on its own thread, pumping messages until it returns.
     int run(int (*work)()) {
         int code = 1;
         std::thread worker([&]() {
@@ -1762,8 +1626,6 @@ public:
         worker.join();
         return code;
     }
-
-    // ---- the work thread
 
     Choice idle() override {
         update([&]() {
@@ -1816,7 +1678,6 @@ public:
             toured_ = true;
         });
         if (tour) {
-            // The window a second Stella.exe brings up, then its Settings.
             PostMessageW(hwnd_, WM_UI_ACTIVATE, 0, 0);
             waitLoaded();
             pause(0.7);
@@ -1869,16 +1730,14 @@ public:
 private:
     enum { kCreateTimer = 1, kLoadTimer = 2 };
 
-    // UI thread only.
     HWND hwnd_ = nullptr;
     ICoreWebView2Controller *controller_ = nullptr;
     ICoreWebView2 *webview_ = nullptr;
     HBRUSH background_ = nullptr;
     COLORREF backgroundColor_ = 0;
-    int creating_ = 0;  // 1 ready, -1 failed
+    int creating_ = 0;
     vector<wstring> pendingScripts_;
 
-    // Shared with the work thread.
     std::mutex mutex_;
     std::condition_variable cond_;
     string phase_ = "idle", status_, reason_, version_;
@@ -1888,8 +1747,6 @@ private:
     bool startingCaptured_ = false, toured_ = false;
     Choice command_ = Choice::None;
     int captureRequests_ = 0, capturesDone_ = 0;
-
-    // ---- work thread helpers
 
     void update(const std::function<void()> &change) {
         {
@@ -1916,7 +1773,6 @@ private:
 
     void script(const wstring &code) { PostMessageW(hwnd_, WM_UI_SCRIPT, 0, (LPARAM) new wstring(code)); }
 
-    // A PNG of the page (a bare name goes in --capture-dir); waits for it.
     void capture(const wstring &name) {
         if (O.captureDir.empty()) return;
         wstring path = name.find(L'\\') == wstring::npos ? O.captureDir + L"\\" + name : name;
@@ -1927,8 +1783,6 @@ private:
             LOG("ui: capture of %s timed out", utf8(path).c_str());
     }
 
-    // Start, Try again, Return, Reinstall or closing the window. The phase
-    // leaves idle/failed in the same step, so a second click isn't queued.
     Choice waitCommand() {
         Choice choice;
         {
@@ -1948,8 +1802,6 @@ private:
         PostMessageW(hwnd_, WM_UI_RENDER, 0, 0);
         return choice;
     }
-
-    // ---- UI thread
 
     static LRESULT CALLBACK windowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         if (msg == WM_NCCREATE)
@@ -2058,7 +1910,7 @@ private:
             if (creating_ == 0) creating_ = -1;
             return S_OK;
         }
-        if (creating_ != 0) {  // gave up waiting meanwhile
+        if (creating_ != 0) {
             controller->Close();
             return S_OK;
         }
@@ -2067,8 +1919,6 @@ private:
         controller_->get_CoreWebView2(&webview_);
         applyTheme();
 
-        // A launcher window, not a browser: no context menu, dev tools, zoom,
-        // status bar or browser shortcuts (F5, Ctrl+R, Ctrl+F, ...).
         ICoreWebView2Settings *settings = nullptr;
         if (SUCCEEDED(webview_->get_Settings(&settings))) {
             settings->put_AreDefaultContextMenusEnabled(FALSE);
@@ -2096,8 +1946,6 @@ private:
             });
         webview_->add_WebMessageReceived(onMessage, &token);
         onMessage->Release();
-        // The page posts "loaded" once its fonts are ready; if that never
-        // comes, show what there is shortly after the navigation.
         auto *onNavigated = new Callback<ICoreWebView2NavigationCompletedEventHandler>(
             kIID_NavigationCompleted, [this](ICoreWebView2 *, ICoreWebView2NavigationCompletedEventArgs *args) -> HRESULT {
                 BOOL ok = FALSE;
@@ -2123,17 +1971,13 @@ private:
         return S_OK;
     }
 
-    // The title bar, the window background and the WebView's default
-    // background all match the page's (#fdfdfb light, #0f0f0d dark), so
-    // nothing flashes white and the caption blends in. Caption and border
-    // colors need Windows 11; Windows 10 ignores them.
     void applyTheme() {
         bool dark = systemUsesDarkTheme();
         backgroundColor_ = dark ? RGB(0x0f, 0x0f, 0x0d) : RGB(0xfd, 0xfd, 0xfb);
         BOOL immersiveDark = dark;
-        DwmSetWindowAttribute(hwnd_, 20 /* DWMWA_USE_IMMERSIVE_DARK_MODE */, &immersiveDark, sizeof(immersiveDark));
-        DwmSetWindowAttribute(hwnd_, 35 /* DWMWA_CAPTION_COLOR */, &backgroundColor_, sizeof(backgroundColor_));
-        DwmSetWindowAttribute(hwnd_, 34 /* DWMWA_BORDER_COLOR */, &backgroundColor_, sizeof(backgroundColor_));
+        DwmSetWindowAttribute(hwnd_, 20 , &immersiveDark, sizeof(immersiveDark));
+        DwmSetWindowAttribute(hwnd_, 35 , &backgroundColor_, sizeof(backgroundColor_));
+        DwmSetWindowAttribute(hwnd_, 34 , &backgroundColor_, sizeof(backgroundColor_));
         if (background_) DeleteObject(background_);
         background_ = CreateSolidBrush(backgroundColor_);
         ICoreWebView2Controller2 *controller2 = nullptr;
@@ -2181,7 +2025,6 @@ private:
         }
     }
 
-    // Commands only count while the work loop is idle or failed.
     void command(Choice choice, const string &action) {
         std::lock_guard<std::mutex> lock(mutex_);
         if ((phase_ != "idle" && phase_ != "failed") || command_ != Choice::None) return;
@@ -2190,8 +2033,6 @@ private:
         cond_.notify_all();
     }
 
-    // The X or Alt+F4: idle or failed quits; otherwise Stella keeps running
-    // and the window only hides.
     void closeRequested() {
         {
             std::lock_guard<std::mutex> lock(mutex_);
@@ -2221,7 +2062,6 @@ private:
         applyVisibility();
     }
 
-    // The whole state, every time.
     void render() {
         string json;
         {
@@ -2238,7 +2078,6 @@ private:
         webview_->ExecuteScript(wide("window.stellaLauncher.render(" + json + ")").c_str(), nullptr);
     }
 
-    // Shown only once the page has rendered.
     void applyVisibility() {
         bool want, loaded;
         {
@@ -2294,8 +2133,6 @@ private:
     }
 };
 
-// A second Stella.exe for the same root: ask the running launcher to show
-// its window. False when there is none (or it uses the fallback).
 static bool showRunningLauncher() {
     struct Search {
         ULONG_PTR tag;
@@ -2319,9 +2156,6 @@ static bool showRunningLauncher() {
     return PostMessageW(search.found, WM_UI_ACTIVATE, 0, 0) != 0;
 }
 
-// --------------------------------------------------------------- install
-
-// The managed git, when it is already installed.
 static bool adoptGit() {
     GitTool git{P.runtimes() + L"\\git-" + wide(kGitVersion)};
     if (!exists(git.bin())) return false;
@@ -2359,9 +2193,6 @@ static void extractZip(const wstring &archive, const wstring &dir) {
     if (r.code != 0) fail(format("Could not unpack %s: %s", utf8(archive).c_str(), trim(r.err).c_str()));
 }
 
-// Bun from the version baked into the launcher, or the one a signed tree asks
-// for in packages\desktop\launcher.json:
-// {"bun": {"version": "1.4.1", "assets": {"win-x64": {"url", "sha256", "member"}}}}.
 static void ensureBun() {
     string key = bunPlatformKey();
     string version = kBunVersion, url, sha, member;
@@ -2383,7 +2214,6 @@ static void ensureBun() {
     }
 
     if (!O.localBun.empty()) {
-        // Offline/testing: adopt an existing Bun instead of downloading.
         CmdResult probe = runCmd({O.localBun, L"--version"}, L"", baseEnvironment(), L"", 60);
         string localVersion = trim(probe.out);
         if (probe.code != 0 || localVersion.empty()) fail(utf8(O.localBun) + " is not a working bun.");
@@ -2424,7 +2254,6 @@ static void ensureBun() {
     gBunVersion = version;
 }
 
-// POST <backend>/api/app-source/bootstrap → {upstream: {remote, token, expiresAt}}.
 static void bootstrapAccess(string &remote, string &token) {
     wstring base = backendURL();
     while (!base.empty() && base.back() == L'/') base.pop_back();
@@ -2434,7 +2263,6 @@ static void bootstrapAccess(string &remote, string &token) {
     if (r.status != 200) fail(format("The app source bootstrap returned HTTP %lu.", r.status));
     mj_value *json = mj_parse(r.body.data(), r.body.size());
     if (!json) fail("The app source bootstrap returned an unexpected body.");
-    // Accept {remote, token} or {upstream: {remote, token}}.
     const mj_value *body = mj_get(json, "upstream");
     if (!body) body = json;
     const char *rm = mj_get_string(body, "remote"), *tk = mj_get_string(body, "token");
@@ -2447,8 +2275,6 @@ static void bootstrapAccess(string &remote, string &token) {
     mj_free(json);
 }
 
-// Clone into app\; staged beside it and renamed, so an interrupted install
-// never leaves half a tree.
 static void cloneSource() {
     progress("Downloading Stella…", 0.10, 0.30);
     wstring staging = P.appStaging();
@@ -2483,8 +2309,6 @@ static void cloneSource() {
     LOG("install: source at %s", gGit->run({"rev-parse", "HEAD"}, P.app()).c_str());
 }
 
-// Where the installed launcher lives and the shortcuts point:
-// %LOCALAPPDATA%\Programs\Stella, or STELLA_LAUNCHER_INSTALL_DIR (testing).
 static wstring installDir() {
     string t = trim(utf8(envVar(L"STELLA_LAUNCHER_INSTALL_DIR")));
     wstring dir = t.empty() ? knownFolder(FOLDERID_LocalAppData) + L"\\Programs\\Stella" : wide(t);
@@ -2513,9 +2337,6 @@ static unsigned long long launcherVersionOf(const wstring &exe) {
     return 0;
 }
 
-// First run: copy the launcher to %LOCALAPPDATA%\Programs\Stella\Stella.exe and
-// add a Start Menu shortcut with Stella's AppUserModelID, so the taskbar
-// groups Electron's windows (which set the same id) under Stella's icon.
 static void installSelf() {
     wstring dir = installDir();
     wstring target = installedLauncher();
@@ -2524,7 +2345,6 @@ static void installSelf() {
     unsigned long long installed = 0;
     if (_wcsicmp(self.c_str(), target.c_str()) != 0 && exists(target) &&
         (installed = launcherVersionOf(target)) > kLauncherVersion) {
-        // An older download opened again doesn't undo an update.
         LOG("install: %s is %llu, newer than this %llu; leaving it", utf8(target).c_str(), installed, kLauncherVersion);
     } else if (_wcsicmp(self.c_str(), target.c_str()) != 0) {
         wstring staging = target + L".new";
@@ -2564,21 +2384,8 @@ static void installSelf() {
     shell->Release();
 }
 
-// ---------------------------------------------------------------- update
-
-// The launcher updates itself from launcher/stable/ (CI's publish uploads
-// Stella.exe and SHA256SUMS, then VERSION, the build number). A background
-// thread checks VERSION as the launcher starts and every 6 hours; a newer build
-// is downloaded to Stella.exe.update, checked against SHA256SUMS, its
-// Authenticode signature (FromYou, LLC) and `--version`, and renamed over the
-// installed copy (a running exe can be renamed but not overwritten, so the
-// installed one moves to Stella.exe.old first). Start waits for the first
-// check and hands over to a new build; a later one takes over when Electron
-// exits for an app update (see handOverToUpdate). Failures are logged and
-// retried at the next check.
-
-static std::mutex gUpdateLock;                // staging and handing over
-static unsigned long long gStagedVersion = 0;  // under gUpdateLock
+static std::mutex gUpdateLock;
+static unsigned long long gStagedVersion = 0;
 
 enum class CheckResult { Off, Pending, Current, Staged, Failed };
 
@@ -2596,7 +2403,6 @@ static void reportUpdate(const string &status, double from, double to) {
     gCheckSeq++;
 }
 
-// `sha256sum` output: "<hex>  <name>", or "<hex> *<name>" in binary mode.
 static string checksumFor(const string &sums, const string &name) {
     for (auto &raw : splitLines(sums)) {
         string line = trim(raw);
@@ -2609,8 +2415,6 @@ static string checksumFor(const string &sums, const string &name) {
     return string();
 }
 
-// Authenticode: the signature must verify to a trusted root (revocation
-// checked) and the signing certificate's simple name must be FromYou, LLC.
 static void verifySigner(const wstring &path) {
     WINTRUST_FILE_INFO file;
     ZeroMemory(&file, sizeof(file));
@@ -2698,7 +2502,6 @@ static CheckResult checkForUpdate(const wstring &base, bool skipSignature) {
         reportUpdate("Installing the update…", 0.7, 0.95);
         if (skipSignature) LOG("update: not checking the signature (STELLA_LAUNCHER_UPDATE_SKIP_SIGNATURE)");
         else verifySigner(update);
-        // It must run, and be the build VERSION promised.
         CmdResult probe = runCmd({update, L"--version"}, dir, currentEnvironment(), L"", 30);
         string said = trim(probe.out);
         if (probe.timedOut || probe.code != 0 || said != format("%llu", available))
@@ -2714,9 +2517,6 @@ static CheckResult checkForUpdate(const wstring &base, bool skipSignature) {
     return CheckResult::Staged;
 }
 
-// Checks run on their own thread and never touch the UI or Electron. Off for
-// a local build (version 0), the self-test and a test root, unless
-// STELLA_LAUNCHER_UPDATE_URL names where to look.
 static void startUpdateChecks() {
     wstring base = wide(trim(utf8(envVar(L"STELLA_LAUNCHER_UPDATE_URL"))));
     bool overridden = !base.empty();
@@ -2751,10 +2551,6 @@ static void startUpdateChecks() {
     }).detach();
 }
 
-// Electron exited for an app update and a newer launcher is staged: start it
-// (--start, so it goes straight to Electron; --after, so it takes the
-// single-instance lock only once this process is gone) and let it take over.
-// False: relaunch Electron here as before.
 static bool handOverToUpdate(bool show = false) {
     std::lock_guard<std::mutex> lock(gUpdateLock);
     if (gStagedVersion <= kLauncherVersion) return false;
@@ -2837,8 +2633,6 @@ static bool updateBeforeStart() {
     return false;
 }
 
-// --version: the build number on stdout (the updater's probe passes pipes;
-// from a console, that console), before any UI, log or lock.
 static bool printVersion() {
     int argc = 0;
     LPWSTR *argv = CommandLineToArgvW(GetCommandLineW(), &argc);
@@ -2855,8 +2649,6 @@ static bool printVersion() {
     return true;
 }
 
-// --after <pid>: the launcher handing over exits right after starting us;
-// wait (bounded) so its single-instance lock is released.
 static void waitForPreviousLauncher(DWORD pid) {
     HANDLE process = OpenProcess(SYNCHRONIZE, FALSE, pid);
     if (!process) return;
@@ -2865,13 +2657,10 @@ static void waitForPreviousLauncher(DWORD pid) {
     CloseHandle(process);
 }
 
-// The copy a previous update moved aside, once nothing runs from it.
 static void removeOldLauncher() {
     wstring old = installedLauncher() + L".old";
     if (exists(old) && DeleteFileW(old.c_str())) LOG("update: removed %s", utf8(old).c_str());
 }
-
-// --------------------------------------------------------------- signing
 
 enum class Verdict { Signed, Unsigned, BadSignature, Dirty };
 
@@ -2882,8 +2671,6 @@ static vector<string> changedFiles() {
     return out;
 }
 
-// Before every spawn: HEAD's note must verify and the tree must be clean
-// (untracked files count, because the renderer globs the source tree).
 static Verdict verifyHead(vector<string> &dirty) {
     dirty = changedFiles();
     if (!dirty.empty()) return Verdict::Dirty;
@@ -2894,7 +2681,6 @@ static Verdict verifyHead(vector<string> &dirty) {
     return gSigner->verify(tree, note.out) ? Verdict::Signed : Verdict::BadSignature;
 }
 
-// Sign HEAD after checking it is `expected` (when given) and clean.
 static string signHead(const string &expected) {
     string head = gGit->run({"rev-parse", "HEAD"}, P.app());
     if (!expected.empty() && expected != head) fail("HEAD is " + short12(head) + ", not " + short12(expected) + ".");
@@ -2906,8 +2692,6 @@ static string signHead(const string &expected) {
     LOG("signing: signed %s tree %s", short12(head).c_str(), short12(tree).c_str());
     return head;
 }
-
-// --------------------------------------------------------------- prepare
 
 // On install, after a relaunch request and after a rollback. Returns electron.exe.
 // Electron keeps its own name: it decides app.isPackaged from the executable's
@@ -2921,7 +2705,6 @@ static wstring prepare() {
         progress("Installing Stella…", 0.40, 0.82);
         LOG("prepare: bun install --frozen-lockfile (lock %s)", short12(lockHash).c_str());
         ULONGLONG started = GetTickCount64();
-        // Dependencies only: the postinstall's asset downloads are prepare-install.mjs's job.
         Env env = baseEnvironment();
         env[L"STELLA_SKIP_BROWSER_HYDRATE"] = L"1";
         env[L"STELLA_SKIP_OFFICE_HYDRATE"] = L"1";
@@ -2936,8 +2719,6 @@ static wstring prepare() {
     string head = gGit->run({"rev-parse", "HEAD"}, app);
     wstring script = app + L"\\packages\\desktop\\scripts\\prepare-install.mjs";
     if (S.preparedHead != head && exists(script)) {
-        // Optional features (computer use, the browser, office previews): a
-        // failure or timeout is logged, not fatal, and retried next launch.
         progress("Finishing setup…", 0.82, 0.94);
         LOG("prepare: prepare-install.mjs for %s", short12(head).c_str());
         double timeout = envSeconds(L"STELLA_LAUNCHER_PREPARE_TIMEOUT_SECONDS", 10 * 60);
@@ -2961,10 +2742,6 @@ static wstring prepare() {
     return electron;
 }
 
-// ------------------------------------------------------------ supervisor
-
-// Keeps the last lines Electron wrote for the recovery screen and tees
-// everything to logs\electron.log.
 class OutputCapture {
 public:
     explicit OutputCapture(const wstring &logFile) {
@@ -3005,7 +2782,7 @@ private:
 
 struct Event {
     enum Kind { Message, Exited, Timer } kind;
-    string text;  // Message: the JSON line; Timer: the name
+    string text;
     DWORD code = 0;
 };
 
@@ -3070,9 +2847,6 @@ static wstring currentUserSid() {
     return out;
 }
 
-// One Electron process: a single-instance named pipe (only the current user
-// may open it, and only the spawned process may be its client) for the
-// launcher channel, stdout/stderr captured.
 class ElectronProcess {
 public:
     EventQueue events;
@@ -3168,7 +2942,6 @@ public:
             GetOverlappedResult(pipe_, &ov, &n, TRUE);
     }
 
-    // Ask the windows to close, then force it if Electron is still up 8 s later.
     void terminate() {
         {
             std::lock_guard<std::mutex> lock(exitLock_);
@@ -3210,7 +2983,6 @@ private:
         return buf;
     }
 
-    // Overlapped I/O that also returns when the process object is torn down.
     bool waitIo(OVERLAPPED *ov, DWORD *n) {
         HANDLE handles[2] = {ov->hEvent, stopEvent_};
         DWORD w = WaitForMultipleObjects(2, handles, FALSE, INFINITE);
@@ -3283,10 +3055,6 @@ struct Outcome {
     vector<string> output;
 };
 
-// Stella installed the dependencies and ran prepare-install.mjs for the
-// checkout it is about to relaunch into: note it, so the relaunch's own
-// prepare finds that work done instead of repeating it. Only what still
-// matches the checkout is taken.
 static void handlePrepared(const mj_value *message) {
     const char *lockHash = mj_get_string(message, "lockHash");
     const char *head = mj_get_string(message, "head");
@@ -3338,7 +3106,6 @@ static void handleSign(const mj_value *message, ElectronProcess &process) {
     }
 }
 
-// The running Electron's events, so the window's Shut down can reach it.
 static std::mutex gSupervisedLock;
 static EventQueue *gSupervised = nullptr;
 
@@ -3390,8 +3157,6 @@ static Outcome supervise(const wstring &electron) {
                     readyAt = GetTickCount64();
                     LOG("supervisor: ready");
                     process->events.after(O.stableSeconds, "stable");
-                    // Hides the window; in the self-test, after its running
-                    // and Settings captures, so the quit timer starts after them.
                     gUi->running();
                     if (O.selfTest) process->events.after(O.hold, "self-test-quit");
                 }
@@ -3468,8 +3233,6 @@ static Outcome supervise(const wstring &electron) {
     }
 }
 
-// --------------------------------------------------------------- recovery
-
 static bool hasKnownGood() {
     if (!gGit || !exists(P.app())) return false;
     try {
@@ -3485,7 +3248,6 @@ static void resetInstallState() {
     S.save();
 }
 
-// No known-good version yet: move the checkout aside and clone again.
 static void reinstall() {
     if (exists(P.app())) {
         wstring aside = P.installRoot() + L"\\app.previous-" + std::to_wstring((long long)time(nullptr));
@@ -3498,8 +3260,6 @@ static void reinstall() {
     resetInstallState();
 }
 
-// A forward commit back to the known-good tree: nothing is rewritten, so the
-// fork still fast-forwards. Uncommitted edits are stashed, not lost.
 static void returnToKnownGood() {
     if (!hasKnownGood()) {
         reinstall();
@@ -3522,12 +3282,8 @@ static void returnToKnownGood() {
     signHead("");
 }
 
-// ---------------------------------------------------------------- launcher
-
 static int gRecoveryCount = 0;
 
-// Settings' Version (short HEAD, "" before install) and whether there is a
-// last working version to return to.
 static void refreshInstallInfo() {
     string version;
     if (gGit && exists(P.app() + L"\\.git")) {
@@ -3589,7 +3345,6 @@ static wstring prepareForLaunch() {
     followServerFile();
     if (!exists(P.app() + L"\\.git")) {
         cloneSource();
-        // The initial clone is signed at install.
         signHead("");
         resetInstallState();
     }
@@ -3610,9 +3365,6 @@ static int run() {
         gHasServer ? gServer.origin.c_str() : "default", O.selfTest ? 1 : 0, GetCurrentProcessId());
     adoptGit();
     refreshInstallInfo();
-    // Nothing starts until the user presses Start (the self-test presses it),
-    // except with --start (a launcher update taking over), which goes
-    // straight on with the window hidden, like a relaunch.
     if (O.start && O.show) gUi->starting("Starting Stella…", 0, 0.05, true);
     Choice next = O.start ? Choice::Retry : gUi->idle();
     if (next == Choice::Quit || next == Choice::None) return 0;
@@ -3635,8 +3387,6 @@ static int run() {
                 }
             }
             next = Choice::Retry;
-            // Relaunches and the crash restart stay hidden; the heavy steps
-            // in prepareForLaunch bring the window up.
             gUi->starting("Starting Stella…", 0, 0.05, false);
             if (checkUpdate) {
                 checkUpdate = false;
@@ -3684,7 +3434,6 @@ static int run() {
                 break;
             }
         } catch (const LauncherError &e) {
-            // First line is the message; any detail (a command's output) goes to the output pane.
             failed = true;
             vector<string> lines = splitLines(e.message);
             reason = lines.empty() ? e.message : lines[0];
@@ -3705,7 +3454,6 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     INITCOMMONCONTROLSEX icc = {sizeof(icc), ICC_STANDARD_CLASSES | ICC_PROGRESS_CLASS};
     InitCommonControlsEx(&icc);
     SetCurrentProcessExplicitAppUserModelID(kAppUserModelID);
-    // Launched from a console (CI, a terminal): log there too.
     if (AttachConsole(ATTACH_PARENT_PROCESS)) gConsole = GetStdHandle(STD_ERROR_HANDLE);
 
     P = Paths::resolve();
@@ -3716,8 +3464,6 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     if (O.after) waitForPreviousLauncher(O.after);
     removeOldLauncher();
 
-    // One launcher per install root; opening Stella again shows its window.
-    // A handover (--after) allows the exiting launcher a moment to let go.
     HANDLE lock = INVALID_HANDLE_VALUE;
     for (int attempt = 0;; attempt++) {
         lock = CreateFileW(P.lockFile().c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL,

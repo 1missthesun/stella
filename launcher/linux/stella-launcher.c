@@ -1,23 +1,3 @@
-/*
- * Stella's Linux launcher: installs Stella's runtimes and source, verifies the
- * signed tree, supervises Electron and rolls back to the last working version.
- * A port of launcher/macos (same contract, same install layout, same health
- * rules); see launcher-client.ts for Electron's side of the channel.
- *
- * Install root: $STELLA_LAUNCHER_ROOT, else $XDG_DATA_HOME/stella
- * (~/.local/share/stella):
- *   app/                  the checkout
- *   runtimes/bun-<v>/bun  pinned Bun (git is the system git on Linux)
- *   signing.pub, launcher-state.json, logs/{launcher,electron,install}.log
- *   bin/stella-launcher   the installed copy the .desktop entry runs
- *   server.json           a self-hosted server Stella picked; its checkout and
- *                         state live in servers/<serverId>/ instead
- *
- * Shells out to curl, tar/unzip and git; uses libcrypto for SHA-256 and
- * ECDSA P-256; keeps the signing key in the Secret Service (libsecret,
- * loaded at runtime) or a 0600 file; GTK3 and WebKitGTK for the launcher
- * window, launcher/common/launcher.html (headless runs log instead).
- */
 #define _GNU_SOURCE
 #include <ctype.h>
 #include <dlfcn.h>
@@ -56,15 +36,10 @@
 
 extern char **environ;
 
-/* ------------------------------------------------------------------ pins */
-
-/* CI's run number (build.sh passes STELLA_LAUNCHER_VERSION); 0 for a local build. */
 #ifndef LAUNCHER_VERSION
 #define LAUNCHER_VERSION 0
 #endif
 #define BUN_VERSION "1.4.0"
-/* A fork builds its own defaults: build.sh passes STELLA_BACKEND_URL and
- * STELLA_RELEASES_URL (the public base of its releases bucket). */
 #ifndef DEFAULT_BACKEND_URL
 #define DEFAULT_BACKEND_URL "https://stella-v2-cloud-builder-prod.fromyou.workers.dev"
 #endif
@@ -104,8 +79,6 @@ static const char *platform_key(void) {
 #endif
 }
 
-/* -------------------------------------------------------------- utilities */
-
 static char *xstrdup(const char *s) {
     char *d = strdup(s ? s : "");
     if (!d) abort();
@@ -130,7 +103,6 @@ static char *trim(char *s) {
     return s;
 }
 
-/* A malloc'd, trimmed copy. */
 static char *trimmed(const char *s) {
     char *copy = xstrdup(s);
     char *t = trim(copy);
@@ -185,7 +157,6 @@ static char *read_file(const char *path, size_t *len_out) {
     return buf;
 }
 
-/* Write via a temp file and rename, so readers never see half a file. */
 static int write_file_atomic(const char *path, const char *data, size_t len, mode_t mode) {
     char *tmp = xasprintf("%s.tmp-%d", path, (int)getpid());
     int fd = open(tmp, O_CREAT | O_TRUNC | O_WRONLY | O_CLOEXEC, mode);
@@ -239,7 +210,6 @@ static char *iso_now(void) {
     return xasprintf("%s.%03dZ", buf, (int)(tv.tv_usec / 1000));
 }
 
-/* Dynamic NULL-terminated string arrays (argv, envp). */
 typedef struct {
     char **items;
     size_t count, cap;
@@ -289,8 +259,6 @@ static void env_set(StrList *env, const char *key, const char *value) {
     free(entry);
 }
 
-/* ------------------------------------------------------------------- log */
-
 static pthread_mutex_t log_lock = PTHREAD_MUTEX_INITIALIZER;
 static FILE *log_file;
 
@@ -310,9 +278,6 @@ static void logf_(const char *fmt, ...) {
 }
 #define LOG(...) logf_(__VA_ARGS__)
 
-/* The last error, set by any function that returns failure. One worker thread
- * does all the launcher work, so a plain global is enough. */
-/* Per thread: the updater runs beside the launcher's work. */
 static __thread char *g_error;
 static void set_error(const char *fmt, ...) {
     va_list ap;
@@ -324,8 +289,6 @@ static void set_error(const char *fmt, ...) {
     g_error = msg;
 }
 static const char *last_error(void) { return g_error ? g_error : "unknown error"; }
-
-/* ----------------------------------------------------------------- paths */
 
 typedef struct {
     char *root;
@@ -373,10 +336,6 @@ static void paths_resolve(void) {
     P.bin_dir = xasprintf("%s/bin", P.root);
 }
 
-/* ---------------------------------------------------------------- server */
-
-/* A self-hosted Stella server from server.json ({origin, serverId, name}),
- * written by the app's "Connect to your own server". */
 typedef struct {
     char *origin, *server_id, *name;
 } Server;
@@ -391,7 +350,6 @@ static void server_free(Server *s) {
     free(s);
 }
 
-/* https://host[:port] (http only for localhost), lowercased, or NULL. */
 static char *normalize_origin(const char *raw) {
     char *t = trimmed(raw), *p, *rest, *out;
     const char *scheme;
@@ -426,7 +384,6 @@ static int valid_server_id(const char *id) {
     return n > 0 && n <= 64;
 }
 
-/* NULL for none, the compiled default, or anything malformed. */
 static Server *server_load(void) {
     char *data = read_file(P.server_file, NULL), *origin, *fallback;
     mj_value *json = data ? mj_parse(data, strlen(data)) : NULL;
@@ -464,13 +421,11 @@ static void paths_apply_server(void) {
     P.state_file = xasprintf("%s/launcher-state.json", P.install_root);
 }
 
-/* ----------------------------------------------------------------- state */
-
 typedef struct {
-    char *bun_lock_hash;   /* sha256 of app/bun.lock at the last successful bun install */
-    char *prepared_head;   /* HEAD at the last successful prepare-install.mjs */
+    char *bun_lock_hash;
+    char *prepared_head;
     char *installed_at;
-    char *key_store;       /* "secret" or "file": where the signing key lives */
+    char *key_store;
 } State;
 
 static State S;
@@ -526,8 +481,6 @@ static void state_reset_install(void) {
     state_save();
 }
 
-/* --------------------------------------------------------------- options */
-
 typedef enum { CHOICE_NONE, CHOICE_RETURN, CHOICE_REINSTALL, CHOICE_RETRY, CHOICE_QUIT } Choice;
 
 static const char *choice_name(Choice c) {
@@ -550,29 +503,25 @@ static double env_seconds(const char *name, double fallback) {
 
 typedef struct {
     int self_test;
-    int start;           /* --start: start right away, without waiting for Start */
+    int start;
     int show;
-    char *source;        /* a local path or git URL instead of the upstream bootstrap */
+    char *source;
     char *source_ref;
-    char *backend;       /* --backend or STELLA_LAUNCHER_BACKEND_URL; wins over server.json */
-    char *local_bun;     /* adopt this Bun instead of downloading */
-    double hold;         /* self-test: stay up this long after ready */
+    char *backend;
+    char *local_bun;
+    double hold;
     Choice recovery_choice;
-    char *capture_dir;   /* save PNGs of the launcher's own windows here */
+    char *capture_dir;
     double ready_timeout;
     double stable_seconds;
 } Options;
 
 static Options O;
 
-/* The backend Stella installs from and talks to. */
 static const char *backend_url(void) {
     return O.backend ? O.backend : g_server ? g_server->origin : DEFAULT_BACKEND_URL;
 }
 
-/* Stella may have picked another server (or gone back to the default) before
- * asking to relaunch: follow server.json to that install. The signing key's
- * record stays with the root's state. */
 static void follow_server_file(void) {
     Server *next;
     char *key_store;
@@ -636,12 +585,10 @@ static void parse_options(int argc, char **argv) {
     }
 }
 
-/* ----------------------------------------------------------------- shell */
-
 typedef struct {
-    int code;        /* exit status, or -1 when killed by a signal */
+    int code;
     char *out;
-    char *err;       /* with an output file: that file's tail */
+    char *err;
     int timed_out;
 } CmdResult;
 
@@ -676,13 +623,6 @@ static void append_buf(char **buf, size_t *len, const char *data, size_t n) {
     (*buf)[*len] = 0;
 }
 
-/*
- * Run a program without a shell (PATH lookup for bare names). With
- * output_file, stdout and stderr are appended there (long installs whose
- * grandchildren might hold a pipe open). With timeout > 0, the child's whole
- * process group is killed when it passes. Returns -1 only when the program
- * couldn't be started.
- */
 static int run_cmd(char *const argv[], const char *cwd, char *const envp[], const char *output_file,
                    double timeout, CmdResult *r) {
     posix_spawn_file_actions_t fa;
@@ -769,7 +709,6 @@ static int run_cmd(char *const argv[], const char *cwd, char *const envp[], cons
         w = waitpid(pid, &status, WNOHANG);
         if (w == pid && outp[0] < 0 && errp[0] < 0) break;
         if (w == pid) {
-            /* Exited; drain what's left without waiting on grandchildren. */
             int i;
             for (i = 0; i < 2; i++) {
                 int *fd = i == 0 ? &outp[0] : &errp[0];
@@ -812,7 +751,6 @@ static char *last_lines(const char *text, int count) {
     return xstrdup(p);
 }
 
-/* The absolute path of `name` on PATH, or NULL. */
 static char *which(const char *name) {
     const char *path = getenv("PATH");
     char *copy, *dir, *save = NULL, *found = NULL;
@@ -826,8 +764,6 @@ static char *which(const char *name) {
     free(copy);
     return found;
 }
-
-/* ---------------------------------------------------------------- crypto */
 
 static char *sha256_file(const char *path) {
     FILE *f = fopen(path, "rb");
@@ -872,8 +808,6 @@ static unsigned char *base64_decode(const char *text, size_t *len_out) {
     return out;
 }
 
-/* --------------------------------------------------- secret service (dlopen) */
-
 /* The parts of libsecret's ABI the launcher uses (stable since 0.18). */
 typedef struct { const char *name; int type; } LsSchemaAttribute;
 typedef struct {
@@ -904,7 +838,6 @@ static void *libsecret(void) {
     return handle;
 }
 
-/* 1 found (*pem set), 0 not found, -1 the Secret Service is unavailable. */
 static int secret_lookup(char **pem) {
     void *h = libsecret();
     ls_lookup_fn lookup;
@@ -943,11 +876,9 @@ static int secret_store(const char *pem) {
     return 0;
 }
 
-/* ---------------------------------------------------------------- signer */
-
 typedef struct {
     EVP_PKEY *key;
-    char *spki_base64;   /* STELLA_LAUNCHER_PUBKEY */
+    char *spki_base64;
 } Signer;
 
 static Signer *g_signer;
@@ -1020,12 +951,6 @@ static EVP_PKEY *file_key(const char *path) {
     }
 }
 
-/*
- * The key lives in the Secret Service when one is running (gnome-keyring,
- * KWallet), else in a 0600 file under the install root. Where it went is
- * recorded, so a keyring that is briefly locked or not yet up never makes the
- * launcher mint a second key and refuse its own signatures.
- */
 static EVP_PKEY *load_or_create_key(void) {
     const char *override = getenv("STELLA_LAUNCHER_KEY_FILE");
     char *fallback = xasprintf("%s/signing.key", P.root);
@@ -1078,7 +1003,6 @@ static EVP_PKEY *load_or_create_key(void) {
                 }
             }
         } else {
-            /* Recorded as "secret" but the Secret Service is down: retryable. */
             set_error("Stella's signing key is in the keyring, which isn't available right now (%s).", last_error());
         }
     }
@@ -1144,8 +1068,6 @@ static int signer_verify(Signer *s, const char *tree, const char *note) {
     return ok;
 }
 
-/* ------------------------------------------------------------------- git */
-
 typedef struct {
     char *bin;
 } Git;
@@ -1174,7 +1096,6 @@ static int git_raw(const char *const *args, const char *cwd, const char *const *
     return rc;
 }
 
-/* Trimmed stdout, or NULL with the error set. */
 static char *git_run(const char *const *args, const char *cwd, const char *const *extra_env) {
     CmdResult r;
     char *out;
@@ -1194,7 +1115,6 @@ static char *git_run(const char *const *args, const char *cwd, const char *const
 
 #define GIT(...) git_run((const char *const[]){__VA_ARGS__, NULL}, P.app, NULL)
 
-/* Linux uses the system git (the plan's choice for this platform). */
 static int ensure_git(void) {
     char *bin;
     if (g_git) return 0;
@@ -1213,7 +1133,6 @@ static int ensure_git(void) {
     return 0;
 }
 
-/* `git status --porcelain` lines; untracked files count (the renderer globs the tree). */
 static int changed_files(StrList *out) {
     char *status = GIT("status", "--porcelain=v1", "--untracked-files=all");
     char *line, *save = NULL;
@@ -1226,7 +1145,6 @@ static int changed_files(StrList *out) {
 
 typedef enum { V_SIGNED, V_UNSIGNED, V_BAD_SIGNATURE, V_DIRTY, V_ERROR } Verdict;
 
-/* Before every spawn: HEAD's note must verify and the tree must be clean. */
 static Verdict verify_head(StrList *dirty) {
     char *head, *tree;
     CmdResult note;
@@ -1248,7 +1166,6 @@ static Verdict verify_head(StrList *dirty) {
     return v;
 }
 
-/* Sign HEAD after checking it is `expected` (when given) and clean. Returns HEAD. */
 static char *sign_head(const char *expected) {
     char *head = GIT("rev-parse", "HEAD"), *tree, *note, *added;
     StrList dirty = {0};
@@ -1278,17 +1195,6 @@ static char *sign_head(const char *expected) {
     return head;
 }
 
-/* ------------------------------------------------------------------- UI */
-
-/*
- * The launcher window is launcher/common/launcher.html in a WebKitGTK view;
- * that file documents the page protocol. GTK runs on the main thread. The
- * launcher's work runs on a worker thread, which publishes its phase here and
- * waits here for the page's commands. Without a display there is no window
- * and everything is logged.
- */
-
-/* The page, embedded at build time (build.sh passes its path). */
 __asm__(".section .rodata\n"
         ".global launcher_html\n"
         "launcher_html:\n"
@@ -1303,22 +1209,19 @@ static const char *const PHASE_NAMES[] = {"idle", "starting", "running", "stoppi
 typedef enum { CMD_NONE, CMD_START, CMD_RETURN, CMD_REINSTALL, CMD_QUIT } Command;
 
 static int g_ui;
-/* The page's Shut down: the supervisor sends Electron {"op":"quit"}. */
 static volatile sig_atomic_t g_shutdown;
 
 typedef struct {
     GMutex lock;
     GCond cond;
-    /* Guarded by lock. */
     Phase phase;
     char *status, *reason, *version;
-    double progress, progress_to;   /* starting: done so far, and where this step ends */
+    double progress, progress_to;
     StrList output;
     int has_known_good;
-    Command command;     /* the page's command, taken by ui_wait_command */
+    Command command;
     int loaded;
-    int captures;        /* snapshots in flight */
-    /* Main thread only. */
+    int captures;
     GtkWidget *window;
     WebKitWebView *view;
     int want_visible;
@@ -1330,7 +1233,6 @@ static int has_known_good(void);
 
 static int idle_or_failed(Phase p) { return p == PHASE_IDLE || p == PHASE_FAILED; }
 
-/* With U.lock held. */
 static char *ui_state_json(void) {
     GString *s = g_string_new(NULL);
     char *status = mj_quote(U.status ? U.status : ""), *reason = mj_quote(U.reason ? U.reason : "");
@@ -1377,7 +1279,6 @@ static void ui_present_main(void) {
     g_mutex_lock(&U.lock);
     loaded = U.loaded;
     g_mutex_unlock(&U.lock);
-    /* Before the page has painted, "loaded" presents it. */
     if (loaded) gtk_window_present(GTK_WINDOW(U.window));
 }
 
@@ -1403,14 +1304,12 @@ static void ui_snapshot_done(GObject *source, GAsyncResult *result, gpointer dat
     g_mutex_unlock(&U.lock);
 }
 
-/* data: the PNG path (owned). U.captures was counted by the caller. */
 static gboolean ui_capture_cb(gpointer data) {
     webkit_web_view_get_snapshot(U.view, WEBKIT_SNAPSHOT_REGION_VISIBLE, WEBKIT_SNAPSHOT_OPTIONS_NONE, NULL,
                                  ui_snapshot_done, data);
     return G_SOURCE_REMOVE;
 }
 
-/* Self-test: save a PNG of the page after delay_ms (main thread). */
 static void ui_capture_later(const char *name, guint delay_ms) {
     g_mutex_lock(&U.lock);
     U.captures++;
@@ -1418,7 +1317,6 @@ static void ui_capture_later(const char *name, guint delay_ms) {
     g_timeout_add(delay_ms, ui_capture_cb, xasprintf("%s/%s", O.capture_dir, name));
 }
 
-/* Self-test, after ready: the window as a reopen shows it, then Settings. */
 static gboolean tour_settings_closed(gpointer data) {
     (void)data;
     ui_eval_main("window.stellaLauncher.showSettings(false)");
@@ -1440,8 +1338,6 @@ static gboolean ui_tour_cb(gpointer data) {
     return G_SOURCE_REMOVE;
 }
 
-/* The page's commands. Start, return and reinstall only mean something while
- * the launcher is waiting for one. */
 static void ui_command_main(Command c) {
     g_mutex_lock(&U.lock);
     if (idle_or_failed(U.phase) && U.command == CMD_NONE) {
@@ -1451,7 +1347,6 @@ static void ui_command_main(Command c) {
     g_mutex_unlock(&U.lock);
 }
 
-/* The close button: quits while nothing is running, otherwise just hides. */
 static void ui_close_main(void) {
     int quit;
     g_mutex_lock(&U.lock);
@@ -1504,7 +1399,6 @@ static void ui_message(WebKitUserContentManager *manager, WebKitJavascriptResult
     } else if (!strcmp(action, "close")) {
         ui_close_main();
     } else if (!strcmp(action, "drag")) {
-        /* The window is undecorated: a press on the page's background moves it. */
         GdkSeat *seat = gdk_display_get_default_seat(gdk_display_get_default());
         GdkDevice *pointer = seat ? gdk_seat_get_pointer(seat) : NULL;
         int x = 0, y = 0;
@@ -1523,7 +1417,6 @@ static gboolean ui_deleted(GtkWidget *w, GdkEvent *e, gpointer data) {
     return TRUE;
 }
 
-/* Only the embedded page itself; anything else (a stray link) stays out. */
 static gboolean ui_decide_policy(WebKitWebView *view, WebKitPolicyDecision *decision, WebKitPolicyDecisionType type,
                                  gpointer data) {
     (void)view; (void)data;
@@ -1539,7 +1432,6 @@ static gboolean ui_decide_policy(WebKitWebView *view, WebKitPolicyDecision *deci
     return FALSE;
 }
 
-/* The page follows the GTK theme; carry the desktop's dark preference into it. */
 static int ui_prefers_dark(void) {
     GtkSettings *settings = gtk_settings_get_default();
     GSettingsSchemaSource *source = g_settings_schema_source_get_default();
@@ -1563,7 +1455,6 @@ static int ui_prefers_dark(void) {
     return dark;
 }
 
-/* A second launcher asks this one to show its window by connecting. */
 static gboolean ui_socket_ready(gint fd, GIOCondition condition, gpointer data) {
     int client = accept4(fd, NULL, NULL, SOCK_CLOEXEC);
     (void)condition; (void)data;
@@ -1608,7 +1499,6 @@ static void ui_listen(void) {
     free(path);
 }
 
-/* The other side: tell the running launcher to show its window. */
 static void ask_running_launcher_to_show(void) {
     struct sockaddr_un addr;
     char *path = socket_path();
@@ -1623,7 +1513,6 @@ static void ask_running_launcher_to_show(void) {
     free(path);
 }
 
-/* Main thread, before the main loop: the window, hidden until the page loads. */
 static void ui_build(void) {
     WebKitUserContentManager *content = webkit_user_content_manager_new();
     WebKitSettings *settings;
@@ -1653,8 +1542,6 @@ static void ui_build(void) {
     ui_listen();
 }
 
-/* ---- worker side ---- */
-
 static gboolean ui_render_cb(gpointer data) { (void)data; ui_render_main(); return G_SOURCE_REMOVE; }
 static gboolean ui_present_cb(gpointer data) { (void)data; ui_present_main(); return G_SOURCE_REMOVE; }
 static gboolean ui_hide_cb(gpointer data) { (void)data; ui_hide_main(); return G_SOURCE_REMOVE; }
@@ -1662,7 +1549,6 @@ static gboolean ui_hide_cb(gpointer data) { (void)data; ui_hide_main(); return G
 static void ui_show(void) { if (g_ui) g_idle_add(ui_present_cb, NULL); }
 static void ui_hide(void) { if (g_ui) g_idle_add(ui_hide_cb, NULL); }
 
-/* Publishes the launcher's phase and what is happening now. */
 static void ui_set(Phase phase, const char *status) {
     g_mutex_lock(&U.lock);
     U.phase = phase;
@@ -1678,8 +1564,6 @@ static void ui_set(Phase phase, const char *status) {
     if (g_ui) g_idle_add(ui_render_cb, NULL);
 }
 
-/* Starting: what's happening in plain words, and the part of setup it covers
- * (the bar shows from, easing toward to). */
 static void ui_step(const char *status, double from, double to) {
     g_mutex_lock(&U.lock);
     U.progress = from;
@@ -1688,7 +1572,6 @@ static void ui_step(const char *status, double from, double to) {
     ui_set(PHASE_STARTING, status);
 }
 
-/* Install and prepare steps (slow): the step, with the window in front. */
 static void progress_show(const char *status, double from, double to) {
     LOG("progress: %s", status);
     ui_step(status, from, to);
@@ -1733,7 +1616,6 @@ static void ui_refresh_version(void) {
     if (g_ui) g_idle_add(ui_render_cb, NULL);
 }
 
-/* Blocks the worker until the page sends start, return, reinstall or close. */
 static Command ui_wait_command(void) {
     Command c;
     g_mutex_lock(&U.lock);
@@ -1744,7 +1626,6 @@ static Command ui_wait_command(void) {
     return c;
 }
 
-/* Self-test: wait for the page, then for any snapshot in flight. */
 static void ui_wait_loaded(void) {
     gint64 deadline = g_get_monotonic_time() + 20 * G_TIME_SPAN_SECOND;
     g_mutex_lock(&U.lock);
@@ -1759,7 +1640,6 @@ static void ui_wait_captures(void) {
     g_mutex_unlock(&U.lock);
 }
 
-/* Self-test: capture name after delay_ms and wait for it. */
 static void ui_capture(const char *name, guint delay_ms) {
     if (!g_ui || !O.capture_dir) return;
     g_mutex_lock(&U.lock);
@@ -1769,13 +1649,9 @@ static void ui_capture(const char *name, guint delay_ms) {
     ui_wait_captures();
 }
 
-/* --------------------------------------------------------- environments */
-
 static char *g_bun_bin;
 static char *g_bun_version;
 
-/* The environment for git, bun and Electron: the managed runtimes first on
- * PATH, and none of the launcher's own secrets. */
 static StrList base_environment(void) {
     StrList env = {0};
     const char *stripped[] = {"STELLA_LAUNCHER_KEY_FILE", "STELLA_LAUNCHER_ROOT", "ELECTRON_RUN_AS_NODE",
@@ -1783,8 +1659,6 @@ static StrList base_environment(void) {
                               "STELLA_DEV_RESTART_REQUEST_FILE", "STELLA_DEV_USER_QUIT_REQUEST_FILE",
                               "STELLA_ELECTRON_DEV_RUNNER_PID", "STELLA_ELECTRON_READY_FILE", "NODE_OPTIONS",
                               "WEBKIT_DISABLE_DMABUF_RENDERER", NULL};
-    /* The dev harness opens Electron to debugging, so it passes through only
-     * for a test root signed with a test key file. */
     const char *harness[] = {"STELLA_DEV_HARNESS", "STELLA_DEV_HARNESS_STORAGE_KEY", "STELLA_V2_DEV_USER_DATA_DIR",
                              "STELLA_REMOTE_DEBUG_PORT", "STELLA_DEV_HARNESS_SESSION_TOKEN", NULL};
     const char *key_file = getenv("STELLA_LAUNCHER_KEY_FILE");
@@ -1819,9 +1693,7 @@ static StrList base_environment(void) {
 static StrList electron_environment(void) {
     StrList env = base_environment();
     env_set(&env, "STELLA_LAUNCHER", "1");
-    /* The backend this launcher installs from is the one the app talks to. */
     env_set(&env, "VITE_STELLA_BACKEND_URL", backend_url());
-    /* Where Stella writes server.json; also tells it this launcher reads one. */
     env_set(&env, "STELLA_LAUNCHER_DATA_DIR", P.root);
     env_unset(&env, "STELLA_LAUNCHER_SERVER_ID");
     env_unset(&env, "STELLA_LAUNCHER_SERVER_NAME");
@@ -1832,7 +1704,6 @@ static StrList electron_environment(void) {
     if (g_bun_bin) env_set(&env, "STELLA_BUN_PATH", g_bun_bin);
     if (g_git) env_set(&env, "STELLA_GIT_BIN", g_git->bin);
     if (g_signer) env_set(&env, "STELLA_LAUNCHER_PUBKEY", g_signer->spki_base64);
-    /* Electron names its Wayland app_id / X11 class after this desktop file. */
     env_set(&env, "CHROME_DESKTOP", "stella.desktop");
     if (P.isolated) {
         env_set(&env, "STELLA_LAUNCHER_USER_DATA_DIR", P.isolated_user_data);
@@ -1841,8 +1712,6 @@ static StrList electron_environment(void) {
     }
     return env;
 }
-
-/* --------------------------------------------------------------- install */
 
 static int download(const char *url, const char *dest, const char *sha256) {
     char *staging = xasprintf("%s.download", dest);
@@ -1883,7 +1752,6 @@ static int download(const char *url, const char *dest, const char *sha256) {
     return 0;
 }
 
-/* unzip, else bsdtar, else Python's zipfile: whichever the system has. */
 static int extract_zip(const char *archive, const char *dir) {
     StrList env = base_environment();
     CmdResult r;
@@ -1910,11 +1778,6 @@ static int extract_zip(const char *archive, const char *dir) {
     return ok ? 0 : -1;
 }
 
-/*
- * Bun from the version baked into the launcher, or the one a signed tree asks
- * for in packages/desktop/launcher.json:
- * {"bun": {"version": "1.4.1", "assets": {"linux-x64": {"url", "sha256", "member"}}}}.
- */
 static int ensure_bun(void) {
     const char *key = platform_key();
     const char *version = BUN_VERSION, *url = NULL, *sha = NULL, *member = NULL;
@@ -1942,7 +1805,6 @@ static int ensure_bun(void) {
     }
 
     if (O.local_bun) {
-        /* Offline/testing: adopt an existing Bun instead of downloading. */
         char *argv[] = {O.local_bun, "--version", NULL};
         StrList env = base_environment();
         CmdResult r;
@@ -2010,7 +1872,6 @@ out:
     return rc;
 }
 
-/* POST <backend>/api/app-source/bootstrap → {upstream: {remote, token, expiresAt}}. */
 static int bootstrap_access(char **remote, char **token) {
     char *base = xstrdup(backend_url()), *url;
     char *argv[12];
@@ -2039,7 +1900,6 @@ static int bootstrap_access(char **remote, char **token) {
     json = mj_parse(r.out, strlen(r.out));
     cmd_free(&r);
     if (!json) { set_error("The app source bootstrap returned an unexpected body."); return -1; }
-    /* Accept {remote, token} or {upstream: {remote, token}}. */
     body = mj_get(json, "upstream");
     if (!body) body = json;
     if (!mj_get_string(body, "remote") || !mj_get_string(body, "token")) {
@@ -2053,8 +1913,6 @@ static int bootstrap_access(char **remote, char **token) {
     return 0;
 }
 
-/* Clone into app/; staged beside it and renamed, so an interrupted install
- * never leaves half a tree. */
 static int clone_source(void) {
     char *staging = xstrdup(P.app_staging);
     StrList args = {0}, extra = {0};
@@ -2105,8 +1963,6 @@ out:
 
 static int probe_version(const char *binary);
 
-/* The .desktop entry, pointing at an installed copy of this launcher (never
- * replacing a newer one the updater installed). */
 static void install_desktop_entry(void) {
     char self[PATH_MAX], *installed, *apps, *entry_path, *entry, *icon_src, *icon, *existing;
     const char *xdg = getenv("XDG_DATA_HOME");
@@ -2151,9 +2007,6 @@ static void install_desktop_entry(void) {
     free(installed);
 }
 
-/* --------------------------------------------------------------- prepare */
-
-/* On install, after a relaunch request and after a rollback. Returns the Electron binary. */
 static char *prepare(void) {
     char *lock = xasprintf("%s/bun.lock", P.app);
     char *lock_hash = sha256_file(lock);
@@ -2170,7 +2023,6 @@ static char *prepare(void) {
         double started = now_seconds();
         progress_show("Installing Stella…", 0.40, 0.82);
         LOG("prepare: bun install --frozen-lockfile (lock %.12s)", lock_hash);
-        /* Dependencies only: the postinstall's asset downloads are prepare-install.mjs's job. */
         env_set(&env, "STELLA_SKIP_BROWSER_HYDRATE", "1");
         env_set(&env, "STELLA_SKIP_OFFICE_HYDRATE", "1");
         if (run_cmd(argv, P.app, env.items, P.install_log, 30 * 60, &r) != 0) { sl_free(&env); goto out; }
@@ -2193,8 +2045,6 @@ static char *prepare(void) {
     head = GIT("rev-parse", "HEAD");
     if (!head) goto out;
     if ((!S.prepared_head || strcmp(S.prepared_head, head) != 0) && file_exists(script)) {
-        /* Optional features (computer use, the browser, office previews): a
-         * failure or timeout is logged, not fatal, and retried next launch. */
         StrList env = base_environment();
         char *argv[] = {g_bun_bin, script, NULL};
         double timeout = env_seconds("STELLA_LAUNCHER_PREPARE_TIMEOUT_SECONDS", 10 * 60);
@@ -2229,12 +2079,10 @@ out:
     return result;
 }
 
-/* ------------------------------------------------------------ supervisor */
-
 typedef struct {
     pid_t pid;
-    int chan;            /* our end of the fd-3 socketpair */
-    int out;             /* Electron's stdout+stderr */
+    int chan;
+    int out;
     FILE *log;
     char *lines[OUTPUT_LINES];
     int line_count, line_start;
@@ -2244,7 +2092,7 @@ typedef struct {
     size_t chan_len;
     int reaped;
     int status;
-    double kill_at;      /* SIGKILL deadline after a SIGTERM, 0 if none */
+    double kill_at;
 } Electron;
 
 static Electron *volatile g_current;
@@ -2438,10 +2286,6 @@ typedef struct {
 
 enum { T_READY_TIMEOUT, T_STABLE, T_SELF_TEST_QUIT, T_QUIT_TIMEOUT, T_EXIT_GRACE, T_COUNT };
 
-/* Stella installed the dependencies and ran prepare-install.mjs for the
- * checkout it is about to relaunch into: note it, so the relaunch's own
- * prepare finds that work done instead of repeating it. Only what still
- * matches the checkout is taken. */
 static void handle_prepared(const mj_value *msg) {
     const char *lock_hash = mj_get_string(msg, "lockHash");
     const char *head = mj_get_string(msg, "head");
@@ -2562,7 +2406,6 @@ static Outcome supervise(const char *electron_bin) {
                             timers[T_STABLE] = ready_at + O.stable_seconds;
                             ui_set(PHASE_RUNNING, NULL);
                             if (O.self_test && g_ui && O.capture_dir) {
-                                /* The running window and Settings first (about 3 s). */
                                 g_idle_add(ui_tour_cb, NULL);
                                 timers[T_SELF_TEST_QUIT] = ready_at + (O.hold > 4 ? O.hold : 4);
                             } else {
@@ -2708,8 +2551,6 @@ done:
     return result;
 }
 
-/* -------------------------------------------------------------- recovery */
-
 static int has_known_good(void) {
     CmdResult r;
     int ok;
@@ -2743,8 +2584,6 @@ static int reinstall(void) {
     return 0;
 }
 
-/* A forward commit back to the known-good tree: nothing is rewritten, so the
- * fork still fast-forwards. Uncommitted edits are stashed, not lost. */
 static int return_to_known_good(void) {
     StrList dirty = {0};
     char *head, *known_tree, *head_tree, *signed_head;
@@ -2782,20 +2621,6 @@ static int return_to_known_good(void) {
     return 0;
 }
 
-/* ---------------------------------------------------------------- update */
-
-/*
- * The launcher updates itself: as it starts and then every six hours it reads
- * launcher/stable/VERSION (CI's run number; LAUNCHER_VERSION is
- * this build's, 0 for a local build, which never updates). A higher one is
- * downloaded, checked against SHA256SUMS, made to run `--version` (which also
- * proves it finds its libraries) and renamed over bin/stella-launcher. Start
- * waits for the first check and hands over to a new one (execv); when
- * Electron restarts for an app update, a later one takes over then, so a
- * launcher that is never quit still updates. Linux builds aren't code-signed;
- * HTTPS and the published checksum are what install.sh trusts too.
- */
-
 #define UPDATE_BASE_URL RELEASES_URL "/launcher/stable"
 
 static volatile int g_staged_version;
@@ -2827,7 +2652,6 @@ static const char *update_asset(void) {
 
 static char *installed_launcher(void) { return xasprintf("%s/stella-launcher", P.bin_dir); }
 
-/* `<binary> --version`, or -1. */
 static int probe_version(const char *binary) {
     char *argv[] = {(char *)binary, "--version", NULL};
     StrList env = base_environment();
@@ -2845,7 +2669,6 @@ static int probe_version(const char *binary) {
     return version;
 }
 
-/* curl's body, trimmed, or NULL. */
 static char *fetch_text(const char *url) {
     char *argv[] = {"curl", "-fsSL", "--retry", "2", "--connect-timeout", "30", "--max-time", "60", (char *)url, NULL};
     StrList env = base_environment();
@@ -2860,7 +2683,6 @@ static char *fetch_text(const char *url) {
     return text;
 }
 
-/* The sha256 for name in a `sha256sum` listing, or NULL. */
 static char *sum_for(const char *sums, const char *name) {
     const char *line = sums;
     size_t name_len = strlen(name);
@@ -2960,7 +2782,6 @@ static gpointer updater(gpointer data) {
     return NULL;
 }
 
-/* Released builds of the installed launcher only; a test root opts in with its own URL. */
 static void updater_start(void) {
     const char *url = getenv("STELLA_LAUNCHER_UPDATE_URL");
     int custom = url && *url;
@@ -2993,7 +2814,6 @@ static CheckResult wait_first_check(double timeout) {
     }
 }
 
-/* A newer launcher is installed: it takes over. Returns only if it can't. */
 static void hand_over_if_updated(int show) {
     char *installed;
     if (g_staged_version <= LAUNCHER_VERSION) return;
@@ -3013,7 +2833,6 @@ static void fall_back(const char *message) {
     g_usleep(2500000);
 }
 
-/* Start: the first update check finishes, and a newer launcher starts Stella instead. */
 static void update_before_start(void) {
     CheckResult result = wait_first_check(0.5);
     if (result == CHECK_PENDING) {
@@ -3031,12 +2850,8 @@ static void update_before_start(void) {
     }
 }
 
-/* ---------------------------------------------------------------- launcher */
-
 static int g_recovery_count;
 
-/* A failure: the window shows it and the user picks what's next (CMD_NONE).
- * A self-test captures it and answers with --recovery-choice once. */
 static Command recover(const char *reason, const StrList *output) {
     size_t i;
     g_recovery_count++;
@@ -3080,7 +2895,6 @@ static char *refusal_message(Verdict v, const StrList *dirty) {
     }
 }
 
-/* Install, verify, prepare. Returns the Electron binary, or NULL with the error set. */
 static char *prepare_for_launch(void) {
     char *git_dir;
     StrList dirty = {0};
@@ -3097,7 +2911,6 @@ static char *prepare_for_launch(void) {
         char *head;
         free(git_dir);
         if (clone_source() != 0) return NULL;
-        /* The initial clone is signed at install. */
         if (!(head = sign_head(NULL))) return NULL;
         free(head);
         state_reset_install();
@@ -3120,12 +2933,6 @@ static char *prepare_for_launch(void) {
     return prepare();
 }
 
-/*
- * The window waits on Start (a headless run starts right away). Start,
- * return and reinstall prepare and launch Stella; a relaunch request or a
- * single early crash starts it again without asking; any failure goes back to
- * the window with the reason.
- */
 static int launcher_run(void) {
     double crash_times[8];
     int crash_count = 0;
@@ -3138,7 +2945,6 @@ static int launcher_run(void) {
     if (O.start && O.show) progress_show("Starting Stella…", 0, 0.05);
     if (ensure_git() == 0) ui_refresh_version();
     if (O.self_test && g_ui) {
-        /* The window as the user first sees it, then Start. */
         ui_set(PHASE_IDLE, NULL);
         ui_show();
         ui_wait_loaded();
@@ -3231,7 +3037,6 @@ static int launcher_run(void) {
                 break;
             }
         } else {
-            /* First line is the message; any detail (a command's output) goes to the output pane. */
             char *copy = xstrdup(last_error()), *nl = strchr(copy, '\n');
             if (nl) {
                 char *line, *save = NULL;
@@ -3252,8 +3057,6 @@ static int launcher_run(void) {
     }
 }
 
-/* ------------------------------------------------------------------ main */
-
 static void on_signal(int sig) {
     Electron *e = g_current;
     if (e && !e->reaped) kill(e->pid, SIGTERM);
@@ -3273,7 +3076,6 @@ int main(int argc, char **argv) {
     int lock_fd;
     struct sigaction sa;
 
-    /* The updater's probe of a download: answer before touching anything. */
     if (argc == 2 && !strcmp(argv[1], "--version")) {
         printf("%d\n", LAUNCHER_VERSION);
         return 0;
@@ -3284,7 +3086,6 @@ int main(int argc, char **argv) {
     if (log_file) fcntl(fileno(log_file), F_SETFD, FD_CLOEXEC);
     parse_options(argc, argv);
 
-    /* One launcher per install root. */
     lock_fd = open(P.lock_file, O_CREAT | O_RDWR | O_CLOEXEC, 0600);
     if (lock_fd < 0 || flock(lock_fd, LOCK_EX | LOCK_NB) != 0) {
         LOG("launcher: another launcher owns %s; exiting", P.root);

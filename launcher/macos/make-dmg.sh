@@ -1,8 +1,4 @@
 #!/bin/bash
-# Packs a built Stella.app into the drag-to-Applications disk image:
-#   launcher/macos/make-dmg.sh <Stella.app> <output.dmg>
-# A 640x400 window with Resources/dmg-background.tiff, Stella on the left and
-# Applications on the right, the app icon as the volume icon, volume "Stella".
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 app="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"

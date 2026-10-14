@@ -1,6 +1,3 @@
--- Slack: "tag Stella in Slack" (src/slack/). One row per workspace that
--- installed the app through OAuth v2; the bot token is AES-GCM encrypted under
--- a key derived from BETTER_AUTH_SECRET.
 CREATE TABLE slack_installations (
   team_id TEXT PRIMARY KEY,
   enterprise_id TEXT,
@@ -14,8 +11,6 @@ CREATE TABLE slack_installations (
   revoked_at INTEGER
 );
 
--- A Slack user linked to a Stella account. A Slack user links to at most one
--- owner; an owner may link several Slack users (one per workspace).
 CREATE TABLE slack_identities (
   team_id TEXT NOT NULL,
   slack_user_id TEXT NOT NULL,
@@ -25,8 +20,6 @@ CREATE TABLE slack_identities (
 );
 CREATE INDEX slack_identities_owner ON slack_identities (owner_id);
 
--- Which Stella conversation a Slack thread (or a DM) runs in, and whose
--- account it runs on.
 CREATE TABLE slack_threads (
   team_id TEXT NOT NULL,
   channel_id TEXT NOT NULL,
@@ -40,8 +33,6 @@ CREATE TABLE slack_threads (
 );
 CREATE INDEX slack_threads_owner ON slack_threads (owner_id);
 
--- Messages the Events API already delivered, kept briefly so a thread's
--- context comes from here instead of the rate-limited history APIs.
 CREATE TABLE slack_messages (
   team_id TEXT NOT NULL,
   channel_id TEXT NOT NULL,
@@ -64,7 +55,6 @@ CREATE TABLE slack_events (
 );
 CREATE INDEX slack_events_received ON slack_events (received_at);
 
--- Display names, so prompts read "@dana" rather than "<@U0123>".
 CREATE TABLE slack_users (
   team_id TEXT NOT NULL,
   slack_user_id TEXT NOT NULL,

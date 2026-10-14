@@ -15,7 +15,7 @@ class StellaReactNativeFeatureFlags final
   }
 };
 
-} // namespace
+}
 
 @implementation StellaReactFlags
 

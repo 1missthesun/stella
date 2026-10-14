@@ -1,11 +1,3 @@
-/* ---------------------------------------------------------------------------
- * Pill button — the canonical Stella button shape.
- *
- * Hoisted from `.settings-btn` so any dialog/screen can adopt the same look.
- * Use `.pill-btn` on plain <button> elements OR on the shared <Button>
- * component (it overrides the base button styling).
- * --------------------------------------------------------------------------- */
-
 .pill-btn {
   display: inline-flex;
   align-items: center;
@@ -67,8 +59,6 @@
   color: var(--text-weak, var(--muted-foreground));
 }
 
-/* Sizes ------------------------------------------------------------------- */
-
 .pill-btn--lg,
 .pill-btn--lg[data-component="button"] {
   min-height: 32px;
@@ -76,7 +66,6 @@
   font-size: var(--font-size-sm);
 }
 
-/* Selected option in a row of pills (a segmented choice). */
 .pill-btn--active,
 .pill-btn--active[data-component="button"],
 .pill-btn--active:hover:not(:disabled),
@@ -85,8 +74,6 @@
   border-color: var(--select-border);
   color: var(--select-text);
 }
-
-/* Variants ---------------------------------------------------------------- */
 
 .pill-btn--primary,
 .pill-btn--primary[data-component="button"] {

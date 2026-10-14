@@ -1,21 +1,3 @@
-/* Top-bar activity indicator — see `ShellTopBarActivity.tsx`.
-
-   The middle slot of the bar's three (`shell-topbar-full.css`), up to 30rem
-   wide with equal tracks either side, so with room to spare the mark sits on
-   the bar's midline, and because the bar's right edge follows the main column
-   it recentres with the display panel. When the window narrows this slot is
-   the one that shrinks, never the
-   nav or the right cluster, so the activity can't paint over the update pill
-   or the account: the label truncates with an ellipsis, then drops out, and
-   at the very narrowest the mark goes too.
-
-   The slot is an inline-size container so those steps follow the room it
-   actually has, whatever the clusters beside it hold.
-
-   Deliberately no pill. Mobile wraps its mark in glass because it floats over
-   the page; here the bar is already chrome, so a capsule would only draw a box
-   the rest of the window does without. */
-
 .shell-topbar-activity {
   container: shell-topbar-activity / inline-size;
   min-width: 0;
@@ -25,19 +7,15 @@
   height: 100%;
   overflow: hidden;
   pointer-events: none;
-  /* The slot is wider than the mark; only the trigger is a control. */
   -webkit-app-region: drag;
 }
 
-/* Too little room for a readable label: the mark alone still says work is
-   running and still opens the menu. */
 @container shell-topbar-activity (max-width: 96px) {
   .shell-topbar-activity__label {
     display: none;
   }
 }
 
-/* No room even for the mark (it would be clipped against a neighbour). */
 @container shell-topbar-activity (max-width: 34px) {
   .shell-topbar-activity__trigger {
     visibility: hidden;
@@ -64,7 +42,6 @@
 }
 
 .shell-topbar-activity__trigger:disabled {
-  /* Idle: the mark is presentation, not a control. */
   cursor: default;
   pointer-events: none;
 }
@@ -98,15 +75,10 @@
   color: inherit;
 }
 
-/* `text-overflow` doesn't inherit, and the shimmer's inner text takes it from
-   the shimmer span, so set it there or the label is cut mid-letter. */
 .shell-topbar-activity__label .text-shimmer {
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-
-/* The menu — the agent list the right-hand activity panel used to show,
-   including its cap, now opened from the bar. */
 
 [data-component="popover-content"].shell-topbar-activity-menu-popover {
   width: 22rem;
@@ -119,9 +91,6 @@
   box-shadow: var(--shadow-overlay), var(--panel-surface-highlight);
 }
 
-/* Sized to the row count rather than a fixed box: a short list stays compact,
-   and only once the content passes the cap does the menu settle at its max
-   height and scroll (through `.sidebar-search__body`'s own overflow). */
 .shell-topbar-activity-menu {
   display: flex;
   flex-direction: column;

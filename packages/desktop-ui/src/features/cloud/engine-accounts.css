@@ -9,8 +9,6 @@
   white-space: nowrap;
 }
 
-/* Account rows sit in a list without hairlines; the account in use carries
-   the canonical selected fill so it reads at a glance. */
 .settings-row.engine-account-row {
   padding: 8px 10px;
   margin: 0 -10px;

@@ -13,7 +13,6 @@
   min-width: 0;
 }
 
-/* ---- Display frame ----------------------------------------------------- */
 .display {
   width: 100%;
   margin: 0;
@@ -36,7 +35,6 @@
   overflow: hidden;
   border-radius: 0;
   border: 1px solid rgba(8, 19, 38, 0.12);
-  /* macOS-style font for everything inside the screen */
   font-family:
     -apple-system, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif;
   isolation: isolate;
@@ -48,13 +46,11 @@
   background: #1a2750 url("/stella-wallpaper.jpg") center / cover no-repeat;
 }
 
-/* ---- Desktop area ------------------------------------------------------ */
 .desktop {
   position: absolute;
   inset: 0;
 }
 
-/* ---- Window chrome (shared) ------------------------------------------- */
 .window {
   position: absolute;
   display: flex;
@@ -124,7 +120,6 @@
   background: rgba(8, 19, 38, 0.07);
 }
 
-/* ---- Calendar (behind) ------------------------------------------------- */
 .calendarWindow {
   z-index: 1;
   top: 3%;
@@ -179,7 +174,6 @@
   font-size: 0.56rem;
 }
 
-/* ---- Mail compose (Stella drives this) -------------------------------- */
 .mailWindow {
   z-index: 2;
   top: 9%;
@@ -280,7 +274,6 @@
   animation: caretBlink 1.1s steps(2, start) infinite;
 }
 
-/* Sign-off lands once the message is sent. */
 .signoff {
   opacity: 0;
   transition: opacity 420ms ease;
@@ -290,7 +283,6 @@
   opacity: 1;
 }
 
-/* ---- Notes (you work here) -------------------------------------------- */
 .notesWindow {
   z-index: 3;
   top: 17%;
@@ -425,9 +417,6 @@
   position: relative;
 }
 
-/* "Text Mom the plan" gets checked off live by the You cursor: the row
-   dims, the box fills, the check pops, the strike draws — all driven by
-   data-done flipping, not a timed keyframe loop. */
 .noteChecklist li[data-anim] {
   transition: color 360ms ease;
 }
@@ -495,7 +484,6 @@
   line-height: 1.5;
 }
 
-/* ---- Live automation indicator ---------------------------------------- */
 .automation {
   position: absolute;
   z-index: 20;
@@ -558,7 +546,6 @@
   transform: translateY(0);
 }
 
-/* ---- Cursors ----------------------------------------------------------- */
 .cursor {
   position: absolute;
   z-index: 25;
@@ -603,9 +590,6 @@
   padding-left: 0.3rem;
 }
 
-/* Anchored to its checklist item so the pointer tip always lands on the
-   checkbox regardless of layout, instead of a brittle %-of-desktop position.
-   Rests in the note body, glides up for the check during step 5. */
 .cursorYou {
   left: 0.32rem;
   top: calc(50% - 0.16rem);
@@ -622,8 +606,6 @@
   background: #1d2738;
 }
 
-/* Stella's cursor rests in the mail body while typing, then glides onto
-   the Send button for the click. */
 .cursorStella {
   left: 5.4%;
   top: 18.5%;
@@ -657,7 +639,6 @@
   animation: clickRing 620ms ease-out both;
 }
 
-/* ---- Keyframes --------------------------------------------------------- */
 @keyframes caretBlink {
   to {
     opacity: 0;
@@ -679,7 +660,6 @@
   }
 }
 
-/* ---- Responsive -------------------------------------------------------- */
 @media (max-width: 860px) {
   .display {
     width: min(100%, 28rem);
@@ -749,8 +729,6 @@
   }
 }
 
-/* Low-power devices: the scene script only runs in view and unwinds on
-   scroll-away, so the remaining cost is the backdrop blur — drop it. */
 :global(html[data-low-power]) .automation {
   backdrop-filter: none;
   -webkit-backdrop-filter: none;

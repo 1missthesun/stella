@@ -1,9 +1,3 @@
-/* Apps section — the library list and the stage the cloud apps render on.
-   See `AppsSection.jsx` for why the stage is a fixed sibling of the list. */
-
-/* Positioning context shared by the library and every app surface, so the two
-   occupy the same box without either one being unmounted or moved to make
-   room for the other. */
 .apps-section__body {
   position: relative;
   flex: 1 1 auto;

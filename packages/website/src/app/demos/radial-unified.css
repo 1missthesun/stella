@@ -1,7 +1,3 @@
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-   Radial dial â€” unified desktop mock
-   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
-
 .radial-demo--unified {
   display: grid;
   gap: 1.5rem;
@@ -83,8 +79,6 @@
   max-width: none;
 }
 
-/* â”€â”€ Desktop mock frame â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
-
 .radial-desktop-mock {
   border: 1px solid rgba(82, 104, 134, 0.14);
   border-radius: 1rem;
@@ -146,8 +140,6 @@
   font-size: 0.72rem;
 }
 
-/* â”€â”€ Screen area (relative container for overlays) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
-
 .radial-desktop-mock__screen {
   position: relative;
   border-radius: 0 0 0.9rem 0.9rem;
@@ -157,8 +149,6 @@
     radial-gradient(circle at 18% 18%, rgba(255, 255, 255, 0.34), transparent 22%),
     linear-gradient(180deg, rgba(236, 243, 252, 0.82), rgba(221, 229, 240, 0.96));
 }
-
-/* â”€â”€ Background mock webpage â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 .radial-desktop-mock__page {
   padding: 1.2rem;
@@ -220,8 +210,6 @@
   border: 1px solid rgba(82, 104, 134, 0.08);
 }
 
-/* ── Quick menu overlay ──────────────────────────────────── */
-
 .radial-desktop-mock__menu,
 .radial-desktop-mock__dial {
   position: absolute;
@@ -237,7 +225,6 @@
   z-index: 5;
 }
 
-/* Native-style context menu mockup that pops at the (mocked) cursor. */
 .quickmenu {
   display: flex;
   flex-direction: column;
@@ -359,8 +346,6 @@
   opacity: 1;
 }
 
-/* â”€â”€ Result overlay â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
-
 .radial-desktop-mock__result {
   position: absolute;
   inset: 0;
@@ -412,8 +397,6 @@
 .radial-desktop-mock__result--visible {
   opacity: 1;
 }
-
-/* â”€â”€ Result: Mini shell (shared) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 .radial-result-minishell {
   position: absolute;
@@ -488,8 +471,6 @@
   border: 1px solid rgba(82, 104, 134, 0.08);
 }
 
-/* â”€â”€ Result: Full shell â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
-
 .radial-result-fullshell {
   position: absolute;
   inset: 0.6rem;
@@ -530,9 +511,6 @@
   overflow: hidden;
 }
 
-/* StellaSidebar lives inside a small absolutely-positioned card; tighten
- * footer padding so the brand + nav + footer all fit in the limited
- * vertical space without scrollbars. */
 .radial-result-fullshell__sidebar {
   background: rgba(251, 253, 255, 0.78);
 }
@@ -578,8 +556,6 @@
   background: rgba(240, 246, 255, 0.6);
   border: 1px solid rgba(82, 104, 134, 0.06);
 }
-
-/* â”€â”€ Result: Voice â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 .radial-result-voice {
   position: absolute;
@@ -634,8 +610,6 @@
   transform: none;
   width: min(22rem, 90%);
 }
-
-/* â”€â”€ Result: Auto panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 .radial-result-autopanel {
   position: absolute;
@@ -722,8 +696,6 @@
   background: var(--page-accent);
   opacity: 0.5;
 }
-
-/* â”€â”€ Desktop scenes (per-mode backgrounds) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 .radial-scene {
   position: absolute;
@@ -815,7 +787,6 @@
   overflow: hidden;
 }
 
-/* Design canvas (Figma-like) */
 .radial-scene__design-canvas {
   display: grid;
   grid-template-columns: 3rem 1fr;
@@ -847,7 +818,6 @@
   height: 50%;
 }
 
-/* Recipe page */
 .radial-scene__recipe {
   padding: 0.8rem;
 }
@@ -865,7 +835,6 @@
   gap: 0.4rem;
 }
 
-/* Notes app */
 .radial-scene__notes {
   display: grid;
   grid-template-columns: 5rem 1fr;
@@ -888,7 +857,6 @@
   gap: 0.4rem;
 }
 
-/* Article page */
 .radial-scene__article {
   padding: 0.8rem;
 }
@@ -906,7 +874,6 @@
   gap: 0.4rem;
 }
 
-/* Code lines placeholder */
 .radial-scene__code-lines {
   padding: 0.6rem;
   display: flex;
@@ -931,7 +898,6 @@
   background: linear-gradient(135deg, rgba(52, 211, 153, 0.1), rgba(96, 165, 250, 0.1));
 }
 
-/* Generic text line placeholders */
 .radial-scene__text-line {
   height: 7px;
   border-radius: 3px;
@@ -949,8 +915,6 @@
   width: 55%;
 }
 
-/* â”€â”€ Vacuum canvas (capture mode) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
-
 .radial-result-vacuum {
   position: absolute;
   inset: 0;
@@ -959,8 +923,6 @@
   z-index: 2;
   pointer-events: none;
 }
-
-/* â”€â”€ Full shell scale-up animation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 .radial-result-fullshell--animate {
   animation: fullShellScaleUp 500ms cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -979,23 +941,12 @@
   }
 }
 
-/* â”€â”€ Responsive â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
-
 .radial-demo--visual-only {
   grid-template-columns: 1fr;
   gap: 1rem;
   padding: var(--demo-panel-inner-padding);
   box-sizing: border-box;
 }
-
-/* ──────────────────────────────────────────────────────────────────
-   "Stella, on call." — full-bleed radial hero.
-
-   Mirrors the .self-mod-hero layout: an unframed section with the
-   eyebrow + display-italic title sitting centred at the top, and a
-   two-column stage below — large interactive dial on the left, the
-   live desktop mock on the right with no card chrome around it.
-   ────────────────────────────────────────────────────────────────── */
 
 .radial-hero {
   position: relative;
@@ -1063,10 +1014,6 @@
   gap: clamp(1.6rem, 3vw, 2.4rem);
 }
 
-/* Hero-scale dial. The inner SVG has a fixed 248px viewBox-bound
-   width/height attribute; we force it to fill the wrapper so the
-   absolutely-centered logo disk lands exactly on the dial's centre at
-   any scale. */
 .radial-hero__dial .radial-dial-interactive {
   width: clamp(280px, 26vw, 360px);
   height: clamp(280px, 26vw, 360px);
@@ -1079,11 +1026,6 @@
   width: clamp(72px, 7vw, 92px);
   height: clamp(72px, 7vw, 92px);
 }
-/* StellaAnimation sizes its canvas as `width × ascii-font-size` per
-   axis — at default 7px font and width=14, that gives roughly a
-   ~52px-wide ASCII orb that fits cleanly inside the centre disk. The
-   container itself is `position: absolute; transform: translate(-50%)`
-   on the canvas, so we just clip overflow as a safety net. */
 .radial-hero__dial .radial-dial-interactive__center {
   overflow: hidden;
 }
@@ -1094,9 +1036,6 @@
   height: 100%;
 }
 
-/* Caption panes overlap in one grid cell: inactive wedges stay visibility:hidden
-   so their intrinsic height participates in sizing — tallest copy sets the slot
-   and the dial/mock no longer shift when wedges rotate. */
 .radial-hero__dial .radial-dial-caption {
   margin-top: 0;
   text-align: center;
@@ -1125,8 +1064,6 @@
   min-height: clamp(360px, 48vw, 560px);
 }
 
-/* Drop the card frame from the visual — the desktop mock now floats
-   directly in the layout, no demo-panel border or shadow. */
 .radial-hero__mock .radial-demo--visual-only {
   background: transparent;
   border: none;
@@ -1156,15 +1093,6 @@
     padding: 0 0.75rem;
   }
 }
-
-/* ──────────────────────────────────────────────────────────────────
-   Canvas hero — "Ask. Watch it appear."
-
-   Same structural rhythm as `.radial-hero`: centered eyebrow + title +
-   lede above, two-column stage below. Left column is a vertical menu
-   of three concept buttons; right column is the chat-centric mock with
-   no card chrome around it.
-   ────────────────────────────────────────────────────────────────── */
 
 .canvas-hero,
 .mobile-hero {
@@ -1219,8 +1147,6 @@
   line-height: 1.6;
 }
 
-/* Stage = horizontal pill bar above + full-width mock below.
-   Distinct from the side-by-side hero pattern used elsewhere. */
 .canvas-hero__stage {
   width: 100%;
   display: flex;
@@ -1278,8 +1204,6 @@
   min-height: clamp(420px, 52vw, 640px);
 }
 
-/* Drop the demo-panel card chrome — the chat-centric mock floats
-   directly on the page, same as the radial-hero mock. */
 .canvas-hero__mock .canvas-showcase {
   background: transparent;
   border: none;
@@ -1347,14 +1271,6 @@
   min-height: 0;
 }
 
-/* ──────────────────────────────────────────────────────────────────
-   Screenshot stack — three real product screenshots cross-faded.
-
-   Container locks the 2560:1566 (≈1.634:1) aspect so the canvas
-   reserves the same height across every tab. Stacked images live in
-   the same box and toggle opacity via `data-active`, giving us a
-   pure GPU-accelerated cross-fade with no layout shift.
-   ────────────────────────────────────────────────────────────────── */
 .canvas-showcase--screenshots {
   width: 100%;
   display: flex;
@@ -1411,14 +1327,6 @@
   }
 }
 
-/* ──────────────────────────────────────────────────────────────────
-   Mobile hero — "Control your computer from anywhere"
-
-   Same hero rhythm. Left column keeps the channels list ("Message
-   Stella from …") so the meaning of the section is right next to the
-   phones. Right column is the phone row with no card behind it.
-   ────────────────────────────────────────────────────────────────── */
-
 .mobile-hero__stage {
   width: 100%;
   display: grid;
@@ -1453,9 +1361,6 @@
   width: 100%;
 }
 
-/* Two-up phone layout on desktop: each phone gets more room than the
-   old three-up row, but we still cap so the pair doesn't dominate the
-   page on very wide viewports. */
 .mobile-hero__mock .mobile-phone-col {
   max-width: 24rem;
 }
@@ -1480,8 +1385,6 @@
     max-width: min(26rem, 100%);
   }
 
-  /* Single layout reuses .mobile-phone-single, which defaults to a short
-     26rem phone for narrow phones — use the same tall mock as two-up. */
   .mobile-hero__mock .mobile-phone-single .mobile-phone-swap {
     height: 46rem;
   }
@@ -1532,8 +1435,6 @@
   }
 }
 
-/* ── Interactive radial dial (in section-kicker) ───────────────── */
-
 .section-kicker--radial {
   display: grid;
   gap: 1.4rem;
@@ -1581,7 +1482,6 @@
 }
 
 .radial-dial-interactive__wedge[data-selected] .radial-dial-interactive__wedge-fill {
-  /* SVG `fill` can't take a CSS gradient; the shadow + halo carry the depth. */
   fill: rgba(29, 120, 242, 0.96);
   stroke: rgba(20, 96, 210, 0.55);
   filter: drop-shadow(0 8px 18px rgba(29, 120, 242, 0.32));
@@ -1694,8 +1594,6 @@
   line-height: 1.55;
   color: var(--page-muted);
 }
-
-/* ── Add wedge result chip ─────────────────────────────────── */
 
 .radial-result-minishell__chip {
   display: inline-flex;

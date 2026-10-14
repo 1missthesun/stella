@@ -1,9 +1,3 @@
-/* ============================================================
-   Catch up — the pill that leads the composer after a busy stretch, and
-   the popover of saved catch-ups it opens. The pill shares the composer's
-   soft panel surface; the popover matches the report popover's fill.
-   ============================================================ */
-
 .catch-up-pill {
   display: inline-flex;
   align-items: center;
@@ -73,8 +67,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* ── Popover ─────────────────────────────────────────────── */
-
 [data-component="popover-content"].catch-up-popover {
   width: min(30rem, calc(100vw - 32px));
   max-width: none;
@@ -89,7 +81,6 @@
 .catch-up {
   display: flex;
   flex-direction: column;
-  /* The tallest a page gets before it scrolls inside itself. */
   --catch-up-page-max: min(28rem, 62vh);
   outline: none;
 }
@@ -159,9 +150,6 @@
   text-align: center;
 }
 
-/* Saved summaries side by side, oldest on the left: each is as wide as the
-   popover and snaps into place, so the history pages left and right. The
-   scroller takes the height of the page in view. */
 .catch-up__pages {
   display: flex;
   align-items: flex-start;
@@ -280,7 +268,6 @@
   list-style: none;
 }
 
-/* A line; tapping one with a source jumps to that message. */
 .catch-up-item {
   display: block;
   box-sizing: border-box;
@@ -307,7 +294,6 @@ button.catch-up-item:focus-visible {
   outline-offset: -2px;
 }
 
-/* A long pause between two lines, marked the way Messages does. */
 .catch-up-time {
   padding: 4px 0 2px;
   color: var(--muted-foreground);
@@ -316,7 +302,6 @@ button.catch-up-item:focus-visible {
   text-align: center;
 }
 
-/* The message a catch-up link landed on, briefly. */
 .chat-jump-flash {
   position: absolute;
   inset: -4px -10px;

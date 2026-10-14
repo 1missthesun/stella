@@ -2,8 +2,6 @@
   grid-column: 1 / -1;
   display: grid;
   gap: clamp(1.2rem, 2vw, 1.8rem);
-  /* No top padding: the main window sits right under the hero CTA so its
-     first third peeks into the bottom of the first screen. */
   padding-block: 0 clamp(1.2rem, 2.6vw, 2.4rem);
 }
 
@@ -32,9 +30,6 @@
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.75) inset,
     0 38px 90px -50px rgba(12, 22, 38, 0.46);
-  /* The full app window slides up into view from below, settling into
-     place. Delay is aligned with the hero CTA reveal so the window
-     appears together with the download button. */
   transform-origin: bottom center;
   animation: mockRise 1150ms cubic-bezier(0.22, 1, 0.36, 1)
     var(--mock-emerge-delay, 4500ms) both;
@@ -72,7 +67,6 @@
   isolation: isolate;
 }
 
-/* Host for the stacked skin surfaces inside the main window. */
 .surfaceHost {
   position: absolute;
   inset: 0;
@@ -316,16 +310,12 @@
   image-rendering: auto;
 }
 
-/* Overlay canvas that holds the outgoing theme's gradient during a
-   scroll-driven theme change, then fades out for a smooth crossfade. */
 .gradientFade {
   z-index: -1;
   opacity: 0;
   pointer-events: none;
 }
 
-/* Chrome colors ease between themes alongside the gradient crossfade.
-   Zero-specificity :where() so explicit hover transitions still win. */
 .window,
 .miniWindow,
 .workspaceStage,
@@ -411,8 +401,6 @@
   padding-left: 84px;
 }
 
-/* Window-level traffic lights: the one piece of chrome every skin keeps,
-   floating above whatever chrome the active skin draws. */
 .trafficLights {
   position: absolute;
   top: 14px;
@@ -754,7 +742,6 @@
   transition: opacity 200ms ease;
 }
 
-/* Live request being typed into the mock composer. */
 .typedText {
   flex: 1;
   min-width: 0;

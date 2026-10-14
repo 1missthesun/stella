@@ -23,12 +23,9 @@
     },
   },
   "limits": {
-    // Managed completions stream from the provider for minutes; assembly and
-    // usage parsing are CPU-light but the wall clock is long.
     "cpu_ms": 60000,
   },
   "vars": {
-    // Canonical development deployment used by source builds and test traffic.
     "STELLA_BACKEND_URL": "https://stella-v2-cloud-builder-dev.fromyou.workers.dev",
     // Dev only, never production: a desktop signed in to a cloud-builder
     // Preview (`https://<name><suffix>`, DEPLOY.md "Previews") gets its
@@ -45,16 +42,9 @@
     // signs for the per-agent cloud-builder Previews (DEPLOY.md, "Previews").
     "CAPABILITY_JWKS": "{\"keys\":[{\"kid\":\"builder-1\",\"issuer\":\"stella-cloud-builder\",\"jwk\":{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"_zTj5c7FMbjcMng9baQbQRXtkHak6jk4-1boqSnt59A\",\"y\":\"tR-kttYxzHOPR__VorAqBes7AkaI9uvAiyuM7h7DMEk\",\"alg\":\"ES256\",\"use\":\"sig\"}},{\"kid\":\"builder-bn118-1\",\"issuer\":\"stella-cloud-builder\",\"jwk\":{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"3B2uhLMZ0nFNovFPfyHOqiVeXac4vJO0YhR1F7U1xQc\",\"y\":\"_vW3crzH0DnvV5yjUqvxa9qH5_lygAfXR7FWiI7MLAA\",\"alg\":\"ES256\",\"use\":\"sig\"}},{\"kid\":\"builder-preview-1\",\"issuer\":\"stella-cloud-builder\",\"jwk\":{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"fNbXqGJFsWaRGpdQmkq-4KmWvbqUVpWzbiPzbVoWyAk\",\"y\":\"gITvf5FUWXr6wCD8-rKlCTsE_FnZt-DXkC-cr5wZeTI\",\"alg\":\"ES256\",\"use\":\"sig\"}}]}",
   },
-  // The default models run on OpenRouter. Every provider key, OPENROUTER_API_KEY
-  // included (FIREWORKS_, DEEPSEEK_, XAI_, OPENAI_, ANTHROPIC_, GOOGLE_AI_,
-  // META_MODEL_API_KEY), and STELLA_RELAY_PROBE_SECRET are optional: a model
-  // whose provider has no key answers "The model provider is not configured."
-  // A server without OpenRouter runs on its owner's Claude or ChatGPT account.
   "durable_objects": {
     "bindings": [
       {
-        // One object per capability `jti`: budget/request ledger plus the
-        // replayable result cache for idempotent retries.
         "name": "CAPABILITY_LEDGER",
         "class_name": "CapabilityLedger",
       },
@@ -86,8 +76,6 @@
   ],
   "services": [
     {
-      // Billing lives in each owner's object on cloud-builder: session
-      // capabilities and usage settlement go through this entrypoint.
       "binding": "BILLING",
       "service": "stella-v2-cloud-builder-dev",
       "entrypoint": "BillingControl",
@@ -138,9 +126,7 @@
         "cpu_ms": 60000,
       },
       "vars": {
-        // Pinned to the packaged desktop release authority.
         "STELLA_BACKEND_URL": "https://stella-v2-cloud-builder-prod.fromyou.workers.dev",
-        // Public production keys for the cloud-builder issuer.
         "CAPABILITY_JWKS": "{\"keys\":[{\"kid\":\"builder-prod-1\",\"issuer\":\"stella-cloud-builder\",\"jwk\":{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"7OPXbcbubpfZqHAZEptNA8Bu1w9Y5D0pq547cg8rYuo\",\"y\":\"tv8_giBW3W4shXI5YPuZMneKHs22dSncE41399_mEmI\",\"alg\":\"ES256\",\"use\":\"sig\"}}]}",
       },
       "secrets": {
@@ -187,10 +173,6 @@
       ],
       "kv_namespaces": [
         {
-          // The namespace production is really bound to
-          // (titled stella-v2-model-gateway-config-snapshot). It was left
-          // without an id, so a deploy had to provision or pick one and could
-          // have repointed the binding and orphaned the live snapshot.
           "binding": "CONFIG_SNAPSHOT",
           "id": "4a6ff4e237de4cf59d85334c1053645b",
         },

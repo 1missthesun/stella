@@ -1,16 +1,3 @@
-/* ──────────────────────────────────────────────────────────────────────
-   "An app that becomes you" — full-bleed self-mod section.
-
-   Sits outside .grid-shell so the interactive Stella surface can span
-   the entire viewport. The header above it borrows the same eyebrow +
-   display-italic h2 treatment as the rest of the site (`.section-kicker`)
-   so it reads as a peer of the other sections, just unframed.
-
-   The mock is the interactive `StellaAppMock` (floating transformation
-   pills). We scope theme variables on `.self-mod-hero__stage-inner` so
-   it matches the app without leaking into the rest of the site.
-   ────────────────────────────────────────────────────────────────────── */
-
 .self-mod-hero {
   position: relative;
   width: 100%;
@@ -25,8 +12,6 @@
 .self-mod-hero--placeholder {
   min-height: clamp(36rem, 80vw, 56rem);
 }
-
-/* ── Heading ─────────────────────────────────────────────────────── */
 
 .self-mod-hero__copy {
   width: min(100%, 56rem);
@@ -65,8 +50,6 @@
   line-height: 1.6;
 }
 
-/* ── Stage ───────────────────────────────────────────────────────── */
-
 .self-mod-hero__stage {
   width: 100%;
   display: flex;
@@ -86,9 +69,6 @@
     0 30px 80px -32px rgba(15, 23, 42, 0.28),
     0 12px 36px -20px rgba(15, 23, 42, 0.14);
 
-  /* Typography + shared chrome — color tokens live on `.sam-root[data-theme]`
-     in `stella-mock-themes.css` so each transformation reads as a real
-     Stella desktop theme. Cozy keeps its own palette via `[data-cozy]`. */
   --font-family-sans: var(--font-sans), system-ui, sans-serif;
   --font-family-display: var(--font-display), system-ui, sans-serif;
   --font-family-mono: var(--font-mono), ui-monospace, monospace;
@@ -99,8 +79,6 @@
   --radius-lg: 8px;
 }
 
-/* Floating pills use position: absolute; z-index: 30 — keep them
-   above the main column and Mochi overlay, and don't clip at the root. */
 .self-mod-hero__stage-inner .sam-root[data-interactive="true"] {
   overflow: visible;
 }
@@ -108,7 +86,6 @@
   z-index: 50;
 }
 
-/* Soft cross-fade when a transformation toggle changes */
 .self-mod-hero__stage-inner .sam-root {
   transition:
     background-color 0.55s cubic-bezier(0.22, 1, 0.36, 1),
@@ -148,9 +125,6 @@
   }
 }
 
-/* The frame around the self-mod mock keeps the centered hero rhythm —
-   no codex-stage 2-col layout — but borrows the gradient and squared
-   corners so it reads as a peer of the other product mocks. */
 .self-mod-hero__frame {
   width: min(100%, 1240px);
   margin: 0 auto;
@@ -170,11 +144,6 @@
   }
 }
 
-/* ──────────────────────────────────────────────────────────────────────
-   Mobile mock — mini-window shell (light theme, no sidebar).
-   See self-mod-hero-mobile.tsx.
-   ────────────────────────────────────────────────────────────────────── */
-
 .smhm {
   width: 100%;
   max-width: 520px;
@@ -185,7 +154,6 @@
   gap: 1.1rem;
 }
 
-/* Collapse the sidebar to icon-only rail — this mock is mobile-only. */
 .mini-window--self-mod .mini-window__body {
   grid-template-columns: 48px minmax(0, 1fr);
 }
@@ -221,9 +189,6 @@
   display: none;
 }
 
-/* Workspaces section — shown only in the "rail" variant. Small dots
-   stacked between the brand and the nav, like the desktop workspace
-   rail collapsed to icons. */
 .mini-sidebar__workspaces {
   display: flex;
   flex-direction: column;
@@ -246,7 +211,6 @@
   border-color: var(--mini-text-strong);
 }
 
-/* Tabs strip — appears above the chat in the "tabs" variant. */
 .smhm-tabs-strip {
   display: flex;
   gap: 4px;
@@ -254,8 +218,6 @@
   border-bottom: 1px solid var(--mini-border);
 }
 
-/* Cozy variant — full-window takeover. The sidebar is hidden and
-   the main column gets the dark rainy-window background. */
 .mini-window--self-mod[data-variant="cozy"] .mini-window__body {
   grid-template-columns: minmax(0, 1fr);
 }
@@ -281,8 +243,6 @@
   background: transparent;
 }
 
-/* ── Tabs strip ──────────────────────────────────────────────────── */
-
 .smhm-tab {
   appearance: none;
   border: 0;
@@ -301,12 +261,6 @@
   background: var(--mini-accent);
   color: #fff;
 }
-
-/* (Removed: the old `.smhm-home*` default-body styles — chip rows,
-   thread cards, and blue-gradient orbs — lived here. The mock now
-   uses the real `.mini-chat` from the single-chat mini-window.) */
-
-/* ── Dashboard variant — clean surface cards, no decorative gradients ── */
 
 .smhm-dash {
   display: grid;
@@ -363,8 +317,6 @@
   line-height: 1.4;
 }
 
-/* ── Cozy variant — rainy-window takeover (mirrors desktop mock) ──── */
-
 .smhm-cozy {
   position: relative;
   flex: 1;
@@ -375,7 +327,6 @@
   color: #f5f6f9;
 }
 
-/* Cool silver pool of moonlight behind the cat. */
 .smhm-cozy__lamp {
   position: absolute;
   right: -22%;
@@ -392,7 +343,6 @@
   filter: blur(2px);
 }
 
-/* Slow cool rain streaks down the window. */
 .smhm-cozy__rain {
   position: absolute;
   inset: 0;
@@ -428,7 +378,6 @@
   }
 }
 
-/* Header — minimalist brand left, text nav top-right (no chrome). */
 .smhm-cozy__header {
   position: relative;
   display: flex;
@@ -466,7 +415,6 @@
   font-weight: 600;
 }
 
-/* Cat — sits in the silver pool, between header and headline. */
 .smhm-cozy__cat {
   position: relative;
   width: 64%;
@@ -506,7 +454,6 @@
   color: rgba(245, 246, 249, 0.62);
 }
 
-/* Dark glass composer, anchored to the bottom of the takeover. */
 .smhm-cozy__compose {
   position: relative;
   margin: auto 12px 12px;
@@ -566,8 +513,6 @@
 .smhm-cozy__compose-placeholder {
   color: rgba(245, 246, 249, 0.45);
 }
-
-/* ── Pill toggle (below the window) ─────────────────────────────── */
 
 .smhm__pills {
   display: grid;

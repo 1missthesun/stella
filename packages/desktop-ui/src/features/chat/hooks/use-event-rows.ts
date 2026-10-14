@@ -1,3 +1,4 @@
+import { assistantRowHasOwnContent } from "../lib/assistant-row-content";
 import { withReplyContext } from "../lib/reply-context";
 import { isUiHiddenChatMessagePayload } from "@stella/contracts/chat-event-visibility";
 import {
@@ -288,31 +289,12 @@ type UseEventRowsResult = {
   rows: EventRowViewModel[];
 };
 
-/**
- * Whether an assistant row carries anything other than a background-work
- * receipt. Used by the dedup pass below to decide between clearing just the
- * card (the row has other content to keep) and dropping the synthetic
- * card-only row entirely.
- *
- * Keep in sync with `AssistantRowViewModel` content fields: every renderable
- * field other than `backgroundWork` must be checked here, otherwise a row
- * that carries only that (unchecked) content can be silently dropped when its
- * duplicate background card is deduped.
- */
 export const assistantRowHasNonBackgroundContent = (
   row: AssistantRowViewModel,
 ): boolean =>
-  row.text.trim().length > 0 ||
-  Boolean(row.officePreviewRef) ||
-  Boolean(row.resourcePayload) ||
-  (row.linkedFiles?.length ?? 0) > 0 ||
-  (row.inlineImagePayloads?.length ?? 0) > 0 ||
-  (row.mapArtifacts?.length ?? 0) > 0 ||
-  (row.sourceDiffPayloads?.length ?? 0) > 0 ||
-  Boolean(row.voiceSession) ||
+  assistantRowHasOwnContent(row) ||
   Boolean(row.reminder) ||
-  (row.agentCompletion?.sections.length ?? 0) > 0 ||
-  Boolean(row.customSlot);
+  (row.agentCompletion?.sections.length ?? 0) > 0;
 
 /**
  * Reconcile a completion that surfaces on more than one row. During the

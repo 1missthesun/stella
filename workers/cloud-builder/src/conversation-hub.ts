@@ -231,13 +231,52 @@ export {
 export const SUBPROTOCOL = "stella.v1";
 export const SUBPROTOCOL_TOKEN_PREFIX = LEGACY_SOCKET_TOKEN_SUBPROTOCOL_PREFIX;
 
-/** Remove every client-supplied `x-stella-*` header before forwarding. */
-export const stripStellaHeaders = (headers: Headers): void => {
-  for (const name of [...headers.keys()]) {
-    if (name.toLowerCase().startsWith(STELLA_HEADER_PREFIX)) {
-      headers.delete(name);
-    }
+const CALLER_CREDENTIAL_HEADERS = new Set([
+  "authorization",
+  "cookie",
+  "sec-websocket-protocol",
+]);
+
+const WEBSOCKET_HANDSHAKE_HEADERS = new Set([
+  "upgrade",
+  "connection",
+  "sec-websocket-key",
+  "sec-websocket-version",
+  "sec-websocket-extensions",
+]);
+
+/**
+ * A new request for a Durable Object that trusts identity headers. Caller
+ * credentials and client `x-stella-*` headers are never copied; a WebSocket
+ * offer carries only `subprotocol`. `headers: "websocket"` copies just the
+ * handshake headers.
+ */
+export const trustedInternalRequest = (
+  request: Request,
+  url: string,
+  options: {
+    identity: Readonly<Record<string, string>>;
+    subprotocol: string;
+    headers: "http" | "websocket";
+  },
+): Request => {
+  const headers = new Headers();
+  for (const [name, value] of request.headers) {
+    const lower = name.toLowerCase();
+    if (lower.startsWith(STELLA_HEADER_PREFIX) || CALLER_CREDENTIAL_HEADERS.has(lower)) continue;
+    if (options.headers === "websocket" && !WEBSOCKET_HANDSHAKE_HEADERS.has(lower)) continue;
+    headers.set(name, value);
   }
+  if (request.headers.has("sec-websocket-protocol")) {
+    headers.set("sec-websocket-protocol", options.subprotocol);
+  }
+  for (const [name, value] of Object.entries(options.identity)) headers.set(name, value);
+  return new Request(url, {
+    method: request.method,
+    headers,
+    body: request.body,
+    redirect: "manual",
+  });
 };
 
 // ---------------------------------------------------------------------------

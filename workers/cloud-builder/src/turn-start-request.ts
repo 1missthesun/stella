@@ -35,7 +35,8 @@ import { AGENT_MESSAGE_FRAMED_MAX_CHARS } from "./agent-messaging.js";
 
 /**
  * How the Worker authenticated the caller of a forwarded turn start. Stamped
- * after `stripStellaHeaders`, so its presence proves the route was taken.
+ * only by the Worker on a request it builds, so its presence proves the route
+ * was taken.
  */
 export const HEADER_TURN_AUTH_KIND = "x-stella-turn-auth";
 export type TurnAuthKind = "user" | "service";

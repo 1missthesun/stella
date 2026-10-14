@@ -22,7 +22,7 @@ import {
   rpcErrorStatus,
   type RpcResponse,
 } from "@stella/contracts/backend/protocol";
-import { stripStellaHeaders } from "../conversation-hub.js";
+import { trustedInternalRequest } from "../conversation-hub.js";
 import {
   HEADER_IDENTITY_LEVEL,
   HEADER_OWNER,
@@ -211,21 +211,20 @@ export const handleLive = async (request: Request, env: RouteEnv): Promise<Respo
     );
   }
   const { caller } = verified;
-  const forwarded = new Request("https://owner-gate.internal/live", request);
-  stripStellaHeaders(forwarded.headers);
-  forwarded.headers.delete("authorization");
-  forwarded.headers.set(HEADER_OWNER, caller.ownerId);
-  forwarded.headers.set(HEADER_SUBJECT, caller.subject);
-  forwarded.headers.set(HEADER_SESSION, caller.sessionId);
-  forwarded.headers.set(HEADER_TOKEN_EXP, String(caller.expiresAtMs));
-  if (caller.identityLevel !== undefined) forwarded.headers.set(HEADER_IDENTITY_LEVEL, String(caller.identityLevel));
-  if (caller.issuedAtMs !== undefined) forwarded.headers.set(HEADER_TOKEN_IAT, String(caller.issuedAtMs));
-  try {
-    // The token has done its job; keep it out of anything downstream logs.
-    forwarded.headers.set("sec-websocket-protocol", LIVE_SUBPROTOCOL);
-  } catch {
-    // Some runtimes guard Sec-* headers; the object is inside the same trust boundary.
-  }
+  const forwarded = trustedInternalRequest(request, "https://owner-gate.internal/live", {
+    headers: "websocket",
+    subprotocol: LIVE_SUBPROTOCOL,
+    identity: {
+      [HEADER_OWNER]: caller.ownerId,
+      [HEADER_SUBJECT]: caller.subject,
+      [HEADER_SESSION]: caller.sessionId,
+      [HEADER_TOKEN_EXP]: String(caller.expiresAtMs),
+      ...(caller.identityLevel !== undefined
+        ? { [HEADER_IDENTITY_LEVEL]: String(caller.identityLevel) }
+        : {}),
+      ...(caller.issuedAtMs !== undefined ? { [HEADER_TOKEN_IAT]: String(caller.issuedAtMs) } : {}),
+    },
+  });
   return await ownerGateStub(env.OWNER_GATES, caller.ownerId).fetch(forwarded);
 };
 

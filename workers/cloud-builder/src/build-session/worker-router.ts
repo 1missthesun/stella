@@ -64,7 +64,7 @@ import {
   HEADER_TOKEN_EXP,
   isWebSocketUpgrade,
   refuseUpgrade,
-  stripStellaHeaders,
+  trustedInternalRequest,
   SUBPROTOCOL,
   tokenFromSubprotocol,
 } from "../conversation-hub.js";
@@ -299,28 +299,18 @@ const forwardToConversation = async (
   const target = new URL(ORCHESTRATOR_INTERNAL_ORIGIN);
   target.pathname = doPath;
   target.search = source.search;
-  const forwarded = new Request(target.toString(), request);
-  // A client must never be able to assert its own identity to the DO. This
-  // strip is one line and its absence is a full account-takeover, so it comes
-  // before every header we then set.
-  stripStellaHeaders(forwarded.headers);
-  forwarded.headers.set(HEADER_OWNER, caller.ownerId);
-  forwarded.headers.set(HEADER_SUBJECT, caller.subject);
-  if (caller.sessionId) forwarded.headers.set(HEADER_SESSION, caller.sessionId);
-  forwarded.headers.set(HEADER_TOKEN_EXP, String(caller.expiresAtMs));
-  forwarded.headers.set(HEADER_ISSUER, caller.issuer);
-  forwarded.headers.set(HEADER_CONVERSATION_ID, conversationId);
-  forwarded.headers.delete("authorization");
-  try {
-    // The token has done its job. Keep the offer so the DO can echo a valid
-    // subprotocol, but drop the bearer half so it cannot reach a log line.
-    if (forwarded.headers.has("sec-websocket-protocol")) {
-      forwarded.headers.set("sec-websocket-protocol", SUBPROTOCOL);
-    }
-  } catch {
-    // Some runtimes guard Sec-* headers. Losing the scrub is acceptable —
-    // the DO is inside the same trust boundary — but it is never fatal.
-  }
+  const forwarded = trustedInternalRequest(request, target.toString(), {
+    headers: "http",
+    subprotocol: SUBPROTOCOL,
+    identity: {
+      [HEADER_OWNER]: caller.ownerId,
+      [HEADER_SUBJECT]: caller.subject,
+      ...(caller.sessionId ? { [HEADER_SESSION]: caller.sessionId } : {}),
+      [HEADER_TOKEN_EXP]: String(caller.expiresAtMs),
+      [HEADER_ISSUER]: caller.issuer,
+      [HEADER_CONVERSATION_ID]: conversationId,
+    },
+  });
   return await env.ORCHESTRATOR_SESSIONS.getByName(conversationId).fetch(
     forwarded,
   );
@@ -474,17 +464,15 @@ const forwardToDevicePresence = async (
   deviceId: string,
   caller: ConversationCaller,
 ): Promise<Response> => {
-  const forwarded = new Request("https://owner-gate/presence", request);
-  stripStellaHeaders(forwarded.headers);
-  forwarded.headers.set(HEADER_OWNER, caller.ownerId);
-  forwarded.headers.set(HEADER_TOKEN_EXP, String(caller.expiresAtMs));
-  forwarded.headers.set(HEADER_PRESENCE_DEVICE_ID, deviceId);
-  forwarded.headers.delete("authorization");
-  try {
-    forwarded.headers.set("sec-websocket-protocol", SUBPROTOCOL);
-  } catch {
-    // Some runtimes guard Sec-* headers. The DO is in the same trust boundary.
-  }
+  const forwarded = trustedInternalRequest(request, "https://owner-gate/presence", {
+    headers: "websocket",
+    subprotocol: SUBPROTOCOL,
+    identity: {
+      [HEADER_OWNER]: caller.ownerId,
+      [HEADER_TOKEN_EXP]: String(caller.expiresAtMs),
+      [HEADER_PRESENCE_DEVICE_ID]: deviceId,
+    },
+  });
   return await ownerGateStub(env.OWNER_GATES, caller.ownerId).fetch(forwarded);
 };
 

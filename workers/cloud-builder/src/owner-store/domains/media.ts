@@ -595,7 +595,10 @@ const startJob = async (
       throw error instanceof RpcError ? error : unavailable("Media sources could not be stored. Try again.");
     }
     ctx.db.run("UPDATE media_jobs SET request_json = ? WHERE job_id = ?", summary(staged), jobId);
-    if (getRow(ctx.db, jobId)?.status === "canceled") throw new RpcError("CONFLICT", "This media request was canceled.");
+    if (getRow(ctx.db, jobId)?.status === "canceled") {
+      settleJob(ctx, jobId, { chargeMicroCents: 0, outcome: "cancelled", reachedProvider: false });
+      throw new RpcError("CONFLICT", "This media request was canceled.");
+    }
     try {
       const submitted = await submitFal({
         apiKey,

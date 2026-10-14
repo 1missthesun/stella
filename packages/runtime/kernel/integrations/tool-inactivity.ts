@@ -2,23 +2,13 @@ import type { ToolResult } from "../tools/types.js";
 import { forkCancelableTimeout } from "./effect-runtime.js";
 
 /**
- * Shared per-tool inactivity bound for Stella tools bridged into external
- * engines (currently Claude Code takeover mode). Mirrors the agent-core
- * loop's own bound: a tool that emits no
- * progress update for the window is cancelled via a composed abort signal
- * and reported to the engine as an error tool result, so the turn continues
- * instead of hanging forever on a tool that will never return (observed in
- * the field: a Recall call stalled on an unbounded network await held an
- * orchestrator turn — and with it the whole conversation — indefinitely).
- *
- * Ten minutes of total tool silence almost always means stuck; since only
- * the tool dies (the engine gets an error result and the turn continues),
- * a rare false positive is cheap and the bound errs tight.
- *
- * Shares `STELLA_TOOL_INACTIVITY_TIMEOUT_MS` with the native path; <= 0
- * disables the bound.
+ * Bound for Stella tools bridged into external engines: a tool that reports
+ * no progress for this long is cancelled and the engine gets an error result.
+ * `STELLA_TOOL_INACTIVITY_TIMEOUT_MS` overrides it; <= 0 disables it.
  */
 export const DEFAULT_TOOL_INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000;
+
+const CANCELLATION_GRACE_MS = 5_000;
 
 const configuredInactivityTimeoutMs = (): number => {
   const raw = process.env.STELLA_TOOL_INACTIVITY_TIMEOUT_MS?.trim();
@@ -28,14 +18,29 @@ const configuredInactivityTimeoutMs = (): number => {
     : DEFAULT_TOOL_INACTIVITY_TIMEOUT_MS;
 };
 
+type Settlement =
+  | { kind: "result"; result: ToolResult }
+  | { kind: "error"; error: unknown };
+
+const settle = (operation: Promise<ToolResult>): Promise<Settlement> =>
+  operation.then(
+    (result) => ({ kind: "result", result }),
+    (error: unknown) => ({ kind: "error", error }),
+  );
+
+const abortedPromise = (signal: AbortSignal): Promise<void> =>
+  signal.aborted
+    ? Promise.resolve()
+    : new Promise((resolve) =>
+        signal.addEventListener("abort", () => resolve(), { once: true }),
+      );
+
 /**
- * Run one bridged tool call under the inactivity bound.
- *
- * `run` receives the composed abort signal (outer signal + inactivity
- * cancellation) and an `onActivity` callback the caller must invoke on every
- * tool progress update to reset the clock. On timeout the composed signal
- * aborts (so a cooperative tool cleans up), and the call resolves with an
- * error ToolResult even if the tool's promise never settles.
+ * Run one bridged tool call under the inactivity bound. `run` gets the
+ * composed cancellation signal and an `onActivity` callback to call on every
+ * progress update. After an inactivity timeout the tool gets a short grace to
+ * honour cancellation; if it still has not settled, the error result says its
+ * outcome is unknown rather than claiming it stopped.
  */
 export const executeToolWithInactivityBound = async (args: {
   toolName: string;
@@ -47,52 +52,62 @@ export const executeToolWithInactivityBound = async (args: {
   ) => Promise<ToolResult>;
 }): Promise<ToolResult> => {
   const timeoutMs = args.timeoutMs ?? configuredInactivityTimeoutMs();
-  // Legitimate ratchet pin: the composed (outer + inactivity) cancellation
-  // must cross the tool-executor seam as a REAL AbortSignal, and the
-  // inactivity contribution is resettable — inexpressible via
-  // AbortSignal.any/timeout, so a controller stays.
-  const toolAbort = new AbortController();
-  const onOuterAbort = () => toolAbort.abort(args.signal?.reason);
-  if (args.signal?.aborted) onOuterAbort();
-  args.signal?.addEventListener("abort", onOuterAbort);
+  const inactivity = new AbortController();
+  const signal = args.signal
+    ? AbortSignal.any([args.signal, inactivity.signal])
+    : inactivity.signal;
   let cancelInactivityTimer: (() => void) | undefined;
-  let timedOut = false;
-  let rejectOnInactivity: (error: Error) => void = () => {};
-  const inactivityFailure = new Promise<never>((_, reject) => {
-    rejectOnInactivity = reject;
-  });
-  inactivityFailure.catch(() => undefined);
   const armInactivityTimer = () => {
     cancelInactivityTimer?.();
     cancelInactivityTimer = undefined;
     if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) return;
-    cancelInactivityTimer = forkCancelableTimeout(timeoutMs, () => {
-      timedOut = true;
-      const error = new Error(
-        `Tool ${args.toolName} produced no output for ${Math.round(timeoutMs / 1000)}s and was cancelled. The agent may retry or continue without it.`,
-      );
-      toolAbort.abort(error);
-      rejectOnInactivity(error);
-    });
+    cancelInactivityTimer = forkCancelableTimeout(timeoutMs, () =>
+      inactivity.abort(
+        new Error(
+          `Tool ${args.toolName} produced no output for ${Math.round(timeoutMs / 1000)}s and was cancelled.`,
+        ),
+      ),
+    );
   };
   armInactivityTimer();
 
   try {
-    return await Promise.race([
-      args.run(toolAbort.signal, () => {
-        if (!timedOut) armInactivityTimer();
+    const operation = settle(
+      args.run(signal, () => {
+        if (!inactivity.signal.aborted) armInactivityTimer();
       }),
-      inactivityFailure,
+    );
+    const first = await Promise.race([
+      operation,
+      abortedPromise(inactivity.signal).then(() => "inactive" as const),
     ]);
-  } catch (error) {
-    if (timedOut) {
-      return {
-        error: error instanceof Error ? error.message : String(error),
-      };
+    if (first !== "inactive") {
+      if (first.kind === "result") return first.result;
+      if (!inactivity.signal.aborted) throw first.error;
     }
-    throw error;
+    const reason = (inactivity.signal.reason as Error).message;
+    let cancelGrace: (() => void) | undefined;
+    const afterCancel = await Promise.race([
+      operation,
+      new Promise<"elapsed">((resolve) => {
+        cancelGrace = forkCancelableTimeout(CANCELLATION_GRACE_MS, () =>
+          resolve("elapsed"),
+        );
+      }),
+    ]);
+    cancelGrace?.();
+    if (afterCancel !== "elapsed") {
+      return { error: `${reason} The agent may retry or continue without it.` };
+    }
+    void operation.then((late) => {
+      console.warn(
+        `[tool-inactivity] ${args.toolName} settled after its inactivity timeout (${late.kind}).`,
+      );
+    });
+    return {
+      error: `${reason} It did not stop within ${CANCELLATION_GRACE_MS / 1000}s of being cancelled and may still be running, so whatever it was doing may or may not have happened. Check before retrying anything with side effects.`,
+    };
   } finally {
     cancelInactivityTimer?.();
-    args.signal?.removeEventListener("abort", onOuterAbort);
   }
 };

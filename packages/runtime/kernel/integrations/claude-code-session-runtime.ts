@@ -353,13 +353,8 @@ const SIGKILL_TIMEOUT_MS = 4_000;
 const MAX_STDERR_CAPTURE = 4_000;
 const DEFAULT_STEP_STARTUP_IDLE_TIMEOUT_MS = 15 * 1000;
 const DEFAULT_STEP_IDLE_TIMEOUT_MS = 5 * 60 * 1000;
-// Ceiling while native tool_use blocks are unresolved. Native tools run
-// inside the CLI where we cannot cancel just the tool, so this is the only
-// bound on a turn whose tool never reports a result — long enough for real
-// silent work, finite so a wedged CLI can't hang the session forever.
-// (Bridged Stella tools are separately bounded at 10 min by
-// executeToolWithInactivityBound; this only backstops native tools and
-// leaked tracking.)
+// Claude Code offers no way to cancel one native tool, so a silent native
+// tool is bounded only by restarting the CLI process after this long.
 const DEFAULT_STEP_TOOL_IDLE_TIMEOUT_MS = 20 * 60 * 1000;
 const DEFAULT_TOOL_CATALOG_TIMEOUT_MS = 40 * 1000;
 const MAX_ADRIFT_LINES = 50_000;
@@ -3316,12 +3311,7 @@ class ClaudeCodeSessionRuntime {
       clearTimeout(pending.idleTimer);
     }
     pending.idleTimer = undefined;
-    // Vanilla Claude Code runs native tools inside the CLI. Their stream-json
-    // lifecycle is edge-triggered, so a silent Bash/Task invocation is still
-    // confirmed live work and must not be mistaken for a dead output stream.
-    // We cannot cancel an individual native tool from out here, so instead of
-    // disarming entirely (an unresolved tool_use would hang the session
-    // forever), arm the watchdog with the much longer tool ceiling.
+    // Claude Code emits nothing while a native tool runs.
     const toolsInFlight = pending.activeNativeToolUseIds.size > 0;
     const timeoutMs = toolsInFlight
       ? configuredTimeoutMs(

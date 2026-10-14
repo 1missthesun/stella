@@ -315,7 +315,7 @@ export const createClaudeCodeToolMcpHost = async (
   const bearer = `Bearer ${crypto.randomBytes(32).toString("base64url")}`;
   const endpointPath = `/mcp/${crypto.randomBytes(32).toString("base64url")}`;
   const hookPath = `/hooks/${crypto.randomBytes(32).toString("base64url")}`;
-  const activeCalls = new Set<AbortController>();
+  let callGeneration = new AbortController();
   const callLedger = new Map<string, Promise<CallToolResult>>();
   const responseDelivery = new AsyncLocalStorage<{
     acknowledgements: Set<() => void | Promise<void>>;
@@ -449,15 +449,10 @@ export const createClaudeCodeToolMcpHost = async (
             };
           }
 
-          // Legitimate ratchet pin: `turn.executeTool` takes a REAL
-          // AbortSignal, and this call must abort from two plain-TS sources
-          // (the MCP client's `extra.signal` and `abortActiveCalls` on
-          // process teardown), so a seam controller stays.
-          const callAbort = new AbortController();
-          activeCalls.add(callAbort);
-          const forwardAbort = () => callAbort.abort(extra.signal.reason);
-          extra.signal.addEventListener("abort", forwardAbort, { once: true });
-          if (extra.signal.aborted) forwardAbort();
+          const callSignal = AbortSignal.any([
+            extra.signal,
+            callGeneration.signal,
+          ]);
 
           let progress = 0;
           const progressToken = request.params._meta?.progressToken;
@@ -488,9 +483,9 @@ export const createClaudeCodeToolMcpHost = async (
                 claimNativeId(
                   request.params.name,
                   request.params.arguments ?? {},
-                  callAbort.signal,
+                  callSignal,
                 ),
-                callAbort.signal,
+                callSignal,
               );
             }
             const result = await awaitWithAbort(
@@ -498,10 +493,10 @@ export const createClaudeCodeToolMcpHost = async (
                 toolCallId,
                 request.params.name,
                 request.params.arguments ?? {},
-                callAbort.signal,
+                callSignal,
                 onUpdate,
               ),
-              callAbort.signal,
+              callSignal,
             );
             turn.onToolResult?.({
               toolCallId,
@@ -510,10 +505,10 @@ export const createClaudeCodeToolMcpHost = async (
             });
             return await awaitWithAbort(
               toolResultToMcp(result, { allowLegacyImagePathReopen }),
-              callAbort.signal,
+              callSignal,
             );
           } catch (error) {
-            if (callAbort.signal.aborted) throw error;
+            if (callSignal.aborted) throw error;
             return {
               content: [
                 {
@@ -523,9 +518,6 @@ export const createClaudeCodeToolMcpHost = async (
               ],
               isError: true,
             };
-          } finally {
-            activeCalls.delete(callAbort);
-            extra.signal.removeEventListener("abort", forwardAbort);
           }
         })();
         callLedger.set(ledgerKey, execution);
@@ -694,7 +686,9 @@ export const createClaudeCodeToolMcpHost = async (
   const port = await listen(httpServer);
   const url = `http://${HOST}:${port}${endpointPath}`;
   const abortActiveCalls = (reason?: unknown) => {
-    for (const controller of activeCalls) controller.abort(reason);
+    const ending = callGeneration;
+    callGeneration = new AbortController();
+    ending.abort(reason);
   };
   const resetClientSessions = async (reason?: unknown) => {
     abortActiveCalls(

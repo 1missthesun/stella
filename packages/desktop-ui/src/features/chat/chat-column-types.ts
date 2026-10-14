@@ -1,5 +1,5 @@
-import type { Dispatch, ReactNode, RefObject, SetStateAction } from "react";
-import type { LegendListRef } from "@legendapp/list/react";
+import type { ChatListBinding } from "@/shell/use-chat-scroll-management";
+import type { Dispatch, ReactNode, SetStateAction } from "react";
 import type { QueuedUserMessage } from "@/features/chat/hooks/use-streaming-chat";
 import type {
   EventRecord,
@@ -68,7 +68,7 @@ export type ChatColumnComposer = {
 };
 
 export type ChatColumnScroll = {
-  listRef: RefObject<LegendListRef | null>;
+  list: ChatListBinding;
   showScrollButton: boolean;
   isAtBottom: boolean;
   isNearBottom: boolean;

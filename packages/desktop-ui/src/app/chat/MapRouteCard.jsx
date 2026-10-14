@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { AlertCircle, ExternalLink } from "@/ui/icons";
 import { useTheme } from "@/context/theme-context";
 import { appleMapsUrl, mapsEmbedUrl, } from "@stella/contracts/map-artifact";
-import { notifyAssistantScrollFollowLayoutChange } from "@/shell/chat-scroll-follow";
 import { useT, useTPlural } from "@/shared/i18n";
 import { useSelfHostedServer } from "@/platform/backend/server-discovery";
 import "./map-route-card.css";
@@ -74,7 +73,7 @@ const MapCard = ({ map }) => {
           </div>) : frameFailed ? (<div className="map-route-card__offline" role="status">
             <AlertCircle size={15} aria-hidden/>
             <span>{t("app.chat.mapCard.previewFailed")}</span>
-          </div>) : (<iframe className="map-route-card__iframe" src={embedUrl} title={t("app.chat.mapCard.frameTitle", { title })} loading="lazy" referrerPolicy="no-referrer" sandbox="allow-scripts allow-same-origin" onLoad={notifyAssistantScrollFollowLayoutChange} onError={() => setFrameFailed(true)}/>)}
+          </div>) : (<iframe className="map-route-card__iframe" src={embedUrl} title={t("app.chat.mapCard.frameTitle", { title })} loading="lazy" referrerPolicy="no-referrer" sandbox="allow-scripts allow-same-origin" onError={() => setFrameFailed(true)}/>)}
       </div>
       <div className="map-route-card__footer">
         <div className="map-route-card__meta">

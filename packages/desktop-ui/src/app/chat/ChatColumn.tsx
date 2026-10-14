@@ -101,10 +101,10 @@ export const ChatColumn = memo(function ChatColumn({
   const { noteManualScroll } = scroll;
 
   const getScrollNode = useCallback((): HTMLElement | null => {
-    const list = scroll.listRef.current;
+    const list = scroll.list.ref.current;
     if (!list) return null;
     return list.getScrollableNode();
-  }, [scroll.listRef]);
+  }, [scroll.list.ref]);
 
   const handleThumbDown = useCallback(
     (e: React.PointerEvent) => {
@@ -134,14 +134,14 @@ export const ChatColumn = memo(function ChatColumn({
         0,
         Math.min(scrollRange, dragStartRef.current.scrollTop + scrollDelta),
       );
-      const list = scroll.listRef.current;
+      const list = scroll.list.ref.current;
       if (list) {
         void list.scrollToOffset({ offset: next, animated: false });
       } else {
         el.scrollTop = next;
       }
     },
-    [getScrollNode, noteManualScroll, scroll.listRef],
+    [getScrollNode, noteManualScroll, scroll.list.ref],
   );
 
   const handleThumbUp = useCallback(() => {
@@ -153,7 +153,7 @@ export const ChatColumn = memo(function ChatColumn({
     showScrollButton,
     scrollToBottom,
     thumbRef,
-    listRef,
+    list,
     isFollowingLatest,
     isNearBottom,
     isUserScrolling,
@@ -336,7 +336,7 @@ export const ChatColumn = memo(function ChatColumn({
                   hasOlderMessages={conversation.history.hasOlderMessages}
                   isLoadingOlder={conversation.history.isLoadingOlder}
                   isLoadingHistory={conversation.history.isInitialLoading}
-                  listRef={listRef}
+                  list={list}
                   className="session-content"
                   contentContainerStyle={FULL_CHAT_CONTENT_STYLE}
                   estimatedItemSize={140}

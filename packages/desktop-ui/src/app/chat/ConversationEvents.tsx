@@ -1,12 +1,11 @@
+import type { ChatListBinding } from "@/shell/use-chat-scroll-management";
 import {
   memo,
   useEffect,
   useMemo,
   useRef,
   useState,
-  type RefObject,
 } from "react";
-import type { LegendListRef } from "@legendapp/list/react";
 import type { MessageRecord } from "@stella/contracts/local-chat";
 import { useEventRows } from "@/features/chat/hooks/use-event-rows";
 import { useThreadActivity } from "@/features/chat/hooks/use-thread-activity";
@@ -42,7 +41,7 @@ type Props = {
   hasOlderMessages?: boolean;
   isLoadingOlder?: boolean;
   isLoadingHistory?: boolean;
-  listRef?: RefObject<LegendListRef | null>;
+  list?: ChatListBinding;
   className?: string;
   contentContainerStyle?: LegendContentStyle;
   estimatedItemSize?: number;
@@ -157,7 +156,7 @@ export const ConversationEvents = memo(function ConversationEvents({
   hasOlderMessages,
   isLoadingOlder,
   isLoadingHistory,
-  listRef,
+  list,
   className,
   contentContainerStyle,
   estimatedItemSize,
@@ -228,7 +227,7 @@ export const ConversationEvents = memo(function ConversationEvents({
       queuedUserMessages={queuedUserMessages}
       onCancelQueued={onCancelQueued}
       indicator={indicator}
-      listRef={listRef}
+      list={list}
       className={className}
       contentContainerStyle={contentContainerStyle}
       estimatedItemSize={estimatedItemSize}

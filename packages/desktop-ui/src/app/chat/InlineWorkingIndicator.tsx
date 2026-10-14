@@ -1,5 +1,4 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { notifyChatContentGrowth } from "@/shell/chat-scroll-follow";
 import {
   getInlineWorkingIndicatorExitDelayMs,
   INLINE_WORKING_INDICATOR_MIN_VISIBLE_MS,
@@ -222,11 +221,6 @@ export function InlineWorkingIndicator({
   );
 
   const showInner = renderShell;
-
-  useLayoutEffect(() => {
-    if (!showInner) return;
-    notifyChatContentGrowth();
-  }, [showInner]);
 
   return (
     <div

@@ -83,7 +83,7 @@ export function CompactConversationSurface({
             hasOlderMessages={hasOlderMessages}
             isLoadingOlder={isLoadingOlder}
             isLoadingHistory={isLoadingHistory}
-            listRef={scroll.listRef}
+            list={scroll.list}
             className={className}
             contentContainerStyle={contentContainerStyle}
             estimatedItemSize={estimatedItemSize}

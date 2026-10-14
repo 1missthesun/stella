@@ -1,17 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { LegendListRef } from "@legendapp/list/react";
-import { subscribeChatContentGrowth } from "@/shell/chat-scroll-follow";
 import {
   AT_BOTTOM_TOLERANCE_PX,
   shouldFollowSend,
 } from "@/shell/chat-follow-target";
 import {
-  captureChatPrependAnchor,
   ChatHistoryPaginationGate,
-  ChatPrependAnchorStabilizer,
   emitChatHistoryPaginationDebug,
-  restoreChatPrependAnchor,
-  type ChatPrependAnchor,
   type HistoryPaginationMetrics,
   type HistoryScrollDirection,
 } from "@/shell/chat-history-pagination";
@@ -22,21 +17,8 @@ const THUMB_FADE_MS = 1200;
 const MANUAL_SCROLL_SETTLE_MS = 140;
 const THUMB_EPSILON_PX = 0.5;
 
-const FOLLOW_SPRING_STIFFNESS = 0.00026;
-const FOLLOW_SPRING_DAMPING = 0.0322;
-const FOLLOW_STREAM_IDLE_MS = 200;
-const FOLLOW_MAX_FRAME_MS = 48;
-const FOLLOW_DEFAULT_FRAME_MS = 16;
-const FOLLOW_HARD_SNAP_PX = 240;
-const FOLLOW_GENTLE_LERP_FACTOR = 0.12;
-/**
- * Minimum per-frame step when the lerp would otherwise produce a
- * sub-pixel movement. Prevents the loop from stalling near the target
- * because of scrollTop rounding (most engines floor to integer at
- * the OS-compositor boundary even when CSS-side scrollTop accepts
- * fractions).
- */
-const FOLLOW_MIN_STEP_PX = 0.5;
+const FOLLOW_LERP_FACTOR = 0.12;
+const FOLLOW_SNAP_TOLERANCE_PX = 1;
 
 const FOLLOW_REARM_THRESHOLD_PX = 24;
 
@@ -62,15 +44,16 @@ type ChatScrollManagementOptions = {
   surface?: ChatScrollSurface;
 };
 
-type FollowTargetOptions = {
-  gentle?: boolean;
-};
-
 type FollowApi = {
-  setTarget: (target: number, options?: FollowTargetOptions) => void;
-  nudgeBy: (delta: number) => void;
   followToEnd: () => void;
   cancel: () => void;
+};
+
+export type ChatListBinding = {
+  ref: { current: LegendListRef | null };
+  dataKey: string | undefined;
+  onScroll: () => void;
+  onReady: () => void;
 };
 
 export function useChatScrollManagement({
@@ -98,18 +81,9 @@ export function useChatScrollManagement({
     };
   }, []);
   const attachedScrollNodeRef = useRef<HTMLElement | null>(null);
-  const mountedRef = useRef(false);
   const paginationGateRef = useRef(new ChatHistoryPaginationGate());
   const newerPaginationGateRef = useRef(new ChatHistoryPaginationGate("end"));
   const paginationActionIdRef = useRef(0);
-  const prependAnchorRef = useRef<{
-    node: HTMLElement;
-    anchor: ChatPrependAnchor;
-    gate: ChatHistoryPaginationGate;
-    cancelledByUser: boolean;
-  } | null>(null);
-  const prependRestoreRafRef = useRef<number | null>(null);
-  const anchorStabilizerRef = useRef<ChatPrependAnchorStabilizer | null>(null);
   const jumpToLatestPendingRef = useRef(false);
   const historyOptionsRef = useRef({
     hasOlderEvents,
@@ -130,20 +104,11 @@ export function useChatScrollManagement({
     onLoadLatest,
   };
   const [isAtBottom, setIsAtBottom] = useState(true);
-  const [paginationCompletionVersion, setPaginationCompletionVersion] =
-    useState(0);
 
   useEffect(() => {
     paginationGateRef.current = new ChatHistoryPaginationGate();
     newerPaginationGateRef.current = new ChatHistoryPaginationGate("end");
-    prependAnchorRef.current = null;
     jumpToLatestPendingRef.current = false;
-    anchorStabilizerRef.current?.stop();
-    anchorStabilizerRef.current = null;
-    if (prependRestoreRafRef.current !== null) {
-      cancelAnimationFrame(prependRestoreRafRef.current);
-      prependRestoreRafRef.current = null;
-    }
   }, [paginationKey]);
   const [isNearBottom, setIsNearBottom] = useState(true);
   const [isFollowingLatest, setIsFollowingLatest] = useState(true);
@@ -157,7 +122,6 @@ export function useChatScrollManagement({
     thumbElRef.current = el;
   }, []);
   const thumbFadeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const scrollStateRafRef = useRef<number | null>(null);
   const isAtBottomRef = useRef(true);
   const isNearBottomRef = useRef(true);
   const showScrollButtonRef = useRef(false);
@@ -200,6 +164,11 @@ export function useChatScrollManagement({
   }, []);
 
   const followApi = useRef<FollowApi | null>(null);
+
+  useEffect(() => {
+    followApi.current?.cancel();
+    setFollow(true);
+  }, [paginationKey, setFollow]);
 
   const hideThumb = useCallback(() => {
     if (!thumbVisibleRef.current) return;
@@ -244,54 +213,63 @@ export function useChatScrollManagement({
     [hideThumb],
   );
 
-  /**
-   * Coalesce native scroll events without wiring Legend's public `onScroll`
-   * prop. On web that prop builds a React Native-shaped event by reading the
-   * content element's `scrollHeight`/`scrollWidth` every frame; those reads
-   * force layout while virtualized markdown rows are mounting. We only need
-   * Legend's already-maintained state snapshot, so listening passively on the
-   * actual scroll node avoids that duplicate geometry pass.
-   */
-  const scheduleScrollStateUpdate = useCallback(() => {
-    if (scrollStateRafRef.current !== null) return;
-    scrollStateRafRef.current = requestAnimationFrame(() => {
-      scrollStateRafRef.current = null;
-      const list = listRef.current;
-      if (!list) return;
-      const state = list.getState();
-      const { scroll, scrollLength, contentLength, isAtEnd } = state;
-      const distFromEnd = Math.max(0, contentLength - scrollLength - scroll);
-      const shouldShowScrollButton = distFromEnd > SCROLL_BUTTON_THRESHOLD;
-      const nearBottom = isAtEnd || distFromEnd <= AT_BOTTOM_TOLERANCE_PX;
+  const updateScrollState = useCallback(() => {
+    const list = listRef.current;
+    if (!list) return;
+    const state = list.getState();
+    const { scroll, scrollLength, contentLength, isAtEnd } = state;
+    const distFromEnd = Math.max(0, contentLength - scrollLength - scroll);
+    const shouldShowScrollButton = distFromEnd > SCROLL_BUTTON_THRESHOLD;
+    const nearBottom = isAtEnd || distFromEnd <= AT_BOTTOM_TOLERANCE_PX;
 
-      if (isAtBottomRef.current !== isAtEnd) {
-        isAtBottomRef.current = isAtEnd;
-        setIsAtBottom(isAtEnd);
-      }
-      if (isNearBottomRef.current !== nearBottom) {
-        isNearBottomRef.current = nearBottom;
-        setIsNearBottom(nearBottom);
-      }
-      if (showScrollButtonRef.current !== shouldShowScrollButton) {
-        showScrollButtonRef.current = shouldShowScrollButton;
-        setShowScrollButton(shouldShowScrollButton);
-      }
-      updateThumb(scroll, scrollLength, contentLength);
+    if (isAtBottomRef.current !== isAtEnd) {
+      isAtBottomRef.current = isAtEnd;
+      setIsAtBottom(isAtEnd);
+    }
+    if (isNearBottomRef.current !== nearBottom) {
+      isNearBottomRef.current = nearBottom;
+      setIsNearBottom(nearBottom);
+    }
+    if (showScrollButtonRef.current !== shouldShowScrollButton) {
+      showScrollButtonRef.current = shouldShowScrollButton;
+      setShowScrollButton(shouldShowScrollButton);
+    }
+    updateThumb(scroll, scrollLength, contentLength);
 
-      if (
-        !followRearmBlockedRef.current &&
-        (isAtEnd || distFromEnd <= FOLLOW_REARM_THRESHOLD_PX)
-      ) {
-        setFollow(true);
-      }
-    });
+    if (
+      !followRearmBlockedRef.current &&
+      (isAtEnd || distFromEnd <= FOLLOW_REARM_THRESHOLD_PX)
+    ) {
+      setFollow(true);
+    }
   }, [listRef, setFollow, updateThumb]);
+
+  const listScrollHandlerRef = useRef<(() => void) | null>(null);
+  const handleListScroll = useCallback(() => {
+    updateScrollState();
+    listScrollHandlerRef.current?.();
+  }, [updateScrollState]);
+
+  const dataKey = paginationKey ?? undefined;
+  const dataKeyRef = useRef(dataKey);
+  dataKeyRef.current = dataKey;
+  const [placedDataKey, setPlacedDataKey] = useState<string | undefined>();
+  const handleListReady = useCallback(() => {
+    setPlacedDataKey(dataKeyRef.current);
+  }, []);
+  const list = useMemo<ChatListBinding>(
+    () => ({
+      ref: listRef,
+      dataKey,
+      onScroll: handleListScroll,
+      onReady: handleListReady,
+    }),
+    [dataKey, handleListReady, handleListScroll, listRef],
+  );
 
   const scrollToBottom = useCallback(
     (behavior: "instant" | "smooth" = "smooth") => {
       setFollow(true);
-      // Legend's own scrollToEnd owns this motion; cancel any lerp
-      // so we don't write scrollTop on the same frame Legend does.
       followApi.current?.cancel();
       const history = historyOptionsRef.current;
       if (history.hasNewerEvents) {
@@ -355,24 +333,12 @@ export function useChatScrollManagement({
   }, [listRef]);
 
   useEffect(() => {
-    mountedRef.current = true;
     return () => {
-      mountedRef.current = false;
       if (thumbFadeRef.current) clearTimeout(thumbFadeRef.current);
       if (manualScrollTimerRef.current) {
         clearTimeout(manualScrollTimerRef.current);
         manualScrollTimerRef.current = null;
       }
-      if (scrollStateRafRef.current !== null) {
-        cancelAnimationFrame(scrollStateRafRef.current);
-        scrollStateRafRef.current = null;
-      }
-      if (prependRestoreRafRef.current !== null) {
-        cancelAnimationFrame(prependRestoreRafRef.current);
-        prependRestoreRafRef.current = null;
-      }
-      anchorStabilizerRef.current?.stop();
-      anchorStabilizerRef.current = null;
     };
   }, []);
 
@@ -416,11 +382,7 @@ export function useChatScrollManagement({
     }
     if (jumpToLatestPendingRef.current && !hasNewerEvents && !isLoadingNewer) {
       jumpToLatestPendingRef.current = false;
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          void listRef.current?.scrollToEnd({ animated: false });
-        });
-      });
+      void listRef.current?.scrollToEnd({ animated: false });
     }
     emitChatHistoryPaginationDebug({
       type: "guards",
@@ -436,91 +398,12 @@ export function useChatScrollManagement({
         newerGate: newerPaginationGateRef.current.snapshot(),
       },
     });
-
-    if (!olderTransition.requestSettled && !newerTransition.requestSettled)
-      return;
-    const pending = prependAnchorRef.current;
-    if (!pending) return;
-    const pendingRequestSettled =
-      (pending.gate === paginationGateRef.current &&
-        olderTransition.requestSettled) ||
-      (pending.gate === newerPaginationGateRef.current &&
-        newerTransition.requestSettled);
-    if (!pendingRequestSettled) return;
-    if (
-      pending.cancelledByUser ||
-      pending.node !== attachedScrollNodeRef.current
-    ) {
-      emitChatHistoryPaginationDebug({
-        type: "anchor-skip",
-        surface,
-        detail: {
-          reason: pending.cancelledByUser
-            ? "user-scrolled"
-            : "scroll-node-replaced",
-          rowId: pending.anchor.rowId,
-        },
-      });
-      prependAnchorRef.current = null;
-      anchorStabilizerRef.current?.stop();
-      return;
-    }
-
-    let attempts = 0;
-    const restore = () => {
-      prependRestoreRafRef.current = null;
-      const current = prependAnchorRef.current;
-      if (!current || current.cancelledByUser) return;
-      if (current.node !== attachedScrollNodeRef.current) {
-        prependAnchorRef.current = null;
-        return;
-      }
-      attempts += 1;
-      const result = restoreChatPrependAnchor(current.node, current.anchor);
-      if (!result.found && attempts < 8) {
-        prependRestoreRafRef.current = requestAnimationFrame(restore);
-        return;
-      }
-      emitChatHistoryPaginationDebug({
-        type: "anchor-restored",
-        surface,
-        detail: {
-          rowId: current.anchor.rowId,
-          before: current.anchor,
-          after: result,
-          thresholdVisible:
-            result.scrollTopAfter <= current.anchor.viewportHeight * 2,
-          attempts,
-        },
-      });
-      anchorStabilizerRef.current?.stop();
-      anchorStabilizerRef.current = new ChatPrependAnchorStabilizer(
-        current.node,
-        current.anchor,
-        (lateResult) => {
-          emitChatHistoryPaginationDebug({
-            type: "anchor-late-restored",
-            surface,
-            detail: { rowId: current.anchor.rowId, after: lateResult },
-          });
-        },
-      );
-      anchorStabilizerRef.current.start();
-      prependAnchorRef.current = null;
-    };
-
-    // Let Legend's MVCP/data pass and row ResizeObservers settle first. In the
-    // normal case it lands exactly and `restore` performs no scroll write.
-    prependRestoreRafRef.current = requestAnimationFrame(() => {
-      prependRestoreRafRef.current = requestAnimationFrame(restore);
-    });
   }, [
     listRef,
     hasNewerEvents,
     hasOlderEvents,
     isLoadingNewer,
     isLoadingOlder,
-    paginationCompletionVersion,
     surface,
   ]);
 
@@ -530,43 +413,9 @@ export function useChatScrollManagement({
     followApi.current?.cancel();
   }, [setFollow]);
 
-  /**
-   * Bump the follow target by `delta` px through the same lerp loop as
-   * the streaming auto-follow, so the two motions blend rather than
-   * fighting via separate concurrent rAF tweens writing scrollTop on
-   * alternating frames.
-   *
-   * The two-rAF wait lets freshly rendered rows lay out and grow
-   * `scrollHeight` before we bump, so the target lands at a real
-   * position rather than getting clamped to the old maxScroll.
-   */
-  const nudgeBy = useCallback(
-    (delta: number) => {
-      setFollow(true);
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          followApi.current?.nudgeBy(delta);
-        });
-      });
-    },
-    [setFollow],
-  );
-
-  /**
-   * After an accepted send, arm follow and settle to the end of content.
-   * The just-sent user row (or, mid-stream, the queued follow-up item) is
-   * the last list item, so the end frames it just above the composer; the
-   * reply then arrives below it and the content-growth follow keeps the
-   * viewport at the end. The two-rAF wait lets the optimistic row lay out
-   * before the loop starts chasing the end.
-   */
   const followAfterSend = useCallback(() => {
     setFollow(true);
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        followApi.current?.followToEnd();
-      });
-    });
+    followApi.current?.followToEnd();
   }, [setFollow]);
 
   useEffect(() => {
@@ -624,13 +473,8 @@ export function useChatScrollManagement({
           expiresAt: performance.now() + INTENT_ACTIVE_MS,
         };
       };
-      const cancelPendingAnchorForUserScroll = () => {
-        anchorStabilizerRef.current?.stop();
-        anchorStabilizerRef.current = null;
+      const cancelPendingJumpForUserScroll = () => {
         jumpToLatestPendingRef.current = false;
-        if (prependAnchorRef.current) {
-          prependAnchorRef.current.cancelledByUser = true;
-        }
       };
       const readPaginationMetrics = (): HistoryPaginationMetrics | null => {
         const list = listRef.current;
@@ -681,69 +525,28 @@ export function useChatScrollManagement({
         });
         if (!decision.request || !load) return;
 
-        anchorStabilizerRef.current?.stop();
-        anchorStabilizerRef.current = null;
-        const anchor = captureChatPrependAnchor(node);
-        if (anchor) {
-          prependAnchorRef.current = {
-            node,
-            anchor,
-            gate,
-            cancelledByUser: false,
-          };
-        }
         emitChatHistoryPaginationDebug({
           type: "request",
           surface,
-          detail: { source, actionId, edge, metrics, anchor },
+          detail: { source, actionId, edge, metrics },
         });
         try {
           const accepted = load();
           if (accepted === false) {
             gate.rejectRequest();
-            if (prependAnchorRef.current?.gate === gate) {
-              prependAnchorRef.current = null;
-            }
           } else if (accepted instanceof Promise) {
-            void accepted.then(
-              (succeeded) => {
-                if (!mountedRef.current) return;
-                const isCurrentGate =
-                  gate === paginationGateRef.current ||
-                  gate === newerPaginationGateRef.current;
-                if (!isCurrentGate) return;
-                const settled = gate.settleRequest();
-                if (
-                  (!succeeded || !node.isConnected) &&
-                  prependAnchorRef.current?.gate === gate
-                ) {
-                  prependAnchorRef.current = null;
-                }
-                if (settled) {
-                  setPaginationCompletionVersion((version) => version + 1);
-                }
-              },
-              () => {
-                if (!mountedRef.current) return;
-                const isCurrentGate =
-                  gate === paginationGateRef.current ||
-                  gate === newerPaginationGateRef.current;
-                if (!isCurrentGate) return;
-                const settled = gate.settleRequest();
-                if (prependAnchorRef.current?.gate === gate) {
-                  prependAnchorRef.current = null;
-                }
-                if (settled) {
-                  setPaginationCompletionVersion((version) => version + 1);
-                }
-              },
-            );
+            const settle = () => {
+              if (
+                gate === paginationGateRef.current ||
+                gate === newerPaginationGateRef.current
+              ) {
+                gate.settleRequest();
+              }
+            };
+            void accepted.then(settle, settle);
           }
         } catch (error) {
           gate.rejectRequest();
-          if (prependAnchorRef.current?.gate === gate) {
-            prependAnchorRef.current = null;
-          }
           emitChatHistoryPaginationDebug({
             type: "request-error",
             surface,
@@ -754,136 +557,45 @@ export function useChatScrollManagement({
         }
       };
 
-      let followTarget: number | null = null;
       let followRaf = 0;
-      let followGentle = false;
-      let followVel = 0;
-      let lastFrameTime = 0;
-      let lastTargetTime = 0;
+      let lastStepFrom: number | null = null;
       const stopLoop = () => {
         if (followRaf) cancelAnimationFrame(followRaf);
         followRaf = 0;
-        followTarget = null;
-        followGentle = false;
-        followVel = 0;
-        lastFrameTime = 0;
-        lastTargetTime = 0;
+        lastStepFrom = null;
       };
 
       const stepFollow = () => {
         followRaf = 0;
-        if (!attached || followTarget === null) return;
-        if (!followRef.current) {
-          followTarget = null;
-          followVel = 0;
-          lastFrameTime = 0;
+        if (!attached || !followRef.current) {
+          lastStepFrom = null;
           return;
         }
-        const maxScroll = Math.max(
-          0,
-          attached.scrollHeight - attached.clientHeight,
-        );
-        const target = Math.max(0, Math.min(maxScroll, followTarget));
+        const end = Math.max(0, attached.scrollHeight - attached.clientHeight);
         const current = attached.scrollTop;
-        const diff = target - current;
-        const absDiff = Math.abs(diff);
-
-        if (absDiff < FOLLOW_MIN_STEP_PX) {
-          attached.scrollTop = target;
-          followVel = 0;
-          lastFrameTime = 0;
-          if (
-            followGentle ||
-            performance.now() - lastTargetTime > FOLLOW_STREAM_IDLE_MS
-          ) {
-            followTarget = null;
-            return;
-          }
-          followRaf = requestAnimationFrame(stepFollow);
+        if (
+          end - current <= FOLLOW_SNAP_TOLERANCE_PX ||
+          current === lastStepFrom
+        ) {
+          attached.scrollTop = end;
+          lastStepFrom = null;
           return;
         }
-
-        if (followGentle) {
-          const lerpStep = diff * FOLLOW_GENTLE_LERP_FACTOR;
-          const stepPx =
-            Math.abs(lerpStep) >= FOLLOW_MIN_STEP_PX
-              ? lerpStep
-              : Math.sign(diff) * FOLLOW_MIN_STEP_PX;
-          attached.scrollTop = current + stepPx;
-          followRaf = requestAnimationFrame(stepFollow);
-          return;
-        }
-
-        if (absDiff > FOLLOW_HARD_SNAP_PX) {
-          attached.scrollTop = target;
-          followVel = 0;
-          lastFrameTime = 0;
-          if (performance.now() - lastTargetTime > FOLLOW_STREAM_IDLE_MS) {
-            followTarget = null;
-            return;
-          }
-          followRaf = requestAnimationFrame(stepFollow);
-          return;
-        }
-
-        const now = performance.now();
-        const dt = lastFrameTime
-          ? Math.min(FOLLOW_MAX_FRAME_MS, Math.max(1, now - lastFrameTime))
-          : FOLLOW_DEFAULT_FRAME_MS;
-        lastFrameTime = now;
-        const accel =
-          FOLLOW_SPRING_STIFFNESS * diff - FOLLOW_SPRING_DAMPING * followVel;
-        followVel = Math.max(0, followVel + accel * dt);
-        let step = followVel * dt;
-        if (step < FOLLOW_MIN_STEP_PX) step = FOLLOW_MIN_STEP_PX;
-        if (step >= diff) {
-          attached.scrollTop = target;
-          followVel = diff / dt;
-        } else {
-          attached.scrollTop = current + step;
-        }
+        lastStepFrom = current;
+        attached.scrollTop = current + (end - current) * FOLLOW_LERP_FACTOR;
         followRaf = requestAnimationFrame(stepFollow);
       };
 
-      const setTarget = (
-        newTarget: number,
-        options: FollowTargetOptions = {},
-      ) => {
-        if (!attached) return;
-        if (!followRef.current) return;
-        const maxScroll = Math.max(
-          0,
-          attached.scrollHeight - attached.clientHeight,
-        );
-        const clamped = Math.max(0, Math.min(maxScroll, newTarget));
-        if (clamped <= attached.scrollTop + 0.5) return;
-        const gentle = Boolean(options.gentle);
-        if (gentle !== followGentle) followVel = 0;
-        followTarget = Math.max(0, newTarget);
-        followGentle = gentle;
-        if (!gentle) lastTargetTime = performance.now();
-        if (!followRaf) followRaf = requestAnimationFrame(stepFollow);
-      };
-
-      const nudgeBy = (delta: number, options: FollowTargetOptions = {}) => {
-        if (!attached) return;
-        if (!followRef.current) return;
-        const base = followTarget !== null ? followTarget : attached.scrollTop;
-        setTarget(base + delta, options);
-      };
-
       const followToEnd = () => {
-        setTarget(Number.POSITIVE_INFINITY, { gentle: true });
+        if (!attached || !followRef.current || followRaf) return;
+        const end = Math.max(0, attached.scrollHeight - attached.clientHeight);
+        if (end - attached.scrollTop <= FOLLOW_SNAP_TOLERANCE_PX) return;
+        followRaf = requestAnimationFrame(stepFollow);
       };
 
-      followApi.current = {
-        setTarget,
-        nudgeBy,
-        followToEnd,
-        cancel: stopLoop,
-      };
+      followApi.current = { followToEnd, cancel: stopLoop };
 
-      const followIdleContentGrowth = () => {
+      const followContentGrowth = () => {
         if (!attached || !followRef.current) return;
         const distFromEnd =
           attached.scrollHeight - attached.clientHeight - attached.scrollTop;
@@ -892,14 +604,6 @@ export function useChatScrollManagement({
           return;
         }
         followToEnd();
-      };
-      let idleGrowthRaf = 0;
-      const scheduleFollowIdleContentGrowth = () => {
-        if (idleGrowthRaf) return;
-        idleGrowthRaf = requestAnimationFrame(() => {
-          idleGrowthRaf = 0;
-          followIdleContentGrowth();
-        });
       };
 
       const releaseLocalFollow = () => {
@@ -922,7 +626,7 @@ export function useChatScrollManagement({
         lastWheelAt = now;
         lastWheelDirection = direction;
         markActiveIntent(wheelActionId, direction);
-        cancelPendingAnchorForUserScroll();
+        cancelPendingJumpForUserScroll();
         if (direction === "up") {
           releaseLocalFollow();
           attemptHistoryLoad(wheelActionId, direction, "wheel");
@@ -938,7 +642,7 @@ export function useChatScrollManagement({
         noteManualScroll();
         setFollow(false);
         stopLoop();
-        cancelPendingAnchorForUserScroll();
+        cancelPendingJumpForUserScroll();
         touchActionId = nextActionId();
         touchStartY = event.touches[0]?.clientY ?? null;
       };
@@ -977,7 +681,7 @@ export function useChatScrollManagement({
           (event.key === " " && event.shiftKey)
         ) {
           releaseLocalFollow();
-          cancelPendingAnchorForUserScroll();
+          cancelPendingJumpForUserScroll();
           if (!event.repeat || keyActionId === null)
             keyActionId = nextActionId();
           markActiveIntent(keyActionId, "up");
@@ -1008,7 +712,7 @@ export function useChatScrollManagement({
       };
       const handlePointerDown = () => {
         pointerActionId = nextActionId();
-        cancelPendingAnchorForUserScroll();
+        cancelPendingJumpForUserScroll();
       };
       const handlePointerUp = () => {
         pointerActionId = null;
@@ -1053,17 +757,10 @@ export function useChatScrollManagement({
       node.addEventListener("pointerdown", handlePointerDown);
       window.addEventListener("pointerup", handlePointerUp);
       document.addEventListener("pointerdown", handleDocumentPointerDown, true);
-      node.addEventListener("scroll", scheduleScrollStateUpdate, {
-        passive: true,
-      });
-      node.addEventListener("scroll", handlePaginationScroll, {
-        passive: true,
-      });
+      listScrollHandlerRef.current = handlePaginationScroll;
 
-      const unsubscribeGrowth = subscribeChatContentGrowth(() => {
-        if (!followRef.current) return;
-        scheduleFollowIdleContentGrowth();
-      });
+      const contentResizeObserver = new ResizeObserver(followContentGrowth);
+      for (const child of node.children) contentResizeObserver.observe(child);
 
       let lastViewportHeight = node.clientHeight;
       const viewportResizeObserver = new ResizeObserver(() => {
@@ -1085,28 +782,12 @@ export function useChatScrollManagement({
       });
       viewportResizeObserver.observe(node);
 
-      // NOTE: We intentionally do NOT re-pin scrollTop on container *width*
-      // changes (the display/sidebar panel sliding open/closed over 460ms).
-      // Earlier versions re-ran `scrollToEnd`, or wrote `scrollTop` directly,
-      // on every width tick to keep the bottom glued during the reflow — but
-      // any external scroll write during the slide fights Legend's
-      // `maintainVisibleContentPosition`, which independently re-anchors on
-      // each reflow frame. The two controllers disagree frame-to-frame and
-      // oscillate: the heavy vertical shake at the bottom while toggling the
-      // sidebar. An isolated A/B harness confirmed it — with the per-frame
-      // pin the reference row's on-screen Y oscillated (5 direction reversals,
-      // 42px range); with no custom write Legend's MVCP held it smoothly (0
-      // reversals, 21px monotonic settle). So we let MVCP own scroll position
-      // across width reflows and write scrollTop only for the explicit motions
-      // (send follow, stream follow, scroll-to-bottom button).
-
       cleanup = () => {
         if (!attached) return;
-        unsubscribeGrowth();
+        contentResizeObserver.disconnect();
         viewportResizeObserver.disconnect();
-        if (idleGrowthRaf) {
-          cancelAnimationFrame(idleGrowthRaf);
-          idleGrowthRaf = 0;
+        if (listScrollHandlerRef.current === handlePaginationScroll) {
+          listScrollHandlerRef.current = null;
         }
         attached.removeEventListener("wheel", handleWheel);
         attached.removeEventListener("touchstart", handleTouchStart);
@@ -1120,8 +801,6 @@ export function useChatScrollManagement({
           handleDocumentPointerDown,
           true,
         );
-        attached.removeEventListener("scroll", scheduleScrollStateUpdate);
-        attached.removeEventListener("scroll", handlePaginationScroll);
         stopLoop();
         followApi.current = null;
         if (attachedScrollNodeRef.current === attached) {
@@ -1150,13 +829,14 @@ export function useChatScrollManagement({
   }, [
     listRef,
     noteManualScroll,
-    scheduleScrollStateUpdate,
     setFollow,
     surface,
   ]);
 
   return {
+    list,
     listRef,
+    isPlacingInitialScroll: placedDataKey !== dataKey,
     isAtBottom,
     isNearBottom,
     isFollowingLatest,
@@ -1166,7 +846,6 @@ export function useChatScrollManagement({
     scrollToBottom,
     releaseFollow,
     followAfterSend,
-    nudgeBy,
     getIsFollowing,
     getShouldFollowSend,
     getIsEffectivelyAtBottom,

@@ -13,7 +13,6 @@ import type { DisplayPayload } from "@stella/contracts/desktop/display-payload";
 import type { MediaJob } from "@stella/contracts/backend/media";
 import { useDisplayFileBlobs } from "@/shared/hooks/use-display-file-data";
 import { openDisplayPayloadTab } from "@/features/workspace-display/open-payload";
-import { notifyAssistantScrollFollowLayoutChange } from "@/shell/chat-scroll-follow";
 import { imageGenerationFailureKey } from "@/app/media/media-error-copy";
 import { useT } from "@/shared/i18n";
 import "./inline-generated-image-card.css";
@@ -388,7 +387,6 @@ export const InlineGeneratedImageCardFrame = ({
               (primaryPath ? filenameOf(primaryPath) : "")
             }
             className="inline-generated-image-card__image"
-            onLoad={notifyAssistantScrollFollowLayoutChange}
           />
         ) : (
           <span

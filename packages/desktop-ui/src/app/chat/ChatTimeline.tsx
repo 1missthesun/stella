@@ -1,3 +1,4 @@
+import type { ChatListBinding } from "@/shell/use-chat-scroll-management";
 import {
   memo,
   startTransition,
@@ -8,11 +9,9 @@ import {
   useState,
   useSyncExternalStore,
   type CSSProperties,
-  type RefObject,
 } from "react";
 import {
   LegendList,
-  type LegendListRef,
   type LegendListRenderItemProps,
 } from "@legendapp/list/react";
 import { AssistantMessageRow, UserMessageRow } from "@/app/chat/MessageRow";
@@ -35,7 +34,6 @@ import { timestampHeaders } from "@/features/chat/lib/message-time-labels";
 import type { EventRowViewModel } from "@/features/chat/conversation-row-types";
 import { shownAgentLabelIds } from "@/features/chat/lib/assistant-row-content";
 import { LoaderCircle } from "@/ui/icons";
-import { notifyChatContentGrowth } from "@/shell/chat-scroll-follow";
 import { UserAskRecordCard } from "@/features/user-ask/UserAskRecordCard";
 import { useConversationUserAskRecords } from "@/features/user-ask/user-ask-store";
 import { useT } from "@/shared/i18n";
@@ -76,7 +74,7 @@ type ChatTimelineProps = {
   queuedUserMessages?: QueuedUserMessage[];
   onCancelQueued?: (message: QueuedUserMessage) => void;
   indicator?: InlineWorkingIndicatorMountProps;
-  listRef?: RefObject<LegendListRef | null>;
+  list?: ChatListBinding;
   recycleItems?: boolean;
   alignItemsAtEnd?: boolean;
   estimatedItemSize?: number;
@@ -219,7 +217,7 @@ export const ChatTimeline = memo(function ChatTimeline({
   queuedUserMessages,
   onCancelQueued,
   indicator,
-  listRef,
+  list,
   recycleItems = true,
   alignItemsAtEnd = false,
   estimatedItemSize = 120,
@@ -274,21 +272,6 @@ export const ChatTimeline = memo(function ChatTimeline({
       };
     });
   }, [askRecords, indicator, queuedUserMessages, rows]);
-  const tailItemId = useMemo(() => {
-    for (let index = listItems.length - 1; index >= 0; index -= 1) {
-      const item = listItems[index];
-      if (item?.type === "message" || item?.type === "ask-record") return item.id;
-    }
-    return null;
-  }, [listItems]);
-  const previousTailItemIdRef = useRef<string | null>(null);
-  useEffect(() => {
-    const previous = previousTailItemIdRef.current;
-    previousTailItemIdRef.current = tailItemId;
-    if (!previous || !tailItemId || previous === tailItemId) return;
-    const frame = requestAnimationFrame(() => notifyChatContentGrowth());
-    return () => cancelAnimationFrame(frame);
-  }, [tailItemId]);
   const tailUserRowId = useMemo(() => {
     for (let index = rows.length - 1; index >= 0; index -= 1) {
       const row = rows[index];
@@ -318,7 +301,7 @@ export const ChatTimeline = memo(function ChatTimeline({
     if (index >= 0) {
       finishMessageJump(messageJump.requestId);
       jumpPagesRef.current = null;
-      void listRef?.current?.scrollToIndex({
+      void list?.ref.current?.scrollToIndex({
         index,
         animated: true,
         viewPosition: 0.2,
@@ -344,8 +327,8 @@ export const ChatTimeline = memo(function ChatTimeline({
     conversationId,
     hasOlderEvents,
     isLoadingOlder,
+    list,
     listItems,
-    listRef,
     messageJump,
     onLoadOlder,
     t,
@@ -471,7 +454,10 @@ export const ChatTimeline = memo(function ChatTimeline({
   return (
     <ReplyHandoffContext.Provider value={replyHandoffController}>
       <LegendList<TimelineListItem>
-        ref={listRef}
+        ref={list?.ref}
+        dataKey={list?.dataKey}
+        onScroll={list?.onScroll}
+        onReady={list?.onReady}
         data={listItems}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
@@ -483,13 +469,6 @@ export const ChatTimeline = memo(function ChatTimeline({
         alignItemsAtEnd={alignItemsAtEnd}
         maintainVisibleContentPosition
         initialScrollAtEnd
-        // Scroll UI state is driven by useChatScrollManagement's passive native
-        // listener. Legend's web `onScroll` adapter synchronously reads full
-        // content geometry on every frame, forcing layout for no useful data.
-        // Do not use Legend's `onStartReached`: it deliberately re-enters on a
-        // data change while the threshold is visible, so each prepend can load
-        // the next page without another user action. The same passive native
-        // listener owns the intent-gated two-viewport threshold instead.
         ListHeaderComponent={ListHeader ?? undefined}
         ListFooterComponent={ListFooter}
         ItemSeparatorComponent={ItemSeparator}

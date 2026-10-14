@@ -127,7 +127,7 @@ function FocusPanel({
               hasOlderMessages={lineage.hasOlder}
               isLoadingOlder={lineage.isLoadingOlder}
               isLoadingHistory={!lineage.hasLoaded}
-              listRef={scroll.listRef}
+              list={scroll.list}
               className="conversation-focus__list"
               contentContainerStyle={FOCUS_CONTENT_STYLE}
               estimatedItemSize={140}

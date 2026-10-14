@@ -45,7 +45,6 @@ import { getDeviceIdOrNull } from "@/platform/electron/device";
 import { cloudAttachmentsStore } from "@/features/cloud/cloud-composer-store";
 import { useCloudConversationSession } from "@/global/auth/hooks/use-cloud-conversation-session";
 import { acceptedUserMessageIds } from "@/features/chat/lib/accepted-user-message-ids";
-import type { LegendListRef } from "@legendapp/list/react";
 import type { EventRecord } from "@stella/contracts/local-chat";
 import type { StreamingAssistantOverlay } from "@/features/chat/streaming/streaming-types";
 import type { ChatContext } from "@/shared/types/electron";
@@ -55,16 +54,7 @@ type TabComposerMemory = {
   chatContext: ChatContext | null;
   selectedText: string | null;
 };
-type TabScrollMemory = { scrollTop: number; followingLatest: boolean };
 const MAX_RETAINED_TAB_STATE = 20;
-/**
- * How long, after opening/switching into a conversation that lands at the
- * bottom, to keep re-pinning to the true end while late-rendering content
- * (agent cards, activity cards, images) settles and grows the scroll height.
- */
-const OPEN_BOTTOM_SETTLE_MS = 600;
-// Frames the height must hold still before an opening chat is shown.
-const OPEN_BOTTOM_STABLE_FRAMES = 3;
 const NO_NEWER_CLOUD_MESSAGES = () => false;
 const EMPTY_EVENTS: EventRecord[] = [];
 const NO_STREAMING_ASSISTANTS: StreamingAssistantOverlay[] = [];
@@ -101,43 +91,6 @@ const setBoundedTabMemory = <T>(
     memory.delete(oldestConversationId);
   }
 };
-export const createConversationScrollMemoryCleanup = ({
-  conversationId,
-  list,
-  scrollMemory,
-  getIsFollowing,
-  isConversationOpen,
-}: {
-  conversationId: string | null;
-  list: Pick<LegendListRef, "getScrollableNode"> | null;
-  scrollMemory: Map<string, TabScrollMemory>;
-  getIsFollowing: () => boolean;
-  isConversationOpen: (conversationId: string) => boolean;
-}) => {
-  // Resolve Legend's DOM node while its internal ref is still mounted. During
-  // layout cleanup the list handle can remain non-null after that internal ref
-  // has already been cleared, making a late getScrollableNode() call throw.
-  let element: ReturnType<LegendListRef["getScrollableNode"]> | null = null;
-  if (conversationId && list) {
-    try {
-      element = list.getScrollableNode();
-    } catch {
-      // A conversation switch can race Legend's own ref teardown. Scroll
-      // memory is best-effort; losing one position is safer than crashing the
-      // account transition while trying to capture it.
-      element = null;
-    }
-  }
-  return () => {
-    if (!conversationId || !isConversationOpen(conversationId) || !element) {
-      return;
-    }
-    setBoundedTabMemory(scrollMemory, conversationId, {
-      scrollTop: element.scrollTop,
-      followingLatest: getIsFollowing(),
-    });
-  };
-};
 export function useFullShellChat({
   activeConversationId,
   isOnChatRoute,
@@ -159,22 +112,11 @@ export function useFullShellChat({
   const composerMemoryByConversationRef = useRef(
     new Map<string, TabComposerMemory>(),
   );
-  const scrollMemoryByConversationRef = useRef(
-    new Map<string, TabScrollMemory>(),
-  );
   const activeConversationIdRef = useRef(activeConversationId);
   activeConversationIdRef.current = activeConversationId;
   const previousComposerConversationIdRef = useRef<string | null>(
     activeConversationId,
   );
-  const restoredConversationScrollRef = useRef<string | null>(null);
-  const [settledScrollConversationId, setSettledScrollConversationId] =
-    useState<string | null>(null);
-  const markScrollSettled = useCallback((conversationId: string | null) => {
-    setSettledScrollConversationId((current) =>
-      current === conversationId ? current : conversationId,
-    );
-  }, []);
   const pendingAutoSendTextRef = useRef<string | null>(null);
   // Auth scope is a hard renderer privacy boundary. Clear composer content,
   // attachment handles, and per-tab memories in a layout effect so no frame
@@ -188,9 +130,7 @@ export function useFullShellChat({
     if (clearedForScopeRef.current === scope) return;
     clearedForScopeRef.current = scope;
     composerMemoryByConversationRef.current.clear();
-    scrollMemoryByConversationRef.current.clear();
     previousComposerConversationIdRef.current = null;
-    restoredConversationScrollRef.current = null;
     setMessage("");
     setChatContext(null);
     setSelectedText(null);
@@ -247,7 +187,6 @@ export function useFullShellChat({
         for (const conversationId of composerMemoryByConversationRef.current.keys()) {
           if (!openIds.has(conversationId)) {
             composerMemoryByConversationRef.current.delete(conversationId);
-            scrollMemoryByConversationRef.current.delete(conversationId);
           }
         }
       }),
@@ -523,7 +462,8 @@ export function useFullShellChat({
     sendAgentInputMessage,
   });
   const {
-    listRef,
+    list,
+    isPlacingInitialScroll,
     isAtBottom,
     isNearBottom,
     isFollowingLatest,
@@ -547,106 +487,10 @@ export function useFullShellChat({
     onLoadLatest: loadLatestMessages,
     paginationKey: activeConversationId,
   });
-  useLayoutEffect(() => {
-    const conversationId = activeConversationId;
-    const scrollMemory = scrollMemoryByConversationRef.current;
-    return createConversationScrollMemoryCleanup({
-      conversationId,
-      list: listRef.current,
-      scrollMemory,
-      getIsFollowing,
-      isConversationOpen: (id: string) =>
-        conversationTabs
-          .getSnapshot()
-          .tabs.some((tab) => tab.conversationId === id),
-    });
-  }, [activeConversationId, getIsFollowing, listRef]);
-  useEffect(() => {
-    if (
-      !activeConversationId ||
-      isInitialLoadingMessages ||
-      displayMessages.length === 0 ||
-      restoredConversationScrollRef.current === activeConversationId
-    ) {
-      if (restoredConversationScrollRef.current === activeConversationId) {
-        markScrollSettled(activeConversationId);
-      }
-      return;
-    }
-    const conversationId = activeConversationId;
-    let settleRaf: number | null = null;
-    const frame = window.requestAnimationFrame(() => {
-      const remembered =
-        scrollMemoryByConversationRef.current.get(conversationId);
-      const element = listRef.current?.getScrollableNode();
-      if (remembered && !remembered.followingLatest && element) {
-        const maximumScrollTop = Math.max(
-          0,
-          element.scrollHeight - element.clientHeight,
-        );
-        element.scrollTo({
-          top: Math.min(remembered.scrollTop, maximumScrollTop),
-          behavior: "instant",
-        });
-        markScrollSettled(conversationId);
-      } else {
-        scrollToBottom("instant");
-        // Agent cards, activity cards, and images near the bottom can
-        // mount/settle a beat AFTER this initial pin, growing the scroll
-        // height so the "bottom" we just landed on is now above the real
-        // one — tab switches that land slightly above the true bottom.
-        // Keep re-pinning to the end through that post-open settling
-        // (until the height stops changing, a short window elapses, or
-        // the user takes over) so we always end at the actual bottom.
-        //
-        // The timeline stays hidden (`isOpeningScroll`) until the height has
-        // held still for a few frames, so a reload or relaunch shows the
-        // chat already at the bottom instead of drawing it at the top and
-        // then scrolling down.
-        let lastHeight = element ? element.scrollHeight : 0;
-        let stableFrames = 0;
-        const deadline = performance.now() + OPEN_BOTTOM_SETTLE_MS;
-        const settle = () => {
-          settleRaf = null;
-          const node = listRef.current?.getScrollableNode();
-          if (!node || !getIsFollowing()) {
-            markScrollSettled(conversationId);
-            return;
-          }
-          if (node.scrollHeight !== lastHeight) {
-            lastHeight = node.scrollHeight;
-            stableFrames = 0;
-            void listRef.current?.scrollToEnd({ animated: false });
-          } else if (++stableFrames === OPEN_BOTTOM_STABLE_FRAMES) {
-            markScrollSettled(conversationId);
-          }
-          if (performance.now() < deadline) {
-            settleRaf = window.requestAnimationFrame(settle);
-          } else {
-            markScrollSettled(conversationId);
-          }
-        };
-        settleRaf = window.requestAnimationFrame(settle);
-      }
-      restoredConversationScrollRef.current = conversationId;
-    });
-    return () => {
-      window.cancelAnimationFrame(frame);
-      if (settleRaf !== null) window.cancelAnimationFrame(settleRaf);
-    };
-  }, [
-    activeConversationId,
-    displayMessages.length,
-    getIsFollowing,
-    isInitialLoadingMessages,
-    listRef,
-    markScrollSettled,
-    scrollToBottom,
-  ]);
   const isOpeningScroll =
     Boolean(activeConversationId) &&
     displayMessages.length > 0 &&
-    settledScrollConversationId !== activeConversationId;
+    isPlacingInitialScroll;
   const handleSend = useCallback(async () => {
     const shouldFollowSend =
       showHomeContent || getIsEffectivelyAtBottom() || getShouldFollowSend();
@@ -871,7 +715,7 @@ export function useFullShellChat({
   );
   const chatColumnScroll = useMemo(
     () => ({
-      listRef,
+      list,
       showScrollButton,
       isAtBottom,
       isNearBottom,
@@ -885,7 +729,7 @@ export function useFullShellChat({
     }),
     [
       isOpeningScroll,
-      listRef,
+      list,
       showScrollButton,
       isAtBottom,
       isNearBottom,

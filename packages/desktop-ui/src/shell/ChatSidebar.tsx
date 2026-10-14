@@ -184,7 +184,6 @@ function AccountScopedChatPanelTab({
   const { showStop, requestStop } = useOptimisticStop(isStreaming, onStop);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   useEscapeToStop({ active: showStop, stop: requestStop, inputRef });
-  const restoredConversationScrollRef = useRef<string | null>(null);
 
   const [surfaceActive, setSurfaceActive] = useState(
     () =>
@@ -217,28 +216,6 @@ function AccountScopedChatPanelTab({
   });
   const { scrollToBottom: scrollSidebarToBottom } = sidebarScroll;
 
-  useEffect(() => {
-    if (
-      !conversationId ||
-      isInitialLoading ||
-      messages.length === 0 ||
-      restoredConversationScrollRef.current === conversationId
-    ) {
-      return;
-    }
-    const restoredConversationId = conversationId;
-    const frame = window.requestAnimationFrame(() => {
-      scrollSidebarToBottom("instant");
-      restoredConversationScrollRef.current = restoredConversationId;
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [
-    conversationId,
-    isInitialLoading,
-    messages.length,
-    scrollSidebarToBottom,
-  ]);
-
   const assistantReplyPeek = useAssistantReplyPeek({
     messages,
     isFollowingLatest: sidebarScroll.isFollowingLatest,
@@ -247,7 +224,7 @@ function AccountScopedChatPanelTab({
 
   const sidebarScrollApi = useMemo<ChatColumnScroll>(
     () => ({
-      listRef: sidebarScroll.listRef,
+      list: sidebarScroll.list,
       showScrollButton: sidebarScroll.showScrollButton,
       isAtBottom: sidebarScroll.isAtBottom,
       isNearBottom: sidebarScroll.isNearBottom,
@@ -259,7 +236,7 @@ function AccountScopedChatPanelTab({
       thumbRef: sidebarScroll.thumbRef,
     }),
     [
-      sidebarScroll.listRef,
+      sidebarScroll.list,
       sidebarScroll.showScrollButton,
       sidebarScroll.isAtBottom,
       sidebarScroll.isNearBottom,

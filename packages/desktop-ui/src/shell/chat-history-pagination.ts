@@ -31,7 +31,6 @@ export class ChatHistoryPaginationGate {
   private readonly edge: "start" | "end";
   private consumedActionIds = new Set<number>();
   private requestPhase: RequestPhase = "idle";
-  private settledSinceLastSync = false;
 
   constructor(edge: "start" | "end" = "start") {
     this.edge = edge;
@@ -42,8 +41,6 @@ export class ChatHistoryPaginationGate {
     requestSettled: boolean;
   } {
     const previous = this.requestPhase;
-    const externallySettled = this.settledSinceLastSync;
-    this.settledSinceLastSync = false;
 
     // Subscription re-keying briefly reports `hasMore=false` while retaining
     // the prior rows. Loading wins over that transient so the accepted request
@@ -59,9 +56,7 @@ export class ChatHistoryPaginationGate {
     return {
       requestStarted:
         previous === "awaiting-loading" && this.requestPhase === "loading",
-      requestSettled:
-        externallySettled ||
-        (previous !== "idle" && this.requestPhase === "idle"),
+      requestSettled: previous !== "idle" && this.requestPhase === "idle",
     };
   }
 
@@ -130,16 +125,8 @@ export class ChatHistoryPaginationGate {
     }
   }
 
-  /**
-   * Complete an accepted request even when React batched the transient
-   * loading=true snapshot away. The next guard sync still reports the
-   * settlement so anchor restoration runs exactly once.
-   */
-  settleRequest(): boolean {
-    if (this.requestPhase === "idle") return false;
+  settleRequest(): void {
     this.requestPhase = "idle";
-    this.settledSinceLastSync = true;
-    return true;
   }
 
   snapshot() {
@@ -147,148 +134,6 @@ export class ChatHistoryPaginationGate {
       requestPhase: this.requestPhase,
       consumedActionIds: [...this.consumedActionIds],
     };
-  }
-}
-
-export type ChatPrependAnchor = {
-  rowId: string;
-  viewportOffset: number;
-  scrollTop: number;
-  viewportHeight: number;
-  contentHeight: number;
-};
-
-const chatRows = (node: HTMLElement): HTMLElement[] =>
-  Array.from(node.querySelectorAll<HTMLElement>("[data-chat-row-id]"));
-
-export const captureChatPrependAnchor = (
-  node: HTMLElement,
-): ChatPrependAnchor | null => {
-  const viewport = node.getBoundingClientRect();
-  const rows = chatRows(node)
-    .map((candidate) => ({
-      candidate,
-      rect: candidate.getBoundingClientRect(),
-    }))
-    .filter(({ rect }) => rect.bottom > viewport.top)
-    .sort((a, b) => a.rect.top - b.rect.top);
-  const row = rows[0]?.candidate;
-  const rowId = row?.dataset.chatRowId;
-  if (!row || !rowId) return null;
-
-  return {
-    rowId,
-    viewportOffset: row.getBoundingClientRect().top - viewport.top,
-    scrollTop: node.scrollTop,
-    viewportHeight: node.clientHeight,
-    contentHeight: node.scrollHeight,
-  };
-};
-
-export type ChatPrependAnchorRestore = {
-  found: boolean;
-  adjustment: number;
-  scrollTopBefore: number;
-  scrollTopAfter: number;
-  viewportOffsetAfter: number | null;
-  contentHeightAfter: number;
-};
-
-/**
- * Correct any residual MVCP error after a prepend. Legend remains the primary
- * anchor owner; this only writes when the captured row's painted viewport
- * offset differs, so an exact MVCP result is a zero-write no-op.
- */
-export const restoreChatPrependAnchor = (
-  node: HTMLElement,
-  anchor: ChatPrependAnchor,
-): ChatPrependAnchorRestore => {
-  const row = chatRows(node).find(
-    (candidate) => candidate.dataset.chatRowId === anchor.rowId,
-  );
-  const scrollTopBefore = node.scrollTop;
-  if (!row) {
-    return {
-      found: false,
-      adjustment: 0,
-      scrollTopBefore,
-      scrollTopAfter: node.scrollTop,
-      viewportOffsetAfter: null,
-      contentHeightAfter: node.scrollHeight,
-    };
-  }
-
-  const viewport = node.getBoundingClientRect();
-  const offsetBefore = row.getBoundingClientRect().top - viewport.top;
-  const adjustment = offsetBefore - anchor.viewportOffset;
-  if (Math.abs(adjustment) > 0.1) node.scrollTop += adjustment;
-
-  const viewportOffsetAfter =
-    row.getBoundingClientRect().top - node.getBoundingClientRect().top;
-  return {
-    found: true,
-    adjustment,
-    scrollTopBefore,
-    scrollTopAfter: node.scrollTop,
-    viewportOffsetAfter,
-    contentHeightAfter: node.scrollHeight,
-  };
-};
-
-/**
- * Keeps the captured reading row fixed while already-mounted content above it
- * settles asynchronously (images, fonts, expanded tool cards, highlighted
- * code). It observes only mounted rows at-or-before the anchor, so observer and
- * callback work stays bounded by the virtual list's render window. A new user
- * gesture must stop the stabilizer; scroll intent always wins over anchoring.
- */
-export class ChatPrependAnchorStabilizer {
-  private resizeObserver: ResizeObserver | null = null;
-  private raf = 0;
-  private stopped = false;
-
-  constructor(
-    private readonly node: HTMLElement,
-    private readonly anchor: ChatPrependAnchor,
-    private readonly onRestore?: (result: ChatPrependAnchorRestore) => void,
-  ) {}
-
-  start(): void {
-    if (this.stopped || typeof ResizeObserver === "undefined") return;
-    const anchorRow = chatRows(this.node).find(
-      (row) => row.dataset.chatRowId === this.anchor.rowId,
-    );
-    if (!anchorRow) return;
-    const anchorTop = anchorRow.getBoundingClientRect().top;
-    this.resizeObserver = new ResizeObserver(() => this.scheduleRestore());
-    for (const row of chatRows(this.node)) {
-      if (row.getBoundingClientRect().top <= anchorTop + 0.5) {
-        this.resizeObserver.observe(row);
-      }
-    }
-  }
-
-  stop(): void {
-    if (this.stopped) return;
-    this.stopped = true;
-    this.resizeObserver?.disconnect();
-    this.resizeObserver = null;
-    if (this.raf) cancelAnimationFrame(this.raf);
-    this.raf = 0;
-  }
-
-  private scheduleRestore(): void {
-    if (this.stopped || this.raf) return;
-    this.raf = requestAnimationFrame(() => {
-      this.raf = 0;
-      if (this.stopped) return;
-      const result = restoreChatPrependAnchor(this.node, this.anchor);
-      if (!result.found) {
-        this.stop();
-        return;
-      }
-      this.onRestore?.(result);
-    });
   }
 }
 

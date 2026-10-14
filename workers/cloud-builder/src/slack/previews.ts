@@ -14,8 +14,10 @@
  * service binding. `SITES_HOST` is the host pattern (`*.stellasites.app` in
  * production, `*-dev.stellasites.app` on dev), so each site is its own origin,
  * and stellasites.app is on the Public Suffix List, so each is its own site
- * too. Without it, every site shares `SITES_SHARED_ORIGIN`, and
- * `/__stella/open/<id>` picks the one a browser sees through a cookie.
+ * too. Without it (a self-hosted server on workers.dev), every site shares
+ * `SITES_SHARED_ORIGIN` under its own path, `<origin>/<id>/`; no response
+ * carries Service-Worker-Allowed, so a site's service worker can't reach
+ * past its own `/<id>/`.
  *
  * Access is the workspace owner's choice, per repository (`slack_repos`,
  * for previews built from one) or for the workspace (`slack_preview_settings`):
@@ -81,7 +83,6 @@ const PUBLISH_TTL_MS = 12 * 60 * 60_000;
 const VIEW_TTL_MS = 7 * DAY_MS;
 const MEMBER_TTL_MS = 30 * DAY_MS;
 const VIEW_COOKIE = "__Host-stella_preview_view";
-const SITE_COOKIE = "__Host-stella_preview_site";
 const MEMBER_COOKIE = "stella_slack_member";
 
 const ID_PATTERN = /^[a-z2-7]{26}$/u;
@@ -227,7 +228,7 @@ const previewLink = (env: Cloudflare.Env, id: string): string | null => {
   const host = sitesHost(env);
   if (host) return `https://${host.before}${id}${host.after}/`;
   const origin = sharedOrigin(env);
-  return origin ? `${origin}/__stella/open/${id}` : null;
+  return origin ? `${origin}/${id}/` : null;
 };
 
 const authOrigin = (env: Cloudflare.Env, request?: Request): string =>
@@ -954,7 +955,18 @@ const serveFile = async (
   });
 };
 
-/** The preview a request is for, from its host or (shared origin) the site cookie. */
+const refererSite = (request: Request): string | null => {
+  try {
+    const referer = new URL(request.headers.get("referer") ?? "");
+    if (referer.origin !== new URL(request.url).origin) return null;
+    const first = referer.pathname.split("/")[1] ?? "";
+    return ID_PATTERN.test(first) ? first : null;
+  } catch {
+    return null;
+  }
+};
+
+/** The preview a request is for, from its host or (shared origin) its first path segment. */
 const previewIdFor = (request: Request, env: Cloudflare.Env): string | null => {
   const host = new URL(request.url).hostname.toLowerCase();
   const pattern = sitesHost(env);
@@ -964,8 +976,8 @@ const previewIdFor = (request: Request, env: Cloudflare.Env): string | null => {
     const label = host.slice(before.length, host.length - after.length);
     return ID_PATTERN.test(label) ? label : null;
   }
-  const site = cookieValues(request, SITE_COOKIE).find((value) => ID_PATTERN.test(value));
-  return site ?? null;
+  const first = new URL(request.url).pathname.split("/")[1] ?? "";
+  return ID_PATTERN.test(first) ? first : null;
 };
 
 const hasView = async (request: Request, env: Cloudflare.Env, teamId: string): Promise<boolean> => {
@@ -986,10 +998,22 @@ export const servePreview = async (request: Request, env: Cloudflare.Env): Promi
   if (shared && url.pathname.startsWith("/__stella/open/")) {
     const id = url.pathname.slice("/__stella/open/".length).replace(/\/+$/u, "");
     if (!ID_PATTERN.test(id)) return missing();
-    return new Response(null, {
-      status: 302,
-      headers: { location: "/", "set-cookie": hostCookie(SITE_COOKIE, id, VIEW_TTL_MS), "cache-control": "no-store" },
-    });
+    return new Response(null, { status: 302, headers: { location: `/${id}/`, "cache-control": "no-store" } });
+  }
+  if (shared) {
+    const [, first = "", ...rest] = url.pathname.split("/");
+    if (ID_PATTERN.test(first) && rest.length === 0) {
+      return new Response(null, { status: 301, headers: { location: `/${first}/${url.search}`, "cache-control": "no-store" } });
+    }
+    if (!ID_PATTERN.test(first) && !url.pathname.startsWith("/__stella/")) {
+      const referrer = refererSite(request);
+      if (referrer) {
+        return new Response(null, {
+          status: 302,
+          headers: { location: `/${referrer}${url.pathname}${url.search}`, "cache-control": "no-store" },
+        });
+      }
+    }
   }
 
   if (url.pathname === "/__stella/auth") {
@@ -1001,7 +1025,6 @@ export const servePreview = async (request: Request, env: Cloudflare.Env): Promi
     const view = await signToken<ViewClaims>(env, VIEW, { t: grant.t }, VIEW_TTL_MS);
     const headers = new Headers({ location: safePath(grant.r), "cache-control": "no-store", "referrer-policy": "no-referrer" });
     headers.append("set-cookie", hostCookie(VIEW_COOKIE, view, VIEW_TTL_MS));
-    if (shared) headers.append("set-cookie", hostCookie(SITE_COOKIE, grant.p, VIEW_TTL_MS));
     return new Response(null, { status: 302, headers });
   }
 
@@ -1027,7 +1050,10 @@ export const servePreview = async (request: Request, env: Cloudflare.Env): Promi
       `<p>This preview is for members of the ${escapeHtml(install.teamName)} Slack workspace.</p><a class="button" href="${escapeHtml(target.toString())}">Sign in</a>`,
     );
   }
-  return await serveFile(request, env, preview, url.pathname, isPublic);
+  const pathname = shared ? url.pathname.slice(preview.id.length + 1) || "/" : url.pathname;
+  const response = await serveFile(request, env, preview, pathname, isPublic);
+  response.headers.delete("service-worker-allowed");
+  return response;
 };
 
 /** What the sites-host Worker calls. Unreachable from the public internet. */

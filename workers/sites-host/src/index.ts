@@ -46,7 +46,11 @@ export default {
     if (url.pathname === "/__stella/healthz") return Response.json({ ok: true });
     if (env.SITES_APEX && url.hostname === env.SITES_APEX) return about();
     try {
-      return await env.SITES.fetch(request);
+      const response = await env.SITES.fetch(request);
+      if (!response.headers.has("service-worker-allowed")) return response;
+      const headers = new Headers(response.headers);
+      headers.delete("service-worker-allowed");
+      return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
     } catch {
       return new Response("Site unavailable. Try again.", {
         status: 503,

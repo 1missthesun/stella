@@ -380,15 +380,15 @@ function ChapterTab({
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const progress = useSharedValue(complete ? 1 : 0);
+  const startedRunKey = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!active) return;
-    cancelAnimation(progress);
-    progress.value = instant ? 1 : 0;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [runKey]);
-
-  useEffect(() => {
+    const newRun = startedRunKey.current !== runKey;
+    startedRunKey.current = runKey;
+    if (newRun && active) {
+      cancelAnimation(progress);
+      progress.value = instant ? 1 : 0;
+    }
     if (!active) {
       cancelAnimation(progress);
       progress.value = withTiming(complete ? 1 : 0, { duration: 240 });

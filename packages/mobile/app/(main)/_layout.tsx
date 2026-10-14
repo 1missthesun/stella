@@ -162,11 +162,10 @@ export default function MainLayout() {
   const accessoryVisible = Boolean(pageTitle) && topBarAccessory != null;
 
   const search = useChatSearch();
+  const { close: closeSearch } = search;
   useEffect(() => {
-    search.close();
-    // `search.close` is stable; only react to route changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname]);
+    closeSearch();
+  }, [pathname, closeSearch]);
 
   useEffect(() => {
     if (activeTab) {

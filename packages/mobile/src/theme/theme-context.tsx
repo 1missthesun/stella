@@ -1,4 +1,12 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { useColorScheme } from "react-native";
 import { setAppColorScheme } from "../carplay/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -89,9 +97,15 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [gradientColor, setGradientColorState] =
     useState<GradientColor>("relative");
   const [loaded, setLoaded] = useState(false);
-  const [catalogVersion, setCatalogVersion] = useState(0);
-
-  useEffect(() => subscribeThemes(() => setCatalogVersion((v) => v + 1)), []);
+  const catalog = useSyncExternalStore(
+    subscribeThemes,
+    getThemesSnapshot,
+    getThemesSnapshot,
+  );
+  const themes = useMemo(
+    () => catalog.filter((t) => !isHiddenOverlay(t)),
+    [catalog],
+  );
 
   useEffect(() => {
     void Promise.all([
@@ -139,20 +153,20 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     );
   }, []);
 
-  const setPreference = (p: ThemePreference) => {
+  const setPreference = useCallback((p: ThemePreference) => {
     setPreferenceState(p);
     void AsyncStorage.setItem(MODE_KEY, p);
-  };
+  }, []);
 
-  const setGradientPreference = (mode: GradientMode) => {
+  const setGradientPreference = useCallback((mode: GradientMode) => {
     setGradientPreferenceState(mode);
     void AsyncStorage.setItem(GRADIENT_KEY, mode);
-  };
+  }, []);
 
-  const setGradientColor = (color: GradientColor) => {
+  const setGradientColor = useCallback((color: GradientColor) => {
     setGradientColorState(color);
     void AsyncStorage.setItem(GRADIENT_COLOR_KEY, color);
-  };
+  }, []);
 
   const customTheme = getThemeById("custom");
   const customPopulated = customTheme?.populated === true;
@@ -167,20 +181,23 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const effectiveActiveId = customPopulated ? themeId : "custom";
   const selectedThemeId = customPopulated ? themeId : customBaseId;
 
-  const setThemeId = (id: string) => {
-    if (!getThemeById(id)) return;
-    if (customPopulated) {
-      setThemeIdState(id);
-      void AsyncStorage.setItem(THEME_KEY, id);
-    } else {
-      setCustomBaseState(id);
-      void AsyncStorage.setItem(CUSTOM_BASE_KEY, id);
-      if (themeId !== "custom") {
-        setThemeIdState("custom");
-        void AsyncStorage.setItem(THEME_KEY, "custom");
+  const setThemeId = useCallback(
+    (id: string) => {
+      if (!getThemeById(id)) return;
+      if (customPopulated) {
+        setThemeIdState(id);
+        void AsyncStorage.setItem(THEME_KEY, id);
+      } else {
+        setCustomBaseState(id);
+        void AsyncStorage.setItem(CUSTOM_BASE_KEY, id);
+        if (themeId !== "custom") {
+          setThemeIdState("custom");
+          void AsyncStorage.setItem(THEME_KEY, "custom");
+        }
       }
-    }
-  };
+    },
+    [customPopulated, themeId],
+  );
 
   const prefersDark =
     preference === "system" ? systemScheme === "dark" : preference === "dark";
@@ -231,7 +248,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       theme,
       selectedThemeId,
       setThemeId,
-      themes: visibleThemes(),
+      themes,
       isDark,
       flat,
       palette,
@@ -243,22 +260,23 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       gradientColor,
       setGradientColor,
     }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       preference,
+      setPreference,
       theme,
-      themeId,
       selectedThemeId,
-      customPopulated,
+      setThemeId,
+      themes,
       isDark,
       flat,
       palette,
       tokens,
       colors,
       gradientPreference,
+      setGradientPreference,
       gradientMode,
       gradientColor,
-      catalogVersion,
+      setGradientColor,
     ],
   );
 

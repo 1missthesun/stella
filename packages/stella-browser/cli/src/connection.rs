@@ -200,6 +200,9 @@ pub struct DaemonResult {
 
 fn configure_daemon_command(cmd: &mut Command, session: &str) {
     cmd.args(["service", "run", "--session", session]);
+    // The daemon outlives this CLI process, so it must not inherit a parent
+    // watch aimed at some other process.
+    cmd.env_remove("STELLA_BROWSER_PARENT_PID");
 }
 
 pub fn ensure_daemon(session: &str) -> Result<DaemonResult, String> {

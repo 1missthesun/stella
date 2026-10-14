@@ -18,8 +18,10 @@ pub async fn parent_exited(parent: u32) {
     // pid stops matching. Unlike probing the pid, this cannot be fooled by a
     // new process reusing it.
     let is_child = || unsafe { libc::getppid() } as u32 == parent;
+    // Fail closed: a daemon whose named parent is already gone at startup
+    // has nobody to stop it, so it exits rather than living on as an orphan.
     if !is_child() {
-        return std::future::pending().await;
+        return;
     }
     let mut interval = tokio::time::interval(Duration::from_secs(1));
     loop {
@@ -41,7 +43,8 @@ pub async fn parent_exited(parent: u32) {
     // even if its pid is later reused.
     let handle = unsafe { OpenProcess(PROCESS_SYNCHRONIZE, 0, parent) };
     if handle == 0 {
-        return std::future::pending().await;
+        // Fail closed: the parent is already gone.
+        return;
     }
     let raw = handle as isize;
     let waited = tokio::task::spawn_blocking(move || unsafe {

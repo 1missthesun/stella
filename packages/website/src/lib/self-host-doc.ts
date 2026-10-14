@@ -7,6 +7,8 @@ A self-hosted Stella is the same Stella, with its server running on your user's 
 
 One command builds it. Most of it runs on its own; a few steps need a person in the browser (signing in to Cloudflare, choosing the paid plan, turning on storage). This page tells you exactly what each step is and how to handle it.
 
+> **Availability (October 2026):** the server side is ready. Connecting the apps needs the next app releases: the phone's **Connect your own server** comes with Stella for iOS and Android 1.0.47, and the desktop's with the next Stella desktop launcher update. Until those are out, set up the server and tell the user their apps will connect once they update.
+
 ## 1. Ask your user how to handle it
 
 Before you run anything, ask your user this, in your own friendly words:

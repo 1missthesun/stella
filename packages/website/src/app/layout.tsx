@@ -6,7 +6,6 @@ import { EmbeddedInitScript } from "@/components/embedded/embedded-init-script";
 import { EmbeddedThemeBridge } from "@/components/embedded/embedded-theme-bridge";
 import { GoogleAdsTag } from "@/components/google-ads-tag";
 import { PerfInitScript } from "@/components/perf-init-script";
-import { RevealOnScroll } from "@/components/reveal-on-scroll";
 import { SmoothScroll } from "@/components/smooth-scroll";
 import "lenis/dist/lenis.css";
 import "./globals.css";
@@ -183,7 +182,6 @@ export default function RootLayout({
         {children}
         <SignInDialogHost />
         <EmbeddedThemeBridge />
-        <RevealOnScroll />
         <SmoothScroll />
       </body>
     </html>

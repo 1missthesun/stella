@@ -229,16 +229,13 @@ export class WorkerPeerBroker {
   private waitForPeer(timeoutMs: number): Promise<JsonRpcPeer> {
     return new Promise<JsonRpcPeer>((resolve, reject) => {
       const onAttach = () => {
-        deadline.cancel();
         const peer = this.pickPeer();
-        if (peer) {
-          resolve(peer);
-        } else {
-          // Race: someone detached before we resolved. Re-queue.
-          // (Parity quirk preserved: the deadline is cancelled on the first
-          // attach even when we re-queue, exactly like the old clearTimeout.)
+        if (!peer) {
           this.waitForPeerResolvers.push(onAttach);
+          return;
         }
+        deadline.cancel();
+        resolve(peer);
       };
       const deadline = forkDelayed(timeoutMs, () => {
         const idx = this.waitForPeerResolvers.indexOf(onAttach);

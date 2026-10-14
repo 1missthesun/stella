@@ -25,6 +25,16 @@ export const liquidGlassSupported: boolean = (() => {
   }
 })();
 
+/**
+ * iOS drops the Liquid Glass material when an ancestor's alpha is below 1, and
+ * renders glass clear when another glass layer sits beneath it. Animate a glass
+ * ancestor's opacity only through this, and keep glass off animated-opacity and
+ * glass backdrops.
+ */
+export function glassAncestorOpacity<T>(opacity: T): T | 1 {
+  return liquidGlassSupported ? 1 : opacity;
+}
+
 function useGlassScheme(): "light" | "dark" {
   const { isDark } = useTheme();
   return isDark ? "dark" : "light";

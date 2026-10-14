@@ -70,14 +70,6 @@ export function PlusMenuPopover({
    */
   containerRef: React.RefObject<View | null>;
   headerLabel?: string | null;
-  /**
-   * Focused context-menu treatment (message menu): a LIGHT non-glass scrim
-   * behind the card plus a frostier tint on the card's Liquid Glass, so the
-   * menu itself is the authentic frosted-glass surface. The backdrop stays a
-   * plain scrim (never a `GlassView`): a second glass layer beneath the in-tree
-   * menu triggers Apple's glass-on-glass suppression and renders the menu clear,
-   * so the frost must come from the single glass card, not the backdrop.
-   */
   scrim?: boolean;
   large?: boolean;
   wrapLabels?: boolean;
@@ -226,11 +218,6 @@ export function PlusMenuPopover({
           pointerEvents="none"
           style={StyleSheet.absoluteFill}
         />
-        {/* Fade the menu *contents* — never the glass or its parent. Animating
-              opacity on a GlassView ancestor makes iOS drop the Liquid Glass
-              material entirely (renders clear). The glass itself fades via its
-              own `present`-driven materialize animation; the spring lives on the
-              transform above. */}
         <Animated.View style={{ opacity: measured ? anim : 0 }}>
           {headerLabel && !submenuTitle ? (
             <View
@@ -354,13 +341,6 @@ const makePlusMenuStyles = (colors: Colors) =>
       zIndex: 50,
     },
     scrim: {
-      // Non-glass backdrop behind the focused message menu: a LIGHT plain dark
-      // scrim (the app's sheet/modal convention), kept subtle so
-      // the menu's Liquid Glass refracts near-live chat and reads as authentic
-      // frost instead of a muddied dark panel. It must NOT be a GlassView — a
-      // second glass layer beneath the menu triggers Apple's glass-on-glass
-      // suppression and renders the menu clear — so the frost comes entirely
-      // from the single glass surface (the menu card), never from the backdrop.
       ...StyleSheet.absoluteFill,
       backgroundColor: "rgba(0, 0, 0, 0.2)",
     },

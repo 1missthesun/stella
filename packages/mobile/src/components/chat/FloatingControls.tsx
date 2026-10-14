@@ -6,7 +6,7 @@ import {
   StyleSheet,
   Text,
 } from "react-native";
-import { GlassSurface, liquidGlassSupported } from "../glass";
+import { GlassSurface, glassAncestorOpacity } from "../glass";
 import { Icon } from "../Icon";
 import { type Colors } from "../../theme/colors";
 import { fadeHex } from "../../theme/oklch";
@@ -39,9 +39,7 @@ export function CatchUpPill({
         styles.catchUpPill,
         {
           top,
-          // Opacity on a Liquid Glass ancestor makes iOS drop the glass
-          // material, so only fade the wrapper on the (non-glass) fallback.
-          opacity: liquidGlassSupported ? 1 : anim,
+          opacity: glassAncestorOpacity(anim),
           transform: [
             {
               translateY: anim.interpolate({
@@ -61,7 +59,6 @@ export function CatchUpPill({
         fallbackColor={colors.surface}
         style={styles.catchUpPillGlass}
       >
-        {/* Border + content are children of the glass, so fading them is safe. */}
         <Animated.View
           pointerEvents="none"
           style={[
@@ -114,10 +111,7 @@ export function ScrollToBottomFab({
         styles.scrollToBottomFab,
         bottomOffset !== undefined && { bottom: bottomOffset },
         {
-          // Opacity on a Liquid Glass ancestor makes iOS drop the glass
-          // material, so only fade the wrapper on the (non-glass) fallback. On
-          // glass the material fades via `present` and the icon fades below.
-          opacity: liquidGlassSupported ? 1 : anim,
+          opacity: glassAncestorOpacity(anim),
           transform: [
             {
               translateY: anim.interpolate({
@@ -151,8 +145,6 @@ export function ScrollToBottomFab({
           fallbackColor={colors.surface}
           style={styles.scrollToBottomFabGlass}
         >
-          {/* Border + icon are children of the glass, so fading them is safe —
-              keeps the outline from lingering after the material dissolves. */}
           <Animated.View
             pointerEvents="none"
             style={[

@@ -1,11 +1,3 @@
-/**
- * The surfaces every onboarding card is built from: the card itself, its
- * settled one-line summary, and the two button weights.
- *
- * Cards arrive under an assistant message with a spring that animates
- * opacity, so they are opaque theme surfaces rather than glass (glass never
- * sits under an animated-opacity ancestor).
- */
 import { useMemo, type ReactNode } from "react";
 import {
   ActivityIndicator,

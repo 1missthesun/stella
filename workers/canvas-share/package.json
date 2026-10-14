@@ -9,7 +9,7 @@
     "types:check": "wrangler types worker-configuration.d.ts --config wrangler.jsonc --strict-vars=false --check",
     "typecheck": "tsc --noEmit && bun run types:check",
     "build:dry-run": "wrangler deploy --config wrangler.jsonc --dry-run",
-    "deploy": "wrangler deploy --config wrangler.jsonc"
+    "deploy": "node ../../scripts/check-deploy-config.mjs canvas-share && wrangler deploy --config wrangler.jsonc"
   },
   "devDependencies": {
     "typescript": "npm:typescript@^7.0.2",

@@ -10,7 +10,7 @@
     "containers:check:production": "node scripts/check-container-metadata.mjs --env production",
     "deploy:dev": "node ../../scripts/check-dev-deploy.mjs && node scripts/check-container-metadata.mjs --config && bun run image:prepare && wrangler deploy --env=\"\" && node scripts/check-container-metadata.mjs --deployed",
     "deploy:acceptance": "node scripts/check-container-metadata.mjs --config --env bn118 && bun run image:prepare && wrangler deploy --env bn118 --strict && node scripts/check-container-metadata.mjs --deployed --env bn118",
-    "deploy:production": "node scripts/check-container-metadata.mjs --config --env production && bun run image:prepare && wrangler deploy --env production --strict && node scripts/check-container-metadata.mjs --deployed --env production",
+    "deploy:production": "node ../../scripts/check-deploy-config.mjs cloud-builder production && node scripts/check-container-metadata.mjs --config --env production && bun run image:prepare && wrangler deploy --env production --strict && node scripts/check-container-metadata.mjs --deployed --env production",
     "preview": "node scripts/preview.mjs",
     "types:generate": "node scripts/generate-worker-types.mjs",
     "types:check": "node scripts/generate-worker-types.mjs --check",

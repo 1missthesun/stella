@@ -25,7 +25,7 @@
     "OWNER_SITE_URL": "https://stella.sh"
   },
 
-  // Public share domain. CANVAS_SHARE_BASE_URL in the backend must match.
+  // Public share domain; scripts/check-deploy-config.mjs holds it to the backend's CANVAS_SHARE_BASE_URL.
   "routes": [
     {
       "pattern": "stellashare.app",

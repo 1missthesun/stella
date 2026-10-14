@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "wrangler dev --env=\"\"",
     "deploy:dev": "node ../../scripts/check-dev-deploy.mjs && wrangler deploy --env=\"\"",
-    "deploy:production": "wrangler deploy --env production --strict",
+    "deploy:production": "node ../../scripts/check-deploy-config.mjs model-gateway production && wrangler deploy --env production --strict",
     "build:dry-run": "wrangler deploy --dry-run --env= --outdir .wrangler/dry-run",
     "types:generate": "wrangler types worker-configuration.d.ts --include-runtime false --env=",
     "types:check": "wrangler types worker-configuration.d.ts --include-runtime false --env= --check",

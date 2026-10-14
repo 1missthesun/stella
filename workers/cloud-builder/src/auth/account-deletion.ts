@@ -205,7 +205,10 @@ const advancePending = async (env: Cloudflare.Env, row: DeletionRow, now: number
       .bind(now, row.user_id)
       .run();
   }
-  if (row.due_at > now) return;
+  if (row.due_at > now) {
+    await ownerGateStub(env.OWNER_GATES, row.user_id).stopRenewal();
+    return;
+  }
   const started = await d1(env)
     .prepare("UPDATE account_deletions SET status = 'deleting', started_at = ? WHERE user_id = ? AND status = 'pending'")
     .bind(now, row.user_id)
@@ -256,7 +259,7 @@ const advanceDeleting = async (env: Cloudflare.Env, row: DeletionRow, now: numbe
   log("info", "account_deletion_completed", { requestedAt: row.requested_at, startedAt: row.started_at });
 };
 
-/** Hourly: cancel on sign-in, retry confirmations, delete due accounts, finish purges. */
+/** Hourly: cancel on sign-in, retry confirmations and renewal-off, delete due accounts, finish purges. */
 export const runAccountDeletions = async (env: Cloudflare.Env, now = Date.now()): Promise<void> => {
   const { results } = await d1(env)
     .prepare(

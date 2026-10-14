@@ -14,8 +14,8 @@ import type {
   LocalChatFilesWindow,
   LocalChatMessageRecord,
   LocalChatMessageWindow,
-  SqliteDatabase,
 } from "@stella/runtime/kernel/storage/shared";
+import { SqliteConnection } from "@stella/runtime/kernel/storage/shared";
 import type {
   CloudConversationCacheLifecycleAuthority,
   CloudConversationCachePurgeResult,
@@ -39,11 +39,11 @@ type LocalChatHistoryServiceOptions = {
   onUpdated?: (payload: LocalChatUpdatedPayload | null) => void;
 };
 
-const openNodeSqliteDatabase = (dbPath: string): SqliteDatabase =>
-  new DatabaseSync(dbPath) as unknown as SqliteDatabase;
+const openNodeSqliteDatabase = (dbPath: string): SqliteConnection =>
+  new SqliteConnection(new DatabaseSync(dbPath));
 
 export class LocalChatHistoryService {
-  private db: SqliteDatabase | null = null;
+  private db: SqliteConnection | null = null;
   private store: SessionStore | null = null;
   private cloudConversationCacheStore: CloudConversationCacheClient | null =
     null;

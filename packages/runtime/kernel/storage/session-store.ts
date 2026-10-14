@@ -1,9 +1,8 @@
 import {
   asTrimmedString,
-  cachedStatements,
   requireConversationId,
   type CachedStatements,
-  type SqliteDatabase,
+  type SqliteConnection,
 } from "./shared.js";
 import { ChatLog } from "./chat-log.js";
 import { MessageWindowReader } from "./message-window.js";
@@ -132,7 +131,7 @@ const COMPUTER_AGENT_CLOUD_OUTBOX_COLUMNS = `sequence,
   updated_at AS updatedAt`;
 
 export class SessionStore {
-  readonly db: SqliteDatabase;
+  readonly db: SqliteConnection;
   private readonly cached: CachedStatements;
   readonly chat: ChatLog;
   readonly messageWindows: MessageWindowReader;
@@ -140,9 +139,9 @@ export class SessionStore {
   private readonly journalOutbox: OutboxRepo<CloudJournalOutboxRecord>;
   private readonly computerAgentOutbox: OutboxRepo<ComputerAgentCloudOutboxRecord>;
   private inTransaction = false;
-  constructor(db: SqliteDatabase) {
+  constructor(db: SqliteConnection) {
     this.db = db;
-    this.cached = cachedStatements(db);
+    this.cached = db.statements;
     const tx = {
       immediate: (work: () => void) => void this.withImmediateTransaction(work),
     };

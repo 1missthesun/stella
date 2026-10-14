@@ -10,7 +10,6 @@ import {
   asFiniteNumber,
   asObject,
   asTrimmedString,
-  cachedStatements,
   eventTextFromPayload,
   generateLocalId,
   parseJsonRecord,
@@ -18,7 +17,7 @@ import {
   toJsonValueString,
   type CachedStatements,
   type LocalChatEventRecord,
-  type SqliteDatabase,
+  type SqliteConnection,
 } from "./shared.js";
 import { eventRoleForType, type Cursor } from "./view.js";
 import type {
@@ -165,12 +164,12 @@ export class ChatLog {
   private readonly cached: CachedStatements;
 
   constructor(
-    private readonly db: SqliteDatabase,
+    private readonly db: SqliteConnection,
     private readonly tx: {
       immediate: (work: () => void) => void;
     },
   ) {
-    this.cached = cachedStatements(db);
+    this.cached = db.statements;
   }
 
   static conversationKind(conversationId: string): "chat" | "derived" {

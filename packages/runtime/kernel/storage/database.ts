@@ -5,9 +5,9 @@ import {
   initializeDesktopDatabase,
   type DesktopDatabaseInitTiming,
 } from "./database-init.js";
-import type { SqliteDatabase } from "./shared.js";
+import { SqliteConnection, type SqliteDriverDatabase } from "./shared.js";
 
-type SqliteDatabaseCtor = new (filePath: string) => SqliteDatabase;
+type SqliteDatabaseCtor = new (filePath: string) => SqliteDriverDatabase;
 
 const requireRuntime = createRequire(import.meta.url);
 
@@ -37,12 +37,12 @@ const loadSqliteDatabaseCtor = (): SqliteDatabaseCtor => {
   );
 };
 
-const openDatabase = (dbPath: string): SqliteDatabase => {
+const openDatabase = (dbPath: string): SqliteConnection => {
   const Database = loadSqliteDatabaseCtor();
-  return new Database(dbPath);
+  return new SqliteConnection(new Database(dbPath));
 };
 
-export const openSqliteConnection = (dbPath: string): SqliteDatabase =>
+export const openSqliteConnection = (dbPath: string): SqliteConnection =>
   openDatabase(dbPath);
 
 export type DesktopDatabaseOpenTiming = DesktopDatabaseInitTiming & {
@@ -52,7 +52,7 @@ export type DesktopDatabaseOpenTiming = DesktopDatabaseInitTiming & {
 export const createDesktopDatabase = (
   stellaDataDir: string,
   options?: { onTiming?: (timing: DesktopDatabaseOpenTiming) => void },
-): SqliteDatabase => {
+): SqliteConnection => {
   const startedAt = performance.now();
   const db = openDatabase(getDesktopDatabasePath(stellaDataDir));
   const openMs = performance.now() - startedAt;

@@ -15,11 +15,10 @@ import {
   type EntryRow,
 } from "./chat-log.js";
 import {
-  cachedStatements,
   requireConversationId,
   type CachedStatements,
   type LocalChatEventRecord,
-  type SqliteDatabase,
+  type SqliteConnection,
 } from "./shared.js";
 import {
   EAGER_TOOL_EVENT_LIMIT,
@@ -149,10 +148,10 @@ export class MessageWindowReader {
   private readonly cached: CachedStatements;
 
   constructor(
-    private readonly db: SqliteDatabase,
+    private readonly db: SqliteConnection,
     private readonly log: ChatLog,
   ) {
-    this.cached = cachedStatements(db);
+    this.cached = db.statements;
   }
 
   private fetchEntryRows(args: {

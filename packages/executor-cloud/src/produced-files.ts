@@ -256,13 +256,6 @@ export const reportProducedFiles = async (options: {
   turnId: string;
   files: ProducedFileReport[];
   known?: ReadonlyMap<string, number>;
-  /**
-   * Of `known`, the paths whose rows the drive protects from a write that did
-   * not read them. Re-sending one of these after a lost response is the one
-   * case where a retry is not a repeat but a second writer, so these are the
-   * paths this checks before it retries.
-   */
-  uploads?: ReadonlySet<string>;
   batchPrefix?: string;
   post: (route: string, body: unknown) => Promise<Response>;
 }): Promise<ProducedFileDelivery> => {
@@ -317,19 +310,10 @@ export const reportProducedFiles = async (options: {
   }
   if (batch.length > 0) batches.push(batch);
 
-  // 413 is "nothing in this batch landed", which the per-file reasons in its
-  // body already explain; any other failure has no body worth reading and is
-  // answered with a null, so a single transient 5xx costs one retry rather
-  // than the batch.
-  //
-  // `batchKey` names the batch, not the attempt: every delivery of one batch
-  // carries the same key, and the route records it on the rows it writes. That
-  // is what lets a redelivery be recognised as the same writer rather than a
-  // second one, whose stale version token would otherwise divert it to an
-  // "(agent copy)" sibling. The turn id is what makes it unique — the index
-  // only has to separate the batches of one turn — and it deliberately does
-  // not depend on the entries, so a retry that carries fewer of them (below,
-  // once the settled ones are dropped) is still the same batch.
+  // 413 means nothing in the batch landed and its body says why. Every
+  // delivery of a batch carries the same `batchKey`; the route records it on
+  // the rows it writes, so a re-send after a lost response replays as the
+  // same writer instead of reading as a second one.
   const send = async (
     entries: Payload[],
     batchKey: string,
@@ -346,100 +330,12 @@ export const reportProducedFiles = async (options: {
       : null;
   };
 
-  /**
-   * Which of these entries the drive already holds — the answer a lost
-   * response did not carry. The route commits before it replies, so a batch
-   * whose reply never arrived may be applied, half-applied or untouched, and
-   * the manifest is the only thing that knows which.
-   *
-   * `since` at the current clock asks for no tombstones: this is a version
-   * read, and deletions are the hydration half's business. Null means the
-   * question could not be answered at all.
-   */
-  const applied = async (
-    entries: Payload[],
-  ): Promise<Map<string, number> | null> => {
-    const response = await options
-      .post("/api/cloud/drive/sync", {
-        turnId: options.turnId,
-        include: entries.map((entry) => entry.path),
-        since: Date.now(),
-      })
-      .catch(() => null);
-    if (!response?.ok) return null;
-    const manifest = (await response.json().catch(() => null)) as {
-      files?: Array<{ path?: string; sizeBytes?: number; updatedAt?: number }>;
-      skipped?: Array<{ path?: string; sizeBytes?: number; updatedAt?: number }>;
-    } | null;
-    if (!manifest) return null;
-    const rows = new Map<string, { sizeBytes?: number; updatedAt?: number }>();
-    for (const row of [
-      ...(manifest.files ?? []),
-      ...(manifest.skipped ?? []),
-    ]) {
-      if (typeof row.path === "string" && !rows.has(row.path)) {
-        rows.set(row.path, row);
-      }
-    }
-    const landed = new Map<string, number>();
-    for (const entry of entries) {
-      const row = rows.get(entry.path);
-      // The row carries this attempt's bytes at a version that is no longer
-      // the one the batch echoed: the lost response was a committed write.
-      if (
-        row &&
-        row.sizeBytes === entry.sizeBytes &&
-        row.updatedAt !== entry.knownUpdatedAt &&
-        typeof row.updatedAt === "number"
-      ) {
-        landed.set(entry.path, row.updatedAt);
-      }
-    }
-    return landed;
-  };
-
   for (const [index, entries] of batches.entries()) {
     const batchKey = `${options.batchPrefix ?? ""}${index}`;
-    let attempt = entries;
-    let response = await send(attempt, batchKey);
+    const response =
+      (await send(entries, batchKey)) ?? (await send(entries, batchKey));
     if (!response) {
-      // A blind re-send is a repeat write for every path the agent owns, and
-      // those the route simply overwrites with the same bytes. For a file the
-      // user uploaded it is not: if the first attempt committed, it moved the
-      // row version this payload echoes, so the identical retry reads as a
-      // writer that never opened the file and is diverted to an "(agent copy)"
-      // sibling of the file it just correctly updated. Those paths are settled
-      // against the drive before anything is sent again.
-      const uploads = attempt.filter((entry) =>
-        options.uploads?.has(entry.path),
-      );
-      if (uploads.length > 0) {
-        const landed = await applied(uploads);
-        const settled = new Set<string>();
-        for (const entry of uploads) {
-          if (landed === null) {
-            // Unanswerable, so not re-sent: duplicating the user's file is a
-            // worse answer than saying the delivery could not be confirmed.
-            settled.add(entry.path);
-            delivery.skipped.push({
-              path: entry.path,
-              reason: `${entry.path} could not be confirmed as saved to the drive, so it is only in this sandbox.`,
-            });
-            continue;
-          }
-          const version = landed.get(entry.path);
-          if (version === undefined) continue;
-          settled.add(entry.path);
-          delivery.stored.add(entry.path);
-          delivery.versions.set(entry.path, version);
-        }
-        attempt = attempt.filter((entry) => !settled.has(entry.path));
-      }
-      if (attempt.length === 0) continue;
-      response = await send(attempt, batchKey);
-    }
-    if (!response) {
-      for (const entry of attempt) {
+      for (const entry of entries) {
         delivery.skipped.push({
           path: entry.path,
           reason: `${entry.path} could not be saved to the drive, so it is only in this sandbox.`,

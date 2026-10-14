@@ -245,7 +245,6 @@ export const writeBackDrive = async (options: {
       turnId: options.turnId,
       files,
       known: options.sync.known,
-      uploads: options.sync.uploads,
       post: options.post,
       batchPrefix: `writeback-${reports}-`,
     });

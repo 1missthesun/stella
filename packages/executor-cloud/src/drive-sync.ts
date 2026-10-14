@@ -30,7 +30,6 @@ type DriveSyncTombstone = {
 
 export type DriveSyncResult = {
   known: Map<string, number>;
-  uploads: Set<string>;
   materialized: string[];
   skipped: Array<{ path: string; reason: string }>;
   deleted: string[];
@@ -42,7 +41,6 @@ export type DriveSyncResult = {
 
 export const emptyDriveSync = (): DriveSyncResult => ({
   known: new Map(),
-  uploads: new Set(),
   materialized: [],
   skipped: [],
   deleted: [],
@@ -354,19 +352,9 @@ const resolveTarget = (
 };
 
 /**
- * Does the workspace already hold this row's bytes, and if so what are they?
- *
- * The old answer was "yes if the size matches, unless the row is an upload".
- * Uploads had to be excluded because size alone cannot tell a re-upload from
- * the copy an earlier turn wrote, and nothing on disk recorded which version
- * that copy came from — so every upload was re-downloaded every turn, which is
- * most of a drive. The ledger records exactly that missing version, and the
- * hash is what makes believing it safe.
- *
- * The hash comes back rather than just the verdict because the ledger is what
- * authorizes a later delete: a copy this workspace is holding but has no entry
- * for can never be removed when its row is, so "current" has to be able to
- * record what it found, not only that it was satisfied.
+ * The workspace copy's sha when it provably holds this row's bytes: the row's
+ * own hash, or the ledger's for this exact version. Anything else is
+ * compared against downloaded bytes.
  */
 const alreadyCurrent = async (
   snapshot: WorkspaceSnapshot | null,
@@ -381,17 +369,7 @@ const alreadyCurrent = async (
     recorded.sizeBytes === entry.sizeBytes
       ? recorded.sha256
       : undefined);
-  if (expected) {
-    return snapshot.sha256 === expected ? { sha256: expected } : null;
-  }
-  // Nothing to verify against: a row this workspace produced is still taken at
-  // its size — that is where its bytes came from — and a file the user
-  // uploaded never is. `origin`, not `source`: an upload an earlier turn
-  // edited is still the user's bytes, and taking it on size would let a
-  // same-size replacement pass unnoticed.
-  if ((entry.origin ?? entry.source) === "upload") return null;
-  const hash = snapshot.sha256;
-  return hash === null ? null : { sha256: hash };
+  return expected && snapshot.sha256 === expected ? { sha256: expected } : null;
 };
 
 const writeContained = async (
@@ -718,7 +696,6 @@ export const materializeDriveFiles = async (options: {
   const entries = manifest.files.slice(0, MANIFEST_FILE_MAX);
   const result: DriveSyncResult = {
     known: new Map(),
-    uploads: new Set(),
     materialized: [],
     skipped: [],
     deleted: [],
@@ -808,7 +785,6 @@ export const materializeDriveFiles = async (options: {
       continue;
     }
     result.known.set(entry.path, version);
-    if (entry.origin === "upload") result.uploads.add(entry.path);
     if (!isHydratedCopy(snapshot, hydrated)) {
       result.conflicts.push({ path: entry.path, driveMoved: false });
       continue;
@@ -1000,7 +976,6 @@ export const materializeDriveFiles = async (options: {
       result.skipped.push({ path: outcome.path, reason: outcome.reason });
       continue;
     }
-    const entry = entries[index];
     if (outcome.kind === "conflict") {
       result.conflicts.push({
         path: outcome.path,
@@ -1008,15 +983,9 @@ export const materializeDriveFiles = async (options: {
       });
       if (outcome.driveMoved) continue;
       result.known.set(outcome.path, outcome.updatedAt);
-      if (entry && (entry.origin ?? entry.source) === "upload") {
-        result.uploads.add(outcome.path);
-      }
       continue;
     }
     result.known.set(outcome.path, outcome.updatedAt);
-    if (entry && (entry.origin ?? entry.source) === "upload") {
-      result.uploads.add(outcome.path);
-    }
     result.materialized.push(outcome.path);
     const held = ledger.files.get(outcome.path);
     if (

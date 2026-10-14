@@ -11,6 +11,7 @@ export {
   subscribeThemes,
 } from "./catalog";
 export { THEME_CSS_VARS } from "./css-vars";
+export { parseTheme } from "./parse-theme";
 export { deriveTokens, type ThemeTokens } from "./tokens";
 export {
   hexToOklch,

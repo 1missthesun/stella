@@ -92,7 +92,6 @@ export function parseColor(input: string | null | undefined): Rgba | null {
   return parseRgbFunction(s);
 }
 
-/** `parseColor` with a mid-grey fallback so token math never throws. */
 export function parseColorOr(
   input: string | null | undefined,
   fallback: Rgba = { r: 128, g: 128, b: 128, a: 1 },

@@ -1,5 +1,4 @@
 import type { ElectronAPI } from "@stella/contracts/desktop/electron-api";
-import type { Theme } from "@stella/theme";
 
 export type {
   ChatContext,
@@ -15,14 +14,7 @@ export type {
   NativeIntegration as ElectronNativeIntegration,
 } from "@stella/contracts/desktop/ipc-contract";
 
-/**
- * Main reads installed theme files from disk and only checks that their
- * `id`, `name`, `light` and `dark` fields are present; the renderer registers
- * them as `Theme`s.
- */
-export type ElectronApi = Omit<ElectronAPI, "theme"> & {
-  theme: { listInstalled: () => Promise<Theme[]> };
-};
+export type ElectronApi = ElectronAPI;
 
 export type ElectronBrowserViewApi = ElectronApi["browserView"];
 export type ElectronLocalChatApi = ElectronApi["localChat"];

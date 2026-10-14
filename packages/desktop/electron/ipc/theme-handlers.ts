@@ -3,26 +3,16 @@ import path from "node:path";
 import { IPC_THEME_LIST_INSTALLED } from "@stella/contracts/desktop/ipc-channels";
 import { handleIpc } from "./typed-ipc.js";
 
-type Theme = {
-  id?: unknown;
-  name?: unknown;
-  light?: unknown;
-  dark?: unknown;
-};
-
 const listInstalledThemes = async (stellaDataDir: string) => {
   const themesDir = path.join(stellaDataDir, "themes");
   try {
     const files = await fs.readdir(themesDir);
-    const themes: Theme[] = [];
+    const themes: unknown[] = [];
     for (const file of files) {
       if (!file.endsWith(".json")) continue;
       try {
         const raw = await fs.readFile(path.join(themesDir, file), "utf-8");
-        const theme = JSON.parse(raw) as Theme;
-        if (theme.id && theme.name && theme.light && theme.dark) {
-          themes.push(theme);
-        }
+        themes.push(JSON.parse(raw) as unknown);
       } catch {
         // One malformed theme file must not hide the user's other themes.
       }

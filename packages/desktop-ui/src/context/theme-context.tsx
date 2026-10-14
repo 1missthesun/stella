@@ -14,6 +14,7 @@ import {
   defaultTheme,
   deriveTokens,
   migrateLegacyThemeId,
+  parseTheme,
   registerTheme,
   resolveThemeColors,
   subscribeThemes,
@@ -157,8 +158,9 @@ function useThemePersistence(clearPreviews: () => void): PersistedThemeState {
     window.electronAPI.theme
       .listInstalled()
       .then((installed) => {
-        if (Array.isArray(installed)) {
-          for (const t of installed) registerTheme(t);
+        for (const file of installed) {
+          const theme = parseTheme(file);
+          if (theme) registerTheme(theme);
         }
       })
       .catch((err) => {

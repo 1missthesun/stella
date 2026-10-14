@@ -12,7 +12,8 @@ import {
 const EMPTY_RECORDS: ThreadActivityRecord[] = [];
 
 const PUSH_REFRESH_DEBOUNCE_MS = 120;
-const LOAD_RETRY_MS = 1_000;
+const LOAD_RETRY_BASE_MS = 1_000;
+const LOAD_RETRY_MAX_ATTEMPTS = 5;
 const RETAINED_CONVERSATION_LIMIT = 10;
 
 const PI_AGENT_POLL_MS = 2_000;
@@ -22,9 +23,7 @@ export const listThreadActivity = async (
   conversationId: string,
 ): Promise<ThreadActivityRecord[]> => {
   if (!piChatAvailable()) return EMPTY_RECORDS;
-  const records = await piChatAgents(conversationId).catch(
-    () => [] as ThreadActivityRecord[],
-  );
+  const records = await piChatAgents(conversationId);
   if (records.some((record) => record.status === "running")) {
     piAgentsRunning.add(conversationId);
   } else {
@@ -73,6 +72,7 @@ type ThreadActivityEntry = {
   pendingRefetch: boolean;
   refreshTimer: number | null;
   retryTimer: number | null;
+  retryAttempt: number;
   requestGeneration: number;
   disposed: boolean;
   assistantUpdates: Map<string, ThreadActivityAssistantUpdate>;
@@ -335,6 +335,7 @@ const refreshEntry = (entry: ThreadActivityEntry): Promise<void> => {
         applyRecordWatermarks(entry, records),
       );
       entry.hasHydrated = true;
+      entry.retryAttempt = 0;
       if (
         piAgentsRunning.has(entry.conversationId) &&
         entry.refreshTimer === null
@@ -374,18 +375,19 @@ const refreshEntry = (entry: ThreadActivityEntry): Promise<void> => {
         const record = entry.recordsByThreadId.get(threadId) ?? null;
         for (const listener of listeners) listener(record, false);
       }
-      // A fetch can fail during a store reset / worker restart window;
-      // self-retry while anyone is subscribed, since no push may follow.
       if (
         (entry.listeners.size > 0 || entry.recordListeners.size > 0) &&
-        entry.retryTimer === null
+        entry.retryTimer === null &&
+        entry.retryAttempt < LOAD_RETRY_MAX_ATTEMPTS
       ) {
+        const delayMs = LOAD_RETRY_BASE_MS * 2 ** entry.retryAttempt;
+        entry.retryAttempt += 1;
         entry.retryTimer = window.setTimeout(() => {
           entry.retryTimer = null;
           if (entry.listeners.size > 0 || entry.recordListeners.size > 0) {
             void refreshEntry(entry);
           }
-        }, LOAD_RETRY_MS);
+        }, delayMs);
       }
     })
     .finally(() => {
@@ -455,11 +457,34 @@ const handleThreadActivityUpdated = (payload: ThreadActivityUpdatedPayload) => {
   }, PUSH_REFRESH_DEBOUNCE_MS);
 };
 
+let runtimeReady = true;
+
+const handleRuntimeAvailability = (snapshot: {
+  connected: boolean;
+  ready: boolean;
+}) => {
+  const ready = snapshot.connected && snapshot.ready;
+  if (ready && !runtimeReady) {
+    for (const entry of entries.values()) {
+      if (!entry.snapshot.error) continue;
+      entry.retryAttempt = 0;
+      void refreshEntry(entry);
+    }
+  }
+  runtimeReady = ready;
+};
+
 const ensureSubscription = () => {
   if (unsubscribeUpdates) return;
-  unsubscribeUpdates = subscribeToThreadActivityUpdates(
+  const unsubscribeActivity = subscribeToThreadActivityUpdates(
     handleThreadActivityUpdated,
   );
+  const unsubscribeAvailability =
+    window.electronAPI?.agent?.onAvailability?.(handleRuntimeAvailability);
+  unsubscribeUpdates = () => {
+    unsubscribeActivity();
+    unsubscribeAvailability?.();
+  };
 };
 
 export const subscribeToThreadActivity = (
@@ -486,6 +511,7 @@ export const subscribeToThreadActivity = (
       pendingRefetch: false,
       refreshTimer: null,
       retryTimer: null,
+      retryAttempt: 0,
       requestGeneration: 0,
       disposed: false,
       assistantUpdates: new Map(),
@@ -542,6 +568,7 @@ export const subscribeToThreadActivityRecord = (
       pendingRefetch: false,
       refreshTimer: null,
       retryTimer: null,
+      retryAttempt: 0,
       requestGeneration: 0,
       disposed: false,
       assistantUpdates: new Map(),

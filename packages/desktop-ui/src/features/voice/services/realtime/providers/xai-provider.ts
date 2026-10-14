@@ -4,6 +4,7 @@ import { VoiceSessionError } from "../voice-session-error";
 import type { ProviderModule, VoiceSessionToken } from "./types";
 
 export const xaiProvider: ProviderModule = {
+  billsConnectedTime: true,
   async fetchToken(ctx): Promise<VoiceSessionToken> {
     const voiceApi = window.electronAPI?.voice;
     if (!voiceApi?.createXaiSession) {

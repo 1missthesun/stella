@@ -23,6 +23,9 @@ export async function resolveActiveProvider(): Promise<RealtimeProviderKey> {
   return coerceRealtimeVoiceProvider(prefs?.realtimeVoice?.provider ?? "");
 }
 
+export const providerBillsConnectedTime = (key: RealtimeProviderKey): boolean =>
+  PROVIDERS[key].billsConnectedTime;
+
 export async function createRealtimeTransport(
   ctx: ProviderTokenContext,
   activeProvider?: RealtimeProviderKey,

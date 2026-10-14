@@ -52,6 +52,7 @@ export interface ProviderTokenContext {
 }
 
 export interface ProviderModule {
+  billsConnectedTime: boolean;
   fetchToken(ctx: ProviderTokenContext): Promise<VoiceSessionToken>;
   createTransport(
     token: VoiceSessionToken,

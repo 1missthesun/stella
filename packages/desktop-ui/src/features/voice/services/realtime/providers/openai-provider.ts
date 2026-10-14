@@ -20,6 +20,7 @@ export const buildOpenAIRealtimeSessionConfig = (
 });
 
 export const openaiProvider: ProviderModule = {
+  billsConnectedTime: false,
   async fetchToken(ctx): Promise<VoiceSessionToken> {
     const voiceApi = window.electronAPI?.voice;
     if (!voiceApi) {

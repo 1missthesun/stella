@@ -31,6 +31,7 @@ export const buildStellaVoiceSessionRequest = (
 });
 
 export const stellaProvider: ProviderModule = {
+  billsConnectedTime: true,
   async fetchToken(ctx): Promise<VoiceSessionToken> {
     const voice = await readGptLiveVoice();
     const session = await backendClient.call(

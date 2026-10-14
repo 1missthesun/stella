@@ -7,6 +7,11 @@ import {
   type SharedMicrophoneLease,
 } from "@/features/voice/services/shared-microphone";
 import { computeAnalyserEnergy } from "@/features/voice/services/audio-energy";
+import {
+  providerBillsConnectedTime,
+  resolveActiveProvider,
+} from "@/features/voice/services/realtime/providers/provider-registry";
+import type { RealtimeProviderKey } from "@/features/voice/services/realtime/providers/types";
 
 type RuntimeVoiceState = {
   sessionState: VoiceSessionState;
@@ -48,20 +53,16 @@ export function VoiceRuntimeRoot() {
   const [bootConversationId, setBootConversationId] = useState<string | null>(
     state.conversationId,
   );
-  /**
-   * Pre-warm: when the wake word is enabled we keep a Realtime WebRTC
-   * session open with the mic gated off (`inputActive=false`). OpenAI
-   * Realtime only bills for streamed audio tokens, so an idle
-   * connection costs nothing — but it removes the ~1s cold-start cost
-   * between "Hey Stella" and Stella starting to listen for real.
-   *
-   * When voice activates (via wake word or keybind), we flip
-   * `inputActive=true` and the existing session takes
-   * over. When voice ends, we drop back to pre-warm rather than
-   * tearing down the connection.
-   */
   const [wakeWordEnabled, setWakeWordEnabled] = useState(false);
-  const sessionShouldRun = state.isVoiceRtcActive || wakeWordEnabled;
+  const [voiceProvider, setVoiceProvider] =
+    useState<RealtimeProviderKey | null>(null);
+  const [voiceRouteRevision, setVoiceRouteRevision] = useState(0);
+  const managerRouteRevisionRef = useRef(0);
+  const sessionShouldRun =
+    state.isVoiceRtcActive ||
+    (wakeWordEnabled &&
+      voiceProvider !== null &&
+      !providerBillsConnectedTime(voiceProvider));
   const analyserRef = useRef<AnalyserNode | null>(null);
   const outputAnalyserRef = useRef<AnalyserNode | null>(null);
   const conversationIdRef = useRef<string>(state.conversationId ?? "voice-rtc");
@@ -184,9 +185,20 @@ export function VoiceRuntimeRoot() {
   }, []);
 
   useEffect(() => {
-    return window.electronAPI?.voice.onPreferencesChanged?.(() => {
-      managerRef.current?.restart();
+    let cancelled = false;
+    void resolveActiveProvider().then((provider) => {
+      if (!cancelled) setVoiceProvider(provider);
     });
+    const unsubscribe = window.electronAPI?.voice.onPreferencesChanged?.(
+      (preferences) => {
+        setVoiceRouteRevision((revision) => revision + 1);
+        setVoiceProvider(preferences.provider);
+      },
+    );
+    return () => {
+      cancelled = true;
+      unsubscribe?.();
+    };
   }, []);
 
   useEffect(
@@ -271,6 +283,7 @@ export function VoiceRuntimeRoot() {
     });
 
     managerRef.current = manager;
+    managerRouteRevisionRef.current = voiceRouteRevision;
     manager.start();
 
     levelTimerRef.current = setInterval(() => {
@@ -287,6 +300,12 @@ export function VoiceRuntimeRoot() {
       });
     }, LEVEL_SAMPLE_MS);
   }, [resolvedConversationId, sessionShouldRun]);
+
+  useEffect(() => {
+    if (voiceRouteRevision <= managerRouteRevisionRef.current) return;
+    managerRouteRevisionRef.current = voiceRouteRevision;
+    managerRef.current?.restart();
+  }, [voiceRouteRevision]);
 
   useEffect(() => {
     return () => {

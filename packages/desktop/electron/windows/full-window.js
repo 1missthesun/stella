@@ -9,19 +9,12 @@ const resolveFullWindowInitialBounds = () => {
     if (process.platform === 'darwin') {
         return { width: dw, height: dh };
     }
-    try {
-        const workArea = screen.getPrimaryDisplay().workArea;
-        const width = Math.max(FULL_SHELL_MIN_SIZE.width, Math.min(dw, workArea.width));
-        const height = Math.max(FULL_SHELL_MIN_SIZE.height, Math.min(dh, workArea.height));
-        const x = Math.round(workArea.x + Math.max(0, (workArea.width - width) / 2));
-        const y = Math.round(workArea.y + Math.max(0, (workArea.height - height) / 2));
-        return { width, height, x, y };
-    }
-    catch {
-        // `screen` can throw if queried before the app is ready; fall back to the
-        // raw default rather than block window creation.
-        return { width: dw, height: dh };
-    }
+    const workArea = screen.getPrimaryDisplay().workArea;
+    const width = Math.max(FULL_SHELL_MIN_SIZE.width, Math.min(dw, workArea.width));
+    const height = Math.max(FULL_SHELL_MIN_SIZE.height, Math.min(dh, workArea.height));
+    const x = Math.round(workArea.x + Math.max(0, (workArea.width - width) / 2));
+    const y = Math.round(workArea.y + Math.max(0, (workArea.height - height) / 2));
+    return { width, height, x, y };
 };
 export class FullWindowController {
     options;

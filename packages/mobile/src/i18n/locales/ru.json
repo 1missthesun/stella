@@ -1419,6 +1419,7 @@
     },
     "settings": {
       "aboutSection": "О приложении",
+      "accountDeletedTitle": "Аккаунт удалён",
       "appearance": {
         "dark": "Тёмная",
         "light": "Светлая",
@@ -1457,7 +1458,11 @@
       "deleteAccountLabel": "Удалить ваш аккаунт Stella",
       "deleteConfirmBody": "Это навсегда удалит ваш аккаунт Stella и связанные с ним облачные данные на наших серверах. Отменить это будет нельзя.",
       "deleteConfirmTitle": "Удалить аккаунт",
+      "deleteFailedBody": "Ваш аккаунт не удалён, и вы по-прежнему в системе.",
       "deleteFailedTitle": "Не удалось удалить аккаунт",
+      "deleteReauthAction": "Войти снова",
+      "deleteReauthBody": "В целях безопасности войдите снова, а затем удалите аккаунт. Ваш аккаунт не удалён.",
+      "deleteRetry": "Повторить",
       "deletingAccount": "Удаляем аккаунт…",
       "loadingSession": "Загрузка сессии…",
       "notificationsSection": "Уведомления",
@@ -1864,6 +1869,7 @@
         "accountDeleted": "Ваш аккаунт Stella удалён.",
         "dataDeleted": "Ваши данные Stella удалены.",
         "deleteAccountFailed": "Не удалось удалить ваш аккаунт. Повторите попытку.",
+        "deleteAccountReauth": "В целях безопасности выйдите и войдите снова, а затем удалите аккаунт. Ваш аккаунт не удалён.",
         "deleteDataFailed": "Не удалось удалить ваши данные. Повторите попытку.",
         "signInBeforeDelete": "Войдите, прежде чем удалять аккаунт."
       }

@@ -1411,6 +1411,7 @@
     },
     "settings": {
       "aboutSection": "À propos",
+      "accountDeletedTitle": "Compte supprimé",
       "appearance": {
         "dark": "Sombre",
         "light": "Clair",
@@ -1449,7 +1450,11 @@
       "deleteAccountLabel": "Supprimer votre compte Stella",
       "deleteConfirmBody": "Cela supprime définitivement votre compte Stella et efface de nos serveurs les données cloud qui lui sont associées. Cette action est irréversible.",
       "deleteConfirmTitle": "Supprimer le compte",
+      "deleteFailedBody": "Votre compte n'a pas été supprimé et vous êtes toujours connecté.",
       "deleteFailedTitle": "Impossible de supprimer le compte",
+      "deleteReauthAction": "Se reconnecter",
+      "deleteReauthBody": "Pour votre sécurité, reconnectez-vous, puis supprimez votre compte. Votre compte n'a pas été supprimé.",
+      "deleteRetry": "Réessayer",
       "deletingAccount": "Suppression du compte…",
       "loadingSession": "Chargement de la session…",
       "notificationsSection": "Notifications",
@@ -1856,6 +1861,7 @@
         "accountDeleted": "Votre compte Stella a été supprimé.",
         "dataDeleted": "Vos données Stella ont été supprimées.",
         "deleteAccountFailed": "Impossible de supprimer votre compte. Veuillez réessayer.",
+        "deleteAccountReauth": "Pour votre sécurité, déconnectez-vous puis reconnectez-vous, puis supprimez votre compte. Votre compte n'a pas été supprimé.",
         "deleteDataFailed": "Impossible de supprimer vos données. Veuillez réessayer.",
         "signInBeforeDelete": "Connectez-vous avant de supprimer votre compte."
       }

@@ -1395,6 +1395,7 @@
     },
     "settings": {
       "aboutSection": "เกี่ยวกับ",
+      "accountDeletedTitle": "ลบบัญชีแล้ว",
       "appearance": {
         "dark": "มืด",
         "light": "สว่าง",
@@ -1433,7 +1434,11 @@
       "deleteAccountLabel": "ลบบัญชี Stella ของคุณ",
       "deleteConfirmBody": "การทำเช่นนี้จะลบบัญชี Stella ของคุณอย่างถาวร และลบข้อมูลบนคลาวด์ที่เกี่ยวข้องออกจากเซิร์ฟเวอร์ของเรา ย้อนกลับไม่ได้",
       "deleteConfirmTitle": "ลบบัญชี",
+      "deleteFailedBody": "บัญชีของคุณยังไม่ถูกลบ และคุณยังลงชื่อเข้าใช้อยู่",
       "deleteFailedTitle": "ลบบัญชีไม่ได้",
+      "deleteReauthAction": "ลงชื่อเข้าใช้อีกครั้ง",
+      "deleteReauthBody": "เพื่อความปลอดภัย โปรดลงชื่อเข้าใช้อีกครั้ง แล้วจึงลบบัญชี บัญชีของคุณยังไม่ถูกลบ",
+      "deleteRetry": "ลองอีกครั้ง",
       "deletingAccount": "กำลังลบบัญชี…",
       "loadingSession": "กำลังโหลดเซสชัน…",
       "notificationsSection": "การแจ้งเตือน",
@@ -1840,6 +1845,7 @@
         "accountDeleted": "ลบบัญชี Stella ของคุณแล้ว",
         "dataDeleted": "ลบข้อมูล Stella ของคุณแล้ว",
         "deleteAccountFailed": "ไม่สามารถลบบัญชีของคุณได้ โปรดลองอีกครั้ง",
+        "deleteAccountReauth": "เพื่อความปลอดภัย โปรดออกจากระบบแล้วลงชื่อเข้าใช้อีกครั้ง แล้วจึงลบบัญชี บัญชีของคุณยังไม่ถูกลบ",
         "deleteDataFailed": "ไม่สามารถลบข้อมูลของคุณได้ โปรดลองอีกครั้ง",
         "signInBeforeDelete": "ลงชื่อเข้าใช้ก่อนลบบัญชีของคุณ"
       }

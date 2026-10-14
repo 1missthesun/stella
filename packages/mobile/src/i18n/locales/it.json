@@ -1411,6 +1411,7 @@
     },
     "settings": {
       "aboutSection": "Informazioni",
+      "accountDeletedTitle": "Account eliminato",
       "appearance": {
         "dark": "Scuro",
         "light": "Chiaro",
@@ -1449,7 +1450,11 @@
       "deleteAccountLabel": "Elimina il tuo account Stella",
       "deleteConfirmBody": "Questo elimina definitivamente il tuo account Stella e rimuove dai nostri server i dati nel cloud associati. Non può essere annullato.",
       "deleteConfirmTitle": "Elimina account",
+      "deleteFailedBody": "Il tuo account non è stato eliminato e sei ancora connesso.",
       "deleteFailedTitle": "Impossibile eliminare l'account",
+      "deleteReauthAction": "Accedi di nuovo",
+      "deleteReauthBody": "Per sicurezza, accedi di nuovo e poi elimina l'account. Il tuo account non è stato eliminato.",
+      "deleteRetry": "Riprova",
       "deletingAccount": "Eliminazione dell'account…",
       "loadingSession": "Caricamento della sessione…",
       "notificationsSection": "Notifiche",
@@ -1856,6 +1861,7 @@
         "accountDeleted": "Il tuo account Stella è stato eliminato.",
         "dataDeleted": "I tuoi dati Stella sono stati eliminati.",
         "deleteAccountFailed": "Impossibile eliminare il tuo account. Riprova.",
+        "deleteAccountReauth": "Per sicurezza, esci e accedi di nuovo, poi elimina l'account. Il tuo account non è stato eliminato.",
         "deleteDataFailed": "Impossibile eliminare i tuoi dati. Riprova.",
         "signInBeforeDelete": "Accedi prima di eliminare il tuo account."
       }

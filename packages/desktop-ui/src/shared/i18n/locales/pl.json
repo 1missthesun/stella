@@ -1419,6 +1419,7 @@
     },
     "settings": {
       "aboutSection": "Informacje",
+      "accountDeletedTitle": "Konto usunięte",
       "appearance": {
         "dark": "Ciemny",
         "light": "Jasny",
@@ -1457,7 +1458,11 @@
       "deleteAccountLabel": "Usuń swoje konto Stella",
       "deleteConfirmBody": "To trwale usuwa twoje konto Stella oraz powiązane z nim dane w chmurze na naszych serwerach. Tej operacji nie można cofnąć.",
       "deleteConfirmTitle": "Usuń konto",
+      "deleteFailedBody": "Twoje konto nie zostało usunięte i nadal jesteś zalogowany.",
       "deleteFailedTitle": "Nie udało się usunąć konta",
+      "deleteReauthAction": "Zaloguj się ponownie",
+      "deleteReauthBody": "Ze względów bezpieczeństwa zaloguj się ponownie, a następnie usuń konto. Twoje konto nie zostało usunięte.",
+      "deleteRetry": "Spróbuj ponownie",
       "deletingAccount": "Usuwanie konta…",
       "loadingSession": "Wczytywanie sesji…",
       "notificationsSection": "Powiadomienia",
@@ -1864,6 +1869,7 @@
         "accountDeleted": "Twoje konto Stelli zostało usunięte.",
         "dataDeleted": "Twoje dane Stelli zostały usunięte.",
         "deleteAccountFailed": "Nie udało się usunąć konta. Spróbuj ponownie.",
+        "deleteAccountReauth": "Ze względów bezpieczeństwa wyloguj się i zaloguj ponownie, a następnie usuń konto. Twoje konto nie zostało usunięte.",
         "deleteDataFailed": "Nie udało się usunąć danych. Spróbuj ponownie.",
         "signInBeforeDelete": "Zaloguj się przed usunięciem konta."
       }

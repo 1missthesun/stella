@@ -1403,6 +1403,7 @@
     },
     "settings": {
       "aboutSection": "Über",
+      "accountDeletedTitle": "Konto gelöscht",
       "appearance": {
         "dark": "Dunkel",
         "light": "Hell",
@@ -1441,7 +1442,11 @@
       "deleteAccountLabel": "Dein Stella-Konto löschen",
       "deleteConfirmBody": "Dies löscht dein Stella-Konto dauerhaft und entfernt die zugehörigen Cloud-Daten von unseren Servern. Das kann nicht rückgängig gemacht werden.",
       "deleteConfirmTitle": "Konto löschen",
+      "deleteFailedBody": "Dein Konto wurde nicht gelöscht, und du bist weiterhin angemeldet.",
       "deleteFailedTitle": "Konto konnte nicht gelöscht werden",
+      "deleteReauthAction": "Erneut anmelden",
+      "deleteReauthBody": "Melde dich zu deiner Sicherheit erneut an und lösche dann dein Konto. Dein Konto wurde nicht gelöscht.",
+      "deleteRetry": "Erneut versuchen",
       "deletingAccount": "Konto wird gelöscht…",
       "loadingSession": "Sitzung wird geladen…",
       "notificationsSection": "Benachrichtigungen",
@@ -1848,6 +1853,7 @@
         "accountDeleted": "Dein Stella-Konto wurde gelöscht.",
         "dataDeleted": "Deine Stella-Daten wurden gelöscht.",
         "deleteAccountFailed": "Dein Konto konnte nicht gelöscht werden. Bitte versuche es erneut.",
+        "deleteAccountReauth": "Melde dich zu deiner Sicherheit ab und wieder an und lösche dann dein Konto. Dein Konto wurde nicht gelöscht.",
         "deleteDataFailed": "Deine Daten konnten nicht gelöscht werden. Bitte versuche es erneut.",
         "signInBeforeDelete": "Melde dich an, bevor du dein Konto löschst."
       }

@@ -1395,6 +1395,7 @@
     },
     "settings": {
       "aboutSection": "정보",
+      "accountDeletedTitle": "계정이 삭제됨",
       "appearance": {
         "dark": "다크",
         "light": "라이트",
@@ -1433,7 +1434,11 @@
       "deleteAccountLabel": "Stella 계정 삭제",
       "deleteConfirmBody": "Stella 계정을 영구히 삭제하고, 당사 서버에 있는 관련 클라우드 데이터도 제거합니다. 되돌릴 수 없습니다.",
       "deleteConfirmTitle": "계정 삭제",
+      "deleteFailedBody": "계정이 삭제되지 않았으며 여전히 로그인되어 있습니다.",
       "deleteFailedTitle": "계정을 삭제할 수 없음",
+      "deleteReauthAction": "다시 로그인",
+      "deleteReauthBody": "보안을 위해 다시 로그인한 후 계정을 삭제하세요. 계정이 삭제되지 않았습니다.",
+      "deleteRetry": "다시 시도",
       "deletingAccount": "계정 삭제 중…",
       "loadingSession": "세션 불러오는 중…",
       "notificationsSection": "알림",
@@ -1840,6 +1845,7 @@
         "accountDeleted": "Stella 계정이 삭제되었습니다.",
         "dataDeleted": "Stella 데이터가 삭제되었습니다.",
         "deleteAccountFailed": "계정을 삭제할 수 없습니다. 다시 시도하세요.",
+        "deleteAccountReauth": "보안을 위해 로그아웃 후 다시 로그인한 다음 계정을 삭제하세요. 계정이 삭제되지 않았습니다.",
         "deleteDataFailed": "데이터를 삭제할 수 없습니다. 다시 시도하세요.",
         "signInBeforeDelete": "계정을 삭제하기 전에 로그인하세요."
       }

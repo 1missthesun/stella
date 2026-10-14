@@ -1411,6 +1411,7 @@
     },
     "settings": {
       "aboutSection": "Sobre",
+      "accountDeletedTitle": "Conta excluída",
       "appearance": {
         "dark": "Escuro",
         "light": "Claro",
@@ -1449,7 +1450,11 @@
       "deleteAccountLabel": "Excluir sua conta da Stella",
       "deleteConfirmBody": "Isto exclui permanentemente sua conta da Stella e remove dos nossos servidores os dados na nuvem associados a ela. Isso não pode ser desfeito.",
       "deleteConfirmTitle": "Excluir conta",
+      "deleteFailedBody": "Sua conta não foi excluída e você continua conectado.",
       "deleteFailedTitle": "Não foi possível excluir a conta",
+      "deleteReauthAction": "Entrar novamente",
+      "deleteReauthBody": "Por segurança, entre novamente e depois exclua sua conta. Sua conta não foi excluída.",
+      "deleteRetry": "Tentar novamente",
       "deletingAccount": "Excluindo a conta…",
       "loadingSession": "Carregando a sessão…",
       "notificationsSection": "Notificações",
@@ -1856,6 +1861,7 @@
         "accountDeleted": "Sua conta da Stella foi excluída.",
         "dataDeleted": "Seus dados da Stella foram excluídos.",
         "deleteAccountFailed": "Não foi possível excluir sua conta. Tente novamente.",
+        "deleteAccountReauth": "Por segurança, saia e entre novamente e depois exclua sua conta. Sua conta não foi excluída.",
         "deleteDataFailed": "Não foi possível excluir seus dados. Tente novamente.",
         "signInBeforeDelete": "Entre antes de excluir sua conta."
       }

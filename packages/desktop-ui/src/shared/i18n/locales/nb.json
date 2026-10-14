@@ -1403,6 +1403,7 @@
     },
     "settings": {
       "aboutSection": "Om",
+      "accountDeletedTitle": "Kontoen er slettet",
       "appearance": {
         "dark": "Mørkt",
         "light": "Lyst",
@@ -1441,7 +1442,11 @@
       "deleteAccountLabel": "Slett Stella-kontoen din",
       "deleteConfirmBody": "Dette sletter Stella-kontoen din permanent og fjerner skydata knyttet til den på serverne våre. Dette kan ikke angres.",
       "deleteConfirmTitle": "Slett konto",
+      "deleteFailedBody": "Kontoen din ble ikke slettet, og du er fortsatt logget inn.",
       "deleteFailedTitle": "Kunne ikke slette kontoen",
+      "deleteReauthAction": "Logg inn på nytt",
+      "deleteReauthBody": "Av sikkerhetshensyn må du logge inn på nytt og deretter slette kontoen. Kontoen din ble ikke slettet.",
+      "deleteRetry": "Prøv igjen",
       "deletingAccount": "Sletter kontoen…",
       "loadingSession": "Laster økt…",
       "notificationsSection": "Varsler",
@@ -1848,6 +1853,7 @@
         "accountDeleted": "Stella-kontoen din ble slettet.",
         "dataDeleted": "Stella-dataene dine ble slettet.",
         "deleteAccountFailed": "Kunne ikke slette kontoen din. Prøv igjen.",
+        "deleteAccountReauth": "Av sikkerhetshensyn må du logge ut og inn igjen og deretter slette kontoen. Kontoen din ble ikke slettet.",
         "deleteDataFailed": "Kunne ikke slette dataene dine. Prøv igjen.",
         "signInBeforeDelete": "Logg på før du sletter kontoen din."
       }

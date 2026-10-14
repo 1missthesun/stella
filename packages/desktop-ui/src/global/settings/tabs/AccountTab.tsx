@@ -12,6 +12,7 @@ import {
 } from "@/ui/dialog";
 import { useAuthSessionState } from "@/global/auth/hooks/use-auth-session-state";
 import { deleteAuthUser } from "@/global/auth/services/auth-session";
+import { isAccountDeleteReauthError } from "@stella/contracts/auth-session";
 import { clearCachedToken } from "@/global/auth/services/auth-token";
 import { uiState } from "@/platform/ui-state";
 import type { LegalDocument } from "@/global/legal/legal-text";
@@ -138,12 +139,14 @@ export function AccountTab({ onSignOut, onOpenLegal }: AccountTabProps) {
     } catch (error) {
       console.error(error);
       showToast(
-        getSettingsErrorMessage(
-          error,
-          action === "data"
-            ? t("settings.account.toasts.deleteDataFailed")
-            : t("settings.account.toasts.deleteAccountFailed"),
-        ),
+        action === "account"
+          ? isAccountDeleteReauthError(error)
+            ? t("settings.account.toasts.deleteAccountReauth")
+            : t("settings.account.toasts.deleteAccountFailed")
+          : getSettingsErrorMessage(
+              error,
+              t("settings.account.toasts.deleteDataFailed"),
+            ),
       );
       setIsDeleting(false);
       setPendingDeleteAction(null);

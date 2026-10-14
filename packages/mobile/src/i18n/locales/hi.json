@@ -1403,6 +1403,7 @@
     },
     "settings": {
       "aboutSection": "परिचय",
+      "accountDeletedTitle": "खाता हटाया गया",
       "appearance": {
         "dark": "डार्क",
         "light": "लाइट",
@@ -1441,7 +1442,11 @@
       "deleteAccountLabel": "अपना Stella खाता हटाएँ",
       "deleteConfirmBody": "इससे आपका Stella खाता हमेशा के लिए हट जाएगा और हमारे सर्वर पर उससे जुड़ा क्लाउड डेटा भी मिट जाएगा। इसे पलटा नहीं जा सकता।",
       "deleteConfirmTitle": "खाता हटाएँ",
+      "deleteFailedBody": "आपका खाता नहीं हटाया गया, और आप अभी भी साइन इन हैं।",
       "deleteFailedTitle": "खाता नहीं हटाया जा सका",
+      "deleteReauthAction": "फिर से साइन इन करें",
+      "deleteReauthBody": "आपकी सुरक्षा के लिए, फिर से साइन इन करें, फिर अपना खाता हटाएँ। आपका खाता नहीं हटाया गया।",
+      "deleteRetry": "फिर से कोशिश करें",
       "deletingAccount": "खाता हटाया जा रहा है…",
       "loadingSession": "सेशन लोड हो रहा है…",
       "notificationsSection": "सूचनाएँ",
@@ -1848,6 +1853,7 @@
         "accountDeleted": "आपका Stella खाता हटा दिया गया।",
         "dataDeleted": "आपका Stella डेटा हटा दिया गया।",
         "deleteAccountFailed": "आपका खाता हटाया नहीं जा सका। कृपया फिर से प्रयास करें।",
+        "deleteAccountReauth": "आपकी सुरक्षा के लिए, साइन आउट करके फिर से साइन इन करें, फिर अपना खाता हटाएँ। आपका खाता नहीं हटाया गया।",
         "deleteDataFailed": "आपका डेटा हटाया नहीं जा सका। कृपया फिर से प्रयास करें।",
         "signInBeforeDelete": "अपना खाता हटाने से पहले साइन इन करें।"
       }

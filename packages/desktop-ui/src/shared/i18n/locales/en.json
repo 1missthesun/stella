@@ -1403,6 +1403,7 @@
     },
     "settings": {
       "aboutSection": "About",
+      "accountDeletedTitle": "Account deleted",
       "appearance": {
         "dark": "Dark",
         "light": "Light",
@@ -1441,7 +1442,11 @@
       "deleteAccountLabel": "Delete your Stella account",
       "deleteConfirmBody": "This permanently deletes your Stella account and removes cloud data associated with it on our servers. This cannot be undone.",
       "deleteConfirmTitle": "Delete account",
+      "deleteFailedBody": "Your account was not deleted, and you're still signed in.",
       "deleteFailedTitle": "Could not delete account",
+      "deleteReauthAction": "Sign in again",
+      "deleteReauthBody": "For your security, sign in again, then delete your account. Your account was not deleted.",
+      "deleteRetry": "Try again",
       "deletingAccount": "Deleting account…",
       "loadingSession": "Loading session…",
       "notificationsSection": "Notifications",
@@ -1848,6 +1853,7 @@
         "accountDeleted": "Your Stella account was deleted.",
         "dataDeleted": "Your Stella data was deleted.",
         "deleteAccountFailed": "Could not delete your account. Please try again.",
+        "deleteAccountReauth": "For your security, sign out and sign in again, then delete your account. Your account was not deleted.",
         "deleteDataFailed": "Could not delete your data. Please try again.",
         "signInBeforeDelete": "Sign in before deleting your account."
       }

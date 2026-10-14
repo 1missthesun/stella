@@ -1411,6 +1411,7 @@
     },
     "settings": {
       "aboutSection": "Despre",
+      "accountDeletedTitle": "Cont șters",
       "appearance": {
         "dark": "Întunecat",
         "light": "Luminos",
@@ -1449,7 +1450,11 @@
       "deleteAccountLabel": "Șterge contul tău Stella",
       "deleteConfirmBody": "Aceasta șterge definitiv contul tău Stella și elimină de pe serverele noastre datele din cloud asociate cu el. Această acțiune nu poate fi anulată.",
       "deleteConfirmTitle": "Șterge contul",
+      "deleteFailedBody": "Contul tău nu a fost șters și ești în continuare conectat.",
       "deleteFailedTitle": "Nu am putut șterge contul",
+      "deleteReauthAction": "Conectează-te din nou",
+      "deleteReauthBody": "Pentru siguranța ta, conectează-te din nou, apoi șterge contul. Contul tău nu a fost șters.",
+      "deleteRetry": "Încearcă din nou",
       "deletingAccount": "Se șterge contul…",
       "loadingSession": "Se încarcă sesiunea…",
       "notificationsSection": "Notificări",
@@ -1856,6 +1861,7 @@
         "accountDeleted": "Contul tău Stella a fost șters.",
         "dataDeleted": "Datele tale Stella au fost șterse.",
         "deleteAccountFailed": "Nu am putut șterge contul tău. Încearcă din nou.",
+        "deleteAccountReauth": "Pentru siguranța ta, deconectează-te și conectează-te din nou, apoi șterge contul. Contul tău nu a fost șters.",
         "deleteDataFailed": "Nu am putut șterge datele tale. Încearcă din nou.",
         "signInBeforeDelete": "Conectează-te înainte de a-ți șterge contul."
       }

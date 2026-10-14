@@ -1395,6 +1395,7 @@
     },
     "settings": {
       "aboutSection": "關於",
+      "accountDeletedTitle": "帳號已刪除",
       "appearance": {
         "dark": "深色",
         "light": "淺色",
@@ -1433,7 +1434,11 @@
       "deleteAccountLabel": "刪除您的 Stella 帳號",
       "deleteConfirmBody": "此操作會永久刪除您的 Stella 帳號，並移除我們伺服器上與其相關的雲端資料。無法復原。",
       "deleteConfirmTitle": "刪除帳號",
+      "deleteFailedBody": "你的帳號未被刪除，你仍處於登入狀態。",
       "deleteFailedTitle": "無法刪除帳號",
+      "deleteReauthAction": "重新登入",
+      "deleteReauthBody": "為了你的安全，請重新登入，然後再刪除帳號。你的帳號未被刪除。",
+      "deleteRetry": "重試",
       "deletingAccount": "正在刪除帳號…",
       "loadingSession": "正在載入工作階段…",
       "notificationsSection": "通知",
@@ -1840,6 +1845,7 @@
         "accountDeleted": "你的 Stella 帳號已刪除。",
         "dataDeleted": "你的 Stella 資料已刪除。",
         "deleteAccountFailed": "無法刪除你的帳號。請重試。",
+        "deleteAccountReauth": "為了你的安全，請登出並重新登入，然後再刪除帳號。你的帳號未被刪除。",
         "deleteDataFailed": "無法刪除你的資料。請重試。",
         "signInBeforeDelete": "請先登入，再刪除帳號。"
       }

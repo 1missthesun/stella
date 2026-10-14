@@ -1395,6 +1395,7 @@
     },
     "settings": {
       "aboutSection": "Giới thiệu",
+      "accountDeletedTitle": "Đã xóa tài khoản",
       "appearance": {
         "dark": "Tối",
         "light": "Sáng",
@@ -1433,7 +1434,11 @@
       "deleteAccountLabel": "Xóa tài khoản Stella của bạn",
       "deleteConfirmBody": "Thao tác này xóa vĩnh viễn tài khoản Stella của bạn và gỡ dữ liệu đám mây liên quan trên máy chủ của chúng tôi. Không thể hoàn tác.",
       "deleteConfirmTitle": "Xóa tài khoản",
+      "deleteFailedBody": "Tài khoản của bạn chưa bị xóa và bạn vẫn đang đăng nhập.",
       "deleteFailedTitle": "Không thể xóa tài khoản",
+      "deleteReauthAction": "Đăng nhập lại",
+      "deleteReauthBody": "Để bảo mật, hãy đăng nhập lại rồi xóa tài khoản. Tài khoản của bạn chưa bị xóa.",
+      "deleteRetry": "Thử lại",
       "deletingAccount": "Đang xóa tài khoản…",
       "loadingSession": "Đang tải phiên…",
       "notificationsSection": "Thông báo",
@@ -1840,6 +1845,7 @@
         "accountDeleted": "Tài khoản Stella của bạn đã được xóa.",
         "dataDeleted": "Dữ liệu Stella của bạn đã được xóa.",
         "deleteAccountFailed": "Không thể xóa tài khoản của bạn. Vui lòng thử lại.",
+        "deleteAccountReauth": "Để bảo mật, hãy đăng xuất và đăng nhập lại rồi xóa tài khoản. Tài khoản của bạn chưa bị xóa.",
         "deleteDataFailed": "Không thể xóa dữ liệu của bạn. Vui lòng thử lại.",
         "signInBeforeDelete": "Đăng nhập trước khi xóa tài khoản của bạn."
       }

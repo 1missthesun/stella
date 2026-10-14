@@ -1411,6 +1411,7 @@
     },
     "settings": {
       "aboutSection": "אודות",
+      "accountDeletedTitle": "החשבון נמחק",
       "appearance": {
         "dark": "כהה",
         "light": "בהיר",
@@ -1449,7 +1450,11 @@
       "deleteAccountLabel": "מחיקת חשבון ה-Stella שלכם",
       "deleteConfirmBody": "פעולה זו מוחקת לצמיתות את חשבון ה-Stella שלכם ומסירה מהשרתים שלנו את נתוני הענן המשויכים אליו. אי אפשר לבטל אותה.",
       "deleteConfirmTitle": "מחיקת חשבון",
+      "deleteFailedBody": "החשבון שלך לא נמחק, ואתה עדיין מחובר.",
       "deleteFailedTitle": "לא ניתן היה למחוק את החשבון",
+      "deleteReauthAction": "התחבר שוב",
+      "deleteReauthBody": "לביטחונך, התחבר שוב ואז מחק את החשבון. החשבון שלך לא נמחק.",
+      "deleteRetry": "נסה שוב",
       "deletingAccount": "מוחק חשבון…",
       "loadingSession": "טוען התחברות…",
       "notificationsSection": "התראות",
@@ -1856,6 +1861,7 @@
         "accountDeleted": "חשבון Stella שלך נמחק.",
         "dataDeleted": "נתוני Stella שלך נמחקו.",
         "deleteAccountFailed": "לא ניתן היה למחוק את החשבון שלך. נסה שוב.",
+        "deleteAccountReauth": "לביטחונך, התנתק והתחבר שוב ואז מחק את החשבון. החשבון שלך לא נמחק.",
         "deleteDataFailed": "לא ניתן היה למחוק את הנתונים שלך. נסה שוב.",
         "signInBeforeDelete": "התחבר לפני מחיקת החשבון שלך."
       }

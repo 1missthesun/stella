@@ -1,5 +1,6 @@
 import { useEffect, useSyncExternalStore } from "react";
 import {
+  ACCOUNT_DELETE_REAUTH_REQUIRED,
   getAuthSessionIdentityIntent,
   getAuthSnapshotSession,
   isRecognizedAuthRejection,
@@ -466,7 +467,22 @@ export const deleteAuthUser = async () => {
     );
   }
   if (!window.electronAPI) {
-    await authClient.deleteUser();
+    const result = await authClient.deleteUser();
+    if (result.error) {
+      if (
+        result.error.code === "SESSION_EXPIRED" ||
+        result.error.code === "SESSION_NOT_FRESH"
+      ) {
+        throw new Error(ACCOUNT_DELETE_REAUTH_REQUIRED);
+      }
+      throw new Error(
+        result.error.message ||
+          `Account deletion failed with HTTP ${result.error.status}.`,
+      );
+    }
+    if (result.data?.success !== true || result.data.message !== "User deleted") {
+      throw new Error("The server did not confirm the account deletion.");
+    }
     clearBrowserSessionToken();
     writeBrowserIdentityIntent("anonymous");
     writeBrowserCachedSession(null);

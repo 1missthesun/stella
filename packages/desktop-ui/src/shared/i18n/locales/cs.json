@@ -1419,6 +1419,7 @@
     },
     "settings": {
       "aboutSection": "O aplikaci",
+      "accountDeletedTitle": "Účet smazán",
       "appearance": {
         "dark": "Tmavý",
         "light": "Světlý",
@@ -1457,7 +1458,11 @@
       "deleteAccountLabel": "Smazat váš účet Stella",
       "deleteConfirmBody": "Tímto trvale smažete svůj účet Stella a odstraníte související cloudová data z našich serverů. Tuto akci nelze vrátit zpět.",
       "deleteConfirmTitle": "Smazat účet",
+      "deleteFailedBody": "Váš účet nebyl smazán a stále jste přihlášeni.",
       "deleteFailedTitle": "Účet se nepodařilo smazat",
+      "deleteReauthAction": "Znovu se přihlásit",
+      "deleteReauthBody": "Z bezpečnostních důvodů se znovu přihlaste a pak účet smažte. Váš účet nebyl smazán.",
+      "deleteRetry": "Zkusit znovu",
       "deletingAccount": "Mazání účtu…",
       "loadingSession": "Načítání relace…",
       "notificationsSection": "Oznámení",
@@ -1864,6 +1869,7 @@
         "accountDeleted": "Váš účet Stella byl smazán.",
         "dataDeleted": "Vaše data Stella byla smazána.",
         "deleteAccountFailed": "Váš účet se nepodařilo smazat. Zkuste to znovu.",
+        "deleteAccountReauth": "Z bezpečnostních důvodů se odhlaste, znovu přihlaste a pak účet smažte. Váš účet nebyl smazán.",
         "deleteDataFailed": "Vaše data se nepodařilo smazat. Zkuste to znovu.",
         "signInBeforeDelete": "Před smazáním účtu se přihlaste."
       }

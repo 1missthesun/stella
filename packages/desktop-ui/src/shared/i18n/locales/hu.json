@@ -1403,6 +1403,7 @@
     },
     "settings": {
       "aboutSection": "Névjegy",
+      "accountDeletedTitle": "Fiók törölve",
       "appearance": {
         "dark": "Sötét",
         "light": "Világos",
@@ -1441,7 +1442,11 @@
       "deleteAccountLabel": "A Stella-fiókod törlése",
       "deleteConfirmBody": "Ez véglegesen törli a Stella-fiókodat, és eltávolítja a hozzá tartozó felhőadatokat a szervereinkről. Ezt nem lehet visszavonni.",
       "deleteConfirmTitle": "Fiók törlése",
+      "deleteFailedBody": "A fiókod nem lett törölve, és továbbra is be vagy jelentkezve.",
       "deleteFailedTitle": "A fiókot nem sikerült törölni",
+      "deleteReauthAction": "Bejelentkezés újra",
+      "deleteReauthBody": "Biztonsági okokból jelentkezz be újra, majd töröld a fiókodat. A fiókod nem lett törölve.",
+      "deleteRetry": "Újra",
       "deletingAccount": "Fiók törlése…",
       "loadingSession": "Munkamenet betöltése…",
       "notificationsSection": "Értesítések",
@@ -1848,6 +1853,7 @@
         "accountDeleted": "A Stella-fiókodat töröltük.",
         "dataDeleted": "A Stella-adataidat töröltük.",
         "deleteAccountFailed": "Nem sikerült törölni a fiókodat. Próbáld újra.",
+        "deleteAccountReauth": "Biztonsági okokból jelentkezz ki, majd be újra, és töröld a fiókodat. A fiókod nem lett törölve.",
         "deleteDataFailed": "Nem sikerült törölni az adataidat. Próbáld újra.",
         "signInBeforeDelete": "Jelentkezz be a fiókod törlése előtt."
       }

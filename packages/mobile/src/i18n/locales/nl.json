@@ -1403,6 +1403,7 @@
     },
     "settings": {
       "aboutSection": "Over",
+      "accountDeletedTitle": "Account verwijderd",
       "appearance": {
         "dark": "Donker",
         "light": "Licht",
@@ -1441,7 +1442,11 @@
       "deleteAccountLabel": "Je Stella-account verwijderen",
       "deleteConfirmBody": "Dit verwijdert je Stella-account definitief en wist de bijbehorende clouddata op onze servers. Dit kan niet ongedaan worden gemaakt.",
       "deleteConfirmTitle": "Account verwijderen",
+      "deleteFailedBody": "Je account is niet verwijderd en je bent nog steeds ingelogd.",
       "deleteFailedTitle": "Kon account niet verwijderen",
+      "deleteReauthAction": "Opnieuw inloggen",
+      "deleteReauthBody": "Log voor je veiligheid opnieuw in en verwijder daarna je account. Je account is niet verwijderd.",
+      "deleteRetry": "Opnieuw proberen",
       "deletingAccount": "Account verwijderen…",
       "loadingSession": "Sessie laden…",
       "notificationsSection": "Meldingen",
@@ -1848,6 +1853,7 @@
         "accountDeleted": "Je Stella-account is verwijderd.",
         "dataDeleted": "Je Stella-gegevens zijn verwijderd.",
         "deleteAccountFailed": "Kon je account niet verwijderen. Probeer het opnieuw.",
+        "deleteAccountReauth": "Log voor je veiligheid uit en opnieuw in en verwijder daarna je account. Je account is niet verwijderd.",
         "deleteDataFailed": "Kon je gegevens niet verwijderen. Probeer het opnieuw.",
         "signInBeforeDelete": "Meld je aan voordat je je account verwijdert."
       }

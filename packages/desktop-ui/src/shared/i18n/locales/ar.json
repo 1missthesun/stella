@@ -1435,6 +1435,7 @@
     },
     "settings": {
       "aboutSection": "حول",
+      "accountDeletedTitle": "تم حذف الحساب",
       "appearance": {
         "dark": "داكن",
         "light": "فاتح",
@@ -1473,7 +1474,11 @@
       "deleteAccountLabel": "حذف حسابك في Stella",
       "deleteConfirmBody": "سيؤدي هذا إلى حذف حسابك في Stella نهائيًا وإزالة البيانات السحابية المرتبطة به من خوادمنا. لا يمكن التراجع عن ذلك.",
       "deleteConfirmTitle": "حذف الحساب",
+      "deleteFailedBody": "لم يتم حذف حسابك، ولا تزال مسجلاً الدخول.",
       "deleteFailedTitle": "تعذّر حذف الحساب",
+      "deleteReauthAction": "تسجيل الدخول مرة أخرى",
+      "deleteReauthBody": "لأمانك، سجّل الدخول مرة أخرى، ثم احذف حسابك. لم يتم حذف حسابك.",
+      "deleteRetry": "حاول مرة أخرى",
       "deletingAccount": "جارٍ حذف الحساب…",
       "loadingSession": "جارٍ تحميل الجلسة…",
       "notificationsSection": "الإشعارات",
@@ -1880,6 +1885,7 @@
         "accountDeleted": "تم حذف حساب Stella الخاص بك.",
         "dataDeleted": "تم حذف بيانات Stella الخاصة بك.",
         "deleteAccountFailed": "تعذّر حذف حسابك. يرجى المحاولة مرة أخرى.",
+        "deleteAccountReauth": "لأمانك، سجّل الخروج ثم سجّل الدخول مرة أخرى، ثم احذف حسابك. لم يتم حذف حسابك.",
         "deleteDataFailed": "تعذّر حذف بياناتك. يرجى المحاولة مرة أخرى.",
         "signInBeforeDelete": "سجّل الدخول قبل حذف حسابك."
       }

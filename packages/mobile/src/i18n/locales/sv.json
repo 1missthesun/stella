@@ -1403,6 +1403,7 @@
     },
     "settings": {
       "aboutSection": "Om",
+      "accountDeletedTitle": "Kontot har raderats",
       "appearance": {
         "dark": "Mörkt",
         "light": "Ljust",
@@ -1441,7 +1442,11 @@
       "deleteAccountLabel": "Radera ditt Stella-konto",
       "deleteConfirmBody": "Detta raderar permanent ditt Stella-konto och tar bort tillhörande molndata från våra servrar. Detta kan inte ångras.",
       "deleteConfirmTitle": "Radera konto",
+      "deleteFailedBody": "Ditt konto raderades inte, och du är fortfarande inloggad.",
       "deleteFailedTitle": "Det gick inte att radera kontot",
+      "deleteReauthAction": "Logga in igen",
+      "deleteReauthBody": "Av säkerhetsskäl behöver du logga in igen och sedan radera kontot. Ditt konto raderades inte.",
+      "deleteRetry": "Försök igen",
       "deletingAccount": "Raderar kontot…",
       "loadingSession": "Läser in sessionen…",
       "notificationsSection": "Aviseringar",
@@ -1848,6 +1853,7 @@
         "accountDeleted": "Ditt Stella-konto har raderats.",
         "dataDeleted": "Dina Stella-data har raderats.",
         "deleteAccountFailed": "Det gick inte att radera ditt konto. Försök igen.",
+        "deleteAccountReauth": "Av säkerhetsskäl behöver du logga ut och in igen och sedan radera kontot. Ditt konto raderades inte.",
         "deleteDataFailed": "Det gick inte att radera dina data. Försök igen.",
         "signInBeforeDelete": "Logga in innan du raderar ditt konto."
       }

@@ -1395,6 +1395,7 @@
     },
     "settings": {
       "aboutSection": "Tentang",
+      "accountDeletedTitle": "Akun dihapus",
       "appearance": {
         "dark": "Gelap",
         "light": "Terang",
@@ -1433,7 +1434,11 @@
       "deleteAccountLabel": "Hapus akun Stella Anda",
       "deleteConfirmBody": "Tindakan ini menghapus akun Stella Anda secara permanen dan membuang data cloud terkait di server kami. Tidak bisa dibatalkan.",
       "deleteConfirmTitle": "Hapus akun",
+      "deleteFailedBody": "Akun Anda tidak dihapus, dan Anda masih masuk.",
       "deleteFailedTitle": "Tidak bisa menghapus akun",
+      "deleteReauthAction": "Masuk lagi",
+      "deleteReauthBody": "Demi keamanan, masuk lagi, lalu hapus akun Anda. Akun Anda tidak dihapus.",
+      "deleteRetry": "Coba lagi",
       "deletingAccount": "Menghapus akun…",
       "loadingSession": "Memuat sesi…",
       "notificationsSection": "Notifikasi",
@@ -1840,6 +1845,7 @@
         "accountDeleted": "Akun Stella Anda telah dihapus.",
         "dataDeleted": "Data Stella Anda telah dihapus.",
         "deleteAccountFailed": "Tidak dapat menghapus akun Anda. Coba lagi.",
+        "deleteAccountReauth": "Demi keamanan, keluar lalu masuk lagi, kemudian hapus akun Anda. Akun Anda tidak dihapus.",
         "deleteDataFailed": "Tidak dapat menghapus data Anda. Coba lagi.",
         "signInBeforeDelete": "Masuk sebelum menghapus akun Anda."
       }

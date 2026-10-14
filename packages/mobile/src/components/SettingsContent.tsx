@@ -23,6 +23,10 @@ import {
 } from "./settings/settings-styles";
 import { env } from "../config/env";
 import { authClient } from "../lib/auth-client";
+import {
+  deleteAccountOnServer,
+  type AccountDeletionOutcome,
+} from "../lib/account-deletion";
 import { clearAiConsent } from "../lib/ai-consent";
 import { clearCachedToken } from "../lib/auth-token";
 import { clearAccountChatData } from "../lib/chat-account-cleanup";
@@ -191,24 +195,52 @@ export function SettingsContent() {
 
   const runDeleteAccount = async () => {
     setIsDeletingAccount(true);
+    let outcome: AccountDeletionOutcome;
     try {
-      const client = authClient as unknown as {
-        deleteUser?: (args?: { callbackURL?: string }) => Promise<unknown>;
-      };
-      if (typeof client.deleteUser !== "function") {
-        throw new Error("Account deletion is not available in this build.");
-      }
-      await tearDownPushNotifications();
-      await client.deleteUser({});
-      clearCachedToken();
-      await authClient.signOut();
-      await clearLocalAccountState();
-      clearAiConsent();
+      outcome = await deleteAccountOnServer();
     } catch (e) {
-      Alert.alert(t("mobile.settings.deleteFailedTitle"), userFacingError(e));
-    } finally {
-      setIsDeletingAccount(false);
+      outcome = { ok: false, reauth: false, message: userFacingError(e) };
     }
+    if (!outcome.ok) {
+      setIsDeletingAccount(false);
+      if (outcome.reauth) {
+        Alert.alert(
+          t("mobile.settings.deleteFailedTitle"),
+          t("mobile.settings.deleteReauthBody"),
+          [
+            { text: t("mobile.common.cancel"), style: "cancel" },
+            {
+              text: t("mobile.settings.deleteReauthAction"),
+              onPress: () => void signOut(),
+            },
+          ],
+        );
+        return;
+      }
+      Alert.alert(
+        t("mobile.settings.deleteFailedTitle"),
+        `${t("mobile.settings.deleteFailedBody")}\n\n${outcome.message}`,
+        [
+          { text: t("mobile.common.cancel"), style: "cancel" },
+          {
+            text: t("mobile.settings.deleteRetry"),
+            style: "destructive",
+            onPress: () => void runDeleteAccount(),
+          },
+        ],
+      );
+      return;
+    }
+    await tearDownPushNotifications().catch(() => {});
+    clearCachedToken();
+    await authClient.signOut().catch(() => {});
+    await clearLocalAccountState().catch(() => {});
+    clearAiConsent();
+    setIsDeletingAccount(false);
+    Alert.alert(
+      t("mobile.settings.accountDeletedTitle"),
+      t("settings.account.toasts.accountDeleted"),
+    );
   };
 
   const confirmDeleteAccount = () => {

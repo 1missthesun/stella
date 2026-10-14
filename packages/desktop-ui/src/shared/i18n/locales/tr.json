@@ -1403,6 +1403,7 @@
     },
     "settings": {
       "aboutSection": "Hakkında",
+      "accountDeletedTitle": "Hesap silindi",
       "appearance": {
         "dark": "Koyu",
         "light": "Açık",
@@ -1441,7 +1442,11 @@
       "deleteAccountLabel": "Stella hesabınızı silin",
       "deleteConfirmBody": "Bu işlem Stella hesabınızı kalıcı olarak siler ve sunucularımızdaki ilgili bulut verilerini kaldırır. Bu işlem geri alınamaz.",
       "deleteConfirmTitle": "Hesabı sil",
+      "deleteFailedBody": "Hesabınız silinmedi ve oturumunuz hâlâ açık.",
       "deleteFailedTitle": "Hesap silinemedi",
+      "deleteReauthAction": "Yeniden oturum aç",
+      "deleteReauthBody": "Güvenliğiniz için yeniden oturum açın, ardından hesabınızı silin. Hesabınız silinmedi.",
+      "deleteRetry": "Tekrar dene",
       "deletingAccount": "Hesap siliniyor…",
       "loadingSession": "Oturum yükleniyor…",
       "notificationsSection": "Bildirimler",
@@ -1848,6 +1853,7 @@
         "accountDeleted": "Stella hesabınız silindi.",
         "dataDeleted": "Stella verileriniz silindi.",
         "deleteAccountFailed": "Hesabınız silinemedi. Lütfen tekrar deneyin.",
+        "deleteAccountReauth": "Güvenliğiniz için oturumu kapatıp yeniden açın, ardından hesabınızı silin. Hesabınız silinmedi.",
         "deleteDataFailed": "Verileriniz silinemedi. Lütfen tekrar deneyin.",
         "signInBeforeDelete": "Hesabınızı silmeden önce giriş yapın."
       }

@@ -43,10 +43,18 @@ import { integrityErrorMessage, integrityPurposeForPath, verifyAuthRequestProof 
 import { oauthStateBinding } from "./oauth-binding.js";
 import { ottCookieHeader } from "./ott-cookie.js";
 import { ownerGateStub } from "../rpc-release.js";
-import { ownerModeRefusesAuthPath } from "../selfhost/owner-mode.js";
+import { ownerModeEnabled, ownerModeRefusesAuthPath } from "../selfhost/owner-mode.js";
 import { betterAuthCipherKey, betterAuthKeys } from "../secret-rotation.js";
 
 type AuthEnv = Cloudflare.Env;
+
+const isSelfHostOwner = async (env: AuthEnv, userId: string): Promise<boolean> => {
+  if (!ownerModeEnabled(env) || !env.DB) return false;
+  const row = await env.DB.prepare("SELECT 1 AS owner FROM selfhost_server WHERE owner_user_id = ?")
+    .bind(userId)
+    .first<{ owner: number }>();
+  return row !== null;
+};
 
 const DAY_SECONDS = 24 * 60 * 60;
 const APPLE_CLIENT_SECRET_TTL_SECONDS = 180 * DAY_SECONDS;
@@ -502,6 +510,13 @@ const buildOptions = (env: AuthEnv) => {
       deleteUser: {
         enabled: true,
         beforeDelete: async (user) => {
+          if (await isSelfHostOwner(env, user.id)) {
+            throw new APIError("FORBIDDEN", {
+              code: "owner_account",
+              message:
+                "This is the account that owns this Stella server, so it can't be deleted here. To remove everything, take the server down with the self-host CLI (selfhost.mjs destroy).",
+            });
+          }
           const closed = await ownerGateStub(env.OWNER_GATES, user.id).closeOwner();
           console.log(JSON.stringify({ event: "auth_user_owner_closed", pending: closed.pending }));
         },

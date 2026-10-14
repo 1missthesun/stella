@@ -5,6 +5,7 @@ import {
   PRIVACY_POLICY,
   TERMS_OF_SERVICE,
 } from "@/lib/legal-text";
+import { INCLUDED_IN_EVERY_PLAN, PLAN_ORDER, PLANS } from "@/lib/plans";
 import { getSiteUrl } from "@/lib/site-url";
 
 const MARKDOWN_HEADERS: HeadersInit = {
@@ -143,19 +144,16 @@ const PRICING_MD = `${header(
   "Pick the usage and capabilities you need.",
 )}
 ## Plans
-- **Free** — $0. No credit card, no trial. Includes the coding agent, personal assistant, research and knowledge work, dictation, and read-aloud.
-- **Go** — $5/mo. 10× higher usage. Includes coding, assistant and research features, dictation, and read-aloud.
-- **Pro** — $15/mo. The highest usage limits, image, video, 3D and voice generation, and multiple agents working together.
+${PLAN_ORDER.map((id) => {
+  const plan = PLANS[id];
+  const price = plan.monthlyPriceCents / 100;
+  return `- **${plan.label}** — $${price}${price > 0 ? "/mo" : ""}. ${plan.tagline.replace(/\.?$/, ".")} Includes: ${plan.features.join("; ")}.`;
+}).join("\n")}
 
 ## Every plan includes
 Every tier includes browser, desktop, and mobile access, with different usage limits.
 
-- Browser, desktop, and mobile access
-- Coding, assistant, and research in one app
-- Dictation and wake word on every tier
-- Customizable interface
-- Work with files and apps
-- Bring your own models and keys
+${INCLUDED_IN_EVERY_PLAN.map((item) => `- ${item}`).join("\n")}
 
 ## Choose Stella and get started
 Free. No credit card, no trial. Download Stella and try it today.

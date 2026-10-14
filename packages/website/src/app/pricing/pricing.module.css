@@ -70,19 +70,11 @@
   color: #fff;
 }
 
-.priceBlock {
-  margin-top: clamp(36px, 6svh, 64px);
-}
-
 .price {
   display: flex;
   align-items: baseline;
   gap: 10px;
   margin: clamp(36px, 6svh, 64px) 0 0;
-}
-
-.priceBlock .price {
-  margin-top: 0;
 }
 
 .amount {
@@ -98,15 +90,8 @@
   color: rgba(10, 10, 13, 0.5);
 }
 
-[data-featured="1"] .period,
-[data-featured="1"] .then {
+[data-featured="1"] .period {
   color: rgba(255, 255, 255, 0.6);
-}
-
-.then {
-  margin: 12px 0 0;
-  font-size: 15px;
-  color: rgba(10, 10, 13, 0.6);
 }
 
 .tagline {

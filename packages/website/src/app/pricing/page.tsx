@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
-import { Check, FolderOpen, KeyRound, Mic, MonitorSmartphone, Paintbrush, Sparkles } from "lucide-react";
+import { Check, FolderOpen, KeyRound, Mic, MonitorSmartphone, Paintbrush, Sparkles, type LucideIcon } from "lucide-react";
 import { Finale } from "@/components/landing/closing";
 import { InView } from "@/components/landing/in-view";
 import { PageShell } from "@/components/landing/page-shell";
 import pg from "@/components/landing/page.module.css";
 import pr from "./pricing.module.css";
+import { INCLUDED_IN_EVERY_PLAN, PLAN_ORDER, PLANS } from "@/lib/plans";
 
 export const metadata: Metadata = {
   title: "Pricing",
@@ -13,60 +14,14 @@ export const metadata: Metadata = {
   alternates: { canonical: "/pricing" },
 };
 
-// Mirrors `STATIC_PLAN_DISPLAY`, `PLAN_USAGE_TAGLINE` and `PLAN_FEATURES`
-// in `src/app/billing/billing-client.tsx` so /pricing and /billing always
-// describe the same plans. `PRICING_MD` in `src/lib/agent-pages.ts` mirrors
-// this page for agents — update all three together.
-//
-// When the Go intro promo runs in the backend
-// (`STELLA_GO_INTRO_FIRST_MONTH_PRICE_CENTS`), keep `introFirstMonthPriceUsd`
-// here in sync so marketing matches `/billing`.
-const plans: {
-  name: string;
-  price: number;
-  /** Shown alongside recurring `price`; must match the backend intro cents ÷ 100. */
-  introFirstMonthPriceUsd?: number;
-  tagline: string;
-  features: string[];
-  featured?: boolean;
-}[] = [
-  {
-    name: "Free",
-    price: 0,
-    tagline: "No credit card, no trial.",
-    features: [
-      "Coding agent",
-      "Personal assistant",
-      "Research and knowledge work",
-      "Dictation and read-aloud",
-    ],
-  },
-  {
-    name: "Go",
-    price: 5,
-    tagline: "10× higher usage",
-    features: ["Coding, assistant and research", "Dictation and read-aloud"],
-  },
-  {
-    name: "Pro",
-    price: 15,
-    tagline: "The highest usage limits",
-    featured: true,
-    features: [
-      "Image, video, 3D and voice generation",
-      "Multiple agents working together",
-    ],
-  },
-];
-
-const included = [
-  { label: "Browser, desktop, and mobile access", icon: MonitorSmartphone },
-  { label: "Coding, assistant and research in one app", icon: Sparkles },
-  { label: "Dictation and wake word on every tier", icon: Mic },
-  { label: "Customizable interface", icon: Paintbrush },
-  { label: "Work with files and apps", icon: FolderOpen },
-  { label: "Bring your own models and keys", icon: KeyRound },
-];
+const INCLUDED_ICONS: Record<(typeof INCLUDED_IN_EVERY_PLAN)[number], LucideIcon> = {
+  "Browser, desktop, and mobile access": MonitorSmartphone,
+  "Coding, assistant and research in one app": Sparkles,
+  "Dictation and wake word on every tier": Mic,
+  "Customizable interface": Paintbrush,
+  "Work with files and apps": FolderOpen,
+  "Bring your own models and keys": KeyRound,
+};
 
 export default function Pricing() {
   return (
@@ -81,41 +36,24 @@ export default function Pricing() {
 
       <section className={pr.plans} data-tone="light" data-bg="#ffffff" aria-label="Plans">
         <InView className={pr.grid} threshold={0.15}>
-          {plans.map((plan, i) => {
-            const intro =
-              typeof plan.introFirstMonthPriceUsd === "number" &&
-              plan.introFirstMonthPriceUsd > 0 &&
-              plan.introFirstMonthPriceUsd < plan.price
-                ? plan.introFirstMonthPriceUsd
-                : null;
+          {PLAN_ORDER.map((id, i) => {
+            const plan = PLANS[id];
+            const price = plan.monthlyPriceCents / 100;
             return (
               <article
-                key={plan.name}
+                key={plan.label}
                 className={pr.card}
                 data-featured={plan.featured ? "1" : "0"}
                 style={{ ["--i" as string]: i }}
               >
                 <header className={pr.cardHead}>
-                  <h2 className={pr.name}>{plan.name}</h2>
+                  <h2 className={pr.name}>{plan.label}</h2>
                   {plan.featured ? <span className={pr.badge}>Popular</span> : null}
                 </header>
-                {intro !== null ? (
-                  <div className={pr.priceBlock}>
-                    <p className={pr.price}>
-                      <span className={pr.amount}>${intro}</span>
-                      <span className={pr.period}>first month</span>
-                    </p>
-                    <p className={pr.then}>
-                      Then <strong>${plan.price}</strong>
-                      <span aria-hidden="true">/mo</span> after that
-                    </p>
-                  </div>
-                ) : (
-                  <p className={pr.price}>
-                    <span className={pr.amount}>${plan.price}</span>
-                    {plan.price > 0 ? <span className={pr.period}>/mo</span> : null}
-                  </p>
-                )}
+                <p className={pr.price}>
+                  <span className={pr.amount}>${price}</span>
+                  {price > 0 ? <span className={pr.period}>/mo</span> : null}
+                </p>
                 <p className={pr.tagline}>{plan.tagline}</p>
                 <ul className={pr.features}>
                   {plan.features.map((f) => (
@@ -142,14 +80,17 @@ export default function Pricing() {
           </p>
         </div>
         <InView className={pr.tiles}>
-          {included.map(({ label, icon: Icon }, i) => (
+          {INCLUDED_IN_EVERY_PLAN.map((label, i) => {
+            const Icon = INCLUDED_ICONS[label];
+            return (
             <div key={label} className={pr.tile} style={{ ["--i" as string]: i }}>
               <span className={pr.tileIcon}>
                 <Icon size={22} strokeWidth={1.8} aria-hidden="true" />
               </span>
               <p>{label}</p>
             </div>
-          ))}
+            );
+          })}
         </InView>
       </section>
     </PageShell>

@@ -17,8 +17,8 @@ import { openSignInDialog } from "@/components/auth/sign-in-dialog";
 import { authClient } from "@/lib/auth-client";
 import { clearCachedToken } from "@/lib/auth-token";
 import { useDesktopBridgeAuthUser } from "@/lib/desktop-bridge-auth";
+import { PLAN_ORDER, PLANS, type BillingPlan } from "@/lib/plans";
 
-type BillingPlan = "free" | "go" | "pro";
 type PaidBillingPlan = Exclude<BillingPlan, "free">;
 
 type BillingPlanConfig = {
@@ -86,48 +86,14 @@ type UsageCreditStatus = {
   totalConsumedUsd: number;
 };
 
-const PLAN_ORDER: BillingPlan[] = ["free", "go", "pro"];
-const VISIBLE_PLAN_ORDER = PLAN_ORDER;
 const RECOMMENDED_PLAN: BillingPlan = "pro";
-
-const STATIC_PLAN_DISPLAY: Record<
-  BillingPlan,
-  { label: string; monthlyPriceCents: number }
-> = {
-  free: { label: "Free", monthlyPriceCents: 0 },
-  go: { label: "Go", monthlyPriceCents: 500 },
-  pro: { label: "Pro", monthlyPriceCents: 1_500 },
-};
-
-// Keep in sync with `plans` in `src/app/pricing/page.tsx` and `PRICING_MD`
-// in `src/lib/agent-pages.ts` so /billing, /pricing and /pricing.md always
-// describe the same plans.
-const PLAN_USAGE_TAGLINE: Record<BillingPlan, string> = {
-  free: "No credit card, no trial.",
-  go: "10× higher usage",
-  pro: "The highest usage limits",
-};
-
-const PLAN_FEATURES: Record<BillingPlan, readonly string[]> = {
-  free: [
-    "Coding agent",
-    "Personal assistant",
-    "Research and knowledge work",
-    "Dictation and read-aloud",
-  ],
-  go: ["Coding, assistant and research", "Dictation and read-aloud"],
-  pro: [
-    "Image, video, 3D and voice generation",
-    "Multiple agents working together",
-  ],
-};
 
 const VERIFIED_BADGE_FEATURE = "Verified creator badge on the Store";
 
 const PAID_PLANS = new Set<BillingPlan>(["go", "pro"]);
 
 const getPlanFeatures = (plan: BillingPlan): readonly string[] => {
-  const features: string[] = [...PLAN_FEATURES[plan]];
+  const features: string[] = [...PLANS[plan].features];
   if (PAID_PLANS.has(plan)) features.push(VERIFIED_BADGE_FEATURE);
   return features;
 };
@@ -304,7 +270,7 @@ function BillingInteractive() {
   const getPlanDisplay = useCallback(
     (plan: BillingPlan) => {
       const live = planCatalog?.[plan];
-      const fallback = STATIC_PLAN_DISPLAY[plan];
+      const fallback = PLANS[plan];
       return {
         label: live?.label ?? fallback.label,
         monthlyPriceCents: live?.monthlyPriceCents ?? fallback.monthlyPriceCents,
@@ -553,7 +519,7 @@ function BillingInteractive() {
             <h2 className="billing-section-title">Plans</h2>
           </div>
           <div className="billing-plans-grid">
-            {VISIBLE_PLAN_ORDER.map((plan) => {
+            {PLAN_ORDER.map((plan) => {
               const display = getPlanDisplay(plan);
               const isCurrentPlan = plan === currentPlan;
               const introCents =
@@ -653,7 +619,7 @@ function BillingInteractive() {
                     )}
                   </div>
                   <p className="billing-plan-allotment">
-                    {PLAN_USAGE_TAGLINE[plan]}
+                    {PLANS[plan].tagline}
                   </p>
                   <ul className="billing-plan-features">
                     {getPlanFeatures(plan).map((feature) => (

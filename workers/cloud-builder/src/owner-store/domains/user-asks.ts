@@ -46,6 +46,7 @@ import {
   type UserAskSummary,
   type UserAskUrgencyLevel,
 } from "@stella/contracts/user-ask";
+import { EXPO_PUSH_ENDPOINT, expoPushEnabled, expoPushHeaders } from "../../push-expo.js";
 import {
   USER_ASK_NOTIFICATION_THREAD,
   USER_ASK_PUSH_CAPABILITY,
@@ -82,7 +83,6 @@ import type {
 import { livePushTokens, type LivePushToken } from "./devices.js";
 import { signUserAskReplyRoute } from "../../user-asks/reply-route-signature.js";
 
-const EXPO_PUSH_ENDPOINT = "https://exp.host/--/api/v2/push/send";
 const MAX_OPEN_ASKS = 32;
 const MAX_SEALED_CIPHERTEXT = 16 * 1024;
 const MAX_PLAIN_VALUE = 4 * 1024;
@@ -955,7 +955,7 @@ const sendAskPush = async (
   policy: UserAskEscalationPolicy,
 ): Promise<PushOutcome> => {
   const tokens = livePushTokens(ctx);
-  if (tokens.length === 0) return "no_push_target";
+  if (tokens.length === 0 || !expoPushEnabled(ctx.env)) return "no_push_target";
   const messages = userAskPushMessages({
     row,
     level,
@@ -966,7 +966,7 @@ const sendAskPush = async (
   });
   const response = await fetch(EXPO_PUSH_ENDPOINT, {
     method: "POST",
-    headers: { "content-type": "application/json", accept: "application/json" },
+    headers: expoPushHeaders(ctx.env),
     body: JSON.stringify(messages),
     signal: AbortSignal.timeout(15_000),
   }).catch(() => null);

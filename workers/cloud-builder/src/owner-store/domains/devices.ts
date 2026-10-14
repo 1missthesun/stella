@@ -5,6 +5,7 @@
  * `/api/mobile/*` routes, which land in `handleMobileRoute`.
  */
 
+import { EXPO_PUSH_ENDPOINT, expoPushEnabled, expoPushHeaders } from "../../push-expo.js";
 import type {
   ActivityNotificationKind,
   DeviceCalls,
@@ -30,7 +31,6 @@ const MAX_SUCCESSION_HOPS = 8;
 const MAX_TOKENS = 25;
 const PAIR_SECRET_LENGTH = 48;
 const PAIR_SECRET_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-const EXPO_PUSH_ENDPOINT = "https://exp.host/--/api/v2/push/send";
 const PUSH_QUIET_MS = 60_000;
 export const DEVICES_PUSH_DIGEST_JOB = "devices.pushDigest";
 
@@ -928,10 +928,10 @@ export const sendPushMessages = async (
   tokens: readonly LivePushToken[],
   messages: readonly Record<string, unknown>[],
 ): Promise<boolean> => {
-  if (messages.length === 0) return true;
+  if (messages.length === 0 || !expoPushEnabled(ctx.env)) return true;
   const response = await fetch(EXPO_PUSH_ENDPOINT, {
     method: "POST",
-    headers: { "content-type": "application/json", accept: "application/json" },
+    headers: expoPushHeaders(ctx.env),
     body: JSON.stringify(messages),
     signal: AbortSignal.timeout(15_000),
   }).catch(() => null);

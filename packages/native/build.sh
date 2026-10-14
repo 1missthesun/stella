@@ -9,7 +9,25 @@ mkdir -p "$OUTPUT_DIR"
 
 MACOS_MIN_VERSION="${MACOSX_DEPLOYMENT_TARGET:-14.0}"
 TMP_DIR="$(mktemp -d)"
-trap 'rm -rf "$TMP_DIR"' EXIT
+# Finished helpers are staged on the output volume and renamed into place, so
+# a helper that is running keeps its file: writing over a running binary
+# invalidates its code pages and macOS kills it (Code Signature Invalid).
+STAGE_DIR="$OUTPUT_DIR/.build-$$"
+mkdir -p "$STAGE_DIR"
+trap 'rm -rf "$TMP_DIR" "$STAGE_DIR"' EXIT
+
+install_into_place() {
+  local staged="$1"
+  local destination="$2"
+  if [ -d "$staged" ] && [ -e "$destination" ]; then
+    local aside="$STAGE_DIR/replaced-$(basename "$destination")"
+    mv "$destination" "$aside"
+    mv "$staged" "$destination"
+    rm -rf "$aside"
+  else
+    mv -f "$staged" "$destination"
+  fi
+}
 
 build_c_universal() {
   local output="$1"
@@ -18,7 +36,8 @@ build_c_universal() {
 
   clang -O2 -target "arm64-apple-macosx$MACOS_MIN_VERSION" -o "$TMP_DIR/$output-arm64" "$source" "$@"
   clang -O2 -target "x86_64-apple-macosx$MACOS_MIN_VERSION" -o "$TMP_DIR/$output-x64" "$source" "$@"
-  lipo -create -output "$OUTPUT_DIR/$output" "$TMP_DIR/$output-arm64" "$TMP_DIR/$output-x64"
+  lipo -create -output "$STAGE_DIR/$output" "$TMP_DIR/$output-arm64" "$TMP_DIR/$output-x64"
+  install_into_place "$STAGE_DIR/$output" "$OUTPUT_DIR/$output"
 }
 
 build_swift_universal() {
@@ -28,7 +47,8 @@ build_swift_universal() {
 
   swiftc -O -target "arm64-apple-macosx$MACOS_MIN_VERSION" -o "$TMP_DIR/$output-arm64" "$source" "$@"
   swiftc -O -target "x86_64-apple-macosx$MACOS_MIN_VERSION" -o "$TMP_DIR/$output-x64" "$source" "$@"
-  lipo -create -output "$OUTPUT_DIR/$output" "$TMP_DIR/$output-arm64" "$TMP_DIR/$output-x64"
+  lipo -create -output "$STAGE_DIR/$output" "$TMP_DIR/$output-arm64" "$TMP_DIR/$output-x64"
+  install_into_place "$STAGE_DIR/$output" "$OUTPUT_DIR/$output"
 }
 
 build_c_bundle_universal() {
@@ -41,7 +61,7 @@ build_c_bundle_universal() {
   clang -O2 -target "arm64-apple-macosx$MACOS_MIN_VERSION" -bundle -o "$TMP_DIR/$executable_name-arm64" "$source" "$@"
   clang -O2 -target "x86_64-apple-macosx$MACOS_MIN_VERSION" -bundle -o "$TMP_DIR/$executable_name-x64" "$source" "$@"
 
-  local bundle_dir="$OUTPUT_DIR/$bundle_name"
+  local bundle_dir="$STAGE_DIR/$bundle_name"
   rm -rf "$bundle_dir"
   mkdir -p "$bundle_dir/Contents/MacOS"
   cp "$info_plist" "$bundle_dir/Contents/Info.plist"
@@ -52,6 +72,7 @@ build_c_bundle_universal() {
   if command -v codesign >/dev/null 2>&1; then
     codesign --force --sign - "$bundle_dir" >/dev/null 2>&1 || true
   fi
+  install_into_place "$bundle_dir" "$OUTPUT_DIR/$bundle_name"
 }
 
 build_c_app_universal() {
@@ -64,7 +85,7 @@ build_c_app_universal() {
   clang -O2 -target "arm64-apple-macosx$MACOS_MIN_VERSION" -o "$TMP_DIR/$executable_name-arm64" "$source" "$@"
   clang -O2 -target "x86_64-apple-macosx$MACOS_MIN_VERSION" -o "$TMP_DIR/$executable_name-x64" "$source" "$@"
 
-  local app_dir="$OUTPUT_DIR/$app_name"
+  local app_dir="$STAGE_DIR/$app_name"
   rm -rf "$app_dir"
   mkdir -p "$app_dir/Contents/MacOS" "$app_dir/Contents/Resources"
   cp "$info_plist" "$app_dir/Contents/Info.plist"
@@ -78,6 +99,7 @@ build_c_app_universal() {
   if command -v codesign >/dev/null 2>&1; then
     codesign --force --sign - "$app_dir" >/dev/null 2>&1 || true
   fi
+  install_into_place "$app_dir" "$OUTPUT_DIR/$app_name"
 }
 
 echo "Building window_info (macOS)..."
@@ -174,14 +196,16 @@ if command -v cargo >/dev/null 2>&1; then
   MACOSX_DEPLOYMENT_TARGET="$MACOS_MIN_VERSION" cargo build --release --quiet --target x86_64-apple-darwin
   popd >/dev/null
   lipo -create \
-    -output "$OUTPUT_DIR/wakeword_listener" \
+    -output "$STAGE_DIR/wakeword_listener" \
     "wakeword/target/aarch64-apple-darwin/release/wakeword_listener" \
     "wakeword/target/x86_64-apple-darwin/release/wakeword_listener"
   if command -v codesign >/dev/null 2>&1; then
-    codesign --force --sign - "$OUTPUT_DIR/wakeword_listener" >/dev/null 2>&1 || true
+    codesign --force --sign - "$STAGE_DIR/wakeword_listener" >/dev/null 2>&1 || true
   fi
+  install_into_place "$STAGE_DIR/wakeword_listener" "$OUTPUT_DIR/wakeword_listener"
   mkdir -p "$OUTPUT_DIR/wakeword_models"
-  cp wakeword/models/hey_stella.onnx "$OUTPUT_DIR/wakeword_models/hey_stella.onnx"
+  cp wakeword/models/hey_stella.onnx "$STAGE_DIR/hey_stella.onnx"
+  install_into_place "$STAGE_DIR/hey_stella.onnx" "$OUTPUT_DIR/wakeword_models/hey_stella.onnx"
   echo "Build successful: $OUTPUT_DIR/wakeword_listener"
 else
   echo "Skipping wakeword_listener: cargo not on PATH (install rustup to enable)."

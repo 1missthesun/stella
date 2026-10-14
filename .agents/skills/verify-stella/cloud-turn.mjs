@@ -30,6 +30,9 @@
 // report (`[Agent completed]`, `[Task failed]`, `[Task canceled]`) has arrived
 // and been answered, for a turn that starts an agent.
 //
+// `--plan free [--allowance spent]` runs as a free owner (with its allowance
+// used up), for checking what a free account can still run, like its own keys.
+//
 // A follow-up into an existing conversation must arrive as the same owner, so
 // pass the `--email` the first run printed together with its `--conversation`.
 //
@@ -77,16 +80,17 @@ if (!adminSecret) {
   process.exit(2);
 }
 
+const plan = flag("--plan", "pro");
 const email = flag("--email", `agent-headless-${randomUUID().slice(0, 8)}@test.stella.local`);
 const session = await (
   await fetch(`${builderUrl}/api/admin/test-accounts/session`, {
     method: "POST",
     headers: { authorization: `Bearer ${adminSecret}`, "content-type": "application/json" },
-    body: JSON.stringify({
-      email,
-      plan: "pro",
-      usageMode: "unlimited",
-    }),
+    body: JSON.stringify(
+      plan === "pro"
+        ? { email, plan: "pro", usageMode: "unlimited" }
+        : { email, plan, ...(flag("--allowance") ? { allowance: flag("--allowance") } : {}) },
+    ),
   })
 ).json();
 const ownerId = session.ownerId;

@@ -182,7 +182,12 @@ function Section({
   const tint = kind === "waiting" ? colors.accent : colors.textMuted;
   return (
     <View style={styles.section}>
-      <View style={styles.sectionHead}>
+      <View
+        style={styles.sectionHead}
+        accessible
+        accessibilityRole="header"
+        accessibilityLabel={t(`app.chat.catchUp.${kind}`)}
+      >
         <Icon name={SECTION_ICONS[kind]} size={12} color={tint} />
         <Text style={[styles.sectionTitle, { color: tint }]} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
           {t(`app.chat.catchUp.${kind}`).toUpperCase()}
@@ -479,10 +484,10 @@ export function SummaryPopover({
                     color={shown === 0 ? fadeHex(colors.textMuted, 0.4) : colors.text}
                   />
                 </Pressable>
-                <Text
-                  style={styles.progress}
-                  maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
-                  // VoiceOver: swipe up or down here to change summary.
+                <View
+                  // VoiceOver: swipe up or down here to change summary. On a
+                  // View, not the Text: iOS hands Text's own accessibility to
+                  // a copy that drops the value and the adjust gestures.
                   accessible
                   accessibilityRole="adjustable"
                   accessibilityLabel={current ? formatWhen(locale, current.createdAt) : undefined}
@@ -494,8 +499,15 @@ export function SummaryPopover({
                   }}
                   testID="summary-progress"
                 >
-                  {t("userAsk.question.progress", { current: shown + 1, total })}
-                </Text>
+                  <Text
+                    style={styles.progress}
+                    maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
+                    importantForAccessibility="no"
+                    accessibilityElementsHidden
+                  >
+                    {t("userAsk.question.progress", { current: shown + 1, total })}
+                  </Text>
+                </View>
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={t("common.next")}

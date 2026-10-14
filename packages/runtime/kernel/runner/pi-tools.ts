@@ -54,6 +54,7 @@ export type RunnerPiTools = {
   run: (call: PiToolCall) => Promise<AgentToolResult<unknown>>;
   shellEnvironment: (owner: { conversationId: string; agentId?: string; cwd: string }) => Record<string, string>;
   endAgentBrowserTurn: (agentId: string) => Promise<void>;
+  releaseAgentComputerUse: (agentId: string) => Promise<void>;
   cliBridgeSocketPath?: string;
 };
 
@@ -99,6 +100,9 @@ export const createRunnerPiTools = (context: RunnerContext): RunnerPiTools => ({
     ),
   endAgentBrowserTurn: async (agentId) => {
     await context.toolHost.endBrowserTurn(runIdFor(agentId), "close-tabs");
+  },
+  releaseAgentComputerUse: async (agentId) => {
+    await context.toolHost.releaseAgentComputerSessions(agentId);
   },
   specs: (agentType) => {
     const offered = offeredTools(context, agentType);

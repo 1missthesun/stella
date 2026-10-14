@@ -2553,6 +2553,8 @@ export class NodeReplKernelRegistry {
   private readonly cells = new Map<string, NodeReplCellRecord>();
   private cellCounter = 0;
   private readonly runningCellByOwner = new Map<string, string>();
+  private readonly nativeUseEpochs = new Map<string, number>();
+  private readonly sessionIdsByAgent = new Map<string, Set<string>>();
   private cancelCellCleanup?: () => void;
   private cellCleanupEpoch = 0;
   private readonly evalTimeoutMs: number;
@@ -2726,6 +2728,12 @@ export class NodeReplKernelRegistry {
     const browserSessionId = getStellaBrowserSessionId(context);
     if (!id || !browserSessionId) {
       throw new Error("code requires a stable Stella agent/session identity.");
+    }
+    this.nativeUseEpochs.set(id, (this.nativeUseEpochs.get(id) ?? 0) + 1);
+    if (context.agentId) {
+      const ids = this.sessionIdsByAgent.get(context.agentId) ?? new Set();
+      ids.add(id);
+      this.sessionIdsByAgent.set(context.agentId, ids);
     }
     let kernel = this.kernels.get(id);
     if (!kernel) {
@@ -3025,6 +3033,35 @@ export class NodeReplKernelRegistry {
     );
   }
 
+  /**
+   * Stops the session's native computer-use helper once its agent run has
+   * ended, keeping the kernel (and its REPL bindings) for a later resume.
+   * The helper is respawned on the next computer-use request. Waits for a
+   * cell still running in the background, and skips the release when the
+   * agent started using code again in the meantime.
+   */
+  async releaseAgentNativeSessions(agentId: string): Promise<number> {
+    const ids = [...(this.sessionIdsByAgent.get(agentId) ?? [])];
+    this.sessionIdsByAgent.delete(agentId);
+    const released = await Promise.all(
+      ids.map((id) => this.releaseNativeSession(id)),
+    );
+    return released.filter(Boolean).length;
+  }
+
+  private async releaseNativeSession(id: string): Promise<boolean> {
+    const epoch = this.nativeUseEpochs.get(id) ?? 0;
+    const runningCellId = this.runningCellByOwner.get(id);
+    const running = runningCellId
+      ? this.cells.get(runningCellId)?.settled
+      : undefined;
+    if (running) await running;
+    if ((this.nativeUseEpochs.get(id) ?? 0) !== epoch) return false;
+    if (this.runningCellByOwner.has(id)) return false;
+    await this.options.disposeSession?.(id);
+    return true;
+  }
+
   private disposeKernel(id: string, kernel: NodeReplKernel): Promise<void> {
     const kernelClose = kernel.close();
     let sessionCleanup = Promise.resolve();
@@ -3041,7 +3078,10 @@ export class NodeReplKernelRegistry {
         // Session cleanup must not mask the evaluation or shutdown outcome.
       }
     }
-    if (this.kernels.get(id) === kernel) this.kernels.delete(id);
+    if (this.kernels.get(id) === kernel) {
+      this.kernels.delete(id);
+      this.nativeUseEpochs.delete(id);
+    }
     const teardown = Promise.allSettled([kernelClose, sessionCleanup]).then(
       () => undefined,
     );

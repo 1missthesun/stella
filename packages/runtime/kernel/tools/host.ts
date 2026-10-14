@@ -680,6 +680,8 @@ export const createToolHost = ({
       runId: string,
       behavior: import("../browser-use/client.js").BrowserTurnEndBehavior,
     ) => nodeReplRegistry.endBrowserTurn(runId, behavior),
+    releaseAgentComputerSessions: (agentId: string) =>
+      nodeReplRegistry.releaseAgentNativeSessions(agentId),
     killAllShells,
     killShell,
     shutdown,

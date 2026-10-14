@@ -407,6 +407,9 @@ export const piChatsFor = (
         void runner.piTools
           .endAgentBrowserTurn(threadId)
           .catch((error) => console.warn("[pi-chat] closing the agent's browser tabs failed", error));
+        void runner.piTools
+          .releaseAgentComputerUse(threadId)
+          .catch((error) => console.warn("[pi-chat] stopping the agent's computer-use helper failed", error));
         const owner = { conversationId, agentId: threadId };
         const runningSessionIds = runner.backgroundExits.runningSessions(owner);
         if (runningSessionIds.length === 0) return;

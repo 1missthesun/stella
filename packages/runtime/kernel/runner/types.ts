@@ -190,6 +190,7 @@ export type RunnerContext = {
       runId: string,
       behavior: import("../browser-use/client.js").BrowserTurnEndBehavior,
     ) => Promise<void>;
+    releaseAgentComputerSessions: (agentId: string) => Promise<number>;
     registerExtensionTools: (tools: ToolDefinition[]) => void;
     unregisterExtensionTools: () => void;
     listRunningShellSessionsOwnedBy: (

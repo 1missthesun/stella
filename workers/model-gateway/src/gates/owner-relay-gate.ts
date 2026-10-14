@@ -23,17 +23,18 @@ import {
   GATEWAY_REFUSED_MINTS_PER_HOUR,
   GATEWAY_TEST_ACCOUNT_MINTS_PER_HOUR,
   GATEWAY_THROTTLED_LIMIT_SHARE,
-  GATEWAY_UPSTREAM_MAX_DURATION_MS,
   limitsAudienceFor,
 } from "@stella/contracts/gateway/api";
 import type { ManagedModelAudience } from "@stella/contracts/gateway/capability";
 
-import { OwnerLedgerStore } from "../owner-ledger-store.js";
-import type {
-  LedgerReserveArgs,
-  LedgerReserveResult,
-  LedgerSettleArgs,
-} from "../ledger.js";
+import {
+  LedgerStore,
+  RESERVATION_LEASE_MS,
+  type LedgerReserveArgs,
+  type LedgerReserveResult,
+  type LedgerSettleArgs,
+  type LedgerSettleResult,
+} from "../ledger-store.js";
 import {
   managedCancellationKey,
   type ManagedCancellationIdentity,
@@ -42,25 +43,30 @@ import {
 const MINUTE_MS = 60_000;
 const HOUR_MS = 60 * MINUTE_MS;
 const OWNER_ENFORCEMENT_INITIALIZATION_VERSION = 2;
-export const OWNER_IN_FLIGHT_ABANDON_AFTER_MS =
-  GATEWAY_UPSTREAM_MAX_DURATION_MS + MINUTE_MS;
 
+export type OwnerAdmissionRefusal = {
+  refused: "concurrency_limit" | "rate_limited";
+  resetAt: number;
+};
+
+/**
+ * Wire shape of `admitRelay`. `duplicate` marks a request id this owner
+ * already holds in flight: it is admitted without a hold of its own, and
+ * only the holder releases it.
+ */
 export type GateAdmission =
-  | {
-      ok: true;
-      /**
-       * The request id was already in flight for this owner: a client retry
-       * of an ambiguous request. It is admitted without counting so the
-       * capability ledger, which owns idempotency, can answer replay or
-       * in-flight. Callers must not release a duplicate admission.
-       */
-      duplicate?: boolean;
-    }
-  | {
-      ok: false;
-      refused: "concurrency_limit" | "rate_limited";
-      resetAt: number;
-    };
+  | { ok: true; duplicate?: boolean }
+  | ({ ok: false } & OwnerAdmissionRefusal);
+
+export type OwnerReservation =
+  | Exclude<LedgerReserveResult, { kind: "reserved" }>
+  | ({ kind: "refused" } & OwnerAdmissionRefusal)
+  | { kind: "reserved"; attempt: string; remainingMicroCents: number | null };
+
+type RelayAdmissionCheck =
+  | { kind: "free" }
+  | { kind: "held" }
+  | ({ kind: "refused" } & OwnerAdmissionRefusal);
 
 /**
  * A session exchange admitted for an owner: it counts against the hourly
@@ -118,7 +124,8 @@ const parseAuthoritativeOwnerEnforcement = (
 const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS in_flight (
     request_id TEXT PRIMARY KEY,
-    started_at INTEGER NOT NULL
+    started_at INTEGER NOT NULL,
+    attempt TEXT
   )`,
   `CREATE TABLE IF NOT EXISTS relay_admissions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -162,6 +169,15 @@ const SCHEMA = [
   )`,
 ];
 
+const ownerLedgerJti = (generation: string, jti: string): string =>
+  JSON.stringify([generation, jti]);
+
+const ownerAdmissionId = (
+  generation: string,
+  jti: string,
+  requestId: string,
+): string => JSON.stringify([generation, jti, requestId]);
+
 const scaledLimit = (limit: number, throttled: boolean): number =>
   throttled
     ? Math.max(1, Math.floor(limit * GATEWAY_THROTTLED_LIMIT_SHARE))
@@ -169,7 +185,7 @@ const scaledLimit = (limit: number, throttled: boolean): number =>
 
 /** One SQLite Durable Object per capability owner (`sub`). */
 export class OwnerRelayGate extends DurableObject<Env> {
-  private readonly ledger: OwnerLedgerStore;
+  private readonly ledger: LedgerStore;
   private readonly instanceId = crypto.randomUUID();
   private readonly managedControllers = new Map<
     string,
@@ -179,9 +195,15 @@ export class OwnerRelayGate extends DurableObject<Env> {
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
-    this.ledger = new OwnerLedgerStore(ctx.storage);
+    this.ledger = new LedgerStore(ctx.storage);
     void ctx.blockConcurrencyWhile(async () => {
       for (const statement of SCHEMA) this.ctx.storage.sql.exec(statement);
+      const inFlightColumns = this.ctx.storage.sql
+        .exec<{ name: string }>("SELECT name FROM pragma_table_info('in_flight')")
+        .toArray();
+      if (!inFlightColumns.some((column) => column.name === "attempt")) {
+        this.ctx.storage.sql.exec("ALTER TABLE in_flight ADD COLUMN attempt TEXT");
+      }
     });
   }
 
@@ -419,18 +441,27 @@ export class OwnerRelayGate extends DurableObject<Env> {
     requestId: string;
     throttled: boolean;
   }): Promise<GateAdmission> {
-    return this.admitRelaySync(args);
+    const now = Date.now();
+    const check = this.checkRelayAdmission(args, now);
+    if (check.kind === "refused") {
+      return { ok: false, refused: check.refused, resetAt: check.resetAt };
+    }
+    if (check.kind === "held") return { ok: true, duplicate: true };
+    this.holdRelay(args.requestId, now, null);
+    return { ok: true };
   }
 
-  private admitRelaySync(args: {
-    audience: ManagedModelAudience;
-    requestId: string;
-    throttled: boolean;
-  }): GateAdmission {
-    const now = Date.now();
+  private checkRelayAdmission(
+    args: {
+      audience: ManagedModelAudience;
+      requestId: string;
+      throttled: boolean;
+    },
+    now: number,
+  ): RelayAdmissionCheck {
     this.ctx.storage.sql.exec(
       "DELETE FROM in_flight WHERE started_at <= ?",
-      now - OWNER_IN_FLIGHT_ABANDON_AFTER_MS,
+      now - RESERVATION_LEASE_MS,
     );
     this.ctx.storage.sql.exec(
       "DELETE FROM relay_admissions WHERE admitted_at <= ?",
@@ -443,7 +474,7 @@ export class OwnerRelayGate extends DurableObject<Env> {
         args.requestId,
       )
       .toArray()[0];
-    if (existing) return { ok: true, duplicate: true };
+    if (existing) return { kind: "held" };
 
     const policy = GATEWAY_OWNER_RELAY_LIMITS[limitsAudienceFor(args.audience)];
     const inFlightLimit = scaledLimit(policy.inFlight, args.throttled);
@@ -455,9 +486,9 @@ export class OwnerRelayGate extends DurableObject<Env> {
         .exec<OldestRow>("SELECT MIN(started_at) AS oldest FROM in_flight")
         .one().oldest;
       return {
-        ok: false,
+        kind: "refused",
         refused: "concurrency_limit",
-        resetAt: (oldest ?? now) + OWNER_IN_FLIGHT_ABANDON_AFTER_MS,
+        resetAt: (oldest ?? now) + RESERVATION_LEASE_MS,
       };
     }
 
@@ -472,55 +503,66 @@ export class OwnerRelayGate extends DurableObject<Env> {
         )
         .one().oldest;
       return {
-        ok: false,
+        kind: "refused",
         refused: "rate_limited",
         resetAt: (oldest ?? now) + MINUTE_MS,
       };
     }
-
-    this.ctx.storage.sql.exec(
-      "INSERT INTO in_flight (request_id, started_at) VALUES (?, ?)",
-      args.requestId,
-      now,
-    );
-    this.ctx.storage.sql.exec(
-      "INSERT INTO relay_admissions (admitted_at) VALUES (?)",
-      now,
-    );
-    return { ok: true };
+    return { kind: "free" };
   }
 
-  /** Owner-wide admission and generation/JTI accounting commit together. */
+  private holdRelay(
+    requestId: string,
+    now: number,
+    attempt: string | null,
+  ): void {
+    this.ctx.storage.sql.exec(
+      `INSERT INTO in_flight (request_id, started_at, attempt) VALUES (?, ?, ?)
+       ON CONFLICT(request_id) DO UPDATE SET started_at = excluded.started_at, attempt = excluded.attempt`,
+      requestId,
+      now,
+      attempt,
+    );
+  }
+
+  /**
+   * Owner-wide admission and generation/JTI accounting commit together; the
+   * admission is held by the reservation's attempt until that attempt settles.
+   */
   async admitAndReserve(args: {
     audience: ManagedModelAudience;
     requestId: string;
     throttled: boolean;
     generation: string;
     reservation: LedgerReserveArgs;
-  }): Promise<{ admission: GateAdmission; reservation?: LedgerReserveResult }> {
-    const admissionId = JSON.stringify([
+  }): Promise<OwnerReservation> {
+    const admissionId = ownerAdmissionId(
       args.generation,
       args.reservation.jti,
       args.requestId,
-    ]);
-    const result = this.ctx.storage.transactionSync(() => {
-      const admission = this.admitRelaySync({
-        ...args,
-        requestId: admissionId,
-      });
-      if (!admission.ok) return { admission };
+    );
+    const now = Date.now();
+    const result = this.ctx.storage.transactionSync((): OwnerReservation => {
+      const check = this.checkRelayAdmission(
+        { ...args, requestId: admissionId },
+        now,
+      );
+      if (check.kind === "refused") return check;
+      if (check.kind === "free") {
+        this.ctx.storage.sql.exec(
+          "INSERT INTO relay_admissions (admitted_at) VALUES (?)",
+          now,
+        );
+      }
       const reservation = this.ledger.reserveSync({
         ...args.reservation,
         requestId: args.requestId,
-        jti: JSON.stringify([args.generation, args.reservation.jti]),
+        jti: ownerLedgerJti(args.generation, args.reservation.jti),
       });
-      if (reservation.kind !== "reserved" && !admission.duplicate) {
-        this.ctx.storage.sql.exec(
-          "DELETE FROM in_flight WHERE request_id = ?",
-          admissionId,
-        );
+      if (reservation.kind === "reserved") {
+        this.holdRelay(admissionId, now, reservation.attempt);
       }
-      return { admission, reservation };
+      return reservation;
     });
     await this.ledger.armAlarm();
     return result;
@@ -528,10 +570,18 @@ export class OwnerRelayGate extends DurableObject<Env> {
 
   async settleCapability(
     args: LedgerSettleArgs & { generation: string; jti: string },
-  ) {
-    return await this.ledger.settle({
-      ...args,
-      jti: JSON.stringify([args.generation, args.jti]),
+  ): Promise<LedgerSettleResult> {
+    return this.ctx.storage.transactionSync(() => {
+      const settled = this.ledger.settleSync({
+        ...args,
+        jti: ownerLedgerJti(args.generation, args.jti),
+      });
+      this.ctx.storage.sql.exec(
+        "DELETE FROM in_flight WHERE request_id = ? AND attempt = ?",
+        ownerAdmissionId(args.generation, args.jti, args.requestId),
+        args.attempt,
+      );
+      return settled;
     });
   }
 

@@ -1,15 +1,54 @@
 import {
   GATEWAY_MAX_RESULT_CACHE_BYTES,
   GATEWAY_RESULT_CACHE_TTL_MS,
+  GATEWAY_UPSTREAM_MAX_DURATION_MS,
 } from "@stella/contracts/gateway/api";
 import { GATEWAY_BUDGET_UNLIMITED } from "@stella/contracts/gateway/capability";
-import {
-  IN_FLIGHT_ABANDON_AFTER_MS,
-  type LedgerReserveArgs,
-  type LedgerReserveResult,
-  type LedgerSettleArgs,
-  type LedgerSettleResult,
-} from "./ledger.js";
+
+export const RESERVATION_LEASE_MS = GATEWAY_UPSTREAM_MAX_DURATION_MS + 60_000;
+
+export type LedgerReserveArgs = {
+  jti: string;
+  budgetMicroCents: number;
+  maxRequests?: number;
+  /** Capability expiry, ms since epoch. */
+  expiresAt: number;
+  requestId: string;
+  estimatedMicroCents: number;
+};
+
+export type LedgerReserveResult =
+  | { kind: "reserved"; attempt: string; remainingMicroCents: number | null }
+  | { kind: "replay"; status: number; body: string }
+  | { kind: "in_flight" }
+  | { kind: "budget_exhausted"; remainingMicroCents: number }
+  | { kind: "request_limit"; maxRequests: number };
+
+export type LedgerSettleArgs = {
+  requestId: string;
+  attempt: string;
+  chargedMicroCents: number;
+  /** Refund the request count when no provider output byte was received. */
+  refundRequest: boolean;
+  /** Present for a completed result that should be replayable. */
+  result?: { status: number; body: string };
+};
+
+export type LedgerSettleResult = {
+  ok: boolean;
+  spentMicroCents: number;
+  reservedMicroCents: number;
+  cached: boolean;
+};
+
+export type LedgerSnapshot = {
+  budgetMicroCents: number;
+  spentMicroCents: number;
+  reservedMicroCents: number;
+  requests: number;
+  maxRequests: number | null;
+  expiresAt: number;
+} | null;
 
 type LedgerRow = {
   jti: string;
@@ -23,6 +62,7 @@ type LedgerRow = {
 
 type ResultRow = {
   request_id: string;
+  attempt: string | null;
   status: number;
   body: string | null;
   bytes: number;
@@ -44,6 +84,7 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS results (
     jti TEXT NOT NULL,
     request_id TEXT NOT NULL,
+    attempt TEXT,
     status INTEGER NOT NULL,
     body TEXT,
     bytes INTEGER NOT NULL DEFAULT 0,
@@ -56,24 +97,65 @@ const SCHEMA = [
 const clampMicroCents = (value: number): number =>
   Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
 
-/** Owner-shared SQL ledger; every budget and result is still keyed by jti.
- * SQL mutations complete before the first await.
+/**
+ * Capability budget, request-count and replay accounting, keyed by jti.
+ * Every method is synchronous SQL, so the hosting object's input gate makes
+ * each one atomic. A reservation is owned by the attempt token `reserve`
+ * returns: only that attempt can settle it, and once its lease lapses the
+ * next reserve for the same request id replaces it with a new attempt.
  */
-export class OwnerLedgerStore {
+export class LedgerStore {
   private alarmAt: number | null = null;
-  constructor(private readonly storage: DurableObjectStorage) {
-    this.initSchema();
-  }
 
-  private initSchema(): void {
+  constructor(private readonly storage: DurableObjectStorage) {
     for (const statement of SCHEMA) this.storage.sql.exec(statement);
+    const columns = new Set(
+      this.storage.sql
+        .exec<{ name: string }>("SELECT name FROM pragma_table_info('results')")
+        .toArray()
+        .map((column) => column.name),
+    );
+    if (!columns.has("attempt")) {
+      this.storage.sql.exec("ALTER TABLE results ADD COLUMN attempt TEXT");
+    }
+    if (!columns.has("jti")) {
+      this.storage.sql.exec("ALTER TABLE results ADD COLUMN jti TEXT");
+    }
   }
 
   private ledgerRow(jti: string): LedgerRow | null {
-    const rows = this.storage.sql
-      .exec<LedgerRow>("SELECT * FROM ledger WHERE jti = ?", jti)
-      .toArray();
-    return rows[0] ?? null;
+    return (
+      this.storage.sql
+        .exec<LedgerRow>("SELECT * FROM ledger WHERE jti = ?", jti)
+        .toArray()[0] ?? null
+    );
+  }
+
+  snapshot(jti: string): LedgerSnapshot {
+    const row = this.ledgerRow(jti);
+    return row
+      ? {
+          budgetMicroCents: row.budget,
+          spentMicroCents: row.spent,
+          reservedMicroCents: row.reserved,
+          requests: row.requests,
+          maxRequests: row.max_requests,
+          expiresAt: row.expires_at,
+        }
+      : null;
+  }
+
+  replay(jti: string, requestId: string): { status: number; body: string } | null {
+    const row = this.storage.sql
+      .exec<ResultRow>(
+        "SELECT * FROM results WHERE jti = ? AND request_id = ? AND status > 0",
+        jti,
+        requestId,
+      )
+      .toArray()[0];
+    return row && row.body !== null
+      ? { status: row.status, body: row.body }
+      : null;
   }
 
   reserveSync(args: LedgerReserveArgs): LedgerReserveResult {
@@ -99,18 +181,14 @@ export class OwnerLedgerStore {
         args.requestId,
       )
       .toArray()[0];
-    let resumingAbandoned = false;
+    let replacingLapsed = false;
     if (existing) {
       if (existing.status > 0 && existing.body !== null) {
         return { kind: "replay", status: existing.status, body: existing.body };
       }
-      if (now - existing.created_at <= IN_FLIGHT_ABANDON_AFTER_MS) {
+      if (now - existing.created_at <= RESERVATION_LEASE_MS) {
         return { kind: "in_flight" };
       }
-      // The isolate that reserved this request died before settling it: no
-      // completion can ever arrive. Release its reservation so the budget is
-      // not held hostage, and let the same request id run again without
-      // counting a second request against the trial.
       this.storage.sql.exec(
         "UPDATE ledger SET reserved = MAX(0, reserved - ?) WHERE jti = ?",
         existing.reserved,
@@ -122,11 +200,11 @@ export class OwnerLedgerStore {
         args.requestId,
       );
       row = this.ledgerRow(args.jti) ?? row;
-      resumingAbandoned = true;
+      replacingLapsed = true;
     }
 
     if (
-      !resumingAbandoned &&
+      !replacingLapsed &&
       row.max_requests !== null &&
       row.requests >= row.max_requests
     ) {
@@ -144,38 +222,40 @@ export class OwnerLedgerStore {
       };
     }
 
+    const attempt = crypto.randomUUID();
     this.storage.sql.exec(
-      "INSERT INTO results (jti, request_id, status, body, bytes, reserved, created_at) VALUES (?, ?, 0, NULL, 0, ?, ?)",
+      "INSERT INTO results (jti, request_id, attempt, status, body, bytes, reserved, created_at) VALUES (?, ?, ?, 0, NULL, 0, ?, ?)",
       args.jti,
       args.requestId,
+      attempt,
       estimate,
       now,
     );
     this.storage.sql.exec(
       "UPDATE ledger SET reserved = reserved + ?, requests = requests + ? WHERE jti = ?",
       estimate,
-      resumingAbandoned ? 0 : 1,
+      replacingLapsed ? 0 : 1,
       args.jti,
     );
     return {
       kind: "reserved",
+      attempt,
       remainingMicroCents:
         remaining === null ? null : Math.max(0, remaining - estimate),
     };
   }
 
-  async settle(
-    args: LedgerSettleArgs & { jti: string },
-  ): Promise<LedgerSettleResult> {
+  settleSync(args: LedgerSettleArgs & { jti: string }): LedgerSettleResult {
     const row = this.ledgerRow(args.jti);
     const pending = this.storage.sql
       .exec<ResultRow>(
-        "SELECT * FROM results WHERE jti = ? AND request_id = ?",
+        "SELECT * FROM results WHERE jti = ? AND request_id = ? AND attempt IS ? AND status = 0",
         args.jti,
         args.requestId,
+        args.attempt ?? null,
       )
       .toArray()[0];
-    if (!row || !pending || pending.status > 0) {
+    if (!row || !pending) {
       return {
         ok: false,
         spentMicroCents: row?.spent ?? 0,

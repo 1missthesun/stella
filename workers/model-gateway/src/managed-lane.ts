@@ -5,9 +5,10 @@ import {
 } from "@stella/contracts/gateway/api";
 import { managedModelDescriptor } from "@stella/model-catalog/gateway-resolution";
 import {
-  capabilityLedgerClient,
-  type CapabilityLedgerClient,
+  relayAccounting,
+  type HeldReservation,
   type OwnerRelayAccounting,
+  type RelaySettlement,
 } from "./ledger-client.js";
 import type { RelayTiming } from "./relay-timing.js";
 import { ownerModeEnabled } from "./owner-mode.js";
@@ -70,7 +71,7 @@ import {
   quotaErrorOptions,
   upstreamErrorBody,
 } from "./errors.js";
-import type { LedgerSettleArgs } from "./ledger.js";
+import type { LedgerSettleResult } from "./ledger-store.js";
 import { classifyNetwork } from "../../shared/network-class.js";
 import {
   ownerEnforcementAdmission,
@@ -594,10 +595,14 @@ export const handleManagedRelay = async (args: {
   const ownerGate =
     args.ownerAccounting ??
     env.OWNER_RELAY_GATE.get(env.OWNER_RELAY_GATE.idFromName(claims.sub));
-  // owner-relay-v2 admits and reserves together once the request is priced.
-  const combinedAccounting = !probe && claims.ledgerScope === "owner-relay-v2";
-  let ownerAdmitted = false;
-  if (!combinedAccounting) {
+  const accounting = probe
+    ? null
+    : relayAccounting(env, claims, ownerGate, {
+        audience: claims.audience,
+        throttled: enforcement.throttled,
+      });
+  let ownerAdmissionHeld = false;
+  if (accounting?.authority !== "owner") {
     const ownerAdmission = await timing.measure("ownerAdmissionMs", () =>
       ownerGate.admitRelay({
         audience: claims.audience,
@@ -619,15 +624,14 @@ export const handleManagedRelay = async (args: {
         }),
       );
     }
-    ownerAdmitted = !ownerAdmission.duplicate;
+    ownerAdmissionHeld = !ownerAdmission.duplicate;
   }
 
   let tierGate: ReturnType<Env["TIER_BUDGET"]["get"]> | null = null;
   let tierReservation: TierReservation | null = null;
   let tierActualMicroCents = 0;
-  let ledger: CapabilityLedgerClient | null = null;
-  let ledgerReserved = false;
-  let ledgerSettled = false;
+  let held: HeldReservation | null = null;
+  let heldSettled = false;
   let firstUpstreamByte = false;
 
   try {
@@ -740,80 +744,36 @@ export const handleManagedRelay = async (args: {
       audience: claims.audience,
     });
 
-    const reserveRequestTierBudget = async (): Promise<void> => {
-      const tierCeiling = config.tierCeilings.get(limitsAudience);
-      if (
-        !probe &&
-        claims.budgetMicroCents !== GATEWAY_BUDGET_UNLIMITED &&
-        tierCeiling &&
-        (tierCeiling.hourlyMicroCents >= 0 || tierCeiling.dailyMicroCents >= 0)
-      ) {
-        const tier = await reserveTierBudget({
-          env,
-          timing,
-          now: deps.now,
-          limitsAudience,
-          ceiling: tierCeiling,
-          estimateMicroCents: estimatedMicroCents,
-        });
-        tierGate = tier.gate;
-        tierReservation = tier.reservation;
-      }
-    };
-    if (!combinedAccounting) await reserveRequestTierBudget();
-
-    ledger = probe
-      ? null
-      : capabilityLedgerClient(env, claims, args.ownerAccounting);
     let capabilityHardLimitMicroCents: number | null = null;
-    if (ledger) {
-      const capabilityLedger = ledger;
-      const reservationArgs = {
-        jti: claims.jti,
-        budgetMicroCents: claims.budgetMicroCents,
-        maxRequests: claims.maxRequests,
-        expiresAt: claims.exp * 1000,
-        requestId,
-        estimatedMicroCents,
-      };
-      const { reserve } = capabilityLedger;
+    if (accounting) {
       const reservation = await timing.measure(
-        reserve ? "ledgerReservationMs" : "ownerReservationMs",
-        async () => {
-          if (reserve) return await reserve(reservationArgs);
-          const result = await ownerGate.admitAndReserve({
-            audience: claims.audience,
+        accounting.authority === "owner"
+          ? "ownerReservationMs"
+          : "ledgerReservationMs",
+        () =>
+          accounting.reserve({
+            jti: claims.jti,
+            budgetMicroCents: claims.budgetMicroCents,
+            maxRequests: claims.maxRequests,
+            expiresAt: claims.exp * 1000,
             requestId,
-            throttled: enforcement.throttled,
-            generation: claims.gen,
-            reservation: reservationArgs,
-          });
-          const admission = result.admission;
-          if (!admission.ok)
-            throw new GatewayError(
-              429,
-              admission.refused,
-              admission.refused === "concurrency_limit"
-                ? "This account has too many model requests in flight."
-                : "This account is sending model requests too quickly.",
-              quotaErrorOptions({
-                scope: "owner",
-                now: deps.now(),
-                resetAt: admission.resetAt,
-              }),
-            );
-          ownerAdmitted =
-            !admission.duplicate && result.reservation?.kind === "reserved";
-          if (!result.reservation)
-            throw new GatewayError(
-              503,
-              "internal",
-              "Model admission did not return a reservation.",
-            );
-          return result.reservation;
-        },
+            estimatedMicroCents,
+          }),
       );
       switch (reservation.kind) {
+        case "refused":
+          throw new GatewayError(
+            429,
+            reservation.refused,
+            reservation.refused === "concurrency_limit"
+              ? "This account has too many model requests in flight."
+              : "This account is sending model requests too quickly.",
+            quotaErrorOptions({
+              scope: "owner",
+              now: deps.now(),
+              resetAt: reservation.resetAt,
+            }),
+          );
         case "replay":
           return new Response(reservation.body, {
             status: reservation.status,
@@ -846,17 +806,33 @@ export const handleManagedRelay = async (args: {
             quotaErrorOptions({ scope: "capability", now: deps.now() }),
           );
         case "reserved":
-          ledgerReserved = true;
+          held = reservation.held;
           capabilityHardLimitMicroCents =
-            reservation.remainingMicroCents === null
+            reservation.held.remainingMicroCents === null
               ? null
-              : estimatedMicroCents + reservation.remainingMicroCents;
+              : estimatedMicroCents + reservation.held.remainingMicroCents;
           break;
       }
     }
 
-    // Completed and in-flight owner requests must not reserve tier budget again.
-    if (combinedAccounting) await reserveRequestTierBudget();
+    const tierCeiling = config.tierCeilings.get(limitsAudience);
+    if (
+      !probe &&
+      claims.budgetMicroCents !== GATEWAY_BUDGET_UNLIMITED &&
+      tierCeiling &&
+      (tierCeiling.hourlyMicroCents >= 0 || tierCeiling.dailyMicroCents >= 0)
+    ) {
+      const tier = await reserveTierBudget({
+        env,
+        timing,
+        now: deps.now,
+        limitsAudience,
+        ceiling: tierCeiling,
+        estimateMicroCents: estimatedMicroCents,
+      });
+      tierGate = tier.gate;
+      tierReservation = tier.reservation;
+    }
 
     const finish = async (
       outcome: GatewayUsageOutcome,
@@ -864,23 +840,19 @@ export const handleManagedRelay = async (args: {
       chargedMicroCents: number,
       upstreamStatus: number | undefined,
       refundRequest: boolean,
-      result?: LedgerSettleArgs["result"],
-    ): Promise<void> => {
+      result?: RelaySettlement["result"],
+    ): Promise<LedgerSettleResult | null> => {
       tierActualMicroCents = chargedMicroCents;
-      if (ledger && ledgerReserved) {
-        const capabilityLedger = ledger;
-        await timing.measure("ledgerSettlementMs", () =>
-          capabilityLedger.settle({
-            requestId,
-            chargedMicroCents,
-            refundRequest,
-            result,
-          }),
+      let settlement: LedgerSettleResult | null = null;
+      if (held) {
+        const reservation = held;
+        settlement = await timing.measure("ledgerSettlementMs", () =>
+          reservation.settle({ chargedMicroCents, refundRequest, result }),
         );
-        ledgerSettled = true;
+        heldSettled = true;
         if (result) timing.mark("resultPersisted");
       }
-      if (probe) return;
+      if (probe) return settlement;
       const event: GatewayUsageEvent = {
         v: GATEWAY_USAGE_EVENT_VERSION,
         requestId,
@@ -917,6 +889,7 @@ export const handleManagedRelay = async (args: {
           );
         }),
       );
+      return settlement;
     };
 
     const controller = createUpstreamController({
@@ -1287,7 +1260,7 @@ export const handleManagedRelay = async (args: {
     const bodyText = JSON.stringify(assembled);
     timing.mark("assemblyComplete");
     const chargedMicroCents = chargeFor(usage);
-    await finish(
+    const settlement = await finish(
       "succeeded",
       usageTokens(usage, estimate),
       chargedMicroCents,
@@ -1299,7 +1272,7 @@ export const handleManagedRelay = async (args: {
       },
     );
     console.log(
-      `[model-gateway] trace=${traceId} agent=${agentType} requested=${route.requestedModel} resolved=${route.resolvedModel} provider=${route.provider} protocol=${protocol} status=${upstream.status} charged=${chargedMicroCents} reported=${usage ? 1 : 0} ms=${deps.now() - startedAt}`,
+      `[model-gateway] trace=${traceId} agent=${agentType} requested=${route.requestedModel} resolved=${route.resolvedModel} provider=${route.provider} protocol=${protocol} status=${upstream.status} charged=${chargedMicroCents} reported=${usage ? 1 : 0} ledger_settled=${settlement ? (settlement.ok ? 1 : 0) : "-"} ledger_spent=${settlement?.spentMicroCents ?? "-"} ledger_reserved=${settlement?.reservedMicroCents ?? "-"} ms=${deps.now() - startedAt}`,
     );
     return new Response(bodyText, {
       status: upstream.status,
@@ -1310,12 +1283,11 @@ export const handleManagedRelay = async (args: {
       },
     });
   } finally {
-    if (ledger && ledgerReserved && !ledgerSettled) {
-      const capabilityLedger = ledger;
+    if (held && !heldSettled) {
+      const reservation = held;
       try {
         await timing.measure("ledgerSettlementMs", () =>
-          capabilityLedger.settle({
-            requestId,
+          reservation.settle({
             chargedMicroCents: 0,
             refundRequest: !firstUpstreamByte,
           }),
@@ -1344,13 +1316,9 @@ export const handleManagedRelay = async (args: {
       }
     }
     try {
-      if (ownerAdmitted)
+      if (ownerAdmissionHeld)
         await timing.measure("ownerReleaseMs", () =>
-          ownerGate.releaseRelay(
-            combinedAccounting
-              ? JSON.stringify([claims.gen, claims.jti, requestId])
-              : requestId,
-          ),
+          ownerGate.releaseRelay(requestId),
         );
     } catch (error) {
       console.error(

@@ -82,12 +82,6 @@ const diagnosticSuffix = (stdout: string, stderr: string): string => {
 
 type SpawnedBrowserChild = ReturnType<typeof spawn>;
 
-/**
- * TERM→1s→KILL ladder (the shell.ts pattern). The escalation is a forked
- * fiber racing the child's `exit` event against a 1s sleep: if the child is
- * still alive at the deadline it is SIGKILLed; if it exits first the fiber
- * ends immediately. Bounded to 1s of fiber lifetime per invocation.
- */
 const terminateBrowserChild = (child: SpawnedBrowserChild) => {
   if (child.exitCode === null && !child.killed) child.kill();
   browserUseRuntime.runFork(
@@ -114,12 +108,6 @@ const terminateBrowserChild = (child: SpawnedBrowserChild) => {
   );
 };
 
-// Effect-native spine behind the exact pre-Effect signature, error codes,
-// and error strings: the spawned stella-browser helper is a scoped resource
-// (an interrupted or failed command window provably reaps it via the
-// TERM→1s→KILL ladder), the timeout and abort waits are fibers interrupted
-// at scope close, and the caller's AbortSignal crosses in through
-// `acquireAbortLatch` (cooperative cancel; identical rejection reasons).
 export const runBrowserCommand: BrowserCommandRunner = async (request) => {
   requirePositiveInteger(request.timeoutMs, "timeoutMs");
   requirePositiveInteger(request.maxOutputBytes, "maxOutputBytes");
@@ -157,10 +145,6 @@ export const runBrowserCommand: BrowserCommandRunner = async (request) => {
           Deferred.doneUnsafe(done, outcome);
         };
 
-        // Spawn AND event wiring happen inside one synchronous acquire, so
-        // no fiber yield can slip between them and drop a next-tick `error`
-        // or early output event (the same atomicity the old promise
-        // executor's synchronous body provided).
         const child = yield* Effect.acquireRelease(
           Effect.try({
             try: () => {
@@ -239,11 +223,6 @@ export const runBrowserCommand: BrowserCommandRunner = async (request) => {
           }),
           (spawned, exit) =>
             Effect.sync(() => {
-              // Every settle path already handled the child (kill paths ran
-              // the ladder; close means it is gone). A scope exit without a
-              // settle — interruption or a defect inside the window — reaps
-              // a still-live child so the process provably cannot outlive
-              // the command window.
               if (
                 exit._tag !== "Success" &&
                 !settled &&

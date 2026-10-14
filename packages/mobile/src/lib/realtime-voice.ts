@@ -54,7 +54,6 @@ const SESSION_START_TIMEOUT_MS = 10_000;
 const SESSION_CLOSE_DRAIN_MS = 1_500;
 const SDP_NEGOTIATION_TIMEOUT_MS = 8_000;
 const DISCONNECTED_GRACE_MS = 10_000;
-/** Transcript deltas are the only speech signal GPT-Live sends on the channel. */
 const USER_SPEECH_IDLE_MS = 900;
 const ASSISTANT_SPEECH_IDLE_MS = 1_200;
 const MAX_DELEGATION_RESULT_CHARS = 6_000;
@@ -131,7 +130,6 @@ type PeerConnection = NativeRTCPeerConnection & {
   addEventListener: (type: string, listener: () => void) => void;
 };
 
-/** One voice request handed to the orchestrator, keyed by its chat turn. */
 type DelegatedRequest = {
   delegationId: string;
   transcript: string;
@@ -141,11 +139,6 @@ type DelegatedRequest = {
 const asString = (value: unknown): string =>
   typeof value === "string" ? value : "";
 
-/**
- * Stable append id for one persisted voice transcript row. The desktop's cloud
- * journal dedupes on it, so a retried send can never duplicate a line.
- * Matches the runtime's `[A-Za-z0-9._:-]{1,128}` append-id contract.
- */
 export const desktopVoiceTranscriptEventId = (
   requestId: string,
   role: "user" | "assistant",
@@ -195,15 +188,6 @@ const waitForDataChannelOpen = (channel: DataChannel): Promise<void> =>
     channel.addEventListener("close", onClose);
   });
 
-/**
- * One foreground mobile GPT-Live session in client-delegation mode. The voice
- * model holds the spoken conversation full-duplex; every delegation it opens
- * becomes an orchestrator turn in the attached Stella chat — the same path a
- * typed message takes — and its result comes back as spoken commentary.
- *
- * The lifecycle stays bounded to the full-screen surface: closing the surface
- * closes the microphone, the peer, and the backend lease.
- */
 export class MobileRealtimeVoiceSession {
   private readonly options: SessionOptions;
   private readonly requestId =
@@ -250,11 +234,6 @@ export class MobileRealtimeVoiceSession {
     this.options = options;
   }
 
-  /**
-   * Interrupting speech never cancels backend work, so settled chat results are
-   * returned to the live conversation whenever they land: spoken commentary for
-   * work the user still wants, silent context for a request they superseded.
-   */
   syncAssistantMessages(
     messages: ChatMessage[],
     tasks: readonly MobileTask[],
@@ -293,8 +272,6 @@ export class MobileRealtimeVoiceSession {
     this.publish({ ...INITIAL_REALTIME_VOICE_SNAPSHOT });
 
     try {
-      // The composer resolves microphone access before this surface opens, so
-      // this normally reuses an existing grant without a system prompt.
       const permission = await ensureMicrophonePermission();
       if (!permission.granted) throw new RealtimeVoicePermissionError();
 
@@ -416,9 +393,6 @@ export class MobileRealtimeVoiceSession {
       await waitForDataChannelOpen(channel);
       if (this.stopped) return;
 
-      // Instructions, voice and startup history are set when the backend
-      // creates the session, so nothing is configured from here. The session
-      // announces itself and only then accepts commands.
       await this.waitForSessionStarted();
       if (this.stopped) return;
       this.sessionLive = true;
@@ -618,11 +592,6 @@ export class MobileRealtimeVoiceSession {
     }, ASSISTANT_SPEECH_IDLE_MS);
   }
 
-  /**
-   * The voice model asked for work. The event carries no task text, so the
-   * request is the accumulated spoken turn plus what the app knows about this
-   * call, and it runs as an ordinary orchestrator turn in the attached chat.
-   */
   private async handleDelegation(event: Record<string, unknown>) {
     const delegation = parseVoiceDelegationCreated(event);
     if (!delegation || this.handledDelegations.has(delegation.id)) return;
@@ -637,8 +606,6 @@ export class MobileRealtimeVoiceSession {
       return;
     }
     const pendingCount = this.delegatedRequests.size;
-    // The request lands in the chat as the user's own turn, so the call context
-    // stays to one readable line rather than a block of markup.
     const request = [
       transcript,
       "",
@@ -668,8 +635,6 @@ export class MobileRealtimeVoiceSession {
       );
       return;
     }
-    // A request the user amended mid-sentence is superseded by this one: its
-    // work keeps running, but its answer is no longer what they asked for.
     for (const pending of this.delegatedRequests.values()) {
       if (
         !pending.superseded &&
@@ -785,7 +750,6 @@ export class MobileRealtimeVoiceSession {
     });
   }
 
-  /** Ask the session to close and keep receiving until it confirms. */
   private async closeLiveSession(): Promise<void> {
     if (!this.sessionLive || this.channel?.readyState !== "open") return;
     this.sessionLive = false;
@@ -846,8 +810,6 @@ export class MobileRealtimeVoiceSession {
     if (this.leaseExpiryTimer) clearTimeout(this.leaseExpiryTimer);
     this.leaseExpiryTimer = null;
     if (this.stopped) return;
-    // Cap the absolute server timestamp to one lease lifetime so a device
-    // clock that is behind cannot accidentally keep the provider peer alive.
     const remainingMs = Math.min(
       LEASE_MAX_LOCAL_LIFETIME_MS,
       leaseExpiresAt - Date.now(),
@@ -900,7 +862,6 @@ export class MobileRealtimeVoiceSession {
     }
   }
 
-  /** The server closed the lease: stop without reporting a terminal event. */
   private async closeForLeaseLoss(reason: string | null) {
     if (this.stopped) return;
     this.stopped = true;

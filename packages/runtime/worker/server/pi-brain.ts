@@ -1,12 +1,3 @@
-/**
- * Where a cloud-stored conversation's brain runs, for the pi-durable chat on
- * this computer (`@stella/agent/host/desktop-execution`): read from and set
- * on the conversation's object (`@stella/contracts/turn-plane/pi-brain`).
- * Stella's brief continues on the new host through the host's placement, the
- * same hand-off `switch_destination` always made, and so does what her
- * agents here tell her once she runs elsewhere, unless that host can't take
- * it now: then this computer does.
- */
 import type { DesktopBrain } from "@stella/agent/host/desktop-execution";
 import { BackendClient } from "@stella/contracts/backend/client";
 import { METHOD_NAMES } from "@stella/contracts/protocol";
@@ -21,7 +12,6 @@ export const brainFor = (
   hostBus: HostBus.Interface,
   conversationId: string,
 ): DesktopBrain | undefined => {
-  // A conversation kept on this computer has its brain here, always.
   if (conversationId.startsWith("local_")) return undefined;
   const call = async (init?: RequestInit): Promise<PiBrainRecord | null> => {
     const auth = session.runnerCell.get()?.getStellaSiteAuth();
@@ -33,7 +23,6 @@ export const brainFor = (
     });
     const body = (await response.json().catch(() => null)) as (PiBrainResponse & { error?: string }) | null;
     if (!response.ok || !body) throw new Error(body?.error ?? `Where Stella runs could not be read (${response.status}).`);
-    // Both engines' turns claim the lease with what this computer last saw.
     session.runnerCell.get()?.brainLeases.note(conversationId, body.record);
     return body.record;
   };
@@ -51,7 +40,6 @@ export const brainFor = (
           conversationId,
           target: host.host === "cloud" ? { mode: "cloud" } : { mode: "device", deviceId: host.deviceId },
           prompt: brief,
-          // Only this conversation moves: the app's destination picker stays as it is.
           brain: true,
         },
         { retryOnDisconnect: true },

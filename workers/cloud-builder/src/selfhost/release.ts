@@ -1,10 +1,3 @@
-/**
- * The release this Worker runs: compiled in by scripts/build-worker.mjs from
- * git (the `server-YYYY.MM.DD[.n]` tag at the built commit, else
- * `dev-<YYYY.MM.DD>-<sha>`, and the commit's date), overridable with the vars
- * STELLA_SERVER_VERSION, STELLA_SERVER_RELEASED_AT and STELLA_BUILD_COMMIT.
- */
-
 declare const __STELLA_RELEASE__:
   | { version: string | null; releasedAt: string | null; commit: string | null }
   | undefined;

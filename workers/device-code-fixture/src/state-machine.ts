@@ -8,7 +8,6 @@ export type AuthorizationState = Readonly<{
   userCode: string;
   deviceCodeDigest: string;
   status: "pending" | "approved" | "denied" | "consumed" | "expired";
-  /** Present only after a successful consume; safe to persist (not a secret). */
   consumedBy?: string;
   createdAt: number;
   expiresAt: number;
@@ -34,9 +33,6 @@ export const expireAuthorization = (
   state: AuthorizationState,
   now: number,
 ): AuthorizationState => {
-  // A consumed grant stays replayable only to its bound consumer during the
-  // short cleanup grace. The alarm deletes it at cleanupAt; it must not first
-  // erase the consumer binding at the nominal authorization deadline.
   if (
     now < state.expiresAt ||
     state.status === "expired" ||

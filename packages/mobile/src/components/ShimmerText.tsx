@@ -10,19 +10,6 @@ const DEFAULT_DURATION_MS = 1600;
 const DEFAULT_DIM_ALPHA = 0.15;
 const PULSE_LOW_OPACITY = 0.45;
 
-/**
- * A single line of live / in-progress text that breathes while active. When
- * `active` is false it renders as plain text, so the same node can settle
- * without remounting.
- *
- * Two polarities:
- *   - `"trough"` (default): bright resting text that dims and returns.
- *   - `"highlight"`: dim resting text (at `dimAlpha`, never below 0.45) that
- *     brightens to full strength and back. Used by the agent activity rows.
- *
- * Reduce-motion and app-backgrounding are handled here rather than by callers,
- * so every live label gets the same lifecycle for free.
- */
 export function ShimmerText({
   text,
   active,
@@ -34,12 +21,10 @@ export function ShimmerText({
 }: {
   text: string;
   active: boolean;
-  /** Base text color the sweep brightens/dims around. */
   color: string;
   textStyle: TextStyle | TextStyle[];
   durationMs?: number;
   dimAlpha?: number;
-  /** Sweep polarity — see the component doc. */
   variant?: "trough" | "highlight";
 }) {
   const restingOpacity = variant === "highlight" ? Math.max(dimAlpha, 0.45) : 1;

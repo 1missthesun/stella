@@ -7,10 +7,6 @@ type CallerEnv = Pick<Cloudflare.Env, "OWNER_GATES" | "CLOUD_BUILDER_PUBLIC_URL"
 
 export type VerifiedCaller = { ok: true; caller: OwnerCaller } | { ok: false; error: RpcError };
 
-/**
- * A user JWT as the owner it speaks for. A missing or bad token is
- * `UNAUTHENTICATED`; a check that could not run is `UNAVAILABLE`.
- */
 export const verifyCaller = async (env: CallerEnv, token: string): Promise<VerifiedCaller> => {
   if (!token) {
     return { ok: false, error: new RpcError("UNAUTHENTICATED", "Sign in to continue.") };
@@ -25,9 +21,5 @@ export const verifyCaller = async (env: CallerEnv, token: string): Promise<Verif
   };
 };
 
-/**
- * The caller behind the request's `Authorization: Bearer` JWT. Routes answer
- * the error with `rpcErrorStatus`.
- */
 export const requireCaller = (request: Request, env: CallerEnv): Promise<VerifiedCaller> =>
   verifyCaller(env, bearerCredential(request.headers.get("authorization")) ?? "");

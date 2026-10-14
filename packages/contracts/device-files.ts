@@ -55,12 +55,6 @@ export const pickDeviceFileLocation = <T extends DeviceFileCandidate>(
   return elsewhere[0] ?? matching[0] ?? null;
 };
 
-/**
- * Where a file a viewer asked for can be read from: this computer, the copy
- * the device that has it put in the user's Drive, or nowhere this computer
- * can reach. `missing` is a file that was on this computer and is gone;
- * `unshared` is one this computer never had that no device has shared.
- */
 export type DeviceFileSource =
   | { kind: "local" }
   | { kind: "drive"; deviceName: string }
@@ -99,11 +93,6 @@ export const deviceFileMissingMessage = (
     ? `This ${noun} isn't on this computer or on any of your other computers that are online, and no copy of it is in your Drive.`
     : `File no longer available — ${fileNameOf(filePath)} was moved or deleted.`;
 
-/**
- * What an "open this path" action says when the file or folder is not on this
- * computer: gone from a folder that is still here, or never here at all (a
- * path another of the user's computers wrote into the chat).
- */
 export const localPathNotFoundMessage = (
   filePath: string,
   wasOnThisComputer: boolean,
@@ -112,16 +101,11 @@ export const localPathNotFoundMessage = (
     ? `${fileNameOf(filePath)} is no longer on this computer. It was moved or deleted.`
     : `${fileNameOf(filePath)} isn't on this computer. It may be on another of your computers.`;
 
-/**
- * What an "open this path" action says about a file Stella has no viewer for
- * that is on another of the user's computers: the OS here cannot open it.
- */
 export const deviceFileNoPreviewMessage = (filePath: string, deviceName: string): string => {
   const device = friendlyDeviceName(deviceName);
   return `${fileNameOf(filePath)} is on ${device}. Stella can't preview this kind of file, so open it on ${device}.`;
 };
 
-/** What a viewer says when it can't show `filePath` from `source`. */
 export const deviceFileUnavailableMessage = (
   source: DeviceFileSource | null,
   filePath: string,

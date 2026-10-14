@@ -1,11 +1,3 @@
-/**
- * How a resident memory document's file text becomes what the model reads,
- * on every host: HTML comments stripped, secrets redacted, capped at a line
- * boundary with a visible marker. Pure, so the desktop (reading
- * `~/.stella`) and the cloud (reading the owner's home) shape the same file
- * into the same bytes.
- */
-
 import { mainMemoryCapNote } from "./memory-layout.js";
 import { redactMemoryText } from "./redaction.js";
 
@@ -43,11 +35,9 @@ const truncateUnicodeAtLineBoundary = (
   return `${prefix.trimEnd()}${marker}`;
 };
 
-/** Characters of a memory file's text as the model is shown it, before any cut. */
 export const residentMemoryChars = (raw: string): number =>
   unicodeCodePointLength(redactMemoryText(stripInjectedHtmlComments(raw)));
 
-/** The injected body for a memory file's text, or undefined when empty. */
 export const shapeResidentMemoryDoc = (
   raw: string,
   maxChars: number,

@@ -27,38 +27,23 @@ import { useT } from "@/shared/i18n";
 import "@/global/settings/settings.css";
 import { platformCapabilities } from "@/platform/capabilities";
 
-// Settings is lazy-preloaded before the sidebar opens. Keep the tabs eager
-// inside that chunk so switching tabs does not show a blank Suspense gap.
 const LegalDialog = lazy(() =>
   import("@/global/legal/LegalDialog").then((m) => ({
     default: m.LegalDialog,
   })),
 );
 
-/** Screen width below which the left rail becomes a top bar. */
 const NARROW_WIDTH = 720;
-
-// ---------------------------------------------------------------------------
-// SettingsScreen (route- or sidebar-mounted, no Dialog wrapper)
-// ---------------------------------------------------------------------------
 
 export type { SettingsTab };
 
 interface SettingsScreenProps {
-  /** Tab currently in view. When omitted, defaults to basic. */
   activeTab?: SettingsTab;
-  /** Called when the user clicks a different tab in the sidebar. */
   onActiveTabChange?: (tab: SettingsTab) => void;
-  /** Called when the user signs out from the Basic tab. */
   onSignOut?: () => void;
-  /** Use the compact layout when Settings is hosted in the right sidebar. */
   embedded?: boolean;
 }
 
-/**
- * The settings UI rendered inline (no Dialog wrapper). Tab state can be
- * controlled by the legacy `/settings` route or uncontrolled in the sidebar.
- */
 export const SettingsScreen = ({
   activeTab: activeTabProp,
   onActiveTabChange,
@@ -74,10 +59,6 @@ export const SettingsScreen = ({
 
   const activeTab = activeTabProp ?? selectedTab;
 
-  // Defer the value used for filtering work. Keeps the input
-  // responsive even on slower machines while the results list catches
-  // up. For our small catalog the win is marginal but the primitive
-  // costs nothing.
   const deferredQuery = useDeferredValue(searchQuery);
   const isSearching = deferredQuery.trim().length > 0;
 
@@ -107,19 +88,13 @@ export const SettingsScreen = ({
       handleTabClick(result.tab);
       setPendingScrollTarget({
         tab: result.tab,
-        // Row-level entries carry `cardTitle` for the actual card to
-        // scroll to; card-level entries scroll to their own title.
         title: result.cardTitle ?? result.title,
-        // Nonce ensures repeat-selecting the same result re-triggers
-        // the scroll/highlight effect even when tab + title are equal.
         nonce: Date.now(),
       });
     },
     [handleTabClick],
   );
 
-  // Below this width the rail would squeeze the cards, so the tabs move
-  // into a single row above the panel instead.
   const screenRef = useRef<HTMLDivElement>(null);
   const [narrow, setNarrow] = useState(embedded);
   useLayoutEffect(() => {

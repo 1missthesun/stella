@@ -55,19 +55,12 @@ export type MobileCloudMemoryPreferenceView =
     retry: () => void;
   };
 
-/** A view value echoing another owner is the previous account's, not ours. */
 const belongsToAnotherOwner = (value: unknown, subject: string): boolean =>
   typeof value === "object" &&
   value !== null &&
   typeof (value as { subject?: unknown }).subject === "string" &&
   (value as { subject: string }).subject !== subject;
 
-/**
- * Session/request/generation-fenced CAS controller for the mobile Memory
- * switch. The owner's live `memory.preference` view is the authority; its
- * caller also keys the component by the full Better Auth session, so an
- * account transition cannot paint the prior owner's setting.
- */
 export const useCloudMemoryPreference = (
   sessionIdentity: CloudConversationIdentity | null,
 ): MobileCloudMemoryPreferenceView => {
@@ -87,7 +80,6 @@ export const useCloudMemoryPreference = (
   const committedIdentityRef = useRef<PreferenceIdentity | null>(identity);
   const activeRequestIdRef = useRef<string | null>(null);
   const preferenceRef = useRef<MobileCloudMemoryPreference | null>(null);
-  /** The last head the view delivered; null until it does or once it fails. */
   const liveRef = useRef<MobileCloudMemoryPreference | null>(null);
   const retryPlanRef = useRef<RetryPlan | null>(null);
   const desiredValueRef = useRef<boolean | null>(null);
@@ -213,10 +205,6 @@ export const useCloudMemoryPreference = (
     runWriteRef.current = runWrite;
   }, [runWrite]);
 
-  /**
-   * Settle on a head the view delivered: write toward `target` when it
-   * differs, otherwise publish it as synced.
-   */
   const settle = useCallback(
     (preference: MobileCloudMemoryPreference, target?: boolean | null) => {
       const currentIdentity = committedIdentityRef.current;
@@ -227,8 +215,6 @@ export const useCloudMemoryPreference = (
         previousGeneration &&
         previousGeneration !== preference.ownerGeneration
       ) {
-        // A reset/migration creates a new authority generation. Never carry
-        // an old exact-attempt retry across that boundary.
         retryPlanRef.current = null;
       }
       if (
@@ -251,11 +237,6 @@ export const useCloudMemoryPreference = (
     [],
   );
 
-  /**
-   * Reconcile from the live view. A failed or still-empty view is retried by
-   * reconnecting the live channel; the head it delivers next is settled by
-   * the subscription effect.
-   */
   const reconcile = useCallback(
     (thenWrite?: boolean) => {
       if (!committedIdentityRef.current || writeInFlightRef.current) return;
@@ -308,7 +289,6 @@ export const useCloudMemoryPreference = (
         target === null
           ? { kind: "load" }
           : { kind: "reload_then_write", memoryEnabled: target };
-      // A head already on screen stays unless the user is waiting on a retry.
       setState((current) =>
         !preferenceRef.current || current.status === "loading"
           ? failedMobileCloudMemoryPreference(
@@ -321,8 +301,6 @@ export const useCloudMemoryPreference = (
     }
     if (live.value === undefined) return;
     if (belongsToAnotherOwner(live.value, identity.expectedSubject)) {
-      // The live channel still speaks for the previous account. Ask it to
-      // reconnect as this one; its next head settles here.
       if (reconnectedForRef.current !== identity.expectedSubject) {
         reconnectedForRef.current = identity.expectedSubject;
         reconnectBackend();
@@ -354,8 +332,6 @@ export const useCloudMemoryPreference = (
       ) {
         return;
       }
-      // The owner generation moved under the write; its result can no longer
-      // apply, so drop it and adopt the new head.
       activeRequestIdRef.current = null;
       writeInFlightRef.current = false;
       desiredValueRef.current = null;

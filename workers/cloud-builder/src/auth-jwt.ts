@@ -23,14 +23,11 @@ import { CLOCK_SKEW_S, JWKS_MIN_REFETCH_MS } from "./conversation-types.js";
 import { withInfrastructureDeadline } from "./build-session/shared/keys.js";
 
 export type VerifiedToken = {
-  /** The owner id: `sub`, the Better Auth user id. */
   ownerId: string;
   subject: string;
   sessionId: string;
   expiresAtMs: number;
-  /** 1 email, 2 social. */
   identityLevel: IdentityLevel;
-  /** `iat` in ms; 0 when absent. */
   issuedAtMs: number;
 };
 
@@ -38,13 +35,7 @@ export type VerifyResult =
   | { ok: true; token: VerifiedToken }
   | {
       ok: false;
-      /** Log-only. Never a user-facing string and never echoed to a client. */
       reason: string;
-      /**
-       * True when the failure is ours (JWKS unreachable), not the caller's.
-       * A retryable failure must not be reported as "unauthenticated" — that
-       * would make every client give up permanently during a blip.
-       */
       retryable: boolean;
     };
 
@@ -80,7 +71,6 @@ const parsePublicKeys = (body: unknown): JwkEntry[] => {
         (!Array.isArray(raw.key_ops) || !raw.key_ops.includes("verify")))
     )
       continue;
-    // Retain only public RSA verification material, never any private fields.
     keys.push({ kid: raw.kid, jwk: { kty: "RSA", n: raw.n, e: raw.e } });
   }
   return keys;
@@ -123,10 +113,6 @@ const fail = (reason: string, retryable = false): VerifyResult => ({
   retryable,
 });
 
-/**
- * @param issuer the PINNED backend origin. Never the token's own `iss`.
- */
-
 type UserKeys = { keys: Map<string, CryptoKey>; fetchedAtMs: number };
 
 const USER_KEYS_LOAD_TIMEOUT_MS = 5_000;
@@ -154,7 +140,6 @@ const loadUserKeys = async (env: Cloudflare.Env): Promise<UserKeys> => {
   return loaded;
 };
 
-/** The key for `kid`, refetching once per JWKS_MIN_REFETCH_MS when it is unknown (a rotation). */
 const userKey = async (env: Cloudflare.Env, kid: string): Promise<CryptoKey | null> => {
   const cached = userKeys;
   const found = cached?.keys.get(kid);
@@ -163,11 +148,6 @@ const userKey = async (env: Cloudflare.Env, kid: string): Promise<CryptoKey | nu
   return (await loadUserKeys(env)).keys.get(kid) ?? null;
 };
 
-/**
- * Verify a Stella JWT (`GET /api/auth/token`): RS256 under this worker's own
- * keys, `iss` equal to this worker's public URL, `aud` "stella". The owner id
- * is `sub`, the Better Auth user id.
- */
 export const verifyUserToken = async (token: string, env: Cloudflare.Env): Promise<VerifyResult> => {
   const issuer = (env.CLOUD_BUILDER_PUBLIC_URL ?? "").trim().replace(/\/+$/, "");
   if (!issuer) return fail("no_issuer_configured", true);
@@ -197,9 +177,6 @@ export const verifyUserToken = async (token: string, env: Cloudflare.Env): Promi
   } catch (error) {
     return fail(`jwks_unavailable:${error instanceof Error ? error.message : "unknown"}`, true);
   }
-  // Retryable, deliberately: an unknown kid is far more often "our keys are
-  // one refetch behind a rotation" than a forged token, and reporting it as
-  // unauthenticated would be terminal for the client.
   if (!key) return fail("unknown_kid", true);
   let valid = false;
   try {

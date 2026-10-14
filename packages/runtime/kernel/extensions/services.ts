@@ -6,24 +6,6 @@ import type {
 } from "../storage/shared.js";
 import type { ExtensionRuntimeApi } from "./runtime-api.js";
 
-/**
- * Runtime services exposed to extension factories.
- *
- * Stella-runtime hooks need access to
- * stable per-runtime values — `stellaDataDir`, `stellaAppDir`,
- * the SQLite store — that can't be reconstructed
- * from per-emit hook payloads alone. The loader threads this object
- * into every `ExtensionFactory` invocation so factories can close over
- * the services they need at registration time. Hot-reload replays the
- * same services object — the runtime owns its lifetime, factories
- * never have to worry about staleness.
- *
- * Lives in its own module to avoid an import cycle: `extensions/types.ts`
- * cannot import from `agent-runtime/types.ts` (the agent runtime imports
- * extension types), but extension factories legitimately need
- * `RuntimeStore` and friends from the runtime side.
- * Splitting the services type out keeps the import graph cycle-free.
- */
 export type ExtensionServices = {
   /** Mutable user-data home (`~/.stella`): personality, skills, memory, and the live agent prompts under `agents/`. */
   stellaDataDir: string;

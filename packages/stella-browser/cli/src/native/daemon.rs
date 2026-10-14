@@ -584,8 +584,6 @@ pub async fn run_daemon(session: &str) {
         }
     }
 
-    // Auto-shutdown the daemon after this many ms of inactivity (no commands received).
-    // Disabled when unset or 0.
     let idle_timeout_ms = env::var("STELLA_BROWSER_IDLE_TIMEOUT_MS")
         .ok()
         .and_then(|s| s.parse::<u64>().ok())
@@ -619,11 +617,6 @@ pub async fn run_daemon(session: &str) {
     }
 }
 
-/// Pre-flight mirror of the `ensure_daemon` length check in connection.rs:
-/// the Electron host spawns `service run` directly (bypassing
-/// `ensure_daemon`), so an over-long path must fail here with a readable
-/// error naming the path and byte count instead of a bare "Failed to bind
-/// socket". Unix `sun_path` is 104 bytes including the null terminator.
 #[cfg(unix)]
 fn validate_unix_socket_path_len(socket_path: &std::path::Path) -> Result<(), String> {
     let path_len = socket_path.as_os_str().len();
@@ -902,11 +895,6 @@ async fn handle_connection<S>(
                     }
                 }
 
-                // Server-push subscription. This connection stops being
-                // request/response and becomes a long-lived stream of
-                // unsolicited extension events (cookie changes) until the peer
-                // disconnects. The idle-reset above already fired, so an active
-                // subscription keeps the daemon from idle-shutting down.
                 if action == Some("subscribe_events") {
                     match authorization {
                         Err(response) => {
@@ -984,13 +972,6 @@ async fn handle_connection<S>(
     }
 }
 
-/// Stream unsolicited extension events to a subscribed control-socket peer.
-///
-/// Runs until the peer disconnects or the broadcast closes. A subscriber that
-/// falls behind the broadcast buffer receives a single `events_lagged` notice
-/// (so it can full-reconcile) rather than stalling the daemon or other
-/// subscribers. Client-sent lines are ignored (reserved for future keepalive),
-/// but a client EOF/error ends the stream promptly.
 async fn stream_extension_events<R, W>(
     mut receiver: broadcast::Receiver<String>,
     reader: &mut BufReader<R>,
@@ -1000,9 +981,6 @@ async fn stream_extension_events<R, W>(
     W: tokio::io::AsyncWrite + Unpin,
 {
     use tokio::sync::broadcast::error::RecvError;
-    // Cap the inbound line buffer: the subscriber (the desktop) is trusted and
-    // sends nothing today, but an unbounded read_line would let a misbehaving
-    // peer grow memory without a delimiter. 64 KiB is far beyond any keepalive.
     const MAX_SUBSCRIBER_LINE_BYTES: usize = 64 * 1024;
     let mut scratch = String::new();
     loop {
@@ -1203,7 +1181,6 @@ mod tests {
             "{\"type\":\"event\",\"event\":\"cookies_changed\"}"
         );
 
-        // Dropping the sole sender closes the broadcast, ending the stream.
         drop(tx);
         tokio::time::timeout(Duration::from_secs(2), task)
             .await
@@ -1214,7 +1191,6 @@ mod tests {
     #[tokio::test]
     async fn test_stream_extension_events_emits_lag_notice_when_overflowed() {
         let (tx, rx) = broadcast::channel::<String>(2);
-        // Overflow the buffer before the stream drains so the first recv lags.
         for i in 0..5 {
             tx.send(format!("{{\"type\":\"event\",\"n\":{}}}", i)).unwrap();
         }
@@ -1358,7 +1334,6 @@ mod tests {
 
         assert!(validate_unix_socket_path_len(&PathBuf::from("/tmp/short.sock")).is_ok());
 
-        // Boundary: exactly 103 bytes passes, 104 fails.
         let base = "/tmp/";
         let at_limit = PathBuf::from(format!("{}{}", base, "a".repeat(103 - base.len())));
         assert_eq!(at_limit.as_os_str().len(), 103);
@@ -1544,8 +1519,6 @@ mod tests {
         let mut response_line = String::new();
         reader.read_line(&mut response_line).await.unwrap();
         let response: Value = serde_json::from_str(&response_line).unwrap();
-        // close_owner is a real finalization on the CDP backend: with no
-        // browser connected there is nothing to reap, which is success.
         assert_eq!(response["success"], true);
         assert_eq!(response["data"]["closedTabIds"], json!([]));
 

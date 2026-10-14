@@ -1,19 +1,3 @@
-/**
- * Persisted expansion state for the Activity rows, keyed by conversation id.
- * Two pieces per conversation, matching the defaults in `WorkspaceSections`:
- *
- *   - `seenTaskIds` — the "seen running this session" set that keeps a
- *     finished standalone agent's row expanded (files visible). Compact
- *     Manager rows are collapsed by default and use task overrides only.
- *   - `taskOverrides` — explicit user toggles, which win
- *     over the status default; persisted so a row the user deliberately
- *     collapsed doesn't spring back open after a relaunch.
- *
- * Entries are LRU-capped by conversation so the shared ui-state file can't
- * grow unboundedly; within a conversation the component already prunes ids
- * to tasks still present in the activity window before saving.
- */
-
 import { uiState } from "@/platform/ui-state";
 
 const STORAGE_KEY = "stella.sidebar.activityExpansion";
@@ -87,16 +71,8 @@ export const activityExpansionStore = {
   },
 
   save(conversationId: string, snapshot: ActivityExpansionSnapshot): void {
-    // No window guard: `uiState` degrades to an in-memory map in windowless
-    // environments, which is exactly what unit tests want.
     const map = readPersisted();
-    // Monotonic stamp: same-millisecond saves would otherwise tie and make
-    // LRU eviction order arbitrary.
     const latest = Math.max(0, ...Object.values(map).map((e) => e.updatedAt));
-    // The Activity surface saves on every task-list update while agents run.
-    // When this conversation is already the newest entry and its sets are
-    // unchanged, re-stamping it cannot change the LRU order, so skip the
-    // serialize + shared ui-state file write.
     const existing = map[conversationId];
     if (
       existing &&

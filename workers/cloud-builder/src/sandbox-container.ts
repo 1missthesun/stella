@@ -1,12 +1,3 @@
-/**
- * The sandbox Durable Object. It owns one container through the Durable Object
- * scheduling policy: it chooses the image and instance size when it starts the
- * container, registers the egress intercept, and runs every command, file
- * operation, and background process itself through `ctx.container`.
- *
- * Callers never hold a container handle. `src/sandbox-client.ts` wraps the
- * stub in the session/process shapes the turn code uses.
- */
 import { admitContainerStart, settleContainer, touchContainer } from "./container-cap.js";
 import {
   DirectoryBackup,
@@ -45,33 +36,18 @@ import { diskClass, INSTANCE_TIERS, type InstanceSize } from "./instance-size.js
 
 export type SandboxInstanceSize = InstanceSize;
 
-/**
- * A Slack workspace's network rules for one agent container
- * (`slack/environment.ts`). Every HTTP and HTTPS request the container sends
- * goes through `SandboxEgress`, which reads the repository's current
- * environment for each one; `internet` is whether other ports reach the
- * Internet directly, fixed when the container starts.
- */
 export type SandboxEgressPolicy = {
   kind: "slack";
   team: string;
-  /** The repository whose environment applies ("" for none). */
   repo?: string;
   internet: boolean;
 };
 export type SandboxWorkloadKind = "world" | "app-build";
 
-/** What a caller asks for when its call may need a running container. */
 export type SandboxBoot = {
   size: SandboxInstanceSize;
   workload: SandboxWorkloadKind;
   idleTimeoutMs?: number;
-  /**
-   * The owner's world store, for an agent container. Every agent container of
-   * an owner starts from the latest snapshot any of them with the same disk
-   * class took and restores that class's caches and dependencies archive,
-   * both kept there; a container without one keeps neither.
-   */
   world?: string;
 };
 
@@ -111,14 +87,8 @@ export type SandboxSessionConfig = {
 };
 
 export type SandboxReleaseOptions = {
-  /** False when the turn was stopped or failed: no warm window after it. */
   warm?: boolean;
-  /** How long it stays up after the release; defaults to the warm window. */
   warmMs?: number;
-  /**
-   * False for a container whose disk is not the owner's setup (the
-   * orchestrator's): no snapshot and no dependency archive, only the stop.
-   */
   snapshot?: boolean;
 };
 
@@ -135,27 +105,13 @@ const SESSION_PREFIX = "session:";
 const PROCESS_ROOT = "/run/stella-processes";
 const WORLD_KEY = "world";
 const RELEASE_DUE_KEY = "releaseDueAt";
-/** Set by a release; any later call that needs the container clears it. */
 const STOP_PENDING_KEY = "stopPending";
-/**
- * The archive this container's caches and dependencies last matched: the one
- * it restored or last wrote. Only a change since then is archived again, so a
- * container that changed nothing never replaces a newer archive.
- */
 const DEPENDENCY_BASELINE_KEY = "dependencyBaseline";
-/** When a released container is due to stop; the snapshot is taken before. */
 const STOP_DUE_KEY = "stopDueAt";
-/** Lets a released turn finish its last writes before the filesystem is frozen. */
 const RELEASE_DELAY_MS = 2_000;
-/**
- * How long a released container stays up after its snapshot, so the thread's
- * next turn soon after reuses it instead of booting and setting up again.
- */
 const WARM_WINDOW_MS = 45_000;
-/** The 0.12 SDK ran commands here unless a call named another directory. */
 const DEFAULT_CWD = "/workspace";
 const EGRESS_KEY = "egress";
-/** The egress policy the running container was started with. */
 const BOOTED_EGRESS_KEY = "bootedEgress";
 const CONTAINERS_CA = "/etc/cloudflare/certs/cloudflare-containers-ca.crt";
 const TRUST_CONTAINERS_CA = `for i in $(seq 1 50); do [ -s ${CONTAINERS_CA} ] && break; sleep 0.1; done
@@ -189,9 +145,6 @@ const resolvedIdleTimeoutMs = (boot: SandboxBoot): number =>
       : DEFAULT_IDLE_TIMEOUT_MS,
   );
 
-// Runs the command in its own process group so a kill reaches its children.
-// The group leader records its pid and then becomes the command; output goes
-// to files so the process outlives the request that started it.
 const RUN_SCRIPT = `dir=$1; shift
 setsid -w bash -c 'echo "$$" >"$0/pid"; exec "$@"' "$dir" "$@" >"$dir/stdout.log" 2>"$dir/stderr.log"
 echo "$?" >"$dir/exit-code.tmp" && mv "$dir/exit-code.tmp" "$dir/exit-code"`;
@@ -294,10 +247,6 @@ type EgressProps = {
   repo?: string;
 };
 
-/**
- * Receives every plain-HTTP request a sandbox container sends and applies the
- * workload's policy. HTTPS and other ports are decided by `enableInternet`.
- */
 export class SandboxEgress extends WorkerEntrypoint<Env, EgressProps> {
   async fetch(request: Request): Promise<Response> {
     const { containerId, policy, team, repo } = this.ctx.props;
@@ -317,11 +266,6 @@ export class SandboxEgress extends WorkerEntrypoint<Env, EgressProps> {
   }
 }
 
-/**
- * Serves an agent container the one code bundle its start asked for, from
- * this Worker version's own static assets (`src/sandbox-code.ts`). Registered
- * on `SANDBOX_CODE_HOST` only; the container checks the bytes' hash itself.
- */
 export class SandboxCode extends WorkerEntrypoint<Env, { sha256: string }> {
   async fetch(request: Request): Promise<Response> {
     const { sha256 } = this.ctx.props;
@@ -363,15 +307,12 @@ type DependencyBaseline = Pick<StoredDependencyBackup, "mark" | "fingerprint">;
 
 export class Sandbox extends DurableObject<Env> {
   #booting: Promise<void> | null = null;
-  /** A released container being stopped; a new call waits, then starts it. */
   #stopping: Promise<void> | null = null;
   #files?: Files;
   #dependencies?: { world: string; backups: DirectoryBackup };
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
-    // A restarted object that finds its container running re-arms the
-    // inactivity timeout and the intercept, which a deploy may have dropped.
     if (ctx.container?.running) {
       const boot = ctx.storage.kv.get<SandboxBoot>("boot");
       if (boot) {
@@ -393,7 +334,6 @@ export class Sandbox extends DurableObject<Env> {
     return this.#files;
   }
 
-  /** The owner's caches and dependencies archive (`sandbox-dependencies.ts`). */
   #dependencyBackups(world: string): DirectoryBackup {
     if (this.#dependencies?.world !== world) {
       this.#dependencies = {
@@ -408,23 +348,15 @@ export class Sandbox extends DurableObject<Env> {
     return this.#dependencies.backups;
   }
 
-  /** The owner's world store an agent container shares its state through. */
   #world(boot: SandboxBoot | undefined) {
     return boot?.world ? this.env.WORLDS.getByName(boot.world) : undefined;
   }
 
-  /** The Slack network rules an agent container runs under, if any. */
   #egress(boot: SandboxBoot): SandboxEgressPolicy | null {
     if (boot.workload !== "world") return null;
     return this.ctx.storage.kv.get<SandboxEgressPolicy>(EGRESS_KEY) ?? null;
   }
 
-  /**
-   * Set the network rules for this container's next start. A running
-   * container started under other rules is stopped, so the next call starts
-   * it under these; the rules themselves are read per request, so a change to
-   * them alone never restarts anything.
-   */
   async setEgress(policy: SandboxEgressPolicy | null): Promise<{ restarted: boolean }> {
     const kv = this.ctx.storage.kv;
     if (policy) kv.put(EGRESS_KEY, policy);
@@ -472,13 +404,6 @@ export class Sandbox extends DurableObject<Env> {
     await container.setInactivityTimeout(resolvedIdleTimeoutMs(boot));
   }
 
-  /**
-   * A container that is already running was started with the idle timeout of
-   * whoever started it. A prewarm starts it with a short one so an unused
-   * prewarm releases its capacity quickly; the turn that then attaches asks for
-   * the full one and must get it. Only ever lengthens: a prewarm arriving while
-   * a turn holds the container cannot shorten that turn's window.
-   */
   async #extendIdleTimeout(boot: SandboxBoot): Promise<void> {
     const stored = this.ctx.storage.kv.get<SandboxBoot>("boot");
     const next = resolvedIdleTimeoutMs(boot);
@@ -511,8 +436,6 @@ export class Sandbox extends DurableObject<Env> {
     const container = this.#container;
     const image = container.images.sandbox!;
     const world = this.#world(boot);
-    // The owner's shared state only ever saves setup: an unreadable slot
-    // starts this container clean rather than not at all.
     const stored =
       this.#snapshotsEnabled && world
         ? await world.containerSnapshot(diskClass(boot.size)).catch(() => null)
@@ -538,19 +461,13 @@ export class Sandbox extends DurableObject<Env> {
       }
     }
     if (!restored) await this.#boot(boot, { image });
-    // A baseline describes the disk it was taken against, which is gone.
     this.ctx.storage.kv.delete(DEPENDENCY_BASELINE_KEY);
-    // Stella's code goes in beside the caches and dependencies. Only the code
-    // is required: a container that cannot install it is stopped.
     const installing = this.#installCode(boot).then(
       (code) => ({ code }),
       (error: unknown) => ({ error }),
     );
     if (restored) {
-      // Process records belong to the container that wrote them.
       await this.#run(["rm", "-rf", "--", PROCESS_ROOT]);
-      // Its caches and dependencies are, as near as anything says, the
-      // owner's latest archive: both were taken at the same release.
       const latest = await world
         ?.dependencyBackup(diskClass(boot.size))
         .catch(() => null);
@@ -598,7 +515,6 @@ export class Sandbox extends DurableObject<Env> {
         event: "sandbox_container_started",
         workload: boot.workload,
         instanceSize: boot.size,
-        // Names this container in the tail: one per agent thread.
         sandbox: this.ctx.id.toString().slice(0, 12),
         ...(this.ctx.id.name ? { name: this.ctx.id.name.slice(0, 16) } : {}),
         source: restored ? "snapshot" : "image",
@@ -609,7 +525,6 @@ export class Sandbox extends DurableObject<Env> {
             }
           : {}),
         ...(stored && !snapshot ? { snapshotSkipped: "image_changed" } : {}),
-        // The Stella code this container runs until it stops.
         ...(code
           ? {
               codeBundle: code.sha256,
@@ -623,13 +538,6 @@ export class Sandbox extends DurableObject<Env> {
     );
   }
 
-  /**
-   * Install the code bundle this Worker version was built with
-   * (`src/sandbox-code.ts`). Only agent containers run Stella's code. The
-   * container verifies the bytes against the hash passed here and refuses
-   * anything else.
-   */
-  /** Whether the deployment serving code bundles has moved past this object's. */
   async #codeSuperseded(): Promise<boolean> {
     const { sha256 } = sandboxCode();
     try {
@@ -693,9 +601,6 @@ export class Sandbox extends DurableObject<Env> {
         service: "stella-v2",
         workload: boot.workload,
         size: boot.size,
-        // The sandbox's name (`agent-<hash>` for an agent thread or the
-        // orchestrator), so container metrics name the same container the
-        // turn logs do (their `sandbox` field).
         ...(this.ctx.id.name ? { sandbox: this.ctx.id.name.slice(0, 16) } : {}),
       },
     } as ContainerStartupOptions);
@@ -726,8 +631,6 @@ export class Sandbox extends DurableObject<Env> {
   }
 
   async #ensure(boot: SandboxBoot): Promise<void> {
-    // Someone needs the container again: a release still waiting to stop it
-    // takes its snapshot but leaves it running.
     if (this.ctx.storage.kv.get<boolean>(STOP_PENDING_KEY)) {
       this.ctx.storage.kv.delete(STOP_PENDING_KEY);
       this.ctx.storage.kv.delete(STOP_DUE_KEY);
@@ -760,11 +663,6 @@ export class Sandbox extends DurableObject<Env> {
     await this.#booting;
   }
 
-  /**
-   * An agent container belongs to one owner's world for good, so the world a
-   * caller once named is remembered and a later start without one still
-   * shares the owner's snapshot and archive.
-   */
   #withWorld(boot: SandboxBoot): SandboxBoot {
     if (boot.world) {
       if (this.ctx.storage.kv.get<string>(WORLD_KEY) !== boot.world) {
@@ -792,8 +690,6 @@ export class Sandbox extends DurableObject<Env> {
       stderr: decoder.decode(output.stderr),
     };
   }
-
-  // ---- lifecycle ---------------------------------------------------------
 
   async state(): Promise<SandboxState> {
     if (!this.ctx.container?.running) return { status: "stopped" };
@@ -829,17 +725,6 @@ export class Sandbox extends DurableObject<Env> {
     await settleContainer(this.env, this.ctx.id.toString()).catch(() => undefined);
   }
 
-  /**
-   * The turn using this container has let go of it: snapshot it for the next
-   * agent container of this owner to start from and bring the owner's caches
-   * and dependencies archive up to date, then keep it up for the warm window
-   * so the thread's next turn soon after reuses it, and stop it after that
-   * rather than leave it idle. A turn that was stopped or failed passes
-   * `warm: false`: nothing is expected to follow it, so the container stops
-   * right after its snapshot. The alarm does all of it, so the caller's turn
-   * never waits; a call that needs the container before the stop keeps it
-   * running. `snapshot: false` only schedules the stop, `warmMs` after now.
-   */
   async release(options: SandboxReleaseOptions = {}): Promise<void> {
     if (!this.ctx.container?.running) return;
     const kv = this.ctx.storage.kv;
@@ -853,8 +738,6 @@ export class Sandbox extends DurableObject<Env> {
       kv.delete(RELEASE_DUE_KEY);
       kv.put(STOP_DUE_KEY, Date.now() + warmMs);
       kv.put(STOP_PENDING_KEY, true);
-      // The alarm is re-armed exactly: an earlier stop set by a previous
-      // release must not cut this container's new window short.
       await this.ctx.storage.setAlarm(Date.now() + warmMs);
       return;
     }
@@ -865,7 +748,6 @@ export class Sandbox extends DurableObject<Env> {
     await this.#armReleaseAlarm();
   }
 
-  /** The alarm at the earliest pending release step, never later than one already set. */
   async #armReleaseAlarm(): Promise<void> {
     const kv = this.ctx.storage.kv;
     const steps = [
@@ -883,7 +765,6 @@ export class Sandbox extends DurableObject<Env> {
     const snapshotDue = kv.get<number>(RELEASE_DUE_KEY);
     if (snapshotDue !== undefined && snapshotDue <= Date.now()) {
       kv.delete(RELEASE_DUE_KEY);
-      // A failed snapshot leaves the owner's previous one; the stop still runs.
       await this.#snapshotReleased().catch((error: unknown) => {
         console.log(
           JSON.stringify({
@@ -973,11 +854,6 @@ export class Sandbox extends DurableObject<Env> {
     );
   }
 
-  /**
-   * Bring the owner's caches and dependencies back into a container that just
-   * started from the image. Never fails the start: without the archive the
-   * container is only slower.
-   */
   async #restoreDependencies(
     worldName: string,
     size: SandboxInstanceSize,
@@ -1016,8 +892,6 @@ export class Sandbox extends DurableObject<Env> {
         }),
       );
     } catch (error) {
-      // An archive that is gone or altered can never restore; a transfer
-      // failure may be transient, so that record is kept for the next start.
       if (
         SandboxBackupError.is(error) &&
         (error.code === "BACKUP_NOT_FOUND" || error.code === "BACKUP_INTEGRITY")
@@ -1040,12 +914,6 @@ export class Sandbox extends DurableObject<Env> {
     }
   }
 
-  /**
-   * Archive the tool home and the world's `node_modules` when anything in them
-   * changed since this container's baseline and the whole is under the cap,
-   * and make it the owner's archive. A skipped or failed archive keeps the
-   * owner's current one; the one replaced is deleted.
-   */
   async #backupDependencies(
     worldName: string,
     size: SandboxInstanceSize,
@@ -1151,8 +1019,6 @@ export class Sandbox extends DurableObject<Env> {
     }
   }
 
-  // ---- sessions ----------------------------------------------------------
-
   async putSession(config: SandboxSessionConfig): Promise<void> {
     this.ctx.storage.kv.put(`${SESSION_PREFIX}${config.id}`, config);
   }
@@ -1167,8 +1033,6 @@ export class Sandbox extends DurableObject<Env> {
     this.ctx.storage.kv.delete(`${SESSION_PREFIX}${id}`);
   }
 
-  // ---- commands ----------------------------------------------------------
-
   async exec(
     boot: SandboxBoot,
     request: SandboxExecRequest,
@@ -1179,8 +1043,6 @@ export class Sandbox extends DurableObject<Env> {
       { cwd: request.cwd ?? DEFAULT_CWD, env: cleanEnv(request.env) },
     );
   }
-
-  // ---- files -------------------------------------------------------------
 
   async readFile(
     boot: SandboxBoot,
@@ -1218,8 +1080,6 @@ export class Sandbox extends DurableObject<Env> {
         ? base64ToBytes(content)
         : content;
     const parent = path.slice(0, path.lastIndexOf("/")) || "/";
-    // A stream can be read once, and a failed write may already have taken
-    // it: its folder is made first, so the one write gets every byte.
     if (typeof bytes !== "string" && !(bytes instanceof Uint8Array)) {
       await this.#fs.mkdir(parent, { recursive: true });
     }
@@ -1260,8 +1120,6 @@ export class Sandbox extends DurableObject<Env> {
       throw error;
     }
   }
-
-  // ---- background processes ---------------------------------------------
 
   async startProcess(
     boot: SandboxBoot,

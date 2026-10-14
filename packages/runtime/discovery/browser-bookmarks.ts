@@ -96,12 +96,6 @@ function walkBookmarkTree(
   return entries;
 }
 
-/**
- * Read one profile's Bookmarks file. Returns null for the "keep scanning"
- * cases (no roots / no entries); read and parse failures reject and are
- * treated identically to null by the scan loop, exactly like the pre-Effect
- * try/catch-continue.
- */
 const readProfileBookmarks = async (
   browser: BrowserBookmarkConfig,
   profile: string,
@@ -132,12 +126,10 @@ const readProfileBookmarks = async (
     return null;
   }
 
-  // Limit to 200 bookmarks
   if (allEntries.length > 200) {
     allEntries = allEntries.slice(0, 200);
   }
 
-  // Extract unique folder names
   const folders = new Set<string>();
   for (const entry of allEntries) {
     if (entry.folder) {
@@ -233,7 +225,6 @@ const collectBrowserBookmarksEffect = (
       : browser.profiles;
 
     for (const profile of profilesToScan) {
-      // Silently continue to next browser/profile on any read/parse error.
       const found = yield* tryDiscovery(() =>
         readProfileBookmarks(browser, profile),
       ).pipe(Effect.catch(() => Effect.succeed(null)));
@@ -277,13 +268,11 @@ export function formatBrowserBookmarksForSynthesis(
 
   let output = `## Browser Bookmarks (${data.browser})\n`;
 
-  // Folders section
   if (data.folders.length > 0) {
     output += `### Bookmark Folders\n`;
     output += data.folders.join(", ") + "\n\n";
   }
 
-  // Group bookmarks by folder
   const byFolder = new Map<string, BookmarkEntry[]>();
   const uncategorized: BookmarkEntry[] = [];
 
@@ -297,7 +286,6 @@ export function formatBrowserBookmarksForSynthesis(
     }
   }
 
-  // Bookmarks by folder (limit to 15 folders, 10 bookmarks each)
   if (byFolder.size > 0) {
     output += `### Bookmarks by Folder\n`;
     const folders = Array.from(byFolder.entries()).slice(0, 15);
@@ -313,7 +301,6 @@ export function formatBrowserBookmarksForSynthesis(
     }
   }
 
-  // Uncategorized bookmarks (limit to 20)
   if (uncategorized.length > 0) {
     output += `### Uncategorized Bookmarks\n`;
     const limitedUncategorized = uncategorized.slice(0, 20);

@@ -1,13 +1,3 @@
-/**
- * IPC handlers for opening file artifacts in external apps.
- *
- * Surfaces a curated list of app openers tailored to the file
- * extension (code editors for code, Keynote/PowerPoint for slides,
- * etc.), the OS-default opener, and a "Reveal in Finder/Explorer"
- * action. The catalog is filtered to apps actually installed on the
- * user's machine so the menu never lists something that can't run.
- */
-
 import { shell } from "electron";
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
@@ -51,12 +41,6 @@ import { handleIpc } from "./typed-ipc.js";
 const CLOUD_WORKSPACE_OPEN_ERROR =
   "This file lives in Stella's cloud workspace, not on this computer, so there is no local file to open. Ask Stella to put it in your Drive.";
 
-/**
- * `shell.openPath` and `shell.showItemInFolder` do nothing useful for a path
- * that is not here (the second fails silently), so every lane checks first
- * and says whether the path was moved or deleted or was never on this
- * computer.
- */
 const localPathMissingError = async (
   filePath: string,
 ): Promise<string | null> => {
@@ -72,14 +56,11 @@ const localPathMissingError = async (
 type MacAppDef = {
   id: string;
   label: string;
-  /** App bundle name without the trailing `.app` */
   appName: string;
-  /** Extensions this app should appear for (lowercase, no leading dot). */
   extensions: string[];
 };
 
 const MAC_APP_CATALOG: MacAppDef[] = [
-  // Image / PDF viewers
   {
     id: "preview",
     label: "Preview",
@@ -111,7 +92,6 @@ const MAC_APP_CATALOG: MacAppDef[] = [
     extensions: PDF_EXTS,
   },
 
-  // Browsers (good for images, PDFs, HTML, SVG)
   {
     id: "safari",
     label: "Safari",
@@ -145,7 +125,6 @@ const MAC_APP_CATALOG: MacAppDef[] = [
   },
   { id: "dia", label: "Dia", appName: "Dia", extensions: BROWSER_EXTS },
 
-  // Media players
   {
     id: "quicktime",
     label: "QuickTime Player",
@@ -166,7 +145,6 @@ const MAC_APP_CATALOG: MacAppDef[] = [
     extensions: AUDIO_EXTS,
   },
 
-  // Code editors
   { id: "cursor", label: "Cursor", appName: "Cursor", extensions: CODE_EXTS },
   {
     id: "vscode",
@@ -190,7 +168,6 @@ const MAC_APP_CATALOG: MacAppDef[] = [
     extensions: [...CODE_EXTS, ...DOC_EXTS],
   },
 
-  // Slides / docs / sheets
   {
     id: "keynote",
     label: "Keynote",
@@ -269,9 +246,6 @@ const buildOpenersForFile = (filePath: string): ExternalOpener[] => {
   if (process.platform === "darwin") {
     openers.push(...listMacOpenersForExt(ext));
   }
-  // The OS-default opener and reveal-in-folder are always last, in that
-  // order. They mirror the macOS Finder right-click "Open" + "Show in
-  // Finder" layout that the menu visually borrows from.
   openers.push({ id: "__default", label: "Default app", kind: "default" });
   openers.push({
     id: "__reveal",

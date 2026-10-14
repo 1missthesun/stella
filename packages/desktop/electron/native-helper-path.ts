@@ -26,7 +26,6 @@ const resolvedHelperPaths = new Map<string, string>()
 const NEGATIVE_CACHE_TTL_MS = 30_000
 const missingHelperUntil = new Map<string, number>()
 
-/** Every directory native helpers may run from, whether or not it exists. */
 export const nativeHelperDirectories = (): string[] => [
   path.join(process.resourcesPath, 'native', 'out', platformDir),
   path.join(__dirname, '..', '..', '..', 'native', 'out', platformDir),
@@ -40,7 +39,6 @@ export const resolveNativeHelperPath = (baseName: string): string | null => {
     return cached
   }
 
-  // Skip the stat sweep if we recently confirmed this helper is absent.
   const missingUntil = missingHelperUntil.get(baseName)
   if (missingUntil !== undefined && Date.now() < missingUntil) {
     return null
@@ -49,13 +47,9 @@ export const resolveNativeHelperPath = (baseName: string): string | null => {
   const ext = process.platform === 'win32' ? '.exe' : ''
   const fileName = `${baseName}${ext}`
   const candidates = [
-    // Packaged app: extraResources copies native/out → Resources/native/out
     path.join(process.resourcesPath, 'native', 'out', platformDir, fileName),
-    // Dev dist-electron output: dist-electron/desktop/electron/ → ../../../native/out
     path.join(__dirname, '..', '..', '..', 'native', 'out', platformDir, fileName),
-    // From compiled tsc layout: dist-electron/electron/ → ../../native/out
     path.join(__dirname, '..', '..', 'native', 'out', platformDir, fileName),
-    // From source layout: electron/ → ../native/out
     path.join(__dirname, '..', 'native', 'out', platformDir, fileName),
   ]
 
@@ -67,7 +61,6 @@ export const resolveNativeHelperPath = (baseName: string): string | null => {
     }
   }
 
-  // Remember the miss so poll-driven callers don't re-stat every tick.
   missingHelperUntil.set(baseName, Date.now() + NEGATIVE_CACHE_TTL_MS)
   return null
 }

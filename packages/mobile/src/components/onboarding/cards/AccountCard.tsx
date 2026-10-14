@@ -1,13 +1,3 @@
-/**
- * Accounts, inside the conversation.
- *
- * A guest is offered a Stella account (the existing sign-in screen; the
- * onboarding resumes on this message when they come back), and everyone is
- * offered their own Claude or ChatGPT subscription for Stella's cloud
- * through the same paste-back flow Settings uses (Claude: the cloud's own
- * `claude auth login`; the phone never signs in to Claude itself). All of it
- * is optional.
- */
 import { useMemo } from "react";
 import {
   ActivityIndicator,
@@ -68,7 +58,6 @@ const ENGINES: EngineSpec[] = [
 type AccountCardProps = {
   active: boolean;
   answered: "done" | "skipped" | undefined;
-  /** Signed in to a real (non-anonymous) Stella account. */
   signedIn: boolean;
   email: string | null;
   onSignIn: () => void;
@@ -88,7 +77,6 @@ export function AccountCard({
   const cardStyles = useCardStyles();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { value: engines } = useBackendView("engines.get", {});
-  // A ChatGPT sign-in counts once Stella's cloud may use the plan.
   const connections = (engines?.connections ?? []).filter(isEngineConnectionUsable);
   const connectedNames = ENGINES.filter((spec) =>
     connections.some((row) => row.provider === spec.provider),

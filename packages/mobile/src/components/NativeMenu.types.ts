@@ -19,7 +19,6 @@ export type NativeMenuProps = {
   height: number;
   circular?: boolean;
   radius?: number;
-  /** Draw only `label`, without the glass button around it. */
   plain?: boolean;
   disabled?: boolean;
   onFallbackPress: () => void;

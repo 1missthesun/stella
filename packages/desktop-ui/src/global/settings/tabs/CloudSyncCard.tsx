@@ -46,7 +46,6 @@ const syncedAtLabel = (locale: string, at: number): string => {
   ).format(at);
 };
 
-/** Cloud sync status for memory and skills. Rendered only where `cloudHome` exists. */
 export function CloudSyncCard() {
   const t = useT();
   const locale = useLocale();

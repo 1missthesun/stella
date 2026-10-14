@@ -1,22 +1,3 @@
-/**
- * "Use Stella's defaults" — one action that clears every prompt/skill
- * customization so Stella's shipped copies can be reinstalled.
- *
- * Nothing is destroyed: everything moves into a timestamped folder under
- * `~/.stella/.trash/` for one level of manual undo.
- *
- * Cleared:
- * - `agents/*.md` and `agents/*.replace.md` (overlays, replacements, and
- *   user-defined agents)
- * - `prompts/*.md` (user prompt replacements)
- * - `PERSONALITY.md` (hand-edited personality)
- * - `skills/<id>/` only where `<id>` is tracked as a Stella-shipped skill.
- *   Purely user-created skills are kept.
- *
- * Moving a shipped skill aside leaves the canonical root without it; the caller
- * re-runs the bundled-skill reconciliation so the shipped copy comes back.
- */
-
 import { promises as fs } from "node:fs";
 import path from "node:path";
 

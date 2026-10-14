@@ -147,11 +147,6 @@ const screenCapturePermissionsHasPrompted = (mod) => {
         return false;
     }
 };
-// System Settings corrupts its own view (it can render nearly blank, showing
-// only General/Spotlight) when the x-apple.systempreferences: URL is opened
-// repeatedly in quick succession. Coalesce rapid opens from every path (enable
-// button spam, request + settings fallback, the openSettings handler) behind a
-// single cooldown so one user click opens System Settings at most once.
 const PERMISSION_SETTINGS_OPEN_COOLDOWN_MS = 1500;
 let lastPermissionSettingsOpenAt = 0;
 const consumePermissionSettingsOpenSlot = () => {
@@ -614,8 +609,6 @@ export const registerSystemHandlers = (options) => {
         if (!options.externalLinkService.assertPrivilegedSender(event, IPC_DIAGNOSTICS_REPORT_ERROR)) {
             return;
         }
-        // Preserve the renderer's original message and stack. Calling crash()
-        // here would replace it with a main-process wrapper stack.
         getMainLogger()?.error("renderer.error", {
             kind: payload?.kind,
             source: payload?.source,
@@ -841,8 +834,6 @@ export const registerSystemHandlers = (options) => {
             mirrorAccount: setOptions?.mirrorAccount === true,
         });
         if (!state.enabled) {
-            // Opting out discards what is still queued on this device;
-            // producers also re-check the preference before every send.
             const telemetryDir = path.join(stellaAppDir, "telemetry");
             const spoolNames = await readdir(telemetryDir).catch(() => []);
             await Promise.all(spoolNames
@@ -955,8 +946,6 @@ export const registerSystemHandlers = (options) => {
     handleIpc(IPC_PROMPT_PRESETS_READ, async (event, agentId, presetId) => {
         const dir = promptPresetContext(event, IPC_PROMPT_PRESETS_READ, agentId);
         const id = String(presetId ?? "");
-        // "default" reads the shipped prompt so the editor can seed a new
-        // preset from what Stella actually ships.
         if (id === "default") {
             const content = (await loadAgentSystemPrompt(agentId)) ?? "";
             return { id: "default", name: "default", agentId, content };
@@ -981,7 +970,6 @@ export const registerSystemHandlers = (options) => {
         const dir = promptPresetContext(event, IPC_PROMPT_PRESETS_DELETE, agentId);
         const id = String(presetId ?? "");
         const ok = await deletePromptPreset(dir, agentId, id);
-        // A deleted selection reverts to the shipped prompt.
         if (ok && getPromptPresetSelection(dir, agentId) === id) {
             setPromptPresetSelection(dir, agentId, "default");
         }
@@ -1030,9 +1018,6 @@ export const registerSystemHandlers = (options) => {
         }
         return getLocalModelPreferences(stellaAppDir);
     });
-    // The ChatGPT models this computer's active account may use
-    // (`GET /v1/models`, `visibility: "list"`, in the server's order), or
-    // Stella's catalog while no account is signed in here.
     handleIpc(IPC_CHATGPT_LIST_MODELS, async (event) => {
         if (!options.externalLinkService.assertPrivilegedSender(event, IPC_CHATGPT_LIST_MODELS)) {
             throw new Error("Blocked untrusted chatgpt:listModels request.");
@@ -1059,9 +1044,6 @@ export const registerSystemHandlers = (options) => {
         const apiKey = stellaAppDir
             ? getLocalLlmCredential(stellaAppDir, "anthropic")
             : null;
-        // Loaded on first use: the Claude Code runtime pulls in the MCP SDK,
-        // turndown/domino and the local tool dispatch graph, which otherwise
-        // evaluate on every launch before the window opens.
         const { listClaudeCodeModels } = await import("@stella/runtime/kernel/integrations/claude-code-session-runtime");
         return listClaudeCodeModels({ apiKey }, stellaAppDir ?? undefined);
     });
@@ -1198,8 +1180,6 @@ export const registerSystemHandlers = (options) => {
         if (!options.externalLinkService.assertPrivilegedSender(event, IPC_LLM_CREDENTIALS_LIST_OAUTH_PROVIDERS)) {
             throw new Error("Blocked untrusted OAuth provider request.");
         }
-        // Claude (Claude Code's own login) and ChatGPT (Sign in with
-        // ChatGPT) are not providers of this store.
         return getLlmOAuthProviders()
             .map((provider) => ({
             provider: provider.id,
@@ -1255,8 +1235,6 @@ export const registerSystemHandlers = (options) => {
                         });
                     }
                 },
-                // The only question these sign-ins ask is GitHub Enterprise's
-                // domain; the empty answer signs in to github.com.
                 prompt: async () => "",
                 signal: controller.signal,
             });
@@ -1280,9 +1258,6 @@ export const registerSystemHandlers = (options) => {
             }
         }
     });
-    // Claude Code logins on this computer. Main runs the real `claude` CLI
-    // (`claude auth login` / `auth status` / `auth logout`) with the chosen
-    // config dir; Stella never sees a Claude credential.
     const claudeAccounts = options.claudeLocalAccounts;
     const guardClaude = (event, channel) => {
         if (!options.externalLinkService.assertPrivilegedSender(event, channel)) {
@@ -1301,7 +1276,6 @@ export const registerSystemHandlers = (options) => {
             ...(configId ? { configId } : {}),
             ...(email ? { email } : {}),
         });
-        // A window that goes away takes its waiting sign-in with it.
         event.sender.once("destroyed", () => claudeAccounts.cancelLogin(started.loginId));
         return started;
     });
@@ -1321,9 +1295,6 @@ export const registerSystemHandlers = (options) => {
         guardClaude(event, IPC_CLAUDE_ACCOUNTS_SIGN_OUT);
         return await claudeAccounts.signOut(asTrimmedString(payload?.configId));
     });
-    // ChatGPT on this computer (Sign in with ChatGPT): this install is its
-    // own agent host. Sign-in runs the loopback flow here in main; the
-    // credentials stay in this computer's keychain-protected store.
     let activeChatGptSignIn = null;
     const chatGptAppDir = () => {
         const dir = options.getStellaAppDir();
@@ -1354,10 +1325,6 @@ export const registerSystemHandlers = (options) => {
         guardChatGpt(event, IPC_CHATGPT_SIGN_IN);
         const dir = chatGptAppDir();
         const sharedClientId = asTrimmedString(payload?.sharedClientId);
-        // Reusing a registration another host of the owner made: sign in
-        // with its issued client id under this install's own host id. When
-        // this computer already has that registration, sign it in again in
-        // place.
         const profileId = asTrimmedString(payload?.profileId) ||
             (sharedClientId ? chatGptProfileIdForClient(dir, sharedClientId) ?? "" : "");
         const shared = !profileId && sharedClientId
@@ -1386,8 +1353,6 @@ export const registerSystemHandlers = (options) => {
             });
             const saved = saveChatGptRegistration(dir, registration);
             chatGptProfilesChanged();
-            // Let the owner's other hosts reuse this registration (its
-            // issued client id only, never tokens). Best effort.
             void options.engineAccountAccess.shareChatGptRegistration({
                 clientId: registration.clientId,
                 ...(registration.email ? { email: registration.email } : {}),
@@ -1426,9 +1391,6 @@ export const registerSystemHandlers = (options) => {
         chatGptProfilesChanged();
         return result;
     });
-    // The owner's cloud is its own ChatGPT host: the server builds the
-    // authorization and keeps the credentials; this computer only catches
-    // the loopback redirect.
     handleIpc(IPC_ENGINE_ACCOUNTS_CONNECT_CHATGPT_CLOUD, async (event, payload) => {
         guardChatGpt(event, IPC_ENGINE_ACCOUNTS_CONNECT_CHATGPT_CLOUD);
         const engineAccounts = options.engineAccountAccess;

@@ -1,11 +1,3 @@
-/**
- * Allocation-aware value and text bounds for Cloud Code.
- *
- * The normal JSON helpers allocate the complete serialization before a caller
- * can inspect its size. Values crossing the Dynamic Worker RPC boundary must
- * instead be measured while they are copied into a JSON-safe representation.
- */
-
 export type BoundedJsonLimits = Readonly<{
   maxBytes: number;
   maxDepth: number;
@@ -37,7 +29,6 @@ const byteWidth = (value: string, index: number): readonly [number, number] => {
   return [3, 1];
 };
 
-/** Count UTF-8 bytes without allocating an encoded copy. Stops above max. */
 export const utf8ByteLengthUpTo = (
   value: string,
   max = Number.MAX_SAFE_INTEGER,
@@ -62,7 +53,6 @@ const jsonStringBytesUpTo = (value: string, max: number): number => {
     if (code === 0x22 || code === 0x5c) {
       width = 2;
     } else if (code <= 0x1f) {
-      // Conservatively account for the longest JSON control escape.
       width = 6;
     } else if (code >= 0xd800 && code <= 0xdbff) {
       const next = value.charCodeAt(index + 1);
@@ -225,10 +215,6 @@ const copyJsonValue = (
   }
 };
 
-/**
- * Copy a value into a plain JSON-safe graph while enforcing every limit before
- * JSON.stringify or Workers RPC gets a chance to allocate an unbounded copy.
- */
 export const cloneBoundedJsonValue = (
   value: unknown,
   limits: BoundedJsonLimits,
@@ -244,7 +230,6 @@ export const cloneBoundedJsonValue = (
   return { ok: true, value: copied, bytes: state.bytes };
 };
 
-/** Return the longest UTF-8 prefix that fits, without splitting a pair. */
 export const utf8Prefix = (value: string, maxBytes: number): string => {
   if (maxBytes <= 0) return "";
   let bytes = 0;
@@ -407,7 +392,6 @@ const writePreview = (
   }
 };
 
-/** Build a bounded JSON-like model preview without first serializing it. */
 export const boundedJsonPreview = (value: unknown, maxBytes: number): string => {
   const suffix = "\n\n[Code output truncated.]";
   const suffixBytes = utf8ByteLengthUpTo(suffix);

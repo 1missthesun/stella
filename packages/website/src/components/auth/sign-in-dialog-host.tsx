@@ -10,7 +10,6 @@ const LazySignInDialogProvider = dynamic(() =>
 
 type HostMode = "idle" | "verify" | "open";
 
-/** Loads the auth dialog implementation only when a sign-in is requested. */
 export function SignInDialogHost() {
   const [mode, setMode] = useState<HostMode>("idle");
 
@@ -20,9 +19,6 @@ export function SignInDialogHost() {
       setMode((current) => (current === "idle" ? "verify" : current));
     window.addEventListener(SIGN_IN_DIALOG_EVENT, activate);
 
-    // OAuth and magic-link returns land on a route with a one-time token.
-    // Load the dialog module to verify it, but keep the dialog closed: the
-    // user has just signed in.
     const returnUrl = new URL(window.location.href);
     if (
       new URLSearchParams(returnUrl.hash.replace(/^#\??/, "")).has("ott") ||

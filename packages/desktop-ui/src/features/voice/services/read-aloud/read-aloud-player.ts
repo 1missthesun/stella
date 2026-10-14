@@ -1,19 +1,3 @@
-/**
- * Read-aloud player — single-instance audio playback for the
- * "read finalized assistant replies" toggle and the per-message button.
- *
- * Two playback paths sit behind one "at most one active playback" invariant:
- *   - `playReadAloud(buffer)` — one-shot: decode a complete encoded buffer and
- *     play via Web Audio (OpenAI mp3, Gemini wav, or the streaming fallback).
- *   - `playReadAloudStream(response)` — progressive: play a chunked
- *     `audio/mpeg` response through Media Source Extensions so speech starts
- *     before Gemini has finished synthesizing the whole reply.
- *
- * Either path cancels the other so a fresh assistant turn never overlaps the
- * previous one's audio. `stop()` cancels playback without queuing anything;
- * `dispose()` tears everything down. Both leave the surface reusable.
- */
-
 let context: AudioContext | null = null;
 let currentSource: AudioBufferSourceNode | null = null;
 let currentStream: StreamPlayback | null = null;
@@ -58,14 +42,9 @@ const stopCurrent = () => {
 };
 
 export type PlayOptions = {
-  /** Called once playback ends naturally (not when interrupted by a new play). */
   onEnded?: () => void;
 };
 
-/**
- * Decode and play an encoded audio buffer. Resolves once playback has
- * begun; the optional `onEnded` callback fires at natural completion.
- */
 export async function playReadAloud(
   encoded: ArrayBuffer,
   options: PlayOptions = {},
@@ -86,8 +65,6 @@ export async function playReadAloud(
   source.buffer = decoded;
   source.connect(ctx.destination);
 
-  // Capture this source so a subsequent play() only nulls ours if
-  // we're still the active node.
   const thisSource = source;
   source.onended = () => {
     if (currentSource === thisSource) {
@@ -100,22 +77,11 @@ export async function playReadAloud(
   source.start();
 }
 
-// ---------------------------------------------------------------------------
-// Progressive (streaming) playback via Media Source Extensions
-// ---------------------------------------------------------------------------
-
 const STREAM_MIME = "audio/mpeg";
-// Keep only a few seconds of already-played audio buffered so a long reply
-// cannot grow the SourceBuffer without bound.
 const KEEP_BEHIND_SECONDS = 3;
 
 type StreamPlayback = { teardown: () => void };
 
-/**
- * Whether progressive read-aloud playback is available in this runtime.
- * MP3-in-MSE is supported in Chromium/Electron; the guard keeps a graceful
- * fallback to `playReadAloud` on any runtime that lacks it.
- */
 export function canStreamReadAloud(): boolean {
   return (
     typeof MediaSource !== "undefined" &&
@@ -124,14 +90,6 @@ export function canStreamReadAloud(): boolean {
   );
 }
 
-/**
- * Play a chunked `audio/mpeg` fetch response progressively.
- *
- * Resolves once playback has begun. Rejects if playback never starts (no
- * usable audio arrives / MSE errors before the first append) so the caller
- * can fall back to a one-shot request. After playback has started, a late
- * upstream error is treated as a natural end (fires `onEnded`).
- */
 export async function playReadAloudStream(
   response: Response,
   options: PlayOptions = {},
@@ -215,7 +173,6 @@ export async function playReadAloudStream(
       detach();
       teardown();
       if (wasStarted) {
-        // Already audible — treat a late failure as a natural end.
         options.onEnded?.();
       } else {
         reject(error instanceof Error ? error : new Error(String(error)));

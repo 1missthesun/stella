@@ -1,10 +1,3 @@
-/**
- * Stella for Slack settings (migrations/0011): engine, model and effort for
- * the workspace's turns and whether `/stella` may change them. Repositories
- * and GitHub connections are in `repos.ts`. The owner edits them on stella.sh; Slack
- * commands edit the first three when the owner allows it.
- */
-
 import { deleteEnvironment, LIMITED_HOSTS } from "./environment.js";
 import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
 import {
@@ -145,7 +138,6 @@ export const deleteWorkspaceSettings = async (
   await deleteWorkspaceRepos(env, teamId);
 };
 
-/** The execution a workspace's turns run on. */
 export const workspaceExecution = (
   settings: SlackWorkspaceSettings,
 ): CloudExecutionSelection =>
@@ -201,7 +193,6 @@ export const workspaceOptions = (
   limitedHosts: [...LIMITED_HOSTS],
 });
 
-/** A model id the engine accepts: a listed one, or any `stella/…` id for Stella. */
 export const resolveModelChoice = (
   engine: SlackWorkspaceEngine,
   requested: string,
@@ -227,7 +218,6 @@ export const resolveModelChoice = (
 
 const REPO_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})\/[A-Za-z0-9._-]{1,100}$/u;
 
-/** `owner/name`, or a github.com URL of one. */
 export const parseRepoName = (value: string): string | null => {
   const trimmed = value
     .trim()

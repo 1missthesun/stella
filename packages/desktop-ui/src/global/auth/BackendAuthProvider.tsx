@@ -49,11 +49,6 @@ export function useAuthBootstrapState() {
   return useContext(AuthBootstrapContext);
 }
 
-/**
- * Whether the renderer holds a verified session identity. Backend calls
- * authenticate with the owner JWT minted from that session, so this is the
- * gate for every account-bound view.
- */
 export function useAuthState() {
   const session = useDesktopAuthSession();
   const sessionUserId =
@@ -90,9 +85,6 @@ function DesktopAuthRuntimeEffects({
         });
       }
 
-      // Re-read after the handoff barrier instead of trusting the render-time
-      // snapshot. The OTT exchange and the cold-start revalidation can both
-      // finish while this effect is waiting.
       const snapshot = getAuthSessionSnapshot();
       if (snapshot.isPending && !snapshot.data) {
         setAuthBootstrapState({ status: "loading_session", error: null });
@@ -113,10 +105,6 @@ function DesktopAuthRuntimeEffects({
           });
           return;
         }
-        // A verified session identity is the whole barrier now. Electron main
-        // owns token minting and refresh, and a browser shell mints through
-        // Better Auth's JWT plugin; neither needs the renderer to hand a token
-        // anywhere before the shell may open.
         setAuthBootstrapState({ status: "ready", error: null });
         return;
       }
@@ -126,8 +114,6 @@ function DesktopAuthRuntimeEffects({
         return;
       }
 
-      // No account on this computer yet. A self-hosted server's computers
-      // join with a pairing link; on Stella's own server the user signs in.
       setAuthBootstrapState({
         status: isSelfHostedServer() ? "needs_pairing" : "signed_out",
         error: null,
@@ -152,13 +138,9 @@ function DesktopAuthRuntimeEffects({
       return;
     }
 
-    // Restore the device preference when the authenticated runtime becomes available.
     void systemApi.setCloudSyncEnabled({ enabled: chatStorageMode === "cloud" });
   }, [chatStorageMode]);
 
-  // Main pushes this when a background retry reaches a new verdict. Drop the
-  // cached owner JWT and re-read the snapshot so the shell converges without
-  // interpreting the notification itself as a sign-out.
   useEffect(() => {
     const systemApi = window.electronAPI?.system;
     if (!systemApi?.onAuthSessionInvalidated) {

@@ -1,16 +1,4 @@
 #!/usr/bin/env node
-// Call a backend function or read a live view as a test account, without
-// printing tokens. Targets STELLA_BACKEND_URL (default: the dev deployment);
-// the admin secret comes from the environment or workers/cloud-builder/.dev.vars
-// (Previews share dev's admin secret).
-//
-//   node backend-call.mjs call <name> [argsJson]   POST /api/rpc/<name>
-//   node backend-call.mjs view <name> [argsJson]   first value of a live view
-//   node backend-call.mjs history <conversationId> conversation history
-//
-// The account is STELLA_VERIFY_ACCOUNT_EMAIL, else the current desktop run's
-// account (.run/current.json, or current-<name>.json with STELLA_VERIFY_RUN), so
-// calls act as the signed-in desktop owner.
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

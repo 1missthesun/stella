@@ -4,7 +4,6 @@ import { useT } from "@/shared/i18n";
 import { dismissToast, showToast } from "@/ui/toast";
 import { markReminderDone, snoozeReminder, useReminderFireList } from "./use-reminder-fires";
 
-/** How long after it fired a reminder this computer missed still pops up, once, when the app opens. */
 const NOTICE_WINDOW_MS = 24 * 60 * 60_000;
 const SEEN_KEY = "stella.reminders.noticed";
 const SEEN_LIMIT = 200;
@@ -26,11 +25,6 @@ const writeSeen = (ids: readonly string[]): void => {
   }
 };
 
-/**
- * A reminder that fires shows here, inside the app, instead of as a system
- * notification: once per delivery, with Done and Snooze. Settled from
- * another device, it goes away here too.
- */
 export function ReminderNoticeLayer() {
   const t = useT();
   const fires = useReminderFireList();

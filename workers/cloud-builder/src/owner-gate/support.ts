@@ -48,7 +48,6 @@ export const ownerFenceRequest = (
     body: JSON.stringify(body),
   });
 
-/** How the snapshot fetch failed. `owner_purged` is definite; the rest are not. */
 export class OwnerGateSnapshotError extends Error {
   constructor(
     readonly code: "owner_purged" | "internal",
@@ -79,7 +78,6 @@ export const log = (
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-/** True when the snapshot lets a turn pin this execution. */
 export const snapshotAllowsExecution = (
   snapshot: Pick<OwnerSnapshot, "connectedEngines" | "connectedProviders">,
   execution: OwnerSnapshot["execution"],
@@ -89,7 +87,6 @@ export const snapshotAllowsExecution = (
     ? (snapshot.connectedProviders ?? []).includes(execution.provider)
     : (snapshot.connectedEngines ?? []).includes(execution.engine));
 
-/** What the user is told when a turn's execution can't run. */
 export const executionUnavailableMessage = (
   execution: OwnerSnapshot["execution"],
 ): string =>
@@ -163,10 +160,6 @@ export const fail = (
   error: dispatchError(code, message, retryable, retryAfterMs).error,
 });
 
-/**
- * The caller the Worker verified, rebuilt from the `x-stella-*` headers it
- * stamps after stripping the client's own. Null when any part is missing.
- */
 export const trustedOwnerCaller = (request: Request): OwnerCaller | null => {
   const ownerId = request.headers.get(HEADER_OWNER)?.trim() ?? "";
   const subject = request.headers.get(HEADER_SUBJECT)?.trim() ?? "";

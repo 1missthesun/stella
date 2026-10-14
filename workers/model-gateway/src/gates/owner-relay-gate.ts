@@ -68,10 +68,6 @@ type RelayAdmissionCheck =
   | { kind: "held" }
   | ({ kind: "refused" } & OwnerAdmissionRefusal);
 
-/**
- * A session exchange admitted for an owner: it counts against the hourly
- * allowance only once it issues a capability (`settleMint`).
- */
 export type MintAdmission =
   | { ok: true; admissionId: number }
   | { ok: false; refused: "rate_limited" | "refused_attempts"; resetAt: number };
@@ -183,7 +179,6 @@ const scaledLimit = (limit: number, throttled: boolean): number =>
     ? Math.max(1, Math.floor(limit * GATEWAY_THROTTLED_LIMIT_SHARE))
     : limit;
 
-/** One SQLite Durable Object per capability owner (`sub`). */
 export class OwnerRelayGate extends DurableObject<Env> {
   private readonly ledger: LedgerStore;
   private readonly instanceId = crypto.randomUUID();
@@ -675,16 +670,9 @@ export class OwnerRelayGate extends DurableObject<Env> {
     );
   }
 
-  /**
-   * Admit one session exchange. A signed-in owner's tier is its plan as the
-   * last capability issued to it named it (the sign-in token does not carry
-   * the plan), the free tier until one was. The admission is held until
-   * `settleMint`: kept once a capability is issued, given back otherwise.
-   */
   async admitMint(args: {
     audience: ManagedModelAudience;
     throttled: boolean;
-    /** A dev test account on a gateway that serves them (`GATEWAY_TEST_ACCOUNT_MINTS_PER_HOUR`). */
     testAccount?: boolean;
   }): Promise<MintAdmission> {
     const now = Date.now();
@@ -740,12 +728,6 @@ export class OwnerRelayGate extends DurableObject<Env> {
     return { ok: true, admissionId };
   }
 
-  /**
-   * The end of an admitted exchange: issued, it keeps counting and its
-   * capability's audience is the owner's tier from now on; refused or
-   * failed, it is given back and counts only as a refused attempt
-   * (`GATEWAY_REFUSED_MINTS_PER_HOUR`).
-   */
   async settleMint(args: { admissionId: number; issuedAudience?: string }): Promise<void> {
     if (args.issuedAudience === undefined) {
       this.ctx.storage.sql.exec("DELETE FROM mint_admissions WHERE id = ?", args.admissionId);

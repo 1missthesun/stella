@@ -36,13 +36,8 @@ export type OwnerGateAdmitInput = {
   lane: OwnerGateLane;
   turnId: string;
   conversationId: string;
-  /**
-   * Service callers pin the owner generation they dispatched with. A
-   * mismatch after a forced snapshot refresh is `generation_stale`.
-   */
   expectedGeneration?: string;
   deferCloudSandboxCheck?: boolean;
-  /** Test seam; defaults to `Date.now()`. */
   now?: number;
 };
 
@@ -78,7 +73,6 @@ export type OwnerGateAdmissionWithLease =
       lease: { status: "skipped"; reason: "admission_refused" };
     };
 
-/** One exact owner-fence lease carried along with a snapshot read. */
 export type OwnerGateFenceLeaseRequest = {
   leaseId: string;
   sessionId: string;
@@ -86,16 +80,13 @@ export type OwnerGateFenceLeaseRequest = {
   ownerGeneration: string;
   namespace: OwnerFenceLeaseNamespace;
   role: OwnerFenceLeaseRole;
-  /** The open-fence generation an exact replay expects to still hold. */
   generation?: string;
   expiresAt?: number;
 };
 
 export type OwnerGateFenceLeaseOutcome =
   | { status: "registered"; generation: string; expiresAt: number }
-  /** The fence host refused, exactly as `POST /owner-fence/register` would. */
   | { status: "refused"; httpStatus: number; code?: string; error?: string }
-  /** The snapshot did not authorize the caller, so no register was tried. */
   | { status: "skipped"; reason: "not_writable" | "generation_stale" };
 
 export type OwnerGateSnapshotWithLease =
@@ -155,9 +146,7 @@ export type DispatchRow = {
 
 export type OwnerGateSubmitInput = {
   request: DispatchSubmitRequest;
-  /** Service callers pin the generation they dispatched with. */
   expectedGeneration?: string;
-  /** Mobile only: the paired desktop the verified proof names. */
   pairGrantDeviceId?: string;
   now?: number;
 };

@@ -37,10 +37,6 @@ const loadWidget = (): Widget<StellaWidgetProps> | null => {
   }
 };
 
-/**
- * Push the latest pairing/bridge snapshot to the home-screen widget.
- * No-ops when widgets aren't available on this build/device.
- */
 export function updateStellaWidget(props: StellaWidgetProps): void {
   const widget = loadWidget();
   if (!widget) return;

@@ -8,11 +8,6 @@ import { broadcastToWindows } from "./context.js";
 const PREVIEW_ROOT_DIRNAME = "office-previews";
 const SESSION_MANIFEST_NAME = "session.json";
 const SESSION_HTML_NAME = "preview.html";
-// Active cadence used only while at least one preview session exists. When there
-// are no sessions we fall back to IDLE_POLL_INTERVAL_MS so the bridge is not
-// doing a readdir every second for the entire app lifetime (the common case is
-// zero preview sessions). Both cadences run the same scan; only the spacing
-// differs, so live-update latency is unchanged whenever a session is present.
 const ACTIVE_POLL_INTERVAL_MS = 1_000;
 const IDLE_POLL_INTERVAL_MS = 5_000;
 const execFileAsync = promisify(execFile);
@@ -62,9 +57,6 @@ const readSnapshotFromSessionDir = async (sessionDir) => {
 };
 export const listOfficePreviewSnapshots = async (stellaDataDir) => {
     const previewRoot = resolvePreviewRoot(stellaDataDir);
-    // No per-call mkdir: the bridge ensures the root once at start. If it does
-    // not exist yet, treat it as "no sessions" rather than recreating it on
-    // every poll tick (a redundant syscall every second for the app lifetime).
     const entries = await fs
         .readdir(previewRoot, { withFileTypes: true })
         .catch((error) => {
@@ -201,8 +193,6 @@ export const startOfficePreviewBridge = (context) => {
     }
     let stopped = false;
     let timer = null;
-    // Tracks which cadence the current timer runs at so we only re-arm it when the
-    // active/idle state actually flips, not on every scan.
     let currentIntervalMs = 0;
     const lastDeliveredAt = new Map();
     const previewRoot = resolvePreviewRoot(stellaDataDir);
@@ -221,7 +211,6 @@ export const startOfficePreviewBridge = (context) => {
         if (!stopped)
             startWatcher();
     });
-    // Coalesce bursts of fs events into a single scan shortly after.
     const kickScanSoon = () => {
         if (stopped || watchKickTimer)
             return;
@@ -232,16 +221,10 @@ export const startOfficePreviewBridge = (context) => {
     };
     const startWatcher = () => {
         try {
-            // Non-recursive watch of the root: fires when a session dir is
-            // created/removed, which is exactly the idle -> first-session transition.
-            // Once a session exists the scan upgrades to the 1s active cadence, so
-            // in-session updates don't depend on the watcher. `persistent: false`
-            // keeps it from holding the process open (like unref).
             watcher = watchFs(previewRoot, { persistent: false }, () => {
                 kickScanSoon();
             });
             watcher.on("error", () => {
-                // Best-effort: the idle poll remains the safety net.
                 watcher?.close();
                 watcher = null;
             });
@@ -268,8 +251,6 @@ export const startOfficePreviewBridge = (context) => {
             if (stopped) {
                 return;
             }
-            // Prune delivery bookkeeping for sessions that no longer exist so the map
-            // does not grow unbounded over the app lifetime.
             if (lastDeliveredAt.size > 0) {
                 const present = new Set(snapshots.map((snapshot) => snapshot.sessionId));
                 for (const sessionId of lastDeliveredAt.keys()) {
@@ -286,9 +267,6 @@ export const startOfficePreviewBridge = (context) => {
                 lastDeliveredAt.set(snapshot.sessionId, snapshot.updatedAt);
                 broadcastToWindows(context, IPC_OFFICE_PREVIEW_UPDATE, snapshot);
             }
-            // Only poll at the active 1s cadence while sessions exist; otherwise fall
-            // back to the idle heartbeat so an app with no previews is not doing a
-            // readdir every second. The scan body is unchanged either way.
             arm(snapshots.length > 0 ? ACTIVE_POLL_INTERVAL_MS : IDLE_POLL_INTERVAL_MS);
         }
         catch (error) {
@@ -296,8 +274,6 @@ export const startOfficePreviewBridge = (context) => {
         }
     };
     void scan();
-    // Start on the idle cadence; the first scan upgrades to the active cadence if
-    // sessions are already present.
     arm(IDLE_POLL_INTERVAL_MS);
     return () => {
         stopped = true;

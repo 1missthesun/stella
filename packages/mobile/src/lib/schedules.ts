@@ -1,10 +1,3 @@
-/**
- * The owner's schedules, read live from the owner's object on the backend
- * worker. Every schedule lives there, whichever computer or the cloud runs
- * it, so the tab works with the computer asleep and opens without a
- * round-trip through it.
- */
-
 import { useCallback, useMemo } from "react";
 import type { ScheduleKind, ScheduleRow } from "@stella/contracts/backend/schedules";
 import { getBackendClient, useBackendView } from "./backend";
@@ -16,20 +9,15 @@ import {
 
 export type MobileSchedule = {
   kind: "cron" | "heartbeat";
-  /** What a cloud schedule does when it fires; absent for heartbeats. */
   scheduleKind?: ScheduleKind;
   id: string;
   title: string;
   conversationId: string;
   enabled: boolean;
   nextRunAtMs: number;
-  /** Serialized LocalCronSchedule for crons; absent for heartbeats. */
   scheduleJson?: string;
-  /** Where a cron with no zone of its own runs now: the user's zone. */
   zone?: string;
-  /** Heartbeat cadence (ms); absent for crons. */
   intervalMs?: number;
-  /** The computer a fire is offered to first; absent means the cloud. */
   targetDeviceId?: string;
   lastStatus?: string;
   lastError?: string;
@@ -68,12 +56,10 @@ export const toMobileSchedule = (row: CloudScheduleRow): MobileSchedule => ({
   running: false,
 });
 
-/** `undefined` while the first read is in flight. */
 export function useMobileSchedules(
   enabled: boolean,
 ): MobileSchedule[] | undefined {
   const rows = useBackendView("schedules.list", enabled ? {} : "skip").value;
-  // Stable per backend snapshot: callers key effects on this array.
   return useMemo(() => rows?.map(toMobileSchedule), [rows]);
 }
 
@@ -101,15 +87,10 @@ export function useScheduleAction() {
   );
 }
 
-/**
- * The two row-rendering decisions the Schedule tab makes per row, extracted
- * so they are testable production code rather than inline JSX ternaries.
- */
 export type ScheduleRowBadge =
   | { kind: "paused" }
   | { kind: "next"; label: string };
 
-/** Paused rows show a Paused badge; active rows show the next-run label. */
 export const scheduleRowBadge = (
   schedule: Pick<MobileSchedule, "enabled" | "nextRunAtMs">,
   nowMs: number,
@@ -118,10 +99,6 @@ export const scheduleRowBadge = (
     ? { kind: "next", label: formatNextRun(schedule.nextRunAtMs, nowMs) }
     : { kind: "paused" };
 
-/**
- * Natural-language cadence line for a row. Empty string when the shape is
- * too custom to summarize (the UI falls back to its localized "custom" copy).
- */
 export const scheduleCadence = (
   schedule: Pick<MobileSchedule, "scheduleJson" | "intervalMs"> &
     Partial<Pick<MobileSchedule, "nextRunAtMs" | "zone">>,

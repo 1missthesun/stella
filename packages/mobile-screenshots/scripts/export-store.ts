@@ -25,7 +25,6 @@ const output = path.resolve(
   process.env.STELLA_SCREENSHOT_OUTPUT ??
     `out/store-${new Date().toISOString().replace(/[:.]/g, "-")}`,
 );
-// Preflight every native source before writing anything. Never replace an approved set.
 const sourceManifest = [];
 const supportingManifest = [];
 for (const [slide, artifact] of Object.entries(supportingArtifacts)) {

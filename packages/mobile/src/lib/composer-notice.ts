@@ -1,18 +1,3 @@
-/**
- * Pinned "act before continuing" notices for the mobile composer: the
- * user is signed out, their plan ran out of room, a model is gated, a
- * provider rejected the request.
- *
- * Mirrors the desktop composer-notice store: one notice per conversation
- * scope (newest wins), an unscoped notice shows on every chat surface, a
- * new send clears whatever a previous failure left behind. The chat
- * screen renders the head of this store above the composer, in the same
- * slot as the cloud-browser intervention card.
- *
- * Classification lives here too so the send pipeline can hand a raw
- * failure over without knowing anything about the UI.
- */
-
 import { useSyncExternalStore } from "react";
 import {
   STELLA_USAGE_LIMIT_DESCRIPTIONS,
@@ -25,12 +10,10 @@ export type ComposerNoticeKind =
   | "upgrade"
   | "limit"
   | "provider"
-  /** A self-hosted server older than this app ("unknown function"). */
   | "server";
 
 export type ComposerNotice = {
   id: string;
-  /** Owning conversation; `null` = unscoped, shown everywhere. */
   conversationId: string | null;
   kind: ComposerNoticeKind;
   title: string;
@@ -72,7 +55,6 @@ export function dismissComposerNotice(id: string): void {
   emit();
 }
 
-/** A new send in `conversationId` makes its notice (and unscoped ones) stale. */
 export function clearComposerNotices(
   conversationId: string | null | undefined,
 ): void {
@@ -104,8 +86,6 @@ export function useComposerNotice(
   return selectComposerNotice(entries, conversationId);
 }
 
-// ─── Classification ─────────────────────────────────────────────────────────
-
 type NoticeCopy = Omit<ComposerNoticeInput, "conversationId">;
 
 const includesAny = (value: string, matchers: readonly string[]) =>
@@ -124,7 +104,6 @@ const SIGN_IN_MATCHERS = [
   "session revoked",
 ] as const;
 
-/** The Free plan's allowance is a lifetime budget — never "try again later". */
 const FREE_ALLOWANCE_MATCHERS = [
   "free_allowance_exhausted",
   "lifetime_limit_reached",
@@ -176,12 +155,6 @@ const statusCodeOf = (normalized: string): number | null => {
   return Number.isFinite(status) ? status : null;
 };
 
-/**
- * Map a failed send's message to notice copy, or `null` when the failure
- * is transient (network, timeout, unknown) and belongs in the reply bubble
- * alone. The copy mirrors the desktop provider-error resolver so the
- * guidance matches across devices.
- */
 export function classifyComposerNotice(
   message: string | null | undefined,
 ): NoticeCopy | null {
@@ -206,8 +179,6 @@ export function classifyComposerNotice(
     };
   }
 
-  // Stella's own usage limit, as the backend or the gateway words it. The
-  // same title and copy as desktop and web.
   const usageLimit = includesAny(normalized, FREE_ALLOWANCE_MATCHERS)
     ? "free_allowance"
     : stellaUsageLimitOf(normalized);
@@ -266,10 +237,6 @@ export function classifyComposerNotice(
   return null;
 }
 
-/**
- * Pin a notice for `error` when it names something the user must act on.
- * Returns true when a notice was shown.
- */
 export function showComposerNoticeForError(
   error: unknown,
   conversationId: string | null | undefined,

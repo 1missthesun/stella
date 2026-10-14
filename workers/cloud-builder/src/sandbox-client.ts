@@ -89,13 +89,7 @@ export interface SandboxHandle extends Omit<ExecutionSession, "id"> {
   deleteSession(id: string): Promise<void>;
   getState(): Promise<SandboxState>;
   destroy(options?: { keepSnapshot?: boolean }): Promise<void>;
-  /**
-   * The turn is done with this container: snapshot it shortly for the
-   * owner's next agent container to start from, then stop it after the warm
-   * window, or right after the snapshot when `warm` is false.
-   */
   release(options?: SandboxReleaseOptions): Promise<void>;
-  /** Network rules for a Slack agent's container (`SandboxEgressPolicy`). */
   setEgress(policy: SandboxEgressPolicy | null): Promise<{ restarted: boolean }>;
 }
 

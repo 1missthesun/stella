@@ -61,14 +61,9 @@ const IMAGE_TARGET = "__image__";
 const VOICE_TARGET = "__voice__";
 const ENGINE_PENDING_TARGET = "__engine__";
 const NATIVE_CLAUDE_CODE_RUNTIME_PENDING_TARGET = "__native_claude_code_runtime__";
-/** Section keys for the two engine entries in the single provider list. */
 const CHATGPT_SECTION_KEY = "chatgpt-engine";
 const CLAUDE_CODE_SECTION_KEY = "claude-code-engine";
-/** `chatgpt` is surfaced as the ChatGPT engine section, never as a
- * second catalog "OpenAI" group. */
 const HIDDEN_CATALOG_PROVIDERS = ["chatgpt"];
-/** Pinned front of the provider list; everything else keeps its catalog
- * (rail-priority) order after these. */
 const SECTION_ORDER = [
     "stella",
     CLAUDE_CODE_SECTION_KEY,
@@ -77,7 +72,6 @@ const SECTION_ORDER = [
     "meta",
     "openrouter",
 ];
-/** Map a saved model override to its section in the provider list. */
 function sectionOfModelValue(value: string): string {
     if (!value || value.startsWith("stella/"))
         return "stella";
@@ -89,17 +83,6 @@ function sectionOfModelValue(value: string): string {
     const slash = value.indexOf("/");
     return slash > 0 ? value.slice(0, slash) : "stella";
 }
-/**
- * The Assistant tab in the sidebar picker writes to both the orchestrator
- * and general agent keys, since users overwhelmingly want them to move
- * together. Splitting them is available in Settings -> Models -> Advanced.
- *
- * Picking a non-Stella model on the Assistant tab ALSO auto-propagates
- * the same model to every other configurable agent.
- * Propagated writes are tracked in `assistantPropagatedAgents` so
- * switching Assistant back to Stella cleans up only those writes and
- * never touches user-intentional per-agent picks.
- */
 const ASSISTANT_AGENT_KEYS: readonly string[] = ["orchestrator", "general"];
 const DEFAULT_IMAGE_GENERATION: ImageGenerationPreferences = {
     provider: "stella",
@@ -107,11 +90,6 @@ const DEFAULT_IMAGE_GENERATION: ImageGenerationPreferences = {
 const DEFAULT_REALTIME_VOICE: RealtimeVoicePreferences = {
     provider: "stella",
 };
-/**
- * Provider labels are brand names (data). The "bring your own key" blurb is
- * UI copy, so it is resolved from the catalog at render time — see
- * `useByokProviderOptions` below.
- */
 export const IMAGE_PROVIDER_OPTIONS: readonly ProviderOption[] = [
     { key: "stella", label: "Stella" },
     { key: "openai", label: "OpenAI" },
@@ -123,13 +101,7 @@ const VOICE_PROVIDER_OPTIONS: readonly ProviderOption[] = [
     { key: "openai", label: "OpenAI" },
     { key: "xai", label: "xAI" },
 ];
-/**
- * Last-known local model preferences, used to seed `useState` so re-opening
- * the picker doesn't flash a loading state while the IPC roundtrip lands.
- * Mutated whenever the picker successfully loads or saves preferences.
- */
 let cachedLocalPreferences: LocalModelPreferences | null = null;
-/** Intent-hover warm: start the preferences IPC before the popover opens. */
 export function warmAgentModelPickerCache() {
     if (cachedLocalPreferences)
         return;
@@ -141,13 +113,6 @@ export function warmAgentModelPickerCache() {
     })
         .catch(() => undefined);
 }
-/**
- * Inline, no-popover model picker keyed off the agent toggle at the top.
- */
-/**
- * Attach the localized "use your own API key" description to every
- * non-Stella provider option.
- */
 function useByokProviderOptions(options: readonly ProviderOption[]): ProviderOption[] {
     const t = useT();
     return useMemo(() => options.map((option) => option.key === "stella"
@@ -172,12 +137,8 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
     const [preferences, setPreferencesRaw] = useState<LocalModelPreferences | null>(() => cachedLocalPreferences);
     const [pendingAgent, setPendingAgent] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
-    // The ChatGPT engine runs on this computer's own Sign in with ChatGPT
-    // account (Settings › Account) through the public Responses API.
     const [claudeCodeSectionOpen, setClaudeCodeSectionOpen] = useState(false);
     const committedEngine = preferences?.agentRuntimeEngine ?? "default";
-    // ChatGPT is signed in per computer: this install's own accounts, kept
-    // and refreshed by Electron main. Signing in here adds one.
     const chatGptProfiles = useChatGptProfiles();
     const { signIn: signInChatGpt, cancelSignIn: cancelChatGptSignIn } = chatGptProfiles;
     const chatGptConnection: "checking" | "connected" | "disconnected" = !chatGptProfiles.loaded
@@ -185,8 +146,6 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
         : chatGptProfiles.usable
             ? "connected"
             : "disconnected";
-    // The active account's models (`GET /v1/models`) once signed in; until
-    // then Stella's catalog stands in.
     const [chatGptAccountModels, setChatGptAccountModels] = useState<Array<{ id: string; name: string }> | null>(null);
     const activeChatGptProfileId = chatGptProfiles.profiles.find((profile) => profile.active)?.id ?? null;
     useEffect(() => {
@@ -204,12 +163,7 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
             cancelled = true;
         };
     }, [activeChatGptProfileId, chatGptConnection]);
-    // Soft status shown when a genuinely-gone saved ChatGPT model was rerouted
-    // to an available one, so the switch is never silent.
     const [chatGptRoutedNotice, setChatGptRoutedNotice] = useState<string | null>(null);
-    // Mirror state writes into the module-level cache so re-mounting the
-    // picker (Radix unmounts popover content on close) shows the last
-    // selection immediately instead of flashing "Loading…".
     const setPreferences = useCallback((updater: LocalModelPreferences | null | ((previous: LocalModelPreferences | null) => LocalModelPreferences | null)) => {
         setPreferencesRaw((current) => {
             const next = typeof updater === "function" ? updater(current) : updater;
@@ -252,8 +206,6 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
             return undefined;
         return getLocalModelDefaults(preferences.defaultModels, stellaDefaultModels);
     }, [preferences, stellaDefaultModels]);
-    // Labels come from the FULL merged catalog so BYOK / local override ids
-    // (openrouter/…, anthropic/…, local/…) render their display names too.
     const modelNamesById = useMemo(() => {
         const next = new Map<string, string>();
         for (const model of allModels) {
@@ -288,9 +240,6 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
             "")
         : null;
     const selectedChatGptModel = savedChatGptOverride ?? preferences?.codexModel ?? DEFAULT_CHATGPT_MODEL;
-    // Even without a ChatGPT connection the static registry knows which
-    // OpenAI models the ChatGPT engine can route — show those instead of an
-    // empty wall. Picking one starts the OAuth flow.
     const chatGptRegistryOptions = useMemo(() => listChatGptCatalogModels(allModels).map((model) => ({
         id: model.modelId,
         label: model.name || model.modelId,
@@ -360,19 +309,11 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
             return {};
         return normalizeModelOverrides(preferences.modelOverrides);
     }, [preferences]);
-    /**
-     * Sidebar: only Assistant/Image/Voice tabs render (Assistant dual-writes
-     * orchestrator + general). Settings: every configurable agent gets its
-     * own tab, so users can decouple orchestrator vs general (and tune the
-     * rest) without leaving the same picker layout.
-     */
     const configurableAgents = useMemo(() => getConfigurableAgents(modelDefaults), [modelDefaults]);
     const initialActiveAgent = surface === "settings"
         ? (configurableAgents[0]?.key ?? "orchestrator")
         : ASSISTANT_TARGET;
     const [activeAgent, setActiveAgent] = useState(initialActiveAgent);
-    // Snap to a known agent key if the catalog loads after first render and
-    // the initially-chosen key isn't in it (Settings surface only).
     useEffect(() => {
         if (surface !== "settings")
             return;
@@ -389,12 +330,9 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
     const activeImage = activeAgent === IMAGE_TARGET;
     const activeVoice = activeAgent === VOICE_TARGET && voiceVisible;
     const activeProviderSetting = activeImage || activeVoice;
-    /** Saved model override for the active tab (assistant reads orchestrator
-     * with general as fallback, same as `current` below). */
     const activeModelValue = activeAssistant
         ? (overrides.orchestrator ?? overrides.general ?? "")
         : (overrides[activeAgent] ?? "");
-    /** Section that holds the current selection — it opens by default. */
     const activeSectionKey = committedEngine === "codex_cli"
         ? CHATGPT_SECTION_KEY
         : committedEngine === "claude_code_local"
@@ -407,16 +345,6 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
         description: model.description,
     })) ?? null, [claudeCodeCatalog.models]);
     const claudeCodeModelsLoading = claudeCodeCatalog.loading;
-    // Only errors from an explicit user action (a model/engine commit or a
-    // preference save, tracked in `error`) surface as a toast. Model *catalog*
-    // fetch failures — the Stella provider list (`catalogError`) and Claude
-    // Code (`claudeCodeCatalog.error`) — used
-    // to be folded in here too, but the picker re-checks every catalog each time
-    // it opens (the picker remounts, so the de-dup ref below reset), which
-    // re-fired the same error toast on every open. Those failures now render as
-    // a quiet inline "Couldn't load models · Retry" line scoped to the specific
-    // provider that failed (the Stella list via ProviderModelPanel's
-    // `catalogError`; Claude Code inside its own section below).
     const lastToastedErrorRef = useRef<string | null>(null);
     useEffect(() => {
         if (!error) {
@@ -432,12 +360,6 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
             variant: "error",
         });
     }, [active, error, t]);
-    /**
-     * The sidebar Assistant tab writes to both orchestrator and general (and
-     * reads from orchestrator with general as a fallback). Settings always
-     * writes to a single agent key — even orchestrator and general are
-     * separate tabs there.
-     */
     const assistantWriteKeys = ASSISTANT_AGENT_KEYS;
     const canonicalAgentKey = activeAssistant
         ? ASSISTANT_AGENT_KEYS[0]
@@ -445,8 +367,6 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
     const handleSelect = useCallback(async (value: string) => {
         if (!preferences || pendingAgent)
             return;
-        // The patch may revert a committed ChatGPT/Claude Code engine
-        // (selection implies engine), so the migration guard resets with it.
         if (preferences.agentRuntimeEngine !== "default")
             migrationAttemptedRef.current = null;
         const patch = buildModelSelectionPatch(preferences, value, activeAssistant
@@ -461,22 +381,13 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
             const saved = await window.electronAPI?.system?.setLocalModelPreferences?.(patch);
             if (saved)
                 setPreferences(saved);
-            // Let other model listeners pick up the new override without remounting.
             window.dispatchEvent(new CustomEvent("stella:local-model-preferences-changed"));
-            // Real catalog picks feed the Recent list in the composer's mini
-            // picker; the empty "default" pick is never recorded.
             if (value)
                 recordRecentModel(value);
             setError(null);
-            // Restricted-tier picks used to fire a toast here. The picker
-            // now disables Stella-provider models that aren't available on
-            // the user's plan up front, so reaching this path means the
-            // selection is allowed and no toast is needed.
             onSelected?.();
         }
         catch (caught) {
-            // Full restore: the optimistic write may have included an engine
-            // revert, so partial rollbacks would leave mixed state.
             setPreferences(preferences);
             setError(caught instanceof Error
                 ? caught.message
@@ -503,9 +414,6 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
         setPendingAgent(ENGINE_PENDING_TARGET);
         setError(null);
         setChatGptRoutedNotice(null);
-        // ChatGPT auto-matches to an available OpenAI model; the model id passed
-        // into the routing patch is resolved below so selection never dead-ends
-        // on a "choose a model" gate. Auth is the only real interruption.
         let effectiveModelId = modelId;
         let connectCancelled = false;
         try {
@@ -540,9 +448,6 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
             const patch: Partial<LocalModelPreferences> = {
                 ...buildEngineRoutingPatch(preferences, engine, effectiveModelId),
                 ...buildEngineTransitionReasoningPatch(preferences, engine),
-                // Record provenance only for an explicit ChatGPT model pick so
-                // Stella Light honors it; engine switches / auto-matches leave the
-                // marker untouched.
                 ...(engine === "codex_cli" && options?.explicit
                     ? { codexModelExplicit: true }
                     : {}),
@@ -553,10 +458,6 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
             if (saved)
                 setPreferences(saved);
             window.dispatchEvent(new CustomEvent("stella:local-model-preferences-changed"));
-            // Engine picks route through this path instead of `handleSelect`,
-            // so they have to feed the shared Recent list themselves —
-            // otherwise the compact pickers only ever show the one engine
-            // model that happens to be current.
             const committed = saved ?? optimistic;
             const recentEngineId = formatRecentEngineModelId(engine, engine === "codex_cli"
                 ? effectiveModelId || committed.codexModel
@@ -592,8 +493,6 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
     const handleEngineModelSelect = useCallback(async (engine: ModelPickerEngine, modelId: string) => {
         if (!preferences)
             return;
-        // Selecting a row from an engine panel is an explicit user pick and
-        // commits that engine (selection implies engine).
         const saved = await commitEngineSelection(engine, modelId, {
             explicit: true,
         });
@@ -637,14 +536,6 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
             setPendingAgent(null);
         }
     }, [onSelected, pendingAgent, preferences, setPreferences, t]);
-    /**
-     * Optimistic patch of just the `realtimeVoice` slice. Voice catalog
-     * changes (voice id, read-aloud family) are tiny and idempotent, so we
-     * deliberately skip the pendingAgent gate that would flicker the whole
-     * picker on every click. The caller passes the next slice and an
-     * error label; we apply locally, write through IPC, and revert on
-     * failure.
-     */
     const patchRealtimeVoice = useCallback(async (next: RealtimeVoicePreferences, errorLabel: string) => {
         if (!preferences)
             return;
@@ -687,11 +578,6 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
         if (!preferences || pendingAgent)
             return;
         const previous = preferences.realtimeVoice ?? DEFAULT_REALTIME_VOICE;
-        // Preserve the per-provider voice ids when switching provider mode
-        // so a Stella → BYOK round-trip doesn't wipe the user's selections.
-        // `model` is intentionally dropped: the kernel re-selects the right
-        // default for the new provider. `enabled` rides along so flipping
-        // provider never silently hides the voice controls.
         const next = {
             provider: coerceRealtimeVoiceProvider(providerKey),
             ...(previous.voices ? { voices: previous.voices } : {}),
@@ -742,8 +628,6 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
             const saved = await window.electronAPI?.system?.setLocalModelPreferences?.(patch);
             if (saved)
                 setPreferences(saved);
-            // Effort changes surface in the composer's mini picker too, so
-            // announce them like model changes.
             window.dispatchEvent(new CustomEvent("stella:local-model-preferences-changed"));
             setError(null);
             onSelected?.();
@@ -804,18 +688,6 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
         (activeProviderSetting || modelDefaults !== undefined);
     const imagePreferences = preferences?.imageGeneration ?? DEFAULT_IMAGE_GENERATION;
     const voicePreferences = preferences?.realtimeVoice ?? DEFAULT_REALTIME_VOICE;
-    /**
-     * Selected value for the active tab — the model that is actually in use,
-     * never a merely remembered one. A committed ChatGPT / Claude Code engine
-     * owns the conversation agents, so its engine-prefixed id IS the
-     * selection; the Stella override it left behind in `modelOverrides` (kept
-     * so switching back restores it) must not read as a second pick. Tabs the
-     * engines don't route keep their own override. For the assistant tab we
-     * prefer the orchestrator key, falling back to general so a "split"
-     * Advanced setup still shows something coherent. For image/voice we
-     * surface the provider key directly (no model id) because those tabs are
-     * provider-only.
-     */
     const engineGovernsActiveTab = activeAssistant ||
         ASSISTANT_AGENT_KEYS.some((key) => key === activeAgent);
     const activeEngineModelId = getActiveEngineModelId(preferences);
@@ -828,9 +700,6 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
                 : activeAssistant
                     ? (overrides.orchestrator ?? overrides.general ?? "")
                     : (overrides[activeAgent] ?? "");
-    // The default row is a routing choice, not another copy of its currently
-    // resolved model. Keep its label stable while the explicit model rows below
-    // show the actual choices.
     const defaultLabel = activeProviderSetting
         ? "Stella"
         : !ready
@@ -881,8 +750,6 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
     const reasoningDisabled = pendingAgent !== null ||
         (committedEngine === "codex_cli" &&
             chatGptConnection !== "connected");
-    /** Reasoning effort rides directly under the selected model row instead
-     * of living in a detached footer. */
     const reasoningControl = (<div className="agent-model-picker-reasoning">
         <Lightbulb size={14} strokeWidth={1.75} className="agent-model-picker-reasoning-icon" aria-hidden/>
         <div className="agent-model-picker-reasoning-options" role="radiogroup" aria-label={t("settings.modelPicker.reasoning.label")}>
@@ -901,12 +768,6 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
         {reasoningControl}
         {chatGptConnection === "connected" ? (<ChatGptPlanInUse label={t("settings.agentModelPicker.chatGptPlanInUse")} manageLabel={t("settings.agentModelPicker.chatGptManageUsage")}/>) : null}
       </div>);
-    /**
-     * ChatGPT and Claude Code are engines, not catalog providers. They render
-     * as their own collapsible sections beside the OpenAI / Anthropic API
-     * sections in the single provider list. `content` is a render-prop so a
-     * collapsed engine never mounts its list.
-     */
     const handleExtraSectionExpanded = useCallback((key: string, expanded: boolean) => {
         if (key === CHATGPT_SECTION_KEY) {
             if (!expanded && oauthPendingProvider)
@@ -923,12 +784,6 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
             jobs.push(claudeCodeCatalog.refresh());
         void Promise.all(jobs);
     }, [claudeCodeCatalog, claudeCodeSectionOpen, committedEngine, refresh]);
-    /**
-     * On free / anonymous / Go plans the backend silently coerces any
-     * non-default Stella-provider pick back to the recommended model.
-     * Surface that up front by disabling those rows in the picker (the
-     * default row + every BYOK provider stay enabled).
-     */
     const restrictedStellaPicks = isRestrictedModelOverrideAudience(audience);
     const restrictedPlanLabel = audience ? getPlanLabel(audience) : null;
     const tabButton = (key: string, label: string, title: string, isActive: boolean) => (<button key={key} type="button" role="tab" aria-selected={isActive} className="agent-model-picker-toggle-btn" data-active={isActive || undefined} onClick={() => {
@@ -939,10 +794,6 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
         }} disabled={pendingAgent !== null && !oauthPendingProvider} title={title}>
       {label}
     </button>);
-    /** Quiet inline "Couldn't load models · Retry" line for an engine section
-     * (ChatGPT/Codex, Claude Code) whose live catalog fetch failed. Replaces
-     * the old repeating fetch-failure toast; the retry refetches only that
-     * engine's catalog. */
     const engineCatalogError = (onRetry: () => void) => (<p className="agent-model-picker-load-error" role="status">
         <span>{t("settings.modelPicker.loadFailed")}</span>
         <button type="button" className="agent-model-picker-load-error-retry" onClick={onRetry} disabled={pendingAgent !== null}>

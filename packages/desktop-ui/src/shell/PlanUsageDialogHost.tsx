@@ -1,7 +1,3 @@
-/**
- * The single mounted host for the Plan & usage dialog, so the account menu
- * and every Upgrade action open the same one (`planUsageDialog`).
- */
 import { lazy, memo, Suspense } from "react";
 import {
   planUsageDialog,

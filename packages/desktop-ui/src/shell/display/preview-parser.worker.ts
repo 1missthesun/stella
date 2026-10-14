@@ -9,7 +9,6 @@ const cancelled = new Set<number>();
 self.onmessage = (event: MessageEvent<PreviewWorkerMessage>) => {
   const message = event.data;
   if ("cancel" in message) {
-    // Requests still queued behind a long parse are skipped entirely.
     cancelled.add(message.id);
     return;
   }

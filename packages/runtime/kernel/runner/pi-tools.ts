@@ -1,16 +1,3 @@
-/**
- * The desktop's Stella tools for the pi-durable harness (`@stella/agent`'s
- * `StellaToolHost`). An agent type is offered what its frontmatter allows and
- * the demoted tools it may reach, except the tools the harness has itself:
- * the agent tools and an agent's file and shell tools. A call runs the agent
- * loops' pipeline (`executeModelToolCall`), so hooks, validation, truncation,
- * spill and images behave as they do there.
- *
- * `code` is the persistent REPL the browser and computer-use skills drive:
- * its `tools.<name>` reach exactly these tools (demoted ones only through it),
- * and its kernel lives as long as the conversation's orchestrator, or the
- * agent, that calls it.
- */
 import { AGENT_IDS } from "@stella/contracts/agent-runtime";
 import {
   collectVisibleDemotedTools,
@@ -24,7 +11,6 @@ import type { ToolMetadata } from "../tools/types.js";
 import { resolveAgent, resolveAgentModelRoute } from "./context.js";
 import type { RunnerContext } from "./types.js";
 
-/** Tools the harness has itself, under these names or older ones (`STELLA_HARNESS_TOOL_NAMES` in `@stella/agent`). */
 const HARNESS_TOOL_NAMES = new Set([
   "spawn_agent",
   "send_message",
@@ -40,7 +26,6 @@ const HARNESS_TOOL_NAMES = new Set([
   "multi_tool_use_parallel",
   "NoResponse",
   "node_repl",
-  // The harness has its own, which moves Stella herself.
   "switch_destination",
 ]);
 
@@ -60,7 +45,6 @@ export type PiToolCall = {
   callId: string;
   args: Record<string, unknown>;
   conversationId: string;
-  /** The calling agent's thread id; the orchestrator has none. */
   agentId?: string;
   signal?: AbortSignal;
 };
@@ -85,16 +69,13 @@ const offeredTools = (
   return catalog.filter(
     (tool) =>
       !HARNESS_TOOL_NAMES.has(tool.name) &&
-      // An agent reads files through the harness, wherever it runs.
       !(agentType === "general" && tool.name === "Read") &&
       (demoted.has(tool.name) || (!tool.demoted && allowed.has(tool.name))),
   );
 };
 
-/** One run id per orchestrator conversation or agent: `code` keeps its kernel across calls by it. */
 const runIdFor = (owner: string) => `pi-${owner.replace(/[^A-Za-z0-9_-]/g, "_")}`;
 
-/** Demoted tools reachable inside code: those without a top-level approval flow. */
 const codeReachableDemoted = (offered: readonly ToolMetadata[]) =>
   offered.filter((tool) => tool.demoted && !toolRequiresExplicitApproval(tool.approval));
 

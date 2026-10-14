@@ -132,10 +132,6 @@ const validators: Readonly<
     typeof value === "string" && /^[A-Za-z0-9._-]{1,64}$/u.test(value),
 };
 
-/**
- * Pure readiness evaluation. The result is intentionally restricted to a
- * fixed allowlist of field names and never carries binding values or secrets.
- */
 export const evaluateCloudBuilderReadiness = (
   input: CloudBuilderReadinessInput,
 ): CloudBuilderReadiness => {

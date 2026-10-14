@@ -175,7 +175,6 @@ export const assertStrictLinuxProcessStatus = (
   }
 };
 
-/** Prove the exact trampoline contract before any untrusted child can start. */
 export const proveStrictCloudProcessIsolation = async (): Promise<void> => {
   await assertSetprivBinaryBoundary();
   const identity: ToolProcessIdentity = {

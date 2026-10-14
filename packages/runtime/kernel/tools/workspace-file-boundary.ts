@@ -35,7 +35,6 @@ type OpenedWorkspaceFile = {
 };
 
 type BoundaryHooks = {
-  /** Test-only race injection after the final descriptor is open. */
   afterOpen?: () => void | Promise<void>;
 };
 
@@ -96,7 +95,6 @@ const assertDirectory = async (
   }
 };
 
-/** Whether this call made the directory; false when it already existed. */
 const mkdirUnlessExists = async (directory: string): Promise<boolean> => {
   try {
     await mkdir(directory, { mode: 0o755 });
@@ -137,8 +135,6 @@ const openLinuxParent = async (args: {
         ) {
           throw error;
         }
-        // A concurrent write into the same new folder may create it first;
-        // that folder is opened and checked like any existing one.
         created = await mkdirUnlessExists(nextPath);
         next = await open(
           nextPath,
@@ -381,11 +377,6 @@ export const readWorkspaceFileNoFollow = async (
   }
 };
 
-/**
- * Hand `use` a descriptor-authorized, read-only handle on one workspace file,
- * then prove the pathname still names that inode. For files too large to
- * buffer: the caller streams from the handle and never reopens the path.
- */
 export const withWorkspaceFileNoFollow = async <T>(
   filePath: string,
   workspaceRoot: string,
@@ -412,7 +403,6 @@ export const withWorkspaceFileNoFollow = async <T>(
   }
 };
 
-/** Descriptor-authorized metadata without reading file bytes. */
 export const statWorkspaceFileNoFollow = async (
   filePath: string,
   workspaceRoot: string,

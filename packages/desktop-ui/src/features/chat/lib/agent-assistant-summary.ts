@@ -1,4 +1,3 @@
-/** Latest non-empty assistant prose from an already chronological message list. */
 export const selectLatestAgentAssistantMessage = (
   messages: readonly string[] | undefined,
 ): string | undefined => {

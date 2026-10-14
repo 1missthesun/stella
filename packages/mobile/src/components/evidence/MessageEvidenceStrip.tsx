@@ -27,7 +27,6 @@ import { fadeHex } from "../../theme/oklch";
 import { WaveformCard } from "./WaveformCard";
 
 const ROW_GAP = 8;
-/** Keep one card's worth of row on each side of the viewport mounted. */
 const MOUNT_MARGIN = 220;
 
 const VISUAL_KINDS: ReadonlySet<EvidenceCard["kind"]> = new Set([
@@ -59,8 +58,6 @@ const ImageThumb = memo(function ImageThumb({
       source={{ uri }}
       style={{ width, height }}
       contentFit="cover"
-      // expo-image downsamples to the view, so a 4K screenshot never becomes a
-      // 4K bitmap in memory, and keeps the result in its own disk cache.
       cachePolicy="memory-disk"
       accessibilityLabel={label}
       recyclingKey={uri}
@@ -106,12 +103,6 @@ const PendingThumb = ({
   />
 );
 
-/**
- * One reply's attached files: a scrolling row of real media, then everything
- * without a preview as pills. No tray, no card container, no grid — either row
- * can stand alone, and media always comes first. `part` renders just one row:
- * a reply with text shows its media under the bubble and its pills inside it.
- */
 export const MessageEvidenceStrip = memo(function MessageEvidenceStrip({
   filePaths,
   conversationId,
@@ -245,9 +236,6 @@ export const MessageEvidenceStrip = memo(function MessageEvidenceStrip({
                 colors={colors}
               />
             );
-            // The whole frame opens the file, except audio, whose waveform is
-            // its own transport. An image opens with the reply's other images
-            // as its neighbours, so the viewer swipes through them.
             const framed =
               card.kind === "audio" || !onOpen || !primary ? (
                 <View style={[styles.frame, { borderColor: colors.borderWeak }]}>

@@ -1,16 +1,3 @@
-/**
- * WebRTC transport for the OpenAI Realtime API (BYOK only).
- *
- * The Stella-managed path no longer runs here — it is GPT-Live, which is a
- * different protocol (`gpt-live-webrtc-transport.ts`). This transport remains
- * for a user's own OpenAI key: it POSTs the SDP offer with a Bearer token and
- * applies session config with `session.update` once the data channel opens,
- * waiting for `session.updated` before exposing the connection.
- *
- * All of the peer-connection, microphone, playback and analyser plumbing is
- * shared with the GPT-Live transport via `webrtc-media-session.ts`.
- */
-
 import type {
   RealtimeTransport,
   RealtimeTransportEvents,
@@ -29,11 +16,8 @@ const CONNECT_DEADLINE_MESSAGE =
   "Timed out while connecting to the realtime voice provider.";
 
 export interface OpenAIWebRTCTransportOptions {
-  /** Server-reported model id (or the requested model as a fallback). */
   model: string;
-  /** Provider-specific SDP exchange (endpoint + auth). */
   sdpFetch: SdpAnswerFetcher;
-  /** Session config applied with `session.update` once the channel opens. */
   initialSessionConfig?: Record<string, unknown>;
 }
 
@@ -161,8 +145,6 @@ export class OpenAIWebRTCTransport implements RealtimeTransport {
     this.settleSessionReady();
     await this.media.close();
   }
-
-  // ── internals ────────────────────────────────────────────────────────
 
   private throwIfCanceled(signal: AbortSignal): void {
     if (!this.destroyed && !signal.aborted) return;

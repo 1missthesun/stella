@@ -1,12 +1,3 @@
-/**
- * What a backend domain contributes: SQLite migrations for the owner's
- * database, calls, views and background jobs. Domains register here; the
- * owner object (`OwnerStore`) and the worker's RPC route read the result.
- *
- * Calls and views are typed against `@stella/contracts/backend/api`, so the
- * registry cannot drift from what clients call.
- */
-
 import type {
   CallArgs,
   CallName,
@@ -20,15 +11,12 @@ import type { OwnerSnapshot } from "@stella/contracts/turn-plane/owner-snapshot"
 import type { MemoryPolicyChange } from "@stella/contracts/turn-plane/memory-policy";
 import type { Parser } from "./args.js";
 
-/** The verified user behind a request. `null` for jobs and internal calls. */
 export type OwnerCaller = {
   ownerId: string;
   subject: string;
   sessionId: string;
   expiresAtMs: number;
-  /** The identity ladder rung the token claims (1 email, 2 social). */
   identityLevel?: import("@stella/contracts/gateway/api").IdentityLevel;
-  /** The token's `iat`, for session revocation. */
   issuedAtMs?: number;
 };
 
@@ -40,49 +28,21 @@ export type OwnerDbReader = {
 };
 
 export type OwnerDb = OwnerDbReader & {
-  /** A write. Marks the owner's views for a recompute. */
   run(query: string, ...params: SqlValue[]): void;
   transaction?<T>(fn: () => T): T;
-  /**
-   * Scratch state that lives as long as the owner object stays in memory
-   * (lost on eviction), for counts not worth a row write each time.
-   */
   memory?: Map<string, unknown>;
 };
 
 export type OwnerJobs = {
-  /**
-   * Run `kind` at `runAt`. With `id`, scheduling replaces any pending job
-   * with that id, so one logical job never runs twice.
-   */
   schedule(kind: string, runAt: number, payload?: unknown, options?: { id?: string }): string;
   cancel(id: string): void;
 };
 
-/**
- * What the owner object offers domains beyond its database. Grows as domains
- * move in; the snapshot shrinks as its fields become local tables.
- */
 export type OwnerHost = {
-  /** The owner's control-plane snapshot (plan, generation, devices). */
   snapshot(): Promise<OwnerSnapshot>;
-  /**
-   * Start an agent attempt the domain already recorded, on its BuildSession.
-   * Throws on refusal; `retryable` says whether trying again can help.
-   */
   dispatchAgentTurn(input: AgentTurnDispatch): Promise<void>;
-  /** The owner's devices as execution destinations, with live presence. */
   deviceDestinations(): Promise<import("@stella/contracts/turn-plane/placement").DeviceDestination[]>;
-  /**
-   * Offer one recorded agent attempt to a named device through the gate's
-   * dispatch. Throws `DispatchError` when the device cannot take it.
-   */
   dispatchDeviceAgentTurn(input: DeviceAgentTurnDispatch): Promise<{ dispatchId: string }>;
-  /**
-   * New input, or a framed message from another agent, for a cloud agent's
-   * running attempt; false when none is running. Refused, retryably, while
-   * a container agent is starting up or finishing.
-   */
   steerAgentTurn(input: {
     threadId: string;
     conversationId: string;
@@ -90,25 +50,15 @@ export type OwnerHost = {
     messageId: string;
     text: string;
   }): Promise<boolean>;
-  /** New input for a device attempt that is running. */
   steerDeviceAgentTurn(input: {
     dispatchId: string;
     messageId: string;
     text: string;
   }): Promise<{ delivered: boolean; reason?: "not_running" | "unreachable" | "timeout" }>;
-  /**
-   * A framed message for an agent a device runs locally (started by its own
-   * Stella, so there is no dispatch). `unreachable` means no live socket;
-   * `timeout` that no answer came, so it may still have landed.
-   */
   messageLocalAgent(input: LocalAgentMessage): Promise<{
     outcome: import("@stella/contracts/turn-plane/placement").AgentMessageDeviceOutcome | "unreachable" | "timeout";
   }>;
   askDeviceConsent(input: { deviceId: string; requestedAt: number }): void;
-  /**
-   * Ask one of the owner's computers something over its presence socket
-   * (an MCP server it runs), answered as JSON. Nothing is stored.
-   */
   relayDeviceRequest(input: {
     deviceId: string;
     method: import("@stella/contracts/turn-plane/device-requests").DeviceRequestMethod;
@@ -121,30 +71,19 @@ export type OwnerHost = {
         message: string;
       }
   >;
-  /**
-   * Stop an agent a device runs locally, and the agents it started there.
-   * `unreachable` means no live socket; `timeout` that no answer came, so it
-   * may still have landed.
-   */
   stopLocalAgent(input: LocalAgentStop): Promise<{
     outcome: import("@stella/contracts/turn-plane/placement").AgentStopDeviceOutcome | "unreachable" | "timeout";
   }>;
   controlHarnessAgent(input: HarnessAgentControl): Promise<{
     outcome: "steered" | "resumed" | "stopped" | "not_running" | "not_found";
   }>;
-  /** Stop a device attempt's dispatch. Idempotent per `cancelRequestId`. */
   cancelDeviceAgentTurn(input: {
     dispatchId: string;
     cancelRequestId: string;
     reason: string;
   }): Promise<void>;
-  /**
-   * Hand a finished thread's report to the cloud agent or conversation that
-   * spawned it. Desktop requesters read their own `forDevice` delivery.
-   */
   deliverAgentCompletion(input: AgentCompletionDelivery): Promise<void>;
   agentReportTarget(input: { conversationId: string; ownerGeneration: string }): Promise<AgentReportTarget>;
-  /** Stop one exact running attempt. `changed` means it is no longer that attempt. */
   cancelAgentTurn(input: {
     threadId: string;
     conversationId: string;
@@ -153,40 +92,21 @@ export type OwnerHost = {
     ownerGeneration: string;
     cancelRequestId: string;
   }): Promise<"canceled" | "changed">;
-  /** Append a card to a conversation's journal. Best effort: false when it was not taken. */
   postConversationCard(input: {
     conversationId: string;
     ownerGeneration: string;
     sourceTurnId: string;
     card: unknown;
   }): Promise<boolean>;
-  /**
-   * The owner's cloud home content moved to `revision` under
-   * `ownerGeneration`, so cached home context must be rebuilt.
-   */
   homeChanged(ownerGeneration: string, revision: number): Promise<void>;
-  /**
-   * Change the memory switch or start a wipe through the gate's memory
-   * policy, which closes model grants first. Throws `RpcError` on refusal.
-   */
   changeMemoryPolicy(change: MemoryPolicyChange): Promise<void>;
-  /**
-   * Queue an agent's framed message as a hidden wake turn on a cloud
-   * conversation's Stella. Idempotent per `clientMsgId`; throws `RpcError`
-   * when the conversation refuses it.
-   */
   startAgentMessageTurn(input: {
     ownerGeneration: string;
     conversationId: string;
     clientMsgId: string;
     prompt: string;
   }): Promise<void>;
-  /** Start a scheduled prompt as a turn, in a cloud chat or on a named desktop. */
   startScheduledTurn(input: ScheduledTurnStart): Promise<void>;
-  /**
-   * One pass of a reset or deletion across every store (src/owner-purge.ts),
-   * rejoining the fence `requestId` opened. Returns the stores still pending.
-   */
   purgeOwner(mode: OwnerPurgeMode, requestId: string): Promise<{ pending: string[] }>;
 };
 
@@ -194,7 +114,6 @@ export type LocalAgentMessage = {
   deviceId: string;
   threadId: string;
   ownerGeneration: string;
-  /** Stable across redeliveries; the device dedupes on it. */
   messageId: string;
   text: string;
 };
@@ -212,23 +131,16 @@ export type LocalAgentStop = {
   deviceId: string;
   threadId: string;
   ownerGeneration: string;
-  /** Stable across redeliveries; the device dedupes on it. */
   commandId: string;
 };
 
 export type ScheduledTurnStart = {
   ownerGeneration: string;
   conversationId: string;
-  /** `schedule:<fireId>`, so a retried fire starts the same turn. */
   clientMsgId: string;
   prompt: string;
   title: string;
-  /** Run on this desktop; absent runs in the cloud. */
   targetDeviceId?: string;
-  /**
-   * Start the prompt as an agent of the conversation's orchestrator instead
-   * of an orchestrator turn; its report comes back to the orchestrator.
-   */
   agent?: { description: string };
 };
 
@@ -244,9 +156,7 @@ export type AgentTurnDispatch = {
   execution: import("@stella/contracts/agent-engine").CloudExecutionSelection;
   originDeviceId?: string;
   originConversationId?: string;
-  /** The spawn's `workspace` (`spawn_agent`), on the thread's first attempt. */
   workspace?: import("@stella/contracts/turn-plane/turn-start").AgentWorkspaceSize;
-  /** Where the thread sits among Stella's agents, from its parent chain. */
   lineage: AgentLineage;
 };
 
@@ -258,18 +168,9 @@ export type DeviceAgentTurnDispatch = {
   description: string;
   prompt: string;
   targetDeviceId: string;
-  /** The desktop that asked, if any; absent for a cloud requester. */
   requestingDeviceId?: string;
-  /** The requester's `spawn_agent` model the device runs the agent on. */
   model?: string;
-  /** Where the thread sits among Stella's agents, from its parent chain. */
   lineage: AgentLineage;
-  /**
-   * Drive paths of the spawning turn's attachments. The device resolves these
-   * to signed GETs and materializes them into its own attachment cache, so the
-   * agent is handed an absolute local path rather than a drive path it has no
-   * way to interpret.
-   */
   attachments?: readonly string[];
   requeue?: number;
 };
@@ -330,13 +231,11 @@ export type GlobalContext = {
 
 export type OwnerCallDef<K extends CallName> = {
   scope: "owner";
-  /** Largest request body this call accepts. Default 1 MiB. */
   maxBodyBytes?: number;
   parse: Parser<CallArgs<K>>;
   handler: (ctx: OwnerContext, args: CallArgs<K>) => CallResult<K> | Promise<CallResult<K>>;
 };
 
-/** Runs in the Worker, for functions over global data (D1, catalogs). */
 export type GlobalCallDef<K extends CallName> = {
   scope: "global";
   parse: Parser<CallArgs<K>>;
@@ -347,39 +246,25 @@ export type CallDef<K extends CallName> = OwnerCallDef<K> | GlobalCallDef<K>;
 
 export type ViewDef<K extends ViewName> = {
   parse: Parser<ViewArgs<K>>;
-  /** Synchronous: a view is a read of the owner's database. */
   read: (ctx: OwnerViewContext, args: ViewArgs<K>) => ViewResult<K>;
 };
 
 export type JobDef = {
   run: (ctx: OwnerContext, payload: unknown) => void | Promise<void>;
-  /** Attempts before the job is dropped and logged. Default 20. */
   maxAttempts?: number;
 };
 
 export type Migration = {
-  /** Stable, unique across domains: `<domain>.<n>-<what>`. */
   id: string;
   statements: string[];
 };
 
-/**
- * A server-internal operation: called by this Worker's own code (agent tools,
- * Worker routes, the turn broker) through `OwnerGate.ownerInternal`, never by
- * clients. Runs with a null caller; parse `args` before trusting them.
- */
 export type InternalDef = (ctx: OwnerContext, args: unknown) => unknown;
 
-/** How an owner object is called from the rest of the Worker. */
 export type OwnerInternalCall = (name: string, args: unknown) => Promise<unknown>;
 
 export type OwnerPurgeMode = "reset" | "delete";
 
-/**
- * Delete this domain's data for a reset or account deletion. Idempotent;
- * `pending` asks to be called again (for example, an R2 sweep that stopped
- * at its batch limit).
- */
 export type PurgeDef = (
   ctx: OwnerContext,
   mode: OwnerPurgeMode,
@@ -401,7 +286,6 @@ export type OwnerRegistry = {
   views: Map<string, ViewDef<ViewName>>;
   jobs: Map<string, JobDef>;
   internal: Map<string, InternalDef>;
-  /** Purge hooks by domain name, in registration order. */
   purges: Map<string, PurgeDef>;
 };
 

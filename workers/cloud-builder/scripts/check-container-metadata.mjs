@@ -78,7 +78,6 @@ if (checkConfig) {
       );
     }
   }
-  // `assets` is inherited unless the environment sets its own.
   const assets = envConfig.assets ?? rawConfig.assets;
   if (
     assets?.binding !== "ASSETS" ||

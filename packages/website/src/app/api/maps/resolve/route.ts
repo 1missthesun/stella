@@ -7,30 +7,6 @@ import type {
   MapTravelMode,
 } from "@/lib/maps/map-artifact";
 
-/**
- * POST /api/maps/resolve — resolve natural map inputs into a `map-route`
- * artifact for Stella's inline chat map cards.
- *
- * Called by the Stella runtime's `map` tool (desktop app). The Google server
- * key (`GOOGLE_MAPS_SERVER_API_KEY`, API-restricted to Places / Directions /
- * Geocoding) lives only here — clients never see a key; the embed page uses a
- * separate referrer-restricted browser key for rendering.
- *
- * Body:
- *   {
- *     places?: string[];          // 1–8 natural queries to pin
- *     origin?: string;            // route endpoints (both or neither)
- *     destination?: string;
- *     mode?: "driving" | "walking" | "cycling" | "transit";
- *     title?: string;
- *   }
- *
- * Returns { map: MapRouteArtifact, unresolved: string[] } or
- * { error: string } with a 4xx/5xx status. Best-effort by design: partial
- * place resolution succeeds with the misses listed in `unresolved`; a failed
- * route is an error (a route card without a route is useless).
- */
-
 export const runtime = "nodejs";
 
 const MAX_PLACES = 8;
@@ -44,7 +20,6 @@ const TRAVEL_MODES = new Set<MapTravelMode>([
   "transit",
 ]);
 
-/** Google Directions uses "bicycling"; the artifact keeps "cycling". */
 const DIRECTIONS_MODE: Record<MapTravelMode, string> = {
   driving: "driving",
   walking: "walking",
@@ -113,7 +88,6 @@ type ResolvedPlace = {
   ratingCount?: number;
 };
 
-/** Places API (New) text search, first hit only. Null when nothing matched. */
 const resolvePlace = async (
   query: string,
   apiKey: string,
@@ -182,10 +156,6 @@ type ResolvedRoute = {
   route: MapArtifactRoute;
 };
 
-/**
- * Directions API with free-text endpoints (Google geocodes them internally,
- * so a route costs one call). Endpoint markers come from the leg.
- */
 const resolveRoute = async (
   originQuery: string,
   destinationQuery: string,

@@ -14,7 +14,6 @@ import { useTheme } from "../theme/theme-context";
 import { liquidGlassSupported } from "./glass";
 import type { NativeMenuProps } from "./NativeMenu.types";
 
-/** SwiftUI owns the menu presentation and its native iOS 26 glass transition. */
 export function NativeMenu(props: NativeMenuProps) {
   const { isDark } = useTheme();
   return (

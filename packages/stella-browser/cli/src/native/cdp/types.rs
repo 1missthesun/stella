@@ -1,7 +1,6 @@
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 
-/// Deserialize a value that may be either a string or an integer into a String.
 /// Lightpanda sends numeric nodeIds/childIds in AX tree responses, while Chrome
 /// sends strings. This accepts both.
 fn string_or_int<'de, D>(deserializer: D) -> Result<String, D::Error>
@@ -19,7 +18,6 @@ where
     }
 }
 
-/// Deserialize an optional Vec where each element may be a string or integer.
 fn opt_vec_string_or_int<'de, D>(deserializer: D) -> Result<Option<Vec<String>>, D::Error>
 where
     D: Deserializer<'de>,
@@ -45,10 +43,6 @@ where
         }
     }
 }
-
-// ---------------------------------------------------------------------------
-// CDP message envelope
-// ---------------------------------------------------------------------------
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -85,20 +79,12 @@ impl std::fmt::Display for CdpError {
     }
 }
 
-// ---------------------------------------------------------------------------
-// CDP events (broadcast to subscribers)
-// ---------------------------------------------------------------------------
-
 #[derive(Debug, Clone)]
 pub struct CdpEvent {
     pub method: String,
     pub params: Value,
     pub session_id: Option<String>,
 }
-
-// ---------------------------------------------------------------------------
-// Target domain
-// ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -110,9 +96,6 @@ pub struct TargetInfo {
     pub url: String,
     pub attached: Option<bool>,
     pub browser_context_id: Option<String>,
-    /// Target that opened this one (e.g. `window.open`, target=_blank).
-    /// Present only for page-opened targets; used to inherit command-owner
-    /// tab tracking from the opener tab.
     pub opener_id: Option<String>,
 }
 
@@ -159,7 +142,6 @@ pub struct CloseTargetParams {
     pub target_id: String,
 }
 
-// Target events
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TargetCreatedEvent {
@@ -177,10 +159,6 @@ pub struct TargetDestroyedEvent {
 pub struct TargetInfoChangedEvent {
     pub target_info: TargetInfo,
 }
-
-// ---------------------------------------------------------------------------
-// Page domain
-// ---------------------------------------------------------------------------
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -213,7 +191,6 @@ pub struct FrameInfo {
     pub name: Option<String>,
 }
 
-// Page.javascriptDialogOpening
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct JavascriptDialogOpeningEvent {
@@ -231,10 +208,6 @@ pub struct HandleJavaScriptDialogParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prompt_text: Option<String>,
 }
-
-// ---------------------------------------------------------------------------
-// Runtime domain
-// ---------------------------------------------------------------------------
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -275,7 +248,6 @@ pub struct ExceptionDetails {
     pub column_number: Option<i64>,
 }
 
-// Runtime.consoleAPICalled
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ConsoleApiCalledEvent {
@@ -285,17 +257,12 @@ pub struct ConsoleApiCalledEvent {
     pub timestamp: Option<f64>,
 }
 
-// Runtime.exceptionThrown
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ExceptionThrownEvent {
     pub timestamp: f64,
     pub exception_details: ExceptionDetails,
 }
-
-// ---------------------------------------------------------------------------
-// Accessibility domain
-// ---------------------------------------------------------------------------
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -334,10 +301,6 @@ pub struct AXProperty {
     pub value: AXValue,
 }
 
-// ---------------------------------------------------------------------------
-// Network domain (minimal for Phase 1)
-// ---------------------------------------------------------------------------
-
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RequestWillBeSentEvent {
@@ -363,10 +326,6 @@ pub struct LoadingFinishedEvent {
 pub struct LoadingFailedEvent {
     pub request_id: String,
 }
-
-// ---------------------------------------------------------------------------
-// DOM domain
-// ---------------------------------------------------------------------------
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -449,10 +408,6 @@ pub struct DomNode {
     pub children: Option<Vec<DomNode>>,
 }
 
-// ---------------------------------------------------------------------------
-// Input domain
-// ---------------------------------------------------------------------------
-
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DispatchMouseEventParams {
@@ -501,10 +456,6 @@ pub struct InsertTextParams {
     pub text: String,
 }
 
-// ---------------------------------------------------------------------------
-// Page.captureScreenshot
-// ---------------------------------------------------------------------------
-
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CaptureScreenshotParams {
@@ -536,10 +487,6 @@ pub struct CaptureScreenshotResult {
     pub data: String,
 }
 
-// ---------------------------------------------------------------------------
-// Runtime.callFunctionOn
-// ---------------------------------------------------------------------------
-
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CallFunctionOnParams {
@@ -563,10 +510,6 @@ pub struct CallArgument {
     pub object_id: Option<String>,
 }
 
-// ---------------------------------------------------------------------------
-// Version info (from /json/version)
-// ---------------------------------------------------------------------------
-
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BrowserVersionInfo {
@@ -576,13 +519,6 @@ pub struct BrowserVersionInfo {
     pub browser: Option<String>,
 }
 
-/// Auto-generated CDP types from protocol JSON files in `cdp-protocol/`.
-///
-/// To populate: download `browser_protocol.json` and `js_protocol.json` from
-/// <https://github.com/nicolo-ribaudo/nicolo-ribaudo.github.io/> (or any
-/// Chromium source) into `cli/cdp-protocol/` and rebuild.
-///
-/// Usage: `use super::cdp::types::generated::cdp_page::*;`
 #[allow(clippy::upper_case_acronyms)]
 pub mod generated {
     include!(concat!(env!("OUT_DIR"), "/cdp_generated.rs"));

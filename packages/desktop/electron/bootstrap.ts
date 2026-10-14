@@ -36,15 +36,9 @@ import { applyDesktopIdentityEnv } from "./source/env.js";
 import { applySelfHostedServerEnv } from "./services/self-host-service.js";
 import { resolveRendererBuildMode } from "./source/renderer-protocol.js";
 const __dirname = import.meta.dirname;
-// Who this process is: the user's Stella, the harness, or a developer's
-// checkout. Never `app.isPackaged` — there is no packaging step, so it is
-// false for the product too. See app-identity.ts.
 const install = resolveAppInstall({ isPackaged: app.isPackaged });
 const isInstalledProduct = install === "product";
-// A human is running this tree: the condition for developer conveniences.
 const isDeveloperInstance = !isInstalledProduct;
-// The app always runs from its source tree — in every install, not just in
-// development. Main lives at packages/desktop/dist-electron/electron/.
 const stellaAppDir = path.resolve(__dirname, "..", "..", "..", "..");
 const devHarnessOptions = resolveDevHarnessOptions({
   isPackaged: app.isPackaged,
@@ -54,8 +48,6 @@ const devHarnessOptions = resolveDevHarnessOptions({
 if (devHarnessOptions) {
   applyDevHarnessOptions(app, devHarnessOptions);
 } else if (isInstalledProduct) {
-  // The native launcher runs the source tree as the product: name, userData
-  // and Stella home are Stella's, not the development app's.
   app.setName(STELLA_APP_NAME);
   app.setPath(
     "userData",
@@ -77,10 +69,6 @@ const usesDevelopmentData = dataMode === "development";
 const configuredStatePath = usesDevelopmentData
   ? process.env.STELLA_V2_DEV_DATA_DIR?.trim()
   : process.env.STELLA_DATA_DIR?.trim();
-// SQLite, bundled-skill reconciliation, the runtime worker, and prompt-facing
-// paths agree on one mode-specific tree. Development defaults to a separate
-// durable home; Electron userData remains a second, replaceable profile for
-// Chromium/auth/runtime state.
 const stellaDataDirPath = resolveDesktopStellaDataDirPath({
   mode: dataMode,
   configuredStatePath,
@@ -113,8 +101,6 @@ const installBrokenPipeGuards = () => {
 };
 
 export const bootstrapMainProcess = () => {
-  // Acquire Electron's process lock before bootstrap services are constructed
-  // so a second instance cannot open local state.
   if (!app.requestSingleInstanceLock()) {
     app.quit();
     return;
@@ -160,7 +146,6 @@ export const bootstrapMainProcess = () => {
     startupRuntimeWarmupDelayMs: STARTUP_RUNTIME_WARMUP_DELAY_MS,
   });
 
-  // The verification harness (`--inspect` on main) reaches the live services here.
   if (install === "harness") {
     (globalThis as { __stellaHarnessContext?: unknown }).__stellaHarnessContext = context;
   }

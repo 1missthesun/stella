@@ -152,18 +152,12 @@ export const stopAllDesktopAutomationDaemons = async (): Promise<void> => {
     ),
   );
 
-  // Drop the pidfiles + per-session sockets so the next launch never
-  // mistakes a dead pid for a live daemon.
   for (const pidFile of pidFiles) {
     rmSync(pidFile, { force: true });
     if (path.basename(path.dirname(pidFile)) === "windows-daemon") {
       rmSync(path.dirname(pidFile), { recursive: true, force: true });
     }
   }
-  // The shared ~/.stella/computer-sockets dir also holds other installs'
-  // sockets, so only remove the ones this install's sessions map to (the
-  // filename hash covers state dir + session id). Orphans are aged out by
-  // the runtime's own pruning.
   for (const name of sessionNames) {
     rmSync(resolveAutomationSocketPath(root, name), { force: true });
   }

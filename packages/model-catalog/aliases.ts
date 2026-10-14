@@ -23,8 +23,6 @@ import {
 } from "./managed-gateway";
 
 export const STELLA_PROVIDER = "stella";
-// Opaque "let the backend pick" sentinel. The concrete model is chosen per
-// agent type + audience on the backend; this stays the per-agent *default*.
 export const STELLA_DEFAULT_MODEL = `${STELLA_PROVIDER}/default`;
 // Bump this whenever Stella default/model/mode mappings change. The catalog
 // route reports it as `updatedAt`; clients revalidate by ETag.
@@ -37,13 +35,6 @@ export type StellaCatalogModel = {
   upstreamModel: string;
   api: ManagedProtocol;
   type: "language" | "multimodal";
-  /**
-   * Whether the requesting audience may pick this model. The catalog
-   * endpoint computes this per request so the desktop picker can
-   * disable rows the backend would silently coerce away — keeping the
-   * UI in sync with the actual enforcement in
-   * `stella_provider/request.ts`.
-   */
   allowedForAudience: boolean;
 };
 
@@ -127,16 +118,6 @@ export const isStellaModel = (model: string | null | undefined): boolean => {
   return Boolean(trimmed) && trimmed!.startsWith(`${STELLA_PROVIDER}/`);
 };
 
-/**
- * A Stella selection is one of:
- * - `default`: empty / `stella` / `stella/default` ⇒ the backend picks the
- *   model for the requesting agent + audience.
- * - `mode`: `stella/<mode>` (e.g. `stella/designer`) ⇒ a branded tier alias
- *   resolved per audience from `BASE_MODE_CONFIGS`.
- * - `upstream`: `stella/<provider>/<model>` ⇒ an explicit managed-model
- *   override (e.g. `stella/openai/gpt-5.6-sol`).
- * Returns null for non-Stella strings.
- */
 export const parseStellaModelSelection = (
   selection: string | null | undefined,
 ):
@@ -164,25 +145,6 @@ export const parseStellaModelSelection = (
   return { kind: "upstream", model: aliasOrUpstreamModel };
 };
 
-/**
- * Resolve a requested model `selection` for an `agentType` + `audience` to its
- * effective managed `ModelConfig`. This is the single source of truth shared by
- * the relay request path (`resolveRequestedStellaModel` in `stella_provider`)
- * and the runtime config path (`resolveModelConfig` in `agent/model_resolver`),
- * so the two can't drift on how an override resolves (provider, options, etc.).
- *
- * An override is honored only when allowed: a `stella/<mode>` resolves per
- * audience via `getModeConfig`; a `stella/<provider>/<model>` pins that model
- * and infers its gateway provider. Everything else — the default sentinel, a
- * locked agent, or an override this audience may not pick — returns the agent's
- * backend default. `applied` is true only when an override was honored.
- */
-/**
- * Whether a Stella id names a model Stella offers at all. Default and mode
- * selections always do; an explicit `stella/<provider>/<model>` must be on the
- * product allowlist. A listed model a plan can't use still falls back to the
- * default; an unlisted one is refused rather than silently substituted.
- */
 export const isListedStellaModel = (selection: string): boolean => {
   const parsed = parseStellaModelSelection(selection);
   if (!parsed) return false;
@@ -211,8 +173,6 @@ export const resolveStellaModelConfigForSelection = (
     return { config: getModeConfig(parsed.mode, audience), applied: true };
   }
   if (allowed && parsed?.kind === "upstream") {
-    // Aliased first so a pinned legacy spelling lands on the active route's
-    // gateway rather than reviving the idle one.
     const model = resolveManagedModelRouteAlias(parsed.model);
     return {
       config: {
@@ -243,9 +203,6 @@ export const resolveStellaModelConfigForSelection = (
 export const listStellaCatalogModels = (
   audience: ManagedModelAudience = "free",
 ): StellaCatalogModel[] => [
-  // Compatibility aliases (stella/light etc.) stay resolvable but are
-  // intentionally absent here: the picker publishes the raw selectable
-  // models only.
   ...listUpstreamManagedModels().map<StellaCatalogModel>((upstreamModel) => ({
     id: toStellaModelId(upstreamModel),
     name: deriveDisplayName(upstreamModel),
@@ -267,9 +224,6 @@ export const listStellaDefaultSelections = (
     const config = getModelConfig(agentType, audience);
     return {
       agentType,
-      // Always the opaque sentinel: the per-agent + per-audience model lives
-      // on the backend and is surfaced separately as `resolvedModel` for the
-      // runtime's tool-policy + display.
       model: STELLA_DEFAULT_MODEL,
       resolvedModel: catalogRoutingModel(config),
     };

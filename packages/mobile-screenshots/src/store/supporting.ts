@@ -1,5 +1,3 @@
-// These are unaltered outputs from the same real tasks shown in native captures.
-// Capture/export tooling owns the PNGs and their provenance, never generated UI.
 export const supportingArtifacts: Record<
   string,
   { source: string; alt: string }

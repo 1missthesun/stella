@@ -166,8 +166,6 @@ export const normalizeCloudMemoryReimportError = (
   if (error instanceof CloudMemoryWipeError) {
     return new CloudMemoryReimportError("invalid_response");
   }
-  // Anything that is not a backend refusal is a transport failure, and the
-  // exact attempt (same request id) is safe to replay.
   if (!(error instanceof BackendRequestError)) {
     return new CloudMemoryReimportError("unavailable", true);
   }
@@ -189,7 +187,6 @@ export const normalizeCloudMemoryReimportError = (
   if (error.code === "UNAUTHENTICATED" || error.code === "FORBIDDEN") {
     return new CloudMemoryReimportError("unauthorized");
   }
-  // Includes MEMORY_POLICY_CHANGING: retrying the same request id settles it.
   return new CloudMemoryReimportError("unavailable", true);
 };
 

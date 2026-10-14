@@ -117,9 +117,6 @@ export const startAgentTurn = (
   if (existing) return existing.settled;
   const execution = startTurnExecution({
     work: (context) => host.runAgentTurn(turn, sandboxId, context),
-    // Cleanup is part of fiber interruption and is bounded by the Effect
-    // facade. A Stop ACK therefore means the exact command session and
-    // container teardown completed (or the cancellation failed visibly).
     onInterrupt: () =>
       host.builderFallbackRecoveries.has(turn.turnId)
         ? host.quiesceCurrentAgentSession(turn)
@@ -257,7 +254,6 @@ export const admitAgentTurnThroughOwnerGate = async (
       ),
     };
   }
-  // The snapshot is the authority for both, overriding the dispatcher.
   turn.audience = snapshot.allowance.audience;
   turn.budgetMicroCents = snapshot.allowance.budgetMicroCents;
   return { ok: true, snapshot };
@@ -284,8 +280,6 @@ const projectAgentTurnStart = async (
   host: AdmissionHost,
   turn: TurnRequest,
 ): Promise<void> => {
-  // The orchestrator's own chat turn is projected by its conversation, under
-  // the same turn id; an agent-thread row for it would be a phantom agent.
   if (turn.agentRole === "orchestrator") return;
   const attemptGeneration = turn.attemptGeneration ?? 1;
   const createdAt = Date.now();
@@ -439,17 +433,11 @@ export const acceptAgentTurn = async (
         };
       }
       const sandboxId = agentContainerId;
-      // A predecessor whose terminal state was never delivered left it
-      // here. Taking over the DO takes the alarm with it, so this is its last
-      // chance; the stale delivery below cannot mutate this successor.
       const orphan =
         await host.ctx.storage.get<PendingTerminal>("pendingTerminal");
       const orphanTurn = orphan
         ? await host.ctx.storage.get<TurnRequest>("turn")
         : undefined;
-      // The spec goes to SQLite (see `durableTurnRecord`). Written in the
-      // same critical section, so a recovering isolate never finds the turn
-      // without it.
       if (turn.orchestratorCli) {
         storeOrchestratorCliSpec(
           host.ctx.storage.sql,
@@ -483,8 +471,6 @@ export const acceptAgentTurn = async (
   );
   if ("response" in admission) {
     await host.unregisterTurn(turn);
-    // A refusal gives the slot straight back; an accepted replay keeps it,
-    // because the attempt it names is still the one running.
     if (!admission.response.ok) await host.releaseOwnerGate(turn);
     return admission.response;
   }
@@ -548,9 +534,6 @@ export const acceptAgentTurn = async (
       Math.min(watchdogDeadlineAt, Date.now() + AGENT_TURN_HEARTBEAT_MS),
     );
   });
-  // Delivered before the run starts: the owner has to know the attempt exists
-  // even if this isolate dies in the next millisecond, and the delivery is
-  // kept as durable debt if the owner refuses.
   await projectAgentTurnStart(host, turn);
   host.ctx.waitUntil(
     host.startAgentTurn(turn, sandboxId).catch(() => undefined),
@@ -565,8 +548,6 @@ export const runAgentTurn = async (
   execution: TurnExecutionContext,
 ): Promise<void> => {
   execution.assertActive();
-  // Admission mints the id, so an absent one here means this isolate is
-  // running a turn whose reservation another attempt owns.
   if (!sandboxId) throw new AgentTurnAuthorityLostError();
   await host.runContainerAgentTurn(turn, sandboxId, execution);
 };

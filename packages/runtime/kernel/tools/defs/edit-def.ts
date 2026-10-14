@@ -1,10 +1,3 @@
-/**
- * The `Edit` tool's model-visible surface, split from the executable
- * definition so workerd hosts advertise the byte-identical tool. The Node
- * host applies the runtime file-access policy; the cloud world Durable Object
- * serves the same surface over its own filesystem.
- */
-
 export const EDIT_TOOL_NAME = "Edit";
 
 export const EDIT_TOOL_DESCRIPTION =
@@ -86,5 +79,4 @@ export const EDIT_TOOL_PARAMETERS: Record<string, unknown> = {
   required: ["file_path"],
 };
 
-/** Replay policy (`ToolReplayPolicy` in ../types.ts). A rerun applies the edit to a file the first attempt may already have changed. */
 export const EDIT_TOOL_REPLAY = "unsafe" as const;

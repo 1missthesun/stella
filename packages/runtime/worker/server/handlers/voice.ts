@@ -17,9 +17,6 @@ const voiceSession = WorkerSessions.sessionOrFail(
 );
 
 export const voiceHandlers: WorkerRpcHandlers = {
-  // A voice call talks to the conversation's harness: what was said is
-  // written into its transcript, the voice model's requests are hidden turns
-  // of its orchestrator, and a call starts with its history.
   [METHOD_NAMES.INTERNAL_WORKER_VOICE_PERSIST_TRANSCRIPT]: (params) =>
     Effect.gen(function* () {
       const session = yield* voiceSession;
@@ -60,8 +57,6 @@ export const voiceHandlers: WorkerRpcHandlers = {
     Effect.gen(function* () {
       const session = yield* voiceSession;
       const request = params as { conversationId: string };
-      // A call's voice model has no tools and writes its own brief; what it
-      // reads from here is the conversation so far, from the transcript.
       const hostBus = yield* HostBus.Service;
       const history = yield* fromPromise(async () =>
         (await piChatsFor(session, hostBus)).voiceHistory(request.conversationId),
@@ -73,8 +68,6 @@ export const voiceHandlers: WorkerRpcHandlers = {
       } satisfies RuntimeVoiceOrchestratorConfig;
     }),
 
-  // A call hands its work to Stella (`voiceOrchestratorChat`), whose tools
-  // run in the conversation; the voice model runs none.
   [METHOD_NAMES.INTERNAL_WORKER_VOICE_EXECUTE_TOOL]: () =>
     Effect.succeed<RuntimeVoiceToolCallResult>({
       output: "Voice calls run no tools here; ask Stella to do it.",

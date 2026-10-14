@@ -11,13 +11,6 @@ import type { Colors } from "../theme/colors";
 import { fonts } from "../theme/fonts";
 import { Icon } from "./Icon";
 
-/**
- * Inline connect card for a cloud turn: the orchestrator's
- * `connector_status` asked to use a Store integration this account has not
- * connected. Connect opens the account's hosted OAuth page; the waiting
- * turn observes the finished connection itself, so the card only has to
- * carry the user's answer.
- */
 export function CloudConnectorConnectCard({
   conversationId,
 }: {

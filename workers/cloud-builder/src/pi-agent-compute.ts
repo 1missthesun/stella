@@ -1,18 +1,3 @@
-/**
- * A cloud pi agent's container: the owner's world materialized on the
- * container's disk, the attached tool host daemon serving the agent's file
- * and shell tools as the unprivileged tool user, the world synced and the
- * drive hydrated around every command, and what the agent's answer links
- * delivered when the work is done. One lease per agent conversation, booted
- * when the agent's run starts and released when its last run ends; every
- * file and shell tool call goes straight to it.
- *
- * The sandbox attachment is the general agents' own; this module gives it
- * what a BuildSession would: a session, a world, a broker credential (served
- * by the orchestrator object, `pi:<conversation>`) and a release. Every
- * record names the exact lease, so a lease an eviction dropped is found and
- * released when the harness opens again.
- */
 import { builderServiceSecret } from "./secret-rotation.js";
 import type { SerializedAgentToolResult } from "@stella/executor-cloud/attached-tool-protocol";
 import {
@@ -47,20 +32,16 @@ export type PiComputeEnv = Pick<
 > &
   Partial<Pick<Cloudflare.Env, "Sandbox" | "SANDBOX_IDLE_TIMEOUT_MS" | "CLOUD_BUILDER_PUBLIC_URL" | "DB" | "BETTER_AUTH_SECRET">>;
 
-/** Whose agent this is. */
 export type PiComputeOwner = { ownerId: string; ownerGeneration: string; conversationId: string };
 
-/** Everything the lease does outside itself. */
 export type PiComputeHost = {
   env: PiComputeEnv;
   storage: DurableObjectStorage;
-  /** One of the owner's agent container slots for this sandbox, waited for. */
   takeSlot(owner: PiComputeOwner, sandboxId: string, signal: AbortSignal): Promise<void>;
   releaseSlot(owner: PiComputeOwner, sandboxId: string): Promise<void>;
   log(event: string, fields: Record<string, unknown>): void;
 };
 
-/** The exact resources of one lease, kept until it is released. */
 export type PiComputeRecord = {
   version: 1;
   owner: PiComputeOwner;
@@ -71,41 +52,26 @@ export type PiComputeRecord = {
   daemonDirectory: string;
 };
 
-/** One file or shell tool call for the agent's container. */
 export type PiWorkspaceCall = { toolCallId: string; toolName: string; params: Record<string, unknown> };
 
 export type PiComputeLease = {
   readonly record: PiComputeRecord;
-  /** Settles when the container is up: the world on its disk and the daemon serving. */
   readonly ready: Promise<void>;
-  /** Run one call in the container, once it is up. */
   call(call: PiWorkspaceCall): Promise<SerializedAgentToolResult>;
-  /** Push the world, write the drive back and deliver what the answer links. */
   quiesce(linkedPaths: readonly string[]): Promise<{ deliveredFiles: readonly string[] }>;
-  /**
-   * Let the container go: its daemon, session and slot. `warm` keeps it up
-   * for the warm window, for a run that ended normally.
-   */
   release(options?: { warm?: boolean }): Promise<void>;
-  /** When its broker and world credentials stop working. */
   readonly expiresAt: number;
-  /** Stops anything still running on it. */
   abort(reason?: unknown): void;
 };
 
-/** The broker session every lease of a conversation presents: `pi:<conversation>`. */
 export const piBrokerSessionId = (conversationId: string): string => `pi:${conversationId}`;
 
 const generationKey = (agentConversationId: number) => `piComputeGen:${agentConversationId}`;
 
-/** The lease of one agent conversation, while it holds resources. */
 export const piComputeKey = (agentConversationId: number) => `piCompute:${agentConversationId}`;
-/** Every agent's container is the small instance. */
 const INSTANCE_SIZE = "small";
 
-/** A credential's life, the most the broker and the world allow. */
 const CREDENTIAL_TTL_MS = Math.min(TURN_BROKER_MAX_TTL_MS, 30 * 60_000);
-/** A world materialization or one command, at most. */
 const COMMAND_TIMEOUT_MS = 15 * 60_000;
 
 const hex = async (value: string): Promise<string> =>
@@ -125,7 +91,6 @@ const sandboxFor = (host: PiComputeHost, sandboxId: string, size: InstanceSize, 
   });
 };
 
-/** This deployment's public origin: where a container reaches the world and the broker. */
 const publicOrigin = (host: PiComputeHost): string => {
   const origin = host.env.CLOUD_BUILDER_PUBLIC_URL?.replace(/\/+$/u, "");
   if (!origin) throw new Error("Cloud containers are not configured.");
@@ -180,10 +145,6 @@ export const releasePiCompute = async (
   if (broker) await host.storage.put(brokerKey, revokeTurnBrokerCredential(broker, Date.now())).catch(() => undefined);
 };
 
-/**
- * Lease the container for one agent conversation: it starts coming up at
- * once, and `ready` settles when the world and the daemon are up.
- */
 export const openPiComputeLease = async (
   host: PiComputeHost,
   args: { owner: PiComputeOwner; agentConversationId: number; threadId: string; turnId: string },
@@ -198,15 +159,12 @@ export const openPiComputeLease = async (
     owner,
     turnId,
     attemptGeneration,
-    // The thread's container, as before: one per agent, reused across its runs.
     sandboxId: await agentSandboxId(owner.ownerId, `pi:${owner.conversationId}:${threadId}`),
     sessionId: `pi-agent-${hash}`,
     daemonDirectory: attachedToolPathsForDirectory(`/workspace/attached/pi-${hash}-${attemptGeneration}`).directory,
   };
   await host.storage.put(piComputeKey(agentConversationId), record);
   const world = await worldName(owner.ownerId);
-  // The lease runs as a supervised execution until it is released: its
-  // signal is what a stop aborts, and what a slot wait and the attach watch.
   let released!: () => void;
   const held = new Promise<void>((resolve) => {
     released = resolve;
@@ -223,7 +181,6 @@ export const openPiComputeLease = async (
   const expiresAt = Date.now() + CREDENTIAL_TTL_MS;
   let sandbox: SandboxHandle | undefined;
   let releaseWarm = false;
-  /** The Slack workspace environment's variables, for the daemon and every command it runs. */
   let workspaceEnv: Record<string, string> = {};
   let environmentNotice: string | undefined;
 
@@ -252,8 +209,6 @@ export const openPiComputeLease = async (
     const coldContainerStartMs = Date.now() - started;
     const restoring = Date.now();
     await normalizeToolWorkspaceRoot(session, WORLD_ROOT);
-    // The disk is a projection of the owner's world: brought down whole here,
-    // then kept in step by the daemon around every command.
     const head = await host.env.WORLDS.getByName(world).head();
     const capability = await issueWorldCapability({
       secret: builderServiceSecret(host.env),
@@ -279,7 +234,6 @@ export const openPiComputeLease = async (
       });
       throw new Error(worldMaterializationFailure(materialized));
     }
-    // Materialization replaces the world root, including the drive directory the daemon expects.
     await normalizeToolWorkspaceRoot(session, WORLD_ROOT);
     const repoDir = await prepareSlackRepo(host.env, session, owner.conversationId, publicOrigin(host), host.log);
     await prepareSlackPreviews(host.env, session, owner.conversationId, publicOrigin(host), host.log);
@@ -320,7 +274,6 @@ export const openPiComputeLease = async (
       now: Date.now(),
       ttlMs: Math.max(1, expiresAt - Date.now()),
     });
-    // Durable before the container can present it.
     await host.storage.put(turnBrokerStorageKey(brokerIdentity), issued.record);
     const credentialsPath = turnBrokerCredentialsPath("/workspace");
     await session.writeFile(credentialsPath, JSON.stringify(issued.handoff));
@@ -331,7 +284,6 @@ export const openPiComputeLease = async (
       attemptGeneration,
       threadId,
       prompt: "",
-      // The drive copy on a reused container is this agent's own earlier hydration.
       workspaceRestored: true,
       turnBroker: { credentialsPath },
       world: {
@@ -378,7 +330,6 @@ export const openPiComputeLease = async (
     daemonDirectory: record.daemonDirectory,
   } as const;
 
-  /** What the daemon noticed while it came up, said once with the first call's result. */
   let bootNotice: string | undefined;
   const ready = (async () => {
     await attachment.boot(target);
@@ -389,7 +340,6 @@ export const openPiComputeLease = async (
     ];
     if (notices.length > 0) bootNotice = notices.join(" ");
   })();
-  // A caller that needs the container hears why it did not come up.
   ready.catch(() => undefined);
   let quiesced: Promise<{ deliveredFiles: readonly string[] }> | undefined;
   let releasing: Promise<void> | undefined;
@@ -420,7 +370,6 @@ export const openPiComputeLease = async (
         },
       });
       if (response.status === "pending") {
-        // The daemon is still running the call this replays; running it again could do it twice.
         return failure("That command is still running in the workspace. Wait for it before trying again.");
       }
       if (response.status !== "completed") return failure(response.error);
@@ -451,7 +400,6 @@ export const openPiComputeLease = async (
   };
 };
 
-/** Forget a released lease's records, its own stored under `recordKey`. */
 export const forgetPiCompute = async (host: PiComputeHost, recordKey: string, record: PiComputeRecord) => {
   await host.storage.delete([recordKey, turnBrokerStorageKey(record)]);
 };

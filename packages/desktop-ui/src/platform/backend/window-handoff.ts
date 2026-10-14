@@ -1,14 +1,5 @@
 import { APP_RELAUNCHING_EVENT } from "@stella/contracts/desktop/app-source";
 
-/**
- * Backend answers a window already had, kept for the next window so it
- * starts from them instead of waiting on the round trip (it asks again all
- * the same). They live in the window's session, which a reload keeps (an
- * update to the UI reloads the window), and are handed to the next window
- * when the page goes away or Stella restarts to apply an update, for a short
- * while only: a later start asks first.
- */
-
 const SESSION_PREFIX = "stella:handoff:";
 const HANDOFF_KEY = "stella:window-handoff";
 const HANDOFF_TTL_MS = 30_000;

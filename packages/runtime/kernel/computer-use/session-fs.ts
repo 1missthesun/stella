@@ -4,18 +4,11 @@ import { resolveStatePath } from "../cli/shared.js";
 import { sanitizeStellaComputerSessionId } from "../tools/stella-computer-session.js";
 import { getComputerExecutionEnv } from "./execution-context.js";
 
-// Session state, pid bookkeeping, and argv helpers shared by the macOS
-// (stella-computer-executor.ts) and Windows (cli/stella-computer-windows.ts)
-// computer-use executors. Both keep per-session state under
-// <state dir>/stella-computer/sessions/<session>/.
-
 export const DEFAULT_COMPUTER_SESSION_ID = "manual";
 
 const sessionPruneIntervalMs = 24 * 60 * 60 * 1000;
 const sessionRetentionMs = 24 * 60 * 60 * 1000;
 
-// Daemon pid files (relative to a session dir) that mark a session as live.
-// macOS writes automation.pid; Windows writes windows-daemon/helper.pid.
 const liveSessionPidFiles = [
   "automation.pid",
   path.join("windows-daemon", "helper.pid"),
@@ -55,10 +48,6 @@ export const pidIsRunning = (pid: number | null | undefined) => {
   }
 };
 
-/**
- * macOS kill hook: the desktop_automation daemon is spawned detached, so
- * SIGKILL its whole process group, falling back to the pid itself.
- */
 export const killProcessGroup = (pid: number | null | undefined) => {
   if (!pid || !Number.isInteger(pid) || pid <= 0) {
     return;
@@ -78,7 +67,6 @@ export const killProcessGroup = (pid: number | null | undefined) => {
   }
 };
 
-/** Windows kill hook: no process groups, SIGKILL the helper pid only. */
 export const killProcess = (pid: number | null | undefined) => {
   if (!pid) return;
   try {
@@ -88,7 +76,6 @@ export const killProcess = (pid: number | null | undefined) => {
   }
 };
 
-/** True when the native helper binary was rebuilt after the daemon started. */
 export const helperNewerThanDaemon = (helperPath: string, pidPath: string) => {
   try {
     return fs.statSync(helperPath).mtimeMs > fs.statSync(pidPath).mtimeMs + 500;
@@ -154,11 +141,6 @@ const pruneStaleEntries = (directory: string, nowMs: number) => {
   }
 };
 
-/**
- * At most once per day, remove sessions (other than the active one) that have
- * no live daemon and have not been touched within the retention window, then
- * sweep stale entries out of `generatedDirectories`.
- */
 export const pruneComputerSessions = (
   activeSessionId: string,
   generatedDirectories: readonly string[] = [],
@@ -174,7 +156,6 @@ export const pruneComputerSessions = (
   try {
     writeJsonAtomic(pruneStatePath(), { prunedAtMs: nowMs });
   } catch {
-    // Without the marker every command would rescan; skip until it persists.
     return;
   }
 
@@ -209,10 +190,6 @@ export const isTruthyEnv = (
     value.trim(),
   );
 
-/**
- * Remove `flag VALUE` / `flag=VALUE` from args. A bare flag followed by
- * nothing or another `--option` reports `missingValue`.
- */
 export const stripOptionValue = (args: string[], flag: string) => {
   const nextArgs: string[] = [];
   let value: string | null = null;
@@ -240,7 +217,6 @@ export const stripOptionValue = (args: string[], flag: string) => {
   return { value, args: nextArgs, missingValue };
 };
 
-/** Read `flag VALUE` / `flag=VALUE`; a following `--option` is not a value. */
 export const getOptionValue = (args: string[], flag: string) => {
   for (let index = 0; index < args.length; index += 1) {
     const current = args[index]!;

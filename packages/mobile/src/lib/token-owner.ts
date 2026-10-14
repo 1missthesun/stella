@@ -5,7 +5,6 @@ const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f]/u;
 const COMPACT_JWT_PATTERN = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/u;
 
 export type TokenOwner = Readonly<{
-  /** The JWT `sub`: the owner id every backend API checks and echoes. */
   subject: string;
   expiresAtSeconds: number;
 }>;
@@ -87,10 +86,6 @@ export const decodeTokenOwner = (token: string): TokenOwner => {
   return Object.freeze({ subject, expiresAtSeconds: parsed.exp });
 };
 
-/**
- * Loads one current token-owner proof, refreshing once when a prior account is
- * still cached. Persistent disagreement fails closed.
- */
 export const resolveTokenOwner = async (options: {
   expectedSubject: string;
   getToken: (options: { forceRefresh: boolean }) => Promise<string>;

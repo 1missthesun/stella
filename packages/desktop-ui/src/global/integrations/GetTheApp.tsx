@@ -44,11 +44,6 @@ const AndroidIcon = (props: SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
-/**
- * The phone app's store link as a QR code, for iOS or Android. Shared by the
- * Connect dialog and onboarding; there is nothing to pair, so this is all a
- * phone needs from the computer.
- */
 export function GetTheApp() {
   const t = useT();
   const [platform, setPlatform] = useState<StorePlatform>("ios");

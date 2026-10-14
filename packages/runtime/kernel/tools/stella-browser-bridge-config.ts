@@ -14,7 +14,6 @@ export const STELLA_BROWSER_BRIDGE_PORT = "39040";
 export const STELLA_IN_APP_BROWSER_INIT_PORT = 39041;
 export const STELLA_BROWSER_MANAGED_BRIDGE = "1";
 
-/** Chrome native messaging host name — must match extension `connectNative` and host manifest. */
 export const STELLA_NATIVE_MESSAGING_HOST_NAME = "com.stella.browser_bridge";
 
 const readBridgeToken = (tokenPath: string): string | null => {

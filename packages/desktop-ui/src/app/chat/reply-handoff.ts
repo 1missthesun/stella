@@ -10,7 +10,6 @@ export type ReplyHandoffIndicatorHandle = {
   shown: () => boolean;
   vacate: () => void;
   exit: () => void;
-  /** Lets an indicator a reply vacated show again. */
   release: () => void;
 };
 
@@ -49,7 +48,6 @@ export function createReplyHandoffController() {
     indicatorReactivated() {
       clearDeactivation();
     },
-    /** The user sent a message: what follows is new work, not the reply's. */
     userMessageSent() {
       indicator?.release();
     },

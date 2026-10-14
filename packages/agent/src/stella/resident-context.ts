@@ -32,7 +32,6 @@ import { CLAUDE_CODE_PROVIDER_ID } from "../engine/selection.ts";
 import { accountProviderOfRegistryId } from "../provider/account-byok.ts";
 import { parseStellaModelId, STELLA_PROVIDER_ID } from "../provider/stella.ts";
 
-/** The sections of `stellaPromptExtension` that are user and environment state, in prompt order. */
 export const RESIDENT_SECTION_KEYS: ReadonlySet<string> = new Set([
   "personality",
   "main-memory",
@@ -98,11 +97,6 @@ const changedText = (key: string, text: string, before: string | undefined, ranO
 const BASELINE_HEADER = "Context about the user and where this conversation runs. A later update replaces a part of it by name.";
 const CHANGE_HEADER = "This context changed. Each part below replaces the earlier part of the same name; the rest still holds.";
 
-/**
- * Whether a user message is resident context: the complete `baseline`, or a
- * `change` to it. Engines that hand the model a conversation as text (Claude
- * Code) use it to deliver the context whole.
- */
 export const residentContextKind = (message: Message): "baseline" | "change" | undefined => {
   if (message.role !== "user") return undefined;
   const text =
@@ -134,7 +128,6 @@ const residentText = (
   return wrapSystemReminder(lines.join("\n\n"));
 };
 
-/** Each resident message's whole context as of it, every change applied, rendered as a baseline. */
 const residentState = new WeakMap<Message, string>();
 
 const residentOrder = [...RESIDENT_SECTION_KEYS];
@@ -144,11 +137,6 @@ const recordState = (message: Message, seen: ReadonlyMap<string, string>) => {
   residentState.set(message, residentText(sections, true));
 };
 
-/**
- * The resident context as of the end of `messages`, every change applied: one
- * baseline to hand a model that is starting over (a fresh session, or one whose
- * own compaction left the context behind). Undefined when there is none.
- */
 export const residentContextAsOf = (messages: readonly Message[]): string | undefined => {
   const last = messages.findLast((message) => residentContextKind(message) !== undefined);
   if (last === undefined) return undefined;
@@ -163,13 +151,6 @@ export const residentContextAsOf = (messages: readonly Message[]): string | unde
     .join("\n\n");
 };
 
-/**
- * Move the resident sections of each system message into a user message at its
- * place: the baseline right after the system prompt, a change in front of the
- * user message that started its turn, so the user's own words stay last. A
- * system message left with nothing (no static section, text or tool change)
- * is dropped.
- */
 export const withResidentContext = (messages: readonly Message[]): readonly Message[] => {
   let changed = false;
   let baselineSeen = false;
@@ -247,8 +228,6 @@ export const withResidentContext = (messages: readonly Message[]): readonly Mess
       out.push(system);
     }
     if (baselineSeen) {
-      // A change lands in front of the input that starts a turn, folded with any change held since. One
-      // written mid-turn is held for the next input, so it never reaches the running turn.
       let end = out.length;
       while (end > 0 && out[end - 1]!.role === "system") end -= 1;
       let at = end;
@@ -257,8 +236,6 @@ export const withResidentContext = (messages: readonly Message[]): readonly Mess
       if (at < end) pendingAt = Math.min(pendingAt ?? at, at);
       continue;
     }
-    // The first system message of a context is its complete baseline; after a compaction it is written
-    // behind the kept messages, and it belongs at the head.
     let at = 0;
     while (at < out.length && out[at]!.role === "system") at += 1;
     for (const [key, text] of resident) if (text !== null) seen.set(key, text);

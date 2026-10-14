@@ -14,17 +14,6 @@ import { type Colors } from "../../theme/colors";
 import { fadeHex } from "../../theme/oklch";
 import { fonts } from "../../theme/fonts";
 
-// ---------------------------------------------------------------------------
-// "+" menu — single source of truth for composer attach actions across both
-// the chat and the computer chat. The chat has both Attach + View computer;
-// the computer chat skips Attach since it doesn't accept image input.
-//
-// The menu renders as a small popover anchored just above the `+` button
-// (drop-up, since the composer is at the bottom of the screen) rather than
-// a center-screen action sheet. This mirrors the desktop's `+` menu
-// behavior and feels more native for an inline composer affordance.
-// ---------------------------------------------------------------------------
-
 export type PlusMenuOption = {
   id: string;
   label: string;
@@ -33,9 +22,7 @@ export type PlusMenuOption = {
   disabled?: boolean;
   selected?: boolean;
   trailingLabel?: string;
-  /** When set, tapping opens this list instead of calling `onSelect`. */
   submenu?: PlusMenuOption[];
-  /** Header shown above a submenu (defaults to the parent row label). */
   submenuTitle?: string;
 };
 
@@ -53,7 +40,6 @@ export type AnchorRect = {
 
 const PLUS_MENU_GAP = 10;
 const PLUS_MENU_MIN_WIDTH = 200;
-// Roomier minimum for the focused message context menu (the `large` variant).
 const PLUS_MENU_LARGE_MIN_WIDTH = 268;
 const PLUS_MENU_EDGE_PADDING = 12;
 
@@ -83,10 +69,6 @@ export function PlusMenuPopover({
    * We translate window anchors into this container's local space.
    */
   containerRef: React.RefObject<View | null>;
-  /**
-   * Non-interactive header shown above the options (the message menu passes the
-   * message timestamp, e.g. "Aug 7, 12:56 PM"). Omitted when null.
-   */
   headerLabel?: string | null;
   /**
    * Focused context-menu treatment (message menu): a LIGHT non-glass scrim
@@ -97,13 +79,7 @@ export function PlusMenuPopover({
    * so the frost must come from the single glass card, not the backdrop.
    */
   scrim?: boolean;
-  /**
-   * Roomier rows/typography/width for the focused message context menu, to match
-   * the reference (a small dense popover like the +/model menus reads too
-   * cramped as a primary context menu).
-   */
   large?: boolean;
-  /** Allow long model names to remain readable. */
   wrapLabels?: boolean;
   minWidth?: number;
 }) {
@@ -117,8 +93,6 @@ export function PlusMenuPopover({
     y: 0,
   });
   const [submenuStack, setSubmenuStack] = useState<PlusMenuLevel[]>([]);
-  // Snappy entrance: the menu springs up from the anchor once it has been
-  // measured, instead of the slow flat fade of the RN Modal.
   const anim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -128,8 +102,6 @@ export function PlusMenuPopover({
       anim.setValue(0);
       return;
     }
-    // Snapshot the container's window offset so window-space anchors land in
-    // the right spot once we re-base them into local coordinates.
     containerRef.current?.measureInWindow((x, y) => setOrigin({ x, y }));
   }, [visible, anim, containerRef]);
 
@@ -192,20 +164,13 @@ export function PlusMenuPopover({
   const measured = menuLayout;
   const menuMinWidth =
     minWidth ?? (large ? PLUS_MENU_LARGE_MIN_WIDTH : PLUS_MENU_MIN_WIDTH);
-  // Cap the options list so a tall menu scrolls instead of overflowing the
-  // screen; short menus (the common case) still size to their content.
   const menuMaxOptionsHeight = Math.round(screen.height * 0.55);
   const desiredWidth = Math.max(menuMinWidth, measured?.width ?? 0);
-  // Left-align with the anchor, clamped inside the screen so the bubble
-  // never spills past the edge of the device. Computed in window space, then
-  // re-based into the container's local space (we render in-tree, not modal).
   const windowLeft = Math.min(
     Math.max(PLUS_MENU_EDGE_PADDING, anchor.x),
     screen.width - desiredWidth - PLUS_MENU_EDGE_PADDING,
   );
   const left = windowLeft - origin.x;
-  // Drop-up by default; fall back to drop-down if the menu wouldn't fit
-  // above the anchor.
   const menuHeight = measured?.height ?? 0;
   const dropUpTop = anchor.y - menuHeight - PLUS_MENU_GAP;
   const isDropDown = Boolean(measured) && dropUpTop < PLUS_MENU_EDGE_PADDING;
@@ -213,8 +178,6 @@ export function PlusMenuPopover({
     ? anchor.y + anchor.height + PLUS_MENU_GAP
     : dropUpTop;
   const top = windowTop - origin.y;
-  // Emerge from the anchor: a drop-up menu rises into place, a drop-down
-  // menu settles down into place.
   const enterTranslateY = anim.interpolate({
     inputRange: [0, 1],
     outputRange: [isDropDown ? -8 : 8, 0],
@@ -254,12 +217,6 @@ export function PlusMenuPopover({
       >
         <GlassSurface
           glass="regular"
-          // The menu card is the ONE Liquid Glass surface (expo-glass-effect
-          // GlassView / UIGlassEffect on iOS 26). The focused message menu
-          // (`scrim` variant) leans into a frostier, more refractive tint so it
-          // reads as genuine Liquid Glass — its backdrop scrim keeps labels
-          // legible, so it needn't carry `legible`'s heavier opaque surface tint
-          // the way the inline +/model menus (over undimmed live chat) do.
           {...(scrim
             ? { tintColor: fadeHex(colors.surface, 0.66) }
             : { legible: true })}
@@ -393,9 +350,6 @@ export function PlusMenuPopover({
 const makePlusMenuStyles = (colors: Colors) =>
   StyleSheet.create({
     overlay: {
-      // In-tree overlay covering the chat root (no Modal), so Liquid Glass can
-      // sample the content behind the menu. `box-none` lets taps fall through
-      // to the backdrop / menu children only.
       ...StyleSheet.absoluteFill,
       zIndex: 50,
     },
@@ -426,7 +380,6 @@ const makePlusMenuStyles = (colors: Colors) =>
       textAlign: "center",
     },
     menuHeaderLabelLarge: { fontSize: 13, paddingVertical: 2 },
-    // `large` variant — roomier rows/typography for the focused message menu.
     menuItemLarge: {
       gap: 14,
       paddingHorizontal: 18,

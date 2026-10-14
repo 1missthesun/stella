@@ -1,28 +1,3 @@
-/**
- * Real previews for a reply's media, generated off the JS thread, once per file.
- *
- * The desktop rail shells out to `qlmanage`, `sips` and `ffmpeg`. A phone has
- * none of that, so each kind takes the cheapest native route Expo already
- * offers, and the JS thread never decodes, parses or rasterizes anything:
- *
- * - An image shows the small JPEG made where the file entered the drive
- *   (`.thumbnails/<drive path>.jpg`, see `chat-evidence-thumbnails`), or one
- *   the computer that has it renders on request. Only when neither exists is the
- *   whole file pulled down and handed to `expo-image` as a `file://` URI.
- * - A video's poster frame comes from `expo-video-thumbnails`, which reads the
- *   frame with AVFoundation. For a drive file it reads the signed URL directly,
- *   so a ten-minute recording costs a range request, not a download. At rest a
- *   video card is that still image; playback only ever happens in the viewer a
- *   tap opens, so a row of videos costs a row of images.
- * - Audio's waveform is a ~200-number peaks array from `@siteed/audio-studio`'s
- *   native extractor. The UI gets the numbers; the audio file is loaded only if
- *   the user presses play.
- *
- * Everything is keyed by content identity and parked in a disk manifest, so a
- * file is read once and a scroll back up costs a `readFile` of a tiny JSON.
- * Identity is the MD5 the filesystem computes natively for a file we hold, and
- * drive path plus byte size for one we deliberately never download.
- */
 import { Directory, File, Paths } from "expo-file-system";
 import { Image } from "expo-image";
 import * as VideoThumbnails from "expo-video-thumbnails";
@@ -54,10 +29,6 @@ const CACHE_SCHEMA = "v1";
 const CACHE_DIRNAME = "chat-evidence";
 const POSTER_WIDTH = 480;
 
-/**
- * Above these a preview is not worth what it costs to get the bytes onto the
- * phone, so the file falls into the pill row instead of showing nothing.
- */
 const MAX_IMAGE_BYTES = 40 * 1024 * 1024;
 const MAX_AUDIO_BYTES = 48 * 1024 * 1024;
 const MAX_DEVICE_READ_BYTES = 64 * 1024 * 1024;
@@ -135,11 +106,6 @@ const writeManifest = (contentKey: string, preview: EvidencePreview): void => {
   }
 };
 
-/**
- * A chat path that names a drive file: a `stella://drive/...` or cloud world
- * link, or the drive-relative form a phone's own upload carries. Anything
- * absolute is a path on the paired computer.
- */
 const drivePathFor = (filePath: string): string | null => {
   const trimmed = filePath.trim();
   const linked = driveLinkPath(trimmed);
@@ -170,11 +136,6 @@ const remoteSourceFor = async (filePath: string): Promise<RemoteSource | null> =
 
 type LocalSource = { uri: string; sizeBytes: number; identity: string };
 
-/**
- * The file on this device, downloaded natively when it lives in the drive and
- * read in ranges from whichever computer has it when it does not, written to
- * disk range by range rather than held whole.
- */
 const localSourceFor = async (
   request: EvidencePreviewRequest,
   remote: RemoteSource | null,
@@ -299,8 +260,6 @@ const imagePreviewFor = async (
   }
   const cached = readManifest(local.identity);
   if (cached?.kind === "image") return cached;
-  // One native load, read for its size and released at once; nothing else
-  // here wants the bitmap.
   const reference = await Image.loadAsync({ uri: local.uri });
   const preview: EvidencePreview = {
     kind: "image",
@@ -317,8 +276,6 @@ const videoPreviewFor = async (
   request: EvidencePreviewRequest,
   remote: RemoteSource | null,
 ): Promise<EvidencePreview> => {
-  // A drive video is never downloaded for its poster: AVFoundation reads the
-  // one frame it needs over the signed URL.
   const identity =
     remote?.identity ?? (await localSourceFor(request, null)).identity;
   const cached = readManifest(identity);
@@ -397,11 +354,6 @@ const withSlot = async <T>(work: () => Promise<T>): Promise<T> => {
 
 const inFlight = new Map<string, Promise<EvidencePreview>>();
 
-/**
- * The preview for one attached file. Shared per path for the life of the app
- * session, so a row that scrolls out and back, or two replies naming the same
- * file, never generate twice.
- */
 export const requestEvidencePreview = (
   request: EvidencePreviewRequest,
 ): Promise<EvidencePreview> => {
@@ -426,7 +378,6 @@ export const clearEvidencePreviews = (): void => {
   inFlight.clear();
 };
 
-/** The playable `file://` URI for an audio card, downloaded only on press. */
 export const evidenceAudioFileUri = async (
   request: EvidencePreviewRequest,
 ): Promise<string> => {
@@ -434,10 +385,6 @@ export const evidenceAudioFileUri = async (
   return (await localSourceFor(request, remote)).uri;
 };
 
-/**
- * The copy of a paired-computer file a preview already pulled onto this
- * device, if there is one, so the viewer can play it without a second read.
- */
 export const cachedEvidenceSourceUri = (filePath: string): string | null => {
   const file = new File(
     directoryFor("source"),

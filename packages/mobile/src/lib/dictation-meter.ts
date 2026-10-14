@@ -1,17 +1,5 @@
 import { useSyncExternalStore } from "react";
 
-/**
- * Leaf-level store for the dictation waveform and timer.
- *
- * Mirrors desktop's session meter: one waveform bar per ~80 ms of audio,
- * published on a fixed ~12.5 Hz tick. The recorder hands audio over in
- * chunks whose length it decides (iOS currently sends a whole second at a
- * time, whatever interval is asked for), so each chunk is cut into 80 ms
- * slices, one level per slice, and the tick releases them one by one. The
- * row therefore keeps moving at desktop's pace however the audio arrives.
- */
-
-/** ≈ 12.5 bars per second, matching desktop's `LEVEL_EMIT_INTERVAL_MS`. */
 const LEVEL_TICK_MS = 80;
 
 type DictationMeterSnapshot = {
@@ -27,7 +15,6 @@ let snapshot: DictationMeterSnapshot = {
   level: 0,
   revision: 0,
 };
-/** Most queued bars kept; older ones are dropped so the row never lags further. */
 const MAX_QUEUED_LEVELS = 16;
 
 let queuedLevels: number[] = [];
@@ -55,7 +42,6 @@ export const startDictationMeter = (startedAt: number): void => {
   }, LEVEL_TICK_MS);
 };
 
-/** Queue 0..1 levels, one per 80 ms of audio; each tick publishes the next. */
 export const pushDictationLevels = (levels: readonly number[]): void => {
   for (const level of levels) {
     queuedLevels.push(Math.max(0, Math.min(1, level)));
@@ -80,11 +66,6 @@ const subscribe = (listener: () => void) => {
   };
 };
 
-/**
- * Re-renders once per waveform tick. Read the level through
- * `getDictationMeterSnapshot()` so identical consecutive levels (silence)
- * still append a bar.
- */
 export const useDictationMeterTick = (): number =>
   useSyncExternalStore(
     subscribe,
@@ -92,7 +73,6 @@ export const useDictationMeterTick = (): number =>
     () => snapshot.revision,
   );
 
-/** The recording start time, or 0 while idle. Stable across level ticks. */
 export const useDictationMeterStartedAt = (): number =>
   useSyncExternalStore(
     subscribe,

@@ -31,7 +31,6 @@ const readBody = async (response: Response): Promise<unknown> => {
   }
 };
 
-/** One call to Stella's X API with the given bearer, as status and JSON body. */
 export const sendXApiRequest = async (
   auth: XApiAuth,
   operation: XApiOperation,

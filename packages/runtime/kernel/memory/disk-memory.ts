@@ -22,7 +22,6 @@ import {
 } from "./memory-client.js";
 import { MEMORIES_DIR } from "./memory-layout.js";
 
-/** Directory entries one `list()` walks before it stops. */
 const MAX_WALK_ENTRIES = 5_000;
 
 const sha256 = (bytes: Uint8Array): string =>
@@ -134,7 +133,6 @@ const createDiskMemoryStore = (stellaDataDir: string): MemoryFileStore => {
   };
 };
 
-/** The memory client over `stellaDataDir`, refused while `enabled()` is false. */
 export const createDiskMemory = (
   stellaDataDir: string,
   enabled: () => boolean,

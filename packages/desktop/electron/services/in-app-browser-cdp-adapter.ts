@@ -149,7 +149,6 @@ const isSafeTargetUrl = (value: string) => {
   if (value === "about:blank") return true;
   try {
     const parsed = new URL(value);
-    // `stella-preview://<draft>` opens the app's own UI from a draft.
     return (
       parsed.protocol === "http:" ||
       parsed.protocol === "https:" ||
@@ -345,8 +344,6 @@ export class InAppBrowserCdpAdapter {
       [...this.clients].map(async (client) => {
         await this.hideClientAgentCursors(client);
         await this.detachChildSessions(client);
-        // Only ever stopped on quit: a closing handshake the client never
-        // answers would hold the server open (and quit) until it times out.
         client.socket.terminate();
       }),
     );
@@ -421,8 +418,6 @@ export class InAppBrowserCdpAdapter {
           protocolVersion: "1.3",
           product: "Stella/InAppBrowser",
           revision: "0",
-          // Mirror the session-level UA so any CDP client that derives the page
-          // UA from Browser.getVersion sees the real Chrome UA, not "Stella".
           userAgent:
             this.controller.getDebuggerUserAgent?.() ??
             buildInAppBrowserUserAgent(undefined),

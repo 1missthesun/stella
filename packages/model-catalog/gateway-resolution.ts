@@ -8,7 +8,6 @@ import {
 } from "./request-estimate";
 import { resolveCloudManagedProtocol } from "./request-shaping";
 
-/** Local prediction only. The gateway validates this entire descriptor on inference. */
 export const resolveManagedModelDescriptor = (args: {
   agentType: string;
   requestedModel: string;
@@ -35,7 +34,6 @@ export const resolveManagedModelDescriptor = (args: {
   });
 };
 
-/** Shared wire metadata construction, used by prediction and authoritative routing. */
 export const managedModelDescriptor = (
   route: Pick<
     GatewayModelResolution,

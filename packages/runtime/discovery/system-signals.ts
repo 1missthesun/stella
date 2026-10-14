@@ -1,14 +1,3 @@
-/**
- * System Signals Collector
- *
- * Gathers behavioral data:
- * - Screen Time / app usage (knowledgeC.db on macOS, ActivitiesCache.db on Windows)
- * - Dock pins (macOS) / Taskbar pins (Windows)
- * - OS account identity
- *
- * NO theme/accessibility/appearance signals — only behavioral data.
- */
-
 import path from "path";
 import os from "os";
 import { exec } from "child_process";
@@ -32,10 +21,6 @@ import type {
 
 const log = (...args: unknown[]) => console.error("[system-signals]", ...args);
 
-// ---------------------------------------------------------------------------
-// Utilities
-// ---------------------------------------------------------------------------
-
 const execAsync = (command: string): Promise<string> => {
   return new Promise((resolve, reject) => {
     exec(command, { encoding: "utf-8", maxBuffer: 5 * 1024 * 1024, windowsHide: true }, (error, stdout) => {
@@ -47,10 +32,6 @@ const execAsync = (command: string): Promise<string> => {
 
 const getErrorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
-
-// ---------------------------------------------------------------------------
-// SQLite Helper
-// ---------------------------------------------------------------------------
 
 type SqliteDatabase = {
   prepare(sql: string): { all(...params: unknown[]): unknown[] };
@@ -64,10 +45,6 @@ const openDatabase = async (dbPath: string): Promise<SqliteDatabase> => {
   const uri = `${pathToFileURL(dbPath).href}?immutable=1`;
   return new Database(uri, { readonly: true }) as SqliteDatabase;
 };
-
-// ---------------------------------------------------------------------------
-// User Identity
-// ---------------------------------------------------------------------------
 
 async function collectUserIdentity(): Promise<UserIdentitySignal | null> {
   const identity: UserIdentitySignal = {};
@@ -96,10 +73,6 @@ async function collectUserIdentity(): Promise<UserIdentitySignal | null> {
     ? identity
     : null;
 }
-
-// ---------------------------------------------------------------------------
-// Dock Pins (macOS)
-// ---------------------------------------------------------------------------
 
 async function collectDockPins(): Promise<DockPin[]> {
   if (os.platform() !== "darwin") {
@@ -139,12 +112,6 @@ async function collectDockPins(): Promise<DockPin[]> {
   }
 }
 
-// ---------------------------------------------------------------------------
-// App Usage
-// ---------------------------------------------------------------------------
-
-// Access denial on open is a distinct, quieter outcome than any other
-// failure — mirrored from the pre-Effect nested try/catch.
 type AppUsageOpenDenied = { readonly _tag: "openDenied" };
 
 const collectAppUsageMacOSEffect: Effect.Effect<AppUsageSummary[]> =
@@ -205,22 +172,18 @@ const processMacAppUsageRows = (
   rows: Array<{ app: string; total_seconds: number }>,
 ): AppUsageSummary[] => {
   {
-    // Process results
     const appUsage: AppUsageSummary[] = rows.map((row) => {
       let appName = row.app;
 
-      // Clean up app names
       if (appName.startsWith("com.apple.")) {
         appName = appName.replace("com.apple.", "");
       }
 
-      // Extract last component of bundle IDs
       const parts = appName.split(".");
       if (parts.length > 1) {
         appName = parts[parts.length - 1];
       }
 
-      // Capitalize first letter
       appName = appName.charAt(0).toUpperCase() + appName.slice(1);
 
       const durationMinutes = Math.round(row.total_seconds / 60);
@@ -241,7 +204,6 @@ const findWindowsActivitiesCacheDb = async (): Promise<string | null> => {
     "AppData/Local/ConnectedDevicesPlatform"
   );
 
-  // Find ActivitiesCache.db (check all subdirs in parallel)
   const dirs = await fs.readdir(cdpBase);
   const dbResults = await Promise.all(
     dirs.map(async (dir) => {
@@ -269,7 +231,6 @@ const collectAppUsageWindowsEffect: Effect.Effect<AppUsageSummary[]> =
 
       const db = yield* acquireCloseable(() => openDatabase(dbPath));
 
-      // Preferred query when ActiveDurationSeconds is available.
       const query = `
         SELECT
           AppId,
@@ -280,7 +241,6 @@ const collectAppUsageWindowsEffect: Effect.Effect<AppUsageSummary[]> =
         ORDER BY total_seconds DESC
         LIMIT 30
       `;
-      // Fallback for schema variants where duration columns differ.
       const fallbackQuery = `
         SELECT
           AppId,
@@ -305,12 +265,10 @@ const collectAppUsageWindowsEffect: Effect.Effect<AppUsageSummary[]> =
         ),
       );
 
-      // Process results
       const appUsage: AppUsageSummary[] = rows
         .map((row) => {
           let appName = row.AppId;
 
-          // Try to parse as JSON
           try {
             const parsed = JSON.parse(appName);
             if (parsed.application) {
@@ -320,7 +278,6 @@ const collectAppUsageWindowsEffect: Effect.Effect<AppUsageSummary[]> =
             // Not JSON, use as-is
           }
 
-          // Clean up app names
           if (appName.startsWith("Microsoft.")) {
             appName = appName.replace("Microsoft.", "");
           }
@@ -354,15 +311,6 @@ const collectAppUsageEffect: Effect.Effect<AppUsageSummary[]> = Effect.suspend(
   },
 );
 
-// ---------------------------------------------------------------------------
-// Device / Hardware
-// ---------------------------------------------------------------------------
-
-/**
- * Device + hardware profile. Most fields come from Node's `os` module (instant,
- * cross-platform); OS marketing version and hardware model are enriched per
- * platform best-effort.
- */
 async function collectDevice(): Promise<DeviceSignals> {
   const platform = os.platform();
   const cpus = os.cpus();
@@ -418,12 +366,6 @@ async function collectDevice(): Promise<DeviceSignals> {
   return { os: osLabel, arch, model, cpu, cpuCores, memoryGB };
 }
 
-// ---------------------------------------------------------------------------
-// Main Collector
-// ---------------------------------------------------------------------------
-
-// All four probes race their timeouts in parallel — the pre-Effect
-// `Promise.all` of `withTimeout(...)` calls, with the same budgets.
 const collectSystemSignalsEffect: Effect.Effect<SystemSignals, unknown> =
   Effect.all(
     [
@@ -446,10 +388,6 @@ export async function collectSystemSignals(): Promise<SystemSignals> {
   return runDiscovery(collectSystemSignalsEffect);
 }
 
-// ---------------------------------------------------------------------------
-// Format for Synthesis
-// ---------------------------------------------------------------------------
-
 export function formatSystemSignalsForSynthesis(data: SystemSignals): string {
   const sections: string[] = [];
 
@@ -467,7 +405,6 @@ export function formatSystemSignalsForSynthesis(data: SystemSignals): string {
     sections.push(identitySection.join("\n"));
   }
 
-  // Device & Hardware
   if (data.device) {
     const d = data.device;
     const deviceLines = ["### Device"];
@@ -481,7 +418,6 @@ export function formatSystemSignalsForSynthesis(data: SystemSignals): string {
     if (deviceLines.length > 1) sections.push(deviceLines.join("\n"));
   }
 
-  // Dock/Pinned Apps
   if (data.dockPins.length > 0) {
     const dockSection = ["### Dock/Pinned Apps"];
     for (const pin of data.dockPins) {
@@ -490,7 +426,6 @@ export function formatSystemSignalsForSynthesis(data: SystemSignals): string {
     sections.push(dockSection.join("\n"));
   }
 
-  // App Usage
   if (data.appUsage.length > 0) {
     const appSection = ["### App Usage (Screen Time)"];
     for (const app of data.appUsage) {

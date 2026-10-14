@@ -174,9 +174,7 @@ const scheduleUserAskRepeats = (askId: string) => {
 Notifications.setNotificationHandler({
   handleNotification: async (notification) => {
     if (!pushDeliveryEnabled()) return { ...SILENT };
-    // User-side mute wins over everything — drop the notification entirely.
     if (getNotificationsMuted()) return { ...SILENT };
-    // A reminder is due now: it shows even over the app.
     if (parseReminderPushData(notification.request.content.data)) {
       return {
         shouldShowAlert: true,
@@ -203,7 +201,6 @@ Notifications.setNotificationHandler({
         };
       }
     }
-    // Don't surface pushes over the app the user is currently looking at.
     const isForeground = isPhoneInForeground();
     if (isForeground) return { ...SILENT };
     return {

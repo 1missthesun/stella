@@ -1,8 +1,3 @@
-/**
- * Pending inline connect cards for the signed-in account: what a cloud
- * orchestrator turn is waiting on while its `connector_status` call holds.
- * Watched through the backend's `connect.pending` view.
- */
 import { useCallback, useMemo } from "react";
 import type {
   CloudConnectorConnectDecision,

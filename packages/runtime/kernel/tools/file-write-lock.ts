@@ -37,7 +37,6 @@ export const withFileWriteLock = async <T>(
 ): Promise<T> => {
   const key = lockKeyForPath(filePath);
   const prev = queues.get(key) ?? Promise.resolve();
-  // Run regardless of whether the previous holder succeeded or failed.
   const run = prev.then(fn, fn);
   const tail = run.then(
     () => undefined,
@@ -52,11 +51,6 @@ export const withFileWriteLock = async <T>(
   return run;
 };
 
-/**
- * Acquire locks on several paths (e.g. an update that also moves the file).
- * Keys are deduped and acquired in sorted order so two multi-path callers
- * can never deadlock against each other.
- */
 export const withFileWriteLocks = async <T>(
   filePaths: string[],
   fn: () => Promise<T>,

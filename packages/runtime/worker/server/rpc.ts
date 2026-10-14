@@ -6,13 +6,6 @@ import type * as ModelCatalog from "./model-catalog.js";
 import type * as RunnerModule from "./runner-module.js";
 import type * as WorkerSessions from "./sessions.js";
 
-/**
- * The thin JSON-RPC adapter over the service layer. Handlers are Effects
- * over the base worker services; dispatch runs each request on the shared
- * ManagedRuntime (one run per request preserves the old unbounded handler
- * concurrency) and rethrows failures as the original error objects so the
- * peer serializes the same `error.message` strings as before.
- */
 export type WorkerRpcContext =
   | HostBus.Service
   | ModelCatalog.Service
@@ -25,8 +18,6 @@ export type WorkerRpcHandler = (
 
 export type WorkerRpcHandlers = Record<string, WorkerRpcHandler>;
 
-/** Adapt an imperative promise into a handler Effect, failing with the raw
- * thrown value so the wire error is unchanged. */
 export const fromPromise = <A>(f: () => Promise<A>): Effect.Effect<A, unknown> =>
   Effect.tryPromise({ try: f, catch: (error) => error });
 

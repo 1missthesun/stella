@@ -1,16 +1,3 @@
-/**
- * iMessage-style time labels for the transcript: a centered time between
- * messages, shown only when a long enough gap precedes one, instead of a stamp
- * under every message.
- *
- * This is the SAME rule mobile applies (`packages/mobile/src/lib/
- * message-time-labels.ts` — same gap threshold, same label shapes), so the two
- * clients break a conversation into the same time groups. Desktop builds the
- * label through `Intl` with the active UI locale rather than hardcoding
- * English, which is the only intentional difference.
- */
-
-/** A new centered time appears after this much quiet. */
 export const TIMESTAMP_GAP_MS = 60 * 60_000;
 
 const DAY_MS = 24 * 60 * 60_000;
@@ -27,17 +14,12 @@ const timeOfDay = (ms: number, locale?: string): string =>
     minute: "2-digit",
   });
 
-/** Calendar days between `ms` and `now` (0 = today, 1 = yesterday). */
 const daysAgo = (ms: number, now: number): number =>
   Math.round((startOfDay(now) - startOfDay(ms)) / DAY_MS);
 
 const capitalize = (value: string): string =>
   value.length > 0 ? value[0]!.toLocaleUpperCase() + value.slice(1) : value;
 
-/**
- * `Intl`'s own "today" / "yesterday" wording for the active locale, so the
- * divider doesn't need a translation key per language.
- */
 const relativeDayLabel = (days: number, locale?: string): string =>
   capitalize(
     new Intl.RelativeTimeFormat(locale, { numeric: "auto" }).format(
@@ -46,10 +28,6 @@ const relativeDayLabel = (days: number, locale?: string): string =>
     ),
   );
 
-/**
- * "Today 5:48 PM", "Yesterday 5:48 PM", "Monday 5:48 PM" within the week,
- * "Sep 23, 11:07 PM" this year, then "Sep 23, 2025, 11:07 PM".
- */
 export function formatTimestampHeader(
   ms: number,
   locale?: string,
@@ -73,11 +51,6 @@ export function formatTimestampHeader(
   });
 }
 
-/**
- * The messages that get a centered time above them, with that time. Entries
- * must be in display order; ones without a usable created time are skipped
- * (they can't open or close a time group).
- */
 export function timestampHeaders(
   entries: readonly { id: string; timestampMs?: number }[],
 ): Map<string, number> {

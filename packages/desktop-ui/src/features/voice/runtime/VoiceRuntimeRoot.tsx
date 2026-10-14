@@ -76,9 +76,6 @@ export function VoiceRuntimeRoot() {
   const speakingRef = useRef(false);
   const userSpeakingRef = useRef(false);
   const sessionStateRef = useRef<VoiceSessionState>("idle");
-  // Dedupe the actionable voice-error toast: the manager re-emits "error" on
-  // every retry tick, so only toast once per distinct error message until the
-  // session recovers (leaves the error state).
   const lastVoiceErrorToastRef = useRef<string | null>(null);
   const resolvedConversationId = state.conversationId ?? bootConversationId;
 
@@ -248,15 +245,6 @@ export function VoiceRuntimeRoot() {
       onStateChange: (sessionState, errorMessage) => {
         sessionStateRef.current = sessionState;
         if (sessionState === "error") {
-          // This runtime lives in the hidden overlay window, so a local
-          // `showToast` would paint where the user can't see it. Two separate
-          // forwards to the main process:
-          //   - the reason, always, so a voice surface can show why the call
-          //     failed rather than rendering an empty card;
-          //   - a toast, only for failures the user must act on (not signed
-          //     in, no Pro, provider not connected). Transient blips ride the
-          //     silent auto-retry, and the toast is deduped per distinct
-          //     message so retries don't restack it.
           window.electronAPI?.voice.reportSessionErrorState?.(
             errorMessage ?? "",
           );

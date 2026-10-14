@@ -1,13 +1,3 @@
-/**
- * Inline connect card: an agent asked (via `connector_status`) to use an
- * integration that isn't connected yet.
- * Rendered in the flow of the chat surfaces, pinned above the composer
- * while the agent's turn is blocked on the answer. Connect launches the
- * same Composio/OAuth flow as the Store (browser hand-off, no modal);
- * Not now resolves a decline; nothing is persisted, so whether to offer
- * again is the orchestrator's call.
- */
-
 import { useState } from "react";
 import { AlertCircle, Check, Globe } from "@/ui/icons";
 import { Button } from "@/ui/button";
@@ -23,7 +13,6 @@ export const ConnectorConnectCard = ({
   conversationId,
 }: {
   compact?: boolean;
-  /** Scope: only requests for this chat (or unscoped ones) render here. */
   conversationId?: string | null;
 }) => {
   const t = useT();

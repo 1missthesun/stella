@@ -3,11 +3,6 @@ import { isDocumentFolderAsset } from "@stella/contracts/html-relative-assets";
 import { DisplayFileSourceContext } from "@/shared/hooks/display-file-source";
 import { backendClient } from "@/platform/backend/backend-client";
 
-/**
- * The Drive file a viewer's read names: the document itself, or an asset in
- * its Drive folder (a markdown file's relative image). The viewer names files
- * as the payload does, the drive path with a leading `/`.
- */
 const drivePathFor = (documentPath: string, filePath: string): string => {
   const document = `/${documentPath}`;
   const requested = filePath.startsWith("/") ? filePath : `/${filePath}`;

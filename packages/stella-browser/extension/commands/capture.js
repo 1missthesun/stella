@@ -1,6 +1,3 @@
-/**
- * Capture command handlers: screenshot, snapshot, content, evaluate, pdf.
- */
 import { getActiveTab } from "./tabs.js";
 import {
   setRefMap,
@@ -148,7 +145,6 @@ export async function handleSnapshot(command) {
 
   const snapshot = await captureFrameSnapshot(tab.id, options, kind);
 
-  // Update the ref map for subsequent commands
   setRefMap(command.ownerId, tab.id, snapshot.refs || {});
 
   return { id: command.id, success: true, data: snapshot };

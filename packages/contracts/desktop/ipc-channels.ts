@@ -1,19 +1,3 @@
-/**
- * IPC Channel Constants
- *
- * Single source of truth for all Electron IPC channel names used between the
- * main process (electron/ipc/*.ts, electron/preload.ts) and the renderer.
- *
- * Import these constants instead of using raw channel-name strings so that:
- *   1. Typos are caught at compile time.
- *   2. Renaming a channel is a single-point change.
- *   3. "Find all references" works across both processes.
- *
- * Naming convention:  `<namespace>:<verb|noun>` in camelCase.
- */
-
-// ── Window ──────────────────────────────────────────────────────────────────
-
 export const IPC_WINDOW_MINIMIZE = "window:minimize" as const;
 export const IPC_WINDOW_MAXIMIZE = "window:maximize" as const;
 export const IPC_WINDOW_CLOSE = "window:close" as const;
@@ -21,8 +5,6 @@ export const IPC_WINDOW_IS_MAXIMIZED = "window:isMaximized" as const;
 export const IPC_WINDOW_SHOW = "window:show" as const;
 export const IPC_WINDOW_SET_NATIVE_BUTTONS_VISIBLE =
   "window:setNativeButtonsVisible" as const;
-
-// ── Display ─────────────────────────────────────────────────────────────────
 
 export const IPC_DISPLAY_UPDATE = "display:update" as const;
 export const IPC_DISPLAY_READ_FILE = "display:readFile" as const;
@@ -46,30 +28,17 @@ export const IPC_OFFICE_PREVIEW_UPDATE = "officePreview:update" as const;
 export const IPC_CHAT_EVIDENCE_CARDS = "chatEvidence:cards" as const;
 export const IPC_CHAT_EVIDENCE_DRIVE_CARDS = "chatEvidence:driveCards" as const;
 
-// ── Remote execution consent ────────────────────────────────────────────────
-
-/**
- * Something tried to dispatch work to this computer and it has not agreed to
- * accept any. Main broadcasts the question; the renderer asks on this
- * machine's own screen and answers with the second channel.
- */
 export const IPC_EXECUTION_REMOTE_REQUEST =
   "execution:remoteExecutionRequest" as const;
 export const IPC_EXECUTION_ANSWER_REMOTE_REQUEST =
   "execution:answerRemoteExecutionRequest" as const;
-/** The question still waiting for an answer, for a window that opened after it was raised. */
 export const IPC_EXECUTION_PENDING_REMOTE_REQUEST =
   "execution:pendingRemoteExecutionRequest" as const;
-/** The orchestrator moved the chat with `switch_destination`; the picker follows. */
 export const IPC_EXECUTION_TARGET_SET = "execution:targetSet" as const;
-
-// ── UI State ────────────────────────────────────────────────────────────────
 
 export const IPC_UI_GET_STATE = "ui:getState" as const;
 export const IPC_UI_SET_STATE = "ui:setState" as const;
 export const IPC_UI_STATE = "ui:state" as const;
-
-// ── Shared UI state KV (~/.stella/ui-state.json) ───────────────────────────
 
 export const IPC_UI_STATE_KV_SNAPSHOT = "uiState:snapshot" as const;
 export const IPC_UI_STATE_KV_APPLY = "uiState:apply" as const;
@@ -80,8 +49,6 @@ export const IPC_APP_RELOAD = "app:reload" as const;
 export const IPC_APP_RELAUNCH = "app:relaunch" as const;
 export const IPC_APP_HARD_RESET = "app:hardResetLocalState" as const;
 
-// ── App source (drafts, undo, fork sync when running from source) ─────────
-
 export const IPC_APP_SOURCE_GET_STATE = "appSource:getState" as const;
 export const IPC_APP_SOURCE_STATE = "appSource:state" as const;
 export const IPC_APP_SOURCE_APPLY = "appSource:apply" as const;
@@ -89,8 +56,6 @@ export const IPC_APP_SOURCE_UNDO = "appSource:undo" as const;
 export const IPC_APP_SOURCE_APPLY_REMOTE = "appSource:applyRemote" as const;
 export const IPC_APP_SOURCE_APPLY_UPSTREAM = "appSource:applyUpstream" as const;
 export const IPC_APP_SOURCE_SKIP = "appSource:skip" as const;
-
-// ── Capture ─────────────────────────────────────────────────────────────────
 
 export const IPC_CHAT_CONTEXT_GET = "chatContext:get" as const;
 export const IPC_CHAT_CONTEXT_SET = "chatContext:set" as const;
@@ -108,8 +73,6 @@ export const IPC_CAPTURE_REGION_FAILED = "capture:regionCaptureFailed" as const;
 export const IPC_CAPTURE_BEGIN_REGION_CAPTURE =
   "capture:beginRegionCapture" as const;
 
-// ── Overlay ─────────────────────────────────────────────────────────────────
-
 export const IPC_OVERLAY_SET_INTERACTIVE = "overlay:setInteractive" as const;
 export const IPC_OVERLAY_START_REGION_CAPTURE =
   "overlay:startRegionCapture" as const;
@@ -123,15 +86,9 @@ export const IPC_OVERLAY_PREVIEW_WINDOW_HIGHLIGHT_AT_POINT =
   "overlay:previewWindowHighlightAtPoint" as const;
 
 
-// ── Theme ───────────────────────────────────────────────────────────────────
-
 export const IPC_THEME_LIST_INSTALLED = "theme:listInstalled" as const;
 
-// ── Website ─────────────────────────────────────────────────────────────────
-
 export const IPC_WEBSITE_GET_BASE_URL = "website:getBaseUrl" as const;
-
-// ── Self-hosted servers ─────────────────────────────────────────────────────
 
 export const IPC_SELF_HOST_GET_STATE = "selfHost:getState" as const;
 export const IPC_SELF_HOST_TAKE_PENDING_LINK = "selfHost:takePendingLink" as const;
@@ -141,16 +98,12 @@ export const IPC_SELF_HOST_USE_DEFAULT = "selfHost:useDefault" as const;
 export const IPC_SELF_HOST_START_PAIRING = "selfHost:startPairing" as const;
 export const IPC_SELF_HOST_PAIRING_STATUS = "selfHost:pairingStatus" as const;
 export const IPC_SELF_HOST_CANCEL_PAIRING = "selfHost:cancelPairing" as const;
-/** Main → renderer: a `stella://pair?…` link opened while Stella runs. */
 export const IPC_SELF_HOST_PAIR_LINK = "selfHost:pairLink" as const;
-
-// ── Voice ───────────────────────────────────────────────────────────────────
 
 export const IPC_VOICE_PERSIST_TRANSCRIPT = "voice:persistTranscript" as const;
 export const IPC_VOICE_ORCHESTRATOR_CHAT = "voice:orchestratorChat" as const;
 export const IPC_VOICE_ORCHESTRATOR_CONFIG =
   "voice:orchestratorConfig" as const;
-/** Main → overlay voice runtime: status/tool activity of a delegated run. */
 export const IPC_VOICE_ORCHESTRATOR_ACTIVITY =
   "voice:orchestratorActivity" as const;
 export const IPC_VOICE_CREATE_OPENAI_SESSION =
@@ -161,22 +114,16 @@ export const IPC_VOICE_RUNTIME_STATE = "voice:runtimeState" as const;
 export const IPC_VOICE_RTC_SET_SHORTCUT = "voice-rtc:setShortcut" as const;
 export const IPC_VOICE_RTC_GET_SHORTCUT = "voice-rtc:getShortcut" as const;
 export const IPC_VOICE_RTC_TOGGLE = "voice-rtc:toggle" as const;
-/** Renderer (overlay voice runtime) → main: an actionable voice session error. */
 export const IPC_VOICE_REPORT_SESSION_ERROR =
   "voice:reportSessionError" as const;
-/** Main → renderer (visible app window): show a voice session error toast. */
 export const IPC_VOICE_SESSION_ERROR = "voice:sessionError" as const;
-/** The last voice connection failure reason (every failure, not just toasts). */
 export const IPC_VOICE_REPORT_SESSION_ERROR_STATE =
   "voice:reportSessionErrorState" as const;
 export const IPC_VOICE_GET_SESSION_ERROR_STATE =
   "voice:getSessionErrorState" as const;
 export const IPC_VOICE_SESSION_ERROR_STATE = "voice:sessionErrorState" as const;
-/** Main → renderer: the effective realtime provider route changed. */
 export const IPC_VOICE_PREFERENCES_CHANGED =
   "voice:preferencesChanged" as const;
-
-// ── Dictation ───────────────────────────────────────────────────────────────
 
 export const IPC_DICTATION_TOGGLE = "dictation:toggle" as const;
 export const IPC_DICTATION_SET_SHORTCUT = "dictation:setShortcut" as const;
@@ -195,22 +142,11 @@ export const IPC_DICTATION_ACTIVE_CHANGED = "dictation:activeChanged" as const;
 export const IPC_DICTATION_PLAY_SOUND = "dictation:playSound" as const;
 
 export const IPC_AGENT_SEND_INPUT = "agent:sendInput" as const;
-/** The pi-durable chat: requests (`PiChatRequest`), and a watched conversation's events. */
 export const IPC_PI_CHAT_REQUEST = "piChat:request" as const;
 export const IPC_PI_CHAT_EVENTS = "piChat:events" as const;
-/**
- * Fired by the main process whenever the runtime client transitions
- * between connected and disconnected — most importantly after the
- * detached worker reattaches following an Electron restart. The
- * renderer subscribes so the chat-side `useResumeAgentRun` hook can
- * re-trigger replay without waiting for the user to navigate away
- * and back.
- */
 export const IPC_RUNTIME_AVAILABILITY = "runtime:availability" as const;
 export const IPC_PREFERENCES_MODELS_UPDATED =
   "preferences:modelsUpdated" as const;
-
-// ── System ──────────────────────────────────────────────────────────────────
 
 export const IPC_DEVICE_GET_ID = "device:getId" as const;
 export const IPC_AUTH_GET_CHALLENGE_TOKEN = "auth:getChallengeToken" as const;
@@ -225,8 +161,6 @@ export const IPC_AUTH_LIST_SESSIONS = "auth:listSessions" as const;
 export const IPC_AUTH_REVOKE_SESSION = "auth:revokeSession" as const;
 export const IPC_HOST_SET_CLOUD_SYNC = "host:setCloudSyncEnabled" as const;
 
-// Main revoked this device's session on its own (the stored bearer was
-// rejected). Push-only: nothing the renderer did triggers it.
 export const IPC_AUTH_SESSION_INVALIDATED = "auth:sessionInvalidated" as const;
 export const IPC_APP_QUIT_FOR_RESTART = "app:quitForRestart" as const;
 export const IPC_PERMISSIONS_GET_STATUS = "permissions:getStatus" as const;
@@ -345,28 +279,20 @@ export const IPC_USER_ASK_SECURE_VALUES_DELETE =
 export const IPC_USER_ASK_SECURE_VALUES_RENAME =
   "userAsk:secureValuesRename" as const;
 
-// ── Connector credentials / connect prompts ────────────────────────────────
-
 export const IPC_CONNECTOR_CONNECT_REQUEST =
   "connector-connect:request" as const;
 export const IPC_CONNECTOR_CONNECT_UPDATE = "connector-connect:update" as const;
 export const IPC_CONNECTOR_CONNECT_RESPOND =
   "connector-connect:respond" as const;
 
-// ── Onboarding ──────────────────────────────────────────────────────────────
-
 export const IPC_ONBOARDING_SYNTHESIZE =
   "onboarding:synthesizeCoreMemory" as const;
-
-// ── Migration ───────────────────────────────────────────────────────────────
 
 export const IPC_CLOUD_HOME_SCAN_LOCAL = "cloudHome:scanLocal" as const;
 export const IPC_CLOUD_HOME_GET_IMPORT_OWNERSHIP =
   "cloudHome:getImportOwnership" as const;
 export const IPC_CLOUD_HOME_CONFIRM_IMPORT_OWNERSHIP =
   "cloudHome:confirmImportOwnership" as const;
-
-// ── Memory sync ─────────────────────────────────────────────────────────────
 
 export const IPC_MEMORY_SYNC_GET_STATUS = "memorySync:getStatus" as const;
 export const IPC_MEMORY_SYNC_STATUS = "memorySync:status" as const;
@@ -383,8 +309,6 @@ export const IPC_DISCOVERY_COLLECT_ALL_SIGNALS =
   "discovery:collectAllSignals" as const;
 
 export const IPC_BROWSER_BRIDGE_STATUS = "browser:bridgeStatus" as const;
-
-// ── In-app browser view ─────────────────────────────────────────────────────
 
 export const IPC_BROWSER_VIEW_GET_STATE = "browserView:getState" as const;
 export const IPC_BROWSER_VIEW_CONNECT = "browserView:connect" as const;
@@ -404,24 +328,14 @@ export const IPC_BROWSER_VIEW_REQUEST_EXTENSION_CONNECT =
   "browserView:requestExtensionConnect" as const;
 export const IPC_BROWSER_VIEW_STATE = "browserView:state" as const;
 
-// ── Home ────────────────────────────────────────────────────────────────────
-
 export const IPC_HOME_LIST_RECENT_APPS = "home:listRecentApps" as const;
 export const IPC_HOME_GET_ACTIVE_BROWSER_TAB =
   "home:getActiveBrowserTab" as const;
 export const IPC_HOME_CAPTURE_APP_WINDOW = "home:captureAppWindow" as const;
 
-// ── Media ───────────────────────────────────────────────────────────────────
-
 export const IPC_MEDIA_SAVE_OUTPUT = "media:saveOutput" as const;
 export const IPC_MEDIA_COPY_IMAGE = "media:copyImage" as const;
-// Copy a sent message's attachment to the system clipboard: an image (built
-// from its on-disk path or data URL) as a real image, or a non-image file's
-// path as text. Backs the desktop message-row Copy action for
-// attachment-only messages.
 export const IPC_MEDIA_COPY_ATTACHMENT = "media:copyAttachment" as const;
-
-// ── Meetings ────────────────────────────────────────────────────────────────
 
 export const IPC_MEETINGS_STATUS = "meetings:status" as const;
 export const IPC_MEETINGS_START = "meetings:start" as const;
@@ -430,22 +344,17 @@ export const IPC_MEETINGS_RESUME = "meetings:resume" as const;
 export const IPC_MEETINGS_STOP = "meetings:stop" as const;
 export const IPC_MEETINGS_OPEN_FOLDER = "meetings:openFolder" as const;
 
-// ── Schedule ────────────────────────────────────────────────────────────────
-
 export const IPC_SCHEDULE_LIST_CRON_JOBS = "schedule:listCronJobs" as const;
 export const IPC_SCHEDULE_LIST_HEARTBEATS = "schedule:listHeartbeats" as const;
 export const IPC_SCHEDULE_LIST_CONVERSATION_EVENTS =
   "schedule:listConversationEvents" as const;
 export const IPC_SCHEDULE_UPDATED = "schedule:updated" as const;
-// Cron job mutations from the desktop schedule dialog.
 export const IPC_SCHEDULE_UPDATE_CRON_JOB = "schedule:updateCronJob" as const;
 export const IPC_SCHEDULE_REMOVE_CRON_JOB = "schedule:removeCronJob" as const;
 export const IPC_SCHEDULE_RUN_CRON_JOB = "schedule:runCronJob" as const;
 export const IPC_SCHEDULE_UPSERT_HEARTBEAT =
   "schedule:upsertHeartbeat" as const;
 export const IPC_SCHEDULE_RUN_HEARTBEAT = "schedule:runHeartbeat" as const;
-
-// ── Local Chat ──────────────────────────────────────────────────────────────
 
 export const IPC_LOCAL_CHAT_GET_OR_CREATE_ID =
   "localChat:getOrCreateDefaultConversationId" as const;
@@ -464,15 +373,11 @@ export const IPC_LOCAL_CHAT_LIST_MODEL_USAGE =
 export const IPC_LOCAL_CHAT_LIST_FILES = "localChat:listFiles" as const;
 export const IPC_LOCAL_CHAT_UPDATED = "localChat:updated" as const;
 
-// ── Native integrations ─────────────────────────────────────────────────────
-
 export const IPC_NATIVE_INTEGRATIONS_LIST = "nativeIntegrations:list" as const;
 export const IPC_NATIVE_INTEGRATIONS_ENABLE =
   "nativeIntegrations:enable" as const;
 export const IPC_NATIVE_INTEGRATIONS_DISABLE =
   "nativeIntegrations:disable" as const;
-
-// ── Derived cloud journal cache ──────────────────────────────────────────
 
 export const IPC_CLOUD_CONVERSATION_CACHE_RETAIN_ACCOUNT =
   "cloudConversationCache:retainAccount" as const;
@@ -485,22 +390,11 @@ export const IPC_CLOUD_CONVERSATION_CACHE_REPLACE =
 export const IPC_CLOUD_CONVERSATION_CACHE_PURGE_CONVERSATION =
   "cloudConversationCache:purgeConversation" as const;
 
-// ── Companion (floating desktop Stella) ────────────────────────────────────
-//
-// Two windows: the small always-on-top *mark* window (hover, click, drag) and
-// the full-size *panel* window behind it (arc, composer, bubbles) that is
-// click-through until the mark is hovered or the panel has something to show.
-
-/** Either renderer → main: mounted; main answers with its layout. */
 export const IPC_COMPANION_HELLO = "companion:hello" as const;
 export const IPC_COMPANION_LAYOUT = "companion:layout" as const;
-/** Either renderer → main: pointer entered / left its hover region. */
 export const IPC_COMPANION_HOVER = "companion:hover" as const;
-/** Panel → main: what it is doing (expanded, recording, wants to be seen). */
 export const IPC_COMPANION_PANEL_STATUS = "companion:panelStatus" as const;
-/** Main → both: combined interaction state. */
 export const IPC_COMPANION_ACTIVITY = "companion:activity" as const;
-/** Mark → main → panel: toggle the composer. */
 export const IPC_COMPANION_TOGGLE_EXPANDED =
   "companion:toggleExpanded" as const;
 export const IPC_COMPANION_SET_EXPANDED = "companion:setExpanded" as const;
@@ -511,16 +405,13 @@ export const IPC_COMPANION_FOCUS = "companion:focus" as const;
 export const IPC_COMPANION_OPEN_MAIN = "companion:openMain" as const;
 export const IPC_COMPANION_SHOW_CONTEXT_MENU =
   "companion:showContextMenu" as const;
-/** Companion renderer → main → full shell: chat actions. */
 export const IPC_COMPANION_SEND = "companion:send" as const;
 export const IPC_COMPANION_STOP = "companion:stop" as const;
 export const IPC_COMPANION_SEND_REQUESTED = "companion:sendRequested" as const;
 export const IPC_COMPANION_STOP_REQUESTED = "companion:stopRequested" as const;
-/** Full shell → main → companion renderers: the chat snapshot. */
 export const IPC_COMPANION_PUBLISH_STATE = "companion:publishState" as const;
 export const IPC_COMPANION_GET_STATE = "companion:getState" as const;
 export const IPC_COMPANION_STATE = "companion:state" as const;
-/** Any renderer: show/hide the companion (persisted). */
 export const IPC_COMPANION_GET_VISIBLE = "companion:getVisible" as const;
 export const IPC_COMPANION_SET_VISIBLE = "companion:setVisible" as const;
 export const IPC_COMPANION_VISIBLE_CHANGED =

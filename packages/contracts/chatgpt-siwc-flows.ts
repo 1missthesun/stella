@@ -1,11 +1,3 @@
-/**
- * The Sign in with ChatGPT calls: discovery, code exchange, ID-token
- * validation, refresh, revocation and the model list. A host runs them for
- * its own credentials: Electron main for this computer, the owner store for
- * the owner's cloud. Web Crypto and `fetch` only, so Node, Electron and
- * Workers share it.
- */
-
 import {
   CHATGPT_SIWC,
   ChatGptError,
@@ -24,7 +16,6 @@ import { createPkce } from "./oauth-pkce.js";
 type FetchOptions = { fetch?: typeof fetch; signal?: AbortSignal };
 
 const REQUEST_TIMEOUT_MS = 30_000;
-/** Allowed clock skew when checking an ID token's times. */
 const CLOCK_SKEW_S = 5;
 
 const timedFetch = async (
@@ -51,8 +42,6 @@ const readJson = async (response: Response): Promise<unknown> => {
   }
 };
 
-// --- Discovery ------------------------------------------------------------------
-
 export type ChatGptDiscovery = {
   issuer: string;
   authorization_endpoint: string;
@@ -63,7 +52,6 @@ export type ChatGptDiscovery = {
 
 let discoveryCache: Promise<ChatGptDiscovery> | null = null;
 
-/** OpenAI's OpenID configuration, checked to stay on the issuer's origin. */
 export const chatGptDiscovery = (options: FetchOptions = {}): Promise<ChatGptDiscovery> => {
   discoveryCache ??= (async () => {
     const response = await timedFetch(options, CHATGPT_SIWC.discoveryUrl, {
@@ -101,9 +89,6 @@ export const chatGptDiscovery = (options: FetchOptions = {}): Promise<ChatGptDis
   return discoveryCache;
 };
 
-// --- A sign-in attempt ---------------------------------------------------------------
-
-/** What one authorization attempt keeps until its callback arrives. */
 export type ChatGptPendingSignIn = {
   state: string;
   nonce: string;
@@ -118,7 +103,6 @@ const randomToken = (): string => {
   return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
 };
 
-/** Fresh state, nonce and PKCE for one attempt. */
 export const createChatGptPendingSignIn = async (): Promise<ChatGptPendingSignIn> => {
   const { verifier, challenge } = await createPkce();
   return { state: randomToken(), nonce: randomToken(), verifier, challenge };
@@ -142,19 +126,12 @@ const postForm = async (
   return json as Record<string, unknown>;
 };
 
-/**
- * Exchange the callback's code (with the issued client id) and validate the
- * result: the ID token's signature, issuer, audience, expiry and this
- * attempt's nonce, and, when signing a saved account in again, that it is
- * still the same account. Plan usage is whether its scope was granted.
- */
 export const completeChatGptSignIn = async (
   args: {
     callback: ChatGptCallback;
     verifier: string;
     nonce: string;
     redirectUri: string;
-    /** The saved account's subject when reauthorizing it. */
     expectedSubject?: string;
   },
   options: FetchOptions = {},
@@ -194,11 +171,6 @@ export const completeChatGptSignIn = async (
   };
 };
 
-/**
- * Renew with the rotating refresh token. The caller stores the whole
- * replacement (access, refresh, expiry, scopes) together and serializes
- * refreshes of one session. A returned ID token must still name the account.
- */
 export const refreshChatGptTokens = async (
   args: { clientId: string; refreshToken: string; scopes: readonly string[]; subject: string },
   options: FetchOptions = {},
@@ -222,10 +194,6 @@ export const refreshChatGptTokens = async (
   return tokens;
 };
 
-/**
- * End the renewable session. Resolves whether the revocation was confirmed;
- * a network failure or 5xx is retried once.
- */
 export const revokeChatGptRefreshToken = async (
   args: { clientId: string; refreshToken: string },
   options: FetchOptions = {},
@@ -264,7 +232,6 @@ export const revokeChatGptRefreshToken = async (
   return false;
 };
 
-/** The selected account's models (`visibility: "list"`), for a picker. */
 export const listChatGptModels = async (
   accessToken: string,
   options: FetchOptions = {},
@@ -277,9 +244,6 @@ export const listChatGptModels = async (
   return parseChatGptModels(json);
 };
 
-// --- ID tokens -----------------------------------------------------------------------------
-
-/** The RSA signing keys OpenAI publishes. */
 type Jwk = { kty?: string; kid?: string; n?: string; e?: string };
 
 let jwksCache: { uri: string; keys: Promise<Jwk[]> } | null = null;
@@ -314,10 +278,6 @@ const decodeSegment = (segment: string): Uint8Array<ArrayBuffer> => {
 const invalidIdToken = () =>
   new ChatGptError("invalid_id_token", "ChatGPT's identity couldn't be verified. Sign in again.");
 
-/**
- * Verify an ID token against OpenAI's published keys (RS256): signature,
- * issuer, audience (the issued client id), expiry, and the attempt's nonce.
- */
 export const verifyChatGptIdToken = async (
   idToken: string,
   expected: { clientId: string; nonce?: string; now?: number },
@@ -345,7 +305,6 @@ export const verifyChatGptIdToken = async (
         (header.kid === undefined || key.kid === header.kid),
     );
   let jwk = findKey(await fetchJwks(discovery.jwks_uri, options, false));
-  // An unfamiliar key id: the key set may have rotated.
   if (!jwk) jwk = findKey(await fetchJwks(discovery.jwks_uri, options, true));
   if (!jwk) throw invalidIdToken();
   let valid = false;

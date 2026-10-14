@@ -21,27 +21,14 @@ import { AgentTurnAuthorityLostError } from "./errors.js";
 import type { Env } from "./env.js";
 import type { TurnRequest } from "./types.js";
 
-/** Owner events the owner object refused, kept for the alarm to retry. */
 export const OWNER_EVENT_DEBT_KEY = "ownerEventDebt";
 
-/**
- * Set once this agent thread's container ran out of memory (before sizes
- * were kept as `AGENT_CONTAINER_SIZE_KEY`): its next turns start large.
- */
 export const AGENT_CONTAINER_LARGE_KEY = "agentContainerLarge";
 
-/**
- * The smallest size this agent thread's container starts at from now on:
- * what its spawn asked for (`workspace: "large"`), raised when its container
- * ran out of memory or disk. It outlives the turn; no other agent's
- * container is affected.
- */
 export const AGENT_CONTAINER_SIZE_KEY = "agentContainerSize";
 
-/** `ContainerOomBaseline`: the OOM-kill count this thread's container last showed. */
 export const CONTAINER_OOM_BASELINE_KEY = "containerOomBaseline";
 
-/** The size this thread's container starts at: `initial`, or larger if the thread needed more before. */
 export const agentContainerSize = async (
   storage: Pick<DurableObjectStorage, "get">,
   initial: InstanceSize,
@@ -60,7 +47,6 @@ export const OWNER_EVENT_DEBT_MAX = 200;
 
 export const OWNER_EVENT_DEBT_RETRY_MS = 30_000;
 
-/** Sources a `turn.started` event may carry; the agent lane has one extra. */
 export const CLOUD_TURN_SOURCES: readonly CloudTurnSource[] = [
   "desktop",
   "web",
@@ -72,7 +58,6 @@ export const CLOUD_TURN_SOURCES: readonly CloudTurnSource[] = [
   "slack",
 ];
 
-/** HTTP status for each owner-gate refusal on the agent lane. */
 export const OWNER_GATE_REFUSAL_STATUS: Record<OwnerGateRefusalCode, number> = {
   owner_purged: 410,
   sign_in_required: 403,
@@ -82,7 +67,6 @@ export const OWNER_GATE_REFUSAL_STATUS: Record<OwnerGateRefusalCode, number> = {
   internal: 503,
 };
 
-/** Terminal event kind -> the status the owner projects onto the turn row. */
 export const TERMINAL_EVENT_STATUS: Record<
   string,
   NonNullable<TurnEventEvent["terminalStatus"]>
@@ -139,11 +123,6 @@ export const durableTurnRecord = (turn: TurnRequest): TurnRequest => {
   return record;
 };
 
-/**
- * One call to the conversation's OrchestratorSession on a
- * `CLOUD_CLI_TURN_DO_PATHS` route. Durable Object stubs are the only way in;
- * the headers repeat the trusted identity the agent wake sends.
- */
 export const callOrchestratorCliTurnRoute = async (
   env: Pick<Env, "ORCHESTRATOR_SESSIONS">,
   turn: Pick<TurnRequest, "ownerId" | "ownerGeneration" | "conversationId">,
@@ -169,11 +148,6 @@ export const callOrchestratorCliTurnRoute = async (
   );
 };
 
-/**
- * The owner-purge lease changes when an alarm borrows an auxiliary lease, so
- * it is intentionally excluded. Everything that can distinguish an ABA turn
- * (including its agent attempt generation) remains exact.
- */
 export const exactTurnIdentityMatches = (
   current: TurnRequest | undefined,
   expected: TurnRequest,
@@ -252,7 +226,6 @@ export const sessionName = (value: string): string =>
     .replace(/^-+|-+$/g, "")
     .slice(0, 56);
 
-/** Longer than the 30s callback timeout; covers an evicted isolate's last send. */
 export const OWNER_PURGE_STALE_LEASE_GRACE_MS = 35_000;
 
 export const backupDebtKey = (workspaceKey: string): string =>
@@ -307,7 +280,6 @@ export const nativeStateIntegrityKeysFor = async (
     ),
   );
 
-/** Names this thread's own native state root (`cloudNativeStateRoot`). */
 export const nativeStateThreadHash = async (
   turn: Pick<TurnRequest, "threadId">,
 ): Promise<string> => {
@@ -350,18 +322,11 @@ export const pendingAppBuildPublicationKey = (turnId: string): string =>
 
 export const ORCHESTRATOR_INTERNAL_ORIGIN = "https://orchestrator-session";
 export const HEADER_CONVERSATION_ID = "x-stella-conversation-id";
-/** Headers the outer Worker forwards a dispatched turn's routing on. */
 export const HEADER_BUILD_SESSION_NAME = "x-stella-build-session-name";
 export const HEADER_TURN_BROKER_ENDPOINT = "x-stella-turn-broker-endpoint";
 
-/**
- * The two directories a model-shaped process may own. `world` is the owner's
- * checkpointed tree; `app` is the throwaway build root of the legacy app-build
- * turn, which is never checkpointed.
- */
 const FORK_WORKSPACE_ROOT = /^\/workspace\/forks\/fork-[0-9a-f-]{36}\/world$/u;
 
-/** Establish the post-mount fixed boundary before any model-shaped process. */
 export const normalizeToolWorkspaceRoot = async (
   session: Pick<ExecutionSession, "exec">,
   workspaceRoot: string,
@@ -385,9 +350,6 @@ export const normalizeToolWorkspaceRoot = async (
     `test "$(stat -c '%u:%g:%a' '${workspaceRoot}')" = 42424:42424:750`,
     ...(workspaceRoot !== APP_BUILD_ROOT
       ? [
-          // `drive/` holds the sandbox's working copy of the user's drive,
-          // which no world export carries; the boundary is 0750 like the
-          // root, so it is created or reset the same way.
           `if [ -e '${workspaceRoot}/drive' ] || [ -L '${workspaceRoot}/drive' ]; then test -d '${workspaceRoot}/drive' && test ! -L '${workspaceRoot}/drive'; else mkdir -m 0750 '${workspaceRoot}/drive'; fi`,
           `chown 42424:42424 '${workspaceRoot}/drive'`,
           `chmod 0750 '${workspaceRoot}/drive'`,
@@ -416,17 +378,9 @@ export const normalizeToolWorkspaceRoot = async (
   }
 };
 
-/** Pages of 1000 keys per bucket prefix. 10M objects is not a real owner. */
 export const R2_SWEEP_MAX_PAGES = 10_000;
 
-/** `crypto.randomUUID()` in the sandbox SDK; anything else is not a backup. */
 export const BACKUP_ID_PATTERN = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
-/**
- * Delete every object under `prefix`. Bounded: `list` is cursor-paged at 1000
- * and each page is deleted before the next is fetched, so neither memory nor
- * the delete batch grows with the owner's history. `done: false` means the
- * sweep ran out of pages and the caller must ask again.
- */
 export const sweepR2Prefix = async (
   bucket: R2Bucket,
   prefix: string,

@@ -1,7 +1,3 @@
-/**
- * The desktop's prompt material: the served prompt bundle, and the user's
- * personality, memory and skills under the Stella home (`~/.stella`).
- */
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -32,16 +28,8 @@ const readOptional = async (file: string): Promise<string | undefined> => {
 
 type ServedPrompts = { revision: string; prompts: Map<string, string>; checkedAt: number };
 
-/** How long a fetched bundle serves before the next request revalidates it in the background. */
 const SERVED_PROMPTS_MAX_AGE_MS = 5 * 60_000;
 
-/**
- * The backend's prompt bundle. The first request waits for it; afterwards a
- * request finding it older than `SERVED_PROMPTS_MAX_AGE_MS` uses it as is and
- * revalidates it in the background (`If-None-Match`), so a prompt the backend
- * publishes reaches a long-open conversation within minutes, not at the next
- * restart.
- */
 function servedPrompts(backendUrl: string | undefined) {
   let current: ServedPrompts | undefined;
   let pending: Promise<void> | undefined;
@@ -76,18 +64,13 @@ function servedPrompts(backendUrl: string | undefined) {
 }
 
 export type DesktopSourcesOptions = {
-  /** The Stella home, `~/.stella` in the installed app. */
   stellaHome: string;
   backendUrl?: string;
   memoryEnabled?: () => boolean;
-  /** This device, where a desktop conversation runs. */
   destination: ExecutionDestination;
   media?: () => MediaAccess | undefined;
-  /** The response language the user's latest message asked for. */
   locale?: () => Promise<string | undefined>;
-  /** The conversation is stored in the cloud, whose journal `history` reads. */
   cloudStored?: boolean;
-  /** The owner's devices and media access; its destination is ignored for `destination`. */
   executionContext?: () => Promise<ExecutionContextSnapshot | undefined>;
 };
 
@@ -112,7 +95,6 @@ export function desktopContextSources(options: DesktopSourcesOptions): StellaCon
       });
     },
     locale: async () => options.locale?.(),
-    // Stella reads a conversation stored in the cloud; an agent reads its own thread, which is here.
     codeHistory: async (agentType) => agentType !== "orchestrator" || options.cloudStored === true,
   };
 }

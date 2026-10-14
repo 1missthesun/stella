@@ -36,11 +36,6 @@ export type AgentCard = {
   status?: TaskLifecycleStatus;
 };
 
-/**
- * The cloud thread an agent id names. A device-placed agent cited by its
- * local placement id resolves to the conversation's cloud thread whose id
- * hashes to it.
- */
 function useCloudThreadId(conversationId: string, threadId: string, enabled: boolean): string {
   const placed = enabled && isPlacementThreadId(threadId);
   const page = useBackendView(
@@ -57,12 +52,6 @@ function useCloudThreadId(conversationId: string, threadId: string, enabled: boo
   }, [placed, threadId, threads]);
 }
 
-/**
- * An agent's title and status. The agent ledger is the authority for both:
- * its row's status wins over this computer's own record of the agent and
- * over the journal. Those stand in while the row loads, for an agent the
- * ledger never held, and for a chat stored only on this computer.
- */
 export function useAgentCard(
   conversationId: string,
   threadId: string,

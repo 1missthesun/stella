@@ -37,18 +37,11 @@ export type EmptyStateMotif = "files" | "schedule" | "apps" | "mail";
 const ART = 184;
 const CENTER = ART / 2;
 const MARK = 74;
-/** One clock drives every motif; each motion completes a whole number of cycles in it. */
 const CLOCK_MS = 60_000;
 const TAU = Math.PI * 2;
 
 const BRAND = ["#00aad8", "#3493d9", "#4878db", "#7449c5", "#be57a4"] as const;
 
-/**
- * The empty page: Stella's own character, breathing and looking about, with a
- * quiet motif behind it for the page it sits on (pages of files, a clock
- * dial, a ring of apps), one line saying what will appear here, and the
- * obvious next step when there is one.
- */
 export function EmptyState({
   motif,
   message,
@@ -58,7 +51,6 @@ export function EmptyState({
   motif: EmptyStateMotif;
   message: string;
   action?: { label: string; onPress: () => void };
-  /** Holds every loop still, e.g. while the page is hidden. */
   paused?: boolean;
 }) {
   const colors = useColors();

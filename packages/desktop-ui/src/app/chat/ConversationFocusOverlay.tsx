@@ -1,10 +1,3 @@
-/**
- * Focus (lineage) overlay — iMessage's thread view for the single chat.
- *
- * The selected chain sits above the dimmed timeline in the same chat column.
- * The composer stays available below it. Escape, the close button, or a
- * click outside the column restores the original timeline and scroll position.
- */
 import { memo, useMemo, useRef } from "react";
 import { ConversationEvents } from "@/app/chat/ConversationEvents";
 import { X } from "@/ui/icons";
@@ -114,10 +107,6 @@ function FocusPanel({
   return (
     <Modal
       onClose={closeConversationFocus}
-      // Not `aria-modal`: the shared composer below the overlay stays
-      // deliberately usable, so the page behind is neither inert nor
-      // trapped. The dialog role, Escape, focus-in and focus restore all
-      // come from the primitive.
       modal={false}
       label={t("app.chat.focus.ariaLabel", { title: heading })}
       backdropClassName="conversation-focus"

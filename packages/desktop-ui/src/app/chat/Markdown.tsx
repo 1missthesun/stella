@@ -50,11 +50,8 @@ interface MarkdownProps {
   text: string;
   cacheKey?: string;
   className?: string;
-  /** Suppress GFM horizontal rules (`---`). Used in chat bubbles where
-   *  models often append a trailing rule that reads as a message divider. */
   hideHorizontalRules?: boolean;
   hiddenFilePaths?: readonly string[];
-  /** The markdown file being shown, so its relative images load from its folder. */
   documentPath?: string;
 }
 
@@ -154,8 +151,6 @@ const REHYPE_PLUGINS: PluggableList = [
  */
 const LINK_SAFETY = { enabled: false } as const;
 
-// Streamdown 2.6 bounds code blocks and tables by default. Keep Stella's
-// existing unbounded chat layout instead of introducing nested scrolling.
 const UNBOUNDED_STREAMDOWN_HEIGHT = Number.POSITIVE_INFINITY;
 
 // Streamdown always splits the text into blocks with a full `marked` lex, but
@@ -210,14 +205,6 @@ type MarkdownLinkProps = AnchorHTMLAttributes<HTMLAnchorElement> & {
   node?: unknown;
 };
 
-/*
- * Unmodified primary clicks on an http(s) link land in the Stella browser
- * rather than the OS one, except a canvas-share link, which opens as a canvas
- * with its owner's grant (the in-app browser would show a private canvas's
- * "private" page). `node` is Streamdown's mdast payload and must not reach
- * the DOM. If the in-app browser can't take the URL we fall back to the
- * external open so the click is never silently swallowed.
- */
 const MarkdownLink = ({
   href,
   onClick,
@@ -248,7 +235,6 @@ const MarkdownLink = ({
   />
 );
 
-/** A reply's `stella://app/<slug>` link: opens the app in the side panel. */
 const StellaAppLink = ({ slug, label }: { slug?: unknown; label?: unknown; node?: unknown }) => {
   const appId = typeof slug === "string" ? slug : "";
   return (
@@ -271,8 +257,6 @@ const StellaAppLink = ({ slug, label }: { slug?: unknown; label?: unknown; node?
 
 const HiddenHorizontalRule = () => null;
 
-// Module-level so every row shares the same component map (and Streamdown's
-// merged map stays referentially stable per surface).
 const COMPONENTS = {
   a: MarkdownLink,
   img: MarkdownImage,
@@ -292,11 +276,6 @@ export const Markdown = memo(function Markdown({
   hiddenFilePaths,
   documentPath,
 }: MarkdownProps) {
-  /*
-   * Stable per-instance fallback when the caller didn't supply one,
-   * matching Streamdown's per-row parse/cache expectations. Bumped
-   * lazily so server-side / first-render parity stays intact.
-   */
   const anonCacheKeyRef = useRef<string | null>(null);
   if (anonCacheKeyRef.current === null) {
     anonCacheKeyRef.current = `markdown-anon-${nextAnonCacheKey++}`;
@@ -309,8 +288,6 @@ export const Markdown = memo(function Markdown({
   const emojiSpritesEnabled = hasCompleteEmojiSpritePack(activeEmojiPack);
   const hiddenFileKey = hiddenFilePaths?.join("\0") ?? "";
   const remarkPlugins = useMemo(() => {
-    // The cache scope names every input besides the text that shapes the
-    // parsed tree: the emoji pass and the hidden file-link set.
     const cacheScope = `${emojiSpritesEnabled ? "emoji" : "plain"}\0${hiddenFileKey}\0${documentPath ?? ""}`;
     const plugins = [
       [remarkMarkdownRenderCache, cacheScope] as [
@@ -325,14 +302,6 @@ export const Markdown = memo(function Markdown({
     ];
     return emojiSpritesEnabled ? [...plugins, remarkEmojiSprites] : plugins;
   }, [documentPath, emojiSpritesEnabled, hiddenFileKey]);
-  /*
-   * `emojiVars` is memoized so the outer `<div>`'s `style` reference is
-   * stable across renders when the active emoji pack hasn't changed.
-   * Otherwise React would diff the style object identity every commit
-   * and write the same custom-property declarations back to the DOM —
-   * harmless but pointless work that can mask other identity issues
-   * during debugging.
-   */
   const emojiVars = useMemo<CSSProperties | undefined>(() => {
     if (!emojiSpritesEnabled || !activeEmojiPack) return undefined;
     return Object.fromEntries(

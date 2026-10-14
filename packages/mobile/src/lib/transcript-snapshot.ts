@@ -4,7 +4,6 @@ export type TranscriptSnapshotRow = {
   messageJson: string;
 };
 
-/** Diff a complete canonical window while retaining its existing order origin. */
 export function diffTranscriptSnapshot(
   existing: readonly TranscriptSnapshotRow[],
   incoming: readonly Omit<TranscriptSnapshotRow, "orderKey">[],
@@ -12,7 +11,6 @@ export function diffTranscriptSnapshot(
   const prior = new Map(existing.map((row) => [row.id, row]));
   const stride = 1_000_000;
   const anchor = incoming.findIndex((row) => prior.has(row.id));
-  // Evicting a prefix or loading an older page must not renumber every row.
   const origin =
     anchor < 0
       ? 0

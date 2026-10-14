@@ -27,14 +27,11 @@
 import { I18nManager } from "react-native";
 import { isRtlLocale, type Locale } from "./locales";
 
-/** Would applying `locale` require a native direction flip (and a reload)? */
 export const needsDirectionFlip = (locale: Locale): boolean =>
   isRtlLocale(locale) !== I18nManager.isRTL;
 
 const reload = async (): Promise<void> => {
   try {
-    // `expo-updates` is already a dependency and its reload works in
-    // production and in dev/preview builds that have updates configured.
     const Updates = await import("expo-updates");
     await Updates.reloadAsync();
     return;
@@ -50,11 +47,6 @@ const reload = async (): Promise<void> => {
   }
 };
 
-/**
- * Point the native layout direction at `locale`, reloading if that actually
- * changed anything. Resolves `false` when no flip (and so no reload) was
- * needed.
- */
 export const applyLayoutDirection = async (
   locale: Locale,
 ): Promise<boolean> => {
@@ -66,11 +58,6 @@ export const applyLayoutDirection = async (
   return true;
 };
 
-/**
- * Startup alignment. Safe to call unconditionally — it is a no-op when the
- * native flag already matches, which is the case on every launch after the
- * first one following a language change.
- */
 export const syncLayoutDirection = (locale: Locale): void => {
   if (isRtlLocale(locale) === I18nManager.isRTL) return;
   void applyLayoutDirection(locale);

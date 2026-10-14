@@ -529,7 +529,6 @@ const BASE_POSITIONS = [
   { x: 0.52, y: 0.54 },
 ];
 
-// Curated palette journey used for the scroll-driven theme crossfade.
 const SCROLL_THEMES = [
   "pearl",
   "sage",
@@ -884,7 +883,6 @@ function renderGradient(
   const sizedCacheKey = `${cacheKey}:${w}x${h}`;
   const cached = gradientImageCache.get(sizedCacheKey);
   if (cached) {
-    // Refresh insertion order so the bounded cache behaves like a small LRU.
     gradientImageCache.delete(sizedCacheKey);
     gradientImageCache.set(sizedCacheKey, cached);
     ctx.putImageData(cached, 0, 0);
@@ -1239,10 +1237,6 @@ export function HomeDesktopMock() {
     }
   }, [colors, resolvedMode, selectedTheme.id]);
 
-  // Repaint on theme change. After the first paint, crossfade between themes:
-  // snapshot the outgoing gradient onto an overlay canvas, repaint the base
-  // with the new theme, then fade the overlay out (the chrome colors ease via
-  // CSS transitions over the same window).
   useEffect(() => {
     const pairs: Array<[HTMLCanvasElement | null, HTMLCanvasElement | null]> = [
       [canvasRef.current, fadeCanvasRef.current],
@@ -1282,9 +1276,6 @@ export function HomeDesktopMock() {
     return () => cancelAnimationFrame(raf);
   }, [paint]);
 
-  // Drive the theme from scroll position: as this section travels up through
-  // the viewport, step through a curated palette journey. Not pinned — the
-  // section scrolls normally; only the theme changes.
   useEffect(() => {
     const el = sectionRef.current;
     if (!el) return;

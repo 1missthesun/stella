@@ -8,19 +8,6 @@ import {
 import { RegionCapture } from "./RegionCapture";
 import "./overlays.css";
 
-/**
- * OverlayRoot manages the unified transparent overlay window.
- *
- * All overlay components (Region Capture, Screen Guide, and Window
- * Highlight) live as absolutely-positioned
- * children. The overlay window is hidden when idle and only shown when a
- * component activates, preventing it from blocking interaction with windows
- * below.
- *
- * Hit-testing: the renderer tracks visible component bounding rects and
- * notifies the main process to toggle `setIgnoreMouseEvents` accordingly.
- */
-
 type WindowBounds = { x: number; y: number; width: number; height: number };
 type WindowHighlightTone = "default" | "subtle";
 
@@ -69,11 +56,6 @@ function overlayReducer(
   }
 }
 
-// ---------------------------------------------------------------------------
-// Hook: useOverlayIPC
-// Consolidates ALL IPC subscription effects (window highlight, region capture)
-// into a single hook.
-// ---------------------------------------------------------------------------
 function useOverlayIPC(dispatch: Dispatch<OverlayAction>) {
   useEffect(() => {
     const api = window.electronAPI;
@@ -113,12 +95,6 @@ function useOverlayIPC(dispatch: Dispatch<OverlayAction>) {
   }, [dispatch]);
 }
 
-// ---------------------------------------------------------------------------
-// Hook: useOverlayHitTesting
-// Manages the overlay's setIgnoreMouseEvents toggle based on which overlay
-// subsystems are currently active and whether the cursor is over an
-// interactive region.
-// ---------------------------------------------------------------------------
 function useOverlayHitTesting(
   state: OverlayState,
   updateInteractive: (shouldBeInteractive: boolean) => void,
@@ -126,16 +102,10 @@ function useOverlayHitTesting(
   const { regionCaptureActive } = state;
 
   useEffect(() => {
-    // Region capture is the only surface that takes the pointer; everything
-    // else (window ring, screen guide) is purely decorative and click-through.
     updateInteractive(regionCaptureActive);
   }, [regionCaptureActive, updateInteractive]);
 }
 
-// ---------------------------------------------------------------------------
-// Component: OverlayRoot
-// Composes the hooks above and renders the overlay subsystem JSX.
-// ---------------------------------------------------------------------------
 export function OverlayRoot() {
   const [state, dispatch] = useReducer(overlayReducer, initialState);
   const interactiveRef = useRef<boolean | null>(null);

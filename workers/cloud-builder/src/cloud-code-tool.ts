@@ -64,12 +64,9 @@ import { historyReadView } from "@stella/contracts/history-search";
 
 const CLOUD_CODE_MODEL_OUTPUT_MAX_BYTES = 50_000;
 const CLOUD_CODE_NESTED_RESULT_MAX_BYTES = 128 * 1024;
-/** `$describe` documents above this are handed back in lossless chunks. */
 const MAX_INLINE_TOOL_DESCRIPTION_CHARS = 96_000;
 const TOOL_DESCRIPTION_CHUNK_CHARS = 64_000;
-/** Keep a runaway cell from stacking maps down the timeline. */
 const MAX_LIFTED_MAPS = 3;
-/** Screenshots one code call may hand the model. */
 const MAX_LIFTED_SCREENSHOTS = 3;
 
 type LiftedScreenshot = CloudBrowserScreenshot["image"];
@@ -84,26 +81,11 @@ const CODE_EXCLUDED_TOOL_NAMES: ReadonlySet<string> = new Set([
   "multi_tool_use_parallel",
 ]);
 
-/**
- * The model-facing contract is the device `code` tool's: the same `tools`
- * proxy (`$list`/`$search`/`$describe`, `tools.<name>(args)`), the same
- * `connect` client, the same demoted-tool catalog suffix. Only the runtime
- * differs, and the differences are stated rather than hidden: a fresh
- * sandbox per call (no persistent bindings, no cell_id), and no
- * computer-use globals because the cloud has no device. An agent's code also
- * gets the `browser` global over Stella's private Browser Run profile; the
- * orchestrator's never does.
- */
 const cloudCodeToolDescription = (browser: boolean): string =>
   `Run JavaScript with top-level await in Stella's cloud code runtime — a fresh isolated sandbox per call. Call the immutable globals directly: connect, history, tools${browser ? ", and browser" : ""}. End with an expression to return its value; console.log lines come back in a [console] section. Bindings do not persist between calls and there is no cell_id, codeRuntime, or sky${browser ? "" : ", or browser"} in this session, so do the whole computation in one call and return a structured-cloneable value. The sandbox has no network and no secrets of its own; reach the outside world only through tools${browser ? ", connect, and browser" : " and connect"}. ${browser ? `${CLOUD_CODE_BROWSER_SENTENCE} ` : ""}tools exposes allowed Stella tools. Use tools.$list() for exact names/access expressions; non-identifier names require bracket notation such as tools[\"mcp.server/tool\"](...). Use tools.$search({ query: \"<capability>\" }) for ranked signatures, and tools.$describe(name) for a complete unfamiliar schema. Use Promise.all for independent calls. Nested tools retain permissions, cancellation, and route artifacts, and a failing nested call rejects with the tool's own error so you can catch it; tools requiring explicit approval are unavailable inside code and must be called directly. Every action of a connected service is a tool here too, named <service>_<action> (tools.gmail_send_email) and found with tools.$search; connect manages the connections themselves (connect.documentation()). ` +
   `${CODE_TOOL_HISTORY_SENTENCE} ` +
   `One execution may make at most ${CLOUD_CODE_MAX_TOOL_CALLS} nested tool calls, with at most ${CLOUD_CODE_MAX_CONCURRENT_TOOL_CALLS} running concurrently, and runs for at most ${Math.round(CLOUD_CODE_MAX_TIMEOUT_MS / 1000)} seconds.`;
 
-/**
- * The cloud browser contract, stated in full because it differs from the
- * device's Playwright tabs: every call is one allowlisted gateway command,
- * the profile persists between turns, and sign-in is a human handoff.
- */
 const CLOUD_CODE_BROWSER_SENTENCE =
   `browser drives Stella's private cloud browser (one persistent signed-in profile, kept between turns; it is not the user's own browser). Each method is one awaited command. browser.open(url, { allowedOrigins? }) starts at an https URL and limits navigation to its origin plus allowedOrigins. browser.open, navigate(url), observe(), back(), forward(), and reload() return { url, title, text, elements }: text is the page's visible text, and elements lists the visible controls as { ref, role, name, selector?, href?, checked?, disabled?, sensitive? } (sensitive marks password, email, code, and card fields). Selectors are Playwright selectors (CSS, text=, role=, xpath=, chains) or ref=eN from the latest observation; refs change after navigation, so observe again. Actions: click(selector), fill(selector, value), press(selector, key), select(selector, value), check(selector), uncheck(selector), hover(selector), text(selector), wait(selector, timeoutMs?), and scroll({ direction?, amount?, selector? }). browser.evaluate(script, arg?) runs a JavaScript expression, or a function source string called with arg, in the page and returns its JSON result (use it for DOM reads, localStorage, or same-origin fetch with the page's session). browser.cookies(urls?), setCookies(cookies), and clearCookies() manage the profile's cookies. browser.requests({ limit? }) lists recent network requests and responseBody(url) returns one response's body. browser.screenshot({ fullPage? }) attaches a picture to this code call's result (up to ${MAX_LIFTED_SCREENSHOTS} per call). Also tabs(), focusTab(tabId), and close(). For signing in, prefer handing the login to the user: call browser.requestLoginTakeover({ allowedOrigins: [origin], displayOrigin: origin, startUrl?, displayTitle?, verification: { expectedOrigin: origin, authenticatedSelector, loggedOutSelector, resumeUrl } }) with one exact https origin everywhere. loggedOutSelector names something visible now only when signed out; authenticatedSelector names something that appears only once signed in (such as text=Sign out); they must differ and cannot be refs. It hands the login screen to the user on their phone or desktop and pauses this task until they finish: make it the last call in that code cell. Type a password or card number yourself only when the user gave it to you in this conversation. When the task continues, this code call's result says whether sign-in was approved, canceled, or expired; on approval, browser.open the site again and carry on signed in.`;
 
@@ -132,25 +114,17 @@ type CloudCodeParameters = Readonly<{
   timeout_ms?: number;
 }>;
 
-/** Agent tools may carry source metadata not represented by the core Tool type. */
 export type CloudCodeSourceAgentTool = AgentTool & {
   approval?: unknown;
   outputSchema?: TSchema;
   workingText?: string;
-  /**
-   * Same semantics as the device catalog: a demoted tool leaves the direct
-   * list whenever code is available and is callable only as
-   * `tools.<name>(args)`; `$search` ranks it by these extra terms.
-   */
   demoted?: {
     searchTerms?: readonly string[];
     requiredConnectorProvider?: string;
   };
-  /** Recovery policy for an unanswered call of this tool (`tool-replay.ts`). */
   replay?: ToolReplayPolicy;
 };
 
-/** Host-side implementation of the sandbox's frozen `connect` global. */
 export type CloudConnectClient = Readonly<{
   discover(query: string): Promise<unknown>;
   connectors(): Promise<unknown>;
@@ -164,10 +138,6 @@ export type CloudConnectClient = Readonly<{
   ): Promise<unknown>;
 }>;
 
-/**
- * Host-side implementation of the sandbox's frozen `history` global: the
- * conversation's own SQLite, plus rows rolled out of it into R2 segments.
- */
 export type CloudHistoryClient = Readonly<{
   search(text: string, options: unknown): Promise<unknown>;
   sql(query: string, params: readonly SqlStorageValue[]): unknown;
@@ -181,25 +151,11 @@ export type CloudCodeExecute = (
 export type CreateCloudCodeAgentToolOptions = Readonly<{
   loader: WorkerLoader;
   tools: readonly CloudCodeSourceAgentTool[];
-  /** Stable owner-generation + conversation + turn identity. */
   executionScope: string;
-  /** Absent means `connect.*` rejects with an explanation. */
   connect?: CloudConnectClient;
-  /** Absent means `history.*` rejects with an explanation. */
   history?: CloudHistoryClient;
-  /**
-   * The orchestrator's `memory` client over its memory files. Present, the
-   * sandbox gets a `memory` global; absent (General agents, or memory off),
-   * there is none.
-   */
   memory?: MemoryClient;
-  /**
-   * The turn's cloud browser. Present, the sandbox gets a `browser` global and
-   * a login handoff ends the call as `AgentToolSuspendedError`; absent, there
-   * is no `browser` at all, as in the cloud orchestrator.
-   */
   browser?: CloudBrowserClient;
-  /** Test seam; production always uses the official Dynamic Worker executor. */
   executeCode?: CloudCodeExecute;
 }>;
 
@@ -211,11 +167,6 @@ const NESTED_RESULT_LIMITS: BoundedJsonLimits = Object.freeze({
   maxStringBytes: CLOUD_CODE_NESTED_RESULT_MAX_BYTES,
 });
 
-/**
- * Whether a tool is reachable as `tools.<name>` inside code. The device
- * rule: every allowed tool except code's own family and anything that
- * needs an explicit top-level approval flow.
- */
 export const isCloudCodeReachableTool = (
   tool: Pick<CloudCodeSourceAgentTool, "name" | "approval">,
 ): boolean =>
@@ -269,11 +220,6 @@ const structuredText = (text: string): unknown => {
   }
 };
 
-/**
- * What `await tools.<name>(args)` resolves to: the tool's model-visible
- * text (the device REPL hands back the tool's result value the same way),
- * or its content blocks when they are not all text.
- */
 const nestedValueForCode = (
   rawName: string,
   result: AgentToolResult<unknown>,
@@ -357,9 +303,6 @@ const definitionForAgentTool = (
       input as Record<string, unknown>,
       context.signal,
     );
-    // Route artifacts a nested call produced (a `map` card) ride the outer
-    // code result so the chat renders them exactly as a direct call would.
-    // Keyed by execution: parallel code calls must not mix their cards.
     const sink = liftedMaps.get(context.executionId);
     if (sink) collectLiftedMaps(result.details, sink);
     return nestedValueForCode(tool.name, result);
@@ -389,7 +332,6 @@ const asRecord = (value: unknown): Record<string, unknown> =>
     ? (value as Record<string, unknown>)
     : {};
 
-/** `tools.$search` — the device scorer over this turn's reachable catalog. */
 const searchIntrinsic =
   (catalog: readonly DemotedToolCatalogEntry[]): CloudCodeIntrinsic =>
   async (input) => {
@@ -402,7 +344,6 @@ const searchIntrinsic =
     return searchToolCatalog(catalog, query, limit);
   };
 
-/** `tools.$describe` — lossless docs for one exact reachable tool. */
 const describeIntrinsic =
   (
     catalog: readonly (DemotedToolCatalogEntry & {
@@ -465,7 +406,6 @@ const CONNECT_METHODS: ReadonlySet<string> = new Set<ConnectMethod>([
   "remove",
 ]);
 
-/** `connect.<method>(...)` — forwarded to the host-side connect client. */
 const connectIntrinsic =
   (client: CloudConnectClient | undefined): CloudCodeIntrinsic =>
   async (input) => {
@@ -486,11 +426,6 @@ const connectIntrinsic =
     );
   };
 
-/**
- * One `connect.<method>(...args)` against a host-side client. Shared by the
- * isolate's intrinsic and the turn broker, which serves the same call for the
- * container's `code`.
- */
 export const invokeCloudConnect = async (
   client: CloudConnectClient,
   method: string,
@@ -511,7 +446,6 @@ export const invokeCloudConnect = async (
   }
 };
 
-/** `history.search(...)` / `history.sql(...)` / `history.read(...)` — forwarded to the host. */
 const historyIntrinsic =
   (client: CloudHistoryClient | undefined): CloudCodeIntrinsic =>
   async (input) => {
@@ -549,7 +483,6 @@ const historyIntrinsic =
     }
   };
 
-/** `memory.read` / `memory.write` / `memory.list` — forwarded to the memory module. */
 const memoryIntrinsic =
   (client: MemoryClient): CloudCodeIntrinsic =>
   async (input) =>
@@ -562,12 +495,6 @@ const isScreenshotResult = (
   typeof value === "object" &&
   typeof (value as { image?: { data?: unknown } }).image?.data === "string";
 
-/**
- * `browser.<method>(...)` — forwarded to the turn's cloud browser client. A
- * screenshot is lifted out of the sandbox: the image rides the outer code
- * result as an image block the model sees, and the cell only learns it was
- * taken, which also keeps image bytes off the sandbox value bridge.
- */
 const browserIntrinsic =
   (
     client: CloudBrowserClient,
@@ -599,11 +526,6 @@ const browserIntrinsic =
     return await client.call(method, args, context.signal);
   };
 
-/**
- * Adapt the exact live AgentTool array — including discovered/MCP-style
- * names — into the cloud sandbox without putting host bindings or
- * credentials in generated code. The model reads the device `code` contract.
- */
 export const createCloudCodeAgentTool = async (
   options: CreateCloudCodeAgentToolOptions,
 ): Promise<AgentTool> => {
@@ -690,9 +612,6 @@ export const createCloudCodeAgentTool = async (
         liftedMaps.delete(executionId);
         liftedScreenshots.delete(executionId);
       }
-      // A login handoff put the profile under human control during this
-      // cell. Whatever the cell did with the error afterwards, the call waits
-      // for the user: the agent's run holds it open until the handoff ends.
       const suspension = options.browser?.suspension();
       if (suspension) throw new AgentToolSuspendedError(suspension);
       const text = modelTextForResult(result);

@@ -27,8 +27,6 @@ export const broadcastToWindows = (context, channel, payload) => {
         window.webContents.send(channel, payload);
     });
 };
-// The gate repeats its question about every ten seconds while work waits, so
-// one it has not repeated for a while is no longer being asked.
 const PENDING_REMOTE_EXECUTION_REQUEST_TTL_MS = 2 * 60_000;
 export const pendingRemoteExecutionRequest = (context) => {
     const pending = context.state.pendingRemoteExecutionRequest;
@@ -99,7 +97,6 @@ export const createBootstrapContext = (config) => {
         lifecycle,
         state,
         getAllWindows: () => getAllWindows(context),
-        // Lazy: host-runner imports this module.
         loadDeviceId: async () => (await import("./host-runner.js")).loadStellaDeviceId(context),
     });
     registerBootstrapProcessCleanups(context);

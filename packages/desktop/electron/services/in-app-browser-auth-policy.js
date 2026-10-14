@@ -1,17 +1,3 @@
-// Centralized authentication policy for the in-app (managed) browser.
-//
-// The managed browser is an Electron WebContentsView on a persistent session
-// that is auto-seeded from the user's real browser cookies, so login is
-// seamless by default. High-security sites (Google, etc.) still run step-up /
-// reauth challenges — "confirm it's you", passkeys, security keys — that need a
-// real window.open popup and WebAuthn device access to complete. This module is
-// the single, maintainable place that decides WHERE those relaxations apply.
-//
-// Guiding rule: relax the otherwise-strict popup / permission policy ONLY for an
-// explicit allowlist of authentication origins. Everything else keeps the strict
-// "no junk tabs / deny permissions" behavior. Add new providers to the lists
-// below — do not scatter host checks through the service.
-
 const fallbackPlatformToken = (platform) => {
   switch (platform) {
     case "win32":
@@ -24,13 +10,6 @@ const fallbackPlatformToken = (platform) => {
   }
 };
 
-/**
- * Remove Electron/Stella product tokens from Electron's own runtime UA while
- * retaining its real OS and Chromium major version. This must be derived at
- * runtime: a static Chrome version disagrees with UA client hints as soon as
- * Electron's embedded Chromium advances, which is a high-signal client
- * inconsistency for Google and other risk engines.
- */
 export const buildInAppBrowserUserAgent = (
   runtimeUserAgent,
   chromiumVersion = process.versions.chrome,
@@ -66,12 +45,9 @@ export const buildInAppBrowserUserAgent = (
  * step-up popups. Extend deliberately.
  */
 export const AUTH_ORIGIN_HOST_SUFFIXES = [
-  // Google account / gaia / reauth / signin-challenge / passkey / account
-  // chooser, plus the YouTube gaia mirror and Google device flow.
   "accounts.google.com",
   "accounts.youtube.com",
   "gds.google.com",
-  // Other major federated identity providers that also step up via popups.
   "login.microsoftonline.com",
   "login.live.com",
   "login.microsoft.com",
@@ -99,10 +75,6 @@ const urlHost = (value) => {
 const hostMatchesSuffix = (host, suffix) =>
   host === suffix || host.endsWith(`.${suffix}`);
 
-/**
- * True when a URL / origin string belongs to a trusted authentication origin.
- * Accepts full URLs and bare origins (both parse via URL()).
- */
 export const isAuthOrigin = (value) => {
   const host = value ? urlHost(String(value)) : null;
   if (!host) return false;
@@ -111,11 +83,6 @@ export const isAuthOrigin = (value) => {
   );
 };
 
-/**
- * True when a would-be popup should open as a REAL child window (opener
- * retained) because it targets an auth origin over http/https. Non-auth popups
- * fall back to the strict anti-junk-tab handling in the service.
- */
 export const isAuthPopupUrl = (value) => {
   if (!value) return false;
   const raw = String(value);
@@ -129,20 +96,9 @@ export const isAuthPopupUrl = (value) => {
   return isAuthOrigin(raw);
 };
 
-/**
- * True for the narrow set of WebAuthn / security-key permission strings. Callers
- * additionally gate on isAuthOrigin, so these are only ever granted on an auth
- * origin. (The request handler's permission union excludes these device types,
- * so this naturally leaves camera/mic/geolocation/notifications denied there.)
- */
 export const isAuthPermission = (permission) =>
   AUTH_DEVICE_PERMISSIONS.has(String(permission || ""));
 
-/**
- * Decide whether to allow a device (WebHID/WebUSB/serial) selection. Allow ONLY
- * a security-key transport, and ONLY on a trusted auth origin, so passkey /
- * security-key reauth can run. Every other device request is denied.
- */
 export const shouldAllowAuthDevice = (details) => {
   if (!details) return false;
   if (!AUTH_DEVICE_PERMISSIONS.has(String(details.deviceType || ""))) {

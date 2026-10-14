@@ -8,7 +8,6 @@ export type LocalToolDeps = {
 
 type DispatchResult = { handled: true; text: string } | { handled: false };
 
-/** Dispatch tools that execute locally without a backend round-trip. */
 export async function dispatchLocalTool(
   toolName: string,
   _args: Record<string, unknown>,

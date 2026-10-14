@@ -41,23 +41,9 @@ import { retireCloudConversationClientAuthority } from "@/features/cloud/convers
 import { cloudAttachmentsStore } from "@/features/cloud/cloud-composer-store";
 import { retireCloudExecutionClientAuthority } from "@/features/cloud/cloud-execution-store";
 import type { RightSidebarHandle } from "@/shell/RightSidebar";
-// The workspace panel is a ~410-line surface not needed for first
-// interaction, so it is lazy-loaded to keep it out of the always-eager
-// shell's first-paint module graph. The imperative `ref` handle is null
-// until the chunk mounts; every consumer (`use-workspace-panel-events`,
-// `use-display-payload-routing`) already accesses it defensively with `?.`,
-// and only from event/async callbacks — never synchronously on mount.
 const RightSidebar = lazy(() =>
   import("@/shell/RightSidebar").then((m) => ({ default: m.RightSidebar })),
 );
-// These dialogs are rarely seen on first interaction (post-OAuth confirmation,
-// billing upgrade) and each already
-// renders null until its own open/visibility state flips. In a dev-server-in-prod
-// app every static import is a separate first-paint transform, so they are
-// lazy-loaded — wrapped in <Suspense fallback={null}> at their conditional mount
-// sites — to keep them off the always-eager shell's first-paint graph. Behavior
-// is unchanged: each dialog still renders null until its own state opens, so
-// nothing visual depends on the deferred chunk and there is no fallback flash.
 const ProviderConnectedDialog = lazy(() =>
   import("@/global/settings/ProviderConnectedDialog").then((m) => ({
     default: m.ProviderConnectedDialog,
@@ -143,12 +129,6 @@ function CloudStartupFailure({
   );
 }
 
-/**
- * The root route owns the app chrome — top shell bar, workspace panel,
- * dialogs, welcome — plus an `<Outlet />` where the active route renders.
- * Chat runtime state is hoisted into a provider so both the chat route and
- * the workspace panel consume the same hook output.
- */
 function RootLayout() {
   const { state, setConversationId } = useUiState();
   const storageMode = useChatStorageMode();
@@ -218,8 +198,6 @@ function RootLayout() {
     router,
     privateSelectionAttempt,
   ]);
-  // Conversation selection reads the owner's recent conversations as a live
-  // backend view, with exact lookups for the routed and last-open ids.
   const {
     isCloudConversationReady,
     isLoading: isAuthLoading,
@@ -307,16 +285,11 @@ function RootLayout() {
           ownerSubject,
         })
       : null;
-  // A greeting written by first-run discovery waits here for the first
-  // selected conversation, then lands as Stella's opening message.
   usePendingDiscoveryWelcome(conversationId);
 
   const settledAccountScope = cloudSession.sessionGate.sessionIsLoading
     ? null
     : accountScope;
-  // Clear the previous owner synchronously, before any child can paint or an
-  // Electron UiState hydration can reintroduce an unvalidated UUID. Tabs are
-  // loaded from the same immutable account scope as one atomic snapshot.
   useLayoutEffect(() => {
     refreshedMainConversationRef.current = null;
     setMainConversationFailure(null);
@@ -337,9 +310,6 @@ function RootLayout() {
     setConversationId,
   ]);
 
-  // `conversationId` is derived only from owner-checked server data. Mirroring
-  // that derived value (including null while gated) makes UiState a consumer,
-  // never an alternate selection authority.
   useLayoutEffect(() => {
     if (state.conversationId !== conversationId) {
       setConversationId(conversationId);
@@ -352,9 +322,6 @@ function RootLayout() {
     refreshMainConversation();
   }, [refreshMainConversation]);
 
-  // Without a routed conversation the owner has, the chat route opens the
-  // account's main conversation. A main that is gone (deleted elsewhere) is
-  // asked for once more; the backend re-pins a live one.
   useEffect(() => {
     if (isAuthLoading || !isOnChatRoute || !isCloudConversationReady) return;
     if (cloudConversations === undefined || routeOwnershipIsLoading) return;
@@ -421,11 +388,6 @@ function RootLayout() {
       mainConversationFailure?.accountScope === accountScope &&
       mainConversationFailure.conversationId === mainCloudConversationId,
   );
-  // The shell is "live" once the user can act on it: a selected conversation
-  // on the chat route, or cloud readiness anywhere else. The launch splash is
-  // held until then (bounded in `launch-splash.ts`) so the window reveals
-  // once, fully working. Startup failures and the re-auth prompt also drop
-  // the splash — they need to be seen, and liveness will not arrive.
   const shellIsLive =
     conversationId !== null || (!isOnChatRoute && isCloudConversationReady);
   const shouldDismissLaunchSplash =
@@ -452,7 +414,6 @@ function RootLayout() {
     return <SelfHostPairScreen />;
   }
 
-  // Stella needs an account before the first chat.
   if (authBootstrapStatus === "signed_out") {
     return <SignInScreen />;
   }
@@ -533,10 +494,6 @@ function RootChrome({ conversationId }: { conversationId: string | null }) {
   const panelOpen = useDisplayPanelOpen();
   const panelExpanded = useDisplayPanelExpanded();
   const shellBreakpoints = useShellBreakpointState();
-  // The global Models control follows the display panel: it is only useful
-  // while a right-side surface is on screen. It never contributes to that
-  // state — it only reads it — so it can never force the right region into
-  // existence.
   const modelControlVisible = panelOpen;
   const panelExpandedBeforeTakeoverRef = useRef<boolean | null>(null);
   const displayBreakpointTransitionTimeoutRef = useRef<number | null>(null);
@@ -674,10 +631,6 @@ function RootChrome({ conversationId }: { conversationId: string | null }) {
     };
   }, [chat.composer, isOnChatRoute]);
 
-  // Display tab rule: Chat is always present in the strip; its body
-  // adapts to the route inside `ChatDisplayTab` (home shows the activity
-  // / files overview, every other route shows the live chat panel).
-  // Tabs are otherwise sticky — only the user closes them.
   useEffect(() => {
     ensureChatDisplayTab();
   }, []);
@@ -688,12 +641,6 @@ function RootChrome({ conversationId }: { conversationId: string | null }) {
 
   useDictationToggleBridge();
 
-  // Auto-follow the route with the panel's default surface: navigating to
-  // home flips an open Chat panel to the Home launcher, and navigating away
-  // from home flips an open Home launcher to Chat. Only the default
-  // surfaces follow the route — an open artifact viewer (Media / Canvas /
-  // PDF / …) is left untouched so navigation never yanks the user off it,
-  // and a closed panel stays closed (it picks the right surface when opened).
   useEffect(() => {
     const { panelOpen, activeTabId } = displayTabs.getSnapshot();
     if (!panelOpen) return;
@@ -907,11 +854,6 @@ function RootChrome({ conversationId }: { conversationId: string | null }) {
   );
 }
 
-/**
- * Root-level search params: dialogs (auth/connect) become URL state so they
- * are deep-linkable (e.g. an auth deep-link from an external browser opens
- * the AuthDialog without any other glue).
- */
 const RootSearch = z.object({
   dialog: z.enum(["auth", "connect"]).optional(),
 });

@@ -1,9 +1,3 @@
-// Owner purge and the world push/pull route.
-//
-// Cut verbatim out of `src/index.ts`. Nothing here touches the `BuildSession`
-// Durable Object instance, so there is no host interface: these are the
-// top-level collaborators that the worker router and a handful of class
-// methods call with an explicit `env`.
 import { builderServiceSecrets } from "../secret-rotation.js";
 import type { LegacyDirectoryBackup as DirectoryBackup } from "../sandbox-client.js";
 import { sha256Hex } from "../hash.js";
@@ -168,13 +162,7 @@ export const beginOwnerPurge = async (
   throw new Error("Owner cloud turns did not quiesce before purge.");
 };
 
-/** The slug a hosted app route is keyed by. */
 export const APP_SLUG_PATTERN = /^[a-z0-9][a-z0-9._-]{0,63}$/;
-/**
- * A caller-supplied R2 prefix is a bucket-wipe primitive, so it is matched
- * against the shapes this worker writes rather than merely checked for
- * non-emptiness.
- */
 export const LEGACY_BUILD_PREFIX_PATTERN = /^builds\/[A-Za-z0-9_-]{1,64}$/;
 
 /**
@@ -327,16 +315,12 @@ export const purgeOwnerStorage = async (
       prefix: `conversations/${ownerHash}/`,
     },
     {
-      // New mini-app builds are owner-addressable before the callback exists,
-      // so a crash orphan is still discoverable by account reset/deletion.
       store: "app-builds",
       bucket: env.APP_BUILDS,
       prefix: `${ownerAppBuildRoot(ownerHash)}/`,
     },
   ];
   for (const target of prefixTargets) {
-    // An unbound bucket is a deployment that has no such store, not a store
-    // that failed to empty.
     if (!target.bucket) continue;
     try {
       const swept = await sweepR2Prefix(target.bucket, target.prefix);
@@ -347,10 +331,6 @@ export const purgeOwnerStorage = async (
     }
   }
 
-  // The world checkpoint. The archive is named only by the descriptor, so the
-  // descriptor is deleted last: a crash between the two leaves a KV key
-  // pointing at bytes that are already gone (harmless — restore fails and the
-  // world starts cold), never bytes with nothing left that names them.
   await (async (): Promise<void> => {
     const store = "checkpoint:world";
     try {
@@ -363,8 +343,6 @@ export const purgeOwnerStorage = async (
         debtKey,
         "json",
       );
-      // The live descriptor, cleanup debt, and the name-derived historical
-      // backups together name every archive this checkpoint ever wrote.
       const backupIds = new Set<string>(debt?.backupIds ?? []);
       if (descriptor?.id) backupIds.add(descriptor.id);
       let backupSweepFailed = false;
@@ -396,20 +374,12 @@ export const purgeOwnerStorage = async (
       }
       await env.APP_ROUTES.delete(key);
       await env.APP_ROUTES.delete(debtKey);
-      // Counted only when there was something to delete: `deleted` is read off
-      // the log to see how much an account actually held, and a fixed number
-      // of unconditional KV deletes would drown that.
       if (descriptor) deleted += 1;
     } catch (error) {
       fail(store, error);
     }
   })();
 
-  // The owner's containers, their latest snapshot, and their caches and
-  // dependencies archive. Every container holding a slot and the sign-in
-  // container are stopped first, so none can snapshot or archive its disk
-  // again; then the world forgets both, and the prefix sweep catches the
-  // archive objects.
   await (async (): Promise<void> => {
     const store = "sandbox-dependencies";
     try {
@@ -430,9 +400,6 @@ export const purgeOwnerStorage = async (
     }
   })();
 
-  // Hosted app routes. Deleting the row is strictly stronger than suspending
-  // it, and the ownership check keeps a slug that has since been reissued to
-  // someone else out of this owner's deletion.
   for (const slug of request.appSlugs ?? []) {
     if (typeof slug !== "string" || !APP_SLUG_PATTERN.test(slug)) {
       pending.push("route:unparseable");
@@ -452,8 +419,6 @@ export const purgeOwnerStorage = async (
     }
   }
 
-  // Build artifacts: the owner's app code and assets, still served by the
-  // apps host until they are gone.
   for (const prefix of request.buildPrefixes ?? []) {
     if (
       typeof prefix !== "string" ||
@@ -499,7 +464,6 @@ export const boundedIngressRequest = async (
   }
 };
 
-/** One container's own changes: entries it created or changed, paths it deleted. */
 const parseWorldPush = (
   value: unknown,
 ): { entries: WorldListingEntry[]; deleted: string[] } | null => {

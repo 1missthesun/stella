@@ -212,10 +212,6 @@ export function PastedTextTile({
   );
 }
 
-/**
- * One row of same-size attachment tiles. When more tiles exist than fit, the
- * last slot becomes a "+N" tile; tapping it reveals the rest.
- */
 const fitCount = (
   widths: readonly number[],
   available: number,
@@ -231,11 +227,6 @@ const fitCount = (
   return widths.length;
 };
 
-/**
- * One row of same-height attachment tiles. When more tiles exist than fit,
- * the last slot becomes a "+N" tile; tapping it reveals the rest. Tiles past
- * the fit stay mounted off-flow so their widths keep being measured.
- */
 export function AttachmentTileRow({
   items,
   align,

@@ -6,7 +6,6 @@ import {
 } from "@stella/runtime/kernel/memory/memory-layout.js";
 import { MEMORY_FILE_MAX_CHARS } from "@stella/runtime/kernel/memory/memory-client.js";
 
-/** A memory file both sides changed, and where this computer's version was saved. */
 export type MemoryMerge = { path: string; copy: string };
 
 const limit = (relative: string): number =>
@@ -14,13 +13,6 @@ const limit = (relative: string): number =>
     ? MAIN_MEMORY_INJECTED_MAX_CHARS
     : MEMORY_FILE_MAX_CHARS;
 
-/**
- * The brief a background agent gets when memory changed here and in the
- * cloud at once. Like the app-source briefs, it is not a user message: the
- * user typed nothing, so nothing is filed as though they had. The sync has
- * already put the cloud's version in place and saved this computer's beside
- * it, so the merge is the only work left, and the sync uploads its result.
- */
 export const memoryMergeBrief = (
   stellaDataDir: string,
   merges: readonly MemoryMerge[],

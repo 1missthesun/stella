@@ -1,12 +1,6 @@
 import { desktopCapturer } from "electron";
 import { captureWindowScreenshotByPid } from "./window-capture.js";
 
-/**
- * Snapshot of an app's topmost window: a PNG data URL plus the window
- * title we found. Returned by `captureAppWindow` for the auto-context chip
- * "lazy capture" path — we attach the chip eagerly with metadata, then
- * patch in this screenshot when it lands.
- */
 export type AppWindowCapture = {
   title: string;
   axTree?: string | null;
@@ -23,9 +17,7 @@ const normalizeName = (value: string): string =>
   value.toLowerCase().replace(/\s+/g, "").trim();
 
 type CaptureOptions = {
-  /** Preferred selector — pid uniquely identifies the running app. */
   pid?: number | null;
-  /** Fallback selector — only used when pid is missing or fails. */
   appName?: string | null;
 };
 

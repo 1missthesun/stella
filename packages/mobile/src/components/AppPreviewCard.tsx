@@ -15,11 +15,6 @@ import { fadeHex } from "../theme/oklch";
 import { Icon } from "./Icon";
 import { NativeMenu } from "./NativeMenu";
 
-/**
- * A cloud app a reply links (`stella://app/<slug>`): a still of the app on
- * top, then its icon, name and "App", with a menu. Tapping anywhere opens the
- * app in the Apps tab. Renders nothing for a slug that is not a ready app.
- */
 export const AppPreviewCard = memo(function AppPreviewCard({
   slug,
   colors,

@@ -1,16 +1,3 @@
-/**
- * Which message bubbles the companion shows, and for how long.
- *
- * The companion mirrors the latest exchange as iMessage-style bubbles above
- * the mark: the user's message on the right, Stella's reply on the left. A
- * reply that is still streaming keeps the bubbles up; once it lands they stay
- * for a reading window scaled to the reply's length, then fade. Hovering or
- * opening the composer pauses the fade.
- *
- * Only messages newer than the companion's mount (with a short grace window
- * so a reply that landed seconds before the window opened still shows) are
- * ever surfaced — history is the full app's job.
- */
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CompanionState } from "@stella/contracts/desktop/companion";
 
@@ -18,17 +5,14 @@ export type CompanionBubble = {
   key: string;
   role: "user" | "assistant";
   text: string;
-  /** Reply still streaming — the bubble shows a typing indicator when empty. */
   streaming: boolean;
 };
 
 const FRESHNESS_GRACE_MS = 45_000;
-/** A reply older than this relative to the user message is a different turn. */
 const TURN_PAIRING_WINDOW_MS = 15 * 60_000;
 const MIN_DWELL_MS = 6_000;
 const MAX_DWELL_MS = 18_000;
 const DWELL_PER_CHAR_MS = 38;
-/** Dwell after a pause (hover / composer) ends. */
 const RESUME_DWELL_MS = 3_000;
 const FADE_MS = 280;
 
@@ -54,7 +38,6 @@ export function useCompanionBubbles(
         : null;
     const out: CompanionBubble[] = [];
     if (assistant && (!user || assistant.at >= user.at)) {
-      // Reply is the newest thing; pair it with its prompt when close enough.
       if (user && assistant.at - user.at < TURN_PAIRING_WINDOW_MS) {
         out.push({
           key: `u:${user.id}`,
@@ -90,7 +73,6 @@ export function useCompanionBubbles(
     return out;
   }, [latestUser, latestAssistant, isStreaming]);
 
-  // Content signature: a change re-arms the dwell timer.
   const signature = bubbles
     .map((b) => `${b.key}:${b.streaming ? "s" : "f"}`)
     .join("|");
@@ -101,7 +83,6 @@ export function useCompanionBubbles(
   const [visible, setVisible] = useState(false);
   const lastSignatureRef = useRef("");
 
-  // New content → show, and (if settled) schedule the fade.
   useEffect(() => {
     if (!signature) {
       setVisible(false);
@@ -119,7 +100,6 @@ export function useCompanionBubbles(
     if (changed) setHideAt(Date.now() + dwellFor(settledText));
   }, [signature, settled, settledText]);
 
-  // Pause/resume: hovering or an open composer holds the bubbles.
   const wasPausedRef = useRef(paused);
   useEffect(() => {
     if (paused) {
@@ -139,8 +119,6 @@ export function useCompanionBubbles(
     return () => window.clearTimeout(timer);
   }, [hideAt, paused, visible]);
 
-  // Keep the last bubbles mounted through the fade-out so the CSS transition
-  // has something to animate.
   const [rendered, setRendered] = useState<CompanionBubble[]>([]);
   useEffect(() => {
     if (visible) {

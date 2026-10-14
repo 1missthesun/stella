@@ -1,44 +1,9 @@
-/**
- * Perf-lab probe, loaded ONLY by `scripts/perf/bench.mjs` via
- * `bun --preload`. Nothing in the production worker imports this file; the
- * worker behaves exactly as shipped except for what is listed here.
- *
- *   1. Network guard (always on). `fetch` never leaves the machine. The
- *      pi.dev model-catalog refresh answers 404 (the runtime records an
- *      empty refreshed catalog and moves on, deterministically); anything
- *      else throws and is counted in `fetch.blocked`.
- *   2. Scripted model server (STELLA_PERF_FAKE_PROVIDER=1). The guard
- *      answers OpenAI-compatible chat completions at
- *      `http://perf-scripted.invalid/v1` in process; the bench pins the
- *      orchestrator to `local/<that base URL>/scripted` in preferences.json,
- *      which pi-durable runs on its `local` provider exactly as it runs a
- *      user's Ollama or LM Studio model. Responses are instant streams, so a
- *      turn's wall-clock is pure runtime overhead:
- *        - last message is a tool result        -> text "done", stop
- *        - user text contains "[perf:tool]"     -> one tool call
- *          (STELLA_PERF_FAKE_TOOL / STELLA_PERF_FAKE_TOOL_ARGS, JSON)
- *        - otherwise                            -> fixed text in
- *          STELLA_PERF_FAKE_CHUNKS deltas (default 8)
- *   3. Counters (always on): bun:sqlite statements (count + time per SQL
- *      shape, split by database file), stdout bytes/lines/method (the stdio
- *      JSON-RPC channel), blocked fetches.
- *   4. Module census (STELLA_PERF_MODULE_CENSUS=1): a Bun loader plugin that
- *      records every TS source / bundle chunk the runtime loads, with byte
- *      size and load time. It re-reads sources through the plugin path, so
- *      census runs are for counting only and are never timed.
- *
- * Snapshots: on SIGUSR2 the probe writes one line
- *   `@@PERF {json}\n`
- * to stderr (after a full GC so RSS/heap are comparable). The bench diffs
- * consecutive snapshots; nothing is ever reset in-process.
- */
 import { readFileSync } from "node:fs";
 import { Database } from "bun:sqlite";
 
 const bootAt = performance.now();
 const env = process.env;
 
-// ---------------------------------------------------------------- census
 type CensusEntry = { path: string; bytes: number; at: number };
 const census: CensusEntry[] = [];
 if (env.STELLA_PERF_MODULE_CENSUS === "1") {
@@ -72,7 +37,6 @@ if (env.STELLA_PERF_MODULE_CENSUS === "1") {
   });
 }
 
-// ---------------------------------------------------------------- fetch
 const fetchStats = { catalog404: 0, blocked: 0, blockedUrls: [] as string[] };
 const fakeStats = { calls: 0, toolCalls: 0, lastToolNames: [] as string[], lastSystemPromptChars: 0, lastMessageCount: 0 };
 const SCRIPTED_BASE_URL = "http://perf-scripted.invalid/v1";
@@ -103,7 +67,6 @@ const guardedFetch = async (input: unknown, init?: RequestInit): Promise<Respons
 };
 (globalThis as { fetch: unknown }).fetch = guardedFetch;
 
-/** The scripted model: one OpenAI chat-completions stream per request. */
 function createScriptedModel() {
   const chunkCount = Math.max(1, Number(env.STELLA_PERF_FAKE_CHUNKS ?? "8") || 8);
   const toolName = env.STELLA_PERF_FAKE_TOOL ?? "Bash";
@@ -178,7 +141,6 @@ function createScriptedModel() {
   };
 }
 
-// ---------------------------------------------------------------- sqlite
 type SqlStat = { count: number; ms: number };
 const sqlStats = new Map<string, SqlStat>();
 const sqlTotals = { statements: 0, ms: 0, rows: 0, prepares: 0, queryCalls: 0, prepareMs: 0 };
@@ -215,7 +177,6 @@ const dbLabel = (db: object): string => {
 const STATEMENT_METHODS = ["run", "all", "get", "values", "iterate"] as const;
 const wrapped = new WeakSet<object>();
 const wrapStatement = <T extends object>(db: object, sql: string, stmt: T): T => {
-  // db.query() returns a cached statement; wrap each object exactly once.
   if (wrapped.has(stmt)) return stmt;
   wrapped.add(stmt);
   const shape = normalizeSql(sql);
@@ -238,8 +199,6 @@ const wrapStatement = <T extends object>(db: object, sql: string, stmt: T): T =>
   return stmt;
 };
 const proto = Database.prototype as unknown as Record<string, unknown>;
-// STELLA_PERF_SQL_COUNTERS=0 leaves bun:sqlite untouched (profile runs, so
-// the wrapper never shows up in a flame graph).
 const sqlCounters = env.STELLA_PERF_SQL_COUNTERS !== "0";
 for (const method of sqlCounters ? (["prepare", "query"] as const) : []) {
   const original = proto[method] as (sql: string, ...rest: unknown[]) => object;
@@ -264,7 +223,6 @@ for (const method of sqlCounters ? (["exec", "run"] as const) : []) {
   };
 }
 
-// ---------------------------------------------------------------- stdout
 const outStats = {
   bytes: 0,
   lines: 0,
@@ -301,23 +259,17 @@ const originalStdoutWrite = process.stdout.write.bind(process.stdout);
   return (originalStdoutWrite as (...a: unknown[]) => boolean)(chunk, ...rest);
 };
 
-// ---------------------------------------------------------------- snapshots
 const preloadDoneAt = performance.now();
 const snapshot = () => {
   const { heapStats } = require("bun:jsc") as {
     heapStats: () => { heapSize: number; heapCapacity: number; objectCount: number; extraMemorySize: number };
   };
-  // Pre-GC heap: live + not-yet-collected garbage. Diffed against the
-  // previous snapshot's post-GC heap it is a lower bound on bytes allocated
-  // in the window (eden collections inside the window reclaim some).
   const preGc = heapStats();
   Bun.gc(true);
   const heap = heapStats();
   const mem = process.memoryUsage();
   return {
     uptimeMs: performance.now() - bootAt,
-    // Epoch anchors so the bench can place worker-internal marks on its own
-    // clock: process start (timeOrigin), preload start, preload end.
     timeOriginEpochMs: performance.timeOrigin,
     preloadStartMs: bootAt,
     preloadDoneMs: preloadDoneAt,

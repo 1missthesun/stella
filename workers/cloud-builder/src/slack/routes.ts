@@ -128,8 +128,6 @@ const logError = (event: string, error: unknown): void => {
   );
 };
 
-// ── Install ────────────────────────────────────────────────────────────────
-
 const install = async (
   request: Request,
   env: Cloudflare.Env,
@@ -259,8 +257,6 @@ const oauthCallback = async (
       `<a class="button primary" href="${escapeHtml(await connectUrl(env, teamId, installer))}">Connect Stella account</a>`,
   );
 };
-
-// ── Events, interactivity, commands ────────────────────────────────────────
 
 const events = async (
   request: Request,
@@ -444,8 +440,6 @@ const settingCommand = async (
   console.log(JSON.stringify({ event: "slack_setting_changed", teamId: installation.teamId, setting: "effort", by: userId }));
   return `Stella now thinks at \`${saved.effort}\` effort in this workspace.`;
 };
-
-// ── Linking ────────────────────────────────────────────────────────────────
 
 const linkPage = async (
   request: Request,
@@ -681,8 +675,6 @@ const linkConfirm = async (
     `<p>Stella is ready for everyone in ${escapeHtml(installation.teamName)}. Go back to Slack and mention <b>@Stella</b>.</p><a class="button primary" href="${escapeHtml(open)}">Open Slack</a>`,
   );
 };
-
-// ── Router ─────────────────────────────────────────────────────────────────
 
 export const handleSlackRoute = async (
   request: Request,

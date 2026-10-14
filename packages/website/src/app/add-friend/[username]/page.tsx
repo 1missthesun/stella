@@ -11,8 +11,6 @@ export const metadata: Metadata = {
   },
 };
 
-// Matches the app's social username shape (see backend USERNAME_REGEX);
-// lenient on case — the app lowercases before sending the request.
 const USERNAME_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 
 export default async function AddFriendInvitePage({

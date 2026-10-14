@@ -6,13 +6,6 @@
 
 import * as Data from "effect/Data";
 
-/**
- * Tagged failures for the Google Workspace auth adapter. The plain-Promise
- * facades in `AuthManager.ts` rethrow these across the Effect boundary, so
- * every escaping message is byte-identical to the string the pre-Effect
- * code threw. Do not reword them.
- */
-
 export class GoogleWorkspaceProjectRootError extends Data.TaggedError(
   "@stella/runtime/google-workspace/GoogleWorkspaceProjectRootError",
 ) {

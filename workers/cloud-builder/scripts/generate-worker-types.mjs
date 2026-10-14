@@ -14,9 +14,6 @@ const { rawConfig } = experimental_readRawConfig({
   config: path.join(workerRoot, "wrangler.jsonc"),
 });
 const sourceEntry = path.join(workerRoot, "src/index.ts");
-// Type RPC methods against their TypeScript definitions, not the generated JS.
-// Derive every binding and environment from the deployment configuration so
-// the checked declaration file cannot drift behind a second hand-written config.
 const sourceConfig = (config) => {
   const {
     build,
@@ -29,7 +26,6 @@ const sourceConfig = (config) => {
   return {
     ...rest,
     main: sourceEntry,
-    // Same for the static assets directory the build writes.
     ...(config.assets?.directory
       ? {
           assets: {
@@ -38,8 +34,6 @@ const sourceConfig = (config) => {
           },
         }
       : {}),
-    // The derived config lives below .wrangler; resolve local image paths
-    // against the original config directory. Registry image names stay intact.
     ...(config.containers
       ? {
           containers: config.containers.map((container) => ({

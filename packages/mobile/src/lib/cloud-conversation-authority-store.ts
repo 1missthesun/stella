@@ -4,11 +4,6 @@ import type {
   CloudConversationAuthority,
 } from "./cloud-conversation-authority";
 
-/**
- * What the account-authority handshake has proven so far for one identity.
- * `identityKey` travels with every entry so a reader can tell a cached result
- * for a previous session apart from one for the session it is rendering.
- */
 export type CloudAuthorityEntry =
   | { status: "loading"; identityKey: string }
   | {
@@ -19,30 +14,13 @@ export type CloudAuthorityEntry =
   | { status: "failed"; identityKey: string; issue: CloudAuthorityIssue };
 
 export type CloudAuthorityStorePorts = {
-  /** The six-hop handshake (token, identity proof, conversation, config…). */
   resolve: (
     identity: CloudConversationIdentity,
   ) => Promise<CloudConversationAuthority>;
   describeFailure: (error: unknown) => CloudAuthorityIssue;
-  /**
-   * Runs exactly once per identity-key change, before the new handshake
-   * starts: the moment to drop the previous subject's bearer token and retire
-   * its sockets. It deliberately does not run on remounts or retries.
-   */
   onIdentityChange: (identity: CloudConversationIdentity) => void;
 };
 
-/**
- * Process-level cache of the account authority handshake, keyed by identity.
- *
- * The handshake used to live in component state, so every mount of the chat
- * screen (each return from Settings, the CarPlay bridge attaching) started it
- * from zero behind a full-screen spinner and threw away a still-valid backend
- * JWT on the way. Here the resolved authority and the in-flight promise
- * outlive any one mount: a remount reads the cached value synchronously, two
- * surfaces on the same session share one handshake, and the root layout can
- * start it while the native splash is still up.
- */
 export class CloudConversationAuthorityStore {
   private identity: CloudConversationIdentity | null = null;
   private entry: CloudAuthorityEntry | null = null;
@@ -61,11 +39,6 @@ export class CloudConversationAuthorityStore {
 
   getSnapshot = (): CloudAuthorityEntry | null => this.entry;
 
-  /**
-   * Starts the handshake for `identity` unless one already ran or is running
-   * for the same identity key. Returns the promise for whichever handshake is
-   * current, settled (never rejected) once it lands in the snapshot.
-   */
   ensure(identity: CloudConversationIdentity): Promise<void> {
     if (this.identity?.identityKey === identity.identityKey && this.entry) {
       return this.inflight ?? Promise.resolve();
@@ -76,13 +49,11 @@ export class CloudConversationAuthorityStore {
     return this.start();
   }
 
-  /** Re-runs the handshake for the current identity, keeping its token. */
   retry(): Promise<void> {
     if (!this.identity) return Promise.resolve();
     return this.start();
   }
 
-  /** Forgets everything; the next `ensure` is treated as an identity change. */
   reset(): void {
     this.generation += 1;
     this.identity = null;

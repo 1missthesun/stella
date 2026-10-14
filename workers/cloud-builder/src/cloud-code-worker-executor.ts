@@ -9,22 +9,11 @@ import { CONNECT_DOCUMENTATION } from "@stella/runtime/kernel/connectors/connect
 
 type CloudflareCodeModeModule = typeof import("@cloudflare/codemode");
 
-/**
- * Reserved sandbox intrinsics dispatched through the same RPC bridge as
- * tools. `$`-prefixed names are never real tools (the device kernel reserves
- * them too), so the child can route them without a second dispatcher.
- */
 export const CLOUD_CODE_SEARCH_INTRINSIC = "$search";
 export const CLOUD_CODE_DESCRIBE_INTRINSIC = "$describe";
 export const CLOUD_CODE_CONNECT_INTRINSIC = "$connect";
 export const CLOUD_CODE_HISTORY_INTRINSIC = "$history";
-/** Present only for an agent's code, which holds the cloud browser. */
 export const CLOUD_CODE_BROWSER_INTRINSIC = "$browser";
-/**
- * Present only for the orchestrator's code while memory is on: its
- * `memory.read` / `memory.write` / `memory.list` over the memory files. It is
- * not `fs`: it reaches those files and nothing else in the world.
- */
 export const CLOUD_CODE_MEMORY_INTRINSIC = "$memory";
 export const CLOUD_CODE_INTRINSIC_NAMES: ReadonlySet<string> = new Set([
   CLOUD_CODE_SEARCH_INTRINSIC,
@@ -38,7 +27,6 @@ export const CLOUD_CODE_INTRINSIC_NAMES: ReadonlySet<string> = new Set([
 
 let cloudflareCodeModePromise: Promise<CloudflareCodeModeModule> | undefined;
 
-/** Load the Code Mode SDK once, only after a turn needs the Code tool. */
 export const loadCloudflareCodeMode = (): Promise<CloudflareCodeModeModule> =>
   (cloudflareCodeModePromise ??= import("@cloudflare/codemode"));
 
@@ -262,11 +250,6 @@ function __errorMessage(error) {
 }
 `;
 
-/**
- * The sandbox `browser` global. Each method is a thin forwarder; the host
- * validates arguments and owns the gateway contract. Trailing omitted
- * arguments are dropped because the value bridge refuses `undefined`.
- */
 const BROWSER_GLOBAL_LINES = [
   "    const __browserCall = (method, args) => {",
   "      let end = args.length;",
@@ -305,11 +288,6 @@ const BROWSER_GLOBAL_LINES = [
   "    });",
 ] as const;
 
-/**
- * The sandbox `memory` global, the orchestrator's only. Omitted arguments are
- * left out of the request because the value bridge refuses `undefined`; the
- * host validates every field.
- */
 const MEMORY_GLOBAL_LINES = [
   "    const __memoryCall = (op, fields) => {",
   "      const request = { op };",
@@ -529,11 +507,6 @@ const disposeResource = async (
   return "unavailable";
 };
 
-/**
- * Stella-owned Dynamic Worker adapter. Unlike the package's opaque executor,
- * this retains both native handles so an Effect finalizer can synchronously
- * fence new work and await their disposal on cancellation.
- */
 export class StellaDynamicWorkerExecutor implements StellaDisposableExecutor {
   readonly #loader: WorkerLoader;
   readonly #timeoutMs: number;
@@ -606,8 +579,6 @@ export class StellaDynamicWorkerExecutor implements StellaDisposableExecutor {
     const dispatchers = {
       codemode: new ToolDispatcher(sanitizedFns),
     };
-    // `tools.<name>` is the exact sanitized identifier; intrinsics are
-    // reachable only through their `tools.$…` accessors.
     const toolNames = [...sanitizedNames.keys()].filter(
       (name) => !CLOUD_CODE_INTRINSIC_NAMES.has(name),
     );
@@ -652,8 +623,6 @@ export class StellaDynamicWorkerExecutor implements StellaDisposableExecutor {
       if (entrypointStatus === "disposed" || workerStatus === "disposed") {
         return "disposed";
       }
-      // No handle can exist when cancellation wins before execute starts. The
-      // closed fence itself is then a complete cleanup outcome.
       return this.#started ? "executor_dispose_unavailable" : "disposed";
     })();
     return this.#disposePromise;

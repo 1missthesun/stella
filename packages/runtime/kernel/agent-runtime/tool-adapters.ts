@@ -53,10 +53,6 @@ import {
 const COMMAND_OUTPUT_TOOL_NAMES = new Set(["Bash", "exec_command", "write_stdin"]);
 const MULTI_TOOL_USE_PARALLEL_TOOL_NAME = "multi_tool_use_parallel";
 export const MODEL_VISIBLE_COMMAND_RESULT_MAX_BYTES = 10_000;
-// Codex's ExecCommandToolOutput::model_output_policy compares the model's
-// truncation policy with max_output_tokens at four approximate bytes/token.
-// Keep Stella's approved 10KB model policy as the outer cap and let smaller
-// per-call token requests reduce only the command preview inside that cap.
 const APPROX_COMMAND_OUTPUT_BYTES_PER_TOKEN = 4;
 const COMMAND_RESULT_LIMITS = Object.freeze({
   maxBytes: MODEL_VISIBLE_COMMAND_RESULT_MAX_BYTES,
@@ -433,12 +429,6 @@ const neutralizeAttachImageString = (text: string): string => {
   return output.replace(/\n{3,}/g, "\n\n").trim();
 };
 
-/**
- * Remove legacy path-bearing image markers without reading any referenced
- * path. Cloud tool output passes through this fail-closed transform: model
- * text can request or echo a marker, but only symbol-carried bytes that were
- * already read through the trusted descriptor boundary can become an image.
- */
 export const neutralizeLegacyAttachImageMarkers = (text: string): string => {
   if (!text || !text.includes(STELLA_ATTACH_IMAGE_MARKER)) return text;
   let jsonValue: unknown;
@@ -463,13 +453,6 @@ export const neutralizeLegacyAttachImageMarkers = (text: string): string => {
   return JSON.stringify(neutralizeJsonStrings(jsonValue));
 };
 
-/**
- * Convert bytes already authorized by a trusted file descriptor into model
- * image blocks. This never reopens `sourcePath`; the path is provenance only.
- * Provider-specific dimension and byte caps are applied before the bytes
- * cross the model boundary, with a bounded raw fallback only when the image
- * was fully decoded and already fits those same caps.
- */
 export const prepareAuthorizedToolImageBlocks = async (
   authorizedImages: readonly AuthorizedToolImage[] | undefined,
   target: ImageCapTarget = {},
@@ -482,8 +465,6 @@ export const prepareAuthorizedToolImageBlocks = async (
   });
   const hardBase64Bytes = maxInlineImageBase64Bytes(target);
   for (const image of authorizedImages) {
-    // Copy at the trust boundary so a mutable Buffer retained by a handler
-    // cannot change after validation but before MCP/provider serialization.
     const bytes = Buffer.from(image.data);
     const decoded = await decodeAndValidateImage(bytes);
     if (!decoded || decoded.mimeType !== image.mimeType) continue;
@@ -530,12 +511,6 @@ export const prepareAuthorizedToolImageBlocks = async (
   return images;
 };
 
-/**
- * Context-visible demoted tools for an (already agent-scoped) catalog:
- * a demoted tool whose `requiredConnectorProvider` doesn't match the turn's
- * connector-delivery provider is invisible everywhere — catalog section,
- * REPL-allowed union, and the direct-list fallback alike.
- */
 export const collectVisibleDemotedTools = (
   toolCatalog: readonly ToolMetadata[] | undefined,
   connectorProvider: string | undefined,
@@ -576,8 +551,6 @@ export const extractAttachImageBlocks = async (
 
   const images: ImageBlock[] = [];
   const markerReplacements: Array<{ full: string; replacement: string }> = [];
-  // Read sequentially to keep failure messages deterministic; screenshots are
-  // small and there's typically 1-2 per call.
   for (const { full, path: imgPath, detailOriginal } of matches) {
     try {
       // Settle the read against the capture -> read race: a screenshot the
@@ -595,14 +568,6 @@ export const extractAttachImageBlocks = async (
         });
         continue;
       }
-      // Provider-aware auto-resize: pass-through when the image already fits
-      // the resolved target's dimension + byte caps (e.g. computer-use
-      // screenshots that the native service pre-caps at 1024px, so screenshot
-      // coordinates stay 1:1), otherwise shrink to fit that target.
-      // `detail=original` lifts the caps to the provider's
-      // hard ceiling so a deliberate full-res read isn't downscaled. The
-      // dimension note tells the model how to map coordinates back when a
-      // resize did happen.
       const caps = resolveImageCaps({
         ...target,
         imageCount: matches.length,
@@ -661,16 +626,11 @@ export const extractAttachImageBlocks = async (
         sourcePath: imgPath,
       });
     } catch {
-      // If the file vanished between CLI exit and our read, leave the marker
-      // in the text so the model can still see what was attempted, but keep
-      // processing sibling markers so one missing image cannot discard them.
       markerReplacements.push({ full, replacement: full });
       continue;
     }
   }
 
-  // Strip attached markers (and swap oversized ones for their notes) so we
-  // don't double-send paths the model no longer needs.
   let stripped = text;
   if (jsonStrings.length > 0) {
     let replacementIndex = 0;
@@ -709,11 +669,6 @@ export const extractAttachImageBlocks = async (
   return { text: stripped, images };
 };
 
-/**
- * Materialize typed code-runtime image items without converting them back into
- * model-visible marker strings. Audio remains in structured details because
- * the current ToolResultMessage content union supports text and images only.
- */
 export const extractCodeImageBlocks = async (
   details: unknown,
   target: ImageCapTarget = {},
@@ -813,7 +768,6 @@ type RuntimeToolContextArgs = {
   stellaAppDir?: string;
   stellaDataDir?: string;
   toolWorkspaceRoot?: string;
-  /** A spawned agent's start directory; it confines nothing. */
   agentWorkingDirectory?: string;
   parentAgentId?: string;
   agentDepth?: number;
@@ -911,8 +865,6 @@ export const executeRuntimeToolCall = async (
   }
 
   const context = buildRuntimeToolContext(args);
-  // The agent loop already validated these args against the same schema;
-  // nested calls run this step with validation (see tools/host.ts).
   return await runToolCallPipeline({
     toolName: args.toolName,
     args: args.args,
@@ -930,7 +882,6 @@ export const executeRuntimeToolCall = async (
   });
 };
 
-/** What one tool call needs from its run, and the names nested calls may reach. */
 export type ModelToolCallOptions = {
   executionHost: "device" | "sandbox";
   runId: string;
@@ -944,7 +895,6 @@ export type ModelToolCallOptions = {
   stellaAppDir?: string;
   stellaDataDir?: string;
   toolWorkspaceRoot?: string;
-  /** A spawned agent's start directory; it confines nothing. */
   agentWorkingDirectory?: string;
   parentAgentId?: string;
   agentDepth?: number;
@@ -965,21 +915,10 @@ export type ModelToolCallOptions = {
     onUpdate?: ToolUpdateCallback,
   ) => Promise<ToolResult>;
   hookEmitter?: HookEmitter;
-  /**
-   * Resolved target provider/model for this run, so `[stella-attach-image]`
-   * screenshots are resized to the best quality that provider supports
-   * (e.g. Anthropic's 2576px high-res tier) instead of a blunt global cap.
-   */
   imageCapTarget?: ImageCapTarget;
   allowedToolNames: string[];
 };
 
-/**
- * One model-issued Stella tool call: the tool pipeline (hooks, then the
- * executor), then what the model sees of its result — formatted, truncated
- * or spilled, with any images attached. The pi-durable harness runs it for
- * its Stella tools (`runner/pi-tools.ts`).
- */
 export const executeModelToolCall = async (
   opts: ModelToolCallOptions,
   call: {

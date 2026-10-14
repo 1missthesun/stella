@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from "react";
 import { getBackendClient, useBackendView } from "./backend";
 import type { CloudConversationIdentity } from "./cloud-conversation-auth";
 
-/** The account's telemetry switch: the backend preference is the authority. */
 export function useTelemetryPreference(identity: CloudConversationIdentity | null) {
   const live = useBackendView("preferences.get", identity ? {} : "skip");
   const [enabled, setEnabled] = useState(true);

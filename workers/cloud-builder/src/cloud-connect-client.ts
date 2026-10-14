@@ -1,20 +1,3 @@
-/**
- * Host-side `connect` client for the cloud orchestrator's code sandbox.
- *
- * Same surface as the device kernel's `connect` (see
- * `connectors/connect-worker-api.ts`), plus the connected integrations'
- * actions as code tools (`connectors/connector-tools.ts`), backed by the Store's Composio
- * integrations: the global catalog in D1 and the owner object's
- * `integrations.*` internals, instead of a local catalog cache and CLI
- * bridge. Connectors belong to the account, not the device, so a service
- * connected anywhere is usable here.
- *
- * Custom MCP servers belong to the account too (the owner object's
- * `mcp.*` internals): `addMcp` and `remove` work here, a remote server that
- * needs no sign-in is called directly, and one that runs on (or signed in
- * on) a computer is reached through that computer while it is online.
- */
-
 import {
   scoreConnectorMatch,
   tokenizeConnectorQuery,
@@ -42,10 +25,6 @@ import {
 import type { CloudConnectClient } from "./cloud-code-tool.js";
 import { RpcError } from "./owner-store/errors.js";
 
-/**
- * Where the directory reads: the global catalog (D1) and the owner's
- * connections and runs (the owner object's `integrations.*` internals).
- */
 export type CloudConnectorSource = Readonly<{
   catalog(): Promise<readonly IntegrationCatalogEntry[]>;
   actions(args: {
@@ -71,7 +50,6 @@ export type CloudMcpDevice = Readonly<{
   acceptsWork: boolean;
 }>;
 
-/** The account's custom MCP servers (the owner object's `mcp.*` internals). */
 export type CloudMcpSource = Readonly<{
   list(options: { refresh: boolean }): Promise<{
     servers: readonly McpServerRecord[];
@@ -103,7 +81,6 @@ export const ownerMcpSource = (
 
 export type CloudConnectClientContext = Readonly<{
   source: CloudConnectorSource;
-  /** Absent (Slack conversations): no custom MCP servers at all. */
   mcp?: CloudMcpSource;
 }>;
 
@@ -200,11 +177,6 @@ export const readCloudConnectorCatalogEntry = (
   };
 };
 
-/**
- * Resolve a connector id or display name against the catalog the way the
- * device `connector_status` tool does: exact id/name first, then the shared
- * scorer with the same acceptance threshold.
- */
 export const resolveCloudConnectorEntry = (
   catalog: readonly CloudConnectorCatalogEntry[],
   query: string,
@@ -232,11 +204,6 @@ export const resolveCloudConnectorEntry = (
   };
 };
 
-/**
- * The account's connector state for one turn: the Store catalog plus the
- * owner's live connections. Both are memoized per turn; connector tools and
- * `connector_status` re-read connections after a connect card resolves.
- */
 export class CloudConnectorDirectory {
   #catalog: Promise<readonly CloudConnectorCatalogEntry[]> | undefined;
   #connections: Promise<readonly CloudConnectorConnection[]> | undefined;
@@ -255,7 +222,6 @@ export class CloudConnectorDirectory {
     return this.#context.mcp;
   }
 
-  /** The account's MCP servers, re-read at most every few seconds. */
   mcpServers(options?: { fresh?: boolean }): ReturnType<CloudMcpSource["list"]> {
     const source = this.#context.mcp;
     if (!source) return Promise.resolve({ servers: [], devices: [] });
@@ -374,7 +340,6 @@ type McpListing = Awaited<ReturnType<CloudMcpSource["list"]>>;
 const deviceName = (listing: McpListing, deviceId: string): string =>
   listing.devices.find((device) => device.deviceId === deviceId)?.label ?? "your computer";
 
-/** Where an MCP server is reached from, in one line an agent can act on. */
 export const mcpWhere = (record: McpServerRecord, listing: McpListing): {
   reach: "anywhere" | "device" | "unreachable";
   deviceId?: string;

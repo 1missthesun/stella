@@ -1,13 +1,6 @@
 import { Context, Layer } from "effect";
 import type { WorkerInitializationState } from "../types.js";
 
-/**
- * Per-session config cell: the host-pushed initialization state plus the
- * device identity resolved during initialize. Mutable by design — CONFIGURE
- * patches and auth refreshes update it in place, mirroring the old
- * `state.init` field. Fan-out of patches to the runner services lives
- * in WorkerSessions (which can see the whole session), not here.
- */
 export interface Interface {
   readonly deviceId: string;
   readonly get: () => WorkerInitializationState;

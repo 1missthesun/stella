@@ -1,12 +1,3 @@
-/**
- * "Connect Gmail" — the one connector worth asking about up front.
- *
- * Shown right after sign-in, and only to signed-in users of the desktop app:
- * Gmail connects through the Stella account (the same Store connect flow as
- * Settings › Connectors), so the card just runs `nativeIntegrations.enable`
- * for it. That call opens Google in the browser and resolves once the
- * connection is confirmed, so the card can say "Connected" honestly.
- */
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/ui/button";
 import { Check, LoaderCircle } from "@/ui/icons";
@@ -23,7 +14,6 @@ type GmailCardProps = {
 
 type Phase = "idle" | "connecting" | "connected" | "error";
 
-/** Gmail's mark, fitted to the 24px box the other row icons use. */
 function GmailMark({ size }: { size: number }) {
   return (
     <svg
@@ -54,7 +44,6 @@ export function GmailCard({ active, answered, onAnswer }: GmailCardProps) {
   const t = useT();
   const [phase, setPhase] = useState<Phase>("idle");
 
-  // Already connected (Settings, another device, an earlier run): say so.
   useEffect(() => {
     if (answered !== undefined) return;
     const api = window.electronAPI?.nativeIntegrations;

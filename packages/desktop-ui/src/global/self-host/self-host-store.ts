@@ -1,10 +1,6 @@
 import { useSyncExternalStore } from "react";
 import type { DesktopServerState } from "@stella/contracts/desktop/self-host";
 
-/**
- * Which self-host dialog is open: "Connect to your own server" (optionally
- * with a pairing link that arrived from the OS) or "Connect a device".
- */
 export type SelfHostDialog =
   | { kind: "connect"; link: string | null }
   | { kind: "device" }
@@ -55,7 +51,6 @@ const loadServerState = () => {
   })();
 };
 
-/** The server this desktop install uses; null until main answers. */
 export const useDesktopServerState = (): DesktopServerState | null => {
   loadServerState();
   return useSyncExternalStore(subscribe, () => serverState, () => null);

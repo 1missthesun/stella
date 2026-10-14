@@ -1,15 +1,3 @@
-/**
- * The cloud agents spending cap (`cloudAgentCaps`): containers running at
- * once and container-hours a calendar month (UTC), across the deployment.
- * On by default in owner mode, where the deployment has one owner; off on
- * hosted Stella unless its vars are set.
- *
- * Each running container has a row in D1 (`cloud_container_runs`), touched
- * while it is used; a row not touched for longer than a container's idle
- * timeout is a container the platform stopped, and is settled into the
- * month's total as if it ran until then.
- */
-
 import { cloudAgentCaps } from "./selfhost/owner-mode.js";
 
 const DEFAULT_IDLE_MS = 10 * 60_000;
@@ -60,7 +48,6 @@ const settleRow = async (db: D1Database, sandbox: string, startedAt: number, end
   ]);
 };
 
-/** Before a container starts: refuses past either cap, else records the run. */
 export const admitContainerStart = async (env: CapEnv, sandbox: string, now = Date.now()): Promise<void> => {
   if (!(await checkContainerCaps(env, sandbox, now))) return;
   await env.DB!
@@ -72,10 +59,6 @@ export const admitContainerStart = async (env: CapEnv, sandbox: string, now = Da
     .run();
 };
 
-/**
- * Throws CloudAgentCapError when another container may not start now; false
- * when no cap is configured.
- */
 export const checkContainerCaps = async (env: CapEnv, sandbox = "", now = Date.now()): Promise<boolean> => {
   const caps = capsOf(env);
   if (!caps || !env.DB) return false;
@@ -108,7 +91,6 @@ export const checkContainerCaps = async (env: CapEnv, sandbox = "", now = Date.n
 
 const lastTouch = new Map<string, number>();
 
-/** While a container is in use; cheap, at most one write a minute per container. */
 export const touchContainer = async (env: CapEnv, sandbox: string, now = Date.now()): Promise<void> => {
   if (!capsOf(env) || !env.DB) return;
   if (now - (lastTouch.get(sandbox) ?? 0) < TOUCH_EVERY_MS) return;
@@ -116,7 +98,6 @@ export const touchContainer = async (env: CapEnv, sandbox: string, now = Date.no
   await env.DB.prepare("UPDATE cloud_container_runs SET last_seen = ? WHERE sandbox = ?").bind(now, sandbox).run();
 };
 
-/** After a container stopped: its time goes into the month's total. */
 export const settleContainer = async (env: CapEnv, sandbox: string, now = Date.now()): Promise<void> => {
   if (!capsOf(env) || !env.DB) return;
   lastTouch.delete(sandbox);

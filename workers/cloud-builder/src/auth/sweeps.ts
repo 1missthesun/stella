@@ -1,19 +1,7 @@
-/**
- * The Cron Trigger's identity sweeps (src/cron.ts).
- *
- * - Expired rows: Better Auth's verification values and sessions, its rate
- *   limit counters, the handoff tables and integrity nonces.
- * - Anonymous users, left from before anonymous sign-in was removed: all of
- *   them, live sessions or not, in bounded batches per run. Each one's owner
- *   object is closed (which purges its data), then the user row goes, taking
- *   its sessions and accounts with it.
- */
-
 import { ownerGateStub } from "../rpc-release.js";
 import { ownerModeEnabled } from "../selfhost/owner-mode.js";
 
 const DAY_MS = 24 * 60 * 60_000;
-/** Upper bound on anonymous users one run closes; the next run takes the rest. */
 const ANONYMOUS_PER_RUN = 200;
 
 type SweepEnv = Pick<Cloudflare.Env, "DB" | "OWNER_GATES">;

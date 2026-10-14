@@ -1,9 +1,3 @@
-/**
- * The account's MCP server registry (`mcpServers.*` backend calls), reached
- * with the worker's live Stella session through the CLI bridge
- * (`connector.accountMcp`).
- */
-
 import { RPC_PATH_PREFIX } from "@stella/contracts/backend/protocol";
 
 export const ACCOUNT_MCP_OPS = ["list", "put", "remove", "call"] as const;

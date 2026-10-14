@@ -1,11 +1,3 @@
-/**
- * Provider-neutral, secret-free contracts for Stella Cloud browser work.
- *
- * Browser cookies, storage state, Live View capability URLs, provider device
- * secrets, OAuth tokens, and credential-field values are deliberately absent.
- * Those values belong only to the private Browser Gateway.
- */
-
 export const CLOUD_BROWSER_INTERACTION_KINDS = [
   "login_takeover",
   "device_code",
@@ -51,7 +43,6 @@ export type CloudBrowserLoginTakeoverDetail = CloudBrowserInteractionSummary &
     loginUrl: string;
   }>;
 
-/** Only the public RFC 8628 values intended to be shown to the user. */
 export type CloudBrowserDeviceCodeDetail = CloudBrowserInteractionSummary &
   Readonly<{
     kind: "device_code";
@@ -63,11 +54,6 @@ export type CloudBrowserDeviceCodeDetail = CloudBrowserInteractionSummary &
 export type CloudBrowserInteractionDetail =
   CloudBrowserLoginTakeoverDetail | CloudBrowserDeviceCodeDetail;
 
-/**
- * A JIT bearer capability. It must be returned only to the authenticated
- * client, held in memory, validated against `live.browser.run`, and discarded
- * when the takeover surface closes or backgrounds.
- */
 export type CloudBrowserLiveViewCapability = Readonly<{
   schemaVersion: 1;
   interactionId: string;
@@ -98,10 +84,6 @@ export type CloudBrowserEncryptedSessionTransfer = Readonly<{
   ciphertext: string;
 }>;
 
-/**
- * Typed control outcome that suspends one hosted Stella turn. This is safe to
- * checkpoint and project; it contains no browser state or human-entered data.
- */
 export type CloudBrowserSuspension = Readonly<{
   schemaVersion: 1;
   outcome: "waiting_for_user";
@@ -193,7 +175,6 @@ export const isCloudBrowserSuspension = (
   );
 };
 
-/** Gateway command envelope. The owner and turn identity come from the run that sends it. */
 export type CloudBrowserCommandRequest = Readonly<{
   schemaVersion: 1;
   requestId: string;

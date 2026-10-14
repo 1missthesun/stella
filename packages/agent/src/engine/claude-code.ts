@@ -52,7 +52,6 @@ import { CLAUDE_CODE_ENGINE_EXTENSION, CLAUDE_CODE_PROVIDER_ID } from "./selecti
 
 export { CLAUDE_CODE_ENGINE_EXTENSION, CLAUDE_CODE_PROVIDER_ID, engineExtensionChange } from "./selection.ts";
 export const CLAUDE_CODE_API = "claude-code-cli";
-/** What a cloud agent's Claude Code CLI records its messages under. */
 const CLOUD_CLAUDE_CODE_API = "claude-code";
 
 export const CLAUDE_CODE_BUILTIN_TOOLS = ["Read", "Edit", "Write", "Bash", "Grep", "Glob"] as const;
@@ -60,7 +59,6 @@ const ENGINE_ONLY_TOOLS = ["Grep", "Glob"] as const;
 const WRAPPED_TOOLS = ["Read", "Edit", "Write", "Bash"] as const;
 const MCP_PREFIX = "mcp__stella__";
 
-/** A Claude Code model's context window when the CLI has not reported it: 1M for a `[1m]` id, else the smallest any has. */
 export const claudeCodeContextWindow = (model: string): number => (/\[1m\]/i.test(model) ? 1_000_000 : 200_000);
 
 export const CLAUDE_CODE_MODEL_ALIASES = [
@@ -92,7 +90,6 @@ export type ClaudeCodeSessionRef = {
   role: ClaudeCodeRole;
   sessionKey: string;
   cwd?: string;
-  /** A one-off session (compacting history for a handover): never synced or resumed. */
   ephemeral?: true;
 };
 
@@ -103,7 +100,6 @@ export type ClaudeCodeStatus =
   | { state: "usage-limit"; text: string; until?: number }
   | { state: "usage-limit-end"; text: string; resumed: boolean };
 
-/** Background commands the CLI ran that finished while it waited for no one; it started a query about them itself. */
 export type ClaudeCodeBackgroundWake = {
   id: string;
   tasks: { summary: string; status?: string; outputFile?: string }[];
@@ -126,22 +122,15 @@ export type ClaudeCodeTurnSpec = {
   onNativeToolEnd(end: { toolUseId: string; result: string; isError: boolean }): void;
   onStatus(status: ClaudeCodeStatus): void;
   onSessionId(sessionId: string): void;
-  /** The CLI compacted its session (`createClaudeCodeCompactionDetector`). */
   onCompaction(compaction: ClaudeCodeCompaction): void;
   control(turn: {
-    /** Steer the running CLI; `onConsumed` once it took the input in, `onDropped` if the step ended before it did. */
     inject(input: { text: string; images: ImageContent[]; onConsumed?: () => void; onDropped?: () => void }): boolean;
-    /** End the CLI's step at this tool boundary, unanswered; `toolSetAfterStep` then carries the turn on. */
     endStep(): boolean;
   }): void;
   toolSetAfterStep(): { tools: ClaudeCodeToolSpec[]; nativeTools: readonly string[]; prompt: string } | undefined;
-  /** The session's CLI started a query of its own about finished background commands: the agent is woken for it. */
   onBackgroundWake(wake: ClaudeCodeBackgroundWake): void;
-  /** This turn was woken for that query and takes it over; its prompt need not reach a CLI that already knows. */
   backgroundWake: boolean;
-  /** No message the user wrote waits for a reply: an empty answer is this turn's reply, and nothing is posted. */
   quiet: boolean;
-  /** The prompt is the CLI's own `/compact`: run it as stock Claude Code, slash commands on, none of Stella's surface. */
   compact?: true;
 };
 
@@ -149,20 +138,10 @@ export type ClaudeCodeTransport = {
   runTurn(spec: ClaudeCodeTurnSpec): Promise<{ text: string; sessionId: string }>;
   preflight?(session: ClaudeCodeSessionRef): Promise<void>;
   resume?(session: ClaudeCodeSessionRef, args: { held?: string; lastReply?: string }): Promise<{ sessionId?: string; restored?: boolean }>;
-  /**
-   * Write a new CLI session for `session` whose transcript `transcript`
-   * renders (Stella's history as native turns), and answer its id to resume.
-   */
   hydrate?(session: ClaudeCodeSessionRef, transcript: (meta: ClaudeCodeTranscriptMeta) => string): Promise<string>;
   close?(session: ClaudeCodeSessionRef): void;
 };
 
-/**
- * `seen`: messages the CLI has, by key. `undelivered`: messages that reached
- * Stella's transcript but never the CLI (a stop or pause ended its step
- * before it took them in); the next turn carries them. `context`: the
- * resident context baseline the CLI was handed whole, by key.
- */
 export type ClaudeCodeSessionRecord = { cliSessionId?: string; seen: string[]; undelivered?: string[]; context?: string };
 export type ClaudeCodeSessionStore = {
   read(piSessionId: string): Promise<ClaudeCodeSessionRecord | undefined>;
@@ -171,7 +150,6 @@ export type ClaudeCodeSessionStore = {
 
 type Binding = {
   session: ClaudeCodeSessionRef;
-  /** The CLI keeps none of its built-ins (`ClaudeCodeEngineOptions.builtins`). */
   builtinsOff: boolean;
   piConversationId: ConversationId;
 };
@@ -192,7 +170,6 @@ type Turn = {
   session: Session;
   abort: AbortController;
   done: boolean;
-  /** Resolves once `done`: its CLI step ended and said what it never took in. */
   settled: Promise<void>;
   settle: () => void;
   outcome?: { ok: true; text: string } | { ok: false; error: unknown };
@@ -200,24 +177,18 @@ type Turn = {
   wake?: () => void;
   callIds: Set<string>;
   prompted?: Message[];
-  /** The resident context baseline this turn's prompt handed the CLI. */
   context?: string;
   unsent: Message[];
   waiting: Map<string, (outcome: ClaudeCodeToolOutcome) => void>;
   early: Map<string, ClaudeCodeToolOutcome>;
-  /** Stella tool calls the CLI asked its MCP server to run. */
   claimed: Set<string>;
-  /** Calls the CLI answered itself, without asking the MCP server: what it told the model. */
   refused: Map<string, string>;
-  /** Stella tool calls held until the CLI runs or refuses them (`cliRuns`). */
   gates: Set<() => boolean>;
   inject?: (input: { text: string; images: ImageContent[]; onConsumed?: () => void; onDropped?: () => void }) => boolean;
   endStep?: () => boolean;
   toolSet: { tools: ClaudeCodeToolSpec[]; nativeTools: readonly string[] };
   nextToolSet?: { tools: ClaudeCodeToolSpec[]; nativeTools: readonly string[] };
-  /** Tool results the CLI's ended step never read; the next step is told them. */
   carried?: Message[];
-  /** Started again because the session it resumed was gone. */
   relaunched?: true;
 };
 
@@ -229,7 +200,6 @@ type TurnRequest = {
   nativeTools: readonly string[];
   thinkingLevel: ModelThinkingLevel;
   prompt?: { text: string; images: ImageContent[] };
-  /** The messages `prompt` carries. */
   steered?: Message[];
 };
 
@@ -240,7 +210,6 @@ type Session = {
   record?: ClaudeCodeSessionRecord;
   turn?: Turn;
   cliSessionId?: string;
-  /** Wake messages sent to the agent for its CLI's own queries, not yet taken in. */
   wakes?: Set<string>;
 };
 
@@ -277,7 +246,6 @@ const textOf = (content: string | readonly (TextContent | ImageContent | Thinkin
         .filter((text) => text.length > 0)
         .join("\n\n");
 
-/** Text of a stream-json `tool_result` block's content. */
 const cliResultText = (content: unknown): string =>
   typeof content === "string"
     ? content
@@ -457,12 +425,10 @@ const thinkingOn = (messages: readonly Message[], alias: string, resolved: strin
 const commandSafe = (text: string, from: readonly Message[]): string =>
   text.startsWith("/") && !(from.length > 0 && from.every(userWrote)) ? ` ${text}` : text;
 
-/** The CLI session this conversation resumed is gone where it runs: it starts again from the conversation. */
 export const CLAUDE_CODE_SESSION_LOST = "CLAUDE_CODE_SESSION_LOST";
 
 const sessionLost = (error: unknown): boolean => (error as { code?: unknown } | undefined)?.code === CLAUDE_CODE_SESSION_LOST;
 
-/** The name the CLI knows a Stella tool by: its own built-in, or one of Stella's over MCP. */
 const cliToolName =
   (binding: Binding) =>
   (name: string): string =>
@@ -504,15 +470,8 @@ const thinkingLevelOf = (options: SimpleStreamOptions | undefined): ModelThinkin
 export type ClaudeCodeEngineOptions = {
   transport: ClaudeCodeTransport;
   sessions: ClaudeCodeSessionStore;
-  /**
-   * `never`: the CLI keeps none of its built-ins, so Stella's Read serves its
-   * file reads (the cloud's orchestrator CLI runs in a container without the
-   * owner's world). Default `here`: the CLI's own built-ins.
-   */
   builtins?: "here" | "never";
-  /** The model id the CLI resolved an alias to, when known (`default` may be a 1M-token model). */
   resolveModel?(alias: string): string | undefined;
-  /** The context window the CLI reported for a resolved model id, when it has run it. */
   reportedContextWindow?(model: string): number | undefined;
   report?(error: unknown): void;
 };
@@ -620,12 +579,6 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
     };
   };
 
-  /**
-   * Claude Code's own compaction of `messages`: a one-off session written
-   * from them is compacted with `/compact`, and the summary it opens the
-   * compacted session with is the answer. Undefined where the host can't
-   * write a session, or there is no summary.
-   */
   const compactWithCli = async (
     binding: Binding,
     model: string,
@@ -679,7 +632,6 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
     return summary;
   };
 
-  /** Messages the CLI never took in: the next turn carries them. */
   const holdUndelivered = (session: Session, messages: readonly Message[]) => {
     if (messages.length === 0) return;
     const record = (session.record ??= { seen: [] });
@@ -737,7 +689,6 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
     for (const gate of [...turn.gates]) gate();
   };
 
-  /** The CLI's `tool_result`s for calls it never asked the MCP server to run: it refused them itself. */
   const noteRefusals = (turn: Turn, event: Record<string, unknown>) => {
     const content = asRecord(event.message)?.content;
     if (!Array.isArray(content)) return;
@@ -752,13 +703,6 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
     if (changed) reconsiderGates(turn);
   };
 
-  /**
-   * A Stella tool call runs only once the CLI asks the MCP server for it, so a
-   * call the CLI refuses never has effects. Resolves to why it must not run,
-   * or undefined to run it. While the CLI waits on another call of the same
-   * step, it is running that step's tools in order and reaches this one only
-   * after Stella answers, so the call runs then too.
-   */
   const cliRuns = (turn: Turn, toolUseId: string, name: string, context: Context): Promise<string | undefined> =>
     new Promise((resolve) => {
       const signal = context.abortSignal;
@@ -847,10 +791,6 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
     const rebuild = rebuildPrompt(conversation);
     const steering = request.prompt && resumeSessionId;
     const resumedDelta = !steering && resumeSessionId && seenAt >= 0 ? conversation.slice(seenAt + 1) : undefined;
-    // Turns another engine, or this engine on another computer, answered since the CLI last ran: it starts
-    // over from the conversation's history rather than reading them as an update.
-    // So does one whose context was compacted for it elsewhere (handed to a smaller model): its own
-    // session still holds what the compaction replaced.
     const seenKeys = new Set(record.seen);
     const foreign =
       options.transport.hydrate !== undefined &&
@@ -860,8 +800,6 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
     const delta = foreign ? undefined : resumedDelta;
     const baselineAt = conversation.findLastIndex((message) => residentContextKind(message) === "baseline");
     const baseline = baselineAt >= 0 ? messageKey(conversation[baselineAt]!) : undefined;
-    // A CLI resumed past the baseline (re-baselined after its own compaction, or a session that predates
-    // `context`) never had it whole: hand it the whole context, every change applied, with this update.
     const missed =
       delta && baseline !== undefined && baseline !== record.context && baselineAt <= seenAt
         ? residentContextAsOf(conversation.slice(0, conversation.length - trailingUsers(delta).users.length))
@@ -873,8 +811,6 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       const key = messageKey(message);
       return message.role === "user" && key !== undefined && undelivered.has(key) && !givenKeys.has(key);
     });
-    // A CLI with no session of this conversation resumes one written from Stella's history: every turn and
-    // tool call as it happened, after the latest compaction. The text replay is only for a host that can't.
     const promptAt = trailingUsers(conversation).start;
     const hydrated =
       !steering && !delta && promptAt > 0 && options.transport.hydrate
@@ -1349,7 +1285,6 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       }
       const restarted = moved && turn.endStep?.() === true;
       if (!restarted) turn.carried = undefined;
-      // A CLI that keeps built-ins its tools left must not read these results and go on: a new turn takes them.
       const stranded = moved && !restarted && dropsBuiltins(turn.toolSet, toolSet);
       if (replaced || stranded) {
         holdUndelivered(session, turn.unsent);
@@ -1363,7 +1298,6 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
           const key = messageKey(message);
           return key !== undefined && !session.record?.seen.includes(key);
         });
-        // A wake for the CLI's own query is news only to Stella: the running CLI told itself.
         const told = unseen.filter((message) => session.wakes?.delete(textOf(message.content).trim()) === true);
         if (told.length > 0) noteSeen(session, told);
         const fresh = unseen.filter((message) => !told.includes(message));
@@ -1541,7 +1475,6 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       },
     }));
 
-  /** Claude Code's Grep and Glob: a built-in's result as the CLI reported it. */
   const engineOnly = (name: (typeof ENGINE_ONLY_TOOLS)[number]) =>
     defineTool({
       name,
@@ -1566,7 +1499,6 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       }
       return { provider: CLAUDE_CODE_PROVIDER_ID, modelId };
     },
-    /** The context window, in tokens, of the Claude Code model `model` names. */
     contextWindow(model: string): number {
       const resolved = options.resolveModel?.(model) ?? model;
       return options.reportedContextWindow?.(resolved) ?? options.reportedContextWindow?.(model) ?? claudeCodeContextWindow(resolved);
@@ -1587,8 +1519,6 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
               return undefined;
             },
           }),
-          // The CLI compacts its own context, so pi never compacts for it on a threshold. A compaction asked
-          // for (handing the conversation to a model with a smaller window) is Claude Code's own `/compact`.
           hook(CompactionTask, {
             beforeCompact: async (compaction, api, context) => {
               if (compaction.reason !== "manual") return { decline: true };
@@ -1608,8 +1538,6 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
             },
           }),
           hook(ToolTask, {
-            // Only what the CLI really runs has effects: a name it called natively runs here only as its
-            // own built-in, answered with what it said; a Stella tool waits for the CLI's MCP request.
             beforeTool: async (call, _api, context) => {
               const record = calls.get(call.id);
               if (!record) return undefined;
@@ -1643,20 +1571,10 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
         ],
       });
     },
-    /**
-     * An agent's CLI started a query of its own because a background command
-     * it ran finished: deliver `text` to the agent as a message (once per
-     * `key`), and its next turn takes that query over.
-     */
     onBackgroundWake(listener: (session: ClaudeCodeSessionRef, wake: { key: string; text: string }) => void): () => void {
       wakeListeners.add(listener);
       return () => wakeListeners.delete(listener);
     },
-    /**
-     * A session's CLI compacted its context: the summary stands in for
-     * everything it had before, and the host records it as the
-     * conversation's compaction (`recordEngineCompaction`).
-     */
     onCompaction(
       listener: (session: ClaudeCodeSessionRef, compaction: ClaudeCodeCompaction, conversation: ConversationId) => void,
     ): () => void {

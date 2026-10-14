@@ -10,21 +10,11 @@ import { getDeviceIdOrNull } from "@/platform/electron/device";
 import { getElectronApi } from "@/platform/electron/electron";
 
 export type ExecutionDeviceRow = DeviceDestination & {
-  /** The computer the user is looking at right now. */
   isCurrent: boolean;
 };
 
 export type ExecutionDevicesError = "load" | "update";
 
-/**
- * The owner's computers for the device list: who is signed in, who is here
- * right now, and who has agreed to run work sent from elsewhere.
- *
- * The read is a presence read and nothing more. `setRemoteExecution` is the
- * only writer and only a user action calls it, which is what keeps "listed"
- * and "willing to run work" apart: reading this list can never enlist a
- * machine, and neither can rendering a row for it.
- */
 export function useExecutionDevicesController() {
   const { hasConnectedAccount } = useAuthSessionState();
   const [devices, setDevices] = useState<DeviceDestination[] | null>(null);
@@ -32,8 +22,6 @@ export function useExecutionDevicesController() {
   const [error, setError] = useState<ExecutionDevicesError | null>(null);
   const [pendingDeviceId, setPendingDeviceId] = useState<string | null>(null);
   const socketOrigin = hasConnectedAccount && backendUrl ? backendUrl : null;
-  // An answer to the user's tap is newer than any read already in flight, so
-  // a read that started before it must not scroll the row back.
   const lastWriteAt = useRef(0);
 
   useEffect(() => {
@@ -61,7 +49,6 @@ export function useExecutionDevicesController() {
       ...device,
       isCurrent: device.deviceId === currentDeviceId,
     }));
-    // This computer first; the rest by the name the user sees.
     return listed.sort((left, right) => {
       if (left.isCurrent !== right.isCurrent) return left.isCurrent ? -1 : 1;
       return (left.label ?? left.deviceId).localeCompare(
@@ -70,11 +57,6 @@ export function useExecutionDevicesController() {
     });
   }, [currentDeviceId, devices]);
 
-  /**
-   * This computer answers for itself, on its own presence socket. For any
-   * other computer, turning it on asks on that computer's screen, and only
-   * its answer there enables it; the gate's reply says which state it is in.
-   */
   const setRemoteExecution = useCallback(
     async (deviceId: string, enabled: boolean): Promise<boolean> => {
       if (pendingDeviceId) return false;
@@ -121,7 +103,6 @@ export function useExecutionDevicesController() {
 
   return {
     hasConnectedAccount,
-    /** `null` until the first read answers; `[]` is a real empty account. */
     devices: devices === null ? null : rows,
     currentDeviceId,
     error,

@@ -1,31 +1,18 @@
 import { mkdir, readFile, readdir, rename, rm } from "node:fs/promises";
 import { CLOUD_TURN_INBOX_MESSAGE_PATTERN } from "@stella/contracts/cloud-turn-attempt";
 
-/**
- * Messages for the running agent of this attempt (`CloudTurnAttemptPaths.inbox`),
- * which BuildSession renames in whole while the agent works. The agent takes
- * them at its next step. `close` renames the directory away, so a message
- * either landed before it (and `close` returns it) or BuildSession's rename
- * fails and its sender is told to send it again.
- */
 export type AgentInbox = {
-  /** Messages that arrived since the last take, oldest first. */
   take(): Promise<string[]>;
-  /** Stop taking messages; returns the ones that arrived before that. */
   close(): Promise<string[]>;
-  /** Take messages again after `close`. */
   reopen(): Promise<void>;
 };
 
 export const openAgentInbox = async (
   directory: string,
 ): Promise<AgentInbox> => {
-  // A resent message has the same id hash; it is taken once.
   const taken = new Set<string>();
   let closings = 0;
   let tail: Promise<unknown> = Promise.resolve();
-  // One operation at a time, so a take never reads a directory a close is
-  // moving away.
   const serial = <T>(work: () => Promise<T>): Promise<T> => {
     const run = tail.then(work, work);
     tail = run.catch(() => undefined);

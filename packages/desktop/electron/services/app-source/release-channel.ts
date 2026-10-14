@@ -7,18 +7,6 @@ import {
   SOCKET_KEEPALIVE_PONG,
 } from "@stella/contracts/backend/protocol";
 
-/**
- * The backend's release channel (contracts `APP_SOURCE_RELEASES_PATH`): it
- * sends the published version on connect and again on every publish, so the
- * desktop never asks. The socket reconnects when it drops (sleep, network
- * change, backend deploy), and each connect brings the current version, which
- * is how a desktop that missed a publish catches up.
- *
- * The keepalive ping is answered by the platform without waking the backend;
- * it only exists so a socket that died silently (after sleep) is noticed and
- * replaced.
- */
-
 const PING_INTERVAL_MS = 30_000;
 const SILENCE_LIMIT_MS = 2 * PING_INTERVAL_MS + 5_000;
 const MIN_RECONNECT_MS = 1_000;
@@ -42,7 +30,6 @@ export class ReleaseChannel {
     this.options = options;
   }
 
-  /** Follow this backend's channel; null closes it. Idempotent. */
   follow(baseUrl: string | null) {
     const next = baseUrl ? baseUrl.replace(/\/+$/, "") : null;
     if (next === this.baseUrl) return;
@@ -86,7 +73,6 @@ export class ReleaseChannel {
         return;
       }
       if (frame?.t !== "published") return;
-      // A frame means the channel works; back off from scratch next time.
       this.attempt = 0;
       const version =
         typeof frame.version === "string" && /^[0-9a-f]{40,64}$/.test(frame.version)
@@ -112,7 +98,6 @@ export class ReleaseChannel {
     this.stopPing();
     this.pingTimer = setInterval(() => {
       if (Date.now() - this.heardAt > SILENCE_LIMIT_MS) {
-        // Dead without a close (the computer slept): replace it.
         this.socket = null;
         this.stopPing();
         try {

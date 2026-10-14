@@ -23,32 +23,21 @@ export type PopoverAction = {
   icon: IconName;
   accessibilityLabel: string;
   onPress: () => unknown;
-  /** Paint the button as switched on (a dot on its glyph). */
   active?: boolean;
   loading?: boolean;
   disabled?: boolean;
-  /** Swap the glyph for a check for a moment after the press settles. */
   confirm?: boolean;
 };
 
 export type FloatingPopoverProps = {
-  /** Window point the popover points at; the latest tap when omitted. */
   anchor?: TouchAnchor | null;
-  /** Where to point when there is neither an anchor nor a recent tap. */
   fallbackAnchor?: TouchAnchor;
-  /** Called once the popover has finished going away. */
   onClose: () => void;
   closeLabel: string;
-  /** Width of the bubble; defaults to the screen less a margin either side. */
   width?: number;
-  /** Fixed bubble height. Without it the bubble hugs its content up to `maxHeight`. */
   height?: number;
   maxHeight?: number;
   actions?: readonly PopoverAction[];
-  /**
-   * Leave out the footer of glass controls (close and any actions); the
-   * popover still closes on a tap outside it.
-   */
   footer?: boolean;
   children: ReactNode | ((close: () => void) => ReactNode);
 };
@@ -64,11 +53,6 @@ function over(color: string, base: Rgba): Rgba {
   };
 }
 
-/**
- * The assistant bubble's translucent fill, flattened onto the chat
- * background it sits on, so a presented surface can wear the same colour
- * without letting the timeline show through.
- */
 export function popoverSurfaceFill(colors: Colors): {
   top: string;
   bottom: string;
@@ -84,12 +68,6 @@ export function popoverSurfaceFill(colors: Colors): {
   };
 }
 
-/**
- * A specular rim: brightest along the top edge and its corners, fading down
- * the sides, with a faint catch-light returning at the bottom. Light themes
- * pair a white top highlight with a soft dark edge so the rim still reads on
- * a pale fill.
- */
 export function popoverRimColors(isDark: boolean): [string, string, ...string[]] {
   return isDark
     ? [
@@ -112,10 +90,6 @@ export function popoverRimColors(isDark: boolean): [string, string, ...string[]]
       ];
 }
 
-/**
- * The bubble inside a specular rim, clipping its content: the assistant fill
- * by default, or the app's own background with `fill="background"`.
- */
 export function PopoverSurface({
   width,
   height,
@@ -210,10 +184,6 @@ function ActionButton({ action }: { action: PopoverAction }) {
   );
 }
 
-/**
- * The popover's footer, inside the same surface as its content: the actions
- * and close, right-aligned and centred in the row.
- */
 export function PopoverFooter({
   actions = [],
   closeLabel,

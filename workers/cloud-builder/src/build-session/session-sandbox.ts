@@ -1,9 +1,3 @@
-/**
- * Sandbox handles, the container-running probe, durable destroy plus its debt
- * drain, and agent session teardown.
- *
- * @see src/build-session/host.ts for why every call out takes `host`.
- */
 import { Effect } from "effect";
 import {
   attachedToolPaths,
@@ -59,7 +53,6 @@ export type SessionSandboxHost = Pick<
   | "sandboxContainerRunning"
 >;
 
-/** Idle timeout for an agent or app-build container a release never stopped. */
 const sandboxSleepAfterMs = (
   env: Pick<Env, "SANDBOX_IDLE_TIMEOUT_MS">,
 ): number | undefined => {
@@ -67,16 +60,8 @@ const sandboxSleepAfterMs = (
   return Number.isSafeInteger(value) && value > 0 ? value : undefined;
 };
 
-/** Used when `ORCHESTRATOR_IDLE_TIMEOUT_MS` is unset or malformed. */
 const DEFAULT_ORCHESTRATOR_IDLE_TIMEOUT_MS = 2 * 60_000;
 
-/**
- * How long the orchestrator's container stays up after its last turn. It
- * holds nothing but a Claude Code session the cloud already keeps, so it
- * sleeps soon after a turn and anything addressed to the conversation (a
- * message, an agent's report or note, a scheduled turn) wakes it again
- * through the admission prewarm (`orchestrator/turn-start.ts`).
- */
 export const orchestratorSleepAfterMs = (
   env: Pick<Env, "ORCHESTRATOR_IDLE_TIMEOUT_MS">,
 ): number => {
@@ -86,7 +71,6 @@ export const orchestratorSleepAfterMs = (
     : DEFAULT_ORCHESTRATOR_IDLE_TIMEOUT_MS;
 };
 
-/** The idle timeout every container call of this turn asks for. */
 export const turnSleepAfterMs = (
   env: Pick<Env, "SANDBOX_IDLE_TIMEOUT_MS" | "ORCHESTRATOR_IDLE_TIMEOUT_MS">,
   turn: Pick<TurnRequest, "agentRole"> | undefined,
@@ -95,16 +79,8 @@ export const turnSleepAfterMs = (
     ? orchestratorSleepAfterMs(env)
     : sandboxSleepAfterMs(env);
 
-/** Used when `SANDBOX_PREWARM_IDLE_TIMEOUT_MS` is unset or malformed. */
 const DEFAULT_PREWARM_IDLE_TIMEOUT_MS = 90_000;
 
-/**
- * Idle timeout a container gets when a prewarm is what started it. A prewarm
- * buys the next turn its cold start, so it only has to outlive the few seconds
- * between admission and attach; the turn's own first container call lengthens
- * the timeout to `SANDBOX_IDLE_TIMEOUT_MS`. Capacity held by a prewarm whose
- * turn never arrives is released on this timeout instead of the post-turn one.
- */
 const sandboxPrewarmSleepAfterMs = (
   env: Pick<
     Env,
@@ -120,13 +96,6 @@ const sandboxPrewarmSleepAfterMs = (
   return afterTurn === undefined ? prewarm : Math.min(prewarm, afterTurn);
 };
 
-/**
- * One sandbox handle per exact tuple. Every workload and size shares one
- * namespace: the object picks the instance size and network policy when it
- * starts the container, so the id alone addresses the container. `world`
- * names the owner's world store for an agent container (`SandboxBoot`); the
- * sandbox object remembers it, so only the call that starts it must say.
- */
 export const sandboxHandle = (
   env: Env,
   target: SandboxTarget,
@@ -140,22 +109,12 @@ export const sandboxHandle = (
     ...(world ? { world } : {}),
   });
 
-/**
- * Every id this worker mints: a lifecycle fingerprint (an agent thread's
- * container, the owner's own container, an app attempt) or a diagnostic echo.
- */
 const RETIRE_SANDBOX_ID =
   /^(?:(?:agent|world|app)-[0-9a-f]{40}|echo-[0-9a-f-]{36})$/u;
 
 const isWorldSandboxId = (sandboxId: string): boolean =>
   sandboxId.startsWith("agent-") || sandboxId.startsWith("world-");
 
-/**
- * Retire one container by its exact tuple, for the inventory reaper. There is
- * no per-instance stop in Wrangler or the public API and only the sandbox
- * object holds the container handle, so the reaper's adapter posts the tuple
- * here and the worker destroys it. Never guesses a namespace from the id.
- */
 export const retireSandboxInstance = async (
   env: Env,
   request: Request,
@@ -214,22 +173,6 @@ export const retireSandboxInstance = async (
   return json({ ok: true, target });
 };
 
-/**
- * `POST /orchestrator-turn/prewarm` `{ ownerId, threadId }`: start the
- * orchestrator thread's own container ahead of its CLI turn, without running
- * one. The OrchestratorSession calls it only while admitting an actual
- * `anthropic` turn, so the turn itself pays only for attach. Starts the exact
- * container the turn would use (`agentSandboxId` for this thread, its size)
- * but with the prewarm idle timeout, so capacity is released soon if the turn
- * never arrives; the turn's own first container call lengthens the timeout
- * to `SANDBOX_IDLE_TIMEOUT_MS`. A running container is left alone. Never
- * touches this session's turn state. Only the orchestrator is prewarmed: a
- * spawned agent's thread is not known until it is spawned.
- *
- *   200 { prewarmed: true, alreadyRunning: boolean, startMs?: number }
- *   502 { prewarmed: false, reason: "start_failed" }
- *   400 / 409 malformed, or another owner's or thread's session
- */
 export const prewarmOrchestratorContainer = async (
   host: SessionSandboxHost,
   request: Request,
@@ -277,7 +220,6 @@ export const prewarmOrchestratorContainer = async (
   }
   const started = performance.now();
   try {
-    // Every container RPC starts the instance; this one does nothing else.
     await withInfrastructureDeadline(
       handle.exec("true", { origin: "internal" }),
       120_000,
@@ -300,16 +242,9 @@ export const prewarmOrchestratorContainer = async (
   return json({ prewarmed: true, alreadyRunning: false, startMs });
 };
 
-/** How long an agent waits for one of its owner's container slots. */
 const AGENT_CONTAINER_WAIT_MS = 3 * 60_000;
 const AGENT_CONTAINER_POLL_MS = 5_000;
 
-/**
- * Take one of the owner's agent container slots (`OWNER_AGENT_CONTAINER_LIMIT`)
- * before this thread's container starts. When all are taken, the agent waits
- * for one to be released, then gives up with a message that says why. The
- * orchestrator's own container takes no slot.
- */
 export const acquireAgentContainerSlot = async (
   host: Pick<SessionSandboxHost, "env">,
   turn: TurnRequest,
@@ -395,10 +330,6 @@ export const sandboxContainerRunning = async (
   }
 };
 
-/**
- * Convert one exact sandbox target into durable teardown debt before the
- * first lifecycle RPC leaves this object.
- */
 export const destroySandboxDurably = async (
   host: SessionSandboxHost,
   target: SandboxTarget,
@@ -422,7 +353,6 @@ export const destroySandboxDurably = async (
   const sandbox = host.sandbox(target.sandboxId, target.size, target.workload);
   try {
     await withInfrastructureDeadline(
-      // A resize restarts the same world larger; every other reason discards it.
       sandbox.destroy({ keepSnapshot: event === "agent_oom_resize" }),
       30_000,
       "Sandbox destruction did not settle.",
@@ -449,7 +379,6 @@ export const destroySandboxDurably = async (
   });
 };
 
-/** Alarm-owned retry pass. Every target is exact; no id-only guessing. */
 export const retryDueSandboxDestroyDebts = async (
   host: SessionSandboxHost,
   now = Date.now(),
@@ -463,7 +392,6 @@ export const retryDueSandboxDestroyDebts = async (
   }
 };
 
-/** Re-arm the earliest remaining debt without postponing another alarm. */
 export const scheduleSandboxDestroyDebtAlarm = async (
   host: SessionSandboxHost,
 ): Promise<void> => {
@@ -482,10 +410,6 @@ export const scheduleSandboxDestroyDebtAlarm = async (
   );
 };
 
-/**
- * The sandbox this DO is currently responsible for. The id addresses the
- * container; the size and workload say how to start it again.
- */
 export const currentSandboxTarget = async (
   host: SessionSandboxHost,
 ): Promise<SandboxTarget | undefined> => {
@@ -515,7 +439,6 @@ export const currentSandbox = async (host: SessionSandboxHost) => {
     : undefined;
 };
 
-/** Release one turn's processes, daemon, session, and bridge directory. */
 export const terminateCurrentAgentSession = async (
   host: SessionSandboxHost,
   turn: TurnRequest,
@@ -576,7 +499,6 @@ export const releaseAgentSessionResources = async (
     workload: "world";
     sessionId: string;
     daemonDirectory: string;
-    /** False when the turn was stopped or failed: no warm window after it. */
     warm?: boolean;
   },
 ): Promise<void> => {
@@ -588,8 +510,6 @@ export const releaseAgentSessionResources = async (
     undefined,
     turnSleepAfterMs(host.env, turn),
   );
-  // The slot goes back whether or not the container is still up: a stopped
-  // or lost container holds no capacity.
   if (turn?.ownerId) {
     await ownerGateStub(host.env.OWNER_GATES, turn.ownerId)
       .releaseAgentContainer({ sandboxId: target.sandboxId })
@@ -665,10 +585,6 @@ export const releaseAgentSessionResources = async (
     "Attached daemon directory removal did not settle.",
   ).catch(() => undefined);
   await sandbox.deleteSession(target.sessionId).catch(() => undefined);
-  // The orchestrator's container stays up a short while for the next
-  // message, then stops; anything addressed to the conversation wakes it.
-  // Its disk, which never installs anything, must not replace the agents'
-  // latest snapshot, so it is only stopped.
   if (turn?.agentRole === "orchestrator") {
     await sandbox
       .release({
@@ -678,11 +594,6 @@ export const releaseAgentSessionResources = async (
       .catch(() => undefined);
     return;
   }
-  // A released agent container is the warmest copy of this owner's setup:
-  // the next agent container to start, this thread's or another's, resumes
-  // from its filesystem. It stays up for the warm window, so the thread's
-  // next turn soon after reuses it, then stops instead of idling until its
-  // timeout.
   await sandbox
     .release({ warm: target.warm !== false })
     .catch(() => undefined);

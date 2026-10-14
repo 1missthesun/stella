@@ -42,8 +42,6 @@ export const prepareStoredLocalChatPayload = (args: {
   }
 
   const nextPayload = { ...payloadRecord };
-  // The sequence tag is model-facing only (see reply-refs); a prompt that
-  // flows back into the transcript (follow-up sends) must not display it.
   if (typeof nextPayload.text === "string") {
     nextPayload.text = stripMessageRefTag(nextPayload.text);
   }
@@ -52,7 +50,6 @@ export const prepareStoredLocalChatPayload = (args: {
     return nextPayload;
   }
 
-  // If the text already has a timestamp tag, keep it as-is
   if (TRAILING_TIME_TAG_RE.test(rawText)) {
     nextPayload.contextText = rawText.trimEnd();
     return nextPayload;

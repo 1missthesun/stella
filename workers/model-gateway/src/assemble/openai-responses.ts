@@ -39,7 +39,6 @@ export const createOpenAIResponsesAssembler = (): Assembler => {
       if (response) terminal = response;
       return;
     }
-    // Some gateways emit a bare `{"error": {...}}` frame with no `type`.
     if (event.error && typeof event.error === "object" && !type) {
       error = event;
     }

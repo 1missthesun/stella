@@ -11,7 +11,6 @@ import {
   STELLA_SHOW_HOME_EVENT,
 } from "@/shared/lib/stella-orb-chat";
 
-/** Set when navigating away from chat; cleared on full app restart (new session). */
 const SESSION_LEFT_CHAT_KEY = "stella_left_chat_once";
 const CHAT_HOME_SURFACE_STORAGE_KEY = "stella.chatHomeSurface";
 
@@ -38,38 +37,13 @@ type UseChatHomeSurfaceOptions = {
 };
 
 type UseChatHomeSurfaceResult = {
-  /** True when the home overlay should be visible above the chat surface. */
   showHomeContent: boolean;
-  /** Mark the user as actively interacting with chat (collapses home). */
   enterChatSurfaceForInteraction: () => void;
-  /** Reset the idle timer (e.g. after the user clicks a suggestion). */
   resetIdleTimer: () => void;
-  /** Explicitly dismiss home. */
   dismissHome: () => void;
-  /** Explicitly bring home back. */
   showHome: () => void;
 };
 
-/**
- * Owns the chat / home toggle for the full-shell chat surface.
- *
- * Three persistence layers stack here:
- *
- * 1. `SESSION_LEFT_CHAT_KEY` (sessionStorage) — once the user has navigated
- *    away from `/chat` once in this session, we stop forcing the home
- *    overlay just because the conversation is empty (the
- *    `firstStintOnChat` guard).
- * 2. `CHAT_HOME_SURFACE_STORAGE_KEY` (shared UI state store) — explicit "is the
- *    home overlay or the chat surface the canonical view right now"
- *    sticky preference. Survives reloads.
- * 3. The idle home timer from `useIdleHomeVisibility` — re-shows home
- *    after a long idle window even if the user previously dismissed it.
- *
- * An explicit dismiss (`dismissHome`) overrides the default
- * "no messages → show home" behavior; otherwise empty conversations
- * could never escape the home overlay. The dismiss is cleared on real
- * interaction or on switching to a different conversation.
- */
 export function useChatHomeSurface({
   isOnChatRoute,
   hasMessages,

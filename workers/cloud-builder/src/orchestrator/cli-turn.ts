@@ -34,20 +34,12 @@ import { ownerGateStub } from "../rpc-release.js";
 
 /** How long a Claude Code turn waits for its chat turn to bind (after an eviction). */
 const CLAUDE_CODE_TURN_WAIT_MS = 60_000;
-/** Storage key of the conversation's latest Claude Code attempt on its orchestrator thread. */
 const CLAUDE_CODE_ATTEMPT_KEY = "claudeCodeAttempt";
-/** Storage key of what the CLI reported about its models (`CloudClaudeCodeModels`). */
 const CLAUDE_CODE_MODELS_KEY = "claudeCodeModels";
 
-/**
- * Claude Code turns, which pi runs on its Claude Code engine: the bridge to
- * the conversation's orchestrator container (`claude-code-transport.ts`),
- * the prompt row every chat turn journals, and the live tool view.
- */
 export abstract class OrchestratorCliTurn extends OrchestratorTools {
   #claudeCode?: CloudClaudeCodeTransport;
 
-  /** The transport pi's Claude Code engine runs this conversation's CLI turns on. */
   protected claudeCodeTransport(): CloudClaudeCodeTransport {
     this.#claudeCode ??= createCloudClaudeCodeTransport({
       env: this.env,
@@ -99,11 +91,6 @@ export abstract class OrchestratorCliTurn extends OrchestratorTools {
     return this.#claudeCode;
   }
 
-  /**
-   * A computer's synced Claude Code session (`claudeSessions`) for the cloud
-   * to resume, when it has no session of its own for this conversation and
-   * the computer's sync covers the conversation's last turn there.
-   */
   protected async claudeCodeAdoption(
     turn: CloudClaudeCodeTurn,
   ): Promise<CloudOrchestratorCliAdoptedSession | null> {
@@ -147,13 +134,6 @@ export abstract class OrchestratorCliTurn extends OrchestratorTools {
     };
   }
 
-  /**
-   * Wake the conversation's orchestrator container for a Claude Code turn that
-   * is being admitted right now, so the turn does not pay a cold start. Fire
-   * and forget. Only an admitted turn warms a container: a socket connect or
-   * any other passive signal would hold an instance for its whole idle window
-   * without a turn ever arriving.
-   */
   protected prewarmCliContainer(ownerId: string, conversationId: string): void {
     if (!conversationId) return;
     const startedAt = performance.now();
@@ -175,17 +155,8 @@ export abstract class OrchestratorCliTurn extends OrchestratorTools {
     );
   }
 
-  /** When a composer prewarm last ran here; one per minute at most. */
   private composerPrewarmAt = 0;
 
-  /**
-   * The user started writing a message (a `prewarm` socket frame): wake the
-   * orchestrator container now, so the reply doesn't wait for its cold
-   * start. Only when the next turn would run there: the conversation runs on
-   * Claude Code in the cloud, no computer holds it, and nothing is running
-   * (a running or queued turn already has it up). An unused prewarm stops on
-   * the prewarm idle timeout (90 s).
-   */
   protected prewarmForComposer(): void {
     const now = Date.now();
     if (now - this.composerPrewarmAt < 60_000) return;
@@ -209,12 +180,6 @@ export abstract class OrchestratorCliTurn extends OrchestratorTools {
     );
   }
 
-  /**
-   * The CLI turn's prompt row and `started` phase, the same rows Stella's
-   * own loop writes. Its provider context names an epoch no Stella prompt
-   * context ever has, so a later Stella turn replays it with its clock and
-   * attachments but no stale system reminders.
-   */
   protected async journalCliPrompt(
     turn: ChatTurnRequest,
     executionContext: ExecutionContextSnapshot,
@@ -318,13 +283,6 @@ export abstract class OrchestratorCliTurn extends OrchestratorTools {
     this.slack().tool(turn.turnId, call.toolCallId, call.name, phase, isError);
   }
 
-  /**
-   * Stella's Claude Code turn met the Claude usage limit: hold it rather than
-   * fail it. The conversation shows the hold (a `usage-limit` card) and the
-   * owner object keeps the durable timer that starts its continuation once
-   * the limit resets. False when the hold could not be recorded, so the
-   * caller reports the limit as the turn's failure instead.
-   */
   protected async holdForClaudeUsageLimit(
     turn: ChatTurnRequest,
     limit: ClaudeUsageLimit,
@@ -369,7 +327,6 @@ export abstract class OrchestratorCliTurn extends OrchestratorTools {
     return true;
   }
 
-  /** `CLOUD_CLI_TURN_DO_PATHS.tool`: a CLI tool call, answered by pi's tool task. */
   protected async handleCliTurnTool(request: Request): Promise<Response> {
     const forward = parseCliTurnToolForward(
       await request.json().catch(() => null),
@@ -378,7 +335,6 @@ export abstract class OrchestratorCliTurn extends OrchestratorTools {
     return this.frameResponse(await this.claudeCodeTransport().tool(forward));
   }
 
-  /** `CLOUD_CLI_TURN_DO_PATHS.events`: one ordered batch of the CLI's messages and status. */
   protected async handleCliTurnEvents(request: Request): Promise<Response> {
     const forward = parseCliTurnEventsForward(
       await request.json().catch(() => null),
@@ -387,11 +343,6 @@ export abstract class OrchestratorCliTurn extends OrchestratorTools {
     return this.frameResponse(this.claudeCodeTransport().events(forward));
   }
 
-  /**
-   * `CLOUD_CLI_TURN_DO_PATHS.terminal`: the attempt is over. A terminal for an
-   * attempt this object no longer runs is acknowledged, so the BuildSession
-   * stops retrying.
-   */
   protected async handleCliTurnTerminal(request: Request): Promise<Response> {
     const terminal = parseCliTurnTerminal(
       await request.json().catch(() => null),

@@ -122,8 +122,6 @@ const PLAN_FEATURES: Record<BillingPlan, readonly string[]> = {
   ],
 };
 
-// Every paid plan grants the verified author badge that surfaces next
-// to your username on Store posts. Free doesn't get it.
 const VERIFIED_BADGE_FEATURE = "Verified creator badge on the Store";
 
 const PAID_PLANS = new Set<BillingPlan>(["go", "pro"]);
@@ -159,9 +157,6 @@ const toUsagePercent = (usedUsd: number, limitUsd: number) => {
   return Math.min(100, Math.max(0, (usedUsd / limitUsd) * 100));
 };
 
-// Round to a whole percent for display while keeping the meter bar at the
-// precise sub-percent width — avoids "0%" reading next to a visibly non-empty
-// bar (and vice versa) at the edges.
 const formatUsagePercent = (pct: number) => {
   if (pct > 0 && pct < 1) return "<1%";
   return `${Math.round(pct)}%`;
@@ -208,9 +203,6 @@ const readCheckoutStatus = (): string | null =>
   new URLSearchParams(window.location.search).get("checkout");
 
 export function BillingClient() {
-  // Skip the backend-bound interactive flow when no backend is configured
-  // (e.g. preview builds without env vars). Lets `/billing` still SSG with a
-  // marketing-style hero.
   if (!isBackendConfigured()) {
     return (
       <main className="billing-root">
@@ -250,11 +242,6 @@ function BillingInteractive() {
     return () => window.clearInterval(id);
   }, []);
 
-  // Stripe redirects back to /billing with ?checkout=success or
-  // ?checkout=cancel — surface a friendly notice and clear the param so a
-  // page refresh doesn't keep showing it. The param is read on the client
-  // only (the server snapshot is null), and the notice is set while
-  // rendering the first time a status is seen.
   const checkoutStatus = useSyncExternalStore(
     subscribeNoop,
     readCheckoutStatus,
@@ -278,7 +265,6 @@ function BillingInteractive() {
     window.history.replaceState(null, "", url.toString());
   }, [checkoutStatus]);
 
-  // The owner's billing ledger, live; the clock only re-renders labels.
   void billingNowMs;
   const ledger = useBackendValue("billing.status", {});
   const billingStatus = ledger as BillingStatus | undefined;
@@ -312,9 +298,6 @@ function BillingInteractive() {
   const isLoadingStatus = billingStatus === undefined;
   const account = useAccountUser();
   const showAccountBody = account.signedIn || hasAccount || !isLoadingStatus;
-  // Once a user has any active paid plan, all plan changes (upgrade,
-  // downgrade, cancel) must go through Stripe's Customer Portal — the
-  // backend's createCheckoutSession throws CONFLICT for active subs.
   const isActivePaidSubscriber = hasAccount && currentPlan !== "free";
   const currentPlanRank = PLAN_ORDER.indexOf(currentPlan);
 
@@ -357,10 +340,6 @@ function BillingInteractive() {
     [hasAccount, startCheckout],
   );
 
-  // The custom-amount input is the source of truth for "what will Stripe
-  // charge". Preset chips just write into it. We parse on submit instead of
-  // on every keystroke so users can type freely (e.g. "5.5") without the
-  // selected-preset state thrashing.
   const parseCustomAmountCents = useCallback(
     (raw: string): { amountCents: number; error: string | null } => {
       if (!creditOptions) {
@@ -590,9 +569,6 @@ function BillingInteractive() {
               const isStartingThisPlan = startingPlan === plan;
               const isRecommended =
                 plan === RECOMMENDED_PLAN && currentPlan !== RECOMMENDED_PLAN;
-              // For active paid subscribers, label upgrades/downgrades by
-              // rank so the action reads naturally and the portal route is
-              // unambiguous.
               const targetRank = PLAN_ORDER.indexOf(plan);
               const changeVerb =
                 isActivePaidSubscriber && isPaidPlan && !isCurrentPlan
@@ -619,8 +595,6 @@ function BillingInteractive() {
               const handlePlanClick = () => {
                 if (isCurrentPlan) return;
                 if (isActivePaidSubscriber) {
-                  // Both plan changes and free-downgrade (cancel) flow
-                  // through the Stripe portal for active subscribers.
                   void handleOpenPortal();
                   return;
                 }

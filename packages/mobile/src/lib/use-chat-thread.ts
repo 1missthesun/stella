@@ -119,8 +119,6 @@ const isPermanentAutomaticAdmissionError = (error: unknown) => {
 
 let lastLocalIdOrder = 0;
 const createId = () => {
-  // Fixed-width logical time keeps same-timestamp mobile identities in compose
-  // order when the desktop's canonical `(timestamp, id)` tie-breaker applies.
   lastLocalIdOrder = Math.max(Date.now(), lastLocalIdOrder + 1);
   const random =
     globalThis.crypto?.randomUUID?.() ??
@@ -128,13 +126,6 @@ const createId = () => {
   return `mobile:${String(lastLocalIdOrder).padStart(16, "0")}:${random}`;
 };
 
-/**
- * Fold composer quote chips into the outgoing message: each quote becomes a
- * markdown blockquote (every line prefixed with "> "), stacked ahead of the
- * user's typed text. Mirrors the desktop quote/reply convention so the quoted
- * context travels with the sent message. Returns just `typed` when there are no
- * quotes, and just the quotes when the user only quoted without typing.
- */
 const composeQuotedText = (quotes: ComposerQuote[], typed: string): string => {
   if (quotes.length === 0) return typed;
   const blocks = quotes
@@ -149,88 +140,39 @@ const composeQuotedText = (quotes: ComposerQuote[], typed: string): string => {
   return typed ? `${blocks}\n\n${typed}` : blocks;
 };
 
-/**
- * Join composer quote chips into a single raw context blob (no `> ` prefixes)
- * delivered to the model as a dedicated `selectedText` field on a fresh turn.
- * The runtime wraps it as hidden context and the bubble shows it as a chip, so
- * the quote never folds into the visible/persisted user body.
- */
 const composeRawQuotes = (quotes: ComposerQuote[]): string =>
   quotes
     .map((quote) => quote.text.trim())
     .filter((text) => text.length > 0)
     .join("\n\n");
 
-/** Bounded preview of quoted context stored on the sent message for its chip. */
 const QUOTED_TEXT_PREVIEW_MAX_CHARS = 4_000;
 
-// Run-level connection status shown before the desktop starts streaming.
-// `connecting` deliberately carries no copy: desktop has no "reaching" state,
-// so mobile lets the indicator fall through to the same baseline
-// "Thinking"/reasoning label desktop shows (see working-indicator-status).
-// Only a genuine cold wake surfaces its own line.
-
-/**
- * A durably ordered send awaiting transmission. Cloud chat holds it until the
- * current reply settles. Computer chat instead drains it through the
- * acceptance-only steer pump as soon as the active message is durable, so it
- * reaches the runtime during the same root turn without opening another reply
- * observer.
- */
 type QueuedSend = {
   structuredAttachments?: true;
   userMessageEventId?: string;
   dispatchId: string;
   clientRequestId: string;
   userMessageId: string;
-  /**
-   * Message body for the steer/queued fallback path — keeps the folded quote
-   * blockquote so a follow-up steer (which carries no separate context) still
-   * delivers the quote to the model.
-   */
   text: string;
-  /**
-   * Fresh-turn message body with quotes decoupled out: just the typed text.
-   * The primary `sendDesktopBridgeChat` path sends this plus `selectedText`
-   * so the quote reaches the model without leaking into the visible body.
-   */
   promptText?: string;
-  /** Raw quoted / "Ask Stella" context delivered as a dedicated model field. */
   selectedText?: string;
-  /**
-   * Drive references for this turn's attachments. Uploaded at pick time, so by
-   * the time a send exists the bytes are already server-side and this is the
-   * whole payload — placement carries paths, never pixels.
-   */
   attachments: DesktopChatOutboxAttachment[];
   queueSequence?: number;
-  /** Mount-local lease preventing an old account hook from dispatching later. */
   canonicalAuthorityLease?: number;
-  /** Durable server cancellation identity restored from the outbox. */
   cancelRequestId?: string;
   executionTarget?: AutomaticExecutionTarget;
   execution?: CloudExecutionSelection;
 };
 
-/**
- * The one signed-in chat authority. Reads come from the cloud journal; writes
- * go through server-owned execution placement, which prefers the paired
- * computer and otherwise commits the turn to cloud.
- */
 export type ChatTransport = {
   accountScope: string;
   ownerGeneration: string;
   conversationId: string;
   authorityReady: boolean;
-  /** Paired desktop credentials, when one is paired, for live activity reads. */
   access?: StoredPhoneAccess | null;
   executionTarget?: AutomaticExecutionTarget;
   execution?: CloudExecutionSelection;
-  /**
-   * Cloud journal reconciliation seam. The placement service allocates a
-   * server dispatch id distinct from the mobile optimistic id; the DO echoes
-   * that server id as clientMsgId.
-   */
   onAdmission?: (event: {
     localMessageId: string;
     dispatchId: string;
@@ -239,94 +181,46 @@ export type ChatTransport = {
   statusWake?: TurnStatusWake;
 };
 
-/**
- * The composer, the optimistic send queue, and the live activity overlay: the
- * half of a chat surface that does not depend on transcript authority.
- */
 export type ChatComposerThread = {
-  /** The optimistic overlay of turns this device has in flight. */
   messages: ChatMessage[];
-  /**
-   * The composer text. Held in a store rather than React state so a keystroke
-   * re-renders only what subscribes to it (see `chat-draft-store`).
-   */
   draftStore: ChatDraftStore;
   setDraft: ChatDraftStore["set"];
-  /** Composer chips, each carrying its own upload state. */
   attachments: ComposerAttachment[];
-  /** Adds picks and starts their uploads. Reports picks over the turn budget. */
   addAttachments: (picked: readonly PickedAttachment[]) => { rejected: number };
   removeAttachment: (id: string) => void;
-  /** Re-runs a failed upload for one chip, leaving the draft untouched. */
   retryAttachment: (id: string) => void;
-  /** How many files one turn may carry. */
   maxAttachments: number;
-  /** Quoted-text chips pending in the composer (folded into the sent message). */
   quotes: ComposerQuote[];
-  /** Add a quoted-text chip (message-menu Quote / assistant "Ask Stella"). */
   addQuote: (text: string) => void;
-  /** Remove a pending quote chip by id. */
   removeQuote: (id: string) => void;
   sending: boolean;
-  /** Prompt owned by the active placement waiter, for canonical reconciliation. */
   activeSendMessageId?: string | null;
-  /** Live working-indicator props — active/label reflect the current step. */
   workingIndicator: WorkingIndicatorState;
   storageLoaded: boolean;
-  /** Named cloud-authority failure; local cache never hides this condition. */
   authorityIssue?: {
     message: string;
     retryable: boolean;
     retry: () => void;
   } | null;
-  /** Background tasks for the activity pill + tray, running-first then newest. */
   conversationTasks: MobileTask[];
-  /**
-   * Submit the current draft/attachments. Returns the optimistic user
-   * bubble's local id when a turn was accepted (dispatched or queued) so
-   * voice callers can locate the turn's reply precisely; null when the send
-   * no-oped (not hydrated, empty draft, or AI consent pending).
-   */
   send: () => { userMessageId: string } | null;
-  /**
-   * Submit a supplied prompt without routing it through React draft state.
-   * Realtime voice uses this to hand an action to the exact active chat.
-   */
   sendPrompt?: (prompt: string) => { userMessageId: string } | null;
   stop: () => void;
 };
 
-/** A full chat surface: the composer half plus the journal-owned transcript. */
 export type ChatThread = ChatComposerThread & {
-  /** The cloud conversation this transcript belongs to. */
   conversationId?: string | null;
-  /** False while signed-in cloud history has no verified DO authority. */
   authorityReady?: boolean;
-  /** Whether durable history exists before/after the bounded loaded window. */
   hasOlderMessages: boolean;
   hasNewerMessages: boolean;
   historyPageLoading: boolean;
-  /** Page the adjacent durable window without growing Hermes state unbounded. */
   loadOlderMessages: () => Promise<void>;
   loadNewerMessages: () => Promise<void>;
-  /** All artifacts in the conversation, newest first and de-duplicated. */
   conversationArtifacts: ChatArtifact[];
-  /**
-   * True while the journal socket is still catching up to the head sequence,
-   * so the surface can say so instead of rendering a partial transcript as
-   * though it were complete.
-   */
   catchingUp: boolean;
-  /** The orchestrator's newest successful `switch_destination`, if any. */
   destinationSwitch?: import("./cloud-journal-projection").DestinationSwitch | null;
 };
 
-/**
- * Owns the composer, the optimistic send queue with its durable outbox, and
- * one server-owned placement decision per durable message identity. The DO
- * journal owns every visible transcript row, so the local rows here are an
- * optimistic overlay and never historical authority.
- */
 export function useChatThread(opts: {
   threadId: ChatThreadId;
   transport: ChatTransport;
@@ -349,8 +243,6 @@ export function useChatThread(opts: {
     }),
     [canonicalAccountScope, canonicalConversationId, canonicalOwnerGeneration],
   );
-  // The separately durable outbox stays inert until this exact authority has
-  // connected and caught up.
   const drainOperationalOutbox = canonicalAuthorityReady;
   const admissionEnabledRef = useRef(drainOperationalOutbox);
   admissionEnabledRef.current = drainOperationalOutbox;
@@ -383,11 +275,6 @@ export function useChatThread(opts: {
   const [attachments, setAttachments] = useState<ComposerAttachment[]>([]);
   const attachmentsRef = useRef(attachments);
   attachmentsRef.current = attachments;
-  /**
-   * Uploads a pick immediately rather than at send time. A failure therefore
-   * lands while the composer still holds the draft and the chip, so there is
-   * nothing to restore: the user retries the one file that broke.
-   */
   const startAttachmentUpload = useCallback(
     (picked: PickedAttachment) => {
       const taken = new Set(
@@ -452,9 +339,6 @@ export function useChatThread(opts: {
   const removeAttachment = useCallback((id: string) => {
     setAttachments((current) => current.filter((entry) => entry.id !== id));
   }, []);
-  // Quoted-text chips pending in the composer (from the message menu's "Quote"
-  // or an assistant selection's "Ask Stella"). Kept out of `draft` so the input
-  // isn't stuffed with a paragraph; folded into the outgoing text on send.
   const [quotes, setQuotes] = useState<ComposerQuote[]>([]);
   const addQuote = useCallback((text: string) => {
     const trimmed = text.trim();
@@ -481,13 +365,8 @@ export function useChatThread(opts: {
     return () => subscription.remove();
   }, []);
 
-  // Merge a partial activity update onto the live snapshot. Run-level status
-  // (wake copy, compaction) and the bridge's tool/streaming signals patch in
-  // independently, so callers only set the fields they own.
   const patchActivity = useCallback((patch: Partial<WorkingActivity>) => {
     setWorkingActivity((current) => {
-      // Identity-stable bail-out: streaming patches per network delta, and a
-      // fresh object here re-renders the whole chat surface for no change.
       for (const key of Object.keys(patch) as (keyof WorkingActivity)[]) {
         if (!Object.is(current[key], patch[key])) {
           return { ...current, ...patch };
@@ -496,16 +375,6 @@ export function useChatThread(opts: {
       return current;
     });
   }, []);
-
-  // Adopt a whole activity snapshot. `patchActivity` only merges the fields a
-  // caller owns, so it can't clear one the snapshot dropped (a tool ending
-  // would leave its label pinned); this replaces every field instead.
-  //
-  // It carries the same bail-out, and needs it more: the desktop bridge
-  // re-emits a settled snapshot on EVERY streamed chunk, so committing a fresh
-  // object here re-rendered the whole chat surface at provider token rate —
-  // on top of the smoother's own per-frame text commit — for a value that
-  // stops changing after the first chunk of a run.
 
   const queueRef = useRef<QueuedSend[]>([]);
   const acceptedDesktopSendIdsRef = useRef<Set<string>>(new Set());
@@ -534,8 +403,6 @@ export function useChatThread(opts: {
     canonicalAuthorityKeyRef.current = canonicalAuthorityKey;
     canonicalAuthorityLeaseRef.current += 1;
   }
-  // A callback from a retired account/session mount can never mutate its
-  // successor.
   const canonicalAuthorityLeaseCurrent = useCallback(
     (lease: number | undefined) => lease === canonicalAuthorityLeaseRef.current,
     [],
@@ -572,10 +439,6 @@ export function useChatThread(opts: {
     };
   }, [canonicalAuthorityKey, canonicalConversationId, draftStore, updateMessages]);
 
-  // ─── Durable outbox hydration ────────────────────────────────────────────
-  // The DO journal owns history, so nothing is read back from SQLite here.
-  // The only durable client state is the outbox of sends this device has not
-  // yet had admitted.
   useEffect(() => {
     let active = true;
     const generation = historyPageGenerationRef.current;
@@ -586,13 +449,6 @@ export function useChatThread(opts: {
         const restored = restoreOutboxMessages([], storedOutbox);
         updateMessages(restored);
         setStorageLoaded(true);
-        // Re-enqueue any queued-but-unsent messages. The optimistic bubbles were
-        // persisted (marked `queued`), but the in-memory dispatch queue was lost
-        // on relaunch — so without this they'd render forever as "sent" yet never
-        // deliver. Rebuild a dispatch for each from its bubble and drain, so a
-        // restart actually sends them. An outbox row's attachments are drive
-        // paths whose bytes already landed, so a replay carries them intact
-        // without the phone holding a single byte across the restart.
         const outboxByUserMessageId = new Map(
           storedOutbox.map((record) => [record.userMessageId, record]),
         );
@@ -627,9 +483,6 @@ export function useChatThread(opts: {
             (a.queueSequence ?? Number.MAX_SAFE_INTEGER) -
             (b.queueSequence ?? Number.MAX_SAFE_INTEGER),
         );
-        // Nothing can be dispatching yet on a fresh mount (send() no-ops until
-        // hydration completes), so draining here just kicks off the first
-        // re-send; the rest drain as each turn settles.
         if (pendingSends.length > 0 && admissionEnabledRef.current) {
           drainQueueRef.current?.();
         }
@@ -673,9 +526,6 @@ export function useChatThread(opts: {
   useEffect(
     () =>
       subscribeChatStorageCleanup(() => {
-        // Account cleanup may run while tab routes remain mounted. Invalidate
-        // every producer before storage deletes so an old hydration or
-        // in-flight dispatch cannot repopulate cleared data.
         historyPageGenerationRef.current += 1;
         dispatchGenerationRef.current += 1;
         queueRef.current = [];
@@ -730,11 +580,8 @@ export function useChatThread(opts: {
     }
   }, [appActive, markSending]);
 
-  // ─── Server-owned automatic placement ───────────────────────────────────
   const dispatchAutomatic = useCallback(
     async (item: QueuedSend, replyId: string, abort: AbortController) => {
-      // A fresh send supersedes any pinned sign-in / limit notice; if the
-      // problem persists this dispatch raises a new one.
       clearComposerNotices(canonicalConversationId);
       const assertAuthorityLease = () => {
         if (!canonicalAuthorityLeaseCurrent(item.canonicalAuthorityLease)) {
@@ -820,9 +667,6 @@ export function useChatThread(opts: {
               (item.executionTarget?.mode ?? "automatic") !== "device" &&
               isAutomaticExecutionPairCredentialRejection(error)
             ) {
-              // No placement was committed: retry without the invalid grant
-              // so server policy can choose cloud for portable work or return
-              // an explicit computer-required failure for computer-only work.
               ignoreStoredAccess = true;
               continue;
             }
@@ -923,8 +767,6 @@ export function useChatThread(opts: {
           automaticExecutionResultText(terminal),
           terminal.state === "canceled",
         );
-        // A refused send (allowance spent, plan limit) also pins the
-        // Upgrade card, as a thrown admission error does below.
         if (terminal.state === "failed" && terminal.errorMessage) {
           showComposerNoticeForError(
             terminal.errorMessage,
@@ -941,11 +783,7 @@ export function useChatThread(opts: {
           return;
         }
         renderReply(userFacingError(error));
-        // Sign-in / plan-limit failures also pin an actionable notice above
-        // the composer, matching desktop; transient ones stay in the bubble.
         showComposerNoticeForError(error, canonicalConversationId);
-        // Authentication/migration/validation failures cannot become valid by
-        // replaying this old account-bound outbox row after every launch.
         if (isPermanentAutomaticAdmissionError(error)) {
           acknowledgeDesktopSendIds([item.dispatchId, item.userMessageId]);
         }
@@ -963,7 +801,6 @@ export function useChatThread(opts: {
     ],
   );
 
-  // ─── Queue & dispatch ─────────────────────────────────────────────────────
   const parkQueuedSend = useCallback(
     (item: QueuedSend) => {
       if (
@@ -1017,24 +854,12 @@ export function useChatThread(opts: {
         generation: dispatchGenerationRef.current,
         latestResponseUserMessageId: item.userMessageId,
       };
-      // Fresh turn — clear any activity left over from the previous reply so
-      // the indicator starts from the pre-tool "thinking" state.
       setWorkingActivity(IDLE_WORKING_ACTIVITY);
-      // Mark the queued bubble dispatched and add an empty
-      // assistant placeholder beside it.
       const dispatchedAt = Date.now();
       updateMessages((m) => {
         const next = [
           ...m.map((msg) => {
             if (msg.id !== item.userMessageId) return msg;
-            // Re-stamp a *queued* bubble's display time to its real dispatch
-            // moment. Its original `createdAt` is the enqueue moment (when the
-            // user tapped send while the prior turn was still streaming), which
-            // would read as sent before any messages that landed during the
-            // wait. Ordering converges via the canonical desktop stamp once the
-            // turn reconciles (`canonicalCreatedAt` — see `sortCanonically` in
-            // chat-merge); this local `createdAt` stays the display anchor and
-            // is preserved by both the merge and the post-turn reconcile.
             return msg.queued
               ? { ...msg, queued: false, createdAt: dispatchedAt }
               : { ...msg, queued: false };
@@ -1090,30 +915,14 @@ export function useChatThread(opts: {
 
   const submit = useCallback(
     (suppliedPrompt?: string): { userMessageId: string } | null => {
-      // Don't dispatch until the durable outbox has hydrated and the journal
-      // authority has caught up: sending earlier would admit a turn this mount
-      // cannot reconcile. The draft is left intact so the queued tap lands once
-      // we're ready.
       if (!storageLoaded || !admissionEnabledRef.current) return null;
       const supplied = suppliedPrompt !== undefined;
       const typed = (suppliedPrompt ?? draftStore.get()).trim();
-      // Composer quote chips fold into the outgoing text as markdown
-      // blockquotes ahead of the typed message; supplied (voice) prompts skip
-      // them since they bypass composer state entirely.
       const pendingQuotes = supplied ? [] : quotes;
-      // `text` is the steer/queued fallback body (folded blockquote so a
-      // follow-up steer still carries the quote). A fresh turn with both typed
-      // text and quotes decouples instead: the quote rides as `selectedText`
-      // and shows as a chip, so it never leaks into the visible body. Quote-only
-      // sends keep the folded form (there is no separate body to attach a chip
-      // to) — matching the desktop behaviour for an empty prompt.
       const text = composeQuotedText(pendingQuotes, typed);
       const decoupleQuotes = typed.length > 0 && pendingQuotes.length > 0;
       const rawQuotes = decoupleQuotes ? composeRawQuotes(pendingQuotes) : "";
       const promptText = decoupleQuotes ? typed : text;
-      // A send only ever carries settled attachments. An in-flight or failed
-      // upload has no drive path, and admitting the turn without it would
-      // execute a materially different request than the one on screen.
       const composerAttachments = supplied ? [] : attachments;
       if (!text && composerAttachments.length === 0) return null;
       if (!attachmentsSettled(composerAttachments)) return null;
@@ -1224,9 +1033,6 @@ export function useChatThread(opts: {
           : {}),
         authority: canonicalOutboxAuthority,
       };
-      // Transmission gates on this write. If iOS kills the process while
-      // AsyncStorage is committing, either no transport happened or hydration
-      // finds this exact stable identity and replays it, attachments included.
       void enqueueDesktopChatOutbox(threadId, durableRecord)
         .then((stored) => {
           pendingEnqueueRef.current.delete(userMessageId);
@@ -1293,8 +1099,6 @@ export function useChatThread(opts: {
   const sendPrompt = useCallback((prompt: string) => submit(prompt), [submit]);
 
   const stop = useCallback(() => {
-    // Cancel queued messages first so the in-flight finally-handler doesn't
-    // pick them up after the abort.
     const cancelledIds = [
       ...new Set([
         ...queueRef.current.map((q) => q.userMessageId),
@@ -1308,9 +1112,6 @@ export function useChatThread(opts: {
       acknowledgeDesktopSendIds(cancelledIds);
     }
     if (cancelledIds.length > 0) {
-      // A canceled queued send is still part of the user's transcript. Keep
-      // the bubble and mark it honestly instead of making text the user just
-      // saw disappear from the conversation.
       updateMessages((m) =>
         m.map((msg) =>
           cancelledIds.includes(msg.id)
@@ -1339,9 +1140,6 @@ export function useChatThread(opts: {
             : msg,
         ),
       );
-      // Persist intent before the server call. If iOS kills the app between
-      // these operations, hydration replays the same idempotency key and
-      // cancels that exact dispatch instead of starting an alternate run.
       void markDesktopChatOutboxCancellation(
         threadId,
         active.dispatchId,
@@ -1382,9 +1180,6 @@ export function useChatThread(opts: {
     [sending, workingActivity],
   );
 
-  // Background tasks folded from this surface's local rows. The canonical
-  // thread merges them under the cloud journal's task rows, which are the
-  // only authority for a computer's running agents.
   const conversationTasks = useMemo(
     () => collectConversationTasks(messages),
     [messages],

@@ -20,40 +20,19 @@ export type GlassIconButtonProps = {
   icon: IconName;
   onPress: () => void;
   accessibilityLabel: string;
-  /** Edge length of the circle. */
   size?: number;
   iconSize?: number;
-  /**
-   * Quieter treatment for a control with nothing to report: muted glyph at
-   * regular weight instead of the strong one.
-   */
   muted?: boolean;
-  /** Status dot painted on the glyph's corner. Omit for none. */
   dot?: string | null;
-  /** Swap the glyph for a spinner. */
   loading?: boolean;
   disabled?: boolean;
   hitSlop?: number;
   style?: StyleProp<ViewStyle>;
   iconStyle?: StyleProp<AnimatedStyle<StyleProp<ViewStyle>>>;
   accessibilityHidden?: boolean;
-  /**
-   * Keep the press inside the circle: a fill clipped to the button instead of
-   * Liquid Glass's interactive lift, which swells into a pill wider than the
-   * button. For buttons set close together or against an edge (popover footers).
-   */
   containPress?: boolean;
 };
 
-/**
- * The React Native glass icon button: the implementation everywhere but
- * iOS's SwiftUI one (`GlassIconButton.ios.tsx`), which hands `containPress`
- * buttons back to it.
- *
- * Circular Liquid Glass icon button — the chrome control used by the top bar
- * (chevron, computer) and the sidebar dock (settings). One shape everywhere
- * so the chrome reads as one family; falls back to a tinted disc off iOS 26.
- */
 export function GlassIconButtonBase({
   icon,
   onPress,

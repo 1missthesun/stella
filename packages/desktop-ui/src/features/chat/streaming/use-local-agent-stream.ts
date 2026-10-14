@@ -63,11 +63,6 @@ type LocalAgentStreamOptions = {
   storageMode?: "cloud" | "local";
 };
 
-/**
- * Sends the composer's message to the conversation's harness. Its timeline
- * and run state come from the pi chat store, keyed by the request id; the
- * runtime prepares the rest of the send (attachments, chat context).
- */
 export function useLocalAgentStream({
   activeConversationId,
   storageMode,
@@ -130,12 +125,9 @@ export function useLocalAgentStream({
             ...(args.messageMetadata
               ? { messageMetadata: args.messageMetadata }
               : {}),
-            // Where the conversation's Stella runs takes the send; its turn
-            // comes back through the conversation's journal.
             ...(storageMode ? { storageMode } : {}),
           },
         );
-        // The cloud journals a placed message under its dispatch id.
         if (
           placed &&
           args.userMessageEventId &&
@@ -158,13 +150,6 @@ export function useLocalAgentStream({
           );
         }
         const reason = message || null;
-        // A queued / follow-up message whose start fails because the user hit
-        // an anonymous cap or usage/auth limit must show the same actionable
-        // sign-in or connect-a-provider notice as the live send path — not the
-        // generic "Stella is still starting up". `resolveAgentNotReadyToast`
-        // only understands local startup hiccups, so route real backend
-        // limit/auth reasons through the provider-error resolver (which
-        // carries the Sign in / Upgrade / BYOK CTAs).
         if (isStellaLimitOrAuthReason(reason)) {
           showToast(resolveStellaProviderErrorToast(reason));
         } else {
@@ -182,8 +167,6 @@ export function useLocalAgentStream({
     [activeConversationId, storageMode],
   );
   const cancelCurrentStream = useCallback(() => {
-    // The runtime stops the conversation's run, and what it placed
-    // elsewhere for it, by its exact dispatch.
     if (activeConversationId) abortPiChat(activeConversationId);
   }, [activeConversationId]);
   return {

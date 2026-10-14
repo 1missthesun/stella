@@ -132,9 +132,6 @@ export const createStellaHostRunner = (
   options: StellaHostRunnerOptions,
 ): RunnerPublicApi => {
   const context = createRunnerContext(options);
-  // Nested (`code`, `multi_tool_use_parallel`) and voice calls dispatch
-  // through the host, so they need the same extension hooks the runtime
-  // adapter applies to model-issued top-level calls.
   context.toolHost.setToolCallHooks(context.hookEmitter);
   let restartReportInbox = () => {};
   let resumeComputerAgentCloudRecords = () => {};
@@ -196,9 +193,6 @@ export const createStellaHostRunner = (
     };
   }
   context.state.webSearch = webSearch;
-
-  // Local history stays on this device. Authentication and startup must not
-  // upload existing transcripts or wait for a history transfer.
 
   const computerAgentCloudRecords = createComputerAgentCloudRecords({
     deviceId: context.deviceId,
@@ -303,10 +297,6 @@ export const createStellaHostRunner = (
   const runtimeInitialization = createRuntimeInitialization(context, {
     disposeBackendClient: () => context.backend.dispose(),
     shutdownTasks: async () => {
-      // Stop network delivery first: shutdown still admits every resulting
-      // cancel/terminal row synchronously, but it must not wait on a backend
-      // client that runtime teardown has already disposed. The next worker
-      // resumes those durable rows before constructing its agent manager.
       computerAgentCloudRecords.stop();
       claudeSessionSync.stop();
       if (claudeSessionSyncSink() === claudeSessionSync) {

@@ -25,7 +25,6 @@ export type ServiceBearerSubtleCrypto = {
 };
 
 export type ServiceBearerVerificationOptions = {
-  /** Test seam for runtimes whose Web Crypto surface differs from Workerd. */
   subtle?: ServiceBearerSubtleCrypto;
 };
 
@@ -67,10 +66,6 @@ const equalFixedLengthBytes = (
   return difference === 0;
 };
 
-/**
- * Compare two raw service secrets with fixed crypto work regardless of their
- * lengths or validity. Callers may apply stricter syntax before this boundary.
- */
 export const fixedWorkSha256SecretEqual = async (
   left: string | null | undefined,
   right: string | null | undefined,
@@ -97,13 +92,6 @@ export const fixedWorkSha256SecretEqual = async (
   return leftValid && rightValid && hashesMatch;
 };
 
-/**
- * Verify the Cloud Builder's server-to-server Bearer credential.
- *
- * Even absent or malformed inputs perform the same two SHA-256 operations and
- * one fixed-length comparison. Validity is applied only after that work, so no
- * malformed value can accidentally authorize through the sentinel path.
- */
 export const verifyServiceBearerAuthorization = async (
   authorization: string | null,
   expectedSecret: string | null | undefined,

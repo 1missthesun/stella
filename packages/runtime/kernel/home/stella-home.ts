@@ -44,7 +44,6 @@ export type StellaDataDirSeedReport = {
   synced: boolean;
 };
 
-/** Adapt a leaf Promise IO call, failing with the raw thrown value. */
 const tryIO = <A>(f: () => Promise<A>): Effect.Effect<A, unknown> =>
   Effect.tryPromise({ try: f, catch: (error) => error });
 
@@ -78,9 +77,6 @@ const copyPathIfMissing = async (sourcePath: string, targetPath: string) => {
   await fs.copyFile(sourcePath, targetPath);
 };
 
-// One-shot copies into the user's space. Bundled skills are reconciled into the
-// canonical `skills/` root below; system prompts live in the app bundle and
-// never materialize into the data dir at all.
 const STELLA_DATA_SEED_ENTRIES = [path.join("outputs", "README.md")] as const;
 
 export const ensureStellaDataDirSeededEffect = (
@@ -137,8 +133,6 @@ export const ensureStellaDataDirSeededEffect = (
       );
     }
 
-    // System prompts are not materialized here: the runtime reads the backend
-    // publication (bundle as fallback) — see `prompts/remote-prompts.ts`.
     return { synced: applied };
   });
 
@@ -148,11 +142,6 @@ export const ensureStellaDataDirSeeded = (
 ): Promise<StellaDataDirSeedReport> =>
   withHome((home) => home.ensureStellaDataDirSeeded(stellaAppDir, stellaDataDir));
 
-/**
- * Re-run only the remote prompt portion after the renderer supplies a site URL
- * later than main-process startup. Agent bodies are live-read per turn and the
- * extension watcher observes the atomic replacements.
- */
 export const resolveStellaDataDirEffect = (
   app: App,
   explicitRoot?: string,
@@ -166,12 +155,6 @@ export const resolveStellaDataDirEffect = (
         stellaAppDir,
         explicitStatePath,
       );
-      // Runtime assets (the bundled extensions) are read from the source tree
-      // every install runs from; there is no packaged copy under the data root
-      // to prefer. User-created projects are the opposite case and must always
-      // live in Stella's writable data root: keeping the workspace under
-      // `stellaAppDir` made the external-app scaffold and the runtime look in
-      // different directories and reintroduced source-tree mutation.
       const runtimeRoot = path.join(stellaAppDir, "runtime");
       const workspacePath = path.join(statePath, "workspace");
 
@@ -190,12 +173,6 @@ export const resolveStellaDataDirEffect = (
       };
     });
 
-    // NOTE: `ensureStellaDataDirSeeded` (migration + skills mirror) is
-    // intentionally NOT invoked here — nothing on the first-paint path consumes
-    // the mirrored dirs, only the deferred runtime worker does. It is awaited in
-    // `initializeStellaHostRunner` (host-runner.ts), off the pre-window path,
-    // before the worker that reads those dirs connects. `resolveStellaDataDir`
-    // keeps only the cheap path resolution + env + dir ensures.
     yield* tryIO(() => ensureDir(resolved.workspacePath));
     yield* tryIO(() => ensureDir(resolved.workspaceAppsPath));
 

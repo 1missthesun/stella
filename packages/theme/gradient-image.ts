@@ -1,18 +1,8 @@
-/**
- * Encode a rendered gradient frame as a PNG data URI.
- *
- * React Native has no canvas, so mobile shows the shared pixel buffer through
- * an <Image>. The encoder uses stored (uncompressed) deflate blocks: the frame
- * is small, the pixels are noisy by design (dither), and skipping compression
- * keeps this dependency-free and fast on Hermes.
- */
 import {
   planGradientFrame,
   renderGradientPixels,
   type GradientFrameInput,
 } from "./gradient";
-
-// ─── Checksums ──────────────────────────────────────────────────────────
 
 const CRC_TABLE = (() => {
   const table = new Uint32Array(256);
@@ -41,8 +31,6 @@ function adler32(bytes: Uint8Array): number {
   return ((b << 16) | a) >>> 0;
 }
 
-// ─── PNG assembly ───────────────────────────────────────────────────────
-
 function writeU32(out: Uint8Array, offset: number, value: number): void {
   out[offset] = (value >>> 24) & 0xff;
   out[offset + 1] = (value >>> 16) & 0xff;
@@ -59,7 +47,6 @@ function chunk(type: string, data: Uint8Array): Uint8Array {
   return out;
 }
 
-/** zlib stream made of stored deflate blocks (no compression). */
 function zlibStored(raw: Uint8Array): Uint8Array {
   const MAX = 65535;
   const blocks = Math.max(1, Math.ceil(raw.length / MAX));
@@ -82,7 +69,6 @@ function zlibStored(raw: Uint8Array): Uint8Array {
   return out;
 }
 
-/** Encode an opaque RGBA buffer as an RGB PNG. */
 export function encodePng(
   pixels: Uint8ClampedArray,
   w: number,
@@ -154,16 +140,10 @@ export function bytesToBase64(bytes: Uint8Array): string {
 
 export interface GradientImage {
   uri: string;
-  /** Buffer dimensions the image was rendered at. */
   width: number;
   height: number;
 }
 
-/**
- * Render a gradient frame for a `width` × `height` surface into a PNG data
- * URI. `scale` picks the buffer resolution; the blobs are smooth enough that
- * the display's bilinear upscale hides it.
- */
 export function renderGradientImage(
   input: GradientFrameInput,
   width: number,

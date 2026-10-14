@@ -99,8 +99,6 @@ export const spillSanitizedToolOutput = async ({
     mode: 0o600,
     flag: "wx",
   });
-  // Linking is atomic and, unlike POSIX rename, cannot replace an existing
-  // artifact from a concurrent identical spill.
   await fs
     .link(temporaryPath, filePath)
     .catch(async (error: NodeJS.ErrnoException) => {

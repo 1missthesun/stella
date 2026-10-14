@@ -8,17 +8,7 @@ import { setConnectorTokenStoreBroker } from "../../../kernel/connectors/oauth.j
 import { setLocalLlmCredentialAccessBroker } from "../../../kernel/storage/local-llm-credential-access.js";
 import * as HostBus from "../host-bus.js";
 
-/**
- * The two process-global credential brokers the worker installs for kernel
- * code: local-LLM credential access (backed by desktop safeStorage over the
- * host hop) and the connector token store. The LLM broker is installed here
- * on acquire; the connector broker is installed by CliBridge (only when the
- * bridge platform is supported, as before) — but BOTH are cleared by this
- * layer's finalizer so clearing lands after the bridge has stopped, matching
- * the old stopWorkerServices order.
- */
 export interface Interface {
-  /** Re-read which providers have credentials and reinstall the broker. */
   readonly refreshLocalLlmCredentialAccess: () => Promise<void>;
 }
 
@@ -80,7 +70,6 @@ export const layer = Layer.effect(
             operation: "claude-config",
           });
           if (!result.ok || !("signedIn" in result)) {
-            // An older host, or none available: the CLI's own default login.
             return { configDir: null, signedIn: true };
           }
           return {

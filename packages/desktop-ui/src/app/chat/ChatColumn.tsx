@@ -1,19 +1,3 @@
-/**
- * ChatColumn: virtualized chat viewport (Legend List v3 web entry),
- * custom scrollbar overlay, composer.
- *
- * Layout:
- *   .full-body-main
- *     .chat-viewport-region (relative; hosts the absolute scrollbar +
- *       scroll-to-bottom button overlays)
- *       <ConversationEvents> → <ChatTimeline> → <LegendList />
- *     .composer-wrap
- *
- * The list element itself is the scroll container — there is no
- * column-reverse wrapper anymore. `useChatScrollManagement` drives the
- * thumb / at-bottom state from the list's native scroll node and `getState()`
- * snapshot rather than reading `scrollTop` from a manual div.
- */
 import {
   memo,
   useCallback,
@@ -72,8 +56,6 @@ const FULL_CHAT_CONTENT_STYLE = {
   paddingLeft: 24,
   paddingRight: 24,
   paddingTop: 112,
-  // The last row's gap above the composer. Matches the bottom mask fade on
-  // `.session-content` so the resting last row is never faded.
   paddingBottom: 16,
 } as const;
 
@@ -82,11 +64,6 @@ type StoreBackedComposerProps = Omit<
   "message"
 > & { messageStore: ComposerMessageStore };
 
-/**
- * Subscribes to the draft text at the composer leaf, so a keystroke
- * re-renders the composer and nothing above it (chat column, timeline,
- * runtime consumers).
- */
 const StoreBackedComposer = memo(function StoreBackedComposer({
   messageStore,
   ...props
@@ -95,11 +72,6 @@ const StoreBackedComposer = memo(function StoreBackedComposer({
   return <Composer {...props} message={message} />;
 });
 
-/**
- * The cards pinned above the composer depend only on the conversation id, so
- * they are memoized as a group: the chat column re-renders on every timeline
- * update, and none of these read the timeline.
- */
 const AboveComposerCards = memo(function AboveComposerCards({
   conversationId,
 }: {
@@ -135,11 +107,6 @@ export const ChatColumn = memo(function ChatColumn({
   const dragStartRef = useRef<{ y: number; scrollTop: number } | null>(null);
   const { noteManualScroll } = scroll;
 
-  /**
-   * The Legend List exposes its scroll element via `getScrollableNode()`.
-   * We only need it inside drag handlers, so we resolve lazily rather
-   * than caching a ref that could go stale across surface remounts.
-   */
   const getScrollNode = useCallback((): HTMLElement | null => {
     const list = scroll.listRef.current;
     if (!list) return null;
@@ -199,10 +166,6 @@ export const ChatColumn = memo(function ChatColumn({
     isUserScrolling,
   } = scroll;
 
-  // Live timeline. At rest it paints every streamed update. During direct
-  // user scrolling, keep the last painted array stable and flush the newest
-  // one after the short scroll settle; this keeps provider cadence from
-  // reconciling the virtual list inside the scroll frame budget.
   const liveMessages = useChatMessages();
   const messages = useDeferredChatMessages(
     liveMessages,
@@ -244,12 +207,6 @@ export const ChatColumn = memo(function ChatColumn({
 
   useReadAloud(messages);
 
-  // The indicator hands off to the reply once the run's final assistant
-  // message lands; a preamble followed by a tool keeps it up.
-  // Memoize over the primitive streaming inputs so the mount props keep a
-  // stable object identity across the run's re-renders. Without this, a fresh
-  // object every render invalidates `ChatTimeline`'s `ListFooter` useMemo and
-  // reconciles the whole working-indicator subtree.
   const indicatorProps = useMemo(
     () =>
       buildInlineWorkingIndicatorProps({
@@ -271,20 +228,10 @@ export const ChatColumn = memo(function ChatColumn({
       conversation.streaming.isCompacting,
     ],
   );
-  // Drag-and-drop file attach stays live at all times, including while the
-  // turn is streaming or agents are busy. Dropped files land in
-  // `composer.chatContext` (screenshot/file chips) exactly as when idle;
-  // this only governs the *attach* interaction, not submit/queue behavior.
   const { isDragOver, dropHandlers } = useFileDrop({
     setChatContext: composer.setChatContext,
   });
 
-  /**
-   * Cancel a still-queued follow-up: drop it from the send queue and hand its
-   * text back to the composer so the user can edit or resend it. Restoring
-   * only clobbers an empty composer (see `restoreQueuedTextToComposer`); an
-   * in-progress draft keeps its place and the recovered text is appended.
-   */
   const { removeQueuedUserMessage } = conversation.streaming;
   const { setMessage: setComposerMessage, requestFocus: requestComposerFocus } =
     composer;
@@ -309,16 +256,6 @@ export const ChatColumn = memo(function ChatColumn({
     [removeQueuedUserMessage, setComposerMessage, requestComposerFocus],
   );
 
-  /**
-   * Two synced instances of the (fully controlled) composer: one pinned at
-   * the bottom of the persistently-mounted chat, one centered inside the
-   * home overlay. Both read the same lifted state, so their content,
-   * context chips, and submittability stay identical — only their on-screen
-   * position differs. `focusRequestId` is routed to whichever surface is
-   * currently active so focus lands on the visible composer, and the
-   * off-surface wrapper is `inert` so it stays out of the tab order and
-   * can't capture Enter/clicks while hidden.
-   */
   const renderComposer = (
     surface: "chat" | "home",
     replyPeek: ComponentProps<typeof Composer>["replyPeek"],
@@ -347,8 +284,6 @@ export const ChatColumn = memo(function ChatColumn({
     );
   };
 
-  // Stable while the peek is unchanged so the memoized composer does not
-  // re-render every time the timeline publishes a new message array.
   const {
     visible: replyPeekVisible,
     previewText: replyPeekText,
@@ -366,9 +301,6 @@ export const ChatColumn = memo(function ChatColumn({
     [dismissReplyPeek, replyPeekText, replyPeekVisible, scrollToBottom],
   );
 
-  // Changes to Stella no agent here made (the user's other computers, drafts
-  // made by hand) are Stella's latest messages in the chat. Agents' changes
-  // show on their own messages; new versions are the top bar's.
   const extraTail = conversation.extraTail;
   const chatTail = useMemo(
     () => (
@@ -380,13 +312,6 @@ export const ChatColumn = memo(function ChatColumn({
     [extraTail],
   );
 
-  // Home content is an overlay ON TOP of the always-mounted chat, not a
-  // replacement for it — so navigating home and back never unmounts the
-  // LegendList. That preserves the user's scroll position and removes the
-  // remount flash. The chat content cross-fades under the overlay via
-  // opacity (which keeps the scroll node mounted + measurable, unlike
-  // `display:none`), while the overlay's own children run their existing
-  // enter/leave fades.
   return (
     <div className="full-body-row">
       {/* The whole chat layer (messages + composer + workspace strip +

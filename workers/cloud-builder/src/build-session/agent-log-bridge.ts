@@ -1,15 +1,3 @@
-/**
- * A cloud agent thread's side of its log in the owner's cloud
- * (`@stella/contracts/backend/agent-logs`): the same conversation the agent
- * had wherever it ran before.
- *
- * Before a turn, records another host wrote since the last import land in
- * this thread's own transcript, so an agent that moved here from a computer
- * continues with its whole conversation. After a turn, the rows the turn
- * produced go to the log, so a computer it moves to next catches up from
- * there. Both are deltas: the import keeps the newest seq it took, and the
- * owner's log keeps each record once by key.
- */
 import {
   AGENT_LOG_MOVED_REASON,
   AGENT_LOG_RECORD_MAX_BYTES,
@@ -28,11 +16,9 @@ const IMPORT_TABLE = `CREATE TABLE IF NOT EXISTS agent_log_import (
   imported_seq INTEGER NOT NULL
 )`;
 
-/** Turn ids the imported rows are stored under in this thread's transcript. */
 const IMPORTED_TURN = "agent-log";
 const IMPORTED_SUMMARY_TURN = "agent-log-summary";
 
-/** Keys of the records this cloud writes, which it never imports back. */
 const CLOUD_RECORD_PREFIX = "cloud:";
 
 const APPEND_BATCH_BYTES = 768 * 1024;
@@ -86,12 +72,6 @@ const STOP_REASONS = new Set(["stop", "length", "toolUse", "error", "aborted"]);
 
 const textOf = (part: Part): string | undefined => (typeof part.text === "string" ? part.text : undefined);
 
-/**
- * Another host's message in the shape this executor takes as history: the
- * fields it requires filled in, and parts it does not know turned into text,
- * so a message is never dropped (a dropped call would orphan its result).
- * Signed thinking stays, so a session written from it keeps its reasoning.
- */
 const historyPayload = (role: "user" | "assistant" | "toolResult", payloadJson: string): string | undefined => {
   let message: Record<string, unknown>;
   try {
@@ -183,11 +163,6 @@ const summaryRow = (summary: string): string =>
     timestamp: Date.now(),
   });
 
-/**
- * Take what other hosts wrote to this agent's log since the last import.
- * An agent that never ran anywhere else has nothing there; a log this
- * thread cannot read now leaves the turn on what it has.
- */
 export const importAgentLogIntoThread = async (
   bridge: Bridge,
   turn: TurnRequest,
@@ -239,10 +214,6 @@ export const importAgentLogIntoThread = async (
   return imported;
 };
 
-/**
- * The rows a turn produced, into the agent's log. The agent moving away
- * since refuses them (the new holder writes it now), which is no failure.
- */
 export const writeThreadToAgentLog = async (
   bridge: Pick<Bridge, "env">,
   turn: TurnRequest,

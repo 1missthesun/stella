@@ -1,9 +1,3 @@
-/**
- * Pure edit-diff text utilities: line endings, BOM, and exact-then-fuzzy
- * matching with original-offset mapping. Dependency-free so workerd hosts
- * (the cloud world's Edit) share the exact same matching as the Node host.
- */
-
 export function detectLineEnding(content: string): "\r\n" | "\n" {
   const crlfIdx = content.indexOf("\r\n");
   const lfIdx = content.indexOf("\n");
@@ -21,8 +15,6 @@ export function restoreLineEndings(text: string, ending: "\r\n" | "\n"): string 
 }
 
 const FUZZY_ASCII_LINE = /^[\x00-\x7f]*$/;
-// One base character plus its combining marks: NFKC composes within such a
-// cluster, so normalizing clusters one by one keeps an offset map exact.
 const FUZZY_CLUSTER = /\P{M}\p{M}*|\p{M}+/gu;
 
 const normalizeFuzzyCluster = (cluster: string): string =>
@@ -35,37 +27,19 @@ const normalizeFuzzyCluster = (cluster: string): string =>
 
 interface FuzzyNormalized {
   text: string;
-  /**
-   * Original offset for each normalized offset used as a match START, or -1
-   * inside the expansion of one source cluster (NFKC "ﬁ" → "fi").
-   */
   startMap: Int32Array;
-  /**
-   * Same as `startMap` except at a line end whose trailing whitespace was
-   * stripped: a match ENDING there maps to before that whitespace, so the
-   * file's own trailing whitespace survives a replacement.
-   */
   endMap: Int32Array;
 }
 
-/**
- * Fuzzy view of `text` (NFKC, trailing whitespace stripped per line, smart
- * quotes/dashes/special spaces folded to ASCII) with a map back to `text`
- * offsets, so a fuzzy match can be applied to the original bytes.
- */
 function normalizeForFuzzyMatchWithMap(text: string): FuzzyNormalized {
   const parts: string[] = [];
   const starts: number[] = [];
   const ends: number[] = [];
   let lineOffset = 0;
-  // Original offset just before the previous line's stripped whitespace.
   let previousStrippedFrom = 0;
   const lines = text.split("\n");
   lines.forEach((line, lineIndex) => {
     if (lineIndex > 0) {
-      // The boundary after the previous line's kept text: a match starting
-      // there begins at the newline, one ending there stops before the
-      // whitespace that was stripped.
       parts.push("\n");
       starts.push(lineOffset - 1);
       ends.push(previousStrippedFrom);
@@ -88,7 +62,6 @@ function normalizeForFuzzyMatchWithMap(text: string): FuzzyNormalized {
       }
       lineText = pieces.join("");
     }
-    // Strip trailing whitespace, but never split one cluster's expansion.
     let kept = lineText.trimEnd().length;
     while (kept < lineText.length && lineMap[kept] === -1) kept++;
     previousStrippedFrom =
@@ -115,20 +88,11 @@ function normalizeForFuzzyMatch(text: string): string {
 
 export interface FuzzyMatchResult {
   found: boolean;
-  /** Match start in the ORIGINAL content. */
   index: number;
-  /** Match length in the ORIGINAL content. */
   matchLength: number;
   usedFuzzyMatch: boolean;
-  /** Non-overlapping occurrences in the space that produced the match. */
   occurrences: number;
-  /** Original-content starts of the first few occurrences. */
   locations: number[];
-  /**
-   * Normalized text to wrap around the replacement when a fuzzy match edge
-   * fell inside one source cluster's expansion and the span was widened to
-   * the whole cluster. Empty for exact matches.
-   */
   leading: string;
   trailing: string;
 }
@@ -147,11 +111,6 @@ const findOccurrences = (haystack: string, needle: string): number[] => {
   return found;
 };
 
-/**
- * Find `oldText` in `content`: exact first, then fuzzy. Offsets are always
- * in the original content, so callers replace only the matched span and
- * every other byte of the file is preserved.
- */
 export function fuzzyFindText(content: string, oldText: string): FuzzyMatchResult {
   const notFound: FuzzyMatchResult = {
     found: false,

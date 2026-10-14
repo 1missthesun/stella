@@ -53,7 +53,6 @@ type Translate = ReturnType<typeof useT>;
 
 const startDesktopSocialAuth = async (t: Translate) => {
   const backendUrl = requireBackendUrl();
-  // Held in memory for this attempt only; the server stores just the hash.
   const claimSecret = generateClaimSecret();
   const response = await fetch(
     `${backendUrl}/api/auth/desktop-social/start`,
@@ -101,8 +100,6 @@ const pollDesktopSocialAuth = async (
       status?: string;
     } | null;
     if (data?.status === "completed") {
-      // The credential is never returned by /link/status. Exchange the secret
-      // for it.
       const token = await claimSessionToken(
         backendUrl,
         requestId,
@@ -124,7 +121,6 @@ const pollDesktopSocialAuth = async (
 export const AuthDialog = ({ open, onOpenChange }: AuthDialogProps) => {
   const t = useT();
   const { hasConnectedAccount } = useAuthSessionState();
-  // The dialog closes as soon as the account is connected.
   useEffect(() => {
     if (hasConnectedAccount && open) onOpenChange(false);
   }, [hasConnectedAccount, open, onOpenChange]);
@@ -149,10 +145,6 @@ export const AuthDialog = ({ open, onOpenChange }: AuthDialogProps) => {
   );
 };
 
-/**
- * Every way to sign in to Stella: Google, a passkey (web only) and an email
- * link. The dialog and the full-window sign-in screen both show this.
- */
 export function AuthMethods() {
   const t = useT();
   return (

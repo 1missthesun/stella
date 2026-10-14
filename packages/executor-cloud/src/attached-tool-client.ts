@@ -1,14 +1,3 @@
-/**
- * One call, one process. The Durable Object writes a root-owned request file
- * and execs this; it forwards that one frame to the daemon's socket, writes
- * the daemon's one answer to a root-owned result file, and exits.
- *
- * It holds no state and makes no decision. Everything it could get wrong is a
- * transport failure, and a transport failure is written out as a `failed`
- * response rather than swallowed, so the caller sees a tool error instead of a
- * turn that never returns.
- */
-
 import { connect, type Socket } from "node:net";
 import { mkdir, writeFile } from "node:fs/promises";
 import { readFile } from "node:fs/promises";
@@ -27,13 +16,6 @@ import {
   parseAttachedToolResponse,
 } from "./attached-tool-protocol.js";
 
-/**
- * The frame the client writes when the daemon could not be reached or did not
- * answer with a valid frame. It is the only way the worker learns why a call
- * failed, so it must parse as a current-protocol failure: a stale version
- * here turned every transport failure into "frame field version is invalid"
- * and hid the real error behind it.
- */
 export const attachedToolClientFailure = (
   request: unknown,
   message: string,
@@ -124,14 +106,6 @@ const roundTrip = (socketPath: string, frame: unknown): Promise<unknown> =>
     );
   });
 
-/**
- * Forward the pending request and leave exactly one result file behind.
- *
- * The answer is re-parsed here even though the daemon just built it: this
- * process is the one that decides what lands in the file the worker trusts,
- * and a frame it cannot parse must become a stated failure rather than bytes
- * the worker has to interpret.
- */
 export const runAttachedToolClient = (
   paths: AttachedToolClientPaths,
 ): Effect.Effect<void, Error> =>
@@ -179,12 +153,6 @@ export const runAttachedToolClient = (
 
 const FINGERPRINT = /^[0-9a-f]{64}$/u;
 
-/**
- * A failure frame still has to name the call it failed, and the only place
- * that name exists is the request this process could not deliver. A request
- * too malformed to name one gets placeholders the worker's parser rejects,
- * which is the right outcome: nothing about that call is provable.
- */
 const toolCallIdOf = (request: unknown): string => {
   const value = (request as Record<string, unknown> | null)?.toolCallId;
   return typeof value === "string" && value.length > 0 && value.length <= 256

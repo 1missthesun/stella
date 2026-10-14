@@ -1,9 +1,5 @@
 import { createRequire } from 'node:module';
 import { areGlobalShortcutsSuspended } from '../ipc/global-shortcuts.js';
-// uiohook-napi is a native addon (node-gyp-build prebuild probing + dlopen).
-// A static import loaded it before `ready` on every launch and platform, yet
-// the hook only ever starts on macOS with Accessibility granted, after the
-// window is up. Load it on first start instead.
 const requireFromMain = createRequire(import.meta.url);
 let uiohookInstance = null;
 const getUiohook = () => {
@@ -13,25 +9,13 @@ const getUiohook = () => {
 const LEFT_ALT = 56;
 const RIGHT_ALT = 3640;
 const ALT_KEYCODES = new Set([LEFT_ALT, RIGHT_ALT]);
-/**
- * Longest press that still counts as a tap. Anything held longer is treated as
- * the user reaching for a chord they never completed, not as a request.
- */
 const ALT_TAP_MAX_MS = 400;
-/**
- * Owns the low-level keyboard hook that turns a bare Option tap into the
- * dictation toggle (Electron's globalShortcut cannot register a lone
- * modifier). Only the tap gesture is recognised: Option pressed and released
- * on its own within `ALT_TAP_MAX_MS`. Any chord, ordinary key, or click while
- * Option is down cancels the gesture so normal keyboard use is untouched.
- */
 export class MouseHookManager {
     started = false;
     disposed = false;
     uiohookListenersAttached = false;
     uiohookStarted = false;
     pressedKeycodes = new Set();
-    /** Timestamp of the bare Option press being tracked, or null. */
     altDownAt = null;
     handlers = null;
     setDictationTapHandlers(handlers) {
@@ -106,7 +90,6 @@ export class MouseHookManager {
         const otherKeyHeld = [...this.pressedKeycodes].some((keycode) => !ALT_KEYCODES.has(keycode));
         this.pressedKeycodes.add(event.keycode);
         if (!ALT_KEYCODES.has(event.keycode)) {
-            // Option + anything is a chord, never a dictation tap.
             this.altDownAt = null;
             return;
         }

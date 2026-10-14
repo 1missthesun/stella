@@ -35,10 +35,6 @@ import {
 import type { Rect } from "./ax-format.js";
 import type { SessionPaths } from "./session-paths.js";
 
-// Lifecycle of the per-session desktop_automation daemon (spawn, readiness,
-// recovery) and the two request channels it serves: legacy argv requests and
-// typed operations.
-
 type AutomationDaemonRequestPayload = {
   seq: number;
   argv: string[];
@@ -188,7 +184,6 @@ export const automationSocketPath = (sessionPaths: SessionPaths) =>
 export const automationPidPath = (sessionPaths: SessionPaths) =>
   path.join(sessionPaths.sessionDir, "automation.pid");
 
-/** Daemon stdout/stderr sink; read back to surface startup failures. */
 const automationLogPath = (sessionPaths: SessionPaths) =>
   path.join(sessionPaths.sessionDir, "automation-daemon.log");
 
@@ -214,7 +209,6 @@ export const recoverAutomationDaemon = (sessionPaths: SessionPaths) => {
   return pid;
 };
 
-/** Stop the session's daemon if it is running; true when a pid was recorded. */
 export const stopAutomationDaemon = (sessionPaths: SessionPaths) => {
   const pid = readPidFile(automationPidPath(sessionPaths));
   if (pid && pidIsRunning(pid)) killProcessGroup(pid);
@@ -413,11 +407,6 @@ const promptForAutomationAccessibility = async (
   };
 };
 
-/**
- * Spawn the daemon via the Electron host (single "Stella" TCC identity) when
- * a CLI bridge is available. Returns null when host spawning is unavailable
- * so the caller can fall back to a local spawn.
- */
 const spawnAutomationDaemonViaHost = async (
   sessionPaths: SessionPaths,
   socketPath: string,
@@ -446,8 +435,6 @@ const spawnAutomationDaemonViaHost = async (
     writeAutomationHostPid(sessionPaths, result.hostPid);
     return { ok: true };
   }
-  // "unsupported" means the running host predates this RPC; let the caller
-  // fall back to the legacy local spawn rather than hard-failing.
   if (result.reason === "unsupported") {
     return null;
   }
@@ -460,10 +447,6 @@ const spawnAutomationDaemonLocally = (
   socketPath: string,
   pidPath: string,
 ): { onSpawnError: () => Error | null; hasExited: () => boolean } => {
-  // Pipe daemon output to a per-session log instead of discarding it; the
-  // startup poll reads it back so a daemon that exits with "Accessibility
-  // permission is required…" surfaces that message instead of an opaque
-  // "failed to start after 7500ms".
   let stdio: StdioOptions = "ignore";
   let logFd: number | null = null;
   try {
@@ -541,9 +524,6 @@ const ensureAutomationDaemon = async (
     if (!helperNewerThanDaemon(helperPath, pidPath) && !staleHost) {
       return { ok: true };
     }
-    // Either the helper binary changed under the daemon, or the Electron host
-    // that spawned it exited (which orphans the daemon's TCC attribution).
-    // Restart it under the current host.
     killProcessGroup(existingPid);
     resetAutomationDaemonFiles(sessionPaths);
   }
@@ -617,8 +597,6 @@ const ensureAutomationDaemon = async (
       return { ok: true };
     }
     if (hasExited?.() && (!pid || !pidIsRunning(pid))) {
-      // The locally spawned daemon already died (e.g. its Accessibility
-      // check failed); no point polling out the rest of the budget.
       break;
     }
   }
@@ -694,8 +672,6 @@ export const runAutomationDaemonCommand = async (
             : new Error("Computer command aborted."),
       });
     };
-    // The request deadline is a forked timeout fiber interrupted by settle
-    // (the clearTimeout analogue); duration and daemon-reset path unchanged.
     const cancelTimer = forkCancelableTimeout(timeoutMs, () => {
       recoverAutomationDaemon(sessionPaths);
       settle({
@@ -809,8 +785,6 @@ export const runAutomationDaemonTypedOperation = async (
           : new Error("Computer request aborted."),
       );
     };
-    // The request deadline is a forked timeout fiber interrupted by settle
-    // (the clearTimeout analogue); duration and daemon-reset path unchanged.
     const cancelTimer = forkCancelableTimeout(timeoutMs, () => {
       recoverAutomationDaemon(sessionPaths);
       settle(

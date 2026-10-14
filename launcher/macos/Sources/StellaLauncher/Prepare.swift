@@ -1,8 +1,5 @@
 import Foundation
 
-/// Runs on install, after a relaunch request and after a rollback: dependency
-/// install when the lockfile changed, the native asset downloads when HEAD
-/// changed, and the Electron app identity for the installed Electron version.
 enum Prepare {
     static func run(
         paths: LauncherPaths,
@@ -18,8 +15,6 @@ enum Prepare {
             progress("Installing Stella's dependencies…")
             log("prepare: bun install --frozen-lockfile (lock \(lockHash.prefix(12)))")
             let started = Date()
-            // Dependencies only: the postinstall's asset downloads are
-            // prepare-install.mjs's job (under the managed Bun, with a timeout).
             var installEnv = env
             installEnv["STELLA_SKIP_BROWSER_HYDRATE"] = "1"
             installEnv["STELLA_SKIP_OFFICE_HYDRATE"] = "1"
@@ -39,9 +34,6 @@ enum Prepare {
         if state.preparedHead != head, FileManager.default.fileExists(atPath: script.path) {
             progress("Preparing Stella…")
             log("prepare: prepare-install.mjs for \(head.prefix(12))")
-            // The assets it fetches are optional features (computer use, the
-            // browser, office previews); a failure or timeout is logged, not
-            // fatal, and retried on the next launch.
             let timeout = Options.seconds("STELLA_LAUNCHER_PREPARE_TIMEOUT_SECONDS", 10 * 60)
             let result = try? Shell.run(runtimes.bunBin.path, [script.path],
                                         cwd: app, env: env, outputFile: paths.installLog, timeout: timeout)
@@ -159,8 +151,6 @@ enum ElectronIdentity {
         return target
     }
 
-    /// Download CI's signed Stella.app for this Electron version and keep it
-    /// only if its checksum and Developer ID signature check out.
     private static func installSigned(
         version: String, dir: URL, target: URL, env: [String: String], progress: (String) -> Void
     ) throws {

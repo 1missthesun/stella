@@ -13,26 +13,14 @@ const BASIC_RE = /\b(Basic)\s+[A-Za-z0-9+/=]+\b/gi;
 const COOKIE_INLINE_RE = /\b(cookie|set-cookie)\s*:\s*([^\n\r;]+)/gi;
 const JWT_RE =
   /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/g;
-// Bare AWS access key IDs (AKIA/ASIA prefix + 16 base32 chars).
 const AWS_ACCESS_KEY_RE = /\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/g;
-// Labeled-prose AWS secret access keys, e.g. `AWS Secret Access Key: <40 chars>`.
 const AWS_SECRET_LABEL_RE =
   /\b(aws\s+secret(?:\s+access)?\s+key\s*[:=]?\s*['"]?)([A-Za-z0-9/+]{40})(?![A-Za-z0-9/+])/gi;
-// 40-char base64 AWS secret access keys reached through an aws/secret context
-// (e.g. `"aws_secret_access_key": "…"`, `aws secret=…`).
 const AWS_SECRET_KEY_RE =
   /\b((?:aws|secret)[A-Za-z0-9_]*['"\s:=-]+)([A-Za-z0-9/+]{40})(?![A-Za-z0-9/+])/gi;
-// Bare provider API tokens: OpenAI `sk-…`, `sk-proj-…`, `sk-svcacct-…`. The
-// `sk-` prefix keeps this off ordinary hyphenated prose (task-, risk-, …).
 const SK_TOKEN_RE = /\bsk-(?:proj-|svcacct-)?[A-Za-z0-9_-]{20,}\b/g;
-// Generic `key = value` assignments (whitespace around `=` allowed). Only redact
-// when the KEY reads as a secret, or the VALUE is quoted / long+high-entropy —
-// plain short identifiers and numbers (count=0, retries=3) stay readable.
 const ASSIGNMENT_RE =
   /\b([A-Za-z_][A-Za-z0-9_]*)\s*=\s*("[^"]*"|'[^']*'|[^\s]+)/g;
-// Sensitive key tokens, matched only at real key-token boundaries (see
-// splitKeyTokens) so `api_key`/`FOO_TOKEN`/`authToken`/bare `auth` match while
-// `author`/`keyboard`/`monkey`/`donkey` do not.
 const SECRET_KEY_TOKENS = new Set([
   "token",
   "secret",
@@ -45,10 +33,6 @@ const SECRET_KEY_TOKENS = new Set([
   "bearer",
   "credential",
 ]);
-// Established FUSED (no-delimiter) sensitive key names that splitKeyTokens
-// cannot break apart. Matched against the normalized key by EXACT equality
-// only (see keyLooksSensitive), so `author`/`keyboard`/`monkey`/`donkey`/
-// `turnkey`/`passwordless`/`accessKeyboard`/`clientSecretary` still survive.
 const FUSED_SECRET_KEYS = [
   "apikey",
   "apisecret",
@@ -68,15 +52,10 @@ const FUSED_SECRET_KEYS = [
   "passwd",
   "passphrase",
 ];
-// High-entropy value: a single opaque token (no path/URL punctuation) that is
-// long and mixes letters with digits. Excludes `/` and `.` so filesystem paths
-// and version strings are not mistaken for secrets.
 const HIGH_ENTROPY_VALUE_RE = /^[A-Za-z0-9+_=-]{24,}$/;
 const SECRET_FLAG_RE =
   /(\s--?(?:api[-_]?key|token|secret|password|passwd|authorization))(?:=|\s+)(?:"[^"]*"|'[^']*'|[^\s]+)/gi;
 
-// Break a key into its constituent word tokens across `_`/`-` delimiters and
-// camelCase / ACRONYMWord boundaries.
 const splitKeyTokens = (key: string): string[] =>
   key
     .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
@@ -196,14 +175,6 @@ const redactJsonStrings = (value: unknown): unknown => {
   return output;
 };
 
-/**
- * `redactSensitiveText` for a serialized JSON document. The text patterns
- * run on each string value, never on the serialized form: JSON escapes a
- * newline, so a pattern that stops at one (the Authorization header) would
- * swallow the closing quotes and brackets and leave unparseable JSON. Keys
- * and structure are kept exactly; only string values change. Input that is
- * not JSON has no structure to keep and is redacted as text.
- */
 export const redactSensitiveJson = (json: string): string => {
   let parsed: unknown;
   try {

@@ -1,13 +1,3 @@
-/**
- * Drop-up menu offering external apps to open a chat artifact with.
- *
- * Lives on the right edge of a file pill, whose body is the primary
- * open target; the bare chevron only exposes the "open in other ways"
- * menu. The menu prefers opening upward (chat artifacts typically sit
- * near the bottom of the viewport during streaming) but Radix auto-flips
- * to a drop-down when the pill is near the top.
- */
-
 import { ChevronDown } from "@/ui/icons";
 import { useCallback, useEffect, useState } from "react";
 

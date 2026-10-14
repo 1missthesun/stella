@@ -16,7 +16,6 @@ type AgentState = MobileAgentState;
 
 type CloudAgent = { title?: string; state?: AgentState };
 
-/** Every agent the transcript cites or carries a work card for, oldest first. */
 const transcriptAgentIds = (messages: readonly ChatMessage[]): string[] => {
   const ids = new Set<string>();
   for (const message of messages) {
@@ -106,13 +105,6 @@ const cloudState = (status: Parameters<typeof agentTaskStatus>[0]): AgentState =
   return state === "canceled" ? "error" : state;
 };
 
-/**
- * The transcript with each cited agent's title and status from the agent
- * ledger. Its status wins over what the journal's cards said; a title
- * replaces only a missing one, since older runs stored a follow-up's label
- * as the description. An agent the ledger has no row for keeps the
- * journal's word, as does every agent while the ledger has not loaded.
- */
 export function useAgentReplyTitles(
   conversationId: string | null,
   messages: ChatMessage[],

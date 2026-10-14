@@ -48,47 +48,6 @@ import type { PiBrainRecord } from "@stella/contracts/turn-plane/pi-brain";
 import { PI_BRAIN_KEY } from "./orchestrator/constants.js";
 import { parseSlackWorkspaceContext } from "./slack/workspace.js";
 
-/**
- * The cloud orchestrator: Stella's delegation-only agent loop running inside
- * a Durable Object — one DO per conversation, one turn at a time, ~token
- * cost only. No sandbox is ever created here; escalation is the spawn tool,
- * which dispatches a general agent into a BuildSession sandbox and returns
- * immediately.
- *
- * This object OWNS its conversation. The transcript lives in its SQLite (see
- * `journal.ts`) and is the single source of truth for message content; the owner
- * keeps only the derived conversation-list projection it alone can serve.
- * There is no per-turn transcript round trip left:
- * the loop reads its context from local storage and writes produced messages
- * back incrementally as they are produced, so an eviction at minute four of a
- * five-minute turn no longer discards everything the turn did.
- *
- * This object is also the turn gateway's admission authority. A turn start
- * arrives from the Worker with a verified caller on trusted headers; the DO
- * decides idempotency (by `clientMsgId`), ownership (a fresh conversation
- * adopts its first verified caller — conversation ids are client-minted
- * UUIDs), owner policy (through the owner gate), the execution, and mints the turn's
- * model capability itself. The owner's object learns what it indexes through
- * owner events: `conversation.created`, `turn.started`, the `turn.event`s it
- * reads (with a DO-assigned `eventSeq`), `conversation.index`,
- * `thread.spawned`, `conversation.deleted`. Everything else a turn touches
- * (web search, schedules, drive attachments, integrations, the agent home) is
- * an owner-object call. The model queries the local journal through
- * `history.sql` in code.
- *
- * What did NOT change, deliberately: the turn lifecycle. Accepted turns are
- * still durable under `queued:*` before the 202, the alarm still retries
- * terminal delivery (now "retry the owner delivery"), and `terminal` /
- * `terminalDelivered` still guarantee exactly one terminal state. The
- * journal's `turns` table is a projection of that machinery and is never
- * consulted to decide whether a terminal event is owed.
- *
- * The loop itself is `packages/runtime`'s agent-core Agent — the same code
- * the desktop ships — with the tool set pinned in `orchestrator/tools.ts`.
- * Frontmatter allowlists are agent-writable home data on desktop; in the
- * cloud the execution surface is never data-driven.
- */
-
 export type { ChatTurnRequest } from "./orchestrator/types.js";
 
 export class OrchestratorSessionObject extends OrchestratorTurnStart {
@@ -96,11 +55,6 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
     await this.readerReady;
   }
 
-  /**
-   * Advisory cold-start hint for the owner gate. The nonce has no authority:
-   * the gate still validates the exact lease and policy before it can issue a
-   * grant bound to this reader. The shell awaits `ready()` before any call.
-   */
   async prepareCloudChatReader(): Promise<string> {
     return this.isolateId;
   }
@@ -119,10 +73,6 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
   }
 
   private async conversationAlarm(): Promise<void> {
-    // A turn can finish after its remote lease was removed but before the
-    // unregister response arrived. Reconcile that durable debt before using
-    // this wake-up for the conversation lifecycle. Same for projections the
-    // queue refused at admission time.
     await this.retryOwnerFenceLeaseRetirements();
     await this.retryOwnerEventDebt();
     const localLease =
@@ -152,18 +102,9 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
     }
     const turn = await this.ctx.storage.get<ChatTurnRequest>("turn");
     if (!turn || (await this.ctx.storage.get<boolean>("terminalDelivered"))) {
-      // Nothing owed for the turn under `turn` — but this firing still spent
-      // the alarm, and the queue may not be empty. Both of these are reachable
-      // with work outstanding: `!turn` is a first-ever dispatch whose watchdog
-      // beat `runTurn` to the claim, and `terminalDelivered` is the ordinary
-      // watchdog of a turn that finished while a later one was queued behind
-      // it.
       await this.ensureQueueAlarm();
       return;
     }
-    // The heartbeat of a turn running in this isolate: nothing is owed and
-    // nothing is lost, so re-arm without the owner-lease round trips the
-    // watchdog path below needs for its writes.
     if (this.turnExecutions.has(turn.turnId)) {
       const [owed, watchdogAt] = await Promise.all([
         this.owedTerminal(turn),
@@ -209,11 +150,6 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
     if (!owed) {
       const watchdogAt = await this.ctx.storage.get<number>("turnWatchdogAt");
       if (watchdogAt !== undefined && Date.now() < watchdogAt) {
-        // Projection retries and lease reconciliation share this alarm. An
-        // earlier maintenance wake must not time out a healthy active turn.
-        // A turn running here keeps its heartbeat; one this isolate never
-        // resumed (its resume budget is spent) waits for the watchdog, as
-        // every lost turn did before resume existed.
         await this.armAlarmNoLaterThan(
           this.turnExecutions.has(turn.turnId)
             ? Math.min(watchdogAt, Date.now() + CHAT_TURN_HEARTBEAT_MS)
@@ -222,8 +158,6 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
         return;
       }
       await this.ctx.storage.put("terminal", true);
-      // Marking the turn terminal is not enough — the loop would keep burning
-      // metered relay calls for output runTurn will discard.
       this.currentTurnCancellation?.abort();
       this.currentPiRun?.abort();
       if (!this.currentPiRun) {
@@ -238,10 +172,6 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
         turnId: turn.turnId,
         conversationId: turn.conversationId,
       });
-      // Additive: the journal row a socket client needs to stop showing a
-      // spinner. It is written whether or not the owner event below lands —
-      // the two deliveries are independent, and this one has no retry ladder
-      // because it cannot fail transiently.
       this.recordTerminal(turn, "timeout", TERMINAL_NOTICE.timeout);
       owed = { kind: "timeout", message: TERMINAL_NOTICE.timeout };
       await this.ctx.storage.put("terminalOwed", owed);
@@ -259,8 +189,6 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
       );
       await this.ctx.storage.put("terminalDelivered", true);
     } catch (error) {
-      // A single enqueue attempt would strand the turn "running" on one
-      // transient queue failure; retry via a re-armed alarm.
       const attempts =
         ((await this.ctx.storage.get<number>("alarmAttempts")) ?? 0) + 1;
       if (attempts <= 5) {
@@ -274,8 +202,6 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
         });
       }
     }
-    // The loop that would have released the gate is gone with the isolate
-    // that ran it; the alarm is the last party that knows this turn ended.
     await this.releaseOwnerGate(turn);
     // Before the projection work, not after it. Every exit above has now
     // either re-armed the alarm for its own retry or consumed it for good, so
@@ -286,21 +212,9 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
     // first and that eviction costs a wake-up; arm after and it costs the
     // queued turn.
     await this.ensureQueueAlarm();
-    // Last, so the terminal event is never held up by projection work — but
-    // unconditionally, on the delivered and the re-armed path alike. A
-    // timed-out turn owes the same post-terminal work as a completed one:
-    // without it the whole turn, including everything the model produced
-    // before the watchdog fired, is absent from the search index forever, and any card
-    // staged while it ran sits in the inbox until the user happens to send
-    // another message in that conversation.
     await this.finalizeTerminalTurn(turn);
   }
 
-  /**
-   * Slack's events route binds this conversation to the thread its replies
-   * go to, before each Slack turn. Internal: only the Worker reaches it. A
-   * conversation already owned by someone else refuses.
-   */
   private async handleAgentReportTarget(request: Request): Promise<Response> {
     const ownerId = request.headers.get(HEADER_OWNER)?.trim() ?? "";
     if (!ownerId || request.headers.get(HEADER_TURN_AUTH_KIND)?.trim() !== "service") {
@@ -361,12 +275,6 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
     return json({ bound: true });
   }
 
-  /**
-   * Stop from Slack: the running and queued turns are canceled, and every
-   * background agent a Slack request started here is stopped, so nothing
-   * reports back afterwards. Internal; the Worker has checked that the person
-   * pressing Stop owns the conversation.
-   */
   private async handleSlackStop(request: Request): Promise<Response> {
     const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
     const ownerId = typeof body?.ownerId === "string" ? body.ownerId : "";
@@ -451,7 +359,6 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
       return this.handlePiBrain(request);
     }
     if (url.pathname === "/prewarm") {
-      // Only the conversation's own owner; anyone else learns nothing.
       const owner = request.headers.get(HEADER_OWNER);
       if (owner && owner === this.journal.ownerId()) this.prewarmForComposer();
       return json({ ok: true }, 202);
@@ -459,10 +366,7 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
     if (url.pathname === AGENT_REPORT_TARGET_PATH) {
       return this.handleAgentReportTarget(request);
     }
-    // A pi agent's container daemon (its drive and its delivered files),
-    // under its lease's own credential.
     if (url.pathname === "/pi-turn-broker") {
-      // Only where pi runs agents: a pi conversation, or one hosting a computer's cloud agent.
       if (
         !this.piRuntime &&
         (await this.ctx.storage.get<string>(AGENT_RUNTIME_KEY)) !== "pi" &&
@@ -473,8 +377,6 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
       const runtime = await this.openPiRuntime(this.piGatewayOrigin());
       return await runtime.handleBroker(request);
     }
-    // Frames of the running Claude Code turn, from its BuildSession. These
-    // only ever touch the exact active turn.
     if (url.pathname === CLOUD_CLI_TURN_DO_PATHS.tool) {
       return this.handleCliTurnTool(request);
     }
@@ -514,8 +416,6 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
       if (!turnId || !ownerId || !ownerGeneration || !generation || !leaseId) {
         return json({ error: "Owner purge lease identity required." }, 400);
       }
-      // A placed turn can still be in transit from OwnerGate. Retain this
-      // rejection after the exact lease receipt is retired.
       await this.ctx.storage.put(ownerPurgeImportedLeaseKey(leaseId), {
         ownerId,
         ownerGeneration,
@@ -547,8 +447,6 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
         this.ctx.storage.get<ChatTurnRequest>(`queued:${turnId}`),
       ]);
       const ownerFencedAppend = this.ownerFencedAppends.get(leaseId);
-      // A durable old receipt authorizes retiring only that exact old lease;
-      // it never authorizes touching an ABA successor that reused the turn id.
       const hasAbaSuccessor = [
         current,
         localLease,
@@ -662,9 +560,6 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
         });
       }
       if (appendMatches && ownerFencedAppend) {
-        // Voice writes have no provider to abort, but their generation-fenced
-        // R2/SQLite work must finish and drop its owner lease before purge can
-        // report quiescence.
         await ownerFencedAppend.settled;
         if (
           !(await this.retireOwnerFenceLeaseByIdentity(
@@ -693,8 +588,6 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
           );
         }
         await this.ctx.storage.delete(`queued:${turnId}`);
-        // A queued turn owns no provider or callback yet; deleting its exact
-        // durable key and lease is already quiescent.
         if (!currentMatches) {
           return json({ canceled: true, turnId, unregistered: true });
         }
@@ -765,14 +658,6 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
     return await this.handleTurnStart(request);
   }
 
-  /**
-   * Turn admission. The Worker has verified the caller and stamped the
-   * trusted identity headers; everything else is decided here, in this
-   * order: request shape, service-only fields, ownership (adopting a fresh
-   * conversation), idempotency on `clientMsgId`, the owner gate, the
-   * execution, then the durable admission intent, the owner fence, and the
-   * queued turn — with the projections the owner needs going out last.
-   */
   async startAdmittedChat(
     start: CloudTurnStartRequest,
     authority: AdmittedCloudChat,
@@ -802,9 +687,6 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
   async freezeOwnerModelGrants(
     args: OwnerModelGrantFreezeRequest,
   ): Promise<{ frozen: true }> {
-    // This is deliberately synchronous before the ACK. It never waits for a
-    // turn, provider, or OwnerGate, so a privacy change cannot deadlock on the
-    // request it is revoking.
     this.localOwnerModelGrants.freeze(args);
     return { frozen: true };
   }
@@ -846,11 +728,6 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
     await this.hub.onError(ws, error);
   }
 
-  /**
-   * `history.*` for a cloud agent spawned from this conversation. The
-   * BuildSession names the owner its turn was admitted under; a conversation
-   * bound to anyone else, or deleted, answers nothing.
-   */
   async queryHistory(ownerId: string, request: unknown): Promise<unknown> {
     if (this.purged() || !ownerId || this.journal.ownerId() !== ownerId) {
       throw new Error("history is unavailable in this session.");
@@ -858,16 +735,11 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
     return await this.runHistoryOp(request);
   }
 
-  /**
-   * What a catch-up reads (owner store `catchUps`): the newest resident
-   * messages the user and Stella exchanged, and the agents still running.
-   */
   async catchUpSource(ownerId: string): Promise<CatchUpSource> {
     if (this.purged() || !ownerId || this.journal.ownerId() !== ownerId) {
       throw new Error("This conversation is unavailable.");
     }
     return {
-      // Rows back from the head, tool rows included.
       messages: catchUpMessagesFromJournal(this.journal.newest(800)),
       running: this.journal
         .runningAgents()

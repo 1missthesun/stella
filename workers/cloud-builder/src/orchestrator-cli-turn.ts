@@ -1,11 +1,3 @@
-/**
- * The OrchestratorSession's side of the BuildSession bridge that runs Claude
- * Code turns in the conversation's orchestrator container (see
- * `@stella/contracts/cloud-orchestrator-cli`): the frames the BuildSession
- * forwards, and the calls that start, stop and warm an attempt. pi's Claude
- * Code engine runs on it through `orchestrator/claude-code-transport.ts`.
- */
-
 import {
   isOrchestratorCliThreadId,
   orchestratorCliThreadId,
@@ -33,11 +25,6 @@ export const sameCliTurnIdentity = (
   left.threadId === right.threadId &&
   left.turnId === right.turnId &&
   left.attemptGeneration === right.attemptGeneration;
-
-// ---------------------------------------------------------------------------
-// Frame parsing (BuildSession -> DO). The BuildSession fills the identity
-// from its own broker claim; the DO still validates every field it reads.
-// ---------------------------------------------------------------------------
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
@@ -231,10 +218,6 @@ export const parseCliTurnTerminal = (
   };
 };
 
-// ---------------------------------------------------------------------------
-// BuildSession calls
-// ---------------------------------------------------------------------------
-
 export type BuildSessionEnv = Pick<Cloudflare.Env, "BUILD_SESSIONS"> &
   Partial<Pick<Cloudflare.Env, "CLOUD_BUILDER_PUBLIC_URL">>;
 
@@ -244,7 +227,6 @@ const buildSession = (env: BuildSessionEnv, threadId: string) =>
 const errorText = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
 
-/** A dispatch the BuildSession refused for good; retrying cannot help. */
 export class OrchestratorCliDispatchRefused extends Error {
   constructor(message: string) {
     super(message);
@@ -252,11 +234,6 @@ export class OrchestratorCliDispatchRefused extends Error {
   }
 }
 
-/**
- * The session's previous attempt is still running or unwinding (409
- * `previous_turn_recovering`, e.g. a canceled turn's kill ladder). Nothing
- * was admitted; the same dispatch may be sent again shortly.
- */
 export class OrchestratorCliPreviousTurnBusy extends Error {
   constructor(message: string) {
     super(message);
@@ -264,13 +241,6 @@ export class OrchestratorCliPreviousTurnBusy extends Error {
   }
 }
 
-/**
- * Start one CLI attempt. Same transport the DO's spawn tool uses for agent
- * attempts (`POST https://build-session/turn`, parsed by
- * `parseCloudAgentTurnStartRequest`): the trusted broker route headers, and
- * `HEADER_GATE_ADMITTED` because the chat turn already holds the owner gate
- * admission for this exact turn id.
- */
 export const dispatchOrchestratorCliTurn = async (args: {
   env: BuildSessionEnv;
   ownerId: string;
@@ -403,14 +373,6 @@ export const cancelOrchestratorCliTurn = async (args: {
   return { status: response.status };
 };
 
-/**
- * Warm the orchestrator thread's own container before a CLI turn needs it
- * (admission, socket connect), so the turn pays only for attach. Best effort;
- * never throws. `POST https://build-session/orchestrator-turn/prewarm`
- * `{ ownerId, threadId }` on the conversation's orchestrator session: 200
- * `{ prewarmed: true, alreadyRunning, startMs? }`, 502 `start_failed`, 409
- * `owner_mismatch`.
- */
 export const prewarmOrchestratorCli = async (args: {
   env: BuildSessionEnv;
   ownerId: string;
@@ -432,7 +394,6 @@ export const prewarmOrchestratorCli = async (args: {
           "x-stella-build-session-name": threadId,
         },
         body: JSON.stringify({ ownerId: args.ownerId, threadId }),
-        // A cold container start can take a while; nothing waits on this.
         signal: AbortSignal.timeout(60_000),
       },
     );

@@ -14,14 +14,6 @@ import {
 } from "../../worker/server-identity.js";
 import { WorkerNotReadyError } from "./errors.js";
 
-/**
- * UDS attach + readiness probe. The probe is a raw JSON-RPC line exchange on
- * a throwaway socket (scoped: destroyed the moment the probe settles); the
- * peer-bound socket is a second, clean connection so the normal JsonRpcPeer
- * owns the stream from byte zero — identical to the old two-connection
- * handshake.
- */
-
 const WORKER_READY_PROBE_ID = "__stella_runtime_ready_probe__";
 
 export type ReadyProbeStatus =
@@ -30,14 +22,9 @@ export type ReadyProbeStatus =
   | "identity-mismatch"
   | "unavailable";
 
-/**
- * The probe's verdict plus the identity the runtime reported (null for a
- * pre-identity runtime, or when the probe got no answer).
- */
 export type ReadyProbeResult = {
   status: ReadyProbeStatus;
   identity: RuntimeServerIdentity | null;
-  /** Why the identity was refused, for "identity-mismatch". */
   mismatch?: string;
 };
 
@@ -51,13 +38,6 @@ const unavailableProbe: ReadyProbeResult = {
   identity: null,
 };
 
-/**
- * Connect to the worker socket, failing WorkerNotReadyError when the path is
- * absent, the connection is refused, or `timeoutMs` elapses. The deadline is
- * `Effect.timeoutOrElse`: its interrupt (like any external interruption)
- * destroys the pending socket via the callback's cleanup effect, then maps
- * to the same WorkerNotReadyError the old internal timer produced.
- */
 const connectSocket = (
   socketPath: string,
   timeoutMs: number,
@@ -114,14 +94,6 @@ const connectSocket = (
     );
   });
 
-/**
- * One-shot readiness probe over an already-connected socket: write the probe
- * request, parse newline-delimited JSON until the matching id answers.
- * Malformed or unrelated lines are ignored (the worker may interleave other
- * traffic); errors and the timeout resolve "unavailable" — never a failure,
- * matching the old probe's tri-state result. With `expectedIdentity`, the
- * reported identity must also match (see `worker/server-identity.ts`).
- */
 const probeWorkerRpcReadiness = (
   socket: Socket,
   timeoutMs: number,
@@ -202,23 +174,12 @@ const probeWorkerRpcReadiness = (
       socket.off("error", onError);
     });
   }).pipe(
-    // Deadline as Effect.timeoutOrElse: the timeout interrupt detaches the
-    // probe listeners via the cleanup effect, then resolves "unavailable" —
-    // never a failure, matching the old probe's tri-state result.
     Effect.timeoutOrElse({
       duration: timeoutMs,
       orElse: () => Effect.succeed(unavailableProbe),
     }),
   );
 
-/**
- * Probe on a scoped throwaway socket, then — only when ready — hand back a
- * clean peer socket. The clean socket is acquired into the AMBIENT scope
- * with an exit-aware release: it survives a successful attach (ownership
- * passes to the caller's JsonRpcPeer) but is destroyed when the attach
- * scope closes in failure or interruption, so an interrupted attach cannot
- * leak a connected socket.
- */
 export const connectReadySocket = (
   socketPath: string,
   timeoutMs: number,

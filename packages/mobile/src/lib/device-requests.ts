@@ -10,13 +10,6 @@ import { resolveExecutionBuilderOrigin } from "./execution-placement";
 import { phonePairingProofHeaders, sha256HexUtf8 } from "./phone-pair-proof";
 import type { StoredPhoneAccess } from "./phone-access";
 
-/**
- * A paired phone's request to one of the owner's computers, relayed by the
- * cloud over that computer's presence connection
- * (`@stella/contracts/turn-plane/device-requests`). The cloud streams the
- * computer's answer straight through and keeps none of it.
- */
-
 const DEFAULT_TIMEOUT_MS = 60_000;
 
 export const DEVICE_OFFLINE_MESSAGE =
@@ -92,11 +85,6 @@ export type DeviceRequestOptions = {
   targetDeviceId?: string;
 };
 
-/**
- * Ask `access.desktopDeviceId`, or `options.targetDeviceId`, for something.
- * Resolves with the response body and its content type; rejects with a
- * `DeviceRequestError`.
- */
 export const requestDevice = async (
   access: StoredPhoneAccess,
   method: DeviceRequestMethod,
@@ -105,8 +93,6 @@ export const requestDevice = async (
 ): Promise<{ bytes: Uint8Array; contentType: string }> => {
   const requestId = createRequestId();
   const target = options?.targetDeviceId?.trim() || access.desktopDeviceId;
-  // The worker re-serializes `params` with JSON.stringify before checking the
-  // proof, so the hash covers exactly that string.
   const paramsJson = JSON.stringify(params);
   const challenge = buildDeviceRequestChallenge({
     requestId,
@@ -181,7 +167,6 @@ export const decodeUtf8 = (bytes: Uint8Array): string => {
   }
 };
 
-/** A device request whose answer is JSON. */
 export const requestDeviceJson = async <T>(
   access: StoredPhoneAccess,
   method: DeviceRequestMethod,

@@ -1,7 +1,5 @@
 import type { StellaBrowserBridgeFailureReason } from "../browser-bridge-status.js";
 
-/** The in-app browser view (Electron `WebContentsView` tabs) as the renderer sees it. */
-
 export type BrowserViewConnection = "checking" | "disconnected" | "connected";
 
 export type BrowserViewUnavailableReason =
@@ -18,7 +16,6 @@ export type BrowserViewTabState = {
   loading: boolean;
   canGoBack: boolean;
   canGoForward: boolean;
-  /** An agent is driving this tab right now. */
   agentActive?: boolean;
 };
 

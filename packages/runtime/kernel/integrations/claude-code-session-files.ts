@@ -105,11 +105,6 @@ export const claudeCliVersion = (): Promise<string> => {
 
 let cachedCliHelp: Promise<string> | null = null;
 
-/**
- * Whether the installed CLI takes `option` (e.g. `--system-prompt-snapshot`),
- * read once from its `--help`. An unknown option makes the CLI exit before
- * it starts, so newer flags are passed only when this says so.
- */
 export const claudeCliHasOption = async (option: string): Promise<boolean> => {
   cachedCliHelp ??= new Promise<string>((resolve) => {
     let executable: string;

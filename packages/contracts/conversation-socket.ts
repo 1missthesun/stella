@@ -1,24 +1,3 @@
-/**
- * The conversation transport: one WebSocket to the conversation's Durable
- * Object, which owns the transcript.
- *
- * Framework-free on purpose — no React, no DOM, no native modules — so desktop
- * and mobile run the same client. This module's whole job is to turn a lossy,
- * reconnecting socket into an ordered, gapless record stream, and to say
- * plainly when it cannot. Platform glue (foreground state, a gateway origin,
- * startup timing) comes in through the options.
- *
- * Three properties it is responsible for:
- *  - exactly once: `seq` is gapless by construction, so a replayed record is
- *    dropped by comparison and a missing one is fetched by `backfill`. There
- *    is no dedup heuristic anywhere.
- *  - never silently wrong: everything outside the server's window arrives as
- *    an explicit `gap` or `reset`, never as an absence.
- *  - client-quiet: the DO bills incoming frames 20:1 against free outgoing
- *    ones, so this client sends nothing on a healthy connection. No
- *    heartbeat, no acks, no send verb.
- */
-
 import { socketCredentialProtocol } from "./socket-ticket.js";
 import {
   BACKFILL_BATCH_RECORDS,
@@ -57,9 +36,7 @@ export type SocketStatus =
 export type SocketStatusEvent = {
   type: "status";
   status: SocketStatus;
-  /** Readable, already user-safe. Never a provider or infrastructure string. */
   message?: string;
-  /** False means the client has stopped retrying and needs an explicit retry. */
   retryable: boolean;
 };
 
@@ -80,7 +57,6 @@ export type ConversationSocketEvent =
   | Extract<ServerFrame, { type: "brain" }>
   | SocketStatusEvent;
 
-/** Connect milestones a platform may time; see `onReadiness`. */
 export type ConversationSocketReadinessPhase =
   | "socket-token"
   | "socket-created"
@@ -89,35 +65,12 @@ export type ConversationSocketReadinessPhase =
 
 export type ConversationSocketOptions = {
   conversationId: string;
-  /** Builder origin, e.g. `https://stella-v2-cloud-builder-dev…workers.dev`. */
   baseUrl: string;
-  /**
-   * Read at every connect. A non-empty answer replaces `baseUrl` as the socket
-   * origin (an embedding host that proxies the builder through its own
-   * gateway).
-   */
   socketBaseUrl?: () => string | null | undefined;
-  /** Resolves the owner's JWT. `forceRefresh` bypasses every cache. */
   getToken: (options?: { forceRefresh?: boolean }) => Promise<string | null>;
   onEvent: (event: ConversationSocketEvent) => void;
-  /**
-   * Foreground gate. A backgrounded client neither refreshes its token nor
-   * sends keepalives, so an unwatched socket may lapse and reconnect on
-   * demand. Missing means always active.
-   */
   isActive?: () => boolean;
-  /**
-   * A cursor restored from a local replica. The first connect then resumes
-   * from it exactly like a reconnect would: the server replays only
-   * `(lastSeq, head]` and answers an epoch mismatch or a compacted window with
-   * `reset`. A cursor that is not structurally a complete suffix is ignored and
-   * the socket connects cold.
-   */
   initialCursor?: ConversationSocketCursor;
-  /**
-   * Connect milestones, for startup timing. `startedAt` is the
-   * `performance.now()` at which the phase began, when it has a duration.
-   */
   onReadiness?: (
     phase: ConversationSocketReadinessPhase,
     startedAt?: number,
@@ -134,26 +87,16 @@ export type ConversationSocketCursor = {
 
 const MAX_BACKOFF_MS = 30_000;
 const BASE_BACKOFF_MS = 250;
-/** Live this long continuously and the next drop starts from zero again. */
 const BACKOFF_RESET_MS = 30_000;
-/** How long a `ready` may claim records the server then does not send. */
 const RESUME_GRACE_MS = 1_500;
-/** Consecutive no-progress repairs before the transcript fails explicitly. */
 const MAX_NO_PROGRESS_BACKFILLS = 3;
-/** How long a liveness probe waits for the auto-response before giving up. */
 const PROBE_TIMEOUT_MS = 5_000;
 const OPEN_TIMEOUT_MS = 20_000;
-/**
- * Keepalive cadence. Under `SOCKET_STALE_MS` (90 s) with room for a missed
- * beat, and answered by the DO's hibernation auto-response — so it stamps the
- * server's liveness clock without waking the object.
- */
 const KEEPALIVE_INTERVAL_MS = 30_000;
 
 const performanceNow = (): number =>
   typeof performance === "undefined" ? 0 : performance.now();
 
-/** Readable text for the close codes the server can send us. */
 const closeMessage = (code: number): string => {
   switch (code) {
     case CLOSE_BAD_REQUEST:
@@ -179,11 +122,6 @@ const closeMessage = (code: number): string => {
   }
 };
 
-/**
- * A refilling budget for outgoing `backfill` frames. The server closes a
- * socket that exceeds its own limit, so the client stays under it rather than
- * discovering it: scrollback keeps a reserve so a gap can always be filled.
- */
 class BackfillBudget {
   private tokens = RATE_BACKFILL_PER_MIN;
   private refilledAt = Date.now();
@@ -216,27 +154,20 @@ export class ConversationSocket {
   private keepaliveTimer: ReturnType<typeof setInterval> | null = null;
   private reauthTimer: ReturnType<typeof setTimeout> | null = null;
   private openTimer: ReturnType<typeof setTimeout> | null = null;
-  /** Observed token window minus the lead, learned from `ready`. */
   private reauthPeriodMs = 0;
   private liveSinceMs = 0;
   private lastFrameAtMs = 0;
   private status: SocketStatus = "idle";
 
-  /** Highest contiguous seq applied. -1 until the first record lands. */
   private lastSeq = -1;
   private epoch: number | null = null;
   private headSeq = -1;
   private windowStartSeq = 0;
-  /** Lowest seq that still exists anywhere. Below it, backfill cannot help. */
   private floorSeq = 0;
   private readonly ahead = new Map<number, JournalRecord>();
   private gapPending = false;
   private noProgressBackfills = 0;
   private requestCounter = 0;
-  /**
-   * Scrollback in flight, by request id. A batch-limited reply is continued
-   * here, so the caller hears once per requested range.
-   */
   private readonly olderRequests = new Map<
     string,
     {
@@ -247,10 +178,8 @@ export class ConversationSocket {
     }
   >();
   private readonly budget = new BackfillBudget();
-  /** One free reconnect after a 4401 — a fresh token usually fixes it. */
   private authRetryUsed = false;
   private reauthInFlight = false;
-  /** True while a connect is between its token request and its socket. */
   private connecting = false;
 
   constructor(options: ConversationSocketOptions) {
@@ -304,7 +233,6 @@ export class ConversationSocket {
     this.setStatus("idle", { retryable: true });
   }
 
-  /** Explicit user retry after the client stopped on its own. */
   retryNow(): void {
     this.attempt = 0;
     this.authRetryUsed = false;
@@ -325,7 +253,6 @@ export class ConversationSocket {
     void this.connect();
   }
 
-  /** The cursor a caller needs to know how far back it can already see. */
   get cursor(): {
     lastSeq: number;
     windowStartSeq: number;
@@ -340,11 +267,6 @@ export class ConversationSocket {
     };
   }
 
-  /**
-   * Ask for a range strictly below what the caller already holds. Scrollback,
-   * never gap repair — the reply arrives as an `older` event and does not move
-   * the head cursor.
-   */
   requestOlder(oldestHeldSeq: number): boolean {
     if (oldestHeldSeq <= this.floorSeq) return false;
     const toSeq = oldestHeldSeq - 1;
@@ -374,12 +296,6 @@ export class ConversationSocket {
     return this.send({ type: "cancel", turnId });
   }
 
-  /**
-   * Nudge after the environment says the world may have changed (network back,
-   * tab visible). A closed socket reconnects immediately; an open one that has
-   * heard nothing for a while is probed with the DO's auto-response, which
-   * answers without waking it.
-   */
   wake(): void {
     if (this.stopped) return;
     const socket = this.socket;
@@ -404,8 +320,6 @@ export class ConversationSocket {
       if (this.lastFrameAtMs === probedAt) this.forceReconnect();
     }, PROBE_TIMEOUT_MS);
   }
-
-  // ---------------------------------------------------------------- internals
 
   private nextRequestId(prefix: string): string {
     this.requestCounter += 1;
@@ -498,8 +412,6 @@ export class ConversationSocket {
       const socket = this.socket;
       if (!socket || socket.readyState !== WebSocket.OPEN) return;
       if (!this.isActive()) return;
-      // Any recent traffic already refreshed the timestamp; a streaming turn
-      // must not also pay for a beat.
       if (Date.now() - this.lastFrameAtMs < KEEPALIVE_INTERVAL_MS) return;
       try {
         socket.send("ping");
@@ -514,8 +426,6 @@ export class ConversationSocket {
   }
 
   private async connect(): Promise<void> {
-    // One connect at a time: a wake or retry landing while the token is still
-    // resolving would otherwise open a second socket and orphan the first.
     if (this.stopped || this.connecting) return;
     this.connecting = true;
     this.setStatus("connecting", { retryable: true });
@@ -532,8 +442,6 @@ export class ConversationSocket {
     }
     if (!token || !isSubprotocolSafe(token)) {
       this.connecting = false;
-      // Signing in produces a token; retrying is the only sane response, and
-      // the backoff keeps a signed-out client from spinning.
       this.scheduleReconnect("Waiting for your session…");
       return;
     }
@@ -543,15 +451,9 @@ export class ConversationSocket {
       `/conversations/${encodeURIComponent(this.options.conversationId)}/socket`,
       socketBaseUrl,
     );
-    // The backend already hands out a `ws:`/`wss:` origin; these two lines only
-    // cover a caller that passed the http form. Blanket-forcing `wss:` would
-    // break a local `ws://localhost` builder.
     if (url.protocol === "http:") url.protocol = "ws:";
     else if (url.protocol === "https:") url.protocol = "wss:";
     url.searchParams.set("protocol", String(PROTOCOL_VERSION));
-    // `since` is a cursor, not a lower bound: the server replays
-    // `(since, headSeq]`, and `since >= headSeq` sends nothing at all. Omitting
-    // it entirely is what asks for a fresh newest-window.
     if (this.lastSeq >= 0) url.searchParams.set("since", String(this.lastSeq));
     if (this.epoch !== null) url.searchParams.set("epoch", String(this.epoch));
 
@@ -609,7 +511,6 @@ export class ConversationSocket {
       if (this.socket !== socket) return;
       this.lastFrameAtMs = Date.now();
       if (typeof event.data !== "string") return;
-      // The DO's hibernation auto-response answers "ping" with a bare "pong".
       if (event.data === "pong") return;
       const frame = decodeServerFrame(event.data);
       if (frame) this.handleFrame(frame);
@@ -697,8 +598,6 @@ export class ConversationSocket {
       MAX_BACKOFF_MS,
       BASE_BACKOFF_MS * 2 ** Math.min(this.attempt, 10),
     );
-    // Full jitter: every client picks a different point in the window, so a
-    // DO that just evicted does not get every watcher back at the same ms.
     const delay = Math.random() * ceiling;
     this.attempt += 1;
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
@@ -741,8 +640,6 @@ export class ConversationSocket {
         void this.reauthenticate();
         return;
       case "error":
-        // Advisory: the close frame (if any) carries the outcome. Surface the
-        // text so a non-fatal server complaint is still visible.
         this.setStatus(this.status === "live" ? "live" : "offline", {
           message: frame.message,
           retryable: frame.retryable,
@@ -762,10 +659,6 @@ export class ConversationSocket {
     this.windowStartSeq = ready.windowStartSeq;
     this.floorSeq = ready.floorSeq;
 
-    // `serverTimeMs`, not `Date.now()`: a client with a skewed clock would
-    // otherwise refresh far too early (harmless) or far too late (a lapsed
-    // socket), and the server told us its own time precisely so this does not
-    // have to trust ours.
     const window = ready.authExpiresAtMs - ready.serverTimeMs;
     if (window > 0) {
       this.reauthPeriodMs = Math.max(30_000, window - RE_AUTH_LEAD_MS);
@@ -773,8 +666,6 @@ export class ConversationSocket {
     }
 
     const epochChanged = this.epoch !== null && this.epoch !== ready.epoch;
-    // A window that starts above our cursor cannot be bridged by any number of
-    // backfills — the rows between are gone. Say so rather than render a hole.
     const unbridgeable =
       this.lastSeq >= 0 && ready.windowStartSeq > this.lastSeq + 1;
     this.epoch = ready.epoch;
@@ -782,13 +673,6 @@ export class ConversationSocket {
       this.resetStream(epochChanged ? "epoch" : "window");
     }
 
-    // After a long absence, replaying every missed record walks a stretch of
-    // journal the view does not even retain, and does it oldest first — so the
-    // one thing the user is waiting for, the latest messages, arrives last.
-    // Reopen without a cursor for the newest window instead; earlier history
-    // remains available through explicit scrollback. The server caps the same
-    // way, so normally this never fires; it is what makes a client talking to
-    // an older server behave.
     if (
       this.lastSeq >= 0 &&
       ready.headSeq - this.lastSeq > MAX_CATCHUP_RESUME_RECORDS
@@ -815,8 +699,6 @@ export class ConversationSocket {
     this.resumeTimer = setTimeout(() => {
       this.resumeTimer = null;
       if (this.lastSeq >= this.headSeq) return;
-      // A gap repair already covers the hole; a second request would only
-      // duplicate it and spend the client's backfill budget.
       if (this.gapPending) return;
       const fromSeq =
         this.lastSeq >= 0
@@ -849,8 +731,6 @@ export class ConversationSocket {
     this.reauthInFlight = true;
     try {
       const token = await this.options.getToken({ forceRefresh: true });
-      // A failed refresh is not an error to show: the server closes 4401 when
-      // the old token lapses and the reconnect path handles it.
       if (token && isSubprotocolSafe(token)) this.send({ type: "auth", token });
     } catch {
       // Same reasoning.
@@ -871,8 +751,6 @@ export class ConversationSocket {
       ];
       const lastSeq = records.at(-1)?.seq ?? olderRequest.nextSeq - 1;
       if (!frame.complete && lastSeq < olderRequest.toSeq) {
-        // The server stopped at its batch limit. Ask for the rest under a new
-        // id and answer the caller once, for the whole range it asked for.
         const requestId = this.nextRequestId("o");
         const fromSeq = lastSeq + 1;
         if (
@@ -924,10 +802,6 @@ export class ConversationSocket {
         return;
       }
     }
-    // A partial response may already have discovered an interior hole and sent
-    // its repair from `collect`. Otherwise retry the still-unresolved prefix.
-    // Empty/incomplete replies take this same bounded path instead of silently
-    // clearing `gapPending` and abandoning the canonical range.
     if (!this.gapPending && !this.requestGap(throughSeq)) {
       this.failGapRecovery();
     }
@@ -963,19 +837,13 @@ export class ConversationSocket {
     this.flush(applied);
   }
 
-  /** Places one record in order, buffering anything that arrived early. */
   private collect(record: JournalRecord, applied: JournalRecord[]): void {
     if (this.lastSeq < 0) {
-      // `ready.windowStartSeq` names the first record promised on a fresh view.
-      // Trusting whichever record happened to arrive first would silently skip
-      // a missing/corrupt prefix and make that later seq look contiguous.
       this.lastSeq = this.windowStartSeq - 1;
     }
     if (record.seq <= this.lastSeq) return;
     if (record.seq > this.lastSeq + 1) {
       if (this.ahead.size >= MAX_BUFFERED_AHEAD) {
-        // The hole is bigger than the client is willing to hold open. Drop
-        // everything and resync from scratch rather than grow without bound.
         this.resetStream("window");
         this.forceReconnect();
         return;

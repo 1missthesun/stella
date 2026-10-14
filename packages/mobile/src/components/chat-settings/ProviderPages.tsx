@@ -24,9 +24,7 @@ import {
   TextAction,
 } from "./kit";
 
-/** Above this many, a list gets a search field. */
 const SEARCH_FROM = 10;
-/** The most rows a list draws at once; search narrows the rest. */
 const LIST_CAP = 60;
 
 const authHint = (provider: AccountProvider) => {
@@ -62,10 +60,6 @@ const matches = (query: string, ...values: string[]) => {
   );
 };
 
-/**
- * Every provider the chat can run on, the ones ready to use first. A row
- * opens that provider's page, where it connects and its models are picked.
- */
 export function ProvidersPage({
   settings,
   onOpenBrain,
@@ -151,10 +145,6 @@ export function ProvidersPage({
   );
 }
 
-/**
- * One provider: how it's connected (or the way to connect it), then its
- * models, where a pick makes it the chat's brain.
- */
 export function BrainPage({
   settings,
   brainId,

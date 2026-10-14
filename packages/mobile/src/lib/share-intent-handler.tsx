@@ -12,11 +12,6 @@ import {
 const asFileUri = (path: string) =>
   path.startsWith("file://") ? path : `file://${path}`;
 
-/**
- * Watches the native share sheet intent (text, links, images shared into
- * Stella) and forwards it to the chat composer. Mounted once at the root so
- * both cold starts and warm shares land in the same place.
- */
 export function ShareIntentHandler() {
   const router = useRouter();
   const { hasShareIntent, shareIntent, resetShareIntent } =
@@ -29,8 +24,6 @@ export function ShareIntentHandler() {
     void (async () => {
       const text = (shareIntent.webUrl ?? shareIntent.text ?? "").trim();
       const attachments: PickedAttachment[] = [];
-      // Every kind of file, not just images: the composer uploads whatever it
-      // is to the drive and the agent reads it there.
       for (const file of shareIntent.files ?? []) {
         try {
           const uri = asFileUri(file.path);
@@ -55,8 +48,6 @@ export function ShareIntentHandler() {
           ...(text ? { text } : {}),
           ...(attachments.length > 0 ? { attachments } : {}),
         });
-        // The chat is the base of the main stack; pop any detail page off it
-        // rather than replacing that page with a second chat.
         router.dismissTo("/chat");
       }
       resetShareIntent();

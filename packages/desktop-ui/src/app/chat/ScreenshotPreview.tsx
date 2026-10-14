@@ -31,8 +31,6 @@ export function ScreenshotPreviewOverlay({
     <Modal
       onClose={onClose}
       container={document.body}
-      // The alt text already names this surface exactly; a second string
-      // would only be the same sentence in a different catalog entry.
       label={t("app.chat.screenshotPreview.alt", { index: index + 1 })}
       backdropStyle={{
         position: "fixed",

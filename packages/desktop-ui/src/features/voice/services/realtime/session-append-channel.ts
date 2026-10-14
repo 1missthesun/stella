@@ -1,24 +1,3 @@
-/**
- * The two channels Stella uses to put information back into a live GPT-Live
- * session.
- *
- *   - `session.commentary.append` — text the model should SAY. It paraphrases
- *     rather than reading verbatim, so this carries results and anything the
- *     user is waiting to hear.
- *   - `session.thinking.append` — text the model should KNOW but not announce:
- *     progress, facts, context arriving from the text chat.
- *
- * Both take a plain-string `content` capped at `VOICE_APPEND_MAX_CHARS` and a
- * REQUIRED `delegation_id`: the saved delegation id when the append updates a
- * task, or `null` for session-wide context. Longer text is split across
- * several appends here rather than truncated.
- *
- * Acks come back as `session.commentary.appended` / `session.thinking.appended`
- * / `session.instructions.appended`, matched by `client_event_id` against the
- * `event_id` we sent. Error variants settle the same pending entry so a
- * rejected append is logged once instead of waiting forever.
- */
-
 import { VOICE_APPEND_MAX_CHARS } from "@stella/contracts/backend/voice";
 import { createClientEventId } from "./transports/webrtc-media-session";
 
@@ -40,10 +19,6 @@ const ACK_EVENT_TYPE: Record<SessionAppendKind, string> = {
 
 const ACK_TYPES = new Set(Object.values(ACK_EVENT_TYPE));
 
-/**
- * Split on sentence boundaries where possible, then on whitespace, so a long
- * result arrives as several speakable appends instead of one truncated one.
- */
 export const splitAppendContent = (
   content: string,
   maxChars = VOICE_APPEND_MAX_CHARS,
@@ -87,10 +62,6 @@ export class SessionAppendChannel {
     private readonly send: (event: Record<string, unknown>) => void,
   ) {}
 
-  /**
-   * Queue an append. `delegationId` is null for session-wide context and the
-   * saved delegation id for an update about that task.
-   */
   append(
     kind: SessionAppendKind,
     content: string,
@@ -113,7 +84,6 @@ export class SessionAppendChannel {
     }
   }
 
-  /** True when the event was an ack/error for one of our appends. */
   handleEvent(event: Record<string, unknown>): boolean {
     const type = typeof event.type === "string" ? event.type : "";
     if (!type.startsWith("session.")) return false;
@@ -130,8 +100,6 @@ export class SessionAppendChannel {
       return true;
     }
 
-    // Error variants of the same three events, plus a generic session error
-    // that names our client_event_id.
     if (type.includes("error") || type === "session.error") {
       console.debug(
         `[gpt-live] ${entry.kind} append was rejected:`,

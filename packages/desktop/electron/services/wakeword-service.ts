@@ -5,15 +5,6 @@ import { existsSync } from "node:fs";
 import { resolveNativeHelperPath } from "../native-helper-path.js";
 import { getFileLogger } from "@stella/runtime/observability/file-logger";
 
-/**
- * Manages the lifecycle of the native `wakeword_listener` child process.
- *
- * The listener emits NDJSON `ready` / `wake` events on stdout. We translate
- * `wake` events into a single callback (`onWake`) that the bootstrap layer
- * wires to `toggleRealtimeVoice`. The listener auto-pauses while a voice session
- * is active so the assistant can't trigger itself.
- */
-
 type WakewordEvent =
   | {
       event: "ready";
@@ -33,21 +24,15 @@ type WakewordEvent =
 type WakewordOptions = {
   threshold: number;
   modelPath?: string;
-  /** Milliseconds between rolling-window predictions (native default 120). */
   predictStrideMs?: number;
-  /** Silero VAD hangover in ms. */
   vadHangoverMs?: number;
-  /** Energy-gate RMS / peak thresholds. */
   energyRmsThreshold?: number;
   energyPeakThreshold?: number;
-  /** Disable the Silero VAD gate / cheap energy gate. */
   disableVad?: boolean;
   disableEnergyGate?: boolean;
-  /** Score-smoothing window: mean over N predictions (1 = off). */
   scoreSmoothing?: number;
   onWake: (event: Extract<WakewordEvent, { event: "wake" }>) => void;
   onReady?: (event: Extract<WakewordEvent, { event: "ready" }>) => void;
-  /** Called once when wake word has given up, so a caller can surface it. */
   onUnavailable?: (info: {
     reason: string;
     detail: Record<string, unknown>;
@@ -70,8 +55,6 @@ const resolveModelPath = (binaryPath: string): string | null => {
   const helperDir = path.dirname(binaryPath);
   const candidates = [
     path.join(helperDir, "wakeword_models", "hey_stella.onnx"),
-    // Dev fallback: source-tree model, in case the build script hasn't
-    // staged it into out/ yet.
     path.resolve(
       helperDir,
       "..",
@@ -104,8 +87,6 @@ export class WakewordService {
     if (this.enabled === enabled) return;
     this.enabled = enabled;
     if (enabled) {
-      // An explicit opt-in is the user asking us to try again, so clear a
-      // previous give-up rather than staying dead for the rest of the session.
       this.consecutiveStartFailures = 0;
       this.unavailableReported = false;
       this.spawnIfIdle();
@@ -114,8 +95,6 @@ export class WakewordService {
     }
   }
 
-  /** Pause/resume without changing the user's enabled preference. Used to
-   *  silence the listener while a voice session is active. */
   setPaused(paused: boolean): void {
     if (this.paused === paused) return;
     this.paused = paused;
@@ -215,9 +194,6 @@ export class WakewordService {
     stdout.on("data", (chunk: string) => this.handleStdout(chunk));
     stderr.setEncoding("utf8");
     stderr.on("data", (chunk: string) => {
-      // Listener uses stderr only for fatal cpal/onnx errors; surface them
-      // for debugging without spamming, and keep the last line so a terminal
-      // failure can report why.
       const line = chunk.trim();
       if (line) {
         this.lastStderrLine = line.split("\n").pop() ?? line;
@@ -238,7 +214,6 @@ export class WakewordService {
       const loadFailure =
         code != null ? WINDOWS_LOAD_FAILURE_CODES.get(code) : undefined;
       if (loadFailure) {
-        // This never fixes itself on retry, so stop instead of looping.
         this.reportUnavailable(
           `the listener could not start because ${loadFailure}`,
           detail,
@@ -269,7 +244,6 @@ export class WakewordService {
         continue;
       }
       if (parsed.event === "ready") {
-        // Reaching ready is the only proof a start actually worked.
         this.consecutiveStartFailures = 0;
         this.options.onReady?.(parsed);
       } else if (parsed.event === "wake") {
@@ -301,11 +275,6 @@ export class WakewordService {
     }
   }
 
-  /**
-   * A start attempt failed. Retry a bounded number of times, then give up
-   * loudly — the old code retried every 5s forever behind a console warning,
-   * so a user whose wake word never worked got no signal anywhere.
-   */
   private noteStartFailure(
     reason: string,
     detail: Record<string, unknown> = {},
@@ -329,7 +298,6 @@ export class WakewordService {
     this.scheduleRestart();
   }
 
-  /** Terminal state: wake word is off until the user re-enables it. */
   private reportUnavailable(
     reason: string,
     detail: Record<string, unknown> = {},

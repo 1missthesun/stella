@@ -1,10 +1,3 @@
-/**
- * Argument parsers for backend functions. Each parser takes untrusted JSON
- * and returns the typed value or throws `RpcError("BAD_REQUEST")` naming the
- * offending path. Deliberately small: the shapes crossing the RPC boundary
- * are flat records of strings, numbers and booleans.
- */
-
 import { RpcError } from "./errors.js";
 
 export type Parser<T> = (value: unknown, path?: string) => T;
@@ -78,7 +71,6 @@ export const array =
     return value.map((entry, index) => parser(entry, `${path}[${index}]`));
   };
 
-/** Any JSON value, bounded by its serialized size. */
 export const json =
   (options: { maxBytes?: number } = {}): Parser<unknown> =>
   (value, path = "") => {
@@ -105,7 +97,6 @@ type Parsed<S extends Shape> = {
   >;
 };
 
-/** A record with exactly these keys; unknown keys are refused. */
 export const object =
   <S extends Shape>(shape: S): Parser<Parsed<S>> =>
   (value, path = "") => {

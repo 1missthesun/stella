@@ -1,10 +1,3 @@
-/**
- * One visible element an agent can act on, the cloud counterpart of the
- * desktop snapshot's interactive refs. Never carries a form value; `selector`
- * is a durable alternative to `ref` (an id, test id, or role and name) when
- * the page offers one, for use where a ref cannot follow, such as sign-in
- * verification.
- */
 export type SafeElement = Readonly<{
   ref: string;
   role: string;
@@ -13,7 +6,6 @@ export type SafeElement = Readonly<{
   href?: string;
   checked?: boolean;
   disabled?: boolean;
-  /** A credential-shaped control (password, email, code, card), flagged so the agent recognises a sign-in form. */
   sensitive?: boolean;
 }>;
 

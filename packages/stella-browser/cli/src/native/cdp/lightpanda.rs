@@ -11,7 +11,7 @@ use super::discovery::discover_cdp_url_with_timeout;
 const LIGHTPANDA_STARTUP_TIMEOUT: Duration = Duration::from_secs(10);
 const LIGHTPANDA_POLL_INTERVAL: Duration = Duration::from_millis(100);
 const LIGHTPANDA_DISCOVERY_TIMEOUT: Duration = Duration::from_millis(500);
-const LIGHTPANDA_SESSION_TIMEOUT_SECS: u64 = 604800; // 1 week, the documented maximum
+const LIGHTPANDA_SESSION_TIMEOUT_SECS: u64 = 604800;
 const MAX_LOG_LINES: usize = 40;
 
 pub struct LightpandaProcess {
@@ -348,9 +348,6 @@ mod tests {
     #[cfg(unix)]
     #[tokio::test]
     async fn waits_for_ready_without_logs() {
-        // Keep the listener bound while the delayed server starts. Reserving a
-        // port and dropping the socket before the task binds it leaves a race
-        // with the rest of the parallel Rust suite.
         let listener = TokioTcpListener::bind("127.0.0.1:0").await.unwrap();
         let port = listener.local_addr().unwrap().port();
         tokio::spawn(serve_json_version_once_after_delay(

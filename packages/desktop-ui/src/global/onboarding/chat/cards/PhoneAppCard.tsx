@@ -1,9 +1,3 @@
-/**
- * "Get the app" — the phone app's store link as a QR code, skippable.
- *
- * Nothing to pair: once the phone signs in to the same account it reaches
- * this computer on its own, so the card is only the download.
- */
 import { Button } from "@/ui/button";
 import { Smartphone } from "@/ui/icons";
 import { useT } from "@/shared/i18n";

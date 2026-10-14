@@ -1,22 +1,9 @@
-/**
- * Hand-off from onboarding into the first real conversation.
- *
- * Onboarding finishes before the root layout has selected (or created) the
- * cloud conversation, so anything that must land in that conversation is
- * parked in shared UI state and consumed once by the chat surface:
- *
- *  - the discovery greeting Stella wrote from the synthesized profile,
- *    appended as her first message in the thread;
- *  - a composer draft — the starter the user tapped on the finale, or the
- *    text they typed into the onboarding composer to skip straight in.
- */
 import { useEffect } from "react";
 import { uiState } from "@/platform/ui-state";
 import { submitPiWelcome } from "@/features/chat/pi/pi-chat-store";
 
 const PENDING_WELCOME_KEY = "stella-onboarding-pending-welcome";
 const PENDING_COMPOSER_KEY = "stella-onboarding-pending-composer";
-/** Fired when a greeting is parked after the chat has already mounted. */
 const WELCOME_PARKED_EVENT = "stella:onboarding-welcome-parked";
 
 export const setPendingDiscoveryWelcome = (message: string) => {
@@ -35,7 +22,6 @@ export const takePendingDiscoveryWelcome = (): string | null => {
 
 export type PendingComposerDraft = {
   text: string;
-  /** Submit as soon as the composer is able to, instead of leaving a draft. */
   send: boolean;
 };
 
@@ -75,16 +61,9 @@ export const clearPendingHandoff = () => {
   uiState.removeItem(PENDING_COMPOSER_KEY);
 };
 
-/**
- * Appends the parked discovery greeting to the active conversation: the
- * first time one is selected, or as soon as it is parked if the quickstart
- * finishes after the user has already headed into the chat. Mounted by the
- * root layout, which owns conversation selection; each greeting lands once.
- */
 export function usePendingDiscoveryWelcome(conversationId: string | null) {
   useEffect(() => {
     if (!conversationId) return;
-    // The greeting goes into the conversation's transcript.
     const deliver = () => {
       const message = takePendingDiscoveryWelcome();
       if (!message) return;

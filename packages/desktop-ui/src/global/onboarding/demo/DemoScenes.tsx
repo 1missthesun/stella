@@ -1,16 +1,8 @@
-/**
- * The memory step's two mocks: the chatbot everyone knows (a sidebar of
- * threads, no memory of last week) and Stella's one conversation, where the
- * same question gets answered by looking back. Presentation-only CSS;
- * `has(cue)` decides each state.
- */
 import { History } from "@/ui/icons";
 import { StellaLogoIcon } from "@/ui/stella-logo-icon";
 import "./demo-scenes.css";
 
 export type Has = (cue: string) => boolean;
-
-/* ── Memory step: the chatbot everyone knows, then Stella ──────────── */
 
 const CHATBOT_THREADS = [
   "Dinner ideas for Friday",

@@ -11,12 +11,6 @@ import "@/app/chat/composer-notice.css";
 const sameEmail = (a: string | undefined, b: string | undefined) =>
   Boolean(a && b && a.trim().toLowerCase() === b.trim().toLowerCase());
 
-/**
- * The "Claude Code needs login" card above the composer. Its button runs the
- * Claude sign-in Settings runs (`claude auth login` on this computer), in
- * place: for the account the failure named, signing its login here in again,
- * or else Claude Code's own login while it is signed out.
- */
 export function ClaudeSignInNotice({
   notice,
   compact,

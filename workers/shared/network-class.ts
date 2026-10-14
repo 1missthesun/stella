@@ -102,7 +102,6 @@ const networkMetadataFrom = (
   };
 };
 
-/** Classify Cloudflare's trusted edge metadata, with an optional ASN override. */
 export const classifyNetwork = async (
   request: Request,
   asnPolicy?: AsnPolicy,

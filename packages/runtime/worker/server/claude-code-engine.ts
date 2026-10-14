@@ -156,7 +156,6 @@ const desktopTransport = (session: OpenSession): ClaudeCodeTransport => {
       stellaDataDir: dataDir(),
       ...(ref.threadId ? { agentId: ref.threadId } : {}),
     });
-  // Stella's session is fenced by her brain lease; an agent's has its own holder (its log's).
   const leaseEpoch = (ref: ClaudeCodeSessionRef): number | null =>
     ref.role === "orchestrator" ? (runner()?.brainLeases.claim(ref.conversationId).epoch ?? null) : null;
 
@@ -176,13 +175,11 @@ const desktopTransport = (session: OpenSession): ClaudeCodeTransport => {
     return restored.sessionId;
   };
 
-  /** Where the signed-in Claude account keeps `sessionId`'s transcript for a CLI working in `cwd`. */
   const transcriptPath = async (cwd: string, sessionId: string) => {
     const configDir = (await getClaudeCodeConfig()).configDir ?? null;
     return path.join(claudeSessionProjectDir(configDir, await resolveClaudeWorkingFolder(cwd)), `${sessionId}.jsonl`);
   };
 
-  /** A session the CLI can resume here: the signed-in account has its transcript (another account's can't). */
   const resumable = async (cwd: string | undefined, sessionId: string): Promise<boolean> =>
     await access(await transcriptPath(cwd ?? process.cwd(), sessionId)).then(
       () => true,
@@ -194,8 +191,6 @@ const desktopTransport = (session: OpenSession): ClaudeCodeTransport => {
     if (!sink || !cwd) return "none";
     if (sink.takeRestored({ threadId: ref.sessionKey, engine: SESSION_ENGINE })) return "native";
     const configDir = (await getClaudeCodeConfig()).configDir ?? null;
-    // An agent resumes the newest session it synced, wherever it ran it:
-    // files here that already cover the cloud's are kept, others come down.
     if (ref.role !== "orchestrator") {
       if ((await sink.restoreForResume({ threadId: ref.sessionKey, configDir, cwd })) === "native") return "native";
       const prepared = await sink.prepareLocalResume({ threadId: ref.sessionKey, engine: SESSION_ENGINE, configDir, cwd });
@@ -257,8 +252,6 @@ const desktopTransport = (session: OpenSession): ClaudeCodeTransport => {
         resumeFallbackPrompt: spec.resumeFallbackPrompt,
         systemPrompt: spec.systemPrompt,
         ...(cwd ? { cwd } : {}),
-        // Stella loads no CLAUDE.md, user settings or plugins: her prompt and
-        // memory are her instructions. Agents keep their folder's own.
         ...(ref.role === "orchestrator" ? { settingSources: [] } : {}),
         ...(spec.images.length > 0
           ? { attachments: spec.images.map((image) => ({ url: `data:${image.mimeType};base64,${image.data}`, mimeType: image.mimeType })) }

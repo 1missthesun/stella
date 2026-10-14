@@ -71,7 +71,6 @@ export const buildI18nCatalogOutputs = ({ desktopI18nRoot }) => {
   ]);
 
   for (const name of catalogFiles) {
-    // Re-serialise so a malformed catalog fails here rather than at runtime.
     const parsed = JSON.parse(readFileSync(join(catalogDir, name), "utf8"));
     outputs.set(`locales/${name}`, `${JSON.stringify(parsed, null, 2)}\n`);
   }

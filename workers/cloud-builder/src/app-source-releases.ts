@@ -1,18 +1,3 @@
-/**
- * The release channel: how desktops learn a new version of the app was
- * published, without polling. One object per backend environment (so per
- * Artifacts namespace) holds the latest published version and a hibernated
- * socket per connected desktop. The publish step POSTs a notice; the object
- * reads upstream `main` itself, so the notice needs no secret and can't
- * claim a version that isn't there, and sends one small frame to each
- * socket when it moved. A desktop that connects (at launch, or after its
- * socket dropped) gets the current version at once, which is how one that
- * was offline during a publish catches up.
- *
- * Idle sockets cost nothing: the keepalive ping is answered by the platform
- * without waking the object.
- */
-
 import { DurableObject } from "cloudflare:workers";
 import {
   APP_SOURCE_RELEASES_PATH,
@@ -25,13 +10,7 @@ import { errorMessage, log } from "./build-session/shared/keys.js";
 const UPSTREAM_REPO = "upstream";
 const OBJECT_NAME = "upstream";
 const RECORD_KEY = "published";
-/** Notices closer together than this share one read of upstream. */
 const MIN_CHECK_INTERVAL_MS = 2_000;
-/**
- * A connect re-reads upstream, after answering, when the record is older
- * than this: it heals a publish whose notice never arrived, at the cost of
- * at most one read per interval, and only while desktops connect.
- */
 const STALE_RECORD_MS = 10 * 60_000;
 
 type PublishedRecord = { version: string | null; checkedAt: number };
@@ -77,7 +56,6 @@ export class AppReleaseChannel extends DurableObject<Env> {
     return this.ctx.storage.kv.get<PublishedRecord>(RECORD_KEY) ?? null;
   }
 
-  /** Read upstream `main`; when it moved, store it and tell every socket. */
   private check(): Promise<PublishedRecord> {
     if (this.checking) return this.checking;
     const checking = (async () => {
@@ -156,7 +134,6 @@ export class AppReleaseChannel extends DurableObject<Env> {
   }
 }
 
-/** `GET` (WebSocket) or `POST /api/app-source/releases`; null for other paths. */
 export const handleAppSourceReleases = async (
   request: Request,
   env: Env,

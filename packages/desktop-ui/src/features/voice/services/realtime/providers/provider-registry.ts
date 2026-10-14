@@ -1,12 +1,3 @@
-/**
- * Provider registry — picks the right {session opener, transport factory}
- * pair based on the user's `realtimeVoice.provider` preference.
- *
- * The session class doesn't know which providers exist or how their sessions
- * are opened; it calls `createRealtimeTransport(ctx)` and gets back a
- * ready-to-connect transport.
- */
-
 import { coerceRealtimeVoiceProvider } from "@stella/contracts/local-preferences";
 import { openaiProvider } from "./openai-provider";
 import { stellaProvider } from "./stella-provider";
@@ -34,7 +25,6 @@ export async function resolveActiveProvider(): Promise<RealtimeProviderKey> {
 
 export async function createRealtimeTransport(
   ctx: ProviderTokenContext,
-  /** Pass the already-resolved route when the caller needed it earlier. */
   activeProvider?: RealtimeProviderKey,
 ): Promise<{
   transport: RealtimeTransport;

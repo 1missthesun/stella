@@ -6,15 +6,6 @@ import {
   toolsRuntime,
 } from "@stella/runtime/kernel/tools/effect-runtime.js";
 
-/**
- * Effect-owned cancellation for the cloud turn retry ladder.
- *
- * The Agent owns the real provider transport signal and is still aborted via
- * `Agent.abort()`. This latch owns only the gap between provider attempts: it
- * stops a fiber-backed retry sleep immediately and gives failure
- * classification an `aborted` bit, without allocating a second platform
- * AbortController whose lifetime is outside the run scope.
- */
 export type TurnRetryCancellation = {
   readonly aborted: boolean;
   readonly reason: unknown;
@@ -25,12 +16,6 @@ export type TurnRetryCancellation = {
 const cancellationError = (reason: unknown): Error =>
   reason instanceof Error ? reason : new Error("Request was aborted");
 
-/**
- * Fail immediately at a side-effect admission boundary after an exact Stop.
- * The signal is owned by the supervising Effect fiber; the Deferred-backed
- * latch remains readable by promise-native retry code after that fiber has
- * been interrupted.
- */
 export const assertTurnExecutionActive = (
   cancellation: TurnRetryCancellation,
   signal?: AbortSignal,
@@ -90,16 +75,11 @@ export type TurnExecutionContext = {
   assertActive(): void;
 };
 
-/** Promise-free control surface for one Effect-supervised cloud turn. */
 export type TurnExecution<T> = {
-  /** Actual promise work, used only to retain same-DO turn serialization. */
   readonly settled: Promise<T>;
   readonly cancellation: TurnRetryCancellation;
-  /** Aborts in-flight platform I/O when the supervising turn is interrupted. */
   readonly signal: AbortSignal;
-  /** Interrupt the supervising fiber and run bounded resource teardown. */
   interrupt(reason?: unknown): Promise<void>;
-  /** Join the Effect fiber (rejections and interruption count as settled). */
   join(): Promise<void>;
 };
 
@@ -117,7 +97,6 @@ export type TurnExecution<T> = {
  */
 export const startTurnExecution = <T>(args: {
   work: (context: TurnExecutionContext) => Promise<T>;
-  /** Immediate abort/teardown, used to make in-flight work unwind promptly. */
   onInterrupt?: (reason: unknown) => void | Promise<void>;
   /**
    * Final resource sweep after promise-native work has physically settled.
@@ -163,8 +142,6 @@ export const startTurnExecution = <T>(args: {
     throw new Error("Turn execution did not acquire its Effect abort signal.");
   }
   const joined = runToolEffect(Fiber.join(fiber));
-  // `join()` below observes the outcome. Keep a handler attached immediately
-  // so a detached DO turn cannot create an unhandled rejection meanwhile.
   void joined.catch(() => undefined);
   let interruption: Promise<void> | undefined;
 

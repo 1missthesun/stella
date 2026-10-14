@@ -1,11 +1,3 @@
-/**
- * A conversation's agents as the app lists them, read from its pi harness.
- *
- * One bounded hydration read builds a thread-id index. Each pi commit in the
- * conversation re-reads it and wakes only listeners for the changed thread.
- * Aggregate subscribers (Activity surfaces) receive a rebuilt list only when
- * one is actually mounted; chat cards never subscribe to or scan that list.
- */
 import type {
   DesktopThreadActivityRecord as ThreadActivityRecord,
   DesktopThreadActivityUpdatedPayload as ThreadActivityUpdatedPayload,
@@ -19,18 +11,13 @@ import {
 
 const EMPTY_RECORDS: ThreadActivityRecord[] = [];
 
-/** Legacy broad invalidations are rare, but coalesce them if an older runtime
- * sends a burst. Current runtimes push complete keyed records instead. */
 const PUSH_REFRESH_DEBOUNCE_MS = 120;
 const LOAD_RETRY_MS = 1_000;
 const RETAINED_CONVERSATION_LIMIT = 10;
 
-/** While a pi agent runs, its row (status, latest prose) is re-read this often. */
 const PI_AGENT_POLL_MS = 2_000;
-/** Conversations whose last read had a pi agent running. */
 const piAgentsRunning = new Set<string>();
 
-/** A conversation's agents, as its harness lists them. */
 export const listThreadActivity = async (
   conversationId: string,
 ): Promise<ThreadActivityRecord[]> => {
@@ -52,8 +39,6 @@ const subscribeToThreadActivityUpdates = (
   listener: (payload: ThreadActivityUpdatedPayload) => void,
 ): (() => void) => {
   if (!piChatAvailable()) return () => {};
-  // pi agents push no rows: a commit in the conversation (a spawn, a
-  // report, a message) is the cue to re-read them.
   return onPiChatEvents(({ conversationId, events }) => {
     if (
       events.some(
@@ -83,7 +68,6 @@ type ThreadActivityEntry = {
     string,
     Set<(record: ThreadActivityRecord | null, hasLoaded: boolean) => void>
   >;
-  /** True after this live entry has completed its one authoritative read. */
   hasHydrated: boolean;
   loading: Promise<void> | null;
   pendingRefetch: boolean;
@@ -129,9 +113,6 @@ export const getRetainedThreadActivitySnapshot = (
   return { records: records.slice(), hasLoaded: false, error: null };
 };
 
-/** Cheap identity for "did anything the UI renders actually change" —
- * a refetch triggered by a no-op write returns byte-identical rows, and
- * notifying React for those re-renders every task surface. */
 const recordsSignature = (records: ThreadActivityRecord[]): string =>
   records
     .map(
@@ -190,8 +171,6 @@ const patchRecord = (
     for (const listener of listeners) listener(record, true);
   }
 
-  // Only genuine aggregate views pay for an array projection. Hundreds of
-  // chat cards use recordListeners and therefore do no unrelated work.
   if (entry.listeners.size > 0) {
     const records = Array.from(entry.recordsByThreadId.values()).sort(
       (a, b) =>
@@ -385,8 +364,6 @@ const refreshEntry = (entry: ThreadActivityEntry): Promise<void> => {
       if (entry.disposed || requestGeneration !== entry.requestGeneration) {
         return;
       }
-      // A keyed push may have landed before this read failed. Preserve that
-      // index rather than rebuilding it from the stale aggregate snapshot.
       entry.snapshot = {
         ...entry.snapshot,
         hasLoaded: false,
@@ -425,9 +402,6 @@ const refreshEntry = (entry: ThreadActivityEntry): Promise<void> => {
 };
 
 const handleThreadActivityUpdated = (payload: ThreadActivityUpdatedPayload) => {
-  // Durable transcript invalidations keep an open exact-thread reader live.
-  // They do not change the Activity projection unless accompanied by an
-  // authored update, so avoid refetching every row for tool-only traffic.
   if (payload.transcriptUpdate && !payload.assistantUpdate) return;
   const entry = entries.get(payload.conversationId);
   if (!entry) return;
@@ -471,8 +445,6 @@ const handleThreadActivityUpdated = (payload: ThreadActivityUpdatedPayload) => {
       }
     }
   }
-  // Keyed lifecycle and assistant deltas are complete; no durable snapshot
-  // read is needed. The timer remains only for legacy broad invalidations.
   if (payload.record || update) return;
   if (entry.refreshTimer !== null) return;
   entry.refreshTimer = window.setTimeout(() => {
@@ -545,8 +517,6 @@ export const subscribeToThreadActivity = (
   };
 };
 
-/** Subscribe to one indexed row. The conversation is hydrated once, but
- * subsequent updates are O(1) and never wake unrelated cards. */
 export const subscribeToThreadActivityRecord = (
   conversationId: string,
   threadId: string,

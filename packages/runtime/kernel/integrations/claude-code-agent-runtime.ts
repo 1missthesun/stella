@@ -46,10 +46,6 @@ export const shouldUseClaudeCodeAgentRuntime = (args: {
   if (args.modelId && isClaudeCodeModel(args.modelId)) {
     return true;
   }
-  // A resolved per-run `default` engine is authoritative. In particular,
-  // plain spawn_agent model pins use it to override a saved Claude Code
-  // preference for that spawn. Only callers that omit agentEngine entirely
-  // should fall back to reading the persisted preference below.
   if (args.agentEngine === "default") {
     return false;
   }
@@ -65,8 +61,6 @@ export const getClaudeCodeAgentModelId = (
   agentType?: string,
   modelOverride?: string,
 ): string => {
-  // A per-spawn pin (spawn_agent `model: claude-code/<model>`) wins for this
-  // one run and never touches the saved claudeCodeModel preference.
   const pinnedModel = modelOverride?.trim();
   if (pinnedModel) {
     return `claude-code/${pinnedModel}`;
@@ -87,8 +81,6 @@ export const getClaudeCodeAgentModelId = (
       ? preferredModel
       : undefined;
   const model =
-    // A caller explicitly selecting Stella Light is authoritative. The old
-    // order let a saved `claudeCodeModel: fable` silently replace Haiku.
     lightDefault ??
     userSelectedModel ??
     preferredModel ??
@@ -96,11 +88,6 @@ export const getClaudeCodeAgentModelId = (
   return `claude-code/${model || DEFAULT_CLAUDE_CODE_MODEL}`;
 };
 
-/**
- * Map the stored reasoning effort to a Claude Code `CLAUDE_CODE_EFFORT_LEVEL`
- * value. Claude Code takes every level natively and itself falls back to the
- * nearest level a model supports.
- */
 const CLAUDE_CODE_EFFORT_BY_REASONING: Record<
   Exclude<AgentModelReasoningEffort, "none">,
   string
@@ -116,8 +103,6 @@ export const getClaudeCodeRuntimeEffortLevel = (
   stellaAppDir?: string,
   spawnOverride?: AgentModelReasoningEffort,
 ): string | undefined => {
-  // A spawn suffix is authoritative for this run only and never writes the
-  // engine-wide preference or environment configuration.
   if (spawnOverride === "none") return undefined;
   if (spawnOverride) return CLAUDE_CODE_EFFORT_BY_REASONING[spawnOverride];
   const envOverride = process.env.CLAUDE_CODE_EFFORT_LEVEL?.trim();
@@ -174,11 +159,6 @@ const toolsToMetadata = (tools: Tool[] | undefined): ToolMetadata[] =>
   }));
 
 export const runClaudeCodeAgentTextCompletion = async (args: {
-  /**
-   * Stella DATA dir: where local preferences (claudeCodeModel, reasoning
-   * effort, per-agent model overrides) live. Used for model/effort selection
-   * only — it is NOT the CLI working directory unless no `cwd` is given.
-   */
   stellaAppDir: string;
   agentType: string;
   context: Context;
@@ -186,15 +166,8 @@ export const runClaudeCodeAgentTextCompletion = async (args: {
   sessionKey?: string;
   abortSignal?: AbortSignal;
   stellaModel?: string;
-  /** Engine-native utility pin that wins over saved preferences; never persisted. */
   modelOverride?: string;
-  /** Internal utility passes may pin effort independently of user agent prefs. */
   effortLevel?: string;
-  /**
-   * Explicit CLI working directory. Callers whose data dir differs from the
-   * agent workspace should pass this; otherwise the cwd falls back to
-   * `resolveAgentWorkingDirectory` (home by default).
-   */
   cwd?: string;
   executeTool?: (
     toolCallId: string,
@@ -202,7 +175,6 @@ export const runClaudeCodeAgentTextCompletion = async (args: {
     toolArgs: Record<string, unknown>,
     signal?: AbortSignal,
   ) => Promise<ToolResult>;
-  /** Diagnostic boundary forwarded from finalized Claude assistant events. */
   onModelRound?: (args: { messageId?: string; toolCallCount: number }) => void;
 }): Promise<string> => {
   const runId =
@@ -246,8 +218,6 @@ export const runClaudeCodeAgentTextCompletion = async (args: {
     });
     return result.text;
   } finally {
-    // Callers that provide a stable key own that reusable utility session's
-    // lifecycle. Anonymous text completions remain truly one-shot.
     if (!args.sessionKey) closeClaudeCodeSessionWhenIdle(sessionKey);
   }
 };

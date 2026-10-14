@@ -17,27 +17,6 @@ export const STELLA_PROMPT_MAX_TOTAL_CONTENT_BYTES = 1024 * 1024;
 export const STELLA_PROMPT_MAX_MANIFEST_BYTES = 1200 * 1024;
 export const STELLA_PROMPT_REVISION_PATTERN = /^[0-9a-f]{64}$/;
 
-/*
- * Condition fences.
- *
- * One agent prompt source serves every environment. A line that is exactly
- * `<!-- when desktop -->`, `<!-- when cloud -->`, `<!-- when tool:NAME -->`
- * or `<!-- when !tool:NAME -->` opens a block that a matching
- * `<!-- end -->` line closes; text outside every block is shared. A block
- * renders when its condition holds and all the blocks around it render.
- *
- * `tool:NAME` holds when NAME is in the agent's tool set for this turn. The
- * set is the agent's real tool names, plus `history` when its `code` tool
- * carries the conversation history client and `memory` when it carries the
- * orchestrator's memory client. Only the names in
- * `STELLA_PROMPT_FENCE_TOOLS` may be named, so a typo fails the bundle sync
- * instead of silently dropping text.
- *
- * Fences are allowed in `agents/*.md` only; the sync script rejects them
- * anywhere else. The published bundle keeps raw sources, so a prompt's digest
- * and the publication revision do not depend on how it is rendered.
- */
-
 export type StellaPromptEnvironment = "desktop" | "cloud";
 
 export type StellaPromptRenderContext = Readonly<{
@@ -59,10 +38,6 @@ export const STELLA_PROMPT_FENCE_TOOLS = [
 
 const FENCE_TOOL_SET = new Set<string>(STELLA_PROMPT_FENCE_TOOLS);
 
-/**
- * The tool set a prompt renders against: tool names plus the `history` and
- * `memory` clients its `code` tool carries.
- */
 export const stellaPromptTools = (
   toolNames: Iterable<string>,
   options: Readonly<{ history: boolean; memory: boolean }>,
@@ -81,7 +56,6 @@ type FenceLine =
   | Readonly<{ kind: "text" }>
   | Readonly<{ kind: "open"; condition: FenceCondition }>
   | Readonly<{ kind: "close" }>
-  /** `opens` keeps a misspelled opening fence balanced against its end. */
   | Readonly<{ kind: "invalid"; reason: string; opens: boolean }>;
 
 const OPEN_FENCE = /^<!-- when (\S+) -->$/u;
@@ -128,7 +102,6 @@ const classifyLine = (line: string): FenceLine => {
   return { kind: "text" };
 };
 
-/** Every fence problem in `source`, one message per problem; empty when valid. */
 export const validateStellaPromptFences = (source: string): string[] => {
   const errors: string[] = [];
   const open: number[] = [];
@@ -162,13 +135,6 @@ const conditionHolds = (
     ? condition.env === context.env
     : context.tools.has(condition.name) !== condition.negated;
 
-/**
- * Render one prompt source for one environment and tool set. Fence lines and
- * the text of every block whose condition fails are dropped; a blank line
- * left next to another blank line (or at the start) by a dropped block is
- * dropped with it, so a source without fences renders byte for byte.
- * Throws on a malformed source.
- */
 export const renderStellaPrompt = (
   source: string,
   context: StellaPromptRenderContext,

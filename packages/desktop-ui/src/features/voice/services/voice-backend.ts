@@ -1,11 +1,6 @@
 import { getAuthToken } from "@/global/auth/services/auth-token";
 import { backendUrl } from "@/platform/backend/backend-client";
 
-/**
- * A request to one of the backend's voice routes that is not a JSON call
- * (SDP and audio bodies), with the user's bearer token. Throws on a non-OK
- * response with the backend's message.
- */
 export const voiceBackendFetch = async (
   path: string,
   init: { body: BodyInit; contentType: string; headers?: Record<string, string>; signal?: AbortSignal },

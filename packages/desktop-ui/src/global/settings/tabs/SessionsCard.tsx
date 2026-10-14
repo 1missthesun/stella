@@ -20,7 +20,6 @@ const deviceLabel = (session: AccountSessionSummary): string => {
 
 const LOAD_TIMEOUT_MS = 15_000;
 
-/** Signed-in sessions on this account, each revocable on its own. */
 export function SessionsCard() {
   const t = useT();
   const [sessions, setSessions] = useState<AccountSessionSummary[] | null>(
@@ -36,7 +35,6 @@ export function SessionsCard() {
         window.setTimeout(() => reject(new Error("timeout")), LOAD_TIMEOUT_MS),
       );
       const next = await Promise.race([listAccountSessions(), timeout]);
-      // Signed in means at least this device's own session exists.
       if (next.length === 0) throw new Error("empty");
       setSessions(next);
     } catch {

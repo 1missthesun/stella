@@ -6,33 +6,6 @@ import { Effect } from "effect";
 
 import { ensurePrivateDir } from "../shared/private-fs.js";
 
-/**
- * Reusable hash-history reconciliation of bundled entries into Stella home.
- *
- * Stella ships default content (skills, agent prompts, …) inside the install
- * tree. Users carry their own copy under `~/.stella/`. A one-shot seed would
- * leave shipped updates permanently shadowed by whatever each user first
- * booted against, so instead every entry is reconciled per-boot:
- *
- *   - Each entry (a directory for skills, a single file for agent prompts) is
- *     hashed as one unit. If the user touched it, it's treated as user-owned
- *     and left alone.
- *   - A manifest at `<homeDir>/<manifestFilename>` records the hash we last
- *     wrote for every entry we seeded. Next boot: home hash matches the
- *     recorded hash → safe to overwrite with the new bundled version; differs
- *     → user diverged, hands off.
- *   - Home entries with no bundled counterpart and no manifest entry (user-
- *     authored) are ignored.
- *
- * The directory-vs-file mechanics are pluggable via {@link BundledEntryAdapter}
- * so skills and backend-synchronized prompt snapshots share this one
- * algorithm.
- *
- * The reconciliation core is an Effect (`reconcileBundledEntriesEffect`);
- * adapters stay plain Promise-shaped leaf IO (the HostBus convention:
- * Effect semantics are applied at the point of use via `Effect.tryPromise`).
- */
-
 const MANIFEST_VERSION = 2 as const;
 
 export type Sha256Hex = string;
@@ -52,21 +25,15 @@ export type BundledSyncAction =
 
 export type BundledSyncReport = { actions: BundledSyncAction[] };
 
-/** Per-unit filesystem operations (directory for skills, file for prompts). */
 export type BundledEntryAdapter = {
-  /** List entry ids in a directory (already filtered for validity). */
   listIds: (dir: string) => Promise<string[]>;
-  /** Hash a single entry as one unit; null when it doesn't exist. */
   hash: (dir: string, id: string) => Promise<Sha256Hex | null>;
-  /** Copy an entry from one directory to another (overwriting). */
   copy: (srcDir: string, destDir: string, id: string) => Promise<void>;
-  /** Remove an entry from a directory. */
   remove: (dir: string, id: string) => Promise<void>;
 };
 
 export type BundledSyncOptions = {
   manifestFilename?: string;
-  /** Filter which bundled ids participate (e.g. platform-exclusive skills). */
   includeBundledId?: (id: string) => boolean;
   /**
    * Legacy alias for the manifest's hash map, read once for installs seeded
@@ -77,11 +44,8 @@ export type BundledSyncOptions = {
    * the first boot.
    */
   legacyEntriesKey?: string;
-  /** Revision of the canonical snapshot being reconciled. */
   sourceRevision?: string;
-  /** Offline bootstrap mode: populate missing entries, never replace files. */
   seedMissingOnly?: boolean;
-  /** Whether untouched entries absent from the source should be removed. */
   removeObsolete?: boolean;
 };
 
@@ -98,7 +62,6 @@ type BundledManifest = {
   entries: Record<string, BundledManifestEntry>;
 };
 
-/** Adapt a leaf Promise IO call, failing with the raw thrown value. */
 const tryIO = <A>(f: () => Promise<A>): Effect.Effect<A, unknown> =>
   Effect.tryPromise({ try: f, catch: (error) => error });
 
@@ -173,12 +136,6 @@ const writeManifest = async (
   await fs.rename(tempPath, manifestPath);
 };
 
-/**
- * Ids the reconciler has ever seeded into `homeDir`, whether or not the user
- * has since diverged from the shipped copy. This is how a caller tells a
- * Stella-shipped entry apart from a purely user-authored one now that both
- * live in the same directory.
- */
 export const listTrackedBundledEntryIds = async (
   homeDir: string,
   options: Pick<
@@ -195,11 +152,6 @@ export const listTrackedBundledEntryIds = async (
   );
 };
 
-/**
- * Reconcile bundled entries into a Stella home directory. Returns a report of
- * every decision so callers can log a summary. Effect-native core; the
- * exported Promise API below is a facade over the shared home runtime.
- */
 export const reconcileBundledEntriesEffect = (
   bundledDir: string,
   homeDir: string,
@@ -231,7 +183,6 @@ export const reconcileBundledEntriesEffect = (
       ...manifest.entries,
     };
 
-    // 1. Reconcile every bundled entry against home + manifest.
     for (const id of bundledIds) {
       const bundledHash = yield* tryIO(() => adapter.hash(bundledDir, id));
       if (!bundledHash) continue;
@@ -252,9 +203,6 @@ export const reconcileBundledEntriesEffect = (
       }
 
       if (seedMissingOnly) {
-        // Bundled bootstrap runs after fresh/cached remote reconciliation. If a
-        // file already exists, its remote/customization history is authoritative;
-        // an older app bundle must not rewrite either the file or its metadata.
         if (recorded) {
           nextEntries[id] = recorded;
           continue;
@@ -286,8 +234,6 @@ export const reconcileBundledEntriesEffect = (
         recordedHash !== undefined &&
         recordedHash === homeHash
       ) {
-        // Bundled changed, user hasn't touched it. Adapters replace atomically;
-        // removing first would create a crash window with no usable entry.
         yield* tryIO(() => adapter.copy(bundledDir, homeDir, id));
         nextEntries[id] = {
           lastSyncedHash: bundledHash,
@@ -298,7 +244,6 @@ export const reconcileBundledEntriesEffect = (
         continue;
       }
 
-      // User diverged (or first run with no manifest entry). Never overwrite.
       nextEntries[id] = {
         lastSyncedHash: recordedHash ?? bundledHash,
         sourceRevision: recorded?.sourceRevision ?? sourceRevision,
@@ -311,7 +256,6 @@ export const reconcileBundledEntriesEffect = (
       });
     }
 
-    // 2. Handle entries the bundle no longer ships.
     const bundledIdSet = new Set(bundledIds);
     for (const id of options.removeObsolete === false ? [] : homeIds) {
       if (bundledIdSet.has(id)) continue;
@@ -389,7 +333,6 @@ export const summarizeBundledSync = (report: BundledSyncReport): string => {
   return parts.length === 0 ? "no-op" : parts.join(" ");
 };
 
-// Directory entry adapter — shared by skills (and any future dir-unit sync).
 const listSubdirectoryIds = async (dir: string): Promise<string[]> => {
   let entries;
   try {
@@ -453,10 +396,6 @@ const hashDirectoryUnit = async (
   return hash.digest("hex");
 };
 
-/**
- * Adapter for entries that are directories (e.g. skills). `isValidId` lets a
- * caller exclude reserved ids (e.g. the user-profile skill).
- */
 export const createDirectoryEntryAdapter = (
   isValidId: (id: string) => boolean = () => true,
 ): BundledEntryAdapter => ({

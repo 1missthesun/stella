@@ -1,25 +1,11 @@
-/**
- * Claude Code's own compaction, as its stream-json output shows it: a
- * `system`/`compact_boundary` line, then the synthetic user message that
- * opens the compacted session with the summary. The summary is what every
- * other host of the conversation can start from, so it becomes the
- * conversation's checkpoint.
- */
-
 export type ClaudeCodeCompaction = {
-  /** The boundary's uuid: one compaction, however often it is reported. */
   id: string;
   summary: string;
   trigger?: string;
   preTokens?: number;
-  /**
-   * Messages the CLI kept word for word after the summary
-   * (`compact_metadata.preserved_messages`): the summary does not cover them.
-   */
   preservedMessages?: number;
 };
 
-/** Keeps a summary within the journal checkpoint's 256 KB, however it encodes. */
 const SUMMARY_MAX_CHARS = 64_000;
 
 const LOCAL_TRANSCRIPT_NOTE = "\n\nIf you need specific details from before compaction";
@@ -39,16 +25,11 @@ const contentText = (content: unknown): string => {
     .join("\n");
 };
 
-/**
- * The summary as another host should read it: without the closing note that
- * points at this computer's session file and tells the CLI to carry on.
- */
 export const claudeCodeSummaryText = (text: string): string => {
   const cut = text.indexOf(LOCAL_TRANSCRIPT_NOTE);
   return (cut >= 0 ? text.slice(0, cut) : text).trim().slice(0, SUMMARY_MAX_CHARS);
 };
 
-/** Watches one CLI's stream lines and returns each compaction once its summary arrives. */
 export const createClaudeCodeCompactionDetector = () => {
   let boundary: Omit<ClaudeCodeCompaction, "summary"> | undefined;
   const seen = new Set<string>();

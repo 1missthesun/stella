@@ -1,14 +1,3 @@
-/**
- * Dev Projects Discovery
- *
- * Finds active development projects from real usage signals. The goal is not
- * to enumerate every repo on disk; it is to rank the projects the user is most
- * likely to mean when they say "open my project".
- *
- * Uses editor and assistant metadata plus shallow repository discovery.
- * Only directory names, paths, and activity timestamps leave this collector.
- */
-
 import { promises as fs } from "fs";
 import path from "path";
 import os from "os";
@@ -25,10 +14,6 @@ import {
 import type { DevProject } from "./types.js";
 
 const log = (...args: unknown[]) => console.error("[dev-projects]", ...args);
-
-// ---------------------------------------------------------------------------
-// Configuration
-// ---------------------------------------------------------------------------
 
 const RECENCY_DAYS = 7;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -83,10 +68,6 @@ type SqliteDatabase = {
   query(sql: string): { get(...params: unknown[]): unknown };
   close(): void;
 };
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 const normalizeCandidatePath = (candidatePath: string): string | null => {
   let normalized = candidatePath.trim();
@@ -213,10 +194,6 @@ const daysAgo = (timestamp: number): number =>
 const sourceList = (sources: Map<string, number>): string[] =>
   Array.from(sources.keys()).sort();
 
-// ---------------------------------------------------------------------------
-// Repository activity
-// ---------------------------------------------------------------------------
-
 const resolveGitRoot = async (
   candidatePath: string,
 ): Promise<string | null> => {
@@ -278,10 +255,6 @@ const getGitRepoActivity = async (repoPath: string): Promise<number | null> => {
   }
 };
 
-// ---------------------------------------------------------------------------
-// Source 1: macOS Spotlight (mdfind)
-// ---------------------------------------------------------------------------
-
 const collectFromSpotlight = async (): Promise<string[]> => {
   if (process.platform !== "darwin") return [];
 
@@ -301,10 +274,6 @@ const collectFromSpotlight = async (): Promise<string[]> => {
     return [];
   }
 };
-
-// ---------------------------------------------------------------------------
-// Source 2: GitHub Desktop repositories.json
-// ---------------------------------------------------------------------------
 
 type GHDesktopRepo = {
   path?: string;
@@ -351,10 +320,6 @@ const collectFromGitHubDesktop = async (): Promise<string[]> => {
     return [];
   }
 };
-
-// ---------------------------------------------------------------------------
-// Source 3: JetBrains Recent Projects
-// ---------------------------------------------------------------------------
 
 const JETBRAINS_IDES = [
   "IntelliJIdea",
@@ -429,10 +394,6 @@ const collectFromJetBrains = async (): Promise<string[]> => {
 
   return results;
 };
-
-// ---------------------------------------------------------------------------
-// Source 4: VS Code / Cursor state
-// ---------------------------------------------------------------------------
 
 const getEditorConfigs = (): { name: string; dbPath: string }[] => {
   const home = os.homedir();
@@ -597,10 +558,6 @@ const collectFromEditorsEffect = (
     return count;
   });
 
-// ---------------------------------------------------------------------------
-// Shallow project roots
-// ---------------------------------------------------------------------------
-
 const shouldSkipScanDir = (name: string): boolean =>
   name.startsWith(".") ||
   [
@@ -663,10 +620,6 @@ const collectFromCommonDevRoots = async (
   return reposFound;
 };
 
-// ---------------------------------------------------------------------------
-// Scoring
-// ---------------------------------------------------------------------------
-
 const resolveCandidates = async (
   candidates: ProjectCandidate[],
 ): Promise<ResolvedProjectCandidate[]> => {
@@ -724,7 +677,6 @@ const scoreProject = async (
     project.editorLastAccessed ?? 0,
   );
   if (lastActivity < Date.now() - RECENCY_DAYS * DAY_MS || lastActivity > Date.now()) return null;
-  // Session counts are capped so one prolific tool cannot dominate forever.
   let score = Math.min(20, project.recentSessionCount ?? 0) * 4;
   for (const weight of project.sources.values()) score += Math.min(20, weight);
   return {
@@ -857,17 +809,6 @@ const collectDevProjectsEffect: Effect.Effect<DevProject[], unknown> =
 export const collectDevProjects = async (): Promise<DevProject[]> =>
   runDiscovery(collectDevProjectsEffect);
 
-// ---------------------------------------------------------------------------
-// Formatting
-// ---------------------------------------------------------------------------
-
-/**
- * Format dev projects for LLM synthesis.
- *
- * Projects are already sorted by confidence and activity from collection.
- * We cap at 8 for synthesis — enough to show active work, not so many that
- * stale projects dilute the signal.
- */
 export const formatDevProjectsForSynthesis = (
   projects: DevProject[],
 ): string => {

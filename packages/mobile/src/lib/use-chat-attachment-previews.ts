@@ -8,21 +8,15 @@ import { getBackendClient } from "./backend";
 const REFRESH_MARGIN_MS = 30_000;
 const RETRY_MS = 30_000;
 
-/** Resolve journal attachment paths through the current owner's authenticated drive. */
 export function useChatAttachmentPreviews(
   messages: ChatMessage[],
   authorityScope: string,
 ): ChatMessage[] {
-  // A stable path key avoids restarting requests for unrelated streamed rows.
-  // Derived per transcript rather than per render: composer keystrokes
-  // re-render this hook without touching `messages`.
   const pathKey = useMemo(() => JSON.stringify([...new Set(messages.flatMap((message) =>
     message.attachmentPaths ?? []))].sort()), [messages]);
   const paths = useMemo(() => JSON.parse(pathKey) as string[], [pathKey]);
   const cacheRef = useRef({ scope: authorityScope, entries: new Map<string, DrivePreview>() });
   if (cacheRef.current.scope !== authorityScope) {
-    // Reset during render: never render the prior account's signed URLs while
-    // waiting for effect cleanup, and reject its outstanding request results.
     cacheRef.current = { scope: authorityScope, entries: new Map() };
   }
   const [revision, setRevision] = useState(0);
@@ -110,8 +104,6 @@ export function useChatAttachmentPreviews(
       if (!resolved.length) return { ...message, attachmentPreviews };
       const images = resolved.filter((preview) => preview.contentType.toLowerCase().startsWith("image/"));
       const documents = resolved.filter((preview) => !preview.contentType.toLowerCase().startsWith("image/"));
-      // Local thumbnails cover the admission/upload handoff; switch only when
-      // the full canonical attachment set has resolved, avoiding partial strips.
       const thumbnailUris = resolved.length === attachmentPaths.length
         ? images.map((preview) => preview.url)
         : message.thumbnailUris?.length ? message.thumbnailUris : images.map((preview) => preview.url);

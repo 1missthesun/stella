@@ -5,35 +5,9 @@ import type {
   PaidBillingPlan,
 } from "@stella/contracts/backend/billing";
 
-/**
- * Plan catalog, from the Worker's secrets. Stella is open source, so prices
- * and limits never live in the repository.
- *
- * Required:
- *   STELLA_INCLUDED_USAGE_UTILIZATION_RATE   number in (0, 1]
- *   STELLA_GO_PRICE_CENTS, STELLA_PRO_PRICE_CENTS
- *   STELLA_FREE_{ROLLING,WEEKLY,MONTHLY}_LIMIT_USD, STELLA_FREE_ROLLING_WINDOW_HOURS
- *   STRIPE_PRICE_GO, STRIPE_PRICE_PRO
- * Optional:
- *   STELLA_<GO|PRO>_{ROLLING,WEEKLY,MONTHLY}_LIMIT_USD, _ROLLING_WINDOW_HOURS
- *   STELLA_FREE_LIFETIME_LIMIT_USD, STELLA_FREE_EMAIL_ALLOWANCE_SHARE
- *   STELLA_GO_INTRO_FIRST_MONTH_PRICE_CENTS with STRIPE_COUPON_GO_FIRST_MONTH
- *
- * With none of STELLA_INCLUDED_USAGE_UTILIZATION_RATE, STRIPE_SECRET_KEY,
- * STRIPE_PRICE_GO and STRIPE_PRICE_PRO set, billing is off (see `enabled`).
- *
- * Paid plans derive their monthly limit from price / utilization rate, and
- * their rolling and weekly limits as fixed shares of it, unless overridden.
- */
-
 export type PlanCatalog = Record<BillingPlan, BillingPlanConfig>;
 
 export type BillingConfig = {
-  /**
-   * False when the deployment sets none of the billing secrets (a
-   * self-hosted Stella): every account is Pro with unlimited usage and
-   * checkout is off.
-   */
   enabled: boolean;
   plans: PlanCatalog;
   freeEmailAllowanceShare: number;
@@ -127,7 +101,6 @@ const paidPlan = (
   };
 };
 
-/** Any of these set means billing is meant to be on, and must be complete. */
 const BILLING_SWITCHES = [
   "STELLA_INCLUDED_USAGE_UTILIZATION_RATE",
   "STRIPE_SECRET_KEY",
@@ -135,7 +108,6 @@ const BILLING_SWITCHES = [
   "STRIPE_PRICE_PRO",
 ] as const;
 
-/** Limits no one reaches, for a deployment without billing. */
 const OPEN_LIMIT_USD = 1_000_000;
 const openPlan = (label: string): BillingPlanConfig => ({
   label,
@@ -204,7 +176,6 @@ const loadBillingConfig = (env: Cloudflare.Env): BillingConfig => {
 
 let cached: { env: Cloudflare.Env; config: BillingConfig } | undefined;
 
-/** The billing configuration, parsed once per isolate. Throws when incomplete. */
 export const billingConfig = (env: Cloudflare.Env): BillingConfig => {
   if (cached?.env === env) return cached.config;
   const config = loadBillingConfig(env);

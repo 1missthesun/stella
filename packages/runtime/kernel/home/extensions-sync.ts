@@ -1,5 +1,3 @@
-/** Hash-history reconciliation for extensions shipped as Stella-home seed. */
-
 import type { Effect } from "effect";
 
 import {
@@ -19,7 +17,6 @@ export const reconcileBundledExtensionsEffect = (
     homeExtensionsDir,
     createDirectoryEntryAdapter(),
     {
-      // Unknown/user-authored extensions are never retired by an app update.
       removeObsolete: false,
       manifestFilename: ".bundled-extensions-manifest.json",
     },

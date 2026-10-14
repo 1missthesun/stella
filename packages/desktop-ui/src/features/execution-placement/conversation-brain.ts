@@ -5,25 +5,11 @@ import type {
 } from "@stella/contracts/pi-chat";
 import { onConversationBrainChanged } from "./conversation-brain-signal";
 
-/**
- * Others move Stella too (her own switch, another device, the cloud taking
- * her over from a computer that went away). The host says when what it reads
- * changes (a `brain` event), and the conversation's socket says when the
- * record changed (`onConversationBrainChanged`); this reads again on either,
- * and when the window regains focus, rather than on a timer.
- */
-
 const api = () =>
   typeof window === "undefined" ? undefined : window.electronAPI?.piChat;
 
-/** Whether this app can read and move where a conversation's Stella runs. */
 export const conversationBrainAvailable = (): boolean => api() !== undefined;
 
-/**
- * Where the open conversation's Stella runs (its brain lease,
- * `@stella/contracts/turn-plane/pi-brain`), and the user moving her there
- * from the picker: the same move as her own `switch_destination`.
- */
 export function useConversationBrain(conversationId: string | null) {
   const [state, setState] = useState<{
     conversationId: string;

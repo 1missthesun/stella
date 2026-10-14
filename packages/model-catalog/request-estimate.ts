@@ -4,10 +4,8 @@ import {
   STELLA_DEFAULT_MODEL,
 } from "./aliases";
 
-/** Raw relay request body, before any provider-specific shaping. */
 export type StellaRequestBody = Record<string, unknown>;
 
-/** Pre-flight token reservation derived from the raw request body. */
 export type TokenEstimate = {
   inputTokens: number;
   outputTokens: number;
@@ -34,15 +32,6 @@ const IMAGE_CAPABLE_MANAGED_MODEL_PREFIXES = [
   "x-ai/grok-4.5",
 ] as const;
 
-/**
- * Map the client's requested model to a concrete managed config.
- *
- * The default path (empty / `stella/default`) — and any request from a locked
- * agent or an audience not allowed to pick the requested model — resolves to
- * the backend-chosen model for the agent + audience. An explicit override is
- * honored when allowed: a `stella/<mode>` tier alias resolves per audience via
- * `getModeConfig`; a `stella/<provider>/<model>` pins that managed model.
- */
 export function resolveRequestedStellaModel(
   agentType: string,
   requestBody: StellaRequestBody,
@@ -56,8 +45,6 @@ export function resolveRequestedStellaModel(
     audience,
   );
   return {
-    // The relay echoes the honored override id back, or the opaque sentinel
-    // when it fell through to the backend-chosen default.
     requestedModel: applied ? trimmed : STELLA_DEFAULT_MODEL,
     resolvedModel: config.model,
     config: withoutFallback(config),
@@ -71,19 +58,11 @@ const withoutFallback = (config: ModelConfig): ModelConfig => ({
   fallbackProviderOptions: undefined,
 });
 
-/** Rough character budget charged for an attached image. */
 const IMAGE_ESTIMATE_CHARS = 512;
 
-/**
- * Upper bound on the reserved completion size. Kept well above the old
- * 16k ceiling because reasoning models routinely emit far more than that,
- * and the reservation is what stops a near-exhausted account from firing
- * one unbounded request.
- */
 const MAX_ESTIMATED_OUTPUT_TOKENS = 64_000;
 const DEFAULT_ESTIMATED_OUTPUT_TOKENS = 1024;
 
-/** Guards against a pathological client body nesting content forever. */
 const MAX_ESTIMATE_DEPTH = 8;
 
 const isImagePart = (record: Record<string, unknown>): boolean =>
@@ -92,14 +71,8 @@ const isImagePart = (record: Record<string, unknown>): boolean =>
   record.inline_data !== undefined ||
   record.fileData !== undefined ||
   record.file_data !== undefined ||
-  // Anthropic image blocks: `{type: "image", source: {...}}`.
   record.source !== undefined;
 
-/**
- * Total prompt-text characters in any message container, across every wire
- * shape. Handles strings, message/part arrays, and the nested `content`
- * arrays that tool results use.
- */
 const textLengthOf = (value: unknown, depth = 0): number => {
   if (typeof value === "string") return value.length;
   if (depth >= MAX_ESTIMATE_DEPTH || !value || typeof value !== "object") {
@@ -114,14 +87,10 @@ const textLengthOf = (value: unknown, depth = 0): number => {
 
   const record = value as Record<string, unknown>;
   let length = 0;
-  // `text` covers chat/Anthropic/Responses text parts and Google
-  // `parts[].text`; `output`/`arguments` cover Responses tool-call items,
-  // which are real prompt text on continuation turns.
   for (const key of ["text", "output", "arguments"] as const) {
     const field = record[key];
     if (typeof field === "string") length += field.length;
   }
-  // `content` is the chat/Anthropic/Responses field, `parts` the Google one.
   for (const key of ["content", "parts"] as const) {
     length += textLengthOf(record[key], depth + 1);
   }
@@ -144,27 +113,13 @@ const numberAt = (
   return undefined;
 };
 
-/**
- * Estimate the tokens a relay request will consume, for the pre-flight
- * budget reservation in `authorizeStellaRelayRequest`.
- *
- * This runs against the *raw client body*, before `bodyForUpstream`
- * normalizes it, so it has to understand every wire shape a client may
- * send: Chat Completions (`messages` / `max_tokens`), Responses
- * (`input` / `max_output_tokens`), and Google (`contents` /
- * `generationConfig.maxOutputTokens`). Missing a shape silently reserves
- * ~nothing and lets an exhausted account through.
- */
 export function estimateRequestTokens(
   requestBody: StellaRequestBody,
 ): TokenEstimate {
   const inputTextLength = [
-    // Message lists, one per wire shape.
     requestBody.messages,
     requestBody.input,
     requestBody.contents,
-    // Top-level preambles: Anthropic `system`, Responses `instructions`,
-    // Google `systemInstruction`.
     requestBody.system,
     requestBody.instructions,
     requestBody.systemInstruction,
@@ -192,12 +147,6 @@ export function estimateRequestTokens(
   };
 }
 
-/** Whether a resolved managed model accepts image input parts.
- * DeepSeek V4.1 Flash accepts image input through OpenRouter:
- * https://openrouter.ai/deepseek/deepseek-v4.1-flash
- * Keep this aligned with its multimodal pricing/catalog metadata so relay
- * shaping never silently discards images accepted by the client runtime.
- */
 export const managedModelSupportsImageInput = (
   resolvedModel: string,
 ): boolean =>
@@ -294,16 +243,6 @@ export function downgradeUnsupportedRequestImages(
   };
 }
 
-// Extract the Stella/upstream model id from a Google relay path. The
-// desktop's Google SDK constructs URLs as `…/models/{model}:{verb}`
-// where `{model}` is whatever was set as `model.id` on the relay model
-// — which is the full requested id (e.g. `stella/google/gemini-3.6-flash`,
-// containing slashes). The previous `[^/]+` capture only matched single-
-// segment names and silently dropped the rest, so the auth layer fell
-// back to the standard mode and the user's pick was ignored. Allow
-// slashes by capturing greedily up to the verb, and tolerate any
-// `generateContent` / `streamGenerateContent` / `countTokens` /
-// `embedContent` suffix Google ever ships.
 export function requestedModelFromGooglePath(pathname: string): string | null {
   const match = /\/models\/(.+?):[A-Za-z][A-Za-z0-9]*$/u.exec(pathname);
   if (!match?.[1]) return null;

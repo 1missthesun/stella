@@ -6,7 +6,6 @@ import {
   STELLA_MARK_VIEWBOX_SPAN,
 } from "./geometry";
 
-/** Span of the shared viewBox (`-15 -15 258.541 258.541`) in viewBox units. */
 export const VIEWBOX_SPAN = STELLA_MARK_VIEWBOX_SPAN;
 export const VIEWBOX_MIN = -15;
 

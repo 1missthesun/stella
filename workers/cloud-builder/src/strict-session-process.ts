@@ -80,12 +80,6 @@ export type CapturedSessionExecOptions = Readonly<{
   startTimeoutMs?: number;
   startedTimeoutMs?: number;
   resultTimeoutMs?: number;
-  /**
-   * Sessionless execution context for the trusted Stella executor. Supplying
-   * these directly avoids Cloudflare's persistent ExecutionSession shell;
-   * that shell is useful for interactive state, but it is not an
-   * authoritative lifetime boundary for a one-shot process.
-   */
   cwd?: string;
   env?: Record<string, string | undefined>;
 }>;

@@ -1,13 +1,3 @@
-/**
- * Incremental Server-Sent Events parser (WHATWG EventSource framing).
- *
- * Providers disagree on the details — `\r\n` vs `\n`, comment keep-alives
- * (`: ping`), multi-line `data:` payloads, `event:` names, a stray BOM — so
- * the framing rules are implemented in full rather than as a `data:` regex.
- * Bytes are decoded as UTF-8 with a streaming decoder so a multi-byte
- * character split across chunks is never corrupted.
- */
-
 export type SseFrame = {
   event: string | undefined;
   data: string;
@@ -15,9 +5,7 @@ export type SseFrame = {
 };
 
 export type SseParser = {
-  /** Feed a decoded text chunk; returns every frame completed by it. */
   push(text: string): SseFrame[];
-  /** Flush the trailing frame that had no terminating blank line. */
   finish(): SseFrame[];
 };
 
@@ -114,7 +102,6 @@ export const createSseParser = (): SseParser => {
   };
 };
 
-/** `data` parsed as JSON, or null for `[DONE]`, blanks, and non-JSON. */
 export const frameJson = (frame: SseFrame): Record<string, unknown> | null => {
   const data = frame.data.trim();
   if (!data || data === "[DONE]") return null;

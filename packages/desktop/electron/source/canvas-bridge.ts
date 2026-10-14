@@ -166,7 +166,6 @@ const CANVAS_BRIDGE_SCRIPT = String.raw`
 
 const BRIDGE_TAG = `<script>${CANVAS_BRIDGE_SCRIPT}</script>`;
 
-/** Insert the bridge before the document's last `</body>`, or append it. */
 export const injectCanvasBridge = (html: string): string => {
   const bodyEnd = html.toLowerCase().lastIndexOf("</body>");
   if (bodyEnd === -1) return `${html}${BRIDGE_TAG}`;

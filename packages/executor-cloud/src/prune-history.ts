@@ -40,7 +40,6 @@ export const CLOUD_HISTORY_TOKEN_BUDGET = 48_000;
  * reads three small columns instead of every payload in the conversation.
  */
 export const estimateTokens = (message: unknown): number => {
-  // An image block is priced by its pixels, not its base64 text.
   let images = 0;
   const serialized = JSON.stringify(message, (_key, value: unknown) => {
     if (

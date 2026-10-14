@@ -9,33 +9,6 @@ import {
 } from "./update-gate.js";
 import { classifyUpdate, installs, relaunches, type UpdatePlan } from "./update-plan.js";
 
-/**
- * Updates made ready before they are offered.
- *
- * Everything taking a version costs that does not change the checkout is done
- * here, in the background, as soon as the version turns up: the merge (as
- * objects only), the check a merge has to pass, main and preload built from
- * the result, and the packages a new lockfile needs downloaded into the
- * caches. The version is offered only once that is done, so pressing Update
- * only has to swap.
- *
- * Preparing never applies. It writes git objects that nothing refers to, a
- * scratch copy that is removed after each build, the caches of bun and
- * Electron, and a record with the built outputs under the app's data
- * directory. The checkout, its branch, its `node_modules` and its own main
- * and preload stay as they are: whatever starts Stella before Update is
- * pressed — a restart, a reload, a relaunch after a crash, the launcher —
- * starts the version that was running. Only `take` reads a record, after
- * Update is pressed.
- *
- * One version at a time, at the lowest CPU and disk priority, and nothing is
- * left running between versions. A record goes when its version stops being
- * offered: the checkout moved, something newer replaced it, or the user
- * skipped it. An action of the user's stops the version being prepared; it
- * starts again afterwards.
- */
-
-/** A version to prepare: what `ref` holds at `tip`, taken onto `head`. */
 export type PrepareJob = {
   head: string;
   tip: string;
@@ -48,13 +21,9 @@ export type PrepareJob = {
 export type PreparedUpdate = {
   head: string;
   tip: string;
-  /** Null when preparing failed: the version is offered and taken as before. */
   plan: Exclude<UpdatePlan, { kind: "none" }> | null;
-  /** The commit to fast-forward onto; for a merge, already made. */
   to: string | null;
-  /** The merge's check, when it needed one. */
   gate: GateResult | null;
-  /** Main and preload built from `to`, in `dir`. */
   bundles: boolean;
   dir: string;
   ms: number;
@@ -82,12 +51,9 @@ export class UpdatePreparer {
 
   constructor(options: {
     cwd: string;
-    /** Where records live; nothing else is ever written there. */
     root: string;
-    /** Scratch copies for building, removed after each one. */
     scratch: string;
     log: Log;
-    /** A version became ready to offer. */
     onPrepared: () => void;
   }) {
     this.cwd = options.cwd;
@@ -97,7 +63,6 @@ export class UpdatePreparer {
     this.onPrepared = options.onPrepared;
   }
 
-  /** Records kept from before this launch; scratch copies a crash left. */
   private load() {
     this.loading ??= (async () => {
       await Promise.all(
@@ -122,16 +87,11 @@ export class UpdatePreparer {
     return this.loading;
   }
 
-  /** Whether the version `tip` taken onto `head` is ready to be offered. */
   async isReady(head: string, tip: string) {
     await this.load();
     return this.records.has(prepareKey(head, tip));
   }
 
-  /**
-   * The versions offered now. Anything else prepared is dropped; anything
-   * here not yet prepared is queued.
-   */
   async want(jobs: PrepareJob[]) {
     await this.load();
     const keys = new Set(jobs.map((job) => prepareKey(job.head, job.tip)));
@@ -146,7 +106,6 @@ export class UpdatePreparer {
     this.next();
   }
 
-  /** Stop preparing while an action runs; `resume` starts it again. */
   pause() {
     this.paused += 1;
     this.running?.abort.abort();
@@ -157,10 +116,6 @@ export class UpdatePreparer {
     this.next();
   }
 
-  /**
-   * The prepared version `tip` onto `head`, when it was prepared and its
-   * commit and outputs are still there. Only `take` asks.
-   */
   async recordFor(head: string, tip: string): Promise<PreparedUpdate | null> {
     await this.load();
     const record = this.records.get(prepareKey(head, tip));
@@ -243,8 +198,6 @@ export class UpdatePreparer {
         .split("\n")
         .filter(Boolean);
       const install = installs(paths);
-      // Built against the checkout's own packages, main and preload are only
-      // the ones the relaunch needs when the packages stay as they are.
       const keep = relaunches(paths) && !install ? dir : undefined;
       const checked = plan.kind === "clean" && !(job.trustIdenticalTree && plan.identical);
       let gate: GateResult | null = null;

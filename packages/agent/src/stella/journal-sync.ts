@@ -1,12 +1,3 @@
-/**
- * A cloud-stored conversation's journal and a host's pi-durable transcript,
- * kept in step. The journal is what every device shows and the record of
- * every writer's turns; a host's transcript is what its orchestrator reads.
- * What other writers journaled (a turn sent from the phone, another
- * computer's) is written into the transcript, once each and marked with its
- * journal seq, so the orchestrator answers with the whole conversation and a
- * host never mirrors it back out.
- */
 import type { Context } from "@earendil-works/chord";
 import type { Message } from "@earendil-works/pi-ai";
 import {
@@ -21,56 +12,34 @@ import {
 } from "@earendil-works/pi-durable";
 import type { JournalCheckpoint, JournalCheckpointFirstKept } from "@stella/contracts/journal-checkpoint";
 
-/** One journaled message, as a reader of the journal gets it. */
 export type JournalMessage = {
   seq: number;
-  /** The journal turn that wrote it. */
   turnId: string;
   role: "user" | "assistant" | "toolResult";
-  /** A prompt no client shows (a wake, a report); still model context. */
   hidden: boolean;
   message: Message;
-  /** A prompt's client id, which the sending client's pending message binds to. */
   clientMsgId?: string;
 };
 
-/** The journal turn a transcript is mirroring now. */
 export type JournalOpenTurn = {
   localTurnId: string;
   leaseToken: string;
   ownerGeneration: string;
-  /** Its assistant and tool-result entries so far. */
   entries: number[];
 };
 
 export type JournalSyncState = {
-  /** Random per transcript, so its turn ids never repeat in the journal. */
   syncId?: string;
-  /** The newest journal seq written into the transcript. */
   importedSeq?: number;
-  /**
-   * The journal's context start the transcript was seeded from
-   * (`journalImportAfter`). Absent on one seeded before that rule, which may
-   * have read the whole journal.
-   */
   seededFromSeq?: number;
-  /** The newest compaction of this transcript published as the journal's checkpoint. */
   publishedCheckpoint?: number;
-  /** The newest journal checkpoint (its `throughSeq`) taken as this transcript's compaction after its seed. */
   adoptedCheckpoint?: number;
-  /** The newest transcript entry mirrored into the journal. */
   mirrored?: number;
-  /** Messages typed here and sent on to where Stella runs (`relay`): the journal's copy is not imported. */
   relayed?: string[];
   open?: JournalOpenTurn;
-  /**
-   * The journal epoch the transcript follows, when it started over on a new
-   * one whose seqs repeat the old ones': its imports are new writes.
-   */
   epoch?: number;
 };
 
-/** How far the transcript and the journal are in step, per conversation. */
 export const JournalSyncDoc = defineDoc<JournalSyncState>({
   kind: "stella.journal-sync",
   version: 1,
@@ -82,35 +51,17 @@ export const JournalSyncDoc = defineDoc<JournalSyncState>({
 
 const ENTRY_KIND = { user: "pi.user", assistant: "pi.assistant", toolResult: "pi.tool-result" } as const;
 
-/**
- * Where a transcript's context starts after `alignJournalContext` cut it to
- * the journal's context start. It carries no message; its `head` is the
- * first entry kept, or itself when nothing after the cut is a prompt.
- */
 export const JournalContextStartEntry = defineEntry("stella.journal-context-start");
 
 const ALIGN_SCAN_PAGE = 64;
 
-/** Where the journal says a new transcript of the conversation starts. */
 export type JournalStart = {
-  /** The journal's bounded context window opens here (`Journal.contextStartSeq`). */
   contextStartSeq: number;
-  /** The conversation's latest compaction checkpoint, published by whichever host compacted. */
   checkpoint?: JournalCheckpoint;
 };
 
-/** How a transcript's first import seeds it (`journalImportAfter`). */
 export type JournalSeed = { fromSeq: number; checkpoint?: JournalCheckpoint };
 
-/**
- * The journal seq a transcript's import reads after: where it left off, or,
- * for one that never imported, where the conversation's context starts. That
- * is the latest compaction checkpoint any host published, its summary
- * followed by every message after it; before any host compacted, the
- * journal's context window. Every host seeds a transcript the same way, so a
- * long conversation is never replayed whole, and from then on the
- * transcript's own compaction keeps its context in bounds.
- */
 export const journalImportAfter = async (
   state: Readonly<JournalSyncState> | undefined,
   start: () => JournalStart | Promise<JournalStart>,
@@ -122,7 +73,6 @@ export const journalImportAfter = async (
     : { after: contextStartSeq - 1, seed: { fromSeq: contextStartSeq } };
 };
 
-/** A compaction this transcript took from the journal, which is never published back. */
 const journalCheckpointOf = (entry: Pick<EntryRecord, "data"> | undefined): number | undefined => {
   const seq = (entry?.data as { journalCheckpoint?: unknown } | undefined)?.journalCheckpoint;
   return typeof seq === "number" ? seq : undefined;
@@ -134,12 +84,6 @@ const messageText = (message: Message | undefined): string => {
   return message.content.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("\n");
 };
 
-/**
- * This transcript's newest compaction, for the journal, when it has not
- * published it yet: the summary as its model reads it and where the context
- * it kept starts. `ownTurnOf` names the turn of one of this host's own
- * prompts (an entry not written from the journal).
- */
 export async function checkpointToPublish(
   harness: Harness,
   root: Conversation,
@@ -164,7 +108,6 @@ export async function checkpointToPublish(
     const kept = await tx.entry(marker.head);
     const keptSeq = journalSeqOf(kept);
     if (keptSeq !== undefined) return { markerId: marker.id, summary, firstKept: { seq: keptSeq } as const };
-    // One of this host's own: the prompt that opened its turn.
     let cursor: Cursor | undefined;
     do {
       const page = await tx.scanEntries(
@@ -190,17 +133,6 @@ export async function checkpointToPublish(
   return firstKept ? { markerId: found.markerId, summary: found.summary, firstKept } : undefined;
 }
 
-/**
- * An engine that keeps its own context (Claude Code) compacted it: record
- * that as this transcript's compaction, so its summary opens the context, as
- * a compaction of pi's own would, and `checkpointToPublish` publishes it as
- * the conversation's checkpoint. The context it keeps opens on the prompt
- * before the last `preservedMessages` messages the engine kept word for word
- * (the newest prompt when it kept none), so nothing the summary leaves out
- * is dropped; counting an entry per engine message errs toward keeping more.
- * Admitted as a write: placed at once when idle, else at the run's next
- * boundary. Returns whether it was submitted.
- */
 export async function recordEngineCompaction(
   harness: Harness,
   root: Conversation,
@@ -242,7 +174,6 @@ export async function recordEngineCompaction(
   return true;
 }
 
-/** The compaction `checkpointToPublish` returned is in the journal now. */
 export async function noteCheckpointPublished(
   harness: Harness,
   root: Conversation,
@@ -256,13 +187,6 @@ export async function noteCheckpointPublished(
   }, context);
 }
 
-/**
- * Bring a transcript seeded before `journalImportAfter`, which read the whole
- * journal, to the same start: a head marker at its first prompt from
- * `contextStartSeq` on, so older entries stay in it but out of context. One
- * that compaction or a reset already bounds is left as it is. Runs once per
- * transcript; returns whether it cut.
- */
 export async function alignJournalContext(
   harness: Harness,
   root: Conversation,
@@ -289,7 +213,6 @@ export async function alignJournalContext(
       }
       cursor = page.next;
     } while (older === undefined && cursor !== undefined);
-    // Nothing older than the start, or a compaction already opens the context after it.
     if (older === undefined || (marker && marker.head > older)) return false;
     await tx.appendEntry(root.id, { kind: JournalContextStartEntry.kind, head: firstKept ?? "self" });
     doc.importedSeq = Math.max(doc.importedSeq, contextStartSeq - 1);
@@ -297,17 +220,6 @@ export async function alignJournalContext(
   }, context);
 }
 
-/**
- * Take a journal checkpoint newer than this transcript's context: a
- * compaction whose summary stands in for everything through
- * `checkpoint.throughSeq`, its context opening on the first prompt after the
- * last entry it covers. That is what a transcript seeded now would hold
- * (`journalImportAfter`). Without it a long-lived transcript that mirrors
- * another host's turns keeps every entry since its own last compaction in
- * context, and in its store, for good. Only ever moves the context forward;
- * admitted as a write (placed when idle, else at the run's next boundary).
- * Returns whether it was submitted.
- */
 export async function adoptJournalCheckpoint(
   harness: Harness,
   root: Conversation,
@@ -322,7 +234,6 @@ export async function adoptJournalCheckpoint(
     if (marker && journalCheckpointOf(marker) !== undefined && journalCheckpointOf(marker)! >= checkpoint.throughSeq) {
       return undefined;
     }
-    // Newest first: the first prompt after the newest entry the checkpoint covers.
     let head: EntryId | undefined;
     let covered = false;
     let cursor: Cursor | undefined;
@@ -340,7 +251,6 @@ export async function adoptJournalCheckpoint(
       if (covered || (marker && page.items.some((entry) => entry.id < marker.head))) break;
       cursor = page.next;
     } while (cursor !== undefined);
-    // Nothing since the current head is covered by it: the context is already newer.
     if (!covered) return undefined;
     if (marker && head !== undefined && head <= marker.head) return undefined;
     return { head };
@@ -367,17 +277,11 @@ export async function adoptJournalCheckpoint(
   return true;
 }
 
-/** The journal seq of an entry written from the journal, which is never mirrored back. */
 export const journalSeqOf = (entry: Pick<EntryRecord, "data"> | undefined): number | undefined => {
   const seq = (entry?.data as { journalSeq?: unknown } | undefined)?.journalSeq;
   return typeof seq === "number" ? seq : undefined;
 };
 
-/**
- * A hidden prompt's text parts are marked, as the host's own hidden prompts
- * are; a prompt's client id goes on its first part, as a placed chat's does,
- * and a visible one's journal seq (its `message #N` id, `message-ids.ts`).
- */
 const asWritten = ({ message, hidden, clientMsgId, seq }: JournalMessage): Message => {
   if (message.role !== "user") return message;
   const parts = typeof message.content === "string" ? [{ type: "text" as const, text: message.content }] : message.content;
@@ -395,25 +299,17 @@ const asWritten = ({ message, hidden, clientMsgId, seq }: JournalMessage): Messa
   } as Message;
 };
 
-/**
- * Write what other writers journaled after the transcript's `importedSeq`
- * into it, in journal order, and advance `importedSeq` to `throughSeq`. A
- * write lands after whatever run is going on, like any passive entry.
- */
 export async function importJournal(
   harness: Harness,
   root: Conversation,
   messages: readonly JournalMessage[],
   throughSeq: number,
   context: Context,
-  /** How a first import seeds the transcript (`journalImportAfter`). */
   seed?: JournalSeed,
 ): Promise<number> {
   let state = await harness.snapshot(JournalSyncDoc, root.id, context);
   const checkpoint = seed?.checkpoint;
   if (checkpoint && state?.importedSeq === undefined) {
-    // The checkpoint's summary opens the transcript's context, as a
-    // compaction of its own would; the messages after it follow.
     state = await harness.commit(async (tx) => {
       const doc = await tx.doc(JournalSyncDoc, root.id);
       if (doc.importedSeq === undefined) {

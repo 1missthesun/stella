@@ -32,11 +32,6 @@ type SelectedTextContextSectionProps = {
   setChatContext: SetChatContext;
 };
 
-/* The chip visuals live entirely in the shared components
- * (`ContextPill`, `ImageAttachmentChip`, `FileAttachmentChip`) so the
- * composer and the sent message row cannot drift apart. The variant maps
- * below only add layout constraints (the compact composer's tighter width
- * cap) plus the pending-capture shimmer's size classes. */
 const pillVariantClassNames = {
   full: {
     containerClassName: null,

@@ -40,10 +40,6 @@ import {
 } from "./support.js";
 import { OrchestratorTurnLifecycle } from "./turn-lifecycle.js";
 
-/**
- * The turn queue, exact cancellation, orphan resume, and desktop-local turn
- * leases.
- */
 export abstract class OrchestratorTurnQueue extends OrchestratorTurnLifecycle {
   protected async cancelTurn(turnId: string): Promise<void> {
     const localLease =
@@ -77,12 +73,8 @@ export abstract class OrchestratorTurnQueue extends OrchestratorTurnLifecycle {
     options: { resume?: boolean } = {},
   ): void {
     if (this.turnExecutions.has(turn.turnId)) return;
-    // Failures surface through the turn's own terminal event; the queue
-    // must survive them.
     const preceding = this.queue;
     const enqueuedAt = performance.now();
-    // This permit exists only in the admitting isolate and only for an idle
-    // queue. Durable replays, alarms and queued work always revalidate remotely.
     const admission =
       freshAdmission && this.turnExecutions.size === 0 && !this.activeTurnId
         ? {
@@ -104,8 +96,6 @@ export abstract class OrchestratorTurnQueue extends OrchestratorTurnLifecycle {
           ),
         ),
       onInterrupt: () => {
-        // Before the run starts, the turn latch and the admission checks below
-        // are authoritative.
         if (this.activeTurnId === turn.turnId) this.currentPiRun?.abort();
       },
     });
@@ -122,12 +112,6 @@ export abstract class OrchestratorTurnQueue extends OrchestratorTurnLifecycle {
     this.ctx.waitUntil(this.queue);
   }
 
-  /**
-   * Exact placement Stop boundary. Target inspection and durable staging share
-   * one critical section, so an unknown/queued turn cannot arrive later and run.
-   * A current turn is acknowledged only after its exact execution promise has
-   * settled; a newer current turn is never touched.
-   */
   protected async cancelExactChatTurn(
     request: ExactTurnCancellationRequest,
   ): Promise<Response> {
@@ -377,18 +361,6 @@ export abstract class OrchestratorTurnQueue extends OrchestratorTurnLifecycle {
     }
   }
 
-  /**
-   * On wake, the turn a replaced isolate was running (a deploy, an eviction)
-   * and whether to resume it. Bounded: at most
-   * {@link CHAT_RESUME_MAX} resumes per turn, counted durably here before the
-   * resumed loop runs; only turns younger than {@link CHAT_RESUME_MAX_AGE_MS};
-   * and only while the original watchdog, which a resume never extends,
-   * leaves room. A refused turn is left exactly as before resume existed: the
-   * watchdog times it out, or the next turn's admission fails it.
-   *
-   * `resume: false` is a turn lost before its prompt was journaled: it simply
-   * runs again, still counted, still under its original watchdog.
-   */
   protected async claimOrphanedTurnResume(): Promise<{
     turn: ChatTurnRequest;
     resume: boolean;
@@ -404,8 +376,6 @@ export abstract class OrchestratorTurnQueue extends OrchestratorTurnLifecycle {
         this.getTurnState<ChatTurnResumeRecord | null>(CHAT_TURN_RESUME_KEY),
         this.getTurnState<ChatTurnRequest>(`queued:${turn.turnId}`),
       ]);
-    // A still-queued copy means the claim itself was interrupted; the queue
-    // replay below runs it from the top.
     if (terminal || delivered || queued) return null;
     if (this.journal.turnState(turn.turnId)?.state === "terminal") return null;
     const now = Date.now();
@@ -491,9 +461,6 @@ export abstract class OrchestratorTurnQueue extends OrchestratorTurnLifecycle {
       lease.cancelRequested &&
       (!Number.isFinite(lease.cancelDeadlineAt) || lease.cancelDeadlineAt! <= 0)
     ) {
-      // A deployment-era or crash-recovered cancellation without a deadline
-      // gets a full new desktop ACK grace. It must never fall back to the
-      // older provider lease expiry and retire immediately.
       lease.cancelDeadlineAt = Date.now() + LOCAL_TURN_CANCEL_GRACE_MS;
       await this.ctx.storage.put(LOCAL_TURN_LEASE_KEY, lease);
     }
@@ -612,12 +579,6 @@ export abstract class OrchestratorTurnQueue extends OrchestratorTurnLifecycle {
     if (terminalRecord) this.publish(terminalRecord);
     this.live = null;
     this.hub.endTurn(claimed.turnId);
-    // Keep the single-writer fence during a short cancellation handshake.
-    // The desktop runtime's control heartbeat observes the terminal receipt,
-    // aborts its provider, and replays a canceled finish, whose receipt path
-    // releases immediately. If the desktop is gone, the alarm force-releases
-    // after the bounded grace instead of admitting conflicting work at the
-    // instant another client presses Stop.
     if (forceRelease) {
       await this.unregisterOwnerTurn(claimed);
       await this.releaseLocalLeaseAndResume(claimed);
@@ -794,7 +755,6 @@ export abstract class OrchestratorTurnQueue extends OrchestratorTurnLifecycle {
     });
   }
 
-  // Implemented by `OrchestratorRunTurn`.
   protected abstract runTurn(
     turn: ChatTurnRequest,
     turnCancellation: TurnRetryCancellation,

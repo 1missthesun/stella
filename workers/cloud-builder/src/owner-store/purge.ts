@@ -1,34 +1,16 @@
-/**
- * Deleting conversations. A conversation's transcript and its R2 segments
- * live in its `OrchestratorSession`, so only that object can say they are
- * gone: the owner object asks it (`POST /purge`) and deletes its own rows for
- * the conversation only once it has said so.
- *
- * Two paths share this:
- *  - `conversations.purge`, the job scheduled when a `conversation.deleted`
- *    event lands. The conversation row stays as a tombstone so late events
- *    cannot bring it back.
- *  - `purgeConversationData`, the reset/delete hook. It purges every
- *    conversation this object knows (the index and the agent threads under
- *    it), then deletes the rows outright.
- */
-
 import { USAGE_LIMIT_AGENT_JOB, USAGE_LIMIT_CONVERSATION_JOB } from "./domains/agent-threads.js";
 import { deleteConversationAgentEvents } from "./domains/agent-events.js";
 import { deleteConversationAgentLogs } from "./domains/agent-logs.js";
 import { AGENT_REPORT_JOB, deleteConversationAgentReports } from "./domains/agent-reports.js";
 import type { JobDef, OwnerContext, OwnerDb, OwnerJobs, PurgeDef } from "./registry.js";
 
-/** Orchestrator purges per hook call; the caller calls again while pending. */
 const PURGE_BATCH = 25;
-/** The job retries on its own backoff; give a stuck orchestrator a day of it. */
 const PURGE_JOB_MAX_ATTEMPTS = 30;
 
 export const CONVERSATION_PURGE_JOB = "conversations.purge";
 
 export type ConversationPurgeJob = { conversationId: string };
 
-/** Schedule the purge of one deleted conversation. Idempotent per conversation. */
 export const scheduleConversationPurge = (
   jobs: OwnerJobs,
   conversationId: string,
@@ -42,11 +24,6 @@ export const scheduleConversationPurge = (
   );
 };
 
-/**
- * Ask the conversation's orchestrator to delete its storage. True only when it
- * confirmed: an incomplete drain answers 202 `{purged:false}`, which is still
- * `ok`, so the body decides.
- */
 const purgeOrchestrator = async (
   env: Cloudflare.Env,
   conversationId: string,
@@ -64,7 +41,6 @@ const purgeOrchestrator = async (
   }
 };
 
-/** Delete the agent threads, attempts and their side rows under one conversation. */
 const deleteThreadRows = (db: OwnerDb, jobs: OwnerJobs, conversationId: string): void => {
   const turns = db.all<{ turn_id: string }>(
     `SELECT turn_id FROM agent_turns WHERE conversation_id = ?
@@ -124,12 +100,10 @@ const runConversationPurge = async (ctx: OwnerContext, payload: unknown): Promis
   const { conversationId } = payload as ConversationPurgeJob;
   if (typeof conversationId !== "string" || !conversationId) return;
   if (!(await purgeOrchestrator(ctx.env, conversationId))) {
-    // Thrown so the store retries with backoff; the rows stay until then.
     throw new Error("The conversation's storage is not purged yet.");
   }
   deleteThreadRows(ctx.db, ctx.jobs, conversationId);
   deleteConversationCatchUps(ctx.db, ctx.jobs, conversationId);
-  // Keep the tombstone, without the user's words.
   ctx.db.run(
     `UPDATE conversations SET title = '', last_preview = NULL, last_role = NULL, activity = NULL
       WHERE conversation_id = ? AND deleted_at IS NOT NULL`,
@@ -142,12 +116,6 @@ export const conversationPurgeJob: JobDef = {
   run: runConversationPurge,
 };
 
-/**
- * Reset and account deletion: purge every conversation's orchestrator, then
- * delete the conversation index, the main-conversation pin, the agent
- * threads and the edit receipts.
- * The owner is fenced with no turns running while this runs.
- */
 export const purgeConversationData: PurgeDef = async (ctx) => {
   const conversations = ctx.db.all<{ conversation_id: string }>(
     `SELECT conversation_id FROM conversations
@@ -170,7 +138,6 @@ export const purgeConversationData: PurgeDef = async (ctx) => {
   if (conversations.length === PURGE_BATCH || purged.some((entry) => !entry.purged)) {
     return { pending: true };
   }
-  // Every conversation is gone; what is left has no conversation to name.
   for (const kind of [
     "agentThreads.dispatch",
     "agentThreads.deviceMessage",

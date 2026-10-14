@@ -59,7 +59,6 @@ const DDL = [
 export type OwnerModelGrantReader = Readonly<{
   ownerId: string;
   conversationId: string;
-  /** Orchestrator isolate nonce. A restarted reader must register a new value. */
   readerId: string;
   updatedAt: number;
   expiresAt?: number;
@@ -73,10 +72,8 @@ export type OwnerModelGrantIdentity = Readonly<{
   leaseId: string;
   fenceGeneration: string;
   memoryPolicy: MemoryPolicy;
-  /** Must equal the latest reader nonce registered for this conversation. */
   readerId: string;
   grantId: string;
-  /** Must be no later than the owner-fence lease expiry that protects the turn. */
   expiresAt: number;
 }>;
 
@@ -125,7 +122,6 @@ export type OwnerModelGrantFreezeRequest = Readonly<{
   ownerId: string;
   ownerGeneration: string;
   conversationId: string;
-  /** Latest Orchestrator isolate nonce known to OwnerGate for the conversation. */
   readerId: string;
   grants: readonly OwnerModelGrantFreezeGrant[];
 }>;
@@ -409,9 +405,6 @@ export class OwnerModelGrantStore {
     const now = this.now();
     this.ctx.storage.sql.exec(
       "DELETE FROM owner_model_grants WHERE expires_at <= ? OR state = 'retired'",
-      // Expiry closes new dispatch, but a request admitted just before it may
-      // still be running. Keep its reader discoverable for privacy revocation
-      // through the gateway's existing maximum request lifetime.
       now - GATEWAY_UPSTREAM_MAX_DURATION_MS,
     );
     this.ctx.storage.sql.exec(
@@ -691,8 +684,6 @@ export class OwnerModelGrantStore {
     }
     const failures: string[] = [];
     const revoked: string[] = [];
-    // All grants are durably closed before contacting readers. Freeze in
-    // parallel so a slow reader does not multiply the owner's exclusive wait.
     await Promise.all(
       Array.from(groups.values(), async (group) => {
         const first = group[0];

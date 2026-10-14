@@ -6,11 +6,6 @@ import {
 } from "@stella/contracts/protocol/rpc-peer";
 import type { WorkerConnection } from "./worker-lifecycle.js";
 
-/**
- * Two JSON-RPC peers wired back to back in one process. Each message is
- * copied through JSON, exactly what a socket would carry, and delivered on a
- * microtask so neither side re-enters the other synchronously.
- */
 export const createInprocPeerPair = (
   options: { onError?: (error: unknown) => void } = {},
 ): { left: JsonRpcPeer; right: JsonRpcPeer; close: () => void } => {
@@ -36,17 +31,8 @@ export const createInprocPeerPair = (
   return { left, right, close };
 };
 
-/**
- * The worker's side of an in-process host: whatever accepts one peer and
- * returns how to detach it (the worker's peer broker).
- */
 export type InprocWorkerAttach = (peer: JsonRpcPeer) => () => void;
 
-/**
- * A process-shaped handle for a worker that shares this process. The
- * lifecycle controller disconnects by ending `stdin` and waiting for `exit`;
- * here that detaches the peer. There is no process to kill.
- */
 const buildInprocProcessShim = (
   disconnect: () => void,
 ): WorkerConnection["process"] => {
@@ -75,7 +61,6 @@ const buildInprocProcessShim = (
   return emitter;
 };
 
-/** A `createConnectionAsync` for the lifecycle controller, in process. */
 export const buildInprocConnectionFactory = (
   attachWorker: InprocWorkerAttach,
   options: { onError?: (error: unknown) => void } = {},

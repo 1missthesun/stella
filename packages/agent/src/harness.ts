@@ -1,8 +1,3 @@
-/**
- * The one Stella harness, whichever host opens it: the same registry,
- * settings and documents over the desktop's SQLite file or the
- * orchestrator Durable Object's SQLite.
- */
 import type { Context } from "@earendil-works/chord";
 import type { ModelThinkingLevel, Models } from "@earendil-works/pi-ai";
 import type { AgentLineage } from "@stella/contracts/agent-depth";
@@ -33,10 +28,6 @@ import type { StellaContextSources } from "./stella/context.ts";
 import { STELLA_AGENT_TOOLS, stellaToolExtensions, type StellaToolHost } from "./stella/host-tools.ts";
 import { stellaPromptExtension } from "./stella/prompt-extension.ts";
 
-/**
- * The managed lane answers a whole completion at once, so one request may
- * legitimately run as long as the gateway lets a completion run.
- */
 const MODEL_REQUEST_TIMEOUT_MS = 30 * 60 * 1000;
 
 export const STELLA_DEFAULT_ALIAS = "stella/default";
@@ -46,7 +37,6 @@ export const stellaModelRef = (agentType: "orchestrator" | "general", alias = ST
   modelId: stellaModelId(agentType, alias),
 });
 
-/** Run policy shared by every Stella conversation. */
 export const stellaHarnessSettings = (overrides: Partial<HarnessSettings> = {}): HarnessSettings => ({
   stream: { timeoutMs: MODEL_REQUEST_TIMEOUT_MS, maxRetries: 0 },
   retry: { enabled: true, maxRetries: 3, baseDelayMs: 2_000, maxAgentDelayMs: 60_000 },
@@ -54,14 +44,12 @@ export const stellaHarnessSettings = (overrides: Partial<HarnessSettings> = {}):
   ...overrides,
 });
 
-/** What the orchestrator runs with: its own tools, without an agent's file, shell and host tools. */
 export const orchestratorAgent = (model: ModelRef) => ({
   model,
   tools: null,
   extensions: { remove: [StellaCoding, { name: STELLA_AGENT_TOOLS }], ...engineExtensionChange(model) },
 });
 
-/** Whether a root conversation's agent still offers what an agent has (it was configured by an older build). */
 export const offersAgentTools = (agent: Agent): boolean =>
   agent.extensions.some(
     (extension) => extension.name === STELLA_CODING_EXTENSION || extension.name === STELLA_AGENT_TOOLS,
@@ -71,11 +59,8 @@ export type StellaHarnessOptions = {
   storage: Storage;
   models: Models;
   sources: StellaContextSources;
-  /** Agents: where they may run and how their runs are admitted. */
   agents: StellaAgentsHost;
-  /** Stella's own tools, run by the host. */
   tools?: StellaToolHost;
-  /** Further extensions the host offers, after Stella's own. */
   extensions?: readonly Extension[];
   env?: HarnessOptions["env"];
   settings?: HarnessSettings;
@@ -85,9 +70,7 @@ export type StellaHarnessOptions = {
 export type OpenStellaHarness = {
   harness: Harness;
   registry: Registry;
-  /** Offer the host's tools as they are now (its catalog changed). */
   refreshTools(): void;
-  /** Start an agent the host asked for (see `stellaAgents`). */
   startAgent(
     args: {
       key: string;
@@ -97,45 +80,31 @@ export type OpenStellaHarness = {
       origin?: AgentOrigin;
       model?: ModelRef;
       thinkingLevel?: ModelThinkingLevel;
-      /** It may have run elsewhere before (it moved here): its first run takes its log first. */
       catchUp?: boolean;
-      /** Where it sits among Stella's agents; absent, it is one of Stella's own. */
       lineage?: AgentLineage;
     },
     context: Context,
   ): Promise<{ threadId: string; existing: boolean }>;
-  /** One of the orchestrator's agents that may have run elsewhere since: its next run takes its log first. */
   markCatchUp(threadId: string, context: Context): Promise<void>;
-  /**
-   * Stop one of the orchestrator's agents, or one of theirs, and every agent
-   * below it, by thread id; undefined when none here has that id. Answers
-   * which stopped here (`local`) and how those that run elsewhere stopped.
-   */
   stopAgent(threadId: string, context: Context): Promise<{ local: string[]; elsewhere: AgentStopResult[] } | undefined>;
-  /** Where one of the orchestrator's agents, or one of theirs, stands; undefined when none here has that id. */
   agentStanding(
     threadId: string,
     context: Context,
   ): Promise<
     | {
         status: StellaAgentRecord["status"];
-        /** It was stopped, or its latest run stopped before it answered. */
         stopped?: true;
         agentStatus: StellaAgentRecord["agentStatus"];
         attempt: number;
       }
     | undefined
   >;
-  /** The orchestrator's agents, as the app lists them. */
   agentRecords(context: Context): Promise<StellaAgentRecord[]>;
-  /** A message from the user to one of the orchestrator's agents, or one of theirs. */
   messageAgent(
     args: { key: string; threadId: string; message: string; fromOrchestrator?: boolean },
     context: Context,
   ): Promise<void>;
-  /** An agent another host placed here, run to its answer. */
   runPlacedAgent(args: PlacedAgentRun, context: Context): Promise<PlacedAgentResult>;
-  /** A message for an agent another host placed here; false when it is not here. */
   steerPlacedAgent(args: { key: string; agentKey: string; message: string }, context: Context): Promise<boolean>;
 };
 

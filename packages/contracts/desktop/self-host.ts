@@ -1,10 +1,7 @@
 import type { PairingStatusResponse, ServerDiscovery } from "../self-host.js";
 
-/** Which Stella server this desktop install talks to. */
 export type DesktopServerState = {
-  /** The launcher reads `server.json`, so this desktop can switch servers. */
   canSwitch: boolean;
-  /** This install runs against a self-hosted server picked by pairing. */
   selfHosted: boolean;
   serverId: string | null;
   name: string | null;

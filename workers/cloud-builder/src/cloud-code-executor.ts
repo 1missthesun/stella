@@ -82,20 +82,14 @@ export type CloudCodeToolCallContext = Readonly<{
   rawName: string;
   sanitizedName: string;
   signal: AbortSignal;
-  /** Present only after an explicit approval gate approved this exact call. */
   approvalId?: string;
 }>;
 
 export type CloudCodeToolDefinition = Readonly<{
-  /**
-   * The canonical host-side name. Code Mode exposes its exact sanitized form
-   * in generated JavaScript and dispatches back to this raw name.
-   */
   rawName: string;
   description: string;
   inputSchema: CloudCodeJsonSchema;
   outputSchema?: CloudCodeJsonSchema;
-  /** Required explicitly so a newly-added side-effecting tool cannot default open. */
   approval: CloudCodeToolApproval;
   execute: (
     input: unknown,
@@ -110,9 +104,7 @@ export type CloudCodeToolNameMapping = Readonly<{
 }>;
 
 export type PreparedCloudCodeTools = Readonly<{
-  /** TypeScript declarations to place in the model-facing code-tool prompt. */
   typeDeclarations: string;
-  /** Exact, collision-checked mapping used by the RPC dispatcher. */
   nameMappings: readonly CloudCodeToolNameMapping[];
 }>;
 
@@ -175,10 +167,8 @@ export type CloudCodeExecutionRequest = Readonly<{
   timeoutMs?: number;
   signal?: AbortSignal;
   approvalGate?: CloudCodeApprovalGate;
-  /** `$`-named intrinsics; every key must be in CLOUD_CODE_INTRINSIC_NAMES. */
   intrinsics?: Readonly<Record<string, CloudCodeIntrinsic>>;
   dynamicTools?: Readonly<Record<string, CloudCodeIntrinsic>>;
-  /** Host-only diagnostics. The original error is never sent to generated code. */
   onToolError?: (
     error: unknown,
     context: CloudCodeToolCallContext,
@@ -290,13 +280,6 @@ export class CloudCodeConfigurationError extends Error {
   }
 }
 
-/**
- * A nested tool's own model-visible failure. Unlike a host exception, this
- * is the tool telling the model what went wrong (the device kernel throws
- * the tool's `error` text into the REPL the same way), so it rejects the
- * awaiting call inside the sandbox — catchable by generated code — instead
- * of failing the whole execution.
- */
 export class CloudCodeNestedToolError extends Error {
   constructor(message: string) {
     super(message);
@@ -314,12 +297,6 @@ const nestedErrorMessage = (error: unknown): string => {
   return truncateUtf8(raw, MAX_NESTED_ERROR_CHARS, "[error truncated]");
 };
 
-/**
- * Sandbox intrinsics (`tools.$search`, `tools.$describe`, `connect.*`)
- * resolved host-side. They share the RPC bridge and value bounds with tools
- * but are not metered as nested tool calls, matching the device kernel where
- * `$search`/`$describe` are catalog lookups rather than tool executions.
- */
 export type CloudCodeIntrinsic = (
   input: unknown,
   context: Readonly<{ executionId: string; signal: AbortSignal }>,
@@ -338,11 +315,6 @@ const assertToolName = (rawName: string): void => {
   }
 };
 
-/**
- * Validate and freeze the catalog once, before exposing its declarations to a
- * model. Both the declarations and runtime dispatch use Cloudflare's own
- * `sanitizeToolName`, and ambiguous sanitized names are rejected.
- */
 export const prepareCloudCodeTools = async (
   tools: readonly CloudCodeToolDefinition[],
 ): Promise<PreparedCloudCodeTools> => {
@@ -839,9 +811,6 @@ const createProvider = (
             throw new Error("Cloud code execution was canceled.");
           }
           if (error instanceof CloudCodeNestedToolError) {
-            // The tool's own report: reject this one call so generated
-            // code can catch it, the way the device REPL rethrows a tool's
-            // `error` text. Host exceptions below stay opaque and fatal.
             throw new Error(nestedErrorMessage(error));
           }
           try {
@@ -867,21 +836,11 @@ const createProductionExecutor: CloudCodeExecutorFactory = (options) =>
     timeout: options.timeout,
   });
 
-/**
- * Production entry point. Each call creates a fresh Stella-owned Dynamic
- * Worker. `globalOutbound` is `null` and there are no bindings; there is no
- * override for modules.
- */
 export const executeCloudCode = (
   request: CloudCodeExecutionRequest,
 ): Promise<CloudCodeExecutionResult> =>
   executeCloudCodeWithExecutorFactory(request, createProductionExecutor);
 
-/**
- * Testable seam for the package executor. Production code should call
- * `executeCloudCode`; this function exists so policy, cancellation, and
- * cleanup can be verified without starting workerd.
- */
 export const executeCloudCodeWithExecutorFactory = async (
   request: CloudCodeExecutionRequest,
   executorFactory: CloudCodeExecutorFactory,

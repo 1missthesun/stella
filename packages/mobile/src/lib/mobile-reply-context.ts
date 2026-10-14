@@ -26,7 +26,6 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
     ? (value as Record<string, unknown>)
     : null;
 
-/** The thread a `spawn_agent` result started; a computer's turn mirrors only the tool's JSON text. */
 const spawnResultThreadId = (record: JournalMessageRecord): string | null => {
   const toolName = record.payload.toolName;
   if (record.role !== "toolResult" || record.payload.isError === true) return null;
@@ -41,12 +40,6 @@ const spawnResultThreadId = (record: JournalMessageRecord): string | null => {
   }
 };
 
-/**
- * Compact one-line excerpt of a task's result for a fileless completion
- * (desktop parity: the AgentCompletionCard's summary). Block markdown goes,
- * links keep their text, whitespace collapses, and a long result is cut at
- * a word boundary.
- */
 export function summaryExcerpt(result: string): string {
   const compact = result
     .replace(/```[\s\S]*?```/g, " ")
@@ -62,20 +55,6 @@ export function summaryExcerpt(result: string): string {
   return `${cut.trimEnd()}…`;
 }
 
-/**
- * Lifecycle cards onto transcript rows, matching desktop:
- *   - the turn that spawned a task carries the spawn card, which settles
- *     (done / failed) when the task's terminal card arrives;
- *   - the reply that relays a settled task's outcome carries a completion
- *     card (and so the task's pill) whether the task completed, failed or
- *     was canceled; a completed one adds a result excerpt and the task's
- *     produced files, which feed the activity hub but never render on the
- *     reply;
- *   - files the journal reports under a spawn turn belong to that task, so
- *     they ride its completion card and never attach to any reply.
- * Rows anchor on the turn's visible replies by journal order, never on a
- * particular reply existing at the moment a card is read.
- */
 export function projectMobileLifecycle(messages: ChatMessage[], records: readonly JournalRecord[], conversationId: string): ChatMessage[] {
   const journal = journalAgents(records);
   const titles = new Map<string, string>();
@@ -90,12 +69,10 @@ export function projectMobileLifecycle(messages: ChatMessage[], records: readonl
     rows.push({ seq: record.seq, message });
     assistantsByTurn.set(record.turnId, rows);
   }
-  /** The reply a card rides: the last one before it, else the first after. */
   const anchorBefore = (turnId: string, seq: number) => {
     const rows = assistantsByTurn.get(turnId) ?? [];
     return rows.filter(row => row.seq < seq).at(-1)?.message ?? rows[0]?.message;
   };
-  /** The reply that relays a result: the first one after the card, else the last. */
   const anchorAfter = (turnId: string, seq: number) => {
     const rows = assistantsByTurn.get(turnId) ?? [];
     return rows.find(row => row.seq > seq)?.message ?? rows.at(-1)?.message;
@@ -139,7 +116,6 @@ export function projectMobileLifecycle(messages: ChatMessage[], records: readonl
       if (artifact?.payload.kind === "agent-work") {
         artifact.payload = { ...artifact.payload, state: "done", completed: event.type === "agent-completed" ? 1 : 0, failed: event.type !== "agent-completed" };
       }
-      // A stopped agent reports nothing, so its card has no completion.
       const stopped =
         event.type === "agent-canceled" &&
         ((event.payload.status as string | undefined) === "paused" || isAgentStopReason(event.payload.error));
@@ -160,10 +136,6 @@ export function projectMobileLifecycle(messages: ChatMessage[], records: readonl
     if (turn) turn.push(record);
     else turns.set(record.turnId, [record]);
   }
-  // A turn a computer ran is mirrored without lifecycle cards: its spawns are
-  // `spawn_agent` results and its outcomes the hidden report the agent sent.
-  // Give each such spawn the card a cloud turn would have carried, settled
-  // by what the journal last said about the task (desktop parity).
   const carded = new Set<string>();
   for (const record of records) {
     if (record.kind === "card" && record.card.type === "agent-lifecycle") carded.add(record.card.event.payload.agentId);
@@ -219,9 +191,6 @@ export function projectMobileLifecycle(messages: ChatMessage[], records: readonl
     } };
     attach(message, [card]);
   }
-  // A spawn that only recorded its description (a locally executed turn
-  // mirrored into the journal) still names the task: its description is the
-  // thread id's slug.
   const descriptions = messages.flatMap(message => message.spawnedDescriptions ?? []);
   const titleFor = (ref: Extract<ReplyRef, { kind: "agent" }>) =>
     titles.get(ref.threadId) ||
@@ -247,15 +216,12 @@ export function projectMobileLifecycle(messages: ChatMessage[], records: readonl
   } : {}) }));
 }
 
-/** Lifecycle state of a task as the transcript's work cards last saw it. */
 export type MobileAgentState = "running" | "completed" | "error" | "canceled";
 
 export type MobileReplyContexts = ReplyContextProjection & {
-  /** Latest known state per agent thread, for the quoted task's status glyph. */
   agentStates: ReadonlyMap<string, MobileAgentState>;
 };
 
-/** Threads a row started: spawn cards and spawn tool calls, never a completion card. */
 const agentIdsOf = (message: ChatMessage): string[] => {
   const ids: string[] = [...(message.spawnedThreadIds ?? [])];
   for (const artifact of message.artifacts ?? []) {
@@ -266,18 +232,6 @@ const agentIdsOf = (message: ChatMessage): string[] => {
   return ids;
 };
 
-/**
- * Apply the shared reply-context rule (`@stella/contracts/reply-context`) to
- * the mobile transcript. Same outcome as desktop: one quotable reference per
- * assistant row that reaches outside its exchange, and a distant-reply count
- * per original message for the "N replies" badge.
- */
-/**
- * Agent threads each row owns: spawned by thread id, or by a spawn
- * description matched to a task title the transcript knows (a cited title,
- * a work card, or the thread id's slug). One rule for reply context and the
- * focused chain, so the badge and the chain agree.
- */
 export function mobileOwnedAgentIds(messages: readonly ChatMessage[]): (message: ChatMessage) => string[] {
   const threadIdsByTitle = new Map<string, string[]>();
   const citedThreadIds = new Set<string>();
@@ -303,7 +257,6 @@ export function mobileOwnedAgentIds(messages: readonly ChatMessage[]): (message:
     const owned = agentIdsOf(message);
     for (const title of message.spawnedDescriptions ?? []) {
       for (const id of threadIdsByTitle.get(title.trim()) ?? []) if (!owned.includes(id)) owned.push(id);
-      // Last resort: the thread id is the description's slug.
       for (const id of citedThreadIds) if (!owned.includes(id) && titleNamesThread(title, id)) owned.push(id);
     }
     return owned;
@@ -338,11 +291,6 @@ export function mobileReplyContexts(messages: readonly ChatMessage[]): MobileRep
   return { ...projection, agentStates };
 }
 
-/**
- * The focused chain for one root. A task root: the turn that spawned it and
- * every reply citing it. A message root: the ask, its own turn's replies,
- * every reply citing it, and every update on the tasks that turn spawned.
- */
 export function mobileReplyLineage(messages: readonly ChatMessage[], root: ReplyRef): ChatMessage[] {
   const isRootMessage = (message: ChatMessage) => root.kind === "message" && (message.id === root.id || message.canonicalId === root.id);
   const rootIds = new Set<string>();

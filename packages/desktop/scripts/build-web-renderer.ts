@@ -1,16 +1,3 @@
-/**
- * Builds the renderer for the browser (see `electron/source/build-web.ts`).
- *
- *   bun packages/desktop/scripts/build-web-renderer.ts [--out <dir>] [--static-home] [--script-src <origin>]...
- *
- * Runs against the checkout it lives in. The default output is the website's
- * `public/chat-app/`; the desktop passes its own directory when it builds a
- * fork's renderer for upload. `--static-home` puts the static Home
- * (desktop-ui/web-static-home.html) in the page and links the entry's
- * stylesheets from it, for the shared build only. Each `--script-src` adds an
- * origin the page's CSP lets scripts load from.
- */
-
 import path from "node:path";
 import { buildWebRenderer, webBuildEnv, type StaticHomeRoot } from "../electron/source/build-web.js";
 import { deriveTokens, getThemeById, resolveThemeColors, THEME_CSS_VARS } from "../../theme/index.ts";

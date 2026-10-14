@@ -14,13 +14,9 @@ import type { WorkerInitializationState } from "../types.js";
 export const lifecycleHandlers: WorkerRpcHandlers = {
   [METHOD_NAMES.INTERNAL_WORKER_INITIALIZE]: (params) =>
     Effect.gen(function* () {
-      // Boot timeline starts the moment initialize is dispatched; sessions
-      // reports it once the runner is ready (worker.ready.timing).
       const timeline = new BootTimeline();
       const catalog = yield* ModelCatalog.Service;
       const sessions = yield* WorkerSessions.Service;
-      // Subscribe before the runner loads extensions or models.json so every
-      // successful initial/hot registry composition reaches the renderer.
       yield* fromPromise(() =>
         timeline.timeAsync("catalogSubscribe", () =>
           catalog.ensureSubscription(),
@@ -58,7 +54,6 @@ export const lifecycleHandlers: WorkerRpcHandlers = {
         protocolVersion: STELLA_RUNTIME_PROTOCOL_VERSION,
         pid: process.pid,
         deviceId: session?.config.deviceId ?? null,
-        // Turns and agents in flight; the same check idle shutdown uses.
         piBusy: session ? piChatsBusy(session) : false,
       };
     }),

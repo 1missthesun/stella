@@ -52,10 +52,6 @@ export const createCloudWebTool = (context: {
         { url, ...(prompt ? { prompt } : {}) },
         {
           guardUrl: (candidate) => normalizeSafePublicUrl(candidate),
-          // Same two protections the desktop tool applies: refuse a URL
-          // carrying a credential (exfiltration via a model-chosen
-          // query string), and redact secrets out of fetched page text
-          // before it becomes model-visible and lands in the transcript.
           checkSecretLikeToken: containsSecretLikeToken,
           sanitize: sanitizeToolVisibleText,
           userAgent: "Stella/1.0 (Cloud)",

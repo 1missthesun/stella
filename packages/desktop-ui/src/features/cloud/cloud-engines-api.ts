@@ -7,11 +7,9 @@ import type { ProviderSettings } from "@stella/contracts/backend/providers";
 import { backendClient } from "@/platform/backend/backend-client";
 import { useBackendValue } from "@/platform/backend/use-backend-view";
 
-/** The account's live engine settings; undefined while loading or skipped. */
 export const useCloudEngines = (enabled: boolean): EngineSettings | undefined =>
   useBackendValue("engines.get", enabled ? {} : "skip");
 
-/** Provider keys saved to the account; undefined while loading or skipped. */
 export const useAccountProviders = (
   enabled: boolean,
 ): ProviderSettings | undefined =>
@@ -30,18 +28,14 @@ export const cloudEnginesApi = {
       accountId,
       ...(deviceId ? { deviceId } : {}),
     }),
-  /** Start Claude Code's own sign-in in the owner's cloud container. */
   startClaudeCloudLogin: (email?: string) =>
     backendClient.call("engines.startClaudeCloudLogin", email ? { email } : {}),
-  /** Hand the code Anthropic showed to the cloud's waiting `claude auth login`. */
   finishClaudeCloudLogin: (loginId: string, code: string) =>
     backendClient.call("engines.finishClaudeCloudLogin", { loginId, code }),
   cancelClaudeCloudLogin: (loginId: string) =>
     backendClient.call("engines.cancelClaudeCloudLogin", { loginId }),
-  /** The Claude account every place uses; none for each place's own login. */
   chooseClaudeAccount: (accountId: string | null) =>
     backendClient.call("engines.chooseClaudeAccount", accountId ? { accountId } : {}),
-  /** Start Claude Code's own sign-in on another of the owner's computers. */
   startClaudeDeviceLogin: (deviceId: string, email?: string) =>
     backendClient.call("engines.startClaudeDeviceLogin", {
       deviceId,

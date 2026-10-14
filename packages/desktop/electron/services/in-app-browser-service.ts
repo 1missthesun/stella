@@ -63,45 +63,25 @@ type InAppBrowserServiceOptions = {
     extensionInstalled: boolean;
   };
   getBrowserBridgeStatus?: () => StellaBrowserBridgeStatus | undefined;
-  /**
-   * Which bridge this instance runs. An isolated bridge has no
-   * native-messaging registration and a private loopback port, so the user's
-   * browser extension cannot attach to it at all — a state no amount of
-   * clicking "connect" can fix, and one the error text has to own up to
-   * instead of blaming the extension.
-   */
   getBrowserBridgeNamespace?: () =>
     | { mode: "shared" | "isolated"; ownsExtensionChannel: boolean }
     | undefined;
   getExtensionStatus: () => Promise<boolean>;
-  /**
-   * Make the extension drop its link to the bridge and reconnect with a
-   * fresh handshake, so a link the daemon retired comes back.
-   */
   reconnectExtension?: () => Promise<void>;
   onStateChanged?: (state: BrowserViewState) => void;
   connectionTimeoutMs?: number;
   connectionPollMs?: number;
   automaticConnectionTimeoutMs?: number;
-  /** Total budget for reconnect-on-demand, across retries. Defaults to 30s. */
   demandConnectionTimeoutMs?: number;
   profilePath?: string;
   sessionFromPath?: typeof session.fromPath;
   createView?: (browserSession: Session) => WebContentsView;
   createDrawableHost?: () => BrowserWindow;
-  /**
-   * Keep the drawable host unmapped and force frames on demand instead of
-   * showing it offscreen. Defaults to true on Linux (see `ensureDrawableHost`).
-   */
   hideDrawableHost?: boolean;
   createId?: () => string;
   wait?: (delayMs: number) => Promise<void>;
   debuggerRecoveryTimeoutMs?: number;
   runtimeUserAgent?: string;
-  /**
-   * Opens `stella-preview://<draft>` for agents. Only set when Stella runs
-   * from source.
-   */
   openPreview?: (name: string) => Promise<InAppBrowserPreview>;
 };
 
@@ -113,16 +93,8 @@ const DEFAULT_CONNECTION_POLL_MS = 250;
 // several seconds on a cold start, so the first automatic connect gets a
 // forgiving window.
 const DEFAULT_AUTOMATIC_CONNECTION_TIMEOUT_MS = 5_000;
-// Reconnect-on-demand: when something actually asks for a web tab, a cold or
-// dead transport is a thing to repair, not to report. The daemon is restarted
-// and the extension re-polled across this budget before the call gives up, so
-// a slept service worker, an exited daemon or an app that outlived its bridge
-// recovers without a browser restart or a fresh agent run.
 const DEFAULT_DEMAND_CONNECTION_TIMEOUT_MS = 30_000;
-// Per-attempt poll windows inside that budget. Short first so a merely-asleep
-// service worker costs little, longer after so a full daemon respawn fits.
 const DEMAND_ATTEMPT_WINDOWS_MS = [2_000, 5_000, 10_000] as const;
-// Gap between attempts, so a daemon that is still booting is not hammered.
 const DEMAND_RETRY_BACKOFF_MS = [250, 1_000, 2_000] as const;
 const MAX_FAVICON_BYTES = 256 * 1024;
 
@@ -190,14 +162,8 @@ const clampBoundsToWindow = (
   };
 };
 
-/** How hard one `connect()` should try, and whether it may re-handshake. */
 type ConnectionAttemptOptions = {
-  /** Poll window for this attempt; defaults to the automatic-connect budget. */
   timeoutMs?: number;
-  /**
-   * Run the full handshake even though a seed already completed, so a bridge
-   * whose daemon died is restarted instead of merely re-probed.
-   */
   recover?: boolean;
 };
 
@@ -318,11 +284,6 @@ export class InAppBrowserService {
     return this.snapshot();
   }
 
-  /**
-   * The panel's Reconnect: a real reconnect, not a status re-probe. The
-   * extension's current link is retired so it handshakes again, then the
-   * bridge is brought back up with the same recovery the agents use.
-   */
   async reconnectExtension(): Promise<BrowserViewState> {
     if (this.disposed) throw new Error("The in-app browser has been closed.");
     const setupRequirement = this.readSetupRequirement();
@@ -353,9 +314,6 @@ export class InAppBrowserService {
   private async connectInternal(
     attempt: ConnectionAttemptOptions = {},
   ): Promise<BrowserViewState> {
-    // An extension that is already reachable needs only a re-probe; `recover`
-    // is how a caller asks for the real handshake again, so a bridge whose
-    // daemon has since exited is restarted rather than merely re-probed.
     if (this.state.connection === "connected" && !attempt.recover) {
       return await this.getState();
     }
@@ -368,11 +326,6 @@ export class InAppBrowserService {
     return this.snapshot();
   }
 
-  /**
-   * One full bridge handshake: start the daemon and wait for the extension.
-   * Idempotent and reusable, so recovering a bridge that was once up takes the
-   * same path as the first connect.
-   */
   private async runConnectionAttempt(attempt: {
     timeoutMs: number;
   }): Promise<boolean> {
@@ -440,8 +393,6 @@ export class InAppBrowserService {
         recover: true,
       });
       if (state.connection === "connected") return true;
-      // A requirement the user has to satisfy (no bridge binary, no extension
-      // installed) does not become true by retrying.
       if (!this.isRecoverableFailure()) return false;
       const backoffMs =
         DEMAND_RETRY_BACKOFF_MS[
@@ -453,7 +404,6 @@ export class InAppBrowserService {
     return this.state.connection === "connected";
   }
 
-  /** Whether another attempt could plausibly succeed. */
   private isRecoverableFailure(): boolean {
     const reason = this.connectionUnavailableReason;
     if (!reason) return true;
@@ -519,8 +469,6 @@ export class InAppBrowserService {
           webviewTag: false,
         },
       });
-    // Match the session UA on the tab's WebContents so navigator.userAgent and
-    // outgoing request headers present the same runtime Chromium version.
     try {
       view.webContents.setUserAgent(this.browserUserAgent);
     } catch {
@@ -563,10 +511,6 @@ export class InAppBrowserService {
     return tab;
   }
 
-  /**
-   * The app's own UI from a draft worktree, as an ordinary tab of the owner,
-   * so drawable mounting, screenshots, CDP and the browser panel all apply.
-   */
   private async createPreviewTab(name: string, ownerId: string) {
     const openPreview = this.options.openPreview;
     if (!openPreview) {
@@ -574,7 +518,6 @@ export class InAppBrowserService {
         "Stella previews are available only when Stella runs from source.",
       );
     }
-    // One preview per draft: its session serves one source tree.
     for (const existing of this.tabs.all()) {
       if (existing.preview?.name !== name) continue;
       existing.preview.dispose();
@@ -604,10 +547,6 @@ export class InAppBrowserService {
     return tab.id;
   }
 
-  /**
-   * Why the login link is down, in words the reader can act on. The browser
-   * itself works regardless; this only explains why pages open signed out.
-   */
   private describeConnectionFailure(
     reason: BrowserViewUnavailableReason | undefined,
     error: string | undefined,
@@ -616,9 +555,6 @@ export class InAppBrowserService {
     const withDetail = (message: string) =>
       detail && detail !== message ? `${message} (${detail})` : message;
     const namespace = this.options.getBrowserBridgeNamespace?.();
-    // An isolated bridge has no native-messaging host and a private loopback
-    // port, so the extension cannot attach to it however many times it is
-    // reinstalled or reconnected. Say so instead of blaming the extension.
     if (
       namespace &&
       namespace.mode === "isolated" &&
@@ -783,10 +719,6 @@ export class InAppBrowserService {
     return true;
   }
 
-  /**
-   * An agent asking to show its tab (`tab.show()`): the panel switches to it.
-   * Nothing else an agent does switches the panel.
-   */
   async activateDebuggerTarget(tabId: string, ownerId?: string): Promise<void> {
     await this.selectTab({
       tabId,
@@ -812,11 +744,6 @@ export class InAppBrowserService {
     );
   }
 
-  /**
-   * Lights the tab's activity dot while an agent drives it, and clears it
-   * once the agent has been quiet for a moment. State is emitted only when
-   * the dot turns on or off, not per command.
-   */
   private markAgentActivity(tabId: string) {
     const tab = this.tabs.get(tabId);
     if (!tab) return;
@@ -897,8 +824,6 @@ export class InAppBrowserService {
         this.profilePath,
         { cache: true },
       );
-      // Derive from Electron's actual runtime UA. A hardcoded Chrome version
-      // diverges from Sec-CH-UA as soon as Electron updates.
       const runtimeUserAgent =
         this.options.runtimeUserAgent ?? this.browserSession.getUserAgent?.();
       this.browserUserAgent = buildInAppBrowserUserAgent(runtimeUserAgent);
@@ -1076,8 +1001,6 @@ export class InAppBrowserService {
           },
         };
       }
-      // Non-auth navigations keep the existing anti-junk-tab behavior: reroute a
-      // normal web URL into an opener-less managed tab, and deny everything else.
       if (isAllowedNavigationUrl(url)) {
         void this.createTab({ url, ownerId: tab.ownerId }).catch((error) => {
           this.setError(errorMessage(error), tab.ownerId);
@@ -1159,10 +1082,6 @@ export class InAppBrowserService {
     error?: string;
   }) {
     this.state.connection = "disconnected";
-    // Always carry a description of what is actually wrong. Most reasons
-    // arrive with no error string, which used to leave `state.error` empty —
-    // and an empty error is what made every caller fall back to its own
-    // guess ("connect the extension") regardless of the real reason.
     this.connectionError = this.describeConnectionFailure(
       failure.reason,
       failure.error,

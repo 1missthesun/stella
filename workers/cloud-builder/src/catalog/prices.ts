@@ -2,15 +2,8 @@ import type { GatewayModelPrice } from "@stella/contracts/gateway/usage";
 import { listManagedModelIds } from "@stella/model-catalog/model";
 import { STATIC_MANAGED_MODEL_PRICE_OVERRIDES } from "@stella/model-catalog/pricing";
 
-/**
- * Managed model prices in D1 (`model_prices`, migration 0002), synced daily
- * from models.dev by the Cron Trigger. The model gateway prices requests with
- * them (`BillingControl.gatewayConfig()`) and the public catalog shows them.
- */
-
 const MODELS_DEV_API_URL = "https://models.dev/api.json";
 const MODELS_DEV_TIMEOUT_MS = 30_000;
-/** Prices change daily at most; a warm isolate rereads D1 this often. */
 const PRICES_CACHE_MS = 5 * 60_000;
 
 type ModelsDevModelEntry = {
@@ -62,7 +55,6 @@ const stripSnapshotSuffix = (model: string): string | null => {
   return withoutMonthDay !== model ? withoutMonthDay : null;
 };
 
-/** Exact id first, then the undated family id of a dated snapshot. */
 const lookupCandidates = (model: string): string[] => {
   const normalized = model.trim();
   if (!normalized) return [];
@@ -168,10 +160,6 @@ const buildPriceRows = (data: ModelsDevApi, modelIds: string[], syncedAt: number
   return { rows, missing };
 };
 
-/**
- * The daily sync. Every resolved row is written before an incomplete catalog
- * is reported, so one newly added model never holds back every other price.
- */
 export async function syncModelPrices(env: Pick<Cloudflare.Env, "DB">): Promise<{ upserted: number }> {
   const db = database(env);
   const response = await fetch(MODELS_DEV_API_URL, { signal: AbortSignal.timeout(MODELS_DEV_TIMEOUT_MS) });
@@ -226,11 +214,6 @@ type StoredPrice = {
 
 let pricesCache: { at: number; value: ManagedModelPrices } | null = null;
 
-/**
- * The price of every managed model id: its synced row (or its undated family
- * row), else the static fill-in. Models with neither are left out; the
- * gateway prices those at its default.
- */
 export async function readManagedModelPrices(env: Pick<Cloudflare.Env, "DB">): Promise<ManagedModelPrices> {
   const now = Date.now();
   if (pricesCache && now - pricesCache.at < PRICES_CACHE_MS) return pricesCache.value;

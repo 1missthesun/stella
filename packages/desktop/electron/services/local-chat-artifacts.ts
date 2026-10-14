@@ -72,10 +72,8 @@ export type LocalChatSyncMessageWithArtifacts = {
   role: "user" | "assistant";
   text: string;
   timestamp: number;
-  /** Durable SessionStore row behind this potentially synthetic projection. */
   sourceMessageId: string;
   sourceTimestamp: number;
-  /** Owning message's monotonic ordering key, when the sequence migration is live. */
   sequence?: number;
   requestId?: string;
   deviceId?: string;

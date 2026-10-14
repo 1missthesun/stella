@@ -15,25 +15,10 @@ export { AppReleaseChannel } from "./app-source-releases.js";
 export { SitesHost } from "./slack/previews.js";
 export { SlackPreviewAssets, SlackPreviewBindings, SlackPreviewData, SlackPreviewOutbound } from "./slack/preview-worker.js";
 
-/**
- * Every sandbox, of either size and either workload, is one object in this
- * namespace; it starts its container through `ctx.container`. `SandboxCode`
- * hands an agent container this version's code bundle as it starts.
- */
 export { Sandbox, SandboxCode, SandboxEgress } from "./sandbox-container.js";
 
-/**
- * Moves a world's caches and dependencies archive between its container and
- * `BACKUP_BUCKET`; the sandbox object reaches it through `ctx.exports`.
- */
 export { DirectoryBackupGateway } from "@cloudflare/sandbox";
 
-/**
- * Run a strict (`set -eu`) script scoped to a subshell. The subshell's exit
- * status is the script's.
- * Defined in `shell-subshell.ts` so the checkpoint archive scripts share it
- * without importing this module.
- */
 export { inSubshell };
 export class BuildSession extends DurableObject<Env> {
   private implementation?: Promise<

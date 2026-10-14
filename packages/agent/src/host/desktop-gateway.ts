@@ -1,10 +1,3 @@
-/**
- * The desktop's lane to the model gateway: the Better Auth JWT is exchanged
- * for a session capability bound to this device's ed25519 key, and every
- * relay request proves possession of that key (DPoP). This is the transport
- * Stella's current routes use (`model-routing-stella.ts`), handed to the
- * `stella` provider as its `StellaGatewayAccess`.
- */
 import {
   GATEWAY_REQUEST_ID_HEADER,
   GATEWAY_RESOLVE_PATH,
@@ -35,11 +28,6 @@ const errorCode = async (response: Response): Promise<unknown> => {
   }
 };
 
-/**
- * 402 budget or usage limit, or 429 request-limit on this capability: one
- * fresh exchange is allowed (an upgrade since the capability was minted is
- * picked up by the fresh one).
- */
 const capabilityExhausted = async (response: Response): Promise<boolean> => {
   if (response.status !== 402 && response.status !== 429) return false;
   const code = await errorCode(response);
@@ -103,7 +91,6 @@ export function desktopGatewayAccess(options: DesktopGatewayOptions): StellaGate
   };
 }
 
-/** Ask the gateway how it serves `alias` for each agent type. */
 export async function resolveStellaModels(
   access: StellaGatewayAccess,
   gatewayOrigin: string,

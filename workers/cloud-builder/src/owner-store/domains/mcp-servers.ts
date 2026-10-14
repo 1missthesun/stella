@@ -1,18 +1,3 @@
-/**
- * The account's custom MCP servers (`@stella/contracts/backend/mcp-servers`).
- *
- * A row says what the server is and where it is reached from. Remote servers
- * that need no sign-in are called straight from here; a stdio server, a
- * local-network URL, or a remote server whose credential a computer holds is
- * reached through that computer's presence socket while it is online and
- * accepting work. No credential, stdio command or environment is ever
- * stored here: computers keep those.
- *
- * Computers sync through the owner calls (`mcpServers.*`); cloud turns use
- * the internal operations (`mcp.*`), which also add servers and refresh a
- * directly reachable server's tools when its listing is stale.
- */
-
 import {
   MCP_SERVER_ID_PATTERN,
   mcpServerReach,
@@ -216,10 +201,6 @@ const ownerDevices = async (ctx: OwnerContext): Promise<DeviceDestination[]> =>
 const deviceLabel = (devices: readonly DeviceDestination[], deviceId: string): string =>
   devices.find((device) => device.deviceId === deviceId)?.label?.trim() || "your computer";
 
-// ---------------------------------------------------------------------------
-// Direct remote calls (servers that need no credential)
-// ---------------------------------------------------------------------------
-
 const sessions = new Map<string, McpHttpSession>();
 
 const directSession = (ownerId: string, record: McpServerRecord, timeoutMs: number) => {
@@ -269,10 +250,6 @@ const probeDirect = async (
     throw error;
   }
 };
-
-// ---------------------------------------------------------------------------
-// Reaching a server
-// ---------------------------------------------------------------------------
 
 type ToolCallResult = { result: unknown };
 
@@ -385,7 +362,6 @@ const callServer = async (
   }
 };
 
-/** Stale listings of directly reachable servers, refreshed in parallel. */
 const refreshStale = async (ctx: OwnerContext): Promise<void> => {
   const stale = listRecords(ctx.db).filter((record) => {
     if (mcpServerReach(record).kind !== "anywhere") return false;
@@ -404,10 +380,6 @@ const refreshStale = async (ctx: OwnerContext): Promise<void> => {
     }),
   );
 };
-
-// ---------------------------------------------------------------------------
-// Writes
-// ---------------------------------------------------------------------------
 
 const assertRoom = (ctx: OwnerContext, id: string) => {
   if (readRow(ctx.db, id)) return;
@@ -482,10 +454,6 @@ const rateLimit = (ctx: OwnerContext, key: string) =>
     { count: 120, windowMs: 60_000 },
     "Too many MCP server changes. Please wait a moment.",
   );
-
-// ---------------------------------------------------------------------------
-// Cloud `connect.addMcp`
-// ---------------------------------------------------------------------------
 
 type CloudAddResult = {
   server: McpServerRecord;
@@ -578,7 +546,6 @@ const addFromCloud = async (ctx: OwnerContext, raw: unknown): Promise<CloudAddRe
   return { server };
 };
 
-/** Cloud `<id>_authorize`: list the tools through the computer that signed in. */
 const authorizeFromCloud = async (ctx: OwnerContext, id: string): Promise<McpServerRecord> => {
   const record = requireRecord(ctx.db, id);
   const reach = mcpServerReach(record);
@@ -604,10 +571,6 @@ const authorizeFromCloud = async (ctx: OwnerContext, id: string): Promise<McpSer
   writeTools(ctx, record.id, { tools });
   return requireRecord(ctx.db, id);
 };
-
-// ---------------------------------------------------------------------------
-// Parsers
-// ---------------------------------------------------------------------------
 
 const idParser = string({ min: 1, max: 64, pattern: MCP_SERVER_ID_PATTERN });
 

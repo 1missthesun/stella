@@ -8,7 +8,6 @@ import {
 import type { AgentThreadSummary } from "@stella/contracts/backend/agent-threads";
 import { getBackendClient } from "./backend";
 
-/** The conversation's newest agents read as one list; running ones always come too. */
 const LEDGER_PAGE_SIZE = 30;
 
 type Lists = {
@@ -25,15 +24,6 @@ const client = (): ReturnType<typeof getBackendClient> | null => {
   }
 };
 
-/**
- * One cloud conversation's agents from the agent ledger: its newest agents,
- * every running one, and each agent in `ids` (cited in the transcript or
- * running by the journal's word) the list does not hold, looked up singly so
- * the answer says whether the ledger has a row at all. Identical views are
- * shared, so every caller in one conversation rides one subscription.
- * `null` as the conversation means a chat with no ledger: it reads
- * nothing and stays on the journal.
- */
 export function useConversationAgentLedger(
   conversationId: string | null,
   wantedIds: readonly string[],

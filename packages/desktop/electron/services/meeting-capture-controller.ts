@@ -6,22 +6,6 @@ import { resolveNativeHelperPath } from "../native-helper-path.js";
 import { pidIsAlive, terminateOwnedProcess } from "./process-identity.js";
 import { hasMacPermission, requestMacPermission } from "../utils/macos-permissions.js";
 
-/**
- * MeetingCaptureController owns the lifecycle of the `meeting_capture` native
- * sidecar — a Granola-style dual-stream recorder that writes rolling WAV
- * segments under `<stellaDataDir>/meetings/<sessionId>/`. System audio + mic are
- * captured via ScreenCaptureKit + AVAudioEngine on macOS, and WASAPI loopback +
- * WASAPI capture on Windows. The TS control surface is identical on both: it
- * shells out to the helper's client verbs, which talk to the daemon over an
- * AF_UNIX socket (macOS) or named pipe (Windows).
- *
- * Meeting capture is session-based rather than always-on:
- * the daemon stays idle until `start()` and only records between start and
- * stop. The daemon process itself is kept alive across recordings (cheap, and
- * avoids a cold ScreenCaptureKit spin-up per meeting); `shutdown()` tears it
- * down on app quit.
- */
-
 const STARTUP_TIMEOUT_MS = 4_000;
 const STARTUP_POLL_MS = 150;
 const STARTUP_POLL_MAX_MS = 1_200;
@@ -104,8 +88,6 @@ export class MeetingCaptureController {
 
   private async waitForDaemonReady(timeoutMs = STARTUP_TIMEOUT_MS): Promise<boolean> {
     const startedAt = Date.now();
-    // Each ping is a full helper-process spawn (Defender-scanned on Windows),
-    // so back off exponentially instead of re-spawning every 150ms.
     let pollMs = STARTUP_POLL_MS;
     while (Date.now() - startedAt < timeoutMs) {
       if ((await this.runCommand(["ping"])) === "pong") {
@@ -117,11 +99,6 @@ export class MeetingCaptureController {
     return false;
   }
 
-  /**
-   * Spawn the daemon if it isn't already answering on its IPC channel
-   * (AF_UNIX socket on macOS, named pipe on Windows). Linux has no native
-   * system-audio path here yet.
-   */
   private async ensureDaemon(): Promise<{ ok: boolean; reason?: string }> {
     if (process.platform !== "darwin" && process.platform !== "win32") {
       return { ok: false, reason: "unsupported-platform" };
@@ -143,8 +120,6 @@ export class MeetingCaptureController {
     const child = spawn(bin, ["daemon", "--root", this.stellaDataDir], {
       detached: true,
       stdio: "ignore",
-      // The daemon finishes any recording and exits if this process dies
-      // without stopping it.
       env: { ...process.env, STELLA_PARENT_PID: String(process.pid) },
     });
     this.child = child;
@@ -173,12 +148,6 @@ export class MeetingCaptureController {
     }
   }
 
-  /**
-   * Begin a recording. Ensures the daemon is up and that Screen Recording (for
-   * system audio) and Microphone (for your voice) permissions are granted,
-   * prompting the user via TCC if needed. The mic is best-effort: a recording
-   * still proceeds system-audio-only if the mic is unavailable.
-   */
   async start(options?: {
     sessionId?: string;
     segmentSeconds?: number;
@@ -321,7 +290,6 @@ export class MeetingCaptureController {
     };
   }
 
-  /** Finalize any active recording and stop the daemon. Used on app quit. */
   async shutdown(): Promise<void> {
     await this.runCommand(["shutdown"]);
     const child = this.child;

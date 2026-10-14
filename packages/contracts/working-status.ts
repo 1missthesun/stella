@@ -1,23 +1,3 @@
-/**
- * The working indicator's words, shared by desktop and the phone so both show
- * the same phrase for the same tool call. Computes a user-friendly status
- * message based on which orchestrator tool is currently in flight.
- *
- * Only the orchestrator's tool surface lives here — anything a general
- * agent runs is rolled up into a "Working on it" task line by the
- * agent-management indicators, not the per-tool status. Keep the copy
- * short, sentence-case, conversational, and in Stella's voice.
- *
- * Each tool has a small pool of variations. The pick is seeded by the
- * tool call's stable id so the label stays put for the duration of one
- * call (no flicker on re-renders), but feels different across calls.
- */
-/**
- * Stella always presents as a single assistant — never expose that
- * `spawn_agent`, `send_message`, and `stop_agent` orchestrate
- * other agents under the hood. Those tools just get generic "Stella is doing
- * the work" copy.
- */
 const AGENT_WORK_VARIATIONS: readonly string[] = [
   "On it",
   "Working on it",
@@ -31,10 +11,6 @@ const AGENT_WORK_VARIATIONS: readonly string[] = [
   "One moment",
 ];
 
-/**
- * The shell tool is `Bash` (the key below is its normalized form); older
- * transcripts carry it as `exec_command`. Both share one pool.
- */
 const SHELL_COMMAND_VARIATIONS: readonly string[] = [
   "Running it",
   "Working on it",
@@ -124,12 +100,7 @@ const TOOL_STATUS_BY_NAME: Record<string, readonly string[]> = {
     "Standing down",
   ],
 
-  // ── General-agent + subagent tools ──────────────────────────────────────
-  // These run inside spawned agents. Raw `Running <toolName>` status text maps
-  // through this same table so the bare tool identifier never reaches the
-  // working indicator. Keep the first entry as the canonical phrase.
   bash: SHELL_COMMAND_VARIATIONS,
-  // Legacy transcript compatibility; never advertised to new turns.
   exec_command: SHELL_COMMAND_VARIATIONS,
   code: [
     "Running code",
@@ -141,7 +112,6 @@ const TOOL_STATUS_BY_NAME: Record<string, readonly string[]> = {
     "Making it happen",
     "Just a sec",
   ],
-  // Legacy transcript compatibility; never advertised to new turns.
   node_repl: [
     "Running code",
     "Working on it",
@@ -214,7 +184,6 @@ const TOOL_STATUS_BY_NAME: Record<string, readonly string[]> = {
     "Tracking files down",
     "Browsing files",
   ],
-  // Legacy persisted calls from before image reads moved into Read.
   view_image: [
     "Taking a look",
     "Viewing the image",
@@ -231,7 +200,6 @@ const TOOL_STATUS_BY_NAME: Record<string, readonly string[]> = {
     "Responding",
     "Sending it over",
   ],
-  // legacy — tool removed; keep for old-transcript rendering.
   tool_search: [
     "Finding the right tool",
     "Looking for tools",
@@ -327,7 +295,6 @@ const TOOL_STATUS_BY_NAME: Record<string, readonly string[]> = {
     "Making it happen",
   ],
 
-  // Direct scheduling tools
   schedule_add: [
     "Scheduling it",
     "Setting it up",
@@ -354,7 +321,6 @@ const TOOL_STATUS_BY_NAME: Record<string, readonly string[]> = {
     "Taking it off the schedule",
   ],
 
-  // Schedule subagent
   cron_add: [
     "Scheduling it",
     "Setting it up",
@@ -406,22 +372,12 @@ const TOOL_STATUS_BY_NAME: Record<string, readonly string[]> = {
   ],
 };
 
-// Verb-prefixed tool status emitted by the runtime when a tool does not
-// provide its own display text. Capturing group 1 is the bare tool identifier.
 const RAW_TOOL_STATUS_PATTERN =
   /^(?:running|executing|calling|invoking)\s+(.+)$/i;
 
-/**
- * Normalize a tool identifier to the snake_case keys used in
- * `TOOL_STATUS_BY_NAME`. Handles the runtime's mixed naming — snake_case
- * (`spawn_agent`), PascalCase (`RequestCredential`, `CronAdd`)
- * and space-separated humanized labels (`Running Spawn Agent`).
- */
 const toToolStatusKey = (value: string): string =>
   value
     .trim()
-    // Acronym → word boundary first (`HTMLPreview` → `HTML_Preview`) so
-    // consecutive capitals don't collapse into one token below.
     .replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2")
     .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
     .replace(/[_\s-]+/g, "_")
@@ -490,10 +446,6 @@ const looksLikeMachineStatus = (value: string): boolean => {
   return false;
 };
 
-/**
- * Turn raw tool status text into the same friendly copy as direct tool-name
- * rendering, while leaving genuine human-readable status text untouched.
- */
 export function normalizeDisplayStatusText(
   statusText: string | undefined,
 ): string | undefined {
@@ -543,18 +495,12 @@ const FALLBACK_VARIATIONS: readonly string[] = [
   "On the case",
 ];
 
-/**
- * Stable string-hash (FNV-1a, 32-bit). Deterministic per-seed so the
- * same tool call always picks the same variation, but spreads small
- * inputs (request ids, tool names) across the variation pool.
- */
 const hashSeed = (seed: string): number => {
   let hash = 0x811c9dc5;
   for (let i = 0; i < seed.length; i += 1) {
     hash ^= seed.charCodeAt(i);
     hash = Math.imul(hash, 0x01000193);
   }
-  // Mask to unsigned 32-bit so the modulo below stays non-negative.
   return hash >>> 0;
 };
 
@@ -597,10 +543,6 @@ const STILL_STATUS_BY_NAME: Record<string, string> = {
   task: "Still on it",
 };
 
-/**
- * The label a single tool call switches to, once, after it has run for a
- * while: the tool's own "still" phrase, or a generic one.
- */
 export function computeStillStatus(toolName: string): string {
   return (
     STILL_STATUS_BY_NAME[toToolStatusKey(toolName)] ?? "Still working on it"
@@ -612,28 +554,18 @@ export function computeStatus({
   seed,
 }: {
   toolName?: string;
-  /** Stable id (e.g. tool call request id) used to lock in one
-   * variation per call. Without it, the first variation is used. */
   seed?: string;
 } = {}): string {
   if (toolName) {
     const normalizedToolName = toToolStatusKey(toolName);
     const mapped = TOOL_STATUS_BY_NAME[normalizedToolName];
     if (mapped) return pickVariation(mapped, seed ?? normalizedToolName);
-    // Unknown / future orchestrator tool — keep it neutral instead of
-    // leaking the raw tool identifier into the UI.
     return pickVariation(FALLBACK_VARIATIONS, seed ?? normalizedToolName);
   }
 
   return "";
 }
 
-/**
- * Thinking stays bare dots while it is short. A stretch of thinking that
- * lasts gets one calm label, and a long one switches once to a second; the
- * clock restarts whenever a tool hands back to thinking. A single tool call
- * that runs long switches once to its "still" label.
- */
 export const WORKING_INDICATOR_THINKING_LABEL_MS = 3500;
 export const WORKING_INDICATOR_LONG_THINKING_MS = 15000;
 export const WORKING_INDICATOR_LONG_TOOL_MS = 15000;

@@ -2,10 +2,6 @@ import { execFile } from 'child_process';
 import { app as electronApp } from 'electron';
 import { runNativeHelper, runNativeHelperDetailed } from './native-helper.js';
 import { requestRecentAppsDaemon } from './native-helper-daemon.js';
-// Dedicated home-suggestion helper. Lives in `home_apps.swift` (separate
-// from `desktop_automation` so the agent-facing tool stays untouched by
-// renderer-UI concerns: MRU sort, AX title fallback, regular-apps-only
-// scope, per-element AX timeouts, diagnostics in warnings).
 const HELPER_NAME = 'home_apps';
 // Perf: the dominant CPU win is the renderer-side focus/visibility gate, which
 // stops the ~5s poll entirely while Stella is hidden/blurred. This cache only
@@ -21,12 +17,7 @@ const WINDOWS_NATIVE_SLOW_SUCCESS_THRESHOLD_MS = 750;
 const WINDOWS_NATIVE_SLOW_SUCCESS_BACKOFF_MS = 60_000;
 const recentAppsCache = new Map();
 const recentAppsInFlight = new Map();
-/**
- * Apps that are part of the OS chrome / always-on infra. Filtered before
- * showing in the renderer because they carry no user signal as a chip.
- */
 const NOISE_NAMES = new Set([
-    // macOS — UI chrome
     'finder',
     'dock',
     'systemuiserver',
@@ -43,9 +34,6 @@ const NOISE_NAMES = new Set([
     'sidecar',
     'siri',
     'crashpad',
-    // macOS — TCC / privacy / auth prompts that occasionally register as
-    // .regular activation-policy apps. None of them are something a user
-    // would deliberately treat as "context for Stella."
     'universalaccessauthwarn',
     'universal access auth',
     'tccd',
@@ -53,7 +41,6 @@ const NOISE_NAMES = new Set([
     'securityagent',
     'storedownloadd',
     'screenshot',
-    // Windows
     'explorer',
     'searchhost',
     'searchapp',
@@ -172,12 +159,6 @@ const isNoiseBundleId = (bundleId) => {
     }
     return false;
 };
-// ---------------------------------------------------------------------------
-// macOS implementation — wraps the bundled `home_apps list` helper.
-// home_apps already filters to regular activation-policy apps (so the AX
-// title-fallback loop stays bounded). It returns apps in MRU order with
-// each app's topmost-window title attached.
-// ---------------------------------------------------------------------------
 const listRecentAppsMac = async (limit) => {
     // Generous timeout because the helper's AX-title fallback can stall for
     // ~0.5s per pid when an app is unresponsive. The UI polls infrequently
@@ -340,8 +321,6 @@ const listRecentAppsWindowsNative = async (limit) => {
     return buildRecentAppsFromWinProcesses(parsed, limit);
 };
 const listRecentAppsWindowsPowerShell = async (limit) => {
-    // PowerShell: enumerate windowed processes, then mark the current foreground
-    // window as active via P/Invoke (GetForegroundWindow).
     const psScript = `
 $ErrorActionPreference = 'SilentlyContinue'
 Add-Type -Name 'StellaFW' -Namespace 'Win32' -MemberDefinition @'
@@ -374,16 +353,8 @@ $procs | ConvertTo-Json -Compress
     }
     return buildRecentAppsFromWinProcesses(parsed, limit);
 };
-/**
- * Shared cleaning/filtering for Windows windowed-process snapshots, used by
- * both the native `recent_apps` helper and the PowerShell fallback (both emit
- * the same `WinProcess` field shape). Sorts foreground-first, drops Stella /
- * OS-chrome noise, dedups by pid, resolves icons concurrently, and caps to
- * `limit`.
- */
 const buildRecentAppsFromWinProcesses = async (parsed, limit) => {
     const seenPids = new Set();
-    // Foreground window first, then by name (case-insensitive) for stable order.
     parsed.sort((a, b) => {
         if (a.IsActive !== b.IsActive) {
             return a.IsActive ? -1 : 1;
@@ -410,9 +381,6 @@ const buildRecentAppsFromWinProcesses = async (parsed, limit) => {
         if (kept.length >= limit)
             break;
     }
-    // Each cache miss is a getFileIcon + resize + toDataURL round trip, so
-    // resolve all icons concurrently; share one promise per executable path so
-    // multiple processes of the same app don't decode the icon twice.
     const iconPromisesByPath = new Map();
     const icons = await Promise.all(kept.map(({ raw }) => {
         const exePath = typeof raw.ExecutablePath === 'string' ? raw.ExecutablePath.trim() : '';
@@ -433,14 +401,6 @@ const buildRecentAppsFromWinProcesses = async (parsed, limit) => {
         iconDataUrl: icons[index],
     }));
 };
-// ---------------------------------------------------------------------------
-/**
- * Snapshot of running user-facing apps. macOS via the bundled Swift helper;
- * Windows via PowerShell. The frontmost app is marked `isActive: true`.
- *
- * Returns `null` when the platform is unsupported or the underlying snapshot
- * call failed (treat as "no signal" — render nothing).
- */
 export const listRecentApps = async (limit = 6) => {
     const normalizedLimit = Math.max(0, Math.floor(limit));
     const cacheKey = `${process.platform}:${normalizedLimit}`;

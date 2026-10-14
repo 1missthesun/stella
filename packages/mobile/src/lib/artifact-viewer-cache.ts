@@ -1,12 +1,5 @@
 import type { ArtifactMediaFile } from "./artifact-media-file";
 
-/**
- * Files the viewer has already loaded this session, so reopening one shows it
- * at once while the viewer rereads it in the background (files change in
- * place; an entry is only a first paint, never the truth). Bounded by entry count and by the
- * bytes of the cache files it owns; evicted entries delete their files.
- */
-
 const MAX_ENTRIES = 16;
 const MAX_FILE_BYTES = 192 * 1024 * 1024;
 const MAX_TEXT_CHARS = 8 * 1024 * 1024;
@@ -74,10 +67,6 @@ export function cachedViewerEntry<T>(
   return { value: entry.value, revision: entry.revision };
 }
 
-/**
- * Keep `value` for `key`. Returns whether the cache took ownership of `file`;
- * when it did not, the caller still owns it and removes it as before.
- */
 export function storeViewerEntry<T>(
   key: string,
   value: T,
@@ -86,7 +75,6 @@ export function storeViewerEntry<T>(
     fileBytes?: number;
     textChars?: number;
     expiresAt?: number | null;
-    /** What the viewer compares on reread when the value alone can't tell. */
     revision?: string | null;
   } = {},
 ): boolean {

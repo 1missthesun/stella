@@ -6,12 +6,6 @@ import type { CloudSandboxAccess } from "../backend/billing.js";
 import type { ExecutionCapability } from "./placement.js";
 import type { StellaUsageLimit } from "../stella-usage-limit.js";
 
-/**
- * The owner snapshot is what the owner gate Durable Object admits turns
- * against. The gate builds it locally from its own domains (account, abuse,
- * billing, engines, devices) and the caller's verified claims.
- */
-
 export const OWNER_SNAPSHOT_VERSION = 1 as const;
 
 export type CloudPlanId = "free" | "go" | "pro";
@@ -20,13 +14,9 @@ export type OwnerSnapshot = {
   v: typeof OWNER_SNAPSHOT_VERSION;
   ownerId: string;
   ownerGeneration: string;
-  /** Owner purged, write-fenced, or suspended: the gate refuses every admission. */
   writable: boolean;
-  /** Always false: anonymous sign-in is gone. Kept for older readers. */
   isAnonymous: boolean;
-  /** Identity ladder rung (1 email … 3 paying); drives allowance shares. */
   identityLevel: IdentityLevel;
-  /** Enforcement status; absent means `ok`. Suspended also sets `writable: false`. */
   enforcement?: OwnerEnforcement;
   plan: CloudPlanId;
   cloudSandbox?: CloudSandboxAccess;
@@ -35,23 +25,9 @@ export type OwnerSnapshot = {
     budgetMicroCents: number;
     maxRequests?: number;
   };
-  /**
-   * The owner has no room left for Stella's models (free allowance spent,
-   * plan limit reached). A turn on Stella's models is refused up front with
-   * this message rather than started on a zero budget.
-   */
   usageLimit?: StellaUsageLimit;
-  /**
-   * Billing is not configured on this server, so the owner's plan can't be
-   * read. Turns on Stella's models are refused as a server error.
-   */
   billingUnavailable?: true;
-  /**
-   * Owner default execution used when a turn does not pin one, filled by the
-   * gate from the owner's engines domain.
-   */
   execution: CloudExecutionSelection;
-  /** The user's IANA time zone, as their devices report it; absent until one does. */
   timeZone?: string;
   /**
    * Paired mobile devices allowed to submit against this owner's desktops
@@ -77,7 +53,6 @@ export type OwnerSnapshot = {
    */
   devices?: Array<{
     deviceId: string;
-    /** Ed25519 key the desktop registered; verifies the presence-socket proof. */
     publicKey: string;
     remoteExecutionEnabled: boolean;
     remoteExecution?:
@@ -86,23 +61,11 @@ export type OwnerSnapshot = {
       | "enabled"
       | "declined";
     remoteExecutionAskedAt?: number;
-    /** The account's home computer, where Stella's brain stays while it is up. */
     brainHome?: true;
     label?: string;
     capabilities?: ExecutionCapability[];
   }>;
-  /**
-   * Engines the owner has a live connected credential for. Lets the gate
-   * refuse (or fall back from) an execution whose engine cannot be honoured
-   * before it mints a `credential` turn capability. Filled by the gate from
-   * the owner's engines domain, like `execution`.
-   */
   connectedEngines?: Array<"anthropic" | "chatgpt">;
-  /**
-   * Account providers (`@stella/contracts/backend/providers`) with a usable
-   * saved credential: an `engine: "provider"` execution needs its provider
-   * here. Absent on snapshots older than provider keys.
-   */
   connectedProviders?: string[];
   fetchedAt: number;
   ttlMs: number;

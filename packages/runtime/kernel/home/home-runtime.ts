@@ -27,7 +27,6 @@ const homeRuntime = (): ManagedRuntime.ManagedRuntime<
   never
 > => (homeRuntimeSingleton ??= ManagedRuntime.make(HomeService.layer));
 
-/** Run a home Effect, rejecting with the original failure object. */
 export const runHome = async <A>(
   effect: Effect.Effect<A, unknown, HomeService.Service>,
 ): Promise<A> => {
@@ -38,7 +37,6 @@ export const runHome = async <A>(
   throw causeToThrowable(exit.cause);
 };
 
-/** Run an operation against the HomeService instance on the shared runtime. */
 export const withHome = <A>(
   use: (home: HomeService.Interface) => Effect.Effect<A, unknown>,
 ): Promise<A> =>

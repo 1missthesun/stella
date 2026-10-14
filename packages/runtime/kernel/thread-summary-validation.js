@@ -68,11 +68,6 @@ const longestRepeatedCodePointRun = (value) => {
   return longest;
 };
 
-/**
- * Canonical summary acceptance shared by online compaction and the offline
- * checkpoint repair classifier. Unknown runtime types fail closed here so an
- * untrusted persisted JSON value can never be coerced into validity.
- */
 export const validateThreadSummary = (
   summary,
   middleTokens,

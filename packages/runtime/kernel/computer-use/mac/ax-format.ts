@@ -14,10 +14,6 @@ import {
 } from "../execution-context.js";
 import { formatScreenshotMarker as formatAttachImageMarker } from "../session-fs.js";
 
-// Rendering of desktop_automation payloads: the accessibility tree and
-// <app_state> block, the state ids derived from them, and the CLI's
-// human-readable output for snapshots, actions, app/window lists and errors.
-
 export type Rect = {
   x: number;
   y: number;
@@ -144,9 +140,6 @@ export type ListedAppPayload = {
   activationPolicy: string;
   isRunning?: boolean | null;
   isActive: boolean;
-  // Spotlight-tracked usage data populated by the desktop_automation
-  // daemon. Either or both can be null when the bundle isn't indexed
-  // (sandboxed apps without read perms, network-mounted bundles, etc.).
   lastUsedDate?: string | null;
   useCount?: number | null;
 };
@@ -221,9 +214,6 @@ const ROLES_WITH_VISIBLE_SETTABLE_STATE = new Set([
   "AXWebArea",
 ]);
 
-// Subrole-aware names for buttons so the model can tell window controls apart
-// instead of seeing a row of identical "button" entries.
-// Mirrors the role labels used by macOS desktop-automation renderers.
 const BUTTON_SUBROLE_LABELS: Record<string, string> = {
   AXCloseButton: "close button",
   AXMinimizeButton: "minimize button",
@@ -367,10 +357,6 @@ const annotationSegment = (node: SnapshotNode) => {
   // Suppress the flag for cells; meaningful focus on a cell's text field
   // child still surfaces normally.
   if (node.focused && node.role !== "AXCell") flags.push("focused");
-  // Outline rows + disclosure groups expose AXExpanded so the model can
-  // tell whether sidebars/sections (Mail Favorites/Smart Mailboxes,
-  // Finder source list, Notes accounts) are open or collapsed before
-  // deciding whether to actuate the disclosure triangle.
   if (node.expanded === true) flags.push("expanded");
   else if (node.expanded === false) flags.push("collapsed");
   if (shouldSurfaceSettable(node)) {
@@ -395,10 +381,6 @@ const filterMenuActions = (actions: string[], role: string) =>
     ? actions.filter((action) => action !== "AXCancel" && action !== "AXPick")
     : actions;
 
-// Container roles that may be skipped from the rendered tree when the node
-// adds no information of its own. Their children re-attach at the parent's
-// depth so the model sees one tight tree instead of a deep stack of empty
-// `container` lines (e.g. web-area wrapper chains).
 const COLLAPSIBLE_CONTAINER_ROLES = new Set([
   "AXGroup",
   "AXGenericElement",
@@ -413,9 +395,6 @@ export const formatNodeLines = (node: SnapshotNode, depth = 0): string[] => {
       ? String(node.index)
       : (node.ref ?? "_");
 
-  // Menu bar items are globally positioned app chrome, not the target window
-  // content. Hiding them prevents the agent from opening menus while trying
-  // to act on visible app UI.
   if (node.role === "AXMenuBarItem") {
     return [];
   }
@@ -488,10 +467,6 @@ export const formatNodeLines = (node: SnapshotNode, depth = 0): string[] => {
     }
   }
 
-  // Placeholder text for empty input fields (Brave's "Search Google or
-  // type a URL", Spotlight's "Spotlight Search", Mail's "To:" hint).
-  // Only meaningful for text-bearing roles, and only when the field
-  // doesn't already carry a typed value to display.
   if (
     node.placeholder &&
     node.placeholder !== rawPrimaryLabel &&
@@ -516,27 +491,6 @@ export const formatNodeLines = (node: SnapshotNode, depth = 0): string[] => {
 
   const annotation = annotationSegment(node);
 
-  // Collapse / skip empty container nodes. Spotify alone emits ~140 such
-  // anonymous `container` lines per snapshot — they're pure DOM
-  // structural scaffolding from the web view, with no label, no extras,
-  // and no flag annotation worth surfacing. The model gets nothing from
-  // them. Two cases:
-  //
-  //   (a) Empty container with no children → drop entirely. Emitting
-  //       `\t\t\t\t\t<id> container` is just noise.
-  //   (b) Empty container with exactly one child → fold the wrapper:
-  //       render the child at the parent's depth. Most macOS
-  //       web-wrapped apps (Spotify, Slack, Discord, Notion, Cursor,
-  //       VS Code) produce 5–10 nested AXGroup/AXSplitGroup wrappers
-  //       around the actual UI. This rule subsumes the previous
-  //       same-role chain-collapse and applies even when the single
-  //       child is a meaningful node (button/text/link).
-  //
-  // "Empty" requires no primary label, no extras (description / value /
-  // url / placeholder / etc.), and no annotation flags (no
-  // disabled/focused/selected/expanded/settable). Containers that
-  // expose `settable` are still part of the actionable tree; we never
-  // collapse those.
   const isEmptyCollapsibleContainer =
     COLLAPSIBLE_CONTAINER_ROLES.has(node.role) &&
     !primaryLabel &&
@@ -558,14 +512,8 @@ export const formatNodeLines = (node: SnapshotNode, depth = 0): string[] => {
       line += `, ${extras.join(", ")}`;
     }
   } else if (extras.length > 0) {
-    // When there's no primary label, extras hang directly off the role with a
-    // single space, no comma. The extras among themselves are still ", "-joined.
     line += ` ${extras.join(", ")}`;
   }
-  // Skip rendering the lone AXCell child of an AXRow when its description
-  // was already folded up into the row's primary label (see
-  // `choosePrimaryLabel`). Otherwise sidebars duplicate every label as a
-  // child cell line right under the row.
   const childrenToRender =
     node.role === "AXRow" &&
     node.children.length === 1 &&
@@ -635,7 +583,6 @@ const formatBundleSpecificStateNote = (snapshot: SnapshotDocument) => {
   );
 };
 
-/** Stable, capture-independent state used for freshness and diffs. */
 const appSemanticStateLines = (snapshot: SnapshotDocument) => {
   const lines: string[] = ["<app_state>"];
   lines.push(
@@ -797,16 +744,12 @@ export const formatAction = (
   printWarnings(payload.warnings);
 };
 
-// Return only "regular" (user-launchable) apps. macOS exposes accessory and
-// background helpers (Spotlight, LoginWindow, WindowManager, renderer helpers)
-// that pollute the list and have no addressable UI for the agent.
 const LISTED_ACTIVATION_POLICIES = new Set(["regular"]);
 
 export const formatListApps = (payload: ListAppsPayload) => {
   const visible = payload.apps.filter((app) =>
     LISTED_ACTIVATION_POLICIES.has(app.activationPolicy),
   );
-  // Put the user's current app first, then keep the usage prior for the rest.
   visible.sort((a, b) => {
     if (a.isActive !== b.isActive) return a.isActive ? -1 : 1;
     const usesA = a.useCount ?? -1;
@@ -850,9 +793,6 @@ export const formatListWindows = (payload: ListWindowsPayload) => {
 export const formatError = (payload: ErrorPayload) => {
   writeComputerStderr(payload.error);
   writeComputerStderr("\n");
-  // Mirror the action/snapshot screenshot-marker contract on the error path
-  // so failures still expose the diagnostic capture without requiring an
-  // extra Read step.
   const marker = formatScreenshotMarker(
     payload.screenshot,
     payload.screenshotPath,

@@ -8,8 +8,6 @@ if (!port) throw new Error("Cloud cache worker requires a parent port.");
 const db = new DatabaseSync(
   workerData.databasePath,
 ) as unknown as SqliteDatabase;
-// Main has already initialized the shared database. Only connection-local
-// pragmas belong here; rerunning migrations would compete with ordinary chat.
 db.exec("PRAGMA busy_timeout = 5000; PRAGMA foreign_keys = ON;");
 const store = new CloudConversationCacheStore(db);
 port.on("message", ({ id, operation, payload }) => {

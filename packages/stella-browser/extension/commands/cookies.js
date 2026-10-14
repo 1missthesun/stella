@@ -1,6 +1,3 @@
-/**
- * Cookie command handlers.
- */
 import { getActiveTab } from './tabs.js';
 
 /**
@@ -30,7 +27,6 @@ export async function handleCookiesGet(command) {
 
   const cookies = await chrome.cookies.getAll({ url });
 
-  // Optionally filter by name
   const filtered = command.name
     ? cookies.filter(c => c.name === command.name)
     : cookies;
@@ -118,7 +114,6 @@ export async function handleCookiesClear(command) {
 
   let cleared = 0;
   for (const cookie of cookies) {
-    // If name filter is specified, only clear matching cookies
     if (command.name && cookie.name !== command.name) continue;
 
     const cookieUrl =

@@ -24,7 +24,6 @@ import {
 import { worldSandboxId } from "./workspace.js";
 
 
-/** The config directory key for an account: hex SHA-256 of its lowercased email. */
 export const claudeCloudAccountKey = async (email: string): Promise<string> => {
   const bytes = new Uint8Array(
     await crypto.subtle.digest(
@@ -37,11 +36,6 @@ export const claudeCloudAccountKey = async (email: string): Promise<string> => {
 
 const LOGIN_ID = /^[0-9a-f]{32}$/u;
 
-/**
- * Driven with `bash -c SCRIPT claude-login <action> ...`. The pasted code
- * arrives only in `CODE` (never on a command line) and goes straight into
- * the waiting CLI's stdin through a FIFO. Every output is one JSON line.
- */
 const SCRIPT = String.raw`set -u
 umask 077
 accounts=${CLOUD_CLAUDE_ACCOUNTS_ROOT}
@@ -246,7 +240,6 @@ const shellQuote = (value: string): string => `'${value.replaceAll("'", `'\\''`)
 
 type ScriptResult = { ok: true; [key: string]: unknown } | { ok: false; error: string };
 
-/** The owner's own container, where signing in and out happens. */
 export const claudeLoginContainer = async (env: Cloudflare.Env, ownerId: string): Promise<SandboxHandle> =>
   sandboxClient(
     (env as unknown as { Sandbox: DurableObjectNamespace<import("./sandbox-container.js").Sandbox> })
@@ -264,7 +257,6 @@ const runScript = async (
     url?: string;
     extraEnv?: Record<string, string>;
     timeoutMs: number;
-    /** An agent's own container; the owner's sign-in container otherwise. */
     container?: SandboxHandle;
   },
 ): Promise<ScriptResult> => {
@@ -304,18 +296,6 @@ const runScript = async (
   return { ok: false, error: "Your cloud couldn't run Claude Code's sign-in. Try again." };
 };
 
-// --- One set of logins across the owner's containers ------------------------
-//
-// Sign-in happens in the owner's own container, but every agent thread runs
-// Claude Code in a container of its own, and none of their disks outlive a
-// new image. So the accounts directory is kept as one opaque archive object
-// in the owner's backup storage: it is the authority, restored into a
-// container before Claude Code runs there and stored back after. The
-// container itself packs and uploads it, and downloads and unpacks it, over
-// presigned URLs: the Worker signs a URL and never carries, opens or parses
-// the bytes. The object is separate from every session checkpoint.
-
-/** The owner's backup object for their cloud Claude Code logins. */
 const loginBackupKey = async (ownerId: string): Promise<string> =>
   `${CLOUD_CLAUDE_LOGIN_BACKUP_PREFIX}/${await claudeCloudAccountKey(`owner:${ownerId}`)}.tgz`;
 
@@ -358,11 +338,6 @@ export const backupClaudeCloudLogins = async (
   return result.ok;
 };
 
-/**
- * Put the owner's stored Claude Code logins into one container, replacing
- * whatever older copy its disk or snapshot carried. Without a stored backup
- * the container keeps what it has.
- */
 export const restoreClaudeCloudLogins = async (
   env: Cloudflare.Env,
   ownerId: string,
@@ -372,9 +347,6 @@ export const restoreClaudeCloudLogins = async (
   const url = await loginBackupUrl(env, ownerId, "GET");
   if (!url) return false;
   const signedAt = Date.now();
-  // What the container is about to fetch, so a copy it already has, or a
-  // backup that does not exist, costs no download. An unreadable head
-  // fetches as before.
   const stored = await (env as unknown as { BACKUP_BUCKET?: R2Bucket }).BACKUP_BUCKET?.head(
     await loginBackupKey(ownerId),
   ).then(
@@ -411,17 +383,8 @@ export const restoreClaudeCloudLogins = async (
   return true;
 };
 
-// --- Dev-only probe for the backup's own verification ------------------------
-
-/** The probe's fixed account: a fake login, never a real one. */
 export const CLAUDE_LOGIN_PROBE_EMAIL = "probe@test.stella.local";
 
-/**
- * `plant` a fake login in the probe account's directory, `inspect` its
- * permissions, digests and `claude auth status`, `backup`, `restore`, or
- * `replace` the owner's sign-in container (so the next start is a fresh
- * container from the current image). Callers gate this on dev test accounts.
- */
 export const claudeLoginProbe = async (
   env: Cloudflare.Env,
   ownerId: string,
@@ -482,7 +445,6 @@ export const seedTestClaudeLogin = async (
   return result.ok;
 };
 
-/** Forget the owner's backup object (owner purge). */
 export const deleteClaudeCloudLoginBackup = async (
   env: Cloudflare.Env,
   ownerId: string,
@@ -494,7 +456,6 @@ export const deleteClaudeCloudLoginBackup = async (
 export const newClaudeCloudLoginId = (): string =>
   crypto.randomUUID().replaceAll("-", "");
 
-/** Start `claude auth login` in the owner's container; Anthropic's sign-in URL. */
 export const startClaudeCloudLogin = async (
   env: Cloudflare.Env,
   ownerId: string,
@@ -502,7 +463,6 @@ export const startClaudeCloudLogin = async (
   email: string | undefined,
 ): Promise<{ ok: true; authorizeUrl: string } | { ok: false; error: string }> => {
   if (!LOGIN_ID.test(loginId)) return { ok: false, error: "Invalid sign-in." };
-  // A new sign-in must land beside the logins this owner already has.
   await restoreClaudeCloudLogins(env, ownerId);
   const result = await runScript(env, ownerId, ["start", loginId, email ?? ""], {
     timeoutMs: 120_000,
@@ -515,7 +475,6 @@ export const startClaudeCloudLogin = async (
   return { ok: true, authorizeUrl: url };
 };
 
-/** Hand the pasted code to the waiting CLI; the account it signed in, or its error. */
 export const finishClaudeCloudLogin = async (
   env: Cloudflare.Env,
   ownerId: string,
@@ -537,7 +496,6 @@ export const finishClaudeCloudLogin = async (
     return { ok: false, error: "Claude Code signed in but didn't say which account." };
   }
   const plan = typeof result.plan === "string" && result.plan ? result.plan : undefined;
-  // Every agent container restores the logins from here before it runs.
   await backupClaudeCloudLogins(env, ownerId);
   return { ok: true, email, key, ...(plan ? { plan } : {}) };
 };
@@ -551,7 +509,6 @@ export const cancelClaudeCloudLogin = async (
   await runScript(env, ownerId, ["cancel", loginId], { timeoutMs: 30_000 });
 };
 
-/** `claude auth logout` for one account's config directory, then remove it. */
 export const signOutClaudeCloudAccount = async (
   env: Cloudflare.Env,
   ownerId: string,

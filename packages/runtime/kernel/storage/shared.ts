@@ -3,10 +3,6 @@ import type {
   ImageContent,
 } from "@earendil-works/pi-ai";
 
-/**
- * An image block as Stella keeps it in a thread: optionally with the durable
- * local copy a text-only history points `Read` at.
- */
 export type StoredImageContent = ImageContent & { sourcePath?: string };
 
 export type LocalChatEventRecord = {
@@ -21,13 +17,6 @@ export type LocalChatEventRecord = {
   channelEnvelope?: Record<string, unknown>;
 };
 
-/**
- * Read shape backing `MessageWindowReader.listMessages` — the same fields
- * as `LocalChatEventRecord` plus the turn-scoped `toolEvents` projection.
- * Renderer-facing contract lives at `runtime/contracts/local-chat.ts`
- * (`MessageRecord`); this is the storage-side mirror so callers in the
- * worker can construct one without depending on the contracts module.
- */
 export type LocalChatMessageRecord = LocalChatEventRecord & {
   toolEvents: LocalChatEventRecord[];
   toolEventSummary?: {
@@ -42,45 +31,13 @@ export type LocalChatMessageRecord = LocalChatEventRecord & {
 export type LocalChatMessageWindow = {
   messages: LocalChatMessageRecord[];
   nextCursor?: { timestamp: number; id: string; sequence?: number };
-  /**
-   * Count of user/assistant entries in `messages` whose payload is not
-   * UI-hidden (see `isUiHiddenChatMessagePayload`). The chat hook bases
-   * pagination state on this rather than raw `messages.length` so hidden
-   * system reminders / workspace-creation requests don't keep
-   * `hasOlderMessages` / `isLoadingOlder` stuck against the wrong
-   * threshold.
-   */
   visibleMessageCount: number;
 };
 
-/**
- * Read shape backing `ChatLog.listActivity` — the persisted agent-*
- * lifecycle events. Kept separate from the message stream so consumers
- * never need to walk the (much larger) raw event stream.
- *
- * `activities` are ordered ASC by `(timestamp, _id)` so consumers see
- * events in the same order a flat replay would. Task STATE no longer
- * derives from these events (that's `listThreadActivity`); the remaining
- * consumers are file-derived surfaces and the inline chat cards.
- */
 export type LocalChatActivityWindow = {
   activities: LocalChatEventRecord[];
 };
 
-/**
- * Read shape backing `ChatLog.listFiles` — the `assistant_message` and
- * `agent-completed` events whose text plausibly carries markdown file
- * links. The Recent Files surfaces (Chat tab Recent Files,
- * ActivityHistoryDialog "files" section) derive their list from this
- * without scanning the full event stream.
- *
- * Events are ordered ASC by `(timestamp, _id)`. The renderer reuses
- * `deriveConversationFiles` to dedup by path; the storage layer's job
- * is just to surface the candidate events efficiently (the SQL
- * pre-filter on JSON payloads keeps the window genuinely scoped to
- * link-carrying events, so a `limit` of 500 buys 500 candidate events
- * rather than 500 arbitrary messages).
- */
 export type LocalChatFilesWindow = {
   files: LocalChatEventRecord[];
 };
@@ -178,7 +135,6 @@ export const DEFAULT_CONVERSATION_SETTING_KEY = "default_conversation_id";
 export const asTrimmedString = (value: unknown): string =>
   typeof value === "string" ? value.trim() : "";
 
-/** A trimmed conversation id; throws when there is none. */
 export const requireConversationId = (value: unknown): string => {
   const conversationId = asTrimmedString(value);
   if (!conversationId) {
@@ -245,11 +201,6 @@ export const eventTextFromPayload = (
   return typeof text === "string" ? text.trim() : "";
 };
 
-/**
- * Chat-events subset the runtime inspects for runtime reminders (stale-user,
- * connector-transition), recall lookups, and the deprecated pre-transition
- * history shim. Structurally a narrowing of `LocalChatEventRecord`.
- */
 export type LocalContextEvent = {
   _id: string;
   timestamp: number;

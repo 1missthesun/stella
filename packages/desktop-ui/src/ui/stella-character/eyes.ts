@@ -1,10 +1,5 @@
 import { TAU, type Point } from "./geometry";
 
-/**
- * Eye poses, built the same way as the body silhouettes: fixed-length rings
- * that interpolate cleanly, so a blink or a squint is a lerp between two
- * poses rather than a swap between two paths.
- */
 export const EYE_N = 48;
 
 function pill(w: number, h: number, n = 4): Point[] {

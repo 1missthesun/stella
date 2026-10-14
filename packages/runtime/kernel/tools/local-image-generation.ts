@@ -453,8 +453,6 @@ export const runLocalImageGeneration = async (
         operationId: operation.operationId,
       });
     } else {
-      // Stella's own image model unless another was configured, with its
-      // edit endpoint when there are references.
       const falRequest =
         model === BYOK_IMAGE_MODELS.fal.image
           ? stellaImageRequest({
@@ -478,7 +476,6 @@ export const runLocalImageGeneration = async (
               },
             };
       const endpoint = falRequest.model;
-      // Request-scoped routes drop the endpoint's sub-path: `owner/app/requests/<id>`.
       const requestBase = endpoint.split("/").slice(0, 2).join("/");
       let requestId = operation.jobId;
       if (!requestId) {

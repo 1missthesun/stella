@@ -18,7 +18,6 @@ import {
   type ReasoningEffortLevel,
 } from "@stella/contracts/reasoning-effort";
 
-/** The website saves the same account route that cloud turn dispatch reads. */
 export function WebsiteModelPicker({
   active = true,
   onSelected,

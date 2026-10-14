@@ -2,7 +2,6 @@ import { getPromptTemplateText } from "./resolve";
 
 export const getVoiceSessionPromptConfig = (): {
   basePrompt: string
-  /** Appended on the routes that hand off by calling `ask_stella`. */
   functionCallHandoffPrompt: string
 } => ({
   basePrompt: getPromptTemplateText("voice_orchestrator.base").trim(),

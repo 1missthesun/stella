@@ -64,7 +64,6 @@ export type AutomaticExecutionDispatch = {
 
 export type SubmitAutomaticExecutionInput = AutomaticExecutionAdmissionInput & {
   access?: StoredPhoneAccess;
-  /** Overrides the backend origin from `EXPO_PUBLIC_STELLA_BACKEND_URL`. */
   builderOrigin?: string | null;
 };
 
@@ -100,10 +99,6 @@ const executionPlacementRequest = async <T>(
   }
 };
 
-/**
- * The backend worker's origin. Placement lives in the per-owner Durable
- * Object there; the origin is build-time config.
- */
 export const resolveExecutionBuilderOrigin = async (
   override?: string | null,
 ): Promise<string> => {
@@ -115,16 +110,11 @@ export const resolveExecutionBuilderOrigin = async (
   return env.backendUrl;
 };
 
-/**
- * A dispatch the gate no longer owns. Read structurally rather than through
- * the error class so any transport that reports a status can answer it.
- */
 const isMissingDispatch = (error: unknown): boolean => {
   const detail = error as { status?: unknown; code?: unknown } | null;
   return detail?.status === 404 || detail?.code === "not_found";
 };
 
-/** The gate answers `{ protocol, dispatch, replayed? }`. */
 const readDispatchEnvelope = (
   value: unknown,
   expected?: { idempotencyKey?: string; dispatchId?: string },
@@ -138,7 +128,6 @@ const readDispatchEnvelope = (
   ) as AutomaticExecutionDispatch;
 };
 
-/** The account's main conversation, the one chat every client opens. */
 export const readMainConversationId = async (): Promise<string> => {
   const { conversationId } = await getBackendClient().call(
     "conversations.bootstrap",
@@ -149,12 +138,6 @@ export const readMainConversationId = async (): Promise<string> => {
 
 export type ExecutionDeviceDestination = DeviceDestination;
 
-/**
- * The owner's execution destinations with live presence, read once from the
- * owner gate. A picker that stays on screen subscribes to `devices.list`
- * instead, which the backend pushes as presence changes.
- */
-/** How long a read waits for the live list's first push before reading HTTP. */
 const HELD_DEVICES_FIRST_PUSH_MS = 3_000;
 
 type HeldDevices = {
@@ -164,11 +147,6 @@ type HeldDevices = {
 };
 let heldDevices: HeldDevices | null = null;
 
-/**
- * The account's computers as the live socket pushes them (`devices.list`),
- * kept subscribed once asked for, so every read after the first is free
- * rather than a request that wakes the owner's object.
- */
 const holdDevices = (): HeldDevices => {
   if (heldDevices) return heldDevices;
   let settle: () => void = () => {};
@@ -217,10 +195,6 @@ const pushedDevices = async (): Promise<
   return held.failed ? undefined : held.devices;
 };
 
-/**
- * The account's computers: the live list when it has arrived, otherwise an
- * HTTP read. A caller naming its own builder origin always reads HTTP there.
- */
 export const listExecutionDevices = async (options?: {
   signal?: AbortSignal;
   builderOrigin?: string | null;
@@ -272,8 +246,6 @@ export const getAutomaticExecutionStatus = async (
       }),
     );
   } catch (error) {
-    // A dispatch the gate no longer owns is a definitive answer, not an
-    // outage: the observer must stop rather than poll a missing row forever.
     if (isMissingDispatch(error)) return null;
     throw error;
   }
@@ -307,12 +279,6 @@ export const cancelAutomaticExecution = async (args: {
   return readDispatchEnvelope(value, { dispatchId });
 };
 
-/**
- * Reconnectable terminal observer. Backend reads are snapshots here instead
- * of a component subscription so the durable outbox can own this lifecycle
- * across hook remounts. Transient read failures keep polling the same committed
- * dispatch; they never authorize a second executor or a transport fallback.
- */
 export const waitForAutomaticExecution = async (args: {
   dispatchId: string;
   signal?: AbortSignal;
@@ -344,10 +310,6 @@ export const submitAutomaticExecution = async (
   const { access, builderOrigin, ...admissionInput } = input;
   const admission = buildAutomaticExecutionAdmission(admissionInput);
   const target = admissionInput.target ?? AUTOMATIC_EXECUTION_TARGET;
-  // A named computer the phone holds no credential for is attached here rather
-  // than refused: the pair secret is this proof's key, not permission to run.
-  // Whether that computer accepts the work is its own remote-execution state,
-  // which the gate answers for — attaching never moves it.
   const deviceAccess =
     target.mode === "device" &&
     (!access || access.desktopDeviceId !== target.deviceId.trim())

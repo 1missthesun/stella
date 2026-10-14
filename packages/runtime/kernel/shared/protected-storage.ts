@@ -18,12 +18,6 @@ const PROTECTED_PREFIX = "stella-protected";
 
 let safeStorageCache: SafeStorageLike | null | undefined;
 
-/**
- * Explicit provider override for isolated runtimes that cannot use the OS
- * credential store, such as the desktop verification harness. Normal app
- * startup leaves this unset and resolves Electron safeStorage. Tests may also
- * install deterministic providers through the same seam.
- */
 export const setProtectedStorageProviderOverride = (
   provider: SafeStorageLike | null,
 ): void => {
@@ -88,8 +82,6 @@ export const unprotectValue = (scope: string, value: string): string | null => {
 };
 
 export const deleteProtectedValue = (scope: string, value: string): void => {
-  // safeStorage encrypts the value itself; deleting the containing record is
-  // sufficient. Keep this API so stores can retain a uniform lifecycle.
   void scope;
   void value;
 };

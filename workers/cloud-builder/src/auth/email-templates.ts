@@ -1,11 +1,5 @@
 import { emailDir, getEmailStrings } from "./email-i18n.js";
 
-/**
- * Build the magic-link sign-in email. Locale is the user's stored
- * preference (BCP-47); when missing, falls back to English. The
- * `<html>` element gets `lang` and `dir` attributes so screen readers
- * and email clients render the body in the correct script direction.
- */
 export const buildMagicLinkEmail = (
   logoSrc: string,
   signInUrl: string,
@@ -80,7 +74,6 @@ export const getMagicLinkSubject = (
   locale: string | null | undefined,
 ): string => getEmailStrings(locale).subjectMagicLink;
 
-/** Security alert for a sign-in from a device this account has not used before. */
 export const NEW_SIGN_IN_SUBJECT = "New sign-in to your Stella account";
 
 export const buildNewSignInAlertEmail = (

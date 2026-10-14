@@ -1,11 +1,3 @@
-/**
- * One completion on a resolved model route (`model-routing.ts`), on
- * upstream pi-ai: a Stella route runs on the `stella` provider over the
- * route's gateway session, a route on the user's own key on that provider's
- * upstream implementation. One-shot completions and thread summaries use
- * it; chats run on pi-durable (`@stella/agent`).
- */
-
 import type {
   Api,
   AssistantMessage,
@@ -34,20 +26,16 @@ export type RouteCompletionOptions = Pick<
   SimpleStreamOptions,
   "reasoning" | "maxTokens" | "temperature" | "cacheRetention" | "signal"
 > & {
-  /** The route's key when the caller already read it; read from the route otherwise. */
   apiKey?: string;
 };
 
-/** A local server often takes no key, but the OpenAI client always sends one. */
 const LOCAL_PLACEHOLDER_KEY = "stella-local";
-/** The same for a models.json proxy whose auth travels in its configured headers. */
 const CREDENTIALLESS_PLACEHOLDER_KEY = "stella-credentialless";
 
 let upstream: readonly Provider[] | undefined;
 const upstreamProvider = (id: string): Provider | undefined =>
   (upstream ??= builtinProviders()).find((provider) => provider.id === id);
 
-/** A provider that signs requests with the key it is given and streams by the model's API. */
 const keyedProvider = (id: string, model: Model<Api>, fallbackKey?: string): Provider =>
   createProvider({
     id,
@@ -69,7 +57,6 @@ const keyedProvider = (id: string, model: Model<Api>, fallbackKey?: string): Pro
     },
   });
 
-/** The provider and model a route on the user's own key runs on. */
 const directTarget = (route: ResolvedLlmRoute): { provider: Provider; model: Model<Api> } => {
   const { model } = route;
   if (route.credentialless) {
@@ -85,8 +72,6 @@ const directTarget = (route: ResolvedLlmRoute): { provider: Provider; model: Mod
   }
   const provider = upstreamProvider(model.provider);
   if (!provider) return { provider: keyedProvider(model.provider, model), model };
-  // pi-ai's own entry carries the request shape its implementation expects,
-  // unless models.json moved the model to another endpoint or API.
   const known = provider.getModels().find((candidate) => candidate.id === model.id);
   if (known && (known.baseUrl !== model.baseUrl || known.api !== model.api)) {
     return { provider: keyedProvider(model.provider, model), model };
@@ -105,13 +90,10 @@ export async function completeOnRoute(
   const { apiKey: givenKey, ...request } = options;
   const models = createModels();
   if (route.stella) {
-    // A pinned level reaches the gateway, which maps it to the upstream
-    // model; without one the gateway uses the route's own default.
     const { access, spec } = route.stella;
     models.setProvider(stellaProvider({ access, models: [spec] }));
     return await models.completeSimple(stellaModel(spec, access.relayBaseUrl), context, request);
   }
-  // Reading the key applies the route's configured models.json headers.
   const apiKey = givenKey ?? (await route.getApiKey())?.trim();
   const send = (key: string | undefined) => {
     const { provider, model } = directTarget(route);
@@ -123,7 +105,6 @@ export async function completeOnRoute(
     });
   };
   const message = await send(apiKey);
-  // A short-lived credential the provider rejected is minted again once.
   if (message.stopReason !== "error" || !route.refreshApiKey || !UNAUTHORIZED.test(message.errorMessage ?? "")) {
     return message;
   }
@@ -131,7 +112,6 @@ export async function completeOnRoute(
   return refreshed ? await send(refreshed) : message;
 }
 
-/** The text of an answer, trimmed. */
 export const readAssistantText = (message: AssistantMessage): string =>
   message.content
     .flatMap((part) => (part.type === "text" ? [part.text] : []))

@@ -5,10 +5,6 @@ import type { StoredDependencyBackup } from "./sandbox-dependencies.js";
 import type { DiskClass } from "./instance-size.js";
 import type { WorldListingEntry, WorldToolCall } from "./world/types.js";
 
-/**
- * A filesystem snapshot of one of this owner's agent containers, the image it
- * was taken on, and the sandbox object it came from.
- */
 export type ContainerSnapshot = {
   id: string;
   size: number;
@@ -146,7 +142,6 @@ export class WorldStore extends DurableObject<Env> {
     return result;
   }
 
-  /** Drop paths from every checkpoint; garbage collection follows. */
   async purgeHistory(paths: readonly string[]) {
     const dropped = await this.ctx.blockConcurrencyWhile(() =>
       Promise.resolve(this.world.purgeHistory(paths)),
@@ -166,14 +161,6 @@ export class WorldStore extends DurableObject<Env> {
     return this.world.head();
   }
 
-  // ---- the owner's agent containers --------------------------------------
-  //
-  // Every agent thread has a container of its own. Containers of one disk
-  // class share one latest snapshot and one caches-and-dependencies archive,
-  // kept here beside the world they all sync: whichever container of that
-  // class released last wrote them, and every new one starts from them. The world itself comes down by
-  // sync either way, so a snapshot only ever saves setup, never truth.
-
   containerSnapshot(slot: DiskClass = "standard"): ContainerSnapshot | null {
     return (
       this.ctx.storage.kv.get<ContainerSnapshot>(
@@ -189,11 +176,6 @@ export class WorldStore extends DurableObject<Env> {
     this.ctx.storage.kv.put(slotKey(CONTAINER_SNAPSHOT_KEY, slot), snapshot);
   }
 
-  /**
-   * Forget a latest snapshot if it is the one named: by its id after a
-   * restore from it failed, or by the container it came from when that
-   * container's state is being discarded. A newer one is kept.
-   */
   forgetContainerSnapshot(match: { id?: string; sandbox?: string }): void {
     for (const slot of DISK_CLASSES) {
       const current = this.containerSnapshot(slot);
@@ -215,7 +197,6 @@ export class WorldStore extends DurableObject<Env> {
     );
   }
 
-  /** Make `next` the archive new containers restore; returns the one replaced. */
   replaceDependencyBackup(
     next: StoredDependencyBackup,
     slot: DiskClass = "standard",
@@ -225,7 +206,6 @@ export class WorldStore extends DurableObject<Env> {
     return previous;
   }
 
-  /** Forget the archive if it is still `record`, which no longer restores. */
   forgetDependencyBackup(recordId: string): void {
     for (const slot of DISK_CLASSES) {
       if (this.dependencyBackup(slot)?.record.id === recordId) {
@@ -234,7 +214,6 @@ export class WorldStore extends DurableObject<Env> {
     }
   }
 
-  /** Owner purge: no later container may start from either. */
   forgetContainerState(): void {
     for (const slot of DISK_CLASSES) {
       this.ctx.storage.kv.delete(slotKey(CONTAINER_SNAPSHOT_KEY, slot));
@@ -242,7 +221,6 @@ export class WorldStore extends DurableObject<Env> {
     }
   }
 
-  /** One agent container's own changes (`WorldSqlStore.pushChanges`). */
   async pushChanges(input: {
     entries: WorldListingEntry[];
     deleted: string[];

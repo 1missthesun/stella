@@ -3,11 +3,6 @@ const record = (value: unknown): Record<string, unknown> | undefined =>
     ? (value as Record<string, unknown>)
     : undefined;
 
-/**
- * Extract the durable expiry boundary from either supported suspension kind.
- * Keeping this independent from BrowserProfileSession makes the alarm policy
- * directly testable without a Cloudflare runtime shim.
- */
 export const suspensionAlarmDeadline = (value: unknown): number | undefined => {
   const result = record(value);
   if (result?.outcome !== "suspended") return undefined;

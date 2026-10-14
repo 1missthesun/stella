@@ -20,10 +20,8 @@ export class StreamAbortError extends Error {
   }
 }
 
-/** One refused request, carrying the status so callers can branch on it. */
 export class HttpRequestError extends Error {
   readonly status: number;
-  /** Contract error code when the service sent one (`{ error: { code } }`). */
   readonly code: string | null;
   constructor(message: string, status: number, code: string | null) {
     super(message);
@@ -50,7 +48,6 @@ const readErrorDetail = async (
     if (typeof o.error === "string" && o.error.trim()) {
       return { message: o.error.trim(), code: null };
     }
-    // The cloud builder answers `{ error: { code, message, retryable } }`.
     if (o.error && typeof o.error === "object") {
       const detail = o.error as Record<string, unknown>;
       return {
@@ -68,8 +65,6 @@ const readErrorDetail = async (
   return { message: GENERIC_REQUEST_FAILURE, code: null };
 };
 
-// Without an explicit timeout, a black-holed connection (captive portal,
-// cellular handoff) pins callers for the OS default (~60s on iOS).
 const REQUEST_TIMEOUT_MS = 15_000;
 
 async function requestJson(
@@ -78,7 +73,6 @@ async function requestJson(
   options?: {
     timeoutMs?: number;
     signal?: AbortSignal;
-    /** Absolute origin override; defaults to the backend worker. */
     origin?: string;
   },
 ) {
@@ -127,8 +121,6 @@ async function requestJson(
     throw new HttpRequestError(detail.message, response.status, detail.code);
   }
 
-  // Guarded parse: a 200 with a non-JSON body (proxy/error interstitial)
-  // must surface as clean copy, never a raw "JSON Parse error: …".
   const text = await response.text();
   try {
     return JSON.parse(text) as unknown;
@@ -137,7 +129,6 @@ async function requestJson(
   }
 }
 
-/** The backend worker's origin. */
 export const backendOrigin = (): string => {
   const origin = env.backendUrl?.trim();
   assert(origin, "EXPO_PUBLIC_STELLA_BACKEND_URL is not configured.");
@@ -211,7 +202,6 @@ export const putJson = (
     },
   );
 
-/** Authenticated non-JSON POST to the backend (the voice SDP route). */
 export const postText = async (
   path: string,
   body: string,

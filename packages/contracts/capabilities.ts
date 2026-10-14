@@ -1,24 +1,3 @@
-/**
- * Which plan gets which capability — the single table the whole app reads.
- *
- * Tiers are differentiated by *what you can do*, not by how much of it you
- * can do: Go buys the coding agent and the text assistant, Pro adds the
- * generative surfaces (image / video / audio / 3D). Usage volume is a
- * separate axis owned by `billing_plans.ts` — a capability check answers
- * "is this surface yours at all", never "have you spent too much this week".
- *
- * Reshuffling the lineup is a one-file edit: flip a boolean in
- * `CAPABILITY_MATRIX` and the gates, the upgrade copy, and the toasts all
- * follow. Nothing downstream is allowed to hardcode a plan name.
- *
- * Every row here is enforced. Anything Pro is merely *marketed* with —
- * orchestration, for instance, which any plan may use but which burns
- * enough usage that Pro is the sensible home for it — belongs in the
- * billing screen's presentational copy, not in this table. A matrix where
- * some rows gate and others are decorative is a trap: the next person to
- * read it cannot tell which is which, and wires up the wrong one.
- */
-
 export const CAPABILITIES = [
   "image_generation",
   "video_generation",
@@ -30,18 +9,12 @@ export type Capability = (typeof CAPABILITIES)[number];
 
 export type CapabilityAudience = "free" | "go" | "pro";
 
-/** Weakest plan first — `minimumPlanForCapability` walks this order. */
 export const CAPABILITY_AUDIENCE_ORDER: readonly CapabilityAudience[] = [
   "free",
   "go",
   "pro",
 ];
 
-/**
- * Free and Go include the assistant and coding workflows. Media generation
- * (image / video / voice / 3D) is what Pro adds; dictation and read-aloud are
- * all-plan features and therefore do not belong in this gate.
- */
 export const CAPABILITY_MATRIX: Record<
   Capability,
   Record<CapabilityAudience, boolean>
@@ -73,11 +46,6 @@ export const hasCapability = (
   capability: Capability,
 ): boolean => CAPABILITY_MATRIX[capability]?.[audience] === true;
 
-/**
- * The cheapest audience that unlocks `capability`, or `null` when no plan
- * grants it (a capability switched off everywhere). Drives the
- * "upgrade to X" copy, so it must never be a hardcoded "pro".
- */
 export const minimumPlanForCapability = (
   capability: Capability,
 ): CapabilityAudience | null =>
@@ -85,25 +53,11 @@ export const minimumPlanForCapability = (
     hasCapability(audience, capability),
   ) ?? null;
 
-/**
- * The backend's richer audience notion (`agent/model.ts`), which splits
- * paying users into "within budget" and "over budget" halves.
- */
 export type ManagedCapabilityAudience =
   | CapabilityAudience
   | "go_fallback"
   | "pro_fallback";
 
-/**
- * Collapse a managed audience onto the four the matrix is keyed by.
- *
- * The `_fallback` audiences mean "paying, but currently over the usage
- * cap" — that is a usage problem, not an entitlement one. A Pro user who
- * has burned through this week's budget still *has* image generation, so
- * they collapse onto their plan rather than dropping a tier. Callers get
- * this helper instead of each reimplementing the collapse and eventually
- * disagreeing about it.
- */
 export const toCapabilityAudience = (
   audience: ManagedCapabilityAudience | null | undefined,
 ): CapabilityAudience | null => {
@@ -134,10 +88,6 @@ export const CAPABILITY_PLAN_LABELS: Record<CapabilityAudience, string> = {
   pro: "Pro",
 };
 
-/**
- * Machine-readable code carried by every capability denial in the HTTP
- * envelope (`code`).
- */
 export const CAPABILITY_DENIED_CODE = "CAPABILITY_REQUIRED" as const;
 
 /**
@@ -150,18 +100,10 @@ export const CAPABILITY_DENIED_CODE = "CAPABILITY_REQUIRED" as const;
 export const capabilityDenialMarker = (capability: Capability): string =>
   `[capability/${capability}]`;
 
-/**
- * The wire shape of a denial. Everything the desktop needs to build its
- * toast — what was denied, who the caller is right now, and the cheapest
- * plan that would have allowed it — travels here, so no client has to
- * re-derive an entitlement decision the backend already made.
- */
 export type CapabilityDenial = {
   code: typeof CAPABILITY_DENIED_CODE;
   capability: Capability;
-  /** The caller's collapsed audience at denial time. */
   audience: CapabilityAudience;
-  /** `null` when the capability is switched off for every plan. */
   minimumPlan: CapabilityAudience | null;
   message: string;
 };

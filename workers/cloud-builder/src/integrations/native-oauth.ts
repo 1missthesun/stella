@@ -1,20 +1,3 @@
-/**
- * Server-side token exchange for desktop OAuth connectors whose client
- * secret cannot ship in the app (`tokenExchange: { type: "backend" }` in the
- * runtime's provider config). The desktop runs the browser leg and posts the
- * code (or a refresh token) here; this adds the secret and calls the
- * provider's token endpoint.
- *
- * Clients come from `NATIVE_OAUTH_CLIENTS_JSON`, one object keyed by
- * lowercase provider id:
- *   {"google-workspace": {"clientId": "...", "clientSecret": "..."},
- *    "box": {"clientId": "...", "clientSecret": "...",
- *            "tokenEndpoint": "https://api.box.com/oauth2/token"}}
- * `tokenEndpoint` is required for every provider without a built-in one;
- * `tokenAuth` ("body" default, or "basic") and `tokenRedirectParam` are
- * optional. The endpoint is never taken from the request.
- */
-
 type NativeOAuthClient = {
   clientId: string;
   clientSecret: string;
@@ -62,7 +45,6 @@ export const nativeOAuthClients = (env: Cloudflare.Env): Map<string, NativeOAuth
   return clients;
 };
 
-/** What `GET /api/native-oauth/providers` answers: the configured ids. */
 export const listNativeOAuthProviders = (env: Cloudflare.Env) => ({
   providers: [...nativeOAuthClients(env)].map(([id, client]) => ({
     id,
@@ -71,7 +53,6 @@ export const listNativeOAuthProviders = (env: Cloudflare.Env) => ({
   })),
 });
 
-/** `POST /api/native-oauth/token`: the provider's token response, or an error. */
 export const exchangeNativeOAuthToken = async (
   env: Cloudflare.Env,
   body: Record<string, unknown>,

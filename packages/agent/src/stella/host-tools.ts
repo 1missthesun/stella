@@ -1,15 +1,3 @@
-/**
- * Stella's own tools on pi-durable (web, html, image_gen, ask_user and the
- * rest), executed by the host that opened the harness: the desktop runtime's
- * tool host, or the cloud orchestrator's turn tools. The harness knows them
- * by their specs only, the same descriptors every other path uses, whose JSON
- * Schema parameters TypeBox 1.x validates as they are.
- *
- * Each agent type has its own extension, so a conversation selects its set by
- * name: the orchestrator's, or an agent's. An agent's file and shell tools
- * are pi-durable's own (`stella-coding`), through its ExecutionEnv, wherever
- * it runs.
- */
 import type { Context, JsonValue } from "@earendil-works/chord";
 import { withAbortSignal, withoutAbortSignal } from "@earendil-works/chord/context";
 import type { ImageContent, TextContent, TSchema } from "@earendil-works/pi-ai";
@@ -26,11 +14,6 @@ export const STELLA_AGENT_TOOLS = "stella-tools-agent";
 
 export type StellaToolRole = "orchestrator" | "general";
 
-/**
- * Tools the harness has itself, under these names or older ones: the agent
- * tools and an agent's file and shell tools. A host's catalog offers the
- * rest, `code` included.
- */
 export const STELLA_HARNESS_TOOL_NAMES: ReadonlySet<string> = new Set([
   "spawn_agent",
   "send_message",
@@ -46,31 +29,22 @@ export const STELLA_HARNESS_TOOL_NAMES: ReadonlySet<string> = new Set([
   "multi_tool_use_parallel",
   "NoResponse",
   "node_repl",
-  // The harness has its own, which moves Stella herself.
   "switch_destination",
 ]);
 
 export type StellaToolSpec = {
   name: string;
   description: string;
-  /** JSON Schema of the arguments. */
   parameters: Record<string, unknown>;
-  /**
-   * Whether a call interrupted by a restart may run again: `keyed` tools do
-   * their work once per call id, so a rerun is as safe as a `safe` one.
-   */
   replay?: "safe" | "keyed" | "unsafe";
-  /** A demoted tool: reached only through `code` when the agent has it, directly otherwise. */
   codeOnly?: { searchTerms?: readonly string[] };
 };
 
 export type StellaToolCall = {
   role: StellaToolRole;
   name: string;
-  /** The model's tool call id, the same on every run of the call. */
   callId: string;
   args: Record<string, unknown>;
-  /** The calling agent's thread id; the orchestrator has none. */
   threadId?: string;
 };
 
@@ -81,7 +55,6 @@ export type StellaToolOutcome = {
 };
 
 export interface StellaToolHost {
-  /** The tools an agent type is offered, as the host has them now. */
   specs(role: StellaToolRole): readonly StellaToolSpec[];
   run(call: StellaToolCall, context: Context): Promise<StellaToolOutcome>;
 }
@@ -165,10 +138,8 @@ const register = (role: StellaToolRole, spec: StellaToolSpec, host: StellaToolHo
   },
 });
 
-/** Stella's Code Mode tool: nested calls reach the host's tools through it (`tools.<name>`). */
 export const STELLA_CODE_TOOL_NAME = "code";
 
-/** The orchestrator's and the agents' tool extensions, from the host's current specs. */
 export function stellaToolExtensions(host: StellaToolHost | undefined): Extension[] {
   const build = (role: StellaToolRole, name: string) => {
     const specs = host?.specs(role) ?? [];
@@ -181,5 +152,4 @@ export function stellaToolExtensions(host: StellaToolHost | undefined): Extensio
   return [build("orchestrator", STELLA_ORCHESTRATOR_TOOLS), build("general", STELLA_AGENT_TOOLS)];
 }
 
-/** An agent conversation's selection: everything but the orchestrator's tools. */
 export const agentToolSelection = { remove: [{ name: STELLA_ORCHESTRATOR_TOOLS }] } as const;

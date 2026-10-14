@@ -1,11 +1,3 @@
-/**
- * State machine for the chat-style onboarding.
- *
- * Owns the transcript (scripted assistant messages and the user's short
- * replies), the current step, the "Stella is typing" beat between messages,
- * resume, and the exit. Cards never touch persistence: they call `answer`
- * and this hook does the rest.
- */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useReducedMotion } from "react-native-reanimated";
 import { useT } from "../../i18n";
@@ -24,16 +16,12 @@ export type OnboardingEntry =
       kind: "assistant";
       id: string;
       step: OnboardingStep;
-      /** Plays the arrival animation: only rows added this session. */
       fresh: boolean;
     }
   | { kind: "user"; id: string; text: string; fresh: boolean };
 
-/** The reply lands, then Stella "reads" it before typing. */
 const TYPING_DELAY_MS = 380;
-/** How long the typing indicator holds before the next message drops in. */
 const TYPING_HOLD_MS = 950;
-/** On a first visit, the hero settles before Stella starts typing. */
 const INTRO_TYPING_AT_MS = 650;
 
 const REPLY_KEYS: Record<
@@ -88,9 +76,6 @@ const buildEntries = (
   for (const step of ONBOARDING_STEPS) {
     if (step === progress.step) break;
     const answer = progress.answers[step];
-    // A past step with no recorded answer was never shown (the flow gained a
-    // step after this progress was saved); rebuilding it would leave an
-    // orphaned card above the current one.
     if (!answer) continue;
     entries.push(assistantEntry(step, false));
     const key = REPLY_KEYS[step][answer];
@@ -108,12 +93,7 @@ export function useOnboardingChat({
   skipGmail,
 }: {
   started: boolean;
-  /**
-   * This owner already has a computer on the account, so the computer message
-   * is left out of the script entirely (see `useComputerStepNeeded`).
-   */
   skipComputer: boolean;
-  /** Gmail connects through a Stella account, so guests never see it. */
   skipGmail: boolean;
 }) {
   const t = useT();
@@ -128,7 +108,6 @@ export function useOnboardingChat({
   const [progress, setProgress] = useState<OnboardingProgress>(
     initial.progress,
   );
-  // A first visit opens on an empty thread: Stella "types" the greeting in.
   const [entries, setEntries] = useState<OnboardingEntry[]>(() =>
     initial.resumed ? buildEntries(initial.progress, t, true) : [],
   );
@@ -139,8 +118,6 @@ export function useOnboardingChat({
   const progressRef = useRef(progress);
   progressRef.current = progress;
 
-  // Dropping a step the user is already on, or already answered, would strand
-  // the transcript, so the decision only applies ahead of the message.
   const steps = useMemo(() => {
     const keep = (step: OnboardingStep, skip: boolean) =>
       !skip ||
@@ -171,8 +148,6 @@ export function useOnboardingChat({
     [],
   );
 
-  // The greeting waits for the screen to actually be visible (the native
-  // splash can still be up while startup state resolves).
   const introStartedRef = useRef(false);
   useEffect(() => {
     if (initial.resumed || !started || introStartedRef.current) return;

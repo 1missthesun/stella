@@ -288,7 +288,6 @@ type PendingResponse = {
   requestId: string;
   resolve: (result: BrowserCommandResult) => void;
   reject: (error: Error) => void;
-  /** Interrupts the round-trip's timeout fiber (the clearTimeout analogue). */
   cancelTimeout: () => void;
   signal?: AbortSignal;
   onAbort?: () => void;
@@ -310,10 +309,6 @@ const EXTERNAL_ATTACH_PREFLIGHT_TIMEOUT_MS = 2_000;
 const EXTERNAL_ATTACH_PREFLIGHT_CACHE_MS = 5_000;
 const EXTERNAL_ATTACH_GRACE_MS = 6_000;
 const EXTERNAL_ATTACH_GRACE_POLL_MS = 750;
-// These requests can be repeated after a managed daemon is replaced without
-// changing page/browser state. Mutations and arbitrary evaluation are
-// deliberately absent: the old daemon may have executed them before its
-// response was lost, and replay protection is daemon-local.
 const BROWSER_REPLACEMENT_REPLAY_SAFE_ACTIONS = new Set<string>([
   "healthcheck",
   "url",
@@ -1066,7 +1061,6 @@ export class BrowserSession implements BrowserSessionClient {
     config: ResolvedExecutionConfig;
   }>;
   private recoverInAppBrowserCapability = false;
-  /** Until when a positive external-attachment preflight is trusted (ms). */
   private externalAttachCheckedUntil = 0;
   private queue: Promise<void> = Promise.resolve();
   private disposed = false;
@@ -1287,11 +1281,6 @@ export class BrowserSession implements BrowserSessionClient {
       const releaseLease = this.enqueue(async () => {
         if (!turn) return;
         try {
-          // A kernel/worker generation can disappear after an ordinary command
-          // rejection or transport timeout. Releasing only this exact lease
-          // lets a replacement generation for the same durable task reclaim
-          // the tabs. End-of-task cleanup still runs through endTurn(), which
-          // explicitly finalizes the task's tabs.
           await this.cleanupTurn(turn, true, false);
         } catch {
           // Stale disposal and unavailable transports are best-effort. Rust
@@ -2060,15 +2049,6 @@ export class BrowserSession implements BrowserSessionClient {
         : `${config.endpoint.host}:${config.endpoint.port}`;
     const session = this;
 
-    // The connection attempt is a scoped Effect: the connecting socket is
-    // acquired via `acquireRelease` with an EXIT-AWARE release — destroyed
-    // on failure (connect error, timeout, abort, disposed-mid-connect),
-    // handed to `installSocket` and left alive on success — so a lost race
-    // can never leak a half-open daemon connection. The connect/error
-    // listeners are scoped resources removed on every exit path, the
-    // timeout is an `Effect.sleep` race, and the caller's AbortSignal
-    // crosses in through `acquireAbortLatch` (cooperative cancel; identical
-    // rejection reasons and error strings).
     await runBrowserUseEffect(
       Effect.scoped(
         Effect.gen(function* () {
@@ -2088,10 +2068,6 @@ export class BrowserSession implements BrowserSessionClient {
               ),
             );
           };
-          // Socket creation AND listener wiring happen inside one
-          // synchronous acquire, so no fiber yield can slip between them
-          // and drop an early connect/error event (the same atomicity the
-          // old promise executor's synchronous body provided).
           const socket = yield* Effect.acquireRelease(
             Effect.sync(() => {
               const created =
@@ -2223,9 +2199,6 @@ export class BrowserSession implements BrowserSessionClient {
     }
 
     return new Promise<BrowserCommandResult>((resolve, reject) => {
-      // Bounded round-trip window: the timeout is a forked fiber
-      // (forkCancelableTimeout) interrupted by `takePending` on every
-      // settle path — the Effect replacement for the cleared setTimeout.
       const cancelTimeout = forkCancelableTimeout(timeoutMs, () => {
         this.invalidateSocket(
           socket,

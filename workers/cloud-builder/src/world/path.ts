@@ -30,10 +30,6 @@ export const normalizeWorldPath = (
   return segments.join("/");
 };
 
-/**
- * The world is the cloud agent's HOME, so `~` and `$HOME` name its root in a
- * file tool exactly as they do in the agent's shell.
- */
 export const expandWorldHome = (
   value: string,
   root: string = WORLD_ROOT,
@@ -84,12 +80,6 @@ export const baseName = (path: string): string => {
 export const pathWithin = (path: string, prefix: string): boolean =>
   prefix === "" || path === prefix || path.startsWith(`${prefix}/`);
 
-/**
- * The owner's drive, as the world names it. The drive is its own store (the
- * owner object's rows and the drive's R2 bucket); a sandbox keeps a working
- * copy of it under the world root, and the world never stores, exports or
- * counts that copy.
- */
 export const WORLD_DRIVE_DIR = "drive";
 
 export const isWorldDrivePath = (path: string): boolean =>

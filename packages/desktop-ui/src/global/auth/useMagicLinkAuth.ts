@@ -25,18 +25,11 @@ import { getPlatformChallengeToken } from "@/platform/auth/challenge-token";
 
 type Status = "idle" | "sending" | "sent" | "verifying" | "error";
 
-/**
- * Errors are stored as i18n descriptors rather than resolved strings: the
- * provider mounts above <I18nProvider>, so the state hook has no `t`. The
- * consumer hook (`useMagicLinkAuth`, always called from inside the i18n
- * tree) resolves them to display text.
- */
 type MagicLinkError =
   | { kind: "key"; key: string }
   | { kind: "plural"; key: string; count: number }
   | { kind: "text"; text: string };
 
-/** Thrown internally so a catch block can preserve the i18n key. */
 class MagicLinkKeyError extends Error {
   readonly key: string;
   constructor(key: string) {
@@ -52,30 +45,17 @@ const toMagicLinkError = (err: unknown): MagicLinkError => {
 };
 
 const POLL_INTERVAL_MS = 2500;
-/**
- * Visual cooldown after a successful send. The backend is the source of
- * truth (3/min/email + Retry-After) — this is purely UX so the resend
- * button doesn't look spam-clickable. A 429 will override with the real
- * Retry-After value.
- */
 const RESEND_COOLDOWN_MS = 30_000;
 
 interface UseMagicLinkAuthResult {
   email: string;
   setEmail: Dispatch<SetStateAction<string>>;
   status: Status;
-  /**
-   * The (normalized) email a sign-in link was last sent to, or null if no
-   * send has succeeded in this session. When `email` differs from this we
-   * treat the form as a fresh send.
-   */
   sentToEmail: string | null;
   error: string | null;
   handleMagicLinkSubmit: (event: FormEvent) => Promise<void>;
   resend: () => Promise<void>;
-  /** Seconds left before resend is enabled (0 when ready). */
   resendCooldownSeconds: number;
-  /** True while the resend network call is in flight. */
   isResending: boolean;
   reset: () => void;
 }
@@ -93,8 +73,6 @@ function useMagicLinkAuthState(): MagicLinkAuthState {
   const [requestId, setRequestId] = useState<string | null>(null);
   const [sentToEmail, setSentToEmail] = useState<string | null>(null);
   const [cooldownUntil, setCooldownUntil] = useState<number>(0);
-  // The claim secret for the in-flight handoff. A ref, not state: it must not
-  // trigger a re-render and must never be persisted anywhere.
   const claimSecretRef = useRef<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [isResending, setIsResending] = useState(false);
@@ -111,8 +89,6 @@ function useMagicLinkAuthState(): MagicLinkAuthState {
       const backendUrl = requireBackendUrl();
       const turnstileToken = await getPlatformChallengeToken();
       const sendRequest = buildMagicLinkSendRequest(targetEmail, turnstileToken);
-      // Held in memory for this attempt only; the server stores just the hash
-      // and returns nothing usable from /link/status.
       const claimSecret = generateClaimSecret();
       claimSecretRef.current = claimSecret;
       const response = await fetch(`${backendUrl}/api/auth/link/send`, {
@@ -181,8 +157,6 @@ function useMagicLinkAuthState(): MagicLinkAuthState {
     await sendMagicLink(trimmed, "resend");
   };
 
-  // Tick every 500ms while a cooldown is active so the visual countdown
-  // stays in sync. We stop ticking once the cooldown elapses.
   useEffect(() => {
     if (cooldownUntil <= Date.now()) return;
     const id = setInterval(() => setNow(Date.now()), 500);
@@ -194,16 +168,8 @@ function useMagicLinkAuthState(): MagicLinkAuthState {
     Math.ceil((cooldownUntil - now) / 1000),
   );
 
-  // Poll for magic link verification.
   useEffect(() => {
     if (status !== "sent" || !requestId) return;
-    // Per-effect cancellation flag, captured by this run's poll closure. Each
-    // effect execution owns its own `cancelled`, so a stale loop from a prior
-    // run (e.g. after Resend re-runs this effect with a new requestId) can
-    // never be un-cancelled by the newer run and stops touching shared state
-    // the moment its cleanup fires. reset() cancels via the same path: it
-    // clears `status`/`requestId`, which re-runs this effect and runs the old
-    // run's cleanup.
     let cancelled = false;
     const backendUrl = requireBackendUrl();
 
@@ -223,8 +189,6 @@ function useMagicLinkAuthState(): MagicLinkAuthState {
             if (cancelled) return;
             setStatus("verifying");
             try {
-              // /link/status carries no credential. Exchange the secret this
-              // shell generated, which is the only thing that can claim it.
               const secret = claimSecretRef.current;
               const token = secret
                 ? await claimSessionToken(backendUrl, requestId, secret)

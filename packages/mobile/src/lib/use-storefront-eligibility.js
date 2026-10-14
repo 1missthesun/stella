@@ -21,11 +21,6 @@ import {
  */
 export const US_STOREFRONT_CODE = "USA";
 
-// Dev-only storefront override so both the eligible and ineligible UI paths
-// can be exercised in the simulator without an App Store account. It is
-// honored ONLY when `__DEV__` is true, so it is dead code in release builds
-// and can never become a production bypass. `undefined` = no override,
-// `null` = force "unknown", a string = force that storefront code.
 let debugStorefrontOverride;
 
 export function setDebugStorefrontOverride(codeOrNull) {

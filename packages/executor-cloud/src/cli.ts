@@ -24,15 +24,9 @@ markTurnStep("modulesLoaded");
 await loadModelRegistry();
 markTurnStep("modelRegistryLoaded");
 
-// A container that just started runs this once in the background so the
-// turn's own executor finds its modules already read.
 if (process.argv.includes("--warm")) process.exit(0);
 
-// The daemon and the one-call client never produce a turn result, so they exit
-// before the turn-result plumbing below.
 if (process.argv.includes("--attached-tool-host")) {
-  // A daemon that dies must say so on stderr: the worker reads it back when
-  // the bridge stops answering, and a bare exit explains nothing.
   for (const signal of ["SIGTERM", "SIGINT", "SIGHUP"] as const) {
     process.on(signal, () => {
       console.error(`attached tool host received ${signal}`);
@@ -102,9 +96,6 @@ await writeFile(attempt.result, `${serialized}\n`, {
   encoding: "utf8",
   mode: 0o600,
 });
-// Keep stdout for compatibility and diagnostics, but never let a lost pipe ACK
-// hold the one-shot executor past Builder's durable-recovery alarm. Agent turns
-// already flushed the authoritative root-only result above.
 const cancelForcedExit = forkAbortTimer(1_000, () => process.exit(0));
 process.stdout.write(`${serialized}\n`, () => {
   cancelForcedExit();

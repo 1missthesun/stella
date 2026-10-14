@@ -1,21 +1,9 @@
-/**
- * Hand-maintained model lists for the subscription engines (Claude Code and
- * ChatGPT). Pickers show these when they can't ask the provider: a signed-in
- * ChatGPT account's own list (`GET /v1/models`, `engines.listModels` for the
- * cloud) replaces the ChatGPT one. Update this file when a provider ships new
- * models.
- */
 export type EngineModelOption = {
   id: string;
   name: string;
   description?: string;
 };
 
-/**
- * Claude Code aliases. The CLI resolves these for local execution; the cloud
- * relay converts them to Messages API model IDs in model-catalog. Update that
- * cloud mapping when Anthropic changes its recommended alias versions.
- */
 export const CLAUDE_ENGINE_MODELS: readonly EngineModelOption[] = [
   {
     id: "default",
@@ -49,7 +37,6 @@ export const CLAUDE_ENGINE_MODELS: readonly EngineModelOption[] = [
   },
 ];
 
-/** ChatGPT plan models, newest family only. */
 export const CHATGPT_ENGINE_MODELS: readonly EngineModelOption[] = [
   {
     id: "gpt-6.1-sol",

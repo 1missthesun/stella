@@ -35,14 +35,9 @@ export type DeviceIdentity = {
   deviceId: string;
   publicKey: string;
   privateKey: string;
-  /** Set when this identity replaced an earlier one whose succession is unclaimed. */
   supersededDeviceId?: string;
 };
 
-/**
- * The existing desktop identity adapted to the raw-key DPoP wire format.
- * Signatures are base64url so callers never need access to the private key.
- */
 export type DeviceSigner = {
   alg: "ed25519";
   rawPublicKey: Uint8Array;
@@ -73,12 +68,9 @@ const logDeviceIdentityRegeneration = (
   reason: DeviceIdentityRegenerationReason,
   supersededDeviceId: string | undefined,
 ) => {
-  // A first run has nothing to report.
   if (reason === "no-record" && !supersededDeviceId) {
     return;
   }
-  // Prefer the process log so a rotation is still diagnosable after the fact;
-  // identity can be loaded before the logger exists, hence the console fallback.
   const logger = getFileLogger();
   if (logger) {
     logger.warn("device-identity.regenerated", {
@@ -93,7 +85,6 @@ const logDeviceIdentityRegeneration = (
   );
 };
 
-/** Adapt a leaf Promise IO call, failing with the raw thrown value. */
 const tryIO = <A>(f: () => Promise<A>): Effect.Effect<A, unknown> =>
   Effect.tryPromise({ try: f, catch: (error) => error });
 
@@ -206,14 +197,6 @@ const createAndStoreDeviceIdentityEffect = (
     return payload;
   });
 
-/**
- * Read the persisted device record, tracking why it is unusable so a
- * regeneration can be logged with its cause. Captures `privateKeyProtected`
- * even when the rest of the record is unusable, so a re-key can clean up the
- * superseded protected value. `reason` is only meaningful when `parsed` is
- * undefined; later stages refine it for records that parse but cannot be
- * reused.
- */
 const readPersistedDeviceRecord = (
   recordPath: string,
 ): Effect.Effect<{
@@ -325,9 +308,6 @@ export const resetDeviceIdentityEffect = (
   Effect.gen(function* () {
     const recordPath = getDeviceRecordPath(statePath);
     const { parsed } = yield* readPersistedDeviceRecord(recordPath);
-    // Only an involuntary rotation (recovering from a key mismatch) carries the
-    // old identity forward. A user-initiated reset is meant to cut ties, so it
-    // must not drag the previous machine's pairings onto the new id.
     const supersededDeviceId =
       options.preservePairings && parsed?.deviceId ? parsed.deviceId : undefined;
     const identity = yield* createAndStoreDeviceIdentityEffect(

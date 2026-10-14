@@ -1,9 +1,3 @@
-/**
- * Per-install state shared by the worker API modules: the selected backend,
- * the current generation of every numeric tab id, and the command transport
- * to the host's browser session.
- */
-
 import type {
   BrowserWorkerBackend,
   BrowserWorkerCall,
@@ -16,9 +10,6 @@ import {
 } from "../protocol.js";
 import { isPlainObject } from "./validation.js";
 
-// Effect-ratchet pin (1 setTimeout): this module is bundled into the
-// Node REPL eval worker (see worker-api-source.ts), which has no Effect
-// runtime, so the raw timer is the only scheduling primitive available.
 export const delay = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
 

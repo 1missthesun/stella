@@ -1,23 +1,3 @@
-/**
- * Model-gateway session capabilities for the desktop runtime.
- *
- * A signed-in (or anonymous) runtime never sends its Better Auth JWT to the
- * gateway on model requests. It exchanges the JWT once at
- * `POST {gatewayOrigin}/v1/capabilities/session` for a session capability
- * (an ES256 JWT minted by the backend) and presents that capability as
- * `Authorization: Bearer <capability>` on every relay call.
- *
- * This module owns two process-wide caches:
- *   - the gateway origin advertised by the `/api/stella/models` catalog, per
- *     Stella site, so routes built before the catalog resolves can still
- *     find the origin once it is known; and
- *   - the session capability, per (gateway, owner identity), cached
- *     until 60 s before its `expiresAt` and re-exchanged on demand when the
- *     gateway rejects it.
- *
- * Deliberately free of node builtins: the same file is reachable from the
- * Cloudflare runtime paths.
- */
 import {
   GATEWAY_SESSION_CAPABILITY_PATH,
   type GatewayErrorBody,
@@ -37,9 +17,7 @@ import {
 import { normalizeStellaSiteUrl } from "@stella/contracts/stella-api";
 import type { DeviceSigner } from "./home/device.js";
 
-/** Re-exchange this long before the capability's own expiry. */
 export const GATEWAY_SESSION_CAPABILITY_REFRESH_SKEW_MS = 60_000;
-/** Bound on the capability exchange round-trip. */
 const GATEWAY_SESSION_EXCHANGE_TIMEOUT_MS = 15_000;
 
 export const STELLA_GATEWAY_UNCONFIGURED_MESSAGE =
@@ -49,21 +27,11 @@ export const STELLA_GATEWAY_CHALLENGE_REQUIRED_MESSAGE =
 export const STELLA_GATEWAY_DEVICE_VERIFICATION_MESSAGE =
   "This device could not be verified. Restart Stella and try again.";
 
-// ---------------------------------------------------------------------------
-// Gateway origin memory
-// ---------------------------------------------------------------------------
-
 const knownGatewayOrigins = new Map<string, string>();
 
 const siteKey = (siteBaseUrl: string): string =>
   normalizeStellaSiteUrl(siteBaseUrl);
 
-/**
- * Validate a catalog-advertised gateway origin. Accepts an absolute http(s)
- * URL (a path prefix is allowed) and strips trailing slashes; anything else
- * is rejected so a misconfigured backend fails loudly instead of producing
- * a relay URL that quietly points nowhere.
- */
 export const normalizeGatewayOrigin = (value: unknown): string | null => {
   if (typeof value !== "string") return null;
   const trimmed = value.trim().replace(/\/+$/, "");
@@ -93,10 +61,6 @@ export const getRememberedStellaGatewayOrigin = (
   siteBaseUrl: string | null | undefined,
 ): string | null =>
   siteBaseUrl ? (knownGatewayOrigins.get(siteKey(siteBaseUrl)) ?? null) : null;
-
-// ---------------------------------------------------------------------------
-// Session capability cache
-// ---------------------------------------------------------------------------
 
 type CapabilityCacheEntry = {
   capability: string;
@@ -190,12 +154,6 @@ export const dpopHeadersForSessionCapability = async (args: {
   };
 };
 
-/**
- * Cache identity of a Better Auth JWT: who the token is for, not which
- * rotation of it. A capability is bound to the owner, so a rotated JWT for
- * the same owner keeps using the still-valid capability; a different owner
- * (sign-out, sign-in, anonymous -> signed in) can never see another's entry.
- */
 const authIdentity = (token: string): string => {
   const payload = decodeJwtPayload(token);
   if (!payload) return `token:${token}`;
@@ -323,32 +281,19 @@ const exchangeOnce = async (args: {
 };
 
 export type GatewaySessionClientArgs = {
-  /** Resolved lazily so a route built before the catalog fetch still works. */
   gatewayOrigin: () => string | null;
-  /** Current Better Auth JWT, already refreshed when it is about to expire. */
   getAuthToken: () => Promise<string | undefined> | string | undefined;
-  /** Mint a fresh Better Auth JWT after the gateway rejects the current one. */
   refreshAuthToken?: () => Promise<string | undefined> | string | undefined;
-  /** Obtain one fresh Turnstile token after a challenge_required response. */
   getChallengeToken?: () => Promise<string | undefined>;
-  /** Existing protected desktop identity, adapted to sign DPoP inputs. */
   getDeviceSigner: () => Promise<DeviceSigner> | DeviceSigner;
   fetch?: typeof fetch;
   now?: () => number;
 };
 
 export type GatewaySessionClient = {
-  /** Cached capability, exchanged on first use and 60 s before expiry. */
   getCapability(): Promise<string | undefined>;
-  /**
-   * A capability in place of `rejected`, the one the gateway just refused:
-   * a fresh exchange, unless another request already replaced it (then that
-   * one). Without `rejected`, always a fresh exchange.
-   */
   refreshCapability(rejected?: string): Promise<string | undefined>;
-  /** Drop the cached capability; the next `getCapability` re-exchanges. */
   invalidate(): Promise<void>;
-  /** The same signer bound to the cached capability. */
   getDeviceSigner(): Promise<DeviceSigner>;
 };
 

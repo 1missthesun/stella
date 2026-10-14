@@ -1,15 +1,3 @@
-/**
- * The Worker half of the backend client protocol: verify the caller, then
- * hand owner-scoped work to the owner's object and run global work here.
- *
- *   POST /api/rpc/<name>   → `OwnerGate.ownerRpc` or a global handler
- *   GET  /owners/me/live   → the owner object's `/live` socket
- *
- * The Worker runs at the caller's edge, so the first request for an owner
- * creates that owner's object near the user (see the placement note on
- * `OwnerGate`).
- */
-
 import { builderServiceSecrets } from "../secret-rotation.js";
 import { SOCKET_TICKET_SUBPROTOCOL_PREFIX } from "@stella/contracts/socket-ticket";
 import { verifySocketTicket } from "../socket-ticket.js";
@@ -75,7 +63,6 @@ const rpcJson = (body: RpcResponse): Response =>
 
 const readArgs = async (request: Request, maxBytes = MAX_RPC_BODY_BYTES): Promise<unknown> => {
   const body = await readJsonObject(request, maxBytes, { allowEmpty: true });
-  // The RPC envelope has no 413: an oversized body is a BAD_REQUEST like any other.
   if (!body.ok) throw new RpcError("BAD_REQUEST", body.error);
   return body.value.args ?? {};
 };
@@ -228,7 +215,6 @@ export const handleLive = async (request: Request, env: RouteEnv): Promise<Respo
   return await ownerGateStub(env.OWNER_GATES, caller.ownerId).fetch(forwarded);
 };
 
-/** The backend client routes, or null when the path is someone else's. */
 export const handleBackendRoute = async (
   request: Request,
   env: RouteEnv,

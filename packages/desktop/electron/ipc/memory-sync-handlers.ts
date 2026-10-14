@@ -9,7 +9,6 @@ import {
   type PrivilegedIpcOptions,
 } from "./privileged-ipc.js";
 
-/** The renderer shows the memory sync and asks for a pass; main does the work. */
 export const registerMemorySyncHandlers = (
   options: PrivilegedIpcOptions & { service: MemorySyncService },
 ): void => {

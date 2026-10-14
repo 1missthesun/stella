@@ -1,17 +1,10 @@
 import AppKit
 import QuartzCore
 
-/// An update that restarts Stella, held on screen between processes (see
-/// UpdateTransition in packages/desktop/electron). Electron frosts its
-/// window, sends `{"op":"hold"}` with the frosted picture, and exits; the
-/// launcher shows the same picture with the mark and a shimmering "Updating
-/// Stella" until the next Electron window is ready over it, so the window
-/// never blinks out.
 struct UpdateHold {
     let image: URL
     let mark: URL?
     let label: String
-    /// Electron's content bounds: points, origin at the primary display's top left.
     let frame: NSRect
     let since: Date
     let dark: Bool
@@ -36,12 +29,8 @@ struct UpdateHold {
 }
 
 final class HoldWindow {
-    /// The mark and label wait this long after the update started, so a
-    /// quick restart never shows them (matches Electron's hold).
     private static let labelDelay: TimeInterval = 0.7
     private var window: NSWindow?
-    /// Bumped on every show and hide, so a delayed hide never takes down a
-    /// later hold.
     private var generation = 0
 
     func show(_ hold: UpdateHold, giveUpAfter limit: TimeInterval) {
@@ -62,7 +51,6 @@ final class HoldWindow {
             window.backgroundColor = .clear
             window.hasShadow = true
             window.isReleasedWhenClosed = false
-            // Clicks go to whatever is underneath: the hold never traps the user.
             window.ignoresMouseEvents = true
             window.contentView = content(for: hold, picture: picture, size: rect.size)
             window.orderFrontRegardless()
@@ -132,7 +120,6 @@ final class HoldWindow {
         group.addSubview(shimmer)
         root.addSubview(group)
 
-        // One moving thing: light passes through the label; the mark stays still.
         let delay = max(0, hold.since.addingTimeInterval(Self.labelDelay).timeIntervalSinceNow)
         DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
             NSAnimationContext.runAnimationGroup { context in
@@ -144,7 +131,6 @@ final class HoldWindow {
         return root
     }
 
-    /// The label at 45% with a bright band sweeping through it, like the CSS shimmer.
     private func shimmerMask(bounds: CGRect) -> CAGradientLayer {
         let mask = CAGradientLayer()
         mask.frame = bounds

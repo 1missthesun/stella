@@ -208,7 +208,6 @@ const ENCODE_SCRIPT = `async ({ width, height }) => {
 }`;
 
 
-/** Encode screencast frames to a video in the browser itself; null when it can't. */
 const encodeFrames = async (
   browser: Browser,
   frames: Frame[],

@@ -198,30 +198,15 @@ if (
 const FOOTER_SHRINK_SETTLE_MS = 140;
 
 const EDGE_FADE = 48;
-/**
- * Where the transcript's first row rests below the top bar: the list's own
- * 80pt lead plus the 4pt the shell's content box used to add above the pane.
- */
 const LIST_TOP_GAP = 84;
-/** How far below the top bar the scrolled-under fade reaches. */
 const TOP_TAPER_TAIL = 24;
 const CATCH_UP_PILL_GAP = 10;
-/** Space kept between the top bar and a question card capped to fit. */
 const ASK_TOP_GAP = 12;
-/** LegendList's data-change tail pin, hoisted so it keeps one identity. */
 const LEGEND_TAIL_SCROLL_AT_END = {
   animated: false,
   on: { dataChange: true, itemLayout: false, layout: false },
 } as const;
 const MESSAGE_LIST_GAP = 10;
-/**
- * Fixed reading-area floor below the last message (desktop's
- * `.event-list-trailing-region` `min-height`). The inline working indicator
- * lives inside this footer region; reserving a constant height means the
- * indicator fading in/out never grows or shrinks the chat's content, so the
- * tail never jumps when a reply starts or finishes. Sized to fully contain the
- * indicator slot plus a few pt so it reads as a deliberate gap when idle.
- */
 const CHAT_TAIL_GAP = WORKING_INDICATOR_SLOT_HEIGHT + 12;
 /**
  * The working indicator used to live inside the footer overlay (above the
@@ -235,7 +220,6 @@ const CHAT_TAIL_GAP = WORKING_INDICATOR_SLOT_HEIGHT + 12;
  * inset, so the buttons keep clearing the home indicator.
  */
 const FLOATING_CONTROL_LIFT = WORKING_INDICATOR_SLOT_HEIGHT;
-/** Cancels the shell `content` padding so chat owns its horizontal inset. */
 const SHELL_CONTENT_PADDING = 20;
 
 const copyMessageText = (text: string) => {
@@ -252,11 +236,6 @@ const shareMessageText = (text: string) => {
   void Share.share({ message: trimmed }).catch(() => {});
 };
 
-/**
- * Renders `text` as a markdown blockquote (each line prefixed with "> "), the
- * quote convention understood by the composer's markdown. Used by the message
- * menu's "Quote" action to reply to a specific message.
- */
 const quoteMessageText = (text: string): string =>
   text
     .trim()
@@ -264,11 +243,6 @@ const quoteMessageText = (text: string): string =>
     .map((line) => `> ${line}`)
     .join("\n");
 
-/**
- * The long-press menu's read-aloud entry for an assistant reply. It reads the
- * playback state when the menu opens, so while this reply's clip is loaded the
- * same slot pauses, resumes or stops it instead of starting over.
- */
 const speakAloudMenuAction = (
   text: string,
   messageId: string,
@@ -319,19 +293,7 @@ const speakAloudMenuAction = (
   };
 };
 
-// ---------------------------------------------------------------------------
-// ChatPane — full chat screen surface (list + composer + scroll model).
-// Used by both the chat and the computer chat so both render visually
-// identically; the parent just owns message state and submission.
-// ---------------------------------------------------------------------------
-
-/** Durable pages adjacent to the bounded in-memory message window. */
 export type ChatPaneHistory = {
-  /**
-   * True while history is still hydrating (e.g. AsyncStorage load on mount or
-   * an unknown pairing state). Suppresses the empty state so it doesn't flash
-   * during tab transitions before the real messages arrive.
-   */
   loading?: boolean;
   hasOlder?: boolean;
   hasNewer?: boolean;
@@ -341,63 +303,26 @@ export type ChatPaneHistory = {
 };
 
 export type ChatPaneComposer = {
-  /**
-   * The composer text. Only the input subscribes to the full value, so a
-   * keystroke re-renders the input rather than this whole pane.
-   */
   draftStore: ChatDraftStore;
-  /** Whether the composer accepts text (typing + sending). */
   enabled?: boolean;
-  /**
-   * Optional paired-computer model control. When pinned, it keeps the composer
-   * expanded and renders a compact model picker in the toolbar.
-   */
   modelPicker?: ComposerModelPickerConfig;
-  /** Visible placeholder when not transcribing. */
   placeholder: string;
-  /** Owner-approved intervention pinned immediately above the composer. */
   intervention?: ReactNode;
-  /**
-   * Everything except content that gates sending (uploads settled, hydrated,
-   * online, authority ready). The pane adds the content check itself: typed
-   * text, an attachment, or a quote.
-   */
   sendReady: boolean;
-  /** Triggered by the send button or `return` key. */
   onSubmit: () => { userMessageId: string } | null;
-  /**
-   * Optional stop handler. When provided AND `streaming` is true, the send
-   * button is replaced by a stop button that calls this. Used to cancel the
-   * in-flight reply (and cancels any queued messages without deleting their
-   * bubbles) for both the local chat stream and computer-chat round trip.
-   */
   onStop?: () => void;
 };
 
-/** Photo and file attachments. Omitted when this transport takes none. */
 export type ChatPaneAttachments = {
-  /** Current attachments. */
   items?: ComposerAttachment[];
-  /** Hands picked files to the owner, which uploads them and reports overflow. */
   onAdd?: (picked: readonly PickedAttachment[]) => {
     rejected: number;
   };
   onRemove?: (id: string) => void;
-  /** Retries one failed upload. Absent means a failed chip can only be removed. */
   onRetry?: (id: string) => void;
-  /**
-   * Optional overall cap for this transport. Picker-level limits reset per
-   * launch, so the chat supplies its backend request limit here.
-   */
   max?: number;
 };
 
-/**
- * Quoted-text chips pending in the composer — added by the message menu's
- * "Quote" and assistant selection's "Ask Stella", rendered as removable chips
- * above the input, and folded into the sent message by `useChatThread`. When
- * `onAdd` is absent those actions fall back to inline draft text.
- */
 export type ChatPaneQuotes = {
   items?: ComposerQuote[];
   onAdd?: (text: string) => void;
@@ -405,92 +330,44 @@ export type ChatPaneQuotes = {
 };
 
 export type ChatPaneDictation = {
-  /** Headers passed to the dictation upload. */
   headers?: Record<string, string>;
 };
 
 export type ChatPaneRealtimeVoice = {
-  /** Stable id of the text chat to which realtime voice is attached. */
   conversationId?: string | null;
-  /** Where voice-request actions should execute. */
   execution?: "phone" | "computer";
-  /** Paired desktop credentials used only by Computer realtime voice. */
   desktopAccess?: StoredPhoneAccess | null;
-  /** Show sign-in before starting capture when no account is signed in. */
   signInRequired?: boolean;
-  /** Dispatches one action request into the attached text chat. */
   onAction?: (request: string) => Promise<RealtimeVoiceActionDispatch>;
 };
 
-// The pane is not memoized, and every group is destructured into scalars
-// before it reaches a hook dependency or a memoized child, so callers may pass
-// these groups inline.
 export type ChatPaneProps = {
-  /** Visible message list (parent-owned). */
   messages: ChatMessage[];
-  /** True while a reply is streaming — controls composer stop button. */
   streaming: boolean;
-  /**
-   * Live working-indicator props derived from the run (active state + the
-   * dynamic, tool-aware label), mirroring the desktop indicator.
-   */
   workingIndicator?: WorkingIndicatorState;
-  /** Shows a quiet offline notice above the composer. */
   offline?: boolean;
-  /** Empty-state body. Rendered centered when there are no messages. */
   emptyContent: ReactNode;
   history?: ChatPaneHistory;
   composer: ChatPaneComposer;
-  /** Omitted hides the photo/file actions of the `+` sheet. */
   attachments?: ChatPaneAttachments;
   quotes?: ChatPaneQuotes;
   dictation: ChatPaneDictation;
   realtimeVoice?: ChatPaneRealtimeVoice;
-  /**
-   * Paired desktop used to open computer-owned files in the transcript. Kept
-   * separate from the voice route so a cloud voice selection does not hide
-   * files produced by an earlier computer turn.
-   */
   desktopAccess?: StoredPhoneAccess | null;
 
-  /** Opens a desktop artifact linked from an assistant message. */
   onOpenArtifact?: (
     artifact: ChatArtifact,
     gallery?: readonly ChatArtifact[],
   ) => void;
 
-  /**
-   * Conversation the transcript belongs to. Used to key artifacts built from
-   * tapped `stella://file/...` links so the viewer's computer file reads are
-   * scoped like inline artifact cards. Optional — link taps still open the
-   * viewer without it.
-   */
   conversationId?: string | null;
 
-  /** Background tasks, for realtime voice's picture of what is running. */
   activityTasks?: MobileTask[];
 
-  /**
-   * Reveals the activity (the sidebar, where tasks, schedules and files
-   * live). Message rows with agent work tap through to it. Running work
-   * itself shows in the top bar's status pill.
-   */
   onOpenActivity?: () => void;
 
-  /**
-   * Height of the chrome floating over the pane's top edge (the safe area
-   * plus the shell's top bar). The transcript scrolls underneath it and rests
-   * below it. Defaults to the shell's own top bar.
-   */
   topInset?: number;
 
-  /**
-   * True while a catch-up sync is pulling turns the phone may have missed
-   * (landing, foreground/refocus, Force Sync — see `useChatThread`). Renders a
-   * small transient "Catching up" pill at the top of the transcript, debounced
-   * by `useCatchUpIndicatorVisible` so instant pulls never flash it.
-   * Steady-state polls and send-path pulls must not set this.
-   */
   catchingUp?: boolean;
   onFooterHeightChange?: (height: number) => void;
 };
@@ -601,8 +478,6 @@ export function ChatPane({
     signInRequired: realtimeVoiceSignInRequired = false,
     onAction: onRealtimeVoiceAction,
   } = realtimeVoice;
-  // Transcript file links open on the preferred paired computer even when the
-  // voice route itself is the phone's cloud session.
   const desktopAccess = desktopAccessProp ?? realtimeVoiceDesktopAccess;
   const messages = useAgentReplyTitles(conversationId, projectedMessages);
   const colors = useColors();
@@ -610,7 +485,6 @@ export function ChatPane({
   const t = useT();
   const serverFeatures = useServerFeatures();
   const readAloudPreference = useReadAloudPreference();
-  // A server without read-aloud never speaks, whatever the saved toggle says.
   const readAloud = serverFeatures.readAloud
     ? readAloudPreference
     : { ...readAloudPreference, enabled: false };
@@ -623,10 +497,6 @@ export function ChatPane({
 
   const inputRef = useRef<TextInput>(null);
   const { height: keyboardHeight, composerBottomPad } = useKeyboardInset();
-  // The composer rests at `composerBottomPad` (the home-indicator band) above
-  // the screen bottom and rides the keyboard's top edge, a constant gap above
-  // it, once the keyboard reaches it: it is lifted by the keyboard height
-  // minus that band.
   const keyboardHeightNow = useSharedValue(0);
   const listAtBottom = useSharedValue(1);
   const listRidesKeyboard = useSharedValue(1);
@@ -672,18 +542,10 @@ export function ChatPane({
   }));
   const keyboardExtra = Math.max(0, keyboardHeight - bottomInset);
 
-  // The composer + working indicator overlay the bottom of the chat. We
-  // measure their actual height so the list can reserve matching
-  // bottom inset, letting messages scroll under the composer (visible
-  // through transparent margins around the glass shell) instead of being
-  // clipped by it. The composer's keyboard lift is a transform, so this
-  // measured height stays constant across keyboard show/hide.
   const [footerHeight, setFooterHeight] = useState(0);
   const [replyHandoffController] = useState(
     createReplyHandoffController,
   );
-  // The list runs under the composer, so its reserved inset is exactly the
-  // overlay; the chat tail supplies the gap between the last row and it.
   const listBottomInsetPx =
     footerHeight + (listLiftedWithKeyboard ? 0 : keyboardExtra);
 
@@ -732,8 +594,6 @@ export function ChatPane({
 
   const assistantTextLenRef = useRef(0);
   const assistantIdRef = useRef<string | null>(null);
-  // Hidden tool/activity rows still own reply relationships and agent state.
-  // Project those from the complete transcript before filtering list cells.
   const replyContexts = useMemo(
     () => mobileReplyContexts(messages),
     [messages],
@@ -856,7 +716,6 @@ export function ChatPane({
   const sawTurnRef = useRef(false);
   const spokenAssistantIdsRef = useRef<Set<string>>(new Set());
   const seenMessageIdsRef = useRef<Set<string>>(new Set());
-  /** Head of the rendered window, so a prepend can be told from an arrival. */
   const headMessageIdRef = useRef<string | null>(null);
   headMessageIdRef.current = markPrependedMessagesSeen(
     seenMessageIdsRef.current,
@@ -889,9 +748,6 @@ export function ChatPane({
   // Assistant identity changes reset its measurements above. A busy-state
   // transition alone must not cancel the in-flight post-send placement.
 
-  // A send records its intent here and fires the nudge on the render where
-  // the submitted row has reached the list. The keyboard no longer changes
-  // the list's insets, so the dismissal that follows a send cannot skew it.
   const pendingSendNudgeRef = useRef<{
     userMessageId: string;
   } | null>(null);
@@ -990,7 +846,6 @@ export function ChatPane({
     replyPin !== null &&
     replyPin.id === lastMessage?.id &&
     Date.now() < replyPin.untilMs;
-  // Re-render once the pin lapses so the tail pin takes the list back.
   useEffect(() => {
     if (!replyPinned || !replyPin) return;
     const timer = setTimeout(
@@ -1046,23 +901,12 @@ export function ChatPane({
     if (!scroll.awayFromBottom) setUnread(false);
   }, [scroll.awayFromBottom]);
 
-  // Read aloud now fires when the assistant MESSAGE arrives rather than on the
-  // falling edge of a stream: there is no stream to end. `sawTurnRef` keeps the
-  // original behaviour's boundary — only a reply produced by a turn this pane
-  // watched is spoken, never a transcript restored from history or pulled by a
-  // background sync. It is armed while a turn is in flight and consumed by the
-  // first assistant text that lands after it.
   useEffect(() => {
     if (!readAloud.enabled) {
-      // Drop the latch, or a turn that landed while read-aloud was off would
-      // speak a stale reply the moment the preference is re-enabled.
       sawTurnRef.current = false;
       return;
     }
     if (streaming && !sawTurnRef.current) {
-      // Rising edge of a turn: every reply already on screen predates it, so
-      // mark them handled. Only a message that lands from here on is eligible,
-      // which is what the old stream-end latch effectively guaranteed.
       for (const message of visibleMessages) {
         if (message.role === "assistant" && message.text.trim()) {
           spokenAssistantIdsRef.current.add(message.id);
@@ -1080,9 +924,6 @@ export function ChatPane({
     ) {
       return;
     }
-    // A landed message consumes the latch: a multi-segment turn speaks its
-    // first segment as it arrives, exactly as the old stream-end latch spoke
-    // the one reply the turn produced.
     sawTurnRef.current = false;
     spokenAssistantIdsRef.current.add(latestAssistant.id);
     void speakReply(latestAssistant.text, latestAssistant.id);
@@ -1103,8 +944,6 @@ export function ChatPane({
     if (!voiceEnabled) setRealtimeVoiceOpen(false);
   }, [voiceEnabled]);
 
-  // Derived draft flags: these re-render the pane only when they flip, not on
-  // every keystroke.
   const draftEmpty = useChatDraftSelector(draftStore, isDraftEmpty);
   const hasText = useChatDraftSelector(draftStore, draftHasText);
 
@@ -1114,7 +953,6 @@ export function ChatPane({
     const submitted = onSubmit();
     if (submitted && shouldPlaceLatestTurn) {
       setSendPinSuppressForId(submitted.userMessageId);
-      // Always start from the committed message list, even with no keyboard.
       pendingSendNudgeRef.current = {
         userMessageId: submitted.userMessageId,
       };
@@ -1131,7 +969,6 @@ export function ChatPane({
 
   const dictationHeadersMemo = useMemo(
     () => dictationHeaders,
-    // We trust the parent to memoize these.
     [dictationHeaders],
   );
 
@@ -1146,8 +983,6 @@ export function ChatPane({
 
   const appendTranscript = useCallback(
     (text: string) => {
-      // The store is read synchronously, so a transcription chunk always
-      // appends to the latest text.
       const trimmedPrev = draftStore.get().trimEnd();
       const next = trimmedPrev ? `${trimmedPrev} ${text}` : text;
       if (pendingVoiceSendRef.current) voiceSendTargetRef.current = next;
@@ -1161,9 +996,6 @@ export function ChatPane({
     onTranscript: appendTranscript,
   });
 
-  // The hook returns a fresh object each render; its callbacks are stable, so
-  // handlers depend on them (not the object) to keep the memoized composer's
-  // props steady.
   const {
     status: dictationStatus,
     start: startDictation,
@@ -1172,8 +1004,6 @@ export function ChatPane({
     toggle: toggleDictation,
   } = dictation;
   const isListening = dictation.isRecording;
-  // Dictation flips the shell between pill and expanded shapes from inside
-  // the hook, so configure the spring on the render that carries the flip.
   const wasListeningRef = useRef(isListening);
   if (wasListeningRef.current !== isListening) {
     wasListeningRef.current = isListening;
@@ -1268,7 +1098,6 @@ export function ChatPane({
     void stopDictation()
       .then((transcript) => {
         if (!pendingVoiceSendRef.current) return;
-        // Never send a stale typed prefix when recording/transcription failed.
         if (transcript && voiceSendTargetRef.current !== null) {
           voiceSendResultReadyRef.current = true;
           // The transcript callback updates parent-owned draft state. Force one
@@ -1424,7 +1253,6 @@ export function ChatPane({
     );
   }, [acceptPicked, enableAttachments, onAddAttachments]);
 
-  // Root the in-tree menu overlays measure against (see PlusMenuPopover).
   const rootRef = useRef<View>(null);
   const modelPickerAnchorRef = useRef<View>(null);
   const [addSheetOpen, setAddSheetOpen] = useState(false);
@@ -1445,8 +1273,6 @@ export function ChatPane({
     action?.();
   }, []);
 
-  // Debounced catch-up indicator (show delay + minimum visible time), so
-  // instant no-op pulls on every tab return never flash the pill.
   const catchUpVisible = useCatchUpIndicatorVisible(catchingUp);
 
   const [historyPaging] = useState(() => new ChatHistoryPaging());
@@ -1493,8 +1319,6 @@ export function ChatPane({
   const modelPickerOptions = useMemo<PlusMenuOption[]>(() => {
     if (!composerModelPicker?.pinned) return [];
     const disabled = Boolean(composerModelPicker.loading);
-    // No effort options means the selected model cannot reason, so the
-    // thinking entry is hidden entirely.
     const thinkingOptions: PlusMenuOption[] =
       composerModelPicker.effortOptions.length === 0
         ? []
@@ -1553,13 +1377,9 @@ export function ChatPane({
 
   const dismissModelPicker = useCallback(() => setModelPickerAnchor(null), []);
 
-  // Long-press message actions — a popover anchored at the touch point so it
-  // matches the app's menu language instead of a native sheet takeover.
   const [messageMenu, setMessageMenu] = useState<MessageMenuRequest | null>(
     null,
   );
-  // The message currently in "Select text" mode (id), entered from the menu's
-  // Select text action. At most one row selects at a time.
   const [selectingMessageId, setSelectingMessageId] = useState<string | null>(
     null,
   );
@@ -1573,11 +1393,6 @@ export function ChatPane({
     setMessageMenu(null);
   }, []);
 
-  // "Quote" a message: drop it into the composer as a removable quote chip (so
-  // the input isn't stuffed with the paragraph), then focus so the reply is
-  // typed alongside it. On send the chip folds back in as a blockquote (see
-  // `useChatThread`). Falls back to inline blockquote text if the surface didn't
-  // wire quote state.
   const quoteMessage = useCallback(
     (text: string) => {
       const trimmed = text.trim();
@@ -1596,9 +1411,6 @@ export function ChatPane({
     [draftStore, onAddQuote],
   );
 
-  // The long-press menu, the same for both speakers (iOS Messages order).
-  // Each action fires a light tap; the open itself is a medium tap in
-  // ChatMessageRow.openMenu.
   const messageMenuActions = useMemo<MessageMenuAction[]>(() => {
     if (!messageMenu) return [];
     const message = messageMenu.message;
@@ -1647,13 +1459,8 @@ export function ChatPane({
     ];
   }, [messageMenu, quoteMessage, startSelectingMessage]);
 
-  // The list's handlers are stable so a composer keystroke — which re-renders
-  // this pane — leaves the memoized LegendList (and its rows) alone.
   const selectingMessageIdRef = useRef<string | null>(null);
   selectingMessageIdRef.current = selectingMessageId;
-  // A quick tap anywhere in the transcript leaves Select mode. The selection
-  // field never raises a keyboard, so the list's tap-to-dismiss never blurs
-  // it; drags (moving the selection handles) are left alone.
   const viewportTouchRef = useRef<{ x: number; y: number; at: number } | null>(
     null,
   );
@@ -1675,14 +1482,10 @@ export function ChatPane({
   );
   const handleListScrollBeginDrag = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-      // Scrolling the transcript exits any active text selection before the
-      // drag runs.
       if (selectingMessageIdRef.current != null) stopSelectingMessage();
       pendingSendNudgeRef.current = null;
       scroll.onScrollBeginDrag();
       historyPaging.beginDrag(conversationId);
-      // A short page may already be at the boundary and never cross a list
-      // threshold. The drag itself requests one page.
       requestHistoryNearPosition(e.nativeEvent);
     },
     [
@@ -1710,10 +1513,6 @@ export function ChatPane({
   }, [handleListScrollSettle, historyPaging]);
 
   const keyExtractor = useCallback((item: ChatMessage) => item.id, []);
-  // The in-flight turn's reply row: appended empty on dispatch, then grown by
-  // whole message segments. It owns the autoscroll follow so a landing message
-  // scrolls itself into view; nothing else about it is per-row state now that
-  // text arrives complete.
   const activeAssistantId =
     streaming && lastMessage?.role === "assistant" ? lastMessage.id : null;
   const latestUserMessageId =
@@ -1725,8 +1524,6 @@ export function ChatPane({
   }, [activeAssistantId, scroll.clearActiveAssistantLayout]);
 
   const activeMenuMessageId = messageMenu?.message.id ?? null;
-  // iMessage time labels: a centered time after a long quiet gap, and a read
-  // receipt under the latest message once the model has it.
   const timeHeaders = useMemo(
     () => timestampHeaders(visibleMessages),
     [visibleMessages],
@@ -1735,8 +1532,6 @@ export function ChatPane({
     () => readReceipt(visibleMessages),
     [visibleMessages],
   );
-  // Tapped `stella://file/<path>` links in assistant markdown resolve into
-  // the same artifact shape inline cards carry, then open the same viewer.
   const onOpenStellaFile = useMemo(
     () =>
       onOpenArtifact
@@ -1750,9 +1545,6 @@ export function ChatPane({
         : undefined,
     [onOpenArtifact, conversationId],
   );
-  // The scroll owner's layout handlers change with the reserved bottom inset
-  // (keyboard, composer height). Route rows through stable forwarders so those
-  // changes do not invalidate every mounted row.
   const scrollLayoutRef = useRef(scroll);
   scrollLayoutRef.current = scroll;
   const onActiveAssistantLayout = useCallback(
@@ -1765,8 +1557,6 @@ export function ChatPane({
       scrollLayoutRef.current.onLatestUserLayout(id, event),
     [],
   );
-  // One handler object for every row (transcript and focused chain), so a
-  // row's memo compares a single stable reference.
   const rowStyles = useMemo(() => makeMessageRowStyles(colors), [colors]);
   const rowActions = useMemo<MessageRowActions>(
     () => ({
@@ -1788,7 +1578,6 @@ export function ChatPane({
       showReport,
     ],
   );
-  // The long-press menu's lifted copy is inert: no file, reply or report taps.
   const menuCloneRowActions = useMemo<MessageRowActions>(
     () => ({
       onOpenMessageMenu: setMessageMenu,
@@ -1883,13 +1672,6 @@ export function ChatPane({
       conversationId,
     ],
   );
-  // Legend re-renders a mounted row only when its item or `extraData`
-  // changes, never when `renderItem` does. Everything a row closes over —
-  // focus and selection, the palette (native attributed text needs new
-  // colors), reply quotes and "N replies" counts that change when *other*
-  // messages land, the latest-turn layout wiring, paired-computer access —
-  // is a `renderItem` dependency, so its identity is the invalidation key.
-  // Rows whose props did not change still bail out in `ChatMessageRow`'s memo.
   const listExtraData = renderItem;
   const renderSeparator = useCallback(
     () => <View style={styles.itemSeparator} />,
@@ -1901,9 +1683,6 @@ export function ChatPane({
     [],
   );
 
-  // The working indicator rides at the tail of the chat (desktop-style) instead
-  // of floating above the composer. It keeps a stable slot, so fading it in or
-  // out never changes the footer's height.
   const listFooter = useMemo(
     () => (
       <View style={styles.chatTail}>
@@ -1920,9 +1699,6 @@ export function ChatPane({
     [streaming, workingIndicator, styles.chatTail, scroll.tailOffscreen],
   );
 
-  // Search shows a separate results menu that overlays the chat (the chat
-  // itself is never filtered). Matches are listed newest-first; tapping one
-  // jumps to that message in the conversation.
   const search = useChatSearch();
   const searchOpen = search.isOpen;
   const searchQuery = search.query.trim();
@@ -1933,9 +1709,6 @@ export function ChatPane({
     searchQuery,
   );
 
-  // Summaries: the pill above the composer after a busy stretch, and the
-  // links in them, which jump to the message they came from (paging older
-  // history in until it is loaded).
   const summaries = useConversationSummaries(
     conversationId,
     visibleMessages,
@@ -1955,8 +1728,6 @@ export function ChatPane({
     );
     if (index >= 0) {
       setSummaryJump(null);
-      // Reading back now: rows measuring in as the list travels must not
-      // pull it back down to the latest message.
       scroll.releaseFollow();
       scroll.listRef.current?.scrollToIndex({ index, animated: true, viewOffset: topInset + 24 });
       return;
@@ -1991,7 +1762,6 @@ export function ChatPane({
   const jumpToMessage = useCallback(
     (index: number) => {
       search.close();
-      // Let the results overlay unmount before scrolling the list underneath.
       setTimeout(() => {
         scroll.listRef.current?.scrollToIndex({
           index,
@@ -2017,7 +1787,6 @@ export function ChatPane({
     }
   }, [composerModelPicker?.pinned, dictationInline]);
 
-  // Realtime voice sits beside the mic only while the composer is empty.
   const showRealtimeVoice = Boolean(
     voiceEnabled &&
       serverFeatures.realtimeVoice &&
@@ -2028,8 +1797,6 @@ export function ChatPane({
       !composerHasContent &&
       dictationStatus === "idle",
   );
-  // Focusing the composer (keyboard opening) exits any active message text
-  // selection. Reads the ref so the memoized composer keeps one handler.
   const onComposerFocus = useCallback(() => {
     if (selectingMessageIdRef.current != null) stopSelectingMessage();
     if (askActiveRef.current && !askCollapsedRef.current) {
@@ -2053,10 +1820,6 @@ export function ChatPane({
     () => [styles.emptyState, { paddingTop: topInset }],
     [styles.emptyState, topInset],
   );
-  // The transcript runs under the top bar. The fade holds the backdrop solid
-  // behind the status bar and thins it across the bar, so rows passing under
-  // the controls dim instead of colliding with them. Built once per geometry:
-  // the backdrop mask would otherwise re-render with every composer keystroke.
   const taperHeight = topInset + TOP_TAPER_TAIL;
   const taperSolidStop =
     topInset > 0 ? Math.min(1, safeAreaTop / taperHeight) : 0;
@@ -2114,8 +1877,6 @@ export function ChatPane({
           onTouchEnd={handleViewportTouchEnd}
         >
           {historyLoading ? (
-            // Hold a stable blank surface while history hydrates so the empty
-            // state never flashes during a tab transition.
             <View style={emptyStateStyle} />
           ) : empty ? (
             <Pressable style={emptyStateStyle} onPress={() => Keyboard.dismiss()}>
@@ -2135,9 +1896,6 @@ export function ChatPane({
                   contentContainerStyle={listContentContainerStyle}
                   data={listMessages}
                   extraData={listExtraData}
-                  // Short transcript rows measure roughly 44–70 pt. Reserve
-                  // enough containers for those runs; measured heights still
-                  // determine layout for longer replies and artifacts.
                   estimatedItemSize={64}
                   renderItem={renderItem}
                   keyExtractor={keyExtractor}
@@ -2154,14 +1912,7 @@ export function ChatPane({
                   showsVerticalScrollIndicator={false}
                   keyboardDismissMode="on-drag"
                   fadingEdgeLength={EDGE_FADE}
-                  // Open at the latest message every time the tab mounts, instead
-                  // of landing at the top of history. Short conversations that
-                  // don't fill the viewport read top-down (no `alignItemsAtEnd`)
-                  // so the first message sits at the top rather than the bottom.
                   initialScrollAtEnd={initialScrollAtEndRef.current === true}
-                  // Keep the visible message anchored when the data array changes
-                  // (e.g. messages syncing in from the desktop) so the list never
-                  // snaps back to the top.
                   maintainVisibleContentPosition={maintainVisibleContentPosition}
                   // Pin to the tail only when new/synced messages arrive while the
                   // user is already near the bottom. Scoped to data changes so it
@@ -2207,8 +1958,6 @@ export function ChatPane({
               onClose={closeReplyFocus}
               hasOlder={hasOlderHistory}
               onLoadOlder={onLoadOlderHistory}
-              // Inside focus the chain is already open, so rows carry no reply
-              // count; a quote still appears for a link to *other* work.
               renderMessage={(item, contexts) => (
                 <ChatMessageRow
                   item={item}
@@ -2394,7 +2143,6 @@ export function ChatPane({
             }}
             onClose={() => {
               setSummaryOpen(null);
-              // Scroll once the popover is gone, as search does.
               const link = summaryJumpAfterCloseRef.current;
               summaryJumpAfterCloseRef.current = null;
               if (link) setTimeout(() => setSummaryJump({ link, pages: 0 }), 60);
@@ -2453,10 +2201,6 @@ export function ChatPane({
   );
 }
 
-// ---------------------------------------------------------------------------
-// Styles
-// ---------------------------------------------------------------------------
-
 const makeStyles = (colors: Colors) =>
   StyleSheet.create({
     screen: {
@@ -2464,10 +2208,6 @@ const makeStyles = (colors: Colors) =>
       marginHorizontal: -SHELL_CONTENT_PADDING,
       position: "relative",
     },
-    // Anchored at the bottom of the screen, above the message list. The list
-    // gets matching bottom inset (via `footerHeight`) so content can still be
-    // scrolled fully into view; the transparent gutters around the composer
-    // shell let messages peek through as they pass underneath.
     footerOverlay: {
       bottom: 0,
       left: 0,
@@ -2487,11 +2227,6 @@ const makeStyles = (colors: Colors) =>
       paddingHorizontal: CHAT_HORIZONTAL_INSET,
     },
     itemSeparator: { height: MESSAGE_LIST_GAP },
-    // Fixed-height tail below the last message. Hosts the inline working
-    // indicator and keeps its footprint constant whether or not it's showing.
-    // Its top padding matches the user-to-assistant bubble gap (separator plus
-    // the assistant row's padding), so the indicator bubble sits as far below
-    // the last message as the next reply will.
     chatTail: {
       minHeight: CHAT_TAIL_GAP,
       paddingTop: MESSAGE_LIST_GAP + ASSISTANT_ROW_PAD_VERTICAL,

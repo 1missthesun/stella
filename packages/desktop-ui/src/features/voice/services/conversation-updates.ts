@@ -1,12 +1,3 @@
-/**
- * Mid-call updates from the conversation the call belongs to.
- *
- * The conversation's pi transcript holds every turn, in either storage mode,
- * and the call watches it. Output is deliberately small: new text turns and
- * finished agent work, tagged as something to SAY or something to merely KNOW. The session layer turns
- * those into `session.commentary.append` / `session.thinking.append`.
- */
-
 import { legacyReportStatus } from "@stella/contracts/agent-status";
 import {
   isPiAgentInput,
@@ -19,29 +10,19 @@ import {
 } from "@stella/contracts/pi-chat";
 import { splitMessageReplyRefs } from "@stella/contracts/reply-refs";
 
-/** `say`: worth speaking. `note`: context only, never announced. */
 export type ConversationUpdateKind = "say" | "note";
 
 export type ConversationUpdate = {
-  /** Stable per source row, so a replay cannot re-announce it. */
   id: string;
   kind: ConversationUpdateKind;
   text: string;
 };
 
 export type ConversationUpdateFeed = {
-  /**
-   * Adopt everything already present as known, without emitting. Called once
-   * before the call goes live so the opening history is not narrated.
-   */
   prime: () => Promise<void>;
   start: () => void;
   stop: () => void;
 };
-
-// ---------------------------------------------------------------------------
-// Shared mapping
-// ---------------------------------------------------------------------------
 
 const agentCompletedUpdate = (result: string): string =>
   `A delegated agent finished. ${
@@ -56,23 +37,12 @@ const agentFailedUpdate = (verb: string, error: string): string =>
 const textTurnNote = (speaker: string, text: string): string =>
   `${speaker} in the text chat: ${text}`;
 
-// ---------------------------------------------------------------------------
-// pi-durable source
-// ---------------------------------------------------------------------------
-
-/**
- * A conversation on pi-durable: its transcript, in either storage mode (a
- * cloud one's other turns are imported into it). Text turns are notes; an
- * agent's report reaching Stella is something to say. What the call itself
- * said, and the turns it handed to Stella, stay out.
- */
 const createPiFeed = (args: {
   conversationId: string;
   onUpdate: (update: ConversationUpdate) => void;
 }): ConversationUpdateFeed => {
   const api = () => window.electronAPI?.piChat;
   const seen = new Set<number>();
-  /** Whether the turn the next replies belong to is one nobody typed. */
   let hiddenTurn = false;
   let emitting = false;
   let watching = false;
@@ -108,7 +78,6 @@ const createPiFeed = (args: {
         hiddenTurn = false;
         update = reportUpdate(entry, text);
       } else if (isPiAgentInput(user) || isPiScheduledInput(user)) {
-        // A note an agent sent Stella, or a schedule's prompt: nothing to say, but Stella's answer to it is relayed.
         hiddenTurn = false;
       } else {
         const typed = piUserView(user).text.trim();
@@ -162,16 +131,9 @@ const createPiFeed = (args: {
   };
 };
 
-// ---------------------------------------------------------------------------
-
-/**
- * One feed for the conversation the call is attached to, picking the source
- * the conversation is actually stored in.
- */
 export const createConversationUpdateFeed = (args: {
   conversationId: string;
   onUpdate: (update: ConversationUpdate) => void;
 }): ConversationUpdateFeed => {
-  // The transcript holds every turn, in either storage mode.
   return createPiFeed(args);
 };

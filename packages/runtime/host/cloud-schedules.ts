@@ -15,26 +15,8 @@ import type {
   LocalCronJobUpdatePatch,
 } from "@stella/contracts/scheduling";
 
-/**
- * Reminders and tasks live in the owner's object on the backend worker with
- * the rest of the owner's schedules, so the phone and the web see them and
- * they still fire while this computer sleeps. A schedule made here names this
- * computer: each fire is offered to it first and runs in the cloud when it
- * can't take it. Watches stay on the local scheduler because their sensor
- * scripts only exist on this machine.
- *
- * Rows are presented as `LocalCronJobRecord`s so the schedule tools, the
- * desktop's schedule chips and the mobile bridge keep one shape.
- */
-
-/** Cloud schedule ids; every other id belongs to the local scheduler. */
 export const isCloudScheduleId = (id: string): boolean => id.startsWith("sch-");
 
-/**
- * A payload the cloud carries: reminders, tasks, and watches with a cloud
- * script. A watch with a script on this computer, and legacy scripts, stay
- * on the local scheduler; a watch lives in exactly one of the two.
- */
 export const isCloudSchedulePayload = (
   payload: LocalCronJobCreateInput["payload"],
 ): boolean =>
@@ -44,17 +26,12 @@ export const isCloudSchedulePayload = (
 
 const LIST_TIMEOUT_MS = 15_000;
 
-/** Stable per intent, so a retried write replays instead of duplicating. */
 const requestIdFor = (...parts: unknown[]): string =>
   `desk-${createHash("sha256")
     .update(JSON.stringify(parts))
     .digest("hex")
     .slice(0, 40)}`;
 
-/**
- * The current value of the live list. Shares the client's subscription when
- * one is open, so it answers at once while `subscribe` is following.
- */
 const readSchedules = async (client: BackendClient): Promise<ScheduleRow[]> => {
   let unsubscribe: (() => void) | undefined;
   try {
@@ -81,7 +58,6 @@ const readSchedules = async (client: BackendClient): Promise<ScheduleRow[]> => {
 export type CloudSchedules = ReturnType<typeof createCloudSchedules>;
 
 export const createCloudSchedules = (options: {
-  /** The backend client while signed in; null when signed out. */
   getClient: () => BackendClient | null;
   getDeviceId: () => string | undefined;
 }) => {
@@ -106,7 +82,6 @@ export const createCloudSchedules = (options: {
     const deviceId = options.getDeviceId();
     const description = input.name || input.description;
     const row = await client().call("schedules.create", {
-      // A fresh id per call: two identical schedules are two schedules.
       requestId: `desk-${randomUUID()}`,
       kind: kindFor(input.payload),
       ...watchFields(input.payload),
@@ -147,7 +122,6 @@ export const createCloudSchedules = (options: {
     return true;
   };
 
-  /** Fires `onChange` whenever the owner's schedules change anywhere. */
   const subscribe = (onChange: () => void): (() => void) => {
     const backend = options.getClient();
     if (!backend) return () => {};

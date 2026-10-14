@@ -1,13 +1,3 @@
-/**
- * A Claude subscription limit (the 5-hour session window, the weekly window,
- * a per-model weekly window) as the `claude` CLI words it, with the time it
- * resets when the CLI says. The CLI has printed both an epoch suffix
- * (`Claude AI usage limit reached|1760000000`) and a wall-clock reset with
- * its time zone (`You've hit your session limit · resets 11:30pm
- * (America/Phoenix)`, `... · resets Oct 14, 9am (America/Phoenix)`).
- * Stella's own wording carries an exact instant (`It resets at
- * 2026-10-12T06:30:00.000Z.`), which is how the cloud reports it onward.
- */
 export type ClaudeUsageLimit = { resetsAt?: number };
 
 const LIMIT_PATTERN =
@@ -59,7 +49,6 @@ const zoneOffset = (epoch: number, zone: string | undefined) => {
   return Date.UTC(wall.year, wall.month - 1, wall.day, wall.hour, wall.minute, wall.second) - Math.floor(epoch / 1000) * 1000;
 };
 
-/** The epoch of a wall-clock time in `zone` (this computer's zone when absent). */
 const zonedEpoch = (year: number, month: number, day: number, hour: number, minute: number, zone: string | undefined) => {
   const guess = Date.UTC(year, month - 1, day, hour, minute);
   const first = guess - zoneOffset(guess, zone);
@@ -104,7 +93,6 @@ const future = (at: number, now: number): ClaudeUsageLimit => {
   return now - at < JUST_RESET_MS ? { resetsAt: now + JUST_RESET_RECHECK_MS } : {};
 };
 
-/** The limit in a CLI result or error, or null when it names none. */
 export const claudeUsageLimitOf = (error: unknown, now = Date.now()): ClaudeUsageLimit | null => {
   const message = error instanceof Error ? error.message : String(error ?? "");
   if (!LIMIT_PATTERN.test(message)) return null;
@@ -116,7 +104,6 @@ export const claudeUsageLimitOf = (error: unknown, now = Date.now()): ClaudeUsag
   return resetsAt !== undefined && Number.isFinite(resetsAt) ? { resetsAt } : {};
 };
 
-/** "11:30 PM" today, or "Tue 9:00 AM" on a later day, in this computer's zone. */
 export const formatClaudeUsageLimitReset = (resetsAt: number, now = Date.now()) => {
   const at = new Date(resetsAt);
   const time = at.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
@@ -129,12 +116,6 @@ export const formatClaudeUsageLimitReset = (resetsAt: number, now = Date.now()) 
   return `${day} ${time}`;
 };
 
-/**
- * Claude Code work in a cloud conversation is held until the Claude usage
- * limit resets (`held`, with `until` when it was named), or the hold ended
- * and the work continues (`resumed`). `threadId` names a held agent; absent,
- * it is Stella's own turn. Clients show the waiting card and the one line.
- */
 export type ClaudeUsageLimitCard = {
   type: "usage-limit";
   state: "held" | "resumed";
@@ -154,9 +135,7 @@ export const parseClaudeUsageLimitCard = (value: unknown): ClaudeUsageLimitCard 
   };
 };
 
-/** The one line clients show when held work continues. */
 export const CLAUDE_USAGE_LIMIT_RESUMED_TEXT = "Claude usage limit reset. Stella is continuing the held work.";
 
-/** What a held turn or agent is told when it continues. */
 export const CLAUDE_USAGE_LIMIT_RESUME_PROMPT =
   "The Claude usage limit has reset. Continue the work it interrupted, picking up where you left off.";

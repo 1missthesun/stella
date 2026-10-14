@@ -46,13 +46,6 @@ const filesEqual = (leftPath, rightPath) => {
   return readFileSync(leftPath).equals(readFileSync(rightPath));
 };
 
-/**
- * Keep the stock Electron dev host recognizable to LaunchServices and TCC.
- *
- * This deliberately does not restore v1's relaunch wrapper or launcher-owned
- * lifecycle. It only aligns the bundle's executable/name/id with the process
- * we actually spawn, then re-seals the ad-hoc development signature.
- */
 export const prepareMacDevPermissionIdentity = ({
   electronBinary,
   desktopDir,

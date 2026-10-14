@@ -16,11 +16,6 @@ import {
 
 const PANEL_TOP = 64;
 
-/**
- * The floating bubble for platforms without iOS's popover: the same surface,
- * its glass controls in a footer inside it, over a dimmed backdrop near the
- * top of the screen.
- */
 export function FloatingPopover({
   onClose,
   closeLabel,

@@ -1,21 +1,8 @@
-/**
- * The owner's devices, served from the owner's object: desktops that can run
- * work (their signing keys, capabilities and remote-execution consent), phones
- * attached to a desktop, and push tokens. Phones reach the same data over
- * `/api/mobile/*` on the backend worker.
- *
- * Only machines running Stella's runtime host register here. Phones and
- * browser sessions are places the owner chats from; they appear as attached
- * phones and push tokens, never as execution devices, which is why the device
- * list cannot fill up with browsers.
- */
-
 import type { DeviceRemoteExecution, DevicesResponse } from "../turn-plane/placement.js";
 
 export type ActivityNotificationKind = "started" | "completed" | "failed";
 
 export type DeviceCalls = {
-  /** Who this desktop is to the backend, after any device-id succession. */
   "devices.identity": {
     args: { deviceId?: string };
     result: {
@@ -25,22 +12,12 @@ export type DeviceCalls = {
       builderOrigin?: string;
     };
   };
-  /**
-   * Bind (or rotate) the key a desktop signs its presence proof with.
-   *
-   * Registering is how a signed-in computer becomes listed, and that is all it
-   * is: a device new to this account comes back `"unconfigured"`, and a device
-   * that already consented keeps the answer it had. Re-registering on every
-   * launch must never re-ask, and must never silently re-enlist a machine the
-   * owner declined.
-   */
   "devices.register": {
     args: {
       deviceId: string;
       devicePublicKey: string;
       deviceName?: string;
       platform?: string;
-      /** What it can do; the backend keeps the ones it knows (`knownExecutionCapabilities`). */
       capabilities?: string[];
     };
     result: {
@@ -51,15 +28,6 @@ export type DeviceCalls = {
       rotated: boolean;
     };
   };
-  /**
-   * Answer the "accept work from your other devices?" question for a device.
-   *
-   * The same call serves both ways in: the device itself answering the prompt
-   * on its own screen, and the owner tapping enable from another signed-in
-   * session rather than waiting for that prompt. The second one means account
-   * access alone is enough to enlist a machine, which is deliberate — but it
-   * is still a decision someone made, never a side effect of signing in.
-   */
   "devices.setRemoteExecution": {
     args: { deviceId: string; enabled: boolean };
     result: {
@@ -68,35 +36,22 @@ export type DeviceCalls = {
       changed: boolean;
     };
   };
-  /**
-   * Record that something tried to dispatch to a device that has not agreed.
-   * Moves it to `asking` so the device's own screen raises the prompt and the
-   * device list can say it is waiting on an answer.
-   */
   "devices.requestRemoteExecution": {
     args: { deviceId: string };
     result: { deviceId: string; remoteExecution: DeviceRemoteExecution };
   };
-  /**
-   * The account's home computer: while it is up, Stella's brain lease stays
-   * on it or comes back to it (`@stella/contracts/turn-plane/pi-brain`).
-   * Null clears it. Set by the user picking a computer in "Run on".
-   */
   "devices.setBrainHome": {
     args: { deviceId: string | null };
     result: { deviceId: string | null };
   };
-  /** Move a retired desktop id's pairings and consent to its successor. */
   "devices.adoptSuccession": {
     args: { previousDeviceId: string; deviceId: string };
     result: {
       ok: true;
       migratedPairings: number;
-      /** The successor inherited the retired id's remote-execution consent. */
       migratedRemoteExecution: boolean;
     };
   };
-  /** Tell the owner's phones about desktop activity. */
   "phone.notifyActivity": {
     args: { kind: ActivityNotificationKind; title?: string; taskId?: string };
     result: null;
@@ -104,11 +59,5 @@ export type DeviceCalls = {
 };
 
 export type DeviceViews = {
-  /**
-   * The owner's computers with live presence, pushed when one connects,
-   * drops, changes availability, or changes in the registry. A computer
-   * whose connection is open counts as online; `GET /owners/me/devices`
-   * also ages out one that went quiet without closing.
-   */
   "devices.list": { args: Record<string, never>; result: DevicesResponse };
 };

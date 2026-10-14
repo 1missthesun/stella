@@ -126,7 +126,6 @@ const bytesToHex = (bytes: ArrayBuffer): string =>
     .map((value) => value.toString(16).padStart(2, "0"))
     .join("");
 
-/** Recheck the executor's full-tree HMAC inside the Builder trust boundary. */
 export const validNativeStateCheckpointMac = async (args: {
   checkpoint: NativeStateCheckpoint;
   threadId: string;
@@ -253,7 +252,6 @@ const parseNativeStateCheckpointVersion = (
   };
 };
 
-/** Treat KV as untrusted durable input; a malformed pointer is never restored. */
 export const parseNativeStateCheckpointRecord = (
   value: unknown,
 ): NativeStateCheckpointRecord | null => {

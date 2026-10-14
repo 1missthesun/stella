@@ -1,11 +1,3 @@
-/**
- * What each chapter's agent window shows while the work happens: a
- * reservation filling in, a product going into the cart, a deck assembling,
- * tomorrow's lock screen with the brief arriving, sources read and ranked.
- *
- * Each scene reads the chapter's cues and hangs its motion on springs that
- * follow them, so nothing here re-renders between cues.
- */
 import { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import Animated, {
@@ -48,8 +40,6 @@ export function ChapterScene({ id, has }: { id: ChapterId; has: Has }) {
       return <ResearchScene has={has} />;
   }
 }
-
-/* ── Errands: a reservation form filling itself in ────────────────── */
 
 function FormField({
   label,
@@ -144,8 +134,6 @@ function ErrandsScene({ has }: { has: Has }) {
   );
 }
 
-/* ── Shopping: the right size, into the cart ──────────────────────── */
-
 const SIZES = ["9", "9½", "10", "10½", "11"];
 
 function SizeChip({ label, selected }: { label: string; selected: boolean }) {
@@ -214,8 +202,6 @@ function ShopScene({ has }: { has: Has }) {
     </MiniAgentWindow>
   );
 }
-
-/* ── Work: a deck assembling slide by slide ───────────────────────── */
 
 type SlideKind = "title" | "bars" | "bullets" | "split" | "quote" | "end";
 const SLIDES: SlideKind[] = ["title", "bars", "bullets", "split", "bars", "end"];
@@ -315,8 +301,6 @@ function WorkScene({ has }: { has: Has }) {
   );
 }
 
-/* ── Routines: tomorrow, 8:00, the brief arrives ──────────────────── */
-
 function RoutineScene({ has }: { has: Has }) {
   const ct = useChapterT("routines");
   const colors = useColors();
@@ -361,8 +345,6 @@ function RoutineScene({ has }: { has: Has }) {
     </MiniAgentWindow>
   );
 }
-
-/* ── Research: read the sources, rank the options ─────────────────── */
 
 function SourceRow({
   icon,
@@ -428,7 +410,6 @@ function ResearchScene({ has }: { has: Has }) {
   const styles = useSceneStyles();
   const ranked = has("rank");
   const swap = useSpringFlag(ranked, SPRING_SOFT);
-  // One hands over to the other rather than both being half-visible at once.
   const sourcesStyle = useAnimatedStyle(() => ({
     opacity: interpolate(swap.value, [0, 0.45], [1, 0], "clamp"),
   }));
@@ -464,7 +445,6 @@ const makeSceneStyles = (colors: Colors) =>
     gap4: { gap: 4 },
     gap6: { gap: 7 },
     gap8: { gap: 8 },
-    /** Holds the taller of the two states so the swap never resizes the window. */
     swap: { height: 86, justifyContent: "center" },
     centerRow: {
       alignItems: "center",

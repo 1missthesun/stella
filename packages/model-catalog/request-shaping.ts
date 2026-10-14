@@ -1,8 +1,3 @@
-/**
- * Provider-native request shaping for Stella's managed model relay: upstream
- * URL selection, header forwarding, and body normalization across the Chat
- * Completions / Responses / Anthropic Messages / Google wire shapes.
- */
 import {
   getManagedGatewayConfig,
   resolveManagedProtocol,
@@ -23,7 +18,6 @@ import {
   type NativeRelayRequest,
 } from "./native-relay";
 
-/** The fields of an authorized relay request that body shaping reads. */
 export type RelayRequestShape = NativeRelayRequest & {
   resolvedModel: string;
   serviceTier?: string;
@@ -50,7 +44,6 @@ export function toProviderNativeModel(
   return stripped;
 }
 
-/** Match the backend runtime's managed-protocol selection exactly. */
 export const resolveCloudManagedProtocol = (args: {
   relayProvider: ManagedGatewayProvider;
   configuredApi?: ManagedProtocol;
@@ -89,8 +82,6 @@ export const cloneForwardHeaders = (
     headers.set("X-OpenRouter-Title", "Stella");
   }
 
-  // Per-gateway extra headers default to the
-  // gateway config so the relay and runtime_ai share one definition.
   if (extraHeaders) {
     for (const [key, value] of Object.entries(extraHeaders)) {
       headers.set(key, value);
@@ -115,10 +106,6 @@ export const upstreamUrl = (
         ? `${base}/chat/completions`
         : `${base}/responses`;
     case "google": {
-      // Preserve whatever verb the desktop adapter asked for —
-      // `:streamGenerateContent`, `:generateContent`, `:countTokens`,
-      // `:embedContent`, etc. Hardcoding stream broke non-streaming
-      // utility calls.
       const verbMatch = /:([A-Za-z][A-Za-z0-9]*)$/u.exec(requestUrl.pathname);
       const verb = verbMatch?.[1] ?? "streamGenerateContent";
       return `${base}/v1beta/models/${encodeURIComponent(upstreamModel)}:${verb}${requestUrl.search}`;
@@ -126,9 +113,6 @@ export const upstreamUrl = (
     case "fireworks":
       return `${base}/responses`;
     case "deepseek":
-      // DeepSeek serves both APIs off the root. Honor whichever the client
-      // asked for: desktop builds that predate the `deepseek/` prefix infer
-      // `openrouter` and post chat completions, and they must keep working.
       return requestUrl.pathname.endsWith("/chat/completions")
         ? `${base}/chat/completions`
         : `${base}/responses`;
@@ -137,14 +121,10 @@ export const upstreamUrl = (
         ? `${base}/chat/completions`
         : `${base}/responses`;
     case "openrouter":
-      // OpenRouter serves both APIs under /api/v1. Honor the client path,
-      // including Responses requests from older desktop builds.
       return requestUrl.pathname.endsWith("/chat/completions")
         ? `${base}/chat/completions`
         : `${base}/responses`;
     case "meta":
-      // Meta Model API is OpenAI-compatible. Prefer chat/completions when the
-      // client asked for it; otherwise use Responses (Meta's agentic default).
       return requestUrl.pathname.endsWith("/chat/completions")
         ? `${base}/chat/completions`
         : `${base}/responses`;
@@ -165,8 +145,6 @@ export const isResponsesRequest = (
     provider !== "deepseek" &&
     provider !== "xai" &&
     provider !== "meta" &&
-    // OpenRouter also serves Responses; the request path decides. Any client
-    // that asks for /responses gets Responses end to end.
     provider !== "openrouter"
   ) {
     return false;
@@ -401,7 +379,6 @@ const stripNestedField = (
   else delete body[containerKey];
 };
 
-/** Remove every client-controlled reasoning form before managed shaping. */
 export const stripManagedReasoningControls = (
   body: Record<string, unknown>,
 ): void => {
@@ -434,12 +411,6 @@ const recordAt = (
     : undefined;
 };
 
-/**
- * The level the client asked for, read from whichever wire shape it used:
- * Responses / OpenRouter `reasoning.effort`, Chat Completions
- * `reasoning_effort`, Anthropic `output_config.effort`, or Google
- * `thinkingConfig.thinkingLevel`.
- */
 export const requestedReasoningEffort = (
   body: Record<string, unknown>,
 ): ReasoningEffortLevel | undefined => {
@@ -465,11 +436,6 @@ const ANTHROPIC_ADAPTIVE_THINKING =
   /(opus|sonnet)-4[.-][6-9]|(opus|sonnet|haiku|fable)-[5-9]/u;
 const ANTHROPIC_XHIGH_EFFORT = /opus-4[.-][7-9]|(opus|sonnet|fable)-[5-9]/u;
 
-/**
- * The effort levels a managed upstream takes natively, or undefined when the
- * gateway leaves that upstream's reasoning untouched. OpenRouter accepts the
- * whole ladder and maps it to each model's own levels itself.
- */
 export const managedReasoningLevels = (
   provider: ManagedGatewayProvider,
   model: string,
@@ -499,7 +465,6 @@ export const managedReasoningLevels = (
   }
 };
 
-/** The level sent upstream: the nearest one the provider takes. */
 export const managedProviderReasoningEffort = (
   provider: ManagedGatewayProvider,
   model: string,
@@ -681,16 +646,11 @@ export const bodyForUpstream = (
     provider === "openrouter" &&
     authorized.resolvedModel === STELLA_DEEPSEEK_V4_FLASH_UPSTREAM_MODEL
   ) {
-    // Catalog-owned restriction wins over any routing supplied by a client.
     body.provider = { only: ["inference-net"], allow_fallbacks: false };
   }
   delete (body as Record<string, unknown>).agentType;
-  // Service tier is a backend-owned billing/routing decision. Never forward a
-  // caller-supplied tier to OpenAI-compatible gateways; add back only the
-  // authorized Fireworks tier below.
   delete body.service_tier;
   if (provider === "google") {
-    // Google REST puts the model in the URL path, not the body.
     delete body.model;
   }
   if (provider === "fireworks" && authorized.serviceTier !== undefined) {

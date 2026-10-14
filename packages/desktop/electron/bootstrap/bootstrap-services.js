@@ -45,13 +45,6 @@ export const createBootstrapServices = (options) => {
         },
     });
     externalLinkService.trustRendererOrigin(RENDERER_ORIGIN);
-    // A canvas-share link (`<CANVAS_SHARE_BASE_URL>/c/<slug>`) that reaches
-    // main as a new-window or navigation request goes to the renderer, which
-    // opens it like a chat click: it asks the backend for the owner's grant
-    // (a private canvas opens only with it), renders the canvas in the Canvas
-    // panel, and opens the browser only when it can't. Returns true so the
-    // external-link funnel skips the browser open. No-ops when the share
-    // domain has not been configured.
     externalLinkService.setCanvasShareHandler((url) => {
         const baseUrl = readConfiguredCanvasShareBaseUrl();
         if (!baseUrl || !isCanvasShareUrl(url, baseUrl))
@@ -69,18 +62,12 @@ export const createBootstrapServices = (options) => {
     });
     let connectorCredentialService = null;
     let selfHostService = null;
-    // NOTE: setPreventComputerSleep is applied post-appReady in
-    // registerBootstrapIpcHandlers (ipc.ts) so the first preferences.json read
-    // and the power toggle don't run on the synchronous pre-paint path.
     const authService = new AuthService({
         authProtocol: config.authProtocol,
         projectDir: path.resolve(config.electronDir, "..", ".."),
         sessionPartition: config.sessionPartition,
         runnerTarget: lifecycle,
         onAuthCallback: (url) => {
-            // The only deep link that still reaches here is an external
-            // connector OAuth callback (`stella://oauth/callback/...`). App
-            // sign-in is claimed over HTTPS, not handed back by deep link.
             if (connectorCredentialService?.handleExternalOAuthCallback(url)) {
                 return;
             }
@@ -140,8 +127,6 @@ export const createBootstrapServices = (options) => {
         getBackendUrl: () => authService.getBackendUrl(),
         getAuthToken: () => authService.getAuthToken(),
     });
-    // Claude Code logins on this computer (the CLI's own; Stella holds no
-    // Claude credential). Re-read when a window gets focus, never polled.
     const claudeLocalAccounts = new ClaudeLocalAccounts({
         stellaDataDir: config.stellaDataDirPath,
         engineAccounts: engineAccountAccess,
@@ -154,15 +139,11 @@ export const createBootstrapServices = (options) => {
             }
         },
     });
-    // Memory files kept the same here and in the cloud, both ways. Started by
-    // the session token (host-runner's onAuthTokenChanged).
     const memorySync = new MemorySyncService({
         stellaDataDir: config.stellaDataDirPath,
         getBackendUrl: () => authService.getBackendUrl(),
         getAuthToken: () => authService.getAuthToken(),
         hasConnectedAccount: () => authService.getHostHasConnectedAccount(),
-        // Memory edited on both sides goes to a background agent to merge,
-        // the way app-source briefs do: no user message is synthesized.
         dispatchAgentBrief: async (brief) => {
             const runner = lifecycle.getRunner();
             const conversationId = uiStateService.state.conversationId;

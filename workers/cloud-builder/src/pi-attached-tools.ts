@@ -1,16 +1,3 @@
-/**
- * A cloud pi agent's file and shell tools: the cloud general agent's own
- * (Bash, Read, Write, Edit, Grep, apply_patch, write_stdin), served by the
- * attached tool host in the agent's container. That host runs every command
- * as the unprivileged tool user in the owner's world, keeps the world and
- * the drive in sync around it, and delivers what the agent's answer links,
- * so a pi agent's workspace is the one the cloud's agents always had.
- *
- * They replace pi's own `stella-coding` tools by extension name, with the
- * legacy schemas as they are: Read's line anchors are what Edit takes.
- * Every call reaches the container through `run`, which attaches it on the
- * first call that needs it.
- */
 import type { Context, JsonValue } from "@earendil-works/chord";
 import type { TSchema } from "@sinclair/typebox";
 import { defineExtension, type Extension } from "@earendil-works/pi-durable";
@@ -59,9 +46,7 @@ import {
   WRITE_TOOL_REPLAY,
 } from "@stella/runtime/kernel/tools/defs/write-def.js";
 
-/** One call for the agent's container. */
 export type PiAttachedToolCall = {
-  /** The calling agent's conversation. */
   conversationId: number;
   callId: string;
   toolName: string;
@@ -100,7 +85,6 @@ const asResult = (result: SerializedAgentToolResult) => {
   };
 };
 
-/** The `stella-coding` extension a cloud agent runs, every call sent through `run`. */
 export const piAttachedCoding = (run: PiAttachedToolRun): Extension =>
   defineExtension({
     name: STELLA_CODING_EXTENSION,

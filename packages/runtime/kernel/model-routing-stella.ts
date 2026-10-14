@@ -150,18 +150,12 @@ const managedUpstreamForBareStellaModel = (
   bareModelId: string,
 ): string | null => {
   const matches = findRegistryModelsById(bareModelId);
-  // Opaque backend-owned aliases are not in the local registry. Preserve the
-  // exact id as a provisional route so catalog enrichment can resolve it; if
-  // the catalog is unavailable, the relay sees that exact id and fails loudly
-  // upstream instead of silently substituting another model family.
   if (matches.length === 0) return bareModelId;
 
   return resolveManagedStellaRegistryMatches(matches);
 };
 
 export const resolveOfflineStellaModelId = (modelId: string): string | null => {
-  // Keep backend-owned aliases opaque when catalog metadata is unavailable.
-  // The gateway resolves them using the current backend configuration.
   switch (modelId) {
     case "stella/light":
     case "stella/priority":
@@ -272,7 +266,6 @@ export const getManagedStellaRegistryLookup = (
   };
 };
 
-/** The relay base a route's requests go to, as soon as the catalog names the gateway. */
 const relayBaseUrlFor = (
   siteBaseUrl: string,
   gatewayOrigin: string | null,
@@ -334,17 +327,10 @@ const createRelayModel = (args: {
     baseUrl: relayBaseUrlFor(args.siteBaseUrl, args.gatewayOrigin),
     headers: {
       ...(registryModel?.headers ?? {}),
-      // `X-Stella-Agent-Type` lets the gateway validate the capability's
-      // agent-type allowlist and attribute usage to the right per-agent
-      // bucket; it is stripped before forwarding upstream.
       "X-Stella-Agent-Type": args.agentType,
     },
   } as Model<Api>;
 
-  // Stash the resolved upstream model id so callers can make
-  // model-capability decisions when `model.id` carries a user-facing Stella
-  // alias like `stella/designer` that doesn't include the underlying model
-  // slug.
   (model as Model<Api> & { upstreamModelId?: string }).upstreamModelId =
     nativeId;
   if (!args.gatewayOrigin) {
@@ -408,11 +394,6 @@ const bearerCapability = (headers: Headers): string | null => {
   return authorization.slice("bearer ".length).trim() || null;
 };
 
-/**
- * One relay request on a session capability: the device's DPoP proof on
- * every request, and one fresh capability for a request the gateway refused
- * on its capability (401, or the session ledger's 402/429 exhaustion).
- */
 const sessionCapabilityFetch = (
   session: ReturnType<typeof createGatewaySessionClient>,
 ): StellaGatewayAccess["fetch"] => {

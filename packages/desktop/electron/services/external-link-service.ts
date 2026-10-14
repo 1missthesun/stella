@@ -13,11 +13,6 @@ export class ExternalLinkService {
 
   private trustedDevOrigin: string | null = null
 
-  /**
-   * Optional interceptor for canvas-share links. When it returns true the URL
-   * was recognized + handled (rendered as a native canvas), so it should NOT
-   * be forwarded to the system browser.
-   */
   private canvasShareHandler: ((url: string) => boolean) | null = null
 
   setCanvasShareHandler(handler: ((url: string) => boolean) | null) {
@@ -58,7 +53,6 @@ export class ExternalLinkService {
     return false
   }
 
-  /** Trust the origin the renderer is served from when it runs from source. */
   trustRendererOrigin(origin: string) {
     this.trustedDevOrigin = origin
   }

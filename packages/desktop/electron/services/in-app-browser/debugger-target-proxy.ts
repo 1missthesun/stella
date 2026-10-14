@@ -16,20 +16,16 @@ import {
 type DrawableLease = {
   count: number;
   mountedInHiddenHost: boolean;
-  /** Set once the hidden mount outlived its limit; no remount until released. */
   expired: boolean;
   expiryTimer?: ReturnType<typeof setTimeout>;
 };
 
 type DebuggerTargetProxyOptions = {
   tabs: BrowserTabRegistry;
-  /** The tab view currently mounted in the visible window, if any. */
   getAttachedView: () => WebContentsView | null;
   getPageBounds: () => Rectangle | undefined;
-  /** Re-mounts the visible tab once a lease no longer holds it. */
   attachActiveView: () => void;
   createDrawableHost?: () => BrowserWindow;
-  /** Keep the drawable host unmapped and force frames on demand. */
   hideDrawableHost: boolean;
   wait?: (delayMs: number) => Promise<void>;
   debuggerRecoveryTimeoutMs?: number;
@@ -43,18 +39,12 @@ const DRAWABLE_HOST_BOUNDS: Rectangle = {
   width: 1280,
   height: 720,
 };
-// Gap between forced frames while a command waits on an unmapped host.
 const DRAWABLE_HOST_FRAME_PUMP_MS = 16;
 const DEFAULT_DEBUGGER_RECOVERY_TIMEOUT_MS = 1_000;
 // Longest a tab stays in the hidden host under one lease. A command that never
 // settles would otherwise keep the tab there, and out of the panel, for good.
 const HIDDEN_MOUNT_LIMIT_MS = 30_000;
 
-/**
- * Routes CDP commands and events between agents and the in-app tabs, and keeps
- * a tab drawable while a command runs against it: a tab that is not the
- * visible one is mounted in a hidden host window under a counted lease.
- */
 export class DebuggerTargetProxy {
   private readonly options: DebuggerTargetProxyOptions;
   private readonly drawableLeases = new Map<string, DrawableLease>();
@@ -224,7 +214,6 @@ export class DebuggerTargetProxy {
     return () => this.debuggerListeners.delete(listener);
   }
 
-  /** Fans a tab's CDP events out to every subscriber. */
   forwardEvents(tab: ManagedTab) {
     tab.view.webContents.debugger.on(
       "message",
@@ -242,12 +231,10 @@ export class DebuggerTargetProxy {
     );
   }
 
-  /** A leased tab stays drawable in the hidden host while it is not shown. */
   isMountedInHiddenHost(tabId: string) {
     return this.drawableLeases.get(tabId)?.mountedInHiddenHost === true;
   }
 
-  /** Called when a view leaves the visible window: keep it drawable if leased. */
   remountLeased(tab: ManagedTab) {
     const lease = this.drawableLeases.get(tab.id);
     if (lease && lease.count > 0 && !lease.expired) {
@@ -255,10 +242,6 @@ export class DebuggerTargetProxy {
     }
   }
 
-  /**
-   * Hands a leased tab back to the panel: the panel shows it now instead of
-   * after the lease ends. Its commands keep running against the visible view.
-   */
   takeBackForPanel(tab: ManagedTab) {
     this.unmountDrawableLease(tab);
   }
@@ -270,7 +253,6 @@ export class DebuggerTargetProxy {
     }
   }
 
-  /** Unmounts and drops a closing tab's lease. */
   releaseTab(tab: ManagedTab) {
     this.unmountDrawableLease(tab);
     this.forgetTab(tab.id);

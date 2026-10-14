@@ -25,7 +25,6 @@ type MagicLinkAuthFlowProps = {
   buttonSize?: ButtonProps["size"];
   autoFocus?: boolean;
   errorClassName?: string;
-  /** Wraps the grow-in region that appears after a successful send. */
   extrasClassName?: string;
   extrasInnerClassName?: string;
   sentClassName?: string;
@@ -33,7 +32,6 @@ type MagicLinkAuthFlowProps = {
   openInboxClassName?: string;
   openInboxLabel?: (providerName: string) => string;
   resendCooldownLabel?: (secondsLeft: number) => string;
-  /** Submit button label when the entered email matches the last sent. */
   resendLabel?: string;
   skipClassName?: string;
   skipLabel?: string;

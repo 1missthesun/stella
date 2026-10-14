@@ -1,10 +1,3 @@
-/**
- * Pinned "you need to act" card above the composer: signed out, plan
- * limit reached, provider key missing, model gated behind an upgrade.
- * Reads the composer-notice store and mirrors the connector connect
- * card's shape so the two share one visual slot.
- */
-
 import { useEffect } from "react";
 import { AlertCircle, KeyRound, Lock, LogIn, X } from "@/ui/icons";
 import { Button } from "@/ui/button";
@@ -31,7 +24,6 @@ export const ComposerNotice = ({
   conversationId,
 }: {
   compact?: boolean;
-  /** Scope: only notices for this chat (or unscoped ones) render here. */
   conversationId?: string | null;
 }) => {
   const t = useT();

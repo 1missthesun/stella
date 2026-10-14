@@ -1,13 +1,3 @@
-/**
- * Slack app settings, read from Worker secrets:
- *
- *   SLACK_CLIENT_ID, SLACK_CLIENT_SECRET   OAuth v2 install
- *   SLACK_SIGNING_SECRET                   request signatures (events, interactivity, commands)
- *
- * Bot tokens are per workspace (D1 `slack_installations`), never a secret here.
- * Missing settings turn the Slack routes off rather than failing readiness.
- */
-
 export type SlackSecret =
   | "SLACK_CLIENT_ID"
   | "SLACK_CLIENT_SECRET"
@@ -28,7 +18,6 @@ export const slackConfigured = (env: Cloudflare.Env): boolean =>
       slackSecret(env, "SLACK_SIGNING_SECRET"),
   );
 
-/** The branded origin Slack calls and links point at (`STELLA_AUTH_URL`). */
 export const slackPublicOrigin = (
   env: Cloudflare.Env,
   request?: Request,

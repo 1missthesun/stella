@@ -14,12 +14,6 @@ import {
   validateSharedGatewayConfigRecord,
 } from "./shared-config.js";
 
-/**
- * `BillingControl.gatewayConfig()` cached per isolate. Fresh for CONFIG_TTL_MS; after
- * that the stale copy keeps serving while one background refresh runs
- * (stale-while-revalidate), so the control plane is never on a request's
- * critical path except on a cold isolate.
- */
 export const CONFIG_TTL_MS = 5 * 60_000;
 
 export type GatewayConfig = {
@@ -32,10 +26,6 @@ export type GatewayConfig = {
   priceFor(model: string): TokenPriceConfig | null;
 };
 
-/**
- * An object-local durable copy of the shared record (same shape and key as
- * the shared KV snapshot), so a restarted owner object serves warm pricing.
- */
 export type GatewayConfigStorage = {
   source: string;
   read(): unknown;
@@ -46,7 +36,6 @@ let cached: GatewayConfig | null = null;
 let inflight: Promise<GatewayConfig> | null = null;
 let sharedInflight: Promise<GatewayConfig | null> | null = null;
 
-/** A delayed restore never replaces a newer resident copy. */
 const adopt = (restored: GatewayConfig | null): void => {
   if (!cached || (restored && restored.fetchedAt > cached.fetchedAt)) {
     cached = restored;
@@ -157,8 +146,6 @@ const persistConfig = async (
   storage?: GatewayConfigStorage,
 ): Promise<void> => {
   if (!storage) return;
-  // Incomplete or oversize snapshots still serve from memory. Persist the
-  // original fetch time, never extend freshness.
   const built = await sharedGatewayConfigRecord({
     snapshot: config.snapshot,
     source: storage.source,
@@ -183,7 +170,6 @@ export const getGatewayConfig = async (
       try {
         return await restoreRecord(await shared.read(), shared.source, now());
       } catch {
-        // The authoritative billing pull below remains the cold-path fallback.
         return null;
       }
     })().finally(() => {
@@ -208,7 +194,6 @@ export const getGatewayConfig = async (
       }),
     );
   }
-  // A warm isolate can serve several owners; seed each owner's restart cache.
   await persistConfig(current, storage);
   return current;
 };

@@ -1,22 +1,3 @@
-/**
- * Events API handling: a Slack message becomes a turn of the workspace's
- * shared Stella (`workspace.ts`).
- *
- * - **Triggers:** an `@Stella` mention in a channel or group DM, any direct
- *   message, and any reply in a thread Stella is already working in: anyone
- *   there can steer her without tagging her again. Everything else in
- *   channels Stella belongs to is cached (`slack_messages`) as context.
- * - **Whose Stella:** the workspace's. It runs on the Stella account of
- *   whoever installed the app, which owns the workspace's home and pays for
- *   it; nobody else needs a Stella account. Until the installer connects
- *   theirs, Stella says so.
- * - **Which conversation:** one per Slack thread (and one per person's DM),
- *   id derived from the Slack coordinates. They live under the owner's
- *   account but never show in the owner's own Stella apps.
- * - **Delivery:** the conversation object is told where its replies go and
- *   who is asking (`/slack/bind`, see `relay.ts`) before the turn starts.
- */
-
 import { environmentSummary, loadEnvironment, slackEnvironmentsEnabled } from "./environment.js";
 import {
   TURN_OWNER_GENERATION_HEADER,
@@ -217,7 +198,6 @@ const toCached = (event: SlackEvent, isBot: boolean): CachedSlackMessage => ({
   })),
 });
 
-/** First mention inside an existing thread with little cached: one history read. */
 const backfillThread = async (
   env: Cloudflare.Env,
   install: SlackInstallation,
@@ -273,7 +253,6 @@ const ownerInternal = async (
     }),
   );
 
-/** The message's files, copied into the workspace's home as turn attachments. */
 const importFiles = async (
   env: Cloudflare.Env,
   install: SlackInstallation,

@@ -172,11 +172,6 @@ const isFiniteNumber = (value: unknown): value is number =>
 const isNonEmptyString = (value: unknown): value is string =>
   typeof value === "string" && value.length > 0;
 
-/**
- * Structural validation of decoded claims. Kept separate so callers that
- * already trust a signature (e.g. the issuer inspecting its own token) can
- * reuse it.
- */
 export const validateCapabilityClaims = (
   value: unknown,
 ): value is GatewayCapabilityClaims => {
@@ -260,7 +255,6 @@ export const verifyCapability = async (
   options: {
     now?: number;
     expectedIssuer?: GatewayCapabilityIssuer;
-    /** Defaults to the model-gateway audience. */
     expectedAudience?: CapabilityAudience;
   } = {},
 ): Promise<CapabilityVerificationResult> => {

@@ -68,11 +68,6 @@ const fromAndroid = (): string[] => {
   }
 };
 
-/**
- * The device's preferred language tags, most-preferred first. Raw BCP-47 /
- * POSIX-ish tags — resolution to a supported Stella locale is the caller's
- * job (`resolveBestLocale`).
- */
 export const deviceLanguageTags = (): string[] => [
   ...fromIos(),
   ...fromAndroid(),

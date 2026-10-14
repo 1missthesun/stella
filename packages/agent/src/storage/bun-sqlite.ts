@@ -16,10 +16,6 @@ const WAL_AUTO_CHECKPOINT_PAGES = 1_000;
 const BUSY_TIMEOUT_MS = 5_000;
 const ignore = () => {};
 
-/**
- * Runs operations in call order. An operation starts at once when nothing is
- * running or waiting; an asynchronous one holds the queue until it settles.
- */
 class SerialQueue {
   private tail: Promise<unknown> = Promise.resolve();
   private pending = 0;
@@ -36,8 +32,6 @@ class SerialQueue {
   runAsync<T>(operation: () => Promise<T>): Promise<T> {
     if (this.pending > 0) return this.enqueue(operation);
     this.pending++;
-    // The barrier is published before the operation starts, so calls it
-    // makes synchronously queue behind it instead of running inside it.
     const { promise: barrier, resolve: release } = Promise.withResolvers<void>();
     this.tail = barrier;
     let started: Promise<T>;
@@ -118,7 +112,6 @@ class BunSqliteTransaction extends BunSqliteExecutor {
   }
 }
 
-/** `SqliteDatabase` facade over one `bun:sqlite` connection. */
 export class BunSqliteDatabase extends BunSqliteExecutor implements SqliteDatabase {
   private readonly access = new SerialQueue();
   private closed = false;
@@ -167,7 +160,6 @@ export class BunSqliteDatabase extends BunSqliteExecutor implements SqliteDataba
   }
 }
 
-/** Open one SQLite file in WAL mode, the durability pi-durable's Node adapter uses. */
 export async function openBunSqliteDatabase(path: string): Promise<BunSqliteDatabase> {
   if (path !== ":memory:") await mkdir(dirname(path), { recursive: true });
   const database = new Database(path, { create: true, strict: true });
@@ -184,7 +176,6 @@ export async function openBunSqliteDatabase(path: string): Promise<BunSqliteData
   }
 }
 
-/** Durable harness storage in one SQLite file, for the desktop runtime. */
 export async function openBunSqliteStorage(path: string): Promise<SqliteStorage> {
   return SqliteStorage.open(await openBunSqliteDatabase(path));
 }

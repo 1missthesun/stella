@@ -16,16 +16,6 @@ import {
 import { UpdateCard } from "./UpdateCard";
 import "./app-update-message.css";
 
-/**
- * Changes to Stella in the chat: an agent's draft shows on the message that
- * relays its completion (Update, then Undo), and changes no agent here made
- * (one from another computer, a draft made by hand) pin above the composer.
- * New versions from the Stella team are the top bar's
- * (`ShellTopBarUpdatePill`). The Updates tab (`UpdatesSection`) lists all of
- * them with their history. Nothing renders unless Stella runs from source.
- */
-
-/** Re-render every half minute so "Updated 3 minutes ago" stays true. */
 export const useNow = () => {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -44,17 +34,11 @@ export const ago = (locale: string, date: number, now: number) => {
   return format.format(Math.round(hours / 24), "day");
 };
 
-/** Undos are `Revert "<subject>"` (and undos of undos nest); show the change. */
 export const subjectOf = (subject: string): string => {
   const inner = /^Revert "(.*)"$/.exec(subject)?.[1];
   return inner === undefined ? subject : subjectOf(inner);
 };
 
-/**
- * Runs card actions: `pending` names the card whose action is running (in any
- * mounted copy). Only a real failure is shown; work that moved to the
- * background succeeded, and the state says so.
- */
 export const useAppSourceAction = () => {
   const t = useT();
   const pending = usePendingAppSourceAction();
@@ -88,8 +72,6 @@ export const AgentUpdateCard = memo(function AgentUpdateCard({
   const change = state ? agentChange(state, agentId) : null;
   if (!state || !api || !change) return null;
   const pending = running === agentId;
-  // Nothing else goes in while Stella is settling its own version: a change
-  // applied into the middle of that merge is a conflict nobody asked for.
   const blocked =
     updateProgress(state)?.state === "merging" ||
     ((state.busy || running !== null) && !pending);
@@ -110,8 +92,6 @@ export const AgentUpdateCard = memo(function AgentUpdateCard({
         action={{
           label: t("shell.appSource.update"),
           primary: true,
-          // Including a draft whose base moved: the main process merges it,
-          // and only involves an agent if that genuinely conflicts.
           onClick: () => void run(agentId, () => api.apply(draft.name)),
         }}
       />
@@ -138,26 +118,17 @@ export const AgentUpdateCard = memo(function AgentUpdateCard({
       busy={pending}
       disabled={blocked}
       action={{
-        // Undoing an undo takes the change again.
         label: commit.undone ? t("shell.appSource.update") : t("shell.appSource.undo"),
         primary: commit.undone,
-        // An undo later work conflicts with goes to an agent, which finishes
-        // it as a draft this card then offers.
         onClick: () => void run(agentId, () => api.undo(commit.sha)),
       }}
     />
   );
 });
 
-/** "Rahuls-MacBook-Air" reads as "Rahuls MacBook Air". */
 export const deviceLabel = (device: string) =>
   device.replace(/[-_]+/g, " ").trim();
 
-/**
- * What adding an offer takes. A new version may already be merged with the
- * user's own changes as a draft; otherwise the main process works out what
- * taking it means.
- */
 export const addOffer = (offer: AppSourceWaiting) => {
   const api = appSourceApi();
   if (!api) return Promise.resolve<AppSourceActionResult>({ ok: false, error: "" });
@@ -168,19 +139,11 @@ export const addOffer = (offer: AppSourceWaiting) => {
   return api.apply(offer.name);
 };
 
-/**
- * Changes waiting to be added that aren't the Stella team's: a change the
- * user made on another computer, or a draft made by hand. Each is a message
- * from Stella in the chat, in the assistant's own bubble, with one button;
- * skipping one is the Updates tab's.
- */
 export const AppSourceOffers = memo(function AppSourceOffers() {
   const t = useT();
   const state = useAppSourceState();
   const { pending, run } = useAppSourceAction();
   if (!state || !appSourceApi()) return null;
-  // While Stella merges its own update, nothing else goes in: applying
-  // another change into the middle of it is a conflict nobody asked for.
   const merging = updateProgress(state)?.state === "merging";
   const offers = state.waiting.filter(
     (offer): offer is Exclude<AppSourceWaiting, { kind: "version" }> =>

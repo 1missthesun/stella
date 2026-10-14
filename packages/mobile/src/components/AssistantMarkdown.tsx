@@ -1,13 +1,3 @@
-/**
- * Renders assistant message text with markdown formatting.
- *
- * Uses `react-native-nitro-markdown` — a native md4c parser bridged via JSI.
- * Assistant messages arrive whole (iMessage-style: one delivery per completed
- * message segment), so this is a single one-shot parse of a settled string —
- * no incremental `MarkdownSession`, no per-token reveal, no re-parse cadence to
- * manage. A message's text only changes if the turn's canonical row later
- * replaces it, which is a normal re-render.
- */
 import { memo, useCallback, useMemo, type ReactNode } from "react";
 import { Alert, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import {
@@ -71,8 +61,6 @@ function buildTheme(colors: Colors): PartialMarkdownTheme {
       tableRowOdd: fadeHex(colors.muted, 0.2),
     },
     fontSizes: {
-      // m is the body size — every other size on this theme is a
-      // bullet/heading/code variant of it.
       xs: 12,
       s: 14,
       m: BASE_FONT_SIZE,
@@ -178,20 +166,10 @@ const containsImage = (node: MarkdownNode): boolean => node.type === "image" || 
 
 const PARSER_OPTIONS = { gfm: true, math: false, html: false } as const;
 const containerStyle = StyleSheet.create({
-  // The wrapping View lets the parent Pressable still receive long-press —
-  // markdown children render as Text/Views that don't intercept it.
   wrapper: { width: "100%" },
-  // Hugging variant: no width, so the wrapper measures to its widest child and
-  // an enclosing bubble can size to the text instead of always filling its
-  // max-width. Block children still stretch to whatever width that yields.
   hug: {},
 });
 
-/**
- * Image sources a file preview may show. Its relative images are read from
- * the computer or Drive copy that has them and inlined as `data:` URIs, which
- * load nothing from anywhere; chat replies stay on http and https.
- */
 const EMBEDDED_IMAGE_OPTIONS = {
   allowedProtocols: ["http:", "https:", "data:"],
 } as const;
@@ -208,31 +186,11 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
 }: {
   text: string;
   colors: Colors;
-  /** Enables native selection on the rendered markdown text nodes. */
   selectable?: boolean;
-  /**
-   * Stretch to the parent's width (documents, artifact bodies). Pass `false`
-   * inside a chat bubble so the bubble hugs the text rather than always
-   * rendering at its max width.
-   */
   fill?: boolean;
-  /**
-   * A file preview whose relative images were inlined as `data:` URIs: show
-   * them. Off for chat, where a reply's images stay http and https.
-   */
   embeddedImages?: boolean;
-  /**
-   * Tap handler for `stella://file/<path>` links — the assistant's way of
-   * pointing at a local file. When provided, such links open the in-app
-   * file viewer instead of being handed to the OS (which silently drops
-   * the unknown scheme).
-   */
   onStellaFileLink?: (path: string) => void;
   onAskStella?: (text: string) => void;
-  /**
-   * The reply's one "Show more", placed like a user message's toggle. It
-   * opens the full reports of every task the reply relays or cites.
-   */
   showMore?: {
     label: string;
     onPress: (anchor?: { x: number; y: number }) => void;
@@ -255,8 +213,6 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
         if (onStellaFileLink) {
           onStellaFileLink(stellaFilePath);
         } else {
-          // Surface something rather than silently dropping the tap — the
-          // OS has no handler for the stella:// scheme.
           Alert.alert(
             "File preview unavailable",
             "This file can't be previewed from this chat.",

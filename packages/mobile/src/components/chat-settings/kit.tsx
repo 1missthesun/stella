@@ -14,13 +14,6 @@ import { fonts } from "../../theme/fonts";
 import { useColors } from "../../theme/theme-context";
 import { Icon, type IconName } from "../Icon";
 
-/**
- * The right sidebar's few pieces, so every page in it speaks the left
- * sidebar's language: large bold names with the accent dot on what's chosen,
- * quiet labels, hairlines between sections, text actions, and one filled
- * button for the one thing a page asks for. No cards, no boxes.
- */
-
 export const KIT = {
   gutter: 24,
   switcherHeight: 62,
@@ -73,10 +66,6 @@ export function Dot({ size = 8 }: { size?: number }) {
   );
 }
 
-/**
- * The face of a switcher: what is chosen now, large, with the up-down mark
- * that says a tap offers the others.
- */
 export function SwitcherFace({
   glyph,
   title,
@@ -140,7 +129,6 @@ export function SwitcherFace({
   );
 }
 
-/** A choice in a list: medium weight, muted until chosen. */
 export function ChoiceRow({
   label,
   detail,
@@ -289,7 +277,6 @@ export function PrimaryButton({
   );
 }
 
-/** A field drawn as a line, not a box. */
 export const LineField = forwardRef<
   TextInput,
   TextInputProps & { trailing?: ReactNode }

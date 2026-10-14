@@ -17,9 +17,6 @@ impl ChromeProcess {
         let _ = self.child.wait();
     }
 
-    /// Wait for Chrome to exit on its own (after Browser.close CDP command),
-    /// falling back to kill() if it doesn't exit within the timeout.
-    /// This allows Chrome to flush cookies and other state to the user-data-dir.
     pub fn wait_or_kill(&mut self, timeout: Duration) {
         let start = std::time::Instant::now();
         let poll_interval = Duration::from_millis(50);
@@ -47,8 +44,6 @@ impl Drop for ChromeProcess {
                         std::thread::sleep(Duration::from_millis(100));
                     }
                     Err(e) => {
-                        // Use write! instead of eprintln! to avoid panicking
-                        // if the daemon's stderr pipe is broken (parent dropped it).
                         let _ = writeln!(
                             std::io::stderr(),
                             "Warning: failed to clean up temp profile {}: {}",
@@ -210,8 +205,6 @@ pub fn launch_chrome(options: &LaunchOptions) -> Result<ChromeProcess, String> {
             Err(e) => {
                 last_err = e;
                 if attempt < max_attempts {
-                    // Use write! instead of eprintln! to avoid panicking
-                    // if the daemon's stderr pipe is broken (parent dropped it).
                     let _ = writeln!(
                         std::io::stderr(),
                         "[chrome] Launch attempt {}/{} failed, retrying in 500ms...",
@@ -354,12 +347,10 @@ fn chrome_launch_error(message: &str, stderr_lines: &[String]) -> String {
 }
 
 pub fn find_chrome() -> Option<PathBuf> {
-    // 1. Check a previously provisioned Chrome for Testing binary.
     if let Some(p) = crate::install::find_installed_chrome() {
         return Some(p);
     }
 
-    // 2. Check system-installed Chrome
     #[cfg(target_os = "macos")]
     {
         let candidates = [
@@ -423,7 +414,6 @@ pub fn find_chrome() -> Option<PathBuf> {
         }
     }
 
-    // 3. Fallback: check Playwright's browser cache (for existing installs)
     if let Some(p) = find_playwright_chromium() {
         return Some(p);
     }
@@ -467,7 +457,6 @@ pub async fn auto_connect_cdp() -> Result<String, String> {
         }
     }
 
-    // Fallback: probe common ports
     for port in [9222u16, 9229] {
         if let Ok(ws_url) = discover_cdp_url("127.0.0.1", port).await {
             return Ok(ws_url);
@@ -575,9 +564,6 @@ fn should_disable_sandbox(existing_args: &[String]) -> bool {
     false
 }
 
-/// Returns true if Chrome should use disk instead of /dev/shm for shared memory.
-/// On CI runners and containers, /dev/shm is often too small (64MB default),
-/// which causes Chrome to crash mid-session.
 fn should_disable_dev_shm(existing_args: &[String]) -> bool {
     if existing_args.iter().any(|a| a == "--disable-dev-shm-usage") {
         return false;
@@ -605,8 +591,6 @@ fn should_disable_dev_shm(existing_args: &[String]) -> bool {
     false
 }
 
-/// Search Playwright's browser cache for a Chromium binary.
-/// Legacy fallback for users who previously installed Chromium via Playwright.
 fn find_playwright_chromium() -> Option<PathBuf> {
     let mut search_dirs = Vec::new();
 
@@ -640,7 +624,6 @@ fn find_playwright_chromium() -> Option<PathBuf> {
                     }
                 })
                 .collect();
-            // Sort descending so the newest version wins
             matches.sort();
             matches.reverse();
             if let Some(p) = matches.into_iter().next() {
@@ -871,16 +854,12 @@ mod tests {
         assert!(dir.exists());
 
         {
-            // Simulate a ChromeProcess with a temp dir but a dummy child.
-            // We can't actually spawn Chrome here, but we can verify the Drop
-            // logic by creating a small helper process.
             let child = spawn_noop_child();
             let _process = ChromeProcess {
                 child,
                 ws_url: String::new(),
                 temp_user_data_dir: Some(dir.clone()),
             };
-            // _process dropped here
         }
 
         assert!(!dir.exists(), "Temp dir should be cleaned up on drop");

@@ -82,7 +82,6 @@ export type NativeAgentTurnResult = {
   error?: string;
   usage: { inputTokens: number; outputTokens: number; llmCalls: number };
   messages: AgentMessage[];
-  /** Builder checkpoint input for Claude's durable native state. */
   nativeStateCheckpoint?: Pick<
     NativeStateAttestation,
     "engine" | "sessionId" | "cursor" | "tree" | "mac"
@@ -94,29 +93,21 @@ type NativeCliTurnResult = Omit<
   "messages" | "nativeStateCheckpoint"
 > & {
   sessionId: string;
-  /** Inbox messages Claude took during the turn, in the order it took them. */
   steered: string[];
-  /** Claude waits stopped in its keeper for this thread's next turn. */
   kept?: KeptClaude;
 };
 
-/** A parked process: handed on once its state is sealed, or ended. */
 type KeptClaude = {
   release: (mac: string) => Promise<void>;
   discard: () => Promise<void>;
 };
 
-/**
- * The keeper that holds this thread's Claude between turns, and what decides
- * whether its parked process may take this turn.
- */
 export type CloudClaudeKeeperInput = {
   client: ClaudeKeeperClient;
   /** Claude lists the tools once; another catalog needs another process. */
   toolCatalogHash: string;
 };
 
-/** How often a running agent's inbox is checked for new messages. */
 const INBOX_POLL_MS = 500;
 
 const streamJsonUserMessage = (
@@ -170,7 +161,6 @@ export const createCloudClaudeMcpConfig = async (
   }
 };
 
-/** This thread's own native state root; threads share the container, not state. */
 export const cloudNativeStateRootForThread = (threadId: string): string =>
   cloudNativeStateRoot(createHash("sha256").update(threadId).digest("hex"));
 const EMPTY_NATIVE_HISTORY_CURSOR = "v1:empty";
@@ -190,7 +180,6 @@ const historyCursor = (value: {
     )
     .digest("hex")}`;
 
-/** Last canonical row is a stable parity cursor even when old context prunes. */
 export const nativeHistoryCursorFromRows = (
   rows: Array<{ turnId: string; role: string; payloadJson: string }>,
 ): string => {
@@ -245,7 +234,6 @@ export const assertNativeHistoryParity = async (args: {
   expectedCursor: string;
   integrityKey: string;
   previousIntegrityKeys?: readonly string[];
-  /** Unit tests may override the production-required root owner. */
   expectedOwner?: { uid: number; gid: number };
 }): Promise<void> => {
   if (args.expectedCursor === EMPTY_NATIVE_HISTORY_CURSOR) {
@@ -309,16 +297,11 @@ const consumeJsonLine = (
   }
 };
 
-/** Which login file the CLI holds: replaced by a restore, rewritten by a refresh. */
 const credentialsIdentity = async (accountDirectory: string): Promise<string> => {
   const details = await stat(path.join(accountDirectory, ".credentials.json"));
   return `${details.dev}:${details.ino}:${details.size}:${details.mtimeMs}`;
 };
 
-/**
- * The state root's files by inode, size and mtime: a restore that rewrote
- * them, even byte for byte, leaves a process holding the old ones.
- */
 const stateFilesIdentity = async (root: string): Promise<string> => {
   const parts: string[] = [];
   const walk = async (directory: string, relative: string): Promise<void> => {
@@ -335,7 +318,6 @@ const stateFilesIdentity = async (root: string): Promise<string> => {
   return createHash("sha256").update(parts.sort().join("\n")).digest("hex");
 };
 
-/** The sealed state's MAC, once the parity check has accepted the root. */
 const sealedStateMac = async (stateRoot: string): Promise<string | undefined> => {
   const raw = await readFile(
     path.join(stateRoot, NATIVE_STATE_ATTESTATION_FILE),
@@ -362,10 +344,8 @@ const runJsonLines = async (options: {
   cwd: string;
   env: NodeJS.ProcessEnv;
   input?: string;
-  /** Writes stdin and ends it itself, instead of `input` then end. */
   feedInput?: (stdin: NodeJS.WritableStream) => void;
   processIdentity?: ToolProcessIdentity;
-  /** SIGKILLs the child; the promise still resolves once it has closed. */
   cancellation?: NativeTurnCancellation;
   onJson: (value: Record<string, unknown>) => void;
 }): Promise<ProcessResult> =>
@@ -405,8 +385,6 @@ const runJsonLines = async (options: {
         child.kill("SIGKILL");
       }
     };
-    // The latch is awaited on its own fiber rather than polled; an already
-    // settled latch kills the child on the next tick.
     const killOnCancel = options.cancellation
       ? Effect.runFork(
           options.cancellation.awaitAborted.pipe(
@@ -466,34 +444,20 @@ export const resolveClaudeReasoningArgs = (
 export const resolveClaudeModelArgs = (model: string): string[] =>
   model === "default" ? [] : ["--model", model];
 
-/**
- * What differs between the two cloud CLI roles. Everything else (flags,
- * gateway wiring, native state, compaction guard) is one shared runner.
- */
 export type CloudClaudeRoleProfile = {
   role: CloudCliTurnRole;
-  /** Seed of the deterministic Claude session id (`--session-id`/`--resume`). */
   sessionKey: string;
-  /** Gateway agent type; the turn capability's `agentTypes` must allow it. */
   agentType: "general" | "orchestrator";
   /**
    * Claude keys its on-disk sessions by cwd under CLAUDE_CONFIG_DIR, so the
    * path must be the same in every container for `--resume` to find them.
    */
   cwd: string;
-  /** Stream `stream_event` deltas (live text, tool-use correlation). */
   includePartialMessages: boolean;
-  /** Hard and idle MCP tool-call bound; unset keeps the CLI defaults. */
   mcpToolTimeoutMs?: number;
-  /** `CLAUDE_CODE_AUTO_COMPACT_WINDOW`; unset keeps the CLI default. */
   autoCompactWindowTokens?: number;
 };
 
-/**
- * Root-only (inside the 0700 host-state directory) and always empty: an
- * orchestrator turn has no workspace, and no model-authored process can plant
- * a CLAUDE.md or `.claude` directory anywhere on its lookup path.
- */
 export const CLOUD_ORCHESTRATOR_CLI_CWD = path.join(
   CLOUD_HOST_STATE,
   "orchestrator-cwd",
@@ -535,10 +499,6 @@ export const cloudClaudeRoleProfile = (args: {
         autoCompactWindowTokens: CLAUDE_CODE_AGENT_AUTO_COMPACT_WINDOW,
       };
 
-/**
- * The owner's cloud Claude Code login a turn runs on: which account directory
- * under the root-only accounts root (a key, never a credential).
- */
 export type CloudClaudeAccountInput = { key: string; email: string };
 
 export const parseCloudClaudeAccountInput = (
@@ -577,33 +537,20 @@ export const buildClaudeChildEnv = (options: {
     ...options.initialEnv,
     CLAUDE_CONFIG_DIR: options.stateRoot,
     CLAUDE_SECURESTORAGE_CONFIG_DIR: options.accountDirectory,
-    // Claude spawns no subprocess here: built-in tools are off (`--tools ""`),
-    // Stella's tools arrive over loopback HTTP MCP and run in the ToolHost's
-    // own isolation, and settings sources (hooks) are empty. Scrubbing would
-    // only demand bubblewrap, which the image cannot run (no user
-    // namespaces), and the CLI then exits before it starts.
     CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: "0",
     // The executor (and so the CLI) runs as root inside the per-owner
     // sandbox container. Claude Code refuses --dangerously-skip-permissions
     // as root unless told it is in a sandbox.
     IS_SANDBOX: "1",
     MCP_CONNECTION_NONBLOCKING: "0",
-    // No telemetry, error reporting or update check: nothing the turn needs
-    // goes out before its first model request.
     CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
-    // claude.ai's own connectors are never this turn's tools
-    // (`--strict-mcp-config`), and with blocking MCP connections their fetch
-    // held every start for about half a second.
     ENABLE_CLAUDEAI_MCP_SERVERS: "false",
   };
-  // Nothing may point the CLI at another endpoint or another credential.
   delete childEnv.ANTHROPIC_BASE_URL;
   delete childEnv.ANTHROPIC_API_KEY;
   delete childEnv.ANTHROPIC_AUTH_TOKEN;
   delete childEnv.ANTHROPIC_CUSTOM_HEADERS;
   delete childEnv.CLAUDE_CODE_OAUTH_TOKEN;
-  // These are forbidden legacy executor credentials, not Claude credentials.
-  // Neither name may enter Claude's environment and reach a tool subprocess.
   delete childEnv.STELLA_TURN_TOKEN;
   delete childEnv.STELLA_CODEX_TURN_TOKEN;
   // Never let a host/image override defeat the turn's explicit selection.
@@ -639,7 +586,6 @@ export const buildCloudClaudeTakeoverArgs = (options: {
   sessionId: string;
   inputPrompt?: string;
   includePartialMessages?: boolean;
-  /** Input as stream-json messages, each echoed back once Claude takes it. */
   streamInput?: boolean;
 }): string[] => [
   "-p",
@@ -653,28 +599,17 @@ export const buildCloudClaudeTakeoverArgs = (options: {
   ...resolveClaudeModelArgs(options.model),
   ...resolveClaudeReasoningArgs(options.reasoningEffort),
   "--dangerously-skip-permissions",
-  // Match the desktop's configured Claude engine takeover: Claude owns the
-  // native loop, but Stella owns its entire capability surface. Ambient MCP
-  // servers and built-ins stay out; the CLI's own commands (`/compact`) run
-  // as on the desktop.
   "--strict-mcp-config",
   "--mcp-config",
   options.mcpConfigPath,
   "--tools",
   "",
-  // Stella's server is the only tool surface; allow it explicitly too, so a
-  // permission mode that overrides the bypass can't deny it.
   "--allowedTools",
   `mcp__${CLOUD_CLAUDE_MCP_SERVER_NAME}`,
-  // CLAUDE_CONFIG_DIR persists only conversation state. Never let a prior
-  // turn or project file turn that persistence into executable hooks,
-  // plugins, permissions, or other settings outside Stella's ToolHost.
   "--setting-sources",
   "",
   "--settings",
   JSON.stringify({
-    // Match the configured desktop engine: keyword-triggered workflows must
-    // not hijack an ordinary Stella task.
     workflowKeywordTriggerEnabled: false,
     disableWorkflows: true,
   }),
@@ -693,7 +628,6 @@ export const buildCloudClaudeTakeoverArgs = (options: {
 
 const transcript = (args: {
   prompt: string;
-  /** Messages the agent took while it worked, after the prompt. */
   steered: readonly string[];
   finalText: string;
   execution: Extract<CloudExecutionSelection, { engine: "anthropic" }>;
@@ -731,7 +665,6 @@ const transcript = (args: {
   ];
 };
 
-/** One stream-json event from the CLI, as parsed from its stdout. */
 export type ClaudeStreamJsonEvent = Record<string, unknown>;
 
 /**
@@ -755,11 +688,6 @@ const stellaToolsUnavailable = (
   return `Claude Code could not load Stella's tools (their server was ${status}), so it stopped before answering. Try again.`;
 };
 
-/**
- * Runs one `claude -p` turn for either role and returns its outcome. Callers
- * observe the raw stream through `onStreamEvent`; this owns the session
- * marker, final text, usage, the compaction-loop breaker, and cancellation.
- */
 export const runCloudClaude = async (options: {
   profile: CloudClaudeRoleProfile;
   inputPrompt: string;
@@ -769,17 +697,9 @@ export const runCloudClaude = async (options: {
   stateRoot: string;
   mcpServerConfig: CloudClaudeMcpServerConfig;
   onStreamEvent?: (event: ClaudeStreamJsonEvent) => void;
-  /** Kills the CLI; the turn then fails with the abort reason. */
   cancellation?: NativeTurnCancellation;
-  /** Messages for the agent while it works (an agent turn's inbox). */
   inbox?: AgentInbox;
-  /** No message the user wrote waits for a reply: the CLI's nudge for a visible answer ends the turn, empty. */
   quiet?: boolean;
-  /**
-   * Run Claude in this thread's keeper, which keeps it for the next turn.
-   * `reusable` is false when this turn must start a new process, and
-   * `sealedMac` names the sealed state the parity check accepted.
-   */
   keeper?: CloudClaudeKeeperInput & {
     reusable: boolean;
     sealedMac?: string;
@@ -799,8 +719,6 @@ export const runCloudClaude = async (options: {
     () => false,
   );
   if (!signedIn) {
-    // Only whether the CLI's credential file exists; its contents are the
-    // CLI's alone. A new container image starts without the old login.
     return {
       finalText: "",
       error: `Claude isn't signed in to ${options.claudeAccount.email} in your cloud anymore. Sign in again under Settings > Account > Claude.`,
@@ -815,16 +733,11 @@ export const runCloudClaude = async (options: {
     () => undefined,
   );
   const resume = marked !== undefined;
-  // The marker names the session the root holds: this thread's own, or
-  // another host's synced session it adopted.
   const sessionId =
     marked && isClaudeSessionId(marked)
       ? marked
       : deterministicUuid(profile.sessionKey);
   markTurnStep("claudeStateChecked");
-  // One latch, two sources: the caller's cancellation and our own
-  // compaction-loop verdict both have to reach one child process. A turn
-  // without a caller latch still owns one for the verdict.
   const cancellation = options.cancellation ?? createNativeTurnCancellation();
   const argsFor = (mcpConfigPath: string, resumeSession: boolean) =>
     buildCloudClaudeTakeoverArgs({
@@ -849,13 +762,9 @@ export const runCloudClaude = async (options: {
       ? { autoCompactWindowTokens: profile.autoCompactWindowTokens }
       : {}),
   });
-  // The keeper runs Claude when it answers; anything short of an attached
-  // process runs it here, as every turn did before.
   let keeper: ClaudeKeeperClient | undefined;
   if (options.keeper && inbox) {
     const env = stringEnv(childEnv);
-    // Everything the process was started with, except whether it resumed:
-    // a kept process has its session in memory either way.
     const key = createHash("sha256")
       .update(
         JSON.stringify({
@@ -913,11 +822,6 @@ export const runCloudClaude = async (options: {
   let handedOn = false;
   try {
     const args = argsFor(mcpConfig?.path ?? "", resume);
-    // With an inbox, the prompt is the first stream-json message and stdin
-    // stays open while Claude works: a message that arrives is written after
-    // it, Claude folds it in at its next tool boundary (or answers it as one
-    // more query) and echoes it back by uuid once it has. Input ends after a
-    // result that leaves nothing unanswered and an inbox that closes empty.
     let stdin: { write(data: string): void; end(): void } | undefined;
     let inputEnded = false;
     const injected = new Map<string, string>();
@@ -1012,8 +916,6 @@ export const runCloudClaude = async (options: {
         }
         const status = getClaudeCodeStatusChangeFromStreamEvent(event);
         if (status) {
-          // Count discrete compactions, as the desktop runtime does. A turn
-          // that keeps re-compacting can no longer fit its context.
           if (status.state === "compacting" && !compacting) {
             compacting = true;
             compactions += 1;
@@ -1043,8 +945,6 @@ export const runCloudClaude = async (options: {
           markTurnStep("claudeResult");
           const resultText =
             typeof event.result === "string" ? event.result.trim() : "";
-          // A message Claude answered as one more query adds its answer to
-          // the report instead of replacing the task's.
           if (resultText) {
             answers.push(resultText);
             finalText = answers.join("\n\n");
@@ -1053,7 +953,6 @@ export const runCloudClaude = async (options: {
             event.usage && typeof event.usage === "object"
               ? (event.usage as Record<string, unknown>)
               : {};
-          // Each query on the stream reports its own usage.
           inputTokens +=
             numberAt(usage.input_tokens) +
             numberAt(usage.cache_creation_input_tokens) +
@@ -1117,8 +1016,6 @@ export const runCloudClaude = async (options: {
         );
         stdin = {
           write: (data) => client.write(data),
-          // A turn that ended cleanly leaves Claude parked for the next one;
-          // any other end takes the process with it.
           end: () => {
             if (settled) return;
             if (error || cancellation.aborted) {
@@ -1192,8 +1089,6 @@ export const runCloudClaude = async (options: {
     }
     const limit = error ? claudeCodeSubscriptionLimitOf(error) : null;
     if (limit) {
-      // Say so, with the exact reset instant when the CLI gave one, so the
-      // cloud can hold the work until then. Nothing switches.
       error =
         limit.resetsAt !== undefined
           ? `Claude usage limit reached for ${options.claudeAccount.email}. It resets at ${new Date(limit.resetsAt).toISOString()}.`
@@ -1213,8 +1108,6 @@ export const runCloudClaude = async (options: {
       ...(kept ? { kept } : {}),
     };
   } finally {
-    // This directory contains the private loopback MCP bearer. It lives
-    // outside every checkpoint root and exists only while Claude is alive.
     await mcpConfig?.cleanup();
     if (keeper && !handedOn) {
       if (kept) await kept.discard().catch(() => undefined);
@@ -1223,10 +1116,6 @@ export const runCloudClaude = async (options: {
   }
 };
 
-/**
- * The general agent's coarse progress events (`/api/cloud/events`): one per
- * assistant text and one per tool call, as the agent loop reports them.
- */
 export const cloudAgentProgressFromStream =
   (emitEvent: NativeEvent) =>
   (event: ClaudeStreamJsonEvent): void => {
@@ -1253,16 +1142,6 @@ export const cloudAgentProgressFromStream =
 
 const NATIVE_SESSION_MARKER = "session-started";
 
-/**
- * Move another host's synced session (written by the BuildSession under
- * `CLOUD_ADOPTED_SESSION_DIR`) under this CLI's working folder and mark it
- * as the session to resume. False when it can't resume here: this CLI is
- * older than the one that wrote it, or the transcript is missing.
- */
-/**
- * A session written from the conversation's journal names no CLI: each line
- * gets this one's version and working folder, as the CLI's own would have.
- */
 const settleHydratedLines = async (file: string, cwd: string): Promise<void> => {
   const version = await claudeCliVersion();
   const lines = (await readFile(file, "utf8")).split("\n").map((line) => {
@@ -1315,7 +1194,6 @@ const adoptSyncedSession = async (args: {
   return true;
 };
 
-/** How much of a thread's history a session written from it holds, in tokens. */
 const WRITTEN_SESSION_TOKEN_BUDGET = 150_000;
 
 const claudeCodeIdentity = (message: { api?: unknown; provider?: unknown; model?: unknown; responseModel?: unknown }) =>
@@ -1323,12 +1201,6 @@ const claudeCodeIdentity = (message: { api?: unknown; provider?: unknown; model?
     ? String(message.responseModel || message.model || "")
     : undefined;
 
-/**
- * A session the CLI resumes, written from the thread's history (an agent
- * that moved here, or a thread whose session is gone): every turn and tool
- * call as it happened, and the thinking of the model that runs on, rather
- * than a replay of it all in one prompt. Undefined with nothing to write.
- */
 const writeHistorySession = async (args: {
   stateRoot: string;
   cwd: string;
@@ -1363,7 +1235,6 @@ export const runNativeAgentTurn = async (options: {
   prompt: string;
   systemPrompt: string;
   execution: Extract<CloudExecutionSelection, { engine: "anthropic" }>;
-  /** The owner's cloud Claude Code login this turn runs on. */
   claudeAccount: CloudClaudeAccountInput;
   threadId: string;
   turnId: string;
@@ -1371,23 +1242,15 @@ export const runNativeAgentTurn = async (options: {
   stateIntegrityKey: string;
   previousStateIntegrityKeys?: readonly string[];
   recoveryHistory?: AgentHistoryRow[];
-  /**
-   * Another host's synced session the BuildSession wrote into the root, or
-   * one written from the conversation's journal (`hydrated`), to resume
-   * natively; `history` rebuilds instead when it can't resume here.
-   */
   adoptedSession?: { sessionId: string; cliVersion: string; hydrated?: true };
-  /** A new session, whatever history the thread has: the prompt carries what it needs. */
   fresh?: true;
   history?: AgentHistoryRow[];
-  /** Test-only override; production always uses the root-only image path. */
   nativeStateRoot?: string;
   claudeMcpServerConfig?: CloudClaudeMcpServerConfig;
   onStreamEvent?: (event: ClaudeStreamJsonEvent) => void;
   cancellation?: NativeTurnCancellation;
   inbox?: AgentInbox;
   quiet?: boolean;
-  /** This thread's Claude keeper; without one each turn starts Claude. */
   keeper?: CloudClaudeKeeperInput;
 }): Promise<NativeAgentTurnResult> => {
   const mcpServerConfig = options.claudeMcpServerConfig;
@@ -1421,8 +1284,6 @@ export const runNativeAgentTurn = async (options: {
           return false;
         })
       : false;
-  // The orchestrator's history is the conversation's journal, which only its
-  // DO holds: a session it handed over that can't resume here goes back.
   if (options.profile.role === "orchestrator" && options.adoptedSession && !adopted && !options.fresh) {
     await rm(stateRoot, { recursive: true, force: true });
     throw new Error(`${CLOUD_CLI_SESSION_LOST_MARK} The Claude Code session handed to the cloud could not resume here.`);
@@ -1475,9 +1336,6 @@ export const runNativeAgentTurn = async (options: {
     });
   }
   markTurnStep("nativeParityChecked");
-  // A kept process holds the session as this thread's last sealed state
-  // left it; only a root the parity check accepted as that state may
-  // continue in it. Recovery and adoption rewrite the session first.
   const reusable = !adopted && !options.fresh && recoveryHistory === undefined;
   const sealedMac = reusable ? await sealedStateMac(stateRoot) : undefined;
   let keeper = options.keeper;
@@ -1511,8 +1369,6 @@ export const runNativeAgentTurn = async (options: {
         : {}),
     });
   let result = await run();
-  // The orchestrator's history is the conversation's journal: a session the
-  // CLI can't find goes back to its DO, which writes it again from there.
   if (
     options.profile.role === "orchestrator" &&
     result.error &&
@@ -1522,7 +1378,6 @@ export const runNativeAgentTurn = async (options: {
     await rm(stateRoot, { recursive: true, force: true });
     throw new Error(`${CLOUD_CLI_SESSION_LOST_MARK} ${result.error}`);
   }
-  // A second run of this turn starts its own process.
   keeper = undefined;
   // Thinking signed under the other host's login, or by another model, may
   // not verify here: the session goes on without its thinking blocks, as the
@@ -1569,7 +1424,6 @@ export const runNativeAgentTurn = async (options: {
   let checkpoint: Awaited<ReturnType<typeof sealNativeState>>;
   try {
     if (!result.sessionId) {
-      // The CLI exited before its init event; its own error says why.
       throw new Error(
         result.error
           ? `Claude Code did not start: ${result.error.slice(-1_000)}`
@@ -1588,8 +1442,6 @@ export const runNativeAgentTurn = async (options: {
     await kept?.discard().catch(() => undefined);
     throw error;
   }
-  // The sealed state is what the parked process holds; the next turn's
-  // parity check has to accept exactly it before it continues there.
   await kept?.release(checkpoint.mac).catch((error: unknown) => {
     console.error(
       `keeping Claude for the next turn failed: ${error instanceof Error ? error.message : String(error)}`,

@@ -1,12 +1,3 @@
-/**
- * Home — the right sidebar's empty-state launcher (the browser-tab "new tab").
- *
- * It keeps the shared search field at the top (owned here; results render in
- * place) and, when nothing is being searched, offers a vertically-centered
- * list of destinations: Files, Apps, Browser, Schedule, Email, and Updates when Stella runs
- * from its own source. Picking one swaps the panel to
- * that section, mirroring opening a new browser tab.
- */
 import { sidebarSections } from "@/features/workspace-display/sidebar-sections";
 import { useAppSourceState } from "@/features/app-source/app-source-store";
 import { WorkList } from "./FilesSection";

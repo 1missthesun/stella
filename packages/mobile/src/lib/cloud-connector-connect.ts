@@ -6,16 +6,9 @@ import { getBackendClient, useBackendView } from "./backend";
 
 export type { CloudConnectorConnectRequest } from "@stella/contracts/cloud-connector-connect";
 
-/**
- * Pending inline connect cards for the signed-in account: what a cloud
- * orchestrator turn is waiting on while its `connector_status` call holds.
- * Watched through the backend's `connect.pending` view.
- */
-
 const EMPTY: readonly CloudConnectorConnectRequest[] = [];
 const decisionRequestIds = new Map<string, string>();
 
-/** Connect cards need a signed-in account. */
 const useConnectedAccountAccess = (): boolean => {
   const session = authClient.useSession();
   return Boolean(session.data);

@@ -1,16 +1,5 @@
-/**
- * What this device expects: "connected" once an account signed in here (a
- * rejected session then asks to sign in again), "anonymous" when no account is
- * expected (never signed in, or signed out). Stella has no guest accounts;
- * the "anonymous" value is the stored name for signed out.
- */
 export type AuthIdentityIntent = "anonymous" | "connected";
 
-/**
- * One signed-in session as the account settings list shows it. Deliberately
- * carries no session token: revocation is by id, resolved by whoever owns
- * the credential (Electron main, or the browser shell's auth client).
- */
 export type AccountSessionSummary = {
   id: string;
   createdAt: number;
@@ -127,8 +116,6 @@ export const resolveAuthSessionObservation = <Session>(args: {
         },
       };
     }
-    // A guest session from before Stella required an account no longer
-    // counts: the device signs in like a new one.
     if (observedIntent === "anonymous") {
       return {
         status: "signed_out",

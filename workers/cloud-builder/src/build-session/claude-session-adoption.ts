@@ -1,17 +1,3 @@
-/**
- * A computer's synced Claude Code session, written into the container for
- * the conversation's orchestrator thread when the cloud resumes it
- * (`CloudOrchestratorCliTurnSpec.adoptSession`): the cloud took the brain
- * over from that computer, or it moved here, and the cloud's own session is
- * behind the log.
- *
- * The files land in the thread's emptied native state root, under
- * `CLOUD_ADOPTED_SESSION_DIR`; the executor moves them under the CLI's
- * working folder (only it resolves that folder) and resumes the session by
- * its own id. Each part is checked against the hash chain the computer
- * uploaded it under. Anything amiss returns undefined, and the turn rebuilds
- * from the log as it would have.
- */
 import {
   claudeSessionChainInput,
   CLAUDE_SESSION_CHAIN_GENESIS,
@@ -27,7 +13,6 @@ import { sha256Hex } from "../hash.js";
 import { log } from "./shared/keys.js";
 import { ownerGateStub } from "../rpc-release.js";
 
-/** The most of a session the container takes; a larger one rebuilds. */
 const MAX_ADOPTED_BYTES = 64 * 1024 * 1024;
 
 const fromBase64 = (value: string): Uint8Array => {
@@ -107,11 +92,6 @@ export const writeAdoptedClaudeSession = async (args: {
   return { sessionId, cliVersion: manifest.cliVersion };
 };
 
-/**
- * A session the conversation's pi runtime wrote from its journal
- * (`CloudOrchestratorCliTurnSpec.hydrateSession`), put where the executor
- * adopts a synced one. It leaves backup storage once it is in the container.
- */
 export const writeHydratedClaudeSession = async (args: {
   bucket: R2Bucket;
   ownerId: string;

@@ -15,68 +15,32 @@ import type { BrainLeaseView } from "./brain-lease.js";
 
 export type CloudTranscriptBeginRequest = {
   conversationId: string;
-  /** Immutable owner-data epoch captured before this local turn was prepared. */
   ownerGeneration: string;
-  /** Stable per local turn. Replaying this id must return the same lease. */
   localTurnId: string;
-  /** Stable id of the user message admitted by this turn. */
   clientMsgId: string;
-  /** Serialized user `AgentMessage`. */
   userMessageJson: string;
-  /** The prompt is a runtime wake the clients never show. */
   hidden?: boolean;
-  /** Local-only data used to reconstruct persisted output after a crash. */
   recovery?: {
-    /**
-     * A historical import has no provider process to reconstruct. Persist
-     * its exact terminal records with the begin so crash recovery can
-     * finish the admitted turn without inventing a canceled response.
-     */
     kind: "precomputed-finish";
     records: CloudTranscriptFinishRecord[];
     phase: CloudTranscriptFinishRequest["phase"];
     notice?: string;
   };
-  /** Abort the provider if a renewal proves this process lost the cloud lease. */
   onLeaseLost?: (reason: string) => void;
-  /** Local cancellation stops waiting but keeps the durable begin for cleanup. */
   signal?: AbortSignal;
-  /**
-   * Replay the durable begin a previous process left for this exact turn id
-   * (its stored payload, byte for byte) instead of writing a new one: a
-   * resumed pi turn reacquires the lease its dead process held. Rejects when
-   * that begin no longer exists.
-   */
   adoptExisting?: boolean;
-  /**
-   * Claim the conversation's brain lease with this turn (the default where
-   * the writer has a lease view). False journals it as a computer from
-   * before the lease did.
-   */
   claimBrain?: boolean;
 };
 
 export type CloudTranscriptBeginAck = {
   turnId: string;
   leaseToken: string;
-  /** Authoritative server deadline for this exact single-writer lease. */
   expiresAt: number;
-  /** Canonical pre-prompt serialized `AgentMessage`s. */
   history: string[];
   contextStartSeq: number;
   contextEndSeq: number;
-  /**
-   * The journal seq of the turn's prompt, its `message #N` id. Absent from a
-   * renewal and from a backend that predates it.
-   */
   promptSeq?: number;
-  /** Set on a renewal ACK, which only extends `leaseToken`/`expiresAt`. */
   renewed?: true;
-  /**
-   * The brain lease as the begin left it, for a claiming begin a backend
-   * with the lease answered: its record, and whether this turn took it
-   * over from a holder that could not answer.
-   */
   brain?: { record: PiBrainRecord | null; takenOver?: true };
 };
 
@@ -84,15 +48,9 @@ export type CloudTranscriptHistory = {
   history: string[];
   contextStartSeq: number;
   contextEndSeq: number;
-  /** The conversation's latest compaction checkpoint, when a host published one. */
   checkpoint?: JournalCheckpoint;
 };
 
-/**
- * The same stable client message was already admitted by the cloud journal.
- * Callers must stop the replacement local run quietly: the canonical turn is
- * already running or terminal and will reconcile through the cloud feed.
- */
 export class CloudTranscriptAlreadyAdmittedError extends Error {
   constructor() {
     super("The cloud conversation already admitted this message.");
@@ -100,7 +58,6 @@ export class CloudTranscriptAlreadyAdmittedError extends Error {
   }
 }
 
-/** The turn was refused: another host holds the conversation's brain lease. */
 export class CloudTranscriptBrainElsewhereError extends Error {
   readonly code = PI_BRAIN_ELSEWHERE_CODE;
   constructor(
@@ -115,27 +72,18 @@ export class CloudTranscriptBrainElsewhereError extends Error {
 export type CloudTranscriptFinishRecord = {
   ordinal: number;
   role: "assistant" | "toolResult";
-  /** Serialized `AgentMessage`, exactly as persisted by the local runtime. */
   payloadJson: string;
 };
 
 export type CloudTranscriptFinishRequest = {
   conversationId: string;
-  /** Must match the generation durably admitted by `begin`. */
   ownerGeneration: string;
   localTurnId: string;
   leaseToken: string;
   records: CloudTranscriptFinishRecord[];
   phase: "completed" | "failed" | "canceled" | "timeout";
-  /** User-facing text only. Raw provider/runtime errors must never be sent. */
   notice?: string;
-  /** Stable local prompt owner for a restart-safe sync-failure notice. */
   failureNotificationUserMessageId?: string;
-  /**
-   * The durable write is delivered after `finish` returns. Surface a
-   * deterministic server rejection (for example, a full conversation) even
-   * though the local provider has already completed.
-   */
   onDeliveryFailure?: (message: string) => void;
 };
 
@@ -155,9 +103,7 @@ export type CloudJournalAppendRecord = {
 
 export type CloudJournalAppendRequest = {
   conversationId: string;
-  /** Optional only for callers that ask the writer to capture it at admission. */
   ownerGeneration?: string;
-  /** Stable id for the complete atomic append batch. */
   appendId: string;
   records: CloudJournalAppendRecord[];
 };
@@ -165,25 +111,14 @@ export type CloudJournalAppendRequest = {
 export type CloudTranscriptWriterOptions = {
   deviceId: string;
   store: RuntimeStore;
-  /** Where a begin's claim on the brain lease comes from and its answer goes. */
   brainLeases?: BrainLeaseView;
-  /** The runtime's backend JWT, or null while signed out. */
   getAuthToken: () => string | null;
-  /** Builder origin from the backend, or null when realtime is not configured. */
   getBaseUrl: () => Promise<string | null>;
-  /** Captures the current immutable owner epoch before a journal append is queued. */
   getOwnerGeneration?: () => Promise<string>;
   fetchImpl?: typeof fetch;
-  /** Test override; production renews well inside the 30-minute DO lease. */
   heartbeatIntervalMs?: number;
-  /** Test override for the maximum time the provider may run without an ACK. */
   authoritySilenceMs?: number;
-  /** Test override for the stop-before-server-expiry safety margin. */
   authorityExpiryMarginMs?: number;
-  /**
-   * Persists a device-specific notice when a recovered finish is rejected
-   * after the original run callback no longer exists.
-   */
   onDurableDeliveryFailure?: (failure: {
     conversationId: string;
     localTurnId: string;
@@ -195,36 +130,17 @@ export type CloudTranscriptWriterOptions = {
     event: string,
     fields: Record<string, unknown>,
   ) => void;
-  /**
-   * True for a local turn that resumes this boot (a pi-durable turn). Its
-   * orphaned begin is left for that resume to replay instead of being
-   * recovered as an interrupted (canceled) finish.
-   */
   isResumableTurn?: (localTurnId: string) => boolean;
   onAssistantRecords?: (payloadJsons: string[]) => void;
 };
 
 export type CloudTranscriptWriter = {
-  /** Reads the canonical bounded DO history without acquiring a turn lease. */
   history: (conversationId: string) => Promise<CloudTranscriptHistory>;
-  /** Returns the last successfully refreshed canonical history window. */
   peekHistory: (conversationId: string) => CloudTranscriptHistory | null;
-  /** Refreshes the cached canonical window without surfacing network errors. */
   refreshHistory: (conversationId: string) => Promise<void>;
-  /**
-   * Persists the admission request, then waits for the Durable Object to grant
-   * the single-writer lease. A caller with a cached canonical window may start
-   * speculatively, but must validate the ACK's `contextEndSeq` before keeping
-   * the result.
-   */
   begin: (
     request: CloudTranscriptBeginRequest,
   ) => Promise<CloudTranscriptBeginAck>;
-  /**
-   * The journal seq of a begun turn's prompt (its `message #N` id): the
-   * ACK's, or read back from the journal when the backend's ACK predates it.
-   * Undefined when it cannot be read.
-   */
   promptSeq: (
     conversationId: string,
     ack: CloudTranscriptBeginAck,
@@ -233,25 +149,14 @@ export type CloudTranscriptWriter = {
     conversationId: string,
     throughSeq: number,
   ) => Promise<number | undefined>;
-  /**
-   * Commits the terminal payload to SQLite before resolving. Delivery is
-   * retried in the background, including after worker restart.
-   */
   finish: (
     request: CloudTranscriptFinishRequest,
   ) => Promise<CloudTranscriptFinishStatus>;
-  /**
-   * Durably queues an ordered, idempotent append that does not own the text
-   * turn lease. Delivery remains FIFO per conversation and retries while a
-   * text turn or owner transfer holds the Durable Object.
-   */
   append: (
     request: CloudJournalAppendRequest,
   ) => Promise<{ queued: true; replayed: boolean }>;
   pending: () => number;
-  /** Retry immediately after startup, connectivity recovery, or auth refresh. */
   resume: () => void;
-  /** Stops network attempts without deleting durable rows. */
   stop: () => void;
 };
 
@@ -262,15 +167,8 @@ const BASE_RETRY_MS = 500;
 const MAX_RETRY_MS = 60_000;
 const TURN_BUSY_RETRY_MS = 3_000;
 const NO_AUTH_RETRY_MS = 4_000;
-/** Remote cancel keeps its lease for a 45s desktop-ack grace window. */
 const DEFAULT_HEARTBEAT_INTERVAL_MS = 10_000;
-/**
- * Owner purge may start immediately after an ACK and retire this lease 45s
- * later. Stop locally after at most 30s of ACK silence, leaving a bounded
- * provider/tool unwind window before a replacement generation can run.
- */
 const DEFAULT_AUTHORITY_SILENCE_MS = 30_000;
-/** Stop comfortably before the ordinary server lease expiry as well. */
 const DEFAULT_AUTHORITY_EXPIRY_MARGIN_MS = 10_000;
 
 type BeginPayload = {
@@ -313,7 +211,6 @@ type AttemptResult =
   | {
       kind: "ack";
       begin?: CloudTranscriptBeginAck;
-      /** Conservative origin for authority granted by a begin/renew request. */
       authorityRequestStartedAt?: number;
     }
   | { kind: "dead_letter"; reason: string; userMessage?: string }
@@ -379,8 +276,6 @@ const journalOutboxId = (
 const parseBeginAck = (value: unknown): CloudTranscriptBeginAck | null => {
   if (!value || typeof value !== "object") return null;
   const candidate = value as Record<string, unknown>;
-  // A renewal only extends the lease: it carries no history or context
-  // window, and the heartbeat keeps the ones the original begin returned.
   if (
     candidate.renewed === true &&
     typeof candidate.turnId === "string" &&
@@ -498,11 +393,6 @@ export const createCloudTranscriptWriter = (
   const historyWindows = new Map<string, CloudTranscriptHistory>();
   const historyRefreshes = new Map<string, Promise<void>>();
   const historyCacheVersions = new Map<string, number>();
-  /**
-   * Acknowledged begins stay in SQLite until finish replaces them. Membership
-   * here means this process still owns the provider run, so the background
-   * drain must not mistake the durable marker for a restart orphan.
-   */
   const activeBegins = new Map<
     string,
     {
@@ -524,7 +414,6 @@ export const createCloudTranscriptWriter = (
     0,
     options.authorityExpiryMarginMs ?? DEFAULT_AUTHORITY_EXPIRY_MARGIN_MS,
   );
-  /** Cancel thunks for the pending delay fibers (the old `clearTimeout`s). */
   let cancelRetryDelay: (() => void) | null = null;
   let cancelJournalRetryDelay: (() => void) | null = null;
   let cancelHeartbeatDelay: (() => void) | null = null;
@@ -719,9 +608,6 @@ export const createCloudTranscriptWriter = (
         reason,
       });
     }
-    // Keep the durable begin untouched. `finish` may still replace it with an
-    // exact canceled result during the server's grace; after restart/resume it
-    // remains the interrupted-turn recovery owner.
     scheduleHeartbeat();
     log("error", "cloud_transcript_authority_deadline", {
       conversationId: active.entry.conversationId,
@@ -1139,8 +1025,6 @@ export const createCloudTranscriptWriter = (
         const result = await attempt(active.entry, {
           renewLeaseToken: active.ack.leaseToken,
         });
-        // Finish may have replaced this marker while the renewal was in
-        // flight. Never resurrect or delete the replacement finish.
         if (activeBegins.get(id) !== active) continue;
         if (result.kind === "ack") {
           if (result.begin) {
@@ -1201,11 +1085,6 @@ export const createCloudTranscriptWriter = (
     scheduleHeartbeat(nextHeartbeatMs);
   };
 
-  /**
-   * An orphaned begin of a turn this boot resumes waits for the resume's
-   * `begin({ adoptExisting })`; until then it is neither recovered nor
-   * retried.
-   */
   const isParkedForResume = (entry: CloudTranscriptOutboxRecord): boolean => {
     if (entry.kind !== "begin" || beginWaiters.has(entry.id)) return false;
     try {
@@ -1217,8 +1096,6 @@ export const createCloudTranscriptWriter = (
 
   const drain = async (): Promise<void> => {
     if (draining || stopped) return;
-    // Cloud outbox drain only applies to stores that support it; a local-only
-    // store (cloud disabled) has no outbox tables, so there is nothing to push.
     if (typeof options.store.listCloudTranscriptOutbox !== "function") return;
     draining = true;
     let nextRetryMs: number | null = null;
@@ -1391,9 +1268,6 @@ export const createCloudTranscriptWriter = (
         }
         const waiters = beginWaiters.get(entry.id);
         if (waiters?.length) {
-          // Keep the begin row as the write-ahead in-flight marker. A clean
-          // finish atomically replaces it; a process restart has no matching
-          // activeBegins entry and therefore recovers it as an orphan.
           const onLeaseLost = waiters.find(
             (waiter) => waiter.onLeaseLost,
           )?.onLeaseLost;
@@ -1413,8 +1287,6 @@ export const createCloudTranscriptWriter = (
             waiter.resolve(ack);
           }
         } else {
-          // This begin survived a worker crash. Reacquire its idempotent lease
-          // and terminalize it instead of leaving the cloud writer blocked.
           persistInterruptedRecovery(entry, ack);
         }
       }
@@ -1434,7 +1306,6 @@ export const createCloudTranscriptWriter = (
 
   const drainJournal = async (): Promise<void> => {
     if (journalDraining || stopped) return;
-    // See `drain`: skip entirely when the store has no cloud journal outbox.
     if (typeof options.store.listCloudJournalOutbox !== "function") return;
     journalDraining = true;
     let nextRetryMs: number | null = null;
@@ -1461,8 +1332,6 @@ export const createCloudTranscriptWriter = (
           });
           continue;
         }
-        // Never let a later append in the same conversation overtake this
-        // one. Other conversations remain independent and may still drain.
         blockedConversations.add(entry.conversationId);
         nextRetryMs =
           nextRetryMs === null
@@ -1494,9 +1363,6 @@ export const createCloudTranscriptWriter = (
     scheduleHeartbeat(0);
   };
 
-  // Startup recovery includes both pending finishes and begins left behind by
-  // a crash. An orphaned begin is converted to a durable canceled finish once
-  // its lease is reacquired.
   resume();
 
   return {

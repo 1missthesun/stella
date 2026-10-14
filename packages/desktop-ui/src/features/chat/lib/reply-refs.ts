@@ -1,10 +1,3 @@
-/**
- * Renderer-side accessors for reply references (`reply-refs` contract).
- *
- * The runtime stores resolved citations on each assistant row as
- * `payload.metadata.runtime.replyRefs`; the live assistant-message boundary
- * carries the same array so the streaming overlay renders identical chips.
- */
 import type { ReplyRef } from "@stella/contracts/reply-refs";
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
@@ -12,7 +5,6 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
     ? (value as Record<string, unknown>)
     : null;
 
-/** Validate an untyped `replyRefs` array into the contract shape. */
 export const parseReplyRefs = (value: unknown): ReplyRef[] => {
   if (!Array.isArray(value)) return [];
   const refs: ReplyRef[] = [];
@@ -47,7 +39,6 @@ export const parseReplyRefs = (value: unknown): ReplyRef[] => {
   return refs;
 };
 
-/** Reply references carried by a message payload's runtime metadata. */
 export const replyRefsFromPayload = (
   payload: Record<string, unknown> | undefined,
 ): ReplyRef[] => {
@@ -56,7 +47,6 @@ export const replyRefsFromPayload = (
   return parseReplyRefs(runtime?.replyRefs);
 };
 
-/** Stable comparison key for row equality. */
 export const replyRefsKey = (refs: readonly ReplyRef[] | undefined): string =>
   refs && refs.length > 0
     ? refs

@@ -23,7 +23,6 @@ export class AgentToolSuspendedError extends Error {
   }
 }
 
-/** Structural fallback keeps the control signal recognizable across bundles. */
 export const isAgentToolSuspendedError = (
   value: unknown,
 ): value is AgentToolSuspendedError =>

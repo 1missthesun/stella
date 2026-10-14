@@ -34,11 +34,6 @@ export async function loadAccountChatCleanupProgress(token: string): Promise<{
   };
 }
 
-/**
- * One marker owns the cross-store account wipe. Per-store completion values
- * carry the same unique token, so stale values from an older cleanup can never
- * complete a newer one after a crash between writes.
- */
 export async function beginAccountChatCleanupIntent(): Promise<string> {
   const existing = await loadAccountChatCleanupIntent();
   if (existing) return existing;
@@ -61,7 +56,6 @@ export async function markAccountChatIndexCleared(
   await AsyncStorage.setItem(CHAT_ACCOUNT_INDEX_CLEARED_KEY, token);
 }
 
-/** Remove the owner marker only after both independently durable stores agree. */
 export async function finalizeAccountChatCleanup(
   token: string,
 ): Promise<boolean> {

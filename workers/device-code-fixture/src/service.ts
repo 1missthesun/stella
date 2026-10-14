@@ -3,7 +3,6 @@ import type { DeviceCodeFixtureBinding } from "./protocol.js";
 import { DeviceCodeFixtureProvider } from "./provider.js";
 import type { DeviceCodeFixtureEnv } from "./authorization-session.js";
 
-/** Named service-binding entrypoint. It has no fetch handler and no public URL. */
 export class DeviceCodeFixtureService
   extends WorkerEntrypoint<DeviceCodeFixtureEnv>
   implements DeviceCodeFixtureBinding

@@ -1,14 +1,3 @@
-/**
- * A local HTML document's relative assets (`<img src="img/x.png">`, a video
- * or audio source, a stylesheet, a script), for viewers that hold the document's text rather
- * than serving its folder: the website and the phone. They read each asset
- * through their own file lane and embed it, so the document renders as it
- * does on the desktop.
- *
- * Only paths inside the document's own folder are considered: `..` past the
- * folder, absolute paths, URLs and hidden files or folders are left alone.
- */
-
 export type HtmlAssetKind = "image" | "media" | "text";
 
 export type HtmlAssetLoader = (asset: {
@@ -43,10 +32,6 @@ const decodeRef = (value: string) => {
   }
 };
 
-/**
- * The absolute path `ref` names relative to the document at `documentPath`,
- * or null when it is not a plain relative path inside the document's folder.
- */
 export const resolveRelativeHtmlAsset = (
   documentPath: string,
   ref: string,
@@ -133,7 +118,6 @@ const findAssetSlots = (html: string): AssetSlot[] => {
   return slots;
 };
 
-/** The absolute paths of the document's relative assets inside its folder. */
 export const relativeHtmlAssetPaths = (
   html: string,
   documentPath: string,
@@ -162,12 +146,6 @@ const withAttribute = (tag: string, attribute: string, value: string) => {
   );
 };
 
-/**
- * `html` with each relative image, stylesheet and script inside the
- * document's folder embedded: images, video and audio as the URIs `load`
- * returns for them, stylesheets and scripts inline as the text it returns. An asset
- * `load` cannot supply keeps its original reference.
- */
 export const embedRelativeHtmlAssets = async (
   html: string,
   documentPath: string,
@@ -279,23 +257,12 @@ const DOCUMENT_ASSET_EXTENSIONS = new Set([
 const extensionOf = (filePath: string) =>
   /\.([a-z0-9]+)$/iu.exec(filePath)?.[1]?.toLowerCase() ?? "";
 
-/** An HTML or markdown document, whose folder its relative assets load from. */
 export const isAssetDocumentPath = (filePath: string): boolean =>
   /\.(?:html?|mdx?)$/iu.test(filePath);
 
-/**
- * A file type a document loads as an asset (an image, video, audio, a
- * stylesheet, script or font): what sharing a document also shares from its
- * folder. Documents, data and code files are not.
- */
 export const isDocumentAssetPath = (filePath: string): boolean =>
   DOCUMENT_ASSET_EXTENSIONS.has(extensionOf(filePath));
 
-/**
- * `assetPath` sits inside `documentPath`'s folder tree (at any depth, no
- * hidden file or folder on the way) and is an asset type. Both are absolute
- * paths in the same style; separators may be `/` or `\`.
- */
 export const isDocumentFolderAsset = (
   documentPath: string,
   assetPath: string,
@@ -319,7 +286,6 @@ const MARKDOWN_IMAGE_RE =
 const markdownImageRef = (destination: string) =>
   destination.startsWith("<") ? destination.slice(1, -1) : destination;
 
-/** The absolute paths of a markdown document's relative images inside its folder. */
 export const relativeMarkdownImagePaths = (
   markdown: string,
   documentPath: string,
@@ -337,11 +303,6 @@ export const relativeMarkdownImagePaths = (
   return [...paths];
 };
 
-/**
- * `markdown` with each relative image (`![alt](img/a.png)`) inside the
- * document's folder pointed at the URI `load` returns for it. An image
- * `load` cannot supply keeps its original reference.
- */
 export const rewriteRelativeMarkdownImages = async (
   markdown: string,
   documentPath: string,

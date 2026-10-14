@@ -35,15 +35,8 @@ import {
   TextAction,
 } from "./kit";
 
-/** Models shown under the switcher before "All models" takes over. */
 const SHORT_LIST = 5;
 
-/**
- * Whether a brain can run now without setting anything up: Stella always;
- * Claude Code and ChatGPT once an account is signed in for the cloud; an
- * account provider once its key or sign-in works. The one in use counts too.
- * The Providers page sorts by this.
- */
 export const brainReady = (brain: Brain, settings: ModelSettings) => {
   if (brain.id === settings.brainId) return true;
   if (brain.kind === "provider")
@@ -52,12 +45,6 @@ export const brainReady = (brain: Brain, settings: ModelSettings) => {
   return settings.connectedProviders?.includes(brain.engine) ?? false;
 };
 
-/**
- * Which brain runs the chat, shown as the one in use with its models under
- * it. The switcher's system menu always holds the same four entries: Stella,
- * Claude Code, ChatGPT, and Other, which opens the page of every provider, so
- * the page stays this size however many providers there are.
- */
 export function BrainSection({
   settings,
   active,
@@ -197,10 +184,6 @@ export function BrainSection({
   );
 }
 
-/**
- * The engine whose accounts the chat's brain runs on: Claude Code or
- * ChatGPT. Stella and account providers have none to pick between.
- */
 export const accountsEngine = (
   settings: ModelSettings,
 ): EngineProvider | null => {
@@ -212,10 +195,6 @@ export const accountsEngine = (
     : null;
 };
 
-/**
- * The account the engine runs on, as one row at the sidebar's foot. Tapping
- * it opens the accounts page, where they are added, chosen and managed.
- */
 export function EngineAccountRow({
   provider,
   onPress,
@@ -323,9 +302,6 @@ export function EngineAccountRow({
   );
 }
 
-/**
- * How hard the chosen model thinks: once, right under the model list.
- */
 export function ThinkingRow({ settings }: { settings: ModelSettings }) {
   const colors = useColors();
   const styles = makeStyles(colors);

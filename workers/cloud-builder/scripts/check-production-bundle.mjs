@@ -120,8 +120,6 @@ try {
       if (!moduleNames.has(dependency.file))
         throw new Error(`Worker module is missing: ${dependency.file}.`);
     }
-    // Source maps remain beside every chunk for upload/debugging. They are
-    // build artifacts, not executable modules matched by Wrangler's rules.
     await access(
       path.join(workerRoot, ".wrangler/worker-build", `${module.file}.map`),
     );

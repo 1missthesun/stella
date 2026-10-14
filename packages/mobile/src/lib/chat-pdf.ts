@@ -4,7 +4,6 @@ type PdfPayload = Extract<MobileDisplayPayload, { kind: "pdf" }>;
 
 export type PdfShareOutcome = { ok: true } | { ok: false; error: string };
 
-/** Present the OS share sheet for an on-device PDF (save to Files / share). */
 export async function sharePdf(payload: PdfPayload): Promise<PdfShareOutcome> {
   const localUri = payload.localUri;
   if (!localUri) {

@@ -161,8 +161,6 @@ const main = async () => {
   const downloadUrl = `${releaseDir}/${assetName}`;
 
   ensureBinDir();
-  // The manifest's hash was checked against this version's SHA256SUMS when
-  // the binary was installed, so a binary that still has it needs no fetch.
   if (
     await alreadyInstalled({
       force: args.force,

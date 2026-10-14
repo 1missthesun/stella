@@ -11,18 +11,14 @@
 import { createPcmMp3Encoder, estimateTtsUsage, openTtsPcm, type TtsProvider, type TtsUsage } from "./tts.js";
 import { ttsObjectKey } from "./ticket.js";
 
-/** Short enough that the first segment plays almost at once. */
 const TARGET_SEGMENT_SEC = 2.0;
-/** The first segment is cut early so a listener hears speech sooner. */
 const FIRST_SEGMENT_SEC = 0.6;
 const MAX_SEGMENTS = 600;
 const MAX_AUDIO_BYTES = 24 * 1024 * 1024;
-/** Bounds the provider stream; well past what 8,000 characters take. */
 const SYNTHESIS_TIMEOUT_MS = 9 * 60_000;
 export const HLS_TARGET_DURATION = 3;
 
 export type HlsManifest = {
-  /** Segment durations in seconds, in order. */
   segments: number[];
   done: boolean;
   error: boolean;
@@ -31,7 +27,6 @@ export type HlsManifest = {
 export const HLS_MANIFEST_FILE = "index.json";
 export const hlsSegmentFile = (n: number): string => `seg-${n}.mp3`;
 
-/** A live EVENT playlist: segments are only appended, ENDLIST once done. */
 export const buildHlsPlaylist = (manifest: HlsManifest): string => {
   const lines = [
     "#EXTM3U",
@@ -48,8 +43,6 @@ export const buildHlsPlaylist = (manifest: HlsManifest): string => {
   return `${lines.join("\n")}\n`;
 };
 
-// ── MP3 frames ────────────────────────────────────────────────────────────
-
 const MPEG1_L3_BITRATES = [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 0];
 const MPEG2_L3_BITRATES = [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160, 0];
 const SAMPLE_RATES: Record<"1" | "2" | "2.5", number[]> = {
@@ -58,7 +51,6 @@ const SAMPLE_RATES: Record<"1" | "2" | "2.5", number[]> = {
   "2.5": [11025, 12000, 8000, 0],
 };
 
-/** The Layer III frame header at `i`, or null when there is none there. */
 const readFrame = (buf: Uint8Array, i: number): { frameLen: number; durationSec: number } | null => {
   if (i + 4 > buf.length) return null;
   if (buf[i] !== 0xff || (buf[i + 1]! & 0xe0) !== 0xe0) return null;
@@ -79,7 +71,6 @@ const readFrame = (buf: Uint8Array, i: number): { frameLen: number; durationSec:
   return { frameLen, durationSec: samplesPerFrame / sampleRate };
 };
 
-/** Bytes of a leading ID3v2 tag, once fully buffered; else 0. */
 const id3v2Length = (buf: Uint8Array): number => {
   if (buf.length < 10 || buf[0] !== 0x49 || buf[1] !== 0x44 || buf[2] !== 0x33) return 0;
   const size = ((buf[6]! & 0x7f) << 21) | ((buf[7]! & 0x7f) << 14) | ((buf[8]! & 0x7f) << 7) | (buf[9]! & 0x7f);
@@ -123,26 +114,18 @@ const id3Timestamp = (startSec: number): Uint8Array => {
   return concat([tagHeader, frameHeader, body]);
 };
 
-// ── Synthesis ─────────────────────────────────────────────────────────────
-
 export type HlsSynthesisResult = {
   status: "done" | "error" | "canceled";
   segments: number;
   usage: TtsUsage | null;
 };
 
-/**
- * Stream one synthesis into `MEDIA`. Never throws: every failure ends with a
- * manifest marked `error` (or `done` with what was published) so the player
- * stops waiting.
- */
 export const synthesizeHls = async (input: {
   bucket: R2Bucket;
   env: object;
   ticket: string;
   text: string;
   voice: string;
-  /** Polled between provider chunks; true stops synthesis early. */
   canceled: () => boolean;
 }): Promise<HlsSynthesisResult> => {
   const manifest: HlsManifest = { segments: [], done: false, error: false };

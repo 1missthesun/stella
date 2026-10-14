@@ -34,14 +34,6 @@ const checklist = [
   { label: "Print the school form", done: false },
 ];
 
-/* The story, step by step:
-   0 — idle desktop
-   1 — Stella types the reply into Mail
-   2 — Stella's cursor glides to Send
-   3 — click
-   4 — sent: title flips, sign-off lands
-   5 — your cursor glides up and checks off "Text Mom the plan"
-   6 — your cursor returns; scene holds */
 type Step = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
 function Pointer({ className }: { className: string }) {

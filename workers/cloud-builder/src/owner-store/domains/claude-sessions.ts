@@ -71,13 +71,6 @@ export const CLAUDE_SESSIONS_MIGRATION = {
   ],
 };
 
-/**
- * A commit wrote its chunk, an offset index entry, the file head and the
- * session row (with its updated_at index). The head now follows from the
- * file's newest chunk, replays find their chunk through the primary key, and
- * an unchanged session row is refreshed at most once a minute, so extending a
- * file writes the chunk alone.
- */
 export const CLAUDE_SESSIONS_LEAN_MIGRATION = {
   id: "claude-sessions.2-lean-commit",
   statements: ["DROP INDEX IF EXISTS idx_claude_session_chunks_offset"],
@@ -253,11 +246,6 @@ const upsertSession = (db: OwnerDb, now: number, tag: ClaudeSessionSyncTag): voi
   );
 };
 
-/**
- * A file's head is its newest chunk in the current generation. The files row
- * names the generation; rows from before heads were derived also carry the
- * same length, chain and count, which the newest chunk agrees with.
- */
 const FILE_HEAD_COLUMNS = `f.path AS path, f.generation AS generation,
        COALESCE((SELECT c.offset + c.length FROM claude_session_chunks c
           WHERE c.thread_id = f.thread_id AND c.session_id = f.session_id AND c.path = f.path
@@ -655,8 +643,6 @@ export const claudeSessionsDomain = {
   internal: {
     "claudeSessions.commitStaged": (ctx: OwnerContext, raw: unknown) =>
       commitStagedChunk(ctx, stagedParser(raw) as StagedClaudeSessionChunk),
-    // The cloud resuming a computer's synced session after it took the
-    // brain over (`@stella/contracts/cloud-orchestrator-cli`).
     "claudeSessions.latestForRestore": (ctx: OwnerContext, raw: unknown) =>
       latestSession(ctx, object({ threadId: threadIdArg })(raw)),
     "claudeSessions.readChunkForRestore": async (ctx: OwnerContext, raw: unknown) =>

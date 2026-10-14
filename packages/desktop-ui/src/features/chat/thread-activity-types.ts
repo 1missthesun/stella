@@ -11,7 +11,6 @@ export type DesktopThreadActivityRecord = ThreadActivityRecord & {
   assistantMessages?: string[];
   assistantMessagesUpdatedAt?: number;
   assistantMessagesUpdatedSequence?: number;
-  /** One of pi's agents, from the conversation's pi transcript. */
   pi?: true;
 };
 

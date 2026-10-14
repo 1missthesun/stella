@@ -1,10 +1,3 @@
-/**
- * The desktop's chats on pi-durable: one harness per Stella conversation, on
- * its own SQLite file under `<data dir>/agent/`, opened on first use and kept
- * open so its agents keep running between turns. The runtime worker serves
- * `PiChatRequest`s with it and forwards a watched conversation's events to
- * the app (`@stella/contracts/pi-chat`).
- */
 import { CLAUDE_USAGE_LIMIT_RESUMED_TEXT, type ClaudeUsageLimitCard } from "@stella/contracts/claude-usage-limit";
 import { execFile } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
@@ -129,70 +122,42 @@ import { agentLogSync, importAgentLog, type AgentLogTransport } from "../stella/
 import { agentMoveModel } from "../stella/agent-move-model.ts";
 import { movedAgentBrief, type AgentMove } from "../stella/execution.ts";
 
-/** The newest entries a client gets when it attaches, and per older page. */
 const HISTORY_PAGE = 200;
-/** A page of entries over IPC stays small enough to parse off the frame budget. */
 const CLIENT_PAGE_BYTES = 2 * 1024 * 1024;
-/** How far back a voice call's history reaches, in entries. */
 const VOICE_HISTORY_ENTRIES = 200;
-/** How far back the files a conversation linked are looked for, in entries. */
 const LINKED_FILE_ENTRIES = 500;
 /** How long a turn waits for other devices' turns to be imported before it starts. */
 const JOURNAL_CATCH_UP_MS = 3_000;
-/** How often an open conversation is checked for being idle again. */
 const IDLE_CHECK_MS = 30_000;
-/** How often the journal is read while a turn here can be stopped from elsewhere and no app window brings its records. */
 const FOLLOW_MS = 2_000;
-/** How long where a conversation's brain runs is trusted before it is read again. */
 const BRAIN_TTL_MS = 5_000;
-/** How often a watched conversation reads again where its Stella runs, for the app's picker. */
 const BRAIN_WATCH_MS = 10_000;
-/** How long a moved brain's brief waits for Stella's turn here to end. */
 const BRAIN_HANDOFF_WAIT_MS = 5 * 60_000;
-/** How long one read of the owner's device list and media access serves the reads around it, such as one request's sections. */
 const EXECUTION_CONTEXT_TTL_MS = 1_000;
-/** Until signed in, recovered work retries the provider this often. */
 const PROVIDER_RETRY_MS = 5_000;
-/** How long the agents' directory waits for the cloud; a message waits out the cloud's own device wait. */
 const DIRECTORY_TIMEOUT_MS = 5_000;
 const AGENT_MESSAGE_TIMEOUT_MS = 15_000;
-/** The request id the report inbox gives a ledger report: this prefix and its report id. */
 const AGENT_REPORT_REQUEST_PREFIX = "agent-report:";
 /** How many of the newest entries a report's receipt is looked for in. */
 const PROMPT_DEDUPE_SCAN = 400;
 
 export type DesktopChatsOptions = {
-  /** The Stella data directory (`~/.stella`). */
   dataDir: string;
   deviceId?: string;
-  /** Where this computer's agents work by default. */
   workspace: string;
   siteAuth(): { baseUrl: string; authToken: string } | null;
   refreshAuthToken?(): Promise<string | null | undefined>;
   getDeviceSigner(): Promise<DeviceSigner> | DeviceSigner;
   memoryEnabled?(): boolean;
-  /** The owner's devices and media access, as the app reads them; the destination is this computer's own. */
   executionContext?(): Promise<ExecutionContextSnapshot | undefined>;
-  /** The model the user picked for the orchestrator (`stella/<alias>`, or another provider's). */
   stellaModel?(): string | undefined;
-  /** The keys the user brought for other providers' models (BYOK), as the app keeps them. */
   credentials?: StellaCredentialAccess;
-  /**
-   * A pick on the user's own key resolved through the app's model registry,
-   * the one the model picker lists (models.json and extension providers,
-   * builtin overrides). Absent, such picks run on pi-ai's builtin providers only.
-   */
   resolveDirectModel?: DirectModelResolver;
-  /** The orchestrator's thinking level, from the user's reasoning effort. */
   thinkingLevel?(): ModelThinkingLevel;
-  /** The environment Stella's shell gives a conversation's commands run here. */
   shellEnv?(target: { conversationId: string; cwd: string }): Record<string, string> | undefined;
-  /** Stella's own tools (web, html, image_gen, ask_user, …) for one conversation. */
   tools?(conversationId: string): StellaToolHost;
-  /** The cloud journal of a conversation stored in the cloud, which its turns are mirrored into. */
   journal?(conversationId: string): DesktopJournal | undefined;
   claudeCodeEngine?: ClaudeCodeEngine;
-  /** Why Claude Code can't run on this computer now (not signed in); undefined when it can. */
   claudeCodeProblem?(): Promise<string | undefined>;
   userReminders?(input: {
     conversationId: string;
@@ -201,48 +166,19 @@ export type DesktopChatsOptions = {
     previousUserAt?: number;
     timezone?: string;
   }): Promise<string[]>;
-  /**
-   * For a conversation stored in the cloud: its cloud agents, run as the
-   * owner's agent threads on their model (the configured one, a Stella
-   * model, Codex, Claude Code, a model on a key saved to the account);
-   * their reports come back as `deliverReport`s.
-   */
   cloudThreads?(conversationId: string): DesktopEngineAgents | undefined;
-  /**
-   * For a conversation stored in the cloud: Stella's agents on the owner's
-   * other computers, each run there as a whole on that computer's own
-   * Stella; their reports come back through the owner's report ledger.
-   */
   deviceAgents?(conversationId: string): DesktopDeviceAgents | undefined;
-  /** For a conversation stored in the cloud: the owner's computers, as the owner gate lists them. */
   devices?(conversationId: string): DesktopDevices | undefined;
-  /**
-   * Every agent's conversation in the owner's cloud: what agents here say
-   * and do, written as they go, and what one that moves here did before.
-   */
   agentLogs?: {
     append(args: AgentLogCalls["agentLogs.append"]["args"]): Promise<AgentLogCalls["agentLogs.append"]["result"]>;
     read(args: AgentLogCalls["agentLogs.read"]["args"]): Promise<AgentLogCalls["agentLogs.read"]["result"]>;
   };
-  /** One of this computer's agents moving itself to another computer (`switch_destination`). */
   agentHandoff?(
     args: Omit<AgentThreadCalls["agentThreads.handoff"]["args"], "ownerGeneration" | "fromDeviceId">,
   ): Promise<{ where: string }>;
-  /** Everything the Claude Code sessions here wrote, in the cloud, before an agent on one moves. */
   flushClaudeSessions?(): Promise<void>;
-  /**
-   * For a conversation stored in the cloud: where its brain runs, as its
-   * object records it. Once that names another host, this computer takes
-   * none of its turns while that host can take them.
-   */
   brain?(conversationId: string): DesktopBrain | undefined;
-  /** The chats on this computer, newest first, which agents list and message as sessions. */
   localSessions?(): Array<{ conversationId: string; title: string; updatedAt: number }>;
-  /**
-   * The owner's agent threads in the cloud, once signed in: a conversation's
-   * agents elsewhere and the user's cloud sessions, and a note for one of
-   * them. A chat kept on this computer never reaches them.
-   */
   agentThreads?: {
     directory(
       conversationId: string,
@@ -252,11 +188,6 @@ export type DesktopChatsOptions = {
     stop(args: { conversationId: string; threadId: string; controlRequestId: string; requesterThreadId?: string }): Promise<AgentStopResult>;
     note(args: { noteId: string; conversationId: string; fromThreadId: string; text: string }): Promise<void>;
   };
-  /**
-   * One of Stella's agents, or one of theirs, started work (a spawn or a
-   * follow-up: `attempt` counts them). `parentThreadId` names the agent that
-   * started it; absent for Stella's own.
-   */
   agentStarted?(agent: {
     conversationId: string;
     threadId: string;
@@ -264,12 +195,6 @@ export type DesktopChatsOptions = {
     attempt: number;
     parentThreadId?: string;
   }): void;
-  /**
-   * An agent another agent started finished a run: it answered, failed, or
-   * was stopped before it answered. Its report goes to the agent that started
-   * it; this is for the owner's records. Stella's own end in `agentReported`
-   * and `agentStopped`.
-   */
   agentRunEnded?(agent: { conversationId: string; threadId: string; interrupted: boolean }): void;
   subagentEnded?(agent: {
     conversationId: string;
@@ -279,68 +204,42 @@ export type DesktopChatsOptions = {
     outcome: AgentAttemptOutcome;
     text?: string;
   }): void;
-  /**
-   * An agent finished and reported to Stella (the app shows a notification).
-   * `running`: a message since has it working again, so `attempt` is that
-   * newer run's and still open.
-   */
   agentReported?(agent: {
     conversationId: string;
     threadId: string;
     description: string;
-    /** How the run it reports ended. */
     status: AgentAttemptOutcome;
     failed: boolean;
     report: string;
     attempt: number;
     running: boolean;
   }): void;
-  /** Stella answered an agent's report with a visible reply, so the user hears of it (the app shows a notification). */
   agentReportRelayed?(agent: { conversationId: string; description: string }): void;
-  /** One of Stella's agents was stopped before it answered; Stella is not told (`StellaAgentsHost.agentStopped`). */
   agentStopped?(agent: { conversationId: string; threadId: string; description: string; attempt: number }): void;
-  /**
-   * For a conversation kept on this computer: the agent loops' chat log,
-   * which the Claude Code engine answers from. Its turns are mirrored both
-   * ways, so the conversation stays one across engines.
-   */
   localLog?(conversationId: string): DesktopLocalLog | undefined;
-  /** A watched conversation's events, for every attached client. */
   emit(payload: PiChatEventsPayload): void;
   report(error: unknown): void;
 };
 
-/** Stella's agents on the owner's other computers (`DesktopChatsOptions.deviceAgents`). */
 export type DesktopDeviceAgents = {
-  /**
-   * Start one there, once per `key`; `model` is what that computer runs it on, absent its own default.
-   * `parentThreadId`: the agent that starts it, which its reports go back to.
-   */
   start(args: { key: string; deviceId: string; description: string; prompt: string; model?: string; parentThreadId?: string }): Promise<{
     threadId: string;
     waitingForDevice: boolean;
   }>;
-  /** Another message for it: steers it while it runs, or starts its next run. */
   message(args: { key: string; threadId: string; description: string; message: string; framed?: boolean }): Promise<"steered" | "resumed">;
-  /** Stop it, and every agent it started, wherever they run. */
   stop(threadId: string): Promise<AgentStopResult | void>;
 };
 
-/** Agents another runtime runs as a whole (`DesktopChatsOptions.cloudThreads`). */
 export type DesktopEngineAgents = {
-  /** Start one, once per `key`, on `model`; `parentThreadId` is the agent that starts it, which its reports go back to. */
   start(args: {
     key: string;
     description: string;
     prompt: string;
     model: string;
     parentThreadId?: string;
-    /** `spawn_agent`'s `workspace`: the size its cloud container starts at. */
     workspace?: import("@stella/contracts/turn-plane/turn-start").AgentWorkspaceSize;
   }): Promise<{ threadId: string }>;
-  /** Another message for it: steers it while it runs, or starts its next run. */
   message(args: { key: string; threadId: string; description: string; message: string; framed?: boolean }): Promise<"steered" | "resumed">;
-  /** Stop it, and every agent it started, wherever they run. */
   stop(threadId: string): Promise<AgentStopResult | void>;
 };
 
@@ -355,21 +254,13 @@ type Chat = {
   agentStanding: OpenStellaHarness["agentStanding"];
   runPlacedAgent: OpenStellaHarness["runPlacedAgent"];
   steerPlacedAgent: OpenStellaHarness["steerPlacedAgent"];
-  /** For a conversation stored in the cloud: its journal mirror. */
   mirror?: JournalMirror;
-  /**
-   * The app's conversation socket saw the journal grow: import it now. One
-   * import at a time; a signal during one runs one more after it.
-   */
   journalAdvanced?(): void;
-  /** For a conversation kept on this computer: its chat log mirror. */
   localLog?: LocalLogMirror;
-  /** Where Stella can move herself. */
   execution: DesktopExecution;
   stream?: AgentEventStream;
   watchers: number;
   idleCheck: ReturnType<typeof setInterval>;
-  /** Reads the journal closely while a turn here is open and no app window watches. */
   followCheck: ReturnType<typeof setInterval>;
   reminderContext?: ReminderContext;
 };
@@ -382,10 +273,8 @@ type ReminderContext = {
 
 const context = BACKGROUND_CONTEXT;
 
-/** The engine id older records give a cloud agent started with a model (`cloudThreads`). */
 const CLOUD_THREAD_ENGINE = "cloud-thread";
 
-/** The response language a conversation's latest message asked for, so it holds across restarts. */
 const LocaleDoc = defineDoc<{ locale?: string }>({
   kind: "stella.locale",
   version: 1,
@@ -395,7 +284,6 @@ const LocaleDoc = defineDoc<{ locale?: string }>({
   initial: () => ({}),
 });
 
-/** A conversation id as a file name. */
 const fileName = (conversationId: string): string => {
   const safe = conversationId.replace(/[^A-Za-z0-9_.-]/g, "_");
   if (!safe || safe.startsWith(".")) throw new Error(`Invalid conversation id: ${conversationId}`);
@@ -409,7 +297,6 @@ const git = (cwd: string, args: string[]): Promise<string> =>
     );
   });
 
-/** The work in a git folder that is only on this computer: uncommitted changes and unpushed commits. */
 const workLeftBehind = async (cwd: string): Promise<string | undefined> => {
   const inside = await git(cwd, ["rev-parse", "--is-inside-work-tree"]).catch(() => "");
   if (inside.trim() !== "true") return undefined;
@@ -419,7 +306,6 @@ const workLeftBehind = async (cwd: string): Promise<string | undefined> => {
   const ahead = upstream.trim()
     ? Number((await git(cwd, ["rev-list", "--count", "@{u}..HEAD"]).catch(() => "0")).trim()) || 0
     : 0;
-  // No upstream: its commits are pushed when a remote has them.
   const remotes = upstream.trim() ? "" : (await git(cwd, ["remote"]).catch(() => "")).trim();
   const unpushed =
     remotes && !(await git(cwd, ["branch", "-r", "--contains", "HEAD"]).catch(() => "")).trim();
@@ -433,13 +319,6 @@ const workLeftBehind = async (cwd: string): Promise<string | undefined> => {
 
 export function desktopChats(options: DesktopChatsOptions) {
   const chats = new Map<string, Promise<Chat>>();
-  /**
-   * The owner's devices and media access for every conversation's prompt.
-   * The runtime keeps them as the backend pushes them, so a read is local and
-   * a turn never waits on the network for them once the first push arrived;
-   * a failed read keeps the last answer, so a moment offline does not
-   * rewrite the prompt.
-   */
   let executionContextRead: { snapshot?: ExecutionContextSnapshot; at: number; pending?: Promise<void> } = { at: 0 };
   const sharedExecutionContext = async (): Promise<ExecutionContextSnapshot | undefined> => {
     const loadOnce = () =>
@@ -453,17 +332,12 @@ export function desktopChats(options: DesktopChatsOptions) {
     if (executionContextRead.at === 0 || Date.now() - executionContextRead.at >= EXECUTION_CONTEXT_TTL_MS) await loadOnce();
     return executionContextRead.snapshot;
   };
-  /** The conversation each agent placed here runs in, by its key at the placing host. */
   const placedIn = new Map<string, string>();
-  /** Runs of agents placed here, until they settle, so the host that placed one can stop it. */
   const placedRuns = new Map<string, { runKey: string; cancel: AbortController }>();
   const directory = path.join(options.dataDir, "agent");
 
-  // Conversations with work in flight, so a new runtime process resumes
-  // them without waiting for a window to open them.
   const activeFile = path.join(directory, "active.json");
   let active: Promise<Set<string>> | undefined;
-  /** The same set once read, for `busy()`. */
   let activeNow: ReadonlySet<string> = new Set();
   let saving = Promise.resolve();
   const activeSet = () =>
@@ -486,8 +360,6 @@ export function desktopChats(options: DesktopChatsOptions) {
     }).catch((error: unknown) => options.report(error));
     await saving;
   };
-  // Stella's agents by thread id, to their conversation: a message from
-  // another device (a paired phone) names only the thread.
   const threadsFile = path.join(directory, "threads.json");
   let threads: Promise<Record<string, string>> | undefined;
   const threadIndex = () =>
@@ -508,15 +380,10 @@ export function desktopChats(options: DesktopChatsOptions) {
     await saving;
   };
   const environments = desktopEnvironments(options.workspace, options.shellEnv);
-  /**
-   * Where each conversation stored in the cloud has its brain, as last read,
-   * and the host that takes this computer's turns for it now (null: here).
-   */
   const brains = new Map<
     string,
     { record: PiBrainRecord | null; host: PiBrainRecord | null; at: number; failed?: true }
   >();
-  /** The record's host, unless that is this computer. */
   const otherHost = (record: PiBrainRecord | null) =>
     record && !(record.host === "device" && record.deviceId === options.deviceId) ? record : null;
   const placementOfHost = (host: PiBrainRecord | null): PiChatBrainResult =>
@@ -525,7 +392,6 @@ export function desktopChats(options: DesktopChatsOptions) {
       : host.host === "cloud"
         ? { here: false, target: { mode: "cloud" } }
         : { here: false, target: { mode: "device", deviceId: host.deviceId }, ...(host.label ? { label: host.label } : {}) };
-  /** What this computer reads of where Stella runs; the app's picker hears when that changes. */
   const rememberBrain = (
     conversationId: string,
     entry: { record: PiBrainRecord | null; host: PiBrainRecord | null; failed?: true },
@@ -537,15 +403,6 @@ export function desktopChats(options: DesktopChatsOptions) {
     if (before && JSON.stringify(placementOfHost(before.host)) === JSON.stringify(brain)) return;
     options.emit({ conversationId, events: [{ type: "brain", brain }] });
   };
-  /**
-   * The host this computer's turns for the conversation go to: the one its
-   * record names, while that host is up. With no record, or one naming a
-   * host that is gone (a computer offline or no longer the owner's, the
-   * cloud out of reach), null: the sender's host answers, as with no record,
-   * and takes the lease over from a gone computer. A computer that is up
-   * holds it even when it takes no work from other devices: what is placed
-   * there is answered as the owner gate falls back, and Stella stays.
-   */
   const brainHost = async (conversationId: string): Promise<PiBrainRecord | null> => {
     const known = brains.get(conversationId);
     if (known && Date.now() - known.at < BRAIN_TTL_MS) return known.host;
@@ -555,7 +412,6 @@ export function desktopChats(options: DesktopChatsOptions) {
     try {
       record = await brain.read();
     } catch {
-      // The cloud is out of reach (offline, signed out), and so is every host it would pass a turn to.
       rememberBrain(conversationId, { record: known?.record ?? null, host: null, failed: true });
       return null;
     }
@@ -563,21 +419,16 @@ export function desktopChats(options: DesktopChatsOptions) {
     rememberBrain(conversationId, { record, host });
     return host;
   };
-  /** The record's holder as this computer should treat it, given which of the owner's computers are up. */
   const hostOfRecord = async (conversationId: string, record: PiBrainRecord | null): Promise<PiBrainRecord | null> => {
     let host = otherHost(record);
-    // A list that can't be read now says nothing of the holder: the record stands.
     const listed =
       host?.host === "device" || options.deviceId
         ? await options.devices?.(conversationId)?.devices().catch(() => undefined)
         : undefined;
     const home = listed?.find((entry) => entry.brainHome && entry.online && entry.availability?.ready === true);
     if (home && home.deviceId === options.deviceId) {
-      // This is the account's home computer and it is up: it answers, and its
-      // turn takes the lease back once the holder is between turns.
       host = null;
     } else if (home && !(host?.host === "device" && host.deviceId === home.deviceId)) {
-      // The home computer is up: Stella goes back there, so a send goes there.
       host = {
         host: "device",
         deviceId: home.deviceId,
@@ -593,18 +444,10 @@ export function desktopChats(options: DesktopChatsOptions) {
     }
     return host;
   };
-  /** Read the record again on the next ask: the conversation's socket said it changed. */
   const expireBrain = (conversationId: string) => {
     const known = brains.get(conversationId);
     if (known) brains.set(conversationId, { ...known, at: 0 });
   };
-  /**
-   * Where Stella runs now, from the record already read and the owner's
-   * computers as the live socket pushes them, with no request. A change of
-   * record reaches this computer on the conversation socket (`op: "brain"`
-   * with `fresh`); what this catches is its holder going up or down. Reads
-   * the record only when none was read yet or the last read failed.
-   */
   const recheckBrainHost = async (conversationId: string): Promise<PiBrainRecord | null> => {
     const known = brains.get(conversationId);
     if (!known || known.failed) {
@@ -615,18 +458,8 @@ export function desktopChats(options: DesktopChatsOptions) {
     rememberBrain(conversationId, { record: known.record, host }, known.at);
     return host;
   };
-  /** Whether this computer takes the conversation's turns, or where a send goes instead. */
   const brainPlacement = async (conversationId: string): Promise<PiChatBrainResult> =>
     placementOfHost(await brainHost(conversationId));
-  /**
-   * What Stella reads hidden and the user did not write (an agent's report
-   * or note) for a conversation whose brain runs elsewhere, once per
-   * `requestId`: to the cloud placed as this computer's sends are, to
-   * another computer through the owner's agent ledger, which hands it to
-   * whichever host holds Stella when it arrives, whether or not that one
-   * takes work from other devices. False when she runs here, or where she
-   * runs can't take it now, for the conversation here to take.
-   */
   const noteOnBrain = async (
     conversationId: string,
     requestId: string,
@@ -635,7 +468,6 @@ export function desktopChats(options: DesktopChatsOptions) {
   ): Promise<boolean> => {
     const host = await brainHost(conversationId);
     if (!host) return false;
-    // Another computer's harness counts its own request ids.
     const id = createHash("sha256").update(`${options.deviceId ?? ""}\0${conversationId}\0${requestId}`).digest("hex").slice(0, 48);
     if (host.host === "device" && options.agentThreads) {
       await options.agentThreads.note({ noteId: `note:${id}`, conversationId, fromThreadId, text });
@@ -644,11 +476,8 @@ export function desktopChats(options: DesktopChatsOptions) {
       if (!brain) return false;
       if (!(await brain.note(host, { id: `pi-note:${id}`, text }))) return false;
     }
-    // Her answer comes back through the journal, which the app's
-    // conversation socket brings here (`journalAdvanced`).
     return true;
   };
-  /** The user moving Stella from the app's picker. */
   const moveBrain = async (conversationId: string, target: PiChatMoveTarget): Promise<PiChatBrainResult> => {
     const chat = await open(conversationId);
     const placement: StellaPlacement =
@@ -663,22 +492,12 @@ export function desktopChats(options: DesktopChatsOptions) {
   };
   const elsewhere = (placement: Extract<PiChatBrainResult, { here: false }>) =>
     `Stella for this chat runs ${placement.target.mode === "cloud" ? "in the cloud" : `on ${placement.label ?? placement.target.deviceId}`} now, so this computer does not answer it.`;
-  // A model on another provider runs with the key the user stored for it,
-  // never one found in this process's environment.
   const models = createModels(
     options.credentials
       ? { credentials: stellaCredentialStore(options.credentials), authContext: storeOnlyAuthContext }
       : {},
   );
   const byok = byokModels(models, options.resolveDirectModel);
-  /**
-   * Claude Code turns held until the Claude usage limit resets, by
-   * conversation and session (Stella's turn or one of its agents): the chat
-   * shows one waiting card while any is held, and one line when the last
-   * resumes. A restart drops this and it fills back up: this computer's
-   * held turns re-run, meet the limit and hold again, and the cloud's holds
-   * are read back from its journal when the conversation opens.
-   */
   const usageLimitHolds = new Map<string, Map<string, number | undefined>>();
   const usageLimitEvent = (conversationId: string): PiChatEvent | undefined => {
     const holds = usageLimitHolds.get(conversationId);
@@ -711,11 +530,6 @@ export function desktopChats(options: DesktopChatsOptions) {
     }
     if (event) options.emit({ conversationId, events: [event] });
   };
-  /**
-   * A hold the cloud journaled: Stella's cloud turn or a cloud agent waiting
-   * on the Claude usage limit. A hold whose reset passed long ago, or a
-   * resume from long ago, is history an import replays, not news.
-   */
   const CLOUD_USAGE_LIMIT_STALE_MS = 15 * 60_000;
   const noteCloudUsageLimit = (conversationId: string, card: ClaudeUsageLimitCard, at: number) => {
     const key = `cloud:${card.threadId ?? "stella"}`;
@@ -756,10 +570,6 @@ export function desktopChats(options: DesktopChatsOptions) {
         })
         .catch(() => undefined);
     });
-    // Claude Code compacts its own context; pi never does for it. Its
-    // summary is the compaction of the conversation it ran for (Stella's, or
-    // an agent's), which the journal or agent log sync publishes for every
-    // other host and engine.
     claudeCodeEngine.onCompaction((session, compaction, conversationId) => {
       void (async () => {
         const chat = await ready(session.conversationId);
@@ -768,9 +578,6 @@ export function desktopChats(options: DesktopChatsOptions) {
         await recordEngineCompaction(chat.harness, conversation, { ...compaction, engine: "claude-code" }, context);
       })().catch((error: unknown) => options.report(error));
     });
-    // An agent's Claude Code CLI took up a background command that finished:
-    // the agent is woken for it, as for one of Stella's own shells, unless
-    // the user stopped it.
     claudeCodeEngine.onBackgroundWake((session, wake) => {
       const threadId = session.threadId;
       if (!threadId) return;
@@ -783,10 +590,8 @@ export function desktopChats(options: DesktopChatsOptions) {
     });
   }
   let gateway: Promise<{ access: StellaGatewayAccess; gatewayOrigin: string }> | undefined;
-  /** Each Stella model alias in use, resolved for the orchestrator and agents. */
   const specsByAlias = new Map<string, Promise<StellaModelSpec[]>>();
 
-  /** The model gateway, once the user is signed in. */
   const ensureGateway = () =>
     (gateway ??= (async () => {
       const site = options.siteAuth();
@@ -809,7 +614,6 @@ export function desktopChats(options: DesktopChatsOptions) {
       throw error;
     }));
 
-  /** The `stella` provider with an alias's models among the ones it offers. */
   const ensureProvider = async (alias: string = STELLA_DEFAULT_ALIAS): Promise<void> => {
     const { access, gatewayOrigin } = await ensureGateway();
     const known = specsByAlias.get(alias);
@@ -829,7 +633,6 @@ export function desktopChats(options: DesktopChatsOptions) {
     models.setProvider(stellaProvider({ access, models: all.flat() }));
   };
 
-  /** Whether this computer holds its own key (or sign-in) for a provider. */
   const hasOwnKey = async (provider: string, modelId: string): Promise<boolean> => {
     const stored =
       (await options.credentials?.apiKey(provider))?.trim() || (await options.credentials?.oauthToken(provider))?.trim();
@@ -839,14 +642,7 @@ export function desktopChats(options: DesktopChatsOptions) {
     return route.credentialless === true || Boolean((await route.getApiKey())?.trim());
   };
 
-  /** Models on the account's keys this computer runs, by provider. */
   const accountModels = new Map<string, NonNullable<ReturnType<typeof accountProviderModel>>[]>();
-  /**
-   * A model on a provider key saved to the account, for a provider this
-   * computer has no key of its own for: its requests go through the model
-   * gateway's BYOK lane on this computer's session, and the key stays on
-   * the server.
-   */
   const ensureAccountModel = async (provider: string, modelId: string): Promise<ModelRef> => {
     const { access, gatewayOrigin } = await ensureGateway();
     const model = accountProviderModel(provider, modelId);
@@ -867,7 +663,6 @@ export function desktopChats(options: DesktopChatsOptions) {
     return { provider: accountRegistryId(provider), modelId: model.id };
   };
 
-  /** The model a pick runs on, for the orchestrator or an agent: a Stella alias, or a model on the user's own key (or the account's). */
   const modelOfPick = async (pick: ModelPick | undefined, agentType: "orchestrator" | "general"): Promise<ModelRef> => {
     if (!pick || pick.kind === "stella") {
       const alias = pick?.alias ?? STELLA_DEFAULT_ALIAS;
@@ -888,15 +683,8 @@ export function desktopChats(options: DesktopChatsOptions) {
     return ref;
   };
 
-  /** The orchestrator's model for the user's pick. */
   const pickedModel = (): Promise<ModelRef> => modelOfPick(parseModelPick(options.stellaModel?.()), "orchestrator");
 
-  /**
-   * What an agent its caller named `requested` for runs on here: Claude Code
-   * as a whole, or a model pi runs (a Stella alias, a model on the user's own
-   * key or plan), with an optional `:<effort>`. Anything else fails; it never
-   * runs on another model.
-   */
   const agentModel = async (
     conversationId: string,
     requested: string,
@@ -922,11 +710,6 @@ export function desktopChats(options: DesktopChatsOptions) {
     return { runsOn: { model, ...(thinkingLevel ? { thinkingLevel } : {}) } };
   };
 
-  /**
-   * A conversation's agents on another engine as its Stella reaches them: a
-   * message one takes mid-run, and a stop, settle what Stella waits for, as
-   * its reports do (`noteEngineReport`).
-   */
   const engineHost = (
     engine: DesktopEngineAgents | undefined,
     defaultModel: string,
@@ -936,7 +719,6 @@ export function desktopChats(options: DesktopChatsOptions) {
     const settle = async (threadId: string, requestId: string, status?: "canceled") => {
       const opened = chat();
       if (!opened) return;
-      // Its record sits with whoever here started it: Stella, or one of her agents.
       const home = (await remoteAgentHome(opened.harness, opened.root.id, threadId, context)) ?? opened.root.id;
       await opened.harness.commit(
         (tx) => noteRemoteReport(tx, home, { threadId, requestId, ...(status ? { status } : {}) }),
@@ -972,12 +754,6 @@ export function desktopChats(options: DesktopChatsOptions) {
     };
   };
 
-  /**
-   * Stella's agent on another of the owner's computers, which runs there as
-   * a whole: a message it takes mid-run, and a stop, settle what Stella
-   * waits for, as its reports do (`noteEngineReport`). One on Claude Code
-   * needs that computer signed in to it.
-   */
   const deviceHost = (
     conversationId: string,
     deviceId: string,
@@ -990,7 +766,6 @@ export function desktopChats(options: DesktopChatsOptions) {
     const settle = async (threadId: string, requestId: string, status?: "canceled") => {
       const opened = chat();
       if (!opened) return;
-      // Its record sits with whoever here started it: Stella, or one of her agents.
       const home = (await remoteAgentHome(opened.harness, opened.root.id, threadId, context)) ?? opened.root.id;
       await opened.harness.commit(
         (tx) => noteRemoteReport(tx, home, { threadId, requestId, ...(status ? { status } : {}) }),
@@ -1037,7 +812,6 @@ export function desktopChats(options: DesktopChatsOptions) {
     };
   };
 
-  /** A report for one of the conversation's Claude Code agents counts as that agent's answer. */
   const noteEngineReport = async (conversationId: string, report: { requestId: string; text: string }) => {
     const threadId = /\nthread_id: (\S+)/.exec(report.text)?.[1];
     if (!threadId) return;
@@ -1050,7 +824,6 @@ export function desktopChats(options: DesktopChatsOptions) {
     );
   };
 
-  /** A model a conversation or one of its agents is on, ready to run (after a restart too). */
   const ensureModel = async (ref: ModelRef | undefined): Promise<void> => {
     const accountProvider = ref ? accountProviderOfRegistryId(ref.provider) : undefined;
     if (ref && accountProvider) await ensureAccountModel(accountProvider, ref.modelId);
@@ -1066,11 +839,9 @@ export function desktopChats(options: DesktopChatsOptions) {
     byok.restore(ref);
   };
 
-  /** The alias a conversation's agent runs on. */
   const aliasOf = (model: { modelId: string } | undefined): string =>
     (model && parseStellaModelId(model.modelId)?.alias) || STELLA_DEFAULT_ALIAS;
 
-  /** The provider, retried until the user is signed in. */
   const waitForProvider = async (alias?: string): Promise<void> => {
     for (let attempt = 0; ; attempt += 1) {
       try {
@@ -1082,7 +853,6 @@ export function desktopChats(options: DesktopChatsOptions) {
     }
   };
 
-  /** Settles as `work` does, or fails once `ms` pass. */
   const within = <T,>(work: Promise<T>, ms: number, message: string): Promise<T> => {
     let timer: ReturnType<typeof setTimeout> | undefined;
     return Promise.race([
@@ -1093,12 +863,6 @@ export function desktopChats(options: DesktopChatsOptions) {
     ]).finally(() => clearTimeout(timer));
   };
 
-  /**
-   * Who a conversation's agents reach beyond its own harness: the other
-   * chats on this computer and their Stellas' agents, and, for a
-   * conversation stored in the cloud, the owner's agent threads (its agents
-   * elsewhere, the user's cloud sessions).
-   */
   const directoryFor = (conversationId: string): AgentDirectoryHost => {
     const cloud = conversationId.startsWith("local_") ? undefined : options.agentThreads;
     const localSessions = (): AgentDirectorySessionRow[] =>
@@ -1127,7 +891,6 @@ export function desktopChats(options: DesktopChatsOptions) {
             DIRECTORY_TIMEOUT_MS,
             "Stella's cloud did not answer.",
           );
-          // A chat here keeps the title this computer has and the cloud's place.
           const sessions = new Map(remote.sessions.map((row) => [row.conversationId, row]));
           for (const row of local) {
             const there = sessions.get(row.conversationId);
@@ -1160,7 +923,6 @@ export function desktopChats(options: DesktopChatsOptions) {
         const id = createHash("sha256").update(`${options.deviceId ?? ""}\0${conversationId}\0${key}`).digest("hex").slice(0, 48);
         const framed = formatAgentMessage(from, text);
         if (!remoteStella && to !== conversationId) {
-          // Another chat here: its Stella reads the note as its next turn, and the user does not see it.
           if (chats.has(to) || localSessions().some((row) => row.conversationId === to)) {
             if (await noteOnBrain(to, `agent-note:${id}`, framed)) return { outcome: "queued", threadId: to };
             const chat = await ready(to);
@@ -1168,7 +930,6 @@ export function desktopChats(options: DesktopChatsOptions) {
             await chat.root.submit({ type: "input", content: [note], whenBusy: "followUp", requestId: `agent-note:${id}` }, context);
             return { outcome: "queued", threadId: to };
           }
-          // One of another chat's agents here: it reaches the agent as that chat's Stella's messages do.
           const home = (await threadIndex())[to];
           if (home && home !== conversationId) {
             const chat = await ready(home);
@@ -1187,7 +948,6 @@ export function desktopChats(options: DesktopChatsOptions) {
         );
       },
       stop: async ({ key, threadId, requesterThreadId }) => {
-        // Another chat's agent here stops here, with its agents; any other agent stops where it runs.
         if (!requesterThreadId) {
           const here = await stopLocalAgent(threadId);
           if (here !== "not_found") {
@@ -1211,11 +971,6 @@ export function desktopChats(options: DesktopChatsOptions) {
     };
   };
 
-  /**
-   * Stop one of Stella's agents on this computer, whichever chat started it,
-   * and every agent below it: those here stop here, those elsewhere where
-   * they run (`elsewhere` says how). Idle, it is recorded stopped all the same.
-   */
   const stopLocalAgent = async (threadId: string): Promise<{ elsewhere: AgentStopResult[] } | "not_found"> => {
     const conversationId = (await threadIndex())[threadId];
     if (!conversationId) return "not_found";
@@ -1260,7 +1015,6 @@ export function desktopChats(options: DesktopChatsOptions) {
             })
           : undefined;
         const handoff = options.agentHandoff;
-        /** One of this chat's agents moving itself, once its run here ended: its log first, then the cloud's hand-off. */
         const moveAgent =
           agentLog && handoff
             ? async (move: AgentMove): Promise<{ where: string } | { error: string }> => {
@@ -1294,7 +1048,6 @@ export function desktopChats(options: DesktopChatsOptions) {
           localOnly: conversationId.startsWith("local_"),
           ...(devices ? { devices } : {}),
           ...(brain ? { brain } : {}),
-          // Stella's brief continues elsewhere once her turn here has ended.
           turnEnded: async () => {
             const deadline = Date.now() + BRAIN_HANDOFF_WAIT_MS;
             while (Date.now() < deadline) {
@@ -1310,7 +1063,6 @@ export function desktopChats(options: DesktopChatsOptions) {
           deviceId: options.deviceId ?? "this-computer",
           label: "This computer",
         };
-        // Stella's turn goes on once the journal mirror has the cloud's word on it.
         let settleStanding!: (held: boolean) => void;
         const standing = new Promise<boolean>((resolve) => {
           settleStanding = resolve;
@@ -1342,7 +1094,6 @@ export function desktopChats(options: DesktopChatsOptions) {
             }),
             agents: (() => {
               const { agentStarted, agentReported, agentStopped, subagentEnded, agentRunEnded } = options;
-              /** How many runs Stella has given one of its agents: the attempt a run is. */
               const attempts = async (threadId: string) => {
                 if (!opened) return 1;
                 const state = await opened.harness.snapshot(StellaAgentsDoc, opened.root.id, context);
@@ -1376,7 +1127,6 @@ export function desktopChats(options: DesktopChatsOptions) {
                 ensureModel: (model) => ensureModel(model),
                 beginAgentRun: async (run) => {
                   if (!opened) return;
-                  // An agent's own agent: listed under the agent that started it.
                   if (run.parentConversationId !== opened.root.id) {
                     if (!run.parentThreadId) return;
                     await noteAgentThread(run.threadId, conversationId);
@@ -1400,13 +1150,11 @@ export function desktopChats(options: DesktopChatsOptions) {
                     attempt: await attempts(run.threadId),
                   });
                 },
-                // Stella's own end when their reports reach her (`agentReported`, `agentStopped`).
                 ...(subagentEnded || agentRunEnded
                   ? {
                       endAgentRun: async (run, _context, end) => {
                         const outcome = agentRunOutcome(end);
                         agentRunEnded?.({ conversationId, threadId: run.threadId, interrupted: outcome === undefined });
-                        // Answered with agents of its own still at work: its attempt stays open.
                         if (!run.parentThreadId || !outcome || end?.waiting || !subagentEnded) return;
                         subagentEnded({
                           conversationId,
@@ -1422,7 +1170,6 @@ export function desktopChats(options: DesktopChatsOptions) {
                 deliverReport: async (report, context) => {
                   if (report.settled || report.ledger) return;
                   if (await noteOnBrain(conversationId, report.requestId, report.text, report.threadId)) return;
-                  // The harness is open by then: reports run once it resumes.
                   const root = await harness.conversation(report.rootConversationId, context);
                   if (!root) return;
                   const submission = await root.submit(
@@ -1443,7 +1190,6 @@ export function desktopChats(options: DesktopChatsOptions) {
                   }
                   const root = await harness.conversation(note.rootConversationId, context);
                   if (!root) throw new Error("Stella is not reachable from here.");
-                  // Read by the model, never shown: the user did not write it.
                   const hidden: TextContent & { stella: { hidden: true } } = { type: "text", text: note.text, stella: { hidden: true } };
                   await root.submit({ type: "input", content: [hidden], whenBusy: "followUp", requestId: note.requestId }, context);
                 },
@@ -1490,27 +1236,18 @@ export function desktopChats(options: DesktopChatsOptions) {
         harnessRef = harness;
         const orchestrator = orchestratorAgent(stellaModelRef("orchestrator"));
         const root = await harness.root(context, { agent: orchestrator });
-        // A conversation from an older build keeps up with what the orchestrator is offered.
         if (offersAgentTools(await root.agent(context))) await root.configure(orchestrator, context);
-        // Stella's turn a previous process left running, read before anything here can resume it.
         const resumed = (await harness.snapshot(LiveDoc, root.id, context))?.run !== undefined;
-        // A conversation kept on this computer starts with what the agent
-        // loops' chat log holds (imported as the mirror starts), and keeps up with it.
         const log = options.localLog?.(conversationId);
         const localLog = log ? await localLogMirror({ harness, root, log, report: options.report, context }) : undefined;
-        // Recovered work needs its models: a Stella alias waits for sign-in; a
-        // model on the user's own key is ready at once.
         const rootModel = (await root.agent(context)).model;
-        /** The Stella aliases the orchestrator and its unfinished agents run on. */
         const aliases = new Set<string>();
-        /** Models on the account's keys, which need the gateway as Stella's aliases do. */
         const accountRefs: ModelRef[] = [];
         for (const agent of Object.values((await harness.snapshot(StellaAgentsDoc, root.id, context))?.agents ?? {})) {
           if (agent.remote) continue;
           const model = (await (await harness.conversation(agent.conversationId as ConversationId, context))?.agent(context))?.model;
           if (model && accountProviderOfRegistryId(model.provider)) accountRefs.push(model);
           else if (model && model.provider !== STELLA_PROVIDER_ID) restoreOwnModel(model);
-          // A finished agent's alias is registered when it is next messaged.
           else if (model && (await harness.snapshot(LiveDoc, agent.conversationId as ConversationId, context))?.run) {
             aliases.add(aliasOf(model));
           }
@@ -1531,16 +1268,13 @@ export function desktopChats(options: DesktopChatsOptions) {
               root,
               journal,
               report: options.report,
-              // A turn running elsewhere shows as running to whoever watches.
               onRemoteTurns: (turns) => {
                 if (opened?.watchers) options.emit({ conversationId, events: [{ type: "remote_turns", turns }] });
-                // Another host answering may have taken Stella over: read again where she runs.
                 if (turns.length > 0) {
                   brains.delete(conversationId);
                   void brainHost(conversationId).catch((error: unknown) => options.report(error));
                 }
               },
-              // The cloud's holds show as this computer's own do.
               onUsageLimit: (card, at) => noteCloudUsageLimit(conversationId, card, at),
               ...(brain ? { readBrain: () => brain.read() } : {}),
               resumed,
@@ -1573,8 +1307,6 @@ export function desktopChats(options: DesktopChatsOptions) {
         const idleCheck = setInterval(() => {
           void (async () => {
             const inspection = await harness.inspect(context);
-            // A cloud agent still working is work here too: its report comes
-            // back through the journal, for this computer to answer.
             const awaitingCloud = mirror
               ? (await agentRecords(context)).some((agent) => agent.placement.kind === "cloud" && agent.status === "running")
               : false;
@@ -1582,10 +1314,6 @@ export function desktopChats(options: DesktopChatsOptions) {
               conversationId,
               inspection.tasks.length > 0 || inspection.submissions.length > 0 || awaitingCloud,
             );
-            // While the app looks at it, its conversation socket says when the
-            // journal grows (`journalAdvanced`). Without it, a report that is
-            // due is read for here; a turn shown running elsewhere is read
-            // again too, so one that went stale stops showing.
             const watched = Boolean(opened?.watchers);
             if ((!watched && awaitingCloud) || (watched && (mirror?.remoteTurns().length ?? 0) > 0)) {
               await mirror?.importNow();
@@ -1596,17 +1324,11 @@ export function desktopChats(options: DesktopChatsOptions) {
         let following = false;
         let brainReadAt = 0;
         const followCheck = setInterval(() => {
-          // Another device moving Stella shows in no turn here: the app's
-          // conversation socket says when the record changes; while the app
-          // looks, check its holder is still up against the pushed device list.
           if (opened?.watchers && mirror && Date.now() - brainReadAt >= BRAIN_WATCH_MS) {
             brainReadAt = Date.now();
             void recheckBrainHost(conversationId).catch((error: unknown) => options.report(error));
           }
           if (!mirror || following || !opened) return;
-          // While the app looks, its conversation socket brings what the
-          // journal gains (`journalAdvanced`). Otherwise, while a turn of this
-          // computer's is open, a Stop from another device must still end it here.
           if (opened.watchers > 0 || !mirror.turnOpen()) return;
           following = true;
           void mirror
@@ -1646,7 +1368,6 @@ export function desktopChats(options: DesktopChatsOptions) {
     return chat;
   };
 
-  /** The newest page of the whole history, ascending; compaction never hides it. */
   const history = async (chat: Chat, beforeEntryId?: number): Promise<{ entries: PiEntry[]; hasOlder: boolean }> => {
     const page = await chat.root.entries(
       beforeEntryId === undefined ? {} : { maxEntryId: (beforeEntryId - 1) as EntryId },
@@ -1658,11 +1379,6 @@ export function desktopChats(options: DesktopChatsOptions) {
     return { entries, hasOlder: page.next !== undefined || trimmed };
   };
 
-  /**
-   * Events as clients receive them, a snapshot's entries cut to its newest
-   * page: older context (all of a long conversation's imported history,
-   * until pi first compacts it) is paged in like the rest of the history.
-   */
   const eventsForClients = (events: readonly PiChatEvent[]): PiChatEvent[] =>
     piEventsForClients(
       events.map((event) =>
@@ -1670,11 +1386,6 @@ export function desktopChats(options: DesktopChatsOptions) {
       ),
     );
 
-  /**
-   * (Re)attach the conversation's event stream. Every attached client gets
-   * the new snapshot as an event, so none misses what happened between the
-   * old stream and the new one.
-   */
   const attach = async (conversationId: string, chat: Chat): Promise<AgentEventStream> => {
     const previous = chat.stream;
     const stream = await watchEvents(chat.harness, chat.root.id, context);
@@ -1693,7 +1404,6 @@ export function desktopChats(options: DesktopChatsOptions) {
 
   const watch = async (conversationId: string): Promise<PiChatWatchResult> => {
     const chat = await open(conversationId);
-    // What another engine said here since shows too.
     await chat.localLog?.importNow().catch((error: unknown) => options.report(error));
     chat.watchers += 1;
     const stream = await attach(conversationId, chat);
@@ -1708,11 +1418,6 @@ export function desktopChats(options: DesktopChatsOptions) {
     };
   };
 
-  /**
-   * Stella's greeting after onboarding, as a reply in the conversation: the
-   * model reads it like its own words, and it stays on this computer, as the
-   * agent loops kept it (`localOnly`: the journal mirror skips it).
-   */
   const welcome = async (conversationId: string, message: string): Promise<void> => {
     const text = message.trim();
     if (!text) return;
@@ -1728,11 +1433,6 @@ export function desktopChats(options: DesktopChatsOptions) {
     );
   };
 
-  /**
-   * The local files Stella linked in a conversation: in its replies and in
-   * its agents' words. Only what Stella wrote grants a paired phone a file,
-   * never what a user or a tool said.
-   */
   const linkedFiles = async (conversationId: string): Promise<{ paths: string[] }> => {
     const chat = await open(conversationId);
     const page = await chat.root.entries({}, LINKED_FILE_ENTRIES, undefined, context);
@@ -1745,10 +1445,6 @@ export function desktopChats(options: DesktopChatsOptions) {
     return { paths: [...new Set(texts.flatMap((text) => extractLocalFileLinkPaths(text)))] };
   };
 
-  /**
-   * A turn of this conversation was placed elsewhere: keep its chat open, so
-   * the records the app's conversation socket brings are imported here.
-   */
   const follow = async (conversationId: string): Promise<void> => {
     await open(conversationId);
   };
@@ -1802,15 +1498,12 @@ export function desktopChats(options: DesktopChatsOptions) {
     content: UserInput,
     sent: { locale?: string; followSender?: boolean; timezone?: string } = {},
   ) => {
-    // Stella answers where her brain is; the app places a send there instead,
-    // and sends it here when that host could not take it.
     if (!sent.followSender) {
       const placement = await brainPlacement(conversationId);
       if (!placement.here) throw new Error(elsewhere(placement));
     }
     const chat = await open(conversationId);
     await followPickedModel(chat);
-    // The tool catalog follows the runtime's (extension tools come and go).
     chat.refreshTools();
     const locale = sent.locale;
     if (locale && (await chat.harness.snapshot(LocaleDoc, chat.root.id, context))?.locale !== locale) {
@@ -1821,15 +1514,12 @@ export function desktopChats(options: DesktopChatsOptions) {
     }
     await markActive(conversationId, true);
     await caughtUp(chat);
-    // Sent here after the host it was placed on gave it back: one that host
-    // did put in the conversation is not answered twice.
     if (sent.followSender && (await transcriptHasPrompt(chat, requestId))) {
       return { submissionId: null, alreadyAnswered: true };
     }
     await afterStop(chat.harness, chat.root, context);
     const input = await withReminders(conversationId, chat, content, sent);
     const submission = await chat.root.submit(
-      // A message sent while Stella works joins the run at its next step.
       { type: "input", content: input, requestId, whenBusy: "steer" },
       context,
     );
@@ -1926,14 +1616,11 @@ export function desktopChats(options: DesktopChatsOptions) {
   };
 
   const followPickedModel = async (chat: Chat): Promise<void> => {
-    // The model the user picked: one of Stella's, or one on their own key.
     const model = await pickedModel();
     const agent = await chat.root.agent(context);
     const thinkingLevel = options.thinkingLevel?.() ?? "off";
     const moved = agent.model?.provider !== model.provider || agent.model?.modelId !== model.modelId;
     if (moved) {
-      // The incoming model starts from the conversation's history; the outgoing one compacts it first
-      // when that is more than the incoming window holds.
       const window = onClaudeCode(model)
         ? (options.claudeCodeEngine?.contextWindow(model.modelId) ?? 0)
         : (models.getModel(model.provider, model.modelId)?.contextWindow ?? 0);
@@ -1950,7 +1637,6 @@ export function desktopChats(options: DesktopChatsOptions) {
     }
   };
 
-  /** The conversation open and its model ready, for work the host starts in it. */
   const ready = async (conversationId: string): Promise<Chat> => {
     const chat = await open(conversationId);
     await chat.localLog?.importNow().catch((error: unknown) => options.report(error));
@@ -1960,46 +1646,32 @@ export function desktopChats(options: DesktopChatsOptions) {
     return chat;
   };
 
-  /** Chats another device placed here, by placement run id, until they settle (`cancelPlacement`). */
   const placements = new Map<string, Placement>();
   type Placement = { chat?: Chat; submission?: Submission; canceled?: true };
 
-  /** Withdraw a placed chat's input while it waits, or stop the run answering it. */
   const stopPlacement = async ({ chat, submission }: Placement) => {
     if (!chat || !submission) return;
     const withdrawn = await chat.harness.abortSubmission(submission.id, context, chat.root.id);
     if (withdrawn === "already_placed") await stopStella(chat.harness, chat.root, context);
   };
 
-  /**
-   * A turn the host starts (a schedule fire, a watch escalation, a chat
-   * another device placed here): its prompt shown as the user's only when
-   * the user wrote it, answered after whatever the conversation is doing.
-   * Settles with the answer's text.
-   */
   const automation = async (
     conversationId: string,
     turn: {
       requestId: string;
       prompt: string;
-      /** The input as prepared (attached images and files); else `prompt`. */
       content?: UserInput;
       visible: boolean;
       rejectIfBusy?: boolean;
-      /** A chat another device placed here, cancellable by this id. */
       placementRunId?: string;
-      /** The conversation's events while the turn is open (a voice call narrates its tools). */
       observe?: (events: PiChatEvent[]) => void;
     },
   ): Promise<{ status: "ok"; finalText: string } | { status: "busy" | "error"; finalText: ""; error: string }> => {
     const { observe, placementRunId } = turn;
-    // A chat placed here is for this computer; anything else waits for where
-    // Stella is, unless that host can't take turns now (then it runs here).
     if (!placementRunId) {
       const where = await brainPlacement(conversationId);
       if (!where.here) return { status: "error", finalText: "", error: elsewhere(where) };
     }
-    // Before anything awaits, so a cancel that lands while the conversation opens still holds.
     const placement: Placement = {};
     if (placementRunId) placements.set(placementRunId, placement);
     try {
@@ -2041,7 +1713,6 @@ export function desktopChats(options: DesktopChatsOptions) {
       submission = await chat.root.submit(
         {
           type: "input",
-          // A prompt the user did not write is read by the model, not shown.
           content: turn.visible ? await withReminders(conversationId, chat, content) : content,
           requestId: turn.requestId,
           whenBusy: turn.rejectIfBusy ? "reject" : "followUp",
@@ -2066,15 +1737,9 @@ export function desktopChats(options: DesktopChatsOptions) {
     if (answer === undefined) return { status: "ok", finalText: "" };
     const page = await chat.root.entries({ minEntryId: answer, maxEntryId: answer }, 1, undefined, context);
     const message = (page.items[0] as unknown as PiEntry | undefined)?.model?.[0];
-    // What gets delivered or spoken is the prose, without the reply's citations.
     return { status: "ok", finalText: splitMessageReplyRefs(message).text.trim() };
   };
 
-  /**
-   * What a voice call said, written into the transcript without a run: the
-   * user's and the voice model's words as model history the timeline leaves
-   * out, and the call's summary, which it shows. Once per `eventId`.
-   */
   const voiceTranscript = async (
     conversationId: string,
     said: {
@@ -2119,7 +1784,6 @@ export function desktopChats(options: DesktopChatsOptions) {
     );
   };
 
-  /** The conversation so far as a voice call starts with it: what was said, oldest first. */
   const voiceHistory = async (
     conversationId: string,
   ): Promise<Array<{ role: "user" | "assistant"; content: string; timestamp: number }>> => {
@@ -2129,8 +1793,6 @@ export function desktopChats(options: DesktopChatsOptions) {
     for (const entry of [...page.items].reverse() as unknown as PiEntry[]) {
       const message = entry.model?.[0];
       if (entry.kind === "pi.user" && message?.role === "user") {
-        // What the user typed or said; not the context and notices sent along,
-        // an agent's report or note, or a prompt the app wrote.
         const text = piUserView(message).text || ((message as PiUserMessage).source === "voice" ? piMessageText(message) : "");
         if (text.trim() && !isPiAgentText(text)) {
           items.push({ role: "user", content: text, timestamp: message.timestamp });
@@ -2143,7 +1805,6 @@ export function desktopChats(options: DesktopChatsOptions) {
     return items;
   };
 
-  /** Once Stella has answered a report: when her reply shows anything, the user hears the task finished. */
   const relayedReport = (conversationId: string, root: Conversation, submission: Submission, text: string) => {
     const relayed = options.agentReportRelayed;
     if (!relayed) return;
@@ -2157,7 +1818,6 @@ export function desktopChats(options: DesktopChatsOptions) {
     })().catch((error: unknown) => options.report(error));
   };
 
-  /** An agent the host starts in a conversation (an app-source merge, memory sync). */
   const startAgent = async (
     conversationId: string,
     agent: { key: string; description: string; prompt: string },
@@ -2167,9 +1827,7 @@ export function desktopChats(options: DesktopChatsOptions) {
     return { threadId };
   };
 
-  /** The conversation's agents, as the app lists them. */
   const agents = async (conversationId: string): Promise<PiChatAgentsResult> => {
-    // A conversation pi never ran has no agents of pi's; asking must not open one.
     if (!chats.has(conversationId) && !(await stat(path.join(directory, fileName(conversationId))).catch(() => undefined))) {
       return { agents: [] };
     }
@@ -2180,7 +1838,6 @@ export function desktopChats(options: DesktopChatsOptions) {
     };
   };
 
-  /** What the user typed into one agent's thread, delivered once per `key`. */
   const messageAgent = async (
     conversationId: string,
     message: { key: string; threadId: string; message: string },
@@ -2189,20 +1846,13 @@ export function desktopChats(options: DesktopChatsOptions) {
     await chat.messageAgent(message, context);
   };
 
-  /**
-   * An agent another host placed on this computer (a cloud conversation's
-   * agent on a device), run in the conversation here to its answer, which
-   * goes back to that host.
-   */
   const runPlacedAgent = async (
     conversationId: string,
     run: Omit<Parameters<OpenStellaHarness["runPlacedAgent"]>[0], "runsOn"> & {
-      /** The model it runs on (`agentModel`), when its host named one. */
       model?: string;
     },
   ): ReturnType<OpenStellaHarness["runPlacedAgent"]> => {
     placedIn.set(run.agentKey, conversationId);
-    // Before anything awaits, so a cancel that lands while the conversation opens still holds.
     const placed = { runKey: run.runKey, cancel: new AbortController() };
     placedRuns.set(run.agentKey, placed);
     const { model, signal, ...placedRun } = run;
@@ -2217,7 +1867,6 @@ export function desktopChats(options: DesktopChatsOptions) {
         runsOn = choice.runsOn;
       }
       const chat = await ready(conversationId);
-      // One on Claude Code runs on this computer's own Claude login, or not at all.
       const engineModel = runsOn?.model ?? (await chat.root.agent(context)).model;
       if (onClaudeCode(engineModel)) {
         const problem = await options.claudeCodeProblem?.().catch(() => undefined);
@@ -2236,21 +1885,17 @@ export function desktopChats(options: DesktopChatsOptions) {
     }
   };
 
-  /** An agent's `history.*` call, answered from its own thread in the conversation that holds it. */
   const agentHistory = async (conversationId: string, threadId: string, args: Record<string, unknown>): Promise<unknown> => {
     const chat = await ready(conversationId);
     return await ownHistoryQuery(chat.harness, chat.root.id, threadId, args, context, ownHistorySql);
   };
 
-  /** A message for an agent placed here, from the host that placed it; false when it is not running here. */
   const steerPlacedAgent = async (message: { key: string; agentKey: string; message: string }): Promise<boolean> => {
     const conversationId = placedIn.get(message.agentKey);
     if (!conversationId) return false;
     return await (await open(conversationId)).steerPlacedAgent(message, context);
   };
 
-  /** Stop a run of an agent placed here, for the host that placed it; false when that run is not going here. */
-  /** Stop an agent another host placed here; `stopped` when `stop_agent` stopped it, which stops the agents it started here too. */
   const cancelPlacedAgent = (agentKey: string, runKey: string, stopped?: boolean): boolean => {
     const placed = placedRuns.get(agentKey);
     if (placed?.runKey !== runKey) return false;
@@ -2262,7 +1907,6 @@ export function desktopChats(options: DesktopChatsOptions) {
     history(await open(conversationId), beforeEntryId);
 
   return {
-    /** Submit a prepared message (text and marked parts). */
     submit,
     automation,
     startAgent,
@@ -2273,10 +1917,6 @@ export function desktopChats(options: DesktopChatsOptions) {
     cancelPlacedAgent,
     voiceTranscript,
     voiceHistory,
-    /**
-     * Stop a chat another device placed here: withdraw it while it waits,
-     * or stop the run answering it.
-     */
     async cancelPlacement(placementRunId: string): Promise<{ canceled: boolean }> {
       const placement = placements.get(placementRunId);
       if (!placement) return { canceled: false };
@@ -2284,11 +1924,6 @@ export function desktopChats(options: DesktopChatsOptions) {
       await stopPlacement(placement);
       return { canceled: true };
     },
-    /**
-     * A message for one of Stella's agents from another device (a paired
-     * phone, the cloud's Stella): it steers the agent while it works or
-     * starts its next run, and the report goes to Stella here.
-     */
     async deliverAgentMessage(
       threadId: string,
       text: string,
@@ -2299,7 +1934,6 @@ export function desktopChats(options: DesktopChatsOptions) {
       const chat = await ready(conversationId);
       const record = await chat.agentStanding(threadId, context);
       if (!record) return "not_found";
-      // The ledger hands an agent the reports of the agents it started under their report ids.
       const report = parseAgentReportId(messageId);
       await chat.messageAgent(
         {
@@ -2313,7 +1947,6 @@ export function desktopChats(options: DesktopChatsOptions) {
       );
       return record.status === "running" ? "steered" : "resumed";
     },
-    /** A stop for one of Stella's agents here, and its agents, from another host (the cloud, another computer). */
     stopAgent: stopLocalAgent,
     async deliverReport(conversationId: string, report: { requestId: string; text: string }): Promise<void> {
       await noteEngineReport(conversationId, report);
@@ -2339,11 +1972,6 @@ export function desktopChats(options: DesktopChatsOptions) {
       );
       relayedReport(conversationId, chat.root, submission, report.text);
     },
-    /**
-     * Where one of Stella's agents on this computer stands, for settling the
-     * cloud's record of it: undefined when no conversation here started it.
-     * A run a previous process left unfinished reads as running: it resumes.
-     */
     async agentStatus(
       threadId: string,
     ): Promise<
@@ -2365,11 +1993,9 @@ export function desktopChats(options: DesktopChatsOptions) {
         attempt: record.attempt,
       };
     },
-    /** Whether any conversation has work in flight here, so the process must stay up. */
     busy(): boolean {
       return activeNow.size > 0;
     },
-    /** Reopen the conversations a previous process left with work in flight. */
     async resumeActive(): Promise<void> {
       for (const conversationId of await activeSet()) {
         await open(conversationId).catch((error: unknown) => options.report(error));
@@ -2431,7 +2057,6 @@ export function desktopChats(options: DesktopChatsOptions) {
           return moveBrain(request.conversationId, request.target);
       }
     },
-    /** End every shell command the chats' agents have running on this computer. */
     async terminateCommands(): Promise<void> {
       await environments.terminateCommands(context);
     },

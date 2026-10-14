@@ -16,34 +16,13 @@ import type { RendererBuildMode } from "./renderer-protocol.js";
 import { createRouteTreeGenerator } from "./routes.js";
 import { loadDepTools, loadOxcTools, loadRouteTools, loadTailwindTools } from "./tools.js";
 
-/**
- * Serves the renderer straight from its source tree, with no dev server and
- * no build: `stella-app://desktop/...` answers HTML, source modules
- * (transformed on request and cached by content), pre-bundled npm
- * dependencies, and stylesheets. Before the first window loads it walks the
- * module graph from the HTML entries, which warms the cache and finds the
- * dependencies to bundle.
- *
- * Nothing watches the files. A page load picks up whatever is on disk, and
- * `applyChanges` swaps changed files into the open windows: React Fast
- * Refresh for components, accept handlers, and stylesheets, with a reload
- * when a change reaches an entry.
- */
-
 export { RENDERER_ORIGIN, RENDERER_SCHEME } from "./origin.js";
 
 const HTML_ENTRIES = ["index.html", "overlay.html", "companion.html"];
-/** Loaded first in every window (see the file). */
 const HOT_CLIENT_URL = "/src/platform/hot/hot-client.ts";
-/** Where PdfViewerCard loads pdf.js's worker from. */
 const PDF_WORKER_URL = "/vendor/pdfjs/pdf.worker.min.mjs";
 const PACK_PREFIX = "/@pack/";
 const GRAPH_FORMAT_VERSION = "1";
-/**
- * Prefixed to every module but the hot client, on its first line. A Web
- * Worker has no hot client, so its modules get no `import.meta.hot` (as in
- * production) and no-op Fast Refresh registrations.
- */
 const HOT_HEADER =
   "const __stella_hot = (import.meta.hot = globalThis.__stellaHot?.module(import.meta.url)) ?? { register() {}, signature: () => (type) => type };";
 
@@ -86,7 +65,6 @@ const respond = (body: string | Uint8Array, type: string, status = 200): SourceR
 });
 const javascript = (code: string | Uint8Array) => respond(code, CONTENT_TYPES[".js"]!);
 
-/** A module that fails the way a broken import should: loudly, with the cause. */
 const errorModule = (message: string) =>
   javascript(
     [
@@ -104,7 +82,6 @@ const exists = (file: string) => {
   }
 };
 
-/** What a window does with an update: see `hot-client.ts` for the payload. */
 export type HotUpdate =
   | { type: "self"; id: string; url: string }
   | { type: "dep"; id: string; spec: string; url: string }
@@ -116,12 +93,10 @@ export type ApplyResult =
 export type RendererSourceOptions = {
   uiRoot: string;
   repoRoot: string;
-  /** The desktop-ui directory whose `.env` files supply `import.meta.env`. */
   envDir: string;
   cacheDir: string;
   mode: RendererBuildMode;
   log: (message: string) => void;
-  /** Dependencies were rebundled: reload the windows. */
   onReloadNeeded: () => void;
   tailwind?: (file: string, source: string) => Promise<string>;
 };
@@ -139,10 +114,6 @@ type StoredGraph = {
 export const createRendererSource = async (options: RendererSourceOptions) => {
   const { uiRoot, repoRoot, log } = options;
   const mode = options.mode;
-  // Hot module replacement belongs to the authoring mode: React Fast Refresh
-  // registrations are emitted by the development transform, so a production
-  // graph has nothing for the hot client to swap and applies changes by
-  // reloading instead.
   const hot = mode === "development";
   const env = loadRendererEnv(options.envDir, mode);
   const graph = createModuleGraph({
@@ -196,9 +167,6 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
       }
       return build.build(source);
     });
-  // What the windows were served, for hot updates: each module's resolved
-  // source and stylesheet imports, the stylesheets loaded as modules, and
-  // the version each updated file is now imported at (`?t=<version>`).
   const servedImports = new Map<string, Set<string>>();
   const servedStylesheets = new Set<string>();
   const tailwindStylesheets = new Set<string>();
@@ -272,8 +240,6 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
   const validate = async (): Promise<{ changed: Set<string>; moved: boolean; count: number; loaded: number }> => {
     const lock = fileDigest(lockfile);
     const stored = await readGraph(lock);
-    // No graph for these packages: the first launch, or new packages. Their
-    // bundle is most likely to be rebuilt too; start its builder now.
     if (!stored && !deps) prewarmDependencyBuilder();
     const changed = new Set<string>();
     const changedDirs = new Set<string>();
@@ -496,7 +462,6 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
   };
 
   let firstPage = true;
-  /** Before a page loads: forget resolutions and compiled CSS, and regenerate the route tree. */
   const refresh = async () => {
     if (firstPage) {
       firstPage = false;
@@ -588,8 +553,6 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
       servedImports.set(file, imported);
       return code;
     }
-    // A dependency nothing imported before: rebundle, then reload the
-    // windows so no page mixes two bundles' copies of shared code.
     for (const file of missing) depFiles.add(file);
     log(`[source] new dependencies: ${missing.map((file) => path.relative(repoRoot, file)).join(", ")}`);
     rendered.clear();
@@ -631,7 +594,6 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
     return built;
   };
 
-  /** Serve an HTML entry from disk, with the hot client as its first module. */
   const html = async (file: string): Promise<string> => {
     await refresh();
     const source = await fs.promises.readFile(file, "utf8");
@@ -705,7 +667,6 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
     }
   };
 
-  /** Whether a changed file can affect a page: the app's sources, or anything a window was served. */
   const isRendererInput = (file: string) =>
     file === lockfile ||
     servedImports.has(file) ||
@@ -713,20 +674,12 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
     HTML_ENTRIES.some((name) => file === path.join(uiRoot, name)) ||
     ((isInside(path.join(uiRoot, "src"), file) || isInside(publicDir, file)) && !isInNodeModules(file));
 
-  /** A module that takes its own updates: JSX whose exports all look like components. */
   const selfAccepts = (file: string, exports: string[]) =>
     graph.isJsxLang(file) &&
     !isInside(routes.routesDirectory, file) &&
     exports.length > 0 &&
     exports.every((name) => name === "default" || /^[A-Z]/.test(name));
 
-  /**
-   * Swap files that changed on disk (repo-relative paths) into the windows.
-   * Walks up from each served changed module through its importers to the
-   * nearest modules that accept the update; every module on the way is
-   * re-imported at a new version, so the rest keep their instances and
-   * state. Reaching a module nothing imports (an entry) means a reload.
-   */
   const applyChanges = async (repoPaths: string[]): Promise<ApplyResult> => {
     await prepare();
     const changed = new Set(
@@ -736,8 +689,6 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
     rendered.clear();
     packCss.clear();
     for (const file of changed) graph.invalidate(file);
-    // Tailwind reads every source file's class names and its own stylesheets'
-    // imports; a change to any other stylesheet can't change what it builds.
     const tailwindChanged = [...changed].some(
       (file) =>
         path.extname(file) !== ".css" ||
@@ -772,7 +723,6 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
         for (const link of chain) stale.add(link);
         return true;
       }
-      // An import cycle: the walk that entered it covers the rest.
       if (chain.includes(file)) return true;
       const trail = [...chain, file];
       const accept = (type: "self" | "css") => {
@@ -807,7 +757,6 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
     };
     try {
       for (const file of changed) {
-        // Nothing loaded it yet: the next page or import reads it from disk.
         if (!servedImports.has(file) && !importers.has(file) && !servedStylesheets.has(file)) continue;
         if (!(await propagate(file, []))) return { mode: "reload" };
       }
@@ -815,19 +764,15 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
       log(`[source] update: ${error instanceof Error ? error.message : String(error)}`);
       return { mode: "reload" };
     }
-    // A new route tree gets new route objects throughout: the router only
-    // rebuilds its routes for a new root route.
     if (stale.has(routes.routeTreeFile)) {
       for (const file of servedImports.get(routes.routeTreeFile) ?? []) stale.add(file);
     }
-    // Tailwind scans the sources for classes, so any such change can change it.
     for (const file of tailwindChanged ? servedStylesheets : []) {
       if (!settled.has(file) && tailwindStylesheets.has(file)) {
         pendingSelf.push({ file, type: "css" });
         stale.add(file);
       }
     }
-    // An updated module that imports a dependency the bundle lacks: rebundle and reload.
     const missing = new Set<string>();
     for (const file of stale) {
       if (path.extname(file) === ".css") continue;

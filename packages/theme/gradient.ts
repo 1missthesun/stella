@@ -1,15 +1,3 @@
-/**
- * The shifting-gradient background, as pure math.
- *
- * Five soft blobs of theme-derived color over the theme background, blended
- * per pixel with a quintic falloff, washed 25% back toward the background and
- * blue-noise dithered. Desktop paints the result onto a canvas; mobile encodes
- * the same pixels into an image. Because both call `renderGradientPixels`
- * with the same palette and the same seeded blob layout, the two platforms
- * draw the identical frame.
- *
- * ("Shifting" is historical — the gradient is static.)
- */
 import type { ThemeColors } from "./types";
 import { generateGradientTokens, parseColor } from "./color";
 
@@ -18,7 +6,6 @@ export type RGB = { r: number; g: number; b: number };
 export type GradientMode = "soft" | "flat";
 export type GradientColor = "relative" | "strong";
 
-/** Where the five blobs sit, in fractions of the surface. */
 export const BASE_POSITIONS = [
   { x: 0.16, y: 0.14 },
   { x: 0.86, y: 0.16 },
@@ -27,16 +14,12 @@ export const BASE_POSITIONS = [
   { x: 0.52, y: 0.54 },
 ] as const;
 
-/** Used when a theme's `background` fails to parse. */
 export const FALLBACK_BACKGROUND: RGB = { r: 248, g: 247, b: 247 };
 
 const FALLBACK_BLOB: RGB = { r: 120, g: 120, b: 120 };
 
-/** Fraction of the surface size the pixel buffer is rendered at; the display
- *  upscales bilinearly, which adds free smoothing on top of the dithering. */
 export const RENDER_SCALE = 0.6;
 
-/** The background wash applied over the blended blobs. */
 export const OVERLAY_ALPHA = 0.25;
 
 export function parseThemeColor(color: string): RGB | null {
@@ -59,13 +42,6 @@ export function mixRgb(a: RGB, b: RGB, t: number): RGB {
 
 export const rgbToCss = ({ r, g, b }: RGB) => `rgb(${r}, ${g}, ${b})`;
 
-/**
- * The five blob colours for a theme, already mixed toward its background.
- *
- * `relative` spreads the theme's five semantic hues at low strength — the
- * quiet, multi-hued wash. `strong` alternates brand and accent at high
- * strength — fewer hues, far more saturated.
- */
 export function buildGradientPalette(
   colors: ThemeColors,
   isDark: boolean,
@@ -117,8 +93,6 @@ export function buildGradientPalette(
   ];
 }
 
-// ─── Blobs ──────────────────────────────────────────────────────────────
-
 export interface Blob {
   x: number;
   y: number;
@@ -127,7 +101,6 @@ export interface Blob {
   color: RGB;
 }
 
-/** FNV-1a over a string → 32-bit seed. */
 function hashSeed(key: string): number {
   let h = 0x811c9dc5;
   for (let i = 0; i < key.length; i++) {
@@ -137,7 +110,6 @@ function hashSeed(key: string): number {
   return h >>> 0;
 }
 
-/** mulberry32 — small, fast, deterministic; identical output on every JS engine. */
 function seededRandom(seed: number): () => number {
   let a = seed >>> 0;
   return () => {
@@ -149,18 +121,12 @@ function seededRandom(seed: number): () => number {
   };
 }
 
-/**
- * Lay out the blobs for a palette. The small positional jitter is seeded by
- * `seedKey` (normally the theme id) so a theme's blobs sit in the same place
- * on every launch and on every platform, instead of wandering per mount.
- */
 export function generateBlobs(
   colors: RGB[],
   mode: GradientMode,
   seedKey: string,
 ): Blob[] {
   if (mode === "flat") {
-    // Single dominant color filling the entire canvas.
     return [{ x: 0.5, y: 0.5, radius: 3, alpha: 0.5, color: colors[0] }];
   }
 
@@ -176,12 +142,8 @@ export function generateBlobs(
   }));
 }
 
-// ─── Pixel renderer ─────────────────────────────────────────────────────
-
 const NOISE_SIZE = 64;
 
-// Interleaved gradient noise (Jorge Jimenez, 2014): a cheap tile with
-// blue-noise-like spectral properties, enough to break quantization bands.
 function generateBlueNoise(size: number): Float32Array {
   const data = new Float32Array(size * size);
   for (let y = 0; y < size; y++) {
@@ -195,7 +157,6 @@ function generateBlueNoise(size: number): Float32Array {
 
 const blueNoise = generateBlueNoise(NOISE_SIZE);
 
-/** Size of the pixel buffer for a surface of `width` × `height` logical px. */
 export function gradientBufferSize(
   width: number,
   height: number,
@@ -204,11 +165,6 @@ export function gradientBufferSize(
   return { w: Math.round(width * scale), h: Math.round(height * scale) };
 }
 
-/**
- * Fill `pixels` (RGBA, length `w * h * 4`) with the rendered gradient.
- * `w` / `h` are the buffer dimensions (already scaled). Zero blobs paints the
- * plain background — what flat themes want.
- */
 export function renderGradientPixels(
   pixels: Uint8ClampedArray,
   w: number,
@@ -235,7 +191,6 @@ export function renderGradientPixels(
 
         if (dist >= radius) continue;
 
-        // Smooth quintic falloff — no visible rings.
         const t = dist / radius;
         const falloff = 1 - t * t * t * (t * (t * 6 - 15) + 10);
         const strength = falloff * blob.alpha;
@@ -270,16 +225,12 @@ export function renderGradientPixels(
 export interface GradientFrameInput {
   colors: ThemeColors;
   isDark: boolean;
-  /** `soft` paints the five blobs, `flat` a single dominant tint. */
   mode: GradientMode;
   colorMode: GradientColor;
-  /** Flat themes paint no blob at all — just the background. */
   flat: boolean;
-  /** Seed for the blob jitter; pass the theme id. */
   seedKey: string;
 }
 
-/** Background + blob layout for a frame, ready for `renderGradientPixels`. */
 export function planGradientFrame(input: GradientFrameInput): {
   bg: RGB;
   blobs: Blob[];

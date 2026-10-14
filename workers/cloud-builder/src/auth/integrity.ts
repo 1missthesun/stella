@@ -81,7 +81,6 @@ export const integrityMode = (env: unknown): "enforce" | "off" => {
 export const turnstileSecret = (env: unknown): string | undefined =>
   configured(env, "TURNSTILE_SECRET_KEY");
 
-/** Which proof purpose an auth path needs, or null when it needs none. */
 export const integrityPurposeForPath = (path: string | undefined): AppIntegrityPurpose | null => {
   if (path === "/sign-in/magic-link" || path === "/link/send") return "magic-link";
   return null;
@@ -97,8 +96,6 @@ export const integrityErrorMessage = (code: AppIntegrityErrorCode): string => {
       return "The verification proof is invalid.";
   }
 };
-
-// ── Nonces ─────────────────────────────────────────────────────────────────
 
 const toBase64Url = (bytes: Uint8Array): string => {
   let binary = "";
@@ -132,7 +129,6 @@ export const issueIntegrityNonce = async (
   return { nonce, expiresAt };
 };
 
-/** Burn the nonce whatever the verdict, so a failed proof cannot be replayed. */
 const consumeNonce = async (env: IntegrityEnv, nonce: string, purpose: AppIntegrityPurpose, now: number) => {
   const row = await db(env)
     .prepare(
@@ -143,8 +139,6 @@ const consumeNonce = async (env: IntegrityEnv, nonce: string, purpose: AppIntegr
     .first<{ purpose: string; expiresAt: number }>();
   return row !== null && row.purpose === purpose && row.expiresAt > now;
 };
-
-// ── Turnstile ──────────────────────────────────────────────────────────────
 
 export const verifyTurnstile = async (env: unknown, token: string, remoteIp?: string): Promise<boolean> => {
   const secret = turnstileSecret(env);
@@ -164,8 +158,6 @@ export const verifyTurnstile = async (env: unknown, token: string, remoteIp?: st
   }
 };
 
-// ── The rule ───────────────────────────────────────────────────────────────
-
 export const isBrowserBorneRequest = (request: Request): boolean => {
   const origin = request.headers.get("origin")?.trim() ?? "";
   if (!origin) return false;
@@ -178,11 +170,6 @@ export const isBrowserBorneRequest = (request: Request): boolean => {
   }
 };
 
-/**
- * A request to a protected endpoint passes with a valid integrity proof or a
- * valid Turnstile answer. Turnstile tokens are single use, so each is
- * checked once, here.
- */
 export const verifyAuthRequestProof = async (args: {
   env: IntegrityEnv;
   request: Request;
@@ -245,8 +232,6 @@ const verifyIntegrityProof = async (env: IntegrityEnv, proof: AppIntegrityProof)
   }
 };
 
-// ── iOS App Attest ─────────────────────────────────────────────────────────
-
 const sha256 = async (data: Uint8Array | string): Promise<Uint8Array> =>
   new Uint8Array(
     await crypto.subtle.digest(
@@ -268,7 +253,6 @@ const concat = (...parts: Uint8Array[]): Uint8Array => {
 const equalBytes = (a: Uint8Array, b: Uint8Array): boolean =>
   a.length === b.length && a.every((byte, index) => byte === b[index]);
 
-/** The subset of CBOR App Attest objects use: ints, byte and text strings, arrays, maps, tags. */
 const decodeCbor = (bytes: Uint8Array): unknown => {
   let offset = 0;
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -322,7 +306,6 @@ const decodeCbor = (bytes: Uint8Array): unknown => {
   return value;
 };
 
-/** The children of a DER constructed value. */
 const derChildren = (bytes: Uint8Array): Array<{ tag: number; value: Uint8Array }> => {
   const children: Array<{ tag: number; value: Uint8Array }> = [];
   let offset = 0;
@@ -382,7 +365,6 @@ const verifyAttestation = async (args: {
   ) {
     throw new Error("invalid attestation");
   }
-  // 1. The chain: credential certificate ← App Attestation CA 1 ← Apple's root.
   const certificates = (x5c as Uint8Array[]).map((entry) => new x509.X509Certificate(entry as Uint8Array<ArrayBuffer>));
   const subCa = certificates.find((cert) => cert.subject.includes("Apple App Attestation CA 1"));
   const leaf = certificates.find((cert) => !cert.subject.includes("Apple App Attestation CA 1"));
@@ -394,33 +376,27 @@ const verifyAttestation = async (args: {
   if (!(await leaf.verify({ publicKey: subCa.publicKey, signatureOnly: true }))) {
     throw new Error("credential certificate is not signed by the sub CA");
   }
-  // 2-4. nonce = SHA256(authData || SHA256(challenge)) equals the credCert extension.
   const nonce = await sha256(concat(authData, await sha256(args.challenge)));
   const extension = leaf.getExtension(APP_ATTEST_NONCE_OID);
   const [sequence] = extension ? derChildren(new Uint8Array(extension.value)) : [];
   const [tagged] = sequence ? derChildren(sequence.value) : [];
   const [octets] = tagged ? derChildren(tagged.value) : [];
   if (!octets || octets.tag !== 0x04 || !equalBytes(octets.value, nonce)) throw new Error("nonce does not match");
-  // 5. SHA256 of the credential public key is the key id.
   const spki = new Uint8Array(leaf.publicKey.rawData);
   const key = await crypto.subtle.importKey("spki", spki, { name: "ECDSA", namedCurve: "P-256" }, true, ["verify"]);
   const point = new Uint8Array((await crypto.subtle.exportKey("raw", key)) as ArrayBuffer);
   if (toBase64(await sha256(point)) !== args.keyId) throw new Error("keyId does not match");
-  // 6. The RP id hash is SHA256 of the App ID.
   const { rpIdHash, signCount } = readAuthData(authData);
   if (!equalBytes(rpIdHash, await sha256(`${args.teamIdentifier}.${APPLE_BUNDLE_IDENTIFIER}`))) {
     throw new Error("appId does not match");
   }
-  // 7. A fresh key has counter 0.
   if (signCount !== 0) throw new Error("signCount is not 0");
-  // 8. The environment.
   if (authData.length < 55) throw new Error("Authenticator data is too short.");
   const aaguid = new TextDecoder().decode(authData.subarray(37, 53));
   if (aaguid !== AAGUID_PRODUCTION && aaguid !== AAGUID_DEVELOPMENT) throw new Error("aaguid is not valid");
   if (aaguid === AAGUID_DEVELOPMENT && !args.allowDevelopmentEnvironment) {
     throw new Error("development environment is not allowed");
   }
-  // 9. The credential id is the key id.
   const credentialIdLength = (authData[53]! << 8) | authData[54]!;
   if (toBase64(authData.subarray(55, 55 + credentialIdLength)) !== args.keyId) {
     throw new Error("credentialId does not match");
@@ -441,7 +417,6 @@ const verifyAssertion = async (args: {
   if (!(signature instanceof Uint8Array) || !(authenticatorData instanceof Uint8Array)) {
     throw new Error("invalid assertion");
   }
-  // 1-3. The signature covers SHA256(authenticatorData || SHA256(clientData)).
   const nonce = await sha256(concat(authenticatorData, await sha256(args.payload)));
   const key = await crypto.subtle.importKey(
     "spki",
@@ -457,7 +432,6 @@ const verifyAssertion = async (args: {
     nonce as Uint8Array<ArrayBuffer>,
   );
   if (!valid) throw new Error("invalid signature");
-  // 4-5. The App ID, and a counter that only moves forward.
   const { rpIdHash, signCount } = readAuthData(authenticatorData);
   if (!equalBytes(rpIdHash, await sha256(`${args.teamIdentifier}.${APPLE_BUNDLE_IDENTIFIER}`))) {
     throw new Error("appId does not match");
@@ -513,8 +487,6 @@ const verifyIosProof = async (
     .run();
   return (advanced.meta.changes ?? 0) > 0 ? { ok: true } : { ok: false, code: "integrity_invalid" };
 };
-
-// ── Android Play Integrity ─────────────────────────────────────────────────
 
 let cachedGoogleToken: { digest: string; accessToken: string; expiresAt: number } | undefined;
 

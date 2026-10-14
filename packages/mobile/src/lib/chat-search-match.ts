@@ -1,21 +1,12 @@
-// Case- and accent-insensitive fold for matching: decompose, drop combining
-// diacritics (the U+0300–U+036F block covers Latin accents), and lowercase. So
-// "Café" and "cafe" match. Uses the combining-marks range rather than the
-// `\p{Diacritic}` property escape for broad RN engine compatibility.
 export const foldText = (value: string): string =>
   value
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
 
-// Split a raw query into folded terms for multi-word (AND) matching.
 export const foldQueryTerms = (query: string): string[] =>
   foldText(query).split(/\s+/).filter(Boolean);
 
-// Fold a string while tracking, for each folded character, the original index
-// it came from. Lets the snippet highlight map a match found in folded space
-// back onto the original (accented/cased) text. `map[k]` is the original UTF-16
-// index of folded char `k`; the trailing entry maps to the string end.
 export function foldWithMap(text: string): { folded: string; map: number[] } {
   const folded: string[] = [];
   const map: number[] = [];
@@ -35,9 +26,6 @@ export function foldWithMap(text: string): { folded: string; map: number[] } {
   return { folded: folded.join(""), map };
 }
 
-// A short preview of a matched message, windowed around the earliest matching
-// term so the hit is visible (and can be emphasised) in the row — accent- and
-// case-insensitively, mapping the folded match back onto the original text.
 export function buildSearchSnippet(
   text: string,
   query: string,

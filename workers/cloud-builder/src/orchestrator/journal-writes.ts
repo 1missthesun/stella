@@ -30,14 +30,7 @@ import type { ChatTurnRequest, OwnerFencedTurn } from "./types.js";
 import { json, errorMessage, log, truncateMessage } from "./support.js";
 import { OrchestratorRunTurn } from "./run-turn.js";
 
-/** Journal append, card, and purge routes. */
 export abstract class OrchestratorJournalWrites extends OrchestratorRunTurn {
-  /**
-   * Realtime voice records, written into the cloud conversation without
-   * pretending the voice provider owns the text-turn lease. The authenticated
-   * owner comparison preserves lane scope, and the strict parser below accepts
-   * message records only — no caller can manufacture turn lifecycle rows.
-   */
   protected async handleJournalAppend(request: Request): Promise<Response> {
     const ownerId = request.headers.get("x-stella-owner") ?? "";
     if (!ownerId) return json({ error: "Unauthorized." }, 401);
@@ -81,9 +74,6 @@ export abstract class OrchestratorJournalWrites extends OrchestratorRunTurn {
       { ownerId },
       { refreshGeneration: true },
     );
-    // Voice append is a fresh owner write. A refused resolution must not fall
-    // back to the DO's cached binding or cached lifecycle generation,
-    // including on idempotent receipt replay.
     if (!ownerRecord) {
       return json({ error: "Conversation not found." }, 404);
     }
@@ -190,10 +180,6 @@ export abstract class OrchestratorJournalWrites extends OrchestratorRunTurn {
       };
       const replay = receiptResponse();
       if (replay) return replay;
-      // The lifetime ceiling. Resident bytes alone would not bound this —
-      // rollover moves them to R2, and an oversize row spills there directly —
-      // so `storedBytes` counts archived segments and spill objects too, and a
-      // conversation cannot grow forever by pushing its bytes out of SQLite.
       const storedBytes = this.journal.storedBytes();
       if (storedBytes + totalBytes > CONVERSATION_MAX_STORED_BYTES) {
         log("error", "conversation_storage_ceiling", {
@@ -209,11 +195,6 @@ export abstract class OrchestratorJournalWrites extends OrchestratorRunTurn {
           413,
         );
       }
-      // Per-request caps bound one request; the window bounds a loop of them.
-      // Tested here, before any R2 spill, so a runaway client is refused before
-      // it can make the DO do work — and charged only once the rows are
-      // committed, below, so a 409 against a running turn never eats the
-      // allowance the client needs in order to retry.
       const budgetArgs = {
         bytes: totalBytes,
         windowMs: APPEND_WINDOW_MS,
@@ -236,12 +217,6 @@ export abstract class OrchestratorJournalWrites extends OrchestratorRunTurn {
           429,
         );
       }
-      // The running-turn refusal, taken twice for two different reasons. This
-      // one is about cost: the spilling below writes to R2, and the check that
-      // can refuse this request must not sit behind it — a client that keeps
-      // asking while a turn runs would otherwise pay for every one of those
-      // objects with a 409 and, because the window is charged only on the
-      // committed path, no rate accounting at all.
       if (await this.turnRunning()) {
         return json(
           {
@@ -252,11 +227,6 @@ export abstract class OrchestratorJournalWrites extends OrchestratorRunTurn {
           409,
         );
       }
-      // Everything that can await — parsing, oversize spilling — happens BEFORE
-      // the second running-turn check, so that check and the appends form one
-      // uninterrupted block. An await between them would reopen the input gate
-      // and let a turn start in the gap, which is the one ordering that can
-      // splice a foreign row between a tool call and its result.
       const now = Date.now();
       const prepared: Array<{
         kind: "message";
@@ -288,9 +258,6 @@ export abstract class OrchestratorJournalWrites extends OrchestratorRunTurn {
       }
 
       try {
-        // Registration keeps generation rotation waiting; this second check
-        // catches a purge that closed the fence while R2 oversize preparation
-        // was in flight, before the SQLite transaction can append anything.
         await this.assertOwnerTurn(appendLease);
       } catch {
         return json(
@@ -304,10 +271,6 @@ export abstract class OrchestratorJournalWrites extends OrchestratorRunTurn {
       const publishAfterCommit: JournalRecord[] = [];
       let finalResponse: Response | null = null;
       let appendFailure: unknown;
-      // Everything below is one input-gate critical section. The storage reads
-      // may yield, but `blockConcurrencyWhile` prevents a queued text turn
-      // from being admitted between the final checks and the synchronous
-      // journal transaction.
       await this.ctx.blockConcurrencyWhile(async () => {
         if (await this.turnRunning()) {
           finalResponse = json(
@@ -333,13 +296,8 @@ export abstract class OrchestratorJournalWrites extends OrchestratorRunTurn {
           return;
         }
         try {
-          // Synchronous, and inside the same uninterrupted block as the appends:
-          // this is the request the window is actually paying for.
           this.journal.appendBudget({ ...budgetArgs, now, commit: true });
           const writer = `${source}:${deviceId}`;
-          // Registered in the projection so a foreign turn is also a legal
-          // rollover boundary; without it a chatty desktop could wedge every cut
-          // point behind rows no cut is allowed to land on.
           this.journal.transactionSync(() => {
             this.journal.upsertTurn({
               turnId,
@@ -406,12 +364,6 @@ export abstract class OrchestratorJournalWrites extends OrchestratorRunTurn {
       void this.index
         .flush({ activity: "idle", updatedAt: now })
         .catch(() => undefined);
-      // Rollover, at the one boundary this route can offer. `afterTerminal` used
-      // to be its only trigger, so a conversation written only through here —
-      // every desktop-mirrored conversation, once that trigger is wired — never
-      // evaluated its resident set at all and grew with its lifetime writes. The
-      // running-turn re-check is not redundant with the one above: the appends
-      // between them yield, and rollover mid-turn is forbidden.
       if (!(await this.turnRunning())) {
         await this.archive.maybeRollover(Date.now());
       }
@@ -468,11 +420,6 @@ export abstract class OrchestratorJournalWrites extends OrchestratorRunTurn {
     return { message: truncated, payloadJson: truncatedJson };
   }
 
-  /**
-   * Cards written by the owner on a non-chat terminal (build, operation) and on
-   * agent-thread completion (files). As journal rows they survive scrollback,
-   * which an `agent_events` row inside a `take(100)` window never did.
-   */
   protected async handleCard(request: Request): Promise<Response> {
     let body: {
       ownerId?: string;
@@ -495,11 +442,6 @@ export abstract class OrchestratorJournalWrites extends OrchestratorRunTurn {
     if (this.purged()) {
       return json({ error: "This conversation was deleted." }, 410);
     }
-    // A build- or operation-only conversation reaches this handler having never
-    // run an orchestrator turn, so `meta.owner_id` is still empty and an index
-    // flush would be a no-op. Bind first (the caller is the owner, behind the
-    // service secret): without it the row keeps `lastSeq` null and the orphan
-    // sweep eventually deletes a conversation that has real content.
     try {
       const owner = await this.resolveOwnerForCaller(
         { ownerId },
@@ -519,14 +461,11 @@ export abstract class OrchestratorJournalWrites extends OrchestratorRunTurn {
       });
       return json({ error: "Conversation owner is unavailable." }, 409);
     }
-    // One files card per source turn; an agent's lifecycle cards are one per
-    // event (its start and its end share the attempt they describe).
     let writerKey = `card:${sourceTurnId}:${card.type}`;
     if (card.type === "agent-lifecycle") {
       const lifecycle = parseCloudAgentLifecycleCard(card);
       if (!lifecycle) return json({ error: "Malformed request." }, 400);
       writerKey = `card:${lifecycle.eventId}`;
-      // The owner's agent threads changed: theirs is the list, the card its receipt.
       this.refreshAgentsSoon();
     }
     const payloadJson = JSON.stringify(card);
@@ -535,8 +474,6 @@ export abstract class OrchestratorJournalWrites extends OrchestratorRunTurn {
       return json({ error: "Card payload is too large." }, 413);
     }
     try {
-      // The owner lookup above yields, so the tombstone is re-read here for the
-      // same reason the append route re-reads it.
       if (this.purged()) {
         return json({ error: "This conversation was deleted." }, 410);
       }
@@ -573,9 +510,6 @@ export abstract class OrchestratorJournalWrites extends OrchestratorRunTurn {
       void this.index
         .flush({ activity: "idle", updatedAt: now })
         .catch(() => undefined);
-      // Same reason as the journal route: a build- or operation-only
-      // conversation runs no orchestrator turn, so this is the only place its
-      // resident set is ever measured.
       if (!(await this.turnRunning())) {
         await this.archive.maybeRollover(Date.now());
       }
@@ -613,15 +547,11 @@ export abstract class OrchestratorJournalWrites extends OrchestratorRunTurn {
    */
   protected async handlePurge(): Promise<Response> {
     const now = Date.now();
-    // Read before anything is destroyed: the deletion projection needs the
-    // owner this object belonged to, and `deleteAll()` takes that with it.
     const identity = this.indexIdentity();
     this.journal.markDeleted(now);
     this.sealed = true;
     this.archive.seal();
     this.hub.closeAll(CLOSE_DELETED);
-    // Pi's runs stop here, with their leases, admissions and containers,
-    // before the storage they write goes.
     const pi = this.piRuntime;
     this.piRuntime = undefined;
     const runtime = await pi?.catch(() => undefined);
@@ -708,9 +638,6 @@ export abstract class OrchestratorJournalWrites extends OrchestratorRunTurn {
     await this.journal.bootstrap();
     if (this.ctx.id.name) this.journal.setConversationId(this.ctx.id.name);
     if (identity) {
-      // After the wipe, best-effort: The owner's own purge already tombstoned
-      // the row before calling here; this closes the loop for a purge that
-      // started on this side.
       await this.deferOwnerEvents([
         {
           ...this.ownerEventBase(identity, purgedId),

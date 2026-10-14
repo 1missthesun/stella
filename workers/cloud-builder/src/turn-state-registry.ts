@@ -53,7 +53,6 @@ export type TurnStateCandidate = {
   operationId: string;
   requestFingerprint: string;
   historyCursor: string;
-  /** The world manifest this state ran against; a native-only one has none. */
   workspace?: { historyCursor: string; manifestId: string };
   native?: TurnStateArchive;
   nativeCheckpoint?: TurnStateNativeCheckpoint;
@@ -88,13 +87,7 @@ type OperationRecord = {
   operationId: string;
   requestFingerprint: string;
   historyCursor: string;
-  /** Absent exactly when `nativeOnly`. */
   manifestId?: string;
-  /**
-   * Native state only, with no world: the orchestrator's CLI thread never has
-   * the world materialized, so its operation names no manifest and its
-   * publication never touches the owner's workspace head.
-   */
   nativeOnly?: true;
   nativeCheckpoint?: TurnStateNativeCheckpoint;
   objectKeys: { native?: string };
@@ -433,7 +426,6 @@ export const commitTurnStateOperation = async (
   args: { operationId: string },
 ): Promise<{
   candidate: TurnStateCandidate;
-  /** Absent for a native-only operation, which names no world. */
   workspaceHead?: TurnStateWorkspaceHead;
   replayed: boolean;
 }> => {
@@ -636,17 +628,11 @@ const retireThreadCandidates = async (
 };
 
 export type PublishedTurnStateWorkspace = {
-  /** Absent for a native-only operation, which never touches the head. */
   workspaceHead?: TurnStateWorkspaceHead;
   publicationReceipt: string;
   replayed: boolean;
 };
 
-/**
- * Publish the bookkeeping head only after the exact origin thread's
- * transcript cursor is canonical. WorldStore already owns and exposes the
- * bytes; this records which manifest most recently completed publication.
- */
 export const publishTurnStateWorkspace = async (
   storage: StrongTurnStateStorage,
   args: {
@@ -727,11 +713,6 @@ export const publishTurnStateWorkspace = async (
           "workspace-published",
         ]),
       ));
-    // A native-only operation publishes its transcript authority and nothing
-    // else. The workspace head says which world an agent last left behind,
-    // and an agent turn that finds one treats its workspace as a restored
-    // checkpoint; a thread that never had the world on disk must never
-    // create or move it.
     const workspaceHead: TurnStateWorkspaceHead | undefined =
       operation.nativeOnly || operation.manifestId === undefined
         ? undefined
@@ -997,11 +978,6 @@ export type TurnStateObjectStore = {
   head(key: string): Promise<{ size: number; etag: string } | null>;
 };
 
-/**
- * Delete archive pairs that a canonical resolve made unreachable. The
- * retirement row is written in the same strong transaction as promotion, so
- * response loss at any delete/HEAD/metadata step is an ordinary exact replay.
- */
 export const drainTurnStateRetirements = async (
   storage: StrongTurnStateStorage,
   objectStore: TurnStateObjectStore,
@@ -1161,9 +1137,6 @@ export const purgeTurnState = async (
       pending = true;
     }
   }
-  // A second complete prefix scan is the authority that catches uploads which
-  // completed after the first list but before their pre-registered key was
-  // reconciled. Owner purge keeps all writers fenced while this runs.
   cursor = undefined;
   for (;;) {
     const page = await objectStore.list(prefix, cursor);

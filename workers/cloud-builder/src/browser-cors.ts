@@ -3,7 +3,6 @@ import { SLACK_INSTALL_START_PATH, SLACK_WORKSPACES_PATH } from "@stella/contrac
 // Keep these aligned with the browser origins Better Auth trusts (src/auth).
 const BROWSER_ORIGINS = new Set([
   "https://stella.sh",
-  // The desktop renderer, served from source (desktop/electron/source).
   "stella-app://desktop",
   "http://localhost:57314",
   "http://127.0.0.1:57314",
@@ -33,8 +32,6 @@ const isBrowserRoute = (path: string): boolean =>
   path.startsWith(SLACK_WORKSPACES_PATH) ||
   path === SLACK_INSTALL_START_PATH;
 
-/** CORS grants browser access only; the router still authenticates every operation. */
-/** STELLA_WEBSITE_URL's origin, when this deployment's website is not stella.sh. */
 const websiteOrigin = (env: unknown): string | null => {
   const value = (env as { STELLA_WEBSITE_URL?: unknown } | undefined)?.STELLA_WEBSITE_URL;
   if (typeof value !== "string" || !value.trim()) return null;

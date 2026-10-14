@@ -1,24 +1,3 @@
-/**
- * Legacy exec compatibility path for the inline "connect the Stella browser
- * extension" offer. Production browser actions use the persistent browser API
- * service from `node_repl`.
- *
- * The extension is optional: Stella's in-app browser works without it, and the
- * extension is how agents work in the user's own browser with their logins
- * (the external backend). Nothing is copied between the two browsers. When legacy command output reports that the
- * extension is not connected, the exec tool asks the desktop to render an
- * inline connect card, waits for the user to connect or decline, and retries
- * the intercepted operation once on success.
- *
- * The whole path is best-effort and conservative:
- * - only completed (non-running) legacy browser commands are considered;
- *   the failure means the command never reached a browser, so a single
- *   re-run is safe;
- * - one offer at a time, with a decline cool-down so a burst of failing
- *   commands can't spam the user with cards;
- * - any bridge/host error falls back to returning the original result.
- */
-
 import { Effect } from "effect";
 import type { ToolResult } from "./types.js";
 import { runToolEffect } from "./effect-runtime.js";
@@ -34,44 +13,25 @@ export type BrowserExtensionConnectRequester = (
   payload: {
     conversationId?: string;
     agentId?: string;
-    /** The failing command, for context in logs — never rendered verbatim. */
     command?: string;
   },
-  /**
-   * Turn abort signal. The worker-side implementation cancels the
-   * pending desktop card when it fires.
-   */
   signal?: AbortSignal,
 ) => Promise<BrowserExtensionConnectOutcome>;
 
-/**
- * Legacy extension-bridge failure strings retained for this compatibility
- * path. Production browser-service connection handling lives outside this
- * exec-command adapter.
- */
 const EXTENSION_FAILURE_PATTERN =
   /Extension not connected|Install the Stella Browser Bridge extension/i;
 
-/**
- * "Service worker terminated" has its own transient error + retry hint and
- * must NOT trigger an install offer — the extension is installed and will
- * self-reconnect.
- */
 const TRANSIENT_EXTENSION_PATTERN =
   /Extension connection is dead|will auto-reconnect/i;
 
 const STELLA_BROWSER_COMMAND_PATTERN = /(^|[\s;|&("'`])stella-browser(\s|$)/;
 
-/** How long the exec tool is willing to sit on an open connect card. */
 const OFFER_WAIT_TIMEOUT_MS = 5 * 60 * 1000;
 
-/** After a decline/timeout, don't re-offer for this long. */
 const DECLINE_COOLDOWN_MS = 15 * 60 * 1000;
 
 type OfferGateState = {
-  /** Millis timestamp of the last decline/timeout outcome. */
   lastRefusedAt: number | null;
-  /** An offer card is currently open. */
   inFlight: boolean;
 };
 
@@ -136,9 +96,6 @@ const withTimeout = async (
   promise: Promise<BrowserExtensionConnectOutcome>,
   timeoutMs: number,
 ): Promise<BrowserExtensionConnectOutcome> =>
-  // Effect race: the timeout arm is a fiber interrupted when the connect
-  // promise settles first (the old `clearTimeout` in `finally`); a
-  // rejection propagates the original error via the runtime facade.
   runToolEffect(
     Effect.raceFirst(
       Effect.tryPromise({ try: () => promise, catch: (error) => error }),
@@ -151,11 +108,6 @@ const withTimeout = async (
     ),
   );
 
-/**
- * Shared low-level offer path for direct browser transports that do not return
- * an Bash-shaped ToolResult. Returns null when the failure is unrelated
- * to a missing extension and otherwise returns the connect-card outcome.
- */
 export const maybeRequestBrowserExtensionConnect = async (options: {
   output: string;
   command?: string;
@@ -217,12 +169,6 @@ export const maybeRequestBrowserExtensionConnect = async (options: {
   return outcome;
 };
 
-/**
- * Wrap a completed legacy `Bash` browser result: on an extension-
- * bridge failure, offer the inline connect card and retry the intercepted
- * operation once after the user connects. Returns either the annotated
- * original result or the retried result.
- */
 export const maybeOfferBrowserExtensionConnect = async (options: {
   result: ToolResult;
   command: string;
@@ -231,7 +177,6 @@ export const maybeOfferBrowserExtensionConnect = async (options: {
   conversationId?: string;
   agentId?: string;
   signal?: AbortSignal;
-  /** Injectable clock for tests. */
   now?: () => number;
 }): Promise<ToolResult> => {
   const {
@@ -297,14 +242,11 @@ export const maybeOfferBrowserExtensionConnect = async (options: {
           : "A connect card for the Stella browser extension was shown in the chat but the user did not respond in time. Do not re-offer or switch to a visible Chrome/Brave browser. Stella's in-app browser works without the extension (signed out): continue there. For steps that need the user's own login, ask them to sign in once in Stella's Browser panel (Stella keeps that sign-in).",
       );
     }
-    // unsupported / bridge error: stay quiet, just return the raw failure.
     return result;
   }
 
   const retried = await rerun();
   if (isBrowserExtensionFailure(command, execPayloadOf(retried) ?? undefined)) {
-    // The user accepted but the bridge still isn't up (extension disabled,
-    // browser closed, install still settling). Don't loop offers.
     gate.lastRefusedAt = now();
     return annotate(
       retried,

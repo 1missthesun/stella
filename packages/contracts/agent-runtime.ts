@@ -7,40 +7,18 @@ export const AGENT_IDS = {
 export type AgentId = (typeof AGENT_IDS)[keyof typeof AGENT_IDS];
 
 type AgentPromptRole = "orchestrator" | "subagent";
-/**
- * Where an agent's local CLI runs when its brief names no folder:
- * `stella-home` is Stella's data folder (`~/.stella`), `frontend` the app
- * checkout, `home` the user's home folder.
- */
 type LocalCliWorkingDirectory = "home" | "frontend" | "stella-home";
 type AgentModelSettings = {
   description?: string;
   order: number;
 };
 
-/** Declarative runtime behaviors for each agent. Unset flags default to false. */
 export type AgentCapabilities = {
-  /**
-   * Load the personality doc into the agent context so it is injected as a
-   * hidden `~/.stella/PERSONALITY.md` startup doc on the first turn (then
-   * replayed from history), mirroring main memory.
-   */
   injectsPersonality?: boolean;
-  /**
-   * Load the user's main memory into the agent context so it is injected as
-   * a hidden `~/.stella/memories/main.md` startup doc on the first turn.
-   */
   injectsMainMemory?: boolean;
-  /** Inject runtime reminder hidden messages. */
   injectsRuntimeReminders?: boolean;
-  /**
-   * Inject the connected-devices list and this run's own execution
-   * destination, so the agent can place work with `spawn_agent`.
-   */
   injectsExecutionContext?: boolean;
-  /** Inject the skill catalog block into the dynamic context. */
   injectsSkillCatalog?: boolean;
-  /** Record a durable thread summary on successful run completion. */
   recordsThreadSummary?: boolean;
 };
 
@@ -55,7 +33,6 @@ type AgentDefinition = {
   promptRole: AgentPromptRole;
   localCliWorkingDirectory: LocalCliWorkingDirectory | null;
   modelSettings: AgentModelSettings | null;
-  /** Optional capability bundle. Defaults to no capabilities. */
   capabilities?: AgentCapabilities;
 };
 
@@ -70,8 +47,6 @@ const BUILTIN_AGENT_DEFINITIONS = [
     runsAsSubagent: false,
     usesLocalCliRuntime: true,
     promptRole: "orchestrator",
-    // Stella's own folder: the orchestrator works on the user's life, not on
-    // the app's source, so nothing of the checkout is its working folder.
     localCliWorkingDirectory: "stella-home",
     modelSettings: {
       description: "Top-level agent that delegates tasks",
@@ -172,7 +147,6 @@ export const getLocalCliWorkingDirectory = (
 ): LocalCliWorkingDirectory | null =>
   getAgentDefinition(agentType)?.localCliWorkingDirectory ?? null;
 
-/** Resolve declarative capabilities for an agent. */
 export const getAgentCapabilities = (agentType: string): AgentCapabilities =>
   getAgentDefinition(agentType)?.capabilities ?? {};
 
@@ -184,8 +158,6 @@ export const agentHasCapability = (
   return value !== undefined && value !== false;
 };
 
-// All IPC stream event types. RUN_FINISHED is the single terminal event for
-// a run; per-agent lifecycle is the AGENT_* family below.
 export const AGENT_STREAM_EVENT_TYPES = {
   RUN_STARTED: "run-started",
   RUN_FINISHED: "run-finished",
@@ -198,17 +170,9 @@ export const AGENT_STREAM_EVENT_TYPES = {
   AGENT_COMPLETED: "agent-completed",
   AGENT_FAILED: "agent-failed",
   AGENT_CANCELED: "agent-canceled",
-  /**
-   * The one and only carrier of assistant text. Emitted once per completed
-   * assistant message segment (a run may produce several — preamble →
-   * post-tool answer), after the row is persisted, carrying that row's
-   * eventId and the segment's full canonical text.
-   */
   ASSISTANT_MESSAGE: "assistant-message",
 } as const;
 
-// Per-agent lifecycle (subset of AGENT_STREAM_EVENT_TYPES). Tracks one
-// subagent task from spawn to terminal state.
 export const TASK_LIFECYCLE_EVENT_TYPES = [
   AGENT_STREAM_EVENT_TYPES.AGENT_STARTED,
   AGENT_STREAM_EVENT_TYPES.AGENT_PROGRESS,
@@ -244,9 +208,6 @@ export const isTaskLifecycleTerminalType = (
   type: string,
 ): type is TaskLifecycleTerminalType => TASK_LIFECYCLE_TERMINAL_SET.has(type);
 
-// Single status enum used by every layer that tracks a task's lifecycle
-// state: TaskItem (UI), ConversationTaskSnapshot (IPC resume), and the
-// runtime LocalAgentManager.
 export type TaskLifecycleStatus =
   | "running"
   | "completed"
@@ -272,15 +233,12 @@ export type TerminalTaskLifecycleStatus = Exclude<
   "running"
 >;
 
-// Outcome of a single run (RUN_FINISHED). Mirrors the terminal subset of
-// TaskLifecycleStatus.
 export const AGENT_RUN_FINISH_OUTCOMES = {
   COMPLETED: "completed",
   ERROR: "error",
   CANCELED: "canceled",
 } as const satisfies Record<string, TerminalTaskLifecycleStatus>;
 
-/** How a run (not an agent) finished. */
 export type AgentRunFinishOutcome = TerminalTaskLifecycleStatus;
 
 export const TOOL_IDS = {

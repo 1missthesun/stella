@@ -1,31 +1,6 @@
-/**
- * Desktop-placed resolution of a turn's attachments.
- *
- * A placement payload names attachments by drive-relative path, never by
- * bytes. The cloud placement turns those paths into image content through
- * the owner object's `drive.turnAttachments`; the desktop turns them into
- * `RuntimeAttachmentRef`s pointing at a short-lived signed drive GET, which the
- * agent runtime already knows how to materialize into vision content.
- *
- * The worker materializes documents from these owner-authorized signed URLs
- * into the profile's local attachment cache and supplies a real absolute Read
- * path to the agent, just as it persists images for later inspection.
- *
- * Nothing here caps the array. The server validated the count and the payload
- * hash covers the exact list, so a cap on this side could only silently drop an
- * attachment the server had already admitted, which is the one outcome the
- * reference design exists to prevent.
- *
- * `sourcePath` stays unset. The runtime hands it to the model as an absolute
- * path to Read, so a drive-relative path there is a broken instruction. The
- * drive-relative path travels as `drivePath` instead: nothing model-facing
- * reads it, and it is the attachment's only durable identity once the signed
- * URL expires, so it is what the cloud journal can persist for other clients.
- */
 import type { RuntimeAttachmentRef } from "@stella/contracts/protocol";
 import { attachmentContentType } from "@stella/contracts/attachment-content-type";
 
-/** What the backend's `drive.fileUrl` returns for one path. */
 export type DriveFileResolution = {
   path: string;
   name: string;
@@ -34,11 +9,6 @@ export type DriveFileResolution = {
   url: string;
 };
 
-/**
- * The paths a dispatch payload carries. Anything that is not a non-empty
- * string is dropped rather than failing the turn: the same payload also
- * reaches the cloud placement, which drops what it cannot read.
- */
 export const placementAttachmentPaths = (
   payload: Record<string, unknown>,
 ): string[] => {
@@ -48,11 +18,6 @@ export const placementAttachmentPaths = (
   );
 };
 
-/**
- * One unreadable attachment must not cost the others, which is how the cloud
- * placement behaves. A path that no longer resolves is reported and skipped so
- * both placements degrade the same way for the same turn.
- */
 export const resolvePlacementAttachments = async (args: {
   paths: readonly string[];
   resolve: (path: string) => Promise<DriveFileResolution>;

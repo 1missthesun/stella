@@ -1,25 +1,11 @@
-/**
- * One durable delivery outbox table: the read/attempt/ack/dead-letter
- * statements every cloud outbox (transcript, journal, computer-agent) shares.
- * Admission stays with each caller because every table has its own
- * idempotency rules.
- */
-
 import type { CachedStatements } from "./shared.js";
 
 const MAX_ERROR_LENGTH = 500;
 
 export type OutboxRepoOptions = {
-  /** SELECT list mapping the table's columns onto the record type. */
   columns: string;
-  /** Delivery order of `list`. */
   orderBy: string;
-  /**
-   * Predicate for rows still awaiting delivery (`dead_lettered_at IS NULL`).
-   * Tables without dead letters omit it.
-   */
   pendingWhere?: string;
-  /** Columns a dead letter redacts to NULL besides `payload_json`. */
   deadLetterClears?: readonly string[];
 };
 
@@ -45,7 +31,6 @@ export class OutboxRepo<T> {
       .get(id) as T | undefined;
   }
 
-  /** Pending rows in delivery order, optionally narrowed by `filter`. */
   list(
     limit = 256,
     filter?: { where: string; params: readonly unknown[] },
@@ -76,10 +61,6 @@ export class OutboxRepo<T> {
     return typeof row?.count === "number" ? row.count : 0;
   }
 
-  /**
-   * Count one delivery attempt and record its error (none clears the last
-   * one). `nextAttemptAt` reschedules tables that back off per row.
-   */
   markAttempt(
     id: string,
     args: { error?: string | null; nextAttemptAt?: number } = {},
@@ -114,7 +95,6 @@ export class OutboxRepo<T> {
     this.cached.prepare(`DELETE FROM ${this.table} WHERE id = ?`).run(id);
   }
 
-  /** Retire a row for good, redacting its payload and keeping the reason. */
   deadLetter(id: string, reason: string): void {
     const now = Date.now();
     const clears = (this.opts.deadLetterClears ?? [])

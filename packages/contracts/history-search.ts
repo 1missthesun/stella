@@ -1,14 +1,3 @@
-/**
- * The conversation-history vocabulary every `history` client shares: what is
- * searched and as which kind, how plain text becomes a search, the read-only
- * guard on `history.sql`, and an in-memory search for a history that has no
- * FTS index of its own (an agent's own thread, read from its transcript).
- *
- * What is searched: what the user and the speaker said, and the prompts that
- * carry another agent's words (an agent's report, an agent's message). Tool
- * calls, tool results and other runtime context are never searched.
- */
-
 export const HISTORY_SEARCH_KINDS = [
   "user",
   "assistant",
@@ -21,10 +10,6 @@ const AGENT_REPORT_RE =
   /^\[(?:Agent completed|Agent failed|Agent canceled|Task failed|Task canceled)\]/mu;
 const AGENT_MESSAGE_RE = /<agent-message\b/u;
 
-/**
- * What a journal message is for search, or null when it is not searched. A
- * hidden user prompt is searched only when it carries another agent's words.
- */
 export const historySearchKind = (
   role: string,
   hidden: boolean,
@@ -38,12 +23,6 @@ export const historySearchKind = (
   return null;
 };
 
-/**
- * What a message in an agent's own thread is for search. Its inputs are not
- * marked hidden: its brief and the user's words are `user`, the reports of the
- * agents it started are `agent_report`, and messages from Stella or another
- * agent are `agent_message`.
- */
 export const agentHistoryKind = (role: string, text: string): HistorySearchKind | null => {
   if (role === "assistant") return "assistant";
   if (role !== "user") return null;
@@ -52,7 +31,6 @@ export const agentHistoryKind = (role: string, text: string): HistorySearchKind 
   return "user";
 };
 
-/** Text-only projection of a message. Binary blocks and tool calls are noise. */
 export const historyMessageText = (message: unknown): string => {
   if (!message || typeof message !== "object") return "";
   const content = (message as { content?: unknown }).content;
@@ -69,17 +47,11 @@ export const historyMessageText = (message: unknown): string => {
   return parts.join("\n");
 };
 
-/**
- * The FTS5 query for plain text: each word, or each quoted phrase, must
- * appear. Punctuation splits words the way the index's tokenizer does, so a
- * thread id like `deploy-dev-ixov5k` is searched as the phrase it indexes as.
- */
 export const historySearchMatch = (text: string): string =>
   historySearchTerms(text)
     .map((tokens) => `"${tokens.join(" ")}"`)
     .join(" ");
 
-/** The words or quoted phrases of a search, each as its tokens. */
 export const historySearchTerms = (text: string): string[][] => {
   const terms: string[][] = [];
   for (const [, phrase, word] of text.matchAll(/"([^"]*)"|(\S+)/gu)) {
@@ -105,7 +77,6 @@ const stem = (token: string): string => {
   return token;
 };
 
-/** Literals, quoted identifiers and comments, which may contain anything. */
 const OPAQUE_SQL_RE =
   /'(?:[^']|'')*'|"(?:[^"]|"")*"|`(?:[^`]|``)*`|\[[^\]]*\]|--[^\n]*|\/\*[\s\S]*?(?:\*\/|$)/gu;
 
@@ -145,7 +116,6 @@ export type HistorySearchHit = {
 export const HISTORY_SEARCH_LIMIT_DEFAULT = 20;
 export const HISTORY_SEARCH_LIMIT_MAX = 100;
 
-/** `history.search`'s options as they arrive from a sandbox or a computer. */
 export const historySearchOptions = (value: unknown): HistorySearchOptions => {
   const raw = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
   return {
@@ -160,7 +130,6 @@ export const historySearchOptions = (value: unknown): HistorySearchOptions => {
   };
 };
 
-/** The kinds a search keeps, checked; empty keeps every kind. */
 export const historySearchKinds = (options: HistorySearchOptions): HistorySearchKind[] => {
   const kinds = (options.kinds ?? []).filter((kind): kind is HistorySearchKind =>
     (HISTORY_SEARCH_KINDS as readonly string[]).includes(kind),
@@ -174,7 +143,6 @@ export const historySearchKinds = (options: HistorySearchOptions): HistorySearch
 export const historySearchLimit = (options: HistorySearchOptions): number =>
   Math.min(Math.max(1, Math.floor(options.limit ?? HISTORY_SEARCH_LIMIT_DEFAULT)), HISTORY_SEARCH_LIMIT_MAX);
 
-/** One searchable message of a history with no index of its own. */
 export type HistoryRecord = {
   seq: number;
   kind: HistorySearchKind;
@@ -265,7 +233,6 @@ export const searchHistoryRecords = (
   });
 };
 
-/** One message of an agent's own thread, as its `history.read` and `history.sql` see it. */
 export type OwnHistoryRow = {
   seq: number;
   kind: "message";
@@ -275,21 +242,14 @@ export type OwnHistoryRow = {
   payload: unknown;
 };
 
-/**
- * `history.sql` over an agent's own rows, for a host that can hold them in a
- * database of their own (an in-memory SQLite). Absent, `history.sql` explains
- * what to use instead.
- */
 export type OwnHistorySql = (rows: readonly OwnHistoryRow[], query: string, params: readonly unknown[]) => unknown;
 
-/** A message without its reasoning blocks, which are the model's and only bulk here. */
 export const withoutThinking = (message: object): unknown => {
   const content = (message as { content?: unknown }).content;
   if (!Array.isArray(content)) return message;
   return { ...message, content: content.filter((part) => (part as { type?: unknown } | null)?.type !== "thinking") };
 };
 
-/** The searchable records of an agent's rows: no tool calls, no tool results. */
 export const ownHistoryRecords = (rows: readonly OwnHistoryRow[]): HistoryRecord[] =>
   rows.flatMap((row) => {
     if (row.role === "toolResult") return [];
@@ -300,11 +260,6 @@ export const ownHistoryRecords = (rows: readonly OwnHistoryRow[]): HistoryRecord
 
 const OWN_READ_RECORDS_MAX = 200;
 
-/**
- * Answer one `history.*` call of an agent from its own rows. `args` is the code
- * tool's request: `{ op: "search", text, options }`, `{ op: "read", fromSeq,
- * toSeq }` or `{ op: "sql", query, params }`.
- */
 export const answerOwnHistory = (
   rows: readonly OwnHistoryRow[],
   args: Record<string, unknown>,
@@ -370,10 +325,6 @@ const historyEntryOf = (input: unknown): HistoryReadEntry | null => {
   return { ...base, role, text };
 };
 
-/**
- * What `history.read` gives the model: each message as its seq, role, time
- * and text, without the app's sync fields. `raw` keeps the rows as stored.
- */
 export const historyReadView = (result: unknown): unknown => {
   const rows = Array.isArray(result)
     ? result

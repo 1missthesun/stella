@@ -27,7 +27,6 @@ function AccountScopedCloudCards() {
   );
 }
 
-/** Account-settings cloud surfaces kept behind one import for the host tab. */
 export function CloudAccountCards() {
   const { isCloudConversationReady, accountScope } =
     useCloudConversationSession();

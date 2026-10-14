@@ -1,18 +1,4 @@
 /**
- * Mobile port of the desktop `global/schedule/schedule-receipt-summary.ts`
- * (the v2 reference implementation). When a Schedule tool result comes back,
- * its human-readable summary renders as a plain-text line in the computer
- * chat — no chip or card — and structured schedule side-channel JSON never
- * reaches user-facing copy.
- *
- * The desktop version handles results that arrive as *serialized* tool-result
- * envelopes; on mobile the bridge already delivers `result` as a parsed
- * object (`{ content: [...] }`), so the envelope check runs against the
- * object shape directly, with the serialized-string path kept for older
- * desktops.
- */
-
-/**
  * Anything that reads as serialized structure is never receipt copy: the
  * persisted schedule side-channel JSON, a non-envelope JSON result, or — the
  * sneaky one — a runtime `resultPreview` sliced at 200 chars mid-envelope,
@@ -23,11 +9,6 @@
 const looksLikeSerializedStructure = (text: string): boolean =>
   text.startsWith("{") || text.startsWith("[");
 
-/**
- * Pull the human-readable `text` out of a tool-result envelope — either the
- * parsed object the bridge delivers or its serialized JSON form. Returns
- * `undefined` for anything that isn't that shape.
- */
 const textFromToolResultEnvelope = (value: unknown): string | undefined => {
   const record =
     value && typeof value === "object" ? (value as { content?: unknown }) : null;
@@ -90,12 +71,6 @@ export const pickScheduleToolSummary = (payload: {
   return undefined;
 };
 
-/**
- * Full receipt resolution for a Schedule tool result: prefer an envelope's
- * text blocks, then fall back to the preview/result summary picker. Anything
- * unparseable — including persisted schedule side-channel JSON previews —
- * yields nothing to render.
- */
 export const scheduleReceiptText = (payload: {
   resultPreview?: unknown;
   result?: unknown;

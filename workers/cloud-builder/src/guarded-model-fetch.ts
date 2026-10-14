@@ -1,8 +1,3 @@
-/**
- * Start gateway routing while the final privacy check runs, but release no
- * request body bytes until that check succeeds. Each physical model request
- * gets a new check; neither permission nor its result is cached here.
- */
 export const guardedModelFetch = async (args: {
   request: Request;
   authorize: () => Promise<void>;
@@ -42,8 +37,6 @@ export const guardedModelFetch = async (args: {
   };
   signal.addEventListener("abort", onAbort, { once: true });
 
-  // Attach rejection handling before transport starts. A refused policy must
-  // surface its original error even when the aborted fetch also rejects.
   const authorization = Promise.resolve().then(authorize);
   void authorization.catch(() => undefined);
   const body = new ReadableStream<Uint8Array>(
@@ -84,9 +77,6 @@ export const guardedModelFetch = async (args: {
     await Promise.race([authorization, aborted]);
     signal.throwIfAborted();
     const response = await responseWork;
-    // A gateway refusal can finish without consuming its request. Close that
-    // source without aborting the response, whose status/body belong to the
-    // caller. Successful gateway handlers consume the complete JSON body.
     if (!bodyFinished) {
       bodyFinished = true;
       controller?.close();

@@ -169,10 +169,6 @@ export function VideoPlayerView({
   );
 }
 
-/**
- * The poster, aspect-fit, under a spinner: what a video shows while it is
- * fetched and until its first frame plays.
- */
 export function PosterCover({
   posterUri,
   colors,

@@ -86,11 +86,6 @@ function OverflowTile({ items }: { items: AttachmentTileItem[] }) {
   );
 }
 
-/**
- * One row of same-size attachment tiles (images, files, pasted text). When
- * more tiles exist than fit, the last slot becomes a "+N" tile; hovering or
- * clicking it reveals the rest, each keeping its own preview behaviour.
- */
 type AttachmentTileRowProps = {
   items: AttachmentTileItem[];
   align: "start" | "end";
@@ -167,10 +162,6 @@ const firstLines = (text: string): string =>
     .join("\n")
     .slice(0, 160);
 
-/**
- * Pasted text as a tile: a small preview of its first lines. Hovering or
- * focusing opens the full (bounded) preview in a scrollable card.
- */
 export function PastedTextTile({
   text,
   preview,

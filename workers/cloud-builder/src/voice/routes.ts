@@ -1,20 +1,3 @@
-/**
- * Voice's HTTP surface: the bodies that are not JSON calls.
- *
- *   POST /api/voice/live/sdp              SDP offer in, SDP answer out (`voice.sdp`)
- *   POST /api/voice/tts                   one-shot read-aloud audio
- *   POST /api/voice/tts/stream            progressive `audio/mpeg` (desktop)
- *   POST /api/voice/tts/stream/cancel     stop a mobile HLS synthesis
- *   GET  /api/voice/tts/stream/hls/<ticket>/{index.m3u8,seg-<n>.mp3}
- *
- * Everything but the HLS GETs takes the user's bearer JWT. The HLS GETs come
- * from a native player that cannot send headers, so the signed ticket in the
- * path authorizes them and they read `MEDIA` without touching the owner's
- * object. Read-aloud runs Gemini TTS on OpenRouter or fal (`tts.ts`).
- * Provider keys never leave the Worker; read-aloud spend is logged
- * (`tts_usage`), not charged, since read-aloud is free on every plan.
- */
-
 import { Effect } from "effect";
 import {
   rpcErrorStatus,
@@ -74,9 +57,6 @@ const errorResponse = (error: unknown): Response => {
   );
 };
 
-// ── Owner object access ────────────────────────────────────────────────────
-
-/** The owner's current generation, read from the owner's object. */
 export const ownerGeneration = async (env: Pick<VoiceEnv, "OWNER_GATES">, ownerId: string): Promise<string> => {
   try {
     return (await ownerGateStub(env.OWNER_GATES, ownerId).snapshot()).ownerGeneration;
@@ -85,7 +65,6 @@ export const ownerGeneration = async (env: Pick<VoiceEnv, "OWNER_GATES">, ownerI
   }
 };
 
-/** A server-internal voice operation on the owner's object, unwrapped. */
 export const voiceInternal = async <T>(
   env: Pick<VoiceEnv, "OWNER_GATES">,
   ownerId: string,
@@ -97,7 +76,6 @@ export const voiceInternal = async <T>(
     await ownerGateStub(env.OWNER_GATES, ownerId).ownerInternal({ name, args, ownerGeneration: generation }),
   ) as T;
 
-/** The Muse relay's metering, on the owner's object under one generation. */
 export const ownerDictationControl = (env: Pick<VoiceEnv, "OWNER_GATES">, ownerId: string): MuseControl => {
   let generation: Promise<string> | null = null;
   const current = () => (generation ??= ownerGeneration(env, ownerId));
@@ -136,15 +114,12 @@ const readJson = async (request: Request): Promise<Record<string, unknown>> => {
   );
 };
 
-/** Trim, bound and admit read-aloud text against the owner's allowance. */
 const admitText = async (env: VoiceEnv, caller: OwnerCaller, raw: unknown): Promise<string> => {
   const text = typeof raw === "string" ? ttsText(raw) : "";
   if (!text) throw new RpcError("BAD_REQUEST", "text is required.");
   await callOwner(env, caller.ownerId, "tts.admit", { chars: text.length });
   return text;
 };
-
-// ── Live voice ─────────────────────────────────────────────────────────────
 
 const liveSdp = async (request: Request, env: VoiceEnv): Promise<Response> => {
   const caller = await authenticate(request, env);
@@ -158,8 +133,6 @@ const liveSdp = async (request: Request, env: VoiceEnv): Promise<Response> => {
     headers: { "content-type": "application/sdp", "cache-control": "no-store" },
   });
 };
-
-// ── Read-aloud: desktop ────────────────────────────────────────────────────
 
 const logTtsUsage = (fields: Record<string, unknown>) => log("info", "tts_usage", fields);
 
@@ -177,7 +150,6 @@ const openPcm = async (env: VoiceEnv, text: string, voice: string, transport: st
   }
 };
 
-/** Streaming synthesis, re-encoded to one progressive MP3 stream. */
 const ttsStream = async (request: Request, env: VoiceEnv): Promise<Response> => {
   const caller = await authenticate(request, env);
   const body = await readJson(request);
@@ -235,7 +207,6 @@ const ttsStream = async (request: Request, env: VoiceEnv): Promise<Response> => 
   return new Response(stream, { headers: { "content-type": "audio/mpeg", "cache-control": "no-store" } });
 };
 
-/** One-shot synthesis: WAV from Gemini TTS, MP3 from OpenAI. */
 const ttsOneShot = async (request: Request, env: VoiceEnv): Promise<Response> => {
   const caller = await authenticate(request, env);
   const body = await readJson(request);
@@ -292,13 +263,10 @@ const ttsOneShot = async (request: Request, env: VoiceEnv): Promise<Response> =>
   return new Response(audio, { headers: { "content-type": "audio/mpeg", "cache-control": "no-store" } });
 };
 
-// ── Read-aloud: mobile HLS ─────────────────────────────────────────────────
-
 const ttsCancel = async (request: Request, env: VoiceEnv): Promise<Response> => {
   const caller = await authenticate(request, env);
   const body = await readJson(request);
   const ticket = typeof body.ticket === "string" ? readTtsTicket(body.ticket.trim(), Date.now()) : null;
-  // An expired or foreign ticket has nothing left to stop.
   if (ticket && ticket.ownerHash === (await sha256Hex(caller.ownerId))) {
     await callOwner(env, caller.ownerId, "tts.cancel", { id: ticket.id });
   }
@@ -312,7 +280,6 @@ const readManifest = async (bucket: R2Bucket, ticket: string): Promise<HlsManife
 
 const AUDIO_RANGE = /^bytes=(\d*)-(\d*)$/u;
 
-/** A segment with byte ranges, so native players can probe it. */
 const audioResponse = (bytes: Uint8Array, range: string | null): Response => {
   const total = bytes.byteLength;
   const headers = { "content-type": "audio/mpeg", "accept-ranges": "bytes", "cache-control": "no-store" };
@@ -349,7 +316,6 @@ const ttsHls = async (request: Request, env: VoiceEnv, path: string): Promise<Re
   if (file === "index.m3u8") {
     const deadline = Date.now() + PLAYLIST_WAIT_MS;
     let manifest = await readManifest(env.MEDIA, ticket.ticket);
-    // Every issued ticket has a manifest from the start, so none means a ticket Stella never issued.
     if (!manifest) throw new RpcError("NOT_FOUND", "Stream is invalid or expired.");
     while ((!manifest || (manifest.segments.length === 0 && !manifest.done)) && Date.now() < deadline) {
       await Effect.runPromise(Effect.sleep(PLAYLIST_POLL_MS));
@@ -374,9 +340,6 @@ const ttsHls = async (request: Request, env: VoiceEnv, path: string): Promise<Re
   throw new RpcError("NOT_FOUND", "Not found.");
 };
 
-// ── Router ─────────────────────────────────────────────────────────────────
-
-/** Voice's routes, or null when the path is someone else's. */
 export const handleVoiceRoute = async (request: Request, env: VoiceEnv): Promise<Response | null> => {
   const path = new URL(request.url).pathname;
   if (!path.startsWith("/api/voice/")) return null;

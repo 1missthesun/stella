@@ -1,13 +1,3 @@
-/**
- * The runtime's connection to the Stella backend worker: backend calls and
- * live views over the shared `@stella/contracts/backend` client, authorized
- * with the same token the host hands every other cloud request.
- *
- * The client is rebuilt when the backend URL changes and reconnects when the
- * signed-in account does, so a view never carries one account's data into
- * another's session.
- */
-
 import {
   BackendClient,
   backendTokenExpiryMs,
@@ -45,11 +35,6 @@ const tokenSubject = (token: string | null): string | null => {
 
 export type BackendSession = ReturnType<typeof createBackendSession>;
 
-/**
- * `mintToken` is how a forced refresh reaches the host. The kernel only holds
- * the token the host pushed, so without it a forced call would hand back that
- * same token and the server's reauthentication could never complete.
- */
 export const createBackendSession = (
   getState: () => BackendSessionState,
   mintToken?: () => Promise<string | null>,
@@ -78,10 +63,6 @@ export const createBackendSession = (
     return next;
   };
 
-  /**
-   * A forced refresh resolves only with a token newer than the cached one, so
-   * no caller can re-present the token that asked for the refresh.
-   */
   const forceToken = async (): Promise<string> => {
     if (forcing) return await forcing;
     const attempt = mintNewerToken();
@@ -108,9 +89,7 @@ export const createBackendSession = (
   };
 
   return {
-    /** The client, or null until the backend URL is configured. */
     client: get,
-    /** Like `client()`, but throws a readable error while unconfigured. */
     require(): BackendClient {
       const current = get();
       if (!current) throw new Error("Stella's cloud is not configured on this device yet.");
@@ -120,7 +99,6 @@ export const createBackendSession = (
       getState().backendUrl =
         sanitizeBackendUrl(value) ?? sanitizeBackendUrl(process.env.STELLA_BACKEND_URL);
     },
-    /** Call after the auth token changes; reconnects only when the account did. */
     noteAuthToken(): void {
       const next = tokenSubject(getState().authToken);
       if (next === subject) return;
@@ -128,10 +106,6 @@ export const createBackendSession = (
       identity = null;
       client?.reconnect();
     },
-    /**
-     * The verified owner identity, asked once per account. A failure is not
-     * cached, so the next caller asks again.
-     */
     async ownerIdentity(): Promise<OwnerIdentity> {
       if (identity && identity.subject === subject) return await identity.value;
       const value = this.require().call("owner.identity", {});
@@ -143,7 +117,6 @@ export const createBackendSession = (
         throw error;
       }
     },
-    /** Drop the cached identity, e.g. after the owner reset their data. */
     forgetOwnerIdentity(): void {
       identity = null;
     },

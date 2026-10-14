@@ -175,7 +175,6 @@ const isTimestampToken = (token: string): boolean =>
   /^\d{2,}$/.test(token) || /^\d{4}-\d{2}-\d{2}$/.test(token);
 
 export type EvidenceNameParts = {
-  /** Lowercase tokens with noise, numbering and variant words removed. */
   subject: string[];
   variant: "before" | "after" | null;
 };

@@ -15,9 +15,6 @@ import styles from "./home-phone-connectors.module.css";
 
 type Bubble = { from: "them" | "you"; text: string };
 
-/* ------------------------------------------------------------------ */
-/*  Reusable iPhone frame                                             */
-/* ------------------------------------------------------------------ */
 function PhoneFrame({
   children,
   statusDark,
@@ -93,17 +90,6 @@ function PhoneFrame({
     </div>
   );
 }
-/* ------------------------------------------------------------------ */
-/*  Stella app skin                                                   */
-/*                                                                    */
-/*  Mirrors the real iOS app (stella-mobile) on its default Pearl     */
-/*  theme: white flat canvas, hamburger-only top bar, Manrope 17pt    */
-/*  copy, accentSoft user bubbles (18 / 4 radii, hairline border),    */
-/*  bubble-less assistant prose, the Stella working indicator at the  */
-/*  chat tail, and the glass pill composer ("+", "Message Stella",     */
-/*  mic, waveform). Sources: mobile/app/(main)/_layout.tsx,           */
-/*  src/components/ChatPane.tsx, WorkingIndicator.tsx, theme/*.       */
-/* ------------------------------------------------------------------ */
 const stellaThread: Bubble[] = [
   { from: "you", text: "What was I working on before lunch?" },
   {
@@ -118,18 +104,9 @@ const stellaThread: Bubble[] = [
   },
 ];
 
-/**
- * Landing time (ms after the phone takes the stage) for each message, paced
- * like a real exchange: a read-dwell after every reply, a short pause after
- * the user sends, then Stella visibly thinks before the final answer lands.
- */
 const STELLA_TIMELINE = [500, 1900, 3300, 5000, 8300];
-/** When the working indicator enters; it holds ~2.5s and fades as the
- *  final reply (last timeline entry) streams in. */
 const THINKING_AT = 5700;
 
-// SF Symbols as used by mobile/src/components/Icon.tsx:
-// menu → line.3.horizontal, plus → plus, mic → mic, waveform → waveform.
 function MenuIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -196,18 +173,6 @@ function WaveformIcon() {
   );
 }
 
-/**
- * Stand-in for the app's working indicator star (stella-v2 mobile
- * `StellaAnimation variant="star"` — the aurora star from the brand mark,
- * "spun like a top" by `starTurn()` in aurora-shader.ts): a 30pt canvas in a
- * 34pt viewport, one staged revolution per 3.2s (drift → wind-up → whip →
- * sprung landing), four horizontal arms seen from a little above the
- * equator (sinElev 0.30) plus the upright axis and hub, tinted with the
- * theme's five aurora ramp stops (Pearl: #859dc3 → #918096, teal-ish low,
- * rose-ish high). The arms' per-frame pose is baked into CSS keyframes
- * sampled from the same starTurn() curve. The ShimmerText label is kept,
- * as in the app.
- */
 function WorkingIndicator() {
   return (
     <div
@@ -294,11 +259,6 @@ function StellaSkin() {
   );
 }
 
-/* ------------------------------------------------------------------ */
-/*  Mobile app downloads                                              */
-/* ------------------------------------------------------------------ */
-// Apple ID 6761148311 — `ascAppId` in stella-mobile/mobile/eas.json; the full
-// store URL matches the one the desktop app links from its Phone Access card.
 const APP_STORE_URL = "https://apps.apple.com/us/app/stella-your-ai/id6761148311";
 const PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.fromyou.stella";
 
@@ -512,7 +472,6 @@ export function HomePhoneConnectors() {
   useEffect(() => {
     const el = sectionRef.current;
     if (!el) return;
-    // Under reduced motion the mockup stays static.
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const io = new IntersectionObserver(
       ([entry]) => setRunning(entry.isIntersecting),

@@ -1,8 +1,3 @@
-/**
- * `GET /api/stella/prompts`: the bundled prompt set for desktop runtimes.
- * Public, like every client's copy of the same text. The revision is the
- * ETag, so a desktop revalidation of an unchanged deploy is one 304.
- */
 import { STELLA_PROMPT_SCHEMA_VERSION } from "@stella/contracts/stella-prompts";
 
 import { STELLA_PROMPT_DEFAULTS } from "./defaults.generated.js";

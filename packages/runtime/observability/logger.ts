@@ -19,40 +19,12 @@ import {
   type Scope,
 } from "effect";
 
-/**
- * Effect-native core of the local debug logger
- * (see `file-logger.ts` for the plain facade every current caller uses).
- *
- * The logger is a scoped resource: the layer acquires the open-file table
- * via `Effect.acquireRelease`, the daily rollover closes and reopens the
- * per-channel descriptors (rotate), and closing the layer's scope closes
- * whatever is still open. Rotation is a size/date check inside the write
- * effect itself — there are no timers anywhere in this module.
- *
- * Writes stay fully synchronous (`openSync` + `writeSync` on an `O_APPEND`
- * descriptor): diagnostic volume is low, and sync writes guarantee the line
- * lands on disk even if the process is mid-crash — which is exactly when
- * these logs matter most. The write path is serialized through a
- * one-permit semaphore so concurrent fibers can never interleave a
- * rollover (close/sweep/reopen) with another fiber's append; the plain
- * facade's `runSync` calls take the free permit synchronously. Every
- * filesystem error is swallowed inside the effect — a write effect never
- * fails and never throws into callers.
- */
-
 export type LogChannel = "error" | "process";
 export type LogLevel = "info" | "warn" | "error" | "fatal";
 export type LogFields = Record<string, unknown>;
 
 const DEFAULT_RETENTION_DAYS = 7;
-// Soft per-file cap so a crash loop can't fill the disk within a single
-// day. Once a day's file passes this we stop appending to it (a single
-// truncation marker is written once); it resets at the next daily rollover.
 const DEFAULT_MAX_FILE_BYTES = 5 * 1024 * 1024;
-// Total budget across every log file in the directory. Enforced on the
-// age sweep (init + daily rollover): oldest files are deleted first until
-// the directory is back under budget. Bounds long-term accumulation
-// independent of the day-count retention window.
 const DEFAULT_MAX_TOTAL_BYTES = 128 * 1024 * 1024;
 const LOG_FILE_PATTERN = /^(error|process)-\d{4}-\d{2}-\d{2}\.txt$/;
 
@@ -103,33 +75,23 @@ const parsePositiveInt = (
 };
 
 export type FileLoggerOptions = {
-  /** Absolute directory the log files live in. */
   logDir: string;
-  /** Identifies the writing process, e.g. "main" or "worker". */
   component: string;
-  /** Delete files older than this many days. */
   retentionDays?: number;
-  /** Stop appending to a single day's file once it passes this size. */
   maxFileBytes?: number;
-  /** Total byte budget across all log files; oldest are deleted first. */
   maxTotalBytes?: number;
 };
 
 export interface Interface {
-  /** Append one structured local-debug line to a channel. Never throws. */
   readonly write: (
     channel: LogChannel,
     level: LogLevel,
     event: string,
     fields?: LogFields,
   ) => Effect.Effect<void>;
-  /** Lifecycle / process event (worker + native helper start/stop/cleanup). */
   readonly process: (event: string, fields?: LogFields) => Effect.Effect<void>;
-  /** Non-fatal warning routed to the process channel. */
   readonly warn: (event: string, fields?: LogFields) => Effect.Effect<void>;
-  /** Recoverable error. */
   readonly error: (event: string, fields?: LogFields) => Effect.Effect<void>;
-  /** Crash / fatal error with its stack trace. */
   readonly crash: (
     event: string,
     error: unknown,
@@ -167,16 +129,12 @@ const make = (
         DEFAULT_MAX_TOTAL_BYTES,
       );
 
-    // Serializes the whole write path (rollover + append) across fibers.
     const writeLock = yield* Semaphore.make(1);
 
     let currentStamp = "";
     let dirReady = false;
     const truncatedChannels = new Set<LogChannel>();
 
-    // The scoped resource: per-channel O_APPEND descriptors for the current
-    // day's files, opened lazily on first write, closed on rotation, and
-    // closed by the layer's finalizer when the scope ends.
     const openFiles = yield* Effect.acquireRelease(
       Effect.sync(() => new Map<LogChannel, number>()),
       (files) =>
@@ -210,8 +168,6 @@ const make = (
         if (process.platform !== "win32") chmodSync(logDir, 0o700);
         dirReady = true;
       } catch {
-        // If we can't create the log dir, diagnostics silently no-op rather
-        // than break the app.
         dirReady = false;
       }
       return dirReady;
@@ -227,7 +183,6 @@ const make = (
           const filePath = path.join(logDir, name);
           try {
             const stat = statSync(filePath);
-            // Age-based retention first.
             if (stat.mtimeMs < cutoff) {
               unlinkSync(filePath);
               continue;
@@ -242,13 +197,9 @@ const make = (
           }
         }
       } catch {
-        // Directory may not exist yet; nothing to sweep.
         return;
       }
 
-      // Total-size budget: delete oldest files first until under budget.
-      // The active (newest) file is preserved so we never delete what we're
-      // about to append to.
       let total = remaining.reduce((sum, entry) => sum + entry.size, 0);
       if (total <= maxTotalBytes) return;
       remaining.sort((a, b) => a.mtimeMs - b.mtimeMs);
@@ -269,10 +220,6 @@ const make = (
       if (stamp === currentStamp) return;
       currentStamp = stamp;
       truncatedChannels.clear();
-      // Rotation: close the previous day's descriptors BEFORE the retention
-      // sweep so the sweep never unlinks a file we still hold open, and the
-      // next append opens the new day's file fresh. No lines can be lost in
-      // between — the whole rollover runs inside the serialized write path.
       closeAllFiles();
       sweepRetention(now);
     };
@@ -280,7 +227,6 @@ const make = (
     const filePathFor = (channel: LogChannel): string =>
       path.join(logDir, `${channel}-${currentStamp}.txt`);
 
-    /** Size of the current file, or null when it does not exist / can't be statted. */
     const currentFileSize = (filePath: string): number | null => {
       try {
         return statSync(filePath).size;
@@ -307,7 +253,6 @@ const make = (
             }
           }
         } catch {
-          // Best-effort diagnostics; retried on the next write.
           return;
         }
         openFiles.set(channel, fd);
@@ -354,9 +299,6 @@ const make = (
       if (truncatedChannels.has(channel)) return;
       const size = currentFileSize(filePath);
       if (size === null && openFiles.has(channel)) {
-        // The current file vanished underneath us (external cleanup): drop
-        // the stale descriptor so the append below recreates the file,
-        // exactly as the per-write append used to.
         const fd = openFiles.get(channel);
         openFiles.delete(channel);
         if (fd !== undefined) {
@@ -406,9 +348,6 @@ const make = (
     };
   });
 
-// `make` acquires into the ambient scope; `Layer.effect` runs it in the
-// layer's own scope (house idiom: acquireRelease inside Layer.effect, no
-// Layer.scoped), so closing the layer closes the open descriptors.
 export const layer = (
   options: FileLoggerOptions,
 ): Layer.Layer<ObservabilityLogger> =>

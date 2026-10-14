@@ -22,8 +22,6 @@ export const registerAgentHandlers = (options) => {
             conversationId,
         });
     });
-    // The desktop chat: the renderer submits to and watches one
-    // conversation's harness in the runtime.
     handleIpc(IPC_PI_CHAT_REQUEST, async (event, request) => {
         if (!options.assertPrivilegedSender(event, IPC_PI_CHAT_REQUEST)) {
             throw new Error("Blocked untrusted request.");
@@ -33,8 +31,6 @@ export const registerAgentHandlers = (options) => {
             throw new Error("Stella runtime not available");
         }
         const op = request?.op;
-        // Sending, stopping and moving Stella act on the selected
-        // conversation only; a window may stop watching one it has left.
         const conversationId = op === "submit" || op === "abort" || op === "move"
             ? requireMatchingCloudConversationId(request?.conversationId, options.uiState?.conversationId)
             : typeof request?.conversationId === "string"

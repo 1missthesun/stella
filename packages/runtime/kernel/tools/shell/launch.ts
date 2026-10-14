@@ -1,9 +1,3 @@
-/**
- * Launch preparation: the shell executable and arguments for a command, the
- * environment it runs with, the working directory and credential drop a tool
- * call may use, and the diagnostics when a spawn fails.
- */
-
 import path from "path";
 import os from "os";
 import { existsSync, realpathSync } from "fs";
@@ -56,13 +50,9 @@ export const resolveShellNodeBinary = (
   const explicit = env.STELLA_NODE_BIN?.trim();
   if (explicit && existsSync(explicit)) return explicit;
 
-  // The detached Stella runtime itself runs under Bun. Electron's host
-  // executable is passed into that worker specifically so child processes can
-  // launch its bundled Node runtime with ELECTRON_RUN_AS_NODE=1.
   const hostExecutable = env.STELLA_HOST_EXECUTABLE_PATH?.trim();
   if (hostExecutable && existsSync(hostExecutable)) return hostExecutable;
 
-  // Non-Electron embeddings commonly run the kernel under Node.
   return process.execPath;
 };
 
@@ -103,7 +93,6 @@ export const buildShellEnv = (
     STELLA_NODE_BIN: resolveShellNodeBinary(
       envOverrides ? { ...process.env, ...envOverrides } : process.env,
     ),
-    // Source-tree CLIs run under Bun (see the CLI shims).
     STELLA_BUN_PATH:
       process.env.STELLA_BUN_PATH?.trim() ||
       (process.versions.bun ? process.execPath : "bun"),
@@ -127,8 +116,6 @@ export const buildShellEnv = (
       ? { STELLA_CLI_BRIDGE_SOCK: options.cliBridgeSocketPath }
       : {}),
   };
-  // Connector actions authenticate through the worker broker. Never inherit
-  // legacy raw Stella bearer variables into shell or agent processes.
   delete mergedEnv.STELLA_SITE_AUTH_TOKEN;
   delete mergedEnv.STELLA_NATIVE_OAUTH_BACKEND_AUTH_TOKEN;
   delete mergedEnv.STELLA_LLM_PROXY_TOKEN;
@@ -141,8 +128,6 @@ export const buildShellEnv = (
     const pathKey =
       Object.keys(mergedEnv).find((key) => key.toLowerCase() === "path") ??
       "PATH";
-    // Another Stella's shims (one whose shell launched this Stella) read
-    // that Stella's variables: off this PATH, and never taken for git.
     const existingPath = (
       typeof mergedEnv[pathKey] === "string" ? mergedEnv[pathKey] : ""
     )
@@ -190,9 +175,7 @@ export const buildShellEnv = (
 type DetectedShellKind = "zsh" | "bash" | "sh" | "powershell" | "cmd";
 
 export type ShellDetectionOptions = {
-  /** Unix login shell from the system account database. Null disables it. */
   userShell?: string | null;
-  /** Test seam for platform-specific executable discovery. */
   executableExists?: (candidate: string) => boolean;
 };
 
@@ -345,11 +328,8 @@ export const resolveDefaultShell = (
 };
 
 export type ShellLaunchOptions = {
-  /** Explicit executable requested by Bash. */
   shell?: string;
-  /** Login-shell semantics are the default for compatibility with prior runs. */
   login?: boolean;
-  /** Allocate a real Unix PTY or Windows ConPTY for this command. */
   tty?: boolean;
 };
 
@@ -441,8 +421,6 @@ export const resolveShellLaunch = (
   }
 
   if (!isWindowsCmdShell(shell)) {
-    // Git Bash and other Unix-style shells available on Windows use the same
-    // command flags as their Unix counterparts, not cmd.exe's `/d /s /c`.
     return {
       shell,
       args: [options.login === false ? "-c" : "-lc", command],
@@ -515,7 +493,6 @@ const pathInside = (candidate: string, root: string): boolean => {
   );
 };
 
-/** Validate the trusted host's child credential drop before any spawn. */
 export const resolveToolProcessIdentity = (
   context?: ToolContext,
   platform: NodeJS.Platform = process.platform,
@@ -558,13 +535,6 @@ export const resolveToolProcessIdentity = (
   return { ...identity, home };
 };
 
-/**
- * Stella's variables over the inherited environment for one managed shell
- * command: process identity, checkout/drafts/agent id, local `bin` PATH
- * entries, and the stella-computer / stella-media / stella-x-api session and
- * auth. With no `command` (a CLI's own shell, whose commands are not known up
- * front) every command-gated variable is included.
- */
 const resolveStellaShellEnvOverrides = (
   state: ShellState,
   cwd: string,
@@ -638,12 +608,6 @@ const resolveStellaShellEnvOverrides = (
   return envOverrides;
 };
 
-/**
- * The environment Stella's managed shell gives its commands (CLI shims on
- * PATH, entrypoint variables, media / X auth), for engines whose CLIs bring
- * their own shell (Claude Code's native Bash) so bundled Stella workflows
- * behave the same there.
- */
 export const buildAgentShellEnvironment = (
   state: ShellState,
   context: ToolContext,
@@ -652,7 +616,6 @@ export const buildAgentShellEnvironment = (
   const env = buildShellEnv(
     resolveStellaShellEnvOverrides(state, cwd, context),
     state,
-    // The CLI owns its own process; leave colors/locale/TERM as inherited.
     true,
   );
   const result: Record<string, string> = {};

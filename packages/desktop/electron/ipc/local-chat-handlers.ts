@@ -46,7 +46,6 @@ const parseConversationFocusRoot = (
 
 type LocalChatHandlersOptions = {
   localChatHistoryService: LocalChatHistoryService;
-  /** The runtime, for what conversations on pi-durable keep (their model usage). */
   getStellaHostRunner?: () =>
     | { piChat(request: unknown): Promise<unknown> }
     | null

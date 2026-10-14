@@ -1,4 +1,3 @@
-/** Ignore sub-pixel clamp rounding when comparing scroll vs client height. */
 export const USER_MESSAGE_OVERFLOW_EPSILON_PX = 1;
 
 export function isUserMessageOverflowing(args: {

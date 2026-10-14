@@ -117,7 +117,6 @@ const getInlineChallengeToken = async (siteKey: string): Promise<string> => {
   });
 };
 
-/** Gets one fresh token from Electron main or from an inline browser widget. */
 export const getPlatformChallengeToken = async (): Promise<
   string | undefined
 > => {

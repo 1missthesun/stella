@@ -190,9 +190,6 @@ export const runNativeHelper = async (args: {
       });
 
       const timeoutMs = args.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-      // Effect-backed timeout fiber (kernel/cli/effect-runtime.ts); the old
-      // `setTimeout`/`clearTimeout` pair with identical timing. The `finish`
-      // race guard means a late timeout firing is a no-op, same as before.
       const cancelTimeout = forkTimeoutFiber(timeoutMs, () => {
         killDetachedProcess(child.pid);
         const stdout = readTrimmedFile(stdoutPath);

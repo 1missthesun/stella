@@ -1,20 +1,3 @@
-/**
- * Reactive registry of top-bar nav apps discovered from
- * `desktop/src/app/<id>/metadata.ts` files via `import.meta.glob`.
- *
- * The glob lives here (not in `ShellTopBarNav.tsx`) so that adding a new
- * `metadata.ts` file invalidates only this leaf module rather than
- * propagating up through the shell to `__root.tsx`. The HMR accept handler
- * below catches the invalidation, recomputes the snapshot, and notifies
- * subscribers via `useSyncExternalStore` -- no full renderer reload, no
- * lost React state for the create-app case.
- *
- * `ShellTopBarNav.tsx` reads via `useSyncExternalStore(subscribe, getSnapshot)`.
- *
- * Production builds: `import.meta.hot` is undefined, so the accept block
- * is a no-op. The snapshot is computed once at module load and never
- * changes -- which is correct for a production build.
- */
 import type { AppMetadata } from "@/app/_shared/app-metadata";
 
 type AppMetadataModule = { default: AppMetadata };
@@ -37,20 +20,10 @@ export const subscribe = (cb: () => void) => {
     subscribers.delete(cb);
   };
 };
-/**
- * Returns the current registered apps. Reference is stable until the
- * underlying glob actually changes (HMR), satisfying React's
- * `useSyncExternalStore` invariant.
- */
 export const getSnapshot = (): AppMetadata[] => cachedSnapshot;
 if (import.meta.hot) {
   import.meta.hot.accept((newModule) => {
     if (!newModule) return;
-    // Re-evaluating the new module's `APP_MODULES` is the safest way to
-    // pick up additions/removals: Vite's `importGlob` plugin re-globs
-    // the filesystem when its `hotUpdate` runs, so the new module's
-    // exports reflect the updated set. Recomputing the snapshot from the
-    // new module ensures stable reference semantics for the consumer.
     const next = (
       newModule as { getSnapshot?: () => AppMetadata[] }
     ).getSnapshot?.();

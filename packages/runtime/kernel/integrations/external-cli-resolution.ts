@@ -23,12 +23,7 @@ export type ResolveExternalCliOptions = {
   env?: NodeJS.ProcessEnv;
   homeDir?: string;
   cwd?: string;
-  /** Replaces the default well-known install directories (tests). */
   wellKnownDirectories?: readonly string[];
-  /**
-   * Reports a candidate executable's version string (`"2.1.293"`), or null
-   * when it cannot be determined. Defaults to running `<cli> --version`.
-   */
   probeVersion?: (executablePath: string) => string | null;
 };
 
@@ -119,10 +114,6 @@ const defaultWellKnownDirectories = (
   };
 
   if (homeDir) {
-    // The CLI's own install locations come first, then its vendor
-    // installer's directory (~/.local/bin for Claude Code), and only then
-    // package-manager global bins such as ~/.bun/bin, whose copies are
-    // installed once and rarely updated.
     for (const relativeDirectory of CLI_CONFIG[cli].toolDirectories) {
       add(path.join(homeDir, relativeDirectory));
     }
@@ -195,7 +186,6 @@ const compareVersions = (left: ParsedVersion, right: ParsedVersion): number => {
 
 const VERSION_PROBE_TIMEOUT_MS = 5_000;
 
-/** Runs `<executable> --version` and returns the first semver-looking match. */
 const probeExecutableVersion = (executablePath: string): string | null => {
   try {
     const result = spawnSync(executablePath, ["--version"], {
@@ -219,11 +209,6 @@ type VersionCacheEntry = {
   size: number;
 };
 
-/**
- * Probing spawns the CLI, so remember each executable's answer keyed by its
- * real path and invalidate only when the file itself changes (an upgrade
- * rewrites it, which moves mtime/size).
- */
 const versionCache = new Map<string, VersionCacheEntry>();
 
 const realPathOf = (executablePath: string): string => {
@@ -269,12 +254,6 @@ type ExecutableCandidate = {
   realPath: string;
 };
 
-/**
- * Among every installed copy of the CLI, prefer the newest version. A copy
- * installed once by a package manager (bun, npm) and never updated must not
- * shadow the vendor installer's self-updating copy merely because of PATH
- * order; the discovery order only breaks ties.
- */
 const pickNewestCandidate = (
   candidates: readonly ExecutableCandidate[],
   probe: (executablePath: string) => string | null,
@@ -324,10 +303,6 @@ export const resolveExternalCliPath = (
     ? options.wellKnownDirectories.map((directory) => path.resolve(directory))
     : defaultWellKnownDirectories(cli, env, homeDir);
   const pathHits = findAllOnPath(cli, env, cwd);
-  // A PATH hit outside every known install directory is a deliberate
-  // choice (a wrapper, a pinned build, a test double) and is honored as is.
-  // Only when PATH lands in one of the package-manager/installer directories
-  // is the choice an accident of PATH order worth second-guessing by version.
   const wellKnownSet = new Set(wellKnownDirectories);
   const firstPathHit = pathHits[0];
   if (firstPathHit && !wellKnownSet.has(path.dirname(firstPathHit))) {
@@ -379,10 +354,6 @@ export const buildExternalCliChildEnv = (
   const pathKey =
     Object.keys(env).find((key) => key.toLowerCase() === "path") ?? "PATH";
   const homeDir = resolveHomeDir(env);
-  // The CLI's own directory leads so the child finds its siblings; the
-  // user's PATH keeps its order; ~/.bun/bin is appended (not prepended) so
-  // bun-installed CLIs stay reachable from a GUI launch without a stale
-  // bun-installed copy shadowing anything the user put on PATH.
   const entries = [
     path.dirname(path.resolve(executablePath)),
     ...pathValue(env).split(path.delimiter).filter(Boolean),
@@ -398,13 +369,9 @@ export const buildExternalCliChildEnv = (
   });
   childEnv[pathKey] = uniqueEntries.join(path.delimiter);
   if (process.platform !== "win32") {
-    // CLIs find their config under HOME, and Claude Code on macOS names its
-    // keychain item's account after USER: an app launched without them
-    // would read the user's own CLI login as signed out.
     try {
       const user = os.userInfo();
       childEnv.HOME ||= user.homedir;
-      // Bun reports "unknown" without a USER in its own environment.
       const username =
         user.username && user.username !== "unknown"
           ? user.username

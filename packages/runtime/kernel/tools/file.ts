@@ -1,8 +1,3 @@
-/**
- * File tools: Read, Write, Edit handlers.
- * File writes are direct filesystem writes; no staging interception.
- */
-
 import { promises as fs } from "fs";
 import path from "path";
 import {
@@ -95,9 +90,6 @@ export const resolveFilePath = (
   return resolvedPath;
 };
 
-// A scoped tool workspace (the cloud sandbox) writes through the same
-// no-follow boundary as apply_patch, owned by the tool identity, so the
-// tool account can read back what Write and Edit produced.
 const writeToolFile = async (
   filePath: string,
   content: string,
@@ -128,8 +120,6 @@ export const writeTextFile = async (
     throw new Error(pathBlock);
   }
 
-  // The whole read-current-state → write cycle runs under the per-path lock
-  // so parallel Write/Edit calls against the same file cannot interleave.
   return withFileWriteLock(filePath, async () => {
     let existed = false;
     let originalEnding: "\r\n" | "\n" = "\n";
@@ -171,8 +161,6 @@ export const replaceTextInFile = async (
     throw new Error(pathBlock);
   }
 
-  // Read → apply → write must be atomic relative to sibling edits of the
-  // same file: parallel tool calls otherwise clobber each other's hunks.
   return withFileWriteLock(filePath, async () => {
     let rawContent: string;
     try {
@@ -224,9 +212,6 @@ export const applyAnchoredEditToFile = async (
       ? undefined
       : parseAnchor(args.endAnchor);
 
-  // Same atomicity contract as replaceTextInFile: anchors resolve against
-  // the file as it exists inside the lock, so sibling edits that shifted
-  // lines are absorbed by hash relocation instead of clobbered.
   return withFileWriteLock(filePath, async () => {
     let rawContent: string;
     try {
@@ -256,10 +241,6 @@ export const applyAnchoredEditToFile = async (
   });
 };
 
-/**
- * Multi-edit form: every entry matches the ORIGINAL file inside one write
- * lock, overlaps are rejected, and the file is written once or not at all.
- */
 export const applyEditsToFile = async (
   args: { filePath: unknown; edits: unknown },
   context?: ToolContext,
@@ -288,15 +269,6 @@ export const applyEditsToFile = async (
   });
 };
 
-/**
- * An image `Read`, the same on every host: the bytes already read through the
- * checked descriptor are fitted to `READ_IMAGE_CAPS` (shared with the cloud
- * Worker's Read) and carried to the model directly, never reopened by
- * pathname — a concurrently running tool-UID shell could otherwise swap the
- * path after this authorized read. An oversized photo is downscaled and
- * re-encoded rather than refused, and the result says so; only an image that
- * cannot be decoded is refused.
- */
 const readImageResult = async (
   filePath: string,
   bytes: Buffer,
@@ -359,11 +331,6 @@ export const handleRead = async (
     if (pathBlock) {
       throw new Error(pathBlock);
     }
-    // An image read is vision input, not text, and must not be bounded by the
-    // text budget (`MAX_FILE_BYTES` is 1MB; a phone photo is routinely
-    // 3-12MB). An image up to the shared source limit is read and fitted to
-    // the model's limits below; the header check stays authoritative for
-    // what the file actually is: this only decides how many bytes may be read.
     const readBudget = imageMimeTypeFromPath(filePath)
       ? READ_IMAGE_MAX_SOURCE_BYTES
       : MAX_FILE_BYTES;
@@ -417,8 +384,6 @@ export const handleRead = async (
     const content = opened.bytes.toString("utf8");
     const offset = Number(args.offset ?? 1);
     const limit = Number(args.limit ?? 2000);
-    // Hashes come from the raw LF-normalized lines (what Edit verifies
-    // against at apply time); the displayed text stays sanitized.
     const rawLines = normalizeToLF(content).split("\n");
     const displayLines = normalizeToLF(
       sanitizeToolVisibleText(content, { codeFile: true }),

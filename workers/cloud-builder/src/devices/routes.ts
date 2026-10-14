@@ -1,14 +1,3 @@
-/**
- * Devices' HTTP surface on the Worker.
- *
- *   /api/mobile/<route>             phones (pairing, push tokens), user JWT
- *
- * A phone's requests to one of the owner's computers are not here: they are
- * `POST /owners/me/devices/:deviceId/requests` (device-request-route.ts).
- *
- * Desktop UI and runtime use backend calls (`devices.*`, `phone.*`) instead.
- */
-
 import { readJsonObject } from "../http/body.js";
 import { requireCaller } from "../http/caller.js";
 import { fail, failRpcError } from "../http/response.js";
@@ -43,7 +32,6 @@ const mobileRoute = async (request: Request, env: Cloudflare.Env, url: URL): Pro
   });
 };
 
-/** Devices routes, or null when the request is not one. */
 export const handleDevicesRoute = async (request: Request, env: Cloudflare.Env): Promise<Response | null> => {
   const url = new URL(request.url);
   if (url.pathname.startsWith(MOBILE_PREFIX)) return await mobileRoute(request, env, url);

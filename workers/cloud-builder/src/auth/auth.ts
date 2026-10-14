@@ -1,23 +1,3 @@
-/**
- * Stella's identity provider: Better Auth on D1, served at `/api/auth/*`.
- *
- * - Sessions are long-lived opaque bearers (desktop and mobile keep them on
- *   disk); `GET /api/auth/token` mints the 15-minute RS256 JWT every other
- *   route verifies (`iss` = this worker's URL, `aud` = "stella", `sub` = the
- *   user id, which is the owner id; claims `sid`, `idl`), and
- *   `GET /api/auth/jwks` publishes its public keys. The private keys are in
- *   D1's `jwks` table, encrypted under BETTER_AUTH_SECRET. DEPLOY.md,
- *   "Rotating server secrets", covers BETTER_AUTH_SECRET_V2.
- * - Magic links (Resend), Google and Apple, one-time tokens for
- *   browser-to-app returns, and the `stellaHandoff` endpoints. There is no
- *   anonymous sign-in.
- * - Mobile integrity and web Turnstile guard magic links
- *   (src/auth/integrity.ts).
- * - Deleting a user closes its owner object first (`OwnerGate.closeOwner`).
- *
- * One instance per isolate.
- */
-
 // The passkey stack's tsyringe needs this evaluating ahead of it in this chunk.
 import "reflect-metadata";
 import { betterAuth, type BetterAuthOptions, type BetterAuthPlugin } from "better-auth";
@@ -68,23 +48,19 @@ const configured = (env: unknown, name: string): string | undefined => {
   return trimmed || undefined;
 };
 
-/** This worker's public origin remains the JWT issuer across auth-domain changes. */
 export const backendUrl = (env: Pick<AuthEnv, "CLOUD_BUILDER_PUBLIC_URL">): string =>
   (env.CLOUD_BUILDER_PUBLIC_URL ?? "").trim().replace(/\/+$/, "");
 
-/** Branded browser callbacks and email links; independent of the JWT issuer. */
 export const authUrl = (env: AuthEnv): string =>
   (configured(env, "STELLA_AUTH_URL") ?? backendUrl(env)).replace(/\/+$/, "");
 
 export const websiteUrl = (env: unknown): string =>
   (configured(env, "STELLA_WEBSITE_URL") ?? DEFAULT_WEBSITE_URL).replace(/\/+$/, "");
 
-/** Dev only: test accounts exist and their magic links are logged, not sent. */
 export const testAccountsEnabled = (env: unknown): boolean => configured(env, "STELLA_TEST_ACCOUNTS") === "1";
 
 const localDevOriginsEnabled = (env: unknown): boolean => configured(env, "STELLA_LOCAL_DEV_ORIGINS") === "1";
 
-/** Browser origins allowed to call `/api/auth/*` and to be redirect targets. */
 export const trustedOrigins = (env: AuthEnv): string[] => {
   const scheme = configured(env, "STELLA_MOBILE_SCHEME") ?? "stella-mobile";
   return Array.from(
@@ -94,8 +70,6 @@ export const trustedOrigins = (env: AuthEnv): string[] => {
       websiteUrl(env),
       DEFAULT_WEBSITE_URL,
       ...(localDevOriginsEnabled(env) ? ["http://localhost:3000", "http://localhost:57314"] : []),
-      // The origin the Electron main process declares on every auth request
-      // (DESKTOP_AUTH_ORIGIN in auth-service.ts).
       "http://127.0.0.1:57314",
       "stella-app://desktop",
       // Native callbacks; platforms serialize the empty path with two or three slashes.
@@ -183,10 +157,6 @@ const sendMagicLinkEmail = async (env: AuthEnv, email: string, url: string): Pro
   console.log(JSON.stringify({ event: "auth_magic_link_sent", provider: "resend" }));
 };
 
-/**
- * Best-effort new-device sign-in alert, over the same transports as magic
- * links. Never throws: an alert must not fail the sign-in it reports.
- */
 const sendNewSignInAlertEmail = async (
   env: AuthEnv,
   email: string,
@@ -246,13 +216,6 @@ const expoOAuthProxy = (): BetterAuthPlugin => {
   return proxy as BetterAuthPlugin;
 };
 
-/**
- * Hand Better Auth's short-lived `set-ott` header to a browser-followed
- * callback without putting it in a query string: same-origin handoff routes
- * read it from a short-lived HttpOnly cookie, and other origins get it in the
- * URL fragment, which is never sent to a server. Must follow
- * `oneTimeToken()`.
- */
 const nativeOttRedirect = (): BetterAuthPlugin => ({
   id: "stella-native-ott-redirect",
   hooks: {
@@ -320,12 +283,6 @@ export const ownerInternalCall = async (
   await gate.ownerInternal({ name, args, ownerGeneration });
 };
 
-/**
- * Signing out everywhere (`/revoke-sessions`) also refuses the JWTs already
- * minted, through the owner's `account.sessionsRevoked` floor; their
- * 15-minute expiry bounds anything that slips past. A plugin hook, after
- * `bearer()`, so the caller's bearer has become its session.
- */
 const revokedTokenFloor = (env: AuthEnv): BetterAuthPlugin => ({
   id: "stella-revoked-token-floor",
   hooks: {
@@ -350,10 +307,6 @@ const revokedTokenFloor = (env: AuthEnv): BetterAuthPlugin => ({
   },
 });
 
-/**
- * Revoking one session (a lost device, from the Sessions list) also refuses
- * the JWTs it already minted and ends its push registrations.
- */
 const revokedSessionTeardown = (env: AuthEnv): BetterAuthPlugin => ({
   id: "stella-revoked-session-teardown",
   hooks: {
@@ -437,8 +390,6 @@ const buildOptions = (env: AuthEnv) => {
     database: env.DB,
     trustedOrigins: trustedOrigins(env),
     telemetry: { enabled: false },
-    // The session token is the credential desktop and mobile keep on disk;
-    // in-use sessions slide forward daily.
     session: { expiresIn: 7 * DAY_SECONDS, updateAge: DAY_SECONDS },
     rateLimit: {
       enabled: true,
@@ -458,8 +409,6 @@ const buildOptions = (env: AuthEnv) => {
     },
     user: {
       additionalFields: {
-        // The identity ladder: 1 email, 2 social. Paying (3) is the billing
-        // ledger's to say, not the user row's.
         isAnonymous: { type: "boolean", required: false, defaultValue: false, input: false },
         identityLevel: { type: "number", required: false, defaultValue: 0, input: false },
       },
@@ -517,7 +466,6 @@ const buildOptions = (env: AuthEnv) => {
       },
       account: {
         create: {
-          // A provider account makes the user a social account.
           after: async (account, ctx) => {
             if (account.providerId !== "google" && account.providerId !== "apple") return;
             await ctx?.context.internalAdapter.updateUser(account.userId, { identityLevel: 2 });
@@ -526,10 +474,6 @@ const buildOptions = (env: AuthEnv) => {
       },
       session: {
         create: {
-          // A device this account has never signed in from (no prior
-          // session shares its user agent) earns the owner an email.
-          // Same device on a new network keeps its user agent, so
-          // roaming does not alert. Best-effort throughout.
           after: async (session, ctx) => {
             try {
               const adapter = ctx?.context.internalAdapter as
@@ -624,5 +568,4 @@ export type Auth = ReturnType<typeof makeAuth>;
 
 let instance: Auth | undefined;
 
-/** The isolate's Better Auth instance. */
 export const createAuth = (env: AuthEnv): Auth => (instance ??= makeAuth(env));

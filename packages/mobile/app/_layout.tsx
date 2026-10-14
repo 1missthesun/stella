@@ -69,32 +69,11 @@ import { ShareIntentHandler } from "../src/lib/share-intent-handler";
 
 void SplashScreen.preventAutoHideAsync();
 
-/**
- * How much longer the splash may stay up for the account-authority handshake
- * once auth has resolved. The handshake normally lands well inside this; on a
- * bad network the splash lifts anyway and the chat shows its own progress.
- */
 const SPLASH_AUTHORITY_WAIT_MS = 2_500;
 
-/** AsyncStorage key holding the last boot-crash breadcrumb (JSON). */
 const BOOT_CRASH_BREADCRUMB_KEY = "stella-mobile-last-boot-crash-v1";
 
-/**
- * Root-level render-error boundary (picked up by expo-router). Postmortem
- * armor from the 2026-07-02 OTA boot crash: a render-time ReferenceError in
- * ChatPane hit `RCTFatal` in release and killed the app before ANY UI — no
- * error screen, no diagnostics, and expo-updates never rolled back. This
- * boundary turns any future render/boot throw into a visible error screen
- * with a retry, persists a breadcrumb for diagnostics, and lifts the native
- * splash (the crash usually happens while the splash is still up, which would
- * otherwise hide the fallback and look like a hang).
- *
- * Deliberately depends on nothing but react-native primitives + AsyncStorage
- * so the fallback itself can't be taken down by whatever module just failed.
- */
 export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
-  // Rendered OUTSIDE the provider tree by expo-router, so this resolves
-  // through the English fallback catalog rather than throwing.
   const t = useT();
   useEffect(() => {
     void SplashScreen.hideAsync().catch(() => undefined);
@@ -232,8 +211,6 @@ function AuthenticatedLayout() {
     });
   }, []);
 
-  // Stella needs an account now. A guest (anonymous) session from an older
-  // build is signed out here, which sends the user to the login screen.
   const legacyGuest =
     (session.data?.user as { isAnonymous?: boolean | null } | undefined)
       ?.isAnonymous === true;
@@ -249,10 +226,6 @@ function AuthenticatedLayout() {
   }, [legacyGuest]);
   const signedInSession = legacyGuest ? null : (session.data ?? null);
 
-  // Start the account-authority handshake the moment the session is known,
-  // while the native splash is still up. The chat screen reads the same
-  // process-level result, so by the time the splash lifts it is usually ready
-  // instead of starting six round trips behind a spinner.
   const cloudIdentity = useMemo(
     () => observeCloudConversationIdentity(signedInSession),
     [signedInSession],
@@ -295,7 +268,6 @@ function AuthenticatedLayout() {
     const onWelcome = pathname === "/welcome";
     const onIndex = pathname === "/" || pathname === "";
     const onOnboarding = pathname === "/onboarding";
-    // Pairing a server works signed in or out; the screen owns its exits.
     const onServerConnect =
       pathname === "/connect-server" || pathname === "/pair";
     const onMain = [
@@ -321,7 +293,6 @@ function AuthenticatedLayout() {
 
     if (signedInSession) {
       const subject = signedInSession.user?.id ?? "";
-      // No push from self-hosted servers yet (they can't send through ours).
       const pushOwner = currentServerFeatures().push ? subject : "";
       setPushDeliveryOwner(pushOwner || null);
       if (pushOwner) void registerForPushNotifications(pushOwner);
@@ -340,8 +311,6 @@ function AuthenticatedLayout() {
 
     setPushDeliveryOwner(null);
 
-    // Signed out of a self-hosted server: there is no sign-in page there,
-    // only a new pairing (or going back to Stella's service).
     if (isSelfHostedLaunch) {
       router.replace({
         pathname: "/connect-server",
@@ -351,7 +320,6 @@ function AuthenticatedLayout() {
     }
 
     if (onMain || onIndex || (mainChatRequested && !onLogin && !onWelcome)) {
-      // Builds that can pair a server ask "Stella or your own server?" first.
       router.replace(selfHostServersAvailable ? "/welcome" : "/login");
     }
   }, [
@@ -439,11 +407,6 @@ function AppLayout() {
   return <AuthenticatedLayout />;
 }
 
-/**
- * Mounted inside `ThemeProvider`, which holds rendering until the stored
- * theme has loaded — so the splash only lifts once the first frame is
- * painted in the user's actual theme (no Pearl flash on cold start).
- */
 function HideSplashWhenThemed() {
   useEffect(() => {
     void SplashScreen.hideAsync().finally(markSplashHidden);

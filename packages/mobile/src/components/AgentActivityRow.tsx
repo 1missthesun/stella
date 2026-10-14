@@ -13,34 +13,10 @@ import { fadeHex } from "../theme/oklch";
 import type { Colors } from "../theme/colors";
 import { fonts } from "../theme/fonts";
 
-/** Sweep duration for the title shimmer — a touch quicker than the base
- *  ShimmerText so the in-progress state reads as lively (desktop parity). */
 const TITLE_SHIMMER_MS = 1900;
 
-/** Resting strength of the running title — the shimmer's bright band lifts
- *  the dimmed glyphs up to full ink as it passes (inverted polarity). Sits
- *  at the settled title's own strength (desktop `--text-shimmer-from:
- *  --text-base`) so settled and running rows agree; the passing wave alone
- *  carries the motion. */
 const RUNNING_REST_ALPHA = AGENT_ACTIVITY_INK.runningRestAlpha;
 
-/**
- * One minimal, chrome-less agent activity line — the mobile analogue of the
- * desktop `agent-activity-row`. No card surface, no border, no badges, no
- * provider icons: an optional leading slot that doubles as the status tell
- * (static star while the shimmering title carries the running motion, a quiet
- * grey check once done, an arrow for `send_message` follow-ups; failed rows keep
- * the plain star), the task DESCRIPTION on a single line, and a trailing
- * chevron as the tap-through affordance.
- *
- * Read-outs of live activity ask for `lifecycleStatus` instead, which fills the
- * same slot with desktop's activity icon vocabulary so the top-bar menus on
- * both platforms label their rows identically.
- *
- * Both of those are earned rather than assumed: a row with nowhere to go drops
- * the chevron, since it promises a tap that does nothing, and a row that needs
- * no status tell omits the glyph.
- */
 export function AgentActivityRow({
   title,
   glyph,
@@ -51,18 +27,11 @@ export function AgentActivityRow({
   roomy = false,
 }: {
   title: string;
-  /** Omit for a plain read-out line with no status tell. */
   glyph?: AgentActivityGlyph;
-  /**
-   * Fills the leading slot with desktop's activity icon vocabulary instead of
-   * the card's own star/check/arrow tell. Takes precedence over `glyph`.
-   */
   lifecycleStatus?: TaskLifecycleStatus;
   working: boolean;
   colors: Colors;
-  /** Opens the agent detail (activity hub). Row is inert when absent. */
   onPress?: () => void;
-  /** Slightly larger, airier text for the top-bar menu. */
   roomy?: boolean;
 }) {
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -107,15 +76,8 @@ export function AgentActivityRow({
           text={title}
           active={working}
           variant="highlight"
-          // Sweep peak lifts to full strong ink (desktop
-          // `--text-shimmer-via: --text-strong`); the resting base below is
-          // the same ink faded to the settled title's strength.
           color={colors.textStrong}
           textStyle={
-            // Running rows rest at the settled title's strength and the sweep
-            // lifts them to full strong ink; ShimmerText renders the same
-            // resting color statically when motion is off, so the state still
-            // reads as in-progress.
             working
               ? [
                   styles.title,
@@ -169,13 +131,8 @@ const makeStyles = (colors: Colors) =>
       minWidth: 0,
     },
     title: {
-      // One notch up from muted (desktop --text-weak -> --text-base):
-      // comfortably readable, still clearly secondary to main-chat body
-      // text, and matching the running shimmer's resting base.
       color: colors[AGENT_ACTIVITY_INK.titleInk],
       fontFamily: fonts.sans.medium,
-      // Matches desktop's bumped row text size — one step up from the old
-      // 14pt so the description reads comfortably without moving the glyphs.
       fontSize: 15,
       lineHeight: 20,
       letterSpacing: -0.2,

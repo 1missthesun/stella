@@ -1,23 +1,3 @@
-/**
- * Desktop database schema and migration runner.
- *
- * The schema is versioned through `PRAGMA user_version` and evolves through
- * the linear, forward-only list in `MIGRATIONS`. Opening a database is:
- * per-connection pragmas, read the version, and — only when the version is
- * behind — run the missing migrations once under an exclusive transaction.
- * A database that is already current performs no writes at open.
- *
- * Design invariants the schema encodes (instead of read-time inference):
- *  - `entry.seq` is a per-conversation sequence assigned in code by the
- *    writer; ordering is always `(conversation_id, seq)`.
- *  - `entry.turn_seq` records the visible user message that opened the turn
- *    an entry belongs to, written at insert time.
- *  - `entry.visible` is computed once at write time by the single policy
- *    function in TypeScript (`chat-event-visibility` contract).
- *  - `entry.search_text` is a writer-populated column that the
- *    external-content FTS index mirrors via trivial triggers.
- */
-
 import type { SqliteDatabase } from "./shared.js";
 
 export const SCHEMA_VERSION = 10;
@@ -81,13 +61,6 @@ CREATE INDEX IF NOT EXISTS idx_entry_run
   ON entry(run_id) WHERE run_id IS NOT NULL;
 `;
 
-/**
- * Reply references: which earlier message or agent thread an assistant
- * entry replied to. Written from the entry's own payload
- * (`metadata.runtime.replyRefs`) inside the entry write, so the index can
- * never disagree with the row. Read by the focus (lineage) query and the
- * reply-count affordance.
- */
 export const ENTRY_REF_SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS entry_ref (
   conversation_id TEXT NOT NULL REFERENCES conversation(id) ON DELETE CASCADE,
@@ -122,10 +95,6 @@ CREATE INDEX IF NOT EXISTS idx_entry_search_conv_created
   WHERE search_text IS NOT NULL;
 `;
 
-/**
- * Operational tables: durable delivery and receipt ledgers for the cloud
- * lane. They are not chat history.
- */
 export const CLOUD_SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS cloud_transcript_outbox (
   id TEXT PRIMARY KEY,
@@ -215,11 +184,6 @@ CREATE INDEX IF NOT EXISTS idx_cloud_journal_admission_receipts_created
   ON cloud_journal_admission_receipts(created_at, id);
 `;
 
-/**
- * Column backfills for pre-existing (legacy) cloud tables that predate later
- * dev columns. CREATE TABLE IF NOT EXISTS above is a no-op for them, so the
- * columns are added here; existing NULL rows are intentionally untrusted.
- */
 const applyCloudColumnBackfills = (db: SqliteDatabase): void => {
   const addColumn = (table: string, column: string) => {
     try {
@@ -310,10 +274,6 @@ END;
 
 `;
 
-/**
- * The agent loops' tables, which nothing reads or writes any more: their
- * threads, agents, runs, summaries and receipts.
- */
 const DROP_AGENT_LOOP_SEARCH_INDEXES = [
   "DROP TABLE IF EXISTS thread_fts;",
   "DROP TABLE IF EXISTS durable_thread_summaries_fts;",
@@ -352,8 +312,6 @@ const MIGRATIONS: Migration[] = [
     version: 1,
     apply: (db) => {
       db.exec(CORE_SCHEMA_SQL);
-      // Backfills first: a legacy cloud table may predate columns that the
-      // index statements in CLOUD_SCHEMA_SQL reference.
       applyCloudColumnBackfills(db);
       db.exec(CLOUD_SCHEMA_SQL);
       // A SQLite build without FTS5 (some bun:sqlite linkages) must not lose
@@ -409,7 +367,6 @@ const MIGRATIONS: Migration[] = [
  */
 export const EXTERNAL_CONTENT_FTS_TABLES = ["entry_fts"] as const;
 
-/** `INSERT INTO <fts>(<fts>) VALUES ('rebuild')` for one index. */
 export const rebuildFtsIndexSql = (table: string): string =>
   `INSERT INTO ${table}(${table}) VALUES ('rebuild');`;
 
@@ -429,12 +386,6 @@ const sleepSync = (ms: number) => {
   Atomics.wait(new Int32Array(buffer), 0, 0, ms);
 };
 
-/**
- * Bring the database to the current schema version. A database already at
- * the current version performs no writes. Migrations run once, under an
- * exclusive transaction; a concurrent opener blocks on the lock (retrying
- * past the busy timeout) and then observes the bumped version.
- */
 export const migrateDesktopDatabase = (db: SqliteDatabase): void => {
   applyConnectionPragmas(db);
   if (readUserVersion(db) >= SCHEMA_VERSION) return;

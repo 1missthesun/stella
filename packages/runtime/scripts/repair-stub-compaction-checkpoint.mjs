@@ -61,9 +61,6 @@ const PROTECTED_MUTATION_TABLES = new Set([
   "runtime_thread_entries",
   "runtime_threads",
 ]);
-// These are the exact trigger definitions installed by database-init.ts.
-// A newly added or locally modified mutating trigger must be reviewed and
-// added deliberately; dry-run authorization never blesses an unknown one.
 const CERTIFIED_MUTATING_TRIGGER_DIGESTS = new Map([
   [
     "trg_runtime_thread_entries_sequence",
@@ -142,12 +139,6 @@ const pathIsWithin = (candidate, root) => {
   );
 };
 
-/**
- * This utility is deliberately incapable of targeting Rahul's installed
- * Stella tree or its live data root. Operators must first make an offline
- * copy elsewhere; stopped-app confirmation and holder checks remain required
- * for writes to that copy.
- */
 const findInodeWithin = (root, targetStat) => {
   if (!fs.existsSync(root)) return undefined;
   const pending = [root];
@@ -192,8 +183,6 @@ export const assertOfflineDatabasePath = (candidate, options = {}) => {
     );
   };
   const absolute = path.resolve(candidate);
-  // Reject lexical live paths before any stat/read against them. Existing
-  // offline paths are then resolved once more to catch symlinks into live.
   rejectProtected(absolute);
   const lexicalStat = lstatIfPresent(absolute);
   if (lexicalStat?.isSymbolicLink()) {
@@ -627,11 +616,6 @@ const loadThreadEntries = (db, threadKey, entryColumns) =>
     )
     .all(threadKey);
 
-// v2's database initializer backfills insertion_sequence and installs a
-// trigger for new rows. The repair therefore performs no legacy sequence
-// migration of its own: parent links remain the topology authority, while a
-// safe sequence is required only for checkpoints the repair will delete.
-
 const loadThreadRow = (db, threadKey, threadColumns) =>
   db
     .prepare(
@@ -849,14 +833,6 @@ const strictSummaryValidationInput = (entryId, data) => {
   };
 };
 
-// v2 now persists both acceptance inputs. Older checkpoints do not contain
-// enough information to replay the runtime validator: tokensBefore is the
-// whole-thread estimate, not the folded middle span, and the previous summary
-// was not recorded. Committed forensic evidence identifies the damaged target
-// and a predecessor ID/length, but not the predecessor's exact summary, full
-// row digest, or runtime inputs. That is insufficient to authorize a byte-exact
-// fallback, so all legacy checkpoints are explicitly unsupported.
-
 const validatePersistedCheckpointSummary = (entryId, data) => {
   const summary = strictSummary(entryId, data);
   const validationInput = strictSummaryValidationInput(entryId, data);
@@ -936,10 +912,6 @@ export const analyzeRepair = (db, entryId) => {
     runtimeValidation,
     validationInput,
   } = classifyCertifiedStubCheckpoint(target.entry_id, targetData);
-  // The only automatically repairable corruption is the exact certified v1
-  // shape: one short ASCII `## Topic` fragment over a large explicit range.
-  // The ASCII signature intentionally rejects Unicode normalization tricks,
-  // format/invisible code points, extra headings, and ambiguous whitespace.
   const rows = loadThreadEntries(db, target.thread_key, entryColumns);
   const { byId, children } = buildTopology(rows);
   assertCheckpointRangeParentAncestry(
@@ -987,10 +959,6 @@ export const analyzeRepair = (db, entryId) => {
   ) {
     fail("An affected checkpoint lacks a safe insertion_sequence.");
   }
-  // Validate every dependent checkpoint except the target itself. Filtering
-  // by entry_id (not position) matters: `rows` is ordered by
-  // insertion_sequence, so a dependent row that sorts BEFORE the target
-  // would occupy index 0 and escape a slice(1)-style check.
   for (const candidate of affected.filter(
     (row) => row.entry_id !== target.entry_id,
   )) {
@@ -1020,10 +988,6 @@ export const analyzeRepair = (db, entryId) => {
     ).length;
     return rightDepth - leftDepth;
   });
-  // Every surviving descendant subtree keeps all of its internal edges. Only
-  // the boundary edge whose immediate parent will be deleted is rewritten to
-  // the nearest surviving ancestor; full-thread verification below then walks
-  // and fingerprints every descendant, not merely these boundary children.
   const reparents = rows
     .filter(
       (row) =>
@@ -1366,8 +1330,6 @@ export const applyRepairPlan = (
   const deleteRow = db.prepare(
     `DELETE FROM runtime_thread_entries WHERE ${fullRowWhere(plan.entryColumns)}`,
   );
-  // Delete descendants before ancestors based on authoritative parent depth,
-  // never insertion order (which is diagnostic ordering, not topology).
   for (const row of plan.affectedDeletionOrder) {
     const result = deleteRow.run(
       ...plan.entryColumns.map((column) => row[column]),
@@ -1718,8 +1680,6 @@ export const applyRestorePlan = (db, backup, restorePlan) => {
     `INSERT INTO runtime_thread_entries (${selectColumns(backup.entryColumns)})
      VALUES (${backup.entryColumns.map(() => "?").join(", ")})`,
   );
-  // Recreate ancestors before dependent checkpoints so restore remains valid
-  // if v2 later adds a parent-entry foreign key.
   for (const row of rowsParentsFirst(backup.deletedEntries)) {
     const result = insert.run(
       ...backup.entryColumns.map((column) => row[column]),
@@ -1981,8 +1941,6 @@ export const main = (argv = process.argv.slice(2)) => {
     ? resolveExistingRegularFile(restoreInput, "Backup")
     : undefined;
   if (backupPath) assertOfflineDatabasePath(backupPath);
-  // Receipt authenticity is checked before database readiness analysis and,
-  // critically, before opening the database writable.
   const backup = backupPath ? loadBackup(backupPath) : undefined;
 
   const db = new DatabaseSync(dbPath, { readOnly: !apply });

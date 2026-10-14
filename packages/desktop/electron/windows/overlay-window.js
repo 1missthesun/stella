@@ -25,8 +25,6 @@ const getAllDisplaysBounds = () => {
     }
     return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
 };
-// ─── OverlayWindow: Electron window lifecycle ───────────────────────────
-/** Pure window lifecycle: create, destroy, respan, show/hide, interactivity. */
 class OverlayWindow {
     options;
     window = null;
@@ -46,7 +44,6 @@ class OverlayWindow {
     getOverlayOrigin() {
         return this.overlayOrigin;
     }
-    /** Keeps overlay-local coords aligned with `getContentBounds()` (macOS can nudge the panel). */
     refreshOverlayOriginFromContentBounds() {
         if (!this.window || this.window.isDestroyed())
             return;
@@ -169,9 +166,6 @@ class OverlayWindow {
                 this.window.setOpacity(0);
                 if (process.platform !== 'darwin') {
                     this.window.showInactive();
-                    // Warm-only create: the present above pre-pays first-show cost so
-                    // the first real show() is instant, but the window must not stay
-                    // resident in the compositor afterwards (see fadeOut).
                     if (this.concealOnWarmPresent) {
                         this.concealOnWarmPresent = false;
                         this.window.hide();
@@ -334,15 +328,6 @@ class OverlayWindow {
         clearTimeout(this.reloadTimer);
         this.reloadTimer = null;
     }
-    /**
-     * Perf: drop the second renderer process when the overlay has gone idle,
-     * WITHOUT marking the controller dead. Unlike `destroy()`, this leaves
-     * `this.destroyed` false so the next show entrypoint can rebuild the window
-     * via `ensureReady()`, reclaiming an unused resident renderer and re-warming
-     * it on demand. Hiding
-     * (fadeOut) alone keeps a transparent, screen-spanning, always-on-top
-     * layered surface resident for the whole session; this actually frees it.
-     */
     reclaimForIdle() {
         if (this.destroyed)
             return;
@@ -356,9 +341,6 @@ class OverlayWindow {
         }
         this.ready = false;
     }
-    /** Idempotent — calling more than once is a no-op after the first.
-     *  After this returns, `create()` refuses to materialize the window
-     *  again (the controller is treated as dead). */
     destroy() {
         if (this.destroyed)
             return;
@@ -381,21 +363,13 @@ class OverlayWindow {
         this.ready = false;
     }
 }
-// Perf: after the overlay has been idle (no active feature) this long, drop
-// its renderer process. The next show entrypoint rebuilds it via
-// `ensureReady()` so a chat-only session doesn't carry a resident second
-// renderer it never uses.
 const OVERLAY_IDLE_DESTROY_DELAY_MS = 5 * 60 * 1000;
 export class OverlayWindowController {
     overlayWindow;
     destroyed = false;
-    // Active component tracking — overlay stays visible when any component is active.
     activeRegionCapture = false;
     activeWindowHighlight = false;
     windowHighlightRequestId = 0;
-    // Perf: idle-reclaim timer for the overlay renderer (see
-    // OVERLAY_IDLE_DESTROY_DELAY_MS). Armed when the overlay goes idle, cancelled
-    // the moment any surface becomes active again.
     idleDestroyTimer = null;
     handleOverlaySetInteractive = (_event, interactive) => {
         if (this.activeRegionCapture && !interactive) {
@@ -415,8 +389,6 @@ export class OverlayWindowController {
         });
     };
     previewWindowHighlightAtScreenPoint(screenPoint) {
-        // Point previews belong exclusively to an active region-capture
-        // session. Ignore delayed renderer events after capture teardown.
         if (!this.activeRegionCapture)
             return;
         const requestId = ++this.windowHighlightRequestId;
@@ -456,14 +428,6 @@ export class OverlayWindowController {
         }
         return warmed;
     }
-    /**
-     * Perf prerequisite for idle-reclaim: every show entrypoint funnels through
-     * here so the overlay self-creates on demand even if it was never created or
-     * was idle-destroyed. Cancels the pending idle-reclaim first (a surface is
-     * about to become active) and waits for the renderer to be ready before the
-     * caller shows it — otherwise `OverlayWindow.show()` no-ops on a null/not-yet
-     * -ready window and the surface would silently fail to appear.
-     */
     async ensureReady(timeoutMs) {
         this.cancelIdleDestroy();
         return this.overlayWindow.ensureReady(timeoutMs);
@@ -479,7 +443,6 @@ export class OverlayWindowController {
         this.cancelIdleDestroy();
         this.idleDestroyTimer = setTimeout(() => {
             this.idleDestroyTimer = null;
-            // Re-check: a surface may have re-activated between scheduling and firing.
             if (this.isAnyActive) {
                 return;
             }
@@ -497,8 +460,6 @@ export class OverlayWindowController {
         }
         this.activeWindowHighlight = true;
         const reqId = this.windowHighlightRequestId;
-        // Perf: self-create on demand so the window highlight still appears after an
-        // idle reclaim (or before the overlay's first build).
         if (!(await this.ensureReady()))
             return;
         // A hide/newer-preview/newer-show landed while the renderer was rebuilding;
@@ -532,15 +493,10 @@ export class OverlayWindowController {
         if (this.isAnyActive)
             return;
         this.overlayWindow.fadeOut();
-        // Perf: hidden alone keeps the renderer resident; arm the idle-reclaim so
-        // an unused overlay frees its process after a grace period. The next show
-        // entrypoint rebuilds it via `ensureReady()`.
         this.scheduleIdleDestroy();
     }
     async showSurface(options) {
         options.setActive();
-        // Perf: self-create the overlay on demand so the surface still appears
-        // after an idle reclaim (or before the first build).
         if (!(await this.ensureReady()))
             return;
         if (options.focusable !== undefined) {
@@ -568,7 +524,6 @@ export class OverlayWindowController {
         this.overlayWindow.send(options.channel, options.payload);
         this.hideOverlayIfIdle();
     }
-    // ─── Region Capture ───────────────────────────────────────────────────
     async startRegionCapture() {
         await this.showSurface({
             setActive: () => {
@@ -580,8 +535,6 @@ export class OverlayWindowController {
             interactive: true,
             focusable: true,
         });
-        // Ring the window under the cursor right away — the renderer only probes
-        // on mousemove, which leaves the overlay blank until the user moves.
         this.previewWindowHighlightAtScreenPoint(screen.getCursorScreenPoint());
     }
     suspendRegionCaptureForScreenshot() {
@@ -614,11 +567,6 @@ export class OverlayWindowController {
     send(channel, ...args) {
         this.overlayWindow.send(channel, ...args);
     }
-    // ─── Cleanup ──────────────────────────────────────────────────────────
-    /** Idempotent — calling more than once is a no-op after the first.
-     *  Detaches every IPC listener this controller registered in its
-     *  constructor so we don't leak listeners across a hot-restart, and
-     *  destroys the underlying overlay window. */
     destroy() {
         if (this.destroyed)
             return;
@@ -626,7 +574,6 @@ export class OverlayWindowController {
         offIpc(IPC_OVERLAY_SET_INTERACTIVE, this.handleOverlaySetInteractive);
         offIpc(IPC_OVERLAY_HIDE_WINDOW_HIGHLIGHT, this.handleOverlayHideWindowHighlight);
         offIpc(IPC_OVERLAY_PREVIEW_WINDOW_HIGHLIGHT_AT_POINT, this.handleOverlayPreviewWindowHighlightAtPoint);
-        // Clear the idle-reclaim timer so it can't fire after teardown.
         this.cancelIdleDestroy();
         this.overlayWindow.destroy();
     }

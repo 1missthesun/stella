@@ -1,36 +1,3 @@
-/**
- * Composes the visible chat timeline from four sources:
- *
- *   - `persistedMessages` — SQLite-backed messages from
- *     `useConversationMessages` (each carries its turn's tool events
- *     pre-grouped on `toolEvents`).
- *   - `optimisticEvents` — fresh user messages emitted by
- *     `useStreamingChat` before the runtime persists them.
- *   - scheduled events — cron / heartbeat user messages still pending
- *     in the scheduler.
- *   - `streamingAssistants` — in-memory assistant messages currently
- *     being streamed from the runtime. Per Option A (standard chat-UI
- *     pattern, c.f. Vercel `useChat`), live stream content is just a
- *     regular assistant row whose text grows over time, NOT a
- *     separate "tail" overlay layered on top of the persisted list. If
- *     SQLite catches up while the live row is still present, the live
- *     row keeps ownership of the visible text and borrows persisted
- *     metadata/tool events from the matching `(userMessageId,
- *     indexInTurn)` slot.
- *
- * Optimistic / scheduled overlays are projected to `MessageRecord[]`
- * via `groupEventsIntoMessages`; streaming overlays are already in
- * `MessageRecord` shape. All four merge into one shape and sort by
- * timestamp + id. For active streamed assistant slots, the live row
- * masks its persisted twin so completion does not swap the rendered
- * message source just because SQLite acknowledged the final text.
- *
- * Kept separate from `useConversationMessages` because the overlay
- * needs `optimisticEvents` / `streamingAssistants` from
- * `useStreamingChat`, which in turn needs `persistedMessages` from
- * `useConversationMessages` — a single hook owning all of that would
- * create a dependency loop.
- */
 import { useMemo, useRef } from "react";
 import { useScheduledEvents } from "@/features/chat/hooks/use-scheduled-events";
 import type { EventRecord } from "@/features/chat/lib/event-transforms";
@@ -125,12 +92,6 @@ export const createOwningUserClampedSortTimestampResolver = (
   };
 };
 
-/**
- * Builds one coherent total ordering for a merge input. Every row in an
- * equal-timestamp bucket uses its pre-sort position as the secondary key;
- * mixing owner-specific ordinals with lexical ids would make the comparator
- * non-transitive when assistants from multiple turns share a clamped anchor.
- */
 export const createDisplayOrderComparator = (
   messages: readonly MessageRecord[],
   getSortTimestamp: SortTimestampResolver = defaultSortTimestamp,
@@ -163,11 +124,6 @@ const getAssistantUserMessageId = (
     : undefined;
 };
 
-/**
- * Every user turn the timeline still knows about: persisted rows plus
- * optimistic/scheduled overlay rows (a just-sent turn exists only as an
- * overlay until the canonical write lands).
- */
 const collectLiveUserMessageIds = (
   persistedMessages: MessageRecord[],
   overlayMessages: MessageRecord[],
@@ -254,12 +210,6 @@ export const keepAssistantTurnsContiguous = (
   return result;
 };
 
-/**
- * Returns `messages` ordered by `getSortTimestamp`, reusing the input array
- * reference when it is already ordered (the common case — the SQLite window is
- * pre-sorted and, with the default resolver, needs no work). Only allocates a
- * sorted copy when the resolver actually reorders something.
- */
 const orderByResolver = (
   messages: MessageRecord[],
   getSortTimestamp: SortTimestampResolver,
@@ -293,16 +243,6 @@ const mergeMessageSources = (
     }
   }
   const merged = [...seen.values()];
-  // The dedup above preserves source + insertion order: persisted messages
-  // first (already in their ordered SQLite-window order), then overlays. In
-  // the common case — a freshly sent/streamed message carrying the newest
-  // timestamp appended onto an already-ordered list — `merged` is ALREADY in
-  // display order, so the O(n log n) sort is pure overhead on the membership-
-  // changing send frame (where this whole merge re-runs because the caches
-  // correctly bust). Detect that with an O(n) adjacency scan and skip the
-  // sort; otherwise sort exactly as before. Behavior-identical either way: a
-  // stable sort of an already-sorted array leaves it unchanged, so the skipped
-  // branch returns the same ordering the sort would have produced.
   return orderByResolver(merged, getSortTimestamp);
 };
 
@@ -323,12 +263,6 @@ export const getPersistedAssistantSlots = (
   return slots;
 };
 
-/**
- * Materialize an overlay slot into a `MessageRecord` so it slots into the
- * timeline alongside persisted assistant messages. The persisted twin's text
- * wins as soon as it exists, so the row never flips between two renderings
- * of the same reply.
- */
 export const overlayToMessageRecord = (
   overlay: StreamingAssistantOverlay,
   persisted?: MessageRecord,
@@ -391,9 +325,6 @@ export const mergeConversationDisplayMessageSources = (args: {
     persistedAssistantSlots,
     getSortTimestamp = defaultSortTimestamp,
   } = args;
-  // Locked streaming overlays stay in renderer memory until the next
-  // conversation switch. Drop assistant overlays whose user turn is gone so
-  // they cannot paint without it.
   const liveUserIds = collectLiveUserMessageIds(
     persistedMessages,
     overlayMessagesInput,
@@ -598,10 +529,6 @@ export const useConversationDisplayMessages = ({
     streamingAssistants,
   ]);
 
-  // A reply arrives whole, so the merge runs a handful of times per turn
-  // rather than once per frame. The structural-sharing cache this used to
-  // carry existed only to skip the dedup + sort while an overlay's text grew;
-  // nothing grows anymore, so the plain merge is the whole story.
   const merged = useMemo(() => {
     return mergeConversationDisplayMessageSources({
       persistedMessages,

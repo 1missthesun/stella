@@ -74,10 +74,6 @@ export function useDrawerHeld(): boolean {
 
 const holders = new Set<string>();
 
-/**
- * Keeps the sidebars still while a sheet is up. A sideways swipe inside a
- * sheet pages its media or scrubs its video; it never opens a sidebar.
- */
 export function useHoldDrawer(active: boolean) {
   const id = useId();
   useEffect(() => {
@@ -169,10 +165,6 @@ export function drawerTravels(width: number) {
   return { start, end };
 }
 
-/**
- * The sidebars' widths. The left one keeps its 3/4; the right one, with more
- * to hold, takes all but a strip of the shrunken page wide enough to tap.
- */
 export function useDrawerMetrics() {
   const { width } = useWindowDimensions();
   const travels = drawerTravels(width);
@@ -313,14 +305,6 @@ function release(owner: number, velocityX: number) {
   settleDrawer(open, v);
 }
 
-/**
- * The page's drag. At rest the direction picks the sidebar (right for the
- * start one, left for the end one); a drawer still moving is caught where it
- * is, whichever way the finger goes. Nothing it reads changes mid-drag, so the
- * gesture is never rebuilt under a finger. Each drag is owned by the gesture
- * that grabbed it, and that gesture's finalize always settles it, so no path
- * leaves the stage part-open.
- */
 export function useDrawerOpenPan({
   start,
   end,
@@ -358,11 +342,6 @@ export function useDrawerOpenPan({
   }, [start, end, open, held, travel, endTravel]);
 }
 
-/**
- * The open sidebar's drag back toward closed, from its panel or the page.
- * `scroll` is the panel's own scroll view, which would otherwise claim a
- * sideways swipe before this sees it.
- */
 export function useDrawerClosePan(
   side: DrawerSide,
   scroll?: ReturnType<typeof Gesture.Native>,

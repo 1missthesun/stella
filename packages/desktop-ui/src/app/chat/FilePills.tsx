@@ -1,14 +1,3 @@
-/**
- * Pill-shaped file chips for a chat row.
- *
- * A file a reply links, or a task produced, is one chip: icon, filename,
- * and for a local file the shared `OpenWithMenu` affordance. The chip body
- * uses the authority-aware opener (owner-scoped drive URL for a cloud file,
- * display payload for a local file). At most `PILL_CAP` chips show, then an
- * animated "+N more" expands the rest. The strip has no card surface: it
- * sits at the bottom of the reply bubble, or on its own when a reply has no
- * text.
- */
 import { fileDisplayName } from "@stella/contracts/file-display-name";
 import { useState } from "react";
 import { ChevronDown } from "@/ui/icons";
@@ -26,14 +15,8 @@ import { useT, useTPlural } from "@/shared/i18n";
 import { useOpenConversationFile } from "@/features/cloud/use-cloud-drive-open";
 import "./agent-activity-row.css";
 
-/** Pills shown before the "+N more" control kicks in. */
 const PILL_CAP = 5;
 
-/**
- * A canvas is named by its author, not by its slug: `tea-brewing-guide.html`
- * is a filename, "Tea Brewing Guide" is the thing the chip reopens. Every
- * other file is still known by its basename.
- */
 const pillName = (entry: ConversationFileEntry): string =>
   entry.payload.kind === "canvas-html"
     ? getDisplayPayloadTitle(entry.payload)
@@ -92,15 +75,11 @@ export const FilePill = ({ entry }: { entry: ConversationFileEntry }) =>
     />
   );
 
-/** The chip strip under a completed row — old card's cap + "+N more"
- *  expand/collapse (grid-rows 0fr -> 1fr, no JS measurement), minus the
- *  card chrome. */
 export const FilePills = ({
   files,
   variant = "row",
 }: {
   files: ConversationFileEntry[];
-  /** `bubble`: at the bottom of the reply bubble, without the under-row indent. */
   variant?: "row" | "bubble" | "standalone";
 }) => {
   const t = useT();
@@ -123,8 +102,6 @@ export const FilePills = ({
         ))}
       </div>
       {capped ? (
-        // `inert` while collapsed keeps the hidden pills out of the tab
-        // order and away from screen readers.
         <div
           className="agent-activity-files__overflow"
           data-expanded={expanded ? "true" : undefined}

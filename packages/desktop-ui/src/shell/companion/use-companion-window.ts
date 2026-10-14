@@ -1,8 +1,3 @@
-/**
- * Per-window plumbing shared by the mark and panel renderers: say hello to
- * main once mounted (main answers with the layout, the latest chat snapshot,
- * and the interaction state) and keep following those two feeds.
- */
 import { useEffect, useState } from "react";
 import type {
   CompanionActivity,

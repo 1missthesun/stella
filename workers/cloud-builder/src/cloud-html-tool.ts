@@ -1,13 +1,3 @@
-/**
- * `html` for the cloud orchestrator — the device tool's exact model-visible
- * surface (see `defs/html-def.ts`). The device writes the canvas to
- * `~/.stella/outputs/html/<slug>.html`; the cloud writes the same document
- * into the owner's drive at `outputs/html/<slug>.html` and publishes a
- * `files` card, which both clients open as a canvas. Like the device, it then
- * saves the canvas to its private link and returns that URL, or only the
- * drive path when the link cannot be made.
- */
-
 import type { TSchema } from "@sinclair/typebox";
 import type { SavedCanvasShare } from "@stella/contracts/backend/shares";
 import {
@@ -20,15 +10,12 @@ import type { CloudCodeSourceAgentTool } from "./cloud-code-tool.js";
 import type { DriveTurnFilesResult } from "./owner-store/domains/drive.js";
 import type { OwnerInternalCall } from "./owner-store/registry.js";
 
-/** Drive folder every cloud canvas lands in; mirrors the device layout. */
 export const CLOUD_HTML_DRIVE_DIR = "outputs/html";
 export const CLOUD_HTML_CONTENT_TYPE = "text/html; charset=utf-8";
-/** Below the drive's inline upload cap with room for the JSON envelope. */
 const MAX_HTML_BYTES = 6 * 1024 * 1024;
 
 export type CloudHtmlToolContext = Readonly<{
   turnId: string;
-  /** A server-internal operation on the owner's object, under the turn's generation. */
   ownerInternal: OwnerInternalCall;
   publishFiles: (
     writerKey: string,
@@ -63,9 +50,6 @@ export const createCloudHtmlTool = (
   context: CloudHtmlToolContext,
 ): CloudCodeSourceAgentTool => ({
   name: HTML_TOOL_NAME,
-  // The drive write lands at the slug's fixed path with the tool call id as
-  // its batch key, and the files card is keyed `html:<toolCallId>`: a rerun
-  // rewrites the same bytes to the same file and the same card.
   replay: "keyed",
   label: "Canvas",
   workingText: "Writing canvas",
@@ -121,8 +105,6 @@ export const createCloudHtmlTool = (
     context.publishFiles(`html:${toolCallId}`, [
       { path, name, sizeBytes: bytes.byteLength, contentType: CLOUD_HTML_CONTENT_TYPE },
     ]);
-    // The canvas is saved and on screen; a link that cannot be made (no
-    // share bucket or domain, a failed write) leaves the drive path.
     let link: SavedCanvasShare | null = null;
     try {
       link = (await context.ownerInternal("shares.saveCanvas", {

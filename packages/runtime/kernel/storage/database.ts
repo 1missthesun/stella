@@ -13,12 +13,6 @@ const requireRuntime = createRequire(import.meta.url);
 
 let cachedSqliteCtor: SqliteDatabaseCtor | null = null;
 
-/**
- * Resolve the sqlite driver lazily so importing this module never fails on
- * runtimes without `bun:sqlite` (e.g. Node). Under Bun this
- * resolves `bun:sqlite` exactly as the previous static import did; under
- * Node >= 22.5 it falls back to `node:sqlite`.
- */
 const loadSqliteDatabaseCtor = (): SqliteDatabaseCtor => {
   if (cachedSqliteCtor) return cachedSqliteCtor;
   if (process.versions.bun) {
@@ -48,15 +42,9 @@ const openDatabase = (dbPath: string): SqliteDatabase => {
   return new Database(dbPath);
 };
 
-/**
- * Open a raw extra connection to an already-initialized database: no
- * pragmas, no migration. Used by storage maintenance, which tunes its own
- * connection (temp_store, busy_timeout) without touching the shared one.
- */
 export const openSqliteConnection = (dbPath: string): SqliteDatabase =>
   openDatabase(dbPath);
 
-/** Open cost (file open) plus connection init/migration cost. */
 export type DesktopDatabaseOpenTiming = DesktopDatabaseInitTiming & {
   openMs: number;
 };

@@ -15,7 +15,6 @@ import {
 
 interface SettingsNavProps {
   tabs: SettingsTabDef[];
-  /** `null` while search results are showing: nothing reads as selected. */
   activeTab: SettingsTab | null;
   onSelect: (tab: SettingsTab) => void;
   label: string;
@@ -30,7 +29,6 @@ const tabButtonProps = (tab: SettingsTab, isActive: boolean) => ({
   tabIndex: isActive ? 0 : -1,
 });
 
-/** Wide layout: grouped vertical list with icons. */
 export function SettingsRailNav({
   tabs,
   activeTab,
@@ -79,11 +77,6 @@ export function SettingsRailNav({
 
 const BAR_GAP = 2;
 
-/**
- * Narrow layout: one row of tabs. Tabs that would clip collapse into a
- * trailing "More" menu; widths come from an invisible copy of the row so
- * the visible one never has to render a clipped state first.
- */
 export function SettingsBarNav({
   tabs,
   activeTab,

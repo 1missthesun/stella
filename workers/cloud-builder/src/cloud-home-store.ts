@@ -21,17 +21,11 @@ export const CLOUD_SKILL_RUNTIME_MAX_SKILLS = 20;
 export const CLOUD_SKILL_RUNTIME_MAX_FILES = 1_000;
 export const CLOUD_SKILL_RUNTIME_MAX_BYTES = 50 * 1024 * 1024;
 
-/**
- * One cloud-home control operation (`memory.context`, `skills.*`) on the owner's
- * object: `OwnerGate.homeControl` from a Worker route or another object, or
- * the gate's own `homeControl` from inside it.
- */
 export type HomeControl = (
   op: string,
   body: { ownerGeneration: string } & Record<string, unknown>,
 ) => Promise<RpcResponse>;
 
-/** `HomeControl` through the owner's gate, for code outside the gate. */
 export const gateHomeControl =
   (gates: Cloudflare.Env["OWNER_GATES"], ownerId: string): HomeControl =>
   async (op, body) =>
@@ -323,7 +317,6 @@ export const skillTreeSha256 = async (
   );
 };
 
-/** HTTP status a Worker route reports for a refused control operation. */
 const controlStatus = (error: BackendError): number => {
   if (error.reason?.includes("STALE") || error.reason === "owner_generation_stale") return 412;
   switch (error.code) {
@@ -459,10 +452,6 @@ export class CloudHomeStore {
     );
   }
 
-  /**
-   * The memory policy a turn runs under. The memory itself is world files
-   * (`world-memory.ts`), read by the turn, not by this store.
-   */
   async getMemoryContext(): Promise<{ preference: CloudMemoryPreference }> {
     const preference = parseMemoryPreference(
       await this.control("memory.context", {}),
@@ -604,7 +593,6 @@ export class CloudHomeStore {
     source: CloudSkillCatalogEntry["source"];
     availability: CloudSkillCatalogEntry["availability"];
     expectedRevision: number;
-    /** Optional receipt bytes from a caller; must equal our canonical manifest. */
     manifestBytes?: Uint8Array;
     files: CloudSkillUploadFile[];
     idempotencyKey: string;

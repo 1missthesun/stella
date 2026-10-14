@@ -22,12 +22,6 @@ const isDirectory = (value: string): boolean => {
   }
 };
 
-/**
- * Resolve the filesystem root an agent should operate from: the folder its
- * brief names, else its definition's default (`stella-home` is Stella's data
- * folder, `frontend` the app checkout), else the user's home. Both defaults
- * apply only when the folder is a real directory.
- */
 export const resolveAgentWorkingDirectory = ({
   agentType,
   stellaAppDir,

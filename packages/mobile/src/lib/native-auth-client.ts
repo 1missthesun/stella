@@ -36,11 +36,6 @@ export const clearMobileAuthStorage = async (): Promise<void> => {
   ]);
 };
 
-/**
- * Show the last known session immediately on cold start so a returning user
- * does not sit behind a spinner while `/get-session` round-trips. The bearer
- * token remains the only credential; this cache is display state.
- */
 const warmSessionFromCache = (store: ClientStore) => {
   const sessionAtom = store.atoms.session;
   if (!sessionAtom) return;
@@ -71,13 +66,6 @@ const warmSessionFromCache = (store: ClientStore) => {
 const toHeaderRecord = (headersInit: HeadersInit | undefined) =>
   Object.fromEntries(new Headers(headersInit).entries());
 
-/**
- * Native Better Auth client support without a userspace cookie jar.
- *
- * It preserves Expo's OAuth browser orchestration and session warm-start, but
- * stores only an opaque bearer token in SecureStore. Browser callbacks return
- * a three-minute OTT, which is exchanged immediately through Better Auth.
- */
 export const nativeBearerClient = ({ scheme }: NativeAuthClientOptions) => {
   let authFetch: BetterFetch | null = null;
   let store: ClientStore | null = null;
@@ -139,8 +127,6 @@ export const nativeBearerClient = ({ scheme }: NativeAuthClientOptions) => {
         }
 
         const params = new URLSearchParams({ authorizationURL });
-        // Match the server's branded callback origin so iOS's sign-in consent
-        // sheet identifies Stella instead of the transport's workers.dev host.
         const redirectURI = new URL(authorizationURL).searchParams.get("redirect_uri");
         const callbackOrigin = redirectURI ? new URL(redirectURI).origin : null;
         const proxyBaseURL = callbackOrigin &&
@@ -188,10 +174,6 @@ export const nativeBearerClient = ({ scheme }: NativeAuthClientOptions) => {
       }
       headers["x-skip-oauth-proxy"] = "true";
 
-      // Every native request carries expo-origin. The Expo server plugin
-      // promotes it to `origin` before Better Auth's CSRF check runs, and an
-      // idToken sign-in has no other origin source. Sending it always is safe
-      // because the value is still matched against trustedOrigins.
       headers["expo-origin"] = Linking.createURL("", { scheme });
 
       const rewriteCallback = (value: unknown) =>
@@ -207,9 +189,6 @@ export const nativeBearerClient = ({ scheme }: NativeAuthClientOptions) => {
           }
         : options.body;
 
-      // Attach the current token above, then clear local state before sending
-      // sign-out. This matches the old Expo client behavior while ensuring the
-      // server still receives the credential it needs to revoke the session.
       if (url.includes("/sign-out")) {
         await clearMobileAuthStorage();
         store?.atoms.session?.set({

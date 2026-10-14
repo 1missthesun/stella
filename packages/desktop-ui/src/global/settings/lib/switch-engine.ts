@@ -4,7 +4,6 @@ import {
   type ModelPickerEngine,
 } from "./engine-model-routing";
 
-/** The same engine switch the model picker commits. */
 export const switchEngine = async (engine: ModelPickerEngine): Promise<boolean> => {
   const system = window.electronAPI?.system;
   const preferences = await system?.getLocalModelPreferences?.();

@@ -19,20 +19,10 @@ import { verifyDpopRequest } from "@stella/contracts/gateway/dpop";
 import { bearerCredential } from "../../shared/bearer.js";
 import { GatewayError } from "./errors.js";
 
-/**
- * Capability bearer verification. Keys come from the CAPABILITY_JWKS var and
- * are imported once per isolate; a redeploy with a new key set is a new
- * isolate. There is deliberately no network fetch here: an unreachable key
- * source must never turn into an open gateway.
- */
 export const RELAY_PROBE_SECRET_HEADER = "x-stella-relay-probe-secret" as const;
 
 export type AuthenticatedCapability = {
   claims: GatewayCapabilityClaims;
-  /**
-   * True for the ops probe: a synthetic `pro` session capability with an
-   * unlimited budget that is never metered and never emits usage events.
-   */
   probe: boolean;
 };
 
@@ -41,19 +31,9 @@ const DEVICE_KEY_HASH_PATTERN = /^[A-Za-z0-9_-]{43}$/u;
 const hasValidDeviceKeyHash = (claims: GatewayCapabilityClaims): boolean =>
   claims.dpk === undefined || DEVICE_KEY_HASH_PATTERN.test(claims.dpk);
 
-/**
- * Session requests sign the caller-provided request id. Resolve requests use
- * an empty component when the header is absent; clients should send the header
- * on both resolve and relay so every proof names its request explicitly.
- */
 export const dpopRequestIdFrom = (request: Request): string =>
   request.headers.get(GATEWAY_REQUEST_ID_HEADER)?.trim() ?? "";
 
-/**
- * Verify possession before any owner, network, tier, or spend gate runs.
- * Turn capabilities stay unchanged because they are already bound to one
- * admitted data-plane turn.
- */
 export const verifySessionDpop = async (args: {
   request: Request;
   auth: AuthenticatedCapability;
@@ -121,7 +101,6 @@ export const verificationKeys = (
   return keyCache.keys;
 };
 
-/** A capability header is at most 16 KiB. */
 const MAX_CAPABILITY_LENGTH = 16_384 - "Bearer ".length;
 
 export const bearerToken = (request: Request): string | null =>
@@ -182,10 +161,8 @@ const constantTimeEqual = (a: string, b: string): boolean => {
   return diff === 0;
 };
 
-/** The optional ops secret; without it no probe is accepted. */
 type RelayProbeEnv = { STELLA_RELAY_PROBE_SECRET?: string };
 
-/** The synthetic capability granted by a matching relay probe secret. */
 export const probeCapability = (
   request: Request,
   env: RelayProbeEnv,
@@ -209,11 +186,6 @@ export const probeCapability = (
   };
 };
 
-/**
- * Resolve the caller's capability: the probe secret first (ops checks carry
- * no capability), otherwise the bearer. Throws a GatewayError with the exact
- * `GatewayErrorCode` for every refusal.
- */
 export const authenticateCapability = async (
   request: Request,
   env: Pick<Env, "CAPABILITY_JWKS"> & RelayProbeEnv,

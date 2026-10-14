@@ -5,11 +5,6 @@ const ROOT_ID = "__stella_agent_cursor_root__";
 const CONTROLLER_PROPERTY = "__stellaAgentCursorController";
 const DEFAULT_GLOW_COLOR = "#339cff";
 
-/**
- * Installs the page-side cursor. This function is deliberately self-contained:
- * its source is serialized into CDP Runtime.evaluate for both Stella browser
- * backends, so the two surfaces run the same artwork and motion engine.
- */
 function installAgentCursor(host, assetUrl, glowColor) {
   const OUTER_SIZE = 24;
   const CENTER = OUTER_SIZE / 2;

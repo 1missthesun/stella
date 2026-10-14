@@ -85,42 +85,23 @@ import { ReminderActions } from "./ReminderActions";
 
 export type MessageRowStyles = ReturnType<typeof makeMessageRowStyles>;
 
-/**
- * The row's callbacks, grouped so the list, the focused reply chain and the
- * long-press menu's lifted copy can share one memoized object instead of
- * threading each handler separately.
- */
 export type MessageRowActions = {
   onOpenArtifact?: (
     artifact: ChatArtifact,
     gallery?: readonly ChatArtifact[],
   ) => void;
-  /** Opens a tapped `stella://file/...` markdown link in the file viewer. */
   onOpenStellaFile?: (path: string, gallery?: readonly string[]) => void;
   onOpenMessageMenu: (request: MessageMenuRequest) => void;
-  /** Leaves native text-selection mode for this row. */
   onEndSelecting: () => void;
   onAskStella: (text: string) => void;
-  /** Opens the activity hub — the tap-through target for agent rows. */
   onOpenAgentActivity?: () => void;
   onOpenReply?: (ref: ReplyRef) => void;
-  /** Opens the full reports of the tasks a reply relays or cites, together. */
   onOpenReport?: (refs: readonly AgentReplyRef[], anchor?: ReportAnchor) => void;
 };
 
-/**
- * How long a finger must rest on a message before its press shrink starts.
- * Longer than a tap and than the moment a drag turns into a list scroll.
- */
 const MESSAGE_HOLD_MS = 180;
-/** When the long-press menu opens; the shrink fills the time after the hold. */
 const MESSAGE_LONG_PRESS_MS = 420;
-/** `assistantRow`'s vertical padding, part of the visible gap between bubbles. */
 export const ASSISTANT_ROW_PAD_VERTICAL = 2;
-
-// ---------------------------------------------------------------------------
-// Message wrapper — pops a just-sent message in, mirroring desktop `bubble-pop`.
-// ---------------------------------------------------------------------------
 
 export function MessageEntry({
   children,
@@ -132,10 +113,6 @@ export function MessageEntry({
   animate: boolean;
 }) {
   const animatedStyle = useBubblePop(animate, SENT_BUBBLE_POP);
-  // Only a row that mounted popping needs Animated. History rows re-render
-  // whenever the list's shared row inputs change (a reply landing, a turn
-  // ending); as Animated views each of those rebuilt its animated props and
-  // re-attached native animation nodes, row by row, inside the arrival frame.
   const popped = useRef(animate).current;
   if (!popped) return <View onLayout={onLayout}>{children}</View>;
   return (
@@ -172,7 +149,6 @@ function ReactionBadge({
   );
 }
 
-/** Anchor passed to the message-actions popover (the long-press point). */
 export type MessageMenuRequest = { message: ChatMessage; anchor: AnchorRect };
 
 /**
@@ -202,7 +178,6 @@ function UserMessageText({
   const [measuring, setMeasuring] = useState(true);
   const measuredWidthRef = useRef<number | null>(null);
 
-  // Reset when the underlying message text changes (row reuse across items).
   useEffect(() => {
     setExpanded(false);
     setTotalLines(null);
@@ -299,7 +274,6 @@ const GeneratedImageTile = memo(function GeneratedImageTile({
   filePath?: string;
   conversationId: string;
   access?: StoredPhoneAccess;
-  /** `filePath` is a cloud drive path; resolve it through the drive, not the computer. */
   driveBacked?: boolean;
   aspectRatio: number;
   alt: string;
@@ -422,8 +396,6 @@ const GeneratedImageCard = memo(function GeneratedImageCard({
       onPress(artifact);
       return;
     }
-    // The viewer renders http(s) images directly; hand it signed URLs so a
-    // cloud drive path is never asked of the computer.
     const asset = payload.asset;
     void Promise.all(asset.filePaths.map(resolveCloudDriveFileUri))
       .then((filePaths) =>
@@ -489,10 +461,6 @@ type CompletionQuote = {
   ref: AgentReplyRef;
 };
 
-/**
- * The tasks a row relays the results of: one quote per agent of each settled
- * completion card on the row (a follow-up keeps its spawn row instead).
- */
 export const rowCompletionQuotes = (
   agentWork: ReturnType<typeof consolidateRowArtifacts>["agentWork"],
 ): CompletionQuote[] =>
@@ -530,11 +498,6 @@ export const rowCompletionQuotes = (
     });
   });
 
-/**
- * A cloud completion lands on its own textless row just above the reply that
- * relays it. That row keeps the task quote; the reply below takes the task's
- * report link and files, so they ride in its bubble like on desktop.
- */
 export const carryCompletionQuotes = (
   messages: readonly ChatMessage[],
 ): {
@@ -602,41 +565,23 @@ export const ChatMessageRow = memo(function ChatMessageRow({
   hideAgentChips = false,
 }: {
   item: ChatMessage;
-  /** Scopes this row's file reads, the way a tapped file link is scoped. */
   conversationId: string;
   styles: MessageRowStyles;
   colors: Colors;
   animate: boolean;
-  /**
-   * True while this row's long-press menu is open. The menu draws its own copy
-   * of the bubble above the scrim, so the original steps aside.
-   */
   menuActive: boolean;
-  /** True while this row is in native text-selection mode. */
   isSelecting: boolean;
-  /** True while ANY row is selecting — lets other rows tap-to-dismiss it. */
   anySelecting: boolean;
-  /** Must keep one identity across renders (memoize it) or every row re-renders. */
   actions: MessageRowActions;
-  /** The one reference worth quoting above this reply (shared reply-context rule). */
   contextRef?: ReplyRef;
-  /** Live state of the quoted task, for its status glyph. */
   contextStatus?: ReplyAgentStatus;
   desktopAccess?: StoredPhoneAccess | null;
-  /** Render only the bubble, for the long-press menu's lifted copy. */
   menuClone?: boolean;
-  /** "Delivered" / "Read" under the latest user message. */
   receiptLabel?: string | null;
-  /** Tasks quoted on the textless row just above, whose report link and
-   *  files this reply's bubble carries. */
   carriedQuotes?: CompletionQuote[];
-  /** This row's tasks are carried by the reply below it. */
   quotesForwarded?: boolean;
-  /** The previous assistant message already shows this row's task chip. */
   hideAgentChips?: boolean;
 }) {
-  // iOS press feedback: the held bubble eases down while the long-press
-  // builds, then the menu lifts a copy of it (see MessageContextMenu).
   const pressScale = useRef(new Animated.Value(1)).current;
   const bubbleRef = useRef<View>(null);
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -651,10 +596,6 @@ export const ChatMessageRow = memo(function ChatMessageRow({
     },
     [],
   );
-  // Nothing moves until the finger has stayed down for MESSAGE_HOLD_MS, so a
-  // tap, or a touch the list takes over as a scroll, never shows the press.
-  // The timer is cancelled on release; an `Animated.delay` would not be,
-  // because stopping `pressScale` leaves a sequence's pending delay running.
   const pressIn = () => {
     cancelHold();
     holdTimerRef.current = setTimeout(() => {
@@ -682,23 +623,15 @@ export const ChatMessageRow = memo(function ChatMessageRow({
     [pressScale],
   );
   const openMenu = () => {
-    // Every menu action works on text; an attachment-only bubble has none.
     if (!item.text.trim()) return;
     const bubble = bubbleRef.current;
     if (!bubble) return;
-    // The frame is measured on an unscaled wrapper, so it is the bubble's
-    // resting size even while the press shrink is showing.
     bubble.measureInWindow((x, y, width, height) => {
-      // Medium impact for the lift; action taps then fire a light tap.
       tapMedium();
       onOpenMessageMenu({ message: item, anchor: { x, y, width, height } });
     });
   };
 
-  // Keyed on the stable sub-objects: the trailing assistant row's `item` is
-  // replaced whenever a message segment lands or a tool step updates, but its
-  // artifacts/toolSteps keep their identity, so these derivations must not
-  // re-run and mint fresh objects that defeat child memoization.
   const consolidated = useMemo(
     () => consolidateRowArtifacts(item.artifacts ?? [], item.tasks ?? []),
     [item.artifacts, item.tasks],
@@ -714,10 +647,6 @@ export const ChatMessageRow = memo(function ChatMessageRow({
     ],
     [completionQuotes, quotesForwarded, carriedQuotes],
   );
-  // Every file this reply hands over, in the order it named them: the loose
-  // file artifacts of the turn, then the files its own text links. A report
-  // the reply relays attaches nothing. Generated images keep their own
-  // full-width presentation, so they stay out of it.
   const evidencePaths = useMemo(() => {
     if (item.role !== "assistant") return [];
     const paths: string[] = [];
@@ -734,9 +663,6 @@ export const ChatMessageRow = memo(function ChatMessageRow({
     paths.push(...extractFileLinkTargets(item.text ?? ""));
     return paths;
   }, [consolidated.looseFiles, item.role, item.text]);
-  // A drive file can be named twice: drive-relative as an artifact, and as a
-  // `stella://drive/...` or world-absolute link. The strip shows each file
-  // once, by the link, which is the one that opens from the drive.
   const evidenceStripPaths = useMemo(() => {
     const byKey = new Map<string, string>();
     for (const filePath of evidencePaths) {
@@ -746,10 +672,6 @@ export const ChatMessageRow = memo(function ChatMessageRow({
     }
     return [...byKey.values()];
   }, [evidencePaths]);
-  // Schedule tool results render their human-readable summaries as plain
-  // text lines in the flow (desktop parity — no chip/card). Every settled
-  // Schedule call in the turn gets its line, in call order; unparseable or
-  // side-channel-JSON results render nothing. Keyed by step id for the map.
   const scheduleReceipts = useMemo(() => {
     const receipts: { id: string; text: string }[] = [];
     for (const step of item.toolSteps ?? []) {
@@ -768,7 +690,6 @@ export const ChatMessageRow = memo(function ChatMessageRow({
       : text;
   }, [item.role, item.text, evidencePaths]);
   const hasText = bodyText.trim().length > 0;
-  // Apps the reply links (`stella://app/<slug>`) show as app cards under it.
   const linkedAppSlugs = useMemo(
     () =>
       item.role === "assistant" ? extractStellaAppLinkSlugs(item.text) : [],
@@ -779,10 +700,6 @@ export const ChatMessageRow = memo(function ChatMessageRow({
       item.role === "assistant" && assistantBubbleNeedsBoundedWidth(item.text),
     [item.role, item.text],
   );
-  // The reply row is appended empty when the turn dispatches and gains its text
-  // when the message lands, so "mounted empty" is exactly "this message arrived
-  // while the user was watching" — the cue for the landing entrance. Rows
-  // restored from history mount with their text and render settled.
   const mountedEmptyRef = useRef(!hasText);
 
   if (item.role === "user") {
@@ -892,9 +809,6 @@ export const ChatMessageRow = memo(function ChatMessageRow({
         <View style={styles.userRow}>
           <View style={styles.userColumn}>
             {quotedText ? (
-              // Quoted / "Ask Stella" context rides to the model as a separate
-              // field and shows here as a chip — never folded into the bubble
-              // body — so internal framing/decoration can't leak into the text.
               <View style={[styles.quoteChip, styles.userQuoteChip]}>
                 <Icon
                   name="quote"
@@ -912,8 +826,6 @@ export const ChatMessageRow = memo(function ChatMessageRow({
               </View>
             ) : null}
             {!hasBubbleBody ? null : isSelecting && showText ? (
-              // "Select" mode: the bubble body becomes a native selection
-              // surface (with a Copy pill), so a substring can be lifted out.
               <View style={styles.userBubble}>
                 <AssistantTextSelection
                   text={item.text}
@@ -935,8 +847,6 @@ export const ChatMessageRow = memo(function ChatMessageRow({
                     onLongPress={openMenu}
                     onPressIn={pressIn}
                     onPressOut={pressOut}
-                    // While another message is selecting, a tap here exits
-                    // selection, so tapping away always dismisses.
                     onPress={anySelecting ? onEndSelecting : undefined}
                     delayLongPress={MESSAGE_LONG_PRESS_MS}
                     accessibilityHint="Long press for message actions"
@@ -979,14 +889,8 @@ export const ChatMessageRow = memo(function ChatMessageRow({
       </View>
     );
   }
-  // Desktop-parity consolidation: agent lifecycle cards are expanded per
-  // agent, noise writes are filtered and declared deliverables lead. The
-  // minimal agent rows no longer surface file pills — agent-produced files
-  // stay reachable through the activity hub — so `agentFiles` is unused here.
   const { maps: mapArtifacts, looseFiles } = consolidated;
   const isStandIn = isStandInArtifactRow(item);
-  // Assistant text no longer streams, so there is no partial-render window to
-  // protect: every card mounts as soon as its artifact reaches the row.
   const showMapArtifacts = !isStandIn && mapArtifacts.length > 0;
   const generatedImages = looseFiles.filter(
     (artifact) =>
@@ -994,21 +898,14 @@ export const ChatMessageRow = memo(function ChatMessageRow({
       artifact.payload.asset.kind === "image",
   );
   const showGeneratedImages = !isStandIn && generatedImages.length > 0;
-  // Everything else the reply attached shows as the strip: one row of real
-  // media previews, then the rest as pills.
   const showEvidence = !isStandIn && evidencePaths.length > 0;
   const showArtifacts =
     showMapArtifacts ||
     (showGeneratedImages && !hasText) ||
     linkedAppSlugs.length > 0;
-  // Desktop parity: a task whose result this reply relays is quoted ABOVE
-  // the bubble the iMessage way, and attaches none of its files to the reply.
-  // A settled follow-up keeps its spawn row.
   const quotedThreadIds = new Set(
     [...completionQuotes, ...relayedQuotes].map((quote) => quote.ref.threadId),
   );
-  // Everything the reply attaches sits at the bottom of its bubble; a reply
-  // with no text shows the same pieces on their own.
   const generatedImageCards = showGeneratedImages
     ? generatedImages.map((artifact) => (
         <GeneratedImageCard
@@ -1020,8 +917,6 @@ export const ChatMessageRow = memo(function ChatMessageRow({
         />
       ))
     : null;
-  // With text, pictures and video sit in their own block under the bubble
-  // and file pills at the bottom of it; without text, the strip stands alone.
   const evidenceMedia = showEvidence ? (
     <MessageEvidenceStrip
       filePaths={evidenceStripPaths}
@@ -1045,11 +940,6 @@ export const ChatMessageRow = memo(function ChatMessageRow({
         style={styles.bubbleEvidence}
       />
     ) : null;
-  // The full report of each task this reply relays (or cites, unless it is
-  // still running) opens from a "Show more" under the reply's text, not from
-  // the quote.
-  // An agent that relayed twice in a turn (a mid-run message, then its
-  // report) is still one report.
   const reportRefs: AgentReplyRef[] = [
     ...new Map(
       [
@@ -1062,7 +952,6 @@ export const ChatMessageRow = memo(function ChatMessageRow({
       ].map((ref) => [ref.threadId, ref] as const),
     ).values(),
   ];
-  // One "Show more" per reply, however many reports it offers.
   const showMore =
     onOpenReport && reportRefs.length > 0
       ? {
@@ -1127,8 +1016,6 @@ export const ChatMessageRow = memo(function ChatMessageRow({
         </View>
       ))}
       {hasText && isSelecting ? (
-        // "Select" mode: the reply's plain text in a selection surface with
-        // everything selected and a Copy / Ask Stella pill.
         <View style={[styles.assistantBubble, styles.assistantSelectBubble]}>
           <AssistantTextSelection
             text={extractPlainText(item.text).trim()}
@@ -1221,10 +1108,6 @@ export const makeMessageRowStyles = (colors: Colors) =>
   StyleSheet.create({
     userRow: { flexDirection: "row", justifyContent: "flex-end" },
     userColumn: { alignItems: "flex-end", maxWidth: "92%" },
-    // iMessage bubbles: one continuous (squircle) radius on every corner. The
-    // radius is desktop's fixed `--radius-3xl` (18) rather than something at or
-    // past half a one-line bubble's height, which is what kept very short
-    // messages from collapsing into a round blob there.
     userBubble: {
       backgroundColor: colors.userBubbleFill,
       borderRadius: 18,
@@ -1282,7 +1165,6 @@ export const makeMessageRowStyles = (colors: Colors) =>
     },
     userToggle: {
       alignSelf: "flex-end",
-      // Muted version of the bubble's own text color (desktop: 68% alpha).
       color: fadeHex(colors.userBubbleText, 0.68),
       fontFamily: fonts.sans.medium,
       fontSize: 13,
@@ -1296,18 +1178,6 @@ export const makeMessageRowStyles = (colors: Colors) =>
     userAttachmentRow: { alignSelf: "flex-end", maxWidth: "92%" },
     userAttachmentRowAbove: { marginBottom: 6 },
     assistantRow: { paddingVertical: ASSISTANT_ROW_PAD_VERTICAL },
-    /**
-     * Mirror of `userBubble`, flipped: same radius family with the tightened
-     * corner on the bottom LEFT, the quieter elevated surface (`card`) instead
-     * of the accent tint, and a hairline `border` rather than `borderStrong` so
-     * the assistant reads as the calmer of the two speakers.
-     *
-     * Vertical padding is asymmetric on purpose: markdown blocks carry their
-     * own trailing margin (a paragraph's is 10 — see `buildNodeStyles` in
-     * AssistantMarkdown), so a small `paddingBottom` plus that margin lands at
-     * the same ~10-12pt optical inset as the top, with no negative margins that
-     * could clip a trailing code block.
-     */
     askRecordAbove: { marginBottom: 6 },
     assistantBubble: {
       alignSelf: "flex-start",
@@ -1319,20 +1189,13 @@ export const makeMessageRowStyles = (colors: Colors) =>
       paddingHorizontal: 14,
       paddingTop: 9,
     },
-    // The long-press target hugs the bubble so its measured frame is the
-    // bubble's own (the menu redraws the bubble at exactly that frame).
     assistantBubbleSlot: { alignSelf: "flex-start", maxWidth: "100%" },
     assistantBubbleSlotFill: { alignSelf: "stretch" },
     assistantSelectBubble: {
       backgroundColor: colors.assistantBubbleFillBottom,
       paddingBottom: 10,
     },
-    // Yoga stretches block Markdown to the measured list-cell width in the
-    // same layout pass, giving nested list/scroller children a definite bound.
-    // Plain text keeps the intrinsic hugging style above.
     assistantBlockBubble: { alignSelf: "stretch" },
-    // Schedule tool receipt — a plain text line in the conversation flow
-    // (desktop parity: no chip or card), slightly quieter than reply prose.
     scheduleReceipt: {
       color: colors.text,
       fontFamily: fonts.sans.regular,
@@ -1367,8 +1230,6 @@ export const makeMessageRowStyles = (colors: Colors) =>
       fontSize: 13,
       letterSpacing: -0.1,
     },
-    // Sent-message variant of the quote chip: right-aligned above the user
-    // bubble (matching the bubble's trailing edge) with a little breathing room.
     userQuoteChip: {
       alignSelf: "flex-end",
       marginBottom: 6,

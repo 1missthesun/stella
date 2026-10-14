@@ -133,11 +133,6 @@ export type CloudAuthorityHookState =
       retry: () => void;
     };
 
-/**
- * The backend verifies the token and answers for the owner it belongs to;
- * the authority check compares that owner with the one this session expects.
- * The conversation socket lives on the same backend origin.
- */
 const readChatBootstrap = async (): Promise<CloudChatBootstrap> => {
   const bootstrap = await getBackendClient().call("conversations.bootstrap", {});
   return {
@@ -165,44 +160,25 @@ const resolveMobileCloudConversationAuthority = async (
   });
 };
 
-/**
- * The one process-wide authority handshake. Every surface on the session (the
- * chat screen, the CarPlay bridge, the root primer) reads this store, so the
- * handshake runs once per identity rather than once per mount.
- */
 const authorityStore = new CloudConversationAuthorityStore({
   resolve: resolveMobileCloudConversationAuthority,
   describeFailure: safeAuthorityIssue,
   onIdentityChange: (identity) => {
-    // A new identity key (sign-in, account switch, session rotation) is the
-    // one moment the previous subject's bearer token and sockets must go.
     clearCachedToken();
     retireCloudConversationClientAuthority(identity.accountScope);
   },
 });
 
-/**
- * Starts (or joins) the handshake for the session as soon as the root layout
- * knows it, so the work overlaps the native splash instead of waiting for the
- * chat screen to mount underneath a spinner.
- */
 export const primeCloudConversationAuthority = (
   identity: CloudConversationIdentity,
 ): void => {
   void authorityStore.ensure(identity);
 };
 
-/** Drops the cached handshake once the session is gone (sign-out). */
 export const resetCloudConversationAuthority = (): void => {
   authorityStore.reset();
 };
 
-/**
- * True once the handshake for `identityKey` has landed (ready or failed), or
- * when there is no identity to resolve. The root layout holds the native
- * splash on this so a returning user lands on a chat that is already
- * authorised rather than on the spinner.
- */
 export const useCloudConversationAuthoritySettled = (
   identityKey: string | null,
 ): boolean => {
@@ -219,7 +195,6 @@ const retryCloudConversationAuthority = (): void => {
   void authorityStore.retry();
 };
 
-/** Resolves and account-fences the one signed-in mobile Chat conversation. */
 export const useCloudConversationAuthority = (): CloudAuthorityHookState => {
   const session = authClient.useSession();
   const identity = useMemo(
@@ -229,10 +204,6 @@ export const useCloudConversationAuthority = (): CloudAuthorityHookState => {
   const identityKey = identity?.identityKey ?? null;
   const pending = session.isPending;
 
-  // Layout timing keeps the auth boundary synchronous with the render that
-  // observed it: the previous subject's sockets retire before its teardown
-  // grace could leave one warm. For an identity the store already resolved
-  // this is a cache hit and does nothing.
   useLayoutEffect(() => {
     if (pending || !identity) return;
     void authorityStore.ensure(identity);
@@ -308,16 +279,9 @@ const EMPTY_STATE: ConversationState = {
 
 const emptySnapshot = () => EMPTY_STATE;
 
-/** Quiet period after the last committed record before the cache rebuilds. */
 const CACHE_WRITE_SETTLE_MS = 1_500;
-/** Upper bound on how stale the cache may get during a long, busy turn. */
 const CACHE_WRITE_MAX_DELAY_MS = 10_000;
 
-/**
- * Rows that survive a re-projection unchanged keep their previous objects (see
- * `reuseEqualChatMessages`), so a committed record re-renders only the rows it
- * touched and an unchanged transcript skips every downstream memo.
- */
 const useStableChatMessages = (messages: ChatMessage[]): ChatMessage[] => {
   const previousRef = useRef<readonly ChatMessage[] | null>(null);
   const stable = useMemo(
@@ -330,16 +294,6 @@ const useStableChatMessages = (messages: ChatMessage[]): ChatMessage[] => {
   return stable;
 };
 
-/**
- * Signed-in Chat: automatic execution for writes, DO journal for every visible
- * transcript row. The base hook's SQLite rows are used only as an optimistic
- * outbox overlay and are never accepted as historical authority.
- */
-/**
- * True only after the socket has been continuously unhealthy for
- * `CLOUD_OFFLINE_NOTICE_DELAY_MS`. Reconnect attempts in between keep the
- * window open; a successful `live` closes it.
- */
 const useSustainedCloudOffline = (status: CloudSocketStatus): boolean => {
   const [offlineWindow, setOfflineWindow] = useState<CloudOfflineWindow>(
     idleCloudOfflineWindow,
@@ -364,7 +318,6 @@ const useSustainedCloudOffline = (status: CloudSocketStatus): boolean => {
   return shouldShowCloudOfflineNotice(offlineWindow, status, nowMs);
 };
 
-/** How long a stopped turn may keep running before the phone says so. */
 const STOP_CONFIRM_MS = 15_000;
 const STOP_UNREACHABLE_MESSAGE =
   "Couldn’t stop this reply. Stella isn’t connected right now.";
@@ -377,15 +330,9 @@ export const useCloudCanonicalChatThread = (
   authority: CloudConversationAuthority,
   options?: {
     reloadAuthority?: () => void;
-    /** Paired computer, when one exists, for the live activity overlay. */
     access?: StoredPhoneAccess | null;
     executionTarget?: AutomaticExecutionTarget;
     execution?: CloudExecutionSelection;
-    /**
-     * Which durable outbox the optimistic overlay queues into. Two surfaces on
-     * the same conversation (the Chat tab and the CarPlay loop) must not drain
-     * one queue, so each names its own.
-     */
     threadId?: ChatThreadId;
   },
 ): ChatThread => {
@@ -440,9 +387,6 @@ export const useCloudCanonicalChatThread = (
   );
 
   useLayoutEffect(() => {
-    // Owner reset keeps the account subject stable while invalidating every
-    // prior owner-bound client. Retire the previous generation synchronously,
-    // before its teardown grace can leave an authenticated socket warm.
     setDispatchBindings(new Map());
     setPlacementIssue(null);
     retireCloudConversationClientAuthority(
@@ -455,10 +399,6 @@ export const useCloudCanonicalChatThread = (
     authority.ownerGeneration,
   ]);
 
-  // Seed the store from the persisted journal tail before its socket opens,
-  // so the first connect resumes from a cursor and the server replays only
-  // the rows this device has not seen. Layout timing puts it ahead of the
-  // subscribe and config effects that would otherwise open a cold socket.
   useLayoutEffect(() => {
     store.hydrate(() =>
       readMobileCloudJournalCache({
@@ -493,8 +433,6 @@ export const useCloudCanonicalChatThread = (
 
   const replyHaptics = useMemo(() => new ReplyArrivalHaptics(), [store, threadId]);
   useEffect(() => {
-    // Observe connection transitions directly: React may batch reconnect + replay
-    // into one render. Catch-up must retire eligibility before old rows arrive.
     const retireDuringReplay = () => {
       replyHaptics.observeConnection(store.getSnapshot());
     };
@@ -572,12 +510,9 @@ export const useCloudCanonicalChatThread = (
   const local = useChatThread({ threadId, transport });
   const clientAuthorityReady = authorityReady && !local.authorityIssue;
 
-  // The user started a message: the cloud may wake the container its reply
-  // runs in, so the reply doesn't wait for a cold start. Once per draft.
   const composing = useChatDraftSelector(local.draftStore, draftHasText);
   useEffect(() => {
     if (!composing) return;
-    // A hint: an older cloud answers 404, and nothing waits on it.
     void postJson(
       `/conversations/${encodeURIComponent(authority.conversationId)}/prewarm`,
       {},
@@ -585,8 +520,6 @@ export const useCloudCanonicalChatThread = (
     ).catch(() => undefined);
   }, [composing, authority.conversationId]);
 
-  // A queued row restored from the durable outbox is operational state, not
-  // history. Track it until admission binds the server's dispatch identity.
   useEffect(() => {
     const activeIds = local.messages.flatMap((message) =>
       message.role === "user" &&
@@ -638,11 +571,6 @@ export const useCloudCanonicalChatThread = (
     ),
   );
 
-  // Cold start: the on-disk projection from the last session paints the
-  // transcript before the socket reconnects. It is read once per authority,
-  // only when the process-level store has nothing yet, and only ever shown
-  // while the journal has not reported an epoch: the first `ready` (even an
-  // empty one) is newer than anything on disk and replaces it.
   const cacheAuthority = useMemo(
     () => ({
       accountScope: authority.accountScope,
@@ -662,7 +590,6 @@ export const useCloudCanonicalChatThread = (
     messages: ChatMessage[];
   } | null>(null);
   useEffect(() => {
-    // Only the chat surface renders history; the CarPlay loop never paints it.
     if (threadId !== "cloud") return;
     const snapshot = store.getSnapshot();
     if (snapshot.epoch !== null || snapshot.records.length > 0) return;
@@ -685,10 +612,6 @@ export const useCloudCanonicalChatThread = (
     state.records.length === 0;
   const settledFailure =
     state.status === "blocked" || state.status === "offline";
-  // What this surface last painted for this store. A reconnect, the cold-start
-  // cache handoff, or an epoch reset must never blank the list: the previous
-  // transcript stands until the journal replays something different, and the
-  // list then diffs rows by id instead of remounting.
   const paintedRef = useRef<{
     store: ConversationStore;
     messages: readonly ChatMessage[] | null;
@@ -759,18 +682,11 @@ export const useCloudCanonicalChatThread = (
       replyHaptics.reset();
       return;
     }
-    // Runs after the canonical reply has committed to the displayed transcript,
-    // independently of the slower execution-placement terminal poll.
     for (const _requestId of replyHaptics.take(messages, state.records)) notifySuccess();
   }, [cacheVisible, clientAuthorityReady, messages, replyHaptics, state.records, threadId]);
 
   const cacheWriteGenerationRef = useRef(0);
   const cacheWriteQueueRef = useRef<Promise<void>>(Promise.resolve());
-  // A rebuild serializes every projected row and the raw journal tail (up to
-  // 4 MB) on the JS thread, then rewrites them in SQLite. It only feeds the
-  // next cold start, so a turn's run of committed records is coalesced into
-  // one rebuild of the latest snapshot instead of one per record. Leaving the
-  // foreground writes it immediately, so a suspended app keeps a current cache.
   const [cacheWriteTask] = useState(
     () => new TrailingTask(CACHE_WRITE_SETTLE_MS, CACHE_WRITE_MAX_DELAY_MS),
   );
@@ -803,10 +719,7 @@ export const useCloudCanonicalChatThread = (
         .then(() =>
           rebuildMobileCloudConversationCache({
             metadata,
-            // The projection is committed records only, so the cache never
-            // persists anything the journal has not durably accepted.
             messages: projected,
-            // The raw tail beside it lets the next launch resume by cursor.
             records,
             isCurrent: () => generation === cacheWriteGenerationRef.current,
           }),
@@ -831,8 +744,6 @@ export const useCloudCanonicalChatThread = (
     },
     [authority.accountScope, authority.conversationId],
   );
-  // Whole-journal scans: keyed on the journal so composer keystrokes, which
-  // re-render this hook, do not repeat them.
   const activeTurnId = useMemo(
     () => activeCloudTurnId(state.records, state.live),
     [state.live, state.records],
@@ -841,9 +752,6 @@ export const useCloudCanonicalChatThread = (
     () => canonicalCloudDispatchIdForTurn(state.records, activeTurnId),
     [activeTurnId, state.records],
   );
-  // A Stop that did not land. It names the turn it was for, so it clears on
-  // its own once that turn ends (stopped or finished), and it never gates
-  // sending: a new message queues behind the running turn as usual.
   const [stopIssue, setStopIssue] = useState<{
     turnId: string;
     message: string;
@@ -851,8 +759,6 @@ export const useCloudCanonicalChatThread = (
   const stopRef = useRef<(options?: { direct?: boolean }) => void>(
     () => undefined,
   );
-  // Try again goes straight to the conversation: the dispatch, if any,
-  // already carries the first request.
   const retryStop = useCallback(() => stopRef.current({ direct: true }), []);
   const sustainedOffline = useSustainedCloudOffline(state.status);
   const socketIssue = useMemo<CloudAuthorityIssue | null>(() => {
@@ -864,10 +770,6 @@ export const useCloudCanonicalChatThread = (
         retryable: state.statusRetryable,
       };
     }
-    // A transient reconnect is not an issue: `catchingUp` drives the pane's
-    // delayed indicator, and a banner here would shift the whole transcript
-    // on every foreground. Only an outage the backoff has failed to clear
-    // for a while earns the offline notice.
     if (state.status === "offline" && sustainedOffline) {
       return {
         message:
@@ -907,8 +809,6 @@ export const useCloudCanonicalChatThread = (
         retry: "retry" in issue ? issue.retry : retryAuthority,
       }
     : null;
-  // Once a transcript has painted for this authority it stays painted; a
-  // resync only ever adds or replaces rows in place.
   const storageLoaded = display.shown && !local.authorityIssue;
 
   const trackSend = useCallback(
@@ -978,15 +878,6 @@ export const useCloudCanonicalChatThread = (
     () => collectActivityHubArtifacts(messages),
     [messages],
   );
-  // Background work is the agent ledger's: each agent's status and title,
-  // and which of them run, wherever they run (`applyAgentLedger`). The
-  // journal places them in the chat and stands in for an agent the ledger
-  // has no row for, or while it has not loaded. That fallback takes which
-  // agents run from the server's list (`ready.agents`, then each `agents`
-  // frame), the only source that names an agent whose start row is below the
-  // window. It is seeded into the record fold so a row this device holds
-  // draws it; a row the fold left running and the list does not name has
-  // ended (`settleUnlistedTasks`).
   const runningAgents = state.runningAgents;
   const journalTasks = useMemo(
     () => collectJournalTasks(state.records, runningAgents),
@@ -1035,7 +926,6 @@ export const useCloudCanonicalChatThread = (
     },
     [authority.accountScope, authority.conversationId],
   );
-  // The turn the latest Stop was for, and its confirmation timer.
   const activeTurnRef = useRef(activeTurnId);
   activeTurnRef.current = activeTurnId;
   const stopWatchRef = useRef<{
@@ -1048,8 +938,6 @@ export const useCloudCanonicalChatThread = (
   }, []);
   useEffect(() => clearStopWatch, [clearStopWatch, store]);
   useEffect(() => {
-    // The turn a Stop was for has ended (or another took its place): there
-    // is nothing left to stop, so the notice and its timer go with it.
     if (stopWatchRef.current && stopWatchRef.current.turnId !== activeTurnId) {
       clearStopWatch();
     }
@@ -1059,14 +947,10 @@ export const useCloudCanonicalChatThread = (
   }, [activeTurnId, clearStopWatch]);
   const stopTurnNow = useCallback((options?: { direct?: boolean }) => {
     replyHaptics.reset();
-    // This phone's own queued and in-flight sends: their durable outbox
-    // cancels the exact dispatch it admitted.
     localStop();
     const turnId = activeTurnId;
     if (!turnId) return;
     setStopIssue(null);
-    // Stop lands when the turn's terminal row reaches the journal. A turn
-    // still running well after Stop says so, with Try again.
     const watch = () => {
       clearStopWatch();
       const timer = setTimeout(() => {
@@ -1076,9 +960,6 @@ export const useCloudCanonicalChatThread = (
       }, STOP_CONFIRM_MS);
       stopWatchRef.current = { turnId, timer };
     };
-    // The conversation's own stop: the session that journals the turn stops
-    // it wherever it runs. A turn a computer holds is ended in the journal at
-    // once and that computer aborts it; a cloud turn is cancelled in place.
     const stopTurn = () => {
       if (store.cancelTurn(turnId)) {
         watch();
@@ -1086,13 +967,6 @@ export const useCloudCanonicalChatThread = (
       }
       setStopIssue({ turnId, message: STOP_UNREACHABLE_MESSAGE });
     };
-    // A turn admitted through placement (from this phone or any client) has
-    // a dispatch row; cancelling that row keeps placement's own bookkeeping
-    // exact. A turn started on the computer that holds the chat, or by an
-    // agent's report, has none, so it goes straight to the conversation.
-    // A turn run on a computer journals this phone's own message id (the
-    // dispatch's idempotency key) where a cloud turn echoes the server
-    // dispatch id, so map it through this phone's admission binding first.
     const dispatchId = runningDispatchId
       ? dispatchBindings.get(runningDispatchId) ?? runningDispatchId
       : null;
@@ -1129,8 +1003,6 @@ export const useCloudCanonicalChatThread = (
           if (!controller.signal.aborted) watch();
         },
         () => {
-          // No dispatch row for this turn, or placement unreachable: the
-          // conversation can still stop it.
           if (!controller.signal.aborted) stopTurn();
         },
       )

@@ -1,12 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ClaudeLocalAccountsState } from "@stella/contracts/claude-local-accounts";
 
-/**
- * This computer's Claude Code logins, as Electron main reads them from the
- * real `claude` CLI (`claude auth status`). Desktop only: in a browser
- * `available` is false and nothing here runs. Identities only; Stella never
- * sees a Claude credential.
- */
 export function useClaudeLocalAccounts() {
   const available =
     typeof window !== "undefined" &&
@@ -44,11 +38,8 @@ export function useClaudeLocalAccounts() {
     cliInstalled: state?.cliInstalled ?? false,
     configs,
     activeConfigId: state?.activeConfigId ?? null,
-    /** Why the active config is the one in use (`ClaudeLocalAccountsState`). */
     activeReason: state?.activeReason,
-    /** Some Claude Code login on this computer is signed in. */
     signedIn: configs.some((config) => config.loggedIn),
-    /** The CLI's default config is present and signed out. */
     defaultSignedOut: configs.some((config) => config.isDefault && !config.loggedIn),
     signOut: async (configId: string) => {
       try {

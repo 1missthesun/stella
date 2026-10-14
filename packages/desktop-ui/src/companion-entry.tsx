@@ -10,15 +10,6 @@ import { applyLowPowerDocumentFlag } from "./shared/lib/device-perf";
 import { CompanionMarkRoot } from "./shell/companion/CompanionMarkRoot";
 import { CompanionPanelRoot } from "./shell/companion/CompanionPanelRoot";
 
-/**
- * Companion window entry — the floating desktop Stella.
- *
- * One entry serves both companion windows: `?window=companion` is the small
- * mark window, `?window=companion-panel` the fixed-size panel behind it.
- * Deliberately tiny: no router, no chat runtime, no auth provider. The full
- * shell renderer owns the conversation and publishes a small snapshot over
- * IPC; these windows only draw the mark, a mini composer, and the last reply.
- */
 applyLowPowerDocumentFlag();
 document.documentElement.dataset.stellaWindow = "companion";
 

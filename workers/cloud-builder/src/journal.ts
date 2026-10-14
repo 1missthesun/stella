@@ -1,28 +1,3 @@
-/**
- * The conversation's transcript, in the conversation's own Durable Object.
- *
- * One ordered journal — messages, turn lifecycle records and UI cards share a
- * single gapless `seq` — is what makes the client's gap detection total: a
- * hole in the counter is the only signal a reader needs, and everything below
- * the resident window is named explicitly by the segment manifest. Two
- * separately numbered streams would need two cursors and could not express
- * "these interleaved this way".
- *
- * Three invariants carry the whole design, and each is asserted at its site
- * below:
- *
- *  1. `seq` comes only from `meta.next_seq`, allocated and inserted inside one
- *     `transactionSync`. Never `MAX(seq)+1` — rollover deletes old rows, so
- *     `MAX` goes backwards and would hand out a seq that already shipped.
- *  2. `writer_key` is UNIQUE and every append is INSERT OR IGNORE + read-back.
- *     Retry is therefore free and unbounded, which is what lets the callers
- *     drop their hand-rolled two-attempt hedges.
- *  3. The async KV keys (`turn`, `terminal`, `terminalDelivered`, `queued:*`,
- *     `alarmAttempts`) stay authoritative for the turn lifecycle. The `turns`
- *     table here is a queryable projection and is never read to decide whether
- *     to emit a terminal event.
- */
-
 import type { OwnerKeks } from "./secret-rotation.js";
 import type { AgentMessage } from "@stella/runtime/kernel/agent-core/types.js";
 import { formatMessageRefTag } from "@stella/contracts/reply-refs";
@@ -186,25 +161,11 @@ const DDL = [
      queued_at INTEGER NOT NULL,
      attempts  INTEGER NOT NULL DEFAULT 0
    )`,
-  // The durable record of every spill object this conversation has ever
-  // written. It cannot live on the journal row that references it: rollover
-  // DELETEs archived rows, and the row's `spill_key` is then reachable only
-  // from inside a compressed segment that the purge never reads. Rows here
-  // outlive both the journal row and the segment, so a per-conversation delete
-  // can still name every object it owns.
-  //
-  // `bytes` is the payload's real size, not the ~60-byte stub the journal row
-  // keeps. Without it the storage ceiling measured everything EXCEPT the bytes
-  // that actually leave the object, and an authenticated writer could push
-  // unbounded payloads into R2 through a journal whose measured size never
-  // moved.
   `CREATE TABLE IF NOT EXISTS spills (
      r2_key     TEXT PRIMARY KEY,
      created_at INTEGER NOT NULL,
      bytes      INTEGER NOT NULL DEFAULT 0
    )`,
-  // Fixed-window append budget. In SQLite rather than in memory because an
-  // eviction between two requests must not hand out a fresh allowance.
   `CREATE TABLE IF NOT EXISTS append_window (
      id         INTEGER PRIMARY KEY CHECK (id = 0),
      started_at INTEGER NOT NULL DEFAULT 0,
@@ -265,14 +226,6 @@ const CURRENT_SCHEMA_OBJECT_NAMES = [
   "conversation_edit_receipts",
 ] as const;
 
-/**
- * What an existing database needs in order to reach the current
- * JOURNAL_SCHEMA_VERSION, keyed by the version it arrives at. `CREATE TABLE IF
- * NOT EXISTS` covers a brand-new object and does nothing for an old one, so a
- * column added to an existing table has to arrive here — and `ADD COLUMN` is an
- * error rather than a no-op the second time, which is why the stamped version,
- * not the statement, decides whether it runs.
- */
 const MIGRATIONS: Array<{
   to: number;
   statements: string[];
@@ -374,30 +327,19 @@ const MIGRATIONS: Array<{
     fullArchivedReindex: true,
   },
   {
-    // The search index stops keeping a second copy of every message (under
-    // encryption, a keyed hash per word: ~4x the text) and its snippet text
-    // is stored deflated. Rahul's main conversation held 28.6 MB of the
-    // former against 6.4 MB of actual text (2026-10-13).
     to: 12,
     statements: [],
     contentlessSearch: true,
   },
 ];
 
-/**
- * Below `ceilingSeq`, rows were archived before agents' reports and messages
- * were searched; `reindexedThrough` is the first seq of the last segment
- * re-read for them so far.
- */
 const SEARCH_REINDEX_KEY = "searchReindex";
 type SearchReindex = {
   ceilingSeq: number;
   reindexedThrough: number;
-  /** Rebuild every message's entry, not only the kinds search once skipped. */
   full?: boolean;
 };
 
-/** Durable witness of the highest epoch this DO name has ever used. */
 const EPOCH_WITNESS_KEY = "conversationEpoch";
 
 export type MetaRow = {
@@ -439,7 +381,6 @@ export type JournalRow = {
 
 export type AppendResult = {
   seq: number;
-  /** False when `writer_key` already existed — the caller's retry was a no-op. */
   inserted: boolean;
   record: JournalRecord;
 };
@@ -464,7 +405,6 @@ export type AppendMessageInput = {
   streamId?: string;
   clientMsgId?: string;
   createdAt?: number;
-  /** Pre-serialized payload, when the caller already paid for the stringify. */
   payloadJson?: string;
   spillKey?: string;
 };
@@ -513,14 +453,6 @@ export type SegmentRow = {
   created_at: number;
 };
 
-/**
- * Stamp each visible user message with its journal sequence number so the
- * model can cite it (`reply-refs`: a reply ends with `#<seq>` lines that the
- * clients resolve against the same journal). Applied after spill hydration
- * so a hydrated payload keeps its tag; hidden rows (lifecycle prompts) carry
- * their thread id instead and are left alone. The journal itself stays raw:
- * the tag exists only in model context.
- */
 export const stampUserMessageSequences = (
   messages: AgentMessage[],
   rows: WindowSelection["rows"],
@@ -562,28 +494,18 @@ type WindowRow = {
 
 export type WindowSelection = {
   messages: AgentMessage[];
-  /** Journal row per message (same order), for sequence stamping. */
   rows: Array<{ seq: number; role: string | null; hidden: boolean }>;
   startSeq: number;
   endSeq: number;
-  /** Rows whose payload lives in R2; the caller hydrates what it can afford. */
   spilled: Array<{
     seq: number;
     spillKey: string;
     index: number;
     role: string;
-    /** Carried so an unhydratable tool result keeps its pairing. */
     toolCallId: string | null;
   }>;
 };
 
-/**
- * A resident canonical row selected for model context could not be decoded.
- *
- * The sequence number is the repair locator. Deliberately omit the raw
- * payload (and the JSON parser's message) so logs can identify the damaged
- * row without copying conversation content out of the journal.
- */
 export class JournalContextIntegrityError extends Error {
   readonly code = "CLOUD_CONTEXT_UNAVAILABLE";
   readonly component = "canonical_history";
@@ -649,7 +571,6 @@ const toolCallsOf = (
     ];
   });
 
-/** What `meta()` reads back once the storage has been destroyed by a purge. */
 const PURGED_META: MetaRow = Object.freeze({
   schema_version: JOURNAL_SCHEMA_VERSION,
   epoch: 0,
@@ -747,7 +668,6 @@ export class Journal {
     return this.crypto;
   }
 
-  /** Stored form of one payload JSON string. Idempotent. */
   encodePayload(payloadJson: string): string {
     return this.ensureCrypto()?.encryptText(payloadJson) ?? payloadJson;
   }
@@ -760,10 +680,6 @@ export class Journal {
     return crypto.decryptText(stored);
   }
 
-  // -------------------------------------------------------------------------
-  // Bootstrap
-  // -------------------------------------------------------------------------
-
   async bootstrap(): Promise<void> {
     const current = this.currentBootstrapMeta();
     if (current) {
@@ -775,7 +691,6 @@ export class Journal {
       }
       return;
     }
-    // One `exec` per statement: the platform runs a single statement per call.
     for (const statement of DDL) this.sql.exec(statement);
     const existing = this.sql
       .exec<{ count: number }>("SELECT COUNT(*) AS count FROM meta")
@@ -834,13 +749,6 @@ export class Journal {
     this.ensureCrypto();
   }
 
-  /**
-   * Migration 12: rebuild `journal_fts` contentless and store every snippet
-   * text deflated as a BLOB. Nothing searchable is lost: the new index is
-   * filled from the old one's own content (the same tokens, hashed or not),
-   * and without a key the old plaintext content becomes the side text first.
-   * One transaction, and safe to repeat if the version stamp never landed.
-   */
   private migrateToContentlessSearch(): void {
     const started = Date.now();
     const crypto = this.ensureCrypto();
@@ -848,7 +756,6 @@ export class Journal {
     this.transactionSync(() => {
       const contentful = !isContentlessSearchTable(this.sql);
       if (contentful && !crypto) {
-        // Plaintext index: its content column is the only copy of the text.
         let after = -1;
         for (;;) {
           const rows = this.sql
@@ -872,7 +779,6 @@ export class Journal {
           }
         }
       }
-      // Older side texts (`enc1.` strings) become deflated BLOBs.
       let after = -1;
       let converted = 0;
       for (;;) {
@@ -903,10 +809,6 @@ export class Journal {
       }
       let moved = 0;
       if (contentful) {
-        // Through a plain holding table, not `ALTER TABLE ... RENAME`: FTS5
-        // does not carry a contentless index's `_content` shadow table
-        // (its UNINDEXED columns) across a rename, and the renamed index
-        // then fails every write.
         this.sql.exec(`DROP TABLE IF EXISTS journal_fts_moving`);
         this.sql.exec(
           `CREATE TABLE journal_fts_moving AS
@@ -932,7 +834,6 @@ export class Journal {
     });
   }
 
-  /** Migration 11: encrypt every resident payload under the new DEK. */
   private encryptExistingPayloads(): void {
     const crypto = this.ensureCrypto();
     if (!crypto) return;
@@ -1026,10 +927,6 @@ export class Journal {
     for (const row of rows) this.indexStoredMessage(row);
   }
 
-  /**
-   * Archived segments not yet re-read for search: those cut before agents'
-   * reports and messages were indexed. Oldest first.
-   */
   async searchReindexPending(): Promise<SegmentRow[]> {
     const state = await this.ctx.storage.get<SearchReindex>(SEARCH_REINDEX_KEY);
     if (!state) return [];
@@ -1046,11 +943,6 @@ export class Journal {
     return pending;
   }
 
-  /**
-   * Index what an archived segment holds that search used to skip (hidden
-   * prompts, and messages whose payload spilled to R2, by their preview), and
-   * remember the segment is done.
-   */
   async reindexArchivedSegment(firstSeq: number, rows: readonly JournalRow[]): Promise<void> {
     const state = await this.ctx.storage.get<SearchReindex>(SEARCH_REINDEX_KEY);
     if (!state) return;
@@ -1097,12 +989,6 @@ export class Journal {
     });
   }
 
-  /**
-   * `history.search`: matches from the transcript index, newest or best
-   * first. With encryption on, the index holds keyed hash tokens and the
-   * snippet is rebuilt from the encrypted side text; without it, the
-   * original plaintext FTS snippet path serves.
-   */
   searchTranscript(
     text: string,
     options: HistorySearchOptions = {},
@@ -1205,10 +1091,6 @@ export class Journal {
     return text.length > 160 ? `${text.slice(0, 160)}…` : text;
   }
 
-  // -------------------------------------------------------------------------
-  // Meta
-  // -------------------------------------------------------------------------
-
   /**
    * Always read from SQL: a cached mirror is one forgotten write from drift.
    *
@@ -1241,11 +1123,6 @@ export class Journal {
     return this.meta().deleted_at !== null;
   }
 
-  /**
-   * Binds this DO to the conversation the owner says it is. Never called with a
-   * connector's self-asserted identity: `conversationId` would otherwise be a
-   * bearer token, and anyone who guessed a UUID would own the object.
-   */
   bindOwner(
     record: ConversationOwnerRecord & { conversationId?: string },
   ): void {
@@ -1316,15 +1193,6 @@ export class Journal {
     };
   }
 
-  // -------------------------------------------------------------------------
-  // Append
-  // -------------------------------------------------------------------------
-
-  /**
-   * A foreign append is a logical batch: its rows and rollover-surviving
-   * receipt either commit together or not at all. Individual append methods
-   * reuse this boundary and avoid nesting `transactionSync`.
-   */
   transactionSync<T>(operation: () => T): T {
     if (this.transactionDepth > 0) return operation();
     return this.ctx.storage.transactionSync(() => {
@@ -1337,21 +1205,12 @@ export class Journal {
     });
   }
 
-  /**
-   * The one seq allocator. Both the allocation and the insert happen inside a
-   * single `transactionSync`: a consumed seq not backed by a row is a
-   * permanent hole that no client can ever close and that `backfill` would
-   * spin on forever.
-   */
   private insert(
     inputColumns: Record<string, string | number | null>,
     writerKey: string,
   ): { seq: number; inserted: boolean } {
     const columns = { ...inputColumns };
     if (typeof columns.payload_json === "string") {
-      // A tool result can carry a secret a command happened to print. The
-      // stored copy keeps none of it; the user's own messages are their
-      // history and are never rewritten.
       if (columns.role === "toolResult") {
         columns.payload_json = redactSensitiveJson(columns.payload_json);
       }
@@ -1649,11 +1508,6 @@ export class Journal {
     };
   }
 
-  /**
-   * Promotes an oversize row's payload to R2 after the fact. Atomic, so a
-   * concurrent read sees either the inline bytes or the stub, never a stub
-   * whose object does not exist yet.
-   */
   attachSpill(
     seq: number,
     spillKey: string,
@@ -1668,10 +1522,6 @@ export class Journal {
       seq,
     );
   }
-
-  // -------------------------------------------------------------------------
-  // Repair on load
-  // -------------------------------------------------------------------------
 
   /**
    * Closes any tool call the tail left unanswered.
@@ -1729,7 +1579,6 @@ export class Journal {
       }
     }
     if (open.length === 0) return [];
-    // Oldest first so the synthetic results land in call order.
     open.reverse();
     const appended: AppendResult[] = [];
     for (const entry of open) {
@@ -1810,7 +1659,6 @@ export class Journal {
       } catch {
         continue;
       }
-      // Reverse within the row so the final reverse below restores call order.
       for (const call of toolCallsOf(parsed).reverse()) {
         if (!answered.has(call.id))
           open.push({
@@ -1824,11 +1672,6 @@ export class Journal {
     return open.reverse();
   }
 
-  /**
-   * Durable result for one call a resume answered. The writer key is the one
-   * `repairTail` uses, so a resume and a later repair of the same call can
-   * never both land.
-   */
   appendRepairedResult(
     turnId: string,
     message: AgentMessage,
@@ -1848,7 +1691,6 @@ export class Journal {
     });
   }
 
-  /** Whether a row was written under this exact writer key. */
   hasRow(writerKey: string): boolean {
     return (
       this.sql
@@ -1857,7 +1699,6 @@ export class Journal {
     );
   }
 
-  /** The history window a turn recorded at its start (`setTurnContext`). */
   turnContextRange(turnId: string): { startSeq: number; endSeq: number } | null {
     const row = this.sql
       .exec<{ ctx_start_seq: number | null; ctx_end_seq: number | null }>(
@@ -1875,11 +1716,6 @@ export class Journal {
     return { startSeq: row.ctx_start_seq, endSeq: row.ctx_end_seq };
   }
 
-  /**
-   * Re-select exactly the history rows a turn started from: every model row
-   * of other turns inside its recorded window. Used by a resume, which must
-   * rebuild the same provider prefix the lost isolate sent.
-   */
   selectRange(
     excludeTurnId: string,
     startSeq: number,
@@ -1901,7 +1737,6 @@ export class Journal {
     );
   }
 
-  /** A turn's own model rows, in order: its prompt, then what it produced. */
   selectTurnMessages(turnId: string): WindowSelection {
     const rows = this.sql
       .exec<WindowRow>(
@@ -1914,13 +1749,6 @@ export class Journal {
     return this.windowFromRows(rows, rows[0]?.seq ?? this.meta().next_seq);
   }
 
-  /**
-   * Model rows strictly between two seqs that a Claude Code orchestrator
-   * session has not seen: everything except rows that session wrote itself
-   * (`excludeWriters`). Newest `limit` rows, returned oldest first, with
-   * `more` set when older qualifying rows were left out. A spilled payload
-   * comes back as `message: null`; the caller names it instead of hydrating.
-   */
   cliContextRows(args: {
     afterSeq: number;
     beforeSeq: number;
@@ -1981,7 +1809,6 @@ export class Journal {
     };
   }
 
-  /** The message journaled under one writer key, or null. */
   messageByWriterKey(writerKey: string): AgentMessage | null {
     const row = this.sql
       .exec<{ payload_json: string }>(
@@ -1998,11 +1825,6 @@ export class Journal {
     }
   }
 
-  /**
-   * The highest `turn:<id>:msg:<n>` index a turn's loop used, or -1. A resume
-   * numbers its own rows after it so none collides with (and is silently
-   * deduplicated against) a row the lost isolate already wrote.
-   */
   maxProducedIndex(turnId: string): number {
     const prefix = `turn:${turnId}:msg:`;
     let max = -1;
@@ -2019,22 +1841,12 @@ export class Journal {
     return max;
   }
 
-  // -------------------------------------------------------------------------
-  // Context window
-  // -------------------------------------------------------------------------
-
   /**
    * Two metadata passes, no payload reads in the first.
    *
    * Deliberately not a `SUM(...) OVER (...)` window function: window-function
    * support in DO SQLite is unverified, and pass 1 already reads three small
    * columns. A micro-optimisation is not worth an unverified dependency.
-   */
-  /**
-   * Where the context window opens: the oldest of the newest messages that
-   * fit `budgetTokens`, on a user message. A transcript any host keeps of
-   * this conversation is seeded from here (`journalImportAfter`). The next
-   * seq when no message qualifies. Reads metadata only.
    */
   contextStartSeq(excludeTurnId: string, budgetTokens: number, afterSeq = -1): number {
     const scan = this.sql
@@ -2047,7 +1859,7 @@ export class Journal {
         CONTEXT_SCAN_ROW_CAP,
       )
       .toArray();
-    scan.reverse(); // oldest-first
+    scan.reverse();
     let used = 0;
     let start = scan.length;
     for (let index = scan.length - 1; index >= 0; index -= 1) {
@@ -2061,7 +1873,6 @@ export class Journal {
     return start < scan.length ? scan[start]!.seq : this.meta().next_seq;
   }
 
-  /** The seq of a turn's first message (its prompt), while its rows are hot. */
   turnStartSeq(turnId: string): number | undefined {
     return this.sql
       .exec<{ seq: number | null }>(
@@ -2071,7 +1882,6 @@ export class Journal {
       .toArray()[0]?.seq ?? undefined;
   }
 
-  /** The newest turns one writer ran, newest first. */
   recentTurnIds(writer: string, limit: number): string[] {
     return this.sql
       .exec<{ turn_id: string }>(
@@ -2125,10 +1935,6 @@ export class Journal {
       try {
         parsed = JSON.parse(this.decodePayload(row.payload_json));
       } catch {
-        // Never silently omit canonical history. Doing so lets the provider
-        // answer from a context the user cannot inspect or repair and makes a
-        // restart behave differently from the original turn. The row remains
-        // untouched in SQLite; `seq` is the safe repair locator.
         throw new JournalContextIntegrityError(row.seq);
       }
       if (row.spill_key && isSpillStub(parsed)) {
@@ -2181,10 +1987,6 @@ export class Journal {
   markModelSkip(seq: number): void {
     this.sql.exec(`UPDATE journal SET model_skip = 1 WHERE seq = ?`, seq);
   }
-
-  // -------------------------------------------------------------------------
-  // Reads
-  // -------------------------------------------------------------------------
 
   rowToRecord(row: JournalRow): JournalRecord {
     const parse = (): unknown => {
@@ -2253,28 +2055,12 @@ export class Journal {
       .toArray();
   }
 
-  /** Newest `limit` records, returned oldest-first. */
   newest(limit = INITIAL_WINDOW_RECORDS): JournalRecord[] {
     const rows = this.selectRows(`ORDER BY seq DESC LIMIT ?`, limit);
     rows.reverse();
     return rows.map((row) => this.rowToRecord(row));
   }
 
-  // -------------------------------------------------------------------------
-  // Running agents
-  // -------------------------------------------------------------------------
-
-  /**
-   * The fold of this conversation's agent activity, kept in the object's
-   * memory. `ready` needs the authoritative answer on every connect and has no
-   * await left to spend on it, so the resident journal is scanned once per
-   * object lifetime and then carried forward by whatever rows were appended
-   * since. An eviction drops the field and the next reader pays for one scan.
-   *
-   * `epoch` is part of the identity, not just `throughSeq`: a journal
-   * recreated under the same name starts a new epoch, and folding its rows
-   * onto the old one's activity would keep agents alive that it never had.
-   */
   private agentActivity: {
     state: AgentActivityState;
     toolCalls: Map<string, AgentActivityToolCall>;
@@ -2282,7 +2068,6 @@ export class Journal {
     epoch: number;
   } | null = null;
 
-  /** Every agent the journal still shows as running, oldest start first. */
   runningAgents(limit = READY_RUNNING_AGENTS_LIMIT): AgentActivityEntry[] {
     const meta = this.meta();
     const headSeq = meta.next_seq - 1;
@@ -2302,10 +2087,6 @@ export class Journal {
       // cannot be read from here), once per object lifetime.
       this.agentActivity = cached;
     }
-    // Catch the cache up completely. A bounded read keeps one statement small,
-    // so a long gap costs several of them rather than one unbounded row set —
-    // but returning while rows remain unfolded would answer from a journal
-    // prefix, which is the very thing this method exists to avoid.
     while (cached.throughSeq < headSeq) {
       const rows = this.selectRows(
         `WHERE seq > ? ORDER BY seq ASC LIMIT ?`,
@@ -2348,19 +2129,11 @@ export class Journal {
       folded = Math.max(folded, row.seq);
     }
     foldAgentActivity(cached.state, records, { toolCalls: cached.toolCalls });
-    // The bounded scan may have stopped short of the head it was told about;
-    // only the rows actually read may be claimed as folded, or a row between
-    // would be skipped forever.
     cached.throughSeq = rows.length > 0 ? folded : Math.max(folded, headSeq);
     trimAgentActivity(cached.state, cached.toolCalls);
   }
 
 
-  /**
-   * Resident rows in `[fromSeq, toSeq]`, bounded by both a row and a byte
-   * budget. `complete` is false when the budget cut the range short — the
-   * client re-asks from where it got to.
-   */
   readResident(
     fromSeq: number,
     toSeq: number,
@@ -2388,7 +2161,6 @@ export class Journal {
     return { records, complete };
   }
 
-  /** Raw rows for archival. Ordered, bounded, includes every column. */
   rowsForArchive(fromSeq: number, toSeq: number, limit: number): JournalRow[] {
     return this.selectRows(
       `WHERE seq >= ? AND seq <= ? ORDER BY seq ASC LIMIT ?`,
@@ -2397,10 +2169,6 @@ export class Journal {
       limit,
     );
   }
-
-  // -------------------------------------------------------------------------
-  // Turn projection (never authoritative — see invariant 3)
-  // -------------------------------------------------------------------------
 
   upsertTurn(input: {
     turnId: string;
@@ -2495,7 +2263,6 @@ export class Journal {
     return rows[0] ?? null;
   }
 
-  /** True when `seq + 1` is a plain user message — a safe history boundary. */
   isCutBoundary(seq: number): boolean {
     const rows = this.sql
       .exec<{
@@ -2518,10 +2285,6 @@ export class Journal {
       seq,
     );
   }
-
-  // -------------------------------------------------------------------------
-  // Inbox
-  // -------------------------------------------------------------------------
 
   /**
    * Single-threaded execution gives total order but not CORRECT order: a
@@ -2593,7 +2356,6 @@ export class Journal {
     this.sql.exec(`DELETE FROM inbox WHERE id = ?`, id);
   }
 
-  /** Last rendered text of the conversation, for the owner index preview. */
   lastPreview(maxChars: number): { text: string; role: string } | null {
     const rows = this.sql
       .exec<{
@@ -2620,14 +2382,6 @@ export class Journal {
     return null;
   }
 
-  // -------------------------------------------------------------------------
-  // Segments / rollover bookkeeping
-  // -------------------------------------------------------------------------
-
-  /**
-   * The resident set's size, kept on `meta` by every insert and every
-   * committed segment, so measuring it never reads the journal.
-   */
   hotStats(): { rows: number; bytes: number; tokens: number } {
     const row = this.sql
       .exec<{ rows: number; bytes: number; tokens: number }>(
@@ -2642,12 +2396,6 @@ export class Journal {
     return this.sql.databaseSize;
   }
 
-  /**
-   * The highest seq rollover would like to archive so the resident set lands
-   * at `targetRows` rows and `targetBytes` bytes: the storage-pressure tiers.
-   * Null when the hot set is already within both. This is a WISH, not a
-   * boundary: the caller still has to find a legal cut at or below it.
-   */
   desiredCutSeq(targetRows: number, targetBytes: number): number | null {
     const total = this.hotStats();
     if (total.rows <= targetRows && total.bytes <= targetBytes) return null;
@@ -2673,13 +2421,6 @@ export class Journal {
     return null;
   }
 
-  /**
-   * The newest seq older than the newest `keepTokens` of model context: what
-   * rollover may archive while a full context window of that size stays
-   * resident. Null when the resident model context is no larger. Reads
-   * metadata a page at a time and stops at `maxRows`, keeping everything when
-   * that many rows still hold less.
-   */
   seqBeforeContextTokens(keepTokens: number, maxRows: number): number | null {
     let kept = 0;
     let before = this.meta().next_seq;
@@ -2705,10 +2446,6 @@ export class Journal {
     return null;
   }
 
-  /**
-   * Terminal turn ends at or below `ceiling`, newest first: where a cut that
-   * keeps everything above `ceiling` resident may land.
-   */
   terminalTurnBoundariesAtOrBelow(
     ceiling: number,
     limit: number,
@@ -2751,12 +2488,6 @@ export class Journal {
     );
   }
 
-  /**
-   * The commit half of the two-phase cut, as ONE transaction: mark committed,
-   * drop the archived rows, raise the resident floor. Rows are never deleted
-   * before the R2 put resolves, so the worst crash outcome is a duplicate
-   * object — never a lost record.
-   */
   commitSegment(firstSeq: number, lastSeq: number): void {
     this.ctx.storage.transactionSync(() => {
       this.sql.exec(
@@ -2822,19 +2553,8 @@ export class Journal {
       .map((row) => row.r2_key);
   }
 
-  /**
-   * Records a spill object at the moment it lands in R2 — before any journal
-   * row references it, and independently of whether one ever does. A row that
-   * rolls over loses its `spill_key` when `commitSegment` deletes it, and an
-   * append that fails after the R2 put never had one; both would otherwise
-   * leave the object unreachable by the purge.
-   */
   recordSpill(key: string, bytes: number, now: number): void {
     if (!key) return;
-    // `bytes` is what the ceiling charges for, so a re-spilled key must not be
-    // able to lower it: the same writer key always carries the same payload,
-    // and taking the larger of the two is what keeps a truncated retry from
-    // discounting an object that is still full size in R2.
     this.sql.exec(
       `INSERT INTO spills (r2_key, created_at, bytes) VALUES (?, ?, ?)
        ON CONFLICT(r2_key) DO UPDATE SET bytes = MAX(spills.bytes, excluded.bytes)`,
@@ -2851,16 +2571,6 @@ export class Journal {
       .map((row) => row.r2_key);
   }
 
-  /**
-   * Everything this conversation has stored, resident, archived and spilled.
-   * Segment rows survive their journal rows precisely so this stays honest
-   * across rollover — a cap on the resident set alone would bound nothing.
-   *
-   * Spills are the third term because they are the only bytes that leave this
-   * object entirely: a spilled row keeps a ~60-byte stub here and its real
-   * payload in R2, so counting only the first two terms measured everything
-   * except the writes worth bounding.
-   */
   storedBytes(): number {
     const archived = this.sql
       .exec<{
@@ -2873,18 +2583,6 @@ export class Journal {
     return this.hotStats().bytes + (archived ?? 0) + (spilled ?? 0);
   }
 
-  /**
-   * The conversation's fixed append window, evaluated and optionally charged.
-   *
-   * Fixed rather than sliding because the bookkeeping has to be as cheap as
-   * the append it guards; the worst case is one window's allowance spent twice
-   * across a boundary, which the lifetime ceiling bounds regardless.
-   *
-   * `commit: false` is what lets the caller test the budget before it has done
-   * any work and charge it only once the rows are actually going in — a
-   * request refused for an unrelated reason must not spend the allowance the
-   * client needs to retry with.
-   */
   appendBudget(input: {
     now: number;
     bytes: number;
@@ -2930,10 +2628,6 @@ export class Journal {
     });
   }
 
-  // -------------------------------------------------------------------------
-  // Purge queue
-  // -------------------------------------------------------------------------
-
   enqueuePurge(keys: string[], now: number): void {
     for (const key of keys) {
       this.sql.exec(
@@ -2944,13 +2638,6 @@ export class Journal {
     }
   }
 
-  /**
-   * Least-attempted first. A batch R2 refuses is re-queued with a higher
-   * attempt count and therefore sorts behind everything still untried, so one
-   * key that keeps failing costs its own deletion and not the queue's — the
-   * old `queued_at ASC` ordering handed the same failing batch back forever
-   * and every key behind it was unreachable.
-   */
   purgeBatch(limit: number): string[] {
     return this.sql
       .exec<{ r2_key: string }>(
@@ -2964,8 +2651,6 @@ export class Journal {
   purgeDone(keys: string[]): void {
     for (const key of keys) {
       this.sql.exec(`DELETE FROM purge_queue WHERE r2_key = ?`, key);
-      // Once R2 confirmed deletion, retaining a spill locator would
-      // over-count storage forever.
       this.sql.exec(`DELETE FROM spills WHERE r2_key = ?`, key);
     }
   }
@@ -2986,7 +2671,6 @@ export class Journal {
   }
 }
 
-/** Thrown by every write path once the conversation is tombstoned. */
 export class ConversationDeletedError extends Error {
   constructor() {
     super("This conversation was deleted.");
@@ -2994,7 +2678,6 @@ export class ConversationDeletedError extends Error {
   }
 }
 
-/** A delayed writer from an older epoch tried to recreate removed history. */
 export class StaleJournalWriterError extends Error {
   constructor() {
     super("This journal writer belongs to a retired conversation epoch.");

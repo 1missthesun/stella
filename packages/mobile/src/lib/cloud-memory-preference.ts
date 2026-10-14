@@ -9,11 +9,6 @@ import {
   type SetCloudMemoryEnabledArgs,
 } from "@stella/contracts/cloud-memory-preference";
 
-/**
- * The mobile names for the shared cloud memory client
- * (`@stella/contracts/cloud-memory-preference`). Mobile adds an identity key
- * to its request fence and drops late results against it.
- */
 export {
   CloudMemoryPreferenceError as MobileCloudMemoryPreferenceError,
   followsOwnerGeneration as followsMobileOwnerGeneration,
@@ -50,11 +45,6 @@ const readIdentityRevision = (value: unknown): number => {
   return value;
 };
 
-/**
- * Strictly decodes a `memory.preference` view value or `memory.setEnabled`
- * result. The backend echoes the caller's owner id so a renderer can never
- * relabel an account-A result as account B after an auth transition.
- */
 export const decodeMobileCloudMemoryPreferenceForSubject = (
   value: unknown,
   expectedSubject: string,
@@ -64,7 +54,6 @@ export const decodeMobileCloudMemoryPreferenceForSubject = (
   return preference;
 };
 
-/** Creates one backend-valid id. Call once per logical toggle attempt. */
 export const createMobileCloudMemoryPreferenceRequestId = (
   createEntropy?: () => string,
 ): string => createCloudMemoryPreferenceRequestId("mobile", createEntropy);
@@ -92,10 +81,6 @@ export const createMobileCloudMemoryPreferenceRequestFence = (
     requestId: createMobileCloudMemoryPreferenceRequestId(createEntropy),
   });
 
-/**
- * Captures the CAS base and idempotency id once. Retrying this exact object is
- * safe; a new target or newly loaded revision must create a new attempt.
- */
 export const beginMobileCloudMemoryPreferenceWrite = (args: {
   accountScope: string;
   identityKey: string;
@@ -143,7 +128,6 @@ export type MobileCloudMemoryPreferenceFencedResult = {
   preference?: MobileCloudMemoryPreference;
 };
 
-/** Drops late results after account replacement or a newer request. */
 export const acceptCurrentMobileCloudMemoryPreferenceResult = <
   T extends MobileCloudMemoryPreferenceFencedResult,
 >(
@@ -189,7 +173,6 @@ export type MobileCloudMemoryPreferenceClient = {
   ) => Promise<MobileCloudMemoryPreferenceWriteResult>;
 };
 
-/** Dependency-injected adapter used by React hooks and deterministic tests. */
 export const createMobileCloudMemoryPreferenceClient = (
   port: MobileCloudMemoryPreferencePort,
 ): MobileCloudMemoryPreferenceClient => ({

@@ -1,9 +1,3 @@
-/**
- * Chain command handler - executes multiple steps sequentially
- * within the extension, with implicit selector waits and optional delays.
- *
- * This eliminates per-step round trips through the native bridge.
- */
 import { assertCurrentOwnerLease, getActiveTab } from "./tabs.js";
 import {
   resolveSelector,
@@ -299,9 +293,6 @@ export function validateChainCommand(command) {
   return command.steps;
 }
 
-/**
- * Random delay between min and max milliseconds (gaussian-ish distribution).
- */
 function abortableDelay(ms, signal) {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) {
@@ -327,7 +318,6 @@ function abortableDelay(ms, signal) {
 }
 
 function randomDelay(min = 300, max = 1200, signal) {
-  // Use average of two randoms for a more natural bell-curve distribution
   const r = (Math.random() + Math.random()) / 2;
   const ms = min + r * (max - min);
   return abortableDelay(ms, signal);
@@ -374,8 +364,6 @@ async function withinChainDeadline(chainDeadline, context, operation) {
       Promise.resolve().then(() => operation(controller.signal)),
       timedOut,
     ]);
-    // Keep synthetic-clock tests and handlers that finish on the boundary
-    // honest even when their promise wins the microtask race with the timer.
     if (Date.now() >= chainDeadline.at) {
       chainDeadline.expired = true;
       const error = new ChainDeadlineError(
@@ -391,10 +379,6 @@ async function withinChainDeadline(chainDeadline, context, operation) {
   }
 }
 
-/**
- * Wait for a selector to appear in the DOM via polling.
- * Returns true if found within timeout, false otherwise.
- */
 async function waitForStepSelector(command, selector, timeout = 10000, signal) {
   if (!selector) return true;
 
@@ -426,7 +410,6 @@ async function waitForStepSelector(command, selector, timeout = 10000, signal) {
       }
     } catch (cause) {
       if (exactRef) throw cause;
-      // Page might be navigating, keep polling
     }
     const remaining = deadline - Date.now();
     if (remaining <= 0) break;
@@ -485,7 +468,6 @@ export async function handleChain(command, handlers) {
     );
     if (stepCommand.tabId === undefined) delete stepCommand.tabId;
 
-    // 1. Implicit wait: if step has a selector/ref, wait for it to appear
     const selector = step.selector || step.ref;
     if (shouldWait && selector) {
       let found;
@@ -538,12 +520,8 @@ export async function handleChain(command, handlers) {
     }
     stepCommand.timeout = Math.min(stepCommand.timeout, remainingBeforeAction);
 
-    // A replacement kernel can claim this owner while a prior chain step or
-    // implicit wait is still running. Revalidate at the execution boundary so
-    // the admitted chain cannot continue acting under its superseded lease.
     await assertCurrentOwnerLease(stepCommand);
 
-    // 2. Look up and execute the handler
     const handler = handlers[step.action];
     if (!handler) {
       results.push({
@@ -611,7 +589,6 @@ export async function handleChain(command, handlers) {
       if (err instanceof ChainDeadlineError || abortOnError) break;
     }
 
-    // 3. Optional delay between steps (skip after last step)
     if (delayConfig && i < steps.length - 1) {
       const remaining = deadline - Date.now();
       if (remaining <= 0) break;
@@ -639,7 +616,6 @@ export async function handleChain(command, handlers) {
     }
   }
 
-  // 4. Build response
   const responseData = {
     results,
     completed: results.filter((r) => r.success).length,
@@ -652,7 +628,6 @@ export async function handleChain(command, handlers) {
     ? `Chain step ${failedStep.step} (${steps[failedStep.step]?.action || "unknown"}) failed: ${failedStep.error || "extension action failed without an error message"}`
     : null;
 
-  // 5. Optional final snapshot
   if (command.returnSnapshot) {
     try {
       if (!handlers.snapshot) {
@@ -690,7 +665,6 @@ export async function handleChain(command, handlers) {
     }
   }
 
-  // 6. Optional final screenshot
   if (command.returnScreenshot) {
     const defaultFormat = "jpeg";
     try {

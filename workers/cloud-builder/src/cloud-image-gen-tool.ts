@@ -1,18 +1,3 @@
-/**
- * `image_gen` for the cloud orchestrator and its agents.
- *
- * Desktop's tool (`packages/runtime/kernel/tools/media.ts`) drives the managed
- * media API and materializes the result under ~/.stella/media/outputs. There
- * is no local disk here, so this one runs the job through the owner's object
- * (`cloud-media-job.ts`) and lands the finished image in the owner's drive.
- * The drive file is what both chat clients render and what the user keeps;
- * the tool result also carries the media job id so the desktop can
- * materialize its own copy the way it does for every media job.
- *
- * BYOK does not exist here: provider keys live on the user's device, so every
- * cloud generation is Stella managed and metered like any other managed job.
- */
-
 import type { TSchema } from "@sinclair/typebox";
 import { generatedImageFileName } from "@stella/contracts/generated-image-name";
 import { stellaImageRequest } from "@stella/contracts/media-models";

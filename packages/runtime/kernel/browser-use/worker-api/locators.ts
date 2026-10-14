@@ -1,9 +1,3 @@
-/**
- * Locator handles: Playwright-style element locators bound to one tab
- * generation. Direct CSS locators run as single commands; filtered, indexed
- * and semantic ones mark their element in the page first (a two-step chain).
- */
-
 import type {
   BrowserWorkerBackend,
   BrowserWorkerLocator,
@@ -123,8 +117,6 @@ export const createLocators = (context: BrowserWorkerContext) => {
   ): Promise<unknown> => {
     const markerAttribute = "data-stella-worker-locator";
     const markerSelector = `[${markerAttribute}="${state.marker}"]`;
-    // Markers can land on elements inside same-origin iframes/shadow roots,
-    // so marker discovery must walk the same roots the resolver searches.
     const markedElementsJs = `(() => {
       const marked = [];
       const visitRoot = (root, depth) => {

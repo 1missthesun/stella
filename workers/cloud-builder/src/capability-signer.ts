@@ -15,20 +15,6 @@ import {
   type CapabilitySigningKey,
 } from "@stella/contracts/gateway/jwt";
 
-/**
- * Turn capabilities minted inside the Durable Object that admitted a turn.
- *
- * The private key lives only in this Worker (secret `CAPABILITY_SIGNING_KEY`,
- * PKCS8 PEM) and the model gateway verifies against the matching public JWK
- * under `CAPABILITY_SIGNING_KID`. A capability carries everything the gateway
- * needs to authorize and meter the turn's model calls without consulting
- * a database: owner, generation, audience, budget, the exact admitted execution,
- * and (for connected subscriptions) which native credential lane to use.
- *
- * The imported CryptoKey is cached per isolate; PKCS8 import is not free and
- * every turn in the isolate signs with the same key.
- */
-
 export type CapabilitySignerEnv = {
   CAPABILITY_SIGNING_KEY?: string;
   CAPABILITY_SIGNING_KID?: string;
@@ -41,31 +27,19 @@ type TurnCapabilityInputBase = {
   conversationId: string;
   audience: ManagedModelAudience;
   budgetMicroCents: number;
-  /** Agent types this turn may act as (`x-stella-agent-type`). */
   agentTypes: readonly string[];
-  /** Defaults to the model-gateway audience. */
   aud?: CapabilityAudience;
-  /** Test seam; defaults to `Date.now()`. */
   now?: number;
 };
 
-/**
- * `credential` is the native credential lane. It defaults to the execution
- * engine when that engine is the cloud's ChatGPT sign-in; a Stella execution
- * never carries one. A Claude (`anthropic`) execution never gets a gateway
- * capability: the cloud's Claude Code CLI talks to Anthropic on its own
- * login.
- */
 export type TurnCapabilityInput = TurnCapabilityInputBase & {
   execution: Exclude<CloudExecutionSelection, { engine: "anthropic" }>;
   credential?: GatewayNativeCredentialProvider;
 };
 
 export type MintedTurnCapability = {
-  /** Compact ES256 JWS; travels as `Authorization: Bearer <token>`. */
   token: string;
   claims: GatewayCapabilityClaims;
-  /** Absolute ms timestamp derived from the `exp` claim. */
   expiresAt: number;
 };
 
@@ -75,7 +49,6 @@ let cachedKey:
   | { pem: string; kid: string; key: Promise<CapabilitySigningKey> }
   | undefined;
 
-/** Resolve (and cache per isolate) the Worker's capability signing key. */
 export const capabilitySigningKey = (
   env: CapabilitySignerEnv,
 ): Promise<CapabilitySigningKey> => {
@@ -92,7 +65,6 @@ export const capabilitySigningKey = (
     return cachedKey.key;
   }
   const key = importCapabilitySigningKey(pem, kid).catch((error: unknown) => {
-    // A failed import must not poison the cache for a later, corrected env.
     if (cachedKey?.key === key) cachedKey = undefined;
     throw error;
   });

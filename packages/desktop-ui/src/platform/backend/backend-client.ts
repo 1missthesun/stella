@@ -10,13 +10,8 @@ if (!backendUrl) {
   );
 }
 
-/** `wss://` twin of `backendUrl`, for the conversation socket. */
 export const backendSocketUrl = backendUrl.replace(/^http/, "ws");
 
-/**
- * The renderer's one connection to the Stella backend worker: calls over
- * HTTP and live views over a single socket.
- */
 export const backendClient = new BackendClient({
   baseUrl: backendUrl || "http://127.0.0.1:8787",
   getToken: (options) =>
@@ -27,11 +22,6 @@ let accountEpoch = 0;
 let accountKey: string | null = null;
 const epochListeners = new Set<() => void>();
 
-/**
- * Point the backend at the signed-in account. When the account changes the
- * socket reconnects with the new token and every view resubscribes from
- * scratch, so nothing from the previous account is shown under the new one.
- */
 export const setBackendAccount = (key: string | null): void => {
   if (key === accountKey) return;
   accountKey = key;

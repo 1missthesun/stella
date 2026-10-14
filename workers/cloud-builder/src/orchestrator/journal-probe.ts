@@ -13,10 +13,6 @@ export abstract class OrchestratorJournalProbe extends OrchestratorTurnQueue {
     return CANONICAL_PROMPTS;
   }
 
-  /**
-   * The journal probe reads the canonical journal exactly the way a client
-   * does, including through R2 segments.
-   */
   protected async handleJournalProbe(url: URL): Promise<Response> {
     const requested = Number(url.searchParams.get("limit") ?? "50");
     const limit = Math.min(
@@ -32,10 +28,6 @@ export abstract class OrchestratorJournalProbe extends OrchestratorTurnQueue {
     const from = Math.max(0, to - limit + 1);
     const range = await this.archive.readRange(from, to, limit);
     const meta = this.journal.meta();
-    // The wake state, so the invariant "an accepted turn always has a pending
-    // alarm" is observable rather than merely asserted: `queued` non-empty with
-    // `alarmAt` null is a stranded turn, and there is no other way to see it
-    // from outside the object.
     const queued = await this.ctx.storage.list<ChatTurnRequest>({
       prefix: "queued:",
     });

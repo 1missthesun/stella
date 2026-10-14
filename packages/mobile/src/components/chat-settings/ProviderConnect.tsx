@@ -37,11 +37,6 @@ const hostOf = (url: string) => {
   }
 };
 
-/**
- * Connecting one provider to the account: its sign-in when it has one, and
- * its API key. The secret goes straight to the server, which checks it with
- * the provider and keeps it; nothing here stores it.
- */
 export function ProviderConnect({
   provider,
   onConnected,

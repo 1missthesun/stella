@@ -1,18 +1,3 @@
-/**
- * Surface a "this model isn't available on your plan" notice when a user on
- * a restricted tier (anonymous / free / go) submits a chat with a saved
- * non-default Stella model override AND Stella's own runtime is the
- * committed engine.
- *
- * The picker (`AgentModelPicker`) notifies at selection time, but a user
- * whose plan downgrades AFTER they picked a model would never see the
- * picker again before sending — this hook catches that case at submit
- * time. Deduped per (audience, agent, model) combo so it doesn't spam on
- * every send.
- *
- * Backend (`stella_provider/request.ts`) silently coerces the model in
- * either case — this is purely a UX notice.
- */
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { planUsageDialog } from "@/global/billing/plan-usage-dialog-store";
 import {
@@ -42,16 +27,10 @@ const buildToastDedupeKey = (
 ): string => `${audience}|${agent}|${model}`;
 
 export function useTierRestrictedModelToast() {
-  // Shares the app's single capability/billing subscription rather than
-  // opening a second one — and mounting it here is what keeps the
-  // audience snapshot fresh for the non-React streaming error path,
-  // since this hook is on every chat send.
   const { audience } = useCapabilityAccess();
   const audienceRef = useRef<ManagedModelAudience | null>(audience);
   audienceRef.current = audience;
 
-  // Which Stella picks the backend honors for this plan comes from the
-  // catalog rows, so the notice can never drift from the enforcement.
   const { models } = useModelCatalog();
   const allowedStellaModelIds = useMemo(() => {
     const stellaRows = models.filter((model) => model.provider === "stella");
@@ -65,8 +44,6 @@ export function useTierRestrictedModelToast() {
   const allowedRef = useRef(allowedStellaModelIds);
   allowedRef.current = allowedStellaModelIds;
 
-  // Reset dedupe set whenever audience changes — re-upgrading should clear
-  // prior toasts so a re-downgrade re-notifies.
   const seenRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     seenRef.current = new Set();
@@ -95,9 +72,6 @@ export function useTierRestrictedModelToast() {
     if (seenRef.current.has(dedupeKey)) return;
     seenRef.current.add(dedupeKey);
 
-    // Pinned above the composer (toast fallback when no chat surface is
-    // mounted): the user has to pick a model or upgrade before their
-    // choice takes effect, so it must not slide away on its own.
     presentComposerNotice({
       conversationId: null,
       kind: "upgrade",

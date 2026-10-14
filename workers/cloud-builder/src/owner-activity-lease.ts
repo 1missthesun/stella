@@ -1,16 +1,11 @@
 import { OwnerPurgeFenceError } from "./build-session/shared/errors.js";
 import { OWNER_FENCE_DEFAULT_MAX_LEASE_MS } from "./owner-fence-store.js";
 
-/** One owner-fence host call, already scoped to the owner. */
 export type OwnerFenceCaller = (
   path: string,
   body: Record<string, unknown>,
 ) => Promise<Response>;
 
-/**
- * Run `operation` under an owner-fence activity lease, so an owner purge
- * waits for it instead of deleting state underneath it.
- */
 export const withOwnerActivityLease = async <T>(
   fence: OwnerFenceCaller,
   ownerGeneration: string,

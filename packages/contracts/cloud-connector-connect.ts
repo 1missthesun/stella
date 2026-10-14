@@ -1,10 +1,3 @@
-/**
- * The inline connect card a cloud orchestrator turn shows while its
- * `connector_status` call waits: the cloud twin of the desktop's IPC-driven
- * connect offer. Secret-free — the Composio link is minted on demand by the
- * client's own decision and never stored on the row.
- */
-
 export const CLOUD_CONNECTOR_CONNECT_STATES = [
   "pending",
   "connecting",
@@ -39,6 +32,5 @@ export type CloudConnectorConnectRequest = Readonly<{
 
 export type CloudConnectorConnectDecisionResult = Readonly<{
   request: CloudConnectorConnectRequest;
-  /** Present after a `connect` decision: the hosted OAuth page to open. */
   url?: string;
 }>;

@@ -34,9 +34,7 @@ const extensionFor = (sourcePath: string, mimeType: string): string => {
 let sequence = 0;
 
 export type ArtifactMediaFile = {
-  /** `file://` URI a WebView or audio player can open directly. */
   uri: string;
-  /** Best-effort removal — the cache directory is disposable either way. */
   remove: () => void;
 };
 
@@ -62,10 +60,6 @@ export function createArtifactMediaFile(
   };
 }
 
-/**
- * Write `bytes` to a uniquely named cache file, taking its extension from
- * `sourcePath` when it has one and falling back to `mimeType`.
- */
 export function writeArtifactMediaFile(
   bytes: Uint8Array,
   mimeType: string,

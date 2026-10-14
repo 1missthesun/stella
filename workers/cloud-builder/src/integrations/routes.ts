@@ -1,23 +1,3 @@
-/**
- * Integrations over HTTP, for the desktop runtime, Electron and the
- * `stella-x-api` CLI:
- *
- *   GET  /api/native-integrations/catalog        the executable Store catalog (public)
- *   GET  /api/native-integrations/actions        ?id&action|query&cursor&limit
- *   GET  /api/native-integrations/status         ?id → `integrations.status`
- *   POST /api/native-integrations/connect-link   {id} → `integrations.connectLink`
- *   POST /api/native-integrations/run            {id, action, input}; `x-stella-request-id` or `Idempotency-Key`
- *   POST /api/admin/native-integrations/upsert   publish one integration (STELLA_ADMIN_API_SECRET)
- *   GET  /api/native-oauth/providers             configured server-side token exchanges
- *   POST /api/native-oauth/token                 one token exchange
- *   GET  /api/x/connect-url | /api/x/connections, POST /api/x/request
- *   GET  /api/x/oauth_callback                   X's redirect, with the signed state
- *   GET  /api/providers/oauth/callback           a provider sign-in's redirect: shows the code to paste
- *
- * Bearer JWTs are verified here and owner work runs in the owner's object,
- * as `/api/rpc` does. Errors are `{ error }` with the RPC error's status.
- */
-
 import { rpcErrorStatus, type RpcResponse } from "@stella/contracts/backend/protocol";
 import { X_OAUTH_CALLBACK_PATH } from "@stella/contracts/backend/integrations";
 import { PROVIDER_OAUTH_CALLBACK_PATH } from "@stella/contracts/backend/providers";
@@ -42,11 +22,6 @@ type RouteEnv = Cloudflare.Env;
 const escapeHtml = (value: string): string =>
   value.replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`);
 
-/**
- * Where a provider sign-in (OpenRouter) lands. The code is only useful with
- * the verifier the owner's object holds, so the page just shows it for the
- * user to paste back into Stella.
- */
 const providerCallbackPage = (request: Request): Response => {
   const code = new URL(request.url).searchParams.get("code")?.trim() ?? "";
   const valid = /^[A-Za-z0-9._~-]{1,512}$/.test(code);
@@ -96,7 +71,6 @@ const authenticate = async (
   return verified.ok ? verified : { ok: false, response: failRpcError(verified.error) };
 };
 
-/** A refused body: 413 says so, anything else gets the route's own message. */
 const failBody = (body: Extract<BodyResult<unknown>, { ok: false }>, invalid: string): Response =>
   fail(body.status, body.status === 413 ? body.error : invalid);
 
@@ -109,7 +83,6 @@ const internal = async (env: RouteEnv, ownerId: string, name: string, args: unkn
   return await gate.ownerInternal({ name, args, ownerGeneration });
 };
 
-/** An owner call with JSON in and out, authenticated by the bearer. */
 const ownerCall = async (
   request: Request,
   env: RouteEnv,
@@ -201,7 +174,6 @@ const xRequest = async (request: Request, env: RouteEnv): Promise<Response> => {
     ...(body.body !== undefined ? { body: body.body } : {}),
   });
   if (!response.ok) return respond(response);
-  // The CLI reads X's own status and body.
   const { status, payload } = response.value as { status: number; payload: unknown };
   return json(payload, status);
 };
@@ -239,7 +211,6 @@ const xCallback = async (request: Request, env: RouteEnv): Promise<Response> => 
 
 const methodNotAllowed = () => fail(405, "Method not allowed.");
 
-/** The integration routes, or null when the path is someone else's. */
 export const handleIntegrationsRoute = async (request: Request, env: RouteEnv): Promise<Response | null> => {
   const path = new URL(request.url).pathname;
   const method = request.method;

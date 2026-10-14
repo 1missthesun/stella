@@ -1,14 +1,3 @@
-/**
- * Companion IPC — relays between the companion window (a thin view) and the
- * full shell renderer (the brain that owns the chat runtime).
- *
- *   full shell  ──publishState──▶  main (cache)  ──state──▶  companion
- *   companion   ──send/stop─────▶  main          ──*Requested──▶ full shell
- *
- * The full shell may not exist (closed on macOS/Linux) when the companion
- * asks to send. Main then creates it hidden and holds the request until that
- * renderer publishes its first snapshot, which doubles as its "ready" signal.
- */
 import {
   BrowserWindow,
   type IpcMainEvent,
@@ -67,7 +56,6 @@ export const registerCompanionHandlers = (
   options: CompanionHandlerOptions,
 ): void => {
   const { windowManager } = options;
-  /** webContents ids of full shell renderers that have published a snapshot. */
   const readyBrains = new Set<number>();
   let pending: Array<PendingRequest & { at: number }> = [];
 
@@ -138,7 +126,6 @@ export const registerCompanionHandlers = (
     const controller = options.getCompanionController();
     if (!controller?.isSender(event.sender)) return;
     const win = fullWindowBrain();
-    // Nothing to stop if the brain is gone — don't resurrect it for a no-op.
     if (!win) return;
     dispatchToBrain({
       channel: IPC_COMPANION_STOP_REQUESTED,

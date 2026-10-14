@@ -1,11 +1,3 @@
-/**
- * "I can change myself" — the self-modification card (desktop only).
- *
- * One film of the real loop: ask for a feature in Stella, an agent drafts
- * it in her own source with a live preview, and the Update card applies it
- * with the app's focus-pull transition. Continue is never gated; the film
- * can be replayed once it finishes.
- */
 import { useCallback, useState } from "react";
 import { Button } from "@/ui/button";
 import { RotateCcw, Wand2 } from "@/ui/icons";

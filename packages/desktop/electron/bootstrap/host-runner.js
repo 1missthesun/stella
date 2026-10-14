@@ -23,17 +23,6 @@ import {
   IPC_EXECUTION_TARGET_SET,
   IPC_PI_CHAT_EVENTS,
 } from "@stella/contracts/desktop/ipc-channels";
-// Module-level one-shot cache for the skills home reconciliation. This
-// seeding used to run on the pre-window path inside `resolveStellaDataDir`, where
-// its ~100 awaited fs ops + sha256 over hundreds of KB contended with first
-// paint. It only needs to complete before the runtime worker reads
-// `~/.stella/skills` and `~/.stella/agents`, so we run it here — off first paint
-// — before `connectHostRunner` spawns the worker.
-//
-// `initializeStellaHostRunner` also runs on host-runner reset flows; caching the
-// first call's promise means runtime resets don't re-pay the reconciliation.
-// The customization-reset handler reconciles explicitly after moving a skill
-// aside, because that reset does change the canonical skills root.
 let stellaDataDirSeedingPromise = null;
 const ensureStellaDataDirSeededOnce = (stellaAppDir, stellaDataDirPath) => {
     if (!stellaDataDirSeedingPromise) {
@@ -155,7 +144,6 @@ const spawnAutomationDaemonFromHost = async (params) => {
                 ...extraEnv,
                 STELLA_COMPUTER_SESSION: sessionId,
                 STELLA_COMPUTER_STATE_DIR: stateDir,
-                // The daemon exits if this process dies without stopping it.
                 STELLA_PARENT_PID: String(process.pid),
             },
         });
@@ -214,10 +202,6 @@ export const createHostRunnerHandlers = (context, options) => ({
         if (!stellaDataDir) {
             return { ok: false, reason: "stella_data_dir_unavailable" };
         }
-        // ChatGPT comes from this computer's own Sign in with ChatGPT
-        // accounts; every other OAuth login and every API key stays in this
-        // computer's store. Claude is no credential at all: the host only
-        // says which Claude Code config (the CLI's own login) to run on.
         if (request.operation === "list") {
             return {
                 ok: true,
@@ -274,8 +258,6 @@ export const createHostRunnerHandlers = (context, options) => ({
     requestBrowserExtensionConnect: (payload) => context.services.connectorConnectService.requestBrowserExtensionConnect(payload),
     requestComputerUseAppApproval: (payload) => context.services.securityPolicyService.ensureComputerUseAppApproval(payload),
     displayUpdate: (payload) => {
-        // Forward structured DisplayPayload objects to all windows. The renderer
-        // validates them before routing to the workspace panel.
         broadcastToWindows(context, IPC_DISPLAY_UPDATE, payload);
     },
     showNotification: ({ title, body, sound }) => {
@@ -295,12 +277,6 @@ export const createHostRunnerHandlers = (context, options) => ({
     },
     requestDesktopPermission: async (kind) => requestMacPermission(kind),
     notifyRemoteExecutionRequest: (payload) => {
-        // Broadcast rather than await: the question belongs on this computer's
-        // screen, and the renderer answers whenever its user does through
-        // `execution:answerRemoteExecutionRequest`. It is also kept here, so a
-        // window that opens or reloads later (a closed window on macOS is gone,
-        // and at launch the gate can ask before the renderer subscribes) still
-        // asks; and a window that is not in front gets a notification once.
         const fresh = !pendingRemoteExecutionRequest(context);
         context.state.pendingRemoteExecutionRequest = {
             request: payload,
@@ -323,8 +299,6 @@ export const createHostRunnerHandlers = (context, options) => ({
     setExecutionTarget: (payload) => {
         broadcastToWindows(context, IPC_EXECUTION_TARGET_SET, payload);
     },
-    // A paired phone's request, relayed by the cloud over the presence socket.
-    // The handlers carry the same remote policy the IPC handlers apply.
     serveDeviceRequest: (request) => serveDeviceRequest(context.state.deviceRequestHandlers ?? null, request),
     spawnAutomationDaemon: (params) => spawnAutomationDaemonFromHost(params),
     openExternal: async (url) => {
@@ -378,9 +352,6 @@ const connectHostRunner = async (context) => {
             return;
         }
     }
-    // Proactively spawn the worker (off the open burst, since connectHostRunner
-    // runs from the deferred-startup sequence). The worker self-warms its model
-    // catalog on init, so the first chat stays fast without a blocking warm.
     await runner.ensureWorkerStarted();
     const workerStartedAt = Math.round(process.uptime() * 1000);
     logger?.process("startup.host-runner.worker-spawned", {
@@ -402,9 +373,6 @@ export const initializeStellaHostRunner = async (context) => {
     if (!stellaAppDir || !stellaDataDirPath || !state.stellaWorkspacePath) {
         throw new Error("Stella root is not initialized.");
     }
-    // Reconcile bundled skills into the canonical home skills root before the worker
-    // (spawned by connectHostRunner -> runner.start()/ensureWorkerStarted) reads
-    // them. One-shot cached so host-runner resets don't re-pay it.
     await ensureStellaDataDirSeededOnce(stellaAppDir, stellaDataDirPath);
     await services.securityPolicyService.loadPolicy();
     const loadDeviceIdentity = async () => await loadStellaDeviceIdentity(context);
@@ -418,8 +386,6 @@ export const initializeStellaHostRunner = async (context) => {
         initializeParams: {
             clientName: "stella-electron-host",
             clientVersion: app.getVersion(),
-            // Chooses the runtime's telemetry deployment, so it follows who the
-            // install is rather than whether the renderer comes from source.
             isDev: context.config.isDeveloperInstance,
             platform: process.platform,
             stellaAppDir,

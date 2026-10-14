@@ -28,7 +28,6 @@ const NativeLockedComputerUseCard = lazy(() =>
   })),
 );
 
-/** Where your chats and memory live, what Stella can access on this computer. */
 export function PrivacyTab() {
   const t = useT();
   const storageMode = useChatStorageMode();

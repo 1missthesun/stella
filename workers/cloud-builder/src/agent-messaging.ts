@@ -1,10 +1,3 @@
-/**
- * `agent_status` without a thread_id, and `send_message` to anyone the caller
- * did not start, for both cloud callers: the conversation's orchestrator and
- * a cloud agent. Both read and write through the owner's agent-thread index,
- * which sees every placement and every conversation.
- */
-
 import {
   AGENT_MESSAGE_MAX_CHARS,
   type AgentDirectoryAgentRow,
@@ -19,11 +12,9 @@ import {
   type AgentStopResult,
 } from "@stella/contracts/backend/agent-threads";
 
-/** The longest a framed message gets: the text plus its `<agent-message>` envelope. */
 export const AGENT_MESSAGE_FRAMED_MAX_CHARS = AGENT_MESSAGE_MAX_CHARS + 1_024;
 
 export type AgentMessagingCaller = Readonly<{
-  /** `OwnerGate.ownerInternal`, already scoped to the owner and generation. */
   ownerInternal: (name: string, args: unknown) => Promise<unknown>;
   ownerGeneration: string;
 }>;
@@ -63,7 +54,6 @@ export const sendAgentMessage = async (
   return agentMessageDelivery(result);
 };
 
-/** `stop_agent` for an agent and every agent below it, wherever they run, through the owner's agent threads. */
 export const stopAgentThread = async (
   caller: AgentMessagingCaller,
   input: { conversationId: string; threadId: string; controlRequestId: string; requesterThreadId?: string },

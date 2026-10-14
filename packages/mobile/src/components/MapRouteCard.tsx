@@ -14,15 +14,6 @@ import { useTheme } from "../theme/theme-context";
 import { fonts } from "../theme/fonts";
 import { fadeHex } from "../theme/oklch";
 
-/**
- * Inline interactive map card — the mobile renderer for the shared
- * `map-route` artifact (see the Stella repo's
- * `runtime/contracts/map-artifact.ts`). The map is the hosted stella.sh
- * Google Maps embed in a WebView (the Google key never ships in the app);
- * the footer is native with an "Open in Apple Maps" handoff for real
- * turn-by-turn navigation.
- */
-
 export type MapRoutePayload = Extract<
   MobileDisplayPayload,
   { kind: "map-route" }
@@ -31,7 +22,6 @@ export type MapRoutePayload = Extract<
 const MAPS_EMBED_BASE_URL = `${env.siteUrl}/maps/embed`;
 
 const embedUrl = (payload: MapRoutePayload, dark: boolean): string => {
-  // Steps aren't needed to draw the map and eat URL budget.
   const { route, ...rest } = payload;
   const slim = route
     ? { ...rest, route: { ...route, steps: undefined } }
@@ -77,8 +67,6 @@ export function MapRouteCard({ payload, colors }: MapRouteCardProps) {
   const title = artifactTitle(payload);
   const subtitle = artifactSubtitle(payload);
 
-  // Self-hosted servers send no place data to stella.sh: no embed there,
-  // just the card with the Apple Maps handoff.
   const embedAllowed = useServerFeatures().maps;
 
   return (
@@ -88,8 +76,6 @@ export function MapRouteCard({ payload, colors }: MapRouteCardProps) {
         <WebView
           source={{ uri }}
           style={styles.map}
-          // The embed is self-contained; block navigations away from it so a
-          // stray tap on Google attribution can't hijack the chat card.
           onShouldStartLoadWithRequest={(request) =>
             request.url.startsWith(MAPS_EMBED_BASE_URL) ||
             request.url.startsWith("about:blank")

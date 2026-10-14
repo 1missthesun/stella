@@ -1,4 +1,3 @@
-/** Frame-scoped CDP observations and exact-node refs, including OOPIF targets. */
 import {
   ensureDebugger,
   onCdpEvent,
@@ -108,7 +107,6 @@ export async function getObservationFrames(tabId) {
     }
     const visit = (tree, parentId) => {
       const frame = tree.frame;
-      // The dedicated OOPIF session supersedes the placeholder in its parent.
       const previous = frames.get(frame.id);
       frames.set(frame.id, {
         ...frame,
@@ -170,7 +168,6 @@ export function exactRef(tabId, frame, backendNodeId, metadata = {}) {
   let ref = state.refs.get(identity);
   if (!ref) {
     ref = `e${++nextRef}`;
-    // This cache only stabilizes labels. Eviction cannot redirect an old ref.
     if (state.refs.size >= 5000)
       state.refs.delete(state.refs.keys().next().value);
     state.refs.set(identity, ref);
@@ -219,7 +216,6 @@ async function validateRef(tabId, ref) {
   return { ...found, sessionId: ref.sessionId };
 }
 
-/** The frame metadata for `frameId` anywhere in a Page.getFrameTree result. */
 function findFrame(tree, frameId) {
   if (tree.frame.id === frameId) return tree.frame;
   for (const child of tree.childFrames || []) {
@@ -294,11 +290,6 @@ const VISIBLE = `
   return el.getClientRects().length > 0;
 `;
 
-/**
- * Yield the owner-element ref of `frame` and of each ancestor frame in turn,
- * innermost first, stopping at the main frame. Lazy so callers can stop at
- * the first ancestor that fails a check.
- */
 async function* frameOwners(tabId, frame, frames) {
   const visited = new Set();
   while (frame.parentId) {
@@ -316,7 +307,6 @@ export async function frameVisible(tabId, frame, frames) {
   return true;
 }
 
-/** Convert a frame-local point through each ancestor, checking occlusion. */
 export async function exactElementPoint(
   tabId,
   resolved,

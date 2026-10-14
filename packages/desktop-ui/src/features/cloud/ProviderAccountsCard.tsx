@@ -15,15 +15,6 @@ import { cloudEnginesApi, useCloudEngines } from "./cloud-engines-api";
 import { publishCloudExecutionSelection } from "./cloud-execution-store";
 import { useServerFeature } from "@/platform/backend/server-discovery";
 
-/**
- * The one place for the owner's Claude and ChatGPT accounts.
- *
- * Both providers sign in per host: a computer's sign-in stays on that
- * computer, and the owner's cloud keeps its own. So each account is one row
- * listing where it is signed in, rather than one card per host. The cloud's
- * engine for its own chat is chosen at the bottom.
- */
-
 const K = "settings.engineAccounts";
 
 export function ProviderAccountsCard() {
@@ -31,7 +22,6 @@ export function ProviderAccountsCard() {
   const { isAuthenticated } = useAuthState();
   const connections = useCloudEngines(isAuthenticated);
   const [switching, setSwitching] = useState(false);
-  // A self-hosted server without Stella's own models can't run on "Stella".
   const managedModels = useServerFeature("managedModels");
 
   const usableProviders = new Set<string>(
@@ -53,12 +43,11 @@ export function ProviderAccountsCard() {
           ? {
               engine,
               provider: engine,
-              // The backend resolves Stella's default model per audience.
               model: "stella/default",
               reasoningEffort,
             }
           : engine === "anthropic"
-            ? // Claude Code's own alias: the recommended model for the account.
+            ?
               { engine, provider: engine, model: "default", reasoningEffort }
             : { engine, provider: engine, model: "gpt-6.1-sol", reasoningEffort };
       await cloudEnginesApi.setExecution(execution);

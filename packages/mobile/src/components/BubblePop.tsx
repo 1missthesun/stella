@@ -35,15 +35,6 @@ const ARRIVING_BUBBLE_POP: Pop = {
   beforePaint: true,
 };
 
-/**
- * iMessage-style entry shared by the sent bubble and the arriving reply: the
- * bubble springs up out of its tail corner while the fade finishes early, so
- * it reads as solid by the time it lands. Same spring as the desktop
- * `--bubble-spring` (stiffness 420, damping 30).
- *
- * `animate` is read once, at mount: callers flip it off on the next render
- * (the row is "seen" by then), and that must not cut the pop short.
- */
 export function useBubblePop(animate: boolean, pop: Pop) {
   const reducedMotion = useReducedMotion();
   const play = useRef(animate).current && !reducedMotion;
@@ -100,7 +91,6 @@ export function useBubblePop(animate: boolean, pop: Pop) {
   );
 }
 
-/** The reply bubble, popping in once if it mounts with `animate`. */
 export function AssistantBubble({
   children,
   style,
@@ -117,7 +107,6 @@ export function AssistantBubble({
     if (arrivedRef.current) handoff?.replyArrived();
   }, [handoff]);
   const pop = useBubblePop(animate, ARRIVING_BUBBLE_POP);
-  // A bubble that mounted settled never animates: keep it a plain view.
   const Bubble = arrivedRef.current ? Animated.View : View;
   return (
     <Bubble style={arrivedRef.current ? [style, pop] : style}>

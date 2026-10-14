@@ -62,14 +62,6 @@ export const throwIfComputerExecutionAborted = () => {
   if (signal?.aborted) throw abortError(signal);
 };
 
-/**
- * Abortable delay for computer-use polling loops. The wait is an Effect:
- * `Effect.sleep(ms)` raced against the caller's abort latch
- * (`acquireAbortLatch` — a scoped listener registration removed on every
- * exit path), replacing the hand-rolled setTimeout/abort-listener pair.
- * Rejection reasons are byte-identical: `signal.reason` when it is an
- * Error, otherwise `new Error("Computer command aborted.")`.
- */
 export const abortableComputerDelay = async (ms: number) => {
   const signal = getComputerExecutionSignal();
   if (signal?.aborted) throw abortError(signal);

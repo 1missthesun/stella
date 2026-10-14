@@ -1,10 +1,3 @@
-/**
- * What a composer send carries besides its typed text, for a chat placed on
- * another host (the computer holding the chat, or the cloud): pasted text,
- * quoted text, selected Stella areas and activities, the active window. The
- * model reads it hidden, as it would here, and the sent message shows its
- * chips. Without it a placed send kept only the typed line.
- */
 import type { RuntimeChatPayload } from "@stella/contracts/protocol";
 import {
   TURN_CONTEXT_DISPLAY_MAX_CHARS,
@@ -30,8 +23,6 @@ export const placedChatContext = (
     payload.chatContext?.selectedText ??
     null;
   if (!payload.chatContext && !selectedText?.trim()) return undefined;
-  // The typed text stays out: the host running the turn reads it (and any
-  // @model mention in it) from the prompt itself.
   const built = buildChatPromptMessages({
     userPrompt: "",
     selectedText,
@@ -55,7 +46,6 @@ export const placedChatContext = (
       `The pasted or attached text is too long to send to where Stella runs (${formatChars(text.length)} characters; the limit is ${formatChars(TURN_CONTEXT_TEXT_MAX_CHARS)}). Attach it as a file instead.`,
     );
   }
-  // Labels and previews only, so this one is trimmed, not refused.
   let shown = display;
   if (JSON.stringify(shown).length > TURN_CONTEXT_DISPLAY_MAX_CHARS) {
     const { windowLabel: _windowLabel, ...rest } = shown;

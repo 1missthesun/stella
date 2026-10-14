@@ -1,25 +1,18 @@
 import AppKit
 import WebKit
 
-/// What launcher/common/launcher.html shows: its render() state.
 struct LauncherViewState {
     enum Phase: String {
         case idle, starting, running, stopping, failed
     }
 
     var phase = Phase.idle
-    /// starting/stopping: what is happening now, in plain words.
     var status = ""
-    /// starting: the part of setup that is done (0...1), and where the
-    /// current step ends; the page's bar eases between them.
     var progress = 0.0
     var progressTo = 0.0
-    /// failed: one sentence.
     var reason = ""
-    /// failed: Electron's last lines (Settings > Last error).
     var output: [String] = []
     var hasKnownGood = false
-    /// Short HEAD, "" before install.
     var version = ""
 
     var json: [String: Any] {
@@ -29,7 +22,6 @@ struct LauncherViewState {
     }
 }
 
-/// What the user chose while the launcher waits (idle or failed).
 enum LauncherCommand {
     case start
     case returnToKnownGood
@@ -37,22 +29,15 @@ enum LauncherCommand {
     case close
 }
 
-/// The launcher's one window: the shared launcher page in a WKWebView. Home
-/// with Start, the progress of a start, "Stella is running" with Shut down,
-/// "Stella couldn't start" with Try again, and Settings. Every method may be
-/// called from any thread; work hops to the main thread, which owns the state.
 final class LauncherWindow: NSObject, WKScriptMessageHandler, NSWindowDelegate {
     enum Show {
         case keep
-        /// Bring the window front only if it is hidden.
         case reveal
         case front
         case hide
     }
 
-    /// Main thread: the user's choice in idle or failed.
     var onCommand: ((LauncherCommand) -> Void)?
-    /// Main thread: the user asked a running Stella to quit.
     var onShutdown: (() -> Void)?
 
     private static let size = NSSize(width: 380, height: 460)
@@ -62,7 +47,6 @@ final class LauncherWindow: NSObject, WKScriptMessageHandler, NSWindowDelegate {
     private var built = false
     private var window: NSWindow?
     private var webView: WKWebView?
-    /// The page posted `loaded`: renders reach it and the window may show.
     private var loaded = false
     private var wantsVisible = false
     private var afterLoad: [() -> Void] = []
@@ -74,7 +58,6 @@ final class LauncherWindow: NSObject, WKScriptMessageHandler, NSWindowDelegate {
         self.captureDir = captureDir
     }
 
-    /// Change the state, render it and show or hide the window.
     func update(show: Show = .keep, _ change: @escaping (inout LauncherViewState) -> Void) {
         DispatchQueue.main.async { [self] in
             change(&state)
@@ -82,7 +65,6 @@ final class LauncherWindow: NSObject, WKScriptMessageHandler, NSWindowDelegate {
         }
     }
 
-    /// Self-test: act as if the page posted `action` after `delay` seconds.
     func perform(_ action: String, after delay: TimeInterval) {
         DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [self] in
             log("ui: self-test presses \(action)")
@@ -90,8 +72,6 @@ final class LauncherWindow: NSObject, WKScriptMessageHandler, NSWindowDelegate {
         }
     }
 
-    /// Save a PNG of the page as `name` in the capture directory, `delay`
-    /// seconds after it has loaded, then run `then` on the main thread.
     func capture(_ name: String, after delay: TimeInterval, then: (() -> Void)? = nil) {
         guard let captureDir else {
             if let then { DispatchQueue.main.async(execute: then) }
@@ -110,7 +90,6 @@ final class LauncherWindow: NSObject, WKScriptMessageHandler, NSWindowDelegate {
         }
     }
 
-    /// Self-test after `ready`: front as a reopen would show it, then Settings.
     func captureRunning() {
         captures.enter()
         update(show: .front) { _ in }
@@ -124,12 +103,10 @@ final class LauncherWindow: NSObject, WKScriptMessageHandler, NSWindowDelegate {
         }
     }
 
-    /// Blocks (off the main thread) until pending captures are written.
     func waitForCaptures() {
         _ = captures.wait(timeout: .now() + 15)
     }
 
-    /// Close Window and Quit, which an accessory app only gets from its own menu.
     func installMenu() {
         let appMenu = NSMenu()
         appMenu.addItem(withTitle: "Close Window", action: #selector(closeFromMenu(_:)), keyEquivalent: "w").target = self
@@ -145,8 +122,6 @@ final class LauncherWindow: NSObject, WKScriptMessageHandler, NSWindowDelegate {
         }
         NSApp.mainMenu = menu
     }
-
-    // MARK: Main thread
 
     private func apply(_ show: Show) {
         if !built { build() }
@@ -184,7 +159,6 @@ final class LauncherWindow: NSObject, WKScriptMessageHandler, NSWindowDelegate {
         window.titleVisibility = .hidden
         window.isReleasedWhenClosed = false
         window.delegate = self
-        // The page's own background, so nothing flashes before its first frame.
         window.backgroundColor = NSColor(name: nil) { appearance in
             appearance.bestMatch(from: [.aqua, .darkAqua]) == NSAppearance.Name.darkAqua
                 ? NSColor(srgbRed: 0x0F / 255, green: 0x0F / 255, blue: 0x0D / 255, alpha: 1)
@@ -196,7 +170,6 @@ final class LauncherWindow: NSObject, WKScriptMessageHandler, NSWindowDelegate {
         let webView = WKWebView(frame: NSRect(origin: .zero, size: Self.size), configuration: config)
         webView.setValue(false, forKey: "drawsBackground")
         webView.autoresizingMask = [.width, .height]
-        // Full size: the traffic lights float over the page's empty top 28px.
         window.contentView = webView
         webView.loadHTMLString(html, baseURL: nil)
         window.center()
@@ -208,9 +181,6 @@ final class LauncherWindow: NSObject, WKScriptMessageHandler, NSWindowDelegate {
         guard let window else { return }
         wantsVisible = true
         guard loaded else {
-            // It shows on `loaded`, once the page can paint its real first
-            // frame. A cold WebContent process can take a few seconds; the
-            // timeout only covers a page that never reports.
             DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [self] in
                 if !loaded {
                     log("ui: the page did not report loaded in time; showing it anyway")
@@ -244,7 +214,6 @@ final class LauncherWindow: NSObject, WKScriptMessageHandler, NSWindowDelegate {
         if loaded || webView == nil { work() } else { afterLoad.append(work) }
     }
 
-    /// Native -> page: the full state, every time.
     private func render() {
         guard loaded,
               let data = try? JSONSerialization.data(withJSONObject: state.json),
@@ -270,7 +239,6 @@ final class LauncherWindow: NSObject, WKScriptMessageHandler, NSWindowDelegate {
         handle(action)
     }
 
-    /// Page -> native. Choices only count in the phase that offers them.
     private func handle(_ action: String) {
         let waiting = state.phase == .idle || state.phase == .failed
         switch action {
@@ -308,8 +276,6 @@ final class LauncherWindow: NSObject, WKScriptMessageHandler, NSWindowDelegate {
         onCommand?(command)
     }
 
-    /// The close button, Cmd+W and Cmd+Q: quit while nothing runs, otherwise
-    /// just hide (Stella keeps running).
     private func close() {
         hideWindow()
         if state.phase == .idle || state.phase == .failed {
@@ -327,7 +293,6 @@ final class LauncherWindow: NSObject, WKScriptMessageHandler, NSWindowDelegate {
         close()
     }
 
-    /// No page in the bundle: start right away, and ask about failures in an alert.
     private func withoutPage() {
         switch state.phase {
         case .idle:

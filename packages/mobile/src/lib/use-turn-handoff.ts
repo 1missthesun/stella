@@ -1,10 +1,3 @@
-/**
- * The phone never runs a turn itself. Its placement waiter settles once the
- * turn is handed to the computer or the cloud that runs it, and that turn
- * shows as running here only when its `started` row reaches the journal. The
- * chat keeps working across that hand-off, until the turn shows as running,
- * a reply follows the message, its turn ends, or the hold runs out.
- */
 import { useEffect, useRef, useState } from "react";
 import type { JournalRecord } from "@stella/contracts/conversation-protocol";
 

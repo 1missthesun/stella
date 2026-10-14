@@ -1,11 +1,3 @@
-/**
- * The showcase's script: five short chapters, each a real request typed into
- * the mini chat, then the work it kicks off, then the reply.
- *
- * A chapter is a list of timed cues; the mini chat and the scene render
- * whatever the cues reached so far say should be on screen. Copy lives in
- * the catalog under `mobile.onboarding.showcase.chapters.<id>`.
- */
 import type { IconName } from "../../Icon";
 
 export type ChapterId = "errands" | "shopping" | "work" | "routines" | "research";
@@ -15,21 +7,17 @@ export type Cue = { id: string; at: number };
 export type Receipt = {
   cue: string;
   icon: IconName;
-  /** Catalog key under the chapter. */
   key: string;
 };
 
-/** The order the pieces of the thread land in, after the user's message. */
 export type ThreadPart = "scene" | "confirm" | "receipts" | "reply";
 
 export type ChapterSpec = {
   id: ChapterId;
   cues: Cue[];
   receipts: Receipt[];
-  /** The "with your OK" moment: an approval card in the thread. */
   confirm?: { cue: string; doneCue: string };
   order: ThreadPart[];
-  /** Cue that clears the working pill (defaults to the first receipt). */
   workingUntil?: string;
 };
 

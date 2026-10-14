@@ -4,9 +4,6 @@ import { WorkerNotInitializedError } from "../errors.js";
 import * as WorkerSessions from "../sessions.js";
 import { fromPromise, type WorkerRpcHandlers } from "../rpc.js";
 
-// Discovery (onboarding signal collection) loads on first call: its modules,
-// with json5 and the browser-data zod schemas, are ~180 KB of bundled JS the
-// worker would otherwise parse at every boot.
 const initializedSession = WorkerSessions.sessionOrFail(
   () => new WorkerNotInitializedError(),
 );

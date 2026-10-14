@@ -19,7 +19,6 @@ import {
 
 const execFile = promisify(execFileCallback);
 const repoRoot = path.resolve(import.meta.dirname, "../../..");
-// The runtime runs its CLIs from source under Bun, as the app does.
 const cliPath = path.join(
   repoRoot,
   "packages/runtime/kernel/cli/stella-computer.ts",

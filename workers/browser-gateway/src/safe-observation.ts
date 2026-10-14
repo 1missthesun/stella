@@ -30,7 +30,6 @@ export const redactVisibleText = (value: string): string =>
     .replace(/\b(?:\+?1[ .-]?)?(?:\d{3}[ .-]?){2}\d{4}\b/gu, "[redacted-phone]")
     .slice(0, 12_000);
 
-/** Trusted DOM filter; model commands cannot alter or bypass this selector. */
 export const SENSITIVE_OBSERVATION_SELECTOR = [
   "input",
   "textarea",

@@ -29,13 +29,7 @@ import {
 } from "./support.js";
 import { OrchestratorOwner } from "./owner.js";
 
-/** Turn events, produced rows, terminal recording, and the card inbox. */
 export abstract class OrchestratorTurnLifecycle extends OrchestratorOwner {
-  /**
-   * The next per-turn event ordinal, durable before it is used so a restart
-   * can never hand out one twice. Serialized: two events of one turn can be
-   * emitted concurrently and share the same get+put window otherwise.
-   */
   protected nextTurnEventSeq(turnId: string): Promise<number> {
     const tail: Promise<unknown> = this.eventSeqTail ?? Promise.resolve();
     const work = tail.then(async () => {
@@ -48,12 +42,6 @@ export abstract class OrchestratorTurnLifecycle extends OrchestratorOwner {
     return work;
   }
 
-  /**
-   * One `turn.event` for the owner. Terminal events commit to a local
-   * durable batch before returning, independently of the owner's availability.
-   * Each batch survives a newer turn replacing terminalOwed; its alarm owns
-   * delivery retries. The original ordinal keeps redelivery idempotent.
-   */
   protected async emitTurnEvent(
     turn: ChatTurnRequest,
     eventKind: string,
@@ -101,7 +89,6 @@ export abstract class OrchestratorTurnLifecycle extends OrchestratorOwner {
     };
   }
 
-  /** The terminal ordinal, assigned once and remembered with the debt. */
   protected async terminalEventSeq(
     turn: ChatTurnRequest,
     owed: OwedTerminal,
@@ -136,24 +123,12 @@ export abstract class OrchestratorTurnLifecycle extends OrchestratorOwner {
     return { kind: kind as TurnPhase, message: terminalNotice(kind) };
   }
 
-  /**
-   * The completed terminal, shared by Stella's own loop and a Claude Code
-   * turn: everything the turn produced is already journaled.
-   */
   protected async completeChatTurn(
     turn: ChatTurnRequest,
     finalText: string,
     started: number,
   ): Promise<Response> {
     const wallClockMs = Math.round(performance.now() - started);
-    // `terminal` and what is owed, in ONE durable write BEFORE delivery —
-    // the same ordering the cancel and failed paths use. The watchdog reads
-    // `terminal` to decide whether a turn is still owed one, so writing it
-    // after the owner round trip left a window (widened by the retry
-    // ladder, which pushes completions toward the deadline) where an alarm
-    // firing mid-delivery declared a finished turn timed out, and clients
-    // group on the last row per turn — so the user saw "timed out" over a
-    // reply that had actually arrived.
     const completedOwed: OwedTerminal = {
       kind: "completed",
       message: "",
@@ -178,9 +153,6 @@ export abstract class OrchestratorTurnLifecycle extends OrchestratorOwner {
       );
       await this.ctx.storage.put("terminalDelivered", true);
     } catch {
-      // Same pairing as the other terminal paths: the re-armed alarm
-      // redelivers exactly what `terminalOwed` says is owed, reply text
-      // included, instead of stranding a completed turn as "running".
       await this.ctx.storage.setAlarm(Date.now() + 30_000);
     }
     await this.afterTerminal(turn);
@@ -214,12 +186,6 @@ export abstract class OrchestratorTurnLifecycle extends OrchestratorOwner {
     return json({ ok: true, text: finalText });
   }
 
-  /**
-   * Hydrate the turn's attached drive images into image content blocks. The
-   * owner's object signs only its own images, image-typed and size-capped,
-   * under the turn's owner generation. Failure of any piece degrades to a
-   * turn without pixels — the prompt text still names the paths.
-   */
   protected async loadChatAttachmentImages(
     turn: ChatTurnRequest,
     signal?: AbortSignal,
@@ -258,7 +224,6 @@ export abstract class OrchestratorTurnLifecycle extends OrchestratorOwner {
           });
         } catch {
           signal?.throwIfAborted();
-          // One unreadable attachment must not cost the others.
         }
       }
       return images;
@@ -272,12 +237,6 @@ export abstract class OrchestratorTurnLifecycle extends OrchestratorOwner {
     }
   }
 
-  /**
-   * The conversation's reply-language locale: a turn that carries one
-   * updates the stored value; turns without one (schedule fires,
-   * agent-completion wakes) reuse it, so the language never flips back to
-   * English mid-conversation.
-   */
   protected async resolveTurnLocale(
     turn: ChatTurnRequest,
     assertActive?: () => void,
@@ -321,11 +280,6 @@ export abstract class OrchestratorTurnLifecycle extends OrchestratorOwner {
     if (turn.title) this.journal.setTitle(turn.title);
   }
 
-  /**
-   * Journal one produced message without publishing it, so a caller can
-   * commit several rows (and its own cursor) in one transaction first. Null
-   * when the message is never journaled.
-   */
   protected appendProduced(
     turn: ChatTurnRequest,
     message: AgentMessage,
@@ -372,11 +326,6 @@ export abstract class OrchestratorTurnLifecycle extends OrchestratorOwner {
     return appended;
   }
 
-  /**
-   * Pulls back what the window needs from R2, and degrades the rest honestly.
-   * A tool result keeps its `toolCallId` through the degradation so it never
-   * orphans the call it answers.
-   */
   protected async hydrateWindow(
     selection: ReturnType<Journal["selectWindow"]>,
   ): Promise<AgentMessage[]> {
@@ -384,8 +333,6 @@ export abstract class OrchestratorTurnLifecycle extends OrchestratorOwner {
     const messages = selection.messages.slice();
     const now = Date.now();
     let hydrated = 0;
-    // Newest first: the most recent oversize payload is the one the model is
-    // most likely to need.
     for (const entry of [...selection.spilled].reverse()) {
       if (hydrated < CONTEXT_MAX_SPILL_HYDRATIONS) {
         const payload = await this.archive
@@ -397,7 +344,6 @@ export abstract class OrchestratorTurnLifecycle extends OrchestratorOwner {
           continue;
         }
       } else {
-        // Over budget, permanently: stop paying to consider this row again.
         this.journal.markModelSkip(entry.seq);
       }
       messages[entry.index] = this.journal.omittedPlaceholder(
@@ -409,12 +355,6 @@ export abstract class OrchestratorTurnLifecycle extends OrchestratorOwner {
     return messages;
   }
 
-  /**
-   * The transcript's copy of a terminal state. Idempotent by writer key and
-   * never throwing: it is a projection of the `terminal` / `terminalDelivered`
-   * storage keys, which remain the authority, and a failure here must not be
-   * able to disturb the delivery ladder that owns them.
-   */
   protected recordTerminal(
     turn: ChatTurnRequest,
     phase: TurnPhase,
@@ -447,8 +387,6 @@ export abstract class OrchestratorTurnLifecycle extends OrchestratorOwner {
       this.live = null;
       this.hub.endTurn(turn.turnId);
     }
-    // A wake turn that ended before it wrote its prompt still settles what
-    // its staged cards report.
     void this.publishStagedWakeCards(turn.turnId).catch((error: unknown) =>
       log("error", "conversation_wake_cards_failed", {
         turnId: turn.turnId,
@@ -457,15 +395,6 @@ export abstract class OrchestratorTurnLifecycle extends OrchestratorOwner {
     );
   }
 
-  /**
-   * Everything that must happen after a turn is terminal, and that must never
-   * be able to make a delivered turn look failed. Rollover in particular runs
-   * only here: never mid-turn, never on a read path.
-   *
-   * Reached from EVERY terminal path, not just the completed one. A canceled
-   * or timed-out turn still owes an index update and inbox drain. Callers that
-   * are not the loop must go through `finalizeTerminalTurn`.
-   */
   protected async afterTerminal(turn: ChatTurnRequest): Promise<void> {
     this.finalizedTurnId = turn.turnId;
     const now = Date.now();
@@ -477,9 +406,6 @@ export abstract class OrchestratorTurnLifecycle extends OrchestratorOwner {
     try {
       this.drainInbox();
     } catch (error) {
-      // The per-row failures are already handled inside; this covers the
-      // enclosing reads. Nothing here may throw: the alarm calls this too, and
-      // a rejection there re-runs the whole watchdog handler.
       log("error", "conversation_inbox_drain_aborted", {
         turnId: turn.turnId,
         message: errorMessage(error),
@@ -495,15 +421,6 @@ export abstract class OrchestratorTurnLifecycle extends OrchestratorOwner {
     });
   }
 
-  /**
-   * `afterTerminal` for a caller that is not the loop — the watchdog and
-   * `/cancel`. It skips a turn it has already finalized, so a retrying alarm
-   * does not re-cut segments.
-   *
-   * The inbox drain and rollover wait for the loop. Draining here could splice
-   * a foreign row between a tool call and its result, and rollover mid-turn is
-   * forbidden outright.
-   */
   protected async finalizeTerminalTurn(turn: ChatTurnRequest): Promise<void> {
     if (this.finalizedTurnId === turn.turnId) return;
     if (this.activeTurnId === turn.turnId) return;
@@ -526,11 +443,6 @@ export abstract class OrchestratorTurnLifecycle extends OrchestratorOwner {
     return !(await this.ctx.storage.get<boolean>("terminal"));
   }
 
-  /**
-   * Moves staged foreign rows into the journal at a clean boundary. Every row
-   * is dropped from the inbox whether or not it applied, so a poison row can
-   * never wedge the drain.
-   */
   protected drainInbox(): void {
     for (;;) {
       const rows = this.journal.takeInbox(50);

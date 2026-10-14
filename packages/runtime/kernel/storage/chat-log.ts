@@ -1,12 +1,3 @@
-/**
- * Chat event log: conversations and their entries.
- *
- * Ordering is always `(conversation_id, seq)`; `seq` is claimed in code
- * inside the write transaction. `visible` and `turn_seq` are written at
- * insert time, so reads are plain indexed range queries instead of
- * cursor-inference passes.
- */
-
 import { isUiHiddenChatMessagePayload } from "@stella/contracts/chat-event-visibility";
 import {
   type ReplyCounts,
@@ -60,11 +51,6 @@ export const LIFECYCLE_EVENT_TYPES = [
   "agent-failed",
   "agent-canceled",
 ] as const;
-/**
- * Legacy event types that never surface through the event APIs. Nothing
- * writes them any more; `run_event` rows left in existing stores are
- * deleted by `sweepLegacyRunEventEntries` (entry-retention.ts).
- */
 export const NON_EVENT_TYPES = [
   "thread_message",
   "run_event",
@@ -115,7 +101,6 @@ export const computeSearchText = (
   return typeof text === "string" ? text : null;
 };
 
-/** Reply references an assistant payload carries, if any. */
 export const readReplyRefs = (
   payload: Record<string, unknown> | undefined,
 ): ReplyRef[] => {
@@ -155,11 +140,6 @@ export const readReplyRefs = (
   return result;
 };
 
-/**
- * Keyset predicate for a cursor. Uses the sequence when the cursor
- * resolves to a stored entry, and falls back to `(created_at, id)` for
- * cursors that no longer resolve (e.g. after truncation).
- */
 export const cursorKeyset = (
   op: ">" | ">=" | "<" | "<=",
   cursor: Cursor,
@@ -174,7 +154,6 @@ export const cursorKeyset = (
   };
 };
 
-/** A chat's title is its newest visible message, as the history list shows it. */
 const conversationTitle = (payloadJson: string | null): string => {
   const payload = parseJsonRecord(payloadJson);
   const rawText = typeof payload?.text === "string" ? payload.text : "";
@@ -193,17 +172,6 @@ export class ChatLog {
     this.cached = cachedStatements(db);
   }
 
-  /* ------------------------------------------------------------------ */
-  /* Conversations                                                       */
-  /* ------------------------------------------------------------------ */
-
-  /**
-   * A conversation the chat UI should list ("chat") is one with a
-   * self-generated ULID id; ids minted by other subsystems (thread keys,
-   * synthetic install/session ids) stay "derived" and never surface in the
-   * conversation list. Computed once at creation instead of re-tested with
-   * GLOB in every listing query.
-   */
   static conversationKind(conversationId: string): "chat" | "derived" {
     return conversationId.startsWith("local_") ||
       (conversationId.length === 26 &&
@@ -246,12 +214,6 @@ export class ChatLog {
     return row.seq;
   }
 
-  /**
-   * `ensureConversation` + `claimSeq` for the append path. The row almost
-   * always exists, so apply the upsert's conflict update (kind, monotonic
-   * updated_at) in the same statement that claims the seq, and fall back to
-   * the upsert only when the row is missing.
-   */
   private claimSeqEnsuringConversation(
     conversationId: string,
     updatedAt: number,
@@ -276,11 +238,6 @@ export class ChatLog {
     return this.claimSeq(conversationId);
   }
 
-  /**
-   * `ensureConversation` for an append that updates an entry already stored
-   * in this conversation: the entry's foreign key proves the row exists, so
-   * only the conflict update (kind, monotonic updated_at) is left to apply.
-   */
   private touchConversation(conversationId: string, updatedAt: number): void {
     const row = this.cached
       .prepare(
@@ -398,8 +355,6 @@ export class ChatLog {
     conversationId = requireConversationId(conversationId);
     const now = Date.now();
     this.tx.immediate(() => {
-      // Selecting a private draft reserves its id without adding a history row.
-      // appendMessage/appendEvent materializes it with the first message.
       if (!conversationId.startsWith("local_"))
         this.ensureConversation(conversationId, now);
       this.setSetting(DEFAULT_CONVERSATION_SETTING_KEY, conversationId);
@@ -501,7 +456,6 @@ export class ChatLog {
     };
   }
 
-  /** One active chat's summary row, or null when this computer has no such chat. */
   getConversationSummary(conversationId: string): {
     conversationId: string;
     title: string;
@@ -559,10 +513,6 @@ export class ChatLog {
     return true;
   }
 
-  /* ------------------------------------------------------------------ */
-  /* Cursor helpers                                                      */
-  /* ------------------------------------------------------------------ */
-
   resolveCursorSequence(conversationId: string, cursor: Cursor): Cursor;
   resolveCursorSequence(
     conversationId: string,
@@ -601,10 +551,6 @@ export class ChatLog {
     return { id: row._id, timestamp: row.timestamp, sequence: row.sequence };
   }
 
-  /* ------------------------------------------------------------------ */
-  /* Writes                                                              */
-  /* ------------------------------------------------------------------ */
-
   private lastVisibleUserSeq(
     conversationId: string,
     atOrBeforeSeq?: number,
@@ -624,7 +570,6 @@ export class ChatLog {
     return typeof row?.seq === "number" ? row.seq : null;
   }
 
-  /** Recompute turn ownership for entries at/after a seq (rare repair path). */
   private reassignTurns(conversationId: string, fromSeq: number): void {
     this.cached
       .prepare(
@@ -641,12 +586,6 @@ export class ChatLog {
       .run(conversationId, fromSeq);
   }
 
-  /**
-   * Insert-or-update one event by id. Must run inside a transaction.
-   * Returns the stored cursor. With `ensureConversation`, the conversation
-   * row is created or touched exactly as `ensureConversation(conversationId,
-   * timestamp)` would, folded into the statements the write needs anyway.
-   */
   upsertEvent(args: {
     conversationId: string;
     eventId: string;
@@ -923,10 +862,6 @@ export class ChatLog {
     );
   }
 
-  /* ------------------------------------------------------------------ */
-  /* Reads: raw events                                                   */
-  /* ------------------------------------------------------------------ */
-
   deserializeEventRow(row: EntryRow): LocalChatEventRecord {
     const envelope = parseJsonRecord(row.channelEnvelopeJson);
     const payload = parseJsonRecord(row.payloadJson);
@@ -960,12 +895,6 @@ export class ChatLog {
     return rows.map((row) => this.deserializeEventRow(row));
   }
 
-  /**
-   * The window `listEvents(conversationId, maxItems)` would return, queried
-   * for only the rows a caller needs (see `event-window.ts`). Each query is
-   * one statement: the window's lower bound (the seq of its oldest row) is a
-   * subquery, so nothing outside the window can match.
-   */
   openEventWindow(
     conversationId: string,
     maxItems: number,
@@ -975,7 +904,6 @@ export class ChatLog {
     return {
       query: (query: LocalChatEventWindowQuery) => {
         if (query.types.length === 0) return [];
-        // Fewer rows than the window: no lower bound (seq starts at 1).
         const clauses = [
           "entry.conversation_id = ?",
           `entry.type IN (${placeholders(query.types)})`,
@@ -1253,10 +1181,6 @@ export class ChatLog {
     return messages.reverse();
   }
 
-  /**
-   * Visible user and assistant messages after `afterSeq`, ascending, from at
-   * most `limit` rows: each with its text, and the last row's seq.
-   */
   listMessagesAfterSeq(
     conversationId: string,
     afterSeq: number,
@@ -1268,7 +1192,6 @@ export class ChatLog {
       role: "user" | "assistant";
       text: string;
       timestamp: number;
-      /** Who wrote the row, when it says (`metadata.writer`): pi marks its own. */
       writer?: string;
     }>;
     throughSeq: number;
@@ -1333,15 +1256,6 @@ export class ChatLog {
     };
   }
 
-  /* ------------------------------------------------------------------ */
-  /* Reply references                                                    */
-  /* ------------------------------------------------------------------ */
-
-  /**
-   * Mirror an assistant entry's `metadata.runtime.replyRefs` into the
-   * `entry_ref` index. Runs inside the entry write, so the index is exactly
-   * the payload and never has to be rebuilt.
-   */
   private syncEntryRefs(
     conversationId: string,
     entrySeq: number,
@@ -1372,7 +1286,6 @@ export class ChatLog {
   }
 
 
-  /** Reply counts for every cited message and agent in a conversation. */
   listReplyCounts(conversationId: string): ReplyCounts {
     conversationId = requireConversationId(conversationId);
     const rows = this.cached

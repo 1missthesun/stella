@@ -1,14 +1,5 @@
 import { LAUNCHER_CHECKSUMS_URL, RELEASE_ASSETS } from "@/lib/downloads";
 
-/**
- * `irm https://stella.sh/install.ps1 | iex`
- *
- * Downloads the signed Windows launcher, checks it against the published
- * SHA256SUMS, and puts it where the launcher installs itself
- * (%LOCALAPPDATA%\Programs\Stella\Stella.exe, so its own first-run copy is a
- * no-op), then starts it. The launcher does the rest of the install and adds
- * the Start Menu shortcut.
- */
 const SCRIPT = `#Requires -Version 5
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'

@@ -1,17 +1,3 @@
-/**
- * Stella-managed realtime voice provider — GPT-Live in client delegation mode.
- *
- * `voice.session` opens a lease and has the backend create the GPT-Live
- * session with its own key, storing the conversation brief, the chosen voice
- * and the startup history server-side. The renderer then posts its SDP offer
- * to the backend under that lease and only ever sees the SDP answer, so no
- * provider key reaches the renderer.
- *
- * The voice model gets no tools and no system prompt here: it carries the
- * spoken conversation and delegates everything else to Stella's text
- * orchestrator through `session.delegation.created`.
- */
-
 import type { CallArgs } from "@stella/contracts/backend/api";
 import { GPT_LIVE_MODEL } from "@stella/contracts/backend/voice";
 import { backendClient } from "@/platform/backend/backend-client";
@@ -23,11 +9,6 @@ import type {
   VoiceSessionToken,
 } from "./types";
 
-/**
- * The user's GPT-Live voice selection. Unknown ids still pass through — a
- * custom voice authorized on the org is an opaque string to us — but an empty
- * selection is omitted so the backend applies its own default.
- */
 const readGptLiveVoice = async (): Promise<string | undefined> => {
   try {
     const prefs =

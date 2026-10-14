@@ -1,5 +1,3 @@
-/** Block Kit actions: the progress message's Stop button, which anyone in the thread may press. */
-
 import { ORCHESTRATOR_INTERNAL_ORIGIN } from "../build-session/shared/keys.js";
 import { loadInstallation, threadOwnerOf } from "./store.js";
 

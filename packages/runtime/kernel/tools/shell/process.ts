@@ -1,9 +1,3 @@
-/**
- * Shell processes: spawning a pipe or PTY shell, the TERM→1s→KILL ladders
- * that tear down a whole process group, and `runShell`, the one-shot
- * foreground runner.
- */
-
 import { spawn } from "child_process";
 import type { ToolProcessIdentity } from "../types.js";
 import { terminateProcessTree } from "../../shared/process-tree.js";
@@ -38,8 +32,6 @@ export const spawnShellProcess = (
     stdio: ["pipe", "pipe", "pipe"],
     windowsHide: true,
     windowsVerbatimArguments,
-    // On Unix, make the shell the leader of its own process group so timeouts
-    // and manual kills can terminate the entire command tree.
     detached: process.platform !== "win32",
     ...(launch.nativeIdentity
       ? {
@@ -193,12 +185,6 @@ export const spawnPtyShellProcess = (
 
 const shellTerminations = new WeakMap<object, Promise<void>>();
 
-/**
- * TERM→1s→KILL for the shell's whole tree. Single-flight per process so
- * repeated kills join the teardown already in progress. The returned promise
- * settles once the shell, its process group and any escaped descendants are
- * gone, or SIGKILL has been dispatched to the survivors.
- */
 const terminateShellTree = (
   key: object,
   pid: number | undefined,

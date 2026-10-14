@@ -1,25 +1,3 @@
-/**
- * Remote system prompts: one source of truth, applied everywhere.
- *
- * The backend worker (cloud-builder) bundles the versioned prompt set and
- * serves it at `/api/stella/prompts`, generated from the bundled
- * `stella-runtime` sources and kept identical to them by CI. Cloud turns use
- * that bundle directly; this module gives the desktop runtime the same text:
- *
- *   - The served bodies live in memory (and in a small disk cache so a cold
- *     start is not stale until the first fetch completes).
- *   - `revalidateRemotePrompts` runs at startup and at every orchestrator
- *     turn, never on the critical path: a turn uses whatever is loaded and the
- *     conditional GET (`If-None-Match`, `304 Not Modified`) refreshes it for
- *     the next one. A prompt change reaches every client within one message
- *     of the cloud-builder deploy.
- *   - No home files, no user overrides, no merge rules. Offline, BYOK without a
- *     backend, or an invalid publication fall back to the bundled copy the
- *     consumers already read.
- *
- * Consumers: `loadAgentSystemPrompt` (agent bodies) and `readRuntimePrompt`
- * (auxiliary prompts) ask `getRemotePromptBody` first.
- */
 import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
@@ -57,7 +35,6 @@ export type RemotePromptRevalidation =
 
 const CACHE_FILE = "prompt-manifest.json";
 const FETCH_TIMEOUT_MS = 3_000;
-/** Bursty turns (a steer right after a send) share one revalidation. */
 const MIN_REVALIDATE_GAP_MS = 2_000;
 
 const sha256 = (content: string): string =>
@@ -78,12 +55,6 @@ export const publicationEtag = (
   manifest: Pick<RemotePromptManifest, "revision">,
 ): string => `"${manifest.revision}"`;
 
-/**
- * Validate a served publication: schema, exact prompt set, per-prompt
- * digests, size bounds, and the aggregate revision. Anything else is
- * rejected wholesale so a half-published or corrupt set never replaces a
- * good one.
- */
 export const parseRemotePromptManifest = (
   value: unknown,
 ): RemotePromptManifest | null => {
@@ -182,7 +153,6 @@ const readCache = async (): Promise<void> => {
     const parsed = JSON.parse(raw) as Partial<CachedManifest>;
     const manifest = parseRemotePromptManifest(parsed.manifest);
     if (!manifest || typeof parsed.endpoint !== "string") return;
-    // A cache from another backend never seeds this one.
     const endpoint = currentEndpoint();
     if (endpoint && endpoint !== parsed.endpoint) return;
     if (!state.manifest) adopt(parsed.endpoint, manifest);
@@ -255,11 +225,6 @@ const fetchOnce = async (
   return "fresh";
 };
 
-/**
- * Bind the store to a data dir and a backend-URL resolver. Called once when
- * the runner context is created; the resolver is read at every revalidation
- * so a sign-in that changes the backend takes effect without re-configuring.
- */
 export const configureRemotePrompts = (options: {
   stellaDataDir: string;
   getBackendUrl: () => string | null;
@@ -271,15 +236,9 @@ export const configureRemotePrompts = (options: {
   state.cacheLoaded = readCache();
 };
 
-/** The served body for a prompt id (`agents/orchestrator.md`, `prompts/personality.md`), if loaded. */
 export const getRemotePromptBody = (id: string): string | undefined =>
   state.bodies.get(id);
 
-/**
- * Conditional refresh. Cheap enough to call on every turn: with a loaded
- * publication it is one `304` round trip. Never throws; a failure leaves the
- * current bodies (or the bundle) in place.
- */
 export const revalidateRemotePrompts =
   async (): Promise<RemotePromptRevalidation> => {
     if (state.inFlight) return state.inFlight;
@@ -300,8 +259,6 @@ export const revalidateRemotePrompts =
         }
         return outcome;
       } catch (error) {
-        // Offline, BYOK without a backend, or a bad publication: the loaded
-        // bodies (or the bundle) carry on. Logged once per outcome change.
         const message = error instanceof Error ? error.message : String(error);
         if (state.lastFailure !== message) {
           state.lastFailure = message;
@@ -316,7 +273,6 @@ export const revalidateRemotePrompts =
     return attempt;
   };
 
-/** Fire-and-forget form for turn starts. */
 export const scheduleRemotePromptRevalidation = (): void => {
   void revalidateRemotePrompts();
 };

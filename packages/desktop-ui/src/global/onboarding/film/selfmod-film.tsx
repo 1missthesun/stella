@@ -1,13 +1,3 @@
-/**
- * "I can change myself" — the self-modification film (desktop only).
- *
- * The same loop the product runs: the user asks for a feature in Stella
- * herself, an agent drafts it in Stella's own source (a diff streams in, a
- * live preview of the draft opens), the reply carries the real Update card,
- * and pressing Update swaps the new code in with the focus pull the app
- * uses — only the part of the window that changed blurs out and sharpens
- * back in. The card settles to "Updated just now" with Undo on it.
- */
 import { Check, Code, Globe } from "@/ui/icons";
 import { UpdateCard } from "@/features/app-source/UpdateCard";
 import {
@@ -71,7 +61,6 @@ const DIFF: { file: string; lines: DiffLine[] }[] = [
   },
 ];
 
-/** What the change adds to Stella's top bar. */
 function MeetingPill({ state }: { state: "none" | "preview" | "pulling" | "in" }) {
   return (
     <span className="osm-pill" data-state={state}>

@@ -14,25 +14,13 @@ export type SwipeDirection = "previous" | "next";
 
 const MAX_SCALE = 5;
 const DOUBLE_TAP_SCALE = 2.5;
-/** Fraction of the width a drag must cover to step to the next image. */
 const SWIPE_DISTANCE_FRACTION = 0.22;
 const SWIPE_VELOCITY = 700;
-/** How far an edge drag follows the finger when there is nothing beyond it. */
 const EDGE_RESISTANCE = 0.3;
 const SETTLE = { damping: 26, stiffness: 260, mass: 0.9 };
 const DISMISS_DISTANCE_FRACTION = 0.16;
 const DISMISS_VELOCITY = 900;
 
-/**
- * A full-bleed image that pinch-zooms around the fingers, pans while zoomed,
- * and double-taps between fit and 2.5x. At fit size a horizontal drag follows
- * the finger and, past a threshold, hands off to `onSwipe` so the viewer can
- * step to the neighbouring image, and a vertical drag hands off to
- * `onDismiss` so the viewer can close.
- *
- * Every transform lives in Reanimated shared values written on the UI thread,
- * so zooming stays at display rate while the JS thread streams a reply.
- */
 export function ZoomableImageView({
   uri,
   accessibilityLabel,
@@ -50,7 +38,6 @@ export function ZoomableImageView({
 }) {
   const width = useSharedValue(0);
   const height = useSharedValue(0);
-  // Natural width / height, for the size of the fitted ("contain") image.
   const aspect = useSharedValue(1);
 
   const scale = useSharedValue(1);
@@ -67,8 +54,6 @@ export function ZoomableImageView({
   const focalX = useSharedValue(0);
   const focalY = useSharedValue(0);
 
-  // When the sheet changes size, a zoom fitted to the old frame no longer
-  // fits, so the image settles back to fit the new one.
   const onLayout = (event: LayoutChangeEvent) => {
     const next = event.nativeEvent.layout;
     const resized =
@@ -86,7 +71,6 @@ export function ZoomableImageView({
     }
   };
 
-  /** Largest translation that keeps the zoomed image covering the frame. */
   const bounds = (s: number) => {
     "worklet";
     const w = width.value;
@@ -133,8 +117,6 @@ export function ZoomableImageView({
         Math.max(0.6, startScale.value * event.scale),
       );
       const ratio = next / startScale.value;
-      // Keep the point that started under the fingers under them, and let a
-      // drifting focal point carry the image along.
       const fx = event.focalX - width.value / 2;
       const fy = event.focalY - height.value / 2;
       scale.value = next;
@@ -201,7 +183,6 @@ export function ZoomableImageView({
       const direction: SwipeDirection = dx < 0 ? "next" : "previous";
       const available = direction === "next" ? hasNext : hasPrevious;
       if (onSwipe && far && available && Math.abs(dx) > 10) {
-        // Carry on off the edge; the next image replaces this view.
         swipeX.value = withTiming(Math.sign(dx) * width.value, {
           duration: 160,
         });
@@ -263,10 +244,6 @@ export function ZoomableImageView({
   );
 }
 
-/**
- * A plain horizontal-swipe surface for the image viewer's loading and error
- * states, so a quick run of swipes isn't stopped by an image still loading.
- */
 export function SwipeArea({
   onSwipe,
   children,

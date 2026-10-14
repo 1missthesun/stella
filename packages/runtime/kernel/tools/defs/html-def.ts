@@ -1,12 +1,3 @@
-/**
- * The `html` tool's model-visible surface, split from the executable
- * definition so workerd hosts advertise the byte-identical tool. The device
- * host writes the canvas under `~/.stella/outputs/html/`; the cloud host
- * writes it into the owner's drive. Both then save it to the canvas's
- * private link (`shares.save`) and return that URL, or only the file when the
- * link cannot be made.
- */
-
 export const HTML_TOOL_NAME = "html";
 
 export const HTML_TOOL_DESCRIPTION =
@@ -38,7 +29,6 @@ export const HTML_TOOL_PARAMETERS: Record<string, unknown> = {
 
 const HTML_SLUG_RE = /^[a-z0-9][a-z0-9-]{0,63}$/;
 
-/** Canonical slug for a canvas: the caller's if well-formed, else derived. */
 export const htmlCanvasSlug = (
   rawSlug: string,
   fallback: string,

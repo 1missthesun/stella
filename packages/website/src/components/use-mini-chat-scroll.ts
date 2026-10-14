@@ -4,14 +4,6 @@ import { useLayoutEffect, useRef } from "react";
 
 const FOLLOW_TIME_MS = 115;
 
-/**
- * Keeps a mini-chat transcript top-aligned until it actually overflows, then
- * follows the newest turn with one continuous compositor-only movement.
- *
- * This deliberately moves an inner track instead of changing scrollTop. It
- * means layout changes that arrive close together (send, thinking, work rows)
- * update one target instead of starting a stack of independent smooth scrolls.
- */
 export function useMiniChatScroll() {
   const viewportRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
@@ -46,8 +38,6 @@ export function useMiniChatScroll() {
         return;
       }
 
-      // Time-based exponential following stays equally smooth at 60 and
-      // 120Hz, and naturally retargets without a second scroll animation.
       current += distance * (1 - Math.exp(-elapsed / FOLLOW_TIME_MS));
       paint();
       frame = requestAnimationFrame(follow);
@@ -60,8 +50,6 @@ export function useMiniChatScroll() {
       const next = Math.max(0, track.scrollHeight - available);
       viewport.toggleAttribute("data-overflow", next > 0.5);
 
-      // Empty/reset transcripts always return to the top immediately, ready
-      // for the next first message. Reduced-motion frames settle immediately.
       if (track.childElementCount === 0 || reduced) {
         target = next;
         current = next;

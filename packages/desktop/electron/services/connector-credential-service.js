@@ -221,9 +221,6 @@ export class ConnectorCredentialService {
             });
         });
         if (headless) {
-            // Another surface (the in-chat connect card) already collected
-            // the user's launch gesture: start the flow now instead of
-            // asking again with a secure input card.
             if (payload.kind === "external_approval") {
                 if (payload.resourceUrl) {
                     // NOTE: `ok: true` here means "browser opened with the user's
@@ -264,8 +261,6 @@ export class ConnectorCredentialService {
                 });
             }
             else {
-                // api_key mode (or a flow without connection details) needs
-                // the secure input card: headless has no way to collect a key.
                 this.pending.resolve(requestId, { ok: false, reason: "unsupported" });
                 this.meta.delete(requestId);
             }
@@ -285,12 +280,6 @@ export class ConnectorCredentialService {
         this.pending.resolve(requestId, outcome);
         this.meta.delete(requestId);
     }
-    /**
-     * The secure input card for a request: a masked key field for api_key,
-     * a consent choice for oauth, in the conversation that made the call
-     * (else the one on screen). A key is read from its handle here and
-     * saved for the connector; it never reaches the runtime or the model.
-     */
     async askInChat(requestId, request, payload) {
         const userAsks = this.options.getUserAskService?.();
         const conversationId = payload.conversationId || this.options.getActiveConversationId?.() || "";
@@ -505,9 +494,6 @@ export class ConnectorCredentialService {
     }
     async runOauthFlow(args) {
         try {
-            // `connectConnectorOAuth` handles the full PKCE Authorization
-            // Code flow + token persistence. It calls `saveConnectorAccessToken`
-            // itself on success, so we just need to resolve the bridge promise.
             if (args.type === "device") {
                 const verificationUri = args.verificationUri || args.authorization?.verification_uri;
                 if (verificationUri)

@@ -109,10 +109,6 @@ export const parseTurnBrokerHandoff = (
   return candidate as TurnBrokerHandoff;
 };
 
-/**
- * Read and unlink the capability before the tool host or a native CLI exists.
- * O_NOFOLLOW prevents an unexpected symlink from redirecting this one read.
- */
 export const takeTurnBrokerHandoff = async (
   input: TurnBrokerInput,
   now = Date.now(),
@@ -144,8 +140,6 @@ export const takeTurnBrokerHandoff = async (
       );
     }
 
-    // Remove the pathname while this exact inode is still held open. Failure
-    // is fatal: proceeding would leave the reusable capability discoverable.
     await unlink(target);
     bytes = await readBoundedFile(handle, MAX_HANDOFF_BYTES);
   } finally {
@@ -330,7 +324,6 @@ const parseCheckpointReceipt = (
   }
   const candidate = value as Record<string, unknown>;
   const keys = Object.keys(candidate).sort();
-  // A native-only (orchestrator) checkpoint names no world manifest.
   const nativeOnly = !Object.hasOwn(candidate, "manifestId");
   const expectedKeys = nativeOnly
     ? "historyCursor,operationId"
@@ -383,8 +376,6 @@ const readBoundedCheckpointReceipt = async (
     const reader = response.body.getReader();
     try {
       while (true) {
-        // A transport failure remains replay-safe: it propagates out of this
-        // helper and the caller retries the exact sequence/fingerprint.
         const next = await reader.read();
         if (next.done) break;
         total += next.value.byteLength;
@@ -429,11 +420,6 @@ const readBoundedCheckpointReceipt = async (
   }
 };
 
-/**
- * Serializes request admission so sequence N+1 cannot arrive before N. Any
- * ambiguous network failure permanently closes the client: availability may
- * be retried as a new attempt, whereas authority replay cannot be repaired.
- */
 export class TurnCredentialBrokerClient {
   readonly identity: Omit<TurnBrokerHandoff, "capability">;
   #capability: string;
@@ -668,12 +654,6 @@ export class TurnCredentialBrokerClient {
     });
   }
 
-  /**
-   * The sole replay-safe broker operation. It stages the exact workspace and,
-   * for Claude, its root-owned native state before the transcript cursor can
-   * become canonical. The deterministic request id and byte-identical body let
-   * Builder return the same durable receipt after a lost response.
-   */
   async commitTurnStateCheckpoint(
     checkpoint: {
       historyCursor: string;

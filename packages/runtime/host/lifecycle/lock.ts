@@ -3,21 +3,6 @@ import { Effect, type Scope } from "effect";
 import { HostLockBusyError, HostLockTimeoutError } from "./errors.js";
 import { pollWithDeadline } from "./poll.js";
 
-/**
- * Host-side lockfile serialization (`runtime.lock.host`): concurrent host
- * starts for the same stellaAppDir must not race the discover-or-spawn
- * critical section. Scope-managed — the release finalizer (close fd +
- * unlink) runs on success, failure, AND interruption, so an interrupted
- * attach can never strand the lock.
- *
- * The acquire loop mirrors opencode's effect-flock: a single `wx`-create
- * attempt that fails with the retryable HostLockBusyError, paced by
- * `Schedule.spaced(50ms)` and admitted against an absolute deadline
- * anchored before attempt one (`pollWithDeadline`) — the same 50ms spacing
- * and total budget as the old hand-rolled while-loop, with the same atomic
- * rename-based stale takeover inside the attempt.
- */
-
 const ACQUIRE_POLL_INTERVAL_MS = 50;
 
 export type HostLockHandle = {
@@ -25,14 +10,6 @@ export type HostLockHandle = {
   readonly fd: number;
 };
 
-/**
- * One acquire attempt. On EEXIST: if the recorded holder is alive, fail
- * busy; if it is dead (or unreadable), take over the stale lock via atomic
- * rename() — only one racing host wins the takeover; the loser's rename
- * fails and it simply retries rather than blindly deleting what may already
- * be another host's freshly created lock (the TOCTOU close the old code
- * documented). Non-EEXIST errors (and write-pid failures) are not retried.
- */
 const tryAcquireLockFile = (
   lockFile: string,
 ): Effect.Effect<HostLockHandle, HostLockBusyError | Error> =>
@@ -60,7 +37,6 @@ const tryAcquireLockFile = (
     return { lockFile, fd };
   });
 
-/** If the holder died, clear the stale lock so the next attempt can win. */
 const takeOverStaleLock = (lockFile: string): Effect.Effect<void> =>
   Effect.promise(async () => {
     try {
@@ -69,7 +45,6 @@ const takeOverStaleLock = (lockFile: string): Effect.Effect<void> =>
       if (Number.isInteger(pid) && pid > 0) {
         try {
           process.kill(pid, 0);
-          // Holder is alive; keep waiting.
           return;
         } catch {
           // Holder is dead — fall through to the atomic takeover below.
@@ -79,7 +54,6 @@ const takeOverStaleLock = (lockFile: string): Effect.Effect<void> =>
       try {
         await fsPromises.rename(lockFile, stalePath);
       } catch {
-        // Lost the takeover race (or the lock was already gone); retry.
         return;
       }
       await fsPromises.unlink(stalePath).catch(() => undefined);
@@ -98,10 +72,6 @@ const releaseLock = (handle: HostLockHandle): Effect.Effect<void> =>
     await fsPromises.unlink(handle.lockFile).catch(() => undefined);
   });
 
-/**
- * Acquire the host lock as a scoped resource. The enclosing scope's close
- * releases it in all exits.
- */
 export const acquireHostLock = (
   lockFile: string,
   timeoutMs: number,

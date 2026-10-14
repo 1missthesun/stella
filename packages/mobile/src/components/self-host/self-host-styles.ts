@@ -3,7 +3,6 @@ import { type Colors } from "../../theme/colors";
 import { fadeHex } from "../../theme/oklch";
 import { fonts } from "../../theme/fonts";
 
-/** Shared look for the server screens (welcome, connect, update gates). */
 export const makeSelfHostStyles = (colors: Colors) =>
   StyleSheet.create({
     screen: {

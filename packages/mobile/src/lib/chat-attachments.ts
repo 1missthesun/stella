@@ -1,37 +1,14 @@
-/**
- * Composer attachments, from picked file to drive reference.
- *
- * A turn's attachment is a drive-relative path and nothing else. The bytes go
- * to the drive out of band, before the send, because the execution-placement
- * envelope is hash-fenced and size-bounded and a photo cannot ride it. Once
- * the bytes are on the drive both placements reach them through machinery that
- * already exists: a cloud turn hydrates the path through the drive sync, a
- * computer-placed turn resolves it through a signed drive GET.
- *
- * Uploading at pick time rather than at send time is what makes a failed
- * upload harmless. The composer still holds the draft and the chip when the
- * failure lands, so there is nothing to restore and nothing to lose.
- */
 import type { BackendClient } from "@stella/contracts/backend/client";
 import { attachmentContentType } from "./image-attachments";
 
-/**
- * One turn's attachment budget. The cloud attachment route signs at most this
- * many images per turn and the orchestrator asks for at most this many, so a
- * composer that accepted more would drop the surplus without saying so.
- */
 export const CHAT_ATTACHMENT_MAX_COUNT = 4;
 
-/** Where a phone's picks land in the drive. `uploads/` is the drive's own
- * convention for user-supplied files and ranks above agent output when a turn
- * hydrates. */
 const CHAT_ATTACHMENT_DRIVE_PREFIX = "uploads";
 
 const MAX_SEGMENT_LENGTH = 255;
 
 export type ChatAttachmentKind = "image" | "file";
 
-/** What the picker hands over: local bytes and what they claim to be. */
 export type PickedAttachment = {
   id: string;
   uri: string;
@@ -41,11 +18,6 @@ export type PickedAttachment = {
   kind: ChatAttachmentKind;
 };
 
-/**
- * A chip's whole lifecycle. A discriminated union so `drivePath` cannot be read
- * off an attachment that has not landed and `message` cannot be read off one
- * that has.
- */
 export type AttachmentStatus =
   | { status: "uploading" }
   | { status: "ready"; drivePath: string }
@@ -58,11 +30,6 @@ export type ReadyAttachment = PickedAttachment & {
   drivePath: string;
 };
 
-/**
- * Advance one chip. Pure so the whole lifecycle (upload, failure, retry) is
- * testable without a composer, and so a stale reply cannot resurrect a chip the
- * user already removed: an id that is gone matches nothing.
- */
 export const withAttachmentStatus = (
   attachments: readonly ComposerAttachment[],
   id: string,
@@ -76,16 +43,11 @@ export const isAttachmentReady = (
   attachment: ComposerAttachment,
 ): attachment is ReadyAttachment => attachment.status === "ready";
 
-/** Whether a send may proceed: nothing may still be in flight or broken. */
 export const attachmentsSettled = (
   attachments: readonly ComposerAttachment[],
 ): attachments is readonly ReadyAttachment[] =>
   attachments.every(isAttachmentReady);
 
-/**
- * Add picks up to the turn budget, reporting the overflow so the picker can
- * say how many it dropped instead of swallowing them.
- */
 export const appendAttachments = <T>(
   current: readonly T[],
   incoming: readonly T[],
@@ -98,11 +60,6 @@ export const appendAttachments = <T>(
   };
 };
 
-/**
- * Reduce a picked filename to one drive path segment. Path separators,
- * traversal and control characters are what `normalizeDrivePath` rejects
- * outright, so they are removed here rather than surfaced as a failed upload.
- */
 export const driveFileNameFor = (name: string, kind: ChatAttachmentKind) => {
   const cleaned = name
     .replaceAll("\\", "/")
@@ -117,12 +74,6 @@ export const driveFileNameFor = (name: string, kind: ChatAttachmentKind) => {
   return cleaned.slice(-MAX_SEGMENT_LENGTH);
 };
 
-/**
- * Day-bucketed so a drive does not accumulate one flat directory, and
- * suffixed when a turn carries two files of the same name — the second upload
- * would otherwise land on the first one's path and the agent would read one
- * file twice.
- */
 export const driveAttachmentPath = (args: {
   name: string;
   kind: ChatAttachmentKind;
@@ -142,12 +93,6 @@ export const driveAttachmentPath = (args: {
   }
 };
 
-/**
- * Attached files ride along as an addressable list in the prompt, the same way
- * the desktop composer names them. A cloud turn's drive sync ranks paths the
- * prompt references above every other row, so naming them is both how the
- * agent learns they exist and how they get hydrated into the world at all.
- */
 export const withAttachmentPreamble = (
   prompt: string,
   paths: readonly string[],
@@ -159,19 +104,11 @@ export const withAttachmentPreamble = (
 
 export type AttachmentUploadDeps = {
   client: Pick<BackendClient, "call">;
-  /** Reads the picked file's bytes. Split out so tests never touch the disk. */
   readFile: (uri: string) => Promise<Uint8Array<ArrayBuffer>>;
-  /** Native uses expo/fetch, which accepts byte buffers without RN Blob conversion. */
   fetch?: (url: string, init: RequestInit) => Promise<Pick<Response, "ok" | "status">>;
   now?: () => Date;
 };
 
-/**
- * The drive's own two-step upload: claim a presigned PUT sized against the
- * plan quota, send the bytes straight to R2, then let the server write the row
- * from the size R2 actually reports. Nothing about the file is client-declared
- * once this returns — the path is the whole reference.
- */
 export const uploadChatAttachment = async (
   attachment: PickedAttachment,
   taken: ReadonlySet<string>,

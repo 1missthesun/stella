@@ -11,12 +11,6 @@ const systemClock: TrailingTaskClock = {
   now: () => Date.now(),
 };
 
-/**
- * Coalesces a burst of scheduled work into one run of the latest task: it
- * fires once scheduling has been quiet for `settleMs`, and never later than
- * `maxDelayMs` after the first task it is holding, so a steady stream still
- * lands periodically. `flush` runs the held task now; `cancel` drops it.
- */
 export class TrailingTask {
   private pending: (() => void) | null = null;
   private firstHeldAt = 0;

@@ -1,9 +1,3 @@
-/**
- * The onboarding composer: the chat composer's glass pill and send button,
- * without the chat-bound extras (attachments, dictation, voice, models).
- * Anything typed here ends onboarding and becomes the first message of the
- * real conversation.
- */
 import { useMemo, useState } from "react";
 import { Platform, StyleSheet, TextInput, View } from "react-native";
 import Animated, { useAnimatedStyle } from "react-native-reanimated";

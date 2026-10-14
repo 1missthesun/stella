@@ -26,32 +26,14 @@ export type MessageMenuAction = {
 };
 
 const MENU_WIDTH = 250;
-/** Every menu row is this tall, so the menu's height is known before layout. */
 const MENU_ITEM_HEIGHT = 48;
 const MENU_PADDING = 6;
-/** Caps label growth under large Dynamic Type so a row keeps its height. */
 const MENU_LABEL_MAX_FONT_SCALE = 1.3;
 const GAP = 8;
 const EDGE = 12;
-/** The least height kept for the message when the screen is short. */
 const MIN_BUBBLE_VIEWPORT = 80;
-/** The held bubble shrinks to this while the press is held (see ChatMessageRow). */
 export const MESSAGE_PRESS_SCALE = 0.96;
 
-/**
- * The iOS Messages context menu: the held bubble lifts out of a dimmed
- * screen and the actions sit under it, aligned to the bubble's side. It is a
- * modal so the dim also covers the native top bar and composer. The bubble is
- * re-rendered at its measured window position (the original is hidden while
- * the menu is up), then moved up just enough that bubble and menu both fit on
- * screen.
- *
- * A message taller than the room left keeps its normal size and scrolls in
- * a viewport that fills that room, starting at the part that was on screen.
- * It only slides into place: scaling a screen-sized text view every frame is
- * what made long messages stutter, so the lift's scale is kept for bubbles
- * that fit.
- */
 export function MessageContextMenu({
   rect,
   side,
@@ -60,7 +42,6 @@ export function MessageContextMenu({
   colors,
   onDismiss,
 }: {
-  /** The held bubble's frame in window coordinates. */
   rect: MessageMenuRect;
   side: "left" | "right";
   bubble: ReactNode;
@@ -109,14 +90,10 @@ export function MessageContextMenu({
   const room = Math.max(MIN_BUBBLE_VIEWPORT, bottom - top - menuHeight - GAP);
   const viewportHeight = Math.min(rect.height, room);
   const scrolls = rect.height > viewportHeight;
-  // The bubble keeps its place unless the menu would run off the bottom; then
-  // the pair moves up together.
   const bubbleTop = Math.max(
     top,
     Math.min(rect.y, bottom - menuHeight - GAP - viewportHeight),
   );
-  // A scrolling message opens on the part that was on screen, so the text
-  // under the finger stays where it was.
   const initialOffset = scrolls
     ? Math.min(Math.max(0, bubbleTop - rect.y), rect.height - viewportHeight)
     : 0;
@@ -183,8 +160,6 @@ export function MessageContextMenu({
       />
       <Animated.View
         style={[styles.bubble, bubbleStyle]}
-        // A bubble that fits is drawn once and its bitmap scaled through the
-        // lift, rather than re-masking its rounded corners on every frame.
         shouldRasterizeIOS={!scrolls}
         renderToHardwareTextureAndroid={!scrolls}
       >

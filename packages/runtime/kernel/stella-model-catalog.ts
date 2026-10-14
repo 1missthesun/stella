@@ -58,7 +58,6 @@ type CatalogApiModel = {
 type CatalogApiResponse = {
   data?: CatalogApiModel[];
   defaults?: CatalogDefaultModel[];
-  /** Model-gateway origin every Stella route must relay through. */
   gateway?: { origin?: unknown };
 };
 
@@ -91,13 +90,6 @@ const parseCatalogApi = (value: unknown): GatewayProtocol | undefined => {
   }
 };
 
-/**
- * The one module-level ManagedRuntime for the Stella model catalog (M5
- * kernel pass, house convention: one requirements-free runtime per facade
- * module family). Disk-cache reads/writes and the bounded catalog fetch run
- * as Effects; the exported `withStellaModelCatalogMetadata` stays a
- * plain-Promise facade rejecting with the original failure (`Cause.squash`).
- */
 const catalogRuntime = ManagedRuntime.make(Layer.empty);
 
 const runCatalogEffect = async <A>(
@@ -110,13 +102,10 @@ const runCatalogEffect = async <A>(
   throw Cause.squash(exit.cause);
 };
 
-/** Wrap one async catalog IO call; failures carry the original error. */
 const tryCatalogOp = <A>(op: () => Promise<A>): Effect.Effect<A, unknown> =>
   Effect.tryPromise({ try: op, catch: (error) => error });
 
-/** Bound on the catalog network round-trip. */
 const CATALOG_FETCH_TIMEOUT_MS = 15_000;
-/** Minimum spacing between background refresh attempts per identity. */
 const CATALOG_REFRESH_MIN_INTERVAL_MS = 30_000;
 
 const publishCatalogToModelRuntime = async (
@@ -151,12 +140,6 @@ const publishCatalogToModelRuntime = async (
   );
 };
 
-/**
- * The disk cache is keyed by the IDENTITY (endpoint + user + device), with
- * the catalog's ETag beside it. A stored copy is servable at once on launch
- * and revalidated in the background, so a catalog change (or a flaky backend
- * mid-deploy) can never leave route resolution with nothing.
- */
 const diskCachePathForIdentity = (
   stellaDataDir: string,
   identityKey: string,
@@ -239,8 +222,6 @@ const readCatalogFromDiskEffect = (
       );
       return parsePersistedCatalog(JSON.parse(raw));
     }).pipe(
-      // Missing/torn/unparsable disk cache reads as "nothing stored" —
-      // the old `catch { return null }`.
       Effect.catch(() => Effect.succeed(null)),
     );
   });
@@ -306,7 +287,6 @@ const buildCatalogRequest = (args: {
 }): {
   endpoint: string;
   headers: Record<string, string>;
-  /** Who is asking: endpoint + stable JWT identity + device. */
   identityKey: string;
 } | null => {
   const backendUrl = args.backendUrl?.trim();
@@ -332,13 +312,6 @@ const buildCatalogRequest = (args: {
 
 type CatalogRequest = NonNullable<ReturnType<typeof buildCatalogRequest>>;
 
-/**
- * The only place the network is touched. Single-flight per identity,
- * bounded, rate-limited between attempts, and every outcome settles — a
- * pending entry can never outlive {@link CATALOG_FETCH_TIMEOUT_MS}, so one
- * stalled request can no longer poison every later lookup (a previous
- * incarnation of this map held unsettled promises forever).
- */
 const fetchCatalogFromNetwork = (
   request: CatalogRequest,
   stellaDataDir: string | undefined,
@@ -349,12 +322,6 @@ const fetchCatalogFromNetwork = (
     return existing;
   }
   lastCatalogFetchAttemptAtMs.set(request.identityKey, Date.now());
-  // `AbortSignal.timeout` stays the network bound (it actually aborts the
-  // fetch — an Effect.timeout wrapper would only abandon it); the pipeline
-  // around it runs as an Effect on the shared catalog runtime. The
-  // single-flight map keeps holding the settled-once Promise so concurrent
-  // awaiters and the background-refresh path share one attempt, exactly as
-  // before.
   const inFlight = catalogRuntime.runPromise(
     Effect.gen(function* () {
       const res = yield* tryCatalogOp(() =>
@@ -373,9 +340,6 @@ const fetchCatalogFromNetwork = (
         return yield* Effect.fail(new Error(`HTTP ${res.status}`));
       }
       const data = (yield* tryCatalogOp(() => res.json())) as CatalogApiResponse;
-      // The gateway origin is part of the catalog contract: without it no
-      // Stella route can be built, so its absence is a catalog failure, not
-      // a partial success.
       const gatewayOrigin = normalizeGatewayOrigin(data.gateway?.origin);
       if (!gatewayOrigin) {
         return yield* Effect.fail(new Error(STELLA_GATEWAY_UNCONFIGURED_MESSAGE));
@@ -410,8 +374,6 @@ const fetchCatalogFromNetwork = (
     }).pipe(
       Effect.catch((error) =>
         Effect.sync(() => {
-          // Loud on purpose: silent nulls here previously made a sick catalog
-          // endpoint (or a poisoned in-flight entry) undiagnosable from logs.
           console.warn(
             `[stella-model-catalog] Catalog fetch failed: ${error instanceof Error ? error.message : String(error)}`,
           );
@@ -429,19 +391,6 @@ const fetchCatalogFromNetwork = (
   return inFlight;
 };
 
-/**
- * Stale-while-revalidate catalog lookup, revalidated once per launch.
- *
- * Resolution order:
- *   1. a copy fetched or revalidated by this process → serve it;
- *   2. the disk copy → serve it IMMEDIATELY and revalidate it in the
- *      background with its ETag (spaced by
- *      {@link CATALOG_REFRESH_MIN_INTERVAL_MS});
- *   3. nothing stored at all (first run) → one bounded network fetch.
- * After the first successful fetch on a device, callers never block on the
- * network again — a catalog change degrades to "briefly stale", never to
- * "hangs" or "no catalog".
- */
 const fetchStellaModelCatalogEffect = (args: {
   site: StellaSiteConfig;
   deviceId?: string;
@@ -465,17 +414,12 @@ const fetchStellaModelCatalogEffect = (args: {
       request.identityKey,
     );
     if (diskCached) {
-      // Usable now, revalidated behind the caller's back. It is memoized
-      // only once the backend confirms it (304) or replaces it.
       const lastAttempt =
         lastCatalogFetchAttemptAtMs.get(request.identityKey) ?? 0;
       if (
         !inFlightCatalogRequests.has(request.identityKey) &&
         Date.now() - lastAttempt >= CATALOG_REFRESH_MIN_INTERVAL_MS
       ) {
-        // Background refresh rides its own fiber (the old fire-and-forget
-        // `void ....then(...)`); a failed publish dies with the fiber
-        // instead of the process' unhandled-rejection path.
         catalogRuntime.runFork(
           tryCatalogOp(() =>
             fetchCatalogFromNetwork(request, args.stellaDataDir, diskCached),
@@ -663,11 +607,6 @@ export const withStellaModelCatalogMetadata = (args: {
     }),
   );
 
-/**
- * The gateway origin is configuration, not data: once the catalog (memory,
- * disk, or network) has been consulted and still no origin is known, the
- * deployment is misconfigured and every Stella model call must fail closed.
- */
 const requireGatewayOrigin = (
   site: StellaSiteConfig,
 ): Effect.Effect<string, Error> =>

@@ -3,7 +3,6 @@ import type {
   AutomaticExecutionStatusSnapshot,
 } from "./execution-placement-core";
 
-/** A landed attachment, as the placement decision needs to see it. */
 export type PlacementAttachment = { path: string; kind: "image" | "file" };
 
 /**
@@ -62,11 +61,6 @@ export const unifiedChatPlacementAdmission = (args: {
   };
 };
 
-/**
- * Placement is an implementation detail. Leave ordinary in-flight states to
- * the working indicator's friendly thinking/tool copy; only cancellation
- * needs an explicit status.
- */
 export const unifiedChatPlacementStatusText = (
   dispatch: AutomaticExecutionStatusSnapshot,
 ): string | undefined =>

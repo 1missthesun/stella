@@ -31,18 +31,7 @@ import * as HostBus from "../host-bus.js";
 import * as SessionConfig from "./config.js";
 import * as RunnerCell from "./runner-cell.js";
 
-/**
- * The local-IPC bridge (a Unix socket, or a token-guarded named pipe on
- * Windows) the worker exposes for sidecar processes (the
- * `stella-computer` daemon spawn path) and the in-process node_repl
- * `connect` client that need to call back into the host without the full
- * runtime JSON-RPC protocol. Connector-capable children may launch
- * immediately after initialize returns, so this layer builds (and therefore
- * listens) BEFORE the session is reported ready, so a startup failure fails
- * initialization.
- */
 export interface Interface {
-  /** Stable socket path advertised to the runner; undefined when unsupported. */
   readonly socketPath: string | undefined;
 }
 
@@ -158,10 +147,6 @@ export const layer = Layer.effect(
         request,
       );
 
-    // Protected connector credentials stay on owner-only local IPC. The
-    // worker and shipped CLI receive plaintext only in memory for a request.
-    // Cleared by the CredentialBrokers finalizer (which runs after this
-    // layer's), preserving the old stop order.
     setConnectorTokenStoreBroker({
       load: async (tokenKey) => {
         const result = await requestHostConnectorTokenStore({

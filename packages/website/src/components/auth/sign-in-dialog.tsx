@@ -25,18 +25,8 @@ import { StellaMark } from "@/components/stella-mark";
 
 const AUTH_TOKEN_PATTERN = /^[A-Za-z0-9._~-]{8,2048}$/;
 
-/**
- * Window event used to open the sign-in dialog from non-React contexts (e.g.
- * top-level helpers in `store-client.tsx`).
- */
 export { openSignInDialog } from "./sign-in-dialog-events";
 
-/**
- * Provider that mounts a single global sign-in dialog, opened through
- * `openSignInDialog`. Renders the same magic-link flow as `/sign-in` but
- * inline, so links and buttons across the marketing site can avoid a full
- * navigation away from the current page.
- */
 export function SignInDialogProvider({
   children,
   initiallyOpen = false,
@@ -100,7 +90,6 @@ export function SignInDialogProvider({
         className={styles.dialog}
         aria-label="Sign in to Stella"
         onClick={(event) => {
-          // Close when clicking the backdrop (the dialog element itself).
           if (event.target === dialogRef.current) {
             setIsOpen(false);
           }

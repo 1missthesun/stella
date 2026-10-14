@@ -1,19 +1,3 @@
-/**
- * Keeps one thread's `claude` process between that thread's turns in a warm
- * container (see `claude-keeper-protocol.ts`). Started detached by the turn's
- * executor with its socket path as the only argument; the executor that
- * attaches drives the process, and between turns it waits stopped (SIGSTOP),
- * so nothing it holds can change the native state the turn sealed.
- *
- * Claude's MCP client is pointed at this process, which forwards to the
- * attached turn's own tool host. A follow-up turn brings a new host, and the
- * proxy opens a new MCP session on it before Claude runs again; Claude keeps
- * its own session id.
- *
- * Any doubt ends the process instead of reusing it: an executor that goes
- * away mid-turn, a process that exits, an idle timeout. The executor then
- * starts a fresh one, exactly as a cold turn does.
- */
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { chmod, mkdir, readdir, rm, stat, writeFile } from "node:fs/promises";
@@ -48,8 +32,6 @@ const sameSecret = (left: string | undefined, right: string): boolean => {
   const b = Buffer.from(right);
   return a.length === b.length && timingSafeEqual(a, b);
 };
-
-// ---- MCP proxy --------------------------------------------------------------
 
 const proxyBearer = `Bearer ${randomBytes(32).toString("base64url")}`;
 const proxyPath = `/mcp/${randomBytes(32).toString("base64url")}`;
@@ -141,8 +123,6 @@ const proxy = http.createServer((request, response) => {
     response.writeHead(401).end();
     return;
   }
-  // No server-initiated stream: the host never needs one, and a stream held
-  // open across a stopped process would only break.
   if (request.method === "GET") {
     response.writeHead(405, { allow: "POST, DELETE" }).end();
     return;
@@ -172,11 +152,6 @@ const rpcResult = async (response: Response): Promise<unknown> => {
   throw new Error("MCP response carried no result");
 };
 
-/**
- * A new turn's tool host has never seen this Claude: open a session on it as
- * Claude first did, and list its tools, which is what tells the host that
- * Claude is ready.
- */
 const openUpstreamSession = async (): Promise<void> => {
   const target = upstream;
   if (!target || initializeParams === undefined) {
@@ -228,14 +203,11 @@ const openUpstreamSession = async (): Promise<void> => {
   await rpcResult(listed);
 };
 
-// ---- the claude process -----------------------------------------------------
-
 type Child = {
   process: ChildProcessWithoutNullStreams;
   key: string;
   exited: boolean;
   parked: boolean;
-  /** Set once the parked turn sealed its state; null while a turn holds it. */
   released: ClaudeKeeperState | null;
   stderr: string;
   exitedPromise: Promise<void>;
@@ -311,7 +283,6 @@ const startChild = async (
   let pending = "";
   let configRemoved = false;
   processHandle.stdout.on("data", (chunk: Buffer) => {
-    // Claude reads its MCP config once, before it writes anything.
     if (!configRemoved) {
       configRemoved = true;
       void rm(configDirectory, { recursive: true, force: true }).catch(() => undefined);
@@ -367,8 +338,6 @@ const attach = async (
   cancelIdleTimer?.();
   cancelIdleTimer = undefined;
   if (attached && attached !== socket) {
-    // A newer attempt of this thread's turn supersedes whatever still holds
-    // the process.
     const previous = attached;
     attached = undefined;
     await killChild();
@@ -405,7 +374,6 @@ const attach = async (
   send(socket, { t: "attached", reused: false, fresh });
 };
 
-/** The tree Claude writes: path, size and mtime of every entry. */
 const fingerprint = async (root: string): Promise<string> => {
   const parts: string[] = [];
   const walk = async (directory: string): Promise<void> => {
@@ -521,8 +489,6 @@ const server = net.createServer((socket) => {
     attached = undefined;
     upstream = undefined;
     const current = child;
-    // Only a turn that parked and sealed hands the process on; an executor
-    // gone any other way (stopped, crashed, killed) takes Claude with it.
     if (!current || current.exited || !current.parked || !current.released) {
       shutdown("executor left mid-turn");
     }

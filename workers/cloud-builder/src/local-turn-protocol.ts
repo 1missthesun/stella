@@ -60,12 +60,6 @@ const canonicalizeJson = (value: unknown): unknown => {
   );
 };
 
-/**
- * The desktop reconstructs the same logical AgentMessage after a restart, and
- * that construction gives it a fresh top-level timestamp. The timestamp is
- * delivery metadata, not message identity, so exclude it while retaining and
- * canonically ordering every other field used by the model.
- */
 export const localClientMessageFingerprintSource = (
   clientMsgId: string,
   message: AgentMessage,
@@ -142,10 +136,6 @@ export type ParsedLocalTurnTools = {
   }>;
 };
 
-/**
- * The tools a computer's running turn started or finished, for the other
- * devices' working indicators. Advisory and lossy: it carries no transcript.
- */
 export const parseLocalTurnTools = (
   value: unknown,
 ): ParsedLocalTurnTools | null => {

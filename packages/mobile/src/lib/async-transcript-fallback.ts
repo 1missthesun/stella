@@ -212,8 +212,6 @@ async function commitDirtyPages(args: {
     const rows = [...dirty].sort(compareRows);
     for (let offset = 0; offset < rows.length; offset += PAGE_SIZE) {
       const chunk = rows.slice(offset, offset + PAGE_SIZE);
-      // Dirty pages are copy-on-write. Until the new manifest commits, the old
-      // manifest must continue to reference an untouched complete page.
       const pageId = meta.nextPageId++;
       writes.push([pageKey(threadId, pageId), JSON.stringify(chunk)]);
       descriptors.push({
@@ -241,8 +239,6 @@ async function commitDirtyPages(args: {
   meta.garbagePageIds = [...new Set([...meta.garbagePageIds, ...pageRemovals])];
   meta.garbageRowIds = [...new Set([...meta.garbageRowIds, ...removedIds])];
 
-  // Page payloads and row locators land before the small manifest. An
-  // interrupted write therefore never advertises a page that does not exist.
   for (let offset = 0; offset < writes.length; offset += 500) {
     await AsyncStorage.multiSet(writes.slice(offset, offset + 500));
   }
@@ -537,7 +533,6 @@ export async function loadNewerAsyncTranscriptRows(
   });
 }
 
-/** Resolve a durable row identity to its paging cursor without loading history. */
 async function findAsyncTranscriptCursor(
   threadId: string,
   messageId: string,
@@ -550,8 +545,6 @@ async function findAsyncTranscriptCursor(
     );
     if (row) return { orderKey: row.orderKey, id: row.id };
   }
-  // Locators are derived hints and can lag an interrupted manifest commit.
-  // Fall back to bounded page reads so checkpoint recovery never trusts one.
   for (const descriptor of meta.pages) {
     const row = (await readPage(threadId, descriptor.id)).find(
       (candidate) => candidate.id === messageId,
@@ -561,7 +554,6 @@ async function findAsyncTranscriptCursor(
   return null;
 }
 
-/** Reconcile a complete cache window, rewriting only pages with changed rows. */
 export async function synchronizeAsyncTranscriptRows(
   threadId: string,
   incoming: readonly Omit<AsyncTranscriptRow, "orderKey">[],

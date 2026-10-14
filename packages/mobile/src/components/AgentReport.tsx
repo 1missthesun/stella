@@ -41,12 +41,6 @@ const threadReportText = (thread: ReportThread): string => {
   return thread?.errorMessage?.trim() || "";
 };
 
-/**
- * A task's report: the backend's record of the thread when it has one, else
- * the text the conversation itself carried back (`journalReport`). Agents a
- * cloud chat runs on Stella's own models report only into the conversation,
- * so for them the journal is the report.
- */
 export function useAgentReport(
   conversationId: string,
   threadId: string,
@@ -81,10 +75,6 @@ export function useAgentReport(
   return lookup.running ? "Working…" : "No report is available yet.";
 }
 
-/**
- * The reports behind one "Show more": one title row and body per task, all
- * in one scroll. A single report reads exactly as it always has.
- */
 export function AgentReportContent({
   sections,
   colors,

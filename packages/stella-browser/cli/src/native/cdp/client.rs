@@ -13,8 +13,6 @@ use super::types::{CdpCommand, CdpEvent, CdpMessage};
 type PendingMap = Arc<Mutex<HashMap<u64, oneshot::Sender<CdpMessage>>>>;
 const CDP_COMMAND_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
 
-/// Raw incoming CDP message (text) broadcast to all subscribers.
-/// Used by the inspect proxy to forward responses and events to DevTools.
 #[derive(Debug, Clone)]
 pub struct RawCdpMessage {
     pub text: String,
@@ -37,8 +35,6 @@ pub struct CdpClient {
     event_tx: broadcast::Sender<CdpEvent>,
     raw_tx: broadcast::Sender<RawCdpMessage>,
     _reader_handle: tokio::task::JoinHandle<()>,
-    /// Flattened child-frame sessions by (parent session, frame id). Entries
-    /// are pruned when Chromium reports the child or parent session detached.
     frame_sessions: Arc<Mutex<HashMap<(String, String), String>>>,
 }
 
@@ -108,13 +104,11 @@ impl CdpClient {
                 };
 
                 if let Some(id) = parsed.id {
-                    // Response to a command
                     let mut pending = pending_clone.lock().await;
                     if let Some(tx) = pending.remove(&id) {
                         let _ = tx.send(parsed);
                     }
                 } else if let Some(ref method) = parsed.method {
-                    // Event
                     if method == "Target.detachedFromTarget" {
                         if let Some(detached) = parsed
                             .params
@@ -139,9 +133,6 @@ impl CdpClient {
                 }
             }
 
-            // Reader loop exited (connection closed or error). Drop all pending
-            // command senders so callers get an immediate channel-closed error
-            // instead of waiting for the 30-second timeout.
             pending_clone.lock().await.clear();
         });
 
@@ -181,10 +172,6 @@ impl CdpClient {
             pending.insert(id, tx);
         }
 
-        // Bound the whole transport operation, including waiting for the sink
-        // lock and flushing the WebSocket frame. The previous timeout started
-        // only after `send()` returned, so a backpressured/dead adapter could
-        // hold the daemon-wide browser state lock forever.
         let operation = async {
             {
                 let mut ws_tx = self.ws_tx.lock().await;
@@ -255,14 +242,10 @@ impl CdpClient {
         self.event_tx.subscribe()
     }
 
-    /// Subscribe to all raw incoming CDP messages (responses + events).
-    /// Used by the inspect proxy to forward traffic to the DevTools frontend.
     pub fn subscribe_raw(&self) -> broadcast::Receiver<RawCdpMessage> {
         self.raw_tx.subscribe()
     }
 
-    /// Create a lightweight handle for the inspect WebSocket proxy.
-    /// Contains only what's needed to forward messages bidirectionally.
     pub fn inspect_handle(&self) -> InspectProxyHandle {
         InspectProxyHandle {
             ws_tx: self.ws_tx.clone(),
@@ -293,8 +276,6 @@ impl CdpClient {
         self.send_command(method, None, session_id).await
     }
 
-    /// Send raw JSON through the WebSocket without tracking a response.
-    /// Used by the inspect proxy to forward DevTools frontend messages.
     pub async fn send_raw(&self, json: String) -> Result<(), String> {
         let mut ws_tx = self.ws_tx.lock().await;
         ws_tx
@@ -315,8 +296,6 @@ type WsTx = Arc<
     >,
 >;
 
-/// Lightweight handle for the inspect WebSocket proxy, holding only
-/// the cloneable parts of CdpClient needed for bidirectional message forwarding.
 pub struct InspectProxyHandle {
     ws_tx: WsTx,
     raw_tx: broadcast::Sender<RawCdpMessage>,

@@ -1,24 +1,3 @@
-/**
- * Per-turn resolution of an agent's system prompt.
- *
- *   1. The user's selected prompt preset, when one is set for this agent
- *      (`~/.stella/prompts/<agent>/<id>.md` — see `prompt-presets.ts`). A
- *      preset replaces the shipped prompt wholesale.
- *   2. Otherwise the shipped body from the bundled
- *      `stella-runtime/agent-metadata/<id>.md` definition.
- *
- * The shipped prompt is never written to, so it always updates with the app;
- * a preset is a separate file, so an update can't clobber it. A selection
- * pointing at a missing or empty preset silently falls back to the shipped
- * prompt rather than leaving the agent without one.
- *
- * Both sources are read live (mtime+size gated) so edits apply on the next
- * turn without an extension reload. Frontmatter is stripped; capability
- * metadata (tools, model, maxAgentDepth) always comes from the registered
- * agent. Whichever body wins is rendered for the desktop and the agent's
- * tools, the same condition fences the cloud renders for itself.
- */
-
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
@@ -52,10 +31,6 @@ const readBody = async (filePath: string): Promise<string | undefined> => {
   }
 };
 
-/**
- * Path of the selected preset for this agent, or null when the shipped
- * prompt is in use. Reading the preference is cheap (mtime-cached).
- */
 const selectedPresetPath = (
   stellaDataDir: string | undefined,
   agentType: string,
@@ -78,12 +53,6 @@ const selectedPresetPath = (
   );
 };
 
-/**
- * Render an agent prompt source for this desktop and the agent's tools (see
- * `renderStellaPrompt`). A preset is the user's own text and may carry a
- * malformed fence; it is then used as written rather than leaving the agent
- * without a prompt.
- */
 export const renderDesktopAgentPrompt = (
   source: string,
   tools: ReadonlySet<string>,
@@ -95,10 +64,6 @@ export const renderDesktopAgentPrompt = (
   }
 };
 
-/**
- * `tools` is the agent's tool set for this turn (`stellaPromptTools`); the
- * shipped, served and preset bodies all render through the same fences.
- */
 export const loadAgentSystemPrompt = async (
   agentType: string,
   stellaDataDir?: string,
@@ -120,9 +85,6 @@ const loadAgentPromptSource = async (
     presetPath ? statSignature(presetPath) : Promise.resolve(null),
   ]);
   const hasPreset = presetPath !== null && presetSig !== null;
-  // The backend-served body is the source of truth once loaded
-  // (`prompts/remote-prompts`); a user's selected preset still wins, and the
-  // bundled file is the offline/BYOK fallback.
   if (!hasPreset) {
     const served = getRemotePromptBody(`agents/${agentType}.md`);
     if (served) return served;

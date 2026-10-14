@@ -1,9 +1,3 @@
-/**
- * Tab handles and `browser.tabs`: every handle is bound to one backend and
- * one tab generation, so a numeric tab id reused by the browser can never be
- * driven through a stale handle.
- */
-
 import type {
   BrowserWorkerAxObservation,
   BrowserWorkerAxSnapshotOptions,
@@ -69,8 +63,6 @@ type TabState = {
   };
 };
 
-// Runs inside the persistent Node worker, never the Electron renderer. The
-// matrix budget bounds work even if a backend returns an unusually deep tree.
 const axLineDiff = (before: string, after: string): string | null => {
   const a = before.split("\n");
   const b = after.split("\n");
@@ -164,14 +156,6 @@ type NormalizedTabList = {
   activeTabId?: number;
 };
 
-// The worker only sees payloads, so backend problems surface here as shape
-// mismatches. Two distinct failure modes get distinct messages: a payload
-// that identifies tabs only by position comes from a backend that predates
-// stable tab ids (fix: update the Stella Browser daemon/extension), while
-// any other malformed payload is a protocol drift between backend and
-// runtime (fix: update Stella so both sides match). Neither is fixed by
-// "update the extension" alone — the in-app CDP daemon speaks the same
-// protocol.
 const browserProtocolMismatch = (detail: string): Error =>
   new Error(
     `Stella Browser protocol mismatch: ${detail}. The connected browser backend (in-app browser daemon or extension) returned a payload shape this runtime cannot drive. Update Stella so the browser backend and runtime versions match.`,
@@ -528,8 +512,6 @@ export const createTabs = (
         params: Record<string, unknown>,
       ) => command(action, params, state.backend);
       state.keyboard = Object.freeze({
-        // Page-level key press (no selector): the key goes to whatever holds
-        // focus, or the document. Supports combos like "Control+a".
         press: async (key: string) =>
           await boundCommand("press", {
             tabId: currentTabId(state),
@@ -676,8 +658,6 @@ export const createTabs = (
       });
       const optionsKey = JSON.stringify(params);
       const cache = (state.ax ??= { pending: Promise.resolve() });
-      // Concurrent callers consume a single ordered baseline, never both a
-      // predecessor that has already been replaced by a later observation.
       const capture = cache.pending.then(
         async (): Promise<BrowserWorkerAxObservation> => {
           try {
@@ -797,8 +777,6 @@ export const createTabs = (
         "scroll options",
       );
       const params: Record<string, unknown> = { tabId: this.id };
-      // x/y are pixel deltas (negative scrolls up/left); direction+amount is
-      // the ergonomic alternative the daemon converts to deltas.
       for (const key of ["x", "y"] as const) {
         if (value[key] !== undefined) {
           if (typeof value[key] !== "number" || !Number.isFinite(value[key])) {
@@ -837,9 +815,6 @@ export const createTabs = (
   const tabs: BrowserWorkerTabs = Object.freeze({
     list: async () => (await listTabsInternal()).tabs,
     new: async (url?: string) => {
-      // Capture before transport: browser.use() may complete while tab_new is
-      // in flight, but the returned handle belongs to the backend that
-      // actually received this dispatch.
       const backend = context.selectedBackend;
       const params: Record<string, unknown> = {};
       if (url !== undefined) {

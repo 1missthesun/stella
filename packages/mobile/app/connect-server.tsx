@@ -67,12 +67,6 @@ const hostOf = (origin: string): string => {
   }
 };
 
-/**
- * Connect this phone to a self-hosted Stella server: scan the pairing QR
- * (or pick a photo of it, or paste the link), confirm whose server it is,
- * then claim the one-time code for a session and restart into the server.
- * `?link=` arrives from a `stella://pair` link opened by the camera app.
- */
 export default function ConnectServerScreen() {
   const colors = useColors();
   const { isDark } = useTheme();
@@ -139,7 +133,6 @@ export default function ConnectServerScreen() {
     [errorFor, t],
   );
 
-  // A pairing link opened from outside (camera app, another app).
   useEffect(() => {
     const link = typeof params.link === "string" ? params.link : "";
     if (!link || handledLinkRef.current === link) return;

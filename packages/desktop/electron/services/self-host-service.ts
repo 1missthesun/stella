@@ -19,17 +19,6 @@ import type {
 } from "@stella/contracts/desktop/self-host";
 import { launcherServerId, writeServerSession } from "./auth-service.js";
 
-/**
- * Self-hosted Stella servers on the desktop.
- *
- * The native launcher reads `<launcher data dir>/server.json` (origin,
- * serverId, name, urls) to pick the backend it installs Stella from and runs
- * it against, each server in its own install folder. Connecting claims a
- * one-time pairing from the server, stores that server's session beside the
- * stella.sh one, writes `server.json` and relaunches through the launcher.
- * Removing the file goes back to stella.sh.
- */
-
 export const SERVER_FILE_NAME = "server.json";
 const REQUEST_TIMEOUT_MS = 15_000;
 const SERVER_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
@@ -74,10 +63,6 @@ export const readServerFile = (): ServerFile | null => {
   }
 };
 
-/**
- * Before the renderer env is read: a self-hosted server's Apps hosts and
- * share links come from its discovery document, saved in `server.json`.
- */
 export const applySelfHostedServerEnv = () => {
   const serverId = launcherServerId();
   if (!serverId) return;
@@ -174,7 +159,6 @@ export class SelfHostService {
     };
   }
 
-  /** A link opened from the OS: the renderer confirms before anything happens. */
   receiveLink(url: string) {
     if (!parsePairingLink(url)) return;
     this.pendingLink = url;
@@ -268,7 +252,6 @@ export class SelfHostService {
     return { ok: true, relaunching: true };
   }
 
-  /** Back to stella.sh: its install and sign-in were left as they were. */
   useDefault(): SelfHostConnectResult {
     const file = serverFilePath();
     if (!file || !this.getState().canSwitch) {

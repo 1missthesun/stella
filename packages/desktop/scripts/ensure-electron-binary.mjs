@@ -58,7 +58,6 @@ function readElectronVersion() {
 
 export function isElectronBinaryHealthy() {
   if (!existsSync(electronDir)) {
-    // Electron isn't installed at all; nothing this guard can repair.
     return true;
   }
 
@@ -161,13 +160,6 @@ function extractZipNatively(zipPath, distDir) {
   throw new Error(`Failed to extract Electron zip: ${lastError}`);
 }
 
-// Every worktree has its own copy of the Electron package (bun hardlinks the
-// rest from its cache, but this binary is unpacked by us). Where the disk can
-// clone files copy-on-write (btrfs, XFS, APFS), unpack each version once next
-// to its cached zip and clone that into the worktree: ~0 extra bytes per
-// worktree instead of ~280 MB. Clones are independent, so a worktree that
-// patches its dist (dev app name) never touches the shared copy. Without
-// copy-on-write nothing is shared and we unpack as before.
 function canCloneBetween(fromFile, toDir) {
   const probe = path.join(toDir, `.clone-probe-${process.pid}`);
   try {
@@ -203,8 +195,6 @@ function cloneSharedDist(zipPath, distDir, platformPath) {
 
   const shared = `${zipPath}.unpacked`;
   if (!existsSync(path.join(shared, platformPath))) {
-    // Unpack aside and rename into place, so the shared copy is only ever
-    // complete; if another install got there first, keep theirs.
     const staging = `${shared}.${process.pid}`;
     extractZipNatively(zipPath, staging);
     try {
@@ -276,7 +266,6 @@ export async function ensureElectronBinary() {
     extractZipNatively(zipPath, distDir);
   }
 
-  // Mirror Electron's installer: hoist the bundled type definitions out of dist.
   const srcTypeDefPath = path.join(distDir, "electron.d.ts");
   if (existsSync(srcTypeDefPath)) {
     renameSync(srcTypeDefPath, path.join(electronDir, "electron.d.ts"));

@@ -1,11 +1,5 @@
 import type { Attachment } from "@stella/contracts/local-chat";
 
-/**
- * True when a sent attachment should be copied to the clipboard as an image.
- * Mirrors the message row's image treatment: a `file`-kind attachment counts
- * only when its mime type is an image; screenshots (no `file` kind) and
- * image-mimed / `data:image/` attachments are images.
- */
 const isImageCopyAttachment = (attachment: Attachment) => {
   const mimeType = attachment.mimeType ?? "";
   if (attachment.kind === "file" && !mimeType.startsWith("image/"))
@@ -19,13 +13,6 @@ const isImageCopyAttachment = (attachment: Attachment) => {
   return attachment.kind !== "file" && !mimeType;
 };
 
-/**
- * Pick the single attachment the Copy action should place on the clipboard
- * for a sent user message, and shape it for `media.copyAttachment`. Prefers
- * the FIRST image attachment (the primary/leftmost chip); falls back to the
- * first attachment that carries a usable on-disk path or data/file URL.
- * Returns null when nothing is copyable.
- */
 export const primaryCopyAttachment = (
   attachments: ReadonlyArray<Attachment> | undefined,
 ) => {

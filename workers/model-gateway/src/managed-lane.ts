@@ -93,16 +93,8 @@ import {
 } from "./resolve.js";
 import type { SharedGatewayConfigStore } from "./shared-config.js";
 
-/**
- * Managed lane: Stella-billed, request/response.
- *
- * authorize -> price -> reserve on the capability ledger -> stream from the
- * provider -> assemble one provider-native object -> meter -> settle ->
- * enqueue usage -> respond. The client never sees SSE.
- */
 export const GATEWAY_REPLAY_HEADER = "x-stella-gateway-replay" as const;
 
-/** Upstream bytes beyond this are a runaway stream, not a completion. */
 const MAX_UPSTREAM_STREAM_BYTES = 64 * 1024 * 1024;
 
 const assemblerFor = (protocol: GatewayProtocol): Assembler => {
@@ -247,12 +239,6 @@ export const clampOutputTokens = (args: {
   return body;
 };
 
-/**
- * The exact upstream call for a managed request: URL, headers, and body as
- * `@stella/model-catalog` shapes them, with streaming forced on (Google via
- * `:streamGenerateContent?alt=sse`, chat completions with
- * `stream_options.include_usage`) and `accept: text/event-stream`.
- */
 export const shapeUpstreamRequest = (args: {
   request: Request;
   protocol: GatewayProtocol;
@@ -405,7 +391,6 @@ const outputTextLengthInFrame = (
 
 type TierReservation = { estimateMicroCents: number; minute: number };
 
-/** Reserves the audience-wide tier budget; a refusal carries the tier quota. */
 const reserveTierBudget = async (args: {
   env: Env;
   timing: RelayTiming;
@@ -477,8 +462,6 @@ export const handleManagedRelay = async (args: {
       now: deps.now(),
     }),
   );
-  // Start cold pricing reads during authorization. Capture rejection even if
-  // the request is refused before pricing is needed.
   const configWork = timing
     .measure("pricingConfigMs", () =>
       getGatewayConfig(
@@ -503,9 +486,6 @@ export const handleManagedRelay = async (args: {
       (value) => ({ ok: true as const, value }),
       (error) => ({ ok: false as const, error }),
     );
-  // A speculative client may have an older catalog. Refuse it before any
-  // limiter, reservation or provider request, so it can rebuild the adapter
-  // and reapply context transforms to the original, unpruned messages.
   let predictedRequestJson:
     | Awaited<ReturnType<typeof readJsonObject>>
     | undefined;

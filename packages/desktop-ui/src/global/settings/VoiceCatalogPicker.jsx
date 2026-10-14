@@ -1,19 +1,3 @@
-/**
- * VoiceCatalogPicker — voice selector that appears below the provider
- * list on the Voice tab of the model picker.
- *
- * Layout, top to bottom:
- *   - Label row with a static source label ("Stella voices" / "OpenAI
- *     voices" / "Grok voices"). Managed Stella mode always runs on
- *     GPT-Live, so there is no voice family to choose.
- *   - Voice stepper: a single horizontal box with left/right chevrons
- *     on either side of the current voice label. Chevrons cycle through
- *     the active catalog; clicking the label opens a dropdown listing
- *     every voice with its tone description.
- *   - Read-aloud provider toggle (Gemini / OpenAI). Gemini read-aloud has
- *     its own voice stepper, stored at `realtimeVoice.voices.gemini`;
- *     OpenAI read-aloud reuses the OpenAI voice above.
- */
 import { useCallback, useMemo } from "react";
 import { Check, ChevronLeft, ChevronRight, ChevronDown } from "@/ui/icons";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, } from "@/ui/dropdown-menu";
@@ -83,8 +67,6 @@ function VoiceStepper({ catalog, activeVoiceId, sourceLabel, onPick, disabled })
 }
 export function VoiceCatalogPicker({ voiceProvider, selectedVoices, onSelectVoice, readAloudProvider, onSelectReadAloudProvider, onSelectReadAloudVoice, disabled = false, }) {
     const t = useT();
-    // Pinned per top-level provider: BYOK modes keep their own Realtime
-    // families and managed Stella mode is always GPT-Live.
     const underlyingProvider = resolveRealtimeUnderlyingProvider({
         provider: voiceProvider,
     });

@@ -4,15 +4,6 @@ import { createAuthClient } from "better-auth/react";
 import { jwtClient, magicLinkClient } from "better-auth/client/plugins";
 import { readBackendUrl } from "./backend-url";
 
-/**
- * Web-side Better Auth client against the backend worker.
- *
- * The backend lives on another origin, so the site keeps no cookie there.
- * The `bearer` plugin returns the signed session token in `set-auth-token`;
- * it is kept in localStorage and sent as `Authorization: Bearer` on every
- * auth request. `authClient.token()` (the jwt plugin) mints the short-lived
- * JWT the backend's calls and views accept.
- */
 const SESSION_TOKEN_KEY = "better-auth_session_token";
 
 const readSessionToken = (): string => {

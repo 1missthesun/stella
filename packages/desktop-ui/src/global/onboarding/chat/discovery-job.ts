@@ -1,23 +1,3 @@
-/**
- * The discovery job: collect local signals, synthesize the core memory,
- * write it to disk, and park the greeting + finale payload for the chat.
- *
- * A module-level store rather than component state so the job survives
- * the onboarding surface unmounting: a user who types straight into the
- * composer and skips to chat still ends up with a profile a few seconds
- * later. IPC calls cannot be aborted, so a generation counter makes an
- * older run's results inert instead of racing a newer one.
- *
- * Unlike the legacy flow this does not wait for a conversation id — the
- * greeting is parked (see `pending-handoff.ts`) and appended by the chat
- * surface once the root layout has selected a conversation.
- *
- * Onboarding runs before the user has a Stella account, and synthesis runs on
- * Stella's model, which needs one. So the signals are collected on this
- * computer right away, but nothing leaves it until the user has signed in:
- * the job waits ("waiting_for_account") holding the collected text in memory
- * only, synthesizes once an account exists, and then drops it.
- */
 import { useSyncExternalStore } from "react";
 import type { DiscoveryCategory } from "@stella/contracts/discovery";
 import type { OnboardingStarter } from "@stella/contracts/desktop/onboarding";
@@ -48,7 +28,6 @@ export type DiscoveryJobResult = {
 export type DiscoveryJobSnapshot = {
   status: DiscoveryJobStatus;
   result: DiscoveryJobResult | null;
-  /** Developer-facing reason; the card shows friendly copy instead. */
   error: string | null;
 };
 
@@ -96,7 +75,6 @@ const fail = (jobGeneration: number, error: string, details?: unknown) => {
 const hasAccount = () =>
   isConnectedAccountSession(getAuthSessionSnapshot().data);
 
-/** Resolves true once a Stella account is signed in, false if superseded. */
 const waitForAccount = (isCurrent: () => boolean): Promise<boolean> =>
   new Promise((resolve) => {
     if (hasAccount()) {
@@ -118,10 +96,6 @@ const waitForAccount = (isCurrent: () => boolean): Promise<boolean> =>
 /** Right after sign-in the runtime may still be picking up the new token. */
 const SYNTHESIS_RETRY_DELAY_MS = 3_000;
 
-/**
- * Starts (or restarts) the job. Safe to call again after a failure; a
- * second call while a run is in flight supersedes it.
- */
 export const startDiscoveryJob = (input: DiscoveryJobInput) => {
   generation += 1;
   const jobGeneration = generation;
@@ -188,9 +162,6 @@ export const startDiscoveryJob = (input: DiscoveryJobInput) => {
       }
 
       publish({ status: "saving", result: null, error: null });
-      // Location is only resolved (and stored in memories/main.md) when the
-      // user opted into a category that already implies their physical
-      // location — browsing history or apps/system signals.
       const includeLocation =
         input.categories.includes("browsing_bookmarks") ||
         input.categories.includes("apps_system");

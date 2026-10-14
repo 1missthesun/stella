@@ -25,7 +25,6 @@ export async function stopStella(harness: Harness, root: Conversation, context: 
   const { model } = await root.agent(context);
   await harness.commit(async (tx) => {
     const live = await tx.doc(LiveDoc, root.id);
-    // Nothing running, or a reply streaming that pi keeps as the stopped one.
     if (!live.run || live.generation?.message) return undefined;
     const stopped: AssistantMessage = {
       role: "assistant",

@@ -8,8 +8,6 @@ import {
 
 const DEV_IN_APP_BROWSER_BOOTSTRAP_SESSION = "stella-app-bridge-development";
 const DEV_IN_APP_BROWSER_INIT_PORT = "39042";
-// The renderer is served from source by Electron itself (electron/source),
-// so there is no dev server to wait for.
 
 const require = createRequire(import.meta.url);
 const electronBinary = require("electron");

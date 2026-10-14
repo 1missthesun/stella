@@ -4,32 +4,15 @@ import { STELLA_MEDIA_MODELS } from "@stella/contracts/media-models";
 import { DEFAULT_GEMINI_TTS_VOICE, isGeminiTtsVoice } from "@stella/contracts/realtime-voice-catalog";
 import { Effect, Fiber } from "effect";
 
-// ---------------------------------------------------------------------------
-// Read-aloud synthesis with the speech model in `@stella/contracts/media-models`
-// (Gemini 3.8 Flash Lite TTS), on OpenRouter or fal.
-//
-// Both providers yield 16-bit mono PCM at 24 kHz (OpenRouter raw from
-// `/audio/speech`, fal as a WAV file). Long text is split into sentence-sized
-// chunks synthesized one ahead of playback. Every read-aloud transport (desktop
-// progressive `audio/mpeg`, mobile HLS segments) is MP3, so callers re-encode
-// the PCM with `createPcmMp3Encoder` as it arrives.
-//
-// OpenRouter is preferred when both keys are set: it answers in one hop
-// (fal hands back a file to download) and bills Gemini's token rates (~$0.50/$6 per million) where fal bills $0.03 per
-// thousand characters. `STELLA_MEDIA_PROVIDER` overrides the choice.
-// ---------------------------------------------------------------------------
-
 export const TTS_MODEL = STELLA_MEDIA_MODELS.speech;
 export const PCM_SAMPLE_RATE = 24_000;
 const PCM_BYTES_PER_SECOND = PCM_SAMPLE_RATE * 2;
 const MP3_KBPS = 48;
 const OPENROUTER_SPEECH_URL = "https://openrouter.ai/api/v1/audio/speech";
 const FAL_RUN_URL = `https://fal.run/${TTS_MODEL}`;
-/** The first chunk ends at the first sentence past this, so audio starts quickly. */
 const FIRST_CHUNK_MIN_CHARS = 40;
 const FIRST_CHUNK_CHARS = 240;
 const CHUNK_CHARS = 400;
-/** Gemini TTS runs at under 2× realtime, so several chunks synthesize at once. */
 const CHUNKS_IN_FLIGHT = 4;
 
 // Billed audio tokens per second of speech. Google documents 25/s, but the
@@ -46,11 +29,6 @@ const read = (env: object, name: string): string | null => {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 };
 
-/**
- * The provider read-aloud uses on this deployment, with its key, or null when
- * it is not set up: OpenRouter when both keys are set, unless
- * `STELLA_MEDIA_PROVIDER` names fal.
- */
 export const ttsProvider = (env: object): { provider: TtsProvider; apiKey: string } | null => {
   const configured = (["openrouter", "fal"] as const).flatMap((provider) => {
     const apiKey = read(env, KEY_NAMES[provider]);
@@ -70,7 +48,6 @@ export type TtsUsage = {
   estimatedUsd: number;
 };
 
-/** What a synthesis cost, estimated from its text and PCM length (neither provider reports it inline). */
 export const estimateTtsUsage = (provider: TtsProvider, requestChars: number, pcmBytes: number): TtsUsage => {
   const textInputTokens = Math.ceil(requestChars / 4);
   const audioOutputTokens = Math.ceil((pcmBytes / PCM_BYTES_PER_SECOND) * AUDIO_TOKENS_PER_SECOND_ESTIMATE);
@@ -80,8 +57,6 @@ export const estimateTtsUsage = (provider: TtsProvider, requestChars: number, pc
       : (textInputTokens * 0.5 + audioOutputTokens * 6) / 1_000_000;
   return { provider, textInputTokens, audioOutputTokens, estimatedUsd: Number(estimatedUsd.toFixed(6)) };
 };
-
-// ── PCM sources ────────────────────────────────────────────────────────────
 
 const openRouterSpeechChunk = async (
   apiKey: string,
@@ -107,7 +82,6 @@ const openRouterSpeechChunk = async (
   return new Uint8Array(await response.arrayBuffer());
 };
 
-/** Sentence-aligned chunks, the first one short so playback starts quickly. */
 export const splitTtsText = (text: string): string[] => {
   const sentences = text.match(/[^.!?。！？\n]+(?:[.!?。！？]+|\n+|$)/gu) ?? [text];
   const chunks: string[] = [];
@@ -132,7 +106,6 @@ export const splitTtsText = (text: string): string[] => {
   return chunks.filter((chunk) => chunk.length > 0);
 };
 
-/** The PCM samples of a WAV file, as 24 kHz mono 16-bit. */
 export const wavToPcm24k = (wav: Uint8Array): Uint8Array => {
   const view = new DataView(wav.buffer, wav.byteOffset, wav.byteLength);
   if (wav.byteLength < 12 || String.fromCharCode(...wav.slice(0, 4)) !== "RIFF") return wav;
@@ -187,7 +160,6 @@ const falSpeechChunk = async (apiKey: string, text: string, voice: string, signa
   return wavToPcm24k(new Uint8Array(await audio.arrayBuffer()));
 };
 
-/** Each chunk synthesized in order, with the next few already in flight while one plays. */
 const chunkedPcm = (
   chunks: string[],
   synthesize: (text: string) => Effect.Effect<Uint8Array, unknown>,
@@ -279,8 +251,6 @@ export const openTtsPcm = async (
   };
 };
 
-// ── Encoding ───────────────────────────────────────────────────────────────
-
 const concat = (parts: Uint8Array[]): Uint8Array => {
   if (parts.length === 1) return parts[0]!;
   let total = 0;
@@ -296,11 +266,6 @@ const concat = (parts: Uint8Array[]): Uint8Array => {
 
 const EMPTY = new Uint8Array(0);
 
-/**
- * Incremental PCM → CBR MP3. Feed PCM bytes to `push` and forward whatever
- * MP3 bytes come back (possibly none until a full frame is ready); call
- * `finish` once at the end to flush the tail.
- */
 export const createPcmMp3Encoder = () => {
   const encoder = new Mp3Encoder(1, PCM_SAMPLE_RATE, MP3_KBPS);
   let oddByte: number | null = null;
@@ -330,7 +295,6 @@ export const createPcmMp3Encoder = () => {
   };
 };
 
-/** A WAV file around 24 kHz mono 16-bit PCM. */
 export const pcmToWav = (pcm: Uint8Array): Uint8Array => {
   const out = new Uint8Array(44 + pcm.byteLength);
   const view = new DataView(out.buffer);

@@ -13,13 +13,6 @@ export type CloudConversationIdentity = {
 let observedIdentityKey: string | null = null;
 let observedRevision = 0;
 
-/**
- * Returns the immutable owner scope and a process-monotonic auth revision.
- *
- * The session id is intentionally part of identityKey: A -> B -> A and token
- * rotation must both force a fresh identity proof before any prior
- * conversation/socket state can be reused.
- */
 export const observeCloudConversationIdentity = (
   session: MobileAuthSession,
 ): CloudConversationIdentity | null => {

@@ -67,7 +67,6 @@ const cleanupStalePartials = async (filePath: string): Promise<void> => {
   );
 };
 
-/** Cross-process single-writer, atomic temp+rename materialization. */
 export const materializeMediaArtifact = async (args: {
   filePath: string;
   signal?: AbortSignal;
@@ -114,9 +113,6 @@ export const materializeMediaArtifact = async (args: {
   }
 
   const partialPath = `${args.filePath}.partial-${process.pid}-${randomUUID()}`;
-  // The controller stays at the producer seam (the download needs a real
-  // AbortSignal); the timeout escalation is a bounded fiber canceled in the
-  // `finally` below.
   const timeoutController = new AbortController();
   const cancelProducerTimeout = args.producerTimeoutMs
     ? forkAbortTimer(args.producerTimeoutMs, () =>
@@ -133,8 +129,6 @@ export const materializeMediaArtifact = async (args: {
     if (raced !== null) {
       return { path: args.filePath, sizeBytes: raced, created: false };
     }
-    // An invalid target may have been left by an older, signature-only
-    // release. Only the lock owner may remove it before atomic replacement.
     if ((await readyMediaArtifactSize(args.filePath)) !== null) {
       await fs.unlink(args.filePath);
     }

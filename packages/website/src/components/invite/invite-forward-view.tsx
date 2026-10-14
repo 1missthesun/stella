@@ -12,18 +12,9 @@ export type InviteForwardKind = "join-community" | "add-friend";
 
 type InviteForwardViewProps = {
   kind: InviteForwardKind;
-  /** Invite code (join) or username (add-friend); already URL-safe. */
   value: string;
 };
 
-/**
- * Handoff page behind shareable social invite links
- * (`stella.sh/join/<code>`, `stella.sh/add-friend/<username>`). Auto
- * forwards to the desktop deep link (`stella://join/...`,
- * `stella://add-friend/...`) and keeps an explicit "Open in Stella"
- * button for browsers that block the automatic handoff — same pattern as
- * the auth callback page.
- */
 export function InviteForwardView({ kind, value }: InviteForwardViewProps) {
   const isJoin = kind === "join-community";
 

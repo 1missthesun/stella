@@ -1,13 +1,3 @@
-/**
- * Sign in with ChatGPT on this computer: the 127.0.0.1 loopback listener and
- * the browser round trip. Node only (Electron main); the protocol itself
- * lives in `@stella/contracts/chatgpt-siwc*`.
- *
- * The listener serves exactly `GET /auth/callback` on 127.0.0.1, answers
- * unrelated requests (and callbacks for another attempt's state) without
- * ending the wait, and closes after the attempt.
- */
-
 import type { Server } from "node:http";
 import {
   CHATGPT_SIWC,
@@ -24,17 +14,11 @@ import {
 } from "@stella/contracts/chatgpt-siwc-flows";
 import { oauthErrorHtml, oauthSuccessHtml } from "./oauth-page.js";
 
-/** How long a browser sign-in may take before the listener gives up. */
 const SIGN_IN_TIMEOUT_MS = 15 * 60_000;
 
 export type ChatGptLoopback = {
-  /** `http://127.0.0.1:<port>/auth/callback`, exact for this attempt. */
   redirectUri: string;
   port: number;
-  /**
-   * The full callback URL carrying `state`. Requests with another state are
-   * refused without ending the wait.
-   */
   waitForCallback(state: string): Promise<string>;
   close(): void;
 };
@@ -42,10 +26,6 @@ export type ChatGptLoopback = {
 const canceled = (signal?: AbortSignal): Error =>
   signal?.reason instanceof Error ? signal.reason : new ChatGptError("cancelled", "ChatGPT sign-in was canceled.");
 
-/**
- * Listen on 127.0.0.1, preferring the documented port and falling back to
- * any free one (only the port may vary between sign-ins).
- */
 export async function listenForChatGptCallback(options: { signal?: AbortSignal } = {}): Promise<ChatGptLoopback> {
   if (typeof process === "undefined" || (!process.versions?.node && !process.versions?.bun)) {
     throw new Error("ChatGPT sign-in on this computer needs Node.js.");
@@ -63,7 +43,6 @@ export async function listenForChatGptCallback(options: { signal?: AbortSignal }
     };
   });
   const settle = (value: string | Error) => attempt.settle?.(value);
-  // The callback may land before anyone awaits it.
   void result.catch(() => undefined);
   let port = 0;
 
@@ -145,26 +124,16 @@ export async function listenForChatGptCallback(options: { signal?: AbortSignal }
   };
 }
 
-/** A saved registration being signed in again on this computer. */
 export type ChatGptSavedRegistration = {
   clientId: string;
   subject?: string;
-  /** Retained ID token from the last sign-in; omitted after signing out. */
   idTokenHint?: string;
   email?: string;
 };
 
-/**
- * Run the whole sign-in on this computer: listener first, then the browser
- * with fresh state, nonce and PKCE and this host's id. A new registration
- * reports its issued client id through `onRegistration` before the one-time
- * code exchange, so a failed exchange can sign in again with it instead of
- * registering another app.
- */
 export async function loginChatGpt(options: {
   hostId: string;
   saved?: ChatGptSavedRegistration;
-  /** Ask for consent again, to enable ChatGPT plan usage after a decline. */
   reconsent?: boolean;
   openUrl: (url: string) => void;
   onRegistration?: (clientId: string) => void | Promise<void>;

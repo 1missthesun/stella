@@ -82,7 +82,6 @@ export type ClaudeSessionRestoreResult = {
 
 export type ClaudeSessionSync = ClaudeSessionSyncSink & {
   resume(): void;
-  /** Weigh what is pending again now, as a lease that moved may have made some of it stale. */
   wake(): void;
   stop(): void;
   pending(): number;
@@ -266,11 +265,6 @@ class ClaudeSessionSyncRepo {
       );
   }
 
-  /**
-   * The conversation's brain lease moved past the epoch this session ran
-   * under: what it has not uploaded is a stale holder's and stays here. A
-   * later step under a newer lease marks it dirty again.
-   */
   markLeaseLost(row: SessionRow, error: string, now: number): void {
     this.db
       .prepare(
@@ -539,7 +533,6 @@ export const createClaudeSessionSync = (options: {
   db: SqliteDatabase;
   getAuthToken: () => string | null;
   getBackend: () => ClaudeSessionSyncBackend | null;
-  /** Whether the conversation's brain lease moved past `epoch` (`BrainLeaseView.superseded`). */
   leaseSuperseded?: (conversationId: string, epoch: number) => boolean;
 }): ClaudeSessionSync => {
   const logger = createRuntimeLogger("claude-session-sync");
@@ -730,8 +723,6 @@ export const createClaudeSessionSync = (options: {
         scheduleDrain(Math.min(...rows.map((candidate) => candidate.nextAttemptAt)) - now);
         return;
       }
-      // A holder that lost the lease stops uploading by its epoch, before
-      // the cloud would refuse it for a newer holder's.
       if (
         row.leaseEpoch !== null &&
         options.leaseSuperseded?.(row.conversationId, row.leaseEpoch) === true

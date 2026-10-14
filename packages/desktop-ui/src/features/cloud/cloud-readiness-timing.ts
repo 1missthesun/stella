@@ -5,11 +5,6 @@ const reported = new Set<string>();
 export const cloudReadinessNow = (): number =>
   typeof performance === "undefined" ? 0 : performance.now();
 
-/**
- * Emits bounded, content-free phase timings to the main process log. Each
- * phase is recorded once per renderer navigation so rerenders and multiple
- * hook consumers cannot distort the startup trace.
- */
 export const reportCloudReadiness = (
   phase: string,
   options: { startedAt?: number; outcome?: CloudReadinessOutcome } = {},

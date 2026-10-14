@@ -224,13 +224,6 @@ export const saveConnectorTokenPayload = async (
   );
 };
 
-// Per-tokenKey in-flight refresh single-flight. Without it, concurrent
-// near-expiry loads each POST the same refresh token, which can revoke
-// rotating grants and let racing saves persist a stale token. The first
-// caller performs the refresh and completes a keyed Deferred with its Exit;
-// joiners await the same Deferred (observing the identical success value or
-// failure object), and the entry clears once it settles — the Effect-native
-// shape of the old promise-coalescing map.
 const connectorRefreshLatches = new Map<
   string,
   Deferred.Deferred<ConnectorTokenPayload | null, unknown>
@@ -333,11 +326,6 @@ const fetchWithTimeout = async (
   init: RequestInit = {},
   timeoutMs = DISCOVERY_TIMEOUT_MS,
 ) => {
-  // Seam: fetch needs a real AbortSignal, so the timeout and the upstream
-  // caller signal funnel into one AbortController (sanctioned ratchet pin).
-  // The timer is a scoped fiber (interrupted when the fetch settles — the
-  // old clearTimeout), and the upstream listener rides the acquireAbortLatch
-  // bridge so its removal is a scoped finalizer on every exit path.
   const timeoutController = new AbortController();
   const upstreamSignal = init.signal ?? undefined;
   return await runConnectorEffect(
@@ -833,10 +821,6 @@ const createOAuthCallbackListener = async (
   }>((resolve, reject) => {
     let settled = false;
     let redirectUri = "";
-    // Assigned once the listener is up; interrupts the 5-minute hard-timeout
-    // fiber when the flow settles first. Never assigned when the caller's
-    // signal was already aborted (the executor returns before forking, just
-    // as the old code returned before scheduling its setTimeout).
     let cancelHardTimeout: (() => void) | null = null;
     let callbackResolver:
       | ((callback: ConnectorOAuthCallbackResult) => void)
@@ -964,10 +948,6 @@ export const connectConnectorOAuth = async (
     callbackPort?: number;
     callbackUrl?: string;
     callbackId?: string;
-    /** Aborting this signal tears down the local callback listener,
-     *  rejects the in-flight `waitForCode`, and propagates the abort
-     *  reason back to the caller (typically a renderer Cancel click).
-     *  Use this rather than waiting for the 5-minute hard timeout. */
     signal?: AbortSignal;
   },
 ) => {

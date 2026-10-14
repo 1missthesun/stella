@@ -30,7 +30,6 @@ import { isDisposableEmail } from "./disposable-email-domains.js";
 import { issueIntegrityNonce } from "./integrity.js";
 import { readOttCookie, withClearedOttCookie } from "./ott-cookie.js";
 
-/** The slice of `auth.api` the handoffs call back into. */
 export type HandoffApi = {
   signInMagicLink(input: { body: { email: string; callbackURL: string }; headers: Headers }): Promise<unknown>;
   verifyOneTimeToken(input: {
@@ -49,13 +48,10 @@ export type HandoffConfig = {
 };
 
 const MAGIC_LINK_EXPIRY_MS = 10 * 60_000;
-/** How long after completion a handoff may still be claimed. */
 const CLAIM_WINDOW_MS = 3 * 60_000;
 const BROWSER_SOCIAL_HANDOFF_EXPIRY_MS = 3 * 60_000;
-/** Wrong-secret attempts before the row is destroyed. */
 const MAX_CLAIM_ATTEMPTS = 5;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-/** base64url(SHA-256(claimSecret)), unpadded. */
 const CLAIM_HASH_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 const CLAIM_SECRET_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9_-]{32,64}$/;
@@ -100,7 +96,6 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 const text = (value: unknown): string => (typeof value === "string" ? value.trim() : "");
 
-/** base64url(SHA-256(value)), unpadded. Matches what clients send. */
 const sha256Base64Url = async (value: string): Promise<string> => {
   const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)));
   let binary = "";
@@ -108,7 +103,6 @@ const sha256Base64Url = async (value: string): Promise<string> => {
   return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
 };
 
-/** Comparison over a fixed window, so neither length nor prefix leaks through timing. */
 const hashesMatch = (a: string, b: string): boolean => {
   const left = new TextEncoder().encode(a);
   const right = new TextEncoder().encode(b);
@@ -117,7 +111,6 @@ const hashesMatch = (a: string, b: string): boolean => {
   return diff === 0;
 };
 
-/** Browser auth returns only to an https (or loopback) URL on the caller's exact origin. */
 const normalizeReturnTarget = (rawReturnTo: string, requestOrigin: string): string | null => {
   if (!rawReturnTo || !requestOrigin || requestOrigin === "null") return null;
   try {
@@ -174,7 +167,6 @@ export const stellaHandoff = (config: HandoffConfig) => {
       .run();
   };
 
-  /** Exchange the one-time token Better Auth appended for the session token. */
   const exchangeOtt = async (ott: string) => {
     try {
       return sessionTokenOf(
@@ -248,7 +240,6 @@ export const stellaHandoff = (config: HandoffConfig) => {
             .run();
           return fail(400, "Unable to claim sign-in");
         }
-        // Single use: the handoff dies with the claim.
         const deleted = await db()
           .prepare("DELETE FROM auth_link_requests WHERE request_id = ? AND claim_attempts = ?")
           .bind(requestId, row.claim_attempts)
@@ -316,9 +307,6 @@ export const stellaHandoff = (config: HandoffConfig) => {
         return reply({ callbackURL });
       }),
 
-      // The provider hook sets the one-time credential as a cookie. This
-      // no-render route consumes it before any app shell loads and returns to
-      // the registered target with the credential in a fragment, once.
       browserSocialVerify: createAuthEndpoint("/browser-social/verify", { method: "GET" }, async (ctx) => {
         const requestId = text(ctx.query?.requestId);
         const ott = readOttCookie(ctx.headers);

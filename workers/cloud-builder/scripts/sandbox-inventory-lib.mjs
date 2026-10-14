@@ -33,10 +33,6 @@ const requireInteger = (value, label) => {
   return value;
 };
 
-/**
- * Strip JSONC comments without touching comment-like text inside strings, then
- * remove trailing commas. This keeps the operational script dependency-free.
- */
 export const parseJsonc = (source) => {
   let output = "";
   let inString = false;
@@ -349,8 +345,6 @@ export const inferWorkload = (className, name) => {
       candidates: ["app-build"],
     };
   }
-  // `agent-` is one agent thread's container; `world-` is the owner's own
-  // (Claude sign-in). Both run the world workload.
   if (name?.startsWith("agent-") || name?.startsWith("world-")) {
     return {
       classification: "world",

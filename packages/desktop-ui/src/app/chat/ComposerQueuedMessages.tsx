@@ -26,18 +26,9 @@ const toVisibleItem = (message: QueuedUserMessage): VisibleItem => ({
 
 type ComposerQueuedMessagesProps = {
   messages: QueuedUserMessage[];
-  /**
-   * When provided, each queued bubble can cancel its message and restore
-   * the text to the composer.
-   */
   onCancel?: (message: QueuedUserMessage) => void;
 };
 
-/**
- * One queued message, rendered with the sent user bubble's exact markup so
- * a queued message is visually indistinguishable from a sent one. The only
- * queue-specific affordance is the hover-reveal cancel control beside it.
- */
 function QueuedMessageBubble({
   item,
   onCancel,

@@ -44,11 +44,6 @@ type OwnerLease = {
   expiresAt?: number;
 };
 
-/**
- * The already-loaded, durable owner fence. The caller must pass the owner id
- * which was bound to this owner-fence Durable Object on its first trusted
- * direct-stub request; request JSON is never allowed to establish that scope.
- */
 export type TurnStateOwnerFence = {
   ownerId: string;
   generation: string;
@@ -401,7 +396,6 @@ const adaptDurableStorage = (
   transaction: transact,
 });
 
-/** Cloudflare Durable Object storage adapter used by the registry. */
 export const createDurableObjectTurnStateStorage = (
   storage: DurableObjectStorage,
 ): StrongTurnStateStorage => {
@@ -434,7 +428,6 @@ const validateR2Cursor = (cursor: string): void => {
   }
 };
 
-/** R2 adapter used for full-prefix deletion and read-after-delete checks. */
 export const createR2TurnStateObjectStore = (
   bucket: R2Bucket,
 ): TurnStateObjectStore => ({
@@ -1132,14 +1125,8 @@ const clearRetiredRouteAuthorizations = async (
           transaction.get(`turn-state:v1:operation:${current.operationId}`),
           transaction.get(`turn-state:v1:retirement:${current.operationId}`),
         ]);
-        // A lost drain response may mean the registry already removed both
-        // records in the previous attempt. The absence proof, rather than the
-        // current drain result, is therefore the idempotent cleanup authority.
         if (operation === undefined && retirement === undefined) {
           await transaction.delete(key);
-          // Abort receipts are compact tombstones, not operation authorization.
-          // Keep them until the scoped owner/workspace purge so a response-loss
-          // retry remains exact even after retirement has drained both archives.
         }
       });
     }
@@ -1361,8 +1348,6 @@ export const handleTurnStateOwnerRoute = async (args: {
         );
       }
       const nativeOnly = row.nativeOnly === true;
-      // A native-only operation names no world; every other one names the
-      // manifest it sealed.
       if (nativeOnly === Object.hasOwn(row, "manifestId")) {
         throw new TurnStateOwnerRouteError(
           "manifestId is invalid.",

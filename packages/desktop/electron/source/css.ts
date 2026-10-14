@@ -3,32 +3,15 @@ import fs from "node:fs";
 import path from "node:path";
 import type { TailwindTools } from "./tools.js";
 
-/**
- * Renderer stylesheets. A stylesheet that imports Tailwind is compiled with
- * Tailwind, scanning the app's sources for the classes it uses; every
- * stylesheet then has its relative `url()`s made absolute, because the
- * renderer injects them as `<style>` tags where relative URLs would resolve
- * against the page instead of the file.
- */
-
 const TAILWIND_ENTRY = /@import\s+["']tailwindcss["']|@tailwind\s|@theme\b|@apply\b|@reference\b/;
 
 export const isTailwindStylesheet = (source: string): boolean => TAILWIND_ENTRY.test(source);
 
 const TAILWIND_CACHE_VERSION = "1";
 
-/**
- * One Tailwind stylesheet, built incrementally the way Tailwind's own Vite
- * plugin does: the compiler and scanner live across builds, each build
- * rescans (the scanner rereads only what changed) and adds any new classes,
- * and only a change to the stylesheet or one of its imports starts over.
- * A cold build scans the whole UI (~250 ms); a warm one takes a few ms, so a
- * change's hot update doesn't wait on Tailwind.
- */
 export const createTailwindBuild = (options: {
   loadTools: () => Promise<TailwindTools>;
   file: string;
-  /** The project root Tailwind scans by default (Vite's root). */
   root: string;
   cacheDir?: string;
   warmDelayMs?: number;
@@ -39,7 +22,6 @@ export const createTailwindBuild = (options: {
     compiler: Compiler;
     scanner: Scanner;
     candidates: Set<string>;
-    /** The stylesheet and its imports, with the mtime each was built from. */
     inputs: Map<string, number | null>;
   } | null = null;
   const mtime = (file: string) =>
@@ -163,7 +145,6 @@ export const createTailwindBuild = (options: {
   let warmTimer: ReturnType<typeof setTimeout> | null = null;
 
   return {
-    /** The stylesheet and the files it imports (as of the last build). */
     inputs,
     build: (source: string): Promise<string> =>
       serially(async () => {
@@ -190,7 +171,6 @@ export type TailwindBuild = ReturnType<typeof createTailwindBuild>;
 
 const URL_REFERENCE = /url\(\s*(['"]?)([^'")]+)\1\s*\)/g;
 
-/** Make relative `url()`s absolute against `baseUrl`, the stylesheet's own URL. */
 export const absolutizeCssUrls = (css: string, baseUrl: string): string =>
   css.replace(URL_REFERENCE, (match, quote: string, reference: string) => {
     const trimmed = reference.trim();
@@ -209,7 +189,6 @@ export const absolutizeCssUrls = (css: string, baseUrl: string): string =>
     }
   });
 
-/** A JS module that applies a stylesheet, as Vite's dev server served CSS imports. */
 export const cssModule = (css: string, id: string): string =>
   [
     `const css = ${JSON.stringify(css)};`,

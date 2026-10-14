@@ -6,7 +6,6 @@
 
 let projectRoot = "";
 
-/** Stella sets this to `<stellaDataDir>/google-workspace` before loading Google Workspace tools. */
 export function setGoogleWorkspaceProjectRoot(root: string): void {
   projectRoot = root;
 }

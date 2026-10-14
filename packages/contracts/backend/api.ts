@@ -1,10 +1,3 @@
-/**
- * Every backend call and view, by name. Each domain declares its own map in
- * this directory and adds it to the intersections below; the server registry
- * and the clients are both typed against these, so a renamed function or a
- * changed argument fails to compile on both sides.
- */
-
 import type { AgentEventViews } from "./agent-events.js";
 import type { AgentReportCalls, AgentReportViews } from "./agent-reports.js";
 import type { AgentThreadCalls, AgentThreadViews } from "./agent-threads.js";
@@ -34,7 +27,6 @@ import type { McpServerCalls } from "./mcp-servers.js";
 import type { CatchUpCalls, CatchUpViews } from "./catch-ups.js";
 
 type SystemCalls = {
-  /** Round trip through the caller's owner object. */
   "system.ping": { args: Record<string, never>; result: { now: number } };
 };
 

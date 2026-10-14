@@ -1,11 +1,3 @@
-/**
- * Agents on the desktop: they run on this computer, their tools in a
- * NodeExecutionEnv per working directory. In a conversation stored in the
- * cloud, Stella's agent placed in the cloud runs there as a whole, as one of
- * the owner's agent threads, so it keeps working while this computer sleeps
- * (`cloud`), and one placed on another of the owner's computers runs there
- * as a whole, on that computer's own Stella (`devices`).
- */
 import { mkdir, stat } from "node:fs/promises";
 import { hostname } from "node:os";
 import type { Context } from "@earendil-works/chord";
@@ -19,26 +11,20 @@ export function desktopAgentsHost(
   options: {
     deviceId?: string;
     cloud?: RemoteAgentHost;
-    /** Stella's agents on another of the owner's computers, run there as a whole. */
     devices?: (deviceId: string) => RemoteAgentHost | undefined;
     agentReported?: StellaAgentsHost["agentReported"];
     agentStopped?: StellaAgentsHost["agentStopped"];
     beginAgentRun?: StellaAgentsHost["beginAgentRun"];
     endAgentRun?: StellaAgentsHost["endAgentRun"];
     ensureModel?: StellaAgentsHost["ensureModel"];
-    /** What an agent named with a model runs on here, and the other engines here that run agents. */
     agentModel?: StellaAgentsHost["agentModel"];
     engine?: StellaAgentsHost["engine"];
-    /** Reports and notes for Stella, which go where she runs. */
     deliverReport?: StellaAgentsHost["deliverReport"];
     deliverNote?: StellaAgentsHost["deliverNote"];
     reportsFromLedger?: StellaAgentsHost["reportsFromLedger"];
     directory?: StellaAgentsHost["directory"];
-    /** The Stella data directory (`~/.stella`): new agents start in a folder of their own under it. */
     dataDir?: string;
-    /** Where Stella can move herself, and how the owner's computers stand. */
     execution?: StellaAgentsHost["execution"];
-    /** Every agent's conversation in the cloud. */
     agentLog?: StellaAgentsHost["agentLog"];
   } = {},
 ): StellaAgentsHost {
@@ -68,7 +54,6 @@ export function desktopAgentsHost(
     rootPlacement: { kind: "local" },
     place: (destination, caller) => {
       if (destination.kind === "here") return caller;
-      // This very computer, named by its device id, is "here".
       if (destination.kind === "device" && destination.deviceId === options.deviceId) return { kind: "local" };
       if (destination.kind === "cloud") {
         return options.cloud
@@ -92,27 +77,12 @@ const isPidAlive = (pid: number) => {
   }
 };
 
-/**
- * One environment per conversation and working directory; agents on this
- * computer share it. `shellEnv` is the environment Stella's shell gives
- * commands (its CLIs on PATH, their entrypoints and the runtime's bridge).
- */
 export function desktopEnvironments(
   defaultCwd: string,
   shellEnv?: (target: { conversationId: string; cwd: string }) => Record<string, string> | undefined,
 ) {
   const envs = new Map<string, NodeExecutionEnv>();
-  /**
-   * Terminations still running. pi starts one without waiting when a command
-   * times out or is aborted (a closing harness aborts every command), and its
-   * command then counts as settled, so `cleanup()` alone would not wait for it.
-   */
   const terminations = new Set<Promise<void>>();
-  /**
-   * How a command's processes end, for a timeout, an abort or `cleanup`: the
-   * whole tree, TERM before KILL, including descendants that left the
-   * command's process group (pi-durable's own default only SIGKILLs the group).
-   */
   const killCommandTree = (pid: number) => {
     const termination = terminateProcessTree(pid, { isRootRunning: () => isPidAlive(pid) }).finally(() => {
       terminations.delete(termination);
@@ -125,14 +95,12 @@ export function desktopEnvironments(
     while (terminations.size > 0) await Promise.allSettled([...terminations]);
   };
   return {
-    /** End every command the agents have running here, with everything it started. */
     terminateCommands,
     env: async ({ conversationId, cwd }: EnvTarget, _context: Context) => {
       const directory = cwd ?? defaultCwd;
       const key = shellEnv ? `${conversationId}\0${directory}` : directory;
       let env = envs.get(key);
       if (!env) {
-        // An agent's own folder exists once it first works there.
         if (cwd) await mkdir(directory, { recursive: true }).catch(() => undefined);
         const commandEnv = shellEnv?.({ conversationId: String(conversationId), cwd: directory });
         env = new NodeExecutionEnv({

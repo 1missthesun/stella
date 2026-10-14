@@ -1,4 +1,3 @@
-/** Memory permission metadata; document contents are a separate prompt snapshot. */
 export type MemoryPolicy = {
   ownerGeneration: string;
   memoryEpoch: string;

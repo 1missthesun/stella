@@ -10,28 +10,12 @@ import { Image } from "expo-image";
 import { renderGradientImage } from "@stella/theme";
 import { useColors, useTheme } from "../theme/theme-context";
 
-/** Height of the top-bar row itself (added on top of the safe-area inset). */
 export const TOP_BAR_BAR_HEIGHT = 42;
 
-/**
- * Buffer resolution as a fraction of the window's logical size. Desktop
- * renders at 0.6. At 0.25 each buffer pixel covered ~12 device pixels on a
- * 3x phone, so the per-pixel dither read as faint mottling on smooth areas.
- * 0.5 halves that cell size (about 80k pixels for a phone window) while
- * keeping the per-pixel loop, which runs on the JS thread in Hermes, cheap
- * enough to stay a one-off per theme change (results are cached below).
- */
 const MOBILE_RENDER_SCALE = 0.5;
 
 const imageCache = new Map<string, string>();
 
-/**
- * The app's canvas backdrop: the same five-blob frame desktop paints, from
- * the shared renderer in `@stella/theme`. In flat mode (a flat theme, or the
- * Gradient → Flat setting) it paints the plain theme surface / single tint
- * exactly as desktop does. Rendered as an absolute fill so it can sit behind
- * any layer and be reused anywhere the same canvas must show through.
- */
 export function AppBackdrop({ style }: { style?: StyleProp<ViewStyle> }) {
   const colors = useColors();
   const { theme, palette, isDark, flat, gradientMode, gradientColor } =

@@ -1,4 +1,3 @@
-/** Wire contract between a Cloud Builder turn broker and its executor. */
 export const TURN_BROKER_VERSION = 1 as const;
 export const TURN_BROKER_AUTH_SCHEME = "StellaTurnBroker";
 export const TURN_BROKER_TURN_TOKEN_HEADER = "x-stella-turn-token";
@@ -32,10 +31,6 @@ export type TurnBrokerIdentity = {
   attemptGeneration: number;
 };
 
-/**
- * Token-bearing half of the handoff. Builder writes it to a one-shot file;
- * the executor unlinks that file before any model or tool process exists.
- */
 export type TurnBrokerHandoff = TurnBrokerIdentity & {
   version: typeof TURN_BROKER_VERSION;
   endpoint: string;
@@ -44,7 +39,6 @@ export type TurnBrokerHandoff = TurnBrokerIdentity & {
   initialSequence: 1;
 };
 
-/** The turn input carries only this non-secret pointer. */
 export type TurnBrokerInput = {
   credentialsPath: string;
 };
@@ -71,9 +65,5 @@ export type TurnBrokerTurnStateCheckpointRequest = {
 export type TurnBrokerTurnStateCheckpointReceipt = {
   operationId: string;
   historyCursor: string;
-  /**
-   * The world manifest the checkpoint sealed. Absent for the orchestrator's
-   * native-only checkpoint, which never has the world on disk.
-   */
   manifestId?: string;
 };

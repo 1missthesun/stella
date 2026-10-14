@@ -1,8 +1,3 @@
-/**
- * In-process cancellation and mutation provenance for chain-dispatched
- * extension commands. These fields are symbol-backed so they never cross the
- * native-messaging protocol or collide with user-supplied command keys.
- */
 const COMMAND_EXECUTION = Symbol("stellaBrowserCommandExecution");
 
 export function attachCommandExecution(command, signal) {

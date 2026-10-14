@@ -1,23 +1,3 @@
-/**
- * Slack Stella's side of a turn: the workspace's shared assistant, shaped
- * like Claude in Slack. A conversation whose id starts with `slack-` runs on
- * this prompt (`slack.md`) instead of the orchestrator prompt and the owner's
- * personality, with the workspace's notes instead of the owner's memory and
- * only the tools a shared Slack assistant has.
- *
- * The workspace's home is a folder in the installer's Drive
- * (`Slack/<workspace>/`). Its notes live there as Markdown files:
- *
- *   memories/rules.md                 the owner's rules, set on stella.sh; read-only to Stella
- *   memories/workspace.md             read everywhere, written from public channels
- *   memories/channels/<channelId>.md  one channel or group DM
- *   memories/people/<slackUserId>.md  one person
- *   memories/dms/<slackUserId>.md     one person's 1:1 DM
- *
- * Which notes a turn loads is routing, not enforcement: the prompt says what
- * belongs where and what not to repeat elsewhere.
- */
-
 import { Type, type TSchema } from "@sinclair/typebox";
 import type { CloudCodeSourceAgentTool } from "../cloud-code-tool.js";
 import type { CloudConnectorSource } from "../cloud-connect-client.js";
@@ -32,48 +12,32 @@ export {
   SLACK_CONVERSATION_PREFIX,
 } from "./conversation-id.js";
 export const SLACK_MEMORY_TOOL_NAME = "slack_memory";
-/** Where a workspace's repositories are cloned in its agents' containers. */
 export const SLACK_REPO_ROOT = "/workspace/repos";
-/** The reply that posts nothing: a thread reply that wasn't for Stella. */
 export const SLACK_NO_REPLY = "<no-reply/>";
 
 export type SlackPerson = { id: string; name: string };
 
-/** One of the workspace's repositories, as the prompt lists it. */
 export type SlackRepoContext = {
-  /** `owner/name`. */
   fullName: string;
-  /** Empty for the default branch. */
   branch: string;
-  /** Agents can push to it, through a GitHub connection. */
   push: boolean;
-  /** One line on its environment (`environment.ts`). */
   environment?: string;
-  /** The owner's rules for work in it. */
   rules?: string;
 };
 
 export type SlackWorkspaceContext = {
   teamId?: string;
   teamName: string;
-  /** Drive-relative folder of the workspace's home. */
   homeFolder: string;
   channelId: string;
   place: SlackPlace;
   requester: SlackPerson;
-  /** Other people active in the thread, newest first. */
   participants: SlackPerson[];
-  /** The workspace's repositories. */
   repos?: SlackRepoContext[];
-  /** The repository this conversation works in, when there is one (`repos.ts`). */
   currentRepo?: string;
-  /** How it was decided: Stella chose it, the channel's default, or the only one. */
   currentRepoSource?: "chosen" | "channel" | "only";
-  /** Whether the conversation chose to work in no repository. */
   noRepo?: boolean;
-  /** The channel's default repository, if it has one. */
   channelRepo?: string;
-  /** One line on the environment of work that isn't about a repository. */
   environment?: string;
 };
 
@@ -104,7 +68,6 @@ const parsePlace = (value: unknown): SlackPlace | null => {
   };
 };
 
-/** The bind body's workspace context, from the Worker; null when malformed. */
 export const parseSlackWorkspaceContext = (
   value: unknown,
 ): SlackWorkspaceContext | null => {
@@ -163,7 +126,6 @@ export const parseSlackWorkspaceContext = (
   };
 };
 
-/** Where a repository is cloned in an agent's container. */
 export const repoCheckout = (fullName: string): string => `${SLACK_REPO_ROOT}/${fullName.split("/")[1] ?? fullName}`;
 
 const repoLine = (repo: SlackRepoContext): string =>
@@ -245,7 +207,6 @@ const readNote = async (
   }
 };
 
-/** Inserted text can't open or close a prompt fence. */
 const inert = (text: string): string => text.replace(/<!--/gu, "< !--");
 
 const clipNote = (text: string): string =>
@@ -259,10 +220,6 @@ const placeLabel = (place: SlackPlace): string => {
   return `${place.isPrivate ? "the private" : "the public"} channel #${place.name}`;
 };
 
-/**
- * Slack Stella's system prompt for one turn: `slack.md`, then where she is
- * and who is here, then the notes that apply.
- */
 export const renderSlackSystemPrompt = async (
   context: SlackWorkspaceContext | null,
   ownerInternal: OwnerInternalCall,
@@ -329,7 +286,6 @@ export const renderSlackSystemPrompt = async (
   ].join("\n\n");
 };
 
-/** Connectors in a Slack workspace: none yet, so the owner's stay out of it. */
 export const SLACK_CONNECTOR_SOURCE: CloudConnectorSource = {
   catalog: async () => [],
   actions: async () => null,
@@ -339,7 +295,6 @@ export const SLACK_CONNECTOR_SOURCE: CloudConnectorSource = {
   },
 };
 
-/** Skills a shared assistant may read: the bundled ones, not the owner's. */
 export const slackSkillCatalog = (
   snapshot: CloudSkillCatalogSnapshot,
 ): CloudSkillCatalogSnapshot => ({
@@ -394,7 +349,6 @@ const failure = (text: string) => ({
   isError: true,
 });
 
-/** `slack_memory`: the workspace's notes, read and rewritten whole. */
 export const createSlackMemoryTool = (options: {
   turnId: string;
   ownerInternal: OwnerInternalCall;

@@ -438,8 +438,6 @@ export const useUserAskSync = (enabled: boolean) => {
     markUserAskLaneDown();
   }, [active, liveDown]);
 
-  // The live view carries every change, so a healthy socket needs no poll.
-  // Only while it is down or not yet live is the list read over HTTP.
   useEffect(() => {
     if (!active || !visible) return;
     if (live && !liveDown) return;

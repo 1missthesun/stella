@@ -1,14 +1,7 @@
-/**
- * `history.sql` for an agent on this computer: its own rows in an in-memory
- * SQLite of their own, shaped like the conversation journal (`journal`, and
- * its FTS5 index `journal_fts`), so the same queries work and nothing else is
- * there to reach.
- */
 import { Database, type SQLQueryBindings } from "bun:sqlite";
 import { agentHistoryKind, historyMessageText, readOnlyHistoryQuery } from "@stella/contracts/history-search";
 import type { OwnHistorySql } from "@stella/contracts/history-search";
 
-/** The largest result, as the code runtime's own value cap. */
 const RESULT_MAX_BYTES = 1024 * 1024;
 
 export const ownHistorySql: OwnHistorySql = (rows, query, params) => {

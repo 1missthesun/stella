@@ -6,12 +6,6 @@ import { useEffect, useSyncExternalStore } from "react";
 import { getAuthHeaders } from "@/global/auth/services/auth-token";
 import { backendUrl } from "@/platform/backend/backend-client";
 
-/**
- * The cloud apps a reply links (`stella://app/<slug>`): one shared app list
- * for every card in the transcript, refetched when a reply names an app the
- * list does not have yet, plus each app's preview still as an object URL.
- */
-
 const REFRESH_AFTER_MS = 15_000;
 
 type AppsState = { apps: WorkspaceApp[] | null; loading: boolean };
@@ -56,7 +50,6 @@ function refreshApps(): Promise<void> {
   return inflight;
 }
 
-/** The linked app, `undefined` while loading, `null` when not a ready app. */
 export function useLinkedCloudApp(
   slug: string,
 ): WorkspaceApp | null | undefined {
@@ -73,10 +66,6 @@ export function useLinkedCloudApp(
 
 const previews = new Map<string, Promise<string | null>>();
 
-/**
- * The app's preview still for its current revision. The backend captures it
- * on the first request, so the first load can take several seconds.
- */
 export function loadCloudAppPreview(app: WorkspaceApp): Promise<string | null> {
   const key = `${app.slug}:${app.revision}`;
   let pending = previews.get(key);
@@ -93,7 +82,6 @@ export function loadCloudAppPreview(app: WorkspaceApp): Promise<string | null> {
       if (!response.ok) throw new Error("Preview unavailable");
       return URL.createObjectURL(await response.blob());
     })().catch(() => {
-      // Let a later mount try again.
       previews.delete(key);
       return null;
     });

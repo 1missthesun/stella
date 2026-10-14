@@ -39,31 +39,9 @@ import { fadeHex } from "../theme/oklch";
 import { useColors } from "../theme/theme-context";
 import { useT } from "../i18n";
 
-/**
- * Settings › Claude & ChatGPT: the subscriptions kept with the Stella
- * account. Several accounts per provider, one in use (checked); the user
- * switches by hand, nothing switches on its own.
- *
- * Claude: Stella never holds a Claude credential. Every computer runs Claude
- * Code on its own sign-in, and Stella's cloud signs in inside the owner's
- * container. The phone never signs in to Claude itself: "Sign in in the
- * cloud" starts `claude auth login` in the cloud
- * (`engines.startClaudeCloudLogin`), opens Anthropic's own page, and hands
- * the code Anthropic shows to that CLI (`engines.finishClaudeCloudLogin`).
- * Each account lists the places it is signed in.
- *
- * ChatGPT: Sign in with ChatGPT for Stella's cloud, which is its own host
- * (each computer signs in separately in the desktop app). The server builds
- * the authorization; ChatGPT redirects to a 127.0.0.1 address nothing on a
- * phone answers, so the user pastes that address back and the server
- * finishes it. A client another of the owner's hosts registered can be
- * reused ("Continue with ChatGPT as …").
- */
-
 type Section = {
   provider: EngineProvider;
   titleKey: string;
-  /** The connect row names its own provider, so it reads alone. */
   connectKey: string;
 };
 
@@ -82,7 +60,6 @@ const SECTIONS: Section[] = [
 
 const PLAN_WELCOME_KEY = "stella-mobile.chatgpt-plan-welcome-shown";
 
-/** "You're using your ChatGPT plan", once, after the first plan-enabled sign-in. */
 const announceChatGptPlanUse = async (t: ReturnType<typeof useT>) => {
   try {
     if (await AsyncStorage.getItem(PLAN_WELCOME_KEY)) return;
@@ -105,11 +82,6 @@ const announceChatGptPlanUse = async (t: ReturnType<typeof useT>) => {
 
 const CLAUDE_SYNC_NOTICE_KEY = "stella-mobile.claude-sync-notice-seen";
 
-/**
- * That full Claude Code sessions, tool outputs included, sync to Stella's
- * cloud: said once per user on this phone, after the first Claude account
- * they add here.
- */
 const announceClaudeSync = async (
   t: ReturnType<typeof useT>,
   userId: string | null,
@@ -140,7 +112,6 @@ const announceClaudeSync = async (
   );
 };
 
-/** ChatGPT Settings › Usage: review usage and Stella's limit. */
 export const openChatGptUsage = () => {
   void Linking.openURL(CHATGPT_SIWC.manageUsageUrl).catch(() => undefined);
 };
@@ -161,10 +132,6 @@ const errorMessage = (error: unknown, fallback: string): string =>
 const hasCloudLogin = (row: EngineConnection): boolean =>
   (row.places ?? []).some((place) => place.kind === "cloud");
 
-/**
- * The owner's ChatGPT registrations this cloud could sign in with: those
- * whose issued client id isn't already one of the cloud's ChatGPT accounts.
- */
 type ReusableRegistration = ChatGptSharedRegistration & { who?: string };
 
 const reusableChatGptRegistrations = (
@@ -187,7 +154,6 @@ const reusableChatGptRegistrations = (
   return result;
 };
 
-/** The accounts page. The app shell draws its back arrow; this draws the title. */
 export function EngineAccountsSettings() {
   const colors = useColors();
   const t = useT();
@@ -218,23 +184,11 @@ export function EngineAccountsSettings() {
   );
 }
 
-/**
- * One provider's accounts, with no screen chrome of its own.
- *
- * The sheet's engine control already says which provider the user means, so
- * the accounts belong under that choice rather than as two stacked sections
- * listing both. `stella` runs on Stella's own capacity and has nothing to
- * connect, so it renders nothing.
- */
 export function EngineAccountSection({
   provider,
   embedded = false,
 }: {
   provider: EngineProvider | "stella";
-  /**
-   * Rows only: `true` lays them inside a card that already frames and names
-   * them, `"panel"` lays them straight on a sidebar panel with no frame.
-   */
   embedded?: boolean | "panel";
 }) {
   const colors = useColors();
@@ -256,10 +210,6 @@ export function EngineAccountSection({
   );
 }
 
-/**
- * Both providers at once, for the standalone Claude & ChatGPT screen where
- * there is no engine control to scope them.
- */
 export function EngineAccountsSections() {
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -282,29 +232,13 @@ export function EngineAccountsSections() {
 }
 
 export type EngineConnectOptions = {
-  /** ChatGPT: sign a saved cloud account in again. */
   accountId?: string;
-  /** ChatGPT: ask for plan-use consent again. */
   enablePlanUsage?: boolean;
-  /** ChatGPT: reuse a client another of the owner's hosts registered. */
   clientId?: string;
-  /** Claude: pre-fill Anthropic's sign-in page with this login. */
   email?: string;
-  /**
-   * Claude: sign this computer of the owner's in instead of the cloud. It
-   * runs its own `claude auth login`; the phone opens the page and sends the
-   * code back to it through Stella's cloud.
-   */
   deviceId?: string;
 };
 
-/**
- * Cloud sign-in shared by Settings and onboarding. Both paste back:
- * Claude: the cloud's `claude auth login` waits for the code Anthropic's page
- * shows; ChatGPT lands on an address that doesn't load, which the server
- * finishes for Stella's cloud. `connectId` names the attempt waiting for the
- * paste (the cloud login's id for Claude, the server's attempt for ChatGPT).
- */
 export function useEngineConnect(
   provider: EngineProvider,
   { onConnected }: { onConnected?: () => void } = {},
@@ -313,19 +247,14 @@ export function useEngineConnect(
   const [busy, setBusy] = useState(false);
   const [connectId, setConnectId] = useState<string | null>(null);
   const [pasted, setPasted] = useState("");
-  /** The pasteboard holds something; what, we haven't looked. */
   const [clipboardReady, setClipboardReady] = useState(false);
-  /** The user asked to type it themselves, or the clipboard let us down. */
   const [manualEntry, setManualEntry] = useState(false);
   const onConnectedRef = useRef(onConnected);
   const session = authClient.useSession();
   const userIdRef = useRef<string | null>(null);
   userIdRef.current = session.data?.user?.id ?? null;
-  /** The provider's sign-in page of the attempt in progress. */
   const authorizeUrl = useRef<string | null>(null);
-  /** The options of the attempt in progress, for "Start again". */
   const lastOptions = useRef<EngineConnectOptions>({});
-  /** Claude: the computer the attempt in progress signs in; null for the cloud. */
   const attemptDevice = useRef<string | null>(null);
   const [target, setTarget] = useState<string | null>(null);
   onConnectedRef.current = onConnected;
@@ -375,7 +304,6 @@ export function useEngineConnect(
     setClipboardReady(false);
   };
 
-  /** Tell the server to drop an attempt; it may already be gone. */
   const abandon = (attempt: string) => {
     const client = getBackendClient();
     const deviceId = attemptDevice.current;
@@ -388,7 +316,6 @@ export function useEngineConnect(
     ).catch(() => {});
   };
 
-  /** Begin a cloud sign-in. */
   const startConnect = (options: EngineConnectOptions = {}) =>
     void run(async () => {
       lastOptions.current = options;
@@ -440,11 +367,6 @@ export function useEngineConnect(
       }
     });
 
-  /**
-   * Hand the code to the cloud's waiting `claude auth login`. A wrong code
-   * ends that login, so a failure shows the CLI's own message and offers to
-   * start again.
-   */
   const finishClaude = (attempt: string, code: string) => {
     void (async () => {
       setBusy(true);
@@ -513,12 +435,6 @@ export function useEngineConnect(
     if (clip) setPasted(clip.trim());
   };
 
-  /**
-   * Commit straight from the pasteboard. This is the only place the clipboard
-   * is actually read, and it is a direct response to the user pressing
-   * Connect. If it turns out to hold nothing usable, the field appears with
-   * whatever was there so they can fix it rather than being told off.
-   */
   const connectFromClipboard = () => {
     void (async () => {
       const clip = (await Clipboard.getStringAsync().catch(() => "")).trim();
@@ -534,7 +450,6 @@ export function useEngineConnect(
 
   const revealManualEntry = () => setManualEntry(true);
 
-  /** Open the sign-in page of the attempt again. */
   const reopenAuthorizePage = () => {
     const url = authorizeUrl.current;
     if (url) void run(() => openAuthorizePage(url));
@@ -543,7 +458,6 @@ export function useEngineConnect(
   return {
     busy,
     connectId,
-    /** Claude: the computer being signed in; null for the cloud. */
     target,
     pasted,
     setPasted,
@@ -583,18 +497,7 @@ function ProviderSection({
   styles: ReturnType<typeof makeStyles>;
   settingsStyles: ReturnType<typeof makeSettingsStyles>;
   colors: Colors;
-  /**
-   * Off where only one provider can be on screen and something else already
-   * named it — the connect row says "Add Claude account" under an engine
-   * control that says Claude, so a "Claude" header is the word three times.
-   * On where both providers stack and the headers are what tells them apart.
-   */
   showHeader?: boolean;
-  /**
-   * Inside a provider card: the rows sit flush under a hairline instead of
-   * in their own rounded group, and the side notes take the card's inset.
-   * `"panel"`: straight on a sidebar panel, no frame and no dividers.
-   */
   embedded?: boolean | "panel";
 }) {
   const panel = embedded === "panel";
@@ -614,8 +517,6 @@ function ProviderSection({
     refreshClipboardCandidate,
   } = connect;
 
-  // The code is copied in another app, so re-check on the way back. This asks
-  // whether the pasteboard has anything, never what.
   useEffect(() => {
     if (!connectId) return;
     void refreshClipboardCandidate();
@@ -625,13 +526,10 @@ function ProviderSection({
     return () => sub.remove();
   }, [connectId, refreshClipboardCandidate]);
 
-  // An attempt abandoned by leaving the screen cleans itself up, so the
-  // server-side sign-in isn't left dangling.
   const cancelRef = useRef(cancelConnect);
   cancelRef.current = cancelConnect;
   useEffect(() => () => cancelRef.current(), []);
 
-  /** Nothing usable on the pasteboard, or they chose to type it themselves. */
   const showField = manualEntry || !clipboardReady || pasted.trim().length > 0;
   const accounts = (settings?.connections ?? []).filter(
     (row) => row.provider === section.provider,
@@ -649,7 +547,6 @@ function ProviderSection({
     );
   };
 
-  /** Whether a row can become the account the cloud uses. */
   const canUse = (row: EngineConnection): boolean =>
     !row.active && isEngineConnectionUsable(row);
 
@@ -669,7 +566,6 @@ function ProviderSection({
     ]);
   };
 
-  /** ChatGPT: sign the cloud out, keeping the registration. */
   const signOutChatGpt = (row: EngineConnection) => {
     const name = row.email ?? row.label;
     confirm(
@@ -691,7 +587,6 @@ function ProviderSection({
     );
   };
 
-  /** Claude: `claude auth logout` for this account in the cloud. */
   const signOutClaudeCloud = (row: EngineConnection) => {
     const name = row.email ?? row.label;
     confirm(
@@ -705,7 +600,6 @@ function ProviderSection({
     );
   };
 
-  /** Forget the account (ChatGPT: registration included). */
   const remove = (row: EngineConnection) => {
     const name = row.email ?? row.label;
     confirm(
@@ -723,7 +617,6 @@ function ProviderSection({
     );
   };
 
-  /** What a row's menu offers, by the account's state. */
   const rowActions = (row: EngineConnection): RowAction[] => {
     const actions: RowAction[] = [];
     if (canUse(row)) {
@@ -788,7 +681,6 @@ function ProviderSection({
     return actions;
   };
 
-  /** Claude: where a Claude Code login for the account exists. */
   const placesText = (row: EngineConnection): string => {
     const places = [...(row.places ?? [])].sort(
       (a, b) => (a.kind === "cloud" ? 0 : 1) - (b.kind === "cloud" ? 0 : 1),

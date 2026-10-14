@@ -30,10 +30,6 @@ export type CharacterShape = {
   face: ReturnType<typeof fitFace>;
 };
 
-/**
- * The silhouettes the mark can hold, pre-flattened to `N`-sample rings so the
- * rig can cross-fade between any two of them by lerping the rings.
- */
 export const N = 96;
 
 export const C = 114.2705;

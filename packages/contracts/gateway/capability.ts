@@ -1,24 +1,6 @@
 import type { CloudExecutionSelection } from "../agent-engine.js";
 import type { StellaUsageLimitReason } from "../stella-usage-limit.js";
 
-/**
- * Model-gateway capability tokens.
- *
- * A capability is a compact ES256 JWT that carries everything the model
- * gateway needs to authorize and meter a request without consulting a
- * database: who pays, which audience rules apply, how much may be spent,
- * and (for turns) the exact execution the turn was admitted with.
- *
- * cloud-builder signs every capability, inside the owner's Durable Object:
- *   - `session` capabilities for signed-in desktop runtimes
- *     (exchanged for a Better Auth JWT at the gateway);
- *   - `turn` capabilities for the turn it admitted, from its owner snapshot.
- *
- * The gateway verifies signatures against a static JWKS of the issuer's
- * public keys. Revocation is by expiry plus the per-capability budget ledger;
- * there is deliberately no per-request lookup.
- */
-
 export const GATEWAY_CAPABILITY_AUDIENCE = "stella-model-gateway" as const;
 
 export type CapabilityAudience = typeof GATEWAY_CAPABILITY_AUDIENCE;
@@ -44,73 +26,38 @@ export const MANAGED_MODEL_AUDIENCES = [
 
 export type ManagedModelAudience = (typeof MANAGED_MODEL_AUDIENCES)[number];
 
-/**
- * The subscriptions the native lane relays: only the cloud's ChatGPT sign-in.
- * Claude never goes through Stella; the cloud's Claude Code CLI talks to
- * Anthropic on its own login.
- */
 export type GatewayNativeCredentialProvider = "chatgpt";
 
-/** Budget sentinel: the capability may spend without a ceiling. */
 export const GATEWAY_BUDGET_UNLIMITED = -1;
 
 export type GatewayTurnBinding = {
   turnId: string;
   conversationId: string;
-  /** The execution the turn was admitted with. The gateway pins model calls to it. */
   execution: CloudExecutionSelection;
 };
 
 export type GatewayCapabilityClaims = {
   iss: GatewayCapabilityIssuer;
   aud: CapabilityAudience;
-  /** Owner id (`${issuer}|${subject}` tokenIdentifier form). */
   sub: string;
-  /** Unique capability id; the budget ledger is keyed on it. */
   jti: string;
   iat: number;
   exp: number;
-  /** Owner data generation. A stale generation is refused at the gateway. */
   gen: string;
   kind: GatewayCapabilityKind;
   audience: ManagedModelAudience;
-  /**
-   * Agent types this capability may act as (`x-stella-agent-type`). Absent
-   * means any agent type.
-   */
   agentTypes?: string[];
-  /** Total spend ceiling for the capability's lifetime, or GATEWAY_BUDGET_UNLIMITED. */
   budgetMicroCents: number;
-  /** Request-count ceiling; absent means unlimited. */
   maxRequests?: number;
-  /**
-   * Session capabilities: base64url SHA-256 of the client's raw device public
-   * key. Relay requests must carry a matching proof (see gateway/dpop.ts).
-   */
   dpk?: string;
-  /** Present on `turn` capabilities. */
   turn?: GatewayTurnBinding;
-  /**
-   * Native lane: requests are forwarded byte-for-byte to the provider using
-   * the owner's connected subscription credential. Never billed to Stella.
-   */
   credential?: GatewayNativeCredentialProvider;
-  /**
-   * Immutable signed routing marker. Capabilities without it keep the
-   * per-capability ledger; owner-relay-v2 capabilities account on the owner gate.
-   */
   ledgerScope?: "owner-relay-v2";
-  /**
-   * Minted while the owner had no room left for Stella's models. A spent
-   * budget is then refused as `usage_limit` (with the reason's wording), not
-   * the capability's own `budget_exhausted`.
-   */
   usageLimit?: StellaUsageLimitReason;
 };
 
 export const GATEWAY_SESSION_CAPABILITY_TTL_MS = 60 * 60 * 1000;
 export const GATEWAY_TURN_CAPABILITY_TTL_MS = 30 * 60 * 1000;
-/** Clock skew tolerated when checking `exp`/`iat`. */
 export const GATEWAY_CAPABILITY_CLOCK_SKEW_S = 60;
 
 // Derive from the host's WebCrypto definitions: Node/Bun expose the JWK type

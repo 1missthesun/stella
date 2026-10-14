@@ -12,13 +12,6 @@ import { type Colors } from "../../theme/colors";
 import { fadeHex } from "../../theme/oklch";
 import { fonts } from "../../theme/fonts";
 
-/**
- * Transient "Catching up" pill — top-center overlay while a catch-up sync
- * (landing / foreground return / Force Sync) is pulling turns the phone may
- * have missed. Non-interactive and absolutely positioned so it never shifts
- * the transcript; appearance/disappearance mirror the floating glass controls'
- * materialize/dissolve language.
- */
 export function CatchUpPill({
   visible,
   top,
@@ -29,8 +22,6 @@ export function CatchUpPill({
   colors: Colors;
 }) {
   const styles = useMemo(() => makeCatchUpPillStyles(colors), [colors]);
-  // Stays mounted so the glass can run its native materialize/dissolve
-  // transition; the JS anim fades the content along with it.
   const anim = useRef(new Animated.Value(visible ? 1 : 0)).current;
   useEffect(() => {
     Animated.timing(anim, {
@@ -104,12 +95,9 @@ export function ScrollToBottomFab({
   hasUnread: boolean;
   onPress: () => void;
   colors: Colors;
-  /** Distance in pt from the bottom of the viewport — sit just above the composer. */
   bottomOffset?: number;
 }) {
   const styles = useMemo(() => makeScrollToBottomFabStyles(colors), [colors]);
-  // Stays mounted across visibility changes so the glass can run its native
-  // materialize/dissolve transition; the JS anim fades the icon along with it.
   const anim = useRef(new Animated.Value(visible ? 1 : 0)).current;
   useEffect(() => {
     Animated.timing(anim, {
@@ -194,7 +182,6 @@ export function ScrollToBottomFab({
 
 const makeCatchUpPillStyles = (colors: Colors) =>
   StyleSheet.create({
-    // "Catching up" pill — top-center, overlaid (no layout participation).
     catchUpPill: {
       alignSelf: "center",
       elevation: 2,
@@ -212,8 +199,6 @@ const makeCatchUpPillStyles = (colors: Colors) =>
       overflow: "hidden",
       paddingHorizontal: 12,
     },
-    // See scrollToBottomFabRing: fading overlay so the hairline dissolves with
-    // the material instead of lingering as an outline.
     catchUpPillRing: {
       borderColor: fadeHex(colors.border, 0.6),
       borderRadius: 15,
@@ -255,9 +240,6 @@ const makeScrollToBottomFabStyles = (colors: Colors) =>
       overflow: "hidden",
       width: 32,
     },
-    // Hairline definition rendered as a fading overlay (not on the glass view
-    // itself) so it dissolves with the material instead of lingering as a
-    // visible outline once the button is hidden on Liquid Glass.
     scrollToBottomFabRing: {
       borderColor: fadeHex(colors.border, 0.6),
       borderRadius: 16,

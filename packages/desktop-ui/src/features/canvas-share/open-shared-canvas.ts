@@ -1,22 +1,3 @@
-/**
- * Renderer entry point for opening a shared canvas URL as a native canvas.
- *
- * When a `<CANVAS_SHARE_BASE_URL>/c/<slug>` link is opened inside Stella
- * (pasted, clicked, or routed from a deep link), we ask the main process to
- * fetch the remote HTML and materialize it into the same
- * `~/.stella/outputs/html/` store local canvases use, then render it through
- * the identical sandboxed canvas path — no extra privileges. The network +
- * filesystem work runs in main (privileged, and free of renderer CORS), and
- * the renderer only routes the resulting file-backed payload.
- *
- * A private link opens only for its owner, so the renderer first asks the
- * backend for the owner's view URL (`shares.viewLink`, which carries a short
- * grant); someone else's link, or a signed-out app, keeps the URL as given.
- * When the canvas can't be rendered here (a private link that isn't ours, the
- * share domain unreachable, or the web app, which has no native canvas
- * fetch), that view URL opens in a browser tab instead, so the owner still
- * gets in and a click is never swallowed.
- */
 import {
   normalizeDisplayPayload,
   type DisplayTabPayload,
@@ -29,11 +10,9 @@ import {
   parseCanvasShareSlug,
 } from "@/shared/lib/canvas-share";
 
-/** Whether `url` matches the configured canvas-share pattern. */
 export const isRendererCanvasShareUrl = (url: string): boolean =>
   isCanvasShareUrl(url, canvasShareBaseUrl());
 
-/** The owner's view URL for one of their own links, else the URL as given. */
 const ownerViewUrl = async (url: string): Promise<string> => {
   const slug = parseCanvasShareSlug(url, canvasShareBaseUrl());
   if (!slug) return url;
@@ -65,7 +44,6 @@ const openPendingBrowserTab = (): ((url: string) => void) => {
   };
 };
 
-/** Render natively; the URL that was tried comes back for a browser fallback. */
 const renderShared = async (
   url: string,
 ): Promise<{ handled: boolean; viewUrl: string }> => {
@@ -85,11 +63,6 @@ const renderShared = async (
   return { handled: true, viewUrl };
 };
 
-/**
- * Fire-and-forget guard for synchronous callers (e.g. the external-link
- * helper). Returns `true` immediately when the URL is a canvas-share link
- * (kicking off the async native render), so the caller can skip the browser.
- */
 export const maybeHandleCanvasShareUrl = (url: string): boolean => {
   if (!isRendererCanvasShareUrl(url)) return false;
   const openFallback = window.electronAPI

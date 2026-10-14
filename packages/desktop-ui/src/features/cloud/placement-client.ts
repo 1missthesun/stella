@@ -1,21 +1,3 @@
-/**
- * Execution placement for the web shell.
- *
- *   POST {socketOrigin}/owners/me/dispatches
- *   GET  {socketOrigin}/owners/me/dispatches/{dispatchId}
- *   POST {socketOrigin}/owners/me/dispatches/{dispatchId}/cancel
- *   GET  {socketOrigin}/owners/me/devices
- *
- * The per-owner Durable Object on the cloud-builder decides where a turn
- * runs: an eligible computer that claims the offer inside the window, else
- * Stella's cloud. The browser talks to the gate with the same Better Auth JWT
- * the conversation socket presents.
- *
- * Mirrors `turn-start-client.ts`: typed refusals, one silent retry after a
- * 401 with a freshly minted token, and transport failures kept distinct from
- * definitive answers.
- */
-
 import {
   DEVICES_PATH,
   DISPATCH_SUBMIT_PATH,
@@ -34,7 +16,6 @@ import {
 import { CLOUD_SANDBOX_SUBSCRIPTION_REQUIRED_MESSAGE } from "@stella/contracts/backend/billing";
 import { notifyCloudSubscriptionRequired } from "./turn-start-client";
 
-/** Bound on one owner-gate round trip. Placement answers before the run. */
 export const PLACEMENT_REQUEST_TIMEOUT_MS = 30_000;
 
 /**
@@ -57,7 +38,6 @@ export type PlacementGetToken = (
 export const PLACEMENT_SIGN_IN_REQUIRED_MESSAGE =
   "Sign in to Stella to send cloud messages.";
 
-/** Readable fallbacks per contract code; the gate's own message wins. */
 const FALLBACK_MESSAGES: Record<DispatchErrorCode, string> = {
   unauthorized: PLACEMENT_SIGN_IN_REQUIRED_MESSAGE,
   forbidden: "This account can't send to that conversation.",
@@ -82,13 +62,8 @@ const ERROR_CODES = new Set<string>(Object.keys(FALLBACK_MESSAGES));
 const isErrorCode = (value: unknown): value is DispatchErrorCode =>
   typeof value === "string" && ERROR_CODES.has(value);
 
-/**
- * The owner gate answered and refused. Definitive: nothing was committed, so
- * an idempotent retry sends the exact same bytes again.
- */
 export class PlacementClientError extends Error {
   readonly code: DispatchErrorCode;
-  /** HTTP status, or 0 when the request never left the client. */
   readonly status: number;
   readonly retryable: boolean;
   readonly retryAfterMs: number | null;
@@ -128,10 +103,6 @@ export class PlacementClientError extends Error {
   }
 }
 
-/**
- * The request may or may not have reached the gate (network drop, timeout).
- * The optimistic row replays safely under the same idempotency key.
- */
 export class PlacementTransportError extends Error {
   constructor(message: string, options?: { cause?: unknown }) {
     super(message, options);
@@ -223,11 +194,8 @@ const isDispatchSummary = (value: unknown): value is DispatchSummary => {
 };
 
 export type PlacementRequestBase = {
-  /** The backend origin (`backendUrl`). */
   socketOrigin: string;
-  /** Resolves the Better Auth JWT; `forceRefresh` bypasses every cache. */
   getToken: PlacementGetToken;
-  /** Test seam. */
   fetch?: typeof fetch;
 };
 
@@ -270,7 +238,6 @@ const requestOnce = async (
   }
 };
 
-/** One authenticated owner-gate call; a 401 is retried once with a fresh JWT. */
 const placementRequest = async (
   args: PlacementRequestBase & {
     path: string;
@@ -313,7 +280,6 @@ const readDispatch = async (response: Response): Promise<DispatchSummary> => {
   return dispatch;
 };
 
-/** Submits (or replays) one dispatch. A replay is the same success. */
 export const submitDispatch = async (
   args: PlacementRequestBase & { request: DispatchSubmitRequest },
 ): Promise<DispatchSummary> => {
@@ -327,7 +293,6 @@ export const submitDispatch = async (
   return await readDispatch(response);
 };
 
-/** One status read. `null` means the gate has no such dispatch for this owner. */
 export const getDispatchStatus = async (
   args: PlacementRequestBase & { dispatchId: string },
 ): Promise<DispatchSummary | null> => {
@@ -363,7 +328,6 @@ export const cancelDispatch = async (
   return await readDispatch(response);
 };
 
-/** The owner's execution destinations with live presence. */
 export const listExecutionDevices = async (
   args: PlacementRequestBase,
 ): Promise<DevicesResponse> => {

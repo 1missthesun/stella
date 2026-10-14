@@ -16,7 +16,6 @@ type ComputerAgentStartPayload = {
   conversationId: string;
   description: string;
   agentType: string;
-  /** The agent that started it, for a subagent. */
   parentAgentId?: string;
 };
 
@@ -79,7 +78,6 @@ type ComputerAgentCloudRecordOptions = {
   deviceId: string;
   store: ComputerAgentCloudOutboxStore;
   getAuthToken: () => string | null;
-  /** The backend's `computerThreads.*` calls. */
   backend: {
     start: (args: Record<string, unknown>) => Promise<unknown>;
     complete: (args: Record<string, unknown>) => Promise<unknown>;
@@ -103,7 +101,6 @@ const withTimeout = <T>(promise: Promise<T>): Promise<T> =>
       ),
   );
 
-/** `computerThreads.complete` with an attempt's outcome. */
 export const completeComputerThread = async (
   call: (args: Record<string, unknown>) => Promise<unknown>,
   args: Record<string, unknown> & {
@@ -177,7 +174,6 @@ const isOwnerGenerationStale = (error: unknown): boolean =>
   asRecord(error)?.reason === "owner_generation_stale" ||
   errorMessage(error).includes("OWNER_DATA_GENERATION_STALE");
 
-/** The backend's `computerThreads.start` refusals (`BackendError.reason`). */
 const START_REJECTION_REASONS = new Set([
   "conversation_not_found",
   "thread_identity_conflict",
@@ -223,11 +219,6 @@ type StartAdmissionWaiter = {
   error?: CloudAgentStartAdmissionError;
 };
 
-/**
- * Stable routing lane for one account identity. This is not an authentication
- * decision: the backend still verifies the JWT. It only prevents a durable row
- * admitted under account A from ever being attempted with account B's client.
- */
 export const resolveJwtOwnerScope = (
   token: string | null | undefined,
 ): string | null => {
@@ -253,20 +244,9 @@ export const resolveJwtOwnerScope = (
   }
 };
 
-/**
- * Authenticated lifecycle projection for agents that execute on this
- * computer while their conversation is cloud-owned.
- *
- * Every mutation is admitted to the runtime's operational SQLite outbox
- * before network I/O. The drain, in order for each agent, survives worker restarts and retries
- * on auth/config/connectivity recovery. The backend independently fences each
- * transition by attemptGeneration, so an acknowledged response lost locally
- * or a late old-generation retry is idempotent.
- */
 export const createComputerAgentCloudRecords = (
   options: ComputerAgentCloudRecordOptions,
 ): ComputerAgentCloudRecords => {
-  /** Cancel thunk for the pending drain-delay fiber (the old `clearTimeout`). */
   let cancelRetryDelay: (() => void) | null = null;
   let activeDrainPromise: Promise<void> | null = null;
   let stopped = false;
@@ -314,9 +294,6 @@ export const createComputerAgentCloudRecords = (
     ) {
       return existing;
     }
-    // Rows written by the first unscoped outbox build have no trustworthy
-    // identity evidence. Never adopt them into whichever account happens to
-    // be signed in after upgrade.
     if (options.store.hasUnscopedComputerAgentCloudOutbox(threadId)) {
       return null;
     }
@@ -418,8 +395,6 @@ export const createComputerAgentCloudRecords = (
         scheduleDrain(NO_AUTH_RETRY_MS);
         return;
       }
-      // Each agent's records go in order, but one agent's record waiting on
-      // a retry never holds up another agent's.
       const lanes = new Set<string>();
       const heads = options.store
         .listComputerAgentCloudOutbox(ownerScope)
@@ -564,8 +539,6 @@ export const createComputerAgentCloudRecords = (
           settleStartAdmission(entry.id, "rejected", rejected);
           continue;
         }
-        // The cloud has no agent of this computer's by that id (its start was
-        // refused, or it is another host's agent): there is nothing to end.
         if (entry.kind !== "start" && asRecord(error)?.code === "NOT_FOUND") {
           options.store.deleteComputerAgentCloudOutbox(entry.id);
           continue;
@@ -587,7 +560,6 @@ export const createComputerAgentCloudRecords = (
             }),
           );
         }
-        // Its next try waits; other agents' records go on.
         continue;
       }
     }
@@ -647,17 +619,11 @@ export const createComputerAgentCloudRecords = (
         threadId: args.threadId,
         attemptGeneration: args.attemptGeneration,
         ownerScope: authority?.ownerScope ?? null,
-        // The expected lifecycle epoch is known at local admission even during
-        // an auth refresh gap. Keep it on the durable row; only ownerScope may
-        // remain null (and such a legacy/unattributed row is never adopted).
         ownerGeneration: args.ownerGeneration,
         payloadJson: JSON.stringify(args.payload),
       });
       const joinedExistingDrain = activeDrainPromise !== null;
       await drain();
-      // If this enqueue joined a drain that had already observed an empty
-      // queue, make one fresh pass so the newly durable row cannot sleep until
-      // an unrelated resume/enqueue wakes it.
       if (joinedExistingDrain && !stopped) await drain();
       if (
         authority &&
@@ -786,8 +752,6 @@ export const createComputerAgentCloudRecords = (
           ...(reason ? { reason } : {}),
         } satisfies ComputerAgentCancelPayload,
       });
-      // The local cancellation is durable even if the backend is temporarily
-      // unavailable; canonical convergence continues in the background.
       return { canceled: true };
     },
 

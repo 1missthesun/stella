@@ -1,10 +1,3 @@
-/**
- * Validation of `POST /conversations/:id/turns` bodies, shared by the Worker
- * route (early 400/403s) and the OrchestratorSession (the DO trusts nothing
- * it did not check itself). The body never names the owner: identity rides
- * on trusted headers the Worker stamps after verifying the caller.
- */
-
 import { isAccountProviderId } from "@stella/contracts/backend/providers";
 import { normalizeReasoningEffortLevel } from "@stella/contracts/reasoning-effort";
 import { MAX_AGENT_DEPTH } from "@stella/contracts/agent-depth";
@@ -57,7 +50,6 @@ const SOURCES: readonly CloudTurnSource[] = [
   "probe",
   "slack",
 ];
-/** What a user-authenticated caller may claim to be. */
 const CLIENT_SOURCES: readonly CloudTurnSource[] = ["desktop", "web", "mobile"];
 const THREAD_STATUSES: readonly CloudAgentThreadControl["status"][] = [
   "running",
@@ -71,10 +63,6 @@ const THREAD_STATUSES: readonly CloudAgentThreadControl["status"][] = [
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-/**
- * A pinned execution: engine and provider agree and every field is a bounded
- * non-empty string. Model availability is the owner snapshot's call.
- */
 export const parseCloudExecutionSelection = (
   value: unknown,
 ): CloudExecutionSelection | null => {
@@ -279,10 +267,6 @@ export const parseCloudTurnStartRequest = (
   return { ok: true, request };
 };
 
-/**
- * Fields a user-authenticated caller may never set. Listed by name so the
- * 403 says which one, and so the DO and the Worker agree on exactly one list.
- */
 export const serviceOnlyTurnFields = (
   request: CloudTurnStartRequest,
 ): string[] => {
@@ -304,7 +288,6 @@ export const serviceOnlyTurnFields = (
   return fields;
 };
 
-/** The title a brand-new conversation gets from its first turn. */
 export const conversationTitleFor = (
   request: Pick<CloudTurnStartRequest, "title" | "prompt">,
 ): string => {
@@ -314,7 +297,6 @@ export const conversationTitleFor = (
   return collapsed.length > 80 ? `${collapsed.slice(0, 77)}…` : collapsed;
 };
 
-/** HTTP status for each turn-start refusal, shared by the Worker and the DO. */
 export const TURN_START_ERROR_STATUS: Record<CloudTurnStartErrorCode, number> =
   {
     unauthorized: 401,
@@ -359,18 +341,6 @@ export const turnStartErrorResponse = (
   });
 };
 
-// ---------------------------------------------------------------------------
-// Agent turns (a `BuildSession` dispatch from the conversation, the owner's
-// agent threads or a placed agent).
-// ---------------------------------------------------------------------------
-
-/**
- * Set by the dispatcher on the spawn/continuation it sends straight to a
- * `BuildSession`. It means "this owner gate admission already happened, and
- * the caller releases it if the dispatch fails" — so the session must not
- * admit a second time for the same turn. It is an internal Durable
- * Object-to-Durable Object header no public route forwards.
- */
 export const HEADER_GATE_ADMITTED = "x-stella-gate-admitted";
 
 const AGENT_SOURCES: readonly CloudAgentTurnSource[] = [
@@ -387,13 +357,6 @@ export type ParsedAgentTurnStartRequest =
   | { ok: true; request: CloudAgentTurnStartRequest }
   | { ok: false; message: string };
 
-/**
- * The one admission shape for an agent attempt, whether it arrived from the
- * orchestrator's direct dispatch or from a service caller through the public service
- * route. Identity is in the body here (unlike a chat turn) because both
- * callers are already inside the service boundary; the Worker route proves
- * that with the shared secret before it forwards.
- */
 export const parseCloudAgentTurnStartRequest = (
   value: unknown,
 ): ParsedAgentTurnStartRequest => {
@@ -532,8 +495,6 @@ export const parseCloudAgentTurnStartRequest = (
     }
     return { ok: true, request };
   }
-  // The orchestrator's own chat turn: the shape cloud-orchestrator-cli.ts
-  // fixes, and only for the engine whose CLI runs it.
   const orchestratorCli = parseCloudOrchestratorCliTurnSpec(
     value.orchestratorCli,
   );

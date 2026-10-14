@@ -1,10 +1,3 @@
-/**
- * The client half of the cloud memory switch, shared by desktop and mobile:
- * strict decoders for what the backend answers, the idempotent request id,
- * the refusal taxonomy, and the compare-and-set write. Each app keeps only its
- * own request fence (what identity a toggle belongs to) and its hook.
- */
-
 import { BackendRequestError } from "./backend/client.js";
 import type { HomeCalls } from "./backend/home.js";
 import { OWNER_GENERATION_STALE } from "./backend/protocol.js";
@@ -17,7 +10,6 @@ const OWNER_GENERATION_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,511}$/u;
 const EPOCH_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:/|?-]{0,1023}$/u;
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f]/u;
-/** The switch a hook works from: the policy without its memory epoch. */
 const SWITCH_KEYS = new Set([
   "ownerGeneration",
   "memoryEnabled",
@@ -35,7 +27,6 @@ const PREFERENCE_OPTIONAL_KEYS = new Set(["lastWipedEpoch"]);
 
 export type SetCloudMemoryEnabledArgs = HomeCalls["memory.setEnabled"]["args"];
 
-/** The memory switch without the epoch only wipes care about. */
 export type CloudMemorySwitch = Omit<MemoryPolicy, "memoryEpoch">;
 
 export type CloudMemoryPreferenceIssue =
@@ -105,7 +96,6 @@ const isMemoryEpoch = (value: unknown): value is string =>
   !CONTROL_CHARACTER_PATTERN.test(value) &&
   EPOCH_PATTERN.test(value);
 
-/** `""` until the owner's first cloud-home write. */
 const isOwnerGeneration = (value: unknown): value is string =>
   typeof value === "string" &&
   (value === "" ||
@@ -114,10 +104,6 @@ const isOwnerGeneration = (value: unknown): value is string =>
       value.trim() === value &&
       OWNER_GENERATION_PATTERN.test(value)));
 
-/**
- * A normalized account scope, subject or similar identity string: non-empty,
- * NFC, untrimmed-equal, bounded and free of control characters.
- */
 export const normalizedCloudMemoryIdentity = (
   value: unknown,
   label: string,
@@ -135,11 +121,6 @@ export const normalizedCloudMemoryIdentity = (
   return value;
 };
 
-/**
- * Whether an observed owner generation can follow a request made against
- * `expected`. Views report `""` before the owner's first cloud-home write;
- * a call made against `""` comes back stamped with a real generation.
- */
 export const followsOwnerGeneration = (
   expected: string,
   observed: string,
@@ -165,7 +146,6 @@ const decodeSwitchFields = (
   };
 };
 
-/** Strictly decodes the switch projection, which carries no memory epoch. */
 export const decodeCloudMemorySwitch = (value: unknown): CloudMemorySwitch => {
   if (!isRecord(value) || !hasExactKeys(value, SWITCH_KEYS)) {
     return invalidResponse();
@@ -173,10 +153,6 @@ export const decodeCloudMemorySwitch = (value: unknown): CloudMemorySwitch => {
   return decodeSwitchFields(value);
 };
 
-/**
- * Strictly decodes the memory switch the hook works from. `ownerGeneration`
- * is `""` until the owner's first cloud-home write.
- */
 export const decodeCloudMemoryPolicy = (value: unknown): MemoryPolicy => {
   if (!isRecord(value) || !hasExactKeys(value, POLICY_KEYS)) {
     return invalidResponse();
@@ -186,11 +162,6 @@ export const decodeCloudMemoryPolicy = (value: unknown): MemoryPolicy => {
   return { ...fields, memoryEpoch: value.memoryEpoch };
 };
 
-/**
- * Decodes a `memory.preference` view value or `memory.setEnabled` result.
- * The backend echoes the caller's owner id, so a result that belongs to
- * another account is refused rather than relabeled.
- */
 export const decodeCloudMemoryPreferenceForSubject = (
   value: unknown,
   expectedSubject: string,
@@ -237,10 +208,6 @@ const defaultRequestEntropy = (): string => {
   ].join("-");
 };
 
-/**
- * Creates one backend-valid idempotency id, tagged with the client that made
- * it. Call once per logical toggle attempt.
- */
 export const createCloudMemoryPreferenceRequestId = (
   client: "desktop" | "mobile",
   createEntropy: () => string = defaultRequestEntropy,
@@ -261,7 +228,6 @@ export const createCloudMemoryPreferenceRequestId = (
   return requestId;
 };
 
-/** Converts backend refusals into a small, UI-safe and exhaustive issue set. */
 export const normalizeCloudMemoryPreferenceIssue = (
   error: unknown,
 ): CloudMemoryPreferenceIssue => {
@@ -271,8 +237,6 @@ export const normalizeCloudMemoryPreferenceIssue = (
       { code: "revision_conflict" }
     >;
   }
-  // Anything that is not a backend refusal is a transport failure, and the
-  // exact attempt (same request id) is safe to replay.
   if (!(error instanceof BackendRequestError)) {
     return { code: "unavailable", retryable: true };
   }
@@ -280,8 +244,6 @@ export const normalizeCloudMemoryPreferenceIssue = (
     return { code: "revision_conflict", retryable: false };
   }
   if (error.reason === OWNER_GENERATION_STALE) {
-    // A reset rotates the owner generation. A UI may offer a reload, but it
-    // must never replay the same frozen write attempt.
     return { code: "owner_generation_changed", retryable: false };
   }
   if (error.reason === "CLOUD_HOME_IDEMPOTENCY_CONFLICT") {
@@ -290,12 +252,9 @@ export const normalizeCloudMemoryPreferenceIssue = (
   if (error.code === "UNAUTHENTICATED" || error.code === "FORBIDDEN") {
     return { code: "unauthorized", retryable: false };
   }
-  // Includes MEMORY_POLICY_CHANGING: the change is still being applied and
-  // the same request id settles it.
   return { code: "unavailable", retryable: true };
 };
 
-/** What a frozen write attempt must carry, whatever fence a platform adds. */
 export type CloudMemoryPreferenceWrite = Readonly<
   SetCloudMemoryEnabledArgs & { expectedSubject: string }
 >;
@@ -309,12 +268,6 @@ export const cloudMemoryPreferenceMutationInput = (
   expectedOwnerGeneration: attempt.expectedOwnerGeneration,
 });
 
-/**
- * Sends one frozen attempt and checks the answer is exactly the write it
- * asked for: the same owner's next revision with the requested value. A
- * revision conflict is an outcome, not an error; every other refusal throws a
- * `CloudMemoryPreferenceError`.
- */
 export const writeCloudMemoryPreference = async <
   Attempt extends CloudMemoryPreferenceWrite,
 >(

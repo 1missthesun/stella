@@ -5,12 +5,10 @@ import {
 } from "@stella/contracts/gateway/api";
 import { GatewayError } from "./errors.js";
 
-/** Per-invocation collaborators, injectable so tests never touch the network. */
 export type GatewayDeps = {
   fetch: typeof fetch;
   now: () => number;
   waitUntil: (promise: Promise<unknown>) => void;
-  /** Wait for the durable output gate before recording actual dispatch readiness. */
   beforeProviderDispatch?: () => Promise<void>;
 };
 
@@ -65,7 +63,6 @@ const readBoundedBytes = async (
   return bytes;
 };
 
-/** JSON object body within GATEWAY_MAX_REQUEST_BODY_BYTES; empty => `{}` when allowed. */
 export const readJsonObject = async (
   request: Request,
   options: { allowEmpty?: boolean; maximumBytes?: number } = {},
@@ -109,10 +106,6 @@ const REQUEST_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/u;
 export const isGatewayRequestId = (value: unknown): value is string =>
   typeof value === "string" && REQUEST_ID_PATTERN.test(value);
 
-/**
- * The caller-minted idempotency key, or a fresh id when none was sent (a
- * request without one can never be replayed).
- */
 export const requestIdFrom = (
   request: Request,
 ): { requestId: string; callerMinted: boolean } => {
@@ -143,16 +136,11 @@ export const sha256Hex = async (text: string): Promise<string> => {
   ).join("");
 };
 
-/** Stable network key shared by mint admission and managed usage events. */
 export const ipHashFrom = async (request: Request): Promise<string> =>
   (await sha256Hex(clientIp(request))).slice(0, 32);
 
 export type AbortCause = "client" | "idle" | "duration" | "budget";
 
-/**
- * One AbortController for an upstream call, tied to the client's signal, an
- * idle watchdog reset on every received byte, and an absolute ceiling.
- */
 export const createUpstreamController = (args: {
   clientSignal: AbortSignal;
   idleTimeoutMs: number;

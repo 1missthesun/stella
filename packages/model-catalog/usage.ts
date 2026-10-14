@@ -1,28 +1,19 @@
 import type { ManagedGatewayProvider } from "./managed-gateway";
 
-/**
- * Normalized relay usage. `inputTokens` is gross (includes cached reads and
- * cache writes) and `outputTokens` is gross (includes reasoning tokens),
- * matching the contract `computeUsageCostMicroCents` expects. Providers
- * report these differently, so each parser converts into this shape.
- */
 export type RelayUsage = {
   inputTokens?: number;
   outputTokens?: number;
   totalTokens?: number;
   cachedInputTokens?: number;
   cacheWriteInputTokens?: number;
-  /** Subset of `cacheWriteInputTokens` written to a 1-hour cache entry. */
   cacheWrite1hInputTokens?: number;
   reasoningTokens?: number;
-  /** Exact upstream-reported spend, normalized to Stella's micro-cent unit. */
   costMicroCents?: number;
   model?: string;
 };
 
 export type RelayUsageParser = {
   pushText: (text: string) => void;
-  /** Usage reported by complete events consumed so far. */
   current: () => RelayUsage | null;
   finish: () => RelayUsage | null;
 };
@@ -163,8 +154,6 @@ function createSseParser(
       .map((line) => line.slice(5).trimStart())
       .join("\n")
       .trim();
-    // Non-streaming relay responses are plain JSON bodies with no SSE
-    // framing; parse the raw payload so their usage is still metered.
     const payload = data || rawEvent.trim();
     if (!payload || payload === "[DONE]") return;
     try {

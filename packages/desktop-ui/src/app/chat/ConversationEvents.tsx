@@ -1,9 +1,3 @@
-/**
- * Home full-chat surface.
- *
- * Projects local `EventRecord[]` into row view models via `useEventRows`
- * and mounts the shared `<ChatTimeline>`.
- */
 import {
   memo,
   useEffect,
@@ -46,21 +40,17 @@ type Props = {
   maxItems?: number;
   pendingUserMessageId?: string | null;
   queuedUserMessages?: QueuedUserMessage[];
-  /** Reveals a hover "X" on each queued bubble to cancel + restore its text. */
   onCancelQueued?: (message: QueuedUserMessage) => void;
-  /** Working/agent indicator rendered below the last assistant message. */
   indicator?: InlineWorkingIndicatorMountProps;
   hasOlderMessages?: boolean;
   isLoadingOlder?: boolean;
   isLoadingHistory?: boolean;
-  /** Threaded through to `<ChatTimeline>` → `<LegendList>`. */
   listRef?: RefObject<LegendListRef | null>;
   className?: string;
   contentContainerStyle?: CSSProperties;
   estimatedItemSize?: number;
   extraTail?: React.ReactNode;
   alignItemsAtEnd?: boolean;
-  /** Threaded through to `<ChatTimeline>`: catch-up links land here. */
   takesMessageJumps?: boolean;
   onLoadOlder?: () => boolean | void | Promise<boolean>;
 };
@@ -87,8 +77,6 @@ function useOneShotIds(
   const [tick, setTick] = useState(0);
 
   const active = useMemo(() => {
-    // `tick` is an explicit clock revision: the timeout below advances it to
-    // expire IDs even when the input list itself has not changed.
     void tick;
     const now = performance.now();
     const set = new Set<string>();
@@ -182,9 +170,6 @@ export const ConversationEvents = memo(function ConversationEvents({
   takesMessageJumps,
   onLoadOlder,
 }: Props) {
-  // Task titles from the runtime's Activity list give reply context the
-  // thread behind a spawn whose journal row only recorded a description.
-  // Keyed on ids and titles only, so status churn never re-projects rows.
   const activity = useThreadActivity(conversationId);
   const agentTitlesKey = activity.records
     .map((record) => `${record.threadId}\u001f${record.description ?? ""}`)

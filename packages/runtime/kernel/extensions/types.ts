@@ -330,10 +330,6 @@ export interface HookDefinition<E extends HookEvent = HookEvent> {
   ): Promise<HookEventMap[E]["result"] | void>;
 }
 
-// ---------------------------------------------------------------------------
-// Provider Definition
-// ---------------------------------------------------------------------------
-
 export interface ProviderModelDefinition {
   id: string;
   name: string;
@@ -363,10 +359,6 @@ export interface ProviderDefinition {
   /** Additional request headers. */
   headers?: Record<string, string>;
 }
-
-// ---------------------------------------------------------------------------
-// Prompt Template
-// ---------------------------------------------------------------------------
 
 export interface PromptTemplate {
   /** Prompt name (derived from filename if not in frontmatter). */
@@ -405,10 +397,6 @@ export type ExtensionFactory = (
   api: ExtensionRegistrationApi,
   services: import("./services.js").ExtensionServices,
 ) => void | Promise<void>;
-
-// ---------------------------------------------------------------------------
-// Loaded extensions bundle
-// ---------------------------------------------------------------------------
 
 export interface LoadedExtensions {
   tools: ToolDefinition[];

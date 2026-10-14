@@ -1,11 +1,3 @@
-/**
- * Answers a paired phone's request relayed by the cloud over this computer's
- * presence socket (`@stella/contracts/turn-plane/device-requests`). The
- * runtime host frames the answer; this decides it, under the same remote
- * policy the IPC handlers apply (`display-handlers`, `office-preview-handlers`,
- * `voice-handlers`).
- */
-
 import type {
   DeviceRequestErrorCode,
   DeviceRequestMethod,
@@ -42,7 +34,6 @@ export type DeviceRequestHandlers = {
   }) => Promise<string>;
   voiceConfig: (payload: Record<string, unknown>) => Promise<unknown>;
   voiceExecuteTool: (payload: Record<string, unknown>) => Promise<unknown>;
-  /** This computer's own `claude auth login`, finished on another device. */
   claudeLogin?: {
     start: (payload: Record<string, unknown>) => Promise<unknown>;
     finish: (payload: Record<string, unknown>) => Promise<unknown>;
@@ -67,8 +58,6 @@ const failure = (error: unknown): DeviceRequestAnswer => {
     error instanceof Error && error.message.trim()
       ? error.message.trim()
       : "Your computer could not answer that request.";
-  // The read policy's refusals carry this prefix; everything else is a
-  // failure of the computer, not a decision.
   const forbidden =
     message.startsWith(REMOTE_VIEW_DENIAL_PREFIX) ||
     message.includes("from mobile is limited") ||

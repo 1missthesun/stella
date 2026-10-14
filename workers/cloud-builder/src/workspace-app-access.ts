@@ -129,7 +129,6 @@ export async function serveWorkspaceApp(
     claims.slug,
     new Request(target, { method: request.method, headers: forwarded, body }),
   );
-  // Generated code cannot set cookies, redirect to the parent, or relax its sandbox.
   const contentType = response.headers.get("content-type");
   if (contentType) headers.set("content-type", contentType);
   return new Response(response.body, { status: response.status, headers });
@@ -148,17 +147,11 @@ const previewResponse = (bytes: Uint8Array) =>
   new Response(bytes, {
     headers: {
       "content-type": "image/jpeg",
-      // Clients key the URL by revision, so a stored still never changes.
       "cache-control": "private, max-age=86400",
       "x-content-type-options": "nosniff",
     },
   });
 
-/**
- * The chat's app card still. The first request for a revision loads the app
- * in the browser gateway through a fresh signed URL and keeps the JPEG next
- * to the app's source; later requests serve the stored image.
- */
 export async function serveWorkspaceAppPreview(
   env: Env,
   ownerId: string,

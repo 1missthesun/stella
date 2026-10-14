@@ -1,16 +1,3 @@
-/**
- * Managed media over HTTP, for the CLI, the desktop runtime and API clients:
- *
- *   GET    /api/media/v1/models           the model list (public)
- *   POST   /api/media/v1/generate         `media.generate`; `Idempotency-Key` is its client request key
- *   GET    /api/media/v1/job              one job by `jobId` or `clientRequestKey`, outputs freshly signed
- *   DELETE /api/media/v1/job              `media.cancel` for the `Idempotency-Key`
- *   POST   /api/media/v1/webhooks/fal     fal's completion webhook (fal ED25519 + the job's own token)
- *
- * Bearer JWTs are verified here and the work runs in the owner's object,
- * exactly as `/api/rpc` does; these routes only adapt the wire shape.
- */
-
 import { rpcErrorStatus, type RpcResponse } from "@stella/contracts/backend/protocol";
 import { sha256Hex } from "../hash.js";
 import { readBodyText } from "../http/body.js";
@@ -23,7 +10,6 @@ import { FAL_WEBHOOK_PATH, readFalWebhookUrl, verifyFalSignature } from "./fal.j
 import { ownerGateStub } from "../rpc-release.js";
 
 const BASE = "/api/media/v1";
-/** Inline sources ride in the body; the owner object stages them in R2. */
 const MAX_BODY_BYTES = 24 * 1024 * 1024;
 const MAX_WEBHOOK_BYTES = 4 * 1024 * 1024;
 const AUTH_ACTION =
@@ -34,10 +20,8 @@ type RouteEnv = Pick<Cloudflare.Env, "OWNER_GATES" | "CLOUD_BUILDER_PUBLIC_URL">
 const fail = (status: number, error: string, extra: Record<string, unknown> = {}): Response =>
   failJson(status, error, { ...extra, docsUrl: MEDIA_DOCS_URL });
 
-/** An owner-object error as the JSON envelope media clients have always read. */
 const failRpc = (response: Extract<RpcResponse, { ok: false }>): Response => {
   const { code, message, reason, retryAfterMs } = response.error;
-  // A plan gate is "upgrade", not "bad credential": 402, as before.
   const status = reason === "capability_required" ? 402 : rpcErrorStatus(code);
   return fail(status, message, {
     code: reason === "capability_required" ? "CAPABILITY_REQUIRED" : code,
@@ -141,7 +125,6 @@ const falWebhook = async (request: Request, env: RouteEnv): Promise<Response> =>
   return json(response.value);
 };
 
-/** The media routes, or null when the path is someone else's. */
 export const handleMediaRoute = async (request: Request, env: RouteEnv): Promise<Response | null> => {
   const path = new URL(request.url).pathname;
   if (!path.startsWith(`${BASE}/`)) return null;

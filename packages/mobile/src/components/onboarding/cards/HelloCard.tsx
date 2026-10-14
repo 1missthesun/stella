@@ -1,7 +1,3 @@
-/**
- * The first message's card: what Stella is in three lines, the way in, and
- * the legal line (Terms / Privacy open in a sheet, like sign-in).
- */
 import { useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import Animated from "react-native-reanimated";
@@ -29,7 +25,6 @@ const PILLARS: { icon: IconName; key: string }[] = [
 type HelloCardProps = {
   active: boolean;
   answered: boolean;
-  /** Plays the staggered entrance (a fresh message, not a resumed one). */
   fresh: boolean;
   onContinue: () => void;
 };

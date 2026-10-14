@@ -11,12 +11,6 @@ import {
   useGithubConnections,
 } from "./cloud-projects-api";
 
-/**
- * "Cloud projects" settings card: install the GitHub App once, then list the
- * projects cloud agents can work in. Deliberately list/connect/create only —
- * a project's real management surface is chat.
- */
-
 const PROVIDER_LABEL: Record<string, string> = {
   github: "GitHub",
   stella: "Stella-hosted",
@@ -42,8 +36,6 @@ function CloudProjectsCardImpl() {
     try {
       const { installUrl } = await startGithubInstall();
       window.open(installUrl, "_blank", "noopener");
-      // The code field only appears once an install is actually in flight,
-      // so the card never invites a code that came from somewhere else.
       setAwaitingCode(true);
     } catch (error) {
       showToast({ title: projectErrorText(error), variant: "error" });
@@ -74,8 +66,6 @@ function CloudProjectsCardImpl() {
       }
       setConnectCode("");
       setAwaitingCode(false);
-      // The account is named, not just acknowledged: a user who was steered
-      // into someone else's handshake finds out here.
       showToast({
         title: `GitHub connected as ${result.accountLogin}.`,
         variant: "success",

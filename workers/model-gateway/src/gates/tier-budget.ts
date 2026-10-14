@@ -38,7 +38,6 @@ const optionalString = (object: object, key: string): string | null => {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 };
 
-/** One SQLite Durable Object per limits audience. */
 export class TierBudget extends DurableObject<Env> {
   private readonly audience: string;
   private readonly alertWebhookUrl: string | null;

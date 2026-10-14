@@ -16,10 +16,6 @@ export const INLINE_WORKING_INDICATOR_MIN_VISIBLE_MS = 2000;
 
 export const INLINE_WORKING_INDICATOR_SHOW_DELAY_MS = 300;
 
-/**
- * Duration of the indicator's handoff exit. Replies are published
- * immediately; the arriving row plays its own entry animation.
- */
 export const WORKING_INDICATOR_HANDOFF_MS = 240;
 
 export const WORKING_INDICATOR_COMPACTING_TEXT = "Compacting";
@@ -27,37 +23,17 @@ export const WORKING_INDICATOR_COMPACTING_TEXT = "Compacting";
 export type InlineWorkingIndicatorProps = {
   runningTool?: string;
   compacting?: boolean;
-  /** Stable id of the in-flight tool call; seeds the friendly status
-   * label so it doesn't churn on every re-render. */
   runningToolId?: string;
-  /** Run-level orchestrator status (spawn / pause / compaction, etc.). */
   status?: string | null;
   minimumVisibleMs?: number;
 };
 
 export type InlineWorkingIndicatorMountProps = InlineWorkingIndicatorProps & {
-  /**
-   * `true` while the orchestrator is thinking or running a tool. Flipping to
-   * `false` triggers the exit; the component stays mounted until the exit
-   * completes. If `active` flips back to true mid-exit, the exit is canceled
-   * and the indicator resumes live updates.
-   */
   active: boolean;
-  /** Skip the `MIN_VISIBLE_MS` floor on deactivation. Set when the run went
-   * terminal without producing an answer, e.g. a user cancel. */
   exitImmediately?: boolean;
-  /**
-   * The final answer landed. The indicator clears in the same commit so the
-   * reply takes the line it held.
-   */
   handoff?: boolean;
 };
 
-/**
- * Single source of truth for the inline working indicator's mount props,
- * shared by every chat surface so they cannot drift. Pass the raw streaming
- * snapshot; the helper derives `active` and the exit mode.
- */
 export function buildInlineWorkingIndicatorProps({
   isStreaming,
   isToolActive,
@@ -69,15 +45,12 @@ export function buildInlineWorkingIndicatorProps({
 }: {
   isStreaming: boolean;
   isToolActive: boolean;
-  /** The run's final assistant message landed (no tool followed it). */
   answerLanded?: boolean;
   activeToolName?: string | null;
   activeToolCallId?: string | null;
   runtimeStatusText?: string | null;
   isCompacting?: boolean;
 }): InlineWorkingIndicatorMountProps {
-  // A tool still in flight outranks a landed answer: a preamble's message
-  // boundary can race ahead of the tool start it precedes.
   const handoff = Boolean(answerLanded) && !isToolActive;
   const active = getInlineWorkingIndicatorActive({
     isStreaming,
@@ -96,7 +69,6 @@ export function buildInlineWorkingIndicatorProps({
   };
 }
 
-/** Which pose the character mark holds while the indicator is up. */
 export type WorkingIndicatorCharacterState =
   | "thinking"
   | "working"
@@ -109,11 +81,9 @@ export type WorkingIndicatorToolPose = Exclude<
   "thinking"
 >;
 
-/** Every pose the rig can hold while a tool runs. */
 export const WORKING_INDICATOR_TOOL_POSES: readonly WorkingIndicatorToolPose[] =
   ["working", "writing", "searching", "reading"];
 
-/** How long one pose holds on a single long tool call before another is dealt. */
 export const WORKING_INDICATOR_POSE_ROTATE_MS = 6000;
 
 const hashSeed = (seed: string): number => {
@@ -125,12 +95,6 @@ const hashSeed = (seed: string): number => {
   return hash >>> 0;
 };
 
-/**
- * A pose for a running tool, dealt from the whole set rather than read off
- * the tool's name: the same seed (one tool call, one rotation window) always
- * lands on the same pose so the mark holds still for that window, and the
- * next window never repeats the pose it just left.
- */
 export function pickWorkingIndicatorToolPose(
   seed: string,
   avoid?: WorkingIndicatorCharacterState,
@@ -149,13 +113,7 @@ export function getWorkingIndicatorCharacterState({
 }: {
   toolName?: string;
   isReasoning?: boolean;
-  /**
-   * When present, a running tool's pose is dealt from `seed` instead of
-   * derived from the tool name, so a turn full of `code` calls still moves
-   * through the whole repertoire.
-   */
   seed?: string;
-  /** The pose the mark is leaving; a dealt pose never repeats it. */
   avoid?: WorkingIndicatorCharacterState;
 }): WorkingIndicatorCharacterState {
   const tool = toolName?.trim().toLowerCase() ?? "";
@@ -185,7 +143,6 @@ export function getInlineWorkingIndicatorActive({
 }: {
   isStreaming: boolean;
   isToolActive: boolean;
-  /** The run's final assistant message landed (no tool followed it). */
   answerLanded?: boolean;
 }): boolean {
   return (isStreaming && !answerLanded) || isToolActive;

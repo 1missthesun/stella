@@ -1,20 +1,3 @@
-/**
- * The `drive` tool's model-visible surface, split from the executable
- * definition so a device and a cloud session advertise the byte-identical
- * tool — the same arrangement `read-def.ts` uses, and for the same reason: a
- * sentence that is true in only one placement is how an agent ends up
- * following an instruction that cannot work where it is running.
- *
- * `fetch` answers with a path rather than bytes, which is what lets the two
- * placements share one description. Wherever the agent runs, the next step is
- * `Read` on the path it was given, over a file that is really there.
- *
- * Nothing here states a size. The readable size is a property of the session,
- * not of the placement: a resident cloud world hydrates far less than a
- * device's real filesystem holds. `fetch` reports the limit it actually hit,
- * so a refusal is accurate instead of a promise being broken.
- */
-
 export const DRIVE_TOOL_NAME = "drive";
 
 export const DRIVE_TOOL_DESCRIPTION =
@@ -44,5 +27,4 @@ export const DRIVE_TOOL_PARAMETERS: Record<string, unknown> = {
   required: ["action"],
 };
 
-/** Replay policy (`ToolReplayPolicy`). Reading the drive again has no effect. */
 export const DRIVE_TOOL_REPLAY = "safe" as const;

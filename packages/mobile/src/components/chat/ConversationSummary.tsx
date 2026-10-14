@@ -1,12 +1,3 @@
-/**
- * "Summary": the pill above the composer once a busy stretch has gone by
- * (`catchUpOffer`, shared with desktop), and the popover it opens. Opening it
- * asks the cloud for a summary of what is new (`catchUps.request`); every
- * summary so far stays in the popover as its own page, oldest on the left and
- * newest on the right, paged sideways. Tapping a line jumps to the message it
- * came from. Desktop's twin is `features/catch-up/CatchUpPill.tsx`.
- */
-
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
@@ -38,7 +29,6 @@ import { Icon, type IconName } from "../Icon";
 const MAX_HEIGHT_RATIO = 0.66;
 const MAX_HEIGHT = 560;
 
-/** The catch-ups of a conversation and whether one is worth offering now. */
 export function useConversationSummaries(
   conversationId: string | null,
   messages: readonly ChatMessage[],
@@ -64,7 +54,6 @@ export function useConversationSummaries(
     () => catchUpOffer(offerInput, catchUps, now),
     [catchUps, now, offerInput],
   );
-  // The pill lingers after a summary lands; take it down when that ends.
   useEffect(() => {
     if (!offer.lingerUntil) return;
     const timer = setTimeout(
@@ -74,12 +63,10 @@ export function useConversationSummaries(
     return () => clearTimeout(timer);
   }, [offer.lingerUntil]);
   const pending = catchUps.some((catchUp) => catchUp.state === "pending");
-  /** Whether the pill shows: a busy stretch, one being written, or a fresh one to reread. */
   const visible = enabled && (offer.offer || pending || offer.lingerUntil > 0);
   return { catchUps, offer, pending, visible };
 }
 
-/** The pill that leads the composer. */
 export function SummaryPill({
   count,
   onPress,
@@ -142,7 +129,6 @@ const formatWhen = (locale: string, at: number): string =>
     minute: "2-digit",
   });
 
-/** A separator's time: the day too when it is not the summary's own day. */
 const formatGap = (locale: string, at: number, pageAt: number): string =>
   new Date(at).toLocaleTimeString(
     locale,
@@ -157,7 +143,6 @@ const SECTION_ICONS: Record<"done" | "ongoing" | "waiting", IconName> = {
   waiting: "alert-circle",
 };
 
-/** The date row and pager above the pages. */
 const HEAD_HEIGHT = 46;
 
 function Section({
@@ -251,7 +236,6 @@ function SummaryPage({
   maxHeight: number;
   onJump: (link: CatchUpLink) => void;
   onRetry: () => void;
-  /** Off-screen pages stay out of VoiceOver's way. */
   hidden: boolean;
   styles: ReturnType<typeof makeStyles>;
   colors: Colors;
@@ -320,11 +304,6 @@ function SummaryPage({
   );
 }
 
-/**
- * The saved summaries side by side, one page each, oldest on the left: swipe
- * or tap the arrows to page. Opens on the newest and follows a new one as it
- * lands. No close button: a tap outside closes it.
- */
 export function SummaryPopover({
   conversationId,
   catchUps,
@@ -335,7 +314,6 @@ export function SummaryPopover({
 }: {
   conversationId: string;
   catchUps: readonly CatchUp[];
-  /** Ask for a summary of what is new as the popover opens. */
   requestNew: boolean;
   onJump: (link: CatchUpLink) => void;
   onClose: () => void;
@@ -351,7 +329,6 @@ export function SummaryPopover({
   const requestedRef = useRef(false);
   const total = catchUps.length;
   const shown = Math.min(index, Math.max(0, total - 1));
-  // A sideways swipe here pages the summaries, never the sidebar.
   useHoldDrawer(true);
 
   const request = useCallback(async () => {
@@ -406,7 +383,6 @@ export function SummaryPopover({
     [slide],
   );
 
-  // Open on the newest page, and follow a new one as it lands or fills in.
   const newest = catchUps.at(-1);
   const newestKey = newest ? `${newest.catchUpId}:${newest.state}` : "";
   const shownKeyRef = useRef<string | null>(null);
@@ -433,7 +409,6 @@ export function SummaryPopover({
       onPanResponderMove: (_event, gesture) => {
         const min = -(totalRef.current - 1) * widthRef.current;
         let x = start + gesture.dx;
-        // Resist past either end.
         if (x > 0) x = x / 3;
         else if (x < min) x = min + (x - min) / 3;
         slide.setValue(x);
@@ -547,7 +522,6 @@ export function SummaryPopover({
                   width={pageWidth}
                   maxHeight={maxHeight - HEAD_HEIGHT}
                   onJump={(link) => {
-                    // Hand the link over first: the popover may close at once.
                     onJump(link);
                     close();
                   }}

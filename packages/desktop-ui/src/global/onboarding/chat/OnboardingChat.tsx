@@ -1,12 +1,3 @@
-/**
- * Chat-style onboarding surface.
- *
- * Looks and behaves like the real chat: the same window chrome, the same
- * assistant rows, the same composer at the bottom. The difference is that
- * the assistant's messages are scripted and each one carries a card. The
- * user answers cards (or types anything into the composer to skip
- * straight in), and the shell swaps to the real conversation on finish.
- */
 import {
   useCallback,
   useEffect,
@@ -54,12 +45,10 @@ type OnboardingChatProps = {
 
 type LegalDocument = "terms" | "privacy";
 
-/** Mark edge length, and how far above its target row it floats. */
 const MARK_SIZE_PX = 40;
 const MARK_OFFSET_PX = MARK_SIZE_PX + 6;
 const SPEAKING_MS = 1600;
 
-/** The resting pose while a step waits on the user. */
 const STEP_MOODS: Record<OnboardingChatStep, StellaCharacterState> = {
   capabilities: "idle",
   selfmod: "idle",
@@ -72,10 +61,6 @@ const STEP_MOODS: Record<OnboardingChatStep, StellaCharacterState> = {
   quickstart: "happy",
 };
 
-/**
- * "By using Stella, you agree to our {terms} and {privacy}." — the
- * placeholders become buttons so word order can follow each locale.
- */
 function LegalLine({
   onOpen,
 }: {
@@ -124,8 +109,6 @@ export function OnboardingChat({ isAuthenticated, onComplete }: OnboardingChatPr
   const [activeLegalDoc, setActiveLegalDoc] = useState<LegalDocument | null>(null);
   const markRef = useRef<StellaMarkHandle | null>(null);
 
-  // Gmail connects through the desktop app's connector service and a Stella
-  // account; without either, the step never shows.
   const canConnectGmail =
     isAuthenticated && Boolean(window.electronAPI?.nativeIntegrations?.enable);
   const {
@@ -142,7 +125,6 @@ export function OnboardingChat({ isAuthenticated, onComplete }: OnboardingChatPr
     skipGmail: !canConnectGmail,
   });
 
-  // Composer state — fully controlled, like the real chat surfaces.
   const [message, setMessage] = useState("");
 
   const handleSend = useCallback(() => {
@@ -161,13 +143,9 @@ export function OnboardingChat({ isAuthenticated, onComplete }: OnboardingChatPr
 
   const handleSkipAll = useCallback(() => finish({}), [finish]);
 
-  /* ── Scrolling ────────────────────────────────────────────────────
-   * A new assistant message scrolls into view from its top (cards are
-   * tall); a user bubble or the typing indicator pins to the bottom. */
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const lastEntryId = entries[entries.length - 1]?.id ?? null;
   const lastEntryKind = entries[entries.length - 1]?.kind ?? null;
-  // A resumed flow lands on its current step at once; later rows glide.
   const scrolledOnceRef = useRef(false);
   useLayoutEffect(() => {
     const scroller = scrollRef.current;
@@ -205,11 +183,6 @@ export function OnboardingChat({ isAuthenticated, onComplete }: OnboardingChatPr
     return () => window.cancelAnimationFrame(frame);
   }, [indicator.active]);
 
-  /* ── The mark travels with the conversation ─────────────────────
-   * It sits above whatever Stella is doing right now: the typing indicator
-   * while she "types", then the message that lands in that spot. Position
-   * is measured from the DOM and animated with a CSS transition, so the
-   * mark glides down the transcript rather than jumping. */
   const contentRef = useRef<HTMLDivElement | null>(null);
   const [markTop, setMarkTop] = useState<number | null>(null);
   const lastAssistantId =
@@ -217,9 +190,6 @@ export function OnboardingChat({ isAuthenticated, onComplete }: OnboardingChatPr
   const placeMark = useCallback(() => {
     const content = contentRef.current;
     if (!content) return;
-    // Through the hand-off the indicator is still on screen, clearing the
-    // row the reply is about to fill; keep the mark there so it doesn't dip
-    // back to the previous message for a frame and then drop down again.
     const target =
       indicator.active || indicator.handoff
         ? content.querySelector<HTMLElement>(".obc-indicator")
@@ -241,7 +211,6 @@ export function OnboardingChat({ isAuthenticated, onComplete }: OnboardingChatPr
     return () => observer.disconnect();
   }, [placeMark, entries.length]);
 
-  // A reply that just landed gets a short "speaking" beat before settling.
   const [speaking, setSpeaking] = useState(false);
   const lastFreshAssistantId =
     [...entries].reverse().find((entry) => entry.kind === "assistant" && entry.fresh)
@@ -253,7 +222,6 @@ export function OnboardingChat({ isAuthenticated, onComplete }: OnboardingChatPr
     return () => window.clearTimeout(timer);
   }, [lastFreshAssistantId]);
 
-  // Steps answered so far; the finale counts once the user heads in.
   const progressCount = exiting ? steps.length : steps.indexOf(currentStep);
 
   const jobBusy =
@@ -277,8 +245,6 @@ export function OnboardingChat({ isAuthenticated, onComplete }: OnboardingChatPr
     if (job.status === "done") markRef.current?.sparkle();
   }, [job.status]);
 
-  /* ── Prose per step ─────────────────────────────────────────────── */
-  // A paired self-hosted server already signed its owner in.
   const selfHosted = useSelfHostedServer();
   const discovery = useServerDiscovery();
   const serverState = useDesktopServerState();

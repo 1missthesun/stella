@@ -1,11 +1,3 @@
-/**
- * Schedule rows as people read them, shared by the desktop and the phone: a
- * cadence line (`Daily 9:00 AM`, `Every 30 min`, `Once at Apr 14, 9:00 AM`)
- * in the reader's time zone, and a short next-run badge (`in 2h`,
- * `tomorrow 9:00 AM`, `due`). Every clock time follows the device's 12- or
- * 24-hour setting, so the two never disagree.
- */
-
 import type { LocalCronSchedule } from "./scheduling.js";
 
 const MINUTE_MS = 60_000;
@@ -64,7 +56,6 @@ const chosenHourCycle = (): "h12" | "h23" | null => {
   }
 };
 
-/** Whether this device shows times on a 12-hour clock, from its own setting. */
 const uses12HourClock = (): boolean => {
   const chosen = chosenHourCycle();
   if (chosen) return chosen === "h12";
@@ -81,7 +72,6 @@ const uses12HourClock = (): boolean => {
   }
 };
 
-/** A clock time as this device writes one: `9:05 AM` or `09:05`. */
 const formatClock = (h: number, m: number): string =>
   uses12HourClock() ? formatClock12(h, m) : padTime(h, m);
 
@@ -90,7 +80,6 @@ const isSameCalendarDay = (a: Date, b: Date): boolean =>
   a.getMonth() === b.getMonth() &&
   a.getDate() === b.getDate();
 
-/** Short right-aligned next-run text, e.g. `in 2h` or `tomorrow 9:00 AM`. */
 export const formatNextRun = (nextRunAtMs: number, nowMs: number): string => {
   if (!Number.isFinite(nextRunAtMs)) return "";
   const delta = nextRunAtMs - nowMs;
@@ -236,13 +225,6 @@ const localWallClock = (atMs: number): WallClock => {
   };
 };
 
-/**
- * Moves a cron's wall-clock time from the zone it fires in (UTC when it names
- * none, as on the backend) to the reader's zone, using the next run as the
- * reference instant so daylight saving and day boundaries line up with the
- * "Next" label beside it. A cron whose next run does not land on its clock in
- * that zone (one a computer runs in its own local time) is left as written.
- */
 const toLocalClock = (
   time: { h: number; m: number },
   tz: string | undefined,
@@ -277,12 +259,6 @@ const summarizeCron = (
   return `${describeWeekdays(shiftWeekdays(days, local.dayDelta))} ${clock}`;
 };
 
-/**
- * Natural-language one-liner for a stored schedule shape (or a heartbeat
- * interval), in the reader's time zone. `zone` is where a cron with none of
- * its own runs: the user's zone, which it follows. Falls back to the raw cron expression
- * when the pattern is too custom to summarize cheaply.
- */
 export const summarizeSchedule = (
   schedule: LocalCronSchedule | null | undefined,
   intervalMs?: number,

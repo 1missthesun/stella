@@ -6,12 +6,6 @@ import { useLocalMediaFailure, type LocalMediaNoun } from "./use-local-media-fai
 const filenameOf = (filePath: string): string =>
   filePath.split(/[\\/]/).pop() ?? filePath;
 
-/**
- * Where a player streams `filePath` from: the file source's own media URL
- * when the viewer shows a file from elsewhere (a signed Stella Drive URL), or
- * this machine's `stella-media:` stream. `url` is null while a remote URL is
- * still being resolved.
- */
 export const useMediaStream = (filePath: string, noun: LocalMediaNoun) => {
   const source = useContext(DisplayFileSourceContext);
   const remote = source?.mediaUrl ?? null;

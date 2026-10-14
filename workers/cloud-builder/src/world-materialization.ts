@@ -7,7 +7,6 @@ const shellQuote = (value: string): string => {
   return `'${value.replace(/'/gu, `'"'"'`)}'`;
 };
 
-/** Build the locked, cold-container-only world import command. */
 export const worldMaterializationCommand = (args: {
   worldRoot: string;
   manifestId: string;
@@ -40,15 +39,12 @@ export const worldMaterializationCommand = (args: {
       `chown -R 42424:42424 ${shellQuote(args.worldRoot)}`,
       'chown 0:0 "$marker"',
       'chmod 0600 "$marker"',
-      // A container started from a new image restored the previous one's
-      // dependencies beside the world; they go back in now.
       ...(args.worldRoot === WORLD_ROOT ? dependencyAdoptionLines(index) : []),
       "fi",
     ].join("\n"),
   );
 };
 
-/** Why a materialization failed, in words the agent and the user can act on. */
 export const worldMaterializationFailure = (result: { stderr: string; exitCode?: number }): string => {
   const detail = result.stderr.trim().split("\n").at(-1)?.trim().slice(0, 300) ?? "";
   if (/no space left on device/iu.test(result.stderr)) {

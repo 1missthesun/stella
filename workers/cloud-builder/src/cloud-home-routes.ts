@@ -37,10 +37,6 @@ const requireBucket = (env: CloudHomeRouteEnv): R2Bucket => {
   return env.AGENT_HOME;
 };
 
-/**
- * The owner's current generation, from the owner's own object. A user route
- * acts for the caller it verified, so reading it there is safe.
- */
 export const ownerAccess = async (
   env: Pick<Cloudflare.Env, "OWNER_GATES">,
   ownerId: string,
@@ -66,10 +62,6 @@ const makeStore = (
   });
 
 const CLOUD_HOME_CONTROL_REQUEST_MAX_BYTES = 64 * 1024;
-// The accepted decoded package is at most 25 MiB. Base64 expands that by 4/3,
-// and the JSON manifest needs a small fixed allowance on top. Keep the route
-// below one third of the Worker isolate limit while allowing the product-level
-// aggregate validator to return its more precise error.
 const CLOUD_HOME_SKILL_UPLOAD_REQUEST_MAX_BYTES = 40 * 1024 * 1024;
 
 const requestBodyLimit = (pathname: string): number => {
@@ -164,10 +156,6 @@ const bytesBase64 = (bytes: Uint8Array): string => {
   return btoa(binary);
 };
 
-/**
- * Authenticated desktop/mobile plane. `ownerId` is the verified JWT subject,
- * never a request field. Responses intentionally omit every R2 object key.
- */
 export const handleUserCloudHomeRoute = async (args: {
   request: Request;
   env: CloudHomeRouteEnv;
@@ -233,10 +221,6 @@ export const handleUserCloudHomeRoute = async (args: {
             const decodedSize = decodedBase64Size(base64);
             totalEncodedBytes += base64.length;
             totalDecodedBytes += decodedSize;
-            // Check the encoded and decoded aggregate before allocating the
-            // next decoded buffer. The encoded ceiling accounts for base64's
-            // 4/3 expansion and prevents a 256-file request from multiplying
-            // the per-file allowance into worker-memory exhaustion.
             if (
               totalEncodedBytes >
                 Math.ceil(CLOUD_SKILL_MAX_TOTAL_BYTES / 3) * 4 ||

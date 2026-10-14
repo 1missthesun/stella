@@ -1,11 +1,3 @@
-/**
- * The public origin of Stella sites (stellasites.app). It holds no logic and
- * no credentials: cloud-builder's `SitesHost` entrypoint decides what each
- * request may see (`workers/cloud-builder/src/slack/previews.ts`). Only sites
- * are served here, so a site can't reach stella.sh, an app origin, or
- * Stella's API with a visitor's cookies. The bare domain (`SITES_APEX`) says
- * what the domain is and where to report abuse.
- */
 const ABOUT = `<!doctype html>
 <html lang="en">
 <head>

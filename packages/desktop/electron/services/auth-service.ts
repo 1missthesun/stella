@@ -52,7 +52,6 @@ const HOST_AUTH_TOKEN_REFRESH_MARGIN_MS = 3 * 60_000;
  */
 const HOST_AUTH_TOKEN_SCHEDULE_MARGIN_MS = 4 * 60_000;
 const HOST_AUTH_TOKEN_SCHEDULE_MIN_DELAY_MS = 15_000;
-/** Used when a token carries no readable `exp`. */
 const HOST_AUTH_TOKEN_SCHEDULE_FALLBACK_MS = 3 * 60 * 1000;
 const HOST_AUTH_TOKEN_RETRY_BASE_MS = 5_000;
 const HOST_AUTH_TOKEN_RETRY_MAX_MS = 5 * 60 * 1000;
@@ -60,17 +59,11 @@ const HOST_AUTH_TOKEN_RETRY_JITTER = 0.2;
 const SESSION_REFRESH_RETRY_BASE_MS = 2_000;
 const SESSION_REFRESH_RETRY_MAX_MS = 60_000;
 const SESSION_REFRESH_RETRY_JITTER = 0.2;
-/**
- * Every `/api/auth` call is bounded. A hung request used to be able to wedge
- * the single-flight mint promise, which then blocked every later caller.
- */
 const AUTH_REQUEST_TIMEOUT_MS = 12_000;
 const AUTH_STORAGE_SCOPE = "desktop-better-auth-storage";
 const AUTH_STORAGE_FILE = "better-auth-storage.json";
 const BETTER_AUTH_SESSION_DATA_STORAGE_KEY = "better-auth_session_data";
-/** The one opaque Better Auth bearer. The only credential stored on disk. */
 const BETTER_AUTH_TOKEN_STORAGE_KEY = "better-auth_session_token";
-/** Non-secret owner intent. Missing credentials may not erase this decision. */
 const AUTH_IDENTITY_INTENT_STORAGE_KEY = "auth_identity_intent";
 /**
  * The last known backend URL. `configurePiRuntime` is driven by the renderer,
@@ -81,16 +74,11 @@ const BACKEND_URL_STORAGE_KEY = "backend_url";
 const AUTH_BASE_PATH = "/api/auth";
 const SERVER_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 
-/** The self-hosted server the launcher started this install for, if any. */
 export const launcherServerId = (): string | null => {
   const id = process.env.STELLA_LAUNCHER_SERVER_ID?.trim() ?? "";
   return SERVER_ID_PATTERN.test(id) ? id : null;
 };
 
-/**
- * Each self-hosted server keeps its own sign-in beside the stella.sh one, so
- * switching servers never signs either account out.
- */
 export const authStoragePathForServer = (serverId: string | null): string => {
   const userData = app.getPath("userData");
   return serverId && SERVER_ID_PATTERN.test(serverId)
@@ -98,7 +86,6 @@ export const authStoragePathForServer = (serverId: string | null): string => {
     : path.join(userData, AUTH_STORAGE_FILE);
 };
 
-/** Sign a server's install in before Stella relaunches into it. */
 export const writeServerSession = (
   serverId: string,
   backendUrl: string,
@@ -190,13 +177,8 @@ type AuthServiceOptions = {
   sessionPartition: string;
   runnerTarget: PiRunnerTarget;
   onAuthCallback: (url: string) => void;
-  /** A `stella://pair?…` link from a self-hosted server's setup. */
   onPairingLink?: (url: string) => void;
   onSecondInstanceFocus: () => void;
-  /**
-   * Main reached a new auth verdict while no renderer request was pending.
-   * Renderers re-read the discriminated snapshot after this push.
-   */
   onSessionInvalidated?: () => void;
 };
 
@@ -216,12 +198,6 @@ export class AuthService {
   private pendingCredentialResync = false;
   private credentialResyncPromise: Promise<void> | null = null;
   private trailingResyncPromise: Promise<void> | null = null;
-  /**
-   * Bumped whenever the stored credential changes (sign-in, sign-out, token
-   * apply). A mint that started under an older epoch is discarded rather than
-   * handed to the runner, so a slow response for the previous identity can
-   * never overwrite the current one.
-   */
   private credentialEpoch = 0;
   private refreshRetryAttempt = 0;
   private sessionStateDerived = false;
@@ -421,8 +397,6 @@ export class AuthService {
       headers.set("origin", DESKTOP_AUTH_ORIGIN);
     }
     if (!headers.has("user-agent")) {
-      // So the account's session list can name this device; Better Auth
-      // records it when the session is created.
       const platform =
         process.platform === "darwin"
           ? "Macintosh"
@@ -485,7 +459,6 @@ export class AuthService {
     return true;
   }
 
-  /** Opens the hosted managed widget and resolves one state-bound token. */
   async getChallengeToken(): Promise<string | undefined> {
     if (!process.env.VITE_TURNSTILE_SITE_KEY?.trim()) return undefined;
 
@@ -604,12 +577,6 @@ export class AuthService {
     });
   }
 
-  /**
-   * `hasConnectedAccount` is derived here rather than reported by the
-   * renderer. An anonymous session is a real Stella identity on this branch
-   * (it owns cloud conversations), so the distinction that matters to the
-   * runner is anonymous versus connected, not signed-out versus signed-in.
-   */
   private applySessionDerivedState(session: unknown | null) {
     const isAnonymous =
       (session as { user?: { isAnonymous?: boolean | null } } | null)?.user
@@ -854,11 +821,6 @@ export class AuthService {
     return { ok: response?.ok !== false };
   }
 
-  /**
-   * Revoke every session on the account (sign out of all devices). Not
-   * best-effort: a failure throws so the caller never reports other devices
-   * signed out while their sessions are still live.
-   */
   async revokeSessions() {
     const response = await this.authFetch("/revoke-sessions", {
       method: "POST",
@@ -874,10 +836,6 @@ export class AuthService {
     return { ok: true };
   }
 
-  /**
-   * Every live session on the account, newest activity first, tokens never
-   * leaving main: the renderer gets ids and device metadata only.
-   */
   async listSessions() {
     const [list, current] = await Promise.all([
       this.authFetch("/list-sessions", {
@@ -892,7 +850,6 @@ export class AuthService {
     if (!list.ok) {
       throw new Error(`Session list failed with HTTP ${list.status}.`);
     }
-    // An unreadable answer is an error, never an empty list.
     const parsed: unknown = await list.json().catch(() => null);
     if (!Array.isArray(parsed)) {
       throw new Error("Session list came back unreadable.");
@@ -936,7 +893,6 @@ export class AuthService {
       .sort((a, b) => b.updatedAt - a.updatedAt);
   }
 
-  /** Revoke one other session by id; main resolves its token server-side. */
   async revokeSessionById(sessionId: string) {
     const list = await this.authFetch("/list-sessions", {
       method: "GET",
@@ -990,13 +946,6 @@ export class AuthService {
     return { ok: true };
   }
 
-  /**
-   * Adopt a bearer token obtained out of band: the magic-link or social
-   * handoff claim, which the renderer performs against
-   * `/api/auth/link/claim`. This is the anonymous-to-connected upgrade point,
-   * so the resync is awaited before returning — the caller must not observe
-   * the old identity's backend JWT after this resolves.
-   */
   async applySessionToken(sessionToken: string) {
     const normalized =
       typeof sessionToken === "string" ? sessionToken.trim() : "";
@@ -1015,7 +964,6 @@ export class AuthService {
     return { ok: true };
   }
 
-  /** Only a recognized invalid-session response is an identity verdict. */
   async getAuthTokenResult(): Promise<
     | { ok: true; token: string }
     | { ok: false; reason: "unauthorized" | "http" | "network" }
@@ -1067,11 +1015,6 @@ export class AuthService {
     );
   }
 
-  /**
-   * Only external connector OAuth callbacks reach the app by deep link now.
-   * Sign-in used to arrive as `stella://auth?ott=…`; the browser handoff is
-   * claimed over HTTPS instead, so that host is no longer trusted here.
-   */
   private isTrustedAuthCallbackUrl(value: string) {
     try {
       const parsed = new URL(value);
@@ -1113,9 +1056,6 @@ export class AuthService {
   }
 
   registerAuthProtocol() {
-    // There is no app bundle for the OS to associate the scheme with — Electron
-    // runs this source tree in every install — so the registration has to name
-    // the Electron binary and the app path explicitly.
     app.setAsDefaultProtocolClient(this.options.authProtocol, process.execPath, [
       app.getAppPath(),
     ]);
@@ -1171,11 +1111,6 @@ export class AuthService {
     return this.hostHasConnectedAccount;
   }
 
-  /**
-   * The Stella backend worker the renderer was built against: Better Auth at
-   * `/api/auth`, backend calls and live views. Falls back to the last value
-   * the renderer configured so main can mint before the first window loads.
-   */
   getBackendUrl(): string | null {
     return (
       readConfiguredBackendUrl(this.pendingBackendUrl) ??
@@ -1201,10 +1136,6 @@ export class AuthService {
     this.ensureHostAuthTokenRefreshArmed();
   }
 
-  /**
-   * A machine that slept through its token's expiry wakes with the timer
-   * already overdue, and Electron does not fire an overdue timer promptly.
-   */
   private bindPowerResumeRefresh() {
     if (this.powerResumeBound || !powerMonitor?.on) {
       return;
@@ -1226,11 +1157,6 @@ export class AuthService {
     return Date.now() < exp * 1000 - HOST_AUTH_TOKEN_REFRESH_MARGIN_MS;
   }
 
-  /**
-   * Mint a fresh backend JWT from the stored bearer. Single-flight so
-   * concurrent callers (runtime refresh, the scheduled timer) share one
-   * network round-trip.
-   */
   private async mintHostAuthToken(): Promise<string | null> {
     if (this.hostAuthTokenMintPromise) {
       return await this.hostAuthTokenMintPromise;
@@ -1240,8 +1166,6 @@ export class AuthService {
       try {
         const result = await this.getAuthTokenResult();
         if (this.credentialEpoch !== mintEpoch) {
-          // Credentials changed while this mint was in flight: the result
-          // belongs to the previous identity and must never reach the runner.
           return null;
         }
         if (result.ok) {
@@ -1255,8 +1179,6 @@ export class AuthService {
           return result.token;
         }
         if (result.reason === "unauthorized") {
-          // Preserve connected identity intent and cached display identity;
-          // only anonymous identities may rotate into a new anonymous owner.
           const snapshot = resolveAuthSessionObservation({
             observation: { kind: "rejected" },
             identityIntent: this.getIdentityIntent(),
@@ -1282,7 +1204,6 @@ export class AuthService {
     return await this.hostAuthTokenMintPromise;
   }
 
-  /** Refresh the cached host token in place when it's missing or near expiry. */
   private async refreshHostAuthTokenIfStale(): Promise<void> {
     const cached = this.hostAuthToken?.trim() || null;
     if (cached && this.isHostAuthTokenFresh(cached)) {
@@ -1329,14 +1250,6 @@ export class AuthService {
       : null;
   }
 
-  /**
-   * The runtime's auth refresh, answered entirely inside main.
-   *
-   * This used to broadcast a request to the renderer and wait for it to relay
-   * a token back, with a timeout fallback. That made the renderer the token
-   * authority for a path the runtime depends on while idle, when no renderer
-   * is guaranteed to answer.
-   */
   async refreshRuntimeAuth(): Promise<HostRuntimeAuthRefreshResult> {
     try {
       await this.awaitPendingResync();
@@ -1409,7 +1322,6 @@ export class AuthService {
     this.hostAuthTokenRefreshTimer = timer;
   }
 
-  /** Jittered so a fleet of devices doesn't retry a recovering deployment in lockstep. */
   private armHostAuthTokenRetry() {
     const ceiling = Math.min(
       HOST_AUTH_TOKEN_RETRY_MAX_MS,
@@ -1479,10 +1391,6 @@ export class AuthService {
     if (!inflight) {
       return await this.startCredentialResync();
     }
-    // A credential change landed while another resync was in flight: that
-    // resync minted under the previous bearer, so its result is invalidated
-    // here and a fresh pass is chained behind it. One trailing pass covers
-    // every caller that piles up while the in-flight pass drains.
     this.invalidateCredentialEpoch();
     if (this.trailingResyncPromise) {
       return await this.trailingResyncPromise;

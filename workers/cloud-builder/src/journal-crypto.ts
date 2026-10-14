@@ -28,7 +28,6 @@ import { ownerKekFor, type OwnerKeks } from "./secret-rotation.js";
 const PREFIX = "enc1.";
 const WRAPPED_V2_PREFIX = "kek2.";
 const AAD = Buffer.from("stella-journal-v1", "utf8");
-/** First byte of `sealBytes` output; a plain (unsealed) blob starts with 0x00. */
 export const SEALED_BYTES_V1 = 0x01;
 export const PLAIN_BYTES_V1 = 0x00;
 
@@ -79,7 +78,6 @@ const decryptWith = (key: Buffer, stored: string): Buffer => {
 export const isEncryptedJournalValue = (value: string): boolean =>
   value.startsWith(PREFIX);
 
-/** The light stem the shared history vocabulary uses, so hashed search keeps `reports` finding `report`. */
 const stem = (token: string): string => {
   if (token.length <= 3) return token;
   for (const suffix of ["ations", "ation", "ingly", "ings", "ing", "edly", "ies", "ied", "ed", "es", "ly", "s"]) {
@@ -140,11 +138,6 @@ export class JournalCrypto {
     return new TextDecoder().decode(decryptWith(this.dek, stored));
   }
 
-  /**
-   * Binary envelope for bytes kept as BLOBs or R2 objects:
-   * `0x01 | iv(12) | tag(16) | ciphertext`, AES-256-GCM under the same DEK
-   * and AAD as the text form, without its base64 overhead.
-   */
   sealBytes(plain: Uint8Array): Uint8Array {
     const iv = randomBytes(12);
     const cipher = createCipheriv("aes-256-gcm", this.dek, iv);
@@ -169,7 +162,6 @@ export class JournalCrypto {
     );
   }
 
-  /** One searchable word as its keyed, stemmed index token. */
   searchToken(word: string): string {
     const digest = createHmac("sha256", this.dek)
       .update(`stella-fts-v1\0${stem(word.toLowerCase())}`, "utf8")

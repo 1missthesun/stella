@@ -1,19 +1,3 @@
-/**
- * Client for the worker's CLI bridge UDS. The node_repl `connect` client
- * (via `connect-service.ts`) dials it when an MCP/REST call fails with
- * auth, the host asks the user with a secure input card in the calling
- * chat, persists the token, and we get `{ ok: true }` back so
- * the caller can retry the original operation. Backend Composio actions
- * are brokered through the same socket (`connector.runBackendAction`),
- * and the `stella-computer` daemon-spawn RPC rides it too.
- *
- * Wire protocol mirrors `runtime/worker/cli-bridge-server.ts`: one
- * connection = one line of JSON request, one line of JSON response,
- * server closes. Keeps the dependency surface small (no shared RPC
- * client framework needed) and avoids holding a long-lived socket
- * open across the credential card.
- */
-
 import { connect, type Socket } from "node:net";
 import { z } from "zod";
 
@@ -29,11 +13,6 @@ import type {
   XApiOperation,
 } from "../cli/x-api-request.js";
 
-/**
- * Shape of the worker→host connector token-store RPC (owner-only local
- * IPC; see `setConnectorTokenStoreBroker` wiring in `worker/server.ts`).
- * Not a CLI-bridge method.
- */
 export type ConnectorTokenStoreRequest =
   | { operation: "load"; tokenKey: string }
   | { operation: "save"; tokenKey: string; payload: ConnectorTokenPayload }
@@ -127,8 +106,6 @@ const sendRequest = (
 
     const endpoint = parseCliBridgeEndpoint(socketPath);
     const socket: Socket = connect(endpoint.path);
-    // Effect timer fiber instead of setTimeout; the cancel thunk below is
-    // the old clearTimeout.
     const cancelTimeout = forkTimeoutFiber(timeoutMs, () => {
       if (settled) return;
       settled = true;
@@ -187,7 +164,6 @@ const sendRequest = (
     socket.on("error", (error) => fail(error));
     socket.on("close", () => {
       if (settled) return;
-      // Closed before any response arrived.
       fail(new Error("cli-bridge: connection closed without a response"));
     });
   });
@@ -210,9 +186,7 @@ export const requestConnectorCredentialFromBridge = async ({
   socketPath: string;
   tokenKey: string;
   displayName: string;
-  /** `"oauth"` switches the host to the browser-based flow and requires `resourceUrl`. */
   authType?: "api_key" | "oauth";
-  /** MCP server URL used for protected-resource metadata discovery when `authType==="oauth"`. */
   resourceUrl?: string;
   oauthClientId?: string;
   oauthResource?: string;
@@ -240,7 +214,6 @@ export const requestConnectorCredentialFromBridge = async ({
   };
   description?: string;
   placeholder?: string;
-  /** Who made the call, so the credential card opens in their chat. */
   caller?: { conversationId?: string; agentId?: string; toolCallId?: string };
   timeoutMs?: number;
 }): Promise<ConnectorCredentialResult> => {
@@ -276,7 +249,6 @@ export const requestConnectorCredentialFromBridge = async ({
   };
 };
 
-/** Withdraw the open credential card of a caller whose run stopped. */
 export const cancelConnectorCredentialFromBridge = async ({
   socketPath,
   caller,
@@ -411,15 +383,11 @@ export const requestBackendConnectorActionsFromBridge = async ({
 };
 
 export type AutomationDaemonSpawnParams = {
-  /** Unix socket path the daemon should listen on. */
   daemonSocketPath: string;
-  /** File the daemon writes its pid into once ready. */
   pidPath: string;
-  /** File the host appends the daemon's stdout/stderr to. */
   logPath: string;
   sessionId: string;
   stateDir: string;
-  /** Extra STELLA_COMPUTER_* env vars to forward to the daemon. */
   env?: Record<string, string>;
 };
 
@@ -472,7 +440,6 @@ export const requestAutomationDaemonSpawnFromBridge = async ({
   };
 };
 
-/** One `stella-media` call made with the worker's live Stella session. */
 export const requestMediaFromBridge = async ({
   socketPath,
   operation,
@@ -500,7 +467,6 @@ export const requestMediaFromBridge = async ({
   return { status: record.status, body: record.body };
 };
 
-/** One `stella-x-api` call made with the worker's live Stella session. */
 export const requestXApiFromBridge = async ({
   socketPath,
   operation,
@@ -556,11 +522,6 @@ export const requestDesktopPermissionFromBridge = async ({
   };
 };
 
-/**
- * One call to the account's MCP server registry (`mcpServers.<op>`) through
- * the worker's live Stella session. Resolves with the call's value; throws
- * with the backend's message (and `reason`, when it gave one).
- */
 export class AccountMcpError extends Error {
   constructor(
     message: string,

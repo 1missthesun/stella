@@ -1,19 +1,3 @@
-/**
- * Stella for Slack's settings API for stella.sh
- * (`@stella/contracts/slack-workspace`). Bearer-authenticated; a workspace is
- * listed and changed only by the Stella account that owns it.
- *
- *   GET    /api/slack/workspaces                    the caller's workspaces, settings and choices
- *   POST   /api/slack/workspaces/:teamId            change settings, rules or notes
- *   POST   /api/slack/workspaces/:teamId/repos      add a repository
- *   POST   /api/slack/workspaces/:teamId/repos/:id  change a repository's branch, rules, environment, previews
- *   POST   /api/slack/workspaces/:teamId/repos/:id/remove  remove a repository
- *   POST /api/slack/install/start         the "Add to Slack" URL for this account
- *   POST /api/slack/workspaces/:teamId/github/connect|finish|disconnect
- *   GET  /api/slack/workspaces/:teamId/github/repos|branches
- *                                         the workspace's GitHub connection (`github.ts`)
- */
-
 import { rpcErrorStatus } from "@stella/contracts/backend/protocol";
 import type { ManagedModelAudience } from "@stella/contracts/gateway/capability";
 import {
@@ -359,7 +343,6 @@ const readJson = async <T>(request: Request): Promise<T | null> => {
   }
 };
 
-/** Checks `fullName` and `branch` on GitHub; a message when they're wrong, else whether a connection reaches it. */
 const checkRepo = async (
   env: Cloudflare.Env,
   connections: SlackGithubConnection[],
@@ -374,7 +357,6 @@ const checkRepo = async (
     return { ok: true, viaGithub: found.viaGithub };
   } catch (error) {
     if (error instanceof RepoNotFoundError) return { ok: false, message: error.message };
-    // GitHub didn't answer: keep what the owner typed.
     return { ok: true, viaGithub: false };
   }
 };
@@ -522,7 +504,6 @@ const githubAction = async (
       return ok({ workspace: await described() } satisfies SlackGithubFinishResponse);
     }
     if (action === "disconnect" && request.method === "POST") {
-      // Repositories stay, reached as public until a connection covers them again.
       const input = await readJson<Partial<SlackGithubDisconnectRequest>>(request);
       const installationId = String(input?.installationId ?? (connections.length === 1 ? connections[0]!.installationId : ""));
       if (!installationId) return fail(400, "Say which GitHub account to disconnect.");

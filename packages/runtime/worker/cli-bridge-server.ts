@@ -1,21 +1,3 @@
-/**
- * Tiny local-IPC RPC the worker exposes for sidecar processes (the
- * `stella-computer` daemon spawn path) and the in-process connector
- * client (node_repl `connect.*` via `connectors/connect-service.ts`)
- * that need to call back into the host without speaking the full
- * host↔worker JSON-RPC protocol.
- *
- * Protocol: one connection = one request line of JSON, one response line
- * of JSON, server closes. Request: `{ id, method, params }`. Response:
- * `{ id, result }` on success or `{ id, error: { message } }` on failure.
- *
- * Surface is intentionally narrow. Connector backend actions,
- * `stella-media` and `stella-x-api` calls are brokered as action-specific requests; the protocol
- * never exposes Stella site auth or an arbitrary HTTP proxy. New methods get added as separate handler entries —
- * no introspection, no versioning, no streaming. If we ever need more
- * than this we should reconsider rather than grow the protocol here.
- */
-
 import { constants as fsConstants, promises as fsPromises } from "node:fs";
 import { z } from "zod";
 import { createServer, type Server, type Socket } from "node:net";
@@ -72,21 +54,6 @@ type ResponseMessage =
   | { id: string | number; error: { message: string } };
 
 export type CliBridgeHandlers = {
-  /**
-   * Resolves with `{ ok: true }` once the credential is persisted on
-   * disk, or `{ ok: false, reason }` when the user dismisses the card
-   * or the host can't service the request. The host asks with a secure
-   * input card in the calling conversation (else the one on screen).
-   *
-   * `authType: "oauth"` switches the host to the browser-based OAuth
-   * flow (`connectConnectorOAuth`) and requires `resourceUrl` (the MCP
-   * server URL — used for protected-resource metadata discovery): the
-   * card asks to open the sign-in page, then the host opens the user's
-   * external browser via `shell.openExternal` and listens on a local
-   * 127.0.0.1 callback port.
-   *
-   * `authType: "api_key"` (or omitted) asks for the key in a masked field.
-   */
   requestConnectorCredential: (params: {
     tokenKey: string;
     displayName: string;
@@ -118,7 +85,6 @@ export type CliBridgeHandlers = {
     };
     description?: string;
     placeholder?: string;
-    /** Who made the call: the credential card opens in their chat. */
     conversationId?: string;
     agentId?: string;
     toolCallId?: string;
@@ -141,7 +107,6 @@ export type CliBridgeHandlers = {
     limit?: number;
     signal?: AbortSignal;
   }) => Promise<BackendConnectorActionsResult>;
-  /** Withdraw a caller's open credential card (its run stopped). */
   cancelConnectorCredential?: (params: {
     conversationId?: string;
     toolCallId: string;
@@ -163,18 +128,12 @@ export type CliBridgeHandlers = {
   spawnAutomationDaemon?: (
     params: AutomationDaemonSpawnParams,
   ) => Promise<AutomationDaemonSpawnResult>;
-  /**
-   * `stella-media` calls made with the worker's live Stella session, so the
-   * CLI never depends on the token its shell was started with.
-   */
   requestMedia?: (
     params: MediaOperation & { deviceId?: string; signal?: AbortSignal },
   ) => Promise<MediaHttpResult>;
-  /** The account's MCP server registry, with the worker's live Stella session. */
   requestAccountMcp?: (
     params: AccountMcpOperation & { signal?: AbortSignal },
   ) => Promise<AccountMcpHttpResult>;
-  /** `stella-x-api` calls made with the worker's live Stella session. */
   requestXApi?: (
     params: XApiOperation & { signal?: AbortSignal },
   ) => Promise<XApiHttpResult>;
@@ -263,11 +222,6 @@ const handleConnection = (
   activeSockets: Set<Socket>,
   requiredToken: string | undefined,
 ) => {
-  // The AbortController stays deliberately (effect-ratchet pinned): the
-  // `signal?: AbortSignal` seam in CliBridgeHandlers is the contract the
-  // backend connector action broker consumes, and an AbortSignal cannot be
-  // constructed without a controller. The bridge is sidecar-process
-  // boundary code; the signal fires on CLI disconnect only.
   const connectionAbort = new AbortController();
   activeSockets.add(socket);
   socket.on("close", () => {

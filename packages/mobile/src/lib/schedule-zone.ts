@@ -1,9 +1,3 @@
-/**
- * Tells the account where the phone is. The phone travels with the user, so
- * its zone is the user's: repeating schedules follow it, and Stella reads
- * the time in it. Reported on launch and whenever the app comes back.
- */
-
 import { useEffect } from "react";
 import { AppState } from "react-native";
 import { deviceTimeZone } from "@stella/contracts/schedule-zone";

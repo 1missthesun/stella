@@ -28,6 +28,5 @@ const canonicalize = (value: unknown): unknown => {
   );
 };
 
-/** Key-order-independent digest of a JSON value. */
 export const stableValueMarker = async (value: unknown): Promise<string> =>
   `sha256:${await sha256Hex(JSON.stringify(canonicalize(value)))}`;

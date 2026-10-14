@@ -10,11 +10,6 @@ import { captchaHeaders } from "@/platform/auth/challenge-token";
 
 type BrowserCallbackLocation = Pick<Location, "origin" | "pathname">;
 
-/**
- * OAuth callbacks must never inherit ambient query parameters or fragments.
- * In particular, an auth credential already being consumed by the shell must
- * not be copied into a new provider callback URL.
- */
 export const getBrowserSocialCallbackUrl = (
   location: BrowserCallbackLocation,
   website = platformCapabilities.website,
@@ -90,10 +85,6 @@ export type MagicLinkSendRequest = {
   body: { email: string };
 };
 
-/**
- * A magic-link send carries only the email and the Turnstile proof: the link
- * signs in whoever opens it, and the shell that asked claims the session.
- */
 export const buildMagicLinkSendRequest = (
   email: string,
   turnstileToken?: string,
@@ -119,16 +110,6 @@ const readConnectedAccountOwnerId = (): string | null => {
   return ownerId && data?.user?.isAnonymous !== true ? ownerId : null;
 };
 
-/**
- * Install a claimed bearer token in whichever store owns credentials for this
- * shell, then perform an authoritative session read. A completed poll without a
- * verifiable connected-account owner is treated as a failed link.
- *
- * Electron hands the token to main, which is the only token authority there.
- * A browser shell writes it to its own local store. Either way the link
- * finishes in the shell the user started it from, so no path asks them to sign
- * in twice.
- */
 export const applyAndVerifyAccountSessionToken = async (
   sessionToken: string,
 ): Promise<void> => {

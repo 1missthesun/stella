@@ -18,10 +18,6 @@ const BAR_COUNT = 44;
 const BAR_WIDTH = 2;
 const BAR_GAP = 2;
 
-/**
- * Collapse the stored ~200 peaks into the bars this card actually draws. The
- * numbers come from the native extractor; nothing here reads the audio.
- */
 const barsFrom = (peaks: readonly number[]): number[] => {
   if (peaks.length === 0) return [];
   const bars: number[] = [];
@@ -43,15 +39,6 @@ const barsFrom = (peaks: readonly number[]): number[] => {
   return bars.map((value) => Math.max(0.06, value / loudest));
 };
 
-/**
- * An audio attachment as its own waveform, with a cursor that runs along it.
- *
- * The bars are drawn from the peaks array alone — the file itself is not
- * touched until the first press, when a player is created for it and torn down
- * with the card. The cursor is a Reanimated timing animation over the known
- * duration rather than a per-frame position read, so playback costs the JS
- * thread nothing while it runs.
- */
 export function WaveformCard({
   filePath,
   conversationId,

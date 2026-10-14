@@ -1,18 +1,3 @@
-/**
- * `ask_stella` — the one tool a BYOK realtime voice model gets.
- *
- * GPT-Live delegates through `session.delegation.created`. The Realtime API
- * (OpenAI BYOK, and xAI's event-compatible Voice Agent) has no delegation
- * channel, but it does have function calling — so the same two-brain shape is
- * expressed as a single function the voice model calls when the user wants
- * something done. Its handler runs the identical `voice.orchestratorChat`
- * path and returns the orchestrator's answer as the function result.
- *
- * Deliberately ONE tool. The per-tool catalog this replaced gave the voice
- * model its own actions and its own idea of what had happened, which is the
- * desync the delegation design exists to remove.
- */
-
 export const ASK_STELLA_TOOL_NAME = "ask_stella";
 
 export type RealtimeFunctionTool = {
@@ -41,16 +26,10 @@ export const ASK_STELLA_TOOL: RealtimeFunctionTool = {
   },
 };
 
-/** The single BYOK tool, as realtime session config wants it. */
 export const ASK_STELLA_SESSION_TOOLS: readonly RealtimeFunctionTool[] = [
   ASK_STELLA_TOOL,
 ];
 
-/**
- * Pull the request out of a function call's arguments. Realtime delivers them
- * as a JSON string; a model that calls the tool with nothing usable still gets
- * a delegation, built from the transcript alone.
- */
 export const parseAskStellaRequest = (rawArguments: unknown): string => {
   if (typeof rawArguments !== "string" || !rawArguments.trim()) return "";
   try {

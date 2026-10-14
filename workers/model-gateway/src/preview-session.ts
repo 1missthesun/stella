@@ -34,12 +34,6 @@ const isResult = (value: unknown): value is Result => {
   );
 };
 
-/**
- * The billing step of a session exchange for a desktop signed in to a
- * cloud-builder Preview (dev only). The Preview holds the owner's billing
- * and signs with `builder-preview-1`, which this gateway's CAPABILITY_JWKS
- * already trusts for the Preview's cloud turns.
- */
 export const issuePreviewSessionCapability = async (args: {
   issuer: string;
   token: string;

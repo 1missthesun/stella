@@ -3,7 +3,6 @@ export type CanvasNavigation =
   | { kind: "external"; url: string }
   | { kind: "blocked" };
 
-/** Classify navigation from a single-file canvas without resolving relative URLs. */
 export function classifyCanvasNavigation(href: string): CanvasNavigation {
   const trimmed = href.trim();
   if (trimmed.startsWith("#")) {

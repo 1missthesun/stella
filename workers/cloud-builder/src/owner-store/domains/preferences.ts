@@ -1,10 +1,3 @@
-/**
- * Account preferences, and feedback (stored globally in D1).
- *
- * Feedback is owner-scoped only so it can share the owner's rate limiter;
- * nothing about the sender is written with it.
- */
-
 import {
   FEEDBACK_MAX_CHARS,
   PREFERENCE_LOCALES,
@@ -220,14 +213,8 @@ export const preferencesDomain = {
     },
   },
   internal: {
-    /** Cloud telemetry producers ask before reporting anything for an owner. */
     "preferences.telemetryEnabled": (ctx) =>
       readPreferences(ctx.db).telemetryEnabled,
-    /**
-     * The only way any support tooling may touch an owner's content: the
-     * owner granted access, and the use is written to their visible log
-     * first. No grant, no access — there is no other staff path to content.
-     */
     "support.recordAccess": (ctx, args) => {
       const tool =
         typeof (args as { tool?: unknown } | null)?.tool === "string"

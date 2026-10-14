@@ -165,21 +165,13 @@ import type { BuildSessionInternals } from "./host.js";
 
 export class BuildSessionObject extends DurableObject<Env> {
   private readonly runningTurns = new Map<string, Set<Promise<unknown>>>();
-  /** Effect-supervised app-build work; owner purge interrupts before joining. */
   private readonly appTurnExecutions = new Map<
     string,
     TurnExecution<Response>
   >();
-  /** Effect-supervised spawned-agent work; Stop never joins a raw promise. */
   private readonly agentTurnExecutions = new Map<string, TurnExecution<void>>();
 
-  /**
-   * Alarm recovery interrupts an exact run without destroying its disk. The
-   * interrupt hooks consult this set, kill/join only the model-controlled
-   * session, and leave the sandbox mounted for the trusted fallback archiver.
-   */
   private readonly builderFallbackRecoveries = new Set<string>();
-  /** Exact replay joins one in-flight archive build instead of racing scratch. */
   private readonly turnStateCheckpointRuns = new Map<
     string,
     Promise<TurnBrokerTurnStateCheckpointReceipt>
@@ -207,7 +199,6 @@ export class BuildSessionObject extends DurableObject<Env> {
     return this as unknown as BuildSessionInternals;
   }
 
-  /** @see src/build-session/session-core.ts */
   private deleteTurnStoragePreservingExactCancellations(
     expectedTurn?: TurnRequest,
     deleteAlarm = false,
@@ -219,41 +210,27 @@ export class BuildSessionObject extends DurableObject<Env> {
     );
   }
 
-  // ── The turn plane: owner gate, capabilities, owner events, transcript ─
-  //
-  // Everything below replaces a synchronous control-plane round trip that used to sit
-  // on a turn's critical path. Admission is the owner gate's, authority is a
-  // signed capability rather than a reusable token the control plane has to look up, and
-  // what the owner indexes is delivered to the owner gate instead of an HTTP
-  // callback with its own retry ladder.
-
-  /** @see src/build-session/session-core.ts */
   private ownerGateFor(ownerId: string) {
     return ownerGateFor(this.self, ownerId);
   }
 
-  /** @see src/build-session/session-core.ts */
   private releaseOwnerGate(turn: TurnRequest): Promise<void> {
     return releaseOwnerGate(this.self, turn);
   }
 
 
-  /** @see src/build-session/session-core.ts */
   private ownerEventBase(turn: TurnRequest, key: string) {
     return ownerEventBase(this.self, turn, key);
   }
 
-  /** @see src/build-session/session-core.ts */
   private deliverOwnerEventsDurable(events: OwnerEvent[]): Promise<void> {
     return deliverOwnerEventsDurable(this.self, events);
   }
 
-  /** @see src/build-session/session-core.ts */
   private retryOwnerEventDebt(): Promise<void> {
     return retryOwnerEventDebt(this.self);
   }
 
-  /** @see src/build-session/session-core.ts */
   private emitTurnEvent(
     turn: TurnRequest,
     eventKind: string,
@@ -269,7 +246,6 @@ export class BuildSessionObject extends DurableObject<Env> {
     return emitTurnEvent(this.self, turn, eventKind, payload, options);
   }
 
-  /** @see src/build-session/session-core.ts */
   private appendThreadTranscript(
     turn: TurnRequest,
     messages: readonly ThreadMessageInput[],
@@ -277,12 +253,10 @@ export class BuildSessionObject extends DurableObject<Env> {
     return appendThreadTranscript(this.self, turn, messages);
   }
 
-  /** @see src/build-session/session-core.ts */
   private trackTurn<T>(turnId: string, work: Promise<T>): Promise<T> {
     return trackTurn(this.self, turnId, work);
   }
 
-  /** @see src/build-session/admission.ts */
   private startAgentTurn(
     turn: TurnRequest,
     sandboxId: string | undefined,
@@ -290,7 +264,6 @@ export class BuildSessionObject extends DurableObject<Env> {
     return startAgentTurn(this.self, turn, sandboxId);
   }
 
-  /** @see src/build-session/session-core.ts */
   private callOwnerFence(
     ownerId: string,
     path: string,
@@ -299,7 +272,6 @@ export class BuildSessionObject extends DurableObject<Env> {
     return callOwnerFenceCore(this.self, ownerId, path, body);
   }
 
-  /** @see src/build-session/session-core.ts */
   private callOwnerTurnState<T>(
     turn: TurnRequest,
     path:
@@ -316,7 +288,6 @@ export class BuildSessionObject extends DurableObject<Env> {
     return callOwnerTurnState(this.self, turn, path, body);
   }
 
-  /** @see src/build-session/turn-broker.ts */
   private resolveAgentTurnState(
     turn: TurnRequest,
     canonicalHistoryCursor: string,
@@ -328,7 +299,6 @@ export class BuildSessionObject extends DurableObject<Env> {
     );
   }
 
-  /** @see src/build-session/turn-broker.ts */
   private publishAgentTurnWorkspace(
     turn: TurnRequest,
     canonicalHistoryCursor: string,
@@ -342,7 +312,6 @@ export class BuildSessionObject extends DurableObject<Env> {
     );
   }
 
-  /** @see src/build-session/turn-broker.ts */
   private confirmAgentTurnStateRestore(
     turn: TurnRequest,
     canonicalHistoryCursor: string,
@@ -358,19 +327,16 @@ export class BuildSessionObject extends DurableObject<Env> {
     );
   }
 
-  /** @see src/build-session/container-turn.ts */
   private quiesceCurrentAgentSession(turn: TurnRequest): Promise<void> {
     return quiesceCurrentAgentSession(this.self, turn);
   }
 
-  /** @see src/build-session/container-turn.ts */
   private exactAgentExecutionMarker(
     turn: TurnRequest,
   ): Promise<AgentExecutionMarker | undefined> {
     return exactAgentExecutionMarker(this.self, turn);
   }
 
-  /** @see src/build-session/container-turn.ts */
   private persistAgentExecutionMarker(
     turn: TurnRequest,
     marker: AgentExecutionMarker,
@@ -378,19 +344,16 @@ export class BuildSessionObject extends DurableObject<Env> {
     return persistAgentExecutionMarker(this.self, turn, marker);
   }
 
-  /** @see src/build-session/container-turn.ts */
   private interruptAgentForBuilderFallback(turn: TurnRequest): Promise<void> {
     return interruptAgentForBuilderFallback(this.self, turn);
   }
 
-  /** @see src/build-session/turn-broker.ts */
   private exactTurnStateCheckpointOperations(
     turn: TurnRequest,
   ): Promise<TurnStateCheckpointOperation[]> {
     return exactTurnStateCheckpointOperations(this.self, turn);
   }
 
-  /** @see src/build-session/turn-broker.ts */
   private abortUnpublishedTurnStateOperation(
     turn: TurnRequest,
     operation: TurnStateCheckpointOperation,
@@ -404,7 +367,6 @@ export class BuildSessionObject extends DurableObject<Env> {
     );
   }
 
-  /** @see src/build-session/alarms-recovery.ts */
   private recoverAgentTurnAfterExecutorLoss(
     turn: TurnRequest,
     marker: AgentExecutionMarker,
@@ -413,7 +375,6 @@ export class BuildSessionObject extends DurableObject<Env> {
     return recoverAgentTurnAfterExecutorLoss(this.self, turn, marker, error);
   }
 
-  /** @see src/build-session/alarms-recovery.ts */
   private reconcileAgentCheckpointAfterQuiescence(
     turn: TurnRequest,
     marker: AgentExecutionMarker,
@@ -429,7 +390,6 @@ export class BuildSessionObject extends DurableObject<Env> {
     );
   }
 
-  /** @see src/build-session/alarms-recovery.ts */
   private ensureBuilderFallbackTranscript(
     turn: TurnRequest,
     input?: BuilderFallbackInput & { error?: string },
@@ -437,7 +397,6 @@ export class BuildSessionObject extends DurableObject<Env> {
     return ensureBuilderFallbackTranscript(this.self, turn, input);
   }
 
-  /** @see src/build-session/alarms-recovery.ts */
   private advanceBuilderFallback(
     turn: TurnRequest,
     fallback: BuilderFallbackTranscript,
@@ -445,12 +404,10 @@ export class BuildSessionObject extends DurableObject<Env> {
     return advanceBuilderFallback(this.self, turn, fallback);
   }
 
-  /** @see src/build-session/session-core.ts */
   private registerTurn(turn: TurnRequest, freshLease = false): Promise<string> {
     return registerTurn(this.self, turn, freshLease);
   }
 
-  /** @see src/build-session/owner-fence-leases.ts */
   private ownerFenceReceiptMatches(
     receipt: BuildOwnerFenceLeaseReceipt,
     target: Pick<TurnRequest, "ownerId" | "ownerGeneration" | "turnId">,
@@ -459,7 +416,6 @@ export class BuildSessionObject extends DurableObject<Env> {
     return ownerFenceReceiptMatches(this.self, receipt, target, leaseId);
   }
 
-  /** @see src/build-session/owner-fence-leases.ts */
   private ownerFenceLeaseSlotKey(
     turn: TurnRequest,
     kind: BuildOwnerFenceLeaseReceipt["kind"],
@@ -467,22 +423,18 @@ export class BuildSessionObject extends DurableObject<Env> {
     return ownerFenceLeaseSlotKey(this.self, turn, kind);
   }
 
-  /** @see src/build-session/owner-fence-leases.ts */
   private armOwnerFenceLeaseReconciliationAlarm(): Promise<void> {
     return armOwnerFenceLeaseReconciliationAlarm(this.self);
   }
 
-  /** @see src/build-session/owner-fence-leases.ts */
   private hasOwnerFenceLeaseRetirementDebt(): Promise<boolean> {
     return hasOwnerFenceLeaseRetirementDebt(this.self);
   }
 
-  /** @see src/build-session/owner-fence-leases.ts */
   private retryOwnerFenceLeaseRetirements(): Promise<void> {
     return retryOwnerFenceLeaseRetirements(this.self);
   }
 
-  /** @see src/build-session/owner-fence-leases.ts */
   private registerBuildOwnerFenceLease(args: {
     turn: TurnRequest;
     kind: BuildOwnerFenceLeaseReceipt["kind"];
@@ -494,12 +446,10 @@ export class BuildSessionObject extends DurableObject<Env> {
     return registerBuildOwnerFenceLease(this.self, args);
   }
 
-  /** @see src/build-session/session-core.ts */
   private unregisterTurn(turn: TurnRequest): Promise<void> {
     return unregisterTurn(this.self, turn);
   }
 
-  /** @see src/build-session/session-core.ts */
   private unregisterTurnLease(
     turn: TurnRequest,
     leaseId: string,
@@ -508,7 +458,6 @@ export class BuildSessionObject extends DurableObject<Env> {
     return unregisterTurnLease(this.self, turn, leaseId, generation);
   }
 
-  /** @see src/build-session/owner-fence-leases.ts */
   private retireBuildOwnerFenceLease(
     receipt: BuildOwnerFenceLeaseReceipt,
     generation = receipt.registrationGeneration,
@@ -516,32 +465,26 @@ export class BuildSessionObject extends DurableObject<Env> {
     return retireBuildOwnerFenceLease(this.self, receipt, generation);
   }
 
-  /** @see src/build-session/session-core.ts */
   private sweepNativeBackupDebt(workspaceKey: string): Promise<void> {
     return sweepNativeBackupDebt(this.self, workspaceKey);
   }
 
-  /** @see src/build-session/session-core.ts */
   private settleAgentTransientBackup(turn: TurnRequest): Promise<boolean> {
     return settleAgentTransientBackup(this.self, turn);
   }
 
-  /** @see src/build-session/session-core.ts */
   private cleanupTransientWrites(turn: TurnRequest): Promise<void> {
     return cleanupTransientWrites(this.self, turn);
   }
 
-  /** @see src/build-session/session-core.ts */
   private cleanupOwnerPurgedTurnStorage(turn: TurnRequest): Promise<boolean> {
     return cleanupOwnerPurgedTurnStorage(this.self, turn);
   }
 
-  /** @see src/build-session/session-core.ts */
   private settleTerminalTransientWrites(turn: TurnRequest): Promise<boolean> {
     return settleTerminalTransientWrites(this.self, turn);
   }
 
-  /** @see src/build-session/session-core.ts */
   private retireTerminalAppTurnStorage(turn: TurnRequest): Promise<void> {
     return retireTerminalAppTurnStorage(this.self, turn);
   }
@@ -550,7 +493,6 @@ export class BuildSessionObject extends DurableObject<Env> {
     return cancelForOwnerPurge(this.self, request);
   }
 
-  /** @see src/build-session/session-core.ts */
   private redeliverOrphan(
     turn: TurnRequest,
     pending: PendingTerminal,
@@ -558,22 +500,18 @@ export class BuildSessionObject extends DurableObject<Env> {
     return redeliverOrphan(this.self, turn, pending);
   }
 
-  /** @see src/build-session/session-core.ts */
   private assertTurnWritable(turn: TurnRequest): Promise<void> {
     return assertTurnWritable(this.self, turn);
   }
 
-  /** @see src/build-session/session-core.ts */
   private assertAgentTurnIdentity(turn: TurnRequest): void {
     return assertAgentTurnIdentity(this.self, turn);
   }
 
-  /** @see src/build-session/session-core.ts */
   private assertAppTurnIdentity(turn: TurnRequest): void {
     return assertAppTurnIdentity(this.self, turn);
   }
 
-  /** @see src/build-session/session-core.ts */
   private fetchCanonicalAgentHistory(
     turn: TurnRequest,
     options: { excludeCurrentTurn: boolean; signal?: AbortSignal },
@@ -581,7 +519,6 @@ export class BuildSessionObject extends DurableObject<Env> {
     return fetchCanonicalAgentHistory(this.self, turn, options);
   }
 
-  /** @see src/build-session/session-core.ts */
   private assertAgentExecutionActive(
     turn: TurnRequest,
     execution: TurnExecutionContext,
@@ -589,7 +526,6 @@ export class BuildSessionObject extends DurableObject<Env> {
     return assertAgentExecutionActive(this.self, turn, execution);
   }
 
-  /** @see src/build-session/session-core.ts */
   private assertAppExecutionActive(
     turn: TurnRequest,
     execution: TurnExecutionContext,
@@ -597,7 +533,6 @@ export class BuildSessionObject extends DurableObject<Env> {
     return assertAppExecutionActive(this.self, turn, execution);
   }
 
-  /** @see src/build-session/session-sandbox.ts */
   private sandbox(
     id: string,
     size: InstanceSize = "large",
@@ -608,14 +543,12 @@ export class BuildSessionObject extends DurableObject<Env> {
     return sandbox(this.self, id, size, workload, world, idleTimeoutMs);
   }
 
-  /** @see src/build-session/session-sandbox.ts */
   private sandboxContainerRunning(
     sandbox: ReturnType<BuildSessionObject["sandbox"]>,
   ): Promise<boolean> {
     return sandboxContainerRunning(this.self, sandbox);
   }
 
-  /** @see src/build-session/session-sandbox.ts */
   private destroySandboxDurably(
     target: SandboxTarget,
     event: string,
@@ -630,37 +563,30 @@ export class BuildSessionObject extends DurableObject<Env> {
     return deliverExecutorLossTerminal(this.self, turn, text);
   }
 
-  /** @see src/build-session/session-sandbox.ts */
   private retryDueSandboxDestroyDebts(now = Date.now()): Promise<void> {
     return retryDueSandboxDestroyDebts(this.self, now);
   }
 
-  /** @see src/build-session/session-sandbox.ts */
   private scheduleSandboxDestroyDebtAlarm(): Promise<void> {
     return scheduleSandboxDestroyDebtAlarm(this.self);
   }
 
-  /** @see src/build-session/session-core.ts */
   private scheduleDurabilityAlarm(): Promise<void> {
     return scheduleDurabilityAlarm(this.self);
   }
 
-  /** @see src/build-session/session-sandbox.ts */
   private currentSandboxTarget(): Promise<SandboxTarget | undefined> {
     return currentSandboxTarget(this.self);
   }
 
-  /** @see src/build-session/session-sandbox.ts */
   private currentSandbox() {
     return currentSandbox(this.self);
   }
 
-  /** @see src/build-session/session-sandbox.ts */
   private terminateCurrentAgentSession(turn: TurnRequest): Promise<void> {
     return terminateCurrentAgentSession(this.self, turn);
   }
 
-  /** @see src/build-session/session-sandbox.ts */
   private releaseAgentSessionResources(target: {
     sandboxId: string;
     size: InstanceSize;
@@ -672,12 +598,10 @@ export class BuildSessionObject extends DurableObject<Env> {
     return releaseAgentSessionResources(this.self, target);
   }
 
-  /** @see src/build-session/session-core.ts */
   private ownsExactTurn(turn: TurnRequest): Promise<boolean> {
     return ownsExactTurn(this.self, turn);
   }
 
-  /** @see src/build-session/session-core.ts */
   private mutateExactTurn(
     turn: TurnRequest,
     operation: (txn: DurableObjectTransaction) => Promise<void>,
@@ -685,7 +609,6 @@ export class BuildSessionObject extends DurableObject<Env> {
     return mutateExactTurn(this.self, turn, operation);
   }
 
-  /** @see src/build-session/session-core.ts */
   private setExactTurnAlarm(
     turn: TurnRequest,
     scheduledTime: number,
@@ -693,7 +616,6 @@ export class BuildSessionObject extends DurableObject<Env> {
     return setExactTurnAlarm(this.self, turn, scheduledTime);
   }
 
-  /** @see src/build-session/session-core.ts */
   private event(
     turn: TurnRequest,
     seq: number | "auto",
@@ -736,24 +658,18 @@ export class BuildSessionObject extends DurableObject<Env> {
     try {
       await this.runScheduledTurnAlarm();
     } finally {
-      // `setAlarm()` is shared by watchdogs, terminal delivery and container
-      // retirement. Whatever the turn path did, outstanding teardown debt
-      // must retain the earliest wake-up.
       await this.scheduleDurabilityAlarm();
     }
   }
 
-  /** @see src/build-session/alarms-recovery.ts */
   private runScheduledTurnAlarm(): Promise<void> {
     return runScheduledTurnAlarm(this.self);
   }
 
-  /** @see src/build-session/alarms-recovery.ts */
   private runAlarmWithLease(turn: TurnRequest): Promise<void> {
     return runAlarmWithLease(this.self, turn);
   }
 
-  /** @see src/build-session/alarms-recovery.ts */
   private runAlarm(turn: TurnRequest): Promise<void> {
     return runAlarm(this.self, turn);
   }
@@ -782,7 +698,6 @@ export class BuildSessionObject extends DurableObject<Env> {
     return cancelExactAgentTurn(this.self, request, reason);
   }
 
-  /** @see src/build-session/turn-broker.ts */
   private executeTurnStateCheckpoint(args: {
     turn: TurnRequest;
     operationKey: string;
@@ -793,7 +708,6 @@ export class BuildSessionObject extends DurableObject<Env> {
     return executeTurnStateCheckpoint(this.self, args);
   }
 
-  /** @see src/build-session/turn-broker.ts */
   private handleTurnBroker(request: Request): Promise<Response> {
     return handleTurnBroker(this.self, request);
   }
@@ -812,8 +726,6 @@ export class BuildSessionObject extends DurableObject<Env> {
     if (url.pathname === "/expire-agent-turn") {
       return await this.expireCurrentAgentTurn(request);
     }
-    // The OrchestratorSession's own CLI turn: its status after the DO lost
-    // track of it, and a container start ahead of the next one.
     if (url.pathname === "/orchestrator-turn/status") {
       return await handleOrchestratorTurnStatus(this.self, request);
     }
@@ -844,8 +756,6 @@ export class BuildSessionObject extends DurableObject<Env> {
 
     if (url.pathname !== "/turn") return json({ error: "Not found." }, 404);
     const raw = (await request.json().catch(() => null)) as unknown;
-    // An agent attempt arrives in the turn-plane contract shape, so every
-    // dispatcher's attempt is admitted by one rule.
     let turn: TurnRequest;
     if (
       raw &&
@@ -855,9 +765,6 @@ export class BuildSessionObject extends DurableObject<Env> {
     ) {
       const parsed = parseCloudAgentTurnStartRequest(raw);
       if (!parsed.ok) return json({ error: parsed.message }, 400);
-      // An agent on Stella's models or the owner's ChatGPT plan runs in its
-      // conversation as a pi agent (`dispatchCloudAgentTurn`); a container
-      // here runs Claude agents and Claude Code's orchestrator turns.
       if (parsed.request.execution.engine !== "anthropic") {
         return json({ error: "This agent runs in its conversation." }, 400);
       }
@@ -865,20 +772,12 @@ export class BuildSessionObject extends DurableObject<Env> {
     } else {
       return json({ error: "Unsupported turn kind." }, 400);
     }
-    // These fields come only from the authenticated outer gateway. Delete any
-    // body-shaped values first so a service caller cannot choose where the
-    // sandbox sends its capability or which BuildSession identity it claims.
     delete turn.turnBrokerRoute;
     delete turn.gateAdmittedByCaller;
-    // Set by the dispatcher, which admitted the owner gate itself before
-    // dispatching and releases it if this call fails. Trusted because only a
-    // Durable Object stub can reach `/turn`.
     if (request.headers.get(HEADER_GATE_ADMITTED)?.trim() === "1") {
       turn.gateAdmittedByCaller = true;
     }
     if (turn.agentRole === "orchestrator") {
-      // Only the conversation's own OrchestratorSession runs its chat turn,
-      // inside a chat-lane admission it holds itself.
       if (!turn.gateAdmittedByCaller) {
         return json(
           { error: "An orchestrator turn is dispatched by its conversation." },
@@ -940,8 +839,6 @@ export class BuildSessionObject extends DurableObject<Env> {
     turn.ownerId = turn.ownerId.trim();
     turn.turnId = turn.turnId.trim();
     turn.ownerGeneration = dispatchOwnerGeneration;
-    // The turn capability is minted from these; an unknown audience or a
-    // non-finite budget can never reach the model gateway.
     if (
       !isManagedModelAudience(turn.audience) ||
       typeof turn.budgetMicroCents !== "number" ||
@@ -990,9 +887,6 @@ export class BuildSessionObject extends DurableObject<Env> {
         );
       }
       try {
-        // Reuse the one durable lease captured by the first admission. A lost
-        // response must never register and then leak a second owner-purge
-        // lease or overwrite the execution's stored lease identity.
         await this.assertTurnWritable(storedTurn);
         if (turn.kind === "agent") {
           this.assertAgentTurnIdentity(turn);
@@ -1009,9 +903,6 @@ export class BuildSessionObject extends DurableObject<Env> {
             ),
           ]);
           if (executionMarker || fallbackJournal) {
-            // The prior isolate admitted model-controlled work. Its sandbox
-            // and durable checkpoint/publication journal are the authority;
-            // never replace them with a failed terminal on a lost /turn ACK.
             await this.setExactTurnAlarm(storedTurn, Date.now());
             return json(
               { accepted: false, replayed: true, recoveryPending: true },
@@ -1038,8 +929,6 @@ export class BuildSessionObject extends DurableObject<Env> {
             );
           }
           await this.setExactTurnAlarm(storedTurn, Date.now());
-          // 425 deliberately keeps the dispatcher's exact retry alive until
-          // the alarm has terminated the orphan and delivered terminal.
           return json(
             { accepted: false, replayed: true, recoveryPending: true },
             425,
@@ -1122,17 +1011,6 @@ export class BuildSessionObject extends DurableObject<Env> {
     }
   }
 
-  // Accept the dispatch immediately and run the turn in the background: a
-  // sandbox turn takes minutes, and holding the POST open that long means a
-  // mid-turn transport failure makes the owner mark a still-running turn (and
-  // its thread) failed while the agent goes on to finish. Outcomes reach
-  // the owner only through events/threads-complete callbacks.
-  /**
-   * The placement this turn is admitted under, decided once and stored beside
-   * it. A turn dispatched without an engine selection has nothing to place, so
-   * it records nothing and keeps the container path it has always had.
-   */
-  /** @see src/build-session/admission.ts */
   private admitAgentTurnThroughOwnerGate(
     turn: TurnRequest,
   ): Promise<
@@ -1141,7 +1019,6 @@ export class BuildSessionObject extends DurableObject<Env> {
     return admitAgentTurnThroughOwnerGate(this.self, turn);
   }
 
-  /** @see src/build-session/admission.ts */
   private agentTurnAccepted(
     turn: TurnRequest,
     replayed: boolean,
@@ -1150,12 +1027,10 @@ export class BuildSessionObject extends DurableObject<Env> {
     return agentTurnAccepted(this.self, turn, replayed, extra);
   }
 
-  /** @see src/build-session/admission.ts */
   private acceptAgentTurn(turn: TurnRequest): Promise<Response> {
     return acceptAgentTurn(this.self, turn);
   }
 
-  /** @see src/build-session/admission.ts */
   private runAgentTurn(
     turn: TurnRequest,
     sandboxId: string | undefined,
@@ -1164,7 +1039,6 @@ export class BuildSessionObject extends DurableObject<Env> {
     return runAgentTurn(this.self, turn, sandboxId, execution);
   }
 
-  /** @see src/build-session/container-turn.ts */
   private runContainerAgentTurn(
     turn: TurnRequest,
     sandboxId: string,
@@ -1173,14 +1047,12 @@ export class BuildSessionObject extends DurableObject<Env> {
     return runContainerAgentTurn(this.self, turn, sandboxId, execution);
   }
 
-  /** @see src/build-session/container-turn.ts */
   private attachAgentWorld(
     args: Parameters<typeof attachAgentWorld>[1],
   ): ReturnType<typeof attachAgentWorld> {
     return attachAgentWorld(this.self, args);
   }
 
-  /** @see src/build-session/container-turn.ts */
   private runAgentAttempt(
     args: Parameters<typeof runAgentAttempt>[1],
   ): ReturnType<typeof runAgentAttempt> {

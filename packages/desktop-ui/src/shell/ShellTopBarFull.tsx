@@ -46,10 +46,6 @@ import { PanelRight } from "@/ui/icons";
 import { useT } from "@/shared/i18n";
 import "./shell-topbar-full.css";
 
-/**
- * Nav entries the full-window bar suppresses. Home is rendered by the
- * standalone workspace surface.
- */
 const OMITTED_NAV_IDS = ["chat"] as const;
 
 type ShellTopBarFullProps = {
@@ -62,8 +58,6 @@ export const ShellTopBarFull = memo(function ShellTopBarFull({ onSignIn }: Shell
   const isMac = platform === "darwin";
   const isWin = platform === "win32";
   const panelOpen = useDisplayPanelOpen();
-  // While signed in, the settings gear is folded into the account button's
-  // unified menu, so the standalone gear only renders when signed out.
   const { hasConnectedAccount } = useAuthSessionState();
 
   return (

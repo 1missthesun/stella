@@ -1,9 +1,3 @@
-/**
- * Stella's hand-drawn icon set. Replaces lucide-react with original geometry:
- * 24x24 grid, stroke-based, rounded caps/joins, SF-Symbols-inspired optical
- * insets. Components keep lucide's prop surface (size / strokeWidth / SVG
- * props) so they remain drop-in at every call site.
- */
 import { forwardRef } from "react";
 import type { ReactNode, SVGProps } from "react";
 
@@ -22,7 +16,6 @@ function createIcon(name: string, children: ReactNode) {
     Icon.displayName = name;
     return Icon;
 }
-/* ---------------------------------- core --------------------------------- */
 export const X = createIcon("x", <path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/>);
 export const Check = createIcon("check", <path d="M5 12.8 9.9 17.7 19 7.3"/>);
 export const Plus = createIcon("plus", <path d="M12 5.5v13M5.5 12h13"/>);
@@ -59,11 +52,9 @@ export const CheckCircle2 = createIcon("check-circle", <>
     <circle cx="12" cy="12" r="8.25"/>
     <path d="m8.4 12.3 2.5 2.5 4.7-5.3"/>
   </>);
-/* -------------------------------- chevrons ------------------------------- */
 export const ChevronDown = createIcon("chevron-down", <path d="m6.5 9.25 5.5 5.5 5.5-5.5"/>);
 export const ChevronLeft = createIcon("chevron-left", <path d="m14.75 6.5-5.5 5.5 5.5 5.5"/>);
 export const ChevronRight = createIcon("chevron-right", <path d="m9.25 6.5 5.5 5.5-5.5 5.5"/>);
-/* --------------------------------- arrows -------------------------------- */
 export const ArrowUp = createIcon("arrow-up", <path d="M12 19.5v-15M5.5 11 12 4.5 18.5 11"/>);
 export const ArrowLeft = createIcon("arrow-left", <path d="M19.5 12h-15M11 5.5 4.5 12l6.5 6.5"/>);
 export const ArrowRight = createIcon("arrow-right", <path d="M4.5 12h15M13 5.5 19.5 12 13 18.5"/>);
@@ -86,7 +77,6 @@ export const House = createIcon("house", <>
 export const Download = createIcon("download", <path d="M4.5 14.25v3.25a2.75 2.75 0 0 0 2.75 2.75h9.5a2.75 2.75 0 0 0 2.75-2.75v-3.25M12 3.75v10M7.75 9.75 12 14l4.25-4.25"/>);
 export const LogIn = createIcon("log-in", <path d="M13.5 4.25h3.25a3 3 0 0 1 3 3v9.5a3 3 0 0 1-3 3H13.5M4 12h9.25M9.75 8.5 13.25 12l-3.5 3.5"/>);
 export const LogOut = createIcon("log-out", <path d="M10.5 4.25H7.25a3 3 0 0 0-3 3v9.5a3 3 0 0 0 3 3h3.25M9.5 12H20M16.5 8.5 20 12l-3.5 3.5"/>);
-/* ------------------------------ communication ---------------------------- */
 const bubblePath = "M12 4.5c-4.69 0-8.5 3.13-8.5 7 0 2.13 1.16 4.04 2.99 5.32-.18 1.21-.74 2.34-1.6 3.21a7.66 7.66 0 0 0 4.27-1.69c.88.27 1.83.41 2.84.41 4.69 0 8.5-3.13 8.5-7.25S16.69 4.5 12 4.5Z";
 export const MessageSquare = createIcon("message", <path d={bubblePath}/>);
 export const Eye = createIcon("eye", <>
@@ -97,7 +87,6 @@ export const Smartphone = createIcon("smartphone", <>
     <rect x="6.75" y="3.25" width="10.5" height="17.5" rx="3"/>
     <path d="M10.5 17.5h3"/>
   </>);
-/* --------------------------------- media --------------------------------- */
 export const Play = createIcon("play", <path d="M8.25 5.6v12.8c0 .87.96 1.4 1.7.93l10.06-6.4a1.1 1.1 0 0 0 0-1.86L9.95 4.67c-.74-.47-1.7.06-1.7.93Z"/>);
 export const Pause = createIcon("pause", <path d="M9.25 5.5v13M14.75 5.5v13"/>);
 export const Square = createIcon("square", <rect x="5.75" y="5.75" width="12.5" height="12.5" rx="2.5"/>);
@@ -134,7 +123,6 @@ export const Video = createIcon("video", <>
     <path d="m10.2 9.1 4.5 2.9-4.5 2.9Z"/>
   </>);
 export const Crop = createIcon("crop", <path d="M6.5 2.5V14A3.5 3.5 0 0 0 10 17.5h11.5M2.5 6.5H14A3.5 3.5 0 0 1 17.5 10v11.5"/>);
-/* -------------------------------- documents ------------------------------ */
 const filePaths = (<>
     <path d="M13.25 3.75H8A2.75 2.75 0 0 0 5.25 6.5v11A2.75 2.75 0 0 0 8 20.25h8a2.75 2.75 0 0 0 2.75-2.75V9.25Z"/>
     <path d="M13.25 3.75V7.5A1.75 1.75 0 0 0 15 9.25h3.75"/>
@@ -187,12 +175,10 @@ export const CreditCard = createIcon("credit-card", <>
     <rect x="3.25" y="5.25" width="17.5" height="13.5" rx="3"/>
     <path d="M3.25 9.75h17.5M6.75 14.75h3.5"/>
   </>);
-/* --------------------------------- people -------------------------------- */
 export const User = createIcon("user", <>
     <circle cx="12" cy="8" r="3.75"/>
     <path d="M5 19.9c.95-3.6 3.8-5.65 7-5.65s6.05 2.05 7 5.65"/>
   </>);
-/* ---------------------------------- tools -------------------------------- */
 export const Pencil = createIcon("pencil", <>
     <path d="m9.3 18.2 9.9-9.9a2.33 2.33 0 0 0-3.3-3.3l-9.9 9.9a2.5 2.5 0 0 0-.66 1.18L4.5 19.5l3.62-.84a2.5 2.5 0 0 0 1.18-.46Z"/>
     <path d="m13.5 7.4 3.1 3.1"/>
@@ -229,7 +215,6 @@ export const Settings = createIcon("settings", <>
     <circle cx="12" cy="12" r="3"/>
     <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1Z"/>
   </>);
-/* --------------------------------- layout -------------------------------- */
 export const PanelRight = createIcon("panel-right", <>
     <rect x="3.25" y="4.75" width="17.5" height="14.5" rx="3"/>
     <path d="M15.25 4.75v14.5"/>
@@ -243,7 +228,6 @@ export const LayoutList = createIcon("layout-list", <>
     <rect x="3.5" y="14" width="5.25" height="5.25" rx="1.75"/>
     <path d="M12.25 6.25h8.25M12.25 9h5.25M12.25 15.5h8.25M12.25 18.25h5.25"/>
   </>);
-/* ---------------------------------- misc --------------------------------- */
 export const Clock = createIcon("clock", <>
     <circle cx="12" cy="12" r="8.25"/>
     <path d="M12 7.5V12l3 2"/>

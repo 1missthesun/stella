@@ -37,14 +37,7 @@ export const cloudAttachmentsStore = {
   clear(): void {
     if (attachments.length) emitAttachments([]);
   },
-  /**
-   * Clears only the unchanged attachment snapshot submitted with a
-   * completed mutation. A slow response must not erase files the user added
-   * to another tab or account while that request was in flight.
-   */
   clearIfCurrent(expected: readonly CloudAttachment[]): boolean {
-    // The durable outbox freezes a copy of the submission, so reference
-    // equality cannot identify the acknowledged composer snapshot.
     if (
       attachments.length !== expected.length ||
       attachments.some((attachment, index) => {
@@ -63,10 +56,6 @@ export const cloudAttachmentsStore = {
   },
 };
 
-/**
- * Attached drive files ride along as an addressable list in the prompt: the
- * cloud agent reaches them by drive path, so naming them is all it needs.
- */
 export const withAttachmentPreamble = (
   prompt: string,
   files: readonly CloudAttachment[],

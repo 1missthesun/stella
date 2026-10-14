@@ -20,7 +20,6 @@ type SetSelectedText = Dispatch<SetStateAction<string | null>>;
 
 type DeriveComposerStateOptions = (
   | { message: string; hasMessage?: never }
-  /** For owners that track only whether the draft has non-blank text. */
   | { hasMessage: boolean; message?: never }
 ) & {
   chatContext?: ChatContext | null;
@@ -33,12 +32,6 @@ type ComposerPlaceholderOptions = {
   contextState: ComposerContextState;
 };
 
-/**
- * Hard cap for chip label characters. Window titles, file names, and
- * selected text snippets can run on for dozens of characters and blow out
- * the chip strip width — the chip's button `title` attribute still carries
- * the full text for hover.
- */
 const CHIP_LABEL_MAX_CHARS = 12;
 
 export const truncateChipLabel = (
@@ -49,10 +42,6 @@ export const truncateChipLabel = (
   return `${text.slice(0, max).trimEnd()}…`;
 };
 
-/**
- * Selected-area chips can still appear from persisted or in-flight
- * composer context after the Select area picker was removed.
- */
 type ComposerAppSelection = NonNullable<ChatContext["appSelection"]>;
 
 /**
@@ -68,12 +57,6 @@ export const getComposerAppSelections = (
   return chatContext?.appSelection ? [chatContext.appSelection] : [];
 };
 
-/**
- * Returns true when there is at least one attached chip to render (window,
- * file, screenshot, selected text, or a pending capture). Callers can use
- * this to skip rendering the chip strip container entirely so it doesn't
- * eat layout space when empty.
- */
 export const hasAttachedComposerChips = (
   chatContext: ChatContext | null,
   selectedText: string | null,
@@ -208,7 +191,6 @@ export const clearComposerWindowContext = (setChatContext: SetChatContext) => {
   ));
 };
 
-/** Removes one leftover selected-area chip; the mirror slot tracks the newest left. */
 export const removeComposerAppSelectionContext = (
   index: number,
   setChatContext: SetChatContext,

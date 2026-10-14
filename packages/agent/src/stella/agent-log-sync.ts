@@ -1,17 +1,3 @@
-/**
- * An agent's conversation, kept in the cloud the way the orchestrator's
- * journal is (`@stella/contracts/backend/agent-logs`). The host that runs the
- * agent writes what its transcript gains to the agent's log as it goes, at
- * every step, so nothing is lost when the host stops and another can take
- * the agent over. Nobody gets those records live: a host that takes the
- * agent over (`switch_destination`) reads only the records after the newest
- * one it already has into its own transcript, with the orchestrator's
- * journal import (`journal-sync`), and carries on there.
- *
- * Records are the transcript's messages and its compactions, keyed by the
- * writing transcript and entry so a retry writes each once; what a host
- * imported carries its seq (`journalSeqOf`) and is never written back.
- */
 import type { Context } from "@earendil-works/chord";
 import type { Message } from "@earendil-works/pi-ai";
 import {
@@ -37,15 +23,10 @@ import {
 import { StellaAgentDoc } from "./agent-doc.ts";
 import { importJournal, journalSeqOf, JournalSyncDoc, type JournalMessage, type JournalSeed } from "./journal-sync.ts";
 
-/** How far an agent's transcript is written to its log, per agent conversation. */
 export type AgentLogState = {
-  /** Random per transcript: its record keys never collide with another host's. */
   syncId?: string;
-  /** The newest transcript entry written (or passed over). */
   mirrored?: number;
-  /** The newest seq the log gave this transcript's own records. */
   ackedSeq?: number;
-  /** The cloud refused this transcript's records: the agent runs elsewhere now. */
   released?: true;
 };
 
@@ -58,17 +39,13 @@ export const AgentLogDoc = defineDoc<AgentLogState>({
   initial: () => ({}),
 });
 
-/** The cloud's side of an agent's log, for one host. */
 export type AgentLogTransport = {
-  /** This host, as the log names its holders. */
   holder: string;
-  /** The conversation the agents belong to, as the cloud names it. */
   conversationId: string;
   append(args: { threadId: string; records: AgentLogRecordDraft[] }): Promise<AgentLogCalls["agentLogs.append"]["result"]>;
   read(args: { threadId: string; afterSeq: number }): Promise<AgentLogCalls["agentLogs.read"]["result"]>;
 };
 
-/** One append's cost, for the host's numbers on what syncing a step takes. */
 export type AgentLogAppendStat = { threadId: string; records: number; bytes: number; ms: number };
 
 const ROLE_OF_KIND: Record<string, "user" | "assistant" | "toolResult" | undefined> = {
@@ -80,7 +57,6 @@ const ROLE_OF_KIND: Record<string, "user" | "assistant" | "toolResult" | undefin
 const PAGE = 100;
 const APPEND_BATCH_BYTES = 768 * 1024;
 const RETRY_MS = [1_000, 5_000, 15_000, 60_000];
-/** Room for the record's own fields around its message. */
 const RECORD_SLACK_BYTES = 4 * 1024;
 
 const recordKey = (syncId: string, entry: EntryId | number) => `${syncId}:${entry}`;
@@ -116,11 +92,6 @@ const refusedAsMoved = (error: unknown): boolean =>
   (error as { data?: { reason?: unknown } } | null)?.data?.reason === AGENT_LOG_MOVED_REASON ||
   String((error as { message?: unknown } | null)?.message ?? "").includes(AGENT_LOG_MOVED_REASON);
 
-/**
- * Writes the agents' transcripts of one harness to their logs. `kick` asks
- * for a sync and returns at once; `flush` returns once everything the
- * transcript has is in the log, or throws.
- */
 export function agentLogSync(options: {
   harness: () => Harness | undefined;
   transport: () => AgentLogTransport | undefined;
@@ -230,7 +201,6 @@ export function agentLogSync(options: {
     void run(conversationId).catch(options.report);
   };
 
-  /** Everything the agent's transcript has, in its log; throws when the cloud can't take it. */
   const flush = async (conversationId: ConversationId): Promise<void> => {
     for (let pass = 0; pass < 3; pass += 1) {
       await running.get(conversationId)?.catch(() => undefined);
@@ -239,7 +209,6 @@ export function agentLogSync(options: {
     }
   };
 
-  /** A sync after every step an agent takes. */
   const extension = (): Extension =>
     defineExtension({
       name: "stella-agent-log-sync",
@@ -261,7 +230,6 @@ export function agentLogSync(options: {
 
 export type AgentLogSync = ReturnType<typeof agentLogSync>;
 
-/** One transcript entry as a record, or undefined for what the log does not keep. */
 const draftOf = async (
   harness: Harness,
   entry: EntryRecord,
@@ -288,13 +256,6 @@ const draftOf = async (
   };
 };
 
-/**
- * Bring an agent's transcript here up to its log before it runs here: the
- * records after the newest one this transcript has (written or imported),
- * except its own, through the orchestrator's journal import. A transcript
- * that has neither starts from the agent's newest checkpoint. Returns how
- * many records it imported, and the folder the agent worked in last.
- */
 export async function importAgentLog(
   harness: Harness,
   conversation: Conversation,
@@ -340,7 +301,6 @@ export async function importAgentLog(
     if (page.complete || through <= after) break;
     after = through;
   }
-  // It came back: this host writes it again.
   if (state.released && holder === transport.holder) {
     await harness.commit(async (tx) => {
       delete (await tx.doc(AgentLogDoc, conversation.id)).released;

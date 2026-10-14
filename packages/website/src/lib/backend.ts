@@ -6,11 +6,6 @@ import { BackendClient, stableStringify } from "@stella/contracts/backend/client
 import { getAuthToken } from "./auth-token";
 import { isBackendConfigured, readBackendUrl } from "./backend-url";
 
-/**
- * The site's connection to the Stella backend worker (calls over HTTP, live
- * views over one socket), authorized with the backend's sign-in JWT.
- */
-
 let cachedClient: BackendClient | null = null;
 
 export { isBackendConfigured };
@@ -27,7 +22,6 @@ export function getBackendClient(): BackendClient {
   return cachedClient;
 }
 
-/** A live backend view's value; `"skip"` holds off. Undefined while loading. */
 export function useBackendValue<K extends ViewName>(
   view: K,
   args: ViewArgs<K> | "skip",
@@ -41,8 +35,6 @@ export function useBackendValue<K extends ViewName>(
     const unwatch = getBackendClient().watch(view, args, (value) => setState({ key, value }), () => {});
     return () => {
       unwatch();
-      // Drop the old view's value so a later return to the same key reads
-      // as loading until it is answered again.
       setState({ key: null });
     };
     // `key` captures `args`.

@@ -403,8 +403,6 @@ const scanSkill = async (args: {
     });
   }
 
-  // Untouched bundled packages are already part of Stella's system skill
-  // catalog. Upload only user-created or user-diverged packages.
   if (
     args.bundledEntry &&
     !args.bundledEntry.customized &&
@@ -468,13 +466,6 @@ const scanSkill = async (args: {
   };
 };
 
-/**
- * Read-only scan of the explicitly supplied Stella data directory.
- *
- * There is intentionally no default to `~/.stella` and no environment
- * fallback. Production calls receive the configured directory from Electron
- * lifecycle state; tests pass a temporary fixture path directly.
- */
 export const scanLocalCloudHome = async (
   stellaDataDir: string,
 ): Promise<LocalCloudHomeScan> => {
@@ -549,10 +540,6 @@ export const scanLocalCloudHome = async (
   };
 };
 
-/**
- * Privileged renderer entry point. Ownership is checked in the same main
- * process operation that starts the scan; client sequencing is not authority.
- */
 export const scanOwnedLocalCloudHome = async (
   stellaDataDir: string,
   accountScope: string,

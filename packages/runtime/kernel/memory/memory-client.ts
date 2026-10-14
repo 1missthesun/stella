@@ -1,25 +1,3 @@
-/**
- * The orchestrator's `memory` client inside `code`, one contract for every
- * host: `memory.read(path)`, `memory.write(path, content, { expectSha })` and
- * `memory.list()` over the memory files under `~/.stella`.
- *
- * Paths are relative to `~/.stella` and name only memory: a Markdown file
- * under `memories/`, such as `memories/main.md` or
- * `memories/areas/finance.md`. Writes are redacted with the memory redaction
- * and capped per file: the main file at its injection budget (so a write can
- * never produce a file the model is shown truncated), any other memory file
- * at `MEMORY_FILE_MAX_CHARS`. A `sha` the model sees is the first
- * `MEMORY_SHA_CHARS` hex characters of the SHA-256 of the file's bytes;
- * `expectSha` takes that prefix or the full hash.
- *
- * This module does no I/O. Each side has one module that owns its files and
- * returns this client — `disk-memory.ts` over `~/.stella` on the desktop,
- * cloud-builder's `world-memory.ts` over `/workspace/world/.stella` in the
- * owner's world — so both validate, redact, cap and answer byte for byte the
- * same. The `$memory` code intrinsics on both hosts only forward a request
- * to that client (`runMemoryRequest`).
- */
-
 import { redactMemoryText } from "./redaction.js";
 import { residentMemoryChars } from "./resident-doc-shape.js";
 import {
@@ -30,9 +8,7 @@ import {
   PERSONALITY_FILE,
 } from "./memory-layout.js";
 
-/** Cap for a memory file that is not resident, in unicode code points. */
 export const MEMORY_FILE_MAX_CHARS = 32_000;
-/** `memory.list()` stops after this many files. */
 export const MEMORY_LIST_MAX_FILES = 500;
 
 const MAX_PATH_CHARS = 240;
@@ -42,12 +18,9 @@ const SHA_PREFIX_HEX = /^[0-9a-f]{12,64}$/u;
 export const MEMORY_SHA_CHARS = 12;
 
 export type MemoryFileInfo = {
-  /** Relative to `~/.stella`, e.g. `memories/main.md`. */
   path: string;
-  /** UTF-8 bytes. */
   size: number;
   sha: string;
-  /** Last modification, epoch milliseconds. */
   updatedAt: number;
 };
 
@@ -59,17 +32,9 @@ export type MemoryListEntry = {
   path: string;
   size: number;
   sha: string;
-  /** ISO 8601. */
   updatedAt: string;
 };
 
-/**
- * One host's raw memory files. Paths are already validated memory paths.
- * `write` must compare and write atomically: with `expectSha` set it writes
- * only when the file's current sha is exactly that (`null`: only when there
- * is no file), and otherwise reports what it found (`null` for a missing
- * file).
- */
 export type MemoryFileStore = {
   read(path: string): Promise<Uint8Array | null>;
   write(
@@ -78,7 +43,6 @@ export type MemoryFileStore = {
     sha: string,
     expectSha: string | null | undefined,
   ): Promise<{ ok: true } | { ok: false; actualSha: string | null }>;
-  /** Every memory file, each with its sha. Non-memory paths may be included. */
   list(): Promise<MemoryFileInfo[]>;
 };
 
@@ -113,11 +77,6 @@ const pathError = (op: string, input: unknown, reason: string): Error =>
     `memory.${op}: ${JSON.stringify(typeof input === "string" ? input : String(input))} ${reason}. Memory paths are relative to ~/.stella: a Markdown file under "memories/", such as "memories/main.md" or "memories/areas/finance.md".`,
   );
 
-/**
- * The validated memory path for `input`, or a thrown error naming what is
- * wrong. Only `memories/**\/*.md`; no absolute, home,
- * parent, hidden or empty segments.
- */
 export const memoryPath = (input: unknown, op = "read"): string => {
   if (typeof input !== "string" || input.length === 0) {
     throw pathError(op, input, "is not a path");
@@ -160,7 +119,6 @@ export const memoryPath = (input: unknown, op = "read"): string => {
   return input;
 };
 
-/** Whether `path` is a memory path, without throwing. */
 export const isMemoryPath = (path: string): boolean => {
   try {
     memoryPath(path);
@@ -170,14 +128,9 @@ export const isMemoryPath = (path: string): boolean => {
   }
 };
 
-/**
- * Whether `path` is one of the `~/.stella` files every computer and the cloud
- * keep the same: a memory path, or the personality override.
- */
 export const isSyncedMemoryPath = (path: string): boolean =>
   path === PERSONALITY_FILE || isMemoryPath(path);
 
-/** Characters one memory file may hold after redaction. */
 export const memoryFileMaxChars = (path: string): number => {
   if (path === MAIN_MEMORY_RELATIVE_PATH) return MAIN_MEMORY_INJECTED_MAX_CHARS;
   return MEMORY_FILE_MAX_CHARS;
@@ -203,12 +156,6 @@ const expectShaOption = (options: unknown): string | null | undefined => {
 const shortSha = (sha: string | null): string =>
   sha ? visibleSha(sha) : "no file";
 
-/**
- * The bytes a write of `content` to `path` stores: redacted, and refused over
- * the file's cap (main.md has none: past its injection budget it is cut from
- * context instead). The model's `memory.write` and the desktop/cloud memory
- * sync both write through this.
- */
 export const prepareMemoryWrite = async (
   path: string,
   content: string,
@@ -225,7 +172,6 @@ export const prepareMemoryWrite = async (
   return { bytes, sha: await memorySha(bytes) };
 };
 
-/** The `memory` client over one host's files. */
 export const createMemoryClient = (store: MemoryFileStore): MemoryClient => ({
   read: async (input) => {
     const path = memoryPath(input, "read");
@@ -287,11 +233,6 @@ export const createMemoryClient = (store: MemoryFileStore): MemoryClient => ({
       })),
 });
 
-/**
- * Answer one `$memory` intrinsic call against `client`. Both hosts' code
- * bridges send `{ op: "read", path }`, `{ op: "write", path, content,
- * options }` or `{ op: "list" }`.
- */
 export const runMemoryRequest = async (
   client: MemoryClient,
   input: unknown,

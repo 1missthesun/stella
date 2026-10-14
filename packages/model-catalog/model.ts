@@ -1,11 +1,3 @@
-/**
- * Centralized model configuration for all AI requests.
- *
- * Model selection is split into:
- * - modes: reusable full model configs (model, fallback, routing, tokens, etc.)
- * - task mappings: each agent/task chooses a mode or direct internal model config
- * - audience overrides: sparse per-plan patches applied to modes
- */
 import { AGENT_IDS } from "./agent-constants";
 import {
   type ManagedGatewayProvider,
@@ -31,12 +23,6 @@ export type ModelConfig = {
   fallback?: string;
   managedGatewayProvider?: ManagedGatewayProvider;
   fallbackManagedGatewayProvider?: ManagedGatewayProvider;
-  /**
-   * Wire protocol for the managed gateway request. When omitted, the runtime
-   * infers it from the gateway provider (`resolveManagedProtocol` in
-   * `runtime_ai/managed.ts`). Set explicitly for models whose gateway hosts a
-   * mix of Chat Completions and Responses protocols.
-   */
   api?: ManagedProtocol;
   temperature?: number;
   maxOutputTokens?: number;
@@ -46,7 +32,6 @@ export type ModelConfig = {
   fallbackProviderOptions?: Record<string, Record<string, JSONValue>>;
 };
 
-/** A managed route's reasoning effort when the client names none. */
 export const getManagedReasoningEffort = (
   config: ModelConfig,
 ): string | undefined => {
@@ -55,9 +40,6 @@ export const getManagedReasoningEffort = (
     ? effort.trim()
     : undefined;
 };
-
-// `ManagedModelAudience` is owned by `@stella/contracts/gateway/capability`
-// and re-exported above.
 
 export const MODEL_MODES = [
   "standard",
@@ -117,7 +99,6 @@ const gatewayOptions = (
   },
 });
 
-/** Legacy Flash ids remain accepted and resolve to the current OpenRouter route. */
 export const DEEPSEEK_V4_FLASH_FIREWORKS_MODEL =
   "accounts/fireworks/models/deepseek-v4-flash-0731";
 export const DEEPSEEK_V4_FLASH_DIRECT_MODEL = "deepseek/deepseek-v4-flash";
@@ -138,7 +119,6 @@ const DEEPSEEK_V4_FLASH_MODEL_CONFIG: ModeConfig = {
   providerOptions: DEEPSEEK_V4_1_FLASH_PROVIDER_OPTIONS,
 };
 
-/** OpenAI GPT-6 Luna through OpenRouter: Stella's default for every mode. */
 export const GPT_6_LUNA_MODEL = "openai/gpt-6-luna";
 export const GPT_6_LUNA_MAX_OUTPUT_TOKENS = 128_000;
 
@@ -187,7 +167,6 @@ const GEMINI_3_1_FLASH_LITE_IMAGE_DESCRIPTION_CONFIG: ModelConfig = {
   providerOptions: gatewayOptions("google"),
 };
 
-/** OpenRouter-hosted Gemini 3.8 Flash for mobile cloud chat. */
 export const GEMINI_3_8_FLASH_OFFLINE_RESPONDER_MODEL =
   "google/gemini-3.8-flash";
 
@@ -232,8 +211,6 @@ const INTERNAL_MODEL_CONFIGS = {
 type InternalModelConfigKey = keyof typeof INTERNAL_MODEL_CONFIGS;
 type TaskModelSelection = ModelMode | InternalModelConfigKey;
 
-// Legacy mode names remain parseable so old clients fail over cleanly. All
-// modes use OpenAI GPT-6 Luna through OpenRouter.
 const BASE_MODE_CONFIGS: Record<ModelMode, ModeConfig> = {
   standard: GPT_6_LUNA_MODEL_CONFIG,
   priority: GPT_6_LUNA_MODEL_CONFIG,
@@ -255,13 +232,6 @@ const AUDIENCE_MODE_OVERRIDES: Record<
   pro_fallback: {},
 };
 
-// Per-audience swaps of an agent's task→model mapping. Lets us point
-// orchestrator/general at alternate models per plan without disturbing other
-// agents that share the underlying modes.
-//
-// The primary Stella agent now works directly for the user, with optional
-// General agents for delegated background work. Both default to Light
-// (DeepSeek V4.1 Flash) for every audience.
 const DEFAULT_AGENT_OVERRIDES: Partial<Record<string, TaskModelSelection>> = {
   [AGENT_IDS.ORCHESTRATOR]: "light",
   [AGENT_IDS.GENERAL]: "light",
@@ -277,45 +247,20 @@ const AUDIENCE_AGENT_MODE_OVERRIDES: Partial<
   pro_fallback: DEFAULT_AGENT_OVERRIDES,
 };
 
-// Only the active Pro audience gets the model picker. Free, Go, and every
-// fallback audience stay on their backend default, with
-// `stella/light` retained as the one explicit compatibility alias.
 export const canOverrideStellaModel = (
   audience: ManagedModelAudience,
 ): boolean => audience === "pro";
 
-// Audiences without a paid subscription. Used to gate paid-only branded modes
-// (e.g. Stella Max) independently of the model-override restriction above:
-// `go` may not freely pin arbitrary models but is still a paid plan that can
-// select the paid-only modes.
 const UNPAID_MODEL_AUDIENCES = new Set<ManagedModelAudience>(["free"]);
 
 export const isPaidManagedAudience = (
   audience: ManagedModelAudience,
 ): boolean => !UNPAID_MODEL_AUDIENCES.has(audience);
 
-// Paid-only branded modes remain unavailable to restricted audiences. The
-// legacy set is retained for compatibility even though those modes are no
-// longer supported by the public Stella catalog.
 const PAID_ONLY_STELLA_MODE_IDS: ReadonlySet<string> = new Set<string>([
   "stella/max",
 ]);
 
-/**
- * Stella model ids the Pro picker may send. The OpenRouter Flash default and
- * legacy DeepSeek V4 Flash spellings are accepted picker selections.
- * `stella/light` remains as a compatibility alias for existing preferences
- * and older clients.
- *
- * All V4 Flash spellings stay accepted so a client that saved the Fireworks
- * or DeepSeek-direct id before/after a route switch never 400s. Only one of
- * them is ever *live* — `resolveManagedModelRouteAlias` coerces the inactive
- * spellings onto the current OpenRouter route.
- *
- * Single source of truth for both the request-time coercion in
- * `stella_provider/request.ts` and the `allowedForAudience` flag the
- * `/api/models` endpoint exposes to the desktop picker.
- */
 const PRO_ALLOWED_STELLA_MODEL_IDS: ReadonlySet<string> = new Set<string>([
   "stella/light",
   `stella/${DEEPSEEK_V4_FLASH_FIREWORKS_MODEL}`,
@@ -324,11 +269,6 @@ const PRO_ALLOWED_STELLA_MODEL_IDS: ReadonlySet<string> = new Set<string>([
   `stella/${GPT_6_LUNA_MODEL}`,
 ]);
 
-/**
- * Collapse the two V4 Flash spellings onto the active route. Keeping both ids
- * pinnable would otherwise split traffic across two upstreams — and bill the
- * idle one at a price row nothing keeps warm.
- */
 export const resolveManagedModelRouteAlias = (model: string): string =>
   model === DEEPSEEK_V4_FLASH_FIREWORKS_MODEL ||
   model === DEEPSEEK_V4_FLASH_DIRECT_MODEL
@@ -339,9 +279,6 @@ export const isStellaModelAllowedForAudience = (
   modelId: string,
   audience: ManagedModelAudience,
 ): boolean => {
-  // This is a product-wide allowlist, not merely a plan restriction. Pro and
-  // fallback audiences must not be able to revive retired managed models by
-  // submitting a stale or hand-written Stella id.
   if (!canOverrideStellaModel(audience)) {
     return modelId === "stella/default" || modelId === "stella/light";
   }
@@ -354,21 +291,8 @@ export const isStellaModelAllowedForAudience = (
   return true;
 };
 
-/**
- * Agent types whose model selection is locked on the backend regardless of
- * audience tier. The client can request whatever model it likes; we ignore
- * it and use whatever the per-tier `TASK_MODEL_SELECTIONS` mapping resolves to.
- *
- * Chronicle is locked because it ticks every minute against the user's
- * captured screen activity — picking the wrong (expensive) model here can
- * burn through quota with no user-visible benefit. Letting the client
- * override would also create surprising billing behavior for users who
- * idly switched their "assistant" model assuming it only affects chat.
- */
 export const LOCKED_AGENT_TYPES: ReadonlySet<string> = new Set<string>([
   "chronicle",
-  // Mobile cloud chat is a backend service route, not a user-selected Stella
-  // mode. Ignore stale mobileModel values when the desktop is disconnected.
   AGENT_IDS.OFFLINE_RESPONDER,
   // Image descriptions must stay on a vision-capable Google route. Treating
   // this utility pass as General lets restricted audiences coerce the model
@@ -522,11 +446,6 @@ export function isModelMode(value: string): value is ModelMode {
   return Object.prototype.hasOwnProperty.call(BASE_MODE_CONFIGS, value);
 }
 
-// Managed model ids that are pinnable / price-synced even when they are not
-// currently the default for any mode or agent task. Prefer putting models
-// behind a mode/task selection when they are catalog defaults; use this list
-// only for extras that have no mode of their own.
-//
 export const ADDITIONAL_MANAGED_MODEL_IDS = [] as const;
 
 export function listManagedModelIds(): string[] {

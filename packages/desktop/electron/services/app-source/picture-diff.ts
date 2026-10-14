@@ -1,20 +1,10 @@
-/**
- * Where two pictures of the window differ, as rects in CSS px. Works on
- * quarter-resolution bitmaps (Electron's resize box-filters, so a one-pixel
- * change still moves its cell), which costs ~5 ms per Retina window to make.
- */
-
 export type Rect = { x: number; y: number; w: number; h: number };
 export type LiveRect = [number, number, number, number];
 
-/** A channel moving less than this is compression noise. */
 const THRESHOLD = 12;
-/** Changes within this many CSS px of each other are one region. */
 const JOIN_PX = 16;
-/** Above this share of the window, the whole window is the region. */
 const WHOLE_SHARE = 0.4;
 
-/** Grow a 0/1 mask by `r` cells: a sliding-window max, rows then columns. */
 const dilate = (src: Uint8Array, w: number, h: number, r: number) => {
   const rows = new Uint8Array(w * h);
   for (let y = 0; y < h; y += 1) {
@@ -40,10 +30,6 @@ const dilate = (src: Uint8Array, w: number, h: number, r: number) => {
   return out;
 };
 
-/**
- * Compare two same-size 4-byte-per-pixel bitmaps `w`×`h`, each cell `cell`
- * CSS px square, in a `viewport` of CSS px. `live` rects never count.
- */
 export const diffRegions = (
   a: Buffer,
   b: Buffer,
@@ -101,7 +87,6 @@ export const diffRegions = (
         queue[tail++] = j;
       }
     }
-    // A few stray cells are compression noise, not a change.
     if (count < 3) continue;
     regions.push({
       x: Math.floor(x0 * cell),

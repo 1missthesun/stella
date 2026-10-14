@@ -44,28 +44,16 @@ export type AgentActivityEntry = {
   createdAtMs: number;
   updatedAtMs: number;
   completedAtMs?: number;
-  /** The attempt its latest start card named; none for a mirrored start. */
   attemptGeneration?: number;
 };
 
-/**
- * One fold in progress. Kept open so a reader that has already scanned the
- * journal can apply later rows to it instead of scanning again.
- */
 export type AgentActivityState = {
   entries: Map<string, AgentActivityEntry>;
   generations: Map<string, number>;
-  /**
-   * The newest attempt a terminal card settled, per agent. A start card can
-   * reach the journal after its own attempt's terminal (the two travel
-   * separately), and must not bring that attempt back.
-   */
   settledGenerations: Map<string, number>;
-  /** Agents with a start card: their mirrored rows no longer count. */
   carded: Set<string>;
 };
 
-/** The shape the fold needs, satisfied by every journal record type we have. */
 export type AgentActivityRecordInput = {
   kind: string;
   createdAtMs: number;
@@ -111,7 +99,6 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
     ? (value as Record<string, unknown>)
     : null;
 
-/** Message text, whether the payload carries a string or content blocks. */
 export const agentActivityMessageText = (
   payload: Record<string, unknown> | undefined,
 ): string => {
@@ -126,11 +113,6 @@ export const agentActivityMessageText = (
     .join("\n");
 };
 
-/**
- * Stella's tools reach some engines under a namespaced name (Claude Code sees
- * `mcp__stella__spawn_agent`). The runtime matches on the bare name, so the
- * journal is read the same way.
- */
 export const bareToolName = (name: string): string =>
   name.includes("__") ? (name.split("__").at(-1) ?? name) : name;
 
@@ -151,12 +133,6 @@ const toolResultThreadId = (
   }
 };
 
-/**
- * A string field of a tool result, from its details or its JSON text. A
- * `send_message` result's `delivered` says whether it started anything: only
- * `resumed` does, and only for an agent this conversation already knows; a
- * steer lands in a running agent and a queued note starts no agent here.
- */
 const toolResultField = (
   payload: Record<string, unknown> | undefined,
   field: string,
@@ -171,13 +147,6 @@ const toolResultField = (
   }
 };
 
-/**
- * A `spawn_agent` / `send_message` call waiting for its result row.
- *
- * Exposed so a long-lived reader can keep the map across folds: the call and
- * the tool result that names the agent are separate journal rows, and an
- * incremental fold would otherwise lose the call before the result arrived.
- */
 export type AgentActivityToolCall = {
   name: string;
   description?: string;
@@ -213,11 +182,6 @@ const collectToolCalls = (
   return into;
 };
 
-/**
- * Folds journal rows into agent activity, in journal order. Safe to call
- * repeatedly with later rows: the state carries everything a continuation
- * needs, so a reader never rescans what it has already folded.
- */
 export const foldAgentActivity = (
   state: AgentActivityState,
   records: readonly AgentActivityRecordInput[],
@@ -299,9 +263,6 @@ export const foldAgentActivity = (
           Math.max(generation, state.settledGenerations.get(agentId) ?? 0),
         );
       }
-      // An agent no start card names is one a mirrored row started: the
-      // terminal card of whoever owns its record settles it, whichever
-      // attempt it names.
       if (generation !== current && state.generations.has(agentId)) continue;
       if (event.type === "agent-progress") {
         if (!state.generations.has(agentId)) continue;
@@ -366,20 +327,9 @@ export const foldAgentActivity = (
   return state;
 };
 
-/** Settled agents one folded state keeps for context before it forgets them. */
 const MAX_SETTLED_ENTRIES = 256;
-/** Unanswered tool calls one folded state holds open. */
 const MAX_PENDING_TOOL_CALLS = 512;
 
-/**
- * Bounds a fold that is kept alive across appends.
- *
- * Running agents are never dropped — they are the answer. Settled ones are kept
- * only so a later row about the same agent reads as a correction rather than a
- * new start, and the oldest-settled are the least likely to see one. The tool
- * call map is trimmed the same way: a call whose result never came is dead
- * weight after enough rows have gone by.
- */
 export const trimAgentActivity = (
   state: AgentActivityState,
   toolCalls?: Map<string, AgentActivityToolCall>,
@@ -396,11 +346,6 @@ export const trimAgentActivity = (
       state.carded.delete(entry.agentId);
     }
   }
-  // `carded` and `generations` are keyed by agent id and are written for every
-  // lifecycle card seen, including ones whose entry was never created (a card
-  // with no description cannot start a row) — so they do not shrink with the
-  // entry map and would grow for the life of the fold. An id no entry mentions
-  // has nothing left to correct.
   if (state.carded.size > MAX_SETTLED_ENTRIES) {
     for (const agentId of state.carded) {
       if (!state.entries.has(agentId)) state.carded.delete(agentId);
@@ -417,7 +362,6 @@ export const trimAgentActivity = (
     }
   }
   if (toolCalls && toolCalls.size > MAX_PENDING_TOOL_CALLS) {
-    // Insertion order is journal order, so the first keys are the oldest.
     for (const key of [...toolCalls.keys()].slice(
       0,
       toolCalls.size - MAX_PENDING_TOOL_CALLS,
@@ -427,7 +371,6 @@ export const trimAgentActivity = (
   }
 };
 
-/** Every agent the journal still shows as working, oldest start first. */
 export const runningAgentEntries = (
   state: AgentActivityState,
   limit?: number,
@@ -440,11 +383,6 @@ export const runningAgentEntries = (
     : running;
 };
 
-/**
- * How many running agents one `ready` frame carries. A conversation with more
- * live work than this is already past the point where a list helps, and the
- * frame has a size budget to keep.
- */
 export const READY_RUNNING_AGENTS_LIMIT = 64;
 
 export const parseAgentActivityEntry = (

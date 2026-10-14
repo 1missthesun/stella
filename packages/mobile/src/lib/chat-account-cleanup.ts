@@ -41,19 +41,13 @@ const defaultOperations: ChatAccountCleanupOperations = {
 export async function clearAccountChatData(
   operations: ChatAccountCleanupOperations = defaultOperations,
 ): Promise<void> {
-  // This owner marker precedes both per-store intents. A kill in the gap
-  // between them therefore rolls the entire account wipe forward on mount.
   const token = await operations.beginCleanupIntent();
   operations.invalidateMountedOwners();
   try {
-    // Canonical rows remain intact until recall is durably blocked.
     await operations.beginIndexRebuild();
     await operations.clearCanonicalStorage();
     await operations.markCanonicalCleared(token);
   } catch (error) {
-    // The account owner marker remains for cold-start recovery. Best-effort
-    // rebuilding only restores this process when canonical mutation never
-    // started; failures remain blocked and retry from the durable marker.
     await operations.rebuildIndex().catch(() => {});
     throw error;
   }

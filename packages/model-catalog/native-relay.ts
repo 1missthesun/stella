@@ -3,26 +3,17 @@ import type { GatewayNativeCredentialProvider } from "@stella/contracts/gateway/
 
 export type NativeCredentialProvider = GatewayNativeCredentialProvider;
 
-/**
- * Server-only credential material for a request bound to the owner's
- * connected engine. Callers must never serialize, log, or return it.
- */
 export type NativeRelayCredential = {
   provider: NativeCredentialProvider;
   accessToken: string;
 };
 
-/** The fields of an authorized relay request the native lane reads. */
 export type NativeRelayRequest = {
   requestJson: Record<string, unknown>;
   upstreamModel: string;
   userCredential?: NativeRelayCredential;
 };
 
-/**
- * Never forward Stella capabilities, browser/session identity, or network
- * edge metadata to an upstream model provider.
- */
 export const isInternalRelayRequestHeader = (name: string): boolean => {
   const lower = name.toLowerCase();
   return (
@@ -64,10 +55,6 @@ export const connectedCredentialForwardHeaders = (
   return headers;
 };
 
-/**
- * Native connected-engine requests already have the provider's exact body
- * shape. Do not run them through Stella's cross-provider normalization.
- */
 export const nativeCredentialBody = (
   authorized: NativeRelayRequest,
 ): string => {

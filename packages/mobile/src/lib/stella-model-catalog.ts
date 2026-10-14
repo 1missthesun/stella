@@ -1,4 +1,3 @@
-/** Stella's managed model catalog, fetched over HTTP from the backend. */
 import type { ReasoningEffortLevel } from "@stella/contracts/reasoning-effort";
 import { backendOrigin, getJson } from "./http";
 
@@ -23,19 +22,13 @@ export type StellaCatalogModel = {
 
 export type StellaCatalog = {
   models: StellaCatalogModel[];
-  /** Agent keys the backend assigns models to (from catalog defaults). */
   agentKeys: string[];
 };
 
 export const STELLA_DEFAULT_MODEL = "stella/default";
 
-// Used when the catalog can't be fetched so a pick still touches the
-// assistant agents rather than silently doing nothing.
 const FALLBACK_AGENT_KEYS = ["orchestrator", "general"];
 
-// When the catalog can't be fetched, the only thing we can safely offer is
-// the opaque default — the concrete pinnable models are tier-dependent and
-// only known from the live catalog.
 const FALLBACK_STELLA_MODELS: StellaCatalogModel[] = [
   {
     id: STELLA_DEFAULT_MODEL,
@@ -43,8 +36,6 @@ const FALLBACK_STELLA_MODELS: StellaCatalogModel[] = [
     allowedForAudience: true,
   },
 ];
-
-/* ── catalog fetch (HTTP, no bridge) ──────────────────────────── */
 
 type CatalogApiResponse = {
   data?: Array<{
@@ -103,7 +94,6 @@ export const stellaModelLabel = (
   }
   const match = catalog.models.find((model) => model.id === modelId);
   if (match) return match.name;
-  // BYOK model id like "anthropic/claude-..." — show the bare model name.
   const slash = modelId.lastIndexOf("/");
   return slash >= 0 ? modelId.slice(slash + 1) : modelId;
 };

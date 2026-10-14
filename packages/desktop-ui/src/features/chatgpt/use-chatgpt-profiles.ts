@@ -4,12 +4,6 @@ import type {
   ChatGptProfilesState,
 } from "@stella/contracts/chatgpt-siwc-types";
 
-/**
- * This computer's ChatGPT accounts (Sign in with ChatGPT), as Electron main
- * keeps them. Desktop host only: in a browser `available` is false and
- * nothing here runs. Sign-in opens the browser from main and finishes on its
- * loopback listener; `signingIn` covers that wait.
- */
 export function useChatGptProfiles() {
   const available =
     typeof window !== "undefined" && Boolean(window.electronAPI?.system?.listChatGptProfiles);
@@ -40,11 +34,6 @@ export function useChatGptProfiles() {
     };
   }, [reload]);
 
-  /**
-   * Sign in: a new account (dynamic registration), `profileId` again, or
-   * with `sharedClientId`, a registration another of the owner's hosts made.
-   * Resolves the saved account, or null when the sign-in was cancelled.
-   */
   const signIn = useCallback(
     async (options?: {
       profileId?: string;
@@ -92,7 +81,6 @@ export function useChatGptProfiles() {
     available,
     loaded: state !== null,
     profiles,
-    /** A signed-in account with plan usage serves ChatGPT on this computer. */
     usable,
     signingIn,
     signIn,

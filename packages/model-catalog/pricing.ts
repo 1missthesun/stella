@@ -1,9 +1,3 @@
-/**
- * Token pricing for Stella-paid managed completions: the price shape, the
- * micro-cent money helpers, the pure cost calculator, and the static price
- * fill-ins for models not yet on models.dev. No env access here; callers
- * supply their catalog.
- */
 export const MICRO_CENTS_PER_CENT = 1_000_000;
 export const CENTS_PER_DOLLAR = 100;
 
@@ -21,7 +15,6 @@ export type TokenPriceCatalog = {
 };
 
 export const DEFAULT_TOKEN_PRICE: TokenPriceConfig = {
-  // Reference baseline from OpenCode Go docs/token table.
   inputPerMillionUsd: 0.6,
   outputPerMillionUsd: 3.0,
 };
@@ -73,7 +66,6 @@ export type UsageCostArgs = {
    */
   cacheWrite1hInputTokens?: number;
   reasoningTokens?: number;
-  /** Explicit price; wins over any catalog lookup. */
   price?: TokenPriceConfig;
 };
 
@@ -82,8 +74,6 @@ export const LONG_CACHE_WRITE_INPUT_MULTIPLIER = 2;
 
 export const computeUsageCostMicroCents = (
   args: UsageCostArgs & {
-    /** Price table consulted when `price` is absent. Defaults to the
-     * package baseline; a host may supply an env-configured catalog. */
     catalog?: TokenPriceCatalog;
   },
 ) => {
@@ -136,21 +126,10 @@ export type StaticManagedModelPrice = {
   modalitiesOutput?: string[];
 };
 
-/**
- * Static prices for managed models not yet (or never) present on models.dev.
- * Used as a fill-in when the models.dev sync would otherwise fail the whole
- * catalog, and as the authoritative price for Muse Spark until Meta lands on
- * models.dev with matching rates.
- *
- * Prices are USD per 1M tokens. Muse Spark 1.2: $1.25 input / $4.25 output
- * (Meta Model API customer pricing carried forward from the Muse Spark 1.1
- * public preview announcement).
- */
 export const STATIC_MANAGED_MODEL_PRICE_OVERRIDES: Record<
   string,
   StaticManagedModelPrice
 > = {
-  // OpenRouter inference-net endpoint rates, verified 2026-10-04.
   "deepseek/deepseek-v4.1-flash": {
     sourceProvider: "openrouter",
     sourceModelId: "deepseek-v4.1-flash",
@@ -161,7 +140,6 @@ export const STATIC_MANAGED_MODEL_PRICE_OVERRIDES: Record<
     modalitiesInput: ["text", "image"],
     modalitiesOutput: ["text"],
   },
-  // OpenRouter rates for OpenAI GPT-6 Luna, verified 2026-10-08.
   "openai/gpt-6-luna": {
     sourceProvider: "openrouter",
     sourceModelId: "gpt-6-luna",
@@ -177,13 +155,10 @@ export const STATIC_MANAGED_MODEL_PRICE_OVERRIDES: Record<
     sourceModelId: "muse-spark-1.2",
     inputPerMillionUsd: 1.25,
     outputPerMillionUsd: 4.25,
-    // Reasoning is billed at the output rate when usage separates it.
     reasoningPerMillionUsd: 4.25,
     modalitiesInput: ["text", "image", "video", "pdf"],
     modalitiesOutput: ["text"],
   },
-  // OpenAI GPT-5.6 Sol (limited preview). OpenAI rates: $5 / $30 per 1M.
-  // Prefer models.dev once listed; static prevents incomplete sync + $0 billing.
   "openai/gpt-5.6-sol": {
     sourceProvider: "openai",
     sourceModelId: "gpt-5.6-sol",
@@ -195,8 +170,6 @@ export const STATIC_MANAGED_MODEL_PRICE_OVERRIDES: Record<
     modalitiesInput: ["text", "image"],
     modalitiesOutput: ["text"],
   },
-  // OpenAI GPT-5.6 Luna launch rates: $1 / $6 per 1M tokens. GPT-5.6
-  // cached reads are 90% off and cache writes cost 1.25x uncached input.
   "openai/gpt-5.6-luna": {
     sourceProvider: "openai",
     sourceModelId: "gpt-5.6-luna",
@@ -208,11 +181,6 @@ export const STATIC_MANAGED_MODEL_PRICE_OVERRIDES: Record<
     modalitiesInput: ["text", "image"],
     modalitiesOutput: ["text"],
   },
-  // DeepSeek V4 Flash first-party rates: $0.14 cache-miss input / $0.28
-  // output, cached reads at $0.0028. models.dev already publishes these under
-  // `deepseek/deepseek-v4-flash`; this is only a fill-in so a models.dev
-  // outage can't fail the sync and drop the catalog to DEFAULT_TOKEN_PRICE.
-  // DeepSeek charges nothing to write the cache.
   "deepseek/deepseek-v4-flash": {
     sourceProvider: "deepseek",
     sourceModelId: "deepseek-v4-flash",
@@ -224,9 +192,6 @@ export const STATIC_MANAGED_MODEL_PRICE_OVERRIDES: Record<
     modalitiesInput: ["text"],
     modalitiesOutput: ["text"],
   },
-  // OpenRouter's Gemini 3.8 Flash rates, verified 2026-10-11. The preferred
-  // models.dev alias normally supplies these; this keeps reservations and
-  // billing correct if the remote catalog is unavailable.
   "google/gemini-3.8-flash": {
     sourceProvider: "openrouter",
     sourceModelId: "google/gemini-3.8-flash",
@@ -238,8 +203,6 @@ export const STATIC_MANAGED_MODEL_PRICE_OVERRIDES: Record<
     modalitiesInput: ["text", "image", "audio", "video", "pdf"],
     modalitiesOutput: ["text"],
   },
-  // Gemini 3.6 Flash GA rates: $1.50 / $7.50 per 1M tokens, with cached
-  // input at $0.15. Keep a static fill-in while models.dev catches up.
   "google/gemini-3.6-flash": {
     sourceProvider: "google",
     sourceModelId: "gemini-3.6-flash",

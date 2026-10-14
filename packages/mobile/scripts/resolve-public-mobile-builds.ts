@@ -1,21 +1,3 @@
-/**
- * Resolve the OTA target from what the stores actually serve, not from the
- * newest EAS build.
- *
- * An `eas update` on a channel reaches every installed binary whose runtime
- * fingerprint matches, so publishing against the newest build silently ships
- * JS to a public app whose native side is older. This asks App Store Connect
- * for the live iOS version and Google Play for the completed production
- * release, walks each back to the EAS build and submission that produced it,
- * and refuses to continue unless that build carries the expected channel and a
- * runtime fingerprint identical to the local one.
- *
- * Usage: bun scripts/resolve-public-mobile-builds.ts
- *          [--platform ios|android|all] [--channel <channel>]
- *          [--google-play-key <path>] [--verify-local-fingerprint]
- *          [--native-match]
- *          [--ios-testflight-build <buildNumber>]
- */
 import { execFile } from "node:child_process";
 import { createSign } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
@@ -252,12 +234,6 @@ const fetchPlayProductionTrack = async (keyPath: string): Promise<PlayTrack> => 
   }
 };
 
-/**
- * A TestFlight build as the OTA target instead of the App Store live
- * version: for a rollout that is live for testers before it is live in the
- * store. The build must still be one App Store Connect knows about and has
- * processed, and it is validated against EAS exactly like the live one.
- */
 export const selectIosTestFlightBuild = (
   status: JsonRecord,
   buildNumber: string,

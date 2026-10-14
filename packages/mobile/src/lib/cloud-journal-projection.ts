@@ -29,8 +29,6 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
     ? (value as Record<string, unknown>)
     : null;
 
-// Placement allocates a dispatch id, but preserves this caller identity in
-// the committed prompt. The journal can arrive before the admission response.
 const projectedMessageId = (record: JournalMessageRecord): string => {
   const origin = record.role === "user" ? record.payload.originUserMessageId : undefined;
   return (typeof origin === "string" && origin.trim()) ||
@@ -80,8 +78,6 @@ const userAttachmentPresentation = (payload: Record<string, unknown>) => {
     ? [...new Set(raw.filter((path): path is string => typeof path === "string" && path.length > 0 && path.length <= 400))]
     : [];
   const text = messageText(payload);
-  // This is the exact transport suffix generated for these structured paths,
-  // not a search for prose that happens to mention attachments or storage.
   const suffix = attachmentPaths.length ? withAttachmentPreamble("", attachmentPaths) : "";
   const thumbnailUris = attachmentPaths.length ? [] : inlineImageUris(payload);
   const documentNames = attachmentPaths.length ? [] : declaredFileNames(payload);
@@ -162,14 +158,6 @@ const stringList = (value: unknown): string[] =>
       )
     : [];
 
-/**
- * One inline image card per `image_gen` call the orchestrator made in this
- * assistant row — the cloud twin of the desktop bridge's tool-start /
- * tool-end artifacts. A call without a result yet renders as generating.
- * A settled cloud call carries the drive paths it saved the image to; a call
- * Stella ran on a computer carries that computer's file paths, which load
- * through the computer like any other file it made.
- */
 const generatedImageArtifacts = (args: {
   record: JournalMessageRecord;
   conversationId: string;
@@ -230,14 +218,8 @@ const generatedImageArtifacts = (args: {
   return artifacts;
 };
 
-/** Keep a runaway turn from stacking maps down the timeline. */
 const MAX_MAP_CARDS_PER_TURN = 3;
 
-/**
- * One inline map card per resolved `map` call in this assistant row — the
- * cloud twin of the desktop bridge's `map-route` artifact. A map resolved
- * inside `code` rides that call's lifted `maps`, exactly as on desktop.
- */
 const mapRouteArtifacts = (args: {
   record: JournalMessageRecord;
   conversationId: string;
@@ -275,25 +257,12 @@ const mapRouteArtifacts = (args: {
   return artifacts;
 };
 
-/**
- * Projects the DO journal into the existing native timeline shape.
- * Canonical sequence order is retained; no local transcript is consulted.
- *
- * Committed records are the only source of assistant text. A turn in flight
- * contributes nothing to the transcript — the working indicator stands in for
- * it until the reply's row commits whole.
- */
 export type DestinationSwitch = {
   toolCallId: string;
   destination: string;
   at: number;
 };
 
-/**
- * The newest `switch_destination` call the orchestrator made in this
- * conversation that succeeded. The phone's picker follows it the same way
- * the desktop's does.
- */
 export const latestDestinationSwitch = (
   records: readonly JournalRecord[],
 ): DestinationSwitch | null => {
@@ -321,7 +290,6 @@ export const latestDestinationSwitch = (
   return latest;
 };
 
-/** Everything one turn's records project to, in order. */
 const projectTurn = (
   turnId: string,
   turn: readonly JournalRecord[],
@@ -334,7 +302,6 @@ const projectTurn = (
   const { recordsBySeq, reactions } = context;
   const args = { conversationId: context.conversationId };
   const out: ChatMessage[] = [];
-  // A reminder Stella delivered: her line, on its own, with Done and Snooze.
   const reminderRecord = turn.find(
     (record): record is Extract<JournalRecord, { kind: "card" }> =>
       record.kind === "card" && record.card.type === "reminder",
@@ -383,9 +350,6 @@ const projectTurn = (
     if (record.role === "user") {
       turnUserRecord = record;
       userMessageId = projectedMessageId(record);
-      // A prompt with nothing to show (older desktop turns mirrored their
-      // lifecycle wake as an empty, unflagged user record) is a hidden one,
-      // and so is one an agent sent (a note stored before it was flagged).
       const display = userDisplayContext(record.payload);
       const hasDisplayContext =
         display.pastedTexts.length > 0 || Boolean(display.quotedText);
@@ -442,11 +406,8 @@ const projectTurn = (
         },
       ];
     });
-    // The trailing `refs` fence is model-facing (see `reply-refs`); it
-    // never renders. Preserve its relationships for contextual navigation.
     const split = splitMessageReplyRefs(record.payload);
     const value = split.text;
-    // Desktop-executed turns persist resolved refs instead of a model fence.
     const storedRefs = storedJournalReplyRefs(record.payload);
     const replyRefs = storedRefs.length
       ? storedRefs
@@ -506,11 +467,6 @@ const projectTurn = (
     });
   }
 
-  // Only what this turn's own `html` calls made rides its last reply, as
-  // on desktop. An `image_gen` image already shows as its call's inline
-  // card (`generatedImageArtifacts`), so the files card naming the same
-  // drive path never repeats it on the reply. Any other file a files card
-  // names (an agent's output, a report's links) is never attached either.
   const ownOutputPaths = new Set<string>();
   for (const { payload } of toolResults.values()) {
     const toolName =
@@ -571,13 +527,6 @@ const projectTurn = (
   return out;
 };
 
-/**
- * Each turn's projection, kept while the turn's records are the same objects.
- * A record arriving appends to one turn, so re-projecting the whole window on
- * every record (allocation-heavy, and linear in the transcript) collapses to
- * the one turn that changed; untouched turns also hand back the same message
- * objects, so nothing downstream sees them change.
- */
 type TurnProjection = {
   records: readonly JournalRecord[];
   reactionsKey: string;
@@ -627,8 +576,6 @@ export const projectCloudConversationMessages = (args: {
   const cacheKey = args.conversationId ?? "";
   const previous = turnProjections.get(cacheKey);
   const next = new Map<string, TurnProjection>();
-  // Reply refs resolve against the window; a different window start (older
-  // history paged in) re-projects everything.
   const windowKey = `${args.hasOlder === true}:${args.records[0]?.seq ?? ""}`;
   const messages: ChatMessage[] = [];
   for (const [turnId, turn] of byTurn) {
@@ -661,8 +608,6 @@ export const projectCloudConversationMessages = (args: {
     turnProjections.delete(oldest);
   }
 
-  // The lifecycle pass attaches cards by assigning `artifacts` on the rows it
-  // is given; hand it copies so the cached turn rows stay as projected.
   return projectMobileLifecycle(
     messages.map((message) => ({ ...message })),
     args.records,
@@ -678,8 +623,6 @@ export const activeCloudTurnId = (
   for (const record of records) {
     if (record.kind === "turn") phases.set(record.turnId, record.phase);
   }
-  // Durable terminal evidence wins over an older ephemeral snapshot. The
-  // terminal record and live-clear frame can arrive in separate renders.
   if (live && (!phases.has(live.turnId) || phases.get(live.turnId) === "started")) {
     return live.turnId;
   }
@@ -691,7 +634,6 @@ export const activeCloudTurnId = (
 
 export { journalWorkingActivity as cloudTurnActivity } from "@stella/contracts/journal-working-activity";
 
-/** Server placement dispatch echoed by the canonical prompt for one turn. */
 export const canonicalCloudDispatchIdForTurn = (
   records: readonly JournalRecord[],
   turnId: string | null,
@@ -711,7 +653,6 @@ export const canonicalCloudDispatchIdForTurn = (
   return null;
 };
 
-/** Canonical dispatch ids echoed by journal user rows. */
 export const canonicalCloudDispatchIds = (
   records: readonly JournalRecord[],
 ): ReadonlySet<string> =>
@@ -723,12 +664,6 @@ export const canonicalCloudDispatchIds = (
     ),
   );
 
-/**
- * Adds only the current device's unresolved optimistic rows to the canonical
- * projection. Historical SQLite rows are never consulted as transcript
- * authority. A binding maps the local bubble id to the server dispatch id,
- * because the DO echoes the latter as clientMsgId.
- */
 export const mergeCanonicalCloudMessages = (args: {
   canonical: readonly ChatMessage[];
   local: readonly ChatMessage[];
@@ -766,8 +701,6 @@ export const mergeCanonicalCloudMessages = (args: {
   const canonical = args.canonical.map(message => {
     const local = localById.get(message.id);
     if (message.role !== "user" || local?.role !== "user") return message;
-    // Identity is already canonical here. Keep the picked preview while the
-    // authenticated canonical attachment URL resolves, including after ACK.
     return {
       ...message,
       ...(message.attachmentPaths?.length ? {
@@ -783,9 +716,6 @@ export const mergeCanonicalCloudMessages = (args: {
       ...(!message.quotedText && local.quotedText ? { quotedText: local.quotedText } : {}),
     };
   });
-  // Failed admissions have no journal row. Appending them after the entire
-  // journal makes an old offline notice follow every later successful reply.
-  // Merge by time while preserving the journal's authoritative relative order.
   const anchors = args.sentAnchors;
   for (const message of optimistic) {
     if (message.role === "user") anchors?.note(message.id, message.createdAt);
@@ -845,11 +775,6 @@ export const mergeCanonicalCloudMessages = (args: {
   return merged;
 };
 
-/**
- * Rebinds the server's placement dispatch id to the mobile optimistic bubble
- * id once admission is known. Canonical identity remains available in
- * canonicalId, while React/UI identity stays stable across the handoff.
- */
 export const rebindCanonicalCloudMessages = (
   canonical: readonly ChatMessage[],
   dispatchBindings: ReadonlyMap<string, string | null>,

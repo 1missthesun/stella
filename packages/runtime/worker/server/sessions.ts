@@ -70,8 +70,6 @@ const sessionLayer = (
   timeline: BootTimeline,
   runnerGate: RunnerGate,
 ) => {
-  // Boot timing only: each layer's own build time (its dependencies are
-  // already built when it starts). Wrapping changes no order or finalizer.
   const timed = <A, E, R>(name: string, layer: Layer.Layer<A, E, R>) =>
     Layer.unwrap(
       Effect.sync(() => {
@@ -120,11 +118,6 @@ const sessionLayer = (
 const BOOT_PROBE_INTERVAL_MS = 25;
 const BOOT_PROBE_MAX_MS = 15 * 60_000;
 
-/**
- * Event-loop stall probe for one boot: a 25 ms sleep loop that records the
- * longest overshoot (synchronous work on the worker thread — SQLite, module
- * evaluation, runner construction). Stops when the timeline finishes.
- */
 const startBootStallProbe = (timeline: BootTimeline): void => {
   let last = performance.now();
   const loop: Effect.Effect<void> = Effect.sleep(BOOT_PROBE_INTERVAL_MS).pipe(
@@ -142,10 +135,6 @@ const startBootStallProbe = (timeline: BootTimeline): void => {
   workerRuntime.runFork(loop);
 };
 
-/**
- * Report one finished boot: the `worker.ready.timing` process-log event and
- * the `app.performance` `worker-ready` metric. Idempotent per timeline.
- */
 const reportBoot = (
   timeline: BootTimeline,
   outcome: BootOutcome,
@@ -162,8 +151,6 @@ const reportBoot = (
   if (logger) {
     logger.process("worker.ready.timing", timing);
   } else {
-    // stdio workers (perf lab, child-mode hosts) have no file logger; stderr
-    // is their diagnostics channel (stdout carries JSON-RPC).
     console.error(
       `[stella:boot] worker.ready.timing ${JSON.stringify(timing)}`,
     );
@@ -177,7 +164,6 @@ type SessionKey = {
   stellaWorkspacePath: string;
 };
 
-/** The live session with its scope and typed handles into the built graph. */
 export type OpenSession = {
   readonly key: SessionKey;
   readonly scope: Scope.Closeable;
@@ -206,12 +192,7 @@ export interface Interface {
   ) => Effect.Effect<{ ok: true; queued?: true }, Error>;
   readonly shutdown: () => Effect.Effect<void>;
   readonly current: () => OpenSession | null;
-  /**
-   * Interrupt the session's turns and end its commands, keeping the session
-   * open. pi keeps interrupted work pending for the next launch.
-   */
   readonly interruptWork: () => Effect.Effect<void>;
-  /** Bounded database maintenance that needs the detached window to finish. */
   readonly holdsWorkerAlive: () => boolean;
 }
 
@@ -219,7 +200,6 @@ export class Service extends Context.Service<Service, Interface>()(
   "@stella/runtime/worker/WorkerSessions",
 ) {}
 
-/** Fetch the current session or fail with the handler's parity error. */
 export const sessionOrFail = <E>(
   onMissing: () => E,
 ): Effect.Effect<OpenSession, E, Service> =>
@@ -232,10 +212,6 @@ export const sessionOrFail = <E>(
     return session;
   });
 
-/**
- * Release latch for one session's background runner build (see
- * `sessionRunnerModule`). Settles once; later calls are no-ops.
- */
 type RunnerGate = {
   readonly published: Promise<void>;
   readonly open: () => void;
@@ -249,7 +225,6 @@ const makeRunnerGate = (): RunnerGate => {
     open = resolve;
     fail = reject;
   });
-  // Observed by RunnerHandle's build; never an unhandled rejection.
   published.catch(() => undefined);
   return { published, open, fail };
 };
@@ -305,10 +280,6 @@ export const layer = Layer.effect(
     const catalog = yield* ModelCatalog.Service;
     const runnerModule = yield* RunnerModule.Service;
 
-    // JSON-RPC handlers run concurrently (one fiber per request), so
-    // initialize/shutdown mutate `currentSession` under this mutex. Without
-    // it, two overlapping INITIALIZE calls could both observe no session,
-    // build two scopes, and leak whichever one lost the final assignment.
     const sessionLock = yield* Semaphore.make(1);
 
     let currentSession: OpenSession | null = null;
@@ -326,7 +297,6 @@ export const layer = Layer.effect(
       if (patch.authToken !== undefined) {
         runner?.setAuthToken(patch.authToken);
         updateRuntimeTelemetryAuth(patch.authToken);
-        // Back in touch with the cloud: settle what it thinks runs here and does not.
         if (patch.authToken && runner) {
           void reconcileComputerAgents(session, hostBus).catch((error) => {
             console.warn(
@@ -342,8 +312,6 @@ export const layer = Layer.effect(
       if (patch.cloudSyncEnabled !== undefined) {
         runner?.setCloudSyncEnabled(patch.cloudSyncEnabled);
       }
-      // Auth identity and the backend are the catalog's cache-key inputs
-      // the runtime controls; re-warm when either moves.
       if (patch.authToken !== undefined || patch.backendUrl !== undefined) {
         catalog.scheduleWarm(() => session.runnerCell.get());
       }
@@ -353,7 +321,6 @@ export const layer = Layer.effect(
       const session = currentSession;
       currentSession = null;
       if (!session) return Effect.void;
-      // pi's chats run on the runner's tools: they close first.
       return Effect.promise(() =>
         closePiChats(session).catch((error) => {
           console.warn("[runtime-worker] pi chat close failed:", (error as Error).message);
@@ -361,13 +328,6 @@ export const layer = Layer.effect(
       ).pipe(Effect.andThen(Scope.close(session.scope, Exit.void)));
     });
 
-    // The whole initialize path holds the session lock and runs under an
-    // uninterruptible mask: teardown of the previous session and publication
-    // of the new one are atomic, while the long awaits (host identity hop,
-    // layer build) stay interruptible via `restore`. An interruption or
-    // failure inside the build closes the partially-built scope via onExit,
-    // so a losing/interrupted initialize can never leak resources or publish
-    // a half-built session.
     const initialize: Interface["initialize"] = (init, options) => {
       const timeline = options?.timeline ?? new BootTimeline();
       const lockRequestedAt = performance.now();
@@ -401,8 +361,6 @@ export const layer = Layer.effect(
                 deviceId: existing.config.deviceId,
               };
             }
-            // A fresh session is being built: this initialize is a boot.
-            // Steps recorded from storage / runner init land on it too.
             setActiveBootTimeline(timeline);
             startBootStallProbe(timeline);
             let bootStep = "closePrevious";
@@ -464,9 +422,6 @@ export const layer = Layer.effect(
                 ),
               ),
             ).pipe(
-              // A failed OR interrupted build must not leak the resources
-              // acquired so far (onExit runs uninterruptibly on every
-              // non-success exit, unlike onError which misses interrupts).
               Effect.onExit((exit) =>
                 Exit.isSuccess(exit)
                   ? Effect.sync(() =>
@@ -512,10 +467,6 @@ export const layer = Layer.effect(
             // a session closed in the meantime still builds and then stops
             // its runner, exactly as when the build started mid-initialize.
             forkDelayed(0, runnerGate.open);
-            // Idle = this exact session is still current and the worker has
-            // no run, agent, voice work or in-flight RPC. Teardown
-            // clears currentSession first, so maintenance goes quiet before
-            // the storage finalizer stops it.
             session.storage.maintenance.start({
               isIdle: () => currentSession === session && !hasSessionWork(),
               attachedClientCount: () => hostBus.attachedClientCount(),
@@ -527,9 +478,6 @@ export const layer = Layer.effect(
               ...(init.clientVersion ? { release: init.clientVersion } : {}),
             });
 
-            // Post-ready warmups — off the initialize response path, as a
-            // forked 0-delay fiber (the old setTimeout(0) block): wait out
-            // the background runner build for startup logging.
             forkDelayed(0, () => {
               void (async () => {
                 const startupStartedAt = Date.now();
@@ -548,8 +496,6 @@ export const layer = Layer.effect(
                     builtRunner?.setBackgroundExitTarget(
                       piBackgroundExitTarget(session, hostBus),
                     );
-                    // The initialize-time warm below no-ops while the runner
-                    // is still building; warm once it exists, as before.
                     if (builtRunner && currentSession === session) {
                       catalog.scheduleWarm(() => session.runnerCell.get());
                     }
@@ -560,9 +506,6 @@ export const layer = Layer.effect(
                         (error as Error).message,
                       );
                     });
-                    // Conversations on pi-durable resume their own work;
-                    // then whatever the cloud still thinks runs here and
-                    // does not is settled.
                     if (builtRunner && currentSession === session) {
                       void resumePiChats(session, hostBus)
                         .catch((error) => {
@@ -596,9 +539,6 @@ export const layer = Layer.effect(
               applyConfigPatch(session, pendingConfigPatch);
               pendingConfigPatch = null;
             }
-            // Warm the catalog against whatever config the worker initialized
-            // with so a restart/reattach doesn't make the next chat pay the
-            // cold fetch. Best-effort; no-ops while the runner is building.
             catalog.scheduleWarm(() => session.runnerCell.get());
 
             const initializedAtMs = timeline.elapsed();
@@ -617,7 +557,6 @@ export const layer = Layer.effect(
       Effect.gen(function* () {
         const session = currentSession;
         if (!session) {
-          // Queue the patch — it will be applied after initialization.
           pendingConfigPatch = { ...pendingConfigPatch, ...patch };
           return { ok: true as const, queued: true as const };
         }
@@ -632,27 +571,17 @@ export const layer = Layer.effect(
       });
 
     const hasSessionWork = () => {
-      // Everything a worker shutdown would interrupt, the work the host
-      // cannot observe after a disconnect included.
       const session = currentSession;
       const requestPinned = hostBus.activeRequestHandlerCount() > 0;
       return Boolean((session ? piChatsBusy(session) : false) || requestPinned);
     };
 
-    // Idle-shutdown keep-alive: only a DB reclaim or index build that is
-    // running or ready for the zero-client window (maintenance.ts). Turns do
-    // not keep the runtime alive without an app; they are interrupted first.
-    // The maintenance idle check uses hasSessionWork, never this, so the hold
-    // cannot make maintenance think the worker is busy.
     const holdsWorkerAlive = () =>
       currentSession?.storage.maintenance.holdsWorkerAlive() ?? false;
 
     const interruptWork = Effect.suspend(() => {
       const session = currentSession;
       if (!session) return Effect.void;
-      // Commands first, while the chats can still reach them; closing a
-      // chat aborts its turns, and that close waits for any command
-      // termination the abort starts.
       return Effect.promise(async () => {
         await Promise.allSettled([
           terminatePiChatCommands(session),
@@ -665,8 +594,6 @@ export const layer = Layer.effect(
     return {
       initialize,
       configure,
-      // Shares the session lock with initialize so a shutdown cannot
-      // interleave with an in-flight initialize and strand its session.
       shutdown: () => sessionLock.withPermit(closeCurrent),
       current: () => currentSession,
       interruptWork: () => interruptWork,

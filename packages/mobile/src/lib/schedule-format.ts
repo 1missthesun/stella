@@ -16,7 +16,6 @@ export {
 
 export type MobileScheduleShape = LocalCronSchedule;
 
-/** Best-effort parse of the runtime's serialized LocalCronSchedule JSON. */
 export const parseStoredSchedule = (
   value: string,
 ): MobileScheduleShape | null => {

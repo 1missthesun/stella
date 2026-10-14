@@ -2,18 +2,6 @@
 
 import { useEffect } from "react";
 
-/**
- * Listens for live theme updates from the Stella desktop app. When the
- * user changes themes inside Stella, the desktop pushes a fresh set of
- * tokens through the preload bridge (`stellaDesktopStore.onThemeChanged`),
- * and we apply them as `--embedded-*` custom properties on `<html>`
- * without reloading the embedded view.
- *
- * Pairs with `embedded-init-script.tsx`, which handles first paint via
- * the URL query string. Render once near the top of the tree (e.g. in
- * the root layout); the bridge is a no-op when the page isn't loaded
- * inside Stella's desktop `WebContentsView`.
- */
 export type EmbeddedTheme = {
   mode?: "light" | "dark";
   foreground?: string;

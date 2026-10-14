@@ -1,15 +1,3 @@
-/**
- * Placement policy: `decideServerExecutionPlacement` and its eligibility
- * predicates.
- *
- * Two things live here and nothing else: the pure routing decision (which
- * never consults reachability — an `offer` is resolved later by a fenced
- * claim) and the eligibility predicate that turns live presence rows into the
- * set of devices an offer may go to. Both are pure so the owner gate's state
- * machine can be tested against the same matrix the original implementation
- * was, and so a routing change is a diff in one readable function.
- */
-
 import {
   DEVICE_PRESENCE_PROTOCOL_VERSION,
   TERMINAL_DISPATCH_STATES,
@@ -30,11 +18,6 @@ import {
 import { parseCloudTurnContext } from "@stella/contracts/turn-plane/turn-start";
 import { parseCloudExecutionSelection } from "./turn-start-request.js";
 
-/**
- * Capabilities the cloud sandbox has by construction. A dispatch requiring
- * anything else can never be honoured in the cloud, so falling back to it
- * would silently execute a materially different request.
- */
 export const CLOUD_PROVIDED_CAPABILITIES: readonly ExecutionCapability[] = [
   "chat",
   "agent",
@@ -62,11 +45,6 @@ export type DispatchPolicyDecision =
     }
   | { kind: "blocked"; reason: string };
 
-/**
- * `subject` says what the work is about; `targetMode` is the independent,
- * user-facing executor choice. Keeping them separate is what stops a portable
- * prompt from changing meaning when it is sent somewhere else.
- */
 export const decideDispatchPlacement = (args: {
   ingress: ExecutionIngress;
   subject: ExecutionSubject;
@@ -76,8 +54,6 @@ export const decideDispatchPlacement = (args: {
     return { kind: "commit", placement: "cloud", reason: "explicit-cloud" };
   }
   if (args.targetMode === "device") {
-    // A picked computer that is asleep or busy hands portable work to the
-    // cloud; only work that needs that computer waits on it.
     return {
       kind: "offer",
       onNoEligibleComputer: args.subject === "computer" ? "blocked" : "cloud",
@@ -110,16 +86,10 @@ export const decideDispatchPlacement = (args: {
   };
 };
 
-/** Ingresses with a device behind them, so a claim to local work is credible. */
 export const ingressMayClaimComputerSubject = (
   ingress: ExecutionIngress,
 ): boolean => ingress === "desktop" || ingress === "mobile";
 
-// ---------------------------------------------------------------------------
-// Eligibility
-// ---------------------------------------------------------------------------
-
-/** A device's live presence as the owner gate keeps it. */
 export type DevicePresenceState = {
   deviceId: string;
   presenceSessionId: string;
@@ -130,7 +100,6 @@ export type DevicePresenceState = {
   lastSeenAt: number;
 };
 
-/** The device as the owner snapshot registered it. */
 export type DeviceRegistration = {
   deviceId: string;
   publicKey: string;
@@ -143,13 +112,6 @@ export const hasCapabilities = (
   required: readonly ExecutionCapability[],
 ): boolean => required.every((capability) => advertised.includes(capability));
 
-/**
- * Online, ready, protocol-current, and capable, with remote execution
- * enabled on the registration. Agent capacity belongs to the runtime
- * scheduler, not the device handoff protocol. Every clause is
- * load-bearing; dropping any of them offers work to a device that
- * cannot run it and costs the user a four-second stall before the fallback.
- */
 export const isEligibleDevice = (args: {
   presence: DevicePresenceState | undefined;
   device: DeviceRegistration | undefined;
@@ -171,7 +133,6 @@ export const isEligibleDevice = (args: {
   return true;
 };
 
-/** Requirements the cloud sandbox cannot honour; a fallback would lie. */
 export const cloudUnsupportedCapabilities = (
   required: readonly ExecutionCapability[],
 ): ExecutionCapability[] =>
@@ -181,10 +142,6 @@ export const cloudUnsupportedCapabilities = (
 
 export const isTerminalDispatchState = (state: DispatchState): boolean =>
   TERMINAL_DISPATCH_STATES.includes(state);
-
-// ---------------------------------------------------------------------------
-// Request parsing
-// ---------------------------------------------------------------------------
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
@@ -212,11 +169,6 @@ export type ParsedDispatchPayload =
   | { ok: true; payload: DispatchPayload }
   | { ok: false; message: string };
 
-/**
- * The payload is frozen behind its own hash, so a replay parses the same
- * bytes to the same verdict. Strict, never truncating: a quietly shortened
- * attachment list executes a different request than the one the user sent.
- */
 export const parseDispatchPayload = (
   value: unknown,
   kind: ExecutionKind,
@@ -279,7 +231,6 @@ export const parseDispatchPayload = (
     if (!context || kind !== "chat") return fail("payload.context is malformed.");
     if (context.text || context.display) payload.context = context;
   }
-  // A chat may be only what the user pasted or attached, with nothing typed.
   if (
     !prompt &&
     !(kind === "chat" && (payload.context?.text || payload.attachments?.length))
@@ -331,11 +282,6 @@ export type ParsedDispatchSubmitRequest =
   | { ok: true; request: DispatchSubmitRequest }
   | { ok: false; message: string };
 
-/**
- * The body of `POST /owners/me/dispatches`. It never names an owner: identity
- * rides on the trusted headers the Worker stamps after verifying the caller,
- * exactly like a turn start.
- */
 export const parseDispatchSubmitRequest = (
   value: unknown,
 ): ParsedDispatchSubmitRequest => {
@@ -364,9 +310,6 @@ export const parseDispatchSubmitRequest = (
     return fail("subject must be portable, computer, or cloud.");
   }
   const subject = value.subject as ExecutionSubject;
-  // A deviceless ingress has no local machine behind it, so a local subject
-  // is a claim it cannot make. Collapsing it silently would change what the
-  // work means; refusing says so.
   if (!ingressMayClaimComputerSubject(ingress) && subject !== "cloud") {
     return fail(`${ingress} ingress cannot claim a local execution subject.`);
   }
@@ -404,7 +347,6 @@ export const parseDispatchSubmitRequest = (
   ) {
     return fail("requiredCapabilities contains an unsupported requirement.");
   }
-  // The kind is itself a capability every executor must advertise.
   const requiredCapabilities = [
     ...new Set<ExecutionCapability>([
       kind,
@@ -451,10 +393,6 @@ export const parseDispatchSubmitRequest = (
   }
   return { ok: true, request };
 };
-
-// ---------------------------------------------------------------------------
-// Errors
-// ---------------------------------------------------------------------------
 
 export const DISPATCH_ERROR_STATUS: Record<DispatchErrorCode, number> = {
   unauthorized: 401,

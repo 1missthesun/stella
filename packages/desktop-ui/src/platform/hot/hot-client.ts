@@ -1,35 +1,20 @@
 import RefreshRuntime from "react-refresh/runtime";
 
-/**
- * The renderer's side of hot updates when it runs from source. The source
- * server loads this before anything else in every window, so React DOM finds
- * the refresh hook, and prefixes every module it serves with
- * `const __stella_hot = (import.meta.hot = globalThis.__stellaHot?.module(import.meta.url)) ?? …`
- * which records that this window loaded the module and gives it a hot
- * context. After an update, Electron main calls `__stellaHot.update(payload)`
- * with the modules to re-import; anything that cannot apply reloads the page.
- */
-
 type HotCallback = (module: unknown) => void;
 
 type HotRecord = {
   data: Record<string, unknown>;
   disposers: Array<(data: Record<string, unknown>) => void>;
-  /** Callbacks by the specifier they accept, as written in `accept()`. */
   accepted: Map<string, HotCallback[]>;
 };
 
 type HotUpdate =
-  /** Re-import a module whose exports are all components. */
   | { type: "self"; id: string; url: string }
-  /** Re-import `url` and hand it to `id`'s `accept(spec, callback)`. */
   | { type: "dep"; id: string; spec: string; url: string }
-  /** Re-import a stylesheet module, which swaps its `<style>`. */
   | { type: "css"; id: string; url: string };
 
 export type HotPayload = {
   updates: HotUpdate[];
-  /** Every module the update re-executes, by id. */
   stale: string[];
 };
 
@@ -51,7 +36,6 @@ const hotContext = (url: string) => {
   };
   return {
     data: record.data,
-    /** Self-accepting is the server's call (all exports are components). */
     accept(deps?: string | string[] | HotCallback, callback?: (module: unknown) => void) {
       if (typeof deps === "string") acceptDep(deps, (module) => callback?.(module));
       if (Array.isArray(deps)) {

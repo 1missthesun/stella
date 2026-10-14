@@ -1,14 +1,3 @@
-/**
- * Bundle Stella's system prompts into cloud-builder.
- *
- * Reads the runtime-owned prompt sources, strips agent frontmatter, validates
- * condition fences (`renderStellaPrompt` in @stella/contracts/stella-prompts)
- * and writes `src/prompts/defaults.generated.ts`, which cloud turns import
- * directly and `GET /api/stella/prompts` serves to desktop. Sources are
- * bundled raw; each consumer renders them for its environment and tools.
- * Publishing a prompt change is deploying cloud-builder. `--check` fails when
- * the generated file drifts.
- */
 import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
@@ -81,9 +70,6 @@ const promptBody = (raw: string, kind: PromptSourceKind, id: string): string => 
       `Runtime prompt source for ${id} must have no surrounding blank lines and one trailing newline.`,
     );
   }
-  // Every consumer renders agent prompts through `renderStellaPrompt`, so a
-  // fence there must be well formed; nothing renders the auxiliary prompts,
-  // so a fence there would reach a model verbatim.
   if (kind === "agent-metadata") {
     const errors = validateStellaPromptFences(body);
     if (errors.length > 0) {

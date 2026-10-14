@@ -1,9 +1,3 @@
-/**
- * Fetches an HTML document the cloud `html` tool wrote into the owner's
- * drive. The signed URL is minted at read time by the owner's object;
- * `version` (the canvas's createdAt) forces a refetch when the same slug is
- * overwritten by a later turn.
- */
 import { useEffect, useState } from "react";
 import { backendClient } from "@/platform/backend/backend-client";
 

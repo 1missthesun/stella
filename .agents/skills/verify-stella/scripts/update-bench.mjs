@@ -1,29 +1,4 @@
 #!/usr/bin/env node
-/**
- * Update benchmark: how long pressing Update takes until Stella is back and
- * usable with the change, broken down by step, on a real isolated Stella.
- *
- * The app under test runs from a sandbox clone (`<dir>/app`, default
- * `~/.stella/tmp/update-bench/app`) through this skill's own harness
- * (`STELLA_VERIFY_RUN=update-bench`, private Xvfb on Linux), so applying an
- * update only ever moves the sandbox's checkout. Each iteration commits a
- * change of one kind onto a `draft/bench-*` branch with git plumbing (the
- * sandbox's working tree is untouched until the app applies it), presses
- * Update through the same IPC the button uses, and polls the window until the
- * change is on screen and the app is usable. The app's own timing lines
- * (`app-source.timing`, `app-source.transition`, `main.quit-*`, startup and
- * `app-source.relaunch-transition`) give the breakdown.
- *
- *   setup                     clone this checkout's HEAD into the sandbox and install
- *   sync [--ref r]            move the sandbox to this checkout's HEAD or r (reinstalls on a lock change)
- *   launch [--mode m]         start the sandbox's Stella (m: production | development renderer)
- *   run --variation v [--iterations n] [--label l]
- *                             v: renderer | main | runtime | deps | stale | undo
- *   report [--label l]        medians per label and variation
- *   stop                      stop the sandbox's Stella
- *
- * Results append to `~/.stella/outputs/update-bench/results.jsonl`.
- */
 import { execFileSync, spawnSync } from "node:child_process";
 import {
   appendFileSync,
@@ -63,8 +38,6 @@ const git = (cwd, gitArgs, input) =>
   execFileSync("git", gitArgs, { cwd, encoding: "utf8", input, maxBuffer: 64 * 1024 * 1024 }).trim();
 const log = (message) => process.stderr.write(`[update-bench] ${message}\n`);
 
-/* ---------------------------------------------------------------- sandbox */
-
 const install = () => {
   const started = Date.now();
   const result = spawnSync(bun, ["install", "--frozen-lockfile"], { cwd: appDir, stdio: "ignore" });
@@ -96,8 +69,6 @@ const sync = () => {
   log(`sandbox at ${sha.slice(0, 12)}`);
 };
 
-/* -------------------------------------------------------------------- run */
-
 const readRun = () => JSON.parse(readFileSync(pointerFile, "utf8"));
 
 const harness = (harnessArgs, extraEnv = {}) => {
@@ -115,7 +86,6 @@ const harness = (harnessArgs, extraEnv = {}) => {
   }
 };
 
-/** Electron main processes of this run, found by the user-data dir in their environment. */
 const runElectronPids = (run) => {
   if (process.platform !== "linux") return run.electronPid ? [run.electronPid] : [];
   const pids = [];
@@ -212,11 +182,8 @@ const launch = async () => {
   console.log(JSON.stringify(record));
 };
 
-/* -------------------------------------------------------------- resources */
-
 const TICK_MS = 1000 / 100;
 
-/** `/proc/<pid>/stat` fields after the command name. */
 const procStat = (pid) => {
   try {
     const text = readFileSync(`/proc/${pid}/stat`, "utf8");
@@ -234,12 +201,6 @@ const rssKb = (pid) => {
   }
 };
 
-/**
- * What the update work costs, sampled from /proc every 20ms (Linux only):
- * the peak memory of the processes the app started during the window (git,
- * builds, installs) on top of what was running when it began, and the CPU
- * time the main process and everything it reaped used meanwhile.
- */
 class ResourceSampler {
   constructor(mainPid) {
     this.mainPid = mainPid;
@@ -297,8 +258,6 @@ class ResourceSampler {
   }
 }
 
-/* -------------------------------------------------------------------- CDP */
-
 const fullPage = async (port) => {
   const list = await (await fetch(`http://127.0.0.1:${port}/json/list`, { signal: AbortSignal.timeout(1000) })).json();
   return list.find((target) => target.type === "page" && target.url.includes("window=full")) ?? null;
@@ -340,9 +299,7 @@ const evaluate = async (port, expression, timeoutMs = 2000) => {
 };
 const tryEvaluate = (port, expression) => evaluate(port, expression).catch(() => undefined);
 
-/** The window is loaded, its launch splash gone and the shell mounted. */
 const LIVE = `document.readyState === "complete" && !document.getElementById("stella-launch") && Boolean(document.querySelector(".shell-topbar-full"))`;
-/** The runtime host answers. */
 const HOST = `(async () => { try { const id = await window.electronAPI.system.getDeviceId(); const catalog = await window.electronAPI.system.listLlmModels(); return Boolean(id) && Boolean(catalog) && typeof catalog === "object"; } catch { return false; } })()`;
 
 const waitForLive = async (run, deadline) => {
@@ -352,8 +309,6 @@ const waitForLive = async (run, deadline) => {
   }
   throw new Error("window never became live");
 };
-
-/* ------------------------------------------------------------------- logs */
 
 const processLog = (run) => {
   const root = path.join(run.dataDir, "logs");
@@ -420,8 +375,6 @@ class LogTail {
   }
 }
 
-/* ---------------------------------------------------------------- changes */
-
 const TOPBAR = "packages/desktop-ui/src/shell/ShellTopBarFull.tsx";
 const TOPBAR_ANCHOR = `<div className="shell-topbar-full__spacer" aria-hidden="true" />`;
 const NAV = "packages/desktop-ui/src/shell/ShellTopBarActivity.tsx";
@@ -432,7 +385,6 @@ const DEP_PACKAGE = "packages/contracts/package.json";
 
 const show = (cwd, rev, file) => git(cwd, ["show", `${rev}:${file}`]);
 
-/** Replace the line holding `anchor` (and any earlier bench marker) with a marked copy. */
 const markUi = (source, anchor, attribute, nonce) => {
   const marker = new RegExp(`\\s*<span ${attribute}="[^"]*">[^<]*</span>`, "g");
   const clean = source.replace(marker, "");
@@ -443,7 +395,6 @@ const markUi = (source, anchor, attribute, nonce) => {
 const markCode = (source, nonce) =>
   `${source.replace(/\n\/\/ update-bench [^\n]*\n.*$/s, "\n")}\n// update-bench ${nonce}\nexport const __updateBench = "${nonce}";\n`;
 
-/** Toggle a tiny dependency, with the lockfile bun makes for it. */
 const toggleDependency = (head) => {
   const lockgen = path.join(benchDir, "lockgen");
   if (!existsSync(lockgen)) git(appDir, ["worktree", "add", "--quiet", "--detach", lockgen, head]);
@@ -464,7 +415,6 @@ const toggleDependency = (head) => {
   return { files, note: adding ? "add ms" : "remove ms" };
 };
 
-/** Write `files` over `base`'s tree as one commit, without touching any working tree. */
 const commitOnto = (base, files, message) => {
   const index = path.join(benchDir, `index-${process.pid}`);
   const env = { ...process.env, GIT_INDEX_FILE: index };
@@ -489,8 +439,6 @@ const prepareChange = (variation, nonce) => {
     case "renderer":
       return { base: head, files: { [TOPBAR]: markUi(show(appDir, head, TOPBAR), TOPBAR_ANCHOR, "data-update-bench", nonce) } };
     case "stale": {
-      // A finished draft whose base moved: made on an older commit, so taking
-      // it is a clean three-way merge that has to pass the update check.
       const parents = git(appDir, ["rev-list", "--parents", "-n1", head]).split(" ").slice(1);
       const base = parents.length > 1 ? parents[1] : parents[0];
       if (git(appDir, ["diff", "--name-only", base, head]).split("\n").includes(NAV)) {
@@ -520,8 +468,6 @@ const KIND = {
   runtime: "runtime",
 };
 
-/* -------------------------------------------------------------- iteration */
-
 const steps = (line) =>
   Object.fromEntries(
     (line ?? "")
@@ -541,7 +487,6 @@ const iterate = async (variation) => {
   let action;
   let markerSelector = null;
   if (variation === "undo") {
-    // Undo the last renderer change: an undo is always checked like a merge.
     const sha = git(appDir, ["log", "-1", "--format=%H", "--first-parent", "--", TOPBAR]);
     action = `window.electronAPI.appSource.undo(${JSON.stringify(sha)})`;
     const previous = git(appDir, ["show", `${sha}^:${TOPBAR}`]).match(/data-update-bench="([^"]+)"/)?.[1];
@@ -554,9 +499,6 @@ const iterate = async (variation) => {
     const prepareResources = new ResourceSampler(runMainPid(run));
     const createdAt = Date.now();
     git(appDir, ["branch", "--force", `draft/${name}`, commit]);
-    // As the user sees it: the draft offered in Updates (which also loads the
-    // transition overlay ahead of the press) before Update is pressed. A
-    // version is offered once it is prepared.
     const offeredBy = Date.now() + 180_000;
     let offeredAt = null;
     while (Date.now() < offeredBy) {
@@ -594,7 +536,6 @@ const iterate = async (variation) => {
   const record = { at: new Date(t0).toISOString(), variation, mode: run.benchMode ?? "development", nonce };
   if (pendingPrepare) record.prepare = pendingPrepare;
   pendingPrepare = null;
-  // The click's own work ends where the action logs its timing.
   const clickDone = tail.waitFor("app-source.timing", deadline).then(() => {
     record.clickResources = clickResources.stop();
   });
@@ -717,8 +658,6 @@ const runBench = async () => {
   }
 };
 
-/* ----------------------------------------------------------------- report */
-
 const median = (values) => {
   const sorted = values.filter((value) => typeof value === "number").sort((a, b) => a - b);
   if (sorted.length === 0) return undefined;
@@ -759,8 +698,6 @@ const report = () => {
     console.log(`${key}\tn=${group.length}\t${JSON.stringify(medians)}`);
   }
 };
-
-/* ------------------------------------------------------------------- main */
 
 try {
   if (command === "setup") setup();

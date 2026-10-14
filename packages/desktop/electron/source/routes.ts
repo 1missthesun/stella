@@ -3,11 +3,6 @@ import fs from "node:fs";
 import path from "node:path";
 import type { RouteTools } from "./tools.js";
 
-/**
- * Keeps `src/routeTree.gen.ts` in step with `src/routes`, as the TanStack
- * router plugin did inside Vite. The generator only rewrites the file when
- * the tree changes.
- */
 export const createRouteTreeGenerator = (
   loadTools: () => Promise<RouteTools>,
   uiRoot: string,

@@ -6,12 +6,6 @@ import { PROVIDER_CONNECTED_EVENT, } from "@/global/settings/hooks/use-llm-crede
 import { useT } from "@/shared/i18n";
 import "./ProviderConnectedDialog.css";
 import { ASSISTANT_AGENT_KEYS, DEFAULT_MODEL_BY_PROVIDER, } from "@/global/settings/lib/provider-default-models";
-/**
- * Some providers can serve more than one of Stella's surfaces (assistant
- * model, image generation, realtime voice). This table answers "if the user
- * just connected provider X, which surfaces could we offer to route through
- * it?". OpenAI is the obvious one — it covers all three.
- */
 const PROVIDER_SURFACES = {
     openai: { assistant: true, image: "openai", voice: "openai" },
     anthropic: { assistant: true, image: null, voice: null },
@@ -21,12 +15,6 @@ const PROVIDER_SURFACES = {
     fal: { assistant: false, image: "fal", voice: null },
     xai: { assistant: true, image: null, voice: "xai" },
 };
-/**
- * Lives near the app root, listens for `stella:llm-provider-connected`, and
- * offers a single confirmation that routes the assistant / image / voice
- * surfaces through the just-connected provider in one shot. Replaces the
- * old "set each surface manually" flow that made BYOK feel hostile.
- */
 export function ProviderConnectedDialog() {
     const t = useT();
     const [stage, setStage] = useState(null);
@@ -41,15 +29,6 @@ export function ProviderConnectedDialog() {
             const surfaces = PROVIDER_SURFACES[detail.provider];
             if (!surfaces)
                 return;
-            // Only ask the user "where should this provider take over?" when more
-            // than one surface is actually on the table. The dialog's whole reason
-            // to exist is multi-surface ambiguity (OpenAI = assistant + image +
-            // voice, OpenRouter = assistant + image). For assistant-only providers
-            // (Anthropic, Google) we don't change the active assistant on connect
-            // — the user just wanted credentials registered, and switching their
-            // chat model behind a confirmation feels invasive. For image-only or
-            // image-only or voice-only providers (fal) are unambiguous, so
-            // we silently apply the preference and skip the dialog.
             const offeredCount = (surfaces.assistant ? 1 : 0) +
                 (surfaces.image ? 1 : 0) +
                 (surfaces.voice ? 1 : 0);

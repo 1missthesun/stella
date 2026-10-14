@@ -1,14 +1,3 @@
-/**
- * Whether the desktop host may run the execution-placement bridge.
- *
- * The bridge proves device presence with an Ed25519 signature, but the host
- * never holds the private key: Electron main and the headless host hand the
- * runtime a public-only identity plus a `signDeviceInput` delegate that signs
- * with the same key. Eligibility therefore keys on that delegate. Requiring a
- * `privateKey` field here is exactly the bug that left every "Cloud" and
- * "other computer" send refused with "Cross-device execution is not ready on
- * this computer": no host handler supplies one, so the bridge never started.
- */
 export type ExecutionPlacementEligibilityInput = {
   started: boolean;
   hostReady: boolean;

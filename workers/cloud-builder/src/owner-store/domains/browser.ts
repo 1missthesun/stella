@@ -1,17 +1,3 @@
-/**
- * Hosted-browser handoffs. A cloud agent's browser command hands a sign-in or
- * device-code page to the user; the agent's conversation records the wait
- * here as an interaction (`browser.handoffOpen`, listed by `browser.pending`)
- * and holds the agent's `code` call open until it ends.
- *
- * Everything secret stays in the private Browser Gateway (the login URL, the
- * Live View, the session itself); the calls below fetch it on demand over the
- * `BROWSER_GATEWAY` binding with the interaction's exact turn authority.
- * `browser.decide` (or the `browser.expire` job at the deadline) takes the
- * gateway's resume receipt and leaves the interaction in a final state, which
- * the waiting conversation reads (`browser.handoffState`) to answer the call.
- */
-
 import type { BrowserCalls } from "@stella/contracts/backend/browser";
 import {
   isCloudBrowserSuspension,
@@ -167,8 +153,6 @@ const expireJobId = (interactionId: string): string => `${EXPIRE_JOB}:${interact
 const log = (event: string, fields: Record<string, unknown>): void =>
   console.error(JSON.stringify({ service: "owner-browser", event, ...fields }));
 
-// ── The gateway ───────────────────────────────────────────────────────────
-
 const invalid = (message: string) => new RpcError("UNAVAILABLE", message, { retryable: false });
 const changed = () => new RpcError("CONFLICT", "This browser request changed. Refresh it and try again.");
 const gone = () => new RpcError("NOT_FOUND", "This browser request is no longer available.");
@@ -253,7 +237,6 @@ const interactionBody = (ownerId: string, row: InteractionRow) => ({
   interactionRevision: row.revision,
 });
 
-/** The row, still open at `expectedRevision`, or a refusal. */
 const openRow = (ctx: OwnerContext, interactionId: string, expectedRevision: number): InteractionRow => {
   const row = readRow(ctx.db, interactionId);
   if (
@@ -276,8 +259,6 @@ const markHumanControl = (ctx: OwnerContext, interactionId: string, revision: nu
     revision,
   );
 };
-
-// ── Calls ─────────────────────────────────────────────────────────────────
 
 const detail = async (
   ctx: OwnerContext,
@@ -438,10 +419,6 @@ const importSessionTransfer = async (
 const finalState = (result: ResumeResult): CloudBrowserInteractionState =>
   result === "approved" ? "completed" : result === "canceled" ? "canceled" : result === "expired" ? "expired" : "failed";
 
-/**
- * Close the interaction with `receipt`: it leaves the pending list, and the
- * agent waiting on it reads how it ended (`browser.handoffState`).
- */
 const resolve = (
   ctx: OwnerContext,
   row: InteractionRow,
@@ -510,8 +487,6 @@ const decide = async (ctx: OwnerContext, args: DecideArgs): Promise<CloudBrowser
     interactionRevision: requiredInteger(value, "interactionRevision"),
     profileId: requiredString(value, "profileId", 64),
     profileEpoch: requiredInteger(value, "profileEpoch"),
-    // The gateway may know only the inner command id; the outer Code
-    // tool-call id recorded with the wait is authoritative.
     toolCallId: row.tool_call_id,
     requestDigest: requiredString(value, "requestDigest", 64),
     result,
@@ -529,7 +504,6 @@ const decide = async (ctx: OwnerContext, args: DecideArgs): Promise<CloudBrowser
   ) {
     throw invalid("The secure browser returned a stale decision.");
   }
-  // Another request may have decided while the gateway answered.
   const current = readRow(ctx.db, row.interaction_id)!;
   if (current.decision_request_id) return replay(current);
   if (current.revision !== row.revision) throw changed();
@@ -537,7 +511,6 @@ const decide = async (ctx: OwnerContext, args: DecideArgs): Promise<CloudBrowser
   return summary(readRow(ctx.db, row.interaction_id)!);
 };
 
-/** At the deadline: resume the agent with `expired`. */
 const expire = (ctx: OwnerContext, payload: unknown): void => {
   const interactionId = (payload as { interactionId?: unknown } | null)?.interactionId;
   if (typeof interactionId !== "string") return;
@@ -602,8 +575,6 @@ const resetProfile = async (
 
 const interactionId = string({ min: 1, max: 256 });
 
-// ── An agent's wait ───────────────────────────────────────────────────────
-
 const SAFE_ID = /^[A-Za-z0-9._~:-]{1,512}$/u;
 const safeId = string({ min: 1, max: 512, pattern: SAFE_ID });
 
@@ -616,12 +587,6 @@ const handoffOpenArgs = object({
   suspension: (value: unknown) => value,
 });
 
-/**
- * An agent's browser command handed the profile to the user: record it as a
- * pending interaction under the exact authority the command ran with, so the
- * user's clients list it and the gateway calls below match the handoff.
- * Opening the same handoff again returns it.
- */
 const handoffOpen = async (ctx: OwnerContext, args: unknown): Promise<CloudBrowserInteractionSummary> => {
   const input = handoffOpenArgs(args, "args");
   const suspension = input.suspension;
@@ -675,7 +640,6 @@ const handoffOpen = async (ctx: OwnerContext, args: unknown): Promise<CloudBrows
 
 const handoffArgs = object({ interactionId });
 
-/** Where a handoff stands, and once it ended, how (the gateway's resume receipt). */
 const handoffState = (
   ctx: OwnerContext,
   args: unknown,
@@ -689,7 +653,6 @@ const handoffState = (
   };
 };
 
-/** The waiting agent stopped: the profile goes back to agents, as if the user canceled. */
 const handoffCancel = async (ctx: OwnerContext, args: unknown): Promise<void> => {
   const row = readRow(ctx.db, handoffArgs(args, "args").interactionId);
   if (!row || (row.state !== "pending" && row.state !== "human_control")) return;

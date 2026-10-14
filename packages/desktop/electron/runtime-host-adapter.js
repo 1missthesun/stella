@@ -17,9 +17,7 @@ export class RuntimeHostAdapter {
     configFlushQueued = false;
     availabilityListeners = new Set();
     constructor(options) {
-        // Main-side followers of the Stella session (engine account access).
         this.onAuthTokenChanged = options.onAuthTokenChanged;
-        // The host runs in the runtime process; this is the app's handle on it.
         this.host = new RemoteRuntimeHost(options);
         this.host.on("runtime-connected", () => {
             this.connected = true;
@@ -119,10 +117,6 @@ export class RuntimeHostAdapter {
         this.lastHealth = await this.host.healthCheck();
         this.emitAvailabilityChange();
     }
-    /**
-     * `shutdownRuntime` stops the runtime too, for quit and for resets that
-     * delete its files; `exitTimeoutMs` bounds how long this waits for it.
-     */
     async stop(options = {}) {
         this.started = false;
         await this.host.stop({
@@ -140,7 +134,6 @@ export class RuntimeHostAdapter {
         this.lastHealth = await this.host.healthCheck();
         this.emitAvailabilityChange();
     }
-    /** An update changed runtime code: the runtime restarts once it is idle (between turns). */
     requestRuntimeRestart() {
         return this.host.requestRuntimeRestart();
     }
@@ -201,7 +194,6 @@ export class RuntimeHostAdapter {
         this.queueRuntimeConfigPatch({ hasConnectedAccount: value });
     }
     setCloudSyncEnabled(enabled) {
-        // This affects future local work; in-flight turns retain their storage mode.
         this.queueRuntimeConfigPatch({ cloudSyncEnabled: Boolean(enabled) });
     }
     refreshLocalLlmCredentials() {
@@ -249,10 +241,6 @@ export class RuntimeHostAdapter {
         return this.host.persistVoiceTranscript(args);
     }
     async handleVoiceChat(payload, callbacks) {
-        // The caller may name the request so it can correlate the run's own
-        // activity (the voice runtime does, to narrate backend progress). The
-        // id used here and the id sent to the worker must be the same one, or
-        // the subscription below filters out every event of its own run.
         const requestId = (typeof payload?.requestId === "string" && payload.requestId.trim()) ||
             globalThis.crypto?.randomUUID?.() ||
             `voice-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -396,7 +384,6 @@ export class RuntimeHostAdapter {
     onLocalChatUpdated(listener) {
         return this.host.on("local-chat-updated", listener);
     }
-    /** The pi-durable chat (`@stella/contracts/pi-chat`). */
     piChat(request) {
         return this.host.piChat(request);
     }

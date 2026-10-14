@@ -78,11 +78,6 @@ export const cloudPendingPromptsToEvents = (
     payload: { text: entry.text },
   }));
 
-/**
- * Only a prompt that is still awaiting canonical cloud progress may drive the
- * queued-user entrance animation. Failed prompts remain visible for their
- * Retry/Discard controls, but they are settled UI and must not stay "pending".
- */
 export const latestInFlightCloudUserMessageId = (
   pending: readonly PendingPrompt[],
 ): string | null =>
@@ -91,12 +86,6 @@ export const latestInFlightCloudUserMessageId = (
 const escapeXmlText = (value: string): string =>
   value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-/**
- * A web send: the visible prompt is exactly what the user typed, and pasted
- * or quoted text goes along as the turn's context, which the model reads
- * hidden and the message shows as chips, as on the desktop. A send of only
- * pasted text reads as "(Pasted text)", since a cloud turn needs typed text.
- */
 export const cloudSendFromSendArgs = (
   args: SendMessageArgs,
 ): { prompt: string; context?: CloudTurnContext } => {
@@ -180,11 +169,6 @@ const nextLocalCloudTaskOverlayExpiry = (
   return next;
 };
 
-/**
- * True only after the socket has been continuously unhealthy for
- * `CLOUD_OFFLINE_NOTICE_DELAY_MS`. Reconnect attempts in between keep the
- * window open; a successful `live` closes it.
- */
 const useSustainedCloudOffline = (status: CloudSocketStatus): boolean => {
   const [offlineWindow, setOfflineWindow] = useState<CloudOfflineWindow>(
     idleCloudOfflineWindow,
@@ -218,15 +202,9 @@ function CloudConversationStatusTail({
     conversation;
   const failed = pending.filter((entry) => Boolean(entry.error));
   const sustainedOffline = useSustainedCloudOffline(state.status);
-  // A blocked socket has stopped on its own and needs the user. A plain
-  // `offline` is the automatic reconnect in progress; it only earns a notice
-  // once it has failed for a while, so a foreground blip never flashes one.
   const showConnection =
     state.status === "blocked" ||
     (state.status === "offline" && sustainedOffline);
-  // Cached rows stay painted through a reconnect and the canonical delta
-  // merges into them in place. That is ordinary connection state, so the
-  // transcript never announces it; only a blocked/offline socket does.
   if (!showConnection && failed.length === 0 && !state.olderNotice) {
     return null;
   }
@@ -528,9 +506,6 @@ export function useCloudChatBridge({
         });
         return false;
       }
-      // `send` registers the optimistic row synchronously before awaiting the
-      // mutation. Once it is visible, the composer can clear; any failure is
-      // retained on that same row with idempotent Retry/Discard controls.
       void conversation.send(prompt, context);
       args.onClear();
       args.onOptimisticStart?.();
@@ -561,10 +536,6 @@ export function useCloudChatBridge({
     });
   }, [conversation, enabled]);
 
-  // Reply references in cloud mode resolve client-side from the loaded
-  // journal window (there is no local `entry_ref` index for a cloud
-  // conversation), so the focus lineage comes from here. Reply counts need
-  // no feed: the timeline projection derives them from the rows it renders.
   useEffect(() => {
     if (!enabled || !conversationId) return;
     provideLineageSource(conversationId, {

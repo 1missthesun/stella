@@ -1,13 +1,4 @@
 #!/usr/bin/env bun
-/**
- * Generates an ES256 capability signing key pair for cloud-builder.
- *
- *   bun scripts/generate-capability-keys.mjs builder-1
- *
- * Prints the PKCS8 private key (set as the cloud-builder secret
- * CAPABILITY_SIGNING_KEY) and the public JWK entry to append to the model
- * gateway's CAPABILITY_JWKS var.
- */
 import { generateCapabilityKeyPair } from "./lib/capability-keys.mjs";
 
 const kid = process.argv[2];

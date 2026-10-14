@@ -1,16 +1,3 @@
-/**
- * Owners' browser renderers. A desktop that pushes a change to the app's UI
- * builds the browser renderer from its fork and uploads it here; the website
- * serves it on its own origin through a rewrite to the public route.
- *
- *   PUT /api/app-source/web-renderer/<treeSha>          (signed-in owner, uncompressed tar)
- *   GET /web-renderer/<forkName>/<treeSha>/<path>        (public, immutable)
- *
- * Files live in `APP_BUILDS` under `web-renderers/<forkName>/<treeSha>/`.
- * Both path parts are unguessable hashes, so the URL itself is the
- * capability; the owner object records which tree is current.
- */
-
 import { WEB_RENDERER_UPLOAD_PREFIX } from "@stella/contracts/backend/app-source";
 import type { RpcResponse } from "@stella/contracts/backend/protocol";
 import { readBodyBytes } from "./http/body.js";
@@ -59,7 +46,6 @@ const CONTENT_TYPES: Record<string, string> = {
 const contentTypeOf = (path: string) =>
   CONTENT_TYPES[path.slice(path.lastIndexOf(".") + 1).toLowerCase()] ?? "application/octet-stream";
 
-/** A safe relative path, or null. */
 const cleanPath = (raw: string): string | null => {
   const path = raw.replace(/^\.\//, "");
   if (!path || path.startsWith("/") || path.includes("\\")) return null;
@@ -74,7 +60,6 @@ const field = (block: Uint8Array, start: number, length: number) => {
   return decoder.decode(end < 0 ? bytes : bytes.subarray(0, end));
 };
 
-/** Regular files from a ustar archive (PAX `path` records honoured). Throws on anything else. */
 export const readTar = (archive: Uint8Array): Array<{ path: string; bytes: Uint8Array }> => {
   const files: Array<{ path: string; bytes: Uint8Array }> = [];
   let offset = 0;
@@ -208,7 +193,6 @@ const serve = async (request: Request, env: WebRendererEnv, rest: string): Promi
   });
 };
 
-/** The web-renderer routes, or null when the path is someone else's. */
 export const handleWebRendererRoute = async (
   request: Request,
   env: WebRendererEnv,

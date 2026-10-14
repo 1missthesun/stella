@@ -1,9 +1,3 @@
-/**
- * X (Twitter) OAuth 2 with PKCE, and the tab the callback leaves the user
- * on. The flow's state is a signed `oauth-state` token of kind `x`; the PKCE
- * verifier stays in the owner's object under the state's nonce.
- */
-
 export const X_STATE_KIND = "x";
 export const X_OAUTH_STATE_TTL_MS = 10 * 60 * 1000;
 export const X_API_BASE_URL = "https://api.x.com";
@@ -66,7 +60,6 @@ export const buildXAuthorizationUrl = async (args: {
   return url.toString();
 };
 
-/** `authorization_code` or `refresh_token` against X's token endpoint. */
 export const requestXToken = async (
   client: XClient,
   params: Record<string, string>,

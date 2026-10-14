@@ -1,12 +1,3 @@
-/**
- * Models on a provider credential saved to the owner's account
- * (`@stella/contracts/backend/providers`), run through the model gateway's
- * BYOK lane. The key never reaches this process: requests carry
- * `GATEWAY_BYOK_PLACEHOLDER_KEY`, the gateway puts the owner's key in its
- * place. The cloud's agents use this for an `engine: "provider"` turn, and a
- * computer with no key of its own for a provider uses it with its session
- * capability.
- */
 import type { Api, Model, ProviderStreams } from "@earendil-works/pi-ai";
 import { anthropicMessagesApi } from "@earendil-works/pi-ai/api/anthropic-messages.lazy";
 import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
@@ -50,7 +41,6 @@ const CATALOGS: Record<string, Catalog> = {
 
 export { isAccountProviderId } from "@stella/contracts/backend/providers";
 
-/** Google's OpenAI-compatible endpoint: its own adapter can't be routed through the gateway. */
 const GOOGLE_OPENAI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai";
 const ROUTABLE_APIS = new Set<string>(["anthropic-messages", "openai-completions", "openai-responses"]);
 
@@ -59,7 +49,6 @@ const isChat = (model: Model<Api>): boolean => {
   return type === undefined || type === "chat";
 };
 
-/** A catalog model as the BYOK lane can run it, or undefined when it can't. */
 const routable = (model: Model<Api>): Model<Api> | undefined => {
   if (!isChat(model)) return undefined;
   if (ROUTABLE_APIS.has(model.api)) return model;
@@ -74,18 +63,12 @@ const routable = (model: Model<Api>): Model<Api> | undefined => {
   return undefined;
 };
 
-/** Every model of an account provider the BYOK lane can run. */
 export const accountProviderModels = (providerId: string): Model<Api>[] =>
   Object.values(CATALOGS[providerId] ?? {}).flatMap((model) => {
     const ready = routable(model);
     return ready ? [ready] : [];
   });
 
-/**
- * The model an `engine: "provider"` selection names: the provider's catalog
- * entry, or, for a model the catalog doesn't list, one shaped like the
- * provider's newest model on the same API family.
- */
 export const accountProviderModel = (providerId: string, modelId: string): Model<Api> | undefined => {
   const models = accountProviderModels(providerId);
   const known = models.find((model) => model.id === modelId);
@@ -94,19 +77,15 @@ export const accountProviderModel = (providerId: string, modelId: string): Model
   return template ? { ...template, id: modelId, name: modelId } : undefined;
 };
 
-/** Every URL prefix an account provider's models are served at. */
 export const accountProviderBaseUrls = (providerId: string): string[] => [
   ...new Set(accountProviderModels(providerId).map((model) => model.baseUrl.replace(/\/+$/, ""))),
 ];
 
 export type AccountByokTransport = {
-  /** The gateway's origin. */
   gatewayOrigin: string;
-  /** Sends a request to the gateway with the caller's capability on it. */
   fetch(request: Request, route: { sessionId?: string }): Promise<Response>;
 };
 
-/** The request for the gateway's BYOK lane: placeholder headers moved, upstream URL named. */
 export const toByokRelayRequest = async (
   providerId: string,
   gatewayOrigin: string,
@@ -127,7 +106,6 @@ export const toByokRelayRequest = async (
   });
 };
 
-/** The registry id a computer gives an account provider, beside its own key's provider. */
 export const ACCOUNT_REGISTRY_PREFIX = "account-key:";
 
 export const accountRegistryId = (providerId: string): string => `${ACCOUNT_REGISTRY_PREFIX}${providerId}`;
@@ -135,11 +113,6 @@ export const accountRegistryId = (providerId: string): string => `${ACCOUNT_REGI
 export const accountProviderOfRegistryId = (registryId: string): string | undefined =>
   registryId.startsWith(ACCOUNT_REGISTRY_PREFIX) ? registryId.slice(ACCOUNT_REGISTRY_PREFIX.length) : undefined;
 
-/**
- * One account provider's models as a pi-ai provider whose requests go
- * through the BYOK lane. `registryId` registers it beside a provider of the
- * same id (a computer's own key); requests still name the real provider.
- */
 export function accountByokProvider(options: {
   providerId: string;
   registryId?: string;

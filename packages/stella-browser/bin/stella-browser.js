@@ -1,11 +1,5 @@
 #!/usr/bin/env node
 
-/**
- * Cross-platform command shim for the Stella browser service.
- *
- * This wrapper enables consistent invocation across install modes and platforms.
- */
-
 import { spawn } from "child_process";
 import {
   existsSync,
@@ -20,7 +14,6 @@ import { platform, arch } from "os";
 
 const __dirname = import.meta.dirname;
 
-// Map Node.js platform/arch to binary naming convention
 function getBinaryName() {
   const os = platform();
   const cpuArch = arch();
@@ -148,7 +141,6 @@ function main() {
     try {
       accessSync(binaryPath, constants.X_OK);
     } catch {
-      // Binary exists but isn't executable - fix it
       try {
         chmodSync(binaryPath, 0o755);
       } catch (chmodErr) {
@@ -161,8 +153,6 @@ function main() {
     }
   }
 
-  // Native-host mode needs stdin; service and diagnostic output stays visible to
-  // the parent process for lifecycle monitoring and troubleshooting.
   const child = spawn(binaryPath, process.argv.slice(2), {
     stdio: ["inherit", "pipe", "pipe"],
     windowsHide: true,

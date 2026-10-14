@@ -49,19 +49,8 @@ export type WorldListingEntry = {
 
 export type WorldIndexEntry = Omit<WorldListingEntry, "path">;
 
-/**
- * What this disk last agreed with the world on, path by path: the base every
- * push is a diff against. Several containers sync one world, so a push sends
- * only what changed here since this base, never the whole disk.
- */
 export type WorldIndex = Record<string, WorldIndexEntry>;
 
-/**
- * The index file. `complete` is false only for the seed a cold
- * materialization writes, which names the export's `node_modules` roots and
- * nothing else; the first pull turns the freshly extracted disk into the
- * base.
- */
 type StoredWorldIndex = { complete: boolean; entries: WorldIndex };
 
 type WorldChanges = {
@@ -120,11 +109,6 @@ const absoluteWorldPath = (root: string, relative: string): string => {
 const isNodeModulesDirectory = (relative: string): boolean =>
   relative === "node_modules" || relative.endsWith("/node_modules");
 
-/**
- * The user's drive is a working copy of its own store (`drive-sync.ts` and
- * `drive-writeback.ts`), not part of the world: it is never pushed, and
- * restoring the world from an export leaves it where it is.
- */
 const isDriveCopy = (relative: string): boolean => relative === "drive";
 
 const indexedNodeModulesDirectories = (index: WorldIndex): Set<string> => {
@@ -150,7 +134,6 @@ const fileSha256 = async (filePath: string): Promise<string> => {
   return hash.digest("hex");
 };
 
-/** The stored index, or null when this disk has none. */
 const readIndex = async (
   indexPath: string,
 ): Promise<StoredWorldIndex | null> => {
@@ -220,11 +203,6 @@ const writeIndex = async (root: string, entries: WorldIndex): Promise<void> =>
     entries,
   } satisfies StoredWorldIndex);
 
-/**
- * Whether the world and this disk hold the same thing at one path. A
- * directory's mtime moves with every child and a file's with every save, so
- * neither alone is a change worth sending or applying.
- */
 const sameContent = (
   base: WorldIndexEntry | undefined,
   entry: WorldIndexEntry,
@@ -238,7 +216,6 @@ const sameContent = (
       base.size === entry.size) ||
     (entry.kind === "symlink" && base.target === entry.target));
 
-/** Paths the world sync owns at all; everything else stays on this disk. */
 const isSyncedPath = (relative: string): boolean =>
   relative !== ".stella/world-manifest" &&
   !isWorldUnsyncedPath(relative) &&
@@ -294,7 +271,6 @@ const writeWorldMarker = async (
   );
 };
 
-/** Hold the same container-wide flock used by cold materialization. */
 export const withWorldSyncLock = async <T>(
   root: string,
   operation: () => Promise<T>,
@@ -368,12 +344,8 @@ export const listWorldProjection = async (
         );
       }
       if (child === ".stella/world-manifest") continue;
-      // HOME's caches and the mirrored skills live only on this disk.
       if (isWorldUnsyncedPath(child)) continue;
       if (isDriveCopy(child)) continue;
-      // Dependency installations are explicitly ephemeral. If a node_modules
-      // subtree came from the durable index, however, scan it rather than
-      // reading it as deleted.
       const durableNodeModulesEntry =
         insideDurableNodeModules || durableNodeModules.has(child);
       if (
@@ -575,10 +547,6 @@ const setTreeOwnership = async (root: string): Promise<void> => {
   await walk("");
 };
 
-/**
- * Empty the world for an export, except what the world store never holds:
- * the unsynced subtrees, and the directories on the way to them.
- */
 const clearSyncedEntries = async (
   root: string,
   relative = "",
@@ -670,21 +638,12 @@ const applyFile = async (
   }
 };
 
-/**
- * Bring one revision down onto this disk and into its base. What the world
- * reports is compared with the base, not the disk: an entry the base already
- * agrees with (this container's own push coming back, most often) is left
- * as it is, so a newer local write is never replaced by its older self. A
- * deletion removes only what the base knew about, children first, and keeps
- * a directory that still holds something only this disk has.
- */
 const applyChanges = async (
   root: string,
   access: WorldSyncAccess,
   received: WorldChanges,
   base: WorldIndex,
 ): Promise<void> => {
-  // The world store never holds these, so nothing it says may touch them.
   const changes: WorldChanges = {
     ...received,
     entries: received.entries.filter((entry) => isSyncedPath(entry.path)),
@@ -784,9 +743,6 @@ const indexRestoredNodeModules = async (root: string): Promise<WorldIndex> => {
         throw new Error("World projection exceeds 200000 entries.");
       }
       if (isNodeModulesDirectory(child)) {
-        // A directory present in an authoritative export is durable historical
-        // data, not a newly generated dependency tree. One root marker is
-        // enough: listWorldProjection preserves its entire nested subtree.
         index[child] = {
           kind: "dir",
           mode: stat.mode & 0o7777,
@@ -843,11 +799,6 @@ const extractWorldExport = async (
   return { manifestId, revision };
 };
 
-/**
- * A disk that holds exactly a world export is the base. The export's own
- * `node_modules` are durable world data, so they are listed as such; any
- * restored beside them later are not (`dependencyAdoptionLines`).
- */
 const baseFromExport = async (
   root: string,
   seed: WorldIndex,
@@ -1168,9 +1119,6 @@ export const pushWorldProjection = async (args: {
       await uploadBatches(args.access, batchWorldBlobUploads(uploads));
       pushed = await postChanges(args.access, { entries, deleted });
     }
-    // Only a push nothing else landed before may move the marker past the
-    // revisions this disk has not pulled; otherwise the next pull brings them
-    // down, this push's own revision included, which the base already holds.
     const nextMarker =
       pushed.previousRevision === marker.revision
         ? { ...marker, revision: pushed.revision }

@@ -85,24 +85,15 @@ import {
 } from "../../src/lib/main-shell-store";
 import { useT } from "../../src/i18n";
 
-/**
- * The chat is the base of the `(main)` stack. The other tabs (Schedule, Apps,
- * Files, Settings) sit one level over it and swap in place, and a deep link or
- * a restored last tab still gets the chat inserted underneath, so the chat
- * never has to remount for a visit to another tab and keeps publishing what
- * those tabs show (files, the paired computer).
- */
 export const unstable_settings = { anchor: "chat" };
 
 const SIDEBAR_WIDTH = 320;
-/** Diameter of the top bar's circular glass controls. */
 const TOP_BAR_BUTTON = DRAWER_CHEVRON_SIZE;
 const TOP_BAR_INSET = 10;
 const TITLE_MAX_FONT_SCALE = 1.3;
 
 const EMPTY_RUNNING_AGENTS: readonly ActivityIndicatorEntry[] = [];
 
-/** Pages whose name the top bar carries, centred between its controls. */
 const PAGE_TITLE_KEYS: Partial<Record<MainTabId, string>> = {
   schedule: "mobile.activityHub.tabs.schedule",
   email: "shell.emailDigest.title",
@@ -119,9 +110,6 @@ export default function MainLayout() {
   const drawerLive = useDrawerLive();
   const drawerSide = useDrawerSide();
   const { travel, endTravel } = useDrawerMetrics();
-  // The in-progress agents the top-bar indicator was showing when it was
-  // pressed. Held rather than re-read so the menu keeps listing what the user
-  // tapped on even as work settles underneath it.
   const [activityMenuRunning, setActivityMenuRunning] = useState<
     readonly ActivityIndicatorEntry[] | null
   >(null);
@@ -161,7 +149,6 @@ export default function MainLayout() {
 
   const activeTab = readMainTabFromPath(pathname);
   const onChatSurface = pathname === "/chat";
-  // A tab's own page (not a page pushed from one, like Cloud Home).
   const onTabRoot = Object.values(MAIN_TAB_HREFS).some(
     (href) => href === pathname,
   );
@@ -175,8 +162,6 @@ export default function MainLayout() {
   const accessoryVisible = Boolean(pageTitle) && topBarAccessory != null;
 
   const search = useChatSearch();
-  // Collapse + clear search whenever the route changes (e.g. switching tabs) so
-  // search never leaks across surfaces.
   useEffect(() => {
     search.close();
     // `search.close` is stable; only react to route changes.
@@ -189,28 +174,17 @@ export default function MainLayout() {
     }
   }, [activeTab]);
 
-  // A restored tab opens over the chat once the chat is on screen.
   useEffect(() => {
     if (!onChatSurface) return;
     const pending = takePendingMainTab();
     if (pending) router.push(MAIN_TAB_HREFS[pending]);
   }, [onChatSurface, router]);
 
-  // The sidebar, which carries the navigation, opens from the tab pages
-  // themselves. Pages pushed from a tab and a route's own in-place view (an
-  // open app) take the full screen behind the top-left back control instead.
   const drawerAvailable = onChatSurface || (onTabRoot && !backOverride);
   const backVisible = !drawerAvailable;
 
   const openSidebar = () => openDrawer("start");
 
-  // Tabs push over the chat rather than replacing it, so the chat keeps its
-  // mount (scroll position, draft, journal socket) and coming back is a pop,
-  // not a cold remount behind the authority spinner. Another tab swaps in
-  // place, so the stack is never deeper than the chat plus one tab. The
-  // wide layout keeps the sidebar on screen over pages pushed from a tab
-  // too; leaving one of those drops to the chat first and opens the tab
-  // from there.
   const selectTab = (tab: MainTabId) => {
     if (!wide && drawerJustOpened()) return;
     const destination = MAIN_TAB_HREFS[tab];
@@ -232,9 +206,6 @@ export default function MainLayout() {
     }
   };
 
-  // The top-left control is the drawer reveal on the chat and the other tab
-  // pages, and "back" on a page pushed from a tab (or a route's in-place
-  // view, like an open app).
   const onPressTopLeft = () => {
     if (drawerAvailable) {
       openSidebar();
@@ -253,19 +224,14 @@ export default function MainLayout() {
     if (wide && isDrawerOpen()) closeDrawer();
   }, [wide]);
 
-  // A route that takes the drawer away (a pushed page, an open app) never
-  // inherits it open.
   useEffect(() => {
     if (!drawerAvailable && isDrawerOpen("start")) closeDrawer();
   }, [drawerAvailable]);
 
-  // The chat's settings sidebar belongs to the chat alone.
   useEffect(() => {
     if (!onChatSurface && isDrawerOpen("end")) closeDrawer();
   }, [onChatSurface]);
 
-  // The chat's running-tasks pill asks for the drawer; the wide layout has
-  // the sidebar on screen already, so there is nothing to reveal there.
   const openSidebarRef = useRef(openSidebar);
   openSidebarRef.current = openSidebar;
   useEffect(
@@ -289,16 +255,9 @@ export default function MainLayout() {
     ),
   }));
 
-  // Constant on every route (like the empty nav bar over an iOS large title),
-  // so the chat underneath never reflows as tabs swap over it.
   const topBarHeight = insets.top + TOP_BAR_BAR_HEIGHT;
 
   return (
-    // edges=[] disables SafeAreaView's auto-padding so every layer below
-    // (gradient, sidebar, foreground) can extend edge-to-edge through the
-    // status-bar and home-indicator regions. The chrome that needs to clear
-    // those areas (top bar, chat composer, scrollable content) reads
-    // `useSafeAreaInsets()` and pads itself.
     <SafeAreaView style={styles.shell} edges={[]}>
       <StatusBar style={isDark ? "light" : "dark"} />
 
@@ -515,13 +474,6 @@ export default function MainLayout() {
   );
 }
 
-/**
- * The route stack under the shell chrome. Screens paint their own canvas: the
- * chat shows the foreground backdrop through a transparent card, and detail
- * routes carry an opaque one (`MainDetailSurface`) so the chat underneath
- * never bleeds through a push. The stack's own edge-swipe stays off because
- * the drawer's swipe-right owns the left edge on every route, as before.
- */
 function MainStack() {
   const pathname = usePathname();
   return (
@@ -551,12 +503,6 @@ function MainStack() {
 
 const TAB_SCREEN_OPTIONS = { animation: "none" } as const;
 
-/**
- * React Navigation paints `colors.background` beneath every stack screen, and
- * with no theme provided that is its light default (rgb 242), which covered
- * the shell's backdrop. The shell owns the canvas, so the navigator gets a
- * theme that paints nothing.
- */
 const TRANSPARENT_NAVIGATION_THEME = {
   ...DefaultTheme,
   colors: { ...DefaultTheme.colors, background: "transparent" },
@@ -569,16 +515,11 @@ const makeStyles = (colors: Colors) =>
       backgroundColor: colors.background,
     },
 
-    // Wide (tablet / landscape)
     wideLayout: {
       flex: 1,
       flexDirection: "row",
     },
 
-    // Top bar — phone and tablet action controls, floating over the routes.
-    // Height is set inline as `insets.top + barHeight` so the safe-area inset
-    // is added on top of the bar's own height rather than eating into it (RN
-    // box model is border-box, so a fixed `height` would absorb the inset).
     topBar: {
       alignItems: "flex-end",
       flexDirection: "row",
@@ -587,14 +528,9 @@ const makeStyles = (colors: Colors) =>
       position: "absolute",
       right: 0,
       top: 0,
-      // Native glass shadows extend below this row. Paint the controls above
-      // the route surface so its backdrop cannot cut them off at the seam.
       overflow: "visible",
       zIndex: 1,
     },
-    // Stella's status pill: spans the bar row beneath the status bar at the
-    // side buttons' height and baseline, drawn under the menu button so the
-    // button keeps its taps.
     statusLane: {
       bottom: 0,
       height: TOP_BAR_BUTTON,
@@ -602,8 +538,6 @@ const makeStyles = (colors: Colors) =>
       position: "absolute",
       right: 0,
     },
-    // A page's name, centred on the bar whatever sits at either side of it,
-    // in the sidebar's place-label face.
     titleLane: {
       alignItems: "center",
       bottom: 0,
@@ -626,7 +560,6 @@ const makeStyles = (colors: Colors) =>
       justifyContent: "center",
       width: 44,
     },
-    // Expanded search field that replaces the top-bar contents.
     searchRow: {
       alignItems: "center",
       flex: 1,
@@ -671,8 +604,6 @@ const makeStyles = (colors: Colors) =>
     },
     handedOff: { opacity: 0 },
 
-    // Shared content area. Routes apply their own inset (see
-    // `mainContentStyles`) so a pushed detail page can paint edge to edge.
     content: {
       flex: 1,
       minHeight: 0,

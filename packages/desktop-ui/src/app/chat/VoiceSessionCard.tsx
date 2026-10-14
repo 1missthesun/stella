@@ -1,16 +1,3 @@
-/**
- * Inline summary pill for a realtime voice session. Replaces the raw
- * "Voice session — Duration: …" text body on the visible assistant message
- * that the voice session manager writes when it deactivates (see
- * `endVisibleVoiceSession` in `use-realtime-voice.ts`).
- *
- * It also carries the failure reason. A call that never connected still
- * writes this pill, which used to leave a bare "Voice session 0s" with no
- * hint of why nothing happened. The reason comes from the voice runtime in
- * the overlay window via `voice-session-error-state.ts`, and the backend's own
- * wording is shown as-is: "Realtime voice is part of Stella Pro.", a
- * usage-limit message, or "Voice sessions are not configured yet."
- */
 import { useSyncExternalStore } from "react";
 import { AudioLines, AlertCircle } from "@/ui/icons";
 import { voiceSessionErrorStore } from "@/features/voice/runtime/voice-session-error-state";

@@ -104,8 +104,6 @@ export const buildWindowsBundledBrowserProcessQuery = (
     [
       "Get-CimInstance Win32_Process",
       "| Where-Object { $_.ExecutablePath -and ($targets -contains $_.ExecutablePath) -and $_.ProcessId -ne $PID -and $_.CommandLine -notlike '*chrome-extension://*' }",
-      // Orphans only: a daemon whose parent still runs belongs to a live
-      // Stella instance (possibly another one) and is not ours to kill.
       "| Where-Object { -not (Get-Process -Id $_.ParentProcessId -ErrorAction SilentlyContinue) }",
       "| Select-Object -ExpandProperty ProcessId -Unique",
     ].join(" "),
@@ -291,7 +289,6 @@ export class StellaBrowserBridgeService {
   private cdpRoutingGeneration = 0;
   private isLaunching = false;
   private stopped = false;
-  /** Which bridge this instance runs (shared vs isolated) and how it claims it. */
   private readonly namespace: BrowserBridgeNamespace =
     getBrowserBridgeNamespace();
   private binaryIdentity: BrowserBridgeBinaryIdentity | null = null;
@@ -314,10 +311,6 @@ export class StellaBrowserBridgeService {
     );
   }
 
-  /**
-   * Retire the daemon's extension connection so the extension reconnects
-   * with a fresh hello. Rejects on a daemon that predates the command.
-   */
   async reconnectExtension(): Promise<boolean> {
     const response = await this.sendCommand({
       id: randomUUID(),
@@ -346,9 +339,6 @@ export class StellaBrowserBridgeService {
     const previousAttempt = this.connectingCdp?.promise;
     const routingGeneration = this.cdpRoutingGeneration;
     const promise = (async () => {
-      // A changed adapter URL is serialized behind any in-flight launch. The
-      // successful URL is checked again afterwards so concurrent callers do
-      // not issue duplicate launch commands.
       await previousAttempt?.catch(() => undefined);
       if (this.connectedCdpUrl === normalizedUrl) return;
       await this.sendCommand({
@@ -368,8 +358,6 @@ export class StellaBrowserBridgeService {
         }
       },
       () => {
-        // Failed launches are deliberately not cached, so the next browser
-        // session can retry the same endpoint.
         if (this.connectingCdp?.promise === promise) {
           this.connectingCdp = null;
         }
@@ -396,9 +384,6 @@ export class StellaBrowserBridgeService {
     await this.start();
     const backendGeneration = this.agentBackendGeneration;
 
-    // The process map is intentionally ephemeral: a daemon may exit after a
-    // transport error. Lease fencing must outlive that process record so an
-    // older worker cannot reclaim the durable owner's capability afterward.
     const highWater = this.agentOwnerLeaseHighWater.get(ownerId);
     if (highWater) {
       const order = compareAgentOwnerLeaseOrder(
@@ -545,10 +530,6 @@ export class StellaBrowserBridgeService {
     this.agentBackendLaunches.clear();
     this.agentOwnerLeaseHighWater.clear();
 
-    // Only close a daemon this instance started: whatever else answers on
-    // the socket belongs to another instance (or nobody we can vouch for).
-    // Hold the daemon past its own exit: a graceful close clears
-    // `daemonProcess`, but anything it started can still be running.
     const daemon = this.daemonProcess;
     if (daemon) {
       const closePromise = this.sendCommand({
@@ -575,16 +556,12 @@ export class StellaBrowserBridgeService {
     this.isLaunching = true;
 
     try {
-      // Handshake before touching anything in the namespace: which instance
-      // owns the daemon there, and may this one replace it?
       const takeover = await this.claimNamespace();
       if (this.stopped) return;
       // Claim it before clearing it, so a concurrent launch in the same
       // namespace sees a live owner and defers instead of racing this one.
       this.recordOwnership();
 
-      // Only the shared bridge owns the Chrome extension's native-messaging
-      // host (one per user); an isolated bridge must not repoint it.
       if (this.namespace.ownsExtensionChannel) {
         const registration = await registerStellaNativeMessagingHost();
         if (!registration.ok) {
@@ -595,9 +572,6 @@ export class StellaBrowserBridgeService {
         }
       }
 
-      // stop() can run while native-host registration or stale-session cleanup
-      // is awaiting Windows I/O. Do not spawn a fresh daemon after shutdown has
-      // already completed its process sweep.
       if (this.stopped) return;
 
       await this.closeExistingSession(takeover.replaceDaemon);
@@ -625,12 +599,6 @@ export class StellaBrowserBridgeService {
     }
   }
 
-  /**
-   * Decide whether this launch may replace the namespace's current daemon.
-   * Throws (and the resource retries later) when another live instance owns
-   * it with equal or higher priority, or when replacing it would downgrade
-   * the bridge binary; nothing is closed or killed in that case.
-   */
   private async claimNamespace(): Promise<{
     replaceDaemon: ProcessIdentity | null;
   }> {
@@ -659,7 +627,6 @@ export class StellaBrowserBridgeService {
       );
       return { replaceDaemon: recordedDaemonIdentity(decision.owner) };
     }
-    // Our own previous daemon, or an orphan whose owner is gone.
     return {
       replaceDaemon:
         decision.replacing === "orphan" && owner
@@ -692,8 +659,6 @@ export class StellaBrowserBridgeService {
         },
       );
     } catch (error) {
-      // Without a record other instances treat the daemon as legacy and may
-      // replace it; the bridge itself still works.
       console.warn(
         "[stella-browser-bridge] Could not record bridge ownership:",
         error instanceof Error ? error.message : error,
@@ -727,7 +692,6 @@ export class StellaBrowserBridgeService {
         env: {
           ...process.env,
           STELLA_BROWSER_SOCKET_DIR: this.namespace.socketDir,
-          // The daemon exits by itself if this process dies without stopping it.
           STELLA_BROWSER_PARENT_PID: String(process.pid),
           STELLA_BROWSER_EXT_PORT: String(extPort),
           STELLA_BROWSER_EXT_TOKEN: STELLA_BROWSER_BRIDGE_TOKEN,
@@ -819,7 +783,6 @@ export class StellaBrowserBridgeService {
         env: {
           ...process.env,
           STELLA_BROWSER_SOCKET_DIR: this.namespace.socketDir,
-          // The daemon exits by itself if this process dies without stopping it.
           STELLA_BROWSER_PARENT_PID: String(process.pid),
           STELLA_BROWSER_CONTROL_TOKEN: controlToken,
           STELLA_BROWSER_EXTENSION_PROXY_SESSION: STELLA_BROWSER_BRIDGE_SESSION,
@@ -972,9 +935,6 @@ export class StellaBrowserBridgeService {
         throw new Error("Browser bridge daemon exited before it became ready.");
       }
 
-      // Client-side identity check: the daemon answering this socket must
-      // be the one this instance just spawned (it records its pid at boot).
-      // Anything else is another instance's daemon, never ours to drive.
       const answeringPid = readBrowserBridgeDaemonPid(
         this.namespace.socketDir,
         STELLA_BROWSER_BRIDGE_SESSION,
@@ -1010,11 +970,6 @@ export class StellaBrowserBridgeService {
     throw new Error("Browser bridge daemon did not become ready in time.");
   }
 
-  /**
-   * Clear the namespace for a fresh daemon. Only reached once
-   * `claimNamespace` allowed it: the daemon there is this instance's own, an
-   * orphan, a pre-ownership one, or one an opted-in claim replaces.
-   */
   private async closeExistingSession(
     replaceDaemon: ProcessIdentity | null = null,
   ) {
@@ -1395,23 +1350,13 @@ export const isStellaBrowserBridgeBinaryInstalled = (): boolean => {
   }
 };
 
-/**
- * Cheap, synchronous scan (readdir + existsSync only — no process spawn, no
- * socket dial) for whether the Stella browser extension is installed in ANY
- * Chromium profile. We enumerate every profile directory under each user-data
- * root (Default, Profile N, and custom-named profiles) rather than a hardcoded
- * shortlist, so a user whose extension lives in "Profile 3" or a renamed
- * profile is still detected. (A fully custom `--user-data-dir` outside the
- * standard roots is the only remaining miss; that case is covered by the
- * on-demand start path in the browser IPC handlers.)
- */
 export const isStellaExtensionInstalled = (): boolean => {
   for (const root of getChromiumUserDataRoots()) {
     let entries;
     try {
       entries = readdirSync(root, { withFileTypes: true });
     } catch {
-      continue; // Root absent/unreadable — try the next browser.
+      continue;
     }
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
@@ -1436,22 +1381,6 @@ export const isStellaExtensionInstalled = (): boolean => {
   return false;
 };
 
-/**
- * Cheap, synchronous check for whether the eager app-ready bridge spawn is
- * worth it. Spawning the bridge daemon unconditionally on every launch starts
- * an extra Electron-as-Node process that, for users without the extension, only
- * ever retries with backoff (browser-bridge-resource onRetry) before failing —
- * pure startup cost for no benefit. We only eager-spawn when one of two signals
- * says the user actually uses browser automation:
- *   (a) the native-messaging host manifest already exists in the socket dir —
- *       written by registerStellaNativeMessagingHost on a prior successful
- *       launch, i.e. steady state once set up; or
- *   (b) the Stella extension directory is present in ANY Chromium profile —
- *       first-launch signal so the bridge still starts for users who DO have the
- *       extension but have never spawned the daemon (which is what registers the
- *       host). Otherwise the spawn is deferred to first real use (the browser
- *       IPC handlers start it on demand).
- */
 export const isBrowserBridgeEagerStartWorthwhile = (): boolean => {
   try {
     const manifestPath = path.join(

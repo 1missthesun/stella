@@ -1,19 +1,3 @@
-/**
- * The cloud browser as a pi agent's `code` sees it.
- *
- * Browser Run lives behind the private Browser Gateway, and every command is
- * a bounded JSON request, so nothing about it needs a container: the
- * conversation's Durable Object forwards each command under the agent run's
- * own authority. The model-facing surface mirrors the desktop agent's:
- * Playwright selectors, page scripts, cookies, the network log, and
- * screenshots.
- *
- * A login handoff is the one command that does not complete. The gateway puts
- * the profile under human control and answers with a secret-free suspension;
- * the `code` call ends as `AgentToolSuspendedError`, and the agent's run holds
- * that call open until the user finishes on their device
- * (`PiConversationRuntime`), then answers it with how the handoff ended.
- */
 import {
   isCloudBrowserSuspension,
   type CloudBrowserCommandRequest,
@@ -21,12 +5,9 @@ import {
 } from "@stella/contracts/cloud-browser";
 import { readBoundedResponseBytes } from "./bounded-body.js";
 
-/** How long the gateway may take to give a profile back. */
 const GATEWAY_CANCEL_TIMEOUT_MS = 30_000;
-/** A screenshot or a response body can be large; anything past this is refused. */
 const GATEWAY_RESPONSE_MAX_BYTES = 16 * 1024 * 1024;
 
-/** Whose command it is: the gateway binds a handoff to exactly this. */
 export type CloudBrowserAuthority = Readonly<{
   ownerId: string;
   ownerGeneration: string;
@@ -40,13 +21,11 @@ export type ForwardedBrowserGatewayCommand =
   | Readonly<{ kind: "failure"; status: number }>
   | Readonly<{ kind: "forwarded"; status: number; body: Uint8Array }>;
 
-/** Forward one command under the caller's authority. */
 export type CloudBrowserTransport = (
   command: CloudBrowserCommandRequest,
   signal: AbortSignal,
 ) => Promise<ForwardedBrowserGatewayCommand>;
 
-/** Commands to the private Browser Gateway over its service binding. */
 export const gatewayBrowserTransport =
   (gateway: Fetcher, authority: CloudBrowserAuthority): CloudBrowserTransport =>
   async (command, signal) => {
@@ -77,12 +56,6 @@ export const gatewayBrowserTransport =
     }
   };
 
-/**
- * Give a handed-off profile back to agents at once, through the gateway's own
- * decision route: for a handoff no client can show the user (its interaction
- * could not be recorded), which would otherwise hold the profile until its
- * deadline.
- */
 export const cancelGatewayHandoff = async (
   gateway: Fetcher,
   authority: CloudBrowserAuthority,
@@ -168,11 +141,6 @@ export const CLOUD_BROWSER_METHODS: ReadonlySet<string> =
     "requestDeviceCodeFixture",
   ]);
 
-/**
- * Thrown into the sandbox once the profile is under human control. The outer
- * `code` tool reads the recorded suspension, not this error, so a cell that
- * catches it still ends the turn as a handoff.
- */
 export class CloudBrowserSuspendedError extends Error {
   constructor() {
     super(
@@ -182,10 +150,6 @@ export class CloudBrowserSuspendedError extends Error {
   }
 }
 
-/**
- * What `screenshot` resolves to on the host. The code tool lifts the image
- * into the call's result for the model; the sandbox only learns it was taken.
- */
 export type CloudBrowserScreenshot = Readonly<{
   image: Readonly<{
     mimeType: "image/jpeg";
@@ -201,13 +165,9 @@ export type CloudBrowserClient = Readonly<{
     args: readonly unknown[],
     signal: AbortSignal,
   ): Promise<unknown>;
-  /** The handoff this run is waiting on, if a takeover suspended it. */
   suspension(): CloudBrowserSuspension | undefined;
-  /** The handoff ended (the user finished, canceled, or it expired): commands may run again. */
   resumed(): void;
-  /** Whether any command reached the gateway and so may need a checkpoint. */
   used(): boolean;
-  /** Persist the profile at the end of a run that is not handing off. */
   checkpoint(signal: AbortSignal): Promise<void>;
 }>;
 
@@ -220,10 +180,6 @@ const hasExactKeys = (
 ): boolean =>
   Object.keys(value).sort().join(",") === [...keys].sort().join(",");
 
-/**
- * Defense in depth: a Live View URL is the human's control capability for a
- * handoff and is never an agent's to hold, whatever a page script returns.
- */
 const assertCapabilityFree = (value: unknown, seen = new Set<object>()): void => {
   if (typeof value === "string") {
     if (!value.includes("live.browser.run")) return;
@@ -296,7 +252,6 @@ const parseGatewayResponse = (
   ) {
     return { outcome: "failed", code: value.code };
   }
-  // The gateway's error envelope (`publicErrorResponse`).
   if (
     isRecord(value.error) &&
     typeof value.error.code === "string" &&
@@ -569,8 +524,6 @@ export const createCloudBrowserClient = (
       if (!CLOUD_BROWSER_METHODS.has(method)) {
         throw new Error(`browser.${method || "?"} is not a browser method.`);
       }
-      // Browser Run is fenced while the human owns it; nothing else may touch
-      // the profile until the handoff ends.
       if (suspension) throw new CloudBrowserSuspendedError();
       const data = await send(
         planFor(method as CloudBrowserMethod, args),

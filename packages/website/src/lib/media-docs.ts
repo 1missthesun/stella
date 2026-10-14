@@ -1,14 +1,3 @@
-/**
- * Agent-facing docs for Stella's media API, served as plain text
- * (llms.txt-style) at https://stella.sh/docs/media. Audience: AI agents and
- * scripts, not human readers.
- *
- * The models come straight from `@stella/contracts/media-models`, the same
- * list the backend serves, so this page never needs editing when a model
- * changes. Each model's input and output are documented on its own page
- * (`docsUrl`); Stella passes them through untouched.
- */
-
 import { MEDIA_MODELS } from "@stella/contracts/media-models";
 
 export const renderMediaDocsOverview = (): string => `# Stella media API

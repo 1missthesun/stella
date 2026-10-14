@@ -1,11 +1,3 @@
-/**
- * Inline connect card for a cloud turn: the cloud orchestrator's
- * `connector_status` asked to use a Store integration the account has not
- * connected. Same look and wording as the desktop card
- * (`app/chat/ConnectorConnectCard`), driven by the pending request row
- * instead of Electron IPC. Connect opens the account's hosted OAuth page;
- * the waiting turn observes the finished connection itself.
- */
 import { useCallback, useState } from "react";
 import { AlertCircle, Check, Globe } from "@/ui/icons";
 import { Button } from "@/ui/button";

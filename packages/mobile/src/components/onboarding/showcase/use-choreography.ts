@@ -1,12 +1,3 @@
-/**
- * A pausable cue timeline. Each cue flips once, at its time, and React only
- * re-renders on those flips (a dozen per chapter), never per frame: the
- * motion between them is springs on the UI thread.
- *
- * Pausing (card scrolled away, app backgrounded) remembers the elapsed time
- * and resumes from it. With `instant` every cue is reached at once, for
- * reduced motion.
- */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Cue } from "./chapters";
 

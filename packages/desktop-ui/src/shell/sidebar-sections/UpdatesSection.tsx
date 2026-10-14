@@ -20,22 +20,9 @@ import { EmptyState } from "@/ui/empty-state/EmptyState";
 import { Check } from "@/ui/icons";
 import "./updates-section.css";
 
-/**
- * Updates — what Stella can add to this computer, and what it already added.
- *
- * Waiting: a new version of Stella, a change the user made on another
- * computer, a change ready to add. Each says what it is in plain words and
- * has Add and Skip; a skipped one moves to a quieter Skipped list, where it
- * can still be added, until something newer arrives.
- * History: what this computer took, newest first, with Undo on the user's own
- * changes (the same undo the chat's cards use). A new version is never undone
- * from here: taking it back would leave no way to take it again.
- */
-
 const REMOTE_MERGE_SUBJECT = "Merge the changes from another computer";
 const UPSTREAM_MERGE_SUBJECT = "Merge the published Stella update";
 
-/** An undo is `Revert "<subject>"`, and undoing it nests another. */
 const reverted = (subject: string): { inner: string; depth: number } => {
   const inner = /^Revert "(.*)"$/.exec(subject)?.[1];
   if (inner === undefined) return { inner: subject, depth: 0 };

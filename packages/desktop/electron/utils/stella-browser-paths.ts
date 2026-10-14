@@ -4,20 +4,6 @@ import path from "node:path";
 
 const __dirname = import.meta.dirname;
 
-/**
- * Locate the Stella browser service and extension directory.
- *
- * The service lives at `packages/stella-browser/` in the source tree the app
- * runs from. The source helper and bundled Electron main both sit three levels
- * below the `packages/` directory, so the workspace path is stable in both
- * layouts.
- *
- *   packages/desktop/dist-electron/electron/stella-browser-paths.js
- *                                           ^ __dirname
- *   ../../../stella-browser = packages/stella-browser
- *
- * If the layout changes, fix it here once.
- */
 const workspaceStellaBrowserRoot = path.resolve(
   __dirname,
   "..",
@@ -118,7 +104,6 @@ const promoteStagedBinary = (binaryPath: string): boolean => {
   }
 };
 
-/** Promote a verified browser artifact before any service/native-host spawn. */
 export const activateStagedStellaBrowserBinary = (
   stellaBrowserRoot = resolveStellaBrowserRoot(),
 ): boolean => {

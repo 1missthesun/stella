@@ -52,8 +52,6 @@ export function CloudModelSelectionBridge() {
   const selectedAt = connections?.selectedAt;
   const loaded = connections !== undefined;
 
-  // Serialize every mirror step so a slow IPC can't apply an older selection
-  // after a newer one.
   const enqueue = (step: () => Promise<void>) => {
     queue.current = queue.current.then(step).catch(() => undefined);
   };
@@ -77,7 +75,6 @@ export function CloudModelSelectionBridge() {
       const local = await readLocal();
       if (!local) return;
       if (selectedAt === null) {
-        // Nothing saved on the account yet: the desktop's choice seeds it.
         await pushLocal(local);
         return;
       }

@@ -20,11 +20,6 @@ export type { StatusPillProps } from "./StatusPill.types";
 
 const RADIUS = STATUS_PILL_HEIGHT / 2;
 
-/**
- * The status pill in the same chrome as `GlassIconButton` off iOS: clear
- * glass where Liquid Glass exists, the theme surface with a hairline ring
- * where it does not. Width springs between the circle and the capsule.
- */
 export function StatusPill({
   width,
   slotWidth,

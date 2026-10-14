@@ -1,16 +1,3 @@
-/**
- * Singleton store backing the workspace panel's tab manager.
- *
- * Exposed as a small custom store rather than a React context because the
- * tab list is mutated from many non-React surfaces — the media
- * materializer, the runtime `display:update` IPC, the chat surface's
- * resource-pill click handlers, the global keyboard shortcuts. Any caller
- * with `import { displayTabs } from ".../tab-store"` can register a tab
- * without first having to climb back up the component tree.
- *
- * Opening any tab activates it AND sets `panelOpen=true`. There is no separate
- * "open the panel" verb; UI surfaces never need to think about that invariant.
- */
 import { useSyncExternalStore } from "react";
 import { uiState } from "@/platform/ui-state";
 import type { DisplayTab, DisplayTabSpec, OpenTabOptions } from "./types";
@@ -33,20 +20,7 @@ type NavSnapshot = {
   canGoForward: boolean;
 };
 type Listener = () => void;
-/**
- * Sentinel id for the grouped library overview — the panel's navigation
- * root. It is never a real registered tab; the display panel renders the
- * overview component whenever the current history entry is this id.
- */
 export const OVERVIEW_ENTRY_ID = "__overview__";
-/**
- * Width clamp applied to the user's resize gesture.
- *
- * The panel itself has only a minimum useful width. Its maximum is derived
- * at drag time from the available shell width after reserving the left
- * sidebar/rail and `DISPLAY_MAIN_CONTENT_MIN_WIDTH` for the main outlet.
- * Use the expand toggle for the "fully take over" case.
- */
 export const DISPLAY_PANEL_MIN_WIDTH = 320;
 export const DISPLAY_MAIN_CONTENT_MIN_WIDTH = 352;
 const STORAGE_KEY_WIDTH = "stella.displayPanel.width";
@@ -68,10 +42,6 @@ const writePersistedWidthNow = (width: number | null) => {
   if (width == null) uiState.removeItem(STORAGE_KEY_WIDTH);
   else uiState.setItem(STORAGE_KEY_WIDTH, String(Math.round(width)));
 };
-// Coalesce width writes during a drag — `setPanelWidth` fires per
-// pointermove (60–120 Hz) and the synchronous `uiState.setItem`
-// adds up. We keep the latest value and flush it on a short timer plus
-// on `pagehide` so the user's last position survives a reload.
 let pendingPersistedWidth: { value: number | null } | null = null;
 let persistedWidthTimer: ReturnType<typeof setTimeout> | null = null;
 const PERSIST_WIDTH_DEBOUNCE_MS = 150;
@@ -93,9 +63,6 @@ const schedulePersistedWidth = (width: number | null) => {
   }, PERSIST_WIDTH_DEBOUNCE_MS);
 };
 if (typeof window !== "undefined") {
-  // Last-chance flush on tab close / app quit so the user's most
-  // recent panel width isn't dropped because the debounce was still
-  // pending.
   window.addEventListener("pagehide", flushPersistedWidth);
   window.addEventListener("beforeunload", flushPersistedWidth);
 }
@@ -124,9 +91,6 @@ let layoutSnapshot: LayoutSnapshot = {
 let nextOrd = 1;
 const tabListListeners = new Set<Listener>();
 const layoutListeners = new Set<Listener>();
-// ── Navigation history ──────────────────────────────────────────────
-// The overview sentinel always anchors the bottom of the stack so back
-// from any viewer eventually lands on the grouped library overview.
 let history: string[] = [OVERVIEW_ENTRY_ID];
 let historyIndex = 0;
 const navListeners = new Set<Listener>();
@@ -140,18 +104,12 @@ const emitNav = () => {
   navSnapshot = computeNavSnapshot();
   for (const listener of navListeners) listener();
 };
-/**
- * Push a new entry onto the history, truncating any forward entries.
- * No-op (just re-points) when the entry already sits at the cursor.
- */
 const pushHistory = (entryId: string) => {
   if (history[historyIndex] === entryId) return;
   history = [...history.slice(0, historyIndex + 1), entryId];
   historyIndex = history.length - 1;
   emitNav();
 };
-// Drop history references to a tab id that no longer exists (closed/reset),
-// collapsing consecutive duplicates so back/forward stay meaningful.
 const dropFromHistory = (entryId: string) => {
   const filtered = history.filter((id) => id !== entryId);
   const deduped: string[] = [];
@@ -183,36 +141,19 @@ const emit = (
 };
 const findIndex = (snap: DisplayTabsState, tabId: string) =>
   snap.tabs.findIndex((tab) => tab.id === tabId);
-/**
- * Public store surface. Always read through the subscribe methods or the
- * React hooks below so callers stay reactive; never reach into the captured
- * `state` directly.
- */
 export const displayTabs = {
-  /**
-   * Tab-list–only subscription. Fires when the tab list or active tab
-   * changes; ignores panel layout updates (open/expanded/width).
-   */
   subscribeTabList(listener: Listener) {
     tabListListeners.add(listener);
     return () => {
       tabListListeners.delete(listener);
     };
   },
-  /**
-   * Layout-only subscription. Fires for panel open/expanded/width
-   * changes; ignores tab-list mutations.
-   */
   subscribeLayout(listener: Listener) {
     layoutListeners.add(listener);
     return () => {
       layoutListeners.delete(listener);
     };
   },
-  /**
-   * Navigation-history subscription. Fires when the current entry or the
-   * back/forward availability changes.
-   */
   subscribeNav(listener: Listener) {
     navListeners.add(listener);
     return () => {
@@ -231,15 +172,6 @@ export const displayTabs = {
   getNavSnapshot(): NavSnapshot {
     return navSnapshot;
   },
-  /**
-   * Register or refresh a tab. If a tab with this id already exists, its
-   * spec is replaced in place (so calling `openTab` twice with the same id
-   * but different `props.prompt` updates the rendered viewer without
-   * stacking another tab).
-   *
-   * Default activates the new/refreshed tab and opens the panel. Pass
-   * `{ activate: false }` to register passively.
-   */
   openTab(spec: DisplayTabSpec, opts: OpenTabOptions = {}) {
     const activate = opts.activate ?? true;
     const openPanel = opts.openPanel ?? (activate ? true : state.panelOpen);
@@ -268,15 +200,8 @@ export const displayTabs = {
         layoutChanged: openPanel !== state.panelOpen,
       },
     );
-    // Activating a viewer pushes it onto the nav history so back returns
-    // to wherever the user came from (often the overview root).
     if (activate) pushHistory(spec.id);
   },
-  /**
-   * Activate an existing tab by id. No-op if the id is unknown. Always
-   * opens the panel as a side effect, so activating from a closed panel
-   * re-opens it.
-   */
   activateTab(tabId: string) {
     if (findIndex(state, tabId) === -1) return;
     if (state.activeTabId === tabId && state.panelOpen) {
@@ -291,10 +216,6 @@ export const displayTabs = {
     );
     pushHistory(tabId);
   },
-  /**
-   * Show the grouped library overview (the navigation root) and open the
-   * panel. Pushes the overview sentinel onto the history.
-   */
   showOverview() {
     const layoutChanged = !state.panelOpen;
     if (layoutChanged) {
@@ -302,7 +223,6 @@ export const displayTabs = {
     }
     pushHistory(OVERVIEW_ENTRY_ID);
   },
-  /** Step back one entry in the panel navigation history. */
   back() {
     if (historyIndex <= 0) return;
     historyIndex -= 1;
@@ -314,7 +234,6 @@ export const displayTabs = {
     }
     emitNav();
   },
-  /** Step forward one entry in the panel navigation history. */
   forward() {
     if (historyIndex >= history.length - 1) return;
     historyIndex += 1;
@@ -326,10 +245,6 @@ export const displayTabs = {
     }
     emitNav();
   },
-  /**
-   * Close a tab. If it was the active tab, activates the most-recent
-   * neighbouring tab; if no tabs remain, closes the panel.
-   */
   closeTab(tabId: string) {
     const idx = findIndex(state, tabId);
     if (idx === -1) return;
@@ -353,10 +268,6 @@ export const displayTabs = {
     );
     dropFromHistory(tabId);
   },
-  /**
-   * Open / close the panel without changing the active tab. Closing here
-   * leaves tabs intact so re-opening restores the previous selection.
-   */
   setPanelOpen(open: boolean) {
     if (state.panelOpen === open) return;
     emit({ ...state, panelOpen: open }, { layoutChanged: true });
@@ -375,11 +286,6 @@ export const displayTabs = {
     nextTabs.splice(boundedTarget, 0, tab);
     emit({ ...state, tabs: nextTabs }, { tabsChanged: true });
   },
-  /**
-   * Toggle / set the "expand to fill" mode. While expanded, the panel
-   * occupies the entire content area to the right of the rail; the chat
-   * outlet is hidden via the root `data-display-panel-expanded` flag.
-   */
   setPanelExpanded(expanded: boolean) {
     if (state.panelExpanded === expanded) return;
     writePersistedExpanded(expanded);
@@ -388,24 +294,11 @@ export const displayTabs = {
   togglePanelExpanded() {
     this.setPanelExpanded(!state.panelExpanded);
   },
-  /**
-   * Persist the user-chosen width (in CSS pixels). `null` reverts to the
-   * stylesheet default. Callers are responsible for clamping to the
-   * panel minimum and main-content-derived maximum before invoking this.
-   *
-   * Shared UI state writes are coalesced so a pointer-driven drag at
-   * 60–120 Hz doesn't synchronously hit storage on every move.
-   */
   setPanelWidth(width: number | null) {
     if (state.panelWidth === width) return;
     schedulePersistedWidth(width);
     emit({ ...state, panelWidth: width }, { layoutChanged: true });
   },
-  /**
-   * Force the pending panel-width to disk now. Call this on
-   * pointer-up to make sure the latest drag value is persisted even if
-   * the user reloads before the debounce window elapses.
-   */
   flushPersistedWidth,
   reset() {
     nextOrd = 1;
@@ -431,23 +324,12 @@ export const displayTabs = {
     );
   },
 };
-/**
- * Subscribe to just the tab list slice (tabs + activeTabId). Use this
- * for the tab strip, the +-menu, and active-tab consumers so panel
- * resize/animation updates don't trigger their re-renders.
- */
 export const useDisplayTabList = () =>
   useSyncExternalStore(
     displayTabs.subscribeTabList,
     displayTabs.getTabListSnapshot,
     displayTabs.getTabListSnapshot,
   );
-/**
- * Subscribe to a single field of the panel-layout snapshot. Per-field
- * selectors keep open/expanded consumers from re-rendering when the user
- * drags the resize handle (width updates fan out separately via a CSS
- * variable on `:root` — see `RightSidebar.tsx`).
- */
 const useLayoutSlice = <T>(pick: (snapshot: LayoutSnapshot) => T) =>
   useSyncExternalStore(
     displayTabs.subscribeLayout,

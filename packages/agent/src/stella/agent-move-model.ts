@@ -1,7 +1,3 @@
-/**
- * The model a moving agent runs on, as `spawn_agent` names one: what the
- * host it moves to resolves into the same model there.
- */
 import type { ModelRef } from "@earendil-works/pi-durable";
 import { CLAUDE_CODE_PROVIDER_ID, onClaudeCode } from "../engine/selection.ts";
 import { accountProviderOfRegistryId } from "../provider/account-byok.ts";

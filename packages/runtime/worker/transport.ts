@@ -22,22 +22,6 @@ import {
   runtimeIpcPathUsesFilesystem,
 } from "./runtime-paths.js";
 
-/**
- * Worker transport selection. The runtime worker can listen on:
- *
- *   --listen stdio://         (default, parent-spawned-child topology)
- *   --listen unix://PATH      (detached topology, host attaches via Unix socket)
- *   --listen pipe://PIPE      (detached topology, host attaches via Windows named pipe)
- *
- * Both share the same JSON-RPC protocol — only the byte stream changes.
- * Shared worker transport names for Stella app-server connections.
- *
- * Stdio mode supports a single connection over stdin/stdout for the lifetime
- * of the process; IPC-listener mode accepts an arbitrary number of sequential
- * or concurrent connections, which is what makes survival-across-host-restart
- * possible.
- */
-
 export type WorkerTransport =
   | { kind: "stdio" }
   | { kind: "unix"; socketPath: string }
@@ -97,22 +81,14 @@ export const parseWorkerListenUrl = (
 
 export type StartTransportArgs = {
   transport: WorkerTransport;
-  /** Takes each connection's peer: the worker broker, or the runtime's client server. */
   attach: (peer: JsonRpcPeer) => void;
-  /** What the readiness probe reports; defaults to the worker protocol. */
   protocolVersion?: string;
-  /**
-   * This process's identity, reported by the readiness probe so a client can
-   * verify which runtime instance owns the socket before adopting it.
-   */
   identity?: RuntimeServerIdentity;
   onError?: (error: unknown) => void;
 };
 
 export type StartTransportResult = {
-  /** Stop accepting new connections and close the listener. */
   close: () => Promise<void>;
-  /** Whichever socket address the listener bound to (IPC path for detached mode, "stdio" for stdio). */
   describe: () => string;
 };
 
@@ -133,12 +109,6 @@ const startStdioTransport = (
   };
 };
 
-/**
- * Probe whether another worker still answers on the socket. The 250ms
- * deadline is `Effect.timeoutOrElse`; its interrupt (like any external
- * interruption) destroys the probe socket via the callback's cleanup
- * effect, then resolves "not alive" — the old timer semantics.
- */
 const probeSocketAlive = (socketPath: string): Effect.Effect<boolean> =>
   Effect.callback<boolean>((resume) => {
     let socket: Socket;
@@ -183,7 +153,6 @@ const removeIfStaleSocket = async (socketPath: string) => {
   if (liveSocket) {
     throw new Error(`Runtime socket is already in use: ${socketPath}`);
   }
-  // Best-effort cleanup for crashed workers that left a dead socket file.
   if (usesFilesystem) {
     await fsPromises.unlink(socketPath).catch(() => undefined);
   }
@@ -238,8 +207,6 @@ const startIpcSocketTransport = async (
       buffered += chunk.toString("utf-8");
       const newlineIndex = buffered.indexOf("\n");
       if (newlineIndex < 0) {
-        // Do not let a malformed probe/client accumulate unbounded data before
-        // the first JSON-RPC line.
         if (buffered.length > 64 * 1024) {
           attachSocket(buffered);
         }
@@ -292,7 +259,6 @@ const startIpcSocketTransport = async (
   });
 
   if (usesFilesystem) {
-    // 0o600 — readable/writable only by the owning user.
     await fsPromises.chmod(socketPath, 0o600).catch(() => undefined);
   }
 

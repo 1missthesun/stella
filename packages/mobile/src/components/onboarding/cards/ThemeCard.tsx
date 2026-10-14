@@ -1,11 +1,3 @@
-/**
- * "Now, how should I look?" — appearance and theme, applied live.
- *
- * The same controls as Settings › Appearance (the system segmented control
- * and the theme swatches). Choices go straight through the theme context,
- * so the backdrop and every surface re-tint as the user taps; "Keep the
- * default" puts back what was there when the card arrived.
- */
 import { useMemo, useRef } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import Animated, { useAnimatedStyle } from "react-native-reanimated";
@@ -183,7 +175,6 @@ function SwatchRing({
   );
 }
 
-/** A theme at a glance: its canvas, its edge, its primary. */
 export function ThemeSwatch({
   theme,
   isDark,

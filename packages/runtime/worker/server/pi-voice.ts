@@ -1,10 +1,3 @@
-/**
- * Voice on pi-durable. The voice model hands what the user wants to the
- * conversation's orchestrator as a hidden turn and speaks its answer; the
- * call's tool activity reaches the voice overlay as the agent loops' events.
- * What was said is written into the transcript as model history, and a call
- * starts with what the conversation has said so far.
- */
 import {
   AGENT_RUN_FINISH_OUTCOMES,
   AGENT_STREAM_EVENT_TYPES,

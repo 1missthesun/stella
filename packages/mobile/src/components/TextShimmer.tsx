@@ -23,13 +23,6 @@ import { CONTENT_MAX_FONT_SCALE } from "../lib/setup-text-defaults";
 import { shouldRunContinuousAnimation } from "../lib/continuous-animation";
 import { useAppVisible } from "../lib/use-app-visible";
 
-/**
- * Desktop's TextShimmer (`desktop-ui/src/app/chat/TextShimmer.tsx` and
- * `text-shimmer.css`): a soft window, 44% of the label's width, crosses the
- * stationary text left to right in the weaker ink, then rests before the
- * next pass. The window is a gradient clipped to the glyphs, and only its
- * transform animates, on the UI thread.
- */
 const SHIMMER_WINDOW_FRACTION = 0.44;
 const SHIMMER_PER_CHAR_MS = 95;
 const SHIMMER_EASING = Easing.bezier(0.42, 0, 0.58, 1);
@@ -55,7 +48,6 @@ export function TextShimmer({
   textStyle,
 }: {
   text: string;
-  /** The label is live and visible; the sweep runs only while true. */
   active: boolean;
   color: string;
   sweepColor: string;

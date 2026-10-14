@@ -1,10 +1,3 @@
-/**
- * Composio's tool router: one session per (owner, integration) under the
- * owner's Composio principal. Sessions mint connect links, report whether the
- * toolkit has a connected account, and execute actions. Provider error bodies
- * are never reflected or logged: they can carry request arguments.
- */
-
 import { sha256Hex } from "../hash.js";
 
 export type ComposioConfig = { apiKey: string; baseUrl: string };
@@ -13,7 +6,6 @@ const DEFAULT_TOOL_ROUTER_URL = "https://backend.composio.dev/api/v3.1/tool_rout
 const REQUEST_TIMEOUT_MS = 30_000;
 const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
 const MAX_ACCOUNT_PAGES = 4;
-/** Responses that prove the provider did not accept the request. */
 const DEFINITE_REJECTIONS = new Set([400, 401, 403, 404, 405, 413, 415, 422]);
 
 export class ComposioHttpError extends Error {
@@ -25,7 +17,6 @@ export class ComposioHttpError extends Error {
   }
 }
 
-/** True when a failed provider call certainly did not run. */
 export const composioDefinitelyRejected = (error: unknown): boolean =>
   error instanceof ComposioHttpError && DEFINITE_REJECTIONS.has(error.status);
 
@@ -43,7 +34,6 @@ export const composioConfig = (env: Cloudflare.Env): ComposioConfig | null => {
   };
 };
 
-/** The stable Composio user every session of one owner runs as. */
 export const composioPrincipalFor = async (ownerId: string): Promise<string> =>
   `stella_${(await sha256Hex(ownerId)).slice(0, 32)}`;
 
@@ -95,7 +85,6 @@ export const composioFetch = async (
   }
 };
 
-/** The v3.1 API next to the tool router, for connected-account cleanup. */
 const toolsApiBaseUrl = (toolRouterBaseUrl: string): string => {
   const url = new URL(toolRouterBaseUrl);
   if (!url.pathname.endsWith("/tool_router")) {
@@ -200,7 +189,6 @@ export const createComposioSession = async (
   return sessionId;
 };
 
-/** Delete a session; one already gone is fine. */
 export const deleteComposioSession = async (config: ComposioConfig, sessionId: string): Promise<void> =>
   await ignoreStatus(composioFetch(config, sessionPath(sessionId), { method: "DELETE" }), [404]);
 
@@ -229,7 +217,6 @@ export const composioConnectLink = async (
   return url;
 };
 
-/** Run one action, or a raw proxy request (Google Ads mutations). */
 export const composioExecute = async (
   config: ComposioConfig,
   sessionId: string,
@@ -275,7 +262,6 @@ const listConnectedAccountIds = async (
       if (!isRecord(item)) continue;
       const id = readString(item.id);
       const slug = readString(isRecord(item.toolkit) ? item.toolkit.slug : null)?.toLowerCase();
-      // Only accounts that are exactly this owner's, for this toolkit.
       if (id && slug === toolkit && readString(item.user_id) === userId) ids.push(id);
     }
     cursor = readString(payload.next_cursor);
@@ -284,12 +270,6 @@ const listConnectedAccountIds = async (
   throw new Error("Composio account listing exceeded its page bound.");
 };
 
-/**
- * Account deletion for one integration: delete the session first (so no
- * issued link can attach a new account), then revoke and delete every
- * connected account the owner's principal holds for the toolkit, and confirm
- * none remain. Throws while anything may be left; a later call retries.
- */
 export const purgeComposioConnection = async (
   config: ComposioConfig,
   input: { sessionId: string | null; toolkit: string; userId: string },

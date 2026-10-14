@@ -1,21 +1,3 @@
-/**
- * The rendered state of one cloud conversation, reduced from the socket's
- * ordered record stream.
- *
- * Nothing here is authoritative. The Durable Object owns the transcript; this
- * is a view of it. Desktop may persist the same bounded raw rows as an
- * explicitly stale, rebuildable SQLite cache, but that cache never becomes a
- * send/cancel/runtime fallback and is repainted only behind this authority
- * reducer after a matching account + generation fence.
- *
- * `conversationStore(id, accountScope, ownerGeneration)` is per exact
- * lifecycle authority + conversation and owns its socket. Optimistic prompts
- * (`pendingPrompts`) are authority-scoped global state in `conversation-outbox`,
- * because the very first prompt is durably written before any conversation
- * exists to file it under; the SQLite replica is written by
- * `ConversationCachePersister`.
- */
-
 import { getAuthToken } from "@/global/auth/services/auth-token";
 import { conversationBrainChanged } from "@/features/execution-placement/conversation-brain-signal";
 import { conversationJournalAdvanced } from "./journal-advanced";
@@ -56,11 +38,6 @@ import {
 } from "./cloud-readiness-timing";
 
 export type ConversationState = ConversationViewState & {
-  /**
-   * `cached-stale` rows may paint while a canonical socket reconnects, but are
-   * never eligible to drive server/runtime behavior. Missing is equivalent to
-   * `none` for older callers and SSR's inert snapshot.
-   */
   recordsSource?: "none" | "cached-stale" | "canonical";
 };
 
@@ -68,8 +45,6 @@ const initialState = (conversationId: string): ConversationState => ({
   ...initialConversationViewState(conversationId),
   recordsSource: "none",
 });
-
-// ----------------------------------------------------------------- store
 
 const OLDER_CONTINUE_RETRY_MS = 3_500;
 const OLDER_CONTINUE_RETRIES = 20;
@@ -95,7 +70,6 @@ class ConversationStore {
   private authorityRetired = false;
   private cacheHydrationStarted = false;
   private cacheHydrated = false;
-  /** True only while rendered rows still contain unverified SQLite bytes. */
   private cacheContainsUnverifiedRecords = false;
   private readonly cache: ConversationCachePersister;
 
@@ -150,7 +124,6 @@ class ConversationStore {
 
   getSnapshot = (): ConversationState => this.state;
 
-  /** Called only after main has activated this exact account generation. */
   activateCache(): void {
     if (this.authorityRetired || this.cacheHydrationStarted) return;
     this.cacheHydrationStarted = true;
@@ -168,8 +141,6 @@ class ConversationStore {
           startedAt: cacheReadStartedAt,
           outcome: cached ? "hit" : "miss",
         });
-        // A live canonical reducer may have won while the disk read was in
-        // flight. Never replace it with older cache bytes; use it to rebuild.
         if (this.state.recordsSource === "canonical") {
           const incompatible =
             cached !== null &&
@@ -183,9 +154,6 @@ class ConversationStore {
           return;
         }
         if (!cached) return;
-        // `ready` can beat a slow disk read. Once the socket has attested an
-        // epoch/window, a late cache may only join that exact canonical view;
-        // it may never rewind the reducer to its own stale ready metadata.
         if (this.state.epoch !== null) {
           const firstCachedSeq = cached.records[0]?.seq ?? cached.floorSeq;
           const compatibleWithReady =
@@ -228,7 +196,6 @@ class ConversationStore {
           startedAt: cacheReadStartedAt,
           outcome: "unavailable",
         });
-        // Derived cache failure never changes cloud availability.
       })
       .finally(() => {
         if (generation === this.cache.generation) {
@@ -238,12 +205,6 @@ class ConversationStore {
       });
   }
 
-  /**
-   * The builder origin arrives from the backend, asynchronously and possibly after
-   * the first render. Setting it is what actually opens the socket.
-   * `resolved` separates "still loading" from "this deployment has none",
-   * which are the same `null` but very different things to show a user.
-   */
   setConfig(baseUrl: string | null, resolved: boolean): void {
     if (this.authorityRetired) return;
     const next = baseUrl?.replace(/\/+$/, "") || null;
@@ -254,9 +215,6 @@ class ConversationStore {
         this.socket.stop();
         this.socket = null;
       }
-      // An origin change is an authority change. Epochs and sequence numbers
-      // are scoped to the DO behind that origin, so retaining the old rows
-      // would let an unrelated generation win the reducer's seq dedupe.
       if (replacedAuthority) {
         this.purgeCache();
         this.state = initialState(this.conversationId);
@@ -280,7 +238,6 @@ class ConversationStore {
     }
   }
 
-  /** True when nothing is watching, so the registry may forget it. */
   get idle(): boolean {
     return this.subscribers <= 0;
   }
@@ -289,7 +246,6 @@ class ConversationStore {
     this.socket?.retryNow();
   }
 
-  /** Immediately retires an old auth subject's socket and rendered state. */
   retireAuthority(): void {
     this.authorityRetired = true;
     this.socket?.stop();
@@ -303,7 +259,6 @@ class ConversationStore {
     this.emit();
   }
 
-  /** False when there is no live socket to carry the stop through. */
   cancelTurn(turnId: string): boolean {
     return this.socket?.cancelTurn(turnId) ?? false;
   }
@@ -325,8 +280,6 @@ class ConversationStore {
       this.patch({ hasOlder: false });
       return;
     }
-    // Say which limit was hit rather than leaving a button that does nothing,
-    // and never grow the array without bound to avoid saying it.
     if (olderWouldExceedRetainedLimit(this.state.records)) {
       this.patch({ hasOlder: false, olderNotice: OLDER_LIMIT_NOTICE });
       return;
@@ -410,8 +363,6 @@ class ConversationStore {
     if (this.olderTimer) clearTimeout(this.olderTimer);
     this.olderTimer = null;
     this.dropOlderPartial();
-    // Records stay: remounting the same conversation should not blank the
-    // view, and the socket resumes from the cursor it kept.
     this.patch({
       status: "idle",
       live: null,
@@ -431,8 +382,6 @@ class ConversationStore {
   }
 
   private onEvent(event: ConversationSocketEvent): void {
-    // A close can race a buffered socket callback. Once authority rotates, an
-    // old callback may neither repaint nor acknowledge the successor outbox.
     if (this.authorityRetired) return;
     switch (event.type) {
       case "status": {
@@ -468,11 +417,6 @@ class ConversationStore {
         return;
       }
       case "ready": {
-        // A socket can be replaced after the teardown grace while this
-        // renderer store deliberately keeps its rows. The new socket has no
-        // local epoch to compare, so the store is the final authority fence:
-        // rows from an older canonical generation must disappear before any
-        // record from the new generation reaches seq-based dedupe below.
         const epochChanged =
           this.state.epoch !== null && this.state.epoch !== event.ready.epoch;
         const cachedOutsideCanonicalWindow =
@@ -484,10 +428,6 @@ class ConversationStore {
         const records = dropCached ? EMPTY_RECORDS : this.state.records;
         if (dropCached) this.purgeCache();
         const oldest = records[0]?.seq ?? event.ready.windowStartSeq;
-        // The socket resumed from the structurally validated cache cursor. If
-        // it reached `ready` without an epoch/window reset, the retained bytes
-        // are now server-attested and can accept only the delta that follows.
-        // This applies equally to an explicit cached empty conversation.
         this.cacheContainsUnverifiedRecords = false;
         this.patch({
           title: event.ready.title,
@@ -506,8 +446,6 @@ class ConversationStore {
           live: liveTurnFromReady(event.ready.live),
         });
         this.scheduleCacheWrite();
-        // A move made while this socket was away sent its frame to nobody,
-        // and what the journal gained meanwhile reached no import.
         conversationBrainChanged(this.conversationId);
         conversationJournalAdvanced(this.conversationId);
         return;
@@ -541,8 +479,6 @@ class ConversationStore {
         });
         return;
       case "gap":
-        // Named, not silent: everything below the reported range is gone from
-        // the hot window but reachable, so scrollback stays offered.
         this.patch({ hasOlder: true });
         return;
       case "tool":
@@ -552,10 +488,6 @@ class ConversationStore {
   }
 
   private appendRecords(incoming: readonly JournalRecord[]): void {
-    // SQLite rows are paint-only. The first canonical record frame replaces
-    // the entire unverified window, including equal-seq rows; otherwise seq
-    // dedupe would let structurally valid cache corruption masquerade as a
-    // server-attested transcript forever.
     const appended = appendJournalRecords(this.state, incoming, {
       replaceRetained: this.cacheContainsUnverifiedRecords,
     });
@@ -587,9 +519,6 @@ class ConversationStore {
     if (this.olderTimer) clearTimeout(this.olderTimer);
     this.olderTimer = null;
     if (this.cacheContainsUnverifiedRecords) {
-      // A backfill cannot be joined to unverified cache bytes without silently
-      // manufacturing a canonical window. Wait for the live replay to replace
-      // the cache first.
       this.dropOlderPartial();
       this.patch({ loadingOlder: false });
       return;
@@ -616,7 +545,6 @@ class ConversationStore {
       return;
     }
     if (!olderRangeIsComplete(incoming, range)) {
-      // Keep the cursor retryable and name the failure in the UI.
       this.patch({
         hasOlder: true,
         loadingOlder: false,
@@ -629,7 +557,6 @@ class ConversationStore {
       continuesPartial ? partial.records.concat(incoming) : incoming,
     );
     if (!prepended) {
-      // Stop offering a button that would ask for the same empty range forever.
       this.patch({
         hasOlder: false,
         loadingOlder: false,
@@ -708,9 +635,6 @@ export const conversationStore = (
   if (activeOwnerGenerationByAccount.get(accountScope) === ownerGeneration) {
     created.activateCache();
   }
-  // Bounded: a session that hops conversations must not accumulate stores.
-  // Only unwatched ones are forgotten — evicting a watched store would strand
-  // its socket with no owner left to close it.
   if (stores.size > MAX_RETAINED_STORES) {
     for (const [id, store] of stores) {
       if (stores.size <= MAX_RETAINED_STORES) break;
@@ -720,11 +644,6 @@ export const conversationStore = (
   return created;
 };
 
-/**
- * Called synchronously at the auth boundary. A socket authenticated for a
- * previous subject must not remain warm or be reused when the same durable
- * conversation id is transferred during anonymous account linking.
- */
 export const retireCloudConversationClientAuthority = (
   accountScope: string,
 ): void => {
@@ -740,11 +659,6 @@ export const retireCloudConversationClientAuthority = (
   void cloudConversationCacheClient.retainAccount(accountScope);
 };
 
-/**
- * Completes the auth fence once the backend reports the canonical lifecycle
- * generation. Old same-account sockets and persisted sends are retired before
- * the exact generation can connect or replay.
- */
 export const activateCloudConversationClientAuthority = (
   authority: CloudConversationOutboxAuthority,
 ): boolean => {

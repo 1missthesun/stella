@@ -1,13 +1,6 @@
 import { buildDependencyBundle, type DepsBuildRequest } from "./deps.js";
 import { loadDepTools } from "./tools.js";
 
-/**
- * Builds one dependency bundle in a process of its own (see
- * `buildDependenciesApart` in deps.ts), then exits, so the memory rolldown
- * held for it goes back to the system. It may start before its request is
- * known: rolldown loads while the request (one JSON line on stdin) is on its
- * way, and a closed stdin with no request just ends it.
- */
 const tools = loadDepTools();
 tools.catch(() => undefined);
 

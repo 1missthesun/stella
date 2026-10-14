@@ -1,27 +1,3 @@
-/**
- * Cold storage for the conversation journal: R2 segments, oversize-row spills,
- * and the deletion path.
- *
- * Rollover is about unbounded growth and the deletion path, not about price —
- * DO SQLite and R2 both bill at $0.20/GB-month. What it buys is a resident set
- * whose size is a function of the CURRENT conversation rather than of its
- * lifetime, and a place to put bytes that the 10 GB per-object ceiling would
- * otherwise eventually meet.
- *
- * Two rules make the cut safe:
- *
- *  - Rows are never deleted before the R2 put resolves. The manifest records
- *    the intent first, the object is written second, and the delete + floor
- *    bump happen third in one transaction. A crash anywhere leaves rows
- *    resident and a segment marked 'uploading'; the next cut re-uploads that
- *    range first. The worst outcome is a duplicate object, never a lost row.
- *  - A cut lands only at or below the conversation's compaction checkpoint
- *    and below the most recent turn's context start, at the end of a terminal
- *    turn, immediately before a plain user message. That is what keeps R2 off
- *    the agent loop's path entirely: a new transcript starts from the
- *    checkpoint and a normal turn never reads a segment.
- */
-
 import {
   BACKFILL_BATCH_BYTES,
   BACKFILL_BATCH_RECORDS,
@@ -47,28 +23,12 @@ import type {
   SegmentRow,
 } from "./journal.js";
 
-/**
- * One cut is bounded independently of the residency target so a single
- * rollover can never build a multi-hundred-megabyte buffer in a 128 MB
- * isolate. A backlog drains over successive turns instead.
- */
 const SEGMENT_MAX_ROWS = 1_000;
 const SEGMENT_MAX_BYTES = 8 * 1024 * 1024;
-/**
- * Segments one rollover pass may write. A new checkpoint can leave a whole
- * context window to archive at once; this drains it in a few passes without
- * holding one turn boundary for long.
- */
 const SEGMENTS_PER_PASS = 4;
-/** Turn ends below the ceiling a cut tries before giving up for this pass. */
 const CUT_BOUNDARY_CANDIDATES = 64;
 const ARCHIVE_READ_ROWS = 500;
 const PURGE_BATCH = 200;
-/**
- * How many delete batches may fail before this pass gives up and lets the owner's
- * sweep retry. Bounded rather than "until it works": the caller is holding an
- * HTTP request open, and the queue is durable.
- */
 const PURGE_MAX_FAILED_BATCHES = 3;
 const R2_TIMEOUT_MS = 30_000;
 
@@ -105,17 +65,6 @@ export type SegmentHeader = {
 export class ConversationArchive {
   private ownerHashCache: { ownerId: string; hash: string } | null = null;
 
-  /**
-   * The R2 writes this object has started and not yet finished.
-   *
-   * Every one of them registers its key in SQLite before it settles — a
-   * segment in `segments` before the upload, a spill in `spills` immediately
-   * after the put. So once this set is empty, the manifest names every object
-   * that exists. That is the whole property `quiesce()` sells to the purge:
-   * without it the deletion snapshot is taken against a manifest that a
-   * still-running rollover or spill is about to add to, and `deleteAll()`
-   * destroys the only record of whatever landed late.
-   */
   private readonly inFlight = new Set<Promise<unknown>>();
 
   /**
@@ -138,12 +87,7 @@ export class ConversationArchive {
     private readonly bucket: R2Bucket | undefined,
     private readonly journal: Journal,
     private readonly log: ConversationLogger,
-    /**
-     * Where the conversation's latest compaction checkpoint covers through,
-     * this epoch; undefined before any host compacted.
-     */
     private readonly checkpointSeq: () => Promise<number | undefined>,
-    /** The object's storage, where pi-durable keeps its tables beside the journal. */
     storage?: DurableObjectStorage,
   ) {
     this.piEntries =
@@ -203,32 +147,11 @@ export class ConversationArchive {
     return `conversations/${this.ownerHashCache.hash}/${meta.conversation_id}`;
   }
 
-  // -------------------------------------------------------------------------
-  // Spill
-  // -------------------------------------------------------------------------
-
-  /**
-   * Keyed by a hash of the writer key rather than by seq: the key has to exist
-   * before a seq is allocated for a synchronous append to reference it, and a
-   * deterministic key makes a retried spill overwrite identical bytes instead
-   * of leaking a second object.
-   *
-   * The key is registered in `spills` here — at the one site that creates the
-   * object — rather than wherever a row happens to reference it. The row is
-   * not a durable record of the key: rollover deletes archived rows, and an
-   * append that fails after this put never writes one at all. Registering
-   * before returning means every object this method creates is nameable by the
-   * purge, whatever happens next.
-   */
   async writeSpill(
     writerKey: string,
     payloadJson: string,
   ): Promise<string | null> {
     if (!this.bucket) return null;
-    // The fence: refusing here is what stops an object being created behind
-    // the purge's snapshot. A spill that had already started when the purge
-    // landed is not refused — it is tracked, so the purge waits for it and
-    // finds its key.
     if (this.sealed || this.journal.isDeleted()) return null;
     return this.track(this.spill(writerKey, payloadJson));
   }
@@ -243,9 +166,6 @@ export class ConversationArchive {
     const stored = this.journal.encodePayload(payloadJson);
     const body = await gzip([new TextEncoder().encode(stored)]);
     await withTimeout(this.bucket.put(key, body), R2_TIMEOUT_MS);
-    // Registered whether or not the conversation was tombstoned while the put
-    // was in flight: an unregistered object is an undeletable one, and this
-    // table is what the purge reads.
     this.journal.recordSpill(key, utf8Length(stored), Date.now());
     return key;
   }
@@ -264,16 +184,6 @@ export class ConversationArchive {
     }
   }
 
-  // -------------------------------------------------------------------------
-  // Rollover
-  // -------------------------------------------------------------------------
-
-  /**
-   * Called only after a turn reached a terminal state AND its terminal event
-   * was delivered — never mid-turn, never on a socket read path. Failures are
-   * logged and swallowed: a conversation that cannot roll over is larger than
-   * we would like, not broken.
-   */
   async maybeRollover(now: number): Promise<void> {
     if (!this.bucket) return;
     if (this.sealed || this.journal.isDeleted()) return;
@@ -285,11 +195,6 @@ export class ConversationArchive {
     );
   }
 
-  /**
-   * pi-durable's entries below every context, to R2 (`PiEntryArchive`). Same
-   * rules as a cut: after a terminal turn, fenced by the purge, and a failure
-   * leaves the object larger, not broken.
-   */
   private async archivePiEntries(now: number): Promise<void> {
     if (!this.piEntries) return;
     try {
@@ -307,12 +212,10 @@ export class ConversationArchive {
     }
   }
 
-  /** Every R2 object holding this conversation's archived pi entries. */
   piEntryArchiveKeys(): string[] {
     return this.piEntries?.allKeys() ?? [];
   }
 
-  /** Archived pi entries of one pi conversation, oldest first (`PiEntryArchive.read`). */
   async readPiEntries(
     piConversationId: number,
     options: { beforeId?: number; limit?: number } = {},
@@ -328,9 +231,6 @@ export class ConversationArchive {
   private async rollover(now: number): Promise<void> {
     try {
       await this.finishPendingSegment();
-      // Re-checked after the first await, and again before the cut: a purge
-      // that lands mid-pass must not get a fresh object written behind it. The
-      // pass already in flight is covered by `quiesce()`, not by this.
       if (this.sealed || this.journal.isDeleted()) return;
       const checkpoint = await this.checkpointSeq();
       if (this.sealed || this.journal.isDeleted()) return;
@@ -361,19 +261,6 @@ export class ConversationArchive {
     }
   }
 
-  /**
-   * The highest seq this pass may archive through, and why; null when
-   * nothing should move.
-   *
-   *  - storage pressure: the database is too big, and the resident set is cut
-   *    to a few hundred rows whatever that costs, checkpoint included;
-   *  - checkpoint: everything older than the latest compaction checkpoint,
-   *    which is where every new transcript starts;
-   *  - window: no checkpoint yet, and the resident model context passed
-   *    RESIDENT_ROLLOVER_TOKENS; the newest RESIDENT_CONTEXT_TOKENS stay;
-   *  - backstop: the resident bytes passed HOT_MAX_BYTES; rows older than
-   *    the newest RESIDENT_CONTEXT_TOKENS go even past a stale checkpoint.
-   */
   private residencyCeiling(checkpoint: number | undefined): {
     ceiling: number;
     reason: string;
@@ -425,18 +312,6 @@ export class ConversationArchive {
     return { ceiling, reason, hot };
   }
 
-  /**
-   * The three conditions, all required:
-   *  1. at or below `ceiling` (the checkpoint, the context window, or the
-   *     pressure target); below anything but the checkpoint, also strictly
-   *     below the most recent turn's context start, which is what makes R2
-   *     non-load-bearing for a normal turn. A checkpoint needs no such
-   *     guard: its summary stands in for every row it covers, and a turn's
-   *     window over the journal only ever reads resident rows;
-   *  2. the last row of a turn that reached a terminal state;
-   *  3. followed immediately by a plain user message, so the resident window
-   *     can never open on an orphaned tool result.
-   */
   private resolveCut(desired: number, belowContext: boolean): number | null {
     const latest = belowContext ? this.journal.latestTerminalTurn() : null;
     const ceiling =
@@ -479,9 +354,6 @@ export class ConversationArchive {
       lastSeq = row.seq;
       count += 1;
     }
-    // Truncating the batch can land the tail mid-turn. Only a boundary is a
-    // legal segment end, so walk back to one; if the very first rows exceed
-    // the byte cap there is nothing safe to cut this pass.
     while (lastSeq > firstSeq && !this.journal.isCutBoundary(lastSeq)) {
       lastSeq -= 1;
     }
@@ -504,7 +376,6 @@ export class ConversationArchive {
       rows: count,
       createdAt: now,
     };
-    // Phase 1: durable intent. No rows deleted.
     this.journal.insertSegment({
       first_seq: firstSeq,
       last_seq: lastSeq,
@@ -514,10 +385,7 @@ export class ConversationArchive {
       state: "uploading",
       created_at: now,
     });
-    // Phase 2: the object. Same range means the same key, so a retry
-    // overwrites identical bytes.
     await this.upload(key, header, firstSeq, lastSeq);
-    // Phase 3: commit, delete, raise the floor — one transaction.
     this.journal.commitSegment(firstSeq, lastSeq);
     this.log("info", "conversation_segment_committed", {
       firstSeq,
@@ -528,7 +396,6 @@ export class ConversationArchive {
     return lastSeq;
   }
 
-  /** Re-runs phase 2 for a range whose previous cut crashed mid-upload. */
   private async finishPendingSegment(): Promise<void> {
     const pending = this.journal.pendingSegment();
     if (!pending) return;
@@ -593,14 +460,6 @@ export class ConversationArchive {
     await withTimeout(this.bucket.put(key, body), R2_TIMEOUT_MS);
   }
 
-  // -------------------------------------------------------------------------
-  // Reads
-  // -------------------------------------------------------------------------
-
-  /**
-   * Client-facing only. The agent loop never calls this: its window is chosen
-   * from resident rows, and the cut rule guarantees the window is resident.
-   */
   async readRange(
     fromSeq: number,
     toSeq: number,
@@ -613,8 +472,6 @@ export class ConversationArchive {
     const maxRecords = Math.min(limit, BACKFILL_BATCH_RECORDS);
     const records: JournalRecord[] = [];
     let missingBelowSeq: number | undefined;
-    // The high-water mark of what has been served. Everything below it in the
-    // requested range is either in `records` or named by `missingBelowSeq`.
     let cursor = start;
 
     if (cursor < head.windowStartSeq) {
@@ -626,8 +483,6 @@ export class ConversationArchive {
       );
       const lowestCovered = segments[0]?.first_seq;
       if (lowestCovered === undefined || lowestCovered > cursor) {
-        // Compacted past what the manifest still names, or never allocated.
-        // Either way it can never be served: name it rather than looping.
         missingBelowSeq = lowestCovered ?? head.windowStartSeq;
         cursor = missingBelowSeq;
       }
@@ -641,8 +496,6 @@ export class ConversationArchive {
           cursor = row.seq + 1;
         }
       }
-      // Short of the cold end means the per-request segment cap (or a hole in
-      // a segment) cut this response; the client re-asks from `cursor`.
       if (cursor <= coldEnd) {
         return {
           records,
@@ -721,7 +574,7 @@ export class ConversationArchive {
     for (const line of text.split("\n")) {
       if (!line) continue;
       if (first) {
-        first = false; // header
+        first = false;
         continue;
       }
       try {
@@ -732,10 +585,6 @@ export class ConversationArchive {
     }
     return rows;
   }
-
-  // -------------------------------------------------------------------------
-  // Deletion
-  // -------------------------------------------------------------------------
 
   /**
    * Drains `purge_queue`, removing only keys R2 confirmed. The caller must not
@@ -750,7 +599,6 @@ export class ConversationArchive {
    */
   async drainPurge(): Promise<{ pending: number }> {
     if (!this.bucket) {
-      // Nothing was ever written, so nothing can be orphaned.
       for (;;) {
         const keys = this.journal.purgeBatch(PURGE_BATCH);
         if (keys.length === 0) break;
@@ -758,10 +606,6 @@ export class ConversationArchive {
       }
       return { pending: this.journal.purgePending() };
     }
-    // A failed batch does not end the drain: `purgeBatch` orders by attempts,
-    // so the next pass picks up keys this one never reached instead of
-    // re-offering the batch that just failed. The failure budget is what stops
-    // that from spinning once every remaining key is failing.
     let failures = 0;
     for (;;) {
       const keys = this.journal.purgeBatch(PURGE_BATCH);

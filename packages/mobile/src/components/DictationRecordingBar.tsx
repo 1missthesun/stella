@@ -1,20 +1,3 @@
-/**
- * Mobile mirror of desktop's DictationRecordingBar
- * (`desktop/src/features/dictation/components/DictationRecordingBar.tsx`).
- * The composer's text area stays as it is while dictating; this row sits
- * under it, where the toolbar normally sits:
- *
- *   [X]  [waveform — flex 1]   [0:24]   [✓]   [↑]
- *
- * No words appear while recording; the transcript lands in the composer once
- * dictation stops. The trailing send (↑) is optional: when `onSend` is given
- * it stops dictation and, once the transcript lands, auto-submits the message
- * in one tap.
- *
- * Waveform and timer are separate leaves on external stores, so a waveform
- * tick never re-renders the rest of the composer.
- */
-
 import { memo, useEffect, useMemo, useState } from "react";
 import {
   Pressable,
@@ -46,7 +29,6 @@ const TIMER_TICK_MS = 250;
 type Props = {
   onCancel: () => void;
   onConfirm: () => void;
-  /** When provided, stop dictation and auto-send once the transcript lands. */
   onSend?: () => void;
 };
 
@@ -131,11 +113,6 @@ const ElapsedTimer = memo(function ElapsedTimer({
   );
 });
 
-/**
- * One bar per meter tick (~12.5 Hz), newest on the right, older bars
- * scrolling off the left once the buffer is full — the same series desktop
- * draws on its canvas.
- */
 const DictationWaveform = memo(function DictationWaveform({
   color,
 }: {

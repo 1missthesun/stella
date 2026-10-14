@@ -21,7 +21,6 @@ import {
 import { markOnboardingSeen } from "./onboarding";
 import { clearAccountChatData } from "./chat-account-cleanup";
 
-/** Restart the JS so every module picks up the newly active server. */
 export const reloadApp = async (): Promise<void> => {
   // Release builds restart through expo-updates. In development builds it is
   // disabled and its reload resolves without restarting, so use the dev one.
@@ -39,11 +38,6 @@ export const reloadApp = async (): Promise<void> => {
   DevSettings.reload();
 };
 
-/**
- * Make `serverId` the active server and restart into it. The local chat
- * cache belongs to the account it came from, so it is cleared first; the
- * server is the source of truth and refills it.
- */
 export const switchToServer = async (serverId: string): Promise<void> => {
   if (serverId === launchServer.id) return;
   await clearAccountChatData().catch(() => undefined);
@@ -101,11 +95,6 @@ const readClaimError = (status: number, body: unknown): PairingError => {
   return new PairingError("server");
 };
 
-/**
- * Claim a pairing link: the server mints a normal session for its owner on
- * this phone. The session is stored under the new server's scope, the
- * server joins the list, and the app restarts into it.
- */
 export const claimPairingAndSwitch = async (
   link: PairingLink,
   discovery: ServerDiscovery,
@@ -141,8 +130,6 @@ export const claimPairingAndSwitch = async (
   const confirmed = parseServerDiscovery(body?.server) ?? discovery;
   const entry = upsertSelfHostedServer(confirmed, link.server);
   await setItemForServerAsync(entry.id, MOBILE_SESSION_TOKEN_KEY, sessionToken);
-  // The scripted first-run chat sells the hosted service; a paired
-  // server's owner goes straight to their chat.
   await markOnboardingSeen().catch(() => undefined);
   await clearAccountChatData().catch(() => undefined);
   setActiveServerId(entry.id);

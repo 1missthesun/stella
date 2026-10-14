@@ -1,16 +1,4 @@
 import { DisplayFileSourceContext } from "@/shared/hooks/display-file-source";
-/**
- * Per-kind viewer components used by the workspace panel's tab manager.
- *
- * Each component is a thin wrapper that delegates to the existing card UI
- * (OfficeArtifactPanel, PdfViewerCard). The
- * wrappers exist so the tab spec's `render()` function can be a single
- * `createElement(Component, props)` call — no per-call branching, no
- * `kind` discriminator inside the render path.
- *
- * The media viewer is its own world (preview, prompt, action bar) and
- * lives in `./media-tab/`.
- */
 
 import { lazy, Suspense, useContext, useEffect, useMemo, useState } from "react";
 import type { OfficePreviewRef } from "@stella/contracts/office-preview";
@@ -36,11 +24,6 @@ import { usePreviewParser } from "./use-preview-parser";
 import { usePreviewWindow } from "./use-preview-window";
 import { PreviewEmpty, PreviewProblem } from "./preview-states";
 
-// Heavy, payload-specific renderers are lazy-loaded so they stay out of the
-// always-eager shell's first-paint module graph (dev server transforms every
-// statically-reachable module before first paint). Their `createElement`
-// closures only run when a tab of the matching kind actually opens, so the
-// chunks are fetched on demand.
 const PdfViewerCard = lazy(() =>
   import("@/app/chat/PdfViewerCard").then((m) => ({
     default: m.PdfViewerCard,
@@ -57,11 +40,6 @@ const OfficeArtifactPanel = lazy(() =>
 
 export { MediaTabContent } from "./media-tab";
 
-/**
- * Live URL preview tab. An iframe pointed at a dev server, with a tiny
- * reload affordance so the user can force a refresh when the page does
- * not hot-reload on its own.
- */
 export const UrlTabContent = ({
   url,
   title,
@@ -438,7 +416,6 @@ const MarkdownView = ({
   const markdown = parsed?.result?.text ?? "";
   const { actionStatus, handleSave, handleCopy } = useFilePreviewActions({
     sourcePath: filePath,
-    // A partial document is never put on the clipboard as if it were whole.
     ...(parsed?.result && !parsed.result.limited ? { copyText: markdown } : {}),
     suggestedName: title ?? filePath.split(/[\\/]/).pop() ?? "document.md",
   });
@@ -569,7 +546,6 @@ const ParsedDiff = ({
 };
 
 const SourceDiffPatchBlock = ({ patch }: { patch: string }) => {
-  // Cap before structured cloning to avoid sending an enormous patch to the worker.
   const request = useMemo(
     () => ({
       kind: "diff" as const,

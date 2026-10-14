@@ -1,26 +1,3 @@
-/**
- * Cloud projects and the owner's GitHub App installations.
- *
- * The connect handshake is split so that no single leg can bind an
- * installation to the wrong account:
- *
- *   1. `projects.startGithubInstall` records an `install` nonce and signs it
- *      into the install URL's `state`.
- *   2. GitHub's redirect (`src/projects/routes.ts`) spends that nonce
- *      (`projects.githubBeginVerify`) for a `verify` nonce naming the
- *      installation, and sends the browser to GitHub's user authorization.
- *   3. The identity leg proves which GitHub user can reach the installation
- *      and parks it as a `claim` (`projects.githubClaim`), whose id is the
- *      connect code shown on the page. The redirect has no Stella session, so
- *      it never binds.
- *   4. The owner types the code into `projects.finishGithubConnect`. The claim
- *      lives in this owner's object, so a code from anyone else's handshake
- *      is simply not found.
- *
- * D1 `github_installations` maps an installation to its owner so GitHub's
- * webhook (which carries nothing else) can reach this object.
- */
-
 import type {
   CloudProject,
   GithubConnection,
@@ -50,8 +27,6 @@ const MAX_PROJECTS = 25;
 const INSTALL_STATE_TTL_MS = 15 * 60_000;
 const VERIFY_STATE_TTL_MS = 10 * 60_000;
 const CLAIM_TTL_MS = 10 * 60_000;
-// Crockford's alphabet minus I/L/O/U: a hand-typed code can't be mistyped
-// into a different valid one.
 const CONNECT_CODE_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 const CONNECT_CODE_LENGTH = 12;
 
@@ -80,8 +55,6 @@ export const PROJECTS_MIGRATION = {
        created_at INTEGER NOT NULL,
        updated_at INTEGER NOT NULL
      )`,
-    // One row per handshake step: `install` and `verify` nonces, and `claim`
-    // rows keyed by their connect code.
     `CREATE TABLE github_connect_states (
        id TEXT PRIMARY KEY,
        phase TEXT NOT NULL,
@@ -151,10 +124,6 @@ const slugify = (value: string): string =>
 
 const bad = (message: string) => new RpcError("BAD_REQUEST", message);
 
-/**
- * A github.com remote, normalized. Credentials in the URL are refused: the
- * App installation exists so no long-lived token is ever stored.
- */
 const parseGithubRemote = (input: string): string => {
   const raw = input.trim();
   if (!raw) throw bad("Paste a GitHub repository URL.");
@@ -201,7 +170,6 @@ const randomHex = (bytes: number): string =>
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
 
-/** 60 bits, uniform: the alphabet is exactly 32 characters. */
 const randomConnectCode = (): string =>
   [...crypto.getRandomValues(new Uint8Array(CONNECT_CODE_LENGTH))]
     .map((byte) => CONNECT_CODE_ALPHABET[byte & 31])
@@ -275,7 +243,6 @@ const createProject = (ctx: OwnerContext, args: CreateArgs): CloudProject => {
       }
       installationId = row.installation_id;
     } else {
-      // With exactly one connection there is nothing to choose.
       const rows = ctx.db.all<{ installation_id: string }>(
         "SELECT installation_id FROM github_installations LIMIT 2",
       );
@@ -310,7 +277,6 @@ const startGithubInstall = async (ctx: OwnerContext): Promise<{ installUrl: stri
       retryable: false,
     });
   }
-  // Minting states is the cheap half of an installation-guessing loop.
   enforceOwnerRateLimit(
     ctx.db,
     ctx.now,
@@ -335,7 +301,6 @@ const startGithubInstall = async (ctx: OwnerContext): Promise<{ installUrl: stri
   return { installUrl: githubInstallUrl(ctx.env, state) };
 };
 
-/** Spend a single-use state row of `phase`. Expired rows are spent too. */
 const spendState = (ctx: OwnerContext, id: string, phase: string): StateRow | null => {
   const row = ctx.db.one<StateRow>(
     "SELECT * FROM github_connect_states WHERE id = ? AND phase = ?",
@@ -347,7 +312,6 @@ const spendState = (ctx: OwnerContext, id: string, phase: string): StateRow | nu
   return row.expires_at > ctx.now ? row : null;
 };
 
-/** Leg 2: the install nonce, swapped for a verify nonce bound to the installation. */
 const beginVerify = (ctx: OwnerContext, args: unknown): { nonce: string; exp: number } | null => {
   const { nonce, installationId } = object({
     nonce: string({ max: 128 }),
@@ -365,7 +329,6 @@ const beginVerify = (ctx: OwnerContext, args: unknown): { nonce: string; exp: nu
   return { nonce: verifyNonce, exp };
 };
 
-/** Leg 3: a verified installation, parked under a fresh connect code. */
 const claim = (ctx: OwnerContext, args: unknown): { connectCode: string } | null => {
   const parsed = object({
     nonce: string({ max: 128 }),
@@ -395,7 +358,6 @@ const claim = (ctx: OwnerContext, args: unknown): { connectCode: string } | null
 
 type FinishResult = ProjectCalls["projects.finishGithubConnect"]["result"];
 
-/** Leg 4, the bind: needs both the code and this owner's session. */
 const finishGithubConnect = async (
   ctx: OwnerContext,
   args: { connectCode: string },
@@ -419,9 +381,6 @@ const finishGithubConnect = async (
     );
   }
   const installationId = row.installation_id;
-  // Rebinding an installation to a different account would silently detach
-  // the first account's projects; reinstalling on GitHub (a new id) is the
-  // supported way to move it.
   await installationIndex(ctx.env).prepare(
     "INSERT INTO github_installations (installation_id, owner_id) VALUES (?, ?) ON CONFLICT (installation_id) DO NOTHING",
   )
@@ -459,7 +418,6 @@ const finishGithubConnect = async (
 
 const dropInstallation = async (ctx: OwnerContext, installationId: string): Promise<void> => {
   ctx.db.run("DELETE FROM github_installations WHERE installation_id = ?", installationId);
-  // Projects keep their remote but can no longer authenticate.
   ctx.db.run(
     "UPDATE projects SET installation_id = NULL, updated_at = ? WHERE installation_id = ?",
     ctx.now,
@@ -470,7 +428,6 @@ const dropInstallation = async (ctx: OwnerContext, installationId: string): Prom
     .run();
 };
 
-/** GitHub's installation webhook: deleted, suspended or unsuspended. */
 const installationStatus = async (ctx: OwnerContext, args: unknown): Promise<{ ok: boolean }> => {
   const { installationId, status } = object({
     installationId: string({ pattern: INSTALLATION_ID_PATTERN }),
@@ -492,7 +449,6 @@ const installationStatus = async (ctx: OwnerContext, args: unknown): Promise<{ o
   return { ok: true };
 };
 
-/** Uninstall each installation from GitHub, then forget it; a failed revoke retries. */
 const purgeProjects = async (ctx: OwnerContext): Promise<{ pending: boolean }> => {
   let pending = false;
   for (const { installation_id } of ctx.db.all<{ installation_id: string }>(

@@ -1,7 +1,3 @@
-/**
- * Shared utilities for the tools system.
- */
-
 import { promises as fs } from "fs";
 import type { Dirent } from "fs";
 import path from "path";
@@ -19,7 +15,6 @@ import {
   truncateStringToBytesFromStart,
 } from "./truncate.js";
 
-// Constants
 export const MAX_OUTPUT = DEFAULT_MAX_BYTES;
 export const MAX_OUTPUT_LINES = DEFAULT_MAX_LINES;
 export const MAX_FILE_BYTES = 1_000_000;
@@ -28,27 +23,19 @@ const logger = createRuntimeLogger("tools");
 
 export const log = (message: string, fields?: unknown) => {
   logger.debug(message, sanitizeForLogs(fields));
-  /* logging removed — use structured telemetry instead */
 };
 export const logError = (message: string, fields?: unknown) => {
   logger.error(message, sanitizeForLogs(fields));
-  /* error logging removed — use structured telemetry instead */
 };
 
 export const sanitizeForLogs = (value: unknown) => sanitizeSensitiveData(value);
 
 export const toPosix = (value: string) => value.replace(/\\/g, "/");
 
-/** The HOME a context's file tools resolve `~` against. */
 export const toolContextHome = (context?: {
   toolProcessIdentity?: { home: string };
 }): string => context?.toolProcessIdentity?.home ?? os.homedir();
 
-/**
- * `home` is the HOME of whoever the path is for: a tool context with a process
- * identity passes that identity's (`toolContextHome`), so `~` in a cloud
- * file tool is the agent's HOME, exactly as it is in its shell.
- */
 export const expandHomePath = (value: string, home: string = os.homedir()) => {
   const userProfile = process.env.USERPROFILE || home;
   const localAppData =
@@ -57,12 +44,8 @@ export const expandHomePath = (value: string, home: string = os.homedir()) => {
     process.env.APPDATA || path.join(userProfile, "AppData", "Roaming");
   const tempDir = process.env.TEMP || process.env.TMP || os.tmpdir();
 
-  // Expand "~" (unix + Git Bash style).
   let expanded = value.replace(/^~(?=$|[\\/])/, home);
 
-  // Expand common env placeholders used in prompts/tool args.
-  // Note: SqliteQuery/Read/Grep run in Node (not bash), so we must expand
-  // these ourselves if the agent includes them.
   expanded = expanded
     .replace(/\$USERPROFILE\b/gi, userProfile)
     .replace(/%USERPROFILE%/gi, userProfile)
@@ -82,7 +65,6 @@ export const expandHomePath = (value: string, home: string = os.homedir()) => {
   return expanded;
 };
 
-// String utilities
 export const truncate = (
   value: string,
   max = MAX_OUTPUT,
@@ -97,7 +79,6 @@ export const truncate = (
   return `${content}\n\n... (${omittedBytes} bytes truncated)`;
 };
 
-// Edit-diff utilities live in a dependency-free module (shared with workerd).
 export {
   detectLineEnding,
   normalizeToLF,
@@ -105,7 +86,6 @@ export {
   stripBom,
 } from "./edit-diff.js";
 
-// Directory utilities
 export const isIgnoredDir = (name: string) =>
   name === "node_modules" ||
   name === ".git" ||
@@ -150,7 +130,6 @@ export const walkFiles = async (basePath: string) => {
   return results;
 };
 
-// File utilities
 export const readFileSafe = async (filePath: string) => {
   const stat = await fs.stat(filePath);
   if (stat.size > MAX_FILE_BYTES) {
@@ -233,7 +212,6 @@ const restoreBackup = async (backupPath: string, mountPath: string) => {
   try {
     await fs.rename(backupPath, mountPath);
   } catch {
-    // Fallback to copy+delete if rename cannot complete.
     await fs.copyFile(backupPath, mountPath);
     await removeFileIfExists(backupPath);
   }

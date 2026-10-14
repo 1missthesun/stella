@@ -1,19 +1,3 @@
-/**
- * `drive` for the cloud orchestrator — the device tool's exact model-visible
- * surface (see `defs/drive-def.ts`) over the same owner drive.
- *
- * `fetch` returns a path, not bytes, which is what lets one description be
- * true in both placements. Here the path is the file's place under the world
- * root, and `Read` on it reads the drive itself (`world-drive-files.ts`), so
- * the agent's next step is `Read` on that path exactly as it would be on a
- * device. Nothing is copied: the drive is never stored in the world.
- *
- * Owner scoping is the owner object's, not this file's. The only thing sent is
- * a drive-relative path; the owner comes from the turn's generation-fenced
- * gate, and `normalizeDrivePath` runs there. So this tool holds no authority
- * that could be widened by what a caller claims.
- */
-
 import type { TSchema } from "@sinclair/typebox";
 import {
   DRIVE_TOOL_DESCRIPTION,
@@ -102,10 +86,6 @@ export const createCloudDriveTool = (
       if (!drivePath) {
         return failure("drive fetch requires the file's drive path.");
       }
-      // `fileUrl` is the existence and authorization check. Its signed URL is
-      // deliberately unused: in this session `Read` on the world path reaches
-      // the bytes, and a URL in a tool result would only be a credential in
-      // the transcript.
       const file = (await options.ownerInternal("drive.fileUrl", {
         path: drivePath,
       })) as { path: string; name: string; sizeBytes: number; contentType: string };

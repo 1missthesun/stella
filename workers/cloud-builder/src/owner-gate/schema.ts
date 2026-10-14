@@ -1,4 +1,3 @@
-/** The owner gate's own SQLite tables. */
 export const DDL = [
   `CREATE TABLE IF NOT EXISTS running (
      turn_id         TEXT    PRIMARY KEY,
@@ -7,16 +6,10 @@ export const DDL = [
      started_at      INTEGER NOT NULL
    )`,
   `CREATE INDEX IF NOT EXISTS running_lane ON running(lane)`,
-  // One row per agent container that is running a turn
-  // (`acquireAgentContainer`). Keyed by the container, so an attach retry or
-  // an OOM restart of the same agent never takes a second slot.
   `CREATE TABLE IF NOT EXISTS agent_containers (
      sandbox_id  TEXT    PRIMARY KEY,
      acquired_at INTEGER NOT NULL
    )`,
-  // One row per device that has ever proven itself here. `connected` goes
-  // false on close rather than deleting the row, so an offline device still
-  // reports its last availability to `GET /owners/me/devices`.
   `CREATE TABLE IF NOT EXISTS device_presence (
      device_id           TEXT    PRIMARY KEY,
      presence_session_id TEXT    NOT NULL,

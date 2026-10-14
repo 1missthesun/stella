@@ -1,11 +1,4 @@
 /**
- * Shared gate for animations that loop for as long as some work is running:
- * the working-indicator mark, shimmering labels, the hero breathe.
- *
- * Kept free of react-native imports so it stays unit testable.
- */
-
-/**
  * Only `background` means the UI is genuinely off screen.
  *
  * `inactive` covers the app switcher, the notification shade and an incoming
@@ -16,7 +9,6 @@ export const isAppVisible = (appState: string): boolean =>
   appState !== "background";
 
 export type ContinuousAnimationInput = {
-  /** The animation has work to represent, e.g. a task is running. */
   logicalActive: boolean;
   appVisible: boolean;
   reducedMotion: boolean;

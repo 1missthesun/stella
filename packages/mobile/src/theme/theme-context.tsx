@@ -23,41 +23,24 @@ export type ThemePreference = "light" | "dark" | "system";
 export type { GradientColor, GradientMode, Theme };
 
 type ThemeContextValue = {
-  /** Light / Dark / System preference. */
   preference: ThemePreference;
   setPreference: (p: ThemePreference) => void;
-  /** Currently active theme definition (Custom while it is unpopulated). */
   theme: Theme;
-  /**
-   * The id a picker should show as selected. While Custom is unpopulated this
-   * is the stock theme it's displaying (its base); otherwise the active id.
-   */
   selectedThemeId: string;
   setThemeId: (id: string) => void;
-  /** Themes a picker should offer (the empty Custom overlay stays hidden). */
   themes: readonly Theme[];
-  /** Whether the resolved appearance is dark. */
   isDark: boolean;
-  /** Whether the active theme renders flat (no gradient blob). */
   flat: boolean;
-  /** The resolved shared palette (what desktop's CSS variables are set from). */
   palette: ThemeColors;
-  /** The resolved derived tokens (identical strings to desktop's). */
   tokens: ThemeTokens;
-  /** Resolved color surface for components. */
   colors: Colors;
-  /** User's stored gradient preference (before `flat` coercion). */
   gradientPreference: GradientMode;
   setGradientPreference: (mode: GradientMode) => void;
-  /** Resolved gradient mode after applying the theme's flatness. */
   gradientMode: GradientMode;
-  /** Blob palette selection, mirrors desktop's Gradient Color setting. */
   gradientColor: GradientColor;
   setGradientColor: (color: GradientColor) => void;
 };
 
-// Same storage keys as desktop's `uiState`, so the two stay conceptually
-// aligned even though the stores are per device.
 const MODE_KEY = "stella-color-mode";
 const THEME_KEY = "stella-theme-id";
 const CUSTOM_BASE_KEY = "stella-custom-base";
@@ -108,7 +91,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [loaded, setLoaded] = useState(false);
   const [catalogVersion, setCatalogVersion] = useState(0);
 
-  // Re-render when a theme is registered/populated at runtime.
   useEffect(() => subscribeThemes(() => setCatalogVersion((v) => v + 1)), []);
 
   useEffect(() => {
@@ -127,9 +109,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
             ? storedMode
             : null;
 
-        // Retired ids (Pearl/Noir, and desktop's old light/dark) were pinned to
-        // one appearance. Land them on Default and carry that appearance onto
-        // the mode toggle so the look doesn't silently flip.
         const legacy =
           (storedTheme && LEGACY_THEME_IDS[storedTheme]) ||
           (storedBase && LEGACY_THEME_IDS[storedBase]) ||
@@ -175,10 +154,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     void AsyncStorage.setItem(GRADIENT_COLOR_KEY, color);
   };
 
-  // ─ Custom overlay two-phase model (mirrors desktop) ─
-  // Phase 1 (Custom unpopulated): the user is always on Custom; picking a theme
-  // only changes the base it displays. Phase 2 (Custom populated): the stored
-  // id is literal, so picking a stock theme actually leaves Custom.
   const customTheme = getThemeById("custom");
   const customPopulated = customTheme?.populated === true;
 
@@ -221,10 +196,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     : prefersDark;
   const flat = resolved.flat;
 
-  // Propagate the *resolved* appearance down to UIKit so system chrome (Liquid
-  // Glass surfaces, native popovers, the keyboard appearance, the status bar
-  // trait, etc.) matches the JS palette we actually render. A forced-mode
-  // theme wins over the picker; otherwise defer to the user's preference.
   const forcedMode = resolved.forcedMode;
   useEffect(() => {
     if (!loaded) return;
@@ -251,7 +222,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
           : lightColors,
     [loaded, palette, tokens, isDark],
   );
-  // Flat themes paint no blob regardless of preference, same as desktop.
   const gradientMode: GradientMode = flat ? "flat" : gradientPreference;
 
   const value = useMemo<ThemeContextValue>(

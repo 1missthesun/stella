@@ -41,19 +41,6 @@ type Route =
   | { name: "accounts" }
   | { name: "brain"; id: string; from: "home" | "providers" };
 
-/**
- * The chat's own settings, the sidebar on the right of the chat, opened by
- * swiping left or from the gear at the top right.
- *
- * Its first page is two switchers in the left sidebar's voice: where turns
- * run, and which model runs them, with that model's siblings listed under it
- * and how hard it thinks right below them. At the foot sits the account a
- * Claude Code or ChatGPT engine runs on, one row that opens its accounts
- * page. Everything else is a page deeper, inside the sidebar: every
- * provider, each provider's own page to connect it and pick its models, and
- * the engine's accounts, so the first page stays the same size however many
- * providers and accounts there are.
- */
 export function ChatSettingsPanel({ width }: { width: number }) {
   const colors = useColors();
   const t = useT();

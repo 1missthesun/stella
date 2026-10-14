@@ -1,8 +1,3 @@
-/**
- * `browser.chain()` input: the step vocabulary agents may use and the
- * options the session accepts, checked before the chain leaves the worker.
- */
-
 import type {
   BrowserWorkerBackend,
   BrowserWorkerChainOptions,
@@ -89,12 +84,6 @@ export const SAFE_ACTION_KEYS: Readonly<Record<string, readonly string[]>> =
     isvisible: ["tabId", "selector"],
     isenabled: ["tabId", "selector"],
     ischecked: ["tabId", "selector"],
-    // Network observation. These read traffic the tab was already going to
-    // make, which is what lets a caller derive a direct API client for a site
-    // instead of re-driving the UI on every run. Deliberately excluded:
-    // `route`/`unroute` (they rewrite responses) and `cookies_*` (raw session
-    // secrets). Authenticated calls are made from the page's own origin with
-    // `evaluate`, so no credential ever has to cross into the worker.
     requests: ["tabId", "filter", "clear", "after", "limit"],
     responsebody: ["tabId", "url", "timeout", "after"],
     har_start: ["tabId"],

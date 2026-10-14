@@ -1,12 +1,3 @@
-/**
- * What a Slack agent's container holds to reach its workspace's repository:
- * a signed claim naming the workspace and the repository, valid for 12
- * hours. The container trades it at `/api/slack/github/agent/*` for a fresh
- * installation token per git operation and for preview lookups. The routes
- * check the workspace's current settings on every call, so changing the
- * repository or disconnecting GitHub revokes it at once.
- */
-
 import { builderServiceSecret, builderServiceSecrets } from "../secret-rotation.js";
 
 const PREFIX = "sr1";

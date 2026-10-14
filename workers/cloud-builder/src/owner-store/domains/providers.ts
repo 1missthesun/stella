@@ -65,8 +65,6 @@ export const PROVIDERS_MIGRATION = {
   ],
 };
 
-// --- Catalog -----------------------------------------------------------------
-
 type KeyCheck = (key: string) => { url: string; headers: Record<string, string> };
 
 type CatalogEntry = {
@@ -190,7 +188,6 @@ const authMethodsOf = (entry: CatalogEntry): ProviderAuthMethod[] => [
 ];
 
 let oauthRegistered = false;
-/** pi-ai's sign-in for a device-code provider. */
 const deviceOAuth = (provider: string): OAuthAuth | undefined => {
   if (!oauthRegistered) {
     registerBunOAuthFlows();
@@ -209,8 +206,6 @@ const deviceOAuth = (provider: string): OAuthAuth | undefined => {
       return undefined;
   }
 };
-
-// --- Encryption (AES-256-GCM under OWNER_SECRETS_KEK) ---------------------
 
 type StoredCredential =
   | { type: "api_key"; key: string }
@@ -262,7 +257,6 @@ const isCurrentKeyVersion = (env: Cloudflare.Env, encrypted: string): boolean =>
   return !keks || encrypted.startsWith(`${keks.current}.`);
 };
 
-/** Bound to the owner and provider, so a row copied elsewhere won't decrypt. */
 const additionalData = (ownerId: string, provider: string) =>
   new TextEncoder().encode(`${ownerId}:provider-key:${provider}`);
 
@@ -289,8 +283,6 @@ const decrypt = async (ctx: OwnerContext, provider: string, encrypted: string): 
   );
   return JSON.parse(new TextDecoder().decode(plaintext)) as StoredCredential;
 };
-
-// --- Rows ------------------------------------------------------------------------
 
 type CredentialRow = {
   provider: string;
@@ -368,9 +360,6 @@ const providerArg = (provider: string): string => {
   return provider;
 };
 
-// --- API keys -----------------------------------------------------------------------
-
-/** "ok", "invalid", or null when the provider couldn't say. */
 const checkKey = async (check: KeyCheck, key: string): Promise<"ok" | "invalid" | null> => {
   const { url, headers } = check(key);
   try {
@@ -434,10 +423,7 @@ const removeCredential = (ctx: OwnerContext, args: ProviderCalls["providers.remo
   return null;
 };
 
-// --- Sign-ins ----------------------------------------------------------------------------
-
 const FLOW_TTL_MS = 15 * 60_000;
-/** How long a call waits for a device flow to show its first step or to finish. */
 const STEP_WAIT_MS = 8_000;
 
 type DeviceFlow = {
@@ -568,7 +554,6 @@ const startDeviceFlow = async (ctx: OwnerContext, entry: CatalogEntry, oauth: OA
   return flowView(flow);
 };
 
-/** Store a finished device sign-in; the flow becomes `complete`. */
 const settleDeviceFlow = async (ctx: OwnerContext, flow: DeviceFlow): Promise<void> => {
   if (!flow.credential || flow.status !== "pending") return;
   const entry = catalogEntry(flow.provider);
@@ -592,7 +577,6 @@ const callbackUrl = (env: Cloudflare.Env): string => {
   return `${origin}${PROVIDER_OAUTH_CALLBACK_PATH}`;
 };
 
-/** OpenRouter's PKCE sign-in: it issues an API key for the code. */
 const startOpenRouter = async (ctx: OwnerContext): Promise<ProviderOAuthFlow> => {
   const verifier = base64Url(crypto.getRandomValues(new Uint8Array(32)));
   const challenge = base64Url(
@@ -731,8 +715,6 @@ const cancelOAuth = (ctx: OwnerContext, args: ProviderCalls["providers.cancelOAu
   return null;
 };
 
-// --- Credentials for the BYOK lane ---------------------------------------------------
-
 const ACCESS_REFRESH_MARGIN_MS = 2 * 60_000;
 const API_KEY_ACCESS_TTL_MS = 5 * 60_000;
 /** One refresh per owner and provider at a time: a refresh can rotate its input token. */
@@ -819,7 +801,6 @@ const resolveAccess = async (ctx: OwnerContext, provider: string): Promise<Provi
   };
 };
 
-/** `providers.access`: the BYOK lane's credential for one provider. */
 const providerAccess = async (ctx: OwnerContext, raw: unknown): Promise<ProviderAccessResult> => {
   const { provider } = object({ provider: string({ min: 1, max: 64 }) })(raw);
   if (!isAccountProviderId(provider)) return null;
@@ -830,8 +811,6 @@ const providerAccess = async (ctx: OwnerContext, raw: unknown): Promise<Provider
   refreshing.set(key, run);
   return await run;
 };
-
-// --- Models ------------------------------------------------------------------------------
 
 const toProviderModel = (model: Model<Api>): ProviderModel => ({
   id: model.id,

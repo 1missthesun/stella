@@ -101,9 +101,6 @@ const activeTabCache = new Map<
 const activeTabInFlight = new Map<string, Promise<ActiveBrowserTab | null>>()
 
 const buildScript = (spec: BrowserSpec): string => {
-  // Quote bundle id once via tell block so the syntax stays straightforward.
-  // Output protocol: `<URL>\u0001<TITLE>` so we can split unambiguously even
-  // when titles contain newlines/tabs.
   if (spec.dialect === 'chromium') {
     return `tell application id "${spec.bundleId}"
   if not (exists window 1) then return ""
@@ -142,10 +139,6 @@ const runOsascript = (
     )
   })
 
-/**
- * Returns the active tab for the bundle id, or `null` if the browser doesn't
- * expose one (no windows, AppleScript not enabled, etc.). Never throws.
- */
 const queryBrowserMac = async (
   spec: BrowserSpec,
 ): Promise<ActiveBrowserTab | null> => {
@@ -159,7 +152,6 @@ const queryBrowserMac = async (
   const cleanUrl = url?.trim() ?? ''
   if (!cleanUrl) return null
 
-  // Filter chrome:// / about: / file:// / extension URLs — useless as context.
   if (
     cleanUrl.startsWith('chrome://') ||
     cleanUrl.startsWith('chrome-extension://') ||

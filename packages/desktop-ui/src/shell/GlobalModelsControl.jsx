@@ -1,19 +1,3 @@
-/**
- * Global Models control — the bottom-right model-picker button + popover.
- *
- * Mounted ONCE at the shell level (see `routes/__root.tsx`), NOT inside the
- * right sidebar, so it is always visible and openable regardless of which
- * sidebar tab is active or whether the sidebar is open, closed or mounted.
- *
- * Open state lives in the shared engine-overlay singleton store, which
- * `openModelPicker()` and the `stella:open-model-picker` window event also flip.
- * The picker itself renders as a top-level portal popover (radix `Popover`)
- * above the whole app, so its lifecycle/anchor are not owned by the sidebar.
- *
- * This control also owns the `stella:open-model-picker` listener, because it
- * is the one models surface mounted for the shell's whole life. The listener
- * used to sit on the standalone Activity surface, which no longer exists.
- */
 import { lazy, Suspense, useEffect } from "react";
 import { openModelPicker } from "@/features/workspace-display/default-tabs";
 import { OPEN_MODEL_PICKER_EVENT } from "@/global/billing/byok-action";

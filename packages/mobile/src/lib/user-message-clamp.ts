@@ -1,11 +1,3 @@
-/**
- * Shared user-message collapse contract (desktop + mobile).
- *
- * Long USER bubbles show at most this many rendered text lines, then the
- * existing Show more / Show less affordance. Overflow is decided from the
- * native text-layout line boxes, not a character-count heuristic — so wrap
- * width, Dynamic Type, and Unicode stay correct.
- */
 export const USER_MESSAGE_COLLAPSE_LINES = 4;
 
 /**
@@ -17,7 +9,6 @@ export const USER_MESSAGE_COLLAPSE_LINES = 4;
 export const USER_MESSAGE_MEASURE_LINES = USER_MESSAGE_COLLAPSE_LINES + 1;
 
 
-/** Ignore sub-pixel width jitter when deciding to remasure wrap. */
 export const USER_MESSAGE_WIDTH_REMEASURE_EPSILON_PX = 1;
 
 export function isUserMessageTruncatable(
@@ -27,12 +18,6 @@ export function isUserMessageTruncatable(
   return totalLines !== null && totalLines > maxLines;
 }
 
-/**
- * `numberOfLines` for the user-message <Text>. While `measuring`, render at
- * the measure cap (collapse + 1) instead of unclamped so overflow detection
- * never requires a full-height paint; once measured, clamp truncatable text
- * to the collapse cap unless expanded.
- */
 export function userMessageNumberOfLines(args: {
   expanded: boolean;
   measuring: boolean;

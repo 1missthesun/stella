@@ -1,11 +1,3 @@
-/**
- * `slack_repo`: Stella picks which of the workspace's repositories a Slack
- * conversation is about (`repos.ts`). The choice holds for the rest of the
- * conversation, and every agent she starts afterwards gets that repository
- * cloned and runs in its environment. She can also set the channel's default,
- * which threads there use until they pick another.
- */
-
 import { Type, type TSchema } from "@sinclair/typebox";
 import type { CloudCodeSourceAgentTool } from "../cloud-code-tool.js";
 import { environmentSummary, loadEnvironment, slackEnvironmentsEnabled } from "./environment.js";
@@ -48,7 +40,6 @@ const failure = (text: string) => ({
 
 const done = (text: string) => ({ content: [{ type: "text" as const, text }], details: null });
 
-/** The workspace's repository `wanted` names: owner/name, a URL, or a unique name. */
 export const matchRepo = (repos: SlackRepoRecord[], wanted: string): SlackRepoRecord | null => {
   const full = parseRepoName(wanted)?.toLowerCase();
   if (full) return repos.find((repo) => repo.fullName.toLowerCase() === full) ?? null;

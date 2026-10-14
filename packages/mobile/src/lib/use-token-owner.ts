@@ -10,7 +10,6 @@ type OwnerSource = TokenOwnerFence;
 
 export type MobileOwnerIdentity = OwnerSource &
   Readonly<{
-    /** The JWT `sub`, checked and echoed by owner APIs. */
     expectedSubject: string;
   }>;
 
@@ -20,11 +19,6 @@ type OwnerResolutionState = Readonly<{
   failed: boolean;
 }>;
 
-/**
- * Resolves the owner (JWT `sub`) from the current authenticated JWT.
- * Every async result is fenced by the immutable account/session revision that
- * requested it, so an A-token can never become B-labelled request authority.
- */
 export const useTokenOwner = (
   identity: CloudConversationIdentity | null,
 ): {

@@ -1,21 +1,3 @@
-/**
- * An orchestrator chat turn run by the real Claude Code CLI.
- *
- * The OrchestratorSession DO owns the system prompt, the tools, and the
- * journal; this mode only runs `claude` against them. The CLI sees the DO's
- * catalog through the private MCP host, and every call is forwarded to the DO
- * over the turn broker under the CLI's own `tool_use` id. Finished assistant
- * messages, status changes, and usage are batched (~500 ms) into ordered event
- * frames the DO journals. No `text_delta` frames are sent: the DO does not
- * broadcast partial text yet, and each frame costs a bounded broker request.
- * Native session state (CLAUDE_CONFIG_DIR) is sealed and checkpointed exactly
- * as an agent thread's is; the BuildSession turns this result into the DO's
- * terminal frame.
- *
- *   claude --MCP--> executeTool --broker tool--> BuildSession --> DO
- *   claude --stream-json--> batches --broker events--> BuildSession --> DO
- */
-
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import {
@@ -70,14 +52,7 @@ type Usage = AgentTurnResult["usage"];
 type Broker = Pick<TurnCredentialBrokerClient, "postJson">;
 
 const EMPTY_USAGE: Usage = { inputTokens: 0, outputTokens: 0, llmCalls: 0 };
-/**
- * Pending events are coalesced for this long before they are posted. The
- * broker admits a bounded number of requests per attempt (4096), and only a
- * finished message, a status change, or usage is sent, so a batch is at most
- * one request per model round plus a few.
- */
 export const ORCHESTRATOR_EVENT_BATCH_MS = 500;
-/** Backoff before each retry of a retryable broker answer (~7.5 s total). */
 const BROKER_RETRY_DELAYS_MS = [250, 500, 1_000, 2_000, 4_000];
 const MCP_TOOL_PREFIX = `mcp__${CLOUD_CLAUDE_MCP_SERVER_NAME}__`;
 
@@ -92,7 +67,6 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
 const numberAt = (value: unknown): number | undefined =>
   typeof value === "number" && Number.isFinite(value) ? value : undefined;
 
-/** The DO no longer names this turn active; nothing more may run for it. */
 export class OrchestratorTurnInactiveError extends Error {
   constructor(message = "This chat turn is no longer active.") {
     super(message);
@@ -100,14 +74,6 @@ export class OrchestratorTurnInactiveError extends Error {
   }
 }
 
-/**
- * The BuildSession answers 410 when the DO refused the frame (the turn is
- * over) and 503 when the DO was unreachable, busy, or failed; both frames
- * are idempotent at the DO (a replayed batchSeq is acknowledged, a replayed
- * toolCallId with identical args returns its recorded result), so 503/429
- * are retried with the identical body. A thrown error means the broker
- * client closed itself, and nothing can be sent for this attempt any more.
- */
 export const postToBrokerWithRetry = async (
   broker: Broker,
   target: string,
@@ -128,21 +94,10 @@ export const postToBrokerWithRetry = async (
 const isTurnOverStatus = (status: number): boolean =>
   status === 410 || status === 409;
 
-// ---------------------------------------------------------------------------
-// Ordered event frames
-// ---------------------------------------------------------------------------
-
-/**
- * One ordered lane to the broker. Event batches get strictly increasing
- * `batchSeq` values and each waits for the previous acknowledgement; tool
- * calls ride the same chain, so every batch queued before a call (its
- * assistant `tool_use` included) is delivered before the call is forwarded.
- */
 export class OrchestratorEventLane {
   #pending: CloudOrchestratorEvent[] = [];
   #batchSeq = 0;
   #chain: Promise<void> = Promise.resolve();
-  /** The batch window: one sleeping fiber, interrupted by an earlier flush. */
   #batchWindow: Fiber.Fiber<void> | undefined;
   #failure: Error | undefined;
 
@@ -176,7 +131,6 @@ export class OrchestratorEventLane {
     );
   }
 
-  /** Queue everything pending as the next batch; resolves once delivered. */
   flush(): Promise<void> {
     if (this.#batchWindow) {
       const window = this.#batchWindow;
@@ -194,7 +148,6 @@ export class OrchestratorEventLane {
     return this.#chain;
   }
 
-  /** Run `task` after every batch queued so far has been delivered. */
   enqueue<T>(task: () => Promise<T>): Promise<T> {
     void this.flush();
     const run = this.#chain.then(() => {
@@ -234,8 +187,6 @@ export class OrchestratorEventLane {
     }
     await response.body?.cancel().catch(() => undefined);
     if (response.ok) return;
-    // 410: the DO ended the turn. Anything else (a 409 sequence gap, retries
-    // exhausted) leaves the journal unable to follow this stream.
     this.#fail(
       response.status === 410
         ? new OrchestratorTurnInactiveError()
@@ -245,10 +196,6 @@ export class OrchestratorEventLane {
     );
   }
 }
-
-// ---------------------------------------------------------------------------
-// stream-json -> CloudOrchestratorEvent
-// ---------------------------------------------------------------------------
 
 type OpenAssistantMessage = {
   id: string;
@@ -301,14 +248,6 @@ const stopReasonOf = (
   }
 };
 
-/**
- * Turns the CLI's stream into DO events. The CLI emits one `assistant` event
- * per finished content block, all sharing the API message id, and starts
- * executing a `tool_use` before the rest of its message has streamed; so
- * blocks are collected per message and the message is journaled once, at
- * `message_stop` (or when the next message, the result, or exit closes it).
- * A tool call waits for that so its assistant row always precedes its result.
- */
 export class CliAssistantAssembler {
   #open: OpenAssistantMessage | undefined;
   #journaled = new Set<string>();
@@ -432,7 +371,6 @@ export class CliAssistantAssembler {
     if (event.type === "result") this.#finalize();
   }
 
-  /** Resolves once the assistant message carrying `toolUseId` is queued. */
   waitForToolUse(toolUseId: string, signal?: AbortSignal): Promise<void> {
     if (this.#closed || this.#journaled.has(toolUseId)) {
       return Promise.resolve();
@@ -455,7 +393,6 @@ export class CliAssistantAssembler {
     });
   }
 
-  /** Cumulative usage of the messages journaled so far. */
   get usage(): Usage {
     return {
       inputTokens: this.#inputTokens,
@@ -464,7 +401,6 @@ export class CliAssistantAssembler {
     };
   }
 
-  /** Journal whatever is still open; the CLI is gone. */
   close(): void {
     this.#finalize();
     this.#closed = true;
@@ -538,10 +474,6 @@ export class CliAssistantAssembler {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Tool forwarding
-// ---------------------------------------------------------------------------
-
 const AUTHORIZED_IMAGE_TYPES = new Set<string>([
   "image/png",
   "image/jpeg",
@@ -549,7 +481,6 @@ const AUTHORIZED_IMAGE_TYPES = new Set<string>([
   "image/webp",
 ]);
 
-/** The DO's serialized AgentToolResult as the MCP host's ToolResult. */
 export const toolResultFromOrchestrator = (
   result: CloudOrchestratorToolResult,
 ): ToolResult => {
@@ -577,18 +508,12 @@ export const toolResultFromOrchestrator = (
         ]
       : [],
   );
-  // `details` are the DO's UI metadata; the model only ever sees content.
   return {
     result: text,
     ...(images.length > 0 ? { [TOOL_RESULT_AUTHORIZED_IMAGES]: images } : {}),
   };
 };
 
-/**
- * Read the broker's answer to one forwarded call. A refusal for an inactive
- * turn ends the turn; an unknown tool or an id conflict is the model's tool
- * error (nothing ran); anything else unexpected is a tool error too.
- */
 export const readOrchestratorToolResponse = async (
   response: Response,
   toolName: string,
@@ -622,10 +547,6 @@ export const readOrchestratorToolResponse = async (
   }
   throw new Error(`Stella returned an unreadable result for ${toolName}.`);
 };
-
-// ---------------------------------------------------------------------------
-// The turn
-// ---------------------------------------------------------------------------
 
 const failed = (error: string): AgentTurnResult => ({
   ok: false,
@@ -672,9 +593,6 @@ export const runOrchestratorTurn = async (args: {
     );
     return failed("Stella couldn't validate this chat's history. Try again.");
   }
-  // The conversation's DO resumed a session this container no longer has.
-  // It starts one again from the conversation's journal, as a computer
-  // does, rather than this thread replaying its own rows as text.
   if (
     input.rebuildNativeSession === true &&
     !input.adoptedNativeSession &&
@@ -686,9 +604,6 @@ export const runOrchestratorTurn = async (args: {
     );
   }
 
-  // The DO ending the turn (inactive / lost event stream) must kill the CLI
-  // from a tool call or the event lane. The latch is one-shot, so the first
-  // reason is the one the turn reports.
   const turnCancellation = createNativeTurnCancellation();
   const abortTurn = (error: Error): void => {
     turnCancellation.abort(error);
@@ -713,7 +628,6 @@ export const runOrchestratorTurn = async (args: {
       name,
       args: toolArgs,
     };
-    // No caller signal: aborting a broker request closes the whole client.
     let response: Response;
     try {
       response = await lane.enqueue(() =>
@@ -724,8 +638,6 @@ export const runOrchestratorTurn = async (args: {
         ),
       );
     } catch (error) {
-      // The lane failed or the broker client closed itself: no later frame
-      // can reach the DO for this attempt, so the turn ends here.
       const lost =
         lane.failure ??
         new Error(
@@ -838,14 +750,11 @@ export const runOrchestratorTurn = async (args: {
         },
       });
     } catch (runError) {
-      // Nothing durable was sealed: keep the prior native state, so the next
-      // turn resumes from the last good checkpoint.
       assembler.close();
       await lane.flush();
       return failed(asError(runError).message);
     }
     if (!native.error && !spec.compact) {
-      // The CLI must have listed the DO's catalog, or its tools were absent.
       try {
         await mcpHost.waitForClientReady(undefined, 1_000);
       } catch (readyError) {
@@ -854,7 +763,6 @@ export const runOrchestratorTurn = async (args: {
     }
     finalText = native.finalText.trim();
     error = native.error ?? error;
-    // A killed CLI never writes its `result` totals; keep the per-message sum.
     assembler.close();
     usage =
       native.usage.inputTokens + native.usage.outputTokens > 0
@@ -871,7 +779,6 @@ export const runOrchestratorTurn = async (args: {
       payloadJson: JSON.stringify(message),
     }));
   } finally {
-    // No tool call may start once the native state is being archived.
     await mcpHost.close().catch((closeError) => {
       console.error(
         `orchestrator MCP close failed: ${asError(closeError).message}`,
@@ -879,8 +786,6 @@ export const runOrchestratorTurn = async (args: {
     });
   }
 
-  // The last batch lands before the result: the DO sees every message and
-  // the final usage before the BuildSession's terminal frame.
   assembler.close();
   lane.emit({ type: "usage", ...usage });
   await lane.flush();
@@ -923,8 +828,6 @@ export const runOrchestratorTurn = async (args: {
     console.error(
       `orchestrator checkpoint failed: ${asError(checkpointError).message}`,
     );
-    // Builder quiesces the process tree and resumes the idempotent journal
-    // from this exact transcript, as for an agent turn.
     return createBuilderFallbackAgentTurnResult({
       finalText,
       ...(error ? { error } : {}),

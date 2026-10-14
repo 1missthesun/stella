@@ -1,12 +1,3 @@
-/**
- * What pi adds to the chat column:
- * its transcript (for the rows the conversation's record does not hold yet)
- * and the run's state. A reply shows once pi has it whole, never while its
- * text streams in. The record itself (journal or chat log) is what the column
- * shows, whatever the engine.
- * Sending goes through the usual composer path, whose `startStream` submits
- * to pi.
- */
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from "react";
 import { piMessageText } from "@stella/contracts/pi-chat";
 import {
@@ -63,7 +54,6 @@ export const usePiChat = (conversationId: string | null) => {
 
   return {
     projection,
-    // A turn running elsewhere (placed in the cloud or on another computer) is running here too.
     isStreaming: state.running || state.queued.length > 0 || state.remote.length > 0,
     isRunningHere: state.running || state.queued.length > 0,
     remoteTurns: state.remote,

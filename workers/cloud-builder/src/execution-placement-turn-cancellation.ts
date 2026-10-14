@@ -105,12 +105,6 @@ const boundedLedger = (
   return [...pending, ...acknowledged];
 };
 
-/**
- * Durable, bounded, fail-closed cancellation ledger for chat turns that may not
- * have reached the conversation Durable Object yet. Pending entries are never
- * aged out or evicted: once the bound is reached, new cancellations are refused
- * instead of silently allowing a delayed turn to resurrect.
- */
 export class ExactTurnCancellationLedger {
   constructor(private readonly storage: ExactTurnCancellationStorage) {}
 

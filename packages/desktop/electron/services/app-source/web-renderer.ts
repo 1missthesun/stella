@@ -4,14 +4,6 @@ import path from "node:path";
 import { WEB_RENDERER_UPLOAD_PREFIX } from "@stella/contracts/backend/app-source";
 import { git, gitRaw, run } from "./git.js";
 
-/**
- * The owner's browser renderer follows their fork: after a push, when the
- * renderer's inputs changed since the last upload (or, before the first one,
- * differ from the published app), build it from the checkout with the
- * checkout's own build script and upload it as a tar keyed by the tree.
- * Owners who never changed the UI keep the shared website build.
- */
-
 export type WebRendererDeps = {
   getBackendUrl: () => string | null;
   getAuthToken: () => Promise<string | null>;
@@ -19,7 +11,6 @@ export type WebRendererDeps = {
 };
 
 const RENDERER_INPUTS = ["packages/desktop-ui/", "packages/contracts/", "packages/theme/", "bun.lock"];
-/** The commit whose renderer was last uploaded. */
 const UPLOADED_REF = "refs/stella/web-renderer";
 const UPSTREAM_REF = "refs/remotes/stella-upstream/main";
 const BUILD_SCRIPT = "packages/desktop/scripts/build-web-renderer.ts";
@@ -29,7 +20,6 @@ const verifiedRef = async (cwd: string, ref: string) => {
   return result.code === 0 ? result.stdout.trim() : null;
 };
 
-/** An uncompressed ustar archive of every file under `root`. */
 export const tarDirectory = (root: string): Buffer => {
   const blocks: Buffer[] = [];
   const names = (fs.readdirSync(root, { recursive: true }) as string[])
@@ -106,10 +96,6 @@ const uploadOnce = async (cwd: string, deps: WebRendererDeps) => {
 
 const inFlight = new Map<string, { running: Promise<void>; again: boolean }>();
 
-/**
- * Build and upload the browser renderer for the checkout at `cwd` if its
- * inputs changed. Pushes that land while one runs coalesce into one more run.
- */
 export const buildAndUploadWebRenderer = (cwd: string, deps: WebRendererDeps): Promise<void> => {
   const current = inFlight.get(cwd);
   if (current) {

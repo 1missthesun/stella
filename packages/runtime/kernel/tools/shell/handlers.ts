@@ -1,8 +1,3 @@
-/**
- * The model-facing shell tools: `exec_command` / `write_stdin` (managed
- * sessions with streamed receipts), `Bash`, `ShellStatus` and `KillShell`.
- */
-
 import { Effect, Exit } from "effect";
 import type { ToolContext, ToolResult, ToolUpdateCallback } from "../types.js";
 import { truncate } from "../utils.js";
@@ -42,26 +37,10 @@ import {
   type ShellState,
 } from "./sessions.js";
 
-// `Bash` blocks until the process exits, up to a timeout, the same
-// way Claude Code's Bash tool does. Every early yield costs a full model
-// round-trip (the model has to call `write_stdin` to keep waiting), and at
-// a few hundred thousand tokens of context that is both slow and expensive;
-// measured Stella sessions spent more wall-clock polling shells than
-// thinking. Only a genuinely long job (past the timeout) or an explicit
-// `run_in_background` hands back a session_id.
 export const DEFAULT_EXEC_YIELD_MS = 120_000;
 export const DEFAULT_WRITE_STDIN_YIELD_MS = 250;
 const MAX_EXEC_YIELD_MS = 600_000;
-/**
- * `run_in_background` still waits this long before returning so an instant
- * spawn failure or a command that finishes immediately is reported in the
- * same call instead of on a later wake.
- */
 export const BACKGROUND_EXEC_SETTLE_MS = 250;
-// An empty `write_stdin` is a poll, not an interaction: nobody is waiting on
-// the other side of the pipe, so it can afford to block much longer than a
-// write. The default is long on purpose: a poll exists to wait, and a turn
-// that ends with the process still running is woken automatically on exit.
 export const DEFAULT_EMPTY_POLL_YIELD_MS = 30_000;
 const MAX_EMPTY_POLL_YIELD_MS = 10 * 60_000;
 export const DEFAULT_EXEC_OUTPUT_TOKENS = 10_000;
@@ -97,7 +76,6 @@ const toolErrorMessage = (error: unknown): string =>
 
 type ExecToolPayload = {
   session_id: string | null;
-  /** Stable provenance even after `session_id` becomes non-pollable/null. */
   shell_session_id: string;
   worker_generation: string;
   session_owner?: ShellSessionOwner;
@@ -130,8 +108,6 @@ const buildExecToolPayload = (
   record.chunkSequence = chunkSequence;
   const receipt = interactionReceipt ??
     record.activeInteractionReceipt ?? { operation: "exec" };
-  // Includes wall_time_seconds and original_token_count so the model can
-  // detect output omitted by the raw one-MiB collector and react.
   const payload: ExecToolPayload = {
     session_id: record.running ? record.id : null,
     shell_session_id: record.id,
@@ -146,8 +122,6 @@ const buildExecToolPayload = (
     exit_code: record.running ? null : record.exitCode,
     output: sanitizeToolVisibleText(drained.text),
     wall_time_seconds: wallTimeSeconds,
-    // Always report the pre-collection-cap token estimate so callers can
-    // distinguish small output from output whose middle was omitted.
     original_token_count: Math.ceil(
       drained.originalLength / APPROX_BYTES_PER_TOKEN,
     ),
@@ -272,8 +246,6 @@ export const handleExecCommand = async (
   }
   const modelOutputTokens = resolveExecOutputTokens(args.max_output_tokens);
   const runInBackground = args.run_in_background === true;
-  // `timeout_ms` is the advertised parameter; `yield_time_ms` is the name
-  // the tool shipped with and stays accepted for older prompts and callers.
   const timeoutMs = resolveExecYieldTime(
     args.timeout_ms ?? args.yield_time_ms,
     DEFAULT_EXEC_YIELD_MS,
@@ -359,17 +331,9 @@ export const handleExecCommand = async (
   }
   try {
     try {
-      // Keep collecting until exit or the advertised deadline. Progress is
-      // delivered as deltas meanwhile, so chatty jobs do not force repeated
-      // model-driven polls merely because their first byte arrived quickly.
       await runToolEffect(
         Effect.scoped(
           Effect.gen(function* () {
-            // This call started the shell, so until the session id reaches the
-            // model the process is run-owned. An interrupted/failed initial
-            // window must not leave a hidden orphan. Later write_stdin calls
-            // deliberately omit this finalizer because their session id was
-            // already delivered and is conversation-scoped.
             yield* Effect.acquireRelease(Effect.void, (_, exit) =>
               Effect.sync(() => {
                 if (Exit.isFailure(exit) && record.running) {
@@ -490,10 +454,6 @@ export const handleWriteStdin = async (
     };
   }
 
-  // A passive poll must not reserve the mutation queue while it waits for the
-  // very write that can wake it. Retain the record against pruning, wait
-  // outside the FIFO, then acquire the lease only for the atomic drain and
-  // receipt. Writes/resize/close/terminate remain fully serialized.
   let releasePassivePollRetention: (() => void) | undefined;
   if (
     operation === "poll" &&
@@ -586,10 +546,6 @@ export const handleWriteStdin = async (
               interactionDeadlineAt,
               signal,
             );
-            // Preserve the short post-yield settle window: pipe/PTY output can
-            // land just after the advertised wait. The scoped abort latch is
-            // still active here, so cancellation surfaces before any cursor
-            // drain instead of being converted into success.
             yield* settleCompletedShellEffect(record, signal);
           }),
         );
@@ -597,8 +553,6 @@ export const handleWriteStdin = async (
         throw signal.reason ?? new Error("Aborted");
       }
     } catch (error) {
-      // A poll/write never owns the process lifecycle; cancellation releases
-      // only this interaction lease and leaves the session addressable.
       return { error: toolErrorMessage(error) };
     }
     if (signal?.aborted) {
@@ -634,7 +588,6 @@ export const handleShellStatus = async (
   cleanupShellSessions(state);
   const shellId = String(args.shell_id ?? "");
 
-  // If no shell_id provided, list all active shells
   if (!shellId) {
     const shells = [...state.shells.entries()]
       .filter(([, record]) => shellOwnerMatchesContext(record.owner, context))
@@ -658,7 +611,6 @@ export const handleShellStatus = async (
 
   const tail_lines = Number(args.tail_lines ?? 50);
   const output = sanitizeToolVisibleText(record.output || "(no output yet)");
-  // Get last N lines
   const lines = output.split("\n");
   const tail = truncate(lines.slice(-tail_lines).join("\n"));
 

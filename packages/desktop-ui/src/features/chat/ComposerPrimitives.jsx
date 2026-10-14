@@ -16,8 +16,6 @@ function RealtimeVoiceIcon() {
     return <AudioLines size={17} strokeWidth={1.75}/>;
 }
 function SpinnerIcon() {
-    // Three-quarter ring on top of a faint full ring so rotation reads
-    // unambiguously regardless of background contrast.
     return (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" className="chat-composer-spinner-svg" aria-hidden>
       <circle cx="12" cy="12" r="9" opacity="0.2"/>
       <path d="M21 12a9 9 0 0 0-9-9"/>

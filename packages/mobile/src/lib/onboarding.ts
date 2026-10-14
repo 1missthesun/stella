@@ -3,10 +3,6 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 const ONBOARDING_SEEN_KEY = "stella-mobile:onboarding-seen";
 const ONBOARDING_PROGRESS_KEY = "stella-mobile:onboarding-progress";
 
-/**
- * The chat-style onboarding, as a script: each step is one assistant message
- * carrying a card, answered in order.
- */
 export type OnboardingStep =
   | "hello"
   | "showcase"
@@ -34,7 +30,6 @@ export type OnboardingProgress = {
 };
 
 let cachedSeen: boolean | null = null;
-/** `undefined` until loaded; `null` when there is nothing to resume. */
 let cachedProgress: OnboardingProgress | null | undefined;
 
 export async function loadOnboardingSeen(): Promise<boolean> {
@@ -78,12 +73,6 @@ const parseProgress = (raw: string | null): OnboardingProgress | null => {
   }
 };
 
-/**
- * Where an interrupted onboarding left off — leaving for the sign-in screen,
- * or the app being closed mid-flow — so it resumes on the same message with
- * the earlier ones already answered. Loaded with the other startup state so
- * the screen can read it synchronously on its first render.
- */
 export async function loadOnboardingProgress(): Promise<OnboardingProgress | null> {
   if (cachedProgress !== undefined) return cachedProgress;
   cachedProgress = parseProgress(

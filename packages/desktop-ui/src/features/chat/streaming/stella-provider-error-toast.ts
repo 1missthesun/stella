@@ -33,10 +33,6 @@ type Translate = (
 ) => string
 
 export type StellaProviderErrorToastOptions = {
-  /**
-   * Overrides the audience snapshot published by `useCapabilityAccess`.
-   * Only tests and callers that already hold billing state need this.
-   */
   audience?: ManagedModelAudience | null
   t?: Translate
 }
@@ -44,7 +40,6 @@ export type StellaProviderErrorToastOptions = {
 const stripClaudeCodeMark = (message: string) =>
   message.replace(/^\s*\[claude-code\/[a-z-]+\]\s*/i, '').trim()
 
-/** The Claude account a login failure names (`... signed in to a@b.c ...`). */
 const claudeLoginEmailOf = (message: string): string | undefined =>
   /(?:login for|signed in to|Sign in to)\s+([^\s@]+@[^\s@]+?)(?=[.,;)]?(?:\s|$))/i.exec(
     message,
@@ -88,21 +83,11 @@ const signInAction = {
   onClick: openSignInDialog,
 }
 
-/**
- * True when a stopped run names a limit or authentication problem worth
- * surfacing. Ordinary user-initiated cancellations remain silent.
- */
 export const isStellaLimitOrAuthReason = (
   reason: string | null | undefined,
 ): boolean =>
   isStellaLimitOrAuthClassification(classifyStellaProviderError(reason))
 
-/**
- * Reactive half of the capability gate: the backend refused a request
- * the affordances did not (or could not) pre-empt. Falls back to the
- * generic media capability when the error names none, so the user still
- * gets an upgrade path rather than a raw provider string.
- */
 const resolveCapabilityToast = (
   capability: Capability | undefined,
   options: StellaProviderErrorToastOptions,
@@ -123,8 +108,6 @@ export const resolveStellaProviderErrorToast = (
   const classification = classifyStellaProviderError(reason)
   const message = classification.message
 
-  // Runtime route failures carry a stable marker, so these keep their exact
-  // actions even if the human-readable runtime prose changes.
   const routeFailureKind = detectLlmRouteFailureKind(message)
   if (routeFailureKind === 'missing-credential') {
     return {
@@ -214,9 +197,6 @@ export const resolveStellaProviderErrorToast = (
         secondaryAction: BYOK_TOAST_ACTION,
       }
     case 'capability-required': {
-      // Prefer the precise "Image generation is on Pro" copy when the
-      // backend named the capability; otherwise fall back to the plan
-      // -shaped generic so there is still somewhere to go.
       const precise = resolveCapabilityToast(classification.capability, options)
       if (precise) return precise
       return {
@@ -228,8 +208,6 @@ export const resolveStellaProviderErrorToast = (
       }
     }
     case 'free-allowance-exhausted':
-      // Terminal by design: the Free allowance is spent once and never
-      // refreshes, so this must never read like "try again later".
       return {
         title: STELLA_USAGE_LIMIT_TITLES.free_allowance,
         description: STELLA_USAGE_LIMIT_DESCRIPTIONS.free_allowance,
@@ -346,13 +324,6 @@ export const resolveStellaProviderErrorToast = (
   }
 }
 
-/**
- * Failures the user must act on before Stella can continue — signed out,
- * plan exhausted, provider key missing, model gated — are pinned above
- * the composer instead of toasted. Everything else (network, timeout,
- * blocked prompt, malformed request, unknown) stays a toast: nothing to
- * do but retry.
- */
 const COMPOSER_NOTICE_KIND_BY_ERROR: Partial<
   Record<StellaProviderErrorKind, ComposerNoticeKind>
 > = {
@@ -386,10 +357,6 @@ export const resolveStellaProviderErrorNoticeKind = (
   return COMPOSER_NOTICE_KIND_BY_ERROR[classification.kind] ?? null
 }
 
-/**
- * Surface a stopped run's failure in the right place: a pinned composer
- * notice for limit/auth/provider problems, a toast for transient ones.
- */
 export const presentStellaProviderError = (
   reason: string | null | undefined,
   options: StellaProviderErrorToastOptions & {

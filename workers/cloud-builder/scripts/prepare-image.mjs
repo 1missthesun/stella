@@ -67,30 +67,10 @@ if (customOutput && !generatedRefreshRoot) {
 }
 await mkdir(path.join(imageRoot, "packages"), { recursive: true });
 
-/**
- * The image holds no Stella source. Its inputs are the OS and tool layers in
- * the Dockerfile, the third-party packages the executor imports (this
- * manifest and `sandbox-image.bun.lock`), the office CLI, and the two
- * bootstrap scripts in `sandbox-bin/`; the image digest moves only when one of
- * those does. Stella's own packages ship as the code bundle each container
- * installs at start (`scripts/sandbox-code.mjs`), so a deploy of Stella
- * source keeps every owner's container snapshot.
- *
- * Document CLI: only the wrapper + download scripts are staged; the native
- * binary is fetched for the image's own platform during the Docker build. It
- * stays in the image because the binary is pinned to the wrapper's version.
- */
 const OFFICE_PACKAGE = "stella-office";
 
 const officeRoot = path.join(repoRoot, "packages", OFFICE_PACKAGE);
 
-/**
- * Office files that must never reach the image. Its vendor tree is the
- * OfficeCLI C# source, which nothing at runtime reads, and native binaries are
- * never staged from this checkout (the checked-in ones are macOS-only, and a
- * locally downloaded Linux one would make the image depend on the machine
- * that deploys): the Docker build downloads the pinned Linux release.
- */
 const isExcluded = (source) => {
   const segments = path.relative(officeRoot, source).split(path.sep);
   const name = segments.at(-1) ?? "";
@@ -154,13 +134,6 @@ if (bunRuntimeVersion !== imageBunVersion) {
     `Cloud image Bun build tool ${imageBunVersion} does not match Docker runtime ${bunRuntimeVersion ?? "<missing>"}.`,
   );
 }
-/**
- * The npm packages the container can load: everything statically reachable
- * from the executor CLI, the only script the container runs, through the
- * code bundle's workspaces. Each is pinned to the version its workspace or
- * the root manifest declares. The root manifest is the desktop app's, so it
- * is never copied wholesale.
- */
 const EXECUTOR_ENTRY = path.join(repoRoot, "packages/executor-cloud/src/cli.ts");
 const tracedImports = async (declared) => {
   const esbuild = createRequire(path.join(workerRoot, "package.json"))("esbuild");
@@ -203,8 +176,6 @@ const tracedImports = async (declared) => {
   });
   return [...names].sort();
 };
-// Every traced package goes at the image root, the one `node_modules` every
-// file of the code bundle resolves third-party imports from.
 const workspaceDependencies = new Set();
 const workspaceVersions = new Map();
 for (const packageName of SANDBOX_CODE_PACKAGES) {
@@ -242,9 +213,6 @@ const imagePackage = {
   type: "module",
   dependencies: {
     ...executorDependencies,
-    // Claude's native coding-agent runtime. This exact version is part of the
-    // sandbox image contract: cloud turns must not change behavior merely
-    // because a registry dist-tag moved between image builds.
     "@anthropic-ai/claude-code": "2.1.294",
   },
 };
@@ -329,8 +297,6 @@ await writeFile(
 if (generatedRefreshRoot) {
   await rm(imageRoot, { recursive: true, force: true });
 } else {
-  // Everything Docker builds from: when this digest is unchanged, so are the
-  // build's cache keys, and the image keeps its digest.
   const inputs = createHash("sha256").update(dockerfile);
   const walk = async (directory) => {
     const entries = await readdir(directory, { withFileTypes: true });

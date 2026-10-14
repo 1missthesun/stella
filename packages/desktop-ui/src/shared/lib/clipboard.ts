@@ -41,8 +41,6 @@ export async function copyTextToClipboard(text: string): Promise<boolean> {
     textarea.select();
     const ok = document.execCommand("copy");
     document.body.removeChild(textarea);
-    // Restore any prior selection so copying doesn't clobber the user's
-    // highlight in the chat.
     if (previousRange && selection) {
       selection.removeAllRanges();
       selection.addRange(previousRange);

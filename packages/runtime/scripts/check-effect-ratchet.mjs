@@ -2,14 +2,6 @@ import { readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { isEntryPoint } from "../../../scripts/lib/entry-point.mjs";
 
-// The Effect migration ratchet (M5 completion, phase 0 — see
-// ~/projects/stella-v2-effect-completion-plan.md "The ratchet"). Promise-land
-// concurrency primitives are banned from every Effect-bearing package:
-// packages/runtime, packages/executor-cloud, and workers/cloud-builder. Every
-// current offender is pinned in effect-ratchet-allowlist.json with its exact
-// hit count. Migration = shrinking the allowlist. CI fails on any new hit or
-// any file exceeding its pinned count; `--update` rewrites the allowlist DOWN
-// to the measured counts (never up), so the number can only fall.
 const bannedPatterns = [
   { label: "new AbortController", regex: /\bnew\s+AbortController\b/g },
   { label: "setTimeout(", regex: /\bsetTimeout\s*\(/g },
@@ -25,8 +17,6 @@ const ignoredDirectories = new Set([
   ".image",
   ".wrangler",
   "tests",
-  // Maintenance/CI scripts are not migration targets; the ratchet measures
-  // shipped runtime source only.
   "scripts",
 ]);
 const sourceSuffixes = new Set([
@@ -40,8 +30,6 @@ const sourceSuffixes = new Set([
   ".cts",
 ]);
 const isTestFile = (name) => /\.test\.[cm]?[jt]sx?$/.test(name);
-// Generated bundles (vendored code serialized for a Dynamic Worker) are not
-// shipped source anyone migrates; their generator is what the ratchet sees.
 const isGeneratedFile = (name) => /\.generated\.[cm]?[jt]sx?$/.test(name);
 
 const walk = async (directory) => {
@@ -81,12 +69,6 @@ const effectBearingTargets = [
   },
 ];
 
-/**
- * Scan every Effect-bearing package for banned promise-land patterns.
- * Runtime keys remain relative to packages/runtime for allowlist continuity;
- * the newer executor and Worker keys are repository-relative and explicit.
- * Returns Map<allowlistKey, { total, byPattern: Map<label, count>, lines: [{line, label, text}] }>.
- */
 export const scanEffectRatchetTargets = async (repoRoot) => {
   const hitsByFile = new Map();
   for (const target of effectBearingTargets) {
@@ -104,7 +86,7 @@ export const scanEffectRatchetTargets = async (repoRoot) => {
           trimmed.startsWith("*") ||
           trimmed.startsWith("/*")
         ) {
-          continue; // prose mentions in comments are not migration debt
+          continue;
         }
         for (const pattern of bannedPatterns) {
           const matches = lines[index].match(pattern.regex);
@@ -135,7 +117,7 @@ const loadAllowlist = async (allowlistPath) => {
   try {
     raw = await readFile(allowlistPath, "utf8");
   } catch (error) {
-    if (error?.code === "ENOENT") return null; // first run: --update bootstraps it
+    if (error?.code === "ENOENT") return null;
     throw error;
   }
   const parsed = JSON.parse(raw);
@@ -171,11 +153,6 @@ const loadAllowlist = async (allowlistPath) => {
 const isPatternPinnedEntry = (entry) =>
   typeof entry === "object" && entry !== null && !Array.isArray(entry);
 
-/**
- * Compare measured debt with the pinned baseline. Legacy Runtime entries use
- * one file total; newly admitted cloud packages pin each primitive so swapping
- * a timer for an AbortController cannot hide new debt behind a flat total.
- */
 export const evaluateEffectRatchet = (hitsByFile, allowlist) => {
   const offenders = [];
   for (const [file, entry] of [...hitsByFile.entries()].sort()) {
@@ -250,8 +227,6 @@ if (isEntryPoint(import.meta.url)) {
     process.exit(1);
   }
 
-  // On the bootstrap run there is no baseline to exceed — the scan itself
-  // becomes the baseline. Every later run compares against the pinned form.
   const { offenders, shrinkage } =
     allowlist === null
       ? { offenders: [], shrinkage: [] }

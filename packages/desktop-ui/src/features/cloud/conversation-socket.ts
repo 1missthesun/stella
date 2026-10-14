@@ -1,9 +1,3 @@
-/**
- * The desktop's binding of the shared conversation socket
- * (`@stella/contracts/conversation-socket`): the interior gateway origin, the
- * document's visibility as the foreground gate, and startup timing.
- */
-
 import {
   ConversationSocket as SharedConversationSocket,
   type ConversationSocketOptions,

@@ -62,9 +62,6 @@ import {
   handleIpc,
 } from "../ipc/typed-ipc.js";
 const DEFAULT_STELLA_WEB_URL = "https://stella.sh";
-// Delay native-service startup ~4s past app-ready so the bridge/office-preview
-// spawns stay off the first-paint (TTI) path. Previously Windows-only; now
-// applied on all platforms.
 const POST_READY_NATIVE_DELAY_MS = 4_000;
 const EXTENSION_STATUS_SETTLE_MS = 30_000;
 const readStellaWebBaseUrl = () => {
@@ -108,14 +105,10 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
                     await resource.reconnectExtension();
                 }
                 catch {
-                    // A daemon that predates extension_reconnect: restarting it
-                    // closes the extension's link, which reconnects on its own.
                     await resource.stop();
                     resource.start();
                 }
             },
-            // Agents check UI drafts in the running app, which always runs from
-            // source.
             openPreview: (name) => openDraftPreview({
                 name,
                 stellaAppDir: state.stellaAppDir ?? config.stellaAppDir,
@@ -155,8 +148,6 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
         }, route.cdpUrl);
     };
     let extensionStatusSettlesAt = 0;
-    // Agent routing never waits for the extension: Stella's browser uses its
-    // own profile, and the extension only gives agents the user's own browser.
     const ensureInAppBrowserReady = async (capability) => {
         if (!isStellaBrowserBridgeBinaryInstalled()) {
             throw new Error(BROWSER_BRIDGE_MISSING_ERROR);
@@ -198,21 +189,11 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
             return;
         }
         postReadyNativeServicesScheduled = true;
-        // Keep native-service startup off the TTI path on every platform. Windows
-        // already deferred ~4s post-paint; apply the same delay on macOS/Linux so
-        // the bridge spawn never competes with first paint.
         state.processRuntime.setManagedTimeout(() => {
             postReadyNativeServicesScheduled = false;
             if (!state.appReady || state.isQuitting) {
                 return;
             }
-            // Only spawn the browser-bridge daemon when a cheap precondition says the
-            // user actually uses browser automation (host already registered, or the
-            // extension is installed). Spawning unconditionally launched an extra
-            // Electron-as-Node process that, for users without the extension, just
-            // retried with backoff before failing — pure startup cost. Users who DO
-            // have the extension still get the bridge; first-time setup picks it up on
-            // the next launch once the extension/host registration is detected.
             if (isBrowserBridgeEagerStartWorthwhile()) {
                 startStellaBrowserBridge(context);
             }
@@ -229,9 +210,6 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
         setAppReady: (ready) => {
             state.appReady = ready;
             if (ready) {
-                // Apply the preventComputerSleep power toggle here rather than during
-                // synchronous bootstrap — it's not needed for the window to appear and
-                // forces the first preferences.json read off the pre-paint path.
                 setPreventComputerSleep(loadLocalPreferences(config.stellaDataDirPath).preventComputerSleep);
                 scheduleGlobalInputHooksAfterAppReady(context);
                 schedulePostReadyNativeServices();
@@ -332,14 +310,10 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
         clearPendingRequest: () => clearPendingRemoteExecutionRequest(context),
         assertPrivilegedSender: (event, channel) => services.externalLinkService.assertPrivilegedSender(event, channel),
     });
-    // A paired phone's file and preview requests are held to files Stella
-    // produced or displayed in the conversation it names, per the cloud
-    // journal, in any of this owner's conversations.
     const cloudFileGrants = createCloudConversationFileGrants({
         getBackendUrl: () => services.authService.getBackendUrl(),
         getAuthToken: () => services.authService.getAuthToken(),
     });
-    // A conversation's pi transcript names the files Stella linked there.
     const piLinkedFiles = async (conversationId) => (await lifecycle.getRunner()?.piChat({ op: "files", conversationId }))?.paths ?? [];
     const deviceFileLocator = createDeviceFileLocator({
         getBackendUrl: () => services.authService.getBackendUrl(),
@@ -349,8 +323,6 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
         locator: deviceFileLocator,
         getDeviceId: () => state.deviceId,
     };
-    // A file another of this owner's computers has is read from it live,
-    // signed with this computer's device key; its own policy decides.
     const peerDeviceFiles = createPeerDeviceFiles({
         getBackendUrl: () => services.authService.getBackendUrl(),
         getAuthToken: () => services.authService.getAuthToken(),
@@ -418,11 +390,7 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
         getBackendUrl: () => services.authService.getBackendUrl(),
         assertPrivilegedSender: (event, channel) => services.externalLinkService.assertPrivilegedSender(event, channel),
     });
-    // Drafts, undo and fork sync for the app's own checkout. Every install is
-    // a checkout, so this is unconditional. Deferred startup starts it.
     if (!state.appSourceService) {
-        // How a change shows on screen: a picture transition for renderer
-        // changes, a frosted hold across a relaunch.
         const updateTransition = state.updateTransition ?? new UpdateTransition({
             getWindow: () => state.windowManager?.getFullWindow() ?? null,
             partition: config.sessionPartition,
@@ -436,8 +404,6 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
         const appSourceService = new AppSourceService({
             stellaAppDir: state.stellaAppDir ?? config.stellaAppDir,
             broadcast: (next) => {
-                // An update is waiting: load the transition's overlay now so
-                // pressing Update doesn't pay for it.
                 if (next.ready.length > 0 ||
                     next.remote.status === "ahead" ||
                     next.upstream.status === "ahead") {
@@ -460,13 +426,7 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
                 state.keepRuntimeAcrossRelaunch = options?.keepRuntime === true;
                 relaunchApp();
             },
-            // Checking a merged update happens on a scratch worktree here,
-            // never in the checkout that is running.
             updateScratchDir: path.join(app.getPath("userData"), "update-merge"),
-            // Git work that needs a judgement goes straight to a background
-            // agent with what the app already knows. No user message is
-            // synthesized for it: the user pressed a button, they did not
-            // type a request, and nothing should file one against them.
             dispatchAgentBrief: async (brief) => {
                 const runner = lifecycle.getRunner();
                 const conversationId = services.uiStateService.state.conversationId;
@@ -484,12 +444,8 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
             getBackendUrl: () => services.authService.getBackendUrl(),
             getAuthToken: () => services.authService.getAuthToken(),
             log: (event, data) => getMainLogger()?.process(event, data),
-            // Under the native launcher, only signed trees run: refuse to act
-            // on an unsigned HEAD and sign every change that lands. Both are
-            // no-ops when Stella runs without the launcher.
             beforeAction: assertHeadSigned,
             afterApply: signHead,
-            // A push that changed the UI rebuilds the owner's browser renderer.
             onPushed: (cwd) => buildAndUploadWebRenderer(cwd, {
                 getBackendUrl: () => services.authService.getBackendUrl(),
                 getAuthToken: () => services.authService.getAuthToken(),
@@ -551,25 +507,11 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
         windowManager: state.windowManager,
         assertPrivilegedSender: (event, channel) => services.externalLinkService.assertPrivilegedSender(event, channel),
     });
-    // ── Wake-word listener ──────────────────────────────────────────────
-    // Spawns the native `wakeword_listener` helper. On a "Hey Stella"
-    // detection it activates the realtime voice agent. Mic buttons stay dictation-only — voice is
-    // wake-word-gated. Auto-pauses while a voice session is active so
-    // the assistant cannot trigger itself.
     services.uiStateService.onVoiceActiveChanged((active) => {
         wakewordPausedForVoice = active;
         syncWakewordPause();
     });
     syncWakewordPause();
-    // Defer both the preferences.json read AND the enable/spawn off the pre-paint
-    // IPC-registration path. The synchronous statSync+readFileSync that fed the
-    // listener threshold used to run before first paint; loading prefs here keeps
-    // that disk read off the TTI path. The threshold is only consumed by
-    // WakewordService at spawn time, so constructing the service here loses
-    // nothing. For "Hey Stella" users `setEnabled(true)` synchronously spawns the
-    // native wakeword_listener helper (ONNX model load + mic open), which we don't
-    // want blocking first paint either. setEnabled is idempotent and
-    // timing-tolerant.
     state.processRuntime.setManagedTimeout(() => {
         const stellaDataDir = lifecycle.getStellaDataDir();
         const wakePrefs = stellaDataDir
@@ -584,8 +526,6 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
                 toggleRealtimeVoiceImpl();
             },
         });
-        // Inherit any pause state accumulated (voice/dictation) during the deferral
-        // gap before applying the persisted enabled preference.
         syncWakewordPause();
         wakeword.setEnabled(wakePrefs.wakeWordEnabled);
     }, 0);
@@ -619,9 +559,6 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
         wakeword?.setEnabled(next);
         return { enabled: next };
     });
-    // What a paired phone may ask of this computer through the cloud relay
-    // (the runtime host's `serveDeviceRequest`), under the same policy the
-    // handlers above apply to a remote caller.
     state.deviceRequestHandlers = {
         readFile: display.readFileForRequest,
         readThumbnail: display.readThumbnailForRequest,

@@ -1,15 +1,5 @@
 import { Text, type TextProps } from "react-native";
 
-/**
- * Cap how far iOS Dynamic Type can stretch our chrome text. Users on
- * default through Accessibility-Medium see no change; users on the
- * largest accessibility sizes still get bigger text but not enough to
- * break composer pills, tab labels, or pairing-code inputs.
- *
- * Conversation content (assistant + user message bubbles) overrides
- * this with a higher multiplier so the reading surface still scales
- * generously for AX users.
- */
 export const CHROME_MAX_FONT_SCALE = 1.4;
 export const CONTENT_MAX_FONT_SCALE = 2.0;
 

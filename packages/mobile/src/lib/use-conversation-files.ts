@@ -26,14 +26,11 @@ type Cursor =
 
 export type ConversationFilesState = {
   files: ConversationFile[];
-  /** True until the first page of the journal has answered. */
   loading: boolean;
-  /** False when the journal could not be read; the chat's own files still show. */
   available: boolean;
   loadingMore: boolean;
   hasMore: boolean;
   loadMore: () => void;
-  /** Device id → the name the owner's device list gives it. */
   deviceNames: ReadonlyMap<string, string>;
 };
 
@@ -56,11 +53,6 @@ const mergeOlder = (
   return added.length ? [...current, ...added] : (current as ConversationFile[]);
 };
 
-/**
- * The conversation's files, newest first, read from its cloud journal while
- * the Files page is open. `revision` changes whenever the chat gains a
- * message, which pulls in only the rows written since the last read.
- */
 export function useConversationFiles(
   conversationId: string | null,
   revision: string | null,

@@ -49,14 +49,9 @@ import {
 import { log } from "./support.js";
 import { OwnerGateDispatch } from "./dispatch.js";
 
-/** A cloud turn needs typed text; a send of only pasted text or files reads as this. */
 const contextOnlyPrompt = (payload: DispatchPayload): string =>
   payload.context?.text ? "(Pasted text)" : "(Attached files)";
 
-/**
- * The cloud branch of a dispatch: starting its cloud chat or cloud agent, and
- * retiring the handoff.
- */
 export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
   protected cloudPayload(row: DispatchRow): DispatchPayload | null {
     if (!row.payload_json) return null;
@@ -67,13 +62,6 @@ export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
     }
   }
 
-  /**
-   * Start the dispatch in Stella's cloud: a chat turn on the conversation
-   * object, an agent attempt on a fresh build session. Both are addressed as
-   * Durable Objects — this gate is already inside the service boundary, so
-   * the trusted headers are stamped directly rather than routed back through
-   * the Worker.
-   */
   protected async runCloudBranch(
     row: DispatchRow,
     now: number,
@@ -126,9 +114,6 @@ export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
         ? await this.startCloudChat(attempting, payload, now)
         : await this.startCloudAgent(attempting, payload, now);
     } catch (error) {
-      // Do not guess that an ambiguous transport failure means the cloud did
-      // not start. The dispatch stays `cloud_committed`; its lease resolves
-      // to `reconciliation_required` rather than to a second start.
       log("error", "dispatch_cloud_start_unresolved", {
         dispatchId: row.dispatch_id,
         kind: row.kind,
@@ -138,12 +123,6 @@ export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
     }
   }
 
-  /**
-   * The cloud said no. A fence or shape refusal is the dispatch's own
-   * terminal error, reported with the builder's code so the client sees the
-   * same reason it would have seen submitting the turn directly. Only a 503
-   * — the builder unavailable, not the request refused — is worth one retry.
-   */
   protected async cloudRefusal(
     row: DispatchRow,
     response: Response,
@@ -197,14 +176,10 @@ export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
     payload: DispatchPayload,
     now: number,
   ): Promise<DispatchRow> {
-    // The DO name is the authenticated owner identity for this dispatch.
-    // Begin only read-only gateway preparation before durable handoff work.
     this.prepareGatewayOwner();
     const sessions = this.env.ORCHESTRATOR_SESSIONS;
     if (!sessions)
       throw new Error("Orchestrator session namespace is not bound.");
-    // Start the nonce-only cold wake alongside owner admission and home
-    // preparation. It cannot authorize a request or mutate policy state.
     const preparedReader = this.prepareCloudChatReader(
       sessions,
       row.conversation_id,
@@ -227,7 +202,6 @@ export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
       ...(payload.handoff || row.ingress === "schedule"
         ? { hiddenMessage: true }
         : {}),
-      // A schedule's agent, its computer away: it starts here instead.
       ...(row.ingress === "schedule" && payload.scheduledAgent
         ? {
             piAgent: {
@@ -382,8 +356,6 @@ export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
         await this.releaseGate(this.dispatchRow(row.dispatch_id) ?? row);
         return this.dispatchRow(row.dispatch_id) ?? row;
       }
-      // Stop can target the exact turn even while its admission RPC is in
-      // flight, including before the conversation has imported the handoff.
       this.ctx.storage.sql.exec(
         "UPDATE dispatches SET cloud_turn_id = ? WHERE dispatch_id = ?",
         handoff.authority.turnId,
@@ -409,8 +381,6 @@ export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
               body: JSON.stringify(request),
             });
     if (!response.ok) {
-      // A definite refusal cannot own an executing turn. An uncertain 5xx
-      // keeps the same registered identity for retry or purge reconciliation.
       if (
         handoff?.phase === "registered" &&
         response.status >= 400 &&
@@ -479,9 +449,6 @@ export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
     const sessions = this.env.BUILD_SESSIONS;
     if (!sessions) throw new Error("Build session namespace is not bound.");
     const snapshot = await this.snapshot({ now });
-    // A fresh thread per placed agent: the gate cannot read a durable
-    // thread's attempt generation, and guessing one would resume the wrong
-    // attempt.
     const threadId = newAgentThreadId();
     const request: CloudAgentTurnStartRequest = {
       protocol: TURN_PLANE_PROTOCOL,
@@ -492,8 +459,6 @@ export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
       threadId,
       agentDepth: 1,
       attemptGeneration: 1,
-      // The session adopts the dispatch id as its turn id, so the release it
-      // sends on the terminal path frees exactly the slot this gate admitted.
       turnId: row.dispatch_id,
       prompt: payload.prompt,
       description: payload.description ?? "Placed agent run",
@@ -522,7 +487,6 @@ export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          // The gate admitted this attempt already and owns its release.
           [HEADER_GATE_ADMITTED]: "1",
         },
         body: JSON.stringify(request),
@@ -553,13 +517,6 @@ export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
     );
   }
 
-  /**
-   * A placed agent on pi (Stella's models or the owner's ChatGPT plan) runs
-   * in its conversation as a pi agent, started at once; pi admits each of
-   * its runs itself, so this dispatch's own hold goes back once the
-   * conversation has it. Its report settles the dispatch by its id, as a
-   * BuildSession agent's terminal does.
-   */
   protected async startPiPlacedAgent(
     row: DispatchRow,
     request: CloudAgentTurnStartRequest & { execution: PiAgentExecution },
@@ -580,7 +537,6 @@ export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
         description: request.description,
         turnId: row.dispatch_id,
         attemptGeneration: 1,
-        // A placed run is a fresh thread of Stella's own.
         lineage: { depth: 1 },
       },
     });
@@ -645,9 +601,6 @@ export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
     }
   }
 
-  // ── Submit, status, cancel ────────────────────────────────────────────
-
-  // Implemented by `OwnerGate`.
   abstract applyOwnerEvents(events: OwnerEvent[]): Promise<void>;
   abstract admitWithFenceLease(input: {
     admission: OwnerGateAdmitInput;

@@ -1,9 +1,3 @@
-/**
- * Slack-side messages and views: setting up the workspace's Stella (the
- * installer connects the Stella account that owns and pays for it) and the
- * App Home tab.
- */
-
 import { slackTry } from "./api.js";
 import { SLACK_PATHS, slackPublicOrigin } from "./config.js";
 import { signLinkToken } from "./link-state.js";
@@ -44,10 +38,6 @@ export const connectBlocks = (url: string, lead: string): unknown[] => [
 const SETUP_LEAD =
   "*Connect your Stella account to set up Stella for this workspace.* You installed her, so your account runs her here. It takes a few seconds.";
 
-/**
- * Stella isn't set up yet: the installer gets the connect button privately;
- * anyone else is told who can set her up.
- */
 export const sendSetupPrompt = async (
   env: Cloudflare.Env,
   install: SlackInstallation,

@@ -13,8 +13,6 @@ const MAX_SNAPSHOT_ELEMENTS: usize = 200;
 const MAX_SNAPSHOT_FRAMES: usize = 32;
 const MAX_FRAME_DEPTH: usize = 8;
 
-/// Capture true Chromium AX trees in document order, keeping every disclosed
-/// ref bound to its owning frame, target session and document loader.
 pub async fn take_ax_snapshot(
     client: &CdpClient,
     session_id: &str,
@@ -32,7 +30,6 @@ pub async fn take_ax_snapshot(
     let root_tree = root
         .get("frameTree")
         .ok_or("Browser did not return a frame tree")?;
-    // (frame subtree, ancestor scope, parent session, listed in parent's tree)
     let mut pending = vec![(
         root_tree.clone(),
         Vec::<RefFrame>::new(),
@@ -152,14 +149,11 @@ pub async fn take_ax_snapshot(
             }
         }
     }
-    // A capture that spans document replacement must never publish old refs
-    // with new text or let the runtime compute a diff across those documents.
     for frame in &captured {
         if !super::element::frame_is_current(client, frame).await? {
             return Err("A frame navigated during AX capture. Capture a new AX snapshot.".into());
         }
     }
-    // Reserve room for both bounded-output and omitted-frame metadata.
     let mut bounded = bound_snapshot_with_budget(&output, 0, MAX_SNAPSHOT_CHARS - 512);
     if omitted_frames > 0 {
         bounded.tree.push_str(&format!("\n[AX metadata: omittedFrames={omitted_frames}; maxFrames={MAX_SNAPSHOT_FRAMES}; maxFrameDepth={MAX_FRAME_DEPTH}]"));
@@ -266,16 +260,14 @@ struct TreeNode {
     has_ref: bool,
     ref_id: Option<String>,
     depth: usize,
-    /// Cursor-interactive information (only set when options.cursor is true)
     cursor_info: Option<CursorElementInfo>,
 }
 
-/// Information about a cursor-interactive element (elements with cursor:pointer, onclick, tabindex, etc.)
 #[derive(Clone)]
 struct CursorElementInfo {
-    kind: String, // "clickable", "focusable", "editable"
+    kind: String,
     hints: Vec<String>,
-    text: String, // textContent from the DOM element (fallback when ARIA name is empty)
+    text: String,
 }
 
 struct RoleNameTracker {
@@ -323,9 +315,6 @@ pub async fn take_snapshot(
         .send_command_no_params("Accessibility.enable", Some(session_id))
         .await?;
 
-    // If a CSS selector is provided, resolve the set of backendNodeIds that
-    // belong to the DOM subtree rooted at the matched element.  We use this
-    // set to pick the right AX subtree root(s) later.
     let selector_backend_ids: Option<std::collections::HashSet<i64>> =
         if let Some(ref selector) = options.selector {
             let js = format!(
@@ -349,8 +338,6 @@ pub async fn take_snapshot(
                 .object_id
                 .ok_or_else(|| format!("Selector '{}' did not match any element", selector))?;
 
-            // Request the full DOM subtree (depth: -1) so we can collect all
-            // backendNodeIds that live under the matched element.
             let describe: Value = client
                 .send_command(
                     "DOM.describeNode",
@@ -439,17 +426,12 @@ pub async fn take_snapshot(
 
     let (tree_nodes, root_indices) = build_tree(&ax_tree.nodes);
 
-    // When a selector is given, find AX nodes whose backendDOMNodeId falls
-    // within the target DOM subtree and pick the top-level ones as roots.
     let effective_roots = if let Some(ref id_set) = selector_backend_ids {
-        // Mark which tree_nodes belong to the target DOM subtree.
         let in_subtree: Vec<bool> = tree_nodes
             .iter()
             .map(|n| n.backend_node_id.is_some_and(|bid| id_set.contains(&bid)))
             .collect();
 
-        // An AX node is a "top-level" match if it is in the subtree but its
-        // parent (in the AX tree) is not.
         let mut roots = Vec::new();
         for (idx, node) in tree_nodes.iter().enumerate() {
             if !in_subtree[idx] {
@@ -477,8 +459,6 @@ pub async fn take_snapshot(
 
     let mut nodes_with_refs: Vec<(usize, usize)> = Vec::new();
 
-    // When cursor mode is enabled, pre-collect cursor-interactive elements
-    // so we can mark them with refs during tree building
     let cursor_elements: HashMap<i64, CursorElementInfo> = if options.cursor {
         find_cursor_interactive_elements(client, session_id)
             .await
@@ -494,7 +474,6 @@ pub async fn take_snapshot(
         } else if CONTENT_ROLES.contains(&role) {
             !node.name.is_empty()
         } else if options.cursor {
-            // In cursor mode, also ref elements that are cursor-interactive
             node.backend_node_id
                 .is_some_and(|bid| cursor_elements.contains_key(&bid))
         } else {
@@ -549,7 +528,6 @@ pub async fn take_snapshot(
         tree_nodes[*idx].ref_id = Some(ref_id);
     }
 
-    // Populate cursor_info for ref-bearing nodes when cursor mode is enabled
     if options.cursor {
         for (idx, _) in &nodes_with_refs {
             if let Some(bid) = tree_nodes[*idx].backend_node_id {
@@ -573,13 +551,9 @@ pub async fn take_snapshot(
         output = compact_tree(&output, options.interactive);
     }
 
-    // Recurse into child iframes: for each Iframe node with a backend_node_id,
-    // resolve the child frame ID and take a snapshot of its content.
-    // We only recurse from the main frame (frame_id == None) to avoid
-    // unbounded depth; nested iframes within iframes are not expanded.
     let mut skipped_cross_origin_frames = 0usize;
     if frame_id.is_none() {
-        let mut iframe_snapshots: Vec<(String, String)> = Vec::new(); // (ref_id, child_snapshot)
+        let mut iframe_snapshots: Vec<(String, String)> = Vec::new();
         for node in tree_nodes.iter() {
             if node.role != "Iframe" || !node.has_ref {
                 continue;
@@ -589,8 +563,6 @@ pub async fn take_snapshot(
             };
             let ref_id = node.ref_id.as_deref().unwrap_or("");
             if let Ok(child_fid) = resolve_iframe_frame_id(client, session_id, bid).await {
-                // Snapshot the child frame; errors are silently ignored
-                // (e.g. cross-origin iframes)
                 if let Ok(child_text) = Box::pin(take_snapshot(
                     client,
                     session_id,
@@ -614,20 +586,17 @@ pub async fn take_snapshot(
             }
         }
 
-        // Insert each child snapshot after its Iframe line in the output
         for (ref_id, child_text) in iframe_snapshots {
             let marker = format!("[ref={}]", ref_id);
             if let Some(pos) = output.find(&marker) {
-                // Find the end of the Iframe line
                 let line_end = output[pos..]
                     .find('\n')
                     .map(|i| pos + i)
                     .unwrap_or(output.len());
-                // Determine the indent of the Iframe line
                 let line_start = output[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
                 let iframe_line = &output[line_start..line_end];
                 let iframe_indent = iframe_line.len() - iframe_line.trim_start().len();
-                let child_indent = iframe_indent + 2; // one level deeper
+                let child_indent = iframe_indent + 2;
                 let prefix = " ".repeat(child_indent);
 
                 let indented_child: String = child_text
@@ -635,7 +604,6 @@ pub async fn take_snapshot(
                     .map(|line| format!("{}{}\n", prefix, line))
                     .collect();
 
-                // Ensure there's a newline to insert after
                 if line_end == output.len() {
                     output.push('\n');
                     output.push_str(&indented_child);
@@ -649,11 +617,6 @@ pub async fn take_snapshot(
     let trimmed = output.trim().to_string();
 
     if trimmed.is_empty() {
-        // Ref assignment happens before render-time filters such as
-        // `interactive`, selector roots, depth, and compact mode. An empty
-        // top-level rendering must therefore clear any handles that were
-        // discovered but never disclosed. Child-frame calls share the
-        // top-level map and leave final pruning to their caller.
         if frame_id.is_none() {
             ref_map.retain_ids(&HashSet::new());
         }
@@ -663,9 +626,6 @@ pub async fn take_snapshot(
         return Ok("(empty page)".to_string());
     }
 
-    // Child-frame snapshots are assembled into the top-level output. Apply a
-    // single global budget only after that assembly so nested content cannot
-    // multiply the public 200-element / 20,000-character limits.
     if frame_id.is_some() {
         return Ok(trimmed);
     }
@@ -675,13 +635,11 @@ pub async fn take_snapshot(
     Ok(bounded.tree)
 }
 
-/// Resolve the child frame ID for an iframe element given its backendNodeId.
 async fn resolve_iframe_frame_id(
     client: &CdpClient,
     session_id: &str,
     backend_node_id: i64,
 ) -> Result<String, String> {
-    // depth: 1 ensures contentDocument is included in the response
     let describe: Value = client
         .send_command(
             "DOM.describeNode",
@@ -690,7 +648,6 @@ async fn resolve_iframe_frame_id(
         )
         .await?;
 
-    // Try contentDocument.frameId first (standard for iframes)
     if let Some(frame_id) = describe
         .get("node")
         .and_then(|n| n.get("contentDocument"))
@@ -700,7 +657,6 @@ async fn resolve_iframe_frame_id(
         return Ok(frame_id.to_string());
     }
 
-    // Fallback: the node itself may have a frameId
     describe
         .get("node")
         .and_then(|n| n.get("frameId"))
@@ -713,15 +669,6 @@ async fn find_cursor_interactive_elements(
     client: &CdpClient,
     session_id: &str,
 ) -> Result<HashMap<i64, CursorElementInfo>, String> {
-    // Single JS evaluation that matches the v0.19.0 Node.js findCursorInteractiveElements():
-    // - Uses querySelectorAll('*') to walk all elements
-    // - Checks getComputedStyle(el).cursor === 'pointer'
-    // - Checks onclick attribute/handler and tabindex
-    // - Skips interactiveTags (a, button, input, select, textarea, details, summary)
-    // - Skips elements with interactive ARIA roles
-    // - Deduplicates inherited cursor:pointer from parent
-    // - Skips empty text and zero-size elements
-    // - Tags each matched element with data-__ab-ci for batch backendNodeId resolution
     let js = r#"
 (function() {
     var results = [];
@@ -805,8 +752,6 @@ async fn find_cursor_interactive_elements(
         return Ok(HashMap::new());
     }
 
-    // Batch-resolve backendNodeIds: use DOM.getDocument to get the root nodeId,
-    // then DOM.querySelectorAll to get all tagged elements in a single call.
     let doc: Value = client
         .send_command(
             "DOM.getDocument",
@@ -838,7 +783,6 @@ async fn find_cursor_interactive_elements(
         .map(|arr| arr.iter().filter_map(|v| v.as_i64()).collect())
         .unwrap_or_default();
 
-    // Resolve backendNodeIds for each DOM node using concurrent CDP calls.
     let describe_futures: Vec<_> = node_ids
         .iter()
         .map(|&node_id| {
@@ -852,7 +796,6 @@ async fn find_cursor_interactive_elements(
 
     let describe_results = futures_util::future::join_all(describe_futures).await;
 
-    // Build a map from data-__ab-ci index to backendNodeId.
     let mut idx_to_backend: HashMap<usize, i64> = HashMap::new();
     for desc in describe_results.into_iter().flatten() {
         let backend_id = desc
@@ -878,7 +821,6 @@ async fn find_cursor_interactive_elements(
         }
     }
 
-    // Clean up the data attributes we injected for backendNodeId resolution.
     let cleanup_js =
         r#"(function(){ var els = document.querySelectorAll('[data-__ab-ci]'); for (var i = 0; i < els.length; i++) els[i].removeAttribute('data-__ab-ci'); return els.length; })()"#.to_string();
     if let Err(e) = client
@@ -896,13 +838,10 @@ async fn find_cursor_interactive_elements(
         eprintln!("[stella-browser] Warning: failed to clean up data-__ab-ci attributes: {e}");
     }
 
-    // Build the map
     let mut map: HashMap<i64, CursorElementInfo> = HashMap::new();
     for (i, elem) in elements.iter().enumerate() {
         let backend_node_id = idx_to_backend.get(&i).copied();
 
-        // Role differentiation: v0.19.0 uses 'clickable' for cursor:pointer or onclick,
-        // 'focusable' for tabindex-only elements.
         let has_cursor_pointer = elem
             .get("hasCursorPointer")
             .and_then(|v| v.as_bool())
@@ -1023,7 +962,6 @@ fn build_tree(nodes: &[AXNode]) -> (Vec<TreeNode>, Vec<usize>) {
         id_to_idx.insert(node.node_id.clone(), i);
     }
 
-    // Build parent-child relationships
     for (i, node) in nodes.iter().enumerate() {
         if let Some(ref child_ids) = node.child_ids {
             for cid in child_ids {
@@ -1035,7 +973,6 @@ fn build_tree(nodes: &[AXNode]) -> (Vec<TreeNode>, Vec<usize>) {
         }
     }
 
-    // Set depths
     let mut root_indices = Vec::new();
     let children_exist: Vec<bool> = nodes.iter().map(|_| false).collect();
     let mut is_child = children_exist;
@@ -1105,7 +1042,6 @@ fn render_tree(
     let node = &nodes[idx];
 
     if node.role.is_empty() {
-        // Ignored node -- still render children
         for &child in &node.children {
             render_tree(nodes, child, indent, output, options);
         }
@@ -1120,7 +1056,6 @@ fn render_tree(
 
     let role = &node.role;
 
-    // Skip root WebArea wrapper
     if role == "RootWebArea" || role == "WebArea" {
         for &child in &node.children {
             render_tree(nodes, child, indent, output, options);
@@ -1129,7 +1064,6 @@ fn render_tree(
     }
 
     if options.interactive && !node.has_ref {
-        // In interactive mode, skip non-interactive but render children
         for &child in &node.children {
             render_tree(nodes, child, indent, output, options);
         }
@@ -1139,7 +1073,6 @@ fn render_tree(
     let prefix = "  ".repeat(indent);
     let mut line = format!("{}- {}", prefix, role);
 
-    // Use ARIA name if available, otherwise fall back to cursor-interactive textContent
     let display_name = if !node.name.is_empty() {
         &node.name
     } else if let Some(ref ci) = node.cursor_info {
@@ -1154,7 +1087,6 @@ fn render_tree(
         ));
     }
 
-    // Properties
     let mut attrs = Vec::new();
 
     if let Some(level) = node.level {
@@ -1190,7 +1122,6 @@ fn render_tree(
         line.push_str(&format!(" [{}]", attrs.join(", ")));
     }
 
-    // Add cursor-interactive kind & hints
     if let Some(ref cursor_info) = node.cursor_info {
         line.push_str(&format!(
             " {} [{}]",
@@ -1199,7 +1130,6 @@ fn render_tree(
         ));
     }
 
-    // Value
     if let Some(ref val) = node.value_text {
         if !val.is_empty() && val != &node.name {
             line.push_str(&format!(
@@ -1228,7 +1158,6 @@ fn compact_tree(tree: &str, interactive: bool) -> String {
     for (i, line) in lines.iter().enumerate() {
         if line.contains("[ref=") || line.contains(": ") {
             keep[i] = true;
-            // Mark ancestors
             let my_indent = count_indent(line);
             for j in (0..i).rev() {
                 let ancestor_indent = count_indent(lines[j]);
@@ -1261,11 +1190,6 @@ fn count_indent(line: &str) -> usize {
     (line.len() - trimmed.len()) / 2
 }
 
-/// Apply the same public snapshot envelope as the extension backend.
-///
-/// Character accounting intentionally uses UTF-16 code units because the
-/// extension's JavaScript implementation accounts with `String.length`.
-/// Metadata is appended after the content budget, matching the extension.
 fn bound_snapshot(tree: &str, skipped_cross_origin_frames: usize) -> BoundedSnapshot {
     bound_snapshot_with_budget(tree, skipped_cross_origin_frames, MAX_SNAPSHOT_CHARS)
 }
@@ -1356,12 +1280,12 @@ fn extract_ax_string_opt(value: &Option<AXValue>) -> Option<String> {
 }
 
 type NodeProperties = (
-    Option<i64>,    // level
-    Option<String>, // checked
-    Option<bool>,   // expanded
-    Option<bool>,   // selected
-    Option<bool>,   // disabled
-    Option<bool>,   // required
+    Option<i64>,
+    Option<String>,
+    Option<bool>,
+    Option<bool>,
+    Option<bool>,
+    Option<bool>,
 );
 
 fn extract_properties(props: &Option<Vec<AXProperty>>) -> NodeProperties {
@@ -1405,11 +1329,6 @@ fn extract_properties(props: &Option<Vec<AXProperty>>) -> NodeProperties {
     (level, checked, expanded, selected, disabled, required)
 }
 
-/// Build the set of texts to de-duplicate cursor-interactive elements against.
-///
-/// All ref-bearing ARIA tree nodes have their names stored in `ref_map` during
-/// tree construction, so the ref-map entries are the single source of truth.
-/// This avoids fragile parsing of the rendered tree text.
 fn build_dedup_set(ref_map: &RefMap) -> std::collections::HashSet<String> {
     ref_map
         .entries_sorted()
@@ -1419,8 +1338,6 @@ fn build_dedup_set(ref_map: &RefMap) -> std::collections::HashSet<String> {
         .collect()
 }
 
-/// Recursively collect all `backendNodeId` values from a CDP DOM node tree
-/// (as returned by `DOM.describeNode` with `depth: -1`).
 fn collect_backend_node_ids(node: &Value, ids: &mut std::collections::HashSet<i64>) {
     if let Some(id) = node.get("backendNodeId").and_then(|v| v.as_i64()) {
         ids.insert(id);
@@ -1430,7 +1347,6 @@ fn collect_backend_node_ids(node: &Value, ids: &mut std::collections::HashSet<i6
             collect_backend_node_ids(child, ids);
         }
     }
-    // Shadow DOM and content documents
     if let Some(shadow) = node.get("shadowRoots").and_then(|v| v.as_array()) {
         for child in shadow {
             collect_backend_node_ids(child, ids);
@@ -1476,7 +1392,6 @@ mod tests {
 
     #[test]
     fn bounded_snapshot_caps_utf16_characters_without_splitting_lines() {
-        // An emoji is two UTF-16 code units, matching JavaScript String.length.
         let long_line = format!("- text: {}x", "🙂".repeat(9_995));
         assert_eq!(long_line.encode_utf16().count() + 1, MAX_SNAPSHOT_CHARS);
         let input = format!("{long_line}\n- button \"hidden\" [ref=e1]");
@@ -1525,10 +1440,6 @@ mod tests {
         assert!(dups.contains_key("button:Submit"));
         assert!(!dups.contains_key("button:Cancel"));
     }
-
-    // -----------------------------------------------------------------------
-    // Cursor-interactive text dedup (Issue #841 regression guard)
-    // -----------------------------------------------------------------------
 
     #[test]
     fn test_dedup_set_from_ref_map_names() {

@@ -45,9 +45,7 @@ const CONNECT_DEADLINE_MESSAGE =
 export const GPT_LIVE_DATA_CHANNEL_LABEL = "oai-events";
 
 export interface GptLiveWebRTCTransportOptions {
-  /** Server-reported model id (or the requested model as a fallback). */
   model: string;
-  /** Posts the SDP offer under the managed lease and returns the answer. */
   sdpFetch: SdpAnswerFetcher;
 }
 
@@ -125,8 +123,6 @@ export class GptLiveWebRTCTransport implements RealtimeTransport {
     await started;
     this.throwIfCanceled(signal);
 
-    // Through the public setter, so the provider-side gate is told about the
-    // starting mute state too and not just the local track.
     await this.setMicEnabled(this.micEnabled);
     this.throwIfCanceled(signal);
   }
@@ -144,8 +140,6 @@ export class GptLiveWebRTCTransport implements RealtimeTransport {
 
   setMicEnabled(enabled: boolean): Promise<void> {
     this.micEnabled = enabled;
-    // The provider-side gate matters as much as the local one: a muted
-    // session must not accrue input on the server either.
     if (this.sessionStarted) {
       this.media.send({
         type: enabled
@@ -189,8 +183,6 @@ export class GptLiveWebRTCTransport implements RealtimeTransport {
     this.sessionStarted = false;
     await this.media.close();
   }
-
-  // ── internals ────────────────────────────────────────────────────────
 
   /**
    * `session.close` then keep receiving until `session.closed`. Tearing the
@@ -258,8 +250,6 @@ export class GptLiveWebRTCTransport implements RealtimeTransport {
       this.sessionStarted = false;
       this.resolveSessionClosed?.();
     } else if (type === "session.error" || type === "error") {
-      // A startup failure must surface as a connect rejection rather than a
-      // silent session that never speaks.
       if (this.resolveSessionStarted) {
         this.settleSessionStarted(new Error(gptLiveErrorMessage(event)));
       }

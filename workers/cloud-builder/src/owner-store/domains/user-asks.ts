@@ -1779,7 +1779,6 @@ export type UserAskRouteInput = {
   caller: OwnerCaller;
   body: Record<string, unknown>;
   query?: Record<string, string>;
-  /** The `x-stella-device-id` request header, when the client sent one. */
   deviceIdHeader?: string;
 };
 

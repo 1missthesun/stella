@@ -1,8 +1,6 @@
 import type { StellaMiniChatExchange } from "@/components/stella-mini-chat";
 import { FIX_PAGES } from "@/lib/fix-pages";
 
-// Per-/fix page conversation for the shared Stella mini-chat.
-// Keep it short: the visitor's own words, then a truthful done-state.
 export const FIX_PAGE_DEMOS: Record<string, StellaMiniChatExchange[]> = {
   "comfyui-broken-after-update": [
     {

@@ -31,13 +31,10 @@ export type ClaudeKeeperClient = {
     request: Extract<ClaudeKeeperRequest, { t: "attach" }>,
   ): Promise<{ reused: boolean; fresh: ClaudeKeeperFreshReason }>;
   write(data: string): void;
-  /** Resolves once Claude is stopped with its session files settled. */
   park(stateRoot: string): Promise<void>;
   release(state: ClaudeKeeperState): Promise<void>;
-  /** Kills Claude; resolves with its exit. */
   kill(): Promise<Exit>;
   onLine(listener: (line: string) => void): void;
-  /** Claude exited, or the keeper went away. Fires once. */
   readonly exited: Promise<Exit>;
   close(): void;
 };
@@ -69,7 +66,6 @@ const killKeeper = async (socketPath: string): Promise<void> => {
     (await readFile(`${socketPath}.pid`, "utf8").catch(() => "")).trim(),
   );
   if (!Number.isSafeInteger(pid) || pid <= 1) return;
-  // A pid file a snapshot carried names some other process here.
   const commandLine = await readFile(`/proc/${pid}/cmdline`, "utf8").catch(() => "");
   if (!commandLine.includes(KEEPER_ENTRY) || !commandLine.includes(socketPath)) {
     return;
@@ -85,11 +81,6 @@ const killKeeper = async (socketPath: string): Promise<void> => {
   }
 };
 
-/**
- * Started outside this executor's process tree, in a session of its own: the
- * executor's exit and its process-tree cleanup leave the keeper up, and the
- * keeper, not the tree, decides when Claude goes (see `claude-keeper.ts`).
- */
 const startKeeper = (socketPath: string): void => {
   const logPath = `${socketPath}.log`;
   try {
@@ -242,10 +233,6 @@ const client = (socket: net.Socket, socketPath: string): ClaudeKeeperClient => {
   };
 };
 
-/**
- * This thread's keeper, started when there is none. Undefined when none
- * answers: the turn then runs Claude itself, as before.
- */
 export const openClaudeKeeper = async (
   threadId: string,
 ): Promise<ClaudeKeeperClient | undefined> => {

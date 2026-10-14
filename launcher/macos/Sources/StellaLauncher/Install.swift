@@ -1,8 +1,5 @@
 import Foundation
 
-/// The managed git (`runtimes/git-<v>`), with the environment it needs to be
-/// relocatable. The same variables go to Electron, matching what the packaged
-/// app's bundled-runtime-environment.ts sets.
 struct GitTool {
     let bin: String
     let root: URL?
@@ -38,7 +35,6 @@ struct GitTool {
         return result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    /// Commits and notes the launcher makes carry Stella's identity.
     static let identityEnv: [String: String] = [
         "GIT_AUTHOR_NAME": "Stella",
         "GIT_AUTHOR_EMAIL": "stella@localhost",
@@ -81,9 +77,6 @@ enum Install {
         return git
     }
 
-    /// Bun from the version baked into the launcher, or the one a signed tree
-    /// asks for in `packages/desktop/launcher.json`:
-    /// `{"bun": {"version": "1.4.1", "assets": {"darwin-arm64": {"url", "sha256", "member"}}}}`.
     static func ensureBun(paths: LauncherPaths, baseEnv: [String: String], localBun: String?, progress: (String) -> Void) throws -> (URL, String) {
         var version = Pins.bunVersion
         var asset = Pins.bun[Pins.platformKey]
@@ -93,7 +86,6 @@ enum Install {
         }
 
         if let localBun {
-            // Offline/testing: adopt an existing Bun binary instead of downloading.
             let probe = try Shell.run(localBun, ["--version"], env: baseEnv)
             let localVersion = probe.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
             guard probe.code == 0, !localVersion.isEmpty else { throw LauncherError("\(localBun) is not a working bun.") }
@@ -150,14 +142,10 @@ enum Install {
     }
 
     enum Source {
-        /// `POST <backend>/api/app-source/bootstrap` → upstream remote + read token.
         case upstream(backend: String)
-        /// A local path or git URL (testing).
         case explicit(String, ref: String?)
     }
 
-    /// Clone the app source into `app/`. The checkout is staged beside it and
-    /// renamed into place, so an interrupted install never leaves half a tree.
     static func cloneSource(paths: LauncherPaths, git: GitTool, source: Source, progress: (String) -> Void) throws {
         progress("Downloading Stella…")
         let staging = paths.appStaging
@@ -207,7 +195,6 @@ enum Install {
         guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw LauncherError("The app source bootstrap returned an unexpected body.")
         }
-        // Accept `{remote, token}` or `{upstream: {remote, token}}`.
         let body = (json["upstream"] as? [String: Any]) ?? json
         guard let remote = body["remote"] as? String, let token = body["token"] as? String else {
             throw LauncherError("The app source bootstrap response has no remote and token.")

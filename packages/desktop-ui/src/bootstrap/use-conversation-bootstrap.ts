@@ -27,9 +27,6 @@ export const useConversationBootstrap = () => {
     const run = async () => {
       markPreparing();
 
-      // Plain-browser dev tab: there is no chat backend and never will be
-      // this session — mark ready with no conversation instead of burning
-      // the 45s retry loop into a bootstrap-failure surface.
       if (!isLocalChatApiAvailable()) {
         markReady();
         return;

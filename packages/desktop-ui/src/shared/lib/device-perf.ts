@@ -20,11 +20,6 @@ export function prefersReducedMotion(): boolean {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
-/**
- * Cheap heuristic for memory/CPU-constrained devices. Windows 8GB machines are
- * included because Stella's dev-server-style desktop stack is memory-bound
- * there even when CPU is mostly idle.
- */
 export function isLowPowerDevice(): boolean {
   if (cachedLowPower !== undefined) return cachedLowPower;
   if (hasForcedLowPowerFlag()) {
@@ -58,7 +53,6 @@ export function shouldUseLowPowerEffects(): boolean {
   return prefersReducedMotion() || isLowPowerDevice();
 }
 
-/** Sync `data-low-power` when boot script could not run (tests, dev HMR). */
 export function applyLowPowerDocumentFlag(): void {
   if (typeof document === "undefined") return;
   if (shouldUseLowPowerEffects()) {

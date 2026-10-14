@@ -1,28 +1,3 @@
-/**
- * Schedules, fired from the owner object's alarm.
- *
- * A schedule is a prompt plus a `LocalCronSchedule`, of a kind: a `task`
- * starts a run at fire time; a `reminder`'s prompt is the text Stella wrote
- * when it was set, delivered with no model and no turn (a push to the
- * phone, a card in the conversation every client shows as Stella's message,
- * an in-app notice on the desktop); a `watch` runs its check script with no
- * model (`../watch-runner.ts`) and only a finding or a failure wakes AI, its
- * prompt saying what to do with a finding. What wakes AI goes to the
- * conversation's orchestrator, or with `route: agent` straight to an agent
- * of it, whose report comes back like any finished job. Each live schedule has
- * exactly one pending `schedules.fire` job, id `schedule:<id>`, at its
- * `next_run_at`; every write that moves the time or the status replaces it.
- * A fire claims the row (re-anchoring recurring schedules from the fire
- * time, marking one-shots done), spends one of the owner's daily scheduled
- * runs, and starts the turn through `host.startScheduledTurn`: on the named
- * desktop, or in the schedule's cloud conversation.
- *
- * Limits: at most MAX_SCHEDULES live rows, no schedule more often than
- * MIN_INTERVAL_MS, and a daily fire budget per plan held apart from the
- * interactive chat budget, so background work never spends the allowance
- * the person at the composer is about to need.
- */
-
 import { Cron } from "croner";
 import type { LocalCronSchedule } from "@stella/contracts/scheduling";
 import {
@@ -72,16 +47,13 @@ const MIN_INTERVAL_MS = 15 * 60_000;
 const MAX_PROMPT_CHARS = 4_000;
 const MAX_DESCRIPTION_CHARS = 200;
 const MAX_ERROR_CHARS = 300;
-/** A fire that failed is retried this soon… */
 const FIRE_RETRY_DELAY_MS = 60_000;
-/** …at most this many times in a row, then the schedule waits for its next slot. */
 const MAX_FIRE_RETRIES = 3;
 const DAY_MS = 24 * 60 * 60_000;
 const RECEIPT_TTL_MS = 7 * DAY_MS;
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9._:-]{8,128}$/u;
 const ID_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/u;
 
-/** Scheduled runs per day; their own budget, apart from interactive chat. */
 const DAILY_FIRES = { free: 24, go: 60, pro: 120 } as const;
 const UNLIMITED_DAILY_FIRES = 800;
 
@@ -120,10 +92,6 @@ export const SCHEDULES_MIGRATION = {
 const LEGACY_REMINDER_PREFIX =
   "Reminder for the user (deliver this exact message to them now, and nothing else): ";
 
-/**
- * Reminders become their own kind. Ones stored as a prompt telling a turn to
- * repeat the text keep just the text.
- */
 export const SCHEDULES_KINDS_MIGRATION = {
   id: "schedules.2-kinds",
   statements: [
@@ -145,11 +113,6 @@ export const SCHEDULES_KINDS_MIGRATION = {
   ],
 };
 
-/**
- * Cloud watches and routing: who handles a fire that needs AI, a watch's
- * script and the state it carries between checks, and a finding waiting to
- * be handed over.
- */
 export const SCHEDULES_WATCHES_MIGRATION = {
   id: "schedules.3-watches",
   statements: [
@@ -164,13 +127,11 @@ export const SCHEDULES_WATCHES_MIGRATION = {
   ],
 };
 
-/** When a late delivery was due, so it can say so. */
 export const SCHEDULES_DUE_MIGRATION = {
   id: "schedules.4-due",
   statements: [`ALTER TABLE reminder_fires ADD COLUMN due_at INTEGER`],
 };
 
-/** The zone schedules run in, and the last zone the user was asked about. */
 export const SCHEDULES_ZONE_MIGRATION = {
   id: "schedules.5-zone",
   statements: [
@@ -183,10 +144,6 @@ export const SCHEDULES_ZONE_MIGRATION = {
   ],
 };
 
-/**
- * The phone decides the user's zone, and repeating schedules follow it: a
- * cron pinned to the user's own zone becomes one that follows them.
- */
 export const SCHEDULES_ZONE_SOURCE_MIGRATION = {
   id: "schedules.6-zone-source",
   statements: [
@@ -199,7 +156,6 @@ export const SCHEDULES_ZONE_SOURCE_MIGRATION = {
   ],
 };
 
-/** A failing watch's repair handed to Stella, separate from the failure being seen. */
 export const SCHEDULES_WATCH_REPAIR_MIGRATION = {
   id: "schedules.7-watch-repair",
   statements: [`ALTER TABLE schedules ADD COLUMN repair_sent_at INTEGER`],
@@ -274,7 +230,6 @@ const zoneField = (scheduleJson: string, ownerZone?: string): { zone?: string } 
 const readRow = (db: OwnerDbReader, scheduleId: string): Row | null =>
   db.one<Row>("SELECT * FROM schedules WHERE schedule_id = ?", scheduleId);
 
-/** Active schedules soonest first, then paused ones. */
 const listRows = (db: OwnerDbReader): ScheduleRow[] => {
   const { zone } = readZone(db);
   return db
@@ -291,9 +246,6 @@ const bad = (message: string): never => {
   throw new RpcError("BAD_REQUEST", message);
 };
 
-// ── Schedules and their times ─────────────────────────────────────────────
-
-/** Untrusted JSON to a `LocalCronSchedule`, with the desktop scheduler's errors. */
 export const normalizeSchedule = (value: unknown): LocalCronSchedule => {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return bad("schedule must be an object.");
@@ -327,8 +279,6 @@ export const normalizeSchedule = (value: unknown): LocalCronSchedule => {
 
 const scheduleParser: Parser<LocalCronSchedule> = (value) => normalizeSchedule(value);
 
-// ── The user's zone, which repeating schedules follow ─────────────────────
-
 const readZone = (db: OwnerDbReader): ScheduleZone => {
   const row = db.one<{ zone: string | null; source: string | null; phone_reported_at: number | null }>(
     "SELECT zone, source, phone_reported_at FROM schedule_zone WHERE id = 1",
@@ -340,16 +290,13 @@ const readZone = (db: OwnerDbReader): ScheduleZone => {
   };
 };
 
-/** The user's zone, for a cron with none of its own. */
 export const ownerZone = (db: OwnerDbReader): string | undefined => readZone(db).zone;
 
-/** The owner snapshot's view of the user's zone. */
 export const snapshotTimeZone = (db: OwnerDbReader): { timeZone?: string } => {
   const zone = ownerZone(db);
   return zone ? { timeZone: zone } : {};
 };
 
-/** A cron set in the user's own zone is their clock, so it follows them. */
 const followingOwner = (db: OwnerDbReader, schedule: LocalCronSchedule): LocalCronSchedule => {
   if (schedule.kind !== "cron" || !schedule.tz) return schedule;
   return schedule.tz === readZone(db).zone ? { kind: "cron", expr: schedule.expr } : schedule;
@@ -360,11 +307,6 @@ const zoneArgs = object({
   source: literal("phone", "computer"),
 });
 
-/**
- * A device says where it is. Every live cron with no zone of its own is kept
- * on the user's clock: re-timed when the zone moves, and an older one that
- * ran in UTC adopts the user's zone.
- */
 const reportZone = (
   ctx: OwnerContext,
   input: { timeZone: string; source: ScheduleZoneSource },
@@ -437,7 +379,6 @@ export const computeNextRunAt = (schedule: LocalCronSchedule, nowMs: number, zon
   return next.getTime();
 };
 
-/** The gap between consecutive fires, or null for a one-shot. */
 const intervalMs = (schedule: LocalCronSchedule, nowMs: number): number | null => {
   if (schedule.kind === "at") return null;
   if (schedule.kind === "every") return schedule.everyMs;
@@ -449,7 +390,6 @@ const intervalMs = (schedule: LocalCronSchedule, nowMs: number): number | null =
 
 const assertAllowed = (schedule: LocalCronSchedule, nowMs: number, kind: ScheduleKind = "task"): void => {
   const interval = intervalMs(schedule, nowMs);
-  // A watch's check runs no model, so it may look more often.
   const floor = kind === "watch" ? WATCH_MIN_INTERVAL_MS : MIN_INTERVAL_MS;
   if (interval !== null && interval < floor) {
     bad(`${kind === "watch" ? "Watches" : "Schedules"} can run at most once every ${floor / 60_000} minutes. Space this one out.`);
@@ -466,11 +406,6 @@ const cleanScript = (value: string | undefined): string => {
   return script;
 };
 
-/**
- * A watch's first check, run before it is saved: a script that cannot run
- * is refused with its error, and one that runs starts from the state it
- * returned. What it found already is reported, not handed over.
- */
 const firstCheck = async (
   ctx: OwnerContext,
   scheduleId: string,
@@ -507,7 +442,6 @@ const parseStored = (json: string): LocalCronSchedule => {
   }
 };
 
-/** Keep exactly one pending fire for a live schedule, and none otherwise. */
 const arm = (ctx: OwnerContext, row: Pick<Row, "schedule_id" | "status" | "next_run_at">, fireId?: string): void => {
   if (row.status === "active") {
     ctx.jobs.schedule(
@@ -521,15 +455,8 @@ const arm = (ctx: OwnerContext, row: Pick<Row, "schedule_id" | "status" | "next_
   }
 };
 
-// ── Writes, replayed by request id ────────────────────────────────────────
-
 type Action = "create" | "update" | "remove";
 
-/**
- * Run `write` once per request id. A retry with the same id and intent
- * returns the stored result instead of writing again; the same id with a
- * different intent is refused.
- */
 const withReceipt = <T>(
   db: OwnerDb,
   now: number,
@@ -586,7 +513,6 @@ const createSchedule = async (
   const schedule = followingOwner(ctx.db, normalizeSchedule(input.schedule));
   const description = cleanDescription(input.description, prompt);
   const conversationId = input.conversationId?.trim() || null;
-  // A reminder runs nowhere: it needs no computer.
   const targetDeviceId = kind === "reminder" ? null : input.targetDeviceId?.trim() || null;
   const route: ScheduleRoute = kind === "reminder" ? "orchestrator" : (input.route ?? "orchestrator");
   const script = kind === "watch" ? cleanScript(input.script) : null;
@@ -594,8 +520,6 @@ const createSchedule = async (
   const requestId = input.requestId.trim();
   const intent = { kind, prompt, schedule, description, conversationId, targetDeviceId, route, script, once };
   const scheduleId = `sch-${crypto.randomUUID().slice(0, 18)}`;
-  // The first check awaits, so it runs before the receipt's write; a replay
-  // of the same request skips it and answers with the first result.
   const replay = ctx.db.one<{ request_id: string }>(
     "SELECT request_id FROM schedule_receipts WHERE request_id = ?",
     requestId,
@@ -686,7 +610,6 @@ const updateSchedule = async (
     "SELECT request_id FROM schedule_receipts WHERE request_id = ?",
     requestId,
   );
-  // A new script proves itself first and starts over from its own state.
   const first = script !== undefined && existing && !replay ? await firstCheck(ctx, existing.schedule_id, script) : null;
   return withReceipt(
     ctx.db,
@@ -715,8 +638,6 @@ const updateSchedule = async (
         scheduleJson = JSON.stringify(schedule);
         nextRunAt = computeNextRunAt(schedule, ctx.now, ownerZone(ctx.db));
       }
-      // Resuming re-anchors to now, so a schedule that slept through a dozen
-      // fires wakes up once rather than catching up.
       if (input.status === "active" && row.status !== "active") {
         nextRunAt = computeNextRunAt(parseStored(scheduleJson), ctx.now, ownerZone(ctx.db));
       }
@@ -806,8 +727,6 @@ const runNow = (ctx: OwnerContext, scheduleId: string): null => {
   return null;
 };
 
-// ── The cloud Schedule tool ───────────────────────────────────────────────
-
 const toolParser = object({
   action: literal("list", "create", "update", "remove"),
   kind: optional(literal("reminder", "task", "watch")),
@@ -889,8 +808,6 @@ const scheduleTool = async (ctx: OwnerContext, raw: unknown): Promise<ScheduleTo
   };
 };
 
-// ── Reminders ─────────────────────────────────────────────────────────────
-
 const REMINDER_KEEP_MS = 30 * DAY_MS;
 const REMINDER_LIST_MS = 7 * DAY_MS;
 const REMINDER_LIST_LIMIT = 100;
@@ -938,12 +855,10 @@ const listFires = (db: OwnerDbReader, now: number): ReminderFire[] =>
     )
     .map(toReminderFire);
 
-/** The delivery's row, once per fire id: a retried fire finds the first one. */
 const recordFire = (
   ctx: OwnerContext,
   fire: { fireId: string; scheduleId: string; conversationId: string | null; text: string; dueAt?: number },
 ): FireRow => {
-  // Late past a point, it says when it was due; it is still delivered just once.
   const dueAt = fire.dueAt !== undefined && ctx.now - fire.dueAt > REMINDER_LATE_MS ? fire.dueAt : null;
   ctx.db.run(
     `INSERT OR IGNORE INTO reminder_fires
@@ -992,10 +907,6 @@ const reminderPushMessages = (ctx: OwnerContext, fire: FireRow) => {
   };
 };
 
-/**
- * Deliver one reminder: the push once, and the card, which the journal takes
- * once per fire. False when something has to be tried again.
- */
 const deliverReminder = async (ctx: OwnerContext, ownerGeneration: string, fire: FireRow): Promise<boolean> => {
   let delivered = true;
   if (fire.pushed_at === null) {
@@ -1050,7 +961,6 @@ const setReminderState = (
   return toReminderFire(readFire(ctx.db, fireId)!);
 };
 
-/** A snoozed reminder comes back as a fresh delivery, at the foot of the chat. */
 const reminderReturn = async (ctx: OwnerContext, payload: unknown): Promise<void> => {
   const { fireId } = object({ fireId: string({ max: 128 }) })(payload);
   const old = readFire(ctx.db, fireId);
@@ -1072,11 +982,8 @@ const reminderReturn = async (ctx: OwnerContext, payload: unknown): Promise<void
   }
 };
 
-// ── Firing ────────────────────────────────────────────────────────────────
-
 const firePayload = object({
   scheduleId: string({ max: 128 }),
-  /** Set on a retry whose first start may have happened: start it again under the same id. */
   fireId: optional(string({ max: 64 })),
 });
 
@@ -1090,12 +997,6 @@ const dailyFires = (ctx: OwnerContext): { plan: string; count: number } => {
 
 const planLabel = (plan: string): string => (plan === "free" ? "Free" : plan === "go" ? "Go" : "Pro");
 
-/**
- * Close out a fire `claim` advanced. A failure goes on the row, where the
- * Schedule tool and the lists read it back; a retryable one pulls the next
- * run forward a minute (at most MAX_FIRE_RETRIES times in a row), and a
- * one-shot that gives up stays done rather than active-and-overdue.
- */
 const finishFire = (
   ctx: OwnerContext,
   scheduleId: string,
@@ -1103,7 +1004,6 @@ const finishFire = (
   outcome: { error?: string; retry?: { sameFire: boolean }; pause?: boolean; oneShot?: boolean },
 ): void => {
   const row = readRow(ctx.db, scheduleId);
-  // Removed or rewritten since the claim: whatever changed it owns the row now.
   if (!row || row.active_fire_id !== fireId) return;
   if (!outcome.error) {
     ctx.db.run(
@@ -1146,8 +1046,6 @@ const finishFire = (
 const fire = async (ctx: OwnerContext, payload: unknown): Promise<void> => {
   const { scheduleId, fireId: retryFireId } = firePayload(payload);
   const snapshot = await ctx.host.snapshot();
-  // Everything from here to the start is synchronous, so nothing interleaves
-  // between reading the row and claiming it.
   const row = readRow(ctx.db, scheduleId);
   if (!row || row.status !== "active") return;
   if (row.next_run_at > ctx.now) {
@@ -1162,8 +1060,6 @@ const fire = async (ctx: OwnerContext, payload: unknown): Promise<void> => {
   try {
     schedule = parseStored(row.schedule_json);
     oneShot = schedule.kind === "at";
-    // Recurring schedules re-anchor from the fire, so an owner object that
-    // slept through several fires wakes up once, not N times.
     if (!oneShot) nextRunAt = computeNextRunAt(schedule, ctx.now + 1_000, ownerZone(ctx.db));
   } catch (error) {
     ctx.db.run("UPDATE schedules SET active_fire_id = ? WHERE schedule_id = ?", fireId, scheduleId);
@@ -1191,7 +1087,6 @@ const fire = async (ctx: OwnerContext, payload: unknown): Promise<void> => {
     return;
   }
   if (toScheduleKind(row.kind) === "reminder") {
-    // No model and no turn, so no scheduled-run budget either.
     const delivery = recordFire(ctx, {
       fireId,
       scheduleId,
@@ -1220,16 +1115,11 @@ const fire = async (ctx: OwnerContext, payload: unknown): Promise<void> => {
   finishFire(ctx, scheduleId, fireId, started.ok ? {} : { ...started.outcome, oneShot });
 };
 
-/** A run that starts well after it was due says so: it runs once, not once per missed slot. */
 const lateNote = (dueAt: number, now: number): string =>
   now - dueAt > REMINDER_LATE_MS
     ? `\n\n(This was due at ${new Date(dueAt).toISOString()} and runs now instead, once, in place of any runs it missed.)`
     : "";
 
-/**
- * One of the owner's daily scheduled runs, for a fire about to wake AI.
- * When they are used up the fire is closed with why, and this is false.
- */
 const spendRun = (ctx: OwnerContext, scheduleId: string, fireId: string, oneShot: boolean): boolean => {
   const budget = dailyFires(ctx);
   try {
@@ -1243,8 +1133,6 @@ const spendRun = (ctx: OwnerContext, scheduleId: string, fireId: string, oneShot
     return true;
   } catch (error) {
     if (!(error instanceof RpcError) || error.code !== "RATE_LIMITED") throw error;
-    // A fact about the account, not a transient failure: wait for the next
-    // slot rather than retrying into the same wall.
     finishFire(ctx, scheduleId, fireId, {
       error: `This run was skipped: today's ${budget.count} scheduled runs on the ${planLabel(budget.plan)} plan are used up.`,
       oneShot,
@@ -1257,10 +1145,6 @@ type StartOutcome =
   | { ok: true }
   | { ok: false; outcome: { error: string; retry?: { sameFire: boolean } } };
 
-/**
- * Start a fire's run in the schedule's conversation: a turn of its
- * orchestrator, or with `agent` an agent of it.
- */
 const startRun = async (
   ctx: OwnerContext,
   row: Row,
@@ -1269,8 +1153,6 @@ const startRun = async (
   run: { prompt: string; agent?: { description: string } },
 ): Promise<StartOutcome> => {
   const scheduleId = row.schedule_id;
-  // Conversation ids are minted here and pinned before the start, so every
-  // retry of this fire and every later fire reports into the same thread.
   let conversationId = row.conversation_id ?? crypto.randomUUID();
   if (!row.conversation_id) {
     ctx.db.run("UPDATE schedules SET conversation_id = ? WHERE schedule_id = ?", conversationId, scheduleId);
@@ -1289,8 +1171,6 @@ const startRun = async (
     try {
       await start(conversationId);
     } catch (error) {
-      // The pinned conversation was deleted while the schedule lived on:
-      // start a fresh one rather than failing every fire from now on.
       if (!(error instanceof ScheduledTurnError) || !error.conversationGone || !row.conversation_id) throw error;
       conversationId = crypto.randomUUID();
       await start(conversationId);
@@ -1301,9 +1181,6 @@ const startRun = async (
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    // A definite refusal never started anything, so its retry is a fresh
-    // fire. Anything else may have started; its retry reuses the fire id,
-    // which the start replays instead of running the prompt twice.
     const definite = error instanceof ScheduledTurnError;
     return {
       ok: false,
@@ -1315,8 +1192,6 @@ const startRun = async (
   }
   return { ok: true };
 };
-
-// ── Watches ───────────────────────────────────────────────────────────────
 
 const watchFoundPrompt = (row: Row, found: string): string =>
   [
@@ -1347,14 +1222,6 @@ const watchFailedPrompt = (row: Row, error: string): string =>
     "It keeps trying on its schedule. Repair it: find out what changed, rewrite the check script and replace it with schedule_update({ jobId, script }), which checks it once before saving. Tell the user only if it can't be fixed.",
   ].join("\n");
 
-/**
- * A watch's fire: its script runs with no model. Nothing found is the end of
- * it. A finding is handed to the orchestrator, or to an agent when the user
- * already approved the action; it waits on the row until it is, so a busy
- * or refused start never loses it and never runs the check again for it. A
- * failing script is reported once per failing streak, for repair, and
- * again on a later failing check until that report reaches Stella.
- */
 const fireWatch = async (
   ctx: OwnerContext,
   row: Row,
@@ -1378,7 +1245,6 @@ const fireWatch = async (
     });
     const current = readRow(ctx.db, scheduleId);
     if (!current) return;
-    // Its script was replaced while this one ran: the new one starts its own state.
     if (current.script !== row.script) {
       finishFire(ctx, scheduleId, fireId, {});
       return;
@@ -1432,7 +1298,6 @@ const fireWatch = async (
     return;
   }
   if (found) {
-    // Handed over. A one-off watch has answered its question.
     ctx.db.run(
       `UPDATE schedules SET pending_finding = NULL, status = CASE WHEN once = 1 THEN 'done' ELSE status END
         WHERE schedule_id = ?`,
@@ -1447,8 +1312,6 @@ const fireWatch = async (
   }
   finishFire(ctx, scheduleId, fireId, failure ? { error: failure } : {});
 };
-
-// ── Domain ────────────────────────────────────────────────────────────────
 
 const createArgs = object({
   requestId: string({ max: 128 }),
@@ -1555,8 +1418,6 @@ export const schedulesDomain = {
   jobs: {
     [SCHEDULE_FIRE_JOB]: {
       run: fire,
-      // Fires handle their own failures; this only covers an unreadable
-      // owner snapshot, which the store retries with backoff.
       maxAttempts: 10,
     },
     [REMINDER_RETURN_JOB]: {

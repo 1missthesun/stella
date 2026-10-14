@@ -1,14 +1,3 @@
-/**
- * Message pages for the focus (lineage) view.
- *
- * A lineage is small — the root, the turn that spawned an agent, and the
- * replies that cited either — so this store is deliberately simpler than
- * the main timeline store: one authoritative read per focus, keyset-paged
- * older reads on demand, and a debounced full re-read whenever the
- * conversation changes underneath it. Rows are the same `MessageRecord`
- * shape the main timeline renders, so the focus list reuses the whole row
- * projection (cards, tool activity, artifacts) unchanged.
- */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type {
   EventRecord,
@@ -57,12 +46,6 @@ type Entry = {
 const entries = new Map<string, Entry>();
 let updateUnsubscribe: (() => void) | null = null;
 
-/**
- * A client-side lineage source. A cloud-mode conversation has no local
- * `entry_ref` index, so the cloud bridge publishes its loaded journal window
- * here and the lineage is derived from it: the root, and every row whose
- * reply references cite the root. Paging older delegates to the source.
- */
 export type LineageSource = {
   messages: readonly MessageRecord[];
   hasOlder: boolean;
@@ -242,7 +225,6 @@ const sortMessages = (messages: MessageRecord[]) =>
         a._id.localeCompare(b._id),
     );
 
-/** Re-read the whole loaded span (at least one page) as one authoritative page. */
 const readAll = (entry: Entry): Promise<void> => {
   const provided = providedSources.get(entry.conversationId);
   if (provided) {
@@ -418,8 +400,6 @@ export const subscribeToLineageMessages = (
   return () => {
     entry.listeners.delete(listener);
     syncUpdateSubscription();
-    // Focus is transient; drop the page when its last viewer leaves so a
-    // reopened focus always starts from a fresh read.
     evictIdle();
   };
 };
@@ -432,7 +412,6 @@ export const loadOlderLineageMessages = (
   return entry ? readOlder(entry) : Promise.resolve(false);
 };
 
-/** Live lineage page for one focus root. */
 export const useLineageMessages = (
   conversationId: string | null | undefined,
   root: ConversationFocusRoot | null | undefined,

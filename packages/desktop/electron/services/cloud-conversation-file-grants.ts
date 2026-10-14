@@ -1,30 +1,10 @@
-/**
- * Files Stella produced or displayed in one of the owner's conversations,
- * read from that conversation's cloud journal.
- *
- * A paired phone may open a file on this computer when Stella put it in front
- * of the user in the conversation the phone names: a file link in one of
- * Stella's replies, the report an agent finished with, a `files` card, or a
- * file a display tool (`html`, `image_gen`) produced. The journal is the
- * source of truth, not this window's local cache, so a phone conversation the
- * desktop window is not showing grants the same as the one it is.
- *
- * The journal is read with this computer's own account token through
- * `history.read`, which the conversation's Durable Object answers only for
- * its owner, so another account's conversation id grants nothing. The user's
- * own messages never grant anything: naming a path is not the same as Stella
- * having produced it.
- */
-
 import { extractLocalFileLinkPaths } from "@stella/contracts/local-file-links";
 
 /** Records `history.read` returns per call (the server's batch cap). */
 const READ_BATCH = 200;
-/** Journal records scanned per conversation, newest first. */
 const MAX_RECORDS = 4_000;
 const CACHE_TTL_MS = 15_000;
 const REQUEST_TIMEOUT_MS = 10_000;
-/** Tools whose result `filePath` is a file Stella showed the user. */
 const DISPLAY_TOOLS = new Set(["html", "image_gen"]);
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
@@ -57,7 +37,6 @@ const parsePayload = (value: unknown): Record<string, unknown> | null => {
   return asRecord(value);
 };
 
-/** Paths one journal record grants, by what kind of record it is. */
 export const journalRecordFilePaths = (raw: unknown): string[] => {
   const record = asRecord(raw);
   if (!record) return [];
@@ -72,7 +51,6 @@ export const journalRecordFilePaths = (raw: unknown): string[] => {
     if (role === "assistant") {
       for (const text of messageTexts(payload)) addLinks(text);
     } else if (role === "user" && payload.source === "agent-thread") {
-      // An agent's completion wake carries the report it finished with.
       for (const text of messageTexts(payload)) addLinks(text);
     } else if (
       role === "toolResult" &&
@@ -109,7 +87,6 @@ type Deps = {
 };
 
 export type CloudConversationFileGrants = {
-  /** Every path Stella produced or displayed in `conversationId`. */
   listPaths: (conversationId: string) => Promise<string[]>;
 };
 

@@ -1,4 +1,3 @@
-/** Activity recoverable from the canonical journal, including device-written tools. */
 type ActivityRecord = {
   kind: string;
   turnId: string;
@@ -33,7 +32,6 @@ export function journalWorkingActivity(records: readonly ActivityRecord[], turnI
       if (typeof block.id === "string" && typeof block.name === "string") tools.set(block.id, block.name);
     }
     answerLanded = hasText && !hasCalls && payload.followedByToolCall !== true;
-    // A final assistant answer supersedes any missed tool-result row.
     if (answerLanded) tools.clear();
   }
   const last = [...tools].at(-1);

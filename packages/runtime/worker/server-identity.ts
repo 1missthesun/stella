@@ -1,46 +1,15 @@
 import { randomUUID } from "node:crypto";
 
-/**
- * Logical identity of one runtime process, for the app ↔ runtime handshake.
- *
- * The detached runtime outlives the app, and its socket path is keyed only by
- * the Stella root, so "something answers on the socket" is not proof that it
- * is the runtime the app expects. Each runtime boot mints a fresh `serverId`
- * and reports it, with its root, pid, build stamp and the environment it must
- * share with its app, in the readiness probe and the attach result:
- *
- *   - The attach pipeline verifies the probed identity against what this app
- *     expects (same root, the pidfile's pid, the same shared environment) and
- *     replaces a runtime that fails it, including a pre-identity runtime.
- *   - The peer socket is a second connection, so `runtime.attach` names the
- *     probed `serverId` and the runtime refuses a mismatch; a runtime that was
- *     replaced between probe and attach can never adopt the client.
- *
- * The build stamp is reported but not enforced here: a stale-code runtime is
- * replaced by the staleness handshake, which defers until in-flight work
- * finishes instead of killing it.
- */
-
 export type RuntimeServerIdentity = {
-  /** Fresh per runtime process boot (the runtime "instance"). */
   serverId: string;
-  /** `hashStellaAppDir` of the root this runtime serves. */
   rootHash: string;
   pid: number;
-  /** Build stamp of the runtime code loaded at boot (generation), when known. */
   buildStamp: string | null;
   protocolVersion: string;
   startedAtMs: number;
-  /** The `RUNTIME_SHARED_ENV_KEYS` values this runtime booted with. */
   launchEnv: Record<string, string>;
 };
 
-/**
- * Environment the runtime must share with its app. Each one names a resource
- * both sides address independently (the browser bridge socket directory and
- * the in-app browser bootstrap session), so a runtime spawned under different
- * values would talk to another instance's endpoints.
- */
 export const RUNTIME_SHARED_ENV_KEYS = [
   "STELLA_BROWSER_SOCKET_DIR",
   "STELLA_IN_APP_BROWSER_BOOTSTRAP_SESSION",
@@ -105,12 +74,9 @@ export const parseRuntimeServerIdentity = (
   };
 };
 
-/** What a client expects of the runtime it is about to adopt. */
 export type ExpectedRuntimeServerIdentity = {
   rootHash: string;
-  /** The pidfile's pid, when attaching to an existing runtime. */
   pid?: number;
-  /** A specific instance, when the identity was already probed. */
   serverId?: string;
   launchEnv?: Record<string, string>;
 };
@@ -126,10 +92,6 @@ const sameLaunchEnv = (
   return true;
 };
 
-/**
- * Why `actual` is not the runtime `expected` describes, or null when it is.
- * A missing identity is a pre-identity runtime: never adopted.
- */
 export const describeRuntimeServerIdentityMismatch = (
   expected: ExpectedRuntimeServerIdentity,
   actual: RuntimeServerIdentity | null,

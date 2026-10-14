@@ -1,11 +1,3 @@
-/**
- * Pure resolution behind the `map` tool: validate the natural-language
- * request, resolve it through the Stella backend's maps resolver (Google
- * Places / Directions with a server-side key, so no key on the user's side),
- * and summarize the resulting `map-route` artifact for the model. No host
- * dependencies, so the device kernel and the cloud Durable Object share it.
- */
-
 import {
   isMapRouteArtifact,
   MAPS_RESOLVE_PATH,
@@ -30,7 +22,6 @@ export type MapResolveOutcome =
 const asTrimmedString = (value: unknown): string =>
   typeof value === "string" ? value.trim() : "";
 
-/** Normalize model arguments; `null` with an error message when unusable. */
 export const parseMapToolArgs = (
   args: Record<string, unknown>,
 ): { request: MapResolveRequest } | { error: string } => {
@@ -74,7 +65,6 @@ const formatDuration = (seconds: number): string => {
   return rest > 0 ? `${hours} hr ${rest} min` : `${hours} hr`;
 };
 
-/** Compact text the model can speak from; the card itself shows the map. */
 export const summarizeMapArtifact = (
   map: MapRouteArtifact,
   unresolved: string[],
@@ -124,7 +114,6 @@ export const summarizeMapArtifact = (
   return lines.join("\n");
 };
 
-/** Shape a resolver response (HTTP status + JSON body) into the tool outcome. */
 export const mapOutcomeFromResolver = (
   status: number,
   payload: unknown,
@@ -152,14 +141,11 @@ export const mapOutcomeFromResolver = (
 };
 
 export type MapResolveOptions = {
-  /** The Stella backend origin and the caller's bearer token. */
   backend: { baseUrl: string; authToken: string };
   fetchImpl?: typeof fetch;
-  /** Composed with the resolve deadline by the caller. */
   signal?: AbortSignal;
 };
 
-/** POST the request to the backend resolver and shape the outcome. Never throws. */
 export const resolveMapArtifact = async (
   request: MapResolveRequest,
   options: MapResolveOptions,

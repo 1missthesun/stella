@@ -6,23 +6,10 @@ import {
 } from "@stella/contracts/self-host";
 import { selfHostServersAvailable } from "./native-capabilities";
 
-/**
- * The servers this phone knows. Stella's hosted service (the build's
- * backend) is always first and is never stored; self-hosted servers are
- * added by pairing. One server is active per app launch: switching writes
- * the choice and reloads the JS, so every module reads one backend for the
- * whole process (`env.backendUrl` is fixed at import).
- *
- * Credentials stay per server: `secure-store.ts` prefixes every key with
- * the active server's scope, so a self-hosted server's session never sits
- * under the hosted keys (which are unchanged for hosted users).
- */
-
 export const HOSTED_SERVER_ID = "hosted";
 
 export type SelfHostedServer = {
   kind: "self-hosted";
-  /** Stable local id, derived from the origin; safe in SecureStore keys. */
   id: string;
   origin: string;
   name: string;
@@ -39,8 +26,6 @@ const REGISTRY_KEY = "stella-mobile.servers.v1";
 const ACTIVE_KEY = "stella-mobile.active-server.v1";
 const scopeKeysKey = (id: string) => `stella-mobile.server-keys.${id}`;
 
-// Unscoped on purpose (the registry is device-wide), and readable after
-// first unlock like the rest of the app's keychain items (CarPlay).
 const options: ExpoSecureStore.SecureStoreOptions = {
   keychainAccessible: ExpoSecureStore.AFTER_FIRST_UNLOCK,
 };
@@ -137,18 +122,12 @@ const resolveLaunchServer = (): ServerEntry => {
   return readSelfHostedServers().find((entry) => entry.id === activeId) ?? HOSTED;
 };
 
-/**
- * The server this process talks to, read once at startup. Everything that
- * builds URLs or storage keys uses it; changing servers reloads the app.
- */
 export const launchServer: ServerEntry = resolveLaunchServer();
 
 export const isSelfHostedLaunch = launchServer.kind === "self-hosted";
 
-/** All servers, Stella's hosted service first. */
 export const listServers = (): ServerEntry[] => [HOSTED, ...readSelfHostedServers()];
 
-/** Add or refresh a server (by origin); returns its entry. */
 export const upsertSelfHostedServer = (
   discovery: ServerDiscovery,
   origin: string,
@@ -175,7 +154,6 @@ export const upsertSelfHostedServer = (
   return entry;
 };
 
-/** Record fresh discovery for a known server (no-op for unknown ids). */
 export const updateServerDiscovery = (
   id: string,
   discovery: ServerDiscovery,
@@ -198,11 +176,6 @@ export const setActiveServerId = (id: string) => {
   writeRaw(ACTIVE_KEY, id);
 };
 
-// ---------------------------------------------------------------------------
-// Per-server storage scope
-// ---------------------------------------------------------------------------
-
-/** SecureStore key prefix for a server; hosted keys keep their old names. */
 export const storageScopeFor = (serverId: string): string | null =>
   serverId === HOSTED_SERVER_ID ? null : `srv.${serverId}.`;
 
@@ -238,7 +211,6 @@ export const noteScopedKey = (serverId: string, key: string) => {
   writeRaw(scopeKeysKey(serverId), JSON.stringify([...keys, key]));
 };
 
-/** Forget a self-hosted server and every credential stored for it. */
 export const removeSelfHostedServer = async (id: string) => {
   if (id === HOSTED_SERVER_ID) return;
   const keys = readScopeKeys(id);

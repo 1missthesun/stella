@@ -10,11 +10,9 @@ import {
 export type { StellaCharacterShape, StellaCharacterState };
 
 export interface StellaCharacterProps {
-  /** Rendered edge length in px. `null` lets the mark fill its container. */
   size: number | null;
   state?: StellaCharacterState;
   shape?: StellaCharacterShape;
-  /** `aurora` is the ambient gradient; `vivid` is the saturated brand fill. */
   ink?: "aurora" | "vivid";
   eyeColor?: string;
   glow?: boolean;
@@ -22,18 +20,9 @@ export interface StellaCharacterProps {
   followPointer?: boolean;
   className?: string;
   style?: React.CSSProperties;
-  /** Escape hatch for imperative pokes like `sparkle()` and `setGaze()`. */
   handleRef?: React.RefObject<StellaMarkHandle | null>;
 }
 
-/**
- * React host for the imperative rig.
- *
- * The rig owns its own animation loop, so this component's job is only to
- * mount it once and forward prop changes onto the handle. Anything the rig can
- * ease between — state, shape, paused — is pushed through a setter rather than
- * remounting; only the props that change the mark's construction rebuild it.
- */
 export function StellaCharacter({
   size,
   state = "idle",

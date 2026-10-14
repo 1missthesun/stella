@@ -72,13 +72,10 @@ function makeVars({
   } as CSSProperties;
 }
 
-// Loop order tells a story: each request rebuilds the app into something
-// unrecognizable, and "Keep it minimal" brings it home before repeating.
 export const SKINS: DemoSkin[] = [
   {
     id: "minimal",
     request: "Keep it minimal",
-    // Minimal hands the window back to the Pearl scroll theme; vars unused.
     vars: {},
   },
   {
@@ -132,8 +129,6 @@ export const SKINS: DemoSkin[] = [
   },
 ];
 
-/* Pearl tokens for hosts without the scroll-theme system (e.g. the
-   "Make Stella yours" card), matching the desktop's default theme. */
 export const PEARL_VARS = makeVars({
   bg: "#ffffff",
   fg: "#111111",
@@ -141,10 +136,6 @@ export const PEARL_VARS = makeVars({
   primaryFg: "#ffffff",
   dark: false,
 });
-
-/* ------------------------------------------------------------------ */
-/* Minimal — the original Stella app: standard topbar, greeting, pill. */
-/* ------------------------------------------------------------------ */
 
 const NAV_ITEMS = ["Home", "Store", "Social", "Apps"];
 
@@ -203,11 +194,6 @@ export function MinimalApp({ typed }: { typed: string }) {
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* Cozy — a paper journal. No app chrome at all: ribbon date header,   */
-/* bookmark tabs, a lined diary page, and a handwriting-rule input.    */
-/* ------------------------------------------------------------------ */
-
 const COZY_TABS = ["Today", "Letters", "Recipes", "Reading"];
 
 function CozySurface({ typed }: { typed: string }) {
@@ -255,11 +241,6 @@ function CozySurface({ typed }: { typed: string }) {
     </div>
   );
 }
-
-/* ------------------------------------------------------------------ */
-/* Terminal — a tmux session. Window tabs, box-drawing panes, command  */
-/* history, a bottom prompt, and a status line. Zero GUI chrome.       */
-/* ------------------------------------------------------------------ */
 
 const TERM_WINDOWS = ["0:chat", "1:files", "2:agents", "3:logs"];
 const TERM_SESSIONS = [
@@ -340,11 +321,6 @@ function TerminalSurface({ typed }: { typed: string }) {
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* Sunset — an ambient lock-screen OS: oversized clock, scene layers,  */
-/* a vertical glass dock, and one floating glass bar. No nav, no grid. */
-/* ------------------------------------------------------------------ */
-
 const SUNSET_DOCK = [Tv, Music, ImageIcon, Languages, Moon];
 
 function SunsetSurface({ typed }: { typed: string }) {
@@ -386,12 +362,6 @@ function SunsetSurface({ typed }: { typed: string }) {
     </div>
   );
 }
-
-/* ------------------------------------------------------------------ */
-/* Sports — a broadcast dashboard: scoreboard rail across the top,     */
-/* standings panel, stat tiles, and a command bar. Built for box       */
-/* scores, not conversation.                                           */
-/* ------------------------------------------------------------------ */
 
 const SPORTS_GAMES = [
   { teams: "LAL · BOS", score: "102–99", state: "FINAL" },
@@ -475,11 +445,6 @@ const SURFACES: Record<SkinId, (props: { typed: string }) => ReactElement> = {
   sports: SportsSurface,
 };
 
-/* The transformation itself: the plain Pearl app you type into, stacked
-   under the requested skin. Flipping `revealed` crossfades the whole
-   interior from one to the other — used by the "Make Stella yours"
-   mosaic tiles. `compact` tightens type and trims chrome for windows
-   around half hero width. */
 export function MorphScene({
   id,
   typed,
@@ -525,8 +490,6 @@ export function MorphScene({
   );
 }
 
-/* Full-bleed wallpaper layers, crossfaded under each skin's chrome. The
-   minimal skin has no wall so the themed gradient canvas shows through. */
 export function SkinWalls({ activeId }: { activeId: SkinId }) {
   return (
     <>
@@ -545,8 +508,6 @@ export function SkinWalls({ activeId }: { activeId: SkinId }) {
   );
 }
 
-/* All five apps stay mounted and crossfade, so the shell reads as one
-   window whose entire interior keeps being rebuilt. */
 export function SkinSurfaceStack({
   activeId,
   typed,

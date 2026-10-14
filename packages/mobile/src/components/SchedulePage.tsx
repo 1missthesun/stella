@@ -32,11 +32,6 @@ import { useColors } from "../theme/theme-context";
 import { EmptyState } from "./EmptyState";
 import { ScheduleRow, makeScheduleRowStyles } from "./schedule-rows";
 
-/**
- * The Schedule tab: every schedule the owner has, whichever computer or the
- * cloud runs it, read live from the backend. Pause / resume / delete write back
- * the same way, so the list updates on every device at once.
- */
 export function SchedulePage() {
   const colors = useColors();
   const t = useT();
@@ -76,7 +71,6 @@ export function SchedulePage() {
     (schedule: MobileSchedule, action: MobileScheduleAction) => {
       if (busyKey) return;
       if (action === "remove") {
-        // Destructive actions confirm first — deleting stops future runs.
         Alert.alert(
           t("mobile.activityHub.schedule.deleteSchedule"),
           t("mobile.activityHub.schedule.deleteConfirm", {
@@ -100,8 +94,6 @@ export function SchedulePage() {
     [busyKey, applyAction, t],
   );
 
-  // Frozen per load so relative badges ("in 5m") don't flicker as the list
-  // re-renders; refreshed each time the schedule list reloads.
   const [nowMs, setNowMs] = useState(() => Date.now());
   useEffect(() => {
     setNowMs(Date.now());

@@ -1,28 +1,3 @@
-/**
- * Stella's presence in the desktop top bar — the DOM half of the indicator
- * mobile already carries (`StellaStatusHeader`).
- *
- * The mark sits centred. While background work runs it glides aside and the
- * work reads out beside it: the single running agent's own description, or a
- * count once several are going; when the last one finishes the mark pops once
- * and the label leaves.
- *
- * Once a run is under way the mark takes up the rig's tool poses — twinkle
- * while working or writing, orbiting marks while searching or reading. The one
- * state it never enters is `thinking`, the three-dot ellipsis: that is the chat
- * working indicator's signature and belongs to `WorkingIndicator`, not up here.
- * The spawn beat is therefore a plain blob moment — the mark holds its resting
- * breathe for the beat, then settles into the pose.
- *
- * The timings, the phase machine and the choice of label are not written twice
- * — they live in `@stella/contracts/activity-indicator` and mobile reads the
- * same module. Only the rendering is local: `motion/react` and the rig here,
- * Reanimated and the mark layers there.
- *
- * Unlike mobile there is no pill around it. The bar already reads as chrome,
- * so a capsule would only add a box where the window has none.
- */
-
 import {
   lazy,
   memo,
@@ -68,7 +43,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import { StellaCharacter } from "@/ui/stella-character/StellaCharacter";
 import "./shell-topbar-activity.css";
 
-/** Keeps the whole Activity hierarchy out of the top bar's eager graph. */
 type ActivityOverviewComponent =
   (typeof import("@/shell/sidebar-sections/HomeSection"))["ActivityOverview"];
 
@@ -81,8 +55,6 @@ const loadActivityOverview = () =>
   });
 
 const preloadActivityOverview = (): void => {
-  // Opening the menu surfaces a real failure through the render boundary;
-  // a speculative hover must not create an unhandled rejection.
   void loadActivityOverview().catch(() => undefined);
 };
 
@@ -103,16 +75,12 @@ const schedulePreloadWhenIdle = (): (() => void) => {
   return () => window.clearTimeout(handle);
 };
 
-/** Sweep for the running label — matches the inline chat indicator. */
 const LABEL_SHIMMER_MS = 1900;
 
 const MARK_SIZE_PX = 22;
 
-/** Punches the eyes out of the mark so they read as holes, not paint. */
 const MARK_EYE_COLOR = "var(--surface-base)";
 
-/** The menu's own list and cap come from `ActivityOverview` (overview variant),
- *  which is the list the right-hand activity panel used to show. */
 function ActivityMenu({ onNavigate }: { onNavigate: () => void }) {
   const Loaded = loadedActivityOverview;
   return (
@@ -180,9 +148,6 @@ export const ShellTopBarActivity = memo(function ShellTopBarActivity() {
   }, [count, popScale, reduceMotion]);
 
   const busy = phase !== "idle" && label !== null;
-  // Poses belong to work actually in flight. `spawn` is deliberately excluded:
-  // it used to carry the thinking ellipsis, and now that the ellipsis is gone
-  // the beat reads as the resting blob before the pose takes over.
   const markState =
     busy && phase === "working"
       ? pickWorkingIndicatorToolPose(running[0]?.id ?? "stella")
@@ -280,8 +245,6 @@ export const ShellTopBarActivity = memo(function ShellTopBarActivity() {
     openedByHover.current = false;
   }, []);
 
-  // The shared settle is a duration + damping ratio; `motion` expresses the
-  // same curve as a duration and a bounce.
   const settle = reduceMotion
     ? { duration: 0 }
     : {

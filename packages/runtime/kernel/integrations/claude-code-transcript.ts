@@ -1,19 +1,3 @@
-/**
- * A Claude Code session transcript written from Stella's own history, so a
- * CLI that has no session of this conversation (it starts here, the engine
- * changed, its account changed, or the conversation moved) resumes a native
- * session holding every turn and tool call as they happened, rather than a
- * replay in one message.
- *
- * The lines are the CLI's session `.jsonl`: one user or assistant line per
- * turn, chained by `parentUuid`. Turns alternate as the Messages API needs
- * them: the results of an assistant's tool calls open the next user turn,
- * and a call whose result was never recorded is answered as such.
- *
- * Thinking stays, signature and all, on the turns `keepsThinking` names: the
- * ones the model resuming the session wrote itself, whose signatures it
- * accepts. Any other model's thinking is left out.
- */
 import { createHash, randomUUID } from "node:crypto";
 import type { AssistantMessage, ImageContent, Message, TextContent } from "@earendil-works/pi-ai";
 
@@ -45,7 +29,6 @@ const blocksOf = (content: string | readonly (TextContent | ImageContent)[]): Bl
           : [{ type: "image", source: { type: "base64", media_type: part.mimeType, data: part.data } }],
       );
 
-/** `messages` as API turns: alternating, tool results first in the turn after their calls. */
 const turnsOf = (
   messages: readonly Message[],
   name: (tool: string) => string,
@@ -125,10 +108,6 @@ const turnsOf = (
   return turns;
 };
 
-/**
- * The session `.jsonl` for `messages`; `toolName` gives each Stella tool the
- * name the CLI knows it by, and `keepsThinking` which turns keep their thinking.
- */
 export const claudeCodeTranscript = (
   messages: readonly Message[],
   meta: ClaudeCodeTranscriptMeta,

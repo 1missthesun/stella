@@ -2,17 +2,13 @@ import { useEffect, useState } from "react";
 import { useT } from "@/shared/i18n";
 import type { PreviewRequest, PreviewResult } from "./preview-parser";
 
-/** Sentinel the worker crash path reports; the hook translates it. */
 export const PREVIEW_UNAVAILABLE = "shell.display.preview.unavailable";
 
-/** How long the shared worker stays warm with no outstanding requests. */
 export const PREVIEW_WORKER_IDLE_MS = 30_000;
 
 type PreviewResponse = { result?: PreviewResult; error?: string };
 type PreviewWorkerResponse = PreviewResponse & { id: number };
 
-// One worker is shared by every preview request: booting a module worker per
-// tab switch costs more than the parse itself.
 let worker: Worker | null = null;
 let nextRequestId = 1;
 const pending = new Map<number, (response: PreviewResponse) => void>();
@@ -35,7 +31,6 @@ function scheduleIdleTermination() {
   clearIdleTimer();
   if (pending.size > 0 || !worker) return;
   idleTimer = setTimeout(terminateWorker, PREVIEW_WORKER_IDLE_MS);
-  // Never keep a Node/test process alive just for the idle sweep.
   (idleTimer as { unref?: () => void }).unref?.();
 }
 
@@ -48,7 +43,6 @@ function ensureWorker(): Worker {
   created.onmessage = (event: MessageEvent<PreviewWorkerResponse>) => {
     const { id, ...response } = event.data ?? ({} as PreviewWorkerResponse);
     const resolve = pending.get(id);
-    // Responses for cancelled requests are dropped here.
     if (resolve) {
       pending.delete(id);
       resolve(response);
@@ -56,7 +50,6 @@ function ensureWorker(): Worker {
     scheduleIdleTermination();
   };
   created.onerror = () => {
-    // A crashed worker cannot be reused; drop it so the next request reboots.
     if (worker === created) terminateWorker();
     else created.terminate();
     const waiting = [...pending.values()];
@@ -67,7 +60,6 @@ function ensureWorker(): Worker {
   return created;
 }
 
-/** Posts one request and returns a cancel handle for stale/unmounted callers. */
 function requestPreview(
   request: PreviewRequest,
   resolve: (response: PreviewResponse) => void,
@@ -76,7 +68,6 @@ function requestPreview(
   const target = ensureWorker();
   clearIdleTimer();
   pending.set(id, resolve);
-  // The read cache owns these bytes; do not detach its buffer.
   target.postMessage({ id, request });
   return () => {
     if (!pending.delete(id)) return;

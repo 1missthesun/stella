@@ -19,34 +19,25 @@ import { formEncode } from "./oauth-pkce.js";
 export const CHATGPT_SIWC = {
   issuer: "https://auth.openai.com",
   discoveryUrl: "https://auth.openai.com/.well-known/openid-configuration",
-  /** Documented production values; the flows read them from discovery. */
   authorizeUrl: "https://auth.openai.com/api/accounts/authorize",
   tokenUrl: "https://auth.openai.com/api/accounts/oauth/token",
-  /** The audience of the access token and the `resource` of every grant. */
   resource: "https://api.openai.com/v1",
   apiBaseUrl: "https://api.openai.com/v1",
   responsesUrl: "https://api.openai.com/v1/responses",
   modelsUrl: "https://api.openai.com/v1/models",
-  /** First-time registration entrypoint; never saved or used for an exchange. */
   dynamicClientId: "dynamic_agent_client",
-  /** `agent_name_hint`: the app's actual name, the same on every install. */
   agentName: "Stella",
   scopes: "openid profile email offline_access resource.invoke chatgpt.tokens.use.direct",
-  /** Without this granted scope the sign-in holds, but inference must not run. */
   planUsageScope: "chatgpt.tokens.use.direct",
   loopbackHost: "127.0.0.1",
   loopbackPath: "/auth/callback",
-  /** The documented example port; any free port works (only the port may vary). */
   defaultLoopbackPort: 1455,
-  /** ChatGPT Settings › Usage: review app usage and manage this app's limits. */
   manageUsageUrl: "https://chatgpt.com/settings/usage",
 } as const;
 
-/** `http://127.0.0.1:<port>/auth/callback`; never `localhost`. */
 export const chatGptLoopbackRedirectUri = (port: number): string =>
   `http://${CHATGPT_SIWC.loopbackHost}:${port}${CHATGPT_SIWC.loopbackPath}`;
 
-/** A fresh `urn:uuid:` host id, generated once per host and persisted. */
 export const createChatGptHostId = (): string => `urn:uuid:${crypto.randomUUID()}`;
 
 const HOST_ID_PATTERN =
@@ -62,13 +53,6 @@ export const isIssuedChatGptClientId = (value: unknown): value is string =>
   ISSUED_CLIENT_ID.test(value) &&
   value !== CHATGPT_SIWC.dynamicClientId;
 
-/**
- * The authorization request. A new registration sends
- * `dynamic_agent_client` and the app's `agent_name_hint`; reauthorizing a
- * saved account sends its issued client id and identity hints instead. Every
- * request carries this host's id. `reconsent` asks for consent again (to
- * enable ChatGPT plan usage after it was declined).
- */
 export const chatGptAuthorizeUrl = (args: {
   authorizationEndpoint?: string;
   clientId?: string;
@@ -100,9 +84,6 @@ export const chatGptAuthorizeUrl = (args: {
   return `${args.authorizationEndpoint ?? CHATGPT_SIWC.authorizeUrl}?${formEncode(params)}`;
 };
 
-// --- Errors -------------------------------------------------------------------
-
-/** A sign-in, refresh or request failure with the provider's own code. */
 export class ChatGptError extends Error {
   constructor(
     readonly code: string,
@@ -118,7 +99,6 @@ export class ChatGptError extends Error {
 export const CHATGPT_USAGE_LIMIT_CODE = "subscription_sharing_usage_limit_exceeded";
 export const CHATGPT_USAGE_UNAVAILABLE_CODE = "subscription_sharing_usage_unavailable";
 
-/** Refresh errors after which the tokens are unusable: sign in again. */
 export const CHATGPT_UNUSABLE_REFRESH_CODES: ReadonlySet<string> = new Set([
   "invalid_grant",
   "invalid_refresh_token",
@@ -160,11 +140,6 @@ const safeCode = (value: unknown): string | undefined =>
     ? value
     : undefined;
 
-/**
- * The machine-readable code of an error body: OAuth errors carry a string
- * `error`, Responses errors `error.code`. Direct-admission `{ detail }` text
- * is diagnostic, not a code.
- */
 export const chatGptErrorCode = (body: unknown): string | undefined => {
   let current: unknown = body;
   for (let depth = 0; depth < 4 && current && typeof current === "object"; depth += 1) {
@@ -179,7 +154,6 @@ export const chatGptErrorCode = (body: unknown): string | undefined => {
   return undefined;
 };
 
-/** A ChatGptError for an HTTP failure or a failed stream. */
 export const chatGptErrorFrom = (body: unknown, status?: number): ChatGptError => {
   const code = chatGptErrorCode(body) ?? "api_error";
   const known = ERROR_MESSAGES[code];
@@ -209,11 +183,8 @@ export const chatGptErrorFrom = (body: unknown, status?: number): ChatGptError =
   return new ChatGptError(code, message ?? "ChatGPT couldn't complete this request.", false, status);
 };
 
-// --- Callback ---------------------------------------------------------------------
-
 export type ChatGptCallback = {
   code: string;
-  /** The issued client id: from the callback, else the attempt's saved one. */
   clientId: string;
 };
 
@@ -242,12 +213,6 @@ const queryValues = (query: string): Map<string, string[]> => {
   return values;
 };
 
-/**
- * Validate the loopback callback (the full redirect URL, or its query) for
- * one attempt: exactly one `state`, matching; an OAuth `error` ends the
- * attempt; a new registration must return its issued `client_id`, and a
- * reauthorization must not return a different one.
- */
 export const parseChatGptCallback = (
   input: string,
   expected: { state: string; savedClientId?: string },
@@ -295,16 +260,11 @@ export const parseChatGptCallback = (
   return { code, clientId };
 };
 
-// --- Tokens -------------------------------------------------------------------------
-
 export type ChatGptTokenSet = {
   access: string;
   refresh: string;
-  /** Epoch ms on the receiving clock. */
   expiresAt: number;
-  /** Epoch ms, when the token response said refreshing may start. */
   earliestRefreshAt?: number;
-  /** Granted scopes, from the response's space-separated `scope`. */
   scopes: string[];
   idToken?: string;
 };
@@ -322,11 +282,6 @@ const epochMs = (value: unknown): number | undefined => {
   return undefined;
 };
 
-/**
- * A token-endpoint response. A refresh may omit `scope` (unchanged grant);
- * `previousScopes` then stands. Plan usage needs a refresh token
- * (`offline_access`) and a bearer access token.
- */
 export const chatGptTokenSet = (
   json: Record<string, unknown>,
   now = Date.now(),
@@ -364,27 +319,17 @@ export const chatGptTokenSet = (
 export const hasChatGptPlanUsage = (scopes: readonly string[]): boolean =>
   scopes.includes(CHATGPT_SIWC.planUsageScope);
 
-/** The verified identity an ID token names. */
 export type ChatGptIdentity = { subject: string; email?: string; name?: string };
 
-/**
- * One ChatGPT account as a host saved it: the issued client id (one per
- * user and workspace), the verified identity, the retained ID token (for
- * `id_token_hint`), and its tokens.
- */
 export type ChatGptRegistration = ChatGptIdentity & {
   clientId: string;
   idToken: string;
   tokens: ChatGptTokenSet;
-  /** `chatgpt.tokens.use.direct` was granted. */
   planUsage: boolean;
 };
 
-// --- Models ---------------------------------------------------------------------------
-
 export type ChatGptModel = { id: string; name: string };
 
-/** `GET /v1/models`: the models meant for display, in the server's order. */
 export const parseChatGptModels = (body: unknown): ChatGptModel[] => {
   const models =
     body && typeof body === "object" ? (body as Record<string, unknown>).models : undefined;
@@ -403,8 +348,6 @@ export const parseChatGptModels = (body: unknown): ChatGptModel[] => {
   }
   return result;
 };
-
-// --- Responses requests (preview limitations) ------------------------------------------
 
 /**
  * Body fields the ChatGPT plan route rejects.
@@ -426,16 +369,9 @@ export const CHATGPT_UNSUPPORTED_REQUEST_FIELDS = [
   "top_p",
   "truncation",
   "user",
-  // HTTP requests carry the full history in `input`.
   "previous_response_id",
 ] as const;
 
-/**
- * Tool types the route accepts: function and custom tools (optionally in
- * namespaces), and web search, which stays subject to model and workspace
- * policy. Hosted tools (image generation, file search, Code Interpreter,
- * computer use, hosted MCP/connectors, `tool_search`) are refused.
- */
 export const CHATGPT_SUPPORTED_TOOL_TYPES: ReadonlySet<string> = new Set([
   "function",
   "custom",
@@ -443,11 +379,6 @@ export const CHATGPT_SUPPORTED_TOOL_TYPES: ReadonlySet<string> = new Set([
   "web_search",
 ]);
 
-/**
- * Why a Responses request body breaks the preview limits, or null when it
- * keeps them: `store: false`, `stream: true`, history as an `input` array
- * without system-role messages, no unsupported fields, supported tools only.
- */
 export const chatGptRequestViolation = (body: Record<string, unknown>): string | null => {
   if (body.store !== false) return "ChatGPT plan requests must set store to false.";
   if (body.stream !== true) return "ChatGPT plan requests must stream.";

@@ -1,11 +1,3 @@
-/**
- * The cloud journal of a conversation stored in the cloud, for the pi-durable
- * chat that runs it on this computer (`@stella/agent/host/desktop-journal`).
- * Turns go in through the runner's cloud transcript writer, the same durable,
- * lease-holding begin and finish the agent loops use; what other writers
- * journaled comes back through `history.read`, as the code tool's history
- * reads it.
- */
 import { promises as fs } from "node:fs";
 import { fileURLToPath } from "node:url";
 import type { DesktopJournal, JournalReadRecord, RelayedMessage } from "@stella/agent/host/desktop-journal";
@@ -118,12 +110,10 @@ const relayContext = (context: RelayedMessage["context"]): CloudTurnContext | un
   if (!context) return undefined;
   const text = context.text?.trim() ? context.text : undefined;
   if (text && text.length > TURN_CONTEXT_TEXT_MAX_CHARS) {
-    // Refused, not shortened: the user is told it did not go.
     throw new Error(
       `The pasted text is too long to send on to where Stella runs (${text.length} characters; the limit is ${TURN_CONTEXT_TEXT_MAX_CHARS}).`,
     );
   }
-  // Chip labels and previews only: a display too large to carry is left off.
   const display =
     context.display && JSON.stringify(context.display).length <= TURN_CONTEXT_DISPLAY_MAX_CHARS
       ? context.display
@@ -138,7 +128,6 @@ export const cloudJournalFor = (
   session: OpenSession,
   conversationId: string,
 ): DesktopJournal | undefined => {
-  // A conversation kept on this computer has no journal.
   if (conversationId.startsWith("local_")) return undefined;
   const deviceId = session.config.deviceId;
   let toolFrames: Promise<void> = Promise.resolve();
@@ -174,7 +163,6 @@ export const cloudJournalFor = (
           signal: AbortSignal.timeout(READ_TIMEOUT_MS),
         },
       );
-      // A refusal is final for this compaction; the next one publishes anew.
       if (response.status >= 500 || response.status === 401 || response.status === 429) {
         throw new Error(`The conversation's checkpoint was not saved (${response.status}).`);
       }
@@ -286,7 +274,6 @@ export const cloudJournalFor = (
       const body: CloudTurnStartRequest = {
         protocol: TURN_PLANE_PROTOCOL,
         clientMsgId,
-        // A cloud turn needs typed text; a message of only pasted text or files reads as this.
         prompt: prompt || (context?.text ? "(Pasted text)" : "(Attached files)"),
         ...(attachments.length ? { attachments } : {}),
         ...(context ? { context } : {}),

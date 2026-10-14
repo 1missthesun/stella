@@ -7,15 +7,6 @@ import { rotateLogIfOversized } from "../../observability/rotate-file.js";
 import { killWorkerProcess } from "./kill.js";
 import type { LifecycleStartOptions } from "./options.js";
 
-/**
- * Resolve the `bun` executable to an absolute path once, falling back to the
- * bare `"bun"` PATH lookup when no known install location exists. Spawning a
- * bare command name on Windows forces a PATHEXT + every-PATH-entry filesystem
- * probe to locate `bun.exe`; pointing `spawn` at an absolute path skips that.
- * Packaged Stella ships Bun under resources/bin; development also honors
- * STELLA_BUN_PATH / BUN_PATH / ~/.bun/bin. Only an existing absolute path is
- * used, so source checkouts can still fall back to the normal PATH lookup.
- */
 let cachedBunBinaryPath: string | null = null;
 export const resolveBunBinaryPath = (): string => {
   if (cachedBunBinaryPath) return cachedBunBinaryPath;
@@ -90,8 +81,6 @@ const spawnDetachedWorkerProcess = (
   if (options.idleShutdownMs && options.idleShutdownMs > 0) {
     args.push("--idle-shutdown-ms", String(options.idleShutdownMs));
   }
-  // Bound the raw stdout/stderr sink before the fresh worker appends to it.
-  // The log dir is separate from the runtime control dir, so ensure it exists.
   mkdirSync(paths.logDir, { recursive: true });
   rotateLogIfOversized(paths.logFile);
   const logFd = openSync(paths.logFile, "a");
@@ -140,12 +129,6 @@ const spawnDetachedWorkerProcess = (
   return { child, bunBinaryPath };
 };
 
-/**
- * Resolve when the child actually spawned; reject with a descriptive error
- * when the executable could not be launched at all (e.g. missing bundled
- * Bun). Post-spawn process errors downgrade to diagnostics — they must never
- * become uncaught host-process exceptions.
- */
 const waitForWorkerSpawn = ({
   child,
   bunBinaryPath,

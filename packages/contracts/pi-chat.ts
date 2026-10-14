@@ -1,46 +1,16 @@
 import type { AgentStatus } from "./agent-status.js";
 import { drivePathFromSignedDriveUrl } from "./attachment-content-type.js";
 import { stellaUsageLimitText } from "./stella-usage-limit.js";
-/**
- * Stella's chat on pi-durable, as its clients see it.
- *
- * The host watches a conversation with pi-durable's `watchEvents` and passes
- * the event batches through unchanged: a `snapshot` when a client attaches,
- * then one batch per commit. Every client folds them with `reducePiChat` into
- * the same `PiChatState`: the transcript's entries, the run, the assistant
- * message in flight and the tools running.
- *
- * The types are structural copies of the pi-durable and pi-ai shapes clients
- * read, so this module stays dependency-free.
- */
 
-/**
- * Stella's marks on a part of a user message. Providers read only a part's
- * `type`, `text` and `data`, so the model never sees them.
- */
 export type PiPartMarks = {
-  /** Model input the user did not type: context, attachment notices, images sized for the model. */
   hidden?: true;
-  /** How the user's message shows besides its text; one part carries it. */
   display?: PiUserDisplay;
-  /**
-   * The id the sending client gave the message (a phone's, for a chat it
-   * placed on a computer). Its journal row keeps it, so that client's
-   * pending message binds to the row instead of showing twice.
-   */
   clientMsgId?: string;
-  /**
-   * The message's seq in its conversation's record (the journal, or the chat
-   * log of one kept on this computer): its `message #N` id for the model.
-   * Set where a message is written from that record.
-   */
   seq?: number;
-  /** A prompt a schedule fired: read by Stella, not shown, and answered in the chat. */
   source?: "schedule";
 };
 
 export type PiUserDisplay = {
-  /** What the user attached: image previews and file references. */
   attachments?: Array<{
     kind: "image" | "file";
     name?: string;
@@ -49,10 +19,8 @@ export type PiUserDisplay = {
     url?: string;
     path?: string;
     drivePath?: string;
-    /** An image too large to go in the message inline: its bytes are only at `path`. */
     spilled?: true;
   }>;
-  /** The context the composer sent along: app selection, activity, quoted and pasted text. */
   context?: Record<string, unknown>;
 };
 
@@ -62,17 +30,14 @@ export type PiContentBlock =
   | { type: "image"; data: string; mimeType: string; stella?: PiPartMarks }
   | { type: "toolCall"; id: string; name: string; arguments: Record<string, unknown> };
 
-/** A part of a user message: text or an image, maybe marked. */
 export type PiUserPart = Extract<PiContentBlock, { type: "text" } | { type: "image" }>;
 
-/** What a voice session wrote: what was said, or the session's summary (`voiceSession`). */
 export type PiVoiceMarks = { source?: "voice"; voiceSession?: { durationMs: number } };
 
 export type PiUserMessage = {
   role: "user";
   content: string | PiContentBlock[];
   timestamp: number;
-  /** `schedule`: a schedule's prompt, as the journal and the cloud mark it. */
   source?: "voice" | "schedule";
 } & Omit<PiVoiceMarks, "source">;
 export type PiAssistantMessage = {
@@ -83,7 +48,6 @@ export type PiAssistantMessage = {
   stopReason?: string;
   errorMessage?: string;
   timestamp: number;
-  /** Model history the timeline leaves out (what the voice model said). */
   stella?: { hidden?: true };
 } & PiVoiceMarks;
 export type PiToolResultMessage = {
@@ -97,7 +61,6 @@ export type PiToolResultMessage = {
 };
 export type PiMessage = PiUserMessage | PiAssistantMessage | PiToolResultMessage | { role: "system"; content: unknown };
 
-/** One transcript entry: `pi.user`, `pi.assistant`, `pi.tool-result`, `pi.system`, `pi.compaction`, ... */
 export type PiEntry = {
   id: number;
   conversationId: number;
@@ -132,7 +95,6 @@ export type PiSubmission = {
   reason?: string;
 };
 
-/** pi-durable's agent events (spec §9.4); clients ignore the kinds they do not read. */
 export type PiChatEvent =
   | {
       type: "snapshot";
@@ -165,36 +127,18 @@ export type PiChatEvent =
   | { type: "compaction_start"; reason: string; blocking: boolean }
   | { type: "compaction_end"; reason: string }
   | { type: "engine_status"; state: "running" | "compacting" | "model-fallback"; text: string }
-  /**
-   * Claude Code work in this conversation (Stella's turn or an agent's) is
-   * held until the Claude usage limit resets at `until`, when the CLI named it.
-   */
   | { type: "engine_status"; state: "usage-limit"; text: string; until?: number }
-  /** Every held turn here ended its hold: resumed, or stopped while held. */
   | { type: "engine_status"; state: "usage-limit-end"; text: string; resumed: boolean }
-  /** Stella's turns another writer is running (the cloud, another computer), from the journal. */
   | { type: "remote_turns"; turns: PiRemoteTurn[] }
-  /** Where the conversation's Stella runs changed, as the host now reads it (`op: "brain"`). */
   | { type: "brain"; brain: PiChatBrainResult }
-  /**
-   * A send placed where Stella runs never reached the conversation, and this
-   * computer could not answer it either: the sent message is taken back and
-   * the reason shown (`op: "sendFailed"`).
-   */
   | { type: "send_failed"; requestId: string; message: string }
-  /** That send was placed again (in the cloud) and is journaled under `userMessageId` (`op: "sendMoved"`). */
   | { type: "send_moved"; requestId: string; userMessageId: string };
 
-/** A turn of the conversation running elsewhere, which the journal shows as started. */
 export type PiRemoteTurn = {
   turnId: string;
-  /** Its prompt row's client id: a placement's dispatch id when one placed it. */
   clientMsgId?: string;
 };
 
-// ---- host ↔ client requests --------------------------------------------------
-
-/** The rest of a desktop composer send (`RuntimeChatPayload`), which the runtime prepares for the model. */
 export type PiChatSend = {
   selectedText?: string | null;
   chatContext?: unknown;
@@ -206,80 +150,44 @@ export type PiChatSend = {
   mode?: string;
   messageMetadata?: Record<string, unknown>;
   agentType?: string;
-  /** Where the conversation is stored; a conversation kept here only runs here. */
   storageMode?: "cloud" | "local";
-  /** Where the conversation's Stella runs could not take this send, so this computer answers it, as with no record. */
   followSender?: boolean;
 };
 
-/** A send that went to run elsewhere: its turn comes back through the journal. */
 export type PiChatPlacedResult = {
   placed: {
-    /** The host's run for the placement, which stops it (`agent.cancelChat`). */
     runId: string;
-    /** The id its journal row carries, which the pending message binds to. */
     userMessageId: string;
   };
 };
 
 export type PiChatRequest =
   | { op: "submit"; conversationId: string; requestId: string; text: string; send?: PiChatSend }
-  /** Stop the conversation's run here, and the placed turns it runs elsewhere (their dispatch ids). */
   | { op: "abort"; conversationId: string; dispatchIds?: string[] }
   | { op: "watch"; conversationId: string }
   | { op: "unwatch"; conversationId: string }
   | { op: "older"; conversationId: string; beforeEntryId: number }
   | { op: "agents"; conversationId: string }
-  /** A turn was placed elsewhere: follow the journal closely until it shows. */
   | { op: "follow"; conversationId: string }
-  /** A placed send ended without reaching the conversation: tell the app (`send_failed`). */
   | { op: "sendFailed"; conversationId: string; requestId: string; message: string }
-  /** That send was placed again and is journaled under `userMessageId`: tell the app (`send_moved`). */
   | { op: "sendMoved"; conversationId: string; requestId: string; userMessageId: string }
-  /** Whether the conversation has the message sent as `requestId` (`{ journaled }`). */
   | { op: "journaled"; conversationId: string; requestId: string }
-  /** Stella's greeting after onboarding, as a reply in the conversation; kept on this computer. */
   | { op: "welcome"; conversationId: string; message: string }
-  /** The local files Stella's replies and its agents linked (`{ paths }`): what a paired phone may open. */
   | { op: "files"; conversationId: string }
-  /**
-   * Where the conversation's brain runs (`PiChatBrainResult`): a send for a
-   * conversation whose Stella runs elsewhere is placed there.
-   */
-  /**
-   * The app's conversation socket received journal records (or reconnected):
-   * the host imports what the journal gained instead of polling for it.
-   */
   | { op: "journal"; conversationId: string }
   | {
       op: "brain";
       conversationId: string;
-      /** The conversation's socket said the record changed: read it again rather than answer from the last read. */
       fresh?: boolean;
     }
-  /**
-   * The user moving Stella from the app's picker, as her own
-   * `switch_destination` moves her: that host takes the conversation's turns
-   * from the next message (`PiChatBrainResult`, or a thrown refusal).
-   * "automatic" is this computer.
-   */
   | { op: "move"; conversationId: string; target: PiChatMoveTarget };
 
 export type PiChatMoveTarget = { mode: "automatic" } | { mode: "cloud" } | { mode: "device"; deviceId: string };
 
-/**
- * Where a conversation's Stella runs (`@stella/contracts/turn-plane/pi-brain`):
- * here, or where a send is placed instead.
- */
 export type PiChatBrainResult =
   | { here: true }
   | { here: false; target: { mode: "cloud" } | { mode: "device"; deviceId: string }; label?: string };
 
-/**
- * The model calls of the conversations on pi, as the usage dashboard lists
- * them (`LocalModelUsagePage`). Sent by the desktop's main process, not by a
- * window, so it names no conversation it acts on.
- */
 export type PiChatUsageRequest = {
   op: "usage";
   fromMs?: number;
@@ -290,7 +198,6 @@ export type PiChatUsageRequest = {
 };
 
 export type PiChatWatchResult = {
-  /** The snapshot, its entries widened to the latest page of the whole history. */
   snapshot: Extract<PiChatEvent, { type: "snapshot" }>;
   hasOlder: boolean;
   remote?: PiRemoteTurn[];
@@ -298,17 +205,14 @@ export type PiChatWatchResult = {
 
 export type PiChatOlderResult = { entries: PiEntry[]; hasOlder: boolean };
 
-/** One of a conversation's agents, as the app lists it (`agents`). */
 export type PiChatAgent = {
   threadId: string;
   description: string;
   status: "running" | "completed" | "error";
   startedAt: number;
   updatedAt: number;
-  /** Its latest prose, oldest first. */
   assistantMessages: string[];
   error?: string;
-  /** Its status in the shared vocabulary; absent from builds before it. */
   agentStatus?: AgentStatus;
 };
 
@@ -316,27 +220,18 @@ export type PiChatAgentsResult = { agents: PiChatAgent[] };
 
 export type PiChatEventsPayload = { conversationId: string; events: PiChatEvent[] };
 
-// ---- the client state ----------------------------------------------------------
-
 export type PiChatState = {
-  /** Transcript entries, ascending by id. */
   entries: PiEntry[];
   hasOlder: boolean;
   running: boolean;
-  /** The assistant message being generated. */
   streaming?: PiAssistantMessage;
-  /** Tools of the current run by call id. */
   tools: Record<string, { name: string; status: PiToolSlot["status"]; output?: string }>;
-  /** Client request ids by the user entry each became. */
   requestIds: Record<number, string>;
-  /** Request ids pi has admitted but not yet placed in the transcript. */
   queued: string[];
   retry?: { at: number; error: string };
-  /** The last task failure of the current run. */
   failure?: string;
   compacting: boolean;
   engineStatus?: string;
-  /** Turns running elsewhere (`remote_turns`). */
   remote: PiRemoteTurn[];
 };
 
@@ -351,7 +246,6 @@ export const emptyPiChat = (): PiChatState => ({
   remote: [],
 });
 
-/** Entries merged by id, ascending. */
 export const mergePiEntries = (entries: readonly PiEntry[], more: readonly PiEntry[]): PiEntry[] => {
   if (more.length === 0) return entries as PiEntry[];
   const byId = new Map<number, PiEntry>();
@@ -388,7 +282,6 @@ const applyChange = (message: PiAssistantMessage, change: PiMessageChange): PiAs
       break;
     }
     case "toolcall_delta":
-      // Arguments stream as JSON fragments; the finished block replaces them.
       return message;
   }
   return { ...message, content };
@@ -411,9 +304,6 @@ const reduceOne = (state: PiChatState, event: PiChatEvent): PiChatState => {
       for (const slot of event.tools) {
         tools[slot.callId] = { name: slot.name, status: slot.status, ...(slot.output ? { output: slot.output } : {}) };
       }
-      // The snapshot names no request ids, so a live run keeps what this watch
-      // saw queued; an idle pi with an empty inbox has nothing queued or
-      // compacting, whatever finished while nobody watched.
       const idle = event.run === undefined;
       return {
         ...state,
@@ -501,26 +391,18 @@ const reduceOne = (state: PiChatState, event: PiChatEvent): PiChatState => {
   }
 };
 
-/** Fold one batch of events into the state. */
 export const reducePiChat = (state: PiChatState, events: readonly PiChatEvent[]): PiChatState => {
   let next = state;
   for (const event of events) next = reduceOne(next, event);
   return next;
 };
 
-/** The text of a message's text blocks. */
 export const piMessageText = (message: PiMessage | undefined): string => {
   if (!message || message.role === "system") return "";
   if (typeof message.content === "string") return message.content;
   return message.content.map((block) => (block.type === "text" ? block.text : "")).join("");
 };
 
-/**
- * How a turn ended when its last reply did not finish: failed with the
- * model's own error, or stopped. Every view of the conversation (this
- * computer's, the journal's, the chat log's) shows these same words, the
- * same ones a cloud turn ends with when stopped.
- */
 export const piTerminalNotice = (message: {
   stopReason?: string;
   errorMessage?: string;
@@ -528,8 +410,6 @@ export const piTerminalNotice = (message: {
   message.stopReason === "error"
     ? {
         phase: "failed",
-        // Stella's usage limit reads as the plan's own sentence, never a
-        // raw gateway error.
         notice:
           stellaUsageLimitText(message.errorMessage) ??
           `Stella couldn't answer: ${message.errorMessage?.replace(ENGINE_ERROR_MARK, "").trim() || "the model request failed."}`,
@@ -541,17 +421,11 @@ export const piTerminalNotice = (message: {
 const ENGINE_ERROR_MARK = /^\s*\[[a-z-]+\/[a-z-]+\]\s*/;
 const ENGINE_WORKING_TEXT = "Working";
 
-/** An agent's report, which arrives as user input the user never wrote. */
 export const PI_REPORT_RE = /^\[(Agent completed|Task failed|Task canceled|Subagent paused)\]/;
 const LEADING_SYSTEM_REMINDER_RE = /^<system-reminder>[\s\S]*?<\/system-reminder>\s*/;
 
-/**
- * A note an agent sent with `send_message`, as `formatAgentMessage`
- * (`agent-directory`) frames it: the whole text, not a message that quotes one.
- */
 const AGENT_NOTE_RE = /^<agent-message from="[^"\n]*" thread_id="[^"\n]*"(?: relation="[^"\n]*")?>\n[\s\S]*\n<\/agent-message>$/;
 
-/** Text from Stella's agents, not the user: an agent's report, or a note an agent sent. */
 export const PI_LATE_ANSWER_PREFIX = "[Late answer]";
 
 export const isPiAgentText = (text: string): boolean => {
@@ -563,28 +437,16 @@ export const isPiAgentText = (text: string): boolean => {
   );
 };
 
-/**
- * A user message an agent sent: one of its text parts is a report or a note.
- * Readers hide it, and show Stella's answer to it.
- */
 export const isPiAgentInput = (message: PiUserMessage): boolean =>
   typeof message.content === "string"
     ? isPiAgentText(message.content)
     : message.content.some((part) => part.type === "text" && isPiAgentText(part.text));
 
-/**
- * A prompt a schedule fired (a task, a reminder): runtime input the user never
- * wrote. Readers hide it, and show Stella's answer to it, which is the delivery.
- */
 export const isPiScheduledInput = (message: PiUserMessage): boolean =>
   message.source === "schedule" ||
   (typeof message.content !== "string" &&
     message.content.some((part) => (part.type === "text" || part.type === "image") && part.stella?.source === "schedule"));
 
-/**
- * Whether readers hide a user message: one the user never wrote (an agent's
- * report or note, a prompt the app sent), or one with nothing to show.
- */
 export const piUserHidden = (message: PiUserMessage): boolean => {
   const { text, display } = piUserView(message);
   return (
@@ -595,14 +457,6 @@ export const piUserHidden = (message: PiUserMessage): boolean => {
   );
 };
 
-/**
- * A user message as the conversation journal holds one, and its readers
- * render it: the text the user typed or said, previews of what they attached
- * (images as image blocks, files as declared attachments) and the context
- * chips, without the parts the runtime added for the model. A message the user
- * never wrote (an agent's report or note, a prompt the app sent) is hidden and
- * keeps its whole text, so a reader can still tell what it answered.
- */
 export const piJournalUserMessage = (
   message: PiUserMessage,
 ): { message: Record<string, unknown>; hidden: boolean; clientMsgId?: string } => {
@@ -657,7 +511,6 @@ export const piProviderAttachmentPaths = (message: PiUserMessage): string[] => {
     : [];
 };
 
-/** What a user message shows: its unmarked text and what its marks display. */
 export const piUserView = (message: PiUserMessage): { text: string; display?: PiUserDisplay } => {
   if (typeof message.content === "string") return { text: message.content };
   let display: PiUserDisplay | undefined;
@@ -669,16 +522,11 @@ export const piUserView = (message: PiUserMessage): { text: string; display?: Pi
   return { text: text.join("\n"), ...(display ? { display } : {}) };
 };
 
-// ---- what reaches clients ---------------------------------------------------------
-
-/** Prompt sections stay with the host; they are large and no client renders them. */
 const isHostOnly = (entry: PiEntry | undefined): boolean => entry?.kind === "pi.system";
 
-/** Provider signatures (encrypted reasoning) mean nothing to a client. */
 const unsigned = <T>(value: T): T =>
   JSON.parse(JSON.stringify(value, (key, field) => (key === "thinkingSignature" || key === "textSignature" ? undefined : field))) as T;
 
-/** Events as clients receive them: no prompt sections, no provider signatures. */
 export const piEventsForClients = (events: readonly PiChatEvent[]): PiChatEvent[] => {
   const out: PiChatEvent[] = [];
   for (const event of events) {
@@ -702,7 +550,6 @@ export const piEventsForClients = (events: readonly PiChatEvent[]): PiChatEvent[
   return out;
 };
 
-/** Entries as clients receive them, newest kept first within `maxBytes`. */
 export const piEntriesForClients = (
   entries: readonly PiEntry[],
   maxBytes: number,

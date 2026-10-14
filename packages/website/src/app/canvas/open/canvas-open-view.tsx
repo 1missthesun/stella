@@ -23,15 +23,6 @@ import { SocialSignInButtons } from "@/components/auth/social-sign-in-buttons";
 import { StellaMark } from "@/components/stella-mark";
 import styles from "@/app/sign-in/sign-in.module.css";
 
-/**
- * Where the share domain's "private" page sends a private canvas's owner when
- * their browser holds no view cookie. Signed in here as the owner, the page
- * asks the backend for the link's view URL (`shares.viewLink`, which carries
- * a short grant) and goes there; the share domain trades the grant for its
- * view cookie. The backend answers only for the caller's own links, so
- * anyone else is told the canvas isn't theirs.
- */
-
 type SessionUser = {
   email?: string;
   isAnonymous?: boolean | null;
@@ -51,7 +42,6 @@ const slugFrom = (search: string): string | null => {
   return value && isCanvasShareSlug(value) ? value : null;
 };
 
-/** The view URL the backend returned, if it is this link's on an https origin. */
 const viewUrlFor = (url: string, slug: string): string | null => {
   try {
     const parsed = new URL(url);

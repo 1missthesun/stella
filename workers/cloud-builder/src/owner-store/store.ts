@@ -1,21 +1,3 @@
-/**
- * The owner's database, hosted inside the owner's Durable Object
- * (`OwnerGate`). One instance per owner object.
- *
- * - **Schema:** domain migrations run once, in registration order, tracked by
- *   id in `_owner_migrations`.
- * - **Calls:** `call()` parses arguments, runs the handler against this
- *   owner's SQLite, then pushes any view that changed.
- * - **Views:** live sockets (tag `live`) subscribe to views. Subscriptions
- *   live in `owner_live_subs` so they survive hibernation. Every write names
- *   the tables it touched; a flush reruns only the subscriptions whose last
- *   read used one of them (or whose dependencies are not known yet, after a
- *   wake), and sends a value only when its hash moved. Flushes in quick
- *   succession coalesce into one.
- * - **Jobs:** `owner_jobs` are the owner's scheduled work. The owner
- *   object's single alarm fires at `nextDeadline()` and calls `onAlarm()`.
- */
-
 import type { RpcResponse } from "@stella/contracts/backend/protocol";
 import {
   LIVE_CLOSE,
@@ -39,7 +21,6 @@ import type {
 } from "./registry.js";
 
 export const LIVE_SOCKET_TAG = "live";
-/** Ask for a fresh token this long before the current one expires. */
 const LIVE_REAUTH_LEAD_MS = 2 * 60_000;
 /**
  * A client that answers a reauthentication with the token the socket already
@@ -84,17 +65,13 @@ type LiveAttachment = {
   connId: string;
   caller: OwnerCaller;
   reauthSent?: boolean;
-  /** How many reauthentications this socket was asked for without a newer token. */
   reauthAttempt?: number;
-  /** When to ask again; absent while waiting for the client's first answer. */
   reauthRetryAtMs?: number;
-  /** Set when this side closed the socket; see `liveSockets`. */
   closed?: true;
 };
 
 const WEBSOCKET_OPEN = 1;
 
-/** Marks a live socket closed by this side, so it never counts as open again. */
 const markLiveClosed = (socket: WebSocket, attachment: LiveAttachment): void => {
   if (attachment.closed) return;
   try {
@@ -132,12 +109,10 @@ export type OwnerStoreOptions = {
   ownerId: () => string;
   registry: OwnerRegistry;
   host: OwnerHost;
-  /** Verifies a refreshed JWT sent on a live socket. */
   verifyToken: (token: string) => Promise<OwnerCaller | null>;
   log?: OwnerStoreLog;
 };
 
-/** Two FNV-1a passes with different offsets: a cheap, synchronous change hash. */
 export const valueHash = (text: string): string => {
   let a = 0x811c9dc5;
   let b = 0x01000193 ^ 0x5bd1e995;
@@ -190,7 +165,6 @@ export class OwnerStore {
   private readonly queryTables = new Map<string, string[]>();
   private readonly writeTables = new Map<string, string[] | null>();
   private readonly viewDeps = new Map<string, ViewDeps>();
-  /** `OwnerDb.memory`: in-memory state domains keep for this object's lifetime. */
   private readonly memory = new Map<string, unknown>();
 
   constructor(options: OwnerStoreOptions) {
@@ -359,7 +333,6 @@ export class OwnerStore {
     };
   }
 
-  /** The context a call or job runs with. */
   context(caller: OwnerCaller | null, now = Date.now()): OwnerContext {
     this.ensureSchema();
     return {
@@ -374,7 +347,6 @@ export class OwnerStore {
     };
   }
 
-  /** Run an owner-scoped call. Never throws; errors become the response. */
   async call(
     name: string,
     args: unknown,
@@ -407,11 +379,6 @@ export class OwnerStore {
     }
   }
 
-  /**
-   * Run a server-internal operation with a null caller. The owner gate
-   * checks the owner generation first. Never throws; errors become the
-   * response.
-   */
   async internalCall(name: string, args: unknown): Promise<RpcResponse> {
     const def = this.registry.internal.get(name);
     if (!def) {
@@ -436,10 +403,6 @@ export class OwnerStore {
     }
   }
 
-  /**
-   * Note a write made outside `call()` (another object, an alarm path) so the
-   * views rerun. Coalesces to one recompute per turn of the event loop.
-   */
   changed(): void {
     this.dirty = true;
     this.dirtyTables = null;
@@ -451,7 +414,6 @@ export class OwnerStore {
     });
   }
 
-  /** Note a write to named tables made outside `call()`, so only the views that read them rerun. */
   wrote(tables: readonly string[]): void {
     this.dirty = true;
     const known = this.tables();
@@ -469,7 +431,6 @@ export class OwnerStore {
     });
   }
 
-  /** Whether an open live socket is subscribed to `view`. */
   watching(view: string): boolean {
     const sockets = this.liveSockets();
     if (sockets.length === 0) return false;
@@ -484,8 +445,6 @@ export class OwnerStore {
       .toArray()
       .some((row) => open.has(row.conn_id));
   }
-
-  // ── Live views ──────────────────────────────────────────────────────────
 
   /**
    * Open live sockets. A socket this side closed stays in `getWebSockets()`
@@ -521,7 +480,6 @@ export class OwnerStore {
     }
   }
 
-  /** Accept a live socket whose caller the Worker already verified. */
   acceptLive(caller: OwnerCaller): Response {
     this.ensureSchema();
     if (caller.ownerId !== this.ownerIdOf()) {
@@ -543,7 +501,6 @@ export class OwnerStore {
     });
   }
 
-  /** False when the frame cannot have moved a deadline (a keepalive). */
   async onLiveMessage(socket: WebSocket, message: string | ArrayBuffer): Promise<boolean> {
     const attachment = this.liveAttachment(socket);
     if (!attachment) {
@@ -690,7 +647,6 @@ export class OwnerStore {
     }
   }
 
-  /** Rerun the subscriptions the writes since the last flush may have changed and push the ones that did. */
   flush(): void {
     if (!this.dirty) return;
     const wait = this.lastFlushAt + FLUSH_COALESCE_MS - Date.now();
@@ -837,8 +793,6 @@ export class OwnerStore {
     }
   }
 
-  // ── Jobs and deadlines ──────────────────────────────────────────────────
-
   /**
    * When to re-ask a socket that answered a reauthentication with a token no
    * newer than the one it already presented. Never sub-second, never past the
@@ -878,7 +832,6 @@ export class OwnerStore {
     return next;
   }
 
-  /** Run due jobs and enforce live-socket token expiry. */
   async onAlarm(now = Date.now()): Promise<void> {
     this.ensureSchema();
     for (const socket of this.liveSockets()) {
@@ -930,7 +883,6 @@ export class OwnerStore {
       }
       try {
         await def.run(this.context(null, now), JSON.parse(job.payload));
-        // A job may reschedule itself under its own id; keep that one.
         this.sql.exec(
           "DELETE FROM owner_jobs WHERE id = ? AND run_at = ? AND attempts = ?",
           job.id,

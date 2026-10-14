@@ -9,7 +9,6 @@ const nameOf = (filePath: string): string =>
 const sharedDrivePath = (name: string): string =>
   `shared/${new Date().toISOString().slice(0, 10)}/${crypto.randomUUID().slice(0, 8)}/${name}`;
 
-/** Where a file shown on this computer is in the drive, uploading it there if it isn't. */
 const drivePathFor = async (filePath: string, blob: Blob | null): Promise<string> => {
   const direct = driveLinkPath(filePath);
   if (direct) return direct;
@@ -41,10 +40,6 @@ const drivePathFor = async (filePath: string, blob: Blob | null): Promise<string
   return finalized.path;
 };
 
-/**
- * A public link to a file: its drive copy's existing link, or a new one. A
- * file the drive doesn't have goes there first, from the bytes on screen.
- */
 export const publicFileLink = async (
   filePath: string,
   blob: Blob | null,

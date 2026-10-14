@@ -14,7 +14,6 @@ import { handleTurnStateOwnerRoute } from "./turn-state-owner-routes.js";
 import { json } from "./http/response.js";
 
 
-/** JSON with object keys sorted, so equal records compare equal whatever order built them. */
 const canonicalJson = (value: unknown): string =>
   JSON.stringify(value, (_key, item: unknown) =>
     item && typeof item === "object" && !Array.isArray(item)
@@ -31,14 +30,10 @@ export const OWNER_FENCE_LEASE_TTL_MS = 30 * 60_000;
 
 export type OwnerPurgeMode = "temporary" | "permanent";
 export type OwnerPurgeFence = {
-  /** Bound on the first trusted direct call into this owner-named DO. */
   ownerId?: string;
   generation: string;
-  /** Owner lifecycle operation that created the current blocked fence. */
   beginRequestId?: string;
-  /** Makes a durable retry of the last temporary release idempotent. */
   lastReleasedGeneration?: string;
-  /** Released generation whose rejoin produced the current blocked fence. */
   rejoinedFromGeneration?: string;
   state: "open" | "blocked";
   mode?: OwnerPurgeMode;
@@ -52,12 +47,9 @@ export type OwnerPurgeFence = {
       turnId: string;
       namespace: "build" | "orchestrator" | "activity";
       role: "run" | "aux" | "orchestrator" | "activity";
-      /** Owner-lifecycle generation carried by the admitted activity. */
       ownerGeneration?: string;
-      /** Fence generation returned when this exact lease was admitted. */
       reservationGeneration?: string;
       workspace?: string;
-      /** Optional bounded lease used by cross-service control-plane work. */
       expiresAt?: number;
     }
   >;
@@ -71,11 +63,6 @@ export type OwnerFenceHost = {
   nextDeadline(): Promise<number | null>;
 };
 
-/**
- * A local owner-gate barrier that must complete before the fence commits an
- * authority-changing begin. It receives only parsed route data, never request
- * headers or credentials.
- */
 export type OwnerFenceAuthorityChangeHook = (args: {
   path: "begin";
   body: Readonly<Record<string, unknown>>;
@@ -417,9 +404,6 @@ class DurableObjectOwnerFenceHost implements OwnerFenceHost {
       ) {
         return json({ error: "Owner purge fence changed." }, 409);
       }
-      // Assertions still check the live fence and exact lease every time.
-      // Renew only when half the lease remains instead of adding a replicated
-      // write to every validation within the same short turn.
       if (lease.expiresAt - now > OWNER_FENCE_LEASE_TTL_MS / 2) {
         return json({ ok: true, expiresAt: lease.expiresAt });
       }
@@ -548,8 +532,6 @@ class DurableObjectOwnerFenceHost implements OwnerFenceHost {
       if (mirror.status !== "complete") {
         throw new Error("Owner fence rollback mirror exceeded its bound.");
       }
-      // The owner gate runs this on every alarm; rewriting an unchanged
-      // record cost a row write each time.
       if (canonicalJson(mirror.active) === canonicalJson(fence.active ?? {})) {
         return;
       }

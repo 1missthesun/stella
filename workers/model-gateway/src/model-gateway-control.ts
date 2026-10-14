@@ -6,7 +6,6 @@ import { applyOwnerEnforcementPush } from "./owner-enforcement.js";
 import { isGatewayRequestId } from "./request-util.js";
 
 export class ModelGatewayControl extends WorkerEntrypoint<Env> {
-  /** What this gateway can serve, for the backend's `/.well-known/stella`. */
   async capabilities(): Promise<{ managedModels: boolean; webSearch: boolean }> {
     const env = this.env as unknown as Record<string, unknown>;
     const configured = (name: string) => typeof env[name] === "string" && (env[name] as string).trim() !== "";
@@ -16,12 +15,6 @@ export class ModelGatewayControl extends WorkerEntrypoint<Env> {
     };
   }
 
-  /**
-   * Best-effort owner-scoped preparation for trusted Worker callers. This
-   * entrypoint deliberately performs no capability validation, inference, or
-   * accounting: the caller has already authenticated the owner object and the
-   * relay gate only warms its configuration and enforcement reads.
-   */
   async prepareOwner(args: { ownerId: string }): Promise<void> {
     const ownerId = typeof args?.ownerId === "string" ? args.ownerId : "";
     if (!ownerId || ownerId.length > 512) {
@@ -36,7 +29,6 @@ export class ModelGatewayControl extends WorkerEntrypoint<Env> {
     ).prepare(ownerId);
   }
 
-  /** An owner's enforcement, pushed by its owner object on cloud-builder. */
   async applyOwnerEnforcement(input: unknown): Promise<void> {
     await applyOwnerEnforcementPush(this.env, input, Date.now());
   }

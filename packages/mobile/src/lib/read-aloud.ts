@@ -29,25 +29,19 @@ const PLAYLIST_READY_POLL_MS = 250;
 // happens we recreate the player and seek back to the last played position —
 // reusing the server-cached segments (no re-synthesis, no duplicated audio) —
 // so playback continues instead of silently stopping partway.
-const HLS_MAX_RECOVER_ATTEMPTS = 4; // mid-stream recoveries before giving up
-const HLS_MAX_START_RETRIES = 3; // pre-audible reloads (e.g. empty first playlist)
+const HLS_MAX_RECOVER_ATTEMPTS = 4;
+const HLS_MAX_START_RETRIES = 3;
 const HLS_RECOVER_BACKOFF_MS = 700;
 const HLS_START_RETRY_BACKOFF_MS = 500;
-const HLS_STALL_TIMEOUT_MS = 6000; // no playback progress → treat as stalled
+const HLS_STALL_TIMEOUT_MS = 6000;
 const HLS_WATCHDOG_INTERVAL_MS = 1500;
-// Treat an end-of-stream this far before the known duration as a premature stop.
 const HLS_PREMATURE_EPS_SEC = 1.5;
 
 let cachedReadAloudEnabled = false;
 const listeners = new Set<() => void>();
 let currentPlayer: AudioPlayer | null = null;
-// The active HLS session ticket, so `stop` can tell the backend to end the
-// single background synthesis early (metered as interrupted) instead of letting
-// it run to completion after the user has already stopped listening.
 let currentStreamTicket: string | null = null;
 let playbackGeneration = 0;
-// Watchdog interval for the resilient HLS player (detects stalls). Held at
-// module scope so `stopReadAloud` can clear it when playback ends.
 let hlsWatchdog: ReturnType<typeof setInterval> | null = null;
 const clearHlsWatchdog = () => {
   if (hlsWatchdog) {
@@ -55,10 +49,6 @@ const clearHlsWatchdog = () => {
     hlsWatchdog = null;
   }
 };
-// Resume context saved when resilient HLS playback exhausts its recovery budget
-// and stops mid-message, so the user can resume from where it stopped (rebuilds
-// the player from the still-cached segments) instead of the message being
-// silently presented as finished.
 let hlsResume: {
   uri: string;
   id: string | null;
@@ -69,12 +59,6 @@ const emit = () => {
   for (const listener of listeners) listener();
 };
 
-// Playback is a singleton (one clip at a time), so its state lives here rather
-// than in a component. `messageId` is the message whose audio is loaded; the
-// status drives that message's sound button — a spinner while the audio is
-// fetched, then a pause/play toggle. `null` means nothing is loaded. Pausing
-// keeps the clip and player alive so playback can resume in place instead of
-// regenerating the audio from scratch.
 export type ReadAloudStatus = "loading" | "playing" | "paused";
 export type ReadAloudState = {
   messageId: string | null;
@@ -128,12 +112,10 @@ const speakingStore = {
   },
 };
 
-/** Current read-aloud playback state, or `null` when nothing is loaded. */
 export function getReadAloudPlaybackState() {
   return playbackState;
 }
 
-/** Current read-aloud playback state, or `null` when nothing is loaded. */
 export function useReadAloudState() {
   return useSyncExternalStore(
     speakingStore.subscribe,
@@ -181,9 +163,6 @@ const stripForSpeech = (text: string) =>
     .replace(/\s+/g, " ")
     .trim();
 
-// Ask the backend to synthesize a read-aloud reply under a random ticket, so
-// the native audio player can progressively stream it from a GET URL. The
-// (long) assistant text is posted here and never appears in the URL.
 async function prepareReadAloudStream(
   text: string,
   signal: AbortSignal,
@@ -193,9 +172,6 @@ async function prepareReadAloudStream(
   return { ticket: prepared.ticket, uri: `${backendOrigin()}${prepared.playlistPath}` };
 }
 
-// Best-effort stop beacon: tell the backend to end the background synthesis for
-// a ticket so provider spend stops when the user stops listening. Fire and
-// forget — a failure just means the synthesis runs to its (bounded) completion.
 function cancelStreamSession(ticket: string) {
   void (async () => {
     try {
@@ -242,12 +218,10 @@ export function stopReadAloud() {
   playbackSession.release();
 }
 
-/** Terminal stop used when dictation begins. Never a pause; nothing resumes. */
 export function stopReadAloudForDictation() {
   stopReadAloud();
 }
 
-/** Stop/cancel every TTS path first, then start dictation. */
 export async function startAfterStoppingReadAloud<T>(
   start: () => T | Promise<T>,
 ): Promise<T> {
@@ -255,7 +229,6 @@ export async function startAfterStoppingReadAloud<T>(
   return await start();
 }
 
-/** Pause the active clip, keeping it loaded so it can resume in place. */
 export function pauseReadAloud() {
   if (!currentPlayer || playbackState?.status !== "playing") return;
   try {
@@ -267,12 +240,8 @@ export function pauseReadAloud() {
   setPlaybackState({ messageId: playbackState.messageId, status: "paused" });
 }
 
-/** Resume a clip that was paused with `pauseReadAloud`. */
 export function resumeReadAloud() {
   if (playbackState?.status !== "paused") return;
-  // Resilient HLS playback that exhausted its recovery budget leaves no live
-  // player but a saved resume point; rebuild it from the cached segments so the
-  // user can pick up where the message stopped instead of restarting.
   if (!currentPlayer && hlsResume) {
     const resume = hlsResume;
     hlsResume = null;
@@ -297,11 +266,6 @@ export type PreparedSpeech = {
   claim: () => void;
 };
 
-/**
- * Starts synthesis ahead of playback, so the next clip is ready by the time
- * the current one ends. `cancel` ends the synthesis unless a speakReply call
- * has claimed the stream.
- */
 export function prepareSpeech(text: string): PreparedSpeech | null {
   const spoken = stripForSpeech(text);
   if (!spoken) return null;
@@ -330,11 +294,8 @@ export function prepareSpeech(text: string): PreparedSpeech | null {
 }
 
 export type SpeakReplyOptions = {
-  /** Keep playing when the app leaves the foreground, ducking other audio. */
   background?: boolean;
-  /** Never raise a phone alert; a failed clip just ends. */
   quiet?: boolean;
-  /** Synthesis already started with prepareSpeech for this same text. */
   prepared?: PreparedSpeech;
 };
 
@@ -350,12 +311,8 @@ export async function speakReply(
   const generation = playbackGeneration;
   const signal = beginPlaybackWork();
   const id = messageId ?? null;
-  // Mark the message as loading right away so its button reflects the active
-  // request — without this, a second tap during generation would start a whole
-  // new request instead of being treated as a pause/cancel.
   setPlaybackState({ messageId: id, status: "loading" });
 
-  // Generate once. Playback retries reuse the ticket's existing audio.
   try {
     await tryStreamReply(spoken, id, generation, signal, options);
   } catch (error) {
@@ -370,7 +327,6 @@ export async function speakReply(
   }
 }
 
-// Start one generation session and play its growing playlist.
 async function tryStreamReply(
   text: string,
   id: string | null,
@@ -383,15 +339,11 @@ async function tryStreamReply(
     ? await options.prepared.stream
     : await prepareReadAloudStream(text, signal);
   if (generation !== playbackGeneration || signal.aborted) {
-    // Superseded before playback began — end the background synthesis so it
-    // does not run to completion unheard.
     cancelStreamSession(ticket);
     return true;
   }
 
   currentStreamTicket = ticket;
-  // `uri` is a live HLS playlist that grows as Gemini generates, so playback
-  // begins on the first segment instead of waiting for the whole clip.
 
   const [, sessionReady] = await Promise.all([
     waitForPlaylistReady(uri, signal),
@@ -433,8 +385,6 @@ async function waitForPlaylistReady(uri: string, signal: AbortSignal) {
   }
 }
 
-// A player is disposable; the generation session is not. Both startup and
-// mid-stream recovery load the same playlist and preserve the playback position.
 let disposeHlsPlayback: (() => void) | null = null;
 
 async function playHlsResilient(
@@ -561,7 +511,6 @@ async function playHlsResilient(
     const attach = (at: number) => {
       if (finished || superseded()) return;
       lastProgressAt = Date.now();
-      // Also covers native failures that never emit a playback error event.
       startTimer = setTimeout(retry, STREAM_START_TIMEOUT_MS);
       try {
         playbackSession.hold();
@@ -589,7 +538,6 @@ async function playHlsResilient(
                   if (player === p) retry();
                 });
             }
-            // Never mistake the pre-seek position for progress or completion.
             return;
           }
           if (Number.isFinite(status.duration) && status.duration > expectedDur)
@@ -639,7 +587,6 @@ async function playHlsResilient(
         lastProgressAt = Date.now();
         return;
       }
-      // Even a player stalled at its advertised duration must finish explicitly.
       if (Date.now() - lastProgressAt > HLS_STALL_TIMEOUT_MS) retry();
     }, HLS_WATCHDOG_INTERVAL_MS);
     attach(startAt);

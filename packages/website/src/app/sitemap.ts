@@ -9,8 +9,6 @@ type Route = {
   changeFrequency: MetadataRoute.Sitemap[number]["changeFrequency"];
 };
 
-// Public, indexable HTML pages. Redirects (/changelog, /how-it-works) and
-// non-indexed app pages (/billing, /sign-in, /auth/*) are intentionally omitted.
 const ROUTES: Route[] = [
   { path: "/", priority: 1, changeFrequency: "weekly" },
   { path: "/learn-more", priority: 0.8, changeFrequency: "weekly" },

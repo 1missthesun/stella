@@ -1,10 +1,3 @@
-/**
- * The `map` tool's model-visible surface, split from the executable
- * definition so workerd hosts advertise the byte-identical tool. Resolution
- * itself lives in `map-resolve.ts`; the device and cloud definitions both
- * call it.
- */
-
 export const MAP_TOOL_NAME = "map";
 
 export const MAP_TOOL_DESCRIPTION =
@@ -55,5 +48,4 @@ export const MAP_TOOL_PARAMETERS: Record<string, unknown> = {
   },
 };
 
-/** Replay policy (`ToolReplayPolicy` in ../types.ts). A geocode/route lookup has no effect beyond the result. */
 export const MAP_TOOL_REPLAY = "safe" as const;

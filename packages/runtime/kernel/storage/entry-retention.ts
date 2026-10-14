@@ -1,22 +1,3 @@
-/**
- * Retention for rows in the chat `entry` table that nothing reads.
- *
- * `run_event` rows were written once per run lifecycle event (and, until
- * 2026-08-29, once per streamed text chunk) by the old
- * `ChatLog.recordRunEvent`. Every event API excludes them (`NON_EVENT_TYPES`
- * in chat-log.ts), they carry no `search_text` (so no FTS rows) and no
- * `entry_ref` rows, and the in-flight resume buffer lives in
- * `stella-runs.sqlite` (run-event-log.ts). The writer is gone; this module
- * drains the rows existing stores still hold.
- *
- * The drain is bounded: each batch deletes at most `batchSize` rows in its
- * own immediate transaction, the loop pauses between batches, and it stops
- * as soon as the caller reports the worker busy or interrupts it. A store
- * with ~1.5 M legacy rows drains over many short transactions instead of
- * one long write that would block a turn. Re-running resumes where the last
- * pass stopped, because the only state is the rows themselves.
- */
-
 import type { SqliteDatabase } from "./shared.js";
 
 export const LEGACY_RUN_EVENT_ENTRY_TYPE = "run_event";
@@ -26,10 +7,6 @@ type Transaction = <T>(work: () => T) => T;
 
 export type LegacyRunEventBatchResult = {
   deleted: number;
-  /**
-   * Conversation the next batch should start from, or null when no
-   * `run_event` rows remain at or after the batch's starting conversation.
-   */
   resumeFrom: string | null;
 };
 
@@ -51,12 +28,6 @@ const immediateTransaction =
     }
   };
 
-/**
- * Delete up to `batchSize` legacy `run_event` rows in one transaction,
- * walking conversations in id order from `fromConversationId`. Each lookup
- * is a seek on `idx_entry_conv_type_seq (conversation_id, type, seq)`, so
- * a batch never scans the table.
- */
 export const deleteLegacyRunEventBatch = (
   db: SqliteDatabase,
   options: {
@@ -104,7 +75,6 @@ export const deleteLegacyRunEventBatch = (
         remaining,
       ) as Array<{ id: number }>;
       for (const row of rows) rowIds.push(row.id);
-      // A full page may leave more rows in this conversation: resume here.
       if (rows.length === remaining) break;
       conversationId = readConversation(nextConversation.get(conversationId));
     }

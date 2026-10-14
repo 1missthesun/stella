@@ -8,7 +8,6 @@ export const Route = createFileRoute("/apps/$slug")({
   component: CloudAppDeepLink,
 });
 
-/** Compatibility only: the current Apps sidebar remains the real surface. */
 function CloudAppDeepLink() {
   const { slug } = Route.useParams();
   const navigate = useNavigate();

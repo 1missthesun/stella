@@ -1,30 +1,16 @@
-/**
- * AWS SigV4 for this Worker's R2 buckets over their S3 API, on WebCrypto,
- * with header signing plus query-string presigning, so clients
- * PUT and GET bytes straight to R2 and the Worker never carries them.
- *
- * The R2 bindings (`DRIVE`, `MEDIA`) do everything else: HEAD, DELETE, LIST
- * and inline writes. Only what must work without a binding is signed here:
- * client URLs and the server-side copy that moves a drive upload out of its
- * client-writable staging key.
- */
-
 import { copyR2ProxyObject, presignR2ProxyUrl, r2ProxySigner, type R2ProxySigner } from "./r2-proxy.js";
 
 export type R2S3Signer = {
   kind?: "s3";
   accessKeyId: string;
   secretAccessKey: string;
-  /** S3 API origin, `https://<account>.r2.cloudflarestorage.com`. */
   endpoint: string;
   bucket: string;
 };
 
-/** S3 presigning with the R2 API token, or the Worker proxy without one (r2-proxy.ts). */
 export type R2Signer = R2S3Signer | R2ProxySigner;
 
 export const UNSIGNED_PAYLOAD = "UNSIGNED-PAYLOAD";
-/** SHA-256 of the empty body, for signed requests that carry none. */
 export const EMPTY_PAYLOAD_SHA256 =
   "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 /** SigV4 refuses presigned lifetimes past seven days. */
@@ -88,14 +74,12 @@ const encodeR2PathSegment = (value: string, label: string): string => {
     throw new Error(`R2 ${label} contains an unsafe path segment.`);
   }
   try {
-    // A literal percent is data, not an escape: it encodes to `%25`.
     return encodeRfc3986(value);
   } catch {
     throw new Error(`R2 ${label} is not valid Unicode.`);
   }
 };
 
-/** `https://<endpoint>/<bucket>/<key>`, every segment encoded exactly once. */
 export const r2ObjectUrl = (
   signer: Pick<R2S3Signer, "endpoint" | "bucket">,
   key: string,
@@ -172,10 +156,6 @@ const signature = async (
   };
 };
 
-/**
- * A request signed in its headers, for the Worker's own S3 calls. `headers`
- * are signed alongside host, date and payload hash (lower-cased names).
- */
 export const signR2Request = async (
   signer: R2S3Signer,
   args: {
@@ -271,10 +251,6 @@ export const presignR2Url = async (
   return `${url.origin}${url.pathname}?${canonicalQuery}&X-Amz-Signature=${result.signature}`;
 };
 
-/**
- * A signer for `bucket` (a bucket name, such as `env.R2_DRIVE_BUCKET`), or
- * null when this deployment has no R2 S3 credentials.
- */
 export const r2Signer = (
   env: Pick<Cloudflare.Env, "R2_ACCESS_KEY_ID" | "R2_SECRET_ACCESS_KEY" | "R2_S3_ENDPOINT">,
   bucket: string | undefined,
@@ -289,11 +265,6 @@ export const r2Signer = (
   return { accessKeyId, secretAccessKey, endpoint, bucket: name };
 };
 
-/**
- * Server-side copy inside one bucket (S3 CopyObject), so a finalized drive
- * upload's bytes leave the staging key its presigned PUT can still write.
- * Throws unless storage confirms the copy.
- */
 export const copyR2Object = async (
   signer: R2Signer,
   args: { from: string; to: string; signal?: AbortSignal; fetchImpl?: typeof fetch },

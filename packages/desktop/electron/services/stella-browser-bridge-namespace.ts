@@ -18,46 +18,11 @@ import { processIdentityIsLive } from "./process-identity.js";
 
 const execFileAsync = promisify(execFile);
 
-/**
- * Which browser bridge this Stella instance runs, and who owns it.
- *
- * The bridge's session name, socket directory, extension port and Chrome
- * native-messaging host are per user, so every Stella instance (the installed
- * app and any dev checkout) used to launch the same bridge and close or kill
- * whichever daemon was already there. Two live instances stole it from each
- * other on every retry, and a stale dev binary could replace the app's daemon
- * with one that lacks newer commands.
- *
- * - Namespace. The installed app runs the shared bridge, the one the Chrome
- *   extension reaches (its native-messaging host name and port 39040 are fixed
- *   by the extension, so there is only one per user). A dev checkout runs an
- *   isolated bridge by default: its own socket directory derived from its data
- *   dir (inherited by its runtime through STELLA_BROWSER_SOCKET_DIR), a free
- *   loopback extension port, and no native-messaging registration. The in-app
- *   browser and agent browsers keep working there; the user's Chrome extension
- *   stays with the installed app. `STELLA_BROWSER_BRIDGE=shared` opts a dev
- *   checkout into the shared bridge (and claims it), `=isolated` isolates any
- *   instance. Windows addresses daemons by TCP ports derived from the session
- *   name, so a directory cannot isolate it there: Windows always uses the
- *   shared namespace and relies on ownership alone. Which of the two an
- *   instance is comes from `isProductInstance`, not from packaging: Stella has
- *   no packaging step, so `app.isPackaged` is false for the product as well.
- *
- * - Ownership. The launching instance records itself next to the daemon
- *   (`<session>.owner.json`). Before closing or killing anything, a launch
- *   reads that record: a daemon owned by another live instance is only ever
- *   replaced by a higher-priority instance (a dev checkout that opted in
- *   claims, then the installed app, then an unclaimed dev checkout), and never
- *   with an older bridge binary. A lower or equal priority instance defers and
- *   retries, so a replaced instance does not steal the bridge back.
- */
-
 export type BrowserBridgeMode = "shared" | "isolated";
 
 export type BrowserBridgeNamespace = Readonly<{
   mode: BrowserBridgeMode;
   socketDir: string;
-  /** Opted in to take the shared bridge from another live instance. */
   claim: boolean;
   /**
    * This instance is the user's Stella rather than a dev checkout. Named for
@@ -65,18 +30,14 @@ export type BrowserBridgeNamespace = Readonly<{
    * decided by `isProductInstance`.
    */
   packaged: boolean;
-  /** Fixed extension port, or null to pick a free loopback port per launch. */
   extPort: number | null;
-  /** Whether this instance writes the Chrome native-messaging host. */
   ownsExtensionChannel: boolean;
   dataDir: string | null;
 }>;
 
-/** `shared` | `isolated`; unset isolates everything but the user's Stella. */
 export const STELLA_BROWSER_BRIDGE_MODE_ENV = "STELLA_BROWSER_BRIDGE";
 export const STELLA_BROWSER_ISOLATED_EXT_PORT_ENV =
   "STELLA_BROWSER_ISOLATED_EXT_PORT";
-/** Lets an opted-in claim replace a newer bridge binary. */
 export const STELLA_BROWSER_BRIDGE_ALLOW_DOWNGRADE_ENV =
   "STELLA_BROWSER_BRIDGE_ALLOW_DOWNGRADE";
 
@@ -90,7 +51,6 @@ const isolatedExtensionPort = (env: NodeJS.ProcessEnv): number | null => {
     : null;
 };
 
-/** Mirror of `getStellaBrowserSocketDir`, ignoring the explicit override. */
 const defaultSocketDir = (env: NodeJS.ProcessEnv): string => {
   const runtimeDir = env.XDG_RUNTIME_DIR?.trim();
   if (runtimeDir) return path.join(runtimeDir, "stella-browser");
@@ -172,10 +132,6 @@ export const configureBrowserBridgeNamespace = (options: {
   return namespace;
 };
 
-/**
- * The configured namespace, or the legacy shared one when nothing configured
- * it (tests, tools): the per-user directory, port 39040, no claim.
- */
 export const getBrowserBridgeNamespace = (): BrowserBridgeNamespace =>
   configuredNamespace ??
   Object.freeze({
@@ -190,7 +146,6 @@ export const getBrowserBridgeNamespace = (): BrowserBridgeNamespace =>
     dataDir: null,
   });
 
-/** A free loopback port for an isolated bridge's extension listener. */
 export const pickFreeLoopbackPort = async (): Promise<number> =>
   await new Promise<number>((resolve, reject) => {
     const server = net.createServer();
@@ -205,17 +160,11 @@ export const pickFreeLoopbackPort = async (): Promise<number> =>
     });
   });
 
-// ---------------------------------------------------------------------------
-// Ownership
-
-/** This Electron process. Every bridge it launches is recorded under it. */
 export const BROWSER_BRIDGE_INSTANCE_ID = randomUUID();
 
 export type BrowserBridgeBinaryIdentity = Readonly<{
   path: string;
-  /** `stella-browser --version`, e.g. "0.9.1"; null when it did not answer. */
   version: string | null;
-  /** Source commit from the hydration manifest, when the binary has one. */
   sourceSha: string | null;
   size: number;
   mtimeMs: number;
@@ -224,7 +173,6 @@ export type BrowserBridgeBinaryIdentity = Readonly<{
 export type BrowserBridgeOwnerRecord = Readonly<{
   version: 1;
   instanceId: string;
-  /** The owning Electron main process. */
   ownerPid: number;
   ownerStartedAtMs?: number | null;
   daemonPid: number | null;
@@ -238,7 +186,6 @@ export type BrowserBridgeOwnerRecord = Readonly<{
   recordedAtMs: number;
 }>;
 
-/** A record younger than this counts as live while its daemon is still booting. */
 const LAUNCH_GRACE_MS = 60_000;
 
 const ownerRecordPath = (socketDir: string, session: string) =>
@@ -324,7 +271,6 @@ export const isLiveForeignOwner = (
       (recordedDaemonIsLive(record) || now - record.recordedAtMs < LAUNCH_GRACE_MS),
   );
 
-/** Opted-in dev claim > installed app > unclaimed dev checkout. */
 const ownerPriority = (owner: { claim: boolean; packaged: boolean }): number =>
   owner.claim ? 2 : owner.packaged ? 1 : 0;
 
@@ -333,7 +279,6 @@ const parseVersion = (value: string | null): number[] | null => {
   return match ? match.slice(1, 4).map((part) => Number(part)) : null;
 };
 
-/** -1 when `left` is older than `right`, 1 newer, 0 same/unknown. */
 export const compareBridgeBinaryVersions = (
   left: string | null,
   right: string | null,
@@ -352,10 +297,6 @@ export type BrowserBridgeTakeoverDecision =
   | Readonly<{ action: "replace-live"; owner: BrowserBridgeOwnerRecord }>
   | Readonly<{ action: "defer"; owner: BrowserBridgeOwnerRecord; reason: string }>;
 
-/**
- * The handshake a launch runs before it closes or kills anything in its
- * namespace: may this instance replace whatever daemon is there?
- */
 export const decideBrowserBridgeTakeover = (args: {
   namespace: BrowserBridgeNamespace;
   owner: BrowserBridgeOwnerRecord | null;
@@ -415,7 +356,6 @@ const readHydrationSourceSha = (binaryPath: string): string | null => {
   }
 };
 
-/** Identify a bridge binary (cached per path, size and mtime). */
 export const readBrowserBridgeBinaryIdentity = async (
   binaryPath: string,
 ): Promise<BrowserBridgeBinaryIdentity | null> => {
@@ -453,7 +393,6 @@ export const readBrowserBridgeBinaryIdentity = async (
   return identity;
 };
 
-/** The pid the session's daemon recorded at boot, or null. */
 export const readBrowserBridgeDaemonPid = (
   socketDir: string,
   session: string,

@@ -5,11 +5,6 @@ import { useAuthSessionState } from "@/global/auth/hooks/use-auth-session-state"
 
 const RECHECK_MS = 15 * 60_000;
 
-/**
- * Tells the account where this computer is, whenever that changes. The
- * phone decides the user's zone; this computer's report counts only while
- * no phone has reported recently.
- */
 export const useReportTimeZone = (): void => {
   const { hasConnectedAccount } = useAuthSessionState();
 

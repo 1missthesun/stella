@@ -6,17 +6,8 @@ struct LauncherError: Error, CustomStringConvertible {
     init(_ description: String) { self.description = description }
 }
 
-/// Everything the launcher owns lives under one root:
-/// `app/` (the checkout), `runtimes/{bun-<v>,git-<v>}`,
-/// `bundles/electron-<v>/Stella.app`, `signing.pub`, `launcher-state.json`
-/// and `logs/launcher.log`. A self-hosted server picked in `server.json`
-/// gets its own checkout and state under `servers/<serverId>/`, so the
-/// stella.sh install stays as it was.
 struct LauncherPaths {
     let root: URL
-    /// Set by `STELLA_LAUNCHER_ROOT` (testing). An overridden root also gets
-    /// its own Electron userData and Stella home, so a test install never
-    /// touches the real profile or collides with a running Stella.
     let isolated: Bool
     var server: ServerConfig? = nil
 
@@ -51,9 +42,6 @@ struct LauncherPaths {
     var isolatedHome: URL { root.appendingPathComponent("stella-home") }
 }
 
-/// A self-hosted Stella server, written to `server.json` by the app's
-/// "Connect to your own server": `{"origin", "serverId", "name"}`.
-/// Anything malformed, or the compiled default server, reads as none.
 struct ServerConfig: Equatable {
     let origin: String
     let serverId: String
@@ -87,9 +75,6 @@ struct ServerConfig: Equatable {
     }
 }
 
-/// The deployment this launcher belongs to. A fork's build.sh writes its own
-/// values into Info.plist (StellaBackendURL, StellaReleasesURL,
-/// StellaAppleTeamID); without them the launcher is Stella's.
 enum Deployment {
     private static func value(_ key: String, _ fallback: String) -> String {
         let configured = (Bundle.main.object(forInfoDictionaryKey: key) as? String)?
@@ -98,19 +83,14 @@ enum Deployment {
     }
 
     static let backendURL = value("StellaBackendURL", "https://stella-v2-cloud-builder-prod.fromyou.workers.dev")
-    /// Public base of the releases bucket: launcher/stable, electron-identity, git-runtime.
     static let releasesURL = value("StellaReleasesURL", "https://pub-a319aaada8144dc9be5a83625033769c.r2.dev")
-    /// The Developer ID team that signs the launcher and Stella.app.
     static let appleTeamID = value("StellaAppleTeamID", "7UVYHQ763X")
 }
 
-/// Versions baked into this launcher build. A signed tree may ask for a newer
-/// Bun through `packages/desktop/launcher.json`.
 enum Pins {
     struct Asset {
         let url: String
         let sha256: String
-        /// Path of the executable inside the archive, for zips.
         let member: String?
     }
 
@@ -134,9 +114,6 @@ enum Pins {
             member: "bun-darwin-x64/bun"),
     ]
 
-    // From the managed git-runtime manifest on R2
-    // (git-runtime/versions/2.53.0/manifest.json), pinned so a tampered
-    // manifest can't swap the binary.
     static let gitVersion = "2.53.0"
     static let git: [String: Asset] = [
         "darwin-arm64": Asset(
@@ -194,9 +171,6 @@ struct ShellResult {
 }
 
 enum Shell {
-    /// Run a program without a shell. With `outputFile`, stdout and stderr are
-    /// appended to that file (long installs whose grandchildren might hold a
-    /// pipe open); `stderr` then holds the file's tail.
     static func run(
         _ executable: String,
         _ args: [String],
@@ -264,7 +238,6 @@ enum Shell {
 
     final class Flag { var value = false }
 
-    /// Kill the process and everything it started once `timeout` passes.
     private static func killAfter(_ timeout: TimeInterval?, _ process: Process) -> Flag {
         let flag = Flag()
         guard let timeout else { return flag }
@@ -320,7 +293,6 @@ enum Net {
         return try result.get()
     }
 
-    /// Download to `destination`, refusing anything whose sha256 differs.
     static func download(_ url: URL, to destination: URL, sha256 expected: String) throws {
         let semaphore = DispatchSemaphore(value: 0)
         let staging = destination.appendingPathExtension("download")
@@ -358,9 +330,7 @@ func sha256File(_ url: URL) throws -> String {
 }
 
 struct LauncherState: Codable {
-    /// sha256 of `app/bun.lock` at the last successful `bun install`.
     var bunLockHash: String?
-    /// HEAD at the last successful `prepare-install.mjs`.
     var preparedHead: String?
     var installedAt: String?
 

@@ -1,30 +1,3 @@
-/**
- * The page inside the update-transition overlay, a transparent view laid
- * over the main window (see update-transition.ts). It only ever sees
- * pictures: main hands it a JPEG screenshot of the window before a change,
- * then the regions where the window differs after it with the after
- * picture's crops of them, and it animates only there.
- *
- * Self-contained on purpose: it has to keep working while the renderer's own
- * source is mid-update, so it is a data: URL built from `transitionPage`'s
- * source and ships inside the main bundle. Nothing in the function may refer
- * to anything outside it.
- *
- * API on `window.__updateTransition` (called by main with executeJavaScript):
- * - `cover(before, live)`: show the before picture over the window, except the
- *   `live` rects (CSS px), which stay live and out of the comparison.
- * - `reveal(items, whole, motion)`: focus-pull each region main found (with the
- *   after picture's crop of it); `whole` when it is the whole window.
- * - `frost(motion)`: frost the covered window for a restart and return the
- *   frosted picture (for the launcher and the next process).
- * - `frosted()`: resolves once the frost reads as done.
- * - `renderMark(svg, dark, size)`: the mark as a PNG, for the launcher.
- * - `hold(frosted, options)`: show a frosted picture with the Stella mark and
- *   the "Updating Stella" label.
- * - `focusIn(after, motion)`: bring the window into focus from the hold.
- * - `clear()`: drop everything; the live window shows again.
- */
-
 // The page runs in a browser, but main typechecks without the DOM library:
 // the few browser APIs it touches are declared here, scoped to this module.
 type Keyframe = Record<string, string | number | null>;
@@ -44,19 +17,14 @@ type Motion = { keyframes: Keyframe[]; timing: KeyframeAnimationOptions };
 export type FocusPullMotion = { out: Motion; in: Motion };
 export type FrostMotion = {
   frost: Motion;
-  /** When the frost reads as done: the spring's tail after it is not seen. */
   shownMs: number;
-  /** Frosting tint over light and dark windows. */
   tintLight: string;
   tintDark: string;
-  /** The frost's end state, for the exported frame: blur in CSS px, saturation. */
   blur: number;
   saturate: number;
 };
 export type HoldOptions = {
-  /** Show the mark and label after this many ms (the label waits 0.7 s in all). */
   labelDelayMs: number;
-  /** How long the update has been holding: keeps the label's shimmer in step. */
   heldMs: number;
   dark: boolean;
   label: string;
@@ -64,33 +32,25 @@ export type HoldOptions = {
   appear: Motion;
 };
 export type FocusInMotion = { focus: Motion; fade: Motion; leave: Motion };
-/** A region to focus-pull: where (CSS px), its feather per side (left,
- * top, right, bottom; 0 at the window's edge), and the after picture's crop
- * of it as a data URL. */
 export type RevealItem = {
   rect: Rect;
   feather: [number, number, number, number];
   after: string;
 };
 export type RevealReport = {
-  /** Decode and layer setup: the wait before the animation starts. */
   prepMs: number;
 };
 
 function transitionPage() {
   const root: Element = document.getElementById("root");
-  /** Device pixels per CSS pixel of the pictures. */
   let dpr = window.devicePixelRatio || 1;
   let before: ImageBitmap | null = null;
-  /** CSS px rects that stay live: out of the cover and the comparison. */
   let live: Array<[number, number, number, number]> = [];
   let holdLayer: Element | null = null;
-  /** The frost's animation on screen, which the hold waits for. */
   let frosting: Promise<unknown> = Promise.resolve();
 
   const frame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
   const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
-  /** Two frames, or half a second if the window stops painting (covered). */
   const painted = () =>
     Promise.race([
       (async () => {
@@ -99,7 +59,6 @@ function transitionPage() {
       })(),
       sleep(500),
     ]);
-  /** Animations' end, or their length plus a margin if the timeline stalls. */
   const finished = (animations: Array<{ finished: Promise<unknown>; effect: { getComputedTiming(): { endTime: number } } }>) =>
     Promise.race([
       Promise.all(animations.map((animation) => animation.finished)),
@@ -108,12 +67,6 @@ function transitionPage() {
   const decode = async (url: string) => createImageBitmap(await (await fetch(url)).blob());
   const viewport = () => ({ w: window.innerWidth, h: window.innerHeight });
 
-  /**
-   * A canvas showing `rect` of a picture at its place in the window. Sides
-   * that touch the window's edge are extended by `pad` CSS px of repeated
-   * edge pixels, so a blur never pulls in transparency (and with it the
-   * sharp live window) from outside.
-   */
   function pictureLayer(
     bitmap: ImageBitmap,
     rect: Rect,
@@ -165,7 +118,6 @@ function transitionPage() {
     await painted();
   }
 
-  /** The live rects stop being live (the page reloads): show them as pictured. */
   function fillLive() {
     if (!before || live.length === 0) return;
     const { w, h } = viewport();
@@ -173,11 +125,6 @@ function transitionPage() {
     root.replaceChildren(pictureLayer(before, { x: 0, y: 0, w, h }, 0));
   }
 
-  /**
-   * Focus-pull each region main found from the before picture to the after
-   * picture (main sends the after picture's crop of each region), then get
-   * out of the way: the live window under it already matches.
-   */
   async function reveal(items: RevealItem[], whole: boolean, motion: FocusPullMotion) {
     const called = performance.now();
     const was = before;
@@ -218,8 +165,6 @@ function transitionPage() {
         ]),
       );
     });
-    // The regions replace the full cover in one frame; outside them the live
-    // window already matches the after picture.
     root.replaceChildren(...groups);
     const prepMs = Math.round(performance.now() - called);
     await Promise.all(runs.map((run) => run()));
@@ -227,7 +172,6 @@ function transitionPage() {
     return { prepMs };
   }
 
-  /** Mean luminance of a picture, 0..1, from a tiny read. */
   function luminance(bitmap: ImageBitmap) {
     const canvas = new OffscreenCanvas(16, 10);
     const g = canvas.getContext("2d", { willReadFrequently: true })!;
@@ -258,9 +202,6 @@ function transitionPage() {
       ]),
       sleep(motion.shownMs),
     ]);
-    // The same frosted frame at half resolution (it is all blur) for whoever
-    // holds it next: the launcher, then the next process. Made while the
-    // frost plays, from the picture rather than the screen.
     const scale = 0.5;
     const out = new OffscreenCanvas(Math.round(picture.width * scale), Math.round(picture.height * scale));
     const g = out.getContext("2d")!;
@@ -284,7 +225,6 @@ function transitionPage() {
     return btoa(binary);
   }
 
-  /** The mark as a PNG in the hold's colors, for the launcher to show natively. */
   async function renderMark(svg: string, dark: boolean, size: number) {
     const color = dark ? "#f5f5f7" : "#1d1d1f";
     const markup = svg
@@ -326,12 +266,8 @@ function transitionPage() {
     layer.append(picture, center);
     root.replaceChildren(layer);
     holdLayer = layer;
-    // Paced from when the update started holding, so a hold shown again in
-    // the next process carries on where the last one was rather than
-    // starting over.
     inner.animate(options.appear.keyframes, { ...options.appear.timing, delay: options.labelDelayMs, fill: "both" });
     label.style.animationDelay = `${-((options.heldMs % 1800) + 1800) % 1800}ms`;
-    // A window that isn't shown yet paints the hold as its first frame.
     if (document.visibilityState === "visible") await painted();
   }
 

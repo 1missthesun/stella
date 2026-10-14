@@ -1,15 +1,3 @@
-/**
- * The owner's billing ledger: the plan Stripe last reported, usage against
- * the plan's windows, purchased credits, and the budget handed out in
- * session capabilities. Everything that spends on a managed model settles
- * here, one owner at a time, so two requests can never both spend the last
- * of an allowance.
- *
- * Stripe stays the record for money. Subscription events refetch the
- * subscription, so the plan follows Stripe's current state whatever order
- * events arrive in, and every event id is applied once.
- */
-
 import type {
   BillingCalls,
   BillingPlan,
@@ -44,7 +32,6 @@ import type { OwnerContext, OwnerDb, OwnerDbReader, OwnerDomain } from "../regis
 
 const MICRO_CENTS_PER_USD = 100_000_000;
 const LIFETIME_RETRY_AFTER_MS = 24 * 60 * 60 * 1000;
-/** A session grant's unspent budget is held this long past its expiry for late usage. */
 const GRANT_SETTLEMENT_GRACE_MS = 10 * 60 * 1000;
 const RECEIPT_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 const ACTIVE_SUBSCRIPTION_STATUSES = new Set(["active", "trialing", "past_due"]);
@@ -139,8 +126,6 @@ type AccountRow = {
   updated_at: number;
 };
 
-// ── Calendar windows ───────────────────────────────────────────────────────
-
 const weekBounds = (now: number) => {
   const date = new Date(now);
   const start = new Date(date);
@@ -149,7 +134,6 @@ const weekBounds = (now: number) => {
   return { start: start.getTime(), end: start.getTime() + 7 * 24 * 60 * 60 * 1000 };
 };
 
-/** The monthly window containing `now`, anchored on the billing day of `anchor`. */
 const monthBounds = (now: number, anchor: number) => {
   const a = new Date(anchor);
   const at = (year: number, month: number) => {
@@ -178,8 +162,6 @@ const monthBounds = (now: number, anchor: number) => {
   const [endYear, endMonth] = shift(year, month, 1);
   return { start, end: at(endYear, endMonth) };
 };
-
-// ── The account row ────────────────────────────────────────────────────────
 
 const defaultAccount = (now: number): AccountRow => ({
   plan: "free",
@@ -241,11 +223,8 @@ const isPaying = (row: AccountRow): boolean =>
   (plan(row) !== "free" && ACTIVE_SUBSCRIPTION_STATUSES.has(row.subscription_status)) ||
   row.credit_balance > 0;
 
-/** The identity rung: the auth claims know sign-in, this ledger knows payment. */
 const identityLevel = (row: AccountRow): IdentityLevel =>
   isPaying(row) ? 3 : (Math.min(2, Math.max(1, row.identity_level)) as IdentityLevel);
-
-// ── Usage against the plan's windows ──────────────────────────────────────
 
 type Window = { used: number; limit: number; resetAt: number; exceeded: boolean };
 
@@ -254,7 +233,6 @@ type UsageSnapshot = {
   weekly: Window;
   monthly: Window;
   lifetime: Window | null;
-  /** Window starts and usage with expired windows zeroed. */
   normalized: Pick<
     AccountRow,
     "rolling_used" | "rolling_started_at" | "weekly_used" | "weekly_started_at" | "monthly_used" | "monthly_started_at"
@@ -305,7 +283,6 @@ const usageSnapshot = (config: BillingConfig, row: AccountRow, now: number): Usa
   };
 };
 
-/** Spend left inside the plan's windows, before purchased credit. */
 const includedHeadroom = (snapshot: UsageSnapshot): number =>
   Math.max(
     0,
@@ -322,18 +299,11 @@ export type BillingAccess = {
   identityLevel: IdentityLevel;
   unlimited: boolean;
   allowed: boolean;
-  /** Paid plans past their windows keep going on fallback models. */
   downgraded: boolean;
   audience: ManagedModelAudience;
   retryAfterMs: number;
   message: string;
-  /** Spend available now (windows plus credit); null when unlimited. */
   remainingMicroCents: number | null;
-  /**
-   * Set when no spend is left for Stella's models: a Free owner refused, or a
-   * paid owner past a window with no credit (its budget is then zero, so
-   * "falling back" has nothing to spend either). Retrying never helps.
-   */
   usageLimit?: StellaUsageLimit;
 };
 
@@ -341,7 +311,6 @@ const audienceFor = (current: BillingPlan, downgraded: boolean): ManagedModelAud
   current === "free" ? "free" : downgraded ? `${current}_fallback` : current;
 
 const accessFor = (config: BillingConfig, row: AccountRow, now: number): BillingAccess => {
-  // Without billing every account is Pro with unlimited usage.
   const current = config.enabled ? plan(row) : "pro";
   const unlimited = row.usage_mode === "unlimited" || !config.enabled;
   const snapshot = usageSnapshot(config, row, now);
@@ -353,8 +322,6 @@ const accessFor = (config: BillingConfig, row: AccountRow, now: number): Billing
     unlimited,
     remainingMicroCents: unlimited ? null : remaining,
   };
-  // A window blocks only when neither it nor purchased credit has room;
-  // the lifetime allowance is checked first because it never comes back.
   const blocks = (window: Window) => Math.max(0, window.limit - window.used) + credit <= 0;
   const blocking = unlimited
     ? null
@@ -409,7 +376,6 @@ const accessFor = (config: BillingConfig, row: AccountRow, now: number): Billing
   };
 };
 
-/** Budget still held by live session grants: issued but not yet spent. */
 const reservedGrants = (db: OwnerDbReader, now: number): number =>
   db.one<{ reserved: number | null }>(
     "SELECT SUM(MAX(0, budget - settled)) AS reserved FROM billing_grants WHERE expires_at + ? >= ?",
@@ -423,7 +389,6 @@ const capabilityBudget = (access: BillingAccess, reserved: number): number => {
   return Math.min(Math.max(0, Math.floor(access.remainingMicroCents - reserved)), chunk);
 };
 
-/** Note who the owner is, as the latest verified sign-in says. */
 export const recordBillingIdentity = (
   ctx: OwnerContext,
   identity: { identityLevel?: IdentityLevel },
@@ -434,7 +399,6 @@ export const recordBillingIdentity = (
   updateAccount(ctx.db, { is_anonymous: 0, identity_level: level });
 };
 
-/** The owner pays: an active paid plan, or purchased credit left. */
 export const billingPaying = (ctx: { db: OwnerDbReader; now: number }): boolean =>
   isPaying(readAccount(ctx.db, ctx.now));
 
@@ -446,7 +410,6 @@ const billingOff = (env: Cloudflare.Env): boolean => {
   }
 };
 
-/** The plan and whether usage is unlimited, for plan quotas kept by other domains. */
 export const billingPlan = (ctx: {
   db: OwnerDbReader;
   env: Cloudflare.Env;
@@ -480,7 +443,6 @@ export const cloudSandboxAccess = (ctx: {
   return config.plans[subscribedPlan(row)].cloudSandbox;
 };
 
-/** Budget for a turn capability: the gateway's owner gate meters it. */
 export const turnAllowance = (ctx: { db: OwnerDbReader; env: Cloudflare.Env; now: number }) => {
   const access = billingAccess(ctx);
   return {
@@ -494,11 +456,6 @@ export const turnAllowance = (ctx: { db: OwnerDbReader; env: Cloudflare.Env; now
   };
 };
 
-/**
- * Reserve a session capability's budget: the smaller of what is left after
- * other live grants and one chunk for the audience. The grant is settled by
- * the usage the gateway reports against `jti`.
- */
 export const reserveSessionGrant = (
   ctx: OwnerContext,
   input: { jti: string; expiresAt: number },
@@ -548,13 +505,6 @@ export const releaseReservation = (ctx: OwnerContext, id: string): void => {
   ctx.db.run("DELETE FROM billing_grants WHERE jti = ?", id);
 };
 
-// ── Settling usage ─────────────────────────────────────────────────────────
-
-/**
- * Charge spend against the windows, drawing purchased credit for whatever
- * the windows no longer cover. Unlimited owners are metered but never draw
- * credit.
- */
 const charge = (ctx: OwnerContext, costMicroCents: number): void => {
   const cost = Math.max(0, Math.floor(costMicroCents));
   const row = ensureAccount(ctx.db, ctx.now);
@@ -597,7 +547,6 @@ export type UsageBatchResult = {
   rejected: Array<{ requestId: string; reason: string }>;
 };
 
-/** Settle the gateway's usage events for this owner. Idempotent on `requestId`. */
 export const applyGatewayUsage = (ctx: OwnerContext, events: GatewayUsageEvent[]): UsageBatchResult => {
   const result: UsageBatchResult = { accepted: [], duplicate: [], rejected: [] };
   pruneReceipts(ctx);
@@ -618,7 +567,6 @@ export const applyGatewayUsage = (ctx: OwnerContext, events: GatewayUsageEvent[]
   return result;
 };
 
-/** Spend metered outside the gateway (media, voice, search). Idempotent on `id`. */
 export const recordUsage = (
   ctx: OwnerContext,
   records: Array<{ id: string; costMicroCents: number }>,
@@ -633,16 +581,12 @@ export const recordUsage = (
   return { recorded, duplicate: records.length - recorded };
 };
 
-// ── Admin ──────────────────────────────────────────────────────────────────
-
-/** Set a plan outside Stripe (test accounts, support). Resets usage on a change. */
 export const setAdminPlan = (
   ctx: OwnerContext,
   input: {
     plan?: BillingPlan;
     usageMode?: "default" | "unlimited";
     resetUsage?: boolean;
-    /** Test accounts: spend the whole allowance, as a user who used it up. */
     spendAllowance?: boolean;
   },
 ): void => {
@@ -666,7 +610,6 @@ export const setAdminPlan = (
   });
 };
 
-/** Far past any plan's lifetime allowance ($100,000). */
 const SPENT_ALLOWANCE_MICRO_CENTS = 10_000_000_000_000;
 
 const resetWindows = (now: number, anchor: number): Partial<AccountRow> => ({
@@ -677,8 +620,6 @@ const resetWindows = (now: number, anchor: number): Partial<AccountRow> => ({
   monthly_used: 0,
   monthly_started_at: monthBounds(now, anchor).start,
 });
-
-// ── Stripe ─────────────────────────────────────────────────────────────────
 
 type StripeSubscription = {
   id: string;
@@ -728,14 +669,12 @@ const stripeUnavailable = (error: unknown): RpcError =>
     { retryable: !(error instanceof StripeError && error.status < 500) },
   );
 
-/** Purchases need billing; a deployment without it says so instead of "try again". */
 const requireBilling = (env: Cloudflare.Env): void => {
   if (!billingConfig(env).enabled) {
     throw new RpcError("UNAVAILABLE", "Billing isn't set up on this Stella.", { retryable: false });
   }
 };
 
-/** The owner's Stripe customer, created on first use with the owner id attached. */
 const ensureCustomer = async (ctx: OwnerContext): Promise<string> => {
   const row = ensureAccount(ctx.db, ctx.now);
   if (row.stripe_customer_id) return row.stripe_customer_id;
@@ -873,7 +812,6 @@ const portal = async (
   }
 };
 
-/** Apply a subscription as Stripe reports it now. */
 const syncSubscription = (ctx: OwnerContext, subscription: StripeSubscription): void => {
   const row = ensureAccount(ctx.db, ctx.now);
   if (row.stripe_customer_id && subscription.customer !== row.stripe_customer_id) return;
@@ -881,7 +819,6 @@ const syncSubscription = (ctx: OwnerContext, subscription: StripeSubscription): 
   const priceId = item?.price?.id ?? null;
   const paid = planForStripePrice(billingConfig(ctx.env), priceId);
   const nextPlan: BillingPlan = ACTIVE_SUBSCRIPTION_STATUSES.has(subscription.status) && paid ? paid : "free";
-  // A newer subscription replaces an ended one; an ended one never replaces a live one.
   if (
     row.stripe_subscription_id &&
     row.stripe_subscription_id !== subscription.id &&
@@ -926,10 +863,6 @@ const subscriptionIdOf = (object: Record<string, unknown>): string | null => {
   return typeof nested === "string" ? nested : null;
 };
 
-/**
- * Apply one verified Stripe event addressed to this owner. Throws only when
- * Stripe should redeliver it.
- */
 export const applyStripeEvent = async (ctx: OwnerContext, event: StripeEvent): Promise<void> => {
   if (ctx.db.one("SELECT 1 AS seen FROM billing_stripe_events WHERE id = ?", event.id)) return;
   const object = event.data.object;
@@ -940,7 +873,6 @@ export const applyStripeEvent = async (ctx: OwnerContext, event: StripeEvent): P
       if (object.mode === "payment" && metadata.purpose === "usage_credit") {
         if (object.payment_status !== "paid") break;
         const sessionId = String(object.id);
-        // The amount the owner chose; tax collected on top is not credit.
         const chosen = Number(metadata.amountCents);
         const cents = Number.isSafeInteger(chosen) && chosen > 0
           ? chosen
@@ -1003,7 +935,6 @@ export const applyStripeEvent = async (ctx: OwnerContext, event: StripeEvent): P
   ctx.db.run("DELETE FROM billing_stripe_events WHERE created_at < ?", ctx.now - RECEIPT_RETENTION_MS);
 };
 
-/** Cancel the subscription and delete the Stripe customer (account deletion). */
 export const closeStripeCustomer = async (ctx: OwnerContext): Promise<void> => {
   const row = readAccount(ctx.db, ctx.now);
   if (!row.stripe_customer_id) return;
@@ -1013,8 +944,6 @@ export const closeStripeCustomer = async (ctx: OwnerContext): Promise<void> => {
     if (!(error instanceof StripeError && error.status === 404)) throw error;
   }
 };
-
-// ── Status ─────────────────────────────────────────────────────────────────
 
 const usd = (microCents: number) => Number((microCents / MICRO_CENTS_PER_USD).toFixed(4));
 

@@ -1,7 +1,3 @@
-/**
- * Search tools: Grep handler.
- */
-
 import { promises as fs } from "fs";
 import path from "path";
 import { spawn } from "child_process";
@@ -121,7 +117,6 @@ const buildProbeArgs = (args: {
   if (args.hidden) probe.push("--hidden", "--no-ignore");
   if (args.glob) probe.push(`--glob=${args.glob}`);
   if (args.type) probe.push(`--type=${args.type}`);
-  // `--` ends option parsing so a pattern like `--pre=<cmd>` stays a pattern.
   probe.push("--", args.pattern, args.basePath);
   return probe;
 };
@@ -279,7 +274,6 @@ export const handleGrep = async (
     : undefined;
   const maxResults = args.max_results ? Number(args.max_results) : 100;
 
-  // Safety check: block system directories
   const pathBlock = isBlockedPath(basePath);
   if (pathBlock) return { error: pathBlock };
   if (scopedRoot && !isPathInsideRoot(basePath, scopedRoot)) {
@@ -342,7 +336,6 @@ export const handleGrep = async (
     };
   }
 
-  // Fallback: simple scan.
   const files = baseStat.isFile() ? [basePath] : await walkFiles(basePath);
   let regex: RegExp;
   try {

@@ -1,9 +1,4 @@
 #!/usr/bin/env node
-/**
- * Isolated launch/doctor/drive/cleanup helper for the Stella desktop app.
- * Invocation examples live in ./SKILL.md. Do not drive a session this
- * script did not start.
- */
 import { createRequire } from "node:module";
 import { spawn, spawnSync } from "node:child_process";
 import {
@@ -61,10 +56,6 @@ const evidenceRoot = () => {
   const outputs = path.join(os.homedir(), ".stella", "outputs");
   return existsSync(outputs) ? path.join(outputs, "verify-stella") : path.join(skillRoot, "artifacts");
 };
-/**
- * The shell is up: the chat's top bar, or, with no account or on first run,
- * onboarding, the sign-in screen or a self-hosted server's pairing screen.
- */
 const READY_SELECTOR = [
   ".shell-topbar-full",
   '[data-window-mode="onboarding"] .full-body > *',
@@ -107,9 +98,6 @@ const ELECTRON_SYSTEM_ENV_KEYS = [
   "TZ",
   "DISPLAY",
   "XDG_RUNTIME_DIR",
-  // The harness is a developer instance, so it serves the renderer in
-  // development mode. Pass this through to verify the production build the
-  // installed product serves (see resolveRendererBuildMode).
   "STELLA_RENDERER_MODE",
 ];
 
@@ -505,11 +493,6 @@ const seedDataDir = (dataDir, { claudeCode = false, firstRun = false } = {}) => 
   });
 };
 
-/**
- * `signed-out` boots with no account (Stella has no guest accounts, so the
- * app shows onboarding or the sign-in screen); the others mint a dev test
- * account on that plan.
- */
 const ACCOUNT_MODES = ["signed-in", "signed-out", "go", "pro"];
 const TEST_ACCOUNT_EMAIL_DOMAIN = "test.stella.local";
 
@@ -517,7 +500,6 @@ const DEV_BACKEND_URL = "https://stella-v2-cloud-builder-dev.fromyou.workers.dev
 
 const resolveAdminApiSecret = adminApiSecret;
 
-/** The backend (cloud-builder) origin: auth, test accounts and the API. */
 const resolveSiteUrl = () =>
   (process.env.STELLA_BACKEND_URL?.trim() || DEV_BACKEND_URL).replace(/\/+$/, "");
 
@@ -528,11 +510,6 @@ const authHeaders = (token) => ({
   ...(token ? { authorization: `Bearer ${token}` } : {}),
 });
 
-/**
- * Mint a signed-in (non-anonymous) test account on the dev deployment via
- * the admin API. Returns the bearer token Electron adopts at boot, plus the
- * identifiers recorded in the run pointer. The token is never persisted.
- */
 const mintTestAccount = async (runId, mode) => {
   const siteUrl = resolveSiteUrl();
   const secret = resolveAdminApiSecret();
@@ -542,8 +519,6 @@ const mintTestAccount = async (runId, mode) => {
       recovery:
         ADMIN_SECRET_HELP,
     });
-  // STELLA_VERIFY_ACCOUNT_EMAIL reuses one test account across runs, e.g.
-  // two checkouts acting as the same owner's two computers.
   const reuseEmail = process.env.STELLA_VERIFY_ACCOUNT_EMAIL?.trim();
   if (reuseEmail && !reuseEmail.endsWith(`@${TEST_ACCOUNT_EMAIL_DOMAIN}`)) {
     fail(`STELLA_VERIFY_ACCOUNT_EMAIL must end with @${TEST_ACCOUNT_EMAIL_DOMAIN}.`, 2, {
@@ -703,11 +678,6 @@ const doctorReport = async (run) => {
   return report;
 };
 
-/**
- * The run's protected-storage key, made once and kept beside the run (owner
- * only), so a relaunch reads what the previous launch encrypted: the device
- * signing key above all, which a new key would make unreadable.
- */
 const runStorageKey = (runDir) => {
   const file = path.join(runDir, "protected-storage.key");
   if (existsSync(file)) return readFileSync(file, "utf8").trim();
@@ -734,8 +704,6 @@ const startElectron = async (run, { minted, modelGateway, fakeMic, browserBridge
     }
   }
   if (fakeMic) {
-    // Chromium plays the WAV as the only microphone, looping, and grants
-    // capture without a prompt. Used to drive dictation end to end.
     electronArgs.push(
       "--use-fake-device-for-media-stream",
       "--use-fake-ui-for-media-stream",
@@ -746,7 +714,6 @@ const startElectron = async (run, { minted, modelGateway, fakeMic, browserBridge
     }
   }
   electronArgs.push("--remote-allow-origins=*");
-  // Main-process inspector for evaluating in main (e.g. hot-update checks).
   if (process.env.STELLA_VERIFY_INSPECT_MAIN) {
     electronArgs.push(`--inspect=127.0.0.1:${process.env.STELLA_VERIFY_INSPECT_MAIN}`);
   }
@@ -766,7 +733,6 @@ const startElectron = async (run, { minted, modelGateway, fakeMic, browserBridge
         : {}),
       ...providerHomes,
       ...runHomeEnvironment(run),
-      // The app talks to the backend the harness signs in against.
       ...(process.env.STELLA_BACKEND_URL?.trim()
         ? { VITE_STELLA_BACKEND_URL: resolveSiteUrl() }
         : {}),

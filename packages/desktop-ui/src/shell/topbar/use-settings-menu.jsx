@@ -1,17 +1,3 @@
-/**
- * Shared settings-menu machinery for the top bar.
- *
- * The gear's destinations and its two anchored popovers (Theme, Connectors)
- * are rendered in two places: the standalone gear (`SettingsMenuButton`, shown
- * while signed out) and the unified account+settings menu (`ShellTopBarAccount`,
- * shown while signed in). Centralizing the destination list, the pending-popover
- * handoff, and the popover elements keeps both surfaces byte-for-byte identical.
- *
- * Theme and Connectors open as popovers anchored to hidden, absolutely
- * positioned targets that sit on top of the trigger button — the menu item only
- * queues which popover to open, and `applyPendingPopover` flips it open once the
- * dropdown has closed (see the note there for why the handoff is deferred).
- */
 import { lazy, Suspense, useRef, useState } from "react";
 import { usePostOnboardingHint } from "@/global/onboarding/post-onboarding-hints";
 import { platformCapabilities } from "@/platform/capabilities";
@@ -91,8 +77,6 @@ export function useSettingsMenu() {
             id: "connect",
             label: "Stella on your phone",
             Icon: Smartphone,
-            // Mirrors the trigger's hint dot inside the opened menu so the user can
-            // see which row clears it; selecting the row dismisses both.
             hint: connectHint.active,
             onSelect: () => {
               if (connectHint.active) connectHint.dismiss();
@@ -117,8 +101,6 @@ export function useSettingsMenu() {
     },
   ];
 
-  // Rendered inside the trigger's positioned wrapper so the hidden anchors line
-  // up on top of the button that opened the menu.
   const popovers = (
     <>
       {themeOpen ? (

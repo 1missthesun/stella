@@ -1,11 +1,3 @@
-/**
- * Shared motion for the onboarding conversation: one family of springs so
- * every card, row and button moves with the same physical feel, plus the
- * small primitives built on them (press scale, a 0→1 spring flag).
- *
- * Everything animates transforms and opacity through Reanimated on the UI
- * thread; React only re-renders when a flag flips, never per frame.
- */
 import { useEffect, type ReactNode } from "react";
 import {
   Pressable,
@@ -40,14 +32,12 @@ export const SPRING_SOFT: WithSpringConfig = {
   mass: 1,
 };
 
-/** Tight and quick: presses, toggles, small pops. */
 export const SPRING_SNAPPY: WithSpringConfig = {
   damping: 31,
   stiffness: 340,
   mass: 0.7,
 };
 
-/** A card or block arriving under a message. */
 export const cardEntering = (delay = 0) =>
   FadeInDown.springify()
     .damping(25)
@@ -57,7 +47,6 @@ export const cardEntering = (delay = 0) =>
     .delay(delay)
     .reduceMotion(ReduceMotion.System);
 
-/** Rows inside a card, staggered by index. */
 export const rowEntering = (index: number, base = 0) =>
   FadeInDown.springify()
     .damping(28)
@@ -72,11 +61,6 @@ export const fadeEntering = (delay = 0, duration = 220) =>
 export const fadeExiting = (duration = 160) =>
   FadeOut.duration(duration).reduceMotion(ReduceMotion.System);
 
-/**
- * A part of a demo thread arriving: it fades while rising the last few points
- * into place, with no scale and no overshoot, the way the desktop onboarding
- * films bring a layer on.
- */
 export const threadEntering = (delay = 0) =>
   FadeInDown.springify()
     .damping(30)
@@ -86,11 +70,6 @@ export const threadEntering = (delay = 0) =>
     .delay(delay)
     .reduceMotion(ReduceMotion.System);
 
-/**
- * A bubble-style pop: springs up from `fromScale` (around the view's
- * `transformOrigin`) while the fade finishes early, so it reads as solid by
- * the time it lands.
- */
 export const popEntering =
   (fromScale: number, fromY = 0, delay = 0) =>
   () => {
@@ -119,16 +98,11 @@ export const popEntering =
     };
   };
 
-/** Siblings sliding to make room for a row that arrived or left. */
 export const springLayout = LinearTransition.springify()
   .damping(28)
   .stiffness(190)
   .reduceMotion(ReduceMotion.System);
 
-/**
- * A 0→1 spring that follows a boolean: the shared value every "this just
- * happened" moment in the demos hangs its transforms on.
- */
 export function useSpringFlag(
   flag: boolean,
   config: WithSpringConfig = SPRING_SOFT,
@@ -145,19 +119,12 @@ export function useSpringFlag(
 }
 
 type SpringPressableProps = Omit<PressableProps, "style"> & {
-  /** The surface that sinks (look and inner layout). */
   style?: StyleProp<ViewStyle>;
-  /** Outer layout (flex, margins) for the touch target itself. */
   containerStyle?: StyleProp<ViewStyle>;
-  /** How far the press sinks. */
   pressScale?: number;
   children?: ReactNode;
 };
 
-/**
- * A pressable that sinks under the finger and springs back: the tactile
- * answer every tappable surface in onboarding gives.
- */
 export function SpringPressable({
   style,
   containerStyle,

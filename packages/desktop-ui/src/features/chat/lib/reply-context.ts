@@ -22,10 +22,6 @@ export type ReplyContextOptions = {
   agentParents?: ReadonlyMap<string, string>;
 };
 
-/**
- * A user row that paints nothing (a runtime wake prompt whose text is
- * withheld, with no attachments or context chips) is not a new ask.
- */
 const rendersNothing = (row: UserRowViewModel): boolean =>
   !row.text.trim() &&
   row.attachments.length === 0 &&
@@ -35,13 +31,6 @@ const rendersNothing = (row: UserRowViewModel): boolean =>
   !(row.appSelectionLabels?.length) &&
   !row.activityLabel;
 
-/**
- * Apply the shared reply-context rule (`@stella/contracts/reply-context`) to
- * the projected timeline. Persisted references stay intact for lineage and
- * focus; this changes display rows only: an assistant row keeps at most one
- * quotable reference, and only when it reaches outside the exchange the
- * reader is already in.
- */
 export function withReplyContext(
   rows: EventRowViewModel[],
   options: ReplyContextOptions = {},

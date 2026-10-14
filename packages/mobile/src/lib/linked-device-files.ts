@@ -143,10 +143,6 @@ const targetFor = async (
   return { deviceId, deviceName, access: await reachPhoneAccess(deviceId) };
 };
 
-/**
- * This phone's credential for the one computer that is online, for reads
- * that do not name the computer they belong to.
- */
 export const soleOnlineComputerAccess = async (): Promise<StoredPhoneAccess | null> => {
   const computers = await onlineComputers();
   const only = computers?.length === 1 ? computers[0] : null;

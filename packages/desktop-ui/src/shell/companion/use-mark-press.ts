@@ -1,11 +1,3 @@
-/**
- * Click-or-drag handling for the mark, shared by the mark window and the
- * panel's invisible hit area at the same spot. Both windows carry it because
- * compositors do not agree on which of the two overlapping always-on-top
- * windows ends up on top; whichever receives the pointer must behave the
- * same. A short press toggles the composer; travel past the threshold turns
- * the press into a drag that main follows by moving both windows.
- */
 import {
   useCallback,
   useRef,
@@ -14,7 +6,6 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 
-/** Pointer travel before a press becomes a drag instead of a click. */
 const DRAG_THRESHOLD_PX = 5;
 
 type Press = {

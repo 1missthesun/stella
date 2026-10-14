@@ -31,7 +31,6 @@ export const preloadModelsPicker = () =>
     preloadModelCatalogCache();
   });
 
-// Warm the Settings screen before opening its sidebar section.
 export const preloadSettingsScreen = () => {
   runOnce("settings", () => import("@/global/settings/SettingsView"));
 };

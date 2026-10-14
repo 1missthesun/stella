@@ -3,8 +3,6 @@ import type {
   RuntimeModelCatalogModel,
   RuntimeModelCatalogSnapshot,
 } from "@stella/contracts/model-catalog";
-// Provider display names live in a shared, browser-safe runtime module so the
-// model picker and the runtime route-error toasts can't drift apart.
 import { getProviderDisplayName } from "@stella/contracts/provider-display";
 import { LOCAL_MODEL_PROVIDER_KEYS } from "./llm-providers";
 
@@ -22,19 +20,9 @@ export type CatalogModel = {
   maxTokens?: number;
   input?: Model<Api>["input"];
   reasoning?: boolean;
-  /** The model came from models.json or an extension/runtime registration. */
   runtimeManaged?: boolean;
-  /** Authentication for this provider is owned by models.json/an extension. */
   runtimeManagedAuth?: boolean;
-  /** The runtime explicitly allows this configured custom provider without auth. */
   runtimeCredentialless?: boolean;
-  /**
-   * Whether the backend will honor this model for the current user's
-   * audience. Defaults to true; the Stella `/api/models` endpoint sets
-   * it to false on per-tier-restricted models so the picker disables
-   * them in sync with the backend's request-time coercion. Models from
-   * other providers (BYOK / local) never carry a restriction.
-   */
   allowedForAudience?: boolean;
 };
 
@@ -72,7 +60,6 @@ export type CatalogApiModel = {
 export type CatalogApiResponse = {
   data?: CatalogApiModel[];
   defaults?: CatalogDefaultModel[];
-  /** Model-gateway origin every Stella route relays through. */
   gateway?: { origin?: string };
 };
 
@@ -233,15 +220,6 @@ export function groupCatalogModelsByProvider(
     });
 }
 
-/**
- * Strip provider prefixes from a Stella model identifier so the visible
- * label is just the trailing model slug (e.g. `openai/gpt-5` → `gpt-5`,
- * `accounts/fireworks/models/qwen-coder-32b` → `qwen-coder-32b`). For
- * preset Stella models with no slash in the modelId we keep the
- * pre-formatted display name (e.g. "Stella Designer") because that's already
- * the friendly form. Only applied to Stella models — every other provider
- * keeps its standard label.
- */
 export function getStellaDisplayName(model: CatalogModel): string {
   if (model.provider !== "stella") return model.name;
   if (!model.name.includes("/")) return model.name;
@@ -250,11 +228,6 @@ export function getStellaDisplayName(model: CatalogModel): string {
   return tail || model.name;
 }
 
-/**
- * Single-line name for a Stella picker row. Curated Stella aliases are routing
- * presets, so their visible name should be the model they currently resolve
- * to rather than the alias ("Stella Light", "Stella Max", and so on).
- */
 export function getStellaResolvedModelName(model: CatalogModel): string {
   return getStellaDisplayName(model);
 }

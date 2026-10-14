@@ -12,10 +12,6 @@ const safeName = (name: string): string =>
 const nameFromUri = (uri: string): string =>
   decodeURIComponent(uri.split(/[?#]/)[0]?.split("/").pop() ?? "") || "file";
 
-/**
- * A `file://` copy of `uri` named `name`, so the save sheet offers the file
- * under its real name. Remote files are downloaded first.
- */
 export const namedLocalCopy = async (uri: string, name: string): Promise<string> => {
   const directory = new Directory(Paths.cache, "file-save", String(Date.now()));
   directory.create({ intermediates: true, idempotent: true });
@@ -44,11 +40,6 @@ const UTI_BY_MIME: Record<string, string> = {
   "video/quicktime": "com.apple.quicktime-movie",
 };
 
-/**
- * Save a file to the phone through the system sheet: images and videos get
- * "Save Image" / "Save Video" (the Photos library), everything else "Save to
- * Files". Android's sheet hands it to Files, Drive or any other app.
- */
 export const saveFileToDevice = async (
   uri: string,
   options: { name: string; mimeType?: string | null },
@@ -63,7 +54,6 @@ export const saveFileToDevice = async (
   });
 };
 
-/** Upload a phone-side copy of a file into the drive, for a file the drive lacks. */
 const uploadToDrive = async (
   uri: string,
   name: string,
@@ -90,21 +80,13 @@ const uploadToDrive = async (
 };
 
 export type ShareSource = {
-  /** The file's drive path, when it is known to be in the drive. */
   drivePath: string | null;
-  /** A computer path the drive may hold a copy of. */
   devicePath: string | null;
-  /** The bytes on the phone (or a URL for them), to upload when the drive has no copy. */
   localUri: string | null;
   name: string;
   mimeType: string;
 };
 
-/**
- * A public link to the file: the drive copy's existing link, or a new one.
- * A file only on a computer is found in the drive by its path; failing that,
- * the phone's copy goes into the drive first.
- */
 export const publicFileLink = async (source: ShareSource): Promise<string> => {
   let drivePath = source.drivePath;
   if (!drivePath && source.devicePath) {
@@ -118,14 +100,12 @@ export const publicFileLink = async (source: ShareSource): Promise<string> => {
   return link.url;
 };
 
-/** Open the system share sheet with a link. */
 export const shareLink = async (url: string, title?: string): Promise<void> => {
   await Share.share(
     Platform.OS === "ios" ? { url } : { message: url, ...(title ? { title } : {}) },
   );
 };
 
-/** A cache file holding `text`, named `name`, for saving or uploading text the viewer shows. */
 export const writeTextCopy = (text: string, name: string): string => {
   const directory = new Directory(Paths.cache, "file-save", String(Date.now()));
   directory.create({ intermediates: true, idempotent: true });

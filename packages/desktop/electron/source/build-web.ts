@@ -7,26 +7,9 @@ import { createModuleGraph, isInNodeModules, SOURCE_EXTENSIONS } from "./modules
 import { createRouteTreeGenerator } from "./routes.js";
 import type { SourceTools } from "./tools.js";
 
-/**
- * The browser build of the renderer, without Vite: rolldown bundles
- * `index.html`'s entry, resolving and transforming through the same module
- * graph the desktop source server uses (oxc, `import.meta.glob`, the `@`
- * alias, one React). Stylesheets are compiled the same way (Tailwind when
- * they ask for it) and applied by their modules, as on desktop.
- *
- * Every URL in the output is relative, so one build serves from any path:
- * the shared `/chat-app/` and each owner's `/chat-app/u/<fork>/<tree>/`. The
- * router keeps its location in memory, so the document's URL, and with it
- * every document-relative URL, stays put for the page's life.
- */
-
 const toPosix = (value: string) => value.replace(/\\/g, "/");
 const ASSETS = "assets";
 
-/**
- * The website's public config: `VITE_*`, then the website's `NEXT_PUBLIC_*`
- * twin, then desktop-ui's `.env` files. The Apps host follows the backend.
- */
 export const webBuildEnv = (
   uiRoot: string,
   processEnv: NodeJS.ProcessEnv = process.env,
@@ -124,7 +107,6 @@ export const buildWebRenderer = async (options: WebBuildOptions): Promise<{ file
   fs.rmSync(outDir, { recursive: true, force: true });
   fs.mkdirSync(path.join(outDir, ASSETS), { recursive: true });
 
-  /** Copy a file into `assets/` under a content-hashed name; returns its output path. */
   const emitted = new Map<string, string>();
   const emitFile = (name: string, bytes: Uint8Array): string => {
     const hash = createHash("sha256").update(bytes).digest("base64url").slice(0, 8);
@@ -142,7 +124,6 @@ export const buildWebRenderer = async (options: WebBuildOptions): Promise<{ file
     return fileName;
   };
 
-  /** A `url()` or attribute reference, made relative to the output root. */
   const rewriteReference = (reference: string, fromFile: string): string | null => {
     const trimmed = reference.trim();
     if (isExternalUrl(trimmed)) return null;
@@ -195,7 +176,6 @@ export const buildWebRenderer = async (options: WebBuildOptions): Promise<{ file
     },
   });
 
-  /** A worker script, bundled on its own into one file. */
   const workers = new Map<string, Promise<string>>();
   const buildWorker = (file: string): Promise<string> => {
     let build = workers.get(file);
@@ -217,7 +197,6 @@ export const buildWebRenderer = async (options: WebBuildOptions): Promise<{ file
     return build;
   };
 
-  /** `new URL("./x", import.meta.url)`: bundle a script, copy anything else. */
   const rewriteModuleUrls = async (code: string, file: string): Promise<string> => {
     const replacements = new Map<string, string>();
     for (const match of code.matchAll(NEW_URL)) {
@@ -228,7 +207,6 @@ export const buildWebRenderer = async (options: WebBuildOptions): Promise<{ file
       const fileName = SOURCE_EXTENSIONS.has(path.extname(target))
         ? await buildWorker(target)
         : emitAsset(target);
-      // Chunks live in `assets/` too.
       replacements.set(match[0], `new URL(${JSON.stringify(`./${path.basename(fileName)}`)}, import.meta.url)`);
     }
     let result = code;
@@ -245,7 +223,6 @@ export const buildWebRenderer = async (options: WebBuildOptions): Promise<{ file
         const resolved = graph.resolveImport(source, importer);
         return resolved ? resolved.file : { id: source, external: true };
       } catch (error) {
-        // Dependencies may import optional packages they guard at runtime.
         if (isInNodeModules(importer)) return null;
         throw error;
       }
@@ -293,7 +270,6 @@ export const buildWebRenderer = async (options: WebBuildOptions): Promise<{ file
     return stylesheets;
   };
 
-  // The entry, from the page's module script.
   const htmlFile = path.join(uiRoot, "index.html");
   let html = fs.readFileSync(htmlFile, "utf8");
   const entryTag = /<script\s+type="module"\s+src="([^"]+)"><\/script>/.exec(html);
@@ -337,7 +313,6 @@ export const buildWebRenderer = async (options: WebBuildOptions): Promise<{ file
     }));
     fs.writeFileSync(statsFile, JSON.stringify(stats));
   }
-  // Preload the entry's static import graph so it doesn't load as a waterfall.
   const preload = new Set<string>();
   const walk = (fileName: string) => {
     for (const imported of chunks.get(fileName)?.imports ?? []) {
@@ -397,7 +372,6 @@ export const buildWebRenderer = async (options: WebBuildOptions): Promise<{ file
   }
   fs.writeFileSync(path.join(outDir, "index.html"), html);
 
-  // Static files, and pdf.js's worker from the copy react-pdf imports.
   fs.cpSync(publicDir, outDir, { recursive: true });
   try {
     const reactPdf = graph.resolveImport("react-pdf", path.join(uiRoot, "src", "main.tsx"));

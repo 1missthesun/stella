@@ -356,9 +356,6 @@ fn validate_chain_actions(cmd: &Value) -> Result<Vec<&str>, String> {
     Ok(actions)
 }
 
-/// Runtime browser sessions default to the in-app CDP daemon. An explicit
-/// per-request marker opts a command into the already-connected extension
-/// bridge without changing the daemon's process-wide provider.
 fn command_targets_extension(cmd: &Value) -> bool {
     cmd.get("browserBackend").and_then(Value::as_str) == Some("extension")
 }
@@ -391,9 +388,6 @@ fn validate_extension_domain_gates(cmd: &Value, state: &DaemonState) -> Result<(
     Ok(())
 }
 
-/// Trimmed, non-empty `ownerId` a command was sent with, if any. The JS
-/// client stamps every command with the session's owner id; commands from
-/// other transports may omit it.
 fn command_owner_id(cmd: &Value) -> Option<&str> {
     cmd.get("ownerId")
         .and_then(Value::as_str)
@@ -601,9 +595,6 @@ fn browser_error_provenance(cmd: &Value, tab_id: u64, generation: &str) -> Strin
     )
 }
 
-/// Rejects an owner-scoped command unless the addressed tab is recorded for
-/// that exact owner. Commands without `ownerId` retain unrestricted manual/UI
-/// behavior.
 fn validate_tab_ownership(cmd: &Value, mgr: &BrowserManager, tab_id: u64) -> Result<(), String> {
     let requested_generation = match cmd.get("tabGeneration") {
         None | Some(Value::Null) => None,
@@ -656,9 +647,6 @@ fn validate_tab_ownership(cmd: &Value, mgr: &BrowserManager, tab_id: u64) -> Res
     }
 }
 
-/// Validates `finalize_tabs`/`close_owner` action-specific inputs after the
-/// common owner-lease fence has authenticated the caller. `keep` is optional
-/// (missing means "close everything") but must be well-formed when present.
 fn validate_owner_finalization(cmd: &Value, action: &str) -> Result<(), String> {
     let owner_id = command_owner_id(cmd)
         .ok_or_else(|| format!("Action '{}' requires a non-empty ownerId", action))?;
@@ -751,35 +739,24 @@ fn validate_mark_tab(cmd: &Value) -> Result<(), String> {
 
 pub struct HarEntry {
     pub request_id: String,
-    /// Seconds since Unix epoch (CDP `wallTime`), with sub-second precision.
     pub wall_time: f64,
-    // Request fields
     pub method: String,
     pub url: String,
     pub request_headers: Vec<(String, String)>,
     pub post_data: Option<String>,
     pub request_body_size: i64,
     pub resource_type: String,
-    // Response fields — populated by `Network.responseReceived`
     pub status: Option<i64>,
     pub status_text: String,
-    /// Normalised from CDP `response.protocol` (e.g. `"h2"` → `"HTTP/2.0"`).
     pub http_version: String,
     pub response_headers: Vec<(String, String)>,
     pub mime_type: String,
     pub redirect_url: String,
-    /// Updated by `Network.loadingFinished` for final accuracy.
     pub response_body_size: i64,
-    /// Response payload, captured only for API-shaped requests. Without it a
-    /// HAR records that a call happened but not what it returned, which is not
-    /// enough to derive a client from.
     pub response_body: Option<String>,
     pub response_body_base64: bool,
     pub response_body_truncated: bool,
-    /// Raw CDP `ResourceTiming` object from `Network.responseReceived`.
     pub cdp_timing: Option<Value>,
-    /// Monotonic timestamp (seconds) from `Network.loadingFinished`; used to
-    /// compute the `receive` timing phase.
     pub loading_finished_timestamp: Option<f64>,
 }
 
@@ -928,7 +905,6 @@ pub struct DaemonState {
     /// are evicted from the CDP buffer on navigation, so they are collected
     /// here and fetched on the next command tick.
     pub har_pending_bodies: Vec<String>,
-    /// Running total of captured body bytes for the open recording.
     pub har_body_bytes: usize,
     pub confirm_actions: Option<ConfirmActions>,
     pub inspect_server: Option<InspectServer>,
@@ -939,15 +915,9 @@ pub struct DaemonState {
     pub tracked_body_bytes: usize,
     pub request_tracking: bool,
     pub active_frame_id: Option<String>,
-    /// Directory downloads are routed to, recorded when the `download` action
-    /// configures Browser.setDownloadBehavior so `waitfordownload` can report
-    /// the real on-disk path of a completed download.
     pub download_dir: Option<String>,
-    /// Shared slot for stream server to receive CDP client when browser launches.
     pub stream_client: Option<Arc<RwLock<Option<Arc<CdpClient>>>>>,
-    /// Stream server instance kept alive so the broadcast channel remains open.
     pub stream_server: Option<Arc<StreamServer>>,
-    /// Signals the daemon accept loop to stop gracefully.
     pub daemon_shutdown_tx: Option<mpsc::UnboundedSender<()>>,
     owner_leases: OwnerLeaseRegistry,
 }
@@ -1014,8 +984,6 @@ impl DaemonState {
         }
     }
 
-    /// Create state with an optional stream client slot and server instance
-    /// (for daemon startup with stream server).
     pub fn new_with_stream(
         stream_client: Option<Arc<RwLock<Option<Arc<CdpClient>>>>>,
         stream_server: Option<Arc<StreamServer>>,
@@ -1032,30 +1000,25 @@ impl DaemonState {
         }
     }
 
-    /// Update the stream server's CDP client slot when browser is set or cleared.
     pub async fn update_stream_client(&self) {
         if let Some(ref slot) = self.stream_client {
             let mut guard = slot.write().await;
             *guard = self.browser.as_ref().map(|m| Arc::clone(&m.client));
         }
         if let Some(ref server) = self.stream_server {
-            // Update the CDP page session ID so screencast commands target the right page
             let session_id = self
                 .browser
                 .as_ref()
                 .and_then(|m| m.active_session_id().ok().map(|s| s.to_string()));
             server.set_cdp_session_id(session_id).await;
 
-            // Broadcast connection status change to WebSocket clients
             let connected = self.browser.is_some();
             let sc = server.is_screencasting().await;
             server.broadcast_status(connected, sc, 1280, 720);
-            // Notify the background CDP event loop that the client changed
             server.notify_client_changed();
         }
     }
 
-    /// Spawn a background task that polls screenshots and pipes them to ffmpeg.
     async fn start_recording_task(
         &mut self,
         client: Arc<CdpClient>,
@@ -1449,9 +1412,6 @@ impl DaemonState {
                             }
                         }
                         "Page.screencastFrame" => {
-                            // Frame broadcasting and acks are handled in real-time by the
-                            // stream server's background CDP event loop. Here we just
-                            // collect acks as a fallback for non-streaming mode.
                             if self.stream_server.is_none() {
                                 if let Some(sid) =
                                     event.params.get("sessionId").and_then(|v| v.as_i64())
@@ -1552,10 +1512,6 @@ pub async fn execute_command(cmd: &Value, state: &mut DaemonState) -> Value {
         Err(error) => return error_response(&id, &error),
     };
     if let Some(ref claim) = owner_lease_claim {
-        // Lease rotation fences stale callers but deliberately preserves the
-        // durable task's tabs. A replacement worker/REPL generation reclaims
-        // them; only an explicit end-of-task finalize/close_owner destroys
-        // targets.
         state.owner_leases.commit(claim);
     }
 
@@ -1587,7 +1543,6 @@ pub async fn execute_command(cmd: &Value, state: &mut DaemonState) -> Value {
         }
     }
 
-    // Drain pending CDP events (console, errors, screencast frames, target lifecycle, fetch)
     let (pending_acks, new_targets, destroyed_targets, fetch_paused) = state.drain_cdp_events();
     // Bodies are read here rather than at har_stop because a navigation clears
     // the CDP buffer, which would silently drop every payload recorded before it.
@@ -1626,7 +1581,6 @@ pub async fn execute_command(cmd: &Value, state: &mut DaemonState) -> Value {
             if let Ok(attach) = attach_result {
                 let _ = mgr.enable_domains_pub(&attach.session_id).await;
 
-                // Install domain filter on new pages
                 if let Some(ref filter) = state.domain_filter {
                     let _ = network::install_domain_filter(
                         &mgr.client,
@@ -1639,19 +1593,13 @@ pub async fn execute_command(cmd: &Value, state: &mut DaemonState) -> Value {
                 let tab_id = mgr.add_page(super::browser::PageInfo {
                     target_id: te.target_info.target_id.clone(),
                     session_id: attach.session_id,
-                    tab_id: 0,                     // assigned by add_page
-                    tab_generation: String::new(), // assigned by add_page
+                    tab_id: 0,
+                    tab_generation: String::new(),
                     url: te.target_info.url.clone(),
                     title: te.target_info.title.clone(),
                     target_type: te.target_info.target_type.clone(),
                 });
 
-                // Popups inherit ownership from their opener tab (mirrors the
-                // extension's owner-tab adoption): a tab opened by an
-                // owner-tracked tab belongs to the same owner, so
-                // finalize_tabs reaps it too. Tabs without a tracked opener
-                // (e.g. user-created tabs in the in-app browser) stay
-                // unowned and are never reaped on the owner's behalf.
                 let opener_owner = te
                     .target_info
                     .opener_id
@@ -1665,7 +1613,6 @@ pub async fn execute_command(cmd: &Value, state: &mut DaemonState) -> Value {
         }
     }
 
-    // Handle Fetch.requestPaused events (route interception + domain filter)
     for paused in &fetch_paused {
         if let Some(ref browser) = state.browser {
             resolve_fetch_paused(
@@ -1679,7 +1626,6 @@ pub async fn execute_command(cmd: &Value, state: &mut DaemonState) -> Value {
         }
     }
 
-    // Hot-reload and check action policy
     if let Some(ref mut policy) = state.policy {
         let _ = policy.reload();
         for policy_action in &actions_to_authorize {
@@ -1706,7 +1652,6 @@ pub async fn execute_command(cmd: &Value, state: &mut DaemonState) -> Value {
         }
     }
 
-    // Check STELLA_BROWSER_CONFIRM_ACTIONS (category-based, independent of policy file)
     if action != "confirm" && action != "deny" {
         if let Some(ref ca) = state.confirm_actions {
             for confirm_action in &actions_to_authorize {
@@ -1765,7 +1710,6 @@ pub async fn execute_command(cmd: &Value, state: &mut DaemonState) -> Value {
             | "extension_reconnect"
     );
     if !skip_launch && !matches!(state.backend_type, BackendType::Extension) {
-        // Check if existing connection is stale and needs re-launch
         let needs_launch = if let Some(ref mgr) = state.browser {
             !mgr.is_connection_alive().await
         } else {
@@ -1785,9 +1729,6 @@ pub async fn execute_command(cmd: &Value, state: &mut DaemonState) -> Value {
             }
         }
 
-        // Validate an explicit stable tab id before creating or selecting any
-        // owner tab. This prevents a rejected foreign-tab command from
-        // mutating browser state as a side effect.
         if let Some(tab_id_value) = cmd.get("tabId") {
             let Some(tab_id) = tab_id_value.as_u64().filter(|tab_id| *tab_id > 0) else {
                 return error_response(&id, "'tabId' must be a positive integer");
@@ -1801,10 +1742,6 @@ pub async fn execute_command(cmd: &Value, state: &mut DaemonState) -> Value {
 
         if let Some(ref mut mgr) = state.browser {
             if let Some(owner_id) = command_owner_id(cmd) {
-                // An owner's first implicit page must be its own even when
-                // other owners or the user already have tabs in the shared
-                // in-app browser. Explicit tab commands resolve the requested
-                // tab instead, and tab_new creates/records its own page.
                 if mgr.owner_tab_ids(owner_id).is_empty()
                     && cmd.get("tabId").is_none()
                     && !matches!(action, "tab_new" | "tab_switch" | "tab_close")
@@ -1838,8 +1775,6 @@ pub async fn execute_command(cmd: &Value, state: &mut DaemonState) -> Value {
                     }
                 }
             } else if mgr.page_count() == 0 {
-                // Legacy/manual requests remain unowned and retain the old
-                // shared-page behavior.
                 if let Err(error) = mgr.ensure_page().await {
                     return error_response(&id, &error);
                 }
@@ -1847,7 +1782,6 @@ pub async fn execute_command(cmd: &Value, state: &mut DaemonState) -> Value {
         }
     }
 
-    // WebDriver backend: reject unsupported CDP-only actions
     if matches!(state.backend_type, BackendType::WebDriver)
         && WEBDRIVER_UNSUPPORTED_ACTIONS.contains(&action)
     {
@@ -1860,8 +1794,6 @@ pub async fn execute_command(cmd: &Value, state: &mut DaemonState) -> Value {
         );
     }
 
-    // The extension is a credential-seeding transport only. Never route agent
-    // browser-control actions into the user's real Chrome/Brave profile.
     if matches!(state.backend_type, BackendType::Extension) {
         match action {
             "healthcheck" | "launch" | "close" | "extension_status" | "extension_reconnect" => {}
@@ -1935,10 +1867,6 @@ pub async fn execute_command(cmd: &Value, state: &mut DaemonState) -> Value {
     }
 }
 
-/// Single-step dispatch shared by top-level commands and chain steps. Every
-/// per-action handler is routed through here so chains reuse the exact same
-/// implementations (including the shared actionability waits) instead of
-/// duplicating handler logic.
 async fn dispatch_action(
     action: &str,
     cmd: &Value,
@@ -2105,13 +2033,9 @@ async fn dispatch_action(
         "mousemove" => handle_mousemove(cmd, state).await,
         "mousedown" => handle_mousedown(cmd, state).await,
         "mouseup" => handle_mouseup(cmd, state).await,
-        // Chains are executed by handle_chain before dispatch; reaching this
-        // arm means a nested chain step slipped past validation.
         "chain" => Err("Chain steps cannot contain a nested chain".to_string()),
         "mark_tab" => handle_mark_tab(cmd, state).await,
         "finalize_tabs" | "close_owner" => handle_finalize_tabs(action, cmd, state).await,
-        // Handled before launch/policy dispatch so release never creates a
-        // browser and stale cleanup cannot reach tab mutation.
         "release_owner_lease" => unreachable!("release handled before dispatch"),
         "cookies_export_all" | "cookies_export_for_urls" => Err(format!(
             "Action '{}' requires the extension backend (it exports cookies from the user's real browser)",
@@ -2121,10 +2045,6 @@ async fn dispatch_action(
     }
 }
 
-// ---------------------------------------------------------------------------
-// Chain execution
-// ---------------------------------------------------------------------------
-
 const DEFAULT_CHAIN_COMMAND_TIMEOUT_MS: u64 = 30_000;
 const MIN_CHAIN_RUNTIME_MS: u64 = 3 * 60_000;
 /// Must stay aligned with MAX_BROWSER_CHAIN_TIMEOUT_MS in the runtime client.
@@ -2132,7 +2052,6 @@ const MAX_CHAIN_RUNTIME_MS: u64 = 4 * 60_000;
 const CHAIN_STEP_BUDGET_MS: u64 = 1_000;
 /// Default implicit selector wait per step, mirroring the extension executor.
 const DEFAULT_CHAIN_WAIT_TIMEOUT_MS: u64 = 10_000;
-/// Poll interval for the implicit selector-existence wait.
 const CHAIN_SELECTOR_POLL_MS: u64 = 200;
 
 async fn within_chain_deadline<T, F>(
@@ -2240,8 +2159,6 @@ fn chain_step_failure(index: usize, action: &str, error: String, duration_ms: u6
     })
 }
 
-/// Random delay in `[min, max]` with a rough bell-curve distribution
-/// (average of two uniform draws), matching the extension's randomDelay().
 fn chain_random_delay_ms(min: u64, max: u64) -> u64 {
     if max <= min {
         return min;
@@ -2256,11 +2173,6 @@ fn chain_random_delay_ms(min: u64, max: u64) -> u64 {
     min + ((first % span) + (second % span)) / 2
 }
 
-/// Implicit per-step wait: poll for the step's selector/ref to resolve before
-/// dispatching the handler. The handler's own actionability wait (visibility,
-/// occlusion) still runs afterwards; this only extends the existence window to
-/// the chain's waitTimeout the way the extension executor does. Skipped when
-/// no CDP page is available (the handler will produce the precise error).
 async fn wait_for_chain_step_selector(
     state: &DaemonState,
     selector_or_ref: &str,
@@ -2324,29 +2236,7 @@ async fn dispatch_chain_output_with_deadline(
     .await?
 }
 
-/// Executes a validated `chain` command: runs each step through the shared
-/// per-action dispatch with implicit selector waits, optional inter-step
-/// delays, and stop-on-first-error semantics, then returns the extension
-/// executor's response shape:
-///
-/// ```json
-/// {
-///   "id": "...",
-///   "success": <all steps ok and requested outputs ok>,
-///   "error": "Chain step N (action) failed: ..."   // only on failure
-///   "data": {
-///     "results": [{ "step", "action", "success", "data"?, "error"?, "durationMs" }],
-///     "completed": <count of successful steps>,
-///     "total": <steps.len()>,
-///     "totalDurationMs": <elapsed>,
-///     "snapshot"?, "snapshotError"?,
-///     "screenshot"?, "screenshotFormat"?, "screenshotError"?
-///   }
-/// }
-/// ```
 async fn handle_chain(cmd: &Value, state: &mut DaemonState, id: &str) -> Value {
-    // Steps were validated by validate_chain_actions before dispatch reached
-    // this point; re-derive them defensively.
     let steps: Vec<Value> = cmd
         .get("steps")
         .and_then(Value::as_array)
@@ -2397,9 +2287,6 @@ async fn handle_chain(cmd: &Value, state: &mut DaemonState, id: &str) -> Value {
             break;
         }
 
-        // Build the step command: the flat step fields plus an inherited chain
-        // tabId, a derived id, and the chain's owner metadata so per-step
-        // handlers observe the same caller as the container.
         let mut step_cmd = step.clone();
         if let Some(step_object) = step_cmd.as_object_mut() {
             step_object.insert("id".to_string(), json!(format!("{}_s{}", id, index)));
@@ -2415,9 +2302,6 @@ async fn handle_chain(cmd: &Value, state: &mut DaemonState, id: &str) -> Value {
                 "ownerLeaseId",
                 "ownerLeaseIssuedAt",
             ] {
-                // The chain container is the authorization boundary. A step
-                // cannot replace its caller identity to gain another owner's
-                // tabs.
                 if let Some(value) = cmd.get(key) {
                     step_object.insert(key.to_string(), value.clone());
                 }
@@ -2521,8 +2405,6 @@ async fn handle_chain(cmd: &Value, state: &mut DaemonState, id: &str) -> Value {
             continue;
         }
 
-        // Implicit wait: element-targeted steps get a bounded existence wait
-        // before the handler's own actionability wait takes over.
         if should_wait {
             if let Some(selector) = step
                 .get("selector")
@@ -2597,7 +2479,6 @@ async fn handle_chain(cmd: &Value, state: &mut DaemonState, id: &str) -> Value {
             }
         }
 
-        // Optional randomized delay between steps (never after the last one).
         if let Some((min, max)) = delay {
             if index + 1 < steps.len() {
                 let remaining = deadline
@@ -2977,8 +2858,6 @@ pub(crate) async fn forward_extension_command(cmd: &Value, bridge: &ExtensionBri
 }
 
 fn normalize_extension_response(id: &str, response: &Value) -> Value {
-    // The daemon owns request correlation, but the extension owns the receipt.
-    // Preserve all current and future receipt fields on both success and failure.
     let Some(source) = response.as_object() else {
         return error_response(id, "Extension command returned an invalid response");
     };
@@ -3013,8 +2892,6 @@ fn normalize_extension_proxy_response(id: &str, response: connection::Response) 
         mut extra,
     } = response;
 
-    // The proxy daemon's response ID belongs to its connection. Restore the
-    // original request ID while forwarding its complete receipt unchanged.
     extra.insert("id".to_string(), json!(id));
     extra.insert("success".to_string(), json!(success));
     if let Some(data) = data {
@@ -3040,12 +2917,6 @@ fn normalize_extension_proxy_response(id: &str, response: connection::Response) 
     Value::Object(extra)
 }
 
-// ---------------------------------------------------------------------------
-// Auto-launch
-// ---------------------------------------------------------------------------
-
-/// Connect to a running Chrome via auto-discovery and open a fresh tab so
-/// subsequent navigations don't hijack the user's existing tabs.
 async fn connect_auto_with_fresh_tab(owner_id: Option<&str>) -> Result<BrowserManager, String> {
     let mut mgr = BrowserManager::connect_auto().await?;
     let tab = mgr.tab_new(None).await?;
@@ -3184,10 +3055,6 @@ async fn try_auto_restore_state(state: &mut DaemonState) {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Phase 1 handlers
-// ---------------------------------------------------------------------------
-
 async fn handle_launch(cmd: &Value, state: &mut DaemonState) -> Result<Value, String> {
     let headless = cmd
         .get("headless")
@@ -3201,7 +3068,6 @@ async fn handle_launch(cmd: &Value, state: &mut DaemonState) -> Result<Value, St
         .unwrap_or(false);
     let targets_cdp = cdp_url.is_some() || cdp_port.is_some() || auto_connect;
 
-    // Relaunch logic: check if we can reuse the existing connection
     let needs_relaunch = if let Some(ref mgr) = state.browser {
         let is_external = cdp_url.is_some() || cdp_port.is_some() || auto_connect;
         let was_external = mgr.is_cdp_connection();
@@ -3285,7 +3151,6 @@ async fn handle_launch(cmd: &Value, state: &mut DaemonState) -> Result<Value, St
     if let Some(provider) = requested_provider(Some(cmd)) {
         match provider.to_lowercase().as_str() {
             "extension" => {
-                // Reuse existing extension bridge if it's still connected
                 if matches!(state.backend_type, BackendType::Extension) {
                     if let Some(ref bridge) = state.extension_bridge {
                         if bridge.is_connected().await {
@@ -3306,11 +3171,6 @@ async fn handle_launch(cmd: &Value, state: &mut DaemonState) -> Result<Value, St
                 let _disconnect_rx = bridge.start(&session).await?;
                 state.extension_bridge = Some(bridge);
                 state.backend_type = BackendType::Extension;
-
-                // The bridge and its connection status remain useful after this
-                // daemon switches to an in-app CDP target. Extension loss must
-                // therefore not terminate the daemon; extension_status reports
-                // the disconnected state while CDP automation keeps running.
 
                 return Ok(json!({ "launched": true, "provider": "extension" }));
             }
@@ -3438,23 +3298,18 @@ async fn launch_ios(cmd: &Value, state: &mut DaemonState) -> Result<Value, Strin
     let device_udid = cmd.get("udid").and_then(|v| v.as_str());
     let platform_version = cmd.get("platformVersion").and_then(|v| v.as_str());
 
-    // Select device (or use default)
     let device = ios::select_device(device_name, device_udid)?;
 
-    // Boot simulator if it's not real and not already booted
     if !device.is_real && device.state != "Booted" {
         ios::boot_simulator(&device.udid)?;
     }
 
-    // Start Appium
     let mut appium = AppiumManager::connect_or_launch(Some(&device.udid)).await?;
 
-    // Create iOS Safari session
     appium
         .create_ios_session(Some(&device.name), platform_version)
         .await?;
 
-    // Create a WebDriverBackend from the Appium session for common commands
     if let Some(sid) = appium.client.session_id_pub().map(String::from) {
         let wd_client = super::webdriver::client::WebDriverClient::new_with_session(4723, sid);
         state.webdriver_backend = Some(WebDriverBackend::new(wd_client));
@@ -3480,11 +3335,9 @@ async fn launch_safari(cmd: &Value, state: &mut DaemonState) -> Result<Value, St
         .unwrap_or(0);
     let driver_port = if port > 0 { port } else { 0 };
 
-    // Find a free port if none specified
     let actual_port = if driver_port > 0 {
         driver_port
     } else {
-        // Use any available high port
         let listener = std::net::TcpListener::bind("127.0.0.1:0")
             .map_err(|e| format!("Failed to find free port: {}", e))?;
         listener
@@ -3524,7 +3377,6 @@ async fn handle_navigate(cmd: &Value, state: &mut DaemonState) -> Result<Value, 
         filter.check_url(url)?;
     }
 
-    // WebDriver backend path
     if let Some(ref wb) = state.webdriver_backend {
         if state.browser.is_none() {
             state.ref_map.clear();
@@ -3590,7 +3442,6 @@ fn handle_cdp_url(state: &DaemonState) -> Result<Value, String> {
 async fn handle_inspect(state: &mut DaemonState) -> Result<Value, String> {
     let mgr = state.browser.as_ref().ok_or("Browser not launched")?;
 
-    // Shut down any existing inspect server so we always target the current page
     if let Some(server) = state.inspect_server.take() {
         server.shutdown();
     }
@@ -3671,10 +3522,6 @@ async fn handle_evaluate(cmd: &Value, state: &DaemonState) -> Result<Value, Stri
         .ok_or("Missing 'script' parameter")?;
 
     let result = mgr.evaluate(script, None).await?;
-    // Do not immediately inject a second `Runtime.evaluate(location.href)`.
-    // A page script can complete while leaving the renderer saturated (for
-    // example, a runaway observer); making origin metadata another blocking
-    // page evaluation turned one command into two independent hang points.
     let url = mgr.active_url_cached();
     Ok(json!({ "result": result, "origin": url }))
 }
@@ -3724,7 +3571,6 @@ pub(crate) async fn teardown_daemon_state(
     state.browser = None;
     state.update_stream_client().await;
 
-    // Close WebDriver sessions.
     if let Some(ref mut wb) = state.webdriver_backend {
         let _ = wb.close().await;
     }
@@ -3738,7 +3584,6 @@ pub(crate) async fn teardown_daemon_state(
     }
     state.safari_driver = None;
 
-    // Close extension bridge.
     if let Some(ref mut bridge) = state.extension_bridge {
         bridge.stop().await;
     }
@@ -3754,12 +3599,6 @@ pub(crate) async fn teardown_daemon_state(
     Ok(())
 }
 
-// ---------------------------------------------------------------------------
-// Phase 2 handlers
-// ---------------------------------------------------------------------------
-
-/// Snapshot options shared by DOM and AX captures. `maxDepth` is the only
-/// depth key: the worker API normalizes `depth` before the command is sent.
 fn snapshot_options(cmd: &Value) -> SnapshotOptions {
     SnapshotOptions {
         selector: cmd
@@ -3933,8 +3772,6 @@ async fn handle_screenshot(cmd: &Value, state: &mut DaemonState) -> Result<Value
     let result =
         screenshot::take_screenshot(&mgr.client, &session_id, &state.ref_map, &options).await?;
 
-    // `base64` and `format` mirror the extension backend's screenshot payload;
-    // runtime consumers (e.g. the node_repl browser receipt) read `base64`.
     let mut response = json!({
         "path": result.path,
         "base64": result.base64,
@@ -4089,10 +3926,6 @@ async fn handle_press(cmd: &Value, state: &mut DaemonState) -> Result<Value, Str
         .and_then(|v| v.as_str())
         .ok_or("Missing 'key' parameter")?;
 
-    // When a selector is provided, resolve and focus the target first
-    // (visible + attached actionability, same as fill/focus) so the key
-    // lands on that element instead of whatever happens to be focused.
-    // Without a selector this is a page-level press.
     if let Some(selector) = cmd
         .get("selector")
         .and_then(|v| v.as_str())
@@ -4229,7 +4062,6 @@ async fn handle_wait(cmd: &Value, state: &mut DaemonState) -> Result<Value, Stri
         return Ok(json!({ "waited": "load", "state": load_state }));
     }
 
-    // Just a timeout wait
     tokio::time::sleep(tokio::time::Duration::from_millis(timeout_ms)).await;
     Ok(json!({ "waited": "timeout", "ms": timeout_ms }))
 }
@@ -4389,10 +4221,6 @@ async fn handle_reload(state: &mut DaemonState) -> Result<Value, String> {
     Ok(json!({ "url": url }))
 }
 
-// ---------------------------------------------------------------------------
-// Wait helpers
-// ---------------------------------------------------------------------------
-
 async fn wait_for_selector(
     client: &super::cdp::client::CdpClient,
     session_id: &str,
@@ -4400,9 +4228,6 @@ async fn wait_for_selector(
     state: &str,
     timeout_ms: u64,
 ) -> Result<(), String> {
-    // Semantic (aria=) selectors go through the unified resolver. Matching is
-    // visibility-filtered (extension parity), so "attached"/"visible" both map
-    // to at-least-one-match and "detached"/"hidden" to zero matches.
     if let Some(semantic) = super::selector::parse_semantic_selector(selector)? {
         let count = super::selector::count_expression(&semantic);
         let check_fn = match state {
@@ -4419,9 +4244,6 @@ async fn wait_for_selector(
         .await;
     }
 
-    // Plain CSS: match across every reachable document (top document,
-    // same-origin iframes, open shadow roots) so waits agree with the
-    // unified resolver used by the input commands.
     let all = super::selector::css_match_all_expression(selector);
     let check_fn = match state {
         "attached" => format!("({}).length > 0", all),
@@ -4632,10 +4454,6 @@ async fn poll_until_true(
     }
 }
 
-// ---------------------------------------------------------------------------
-// Phase 3 handlers
-// ---------------------------------------------------------------------------
-
 async fn handle_cookies_get(cmd: &Value, state: &DaemonState) -> Result<Value, String> {
     if let Some(ref wb) = state.webdriver_backend {
         if state.browser.is_none() {
@@ -4835,10 +4653,6 @@ async fn handle_state_rename(cmd: &Value) -> Result<Value, String> {
     state::state_rename(path, name)
 }
 
-// ---------------------------------------------------------------------------
-// Phase 6 handlers
-// ---------------------------------------------------------------------------
-
 async fn handle_diff_snapshot(cmd: &Value, state: &mut DaemonState) -> Result<Value, String> {
     let mgr = state.browser.as_ref().ok_or("Browser not launched")?;
     let session_id = mgr.active_session_id()?.to_string();
@@ -4904,7 +4718,6 @@ async fn handle_diff_url(cmd: &Value, state: &mut DaemonState) -> Result<Value, 
         .map(WaitUntil::from_str)
         .unwrap_or(WaitUntil::Load);
 
-    // Navigate to URL1 and snapshot
     mgr.navigate(url1, wait_until).await?;
     let session_id = mgr.active_session_id()?.to_string();
     let options = SnapshotOptions::default();
@@ -4912,7 +4725,6 @@ async fn handle_diff_url(cmd: &Value, state: &mut DaemonState) -> Result<Value, 
         snapshot::take_snapshot(&mgr.client, &session_id, &options, &mut state.ref_map, None)
             .await?;
 
-    // Navigate to URL2 and snapshot
     mgr.navigate(url2, wait_until).await?;
     state.ref_map.clear();
     let snap2 =
@@ -5034,10 +4846,6 @@ async fn handle_keyboard(cmd: &Value, state: &DaemonState) -> Result<Value, Stri
     Ok(json!({ "dispatched": event_type }))
 }
 
-// ---------------------------------------------------------------------------
-// Phase 5 handlers
-// ---------------------------------------------------------------------------
-
 async fn handle_tab_list(cmd: &Value, state: &DaemonState) -> Result<Value, String> {
     let mgr = state.browser.as_ref().ok_or("Browser not launched")?;
     let owner_id = command_owner_id(cmd);
@@ -5088,17 +4896,6 @@ async fn handle_mark_tab(cmd: &Value, state: &mut DaemonState) -> Result<Value, 
     }))
 }
 
-/// CDP implementation of `finalize_tabs`/`close_owner`: closes every tab
-/// recorded for the command owner (minus `keep` entries, which are released
-/// from ownership without closing) and clears the owner's mapping. The
-/// response shape mirrors the extension handler
-/// (extension/commands/tabs.js finalizeOwnerTabs), which is the contract
-/// worker-api.ts `browser.tabs.finalize` round-trips:
-/// `{ closedTabIds, releasedTabIds, kept }`.
-///
-/// Tabs that are already gone are success, not an error — the goal state
-/// (tab closed) holds. With no browser connected there is nothing to reap,
-/// which is likewise success with empty results.
 async fn handle_finalize_tabs(
     action: &str,
     cmd: &Value,
@@ -5108,8 +4905,6 @@ async fn handle_finalize_tabs(
         .ok_or_else(|| format!("Action '{}' requires a non-empty ownerId", action))?
         .to_string();
 
-    // `close_owner` always closes everything; `finalize_tabs` may keep tabs.
-    // Entries were validated by validate_owner_finalization before dispatch.
     let mut keep_entries: Vec<(u64, Option<String>, String)> = if action == "finalize_tabs" {
         cmd.get("keep")
             .and_then(Value::as_array)
@@ -5160,9 +4955,6 @@ async fn handle_finalize_tabs(
     let mut closed_tab_ids: Vec<u64> = Vec::new();
     let mut released_tab_ids: Vec<u64> = Vec::new();
     if let Some(ref mut mgr) = state.browser {
-        // Validate every retained handle before mutating ownership or closing
-        // any tab. A stale generation must fail atomically rather than keep a
-        // newly reused numeric id while closing the rest of the task's tabs.
         for (tab_id, tab_generation, _) in &keep_entries {
             let mut handle_cmd = cmd.clone();
             if let Some(object) = handle_cmd.as_object_mut() {
@@ -5211,9 +5003,6 @@ async fn handle_finalize_tabs(
     }))
 }
 
-/// Resolves which tab a `tab_switch`/`tab_close` command addresses. Prefers
-/// the stable `tabId` that `tab_list`/`tab_new` report; falls back to the
-/// legacy positional `index` for older callers.
 fn resolve_tab_index(cmd: &Value, mgr: &BrowserManager) -> Result<Option<usize>, String> {
     if let Some(tab_id_value) = cmd.get("tabId") {
         let tab_id = tab_id_value
@@ -5326,15 +5115,9 @@ async fn handle_download(cmd: &Value, state: &mut DaemonState) -> Result<Value, 
         .and_then(|v| v.as_str())
         .ok_or("Missing 'path' parameter")?;
     mgr.set_download_behavior(path).await?;
-    // Remembered so waitfordownload can report the real on-disk path of the
-    // completed download instead of echoing whatever the caller asked for.
     state.download_dir = Some(path.to_string());
     Ok(json!({ "downloadPath": path }))
 }
-
-// ---------------------------------------------------------------------------
-// Phase 4 handlers
-// ---------------------------------------------------------------------------
 
 async fn handle_trace_start(state: &mut DaemonState) -> Result<Value, String> {
     let mgr = state.browser.as_ref().ok_or("Browser not launched")?;
@@ -5388,7 +5171,6 @@ async fn handle_recording_start(cmd: &Value, state: &mut DaemonState) -> Result<
         let mgr = state.browser.as_mut().ok_or("Browser not launched")?;
         let old_session_id = mgr.active_session_id()?.to_string();
 
-        // Capture current URL if no URL specified
         let nav_url = if let Some(u) = recording_url {
             u.to_string()
         } else {
@@ -5397,14 +5179,12 @@ async fn handle_recording_start(cmd: &Value, state: &mut DaemonState) -> Result<
                 .unwrap_or_else(|_| "about:blank".to_string())
         };
 
-        // Capture current cookies
         let cookies_result = mgr
             .client
             .send_command_no_params("Network.getAllCookies", Some(&old_session_id))
             .await
             .ok();
 
-        // Create new browser context
         let ctx_result = mgr
             .client
             .send_command_no_params("Target.createBrowserContext", None)
@@ -5415,7 +5195,6 @@ async fn handle_recording_start(cmd: &Value, state: &mut DaemonState) -> Result<
             .ok_or("Failed to get browserContextId")?
             .to_string();
 
-        // Create page in new context
         let create_result: CreateTargetResult = mgr
             .client
             .send_command_typed(
@@ -5440,7 +5219,6 @@ async fn handle_recording_start(cmd: &Value, state: &mut DaemonState) -> Result<
         let new_session_id = attach_result.session_id.clone();
         mgr.enable_domains_pub(&new_session_id).await?;
 
-        // Transfer cookies to new context
         if let Some(ref cr) = cookies_result {
             if let Some(cookie_arr) = cr.get("cookies").and_then(|v| v.as_array()) {
                 if !cookie_arr.is_empty() {
@@ -5456,12 +5234,11 @@ async fn handle_recording_start(cmd: &Value, state: &mut DaemonState) -> Result<
             }
         }
 
-        // Add page and switch to it
         let recording_tab_id = mgr.add_page(super::browser::PageInfo {
             target_id: create_result.target_id,
             session_id: new_session_id.clone(),
-            tab_id: 0,                     // assigned by add_page
-            tab_generation: String::new(), // assigned by add_page
+            tab_id: 0,
+            tab_generation: String::new(),
             url: nav_url.clone(),
             title: String::new(),
             target_type: "page".to_string(),
@@ -5470,7 +5247,6 @@ async fn handle_recording_start(cmd: &Value, state: &mut DaemonState) -> Result<
             mgr.record_owner_tab(owner_id, recording_tab_id);
         }
 
-        // Navigate to URL
         if nav_url != "about:blank" {
             let _ = mgr
                 .client
@@ -5563,10 +5339,6 @@ async fn handle_pdf(cmd: &Value, state: &DaemonState) -> Result<Value, String> {
     Ok(json!({ "path": save_path }))
 }
 
-// ---------------------------------------------------------------------------
-// Phase 8 handlers
-// ---------------------------------------------------------------------------
-
 async fn handle_focus(cmd: &Value, state: &mut DaemonState) -> Result<Value, String> {
     let mgr = state.browser.as_ref().ok_or("Browser not launched")?;
     let session_id = mgr.active_session_id()?.to_string();
@@ -5656,7 +5428,6 @@ async fn handle_highlight(cmd: &Value, state: &mut DaemonState) -> Result<Value,
 async fn handle_tap(cmd: &Value, state: &mut DaemonState) -> Result<Value, String> {
     let selector = cmd.get("selector").and_then(|v| v.as_str());
 
-    // Route through Appium for iOS/WebDriver using coordinate-based tap
     if let Some(ref appium) = state.appium {
         if state.browser.is_none() {
             let x = cmd.get("x").and_then(|v| v.as_f64()).unwrap_or(200.0);
@@ -5990,7 +5761,6 @@ async fn handle_clipboard(cmd: &Value, state: &DaemonState) -> Result<Value, Str
 
     let session_id = mgr.active_session_id()?.to_string();
 
-    // cfg! is compile-time; assumes the browser runs on the same OS as the service binary.
     let modifier: i32 = if cfg!(target_os = "macos") { 4 } else { 2 };
 
     match action {
@@ -6081,10 +5851,6 @@ async fn handle_device(cmd: &Value, state: &DaemonState) -> Result<Value, String
     }))
 }
 
-// ---------------------------------------------------------------------------
-// Screencast handlers
-// ---------------------------------------------------------------------------
-
 async fn handle_screencast_start(cmd: &Value, state: &mut DaemonState) -> Result<Value, String> {
     let mgr = state.browser.as_ref().ok_or("Browser not launched")?;
     let session_id = mgr.active_session_id()?.to_string();
@@ -6133,10 +5899,6 @@ async fn handle_screencast_stop(state: &mut DaemonState) -> Result<Value, String
 
     Ok(json!({ "stopped": true }))
 }
-
-// ---------------------------------------------------------------------------
-// Wait variant handlers
-// ---------------------------------------------------------------------------
 
 async fn handle_waitforurl(cmd: &Value, state: &DaemonState) -> Result<Value, String> {
     let mgr = state.browser.as_ref().ok_or("Browser not launched")?;
@@ -6196,10 +5958,6 @@ async fn handle_waitforfunction(cmd: &Value, state: &DaemonState) -> Result<Valu
     Ok(json!({ "result": result.result.value.unwrap_or(Value::Null) }))
 }
 
-// ---------------------------------------------------------------------------
-// Frame handlers
-// ---------------------------------------------------------------------------
-
 async fn handle_frame(cmd: &Value, state: &mut DaemonState) -> Result<Value, String> {
     let mgr = state.browser.as_mut().ok_or("Browser not launched")?;
     let session_id = mgr.active_session_id()?.to_string();
@@ -6246,7 +6004,6 @@ async fn handle_frame(cmd: &Value, state: &mut DaemonState) -> Result<Value, Str
 
     let frame_tree = &tree_result["frameTree"];
 
-    // If selector, resolve via JS to find the iframe's contentWindow
     if let Some(sel) = selector {
         let js = format!(
             r#"(() => {{
@@ -6280,10 +6037,6 @@ async fn handle_mainframe(state: &mut DaemonState) -> Result<Value, String> {
     state.active_frame_id = None;
     Ok(json!({ "frame": "main" }))
 }
-
-// ---------------------------------------------------------------------------
-// Semantic locator handlers
-// ---------------------------------------------------------------------------
 
 async fn execute_subaction(
     cmd: &Value,
@@ -6349,9 +6102,6 @@ async fn handle_getbyrole(cmd: &Value, state: &mut DaemonState) -> Result<Value,
     let name = cmd.get("name").and_then(|v| v.as_str());
     let exact = cmd.get("exact").and_then(|v| v.as_bool()).unwrap_or(false);
 
-    // Route through the unified selector resolver: encode as a semantic
-    // (aria=) selector and let the subaction resolve it like any other
-    // selector string.
     let semantic = super::selector::SemanticSelector::by_role(role, name, exact)?;
     let selector = super::selector::encode_semantic_selector(&semantic);
     execute_subaction(cmd, state, &selector).await
@@ -6370,8 +6120,6 @@ async fn handle_semantic_locator(
         .ok_or(format!("Missing '{}' parameter", param_name))?;
     let exact = cmd.get("exact").and_then(|v| v.as_bool()).unwrap_or(false);
 
-    // Route through the unified selector resolver instead of bespoke per-kind
-    // page scripts (previously half-duplicated the extension's selector.js).
     let semantic = super::selector::SemanticSelector::by_value(kind, value, exact)?;
     let selector = super::selector::encode_semantic_selector(&semantic);
     execute_subaction(cmd, state, &selector).await
@@ -6522,10 +6270,6 @@ async fn handle_evalhandle(cmd: &Value, state: &DaemonState) -> Result<Value, St
     Ok(json!({ "handle": handle }))
 }
 
-// ---------------------------------------------------------------------------
-// Advanced interaction handlers
-// ---------------------------------------------------------------------------
-
 async fn handle_drag(cmd: &Value, state: &mut DaemonState) -> Result<Value, String> {
     let mgr = state.browser.as_ref().ok_or("Browser not launched")?;
     let session_id = mgr.active_session_id()?.to_string();
@@ -6538,10 +6282,6 @@ async fn handle_drag(cmd: &Value, state: &mut DaemonState) -> Result<Value, Stri
         .and_then(|v| v.as_str())
         .ok_or("Missing 'target' parameter")?;
 
-    // Shared actionability layer for both drag endpoints. The source must
-    // win the hit-test (the pointer actually grabs it); the target only needs
-    // to be visible with a stable point (drop zones are often overlaid by
-    // placeholder/preview elements).
     let source_point =
         interaction::wait_for_actionable(&mgr.client, &session_id, &state.ref_map, source, true)
             .await?;
@@ -6593,7 +6333,6 @@ async fn handle_drag(cmd: &Value, state: &mut DaemonState) -> Result<Value, Stri
         None
     };
 
-    // Mouse down at source
     mgr.client
         .send_command(
             "Input.dispatchMouseEvent",
@@ -6609,7 +6348,6 @@ async fn handle_drag(cmd: &Value, state: &mut DaemonState) -> Result<Value, Stri
         )
         .await?;
 
-    // Move in steps to target
     let steps = 10;
     for i in 1..=steps {
         let cx = sx + (tx - sx) * (i as f64) / (steps as f64);
@@ -6627,8 +6365,6 @@ async fn handle_drag(cmd: &Value, state: &mut DaemonState) -> Result<Value, Stri
         }
     }
 
-    // A dragstart fired by the final moves can arrive slightly after the
-    // move that triggered it; give interception a short grace window.
     if intercepting && drag_data.is_none() {
         for _ in 0..10 {
             tokio::time::sleep(tokio::time::Duration::from_millis(30)).await;
@@ -6640,8 +6376,6 @@ async fn handle_drag(cmd: &Value, state: &mut DaemonState) -> Result<Value, Stri
     }
 
     let result = if let Some(data) = drag_data {
-        // Replay the intercepted drag over the target so the page sees the
-        // full HTML5 sequence (dragEnter -> dragOver -> drop).
         let mut replay: Result<(), String> = Ok(());
         for event_type in ["dragEnter", "dragOver", "drop"] {
             if let Err(e) = mgr
@@ -6662,7 +6396,6 @@ async fn handle_drag(cmd: &Value, state: &mut DaemonState) -> Result<Value, Stri
                 json!({ "dragged": true, "html5": true, "source": source, "target": target })
             }
             Err(e) => {
-                // Don't leave the page mid-drag with the button down.
                 let _ = mgr
                     .client
                     .send_command(
@@ -6790,10 +6523,6 @@ async fn handle_responsebody(cmd: &Value, state: &mut DaemonState) -> Result<Val
     let timeout_ms = cmd.get("timeout").and_then(|v| v.as_u64()).unwrap_or(30000);
     let after = cmd.get("after").and_then(Value::as_u64).unwrap_or(0);
 
-    // The command entry drain captures responses that completed between an
-    // action and this wait. Prefer that bounded cache before subscribing for
-    // future traffic; this makes `waitForResponse(pattern, () => click())`
-    // race-free despite BrowserSession's serialized command transport.
     if let Some(entry) = state
         .tracked_requests
         .iter()
@@ -6812,9 +6541,6 @@ async fn handle_responsebody(cmd: &Value, state: &mut DaemonState) -> Result<Val
         }));
     }
 
-    // Headers may have arrived during the command-entry drain while the body
-    // is still loading. Poll CDP for that exact request instead of waiting for
-    // another responseReceived event that will never be emitted.
     let pending_cached = state.tracked_requests.iter().rev().find(|entry| {
         entry.session_id == session_id
             && entry.timestamp >= after
@@ -7237,18 +6963,6 @@ async fn handle_authenticated_request_batch(
     Ok(json!({ "responses": successful, "concurrency": concurrency }))
 }
 
-/// Waits for a download to complete and reports where it actually landed.
-///
-/// `Browser.downloadWillBegin`/`Page.downloadWillBegin` supply the download's
-/// guid, source url, and suggested filename; the matching
-/// `*.downloadProgress` event with state `completed` marks the finish. With
-/// the download directory known (recorded by the `download` action or
-/// STELLA_BROWSER_DOWNLOAD_PATH), the real path is `<dir>/<guid>`
-/// (Browser.setDownloadBehavior "allowAndName") or `<dir>/<suggested>`
-/// ("allow" from launch); whichever exists on disk wins and is returned with
-/// `verified: true`. When neither can be confirmed, the response falls back
-/// to the caller-requested `path` with `verified: false` so callers can no
-/// longer mistake an echo of their own input for the download location.
 async fn handle_waitfordownload(cmd: &Value, state: &DaemonState) -> Result<Value, String> {
     let mgr = state.browser.as_ref().ok_or("Browser not launched")?;
     let session_id = mgr.active_session_id()?.to_string();
@@ -7257,7 +6971,6 @@ async fn handle_waitfordownload(cmd: &Value, state: &DaemonState) -> Result<Valu
     let mut rx = mgr.client.subscribe();
     let deadline = tokio::time::Instant::now() + tokio::time::Duration::from_millis(timeout_ms);
 
-    // guid -> (url, suggestedFilename) from downloadWillBegin events.
     let mut announced: std::collections::HashMap<String, (String, String)> =
         std::collections::HashMap::new();
 
@@ -7335,8 +7048,6 @@ async fn handle_waitfordownload(cmd: &Value, state: &DaemonState) -> Result<Valu
                     }
                 }
 
-                // Could not verify a file on disk: report the caller's
-                // requested path, explicitly marked unverified.
                 let requested = cmd
                     .get("path")
                     .and_then(|v| v.as_str())
@@ -7358,7 +7069,6 @@ async fn handle_waitfordownload(cmd: &Value, state: &DaemonState) -> Result<Valu
 async fn handle_window_new(cmd: &Value, state: &mut DaemonState) -> Result<Value, String> {
     let mgr = state.browser.as_mut().ok_or("Browser not launched")?;
 
-    // Create a new browser context
     let context_result = mgr
         .client
         .send_command_no_params("Target.createBrowserContext", None)
@@ -7393,8 +7103,8 @@ async fn handle_window_new(cmd: &Value, state: &mut DaemonState) -> Result<Value
     let tab_id = mgr.add_page(super::browser::PageInfo {
         target_id: create_result.target_id,
         session_id: attach.session_id,
-        tab_id: 0,                     // assigned by add_page
-        tab_generation: String::new(), // assigned by add_page
+        tab_id: 0,
+        tab_generation: String::new(),
         url: "about:blank".to_string(),
         title: String::new(),
         target_type: "page".to_string(),
@@ -7476,10 +7186,6 @@ async fn handle_diff_screenshot(cmd: &Value, state: &DaemonState) -> Result<Valu
     }))
 }
 
-// ---------------------------------------------------------------------------
-// Video and HAR handlers
-// ---------------------------------------------------------------------------
-
 async fn handle_video_start(cmd: &Value, state: &mut DaemonState) -> Result<Value, String> {
     let path = cmd
         .get("path")
@@ -7532,14 +7238,9 @@ async fn handle_har_start(state: &mut DaemonState) -> Result<Value, String> {
 async fn handle_har_stop(cmd: &Value, state: &mut DaemonState) -> Result<Value, String> {
     let path = har_output_path(cmd.get("path").and_then(|v| v.as_str()));
 
-    // Requests that finished during the very last tick have not had their
-    // bodies pulled yet; do it before the recording is torn down.
     har_collect_pending_bodies(state).await;
     state.har_recording = false;
 
-    // HAR capture attached the Network domain on demand; release it again so
-    // the session returns to the uninstrumented default. Request tracking
-    // shares the same event stream, so keep the domain up while it is active.
     if !state.request_tracking {
         if let Some(mgr) = state.browser.as_ref() {
             if let Ok(session_id) = mgr.active_session_id() {
@@ -7584,11 +7285,6 @@ async fn handle_har_stop(cmd: &Value, state: &mut DaemonState) -> Result<Value, 
     }))
 }
 
-// ---------------------------------------------------------------------------
-// HAR serialization helpers
-// ---------------------------------------------------------------------------
-
-/// Convert a `HarEntry` (collected from CDP events) into a HAR 1.2 entry object.
 fn har_entry_to_json(e: HarEntry) -> Value {
     let started_date_time = har_wall_time_to_rfc3339(e.wall_time);
 
@@ -7690,14 +7386,9 @@ fn har_entry_to_json(e: HarEntry) -> Value {
     })
 }
 
-/// Per-body and per-recording caps. Copying every response would mean holding
-/// bundles, fonts and images in memory for a recording that only needs the JSON.
 const HAR_MAX_BODY_BYTES: usize = 512 * 1024;
 const HAR_MAX_TOTAL_BODY_BYTES: usize = 8 * 1024 * 1024;
 
-/// Whether a recorded exchange is an API call worth keeping the body of. The
-/// CDP resource type is the reliable signal; the MIME check catches JSON served
-/// under an unexpected type.
 fn har_is_api_shaped(resource_type: &str, mime_type: &str) -> bool {
     if resource_type == "XHR" || resource_type == "Fetch" {
         return true;
@@ -7706,9 +7397,6 @@ fn har_is_api_shaped(resource_type: &str, mime_type: &str) -> bool {
     mime.contains("json") || mime.contains("graphql")
 }
 
-/// Pull queued response bodies out of the CDP buffer into their HAR entries.
-/// Best-effort throughout: an evicted buffer or a detached target degrades the
-/// report but must never fail the command that happened to trigger the drain.
 async fn har_collect_pending_bodies(state: &mut DaemonState) {
     if state.har_pending_bodies.is_empty() {
         return;
@@ -7775,10 +7463,6 @@ async fn har_collect_pending_bodies(state: &mut DaemonState) {
     }
 }
 
-/// Pull completed observed response bodies while CDP still retains them.
-/// Observation is deliberately bounded both per response and across the
-/// daemon, so a tab that streams large assets cannot grow the bridge without
-/// limit.
 async fn tracked_collect_pending_bodies(state: &mut DaemonState) {
     if state.tracked_pending_bodies.is_empty() {
         return;
@@ -7878,8 +7562,6 @@ fn har_parse_request_cookies(cookie_header: &str) -> Vec<Value> {
         .collect()
 }
 
-/// Compute HAR `timings` and total `time` (ms) from a CDP `ResourceTiming`
-/// object and the optional `Network.loadingFinished` monotonic timestamp.
 fn har_compute_timings(
     cdp_timing: Option<&Value>,
     loading_finished_ts: Option<f64>,
@@ -8041,10 +7723,6 @@ fn browser_metadata_from_version(version: &Value) -> Option<Value> {
     }))
 }
 
-// ---------------------------------------------------------------------------
-// Fetch interception resolver (routes + domain filter)
-// ---------------------------------------------------------------------------
-
 async fn resolve_fetch_paused(
     browser: &BrowserManager,
     domain_filter: Option<&DomainFilter>,
@@ -8054,7 +7732,6 @@ async fn resolve_fetch_paused(
 ) {
     let session_id = &paused.session_id;
 
-    // Domain filter check (takes priority over routes)
     if let Some(filter) = domain_filter {
         if let Ok(parsed) = url::Url::parse(&paused.url) {
             let scheme = parsed.scheme();
@@ -8129,7 +7806,6 @@ async fn resolve_fetch_paused(
         }
     }
 
-    // Route matching
     for route in routes {
         let matches = url_pattern_matches(&route.url_pattern, &paused.url);
 
@@ -8184,9 +7860,6 @@ async fn resolve_fetch_paused(
         }
     }
 
-    // Request rewriting stays entirely at the CDP Fetch boundary. No page
-    // global is patched, and rewrites are scoped to the exact attached tab
-    // session that registered them.
     if let Some(rewrite) = request_rewrites.iter().rev().find(|rewrite| {
         rewrite.session_id == paused.session_id
             && url_pattern_matches(&rewrite.url_pattern, &paused.url)
@@ -8241,7 +7914,6 @@ async fn resolve_fetch_paused(
         return;
     }
 
-    // No matching route -- continue the request
     let _ = browser
         .client
         .send_command(
@@ -8274,10 +7946,6 @@ fn url_pattern_matches(pattern: &str, url: &str) -> bool {
     pattern.ends_with('*') || remainder.is_empty()
 }
 
-/// RFC 7396-style JSON merge patch. Object keys recurse, null removes a key,
-/// and scalar/array values replace the original. This supports changing a
-/// nested request field while preserving every untouched field from the
-/// page's actual request body.
 fn merge_json_value(target: &mut Value, patch: &Value) {
     let Value::Object(patch_object) = patch else {
         *target = patch.clone();
@@ -8298,10 +7966,6 @@ fn merge_json_value(target: &mut Value, patch: &Value) {
         );
     }
 }
-
-// ---------------------------------------------------------------------------
-// Route handlers
-// ---------------------------------------------------------------------------
 
 async fn handle_route(cmd: &Value, state: &mut DaemonState) -> Result<Value, String> {
     let mgr = state.browser.as_ref().ok_or("Browser not launched")?;
@@ -8340,9 +8004,6 @@ async fn handle_route(cmd: &Value, state: &mut DaemonState) -> Result<Value, Str
         abort,
     });
 
-    // Re-enable Fetch with all route patterns combined.
-    // When domain filtering is active, include a wildcard so all requests
-    // continue to be intercepted for domain checks.
     let mut patterns: Vec<Value> = state
         .routes
         .iter()
@@ -8393,7 +8054,6 @@ async fn handle_unroute(cmd: &Value, state: &mut DaemonState) -> Result<Value, S
         .collect();
     if state.routes.is_empty() && rewrite_patterns.is_empty() {
         if state.domain_filter.is_some() {
-            // Domain filtering still needs Fetch interception; reset to wildcard
             mgr.client
                 .send_command(
                     "Fetch.enable",
@@ -8642,10 +8302,6 @@ async fn handle_http_credentials(cmd: &Value, state: &DaemonState) -> Result<Val
     Ok(json!({ "set": true }))
 }
 
-// ---------------------------------------------------------------------------
-// Auth handlers
-// ---------------------------------------------------------------------------
-
 async fn handle_auth_save(cmd: &Value) -> Result<Value, String> {
     let name = cmd
         .get("name")
@@ -8724,7 +8380,6 @@ async fn handle_auth_login(cmd: &Value, state: &mut DaemonState) -> Result<Value
         .map(String::from)
         .or(cred.submit_selector);
 
-    // Find and fill username
     let user_sel = if let Some(s) = username_sel {
         s
     } else {
@@ -8752,7 +8407,6 @@ async fn handle_auth_login(cmd: &Value, state: &mut DaemonState) -> Result<Value
     )
     .await?;
 
-    // Find and fill password
     let pass_sel = password_sel.unwrap_or_else(|| "input[type=password]".to_string());
     interaction::fill(
         &mgr.client,
@@ -8763,7 +8417,6 @@ async fn handle_auth_login(cmd: &Value, state: &mut DaemonState) -> Result<Value
     )
     .await?;
 
-    // Find and click submit
     let sub_sel = if let Some(s) = submit_sel {
         s
     } else {
@@ -8792,7 +8445,6 @@ async fn handle_auth_login(cmd: &Value, state: &mut DaemonState) -> Result<Value
     )
     .await?;
 
-    // Wait for navigation after submit (with fallback timeout)
     let mut rx = mgr.client.subscribe();
     let deadline = tokio::time::Instant::now() + tokio::time::Duration::from_secs(10);
     let mut navigated = false;
@@ -8823,10 +8475,6 @@ async fn handle_auth_login(cmd: &Value, state: &mut DaemonState) -> Result<Value
     Ok(json!({ "loggedIn": true, "name": name }))
 }
 
-// ---------------------------------------------------------------------------
-// Confirmation handlers
-// ---------------------------------------------------------------------------
-
 async fn handle_confirm(_cmd: &Value, state: &mut DaemonState) -> Result<Value, String> {
     let pending = state
         .pending_confirmation
@@ -8852,12 +8500,7 @@ async fn handle_deny(_cmd: &Value, state: &mut DaemonState) -> Result<Value, Str
     Ok(json!({ "denied": true, "action": pending.action }))
 }
 
-// ---------------------------------------------------------------------------
-// iOS handlers
-// ---------------------------------------------------------------------------
-
 async fn handle_swipe(cmd: &Value, state: &mut DaemonState) -> Result<Value, String> {
-    // Route through Appium for iOS/WebDriver
     if let Some(ref appium) = state.appium {
         if state.browser.is_none() {
             let start_x = cmd.get("startX").and_then(|v| v.as_f64()).unwrap_or(200.0);
@@ -8950,7 +8593,6 @@ async fn handle_swipe(cmd: &Value, state: &mut DaemonState) -> Result<Value, Str
         return Ok(json!({ "swiped": direction }));
     }
 
-    // Manual coordinates
     mgr.client
         .send_command(
             "Input.dispatchTouchEvent",
@@ -8997,10 +8639,6 @@ async fn handle_device_list() -> Result<Value, String> {
         Err("device_list is only available on macOS with Xcode".to_string())
     }
 }
-
-// ---------------------------------------------------------------------------
-// Input event handlers
-// ---------------------------------------------------------------------------
 
 async fn handle_input_mouse(cmd: &Value, state: &DaemonState) -> Result<Value, String> {
     let mgr = state.browser.as_ref().ok_or("Browser not launched")?;
@@ -9078,8 +8716,6 @@ async fn handle_keydown(cmd: &Value, state: &DaemonState) -> Result<Value, Strin
         .and_then(|v| v.as_str())
         .ok_or("Missing 'key' parameter")?;
 
-    // Enriched dispatch (key/code/windowsVirtualKeyCode/text) so pages that
-    // rely on keyCode or keypress semantics observe a real key event.
     interaction::key_down(&mgr.client, &session_id, key).await?;
     Ok(json!({ "keydown": key }))
 }
@@ -9092,7 +8728,6 @@ async fn handle_keyup(cmd: &Value, state: &DaemonState) -> Result<Value, String>
         .and_then(|v| v.as_str())
         .ok_or("Missing 'key' parameter")?;
 
-    // Same key-info machinery as keydown/press so the pair matches.
     interaction::key_up(&mgr.client, &session_id, key).await?;
     Ok(json!({ "keyup": key }))
 }
@@ -9160,10 +8795,6 @@ async fn handle_mouseup(cmd: &Value, state: &DaemonState) -> Result<Value, Strin
         .await?;
     Ok(json!({ "released": true }))
 }
-
-// ---------------------------------------------------------------------------
-// Response helpers
-// ---------------------------------------------------------------------------
 
 fn success_response(id: &str, data: Value) -> Value {
     json!({
@@ -9426,7 +9057,6 @@ mod tests {
             assert!(error.contains(action), "{}", error);
         }
 
-        // Everything the JS client allows and the CDP backend knows must pass.
         let steps: Vec<Value> = [
             "navigate",
             "click",
@@ -9476,8 +9106,6 @@ mod tests {
     #[tokio::test]
     async fn test_chain_reports_failing_step_index_and_aborts_by_default() {
         let mut state = DaemonState::new();
-        // No browser: the first step's handler fails; the chain must surface
-        // the failing step index and stop before the second step runs.
         let cmd = json!({
             "id": "chain-abort",
             "action": "chain",
@@ -9523,8 +9151,6 @@ mod tests {
             ]
         });
         let response = handle_chain(&cmd, &mut state, "chain-continue").await;
-        // A failed step still fails the chain envelope, but every step ran and
-        // the per-step results are preserved for the caller.
         assert_eq!(response["success"], false);
         assert!(response["error"]
             .as_str()
@@ -9570,8 +9196,6 @@ mod tests {
             "steps": [{ "action": "healthcheck" }]
         });
         let response = handle_chain(&cmd, &mut state, "chain-snap").await;
-        // All steps passed but the requested trailing snapshot could not be
-        // captured, so the chain reports failure with the snapshot error.
         assert_eq!(response["success"], false);
         assert_eq!(response["data"]["completed"], 1);
         assert!(response["data"]["snapshotError"]
@@ -9752,8 +9376,6 @@ mod tests {
         assert_eq!(response["success"], true, "response: {}", response);
         assert_eq!(response["data"]["released"], false);
 
-        // The stale release did not remove the current lease: the exact
-        // newer capability remains valid without another lease rotation.
         let still_current = with_owner_lease(
             json!({ "id": "still-current", "action": "healthcheck" }),
             "worker-1",
@@ -9903,7 +9525,6 @@ mod tests {
                 "lease-1",
                 1,
             ),
-            // `keep` is optional; the owner lease still remains mandatory.
             with_owner_lease(
                 json!({ "id": "f2", "action": "finalize_tabs" }),
                 "worker-1",
@@ -9954,8 +9575,6 @@ mod tests {
                 { "tabId": 9, "status": "deliverable" },
             ])
         );
-        // No browser: the keep entries were never owned, so nothing was
-        // actually released or closed.
         assert_eq!(response["data"]["closedTabIds"], json!([]));
         assert_eq!(response["data"]["releasedTabIds"], json!([]));
     }
@@ -10004,8 +9623,6 @@ mod tests {
         .unwrap_err()
         .contains("unknown fields"));
 
-        // Missing keep is valid at the action-shape layer; execute_command
-        // separately requires and authenticates the complete owner lease.
         let no_keep = json!({ "id": "finalize", "action": "finalize_tabs", "ownerId": "worker-1" });
         assert!(validate_owner_finalization(&no_keep, "finalize_tabs").is_ok());
         assert!(validate_owner_finalization(
@@ -10019,7 +9636,6 @@ mod tests {
         )
         .unwrap_err()
         .contains("preserveMarked must be a boolean"));
-        // Lease validation is a separate execute_command concern.
         assert!(validate_owner_finalization(
             &json!({ "action": "close_owner", "ownerId": "worker-1" }),
             "close_owner"
@@ -10150,8 +9766,6 @@ mod tests {
             "id": "test-4"
         });
         let result = execute_command(&cmd, &mut state).await;
-        // Will fail because auto-launch fails, but the domain filter won't block since
-        // auto-launch happens first
         assert_eq!(result["success"], false);
     }
 

@@ -1,12 +1,3 @@
-/**
- * `BuildSession`'s core: the turn registry, the identity assertions every
- * other cluster calls before it writes, owner event delivery, transient-write
- * settlement, and the owner-plane RPC (gate, fence, turn state).
- *
- * Extracted verbatim from `src/index.ts`; every method takes the host surface
- * instead of `this` and is delegated to from the class. See
- * `src/build-session/host.ts` for why the host is a structural type.
- */
 import { retireTransientAppBuild } from "../app-build-artifacts.js";
 import { EXACT_TURN_CANCELLATIONS_KEY } from "../execution-placement-turn-cancellation.js";
 import {
@@ -104,14 +95,6 @@ export type SessionCoreHost = Pick<
   | "unregisterTurnLease"
 >;
 
-/**
- * Normal turn cleanup must retain exact cancellation receipts. The key list
- * is captured while input is gated and the deletion is one transaction, so
- * a crash or concurrent Stop cannot open a tombstone-loss window. Sandbox
- * destroy debt is retained too: terminal delivery is never authority to
- * forget a container whose teardown has not been confirmed. So is the
- * thread's container size, which belongs to the thread, not the turn.
- */
 export const deleteTurnStoragePreservingExactCancellations = async (
   host: SessionCoreHost,
   expectedTurn?: TurnRequest,
@@ -130,9 +113,6 @@ export const deleteTurnStoragePreservingExactCancellations = async (
     const listed = [...(await host.ctx.storage.list<unknown>()).keys()];
     const hasDestroyDebt = listed.some(isSandboxDestroyDebtKey);
     const hasOwnerFenceDebt = listed.some(isBuildOwnerFenceDurabilityKey);
-    // Owner events an unreachable owner deferred outlive the turn that
-    // produced them: the owner has no other way to learn a terminal state, and the
-    // alarm that retries them must survive with the debt.
     const hasOwnerEventDebt = listed.includes(OWNER_EVENT_DEBT_KEY);
     const keys = listed.filter(
       (key) =>
@@ -176,19 +156,11 @@ export const ownerGateFor = (host: SessionCoreHost, ownerId: string) => {
   return ownerGateStub(host.env.OWNER_GATES, ownerId);
 };
 
-/**
- * Give this turn's slot back to the owner gate. Idempotent by construction
- * (the gate deletes a row it may not have), and never fatal: a release that
- * cannot be delivered is bounded by the gate's own running-row expiry, so
- * failing the turn over it would trade a recoverable lag for a lost result.
- */
 export const releaseOwnerGate = async (
   host: SessionCoreHost,
   turn: TurnRequest,
 ): Promise<void> => {
   if (turn.kind !== "agent" || !turn.ownerId) return;
-  // The OrchestratorSession admitted its chat turn on the chat lane and
-  // releases that slot when it settles the turn itself.
   if (turn.agentRole === "orchestrator") return;
   try {
     await host.ownerGateFor(turn.ownerId).release({ turnId: turn.turnId });
@@ -214,11 +186,6 @@ export const ownerEventBase = (
   } as const;
 };
 
-/**
- * Deliver to the owner's object, or remember the debt and let the alarm
- * retry it. An unreachable owner must not lose what it has no other way to
- * learn: the UI's thread rows and the turn's terminal state.
- */
 export const deliverOwnerEventsDurable = async (
   host: SessionCoreHost,
   events: OwnerEvent[],
@@ -267,12 +234,6 @@ export const retryOwnerEventDebt = async (host: SessionCoreHost): Promise<void> 
   }
 };
 
-/**
- * One `turn.event`. The ordinal is assigned here — the control plane used to do it —
- * and persisted in this object's SQLite, so a restarted isolate continues
- * the sequence instead of colliding with events already projected. Callers
- * that own an idempotent retry pass their own `eventSeq` back in.
- */
 export const emitTurnEvent = async (
   host: SessionCoreHost,
   turn: TurnRequest,
@@ -324,19 +285,12 @@ export const emitTurnEvent = async (
     ...(options.resultJson ? { resultJson: options.resultJson } : {}),
     createdAt: Date.now(),
   };
-  // An orchestrator CLI turn shares its id with the conversation's chat
-  // turn, which owns that turn's events; the DO hears this attempt through
-  // the CLI turn routes instead.
   if (turn.agentRole !== "orchestrator") {
     await host.deliverOwnerEventsDurable([event]);
   }
   return eventSeq;
 };
 
-/**
- * Commit transcript rows to this thread's own table. A continuation reads
- * them back from SQLite, and re-appending the same ordinals is a no-op.
- */
 export const appendThreadTranscript = async (
   host: SessionCoreHost,
   turn: TurnRequest,
@@ -519,10 +473,6 @@ export const unregisterTurn = async (
         )));
   if (hasTransientWrites) {
     try {
-      // A callback whose response was lost may already have committed the
-      // row that names a build. Preserve it during ordinary operation. Once
-      // purge changes the generation, the turn's lease stays active until
-      // these otherwise-unnameable bytes are verifiably gone.
       await host.assertTurnWritable(turn);
       return;
     } catch (error) {
@@ -750,7 +700,6 @@ export const cleanupTransientWrites = async (
   }
 };
 
-/** Shared by alarm and live-unwind owner-fence loss paths. */
 export const cleanupOwnerPurgedTurnStorage = async (
   host: SessionCoreHost,
   turn: TurnRequest,
@@ -779,11 +728,6 @@ export const settleTerminalTransientWrites = async (
   }
 };
 
-/**
- * Durable app-turn state is the only name for transient backup/build bytes.
- * Never erase it until every named prefix is empty; an alarm retains the
- * owner lease and retries cleanup after a partial R2 failure.
- */
 export const retireTerminalAppTurnStorage = async (
   host: SessionCoreHost,
   turn: TurnRequest,
@@ -846,16 +790,6 @@ const assertAgentTurnActive = async (
   }
 };
 
-/**
- * The turn's own identity, which is now the only authority there is.
- *
- * The control plane used to be asked, on every side effect, whether this attempt was
- * still the live one (`/api/cloud/agent-turn-authority`, resolved against a
- * reusable turn token). That question is answered locally now: the owner
- * gate admitted the attempt, this object holds the attempt, and its
- * capability is signed and bound to it. What remains is the structural
- * check — a record that cannot name a thread and an attempt is not a turn.
- */
 export const assertAgentTurnIdentity = (
   host: SessionCoreHost,
   turn: TurnRequest,
@@ -871,7 +805,6 @@ export const assertAgentTurnIdentity = (
   }
 };
 
-/** The app-build lane's equivalent of `assertAgentTurnIdentity`. */
 export const assertAppTurnIdentity = (
   host: SessionCoreHost,
   turn: TurnRequest,
@@ -886,13 +819,6 @@ export const assertAppTurnIdentity = (
   }
 };
 
-/**
- * This thread's transcript, from this object's own SQLite.
- *
- * It used to be a `GET /api/cloud/context` on the continuation's critical
- * path, which made the control plane the authority for rows only this object ever
- * writes and put a control-plane round trip in front of every send_message.
- */
 export const fetchCanonicalAgentHistory = (
   host: SessionCoreHost,
   turn: TurnRequest,
@@ -913,8 +839,6 @@ export const assertAgentExecutionActive = async (
   execution.assertActive();
   await assertAgentTurnActive(host, turn);
   host.assertAgentTurnIdentity(turn);
-  // Stop can land while the durable owner/turn checks await remote storage.
-  // Repeat the local fiber latch immediately before the caller's side effect.
   execution.assertActive();
 };
 
@@ -938,11 +862,9 @@ export const assertAppExecutionActive = async (
 ): Promise<void> => {
   execution.assertActive();
   await assertAppTurnActive(host, turn);
-  // Owner purge can land while the durable fence read is in flight.
   execution.assertActive();
 };
 
-/** Keep the one DO alarm at the earliest lease, teardown, or receipt debt. */
 export const scheduleDurabilityAlarm = async (
   host: SessionCoreHost,
 ): Promise<void> => {
@@ -950,8 +872,6 @@ export const scheduleDurabilityAlarm = async (
   if (await host.hasOwnerFenceLeaseRetirementDebt()) {
     await host.armOwnerFenceLeaseReconciliationAlarm();
   }
-  // Deferred owner events are durability debt like any other: without a wake
-  // an unreachable owner would strand a terminal state it never hears about.
   const ownerEventDebt = await host.ctx.storage.get<OwnerEvent[]>(OWNER_EVENT_DEBT_KEY);
   if (ownerEventDebt && ownerEventDebt.length > 0) {
     const retryAt = Date.now() + OWNER_EVENT_DEBT_RETRY_MS;
@@ -962,9 +882,6 @@ export const scheduleDurabilityAlarm = async (
   }
 };
 
-// The detached agent-turn promise and the alarm share this DO's storage;
-// a stale turn (superseded by a send_message continuation on the same
-// thread) must never mutate the successor's state or complete its thread.
 export const ownsExactTurn = async (
   host: SessionCoreHost,
   turn: TurnRequest,
@@ -999,11 +916,6 @@ export const setExactTurnAlarm = async (
   });
 };
 
-/**
- * The positional shape every call site in this file already uses. `"auto"`
- * takes the next DO-assigned ordinal; an explicit number is an idempotent
- * retry of an ordinal this turn already reserved.
- */
 export const event = (
   host: SessionCoreHost,
   turn: TurnRequest,

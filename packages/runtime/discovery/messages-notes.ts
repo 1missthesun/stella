@@ -23,7 +23,6 @@ const log = (...args: unknown[]) => console.error("[messages-notes]", ...args);
 const getErrorCode = (error: unknown): string | undefined =>
   (error as NodeJS.ErrnoException | undefined)?.code;
 
-// SQLite helper
 type SqliteDatabase = {
   prepare(sql: string): { all(...params: unknown[]): unknown[] };
   close(): void;
@@ -36,10 +35,6 @@ const openDatabase = async (dbPath: string): Promise<SqliteDatabase> => {
   return new Database(uri, { readonly: true }) as SqliteDatabase;
 };
 
-/**
- * Collect iMessage metadata (contacts and group chats)
- * macOS only - requires Full Disk Access
- */
 const collectIMessageMetadataEffect: Effect.Effect<{
   contacts: ContactFrequency[];
   groupChats: GroupChat[];
@@ -52,11 +47,9 @@ const collectIMessageMetadataEffect: Effect.Effect<{
 
   return Effect.scoped(
     Effect.gen(function* () {
-      // Open the live database directly
       const db = yield* acquireCloseable(() => openDatabase(sourceDb));
 
       return yield* tryDiscoverySync(() => {
-      // Query contact frequency (NO message body - only handle + count)
       const contactQuery = `
         SELECT
           h.id as identifier,
@@ -85,7 +78,6 @@ const collectIMessageMetadataEffect: Effect.Effect<{
         messageCount: row.msg_count,
       }));
 
-      // Query group chats
       const groupQuery = `
         SELECT
           c.display_name as name,
@@ -124,10 +116,6 @@ const collectIMessageMetadataEffect: Effect.Effect<{
   );
 });
 
-/**
- * Collect Apple Notes metadata (folders and counts)
- * macOS only - requires Full Disk Access
- */
 const collectAppleNotesEffect: Effect.Effect<NoteFolder[]> = Effect.suspend(
   () => {
     if (process.platform !== "darwin") {
@@ -139,7 +127,6 @@ const collectAppleNotesEffect: Effect.Effect<NoteFolder[]> = Effect.suspend(
       "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
     );
 
-    // Try primary query first
     const primaryQuery = `
         SELECT
           COALESCE(folder.ZTITLE2, 'Uncategorized') as folder_name,
@@ -151,7 +138,6 @@ const collectAppleNotesEffect: Effect.Effect<NoteFolder[]> = Effect.suspend(
         GROUP BY folder_name
         ORDER BY note_count DESC
       `;
-    // Fallback with alternative column names
     const alternativeQuery = `
           SELECT
             COALESCE(folder.ZTITLE, 'Uncategorized') as folder_name,
@@ -163,7 +149,6 @@ const collectAppleNotesEffect: Effect.Effect<NoteFolder[]> = Effect.suspend(
           GROUP BY folder_name
           ORDER BY note_count DESC
         `;
-    // Final fallback - just count notes
     const simpleQuery = `
             SELECT 'Notes' as folder_name, COUNT(*) as note_count
             FROM ZICCLOUDSYNCINGOBJECT
@@ -225,18 +210,8 @@ const collectAppleNotesEffect: Effect.Effect<NoteFolder[]> = Effect.suspend(
   },
 );
 
-// Reminders lists managed by the OS/Siri, not the user — filtered out.
 const REMINDERS_SYSTEM_LISTS = new Set(["SiriFoundInApps"]);
 
-/**
- * Collect Reminders metadata (list names + active item counts).
- *
- * macOS only. Modern Reminders keeps one SQLite store per account under the
- * group container (Data-local.sqlite + Data-<accountUUID>.sqlite), so we read
- * every store and merge by list name. Schema: ZREMCDBASELIST holds the lists
- * (ZNAME), ZREMCDREMINDER holds items linked via ZLIST. The legacy
- * ~/Library/Reminders path is kept as a fallback for old macOS.
- */
 const findRemindersStores = async (): Promise<{
   storesDir: string;
   storeFiles: string[];
@@ -278,7 +253,6 @@ const collectRemindersEffect: Effect.Effect<NoteFolder[], unknown> =
       }
       const { storesDir, storeFiles } = stores;
 
-      // List name -> active reminder count, merged across account stores.
       const listCounts = new Map<string, number>();
 
       for (let index = 0; index < storeFiles.length; index += 1) {
@@ -329,10 +303,6 @@ const collectRemindersEffect: Effect.Effect<NoteFolder[], unknown> =
     });
   });
 
-/**
- * Collect Calendar metadata
- * macOS only - requires Full Disk Access
- */
 const collectCalendarEffect: Effect.Effect<CalendarSummary[]> = Effect.suspend(
   () => {
     if (process.platform !== "darwin") {
@@ -346,7 +316,6 @@ const collectCalendarEffect: Effect.Effect<CalendarSummary[]> = Effect.suspend(
         const db = yield* acquireCloseable(() => openDatabase(sourceDb));
 
         return yield* tryDiscoverySync(() => {
-          // Query for calendar names and event counts
       const calendarQuery = `
         SELECT
           c.ZTITLE as calendar_name,
@@ -362,7 +331,6 @@ const collectCalendarEffect: Effect.Effect<CalendarSummary[]> = Effect.suspend(
         event_count: number;
       }>;
 
-      // Query for recurring event titles (high signal — reveals habits)
       const recurringQuery = `
         SELECT DISTINCT ci.ZTITLE as title, c.ZTITLE as calendar_name
         FROM ZCALENDARITEM ci
@@ -377,7 +345,6 @@ const collectCalendarEffect: Effect.Effect<CalendarSummary[]> = Effect.suspend(
         calendar_name: string;
       }>;
 
-      // Build calendar summaries
       const calendars: CalendarSummary[] = calendarRows.map((row) => {
         const recurringTitles = recurringRows
           .filter((r) => r.calendar_name === row.calendar_name)
@@ -413,10 +380,6 @@ const collectCalendarEffect: Effect.Effect<CalendarSummary[]> = Effect.suspend(
   },
 );
 
-/**
- * Collect Windows Sticky Notes metadata
- * Windows only
- */
 const collectStickyNotesEffect: Effect.Effect<NoteFolder[]> = Effect.suspend(
   () => {
     if (process.platform !== "win32") {
@@ -455,7 +418,6 @@ const collectStickyNotesEffect: Effect.Effect<NoteFolder[]> = Effect.suspend(
                 }>,
             );
 
-          // Try primary query first; fall back if schema is different.
           const rows = yield* runQuery(
             `SELECT 'Sticky Notes' as name, COUNT(*) as note_count FROM Note WHERE IsDeleted = 0`,
           ).pipe(
@@ -487,8 +449,6 @@ const collectStickyNotesEffect: Effect.Effect<NoteFolder[]> = Effect.suspend(
   },
 );
 
-// Platform fan-in: the same per-source timeout budgets the pre-Effect
-// `Promise.all` of `withTimeout(...)` calls raced, run in parallel.
 const collectMessagesNotesEffect: Effect.Effect<MessagesNotesSignals, unknown> =
   Effect.suspend(() => {
     const platform = process.platform;
@@ -534,20 +494,13 @@ const collectMessagesNotesEffect: Effect.Effect<MessagesNotesSignals, unknown> =
     });
   });
 
-/**
- * Main collection function
- */
 export async function collectMessagesNotes(): Promise<MessagesNotesSignals> {
   return runDiscovery(collectMessagesNotesEffect);
 }
 
-/**
- * Format messages and notes signals for synthesis
- */
 export function formatMessagesNotesForSynthesis(data: MessagesNotesSignals): string {
   const sections: string[] = [];
 
-  // Communication Patterns
   if (data.contacts.length > 0) {
     const contactLines = data.contacts.map(
       (c) => `- ${c.displayName} (${c.messageCount} messages)`
@@ -555,19 +508,16 @@ export function formatMessagesNotesForSynthesis(data: MessagesNotesSignals): str
     sections.push(`### Communication Patterns\nTop contacts by message frequency:\n${contactLines.join("\n")}`);
   }
 
-  // Group Chats
   if (data.groupChats.length > 0) {
     const groupLines = data.groupChats.map((g) => `- ${g.name} (${g.participantCount} members)`);
     sections.push(`### Group Chats\n${groupLines.join("\n")}`);
   }
 
-  // Note Organization
   if (data.noteFolders.length > 0) {
     const folderLines = data.noteFolders.map((f) => `- ${f.name}: ${f.noteCount} notes`);
     sections.push(`### Note Organization\n${folderLines.join("\n")}`);
   }
 
-  // Calendars
   if (data.calendars.length > 0) {
     const calendarLines = data.calendars.map((cal) => {
       let line = `- ${cal.calendarName}: ${cal.eventCount} events`;

@@ -15,13 +15,7 @@ type PendingChange = {
 };
 
 export type OwnerMemoryPolicyHooks = {
-  /** Closes grant-backed local assertions during owner fence/purge barriers. */
   issuanceOpen?: () => Promise<boolean>;
-  /**
-   * Called while a policy change is durably pending and before it is applied
-   * to the owner's home state. It must durably freeze local reader grants or
-   * throw; a throw leaves the pending change closed for alarm retry.
-   */
   revokeReaders?: (change: MemoryPolicyChange) => Promise<void>;
 };
 
@@ -35,14 +29,6 @@ export class MemoryPolicyError extends Error {
   }
 }
 
-/**
- * The owner gate's memory permission coordinator. A change is recorded as
- * pending, reader grants are frozen, and only then is it applied to the
- * owner's home state (`transport`). While a change is pending, provider
- * admission is closed. A wipe stays pending until its new epoch opens.
- * Failures leave the exact operation for alarm replay; expiry never silently
- * reopens access.
- */
 export class OwnerMemoryPolicy {
   constructor(
     private readonly ctx: DurableObjectState,
@@ -116,8 +102,6 @@ export class OwnerMemoryPolicy {
       if (pending.change.expectedOwnerGeneration === expected.ownerGeneration) {
         throw new MemoryPolicyError("MEMORY_POLICY_CHANGING");
       }
-      // The caller's live owner lease proves a new account generation.
-      // An old generation's pending operation cannot mutate the new one.
       await this.remove(CHANGE_KEY);
       await this.remove(CACHE_KEY);
     }
@@ -200,8 +184,6 @@ export class OwnerMemoryPolicy {
       } satisfies CachedPolicy);
       await this.remove(CHANGE_KEY);
     } catch (error) {
-      // A definitive mutation refusal did not change authority. Unknown
-      // outcomes retain the intent, and the original request id is retried.
       if (error instanceof MemoryPolicyError && error.status === 400) {
         await this.remove(CHANGE_KEY);
         await this.remove(CACHE_KEY);

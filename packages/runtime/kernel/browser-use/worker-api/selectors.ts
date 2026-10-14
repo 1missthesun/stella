@@ -1,9 +1,3 @@
-/**
- * Locator selectors: the semantic (`aria=`) selector encoding behind
- * getByRole/getByText/..., and the page-side resolver script every
- * non-direct locator action runs in the tab.
- */
-
 import type { LocatorState } from "./locators.js";
 import {
   assertKnownKeys,

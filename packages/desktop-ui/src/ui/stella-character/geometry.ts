@@ -1,12 +1,3 @@
-/**
- * Path maths for the Stella character rig.
- *
- * Every silhouette the rig can wear is authored once as an SVG path string,
- * then flattened here into a fixed-length radial ring: `N` samples of the
- * distance from the shape's centre at evenly spaced angles. Rings of equal
- * length can be interpolated component-wise, which is what lets the rig morph
- * between silhouettes without a path-morphing library.
- */
 export type Point = [number, number];
 export type Ring = Point[];
 

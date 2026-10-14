@@ -7,14 +7,6 @@ import {
   type MapRouteArtifact,
 } from "@/lib/maps/map-artifact";
 
-/**
- * Client half of /maps/embed. Loads the Maps JavaScript API with the
- * referrer-restricted browser key, then draws the artifact: markers (with a
- * small place info window on tap) and, when present, the route polyline.
- * Everything is already resolved server-side — this page makes no Places or
- * Directions calls of its own.
- */
-
 const BROWSER_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY?.trim();
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -59,10 +51,6 @@ const loadGoogleMaps = (): Promise<GoogleMaps> => {
   return mapsLoader;
 };
 
-/**
- * Google's standard night-mode raster styling, trimmed to the layers that
- * matter for a small card, so the dark theme card doesn't glow white.
- */
 const DARK_MAP_STYLES = [
   { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
   { elementType: "labels.text.fill", stylers: [{ color: "#8b95a5" }] },
@@ -201,7 +189,6 @@ const renderArtifact = (
     map.setZoom(15);
   } else {
     map.fitBounds(bounds, 48);
-    // Never over-zoom tight clusters (two pins on one block).
     maps.event.addListenerOnce(map, "idle", () => {
       if ((map.getZoom() ?? 0) > 16) map.setZoom(16);
     });

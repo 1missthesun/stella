@@ -1,13 +1,3 @@
-/**
- * An agent this BuildSession runs on Claude Code moving itself to one of the
- * owner's computers (`switch_destination`, `@stella/executor-cloud/cloud-agent-move`).
- *
- * The tool call is checked here while the agent still listens: the computer
- * exists, is online, takes work, and is signed in to Claude Code. The request
- * is kept for the turn, and once the turn's transcript is saved (and so in
- * the agent's log), `takeAgentMove` hands the thread to that computer through
- * the owner's agent threads, which continues it there with its brief.
- */
 import type { RpcResponse } from "@stella/contracts/backend/protocol";
 import type { AgentThreadCalls } from "@stella/contracts/backend/agent-threads";
 import { findDeviceDestination } from "@stella/contracts/turn-plane/placement";
@@ -27,7 +17,6 @@ const BRIEF_MAX_CHARS = 6_000;
 const reply = (body: { ok: true; text: string } | { ok: false; error: string }) =>
   Response.json(body, { headers: { "cache-control": "no-store" } });
 
-/** The owner's computers as a cloud agent reads them, for its prompt. */
 export const agentDevicesSection = async (env: Pick<Cloudflare.Env, "OWNER_GATES">, turn: TurnRequest): Promise<string | undefined> => {
   const listed = await ownerGateStub(env.OWNER_GATES, turn.ownerId)
     .devices()
@@ -83,11 +72,6 @@ export const serveAgentMoveRequest = async (
   });
 };
 
-/**
- * After a turn that asked to move, once its transcript is saved: the owner
- * hands the thread to the computer. Undefined when it asked for nothing;
- * otherwise where it runs now, or why it stays.
- */
 export const takeAgentMove = async (
   storage: DurableObjectStorage,
   env: Pick<Cloudflare.Env, "OWNER_GATES">,

@@ -1,11 +1,3 @@
-/**
- * Module-scoped store of HTML canvases the orchestrator's `html` tool has
- * produced. Files live under `~/.stella/outputs/html/` and a small index in
- * the shared UI state store keeps them listed across renderer and desktop
- * restarts; every mutation republishes the list into the Files index, which
- * is what the sidebar actually renders.
- */
-
 import {
   setFileEntries,
   type FileEntry,
@@ -20,11 +12,9 @@ export type CanvasHtmlItem = {
   title: string;
   slug?: string;
   createdAt: number;
-  /** Cloud canvas: `filePath` is a drive path, fetched by signed URL. */
   driveBacked?: boolean;
 };
 
-/** Display-tab id for a canvas, so one file is one Files entry. */
 export const canvasDisplayTabId = (filePath: string): string =>
   `canvas:${filePath}`;
 
@@ -34,7 +24,6 @@ const STORAGE_KEY = "stella-display-canvas-html-items";
 const REMOVED_KEY = "stella-display-canvas-html-removed";
 const MAX_ITEMS = 200;
 
-// Stable snapshot for `useSyncExternalStore`; refreshed only on mutation.
 let snapshot: ReadonlyArray<CanvasHtmlItem> = [];
 
 const toFileEntry = (item: CanvasHtmlItem): FileEntry => ({
@@ -117,7 +106,6 @@ const titleFromPayload = (
   return payload.filePath.split(/[\\/]/).pop() ?? "Canvas";
 };
 
-/** Add or refresh a canvas item; returns the up-to-date snapshot. */
 export const addCanvasHtmlItem = (
   payload: Extract<DisplayPayload, { kind: "canvas-html" }>,
 ): ReadonlyArray<CanvasHtmlItem> => {

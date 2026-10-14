@@ -1,11 +1,3 @@
-/**
- * Whether a turn of the conversation runs elsewhere (the cloud, another
- * computer). The runtime learns it from reading the journal every couple of
- * seconds; the conversation's live socket has the same `started` and ending
- * rows the moment they are written. While the socket is live it decides, so
- * the chat starts and settles with the turn itself. Otherwise the runtime's
- * reading stands.
- */
 import type { JournalRecord } from "@stella/contracts/conversation-protocol";
 import type { LiveTurn } from "@stella/contracts/conversation-store-reducer";
 import type { PiRemoteTurn } from "@stella/contracts/pi-chat";

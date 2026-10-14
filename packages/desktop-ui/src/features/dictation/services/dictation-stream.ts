@@ -17,15 +17,9 @@ const OPEN_TIMEOUT_MS = 10_000;
 const FINAL_TIMEOUT_MS = 15_000;
 const REPLAY_TIMEOUT_MS = 90_000;
 
-/** The relay origin only changes with a deploy; re-check it now and then. */
 const CONFIG_TTL_MS = 10 * 60_000;
 let cachedConfig: { value: Promise<RealtimeConfig>; at: number } | null = null;
 
-/**
- * The realtime config (and the auth check behind it) is a backend round trip
- * on the path to the socket. Reuse it across presses, and let callers warm it
- * before the user presses the mic.
- */
 export const loadDictationRealtimeConfig = (): Promise<RealtimeConfig> => {
   if (cachedConfig && Date.now() - cachedConfig.at < CONFIG_TTL_MS) {
     return cachedConfig.value;
@@ -41,27 +35,17 @@ export const loadDictationRealtimeConfig = (): Promise<RealtimeConfig> => {
   return entry.value;
 };
 
-/**
- * Fetch what a press needs before the socket (relay config and a fresh
- * token) so the press itself goes straight to the handshake. Both are cached,
- * so calling this on hover, focus, or mount is cheap.
- */
 export const prewarmDictation = (): void => {
   void Promise.all([loadDictationRealtimeConfig(), getAuthToken()]).catch(
     () => undefined,
   );
 };
 
-/** A likely press: also connect the relay socket ahead of it. */
 export const prewarmDictationSocket = (): void => {
   prewarmDictation();
   warmDictationSocket();
 };
 
-/**
- * Open an authenticated relay socket in deferred-start mode: the relay
- * accepts it without reserving anything until the client sends `start`.
- */
 const connectRelay = async (): Promise<WebSocket> => {
   const [config, token] = await Promise.all([
     loadDictationRealtimeConfig(),
@@ -103,15 +87,10 @@ const connectRelay = async (): Promise<WebSocket> => {
   });
 };
 
-/** Close an unused warm socket before the relay's 60 s idle limit. */
 const WARM_SOCKET_TTL_MS = 50_000;
 let warmSocket: { socket: Promise<WebSocket>; expiresAt: number } | null =
   null;
 
-/**
- * Connect ahead of a likely press (mic hover or focus). The socket holds no
- * reservation and no provider session until a press sends `start`.
- */
 export const warmDictationSocket = (): void => {
   if (warmSocket && Date.now() < warmSocket.expiresAt) return;
   const entry = {
@@ -136,7 +115,6 @@ export const warmDictationSocket = (): void => {
   );
 };
 
-/** Claim the warm socket if one is usable, else fall back to a fresh one. */
 const takeWarmSocket = (): Promise<WebSocket> | null => {
   const entry = warmSocket;
   warmSocket = null;
@@ -169,7 +147,6 @@ export class DictationStream {
   private openSettle: ((error: Error | null) => void) | null = null;
 
   constructor(
-    /** The relay ended the session while recording (not while finishing). */
     private readonly onFailure?: (error: Error) => void,
   ) {}
 
@@ -179,11 +156,6 @@ export class DictationStream {
     this.onFailure?.(error);
   }
 
-  /**
-   * Resolves once the provider acknowledged its session, which is when its
-   * real-time clock starts; audio captured before then is the caller's to
-   * hold and pace.
-   */
   async open(): Promise<void> {
     const socket = await (takeWarmSocket() ?? connectRelay());
     if (this.cancelled) {
@@ -231,7 +203,6 @@ export class DictationStream {
       }
       this.clearFinishHandlers();
     };
-    // The relay reserves the session and opens the provider only now.
     socket.send(JSON.stringify({ type: "start" }));
     await acknowledged;
   }

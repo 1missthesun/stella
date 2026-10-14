@@ -1,10 +1,3 @@
-/**
- * Pinned "you need to act" card above the composer — signed out, plan
- * limit reached, model gated, provider rejected. Reads the composer-notice
- * store and shares the cloud-browser intervention card's silhouette so
- * the two occupy one slot. Mirrors the desktop `ComposerNotice`.
- */
-
 import { useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
@@ -54,7 +47,6 @@ export function ComposerNotice({
           label: "Sign in",
           onPress: () => {
             dismiss();
-            // A self-hosted server has no sign-in page: pair again.
             router.replace(
               isSelfHostedLaunch
                 ? { pathname: "/connect-server", params: { reason: "signed-out" } }

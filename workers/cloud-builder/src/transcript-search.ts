@@ -1,17 +1,3 @@
-/**
- * Full-text index for a transcript stored in the same Durable Object SQLite.
- *
- * The FTS rowid is the transcript's own sequence number, so a MATCH joins
- * straight back to canonical rows, and deleting resident journal rows during
- * rollover does not disturb the index. The orchestrator queries it through
- * `history.search` and `history.sql` in its code tool.
- *
- * What it holds: what the user and Stella said, and the hidden prompts that
- * carry another agent's words to Stella (an agent's report, an agent's
- * message). Its `role` column names which. Tool calls, tool results, cards
- * and other hidden runtime context stay out.
- */
-
 export const DEFAULT_TRANSCRIPT_SEARCH_TABLE = "journal_fts";
 
 const INDEXED_TEXT_MAX_BYTES = 64 * 1024;
@@ -40,13 +26,6 @@ const tableIdentifier = (name: string): string => {
   return name;
 };
 
-/**
- * `contentless`: the index keeps no copy of the text it indexed (only the
- * inverted index and the UNINDEXED columns), and rows are deleted by rowid.
- * The readable text then lives only in `<table>_text`. A contentful table
- * stores the indexed text a second time; under encryption that copy is the
- * keyed hash of every word (~25 bytes a word), several times the text.
- */
 export const transcriptSearchDdl = (
   tableName = DEFAULT_TRANSCRIPT_SEARCH_TABLE,
   options: { contentless?: boolean } = {},
@@ -62,7 +41,6 @@ export const transcriptSearchDdl = (
   )`;
 };
 
-/** Whether `tableName` exists as a contentless index (`transcriptSearchDdl`). */
 export const isContentlessSearchTable = (
   sql: SqlStorage,
   tableName = DEFAULT_TRANSCRIPT_SEARCH_TABLE,
@@ -113,7 +91,6 @@ export const openSideText = (
   return "";
 };
 
-/** Text-only projection of an AgentMessage. Binary blocks and calls are noise. */
 export const extractMessageText = (message: unknown): string => {
   if (!message || typeof message !== "object") return "";
   const content = (message as { content?: unknown }).content;
@@ -154,11 +131,6 @@ const capUtf8 = (value: string, maxBytes: number): string => {
 export type TranscriptSearchCodec = {
   indexedText: (text: string) => string;
   encryptSideText: (text: string) => string | null;
-  /**
-   * The side text as a compressed (and, with a key, sealed) BLOB
-   * (`sealSideText`). A contentless index requires it: the side text is
-   * then the only copy of what was indexed.
-   */
   sealSideText?: (text: string) => Uint8Array;
 };
 

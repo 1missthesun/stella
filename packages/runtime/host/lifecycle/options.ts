@@ -6,13 +6,7 @@ export type LifecycleConnection = {
   socket: Socket;
   pid: number;
   paths: RuntimePaths;
-  /** True if we spawned the worker; false if we attached to an existing one. */
   spawned: boolean;
-  /**
-   * The identity the runtime reported on the readiness probe, when the
-   * caller asked for identity verification. The caller names its
-   * `serverId` on attach so the peer socket is fenced to this instance.
-   */
   identity?: RuntimeServerIdentity | null;
 };
 
@@ -21,36 +15,17 @@ export type LifecycleStartOptions = {
   workerEntryPath: string;
   bunBinaryPath?: string;
   idleShutdownMs?: number;
-  /**
-   * Extra env merged onto the child process. The host adapter passes
-   * NODE_ENV, custom debug flags, etc.
-   */
   env?: NodeJS.ProcessEnv;
   expectedProtocolVersion?: string;
   hostExecutablePath?: string;
-  /**
-   * Verify the runtime's identity before adopting it: same root, the
-   * pidfile's pid, and this environment shared with the app (see
-   * `worker/server-identity.ts`). A runtime that fails it, including one that
-   * predates the identity handshake, is replaced like a protocol mismatch.
-   * Omitted: no identity check (tests, legacy callers).
-   */
   verifyIdentity?: { launchEnv: Record<string, string> };
 };
 
-/**
- * Retry/timeout policy for the attach pipeline.
- */
 export type LifecycleBudgets = {
-  /** Spacing of the spawn-readiness poll attempts. */
   startPollIntervalMs: number;
-  /** Total budget for a freshly spawned worker to answer the probe. */
   startTimeoutMs: number;
-  /** Per-attempt socket connect + probe budget. */
   socketConnectTimeoutMs: number;
-  /** Total budget for the host lockfile acquire loop. */
   hostLockTimeoutMs: number;
-  /** Readiness budget for an alive-pid-but-unreachable-socket worker. */
   staleRetryTimeoutMs: number;
 };
 

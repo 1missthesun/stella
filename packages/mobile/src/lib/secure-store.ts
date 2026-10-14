@@ -37,7 +37,6 @@ export const setItemAsync = (key: string, value: string) => {
 export const deleteItemAsync = (key: string) =>
   ExpoSecureStore.deleteItemAsync(scoped(key), options);
 
-/** Write a key for another server (pairing stores the new session first). */
 export const setItemForServerAsync = (
   serverId: string,
   key: string,

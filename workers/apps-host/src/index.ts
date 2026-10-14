@@ -8,7 +8,6 @@ export class AppFetchGate extends DurableObject {
   }
 }
 
-/** Separate origin for generated content. Account credentials never reach apps. */
 export default {
   async fetch(request: Request, env: AppsHostBindings): Promise<Response> {
     const incoming = new URL(request.url);
@@ -20,8 +19,6 @@ export default {
       const value = request.headers.get(name);
       if (value) headers.set(name, value);
     }
-    // The binding pins the destination; neither the URL nor generated code can
-    // select another upstream. The runtime validates the signed app session.
     try {
       return await env.CLOUD_APPS.fetch(
         new URL(

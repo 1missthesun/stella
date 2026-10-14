@@ -1,10 +1,3 @@
-/**
- * The owner's devices: desktops that can run work (their presence-signing
- * keys and capabilities), the credentials phones reach them with, and the
- * phones' push tokens. Desktop UI and runtime calls arrive as backend calls; phones use the
- * `/api/mobile/*` routes, which land in `handleMobileRoute`.
- */
-
 import { EXPO_PUSH_ENDPOINT, expoPushEnabled, expoPushHeaders } from "../../push-expo.js";
 import type {
   ActivityNotificationKind,
@@ -119,16 +112,6 @@ export const DEVICES_MIGRATION = {
   ],
 };
 
-/**
- * Split "listed" from "willing to run dispatched work".
- *
- * `remote_execution_enabled` has been written as 1 by every registration since
- * the table existed, so it is not a setting anyone ever chose — it is just the
- * absence of the question. The backfill therefore reads it as the migration
- * input it is: every device already in the table, including every desktop a
- * phone had paired with, arrives `enabled` and is never asked. Only devices
- * that register *after* this migration start out `unconfigured`.
- */
 export const DEVICES_REMOTE_EXECUTION_MIGRATION = {
   id: "devices.2-remote-execution-consent",
   statements: [
@@ -138,11 +121,6 @@ export const DEVICES_REMOTE_EXECUTION_MIGRATION = {
   ],
 };
 
-/**
- * The phone bridge is gone: phones reach a computer through the owner gate's
- * relay over its presence socket, so the bridge's registrations, sessions,
- * connect requests and Cloudflare tunnels have nothing left to describe.
- */
 export const DEVICES_DROP_PHONE_BRIDGE_MIGRATION = {
   id: "devices.3-drop-phone-bridge",
   statements: [
@@ -174,11 +152,6 @@ export const DEVICES_PUSH_TOKEN_SESSION_MIGRATION = {
   ],
 };
 
-/**
- * Pairing codes are gone: a phone signed in to the account reaches its
- * computers through `pairing/attach`. The codes, and the sweep that expired
- * them, go with it.
- */
 export const DEVICES_DROP_PAIRING_CODES_MIGRATION = {
   id: "devices.6-drop-pairing-codes",
   statements: [
@@ -195,7 +168,6 @@ export const DEVICES_PUSH_CAPABILITIES_MIGRATION = {
   ],
 };
 
-/** The account's home computer for Stella's brain (`devices.setBrainHome`): at most one row. */
 export const DEVICES_BRAIN_HOME_MIGRATION = {
   id: "devices.8-brain-home",
   statements: [`ALTER TABLE devices ADD COLUMN brain_home INTEGER NOT NULL DEFAULT 0`],
@@ -226,8 +198,6 @@ type PairedPhoneRow = {
   revoked_at: number | null;
 };
 
-// ── Small helpers ──────────────────────────────────────────────────────────
-
 const randomFrom = (alphabet: string, length: number): string => {
   const bytes = crypto.getRandomValues(new Uint8Array(length));
   return [...bytes].map((byte) => alphabet[byte % alphabet.length]).join("");
@@ -238,7 +208,6 @@ const text = (value: unknown, max: number): string =>
 
 const optionalText = (value: unknown, max: number): string | undefined => text(value, max) || undefined;
 
-/** Follow the succession chain to the id a retired desktop id now resolves to. */
 export const resolveCurrentDeviceId = (db: OwnerDbReader, deviceId: string): string => {
   let current = deviceId;
   const seen = new Set([current]);
@@ -261,8 +230,6 @@ const requireAccountCaller = (caller: OwnerCaller | null): OwnerCaller => {
   return caller;
 };
 
-// ── Desktops ───────────────────────────────────────────────────────────────
-
 const identity = async (
   ctx: OwnerContext,
   args: DeviceCalls["devices.identity"]["args"],
@@ -278,12 +245,6 @@ const identity = async (
   };
 };
 
-/**
- * Registering is being listed, nothing more. A device the account has never
- * seen starts `unconfigured`; one that already answered keeps its answer, so
- * launching Stella again neither re-asks nor quietly re-enables a machine the
- * owner declined.
- */
 const register = async (
   ctx: OwnerContext,
   args: DeviceCalls["devices.register"]["args"],
@@ -396,12 +357,6 @@ const answerRemoteExecution = (
   return { deviceId: row.device_id, remoteExecution: after, changed: true };
 };
 
-/**
- * Enable or disable a device from the account, on any of the owner's
- * clients. Turning remote work off takes effect at once. Turning it on is
- * only asked for: that computer raises the question on its own screen (now,
- * or as soon as it next connects), and only its own answer enables it.
- */
 const setRemoteExecution = (
   ctx: OwnerContext,
   args: DeviceCalls["devices.setRemoteExecution"]["args"],
@@ -418,7 +373,6 @@ const setRemoteExecution = (
   return { deviceId: row.device_id, remoteExecution: "asking", changed: before !== "asking" };
 };
 
-/** The account's home computer for Stella's brain; null clears it. */
 const setBrainHome = (
   ctx: OwnerContext,
   args: DeviceCalls["devices.setBrainHome"]["args"],
@@ -434,12 +388,6 @@ const setBrainHome = (
   return { deviceId };
 };
 
-/**
- * Something tried to dispatch here and this device has not agreed. Recorded so
- * the device raises its own prompt and the list can say an answer is pending.
- * A device that already said yes is left alone; a device that said no is asked
- * again, because a later attempt is new information, not a replay.
- */
 const requestRemoteExecution = (
   ctx: OwnerContext,
   args: DeviceCalls["devices.requestRemoteExecution"]["args"],
@@ -453,12 +401,6 @@ const requestRemoteExecution = (
   return { deviceId: row.device_id, remoteExecution: "asking" };
 };
 
-/**
- * Move a retired desktop id's pairings and consent onto its
- * successor. A desktop mints a new device id when its local keypair stops
- * being readable; that is the same physical machine, so making the owner
- * consent again because a key file moved would be a bug, not a safeguard.
- */
 const adoptSuccession = (
   ctx: OwnerContext,
   args: DeviceCalls["devices.adoptSuccession"]["args"],
@@ -516,9 +458,6 @@ const adoptSuccession = (
     "SELECT * FROM devices WHERE device_id = ?",
     args.deviceId,
   );
-  // Only an answer is inherited. A successor that already carries one of its
-  // own keeps it, and `unconfigured` is the absence of an answer, so it has
-  // nothing to pass on.
   const inherited = retired ? remoteExecutionOf(retired) : "unconfigured";
   const migratedRemoteExecution = Boolean(
     successor &&
@@ -528,7 +467,6 @@ const adoptSuccession = (
   if (migratedRemoteExecution) {
     writeRemoteExecution(ctx, args.deviceId, inherited, retired?.remote_execution_asked_at ?? null);
   }
-  // The home computer is the machine, not its key.
   if (retired?.brain_home === 1 && successor) {
     ctx.db.run("UPDATE devices SET brain_home = CASE WHEN device_id = ? THEN 1 ELSE 0 END", args.deviceId);
   }
@@ -545,7 +483,6 @@ const adoptSuccession = (
   };
 };
 
-/** The devices and pairings the gate admits placements and proofs against. */
 export const snapshotDevices = (
   db: OwnerDbReader,
 ): Pick<OwnerSnapshot, "devices" | "pairedDevices"> => ({
@@ -574,18 +511,12 @@ export const snapshotDevices = (
         .map((row) => ({
           mobileDeviceId: row.mobile_device_id,
           desktopDeviceId: row.desktop_device_id,
-          // The pairing proof is an HMAC keyed by this value.
           mobilePublicKey: row.pair_secret_hash,
         })),
     [],
   ),
 });
 
-/**
- * `devices.list`: the registry joined with presence rows. An open connection
- * is online; when it was last heard from is left out while it is, so the value
- * changes only when presence or the registry does.
- */
 const devicesList = (db: OwnerDbReader): DevicesResponse => {
   const presence = new Map(
     readOrDefault(
@@ -612,16 +543,6 @@ const devicesList = (db: OwnerDbReader): DevicesResponse => {
   };
 };
 
-// ── Phones ─────────────────────────────────────────────────────────────────
-
-/**
- * Issue this phone a credential for one of the account's desktops.
- *
- * The pair secret is not an authorization step; it is the phone's *transport*
- * key. A phone has no Stella device key the cloud can verify, so this HMAC key
- * is what stands in for one on the mobile dispatch proof and on its requests
- * to the computer.
- */
 const grantPhoneAccess = async (
   ctx: OwnerContext,
   input: {
@@ -653,19 +574,6 @@ const grantPhoneAccess = async (
   return { desktopDeviceId: input.desktopDeviceId, approvedAt: ctx.now, pairSecret };
 };
 
-/**
- * A phone signed into this account asks for a credential for a desktop it can
- * already see in the device list, with no code to carry between the two.
- *
- * Account access is sufficient, and it is still only a credential to *reach*
- * that desktop. Whether the desktop will run anything is
- * `remote_execution_state`, which this does not touch. The route keeps its
- * `pairing/` path because phones already in the field call it.
- *
- * The named desktop must be a registered device of this same owner. There is
- * no cross-account reach to check for: the row lives in the caller's own owner
- * object, so another account's desktop is not nameable from here.
- */
 const attachPhone = async (
   ctx: OwnerContext,
   input: {
@@ -686,8 +594,6 @@ const attachPhone = async (
   }
   return await grantPhoneAccess(ctx, { ...input, desktopDeviceId });
 };
-
-// ── Push ───────────────────────────────────────────────────────────────────
 
 const ACTIVITY_COPY: Record<ActivityNotificationKind, { title: string; body: string }> = {
   started: { title: "Stella is working", body: "Stella started on your desktop." },
@@ -919,10 +825,6 @@ const flushDigest = async (ctx: OwnerContext): Promise<void> => {
   await sendPush(ctx, digestCopy(digest), "agent_activity:digest");
 };
 
-/**
- * One Expo push message per token, in token order. Tokens Expo reports as
- * gone are forgotten. False when the request itself did not go through.
- */
 export const sendPushMessages = async (
   ctx: OwnerContext,
   tokens: readonly LivePushToken[],
@@ -974,14 +876,11 @@ const sendPush = async (
   return null;
 };
 
-// ── /api/mobile/* ──────────────────────────────────────────────────────────
-
 export type MobileRouteInput = {
   route: string;
   caller: OwnerCaller;
   query: Record<string, string>;
   body: Record<string, unknown>;
-  /** The `x-stella-mobile-*` request headers, lower-cased. */
   headers: Record<string, string>;
 };
 
@@ -989,7 +888,6 @@ export type MobileRouteResult = { status: number; body: unknown };
 
 const error = (status: number, message: string): MobileRouteResult => ({ status, body: { error: message } });
 
-/** The phone routes, for a signed-in account. */
 export const handleMobileRoute = async (ctx: OwnerContext, input: MobileRouteInput): Promise<MobileRouteResult> => {
   const caller = requireAccountCaller(input.caller);
   const body = input.body;
@@ -1115,13 +1013,6 @@ export const devicesDomain = {
       handler: (ctx: OwnerContext, args: DeviceCalls["phone.notifyActivity"]["args"]) => notifyActivity(ctx, args),
     },
   },
-  /**
-   * The gate owns the presence socket, so it is the gate that raises the
-   * consent question and the gate that receives the answer the device signs
-   * for on that socket. Both land here as internal writes rather than as
-   * account calls, because the authority in those two moments is the device
-   * key, not a user token.
-   */
   internal: {
     "devices.setRemoteExecution": (ctx: OwnerContext, raw: unknown) =>
       answerRemoteExecution(

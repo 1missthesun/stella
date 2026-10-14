@@ -1,18 +1,3 @@
-/**
- * Share controls for the active canvas, overlaid on the canvas hero.
- *
- *  - Share button: every canvas the agent writes already has a private link
- *    (only its owner can open it, the live `shares.canvas` view). The
- *    popover shows that link with copy and "Open in browser", and sharing is
- *    "Make public" (`shares.setVisibility`); "Make private" takes it back. A
- *    canvas with no link yet gets one, public, from its HTML (`shares.save`).
- *  - Shared links: a small panel listing the account's public links (the
- *    live `shares.list` view) with copy and make-private (or revoke, for an
- *    older one-off share).
- *
- * The whole bar renders nothing when the canvas-share context is absent, so
- * the sandboxed canvas renderer never reaches for the backend outside a provider.
- */
 import { useCallback, useContext, useState } from "react";
 import {
   Check,
@@ -49,7 +34,6 @@ const readCanvasHtml = async (
   filePath: string,
   source: DisplayFileSource | null,
 ): Promise<string> => {
-  // A Drive document has no file on this machine: read it where the tab does.
   if (source) return decoder.decode((await source.read(filePath)).bytes);
   const readFile = window.electronAPI?.display?.readFile;
   if (typeof readFile !== "function") {
@@ -66,7 +50,6 @@ const copyToClipboard = async (value: string): Promise<void> => {
   await navigator.clipboard.writeText(value);
 };
 
-/** Straight to the system browser: a share link opened in-app renders here. */
 const openInSystemBrowser = (url: string): void => {
   if (window.electronAPI?.system.openExternal) {
     window.electronAPI.system.openExternal(url);
@@ -86,11 +69,9 @@ const formatDate = (ms: number): string => {
   }
 };
 
-/** Links written before visibility existed are public. */
 const isPublicLink = (link: SharedCanvasLink): boolean =>
   link.visibility !== "private";
 
-/** The canvas slug behind an item: its own, else its file's name. */
 const canvasKeyOf = (item: CanvasHtmlItem): string | null =>
   canvasLinkKey(
     item.slug ??
@@ -127,7 +108,6 @@ const CanvasLinkPanel = ({ item }: { item: CanvasHtmlItem }) => {
   const fileSource = useContext(DisplayFileSourceContext);
   const canvas = canvasKeyOf(item);
   const linkView = useCanvasLink(share ? canvas : null);
-  // A canvas-less item's one-off public copy has no view to watch.
   const [published, setPublished] = useState<SharedCanvasLink | null>(null);
   const link = canvas ? linkView.value : published;
   const [pending, setPending] = useState<Pending>(null);
@@ -151,8 +131,6 @@ const CanvasLinkPanel = ({ item }: { item: CanvasHtmlItem }) => {
             visibility,
           });
         } else {
-          // Not a canvas the agent named (a shared link opened here): a
-          // one-off public copy is the only link it can have.
           const result = await share.publish({
             html: await readCanvasHtml(item.filePath, fileSource),
             title: item.title,
@@ -343,8 +321,6 @@ const SharedLinksPanel = () => {
   const [busy, setBusy] = useState<string | null>(null);
   const { copied, copy } = useCopyLink();
 
-  // A canvas's link goes back to private; an older one-off share has no
-  // canvas behind it, so it is taken down.
   const onTakeDown = useCallback(
     async (link: SharedCanvasLink) => {
       if (!share) return;
@@ -468,7 +444,6 @@ export const CanvasShareBar = ({ item }: { item: CanvasHtmlItem }) => {
   const [shareOpen, setShareOpen] = useState(false);
   const [linksOpen, setLinksOpen] = useState(false);
 
-  // No canvas-share context means there is no share UI.
   if (!share) return null;
 
   const isPublic = link ? isPublicLink(link) : false;

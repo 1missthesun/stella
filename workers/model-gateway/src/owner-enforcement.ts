@@ -12,7 +12,6 @@ export type StoredOwnerEnforcement = {
   status: OwnerEnforcementStatus;
   until?: number;
   updatedAt: number;
-  /** Effective expiry for statuses without an explicit `until`. */
   expiresAt?: number;
 };
 
@@ -51,7 +50,6 @@ export const normalizeStoredOwnerEnforcement = (
   };
 };
 
-/** The KV mirror stores the record as JSON text. */
 export const parseStoredOwnerEnforcement = (
   value: string,
 ): StoredOwnerEnforcement | null => {
@@ -141,12 +139,6 @@ export const ownerEnforcementAdmission = async (
   );
 };
 
-/**
- * Apply an owner's enforcement pushed by its owner object on cloud-builder
- * (`ModelGatewayControl.applyOwnerEnforcement`): the relay gate orders it by
- * `updatedAt`, KV mirrors it for session mints, and a status change posts
- * `STELLA_ALERT_WEBHOOK_URL` when one is set.
- */
 export const applyOwnerEnforcementPush = async (
   env: Env,
   input: unknown,
@@ -200,7 +192,6 @@ export const applyOwnerEnforcementPush = async (
   }
 };
 
-/** Best effort: an alert never fails the change that raised it. */
 export const postAlert = async (env: object, text: string): Promise<void> => {
   const url = Reflect.get(env, "STELLA_ALERT_WEBHOOK_URL");
   if (typeof url !== "string" || !url.trim()) return;

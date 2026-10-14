@@ -4,10 +4,6 @@ import type { AccountSessionSummary } from "@stella/contracts/auth-session";
 
 type SignOutScope = "current_device" | "all_devices";
 
-/**
- * Revoke every Better Auth session on the account. Electron routes it through
- * main, which owns the bearer; a browser shell calls Better Auth directly.
- */
 const revokeAllSessions = async () => {
   const revoke = window.electronAPI?.system?.revokeAuthSessions;
   if (revoke) {
@@ -27,10 +23,8 @@ const toMs = (value: Date | string | number | null | undefined): number => {
   return 0;
 };
 
-/** Browser-shell session tokens by session id; Electron never sends them here. */
 const browserSessionTokens = new Map<string, string>();
 
-/** Every live session on the account, for the account settings list. */
 export const listAccountSessions =
   async (): Promise<AccountSessionSummary[]> => {
     const list = window.electronAPI?.system?.listAuthSessions;
@@ -62,7 +56,6 @@ export const listAccountSessions =
       .sort((a, b) => b.updatedAt - a.updatedAt);
   };
 
-/** Revoke one session by id. Not best-effort, for the same reason as below. */
 export const revokeAccountSession = async (sessionId: string) => {
   const revoke = window.electronAPI?.system?.revokeAuthSession;
   if (revoke) {
@@ -79,11 +72,6 @@ export const revokeAccountSession = async (sessionId: string) => {
 };
 
 export const secureSignOut = async (scope: SignOutScope = "current_device") => {
-  // Revocation is NOT best-effort. It deletes every Better Auth session row on
-  // the account, and reporting success when it failed would leave the user
-  // believing their other devices are signed out while those sessions are
-  // still live. A failure propagates instead, and the local sign-out below is
-  // deliberately not attempted in that case.
   if (scope === "all_devices") {
     await revokeAllSessions();
   }

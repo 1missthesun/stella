@@ -648,12 +648,6 @@ const validateHidAccess = (
   }
 };
 
-// The argv CLI path. It deliberately does not route through
-// executeMacComputerUseRequest: it forwards native argv (target resolution,
-// --state/--screenshot files, HID opt-in) to the daemon, takes the directory
-// locks and locked-use lease itself, and prints human-readable output, while
-// the typed path resolves targets from list_apps, requires observed state ids
-// for actions, and returns structured responses.
 const runCommand = async (
   command: string,
   args: string[],
@@ -1915,10 +1909,6 @@ export const executeStellaComputerCommand = async (
   argv: string[],
   options: StellaComputerExecutionOptions = {},
 ): Promise<StellaComputerExecutionResult> => {
-  // Effect-ratchet pin (1 new AbortController): this is the seam controller
-  // whose real AbortSignal rides the execution context into native helper
-  // children, daemon sockets, and bridge requests — non-Effect consumers
-  // that need a genuine AbortSignal.
   const controller = new AbortController();
   const onAbort = () =>
     controller.abort(
@@ -1928,10 +1918,6 @@ export const executeStellaComputerCommand = async (
     );
   options.signal?.addEventListener("abort", onAbort, { once: true });
   if (options.signal?.aborted) onAbort();
-  // The execution deadline is a forked timeout fiber aborting the seam
-  // controller, interrupted in the finally block on every exit path (the
-  // cleared, unref'd setTimeout analogue — cancellation in finally keeps
-  // CLI process liveness identical).
   const cancelTimeout =
     options.timeoutMs && options.timeoutMs > 0
       ? forkCancelableTimeout(options.timeoutMs, () =>

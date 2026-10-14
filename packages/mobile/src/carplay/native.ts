@@ -60,11 +60,6 @@ export function isCarPlayConnected(): boolean {
   }
 }
 
-/**
- * Whether the user is actually looking at Stella on the phone. With a CarPlay
- * scene in front, iOS reports the whole app as active even while the phone is
- * locked in a pocket, so AppState alone over-reports.
- */
 export function isPhoneInForeground(): boolean {
   if (AppState.currentState !== "active") return false;
   if (!carPlayNative || !isCarPlayConnected()) return true;

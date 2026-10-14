@@ -28,11 +28,6 @@ const unavailable = (accountScope: string, message: string) =>
 
 const SKILL_HEADS_TIMEOUT_MS = 20_000;
 
-/**
- * One fresh read of the `skills.heads` view: subscribe, take the first value
- * the owner object computes, unsubscribe. The sync diffs against a snapshot
- * and re-reads after each upload, so it never holds the subscription open.
- */
 const readSkillHeadsOnce = (
   clientScope: string,
   signal: AbortSignal,
@@ -70,12 +65,6 @@ const readSkillHeadsOnce = (
     if (settled) stop();
   });
 
-/**
- * Passive startup bridge that mirrors this Mac's Cloud Home root into the
- * cloud. Existing divergent cloud heads are never overwritten, and a skill the
- * root has dropped is tombstoned so cloud turns stop loading it; a settings
- * status card exposes conflicts and lets the user retry transient failures.
- */
 export function CloudHomeSyncBridge() {
   const {
     isCloudConversationReady,
@@ -91,8 +80,6 @@ export function CloudHomeSyncBridge() {
   const identityKey = `${accountScope}:${identityRevision}:${ownerSubject ?? "missing"}`;
   const activeIdentityRef = useRef(identityKey);
 
-  // Clear the old owner's labels before the browser can paint a transition
-  // frame. AccountTab independently filters by scope as defense in depth.
   useLayoutEffect(() => {
     activeIdentityRef.current = identityKey;
     cloudHomeSyncStatusStore.reset(

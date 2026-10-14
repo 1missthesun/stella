@@ -1,9 +1,3 @@
-/**
- * The self-hosted server's identity and its owner: one real, non-anonymous
- * Better Auth user created once by setup (`POST /api/admin/selfhost/owner`,
- * admin bearer), recorded with the server id and name in D1.
- */
-
 import { createAuth } from "../auth/auth.js";
 import { fail, json } from "../http/response.js";
 import { ownerModeEnabled } from "./owner-mode.js";

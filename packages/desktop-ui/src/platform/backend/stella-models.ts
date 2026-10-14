@@ -3,11 +3,6 @@ import type { CatalogApiResponse } from "@/global/settings/lib/model-catalog";
 import { STELLA_MODELS_PATH } from "@/shared/stella-api";
 import { backendUrl } from "./backend-client";
 
-/**
- * `GET /api/stella/models` on the backend worker. The bearer (when signed in)
- * picks the plan audience. The last body is kept with its ETag, so a refetch
- * the catalog hasn't changed since costs a 304.
- */
 let last: { etag: string; body: CatalogApiResponse } | null = null;
 
 export const fetchStellaModels = async (): Promise<CatalogApiResponse> => {

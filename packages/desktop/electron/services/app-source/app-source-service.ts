@@ -58,122 +58,41 @@ import {
   type AgentBrief,
 } from "./app-source-briefs.js";
 
-/**
- * Applies finished drafts to the app's own checkout, undoes recent commits,
- * keeps the checkout in step with the owner's fork on Artifacts, and takes
- * updates from the published app (upstream).
- *
- * The service never polls the backend. It fetches at launch, when the
- * backend's release channel says a new version was published (it says so
- * again on every reconnect), and when the owner's `appSource.fork` view says
- * another computer pushed to the fork.
- *
- * Git is the only bookkeeping: drafts are `draft/<name>` branches (in
- * progress while a worktree has one checked out), "recent" is first-parent
- * history, and the fork and upstream are remote-tracking refs. Every git call
- * is async so main never blocks on one.
- */
-
 type AppSourceServiceOptions = {
   stellaAppDir: string;
   broadcast: (state: AppSourceState) => void;
   isAnyWindowVisible: () => boolean;
   requestRuntimeRestart: () => void;
   applyRendererChanges: (paths: string[]) => Promise<unknown> | undefined;
-  /**
-   * Quit and start again. With `keepRuntime`, the runtime stays up for the
-   * next process to attach to: the update did not change it.
-   */
   relaunch: (options?: { keepRuntime?: boolean }) => void;
   hasConnectedAccount: () => boolean;
   getBackendUrl: () => string | null;
   getAuthToken: () => Promise<string | null>;
   log: (event: string, data: Record<string, unknown>) => void;
-  /** After a successful push to the fork. Not awaited by the push. */
   onPushed?: (cwd: string) => void | Promise<void>;
-  /**
-   * After an apply, undo, applyRemote or applyUpstream lands in the checkout,
-   * before it is swapped in. A throw fails the action.
-   */
   afterApply?: (cwd: string) => void | Promise<void>;
-  /**
-   * Runs before every action, against the checkout as it stands. A throw
-   * refuses the action (the launcher refuses to act on an unsigned HEAD).
-   */
   beforeAction?: (cwd: string) => void | Promise<void>;
-  /**
-   * Picture and cover the window before a renderer swap; the covered window
-   * then runs the swap and reveals it. Null runs the swap plain.
-   */
   coverRenderer?: () => Promise<CoveredWindow | null>;
-  /**
-   * Before a relaunch: frost the window on screen while the next process is
-   * made ready, committed once the relaunch is certain. Never throws.
-   */
   beforeRelaunch?: () => Promise<RelaunchHold | null>;
-  /**
-   * The launcher prepares the tree again on every relaunch: do that here,
-   * while the window is held, so its run finds the work done.
-   */
   launcherPreparesOnRelaunch?: boolean;
-  /**
-   * Before a relaunch, what was made ready here that the launcher would
-   * otherwise redo: the dependencies for this lockfile, the setup for this
-   * HEAD.
-   */
   reportPrepared?: (prepared: { lockHash?: string; head?: string }) => void;
-  /**
-   * Scratch copy for checking a merged update, removed after each check.
-   * Versions prepared before they are offered keep their records next to
-   * it (see `UpdatePreparer`).
-   */
   updateScratchDir: string;
-  /**
-   * Hand git work that needs a judgement to a background agent. Absent when
-   * no runtime is up, which leaves that work unavailable rather than done
-   * unchecked.
-   */
   dispatchAgentBrief?: (brief: AgentBrief) => Promise<void>;
 };
 
-/**
- * A version this checkout can take, and what taking it means. The published
- * app, the owner's other computer and a finished draft whose base moved differ
- * only in where the commits come from, whether their tree is already known good,
- * and what becomes of the draft afterwards — never in how the merge itself is
- * decided, which is why they share `take`.
- */
 type TakeSource = {
   kind: "upstream" | "remote" | "draft";
-  /** The ref holding the commits to take. */
   ref: string;
-  /** Said when the ref holds nothing this checkout lacks. */
   emptyMessage: string;
-  /** Message for the merge commit, when a merge has to be made. */
   subject: string;
-  /**
-   * A merged tree identical to the ref's own tree needs no check. True only
-   * for upstream: that tree is published, and publishing builds it. The fork
-   * is another of the owner's computers and a draft is an agent's work;
-   * neither tree was ever built by this path, so being identical to one of
-   * them proves nothing about it.
-   */
   trustIdenticalTree: boolean;
   brief: (
     plan: Extract<UpdatePlan, { kind: "clean" | "conflict" }>,
     head: string,
     gateOutput?: string,
   ) => AgentBrief;
-  /** The draft the app takes once an agent has finished it. */
   pendingDraft: string;
-  /**
-   * That draft already exists before any agent runs (a stale draft of the
-   * user's is brought up to date on its own branch). Then only a worktree on
-   * it means someone is on it; for a draft the app names, the branch existing
-   * at all means an agent has already made it.
-   */
   pendingDraftExists: boolean;
-  /** Runs with the checkout advanced onto the merge, before the swap. */
   settle?: (to: string) => Promise<void>;
 };
 
@@ -184,28 +103,16 @@ type ForkAccess = {
   expiresAt: number;
 };
 
-/** The fork exists only for a signed-in owner; upstream is always readable. */
 type SourceAccess = { fork: ForkAccess | null; upstream: AppSourceRemote };
 
-/** Rereads local git state (drafts, worktrees); never touches the network. */
 const STATE_POLL_MS = 10_000;
-/** How long "Stella is up to date" stays in the chat after an update lands. */
-/** A merge that never arrives stops being announced after this. */
 const UPDATE_MERGE_WAIT_MS = 60 * 60_000;
-/** The launch sync waits this long, off the startup path. */
 const LAUNCH_SYNC_DELAY_MS = 5_000;
-/** A failed sync is retried after this, doubling up to the cap. */
 const SYNC_RETRY_MS = 30_000;
 const SYNC_RETRY_MAX_MS = 10 * 60_000;
 const RECENT_COUNT = 20;
-/**
- * A history row and what Undo takes out for it: the commits in
- * `base..commit.sha`, which arrived together.
- */
 type RecentRow = { commit: AppSourceCommit; base: string };
-/** Where HEAD moved to a commit from, most recently, and when. */
 type HeadMove = { from: string; at: number };
-/** Under the git common dir: offers the user skipped, by key. */
 const SKIPPED_FILE = "stella-updates-skipped.json";
 const UPSTREAM_MERGE_SUBJECT = "Merge the published Stella update";
 const REMOTE_MERGE_SUBJECT = "Merge the changes from another computer";
@@ -213,18 +120,10 @@ const CATCH_UP_SUBJECT = "Catch up with Stella on your other computers";
 const SKIP_KEY = /^(version|other|draft):[0-9a-f]{40}([0-9a-f]{24})?$/;
 const FORK_REF_PREFIX = "refs/remotes/stella-fork/";
 const UPSTREAM_REF = "refs/remotes/stella-upstream/main";
-/** Under the git common dir: the agent whose draft each applied commit was. */
 const COMMIT_AGENTS_DIR = "stella-commits";
-/**
- * An agent's change applied here is tagged `stella-change/<hex agent id>`,
- * annotated with this computer's name, and pushed to the fork with main, so
- * the owner's other computers can offer it on that agent's completion.
- */
 const CHANGE_TAG = "stella-change/";
 const CHANGE_TAG_PREFIX = `refs/tags/${CHANGE_TAG}`;
-/** Every computer's change tags, as last fetched from the fork. */
 const FORK_CHANGES_PREFIX = "refs/stella/fork-changes/";
-/** Public: anonymous users read upstream with a shared, edge-cached token. */
 const BOOTSTRAP_PATH = "/api/app-source/bootstrap";
 const ACCESS_ATTEMPTS = 5;
 
@@ -245,15 +144,8 @@ const EMPTY_STATE: AppSourceState = {
   busy: false,
 };
 
-/**
- * Another version, judged by the files taking it would change here rather
- * than by its history. `real` is false when it brings nothing this computer
- * lacks; `catchUp` then says the history alone can be joined, silently,
- * because the result is this computer's own tree.
- */
 type Offer = { tip: string; real: boolean; catchUp: boolean };
 
-/** This computer, as the owner's other computers name it. */
 const deviceName = () =>
   hostname()
     .trim()
@@ -298,42 +190,26 @@ export class AppSourceService {
   private refreshing: Promise<void> | null = null;
   private refreshAgain = false;
   private syncing = false;
-  /** A sync was asked for and hasn't run yet (deferred by a draft or an action). */
   private syncWanted = false;
-  /** No sync starts before this: the launch delay, or a failure's backoff. */
   private syncNotBefore = 0;
   private syncFailures = 0;
   private syncTimer: NodeJS.Timeout | null = null;
-  /** The newest version the release channel announced. */
   private published: string | null = null;
-  /** The announced version the last completed sync fetched for. */
   private syncedFor: string | null = null;
   private readonly releases: ReleaseChannel;
   private forkWatch: { baseUrl: string; stop: () => void } | null = null;
-  /** `appSource.fork`'s last `pushedAt`, and the ones this computer made. */
   private forkPushSeen: number | null = null;
   private readonly ownForkPushes = new Set<number>();
-  /**
-   * This computer's reports still in flight: a push announced meanwhile may
-   * be its own (the view can arrive before the call returns), so it waits.
-   */
   private forkReports = 0;
   private forkPushHeld: number | null = null;
-  /** Why the next sync runs, for the log. */
   private syncReason = "launch";
   private timers: NodeJS.Timeout[] = [];
   private backend: { baseUrl: string; client: BackendClient } | null = null;
   private access: SourceAccess | null = null;
-  /** The fork's branch, once fetched and found to share history with HEAD. */
   private forkBranch: string | null = null;
   private forkUnrelated = false;
-  /** Upstream was fetched and shares history with HEAD. */
   private upstreamTracked = false;
   private upstreamUnrelated = false;
-  /**
-   * An official update an agent is merging; "merging" names the draft it is
-   * preparing.
-   */
   private updateState:
     | { state: "merging"; name: string; since: number; from: TakeSource["kind"] }
     | null = null;
@@ -343,7 +219,6 @@ export class AppSourceService {
   private skipped: Set<string> | null = null;
   private offeredKeys: string[] = [];
   private disposed = false;
-  /** The action under way: where its time went, step by step. */
   private timeline: { last: number; startedAt: number; steps: string[] } | null =
     null;
   private readonly onFocus = () => void this.refresh();
@@ -369,15 +244,11 @@ export class AppSourceService {
     app.on("browser-window-focus", this.onFocus);
     const poll = setInterval(() => {
       if (this.options.isAnyWindowVisible()) void this.refresh();
-      // Local checks only: sign-in or backend changes, and a sync a draft
-      // or an action deferred.
       this.followBackend();
       if (this.syncWanted && Date.now() >= this.syncNotBefore) void this.syncFork();
     }, STATE_POLL_MS);
     poll.unref?.();
     this.timers = [poll];
-    // The launch sync: the fork, upstream, and a push of anything this
-    // computer applied while it couldn't reach the fork.
     this.syncNotBefore = Date.now() + LAUNCH_SYNC_DELAY_MS;
     this.wantSync("launch");
     this.followBackend();
@@ -409,19 +280,12 @@ export class AppSourceService {
     return this.state;
   }
 
-  /**
-   * Take a finished draft. One made against an older version used to be
-   * refused here and sent to an agent as a sentence typed into the chat on
-   * the user's behalf; now it merges like anything else, and only a real
-   * conflict in the user's own change reaches an agent.
-   */
   applyDraft(name: string) {
     return this.exclusive(async (cwd) => {
       if (!isDraftName(name)) throw new Error("Unknown draft.");
       const ref = `${DRAFT_REF_PREFIX}${name}`;
       const [worktrees, subject] = await Promise.all([
         listWorktrees(cwd),
-        // Fails for a draft that does not exist.
         git(cwd, ["log", "-1", "--format=%s", `${ref}^{commit}`]),
       ]);
       if (worktrees.some((tree) => tree.branch === ref)) {
@@ -431,8 +295,6 @@ export class AppSourceService {
         kind: "draft",
         ref,
         emptyMessage: "That change is already in this version.",
-        // The change's own subject, so the chat's card and the recent list
-        // still name what it does rather than saying "Merge".
         subject,
         trustIdenticalTree: false,
         brief: (plan, head, gateOutput) =>
@@ -441,22 +303,18 @@ export class AppSourceService {
         pendingDraftExists: true,
         settle: async (to) => {
           await git(cwd, ["branch", "-D", `draft/${name}`]);
-          // A draft Stella dispatched for itself isn't a change the user
-          // asked for: it stays out of the chat and off their other computers.
           if (!isStellaDraft(name)) await this.rememberAgent(cwd, name, to);
         },
       });
     });
   }
 
-  /** Carry a draft's agent over to the commit that applied it. */
   private async rememberAgent(cwd: string, name: string, sha: string) {
     const from = path.join(await this.commonDir(cwd), DRAFT_AGENTS_DIR, name);
     const agentId = await this.agentOf(cwd, DRAFT_AGENTS_DIR, name);
     if (!agentId) return;
     await this.writeChange(cwd, sha, agentId, false);
     await fs.rm(from, { force: true });
-    // Best-effort: without the tag the change only goes unannounced elsewhere.
     const tag = await gitRaw(
       cwd,
       [
@@ -474,14 +332,12 @@ export class AppSourceService {
     }
   }
 
-  /** Note a commit as applying (or undoing) an agent's change. */
   private async writeChange(cwd: string, sha: string, agentId: string, undone: boolean) {
     const dir = path.join(await this.commonDir(cwd), COMMIT_AGENTS_DIR);
     await fs.mkdir(dir, { recursive: true });
     await fs.writeFile(path.join(dir, sha), `${agentId}\n${undone ? "undone\n" : ""}`);
   }
 
-  /** The agent change a commit applied or undid, if it was one. */
   private async changeOf(cwd: string, sha: string) {
     const file = path.join(await this.commonDir(cwd), COMMIT_AGENTS_DIR, sha);
     const [agentId = "", flag = ""] = (await fs.readFile(file, "utf8").catch(() => ""))
@@ -500,14 +356,12 @@ export class AppSourceService {
     return this.commonDirPath;
   }
 
-  /** The agent noted in `dir` under `key`, if any. */
   private async agentOf(cwd: string, dir: string, key: string) {
     const file = path.join(await this.commonDir(cwd), dir, key);
     const agentId = (await fs.readFile(file, "utf8").catch(() => "")).trim();
     return agentId || undefined;
   }
 
-  /** What a draft changes against `head`: file count, and whether it relaunches. */
   private async draftShape(cwd: string, head: string, sha: string) {
     const paths = (await git(cwd, ["diff", "--name-only", `${head}...${sha}`]))
       .split("\n")
@@ -527,18 +381,11 @@ export class AppSourceService {
       if (!(await isAncestor(cwd, sha, head))) {
         throw new Error("That change is not part of the current version.");
       }
-      // The history row is the unit: everything that arrived with `sha`
-      // (a draft's commits fast-forwarded together, a catch-up with the
-      // fork) comes out together, since the earlier commits of one arrival
-      // can need the later ones to build. Anything else is its one commit.
       const row = (await this.readRecent(cwd, await this.recentLog(cwd))).find(
         (entry) => entry.commit.sha === sha,
       );
       const base = row?.base ?? (await git(cwd, ["rev-parse", `${sha}^`]));
       const subject = await git(cwd, ["log", "-1", "--format=%s", sha]);
-      // Three-way merge with the change as base and what it started from as
-      // "theirs": HEAD minus the change, computed without touching the
-      // working tree.
       const merge = await gitRaw(cwd, [
         "merge-tree",
         "--write-tree",
@@ -563,10 +410,6 @@ export class AppSourceService {
         ["commit-tree", tree, "-p", head, "-m", `Revert "${subject}"`],
         { env: await this.identityEnv(cwd) },
       );
-      // No text conflict is not the same as working: later work can still
-      // import what the change added. An undo is checked like a merged
-      // update, so it never lands a Stella that cannot start; one that fails
-      // goes to an agent like a conflict does.
       const gate = await checkMergedUpdate(
         cwd,
         revert,
@@ -585,22 +428,12 @@ export class AppSourceService {
         });
       }
       await this.swapIn(cwd, head, revert, async () => {
-        // Undoing an agent's change (or an undo of it) stays that agent's.
         const change = await this.changeOf(cwd, sha);
         if (change) await this.writeChange(cwd, revert, change.agentId, !change.undone);
       });
     });
   }
 
-  /**
-   * Take the changes the owner made on another of their computers.
-   *
-   * Diverged used to be refused outright here, and the card then typed
-   * "Merge the changes from my other computer." into the chat as though the
-   * user had asked for it. Both sides are the user's own work and a clean
-   * merge of them needs nobody: it applies, with the same check an update
-   * gets.
-   */
   applyRemote() {
     return this.exclusive(async (cwd) => {
       if (!this.forkBranch)
@@ -621,7 +454,6 @@ export class AppSourceService {
     });
   }
 
-  /** Take the published app's update. */
   applyUpstream() {
     return this.exclusive(async (cwd) => {
       if (!this.upstreamTracked) throw new Error("No update is available.");
@@ -630,9 +462,6 @@ export class AppSourceService {
         "--verify",
         `${UPSTREAM_REF}^{commit}`,
       ]);
-      // Another computer may already have merged this update into the
-      // user's changes: take that merge rather than resolving the same
-      // conflict again here, and differently.
       return await this.take(cwd, {
         kind: "upstream",
         ref: (await this.mergedElsewhere(cwd, tip)) ?? UPSTREAM_REF,
@@ -646,24 +475,11 @@ export class AppSourceService {
     });
   }
 
-  /**
-   * Advance the checkout onto another version.
-   *
-   * A fast-forward applies. A diverged side that git merges without a
-   * conflict also applies, by itself: the merge is computed into the object
-   * database, checked on a scratch worktree, and only then fast-forwarded in.
-   * Divergence on its own is not a reason to involve anybody — history whose
-   * shape differs while its tree does not has no merge judgement in it to
-   * make. Only a real textual conflict, or a merge that does not build, goes
-   * to an agent.
-   */
   private async take(
     cwd: string,
     source: TakeSource,
   ): Promise<void | { background: true }> {
     const head = await git(cwd, ["rev-parse", "HEAD"]);
-    // Prepared before it was offered: the plan, the merge and its check are
-    // already done, for exactly this HEAD and this tip.
     const tip = (
       await gitRaw(cwd, ["rev-parse", "--verify", "--quiet", `${source.ref}^{commit}`])
     ).stdout.trim();
@@ -694,8 +510,6 @@ export class AppSourceService {
         );
       }
     } else if (plan.kind === "clean") {
-      // The merge exists as objects only: nothing is checked out and the
-      // checkout's branch has not moved, so giving up here leaves no state.
       to = await git(
         cwd,
         [
@@ -710,8 +524,6 @@ export class AppSourceService {
         ],
         { env: await this.identityEnv(cwd) },
       );
-      // Nothing of this checkout's own survived into the result that the
-      // other side had not already published: there is nothing left to check.
       if (!(source.trustIdenticalTree && plan.identical)) {
         const gate = await checkMergedUpdate(
           cwd,
@@ -729,9 +541,6 @@ export class AppSourceService {
         }
       }
     }
-    // No line in the chat for this: it applied while the user watched the
-    // button, exactly like a fast-forward. The two lines belong to the work
-    // that had to go on in the background.
     await this.swapIn(
       cwd,
       head,
@@ -741,12 +550,6 @@ export class AppSourceService {
     );
   }
 
-  /**
-   * Hand a merge to a background agent and report the action as going on in
-   * the background. No user turn is fabricated for it: the brief carries the
-   * shas, the divergence and the conflicting files the app already knows, so
-   * nothing has to be re-derived from a sentence the user never typed.
-   */
   private async dispatchMerge(
     cwd: string,
     source: TakeSource,
@@ -757,8 +560,6 @@ export class AppSourceService {
       throw new Error("Stella isn't ready to make that change yet.");
     }
     const name = source.pendingDraft;
-    // Already under way (an earlier press, or a relaunch that forgot it):
-    // wait for that one instead of putting a second agent on the same work.
     if (!(await this.draftUnderWay(cwd, name, !source.pendingDraftExists))) {
       await dispatch(brief);
       this.options.log("app-source.brief-dispatched", {
@@ -775,11 +576,6 @@ export class AppSourceService {
     return { background: true };
   }
 
-  /**
-   * Someone is already on this draft. A worktree holding it means an agent is
-   * working now; for a draft the app names itself, the branch merely existing
-   * means an agent already finished one.
-   */
   private async draftUnderWay(
     cwd: string,
     name: string,
@@ -796,19 +592,6 @@ export class AppSourceService {
     );
   }
 
-  /**
-   * An undo that later work conflicts with, or that leaves Stella unable to
-   * build.
-   *
-   * This is the one button whose result the app does not take by itself.
-   * Pressing Undo is consent to remove a change; it is not consent to
-   * whatever an agent decides the work built on top of it should become, and
-   * that is a judgement with no single right answer. So the agent finishes an
-   * ordinary draft, the chat shows it the way it shows any change, and the
-   * user applies it having seen what it came to. There is no background line
-   * either: the agent's own card is the thing to look at, and a line next to
-   * it would be saying the same thing twice.
-   */
   private async dispatchUndo(
     cwd: string,
     args: {
@@ -835,13 +618,6 @@ export class AppSourceService {
   }
 
 
-  /**
-   * The agent's merge is ready: stop saying Stella is updating and leave it in
-   * Updates. Pressing Update started the merge, but taking it means a relaunch
-   * minutes later, and that is the user's call, so it applies only when they
-   * press Add on it. A merge that never arrives is forgotten after a while
-   * rather than leaving the chat saying Stella is updating forever.
-   */
   private settleFinishedMerge(state: Omit<AppSourceState, "busy">) {
     const pending = this.updateState;
     if (pending?.state !== "merging") return;
@@ -886,7 +662,6 @@ export class AppSourceService {
     return result;
   }
 
-  /** Note how long the step that just ended took. */
   private mark(step: string) {
     const timeline = this.timeline;
     if (!timeline) return;
@@ -895,7 +670,6 @@ export class AppSourceService {
     timeline.last = now;
   }
 
-  /** One line per action: every step's milliseconds, and the total. */
   private logTimeline(outcome: string) {
     const timeline = this.timeline;
     if (!timeline || timeline.steps.length === 0) return;
@@ -907,13 +681,6 @@ export class AppSourceService {
     timeline.steps = [];
   }
 
-  /**
-   * Advance the checkout from `from` onto `to` and make the change take
-   * effect. The window is pictured while the checkout moves and the launcher
-   * signs it; `settle` (bookkeeping nothing on screen depends on) runs
-   * alongside the swap and is done before the action ends or Stella
-   * relaunches.
-   */
   private async swapIn(
     cwd: string,
     from: string,
@@ -927,8 +694,6 @@ export class AppSourceService {
     this.mark("diff");
     const install = installs(paths);
     const restart = relaunches(paths);
-    // Only changes the renderer can show get the transition: the runtime and
-    // the desktop shell aren't in the window.
     const visible =
       !restart &&
       paths.some(
@@ -936,8 +701,6 @@ export class AppSourceService {
           !file.startsWith("packages/runtime/") &&
           !file.startsWith("packages/desktop/"),
       );
-    // Picture the window while the launcher signs the change (nothing on
-    // screen moves meanwhile).
     const covering = visible ? this.options.coverRenderer?.() ?? null : null;
     try {
       await git(cwd, ["merge", "--ff-only", to]);
@@ -954,9 +717,6 @@ export class AppSourceService {
     settling.catch(() => undefined);
     this.options.log("app-source.applied", { files: paths.length });
     if (restart) {
-      // The window is frosted while the next process is made ready, not
-      // after: its dependencies installed and main and preload built here, so
-      // the relaunch only has to start. The runtime restarts with the app.
       const holding = this.options.beforeRelaunch?.() ?? Promise.resolve(null);
       try {
         if (install) {
@@ -997,9 +757,6 @@ export class AppSourceService {
       await (await holding)?.commit();
       this.mark("hold");
       this.logTimeline("relaunch");
-      // The runtime outlives the relaunch when the update leaves it and its
-      // packages as they are: turns keep running and the next window finds
-      // it ready. Not across an install, which changes what it loads.
       this.options.relaunch({ keepRuntime: !install && !restartsRuntime(paths) });
       return;
     }
@@ -1020,9 +777,6 @@ export class AppSourceService {
     const bun = process.env.STELLA_BUN_PATH?.trim() || "bun";
     const result = await run(bun, ["install"], {
       cwd,
-      // The browser and office downloads are prepare-install.mjs's job when
-      // the launcher prepares the relaunch (run ahead of it here); the
-      // postinstall would only check them a second time.
       env: this.options.launcherPreparesOnRelaunch
         ? { STELLA_SKIP_BROWSER_HYDRATE: "1", STELLA_SKIP_OFFICE_HYDRATE: "1" }
         : undefined,
@@ -1063,9 +817,6 @@ export class AppSourceService {
   }
 
   refresh(): Promise<void> {
-    // Mid-action the checkout is in flux (a draft's branch is already gone
-    // while its change is still swapping in); the action refreshes when it
-    // ends, so the chat never sees a half-applied state.
     if (this.disposed || this.busy) return Promise.resolve();
     if (this.refreshing) {
       this.refreshAgain = true;
@@ -1131,9 +882,6 @@ export class AppSourceService {
     const upstreamOffer = this.upstreamTracked
       ? await this.offerFrom(cwd, head, UPSTREAM_REF, null)
       : null;
-    // What the other computer would bring beyond the published version: a
-    // fork that only took the official update is that update, not a change
-    // of the user's.
     const forkOffer = forkRef
       ? await this.offerFrom(
           cwd,
@@ -1152,9 +900,6 @@ export class AppSourceService {
     } else if (upstreamOffer?.catchUp) {
       this.catchUpLater(UPSTREAM_REF, upstreamOffer.tip, head);
     }
-    // A version is offered once it is prepared, so pressing Update only has
-    // to swap it in. One the user skipped is not prepared; it can still be
-    // added, the slower way.
     const skippedNow = await this.skippedKeys(cwd);
     const jobs: PrepareJob[] = [];
     const identityEnv = () => this.identityEnv(cwd);
@@ -1255,8 +1000,6 @@ export class AppSourceService {
         summary: draft.subject || draft.name,
       });
     }
-    // A change of the user's that an agent is bringing up to date is off
-    // the ready list while it works; it stays in the list as being added.
     const pending = this.updateState?.state === "merging" ? this.updateState : null;
     if (
       pending?.from === "draft" &&
@@ -1291,7 +1034,6 @@ export class AppSourceService {
     };
   }
 
-  /** First-parent history for `readRecent`, newest first. */
   private recentLog(cwd: string) {
     return git(cwd, [
       "log",
@@ -1329,17 +1071,7 @@ export class AppSourceService {
     return moves;
   }
 
-  /**
-   * First-parent history in the user's terms, one row per thing that
-   * arrived. The commits one move of HEAD brought (a draft's commits
-   * fast-forwarded together, a catch-up with the owner's fork) are one row,
-   * and Undo takes out the whole row. Commits that changed no files are
-   * left out: catching up with another computer's history, or a merge of a
-   * version this computer already had, is nothing to them.
-   */
   private async readRecent(cwd: string, log: string): Promise<RecentRow[]> {
-    // The ref as last fetched, even before this launch has synced: until
-    // then a published version must not read as a change that can be undone.
     const published = new Set(
       (await gitRaw(cwd, ["rev-list", "-n", "5000", UPSTREAM_REF])).stdout.split("\n"),
     );
@@ -1347,11 +1079,7 @@ export class AppSourceService {
     const lines = log.split("\n").filter(Boolean).map((line) => line.split("\0"));
     const position = new Map(lines.map(([sha = ""], index) => [sha, index]));
     const rows: RecentRow[] = [];
-    // When the checkout arrived at each commit: a version published days
-    // ago but taken just now was applied just now. Commits between two
-    // places HEAD stopped at arrived together, when the newer one did.
     let arrival: number | undefined;
-    /** The move under way: the last line it brought, and its newest row. */
     let move: { last: number; row: RecentRow | null } | null = null;
     for (const [index, line] of lines.entries()) {
       const [sha = "", subject = "", seconds = "0", tree = "", parents = ""] = line;
@@ -1359,7 +1087,6 @@ export class AppSourceService {
       const moved = moves.get(sha);
       if (moved) {
         arrival = moved.at;
-        // Only a move from an older first-parent commit brought a range.
         const from = position.get(moved.from);
         move = { last: from !== undefined && from > index ? from - 1 : index, row: null };
       } else if (move && index > move.last) {
@@ -1375,8 +1102,6 @@ export class AppSourceService {
               others.some((parent) => published.has(parent))
             ? "version"
             : "change";
-      // Arrived with the row above, and the same kind of thing: one row.
-      // Published versions taken one after another are one new version.
       const joins =
         move?.row && move.row.commit.kind === kind
           ? move.row
@@ -1407,7 +1132,6 @@ export class AppSourceService {
     return rows;
   }
 
-  /** The tree taking `tip` onto `onto` makes, or null when it conflicts. */
   private async mergedTree(cwd: string, onto: string, tip: string) {
     if (await isAncestor(cwd, tip, onto)) {
       return await git(cwd, ["rev-parse", `${onto}^{tree}`]);
@@ -1415,8 +1139,6 @@ export class AppSourceService {
     if (await isAncestor(cwd, onto, tip)) {
       return await git(cwd, ["rev-parse", `${tip}^{tree}`]);
     }
-    // The same merge `classifyUpdate` makes when it is taken, so what is
-    // offered is exactly what Add applies.
     const base = await git(cwd, ["merge-base", onto, tip]);
     const merge = await gitRaw(cwd, [
       "merge-tree",
@@ -1433,13 +1155,6 @@ export class AppSourceService {
     return merge.stdout.split("\n")[0]!.trim();
   }
 
-  /**
-   * What taking `ref` would really change here. Commits HEAD lacks are not
-   * enough: two computers that each merged the same official update hold
-   * different commits with the same files. Only a different resulting tree
-   * is something to offer. With `published`, a ref whose every change is
-   * already in the published version offers nothing of its own either.
-   */
   private async offerFrom(
     cwd: string,
     head: string,
@@ -1465,10 +1180,6 @@ export class AppSourceService {
     if (merged === headTree) {
       offer = { tip, real: false, catchUp: true };
     } else if (fork && !(await this.bringsChange(cwd, head, tip, upstreamTip || null))) {
-      // Nothing beyond the published app but merges: the other computer's
-      // own way of taking an update this one takes too. Taking the update
-      // here covers it, so it is never offered. Once it holds no version
-      // this computer lacks, its history is joined, keeping these files.
       offer = {
         tip,
         real: false,
@@ -1490,13 +1201,6 @@ export class AppSourceService {
     return offer;
   }
 
-  /**
-   * Whether `tip` holds a commit HEAD lacks that is not a merge (nor in
-   * `published`, when given): a change somebody made. A merge only settles
-   * what its sides already held, so two computers that each merged the same
-   * update into the same changes differ by nothing but how each resolved
-   * it, and that resolution is each computer's own.
-   */
   private async bringsChange(
     cwd: string,
     head: string,
@@ -1514,11 +1218,6 @@ export class AppSourceService {
     return found !== "";
   }
 
-  /**
-   * The fork, when another computer has already merged the published `tip`
-   * into exactly what this computer has: a fast-forward from HEAD that holds
-   * `tip` and no change beyond it.
-   */
   private async mergedElsewhere(cwd: string, tip: string) {
     if (!this.forkBranch) return null;
     const ref = `${FORK_REF_PREFIX}${this.forkBranch}`;
@@ -1537,12 +1236,9 @@ export class AppSourceService {
     return ref;
   }
 
-  /** Everything `tip` would bring here is in the published version. */
   private async coveredBy(cwd: string, head: string, published: string, tip: string) {
     const withPublished = await this.mergedTree(cwd, head, published);
     if (withPublished === null) return false;
-    // The published version taken here, as objects only, so the other side
-    // can be merged onto it.
     const onto = (await isAncestor(cwd, published, head))
       ? head
       : (await isAncestor(cwd, head, published))
@@ -1564,7 +1260,6 @@ export class AppSourceService {
     return (await this.mergedTree(cwd, onto, tip)) === withPublished;
   }
 
-  /** The newest change the other computer has that is not the published app. */
   private async forkSummary(cwd: string, head: string, tip: string) {
     const out = await git(cwd, [
       "log",
@@ -1578,10 +1273,6 @@ export class AppSourceService {
     return out.trim();
   }
 
-  /**
-   * The computer the newest change came from, as its change tag names it.
-   * Empty when the other computer's changes weren't made by an agent there.
-   */
   private async forkDevice(cwd: string) {
     const [all, merged, own] = await Promise.all([
       git(cwd, [
@@ -1606,13 +1297,6 @@ export class AppSourceService {
     return "";
   }
 
-  /**
-   * Join another side's history when it brings no files this computer lacks,
-   * or only its own merges of what this computer already has, so it never
-   * shows as something to add. The checkout ends on its own tree: nothing on
-   * screen changes and nothing restarts. Once per head and tip, so a refused
-   * attempt is not retried on every poll.
-   */
   private catchUpLater(ref: string, tip: string, head: string) {
     if (this.catchingUp || this.busy || this.disposed) return;
     if (this.updateState?.state === "merging") return;
@@ -1622,16 +1306,13 @@ export class AppSourceService {
     this.caughtUp.add(attempt);
     this.catchingUp = true;
     void this.exclusive(async (cwd) => {
-      // Deferred, not refused: the next poll tries again.
       if (!(await this.catchUp(cwd, ref, tip))) this.caughtUp.delete(attempt);
     }).finally(() => {
       this.catchingUp = false;
     });
   }
 
-  /** False when it has to wait: a draft is in progress. */
   private async catchUp(cwd: string, ref: string, tip: string) {
-    // A draft in progress: its base must not move under the agent.
     const worktrees = await listWorktrees(cwd);
     if (worktrees.some((tree) => tree.branch?.startsWith(DRAFT_REF_PREFIX))) {
       return false;
@@ -1642,8 +1323,6 @@ export class AppSourceService {
     const ahead = await isAncestor(cwd, head, tip);
     if (
       (await this.mergedTree(cwd, head, tip)) !== tree &&
-      // Another computer's merge of what this one has keeps these files;
-      // anything else that would change them is the user's to add.
       (ref === UPSTREAM_REF || ahead || (await this.bringsChange(cwd, head, tip, null)))
     ) {
       return true;
@@ -1685,10 +1364,6 @@ export class AppSourceService {
     return this.skipped;
   }
 
-  /**
-   * Set one offer aside until something newer arrives; it can still be added. Only what is offered now is
-   * kept, so the list never outgrows the offers themselves.
-   */
   async skip(key: string): Promise<AppSourceActionResult> {
     if (!SKIP_KEY.test(key)) return { ok: false, error: "Unknown update." };
     const cwd = this.options.stellaAppDir;
@@ -1707,7 +1382,6 @@ export class AppSourceService {
     return { ok: true };
   }
 
-  /** A remote-tracking ref that has commits HEAD lacks, or null. */
   private async compareRef(cwd: string, head: string, ref: string) {
     const tip = (
       await gitRaw(cwd, ["rev-parse", "--verify", "--quiet", `${ref}^{commit}`])
@@ -1725,11 +1399,6 @@ export class AppSourceService {
     };
   }
 
-  /**
-   * Follow the backend's release channel, and the owner's fork view while
-   * signed in. Cheap and idempotent: the poll calls it to notice sign-in and
-   * backend changes.
-   */
   private followBackend() {
     if (this.disposed) return;
     const baseUrl = this.options.getBackendUrl();
@@ -1753,11 +1422,9 @@ export class AppSourceService {
     this.forkWatch = { baseUrl: watchFork, stop };
   }
 
-  /** The release channel's version: on connect, and on every publish. */
   private onPublished(version: string | null) {
     this.published = version;
     if (!version || version === this.syncedFor) return;
-    // A dev checkout doesn't follow upstream.
     if (this.forkUnrelated || this.upstreamUnrelated) return;
     void gitRaw(this.options.stellaAppDir, ["rev-parse", "--verify", "--quiet", UPSTREAM_REF])
       .then((result) => {
@@ -1771,14 +1438,11 @@ export class AppSourceService {
       .catch(() => this.wantSync("published"));
   }
 
-  /** Another computer pushed to the fork (its main or change tags). */
   private onForkPush(pushedAt: number | null) {
     if (pushedAt === null || pushedAt === this.forkPushSeen) return;
     const first = this.forkPushSeen === null;
     this.forkPushSeen = pushedAt;
     if (first) {
-      // The first value since launch or sign-in: whatever it says, fetch
-      // the fork once (folded into the launch sync when there is one).
       if (!this.forkUnrelated) this.wantSync("fork");
       return;
     }
@@ -1795,7 +1459,6 @@ export class AppSourceService {
     this.wantSync("fork");
   }
 
-  /** Ask for a sync: now, or when the launch delay or a backoff ends. */
   private wantSync(reason: string) {
     if (!this.syncWanted) this.syncReason = reason;
     this.syncWanted = true;
@@ -1812,10 +1475,6 @@ export class AppSourceService {
     this.syncTimer.unref?.();
   }
 
-  /**
-   * Fetch the fork and upstream; push to the fork when this computer is
-   * ahead. Runs when asked (`wantSync`), never on a timer of its own.
-   */
   async syncFork() {
     if (this.disposed || this.busy || this.syncing) return;
     this.syncing = true;
@@ -1823,8 +1482,6 @@ export class AppSourceService {
     const target = this.published;
     let outcome: "done" | "deferred" | "failed" = "failed";
     try {
-      // A draft in progress: its base must not move under the agent. The
-      // poll tries again once it is gone.
       const worktrees = await listWorktrees(cwd);
       if (worktrees.some((tree) => tree.branch?.startsWith(DRAFT_REF_PREFIX))) {
         outcome = "deferred";
@@ -1844,7 +1501,6 @@ export class AppSourceService {
           });
         });
       }
-      // A checkout unrelated to the fork is unrelated to upstream too.
       if (!this.forkUnrelated && !this.upstreamUnrelated) {
         await this.fetchUpstream(cwd, access.upstream);
       }
@@ -1859,8 +1515,6 @@ export class AppSourceService {
         this.syncFailures = 0;
         this.syncedFor = target;
       } else if (outcome === "failed") {
-        // Retried with backoff until it works; the channel's next connect
-        // or announcement asks again anyway.
         this.syncWanted = true;
         this.syncReason = "retry";
         this.syncNotBefore =
@@ -1868,7 +1522,6 @@ export class AppSourceService {
         this.syncFailures += 1;
       }
       void this.refresh();
-      // Asked again while this one ran: a newer version, or another push.
       if (outcome !== "deferred" && this.syncWanted) this.wantSync(this.syncReason);
     }
   }
@@ -1888,8 +1541,6 @@ export class AppSourceService {
       ],
       { env: fetchEnv(fork.token), timeoutMs: 5 * 60_000 },
     );
-    // The dev repo's history is unrelated to the published fork; only
-    // checkouts cloned from the fork sync with it.
     if ((await gitRaw(cwd, ["merge-base", "HEAD", ref])).code !== 0) {
       this.forkUnrelated = true;
       this.options.log("app-source.fork-unrelated", {});
@@ -1921,7 +1572,6 @@ export class AppSourceService {
     this.upstreamTracked = true;
   }
 
-  /** Best-effort, never awaited by an action. */
   private pushToFork() {
     if (!this.forkBranch) return;
     void (async () => {
@@ -1941,7 +1591,6 @@ export class AppSourceService {
     const head = await git(cwd, ["rev-parse", "HEAD"]);
     const forkTip = await git(cwd, ["rev-parse", "--verify", ref]);
     let pushed = false;
-    // Only fast-forwards: a diverged fork is merged by an agent, never forced.
     if (forkTip !== head && (await isAncestor(cwd, forkTip, head))) {
       await git(
         cwd,
@@ -1966,7 +1615,6 @@ export class AppSourceService {
     }
   }
 
-  /** Tell the owner's other computers to fetch. Best-effort. */
   private reportForkPush(tip: string) {
     const baseUrl = this.options.getBackendUrl();
     if (!baseUrl || !this.options.hasConnectedAccount()) return;
@@ -1993,10 +1641,6 @@ export class AppSourceService {
       });
   }
 
-  /**
-   * Push this computer's change tags whose change the fork's main now has;
-   * true when it pushed any.
-   */
   private async pushChangeTags(
     cwd: string,
     fork: ForkAccess,
@@ -2010,7 +1654,6 @@ export class AppSourceService {
     const onFork = new Set(
       pushed.split("\n").map((line) => line.slice(FORK_CHANGES_PREFIX.length)),
     );
-    // A tag moves when the same agent's next change is applied.
     const tags = own
       .split("\n")
       .filter((line) => line && !onFork.has(line.slice(CHANGE_TAG_PREFIX.length)))
@@ -2028,11 +1671,6 @@ export class AppSourceService {
     return true;
   }
 
-  /**
-   * A signed-in owner gets their fork (write) and upstream (read) from
-   * `appSource.access`; anyone else reads upstream through the public
-   * bootstrap endpoint.
-   */
   private async sourceAccess(): Promise<SourceAccess | null> {
     const baseUrl = this.options.getBackendUrl();
     if (!baseUrl) return null;
@@ -2076,7 +1714,6 @@ export class AppSourceService {
   private backendClient(baseUrl: string): BackendClient {
     if (this.backend?.baseUrl !== baseUrl) {
       this.backend?.client.dispose();
-      // Its socket carried the old backend's fork view.
       this.forkWatch = null;
       this.backend = {
         baseUrl,
@@ -2107,7 +1744,6 @@ export class AppSourceService {
           upstream,
         };
       } catch (error) {
-        // The fork is created on first use; the backend asks to retry.
         if (
           attempt < ACCESS_ATTEMPTS &&
           error instanceof BackendRequestError &&

@@ -13,24 +13,11 @@ import {
 import { useAuthSessionState } from "./use-auth-session-state";
 import { reportCloudReadiness } from "@/features/cloud/cloud-readiness-timing";
 
-/**
- * The one authority predicate for conversation storage and routing.
- *
- * A signed-in Better Auth session owns cloud conversations. There is
- * deliberately no signed-out/local fallback: until the user signs in and the
- * token exchange completes, conversation selection stays in a loading state.
- *
- * The identity proof is the backend's own answer: `conversations.bootstrap`
- * returns the owner it verified from the current token, and selection waits
- * until that is the account the renderer expects. The same answer names the
- * account's main conversation, the chat every client opens.
- */
 export function useCloudConversationSession() {
   const auth = useAuthState();
   const session = useAuthSessionState();
   const authBootstrap = useAuthBootstrapState();
   const expectedSubject = session.user?.id?.trim() || null;
-  // The backend's owner id is the Better Auth user id (the JWT's `sub`).
   const ownerSubject = expectedSubject;
   const shouldConfirmIdentity = Boolean(
     authBootstrap.status === "ready" &&
@@ -103,11 +90,8 @@ export function useCloudConversationSession() {
     accountScope: session.cacheScope,
     expectedSubject,
     ownerSubject,
-    /** The verified owner's generation, once the identity is confirmed. */
     ownerGeneration: identityConfirmed ? (identity?.ownerGeneration ?? null) : null,
-    /** The account's main conversation, once the identity is confirmed. */
     mainConversationId: identityConfirmed ? (identity?.conversationId ?? null) : null,
-    /** Re-resolve the main conversation, e.g. after it was deleted. */
     refreshMainConversation,
     identityRevision: session.identityRevision,
     error: authBootstrap.error,

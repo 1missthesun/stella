@@ -1,8 +1,3 @@
-/**
- * Tiny singleton store for pinning the model picker into the composer. The
- * Work footer's "Show in composer" toggle flips this on so the composer keeps
- * its expanded toolbar and renders the mini model picker beside the mic.
- */
 import { useSyncExternalStore } from "react";
 import { uiState } from "@/platform/ui-state";
 

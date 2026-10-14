@@ -1,8 +1,3 @@
-/**
- * Shell shims: the `node`, `git`, Python/pip and Stella CLI wrappers written
- * into the state directory and put first on every shell's PATH.
- */
-
 import path from "path";
 import { chmodSync, closeSync, existsSync, mkdirSync, openSync, readSync, writeFileSync } from "fs";
 
@@ -41,8 +36,6 @@ const WINDOWS_CLI_SHIMS = [
   },
 ] as const;
 
-// A CLI resolved to its TypeScript source (a source tree) runs under Bun, the
-// runtime's own executable; a bundled one runs under the host's Node.
 const buildWindowsCliShimScript = (envVar: string): string =>
   [
     "@echo off",
@@ -92,10 +85,8 @@ const buildUnixCliShimScript = (envVar: string): string =>
     "",
   ].join("\n");
 
-/** What every shim script names, and no real executable does: how a shim, this Stella's or another's, is known. */
 const SHIM_SIGNATURES = ["STELLA_REAL_GIT_BIN", "STELLA_NODE_BIN", "STELLA_PYTHON_BIN", "STELLA_REAL_BUN_BIN"];
 
-/** Whether `file` is one of Stella's shell shims (from any Stella install), not the program it stands for. */
 export const isStellaShellShim = (file: string): boolean => {
   let fd: number | undefined;
   try {
@@ -111,11 +102,6 @@ export const isStellaShellShim = (file: string): boolean => {
   }
 };
 
-/**
- * Whether `directory` holds Stella's shell shims, such as another Stella's
- * whose shell started this one: its shims read that Stella's variables, so
- * they never belong on this one's PATH.
- */
 export const isStellaShellShimDir = (directory: string): boolean =>
   existsSync(path.join(directory, ELECTRON_NODE_ARGV_FIX)) ||
   ["git", "node", "node.cmd"].some((name) => isStellaShellShim(path.join(directory, name)));

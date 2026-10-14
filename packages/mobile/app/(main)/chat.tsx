@@ -78,10 +78,7 @@ import { CloudBoundary } from "../../src/components/CloudBoundary";
 import type { ChatArtifact } from "../../src/types";
 import { useT } from "../../src/i18n";
 
-/** How often the paired computer's presence is re-read while chat is open. */
 const STATUS_POLL_MS = 20_000;
-/** How often a parked onboarding message retries its send, and for how long. */
-/** Coarse enough to be free, fine enough that a settled task clears promptly. */
 const HUB_STALE_RECHECK_MS = 30_000;
 const HANDOFF_SEND_RETRY_MS = 400;
 const HANDOFF_SEND_MAX_ATTEMPTS = 150;
@@ -92,13 +89,6 @@ type DeviceStatus = {
   platform: string | null;
 };
 
-/**
- * The one chat. Its transcript belongs to the signed-in account, and each turn's execution placement is decided server-side: the
- * paired computer is offered first and cloud takes the turn when no computer
- * is reachable. Pairing
- * therefore only changes what Stella can reach, never where the conversation
- * lives, so the surface is the same with or without a computer.
- */
 export default function ChatScreen() {
   return <SignedInChatScreen />;
 }
@@ -118,7 +108,6 @@ function SignedInChatScreen() {
           }
         />
       ) : (
-        // One conversation per account: there is no switching or new chat.
         <SignedInCanonicalChat
           key={`${authority.authority.accountScope}:${authority.authority.ownerGeneration}:${authority.authority.conversationId}`}
           authority={authority.authority}
@@ -135,8 +124,6 @@ function SignedInCanonicalChat(props: {
   >;
   reloadAuthority: () => void;
 }) {
-  // Pairing is resolved alongside the conversation rather than gating it: the
-  // chat is usable before (and without) a paired computer.
   const [access, setAccess] = useState<StoredPhoneAccess | null>(null);
   const [pairedDesktops, setPairedDesktops] = useState<StoredPhoneAccess[]>([]);
   const [executionTarget, setExecutionTarget] =
@@ -166,7 +153,6 @@ function SignedInCanonicalChat(props: {
     executionTarget,
     Boolean(access),
   );
-  // One account-wide selection for cloud and computer turns alike.
   const cloudModelSettings = useCloudModelSettings(true);
   const thread = useCloudCanonicalChatThread(props.authority, {
     reloadAuthority: props.reloadAuthority,
@@ -340,8 +326,6 @@ function ChatSurface(props: {
     return () => sub.remove();
   }, []);
 
-  // Content shared in from another app prefills the composer (it never
-  // auto-sends — the user confirms with the send button).
   useEffect(() => {
     const applyShare = () => {
       const share = consumePendingShare();
@@ -359,11 +343,6 @@ function ChatSurface(props: {
     return subscribePendingShare(applyShare);
   }, [addAttachments, setDraft]);
 
-  // The first message from onboarding (a starter, or what the user typed
-  // there): prefill it at once, then send it as soon as the conversation can
-  // take a turn. Until the AI-data consent is granted the send would only
-  // re-raise the consent sheet, so it waits for that too; if it never
-  // becomes sendable the text simply stays in the composer.
   const [handoffDraft] = useState(peekPendingComposerDraft);
   const sendRef = useRef(thread.send);
   sendRef.current = thread.send;
@@ -374,8 +353,6 @@ function ChatSurface(props: {
     setDraft(handoffDraft.text);
   }, [handoffDraft, setDraft]);
 
-  // The computer is reachable exactly when its presence connection to the
-  // cloud is live, so the owner's device list is the status source.
   const checkStatus = useCallback(
     async (desktopDeviceId: string) => {
       try {
@@ -431,7 +408,6 @@ function ChatSurface(props: {
     };
   }, [access, appActive, checkStatus, isFocused]);
 
-  // Celebrate the computer coming back while the user is looking.
   const previousAvailableRef = useRef<boolean | null>(null);
   useEffect(() => {
     if (previousAvailableRef.current === false && status.available === true) {
@@ -440,8 +416,6 @@ function ChatSurface(props: {
     previousAvailableRef.current = status.available;
   }, [status.available]);
 
-  // The top bar's activity indicator and the Files tab both read this
-  // conversation's background work, published as it changes.
   const { conversationTasks, conversationArtifacts } = thread;
   // Stale `running` rows are settled on the way in (see `settleStaleHubTasks`),
   // so the chrome never reports work the fold only *believes* is still going.
@@ -478,7 +452,6 @@ function ChatSurface(props: {
     hubRevision,
     hasRunningConversationTask,
   ]);
-  // Leaving the chat (sign-out, authority swap) clears what the chrome shows.
   useEffect(
     () => () => {
       publishActivityHub(null);
@@ -495,11 +468,6 @@ function ChatSurface(props: {
       ? t("mobile.computer.statusConnected")
       : t("mobile.computer.statusAsleep");
 
-  // The Settings tab shows the paired computer and where turns run, but that
-  // state lives here, so it travels through the shell store. The chat stays
-  // mounted under every tab, so what Settings shows stays live. Built from
-  // the fields Settings reads (not the whole model-settings object, which is
-  // new every render) so streaming doesn't re-render Settings per token.
   const connecting = status.checking;
   const computerModel = useMemo(
     () => ({ label: cloudModelSettings.label, settings: cloudModelSettings }),
@@ -536,11 +504,7 @@ function ChatSurface(props: {
     composerModelPinned,
   ]);
 
-  // Content (typed text, an attachment or a quote) is checked by the pane, so
-  // this screen never reads the draft and a keystroke never re-renders it.
   const sendReady =
-    // A turn is only sendable once every attachment has a drive path. Until
-    // then the chip is still uploading or has failed, and sending would drop it.
     attachmentsSettled(thread.attachments) &&
     !offline &&
     thread.storageLoaded &&
@@ -552,7 +516,6 @@ function ChatSurface(props: {
     let timer: ReturnType<typeof setInterval> | null = null;
     const attempt = () => {
       attempts += 1;
-      // The user took over the composer (edited or cleared it): leave it.
       const settled =
         draftStore.get().trim() !== handoffDraft.text ||
         attempts > HANDOFF_SEND_MAX_ATTEMPTS ||
@@ -573,8 +536,6 @@ function ChatSurface(props: {
     async (request: string) => sendRealtimePrompt?.(request) ?? null,
     [sendRealtimePrompt],
   );
-  // Voice follows the execution selection: Cloud stays on the phone even with
-  // paired computers, and a chosen computer runs voice tools on that computer.
   const realtimeVoiceRoute = useMemo(
     () =>
       resolveRealtimeVoiceRoute({
@@ -587,8 +548,6 @@ function ChatSurface(props: {
 
   const composerModelPicker = useMemo(
     () => ({
-      // One pin for both cloud and computer chats: off by default, and only
-      // the user's own "Show in composer" toggle turns it on.
       pinned: composerModelPinned,
       label: cloudModelSettings.label,
       loading: cloudModelSettings.loading && !cloudModelSettings.execution,
@@ -610,8 +569,6 @@ function ChatSurface(props: {
     }),
     [cloudModelSettings, composerModelPinned, t],
   );
-  // Same identity while the problem is the same, so the memoized composer
-  // below re-renders only when it changes.
   const issue = thread.authorityIssue ?? null;
   const chatIssue = useMemo(
     () =>
@@ -620,7 +577,6 @@ function ChatSurface(props: {
         : null,
     [issue?.message, issue?.retryable, issue?.retry],
   );
-  // Handed to the pane's memoized composer, so it keeps one identity per chat.
   const composerIntervention = useMemo(
     () => (
       <>
@@ -708,7 +664,6 @@ function ChatSurface(props: {
   );
 }
 
-/** The transcript runs edge to edge under the floating top bar. */
 const chatContentStyle = { paddingTop: 0 } as const;
 
 const makeStyles = (colors: {

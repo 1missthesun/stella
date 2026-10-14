@@ -1,15 +1,3 @@
-/**
- * Whether Stella shows its voice/call controls at all.
- *
- * Voice is off until the user turns it on in Settings › Audio. The stored
- * value is `realtimeVoice.enabled` in `~/.stella/preferences.json`, so it
- * travels with the rest of the voice preferences. Dictation is a separate
- * feature and is never gated by this flag.
- *
- * Reads are served from a module-level cache so render paths (the composer,
- * the companion panel) stay synchronous; the cache is refreshed whenever
- * anything announces `stella:local-model-preferences-changed`.
- */
 import { useEffect, useState } from "react";
 import {
   isRealtimeVoiceEnabled,
@@ -60,11 +48,9 @@ if (typeof window !== "undefined" && platformCapabilities.realtimeVoice) {
   });
 }
 
-/** Last known value. False until the first read resolves. */
 export const realtimeVoiceVisible = (): boolean =>
   platformCapabilities.realtimeVoice && cachedEnabled;
 
-/** Persist the toggle and tell every surface that reads it. */
 export const setRealtimeVoiceVisible = async (
   enabled: boolean,
 ): Promise<void> => {
@@ -80,7 +66,6 @@ export const setRealtimeVoiceVisible = async (
   window.dispatchEvent(new CustomEvent(PREFERENCES_CHANGED_EVENT));
 };
 
-/** Subscribe a React tree to the toggle. */
 export const useRealtimeVoiceVisible = (): boolean => {
   const [enabled, setEnabled] = useState(() => realtimeVoiceVisible());
 

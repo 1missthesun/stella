@@ -46,10 +46,6 @@ export function OnboardingCard({
   );
 }
 
-/**
- * What a card collapses to once its step is answered: one quiet row that
- * still says what was chosen, so scrolling back reads like a transcript.
- */
 export function SettledCard({
   icon,
   leading,
@@ -58,7 +54,6 @@ export function SettledCard({
   tone = "neutral",
 }: {
   icon?: IconName;
-  /** Custom leading visual in place of the icon (a theme swatch, say). */
   leading?: ReactNode;
   title: string;
   description?: string;

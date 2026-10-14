@@ -34,7 +34,6 @@ export const ContinueWithChatGptButton = forwardRef<
   HTMLButtonElement,
   ButtonHTMLAttributes<HTMLButtonElement> & {
     loading?: boolean;
-    /** Defaults to "Continue with ChatGPT". */
     label?: string;
   }
 >(function ContinueWithChatGptButton({ disabled, loading, label, ...props }, ref) {
@@ -55,7 +54,6 @@ export const ContinueWithChatGptButton = forwardRef<
 
 export const openChatGptUsage = () => openExternalUrl(CHATGPT_SIWC.manageUsageUrl);
 
-/** "Manage usage": review usage and Stella's limits in ChatGPT Settings. */
 export function ManageChatGptUsageLink({ label = "Manage usage" }: { label?: string }) {
   return (
     <button
@@ -93,7 +91,6 @@ export const announceChatGptPlanUse = (): void => {
   });
 };
 
-/** "Using ChatGPT plan · Manage usage", shown where ChatGPT is in use. */
 export function ChatGptPlanInUse({
   label = "Using ChatGPT plan",
   manageLabel,

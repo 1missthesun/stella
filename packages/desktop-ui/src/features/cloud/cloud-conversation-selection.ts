@@ -1,14 +1,3 @@
-/**
- * Which cloud conversation the shell shows. The account's main conversation
- * comes from the backend (`conversations.bootstrap`), so every client opens
- * the same chat; a routed conversation the owner has stays open.
- *
- * Conversations created by this renderer may be routed to before the live
- * `conversations.recent` view has delivered its next value. Keep that
- * short handoff explicit so route validation cannot mistake a just-created
- * conversation for a stale or foreign id and immediately navigate away.
- */
-
 import type { CloudConversation } from "./cloud-api";
 
 const PENDING_CREATE_TTL_MS = 30_000;
@@ -21,11 +10,6 @@ const pendingCreatedConversations = new Map<
   PendingCreatedConversation
 >();
 
-/**
- * The backend returns the immutable owner id (the Better Auth user id, the
- * JWT's `sub`) with every conversation summary. Compare it to the session's
- * owner subject. `accountScope` is a local cache namespace, not an owner id.
- */
 export const cloudConversationBelongsToOwnerSubject = (
   conversation: Pick<CloudConversation, "ownerId">,
   ownerSubject: string | null,
@@ -89,10 +73,6 @@ export const isOwnedCloudConversation = (
         isPendingCloudConversation(conversationId, accountScope)),
   );
 
-/**
- * Route selection is deterministic and never follows list reordering: the
- * routed conversation while the owner has it, else the main conversation.
- */
 export const resolveCloudConversationRoute = (args: {
   conversations: readonly CloudConversation[];
   routeConversationId: string | null;
@@ -115,11 +95,6 @@ export const resolveCloudConversationRoute = (args: {
   return null;
 };
 
-/**
- * The URL owns selection while the chat route is visible. Elsewhere the main
- * conversation keeps the persistent workspace Chat panel attached without
- * manufacturing a chat-route redirect.
- */
 export const resolveCloudConversationForShell = (args: {
   isOnChatRoute: boolean;
   conversations: readonly CloudConversation[];

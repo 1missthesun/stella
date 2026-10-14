@@ -39,12 +39,6 @@ const BLOCKED_HOSTNAMES = new Set([
   "host.docker.internal",
 ]);
 
-/**
- * Canonical form for hostname classification: lowercased, brackets removed,
- * and — the part that matters — a single trailing dot stripped. `localhost.`
- * is the same host as `localhost` to DNS but a different string to a `Set`,
- * so without this the name blocklist is bypassed by typing one extra dot.
- */
 const normalizeHostForClassification = (host: string): string =>
   host
     .trim()
@@ -68,25 +62,19 @@ const parseDottedQuad = (host: string): number[] | null => {
 const isBlockedIpv4Bytes = (bytes: number[]): boolean => {
   const [a, b] = bytes;
   return (
-    a === 0 || // "this network", including 0.0.0.0
-    a === 10 || // RFC1918
-    a === 127 || // loopback
-    (a === 100 && b >= 64 && b <= 127) || // CGNAT 100.64/10
-    (a === 169 && b === 254) || // link-local (cloud metadata endpoints)
-    (a === 172 && b >= 16 && b <= 31) || // RFC1918
-    (a === 192 && b === 168) || // RFC1918
-    a >= 240 // reserved 240/4 + broadcast
+    a === 0 ||
+    a === 10 ||
+    a === 127 ||
+    (a === 100 && b >= 64 && b <= 127) ||
+    (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168) ||
+    a >= 240
   );
 };
 
-/**
- * Expand an IPv6 literal into its eight 16-bit groups, or null when the
- * string is not valid IPv6. Accepts the trailing-dotted-quad form
- * (`::ffff:127.0.0.1`) the URL parser preserves.
- */
 const parseIpv6Groups = (host: string): number[] | null => {
   let input = host;
-  // Trailing IPv4 tail → two 16-bit groups.
   const v4TailMatch = input.match(/^(.*:)(\d{1,3}(?:\.\d{1,3}){3})$/);
   if (v4TailMatch) {
     const bytes = parseDottedQuad(v4TailMatch[2]);
@@ -125,17 +113,9 @@ const parseIpv6Groups = (host: string): number[] | null => {
 const isBlockedIpv6Groups = (groups: number[]): boolean => {
   const isZeroThrough = (count: number) =>
     groups.slice(0, count).every((group) => group === 0);
-  // Unspecified (::) and loopback (::1).
   if (isZeroThrough(7) && (groups[7] === 0 || groups[7] === 1)) return true;
-  // ULA fc00::/7.
   if ((groups[0] & 0xfe00) === 0xfc00) return true;
-  // Link-local fe80::/10.
   if ((groups[0] & 0xffc0) === 0xfe80) return true;
-  // Embedded-IPv4 forms: mapped ::ffff:x/96, translated ::ffff:0:x/96,
-  // NAT64 64:ff9b::/96, and the deprecated IPv4-COMPATIBLE ::a.b.c.d — the
-  // effective target is the embedded v4 address in every one of them. The
-  // compatible form matters because `::7f00:1` is a spelling of 127.0.0.1
-  // that no prefix check catches.
   const embeddedV4 =
     (isZeroThrough(5) && groups[5] === 0xffff) ||
     (isZeroThrough(4) && groups[4] === 0xffff && groups[5] === 0) ||
@@ -157,18 +137,12 @@ const isBlockedIpv6Groups = (groups: number[]): boolean => {
   return false;
 };
 
-/**
- * True for literal IP strings targeting loopback, private, link-local,
- * CGNAT, reserved, or embedded-v4-blocked space. Domain names return false
- * — resolution is the `resolveHost` capability's job.
- */
 export const isBlockedIpAddress = (ip: string): boolean => {
   const trimmed = normalizeHostForClassification(ip);
   const v4 = parseDottedQuad(trimmed);
   if (v4) return isBlockedIpv4Bytes(v4);
   if (trimmed.includes(":")) {
     const groups = parseIpv6Groups(trimmed);
-    // An unparseable bracketed literal is refused rather than resolved.
     if (!groups) return true;
     return isBlockedIpv6Groups(groups);
   }

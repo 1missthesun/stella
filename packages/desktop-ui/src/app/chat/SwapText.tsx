@@ -1,22 +1,3 @@
-/**
- * SwapText: crossfades + slides between text values when `text` changes.
- *
- * Used by the working indicator so that transitions like
- *   Working · X → Updating · X → Working · X
- * and multi-agent rotation row swaps animate instead of snapping.
- *
- * Width changes are not explicitly animated; the grid stack keeps both
- * layers in the same cell during the transition (cell sizes to the
- * larger of the two), then snaps to the new content's natural width
- * once the outgoing layer is unmounted. In the sticky footer the
- * surrounding flex container absorbs that final size change without
- * shifting layout.
- *
- * Deciding *which* values are worth showing is not this component's job: it
- * animates whatever it is handed. Callers that need a legibility floor hold
- * their value through `useMinimumVisibleValue` first.
- */
-
 import { useEffect, useRef, useState } from "react";
 import { useMinimumVisibleValue } from "@/shared/hooks/use-minimum-visible-value";
 import { TextShimmer } from "./TextShimmer";
@@ -24,8 +5,6 @@ import { TextShimmer } from "./TextShimmer";
 interface SwapTextProps {
   text: string;
   active?: boolean;
-  /** Let a parent-owned entrance animation reveal the initial text as part of
-   * one atomic surface, while preserving animated swaps after it changes. */
   animateInitial?: boolean;
   minimumVisibleMs?: number;
   className?: string;

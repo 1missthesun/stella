@@ -5,19 +5,12 @@ import * as WorkerSessions from "../sessions.js";
 import { fromPromise, type WorkerRpcHandlers } from "../rpc.js";
 import { terminatePiChatCommands } from "../pi-chats.js";
 
-/**
- * Runner-hosted operations that require the runner to EXIST but not to have
- * finished initializing (the old `ensureRunner()` — no build join): store
- * browsing, shell process control, Google Workspace connection management.
- */
 const runnerNow = Effect.flatMap(
   WorkerSessions.sessionOrFail(() => new RunnerUnavailableError()),
   (session) => session.runner.current,
 );
 
 export const runnerOpsHandlers: WorkerRpcHandlers = {
-  // Every command an agent has running on this computer: the runner's shell
-  // sessions and the commands of the desktop chats' agents.
   [METHOD_NAMES.INTERNAL_WORKER_KILL_ALL_SHELLS]: () =>
     Effect.flatMap(
       WorkerSessions.sessionOrFail(() => new RunnerUnavailableError()),

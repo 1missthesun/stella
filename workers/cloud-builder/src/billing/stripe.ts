@@ -8,7 +8,6 @@
 const STRIPE_API = "https://api.stripe.com/v1";
 const STRIPE_API_VERSION = "2026-05-27.dahlia";
 const STRIPE_TIMEOUT_MS = 30_000;
-/** Stripe's default webhook tolerance. */
 const WEBHOOK_TOLERANCE_S = 300;
 
 export class StripeError extends Error {
@@ -96,7 +95,6 @@ export type StripeEvent = {
   data: { object: Record<string, unknown> };
 };
 
-/** The verified event, or null when the signature or timestamp is wrong. */
 export const verifyStripeWebhook = async (
   payload: string,
   signatureHeader: string | null,

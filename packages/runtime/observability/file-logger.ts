@@ -65,22 +65,18 @@ export class FileLogger {
     this.logger = buildLogger(options);
   }
 
-  /** Lifecycle / process event (worker + native helper start/stop/cleanup). */
   process(event: string, fields?: LogFields): void {
     this.run(this.logger.process(event, fields));
   }
 
-  /** Non-fatal warning routed to the process channel. */
   warn(event: string, fields?: LogFields): void {
     this.run(this.logger.warn(event, fields));
   }
 
-  /** Recoverable error. */
   error(event: string, fields?: LogFields): void {
     this.run(this.logger.error(event, fields));
   }
 
-  /** Crash / fatal error with its stack trace. */
   crash(event: string, error: unknown, fields?: LogFields): void {
     this.run(this.logger.crash(event, error, fields));
   }
@@ -96,11 +92,6 @@ export class FileLogger {
 
 let sharedLogger: FileLogger | null = null;
 
-/**
- * Initialize (or return the existing) per-process diagnostic logger.
- * Idempotent: a process should call this once at startup; later callers
- * reuse the same instance.
- */
 export const initFileLogger = (
   stellaAppDir: string,
   component: string,
@@ -122,10 +113,6 @@ export const initFileLogger = (
   return sharedLogger;
 };
 
-/**
- * Get the process-wide logger if it has been initialized. Returns null
- * before `initFileLogger` runs so call sites can no-op safely.
- */
 export const getFileLogger = (): FileLogger | null => sharedLogger;
 
 /**

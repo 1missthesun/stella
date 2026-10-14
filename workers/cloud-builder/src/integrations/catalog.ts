@@ -1,12 +1,3 @@
-/**
- * The Store's integration catalog in D1 (`migrations/0003_integrations.sql`):
- * reads for every surface and the admin publication that replaces one
- * integration with its full action set.
- *
- * An integration is executable only when it is enabled, Composio-backed and
- * has at least one published action; everything else is invisible here.
- */
-
 import type {
   IntegrationAction,
   IntegrationActionsPage,
@@ -45,7 +36,6 @@ type StoredIntegration = {
 
 type StoredAction = Omit<IntegrationAction, "revision">;
 
-/** An integration resolved for execution. */
 export type ExecutableIntegration = {
   id: string;
   toolkit: string;
@@ -53,7 +43,6 @@ export type ExecutableIntegration = {
   updatedAt: number;
 };
 
-/** Only the D1 binding: the orchestrator object reads the catalog too. */
 type CatalogEnv = { readonly DB?: D1Database };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -112,7 +101,6 @@ export const listIntegrationCatalog = async (env: CatalogEnv): Promise<Integrati
   });
 };
 
-/** One executable integration by id, or null. */
 export const loadExecutableIntegration = async (
   env: CatalogEnv,
   id: string,
@@ -139,11 +127,6 @@ const toAction = (row: { json: string; updated_at: number }): IntegrationAction 
   return { ...stored, revision: String(row.updated_at) };
 };
 
-/**
- * A page of one integration's actions in name order, optionally filtered by
- * words that must all appear in the name, title or description. The cursor is
- * the last name of the previous page. With `action`, just that one.
- */
 export const listIntegrationActions = async (
   env: CatalogEnv,
   args: { id: string; action?: string; query?: string; cursor?: string; limit?: number },
@@ -198,7 +181,6 @@ export const listIntegrationActions = async (
   };
 };
 
-/** One published action of an executable integration, or null. */
 export const loadIntegrationAction = async (
   env: CatalogEnv,
   id: string,
@@ -213,8 +195,6 @@ export const loadIntegrationAction = async (
   const parsed = row ? toAction(row) : null;
   return parsed ? { integration, action: parsed } : null;
 };
-
-// ── Publication ───────────────────────────────────────────────────────────
 
 const optionalText = (value: unknown, max: number): string | undefined | null => {
   if (value === undefined || value === null) return undefined;
@@ -276,11 +256,6 @@ const normalizeActions = (value: unknown, toolkit: string): StoredAction[] => {
   return actions.sort((left, right) => left.name.localeCompare(right.name));
 };
 
-/**
- * Replace one integration and its whole action set. The body is what the
- * publish script sends: the Store record plus `actions` with object
- * `inputSchema`s. One D1 batch, so it lands whole or not at all.
- */
 export const publishIntegration = async (
   env: CatalogEnv,
   body: unknown,

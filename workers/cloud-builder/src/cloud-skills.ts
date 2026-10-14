@@ -1,10 +1,3 @@
-/**
- * The owner's mirrored skills as the orchestrator sees them on every host:
- * a `<skills>` block listing `~/.stella/skills/<slug>/SKILL.md` paths, read
- * with the ordinary `Read` tool. The cloud store pins one version of each
- * skill for the whole turn and verifies every file it hands back.
- */
-
 import {
   renderInlineSkillCatalogBlock,
   SKILLS_DISPLAY_ROOT,
@@ -18,7 +11,6 @@ import type {
 
 const SKILL_PROGRAM_PATH = "scripts/program.ts";
 
-/** The `<skills>` block for a pinned cloud catalog; "" when there is none. */
 export const buildCloudSkillsBlock = (
   snapshot: CloudSkillCatalogSnapshot,
 ): string => {
@@ -35,7 +27,6 @@ export const buildCloudSkillsBlock = (
 
 export type CloudSkillFileRef = Readonly<{
   entry: CloudSkillCatalogEntry;
-  /** Package-relative path inside the pinned skill version. */
   path: string;
 }>;
 
@@ -44,12 +35,6 @@ const SKILL_PATH_PREFIXES = [
   "/.stella/skills/",
 ];
 
-/**
- * Resolve a `Read` path against the pinned catalog. Accepts the display
- * form (`~/.stella/skills/<slug>/...`) and any absolute path that ends in
- * `/.stella/skills/<slug>/...` (a model echoing a home directory it saw
- * elsewhere). Returns null for paths outside the skills tree.
- */
 export const resolveCloudSkillPath = (
   snapshot: CloudSkillCatalogSnapshot,
   filePath: string,

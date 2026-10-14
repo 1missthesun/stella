@@ -9,8 +9,6 @@ const initializedSession = WorkerSessions.sessionOrFail(
 );
 
 export const mcpHandlers: WorkerRpcHandlers = {
-  // The cloud reaches an MCP server this computer runs (or is signed in to)
-  // for an agent elsewhere on the account.
   [METHOD_NAMES.INTERNAL_WORKER_MCP_DEVICE_REQUEST]: (params) =>
     Effect.flatMap(initializedSession, (session) =>
       fromPromise(async () => {

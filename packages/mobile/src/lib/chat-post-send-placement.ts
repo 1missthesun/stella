@@ -1,7 +1,5 @@
-/** Do not pull a submit out of scrollback when the user is reading history. */
 export const LATEST_TURN_PLACEMENT_THRESHOLD_PX = 300;
 
-/** Apply latest-turn placement only while following the live tail. */
 export function shouldPlaceLatestTurn({
   distanceFromBottomPx,
   isFollowingLatest,
@@ -15,13 +13,6 @@ export function shouldPlaceLatestTurn({
   );
 }
 
-/**
- * Frame the latest user row at the list tail. A row that fits above the
- * trailing slack lands with the list scrolled to its end; a user message
- * taller than the remaining reading area is aligned by its top instead, so
- * its opening lines stay in view. `leadingInsetPx` is the chrome floating
- * over the list's top edge, which a top-aligned row lands below.
- */
 export function resolvePostSendTarget({
   rowTop,
   rowBottom,
@@ -79,7 +70,6 @@ export function resolvePostSendPlacement({
   });
 }
 
-/** A send anchor needs both the submitted row and the resting keyboard inset. */
 export function canStartPostSendPlacement(
   userMessageId: string,
   renderedMessageIds: readonly string[],

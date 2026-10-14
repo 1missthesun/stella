@@ -309,7 +309,6 @@ export function NativeDesktopGeneralSettings() {
   );
 }
 
-/** Locked computer use (macOS): lives under Privacy, beside permissions. */
 export function NativeLockedComputerUseCard() {
   const t = useT();
   const platform = window.electronAPI?.platform;

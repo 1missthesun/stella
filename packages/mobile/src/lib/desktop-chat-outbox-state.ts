@@ -4,13 +4,6 @@ import type { ChatMessage } from "../types";
 import type { AutomaticExecutionTarget } from "./execution-placement";
 import { withAttachmentPreamble } from "./chat-attachments";
 
-/**
- * An attachment a queued row carries. The bytes are not here: they reached the
- * owner's drive before the row was ever written, so replay only needs the path
- * that names them. `previewUri` is the local thumbnail and is allowed to be
- * missing — a picked photo's cache entry does not have to survive a restart for
- * the turn to.
- */
 export type DesktopChatOutboxAttachment = {
   path: string;
   name: string;
@@ -27,9 +20,7 @@ export type DesktopChatOutboxAuthority = {
 export type DesktopChatOutboxRecord = {
   sendId: string;
   userMessageId: string;
-  /** Journal echo identity; absent on pre-upgrade rows to preserve their hash. */
   userMessageEventId?: string;
-  /** New sends carry drive paths only in the structured admission payload. */
   structuredAttachments?: true;
   text: string;
   displayText: string;
@@ -38,14 +29,11 @@ export type DesktopChatOutboxRecord = {
   attachments: DesktopChatOutboxAttachment[];
   executionTarget?: AutomaticExecutionTarget;
   execution?: CloudExecutionSelection;
-  /** Exact server owner fence for canonical journal replay. */
   authority?: DesktopChatOutboxAuthority;
-  /** Durable placement cancel intent, retained until the server is terminal. */
   cancelRequestId?: string;
   cancelRequestedAt?: number;
 };
 
-/** Preserve the exact prompt used by pre-upgrade idempotent admissions. */
 export const desktopChatOutboxPrompt = (
   record: Pick<DesktopChatOutboxRecord, "text" | "attachments" | "structuredAttachments">,
 ): string => record.structuredAttachments === true
@@ -93,11 +81,6 @@ export const desktopChatOutboxAuthorityMatches = (
   record.authority.ownerGeneration === authority.ownerGeneration &&
   record.authority.conversationId === authority.conversationId;
 
-/**
- * Exact-scope rows may replay. Rows from another account (or a legacy build)
- * remain quarantined; stale generations/conversations for this same account
- * are deleted because they can never become valid again.
- */
 export const partitionDesktopChatOutboxForAuthority = (
   records: DesktopChatOutboxRecord[],
   authority: DesktopChatOutboxAuthority,
@@ -298,11 +281,6 @@ export const markDesktopChatOutboxRecordCanceled = (
       : record,
   );
 
-/**
- * What a restored bubble shows for its attachments. An image counts even when
- * its local preview is gone: the turn still carries the photo, and claiming
- * otherwise would render the bubble as text-only.
- */
 const outboxAttachmentPreview = (record: DesktopChatOutboxRecord) => {
   const images = record.attachments.filter((entry) => entry.kind === "image");
   return {

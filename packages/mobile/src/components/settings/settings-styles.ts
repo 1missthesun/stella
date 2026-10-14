@@ -3,19 +3,11 @@ import type { Colors } from "../../theme/colors";
 import { fonts } from "../../theme/fonts";
 import { fadeHex } from "../../theme/oklch";
 
-/**
- * The Settings page's grouped-list vocabulary: an uppercase section label
- * over a rounded surface card of rows split by hairlines. It matches the
- * Subscription section's card so every section on the page reads as one set.
- */
 export const makeSettingsStyles = (colors: Colors) =>
   StyleSheet.create({
     section: {
       marginTop: 28,
     },
-    // Sentence case, not all-caps: the platform moved its own settings
-    // headers off shouting a long time ago, and the catalog already stores
-    // these the way they should read.
     sectionLabel: {
       color: colors.textMuted,
       fontFamily: fonts.sans.medium,

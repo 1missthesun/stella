@@ -1,19 +1,3 @@
-/**
- * Turn starts for the desktop cloud path.
- *
- *   POST {socketOrigin}/conversations/{conversationId}/turns
- *
- * The cloud-builder worker is the turn gateway: it verifies the same Better
- * Auth JWT the conversation socket presents and hands the request to the
- * conversation's Durable Object, which owns admission (idempotency on
- * `clientMsgId`, owner adoption for a fresh conversation, policy, journaling)
- * and answers 202.
- *
- * Conversation ids are minted here, on the client: a brand-new conversation
- * is a UUID the renderer picked before the first turn was posted, and the
- * socket subscription, the route, and this request all carry the same id.
- */
-
 import {
   BILLING_UNAVAILABLE_MESSAGE,
   STELLA_USAGE_LIMIT_MESSAGES,
@@ -32,7 +16,6 @@ import {
 import { CLOUD_SANDBOX_SUBSCRIPTION_REQUIRED_MESSAGE } from "@stella/contracts/backend/billing";
 import type { PendingCloudTurnSubmission } from "./conversation-outbox";
 
-/** Bound on the admission round-trip. The DO answers before the model runs. */
 export const TURN_START_TIMEOUT_MS = 30_000;
 
 export type CloudTurnStartTokenOptions = { forceRefresh?: boolean };
@@ -43,10 +26,6 @@ export type CloudTurnStartGetToken = (
 export const CLOUD_TURN_SIGN_IN_REQUIRED_MESSAGE =
   "Sign in to Stella to send cloud messages.";
 
-/**
- * Readable fallbacks per contract code. The gateway's own `message` wins
- * when it sends one; these cover a terse or missing body.
- */
 const FALLBACK_MESSAGES: Record<CloudTurnStartErrorCode, string> = {
   unauthorized: CLOUD_TURN_SIGN_IN_REQUIRED_MESSAGE,
   forbidden: "This account can't send to that conversation.",
@@ -89,17 +68,10 @@ const ERROR_CODES = new Set<string>(Object.keys(FALLBACK_MESSAGES));
 const isErrorCode = (value: unknown): value is CloudTurnStartErrorCode =>
   typeof value === "string" && ERROR_CODES.has(value);
 
-/**
- * The gateway answered and refused the turn. Definitive: the server did not
- * commit anything, so the row is not transport-ambiguous and a retry sends
- * the exact same payload again.
- */
 export class CloudTurnStartClientError extends Error {
   readonly code: CloudTurnStartErrorCode;
-  /** HTTP status, or 0 when the request never left the client. */
   readonly status: number;
   readonly retryable: boolean;
-  /** Set on retryable refusals that name a wait; already folded into `message`. */
   readonly retryAfterMs: number | null;
 
   constructor(args: {
@@ -144,11 +116,6 @@ export class CloudTurnStartClientError extends Error {
   }
 }
 
-/**
- * The request may or may not have reached the DO (network drop, timeout).
- * The optimistic row is re-armed on the next process load because the same
- * `clientMsgId` replays safely.
- */
 export class CloudTurnStartTransportError extends Error {
   constructor(message: string, options?: { cause?: unknown }) {
     super(message, options);
@@ -156,7 +123,6 @@ export class CloudTurnStartTransportError extends Error {
   }
 }
 
-/** A fresh conversation id. Satisfies `CONVERSATION_ID_PATTERN` by construction. */
 export const newCloudConversationId = (): string => {
   const id = crypto.randomUUID();
   if (!CONVERSATION_ID_PATTERN.test(id)) {
@@ -165,20 +131,11 @@ export const newCloudConversationId = (): string => {
   return id;
 };
 
-/**
- * Title hint for the conversation this turn may create: the visible prompt,
- * whitespace-collapsed, the way the tab strip derives titles. The DO ignores
- * it when the conversation already exists.
- */
 export const cloudTurnTitleHint = (text: string): string | undefined => {
   const title = text.replace(/\s+/g, " ").trim().slice(0, TURN_TITLE_MAX_CHARS);
   return title || undefined;
 };
 
-/**
- * Wire body for one turn. Built only from the frozen submission and the
- * visible prompt text, so an idempotent retry sends identical bytes.
- */
 export const cloudTurnStartRequest = (
   clientMsgId: string,
   submission: PendingCloudTurnSubmission,
@@ -287,13 +244,10 @@ const isStartResponse = (
 };
 
 export type StartCloudTurnArgs = {
-  /** The backend origin (`backendUrl`), e.g. `https://build.example`. */
   socketOrigin: string;
   conversationId: string;
   request: CloudTurnStartRequest;
-  /** Resolves the Better Auth JWT; `forceRefresh` bypasses every cache. */
   getToken: CloudTurnStartGetToken;
-  /** Test seam. */
   fetch?: typeof fetch;
 };
 
@@ -336,11 +290,6 @@ const postOnce = async (
   }
 };
 
-/**
- * Starts (or replays) one turn. Resolves with the DO's admission receipt;
- * `replayed: true` is the same success from the caller's point of view. A
- * 401 is retried exactly once with a freshly minted JWT before it surfaces.
- */
 export const startCloudTurn = async (
   args: StartCloudTurnArgs,
 ): Promise<CloudTurnStartResponse> => {

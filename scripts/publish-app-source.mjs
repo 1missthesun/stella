@@ -1,24 +1,4 @@
 #!/usr/bin/env node
-/**
- * Publish the desktop app's source to an environment's upstream Artifacts
- * repo, where each owner's fork pulls updates from (v3).
- *
- *   node scripts/publish-app-source.mjs [--namespace stella-app-dev] [--ref HEAD] [--backend <url>]
- *
- * The published tree is the ref minus the server, the mobile app and repo
- * tooling, with `bun.lock` regenerated for the workspaces that remain so a
- * frozen install works. Each publish is one commit on upstream `main`,
- * parented on the previous publish, with the source commit in a
- * `Stella-Source:` trailer. An unchanged tree publishes nothing.
- *
- * Then it tells the namespace's backend (`--backend` for any other, such as a
- * Preview bound to a test namespace), which reads upstream itself and pushes
- * the new version to every connected desktop of that environment. Desktops
- * don't poll: without this notice they learn of the publish only when they
- * next connect.
- *
- * Needs a Wrangler login (or CLOUDFLARE_API_TOKEN) for the account.
- */
 
 import { execFileSync, spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -29,7 +9,6 @@ import { fileURLToPath } from "node:url";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const UPSTREAM_REPO = "upstream";
 
-/** Not part of the desktop app a user's agents can modify. */
 const EXCLUDED_PATHS = [
   ".agents",
   ".github",
@@ -50,7 +29,6 @@ const option = (name, fallback) => {
 const namespace = option("namespace", "stella-app-dev");
 const ref = option("ref", "HEAD");
 
-/** The backend whose desktops follow each namespace. */
 const NAMESPACE_BACKENDS = {
   "stella-app-dev": "https://stella-v2-cloud-builder-dev.fromyou.workers.dev",
   "stella-app-prod": "https://stella-v2-cloud-builder-prod.fromyou.workers.dev",
@@ -100,7 +78,6 @@ const sourceSha = run("git", ["rev-parse", ref], { cwd: repoRoot });
 const workDir = mkdtempSync(path.join(tmpdir(), "stella-app-source-"));
 
 try {
-  // 1. The app tree at the ref.
   const archive = spawnSync("git", ["archive", sourceSha], { cwd: repoRoot, maxBuffer: 1 << 30 });
   if (archive.status !== 0) throw new Error("git archive failed");
   const untar = spawnSync("tar", ["-x", "-C", workDir], { input: archive.stdout });
@@ -110,7 +87,6 @@ try {
   }
   run("bun", ["install", "--lockfile-only"], { cwd: workDir });
 
-  // 2. The upstream repo and a short write token for it.
   let upstream = wrangler(["repos", "get", UPSTREAM_REPO, "--namespace", namespace]);
   if (!upstream.ok) {
     upstream = wrangler(["repos", "create", UPSTREAM_REPO, "--namespace", namespace, "--default-branch", "main"]);
@@ -132,7 +108,6 @@ try {
       },
     });
 
-  // 3. One commit on top of the previous publish.
   git(["init", "-q", "-b", "main"]);
   const fetched = spawnSync(
     "git",

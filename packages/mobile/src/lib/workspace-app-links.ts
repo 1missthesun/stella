@@ -8,13 +8,6 @@ import { AppState } from "react-native";
 import { env } from "../config/env";
 import { getAuthToken } from "./auth-token";
 
-/**
- * What the chat knows about the owner's cloud apps: the app list behind the
- * cards a reply's `stella://app/<slug>` links become, and a pending "open this
- * app" request the Apps tab picks up. The Apps tab shares its own list here so
- * the two never disagree for long.
- */
-
 const REFRESH_AFTER_MS = 15_000;
 
 type AppsState = { apps: WorkspaceApp[] | null; loading: boolean };
@@ -35,7 +28,6 @@ const subscribe = (listener: () => void) => {
   };
 };
 
-/** The Apps tab's freshly loaded list. */
 export function shareWorkspaceApps(list: WorkspaceApp[]) {
   state = { ...state, apps: list };
   fetchedAt = Date.now();
@@ -70,17 +62,11 @@ function refreshWorkspaceApps(): Promise<void> {
   return inflight;
 }
 
-/**
- * The app a reply links: the app, `undefined` while the list loads, or `null`
- * when the owner has no ready app by that slug.
- */
 export function useWorkspaceApp(slug: string): WorkspaceApp | null | undefined {
   const snapshot = useSyncExternalStore(subscribe, () => state);
   const app = snapshot.apps?.find((entry) => entry.slug === slug);
   const known = app !== undefined;
   useEffect(() => {
-    // A reply can link an app the cached list predates, so a missing slug
-    // refetches once; a known one refreshes when the list has gone stale.
     if (!known || Date.now() - fetchedAt > REFRESH_AFTER_MS)
       void refreshWorkspaceApps();
   }, [slug, known]);
@@ -95,15 +81,10 @@ export function useWorkspaceApp(slug: string): WorkspaceApp | null | undefined {
   return snapshot.apps === null || snapshot.loading ? undefined : null;
 }
 
-/**
- * A turn just ended, and it may have built or changed an app. Refetch the list
- * while app cards are on screen so they show the new revision right away.
- */
 export function refreshLinkedWorkspaceApps() {
   if (listeners.size > 0) void refreshWorkspaceApps();
 }
 
-/** Open an app from the chat: the Apps tab takes the request and opens it. */
 export function requestOpenApp(slug: string) {
   pendingOpen = slug;
   notify();
@@ -119,7 +100,6 @@ export function clearPendingAppOpen() {
   notify();
 }
 
-/** Signed-in fetch of the app's preview still, keyed by revision. */
 export const workspaceAppPreviewUrl = (app: WorkspaceApp): string | null =>
   env.backendUrl
     ? `${env.backendUrl}/owners/me/apps/${encodeURIComponent(app.slug)}/preview?v=${encodeURIComponent(app.revision)}`

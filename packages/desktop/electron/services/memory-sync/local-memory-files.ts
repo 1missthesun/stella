@@ -11,7 +11,6 @@ import {
   PERSONALITY_FILE,
 } from "@stella/runtime/kernel/memory/memory-layout.js";
 
-/** Directory entries one scan walks before it gives up. */
 const MAX_WALK_ENTRIES = 5_000;
 
 export const sha256Hex = (bytes: Uint8Array): string =>
@@ -39,10 +38,6 @@ export class LocalMemoryFiles {
     return path.join(this.stellaDataDir, ...relative.split("/"));
   }
 
-  /**
-   * Every synced file with its sha. Throws rather than return a listing cut
-   * short, which a pass would read as deletions.
-   */
   async scan(): Promise<Map<string, string>> {
     const relatives = [PERSONALITY_FILE];
     let visited = 0;
@@ -86,7 +81,6 @@ export class LocalMemoryFiles {
     return files;
   }
 
-  /** A file's sha, rehashed only when its stat moved. */
   private async sha(relative: string): Promise<string | null> {
     const file = this.absolute(relative);
     const stat = await fs.stat(file).catch(() => null);

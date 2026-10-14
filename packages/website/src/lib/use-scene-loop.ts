@@ -5,12 +5,8 @@ import { useEffect, useRef, useState, type RefObject } from "react";
 class SceneCancel extends Error {}
 
 export type Scene = {
-  /* Sleeps, then throws internally if the scene was cancelled while
-     sleeping — scripts never run another step after cancellation. */
   sleep: (ms: number) => Promise<void>;
-  /* Wait for the browser's next paint so visual updates land on real frames. */
   frame: () => Promise<number>;
-  /* Type `text` through `onChar` at `ms` per character. */
   type: (
     text: string,
     onChar: (typed: string) => void,
@@ -18,15 +14,6 @@ export type Scene = {
   ) => Promise<void>;
 };
 
-/**
- * Runs `script` in a loop while `ref` is on screen, fully unwinding it the
- * moment the section scrolls away. The script receives scene helpers and is
- * expected to set component state as it goes; `reset` is called whenever the
- * loop stops so the section returns to its opening frame.
- *
- * Under `prefers-reduced-motion` the loop never starts and `reduced` is
- * true, so sections can render a settled final frame instead.
- */
 export function useSceneLoop(
   ref: RefObject<HTMLElement | null>,
   script: (scene: Scene) => Promise<void>,

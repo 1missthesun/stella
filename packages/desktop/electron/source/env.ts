@@ -1,20 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
 
-/**
- * The renderer's `import.meta.env`, as Vite defined it: `VITE_*` keys from
- * `.env`, `.env.local`, `.env.<mode>` and `.env.<mode>.local` (later files
- * win, then the process environment), plus MODE, DEV, PROD, SSR and
- * BASE_URL.
- */
-
-/**
- * A backend deployed under the repo's worker names (a first hostname label
- * containing `cloud-builder`, on any domain) pairs with the same-named Apps
- * hosts: `cloud-builder` becomes `apps-host` and `apps-auth`. Any other
- * backend names its Apps hosts with VITE_STELLA_APPS_HOST and
- * VITE_STELLA_APPS_AUTH_HOST.
- */
 export const pairedAppsHosts = (
   backendUrl: string | undefined,
 ): { appsHost: string; appsAuthHost: string } | null => {
@@ -74,7 +60,6 @@ export const applyDesktopIdentityEnv = (uiRoot: string, mode: string): void => {
     if (trimmed && !process.env[key]?.trim()) process.env[key] = trimmed;
   };
   adopt("STELLA_WEB_URL", process.env.VITE_STELLA_WEB_URL ?? files.VITE_STELLA_WEB_URL);
-  // Main fetches canvas-share links opened in the app (canvas-share-service).
   adopt(
     "CANVAS_SHARE_BASE_URL",
     process.env.VITE_CANVAS_SHARE_BASE_URL ?? files.VITE_CANVAS_SHARE_BASE_URL,
@@ -89,7 +74,6 @@ export const loadRendererEnv = (uiRoot: string, mode: string): RendererEnv => {
   for (const [key, value] of Object.entries(process.env)) {
     if (key.startsWith("VITE_") && value !== undefined) merged[key] = value;
   }
-  // A launcher that only names the backend gets its Apps hosts too.
   const paired = pairedAppsHosts(merged.VITE_STELLA_BACKEND_URL);
   if (paired) {
     merged.VITE_STELLA_APPS_HOST ||= paired.appsHost;
@@ -103,7 +87,6 @@ export const loadRendererEnv = (uiRoot: string, mode: string): RendererEnv => {
   return { ...env, MODE: mode, DEV: dev, PROD: !dev, SSR: false, BASE_URL: "/" };
 };
 
-/** `define` entries for the transformer: each key, plus the whole object. */
 export const envDefines = (env: RendererEnv): Record<string, string> => {
   const defines: Record<string, string> = {
     "import.meta.env": JSON.stringify(env),

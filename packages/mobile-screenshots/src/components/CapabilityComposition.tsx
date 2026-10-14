@@ -1,6 +1,5 @@
 import { BrandCharacter } from "./BrandCharacter";
 
-// Editorial capability symbols, outside the unchanged native screenshot.
 const capabilities = [
   { id: "computer", label: "Computer use", color: "#505c61", path: "M3 4h26v18H3z M11 28h10 M16 22v6" },
   { id: "browse", label: "Browse the web", color: "#657cd0", path: "M4 7h24v19H4z M4 12h24 M8 9.5h.1 M11 9.5h.1" },

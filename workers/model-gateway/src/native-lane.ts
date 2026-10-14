@@ -39,22 +39,8 @@ import {
 } from "./request-util.js";
 import { assertAgentTypeAllowed } from "./resolve.js";
 
-/**
- * Native lane: the ChatGPT plan signed in for the owner's cloud through Sign
- * in with ChatGPT. Claude never passes through here: the cloud's Claude Code
- * CLI talks to Anthropic directly on its own login.
- *
- * A byte pipe. The request goes upstream untouched apart from credentials and
- * the model pin the turn was admitted with; the response comes back untouched
- * (SSE or JSON) with the upstream status. A usage limit is passed through and
- * marked for the client, which tells the user; nothing switches accounts.
- * Nothing here is billed to Stella — the usage event is `billable: false` and
- * usage is parsed only when the response was JSON, best-effort, off the
- * response path.
- */
 export const ENGINE_ACCESS_MAX_CACHE_MS = 5 * 60_000;
 export const ENGINE_ACCESS_EXPIRY_MARGIN_MS = 60_000;
-/** JSON responses larger than this are not parsed for usage. */
 const MAX_USAGE_PARSE_BYTES = 4 * 1024 * 1024;
 
 type EngineAccessEntry = {
@@ -68,13 +54,8 @@ const engineAccessKey = (
   provider: GatewayNativeCredentialProvider,
 ): string => `${claims.sub}|${claims.gen}|${provider}`;
 
-/** Error bodies read to classify a limit; larger ones are passed through unread. */
 const MAX_LIMIT_BODY_BYTES = 64 * 1024;
 
-/**
- * A ChatGPT usage-limit rejection (the plan's or the per-app limit), as
- * opposed to an ordinary rate limit that clears in seconds.
- */
 export const subscriptionLimitOf = (status: number, bodyText: string): boolean => {
   if (status !== 429) return false;
   try {
@@ -107,7 +88,6 @@ const engineAccessFor = async (
   const key = engineAccessKey(claims, provider);
   const hit = engineAccessCache.get(key);
   if (hit && hit.validUntil > now) return hit.access;
-  // BillingControl reports refusals as data; a throw is a transport failure.
   const result = await billingControl(env)
     .engineAccess({
       ownerId: claims.sub,
@@ -346,7 +326,6 @@ export const handleNativeRelay = async (args: {
       body,
       signal: controller.signal,
     });
-    // A usage limit passes through untouched; the client tells the user.
     if (upstream.status === 429 && !probe) {
       const errorText = await readBoundedText(upstream.clone()).catch(
         () => null,

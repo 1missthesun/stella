@@ -154,10 +154,6 @@ export const validateSharedGatewayConfigRecord = async (args: {
   };
 };
 
-/**
- * The KV record for a snapshot. Only complete snapshots are shared, and only
- * when the record fits one KV value.
- */
 export const sharedGatewayConfigRecord = async (args: {
   snapshot: unknown;
   source: string;

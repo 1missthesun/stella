@@ -1,9 +1,3 @@
-/**
- * Bot tokens at rest: AES-256-GCM under a key derived (HKDF-SHA-256) from
- * BETTER_AUTH_SECRET with a Slack-specific label, stored as
- * `v1.<iv>.<ciphertext>` in base64url.
- */
-
 import { BETTER_AUTH_SECRET_V2 } from "../secret-rotation.js";
 
 const encoder = new TextEncoder();

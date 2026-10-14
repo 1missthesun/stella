@@ -56,15 +56,9 @@ const requestCards = (
   return work;
 };
 
-/** The drive path an evidence card was made from, when it was made from one. */
 export const evidenceCardDrivePath = (card: EvidenceCard): string | null =>
   card.sourcePaths[0] ? driveLinkPath(card.sourcePaths[0]) : null;
 
-/**
- * Preview cards for the drive files a reply links: an image's crop or a
- * video's poster, made in the main process from each file's signed URL. Files
- * with no card (other kinds, or too large to read) keep their pill.
- */
 export const useDriveEvidenceCards = (
   drivePaths: readonly string[],
 ): readonly EvidenceCard[] => {

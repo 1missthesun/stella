@@ -29,27 +29,6 @@ import {
   type LifecycleStartOptions,
 } from "./options.js";
 
-/**
- * Host-side discover-or-spawn as one scoped Effect pipeline.
- *
- * Discovery flow (unchanged from the pre-Effect implementation):
- *   1. Resolve Electron userData runtime control files plus the short POSIX
- *      socket path, or the equivalent Windows named pipe path.
- *   2. If pidfile points to a live process AND we can connect to the
- *      socket, reuse it. This is the "Electron just restarted, reattach"
- *      path. Protocol or host-executable mismatch is a hard worker restart;
- *      in-flight work is not preserved across that compatibility boundary.
- *   3. Otherwise (no pidfile, dead pid, or socket refusing connections),
- *      spawn a fresh detached worker pointed at the same paths and poll
- *      until it answers a lightweight RPC readiness probe.
- *
- * Resource ownership: the host lock, probe sockets, and the spawned child
- * are acquired into the pipeline's scope — failure and interruption release
- * them LIFO (spawned child reaped on interrupt only, see spawn.ts; lock
- * always unlinked). The final peer socket alone outlives the scope on
- * success; on any non-success scope exit its exit-aware release destroys it.
- */
-
 const hostExecutableMatches = (
   paths: RuntimePaths,
   expectedHostExecutablePath?: string,
@@ -64,16 +43,6 @@ const hostExecutableMatches = (
     }
   });
 
-/**
- * Poll `connectReadySocket` on a spaced Schedule, with attempt admission
- * checked against an absolute deadline anchored before attempt one
- * (`pollWithDeadline` — the old `while (Date.now() < deadline)` shape).
- * "version-mismatch" fails fast with the protocol parity error; deadline
- * lapse maps to the readiness-timeout parity error.
- *
- * Exported for the timing-parity regression tests only; the exports map
- * does not expose this module outside packages/runtime.
- */
 export const pollForWorkerReady = (
   paths: RuntimePaths,
   timeoutMs: number,
@@ -147,13 +116,6 @@ const stopRunningWorkerForRestart = (
   stellaAppDir: string,
 ): Effect.Effect<void> => Effect.asVoid(stopRunningWorkerEffect(stellaAppDir));
 
-/**
- * The discover-or-spawn decision tree, verbatim from the old
- * `startOrAttachWorker` critical section (it runs entirely under the host
- * lock). Returns an attach when a healthy same-executable, same-protocol
- * worker answers; otherwise clears whatever stale state it found and
- * returns null so the caller spawns fresh.
- */
 const discoverExistingWorker = (
   options: LifecycleStartOptions,
   paths: RuntimePaths,
@@ -164,15 +126,6 @@ const discoverExistingWorker = (
       probeRunningWorker(options.stellaAppDir),
     );
     if (existingPid == null) {
-      // No pidfile for this root: the overwhelmingly common case is a clean
-      // fresh boot with no worker to reap, so we skip the process scan here.
-      // On Windows that scan is a PowerShell cold start + full WMI/CIM
-      // Win32_Process enumeration (commonly 0.5-2s) that would otherwise be
-      // paid on EVERY launch with no live worker, for nothing. A genuinely
-      // orphaned worker that lost its pidfile is exceedingly rare (clean
-      // shutdown removes the pidfile; a crash leaves a stale one, which is
-      // handled by the stale-pidfile branch below); spawning a fresh worker
-      // binds the socket and supersedes it regardless.
       yield* Effect.promise(() =>
         removeStaleRuntimeArtifacts(options.stellaAppDir),
       );
@@ -209,10 +162,6 @@ const discoverExistingWorker = (
       };
     }
     if (ready.status === "identity-mismatch") {
-      // Someone answers on this root's socket, but not the runtime this app
-      // may adopt: an older generation without the handshake, a process the
-      // pidfile does not name, or one booted with another app's shared
-      // environment. Replace it rather than route this app's traffic there.
       console.warn(
         `[runtime-host] Existing runtime failed the identity handshake (${ready.mismatch}); restarting detached worker (pid=${existingPid}).`,
       );
@@ -223,8 +172,6 @@ const discoverExistingWorker = (
         reportedPid: ready.identity?.pid ?? null,
       });
       yield* stopRunningWorkerForRestart(options.stellaAppDir);
-      // A socket served by a pid the pidfile does not name survives the
-      // pidfile kill; reap whatever still runs this root.
       const survivors = yield* Effect.promise(() =>
         findSameRootWorkerPids(options.workerEntryPath, options.stellaAppDir),
       );
@@ -244,8 +191,6 @@ const discoverExistingWorker = (
       );
       return null;
     }
-    // Pid is alive but socket isn't reachable — likely a worker that's
-    // still binding the socket. Wait briefly before declaring it stale.
     let retryIdentity: LifecycleConnection["identity"] = null;
     const retry = yield* pollForWorkerReady(
       paths,
@@ -289,13 +234,6 @@ const discoverExistingWorker = (
     return null;
   });
 
-/**
- * Resolve a connected socket to the runtime worker, spawning a new
- * worker if one is not already running for `stellaAppDir`. Idempotent
- * across hosts thanks to the host-side lock. The caller owns the returned
- * socket on success; every other resource is released when the scope
- * closes.
- */
 export const startOrAttachWorkerEffect = (
   options: LifecycleStartOptions,
   budgets: LifecycleBudgets = defaultLifecycleBudgets,
@@ -317,9 +255,6 @@ export const startOrAttachWorkerEffect = (
     }
 
     yield* spawnAdoptedWorker(options, paths);
-    // A fresh spawn has no pidfile pid to pin yet; root and shared
-    // environment still have to match, and the probed serverId fences the
-    // attach to the instance that answered.
     const expectedIdentity = expectedIdentityFor(options, paths, undefined);
     let spawnedIdentity: LifecycleConnection["identity"] = null;
     const socket = yield* pollForWorkerReady(
@@ -344,10 +279,6 @@ export const startOrAttachWorkerEffect = (
     };
   });
 
-/**
- * Stop a running worker by SIGTERM-then-SIGKILL for `runtime restart` flows
- * that need a synchronous tear-down.
- */
 export const stopRunningWorkerEffect = (
   stellaAppDir: string,
   options?: { graceMs?: number },
@@ -357,8 +288,6 @@ export const stopRunningWorkerEffect = (
     if (pid == null) return { stopped: false, pid: null };
     const startedAt = Date.now();
     const result = yield* killWorkerProcess(pid, options?.graceMs ?? 1_500);
-    // Instrumentation for the restart-grace decision: how long SIGTERM→exit
-    // actually takes, and whether the worker needed a SIGKILL escalation.
     getFileLogger()?.process("worker.kill-latency", {
       pid,
       ms: Date.now() - startedAt,

@@ -26,7 +26,6 @@ import type { ChatArtifact, ChatMessage, MobileTask } from "../types";
  */
 export const RUNNING_TASK_STALE_MS = 5 * 60_000;
 
-/** Freshest evidence that a task was still alive. */
 const lastSeenAt = (task: MobileTask): number =>
   task.updatedAt ?? task.completedAt ?? task.createdAt;
 
@@ -69,16 +68,10 @@ const compareHubTasks = (a: MobileTask, b: MobileTask): number => {
   );
 };
 
-/** Active agents first, then most-recently-active within each status group. */
 export const sortHubTasksByRecency = (
   tasks: readonly MobileTask[],
 ): MobileTask[] => [...tasks].sort(compareHubTasks);
 
-/**
- * The running top-level agents, as the top-bar indicator and its menu read
- * them out: only Stella's own agents, like desktop's top-level work units. An
- * agent's own agents never count, whether or not their parent is listed.
- */
 export const runningActivityIndicatorEntries = (
   tasks: readonly MobileTask[],
 ): ActivityIndicatorEntry[] =>
@@ -86,7 +79,6 @@ export const runningActivityIndicatorEntries = (
     tasks.filter((task) => isTopLevelAgent(task) && task.status === "running"),
   ).map((task) => ({ id: task.id, title: task.title.trim() }));
 
-/** Full, newest-first artifact dataset for ownership and search. */
 export const collectActivityHubArtifacts = (
   messages: readonly Pick<ChatMessage, "artifacts">[],
 ): ChatArtifact[] => {

@@ -1,7 +1,6 @@
 import Darwin
 import Foundation
 
-/// A thread-safe FIFO the supervisor blocks on.
 final class EventQueue<T> {
     private var items: [T] = []
     private let condition = NSCondition()
@@ -13,7 +12,6 @@ final class EventQueue<T> {
         condition.unlock()
     }
 
-    /// Next event, or nil once `deadline` passes.
     func next(until deadline: Date?) -> T? {
         condition.lock()
         defer { condition.unlock() }
@@ -28,8 +26,6 @@ final class EventQueue<T> {
     }
 }
 
-/// Keeps the last lines Electron wrote to stdout/stderr for the recovery
-/// screen, and tees everything to logs/electron.log.
 final class OutputCapture {
     private let lock = NSLock()
     private var lines: [String] = []
@@ -122,7 +118,6 @@ final class ElectronProcess {
         var allSignals = sigset_t()
         sigfillset(&allSignals)
         posix_spawnattr_setsigdefault(&attr, &allSignals)
-        // CLOEXEC_DEFAULT: the child gets exactly 0-3, nothing else of ours.
         posix_spawnattr_setflags(&attr, Int16(POSIX_SPAWN_CLOEXEC_DEFAULT | POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF))
         ElectronProcess.disclaimResponsibility(&attr)
 
@@ -187,7 +182,6 @@ final class ElectronProcess {
         }
     }
 
-    /// Port of packages/desktop/scripts/disclaim-spawn.c.
     private static func disclaimResponsibility(_ attr: inout posix_spawnattr_t?) {
         typealias Disclaim = @convention(c) (UnsafeMutablePointer<posix_spawnattr_t?>, Int32) -> Int32
         guard let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "responsibility_spawnattrs_setdisclaim") else {

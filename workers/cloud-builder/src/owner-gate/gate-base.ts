@@ -53,32 +53,16 @@ import {
 import { DDL } from "./schema.js";
 import { withTimeout, ownerFenceRequest, log } from "./support.js";
 
-/**
- * `OwnerGate` (see `../owner-gate.ts`) is one Durable Object class split by
- * concern into a chain of layers, each extending the one below it:
- *
- *   gate-base → device-sockets → dispatch → cloud-dispatch → OwnerGate
- *
- * `OwnerGate` itself declares every public (RPC) method. This bottom layer
- * holds every field, so fields are initialized exactly once and in their
- * original order, plus the owner store, model grant, memory policy and owner
- * fence plumbing. A layer calls only down the chain, except for the few
- * methods declared abstract where a lower layer needs one implemented above
- * it.
- */
 export abstract class OwnerGateBase extends DurableObject<OwnerGateEnv> {
   protected schemaReady = false;
-  /** Steers waiting for their device's `steer.ack`, by dispatch and message. */
   protected readonly steerAcks = new Map<
     string,
     (delivered: boolean) => void
   >();
-  /** Local-agent messages waiting for `agent-message.ack`, by device and message. */
   protected readonly localAgentMessageAcks = new Map<
     string,
     (outcome: AgentMessageDeviceOutcome) => void
   >();
-  /** Local-agent stops waiting for `agent-pause.ack`, by device and command. */
   protected readonly localAgentStopAcks = new Map<
     string,
     (outcome: AgentStopDeviceOutcome) => void
@@ -92,20 +76,11 @@ export abstract class OwnerGateBase extends DurableObject<OwnerGateEnv> {
   protected homeContextState?: OwnerHomeContextCache;
 
   protected ownerModelGrantState?: OwnerModelGrantStore;
-  // A prepared reader nonce is advisory and only usable by the turn that
-  // started its wake. Later turns must read the durable registration, since an
-  // Orchestrator restart can replace that nonce.
   protected cloudChatReaderPreparationState?: Map<string, Promise<void>>;
   protected cloudChatReaderPreparedState?: Set<string>;
 
   constructor(ctx: DurableObjectState, env: OwnerGateEnv) {
     super(ctx, env);
-    // Keepalives from the live socket and device presence sockets are
-    // answered by the platform, so a connected but idle owner can hibernate.
-    // A JSON heartbeat ran this object every 10 seconds, which never let it
-    // go idle long enough to hibernate and billed it around the clock. Set on
-    // every cold start, as the conversation hub does, so whether the pair
-    // survives eviction never matters.
     try {
       ctx.setWebSocketAutoResponse(
         new WebSocketRequestResponsePair(
@@ -119,12 +94,10 @@ export abstract class OwnerGateBase extends DurableObject<OwnerGateEnv> {
       });
     }
   }
-  /** The domains this object serves. Test fixtures substitute their own. */
   protected backendRegistry(): OwnerRegistry {
     return ownerRegistry;
   }
 
-  /** Run a write on the owner's database outside a backend call, then push views and arm jobs. */
   protected async billingWrite<T>(
     write: (ctx: ReturnType<OwnerStore["context"]>) => T | Promise<T>,
   ): Promise<T> {
@@ -137,7 +110,6 @@ export abstract class OwnerGateBase extends DurableObject<OwnerGateEnv> {
     }
   }
 
-  /** One reset or deletion pass across every store; see src/owner-purge.ts. */
   protected async purgeOwnerPass(
     mode: OwnerPurgeMode,
     requestId: string,
@@ -176,8 +148,6 @@ export abstract class OwnerGateBase extends DurableObject<OwnerGateEnv> {
     const prepared = (this.cloudChatReaderPreparedState ??= new Set<string>());
     if (prepared.has(conversationId)) return Promise.resolve(undefined);
     const existing = preparations.get(conversationId);
-    // The first caller owns the nonce from a shared wake. Other concurrent
-    // callers wait for the wake but resolve their reader from durable state.
     if (existing) return existing.then(() => undefined);
     const preparation = withTimeout(
       (
@@ -233,7 +203,6 @@ export abstract class OwnerGateBase extends DurableObject<OwnerGateEnv> {
     });
   }
 
-  /** One owner-fence host call from this object; `fetch()` routes external ones. */
   protected ownerFenceCall(
     path: string,
     body: unknown,
@@ -301,11 +270,6 @@ export abstract class OwnerGateBase extends DurableObject<OwnerGateEnv> {
     );
   }
 
-  /**
-   * The memory policy's transport is this object's own `home_state`. A
-   * refusal from the home domain is definitive (400); anything else leaves
-   * the change pending for the alarm to retry.
-   */
   protected memoryPolicy(): OwnerMemoryPolicy {
     return (this.memoryPolicyState ??= new OwnerMemoryPolicy(
       this.ctx,
@@ -356,7 +320,6 @@ export abstract class OwnerGateBase extends DurableObject<OwnerGateEnv> {
     ));
   }
 
-  /** `memory.setEnabled` / `memory.startWipe`: a policy change, refusals as `RpcError`. */
   protected async changeMemoryPolicyForCall(
     change: MemoryPolicyChange,
   ): Promise<void> {
@@ -386,7 +349,6 @@ export abstract class OwnerGateBase extends DurableObject<OwnerGateEnv> {
             );
   }
 
-  /** The owner this object gates. The namespace is addressed by name only. */
   protected ownerId(): string {
     const name = this.ctx.id.name ?? "";
     if (!name)
@@ -394,11 +356,6 @@ export abstract class OwnerGateBase extends DurableObject<OwnerGateEnv> {
     return name;
   }
 
-  /**
-   * Start the owner-scoped gateway cache warm-up while this gate performs its
-   * required durable admission. It is intentionally one-shot per DO instance:
-   * preparation is advisory and a failure must never delay or refuse a turn.
-   */
   protected prepareGatewayOwner(): void {
     if (this.gatewayOwnerPreparation) return;
     const control = this.env.MODEL_GATEWAY_CONTROL;
@@ -486,7 +443,6 @@ export abstract class OwnerGateBase extends DurableObject<OwnerGateEnv> {
     );
   }
 
-  /** `body` is `request`'s parsed JSON when the path can change authority. */
   protected async fetchOwnerFence(
     path: string,
     request: Request,
@@ -497,8 +453,6 @@ export abstract class OwnerGateBase extends DurableObject<OwnerGateEnv> {
         path,
         request,
       );
-    // Owner admission and revocation share this section. Reader freeze RPCs
-    // only touch local conversation state; they never call back into OwnerGate.
     const outcome = await this.ctx.blockConcurrencyWhile(async () => {
       try {
         const operationId = await sha256Hex(JSON.stringify({ path, body }));
@@ -517,8 +471,6 @@ export abstract class OwnerGateBase extends DurableObject<OwnerGateEnv> {
             });
           },
         }).fetch(path, request);
-        // A definite result closes this exact replay marker, including a
-        // successful replay after the fence commit outlived the previous caller.
         if (response.ok || response.status < 500)
           await this.modelGrants().completeFenceBarrier(operationId);
         return { ok: true as const, response };
@@ -530,7 +482,6 @@ export abstract class OwnerGateBase extends DurableObject<OwnerGateEnv> {
     return outcome.response;
   }
 
-  // Implemented further up the chain.
   abstract ownerStore(): OwnerStore;
   abstract changeMemoryPolicy(
     change: MemoryPolicyChange,

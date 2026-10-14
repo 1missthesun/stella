@@ -5,15 +5,10 @@ const REPEAT_WINDOW_MS = 15_000;
 const FIRST_PART_MIN = 12;
 const FIRST_PART_MAX = 220;
 
-/** One clip to speak. `source` is the whole reply it came from, normalized. */
 export type QueuedReply = { id: string; text: string; source: string };
 
 const normalize = (text: string) => text.replace(/\s+/g, " ").trim();
 
-/**
- * Splits a reply after its first sentence. Speech for a short clip starts
- * sooner, and the remainder is synthesized while the first part plays.
- */
 export function splitForSpeech(id: string, text: string): QueuedReply[] {
   const source = normalize(text);
   const match = /^[\s\S]+?[.!?…](?=\s)/u.exec(text);
@@ -28,12 +23,6 @@ export function splitForSpeech(id: string, text: string): QueuedReply[] {
   ];
 }
 
-/**
- * Decides which assistant messages the car speaks. Every message that arrives
- * while the queue is accepting is spoken once, in transcript order. While the
- * driver is talking the queue stops accepting, and anything that lands in that
- * window is dropped rather than read out after the send.
- */
 export class ReplyQueue {
   accepting = true;
   private known = new Set<string>();
@@ -54,7 +43,6 @@ export class ReplyQueue {
     this.settling.delete(message.id);
   }
 
-  /** Marks every reply that already has text; a row still filling in stays new. */
   markAllKnown(messages: readonly ChatMessage[]) {
     for (const message of messages) {
       if (message.role === "assistant" && message.text.trim()) this.markKnown(message);
@@ -65,11 +53,6 @@ export class ReplyQueue {
     this.queue = [];
   }
 
-  /**
-   * Picks up newly arrived replies. While a turn is still running, a reply is
-   * held until its text has stopped changing. Returns the delay after which
-   * held replies should be scanned again, or null when nothing is held.
-   */
   scan(messages: readonly ChatMessage[], turnRunning: boolean): number | null {
     const now = Date.now();
     let waiting = false;

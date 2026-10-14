@@ -1,18 +1,4 @@
 #!/usr/bin/env bun
-/**
- * Runtime-worker perf lab. Deterministic lab measurements for the journeys
- * that matter, a baseline, and a ratchet. See README.md next to this file.
- *
- *   bun packages/runtime/scripts/perf/bench.mjs <command> [options]
- *
- * Commands: boot | turn | history | memory | bundle | profile | validate |
- *           all | check
- *
- * Every worker this script spawns runs with a scratch HOME, data dir and
- * runtime-state dir under --lab-dir, a minimal allowlisted environment (no
- * inherited API keys or STELLA_* vars), and the probe preload
- * (probe-preload.ts): network guard + scripted model + counters. Nothing touches ~/.stella and nothing leaves the machine.
- */
 import { spawn, spawnSync } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
@@ -35,7 +21,6 @@ const PRELOAD = path.join(HERE, "probe-preload.ts");
 const BASELINE_PATH = path.join(HERE, "baseline.json");
 const BUN = process.env.STELLA_PERF_BUN?.trim() || "bun";
 
-// ------------------------------------------------------------------ cli
 const parseCli = (argv) => {
   const [command = "help", ...rest] = argv;
   const opts = { _: [] };
@@ -79,7 +64,6 @@ const log = (...args) => {
   if (!opts.quiet) process.stderr.write(`[perf] ${args.join(" ")}\n`);
 };
 
-// ------------------------------------------------------------------ stats
 const quantile = (values, q) => {
   const sorted = values.filter((v) => Number.isFinite(v)).sort((a, b) => a - b);
   if (sorted.length === 0) return null;
@@ -128,7 +112,6 @@ const spearman = (xs, ys) => {
   return pearson(rank(xs), rank(ys));
 };
 
-// ------------------------------------------------------------------ fs helpers
 const rmrf = (p) => fs.rmSync(p, { recursive: true, force: true });
 const mkdirp = (p) => fs.mkdirSync(p, { recursive: true });
 const copyDir = (from, to) => {
@@ -136,13 +119,6 @@ const copyDir = (from, to) => {
   fs.cpSync(from, to, { recursive: true });
   restampCatalogStore(to);
 };
-/**
- * Templates are cached across invocations, but the catalog stamps the seed
- * wrote age with them: once they pass the runtime's refresh interval (4 h,
- * `REMOTE_CATALOG_REFRESH_INTERVAL_MS` in kernel/model-runtime.ts) every boot
- * refetches each provider and republishes the catalog, so the "returning user"
- * would depend on the template's age. Each copy gets a just-refreshed store.
- */
 const restampCatalogStore = (dataDir) => {
   const storePath = path.join(dataDir, "models-store.json");
   if (!fs.existsSync(storePath)) return;
@@ -165,14 +141,8 @@ const writeJson = (file, value) => {
   fs.writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`);
 };
 
-/**
- * The orchestrator's model: a `local/<base URL>/<model>` pick, which pi runs
- * on its OpenAI-compatible `local` provider. The probe's network guard
- * answers that base URL with the scripted model (see probe-preload.ts).
- */
 const SCRIPTED_MODEL = `local/${encodeURIComponent("http://perf-scripted.invalid/v1")}/scripted`;
 
-/** Seed the scratch data dir: scripted model pin + a Read fixture. */
 const prepareDataDir = (dataDir) => {
   mkdirp(dataDir);
   const prefsPath = path.join(dataDir, "preferences.json");
@@ -209,8 +179,6 @@ const workerEnv = ({ runDir, dataDir, cacheDir, entryKind, census = false, sqlCo
       file_path: path.join(dataDir, "perf-fixture.txt"),
     }),
   };
-  // Bundle runs resolve runtime assets (extensions, agent markdown) from the
-  // dist-electron tree, exactly as a packaged app resolves Resources/runtime.
   if (entryKind === "bundle") {
     env.STELLA_APP_RESOURCES_PATH = path.join(REPO, "packages", "desktop", "dist-electron");
   }
@@ -220,18 +188,6 @@ const workerEnv = ({ runDir, dataDir, cacheDir, entryKind, census = false, sqlCo
   return env;
 };
 
-// ------------------------------------------------------------------ boot rpc accounting
-/**
- * Boot JSON-RPC accounting, bench side, in stdout order. Counts every line the
- * worker writes during boot EXCEPT the responses to the bench's own probes
- * (`internal.worker.readyz` and the 5ms `internal.worker.health` polls, whose
- * count depends on timing). What remains is deterministic per tree: the
- * initialize response, notifications, and worker→host requests.
- *
- * Bytes are measured after replacing the lab dir and repo paths with fixed
- * tokens (and a per-run dir with `<run>`), so a longer checkout or temp path
- * on a CI runner does not move the byte count.
- */
 const PROBE_METHODS = new Set(["internal.worker.readyz", "internal.worker.health"]);
 const newBootAccount = () => ({
   lines: 0,
@@ -278,12 +234,7 @@ const bootAccount = (acct, msg, line, responseMethod) => {
   acct.notifications[key] = (acct.notifications[key] ?? 0) + 1;
   acct.notificationBytes[key] = (acct.notificationBytes[key] ?? 0) + bytes;
 };
-/** Notifications always reported (0 when absent) so a baseline key never goes missing. */
 const TRACKED_BOOT_NOTIFICATIONS = ["modelCatalog.updated"];
-/**
- * Fold per-run boot accounts into max values (the gate is conservative) and
- * list every field whose value differed between runs (should be empty).
- */
 const foldBootAccounts = (accounts) => {
   const out = { lines: 0, bytes: 0, notificationsTotal: 0, hostRequestsTotal: 0, notifications: {}, notificationBytes: {}, hostRequests: {} };
   const seen = {};
@@ -315,7 +266,6 @@ const foldBootAccounts = (accounts) => {
   return out;
 };
 
-// ------------------------------------------------------------------ worker client
 const PERF_PREFIX = "@@PERF ";
 const hostIdentity = (() => {
   const { publicKey } = crypto.generateKeyPairSync("ed25519");
@@ -341,7 +291,6 @@ class WorkerClient {
     this.hostRequests = {};
     this.lastMessageAt = 0;
     this.exited = null;
-    // Boot accounting (see bootAccount): active from spawn until endBootAccounting().
     this.bootAcct = newBootAccount();
     this.bootAcctAtReady = null;
   }
@@ -439,9 +388,6 @@ class WorkerClient {
       const pollMethod =
         "id" in msg && !("method" in msg) ? this.pending.get(msg.id)?.method : undefined;
       bootAccount(this.bootAcct, msg, line, pollMethod);
-      // Snapshot in stdout order, at the exact line that first reports ready:
-      // later lines in the same chunk are processed before the awaiting
-      // boot() resumes, so a snapshot taken there would not be deterministic.
       if (
         this.bootAcctAtReady == null &&
         pollMethod === "internal.worker.health" &&
@@ -541,14 +487,6 @@ class WorkerClient {
     };
   }
 
-  /**
-   * Boot marks. The stdio transport only answers once the whole entry module
-   * graph is evaluated and main() has attached the JSON-RPC peer, so the
-   * first response to a probe written at spawn time is the "transport
-   * attached" mark. `internal.worker.readyz` is answered pre-attach only by
-   * the socket transport; over stdio it returns METHOD_NOT_FOUND, which is
-   * exactly the cheap round trip we want.
-   */
   async boot(dataDir, { pollMs = 5, readyTimeoutMs = 30_000, keepBootAccounting = false } = {}) {
     const probe = this.request("internal.worker.readyz", {}).catch((e) => ({ at: e.at }));
     const probeRes = await probe;
@@ -571,7 +509,6 @@ class WorkerClient {
     if (readyAt == null) {
       throw new Error(`worker never became ready: ${JSON.stringify(lastHealth)}\n${this.stderrTail.slice(-20).join("\n")}`);
     }
-    // Path normalization is per line; stop it before any timed turn traffic.
     if (!keepBootAccounting) this.endBootAccounting();
     return {
       spawnToFirstByteMs: this.firstByteAt - this.spawnAt,
@@ -604,7 +541,6 @@ class WorkerClient {
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// ------------------------------------------------------------------ snapshot diffs
 const diffSnap = (a, b) => {
   const sqlDelta = {};
   for (const [key, stat] of Object.entries(b.sqlite.byStatement)) {
@@ -628,7 +564,6 @@ const diffSnap = (a, b) => {
     rpcLinesOut: b.stdout.lines - a.stdout.lines,
     rpcBytesOut: b.stdout.bytes - a.stdout.bytes,
     fetchBlocked: b.fetch.blocked - a.fetch.blocked,
-    // lower bound on JS heap bytes allocated in the window (see probe)
     heapAllocLowerBound: b.memory.jscHeapSizeBeforeGc - a.memory.jscHeapSize,
     objectsAllocLowerBound: b.memory.jscObjectCountBeforeGc - a.memory.jscObjectCount,
     retainedHeapDelta: b.memory.jscHeapSize - a.memory.jscHeapSize,
@@ -657,13 +592,7 @@ const topStatements = (byStatement, n = 15, divisor = 1) =>
       };
     });
 
-// ------------------------------------------------------------------ templates
 const TEMPLATE_VERSION = 2;
-/**
- * A "returning user" data dir: booted once and one turn run, then shut down
- * cleanly. Boot and turn journeys copy it so every run starts from the same
- * bytes (schema migrated, catalog refresh stamped, one conversation).
- */
 const ensureBaseTemplate = async () => {
   const dir = path.join(LAB_DIR, "templates", `base-v${TEMPLATE_VERSION}`);
   if (fs.existsSync(path.join(dir, ".complete")) && !opts.reseed) return dir;
@@ -679,16 +608,12 @@ const ensureBaseTemplate = async () => {
   await client.boot(dir);
   await runTurn(client, { conversationId: "local_perf-conv", prompt: "seed turn" });
   await client.waitQuiet();
-  // A fresh data dir refreshes the pi.dev catalog once; the probe answers it
-  // with a local 404 (never a real request). Anything else is blocked.
   const { fetch: seedFetch } = await client.snapshot();
   log(
     `seed network guard: catalog requests answered locally=${seedFetch.catalog404}, other fetches blocked=${seedFetch.blocked}` +
       `${seedFetch.blockedUrls.length ? ` (${seedFetch.blockedUrls.join(", ")})` : ""}`,
   );
   await client.stop();
-  // The seed turn finished: a returning user has no pi work in flight (the
-  // idle check would clear this list 30s later), so boot resumes nothing.
   rmrf(path.join(dir, "agent", "active.json"));
   fs.writeFileSync(path.join(dir, ".complete"), new Date().toISOString());
   return dir;
@@ -699,19 +624,9 @@ const warmCacheDir = (entryKind) => {
   return dir;
 };
 
-// ------------------------------------------------------------------ turn driver
 let turnSeq = 0;
-// Request ids must be unique across invocations: a reused template already
-// holds the seed turn's submission, and pi answers a repeated
-// (conversation, request id) as the same submission without a new run.
 const TURN_RUN_TAG = Date.now().toString(36);
-/** Conversations each client watches, so their `piChat.events` reach it. */
 const watchedConversations = new WeakMap();
-/**
- * Watch a conversation (once per client). Opening it imports its chat log
- * into pi's transcript, so on a large seeded history the first watch can
- * take minutes; returns how long it took (null when already watched).
- */
 const watchConversation = async (client, conversationId, { timeoutMs = 60_000 } = {}) => {
   let watched = watchedConversations.get(client);
   if (!watched) watchedConversations.set(client, (watched = new Set()));
@@ -720,15 +635,6 @@ const watchConversation = async (client, conversationId, { timeoutMs = 60_000 } 
   const r = await client.request("internal.worker.piChat", { op: "watch", conversationId }, { timeoutMs });
   return r.at - r.sentAt;
 };
-/**
- * One chat turn as the composer sends it: `internal.worker.piChat` `submit`
- * on a watched conversation, which pi-durable answers. Marks come from the
- * conversation's `piChat.events` notifications, timestamped on arrival:
- *   send → ack (submit response) → run_start → first assistant entry
- *   (`message_end`) → run_end. Tool turns add tool_execution_start/end.
- * `settledMs` is when the worker went quiet (>=150ms without a message),
- * which captures post-turn tail work (chat log mirror, persistence fan-out).
- */
 const runTurn = async (client, { conversationId, prompt, timeoutMs = 30_000 }) => {
   turnSeq += 1;
   const requestId = `perf-req-${TURN_RUN_TAG}-${turnSeq}`;
@@ -757,9 +663,6 @@ const runTurn = async (client, { conversationId, prompt, timeoutMs = 30_000 }) =
         if (span) span.end = at;
       } else if (ev.type === "run_end" && marks.runStarted != null && marks.runFinished == null) {
         marks.runFinished = at;
-        // Event-loop availability probe: a health RPC written the instant the
-        // run finishes is answered only once synchronous post-turn work
-        // (mirror writes, completion hooks) yields.
         marks.idle = client
           .request("internal.worker.health")
           .then((r) => r.at)
@@ -798,7 +701,6 @@ const runTurn = async (client, { conversationId, prompt, timeoutMs = 30_000 }) =
   };
 };
 
-// ------------------------------------------------------------------ J1 boot
 const bootOnce = async ({ entryKind, cache, dataTemplate, cpuProfDir = null, census = false }) => {
   const entry = entryKind === "bundle" ? BUNDLE_ENTRY : SOURCE_ENTRY;
   const runDir = newRunDir(`boot-${entryKind}-${cache}`);
@@ -816,10 +718,6 @@ const bootOnce = async ({ entryKind, cache, dataTemplate, cpuProfDir = null, cen
   try {
     const marks = await client.boot(dataDir, { keepBootAccounting: true });
     const snap = await client.snapshot();
-    // Boot RPC windows: `ready` = spawn → the first health response reporting
-    // ready (what the host's runtime-ready waits on); `settled` = through the
-    // first 250ms of stdout silence after ready (debounced post-ready work
-    // such as the background catalog warm lands here).
     await client.waitQuiet(250);
     const settledSnap = await client.snapshot();
     const bootRpc = { ready: client.bootAcctAtReady, settled: client.endBootAccounting() };
@@ -828,7 +726,6 @@ const bootOnce = async ({ entryKind, cache, dataTemplate, cpuProfDir = null, cen
       execToProcessStartMs: workerStartEpoch - client.spawnEpoch,
       processStartToPreloadMs: snap.preloadStartMs,
       preloadMs: snap.preloadDoneMs - snap.preloadStartMs,
-      // entry module graph load + evaluate + main() prelude up to transport attach
       entryGraphToTransportMs:
         marks.spawnToTransportMs - (workerStartEpoch - client.spawnEpoch) - snap.preloadDoneMs,
     };
@@ -848,7 +745,6 @@ const bootOnce = async ({ entryKind, cache, dataTemplate, cpuProfDir = null, cen
       census: snap.census,
       censusAnchor: census
         ? {
-            // convert census `at` (ms since preload start) to spawn-relative
             offsetMs: workerStartEpoch - client.spawnEpoch + snap.preloadStartMs,
             transportMs: marks.spawnToTransportMs,
             initializedMs: marks.spawnToInitializedMs,
@@ -873,7 +769,6 @@ const cmdBoot = async () => {
       log(`bundle entry missing (${BUNDLE_ENTRY}); skipping (the app runs the worker from source)`);
       continue;
     }
-    // Prime the warm cache once, discarded.
     await bootOnce({ entryKind, cache: "warm", dataTemplate: template });
     for (const cache of caches) {
       const runs = [];
@@ -896,8 +791,6 @@ const cmdBoot = async () => {
         heapAfterReadyMB: pick((r) => r.heapAfterReady / 1048576),
         bootSqlStatements: pick((r) => r.bootSql),
         bootRpcBytesOut: pick((r) => r.bootRpcBytesOut),
-        // Deterministic boot RPC counts (max over runs; `nondeterministic`
-        // lists any field that differed between runs and should be empty).
         bootRpc: {
           ready: foldBootAccounts(runs.map((r) => r.bootRpc.ready)),
           settled: foldBootAccounts(runs.map((r) => r.bootRpc.settled)),
@@ -938,10 +831,6 @@ const classifyModule = (file) => {
   return { rel, pkg: parts[0] };
 };
 
-/**
- * esbuild metafile of the SOURCE worker graph (everything bundled except
- * bun:* / electron), used only for its import edges and input byte sizes.
- */
 let sourceGraphPromise = null;
 const sourceGraph = () =>
   (sourceGraphPromise ??= (async () => {
@@ -985,15 +874,6 @@ const staticClosure = (meta, startRel, seen = new Set()) => {
   return out;
 };
 
-/**
- * Module census: one untimed run with the loader plugin. The plugin sees
- * every TypeScript module (source entry) or bundle chunk (bundle entry) as
- * it loads, timestamped; for the source entry each observed module is
- * expanded to its static import closure from the esbuild metafile so
- * node_modules JS is counted too (a static import graph is evaluated in
- * full before the importer runs). Phases: before transport attach / before
- * initialize returned / before runner ready / during the first two turns.
- */
 const moduleCensus = async (entryKind, template) => {
   const entry = entryKind === "bundle" ? BUNDLE_ENTRY : SOURCE_ENTRY;
   const runDir = newRunDir(`census-${entryKind}`);
@@ -1077,9 +957,6 @@ const moduleCensus = async (entryKind, template) => {
     }
   }
   const bootModules = modules.filter((m) => m.phase !== "firstTurns");
-  // Each observed module's load gap = time until the next observed module
-  // started loading (fetch+transpile order); a coarse per-module load-time
-  // signal to pair with the CPU profile's per-module self time.
   const obs = modules.filter((m) => m.observed).sort((a, b) => a.atMs - b.atMs);
   for (let i = 0; i < obs.length; i += 1) {
     obs[i].gapMs = round((obs[i + 1]?.atMs ?? obs[i].atMs) - obs[i].atMs, 2);
@@ -1117,7 +994,6 @@ const moduleCensus = async (entryKind, template) => {
   };
 };
 
-// ------------------------------------------------------------------ J2/3/5 turns
 const bootForTurns = async (label, template) => {
   const runDir = newRunDir(label);
   const dataDir = path.join(runDir, "data");
@@ -1162,14 +1038,6 @@ const counterRow = (d, { rxLines, hostRequests, turns = 1, rssMB }) => {
 };
 const hostTotal = (client) => Object.values(client.hostRequests).reduce((a, b) => a + b, 0);
 
-/**
- * Turn measurement. The first turn is bracketed by probe snapshots on its
- * own (first-turn-after-boot cost incl. lazy imports). Then `warmup` turns,
- * one snapshot, `repeat` timed turns back to back with NO snapshot in
- * between (a snapshot forces a full GC, which would flatter turn latency),
- * and a closing snapshot: counters are per-turn means over that window
- * (they are deterministic per turn shape), timings are per-turn p50/p95.
- */
 const measureTurns = async (client, { prompt, repeat, warmup, conversationId }) => {
   const s0 = await client.snapshot();
   const rx0 = client.rx.lines;
@@ -1189,11 +1057,7 @@ const measureTurns = async (client, { prompt, repeat, warmup, conversationId }) 
   const hA = hostTotal(client);
   const rows = [];
   for (let i = 0; i < repeat; i += 1) {
-    // --gc-each-turn: force a full GC before every timed turn (diagnostic;
-    // shows how much of turn latency is GC debt from earlier turns).
     if (opts["gc-each-turn"]) await client.snapshot();
-    // --turn-gap-ms: idle time between timed turns (diagnostic; separates GC
-    // debt from timer-driven background work spilling into the next turn).
     if (opts["turn-gap-ms"]) await sleep(Number(opts["turn-gap-ms"]));
     rows.push(await runTurn(client, { conversationId, prompt }));
   }
@@ -1240,7 +1104,6 @@ const cmdTurn = async () => {
       warmup,
       conversationId: "local_perf-turns-tool",
     });
-    // Journey 5: persistence cost per persisted event, derived from J2.
     const s = plain.steady;
     const eventsPerTurn =
       (plain.rpcOutPerTurn["localChat.updated"]?.lines ?? 0) +
@@ -1260,12 +1123,6 @@ const cmdTurn = async () => {
   }
 };
 
-// ------------------------------------------------------------------ J4 history
-// --history-shape legacy (default): events only, so every event predates the
-// conversation's pi transcript and its chat-log mirror imports them all when
-// the conversation first opens. modern: one real turn first, then N events
-// after it, so the transcript already exists and the mirror imports only the
-// events written after it.
 const historyShape = () => (String(opts["history-shape"] ?? "legacy") === "modern" ? "modern" : "legacy");
 const ensureHistoryTemplate = async (n) => {
   const shape = historyShape();
@@ -1391,11 +1248,9 @@ const cmdHistory = async () => {
           conversationId: "local_perf-history",
         }),
       };
-      // Opening the conversation imports its N events into pi's transcript.
       results[n].openMs = round(
         await watchConversation(client, "local_perf-history", { timeoutMs: 30 * 60_000 }),
       );
-      // A turn on the large conversation: does history size leak into turn cost?
       const t = await measureTurns(client, {
         prompt: "perf turn on seeded history",
         repeat: 5,
@@ -1415,7 +1270,6 @@ const cmdHistory = async () => {
   return results;
 };
 
-// ------------------------------------------------------------------ J6 memory
 const psRssMB = (pid) => {
   const r = spawnSync("ps", ["-o", "rss=", "-p", String(pid)], { encoding: "utf8" });
   const kb = Number.parseInt(r.stdout.trim(), 10);
@@ -1472,7 +1326,6 @@ const cmdMemory = async () => {
   }
 };
 
-// ------------------------------------------------------------------ J7 bundle
 const walk = (dir, out = []) => {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const p = path.join(dir, entry.name);
@@ -1508,7 +1361,6 @@ const cmdBundle = async () => {
   } else {
     result.dist = { missing: distRuntime };
   }
-  // A code-split worker build with write:false to obtain a metafile.
   const esbuild = await import("esbuild");
   const build = await esbuild.build({
     absWorkingDir: REPO,
@@ -1537,7 +1389,6 @@ const cmdBundle = async () => {
   writeJson(path.join(LAB_DIR, "bundle-metafile.json"), meta);
   const outputs = meta.outputs;
   const entryOut = Object.keys(outputs).find((o) => o.endsWith("runtime/worker/entry.js"));
-  // Outputs reachable from entry.js via static imports = parsed at boot.
   const bootOutputs = new Set();
   const stack = [entryOut];
   while (stack.length) {
@@ -1581,7 +1432,6 @@ const cmdBundle = async () => {
   return result;
 };
 
-// ------------------------------------------------------------------ profiles
 const aggregateCpuProfile = (file, { topN = 30, intervalUs = 250 } = {}) => {
   const prof = JSON.parse(fs.readFileSync(file, "utf8"));
   const nodes = new Map(prof.nodes.map((n) => [n.id, n]));
@@ -1630,13 +1480,11 @@ const newestProfile = (dir) => {
     .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs)[0];
 };
 const cmdProfile = async () => {
-  // --template NAME profiles against a seeded template (e.g. history-100000-v2)
   const template = opts.template
     ? path.join(LAB_DIR, "templates", String(opts.template))
     : await ensureBaseTemplate();
   const interval = intOpt("interval", 250);
   const out = {};
-  // Boot-only profile (source + bundle), process exits right after ready.
   for (const entryKind of listOpt("entry", ["source", "bundle"])) {
     if (entryKind === "bundle" && !fs.existsSync(BUNDLE_ENTRY)) continue;
     const dir = path.join(LAB_DIR, "profiles", `boot-${entryKind}-${Date.now().toString(36)}`);
@@ -1657,7 +1505,6 @@ const cmdProfile = async () => {
       ? { spawnToReadyMs: round(marks.spawnToReadyMs), ...aggregateCpuProfile(file, { intervalUs: interval }) }
       : { error: "no profile written" };
   }
-  // Turn profile: boot + N turns minus boot-only (subtraction; inferred).
   const turns = intOpt("turns", 40);
   const dir = path.join(LAB_DIR, "profiles", `turns-${Date.now().toString(36)}`);
   const runDir = newRunDir("profile-turns");
@@ -1703,18 +1550,11 @@ const cmdProfile = async () => {
   return out;
 };
 
-// ------------------------------------------------------------------ validation
-/**
- * Proxy validation: each proxy must move with wall-clock across >= 3
- * configurations. Reports Pearson r and Spearman rho per proxy.
- */
 const cmdValidate = async () => {
   const template = await ensureBaseTemplate();
   const repeat = intOpt("repeat", 5);
   const out = {};
 
-  // (a) boot: module bytes loaded vs spawn-to-phase wall-clock, across phases
-  //     and entries (source/bundle) and cache states.
   const bootPoints = [];
   for (const entryKind of ["source", "bundle"]) {
     if (entryKind === "bundle" && !fs.existsSync(BUNDLE_ENTRY)) continue;
@@ -1736,8 +1576,6 @@ const cmdValidate = async () => {
     spearman: spearman(bootPoints.map((p) => p.proxyBytes), bootPoints.map((p) => p.wallMs)),
   };
 
-  // (b) turns: sql statements / rpc bytes vs turn wall-clock across turn
-  //     shapes (plain, tool, turn on 1k/10k history).
   const turnPoints = [];
   {
     const { client } = await bootForTurns("validate-turns", template);
@@ -1788,16 +1626,6 @@ const cmdValidate = async () => {
   return out;
 };
 
-// ------------------------------------------------------------------ baseline / check
-/**
- * Metrics the ratchet tracks. kind decides the default tolerance:
- *   time  -> +35% and +3ms slack (machine noise)
- *   count -> +5%  and +2 slack   (near-deterministic)
- *   exact -> no slack            (identical on every run: boot notifications,
- *                                 host requests, blocked fetches)
- *   bytes -> +5%  and +1KB slack (deterministic byte counts)
- *   mem   -> +20% and +2 slack   (RSS/heap in MB or KB; GC-timing noise)
- */
 const TOLERANCE = {
   time: { rel: 0.35, abs: 3 },
   count: { rel: 0.05, abs: 2 },
@@ -1805,7 +1633,6 @@ const TOLERANCE = {
   bytes: { rel: 0.05, abs: 1024 },
   mem: { rel: 0.2, abs: 2 },
 };
-/** Kinds that gate by default and under --counts-only (machine-independent). */
 const DETERMINISTIC_KINDS = new Set(["count", "exact", "bytes"]);
 const extractMetrics = (report) => {
   const m = {};
@@ -1820,7 +1647,6 @@ const extractMetrics = (report) => {
     put(`boot.${cfg}.spawnToReadyMs.p50`, b.spawnToReadyMs?.p50, "time");
     put(`boot.${cfg}.spawnToReadyMs.p95`, b.spawnToReadyMs?.p95, "time");
     put(`boot.${cfg}.rssAfterReadyMB.p50`, b.rssAfterReadyMB?.p50, "mem");
-    // Boot JSON-RPC (bench side, probe responses excluded, paths normalized).
     const ready = b.bootRpc?.ready;
     const settled = b.bootRpc?.settled;
     if (ready) {
@@ -1836,8 +1662,6 @@ const extractMetrics = (report) => {
       }
     }
     if (ready && settled) {
-      // Work that moves from before ready to just after it must not escape
-      // the gate: lines/bytes emitted in the post-ready settle window.
       put(`boot.${cfg}.bootRpc.postReadyLinesOut`, settled.lines - ready.lines, "exact");
       put(`boot.${cfg}.bootRpc.postReadyBytesOut`, settled.bytes - ready.bytes, "bytes");
     }
@@ -1896,11 +1720,7 @@ const ceilingFor = (value, kind) => {
   return round(value * (1 + tol.rel) + tol.abs, 2);
 };
 const isGating = (kind) => {
-  // --counts-only (CI): only machine-independent kinds gate; wall-clock and
-  // memory are reported as warnings on any runner.
   if (opts["counts-only"]) return DETERMINISTIC_KINDS.has(kind);
-  // Default: counts, bytes and memory gate; wall-clock gates only with
-  // --strict-time (same machine class, quiet host).
   return kind !== "time" || Boolean(opts["strict-time"]);
 };
 const checkAgainstBaseline = (metrics, baseline) => {
@@ -1922,7 +1742,6 @@ const checkAgainstBaseline = (metrics, baseline) => {
   return { rows, failures, skipped, untracked };
 };
 
-// ------------------------------------------------------------------ main
 const machine = () => ({
   platform: `${process.platform}-${process.arch}`,
   cpu: os.cpus()[0]?.model,
@@ -1930,7 +1749,6 @@ const machine = () => ({
   memGB: Math.round(os.totalmem() / 1073741824),
   bun: spawnSync(BUN, ["--version"], { encoding: "utf8" }).stdout.trim(),
   gitHead: spawnSync("git", ["rev-parse", "--short", "HEAD"], { cwd: REPO, encoding: "utf8" }).stdout.trim(),
-  // Uncommitted runtime/contracts edits change what is measured; record them.
   dirtyRuntimeFiles: spawnSync("git", ["status", "--porcelain", "--", "packages/runtime", "packages/contracts"], { cwd: REPO, encoding: "utf8" })
     .stdout.split("\n")
     .filter((l) => l.trim() && !l.includes("scripts/perf/")).length,
@@ -2030,7 +1848,6 @@ const main = async () => {
         `${failures.length} failed, ${skipped.length} baseline metrics not measured by this run` +
         `${untracked.length ? `, ${untracked.length} measured but not in baseline: ${untracked.join(", ")}` : ""}\n`,
     );
-    // Deterministic boot counts must not vary between runs of one check.
     const varied = Object.entries(report.boot ?? {}).flatMap(([cfg, b]) =>
       Object.entries(b?.bootRpc ?? {}).flatMap(([window, f]) => f.nondeterministic.map((x) => `${cfg}.${window}.${x}`)),
     );
@@ -2053,8 +1870,6 @@ const main = async () => {
     }
   }
   if (opts["add-missing"] && !opts["write-baseline"]) {
-    // Add metrics this run measured that baseline.json lacks (fresh ceilings);
-    // never touches an existing entry.
     const baseline = JSON.parse(fs.readFileSync(BASELINE_PATH, "utf8"));
     const added = [];
     for (const [k, v] of Object.entries(metrics)) {
@@ -2066,9 +1881,6 @@ const main = async () => {
     log(`added ${added.length} metrics to ${BASELINE_PATH}${added.length ? `: ${added.join(", ")}` : ""}`);
   }
   if (opts.rerecord && !opts["write-baseline"]) {
-    // Re-record the metrics under these key prefixes from this run (value and
-    // a fresh ceiling): for a journey that itself changed, whose old numbers
-    // measured something else. Every other entry is left alone.
     const prefixes = String(opts.rerecord)
       .split(",")
       .map((prefix) => prefix.trim())
@@ -2096,8 +1908,6 @@ const main = async () => {
     writeJson(BASELINE_PATH, baseline);
     log(`wrote ${BASELINE_PATH}`);
   }
-  // Per-run scratch (copied data dirs, cold transpiler caches) is disposable;
-  // templates/, cache/ and profiles/ are kept.
   if (!opts["keep-runs"]) rmrf(path.join(LAB_DIR, "runs"));
   if (opts.out) writeJson(path.resolve(String(opts.out)), report);
   if (JSON_OUT) process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
@@ -2105,7 +1915,6 @@ const main = async () => {
   process.exit(exitCode);
 };
 
-// Importable for ad-hoc experiments (bun only): the CLI runs when executed.
 export {
   WorkerClient,
   workerEnv,

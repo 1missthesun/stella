@@ -4,7 +4,6 @@ import {
   type AgentStatus,
 } from "./agent-status.js";
 
-/** Durable chat decorations. Payloads match the on-device lifecycle events. */
 type LifecycleIdentity = {
   agentId: string;
   rootRunId?: string;
@@ -31,11 +30,6 @@ export type CloudAgentLifecycleEvent =
     }
   | {
       type: "agent-failed" | "agent-canceled";
-      /**
-       * `status` says how the attempt ended in the shared vocabulary. Builds
-       * before `stop_agent` wrote `status: "paused"` on a stop's card, which
-       * reads as `canceled`.
-       */
       payload: LifecycleIdentity & { error?: string; status?: AgentAttemptOutcome };
     };
 
@@ -151,7 +145,6 @@ export const parseCloudAgentLifecycleCard = (
   }
 };
 
-/** The status a lifecycle card leaves its agent in, in the shared vocabulary. */
 export const cloudAgentLifecycleStatus = (event: CloudAgentLifecycleEvent): AgentStatus => {
   switch (event.type) {
     case "agent-started":

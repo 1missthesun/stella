@@ -8,19 +8,9 @@ export type BrandCharacterShape = "blob" | "cursor";
 export interface BrandCharacterProps {
   shape?: BrandCharacterShape;
   className?: string;
-  /** Match the scene surface, as in the desktop working indicator. */
   eyeColor?: string;
 }
 
-/**
- * Original Stella artwork, held still for store-image export.
- * Blob: the exact shipping desktop working-indicator rig and default star.
- * Cursor: the exact gradient PNG shared by the browser automation cursor
- * and native desktop helper. Its source is agent-cursor.js CURSOR_ASSET.
- * Do not substitute the unrelated onboarding arrow or redraw this artwork.
- * The parent supplies dimensions through className. Export waits for
- * [data-brand-ready="true"] so the imperative SVG has painted its first frame.
- */
 export function BrandCharacter({
   shape = "blob",
   className,
@@ -49,8 +39,6 @@ export function BrandCharacter({
       followPointer: false,
       visibilityGate: false,
     });
-    // createStellaMark queues its first paint before this callback and then
-    // suspends. Do not start an animation or capture an empty host.
     const frame = requestAnimationFrame(() => setReady(true));
     return () => {
       cancelAnimationFrame(frame);

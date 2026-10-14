@@ -1,11 +1,3 @@
-/**
- * Build WebP variants for canvas hero screenshots.
- * Run: bun scripts/optimize-canvas-screenshots.mjs
- *
- * Reads PNG sources in public/demos/, writes:
- *   canvas-{name}.webp      (2560w, retina desktop)
- *   canvas-{name}-1280.webp (1280w, mobile / 1x)
- */
 import sharp from "sharp";
 import path from "path";
 

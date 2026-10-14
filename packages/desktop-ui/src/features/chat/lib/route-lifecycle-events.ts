@@ -65,17 +65,11 @@ const LIFECYCLE_EVENT_TYPES = new Set([
 const isLifecycleEvent = (event: EventRecord): boolean =>
   LIFECYCLE_EVENT_TYPES.has(event.type);
 
-/** Synthetic `_id` prefix of streaming-overlay rows (see streaming-types). */
 const STREAMING_OVERLAY_ID_PREFIX = "stream-overlay:";
 
 export type LifecycleRoutingState = {
   /** Sticky `eventId -> anchorKey` decisions for the session. */
   sticky: Map<string, string>;
-  /**
-   * Structural-sharing cache: base (unrouted) message object -> the routed
-   * object previously produced for it, so unchanged routings reuse the same
-   * output identity across stream deltas and downstream memo caches hold.
-   */
   routedByBase: WeakMap<MessageRecord, MessageRecord>;
 };
 export const createLifecycleRoutingState = (): LifecycleRoutingState => ({
@@ -95,8 +89,6 @@ const getAssistantUserMessageId = (
 
 const getStreamStartedAtMs = (message: MessageRecord): number | undefined => {
   if (message._id.startsWith(STREAMING_OVERLAY_ID_PREFIX)) {
-    // Overlay rows sort by (and were created at) the moment their text
-    // arrived, which for a whole message is the moment the row appeared.
     return message.timestamp;
   }
   const metadata = (
@@ -112,19 +104,8 @@ const getStreamStartedAtMs = (message: MessageRecord): number | undefined => {
 
 type Anchor = {
   key: string;
-  /**
-   * Stream start for assistant anchors; `-Infinity` for the user-message
-   * anchor; `undefined` for legacy assistants (not routing targets, and
-   * their attached events stay put).
-   */
   startTs: number | undefined;
   messageIndex: number;
-  /**
-   * A hidden user prompt (an agent's `[Agent completed]` wake) renders no
-   * row, so nothing anchored to it can paint. It is never a routing target:
-   * an event that predates every reply in its turn waits on it, unpinned,
-   * and moves to the first reply once one exists.
-   */
   hiddenUser?: boolean;
 };
 
@@ -144,17 +125,10 @@ const sameToolEventIds = (
   return true;
 };
 
-/**
- * Re-anchor lifecycle events across the merged display messages per the
- * arrival-order rule above. Pure aside from the caller-owned `state`
- * (sticky decisions + identity cache). Returns the input array reference
- * when nothing moves.
- */
 export const routeLifecycleEvents = (
   messages: MessageRecord[],
   state: LifecycleRoutingState,
 ): MessageRecord[] => {
-  // Fast bail: no lifecycle events anywhere.
   let hasLifecycle = false;
   for (const message of messages) {
     if (message.toolEvents.some(isLifecycleEvent)) {
@@ -164,7 +138,6 @@ export const routeLifecycleEvents = (
   }
   if (!hasLifecycle) return messages;
 
-  // `messageIndex -> final toolEvents` for messages whose events changed.
   const routedEventsByIndex = new Map<number, EventRecord[]>();
 
   const assistantCountByUserMessageId = new Map<string, number>();
@@ -193,10 +166,6 @@ export const routeLifecycleEvents = (
       string,
       { event: EventRecord; lastSource: TurnEntry }
     >();
-    // Entries whose toolEvents may change (lose a duplicate/moved copy or
-    // gain a routed-in event). Everything else skips the rebuild below —
-    // this runs per stream chunk, so untouched rows must stay allocation
-    // free.
     const changed = new Set<TurnEntry>();
     for (const entry of entries) {
       for (const event of entry.message.toolEvents) {
@@ -216,9 +185,6 @@ export const routeLifecycleEvents = (
 
     const anchorsByKey = new Map<string, TurnEntry>();
     for (const entry of entries) anchorsByKey.set(entry.anchor.key, entry);
-    // Routing targets: anchors with a defined start, in walk order (their
-    // startTs are non-decreasing by construction of the timeline). A hidden
-    // user prompt is not one (see `Anchor.hiddenUser`).
     const targets = entries.filter(
       (entry) =>
         entry.anchor.startTs !== undefined && !entry.anchor.hiddenUser,
@@ -274,9 +240,6 @@ export const routeLifecycleEvents = (
         }
       }
       if (resolved === undefined && source.anchor.hiddenUser) {
-        // Nothing painted before the event and its prompt cannot paint it:
-        // the turn's first reply carries it. With no reply yet, keep waiting
-        // on the prompt without a pin so the reply claims it on arrival.
         const firstReply = targets[0];
         if (!firstReply) return source;
         resolved = firstReply;
@@ -299,9 +262,6 @@ export const routeLifecycleEvents = (
       targetByEventId.set(eventId, resolveTarget(lastSource, event));
     }
 
-    // Incoming lifecycle events per anchor key (routed from elsewhere),
-    // and the set of ids each target already carries (so a routed-in copy
-    // is added at most once and prefers the copy already on the target).
     const incomingByKey = new Map<string, EventRecord[]>();
     const placedIds = new Set<string>();
     for (const [eventId, target] of targetByEventId) {
@@ -318,10 +278,10 @@ export const routeLifecycleEvents = (
         if (!isLifecycleEvent(event)) continue;
         const target = targetByEventId.get(event._id);
         if (!target || target === entry) continue;
-        changed.add(entry); // loses this copy
+        changed.add(entry);
         if (placedIds.has(event._id)) continue;
         placedIds.add(event._id);
-        changed.add(target); // gains the routed-in copy
+        changed.add(target);
         let incoming = incomingByKey.get(target.anchor.key);
         if (!incoming) incomingByKey.set(target.anchor.key, (incoming = []));
         incoming.push(event);
@@ -331,11 +291,6 @@ export const routeLifecycleEvents = (
     for (const entry of entries) {
       if (!changed.has(entry)) continue;
       const incoming = incomingByKey.get(entry.anchor.key);
-      // Keep events that stay on this anchor, dropping moved-away copies
-      // and any duplicate occurrences beyond the first. Merge routed-in
-      // lifecycle events by authoritative event chronology: appending an
-      // older moved event after a newer kept start reverses follow-up cards.
-      // A message whose events did not move keeps an identical id sequence.
       const seenHere = new Set<string>();
       const kept = entry.message.toolEvents.filter((event) => {
         if (!isLifecycleEvent(event)) return true;
@@ -368,8 +323,6 @@ export const routeLifecycleEvents = (
       continue;
     }
     if (message.type !== "assistant_message") continue;
-    // Hidden assistants never anchor cards (mirrors the grouping walk);
-    // leave them and their (normally empty) toolEvents untouched.
     if (isUiHiddenChatMessagePayload(message.payload ?? null)) continue;
     const userMessageId = getAssistantUserMessageId(message);
     let key: string;

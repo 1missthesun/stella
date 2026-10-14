@@ -1,24 +1,13 @@
-// Hand-curated normie-friendly changelog. Grouped by release (desktop version
-// range that shipped that batch), not by date. Date is kept as a secondary
-// label. Items default to the Desktop app; cross-product items (Launcher,
-// Mobile, Backend) carry a product chip.
-
 export type Product = "Launcher" | "Mobile" | "Backend";
 
 export type ChangeItem = string | { text: string; product: Product };
 
 export type ChangelogEntry = {
-  /** Desktop version range shipped in this batch, e.g. "v0.0.323 – v0.0.324".
-   *  Omitted for pre-tag entries (use `era` instead). */
   release?: string;
-  /** Calendar date the work landed (secondary label). */
   date: string;
-  /** Used in place of `release` for pre-release foundational entries. */
   era?: string;
   tags?: string[];
-  /** Tier 1: headline, user-facing wins. Rendered open. */
   highlights?: ChangeItem[];
-  /** Tier 2: misc, fixes, and other. Rendered behind a disclosure. */
   more?: ChangeItem[];
 };
 

@@ -22,7 +22,6 @@ import { readManagedModelPrices } from "../catalog/prices.js";
 import { ownerGateStub } from "../rpc-release.js";
 import { reportCharges } from "./charge-telemetry.js";
 
-/** A breaker in USD from the Worker's env, -1 meaning none; else the default. */
 const tierCeilingMicroCents = (env: Env, name: string, defaultUsd: number): number => {
   const raw = (env as unknown as Record<string, unknown>)[name];
   const value = typeof raw === "string" && raw.trim() ? Number(raw.trim()) : defaultUsd;
@@ -32,12 +31,6 @@ const tierCeilingMicroCents = (env: Env, name: string, defaultUsd: number): numb
   return value === -1 ? -1 : dollarsToMicroCents(value);
 };
 
-/**
- * The model gateway's way into billing, over a service binding: session
- * capabilities for client runtimes, and the usage it settles. A service
- * binding runs where the gateway's request runs, so a session exchange from
- * a client still reaches the owner's object from the client's edge.
- */
 export class BillingControl extends WorkerEntrypoint<Env> implements BillingControlRpc {
   async issueSessionCapability(
     request: SessionCapabilityRequest,
@@ -58,10 +51,6 @@ export class BillingControl extends WorkerEntrypoint<Env> implements BillingCont
     }
   }
 
-  /**
-   * The gateway's pricing and limits snapshot. Prices come from D1
-   * (`model_prices`, synced by the Cron Trigger); the gateway caches it.
-   */
   async gatewayConfig(): Promise<GatewayConfigSnapshot> {
     const { prices, updatedAt } = await readManagedModelPrices(this.env);
     return {
@@ -78,7 +67,6 @@ export class BillingControl extends WorkerEntrypoint<Env> implements BillingCont
     };
   }
 
-  /** One owner's enforcement, from its abuse domain. Seeds the gateway's owner object. */
   async ownerEnforcement(ownerId: string): Promise<OwnerEnforcementState> {
     if (typeof ownerId !== "string" || !ownerId || ownerId.length > 512) {
       throw new Error("The owner id is invalid.");
@@ -86,12 +74,6 @@ export class BillingControl extends WorkerEntrypoint<Env> implements BillingCont
     return await ownerGateStub(this.env.OWNER_GATES, ownerId).ownerEnforcement();
   }
 
-  /**
-   * The current access token for the cloud's ChatGPT sign-in (the native
-   * lane), from the engines domain in the owner's object. Refused as
-   * `generation_stale` when the capability predates an owner reset and as
-   * `engine_sign_in_required` when the cloud's ChatGPT sign-in ended.
-   */
   async engineAccess(
     request: EngineAccessRequest,
   ): Promise<BillingControlResult<EngineAccessResponse>> {
@@ -135,12 +117,6 @@ export class BillingControl extends WorkerEntrypoint<Env> implements BillingCont
     }
   }
 
-  /**
-   * The owner's saved credential for one account provider (the BYOK lane),
-   * from the providers domain in the owner's object. Refused as
-   * `generation_stale` when the capability predates an owner reset and as
-   * `engine_sign_in_required` when the provider's sign-in ended.
-   */
   async providerAccess(
     request: ProviderAccessRequest,
   ): Promise<BillingControlResult<ProviderAccessResponse>> {
@@ -185,7 +161,6 @@ export class BillingControl extends WorkerEntrypoint<Env> implements BillingCont
     }
   }
 
-  /** Settle a batch. Throws when any owner's share should be redelivered. */
   async ingestUsage(batch: GatewayUsageBatch): Promise<GatewayUsageBatchResult> {
     const byOwner = new Map<string, GatewayUsageEvent[]>();
     for (const event of batch.events) {
@@ -198,8 +173,6 @@ export class BillingControl extends WorkerEntrypoint<Env> implements BillingCont
         const result = await ownerGateStub(this.env.OWNER_GATES, ownerId).applyGatewayUsage(events);
         const accepted = new Set(result.accepted);
         this.ctx.waitUntil(
-          // Billing itself is already settled above; only the report waits
-          // on the owner's telemetry preference.
           reportCharges(
             this.env,
             { ownerId, ownerGeneration: events[0]?.ownerGeneration ?? "" },

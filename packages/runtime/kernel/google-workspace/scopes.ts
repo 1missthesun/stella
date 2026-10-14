@@ -4,10 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/**
- * OAuth scopes required by the Google Workspace integration.
- * Shared with the headless login CLI.
- */
 export const SCOPES = [
   'https://www.googleapis.com/auth/documents',
   'https://www.googleapis.com/auth/drive',

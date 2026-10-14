@@ -4,13 +4,6 @@ import { useChatGptProfiles } from "@/features/chatgpt/use-chatgpt-profiles";
 import { DEFAULT_MODEL_BY_PROVIDER } from "@/global/settings/lib/provider-default-models";
 import { switchEngine } from "@/global/settings/lib/switch-engine";
 
-/**
- * A self-hosted server without Stella's own models can't answer on the
- * "Stella" engine. When this desktop is still on it (it was set up on
- * stella.sh, or never chose), move it once to the Claude or ChatGPT account
- * signed in on this computer. A provider API key on the default engine is a
- * real choice and stays.
- */
 export function ManagedModelsFallback() {
   const claude = useClaudeLocalAccounts();
   const chatgpt = useChatGptProfiles();

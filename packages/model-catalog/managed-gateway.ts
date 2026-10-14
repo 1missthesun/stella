@@ -15,9 +15,6 @@ export const MANAGED_GATEWAY_PROVIDERS = [
 
 export type ManagedGatewayProvider = (typeof MANAGED_GATEWAY_PROVIDERS)[number];
 
-/**
- * Wire protocol a managed gateway speaks.
- */
 export type ManagedProtocol =
   | "openai-completions"
   | "openai-responses"
@@ -27,21 +24,8 @@ export type ManagedProtocol =
 export type ManagedGatewayConfig = {
   provider: ManagedGatewayProvider;
   baseURL: string;
-  /**
-   * Primary env var name for the managed upstream key. Some providers
-   * accept additional documented aliases via `apiKeyEnvVarFallbacks`.
-   */
   apiKeyEnvVar: string;
-  /**
-   * Optional secondary env var names tried when `apiKeyEnvVar` is unset.
-   * Used for Meta's documented `MODEL_API_KEY` alias alongside Stella's
-   * namespaced `META_MODEL_API_KEY`.
-   */
   apiKeyEnvVarFallbacks?: readonly string[];
-  /**
-   * Static headers sent on every request to this gateway. Used for
-   * provider-specific requirements with no request-body equivalent.
-   */
   extraHeaders?: Record<string, string>;
 };
 
@@ -86,8 +70,6 @@ const MANAGED_GATEWAY_CONFIGS: Record<
     baseURL: "https://generativelanguage.googleapis.com",
     apiKeyEnvVar: "GOOGLE_AI_API_KEY",
   },
-  // Meta Model API (Muse Spark). OpenAI-compatible chat completions / responses
-  // at api.meta.ai. Stella hosts the key — no end-user BYOK for Meta.
   meta: {
     provider: "meta",
     baseURL: "https://api.meta.ai/v1",
@@ -109,13 +91,7 @@ const DIRECT_MODEL_PROVIDER_PREFIXES = [
   ["openai/", "openai"],
   ["anthropic/", "anthropic"],
   ["google/", "google"],
-  // `meta/muse-spark-1.2` (first-party Meta Model API) belongs here, but the
-  // OpenRouter-hosted `-contributor` variant must NOT match this prefix — its
-  // mode config pins `managedGatewayProvider: "openrouter"`, which
-  // `resolveManagedGatewayProvider` honors over prefix inference.
   ["meta/", "meta"],
-  // OpenRouter-namespaced slugs (e.g. `openrouter/<vendor>/<model>`)
-  // pass through the OpenRouter gateway verbatim.
   ["openrouter/", "openrouter"],
 ] as const;
 
@@ -125,21 +101,12 @@ export function getManagedGatewayConfig(
   return MANAGED_GATEWAY_CONFIGS[provider];
 }
 
-/**
- * Env var names that may hold a gateway's upstream key: the primary name
- * first, then any documented aliases (`apiKeyEnvVarFallbacks`).
- */
 export function listManagedGatewayApiKeyEnvVars(
   config: ManagedGatewayConfig,
 ): readonly string[] {
   return [config.apiKeyEnvVar, ...(config.apiKeyEnvVarFallbacks ?? [])];
 }
 
-/**
- * Resolve the managed upstream API key for a gateway from an explicit env
- * map, honoring the documented aliases. Runtime-agnostic: the caller passes
- * `process.env`, a Worker `env` binding, or a test fixture.
- */
 export function resolveManagedGatewayApiKeyFromEnv(
   config: ManagedGatewayConfig,
   env: Readonly<Record<string, string | undefined>>,
@@ -182,7 +149,6 @@ export function resolveManagedGatewayProvider(args: {
   );
 }
 
-/** Resolve the wire protocol for a managed route from its provider and config. */
 export const resolveManagedProtocol = (args: {
   provider: ManagedGatewayProvider;
   configuredApi?: ManagedProtocol;

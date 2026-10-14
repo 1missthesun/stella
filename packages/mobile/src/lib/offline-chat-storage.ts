@@ -33,13 +33,6 @@ import {
   type AsyncTranscriptPage,
 } from "./async-transcript-fallback";
 
-/**
- * The local stores behind the one cloud conversation. Both threads read and
- * write the SAME conversation; they are separate only so the two surfaces that
- * can be mounted at once never drain one another's queue. `cloud` is the chat
- * surface (and keeps its original key, from when it was the cloud-only store).
- * `carplay` is the hands-free voice loop driven from a head unit.
- */
 export type ChatThreadId = "cloud" | "carplay";
 const CHAT_THREAD_IDS: ChatThreadId[] = ["cloud", "carplay"];
 
@@ -51,11 +44,6 @@ const SYNC_STATE_KEY: Record<ChatThreadId, string> = {
   cloud: "stella-mobile-chat-sync-state-v1",
   carplay: "stella-mobile-carplay-sync-state-v1",
 };
-/**
- * Raw journal tail beside the projection cache, so a cold launch resumes the
- * conversation socket from a cursor instead of downloading the newest window.
- * SQLite `mobile_chat_meta` holds it natively; this is the non-native fallback.
- */
 const JOURNAL_CACHE_KEY: Record<ChatThreadId, string> = {
   cloud: "stella-mobile-cloud-journal-v1",
   carplay: "stella-mobile-carplay-journal-v1",
@@ -94,11 +82,6 @@ CREATE TABLE IF NOT EXISTS mobile_chat_meta (
 );
 `;
 
-/**
- * Initial hydration is deliberately small. Durable history lives in SQLite;
- * React/Hermes owns only a sliding window and asks for adjacent pages as the
- * user scrolls.
- */
 export const CHAT_TRANSCRIPT_INITIAL_LIMIT = 160;
 export const CHAT_TRANSCRIPT_PAGE_LIMIT = 80;
 export const CHAT_TRANSCRIPT_MAX_LOADED = 480;
@@ -155,13 +138,11 @@ let transcriptCleanupMarkerCheck: Promise<boolean> | null = null;
 let transcriptCleanupRecovery: Promise<void> | null = null;
 const transcriptCleanupListeners = new Set<() => void>();
 
-/** Notify mounted transcript owners before account data is wiped. */
 export function subscribeChatStorageCleanup(listener: () => void): () => void {
   transcriptCleanupListeners.add(listener);
   return () => transcriptCleanupListeners.delete(listener);
 }
 
-/** Synchronously detach mounted producers once durable account intent exists. */
 export function invalidateChatStorageForAccountCleanup(): void {
   beginAccountChatMetadataCleanup();
   for (const listener of transcriptCleanupListeners) {
@@ -242,9 +223,6 @@ async function cleanupRequired(): Promise<boolean> {
   )
     .then((value) => value === "1")
     .catch((error) => {
-      // A storage read failure cannot be interpreted as "no cleanup intent":
-      // doing so could expose the prior account's rows. Leave the check
-      // retryable and fail closed until AsyncStorage is readable again.
       transcriptCleanupMarkerCheck = null;
       throw error;
     });
@@ -297,26 +275,16 @@ async function recoverInterruptedAccountCleanup(): Promise<void> {
     const messageIndex = await import("./chat-message-index");
     if (!progress.canonicalCleared) {
       invalidateChatStorageForAccountCleanup();
-      // Account intent may have been the final write before a process kill.
-      // Establish the independent index block before canonical deletion so a
-      // stale FTS database can never become the only surviving account copy.
       await messageIndex.ensureMessageIndexRebuildIntent();
-      // `clearAllChatStorage` raises its own canonical marker before deleting
-      // anything. Its in-progress latch prevents this recovery call from
-      // recursively entering through getTranscriptDb().
       await clearAllChatStorage();
       await markAccountCanonicalChatCleared(token);
     }
     const latestProgress = await loadAccountChatCleanupProgress(token);
     if (!latestProgress.indexCleared) {
-      // Recovery may begin at the transcript entry point before the recall
-      // subsystem mounts. Finish the independently durable index deletion here
-      // rather than leaving the account-wide owner pending indefinitely.
       await messageIndex.clearMessageIndex();
       await markAccountChatIndexCleared(token);
     }
     if (!(await finalizeAccountChatCleanup(token))) {
-      // A concurrent index recovery may already have finalized this token.
       if ((await loadAccountChatCleanupIntent()) === token) {
         throw new Error("Local chat account cleanup did not finalize");
       }
@@ -344,10 +312,6 @@ async function openTranscriptDb(): Promise<SQLiteDatabase | null> {
 }
 
 const getTranscriptDb = async () => {
-  // Cross-store ownership must be recovered before any canonical store is
-  // opened or served. Recovery's own clearAllChatStorage() call raises the
-  // in-progress latch before recursively opening the DB, so this does not
-  // recurse.
   if (!transcriptCleanupInProgress) {
     await recoverInterruptedAccountCleanup();
   }
@@ -417,13 +381,6 @@ function parseStoredToolSteps(value: unknown): ToolStep[] {
   });
 }
 
-/**
- * Round-trip the background-task snapshots riding a persisted row. Tasks feed
- * the activity pill/tray via `collectConversationTasks`; dropping them on load
- * (the pre-fix behavior) killed the pill on every app relaunch — the sync
- * cursor is already past the spawning rows, so a cursor delta only re-delivers
- * them when the agent happens to emit another lifecycle event.
- */
 function parseStoredTasks(value: unknown): MobileTask[] {
   if (!Array.isArray(value)) return [];
   const tasks: MobileTask[] = [];
@@ -524,11 +481,6 @@ function parseRow(row: unknown): ChatMessage | null {
     ...(typeof o.canonicalId === "string" && o.canonicalId.trim()
       ? { canonicalId: o.canonicalId.trim() }
       : {}),
-    // The turn `requestId` links a phone-sent reply to its canonical desktop
-    // row (see `mergeMessagesById`). Dropping it on reload let a restart's
-    // catch-up sync re-append the already-stored reply as a duplicate when the
-    // row carried a `requestId` but hadn't been stamped with a `canonicalId`
-    // yet (killed before the background reconcile landed).
     ...(typeof o.requestId === "string" && o.requestId.trim()
       ? { requestId: o.requestId.trim() }
       : {}),
@@ -588,9 +540,6 @@ function parseRow(row: unknown): ChatMessage | null {
         }
       : {}),
     ...(o.cloudFallback === true ? { cloudFallback: true } : {}),
-    // A queued-but-unsent bubble must reload as queued, never as a delivered
-    // message. The hook re-enqueues these on hydration so a restart actually
-    // sends them (see `useChatThread`).
     ...(o.queued === true ? { queued: true } : {}),
     ...(o.stopped === true ? { stopped: true } : {}),
   };
@@ -603,10 +552,6 @@ function parseStoredMessages(raw: string | null): ChatMessage[] {
     if (!Array.isArray(parsed)) return [];
     const out: ChatMessage[] = [];
     for (const item of parsed) {
-      // Hydration must be corruption-tolerant per ROW: parseRow is defensive,
-      // but if a row written by a different code version still manages to
-      // throw, only that row is dropped — never the whole transcript, and
-      // never the boot (this runs during initial mount).
       let row: ChatMessage | null = null;
       try {
         row = parseRow(item);
@@ -625,13 +570,6 @@ function parseStoredMessages(raw: string | null): ChatMessage[] {
 
 const migrationKey = (thread: ChatThreadId) => `legacy-migration-v1:${thread}`;
 
-/**
- * Copy the old whole-array AsyncStorage value into SQLite exactly once. The
- * marker and rows commit in one transaction; deleting the source happens only
- * after that commit. A kill at any boundary therefore retries harmlessly:
- * primary-key INSERT OR IGNORE prevents duplicates and the source remains
- * available until the durable commit is known to have succeeded.
- */
 async function migrateLegacyTranscript(
   db: SQLiteDatabase,
   thread: ChatThreadId,
@@ -684,8 +622,6 @@ async function migrateLegacyTranscript(
     return true;
   });
   if (!committed) return;
-  // If this removal fails, the completed SQLite marker wins next launch. The
-  // legacy value is merely redundant; it can never overwrite canonical rows.
   await AsyncStorage.removeItem(MESSAGES_KEY[thread]).catch(() => {});
 }
 
@@ -809,7 +745,6 @@ export async function loadRecentChatMessages(
   return pageFromRows({ thread, rows, hasOlder, hasNewer: false });
 }
 
-/** Start an oldest-to-newest bounded scan (used to seed a missing checkpoint). */
 export async function loadOldestChatMessages(
   thread: ChatThreadId,
   limit = CHAT_TRANSCRIPT_INITIAL_LIMIT,
@@ -901,11 +836,6 @@ export async function loadNewerChatMessages(
   return pageFromRows({ thread, rows, hasOlder: Boolean(older), hasNewer });
 }
 
-/**
- * Reconcile a complete canonical window. The caller invalidates cache metadata
- * first and publishes it only after this operation succeeds. SQLite changes
- * commit together; interrupted fallback writes remain behind that same fence.
- */
 export async function synchronizeChatMessages(
   thread: ChatThreadId,
   messages: ChatMessage[],
@@ -913,8 +843,6 @@ export async function synchronizeChatMessages(
 ): Promise<void> {
   if (transcriptCleanupInProgress) return;
   const previousSnapshot = canonicalSnapshotByThread.get(thread);
-  // A complete authoritative window supersedes pending legacy/delta writers,
-  // just as the previous clear-and-rebuild path did.
   invalidateTranscriptWrites(thread);
   const revision = canonicalSnapshotRevisionByThread.get(thread);
   const generation = transcriptGeneration(thread);
@@ -932,9 +860,6 @@ export async function synchronizeChatMessages(
     if (!db) {
       await synchronizeAsyncTranscriptRows(thread, incoming, current);
     } else {
-      // Reuse only a successfully committed, bounded snapshot. Other write
-      // APIs advance the revision even when queued, so no captured cache can
-      // hide changes made while this reconciliation waited for its turn.
       const existing =
         previousSnapshot &&
         revision === canonicalSnapshotRevisionByThread.get(thread)
@@ -991,8 +916,6 @@ export async function synchronizeChatMessages(
         if (error === stale) return;
         throw error;
       }
-      // At most 3,000 rows and roughly 16 MiB of UTF-16 payload. Oversized
-      // snapshots remain correct and simply use the durable comparison path.
       if (
         current() &&
         revision === canonicalSnapshotRevisionByThread.get(thread) &&
@@ -1009,8 +932,6 @@ export async function synchronizeChatMessages(
     if (!current()) return;
     await AsyncStorage.removeItem(MESSAGES_KEY[thread]);
     fallbackMigrations.delete(thread);
-    // The ordinary append writer's bounded caches must not retain deleted or
-    // reordered identities. This path compares against durable rows directly.
     orderKeysByThread.delete(thread);
     serializedByThread.delete(thread);
   });
@@ -1077,11 +998,6 @@ export async function saveChatSyncState(
   });
 }
 
-/**
- * The encoded raw journal tail the last cache rebuild committed, or null.
- * Read under the same account-cleanup gates as the sync cursor so a wiped
- * account can never seed its successor's socket.
- */
 export async function loadCloudJournalCache(
   thread: ChatThreadId,
 ): Promise<string | null> {
@@ -1102,7 +1018,6 @@ export async function loadCloudJournalCache(
   }
 }
 
-/** Persist (or with null, drop) the encoded raw journal tail for a thread. */
 export async function saveCloudJournalCache(
   thread: ChatThreadId,
   encoded: string | null,
@@ -1147,27 +1062,15 @@ export async function saveCloudJournalCache(
   });
 }
 
-/**
- * Wipe every thread's transcript and sync cursor. The stores are keyed
- * globally (not per account), so sign-out and account deletion must clear
- * them or the next signed-in user inherits — and re-sends as history — the
- * previous user's messages.
- */
 export async function clearAllChatStorage(): Promise<void> {
   transcriptCleanupInProgress = true;
   transcriptCleanupRecoveryRequired = true;
   transcriptCleanupMarkerCheck = Promise.resolve(true);
   invalidateChatStorageForAccountCleanup();
-  // Do not let an enqueue already committing in the background recreate the
-  // old account's outbox after sign-out has removed its storage keys. Cleanup
-  // remains independent: a SQLite failure must not skip AsyncStorage removal.
   let databaseCleared = false;
   let fallbackCleared = false;
   let asyncStorageCleared = false;
   try {
-    // Do not begin a partly durable account wipe. If intent persistence fails,
-    // the caller gets an error and canonical data remains intact for a retry;
-    // the process-local latch still prevents this process from serving it.
     await AsyncStorage.setItem(TRANSCRIPT_CLEANUP_REQUIRED_KEY, "1");
     await waitForDesktopChatOutboxWrites().catch(() => {});
     let databaseOpenFailed = false;

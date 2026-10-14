@@ -1,18 +1,3 @@
-/**
- * Stella's voice and register, injected as a hidden startup doc on the first
- * orchestrator turn.
- *
- * Composition is live and mirrors the agent-prompt customization model:
- *
- * - `~/.stella/PERSONALITY.md`, when present, is the user's replacement and is
- *   used verbatim — hand edits always win.
- * - Otherwise the content comes straight from the bundled
- *   `stella-runtime/prompts/personality.md` (via `readRuntimePrompt`), so
- *   shipped updates apply automatically with no reconciliation.
- *
- * A hand edit takes effect on the next fresh conversation, not mid-thread.
- */
-
 import fs from "node:fs";
 import path from "node:path";
 import { readRuntimePrompt } from "../prompts/home-prompts.js";
@@ -39,6 +24,5 @@ export const readOrSeedPersonality = (stellaDataDir: string): string => {
     // Missing or unreadable file falls through to the bundled prompt.
   }
 
-  // Reading never materializes a file, so shipped updates keep flowing.
   return bundledPersonality();
 };

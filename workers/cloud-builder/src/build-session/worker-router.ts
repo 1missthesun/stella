@@ -4,16 +4,6 @@ import {
   serveWorkspaceAppPreview,
 } from "../workspace-app-access.js";
 import { worldName } from "../workspace.js";
-/**
- * The Worker's request router: every HTTP entry point the cloud builder
- * exposes, plus the route helpers only it uses.
- *
- * The Durable Object classes it addresses are bindings on `Env`, so this
- * module never imports `../index.js` — it depends only on `shared/*`, its
- * sibling build-session modules, and the plain `src/*` collaborators.
- *
- * @see src/index.ts for `export default worker`.
- */
 
 import { handleSlackRoute } from "../slack/routes.js";
 import { Hono, type MiddlewareHandler } from "hono";
@@ -182,8 +172,6 @@ const authenticateConversationCaller = async (
   });
 
   if (!issuer) {
-    // Fail closed and loudly. The alternative — treating a missing issuer as
-    // "skip verification" — is how an auth check becomes optional in practice.
     log("error", "conversation_auth_unconfigured", { requestId });
     return deny(
       CLOSE_INTERNAL,
@@ -246,7 +234,6 @@ const authenticateConversationCaller = async (
   }
   const verified = await verifyUserToken(token, env);
   if (!verified.ok) {
-    // The reason is a log-only discriminator; the caller is told one thing.
     log(verified.retryable ? "error" : "info", "conversation_auth_rejected", {
       requestId,
       reason: verified.reason,
@@ -316,13 +303,6 @@ const forwardToConversation = async (
   );
 };
 
-/**
- * `POST /conversations/:id/turns`: the one route both a signed-in user's JWT
- * and the service secret open. The Worker verifies the caller and does the
- * cheap refusals (shape, service-only fields); every admission decision is
- * the conversation Durable Object's. Identity reaches it on trusted headers
- * — never from the body, which cannot name an owner at all.
- */
 const handleTurnStartRoute = async (
   request: Request,
   env: Env,
@@ -341,9 +321,6 @@ const handleTurnStartRoute = async (
   let ownerGeneration: string | null = null;
   let tokenExpiresAtMs: number | null = null;
   if (await verifyServiceBearerRequestWithAny(request, builderServiceSecrets(env))) {
-    // Service-originated: a schedule fire, placement's cloud branch, an
-    // agent-completion wake. It names the owner it acts for and pins the
-    // generation it read; the gate refuses a stale one.
     const headerOwner = request.headers.get(TURN_OWNER_ID_HEADER)?.trim() ?? "";
     ownerGeneration = normalizeOwnerGeneration(
       request.headers.get(TURN_OWNER_GENERATION_HEADER),
@@ -365,8 +342,6 @@ const handleTurnStartRoute = async (
       requestId,
     );
     if (!auth.ok) {
-      // Re-shaped to the turn-start contract; the socket-oriented refusal
-      // already logged the discriminator.
       const status = auth.response.status;
       await auth.response.body?.cancel().catch(() => undefined);
       return status === 503
@@ -425,8 +400,6 @@ const handleTurnStartRoute = async (
       );
     }
   }
-  // Built from scratch rather than cloned: nothing of the caller's headers
-  // may reach the DO, and the trusted identity is exactly these four.
   const headers = new Headers({ "content-type": "application/json" });
   headers.set(HEADER_OWNER, ownerId);
   headers.set(HEADER_TURN_AUTH_KIND, authKind);
@@ -452,12 +425,6 @@ const handleTurnStartRoute = async (
   return response;
 };
 
-/**
- * `GET /owners/me/devices/:deviceId/presence`. The device's socket lands on
- * its owner's gate, which is where presence, offers, and claims all live —
- * the JWT proves the account, the Ed25519 proof inside the socket proves the
- * device.
- */
 const forwardToDevicePresence = async (
   request: Request,
   env: Env,
@@ -556,10 +523,6 @@ const handleDispatchSubmitRoute = async (
   const gate = ownerGateStub(env.OWNER_GATES, caller.ownerId);
 
   if (caller.kind === "user" && hasMobilePairingProofHeaders(request.headers)) {
-    // A phone has no device key the cloud can verify; the pairing key in the
-    // owner snapshot is what stands in for one. The challenge is rebuilt from
-    // the request the worker is about to act on, so a proof minted for other
-    // bytes cannot authorize these.
     const fields = readMobilePairingProofHeaders(request.headers);
     if (!fields) {
       return dispatchErrorResponse(
@@ -639,8 +602,6 @@ const handleDispatchSubmitRoute = async (
   }
 
   if (caller.kind === "user" && submitted.ingress === "mobile") {
-    // A user JWT authorizes cloud chat. Only a verified pairing proof may
-    // supply the phone identity used to offer work to a computer.
     const { requestingDeviceId: _unverifiedDeviceId, ...unpaired } = submitted;
     submitted = unpaired;
   }
@@ -697,11 +658,6 @@ const handleDispatchSubmitRoute = async (
   });
 };
 
-/**
- * Status and cancel. Both are owner-bound: the gate is addressed by the owner
- * the caller proved, so a dispatch id from another account simply is not in
- * this object and answers `not_found`.
- */
 const handleDispatchControlRoute = async (
   request: Request,
   env: Env,
@@ -835,10 +791,8 @@ type SubRouter = (
   ctx: ExecutionContext,
 ) => Promise<Response | null | undefined>;
 
-/** An area router that answers its own paths and returns null for the rest. */
 const mount = (handle: SubRouter): MiddlewareHandler<RouterEnv> =>
   async (c, next) => {
-    // `executionCtx` throws when the caller passed none; read it only on use.
     const ctx = {
       waitUntil: (promise: Promise<unknown>) => c.executionCtx.waitUntil(promise),
       passThroughOnException: () => c.executionCtx.passThroughOnException(),
@@ -848,10 +802,6 @@ const mount = (handle: SubRouter): MiddlewareHandler<RouterEnv> =>
     await next();
   };
 
-/**
- * Verify the signed-in user's JWT and expose the proven identity as
- * `c.var.caller`. `socket` shapes refusals for a WebSocket client.
- */
 const userAuth = (
   { socket }: { socket?: "conversation" | "presence" } = {},
 ): MiddlewareHandler<RouterEnv> =>
@@ -872,7 +822,6 @@ const userAuth = (
     await next();
   };
 
-/** Buffer and validate a JSON body before the handler forwards it. */
 const jsonBody = (maxBytes: number): MiddlewareHandler<RouterEnv> =>
   async (c, next) => {
     const bounded = await boundedIngressRequest(c.req.raw, maxBytes);
@@ -898,7 +847,6 @@ const serviceSecret: MiddlewareHandler<RouterEnv> = async (c, next) => {
   await next();
 };
 
-/** Hand the buffered body to a Durable Object path with nothing else attached. */
 const forwardBody = async (
   stub: { fetch(url: string, init: RequestInit): Promise<Response> },
   url: string,
@@ -913,11 +861,6 @@ const forwardBody = async (
 
 const WORLD_KEY = "[0-9a-f]{64}:[0-9a-f]{64}";
 const APP_SLUG = "[a-z][a-z0-9-]{0,31}";
-/**
- * A broker session may also be the orchestrator's `orch:<conversationId>`
- * thread, whose name reaches this route percent-encoded
- * (`encodeURIComponent`); the parameter decodes back to the exact name.
- */
 const BROKER_SESSION_ID = "(?:[A-Za-z0-9._~-]|%3[Aa]){1,160}";
 const { tinyControl } = CLOUD_BUILDER_BODY_LIMITS;
 
@@ -942,11 +885,7 @@ app.use(async (c, next) => {
   }
 });
 
-// ── Public ────────────────────────────────────────────────────────────────
-
 app.get("/healthz", () => json({ ok: true, service: "stella-v2-cloud-builder" }));
-// What is actually deployed, so the open-source claim is checkable: the
-// platform's own version id (and the source commit when the deploy set it).
 app.get("/version", (c) => {
   const env = c.env as unknown as Record<string, unknown>;
   const metadata = env.CF_VERSION_METADATA as
@@ -990,13 +929,11 @@ app.all("/api/auth/device-pairing/:name", async (c) => {
   const { handleDevicePairingRoute } = await import("../selfhost/pairing.js");
   return await handleDevicePairingRoute(c.req.raw, c.env as unknown as Cloudflare.Env);
 });
-// Identity: Better Auth, loaded on first use to keep it off other wakes.
 app.all("/api/auth/:rest{.*}", async (c) => {
   const { handleAuthRoute } = await import("../auth/routes.js");
   return await handleAuthRoute(c.req.raw, c.env);
 });
 
-// World sync carries its own capability; the handler checks it.
 app.all(`/internal/worlds/:world{${WORLD_KEY}}/:op{export|changes|push}`, (c) => {
   const op = c.req.param("op") as "export" | "changes" | "push";
   return handleWorldRoute(c.req.raw, c.env, c.req.param("world"), { kind: op });
@@ -1015,10 +952,6 @@ app.all("/workspace-apps/:rest{.*}", (c) => serveWorkspaceApp(c.req.raw, c.env))
 // verifies it and forwards the proven identity to the DO in x-stella-*
 // headers, stripping whatever the client sent under those names first.
 
-// Listing, minting an app URL and serving a preview only read owner state, so
-// none of them takes an activity lease: a lease would turn every poll into
-// durable register/assert/unregister writes, and a stale read cannot outlive a
-// purge because the minted capability carries the generation.
 const listOwnerApps = async (env: Env, ownerId: string) => {
   const world = env.WORLDS.getByName(await worldName(ownerId));
   await ownerAccess(env, ownerId);
@@ -1049,10 +982,6 @@ app.get(`/owners/me/apps/:slug{${APP_SLUG}}/preview`, userAuth(), async (c) => {
 });
 app.all(`/owners/me/apps/:slug{${APP_SLUG}}/preview`, methodNotAllowed("Method not allowed"));
 
-// Area routers. Each authenticates its own routes: the owner store and voice
-// check the user's JWT; media, projects, billing and integrations also take
-// signed webhooks and callbacks; admin checks STELLA_ADMIN_API_SECRET; the
-// model catalog, app-source bootstrap and release channel are public.
 app.use(mount(handleBackendRoute));
 app.use(mount(handleStellaModelsRoute));
 app.use(mount(handlePreviewSessionCapabilityRoute));
@@ -1073,7 +1002,6 @@ app.use(mount(handleDevicesRoute));
 app.use(mount(handleUserAsksRoute));
 app.use(mount(handleVoiceRoute));
 app.use(mount(handleIntegrationsRoute));
-// Slack signs its own requests; the link pages carry signed state.
 app.use(mount(handleSlackRoute));
 
 app.all("/dictation/socket", socketOnly, async (c) => {
@@ -1138,9 +1066,6 @@ app.get(DEVICES_PATH, userAuth(), async (c) => {
 app.post(DISPATCH_SUBMIT_PATH, (c) =>
   handleDispatchSubmitRoute(c.req.raw, c.env, c.var.requestId),
 );
-// Dispatch ids carry a colon (`dsp:<uuid>`), and every client builds this
-// path with `encodeURIComponent`, so the segment arrives as `dsp%3A…`. The
-// class admits the escape; the param arrives decoded.
 const DISPATCH_ID = "[A-Za-z0-9._:~%-]{1,96}";
 app.get(`${DISPATCH_SUBMIT_PATH}/:dispatchId{${DISPATCH_ID}}`, (c) =>
   handleDispatchControlRoute(c.req.raw, c.env, c.req.param("dispatchId"), "status", c.var.requestId),
@@ -1214,21 +1139,18 @@ app.get("/conversations/:id/history", userAuth(), (c) =>
 app.post("/conversations/:id/history/query", userAuth(), jsonBody(tinyControl), (c) =>
   forwardToConversation(c.req.raw, c.env, c.req.param("id"), "/history/query", c.var.caller),
 );
-// A computer's compaction, as the conversation's checkpoint for every host.
 app.post(
   `/conversations/:id${JOURNAL_CHECKPOINT_PATH}`,
   userAuth(),
   jsonBody(JOURNAL_CHECKPOINT_SUMMARY_MAX_BYTES + 4096),
   (c) => forwardToConversation(c.req.raw, c.env, c.req.param("id"), JOURNAL_CHECKPOINT_PATH, c.var.caller),
 );
-// Where the conversation's Stella runs, read and moved by the owner's devices.
 app.get("/conversations/:id/pi-brain", userAuth(), (c) =>
   forwardToConversation(c.req.raw, c.env, c.req.param("id"), "/pi-brain", c.var.caller),
 );
 app.post("/conversations/:id/pi-brain", userAuth(), jsonBody(tinyControl), (c) =>
   forwardToConversation(c.req.raw, c.env, c.req.param("id"), "/pi-brain", c.var.caller),
 );
-// The user started writing a message: wake the container the reply runs in.
 app.post("/conversations/:id/prewarm", userAuth(), jsonBody(tinyControl), (c) =>
   forwardToConversation(c.req.raw, c.env, c.req.param("id"), "/prewarm", c.var.caller),
 );
@@ -1291,8 +1213,6 @@ app.all("/cloud-home/:rest{.*}", userAuth(), async (c, next) => {
 app.all(`/sessions/:sessionId{${BROKER_SESSION_ID}}/turn-broker`, async (c) => {
   const brokerSessionId = c.req.param("sessionId");
   const request = c.req.raw;
-  // A pi agent's container presents `pi:<conversation>`: its broker is that
-  // conversation's orchestrator object, which holds the agent's lease.
   const piConversation = /^pi(?::|%3[Aa])([A-Za-z0-9._~-]{1,128})$/u.exec(brokerSessionId)?.[1];
   const response = piConversation
     ? await c.env.ORCHESTRATOR_SESSIONS.getByName(piConversation).fetch(
@@ -1306,9 +1226,6 @@ app.all(`/sessions/:sessionId{${BROKER_SESSION_ID}}/turn-broker`, async (c) => {
       request.headers.get(TURN_BROKER_HEADERS.targetMethod),
       request.headers.get(TURN_BROKER_HEADERS.targetPath),
     );
-    // The outer Worker sees only the broker's already-scrubbed response.
-    // Record an allowlisted target kind and numeric status for preview
-    // acceptance without reading token-bearing data or the response body.
     log("info", "turn_broker_public_response", {
       threadId: brokerSessionId,
       targetKind: diagnosticTarget?.kind ?? "rejected",
@@ -1324,9 +1241,6 @@ app.all(`/sessions/:sessionId{${BROKER_SESSION_ID}}/turn-broker`, async (c) => {
 
 app.use(serviceSecret);
 
-// Exact placement turn + cancellation identity must survive the gateway.
-// Dropping this body regresses to conversation-wide Stop and can cancel a
-// newer turn after a delayed retry.
 app.post("/conversations/:id/cancel", jsonBody(tinyControl), (c) =>
   forwardBody(
     c.env.ORCHESTRATOR_SESSIONS.getByName(c.req.param("id")),
@@ -1334,8 +1248,6 @@ app.post("/conversations/:id/cancel", jsonBody(tinyControl), (c) =>
     c.req.raw,
   ),
 );
-// The journal probe reads the canonical journal exactly the way a client
-// does, including through R2 segments.
 app.get("/conversations/:id/journal", (c) => {
   const probe = new URL("https://orchestrator-session/journal");
   probe.search = new URL(c.req.url).search;
@@ -1351,10 +1263,6 @@ app.post("/sessions/:sessionId/cancel", jsonBody(tinyControl), (c) =>
     c.req.raw,
   ),
 );
-// Operator surface for a thread stuck "running": expire its watchdog now.
-// The DO interrupts a hung local fiber and re-arms its alarm so the ordinary
-// timeout path delivers the terminal while the container's teardown stays
-// alarm-owned debt.
 app.post("/sessions/:sessionId/expire", jsonBody(tinyControl), (c) =>
   forwardBody(
     c.env.BUILD_SESSIONS.getByName(c.req.param("sessionId")),
@@ -1362,17 +1270,11 @@ app.post("/sessions/:sessionId/expire", jsonBody(tinyControl), (c) =>
     c.req.raw,
   ),
 );
-// Operator surface for a container the inventory says is live but no Durable
-// Object still owns. Wrangler cannot stop one instance and only the sandbox
-// object holds the container handle, so retirement is a keep-alive release
-// plus destroy on the exact tuple, by name.
 app.post("/internal/sandboxes/retire", jsonBody(tinyControl), (c) =>
   retireSandboxInstance(c.env, c.req.raw),
 );
 
 app.notFound(() => json({ error: "Not found." }, 404));
-// Uncaught errors leave the Worker as they always have, so the runtime's
-// exception reporting still sees them.
 app.onError((error) => {
   throw error;
 });

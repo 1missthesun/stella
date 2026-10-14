@@ -1,27 +1,12 @@
-/**
- * A conversation's latest compaction checkpoint, kept beside its journal so
- * any host (the cloud, another computer) seeds its transcript from it: the
- * summary stands in for everything up to `throughSeq`, and the journal's
- * messages after it follow word for word.
- */
 export type JournalCheckpoint = {
-  /** The summary message a host's compaction wrote, as its model read it. */
   summary: string;
-  /** The newest journal seq the summary covers. */
   throughSeq: number;
 };
 
-/**
- * Where the context a checkpoint keeps starts, as the publishing host knows
- * it: the journal seq of a message it imported, or the turn of one of its
- * own (a journal turn id, or a computer's local turn id under its device).
- */
 export type JournalCheckpointFirstKept = { seq: number } | { turnId: string } | { localTurnId: string };
 
-/** `POST /conversations/:id/checkpoint`. */
 export type JournalCheckpointPublish = {
   expectedOwnerGeneration: string;
-  /** The publishing computer, which a `localTurnId` belongs to. */
   deviceId?: string;
   summary: string;
   firstKept: JournalCheckpointFirstKept;

@@ -52,11 +52,6 @@ const configuredGatewayOrigin = (): string | null => {
   }
 };
 
-/**
- * Presence alone is insufficient: normal browser/desktop builds may execute
- * arbitrary page code. The immutable pre-module runtime must also name the
- * exact gateway compiled into this build before any auth path switches over.
- */
 export const getStellaInteriorBridge = (): StellaInteriorBridge | null => {
   if (typeof window === "undefined") return null;
   const bridge = window.__STELLA_INTERIOR_BRIDGE__;

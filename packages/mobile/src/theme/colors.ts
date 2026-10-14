@@ -1,11 +1,3 @@
-/**
- * The mobile color surface: the shared palette + derived tokens from
- * `@stella/theme`, renamed onto the keys mobile components already use.
- *
- * Nothing here invents a color. Every value is either a palette entry or a
- * token that desktop writes to a CSS variable of the same recipe, so a theme
- * renders the same muted text, hairlines, bubbles, and panel tints on both.
- */
 import {
   deriveTokens,
   getThemeById,
@@ -16,22 +8,17 @@ import {
 } from "@stella/theme";
 
 export type Colors = {
-  // Core backgrounds
   background: string;
   backgroundWeak: string;
   backgroundStrong: string;
-  /** Opaque floating chrome (desktop `--overlay-surface`). */
   surface: string;
   panel: string;
-  /** Recessed surface (desktop `--surface-inset`). */
   surfaceInset: string;
 
-  // Borders (desktop `--border`, `--border-weak`, `--border-strong`)
   border: string;
   borderWeak: string;
   borderStrong: string;
 
-  // Text (desktop `--foreground` / `--text-*`)
   text: string;
   textBase: string;
   textMuted: string;
@@ -39,59 +26,39 @@ export type Colors = {
   textStrong: string;
   textInteractive: string;
 
-  // Brand / primary
   accent: string;
   accentHover: string;
-  /** Canonical "selected" fill (desktop `--select-fill`). */
   accentSoft: string;
-  /** Canonical "selected" hairline (desktop `--select-border`). */
   selectBorder: string;
   accentForeground: string;
 
-  // Decorative accent (distinct from brand — e.g. pink in Carbon, orange in Neon)
   decorative: string;
   decorativeForeground: string;
 
-  // Status
   ok: string;
   warning: string;
   danger: string;
   info: string;
 
-  // Surfaces
   card: string;
   cardForeground: string;
   muted: string;
   mutedForeground: string;
 
-  // Tint-only panels (desktop `--panel-surface-*`): the composer material,
-  // rendered top → bottom as a two-stop gradient.
   panelSurfaceBgTop: string;
   panelSurfaceBgBottom: string;
   panelSurfaceBorder: string;
   panelSurfaceHighlight: string;
 
-  // Chat bubbles (desktop `--chat-*-bubble-*`)
   userBubbleFill: string;
   userBubbleText: string;
   assistantBubbleFillTop: string;
   assistantBubbleFillBottom: string;
   assistantBubbleText: string;
 
-  // Scrim
   overlay: string;
 };
 
-/**
- * Map the shared palette + tokens onto the mobile key set.
- *
- * `isDark` exists for one reason: the phone's substrate goes to true black
- * rather than the palette's dark grey. This is a mobile-only decision and
- * stays here rather than in `@stella/theme`, which desktop reads too — the
- * shared palettes are untouched. Only the base page/chat surface moves;
- * everything layered on it (card, muted, overlay surface, bubbles, borders)
- * keeps its palette value and so gains contrast rather than losing it.
- */
 export function makeColors(
   palette: ThemeColors,
   tokens: ThemeTokens,
@@ -156,7 +123,5 @@ function fallbackFor(isDark: boolean): Colors {
   return makeColors(colors, deriveTokens(colors, isDark, { flat }), isDark);
 }
 
-/** Pre-load palettes — the Default theme, so the frame before AsyncStorage
- *  resolves matches what most users actually see. */
 export const lightColors: Colors = fallbackFor(false);
 export const darkColors: Colors = fallbackFor(true);

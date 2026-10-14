@@ -6,15 +6,6 @@ import {
 import type { BillingControlRpc } from "@stella/contracts/gateway/usage";
 import { billingControl } from "./billing-control.js";
 
-/**
- * USAGE_QUEUE consumer. Each batch settles into the owners' billing ledgers
- * on cloud-builder (`BillingControl.ingestUsage`), which also takes the
- * owners' risk signals from it.
- * Settlement is idempotent on `requestId`, so a retried batch is safe.
- *
- *   settled   ack the whole batch (rejections are logged, never retried).
- *   a failure retry the whole batch with a growing delay.
- */
 const RETRY_DELAY_SECONDS = [5, 15, 60, 180, 600] as const;
 
 export const isUsageEvent = (value: unknown): value is GatewayUsageEvent => {

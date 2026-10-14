@@ -6,12 +6,6 @@ import { Button } from "@/ui/button";
 import { showToast } from "@/ui/toast";
 import { useT } from "@/shared/i18n";
 
-/**
- * What Stella Cloud holds for this account, in one place: download it, and
- * the support-access grant (off unless the owner turns it on for a day,
- * with every use recorded below). Everything else about privacy here is
- * on by default and needs no switch.
- */
 export function YourDataCard() {
   const t = useT();
   const { isCloudConversationReady } = useCloudConversationSession();

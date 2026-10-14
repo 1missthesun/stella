@@ -1,11 +1,3 @@
-/**
- * "Stella on your computer" — no pairing, just where to get it.
- *
- * A computer signed in to the same account connects to this phone on its
- * own, so the card says so in a few words and links to the desktop app.
- * While it is on screen it watches the account's computers, and settles to
- * "Connected to <computer>" the moment one appears.
- */
 import { useEffect, useMemo, useState } from "react";
 import { Linking, StyleSheet, Text, View } from "react-native";
 import Animated, {
@@ -40,12 +32,10 @@ import {
 
 const ART_WIDTH = 240;
 const ART_HEIGHT = 72;
-/** Phone centre → computer centre, the arc the task travels along. */
 const FROM_X = 34;
 const TO_X = 190;
 const BASE_Y = 58;
 const ARC_LIFT = 30;
-/** Device centres sit on this line; the arc rises from it. */
 const ARC_Y = BASE_Y - 18;
 const HOP_MS = 2600;
 const CHIP = 18;
@@ -70,8 +60,6 @@ export function ComputerCard({
     undefined,
   );
 
-  // The account's computers as the live socket pushes them, so a computer
-  // signing in shows up here the moment it does, with no polling.
   const devicesView = useBackendView(
     "devices.list",
     active && !answered ? DEVICES_VIEW_ARGS : "skip",
@@ -149,12 +137,6 @@ export function ComputerCard({
   );
 }
 
-/**
- * Phone on the left, computer on the right, and a task chip hopping along
- * the arc between them. Once connected the arc goes solid and the computer
- * shows a check. The hop loops only while it is on screen, in the
- * foreground and motion is allowed.
- */
 function HopArt({ connected, running }: { connected: boolean; running: boolean }) {
   const colors = useColors();
   const art = useMemo(() => makeArtStyles(colors), [colors]);
@@ -183,7 +165,6 @@ function HopArt({ connected, running }: { connected: boolean; running: boolean }
   }, [clock, loop]);
 
   const chipStyle = useAnimatedStyle(() => {
-    // 0–0.62 travel (eased), 0.62–0.8 land and fade, rest offstage.
     const raw = clock.value;
     const travel = Math.min(1, raw / 0.62);
     const eased = travel < 0.5

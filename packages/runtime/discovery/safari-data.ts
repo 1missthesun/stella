@@ -1,10 +1,3 @@
-/**
- * Safari Data Collection
- *
- * Reads Safari browser history and bookmarks on macOS.
- * Requires Full Disk Access for both History.db and Bookmarks.plist.
- */
-
 import { promises as fs } from "fs";
 import path from "path";
 import os from "os";
@@ -43,14 +36,6 @@ const execAsync = (command: string): Promise<string> => {
   });
 };
 
-// ---------------------------------------------------------------------------
-// Safari History
-// ---------------------------------------------------------------------------
-
-/**
- * Collect Safari browsing history (last 7 days)
- * Requires Full Disk Access to read ~/Library/Safari/History.db
- */
 const collectSafariHistoryEffect: Effect.Effect<
   { domain: string; visits: number }[]
 > = Effect.suspend(() => {
@@ -61,7 +46,6 @@ const collectSafariHistoryEffect: Effect.Effect<
   const historyPath = path.join(os.homedir(), "Library", "Safari", "History.db");
 
   return Effect.gen(function* () {
-    // Check if the file exists
     const exists = yield* tryDiscovery(() => fs.access(historyPath)).pipe(
       Effect.match({
         onSuccess: () => true,
@@ -75,7 +59,6 @@ const collectSafariHistoryEffect: Effect.Effect<
 
     return yield* Effect.scoped(
       Effect.gen(function* () {
-        // Open the live database directly readonly
         const db = yield* acquireCloseable(() => openDatabase(historyPath));
 
         // Query top domains by explicit visit rows in the last 7 days.
@@ -99,7 +82,6 @@ const collectSafariHistoryEffect: Effect.Effect<
             db.prepare(query).all() as Array<{ domain: string; visits: number }>,
         ).pipe(
           Effect.catch((visitQueryError) =>
-            // Fallback for schema variants where history_visits is unavailable.
             tryDiscoverySync(() => {
               const fallbackQuery = `
         SELECT domain, visit_count
@@ -143,10 +125,6 @@ const collectSafariHistoryEffect: Effect.Effect<
   );
 });
 
-// ---------------------------------------------------------------------------
-// Safari Bookmarks
-// ---------------------------------------------------------------------------
-
 type BookmarkNode = {
   Title?: string;
   URLString?: string;
@@ -159,20 +137,15 @@ type BookmarksPlist = {
   Children?: BookmarkNode[];
 };
 
-/**
- * Recursively walk bookmark tree and collect entries
- */
 const walkBookmarks = (
   node: BookmarkNode,
   folder: string,
   result: BookmarkEntry[]
 ): void => {
-  // Skip proxy entries (Reading List header, etc.)
   if (node.WebBookmarkType === "WebBookmarkTypeProxy") {
     return;
   }
 
-  // Leaf node: has URL
   if (node.URLString) {
     const title = node.URIDictionary?.title || node.Title || "Untitled";
     result.push({
@@ -183,7 +156,6 @@ const walkBookmarks = (
     return;
   }
 
-  // Folder node: has children
   if (node.Children) {
     const folderName = node.Title || folder;
     for (const child of node.Children) {
@@ -192,10 +164,6 @@ const walkBookmarks = (
   }
 };
 
-/**
- * Collect Safari bookmarks from Bookmarks.plist
- * Requires Full Disk Access to read ~/Library/Safari/Bookmarks.plist
- */
 const collectSafariBookmarksEffect: Effect.Effect<BookmarkEntry[]> =
   Effect.suspend(() => {
     if (process.platform !== "darwin") {
@@ -205,7 +173,6 @@ const collectSafariBookmarksEffect: Effect.Effect<BookmarkEntry[]> =
     const bookmarksPath = path.join(os.homedir(), "Library", "Safari", "Bookmarks.plist");
 
     return tryDiscovery(() =>
-      // Convert binary plist to JSON
       execAsync(`plutil -convert json -o - "${bookmarksPath}"`),
     ).pipe(
       Effect.flatMap((jsonOutput) =>
@@ -220,7 +187,6 @@ const collectSafariBookmarksEffect: Effect.Effect<BookmarkEntry[]> =
             }
           }
 
-          // Limit to 200 entries
           return result.slice(0, 200);
         }),
       ),
@@ -237,13 +203,6 @@ const collectSafariBookmarksEffect: Effect.Effect<BookmarkEntry[]> =
     );
   });
 
-// ---------------------------------------------------------------------------
-// Main Collection
-// ---------------------------------------------------------------------------
-
-/**
- * Collect Safari history and bookmarks
- */
 const collectSafariDataEffect: Effect.Effect<SafariData | null> =
   Effect.suspend(() => {
     if (process.platform !== "darwin") {
@@ -275,19 +234,11 @@ const collectSafariDataEffect: Effect.Effect<SafariData | null> =
 export const collectSafariData = async (): Promise<SafariData | null> =>
   runDiscovery(collectSafariDataEffect);
 
-// ---------------------------------------------------------------------------
-// Formatting for Synthesis
-// ---------------------------------------------------------------------------
-
-/**
- * Format Safari data for LLM synthesis input
- */
 export const formatSafariDataForSynthesis = (data: SafariData | null): string => {
   if (!data) return "";
 
   const sections: string[] = ["## Safari Data"];
 
-  // Top domains (limit to 20)
   if (data.history.length > 0) {
     sections.push("\n### Top Domains");
     sections.push(
@@ -298,11 +249,9 @@ export const formatSafariDataForSynthesis = (data: SafariData | null): string =>
     );
   }
 
-  // Bookmarks (limit to 15 folders with 8 entries each)
   if (data.bookmarks.length > 0) {
     sections.push("\n### Bookmarks");
 
-    // Group bookmarks by folder
     const byFolder = new Map<string, BookmarkEntry[]>();
     for (const bookmark of data.bookmarks) {
       const folder = bookmark.folder || "Bookmarks";
@@ -312,17 +261,14 @@ export const formatSafariDataForSynthesis = (data: SafariData | null): string =>
       byFolder.get(folder)!.push(bookmark);
     }
 
-    // Limit to 15 folders
     const folders = Array.from(byFolder.entries()).slice(0, 15);
 
     for (const [folder, entries] of folders) {
       sections.push(`\n**${folder}**`);
 
-      // Limit to 8 entries per folder
       const limitedEntries = entries.slice(0, 8);
 
       for (const entry of limitedEntries) {
-        // Extract domain from URL for compact display
         const domain = extractDomain(entry.url);
         sections.push(`- ${entry.title} (${domain})`);
       }
@@ -332,9 +278,6 @@ export const formatSafariDataForSynthesis = (data: SafariData | null): string =>
   return sections.join("\n");
 };
 
-/**
- * Extract domain from URL
- */
 const extractDomain = (url: string): string => {
   try {
     const urlObj = new URL(url);

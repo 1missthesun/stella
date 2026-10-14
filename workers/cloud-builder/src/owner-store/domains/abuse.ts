@@ -1,23 +1,3 @@
-/**
- * Abuse admission and enforcement for one owner.
- *
- * - **Admission:** `admitSession` rules on a model-gateway session mint
- *   before billing reserves its budget: enforcement, step-up (Turnstile)
- *   and sybil pressure from D1 sightings.
- * - **Enforcement:** `abuse_state` holds the owner's status (ok, challenged,
- *   throttled, suspended) with an optional expiry. Every change is pushed to
- *   the model gateway (`ModelGatewayControl.applyOwnerEnforcement`) by the
- *   `abuse.pushEnforcement` job; `abuse.expire` clears it at `until`.
- * - **Risk:** `risk_signals` counts requests, spend, mints and sybil flags in
- *   1-hour and 24-hour buckets. The score is recomputed whenever a signal
- *   lands (a mint, or settled gateway usage); a high score challenges or
- *   throttles the owner for a day. D1's `owner_risk` mirrors the score and
- *   status for the admin top list.
- *
- * Without `TURNSTILE_SECRET_KEY` and `STELLA_TURNSTILE_STEP_UP=1` challenges
- * are skipped; sign-in requirements and suspension still apply.
- */
-
 import {
   GATEWAY_NETWORK_POLICY,
   type GatewayErrorCode,
@@ -42,8 +22,6 @@ import { log } from "../../build-session/shared/keys.js";
 import { RpcError } from "../errors.js";
 import type { OwnerContext, OwnerDbReader, OwnerDomain, OwnerPurgeMode } from "../registry.js";
 
-// ── Constants ──────────────────────────────────────────────────────────────
-
 const HOUR_MS = 60 * 60_000;
 const DAY_MS = 24 * HOUR_MS;
 const RISK_WINDOWS = { "1h": HOUR_MS, "24h": DAY_MS } as const;
@@ -56,7 +34,6 @@ const SYBIL_DEVICE_CHALLENGE_COUNT = 2;
 const SYBIL_HOSTING_CHALLENGE_COUNT = 5;
 export const SYBIL_SIGHTING_RETENTION_MS = SYBIL_DEVICE_WINDOW_MS;
 
-/** Admin top-list rows for owners back at `ok` are dropped after this. */
 export const OWNER_RISK_RETENTION_MS = 2 * DAY_MS;
 
 const TURNSTILE_SITEVERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
@@ -98,8 +75,6 @@ export const ABUSE_MIGRATION = {
   ],
 };
 
-// ── Enforcement ────────────────────────────────────────────────────────────
-
 type StateRow = {
   status: string;
   until_at: number | null;
@@ -114,7 +89,6 @@ const readStateRow = (db: OwnerDbReader): StateRow | null =>
 const isStatus = (value: unknown): value is OwnerEnforcementStatus =>
   typeof value === "string" && (OWNER_ENFORCEMENT_STATUSES as readonly string[]).includes(value);
 
-/** The owner's enforcement now. A status past its `until` reads as `ok`. */
 export const readEnforcement = (ctx: { db: OwnerDbReader; now: number }): OwnerEnforcementState => {
   const row = readStateRow(ctx.db);
   if (!row) return { enforcement: { status: "ok" }, updatedAt: null };
@@ -131,7 +105,6 @@ export const readEnforcement = (ctx: { db: OwnerDbReader; now: number }): OwnerE
   };
 };
 
-/** The snapshot field the gate refuses suspended owners on. */
 export const enforcementForSnapshot = (ctx: { db: OwnerDbReader; now: number }): OwnerEnforcement | undefined => {
   const { enforcement } = readEnforcement(ctx);
   return enforcement.status === "ok" ? undefined : enforcement;
@@ -144,7 +117,6 @@ export type SetEnforcementInput = {
   actor: string;
 };
 
-/** Set the owner's status, push it to the gateway, and arm its expiry. */
 export const setEnforcement = (ctx: OwnerContext, input: SetEnforcementInput): OwnerEnforcementState => {
   const reason = input.reason.trim();
   const actor = input.actor.trim();
@@ -155,7 +127,6 @@ export const setEnforcement = (ctx: OwnerContext, input: SetEnforcementInput): O
     throw new RpcError("BAD_REQUEST", "until must be a finite timestamp.");
   }
   const previous = readStateRow(ctx.db);
-  // The gateway orders pushes by `updatedAt`, so it must always advance.
   const updatedAt = Math.max(ctx.now, (previous?.updated_at ?? 0) + 1);
   const until = input.status !== "ok" ? (input.until ?? null) : null;
   ctx.db.run(
@@ -213,8 +184,6 @@ const expireEnforcement = (ctx: OwnerContext): void => {
   setEnforcement(ctx, { status: "ok", reason: row.reason || "expired", actor: "system:expiry" });
 };
 
-// ── Risk ───────────────────────────────────────────────────────────────────
-
 type RiskDelta = {
   requests?: number;
   chargedMicroCents?: number;
@@ -263,7 +232,6 @@ const addDistinct = (values: string[], candidates: string[] | undefined): string
 const count = (value: number | undefined): number =>
   typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
 
-/** The risk rules: each signal over its threshold adds its weight. */
 const riskScore = (
   row: {
     requests: number;
@@ -290,11 +258,6 @@ const riskScore = (
   return Math.round(score);
 };
 
-/**
- * Add signals to both windows, rescore, and escalate enforcement when the
- * score calls for it. Owners at identity level 3 (paying) are never
- * escalated automatically.
- */
 export const recordRiskSignals = (ctx: OwnerContext, delta: RiskDelta, identityLevel: IdentityLevel): void => {
   let score = 0;
   for (const window of Object.keys(RISK_WINDOWS) as RiskWindow[]) {
@@ -356,7 +319,6 @@ export const recordRiskSignals = (ctx: OwnerContext, delta: RiskDelta, identityL
   });
 };
 
-/** Risk signals from settled gateway usage (the hook after billing applies a batch). */
 export const recordGatewayUsageRisk = (
   ctx: OwnerContext,
   events: GatewayUsageEvent[],
@@ -397,7 +359,6 @@ const recordOwnerRisk = async (ctx: OwnerContext): Promise<void> => {
     .run();
 };
 
-/** Enforcement and risk windows, for the admin owner lookup. */
 export const abuseState = (ctx: { db: OwnerDbReader; now: number }) => ({
   ...readEnforcement(ctx),
   score: ctx.db.one<{ score: number }>("SELECT score FROM risk_score WHERE id = 1")?.score ?? 0,
@@ -416,18 +377,12 @@ export const abuseState = (ctx: { db: OwnerDbReader; now: number }) => ({
   })),
 });
 
-// ── Admission ──────────────────────────────────────────────────────────────
-
 type SybilPressure =
   | { action: "ok" }
   | { action: "challenge"; reason: "device_key" | "hosting_network" };
 
 type SybilKind = "device" | "hosting_ip";
 
-/**
- * Distinct owners behind this device key or network, counting this owner.
- * Only identity level 1 is checked (and recorded).
- */
 const evaluateSybilPressure = async (
   database: D1Database,
   input: {
@@ -532,11 +487,6 @@ export type SessionAdmissionInput = SessionCapabilityRequest & {
   snapshot: OwnerSnapshot;
 };
 
-/**
- * May this owner, device and network have a session capability? Rules on
- * enforcement, step-up and sybil pressure, and
- * records the mint's sightings and risk signals.
- */
 export const admitSession = async (
   ctx: OwnerContext,
   input: SessionAdmissionInput,
@@ -594,9 +544,6 @@ export const admitSession = async (
   return { ok: true, body: { ownerGeneration: snapshot.ownerGeneration, identityLevel } };
 };
 
-// ── Sweeps and purge ───────────────────────────────────────────────────────
-
-/** The Cron Trigger's TTL sweep of the abuse tables in D1. */
 export const sweepAbuseTables = async (env: Cloudflare.Env, now = Date.now()): Promise<void> => {
   const database = env.DB;
   if (!database) throw new Error("The DB binding is missing.");
@@ -608,11 +555,6 @@ export const sweepAbuseTables = async (env: Cloudflare.Env, now = Date.now()): P
   ]);
 };
 
-/**
- * Enforcement and risk survive a reset, so resetting can't lift a
- * suspension. Account deletion drops them and the admin row; D1 sightings
- * age out on their own.
- */
 const purgeAbuse = async (ctx: OwnerContext, mode: OwnerPurgeMode): Promise<{ pending: boolean }> => {
   if (mode !== "delete") return { pending: false };
   ctx.jobs.cancel(ABUSE_PUSH_JOB);

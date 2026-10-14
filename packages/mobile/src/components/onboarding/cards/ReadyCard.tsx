@@ -1,7 +1,3 @@
-/**
- * The finale: a few starters that open the real chat with the request
- * already sent, and "Start chatting" to open it empty.
- */
 import { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import Animated from "react-native-reanimated";

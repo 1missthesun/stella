@@ -1,8 +1,3 @@
-/**
- * DOM interaction command handlers.
- * Uses chrome.scripting.executeScript for most interactions,
- * chrome.debugger for keyboard input when more reliable handling is needed.
- */
 import { getActiveTab } from "./tabs.js";
 import {
   resolveSelector,
@@ -161,8 +156,6 @@ async function dispatchPointerClick(
   }
 }
 
-// --- Command Handlers ---
-
 export async function handleClick(command) {
   throwIfCommandAborted(command);
   const tab = await getActiveTab(command);
@@ -267,7 +260,6 @@ export async function handleType(command) {
   const tab = await getActiveTab(command);
   const text = command.text || "";
 
-  // If there's a selector, focus that element first
   if (command.selector || command.ref) {
     const resolved = resolveSelector(
       command.selector || command.ref,
@@ -285,8 +277,6 @@ export async function handleType(command) {
     );
   }
 
-  // CDP inserts the full string as one native text operation. Per-character
-  // key dispatch is much slower and can outlive a batched command deadline.
   await ensureDebugger(tab.id);
   markCommandMutationDispatched(command);
   await chrome.debugger.sendCommand({ tabId: tab.id }, "Input.insertText", {
@@ -352,7 +342,6 @@ export async function handlePress(command) {
   const key = command.key;
   if (!key) throw new Error("Key is required for press");
 
-  // If there's a selector, focus that element first
   if (command.selector || command.ref) {
     const resolved = resolveSelector(
       command.selector || command.ref,
@@ -365,7 +354,6 @@ export async function handlePress(command) {
 
   await ensureDebugger(tab.id);
 
-  // Parse modifier+key combos like "Control+a"
   const parts = key.split("+");
   const mainKey = parts.pop();
   const modifiers = parts.map((m) => m.toLowerCase());
@@ -379,7 +367,6 @@ export async function handlePress(command) {
     modifierFlags |= 4;
   if (modifiers.includes("shift")) modifierFlags |= 8;
 
-  // Key down for modifiers
   for (const mod of modifiers) {
     markCommandMutationDispatched(command);
     await chrome.debugger.sendCommand(
@@ -393,7 +380,6 @@ export async function handlePress(command) {
     );
   }
 
-  // Main key
   markCommandMutationDispatched(command);
   await chrome.debugger.sendCommand(
     { tabId: tab.id },
@@ -415,7 +401,6 @@ export async function handlePress(command) {
     },
   );
 
-  // Key up for modifiers (reverse order)
   for (const mod of [...modifiers].reverse()) {
     throwIfCommandAborted(command);
     await chrome.debugger.sendCommand(
@@ -574,14 +559,12 @@ export async function handleWait(command) {
   const timeout = command.timeout || 30000;
 
   if (!selector) {
-    // Just wait for a duration
     await abortableCommandDelay(command, timeout);
     return { id: command.id, success: true, data: { waited: true } };
   }
 
   const resolved = resolveSelector(selector, command.ownerId, tab.id);
 
-  // Poll until element appears or timeout
   if (resolved.exactNode) {
     await callExactElement(tab.id, resolved, "return true;");
     return {
@@ -631,8 +614,6 @@ export async function handleWait(command) {
   throw new Error(`Timeout waiting for selector: ${selector}`);
 }
 
-// --- Clipboard ---
-
 export async function handleClipboard(command) {
   throwIfCommandAborted(command);
   const tab = await getActiveTab(command);
@@ -648,7 +629,6 @@ export async function handleClipboard(command) {
     case "copy": {
       await ensureDebugger(tab.id);
       markCommandMutationDispatched(command);
-      // Use Command on macOS, Control elsewhere.
       await chrome.debugger.sendCommand(
         { tabId: tab.id },
         "Input.dispatchKeyEvent",
@@ -692,7 +672,6 @@ export async function handleClipboard(command) {
     case "paste": {
       await ensureDebugger(tab.id);
       markCommandMutationDispatched(command);
-      // Use Command on macOS, Control elsewhere.
       await chrome.debugger.sendCommand(
         { tabId: tab.id },
         "Input.dispatchKeyEvent",
@@ -756,8 +735,6 @@ export async function handleClipboard(command) {
       throw new Error(`Unknown clipboard operation: ${operation}`);
   }
 }
-
-// --- Advanced Mouse Input (CDP) ---
 
 export async function handleMouseMove(command) {
   throwIfCommandAborted(command);
@@ -841,7 +818,6 @@ export async function handleDrag(command) {
 
   await ensureDebugger(tab.id);
 
-  // Mouse down at start
   await presentAgentCursor(command, tab.id, { x: startX, y: startY });
   markCommandMutationDispatched(command);
   await chrome.debugger.sendCommand(
@@ -856,7 +832,6 @@ export async function handleDrag(command) {
     },
   );
 
-  // Move in steps
   const steps = command.steps || 10;
   for (let i = 1; i <= steps; i++) {
     throwIfCommandAborted(command);
@@ -875,7 +850,6 @@ export async function handleDrag(command) {
     );
   }
 
-  // Mouse up at end
   throwIfCommandAborted(command);
   await chrome.debugger.sendCommand(
     { tabId: tab.id },
@@ -891,8 +865,6 @@ export async function handleDrag(command) {
 
   return { id: command.id, success: true, data: { dragged: true } };
 }
-
-// --- Advanced Keyboard Input (CDP) ---
 
 export async function handleKeyDown(command) {
   throwIfCommandAborted(command);

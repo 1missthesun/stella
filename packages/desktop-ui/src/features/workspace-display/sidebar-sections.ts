@@ -1,19 +1,3 @@
-/**
- * The right sidebar's browser-tab model.
- *
- * Every open destination is its OWN tab — a `{ id, kind, location }` triple.
- * `kind` is which surface it renders (home launcher, a file, an app, the
- * browser); `location` is the specific item (a display-tab id for a file, a
- * `cloud:<appId>` location for an app, `null` for a launcher/list/browser).
- * Two files, two launchers can all coexist as independent tabs, exactly like
- * browser tabs.
- *
- * This sits beside `tab-store` (the artifact viewer registry + panel width)
- * because the two answer different questions: `tab-store` owns *which artifact
- * specs exist*; this store owns *which tabs the sidebar has open and which one
- * is active*.
- */
-
 import { useSyncExternalStore } from "react";
 import { uiState } from "@/platform/ui-state";
 import { getFileEntries } from "./files-index";
@@ -51,7 +35,6 @@ const LEGACY_SECTION_ALIASES: Readonly<Record<string, SidebarSection>> = {
   quickchat: "home",
 };
 
-/** Every id the sidebar can be pointed at, resolved to one that exists. */
 export const resolveSidebarSection = (value: unknown): SidebarSection => {
   if (isSidebarSection(value)) return value;
   if (typeof value === "string" && Object.hasOwn(LEGACY_SECTION_ALIASES, value))
@@ -59,11 +42,6 @@ export const resolveSidebarSection = (value: unknown): SidebarSection => {
   return "home";
 };
 
-/**
- * A persisted tab's kind, resolved for restore. A retired id becomes its
- * replacement and loses its `location` (that item no longer exists); anything
- * unrecognisable is dropped rather than guessed at.
- */
 const restoreTabKind = (
   value: unknown,
 ): { kind: SidebarSection; keepLocation: boolean } | null => {
@@ -73,10 +51,6 @@ const restoreTabKind = (
   return null;
 };
 
-/**
- * Surfaces that only ever have one tab: opening one again focuses the tab
- * already open instead of adding another.
- */
 const SINGLE_TAB_SECTIONS: ReadonlySet<SidebarSection> = new Set(["updates", "email", "schedule"]);
 
 /** Drop repeats of a single-tab surface (layouts saved before the rule). */
@@ -96,11 +70,9 @@ export type SidebarFileRecord = {
   payload?: unknown;
 };
 
-/** A single open tab: a surface `kind` plus the specific item it shows. */
 export type SidebarTab = {
   id: string;
   kind: SidebarSection;
-  /** files → display-tab id; apps → slug; takeover → safe interaction id. */
   location: string | null;
   file?: SidebarFileRecord;
 };
@@ -256,10 +228,6 @@ const readPersistedState = (): PersistedState => {
             if (typeof candidate.id !== "string") continue;
             const restored = restoreTabKind(candidate.kind);
             if (!restored) continue;
-            // Human-takeover tabs are deliberately ephemeral. They contain only
-            // a safe interaction id (never the capability URL), but restoring a
-            // stale sign-in surface after relaunch is still misleading and can
-            // accidentally mint fresh access without an explicit user action.
             if (restored.kind === "takeover") continue;
             const location =
               restored.keepLocation &&
@@ -345,11 +313,6 @@ const emit = (next: SidebarSectionsSnapshot): void => {
 const activeTabOf = (state: SidebarSectionsSnapshot): SidebarTab | null =>
   state.tabs.find((tab) => tab.id === state.activeTabId) ?? null;
 
-/**
- * A tab that shows a launcher/list rather than a concrete item, so selecting an
- * item from it is in-place navigation (reuse the tab) rather than a new tab:
- * the empty Home launcher, or a Files/Apps list with nothing drilled in.
- */
 const isReusableNavTab = (tab: SidebarTab): boolean =>
   tab.kind === "home" ||
   (tab.location === null && (tab.kind === "files" || tab.kind === "apps")) ||
@@ -365,43 +328,20 @@ export const sidebarSections = {
     return snapshot;
   },
 
-  /** The active tab, or null when the (empty) panel has none. */
   getActiveTab(): SidebarTab | null {
     return activeTabOf(snapshot);
   },
 
-  /**
-   * Open a NEW empty Home tab (the browser "+") and activate it, WITHOUT
-   * touching the current tab. Opens the panel.
-   */
   openHomeLauncher(): void {
     const tab = makeTab("home");
     emit({ tabs: [...snapshot.tabs, tab], activeTabId: tab.id });
     displayTabs.setPanelOpen(true);
   },
 
-  /**
-   * Open an item as a tab.
-   *
-   * - If a tab for this exact concrete item (kind + location) is already open,
-   *   it is focused — never duplicated. A single-tab surface (Updates) is
-   *   focused wherever its one tab is, closing the empty Home tab it was
-   *   picked from.
-   * - Else, if the active tab is a launcher/list surface (the empty Home
-   *   launcher, or a Files/Apps list with nothing drilled in), that SAME tab is
-   *   reused in place — selecting an item from a list/launcher is in-place
-   *   navigation (Files list → click report.pdf → that tab becomes report.pdf),
-   *   preserving its id / order / mounted state.
-   * - Otherwise (a concrete content tab is active: a specific file/app, the
-   *   browser) a brand-new tab is created, never overwriting it.
-   *
-   * Always activates the destination and opens the panel.
-   */
   openLocation(section: SidebarSection, location: string | null): void {
     const kind = resolveSidebarSection(section);
     const loc = location ?? null;
 
-    // Dedupe concrete items: focus an already-open tab for this exact item.
     if (loc !== null || SINGLE_TAB_SECTIONS.has(kind)) {
       const existing = snapshot.tabs.find(
         (tab) =>
@@ -409,8 +349,6 @@ export const sidebarSections = {
           (SINGLE_TAB_SECTIONS.has(kind) || tab.location === loc),
       );
       if (existing) {
-        // Reached from an empty Home tab opened just to get there: switching
-        // to the one already open leaves no empty tab behind.
         const active = activeTabOf(snapshot);
         if (
           active &&
@@ -444,22 +382,16 @@ export const sidebarSections = {
     displayTabs.setPanelOpen(true);
   },
 
-  /** A Home-launcher option click: open that surface's default (list) view. */
   selectSection(section: SidebarSection): void {
     this.openLocation(section, null);
   },
 
-  /** Switch to an already-open tab by id. */
   activateTab(tabId: string): void {
     if (snapshot.activeTabId === tabId) return;
     if (!snapshot.tabs.some((tab) => tab.id === tabId)) return;
     emit({ ...snapshot, activeTabId: tabId });
   },
 
-  /**
-   * Close a tab. Activates a neighbor when the closed tab was active; closing
-   * the last tab closes the panel (and reseeds a single Home tab for next open).
-   */
   closeTab(tabId: string): void {
     const index = snapshot.tabs.findIndex((tab) => tab.id === tabId);
     if (index === -1) return;
@@ -484,11 +416,6 @@ export const sidebarSections = {
     emit({ tabs, activeTabId });
   },
 
-  /**
-   * Point the active tab's location (drill within a tab), only when the active
-   * tab is of `section`. No-op otherwise — background refreshes for a file the
-   * user isn't looking at must not hijack the active tab.
-   */
   setLocation(section: SidebarSection, location: string | null): void {
     const kind = resolveSidebarSection(section);
     const active = activeTabOf(snapshot);
@@ -562,7 +489,6 @@ export const sidebarSections = {
     return unavailableFileTabs;
   },
 
-  /** Return the active `section` tab to its default list view. */
   clearLocation(section: SidebarSection): void {
     this.setLocation(section, null);
   },
@@ -598,7 +524,6 @@ export const useSidebarTab = (tabId: string | undefined): SidebarTab | null =>
     () => null,
   );
 
-/** The active tab's kind (or `home` when there is somehow no active tab). */
 export const useActiveSidebarSection = (): SidebarSection =>
   useSyncExternalStore(
     sidebarSections.subscribe,
@@ -606,10 +531,6 @@ export const useActiveSidebarSection = (): SidebarSection =>
     () => activeTabOf(sidebarSections.getSnapshot())?.kind ?? "home",
   );
 
-/**
- * The active tab's location, but only when the active tab is `section`. Used by
- * the shared singleton surfaces (Apps, Browser) that render the active item.
- */
 export const useSidebarSectionLocation = (
   section: SidebarSection,
 ): string | null => {
@@ -627,7 +548,6 @@ export const useSidebarSectionLocation = (
   );
 };
 
-/** The ordered list of open tabs (the browser-tab strip). */
 export const useSidebarOpenTabs = (): SidebarTab[] =>
   useSyncExternalStore(
     sidebarSections.subscribe,
@@ -635,7 +555,6 @@ export const useSidebarOpenTabs = (): SidebarTab[] =>
     () => sidebarSections.getSnapshot().tabs,
   );
 
-/** The active tab's id (drives per-tab body visibility). */
 export const useSidebarActiveTabId = (): string | null =>
   useSyncExternalStore(
     sidebarSections.subscribe,

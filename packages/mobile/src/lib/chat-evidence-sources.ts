@@ -1,13 +1,3 @@
-/**
- * What an assistant message's attached files are, before anything is read.
- *
- * The strip under a reply has two rows: media that can show a real preview
- * (images, video, audio) and everything else as a compact pill. Which row a
- * file belongs to, and what it is called, is decided here from its path alone,
- * through the shared naming module the desktop rail uses. Nothing in this file
- * touches the filesystem or the network, so the rows can be laid out before a
- * single byte has moved.
- */
 import {
   evidenceSourceKind,
   formatByteSize,
@@ -24,7 +14,6 @@ export type EvidenceSource = {
   order: number;
 };
 
-/** How many of each row the strip shows before it says "+N more". */
 export const EVIDENCE_MEDIA_CAP = 8;
 export const EVIDENCE_PILL_CAP = 8;
 
@@ -36,10 +25,6 @@ export const evidenceBasename = (filePath: string): string => {
   return parts[parts.length - 1] ?? cleaned;
 };
 
-/**
- * Deduplicated sources in the order the reply named them. A directory never
- * arrives through a chat link, so everything here is a file.
- */
 export const describeEvidenceSources = (
   filePaths: readonly string[],
 ): EvidenceSource[] => {
@@ -61,7 +46,6 @@ export const describeEvidenceSources = (
 export const evidenceTitleFor = (source: EvidenceSource): string =>
   humanTitleFor(source.filePath, source.kind);
 
-/** A pill: a human name, what the thing is, and its weight when known. */
 export const pillCardFor = (
   source: EvidenceSource,
   byteSize?: number,

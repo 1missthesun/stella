@@ -1,13 +1,3 @@
-/**
- * The cloud agent home: the owner's memory files and mirrored skills.
- *
- * Memory is plain files in the owner's world under `.stella/`, the desktop's
- * `~/.stella` layout (`world-memory.ts`). Only the documents the shared
- * resident registry keeps resident are injected (`readDocuments`), read
- * fresh every turn; every nested `memories/` file is opened on demand.
- * Skills stay in the owner's cloud home (R2 plus the owner object's catalog).
- */
-
 import { RESIDENT_MEMORY_DISPLAY_PATHS } from "@stella/runtime/kernel/agent-runtime/resident-context.js";
 import {
   CloudHomeStore,
@@ -50,7 +40,6 @@ export class AgentHome {
     bucket: R2Bucket | undefined,
     private readonly ownerId: string,
     endpoint: Omit<CloudHomeEndpoint, "ownerId">,
-    /** The owner's world, where memory lives; absent, there is none. */
     private readonly world?: () => Promise<MemoryWorld>,
   ) {
     if (bucket) {
@@ -96,10 +85,6 @@ export class AgentHome {
     return this.legacyImport;
   }
 
-  /**
-   * The owner's open memory epoch, read fresh from the owner's object, for
-   * `createWorldMemory`'s write fence; absent without a cloud home.
-   */
   memoryEpochFence(): MemoryEpochFence | undefined {
     const cloud = this.cloud;
     if (!cloud) return undefined;
@@ -109,12 +94,6 @@ export class AgentHome {
     };
   }
 
-  /**
-   * The owner's resident memory document (`~/.stella/memories/main.md`) as
-   * raw file text from the
-   * world, keyed by the display path the model sees. The shared resident
-   * registry shapes them (redaction, caps) exactly as it does on the desktop.
-   */
   async readDocuments(): Promise<MemoryDocument[]> {
     if (!this.world) return [];
     await this.importLegacyMemory();
@@ -132,11 +111,6 @@ export class AgentHome {
     return documents.filter((document) => document.content.trim());
   }
 
-  /**
-   * The user's personality override, when their world carries one
-   * (`.stella/PERSONALITY.md`); otherwise the caller falls back to the
-   * canonical default personality.
-   */
   async readPersonality(): Promise<string | null> {
     if (!this.world) return null;
     await this.importLegacyMemory();

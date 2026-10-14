@@ -1,33 +1,7 @@
 import type { UpdatePlan } from "./update-plan.js";
 
-/**
- * The briefs the app sends an agent when git work it pressed a button for
- * genuinely needs a judgement, carrying the state the app already established.
- *
- * These replace fabricated user turns. The app used to synthesize sentences
- * like "Update Stella to the latest version" and "Merge the changes from my
- * other computer." into the conversation as though the user had typed them,
- * and the orchestrator then re-derived the shas, the divergence and the
- * conflicts from scratch — all of which the app had in hand. Worse, the user
- * saw themselves asking for something they never asked for: they pressed a
- * button. So nothing claims they typed anything. Each of these goes straight
- * to a background agent, which writes no user row at all, which is the rule
- * `userAuthoredPrompt` already states for journal rows — visibility follows
- * authorship — rather than a second convention beside it.
- *
- * Every brief ends up in the same place: a finished draft, which then waits
- * in Updates until the user adds it. What differs is what the agent is
- * reconciling.
- */
-
 export type AgentBrief = { description: string; prompt: string };
 
-/**
- * The name for a merge the app dispatched. The `update-`
- * prefix is what `isStellaDraft` reads: such a draft is Stella settling its
- * own version, so it stays out of the chat and off the user's other
- * computers as a change of theirs.
- */
 export const mergeDraftName = (tip: string) => `update-${tip.slice(0, 12)}`;
 
 const listing = (paths: string[], limit = 40) => {
@@ -36,7 +10,6 @@ const listing = (paths: string[], limit = 40) => {
   return shown.join("\n");
 };
 
-/** Why a merge reached an agent: it conflicts, or its result does not build. */
 const reason = (
   plan: Extract<UpdatePlan, { kind: "clean" | "conflict" }>,
   gateOutput: string | undefined,
@@ -110,11 +83,6 @@ ${state(plan, head, {
 Both sides are the user's own work, so neither wins by default: keep what each one was for. ${KEEP_MERGE}`,
 });
 
-/**
- * A finished draft whose base moved under it. The agent brings it up to date
- * on the branch it is already on; it then waits in Updates for the user to
- * add, since taking it can relaunch Stella.
- */
 export const staleDraftBrief = (
   plan: Extract<UpdatePlan, { kind: "clean" | "conflict" }>,
   head: string,
@@ -136,20 +104,12 @@ ${state(plan, head, {
 Keep what the change was for: take the current version's code, then carry the change onto it so it still does what it set out to do.`,
 });
 
-/**
- * An undo later changes conflict with, or one that leaves Stella unable to
- * build. Unlike the merges above, the result is not taken by the app:
- * removing a change that other work was built on top of has no single right
- * answer, so the user sees what it came to and applies it themselves.
- */
 export const undoBrief = (args: {
   sha: string;
-  /** The change is the commits in `base..sha`, which arrived together. */
   base: string;
   subject: string;
   head: string;
   conflicts: string[];
-  /** The build's complaint, when taking the change out lifts cleanly but breaks the build. */
   buildOutput?: string;
 }): AgentBrief => ({
   description: `Undo "${args.subject}"`,

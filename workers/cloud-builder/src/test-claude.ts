@@ -44,8 +44,6 @@ export const testClaudeCredentials = (env: unknown): string | null => {
     claudeAiOauth: {
       accessToken: token,
       refreshToken: null,
-      // Fixed, so each turn writes the same file and a Claude process kept
-      // from the last turn still counts as holding the current login.
       expiresAt: TEST_CREDENTIALS_EXPIRE_AT,
       scopes: ["user:inference"],
     },

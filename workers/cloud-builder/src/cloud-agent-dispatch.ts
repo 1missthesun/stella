@@ -48,7 +48,6 @@ const controlStatusOf = (status: unknown): CloudAgentControlStatus | null =>
       : null;
 
 export type CloudAgentControlReceipt = {
-  /** Report fixed with the terminal decision, never parsed from the wake prompt. */
   lifecycleReport?: string;
   threadId: string;
   attemptGeneration: number;
@@ -57,7 +56,6 @@ export type CloudAgentControlReceipt = {
   turnId?: string;
   execution?: CloudExecutionSelection;
   description?: string;
-  /** Set when the thread runs on one of the owner's devices, not in a BuildSession. */
   executorDeviceId?: string;
 };
 
@@ -153,7 +151,6 @@ export const advanceCloudAgentControlReceipt = (
 ): CloudAgentControlReceipt => {
   if (!existing) return receipt;
   if (receipt.attemptGeneration < existing.attemptGeneration) return existing;
-  // Where a thread runs never changes between attempts.
   if (
     receipt.executorDeviceId === undefined &&
     existing.executorDeviceId !== undefined
@@ -312,13 +309,9 @@ export type CloudAgentDispatchCaller = Readonly<{
   ownerId: string;
   ownerGeneration: string;
   conversationId: string;
-  /** Absent for a desktop dispatch: no cloud turn sits above it. */
   parentTurnId?: string;
-  /** The agent that starts the thread; absent when Stella does. */
   parentThreadId?: string;
-  /** That agent's description, which the thread is told started it. */
   parentLabel?: string;
-  /** The caller's own depth: the thread runs one below it. */
   agentDepth: number;
 }>;
 
@@ -330,16 +323,12 @@ export type CloudAgentDispatchAttempt = Readonly<{
   description: string;
   prompt: string;
   execution: CloudExecutionSelection;
-  /** Defaults to `agent-thread`; a desktop's own dispatch is `desktop`. */
   source?: CloudAgentTurnSource;
-  /** The desktop and local conversation that receive a desktop dispatch's result. */
   originDeviceId?: string;
   originConversationId?: string;
-  /** The spawn's `workspace`, on the thread's first attempt. */
   workspace?: AgentWorkspaceSize;
 }>;
 
-/** A refusal that trying again cannot fix (admission said no, or the request was bad). */
 export class CloudAgentDispatchRefused extends Error {
   constructor(message: string) {
     super(message);
@@ -355,10 +344,6 @@ type CloudAgentDispatchEnv = Pick<
 
 export type CloudAgentDispatchDependencies = Readonly<{
   env: CloudAgentDispatchEnv;
-  /**
-   * Start an attempt that runs as its conversation's pi agent. Defaults to
-   * the conversation's object; the conversation itself starts it in place.
-   */
   startPiThread?: (input: PiThreadStart) => Promise<void>;
   ownerGateAdmit: (input: {
     ownerId: string;
@@ -422,8 +407,6 @@ export const dispatchCloudAgentTurn = async (args: {
     throw new CloudAgentDispatchRefused(executionUnavailableMessage(attempt.execution));
   }
   if (runsAsPiAgent(attempt.execution)) {
-    // Admitted above only so a refusal (the plan, the owner's limits)
-    // reaches the caller now: pi admits each of its runs on the agent lane.
     await release();
     const start: PiThreadStart = {
       ownerId: caller.ownerId,
@@ -558,7 +541,6 @@ export const dispatchCloudAgentTurn = async (args: {
   return await projectSpawnedAttempt(dependencies, caller, attempt, agentDepth);
 };
 
-/** The owner's agent threads learn of a started attempt; the receipt its starter keeps. */
 const projectSpawnedAttempt = async (
   dependencies: CloudAgentDispatchDependencies,
   caller: CloudAgentDispatchCaller,
@@ -604,43 +586,25 @@ const projectSpawnedAttempt = async (
   };
 };
 
-/** An execution pi runs: Stella's models, or the owner's ChatGPT plan. */
 export type PiAgentExecution = Extract<
   CloudExecutionSelection,
   { engine: "stella" | "chatgpt" }
 >;
 
-/**
- * Whether an attempt on this execution runs as its conversation's pi agent
- * rather than in a container: all but Claude, which runs on its own CLI.
- */
 export const runsAsPiAgent = (
   execution: CloudExecutionSelection,
 ): execution is PiAgentExecution =>
   execution.engine === "stella" || execution.engine === "chatgpt" || execution.engine === "provider";
 
-/**
- * One attempt of an agent thread the owner's agent threads track (a Claude
- * Code orchestrator's spawn, a computer's cloud dispatch, a placed agent)
- * that runs on pi, as its conversation's pi agent.
- */
 export type PiThreadAttempt = Readonly<{
   threadId: string;
   description: string;
-  /** The attempt's turn id in the agent threads (a placed agent's dispatch id). */
   turnId: string;
   attemptGeneration: number;
-  /** A computer's dispatch: its report reaches that computer through the agent threads, not a wake here. */
   originDeviceId?: string;
-  /** Where it sits among Stella's agents, which the conversation's pi runs it as. */
   lineage: AgentLineage;
 }>;
 
-/**
- * Start one attempt in its conversation (`OrchestratorSession.startPiThread`)
- * on the authority its dispatcher admitted: the owner's plan audience and
- * budget, and the attempt's execution.
- */
 export type PiThreadStart = Readonly<{
   ownerId: string;
   ownerGeneration: string;
@@ -652,7 +616,6 @@ export type PiThreadStart = Readonly<{
   attempt: PiThreadAttempt;
 }>;
 
-/** New input for a running pi agent of an agent thread (`OrchestratorSession.steerPiThread`). */
 export type PiThreadSteer = Readonly<{
   ownerId: string;
   ownerGeneration: string;
@@ -661,12 +624,10 @@ export type PiThreadSteer = Readonly<{
   text: string;
 }>;
 
-/** `unknown`: no agent of that thread runs in the conversation. */
 export type PiThreadSteerResult =
   | Readonly<{ accepted: true; turnId: string; attemptGeneration: number }>
   | Readonly<{ accepted: false; reason: "not_running" | "unknown" }>;
 
-/** Stop one exact attempt of an agent thread's pi agent (`OrchestratorSession.stopPiThread`). */
 export type PiThreadStop = Readonly<{
   ownerId: string;
   ownerGeneration: string;
@@ -675,12 +636,6 @@ export type PiThreadStop = Readonly<{
   attemptGeneration: number;
 }>;
 
-/**
- * `stopped`: it is stopping, with the agents it started, and its attempt
- * settles as canceled.
- * `terminal`: that attempt already settled. `changed`: another attempt is
- * the thread's now. `unknown`: no agent of that thread runs there.
- */
 export type PiThreadStopResult = "stopped" | "terminal" | "changed" | "unknown";
 
 export type PiHarnessAgentControl = Readonly<{
@@ -699,19 +654,10 @@ export type PiHarnessAgentControlResult =
   | "not_running"
   | "not_found";
 
-/**
- * `busy`: the thread's container agent is starting up or finishing and takes
- * no input this moment; sent again shortly, it either reaches the agent or
- * finds it finished.
- */
 export type CloudAgentSteerResult =
   | Readonly<{ accepted: true; turnId: string; attemptGeneration: number }>
   | Readonly<{ accepted: false; reason: "not_running" | "busy" }>;
 
-/**
- * New input for the running attempt of an agent in its own container (Claude
- * Code, Codex), through its BuildSession; it takes it at its next step.
- */
 export const steerContainerAgent = async (
   args: PiThreadSteer & { env: Pick<Cloudflare.Env, "BUILD_SESSIONS"> },
 ): Promise<CloudAgentSteerResult> => {
@@ -741,10 +687,6 @@ export const steerContainerAgent = async (
       };
 };
 
-/**
- * New input for a cloud agent's running attempt, which it takes at its next
- * step: its conversation's pi agent, or else its container agent.
- */
 export const steerCloudAgent = async (
   args: PiThreadSteer & {
     env: Pick<Cloudflare.Env, "BUILD_SESSIONS" | "ORCHESTRATOR_SESSIONS">;
@@ -767,10 +709,6 @@ export const steerCloudAgent = async (
   return await steerContainerAgent(args);
 };
 
-/**
- * Stop one exact attempt of a cloud agent: its conversation's pi agent, or
- * else its BuildSession. `changed` means it is no longer that attempt.
- */
 export const cancelCloudAgentAttempt = async (args: {
   env: Pick<Cloudflare.Env, "BUILD_SESSIONS" | "ORCHESTRATOR_SESSIONS">;
   conversationId: string;
@@ -837,7 +775,6 @@ export const agentLifecycleReport = (completion: {
   return resultText || "No result was reported.";
 };
 
-/** The hidden prompt that hands one finished thread to its requester. */
 export const agentCompletionPromptText = (args: {
   threadId: string;
   description?: string;

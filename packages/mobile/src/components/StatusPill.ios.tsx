@@ -22,12 +22,6 @@ const GLASS_SPRING = Animation.spring({
   bounce: 1 - STATUS_PILL_SPRING.dampingRatio,
 });
 
-/**
- * The status pill in the same native SwiftUI chrome as `GlassIconButton`:
- * the glass button style on iOS 26, the bordered style before it, in
- * Stella's colour scheme. The capsule's width animates natively, so the
- * material never has to be faded or rebuilt while it grows.
- */
 export function StatusPill({
   width,
   slotWidth,

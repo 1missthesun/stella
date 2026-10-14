@@ -46,12 +46,6 @@ const ACTIVE_HOURS_TIME_PATTERN = /^([01]\d|2[0-3]|24):([0-5]\d)$/
 const STATE_VERSION = 1
 const TURN_REPLIES_IN_CONVERSATION_SINCE_MS = Date.UTC(2026, 9, 11, 5)
 
-/**
- * The one module-level ManagedRuntime for the scheduler (M5 kernel pass,
- * house convention: one requirements-free runtime per facade module family;
- * context rides in closures). Croner stays the cron parser — Effect owns
- * only the timing/supervision layer.
- */
 const schedulerRuntime = ManagedRuntime.make(Layer.empty)
 
 /**
@@ -71,13 +65,6 @@ type LocalSchedulerState = {
   generatedEvents: Record<string, ScheduledConversationEvent[]>
 }
 
-/**
- * Optional OS-notification surface. The runtime client wires this to the
- * Electron-side `showStellaNotification` so each delivered scheduled
- * message also pops a native banner. Headless contexts (the
- * mobile runtime if it ever embeds the scheduler) leave it
- * undefined and silently skip notifications.
- */
 export type LocalSchedulerNotifier = (params: {
   title: string
   body: string
@@ -132,7 +119,6 @@ const cloneCronJob = (job: LocalCronJobRecord): LocalCronJobRecord => ({
     : {}),
 })
 
-/** Script file backing a payload, if any (`watch` sensors and legacy `script` jobs). */
 const payloadScriptPath = (payload: LocalCronPayload): string | null =>
   payload.kind === 'script' || payload.kind === 'watch'
     ? (payload.scriptPath ?? null)
@@ -334,12 +320,6 @@ const resolveHeartbeatPrompt = (params: {
   return `${base}\n\nHeartbeat checklist:\n${checklist}`
 }
 
-/**
- * Fire-time prompts for orchestrator-bound triggers. The automation turn's
- * prompt is hidden and its reply is the conversation's assistant message,
- * which the scheduler also raises as an OS notification, so each prompt says
- * so explicitly.
- */
 const buildTaskFirePrompt = (name: string, intent: string) =>
   `Scheduled task "${name}" fired. Carry out the stored intent below now — answer directly or spawn agents as you normally would. Your final reply is delivered to the user as an assistant message and a native notification, so make it a concise user-facing report of what happened.
 
@@ -681,16 +661,8 @@ export class LocalSchedulerService {
   private readonly scriptsDir: string
   private readonly listeners = new Set<() => void>()
   private state = createEmptyState()
-  /**
-   * Service scope for one start()..stop() lifetime. Every timing fiber —
-   * the pending tick-delay fiber and the tick (job execution) fiber — is
-   * forked into it, so stop() can account for in-flight work structurally
-   * instead of abandoning it.
-   */
   private serviceScope: Scope.Closeable | null = null
-  /** Pending delay fiber (the old `setTimeout` handle). */
   private timerFiber: Fiber.Fiber<void, unknown> | null = null
-  /** Fiber currently draining due items, when a tick is in flight. */
   private tickFiber: Fiber.Fiber<void, unknown> | null = null
   private started = false
   private tickInFlight = false
@@ -700,11 +672,6 @@ export class LocalSchedulerService {
     this.scriptsDir = scheduleScriptsDir(options.stellaDataDir)
   }
 
-  /**
-   * Absolute directory under which `payload.kind === 'script'` cron jobs
-   * live. Surfaced so the `ScriptDraft` tool can resolve the same path
-   * the scheduler validates against.
-   */
   getScheduleScriptsDir(): string {
     return this.scriptsDir
   }
@@ -859,9 +826,6 @@ export class LocalSchedulerService {
     job.nextRunAtMs = computeNextRunAtMs(nextSchedule, now)
     job.updatedAt = now
 
-    // If we replaced a `script` payload (or swapped to a different kind),
-    // the prior script file is now orphaned. Clean it up immediately so
-    // we don't accumulate dead `.ts` files in `~/.stella/schedule-scripts`.
     if (
       priorScriptPath &&
       payloadScriptPath(nextPayload) !== priorScriptPath &&
@@ -1020,15 +984,6 @@ export class LocalSchedulerService {
     }
   }
 
-  /**
-   * Sweep the schedule-scripts directory and remove any `.ts` file (and
-   * matching `.state.json` sidecar) not referenced by an active cron's
-   * `payload.scriptPath`. Runs once at startup so iterated `ScriptDraft`
-   * attempts that the agent ultimately abandoned don't accumulate.
-   *
-   * Best-effort: any failure is swallowed — the scripts directory is just
-   * a cache of authored work, never load-bearing for live cron firing.
-   */
   private collectOrphanScripts() {
     let entries: string[]
     try {
@@ -1125,10 +1080,6 @@ export class LocalSchedulerService {
     const previous = this.timerFiber
     this.timerFiber = null
     if (previous) {
-      // clearTimeout parity: interrupt the stale delay fiber in the
-      // background. The identity check inside the fork below guarantees a
-      // superseded fiber can never fire its tick even if it wins the race
-      // against this interrupt.
       schedulerRuntime.runFork(Fiber.interrupt(previous))
     }
     if (!this.started || !this.serviceScope) {
@@ -1144,15 +1095,12 @@ export class LocalSchedulerService {
       delayMs = Math.max(250, Math.min(dueAt - Date.now(), MAX_TIMER_DELAY_MS))
     }
 
-    // Identical timing to the old `setTimeout(..., Math.max(0, delayMs))`:
-    // one delay, then a single tick that drains every due item.
     const fiber: Fiber.Fiber<void, unknown> = schedulerRuntime.runSync(
       Effect.forkIn(
         Effect.sleep(Math.max(0, delayMs)).pipe(
           Effect.flatMap(() =>
             Effect.suspend(() => {
               if (this.timerFiber !== fiber) {
-                // Superseded while sleeping (clearTimeout parity).
                 return Effect.void
               }
               this.timerFiber = null
@@ -1245,15 +1193,6 @@ export class LocalSchedulerService {
     )
   }
 
-  /**
-   * One tick: drain every due item sequentially (jobs never overlap — same
-   * as the old promise loop). Runs on a fiber forked into the service
-   * scope; job execution crosses into promise land through a single
-   * `Effect.tryPromise` seam per item so failures carry the original error
-   * object. The `Effect.onExit` finalizer is the old `finally` block — it
-   * reschedules on success, failure, AND interruption (rescheduling is a
-   * no-op once stop() flipped `started`).
-   */
   private runDueItemsEffect(): Effect.Effect<void, unknown> {
     return Effect.suspend(() => {
       if (!this.started || this.tickInFlight) {
@@ -1276,8 +1215,6 @@ export class LocalSchedulerService {
           ? this.options.runnerTarget.getRunner()
           : null
         if (needsRunner && !runner) {
-          // Worker isn't ready yet; back off and retry. notify/script
-          // fires don't need the runner so they continue to drain.
           nextDelayOverride = 5_000
           return Effect.void
         }
@@ -1343,13 +1280,6 @@ export class LocalSchedulerService {
     }
   }
 
-  /**
-   * Advance a fired cron's nextRunAtMs / enabled / deleteAfterRun
-   * book-keeping. Centralizes the at-vs-recurring policy that ran inline
-   * inside the old monolithic executor.
-   *
-   * Returns whether the job survived (`true`) or was deleted (`false`).
-   */
   private advanceCronAfterRun(
     active: LocalCronJobRecord,
     finishedAt: number,
@@ -1537,12 +1467,6 @@ export class LocalSchedulerService {
     return 'done'
   }
 
-  /**
-   * Task trigger: deliver the stored intent as a hidden orchestrator turn.
-   * The orchestrator answers directly or spawns agents as it normally
-   * would; its reply is already the conversation's assistant message, so
-   * the scheduler only raises the OS notification for it.
-   */
   private async executeCronTask(
     active: LocalCronJobRecord,
     runner: NonNullable<LocalSchedulerRunner>,
@@ -1665,7 +1589,6 @@ export class LocalSchedulerService {
       if (runResult.exitCode === 0) {
         const text = runResult.stdout.trim()
         if (!text) {
-          // Deterministic no-op: unchanged sensors are silent.
           active.runningAtMs = undefined
           active.lastStatus = 'no-change'
           active.lastError = undefined
@@ -1692,8 +1615,6 @@ export class LocalSchedulerService {
       }
     }
 
-    // An approved action goes straight to an agent; anything else, and a
-    // failing sensor, to the orchestrator.
     const toAgent =
       escalation.reason === 'change' &&
       watch.route === 'agent' &&
@@ -1781,7 +1702,6 @@ export class LocalSchedulerService {
     }
 
     this.advanceCronAfterRun(active, finishedAt, false)
-    // A one-off watch has answered its question once its finding is handed over.
     if (escalation.reason === 'change' && watch.once === true) {
       active.enabled = false
       active.lastStatus = 'done'

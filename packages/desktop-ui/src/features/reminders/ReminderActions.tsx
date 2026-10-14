@@ -26,7 +26,6 @@ const formatTime = (ms: number): string => {
       });
 };
 
-/** Done and Snooze under a reminder Stella delivered; the state is the same on every device. */
 export const ReminderActions = memo(function ReminderActions({ mark }: { mark: ReminderMark }) {
   const { t } = useI18n();
   const fires = useReminderFires();

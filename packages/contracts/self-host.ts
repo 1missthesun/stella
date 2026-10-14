@@ -55,12 +55,6 @@ export type PairingLink = {
   secret: string;
 };
 
-/**
- * `review`: a reusable code for app review demos, claimable by many devices
- * until it expires (`days`, 1-90, default 30) or is canceled; canceling signs
- * those devices out. Admin bearer only, and only on a server with
- * STELLA_REVIEW_PAIRING=1.
- */
 export type PairingStartRequest = {
   review?: boolean;
   days?: number;

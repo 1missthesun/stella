@@ -32,11 +32,6 @@ const writeSeen = (userId: string) => {
   }
 };
 
-/**
- * That a Claude account's full Claude Code sessions, tool outputs included,
- * sync to Stella's cloud: said once, after the first Claude account this user
- * adds on this computer, and never again once dismissed.
- */
 export function useClaudeSyncNotice() {
   const session = useDesktopAuthSession();
   const userId =

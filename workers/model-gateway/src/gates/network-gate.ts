@@ -24,7 +24,6 @@ const SCHEMA = [
   `DROP TABLE IF EXISTS mint_refusals`,
 ];
 
-/** One SQLite Durable Object per `sha256(ip).slice(0, 32)`. */
 export class NetworkGate extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);

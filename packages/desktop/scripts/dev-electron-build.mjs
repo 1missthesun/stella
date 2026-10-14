@@ -1,21 +1,3 @@
-/**
- * Electron-main / preload bundles.
- *
- * Stella runs from its source tree. The renderer is served from source
- * (`electron/source/`) and the runtime is Bun running TypeScript, so the only
- * bundles a source launch needs are Electron main and the sandboxed preload.
- * `electron/start.mjs` calls `ensureElectronBundlesFresh` before loading main:
- * a stat fingerprint of the source roots, persisted next to the outputs,
- * skips the build when nothing changed, and otherwise main and preload are
- * rebuilt in place (about a second).
- *
- * Builds use the esbuild API with `write: false` plus write-if-changed, so
- * byte-identical outputs never touch disk, and stop the esbuild service
- * afterwards so nothing stays resident.
- *
- * Run directly (`--once`) it does a clean build of the same bundles and
- * exits.
- */
 import { build as runEsbuildBuild, stop as stopEsbuildService } from "esbuild";
 import { createHash } from "node:crypto";
 import {
@@ -37,9 +19,6 @@ const repoRootDir = path.resolve(desktopDir, "..", "..");
 const outdir = "dist-electron";
 const nodeTarget = `node${process.versions.node.split(".")[0]}`;
 const electronMainEntryPoints = {
-  // `launch` enables the V8 compile cache, then imports the `main` bundle
-  // through a computed specifier so it stays a separate output instead of
-  // being inlined.
   "electron/launch": "packages/desktop/electron/launch.ts",
   "electron/main": "packages/desktop/electron/main.ts",
   "electron/cloud-conversation-cache-worker": "packages/desktop/electron/services/cloud-conversation-cache-worker.ts",
@@ -51,7 +30,6 @@ const preloadEntryPoints = {
   "electron/preload": "packages/desktop/electron/preload.ts",
 };
 const desktopUiDir = path.join(repoRootDir, "packages", "desktop-ui");
-/** desktop-ui's env files in Vite's order (later files win). */
 const desktopEnvFiles = (mode) => [".env", ".env.local", `.env.${mode}`, `.env.${mode}.local`];
 const desktopPublicEnv = {};
 for (const name of desktopEnvFiles(process.env.NODE_ENV || "development")) {
@@ -69,7 +47,6 @@ const publicTurnstileSiteKey =
 // Workspace packages are source inputs in this monorepo, not installed
 // runtime dependencies. Resolve them before `packages: "external"` is applied
 // so Electron never attempts to execute their TypeScript sources directly.
-/** Loaded by the renderer source server on first use, never bundled. */
 const rendererSourceExternals = [
   "rolldown",
   "rolldown/*",
@@ -89,14 +66,6 @@ const fingerprintFilePath = path.join(
   ".dev-electron-bundle-fingerprint.json",
 );
 
-/**
- * Everything the bundles can pull in. `desktop/src/shared/` is included
- * because electron-main/preload import contracts and lib shims from there
- * (see e.g. `desktop/electron/preload.ts`). `runtime/home-seed/` is seed
- * data, never bundled, and excluded so seeding churn doesn't trigger builds.
- * `desktop-ui/src/shared/i18n` is the renderer-owned locale set: electron-main
- * imports `locales.ts` from it.
- */
 const bundleSourceRoots = [
   "packages/contracts",
   "packages/desktop/electron",
@@ -113,7 +82,6 @@ const bundleConfigFiles = [
   "packages/desktop/tsconfig.electron.json",
   "packages/desktop/tsconfig.preload.json",
   "packages/runtime/package.json",
-  // VITE_TURNSTILE_SITE_KEY is baked into main from these.
   ...desktopEnvFiles("development").map((name) => `packages/desktop-ui/${name}`),
 ];
 const bundleSourceExtensions = new Set([
@@ -136,9 +104,6 @@ const isBundleSourceRelPath = (relPosixPath) => {
   return bundleSourceExtensions.has(path.posix.extname(relPosixPath));
 };
 
-// Some dependencies import their own package.json for name/version metadata.
-// Keep that runtime metadata without embedding upstream development scripts and
-// devDependencies into Stella's production JavaScript bundle.
 const pruneDependencyPackageMetadataPlugin = {
   name: "prune-dependency-package-metadata",
   setup(build) {
@@ -180,7 +145,6 @@ const buildOptions = [
       js: 'import { createRequire as __stellaCreateRequire } from "node:module"; import { fileURLToPath as __stellaFileURLToPath } from "node:url"; import { dirname as __stellaDirname } from "node:path"; const require = __stellaCreateRequire(import.meta.url); const __filename = __stellaFileURLToPath(import.meta.url); const __dirname = __stellaDirname(__filename);',
     },
     format: "esm",
-    // Consumed by assertMainBundleStartupBoundary after each build.
     metafile: true,
     logLevel: "warning",
     plugins: [pruneDependencyPackageMetadataPlugin],
@@ -214,15 +178,8 @@ const buildOptions = [
  */
 export const mainStartupDeferredExternals = [
   "uiohook-napi",
-  // The renderer source server's tooling (electron/source/tools.ts).
   ...rendererSourceExternals,
 ];
-/**
- * Bundled modules that must stay behind a dynamic `import()`: statically
- * reachable from the startup roots, their whole subgraph evaluates before the
- * window is created. `bootstrap.ts` counts as a root because main.ts loads it
- * immediately.
- */
 export const mainStartupDeferredInputs = [
   "packages/runtime/kernel/integrations/claude-code-session-runtime.ts",
   "packages/desktop/electron/source/renderer-source.ts",
@@ -252,13 +209,6 @@ const collectStaticallyReachableInputs = (metafile, roots) => {
   return reached;
 };
 
-/**
- * Fails the build when electron-main's cold-start work regresses: a deferred
- * external imported statically again, a deferred bundled module pulled back
- * into the startup graph, or `launch.js` (which must enable the
- * V8 compile cache before the bundle is compiled) inlining the bundle it is
- * meant to load.
- */
 export const assertMainBundleStartupBoundary = (metafile) => {
   const violations = [];
   for (const [outputPath, output] of Object.entries(metafile?.outputs ?? {})) {
@@ -327,12 +277,6 @@ const writeOutputIfChanged = (absPath, contents) => {
   return true;
 };
 
-/**
- * One-shot build. Outputs are produced with `write: false` and written only
- * when their bytes differ from what's on disk, so watchers only ever see
- * genuine changes. The esbuild service is stopped afterwards so nothing stays
- * resident between builds.
- */
 export const buildElectronBundles = async () => {
   try {
     const results = await Promise.all(
@@ -356,13 +300,6 @@ export const buildElectronBundles = async () => {
   }
 };
 
-/**
- * The repo files the last build read, outside node_modules: what a change
- * must touch to change main or preload. Recorded with the fingerprint, so
- * the fingerprint covers files outside the source roots that the bundles
- * import (the browser extension's shared code, for one), and so a merge can
- * be judged by them without building it.
- */
 let lastBuildInputs = [];
 const sourceInputsOf = (metafiles) => {
   const inputs = new Set();
@@ -454,7 +391,6 @@ const readBundleFingerprint = () => {
   return typeof parsed?.fingerprint === "string" ? parsed.fingerprint : null;
 };
 
-/** The source files the last build read (see `sourceInputsOf`). */
 export const readBundleInputs = (file = fingerprintFilePath) => {
   const inputs = readFingerprintFile(file)?.inputs;
   return Array.isArray(inputs) ? inputs.filter((input) => typeof input === "string") : [];
@@ -489,11 +425,6 @@ export const cleanOutdir = async () => {
   });
 };
 
-/**
- * The source launch: skip the build when main and preload exist and the
- * source fingerprint matches the last successful build, otherwise rebuild
- * them in place (a missing output cleans the outdir first).
- */
 export const ensureElectronBundlesFresh = async ({ log } = {}) => {
   const fingerprint = computeBundleInputsFingerprint();
   if (requiredOutputsExist() && readBundleFingerprint() === fingerprint) {
@@ -509,12 +440,6 @@ export const ensureElectronBundlesFresh = async ({ log } = {}) => {
   return { built: true };
 };
 
-/**
- * Take main and preload built elsewhere from this same tree (an update
- * prepared on a scratch worktree before it was applied): its outputs and
- * the inputs it read, fingerprinted here, so the next launch finds them
- * fresh. `from` is that tree's `packages/desktop`.
- */
 export const adoptElectronBundles = (from) => {
   const fromOut = path.join(from, outdir);
   const inputs = readBundleInputs(path.join(from, path.basename(fingerprintFilePath)));
@@ -532,8 +457,6 @@ export const adoptElectronBundles = (from) => {
 };
 
 if (isEntryPoint(import.meta.url)) {
-  // A clean build of main and preload. `--once` is accepted for existing
-  // callers.
   try {
     await cleanOutdir();
     await buildElectronBundles();

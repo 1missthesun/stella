@@ -1,15 +1,3 @@
-// Markdown ("for agents") variants of the public Stella pages.
-//
-// Every indexable page has a `<route>.md` twin (the homepage lives at
-// `/index.md`) so agents and LLMs can read clean, chrome-free copy instead of
-// scraping the rendered React. The Store is intentionally excluded — it is a
-// live catalog, not a static document.
-//
-// Marketing copy is authored here as plain markdown that mirrors the JSX pages.
-// Dynamic pages reuse their real source of truth: `/learn-more/whats-new.md`
-// is built from `changelogEntries`, and the legal pages render the same text
-// the HTML pages do (`@/lib/legal-text`).
-
 import { changelogEntries } from "@/app/learn-more/changelog-entries";
 import { ANSWER_PAGES, FAQ } from "@/lib/answers";
 import {
@@ -21,22 +9,18 @@ import { getSiteUrl } from "@/lib/site-url";
 
 const MARKDOWN_HEADERS: HeadersInit = {
   "Content-Type": "text/markdown; charset=utf-8",
-  // Match the other static text routes: cache hard at the edge, revalidate on deploy.
   "Cache-Control":
     "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
 };
 
-/** Build a `Response` for a markdown body with the shared headers. */
 export function markdownResponse(body: string): Response {
   return new Response(body, { status: 200, headers: MARKDOWN_HEADERS });
 }
 
-/** Absolute URL for a site path (stella.sh in prod, localhost in dev). */
 function abs(path: string): string {
   return new URL(path, getSiteUrl()).href;
 }
 
-/** Standard doc header: H1 + a note pointing back to the canonical HTML page. */
 function header(title: string, route: string, ...taglines: string[]): string {
   const lines = [
     `# ${title}`,
@@ -47,10 +31,6 @@ function header(title: string, route: string, ...taglines: string[]): string {
   lines.push("");
   return lines.join("\n");
 }
-
-/* ------------------------------------------------------------------ */
-/*  Home — /index.md                                                   */
-/* ------------------------------------------------------------------ */
 
 const HOME_MD = `${header(
   "Stella — your personal assistant",
@@ -91,10 +71,6 @@ Models & providers: OpenAI, Anthropic, Google, xAI, DeepSeek, Moonshot AI.
 - What's New: ${abs("/learn-more/whats-new.md")}
 `;
 
-/* ------------------------------------------------------------------ */
-/*  One chat — /one-chat.md                                            */
-/* ------------------------------------------------------------------ */
-
 const ONE_CHAT_MD = `${header(
   "One chat — everything in it",
   "/one-chat",
@@ -132,10 +108,6 @@ yours. Running several jobs at once in the background comes with Pro; other
 plans work through one at a time. See ${abs("/pricing.md")}.
 `;
 
-/* ------------------------------------------------------------------ */
-/*  Voice — /voice.md                                                  */
-/* ------------------------------------------------------------------ */
-
 const VOICE_MD = `${header(
   "Voice — talk to Stella out loud",
   "/voice",
@@ -165,10 +137,6 @@ plan. Dictation and "Hey Stella" are on every tier — turning
 your speech into text is never gated. See ${abs("/pricing.md")}.
 `;
 
-/* ------------------------------------------------------------------ */
-/*  Pricing — /pricing.md                                              */
-/* ------------------------------------------------------------------ */
-
 const PRICING_MD = `${header(
   "Pricing — choose your plan",
   "/pricing",
@@ -192,10 +160,6 @@ Every tier includes browser, desktop, and mobile access, with different usage li
 ## Choose Stella and get started
 Free. No credit card, no trial. Download Stella and try it today.
 `;
-
-/* ------------------------------------------------------------------ */
-/*  Learn More — /learn-more.md                                        */
-/* ------------------------------------------------------------------ */
 
 const LEARN_MORE_MD = `${header(
   "Learn More — Stella, in detail",
@@ -265,10 +229,6 @@ highlights up top and the rest collapsed below, lives at
 ${abs("/learn-more/whats-new.md")}.
 `;
 
-/* ------------------------------------------------------------------ */
-/*  What's New — /learn-more/whats-new.md (generated)                  */
-/* ------------------------------------------------------------------ */
-
 function renderWhatsNew(): string {
   const lines: string[] = [
     header(
@@ -306,17 +266,9 @@ function renderWhatsNew(): string {
   return `${lines.join("\n").trimEnd()}\n`;
 }
 
-/* ------------------------------------------------------------------ */
-/*  Legal — /terms.md and /privacy.md (rendered from source)          */
-/* ------------------------------------------------------------------ */
-
 function renderLegal(title: string, route: string, body: string): string {
   return `${header(title, route)}\n${body.trim()}\n`;
 }
-
-/* ------------------------------------------------------------------ */
-/*  FAQ — /faq.md, and appended to /index.md                           */
-/* ------------------------------------------------------------------ */
 
 function faqBody(): string {
   return FAQ.map((item) => `### ${item.q}\n${item.a}`).join("\n\n");
@@ -345,14 +297,8 @@ function renderAnswerPage(page: (typeof ANSWER_PAGES)[number]): string {
   return lines.join("\n");
 }
 
-/* ------------------------------------------------------------------ */
-/*  Registry + llms.txt                                               */
-/* ------------------------------------------------------------------ */
-
 export type AgentPage = {
-  /** Canonical HTML route this mirrors. */
   route: string;
-  /** The markdown URL served for agents. */
   mdPath: string;
   label: string;
   description: string;
@@ -441,7 +387,6 @@ const SUMMARY = [
   "- Self-hosting: Stella's server can run on your own Cloudflare account ($5/month Workers Paid plus usage, your own Claude or ChatGPT subscription for models). Agents: follow https://stella.sh/self-host.md.",
 ];
 
-/** llms.txt index so agents can discover every markdown page in one fetch. */
 export function renderLlmsTxt(): string {
   const lines = ["# Stella", "", ...SUMMARY, "", "## Pages"];
   for (const page of AGENT_PAGES) {
@@ -460,7 +405,6 @@ export function renderLlmsTxt(): string {
   return `${lines.join("\n")}\n`;
 }
 
-/** Every marketing page, the FAQ and the answer pages in one document. */
 export function renderLlmsFull(): string {
   const skip = new Set(["/learn-more/whats-new.md", "/privacy.md", "/terms.md", "/faq.md"]);
   const parts = ["# Stella", "", ...SUMMARY, ""];

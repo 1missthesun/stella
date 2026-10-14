@@ -5,19 +5,6 @@ import { displayTabKindForPayload } from "@/features/workspace-display/payload-k
 import { basenameOf } from "@/features/workspace-display/path-to-viewer";
 import { useT, useTPlural } from "@/shared/i18n";
 import "./end-resource-card.css";
-/**
- * Inline + card surface for per-turn developer file changes.
- *
- * - `batchId` keys the source-diff batch (use the assistant row's
- *   stable id so re-renders of the same turn replace the batch in
- *   place instead of stacking duplicates in the footer).
- * - When `payloads.length === 1`, renders as a quiet underlined
- *   filename.
- * - When `payloads.length > 1`, renders as the artifact card
- *   labeled "N file changes".
- * Either path pushes the batch into the source-diff store and
- * opens (or activates) the singleton "Code changes" tab.
- */
 export const SourceDiffEndResource = ({ batchId, payloads, }) => {
     const t = useT();
     const tPlural = useTPlural();

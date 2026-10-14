@@ -60,7 +60,6 @@ export default {
         return publicErrorResponse(new GatewayError("not_found", 404));
       }
       const body = await readJsonBody(request);
-      // A profile-less page load; it never touches an owner's browser.
       if (path === "/internal/apps/preview")
         return await captureAppPreview(env, body);
       if (path === "/internal/sites/capture")

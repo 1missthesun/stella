@@ -7,10 +7,6 @@ type CurrentUser = {
   isAnonymous?: boolean;
 } | null | undefined;
 
-/**
- * The signed-in account's profile, read from the session main verified
- * (`auth:getSession`). Only connected accounts have one to show.
- */
 export function useCurrentUser(): { user: CurrentUser; hasConnectedAccount: boolean } {
   const { user, hasConnectedAccount } = useAuthSessionState();
   return useMemo(() => {

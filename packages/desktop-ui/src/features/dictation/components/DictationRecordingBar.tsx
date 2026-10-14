@@ -1,17 +1,3 @@
-/**
- * DictationRecordingBar — the row that shows dictation is on. In-app
- * composers keep their textarea as it is and place this row under it; no
- * words appear while recording, and the transcript lands in the composer once
- * dictation stops:
- *
- *   [waveform — flex 1]   [0:24]   [X]   [✓]   [↑ (optional)]
- *
- * The external overlay can hide controls because stopping the shortcut commits
- * the dictation directly. In-app composers also use that quieter treatment.
- *
- * The waveform uses one <canvas>, so meter updates do not reconcile the chat tree.
- */
-
 import { useEffect, useRef } from "react";
 import { cn } from "@/shared/lib/utils";
 import { ArrowUp, Check, X } from "@/ui/icons";
@@ -25,12 +11,6 @@ type DictationRecordingBarProps = {
   onCancel?: () => void;
   onConfirm?: () => void;
   showControls?: boolean;
-  /**
-   * When provided, renders an arrow button to the right of the check that
-   * stops dictation and immediately submits the resulting message. Only the
-   * in-app composers pass this; the global overlay omits it because the
-   * transcript is being pasted into another application.
-   */
   onSend?: () => void;
 };
 
@@ -111,18 +91,12 @@ export function DictationCancelButton({
   );
 }
 
-/* -------------------------------------------------------------------------- */
-/* Waveform canvas                                                            */
-/* -------------------------------------------------------------------------- */
-
 const BAR_WIDTH_CSS = 2;
 const BAR_GAP_CSS = 1;
 const MIN_BAR_HEIGHT_CSS = 1;
 
 function DictationWaveform({ levels }: { levels: number[] }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  // Cache the resolved bar color so we don't re-read computed style on every
-  // tick. Falling back to text-weak inside the effect.
   const barColorRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -168,8 +142,6 @@ function DictationWaveform({ levels }: { levels: number[] }) {
     const maxBarH = targetH;
 
     ctx.fillStyle = barColorRef.current;
-    // Right-align the bar series so the most recent sample sits on the right
-    // edge of the canvas; older bars scroll off the left as the buffer fills.
     const startX = targetW - visibleCount * stride + gap / 2;
 
     for (let i = 0; i < visibleCount; i += 1) {
@@ -189,10 +161,6 @@ function DictationWaveform({ levels }: { levels: number[] }) {
     />
   );
 }
-
-/* -------------------------------------------------------------------------- */
-/* Helpers                                                                    */
-/* -------------------------------------------------------------------------- */
 
 const formatElapsed = (ms: number): string => {
   const totalSec = Math.max(0, Math.floor(ms / 1000));

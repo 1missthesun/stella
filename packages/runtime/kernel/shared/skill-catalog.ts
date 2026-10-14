@@ -21,12 +21,6 @@ const SKILLS_DIR_NAME = "skills";
 const SKILL_FILENAME = "SKILL.md";
 const PROGRAM_FILENAME = path.join("scripts", "program.ts");
 
-/**
- * Every installed skill, shipped or user-created, resolves from the single
- * `~/.stella/skills/` root. Shipped skills are reconciled into it by content
- * hash (see `home/skills-sync.ts`); a collision or a local edit makes that
- * skill user-owned, so there is no second root to shadow.
- */
 type SkillLocation = { id: string; dir: string; displayPath: string };
 
 const asNonEmptyString = (value: unknown): string | null => {
@@ -74,7 +68,6 @@ const listSkillLocations = async (
   stellaAppDir: string,
 ): Promise<SkillLocation[]> => {
   const skillsRoot = path.join(stellaAppDir, SKILLS_DIR_NAME);
-  // Dot-prefixed entries are reconciliation staging/backup dirs, never skills.
   return (await listDirectoryNames(skillsRoot))
     .filter((id) => !id.startsWith("."))
     .map((id) => ({

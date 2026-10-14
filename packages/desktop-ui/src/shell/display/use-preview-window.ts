@@ -2,7 +2,6 @@ import { useState } from "react";
 
 export const PREVIEW_VIEWPORT_HEIGHT = 480;
 const OVERSCAN = 5;
-/** Fixed row geometry keeps work bounded even for wide, ragged input. */
 export function usePreviewWindow(count: number, rowHeight: number) {
   const [scrollTop, setScrollTop] = useState(0);
   const height = Math.min(PREVIEW_VIEWPORT_HEIGHT, count * rowHeight);

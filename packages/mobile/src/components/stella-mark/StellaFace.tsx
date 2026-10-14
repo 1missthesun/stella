@@ -23,20 +23,6 @@ import {
 } from "./face";
 import type { ToolCharacterMotionState } from "./motion";
 
-/**
- * The character's eyes, laid over the mark's silhouette.
- *
- * Three independent idle behaviours, each on its own random schedule: the pose
- * changes, the eyes blink, and the gaze drifts. Only the pose change rebuilds
- * the eye path, and only while its 190ms transition runs — blinking rides the
- * same path as a height scale, and the gaze as a centre offset, so a face that
- * is merely sitting there costs no per-frame path work at all.
- *
- * All three are gated on `active`, which the caller ties to app visibility and
- * reduced motion. The socket layout below is the desktop rig's, factor for
- * factor, against the same baked face box.
- */
-
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 
 const C = STELLA_MARK_CENTER;
@@ -46,7 +32,6 @@ const HALF_GAP = FACE.rx * 0.42;
 const EYE_W = FACE.rx * 0.78;
 const EYE_H = FACE.ry * 0.62;
 
-/** Floor on the blink's height scale: a zero-height ring is a degenerate path. */
 const BLINK_FLOOR = 0.04;
 
 const GAZE_EVERY_MS: [number, number] = [1600, 3400];
@@ -54,11 +39,6 @@ const GAZE_MS = 620;
 const GAZE_X = C * 0.085;
 const GAZE_Y = C * 0.06;
 
-/**
- * Voice states mirror `voice-motion.ts`: connecting is drowsy, listening is
- * bright and looks around, hearing locks a wide attentive gaze, talking is
- * warm and animated, error is sad.
- */
 export type StellaFaceVoiceState =
   | "connecting"
   | "listening"
@@ -110,7 +90,6 @@ const BLINK_EVERY_BY_STATE: Record<StellaFaceState, [number, number]> = {
   error: [4000, 7000],
 };
 
-/** Gaze drift cadence: listening looks around; hearing and talking hold. */
 const GAZE_EVERY_BY_STATE: Partial<Record<StellaFaceState, [number, number]>> = {
   listening: [900, 1900],
   hearing: [2600, 4200],
@@ -178,7 +157,6 @@ export function StellaFace({
     });
     const schedule = () => {
       timer = setTimeout(() => {
-        // Step by at least one so the same pose is never picked twice running.
         poseIndexRef.current =
           (poseIndexRef.current +
             1 +
@@ -221,8 +199,6 @@ export function StellaFace({
     let timer: ReturnType<typeof setTimeout>;
     const cadence = GAZE_EVERY_BY_STATE[state] ?? GAZE_EVERY_MS;
     const maxReach = GAZE_REACH_BY_STATE[state] ?? 1;
-    // A state that holds its gaze (hearing) should also settle it, not keep
-    // the previous state's random offset.
     if (maxReach < 0.5) {
       gazeX.value = withTiming(0, { duration: GAZE_MS });
       gazeY.value = withTiming(0, { duration: GAZE_MS });

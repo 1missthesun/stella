@@ -1,11 +1,3 @@
-/**
- * State machine for the chat-style onboarding.
- *
- * Owns the transcript (assistant messages + the user's short replies), the
- * current step, the "Stella is typing" beat between messages, resume, and
- * the exit. Cards never talk to persistence directly — they call `answer`
- * and the hook does the rest.
- */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { WORKING_INDICATOR_HANDOFF_MS } from "@/features/chat/working-indicator-state";
 import { useT } from "@/shared/i18n";
@@ -26,7 +18,6 @@ export type OnboardingChatEntry =
       kind: "assistant";
       id: string;
       step: OnboardingChatStep;
-      /** Plays the arrival animation — only for rows added this session. */
       fresh: boolean;
     }
   | { kind: "user"; id: string; text: string; fresh: boolean };
@@ -37,18 +28,11 @@ export type OnboardingChatHandoff = {
 
 type UseOnboardingChatArgs = {
   onFinished: (handoff: OnboardingChatHandoff) => void;
-  /**
-   * Gmail connects through a Stella account (and the desktop app), so the
-   * Gmail message is left out of the script for anyone without one.
-   */
   skipGmail: boolean;
 };
 
-/** The user bubble lands, then Stella "reads" it before typing. */
 const TYPING_DELAY_MS = 420;
-/** How long the working indicator stays before the reply drops in. */
 const TYPING_HOLD_MS = 900;
-/** Surface fade before the shell swaps to the real chat. */
 const EXIT_MS = 320;
 
 const prefersReducedMotion = () =>
@@ -112,9 +96,6 @@ const buildResumedEntries = (
   for (const step of ONBOARDING_CHAT_STEPS) {
     if (step === progress.step) break;
     const answer = progress.answers[step];
-    // A past step with no recorded answer was never shown (the flow gained a
-    // step after this progress was saved); rebuilding it would leave an
-    // orphaned card above the current one.
     if (!answer) continue;
     entries.push(assistantEntry(step, false));
     const textKey = ANSWER_TEXT_KEYS[step][answer];
@@ -152,8 +133,6 @@ export function useOnboardingChat({
   const onFinishedRef = useRef(onFinished);
   onFinishedRef.current = onFinished;
 
-  // Dropping a step the user is already on, or already answered, would strand
-  // the transcript, so the decision only applies ahead of the message.
   const steps = useMemo(() => {
     if (!skipGmail) return ONBOARDING_CHAT_STEPS;
     if (progress.step === "gmail") return ONBOARDING_CHAT_STEPS;

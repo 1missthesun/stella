@@ -1,10 +1,6 @@
 import { promises as fs } from "fs";
 import { session } from "electron";
 import path from "path";
-/**
- * `stopRuntime` also stops the runtime process, so a reset can delete the
- * files it holds; the next runner start spawns a fresh one.
- */
 export const shutdownBootstrapRuntime = async (context, options = {}) => {
     const { lifecycle, state } = context;
     state.localChatUpdateUnsubscribe?.();

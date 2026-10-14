@@ -1,12 +1,3 @@
-/**
- * fal's queue API and webhooks. fal calls back to
- * `/api/media/v1/webhooks/fal?o=<owner>&j=<job>&t=<token>`: owner and job
- * address the owner's object without an index, and `t` is a random token
- * minted for that one job and kept in its row, so only the URL Stella gave
- * fal can settle the job. fal's own ED25519 signature proves the body came
- * from fal.
- */
-
 const QUEUE_BASE = "https://queue.fal.run";
 const JWKS_URL = "https://rest.alpha.fal.ai/.well-known/jwks.json";
 const MAX_SKEW_SECONDS = 300;
@@ -14,7 +5,6 @@ const TIMEOUT_MS = 30_000;
 export const FAL_WEBHOOK_PATH = "/api/media/v1/webhooks/fal";
 
 export class FalError extends Error {
-  /** fal refused the request outright; nothing will run or bill. */
   readonly definitive: boolean;
   readonly code?: string;
   constructor(message: string, definitive: boolean, code?: string) {
@@ -30,10 +20,8 @@ const encoder = new TextEncoder();
 const hex = (bytes: ArrayBuffer): string =>
   Array.from(new Uint8Array(bytes), (byte) => byte.toString(16).padStart(2, "0")).join("");
 
-/** A fresh per-job webhook token. */
 export const mintWebhookToken = (): string => `${crypto.randomUUID()}${crypto.randomUUID()}`.replace(/-/g, "");
 
-/** The URL fal calls when `jobId` settles. */
 export const falWebhookUrl = (args: { baseUrl: string; ownerId: string; jobId: string; token: string }): string => {
   const url = new URL(FAL_WEBHOOK_PATH, args.baseUrl);
   url.searchParams.set("o", args.ownerId);
@@ -42,7 +30,6 @@ export const falWebhookUrl = (args: { baseUrl: string; ownerId: string; jobId: s
   return url.toString();
 };
 
-/** The owner, job and token a webhook URL names, or null when one is missing. */
 export const readFalWebhookUrl = (url: URL): { ownerId: string; jobId: string; token: string } | null => {
   const ownerId = url.searchParams.get("o") ?? "";
   const jobId = url.searchParams.get("j") ?? "";
@@ -50,7 +37,6 @@ export const readFalWebhookUrl = (url: URL): { ownerId: string; jobId: string; t
   return ownerId && jobId && /^[0-9a-f]{64}$/.test(token) ? { ownerId, jobId, token } : null;
 };
 
-/** Equal strings, compared in time that does not depend on where they differ. */
 export const constantTimeEqual = (a: string, b: string): boolean => {
   if (a.length !== b.length) return false;
   let diff = 0;
@@ -119,7 +105,6 @@ const errorMessage = (data: unknown, fallback: string): string => {
     const detail = record.detail;
     if (typeof detail === "string") return detail;
     if (Array.isArray(detail)) {
-      // Validation errors: say which input field and why, for every one.
       const lines = detail.flatMap((entry) => {
         const item = entry as { msg?: unknown; loc?: unknown };
         if (typeof item.msg !== "string") return [];
@@ -143,10 +128,6 @@ const readJson = async (response: Response): Promise<unknown> => {
   }
 };
 
-/**
- * Queue a request. Throws `FalError` with `definitive` when fal refused it;
- * any other throw means fal may have accepted it.
- */
 export const submitFal = async (args: {
   apiKey: string;
   endpointId: string;
@@ -188,7 +169,6 @@ export type FalOutcome =
   | { state: "succeeded"; payload: unknown }
   | { state: "failed"; message: string; code?: string };
 
-/** Where a request stands, with its payload once it completed. */
 export const pollFal = async (apiKey: string, endpointId: string, requestId: string): Promise<FalOutcome> => {
   const base = requestBase(endpointId, requestId);
   const status = await fetch(`${base}/status`, { headers: headers(apiKey), signal: AbortSignal.timeout(TIMEOUT_MS) });

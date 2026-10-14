@@ -2,27 +2,8 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { gitRaw } from "./git.js";
 
-/**
- * A `reference-transaction` hook that keeps agents out of the running
- * checkout. Agent shells carry `STELLA_DRAFTS_DIR` and `STELLA_APP_DIR`, the
- * checkout their own Stella runs from (runtime shell.ts); when a git command
- * run from one would move the branch that checkout has checked out, the hook
- * refuses the transaction and points the agent at the draft flow. A repo that
- * isn't the shell's `STELLA_APP_DIR` passes, so a hook left behind in a
- * checkout Stella no longer runs from blocks nobody. Stella itself (this
- * service, the launchers) never sets `STELLA_DRAFTS_DIR`, so applies, undos
- * and syncs pass. Unlike pre-commit, `--no-verify` doesn't skip it, and
- * it also covers merges, resets and fast-forwards.
- *
- * Once a transaction commits, it also notes which agent (`STELLA_AGENT_ID`,
- * set by the same shells) last moved each `draft/<name>` branch, in
- * `<common dir>/stella-drafts/<name>`, so the chat can offer the draft on
- * that agent's completion.
- */
-
 const MARKER = "stella-checkout-guard v5";
 
-/** Where the hook notes each draft's agent, under the git common dir. */
 export const DRAFT_AGENTS_DIR = "stella-drafts";
 
 const HOOK = `#!/bin/sh
@@ -60,7 +41,6 @@ esac
 exit 0
 `;
 
-/** Install or refresh the hook; leaves a foreign reference-transaction hook alone. */
 export const installCheckoutGuard = async (
   appDir: string,
   log: (event: string, data: Record<string, unknown>) => void,

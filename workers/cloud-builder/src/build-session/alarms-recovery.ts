@@ -192,9 +192,6 @@ export const runAlarmWithLease = async (
           ),
         ));
     if (useRunLeaseForRecovery) {
-      // Turn-state mutation is authorized only by the exact run lease bound
-      // to this workspace. Renew/rejoin that lease after isolate loss; an
-      // auxiliary lease deliberately cannot checkpoint user bytes.
       turn.ownerPurgeGeneration = await host.registerTurn(turn);
     } else {
       turn.ownerPurgeGeneration = await host.registerTurn(turn, true);
@@ -218,10 +215,6 @@ export const runAlarmWithLease = async (
         }
       }
       try {
-        // Confirmed sandbox teardown may have produced world-unregister
-        // debt. Preserve it (and any destroy tombstone) while deleting the
-        // exact turn, otherwise a transient owner-fence failure would erase
-        // the only names capable of freeing the slot on the next alarm.
         retireOriginalLease = await host.cleanupOwnerPurgedTurnStorage(turn);
       } catch (cleanupError) {
         log("error", "owner_purge_alarm_cleanup_failed", {
@@ -234,9 +227,6 @@ export const runAlarmWithLease = async (
     throw error;
   } finally {
     if (auxiliaryLeaseId && auxiliaryGeneration) {
-      // An auxiliary alarm lease never owns transient bytes. Release it
-      // directly even when the original run lease must remain as the fence
-      // for backup-debt persistence.
       await host.unregisterTurnLease(
         turn,
         auxiliaryLeaseId,
@@ -278,8 +268,6 @@ export const runAlarm = async (
           exactCancellation,
         ))
       ) {
-        // Keep the durable terminal payload while another exact-run promise
-        // is still joining. No age or state guess can advance the receipt.
         return;
       }
     }
@@ -290,9 +278,6 @@ export const runAlarm = async (
     await host.deleteTurnStoragePreservingExactCancellations(turn);
     return;
   }
-  // A terminal state already decided is not a timeout: the run finished, its
-  // workspace is checkpointed, and the only thing left is getting the result
-  // delivered. Redelivering that is the whole point of the alarm here.
   const pending =
     await host.ctx.storage.get<PendingTerminal>("pendingTerminal");
   if (pending) {
@@ -355,10 +340,6 @@ export const runAlarm = async (
       return;
     }
   }
-  // An agent on Stella's models runs as its conversation's pi agent, and
-  // BuildSession refuses one. A turn of one here is the resident loop's,
-  // which an update stopped mid-flight: it is settled once, as stopped by
-  // the update, after the usual recovery of any container it had attached.
   const residentLeftover =
     turn.kind === "agent" &&
     turn.agentRole !== "orchestrator" &&
@@ -444,8 +425,6 @@ export const runAlarm = async (
     terminateSandbox: true,
   };
   if (!(await host.claimTerminalDecision(turn, timeoutPending))) {
-    // A normal completion or cancellation claimed the same instant. Let its
-    // durable payload, rather than this timeout fallback, own the next alarm.
     await host.setExactTurnAlarm(turn, Date.now() + 1_000);
     return;
   }
@@ -659,9 +638,6 @@ export const reconcileAgentCheckpointAfterQuiescence = async (
     return accepted[0].receipt;
   }
 
-  // A checkpoint whose transcript never became canonical must remain
-  // invisible. Retire its pre-registered native objects before preparing a
-  // fresh synthetic cursor.
   for (const operation of operations) {
     await host.abortUnpublishedTurnStateOperation(
       turn,
@@ -906,9 +882,6 @@ export const advanceBuilderFallback = async (
     });
   }
   if (!fallback.transcriptCommitted) {
-    // The rows are committed to this thread's own table. Re-appending the
-    // same ordinals is a no-op, so the
-    // replay this journal exists for cannot double-write the transcript.
     await host.appendThreadTranscript(turn, fallback.messages);
     const canonicalRows = host.fetchCanonicalAgentHistory(turn, {
       excludeCurrentTurn: false,
@@ -938,7 +911,6 @@ export const advanceBuilderFallback = async (
   return receipt;
 };
 
-/** One more failed builder-fallback pass for this exact attempt; returns the total. */
 const recordBuilderFallbackRetry = async (
   host: AlarmsRecoveryHost,
   turn: TurnRequest,

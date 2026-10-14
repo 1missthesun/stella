@@ -1,29 +1,3 @@
-/**
- * Save what a turn changed under `/workspace/world/drive` back to the drive.
- *
- * The drive (owner-store rows + R2 bytes) is the only durable home of the
- * user's files: the world never stores its `drive/` subtree, so a sandbox's
- * copy lives on this disk only and is gone when the sandbox is. Hydration
- * (`drive-sync.ts`) is the read half; this is the write half, and it runs
- * once the agent has finished:
- *
- *  - a file the turn created or changed is saved — inline below the inline
- *    limit, through a staged presigned PUT above it, so a file of any size
- *    the plan allows reaches the drive with its bytes;
- *  - a file the turn deleted is deleted from the drive, but only while the
- *    drive still holds the exact version this disk had;
- *  - a file the reply links is saved too when the drive does not have it yet
- *    (an earlier turn's unsaved work), and becomes the turn's files card.
- *
- * "Changed during this turn" is measured against a snapshot taken right after
- * hydration, before any agent process existed, by inode identity — so a copy
- * that diverged in an earlier turn (a conflict, or a file the user deleted
- * from the drive) is left alone unless this turn touches or links it. Every
- * byte read goes through the descriptor boundary, the same as delivery always
- * has: a path is an agent-chosen string, and only singly-linked files owned
- * by the tool account are read, from the opened descriptor.
- */
-
 import { createHash } from "node:crypto";
 import { lstat, readdir } from "node:fs/promises";
 import path from "node:path";
@@ -59,34 +33,24 @@ type FileIdentity = {
   ctimeMs: number;
 };
 
-/** Drive path → the identity of the file standing there. */
 export type DriveTreeSnapshot = ReadonlyMap<string, FileIdentity>;
 
-/** Entries one walk visits; a larger tree is saved over several turns. */
 const WALK_MAX_ENTRIES = 20_000;
-/** Files one turn saves; the rest are named in the report. */
 const SAVE_MAX_FILES = 200;
-/** Inline bytes held in memory before they are sent. */
 const INLINE_FLUSH_BYTES = 32 * 1024 * 1024;
-/** Files read per collection, so a flush is never far past that bound. */
 const COLLECT_BATCH = 8;
-/** Deletions one turn applies. */
 const DELETE_MAX_FILES = 500;
 const DELETE_BATCH = 100;
 const STAGE_BATCH = 25;
-/** The largest file any plan accepts; anything larger is not even staged. */
 const FILE_MAX_BYTES = 2 * 1024 * 1024 * 1024;
 const PUT_TIMEOUT_MS = 10 * 60_000;
 const PUT_CHUNK_BYTES = 1024 * 1024;
-/** Reply-linked files the card shows, as produced files always have. */
 const CARD_MAX_FILES = 25;
 const NOTICE_MAX_REASONS = 12;
 const THUMBNAIL_MAX_FILES = 12;
-/** Mirrors the drive's own path rules (`normalizeDrivePath`). */
 const DRIVE_PATH_MAX = 400;
 const DRIVE_SEGMENT_MAX = 255;
 
-/** Never part of the drive: hydration's own state, and dependency installs. */
 const UNSAVED_DIRECTORIES = new Set([".stella", "node_modules"]);
 
 const identityOf = (stat: FileIdentity): FileIdentity => ({
@@ -125,8 +89,6 @@ const walkDriveTree = async (
       visited += 1;
       if (UNSAVED_DIRECTORIES.has(name)) continue;
       const child = relative ? `${relative}/${name}` : name;
-      // Names only: every byte is read later through the descriptor
-      // boundary, which refuses whatever a link here could point at.
       const stat = await lstat(path.join(root, child)).catch(() => null);
       if (!stat) continue;
       if (stat.isDirectory()) {
@@ -140,10 +102,6 @@ const walkDriveTree = async (
   return { files, truncated };
 };
 
-/**
- * The drive tree as it stands once hydration finished, before any agent
- * process exists: the baseline "changed during this turn" is measured from.
- */
 export const snapshotDriveTree = async (
   driveRoot: string,
 ): Promise<DriveTreeSnapshot> => (await walkDriveTree(path.resolve(driveRoot))).files;
@@ -162,7 +120,6 @@ const validDrivePath = (relative: string): boolean =>
         !/[\u0000-\u001f\u007f\\]/u.test(segment),
     );
 
-/** The reply's links that name files under the drive root, in link order. */
 const linkedDrivePaths = (
   linked: readonly string[],
   root: string,
@@ -191,13 +148,9 @@ const sha256Hex = (bytes: Uint8Array): string =>
   createHash("sha256").update(bytes).digest("hex");
 
 export type DriveWriteBack = {
-  /** The reply-linked files the drive now holds: the turn's files card. */
   files: ProducedFileReport[];
-  /** Sentences for the agent's report about what did not go as asked. */
   notice: string;
-  /** Drive paths saved this turn, under the path each landed at. */
   saved: string[];
-  /** Drive paths this turn deleted from the drive. */
   deleted: string[];
 };
 
@@ -211,13 +164,10 @@ type LargeFile = {
 export const writeBackDrive = async (options: {
   turnId: string;
   driveRoot: string;
-  /** Hydration's state directory, where the ledger lives. */
   stateDir: string;
-  /** The fixed tool account that owns every file the agent wrote. */
   identity: ToolProcessIdentity;
   sync: DriveSyncResult;
   before: DriveTreeSnapshot;
-  /** Paths linked in the turn's final reply; agent-chosen strings. */
   linked: readonly string[];
   post: (route: string, body: unknown) => Promise<Response>;
   fetchImpl?: typeof fetch;
@@ -225,9 +175,6 @@ export const writeBackDrive = async (options: {
   const root = path.resolve(options.driveRoot);
   const owner = { uid: options.identity.uid, gid: options.identity.gid };
   const ledger = options.sync.ledger.files;
-  // Another turn sharing this sandbox may have saved a file since this one
-  // hydrated: its ledger entry spares this turn from saving the same bytes
-  // again under a version it never read.
   const current = await readDriveLedgerFiles({
     workspaceRoot: root,
     stateDir: options.stateDir,
@@ -246,7 +193,6 @@ export const writeBackDrive = async (options: {
     })
     .map(([drivePath]) => drivePath)
     .sort();
-  // Linked first, so the files the reply hands over are the ones a cap spares.
   const candidates = [
     ...new Set([
       ...linked.filter((drivePath) => after.files.has(drivePath)),
@@ -314,9 +260,6 @@ export const writeBackDrive = async (options: {
       cardSaved.set(file.path, { path: landedAt, sizeBytes: file.sizeBytes });
       const version = delivery.versions.get(landedAt);
       const hashed = shaOf.get(file.path);
-      // Saved where it stands: this disk now holds exactly that row version.
-      // Saved beside it instead: the copy here is still not the drive's, and
-      // the ledger keeps saying what this disk last held for that path.
       if (landedAt === file.path && version !== undefined && hashed) {
         savedEntries.set(file.path, {
           updatedAt: version,
@@ -332,8 +275,6 @@ export const writeBackDrive = async (options: {
     );
   };
 
-  // Read through the same boundary delivery always used, a few files at a
-  // time so inline bytes waiting to be sent stay bounded.
   const toSave = savable.slice(0, SAVE_MAX_FILES);
   for (let index = 0; index < toSave.length; index += COLLECT_BATCH) {
     const chunk = toSave.slice(index, index + COLLECT_BATCH);
@@ -367,8 +308,6 @@ export const writeBackDrive = async (options: {
         inlineBytes += bytes.byteLength;
         continue;
       }
-      // At or above the inline limit the collection carries no bytes; the
-      // hash comes from the authorized descriptor, as the upload will.
       const absolute = path.join(root, file.path);
       const sha256 = await withWorkspaceFileNoFollow(
         absolute,
@@ -404,9 +343,6 @@ export const writeBackDrive = async (options: {
   }
   await report(inline.splice(0));
 
-  // Files too large to carry inline go straight to the drive's storage under
-  // a presigned PUT, streamed from the authorized descriptor, then land with
-  // the same report — and the same write rules — as everything else.
   for (let index = 0; index < large.length; index += STAGE_BATCH) {
     const group = large.slice(index, index + STAGE_BATCH);
     const staged = await options
@@ -475,8 +411,6 @@ export const writeBackDrive = async (options: {
           const response = await (options.fetchImpl ?? fetch)(upload.url, init);
           await response.body?.cancel().catch(() => undefined);
           const settled = await handle.stat();
-          // The bytes sent are the bytes hashed, and the file did not move
-          // under the descriptor while they were read.
           return (
             response.ok &&
             hash.digest("hex") === file.sha256 &&
@@ -532,8 +466,6 @@ export const writeBackDrive = async (options: {
     );
   }
 
-  // Deletions: a file present when the turn began and gone now, removed from
-  // the drive only while the drive still has the version this disk held.
   const deletions: Array<{ path: string; knownUpdatedAt: number }> = [];
   for (const drivePath of options.before.keys()) {
     if (after.files.has(drivePath) || deletions.length >= DELETE_MAX_FILES) continue;
@@ -584,15 +516,12 @@ export const writeBackDrive = async (options: {
       removed: removedEntries,
       fallback: options.sync.ledger,
     }).catch((error) => {
-      // The next turn re-reads the drive and downloads what it cannot vouch
-      // for; nothing saved here is lost by a stale ledger.
       console.error(
         `drive ledger write failed: ${error instanceof Error ? error.message : String(error)}`,
       );
     });
   }
 
-  // The card: what the reply links and the drive now holds.
   const files: ProducedFileReport[] = [];
   const cardOverflow: string[] = [];
   for (const drivePath of linked) {

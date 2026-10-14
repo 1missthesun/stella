@@ -25,19 +25,11 @@ type UnifiedLike = {
   runSync: (tree: unknown, file?: unknown) => unknown;
 };
 
-/**
- * Upper bound on the source text retained, summed across entries. A cached
- * tree measured ~120 bytes of heap per source character, so this caps the
- * cache near 18MB while covering the 80-message visible window at typical
- * reply lengths.
- */
 export const MAX_CACHED_MARKDOWN_CHARS = 150_000;
-/** A single reply larger than this is never cached (it would evict the rest). */
 const MAX_CACHED_ENTRY_CHARS = MAX_CACHED_MARKDOWN_CHARS / 4;
 
 type CacheEntry = { tree: object; chars: number };
 
-// Insertion-ordered: the first key is the least recently used.
 const entries = new Map<string, CacheEntry>();
 let cachedChars = 0;
 

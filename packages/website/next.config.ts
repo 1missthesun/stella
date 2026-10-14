@@ -7,9 +7,6 @@ const desktopPublicEnv = loadEnv(
   path.resolve(__dirname, "../desktop-ui"),
   "VITE_",
 );
-// The backend worker serves auth, billing and owners' own browser renderers;
-// the chat iframe loads those renderers through a rewrite so they stay on
-// this origin.
 const stellaBackendUrl = (
   process.env.NEXT_PUBLIC_STELLA_BACKEND_URL ||
   desktopPublicEnv.VITE_STELLA_BACKEND_URL ||
@@ -27,8 +24,6 @@ const REVALIDATING_ASSET_CACHE =
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   experimental: {
-    // Keep route and component CSS in import-order chunks instead of merging
-    // unrelated route styles into the homepage's paint-blocking stylesheet.
     cssChunking: "strict",
   },
   env: {
@@ -40,8 +35,6 @@ const nextConfig: NextConfig = {
       : {}),
   },
   webpack(config) {
-    // Workspace TypeScript sources (`@stella/contracts`) import siblings as
-    // `./x.js`; resolve those to the `.ts` files.
     config.resolve.extensionAlias = {
       ...config.resolve.extensionAlias,
       ".js": [".ts", ".tsx", ".js"],
@@ -49,13 +42,10 @@ const nextConfig: NextConfig = {
     return config;
   },
   turbopack: {
-    // Dependencies and the lockfile live at the workspace root.
     root: path.resolve(__dirname, "../.."),
   },
   images: {
-    // Serve AVIF first (smallest), then WebP, then fall back to the source.
     formats: ["image/avif", "image/webp"],
-    // Whitelist the quality levels used via the `quality` prop (default is [75]).
     qualities: [75, 82],
     remotePatterns: [
       {
@@ -63,25 +53,13 @@ const nextConfig: NextConfig = {
         hostname: "**.fal.media",
       },
     ],
-    // Keep generated variants warm in the optimizer cache. Browser caching is
-    // controlled separately below because public source filenames are mutable.
     minimumCacheTTL: 31536000,
   },
   async redirects() {
     return [
-      // The "Agents" page was renamed to "One chat"; keep old links alive.
       { source: "/agents", destination: "/one-chat", permanent: true },
       { source: "/agents.md", destination: "/one-chat.md", permanent: true },
-      // The dedicated "Stella Go" landing page was retired. Send its old URL
-      // (and any inbound ad/link traffic) to the homepage with a 301 so it
-      // never 404s (a 404 would get Google Ads disapproved). An explicit 301
-      // (rather than Next's default 308 for `permanent`) is what Google Ads /
-      // Search expect for a retired page.
       { source: "/go", destination: "/", statusCode: 301 },
-      // The Slack settings page became the Crew page. Stella's own messages
-      // now link to /crew, but old messages and the Slack and GitHub app
-      // listings still point at /slack; query strings (install and GitHub
-      // return params) pass through.
       { source: "/slack", destination: "/crew", permanent: true },
     ];
   },
@@ -129,7 +107,6 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        // An owner's renderer lives under its tree hash and never changes.
         source: "/chat-app/u/:path*",
         headers: [
           {
@@ -139,16 +116,11 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        // These files are deployed assets, but their public URLs are not
-        // content-hashed. Cache them for repeat visits without marking them
-        // immutable, so a same-name replacement is picked up within a day.
         source:
           "/:asset(stella-logo|stella-logo-ui|stella-wallpaper).:ext(png|jpg|svg)",
         headers: [{ key: "Cache-Control", value: REVALIDATING_ASSET_CACHE }],
       },
       {
-        // Next appends a content hash to these URLs in generated metadata, but
-        // keep the direct, unhashed route bounded rather than immutable.
         source: "/:asset(icon|apple-icon).png",
         headers: [{ key: "Cache-Control", value: REVALIDATING_ASSET_CACHE }],
       },

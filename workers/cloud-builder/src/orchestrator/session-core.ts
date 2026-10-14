@@ -45,20 +45,6 @@ import type { OrchestratorOwner } from "./owner.js";
 import { SlackRelay } from "../slack/relay.js";
 import { ownerGateStub } from "../rpc-release.js";
 
-/**
- * The conversation Durable Object (`OrchestratorSessionObject`, see
- * `../orchestrator-session-object.ts`) is one class split by concern into a
- * chain of layers, each extending the one below it:
- *
- *   session-core → owner → turn-lifecycle → turn-queue → journal-probe →
- *   cloud-agents → pi → tools → cli-turn → run-turn → journal-writes →
- *   local-turn → turn-start → OrchestratorSessionObject
- *
- * This bottom layer holds every field and the constructor, so fields are
- * initialized exactly once and in their original order. A layer calls only
- * down the chain, except for the few methods declared abstract where a lower
- * layer needs one implemented above it.
- */
 export abstract class OrchestratorSessionCore extends DurableObject<Env> {
   protected firstChatInIsolate = true;
   protected gatewayPreparedInInstance = false;
@@ -76,15 +62,11 @@ export abstract class OrchestratorSessionCore extends DurableObject<Env> {
     restoreMs: number;
     totalMs: number;
   };
-  // Serializes turns: the owner can dispatch a wake turn while a user turn is
-  // still streaming; the second waits its turn instead of interleaving.
   protected queue: Promise<unknown> = Promise.resolve();
-  /** Exact promises let Stop join only its target, never a newer queued turn. */
   protected readonly turnExecutions = new Map<
     string,
     TurnExecution<Response>
   >();
-  /** Fresh voice writes hold an owner fence and are joined by owner purge. */
   protected readonly ownerFencedAppends = new Map<
     string,
     { lease: OwnerFencedTurn; settled: Promise<void> }
@@ -96,30 +78,10 @@ export abstract class OrchestratorSessionCore extends DurableObject<Env> {
   protected readonly hub: ConversationHub;
   protected readonly exactTurnCancellations: ExactTurnCancellationLedger;
 
-  /**
-   * Work that must finish before a turn is called terminal but that cannot run
-   * on the Agent's synchronous event sink — today, promoting an oversize row's
-   * payload into R2.
-   */
   protected background: Promise<unknown> = Promise.resolve();
 
-  /** In-memory only. Rebuilt every turn; nothing durable depends on it. */
   protected live: LiveTurnSnapshot | null = null;
 
-  /**
-   * The turn whose `runTurn` body is executing in THIS isolate, and the last
-   * turn whose post-terminal work ran.
-   *
-   * Together they route `afterTerminal` to exactly one caller. `/cancel` and
-   * the watchdog can mark a turn terminal from outside the loop, and the
-   * post-terminal work — the search excerpt, the card-inbox drain, rollover —
-   * must run for those turns too. But it must never run while the loop is
-   * still unwinding: a drain there could splice a foreign row between a tool
-   * call and its result, and rollover mid-turn is forbidden outright. So the
-   * loop finalizes its own turn whenever it is alive to do it, and those two
-   * paths only step in for a turn no loop will return to (an eviction, or a
-   * cancel that arrived after the isolate lost the run).
-   */
   protected activeTurnId: string | null = null;
   protected finalizedTurnId: string | null = null;
 
@@ -137,20 +99,12 @@ export abstract class OrchestratorSessionCore extends DurableObject<Env> {
    */
   protected sealed = false;
 
-  /** Serializes `/turn` admission through durable replay classification. */
   protected turnAdmissionTail: Promise<void> = Promise.resolve();
-  /** Serializes per-turn event ordinal allocation (a get+put pair). */
   protected eventSeqTail: Promise<unknown> = Promise.resolve();
-  /** Persisted with accepted turns so cold-start index flushes stay fenced. */
   protected ownerGeneration?: string;
 
-  // Aborts the live turn's retry ladder:
-  // classification reads it to refuse retries after a cancel/timeout, and an
-  // abort during retry backoff wakes the sleep instead of waiting it out.
   protected currentTurnCancellation?: TurnRetryCancellation;
-  /** The pi-durable run of the live turn, for the same Stop and watchdog paths. */
   protected currentPiRun?: { abort(): void };
-  /** This conversation's pi-durable harness, opened once per isolate. */
   protected piRuntime?: Promise<
     import("../pi-runtime.js").PiConversationRuntime
   >;
@@ -164,16 +118,9 @@ export abstract class OrchestratorSessionCore extends DurableObject<Env> {
     }
   >();
 
-  /** When this object last checked its running agents against their owners. */
   protected agentsReconciledAt = 0;
 
-  /** What `agentsView` read last is in storage. */
   protected agentsViewStored = false;
-  /**
-   * The running agents of a conversation pi has run in (`refreshAgents`),
-   * which `ready` and `agents` frames list; null where they are folded
-   * from the journal's agent cards.
-   */
   protected agentsView: AgentsView | null = null;
   protected agentsRefresh: Promise<void> | null = null;
   protected agentsRefreshAgain = false;
@@ -240,21 +187,11 @@ export abstract class OrchestratorSessionCore extends DurableObject<Env> {
         },
       },
     });
-    // Set in the constructor rather than at accept time: whether an
-    // auto-response survives DO eviction is not something the docs settle, and
-    // setting it on every cold start makes the question moot. This is what
-    // keeps an idle conversation free — a JSON heartbeat would wake the object
-    // on every beat and bill the incoming frame at 20:1.
     ctx.setWebSocketAutoResponse(
       new WebSocketRequestResponsePair("ping", "pong"),
     );
-    // Accepted turns are persisted under queued:* before the 202 goes out;
-    // an isolate restart wipes the in-memory queue, so re-enqueue whatever
-    // survived — otherwise an accepted turn (and its owner "running" row)
-    // would be silently lost forever.
     const wake = this.ctx.blockConcurrencyWhile(async () => {
       const wakeStartedAt = performance.now();
-      // The schema has to exist before anything can read or write a turn.
       await this.journal.bootstrap();
       const bootstrapMs = Math.round(performance.now() - wakeStartedAt);
       const restoreStartedAt = performance.now();
@@ -264,8 +201,6 @@ export abstract class OrchestratorSessionCore extends DurableObject<Env> {
       if (this.journal.meta().conversation_id === "" && this.ctx.id.name) {
         this.journal.setConversationId(this.ctx.id.name);
       }
-      // A conversation on pi lists its running agents from their owners from
-      // the first connect on, even before it has read them.
       const agentsView =
         await this.ctx.storage.get<AgentsView>(AGENTS_VIEW_KEY);
       this.agentsViewStored = agentsView !== undefined;
@@ -279,8 +214,6 @@ export abstract class OrchestratorSessionCore extends DurableObject<Env> {
       if (localLease) {
         await this.restoreLocalLease(localLease);
       } else {
-        // The turn a replaced isolate was running goes first, ahead of
-        // everything queued behind it, exactly where it stood.
         const orphan = await this.claimOrphanedTurnResume();
         if (orphan) this.enqueue(orphan.turn, false, { resume: orphan.resume });
         for (const turn of await this.queuedTurns()) this.enqueue(turn);
@@ -346,13 +279,11 @@ export abstract class OrchestratorSessionCore extends DurableObject<Env> {
     }
   }
 
-  /** Pull the alarm forward to `at` unless one already fires sooner. */
   protected async armAlarmNoLaterThan(at: number): Promise<void> {
     const current = await this.ctx.storage.getAlarm();
     if (current === null || current > at) await this.ctx.storage.setAlarm(at);
   }
 
-  /** Who the projection belongs to; null until the conversation is bound. */
   protected indexIdentity(): {
     ownerId: string;
     ownerGeneration: string;
@@ -404,11 +335,6 @@ export abstract class OrchestratorSessionCore extends DurableObject<Env> {
       .catch(() => undefined);
   }
 
-  /**
-   * Publishes a committed row. Broadcast is best-effort by construction: the
-   * row is durable first, the frame is sent second, and a crash in between
-   * costs a frame, not a fact. The client's gap detection closes it.
-   */
   protected publish(record: JournalRecord | null | undefined): void {
     if (!record) return;
     try {
@@ -424,7 +350,6 @@ export abstract class OrchestratorSessionCore extends DurableObject<Env> {
 
   private slackRelay?: SlackRelay;
 
-  /** Mirrors a Slack-started conversation into its thread (`../slack/relay.ts`). */
   protected slack(): SlackRelay {
     this.slackRelay ??= new SlackRelay(
       this.ctx.storage,
@@ -461,9 +386,6 @@ export abstract class OrchestratorSessionCore extends DurableObject<Env> {
       conversationId: this.conversationId(),
       reason,
     });
-    // Called from inside a flush's retry ladder, where a throw would be caught
-    // as a transport failure and retried. The seal is the point; disconnecting
-    // stale tabs is a courtesy.
     try {
       this.hub.closeAll(CLOSE_DELETED);
     } catch (error) {
@@ -473,8 +395,6 @@ export abstract class OrchestratorSessionCore extends DurableObject<Env> {
     }
   }
 
-  // Implemented further up the chain; the constructor and the conversation
-  // hub wiring above need them.
   protected abstract cancelTurn(turnId: string): Promise<void>;
   protected abstract journalStoppedPrompt(turn: ChatTurnRequest): Promise<void>;
   protected abstract publishStagedWakeCards(turnId: string): Promise<void>;

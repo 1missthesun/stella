@@ -109,16 +109,8 @@ export const getBackgroundWork = (
       threadIds: string[];
       descriptions: Record<string, string>;
       spawnedAtMs: Record<string, number>;
-      /** Per-thread follow-up message/description for threads re-activated via
-       *  `send_message` on this turn (the card title for a follow-up), lifted
-       *  from the `agent-started` `statusText`. Absent for plain spawns. */
       statusTexts: Record<string, string>;
-      /** Threads on this card whose `agent-started` was flagged a `send_message`
-       *  follow-up (re-activation) rather than a fresh spawn — the explicit
-       *  discriminator the card reads to pick its follow-up variant. */
       followUpThreadIds: string[];
-      /** Canonical identity/anchor for each task occurrence. Unlike agentId
-       *  and rootRunId, this changes for every `send_message` activation. */
       startEventIdsByThread: Record<string, string>;
       attemptGenerationsByThread: Record<string, number>;
       rootRunIdsByThread: Record<string, string>;
@@ -132,14 +124,9 @@ export const getBackgroundWork = (
   const startEventIdsByThread: Record<string, string> = {};
   const attemptGenerationsByThread: Record<string, number> = {};
   const rootRunIdsByThread: Record<string, string> = {};
-  // When this thread was kicked off / last advanced on this turn (ms). Lets
-  // the card distinguish a fresh spawn (read as working) from one whose
-  // lifecycle aged out of the loaded windows (presume settled, not pinned
-  // as forever-working).
   const spawnedAtMs: Record<string, number> = {};
   for (const event of events) {
     if (!isAgentStartedEvent(event)) continue;
-    // Skip internal/system agents invoked behind a tool (schedule, etc.).
     const agentType = asNonEmptyString(event.payload.agentType);
     if (agentType && isOrchestratorReservedBuiltinAgentId(agentType)) {
       continue;
@@ -182,8 +169,6 @@ export const getBackgroundWork = (
         followUpThreadIds.splice(previousFollowUpIndex, 1);
       }
       delete statusTexts[agentId];
-      // Explicit runtime signal: a `send_message` re-activation stamps
-      // `isFollowUp`; statusText is that occurrence's own title.
       if (event.payload.isFollowUp) {
         followUpThreadIds.push(agentId);
         const followUp = asNonEmptyString(event.payload.statusText);
@@ -208,18 +193,6 @@ export const getBackgroundWork = (
   };
 };
 
-/**
- * Preserve one inline receipt per lifecycle start occurrence. A spawn and a
- * `send_message` follow-up can share the same assistant row, but they are still
- * separate user-visible actions and must not be flattened into one card.
- */
-/**
- * Agent threads a set of tool events started, for reply context. Unlike the
- * inline card this needs no lifecycle event: a cloud journal spreads the
- * `spawn_agent` / `send_message` result details (`thread_id`) onto the
- * `tool_result` payload, and a local transcript carries `agent-started`.
- * Either is enough to say "this exchange owns that task".
- */
 export const getSpawnedThreadIds = (
   events: readonly EventRecord[],
 ): string[] => {
@@ -238,7 +211,6 @@ export const getSpawnedThreadIds = (
       | undefined;
     if (payload?.toolName !== "spawn_agent" && payload?.toolName !== "send_message") continue;
     if (event.type === "tool_request") {
-      // `send_message` names the thread it steers in its arguments.
       add(payload.args?.thread_id);
       continue;
     }
@@ -279,9 +251,6 @@ export const getBackgroundWorks = (
   events: readonly EventRecord[],
 ): NonNullable<ReturnType<typeof getBackgroundWork>>[] => {
   const cards: NonNullable<ReturnType<typeof getBackgroundWork>>[] = [];
-  // Lifecycle routing can merge an older start into a row that already owns a
-  // newer follow-up. The event timestamps/ids are the persisted timeline
-  // order; the merged array's insertion order is not.
   const starts = events
     .filter(isAgentStartedEvent)
     .sort((a, b) => a.timestamp - b.timestamp || a._id.localeCompare(b._id));
@@ -311,7 +280,6 @@ const getCwd = (events: readonly EventRecord[]): string | undefined => {
 type UseEventRowsOptions = {
   messages: MessageRecord[];
   maxItems?: number;
-  /** Task titles by thread id (runtime Activity list), for reply context. */
   agentTitles?: ReadonlyMap<string, string>;
   agentParents?: ReadonlyMap<string, string>;
 };
@@ -394,12 +362,6 @@ export const dedupeAgentCompletionRows = (
   });
 };
 
-/**
- * Files a reply links, as pills under its bubble. Local links keep their
- * local viewer payload; links into the cloud world's drive become drive
- * entries (opened through a drive URL, never the local file system).
- * Developer source files keep their own diff presentation.
- */
 export const deriveLinkedFiles = (
   text: string,
   timestamp: number,
@@ -421,7 +383,6 @@ const isOwnTurnToolEvent = (event: EventRecord): boolean => {
   return !agentType || agentType === "orchestrator";
 };
 
-/** Resolve completion events on one timeline row through their exact start. */
 export const projectAgentCompletionSections = (
   toolEvents: readonly EventRecord[],
   lifecycleIndex: BackgroundTaskLifecycleIndex,
@@ -443,7 +404,6 @@ export const projectAgentCompletionSections = (
   return [...sections.values()];
 };
 
-/** Whether an assistant message is a pre-tool segment, not the final answer. */
 export const isIntraTurnAssistantRuntime = (
   runtime:
     | { followedByToolCall?: boolean; turnComplete?: boolean }
@@ -463,7 +423,6 @@ const isImageOnlyInlineRow = (row: AssistantRowViewModel): boolean =>
   !row.agentCompletion?.sections.length &&
   !row.customSlot;
 
-/** Merge sequential one-by-one image_gen rows into a single inline strip. */
 const coalesceInlineImageRows = (
   rows: EventRowViewModel[],
 ): EventRowViewModel[] => {
@@ -509,12 +468,6 @@ const isVoiceOnlyRow = (row: AssistantRowViewModel): boolean =>
   !row.agentCompletion?.sections.length &&
   !row.customSlot;
 
-/**
- * Collapse a run of back-to-back voice-session summary rows (no user
- * message or other assistant content between them) into a single
- * "Talked with Stella" chip whose duration is the sum of the run, rather
- * than stacking one chip per session.
- */
 const coalesceVoiceSessionRows = (
   rows: EventRowViewModel[],
 ): EventRowViewModel[] => {
@@ -556,12 +509,6 @@ export function useEventRows(opts: UseEventRowsOptions): UseEventRowsResult {
     [messages],
   );
 
-  /**
-   * Canonical per-start lifecycle state across the loaded transcript. The
-   * selector deduplicates live + persisted copies by raw event id and binds a
-   * terminal packet to its exact `agent-started` occurrence. That start id is
-   * both identity and anchor, so completion can only update the existing card.
-   */
   const lifecycleCacheRef = useRef<{
     toolEventsByIndex: ReadonlyArray<readonly EventRecord[]>;
     result: BackgroundTaskLifecycleIndex;
@@ -623,21 +570,8 @@ export function useEventRows(opts: UseEventRowsOptions): UseEventRowsResult {
 
   const allRows = useMemo<EventRowViewModel[]>(() => {
     const computed: EventRowViewModel[] = [];
-    /**
-     * 1-based per-`userMessageId` count of assistant rows seen so far
-     * in this projection walk. Drives `assistantScrollFollowKey(...)`
-     * so a live-streaming overlay and the eventual persisted row at
-     * the same position end up with the same React key. The display-
-     * messages merge upstream filters
-     * out overlays whose persisted counterpart has landed, so each
-     * `(userMessageId, indexInTurn)` slot is occupied by exactly one
-     * source at a time.
-     */
     const assistantCountByUserMessageId = new Map<string, number>();
 
-    // Spawn-anchored card descriptor. Terminal/progress payloads may live on a
-    // much later message, but the lifecycle selector resolves them back to the
-    // exact persisted start event represented by this card.
     const buildBackgroundWorks = (toolEvents: readonly EventRecord[]) =>
       getBackgroundWorks(toolEvents).map((base) => ({
         ...base,
@@ -677,11 +611,6 @@ export function useEventRows(opts: UseEventRowsOptions): UseEventRowsResult {
     const cacheByMessage = projectionCache.byMessage;
 
     for (const message of displayMessages) {
-      // Advance the per-turn assistant index for every assistant message
-      // (cache hit or miss) so the sequential stableKeys stay correct, then
-      // reuse the prior projection of any message whose identity — and index
-      // position — is unchanged. The live overlay's identity changes per
-      // delta, so it always re-projects; finalized rows are reused.
       let indexWithinTurn = -1;
       let assistantReplyId: string | undefined;
       if (isAssistantMessage(message)) {
@@ -785,11 +714,6 @@ export function useEventRows(opts: UseEventRowsOptions): UseEventRowsResult {
             : {}),
         };
         produced.push(row);
-        // A fire-and-forget spawn / send_message that never produced an
-        // assistant message has its tools anchored on this user_message.
-        // Surface the card on a synthetic assistant row right under it so
-        // background work is still visible (the working indicator steps
-        // aside once a task is running).
         const userBackgroundWorks = buildBackgroundWorks(message.toolEvents);
         const userBackgroundWork = userBackgroundWorks[0];
         if (userBackgroundWork) {
@@ -820,12 +744,6 @@ export function useEventRows(opts: UseEventRowsOptions): UseEventRowsResult {
         const text = getDisplayMessageText(message);
         const payload = getMessagePayload(message);
         const replyToUserMessageId = assistantReplyId;
-        // Read `responseTarget` straight off this message's own runtime
-        // metadata. It was previously precomputed into a per-render
-        // `Map<_id, responseTarget>` and looked up here by `message._id` — but
-        // that lookup is always THIS same message, so the map was a redundant
-        // O(messages) pass + allocation on every render. Inlining it folds it
-        // into the per-message projection cache.
         const runtimeMetadata = (
           payload?.metadata as
             | {
@@ -840,12 +758,6 @@ export function useEventRows(opts: UseEventRowsOptions): UseEventRowsResult {
         )?.runtime;
         const responseTarget = runtimeMetadata?.responseTarget;
         const replyRefs = parseReplyRefs(runtimeMetadata?.replyRefs);
-        // Unified key for both in-memory overlays (synthetic
-        // `_id`s) and the eventual persisted rows for the same
-        // `(userMessageId, indexInTurn)` slot. The display merge
-        // ensures only one source is present at a time, so the count
-        // stays consistent. `indexWithinTurn` was advanced in the loop
-        // preamble (so cache hits keep positions correct).
         const stableKey =
           replyToUserMessageId !== undefined
             ? assistantScrollFollowKey(replyToUserMessageId, indexWithinTurn)
@@ -881,9 +793,6 @@ export function useEventRows(opts: UseEventRowsOptions): UseEventRowsResult {
         const row: AssistantRowViewModel = {
           kind: "assistant",
           id: stableKey,
-          // The voice-session summary card replaces the text body entirely,
-          // so the raw "Voice session\n\nDuration: …" model-history fallback
-          // never renders as markdown.
           text: voiceSession ? "" : text,
           timestampMs: message.timestamp,
           cacheKey: stableKey,
@@ -941,13 +850,6 @@ export function useEventRows(opts: UseEventRowsOptions): UseEventRowsResult {
       }
       for (const producedRow of produced) computed.push(producedRow);
     }
-
-    // No synthetic trailing artifact row: a `user_message` carrying inline-
-    // image tool events with no assistant reply yet is an in-progress turn,
-    // and inline artifact cards only render once their owning assistant
-    // message is finalized. The images resurface on that assistant row's
-    // tool events once it lands (see `showInlineArtifacts` above), so the
-    // fire-and-forget stand-in is no longer projected mid-flight.
 
     // Reconcile a thread that surfaces on more than one row. Exact duplicate
     // copies share the canonical `agent-started` event id. A different start
@@ -1009,9 +911,6 @@ export function useEventRows(opts: UseEventRowsOptions): UseEventRowsResult {
         ) {
           replaced.add(id);
         } else if (owner?.followUpThreadIds?.includes(id)) {
-          // The predecessor had already settled before this follow-up. Keep
-          // its terminal card, but fence it from the durable thread's newer
-          // attempt so only the follow-up can become the current live unit.
           superseded.push(id);
         } else {
           superseded.push(id);

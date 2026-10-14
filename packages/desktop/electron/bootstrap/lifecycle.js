@@ -6,18 +6,12 @@ import { t } from "../services/i18n-service.js";
 import { shutdownBootstrapRuntime } from "./resets.js";
 import { initializeBootstrapApplication } from "./runtime.js";
 import { isLauncherPresent, launcherExitCode, relaunchApp, reportFailed, } from "../launcher-client.js";
-// Shutdown cleanup is best-effort, never a hostage. Squirrel's installer waits
-// for this process to exit before it swaps the bundle in, so a cleanup that
-// stalls reads to the user as "the update never restarted" — the app is gone
-// from screen but still alive. Each phase gets a budget; whatever hasn't
-// finished when it runs out is abandoned and the process exits anyway.
 const QUIT_PHASE_DEADLINE_MS = {
     "before-quit": 4_000,
     "will-quit": 2_000,
 };
 const SLOW_QUIT_PHASE_MS = 1_500;
 const SLOW_CLEANUP_MS = 750;
-/** Cleanups shorter than this are left out of the per-phase timing line. */
 const LISTED_CLEANUP_MS = 20;
 const runQuitPhase = async (context, phase) => {
     const startedAt = Date.now();
@@ -79,7 +73,6 @@ export const registerBootstrapLifecycle = (context) => {
             : String(error);
         console.error("Fatal startup failure:", error);
         if (isLauncherPresent()) {
-            // The launcher shows its recovery screen with this output.
             reportFailed(detail);
             app.exit(1);
             return;

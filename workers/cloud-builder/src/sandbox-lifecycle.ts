@@ -1,13 +1,3 @@
-/**
- * Durable sandbox retirement primitives.
- *
- * This module deliberately knows nothing about a particular Durable Object or
- * container binding.  The caller supplies storage and performs destruction;
- * the durable value only records the exact resource that is still owed.  That
- * keeps teardown retryable after isolate loss without letting a later attempt
- * accidentally reinterpret an older sandbox at a different size or workload.
- */
-
 import { isInstanceSize, type InstanceSize } from "./instance-size.js";
 
 export const SANDBOX_WORKLOADS = ["app-build", "world"] as const;
@@ -50,12 +40,6 @@ const fingerprint = async (parts: readonly string[]): Promise<string> =>
     ),
   ).slice(0, 40);
 
-/**
- * Stable for an exact app attempt, for one agent thread's container in an
- * owner's world, or for the owner's own world container (Claude sign-in).
- * Only a SHA-256 fingerprint enters the SDK-visible id; authority material
- * and user-controlled prefixes never do.
- */
 export const sandboxLifecycleId = async (
   workloadPrefix: "agent" | "app" | "echo" | "world",
   identity:
@@ -116,11 +100,6 @@ export const sandboxLifecycleId = async (
 export type SandboxLifecycleFailureFields = Readonly<{
   failureCode:
     "aborted" | "deadline_exceeded" | "out_of_memory" | "sandbox_rpc_failed";
-  /**
-   * The error's class name only (letters and digits), never its message:
-   * enough to tell an SDK transport error from a platform reset without
-   * carrying provider text into logs.
-   */
   errorName: string;
   detailBytes: number;
   detailBytesCapped: boolean;
@@ -135,7 +114,6 @@ export class SandboxLifecycleDeferredError extends Error {
 
 const FAILURE_DETAIL_BYTE_CAP = 4_096;
 
-/** Allowlisted lifecycle diagnostics only; provider bodies and URLs stay out. */
 export const sandboxLifecycleFailureFields = (
   error: unknown,
 ): SandboxLifecycleFailureFields => {
@@ -172,7 +150,6 @@ export type SandboxDestroyDebt = Readonly<{
   kind: "destroy-pending";
   target: SandboxTarget;
   createdAt: number;
-  /** Number of failed destroy calls. There is intentionally no retry limit. */
   attemptCount: number;
   nextAttemptAt: number;
   lastAttemptAt?: number;
@@ -217,11 +194,6 @@ export const sameSandboxTarget = (
   left.size === right.size &&
   left.workload === right.workload;
 
-/**
- * The encoded component is lossless, including `:` and non-ASCII ids.  A debt
- * for the same sandbox id at another size/workload gets a different key, so it
- * cannot silently overwrite or clear the wrong container's tombstone.
- */
 export const sandboxDestroyDebtKey = (target: SandboxTarget): string =>
   `${SANDBOX_DESTROY_DEBT_PREFIX}${encodeURIComponent(target.workload)}:${encodeURIComponent(
     target.size,
@@ -272,12 +244,9 @@ const checkedTimestamp = (value: number, name: string): number => {
   return value;
 };
 
-/** Delay after `attemptCount` failures; the first failure waits one second. */
 export const sandboxDestroyRetryDelayMs = (attemptCount: number): number => {
   checkedTimestamp(attemptCount, "attemptCount");
   if (attemptCount === 0) return 0;
-  // Capping the exponent before exponentiation keeps even MAX_SAFE_INTEGER
-  // attempts finite. The attempt counter is never used to terminate retry.
   const capExponent = Math.ceil(
     Math.log2(SANDBOX_DESTROY_RETRY_MAX_MS / SANDBOX_DESTROY_RETRY_BASE_MS),
   );
@@ -300,10 +269,6 @@ export const createSandboxDestroyDebt = (
   nextAttemptAt: createdAt,
 });
 
-/**
- * Advance after one failed destroy call.  The counter saturates solely to stay
- * representable; the record and capped schedule continue forever.
- */
 export const advanceSandboxDestroyDebt = (
   debt: SandboxDestroyDebt,
   failedAt: number,
@@ -328,7 +293,6 @@ export const isSandboxDestroyDue = (
   now: number,
 ): boolean => checkedTimestamp(now, "now") >= debt.nextAttemptAt;
 
-/** Structural subset implemented by DurableObjectStorage and tiny test fakes. */
 export type SandboxLifecycleStorage = Readonly<{
   get<T = unknown>(key: string): Promise<T | undefined>;
   put<T>(key: string, value: T): Promise<void>;
@@ -385,11 +349,6 @@ export const clearSandboxDestroyDebt = async (
   debt: SandboxDestroyDebt,
 ): Promise<boolean> => await storage.delete(sandboxDestroyDebtKey(debt.target));
 
-/**
- * Parse a prefix listing without trusting either the key or value alone. A
- * malformed row, or a valid debt stored under a different tuple's key, is
- * ignored instead of becoming authority to destroy a container.
- */
 export const parseSandboxDestroyDebtEntries = (
   entries: Iterable<readonly [string, unknown]>,
 ): readonly SandboxDestroyDebt[] => {

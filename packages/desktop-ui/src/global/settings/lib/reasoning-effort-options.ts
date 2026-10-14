@@ -1,7 +1,3 @@
-/**
- * Reasoning-effort choices shared by the sidebar model picker and the
- * composer's pinned mini picker, so both surfaces present the same ladder.
- */
 import type { ReasoningEffortLevel } from "@stella/contracts/reasoning-effort";
 
 export type ReasoningEffortOptionId = ReasoningEffortLevel;
@@ -13,7 +9,6 @@ export type ReasoningEffortOption = {
    * Prefer `labelKey` with the i18n catalog for anything user-visible.
    */
   label: string;
-  /** Catalog key for the localized label. */
   labelKey: string;
 };
 
@@ -29,7 +24,6 @@ export const REASONING_EFFORT_OPTIONS: readonly ReasoningEffortOption[] = [
   { id: "max", label: "Max", labelKey: "settings.reasoningEffort.max" },
 ];
 
-/** Every engine and model shows the same ladder; each maps it to its own levels. */
 export function listReasoningEffortOptions(): readonly ReasoningEffortOption[] {
   return REASONING_EFFORT_OPTIONS;
 }

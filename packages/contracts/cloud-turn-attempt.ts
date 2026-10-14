@@ -1,21 +1,3 @@
-/**
- * Root-only handoff files between BuildSession and the cloud executor for one
- * container attempt.
- *
- * One world container runs several threads at once (the orchestrator's
- * `orch:<conversationId>` thread beside general agents), so every attempt gets
- * its own directory, keyed by the thread hash (lowercase hex SHA-256 of the
- * thread id, as for the native state root) and the attempt generation. The
- * turn input, the executor's result and the broker credential handoff all
- * live there; no attempt can read or replace another's.
- *
- * `/workspace` is root-owned and outside every checkpointed tool root
- * (`/workspace/drive`, `/workspace/stella`, `/workspace/projects/...`), and
- * BuildSession makes the anchor and each attempt directory 0700, so
- * model-controlled UID 42424 can neither read nor create anything in them.
- * BuildSession removes the directory when the attempt finishes.
- */
-
 export const CLOUD_TURN_ATTEMPT_ANCHOR = "/workspace/.stella-turn-attempts";
 
 const ATTEMPT_DIRECTORY_PATTERN =
@@ -23,16 +5,8 @@ const ATTEMPT_DIRECTORY_PATTERN =
 
 export type CloudTurnAttemptPaths = {
   directory: string;
-  /** Turn input; the executor reads and unlinks it before anything else. */
   input: string;
-  /** The executor's authoritative result, written mode 0600. */
   result: string;
-  /**
-   * Messages for the running agent. The executor creates it once the agent
-   * can take them and renames it away when the agent stops taking them;
-   * BuildSession renames each message into it whole, so a message either
-   * lands while the agent takes messages or is refused.
-   */
   inbox: string;
 };
 
@@ -43,14 +17,9 @@ const pathsFor = (directory: string): CloudTurnAttemptPaths => ({
   inbox: `${directory}/inbox`,
 });
 
-/** One inbox message's file: `{ "text": string }` as JSON. */
 export const CLOUD_TURN_INBOX_MESSAGE_PATTERN =
   /^([0-9]{16})-([0-9a-f]{64})\.json$/u;
 
-/**
- * Named by when it arrived (so the inbox reads in order) and the hash of the
- * sender's message id (so a resent message is taken once).
- */
 export const cloudTurnInboxMessageName = (
   receivedAt: number,
   messageIdHash: string,
@@ -61,7 +30,6 @@ export const cloudTurnInboxMessageName = (
   return `${String(Math.max(0, Math.floor(receivedAt))).padStart(16, "0")}-${messageIdHash}.json`;
 };
 
-/** BuildSession side: the directory for this thread's attempt. */
 export const cloudTurnAttemptPaths = (
   threadHash: string,
   attemptGeneration: number,
@@ -77,10 +45,6 @@ export const cloudTurnAttemptPaths = (
   );
 };
 
-/**
- * Executor side: the paths for the directory BuildSession named on the
- * command line. Null for anything that is not an attempt directory.
- */
 export const parseCloudTurnAttemptDirectory = (
   directory: string | undefined,
 ): CloudTurnAttemptPaths | null =>
@@ -88,5 +52,4 @@ export const parseCloudTurnAttemptDirectory = (
     ? pathsFor(directory)
     : null;
 
-/** The executor flag that carries the attempt directory. */
 export const CLOUD_TURN_ATTEMPT_DIRECTORY_FLAG = "--attempt-dir";

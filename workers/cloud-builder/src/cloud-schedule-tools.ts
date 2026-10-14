@@ -1,18 +1,3 @@
-/**
- * `schedule_add` / `schedule_list` / `schedule_update` / `schedule_remove`
- * for the cloud orchestrator — the device tools' exact model-visible
- * surface (see `defs/schedule-manage-def.ts`) over the owner's schedules in
- * the owner's object (`schedules.tool`).
- *
- * The cloud store keeps the device's trigger kinds:
- *  - task     — the prompt, run at fire time
- *  - reminder — the message itself, delivered with no model: a push to the
- *               phone and Stella's line in the conversation
- *  - watch    — a check script run with no model at each fire; its prompt
- *               is what to do with a finding. A watch on a computer
- *               (`runsOn: "computer"`) is set up from that computer.
- */
-
 import type { TSchema } from "@sinclair/typebox";
 import type { AgentToolResult } from "@stella/runtime/kernel/agent-core/types.js";
 import {
@@ -35,11 +20,9 @@ export type CloudScheduleToolContext = Readonly<{
   ownerId: string;
   ownerGeneration: string;
   conversationId: string;
-  /** A server-internal operation on the owner's object, under `ownerGeneration`. */
   ownerInternal: OwnerInternalCall;
 }>;
 
-/** The cloud scheduler's floor; nothing can run more often than this. */
 export const CLOUD_SCHEDULE_MIN_EVERY_MS = 15 * 60_000;
 
 type ScheduleRow = {
@@ -114,7 +97,6 @@ const listRow = (row: ScheduleRow): ScheduleListRow => {
   };
 };
 
-/** The device `summarizeJob` shape so lists read the same on both hosts. */
 const summarizeRow = (row: ScheduleRow): Record<string, unknown> => {
   const message = row.kind === "reminder" ? row.prompt : null;
   const watch = row.kind === "watch";
@@ -144,11 +126,6 @@ const summarizeRow = (row: ScheduleRow): Record<string, unknown> => {
   };
 };
 
-/**
- * The device schedule shape, validated the way `normalizeScheduleInput`
- * will on the backend, plus the cloud interval floor so the model hears
- * about it before the request leaves.
- */
 const scheduleFromArgs = (value: unknown, triggerKind = "task"): Record<string, unknown> => {
   const watch = triggerKind === "watch";
   const floor = watch ? WATCH_MIN_INTERVAL_MS : CLOUD_SCHEDULE_MIN_EVERY_MS;
@@ -204,7 +181,6 @@ const failure = (message: string): AgentToolResult<unknown> => ({
   isError: true,
 });
 
-/** A watch's first check, which ran before it was saved. */
 const firstCheckNote = (payload: Record<string, unknown>): string => {
   const check = isRecord(payload.check) ? payload.check : null;
   if (!check || check.ok !== true) return "";
@@ -245,7 +221,6 @@ export const createCloudScheduleTools = (
         ...body,
       });
     } catch (error) {
-      // The model reads this text back to the user.
       throw new Error(
         error instanceof RpcError && error.reason === "sign_in_required"
           ? "Sign in to Stella with a connected account before scheduling."
@@ -267,9 +242,6 @@ export const createCloudScheduleTools = (
     description: descriptor.description,
     parameters: descriptor.parameters as unknown as TSchema,
     demoted: { searchTerms: SCHEDULE_SEARCH_TERMS },
-    // Every write carries a request id derived from the tool call id, and
-    // the owner's object replays its receipt for it (`replayed: true`), so a
-    // rerun reports the first attempt's schedule instead of adding a twin.
     replay:
       descriptor.name === SCHEDULE_LIST_TOOL_DESCRIPTOR.name ? "safe" : "keyed",
     execute,
@@ -330,8 +302,6 @@ export const createCloudScheduleTools = (
           toolCallId,
           signal,
         );
-        // The receipt carries the created row; the list beside it is the
-        // owner's full schedule after the change.
         const receiptRow = isRecord(payload.schedule) ? payload.schedule : null;
         const jobId =
           typeof receiptRow?.scheduleId === "string" ? receiptRow.scheduleId : "";

@@ -1,11 +1,3 @@
-/**
- * The scheduling tools' model-visible surface — `schedule_add`,
- * `schedule_list`, `schedule_update`, `schedule_remove` — split from the
- * executable definitions so workerd hosts advertise the byte-identical
- * tools. The device host executes them against the local schedule store;
- * the cloud Durable Object against the owner's cloud schedule.
- */
-
 export const SCHEDULE_ADD_TOOL_NAME = "schedule_add";
 export const SCHEDULE_LIST_TOOL_NAME = "schedule_list";
 export const SCHEDULE_UPDATE_TOOL_NAME = "schedule_update";

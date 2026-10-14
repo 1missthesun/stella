@@ -6,15 +6,6 @@ import { wakeTelemetryAccountSync } from "@/features/cloud/TelemetryPreferenceBr
 import { useT } from "@/shared/i18n";
 import { SettingsToggleCard } from "./settings-toggle-card";
 
-/**
- * The one telemetry switch. The account preference is authoritative when
- * signed in (it also stops cloud-side reporting); the local preference is
- * what this device's producers check before recording anything, so both are
- * always written together and the account value is mirrored locally
- * (TelemetryPreferenceBridge). A failed save never leaves this device
- * collecting: turning on writes the account first; turning off stops this
- * device first and keeps it off until the account write lands.
- */
 export function TelemetrySettingsCard() {
   const t = useT();
   const { isCloudConversationReady } = useCloudConversationSession();
@@ -82,8 +73,6 @@ export function TelemetrySettingsCard() {
       void (async () => {
         try {
           if (next) {
-            // On: the account first, so a failed save never leaves this
-            // device collecting while the switch shows Off.
             await setAccount(true);
             try {
               await setLocal(true);
@@ -93,8 +82,6 @@ export function TelemetrySettingsCard() {
             }
             return;
           }
-          // Off: this device stops first, marked pending until the account
-          // is off too, so a failed account write can't turn it back on.
           await setLocal(false, true);
           if (!isCloudConversationReady) return;
           try {

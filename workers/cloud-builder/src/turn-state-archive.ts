@@ -21,11 +21,6 @@ import {
 
 export { TURN_STATE_MAX_ARCHIVE_BYTES };
 
-/**
- * One thread's native state root (`cloudNativeStateRoot(threadHash)`). Its
- * lock, claim and scratch paths are per thread too, so threads sharing a
- * container archive and restore independently.
- */
 export type TurnStateArchiveTarget = { kind: "native"; threadHash: string };
 
 export type TurnStateArchiveSession = Pick<
@@ -35,7 +30,6 @@ export type TurnStateArchiveSession = Pick<
 
 export type UploadTurnStateArchiveResult = {
   archive: TurnStateArchive;
-  /** True when an exact prior upload was recovered or reused. */
   replayed: boolean;
 };
 
@@ -72,7 +66,6 @@ const targetParent = (_target: TurnStateArchiveTarget): string =>
 const targetOwnerMode = (_target: TurnStateArchiveTarget): string => "0:0:700";
 
 const targetPathSlug = (target: TurnStateArchiveTarget): string => {
-  // Validates the hash before it reaches any shell command.
   cloudNativeStateRoot(target.threadHash);
   return `native-${target.threadHash}`;
 };
@@ -295,8 +288,6 @@ const boundedArchivePipe = (
     () => new Promise<never>(() => undefined),
     (error: unknown) => Promise.reject(error),
   );
-  // Observe both rejecting promises immediately. Callers still await the
-  // originals, but no delayed R2/Sandbox response can create an unhandled event.
   void completed.catch(() => undefined);
   void failed.catch(() => undefined);
   void deadline.catch(() => undefined);
@@ -469,11 +460,6 @@ const buildArchiveCommand = (
   ].join("\n");
 };
 
-/**
- * The archive the target's tree on disk would pack to now, built exactly as
- * the checkpoint built it (the build is reproducible), or a line saying there
- * is no complete tree to pack. A tree left mid-swap counts as absent.
- */
 const currentTargetDigestCommand = (
   target: TurnStateArchiveTarget,
   scratchId: string,
@@ -562,8 +548,6 @@ const swapRestoredTargetCommand = (
     `test ! -L ${restorePath}`,
     `test "$(/usr/bin/readlink -f -- ${restorePath})" = ${restorePath}`,
     `test "$(/usr/bin/stat -c '%u:%g:%a' -- ${restorePath})" = ${targetOwnerMode(target)}`,
-    // A previous swap may have lost its response at any rename boundary. Roll
-    // it back to the old complete tree before applying this fully staged tree.
     recoverPriorCommand(target, priorPath, failedPath),
     `test ! -e ${priorPath}`,
     `test ! -L ${priorPath}`,
@@ -628,13 +612,6 @@ type ArchiveExpectation = Pick<
   "kind" | "key" | "sizeBytes" | "sha256"
 > & { target: TurnStateArchiveTarget };
 
-/**
- * Canonical custom metadata for a durable turn-state archive object.
- *
- * Both the uploader and owner route use this constructor so a successfully
- * uploaded native object is judged against one exact metadata
- * contract when it is marked durable.
- */
 export const turnStateArchiveMetadata = (
   archive: Pick<TurnStateArchive, "kind" | "key" | "sizeBytes" | "sha256">,
   target: TurnStateArchiveTarget,
@@ -794,8 +771,6 @@ const withScratchCleanup = async <T>(
       );
     } catch (cleanupError) {
       if (!primaryFailed) throw cleanupError;
-      // Preserve the integrity/R2 failure as the actionable error. Scratch is
-      // invocation-unique and root-confined, so a retry cannot consume it.
       console.error(
         JSON.stringify({
           level: "error",
@@ -900,9 +875,6 @@ export const uploadTurnStateArchive = async (args: {
         }
       } catch (error) {
         await cancelBoundedArchivePipe(fixed, transfer);
-        // Covers the important lost-response edge: R2 may have durably accepted
-        // the object before the request failed. Exact bytes/metadata are a replay;
-        // anything else is a conflict and is never overwritten.
         const recovered = await reusableStoredArchive(args.bucket, expected);
         if (recovered) return { archive: recovered, replayed: true };
         throw error;
@@ -936,12 +908,6 @@ const cancelObjectBody = async (
   await cancelReadableStream((stored as Partial<R2ObjectBody>).body);
 };
 
-/**
- * Restore one exact registered native object. A container that still holds
- * the very tree the archive was packed from (the thread's last turn ran
- * here) keeps it: the tree is packed again, and only identical bytes count.
- * Resolves `current` then, `restored` after a download.
- */
 export const restoreTurnStateArchive = async (args: {
   session: TurnStateArchiveSession;
   bucket: Pick<R2Bucket, "head" | "get">;
@@ -954,8 +920,6 @@ export const restoreTurnStateArchive = async (args: {
   }
   const scratchId = newScratchId();
   const { archivePath } = scratchPaths(args.target, scratchId);
-  // One command under the target's lock: nothing can swap the tree while it
-  // is packed, and the packed copy is removed before the lock is let go.
   const onDisk = await runOwnedLockedCommand(
     args.session,
     args.target,

@@ -3,10 +3,6 @@ import { AppState, type AppStateStatus } from "react-native";
 
 import { isAppVisible } from "./continuous-animation";
 
-/**
- * One AppState subscription shared by every animated component, so a screen full
- * of shimmering rows does not register a listener each.
- */
 let visible = isAppVisible(AppState.currentState);
 const listeners = new Set<() => void>();
 let subscription: { remove: () => void } | null = null;

@@ -22,17 +22,11 @@ const sans = Manrope({
   adjustFontFallback: true,
 });
 
-// Mona Sans is the display face across Stella (the landing hero sets it too).
-// It is a variable font: one file covers every weight and width we use, so we
-// rely on the variable axes instead of enumerating discrete weights.
 const display = Mona_Sans({
   variable: "--font-display",
   subsets: ["latin"],
   axes: ["wdth"],
   display: "swap",
-  // The display face paints the global header wordmark, which is the measured
-  // mobile LCP element, as well as the homepage hero. Discover it in the HTML
-  // instead of waiting for the route stylesheet to reveal the font URLs.
   preload: true,
   adjustFontFallback: true,
 });
@@ -71,9 +65,6 @@ export const metadata: Metadata = {
     address: false,
     telephone: false,
   },
-  // og:/twitter: title and description are intentionally omitted so each
-  // route's own title + description flow into the social tags. The homepage
-  // falls back to the default title and root `description`.
   openGraph: {
     siteName: "Stella",
     type: "website",

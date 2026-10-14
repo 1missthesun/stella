@@ -1,9 +1,3 @@
-/**
- * Argument validation for the Node REPL worker's `browser` object. Agents
- * call that API with arbitrary values, so every option bag is checked here
- * before anything crosses into the browser session.
- */
-
 import { requireNonNegativeInteger } from "../protocol.js";
 
 export const isPlainObject = (

@@ -1,10 +1,3 @@
-/**
- * Pure projection and view helpers for the storage layer.
- *
- * Everything in this file is a pure function over already-loaded rows:
- * eager-event projection and search tokenization. No SQL lives here.
- */
-
 import {
   type LocalChatEventRecord,
 } from "./shared.js";
@@ -27,10 +20,6 @@ export const eventRoleForType = (type: string): string => {
   }
 };
 
-/* ------------------------------------------------------------------ */
-/* Timeline cursors                                                    */
-/* ------------------------------------------------------------------ */
-
 export type Cursor = {
   timestamp: number;
   id: string;
@@ -50,10 +39,6 @@ export const compareTimelineCursor = (a: Cursor, b: Cursor): number => {
   if (a.timestamp !== b.timestamp) return a.timestamp - b.timestamp;
   return a.id.localeCompare(b.id);
 };
-
-/* ------------------------------------------------------------------ */
-/* Eager tool-event payload projection                                 */
-/* ------------------------------------------------------------------ */
 
 type ProjectionLimits = {
   stringChars: number;
@@ -179,8 +164,4 @@ export const projectLocalChatUpdateEvent = (
   event: LocalChatEventRecord,
 ): LocalChatEventRecord =>
   projectLocalChatUpdateEventWithMetadata(event).event;
-
-/* ------------------------------------------------------------------ */
-/* Message previews                                                    */
-/* ------------------------------------------------------------------ */
 

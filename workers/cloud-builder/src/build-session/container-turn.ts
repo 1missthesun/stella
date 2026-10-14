@@ -1,10 +1,3 @@
-/**
- * The eager container agent turn: booting a world sandbox, attaching the
- * owner's world to its disk, running one executor attempt, the durable
- * execution markers that survive an evicted DO, and session quiesce.
- *
- * @see src/build-session/host.ts for why every call out takes `host`.
- */
 import { builderServiceSecret } from "../secret-rotation.js";
 import {
   agentFailureMessage,
@@ -346,16 +339,8 @@ export const interruptAgentForBuilderFallback = async (
   }
 };
 
-/** Longer input belongs in a file in the agent's workspace. */
 const AGENT_MESSAGE_MAX_CHARS = 64_000;
 
-/**
- * `POST /steer`: new input for the agent this thread runs in its container,
- * which takes it at its next step. The message is staged in the container
- * and renamed into the attempt's inbox (see cloud-turn-attempt.ts), which
- * exists only while the agent takes messages: `busy` when it is starting up
- * or finishing, `not_running` when no attempt of this thread runs here.
- */
 export const steerContainerAgent = async (
   host: ContainerTurnHost,
   request: Request,
@@ -396,8 +381,6 @@ export const steerContainerAgent = async (
   ) {
     return json({ accepted: false, reason: "not_running" });
   }
-  // The marker is written once the executor runs; before it there is no
-  // inbox to deliver to.
   const marker = await host
     .exactAgentExecutionMarker(turn)
     .catch(() => undefined);
@@ -410,8 +393,6 @@ export const steerContainerAgent = async (
     Date.now(),
     await sha256Hex(messageId),
   );
-  // Staged beside the attempt directories, never inside one: an attempt
-  // that already finished has had its directory removed.
   const staged = `${CLOUD_TURN_ATTEMPT_ANCHOR}/.inbox-${crypto.randomUUID()}`;
   const sandbox = host.sandbox(marker.sandboxId, marker.size, "world");
   // Any call into a stopped container starts it again; a lost one is the
@@ -453,14 +434,8 @@ export const steerContainerAgent = async (
   });
 };
 
-/** Below this much free disk, a container counts as having run out. */
 const DISK_EXHAUSTED_BYTES = 1_500 * 1000 ** 2;
 
-/**
- * The kernel's OOM-kill count since this container booted, with the boot's
- * id, and the workspace filesystem's free and total bytes. Cloud containers are
- * VMs, so these are the container's own.
- */
 const CONTAINER_PRESSURE_PROBE = `boot=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null)
 oom=$(awk '$1 == "oom_kill" { print $2 }' /proc/vmstat 2>/dev/null)
 set -- $( (df -B1 --output=avail,size /workspace 2>/dev/null || df -B1 --output=avail,size /) | tail -1)
@@ -468,12 +443,6 @@ printf '%s %s %s %s\n' "\${boot:-unknown}" "\${oom:-0}" "\${1:-0}" "\${2:-0}"`;
 
 export type ContainerOomBaseline = { bootId: string; oomKills: number };
 
-/**
- * Whether this turn's container ran out of memory (a process the kernel
- * killed) or disk, read while it is still up. When it did, the thread's
- * containers start at the next larger size from now on, and the report says
- * so; when there is no larger size, the report says the container is full.
- */
 const containerPressure = async (
   host: ContainerTurnHost,
   turn: TurnRequest,
@@ -541,8 +510,6 @@ export const runContainerAgentTurn = async (
   const requestStarted = performance.now();
   const turnStartedAt = Date.now();
   const ownerWorld = await worldName(turn.ownerId);
-  // The orchestrator's container sleeps soon after its turn; an agent's is
-  // released by its turn and only falls back to the general timeout.
   const idleTimeoutMs = turnSleepAfterMs(host.env, turn);
   let sandbox = host.sandbox(
     sandboxId,
@@ -560,17 +527,11 @@ export const runContainerAgentTurn = async (
     turnId: turn.turnId,
     threadId: turn.threadId,
     sessionId: host.ctx.id.toString(),
-    // The first 16 characters name this agent's own container in the tail.
     sandbox: sandboxId.slice(0, 16),
   });
   let prewarmed: Promise<void> | undefined;
   try {
     await host.assertAgentExecutionActive(turn, execution);
-    // The thread's container comes up while its context is prepared: the
-    // slot first, then the start, which a warm container answers at once.
-    // The attempt's own first call waits for a start still under way.
-    // The spawn says whether the work needs a big disk; anything the thread
-    // needed before (a spawn's ask, a container that ran out) is kept.
     const proposedSize: InstanceSize = initialInstanceSize({
       workspace: turn.workspace,
     });
@@ -620,10 +581,6 @@ export const runContainerAgentTurn = async (
     );
     execution.assertActive();
 
-    // Thread transcript for send_message continuations: the DO fetches it
-    // (service secret) and hands it to the executor, which holds only the
-    // turn token. Fetched once, before any sandbox exists, so an escalation
-    // retry does not pay for it twice.
     await importAgentLogIntoThread(host, turn, execution.signal);
     execution.assertActive();
     const history = host.fetchCanonicalAgentHistory(turn, {
@@ -667,8 +624,6 @@ export const runContainerAgentTurn = async (
     if (
       resolvedTurnState.threadRegistryPresent &&
       !turnStateThreadRestore &&
-      // An explicit engine rebuilds its context from canonical rows when its
-      // exact checkpoint is missing; a turn dispatched without one cannot.
       turn.execution === undefined
     ) {
       throw new AgentTurnError(
@@ -677,10 +632,6 @@ export const runContainerAgentTurn = async (
     }
     execution.assertActive();
 
-    // The mirror snapshot is pinned once for the logical turn, before either
-    // sandbox attempt. An OOM retry therefore cannot silently pick up a
-    // device-side skill edit that landed halfway through the turn.
-    // The orchestrator CLI turn runs the DO's prompt and tools, never skills.
     const cloudSkillHome =
       host.env.AGENT_HOME && turn.agentRole !== "orchestrator"
         ? new CloudHomeStore(host.env.AGENT_HOME, {
@@ -725,10 +676,6 @@ export const runContainerAgentTurn = async (
     });
     execution.assertActive();
 
-    // One escalation, one retry. The failed attempt's sandbox is discarded
-    // rather than checkpointed — an OOM-killed workspace is not a state
-    // worth persisting — so the retry restores the same checkpoint the
-    // first attempt did.
     const sizeAfterOom = sizeAfterOutOfMemory(size);
     if (
       attempt.oom &&
@@ -812,9 +759,6 @@ export const runContainerAgentTurn = async (
       });
     }
     let result = attempt.result;
-    // A stale turn (alarm fired, or a successor continuation took over
-    // this thread's DO) must not checkpoint over the successor's restore
-    // or report on the shared thread.
     if (
       !(await host.ownsExactTurn(turn)) ||
       (await host.ctx.storage.get<boolean>("terminal"))
@@ -835,9 +779,6 @@ export const runContainerAgentTurn = async (
       return;
     }
 
-    // A build or install the container could not hold doesn't fail the
-    // turn: the agent sees its command die. Say so in the report, and give
-    // the thread's next run a container that holds it.
     const pressure =
       turn.agentRole === "orchestrator"
         ? undefined
@@ -900,9 +841,6 @@ export const runContainerAgentTurn = async (
             builderFallback: undefined,
           };
         } else {
-          // The journal and sandbox disk are retained. Alarm replay resumes
-          // the same operation/request ids; it never manufactures a second
-          // archive after a lost checkpoint/transcript/publication response.
           log("error", "agent_builder_fallback_deferred", {
             turnId: turn.turnId,
             threadId: turn.threadId,
@@ -914,10 +852,6 @@ export const runContainerAgentTurn = async (
       }
     }
 
-    // The executor's broker receipt proves that the world checkpoint and
-    // optional native archive committed before the transcript was accepted.
-    // There is deliberately no second SDK backup here: that would
-    // reintroduce random-address orphan bytes and split the atomic boundary.
     const checkpointMs =
       Number.isSafeInteger(result.checkpointMs) && result.checkpointMs! >= 0
         ? result.checkpointMs!
@@ -956,8 +890,6 @@ export const runContainerAgentTurn = async (
           );
           if (
             published.workspacePublication ||
-            // A native-only (orchestrator) checkpoint names no world, so
-            // it neither needs nor creates a workspace head.
             (checkpoint.manifestId !== undefined && !published.workspace) ||
             !published.restore ||
             published.restore.workspace?.manifestId !== checkpoint.manifestId
@@ -967,9 +899,6 @@ export const runContainerAgentTurn = async (
             );
           }
         } catch (error) {
-          // WorldStore already owns the bytes. Registry publication is
-          // bookkeeping, and the next turn can retry an unpublished native
-          // candidate after this transcript becomes canonical.
           if (!isTurnStateAuthorityError(error)) {
             log("error", "turn_state_publish_failed", {
               turnId: turn.turnId,
@@ -1089,14 +1018,9 @@ export const runContainerAgentTurn = async (
         workload: "world",
         sessionId,
         daemonDirectory,
-        // A container that is moving to a larger size stops now, so the
-        // thread's next turn starts at that size instead of reusing it.
         ...(pressure?.resizedTo ? { warm: false } : {}),
       })
       .catch(() => undefined);
-    // Storage is the redelivery's only memory: clear it once the terminal
-    // state is delivered, and leave it — with the alarm deliverTerminal
-    // re-armed — when it is not.
     if (delivered && (await host.ownsExactTurn(turn))) {
       if (await host.settleAgentTransientBackup(turn)) {
         await host.deleteTurnStoragePreservingExactCancellations(turn, true);
@@ -1130,14 +1054,9 @@ export const runContainerAgentTurn = async (
       instanceType: INSTANCE_TIERS[size].instanceType,
     });
   } catch (error) {
-    // A container still coming up for this turn is up before any teardown
-    // looks for it, so none of it outlives the turn.
     await prewarmed;
     const message = errorMessage(error);
     if (host.builderFallbackRecoveries.has(turn.turnId)) {
-      // Alarm recovery owns the exact kill/join/archive sequence. Destroying
-      // the sandbox here would discard the only surviving workspace bytes
-      // between quiescence and the deterministic Builder checkpoint.
       log("info", "agent_turn_yielded_to_builder_fallback", {
         turnId: turn.turnId,
         threadId: turn.threadId,
@@ -1168,10 +1087,6 @@ export const runContainerAgentTurn = async (
       (await host.ownsExactTurn(turn)) &&
       !(await host.ctx.storage.get<boolean>("terminal"))
     ) {
-      // A model-controlled process was admitted. Retain the disk and let
-      // the alarm resume the durable fallback journal after this promise
-      // has fully unwound; snapshotting from this catch could race a late
-      // descendant or a platform exec promise that has not joined yet.
       log("error", "agent_turn_recovery_scheduled", {
         turnId: turn.turnId,
         threadId: turn.threadId,
@@ -1216,10 +1131,6 @@ export const runContainerAgentTurn = async (
       failureCode,
     });
     if (error instanceof AgentTurnAuthorityLostError) {
-      // Rotation/reset may have admitted another physical executor under the
-      // same logical turn id. Never project this stale isolate's unwind as a
-      // terminal outcome or delete shared DO state; its sandbox is already
-      // gone and the authoritative attempt owns recovery.
       log("info", "agent_turn_authority_lost", {
         turnId: turn.turnId,
         threadId: turn.threadId,
@@ -1227,9 +1138,6 @@ export const runContainerAgentTurn = async (
       });
       return;
     }
-    // Fencing: a stale unwind (successor accepted on this thread's DO, or
-    // the alarm already owns terminal delivery) must not fail the thread,
-    // kill the successor's watchdog, or wipe shared storage.
     if (!(await host.ownsExactTurn(turn))) return;
     if (await host.ctx.storage.get<boolean>("terminal")) return;
     if (error instanceof OwnerPurgeFenceError) {
@@ -1243,8 +1151,6 @@ export const runContainerAgentTurn = async (
       }
       return;
     }
-    // Raw infrastructure errors stay in logs; only messages written for a
-    // person reach the thread and the event.
     const friendly =
       error instanceof AgentTurnError
         ? error.userMessage
@@ -1258,8 +1164,6 @@ export const runContainerAgentTurn = async (
       payload: { message: friendly },
       threadError: friendly,
     });
-    // Undelivered leaves storage and the re-armed alarm in place, so the
-    // turn cannot stay "running" forever.
     if (delivered && (await host.ownsExactTurn(turn))) {
       if (await host.settleAgentTransientBackup(turn)) {
         await host.deleteTurnStoragePreservingExactCancellations(turn, true);
@@ -1272,13 +1176,6 @@ export const runContainerAgentTurn = async (
   }
 };
 
-/**
- * Bring a container up with this owner's world on disk: create the command
- * session, restore the canonical archives (or seed a first world), verify
- * the packaged renderer still matches, and confirm the restore with the
- * owner fence.
- * It does not emit `sandbox_ready`; its caller reports the boot.
- */
 export const attachAgentWorld = async (
   host: ContainerTurnHost,
   args: {
@@ -1298,7 +1195,6 @@ export const attachAgentWorld = async (
   coldContainerStartMs: number;
   restoreMs: number;
   adoptedSession?: { sessionId: string; cliVersion: string; hydrated?: true };
-  /** The thread's own native state came back from its checkpoint. */
   nativeRestored: boolean;
 }> => {
   const { turn, execution: turnExecution, sandbox } = args;
@@ -1308,8 +1204,6 @@ export const attachAgentWorld = async (
     Math.min(60 * 60_000, Math.max(0, Math.round(performance.now() - started)));
   const coldStarted = performance.now();
   await host.assertAgentExecutionActive(turn, turnExecution);
-  // Owner hashing is local and immutable, unlike world.head(). It is safe to
-  // overlap with provisioning as long as its rejection is always observed.
   const worldNameStarted = performance.now();
   const worldNamePreparation = worldName(turn.ownerId).then(
     (name) => ({ ok: true as const, name }),
@@ -1333,15 +1227,12 @@ export const attachAgentWorld = async (
   turnExecution.assertActive();
   const coldContainerStartMs = phaseMs(coldStarted);
 
-  // Sandbox disk is a projection of the world object, never its owner.
   let restoreMs = 0;
   const initialNormalizeStarted = performance.now();
   await normalizeToolWorkspaceRoot(session, worldRoot);
   const initialNormalizeMs = phaseMs(initialNormalizeStarted);
   turnExecution.assertActive();
   const restoreStarted = performance.now();
-  // The orchestrator's CLI has no file tools and works in an empty
-  // directory of its own: the world is not put on disk for it.
   const materializeWorld = turn.agentRole !== "orchestrator";
   const worldMetadataStarted = performance.now();
   const preparedName = await worldNamePreparation;
@@ -1393,9 +1284,6 @@ export const attachAgentWorld = async (
     );
     if (!materialized.success)
       throw new AgentTurnError(worldMaterializationFailure(materialized));
-    // Materialization replaces everything under the world root, including
-    // the drive directory the daemon expects, so the boundary is normalized
-    // again.
     await normalizeToolWorkspaceRoot(session, worldRoot);
     turnExecution.assertActive();
     materializationMs = phaseMs(materializationStarted);
@@ -1413,8 +1301,6 @@ export const attachAgentWorld = async (
           attemptGeneration: turn.attemptGeneration!,
         }))
       : undefined;
-  // The DO handed the CLI a session written from the conversation's journal,
-  // or none to resume: whatever session the thread had stays unused.
   const replacesSession = Boolean(orchestratorSpec?.hydrateSession || orchestratorSpec?.startFresh);
   const nativeArchive = replacesSession ? undefined : args.turnStateThreadRestore?.native;
   if (turn.execution?.engine === "anthropic" && !nativeArchive) {
@@ -1433,8 +1319,6 @@ export const attachAgentWorld = async (
     };
     await clear();
     const hydrateSession = orchestratorSpec?.hydrateSession;
-    // Behind the log here, but another host's synced session covers it:
-    // that session resumes natively instead of a rebuild.
     const adopt = orchestratorSpec?.startFresh || hydrateSession ? undefined : orchestratorSpec?.adoptSession;
     if (hydrateSession && turn.conversationId) {
       const hydrateStarted = performance.now();
@@ -1498,8 +1382,6 @@ export const attachAgentWorld = async (
     );
     turnExecution.assertActive();
   }
-  // One bounded summary instead of a log/event per remote operation. It is
-  // identifier-only and contains neither the capability nor signed URLs.
   log("info", "agent_world_attached", {
     turnId: turn.turnId,
     threadId: turn.threadId,
@@ -1524,12 +1406,6 @@ export const attachAgentWorld = async (
   };
 };
 
-/**
- * One sandbox attempt at an agent turn: boot, restore the workspace, hand
- * the executor its input, run it. Kept separate from {@link runAgentTurn}
- * so an OOM escalation can repeat it on a bigger instance without
- * duplicating any of the turn's lifecycle or fencing.
- */
 export const runAgentAttempt = async (
   host: ContainerTurnHost,
   args: {
@@ -1537,9 +1413,7 @@ export const runAgentAttempt = async (
     execution: TurnExecutionContext;
     sandbox: ReturnType<BuildSessionInternals["sandbox"]>;
     size: InstanceSize;
-    /** Latest canonical owner world manifest, shared across all threads. */
     turnStateWorkspaceRestore?: TurnStateWorkspaceHead;
-    /** Canonical transcript/native state for this exact thread only. */
     turnStateThreadRestore?: TurnStateCandidate;
     turnStateThreadRestoreConfirmationRequired: boolean;
     history: AgentHistoryRow[];
@@ -1565,9 +1439,6 @@ export const runAgentAttempt = async (
   const world = await host.attachAgentWorld(args);
   setupStep("attachWorld");
   const { session, coldContainerStartMs, restoreMs, adoptedSession, nativeRestored } = world;
-  // The ready event, the skills, the Claude logins and the attempt
-  // directory below need nothing from each other; each is awaited before
-  // the turn input is written.
   const sandboxReadyEvent = host.event(
     turn,
     "auto",
@@ -1582,10 +1453,6 @@ export const runAgentAttempt = async (
     turnExecution.signal,
   );
   sandboxReadyEvent.catch(() => undefined);
-  // This agent's container gets the owner's current Claude Code logins
-  // before the CLI looks for them; its own copy may be older. Nothing below
-  // reads them before the turn input is written, so they come down while
-  // the skills and the attempt directory are set up.
   let claudeLoginsMs: Record<string, number> | undefined;
   const claudeLogins = (async () => {
     if (turn.execution?.engine !== "anthropic") return null;
@@ -1617,8 +1484,6 @@ export const runAgentAttempt = async (
       assertActive: () => turnExecution.assertActive(),
     });
     turnExecution.assertActive();
-    // The pinned roots above stay authoritative; HOME's copy is for an agent
-    // that looks where a device keeps them.
     await mirrorCloudSkillsIntoHome({ session, catalog: materialized }).catch(
       (error: unknown) => {
         log("error", "cloud_skills_home_mirror_failed", {
@@ -1633,9 +1498,6 @@ export const runAgentAttempt = async (
   })();
   skillsReady.catch(() => undefined);
 
-  // The native CLI's resumable session lives in the root-only backup mount.
-  // Its full-tree attestation is bound to this builder-derived owner/thread
-  // key, consumed before any model or tool process starts.
   const nativeStateIntegrityKey = await nativeStateIntegrityKeyFor(
     host.env,
     turn,
@@ -1665,8 +1527,6 @@ export const runAgentAttempt = async (
   await host.ctx.storage.put(brokerRecordKey, issuedBroker.record);
   turnExecution.assertActive();
   setupStep("brokerIssue");
-  // Every handoff file of this attempt lives in its own root-only
-  // directory: the container runs other threads' attempts beside this one.
   const attemptPaths = cloudTurnAttemptPaths(
     await nativeStateThreadHash(turn),
     turn.attemptGeneration!,
@@ -1680,8 +1540,6 @@ export const runAgentAttempt = async (
   let recordedExecutorResultText: string | undefined;
   let recordedResultProcessQuiesced = false;
   try {
-    // A lost predecessor of this exact attempt may have left files behind;
-    // start from an empty directory so none of them is read as this one's.
     const createdAttemptDirectory = await session.exec(
       `mkdir -p ${CLOUD_TURN_ATTEMPT_ANCHOR} && chmod 700 ${CLOUD_TURN_ATTEMPT_ANCHOR} && rm -rf ${attemptPaths.directory} && mkdir -m 700 ${attemptPaths.directory}`,
     );
@@ -1704,10 +1562,6 @@ export const runAgentAttempt = async (
     turnExecution.assertActive();
     setupStep("chmodCredentials");
 
-    // Only Claude turns run here (agents on Stella's models or a ChatGPT
-    // plan run on pi in their conversation), and a Claude turn holds no
-    // model capability: its Claude Code CLI runs on the login the owner's
-    // container uses, and talks to Anthropic itself.
     if (!turn.execution) throw new AgentTurnAuthorityLostError();
     const orchestrator = turn.agentRole === "orchestrator";
     const claudeAccount = await claudeLogins;
@@ -1718,15 +1572,7 @@ export const runAgentAttempt = async (
     turnExecution.assertActive();
     setupStep("skillsWait");
 
-    // The turn input sits in the root-only attempt directory, above the
-    // world root on purpose: the checkpoint only covers the root, so
-    // nothing here reaches a durable backup. The executor unlinks it before
-    // any model or tool process exists.
     turnExecution.assertActive();
-    // An agent turn runs `general.md` rendered here, from this deploy's
-    // bundle, for exactly the tools the executor will give this engine;
-    // its `code` reads its own thread's history. The image never supplies prose.
-    // Any agent moves itself, at any depth; its starter is still its starter.
     const devicesSection = await agentDevicesSection(host.env, turn);
     let roleInput: CloudCliTurnRoleInput = {
       role: "agent",
@@ -1739,8 +1585,6 @@ export const runAgentAttempt = async (
       ].join("\n\n"),
     };
     if (orchestrator) {
-      // The admitted dispatch carries the spec; the stored copy covers a
-      // turn object rebuilt from the durable record.
       const spec =
         turn.orchestratorCli ??
         readOrchestratorCliSpec(host.ctx.storage.sql, {
@@ -1828,19 +1672,12 @@ export const runAgentAttempt = async (
       {
         cwd: "/opt/stella",
         env: executorSessionEnvironment(),
-        // The root-only result file is authoritative. Bound the optional
-        // stdout transfer well below the durable execution-marker alarm so
-        // this invocation can recover the file before alarm fallback runs.
         resultTimeoutMs: 10_000,
         processId: executorProcessId,
         signal: turnExecution.signal,
         onAbandon: async ({ phase, processId }) => {
           if (phase === "process_unsettled") {
             try {
-              // An exact tree-aware kill is sufficient to stop every
-              // model-controlled writer. Keep the session for the durable
-              // Builder fallback, which performs its own final session
-              // teardown before reading the workspace.
               await withInfrastructureDeadline(
                 sandbox.killProcess(processId, "SIGKILL"),
                 35_000,
@@ -1891,11 +1728,6 @@ export const runAgentAttempt = async (
           return "compute_released" as const;
         },
         onStarted: async () => {
-          // The durable marker means the trusted executor that can spawn
-          // model-controlled children exists, not merely that its sandbox
-          // and turn input are ready. This keeps cancellation and fallback
-          // recovery from resolving a process RPC for a command that never
-          // crossed the sessionless process boundary.
           turnExecution.assertActive();
           const marker = await host.ctx.storage.transaction(
             async (transaction): Promise<AgentExecutionMarker> => {
@@ -1990,10 +1822,6 @@ export const runAgentAttempt = async (
           !(captureAfterFile.error instanceof CapturedSessionAbandonedError) ||
           captureAfterFile.error.disposition === "session_quiesced";
       } else {
-        // The executor writes this file only after its checkpoint and
-        // transcript work has completed. If Cloudflare's process registry is
-        // still waiting, stop that exact process tree before accepting the
-        // root-only result.
         await withInfrastructureDeadline(
           sandbox.killProcess(executorProcessId, "SIGKILL"),
           10_000,
@@ -2010,20 +1838,13 @@ export const runAgentAttempt = async (
       session,
       attemptPaths.result,
     );
-    // The executor unlinks this the moment it has read it; this is the
-    // backstop for an executor that died before it got that far, so the
-    // token cannot outlive the process that needed it.
     if (credentialsPath) {
       await session.deleteFile(credentialsPath).catch(() => undefined);
     }
     await session.deleteFile(brokerCredentialsPath).catch(() => undefined);
-    // The finished attempt's directory goes with its input, result and
-    // handoff. If this fails the directory stays root-only, and a retry of
-    // this attempt clears it before writing anything.
     await session
       .exec(`rm -rf ${attemptPaths.directory}`)
       .catch(() => undefined);
-    // The CLI may have rotated its refresh token during the turn.
     if (turn.execution?.engine === "anthropic") {
       await backupClaudeCloudLogins(host.env, turn.ownerId, sandbox).catch(
         () => false,
@@ -2132,12 +1953,6 @@ export const runAgentAttempt = async (
   };
 };
 
-/**
- * Which of the owner's container Claude Code logins a Claude turn runs on:
- * the account the cloud uses, among the logins it holds. Only a directory key and
- * the email go into the turn input; the credential stays where the CLI
- * wrote it.
- */
 const claudeCloudAccountFor = async (
   env: Env,
   turn: TurnRequest,

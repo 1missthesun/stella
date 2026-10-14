@@ -22,19 +22,6 @@ import {
 } from "./motion";
 import { useAppVisible } from "../../lib/use-app-visible";
 
-/**
- * The character mark at hero size: onboarding's welcome step and the realtime
- * voice overlay.
- *
- * With no `energy` it simply breathes. Passing a shared value hands the scale
- * over to live mic/output level, so the same rig serves as the voice
- * visualizer. `energy` stays a `SharedValue` rather than a prop so the audio
- * meter can drive it on the UI thread without re-rendering React at frame rate.
- *
- * A `faceColor` gives the character eyes, which idle, blink and look around.
- * Without one it stays a silhouette, which is what the voice overlay wants: the
- * mark is a level meter there, not a character.
- */
 export function StellaMarkHero({
   size,
   energy,
@@ -45,9 +32,7 @@ export function StellaMarkHero({
   size: number;
   energy?: SharedValue<number>;
   faceColor?: string;
-  /** `soft` sits halfway between the star and the fully inflated orb. */
   shape?: "star" | "soft" | "orb";
-  /** Holds the breathe and the face still, e.g. while scrolled out of view. */
   paused?: boolean;
 }) {
   const reduceMotion = useReducedMotion();
@@ -67,8 +52,6 @@ export function StellaMarkHero({
       clock.value = 0;
       return;
     }
-    // The breathe has no end of its own, so without this gate a backgrounded
-    // app keeps the clock looping forever.
     if (!appVisible) return;
     clock.value = 0;
     clock.value = withRepeat(

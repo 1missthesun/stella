@@ -57,13 +57,6 @@ const isBrokenPipe = (error: unknown): boolean =>
   error.code === "EPIPE";
 
 const configureConsoleTransport = (): void => {
-  // Kept on in every install. Electron's stdout belongs to whatever started it
-  // — the native launcher for the user's Stella, which captures it into the
-  // launcher log, and the dev runner for a checkout — so console output is a
-  // diagnostic rather than noise. The guard below covers the parent pipe going
-  // away. (This used to be silenced for packaged builds; nothing is packaged,
-  // so the silencing never happened and relying on it would mean losing the
-  // launcher's record of a failed start.)
   const writeConsole = log.transports.console.writeFn.bind(
     log.transports.console,
   );
@@ -136,9 +129,6 @@ export const initDesktopDebugLogging = (stellaAppDir: string): void => {
       );
     log.initialize({ preload: false, spyRendererConsole: true });
     configureConsoleTransport();
-    // Stella still has many direct console call sites. Route them through the
-    // same scoped file transport so local debug logs are complete while the
-    // original console transport remains visible during development.
     Object.assign(console, log.functions);
 
     app.setPath("crashDumps", crashDumps);
@@ -149,7 +139,6 @@ export const initDesktopDebugLogging = (stellaAppDir: string): void => {
     });
     log.scope("crash").info("crash reporter started", { path: crashDumps });
   } catch (error) {
-    // Logging is diagnostic infrastructure; failure cannot block the app.
     try {
       console.warn("[diagnostics] failed to initialize desktop logging", error);
     } catch {

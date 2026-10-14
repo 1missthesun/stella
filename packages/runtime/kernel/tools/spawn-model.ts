@@ -1,7 +1,3 @@
-/**
- * spawn_agent's `model` parameter, as the owner's cloud agent threads read it.
- */
-
 import type {
   AgentRuntimeEngine,
   SpawnEngineSelection,
@@ -21,7 +17,6 @@ const toOptionalString = (value: unknown): string | undefined => {
   return trimmed.length > 0 ? trimmed : undefined;
 };
 
-/** Engine ids accepted in spawn_agent's `model` parameter. */
 const SPAWN_ENGINE_IDS: Record<
   string,
   Exclude<AgentRuntimeEngine, "default">
@@ -61,28 +56,12 @@ const invalidSpawnReasoningSuffix = (suffix: string): Error =>
     `Invalid spawn_agent model reasoning suffix ":${suffix}". Expected one of :low, :medium, :high, :xhigh, or :max; open-ended gateway references keep colons verbatim.`,
   );
 
-/**
- * Parses spawn_agent's optional `model` parameter:
- *
- *   - omitted / `default`            → the user's configured setup, untouched
- *   - `stella`                        → Stella's in-process engine
- *   - `codex` / `claude-code`        → that engine with its configured model
- *   - `codex/<m>` / `claude-code/<m>`→ that engine with `<m>` pinned
- *   - anything else                  → plain model reference, resolved through
- *                                      the normal model-routing path
- *
- * Closed known forms may end in `:low`, `:medium`, `:high`, `:xhigh`, or `:max`.
- * Open-ended provider model identifiers preserve colons verbatim.
- */
 export const parseSpawnAgentModel = (
   value: unknown,
   canResolveModel: (modelName: string) => boolean = () => false,
 ): SpawnModelSelection => {
   const raw = toOptionalString(value);
   if (!raw) return { kind: "default" };
-  // Registered full model references win over suffix interpretation.
-  // This preserves legitimate ids such as `...:thinking`, `...:free`, and
-  // even a future registered model whose id literally ends in `:high`.
   const fullReferenceIsModel =
     isRegisteredModelReference(raw) || isOpenEndedModelReference(raw);
   const suffixParts = splitSpawnReasoningSuffix(raw);
@@ -123,8 +102,6 @@ export const parseSpawnAgentModel = (
     };
   }
   const slash = modelReference.indexOf("/");
-  // Engine ids are matched case-insensitively so `Codex/gpt-x` selects the
-  // engine instead of falling through to a confusing route error.
   const head = (
     slash === -1 ? modelReference : modelReference.slice(0, slash)
   ).toLowerCase();

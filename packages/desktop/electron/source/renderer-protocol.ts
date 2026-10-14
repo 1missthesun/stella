@@ -29,7 +29,6 @@ export const registerRendererScheme = () => {
 
 export const isRendererSourceUrl = (url: string) => url.startsWith(`${RENDERER_ORIGIN}/`);
 
-/** A top-level script in desktop-ui's public/ that `url` asks for, as is. */
 const earlyPublicFile = (uiRoot: string, url: URL) => {
   const name = url.pathname.slice(1);
   if (url.search || !/^[\w.-]+\.js$/.test(name)) return null;
@@ -37,22 +36,8 @@ const earlyPublicFile = (uiRoot: string, url: URL) => {
   return fs.existsSync(file) ? file : null;
 };
 
-/**
- * How the renderer is built from source.
- *
- * `development` is the authoring mode: React's development transform, Fast
- * Refresh registrations, the hot client, unminified dependencies, and
- * `import.meta.env.DEV === true`. `production` is what the user's Stella
- * serves: React's production transform and `import.meta.env.DEV === false`,
- * with changes applied by reloading rather than hot-swapping.
- *
- * This is a build mode, not a claim about who is running the app — the app
- * always runs from source. Which mode an install serves is decided from
- * `app-identity`, in one place.
- */
 export type RendererBuildMode = "development" | "production";
 
-/** `development` | `production`; overrides the mode an install would pick. */
 export const STELLA_RENDERER_MODE_ENV = "STELLA_RENDERER_MODE";
 
 export const resolveRendererBuildMode = (options: {
@@ -67,15 +52,7 @@ export const resolveRendererBuildMode = (options: {
 };
 
 export type RendererSourceHandle = {
-  /**
-   * Swap in files that changed in this source root (repo-relative posix
-   * paths). Hot-updates every renderer webContents on this partition
-   * (windows and WebContentsViews), falling back to reloading them. "none"
-   * when no path is a renderer input (desktop-ui files, or files of other
-   * packages, such as packages/contracts, that the served graph includes).
-   */
   applyChanges(paths: string[]): Promise<{ mode: "none" | "hot" | "reload" }>;
-  /** Stop serving: unhandle the protocol on the partition, dispose the source. */
   dispose(): void;
 };
 
@@ -116,7 +93,6 @@ const openSourceChannel = (
   const child = utilityProcess.fork(fileURLToPath(SOURCE_WORKER_URL), [`${SOURCE_DATA_ARG}${JSON.stringify(workerData)}`], {
     serviceName: "Stella source server",
     stdio: "ignore",
-    // On macOS, through the helper that may load node_modules' native tools.
     allowLoadingUnsignedLibraries: process.platform === "darwin",
     // rolldown keeps a heap per pool thread (one per core by default) and
     // returns freed pages lazily: a cold dependency bundle then holds about
@@ -205,25 +181,13 @@ const startSourceWorker = (options: {
 
 const NO_CACHE = { "cache-control": "no-cache" };
 
-/**
- * Serve the renderer from a source root on a session partition and start
- * warming it. Every partition shares one transform and dependency cache.
- */
 export const serveRendererSource = (options: {
   partition: string;
-  /** Repo root to serve (the checkout, or a draft worktree). */
   sourceRoot: string;
-  /** Repo root whose packages/desktop-ui .env files supply the defines; defaults to sourceRoot. */
   envRoot?: string;
   mode: RendererBuildMode;
-  /** Where the source server runs; `process` for one that closes while the app runs on. */
   isolate?: "thread" | "process";
   log: (message: string) => void;
-  /**
-   * Rewrites the main window's first page, once. In production it is served
-   * straight from disk rather than after the source server has loaded, so
-   * it can paint sooner.
-   */
   firstPage?: (html: string) => string;
 }): RendererSourceHandle => {
   const partitionSession = session.fromPartition(options.partition);
@@ -263,8 +227,6 @@ export const serveRendererSource = (options: {
 
   const answer = async (requestUrl: string): Promise<Answer> => {
     const url = new URL(requestUrl);
-    // The first page's own scripts are plain files in public/: served from
-    // disk while the source server is still loading, so the page can paint.
     const early = options.mode === "production" ? earlyPublicFile(uiRoot, url) : null;
     if (early) {
       const body = await fs.promises.readFile(early).catch(() => null);

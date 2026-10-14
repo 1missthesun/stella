@@ -11,16 +11,8 @@ import { Check, MoreHorizontal } from "@/ui/icons";
 import { useT } from "@/shared/i18n";
 import "./engine-accounts.css";
 
-/**
- * The row primitives both provider sections use. One row is one account of
- * the owner's: who it is, where it is signed in, and whether it is the one
- * in use. Picking the account is the row itself; everything destructive is
- * behind its menu.
- */
-
 export type EngineAccountMenuItem = { key: string; label: string; onSelect: () => void };
 
-/** Where an account is signed in: this computer, the cloud, another computer. */
 export type EngineAccountPlace = {
   key: string;
   label: string;
@@ -38,7 +30,6 @@ export const accountInitials = (row: { email?: string; label: string }): string 
   return letters.toUpperCase() || "?";
 };
 
-/** "max" → "Max": plans as the provider reports them, capitalized. */
 export const formatPlan = (plan: string | undefined): string | undefined =>
   plan ? `${plan.charAt(0).toUpperCase()}${plan.slice(1)}` : undefined;
 
@@ -73,7 +64,6 @@ export function EngineAccountPlaces({ places }: { places: EngineAccountPlace[] }
   );
 }
 
-/** The title row of an account list: what it is, plus its add control. */
 export function EngineAccountHeader({
   title,
   description,
@@ -94,11 +84,6 @@ export function EngineAccountHeader({
   );
 }
 
-/**
- * One account: avatar, name, where it is signed in, the Active badge and its
- * menu. Clicking the row makes the account the active one — no menu hop —
- * while sign-out and remove stay behind the menu.
- */
 export function EngineAccountRowView({
   id,
   title,
@@ -119,15 +104,11 @@ export function EngineAccountRowView({
   subtitle?: string;
   places?: EngineAccountPlace[];
   active: boolean;
-  /** The badge on the active row; "Active" by default. */
   activeLabel?: string;
-  /** Drawn instead of the initials avatar. */
   leading?: ReactNode;
   busy: boolean;
-  /** Make this the active account. Absent when it cannot serve turns yet. */
   onPick?: () => void;
   items: EngineAccountMenuItem[];
-  /** Destructive items, after a separator. */
   tail?: EngineAccountMenuItem[];
 }) {
   const t = useT();

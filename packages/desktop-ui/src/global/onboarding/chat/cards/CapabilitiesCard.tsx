@@ -1,12 +1,3 @@
-/**
- * "So, what can I do?" — the capabilities card.
- *
- * Five short films (see `film/capability-films.tsx`), each one real request
- * carried out end to end: Stella spawns agents, the camera follows the work,
- * and the result comes back into the chat. User-paced: the word strip jumps
- * to or replays any film, films auto-advance after a short hold, and
- * Continue is never gated.
- */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Play, RotateCcw } from "@/ui/icons";
 import { Button } from "@/ui/button";

@@ -3,14 +3,8 @@ import path from "node:path";
 import type { ParsedAgent } from "./types.js";
 import { loadParsedAgentsFromDir } from "./markdown-agent-loader.js";
 
-/** The engine ships no agent definitions; Stella's home extension owns them. */
 export const loadBundledAgents = (): ParsedAgent[] => [];
 
-/**
- * Join user-editable home prompt bodies with extension-owned capability
- * metadata. Kept in the engine as a generic loader primitive so home extension
- * code never imports repo-relative parser modules.
- */
 export const loadHomeAgentsWithMetadata = (
   stellaDataDir: string,
   agentMetadataDir: string | URL,
@@ -70,7 +64,6 @@ export const mergeBundledAndExtensionAgents = (
   return merged;
 };
 
-/** Resolved when `agentType` is internal-only (not in `loadBundledAgents`). */
 export const getBundledCoreAgentFallback = (
   _agentType: string,
 ): ParsedAgent | undefined => undefined;

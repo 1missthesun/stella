@@ -15,7 +15,6 @@ import { STELLA_MARK_CENTER, STELLA_MARK_VIEWBOX_SPAN } from "./geometry";
 import { DOT_RADIUS_UNITS, DOT_SPREAD_UNITS, SIDE_DOT_SCALE } from "./motion";
 import { rigMaxZoom } from "./rig";
 
-/** Fraction of the full mark a settled ellipsis dot occupies. */
 export const DOT_SHRINK = DOT_RADIUS_UNITS / STELLA_MARK_CENTER;
 
 export function markZoom(size: number): number {
@@ -23,14 +22,11 @@ export function markZoom(size: number): number {
 }
 
 export type StellaMarkLayout = {
-  /** Pixels per viewBox unit at this mark size. */
   pxPerUnit: number;
   zoom: number;
-  /** Side-dot offset from centre, in pixels, zoom included. */
   spreadPx: number;
   dotPx: number;
   sideDotPx: number;
-  /** Scale that takes a settled dot back up to the full mark's box. */
   dotOversize: number;
 };
 

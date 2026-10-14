@@ -19,11 +19,6 @@ const FALLBACK_READ_TIMEOUT_MS = 1_000;
 type HeldView<T> = { client: BackendClient; value?: T; failed: boolean; stop(): void };
 const heldViews = new Map<string, HeldView<unknown>>();
 
-/**
- * A view this process keeps subscribed for as long as the client lives, so a
- * read is the latest pushed value rather than a request. A new client (another
- * sign-in) starts over.
- */
 const holdView = <K extends ViewName>(client: BackendClient, view: K, args: ViewArgs<K>): HeldView<ViewResult<K>> => {
   const existing = heldViews.get(view) as HeldView<ViewResult<K>> | undefined;
   if (existing?.client === client) return existing;
@@ -44,11 +39,6 @@ const holdView = <K extends ViewName>(client: BackendClient, view: K, args: View
   return held;
 };
 
-/**
- * The owner's computers as `devices.list` last pushed them over the live
- * socket, or undefined until the first push or after the view failed. Starts
- * the subscription the first time it is asked.
- */
 export const pushedDevices = (client: BackendClient | null): DeviceDestination[] | undefined => {
   if (!client) return undefined;
   const held = holdView(client, "devices.list", {});
@@ -82,7 +72,6 @@ const readCatalog = async (response: Response): Promise<unknown> => {
   }
 };
 
-/** The plan's media entitlement, from the backend's billing status; null when it cannot be read. */
 const readMediaPlan = async (
   client: BackendClient | null,
 ): Promise<MediaAccess["stella"] | null> => {
@@ -92,8 +81,6 @@ const readMediaPlan = async (
     if (!held.value.authenticated) return null;
     return held.value.isAnonymous ? "sign_in" : mediaAccessForAudience(held.value.plan);
   }
-  // The watch is the callback's canceler: a timeout interrupts the wait and
-  // stops the subscription, the same as the old timer settling with null.
   return await Effect.runPromise(
     Effect.callback<MediaAccess["stella"] | null>((resume) => {
       let stop: (() => void) | null = null;
@@ -102,7 +89,6 @@ const readMediaPlan = async (
         if (settled) return;
         settled = true;
         resume(Effect.succeed(value));
-        // The first value can arrive before `watch` returns.
         queueMicrotask(() => stop?.());
       };
       stop = client.watch(
@@ -127,7 +113,6 @@ const readMediaPlan = async (
   );
 };
 
-/** What media the user can generate: their plan, and `image_gen`'s own-key setting. */
 export const loadMediaAccess = async (args: {
   stellaDataDir: string;
   hasConnectedAccount: boolean;
@@ -149,7 +134,6 @@ export const loadMediaAccess = async (args: {
   };
 };
 
-/** Runs in the runtime worker, never the renderer. Failed discovery is advisory. */
 export const loadDeviceExecutionContext = async (args: {
   deviceId: string;
   baseUrl: string | null;
@@ -182,7 +166,6 @@ const fetchDevices = async (args: {
     const body = await readCatalog(response);
     return body && typeof body === "object" && "devices" in body ? body.devices : undefined;
   } catch {
-    // Offline/signed-out local work must not depend on the device catalog.
     return undefined;
   }
 };
@@ -190,12 +173,6 @@ const fetchDevices = async (args: {
 type FetchedDevices = { devices?: unknown; pending?: Promise<void> };
 const fetchedDevices = new WeakMap<BackendClient, FetchedDevices>();
 
-/**
- * The owner's computers as `devices.list` last pushed them. Until the first
- * push arrives, or on a backend without the view, a read falls back to the
- * HTTP list: it waits only when nothing was read yet, and otherwise answers
- * with the last list while a newer one loads.
- */
 const loadDevices = async (args: {
   deviceId: string;
   baseUrl: string | null;

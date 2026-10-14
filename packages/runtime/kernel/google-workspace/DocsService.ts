@@ -46,10 +46,6 @@ type DocsSuggestion =
   | DocsParagraphStyleChangeSuggestion;
 
 export class DocsService {
-  /**
-   * Recursively flattens a tab tree into a single array,
-   * so that nested (child) tabs are included alongside top-level ones.
-   */
   private _flattenTabs(tabs: docs_v1.Schema$Tab[]): docs_v1.Schema$Tab[] {
     return tabs.flatMap((tab) => {
       const children = tab.childTabs ? this._flattenTabs(tab.childTabs) : [];
@@ -127,7 +123,6 @@ export class DocsService {
     ) => {
       elements?.forEach((element) => {
         if (element.paragraph) {
-          // Handle paragraph-level style suggestions
           if (element.paragraph.suggestedParagraphStyleChanges) {
             for (const [suggestionId, suggestion] of Object.entries(
               element.paragraph.suggestedParagraphStyleChanges,
@@ -144,7 +139,6 @@ export class DocsService {
             }
           }
 
-          // Handle text-run-level suggestions within the paragraph
           element.paragraph.elements?.forEach((pElement) => {
             if (pElement.textRun) {
               const baseSuggestion = {
@@ -224,7 +218,6 @@ export class DocsService {
       const documentId = doc.data.documentId!;
       const docTitle = doc.data.title!;
 
-      // Insert content if provided
       if (content) {
         logToFile('[DocsService] Inserting content into new doc');
         await docs.documents.batchUpdate({
@@ -326,7 +319,6 @@ export class DocsService {
           const endIndex = lastElement?.endIndex || 1;
           index = Math.max(1, endIndex - 1);
         } else {
-          // Treat as a numeric index
           index = parseInt(position, 10);
           if (isNaN(index) || index < 1) {
             throw new Error(
@@ -536,18 +528,16 @@ export class DocsService {
       `[DocsService] Starting getText for document: ${documentId}, tabId: ${tabId}`,
     );
     try {
-      // Validate and extract document ID
       const id = validateAndExtractDocId(documentId);
       const docs = await this.getDocsClient();
       const res = await docs.documents.get({
         documentId: id,
-        fields: 'tabs', // Request tabs only (body is legacy and mutually exclusive with tabs in mask)
+        fields: 'tabs',
         includeTabsContent: true,
       });
 
       const tabs = this._flattenTabs(res.data.tabs || []);
 
-      // If tabId is provided, try to find it
       if (tabId) {
         const tab = tabs.find((t) => t.tabProperties?.tabId === tabId);
         if (!tab) {
@@ -581,7 +571,6 @@ export class DocsService {
         };
       }
 
-      // If no tabId provided
       if (tabs.length === 0) {
         return {
           content: [
@@ -593,7 +582,6 @@ export class DocsService {
         };
       }
 
-      // If only 1 tab, return plain text (backward compatibility)
       if (tabs.length === 1) {
         const tab = tabs[0];
         let text = '';
@@ -612,7 +600,6 @@ export class DocsService {
         };
       }
 
-      // If multiple tabs, return JSON
       const tabsData = tabs.map((tab, index) => {
         let tabText = '';
         if (tab.documentTab?.body?.content) {
@@ -725,7 +712,6 @@ export class DocsService {
       const id = extractDocId(documentId) || documentId;
       const docs = await this.getDocsClient();
 
-      // Get the document to find where the text will be replaced
       const docBefore = await docs.documents.get({
         documentId: id,
         fields: 'tabs',
@@ -820,7 +806,6 @@ export class DocsService {
       const occurrence = occurrences[i];
       const adjustedPosition = occurrence + cumulativeOffset;
 
-      // Delete old text
       requests.push({
         deleteContentRange: {
           range: {
@@ -831,7 +816,6 @@ export class DocsService {
         },
       });
 
-      // Insert new text
       requests.push({
         insertText: {
           location: {

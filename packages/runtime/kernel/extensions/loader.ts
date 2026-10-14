@@ -1,8 +1,3 @@
-/**
- * Extension loader - auto-discovers tools, hooks, providers, prompts, and agents
- * from the extensions directory structure.
- */
-
 import { promises as fs } from "fs";
 import path from "path";
 import { pathToFileURL } from "url";
@@ -71,23 +66,15 @@ const cacheBusterEffect = (
   }).pipe(
     Effect.andThen(tryExtensionOp(() => fs.stat(filePath))),
     Effect.map((stat) => stat.mtimeMs),
-    // Falling back to loadToken alone keeps the cache-bust correct
-    // even if stat fails for some reason.
     Effect.catch(() => Effect.succeed(0)),
     Effect.map((mtime) => `?v=${mtime}-${loadToken}`),
   );
 
-/** List a directory, reading an unreadable/missing one as empty. */
 const readDirOrEmpty = (dir: string): Effect.Effect<string[]> =>
   tryExtensionOp(() => fs.readdir(dir)).pipe(
     Effect.catch(() => Effect.succeed([] as string[])),
   );
 
-/**
- * Dynamically import all matching TypeScript files from a directory.
- * Returns the default export of each file. Per-file failures are logged and
- * skipped (error isolation identical to the pre-Effect loader).
- */
 const importModules = <T>(
   dir: string,
   suffix: string,
@@ -101,8 +88,6 @@ const importModules = <T>(
       if (!entry.endsWith(suffix)) continue;
       const filePath = path.join(dir, entry);
       yield* Effect.gen(function* () {
-        // Use file:// URL for cross-platform ESM import compatibility,
-        // with a cache-busting query string so F1 reload picks up edits.
         const resolvedPath = path.resolve(filePath);
         const fileUrl =
           pathToFileURL(resolvedPath).href +
@@ -164,7 +149,6 @@ const loadExtensionFactories = (
           fs.access(candidate),
         ).pipe(
           Effect.map(() => true),
-          // Try the next supported extension entry format.
           Effect.catch(() => Effect.succeed(false)),
         );
         if (accessible) {
@@ -212,7 +196,6 @@ const loadExtensionFactories = (
           },
         };
 
-        // The factory is user-authored promise-land code — one seam.
         yield* tryExtensionOp(async () => factory(api, services));
         log(`Loaded extension: ${entry}`);
       }).pipe(
@@ -230,9 +213,6 @@ const loadExtensionFactories = (
     return collected;
   });
 
-/**
- * Parse prompt template markdown files with optional frontmatter.
- */
 const loadPrompts = (dir: string): Effect.Effect<PromptTemplate[]> =>
   Effect.gen(function* () {
     const results: PromptTemplate[] = [];
@@ -241,8 +221,6 @@ const loadPrompts = (dir: string): Effect.Effect<PromptTemplate[]> =>
     for (const entry of entries) {
       if (!entry.endsWith(".prompt.md")) continue;
       const filePath = path.join(dir, entry);
-      // One seam per file: the read AND the frontmatter parse sit inside it,
-      // so a parse throw is isolated per-file exactly as before.
       yield* tryExtensionOp(async () => {
         const raw = await fs.readFile(filePath, "utf-8");
         const { metadata, body } = extractFrontmatter(raw);
@@ -272,17 +250,6 @@ const loadPrompts = (dir: string): Effect.Effect<PromptTemplate[]> =>
     return results;
   });
 
-/**
- * Load all extensions from an extensions directory.
- *
- * Expected structure:
- *   baseDir/
- *     my-extension/index.ts
- *     tools/*.tool.ts
- *     hooks/*.hook.ts
- *     providers/*.provider.ts
- *     prompts/*.prompt.md
- */
 // Per-process counter of how many times `loadExtensions` has run.
 // First call (startup) is 1; each F1 reload increments it. Used only
 // to surface a warning when the count crosses
@@ -317,7 +284,6 @@ export function loadExtensions(
       // sees a fresh token and re-imports edited files. See `cacheBuster`.
       const loadToken = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-      // The five collectors run concurrently, matching the old Promise.all.
       const [tools, hooks, providers, prompts, registered] = yield* Effect.all(
         [
           importModules<ToolDefinition>(

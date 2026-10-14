@@ -1,11 +1,3 @@
-/**
- * The one validate → before_tool → execute → after_tool step every tool
- * call runs through, whether the model issued it directly or a tool
- * re-entered the dispatcher for it (`code` cells, `multi_tool_use_parallel`).
- * Without a shared step, nested calls skipped schema validation and the
- * extension hooks that top-level calls get.
- */
-
 import type { JsonObject, Tool } from "@earendil-works/pi-ai";
 import type { HookEmitter } from "../extensions/hook-emitter.js";
 import type { ToolContext, ToolResult } from "./types.js";
@@ -13,7 +5,6 @@ import type { ToolContext, ToolResult } from "./types.js";
 let toolValidationModule:
   | Promise<typeof import("@earendil-works/pi-ai/utils/validation")>
   | undefined;
-// Loaded on the first validated call: the validator stays off the startup path.
 const loadToolValidation = () =>
   (toolValidationModule ??= import("@earendil-works/pi-ai/utils/validation"));
 
@@ -62,7 +53,6 @@ export type ToolCallPipelineArgs = {
   args: Record<string, unknown>;
   context: ToolContext;
   hookEmitter?: Pick<HookEmitter, "emit">;
-  /** Hook filter context; defaults to `context.agentType`. */
   agentType?: string;
   /**
    * JSON schema to validate (and coerce) `args` against. Omit only when the
@@ -70,7 +60,6 @@ export type ToolCallPipelineArgs = {
    * for model-issued top-level calls.
    */
   parameters?: Record<string, unknown>;
-  /** Compatibility shim run on the raw args before validation. */
   prepareArguments?: (args: unknown) => unknown;
   execute: (args: Record<string, unknown>) => Promise<ToolResult>;
 };

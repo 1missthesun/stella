@@ -24,10 +24,6 @@ export const isOwnerAppBuildPrefix = (
   );
 };
 
-/**
- * Recovery markers are retired only after the whole R2 prefix is confirmed
- * empty. Returning false leaves the marker intact for the next alarm/purge.
- */
 export const retireTransientAppBuild = async (args: {
   sweep: () => Promise<{ done: boolean }>;
   clearRecovery: () => Promise<void>;

@@ -15,11 +15,6 @@ const HTTP_TIMEOUT_MS = 20_000;
 const SCAN_TIMEOUT_MS = 30_000;
 const MAX_HTTP_RESPONSE_BYTES = 4 * 1024 * 1024;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/u;
-/**
- * Scan warnings that can hide a skill the device root really does hold. Any of
- * them makes the scanned slug set an incomplete picture of that root, and a
- * mirror prune driven by an incomplete picture deletes live skills.
- */
 const SKILL_SCAN_INCOMPLETE_CODES = new Set<CloudHomeScanWarningCode>([
   "invalid_path",
   "unsafe_file",
@@ -39,7 +34,6 @@ const hasAsciiControlCharacter = (value: string): boolean => {
 export type CloudHomeCursorStore = {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
-  /** Test/alternate privileged-store seam. Missing always fails closed. */
   readImportOwnership?: (
     accountScope: string,
   ) => Promise<CloudHomeImportOwnership>;
@@ -85,7 +79,6 @@ const emptyStatus = (accountScope: string | null): CloudHomeSyncStatus => ({
   issues: [],
 });
 
-/** Never let a previous account's item labels cross an account transition. */
 export const cloudHomeStatusForAccount = (
   status: CloudHomeSyncStatus,
   accountScope: string,
@@ -518,8 +511,6 @@ export const runCloudHomeSync = async (
   let cloudSkills: CloudSkillHead[];
   let scan: LocalCloudHomeScan;
   try {
-    // Read the cloud authority before inspecting local state. The importer is
-    // additive only: an existing divergent cloud head always wins.
     cloudSkills = await awaitBounded({
       operation: options.readSkillHeads,
       timeoutMs: HTTP_TIMEOUT_MS,
@@ -559,8 +550,6 @@ export const runCloudHomeSync = async (
   publishStatus();
 
   const interrupted = (): CloudHomeSyncStatus => {
-    // Confirmed item cursors remain resumable, but a canceled/account-switched
-    // pass never records lastCompletedAt or presents itself as successful.
     const partial = { ...status, phase: "idle" as const };
     status = partial;
     publishStatus();
@@ -758,8 +747,6 @@ export const runCloudHomeSync = async (
             };
       publishStatus();
     }
-    // A slug the device root no longer holds keeps no cursor row, so a bounded
-    // cursor never fills with skills this Mac deleted long ago.
     for (const slug of Object.keys(cursor.skills)) {
       if (!deviceSlugs.has(slug)) delete cursor.skills[slug];
     }

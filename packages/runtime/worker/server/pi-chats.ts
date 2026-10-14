@@ -39,30 +39,17 @@ import {
 import type * as HostBus from "./host-bus.js";
 import type { OpenSession } from "./sessions.js";
 
-/**
- * The desktop chat on pi-durable (`@stella/agent/host/desktop-chats`), one
- * per worker session, loaded on its first request: conversations that run on
- * it never touch the runner's orchestrator loop. Watched conversations'
- * events go to the app as `piChat.events` notifications.
- */
 type DesktopChats = import("@stella/agent/host/desktop-chats").DesktopChats;
 
-/** What pi wrote into a conversation's chat log, by its row ids (and `metadata.writer`, for a row keeping the sender's id). */
 const PI_LOG_ROW = "pi:";
 const PI_WRITER = "pi";
-/** The chats on this computer the pi agents' directory lists. */
 const AGENT_DIRECTORY_SESSIONS = 12;
 
-/**
- * A conversation's chat log as pi mirrors it: pi's own messages written into
- * the timeline the app shows, and the rows other writers added read back.
- */
 const piLocalLog = (
   session: OpenSession,
   conversationId: string,
 ): import("@stella/agent/host/desktop-local-log").DesktopLocalLog => {
   const rowId = (key: string) => `${PI_LOG_ROW}${conversationId}:${key}`;
-  // An answer names its user message by row id; older mirrors stored the key.
   const userRowId = (replyTo: string) => (/^\d+:\d+$/.test(replyTo) ? rowId(replyTo) : replyTo);
   return {
     read: async (afterSeq, limit) => {
@@ -122,7 +109,6 @@ const piLocalLog = (
               : {
                   ...(details ?? {}),
                   toolName: message.toolName,
-                  // Every tool result in a conversation's own transcript is the orchestrator's.
                   agentType: "orchestrator",
                   result: details ?? message.text,
                   resultPreview: message.text,
@@ -167,7 +153,6 @@ const piLocalLog = (
                   }
                 : {
                     ...writer,
-                    // When the reply began, which the timeline places the turn's agent cards by.
                     runtime: {
                       streamStartedAtMs: message.timestamp,
                       ...(message.followedByToolCall ? { followedByToolCall: true } : {}),
@@ -182,11 +167,6 @@ const piLocalLog = (
   };
 };
 
-/**
- * Cloud agents pi's Stella starts, on the model it names or the configured
- * one, for a conversation stored in the cloud: the runner dispatches them through the owner's agent
- * threads as its own cloud placements, and their reports come back the same way.
- */
 const cloudAgentThreadsFor = (
   session: OpenSession,
   conversationId: string,
@@ -222,12 +202,6 @@ const cloudAgentThreadsFor = (
   };
 };
 
-/**
- * Agents pi's Stella starts on another of the owner's computers, for a
- * conversation stored in the cloud: each runs there as a whole, on that
- * computer's own Stella, through the owner's agent threads; its reports come
- * back through the owner's report ledger to wherever Stella runs.
- */
 const deviceAgentThreadsFor = (
   session: OpenSession,
   conversationId: string,
@@ -264,13 +238,10 @@ const deviceAgentThreadsFor = (
 };
 
 const chatsBySession = new WeakMap<OpenSession, Promise<DesktopChats>>();
-/** The same chats once loaded, for synchronous checks. */
 const loadedBySession = new WeakMap<OpenSession, DesktopChats>();
 
-/** Whether pi has work in flight in this session: the worker stays up for it. */
 export const piChatsBusy = (session: OpenSession): boolean => loadedBySession.get(session)?.busy() ?? false;
 
-/** Close the session's pi chats (their harnesses, mirrors and environments), if they were opened. */
 export const closePiChats = async (session: OpenSession): Promise<void> => {
   const chats = chatsBySession.get(session);
   chatsBySession.delete(session);
@@ -278,7 +249,6 @@ export const closePiChats = async (session: OpenSession): Promise<void> => {
   await (await chats?.catch(() => undefined))?.close();
 };
 
-/** End the shell commands of the session's pi chats, if they were opened. */
 export const terminatePiChatCommands = async (session: OpenSession): Promise<void> => {
   const chats = await chatsBySession.get(session)?.catch(() => undefined);
   await chats?.terminateCommands();
@@ -330,7 +300,6 @@ export const piChatsFor = (
         apiKey: (provider) => getAccessibleLocalLlmApiKey(session.config.get().stellaDataDirPath, provider),
         oauthToken: (provider) => getAccessibleLocalLlmOAuthApiKey(session.config.get().stellaDataDirPath, provider),
       },
-      // The models the picker lists: models.json and extension providers, builtin overrides.
       resolveDirectModel: (reference) =>
         resolveDirectLlmRoute({ stellaAppDir: session.config.get().stellaDataDirPath, modelName: reference }),
       thinkingLevel: () => getReasoningEffort(session.config.get().stellaDataDirPath, "orchestrator"),
@@ -431,9 +400,6 @@ export const piChatsFor = (
           () => session.runnerCell.get()?.pushedDevices(),
         ),
       brain: (conversationId) => brainFor(session, hostBus, conversationId),
-      // A conversation stored in the cloud lists this computer's agents in
-      // the owner's agent threads, where a paired phone shows and messages
-      // them: Stella's own, and each agent's own under the agent that started it.
       agentRunEnded: ({ conversationId, threadId, interrupted }) => {
         const runner = session.runnerCell.get();
         if (!runner) return;
@@ -462,7 +428,6 @@ export const piChatsFor = (
           });
         })().catch((error) => console.warn("[pi-chat] computer thread start failed", error));
       },
-      // An agent's own agent ended a run; its report went to that agent.
       subagentEnded: (agent) => {
         if (agent.conversationId.startsWith("local_")) return;
         void (async () => {
@@ -481,7 +446,6 @@ export const piChatsFor = (
         })().catch((error) => console.warn("[pi-chat] computer thread completion failed", error));
       },
       agentReportRelayed: (agent) => {
-        // The loop's notice for a finished task, once Stella has told the user.
         void hostBus
           .request(METHOD_NAMES.HOST_NOTIFICATION_SHOW, {
             title: agent.description.trim() || "Task complete",
@@ -491,7 +455,6 @@ export const piChatsFor = (
           .catch((error) => console.debug("[pi-chat] agent notification failed", error));
       },
       agentReported: (agent) => {
-        // A message since has it working again: that run's record stays open.
         if (agent.conversationId.startsWith("local_") || agent.running) return;
         const body = /\n(?:result|error): ([\s\S]*?)(?=\n(?:agent_state|routing|presentation): |$)/.exec(agent.report)?.[1]?.trim();
         void (async () => {
@@ -507,8 +470,6 @@ export const piChatsFor = (
           });
         })().catch((error) => console.warn("[pi-chat] computer thread completion failed", error));
       },
-      // Stopped before it answered: Stella is not woken, but the agent stopped,
-      // and the phone counts what the owner's records say is running.
       agentStopped: (agent) => {
         if (agent.conversationId.startsWith("local_")) return;
         void (async () => {
@@ -523,8 +484,6 @@ export const piChatsFor = (
           });
         })().catch((error) => console.warn("[pi-chat] computer thread stop failed", error));
       },
-      // A conversation kept on this computer shares the agent loops' chat
-      // log; a cloud one shares the journal.
       localLog: (conversationId) =>
         conversationId.startsWith("local_") ? piLocalLog(session, conversationId) : undefined,
       emit: (payload) => hostBus.notify(NOTIFICATION_NAMES.PI_CHAT_EVENTS, payload),
@@ -550,11 +509,6 @@ export const piBackgroundExitTarget = (
     (await (await piChatsFor(session, hostBus)).deliverAgentMessage(agentId, text, eventId)) !== "not_found",
 });
 
-/**
- * Resume the conversations a previous runtime process left with pi work in
- * flight (`<data dir>/agent/active.json`). Loads the pi chat only when there
- * are any.
- */
 export const resumePiChats = async (
   session: OpenSession,
   hostBus: HostBus.Interface,
@@ -570,11 +524,6 @@ export const resumePiChats = async (
   await (await piChatsFor(session, hostBus)).resumeActive();
 };
 
-/**
- * How one of pi's agents on this computer stands, for the owner's records of
- * it: undefined when no pi conversation here started it. Loads the pi chat
- * only for an agent it knows (`<data dir>/agent/threads.json`).
- */
 const piAgentStanding = async (
   session: OpenSession,
   hostBus: HostBus.Interface,
@@ -594,11 +543,6 @@ const piAgentStanding = async (
 
 const reconciling = new WeakMap<OpenSession, Promise<void>>();
 
-/**
- * Settle the owner's record of every agent it says runs on this computer and
- * no longer does (`computer-agent-reconcile`), on start and on reconnect. A
- * pi agent whose run resumes after a restart is still running.
- */
 export const reconcileComputerAgents = (
   session: OpenSession,
   hostBus: HostBus.Interface,
@@ -619,12 +563,6 @@ export const reconcileComputerAgents = (
   return run;
 };
 
-/**
- * A message the user sent on another device that the cloud placed on this
- * computer: prepared as a composer send is (attachments included) and
- * answered as a visible turn of the conversation, cancellable by its
- * placement run id (`cancelPiPlacement`).
- */
 export const piPlacedChat = async (
   session: OpenSession,
   hostBus: HostBus.Interface,
@@ -635,12 +573,7 @@ export const piPlacedChat = async (
     userMessageEventId?: string;
     attachments?: RuntimeChatPayload["attachments"];
     context?: unknown;
-    /** A schedule's prompt: read by Stella, never shown; its answer shows. */
     scheduled?: boolean;
-    /**
-     * Stella's brief to herself after she moved here, or a note for her from
-     * where she ran before: read by her, never shown; her answer shows.
-     */
     handoff?: boolean;
   },
 ) => {
@@ -661,7 +594,6 @@ export const piPlacedChat = async (
   const content = piUserContent(payload, prepared);
   const context = run.context === undefined ? null : parseCloudTurnContext(run.context);
   if (context?.text) {
-    // Nothing typed: the pasted text is the message, not a placeholder beside it.
     const [first] = content;
     const placeholderOnly =
       content.length === 1 && first?.type === "text" && first.stella?.hidden && first.text === "(empty message)";
@@ -677,7 +609,6 @@ export const piPlacedChat = async (
       stella: { ...first.stella, display: { ...display, context: { ...display?.context, ...context.display } } },
     } as typeof first;
   }
-  // The sender binds its pending message to this id: the journal row keeps it.
   content[0] = { ...content[0]!, stella: { ...content[0]!.stella, clientMsgId: requestId } } as typeof content[number];
   if (run.scheduled || run.handoff) {
     for (const [index, part] of content.entries()) {
@@ -699,24 +630,15 @@ export const piPlacedChat = async (
   });
 };
 
-/**
- * A message from another device for one of this computer's pi agents;
- * `not_found` when no pi conversation here has that agent.
- */
 export const piDeliverAgentMessage = async (
   session: OpenSession,
   hostBus: HostBus.Interface,
   message: { threadId: string; text: string; messageId: string },
 ) => (await piChatsFor(session, hostBus)).deliverAgentMessage(message.threadId, message.text, message.messageId);
 
-/**
- * A stop from another host for one of this computer's pi agents, and the
- * agents below it; `not_found` when no pi conversation here has that agent.
- */
 export const piStopAgent = async (session: OpenSession, hostBus: HostBus.Interface, threadId: string) =>
   await (await piChatsFor(session, hostBus)).stopAgent(threadId);
 
-/** An agent's `history.*` call, from its own thread in the pi conversation that holds it. */
 export const piAgentHistory = async (
   session: OpenSession,
   hostBus: HostBus.Interface,
@@ -734,19 +656,12 @@ export const piDeliverReport = async (
     text: report.text,
   });
 
-/**
- * Why a placement was canceled before it ran here, if it was: the cancel is
- * kept on disk, so a run delivered after it (even after a restart) never
- * starts. Read in the same step that registers the run, so a later cancel
- * finds the run instead.
- */
 export const piPlacementCanceled = (
   session: OpenSession,
   kind: PlacementLocalExecutionKind,
   executionId: string,
 ): string | null => getPlacementCancellation({ store: session.storage.runtimeStore.chat, kind, executionId });
 
-/** Keep a placement's cancel, before anything awaits (`piPlacementCanceled`). */
 const persistPiCancel = (
   session: OpenSession,
   kind: PlacementLocalExecutionKind,
@@ -754,11 +669,6 @@ const persistPiCancel = (
   reason?: string,
 ) => persistPlacementCancellation({ store: session.storage.runtimeStore.chat, kind, executionId, ...(reason ? { reason } : {}) });
 
-/**
- * Stop a placed chat pi is answering. Once the cancel is kept it holds: a
- * run this process holds stops, and one it does not (never started, or
- * started by a process that has since exited) can no longer start.
- */
 export const cancelPiPlacement = async (session: OpenSession, placementRunId: string, reason?: string): Promise<boolean> => {
   persistPiCancel(session, "chat", placementRunId, reason);
   const chats = await chatsBySession.get(session)?.catch(() => undefined);
@@ -766,7 +676,6 @@ export const cancelPiPlacement = async (session: OpenSession, placementRunId: st
   return true;
 };
 
-/** Stop a run of an agent placed here that pi is running; false when pi has no such run. */
 export const cancelPiPlacedAgent = async (
   session: OpenSession,
   cancel: { agentKey: string; runKey: string; reason?: string },
@@ -776,11 +685,6 @@ export const cancelPiPlacedAgent = async (
   return chats?.cancelPlacedAgent(cancel.agentKey, cancel.runKey, isAgentStopReason(cancel.reason)) === true;
 };
 
-/**
- * A pi chat request from the app. A composer send arrives as the composer
- * sent it and is prepared here as the agent loops prepare it (images sized
- * and spilled, files saved, chat context), then submitted as one user input.
- */
 export const piChatRequest = async (
   session: OpenSession,
   hostBus: HostBus.Interface,
@@ -801,8 +705,6 @@ export const piChatRequest = async (
       (await session.runnerCell.get()?.resolveImageTarget(payload.agentType)) ?? undefined,
   });
   const content = piUserContent(payload, prepared);
-  // The composer's id rides on the message into the journal, so every view of
-  // the conversation binds the sent message to the same row.
   if (CLIENT_MSG_ID_PATTERN.test(request.requestId)) {
     const [first] = content;
     content[0] = { ...first!, stella: { ...first!.stella, clientMsgId: request.requestId } };

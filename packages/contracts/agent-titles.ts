@@ -12,7 +12,6 @@ export type AgentTitleRecord = {
 export type JournalAgent = {
   title?: string;
   status?: TaskLifecycleStatus;
-  /** Labels derived from follow-ups sent to it, which never name the agent. */
   followUpTitles?: string[];
 };
 
@@ -30,7 +29,6 @@ export const followUpLabel = (message: string): string => {
   return firstLine.length > 80 ? `${firstLine.slice(0, 77).trimEnd()}...` : firstLine;
 };
 
-/** Whether a title is only a follow-up's label for this agent. */
 export const isFollowUpTitle = (agent: JournalAgent | undefined, title: string | undefined): boolean =>
   Boolean(title && agent?.followUpTitles?.includes(title.trim()));
 
@@ -77,7 +75,6 @@ const CARD_STATUS: Record<string, TaskLifecycleStatus> = {
   "agent-canceled": "canceled",
 };
 
-/** A lifecycle card's status: the outcome it carries, else its type's. */
 const cardStatus = (type: string, payload: Record<string, unknown> | null): TaskLifecycleStatus | undefined =>
   (type === "agent-failed" || type === "agent-canceled") && isAgentAttemptOutcome(payload?.status)
     ? agentTaskStatus(payload.status)

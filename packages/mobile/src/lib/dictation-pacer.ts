@@ -35,7 +35,6 @@ const STALLED_TICK_MS = 200;
 const PAD_AFTER_MS = 1_000;
 /** Lateness left in place so an in-flight recorder chunk cannot overshoot. */
 const PAD_KEEP_MS = 250;
-/** Largest single fill; also the relay's per-frame limit. */
 const MAX_PAD_MS = 1_000;
 
 export class DictationIngressPacer {
@@ -52,22 +51,18 @@ export class DictationIngressPacer {
     this.queue = new DictationIngressQueue((bytes) => stream.send(bytes), now);
   }
 
-  /** Audio captured but not yet released to the relay. */
   get queuedMs(): number {
     return this.queue.queuedMs;
   }
 
-  /** Audio released to the relay so far. */
   get sentMs(): number {
     return this.queue.sentMs;
   }
 
-  /** Forward captured audio; before `start` it is held, never dropped. */
   send(bytes: ArrayBuffer): void {
     this.queue.push(bytes);
   }
 
-  /** The provider acknowledged its handshake: its clock starts now. */
   start(startedAt: number = this.now()): void {
     if (this.stopped || this.timer !== null) return;
     this.startedAt = startedAt;
@@ -76,18 +71,15 @@ export class DictationIngressPacer {
     this.timer = setInterval(this.tick, TICK_MS);
   }
 
-  /** Recording ended: no more silence, but captured audio keeps flowing. */
   stopPadding(): void {
     if (this.timer !== null) clearInterval(this.timer);
     this.timer = null;
   }
 
-  /** Resolves once every captured byte has been released to the relay. */
   flushed(): Promise<void> {
     return this.queue.flushed();
   }
 
-  /** Abandon the session: stop the timer and forget queued audio. */
   stop(): void {
     this.stopped = true;
     this.stopPadding();

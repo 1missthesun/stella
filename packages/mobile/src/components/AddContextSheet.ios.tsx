@@ -9,10 +9,6 @@ import { AddContextSheetBody, ADD_CONTEXT_BODY_HEIGHT } from "./AddContextSheetB
 import type { AddContextSheetProps } from "./AddContextSheet.types";
 import { useTheme } from "../theme/theme-context";
 
-/**
- * The composer's plus button opens iOS's own sheet, so it gets the system
- * glass, the grabber, and swipe-to-dismiss for free.
- */
 export function AddContextSheet(props: AddContextSheetProps) {
   const { isDark } = useTheme();
   const insets = useSafeAreaInsets();

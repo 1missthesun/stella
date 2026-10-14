@@ -1,26 +1,9 @@
-/**
- * Eye geometry for the character mark, ported from the desktop rig's
- * `eyes.js`.
- *
- * Every pose is a fixed-length ring in unit space, so a blink or a squint is a
- * lerp between two poses rather than a swap between two authored paths. The
- * rings are half the desktop's resolution: mobile rebuilds the path in a
- * worklet while a transition runs, and 32 points is already past the point
- * where a hero-sized eye shows a corner.
- */
-
 const TAU = Math.PI * 2;
 
 export const EYE_N = 32;
 
-/**
- * The face box the desktop rig's `fitFace` measures from the character
- * silhouette, baked so mobile needs no ring sampling at runtime. The mark's
- * shape never changes here, so the measurement is a constant.
- */
 export const FACE = { dx: -1.14, dy: 0.86, rx: 70.705, ry: 70.705 };
 
-/** Superellipse eye: `n` controls how square the corners read. */
 const pill = (
   count: number,
   w: number,
@@ -59,7 +42,6 @@ const starEye = (
   return pts;
 };
 
-/** Squashes and arcs a pill into an expression: `bend` is what makes a smile. */
 const warp = (
   pts: number[][],
   { squash = 1, bend = 0, shift = 0 } = {},
@@ -95,7 +77,6 @@ export const EYE_POSES = buildEyePoses(EYE_N);
 
 export type EyePoseName = keyof typeof EYE_POSES;
 
-/** Poses the hero cycles through while nothing in particular is happening. */
 export const IDLE_POSES: EyePoseName[] = [
   "neutral",
   "open",
@@ -113,11 +94,6 @@ export const BLINK_MS = 78;
 export const randomBetween = (a: number, b: number) =>
   a + Math.random() * (b - a);
 
-/**
- * One eye's path in the mark's viewBox units, as a lerp between two poses.
- * Worklet-safe: this is called on the UI thread while a transition is in
- * flight, and only then — a settled face costs no per-frame path work.
- */
 export const eyePath = (
   from: number[][],
   to: number[][],

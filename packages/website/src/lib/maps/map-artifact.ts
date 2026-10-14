@@ -16,15 +16,12 @@
 export type MapTravelMode = "driving" | "walking" | "cycling" | "transit";
 
 export type MapArtifactMarker = {
-  /** Stable id within the artifact (e.g. "m1", "origin"). */
   id: string;
   name: string;
   lat: number;
   lng: number;
   address?: string;
-  /** Google place id when the marker came from Places resolution. */
   placeId?: string;
-  /** Google rating (1–5) when available. */
   rating?: number;
   ratingCount?: number;
   role?: "origin" | "destination" | "place";
@@ -37,16 +34,12 @@ export type MapArtifactRouteStep = {
 
 export type MapArtifactRoute = {
   mode: MapTravelMode;
-  /** Marker ids for the endpoints. */
   originId: string;
   destinationId: string;
   distanceMeters: number;
   durationSeconds: number;
-  /** Human route summary, e.g. "via US-101 N". */
   summary?: string;
-  /** Google encoded overview polyline. */
   polyline: string;
-  /** Plain-text turn summary (capped); not required to draw the map. */
   steps?: MapArtifactRouteStep[];
 };
 
@@ -93,11 +86,6 @@ export const isMapRouteArtifact = (
   return true;
 };
 
-/**
- * Decode the `?d=` embed param (base64url JSON) back into an artifact.
- * Returns null for anything malformed — the embed page shows a quiet
- * fallback instead of a broken map.
- */
 export const decodeMapArtifactParam = (
   param: string | null | undefined,
 ): MapRouteArtifact | null => {

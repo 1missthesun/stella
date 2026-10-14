@@ -1,12 +1,3 @@
-/**
- * "Summary" (catch-ups inside): the pill above the composer once a busy stretch has gone by
- * (`catchUpOffer`, shared with mobile), and the popover it opens. Opening it
- * asks the cloud for a summary of what is new (`catchUps.request`); every
- * summary so far stays in the popover as its own page, oldest on the left and
- * newest on the right, swiped or arrowed through one at a time. Tapping a
- * line jumps to the message it came from.
- */
-
 import {
   memo,
   useCallback,
@@ -43,7 +34,6 @@ const visibleMessageText = (message: MessageRecord): string => {
   return typeof text === "string" ? text : "";
 };
 
-/** The user's and Stella's shown messages, as the offer rule reads them. */
 const offerMessages = (messages: readonly MessageRecord[]) =>
   messages.flatMap((message) =>
     (message.type === "assistant_message" || message.type === "user_message") &&
@@ -62,7 +52,6 @@ const formatWhen = (locale: string, at: number): string =>
     minute: "2-digit",
   }).format(at);
 
-/** A separator's time: the day too when it is not the summary's own day. */
 const formatGap = (locale: string, at: number, pageAt: number): string =>
   new Intl.DateTimeFormat(
     locale,
@@ -185,7 +174,6 @@ export const CatchUpPill = memo(function CatchUpPill({
     () => catchUpOffer(offerInput, catchUps, now),
     [catchUps, now, offerInput],
   );
-  // The pill lingers after a summary lands; take it down when that ends.
   useEffect(() => {
     if (!offer.lingerUntil) return;
     const timer = window.setTimeout(
@@ -217,7 +205,6 @@ export const CatchUpPill = memo(function CatchUpPill({
   const onOpenChange = useCallback(
     (next: boolean) => {
       setOpen(next);
-      // Only what no catch-up covers yet is worth a new one.
       if (next && offer.count >= CATCH_UP_MIN_NEW_MESSAGES && !pending) void request();
     },
     [offer.count, pending, request],
@@ -231,16 +218,12 @@ export const CatchUpPill = memo(function CatchUpPill({
     [conversationId],
   );
 
-  // Oldest on the left, newest on the right: open on the newest, and follow
-  // a new page as it lands or fills in. The pages mount with the popover,
-  // after this component's own effects, so their node is tracked as state.
   const newest = catchUps.at(-1);
   const newestKey = newest ? `${newest.catchUpId}:${newest.state}` : "";
   const [pagesNode, setPagesNode] = useState<HTMLDivElement | null>(null);
   const [pageIndex, setPageIndex] = useState(0);
   const [pagesHeight, setPagesHeight] = useState<number | null>(null);
   const shownKeyRef = useRef<string | null>(null);
-  // The page a button or key is sliding to, until the scroller gets there.
   const targetRef = useRef<number | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const total = catchUps.length;
@@ -268,11 +251,9 @@ export const CatchUpPill = memo(function CatchUpPill({
     const opening = shownKeyRef.current === null;
     goTo(total - 1, opening ? "instant" : "smooth");
     shownKeyRef.current = newestKey;
-    // Take focus on open so the arrow keys page right away.
     if (opening) rootRef.current?.focus({ preventScroll: true });
   }, [goTo, newestKey, pagesNode, total]);
 
-  // The page in view after a swipe or a trackpad scroll.
   const onPagesScroll = useCallback(() => {
     if (!pagesNode || pagesNode.clientWidth === 0) return;
     const position = Math.abs(pagesNode.scrollLeft) / pagesNode.clientWidth;
@@ -283,8 +264,6 @@ export const CatchUpPill = memo(function CatchUpPill({
     setPageIndex(Math.round(position));
   }, [pagesNode]);
 
-  // The popover is as tall as the page in view, up to its cap; a longer page
-  // scrolls inside itself.
   useLayoutEffect(() => {
     const page = pagesNode?.children[shown] as HTMLElement | undefined;
     if (!page) return;
@@ -309,7 +288,6 @@ export const CatchUpPill = memo(function CatchUpPill({
     [goTo, pagesNode, shown],
   );
 
-  // A new summary appearing (from any device) restarts the linger clock.
   useEffect(() => setNow(Date.now()), [catchUps]);
 
   if (!offer.offer && !pending && !open && !offer.lingerUntil) return null;

@@ -1,9 +1,3 @@
-/**
- * On the website a canvas renders from its text (`srcDoc`), with no folder
- * behind it, so its relative images, video, audio, stylesheets and scripts are read from
- * their Drive copies (the desktop copies them beside the document) and
- * embedded before it shows.
- */
 import { useEffect, useState } from "react";
 import { embedRelativeHtmlAssets } from "@stella/contracts/html-relative-assets";
 import { readDeviceFileCopy } from "@/features/cloud/device-file-copy";

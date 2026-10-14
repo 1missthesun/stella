@@ -10,18 +10,6 @@ import { springEasing } from "@stella/contracts/desktop/spring";
 import { AlertCircle, RefreshCw } from "@/ui/icons";
 import "./update-card.css";
 
-/**
- * The card a change to Stella shows up as in the chat: what it is, where it
- * stands, and the one thing to do with it (Update, Undo, Ask Stella). The
- * button turns into a progress ring while the change applies and opens back
- * up around the next action; the icon and the detail line swap with a short
- * blur roll so the card reads as the same object changing state.
- *
- * While its ring spins the button is marked `data-update-transition="live"`:
- * the screen transition keeps it live over the cover and out of the
- * before/after comparison.
- */
-
 export type UpdateCardTone = "update" | "done" | "attention";
 
 export type UpdateCardAction = {
@@ -53,10 +41,6 @@ const ICONS: Record<UpdateCardTone, ReactNode> = {
   attention: <AlertCircle size={16} strokeWidth={2} />,
 };
 
-/**
- * Cross-swaps its content when `value` changes: the old layer leaves while
- * the new one enters, stacked in one grid cell.
- */
 const Swap = ({
   value,
   variant,
@@ -116,7 +100,6 @@ const UpdateButton = ({
   const [ring, setRing] = useState(busy);
   const [afterRing, setAfterRing] = useState(false);
 
-  // The ring completes its circle before it gives way to the next action.
   useEffect(() => {
     if (busy) {
       setRing(true);
@@ -135,7 +118,6 @@ const UpdateButton = ({
     else done();
   }, [busy, ring]);
 
-  // The capsule closes into the ring and opens around the next label on a spring.
   useLayoutEffect(() => {
     const element = button.current;
     if (!element) return;
@@ -194,12 +176,10 @@ export const UpdateCard = ({
 }: {
   tone: UpdateCardTone;
   title: string;
-  /** Absent for a card that is one plain line and nothing else. */
   detail?: string;
   action: UpdateCardAction | null;
   busy?: boolean;
   disabled?: boolean;
-  /** In an agent's message, or pinned above the composer. */
   placement?: "message" | "composer";
 }) => (
   <div

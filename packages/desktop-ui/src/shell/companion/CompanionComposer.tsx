@@ -1,9 +1,3 @@
-/**
- * The companion's prompt bar — the chat composer's pill, built from the same
- * primitives (textarea, send/stop). Mic and voice live on the arc around the
- * mark, so the pill carries only the input and its send button; while a
- * dictation is recording the pill shows the live transcript bar instead.
- */
 import { useEffect, useRef, type Dispatch, type SetStateAction } from "react";
 import {
   ComposerStopButton,

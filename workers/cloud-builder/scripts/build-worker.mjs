@@ -56,8 +56,6 @@ export const serverRelease = () => {
 
 /** Keep real import() boundaries; Wrangler's normal bundle flattens them. */
 export const buildWorker = async ({ outdir = workerBuildDirectory } = {}) => {
-  // Stella's code for sandbox containers: written into this version's static
-  // assets, and its hash compiled into the Sandbox object that installs it.
   const sandboxCode = await buildSandboxCode();
   const result = await build({
     absWorkingDir: workerRoot,
@@ -92,9 +90,6 @@ export const buildWorker = async ({ outdir = workerBuildDirectory } = {}) => {
         bytes: sandboxCode.bytes,
       }),
     },
-    // Every isolate parses the eager modules at startup. Minified output keeps
-    // that parse small; keepNames preserves class and function names, and the
-    // uploaded source maps keep production stack traces readable.
     minify: true,
     keepNames: true,
     sourcemap: true,
@@ -146,8 +141,6 @@ export const buildWorker = async ({ outdir = workerBuildDirectory } = {}) => {
     ),
   };
 
-  // Build completely before replacing the prior output. Failed compilation
-  // leaves the last valid artifact intact; old hashed chunks never accumulate.
   await mkdir(path.dirname(outdir), { recursive: true });
   const staging = await mkdtemp(
     path.join(path.dirname(outdir), ".worker-build-"),

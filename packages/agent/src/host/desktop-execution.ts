@@ -1,13 +1,3 @@
-/**
- * Where a desktop conversation's Stella runs. Everything the conversation
- * does here runs on this computer; an agent meant for another computer or
- * the cloud runs there as a whole (`desktop-agents`).
- *
- * In a conversation stored in the cloud Stella can move herself
- * (`switch_destination`): the conversation's object records the new host
- * (`@stella/contracts/turn-plane/pi-brain`), and once her turn here ends
- * her brief continues there as a placed chat.
- */
 import type { Context } from "@earendil-works/chord";
 import { samePiBrainHost, type PiBrainHost, type PiBrainRecord } from "@stella/contracts/turn-plane/pi-brain";
 import {
@@ -21,15 +11,8 @@ import type { StellaPlacement } from "../stella/placement.ts";
 
 const LIST_TIMEOUT_MS = 15_000;
 
-/** The owner's computers, as the owner gate lists them, for one conversation stored in the cloud. */
 export type DesktopDevices = { devices(): Promise<DeviceDestination[]> };
 
-/**
- * The owner's computers for a conversation stored in the cloud; undefined for
- * one kept on this computer. The list the live socket pushes when there is
- * one (`pushed`), else an HTTP read with the user's sign-in: a read per
- * brain check kept the owner's object awake.
- */
 export const httpDevices = (
   conversationId: string,
   auth: () => { baseUrl: string; authToken: string } | null | undefined,
@@ -52,52 +35,34 @@ export const httpDevices = (
   };
 };
 
-/** Where a conversation stored in the cloud has its brain, as its object records it. */
 export type DesktopBrain = {
   read(): Promise<PiBrainRecord | null>;
   set(host: PiBrainHost): Promise<PiBrainRecord>;
-  /** Carry on at `host` with Stella's brief, as a chat placed there. */
   handOff(host: PiBrainHost, brief: string): Promise<void>;
-  /**
-   * What Stella reads hidden (an agent's report or note), placed at `host`,
-   * where she runs; once per `id`. False when that host can't take it now
-   * (out of reach, not ready), for this computer to take instead.
-   */
   note(host: PiBrainHost, note: { id: string; text: string }): Promise<boolean>;
-  /** The account's home computer, where Stella stays while it is up; null clears it. */
   setHome?(deviceId: string | null): Promise<void>;
 };
 
-/** One conversation's execution host on this computer: where Stella can move herself. */
 export function desktopExecution(options: {
-  /** This computer: naming it keeps Stella here. */
   deviceId?: string;
-  /** Kept on this computer only: Stella never moves. */
   localOnly: boolean;
   devices?: DesktopDevices;
-  /** Where the conversation's brain runs, for a conversation stored in the cloud. */
   brain?: DesktopBrain;
-  /** Settles once Stella's turn here has ended, so her brief continues after it. */
   turnEnded?(): Promise<void>;
-  /** The record the conversation's object took for a move. */
   brainMoved?(record: PiBrainRecord): void;
-  /** One of the conversation's agents here moving itself to another computer, once its run ended. */
   moveAgent?: StellaExecutionHost["moveAgent"];
-  /** What a folder holds that an agent moving away would leave behind. */
   leftBehind?: StellaExecutionHost["leftBehind"];
   report(error: unknown): void;
 }) {
   const isHere = (target: StellaPlacement): boolean =>
     target.kind === "local" || (target.kind === "device" && target.deviceId === options.deviceId);
 
-  /** The brain record names `next` from now on: that host takes the conversation's turns. */
   const setBrain = async (brain: DesktopBrain, next: PiBrainHost): Promise<PiBrainRecord> => {
     const record = await brain.set(next);
     options.brainMoved?.(record);
     return record;
   };
 
-  /** The cloud, or another computer that can take work now. */
   const brainHostAt = async (target: StellaPlacement): Promise<{ placement: StellaPlacement; next: PiBrainHost } | { error: string }> => {
     if (isHere(target)) return { error: "You already run on this computer." };
     if (!options.devices) return { error: "Sign in to Stella to move away from this computer." };
@@ -119,7 +84,6 @@ export function desktopExecution(options: {
     };
   };
 
-  /** A computer an agent here can move to now, or why it can't. */
   const agentTarget: NonNullable<StellaExecutionHost["agentTarget"]> = async (deviceId, needs) => {
     if (!options.devices) return { error: "Sign in to Stella to move to another computer." };
     if (deviceId.trim().toLowerCase() === AGENT_MOVE_CLOUD) return { deviceId: AGENT_MOVE_CLOUD, name: "Stella's cloud" };
@@ -170,22 +134,13 @@ export function desktopExecution(options: {
       : {}),
   };
 
-  /**
-   * The user moving Stella from the app's picker: the same move as her own,
-   * with no brief to hand on, since the user's next message continues
-   * there. This computer is a host like any other: picking it keeps her here
-   * for every device's messages.
-   */
   const pinBrain = async (target: StellaPlacement, _context: Context): Promise<PiBrainRecord | { error: string }> => {
     const brain = options.brain;
     if (!brain || options.localOnly) return { error: "This chat is stored only on this computer, so it can only run here." };
-    // The computer the user picks is the account's home computer from now
-    // on: Stella comes back to it whenever it is up. Picking the cloud clears it.
     const home = async (record: PiBrainRecord): Promise<PiBrainRecord> => {
       await brain.setHome?.(record.host === "device" ? record.deviceId : null);
       return record;
     };
-    // Already there: only the home computer changes, and the lease keeps its epoch.
     const settle = async (next: PiBrainHost): Promise<PiBrainRecord> => {
       const current = await brain.read().catch(() => null);
       return await home(current && samePiBrainHost(current, next) ? current : await setBrain(brain, next));

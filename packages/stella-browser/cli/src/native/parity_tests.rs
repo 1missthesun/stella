@@ -1,8 +1,3 @@
-//! Parity tests for the native daemon's command interface.
-//!
-//! These tests cover credential persistence and validation, state cleanup,
-//! and domain filtering without a browser.
-
 use serde_json::json;
 
 use super::actions::{execute_command, DaemonState};
@@ -51,7 +46,6 @@ async fn test_auth_profile_name_validation() {
     assert!(invalid2.is_err());
     let invalid3 = auth::credentials_set("has space", "u", "p", None);
     assert!(invalid3.is_err());
-    // Cleanup
     let _ = auth::credentials_delete("valid-name_123");
 }
 
@@ -80,7 +74,6 @@ async fn test_auth_save_and_show() {
     assert!(full.is_ok());
     assert_eq!(full.unwrap().password, "pass");
 
-    // Cleanup
     let _ = auth::credentials_delete("parity-roundtrip");
 }
 

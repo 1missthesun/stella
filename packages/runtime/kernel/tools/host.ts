@@ -1,19 +1,3 @@
-/**
- * Tool host factory.
- *
- * Builds the tool execution environment for a Stella session.
- *
- * Every model-facing tool lives as a contained `ToolDefinition` under
- * `runtime/kernel/tools/defs/`. `buildBuiltinTools()` returns the full set;
- * the host indexes them by name into a single Map that drives both:
- *
- *   - the catalog the model sees (`getToolCatalog`)
- *   - the handler dispatcher (`executeTool`)
- *
- * The legacy companion handlers (Bash / ShellStatus / KillShell, plus
- * extension-injected ToolDefinitions) sit alongside in the same map.
- */
-
 import { createHash } from "node:crypto";
 import path from "node:path";
 import { AGENT_IDS, getAgentDefinition } from "@stella/contracts/agent-runtime";
@@ -115,7 +99,6 @@ const copyCallableMetadata = (
   ...(tool.resultSchema ? { resultSchema: tool.resultSchema } : {}),
   ...(tool.approval !== undefined ? { approval: tool.approval } : {}),
   ...(tool.sideEffects !== undefined ? { sideEffects: tool.sideEffects } : {}),
-  // Extension tools declare no replay policy and stay unsafe.
   ...("replay" in tool && tool.replay ? { replay: tool.replay } : {}),
   ...(tool.reversible !== undefined ? { reversible: tool.reversible } : {}),
   ...(tool.annotations ? { annotations: tool.annotations } : {}),
@@ -124,12 +107,6 @@ const copyCallableMetadata = (
   ...("awaitsUser" in tool && tool.awaitsUser ? { awaitsUser: true } : {}),
 });
 
-/**
- * `$`-prefixed tool names are reserved for Node REPL intrinsics
- * (`tools.$search`, `tools.$describe`). Built-ins violating this fail loudly
- * at startup; extension tools are skipped with an error log so a bad extension
- * cannot shadow the intrinsic surface.
- */
 const isReservedToolName = (name: string): boolean =>
   name.startsWith("$") || name === LEGACY_NODE_REPL_TOOL_NAME;
 
@@ -138,11 +115,6 @@ const reservedToolNameReason = (name: string): string =>
     ? '"node_repl" is reserved for legacy transcript compatibility; extensions must not advertise it because the public tool is "code".'
     : '"$" names belong to code-runtime intrinsics like tools.$search and tools.$describe.';
 
-/**
- * Defense-in-depth gate consulted both at catalog filter time and at
- * executeTool time. A tool with no `agentTypes` is unrestricted; a tool
- * with `agentTypes` must list the requesting agent or it's denied.
- */
 const isAgentAllowedForTool = (
   tool: { agentTypes?: readonly string[] },
   agentType: string | undefined,
@@ -152,33 +124,12 @@ const isAgentAllowedForTool = (
   return tool.agentTypes.includes(agentType);
 };
 
-/**
- * Second, ownership-based gate. A parent-owned agent (one spawned BY another
- * agent) runs with a top-level agent's toolset minus the agent control
- * tools, so it cannot open a third level or pause another thread. Applied
- * at catalog build time so the tools are simply absent from what the model
- * sees, and mirrored at executeTool time as defense in depth.
- */
 const isAgentControlToolWithheld = (
   toolName: string,
   parentOwned: boolean | undefined,
 ): boolean =>
   parentOwned === true && AGENT_CONTROL_TOOL_NAMES.includes(toolName);
 
-/**
- * Tools that `tools.$search` may return for one calling context.
- *
- * Searchable MUST equal callable: every result must be invocable as
- * `tools.<name>` in the same REPL, so membership in the context's
- * `allowedToolNames` is required for demoted and normal tools alike —
- * wherever a demoted tool is legitimately reachable, the runtime adapter
- * (or the external-engine widening) has already added its name to the
- * union. A context that never widened (e.g. a surface without demoted
- * support) therefore gets no hit for it. The agent-type / ownership /
- * connector gates stay as defense in depth.
- *
- * Exported for tests.
- */
 export const collectReplSearchableTools = (
   tools: Iterable<ToolMetadata>,
   context: ToolContext,
@@ -255,14 +206,7 @@ export const createToolHost = ({
     signal?: AbortSignal,
     onUpdate?: ToolHandlerExtras["onUpdate"],
   ) => Promise<ToolResult>;
-  // Extension hooks for calls that do not come through the runtime adapter
-  // (nested `code` / `multi_tool_use_parallel` calls, voice). Attached by
-  // the runner once its emitter exists.
   let toolCallHooks: Pick<HookEmitter, "emit"> | undefined;
-  /**
-   * Dispatch with the same validate + before_tool/after_tool step a
-   * model-issued top-level call gets in the runtime adapter.
-   */
   const executeToolCall = (
     toolName: string,
     toolArgs: Record<string, unknown>,
@@ -285,10 +229,6 @@ export const createToolHost = ({
         executeTool(toolName, effectiveArgs, context, signal, onUpdate),
     });
   };
-  /**
-   * Re-entry from inside another tool. Tools requiring explicit approval
-   * stay top-level only so nesting cannot bypass their approval flow.
-   */
   const executeNestedToolCall = (
     toolName: string,
     toolArgs: Record<string, unknown>,
@@ -307,7 +247,6 @@ export const createToolHost = ({
   const queryCodeHistory =
     codeHistoryQuery ??
     (async (args: Record<string, unknown>, context: ToolContext): Promise<unknown> => {
-      // An agent reads its own thread, never the conversation it was started from.
       if (context.agentType && context.agentType !== AGENT_IDS.ORCHESTRATOR) {
         if (!agentHistoryQuery) throw new Error("Your history is unavailable in this session.");
         return await agentHistoryQuery(args, context);
@@ -375,7 +314,6 @@ export const createToolHost = ({
       if (browserSessionFactory) {
         return createBrowserOnlyComputerUseSession();
       }
-      // Keep the code-runtime session; throw only if a cell hits computer use.
       return createComputerUseSession(async () => {
         throw new Error(
           `Typed Computer Use is not available on ${process.platform}.`,
@@ -392,10 +330,6 @@ export const createToolHost = ({
     },
     executeTool: executeNestedToolCall,
     toolAwaitsUser: (toolName) => toolCatalog.get(toolName)?.awaitsUser === true,
-    // In-REPL `tools.$search` — runs host-side over the LIVE catalog so
-    // connector/extension changes are visible immediately. Scope: exactly
-    // the tools the calling context can invoke as `tools.<name>` in the
-    // same REPL (see collectReplSearchableTools).
     searchTools: async (query, context, limit) =>
       searchToolCatalog(
         [
@@ -405,9 +339,6 @@ export const createToolHost = ({
         query,
         limit,
       ),
-    // `memory.*`: the orchestrator's own edits to its memory files under
-    // `~/.stella`, forwarded to the desktop memory module. Every other agent
-    // edits those files with its ordinary file tools.
     ...(stellaDataDir
       ? {
           memory: (() => {
@@ -424,8 +355,6 @@ export const createToolHost = ({
           })(),
         }
       : {}),
-    // `history.sql` / `history.read`: the conversation lives in its cloud
-    // session DO, which answers both exactly as the cloud code tool does.
     queryHistory: async (args, context) => {
       const result = await queryCodeHistory(args, context);
       return args.op === "read" && args.raw !== true
@@ -507,9 +436,6 @@ export const createToolHost = ({
     createShellToolHandlers(shellState),
   );
 
-  // Built-in def-driven tools. Each `defs/<name>.ts` owns its own schema +
-  // description + handler; they're the single source of truth for everything
-  // the model sees.
   const builtinTools: BuiltinToolDefinition[] = buildBuiltinTools({
     stellaAppDir,
     stellaDataDir: stateRoot,
@@ -535,13 +461,6 @@ export const createToolHost = ({
     nodeReplRegistry,
     executeTool: executeNestedToolCall,
   });
-  // Names of built-in tools live in a dedicated Set so the
-  // extension-registration paths below can reject collisions instead
-  // of silently overwriting handlers. Without this guard, an extension
-  // that registers `web` or `Bash` would replace the built-in
-  // implementation; on F1 reload `unregisterExtensionTools` would then
-  // delete the name entirely, leaving the runtime without a built-in
-  // handler until the worker restarts.
   const builtinToolNames = new Set<string>();
   for (const tool of builtinTools) {
     if (isReservedToolName(tool.name)) {
@@ -555,10 +474,6 @@ export const createToolHost = ({
     builtinToolNames.add(tool.name);
   }
 
-  // Filter out any startup-time `extensionTools` that collide with
-  // built-ins (or use a reserved "$" name) before letting them touch the
-  // catalog or handler map. Same policy as the runtime
-  // `registerExtensionTools` below.
   const acceptedStartupExtensionTools = (extensionTools ?? []).filter(
     (tool) => {
       if (isReservedToolName(tool.name)) {
@@ -606,9 +521,6 @@ export const createToolHost = ({
       }
     }
 
-    // Sandbox execution deliberately has no unrestricted in-process REPL. Keep
-    // this at the dispatcher as well as the catalog so a replayed/hallucinated
-    // legacy call cannot bypass the cloud adapter's allowlist.
     if (
       context.executionHost === "sandbox" &&
       (toolName === "code" || toolName === LEGACY_NODE_REPL_TOOL_NAME) &&
@@ -619,30 +531,18 @@ export const createToolHost = ({
       } satisfies ToolResult;
     }
 
-    // Ownership gate, mirroring the catalog filter for the same
-    // catalog-bypass reasons. A parent-owned agent never sees these tools, so
-    // reaching here means a hallucinated or replayed call.
     if (isAgentControlToolWithheld(toolName, Boolean(context.parentAgentId))) {
       return {
         error: `${toolName} is not available to a subagent. Complete the work in this task and report the result to the agent that started you.`,
       };
     }
 
-    // Declarative agent-type gate. Mirrors the catalog filter so a tool that
-    // declares `agentTypes` is rejected here too, defending against
-    // hallucinated tool names and against any future catalog filter bypass.
     const catalogEntry = toolCatalog.get(toolName);
     if (
       catalogEntry &&
       !isAgentAllowedForTool(catalogEntry, context.agentType)
     ) {
       const allowed = catalogEntry.agentTypes ?? [];
-      // Format the denial message to match historical per-agent wording.
-      // The orchestrator reads "only available to the orchestrator"
-      // (lowercase agent id, no " agent" suffix) because existing UI/error
-      // consumers depend on that exact substring. Every other agent uses its
-      // definition's display `name` with an " agent" suffix, so the message
-      // never leaks a raw internal id.
       const formatAllowedAgent = (id: string): string => {
         if (id === AGENT_IDS.ORCHESTRATOR) return "the orchestrator";
         const def = getAgentDefinition(id);
@@ -669,10 +569,6 @@ export const createToolHost = ({
       const rawResult = await handler(toolArgs, context, extras);
       const authorizedImages = rawResult[TOOL_RESULT_AUTHORIZED_IMAGES];
       const result = await redactSecureValues(sanitizeToolResult(rawResult));
-      // `sanitizeToolResult` deliberately rebuilds enumerable JSON-shaped
-      // data. Reattach only the symbol-keyed trusted bytes emitted by the
-      // built-in handler so a descriptor-authorized image is not reopened by
-      // pathname after an attacker-controlled race.
       if (authorizedImages) {
         Object.defineProperty(result, TOOL_RESULT_AUTHORIZED_IMAGES, {
           configurable: false,
@@ -713,22 +609,9 @@ export const createToolHost = ({
     if (shell.running) {
       shell.kill();
     }
-    // Event-driven join on the shell's exit latch (was a 25ms poll),
-    // bounded at the same 1.5s so a TERM-ignoring child can't hang the
-    // caller; the ladder's SIGKILL fires at 1s.
     await waitForShellExit(shell, 1_500);
   };
 
-  /**
-   * Idempotent, bounded, JOINED teardown (finalizer ordering: shells →
-   * repl kernels). `shutdownManagedShells` starts every running shell's
-   * TERM→1s→KILL ladder and then joins every exit latch in parallel under
-   * a single 3s bound (comfortably past the ladder), so a wedged process
-   * can never hang worker stop; anything still alive at the bound is
-   * logged and left to the OS as the ladder's KILL already fired.
-   * Conversation-scoped shells are deliberately worker-lifetime resources:
-   * they die here, never earlier.
-   */
   let shutdownPromise: Promise<void> | null = null;
   const shutdown = () => {
     if (shutdownPromise) return shutdownPromise;
@@ -744,7 +627,6 @@ export const createToolHost = ({
     options?: {
       model?: Pick<Model<Api>, "api" | "provider" | "id" | "name">;
       agentEngine?: FileEditAgentEngine;
-      /** This thread was spawned by another agent; withhold agent control tools. */
       parentOwned?: boolean;
     },
   ) => {
@@ -754,20 +636,10 @@ export const createToolHost = ({
       agentEngine: options?.agentEngine,
     });
     return Array.from(toolCatalog.values()).filter((tool) => {
-      // A tool's `agentTypes` is the single audience gate: a tool with no
-      // `agentTypes` is available to every agent, and the per-agent
-      // frontmatter `tools:` allowlist (applied downstream in
-      // tool-adapters) decides what each agent is actually offered.
       if (!isAgentAllowedForTool(tool, agentType)) return false;
       if (isAgentControlToolWithheld(tool.name, options?.parentOwned)) {
         return false;
       }
-      // Demoted tools stay in the catalog: each engine's tool list
-      // (`getProviderToolMetadata`, pi's `runner/pi-tools.ts`) decides
-      // whether they surface directly or only through code's catalog. Voice
-      // and other realtime surfaces filter them out explicitly.
-      // Swap the file-edit tool family to the agent's engine: Claude Code
-      // wants Write/Edit, Stella wants apply_patch.
       if (
         fileEditToolFamily === "write_edit" &&
         tool.name === APPLY_PATCH_TOOL_NAME
@@ -784,30 +656,19 @@ export const createToolHost = ({
     });
   };
 
-  // Track tool names that came from user-installable extensions so a
-  // reload (F1) can sweep them without touching built-in tools. The Set
-  // is rebuilt on every successful `registerExtensionTools` call.
   const extensionToolNames = new Set<string>();
 
   return {
     executeTool,
     executeToolCall,
-    /** Attach the runner's extension hooks to host-dispatched tool calls. */
     setToolCallHooks: (hooks: Pick<HookEmitter, "emit"> | undefined) => {
       toolCallHooks = hooks;
     },
     getToolCatalog,
     getHandlerNames: () => Object.keys(handlers),
     getShells: () => Array.from(shellState.shells.values()),
-    /** Stella's managed-shell environment, for CLIs that bring their own shell. */
     buildAgentShellEnvironment: (context: ToolContext, cwd: string) =>
       buildAgentShellEnvironment(shellState, context, cwd),
-    /**
-     * Session ids still running, optionally scoped to the sessions a run
-     * touched. Shells outlive the run that started them by design (see the
-     * shutdown comment above), so a non-empty answer at run teardown means
-     * the agent left work running past the end of its turn.
-     */
     listRunningShellSessionIds: (sessionIds?: string[]) => {
       const scope = sessionIds ? new Set(sessionIds) : null;
       const running: string[] = [];
@@ -818,16 +679,12 @@ export const createToolHost = ({
       }
       return running;
     },
-    /** Running sessions owned by one conversation/agent thread across runs. */
     listRunningShellSessionsOwnedBy: (access: ShellSessionAccess) =>
       listRunningShellSessionsOwnedBy(shellState, access),
-    /** Subscribe to one session's exit. Returns a disposer. */
     watchShellExit: (sessionId: string, listener: () => void) =>
       watchShellExit(shellState, sessionId, listener),
-    /** Terminal facts about an exited session; null while it still runs. */
     readShellExitSnapshot: (sessionId: string) =>
       readShellExitSnapshot(shellState, sessionId),
-    /** Finalize and detach browser ownership for one completed agent run. */
     endBrowserTurn: (
       runId: string,
       behavior: import("../browser-use/client.js").BrowserTurnEndBehavior,
@@ -836,14 +693,6 @@ export const createToolHost = ({
     killShell,
     shutdown,
     registerExtensionTools: (tools: ToolDefinition[]) => {
-      // Reject tools that collide with built-in names. Pre-fix, an
-      // extension registering e.g. `web` or `Bash` would
-      // overwrite the built-in handler/catalog entry AND get tracked in
-      // `extensionToolNames`. On F1 reload `unregisterExtensionTools`
-      // would then `delete` that name from both maps, leaving the
-      // runtime without a built-in until worker restart. Skipping the
-      // collision keeps the built-in intact — the right user fix is to
-      // rename the extension tool.
       const accepted: ToolDefinition[] = [];
       for (const tool of tools) {
         if (isReservedToolName(tool.name)) {
@@ -866,12 +715,6 @@ export const createToolHost = ({
         extensionToolNames.add(tool.name);
       }
     },
-    /**
-     * Remove all tools that came from user-installable extensions. Used by
-     * F1 (extension hot-reload) before re-registering the freshly-loaded
-     * extension set; built-in tools remain in the catalog and handler
-     * maps untouched.
-     */
     unregisterExtensionTools: () => {
       for (const name of extensionToolNames) {
         toolCatalog.delete(name);

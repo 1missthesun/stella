@@ -1,25 +1,3 @@
-/**
- * The thread transcript a `BuildSession` owns.
- *
- * A spawned agent's conversation used to live in the control plane (`/api/cloud/context`
- * to read it, `/api/cloud/messages` to append). That put a synchronous
- * control-plane round trip on every continuation's critical path and made
- * the control plane the authority for state only this Durable Object ever writes. The
- * rows now live in the object's own SQLite and continuations read them here.
- *
- * Ordering is the table's implicit `rowid`, which SQLite assigns in insertion
- * order and never reuses here because nothing deletes a row (owner purge drops
- * the whole table). That is the `seq` the executor's history contract wants,
- * so a continuation reads back exactly the shape the old context route returned.
- * The FTS rowid mirrors that same value. The composite primary key makes an
- * append idempotent, and the mirrored rowid stays stable for the object's
- * lifetime.
- *
- * `turn_counters` persists the per-attempt event sequence
- * (`turn.event.eventSeq`), so a restarted isolate continues the sequence
- * instead of colliding with events already projected.
- */
-
 import type { OwnerKeks } from "./secret-rotation.js";
 import type { AgentHistoryRow } from "@stella/executor-cloud/agent-history";
 import {
@@ -67,7 +45,6 @@ export const THREAD_TRANSCRIPT_DDL = [
    )`,
 ] as const;
 
-/** Per-object envelope encryption, configured once by the owning Durable Object. */
 const cryptos = new WeakMap<SqlStorage, JournalCrypto | null>();
 
 const indexFor = (sql: SqlStorage): TranscriptSearchIndex => {
@@ -220,10 +197,6 @@ export class ThreadTranscriptError extends Error {
 const isRole = (value: unknown): value is ThreadTranscriptRole =>
   value === "user" || value === "assistant" || value === "toolResult";
 
-/**
- * The DDL is idempotent, but it is also on the read path of every
- * continuation and every event, so it runs once per storage per isolate.
- */
 const provisioned = new WeakSet<SqlStorage>();
 
 export const ensureThreadTranscriptSchema = (
@@ -304,12 +277,6 @@ const validateAppend = (
   return validated.slice().sort((left, right) => left.ordinal - right.ordinal);
 };
 
-/**
- * Reserve the next value of one persisted counter. Callers run inside the
- * Durable Object's single-threaded storage, so read-then-write is atomic
- * enough here; there is no concurrent writer for a given (scope, turn,
- * attempt).
- */
 const nextCounter = (
   sql: SqlStorage,
   turnId: string,
@@ -338,23 +305,12 @@ const nextCounter = (
   return value;
 };
 
-/**
- * The per-attempt event ordinal the control plane used to assign when the DO sent
- * `seq: "auto"`. Monotonic from 1 and durable across isolate restarts.
- */
 export const nextTurnEventSeq = (
   sql: SqlStorage,
   turnId: string,
   attemptGeneration: number,
 ): number => nextCounter(sql, turnId, attemptGeneration);
 
-/**
- * Record that an ordinal a caller chose itself has been used, so a later
- * auto-assigned one cannot land on it. The app-build lane numbers its own
- * events (it has to, because its retries replay an exact ordinal), while its
- * recovery paths take the next one from here — without this they would
- * eventually collide on the same owner event key.
- */
 export const reserveTurnEventSeq = (
   sql: SqlStorage,
   turnId: string,
@@ -374,12 +330,6 @@ export const reserveTurnEventSeq = (
   );
 };
 
-/**
- * Append a batch of transcript rows. Re-appending the same (turn, attempt,
- * ordinal) is a no-op, so a retried commit cannot duplicate the transcript.
- * Every attempted row refreshes its FTS entry from the stored payload, which
- * also repairs an index write interrupted after the canonical insert.
- */
 export const appendThreadMessages = (
   sql: SqlStorage,
   args: {
@@ -456,13 +406,6 @@ export const appendThreadMessages = (
   }
 };
 
-/**
- * The thread's history, oldest first, in the exact row shape the executor
- * already validates. Bounded to the newest
- * `AGENT_HISTORY_MAX_ROWS` rows and `AGENT_HISTORY_MAX_BYTES`, the ceilings
- * the executor validates, so a long-lived thread degrades by dropping its
- * oldest turns rather than failing the whole preflight.
- */
 export const readThreadHistory = (
   sql: SqlStorage,
   options: { excludeTurnId?: string; limit?: number } = {},
@@ -515,7 +458,6 @@ export const readThreadHistory = (
   return kept.reverse();
 };
 
-/** Owner purge: the thread's private job state goes with the rest of it. */
 export const purgeThreadTranscript = (sql: SqlStorage): void => {
   sql.exec(`DROP TABLE IF EXISTS ${THREAD_SEARCH_TABLE}`);
   sql.exec(`DROP TABLE IF EXISTS ${THREAD_SEARCH_TABLE}_text`);

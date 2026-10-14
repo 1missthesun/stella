@@ -18,7 +18,6 @@ export type StoredAuthorizationInput = Readonly<{
   expiresAt: number;
 }>;
 
-/** Wrangler-generated bindings, named here for the public fixture modules. */
 export type DeviceCodeFixtureEnv = Readonly<Env>;
 
 export class DeviceAuthorizationSession extends DurableObject<DeviceCodeFixtureEnv> {

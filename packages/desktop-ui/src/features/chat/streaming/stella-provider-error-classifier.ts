@@ -1,6 +1,3 @@
-// Imported from the contract rather than from `global/billing/capabilities`
-// on purpose: this module must stay a pure classifier, free of the toast
-// and router graph that the capability entry point pulls in.
 import {
   CAPABILITIES,
   CAPABILITY_DENIED_CODE,
@@ -33,11 +30,6 @@ export type StellaProviderErrorClassification = {
   kind: StellaProviderErrorKind
   message: string
   detail?: string
-  /**
-   * Set on `capability-required` when the backend names which capability
-   * was denied, so the toast can say what the user actually lost and
-   * which plan returns it.
-   */
   capability?: Capability
 }
 
@@ -100,12 +92,6 @@ const billingMatchers = [
 
 const chatGptUsageLimitMatcher = 'you have hit your chatgpt usage limit'
 
-/**
- * ChatGPT OAuth (Codex subscription) rejected its access token. This is the
- * user's ChatGPT connection, not their Stella account, so it must not be
- * routed to the Stella sign-in dialog. The transport prefixes these with
- * "Codex error"; the codes and prose are OpenAI's own.
- */
 const chatGptAuthMatchers = [
   'token_expired',
   'token_revoked',

@@ -1,41 +1,4 @@
-/**
- * The wire between an agent that runs outside its container (a cloud pi
- * agent, `pi-agent-compute.ts`) and the tool-host daemon that runs inside it.
- *
- * Both ends parse with the same exact-key parsers. That is the point: the
- * Durable Object writes a root-owned request file and reads a root-owned
- * result file, and neither side may accept a frame it did not fully validate.
- * A tool name outside `ATTACHED_TOOL_NAMES` is refused before any handler
- * exists for it, so adding a bridged tool is a change to this allowlist rather
- * than something a request can assert.
- *
- * The raw turn token appears nowhere here. Idempotency is a `toolCallId` plus
- * a fingerprint of the exact arguments; a replay whose effect cannot be proven
- * fails closed rather than running a command twice.
- *
- * This module is imported by workerd. It holds types, constants and pure
- * parsers, and must never reach a Node builtin.
- */
-
-/**
- * The tools the daemon serves.
- *
- * `code` is deliberately absent. An agent outside its container runs `code`
- * in a Dynamic Worker its Durable Object loads itself, with that object's
- * own nested tools, so it never crosses this channel. The in-container
- * `code` of a container turn is a different tool host; it is not bridged
- * either.
- *
- * `view_image` is absent for a different reason: it has no runtime definition
- * and no descriptor, so it never reaches the model and the daemon has nothing
- * to dispatch it to.
- */
-/** The shell tool, named like Claude Code's built-in. */
 export const SHELL_COMMAND_TOOL_NAME = "Bash";
-/**
- * What the shell tool was called before the rename. An older caller may
- * still send it, so the daemon keeps accepting it and executes it as `Bash`.
- */
 export const LEGACY_SHELL_COMMAND_TOOL_NAME = "exec_command";
 
 export const isShellCommandToolName = (value: unknown): boolean =>
@@ -61,26 +24,13 @@ const ATTACHED_TOOL_NAME_SET: ReadonlySet<string> = new Set(
 export const isAttachedToolName = (value: unknown): value is AttachedToolName =>
   typeof value === "string" && ATTACHED_TOOL_NAME_SET.has(value);
 
-/** The name the tool host executes: the legacy shell name folds into `Bash`. */
 export const canonicalAttachedToolName = (toolName: string): string =>
   toolName === LEGACY_SHELL_COMMAND_TOOL_NAME
     ? SHELL_COMMAND_TOOL_NAME
     : toolName;
 
-/**
- * v2: tool results no longer carry `fileChanges` / `producedFiles` /
- * `producedFilesOmitted`; the quiesce control request carries the untrusted
- * `linkedPaths` derived from the reply's markdown links, and the quiesced
- * response reports the delivered drive paths. A mixed-version daemon/DO pair
- * fails closed on the version check rather than silently dropping fields.
- */
 export const ATTACHED_TOOL_PROTOCOL_VERSION = 2;
 
-/**
- * Everything the bridge touches lives here, outside the world root. The world
- * is owned by the unprivileged tool account; this directory is root-owned, so
- * a tool the agent ran cannot read a frame or plant one.
- */
 export const ATTACHED_TOOL_ROOT = "/workspace/attached";
 
 export type AttachedToolPaths = Readonly<{
@@ -129,24 +79,14 @@ export const attachedToolPathsForDirectory = (
   };
 };
 
-/** One framed request, including its identity envelope. */
 export const ATTACHED_TOOL_REQUEST_MAX_BYTES = 1024 * 1024;
 
-/**
- * One framed response. Large enough for the biggest image `Read` returns after
- * base64 expansion, plus the surrounding result: `Read` fits every image to
- * `READ_IMAGE_CAPS.maxBytes` (4.5MB base64, runtime kernel/shared/image-caps)
- * on every host, so a full-size photo is downscaled before it reaches this
- * frame instead of failing it as an invalid `authorizedImages` field.
- */
 export const ATTACHED_TOOL_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 export const ATTACHED_TOOL_MAX_IMAGES = 8;
 export const ATTACHED_TOOL_RESPONSE_MAX_BYTES = 48 * 1024 * 1024;
 
-/** Bounds the linked paths one quiesce request may carry. */
 export const ATTACHED_TOOL_MAX_LINKED_PATHS = 512;
 const MAX_LINKED_PATH_LENGTH = 4096;
-/** Bounds the delivered drive paths one quiesced response may report. */
 export const ATTACHED_TOOL_MAX_DELIVERED_FILES = 512;
 
 const MAX_ID_LENGTH = 256;
@@ -160,18 +100,11 @@ const MIME_TYPES: ReadonlySet<string> = new Set([
 ]);
 
 export type SerializedAuthorizedImage = Readonly<{
-  /** Base64. The daemon holds the bytes; only this crosses the wire. */
   data: string;
   mimeType: "image/png" | "image/jpeg" | "image/gif" | "image/webp";
   sourcePath: string;
 }>;
 
-/**
- * A `ToolResult` reduced to what survives JSON and what the worker still needs:
- * the model-visible outcome, the details blob, and authorized image bytes.
- * Nothing here is a live handle, so a lost daemon cannot leave the worker
- * holding one.
- */
 export type SerializedAgentToolResult = Readonly<{
   outcome:
     | Readonly<{ kind: "ok"; text: string }>
@@ -212,10 +145,6 @@ export type AttachedToolResponse =
       error: string;
     }>;
 
-/**
- * The daemon's answer to a boot, quiesce, or receipt question. These share the
- * socket with tool calls, so they share its parser discipline.
- */
 export type AttachedToolControlRequest =
   | Readonly<{
       version: typeof ATTACHED_TOOL_PROTOCOL_VERSION;
@@ -228,11 +157,6 @@ export type AttachedToolControlRequest =
       turnId: string;
       attemptGeneration: number;
       control: "quiesce";
-      /**
-       * Untrusted paths linked in the turn's final assistant message(s). The
-       * daemon authorizes each one beneath the workspace boundary before
-       * anything is delivered.
-       */
       linkedPaths: readonly string[];
     }>;
 
@@ -245,7 +169,6 @@ export type AttachedToolControlResponse =
   | Readonly<{
       version: typeof ATTACHED_TOOL_PROTOCOL_VERSION;
       status: "quiesced";
-      /** Drive paths whose delivery to the drive succeeded. */
       deliveredFiles: readonly string[];
     }>
   | Readonly<{
@@ -559,12 +482,6 @@ export const parseAttachedToolControlResponse = (
   throw new AttachedToolProtocolError("status");
 };
 
-/**
- * Stable across key order so a replay of the same call cannot look like a
- * different one, and so a different call cannot borrow a completed receipt.
- * `crypto.subtle` is available in both workerd and Node, which is why the
- * fingerprint is computed here rather than on either side alone.
- */
 export const attachedToolFingerprint = async (args: {
   toolName: AttachedToolName;
   params: Readonly<Record<string, unknown>>;

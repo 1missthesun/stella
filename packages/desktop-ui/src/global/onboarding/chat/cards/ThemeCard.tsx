@@ -1,11 +1,3 @@
-/**
- * "Make it yours" — theme selection inside the conversation.
- *
- * Appearance (light / dark / system) plus the theme swatches from Settings,
- * with hover preview so the whole window tries a theme on before the user
- * commits. The choice is applied live through the theme context, so
- * nothing here needs saving on Continue.
- */
 import { useMemo, useState } from "react";
 import { Button } from "@/ui/button";
 import { ThemeOrb } from "@/ui/theme-orb";

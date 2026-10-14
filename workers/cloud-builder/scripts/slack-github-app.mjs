@@ -1,17 +1,4 @@
 #!/usr/bin/env node
-/**
- * Creates Stella for Slack's GitHub App from a manifest and stores
- * its credentials as cloud-builder secrets, without printing any of them.
- *
- *   node scripts/slack-github-app.mjs manifest --env dev|production [--org <login>]
- *     Prints the manifest and the github.com URL to POST it to (field
- *     `manifest`). Creating it there redirects to `redirect_url?code=…`.
- *
- *   node scripts/slack-github-app.mjs store --env dev|production --code <code>
- *     Exchanges the one-time code (valid one hour) for the App's id, slug,
- *     client id and secret, private key and webhook secret, and pipes each
- *     into `wrangler secret put SLACK_GITHUB_*`. Prints only the App's URL.
- */
 
 import { spawnSync } from "node:child_process";
 

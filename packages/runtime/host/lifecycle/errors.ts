@@ -35,29 +35,13 @@ export class WorkerReadyTimeoutError extends Data.TaggedError(
   }
 }
 
-/**
- * Retry driver for the lockfile acquire loop: the lock is currently held (or
- * a takeover race was lost) and the attempt should recur on its Schedule.
- * Never escapes `acquireHostLock` — exhaustion maps to HostLockTimeoutError.
- */
 export class HostLockBusyError extends Data.TaggedError(
   "@stella/runtime/host/HostLockBusyError",
 )<{ readonly lockFile: string }> {}
 
-/**
- * Retry driver for the readiness poll: the socket refused, timed out, or the
- * probe answered with an error. Never escapes `pollForWorkerReady` —
- * exhaustion maps to WorkerReadyTimeoutError.
- */
 export class WorkerNotReadyError extends Data.TaggedError(
   "@stella/runtime/host/WorkerNotReadyError",
 )<{ readonly socketPath: string }> {}
 
-/**
- * Recover the original failure from a Cause so the Promise facade rejects
- * with the same object the Effect failed with (tagged error, spawn error, …).
- * Mirrors `worker/server/errors.ts` — `Cause.squash` preserves the `message`
- * every caller and log line observes.
- */
 export const causeToThrowable = (cause: Cause.Cause<unknown>): unknown =>
   Cause.squash(cause);

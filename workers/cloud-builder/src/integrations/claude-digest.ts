@@ -59,7 +59,6 @@ export const runClaudeDigest = async (input: {
   prompt: string;
   schema: Record<string, unknown>;
   cli?: string;
-  /** Claude Code's `--effort`; its own default when absent. */
   effort?: "low" | "medium" | "high";
 }): Promise<ClaudeDigestOutcome> => {
   const container = await claudeLoginContainer(input.env, input.ownerId);

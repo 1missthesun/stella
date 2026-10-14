@@ -26,7 +26,6 @@ export const noteOwnerIdentity = async (
       "owner identity note timed out",
     );
   } catch (error) {
-    // The owner object refuses the turn itself if it is unreachable.
     console.error(
       JSON.stringify({ event: "owner_identity_note_failed", message: error instanceof Error ? error.message : String(error) }),
     );

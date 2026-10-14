@@ -1,8 +1,3 @@
-/**
- * The host methods a runtime client may call over `runtime.call`, by name.
- * Each takes and returns JSON. Anything else on the host stays internal to
- * the runtime process.
- */
 export const RUNTIME_HOST_CALLS = [
   "health",
   "healthCheck",
@@ -11,7 +6,6 @@ export const RUNTIME_HOST_CALLS = [
   "requestRuntimeRestart",
   "listModels",
   "sendAgentInput",
-  /** The pi-durable chat: `PiChatRequest` in, its result out. */
   "piChat",
   "runAutomationTurn",
   "createBackgroundAgent",
@@ -37,7 +31,6 @@ export const RUNTIME_HOST_CALLS = [
   "googleWorkspaceGetAuthStatus",
   "googleWorkspaceConnect",
   "googleWorkspaceDisconnect",
-  /** This computer's answer to its own "accept remote work?" prompt. */
   "answerRemoteExecutionRequest",
 ] as const;
 
@@ -48,10 +41,6 @@ const callable = new Set<string>(RUNTIME_HOST_CALLS);
 export const isRuntimeHostCall = (name: unknown): name is RuntimeHostCall =>
   typeof name === "string" && callable.has(name);
 
-/**
- * The host callbacks a client serves, by name: what the host needs from the
- * app (keychain secrets, prompts, notifications, windows).
- */
 export const RUNTIME_HOST_HANDLERS = [
   "getActiveConversationId",
   "getDeviceIdentity",
@@ -76,20 +65,8 @@ export const RUNTIME_HOST_HANDLERS = [
   "displayUpdate",
   "showNotification",
   "requestDesktopPermission",
-  /**
-   * Something tried to dispatch work to this computer and it has not agreed to
-   * accept any. Fire and forget: the app raises the question on this machine's
-   * own screen and answers later through `answerRemoteExecutionRequest`, so
-   * nothing here is waiting on a person.
-   */
   "notifyRemoteExecutionRequest",
-  /** The orchestrator moved the chat; the app's destination picker follows. */
   "setExecutionTarget",
-  /**
-   * A paired phone's request (a file, an office preview, voice tools),
-   * relayed by the cloud over the presence socket. The app answers it under
-   * its own file-access policy.
-   */
   "serveDeviceRequest",
   "spawnAutomationDaemon",
   "openExternal",
@@ -105,23 +82,6 @@ export const isRuntimeHostHandler = (
   name: unknown,
 ): name is RuntimeHostHandler => typeof name === "string" && handlers.has(name);
 
-/**
- * Route fencing on the client protocol (after Pi's protocol: the client hello
- * names the server it expects, and every session frame names its attachment).
- *
- * - `runtime.attach` may name the runtime instance the client probed
- *   (`expectedServerId`) and its root; the runtime refuses a mismatch with
- *   `RUNTIME_SERVER_MISMATCH` instead of adopting a client meant for another
- *   instance.
- * - Each attach carries a client-minted `attachmentId`. The runtime binds it
- *   to that connection and stamps every event and host callback it sends there
- *   with it; calls carry it back. A frame whose attachment is not the live one
- *   on either side (a superseded or retired connection, a re-attach) is dropped
- *   and logged rather than applied.
- *
- * All fields are optional on the wire so either side tolerates a peer that
- * predates fencing.
- */
 export const RUNTIME_SERVER_MISMATCH = "runtime-server-mismatch";
 export const RUNTIME_ATTACHMENT_STALE = "runtime-attachment-stale";
 
@@ -158,7 +118,6 @@ export type FencedRuntimeCallParams = {
 
 const MAX_ATTACHMENT_ID_LENGTH = 128;
 
-/** A well-formed attachment id, or undefined. */
 export const readAttachmentId = (value: unknown): string | undefined =>
   typeof value === "string" &&
   value.length > 0 &&

@@ -46,26 +46,17 @@ import { OverlayPortal } from "./OverlayHost";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-/** Extra hide distance so the drop shadow clears the top edge too. */
 const SHADOW_CLEARANCE = 40;
 const RADIUS = 26;
-/** Starts the slide even if the modal never reports that it is showing. */
 const SHOW_FALLBACK_MS = 250;
-/** Room kept between an overlay sheet and the composer or keyboard under it. */
 const EDGE_GAP = 8;
-/** How much of the composer's transparent top padding the sheet may cover. */
 const COMPOSER_TOP_SLACK = 12;
-/** An upward drag on the handle this far, or this fast, closes the sheet. */
 const DISMISS_DISTANCE = 56;
 const DISMISS_VELOCITY = 600;
 const DRAG_RETURN_SPRING = { duration: 300, dampingRatio: 1 };
 
 const TopSheetDragContext = createContext<PanGesture | null>(null);
 
-/**
- * Wraps the part of a sheet that drags it: pulling it up closes the sheet,
- * a short pull springs back. Outside a `TopSheet` it renders its children.
- */
 export function TopSheetDragHandle({ children }: { children: ReactNode }) {
   const pan = useContext(TopSheetDragContext);
   if (!pan) return <>{children}</>;
@@ -76,36 +67,11 @@ type TopSheetProps = {
   visible: boolean;
   onClose: () => void;
   children: React.ReactNode;
-  /**
-   * Fraction of the screen height the sheet occupies — or caps at, when
-   * `contentSized`. Defaults to 80%.
-   */
   heightFraction?: number;
-  /**
-   * Hug the content's natural height (up to `heightFraction`) instead of
-   * always filling the fixed fraction. Used by sheets whose content is often
-   * sparse (e.g. the activity hub with one or two tasks).
-   */
   contentSized?: boolean;
   glass?: boolean;
-  /**
-   * Controls that belong to the sheet but float just beneath its bottom edge,
-   * in the open screen this top-anchored sheet leaves below itself.
-   *
-   * Anchored to the sheet rather than the screen: it rides the same slide
-   * animation, keeps the same gap whatever the sheet's height, and never
-   * strands itself halfway down the page or drifts onto whatever the page
-   * behind is showing. Outside the scroll, so it never scrolls away.
-   */
   floatingFooter?: React.ReactNode;
-  /** Dim the screen behind the sheet. A tap outside still closes it either way. */
   dim?: boolean;
-  /**
-   * `"overlay"` draws the sheet in the app's overlay layer instead of a modal,
-   * so the composer under it stays usable: the sheet then ends above the
-   * composer (`bottomReserve` tall) and the keyboard, and shrinks with them
-   * as they move.
-   */
   presentation?: "modal" | "overlay";
   bottomReserve?: number;
 };
@@ -113,18 +79,6 @@ type TopSheetProps = {
 const OPEN_TIMING = { duration: 300, easing: Easing.out(Easing.cubic) };
 const CLOSE_TIMING = { duration: 220, easing: Easing.in(Easing.cubic) };
 
-/**
- * A page-sheet that anchors to the top of the screen and slides down into view.
- * Covers ~80% of the height (or hugs content when `contentSized`), leaving the
- * rest as a tappable scrim, with rounded bottom corners and a soft hairline on
- * the leading (bottom) edge so the sheet reads against the page beneath it.
- * Used for the artifact viewer, the activity hub, and the device sheet.
- *
- * The slide runs on the UI thread and starts only once the sheet has mounted
- * and measured, so it is never spent on frames the sheet isn't on screen for.
- * Its shadow and corners are drawn from paths, so nothing in the sheet has to
- * be re-rendered offscreen on every frame of the slide.
- */
 export function TopSheet({
   visible,
   onClose,
@@ -376,20 +330,12 @@ const makeStyles = (colors: Colors) =>
       ...StyleSheet.absoluteFill,
       backgroundColor: "transparent",
     },
-    // The sheet starts one corner radius above the screen, so all four
-    // corners can share a radius and only the bottom two are ever seen. With
-    // uniform corners iOS clips the sheet with its own corner radius instead
-    // of a mask layer, which would re-render the whole sheet offscreen on
-    // every frame of the slide.
     slide: {
       left: 0,
       position: "absolute",
       right: 0,
       top: -RADIUS,
     },
-    // An opaque, uniformly rounded shadow caster lets iOS draw the shadow
-    // from the outline's path. A glass sheet has no opaque fill, so it takes
-    // a box shadow, also drawn from a path.
     shadow: {
       backgroundColor: colors.background,
       borderRadius: RADIUS,
@@ -406,9 +352,6 @@ const makeStyles = (colors: Colors) =>
     sheet: {
       backgroundColor: colors.background,
       borderRadius: RADIUS,
-      // Soft hairline on the leading (bottom) edge and down the sides, where
-      // the sheet meets the page, so its boundary reads against a
-      // same-colour background. The top edge is offscreen.
       borderColor: colors.border,
       borderWidth: StyleSheet.hairlineWidth,
       overflow: "hidden",

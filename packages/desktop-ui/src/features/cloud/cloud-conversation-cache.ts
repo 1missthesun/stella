@@ -10,10 +10,6 @@ const storageKey = (accountScope: string): string =>
 const validConversationId = (value: string | null): value is string =>
   Boolean(value && value.length <= MAX_ID_LENGTH && ID_PATTERN.test(value));
 
-/**
- * Cloud selection is account-scoped. A UUID from the previous Better Auth
- * identity must never be treated as the active conversation for the next one.
- */
 export const readActiveCloudConversationIdCache = (
   accountScope: string,
 ): string | null => {

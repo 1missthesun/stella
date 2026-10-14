@@ -8,7 +8,6 @@ type HistoryPageState = {
   loading: boolean;
 };
 
-/** History is demand-loaded: layout and incoming pages cannot request more. */
 export class ChatHistoryPaging {
   private scrolling = false;
   private requested = false;
@@ -28,8 +27,6 @@ export class ChatHistoryPaging {
   }
 
   beginMomentum(): void {
-    // Momentum belongs to the same gesture, with the same one-page budget.
-    // Programmatic scrolling can emit momentum events too; it has no budget.
     this.scrolling = this.momentumPending;
     this.momentumPending = false;
   }

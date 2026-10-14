@@ -1,54 +1,22 @@
-/**
- * Device-bound session capabilities (proof of possession).
- *
- * A session capability is bound to a client-held signing key: the exchange
- * carries the public key plus a signature over a fresh binding string, and
- * the capability's `dpk` claim is the SHA-256 of the raw public key. Every
- * relay request then carries a signature over the request's identity, so a
- * capability lifted from logs, a sandbox, or a proxy is useless without the
- * private key. Turn capabilities are not device-bound: they are minted and
- * consumed inside the data plane with fixed budgets.
- *
- * Algorithms: `ed25519` (raw 32-byte public key) everywhere WebCrypto offers
- * it (Workers, Node, Bun, Chromium, Safari 17+); `es256` (P-256, raw
- * uncompressed 65-byte public key, IEEE P1363 signature) as the fallback for
- * browsers without Ed25519. The hash and the wire encoding are the same for
- * both: `dpk = base64url(sha256(rawPublicKey))`.
- *
- * Every function here uses only WebCrypto so clients and the gateway share
- * one implementation.
- */
-
 export type DpopAlgorithm = "ed25519" | "es256";
 
-/** Relay requests: signature, raw public key, timestamp, algorithm. */
 export const GATEWAY_DPOP_HEADER = "x-stella-dpop" as const;
 export const GATEWAY_DPOP_KEY_HEADER = "x-stella-dpop-key" as const;
 export const GATEWAY_DPOP_TS_HEADER = "x-stella-dpop-ts" as const;
 export const GATEWAY_DPOP_ALG_HEADER = "x-stella-dpop-alg" as const;
 
-/** Tolerated clock skew between the client's `ts` and the gateway's clock. */
 export const GATEWAY_DPOP_MAX_SKEW_MS = 5 * 60_000;
 
-/** Device key material presented on the session-capability exchange. */
 export type GatewayDeviceKeyProof = {
   alg: DpopAlgorithm;
-  /** base64url raw public key (32 bytes ed25519, 65 bytes uncompressed P-256). */
   publicKey: string;
-  /** base64url signature over `deviceExchangeSigningInput(...)`. */
   signature: string;
-  /** ms since epoch when the signature was produced. */
   timestamp: number;
 };
 
 export const isDpopAlgorithm = (value: unknown): value is DpopAlgorithm =>
   value === "ed25519" || value === "es256";
 
-// ---------------------------------------------------------------------------
-// Signing inputs (canonical strings, newline separated, no trailing newline)
-// ---------------------------------------------------------------------------
-
-/** What the client signs to bind a key to an exchange. */
 export const deviceExchangeSigningInput = (args: {
   ownerId: string;
   gatewayOrigin: string;
@@ -58,7 +26,6 @@ export const deviceExchangeSigningInput = (args: {
     "\n",
   );
 
-/** What the client signs on every relay request. */
 export const dpopSigningInput = (args: {
   method: string;
   pathname: string;
@@ -74,10 +41,6 @@ export const dpopSigningInput = (args: {
     args.requestId,
     String(args.timestamp),
   ].join("\n");
-
-// ---------------------------------------------------------------------------
-// Encoding
-// ---------------------------------------------------------------------------
 
 export const base64UrlEncode = (bytes: Uint8Array): string => {
   let binary = "";
@@ -103,17 +66,12 @@ const textBytes = (value: string): Uint8Array<ArrayBuffer> => {
   return copy;
 };
 
-/** `dpk` claim value for a raw public key. */
 export const deviceKeyHash = async (rawPublicKey: Uint8Array): Promise<string> => {
   const copy = new Uint8Array(new ArrayBuffer(rawPublicKey.byteLength));
   copy.set(rawPublicKey);
   const digest = await crypto.subtle.digest("SHA-256", copy);
   return base64UrlEncode(new Uint8Array(digest));
 };
-
-// ---------------------------------------------------------------------------
-// WebCrypto key handling
-// ---------------------------------------------------------------------------
 
 const ED25519_RAW_LENGTH = 32;
 const P256_RAW_LENGTH = 65;
@@ -167,10 +125,6 @@ export const verifyDpopInput = async (
   }
 };
 
-// ---------------------------------------------------------------------------
-// Gateway-side verification of a relay request
-// ---------------------------------------------------------------------------
-
 export type DpopVerificationFailure =
   | "missing"
   | "malformed"
@@ -183,10 +137,6 @@ export type DpopVerificationResult =
   | { ok: true; deviceKeyHash: string }
   | { ok: false; reason: DpopVerificationFailure };
 
-/**
- * Verify the proof headers of one relay request against the capability's
- * `dpk` claim. `headers` is the incoming request's headers; `now` is ms.
- */
 export const verifyDpopRequest = async (args: {
   headers: Headers;
   method: string;
@@ -241,11 +191,6 @@ export const verifyDpopRequest = async (args: {
   return valid ? { ok: true, deviceKeyHash: hash } : { ok: false, reason: "bad_signature" };
 };
 
-/**
- * Inputs a device key may sign on behalf of a less-trusted caller (renderer,
- * runtime worker). Anything else, notably the presence-socket proof that
- * shares the desktop key, must never be signable through those channels.
- */
 export const DPOP_SIGNING_INPUT_PREFIXES = [
   "stella-dpop\n",
   "stella-device-exchange\n",
@@ -256,7 +201,6 @@ export const isDelegatedDeviceSigningInput = (input: string): boolean =>
   input === DEVICE_SIGNING_PROBE_INPUT ||
   DPOP_SIGNING_INPUT_PREFIXES.some((prefix) => input.startsWith(prefix));
 
-/** Gateway-side: verify an exchange proof and return the `dpk` to mint. */
 export const verifyDeviceKeyProof = async (args: {
   proof: GatewayDeviceKeyProof;
   ownerId: string;

@@ -1,17 +1,3 @@
-/**
- * Hash-history reconciliation of bundled skills into Stella home.
- *
- * Stella ships a default skill catalogue at the packaged `home-seed/skills/`
- * resource. `${stellaDataDir}/skills/` is the one root every installed skill
- * resolves from, shipped or user-created (see `shared/skill-catalog.ts`). Each
- * skill (`<id>/` directory) is reconciled as a unit so shipped updates reach
- * users who haven't edited that skill, while a local edit or a pre-existing
- * collision makes that skill user-owned and never overwritten. The
- * reconciliation algorithm itself lives in `bundled-sync.ts` — this module just
- * supplies the skill-specific policy (directory units, platform gating,
- * user-profile exclusion).
- */
-
 import type { Effect } from "effect";
 
 import {
@@ -56,12 +42,6 @@ const bundledSkillAdapter = createDirectoryEntryAdapter(
   (id) => id !== USER_PROFILE_SKILL_ID,
 );
 
-/**
- * The skill ids this build ships for the running platform. The legacy
- * `system/` mirror retirement needs the same set the reconciler installs, so
- * it can leave those ids to the reconciler instead of pinning stale mirrored
- * copies as user forks.
- */
 export const listIncludedBundledSkillIds = async (
   bundledSkillsDir: string,
   options: SkillsSyncOptions = {},
@@ -73,10 +53,6 @@ export const listIncludedBundledSkillIds = async (
   );
 };
 
-/**
- * Reconcile bundled skills into a Stella home skills tree. `user-profile` is
- * intrinsically user-owned onboarding memory and is excluded entirely.
- */
 export const reconcileBundledSkillsEffect = (
   bundledSkillsDir: string,
   homeSkillsDir: string,
@@ -96,11 +72,6 @@ export const reconcileBundledSkillsEffect = (
   );
 };
 
-/**
- * Skill ids Stella has installed into the canonical root, including ones the
- * user has since edited. "Use Stella's defaults" clears exactly this set and
- * leaves purely user-created skills alone.
- */
 export const listTrackedBundledSkillIds = (
   homeSkillsDir: string,
 ): Promise<string[]> =>

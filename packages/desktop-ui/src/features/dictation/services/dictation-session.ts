@@ -16,22 +16,12 @@ const PCM_WORKLET_NAME = "stella-dictation-pcm-capture";
 const PCM_WORKLET_FILE = "dictation-pcm-worklet.js";
 const DICTATION_SUPER_FAST_KEY = "stella-dictation-super-fast";
 const DICTATION_MIC_OPENED_KEY = "stella-dictation-mic-opened";
-/** Hard cap on a single dictation recording before we auto-stop and
- * transcribe. Stella keeps the existing 15-minute product limit. */
 const MAX_DICTATION_DURATION_MS = 15 * 60 * 1000;
 
-/** How often we emit a level tick to consumers (≈ 12 Hz). The waveform UI
- *  appends one bar per tick, so this also controls the bar density of the
- *  scrolling visualization. */
 const LEVEL_EMIT_INTERVAL_MS = 80;
 
-/** RMS values during normal speech sit around 0.05–0.15. Multiplying by
- *  this constant maps that range onto a perceptually pleasing 0–1 scale
- *  for the waveform without immediately clipping at the top. */
 const LEVEL_GAIN = 6;
-/** Audio kept from just before the press, covering the click's own latency. */
 const PRE_ROLL_MS = 300;
-/** A warm-up from hovering the mic ends this long after the last intent. */
 const INTENT_WARM_MS = 10_000;
 
 export const resolveDictationPcmWorkletUrl = (rendererHref: string): string =>
@@ -46,9 +36,6 @@ export type DictationSessionState =
 type DictationCallbacks = {
   onFinalTranscript?: (text: string) => void;
   onStateChange?: (state: DictationSessionState, error?: string) => void;
-  /** Periodic 0..1 input-level tick used by the recording UI to render a
-   *  scrolling waveform. Fires at ~12 Hz while listening; the value is the
-   *  peak RMS observed since the previous tick. */
   onLevel?: (level: number) => void;
 };
 
@@ -60,16 +47,6 @@ export function setDictationSuperFastPreference(enabled: boolean): void {
   uiState.setItem(DICTATION_SUPER_FAST_KEY, enabled ? "true" : "false");
 }
 
-/**
- * The microphone and its 16 kHz PCM pipeline, shared by every recording.
- *
- * Opening a microphone and an AudioContext on macOS takes from a few hundred
- * milliseconds to almost two seconds, and nothing said in that time can be
- * recovered. So the pipeline opens ahead of a likely press (hovering or
- * focusing the mic, or always with Super Fast), keeps only the last
- * `PRE_ROLL_MS` while nobody is recording, and a press takes it over with no
- * device open at all. A press with nothing warm opens it on the spot.
- */
 class DictationWarmCapture {
   private micLease: SharedMicrophoneLease | null = null;
   private audioContext: AudioContext | null = null;
@@ -90,7 +67,6 @@ class DictationWarmCapture {
     return this.startPromise;
   }
 
-  /** Super Fast: stay open until turned off. */
   async pin(enabled: boolean): Promise<void> {
     this.pinned = enabled;
     if (enabled) {
@@ -101,11 +77,6 @@ class DictationWarmCapture {
     }
   }
 
-  /**
-   * A press is likely: open now and close again if none comes. Only once
-   * dictation has opened the microphone before, so hovering never raises the
-   * system permission prompt.
-   */
   warmForIntent(): void {
     if (this.listener) return;
     if (uiState.getItem(DICTATION_MIC_OPENED_KEY) !== "true") return;
@@ -113,12 +84,6 @@ class DictationWarmCapture {
     void this.start().catch(() => undefined);
   }
 
-  /**
-   * Hand the pipeline to a recording, opening it if nothing is warm: resolves
-   * with the pre-roll, and every later frame goes to `listener` until
-   * `detach`. The listener is registered first, so a warm-up timing out
-   * meanwhile cannot close the microphone under the press.
-   */
   async attach(listener: (frame: WorkletFrame) => void): Promise<Int16Array[]> {
     this.clearIdle();
     this.listener = listener;
@@ -140,7 +105,6 @@ class DictationWarmCapture {
     void this.stop();
   }
 
-  /** Close the microphone unless a recording or Super Fast still needs it. */
   async stop(): Promise<void> {
     this.clearIdle();
     const starting = this.startPromise;
@@ -173,7 +137,6 @@ class DictationWarmCapture {
 
   private async startInner(): Promise<void> {
     if (this.audioContext && this.micLease) return;
-    // The context and its worklet come up while the device opens.
     const ctx = new AudioContext();
     const moduleReady = ctx.audioWorklet.addModule(
       resolveDictationPcmWorkletUrl(window.location.href),
@@ -264,7 +227,6 @@ export async function ensureDictationSuperFastWarm(): Promise<void> {
   await setDictationSuperFastModeEnabled(true);
 }
 
-/** The user is about to press the mic (hover or focus): open it now. */
 export function warmDictationMicrophone(): void {
   warmCapture.warmForIntent();
 }
@@ -278,14 +240,11 @@ export class DictationSession {
   private streaming = false;
   private streamedSamples = 0;
   private stream: DictationStream | null = null;
-  /** Settles once the provider acknowledged its session or the relay failed. */
   private streamOpened: Promise<void> = Promise.resolve();
   private streamFailure: Error | null = null;
-  /** Everything captured, held from the press and paced out once connected. */
   private ingress: DictationIngressQueue | null = null;
   private durationLimitTimer: ReturnType<typeof setTimeout> | null = null;
   private cancelled = false;
-  /** Peak RMS seen since the last `onLevel` emit, reset every tick. */
   private peakSinceLastEmit = 0;
   private levelEmitTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -329,7 +288,6 @@ export class DictationSession {
         return;
       }
       for (const chunk of preRoll) this.capture(chunk);
-      // The relay may already have refused while the mic was starting.
       if (this.streamFailure) throw this.streamFailure;
       this.durationLimitTimer = setTimeout(() => {
         console.warn("[dictation] hit max segment duration, auto-stopping");
@@ -393,7 +351,6 @@ export class DictationSession {
     }
   }
 
-  /** Stop without transcribing. Used on unmount / error paths. */
   async cancel(): Promise<void> {
     this.cancelled = true;
     this.stream?.cancel();
@@ -457,8 +414,6 @@ export class DictationSession {
         const failure =
           error instanceof Error ? error : new Error(String(error));
         this.streamFailure = failure;
-        // Failure while recording: tear down and surface it. Before that,
-        // start() reads the failure; after, stop() does.
         if (this.state === "listening" && !this.cancelled) {
           void this.failWhileListening(failure);
         }
@@ -484,8 +439,6 @@ export class DictationSession {
   private async finishStream(): Promise<string> {
     const stream = this.stream;
     try {
-      // A short recording can end before the relay connects; its audio is
-      // still buffered and goes out the moment the socket opens.
       await this.streamOpened;
       if (this.streamFailure) throw this.streamFailure;
       if (!stream) throw new Error("Dictation stream is unavailable.");

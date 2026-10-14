@@ -12,10 +12,6 @@ import { fonts } from "../theme/fonts";
 import { useColors } from "../theme/theme-context";
 import { useT } from "../i18n";
 
-/**
- * The Terms of Service or Privacy Policy in a page sheet. Shared by sign-in
- * and onboarding so the legal copy is presented one way.
- */
 export function LegalSheet({
   document,
   onClose,
@@ -64,8 +60,6 @@ const makeStyles = (colors: Colors) =>
     legalModal: {
       flex: 1,
       backgroundColor: colors.background,
-      // Soft hairline on the leading (top) edge so the sheet reads against the
-      // page beneath.
       borderTopColor: colors.border,
       borderTopWidth: StyleSheet.hairlineWidth,
     },

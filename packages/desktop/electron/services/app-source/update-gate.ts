@@ -39,21 +39,8 @@ export type GateResult = { ok: true } | { ok: false; output: string };
 type Log = (event: string, data: Record<string, unknown>) => void;
 
 const BUILD_TIMEOUT_MS = 5 * 60_000;
-/** Enough of the build's complaint to act on, without a brief made of noise. */
 const OUTPUT_LIMIT = 4_000;
 const RUNNER = "stella-update-gate.mjs";
-/**
- * Written into the scratch copy and run there, rather than running the build
- * script as the entry point.
- *
- * Any entry-point guard decides whether to work from the shape of
- * `process.argv[1]`, and this gate was where one got that wrong: a scratch
- * path under a symlinked directory made the comparison fail, and the build
- * exited 0 having built nothing. The guard is fixed (`scripts/lib/
- * entry-point.mjs`), but a gate should not be taking anyone's word for it:
- * importing the export and asserting both `built` and the outputs cannot
- * pass vacuously, whatever the guard decides.
- */
 const RUNNER_SOURCE = `import {
   ensureElectronBundlesFresh,
   requiredOutputsExist,
@@ -75,14 +62,6 @@ try {
 }
 `;
 
-/**
- * What main and preload are built from: the build script and what it
- * imports, the build's source roots, the directories of every file the
- * checkout's last build read, and the files that steer resolution (the top
- * of the repo, package manifests, tsconfigs).
- * About a quarter of the tree. A build that fails on just these is tried
- * again on the whole tree, so leaving something out only costs time.
- */
 const BUILD_ROOTS = [
   "scripts/lib/",
   "packages/contracts/",
@@ -107,7 +86,6 @@ const FINGERPRINT_FILE = ".dev-electron-bundle-fingerprint.json";
 
 type ScratchOptions = { background?: boolean; signal?: AbortSignal };
 
-/** Write `commit`'s tree into `scratch` from git's objects alone. */
 const writeTree = async (
   cwd: string,
   commit: string,
@@ -140,7 +118,6 @@ const writeTree = async (
   }
 };
 
-/** Packages whose `node_modules` the bundle build resolves through. */
 const linkNodeModules = async (cwd: string, scratch: string) => {
   await fs.symlink(
     path.join(cwd, "node_modules"),
@@ -162,10 +139,6 @@ const linkNodeModules = async (cwd: string, scratch: string) => {
   }
 };
 
-/**
- * desktop-ui's env files are untracked, and main bakes a key from them: the
- * scratch build reads the checkout's, as the checkout's own build would.
- */
 const copyEnvFiles = async (cwd: string, scratch: string) => {
   const dir = path.join("packages", "desktop-ui");
   const names = await fs.readdir(path.join(cwd, dir)).catch(() => [] as string[]);
@@ -178,7 +151,6 @@ const copyEnvFiles = async (cwd: string, scratch: string) => {
   }
 };
 
-/** The repo files the checkout's last build of main and preload read. */
 const recordedBundleInputs = async (cwd: string) => {
   try {
     const parsed = JSON.parse(
@@ -194,14 +166,6 @@ const recordedBundleInputs = async (cwd: string) => {
   }
 };
 
-/**
- * Whether any of `files` can change what main and preload build into: a file
- * the last build read (that is how a shared file elsewhere in the repo, like
- * the browser extension's, counts), the build's source roots and config, the
- * build scripts, any package manifest or lockfile, and anything at the top of
- * the repo. Broader than the build's own list on purpose; erring here only
- * costs the check.
- */
 export const touchesBundleInputs = async (cwd: string, files: string[]) => {
   const recorded = await recordedBundleInputs(cwd);
   return files.some(
@@ -228,12 +192,6 @@ export type ScratchBuild =
   | { ok: true; ms: number }
   | { ok: false; ms: number; output: string };
 
-/**
- * Build main and preload from `commit` in `scratch`. With `keep`, the outputs
- * and the inputs they read are copied there (`adoptElectronBundles` takes
- * them into the checkout once it holds `commit`). Always removes the scratch
- * copy, including when the build throws.
- */
 export const buildOnScratch = async (args: {
   cwd: string;
   commit: string;
@@ -252,8 +210,6 @@ export const buildOnScratch = async (args: {
     await fs.writeFile(path.join(scratch, RUNNER), RUNNER_SOURCE);
     return await run(process.execPath, [path.join(scratch, RUNNER)], {
       cwd: scratch,
-      // Electron's binary is the only Node this app is sure to have, and it
-      // is what builds these bundles on a normal launch.
       env: { ELECTRON_RUN_AS_NODE: "1" },
       timeoutMs: BUILD_TIMEOUT_MS,
       ...options,
@@ -283,12 +239,6 @@ export const buildOnScratch = async (args: {
   }
 };
 
-/**
- * Build Electron main and preload from `commit` on a scratch copy, as the
- * check a merge passes before it applies. Passes at once when `commit`
- * changes nothing the build reads from the checkout's HEAD: its main and
- * preload are then the ones this process was started from.
- */
 export const checkMergedUpdate = async (
   cwd: string,
   commit: string,
@@ -381,7 +331,6 @@ export const prepareInstallAhead = async (cwd: string, log: Log): Promise<boolea
   }
 };
 
-/** `name@version` for every registry package a `bun.lock` pins. */
 const lockedPackages = (text: string) => {
   const found = new Set<string>();
   try {
@@ -418,13 +367,6 @@ await downloadArtifact({
 });
 `;
 
-/**
- * Download the packages an update's lockfile adds into bun's own cache, and
- * Electron's archive into Electron's when the update moves it, so the install
- * the update needs when it is applied only has to link them. Nothing here
- * touches the checkout: the packages land in a scratch project of their own,
- * installed without scripts and removed afterwards. Never throws.
- */
 export const warmDependencies = async (args: {
   cwd: string;
   from: string;

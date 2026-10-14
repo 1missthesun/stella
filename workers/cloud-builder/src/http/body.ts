@@ -1,6 +1,5 @@
 import { BoundedBodyError, readBoundedRequestBytes, readBoundedRequestText } from "../bounded-body.js";
 
-/** A request body, or why it was refused: 413 past the limit, 400 otherwise. */
 export type BodyResult<T> = { ok: true; value: T } | { ok: false; status: 400 | 413; error: string };
 
 type Refused = Extract<BodyResult<never>, { ok: false }>;
@@ -22,7 +21,6 @@ const refused = (error: unknown): Refused => {
   }
 };
 
-/** The raw body, streamed and cut off at `maxBytes` whatever Content-Length says. */
 export const readBodyBytes = async (request: Request, maxBytes: number): Promise<BodyResult<Uint8Array>> => {
   try {
     return { ok: true, value: await readBoundedRequestBytes(request, maxBytes) };
@@ -31,7 +29,6 @@ export const readBodyBytes = async (request: Request, maxBytes: number): Promise
   }
 };
 
-/** The body as UTF-8 text, bounded like `readBodyBytes`. */
 export const readBodyText = async (request: Request, maxBytes: number): Promise<BodyResult<string>> => {
   try {
     return { ok: true, value: await readBoundedRequestText(request, maxBytes) };
@@ -40,7 +37,6 @@ export const readBodyText = async (request: Request, maxBytes: number): Promise<
   }
 };
 
-/** The body parsed as JSON, bounded like `readBodyBytes`. An empty body is invalid. */
 export const readJsonBody = async (request: Request, maxBytes: number): Promise<BodyResult<unknown>> => {
   const text = await readBodyText(request, maxBytes);
   if (!text.ok) return text;
@@ -51,7 +47,6 @@ export const readJsonBody = async (request: Request, maxBytes: number): Promise<
   }
 };
 
-/** The body as a JSON object, bounded like `readBodyBytes`. With `allowEmpty`, no body is `{}`. */
 export const readJsonObject = async (
   request: Request,
   maxBytes: number,

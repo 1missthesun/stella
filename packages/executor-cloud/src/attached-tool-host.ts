@@ -1,24 +1,3 @@
-/**
- * The resident tool-host daemon for an attached sandbox.
- *
- * One daemon per turn, started when the Durable Object attaches the container
- * and joined when the turn quiesces. It exists because `write_stdin` writes to
- * the PTY `Bash` created: a per-call exec would lose that shell, so
- * the shell state has to outlive any single call and the tool host is created
- * exactly once here.
- *
- * The daemon serves only `ATTACHED_TOOL_NAMES` over a root-only Unix socket.
- * It never sees the reusable turn token; the broker capability it consumes is
- * the same one-shot file handoff the container executor already uses, and it
- * spends that only on the drive routes.
- *
- * Idempotency is `toolCallId` plus an argument fingerprint. A repeat of a
- * completed call replays its cached result. A repeat of a call still running
- * answers `pending`. A repeat of a call whose outcome the daemon cannot prove
- * answers `failed`, because a command may already have crossed a boundary the
- * world cannot undo and guessing would run it twice.
- */
-
 import { connect, createServer, type Server, type Socket } from "node:net";
 import { lstat, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -116,7 +95,6 @@ export const writeAttachedToolDaemonIdentity = async (
   );
 };
 
-/** Remove only an abandoned Unix socket; never steal a live daemon's path. */
 export const removeStaleAttachedToolSocket = async (
   socketPath: string,
 ): Promise<void> => {
@@ -185,7 +163,6 @@ export const parseAttachedToolHostInput = (
   };
 };
 
-/** What the daemon knows about one `toolCallId` + fingerprint pair. */
 export type CallState =
   | Readonly<{ kind: "running" }>
   | Readonly<{ kind: "done"; result: SerializedAgentToolResult }>
@@ -297,7 +274,6 @@ const writeFrame = (socket: Socket, frame: unknown): Promise<void> =>
 
 export type AttachedToolHostReport = Readonly<{
   bootNotices: readonly string[];
-  /** Drive paths whose delivery to the drive succeeded. */
   deliveredFiles: readonly string[];
 }>;
 
@@ -307,13 +283,6 @@ export type AttachedToolDispatcher = Readonly<{
   ): Promise<AttachedToolResponse | AttachedToolControlResponse>;
 }>;
 
-/**
- * The daemon's decision layer, separated from its process and its socket.
- *
- * Everything that decides whether a frame runs a command, replays a receipt,
- * or refuses lives here, over a call table the caller owns. The transport
- * around it only moves bytes.
- */
 export const createAttachedToolDispatcher = (args: {
   identity: Readonly<{ turnId: string; attemptGeneration: number }>;
   bootNotices: readonly string[];
@@ -409,11 +378,6 @@ export const createAttachedToolDispatcher = (args: {
   };
 };
 
-/**
- * Run the daemon until a `quiesce` control call joins it. The returned report
- * is what the last caller already received; it is repeated here so the process
- * can log a truthful exit line without a second round trip.
- */
 export const runAttachedToolHost = (
   input: AttachedToolHostInput,
   paths: AttachedToolPaths,
@@ -462,8 +426,6 @@ export const runAttachedToolHost = (
           }),
         catch: asError,
       });
-      // The write-back at quiesce saves what changes from here; the resident
-      // tools that ran before this sandbox attached wrote the drive itself.
       const driveBefore = yield* Effect.promise(() =>
         snapshotDriveTree(driveWorkspace.root).catch(() => new Map()),
       );
@@ -525,8 +487,6 @@ export const runAttachedToolHost = (
         }
         let result: ToolResult;
         try {
-          // The host registers the shell tool as `Bash`; an older caller's
-          // `exec_command` is the same tool.
           result = await toolHost.executeTool(
             canonicalAttachedToolName(toolName),
             params,
@@ -544,8 +504,6 @@ export const runAttachedToolHost = (
               console.error(`world push failed: ${asError(failure).message}`),
             );
           }
-          // The command may already have run. Recording the loss keeps a
-          // replay from re-running it behind the caller's back.
           calls.set(key, { kind: "lost", error: asError(error).message });
           throw asError(error);
         }
@@ -571,20 +529,12 @@ export const runAttachedToolHost = (
         linkedPaths: readonly string[],
       ): Promise<AttachedToolHostReport> => {
         await toolHost.shutdown();
-        // A file the turn wrote through the Durable Object's own Write/Edit
-        // tools after this sandbox's last sync is in the world but not on
-        // this disk. Bring the world down first, exactly as every exec
-        // boundary does, so the linked files collected below can include it,
-        // then push this disk's own changes.
         await pullWorldProjection({
           root: workspaceRoot,
           access: input.world,
         }).catch((error) => {
           console.error(`world pull failed: ${asError(error).message}`);
         });
-        // A failed world push must not cost the turn its drive changes: the
-        // container is released after this, so write the drive back first and
-        // only then surface the world failure.
         const worldPushError = await pushWorldProjection({
           root: workspaceRoot,
           access: input.world,
@@ -600,8 +550,6 @@ export const runAttachedToolHost = (
       const deliverDrive = async (
         linkedPaths: readonly string[],
       ): Promise<AttachedToolHostReport> => {
-        // The drive copy is not part of the world: what this turn created,
-        // changed or deleted under drive/ reaches the drive only from here.
         const writeBack = await writeBackDrive({
           turnId: input.turnId,
           driveRoot: driveWorkspace.root,
@@ -612,8 +560,6 @@ export const runAttachedToolHost = (
           linked: linkedPaths,
           post: postJson,
         }).catch((error) => {
-          // Best-effort, but a swallowed failure here is the difference
-          // between a file the user can open and one that never reaches it.
           console.error(`drive write-back failed: ${asError(error).message}`);
           return null;
         });
@@ -634,10 +580,6 @@ export const runAttachedToolHost = (
         }
         const delivered = writeBack?.files ?? [];
         if (delivered.length === 0) {
-          // A reply that linked files but delivered none is worth a record
-          // the turn's event stream keeps: what was linked, and what this
-          // disk actually had at each path, so the gap is diagnosable from
-          // the backend instead of from a container that is about to be torn down.
           if (linkedPaths.length > 0) {
             const looked = await Promise.all(
               linkedPaths.slice(0, 8).map(async (linked) => {
@@ -678,10 +620,6 @@ export const runAttachedToolHost = (
           }
           return { bootNotices, deliveredFiles: [] };
         }
-        // The container path announces its deliverables with an
-        // `output_files` event, which is what the outbox turns into the
-        // conversation's files card. The attached path must announce them
-        // the same way, or an attached agent's files stay drive-only.
         await postJson("/api/cloud/events", {
           turnId: input.turnId,
           attemptGeneration: input.attemptGeneration,
@@ -736,9 +674,6 @@ export const runAttachedToolHost = (
         } catch (error) {
           const message = asError(error).message;
           console.error(`attached tool call failed: ${message}`);
-          // A failed answer is still an answer. Closing the socket instead
-          // left the client with a bare transport failure, so the worker
-          // learned nothing about why a quiesce or tool call failed.
           await writeFrame(
             socket,
             attachedToolAnswerFailure(frame, message),
@@ -783,11 +718,6 @@ export const runAttachedToolHost = (
     }),
   );
 
-/**
- * A response frame the caller can act on when the socket is unreachable. The
- * client writes this rather than exiting silently, so a lost daemon surfaces
- * as a tool error the model can react to instead of a hung turn.
- */
 export const attachedToolTransportFailure = (
   toolCallId: string,
   fingerprint: string,
@@ -800,12 +730,6 @@ export const attachedToolTransportFailure = (
   error: message.slice(0, 8_000) || "The attached tool host is unreachable.",
 });
 
-/**
- * The frame the daemon answers with when producing the real answer threw.
- * Shaped by the request it failed to answer, so the client can parse it as
- * a failed control response or a failed tool response and carry the message
- * to the worker instead of reporting a closed socket.
- */
 export const attachedToolAnswerFailure = (
   frame: unknown,
   message: string,

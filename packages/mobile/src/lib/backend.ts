@@ -14,11 +14,6 @@ import { getAuthToken } from "./auth-token";
 import { isSelfHostedLaunch } from "./server-registry";
 import { noteBackendError } from "./server-features";
 
-/**
- * The app's one connection to the Stella backend worker: calls over HTTP and
- * live views over a single socket, authorized with the same JWT as every
- * other cloud request.
- */
 let cachedClient: BackendClient | null = null;
 
 export function getBackendClient(): BackendClient {
@@ -32,8 +27,6 @@ export function getBackendClient(): BackendClient {
       getAuthToken(options?.force ? { forceRefresh: true } : undefined),
   });
   if (isSelfHostedLaunch) {
-    // A self-hosted server can be older than this app: note "unknown
-    // function/view" answers so the shell can say the server needs an update.
     const call = client.call.bind(client);
     client.call = (async (name, args) => {
       try {
@@ -54,12 +47,10 @@ export function getBackendClient(): BackendClient {
   return cachedClient;
 }
 
-/** Reconnect as the current account, e.g. after sign-in or sign-out. */
 export function reconnectBackend(): void {
   cachedClient?.reconnect();
 }
 
-/** A view's current value, read once. */
 export function readBackendView<K extends ViewName>(
   view: K,
   args: ViewArgs<K>,
@@ -79,12 +70,10 @@ export function readBackendView<K extends ViewName>(
       (value) => settle(() => resolve(value)),
       (error) => settle(() => reject(error)),
     );
-    // The value may already have arrived synchronously.
     if (done) unsubscribe();
   });
 }
 
-/** Subscribe to a backend view; `"skip"` holds off. Undefined while loading. */
 export function useBackendView<K extends ViewName>(
   view: K,
   args: ViewArgs<K> | "skip",

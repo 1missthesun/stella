@@ -1,12 +1,3 @@
-/**
- * "Connect Gmail", right after the account step (signed-in users only).
- *
- * Gmail is an account-level connection, so connecting it here connects it
- * for Stella everywhere. Connect opens the account's hosted Google page;
- * the card then watches the connection status (on a short poll, and again
- * whenever the app comes back to the foreground) and flips to Connected
- * once Google is done.
- */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Linking, StyleSheet, Text, View } from "react-native";
 import Animated from "react-native-reanimated";
@@ -54,7 +45,6 @@ export function GmailCard({ active, answered, onAnswer }: GmailCardProps) {
   const appVisible = useAppVisible();
   const [phase, setPhase] = useState<Phase>("idle");
 
-  // Already connected (another device, an earlier run): say so up front.
   useEffect(() => {
     if (answered) return;
     let cancelled = false;
@@ -70,7 +60,6 @@ export function GmailCard({ active, answered, onAnswer }: GmailCardProps) {
     };
   }, [answered]);
 
-  // After the Google page opens, watch for the connection to land.
   useEffect(() => {
     if (answered || phase !== "waiting" || !appVisible) return;
     let cancelled = false;
@@ -175,7 +164,6 @@ export function GmailCard({ active, answered, onAnswer }: GmailCardProps) {
   );
 }
 
-/** Gmail's mark, fitted to a 24px box. */
 function GmailMark({ size }: { size: number }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24">

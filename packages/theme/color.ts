@@ -1,37 +1,17 @@
-/**
- * Color math shared by every Stella client.
- *
- * Everything here is pure arithmetic on strings and numbers — no DOM, no
- * React Native — so desktop (CSS custom properties) and mobile (style objects)
- * derive the exact same bytes from the same palette. The mixing functions
- * reproduce CSS `color-mix()` semantics (premultiplied alpha, shorter hue arc,
- * powerless hue on achromatic colors) so the desktop stylesheet could hand its
- * derivations to TypeScript without changing a single rendered pixel.
- */
-
 export type Rgba = {
-  /** 0–255 */
   r: number;
-  /** 0–255 */
   g: number;
-  /** 0–255 */
   b: number;
-  /** 0–1 */
   a: number;
 };
 
 export interface OklchColor {
-  /** Lightness 0–1 */
   l: number;
-  /** Chroma 0–0.4+ */
   c: number;
-  /** Hue 0–360 */
   h: number;
 }
 
 type Oklcha = OklchColor & { a: number };
-
-// ─── Parsing / formatting ────────────────────────────────────────────────
 
 const NAMED: Record<string, Rgba> = {
   transparent: { r: 0, g: 0, b: 0, a: 0 },
@@ -103,12 +83,6 @@ function parseRgbFunction(input: string): Rgba | null {
   return { r, g, b, a: parseAlpha(parts[3]) };
 }
 
-/**
- * Parse the color syntaxes a theme palette may use: `#rgb[a]`, `#rrggbb[aa]`,
- * `rgb()` / `rgba()` (comma or space separated, optional `/ alpha`), and the
- * three keywords the token recipes lean on (`transparent`, `white`, `black`).
- * Returns null for anything else — callers pick their own fallback.
- */
 export function parseColor(input: string | null | undefined): Rgba | null {
   if (!input) return null;
   const s = input.trim();
@@ -130,11 +104,6 @@ function byteHex(v: number): string {
   return Math.round(clampByte(v)).toString(16).padStart(2, "0");
 }
 
-/**
- * Serialize for both CSS and React Native. Opaque colors become `#rrggbb`;
- * translucent ones become `rgba(r, g, b, a)` so alpha keeps float precision
- * instead of being quantized to 8 bits.
- */
 export function formatColor(c: Rgba): string {
   const r = Math.round(clampByte(c.r));
   const g = Math.round(clampByte(c.g));
@@ -144,18 +113,14 @@ export function formatColor(c: Rgba): string {
   return `rgba(${r}, ${g}, ${b}, ${a})`;
 }
 
-/** Opaque `#rrggbb` regardless of alpha. */
 export function toHex(c: Rgba): string {
   return `#${byteHex(c.r)}${byteHex(c.g)}${byteHex(c.b)}`;
 }
 
-/** `color` with its alpha replaced (multiplied into any existing alpha). */
 export function withAlpha(color: string, alpha: number): string {
   const c = parseColorOr(color);
   return formatColor({ ...c, a: c.a * Math.max(0, Math.min(1, alpha)) });
 }
-
-// ─── sRGB ⇄ OKLCH ────────────────────────────────────────────────────────
 
 function linearToSrgb(c: number): number {
   if (c <= 0.0031308) return c * 12.92;
@@ -167,7 +132,6 @@ function srgbToLinear(c: number): number {
   return Math.pow((c + 0.055) / 1.055, 2.4);
 }
 
-/** r, g, b in 0–1. */
 export function rgbToOklch(r: number, g: number, b: number): OklchColor {
   const lr = srgbToLinear(r);
   const lg = srgbToLinear(g);
@@ -247,9 +211,6 @@ function fromOklcha(c: Oklcha): Rgba {
   return { r: r * 255, g: g * 255, b: b * 255, a: c.a };
 }
 
-// ─── CSS color-mix() ─────────────────────────────────────────────────────
-
-/** Hue is powerless (treated as missing for interpolation) when chroma is ~0. */
 const POWERLESS_CHROMA = 1e-4;
 
 /**
@@ -308,20 +269,14 @@ export function mixOklch(a: Rgba, b: Rgba, weightA: number): Rgba {
   });
 }
 
-/** String-in, string-out convenience over `mixSrgb`. `pct` is 0–100. */
 export function mixSrgbCss(a: string, pct: number, b: string): string {
   return formatColor(mixSrgb(parseColorOr(a), parseColorOr(b), pct / 100));
 }
 
-/** String-in, string-out convenience over `mixOklch`. `pct` is 0–100. */
 export function mixOklchCss(a: string, pct: number, b: string): string {
   return formatColor(mixOklch(parseColorOr(a), parseColorOr(b), pct / 100));
 }
 
-/**
- * CSS relative color syntax `oklch(from <color> L C H / alpha)`: hand the
- * source's OKLCH channels to `adjust` and get a serialized color back.
- */
 export function relativeOklch(
   color: string,
   adjust: (c: OklchColor) => OklchColor,
@@ -331,12 +286,6 @@ export function relativeOklch(
   return formatColor(fromOklcha({ ...next, a: src.a }));
 }
 
-// ─── Aura-style scales (gradient blob palette) ──────────────────────────
-
-/**
- * The 12-step scale the shifting-gradient palette samples from. Kept exactly
- * as the original desktop port so the blob colors do not move.
- */
 function generateScale(seed: string, isDark: boolean): string[] {
   const base = hexToOklch(seed);
   const scale: string[] = [];
@@ -404,7 +353,6 @@ export interface GradientTokens {
   surfaceBrandBase: string;
 }
 
-/** Derived gradient tokens from theme seed colors (Aura's token recipe). */
 export function generateGradientTokens(
   seeds: GradientSeeds,
   isDark: boolean,

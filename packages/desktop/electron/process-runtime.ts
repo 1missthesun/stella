@@ -13,12 +13,6 @@ type CleanupFn = () => void | Promise<void>;
 
 type TimerHandle = ReturnType<typeof setTimeout>;
 
-/**
- * Stop a child and everything it started, even when the child itself has
- * already exited: its process group (and on Windows its orphaned children)
- * is checked and terminated on its own. Spawn the child with
- * `detached: process.platform !== "win32"` so it leads its own group.
- */
 export const stopChildProcessTree = async (
   child: ChildProcess | null | undefined,
   options: {
@@ -155,9 +149,6 @@ export class ProcessRuntime {
       this.clearTimers();
     }
 
-    // Every cleanup starts at once, last registered first, and the phase
-    // takes as long as the slowest of them rather than their sum: quitting
-    // (and so every update that relaunches) waits on this.
     const run = Promise.all(
       [...this.cleanups[phase].entries()].reverse().map(async ([key, cleanup]) => {
         const startedAt = Date.now();
@@ -166,9 +157,6 @@ export class ProcessRuntime {
         } catch (error) {
           console.error(`[process-runtime] Cleanup failed for ${phase}:${key}`, error);
         }
-        // Quit is on a deadline, so a cleanup that drags is a real
-        // regression. Report per-cleanup timing so the culprit is named, not
-        // just the total.
         options.onCleanupTiming?.({
           phase,
           key,

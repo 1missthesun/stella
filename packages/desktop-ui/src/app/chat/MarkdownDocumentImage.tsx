@@ -4,12 +4,6 @@ import type { Image, Parent, Root } from "mdast";
 import { resolveRelativeHtmlAsset } from "@stella/contracts/html-relative-assets";
 import { useDisplayFileBlobs } from "@/shared/hooks/use-display-file-data";
 
-/**
- * A markdown file's relative image (`![chart](img/chart.png)`) resolves
- * against the file's own folder, not the app. The sanitize/harden passes drop
- * relative image URLs, so the remark step below turns each into
- * `<stella-document-image path alt>` first, naming the absolute path.
- */
 export const STELLA_DOCUMENT_IMAGE_TAG = "stella-document-image";
 export const STELLA_DOCUMENT_IMAGE_TAG_ATTRIBUTES = ["path", "alt"] as const;
 
@@ -37,10 +31,6 @@ export const remarkDocumentImages: Plugin<[string], Root> = (documentPath) => (t
   visitImages(tree, documentPath);
 };
 
-/**
- * An image beside the markdown file, read through the display lane: from
- * disk here, live from the computer that has it, or its copy in Drive.
- */
 export const MarkdownDocumentImage = ({
   path,
   alt,

@@ -4,12 +4,6 @@ import { useT } from "@/shared/i18n";
 import type { EngineConnect } from "./use-engine-connect";
 import "./EngineConnectPrompt.css";
 
-/**
- * The step of signing the cloud in to ChatGPT that needs the user: waiting
- * while the browser sign-in finishes (desktop), or pasting back the address
- * ChatGPT redirected to (a browser, where nothing listens on 127.0.0.1).
- * Shared by Settings and onboarding.
- */
 export function EngineConnectPrompt({ connect }: { connect: EngineConnect }) {
   const t = useT();
   const { flow, error, busy } = connect;
@@ -61,7 +55,6 @@ export function EngineConnectPrompt({ connect }: { connect: EngineConnect }) {
     );
   }
 
-  // The browser is open and this computer is waiting for its callback.
   return (
     <div className="engine-connect-prompt" role="group">
       <p className="engine-connect-prompt__hint" aria-live="polite">

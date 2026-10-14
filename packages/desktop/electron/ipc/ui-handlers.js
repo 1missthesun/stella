@@ -84,10 +84,6 @@ export const registerUiHandlers = (options) => {
             return;
         options.windowManager.reloadFullWindow();
     });
-    // Used by the static launch splash (`desktop/index.html`) when the renderer
-    // has been stuck on the splash long enough that a plain reload is unlikely
-    // to help. Packaged builds re-exec Electron; dev builds ask the supervisor
-    // to spawn a fresh Electron process without tearing down Vite.
     onIpc(IPC_APP_RELAUNCH, (event) => {
         if (!options.assertPrivilegedSender(event, IPC_APP_RELAUNCH))
             return;

@@ -27,7 +27,6 @@ import { splitMessageReplyRefs, type ReplyRef } from "@stella/contracts/reply-re
 const userEventId = (record: JournalMessageRecord): string =>
   record.clientMsgId ?? `cloud:${record.turnId}:message:${record.seq}`;
 
-/** The id this projection renders a journal message record under. */
 const messageEventId = (record: JournalMessageRecord): string =>
   record.role === "user"
     ? userEventId(record)
@@ -383,11 +382,6 @@ export const activeCloudUserMessageIds = (
   );
 };
 
-/**
- * A failed turn's notice renders as the turn's closing reply row (the same
- * inline assistant row a rejected local delivery leaves). Mobile projects the
- * same row.
- */
 const terminalNoticeEvent = (
   turnId: string,
   turnRecords: readonly JournalRecord[],
@@ -407,15 +401,6 @@ const terminalNoticeEvent = (
   };
 };
 
-/**
- * Projects the Durable Object's canonical AgentMessage journal into the
- * renderer's existing timeline contract.
- *
- * This is a view only. It never writes journal rows into the authoritative
- * local transcript tables: signed-in history remains owned by the conversation
- * Durable Object. Desktop may separately retain a bounded raw-journal cache for
- * explicitly stale reconnect paint; that cache is never runtime/server input.
- */
 export const journalRecordsToMessageRecords = (
   records: readonly JournalRecord[],
 ): MessageRecord[] => {
@@ -437,8 +422,6 @@ export const journalRecordsToMessageRecords = (
     let userMessageId: string | undefined;
     let turnUserRecord: JournalMessageRecord | undefined;
     const mirrored = mirroredLifecycleEvents(turnId, turnRecords, startCarded);
-    // A wake turn can record its lifecycle card ahead of its own prompt. The
-    // reply that relays it follows the prompt, so the card waits for it.
     const promptAhead = turnRecords.some(
       (record) => record.kind === "message" && record.role === "user",
     );
@@ -451,7 +434,6 @@ export const journalRecordsToMessageRecords = (
         else events.push(lifecycle);
         continue;
       }
-      // A reminder Stella delivered: her line, on its own, with Done and Snooze.
       const reminder = record.kind === "card" ? parseReminderCard(record.card) : null;
       if (reminder) {
         events.push({
@@ -499,18 +481,13 @@ export const journalRecordsToMessageRecords = (
             ...(reaction ? { reaction } : {}),
           },
         });
-        // The wake's completion precedes the reply that relays it, so the
-        // grouping hands it to that reply.
         if (mirrored.wake) events.push(mirrored.wake);
         events.push(...beforePrompt.splice(0));
         continue;
       }
 
       if (record.role === "assistant") {
-        // The trailing `refs` fence is model-facing (it stays in the journal
-        // so the model sees its own citations); the user sees chips instead.
         const { text, refs } = splitMessageReplyRefs(record.payload);
-        // Text written before a tool call is a preamble, not the turn's answer.
         const followedByToolCall =
           record.payload.followedByToolCall === true ||
           contentBlocks(record.payload).some((block) => block.type === "toolCall");
@@ -575,10 +552,6 @@ export const journalRecordsToMessageRecords = (
         requestId: toolCallId,
         payload: {
           toolName,
-          // Every tool result in the conversation journal is the
-          // orchestrator's own (spawned agents keep their own transcripts),
-          // which the turn-resource derivations key on to render, e.g., an
-          // `image_gen` result inline rather than as a subagent's file.
           agentType: "orchestrator",
           result: details ?? resultText,
           resultPreview: resultText,
@@ -631,9 +604,6 @@ export const mergeCanonicalMessagesWithLocalCache = (
   const localAssistantOrdinals = new Map<string, number>();
   const unacknowledged = local.filter((message) => {
     if (canonicalIds.has(message._id)) return false;
-    // A delivery rejection is device-specific operational state, not a
-    // competing transcript row. Keep the durable local notice visible across
-    // restart even after the canonical turn becomes terminal.
     if (
       message.type === "assistant_message" &&
       message.payload?.source === "cloud-sync-error"

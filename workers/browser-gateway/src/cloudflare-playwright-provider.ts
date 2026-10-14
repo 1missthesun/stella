@@ -55,13 +55,11 @@ const boundedString = (value: unknown, maximum: number): string => {
 const safeTitle = (value: string): string =>
   redactVisibleText(value).slice(0, 512);
 
-/** Credential-shaped controls, flagged in observations so the agent knows a sign-in form when it sees one. */
 const SENSITIVE_CONTROL_PATTERN =
   "(?:password|email|tel|username|one-time-code|otp|token|secret|passkey|cc-)";
 
 const MAX_OBSERVED_ELEMENTS = 150;
 const SCREENSHOT_MAX_BYTES = 6 * 1024 * 1024;
-/** Requests remembered for `requests()`; bodies are kept for the newest few. */
 const NETWORK_LOG_SIZE = 500;
 const NETWORK_BODY_RETAINED = 100;
 const RESPONSE_BODY_MAX_CHARS = 8 * 1024 * 1024;
@@ -209,7 +207,6 @@ const collectElements = Object.assign(
   { toString: () => COLLECT_ELEMENTS_SOURCE },
 );
 
-/** Host-side projection: redact names and offer a durable selector when one is safe. */
 const safeElement = (raw: RawElement): SafeElement => {
   const name = redactVisibleText(raw.name ?? "").slice(0, 120);
   const nameIsPublic = name === raw.name;
@@ -354,7 +351,6 @@ export class CloudflarePlaywrightProvider implements BrowserBackend {
     }
   }
 
-  /** The desktop agent's `requests`/`responsebody`: a bounded log of this context's traffic. */
   private recordNetwork(context: BrowserContext): void {
     this.network = [];
     const remember = (
@@ -382,7 +378,6 @@ export class CloudflarePlaywrightProvider implements BrowserBackend {
       }
       item.entry = { ...item.entry, ...update };
       if (response) item.response = response;
-      // Bodies are only kept for the newest responses.
       const withBodies = this.network.filter((candidate) => candidate.response);
       for (const stale of withBodies.slice(0, -NETWORK_BODY_RETAINED)) {
         delete stale.response;
@@ -480,7 +475,6 @@ export class CloudflarePlaywrightProvider implements BrowserBackend {
     }
   }
 
-  /** Playwright's own locator semantics: auto-waiting and strict, as on the desktop. */
   private async safeAgentLocator(selector: string): Promise<Locator> {
     return this.requiredPage().locator(
       toPlaywrightSelector(boundedString(selector, 4_096)),
@@ -537,8 +531,6 @@ export class CloudflarePlaywrightProvider implements BrowserBackend {
 
   async wait(selector: string, timeoutMs: number): Promise<void> {
     try {
-      // Waiting is for something that has not appeared yet, so it cannot
-      // require a match up front.
       await this.requiredPage()
         .locator(toPlaywrightSelector(boundedString(selector, 4_096)))
         .first()
@@ -629,11 +621,6 @@ export class CloudflarePlaywrightProvider implements BrowserBackend {
     }
   }
 
-  /**
-   * The desktop agent's `evaluate`: an expression, or a function source
-   * called with `arg`. Errors come back as the page's own message so the
-   * agent can fix its script.
-   */
   async evaluate(script: string, arg: unknown): Promise<unknown> {
     const page = this.requiredPage();
     const source = `(async () => {
@@ -820,8 +807,6 @@ export class CloudflarePlaywrightProvider implements BrowserBackend {
       this.handoffOriginViolation = false;
       await this.installHandoffNavigationFence(args.expectedOrigin);
       const { targetInfo } = await cdp.send("Target.getTargetInfo");
-      // The gateway's own interaction expiry (bounded by args.handoffTimeoutMs
-      // upstream) and suspension alarm end the handoff; no remote timer exists.
       const handoffId = crypto.randomUUID();
       this.activeHandoffId = handoffId;
       return { handoffId, targetId: targetInfo.targetId };
@@ -850,7 +835,6 @@ export class CloudflarePlaywrightProvider implements BrowserBackend {
         await route.continue();
         return;
       }
-      // The durable violation flag makes Done and verification fail.
       this.handoffOriginViolation = true;
       await route.abort("blockedbyclient").catch(() => undefined);
     };
@@ -888,8 +872,6 @@ export class CloudflarePlaywrightProvider implements BrowserBackend {
   }
 
   async handoffState(): Promise<HandoffState> {
-    // A handoff is active only while this provider still holds the fenced
-    // context it was started on. A recreated browser never inherits one.
     if (
       this.activeHandoffId &&
       this.context &&

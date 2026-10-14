@@ -1,6 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-/** The shell's destinations, as the sidebar lists them. */
 export type MainTabId = "chat" | "schedule" | "email" | "apps" | "files" | "settings";
 
 export const MAIN_TAB_HREFS = {
@@ -16,7 +15,6 @@ export type MainTabHref = (typeof MAIN_TAB_HREFS)[MainTabId];
 
 const LAST_MAIN_TAB_KEY = "stella-mobile:last-main-tab";
 
-/** The tab a path belongs to; pages pushed from Settings stay under it. */
 export function readMainTabFromPath(pathname: string): MainTabId | null {
   if (pathname === "/chat") return "chat";
   if (pathname === "/schedule") return "schedule";
@@ -44,7 +42,6 @@ function parseMainTab(value: string | null): MainTabId | null {
   ) {
     return value;
   }
-  // Account merged into Settings.
   if (value === "account") return "settings";
   return null;
 }
@@ -60,33 +57,18 @@ export async function loadLastMainTabHref(): Promise<string> {
 
 type MainShellRouter = { replace: (href: MainTabHref) => void };
 
-/** A restored tab waiting for the shell to land on the chat. */
 let pendingMainTab: MainTabId | null = null;
 
-/**
- * Enter the `(main)` shell at `href`. The chat always goes in first and the
- * `(main)` layout pushes a restored tab over it once the chat is on screen
- * (see `takePendingMainTab`), so the chat is mounted under every tab from the
- * start: the tabs show what it publishes (files, the paired computer), and
- * "Chat" is a pop back to the same instance rather than a cold mount. Pushing
- * in the same tick as the replace would open a second `(main)` stack.
- */
 export function enterMainShell(router: MainShellRouter, href: string): void {
   const tab = readMainTabFromPath(href);
   pendingMainTab = tab && tab !== "chat" ? tab : null;
   router.replace(MAIN_TAB_HREFS.chat);
 }
 
-/**
- * Open `tab` over the chat once the shell is back on it. For leaving a page
- * pushed from a tab: the stack drops to the chat first, so the new tab lands
- * one level over it instead of on top of the old tab's page.
- */
 export function queueMainTab(tab: MainTabId): void {
   pendingMainTab = tab === "chat" ? null : tab;
 }
 
-/** The tab waiting to open over the chat, once; `null` when there is none. */
 export function takePendingMainTab(): MainTabId | null {
   const tab = pendingMainTab;
   pendingMainTab = null;

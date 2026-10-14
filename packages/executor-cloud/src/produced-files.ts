@@ -1,23 +1,3 @@
-/**
- * Produced-file reporting for a cloud agent turn.
- *
- * The agent's own reply names what a turn delivered: the file list is derived
- * from the markdown links in the turn's final assistant message(s), the same
- * contract the local lane uses. A linked path is deliberate by construction —
- * the model wrote it into the reply — which is what a filesystem diff could
- * never tell apart from a dependency install.
- *
- * Reported files are saved to the owner's drive with their bytes: inline when
- * small enough, and through a staged upload (`drive-writeback.ts`) above
- * that. The drive is the only place these files are kept — the world never
- * stores its `drive/` — so a report never registers a file without them.
- *
- * A linked path is a string the agent chose, so every candidate is opened
- * component-by-component beneath the workspace descriptor and required to be
- * a singly-linked, workspace-owned regular file. Small-file bytes are retained
- * from that authorization; delivery never reopens the linked pathname.
- */
-
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { isolateToolProcessLaunch } from "@stella/runtime/kernel/tools/process-isolation.js";
@@ -27,46 +7,24 @@ import {
   statWorkspaceFileNoFollow,
 } from "@stella/runtime/kernel/tools/workspace-file-boundary.js";
 
-/**
- * Stable bytes authorized through the workspace descriptor boundary.
- *
- * A non-enumerable symbol keeps these bytes out of object spreading and JSON
- * while the trusted executor carries a report from collection to delivery.
- * Delivery is deliberately unable to fall back to a path if this field is
- * absent.
- */
 export const PRODUCED_FILE_AUTHORIZED_BYTES = Symbol(
   "stella.produced-file.authorized-bytes",
 );
 
 export type ProducedFileReport = {
-  /**
-   * Drive-relative POSIX path, no leading slash (contract C3). Non-drive
-   * workspaces are namespaced here rather than in the backend route, because
-   * the chat surface resolves the path it sees in the `output_files` event
-   * straight against the drive — the two have to be the same string.
-   */
   path: string;
   name: string;
   sizeBytes: number;
   contentType: string;
-  /**
-   * A `drive.turnStage` upload already holding this file's bytes, for a file
-   * at or above the inline limit.
-   */
   uploadId?: string;
-  /** Trusted-host-only bytes; omitted from JSON and never reconstructed. */
   [PRODUCED_FILE_AUTHORIZED_BYTES]?: Buffer;
 };
 
-/** What a turn produced, and what did not fit the report. */
 export type ProducedFileCollection = {
   files: ProducedFileReport[];
-  /** Deliverables the cap left behind, as drive paths, for the agent's report. */
   omitted: string[];
 };
 
-/** The wire shape of one file in the C4 report and the `output_files` event. */
 export const toDriveFile = (file: ProducedFileReport) => ({
   path: file.path,
   name: file.name,
@@ -74,13 +32,9 @@ export const toDriveFile = (file: ProducedFileReport) => ({
   contentType: file.contentType,
 });
 
-/** Files at or above this size are staged rather than uploaded inline. */
 export const INLINE_LIMIT_BYTES = 8 * 1024 * 1024;
-/** A turn that "produced" more than this is reporting churn, not deliverables. */
 const MAX_REPORTED_FILES = 25;
 
-// The tool host's private state directory: in a cloud workspace it holds
-// shell state, not deliverables, so a link into it is never delivered.
 const STATE_DIR_SEGMENT = ".stella";
 
 const CONTENT_TYPES: Record<string, string> = {
@@ -141,7 +95,6 @@ const assertStrictProcessIdentity = (identity: ToolProcessIdentity): void => {
   }
 };
 
-/** Pure launch builder retained as focused evidence for the privilege fence. */
 export const buildProducedFilesGitCheckIgnoreLaunch = (
   identity: ToolProcessIdentity,
   platform: NodeJS.Platform = process.platform,
@@ -155,10 +108,6 @@ export const buildProducedFilesGitCheckIgnoreLaunch = (
   });
 };
 
-/**
- * A project workspace is a git checkout: build output, caches and local
- * env files are exactly the paths its `.gitignore` already names.
- */
 const filterGitIgnored = async (
   workspaceRoot: string,
   relativePaths: string[],
@@ -196,33 +145,12 @@ const filterGitIgnored = async (
     child.stdin.end(`${relativePaths.join("\0")}\0`);
   });
 
-/**
- * Turn the reply's linked paths into the deliverables worth reporting.
- *
- * `linked` paths come from markdown links in the turn's final assistant
- * message(s): each is deliberate — the model wrote it into the reply — so no
- * churn heuristics apply. They are still agent-chosen strings, so each one is
- * resolved against the workspace root and refused if it escapes it or names
- * the tool host's state directory, before the descriptor-boundary
- * authorization below ever sees it.
- *
- * The report (25 files unless `limit` says otherwise) is spent in link
- * order, and whatever it cannot fit comes back as `omitted` so the turn can
- * say so.
- *
- * `gitAware` runs the surviving paths past `.gitignore`, which is only
- * meaningful for a project checkout.
- */
 export const collectProducedFiles = async (options: {
   workspaceRoot: string;
-  /** Fixed Cloud identity used for both subprocesses and workspace ownership. */
   processIdentity: ToolProcessIdentity;
-  /** Untrusted paths linked in the turn's final assistant message(s). */
   linked: readonly string[];
   gitAware: boolean;
-  /** Drive folder this workspace's files land under; "" for the drive itself. */
   drivePrefix: string;
-  /** Files the collection may hold; the rest come back as `omitted`. */
   limit?: number;
 }): Promise<ProducedFileCollection> => {
   const limit = options.limit ?? MAX_REPORTED_FILES;
@@ -274,9 +202,6 @@ export const collectProducedFiles = async (options: {
       continue;
     }
 
-    // Only bytes opened and held by the descriptor-safe boundary may leave the
-    // workspace. A later rename/symlink swap is harmless because delivery has
-    // no pathname to reopen. Large files remain metadata-only by contract.
     let authorizedBytes: Buffer | undefined;
     let sizeBytes = metadataSize;
     if (metadataSize < INLINE_LIMIT_BYTES) {
@@ -319,43 +244,14 @@ export const collectProducedFiles = async (options: {
   return { files, omitted };
 };
 
-/** What the drive did with a turn's report, per path. */
 export type ProducedFileDelivery = {
-  /** Paths whose bytes actually reached the drive. */
   stored: Set<string>;
-  /** Of `stored`, the row version each now has, under its final path. */
   versions: Map<string, number>;
-  /** Paths the drive refused, with the reason to put in front of the user. */
   skipped: Array<{ path: string; reason: string }>;
-  /** Paths saved under a different name to protect a file the user uploaded. */
   renamed: Array<{ from: string; to: string; reason: string }>;
-  /**
-   * Paths that landed on a drive row this turn never read. Not a refusal —
-   * these are delivered — but the turn hydrates a bounded window of the drive,
-   * so this is the only place a user learns that the file their agent "wrote"
-   * had a previous version it never opened.
-   */
   replaced: Array<{ path: string; reason: string }>;
 };
 
-/**
- * Save the reported files to the drive: inline bytes for everything under the
- * inline limit, a staged upload's id for anything larger. Batched so one
- * request never carries more than the inline limit's worth of content. A file
- * that carries neither is not sent: the drive keeps no row without bytes.
- *
- * `known` carries, per drive path, the row version this turn hydrated. The
- * route only lets an agent write replace a file the user uploaded when that
- * version still matches, so a path missing from this map is a path the turn
- * never read — and its write is diverted rather than allowed to destroy the
- * upload.
- *
- * No batch failure is ever thrown, for the same reason a 413 is not: the
- * batches before it are already in the owner's drive, charged against their
- * quota, and losing their result means the user gets no card for files that
- * were delivered and a report telling them nothing was. A batch that cannot be
- * delivered becomes a per-file `skipped` verdict for its own files only.
- */
 export const reportProducedFiles = async (options: {
   turnId: string;
   files: ProducedFileReport[];
@@ -367,7 +263,6 @@ export const reportProducedFiles = async (options: {
    * paths this checks before it retries.
    */
   uploads?: ReadonlySet<string>;
-  /** Separates the batches of several reports made by one turn. */
   batchPrefix?: string;
   post: (route: string, body: unknown) => Promise<Response>;
 }): Promise<ProducedFileDelivery> => {
@@ -376,9 +271,6 @@ export const reportProducedFiles = async (options: {
     uploadId?: string;
     knownUpdatedAt?: number;
   };
-  // A file too large to send inline is staged, so offering the user a
-  // download for one whose staging failed would hand them a URL with nothing
-  // behind it; it is never sent.
   const delivery: ProducedFileDelivery = {
     stored: new Set<string>(),
     versions: new Map<string, number>(),
@@ -481,8 +373,6 @@ export const reportProducedFiles = async (options: {
     } | null;
     if (!manifest) return null;
     const rows = new Map<string, { sizeBytes?: number; updatedAt?: number }>();
-    // A row the turn's budget left out of hydration is reported as skipped,
-    // with the same version and size.
     for (const row of [
       ...(manifest.files ?? []),
       ...(manifest.skipped ?? []),
@@ -549,7 +439,6 @@ export const reportProducedFiles = async (options: {
       response = await send(attempt, batchKey);
     }
     if (!response) {
-      // This attempt's files only: the ones already accepted stay delivered.
       for (const entry of attempt) {
         delivery.skipped.push({
           path: entry.path,

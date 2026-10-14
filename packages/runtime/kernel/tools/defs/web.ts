@@ -1,17 +1,3 @@
-/**
- * `web` tool — unified web search + fetch.
- *
- * Pass exactly one of `query` or `url`. Search routes through the optionally
- * injected `webSearch` capability; fetch always uses the local readable-text
- * extractor (`localWebFetch`). Search results flow back as plain text /
- * structured `details.results` for the model to summarize — the chat
- * surface never auto-renders them.
- *
- * The model-visible surface (name, description, parameters) lives in
- * `web-def.ts` so workerd hosts expose the identical tool; this file adds
- * the executable handler for tool-host consumers.
- */
-
 import { localWebFetch } from "../local-tool-overrides.js";
 import type { ToolDefinition } from "../types.js";
 import {

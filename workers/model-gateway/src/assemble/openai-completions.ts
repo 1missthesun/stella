@@ -6,20 +6,6 @@ import {
   type AssembleOutcome,
 } from "./types.js";
 
-/**
- * OpenAI Chat Completions stream -> `ChatCompletion`.
- *
- * Chunks are merged by `choices[i].index`: text-like delta fields append,
- * `tool_calls` merge by their own `index` (id/type/name set once, arguments
- * appended), `reasoning_details` concatenate, `finish_reason` is the last
- * non-null value, and `usage` comes from the last chunk that carried it
- * (`stream_options.include_usage`).
- *
- * Reasoning fields vary by gateway — DeepSeek `reasoning_content`, OpenRouter
- * `reasoning` + `reasoning_details`, some OpenAI-compatible hosts
- * `reasoning_text` — and each is folded into the same-named message field so
- * the caller's adapter sees exactly what a non-streaming call returns.
- */
 const APPEND_FIELDS = [
   "content",
   "reasoning_content",

@@ -1,31 +1,13 @@
-/**
- * Record-then-transcribe dictation transport.
- *
- * The whole utterance is captured locally as 16 kHz mono PCM16, wrapped in a
- * WAV header here, and posted to the backend's `/api/dictation/transcribe`,
- * which answers `{ text, seconds }`. There are no partial results: the request
- * is a single batch round trip (managed dictation runs the same Muse model
- * through OpenRouter), so the caller shows its "transcribing" state until this
- * resolves.
- */
-
 import { getAuthToken } from "./auth-token";
 import { backendOrigin } from "./http";
 
 export const DICTATION_SAMPLE_RATE = 16_000;
 const PCM_BYTES_PER_SECOND = DICTATION_SAMPLE_RATE * 2;
-/** The route's own ceiling; capture stops here rather than being refused. */
 export const DICTATION_MAX_PCM_BYTES = 15 * 60 * PCM_BYTES_PER_SECOND;
 const WAV_HEADER_BYTES = 44;
-/**
- * Batch transcription is roughly real time in the worst case and the request
- * also carries the upload, so the budget grows with the recording instead of
- * using `http.ts`'s fixed 15 s.
- */
 const BASE_TIMEOUT_MS = 30_000;
 const TIMEOUT_MS_PER_SECOND = 3_000;
 
-/** A refused transcription, with the route's error code when it sent one. */
 export class DictationTranscribeError extends Error {
   readonly code: string | null;
   constructor(message: string, code: string | null) {
@@ -35,10 +17,6 @@ export class DictationTranscribeError extends Error {
   }
 }
 
-/**
- * One 16 kHz mono PCM16 WAV over the captured chunks. Single pass over the
- * audio, which is the only sizeable work dictation does on the JS thread.
- */
 export const wavFromPcm16 = (
   chunks: ArrayBuffer[],
   pcmBytes: number,
@@ -129,7 +107,6 @@ export const loadDictationStreamingAvailable = (): Promise<boolean> => {
   return entry.value;
 };
 
-/** POST the WAV and return the transcript, or throw a described failure. */
 export const transcribeDictationWav = async (
   wav: Uint8Array,
 ): Promise<string> => {
@@ -154,8 +131,6 @@ export const transcribeDictationWav = async (
         Authorization: `Bearer ${await getAuthToken()}`,
         "Content-Type": "audio/wav",
       },
-      // React Native's networking accepts a buffer and uploads it as binary;
-      // its fetch types only describe the web's text/Blob bodies.
       body: wav.buffer as BodyInit,
       signal: controller.signal,
     });

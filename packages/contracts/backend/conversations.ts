@@ -1,11 +1,4 @@
-/**
- * Conversations and the owner identity, served from the owner's object.
- * The conversation's transcript stays in its own `OrchestratorSession`; this
- * is the index a client lists and selects from.
- */
-
 export type ConversationSummary = {
-  /** The account this row belongs to; clients drop rows for any other. */
   ownerId: string;
   conversationId: string;
   title: string;
@@ -18,13 +11,10 @@ export type ConversationSummary = {
 
 export type OwnerIdentity = {
   ownerId: string;
-  /** Changes when the owner resets or deletes their data; fences stale work. */
   ownerGeneration: string;
-  /** Always false: anonymous sign-in is gone. Kept for older clients. */
   isAnonymous: boolean;
 };
 
-/** One conversation in an owner data export: its index row and journal records. */
 export type ConversationExport = {
   summary: ConversationSummary;
   records: unknown[];
@@ -39,27 +29,14 @@ export type DataExport = {
 
 export type ConversationCalls = {
   "owner.identity": { args: Record<string, never>; result: OwnerIdentity };
-  /**
-   * The account's main conversation plus the owner identity: everything a
-   * client needs before showing its chat. Every client opens the same main
-   * conversation. The server pins it the first time any client asks: the
-   * `preferConversationId` hint when it is a live conversation, else the most
-   * recently used one, else a new empty one. Deleting it re-pins on the next
-   * call. Older phone builds still send `clientCreateId`; it is ignored.
-   */
   "conversations.bootstrap": {
     args: { clientCreateId?: string; preferConversationId?: string };
     result: OwnerIdentity & { conversationId: string };
   };
-  /**
-   * The owner's conversations with their journal records, for download.
-   * Bounded; `truncated` says the cap cut something off.
-   */
   "data.export": { args: Record<string, never>; result: DataExport };
 };
 
 export type ConversationViews = {
-  /** The newest conversations, for selection and the sidebar's first page. */
   "conversations.recent": { args: Record<string, never>; result: ConversationSummary[] };
   "conversations.get": {
     args: { conversationId: string };

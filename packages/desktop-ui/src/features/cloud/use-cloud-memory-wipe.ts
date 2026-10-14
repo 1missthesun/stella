@@ -57,7 +57,6 @@ const wipeClient = createCloudMemoryWipeClient({
   start: (args) => backendClient.call("memory.startWipe", args),
 });
 
-/** A view value echoing another owner is the previous account's, not ours. */
 const belongsToAnotherOwner = (value: unknown, subject: string): boolean =>
   typeof value === "object" &&
   value !== null &&
@@ -73,12 +72,6 @@ const phaseForStatus = (
       ? "completed"
       : "ready";
 
-/**
- * Account/session-fenced controller for the dedicated destructive Memory wipe.
- * The owner's live `memory.wipeStatus` view is the only authority and pushes
- * every stage; intermediate call success is never treated as completion, and
- * an ambiguous retry reuses its exact request id.
- */
 export function useCloudMemoryWipe(): CloudMemoryWipeView {
   const mode = useCloudConversationSession();
   const identity = useMemo<CloudMemoryWipeIdentity | null>(
@@ -107,7 +100,6 @@ export function useCloudMemoryWipe(): CloudMemoryWipeView {
 
   const currentIdentityRef = useRef<CloudMemoryWipeIdentity | null>(identity);
   const statusRef = useRef<MemoryWipeStatus | null>(null);
-  /** The last status the view delivered, published or not; null once it fails. */
   const liveStatusRef = useRef<MemoryWipeStatus | null>(null);
   const activeRequestIdRef = useRef<string | null>(null);
   const activeAttemptRef = useRef<CloudMemoryWipeAttempt | null>(null);
@@ -209,8 +201,6 @@ export function useCloudMemoryWipe(): CloudMemoryWipeView {
           setView({ phase: "completed", status, issueCode: null });
           return true;
         }
-        // An unchanged pre-start open head is not evidence that an ambiguous
-        // mutation committed. Preserve its exact-attempt retry plan.
         return false;
       }
 
@@ -268,11 +258,6 @@ export function useCloudMemoryWipe(): CloudMemoryWipeView {
     [publishError, publishStatus, requestIsCurrent],
   );
 
-  /**
-   * Republish from the live view. A failed view is retried by reconnecting
-   * the live channel; the status it delivers next is published by the
-   * subscription effect.
-   */
   const load = useCallback(async (): Promise<boolean> => {
     const current = currentIdentityRef.current;
     if (!current || startingRef.current) return false;

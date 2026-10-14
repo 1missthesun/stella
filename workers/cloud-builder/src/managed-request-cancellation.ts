@@ -1,6 +1,5 @@
 import { GATEWAY_REQUEST_ID_HEADER } from "@stella/contracts/gateway/api";
 
-/** Private RPC surface; identity is derived from the signed capability there. */
 export type ManagedRequestControl = {
   cancelManagedRequest(args: {
     capability: string;
@@ -8,7 +7,6 @@ export type ManagedRequestControl = {
   }): Promise<{ canceled: boolean }>;
 };
 
-/** The `MODEL_GATEWAY_CONTROL` entrypoint as OwnerGate and the Orchestrator call it. */
 export type ModelGatewayControl = ManagedRequestControl & {
   prepareOwner(args: { ownerId: string }): Promise<void>;
 };
@@ -44,8 +42,6 @@ export const fetchWithManagedCancellation = async (args: {
       void responseReader?.cancel(request.signal.reason).catch(() => undefined);
     }
     cancelWork ??= (async () => {
-      // Cancel is idempotent. Retrying a lost cancel response never retries
-      // model execution or changes the request identity.
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
           await args.control.cancelManagedRequest({

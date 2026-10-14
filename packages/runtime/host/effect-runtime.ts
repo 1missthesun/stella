@@ -1,21 +1,3 @@
-/**
- * The one module-level ManagedRuntime for the host tree (the runtime host in
- * the runtime process, and its client in the app), plus the small timer
- * combinators the host facades share.
- *
- * House conventions (docs/effect-architecture.md, kernel/tools/effect-runtime.ts):
- * - Exactly ONE requirements-free runtime per facade module family; context
- *   rides in closures, never per-call `Effect.runPromise`.
- * - Promise facades rethrow the ORIGINAL failure via `Cause.squash`, so
- *   callers observe byte-identical error objects and messages.
- * - Timers are forked fibers cancelled through a `Deferred` latch (the same
- *   shape as `forkAbortTimer` in kernel/tools) — the Effect replacement for
- *   `setTimeout`/`setInterval` + `clearTimeout` pairs.
- *
- * Worker modules (`worker/**`) keep their own runtime module; only the
- * runtime entry reaches into the host tree, to start the host beside them.
- */
-
 import {
   Cause,
   Deferred,
@@ -26,15 +8,8 @@ import {
   Schedule,
 } from "effect";
 
-/** Shared runtime for every Effect run in `host/` (staleness handshake,
- * quiescence poll, lifecycle controller, client timers). */
 export const hostRuntime = ManagedRuntime.make(Layer.empty);
 
-/**
- * Run a host Effect on the shared runtime, rejecting with the ORIGINAL
- * failure object (`Cause.squash`) so facade callers see the exact error the
- * pre-Effect code would have thrown.
- */
 export const runHostEffect = async <A>(
   effect: Effect.Effect<A, unknown>,
 ): Promise<A> => {
@@ -45,17 +20,10 @@ export const runHostEffect = async <A>(
   throw Cause.squash(exit.cause);
 };
 
-/** Cancellation handle for a forked timer fiber. Cancel is idempotent and
- * a no-op once the timer has fired (matching `clearTimeout`). */
 export type HostTimerHandle = {
   readonly cancel: () => void;
 };
 
-/**
- * `setTimeout` replacement: run `fire` once after `delayMs` on the host
- * runtime. The returned handle interrupts the pending sleep via a
- * `Deferred` latch.
- */
 export const forkDelayed = (
   delayMs: number,
   fire: () => void,
@@ -76,12 +44,6 @@ export const forkDelayed = (
   };
 };
 
-/**
- * `setInterval` replacement: first fire after `intervalMs`, then repeat on
- * the fixed-rate grid (`Schedule.fixed` — a slow callback does not push
- * later ticks, matching `setInterval` cadence; see
- * `host/staleness.ts#quiescencePollEffect` for the same parity argument).
- */
 export const forkInterval = (
   intervalMs: number,
   fire: () => void,

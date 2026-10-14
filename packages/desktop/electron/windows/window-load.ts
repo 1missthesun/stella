@@ -24,7 +24,6 @@ const applyWindowQueryParams = (url: URL, windowMode: WindowLoadMode) => {
   }
 }
 
-/** The renderer served from source (see `source/renderer-source.ts`). */
 export const getSourceUrl = (windowMode: WindowLoadMode) => {
   const url = new URL(getWindowEntryFile(windowMode), `${RENDERER_ORIGIN}/`)
   applyWindowQueryParams(url, windowMode)

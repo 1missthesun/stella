@@ -1,12 +1,3 @@
-// Regenerates `oauth-provider-catalog.index.json` (the catalog minus each
-// provider's `tools`) from `oauth-provider-catalog.json`. Run after editing the
-// catalog (e.g. after scripts/recover-composio-oauth-actions.mjs):
-//
-//   bun packages/runtime/kernel/connectors/generate-oauth-provider-catalog-index.ts [--check]
-//
-// `--check` exits 1 when the committed sidecar has drifted; CI runs it through
-// `bun run check:generated`.
-
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

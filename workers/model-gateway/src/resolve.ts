@@ -33,7 +33,6 @@ export type ManagedRoute = {
   config: ModelConfig;
 };
 
-/** Wire protocols each provider's upstream actually serves. */
 export const PROTOCOLS_BY_PROVIDER: Record<
   ManagedGatewayProvider,
   readonly GatewayProtocol[]

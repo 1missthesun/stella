@@ -85,8 +85,6 @@ const createImageGenHandler =
         : null;
     let size: { width: number; height: number } | null = null;
 
-    // Optional explicit pixel dimensions. Validate the image model's envelope
-    // locally so the agent gets a clear error instead of a 4xx from upstream.
     const sizeArg = args.size as
       { width?: unknown; height?: unknown } | undefined;
     if (sizeArg && typeof sizeArg === "object") {
@@ -125,9 +123,6 @@ const createImageGenHandler =
       size = { width, height };
     }
 
-    // Reference paths are authorized and signature-checked before any read.
-    // BYOK sends them only to the selected provider. Managed Stella requires
-    // an explicit per-call upload consent flag below.
     const referencePaths = collectStringList(args.referenceImagePaths);
     const referenceUrlsRaw = collectStringList(args.referenceImageUrls);
     if (

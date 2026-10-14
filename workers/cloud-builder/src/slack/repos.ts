@@ -1,21 +1,3 @@
-/**
- * Stella Crew repositories (migrations/0016): a Slack workspace has any
- * number of GitHub repositories, each with its own environment
- * (`environment.ts`, keyed by repository id), preview settings and rules.
- *
- * Which repository a request is about is Stella's call, not routing: her
- * prompt lists the workspace's repositories, and she records her choice for
- * the conversation with `slack_repo` (`slack_conversation_repos`). A
- * conversation that hasn't chosen uses its channel's default repository
- * (`slack_channel_repos`), else the workspace's only repository, else none.
- * Every agent container started for the conversation then gets that
- * repository cloned (`repo-clone.ts`) and runs in its environment.
- *
- * GitHub access is through the workspace's GitHub connections
- * (`slack_github_connections`), one per connected account; a repository uses
- * the connection whose account owns it.
- */
-
 import { decryptToken } from "./crypto.js";
 
 const d1 = (env: Cloudflare.Env): D1Database => {
@@ -43,7 +25,6 @@ export type SlackRepoRecord = {
   previewTtlDays: number | null;
 };
 
-/** A repository with how agents reach it. */
 export type SlackRepoSettings = {
   teamId: string;
   id: string;
@@ -51,7 +32,6 @@ export type SlackRepoSettings = {
   branch: string;
   /** A token pasted before GitHub connections existed. */
   legacyToken: string | null;
-  /** The connection whose account owns the repository, if any. */
   github: SlackGithubConnection | null;
 };
 
@@ -79,8 +59,6 @@ const fromRow = (row: RepoRow): SlackRepoRecord => ({
 
 const isGithubStatus = (value: unknown): value is SlackGithubStatus =>
   value === "active" || value === "suspended" || value === "revoked";
-
-// ── GitHub connections ────────────────────────────────────────────────────
 
 export const listGithubConnections = async (
   env: Cloudflare.Env,
@@ -128,7 +106,6 @@ export const deleteGithubConnection = async (
   return (result.meta.changes ?? 0) > 0;
 };
 
-/** Record what GitHub said about an installation on every workspace using it. */
 export const setGithubStatus = async (
   env: Cloudflare.Env,
   installationId: string,
@@ -141,12 +118,10 @@ export const setGithubStatus = async (
   return result.meta.changes ?? 0;
 };
 
-/** Whether the connection's account owns `fullName`, so the App can mint for it. */
 export const repoOwnedBy = (github: SlackGithubConnection | null, fullName: string): boolean =>
   Boolean(github?.account) &&
   fullName.split("/")[0]!.toLowerCase() === github!.account.toLowerCase();
 
-/** The connection a repository uses: its owner's, an active one first. */
 export const connectionFor = (
   connections: SlackGithubConnection[],
   fullName: string,
@@ -154,8 +129,6 @@ export const connectionFor = (
   const owned = connections.filter((connection) => repoOwnedBy(connection, fullName));
   return owned.find((connection) => connection.status === "active") ?? owned[0] ?? null;
 };
-
-// ── Repositories ──────────────────────────────────────────────────────────
 
 export const listRepos = async (env: Cloudflare.Env, teamId: string): Promise<SlackRepoRecord[]> => {
   const rows = await d1(env)
@@ -214,7 +187,6 @@ export type RepoPatch = {
   rules?: string;
   previewAccess?: string;
   previewTtlDays?: number;
-  /** Forget a token pasted before GitHub connections existed. */
   dropToken?: boolean;
 };
 
@@ -240,7 +212,6 @@ export const updateRepo = async (
     .run();
 };
 
-/** Removes the repository with its environment, secrets and channel defaults. */
 export const removeRepo = async (env: Cloudflare.Env, teamId: string, repoId: string): Promise<void> => {
   const db = d1(env);
   await db.batch([
@@ -252,7 +223,6 @@ export const removeRepo = async (env: Cloudflare.Env, teamId: string, repoId: st
   ]);
 };
 
-/** Everything about a workspace's repositories, for when its settings go. */
 export const deleteWorkspaceRepos = async (env: Cloudflare.Env, teamId: string): Promise<void> => {
   const db = d1(env);
   await db.batch([
@@ -283,8 +253,6 @@ export const repoSettings = async (
     github: connectionFor(connections ?? (await listGithubConnections(env, record.teamId)), record.fullName),
   };
 };
-
-// ── Channel defaults ──────────────────────────────────────────────────────
 
 export const listChannelDefaults = async (
   env: Cloudflare.Env,
@@ -342,9 +310,6 @@ export const removeChannelDefaults = async (
   );
 };
 
-// ── A conversation's repository ───────────────────────────────────────────
-
-/** Stella's choice for a conversation; null clears it, "" means none on purpose. */
 export const setConversationRepo = async (
   env: Cloudflare.Env,
   conversationId: string,
@@ -368,15 +333,9 @@ export const setConversationRepo = async (
 export type ConversationRepo = {
   teamId: string;
   repo: SlackRepoRecord | null;
-  /** How it was decided. */
   source: "chosen" | "channel" | "only" | "none";
 };
 
-/**
- * The repository a Slack conversation works in: Stella's choice, else its
- * channel's default, else the workspace's only repository. `channelId` is
- * read from the conversation's thread when not given.
- */
 export const resolveConversationRepo = async (
   env: Cloudflare.Env,
   conversationId: string,
@@ -413,7 +372,6 @@ export const resolveConversationRepo = async (
   return { teamId, repo: null, source: "none" };
 };
 
-/** The repository a Slack conversation's agents start with, with how to reach it. */
 export const repoForConversation = async (
   env: Cloudflare.Env,
   conversationId: string,
@@ -423,7 +381,6 @@ export const repoForConversation = async (
   return await repoSettings(env, resolved.repo);
 };
 
-/** Whether Stella chose no repository for the conversation on purpose. */
 export const conversationChoseNone = async (env: Cloudflare.Env, conversationId: string): Promise<boolean> =>
   (
     await d1(env)

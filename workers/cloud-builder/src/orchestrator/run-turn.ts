@@ -80,8 +80,6 @@ import {
 import { OrchestratorCliTurn } from "./cli-turn.js";
 import type { OrchestratorOwner } from "./owner.js";
 
-/** One admitted chat turn, start to terminal, on Stella's loop or on pi. */
-/** pi's error reply for a Claude Code turn the usage limit stopped. */
 const isUsageLimitReply = (message: unknown): boolean => {
   const reply = message as { role?: unknown; stopReason?: unknown; errorMessage?: unknown };
   return (
@@ -92,7 +90,6 @@ const isUsageLimitReply = (message: unknown): boolean => {
   );
 };
 
-/** A model-gateway refusal that is about the owner's plan, not the request. */
 type GatewayPlanRefusal = "budget_exhausted" | "usage_limit" | "tier_paused";
 
 const gatewayPlanRefusalOf = async (
@@ -114,7 +111,6 @@ const gatewayPlanRefusalOf = async (
   }
 };
 
-/** What a turn the gateway refused on the owner's plan tells the user. */
 type PlanRefusalNotice = {
   message: string;
   code?: typeof STELLA_USAGE_LIMIT_CODE | typeof BILLING_UNAVAILABLE_CODE;
@@ -127,11 +123,6 @@ const TURN_BUDGET_SPENT_NOTICE =
   "This reply reached its spending limit before it finished. Send a message to continue.";
 
 export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
-  /**
-   * Why the gateway refused this turn's model call on the plan. The owner's
-   * billing decides: out of room is the usage-limit notice with Upgrade;
-   * still in room means only this turn's own budget ran out.
-   */
   protected async planRefusalNotice(
     turn: ChatTurnRequest,
     refusal: GatewayPlanRefusal,
@@ -179,12 +170,6 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
     return { message: TURN_BUDGET_SPENT_NOTICE };
   }
 
-  /**
-   * A stopped turn keeps what the user sent: its prompt is journaled now if
-   * the turn had not journaled it yet (Stop before admission, or while it
-   * was still preparing), so every client shows the message and its
-   * "Stopped." notice. Idempotent on the prompt's writer key.
-   */
   protected async journalStoppedPrompt(turn: ChatTurnRequest): Promise<void> {
     if (this.journal.hasRow(`turn:${turn.turnId}:prompt`)) return;
     const now = Date.now();
@@ -301,7 +286,6 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
     const startupTimings: Record<string, number> = {
       queueWaitMs: Math.round(enteredAt - enqueuedAt),
     };
-    // A turn already terminal in the journal.
     if (this.journal.turnState(turn.turnId)?.state === "terminal") {
       log("info", "chat_turn_duplicate_ignored", { turnId: turn.turnId });
       await this.ctx.storage.delete(`queued:${turn.turnId}`);
@@ -346,9 +330,6 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
         performance.now() - admission.at < 1_000
       ) {
         assertTurnExecutionActive(turnCancellation, executionSignal);
-        // Retirement/purge can race admission even in this isolate. The exact
-        // durable receipt must still be live; provider dispatch also checks the
-        // remote fence together with the current memory permission.
         await this.assertOwnerFenceLeaseReceiptActive(turn);
         startupTimings.admissionReused = 1;
       } else {
@@ -373,9 +354,6 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
       }
       throw error;
     }
-    // A turn that raced the deletion of its own conversation. Running it
-    // would rebuild the transcript the purge just destroyed, in an object no
-    // later purge will visit.
     if (this.purged()) {
       await this.ctx.storage.delete(`queued:${turn.turnId}`);
       await this.unregisterOwnerTurn(turn);
@@ -396,8 +374,6 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
       await this.releaseOwnerGate(turn);
       return json({ ok: false, duplicate: true });
     }
-    // A prior turn that never delivered its terminal event (isolate restart
-    // mid-run) would otherwise stay "running" in the owner forever.
     const stale = await this.getTurnState<ChatTurnRequest>("turn");
     if (
       stale &&
@@ -412,10 +388,7 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
         { terminal: true, errorMessage: interrupted },
       ).catch(() => undefined);
       await this.releaseOwnerGate(stale);
-      // Additive: the same terminal fact, in the transcript the clients read.
       this.recordTerminal(stale, "failed", interrupted);
-      // Flush, inbox drain, and rollover belong to the turn boundary that is
-      // about to reopen below.
     }
     // Claim first, dequeue second, and never the other way round. Between the
     // two writes is the only moment a restart can see this turn twice; before
@@ -444,17 +417,12 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
     let preCanceled: ExactTurnCancellation | null = null;
     const claimAt = performance.now();
     await this.ctx.blockConcurrencyWhile(async () => {
-      // This check and the queued -> current swap share the same critical
-      // section as `/cancel`'s durable tombstone. Either Stop wins and this turn
-      // never launches, or the turn becomes the exact current owner Stop joins.
       preCanceled = await this.exactTurnCancellations.matching({
         turnId: turn.turnId,
         ownerId: turn.ownerId,
         ownerGeneration: turn.ownerGeneration,
       });
       if (preCanceled) return;
-      // The heartbeat, not the watchdog: it is what wakes a replaced object
-      // in time to resume this turn.
       await this.armAlarmNoLaterThan(
         Math.min(watchdogAt, Date.now() + CHAT_TURN_HEARTBEAT_MS),
       );
@@ -509,8 +477,6 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
       ...(this.firstChatInIsolate ? { wakeTiming: this.wakeTiming } : {}),
     });
     this.firstChatInIsolate = false;
-    // Claimed inside the try so the matching `finally` always releases it: a
-    // turn id stuck here would stop the watchdog from ever finalizing a turn.
     const assertExactTurnActive = async (): Promise<void> => {
       assertTurnExecutionActive(turnCancellation, executionSignal);
       const [stored, terminal] = await Promise.all([
@@ -534,19 +500,11 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
     let providerRejection: string | undefined;
     let gatewayRefusal: GatewayPlanRefusal | undefined;
     try {
-      // The queue boundary checked the live owner lease. The provider guard
-      // checks it again with memory policy after read-only preparation.
       await assertExactTurnActive();
       this.activeTurnId = turn.turnId;
-      // Every turn runs on pi-durable (`runPiTurn`). An `anthropic` turn's
-      // model is Claude Code, whose CLI runs in the orchestrator container
-      // (`claude-code-transport.ts`); it holds no model capability.
       const harnessExecution =
         turn.execution.engine === "anthropic" ? undefined : turn.execution;
-      // Admission already bound the owner; this only re-asserts it and sets
-      // the title on a turn that carried one.
       this.bindConversation(turn);
-      // A resumed turn already projected its start.
       if (!resumeTurn) {
         await this.emitTurnEvent(turn, "started", {}, { deferred: true });
       }
@@ -560,11 +518,7 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
             this.loadCanonicalPromptsForTurn(executionSignal),
           ),
       );
-      // This work can reject before the other preparation joins it. Preserve
-      // that rejection for the await below without an unhandled rejection.
       void canonicalPromptsWork.catch(() => undefined);
-      // The model capability is the only credential the model gateway ever
-      // sees.
       const destinationsWork = measurePreparation(
         "devicesMs",
         () =>
@@ -608,9 +562,6 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
       const minted = await measurePreparation("capabilitiesMs", () =>
         mintOrchestratorTurnCapability(this.env, turn, harnessExecution),
       );
-      // A resumed turn keeps presenting the capability its first isolate
-      // minted while it outlives the watchdog: a fresh one is a fresh ledger,
-      // which would hand the same turn its whole budget a second time.
       const persistedModel = resumeTurn
         ? await this.getTurnState<PersistedChatTurnModelCapability>(
             CHAT_TURN_MODEL_CAPABILITY_KEY,
@@ -638,10 +589,6 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
       }
       await assertExactTurnActive();
 
-      // Resolve the owner's control-plane preference before any Agent Home
-      // content. Disabled means no resident-memory/personality read and no
-      // memory tools; unavailable or corrupt authoritative context blocks the
-      // turn instead of producing a normal-looking memoryless reply.
       const executionSelection = harnessExecution;
       const modelGatewayOrigin = this.env.MODEL_GATEWAY_URL?.trim() ?? "";
       const modelGateway = this.env.MODEL_GATEWAY;
@@ -655,10 +602,6 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
         !this.admittedOwnerModelGrants.has(turn.turnId)
       ) {
         this.gatewayPreparedInInstance = true;
-        // Owner-admitted turns already start this preparation at ingress.
-        // Prepare the owner executor and pricing while local adapters/context
-        // initialize. Discard the descriptor: inference still validates the
-        // current model and privacy state. This never starts a provider call.
         const gatewayPreparationStartedAt = performance.now();
         this.ctx.waitUntil(
           modelGateway
@@ -759,8 +702,6 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
         if (
           !this.localOwnerModelGrants.valid(current.grant, current.expected)
         ) {
-          // Revocation is terminal for this grant. Never turn it into a fresh
-          // OwnerGate request that could race the freeze acknowledgement.
           throw new OwnerPurgeFenceError();
         }
         if (current.grant.expiresAt - Date.now() > 60_000) return current;
@@ -768,14 +709,11 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
         void modelGrantWork.catch(() => undefined);
         return await modelGrantWork;
       };
-      // The turn's one transport to the model gateway: owner fence, model
-      // grant and managed cancellation on every physical request.
       const relayFetch = async (
         input: RequestInfo | URL,
         init?: RequestInit,
       ): Promise<Response> => {
         const request = new Request(input, init);
-        // Resolution contains no prompt and can overlap home loading.
         if (new URL(request.url).pathname === GATEWAY_RESOLVE_PATH) {
           return measurePreparation("modelResolutionTransportMs", () =>
             modelGateway.fetch(request),
@@ -796,8 +734,6 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
               })
             : physicalRequest;
           try {
-            // An eligible signed request goes straight to its owner
-            // DO; the DO retains every check.
             const relayOwners =
               executionSelection.engine === "stella" &&
               turnCapability.claims.ledgerScope === "owner-relay-v2"
@@ -904,8 +840,6 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
     } catch (error) {
       const message = errorMessage(error);
       const contextFailure = cloudContextFailure(error);
-      // A plan refusal (allowance spent, plan limit) is never "try again":
-      // the owner's billing says why, and clients offer Upgrade on its code.
       const planNotice =
         !contextFailure && gatewayRefusal
           ? await this.planRefusalNotice(turn, gatewayRefusal)
@@ -945,9 +879,6 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
         });
       }
       if (!(await this.getTurnState<boolean>("terminal"))) {
-        // Same pairing as `/cancel`: the alarm retries what is owed, so what
-        // is owed becomes durable in the same write that says a terminal was
-        // reached at all.
         const failedOwed: OwedTerminal = {
           kind: "failed",
           message: terminalNotice,
@@ -958,10 +889,6 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
           terminal: true,
           terminalOwed: failedOwed,
         });
-        // The raw message is often a provider error blob or infrastructure
-        // detail; it belongs in logs, never in the user's chat bubble — and
-        // never in a frame either. `ref` in the socket's error frame is the
-        // correlation key back to this log line.
         this.recordTerminal(turn, "failed", terminalNotice);
         try {
           await this.emitTurnEvent(turn, "failed", terminalPayload, {
@@ -971,8 +898,6 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
           });
           await this.ctx.storage.put("terminalDelivered", true);
         } catch {
-          // Delivery failed; the re-armed alarm retries so the turn cannot
-          // stay "running" forever.
           await this.ctx.storage.setAlarm(Date.now() + 30_000);
         }
       }
@@ -1006,15 +931,6 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
     }
   }
 
-  /**
-   * A turn of a conversation that runs on pi-durable, on any engine. The turn
-   * plane around it is unchanged: admission, owner fence, the turn's model
-   * capability and guarded transport, watchdog, terminal delivery. pi owns
-   * the run: the prompt goes to its root conversation under the turn id, so
-   * a turn resumed after an eviction finds the same submission, and pi's
-   * committed messages are mirrored into the journal for `/history`, the
-   * socket and the existing clients.
-   */
   protected async runPiTurn(args: {
     turn: ChatTurnRequest;
     turnCancellation: TurnRetryCancellation;
@@ -1094,7 +1010,6 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
       turnId: turn.turnId,
       capability: args.capability,
       fetch: args.relayFetch,
-      // Agents this turn starts run on this owner's authority after it ends.
       authority: {
         ownerId: turn.ownerId,
         ownerGeneration: turn.ownerGeneration,
@@ -1103,7 +1018,6 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
         budgetMicroCents: turn.budgetMicroCents,
         execution: args.execution,
       },
-      // A ChatGPT plan turn runs on the plan's model, which the gateway does not resolve.
       ...(args.execution.engine === "stella"
         ? {
             stellaModels: {
@@ -1149,9 +1063,6 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
         .flush({ activity: "running", updatedAt: Date.now() })
         .catch(() => undefined);
       await runtime.configureRoot(binding, context);
-      // A reply the journal could not take fails the turn, as the loop's
-      // does: what the user is shown and what Stella read must not diverge.
-      // The entry stays unmirrored, so the next turn writes it again.
       let persistError: string | undefined;
       stream = await runtime.follow(
         mirrored,
@@ -1162,10 +1073,7 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
             message &&
             (entry.kind === "pi.assistant" ||
               entry.kind === "pi.tool-result") &&
-            // Written from the journal: another writer's, already there.
             pi.journalSeqOf(entry) === undefined &&
-            // A reply the Claude usage limit cut off is not the turn's
-            // outcome: the turn is held, and the held card says so.
             !isUsageLimitReply(message)
           ) {
             try {
@@ -1188,7 +1096,6 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
           mirrored = Math.max(mirrored, entry.id);
         },
         context,
-        // Every client shows a turn's tools as they run, as the loop's.
         (tool) =>
           this.noteTurnTool(
             turn,
@@ -1212,10 +1119,7 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
         });
         return await this.completeChatTurn(turn, "", args.started);
       }
-      // What other writers journaled since (a computer's turns, another
-      // engine's) is part of the conversation this turn answers.
       const [, images] = await Promise.all([
-        // Rows already rolled over to R2 are read from there.
         runtime.importJournal(
           (afterSeq) =>
             this.archive.readRange(
@@ -1233,8 +1137,6 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
       const text = turn.hiddenMessage
         ? report.prompt
         : `${report.prompt.replace(/\s+$/u, "")}\n\n${formatMessageRefTag(promptSeq)}`;
-      // Marked as the journal row is: the clock is context, and a prompt the
-      // user did not write (a wake, an agent's note) is read, not shown.
       const hidden = { stella: { hidden: true as const } };
       const submission = await root.submit(
         {
@@ -1297,7 +1199,6 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
           executionSignal.aborted ||
           (await this.getTurnState<boolean>("terminal"))
         ) {
-          // Stop or the watchdog wrote the terminal; pi was aborted with it.
           this.currentPiRun?.abort();
           await this.afterTerminal(turn);
           return json({ ok: false, canceled: true });
@@ -1315,12 +1216,10 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
         return json({ ok: false, canceled: true });
       }
       if (settled.status !== "done") {
-        // Claude Code's own reason (a login, a usage limit) is the user's to read.
         const claudeCodeFailure =
           args.execution.engine === "anthropic"
             ? this.claudeCodeTransport().takeFailure(turn.turnId)
             : undefined;
-        // A usage limit holds the work until it resets instead of failing it.
         const usageLimit = claudeCodeFailure ? claudeUsageLimitOf(claudeCodeFailure) : null;
         if (usageLimit && (await this.holdForClaudeUsageLimit(turn, usageLimit))) {
           return await this.completeChatTurn(turn, "", args.started);
@@ -1349,9 +1248,7 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
       await this.ctx.storage
         .put(PI_MIRRORED_KEY, mirrored)
         .catch(() => undefined);
-      // Agents this turn started keep running after it.
       await this.piHeartbeat().catch(() => undefined);
-      // A compaction this turn (or one since the last) is every host's checkpoint.
       await runtime
         .publishCheckpoint(
           () =>

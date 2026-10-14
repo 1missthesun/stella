@@ -1,16 +1,6 @@
-/**
- * One streamable-HTTP MCP session: `initialize`, then `tools/list` and
- * `tools/call`, over plain `fetch`. Platform-neutral (no Node built-ins), so
- * the desktop's connector bridge and the cloud worker share it. Credentials
- * come from the caller's `authHeaders`; this module never stores any.
- */
-
 import { guardWithAbortTimeout } from "./effect-runtime.js";
 import type { ConnectorToolCallResult, ConnectorToolInfo } from "./types.js";
 
-/** Thrown when a connector request comes back with an HTTP auth status
- *  (401/403/407). Lets callers branch
- *  on auth failure vs. real probe errors without parsing message strings. */
 export class ConnectorAuthError extends Error {
   readonly kind = "auth_required" as const;
   constructor(
@@ -56,10 +46,6 @@ const parseSseMessages = (text: string): RpcMessage[] => {
   return messages;
 };
 
-/**
- * Optional server-provided usage guidance from the MCP `initialize`
- * response (`result.instructions`).
- */
 const readInstructions = (result: unknown): string | undefined => {
   const instructions =
     result && typeof result === "object"
@@ -78,10 +64,6 @@ export type McpHttpServer = {
 };
 
 export type McpHttpSessionOptions = {
-  /**
-   * Headers that carry the server's credential, or `{}` for none. Throw
-   * `ConnectorAuthError` when the server needs one that is missing.
-   */
   authHeaders: () => Promise<Record<string, string>>;
   fetch?: typeof fetch;
   timeoutMs?: number;
@@ -90,7 +72,6 @@ export type McpHttpSessionOptions = {
 export class McpHttpSession {
   private sessionId: string | null = null;
   private initialized = false;
-  /** From the last successful `initialize` (see {@link readInstructions}). */
   instructions: string | undefined;
 
   constructor(
@@ -118,9 +99,6 @@ export class McpHttpSession {
     const url = this.server.url;
     const doFetch = this.options.fetch ?? fetch;
     const headers = await this.headers();
-    // Seam: fetch needs a real AbortSignal for the guard, so the controller
-    // stays (sanctioned ratchet pin); the timer is a scoped Effect fiber
-    // interrupted when the request settles.
     const controller = new AbortController();
     return await guardWithAbortTimeout({
       timeoutMs: this.options.timeoutMs ?? REQUEST_TIMEOUT_MS,
@@ -267,7 +245,6 @@ export class McpHttpSession {
   }
 }
 
-/** The header a stored credential goes in, per the connector's auth scheme. */
 export const mcpCredentialHeader = (
   token: string,
   auth: { headerName?: string; scheme?: "bearer" | "basic" | "oauth" | "raw" } | undefined,

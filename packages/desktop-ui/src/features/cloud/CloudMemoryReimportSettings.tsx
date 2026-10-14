@@ -40,11 +40,6 @@ const dialogActionsStyle = {
   marginTop: 20,
 };
 
-/**
- * After a wipe: the account-wide choice to let computers upload the memory
- * they kept from before it, and, on a computer whose memory sync is holding
- * for that choice, erasing its memory instead. Skills are unrelated.
- */
 export function CloudMemoryReimportSettings() {
   const t = useT();
   const {

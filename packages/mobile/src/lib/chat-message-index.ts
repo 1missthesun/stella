@@ -173,8 +173,6 @@ async function recoverAccountCleanupIndex(
   try {
     let cleanupRebuildIntent: string | null = null;
     if (!progress.indexCleared) {
-      // Keep recall blocked across a kill before the cross-store owner can
-      // record this store's completion.
       cleanupRebuildIntent = await persistRebuildIntent();
       await deleteIndexContents(db);
       await markAccountChatIndexCleared(token);
@@ -364,17 +362,12 @@ export async function clearMessageIndex(): Promise<void> {
     getDb().then(deleteIndexContents),
   ]);
   if (databaseResult.status === "fulfilled") {
-    // Database deletion is authoritative for account-data cleanup. A failed
-    // marker write cannot preserve stale recall rows once this has committed;
-    // a failed marker removal merely causes a harmless empty rebuild later.
     if (markerResult.status === "fulfilled") {
       await clearRebuildIntent(markerResult.value).catch(() => {});
     }
     rebuildPhase = "idle";
     return;
   }
-  // Keep recall blocked when stale account rows could still exist. A durable
-  // marker (when available) makes the next process initialization retry.
   rebuildPhase = "failed";
   if (markerResult.status === "rejected") throw markerResult.reason;
   throw databaseResult.reason;

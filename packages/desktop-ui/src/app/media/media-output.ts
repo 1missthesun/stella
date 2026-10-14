@@ -1,8 +1,3 @@
-/**
- * A finished media job's output, read for the files it produced and saved
- * under the Stella media folder.
- */
-
 export type OutputMedia =
   | {
       kind: "image";
@@ -17,13 +12,10 @@ export type OutputMedia =
       kind: "download";
       url: string;
       label: string;
-      /** The model's own file name, whose extension says what the file is. */
       fileName?: string;
       localPath?: string;
     }
   | { kind: "unknown" };
-
-/* ── Output extraction ── */
 
 export function extractOutput(output: unknown): OutputMedia {
   if (!output || typeof output !== "object") return { kind: "unknown" };
@@ -81,8 +73,6 @@ export function extractOutput(output: unknown): OutputMedia {
 
   return { kind: "unknown" };
 }
-
-/* ── Save output files to desktop/state ── */
 
 export async function saveOutputToStella(
   output: OutputMedia,

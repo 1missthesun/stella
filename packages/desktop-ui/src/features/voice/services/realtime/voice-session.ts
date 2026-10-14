@@ -1,34 +1,3 @@
-/**
- * RealtimeVoiceSession — transport-agnostic session orchestration for
- * Stella's live voice call.
- *
- * Since the move to GPT-Live client delegation this is a two-brain session:
- * the voice model owns the spoken conversation full-duplex and owns nothing
- * else. It has no tools and no system prompt. Everything that requires
- * thinking, memory, files, apps or subagents is delegated to Stella's text
- * orchestrator and handed back as commentary.
- *
- * Responsibilities:
- *   - Lifecycle / state machine (idle → connecting → connected → …).
- *   - Server event routing: transcripts (fragments, accumulated into turns),
- *     delegation requests, append acks.
- *   - Delegation to the orchestrator and the appends that answer it.
- *   - Mid-call updates from the conversation stream (cloud or local), so a
- *     call hears about agent results and new text turns while it is open.
- *   - Echo guard: watches the mic and assistant-output analysers and applies a
- *     soft input mute when our own voice is leaking into the microphone.
- *   - Lease heartbeat for the Stella-managed path. GPT-Live is billed per
- *     second of session duration, so there is no per-response usage report —
- *     the orchestrator's model spend is metered through the normal agent path.
- *   - Goodbye-phrase detection that ends the live turn while leaving the warm
- *     session attached for the next wake word.
- *
- * What it deliberately does NOT do:
- *   - Open RTCPeerConnection / WebSocket, capture mic audio, or schedule
- *     playback. That's the transport.
- *   - Run tools. There are none here any more.
- */
-
 import { z } from "zod";
 import type {
   VoiceHistoryMessage,
@@ -77,10 +46,6 @@ const eventRecordSchema = z.record(z.string(), z.unknown());
 const isEventRecord = (value: unknown): value is Record<string, unknown> =>
   eventRecordSchema.safeParse(value).success;
 
-// ---------------------------------------------------------------------------
-// Public types
-// ---------------------------------------------------------------------------
-
 export type VoiceSessionState =
   | "idle"
   | "connecting"
@@ -119,10 +84,6 @@ const getVoiceRuntimeState = (): VoiceRuntimeState => {
   return root[VOICE_RUNTIME_STATE_KEY];
 };
 
-// ---------------------------------------------------------------------------
-// Echo guard tuning
-// ---------------------------------------------------------------------------
-
 const ECHO_GUARD_SAMPLE_MS = 40;
 const ECHO_GUARD_OUTPUT_LEVEL_THRESHOLD = 0.02;
 const ECHO_GUARD_BARGE_IN_MIN_MIC_LEVEL = 0.05;
@@ -133,7 +94,6 @@ const STELLA_VOICE_LEASE_HEARTBEAT_MS = 2_000;
 const STELLA_VOICE_LEASE_REQUEST_TIMEOUT_MS = 1_500;
 const STELLA_VOICE_AUTHORITY_MAX_LOCAL_LIFETIME_MS = 10_000;
 const STELLA_VOICE_AUTHORITY_EXPIRY_SKEW_MS = 1_000;
-/** How many of our own utterances to remember for update de-duplication. */
 const SPOKEN_MEMORY_SIZE = 24;
 
 type VoiceEchoMetrics = {
@@ -164,12 +124,6 @@ const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T> =>
     );
   });
 
-/**
- * Lightweight goodbye matcher. We only fire on simple terminal farewells —
- * "bye", "goodbye", "bye stella" — said as a standalone utterance. Anything
- * embedded in a longer sentence ("…by Tuesday", "good morning") is left alone
- * so the user can't accidentally hang up mid-sentence.
- */
 const GOODBYE_PHRASES = [
   /^(?:hey\s+|ok(?:ay)?\s+|alright\s+)?(?:bye|goodbye|good\s*bye)(?:\s+stella)?[\s.!?,]*$/i,
   /^(?:bye|goodbye)\s+(?:now|then|for\s+now)[\s.!?,]*$/i,
@@ -203,10 +157,6 @@ function shouldGateVoiceInputForEcho({
   return !userLikelyBargingIn;
 }
 
-// ---------------------------------------------------------------------------
-// Startup history
-// ---------------------------------------------------------------------------
-
 const HISTORY_ROLE_BY_RUNTIME_ROLE: Record<string, VoiceHistoryRole> = {
   user: "user",
   assistant: "assistant",
@@ -214,11 +164,6 @@ const HISTORY_ROLE_BY_RUNTIME_ROLE: Record<string, VoiceHistoryRole> = {
   runtimeInternal: "developer",
 };
 
-/**
- * GPT-Live takes startup history as a bounded list of single-part messages.
- * It is newest-biased on purpose: when the budget runs out the oldest turns
- * are the ones the call can afford to open without.
- */
 export const buildVoiceStartupHistory = (
   history: RuntimeVoiceHistoryItem[] | undefined,
   limits: { maxMessages: number; maxChars: number } = {
@@ -246,18 +191,6 @@ export const buildVoiceStartupHistory = (
   return selected.reverse();
 };
 
-/**
- * The spoken-conversation brief. Short by construction: the orchestrator
- * keeps Stella's real system prompt, and this model only needs to know how to
- * talk and when to hand off.
- *
- * The BYOK routes get one extra paragraph, because they hand off by calling
- * the `ask_stella` function rather than raising a delegation. The policy
- * itself is the same text in both cases.
- *
- * The assertion guards the contract ceiling for a locally edited prompt
- * rather than truncating mid-sentence.
- */
 const buildVoiceSessionInstructions = (
   providerKey: RealtimeProviderKey,
 ): string => {
@@ -283,10 +216,6 @@ const normalizeSpoken = (text: string): string =>
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 160);
-
-// ---------------------------------------------------------------------------
-// Session
-// ---------------------------------------------------------------------------
 
 export class RealtimeVoiceSession {
   private transport: RealtimeTransport | null = null;
@@ -345,10 +274,6 @@ export class RealtimeVoiceSession {
     this.conversationId = conversationId;
   }
 
-  /**
-   * Toggle whether mic audio is actively sent to the provider. The session
-   * stays connected; transport-level capture is suspended while inactive.
-   */
   setInputActive(active: boolean) {
     this.inputActive = active;
     void this.transport?.setMicEnabled(active).catch((err) => {
@@ -358,10 +283,6 @@ export class RealtimeVoiceSession {
       );
     });
   }
-
-  // ---------------------------------------------------------------------------
-  // Event emitter
-  // ---------------------------------------------------------------------------
 
   on(listener: VoiceSessionListener): () => void {
     this.listeners.add(listener);
@@ -386,10 +307,6 @@ export class RealtimeVoiceSession {
     this.emit({ type: "state-change", state, error });
   }
 
-  // ---------------------------------------------------------------------------
-  // Public API
-  // ---------------------------------------------------------------------------
-
   async connect(conversationId: string): Promise<void> {
     if (this._state !== "idle") {
       throw new Error(`Cannot connect in state: ${this._state}`);
@@ -407,8 +324,6 @@ export class RealtimeVoiceSession {
           );
           return null;
         });
-      // The route decides how the model hands off, so it has to be known
-      // before the brief is written.
       const activeProvider = await resolveActiveProvider();
       const instructions = buildVoiceSessionInstructions(activeProvider);
       const history = buildVoiceStartupHistory(orchestratorConfig?.history);
@@ -486,8 +401,6 @@ export class RealtimeVoiceSession {
 
       getVoiceRuntimeState().activeSession = this;
       this.setState("connected");
-      // Only now: updates arriving before the session is connected are
-      // dropped, and the feed would have advanced past them for good.
       this.updateFeed?.start();
     } catch (err) {
       if (this.destroyed) {
@@ -523,19 +436,13 @@ export class RealtimeVoiceSession {
     this.setState("idle");
   }
 
-  /** Get the mic input analyser node for visualization. */
   getAnalyser(): AnalyserNode | null {
     return this.transport?.getMicAnalyser() ?? null;
   }
 
-  /** Get the output (assistant voice) analyser node for visualization. */
   getOutputAnalyser(): AnalyserNode | null {
     return this.transport?.getOutputAnalyser() ?? null;
   }
-
-  // ---------------------------------------------------------------------------
-  // Echo guard
-  // ---------------------------------------------------------------------------
 
   private getAnalyserEnergy(
     analyser: AnalyserNode | null,
@@ -556,9 +463,6 @@ export class RealtimeVoiceSession {
     if (this.echoGuardTimer) return;
     this.echoGuardTimer = setInterval(() => {
       this.syncEchoGuard();
-      // Echo guard only matters while assistant audio is (or was just)
-      // playing — that's the only time the mic could be picking up our own
-      // speech. Past the release window the monitor has nothing useful to do.
       if (
         !this.assistantOutputActive &&
         this.recentOutputActiveUntil <= Date.now()
@@ -602,17 +506,11 @@ export class RealtimeVoiceSession {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // Delegation + mid-call updates
-  // ---------------------------------------------------------------------------
-
   private sendEvent(event: Record<string, unknown>) {
     this.transport?.send(event);
   }
 
   private startDelegation() {
-    // GPT-Live answers out of band; the Realtime routes answer the function
-    // call that asked. Everything between those two ends is shared.
     const channel =
       this.sessionProvider === "stella"
         ? createAppendDelegationChannel(this.appends)
@@ -651,17 +549,6 @@ export class RealtimeVoiceSession {
     this.appends.dispose();
   }
 
-  /**
-   * Attach the conversation stream and adopt its current contents as already
-   * known, so opening a call does not narrate the history the startup
-   * `history` field already carried.
-   *
-   * Managed route only: mid-call context needs a channel that does not take a
-   * conversation turn, and `session.thinking.append` is the only one of those.
-   * Pushing the same updates into a Realtime session would mean writing
-   * conversation items behind the model's back, which is the desync the
-   * two-brain design removed.
-   */
   private async startConversationUpdates(conversationId: string) {
     if (this.sessionProvider !== "stella") return;
     const feed = createConversationUpdateFeed({
@@ -688,8 +575,6 @@ export class RealtimeVoiceSession {
     if (this.deliveredUpdateIds.has(update.id)) return;
     this.deliveredUpdateIds.add(update.id);
 
-    // Never tell the model its own words back: the call's commentary and its
-    // own speech are already in the session.
     if (this.wasAlreadyHeard(update.text)) return;
 
     if (update.kind === "say" && this.inputActive) {
@@ -721,10 +606,6 @@ export class RealtimeVoiceSession {
         (normalized.includes(remembered) || remembered.includes(normalized)),
     );
   }
-
-  // ---------------------------------------------------------------------------
-  // Lease reporting
-  // ---------------------------------------------------------------------------
 
   private buildLeaseRequest(event: VoiceLeaseEvent): VoiceLeaseRequest | null {
     if (this.sessionProvider !== "stella" || !this.sessionToken) return null;
@@ -765,7 +646,6 @@ export class RealtimeVoiceSession {
     return request;
   }
 
-  /** Send a terminal event after the transport is closed. */
   private async reportClosedLeaseRequest(request: VoiceLeaseRequest) {
     try {
       await this.postLeaseRequest(request);
@@ -777,7 +657,6 @@ export class RealtimeVoiceSession {
     }
   }
 
-  /** Invoke the transport close before doing any terminal bookkeeping. */
   private disconnectTransportImmediately(): Promise<void> {
     const transport = this.transport;
     this.transport = null;
@@ -910,7 +789,6 @@ export class RealtimeVoiceSession {
       }
 
       if (response.directive === "closed" || response.leaseExpiresAt === null) {
-        // The server already closed the lease: nothing left to report.
         this.leaseTerminalReported = true;
         void this.terminateForAuthority(
           null,
@@ -933,8 +811,6 @@ export class RealtimeVoiceSession {
       this.updateLocalAuthorityExpiry(response.leaseExpiresAt);
       this.scheduleLeaseExpiry(generation);
     } catch (err) {
-      // Network failures never extend the lease. The local expiry timer stays
-      // armed and closes the transport if renewal cannot get through.
       console.debug(
         "[realtime-voice] Failed to renew voice lease:",
         (err as Error).message,
@@ -991,10 +867,6 @@ export class RealtimeVoiceSession {
     return this.authorityTerminationPromise;
   }
 
-  // ---------------------------------------------------------------------------
-  // Server event handling
-  // ---------------------------------------------------------------------------
-
   private handleServerEvent(event: Record<string, unknown>) {
     const type = typeof event.type === "string" ? event.type : "";
 
@@ -1028,7 +900,6 @@ export class RealtimeVoiceSession {
         });
         break;
 
-      // The BYOK Realtime routes still speak the old vocabulary.
       case "response.audio_transcript.delta":
       case "response.output_audio_transcript.delta":
         this.markAssistantSpeaking();
@@ -1114,10 +985,6 @@ export class RealtimeVoiceSession {
     this.syncEchoGuard();
   }
 
-  /**
-   * One reconstructed utterance. User turns can hang up the live turn; our own
-   * turns are remembered so a mid-call update never repeats them back.
-   */
   private handleCompletedTurn(turn: CompletedTranscriptTurn) {
     this.emit({
       type:
@@ -1151,10 +1018,6 @@ export class RealtimeVoiceSession {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // Cleanup
-  // ---------------------------------------------------------------------------
-
   private async tearDown() {
     this.stopLeaseReporting();
     const terminalRequest = this.claimTerminalLeaseRequest("ended");
@@ -1180,7 +1043,6 @@ export class RealtimeVoiceSession {
     this.outputEnergyBuffer = null;
   }
 
-  /** Tear down state without awaiting (used inside synchronous onClose paths). */
   private cleanupAfterConnectionLoss() {
     this.stopLeaseReporting();
     this.stopEchoGuardMonitor();

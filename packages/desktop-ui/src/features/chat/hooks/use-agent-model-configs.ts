@@ -14,17 +14,9 @@ const signatureForTasks = (tasks: readonly TaskItem[]): string =>
     )
     .join("\n");
 
-/**
- * Keep the thread-to-model map stable across status/progress-only task
- * updates. Chat rows only need to repaint when a thread's resolved model
- * metadata actually changes.
- */
 export const useAgentModelConfigs = (
   tasks: readonly TaskItem[],
 ): AgentModelConfigsByThread => {
-  // Keyed on the list identity: the chat surfaces re-render on every
-  // timeline update and composer keystroke, and the signature stringifies
-  // every task's model snapshot.
   const signature = useMemo(() => signatureForTasks(tasks), [tasks]);
   const cached = useRef<{
     signature: string;

@@ -46,9 +46,6 @@ import { OwnerGateBase } from "./gate-base.js";
 
 const WEBSOCKET_OPEN = 1;
 
-/**
- * Device presence sockets: frames, presence rows, device requests, and consent.
- */
 export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
   /**
    * Open sockets, optionally one device's. A socket this side closed stays in
@@ -151,7 +148,6 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
     }
   }
 
-  /** The device's connected socket, only while its presence is not stale. */
   protected liveSocket(deviceId: string): WebSocket | null {
     const socket = this.connectedSocket(deviceId);
     if (!socket) return null;
@@ -266,9 +262,6 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
         );
         return;
       }
-      // The proof is what earns the device its slot, so the older socket for
-      // the same device only loses it here — a failed handshake can never
-      // evict a working one.
       for (const other of this.sockets(attachment.deviceId)) {
         if (other === socket) continue;
         this.deviceRequestRelay().onDeviceGone(attachment.deviceId, other);
@@ -283,8 +276,6 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
         presenceSessionId: attachment.presenceSessionId,
         serverTimeMs: now,
       });
-      // Work offered to this computer while it was reconnecting reaches it
-      // now, on the session it can claim from.
       if (attachment.availability?.ready) this.offerAgainTo(attachment, now);
       if (device!.remoteExecution === "asking") {
         this.send(socket, {
@@ -335,10 +326,6 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
       return;
     }
     if (frame.type === "consent") {
-      // The answer arrives on the proven presence socket, so it is the machine
-      // itself speaking, not merely someone holding the account. That is what
-      // makes this the on-device half of the decision rather than a second
-      // copy of the enable button.
       if (typeof frame.allow !== "boolean") {
         this.closeSocket(socket, DEVICE_PRESENCE_CLOSE.protocol, "bad_request");
         return;
@@ -412,11 +399,6 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
     }));
   }
 
-  /**
-   * `POST /owners/me/devices/:deviceId/requests`, forwarded by the Worker
-   * after it verified the account and the phone's pairing proof. The body is
-   * the request's params JSON; the answer streams back from the computer.
-   */
   protected async handleDeviceRequest(request: Request): Promise<Response> {
     if (request.method !== "POST") {
       return Response.json({ error: "Method not allowed." }, { status: 405 });
@@ -461,11 +443,6 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
     });
   }
 
-  /**
-   * The cloud's own request to one of the owner's computers (an MCP server
-   * that computer runs), answered as JSON. Same relay and limits as a
-   * phone's request; nothing is stored.
-   */
   async relayCloudDeviceRequest(input: {
     deviceId: string;
     method: DeviceRequestMethod;
@@ -574,10 +551,6 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
     this.ownerStore().wrote(["device_presence"]);
   }
 
-  /**
-   * A device that goes away keeps its row (so the destinations list can say
-   * "offline" rather than "unknown") but is immediately ineligible.
-   */
   protected markDisconnected(
     attachment: PresenceAttachment,
     now: number,
@@ -605,8 +578,6 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
     if (!row) return undefined;
     const state = presenceState(row);
     if (!state.connected) return state;
-    // The row's `last_seen_at` is only written when presence changes; between
-    // changes the socket knows when the device was last heard from.
     for (const socket of this.sockets(deviceId)) {
       const attachment = this.attachment(socket);
       if (
@@ -637,10 +608,6 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
     const presence = args.deviceId
       ? this.presenceRow(args.deviceId)
       : undefined;
-    // Consent comes first: a computer that has not agreed to run remote work
-    // is refusing for a reason the owner can fix in one tap, and saying
-    // "offline" or "not ready" instead would send them looking for the wrong
-    // problem. This code is also what keeps a waiting agent waiting.
     if (args.remoteExecution && args.remoteExecution !== "enabled") {
       return {
         fallbackReason: `selected-device-${args.remoteExecution}`,
@@ -673,15 +640,6 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
     return null;
   }
 
-  /**
-   * Ask a device, on its own screen, to start accepting dispatched work.
-   *
-   * Called when something was aimed at a device that has not agreed. The
-   * attempt it came from does not wait on the answer — a human tap is not on
-   * the offer window's timescale — so this only raises the prompt and records
-   * that it is up. Agent work retries for the next hour, which is what makes
-   * "wait for allow" work without holding a dispatch open.
-   */
   protected async requestDeviceConsent(args: {
     deviceId: string;
     remoteExecution: DeviceRemoteExecution;
@@ -746,12 +704,10 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
     }
   }
 
-  // Implemented further up the chain.
   abstract snapshot(options?: {
     refresh?: boolean;
     now?: number;
   }): Promise<OwnerSnapshot>;
-  /** Open offers to this device, pushed again to its current session. */
   protected abstract offerAgainTo(
     attachment: PresenceAttachment,
     now: number,

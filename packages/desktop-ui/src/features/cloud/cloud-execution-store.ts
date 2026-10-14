@@ -19,12 +19,6 @@ const emit = (): void => {
   for (const listener of listeners) listener();
 };
 
-/**
- * Bridges the short gap between a successful settings mutation and the backend's
- * live view update. Turn dispatch reads this snapshot synchronously, so
- * closing the picker and immediately pressing Send cannot resurrect the old
- * cloud route.
- */
 export const publishCloudExecutionSelection = (
   execution: CloudExecutionSelection,
 ): void => {
@@ -62,13 +56,6 @@ export const subscribeCloudExecutionSelection = (
   return () => listeners.delete(listener);
 };
 
-/**
- * Establishes the auth subject that owns the renderer-local picker override.
- * A successful settings mutation can outpace its reactive query, so the
- * override intentionally survives ordinary renders. It must not survive an
- * owner handoff: otherwise the next owner's first turn can inherit the prior
- * owner's explicit provider/model route.
- */
 export const retireCloudExecutionClientAuthority = (
   accountScope: string,
 ): void => {

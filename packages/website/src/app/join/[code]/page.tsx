@@ -11,8 +11,6 @@ export const metadata: Metadata = {
   },
 };
 
-// Codes are 8 chars, optionally displayed as ABCD-EFGH; be lenient about
-// case/hyphen here — the app normalizes before joining.
 const CODE_PATTERN = /^[A-Za-z0-9-]{8,9}$/;
 
 export default async function JoinInvitePage({

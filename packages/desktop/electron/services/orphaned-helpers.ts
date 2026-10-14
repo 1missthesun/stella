@@ -7,18 +7,6 @@ import { terminateProcessTree } from "@stella/runtime/kernel/shared/process-tree
 import { nativeHelperDirectories } from "../native-helper-path.js";
 import { getMainLogger } from "../observability/main-logger.js";
 
-/**
- * Helpers a previous Stella left running when it was killed without a chance
- * to stop them (a crash, a force quit). Quit stops them; this is the sweep
- * for everything else, run once at launch.
- *
- * An orphan is a helper whose parent is gone: on macOS and Linux it has been
- * handed to init (pid 1) or, on Linux, a session subreaper such as
- * `systemd --user`; on Windows its recorded parent no longer runs. A helper
- * whose parent still runs belongs to a live Stella (this one, or another
- * instance) and is left alone.
- */
-
 const execFileAsync = promisify(execFile);
 
 type ProcessRow = { pid: number; ppid: number; command: string };
@@ -57,7 +45,6 @@ const startsWithDirectory = (command: string, directory: string) =>
 
 const quotePowerShell = (value: string) => `'${value.replace(/'/g, "''")}'`;
 
-/** Orphaned processes whose executable lives in one of `directories`. */
 export const findOrphanedProcessesIn = async (
   directories: readonly string[],
 ): Promise<number[]> => {
@@ -111,7 +98,6 @@ const isPidAlive = (pid: number) => {
   }
 };
 
-/** End each process and everything it started, TERM before KILL. */
 export const terminateOrphans = async (pids: readonly number[]) => {
   await Promise.all(
     pids.map((pid) =>
@@ -132,12 +118,6 @@ const parseElapsedSeconds = (value: string): number | null => {
   );
 };
 
-/**
- * Electron's crash reporter starts a `chrome_crashpad_handler` per launch
- * that does not exit with the app on macOS, so one piles up per run. Only
- * the handler this process started is live: any handler writing to this
- * app's crash database that started before this process is stale.
- */
 const findStaleCrashpadHandlers = async (): Promise<number[]> => {
   if (process.platform === "win32") return [];
   let database: string;
@@ -176,12 +156,6 @@ const findStaleCrashpadHandlers = async (): Promise<number[]> => {
   }
 };
 
-/**
- * Stop what a killed Stella left behind: orphaned native helpers (computer
- * use, meeting capture, wakeword, window queries), orphaned browser service
- * daemons, and stale crash-reporter handlers. Best effort and bounded by the
- * process-tree terminator's own deadlines.
- */
 export const sweepOrphanedHelpers = async (options: {
   browserBinaryDirectories: readonly string[];
 }) => {

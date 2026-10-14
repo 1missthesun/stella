@@ -3,9 +3,6 @@ import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 const repoRoot = path.resolve(import.meta.dirname, "../..");
-// The catalog is now a plain JSON data file (loaded lazily at runtime by
-// oauth-provider-catalog.ts). This generator reads and rewrites that JSON
-// directly instead of round-tripping a TS `export const` literal.
 const catalogPath = path.join(
   repoRoot,
   "runtime/kernel/connectors/oauth-provider-catalog.json",
@@ -92,9 +89,6 @@ const readCatalog = async () => {
   return { catalog: JSON.parse(text) };
 };
 
-// The runtime reads the tools-free sidecar (oauth-provider-catalog.index.json)
-// before it ever parses the full catalog, so every catalog rewrite must
-// regenerate it; the drift test beside the generator fails otherwise.
 const catalogIndexGeneratorPath = path.join(
   repoRoot,
   "runtime/kernel/connectors/generate-oauth-provider-catalog-index.ts",

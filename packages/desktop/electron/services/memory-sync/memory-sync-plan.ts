@@ -1,25 +1,3 @@
-/**
- * What one memory sync pass does, decided from three listings: the shas both
- * sides had when a file was last synced (the base), this computer's files
- * now, and the cloud's files now. Pure; `memory-sync-service.ts` carries
- * the actions out.
- *
- * Each side is compared with its own sha in the base, because the cloud
- * stores what the shared memory rules make of a write (redacted), which can
- * differ byte for byte from the local file it came from.
- *
- *   neither side changed            nothing
- *   one side changed                copy it (or its deletion) to the other
- *   both changed, now identical     note it as synced
- *   both deleted                    forget it
- *   deleted here, changed there     the change wins (nothing is lost)
- *   both changed, now different     conflict
- *
- * A file with no base (a first sync, or a new file) counts as changed on
- * every side that has it.
- */
-
-/** The shas a file had on each side when it was last the same. */
 export type SyncedPair = { local: string; cloud: string };
 
 export type SyncBase = Readonly<Record<string, SyncedPair>>;

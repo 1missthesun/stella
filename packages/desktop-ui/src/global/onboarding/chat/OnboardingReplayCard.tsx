@@ -1,11 +1,3 @@
-/**
- * Settings card: replay onboarding.
- *
- * A light reset — it clears completion, resume state, and any parked
- * hand-off, then lets the shell swap back to onboarding. Nothing about the
- * account, memory, or conversations is touched, so the flow can be re-run
- * as often as needed.
- */
 import { useCallback } from "react";
 import { Button } from "@/ui/button";
 import { useT } from "@/shared/i18n";

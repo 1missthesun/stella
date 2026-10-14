@@ -23,12 +23,6 @@ import { useT } from "../../i18n";
 const APP_STORE_URL = "https://apps.apple.com/app/id6761148311";
 const PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.fromyou.stella";
 
-/**
- * On a self-hosted server, check it is a version this app can use (launch
- * and every return to the foreground). Too old, or needing a newer app,
- * replaces the whole app with a screen that says which side to update.
- * Stella's hosted service always passes through untouched.
- */
 export function ServerStatusGate({ children }: { children: ReactNode }) {
   const status = useActiveServerStatus();
 

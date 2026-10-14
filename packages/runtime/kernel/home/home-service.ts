@@ -22,15 +22,6 @@ import {
   type StellaDataDirSeedReport,
 } from "./stella-home.js";
 
-/**
- * The Stella-home subsystem as one Effect-native service: data-dir
- * resolution and seeding, bundled skills/extensions reconciliation, the
- * remote prompt manifest pipeline, personality reconciliation, and device
- * identity. Effect-native runtime code consumes this service; the legacy
- * plain-Promise module exports are facades over the shared home
- * `ManagedRuntime` (see `home-runtime.ts`), preserving every caller-visible
- * signature and error string.
- */
 export interface Interface {
   readonly ensureStellaDataDirSeeded: (
     stellaAppDir: string,
@@ -113,12 +104,6 @@ const make = (): Interface => ({
   }),
 });
 
-/**
- * Built lazily (first facade call / first Effect-native use): the service
- * holds no OS resources of its own — every held resource (the SQLite
- * prompt-apply lock, temp file handles) is scoped inside the individual
- * operations via acquireRelease.
- */
 export const layer = Layer.effect(
   Service,
   Effect.sync(() => make()),

@@ -1,9 +1,3 @@
-/**
- * Companion-window subscriptions: the chat snapshot published by the full
- * shell, the realtime voice runtime's speaking flags, and the read-aloud
- * preference. Each is a `useSyncExternalStore`-style subscription so the
- * companion never polls.
- */
 import { useEffect, useState, useSyncExternalStore } from "react";
 import {
   EMPTY_COMPANION_STATE,
@@ -46,11 +40,6 @@ const IDLE_VOICE: VoiceSpeakingState = {
   isUserSpeaking: false,
 };
 
-/**
- * Speaking flags from the realtime voice runtime (which lives in the overlay
- * window). Subscribed only while a voice session is active so an idle
- * companion carries no extra IPC traffic.
- */
 export function useVoiceSpeakingState(active: boolean): VoiceSpeakingState {
   const [state, setState] = useState<VoiceSpeakingState>(IDLE_VOICE);
 

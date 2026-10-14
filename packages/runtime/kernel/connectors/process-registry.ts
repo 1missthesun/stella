@@ -43,8 +43,6 @@ const isPidAlive = (pid: number) => {
   }
 };
 
-// Effect-backed sleep (kernel/connectors/effect-runtime.ts); the exit-grace
-// poll below stays a deadline-computed loop with identical 50ms pacing.
 const delay = (ms: number) => sleepMs(ms);
 
 const waitForPidExit = async (

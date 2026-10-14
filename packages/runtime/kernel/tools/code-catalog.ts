@@ -1,16 +1,3 @@
-/**
- * Demoted-tool catalog helpers.
- *
- * Demoted tools leave the model's direct tool list whenever `code` is
- * available and become callable only as `tools.<name>(args)` inside code.
- * This module renders the compact TypeScript-style signature catalog that is
- * appended to code's description each turn, and implements the
- * deterministic scorer behind the in-REPL `tools.$search({ query })` lookup.
- *
- * Everything here is pure and never throws: a malformed schema degrades to
- * `unknown`, a malformed catalog degrades to an empty section/result list.
- */
-
 export type DemotedToolCatalogEntry = {
   name: string;
   description?: string;
@@ -35,7 +22,6 @@ export type ToolSearchResult = {
   description?: string;
 };
 
-/** Full, lossless docs returned only after an authorized `$describe` call. */
 export type ToolDescription = {
   name: string;
   description: string;
@@ -53,17 +39,10 @@ export type ToolDescription = {
 
 const MAX_SCHEMA_RENDER_DEPTH = 6;
 const MAX_COMMENT_CHARS = 120;
-/** Union/enum members rendered before collapsing the tail into "…". */
 const MAX_UNION_MEMBERS = 8;
-/**
- * Hard cap on one rendered signature inside a `$search` result. Keeps any
- * result far below MAX_NODE_REPL_PROTOCOL_MESSAGE_BYTES so the kernel's
- * all-or-nothing protocol-size failure is unreachable in practice.
- */
 const MAX_SEARCH_SIGNATURE_CHARS = 2000;
 const IDENTIFIER_RE = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 
-/** Estimated tokens for budget accounting: chars / 4, rounded up. */
 const estimateTokens = (text: string): number => Math.ceil(text.length / 4);
 
 export const DEFAULT_CATALOG_TOKEN_BUDGET = 2000;
@@ -157,7 +136,6 @@ const renderSchema = (schema: unknown, depth: number): string => {
   }
 };
 
-/** Minimal JSON-Schema → TypeScript-ish renderer. Never throws. */
 export const schemaToTs = (schema: unknown, depth = 0): string => {
   try {
     return renderSchema(schema, depth);
@@ -166,7 +144,6 @@ export const schemaToTs = (schema: unknown, depth = 0): string => {
   }
 };
 
-/** `tools.<name>(input: {...}): Promise<unknown>` — never throws. */
 export const renderToolSignature = (tool: {
   name: string;
   parameters?: Record<string, unknown>;
@@ -278,7 +255,6 @@ export const buildCatalogSection = (
         const block = queue[cursor];
         if (!block) continue;
         if (block.cost > remaining) {
-          // Cheapest-first queue: nothing later in this namespace fits either.
           continue;
         }
         remaining -= block.cost;
@@ -286,8 +262,6 @@ export const buildCatalogSection = (
         cursors.set(name, cursor + 1);
         if (cursor + 1 < queue.length) next.push(name);
       }
-      // Every namespace in `next` consumed a block this pass, so the loop
-      // makes progress toward the finite block count and must terminate.
       active = next;
     }
 
@@ -323,7 +297,6 @@ const singularize = (token: string): string =>
     ? token.slice(0, -1)
     : token;
 
-/** camelCase- and snake_case-aware tokenizer with naive singularization. */
 export const tokenizeToolQuery = (value: string): string[] => {
   if (typeof value !== "string") return [];
   const spaced = value.replace(/([a-z0-9])([A-Z])/g, "$1 $2").toLowerCase();
@@ -361,11 +334,6 @@ const collectPropertyText = (
   if (record.items) collectPropertyText(record.items, depth + 1, sink);
 };
 
-/**
- * Deterministic relevance score for one tool against pre-tokenized query
- * terms. Weights: exact name 20 > name substring 8 > description/search-term
- * text 4 > input property text 2. Never throws; garbage scores 0.
- */
 export const scoreToolSearch = (
   tool: DemotedToolCatalogEntry,
   queryTokens: readonly string[],
@@ -421,12 +389,6 @@ const toSearchResult = (tool: DemotedToolCatalogEntry): ToolSearchResult => {
   };
 };
 
-/**
- * Rank `tools` against `query` and return compact callable signatures. Full
- * JSON schemas deliberately remain host-side until `$describe` selects one
- * exact tool. An exact name query short-circuits straight to that tool. Ties
- * break by name for determinism. Never throws.
- */
 export const searchToolCatalog = (
   tools: readonly DemotedToolCatalogEntry[],
   query: string,
@@ -460,11 +422,6 @@ export const searchToolCatalog = (
   }
 };
 
-/**
- * Build full on-demand documentation for one exact tool. This helper performs
- * no lookup or authorization itself; callers must first select from the live,
- * context-filtered catalog used for invocation.
- */
 export const describeToolCatalogEntry = (
   tool: DemotedToolCatalogEntry & {
     description: string;
@@ -485,16 +442,9 @@ export const describeToolCatalogEntry = (
   ...(tool.workingText ? { workingText: tool.workingText } : {}),
 });
 
-/**
- * The workflow paragraph that precedes the demoted catalog in code's
- * description. Shared by every host that advertises `code` (device kernel,
- * external engines, the cloud Durable Object) so the model reads one
- * contract everywhere.
- */
 export const DEMOTED_WORKFLOW_TEXT =
   'Some tools are callable only here, as tools.<name>(args); they are listed below. Do not guess tool names.';
 
-/** Workflow paragraph + budgeted signature catalog; "" for an empty set. */
 export const buildDemotedCodeSuffix = (
   demotedTools: readonly DemotedToolCatalogEntry[],
 ): string =>
@@ -508,13 +458,6 @@ const CODE_PROMPT_HEADING = "# The `code` tool";
 const CODE_PROMPT_POINTER =
   "More of this tool's documentation, including every tool callable only inside it, is in your system prompt under \"The `code` tool\".";
 
-/**
- * Claude Code shows the model only the first 2048 characters of a tool's
- * description. When `code`'s description (its contract plus the demoted
- * catalog) is longer, the overflow moves into the system prompt: the demoted
- * catalog first, and the whole description when even its contract is too
- * long. The tool keeps a pointer to that section.
- */
 export const fitCodeDescriptionForClaudeCode = <
   T extends { name: string; description: string },
 >(

@@ -31,11 +31,6 @@ export class OwnerPurgeFenceError extends Error {}
 export class OwnerFenceLeaseConflictError extends Error {}
 export class OwnerFenceRegistrationUncertainError extends Error {}
 
-/**
- * How a pi agent's report ended (its own `status`, or for a report an older
- * build wrote, its heading), and its result or error, for the agent's
- * lifecycle card.
- */
 export const piReportOutcome = (report: {
   text: string;
   status?: AgentAttemptOutcome;
@@ -50,7 +45,6 @@ export const piReportOutcome = (report: {
   return { kind, body: field(kind === "completed" ? "result" : "error") };
 };
 
-/** One list, pi's own first where both name an agent, oldest start first. */
 export const listedAgents = (
   view: AgentsView,
   limit: number,
@@ -61,11 +55,6 @@ export const listedAgents = (
     .slice(0, limit);
 };
 
-/**
- * The model capability for a turn this object's own loop runs. Never called
- * for an `anthropic` execution: a Claude subscription is spent only by the
- * Claude Code CLI, whose capability its BuildSession mints.
- */
 export const mintOrchestratorTurnCapability = (
   env: Env,
   turn: ChatTurnRequest,
@@ -82,11 +71,6 @@ export const mintOrchestratorTurnCapability = (
     agentTypes: ["orchestrator"],
   });
 
-/**
- * A Claude Code turn the BuildSession reported failed. `userMessage` is the
- * contract's user-safe failure text (e.g. a subscription limit), shown in
- * place of the generic notice; the raw detail stays in logs.
- */
 export class CliTurnFailedError extends Error {
   constructor(
     message: string,
@@ -97,11 +81,6 @@ export class CliTurnFailedError extends Error {
   }
 }
 
-/**
- * The execution context a cloud turn runs under, as a resident block reads
- * it. Provider keys live on the user's devices, so the cloud has only the
- * plan for media.
- */
 export const cloudExecutionContext = (
   turn: Pick<ChatTurnRequest, "audience">,
   destinations: DevicesResponse | null,
@@ -112,7 +91,6 @@ export const cloudExecutionContext = (
     media: { stella: mediaAccessForAudience(turn.audience) },
   });
 
-/** A Stella model as pi's `stella` provider serves it, for one agent type and audience. */
 export const piModelSpec = (
   agentType: "orchestrator" | "general",
   execution: Extract<CloudExecutionSelection, { engine: "stella" }>,
@@ -138,7 +116,6 @@ export const piModelSpec = (
   };
 };
 
-/** A resume that cannot rebuild the turn's exact context fails the turn. */
 export class ChatTurnNotResumableError extends Error {
   constructor(readonly reason: string) {
     super(`The interrupted turn could not be resumed (${reason}).`);
@@ -146,7 +123,6 @@ export class ChatTurnNotResumableError extends Error {
   }
 }
 
-/** Time one named step into `timings`, whether it resolves or throws. */
 export const measureInto =
   (timings: Record<string, number>) =>
   async <T>(name: string, work: () => Promise<T>): Promise<T> => {
@@ -239,8 +215,6 @@ export const truncateMessage = (
   for (const block of record.content) {
     const text = (block as { text?: unknown }).text;
     if (typeof text !== "string") {
-      // Non-text blocks (images, tool calls) are structural: dropping a
-      // toolCall would orphan its result, so they always travel.
       content.push(block);
       continue;
     }

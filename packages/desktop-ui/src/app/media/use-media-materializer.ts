@@ -1,17 +1,3 @@
-/**
- * Subscribes to every succeeded media job for the current viewer and
- * materializes its outputs into `~/.stella/media/outputs/`. This is the single
- * place that turns a remote media job (started by `image_gen`, by an
- * agent's `stella-media`, …) into a local file plus a
- * `DisplayPayload` the sidebar can render when the user opens it.
- *
- * Decoupling production from materialization is what makes "all generated
- * media is available in the workspace panel" robust: it doesn't matter who
- * `curl`'d the managed media API — every job lives in the owner's backend
- * object (`media.jobs`), this hook drains the queue, and downstream UI
- * subscribes to a single payload stream.
- */
-
 import { useEffect, useMemo, useRef } from "react"
 import { useBackendView } from "@/platform/backend/use-backend-view"
 import type { MediaJob } from "@stella/contracts/backend/media"
@@ -64,7 +50,6 @@ const toMediaAsset = (output: OutputMedia): MediaAsset | null => {
       return { kind: "audio", filePath: output.localPath }
     case "download":
       if (!output.localPath) return null
-      // Treat 3D-ish extensions as model3d; everything else stays as download.
       if (/\.(glb|gltf|obj|stl)$/i.test(output.localPath)) {
         return { kind: "model3d", filePath: output.localPath, label: output.label }
       }
@@ -84,10 +69,6 @@ type UseMediaMaterializerOptions = {
   onMaterialized: (payload: DisplayTabPayload) => void
 }
 
-/**
- * Mounts the global media materializer. Safe to call once at the root level.
- * The query is gated on auth; while signed-out it sits idle.
- */
 export const useMediaMaterializer = ({
   onMaterialized,
 }: UseMediaMaterializerOptions): void => {
@@ -119,8 +100,6 @@ export const useMediaMaterializer = ({
   useEffect(() => {
     if (!jobs || jobs.length === 0) return
 
-    // Process oldest-first so multiple completions in one tick land in the
-    // right order in the sidebar.
     const ordered = [...jobs].sort(
       (a, b) =>
         (a.completedAt ?? a.updatedAt) - (b.completedAt ?? b.updatedAt),
@@ -186,7 +165,6 @@ export const useMediaMaterializer = ({
       if (job.kind !== "image") continue
       if (failedNotifiedJobs.has(job.jobId)) continue
       failedNotifiedJobs.add(job.jobId)
-      // Bound the in-memory set, matching the persist-time cap.
       capInMemory(failedNotifiedJobs)
       persistFailedNotifiedJobs()
       showToast({

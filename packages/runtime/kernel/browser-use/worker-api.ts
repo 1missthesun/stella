@@ -264,12 +264,6 @@ export interface BrowserWorkerApi {
   readonly tabs: BrowserWorkerTabs;
 }
 
-/**
- * Installs the browser object graph inside the Node REPL worker. The worker
- * runs this module bundled into one expression (worker-api-source.ts), so it
- * and everything under worker-api/ must import nothing but each other and
- * ./protocol.js: no packages, no Node built-ins.
- */
 export function installBrowserWorkerApi(
   callBrowser: BrowserWorkerCall,
   options: BrowserWorkerApiOptions = {},

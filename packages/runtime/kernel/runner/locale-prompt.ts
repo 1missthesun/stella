@@ -39,15 +39,6 @@ const LOCALE_ENGLISH_NAMES: Record<string, string> = {
   he: "Hebrew",
 };
 
-/**
- * Returns a system-prompt directive for the user's locale, or `undefined`
- * for English (no directive needed — the default model behavior is
- * English already).
- *
- * Code, commands, filenames, API names, and quoted source text stay in
- * their original language by directive — translating those would break
- * tool calls and confuse the user.
- */
 export const getResponseLanguageSystemPrompt = (
   locale: string | undefined,
 ): string | undefined => {
@@ -64,7 +55,6 @@ export const getResponseLanguageSystemPrompt = (
   ].join(" ");
 };
 
-/** The system prompt section for the user's language, on every host. */
 export const responseLanguageSection = (
   locale: string | undefined,
 ): { id: string; text: string } | undefined => {

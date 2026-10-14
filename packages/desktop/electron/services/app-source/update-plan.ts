@@ -1,47 +1,11 @@
 import { git, gitRaw } from "./git.js";
 
-/**
- * What taking some other version means for this checkout, decided before
- * anything is touched. The other version is the published app (upstream), the
- * same owner's other computer (the fork), or a finished draft whose base
- * moved — the question is identical in all three, so the answer is computed
- * in one place.
- *
- * The checkout only ever fast-forwards, so a branch that is not the other
- * side's ancestor cannot simply advance. That is a statement about the shape
- * of history, not about the files: a checkout whose own commits are four past
- * update-merges plus a change and its revert has diverged while its tree is
- * identical to the upstream commit it last merged. Reporting that as a
- * conflict, and handing it to an agent, is work nobody needed.
- *
- * So divergence is split by what git can actually tell us:
- *
- * - `fast-forward` — local is an ancestor of the other side. Advance.
- * - `clean` — diverged, and the three-way merge has no textual conflict.
- *   `identical` means the merged tree is byte-for-byte the other side's tree,
- *   so nothing of this checkout's own is in the result. Whether that is
- *   reason enough to skip checking the result depends on whether the other
- *   side's tree is known good, which is the caller's question, not this
- *   one's.
- * - `conflict` — real textual conflicts, naming the files. The only case
- *   where a judgement exists to make.
- *
- * Nothing here writes a ref or touches the working tree. `clean` carries the
- * merged tree, already written to the object database by `merge-tree`, which
- * is what the apply path commits.
- */
-
-/** A change here takes a relaunch (main and preload build on launch). */
 const RESTART_PREFIX = "packages/desktop/electron/";
-/** Changed files that take a `bun install`. */
 export const installs = (paths: string[]) =>
   paths.some((file) => file === "bun.lock" || file.endsWith("package.json"));
-/** What the runtime process runs: a change here restarts it. */
 const RUNTIME_PREFIXES = ["packages/runtime/", "packages/contracts/", "packages/agent/"];
-/** Changed files that take a restart of the runtime. */
 export const restartsRuntime = (paths: string[]) =>
   paths.some((file) => RUNTIME_PREFIXES.some((prefix) => file.startsWith(prefix)));
-/** Changed files that take a relaunch of the app. */
 export const relaunches = (paths: string[]) =>
   installs(paths) || paths.some((file) => file.startsWith(RESTART_PREFIX));
 
@@ -49,9 +13,7 @@ export type UpdatePlan =
   | { kind: "none" }
   | {
       kind: "fast-forward";
-      /** Upstream's tip. */
       tip: string;
-      /** Commits upstream has that this checkout lacks. */
       count: number;
       subject: string;
     }
@@ -60,13 +22,9 @@ export type UpdatePlan =
       tip: string;
       count: number;
       subject: string;
-      /** The commit the two sides last shared. */
       base: string;
-      /** The merge's result, written to the object database. */
       tree: string;
-      /** The result is the other side's tree exactly; nothing of ours is in it. */
       identical: boolean;
-      /** The checkout's tree differs from `base`: the user has real changes. */
       localChanges: boolean;
     }
   | {
@@ -75,7 +33,6 @@ export type UpdatePlan =
       count: number;
       subject: string;
       base: string;
-      /** Files the merge could not resolve, in git's order. */
       conflicts: string[];
       localChanges: boolean;
     };
@@ -101,9 +58,6 @@ export const classifyUpdate = async (
   head: string,
   ref: string,
 ): Promise<UpdatePlan> => {
-  // Two git calls settle the common cases: the tip and its subject, then how
-  // many commits each side has that the other lacks (none on ours is a
-  // fast-forward, none on theirs is nothing to take).
   const found = await gitRaw(cwd, ["log", "-1", "--format=%H%x00%s", `${ref}^{commit}`, "--"]);
   const [tip = "", subject = ""] = found.code === 0 ? found.stdout.trim().split("\0") : [];
   if (!tip || tip === head) return { kind: "none" };
@@ -115,8 +69,6 @@ export const classifyUpdate = async (
   if (count === 0) return { kind: "none" };
   if (ours === 0) return { kind: "fast-forward", tip, count, subject };
   const base = await git(cwd, ["merge-base", head, tip]);
-  // One diff settles the provably-safe subcase: no net local difference from
-  // the upstream commit last merged means no merge judgement exists to make.
   const localChanges =
     (await gitRaw(cwd, ["diff", "--quiet", base, head])).code !== 0;
   const merge = await gitRaw(cwd, [

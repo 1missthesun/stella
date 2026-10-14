@@ -3,10 +3,6 @@ import type { AutomaticExecutionTarget } from "./execution-placement";
 
 const KEY = "stella-mobile.execution-target.v1";
 
-/**
- * The phone offers Cloud or a specific computer. Nothing saved, or the old
- * "Automatic" choice, means Cloud.
- */
 export const CLOUD_EXECUTION_TARGET: AutomaticExecutionTarget = Object.freeze({
   mode: "cloud",
 });
@@ -43,7 +39,6 @@ const setAtOf = (value: string | null): number => {
 export const getMobileExecutionTarget = async () =>
   parse(await SecureStore.getItemAsync(KEY));
 
-/** When the saved choice was made, so a later orchestrator switch can win. */
 export const getMobileExecutionTargetSetAt = async () =>
   setAtOf(await SecureStore.getItemAsync(KEY));
 

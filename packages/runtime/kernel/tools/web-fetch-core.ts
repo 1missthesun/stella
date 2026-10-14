@@ -1,32 +1,9 @@
-/**
- * The `web` tool's fetch pipeline, shared by every host: readable-text
- * extraction, manual redirect following with per-hop SSRF re-validation,
- * timeout, and truncation. Pure fetch API — no node builtins — so the
- * cloud orchestrator DO (workerd) runs the same pipeline the desktop does.
- *
- * The URL guard and text sanitizer are capabilities, not imports: desktop
- * passes its DNS-checking guard and secret-redacting sanitizer; workerd
- * passes the literal-only guard.
- */
-
 export const MAX_FETCH_BODY_CHARS = 80_000;
 export const FETCH_TIMEOUT_MS = 30_000;
 export const MAX_FETCH_REDIRECTS = 5;
 
-/**
- * Hard ceiling on bytes read off the wire. The char cap above can only be
- * applied to a string that already exists, so without this a model-chosen URL
- * serving hundreds of megabytes is fully buffered before it is truncated —
- * an OOM in a 128 MB Durable Object isolate. Generous enough that no real
- * page is affected: the readable text is capped far below it anyway.
- */
 export const MAX_FETCH_BODY_BYTES = 8 * 1024 * 1024;
 
-/**
- * Read at most `MAX_FETCH_BODY_BYTES`, then stop pulling. Cancels the
- * remainder rather than draining it, so an endless response costs one buffer,
- * not the whole stream.
- */
 const readCappedText = async (response: Response): Promise<string> => {
   const contentLength = Number(response.headers.get("content-length"));
   if (
@@ -48,8 +25,6 @@ const readCappedText = async (response: Response): Promise<string> => {
       if (!value) continue;
       const remaining = MAX_FETCH_BODY_BYTES - total;
       if (remaining <= 0) break;
-      // A stream is allowed to yield a chunk larger than the remaining budget.
-      // Never use that chunk's full size to allocate the joined buffer.
       const accepted = Math.min(value.byteLength, remaining);
       chunks.push(
         accepted === value.byteLength ? value : value.slice(0, accepted),
@@ -68,14 +43,9 @@ const readCappedText = async (response: Response): Promise<string> => {
     offset += chunk.byteLength;
     if (offset >= total) break;
   }
-  // A cap can cut mid-sequence, so decoding must not be fatal.
   return new TextDecoder().decode(joined);
 };
 
-/**
- * Minimal HTML-to-text conversion. Strips tags and decodes common entities.
- * No external dependency needed for this basic extraction.
- */
 const htmlToText = (html: string): string => {
   let text = html.replace(/<script[\s\S]*?<\/script>/gi, "");
   text = text.replace(/<style[\s\S]*?<\/style>/gi, "");
@@ -94,18 +64,10 @@ const htmlToText = (html: string): string => {
 };
 
 export type WebFetchCoreOptions = {
-  /**
-   * Validate and canonicalize a URL before it is dialed — the SSRF guard.
-   * Called on the initial URL and again on EVERY redirect hop. Throws to
-   * refuse.
-   */
   guardUrl: (url: string) => Promise<string>;
-  /** Refuse URLs carrying what looks like a credential. */
   checkSecretLikeToken?: (url: string) => boolean;
-  /** Redact/clean text before it becomes model-visible. */
   sanitize?: (text: string) => string;
   userAgent?: string;
-  /** Caller cancellation is combined with the whole-pipeline deadline. */
   signal?: AbortSignal;
 };
 
@@ -119,10 +81,6 @@ export const fetchReadableText = async (
     return "Error: URL contains what appears to be an API key or token. Secrets must not be sent in URLs.";
   }
 
-  // Whole-pipeline deadline. This module must stay pure fetch API (the
-  // cloud orchestrator DO runs it in workerd), so the deadline is the
-  // platform's own `AbortSignal.timeout` rather than an Effect fiber; the
-  // catch below maps its `TimeoutError` to the exact legacy timeout string.
   const timeoutSignal = AbortSignal.timeout(FETCH_TIMEOUT_MS);
   const requestSignal = options.signal
     ? AbortSignal.any([options.signal, timeoutSignal])

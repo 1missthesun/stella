@@ -53,10 +53,6 @@ type ContainerEgressState = {
   activeResponses: number;
 };
 
-/**
- * Produce the complete egress event. Deliberately omit the URL path, query,
- * fragment, headers, and body so observability cannot become a content log.
- */
 export const egressDestinationTelemetry = (
   request: Request,
   fields: Pick<EgressDestinationTelemetry, "workload" | "phase"> &
@@ -155,8 +151,6 @@ const meteredResponse = (args: {
   const refuseChunk = (
     controller: ReadableStreamDefaultController<Uint8Array>,
   ): void => {
-    // Saturate accounting at the cap. A transport may already have received
-    // this one chunk, but none of the chunk is exposed to the sandbox.
     const available = Math.max(
       0,
       args.budgetBytes -
@@ -329,9 +323,6 @@ export const createGeneralAgentEgress = (
       phase: "broad",
       decision: "allow",
     });
-    // Preserve streaming request bodies and Cloudflare's native fetch semantics.
-    // An attempted fetch consumes a rate slot even if the upstream later fails.
-    // This prevents retry storms from bypassing the connection-rate guard.
     state.inFlightRequests += 1;
     let response: Response;
     try {

@@ -1,16 +1,3 @@
-/**
- * "What can I do?" — five short films, one request each.
- *
- * Each film opens close on Stella's composer while the request types, then
- * pulls back as she spawns agents: their windows are dealt out from behind
- * hers with a thread back to her, and the camera follows whichever one is
- * doing the interesting thing. Results flow back into the chat as receipts
- * and a reply, and the camera returns to read it. The approval moment in
- * the shopping film is the user's own cursor, labelled "You".
- *
- * Copy inside the films is set dressing (like a screenshot) and stays in
- * English; the card around them is translated.
- */
 import type { ReactNode } from "react";
 import {
   Check,
@@ -59,12 +46,8 @@ export type CapabilityFilm = {
   render: (props: { has: Has; typed: string; typing: boolean }) => ReactNode;
 };
 
-/* ── Stella's window ─────────────────────────────────────────────── */
-
 const STELLA = { x: 30, y: 32, w: 400, h: 476 };
-/** Where threads leave Stella's window: its right edge, by the chat tail. */
 const THREAD_ORIGIN = { x: STELLA.x + STELLA.w - 6, y: 384 };
-/** Opening shot: close on the composer while the request types. */
 const COMPOSER_SHOT: Shot = { x: 230, y: 300, z: 1.55 };
 const READ_SHOT: Shot = { x: 300, y: 330, z: 1.32 };
 
@@ -87,11 +70,8 @@ function StellaPane({
   working: string;
   receipts: Receipt[];
   reply: string;
-  /** Rendered between the receipts and the reply (an approval card). */
   extra?: ReactNode;
-  /** Rendered after the reply (a later message). */
   after?: ReactNode;
-  /** Stella stops working here to wait on the user. */
   pauseCue?: string;
 }) {
   const firstBusy = pauseCue ?? receipts[0]?.cue ?? "reply";
@@ -136,7 +116,6 @@ function StellaPane({
   );
 }
 
-/** The user's approval, inline in the chat. */
 function ApprovalCard({ has }: { has: Has }) {
   const done = has("approved");
   return (
@@ -158,8 +137,6 @@ function ApprovalCard({ has }: { has: Has }) {
     </div>
   );
 }
-
-/* ── 1. Errands: find a quiet place, book it, put it on the calendar ── */
 
 const ERRANDS_CUES: ChoreographyCue[] = [
   { id: "send", at: 1500 },
@@ -329,8 +306,6 @@ function ErrandsFilm({ has, typed, typing }: { has: Has; typed: string; typing: 
   );
 }
 
-/* ── 2. Shopping: find it, check out, wait for the user's OK ──────── */
-
 const SHOPPING_CUES: ChoreographyCue[] = [
   { id: "send", at: 1500 },
   { id: "working", at: 1850 },
@@ -480,8 +455,6 @@ function ShoppingFilm({ has, typed, typing }: { has: Has; typed: string; typing:
   );
 }
 
-/* ── 3. Work: two agents at once, and a chart that changes hands ──── */
-
 const WORK_CUES: ChoreographyCue[] = [
   { id: "send", at: 1600 },
   { id: "working", at: 1950 },
@@ -504,7 +477,6 @@ const WORK_CUES: ChoreographyCue[] = [
 
 const SHEET = { x: 468, y: 40, w: 322, h: 252 };
 const DECK = { x: 600, y: 262, w: 330, h: 240 };
-/** The chart's two homes, in canvas pixels: in the sheet, then the slide. */
 const CHART_IN_SHEET = { x: SHEET.x + 196, y: SHEET.y + 70, w: 112, h: 92 };
 const CHART_ON_SLIDE = { x: DECK.x + 118, y: DECK.y + 70, w: 132, h: 108 };
 const FLIGHT = {
@@ -646,8 +618,6 @@ function WorkFilm({ has, typed, typing }: { has: Has; typed: string; typing: boo
   );
 }
 
-/* ── 4. Build: code, a site that assembles, then live ─────────────── */
-
 const BUILD_CUES: ChoreographyCue[] = [
   { id: "send", at: 1600 },
   { id: "working", at: 1950 },
@@ -777,8 +747,6 @@ function BuildFilm({ has, typed, typing }: { has: Has; typed: string; typing: bo
     </Film>
   );
 }
-
-/* ── 5. Routines: ask once, and it happens every morning ───────────── */
 
 const ROUTINE_CUES: ChoreographyCue[] = [
   { id: "send", at: 1700 },

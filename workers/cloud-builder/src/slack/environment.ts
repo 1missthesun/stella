@@ -1,39 +1,3 @@
-/**
- * Stella for Slack environments: what every agent container started from a
- * workspace's Slack runs with. One per repository, plus one (`repo_id` '')
- * for work that isn't about a repository (migrations/0015, 0016), edited by
- * the owner on stella.sh/crew. A container runs in the environment of the
- * repository its conversation works in (`repos.ts`).
- *
- * Network access is enforced by the container's network, not by the agent.
- * A Slack agent's container sends every HTTP and HTTPS request through
- * `SandboxEgress` (HTTPS is intercepted with a per-container CA the container
- * trusts), which calls `slackEgress` here. It reads the repository's current
- * environment (cached for seconds) and allows or refuses each request:
- *
- *   none     Stella itself, the engine's model API and the repository on
- *            GitHub; nothing else
- *   limited  also package registries, GitHub and other build hosts
- *            (`LIMITED_HOSTS`), the owner's extra hosts and the secrets' hosts
- *   full     everything; other ports reach the Internet directly too
- *
- * Under none and limited the container starts without Internet access, so
- * only ports 80 and 443 leave it, and only through here.
- *
- * Network secrets never enter the container. Their values are sealed in D1
- * and decrypted only here: an HTTPS request to a secret's host gets the
- * secret's header set to the value (replacing whatever the agent sent), and
- * redirects are handed back to the container rather than followed, so the
- * header never travels to another host. The agent sees a placeholder
- * variable named after the secret, so clients that insist on a key start.
- *
- * The setup script runs once per container start, before the agent, as the
- * agent's own user (never root) in the repository's checkout, under the same
- * network rules. Variables it exports (PATH included) carry over to the
- * agent. A failure is recorded with its log for the settings page, noted in
- * the Slack thread, and told to the agent, which goes on without it.
- */
-
 import {
   SLACK_ALLOWED_HOSTS_MAX,
   SLACK_ENV_NAME_MAX_CHARS,
@@ -56,7 +20,6 @@ import { decryptToken, encryptToken } from "./crypto.js";
 import { loadInstallation } from "./store.js";
 import { resolveConversationRepo } from "./repos.js";
 
-/** Hosts `limited` allows: package registries, source hosts and toolchain downloads. */
 export const LIMITED_HOSTS: readonly string[] = [
   "github.com",
   "*.github.com",
@@ -113,7 +76,6 @@ export const LIMITED_HOSTS: readonly string[] = [
   "playwright.download.prss.microsoft.com",
 ];
 
-/** The engines' own model APIs and sign-in refresh: an agent can't run without them. */
 const ENGINE_HOSTS: readonly string[] = ["*.anthropic.com", "claude.ai", "*.claude.ai", "*.claude.com"];
 
 const SECRET_PLACEHOLDER = "stella-network-secret";
@@ -121,7 +83,6 @@ const CONTAINERS_CA = "/etc/cloudflare/certs/cloudflare-containers-ca.crt";
 const SYSTEM_BUNDLE = "/etc/ssl/certs/ca-certificates.crt";
 const TOOL_UID = 42424;
 const SETUP_DIR = "/opt/stella-env";
-/** Outside SETUP_DIR, which each run replaces. */
 const SETUP_LOCK = "/opt/stella-env.lock";
 const SETUP_TIMEOUT_S = 600;
 const SETUP_LOG_CHARS = 16_000;
@@ -169,7 +130,6 @@ const parseHosts = (raw: string): string[] => {
   }
 };
 
-/** `repoId` "" is the environment of work that isn't about a repository. */
 export const loadEnvironment = async (
   env: Cloudflare.Env,
   teamId: string,
@@ -215,11 +175,8 @@ export const deleteEnvironment = async (env: Cloudflare.Env, teamId: string): Pr
   ]);
 };
 
-// ---- validation ------------------------------------------------------------
-
 const HOST_LABEL = /^(?!-)[a-z0-9-]{1,63}(?<!-)$/u;
 
-/** `example.com` or `*.example.com`, lower-cased; null when it isn't one. */
 export const normalizeHostPattern = (input: string): string | null => {
   let host = input.trim().toLowerCase();
   if (!host) return null;
@@ -237,7 +194,6 @@ export const hostMatches = (pattern: string, host: string): boolean =>
 const ENV_NAME = /^[A-Za-z_][A-Za-z0-9_]{0,127}$/u;
 const HEADER_NAME = /^[A-Za-z0-9!#$%&'*+.^_`|~-]{1,64}$/u;
 
-/** Variables Stella sets itself; the environment can't override them. */
 const RESERVED_VARS = new Set([
   "HOME",
   "USER",
@@ -262,10 +218,6 @@ const RESERVED_VARS = new Set([
 const reservedVar = (name: string): boolean =>
   RESERVED_VARS.has(name) || name.startsWith("STELLA_") || name.startsWith("XDG_") || name.startsWith("BASH_");
 
-/**
- * `.env` text: `KEY=value` per line, `export ` allowed, `#` comments, values
- * optionally in single quotes (literal) or double quotes (`\n`, `\"`, `\\`).
- */
 export const parseEnvVars = (text: string): { vars: Record<string, string>; errors: string[] } => {
   const vars: Record<string, string> = {};
   const errors: string[] = [];
@@ -465,7 +417,6 @@ const NETWORK_SUMMARY: Record<SlackNetworkLevel, string> = {
   full: "full network access",
 };
 
-/** One line for the orchestrator's prompt: what its agents' containers run with. */
 export const environmentSummary = (environment: SlackEnvironment): string => {
   const network =
     environment.network === "limited"
@@ -484,8 +435,6 @@ export const environmentSummary = (environment: SlackEnvironment): string => {
   ].filter(Boolean);
   return `${parts.join("; ")}.`;
 };
-
-// ---- egress ------------------------------------------------------------------
 
 type EgressPolicy = {
   network: SlackNetworkLevel;
@@ -546,11 +495,8 @@ const repoRequest = (url: URL, repo: string | null): boolean => {
 export type SlackEgressDeps = {
   containerId: string;
   team: string;
-  /** The repository whose environment applies; "" for none. */
   repo: string;
-  /** This Worker itself, for requests to Stella's own origin. */
   loopback: (request: Request) => Promise<Response>;
-  /** The general agent policy, metered, for plain HTTP. */
   general: (request: Request) => Promise<Response>;
 };
 
@@ -604,8 +550,6 @@ export const slackEgress = async (
   return await fetch(new Request(request, { headers, redirect: "manual" }));
 };
 
-// ---- the container ------------------------------------------------------------
-
 type ThreadRow = { team_id: string; channel_id: string; thread_key: string };
 
 const threadOf = async (env: Cloudflare.Env, conversationId: string): Promise<ThreadRow | null> =>
@@ -614,7 +558,6 @@ const threadOf = async (env: Cloudflare.Env, conversationId: string): Promise<Th
     .bind(conversationId)
     .first<ThreadRow>();
 
-/** The repository (id, "" for none) whose environment a conversation's agents run in. */
 const repoIdFor = async (env: Cloudflare.Env, conversationId: string, thread: ThreadRow): Promise<string> => {
   const resolved = await resolveConversationRepo(env, conversationId, {
     teamId: thread.team_id,
@@ -623,7 +566,6 @@ const repoIdFor = async (env: Cloudflare.Env, conversationId: string, thread: Th
   return resolved?.repo?.id ?? "";
 };
 
-/** The network rules a Slack conversation's agent containers start under. */
 export const egressForConversation = async (
   env: Cloudflare.Env,
   conversationId: string,
@@ -635,7 +577,6 @@ export const egressForConversation = async (
   return { kind: "slack", team: thread.team_id, repo, internet: environment.network === "full" };
 };
 
-/** Whether a conversation's network access reaches a host on its own (Full, or a domain the owner added). */
 export const conversationAllowsHost = async (env: Cloudflare.Env, conversationId: string, host: string): Promise<boolean> => {
   const thread = await threadOf(env, conversationId);
   if (!thread) return false;
@@ -665,7 +606,6 @@ const decodeEnvDump = (dump: string): Record<string, string> => {
 
 const BASE_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
 
-/** What every Slack agent process trusts and sees, before the workspace's own variables. */
 const baseAgentEnv = (environment: SlackEnvironment): Record<string, string> => ({
   NODE_EXTRA_CA_CERTS: CONTAINERS_CA,
   SSL_CERT_FILE: SYSTEM_BUNDLE,
@@ -705,7 +645,6 @@ const noteInThread = async (env: Cloudflare.Env, thread: ThreadRow, text: string
   });
 };
 
-/** Hosts the egress proxy refused during a run, from its 403 bodies in the log. */
 export const blockedHostsIn = (log: string): string[] => {
   const hosts = new Set<string>();
   for (const match of log.matchAll(/network access, which doesn't include ([a-z0-9.-]+)\./giu)) {
@@ -716,7 +655,6 @@ export const blockedHostsIn = (log: string): string[] => {
 
 const NOISE = [/^\s*at\s/u, /^rm: cannot remove '\/var\/cache\/apt/u, /^\s*$/u, /^\s*[\^~]+\s*$/u, /^\s*[}\])]+;?\s*$/u];
 
-/** The line of a failed run's log most likely to say why. */
 const failureLine = (log: string): string => {
   const lines = log.split("\n").filter((line) => !NOISE.some((pattern) => pattern.test(line)));
   const telling = [...lines].reverse().find((line) => /error|failed|not found|denied|refused|cannot|can't|unable|timed? ?out/iu.test(line));
@@ -738,16 +676,10 @@ const setupFailureNote = (
 };
 
 export type PreparedEnvironment = {
-  /** For the agent's daemon, and so every command it runs. */
   env: Record<string, string>;
-  /** Told to the agent with its first result. */
   notice?: string;
 };
 
-/**
- * Before a Slack agent starts: the workspace's variables, and the setup
- * script once per container start, in `cwd` (the repository's checkout).
- */
 export const prepareSlackEnvironment = async (
   env: Cloudflare.Env,
   session: Pick<ExecutionSession, "exec">,
@@ -811,7 +743,6 @@ cd ${shellQuote(cwd)} 2>/dev/null || cd ${shellQuote(WORLD_ROOT)}
     "set +e",
     `env -i ${envArgs} timeout -k 10 ${SETUP_TIMEOUT_S}s /usr/bin/setpriv --reuid=${TOOL_UID} --regid=${TOOL_UID} --clear-groups --no-new-privs --bounding-set=-all --inh-caps=-all --ambient-caps=-all -- /bin/bash ${SETUP_DIR}/run.sh > ${SETUP_DIR}/log 2>&1 < /dev/null`,
     "code=$?",
-    // A root-owned copy of what the script exported, for agents that start later.
     `if [ "$code" = 0 ]; then install -m 0600 ${out}/env ${savedEnv} 2>/dev/null || : > ${savedEnv}; fi`,
     `printf '%s\\n%s\\n' "$boot" "$code" > ${ran}`,
     ...report,

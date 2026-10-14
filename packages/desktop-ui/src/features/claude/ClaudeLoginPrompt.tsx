@@ -6,22 +6,13 @@ import "@/features/cloud/EngineConnectPrompt.css";
 
 const K = "settings.engineAccounts.claudeLogin";
 
-/**
- * The one Claude sign-in step, shared by Settings and onboarding. On this
- * computer it waits while the user approves on Anthropic's page, which
- * finishes by itself; in the cloud (or with "Use a code instead") the user
- * pastes the code that page shows.
- */
 export function ClaudeLoginPrompt({ login }: { login: ClaudeLogin }) {
   const t = useT();
   const [code, setCode] = useState("");
   const { flow, starting, submitting, error, failed } = login;
   const loginId = flow?.loginId ?? null;
-  /** Approving in the browser finishes it: nothing to paste. */
   const approving = flow !== null && !flow.pasting;
 
-  // A new attempt starts with an empty field: the old code belongs to the
-  // ended CLI.
   useEffect(() => {
     if (loginId) setCode("");
   }, [loginId]);

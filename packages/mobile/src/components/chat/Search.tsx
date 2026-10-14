@@ -28,21 +28,12 @@ type SearchStyles = ReturnType<typeof makeSearchStyles>;
 
 const searchResultKey = (result: ChatSearchResult) => result.message.id;
 
-/**
- * Messages matching `query` (already trimmed), newest first. A message matches
- * when every folded term appears somewhere in it.
- */
 export function useChatSearchResults(
   messages: ChatMessage[],
   open: boolean,
   query: string,
 ): ChatSearchResult[] {
   const active = query.length > 0;
-  // Fold each message once (recomputed only when messages change) so each
-  // keystroke just filters precomputed strings instead of re-normalizing the
-  // whole history. Gated on the search being open: during streaming,
-  // `messages` gets a new identity every frame, and folding the full
-  // transcript per frame is pure waste while the results are unread.
   const foldedMessages = useMemo(() => {
     if (!open) {
       return [] as { message: ChatMessage; index: number; folded: string }[];
@@ -60,7 +51,6 @@ export function useChatSearchResults(
       return [] as ChatSearchResult[];
     }
     const out: ChatSearchResult[] = [];
-    // Newest first; a message matches when every term appears somewhere in it.
     for (let i = foldedMessages.length - 1; i >= 0; i -= 1) {
       const entry = foldedMessages[i];
       if (terms.every((term) => entry.folded.includes(term))) {
@@ -71,10 +61,6 @@ export function useChatSearchResults(
   }, [foldedMessages, active, query]);
 }
 
-/**
- * The results menu that overlays the chat while searching (the chat itself is
- * never filtered). Tapping a result hands its transcript index to `onSelect`.
- */
 export function ChatSearchResults({
   results,
   query,
@@ -190,9 +176,6 @@ const SearchResultRow = memo(function SearchResultRow({
 
 const makeSearchStyles = (colors: Colors) =>
   StyleSheet.create({
-    // Compact results popover that drops in just below the search field,
-    // floating over the chat (which stays visible). Matches the `+` menu
-    // surface so it reads as a menu, not a takeover.
     searchDropdown: {
       borderColor: fadeHex(colors.border, 0.6),
       borderRadius: 14,

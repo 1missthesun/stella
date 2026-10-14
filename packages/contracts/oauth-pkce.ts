@@ -1,22 +1,14 @@
-/**
- * The generic OAuth helpers the Sign in with ChatGPT flows share: PKCE and
- * form encoding. Pure, so Node, Electron, Workers and React Native can use
- * it (React Native passes its own crypto primitives).
- */
-
 export const base64UrlEncode = (bytes: Uint8Array): string => {
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
   return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
 };
 
-/** The two primitives PKCE needs; React Native supplies its own. */
 export type PkceCrypto = {
   randomBytes(length: number): Uint8Array;
   sha256(data: Uint8Array): Uint8Array | Promise<Uint8Array>;
 };
 
-/** Web Crypto, as Node, Electron and browsers have it. */
 export const webPkceCrypto: PkceCrypto = {
   randomBytes: (length) => crypto.getRandomValues(new Uint8Array(length)),
   sha256: async (data) =>

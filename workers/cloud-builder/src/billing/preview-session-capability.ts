@@ -9,12 +9,6 @@ import { parseNetworkClass } from "../../../shared/network-class.js";
 import { verifyUserToken } from "../auth-jwt.js";
 import { ownerGateStub } from "../rpc-release.js";
 
-/**
- * `POST /api/gateway/preview-session-capability` (contracts gateway/api.ts):
- * the dev model gateway's session exchange for a desktop signed in to this
- * Preview. Served only by a Worker that signs with the Preview key, which
- * only the dev gateway trusts, so dev and production never answer it.
- */
 const PREVIEW_SIGNING_KID = "builder-preview-1";
 const IP_HASH_PATTERN = /^[0-9a-f]{32}$/u;
 

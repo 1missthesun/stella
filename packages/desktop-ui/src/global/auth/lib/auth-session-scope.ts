@@ -11,11 +11,6 @@ export type AuthSessionScopeData =
   | null
   | undefined;
 
-/**
- * Cache ownership must follow the immutable Better Auth user id. Email, name,
- * and a mutable session id can collide or rotate during account linking and
- * must never make one identity reuse another identity's conversation pointer.
- */
 export const resolveAuthSessionCacheScope = (
   sessionData: AuthSessionScopeData,
 ): string => {

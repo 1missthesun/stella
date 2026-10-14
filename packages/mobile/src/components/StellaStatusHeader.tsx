@@ -49,41 +49,14 @@ import { useTPlural } from "../i18n";
 const MARK_SIZE = STATUS_PILL_HEIGHT - STATUS_PILL_INSET * 2;
 const LABEL_GAP = 8;
 const LABEL_TRAILING = 16;
-/**
- * Bar padding + a side button + the gap: the pill keeps at least this much
- * room from the menu button on the left and the settings button on the right.
- */
 const SIDE_CLEARANCE = 10 + 44 + 8;
-/** Long enough for a shrinking pill to settle before its slot narrows. */
 const SLOT_SETTLE_MS = 560;
 
 const NO_RUNNING_AGENTS: ActivityIndicatorEntry[] = [];
 
-/**
- * Stella's presence in the chat's top bar: the mark inside a glass pill
- * that matches the side buttons. At rest the pill is a circle around the
- * mark's idle eyes. While background work runs it grows, centred, to carry
- * the work beside the mark: the task's own description for one, a short count
- * for several; when everything finishes the mark pops once and the pill closes
- * back around it. Pressing it opens the menu of what is running.
- *
- * Once a run is under way the mark takes up `StellaMarkIndicator`'s tool poses
- * — working and writing reshape and bob the body, searching and reading add
- * orbiting marks. The one state it never enters is `thinking`, the three-dot
- * ellipsis: that is the chat working indicator's signature and belongs to
- * `WorkingIndicator`, not up here. The spawn beat is therefore a plain blob
- * moment — the hero mark holds its breathe for the beat, then the pose takes
- * over.
- *
- * The timings, the phase machine and the choice of label come from
- * `@stella/contracts/activity-indicator`; desktop's own top-bar indicator
- * reads the same module, so the two can't drift into different behaviour.
- * Desktop renders without the pill — the window chrome stands in for it.
- */
 export function StellaStatusHeader({
   onPress,
 }: {
-  /** Opens the menu of in-progress agents. Inert while nothing runs. */
   onPress: (running: readonly ActivityIndicatorEntry[]) => void;
 }) {
   const tPlural = useTPlural();
@@ -133,9 +106,6 @@ export function StellaStatusHeader({
   }, [count, pop]);
 
   const busy = phase !== "idle" && label !== null;
-  // Poses belong to work actually in flight. `spawn` is deliberately excluded:
-  // it used to carry the thinking ellipsis, and now that the ellipsis is gone
-  // the beat reads as the resting blob before the pose takes over.
   const posed = busy && phase === "working";
   const pose = pickWorkingIndicatorToolPose(running[0]?.id ?? "stella");
 

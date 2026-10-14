@@ -1,13 +1,3 @@
-/**
- * Drive, media and backup files through this Worker, for servers without an
- * R2 API token (R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY). The owner store
- * hands out `/api/r2/<bucket>/<key>?m=&e=&d=&s=` URLs instead of presigned
- * S3 URLs: an HMAC over bucket, key, method, expiry and disposition, keyed
- * from BETTER_AUTH_SECRET. GET and HEAD stream from the R2 binding with
- * Range support; PUT streams the body into it (one request, so the edge's
- * request-size limit applies: R2_PROXY_MAX_PUT_BYTES).
- */
-
 import { betterAuthKeys } from "./secret-rotation.js";
 
 export const R2_PROXY_PATH_PREFIX = "/api/r2/";
@@ -58,7 +48,6 @@ const sign = async (secret: string, payload: string): Promise<string> => {
 const payloadOf = (alias: string, key: string, method: string, expires: number, disposition: string): string =>
   [alias, key, method, String(expires), disposition].join("\n");
 
-/** The proxy signer for a bucket named by one of the R2_*_BUCKET vars, or by its alias. */
 export const r2ProxySigner = (env: unknown, bucketName: string | undefined): R2ProxySigner | null => {
   const origin = read(env, "CLOUD_BUILDER_PUBLIC_URL").replace(/\/+$/u, "");
   const keys = proxyKeys(env);

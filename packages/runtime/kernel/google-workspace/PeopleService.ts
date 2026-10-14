@@ -129,11 +129,6 @@ export class PeopleService {
     }
   };
 
-  /**
-   * Gets a user's relations (e.g., manager, spouse, assistant).
-   * Defaults to the authenticated user if no userId is provided.
-   * Optionally filters by a specific relation type.
-   */
   public getUserRelations = async ({
     userId,
     relationType,

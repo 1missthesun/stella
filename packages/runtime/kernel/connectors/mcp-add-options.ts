@@ -1,15 +1,8 @@
-/**
- * `connect.addMcp` options, checked the same way wherever an MCP server is
- * added: on a computer (`connect-service.ts`) or in the cloud. Platform
- * neutral.
- */
-
 import type { ConnectorCommandConfig } from "./types.js";
 
 const isPlainRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value);
 
-/** Mirrors the old CLI's `safeId`, throwing instead of exiting. */
 export const validateMcpConnectorId = (value: string): string => {
   const id = value.trim().toLowerCase();
   if (
@@ -37,7 +30,6 @@ const isStringRecordValue = (
   isPlainRecord(value) &&
   Object.values(value).every((entry) => typeof entry === "string");
 
-/** Strict shape check for `connect.addMcp` options with actionable errors. */
 export const parseAddMcpOptions = (raw: Record<string, unknown>): {
   command: ConnectorCommandConfig;
 } => {

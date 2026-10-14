@@ -127,11 +127,9 @@ const findWebpTiffOffset = (bytes: Uint8Array): number => {
 const getExifOrientation = (bytes: Uint8Array): number => {
   let tiffOffset = -1;
 
-  // JPEG: starts with FF D8
   if (bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xd8) {
     tiffOffset = findJpegTiffOffset(bytes);
   }
-  // WebP: starts with RIFF....WEBP
   else if (
     bytes.length >= 12 &&
     bytes[0] === 0x52 &&

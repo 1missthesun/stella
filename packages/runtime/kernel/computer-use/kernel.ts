@@ -107,7 +107,6 @@ export type NodeReplToolSearchResult = {
   name: string;
   signature: string;
   description?: string;
-  /** Exact JavaScript expression for this tool; uses brackets when needed. */
   access?: string;
   dotNotation?: boolean;
 };
@@ -126,9 +125,7 @@ export type NodeReplCellObservation = Readonly<{
   generation: number;
   status: "running" | "completed" | "failed";
   elapsedMs: number;
-  /** Exclusive cursor used for this observation's first content item. */
   fromCursor: number;
-  /** Monotonic cursor after the last returned content item. */
   cursor: number;
   output?: string;
   content?: readonly NodeReplContentItem[];
@@ -150,16 +147,9 @@ export type NodeReplKernelManagerOptions = {
   evalTimeoutMs?: number;
   commandTimeoutMs?: number;
   idleTimeoutMs?: number;
-  /**
-   * Bounded settlement deadline for nested `tools.*` calls a cell started
-   * without awaiting (see `DEFAULT_NODE_REPL_TOOL_DRAIN_TIMEOUT_MS`).
-   */
   toolDrainTimeoutMs?: number;
-  /** Bound on teardown awaited in the evaluate error path (tests only). */
   disposeTimeoutMs?: number;
-  /** TTL for completed yielded cells retained for repeatable cursor reads. */
   cellRetentionMs?: number;
-  /** LRU bound for completed yielded cells retained by this registry. */
   maxRetainedCells?: number;
   executeTool?: (
     toolName: string,
@@ -169,50 +159,21 @@ export type NodeReplKernelManagerOptions = {
     onUpdate?: ToolUpdateCallback,
   ) => Promise<ToolResult>;
   toolAwaitsUser?: (toolName: string) => boolean;
-  /**
-   * Host-side implementation of the in-REPL frozen `connect` client
-   * (third-party app integrations: discover/connectors/actions/schema/
-   * call). Dispatched by the kernel from worker `connect-call` messages;
-   * thrown Errors are serialized back so REPL code sees them as rejects.
-   */
   connectClient?: ReplConnectClient;
-  /**
-   * Host-side handler for the in-REPL `tools.$search({ query })` intrinsic.
-   * Runs over the live tool catalog scoped to the calling context and
-   * returns full callable signatures. Intercepted by the kernel before the
-   * per-context allowlist gate, so it never needs to appear in
-   * `allowedToolNames`.
-   */
   searchTools?: (
     query: string,
     context: ToolContext,
     limit?: number,
   ) => Promise<NodeReplToolSearchResult[]> | NodeReplToolSearchResult[];
-  /**
-   * Host-side handler for `tools.$describe(name)`. It resolves one exact name
-   * against the same live, authorized surface as invocation. `cursor` is only
-   * for deterministic lossless paging of exceptionally large schema docs.
-   */
   describeTool?: (
     name: string,
     context: ToolContext,
     cursor?: number,
   ) => Promise<unknown> | unknown;
-  /**
-   * Host-side handler for `history.sql(query, params)` (`op: "sql"`) and
-   * `history.read(fromSeq, toSeq)` (`op: "read"`) over the calling
-   * conversation's history. Intercepted before the allowlist gate.
-   */
   queryHistory?: (
     args: Record<string, unknown>,
     context: ToolContext,
   ) => Promise<unknown>;
-  /**
-   * Host side of the in-REPL `memory` client (`memory.read`, `memory.write`,
-   * `memory.list`) over the user's memory files. `available` decides per
-   * kernel whether its REPL gets the global at all; calls are intercepted
-   * before the allowlist gate like `$history`.
-   */
   memory?: NodeReplMemoryHost;
 };
 
@@ -240,9 +201,7 @@ export type EvaluateOptions = {
   signal?: AbortSignal;
   onToolResult?: (result: ToolResult) => void;
   onToolUpdate?: ToolUpdateCallback;
-  /** UI-only response metadata; excluded from model-facing REPL output. */
   onResponseMeta?: (meta: BrowserUseResponseMeta) => void;
-  /** Ordered typed output as the worker emits it. Cursor starts at one. */
   onContent?: (item: NodeReplContentItem, cursor: number) => void;
 };
 
@@ -358,7 +317,6 @@ const deserializeError = (error: SerializedError): Error => {
 type ActiveEvaluation = {
   id: number;
   controller: AbortController;
-  /** Interrupts the evaluation's timeout fiber (the clearTimeout analogue). */
   cancelTimeout: () => void;
   timeoutMs: number;
   remainingMs: number;
@@ -438,12 +396,6 @@ const READ_ONLY_BROWSER_ACTIONS = new Set([
   "wait",
   "waitforurl",
 ]);
-/**
- * Successful commands that warrant one UI-only post-cell screenshot. This is
- * intentionally a positive allowlist matching ChatGPT's browser client: DOM
- * reads/evaluate/network calls, hover/focus, uploads, and failures do not
- * capture. A cell with several visual commands captures only after the last.
- */
 const BROWSER_PRESENTATION_ACTIONS = new Set([
   "tab_close",
   "click",
@@ -463,7 +415,6 @@ const BROWSER_PRESENTATION_ACTIONS = new Set([
   "reload",
   "dialog",
   "download",
-  // Raw CUA equivalents retained for protocol parity if surfaced later.
   "input_keyboard",
   "input_mouse",
   "keyboard",
@@ -473,19 +424,12 @@ const BROWSER_PRESENTATION_ACTIONS = new Set([
 ]);
 const BROWSER_PRESENTATION_TIMEOUT_MS = 10_000;
 const MAX_BROWSER_SCREENSHOT_FILES_PER_KERNEL = 100;
-/**
- * Tools never exposed inside the REPL's `tools` object. `$`-prefixed names
- * need no entry here: the host rejects them at registration, and the worker
- * filters them from every refresh, so nothing can shadow the built-in
- * `tools.$search` or `tools.$describe`.
- */
 export const NODE_REPL_EXCLUDED_TOOL_NAMES: ReadonlySet<string> = new Set([
   CODE_TOOL_NAME,
   LEGACY_NODE_REPL_TOOL_NAME,
   "multi_tool_use_parallel",
 ]);
 
-/** Current REPL-visible tool names for a context (exclusions applied). */
 const replToolNamesForContext = (context: ToolContext): string[] =>
   [...new Set(context.allowedToolNames ?? [])].filter(
     (name) => !NODE_REPL_EXCLUDED_TOOL_NAMES.has(name) && !name.startsWith("$"),
@@ -602,7 +546,6 @@ export const nodeReplChildUsesElectronRuntime = (
 export type NodeReplProcessIsolation = Readonly<{
   identity: ToolProcessIdentity;
   cwd: string;
-  /** The context's `toolStateRoot`: caches, config and state go there, not HOME. */
   stateRoot?: string;
 }>;
 
@@ -763,7 +706,6 @@ class NodeReplKernel {
   private readonly connectClient?: ReplConnectClient;
   private readonly onTerminated: (kernel: NodeReplKernel) => void;
   private tail: Promise<void> = Promise.resolve();
-  /** Interrupts the pending idle-teardown fiber (the clearTimeout analogue). */
   private cancelIdleTimer: (() => void) | null = null;
   private pending = 0;
   private skyTail: Promise<void> = Promise.resolve();
@@ -801,14 +743,10 @@ class NodeReplKernel {
       searchTools?: NodeReplKernelManagerOptions["searchTools"];
       describeTool?: NodeReplKernelManagerOptions["describeTool"];
       queryHistory?: NodeReplKernelManagerOptions["queryHistory"];
-      /** Present only when this kernel's context may use `memory`. */
       memory?: NodeReplMemoryHost;
-      /** Whether this kernel's context gets `sky` and `browser`; the orchestrator's never does. */
       deviceControl: boolean;
       connectClient?: ReplConnectClient;
-      /** The context's validated tool account; the REPL child runs as it. */
       processIdentity?: ToolProcessIdentity;
-      /** The context's `toolStateRoot`, for the child's state directories. */
       toolStateRoot?: string;
       toolNames: string[];
       browserSessionId: string;
@@ -1043,11 +981,6 @@ class NodeReplKernel {
     return task;
   }
 
-  // The idle teardown is a forked timeout fiber (forkCancelableTimeout),
-  // interrupted by enqueue/close — the Effect replacement for the unref'd
-  // setTimeout. Process liveness is unaffected: the runtime worker exits via
-  // explicit process.exit (worker/entry.ts), never by event-loop drain, and
-  // registry disposal cancels the fiber.
   private scheduleIdle(
     timeoutMs: number,
     onIdle: (kernel: NodeReplKernel) => void,
@@ -1081,10 +1014,6 @@ class NodeReplKernel {
 
     return new Promise<NodeReplEvaluationResult>((resolve, reject) => {
       const id = this.nextEvaluationId++;
-      // Effect-ratchet pin (1 new AbortController): this is the seam
-      // controller whose real AbortSignal is handed to the computer-use
-      // session daemon, the browser client (CDP transport), and nested tool
-      // execution — non-Effect consumers that need a genuine AbortSignal.
       const controller = new AbortController();
       const active: ActiveEvaluation = {
         id,
@@ -1128,9 +1057,6 @@ class NodeReplKernel {
         }
       }
       try {
-        // Ship the current allowed tool names with every evaluate so the
-        // worker's `tools` object tracks tools added or removed mid-session
-        // (the frozen construction-time list went stale otherwise).
         this.post({
           type: "evaluate",
           evaluationId: id,
@@ -1501,11 +1427,6 @@ class NodeReplKernel {
     }
   }
 
-  /**
-   * Per-method argument shape check before touching the client. The worker
-   * installer already validates for cooperative callers; this is the
-   * protocol-boundary defense against handcrafted messages.
-   */
   private dispatchConnectCall(
     client: ReplConnectClient,
     method: ConnectMethod,
@@ -1873,10 +1794,6 @@ class NodeReplKernel {
       return;
     }
 
-    // `$search` and `$describe` are kernel intrinsics, resolved host-side over
-    // the live tool catalog BEFORE the per-context direct-tool gate. Demoted
-    // tools are absent from the provider's eager list, and these intrinsics
-    // progressively disclose only the callable surface for this context.
     if (message.toolName === NODE_REPL_TOOL_SEARCH_NAME) {
       try {
         if (!this.searchTools) {
@@ -2298,10 +2215,6 @@ class NodeReplKernel {
     if (!presentation) return;
     const tabs = tabState?.tabs ?? [];
     const activeTab = tabs.find((tab) => tab.tabId === tabState?.activeTabId);
-    // ChatGPT treats an explicitly targeted visual action as authoritative:
-    // if that target vanished, capture fails best-effort rather than silently
-    // showing another tab. Closing a tab is the exception and intentionally
-    // selects the surviving active tab.
     const screenshotTab =
       presentation.action === "tab_close"
         ? (activeTab ?? tabs[0])
@@ -2372,16 +2285,10 @@ class NodeReplKernel {
     const needsPresentation =
       Boolean(active.onResponseMeta) &&
       (activity.terminalLifecycle || Boolean(activity.presentationAction));
-    // The submitted cell itself has completed. From here ChatGPT gives the
-    // UI-only presentation hook its own ten-second budget rather than racing
-    // it against whatever remained of the REPL evaluation deadline.
     if (needsPresentation) active.cancelTimeout();
     const content: NodeReplContentItem[] = [...(workerContent ?? [])];
     if (!error) {
       for (const attachment of activity.screenshotAttachments) {
-        // Ownership of kernel-created screenshot files transfers to the outer
-        // tool adapter before reset/close starts. The adapter acknowledges the
-        // transfer by deleting the file only after it has read the bytes.
         if (attachment.deleteAfterAttach) {
           this.browserScreenshotPaths.delete(attachment.path);
         }
@@ -2600,8 +2507,6 @@ const waitForCellChange = async (
         yield* Effect.acquireRelease(
           Effect.sync(() => {
             cell.listeners.add(onChange);
-            // Close the registration race: the cell can settle while the
-            // managed runtime is starting this wait.
             onChange();
           }),
           () => Effect.sync(() => cell.listeners.delete(onChange)),
@@ -2833,7 +2738,6 @@ export class NodeReplKernelRegistry {
         this.lastOwnerLeaseIssuedAt + 1,
       );
       this.lastOwnerLeaseIssuedAt = ownerLeaseIssuedAt;
-      // Validated before anything spawns, exactly as a `Bash` command's is.
       const processIdentity = resolveToolProcessIdentity(context);
       const toolStateRoot = context.toolStateRoot?.trim();
       const generation = (this.generations.get(id) ?? 0) + 1;

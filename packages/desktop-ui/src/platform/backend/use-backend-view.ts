@@ -15,24 +15,15 @@ import {
 } from "./backend-client";
 
 export type BackendViewState<T> =
-  /** `value` is the previous arguments' value when `keepPreviousValue` is set. */
   | { status: "loading"; value: T | undefined; error: undefined }
   | { status: "ready"; value: T; error: undefined }
   | { status: "error"; value: T | undefined; error: BackendRequestError };
 
 const LOADING = { status: "loading", value: undefined, error: undefined } as const;
 
-/** Changes whenever the signed-in account does; views resubscribe on it. */
 export const useBackendAccountEpoch = (): number =>
   useSyncExternalStore(subscribeBackendAccount, readBackendAccountEpoch);
 
-/**
- * Subscribe to a backend view. Pass `"skip"` as the args to hold off (for
- * example until the account is known). The value stays at its last good
- * state across a transient error, so callers can keep rendering it, and
- * resets to loading when the account changes. With `keepPreviousValue`, new
- * arguments for the same view keep showing the old value until theirs lands.
- */
 export function useBackendView<K extends ViewName>(
   view: K,
   args: ViewArgs<K> | "skip",
@@ -72,7 +63,6 @@ export function useBackendView<K extends ViewName>(
   return state;
 }
 
-/** The view's value, or undefined while loading or skipped. */
 export function useBackendValue<K extends ViewName>(
   view: K,
   args: ViewArgs<K> | "skip",

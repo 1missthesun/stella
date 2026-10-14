@@ -38,7 +38,6 @@ const piPlacedAgentKey = (agentId: string): string =>
     ? agentId
     : placementRemoteThreadAgentId(agentId);
 
-/** A placed agent's brief, with where the files the user attached are on this computer. */
 const withAttachedFiles = (
   prompt: string,
   attachments: readonly RuntimeAttachmentRef[],
@@ -69,8 +68,6 @@ export const runsHandlers: WorkerRpcHandlers = {
         attachments?: RuntimeAttachmentRef[];
         context?: unknown;
       };
-      // The host's own turns (schedule fires, watch escalations, heartbeats)
-      // and the chats other devices place here run in the conversation's harness.
       const hostBus = yield* HostBus.Service;
       if (automation.executionPlacementRunId) {
         const placementRunId = automation.executionPlacementRunId;
@@ -119,18 +116,12 @@ export const runsHandlers: WorkerRpcHandlers = {
         () => new RunnerUnavailableError(),
       );
       const payload = params as RuntimeLocalAgentRequest;
-      // Before the agent starts, so its brief can name real paths. A failed
-      // download fails the agent here rather than starting one that will
-      // report it cannot find the file the user attached.
       const attachments = yield* fromPromise(() =>
         session.agentRuns.materializeAgentAttachments({
           conversationId: payload.conversationId,
           ...(payload.attachments ? { attachments: payload.attachments } : {}),
         }),
       );
-      // An agent another device placed here runs in the conversation's
-      // harness, on the model its requester named (Claude Code included);
-      // its answer goes back through the placement.
       const requestedModel = payload.requestedModel?.trim();
       const pickedModel = requestedModel && requestedModel !== "default" ? requestedModel : undefined;
       const hostBus = yield* HostBus.Service;
@@ -158,15 +149,12 @@ export const runsHandlers: WorkerRpcHandlers = {
             error: `This device couldn't run the agent on "${pickedModel}": ${error instanceof Error ? error.message : String(error)}`,
           };
         });
-        // The report goes back to a chat on another device; the files it
-        // links are here, so this computer shares them.
         if (result.status === "ok" && result.finalText) {
           await session.runner
             .ensureInitialized()
             .then((runner) => runner.publishLinkedFiles(result.finalText))
             .catch(() => undefined);
         }
-        // It moved itself on: the attempt here ended, and the next one runs where it went.
         if (result.status === "moved") return { status: "ok" as const, finalText: "", threadId: result.threadId };
         return result.status === "ok"
           ? { status: "ok" as const, finalText: result.finalText, threadId: result.threadId }
@@ -257,8 +245,6 @@ export const runsHandlers: WorkerRpcHandlers = {
         () => new RunnerUnavailableError(),
       );
       const payload = params as RuntimeLocalAgentRequest;
-      // An agent the app starts (an app-source merge, memory sync) is a pi
-      // agent of the conversation's orchestrator.
       const hostBus = yield* HostBus.Service;
       return yield* fromPromise(async () =>
         (await piChatsFor(session, hostBus)).startAgent(payload.conversationId, {

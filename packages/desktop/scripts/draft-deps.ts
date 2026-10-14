@@ -1,12 +1,3 @@
-/**
- * Give a draft worktree its packages:
- *
- *   bun "$STELLA_APP_DIR/packages/desktop/scripts/draft-deps.ts" "$STELLA_DRAFTS_DIR/<name>"
- *
- * Links the app checkout's node_modules while the draft's dependencies match
- * the checkout's, and installs the draft's own once they differ (removing
- * the link first, so the install never touches the running app's packages).
- */
 import path from "node:path";
 import { prepareDraftDependencies } from "../electron/services/app-source/draft-deps.js";
 

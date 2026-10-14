@@ -8,26 +8,11 @@ import type {
 } from "@stella/contracts/backend/engines";
 import { listenForChatGptCallback } from "@stella/runtime/kernel/integrations/chatgpt-sign-in";
 
-/**
- * The owner's engine accounts as this computer sees them: the list in the
- * owner's Stella account (`engines.get`), followed while signed in, and the
- * few calls this computer makes about them. It holds no credential.
- *
- * - Claude: this computer reports which Claude Code logins it holds
- *   (identities only, `reportClaudeLogins`); `ClaudeLocalAccounts` picks the
- *   login this computer uses from `settings()`.
- * - ChatGPT: this computer's own accounts live in `chatgpt-profiles.ts`;
- *   here it publishes the issued client ids it registered
- *   (`shareChatGptRegistration`) and signs the owner's cloud in
- *   (`connectChatGptCloud`), whose credentials stay on Stella's server.
- */
-
 export type EngineAccountAccessOptions = {
   getBackendUrl: () => string | null;
   getAuthToken: () => Promise<string | null>;
 };
 
-/** The account a Stella session token is for (its `sub`). */
 export const tokenSubject = (token: string | null): string | null => {
   const payload = token?.split(".")[1];
   if (!payload) return null;
@@ -51,10 +36,6 @@ export class EngineAccountAccess {
 
   constructor(private readonly options: EngineAccountAccessOptions) {}
 
-  /**
-   * The Stella session changed. A different account (or a sign-out) drops
-   * the list held for the previous one and re-reads it.
-   */
   noteAuthToken(token: string | null): void {
     const next = tokenSubject(token);
     if (next === this.subject) return;
@@ -65,24 +46,20 @@ export class EngineAccountAccess {
     if (next) this.ensureWatch();
   }
 
-  /** Signed in to Stella (the session's subject), whether or not the list arrived. */
   isSignedIn(): boolean {
     return this.subject !== null;
   }
 
-  /** The owner's engine settings; null while signed out or before the first read. */
   settings(): EngineSettings | null {
     if (this.subject) this.ensureWatch();
     return this.current;
   }
 
-  /** Called when the settings change (including to null); returns an unsubscribe. */
   onSettingsChanged(listener: () => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
   }
 
-  /** Record this computer's Claude Code logins (identities only). */
   async reportClaudeLogins(args: {
     deviceId: string;
     deviceName?: string;
@@ -94,7 +71,6 @@ export class EngineAccountAccess {
     await client.call("engines.reportClaudeLogins", args);
   }
 
-  /** A shared ChatGPT registration's identity hints, when another host published it. */
   chatGptRegistration(clientId: string): { email?: string; name?: string } | null {
     const row = this.settings()?.chatGptRegistrations?.find((entry) => entry.clientId === clientId);
     if (!row) return null;
@@ -104,10 +80,6 @@ export class EngineAccountAccess {
     };
   }
 
-  /**
-   * Publish an issued ChatGPT client id this computer signed in with, so the
-   * owner's other hosts can reuse it. Identifiers only; best effort.
-   */
   async shareChatGptRegistration(args: {
     clientId: string;
     email?: string;
@@ -130,16 +102,6 @@ export class EngineAccountAccess {
     }
   }
 
-  /**
-   * Sign the owner's cloud in to ChatGPT. The server builds the
-   * authorization for the cloud's own host id; this computer only catches
-   * the browser's 127.0.0.1 redirect on its loopback listener and hands the
-   * URL back, and the server exchanges the code and keeps the credentials.
-   * `accountId` signs a saved cloud account in again; `clientId` reuses a
-   * registration another host of the owner made; `enablePlanUsage` asks for
-   * consent again after plan usage was declined. A second call cancels the
-   * first.
-   */
   async connectChatGptCloud(
     openUrl: (url: string) => void,
     options: { accountId?: string; clientId?: string; enablePlanUsage?: boolean } = {},
@@ -182,7 +144,6 @@ export class EngineAccountAccess {
     }
   }
 
-  /** Stop a cloud ChatGPT sign-in in progress; whether there was one. */
   cancelChatGptCloudConnect(): boolean {
     const current = this.chatGptConnect;
     current?.abort();
@@ -217,7 +178,6 @@ export class EngineAccountAccess {
       "engines.get",
       {},
       (value) => this.applySettings(value),
-      // Signed out or refused: no accounts until the session changes.
       () => this.applySettings(null),
     );
   }

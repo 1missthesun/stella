@@ -1,18 +1,3 @@
-/**
- * Connector client engine behind the node_repl `connect` client
- * (`createReplConnectClient`): discovering and managing connectors, and
- * listing and running enabled connectors' actions, which the code runtime
- * offers as deferred tools (`connector-tools.ts`).
- *
- * Everything here throws plain Errors (the broker's message included);
- * the REPL kernel serializes them across the worker boundary so agent
- * code sees a thrown Error.
- *
- * Backend Composio actions run through the same trusted path as always:
- * CLI bridge UDS → worker `backend-connector-action-broker` (Ajv input
- * validation + tiered action allowlist) → stella.sh backend.
- */
-
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { Effect } from "effect";
@@ -96,7 +81,6 @@ import {
 } from "./mcp-add-options.js";
 import { loadGoogleWorkspaceTools } from "../google-workspace/load-google-workspace-tools.js";
 
-/** Who made a connector call, so a credential card opens in their chat. */
 export type ConnectorCaller = {
   conversationId?: string;
   agentId?: string;
@@ -105,25 +89,14 @@ export type ConnectorCaller = {
 
 export type ConnectClientOptions = {
   stellaAppDir: string;
-  /** The conversation, agent and tool call a credential card belongs to. */
   caller?: ConnectorCaller;
-  /** Runs while the user answers a credential card (the code cell's clock stops). */
   awaitUser?: <T>(task: () => Promise<T>) => Promise<T>;
-  /** The caller's run stopped: an open credential card is withdrawn. */
   signal?: AbortSignal;
-  /** UDS path of the worker's CLI bridge (credential cards + broker). */
   cliBridgeSocketPath?: string;
-  /** Non-fatal bridge diagnostics (logged by the host). */
   onBridgeUnreachable?: (message: string) => void;
-  /** This computer's device id, which the account's MCP registry names it by. */
   deviceId?: string;
 };
 
-/**
- * Broker refusals/failures surface as this error so callers can branch on
- * `reason` without parsing the message. The message carries the broker's
- * own text plus status/request diagnostics.
- */
 export class ConnectorBrokerActionError extends Error {
   constructor(
     message: string,
@@ -247,14 +220,6 @@ export const resolveConnectorAuthHints = async (
   return { authType: undefined };
 };
 
-/**
- * Run `attempt`. If it throws `ConnectorAuthError` AND the bridge socket
- * is wired AND the error carries a `tokenKey`, dial the bridge to ask the
- * user with a credential card; on `{ ok: true }` retry once. Anything else (no
- * socket, no tokenKey, user cancel/timeout, second auth failure) rethrows
- * to the caller. Single retry is intentional: a second auth failure means
- * a bad key, not that another round-trip would help.
- */
 export const withAuthRetry = async <T>(
   options: ConnectClientOptions,
   attempt: () => Promise<T>,
@@ -277,9 +242,6 @@ export const withAuthRetry = async <T>(
 
     let result: ConnectorCredentialResult;
     try {
-      // No `description`: the host's canonical copy is used instead of
-      // leaking the upstream HTTP status / generic-error verbiage into a
-      // user-facing card.
       const ask = () => requestConnectorCredentialFromBridge({
         socketPath,
         tokenKey,
@@ -305,9 +267,6 @@ export const withAuthRetry = async <T>(
         options.signal?.removeEventListener("abort", withdraw);
       }
     } catch (bridgeError) {
-      // The bridge was advertised but isn't reachable — fall through to
-      // the original auth error so the agent gets a clean signal rather
-      // than a confusing "socket refused" string.
       options.onBridgeUnreachable?.(
         `cli-bridge unreachable: ${(bridgeError as Error).message}`,
       );
@@ -367,12 +326,6 @@ export const nativeCatalogDiagnostics = (
   };
 };
 
-/**
- * Catalog policy shared by every consumer here: disk cache / bundled
- * fallback, never a network fetch (the connect client must stay fast and
- * offline-capable; the broker re-resolves the live catalog server-side
- * before running anything).
- */
 export const loadConnectCatalog = async (
   stellaAppDir: string,
 ): Promise<ResolvedNativeCatalog> =>
@@ -450,10 +403,6 @@ export const callNativeConnector = async (
   const { stellaAppDir } = options;
   const locallyEnabled = await isNativeConnectorEnabled(stellaAppDir, id);
   const locallyResolved = getNativeConnectorCatalogEntry(id, catalogEntries);
-  // A freshly authenticated desktop may have a live authoritative Store
-  // entry before this process has a disk cache. Do not reinterpret bundled
-  // metadata as executable, but allow the trusted broker to resolve and
-  // authorize the canonical backend identity for an already-enabled id.
   if (
     locallyEnabled &&
     options.cliBridgeSocketPath?.trim() &&
@@ -699,10 +648,6 @@ export const callNativeConnector = async (
   }
 };
 
-// ---------------------------------------------------------------------------
-// MCP connector management (connect.addMcp / connect.remove)
-// ---------------------------------------------------------------------------
-
 const MCP_TOOLS_CACHE_FILE = "mcp-tools.json";
 const MCP_TOOLS_REFRESH_MS = 60 * 60_000;
 const MCP_PROBE_RETRY_MS = 60_000;
@@ -771,7 +716,6 @@ export type AddMcpResult = {
 export type RemoveConnectorResult = {
   removed: { commands: number; apis: number };
   deletedTokenKeys: string[];
-  /** The account's copy: gone everywhere, or retried on the next check. */
   account: "removed" | "pending" | "none";
 };
 
@@ -935,18 +879,6 @@ export const removeMcpConnector = async (
   };
 };
 
-// ---------------------------------------------------------------------------
-// Account sync: every MCP server belongs to the account
-// ---------------------------------------------------------------------------
-//
-// The account's registry (`mcpServers.*`) is the source of truth while this
-// computer is signed in and online. A remote server added anywhere is copied
-// into this computer's commands; a stdio (or local-network) server stays on
-// the computer that added it, with only its name and tools on the account,
-// and other places reach it through that computer. `synced` records which
-// local servers the account has seen, so one removed elsewhere is removed
-// here too; `pendingRemovals` retries a removal the account missed.
-
 const ACCOUNT_MCP_STATE_FILE = "account-mcp.json";
 const ACCOUNT_MCP_TTL_MS = 15_000;
 const ACCOUNT_MCP_LIST_TIMEOUT_MS = 8_000;
@@ -1066,7 +998,6 @@ const forgetAccountListing = (stellaAppDir: string) => {
   accountListings.delete(stellaAppDir);
 };
 
-/** The account's MCP servers, or null while the account can't be reached. */
 const accountMcpListing = (
   options: ConnectClientOptions,
 ): Promise<AccountMcpListing | null> => {
@@ -1096,7 +1027,6 @@ const accountMcpListing = (
   return listing;
 };
 
-/** Where this computer runs a server, for the account: stdio and local URLs. */
 const runsOnlyHere = (command: ConnectorCommandConfig) =>
   command.transport === "stdio" || isLocalMcpUrl(command.url);
 
@@ -1113,7 +1043,6 @@ const accountPut = (
   extra: {
     tools?: readonly ConnectorToolInfo[];
     needsAuth?: boolean;
-    /** This computer holds the credential the account should route through. */
     holdsCredential?: boolean;
   },
 ): McpServerPut => {
@@ -1143,7 +1072,6 @@ const accountPut = (
   };
 };
 
-/** Tell the account about a server this computer added, probed or signed in to. */
 const putOnAccount = async (
   options: ConnectClientOptions,
   command: ConnectorCommandConfig,
@@ -1166,11 +1094,6 @@ const putOnAccount = async (
   }
 };
 
-/**
- * A fresh tool listing from this computer. Shared with the account when it
- * changed, or when this computer now holds the credential the cloud should
- * route through.
- */
 const reportMcpTools = async (
   options: ConnectClientOptions,
   command: ConnectorCommandConfig,
@@ -1235,7 +1158,6 @@ const recordToCommand = (record: McpServerRecord): ConnectorCommandConfig => ({
         },
 });
 
-/** A server on the account that this computer reaches through another one. */
 export type ElsewhereMcpServer = {
   record: McpServerRecord;
   deviceName: string;
@@ -1245,11 +1167,6 @@ export type ElsewhereMcpServer = {
 
 const reconciling = new Map<string, Promise<ElsewhereMcpServer[]>>();
 
-/**
- * Bring this computer's MCP servers and the account's into line, and return
- * the account's servers that run on another computer. Offline, nothing
- * changes and nothing is returned.
- */
 export const reconcileAccountMcp = (
   options: ConnectClientOptions,
 ): Promise<ElsewhereMcpServer[]> => {
@@ -1404,11 +1321,6 @@ const localWhere = (command: ConnectorCommandConfig): string =>
     ? "Device-only: runs on this computer; the cloud and your other computers reach it through here while Stella is open."
     : "Remote server on the account: works here, in the cloud, and on your other computers.";
 
-/**
- * The cloud asks this computer to list or run one of its MCP servers' tools
- * for an agent elsewhere on the account. No credential card opens here: the
- * user is not at this computer's chat.
- */
 export const serveRelayedMcpRequest = async (
   options: ConnectClientOptions,
   method: unknown,
@@ -1460,10 +1372,6 @@ export const serveRelayedMcpRequest = async (
   throw new Error("Unknown MCP request.");
 };
 
-// ---------------------------------------------------------------------------
-// Discovery / listing surface (shared by the CLI and the REPL client)
-// ---------------------------------------------------------------------------
-
 export type DetailedDiscoveryMatch = {
   id: string;
   name: string;
@@ -1481,11 +1389,6 @@ export type DetailedDiscoveryMatch = {
   executable?: boolean;
 };
 
-/**
- * Discovery enriched with live connection state and a `next` hint per
- * match, so `connect.discover` tells the agent what to do with each
- * result instead of leaving it to guess.
- */
 export const discoverConnectorsDetailed = async (
   options: ConnectClientOptions,
   query: string,
@@ -1526,8 +1429,6 @@ export const discoverConnectorsDetailed = async (
           stellaAppDir,
           config?.auth,
         );
-        // "unsupported" means the connector needs no credential — it is
-        // usable as-is.
         connected = authStatus === "connected" || authStatus === "unsupported";
       }
       const next = connected
@@ -1575,12 +1476,10 @@ export type ConnectorSummary = {
   connected: boolean;
   description: string;
   transport?: "stdio" | "streamable_http";
-  /** MCP servers: where they run, for the agent and the user. */
   reach?: "anywhere" | "this-device" | "other-device";
   where?: string;
 };
 
-/** Enabled/connected connectors as one-liners (REPL `connect.connectors()`). */
 export const listEnabledConnectorSummaries = async (
   options: ConnectClientOptions,
   resolved: ResolvedNativeCatalog,
@@ -1884,11 +1783,6 @@ const toQueryRecord = (
       ) as Record<string, string | number | boolean>)
     : undefined;
 
-/**
- * Execute a connector action with REPL-shaped arguments. `target` is an
- * action name, or (for REST-capable connectors) an API path beginning with
- * "/" whose `args` may carry `{ method, query, body, headers }`.
- */
 export const callConnectorAction = async (
   options: ConnectClientOptions,
   id: string,
@@ -1907,9 +1801,6 @@ export const callConnectorAction = async (
   };
   const isKnownNative =
     getNativeConnectorCatalogEntry(id, resolved.entries) !== undefined;
-  // An enabled id with a bridge socket may execute through the trusted
-  // broker even when the local catalog cannot resolve it (fresh desktop
-  // sign-in before the disk cache exists).
   const brokerEligible =
     !isKnownNative &&
     options.cliBridgeSocketPath?.trim() &&
@@ -1958,10 +1849,6 @@ export const callConnectorAction = async (
     ),
   );
 };
-
-// ---------------------------------------------------------------------------
-// node_repl `connect` client
-// ---------------------------------------------------------------------------
 
 export type ReplConnectClient = {
   discover(query: string): Promise<unknown>;

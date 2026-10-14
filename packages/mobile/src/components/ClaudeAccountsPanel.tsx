@@ -17,16 +17,6 @@ import { useColors } from "../theme/theme-context";
 import { useT } from "../i18n";
 import type { EngineConnectOptions } from "./EngineAccountsSettings";
 
-/**
- * Claude on the phone, around what each place runs. One choice (an account,
- * or each computer's own Claude Code login) applies to every computer and
- * the cloud. Below it every place shows the account it actually runs and
- * why, and a place without a login for the choice offers "Sign in": the
- * cloud signs in inside the owner's container, a computer runs its own
- * `claude auth login`, and either way the phone opens Anthropic's page and
- * sends back the code it shows.
- */
-
 const C = "settings.engineAccounts.claude";
 
 const sameEmail = (a: string | undefined, b: string | undefined) =>
@@ -52,7 +42,6 @@ export function ClaudeAccountsPanel({
 }: {
   settings: EngineSettings | undefined;
   busy: boolean;
-  /** A sign-in is waiting for its code. */
   connecting: boolean;
   run: (action: () => Promise<unknown>) => Promise<boolean>;
   startConnect: (options?: EngineConnectOptions) => void;

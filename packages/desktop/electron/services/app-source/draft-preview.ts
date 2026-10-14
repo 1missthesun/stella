@@ -13,12 +13,6 @@ export type DraftPreview = {
   dispose: () => void;
 };
 
-/**
- * The full Stella UI served from a draft worktree, headless inside the
- * running app: same preload and IPC as the real windows (so the user's real
- * account and runtime), but its own in-memory session, so browser storage is
- * separate.
- */
 export const openDraftPreview = async (options: {
   name: string;
   stellaAppDir: string;
@@ -44,10 +38,7 @@ export const openDraftPreview = async (options: {
     partition,
     sourceRoot: worktree.path,
     envRoot: options.stellaAppDir,
-    // A preview is an authoring surface: the agent iterating on the draft wants
-    // hot updates and readable errors, whichever mode the app itself serves.
     mode: "development",
-    // Closing the preview then gives back everything its server allocated.
     isolate: "process",
     log: (message) =>
       getMainLogger()?.process("renderer.preview-source", {
@@ -59,7 +50,6 @@ export const openDraftPreview = async (options: {
     webPreferences: createSharedWebPreferences({
       preloadPath: options.preloadPath,
       sessionPartition: partition,
-      // Agents screenshot it while it sits in a hidden host.
       backgroundThrottling: false,
     }),
   });

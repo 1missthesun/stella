@@ -1,13 +1,3 @@
-/**
- * Full-shell side of the companion: this renderer owns the chat runtime, so
- * it publishes the small `CompanionState` snapshot the floating companion
- * draws, and executes the sends / stops the companion relays back.
- *
- * Publishing is diffed and throttled (~12 Hz while a reply streams) and
- * pauses entirely while the companion is hidden. The very first publish is
- * unconditional: main treats it as this renderer's "ready" signal and flushes
- * any send the companion queued while the shell was still booting.
- */
 import {
   useEffect,
   useMemo,
@@ -42,9 +32,6 @@ type MessagePayload = {
   };
 };
 
-// Every timeline update re-derives the latest previews, but the latest reply
-// rarely changes between updates. Remember the last conversion per preview
-// size so an unchanged message skips the full-text markdown strip.
 const lastPlainPreview = new Map<number, { raw: string; preview: string }>();
 
 const toPlainPreview = (raw: string, maxChars: number): string => {
@@ -176,7 +163,6 @@ export function useCompanionBridge(conversationId: string | null): void {
       lastSentRef.current = JSON.stringify(current);
       api.publishState(current);
     };
-    // First publish is the ready handshake — always send it.
     if (!lastSentRef.current) {
       publish();
       return;
@@ -213,12 +199,6 @@ export function useCompanionBridge(conversationId: string | null): void {
   }, [api, cancelCurrentStream]);
 }
 
-/**
- * Hosts `useCompanionBridge` in its own leaf. The bridge subscribes to the
- * live message timeline; called from the root chrome, that subscription
- * re-rendered the whole shell (top bar, right sidebar, dialogs) on every
- * timeline update. As a leaf, only this null-rendering component does.
- */
 export function CompanionBridge({
   conversationId,
 }: {

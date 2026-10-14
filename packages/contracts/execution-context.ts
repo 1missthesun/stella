@@ -18,21 +18,11 @@ export type ExecutionContextDevice = Pick<
   "deviceId" | "label" | "online" | "remoteExecutionEnabled" | "remoteExecution"
 >;
 
-/**
- * What media the user can generate right now, so an agent says what to do
- * instead of starting a generation that is refused.
- */
 export type MediaAccess = {
-  /**
-   * Stella's own media models: in the user's plan, not in it, or no Stella
-   * account to have a plan on.
-   */
   stella: "included" | "upgrade" | "sign_in";
-  /** `image_gen` is set to the user's own provider key, and whether one is saved. */
   ownImageKey?: { provider: "openai" | "openrouter" | "fal"; saved: boolean };
 };
 
-/** Whether a plan audience includes Stella's media models. */
 export const mediaAccessForAudience = (
   audience: ManagedCapabilityAudience | string,
 ): MediaAccess["stella"] => {
@@ -44,7 +34,6 @@ export type ExecutionContextSnapshot = {
   devices: ExecutionContextDevice[];
   destination: ExecutionDestination;
   devicesKnown: boolean;
-  /** Absent when it could not be worked out (offline, plan still loading). */
   media?: MediaAccess;
 };
 
@@ -55,7 +44,6 @@ const labelText = (value: string): string =>
     .trim()
     .slice(0, 256);
 
-/** Presence timestamps, socket ids and free slots must not churn prompt bytes. */
 export const createExecutionContextSnapshot = (args: {
   devices: readonly DeviceDestination[] | null;
   destination: ExecutionDestination;
@@ -130,7 +118,6 @@ const remoteExecutionText = (
 const boundedString = (value: unknown): value is string =>
   typeof value === "string" && value.length > 0 && value.length <= 256;
 
-/** Only the bounded context metadata is read from a persisted user message. */
 export const readExecutionContextSnapshot = (
   message: unknown,
 ): ExecutionContextSnapshot | undefined => {
@@ -172,8 +159,6 @@ export const readExecutionContextSnapshot = (
       ...(typeof device.label === "string" ? { label: device.label } : {}),
       online: device.online,
       remoteExecutionEnabled: device.remoteExecutionEnabled,
-      // Messages persisted before devices carried a consent state still parse;
-      // the boolean they did carry says which of the two ends it was at.
       remoteExecution: remoteExecutionText(device.remoteExecution)
         ?? (device.remoteExecutionEnabled ? "enabled" : "unconfigured"),
     });
@@ -185,11 +170,6 @@ export const readExecutionContextSnapshot = (
   });
 };
 
-/**
- * Why a listed device will not take work, in the words an agent can act on.
- * "Not set up" and "turned down" are different situations and the agent should
- * not report one as the other.
- */
 const remoteExecutionNote = (device: ExecutionContextDevice): string => {
   switch (device.remoteExecution) {
     case "enabled":
@@ -235,7 +215,6 @@ const OWN_KEY_NAMES: Record<NonNullable<MediaAccess["ownImageKey"]>["provider"],
   fal: "fal",
 };
 
-/** Whether the user can generate media, and if not, what turns it on. */
 export const renderMediaAccess = (snapshot: ExecutionContextSnapshot): string | undefined => {
   const media = snapshot.media;
   if (!media) return undefined;

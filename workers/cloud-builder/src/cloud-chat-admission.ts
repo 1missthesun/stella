@@ -4,8 +4,6 @@ import type { OwnerSnapshot } from "@stella/contracts/turn-plane/owner-snapshot"
 import type { DevicesResponse } from "@stella/contracts/turn-plane/placement";
 import type { OwnerHomeContext } from "./owner-home-context.js";
 
-/** Durable authority created by OwnerGate before forwarding a placed chat.
- * Only the internal RPC accepts it; public turn bodies cannot supply it. */
 export type AdmittedCloudChat = {
   version: 1;
   ownerId: string;
@@ -33,12 +31,6 @@ export const cloudChatHandoffKey = (dispatchId: string) =>
 export const cloudChatTurnKey = (turnId: string) =>
   `cloudChatHandoffTurn:${turnId}`;
 
-/**
- * The semantic identity of a turn start: everything the caller chose. Ids the
- * DO mints (turnId, sessionId) and facts the snapshot supplies (generation,
- * audience, budget) are deliberately absent, so a retry after a lost response
- * replays and a different message under the same `clientMsgId` conflicts.
- */
 export const chatTurnFingerprintSource = (
   ownerId: string,
   conversationId: string,

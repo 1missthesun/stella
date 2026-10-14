@@ -1,28 +1,3 @@
-/**
- * Operator routes, authenticated with `STELLA_ADMIN_API_SECRET` as a bearer
- * (and, in production, a Cloudflare Access JWT; see access.ts):
- *
- *   GET  /api/admin/owners/lookup?ownerId=      snapshot identity, enforcement, billing and risk row
- *   GET  /api/admin/owners/top?limit=&status=   D1 `owner_risk` by score
- *   GET  /api/admin/owners/storage?ownerId=     the owner's drive usage and world store usage
- *   POST /api/admin/owners/enforcement          {ownerId, status, reason, until?} via the gate's setOwnerEnforcement
- *   POST /api/admin/billing/plan                {ownerId, plan?, usageMode? | unlimited?, resetUsage?}
- *   POST /api/admin/delete                      {kind: "feedback", id} | {kind: "media_job", ownerId, id}
- *   POST /api/admin/test-accounts/session       {email?, plan?, usageMode?, allowance?: "spent"} → a signed-in test user (dev only)
- *   POST /api/admin/test-accounts/conversation-restart  {conversationId} → restart that conversation's object (dev only)
- *   POST /api/admin/test-accounts/email-digest-probe  {ownerId, messages, simulate?} → one digest check on given mail (dev only)
- *   POST /api/admin/selfhost/owner              {name?} → the owner-mode server's owner, created once
- *   GET  /api/admin/secret-rotation/status      D1 rows still under BETTER_AUTH_SECRET (jwks, Slack)
- *   POST /api/admin/secret-rotation/reencrypt   re-encrypt them under BETTER_AUTH_SECRET_V2
- *
- * Owners are addressed by id only.
- *
- * Privacy invariant: no admin route returns conversation, message, memory,
- * or file content — identity, billing, enforcement, and storage metadata
- * only. There is deliberately no staff view of what a user said or saved.
- * Every call is audit-logged below with the route and status only.
- */
-
 import { OWNER_ENFORCEMENT_STATUSES, type OwnerEnforcementStatus } from "@stella/contracts/gateway/usage";
 import { rpcErrorStatus, type RpcResponse } from "@stella/contracts/backend/protocol";
 import { bearerCredential } from "../../../shared/bearer.js";
@@ -58,7 +33,6 @@ const ownerIdOf = (value: unknown): string | null => {
   return ownerId && ownerId.length <= OWNER_ID_MAX ? ownerId : null;
 };
 
-/** The bearer against the secret, with the same work whatever was sent. */
 const authorized = async (request: Request, env: AdminEnv): Promise<Response | null> => {
   const raw = (env as unknown as Record<string, unknown>).STELLA_ADMIN_API_SECRET;
   const expected = typeof raw === "string" ? raw.trim() : "";
@@ -67,10 +41,6 @@ const authorized = async (request: Request, env: AdminEnv): Promise<Response | n
   return (await fixedWorkSha256SecretEqual(provided, expected)) ? null : fail(401, "Invalid admin credentials.");
 };
 
-/**
- * The owner's object and its current snapshot. A snapshot that cannot be
- * read (an unknown or purged owner) answers 404 with why.
- */
 const ownerGate = async (env: AdminEnv, ownerId: string) => {
   const gate = ownerGateStub(env.OWNER_GATES, ownerId);
   try {
@@ -96,8 +66,6 @@ const db = (env: AdminEnv): D1Database => {
   return env.DB;
 };
 
-// ── Owners ───────────────────────────────────────────────────────────────
-
 const lookup = async (url: URL, env: AdminEnv): Promise<Response> => {
   const ownerId = ownerIdOf(url.searchParams.get("ownerId"));
   if (!ownerId) return fail(400, "Missing ownerId.");
@@ -122,11 +90,6 @@ const lookup = async (url: URL, env: AdminEnv): Promise<Response> => {
   });
 };
 
-/**
- * Where an owner's files are stored and against which quota: the drive (rows
- * and bytes in R2) and the world store, which never holds the drive and
- * reports anything it still lists under `drive/` separately.
- */
 const storage = async (url: URL, env: AdminEnv): Promise<Response> => {
   const ownerId = ownerIdOf(url.searchParams.get("ownerId"));
   if (!ownerId) return fail(400, "Missing ownerId.");
@@ -190,8 +153,6 @@ const enforcement = async (request: Request, env: AdminEnv): Promise<Response> =
   return json({ ownerId, enforcement: state });
 };
 
-// ── Billing ──────────────────────────────────────────────────────────────
-
 const billingPlan = async (request: Request, env: AdminEnv): Promise<Response> => {
   const body = await readBody(request);
   const ownerId = ownerIdOf(body?.ownerId);
@@ -218,8 +179,6 @@ const billingPlan = async (request: Request, env: AdminEnv): Promise<Response> =
   return json(await owner.gate.billingAccess());
 };
 
-// ── Deletes ──────────────────────────────────────────────────────────────
-
 const remove = async (request: Request, env: AdminEnv): Promise<Response> => {
   const body = await readBody(request);
   const kind = typeof body?.kind === "string" ? body.kind.trim() : "";
@@ -242,16 +201,8 @@ const remove = async (request: Request, env: AdminEnv): Promise<Response> => {
   }
 };
 
-// ── Test accounts ────────────────────────────────────────────────────────
-
 const TEST_ACCOUNT_SUFFIX = "@test.stella.local";
 
-/**
- * A signed-in `@test.stella.local` user for agents and harnesses, through the
- * same magic-link verification a real sign-in takes. Dev deployments only
- * (`STELLA_TEST_ACCOUNTS=1`). The plan is set on the owner's object, which
- * this request places near the tester.
- */
 const testAccountSession = async (request: Request, env: AdminEnv): Promise<Response> => {
   const { backendUrl, createAuth, testAccountsEnabled } = await import("../auth/auth.js");
   if (!testAccountsEnabled(env)) return fail(404, "Test accounts disabled.", { env: "STELLA_TEST_ACCOUNTS" });
@@ -302,7 +253,6 @@ const testAccountSession = async (request: Request, env: AdminEnv): Promise<Resp
   const oneTimeToken = await auth.api.generateOneTimeToken({ headers: sessionHeaders });
 
   const ownerId = userId;
-  // `allowance: "spent"` makes the account one that used up its allowance.
   const spendAllowance = body.allowance === "spent";
   if (plan || spendAllowance) {
     await ownerGateStub(env.OWNER_GATES, ownerId).setBillingPlan({
@@ -324,11 +274,6 @@ const testAccountSession = async (request: Request, env: AdminEnv): Promise<Resp
   });
 };
 
-/**
- * Dev test accounts only: drive the cloud Claude Code login backup with a
- * FAKE login in a fixed probe account, to prove it survives a container
- * replacement. Never touches a real account's directory.
- */
 const claudeLoginProbeRoute = async (request: Request, env: AdminEnv): Promise<Response> => {
   const { testAccountsEnabled } = await import("../auth/auth.js");
   if (!testAccountsEnabled(env)) return fail(404, "Test accounts disabled.", { env: "STELLA_TEST_ACCOUNTS" });
@@ -345,11 +290,6 @@ const claudeLoginProbeRoute = async (request: Request, env: AdminEnv): Promise<R
   return json(await claudeLoginProbe(env as unknown as Cloudflare.Env, ownerId, action));
 };
 
-/**
- * Restart one conversation's Durable Object the way an eviction or a deploy
- * does, so verification can prove a turn survives one without redeploying
- * over everyone else's turns. Dev only, like test accounts.
- */
 const conversationRestart = async (request: Request, env: AdminEnv): Promise<Response> => {
   const { testAccountsEnabled } = await import("../auth/auth.js");
   if (!testAccountsEnabled(env)) return fail(404, "Test accounts disabled.", { env: "STELLA_TEST_ACCOUNTS" });
@@ -398,8 +338,6 @@ const emailDigestProbeRoute = async (request: Request, env: AdminEnv): Promise<R
   return response.ok ? json(response.value) : fail(rpcErrorStatus(response.error.code), response.error.message);
 };
 
-// ── Routing ──────────────────────────────────────────────────────────────
-
 const ROUTES: Record<string, { method: "GET" | "POST"; run: (request: Request, url: URL, env: AdminEnv) => Promise<Response> }> = {
   "/api/admin/owners/lookup": { method: "GET", run: (_request, url, env) => lookup(url, env) },
   "/api/admin/owners/top": { method: "GET", run: (_request, url, env) => top(url, env) },
@@ -437,7 +375,6 @@ const ROUTES: Record<string, { method: "GET" | "POST"; run: (request: Request, u
   },
 };
 
-/** Admin routes, or null when the request is not one. */
 export const handleAdminRoute = async (request: Request, env: AdminEnv): Promise<Response | null> => {
   const url = new URL(request.url);
   const route = ROUTES[url.pathname];

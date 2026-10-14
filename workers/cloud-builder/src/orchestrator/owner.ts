@@ -43,10 +43,6 @@ import {
 import { OrchestratorSessionCore } from "./session-core.js";
 import { ownerGateStub } from "../rpc-release.js";
 
-/**
- * Owner fence leases, the owner gate, owner events, and the owner's home
- * context.
- */
 export abstract class OrchestratorOwner extends OrchestratorSessionCore {
   protected async callOwnerFence(
     ownerId: string,
@@ -108,7 +104,6 @@ export abstract class OrchestratorOwner extends OrchestratorSessionCore {
     );
   }
 
-  /** Retirements or projections the alarm still owes. */
   protected async hasMaintenanceDebt(): Promise<boolean> {
     return (
       (await this.hasOwnerFenceLeaseRetirementDebt()) ||
@@ -130,10 +125,6 @@ export abstract class OrchestratorOwner extends OrchestratorSessionCore {
     }
   }
 
-  /**
-   * Retire one exact durable lease receipt. The pending state is written before
-   * the cross-DO request, so a lost response is replayable after isolate loss.
-   */
   protected async retireOwnerFenceLeaseReceipt(
     receipt: OwnerFenceLeaseReceipt,
     generation = receipt.registrationGeneration,
@@ -248,8 +239,6 @@ export abstract class OrchestratorOwner extends OrchestratorSessionCore {
       ) {
         throw new OwnerFenceLeaseConflictError();
       }
-      // Reusing a registered lease is a read. Rewriting its unchanged receipt
-      // and run slot adds a durable write barrier to every admitted turn.
       if (
         current?.phase === "registered" &&
         current.registrationGeneration &&
@@ -298,7 +287,6 @@ export abstract class OrchestratorOwner extends OrchestratorSessionCore {
           leaseId,
         } satisfies OwnerFenceRunSlot;
       }
-      // The exact lease id is durable before owner-fence/register can commit.
       await this.putTurnState(writes);
     });
 
@@ -335,8 +323,6 @@ export abstract class OrchestratorOwner extends OrchestratorSessionCore {
           : {}),
       });
     } catch {
-      // The remote Durable Object may have committed before the response was
-      // lost. Preserve the exact intent so replay uses the same lease id.
       throw new OwnerFenceRegistrationUncertainError();
     }
     if (!body) throw new OwnerPurgeFenceError();
@@ -366,8 +352,6 @@ export abstract class OrchestratorOwner extends OrchestratorSessionCore {
       committed = true;
     });
     if (!committed) {
-      // A concurrent purge retired the local intent while register was in
-      // flight. Best-effort exact rollback; the purge still owns retry.
       await this.callOwnerFence(receipt.ownerId, "unregister", {
         ownerGeneration: receipt.ownerGeneration,
         leaseId: receipt.leaseId,
@@ -382,7 +366,6 @@ export abstract class OrchestratorOwner extends OrchestratorSessionCore {
     return body.generation;
   }
 
-  /** The default register transport: one `POST /owner-fence/register`. */
   protected async registerOwnerFenceLease(
     ownerId: string,
     body: OwnerFenceRegisterRequest,
@@ -396,15 +379,6 @@ export abstract class OrchestratorOwner extends OrchestratorSessionCore {
       : null;
   }
 
-  /**
-   * A new local turn's owner lookup and fence registration in one gate round
-   * trip. The gate registers the lease only while its snapshot still says
-   * the owner is writable at `turn.ownerGeneration`, so a stale caller never
-   * leaves a lease behind. The durable receipt protocol is registerOwnerTurn's,
-   * unchanged; only the transport differs. A replayed registration (receipt
-   * already `registered`) makes no register call and reads the snapshot on
-   * its own.
-   */
   protected async registerOwnerTurnWithSnapshot(
     turn: OwnerFencedTurn,
     operationFingerprint: string,
@@ -451,8 +425,6 @@ export abstract class OrchestratorOwner extends OrchestratorSessionCore {
       );
     } catch (error) {
       if (error instanceof OwnerPurgeFenceError) {
-        // A snapshot the gate could not obtain fails the way the separate
-        // snapshot read used to: nothing was registered.
         if (observed.snapshotError) throw observed.snapshotError;
         if (observed.skipped && observed.snapshot) {
           return {
@@ -555,7 +527,6 @@ export abstract class OrchestratorOwner extends OrchestratorSessionCore {
     return await this.ownerGate(ownerId).snapshot();
   }
 
-  /** A refusal, never a throw: the caller maps it to the start contract. */
   protected async ownerGateAdmit(
     ownerId: string,
     input: OwnerGateAdmitInput,
@@ -577,11 +548,6 @@ export abstract class OrchestratorOwner extends OrchestratorSessionCore {
     }
   }
 
-  /**
-   * Best-effort and idempotent. A release the gate never receives is bounded
-   * by its own `TURN_TIMEOUT_MS` grace, so a lost call costs a slot for
-   * minutes, never forever.
-   */
   protected async releaseOwnerGate(
     turn: Pick<ChatTurnRequest, "ownerId" | "turnId">,
   ): Promise<void> {
@@ -595,14 +561,6 @@ export abstract class OrchestratorOwner extends OrchestratorSessionCore {
     }
   }
 
-  /**
-   * Persist the events locally, then deliver; the owner round trip must not
-   * delay a reply. For the events a turn owes (`conversation.created`,
-   * `turn.started`, `thread.spawned`, `conversation.deleted`) an unreachable
-   * owner must never turn into a lost row: the owner cannot index a
-   * conversation it never heard of, so the alarm retries every batch still
-   * on disk.
-   */
   protected async deferOwnerEvents(events: OwnerEvent[]): Promise<void> {
     if (events.length === 0) return;
     const key = `${OWNER_EVENT_BATCH_PREFIX}${crypto.randomUUID()}`;
@@ -626,8 +584,6 @@ export abstract class OrchestratorOwner extends OrchestratorSessionCore {
   ): Promise<void> {
     try {
       await deliverOwnerEvents(this.env, events);
-      // Each batch owns its key. A concurrent append or retry cannot be erased
-      // by an earlier send completing; duplicate sends remain idempotent.
       if (this.ctx.storage.kv) this.ctx.storage.kv.delete(key);
       else await this.ctx.storage.delete(key);
     } catch (error) {
@@ -675,17 +631,6 @@ export abstract class OrchestratorOwner extends OrchestratorSessionCore {
     } as const;
   }
 
-  /**
-   * The owner of this conversation for a verified caller — the session is
-   * the authority. Bound: the caller must be the owner (null otherwise, so the
-   * route answers 404 and confirms nothing). Unbound: adopt the caller. This
-   * is what lets a client subscribe to a conversation it has just minted
-   * before its first turn: the socket binds the prospective owner, and the
-   * first turn projects `conversation.created` to the owner. The generation
-   * comes from the owner gate's snapshot; a write path passes
-   * `refreshGeneration` because a new write capability must be fenced on the
-   * generation that is current now, not the one cached with the last turn.
-   */
   protected async resolveOwnerForCaller(
     caller: { ownerId: string },
     options: { refreshGeneration?: boolean } = {},
@@ -706,12 +651,6 @@ export abstract class OrchestratorOwner extends OrchestratorSessionCore {
     return await this.adoptOwnerSnapshot(callerId, snapshot);
   }
 
-  /**
-   * The half of resolveOwnerForCaller that runs once a snapshot is in hand:
-   * the write fence, adoption of an unbound conversation, and the persisted
-   * owner generation. Shared with the local-turn begin path, whose snapshot
-   * arrives together with its fence registration.
-   */
   protected async adoptOwnerSnapshot(
     callerId: string,
     snapshot: OwnerSnapshot,
@@ -756,8 +695,6 @@ export abstract class OrchestratorOwner extends OrchestratorSessionCore {
       admittedContext ??
       (await measure("homeMetadataMs", async () => {
         if (!turn.ownerPurgeGeneration) {
-          // Initial separate registration has not finished yet. This bootstrap
-          // uses the original authoritative reads; warm admission carries metadata.
           const [memory, skills] = await Promise.all([
             home.cloudStore().getMemoryContext(),
             home.loadSkillCatalog("orchestrator"),
@@ -772,8 +709,6 @@ export abstract class OrchestratorOwner extends OrchestratorSessionCore {
     timings.homeMetadataRevision = metadata.revision;
     if (this.purged()) throw new Error("Conversation was purged.");
     const memoryPreference = metadata.memory.preference;
-    // Memory is plain world files that change without a home revision, so
-    // the resident documents and the personality are read fresh every turn.
     const [memoryDocuments, personalityOverride] =
       memoryPreference.memoryEnabled
         ? await Promise.all([
@@ -797,10 +732,6 @@ export abstract class OrchestratorOwner extends OrchestratorSessionCore {
     };
   }
 
-  /**
-   * The owner's agent home for one turn: skills from the cloud home, memory
-   * from the owner's world.
-   */
   protected cloudAgentHome(turn: ChatTurnRequest): AgentHome {
     const worlds = this.env.WORLDS as typeof this.env.WORLDS | undefined;
     return new AgentHome(

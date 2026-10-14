@@ -19,42 +19,13 @@ import {
   parsePiBrainRecord,
   type PiBrainRecord,
 } from "./turn-plane/pi-brain.js";
-/**
- * The conversation socket's wire contract, shared by every client.
- *
- * Desktop and mobile decode the same frames with this module, and the worker's
- * `workers/cloud-builder/src/conversation-types.ts` takes its socket constants
- * and close codes from here, so the three cannot drift apart. The worker keeps
- * its own writer-side record shapes (spill stubs, stream ids); these are the
- * decoded, render-side ones. Unknown advisory frames are dropped; durable rows
- * with a valid raw sequence become skipped sentinels so the ordered cursor can
- * still advance.
- *
- * The one invariant to keep in mind while reading: a frame carrying `seq` is
- * durable and replayable; a frame without `seq` is advisory and lossy.
- */
 
 export const PROTOCOL_VERSION = 1;
 
-/** Newest records the server sends when the client asks for no `since`. */
 export const INITIAL_WINDOW_RECORDS = 100;
-/** Server cap on one resume; the client never asks for more in one request. */
 export const MAX_RESUME_RECORDS = 2_000;
-/**
- * How far behind the head a cursor may be and still be worth replaying.
- *
- * Past this, catching up record by record is slower than simply reading the
- * newest window — and it is also the wrong thing to show: the rows arrive
- * oldest first, so the view would spend the whole replay displaying history the
- * user has already read while the messages they opened the app for are still on
- * the wire. Beyond the limit the view takes the newest window immediately and
- * earlier history comes back through scrollback. The server applies the same
- * limit; this copy is what protects a client talking to an older one.
- */
 export const MAX_CATCHUP_RESUME_RECORDS = 300;
-/** Server cap on one backfill response. */
 export const BACKFILL_BATCH_RECORDS = 200;
-/** Server's socket-liveness window; the client probes rather than assumes. */
 export const SOCKET_STALE_MS = 90_000;
 /**
  * How far ahead of expiry the token is refreshed. Mirrors the server constant,
@@ -63,17 +34,10 @@ export const SOCKET_STALE_MS = 90_000;
  * making the next wake or scheduled reply cost a reconnect.
  */
 export const RE_AUTH_LEAD_MS = 60_000;
-/** Server's per-socket backfill budget. The client stays under it locally. */
 export const RATE_BACKFILL_PER_MIN = 20;
 
-/**
- * How many journal records one conversation view keeps in memory. Scrollback
- * is unbounded on the server; the renderer is not. Older records are dropped
- * from the head of the array and can be fetched again.
- */
 export const MAX_CLIENT_RECORDS = 3_000;
 
-/** Records buffered while a gap is being filled before we give up and resync. */
 export const MAX_BUFFERED_AHEAD = 512;
 
 /**
@@ -91,10 +55,6 @@ export const CLOSE_FRAME_TOO_LARGE = 4413;
 export const CLOSE_RATE_LIMITED = 4429;
 export const CLOSE_TOO_MANY_SOCKETS = 4503;
 
-/**
- * Closes the client must never retry. `4401` is retryable exactly once — a
- * fresh token may fix it — and becomes terminal when the retry also fails.
- */
 export const TERMINAL_CLOSE_CODES: ReadonlySet<number> = new Set([
   CLOSE_BAD_REQUEST,
   CLOSE_FORBIDDEN,
@@ -113,13 +73,11 @@ export type TurnPhase =
   | "canceled"
   | "timeout";
 
-/** A file a turn produced, as it arrives inside a `files` card. */
 export type JournalFile = {
   path: string;
   name: string;
   sizeBytes: number;
   contentType: string;
-  /** False when the bytes stayed in the workspace (file over the inline cap). */
   stored?: boolean;
 };
 
@@ -145,9 +103,7 @@ type JournalRecordBase = {
 export type JournalMessageRecord = JournalRecordBase & {
   kind: "message";
   role: MessageRole;
-  /** Render flag: no bubble. The row is still model context. */
   hidden: boolean;
-  /** Echo-resolution key for a prompt this client optimistically rendered. */
   clientMsgId?: string;
   payload: Record<string, unknown>;
 };
@@ -157,7 +113,6 @@ export type JournalTurnRecord = JournalRecordBase & {
   phase: TurnPhase;
   lane?: string;
   source?: string;
-  /** User-facing text for every phase that is not `completed`. */
   notice?: string;
   wallClockMs?: number;
 };
@@ -172,33 +127,13 @@ export type KnownJournalRecord =
   | JournalTurnRecord
   | JournalCardRecord;
 
-/**
- * A durable row whose sequence is understood but whose payload is not.
- *
- * This stays in the in-memory ordered store but is ignored by render
- * projections. Keeping it there lets contiguity, reconnect, backfill, and
- * scrollback all move past a kind introduced by a newer server instead of
- * requesting the same unrenderable gap forever.
- */
 export type SkippedJournalRecord = JournalRecordBase & {
   kind: "skipped";
-  /** Kind advertised by the newer server, when it was readable. */
   originalKind?: string;
 };
 
 export type JournalRecord = KnownJournalRecord | SkippedJournalRecord;
 
-/**
- * The turn that is running right now, as `ready` describes it.
- *
- * There is no partial reply here. Assistant text is delivered whole on a
- * committed `record`, so a mid-turn joiner gets the working indicator from the
- * turn's `started` phase and then the finished reply.
- *
- * The hub still writes the retired stream fields on the wire — an empty
- * `partialText` here and a `streamId` on each message row. This decoder names
- * neither, so a client carries no notion of a provider stream at all.
- */
 export type LiveTurnSnapshot = {
   turnId: string;
   tools: Array<{
@@ -216,28 +151,16 @@ export type ReadyFrame = {
   conversationId: string;
   epoch: number;
   headSeq: number;
-  /** First seq delivered on this connect — the scrollback anchor. */
   windowStartSeq: number;
-  /** Lowest seq any backfill can ever resolve. Below it there is nothing. */
   floorSeq: number;
   title: string;
   activity: string;
   authExpiresAtMs: number;
   serverTimeMs: number;
   live: LiveTurnSnapshot | null;
-  /**
-   * Every agent the conversation has running, whatever this client holds:
-   * agents whose `agent-started` row is far below its window, and ones
-   * started on another device. Authoritative, and `agents` frames carry it
-   * on. Empty from a server that predates the field.
-   */
   agents: AgentActivityEntry[];
 };
 
-/**
- * The running agents again, sent whenever they change. `atMs` is when the
- * server read them: an agent whose start card is newer is not in it yet.
- */
 export type AgentsFrame = {
   type: "agents";
   agents: AgentActivityEntry[];
@@ -269,10 +192,6 @@ export type ServerFrame =
       isError?: boolean;
     }
   | { type: "auth.expiring"; atMs: number }
-  /**
-   * Where the conversation's Stella runs, sent whenever its holder changes
-   * (`@stella/contracts/turn-plane/pi-brain`), so no client polls for it.
-   */
   | { type: "brain"; record: PiBrainRecord | null }
   | {
       type: "error";
@@ -312,11 +231,6 @@ const TURN_PHASES: ReadonlySet<string> = new Set([
   "timeout",
 ]);
 
-/**
- * Decodes one journal record for rendering. Callers processing an ordered
- * stream must use `decodeSequencedJournalEntry`, which preserves the raw
- * sequence when this decoder cannot understand the payload.
- */
 export const decodeRecord = (value: unknown): KnownJournalRecord | null => {
   const raw = asRecord(value);
   if (!raw) return null;
@@ -367,11 +281,6 @@ export const decodeRecord = (value: unknown): KnownJournalRecord | null => {
   return null;
 };
 
-/**
- * Decodes a durable journal row without ever discarding a valid raw cursor.
- * Unknown future kinds and malformed known payloads become a skipped sentinel
- * so gap repair remains monotonic across rolling client/server upgrades.
- */
 export const decodeSequencedJournalEntry = (
   value: unknown,
 ): JournalRecord | null => {
@@ -441,7 +350,6 @@ const decodeCard = (value: unknown): JournalCard | null => {
   return null;
 };
 
-/** Text a rendered bubble shows for one `AgentMessage` payload. */
 export const messageText = (payload: Record<string, unknown>): string => {
   const content = payload.content;
   if (typeof content === "string") return content.trim();
@@ -456,15 +364,10 @@ export const messageText = (payload: Record<string, unknown>): string => {
   return parts.join("\n").trim();
 };
 
-/** True when an assistant payload is nothing but tool calls. */
 export const hasToolCalls = (payload: Record<string, unknown>): boolean =>
   Array.isArray(payload.content) &&
   payload.content.some((entry) => asRecord(entry)?.type === "toolCall");
 
-/**
- * Decodes a server frame. Unknown `type` values decode to `null` so a server
- * that learns a new frame does not break an older client.
- */
 export const decodeServerFrame = (data: string): ServerFrame | null => {
   let parsed: unknown;
   try {

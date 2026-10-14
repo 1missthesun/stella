@@ -1,16 +1,3 @@
-/**
- * One pass of an owner's reset or account deletion, run by the owner's own
- * object (`OwnerGate.closeOwner` and the `account.purge` job).
- *
- * It fences the owner and cancels its running turns, purges durable turn
- * state, the hosted browser profile, every owner-store domain
- * (`purgeOwnerData`) and the owner's R2 and KV stores, then lifts a reset's
- * fence. Deletion keeps its fence for good.
- *
- * Every step is "delete if present", so a pass with `pending` stores is
- * simply run again with the same `requestId`, which rejoins the same fence.
- */
-
 import { purgeSlackOwner } from "./slack/store.js";
 import type { Env } from "./build-session/shared/env.js";
 import { errorMessage, log } from "./build-session/shared/keys.js";
@@ -22,7 +9,6 @@ import {
 import type { OwnerPurgeMode } from "./owner-store/registry.js";
 
 export type OwnerPurgePass = {
-  /** Stores this pass did not finish. Empty means the purge is complete. */
   pending: string[];
 };
 
@@ -58,7 +44,6 @@ export const runOwnerPurge = async (input: {
   env: Env;
   ownerId: string;
   mode: OwnerPurgeMode;
-  /** Stable for one reset or deletion, so a retry rejoins its fence. */
   requestId: string;
   purgeOwnerData: () => Promise<{ pending: string[] }>;
 }): Promise<OwnerPurgePass> => {

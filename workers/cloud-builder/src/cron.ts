@@ -4,10 +4,6 @@ import { sweepAbuseTables } from "./owner-store/domains/abuse.js";
 import { sweepAnonymousUsers, sweepAuthTables } from "./auth/sweeps.js";
 import { sweepSlackPreviews } from "./slack/previews.js";
 
-/**
- * The worker's one Cron Trigger (`17 3 * * *`). Each global sweep adds itself
- * here; a failing sweep is logged and doesn't stop the others.
- */
 export async function runScheduled(
   _controller: ScheduledController,
   env: Env,

@@ -10,16 +10,6 @@ const taskTerminalAt = (task: MobileTask) =>
 const isWellFormedTaskId = (value: string): boolean =>
   value.length > 0 && value.trim() === value;
 
-/**
- * Project the merged task graph onto the root mobile Activity surface.
- *
- * A General task whose first unresolved parent is absent from Activity is a
- * normal standalone task owned by the Orchestrator. Once an Activity parent
- * resolves, Manager ancestry, malformed ownership, duplicate ids, cycles, or
- * a later missing ancestor suppress the descendant rather than presenting
- * Manager-internal work as an independent task. Root Manager rows remain
- * visible and also provide the ownership evidence for that suppression.
- */
 export const selectRootMobileActivityTasks = (
   tasks: readonly MobileTask[],
 ): MobileTask[] => {
@@ -145,13 +135,6 @@ export const collectConversationTasks = (
   );
 };
 
-/**
- * Join the tasks the conversation's cloud journal records with the ones this
- * phone folded from its own optimistic rows. The journal is the authority for
- * every task, including agents running on a paired computer; a task both know
- * about keeps whichever snapshot is newer, so a stale running row cannot
- * revive a task the journal already saw finish.
- */
 export const mergeJournalTasks = (
   journal: readonly MobileTask[],
   live: readonly MobileTask[],

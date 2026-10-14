@@ -1,34 +1,13 @@
-/**
- * Every media model Stella runs, in one list. This is the file to edit when a
- * model changes: add, swap or drop an entry here and everything else follows
- * — the managed gateway's allowlist and billing, the `stella-media` CLI's
- * listing, and Stella's own features (`STELLA_MEDIA_MODELS` below).
- *
- * The gateway does not reshape anything. A request names a model by its fal
- * endpoint id and sends that model's own input, exactly as the model's page
- * documents it (`docsUrl`); the job's output is the model's own output with
- * each file URL swapped for a copy Stella keeps.
- *
- * `price` is what fal charges for one finished request, in USD, from fal's
- * published pricing. It is called once with the input alone (before the job
- * starts, to check the owner can afford it; null when it cannot be known
- * yet) and once with the output (to bill). Keep it at or above fal's price.
- */
-
 import type { Capability } from "./capabilities.js";
 
 export type MediaModelKind = "image" | "video" | "music" | "speech" | "transcription" | "3d";
 
 export type MediaModel = {
-  /** fal's endpoint id; requests name the model by it. */
   id: string;
   name: string;
   kind: MediaModelKind;
-  /** One line on what it does, for the listing agents read. */
   does: string;
-  /** The model's own page with its input and output schema. */
   docsUrl: string;
-  /** The plan surface it needs; null for one every signed-in user has. */
   plan: Capability | null;
   price: (input: Record<string, unknown>, output?: unknown) => number | null;
 };
@@ -46,7 +25,6 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 const list = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
 
-/** The largest `field` anywhere in `value` (a transcript's last word end). */
 const maxNumber = (value: unknown, field: string, depth = 0): number | null => {
   if (depth > 8 || value === null || typeof value !== "object") return null;
   let max = Array.isArray(value) ? null : num((value as Record<string, unknown>)[field]);
@@ -57,9 +35,6 @@ const maxNumber = (value: unknown, field: string, depth = 0): number | null => {
   return max;
 };
 
-// ── GPT Image 2.5 Flare ────────────────────────────────────────────────────
-
-/** fal's per-image table: [up to ~2 MP, up to 4K], per quality. */
 const GPT_IMAGE_PER_IMAGE: Record<string, [number, number]> = {
   low: [0.00588, 0.01113],
   medium: [0.01317, 0.02595],
@@ -84,21 +59,16 @@ const gptImagePrice = (input: Record<string, unknown>): number => {
     ? (num(size.width) ?? 0) * (num(size.height) ?? 0)
     : typeof size === "string" && GPT_IMAGE_SIZES[size] !== undefined
       ? GPT_IMAGE_SIZES[size]!
-      : // `auto` follows the input image on an edit; bill it as the large size.
+      :
         Number.POSITIVE_INFINITY;
   const perImage = pixels <= 2_100_000 ? row[0] : row[1];
   const images = Math.max(1, Math.round(num(input.num_images) ?? 1));
-  // Text at $5/M tokens (~4 chars each); each input image is ~1.5k image tokens at $8/M.
   const prompt = typeof input.prompt === "string" ? (input.prompt.length / 4) * 5e-6 : 0;
   const references = list(input.image_urls).length * 1_500 * 8e-6;
   return images * perImage + prompt + references;
 };
 
-// ── Seedance 2.5 ───────────────────────────────────────────────────────────
-
-/** fal's per-second rate by resolution (from its token formula). */
 const SEEDANCE_PER_SECOND: Record<string, number> = { "480p": 0.2205, "720p": 0.473, "1080p": 1.164 };
-/** `duration: "auto"` lets the model choose; it is billed as this many seconds. */
 const SEEDANCE_AUTO_SECONDS = 15;
 
 const seedancePrice = (input: Record<string, unknown>): number => {
@@ -106,20 +76,14 @@ const seedancePrice = (input: Record<string, unknown>): number => {
   const perSecond = SEEDANCE_PER_SECOND[resolution] ?? SEEDANCE_PER_SECOND["1080p"]!;
   const seconds = num(input.duration) ?? SEEDANCE_AUTO_SECONDS;
   const videos = list(input.video_urls).length;
-  // Input video seconds are billed too, at 0.6× the rate for the whole job
-  // (up to 30.2 s combined; each clip is counted as 10 s).
   return videos > 0 ? perSecond * 0.6 * (seconds + Math.min(30.2, videos * 10)) : perSecond * seconds;
 };
-
-// ── Tripo P2 ───────────────────────────────────────────────────────────────
 
 const tripoPrice = (input: Record<string, unknown>): number => {
   if (input.texture === false) return 1.0;
   const quality = String(input.texture_quality ?? "standard").toLowerCase();
   return quality === "extreme" ? 1.3 : quality === "detailed" ? 1.2 : 1.1;
 };
-
-// ── The list ───────────────────────────────────────────────────────────────
 
 const ttsText = (input: Record<string, unknown>): string =>
   typeof input.prompt === "string"
@@ -229,27 +193,21 @@ export const MEDIA_MODELS: readonly MediaModel[] = [
 export const mediaModel = (id: string): MediaModel | null =>
   MEDIA_MODELS.find((model) => model.id === id) ?? null;
 
-/** What Stella's own features run on. */
 export const STELLA_MEDIA_MODELS = {
-  /** `image_gen` through Stella: text to image, and with references, edit. */
   image: "openai/gpt-image-2.5/flare/text-to-image",
   imageEdit: "openai/gpt-image-2.5/flare/edit",
   video: "bytedance/seedance-2.5/text-to-video",
   imageToVideo: "bytedance/seedance-2.5/image-to-video",
-  /** Read-aloud; fal and OpenRouter both name it this. */
   speech: "google/gemini-3.8-flash-lite-tts",
-  /** Record-then-transcribe dictation, on OpenRouter (Stella's key or the user's own). */
   dictation: "elevenlabs/scribe-v2",
 } as const;
 
-/** `image_gen` on the user's own provider account: the same model as each provider names it. */
 export const BYOK_IMAGE_MODELS = {
   openai: "gpt-image-2.5-flare",
   openrouter: "openai/gpt-image-2.5-flare",
   fal: { image: STELLA_MEDIA_MODELS.image, edit: STELLA_MEDIA_MODELS.imageEdit },
 } as const;
 
-/** Pixel sizes per aspect ratio for `image_gen` (multiples of 16, inside GPT Image's envelope). */
 const IMAGE_ASPECT_SIZES: Record<string, { width: number; height: number }> = {
   "1:1": { width: 1024, height: 1024 },
   "4:3": { width: 1024, height: 768 },
@@ -261,11 +219,6 @@ const IMAGE_ASPECT_SIZES: Record<string, { width: number; height: number }> = {
   "21:9": { width: 1344, height: 576 },
 };
 
-/**
- * The managed request for one `image_gen` call (desktop and cloud alike):
- * the image model, or its edit model when there are references, with that
- * model's own input. Quality defaults to low unless the call asks for more.
- */
 export const stellaImageRequest = (args: {
   prompt: string;
   aspectRatio?: string | null;

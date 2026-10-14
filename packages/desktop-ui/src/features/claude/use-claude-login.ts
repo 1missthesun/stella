@@ -2,21 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { cloudEnginesApi } from "@/features/cloud/cloud-engines-api";
 import { openExternalUrl } from "@/platform/electron/open-external";
 
-/**
- * Signing a Claude account in, on this computer or in the owner's cloud.
- * Both run the real `claude auth login`. On this computer Electron main runs
- * it with the chosen config dir; the CLI opens Anthropic's page itself and
- * finishes on its own localhost redirect when the user approves, so nothing
- * is pasted unless the browser didn't open ("Use a code instead"). In the
- * cloud it runs in the owner's container, which the browser can't redirect
- * to, so this window opens the page and the user pastes the code Anthropic
- * shows. Another of the owner's computers works like the cloud: it runs its
- * own `claude auth login` without opening a browser there, this window opens
- * the page, and the pasted code goes back through Stella's cloud to that
- * computer's CLI. A pasted code goes straight to the waiting CLI; a failed
- * attempt is started again rather than retried.
- */
-
 export type ClaudeLoginTarget =
   | { place: "local"; configId?: string; email?: string }
   | { place: "cloud"; email?: string }
@@ -25,18 +10,15 @@ export type ClaudeLoginTarget =
 export type ClaudeLoginFlow = {
   target: ClaudeLoginTarget;
   loginId: string;
-  /** Anthropic's page that shows a code to paste. */
   authorizeUrl: string;
-  /** Waiting on a pasted code (always in the cloud). */
   pasting: boolean;
 };
 
 export type ClaudeLoginResult = { email?: string };
 
-/** The error's own message (the CLI's, for a rejected code); null when it has none. */
 const messageOf = (error: unknown): string | null =>
   error instanceof Error && error.message
-    ? // Electron wraps a main-process rejection in its own prefix.
+    ?
       error.message.replace(/^Error invoking remote method '[^']*': (?:\w*Error: )?/u, "")
     : null;
 
@@ -58,18 +40,15 @@ export function useClaudeLogin({
   onSignedIn?: (result: ClaudeLoginResult, target: ClaudeLoginTarget) => void;
 } = {}) {
   const [flow, setFlow] = useState<ClaudeLoginFlow | null>(null);
-  /** The target of the attempt being started (before a flow exists). */
   const [starting, setStarting] = useState<ClaudeLoginTarget | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  /** The last code was rejected; its CLI has ended. */
   const [failed, setFailed] = useState<ClaudeLoginTarget | null>(null);
   const flowRef = useRef<ClaudeLoginFlow | null>(null);
   flowRef.current = flow;
   const onSignedInRef = useRef(onSignedIn);
   onSignedInRef.current = onSignedIn;
 
-  /** This computer's CLI finished by itself (approved in the browser) or failed. */
   const awaitLocal = useCallback(async (started: ClaudeLoginFlow) => {
     const wait = window.electronAPI?.system?.waitClaudeLocalLogin;
     if (!wait) return;
@@ -102,7 +81,6 @@ export function useClaudeLogin({
       if (target.place === "local") {
         const run = window.electronAPI?.system?.startClaudeLocalLogin;
         if (!run) throw new Error();
-        // The CLI opens Anthropic's page itself.
         const started = await run({
           ...(target.configId ? { configId: target.configId } : {}),
           ...(target.email ? { email: target.email } : {}),
@@ -157,7 +135,6 @@ export function useClaudeLogin({
       onSignedInRef.current?.(result, current.target);
     } catch (caught) {
       if (flowRef.current !== current) return;
-      // The CLI's own message, verbatim. Its attempt is over.
       cancelLogin(current);
       setError(messageOf(caught));
       flowRef.current = null;
@@ -181,7 +158,6 @@ export function useClaudeLogin({
     if (failed) void start(failed);
   }, [failed, start]);
 
-  /** Open the page that shows a code, and wait on a paste. */
   const reopen = useCallback(() => {
     const current = flowRef.current;
     if (!current) return;
@@ -193,7 +169,6 @@ export function useClaudeLogin({
     }
   }, []);
 
-  // Leaving the surface abandons the attempt.
   useEffect(
     () => () => {
       const current = flowRef.current;
@@ -208,7 +183,6 @@ export function useClaudeLogin({
     submitting,
     error,
     failed,
-    /** A sign-in is in progress or waiting for "Start again". */
     open: flow !== null || starting !== null || failed !== null,
     start,
     submit,

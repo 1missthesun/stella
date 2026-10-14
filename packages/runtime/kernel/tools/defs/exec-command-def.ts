@@ -1,18 +1,3 @@
-/**
- * The `Bash` tool's model-visible surface — name, description, prompt
- * snippet, parameter schema — split from the executable definition so hosts
- * that assemble their own tool list still expose the byte-identical tool to
- * the model. The cloud `BuildSession` DO runs in workerd and cannot import
- * `shell.ts`, which reaches `node:child_process`. `exec-command.ts` composes
- * this with the executable handler for tool-host consumers.
- */
-
-/**
- * Named like Claude Code's built-in so the model meets one shell tool by one
- * name whichever engine runs the turn. `exec_command` was the original name
- * and stays recognized wherever a tool name is received (agent definitions,
- * persisted transcripts, cloud protocol frames).
- */
 export const EXEC_COMMAND_TOOL_NAME = "Bash";
 export const LEGACY_EXEC_COMMAND_TOOL_NAME = "exec_command";
 
@@ -66,5 +51,4 @@ export const EXEC_COMMAND_TOOL_PARAMETERS: Record<string, unknown> = {
   required: ["cmd"],
 };
 
-/** Replay policy (`ToolReplayPolicy` in ../types.ts). An arbitrary process; its effect cannot be proven or repeated safely. */
 export const EXEC_COMMAND_TOOL_REPLAY = "unsafe" as const;

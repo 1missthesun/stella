@@ -66,9 +66,6 @@ export function StellaMiniChat({
         await type(exchange.user, setComposerTyped, 22);
         await sleep(240);
         setComposerTyped("");
-        // Reserve the assistant's final wrapped height in the same commit as
-        // the user message. Thinking and streamed text can then appear inside
-        // that stable slot without causing a second transcript movement.
         setMessages((prev) => [
           ...prev,
           { id: `user-${k}`, role: "user", text: exchange.user },
@@ -120,8 +117,6 @@ export function StellaMiniChat({
       }
       onActiveIndexChange?.(exchanges.length);
       await sleep(3200);
-      // Fade the conversation out before the loop resets it, so the
-      // restart reads as a deliberate beat instead of a snap.
       setClearing(true);
       await sleep(450);
     },

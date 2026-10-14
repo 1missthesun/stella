@@ -1,10 +1,3 @@
-/**
- * Pure connector-match scorer shared by device discovery, the device
- * `connector_status` tool, and the cloud connect client. No I/O here: the
- * caller is a language model that already did the semantic work of picking
- * keywords, so this only ranks catalog entries against those tokens.
- */
-
 export type ConnectorScoreFields = {
   id: string;
   name: string;
@@ -12,7 +5,6 @@ export type ConnectorScoreFields = {
   description?: string;
 };
 
-/** Lower-cased, de-duplicated alphanumeric tokens of a free-text query. */
 export const tokenizeConnectorQuery = (value: string): string[] => [
   ...new Set(
     value
@@ -23,11 +15,6 @@ export const tokenizeConnectorQuery = (value: string): string[] => [
   ),
 ];
 
-/**
- * Shared by connector discovery and direct connector-status resolution.
- * Exact id/name hits dominate so `discover gmail` always puts the Gmail
- * integration first even though "mail" appears in dozens of descriptions.
- */
 export const scoreConnectorMatch = (
   tokens: readonly string[],
   fields: ConnectorScoreFields,

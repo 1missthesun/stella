@@ -27,14 +27,6 @@ import {
 } from "./launch-splash";
 import { reportFirstAppPaint } from "./app-paint";
 
-/* Onboarding is loaded as a dynamic chunk that contains the whole flow:
- * the conversation surface, every card, the demo scenes, and all
- * onboarding CSS.
- *
- * Returning users (`appReady === true` at first paint) never fetch this
- * chunk. After completion the React subtree unmounts and the lazy
- * import is never re-evaluated, so onboarding code is genuinely gone
- * for the remainder of the session and absent from the next cold start. */
 const onboardingChunkPromise: { current: Promise<unknown> | null } = {
   current: null,
 };
@@ -57,11 +49,6 @@ type OnboardingExperienceProps = {
   onEnteredApp: () => void;
 };
 
-/**
- * First run as a conversation. Mounts inside the normal window chrome and
- * completes through the shared onboarding state, so the shell's hand-off
- * to the real chat is the same flip of `onboardingDone`.
- */
 function OnboardingExperience({ onEnteredApp }: OnboardingExperienceProps) {
   const { completed: onboardingDone, complete: completeOnboarding } =
     useOnboardingState();
@@ -138,10 +125,6 @@ const WebsiteShell = () => {
 const DesktopFullShell = () => {
   const { completed: onboardingDone, hydrated: onboardingHydrated } =
     useOnboardingState();
-  // Returning users resolve `onboardingDone` synchronously from shared UI state,
-  // so seed `hasEnteredApp` synchronously too. Otherwise the chat surface /
-  // RouterProvider mount waits on the setTimeout(0) below. The splash stays up
-  // until `appReady`, so there is no flash.
   const [hasEnteredApp, setHasEnteredApp] = useState(() =>
     readLocalOnboardingCompleted(),
   );
@@ -162,21 +145,10 @@ const DesktopFullShell = () => {
     reportFirstAppPaint();
   }, []);
 
-  // The renderer shell does not depend on auth or the local runtime. Those
-  // background bootstraps only unlock cloud state, chat history, sends, and
-  // local tools once their own state arrives.
   useEffect(() => {
     window.electronAPI?.ui.setAppReady?.(appReady);
   }, [appReady]);
 
-  // Keep the static launch splash up for returning users until the shell is
-  // *live* — auth resolved and the active conversation selected — so the
-  // window reveals once, fully working, instead of showing a shell whose
-  // composer enables and conversation list fills in a moment later. The root
-  // layout calls `dismissLaunchSplash()` at that point; `holdLaunchSplash…`
-  // bounds the wait so offline or cold starts never sit behind the splash.
-  // First-run onboarding dismisses it after its chunk is loaded from
-  // OnboardingExperience.
   useEffect(() => {
     if (appReady) {
       holdLaunchSplashUntilLive();

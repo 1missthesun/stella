@@ -32,7 +32,6 @@ export const telemetryHttpEnvironment = (
 ): Extract<TelemetryEnvironment, "development" | "production"> =>
   isDev ? "development" : "production";
 
-/** Where to send events carrying `authToken`, or null when telemetry is off. */
 export const telemetryHttpEndpoint = (
   environment: Extract<TelemetryEnvironment, "development" | "production">,
   authToken: string,

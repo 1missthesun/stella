@@ -1,8 +1,3 @@
-/**
- * The single mounted host for the Settings dialog. Triggers (gear buttons,
- * toast CTAs) go through `settingsDialog` so exactly one dialog exists no
- * matter how many triggers are on screen.
- */
 import { lazy, memo, Suspense, useCallback } from "react";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { secureSignOut } from "@/global/auth/services/auth";

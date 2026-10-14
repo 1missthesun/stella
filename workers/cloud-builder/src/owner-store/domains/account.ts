@@ -1,18 +1,3 @@
-/**
- * The owner's account state, of which this object is the authority:
- *
- * - **Generation.** `owner_state.generation` names the owner's current data.
- *   `account.reset` rotates it, closes the owner to writes and runs the
- *   `account.purge` job, which purges every store (src/owner-purge.ts) and
- *   reopens the owner when nothing is pending.
- * - **Closed.** Account deletion (`OwnerGate.closeOwner`) closes the owner for
- *   good and runs the same job in delete mode.
- * - **Identity.** The owner's identity level, as the caller's last verified
- *   token said.
- * - **Session revocation.** `account.sessionsRevoked` records a floor; tokens
- *   issued before it are refused (their 15-minute expiry bounds the rest).
- */
-
 import type { IdentityLevel } from "@stella/contracts/gateway/api";
 import { empty } from "../args.js";
 import { RpcError } from "../errors.js";
@@ -75,7 +60,6 @@ type OwnerStateRow = {
 const toIdentityLevel = (value: unknown): IdentityLevel =>
   value === 2 || value === 3 ? value : 1;
 
-/** The owner's state, created on first read: a fresh generation, writable, email-level until a caller says otherwise. */
 export const readOwnerState = (db: OwnerDb): OwnerState => {
   let row = db.one<OwnerStateRow>("SELECT * FROM owner_state WHERE id = 1");
   if (!row) {
@@ -99,7 +83,6 @@ export const readOwnerState = (db: OwnerDb): OwnerState => {
   };
 };
 
-/** Record who the caller's verified token says the owner is. */
 export const noteCallerIdentity = (
   db: OwnerDb,
   caller: { identityLevel?: IdentityLevel },
@@ -110,7 +93,6 @@ export const noteCallerIdentity = (
   db.run("UPDATE owner_state SET is_anonymous = 0, identity_level = ? WHERE id = 1", identityLevel);
 };
 
-/** True when the caller's token predates the owner's last sign-out-everywhere. */
 export const callerSessionRevoked = (
   db: OwnerDb,
   caller: Pick<OwnerCaller, "issuedAtMs"> & { sessionId?: string },
@@ -128,10 +110,6 @@ export const callerSessionRevoked = (
   );
 };
 
-/**
- * Start a reset or a deletion: fence the owner off and queue the purge. A
- * deletion joins a reset that is still running, so they share one fence.
- */
 export const beginOwnerPurge = (ctx: OwnerContext, mode: OwnerPurgeMode): void => {
   const state = readOwnerState(ctx.db);
   if (mode === "reset") {
@@ -152,7 +130,6 @@ export const beginOwnerPurge = (ctx: OwnerContext, mode: OwnerPurgeMode): void =
   ctx.jobs.schedule(ACCOUNT_PURGE_JOB, ctx.now, {}, { id: ACCOUNT_PURGE_JOB_ID });
 };
 
-/** Pending scheduled fires must not start turns for data that is going away. */
 const cancelScheduleFires = (ctx: OwnerContext): void => {
   const fires = ctx.db.all<{ id: string }>(
     "SELECT id FROM owner_jobs WHERE kind IN (?, ?)",
@@ -163,7 +140,6 @@ const cancelScheduleFires = (ctx: OwnerContext): void => {
 };
 
 const resetAccount = (ctx: OwnerContext): null => {
-  // The sensitive-action limit: five a minute.
   enforceOwnerRateLimit(
     ctx.db,
     ctx.now,
@@ -176,7 +152,6 @@ const resetAccount = (ctx: OwnerContext): null => {
   return null;
 };
 
-/** One purge pass; throws while stores are pending so the job retries with backoff. */
 const runAccountPurge = async (ctx: OwnerContext): Promise<void> => {
   const { purge } = readOwnerState(ctx.db);
   if (!purge) return;
@@ -208,14 +183,12 @@ export const accountDomain: OwnerDomain = {
     },
   },
   internal: {
-    /** Better Auth's revoke-sessions: refuse every token issued before `minIatMs`. */
     "account.sessionsRevoked": (ctx, args) => {
       const { minIatMs } = parseSessionsRevoked(args);
       readOwnerState(ctx.db);
       ctx.db.run("UPDATE owner_state SET min_iat_ms = MAX(min_iat_ms, ?) WHERE id = 1", minIatMs);
       return null;
     },
-    /** Better Auth's revoke-session: refuse that session's tokens until they have all expired. */
     "account.sessionRevoked": (ctx, args) => {
       const sessionId = (args as { sessionId?: unknown } | null)?.sessionId;
       if (typeof sessionId !== "string" || !sessionId || sessionId.length > 256) {

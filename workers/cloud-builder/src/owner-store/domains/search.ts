@@ -1,11 +1,3 @@
-/**
- * Web search, metered in the owner's object: the plan admits the request,
- * and a search the provider served is charged once, at its list price.
- *
- * The desktop runtime calls `search.web`; the orchestrator, cloud agents and
- * the turn broker reach the same operation as an internal call.
- */
-
 import type { SearchCalls } from "@stella/contracts/backend/search";
 import { searchWeb } from "../../web-search.js";
 import { object, optional, string } from "../args.js";

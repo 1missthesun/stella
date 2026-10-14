@@ -1,9 +1,3 @@
-/**
- * The packages the source server runs on, loaded on first use. A static
- * import would be hoisted to the top of the Electron main bundle and load on
- * every launch, including packaged ones, which don't ship them.
- */
-
 const once = <T>(load: () => Promise<T>) => {
   let loaded: Promise<T> | null = null;
   return () => (loaded ??= load());

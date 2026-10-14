@@ -1,27 +1,3 @@
-/**
- * Canvas shares: a self-contained HTML document published to the
- * `CANVAS_SHARES` bucket at `shares/<slug>.html`, which `workers/canvas-share`
- * serves at `<CANVAS_SHARE_BASE_URL>/c/<slug>`.
- *
- * A canvas the `html` tool writes is saved to one link per canvas slug
- * (`canvas`), private until its owner makes it public. A private object
- * carries its owner's tag and `visibility: private` in its metadata, and the
- * serving worker opens it only for a browser holding that owner's view cookie,
- * which it trades for a grant from `shares.viewLink`
- * (`workers/shared/canvas-view-grant.ts`). A browser without that cookie gets
- * the worker's "private" page, which sends the owner to `/canvas/open` on the
- * object's `owner-site` (`CANVAS_OWNER_SITE_URL`) to sign in and come back
- * with a grant. R2 metadata cannot change in place, so a visibility change
- * rewrites the object.
- *
- * The row is the owner's locator for the object. It is written before the
- * object, so every object that may exist has a row, and each row has a
- * `shares.expire` job at its expiry. Revoke, expiry and purge delete the
- * object first and the row after, so a failed delete keeps its locator for
- * the retry. The object also carries its expiry, so the serving worker 404s
- * it on time even if the job is late.
- */
-
 import {
   SHARE_CANVAS_PATTERN,
   SHARE_MAX_HTML_BYTES,
@@ -54,7 +30,6 @@ const LIST_LIMIT = 100;
 const PURGE_BATCH = 1_000;
 const EXPIRE_JOB = "shares.expire";
 const RATE_LIMIT = { count: 20, windowMs: 60_000 };
-/** Every canvas the agent writes saves here, so this one is roomier. */
 const SAVE_RATE_LIMIT = { count: 60, windowMs: 60_000 };
 
 export const SHARES_MIGRATION = {
@@ -70,7 +45,6 @@ export const SHARES_MIGRATION = {
   ],
 };
 
-/** One link per canvas, and whether anyone but the owner may open it. */
 export const SHARES_CANVAS_MIGRATION = {
   id: "shares.2-canvas-visibility",
   statements: [
@@ -80,7 +54,6 @@ export const SHARES_CANVAS_MIGRATION = {
   ],
 };
 
-/** A shared drive file: the drive path it copies and the drive object it copied. */
 export const SHARES_FILE_MIGRATION = {
   id: "shares.3-files",
   statements: [
@@ -90,7 +63,6 @@ export const SHARES_FILE_MIGRATION = {
   ],
 };
 
-/** Largest drive file `shares.shareFile` copies to a public link. */
 const SHARE_FILE_MAX_BYTES = 500 * 1024 * 1024;
 
 type ShareRow = {
@@ -121,7 +93,6 @@ const baseUrlOf = (env: Cloudflare.Env): string => {
   return base;
 };
 
-/** The website origin a private canvas's owner signs in through, when set. */
 const ownerSiteOf = (env: Cloudflare.Env): string | null => {
   const value = env.CANVAS_OWNER_SITE_URL?.trim();
   if (!value) return null;
@@ -159,7 +130,6 @@ const validateDocument = (html: string, rawTitle: string | undefined) => {
   return { bytes, title };
 };
 
-/** Write a share's bytes with the metadata the serving worker enforces. */
 const putObject = async (
   ctx: OwnerContext,
   key: string,
@@ -197,7 +167,6 @@ const toLink = (base: string, row: ShareRow): ShareLink => ({
   file: row.file_path,
 });
 
-/** 128 bits of CSPRNG as base64url (22 characters): public and unguessable. */
 const generateSlug = (): string => {
   const bytes = crypto.getRandomValues(new Uint8Array(16));
   return btoa(String.fromCharCode(...bytes))
@@ -217,8 +186,6 @@ const listShares = (db: OwnerDbReader, env: Cloudflare.Env, now: number): ShareL
   const base = baseUrlOf(env);
   return db
     .all<ShareRow>(
-      // Public links only: private ones are every canvas the agent wrote,
-      // reached one at a time through `shares.canvas`.
       "SELECT * FROM shares WHERE expires_at > ? AND visibility = 'public' ORDER BY created_at DESC LIMIT ?",
       now,
       LIST_LIMIT,
@@ -276,11 +243,6 @@ const publish = async (
   return { url: buildCanvasShareUrl(base, slug), slug, expiresAt };
 };
 
-/**
- * After a failed first put of a new link. The put may still have landed:
- * without a confirmed delete the row stays as the locator and its expiry job
- * removes the object.
- */
 const forgetFailedPut = async (
   ctx: OwnerContext,
   slug: string,
@@ -299,11 +261,6 @@ const forgetFailedPut = async (
   }
 };
 
-/**
- * Save a canvas to its link: the first save creates it (private unless told
- * otherwise), later saves rewrite the same object, so the URL a user already
- * has shows the latest canvas. Each save pushes expiry out again.
- */
 const save = async (
   ctx: OwnerContext,
   args: { canvas: string; html: string; title?: string; visibility?: ShareVisibility },
@@ -323,8 +280,6 @@ const save = async (
 
   if (existing) {
     const visibility = args.visibility ?? visibilityOf(existing);
-    // Row and job first: an object whose put fails keeps its older expiry
-    // metadata, which the serving worker enforces on its own.
     ctx.db.run(
       "UPDATE shares SET title = ?, expires_at = ? WHERE slug = ?",
       title ?? existing.title,
@@ -371,7 +326,6 @@ const save = async (
   return { url: buildCanvasShareUrl(base, slug), slug, visibility, expiresAt };
 };
 
-/** Make a link public or private. The object is rewritten with the new metadata. */
 const setVisibility = async (
   ctx: OwnerContext,
   args: { slug: string; visibility: ShareVisibility },
@@ -404,7 +358,6 @@ const setVisibility = async (
 
   const object = await bucket.get(row.r2_key);
   if (!object) {
-    // The bytes are gone (expired early or deleted); so is the link.
     dropRow(ctx, row.slug);
     throw new RpcError("NOT_FOUND", "Share not found.");
   }
@@ -422,10 +375,6 @@ const setVisibility = async (
   return result(args.visibility);
 };
 
-/**
- * A browser URL for the owner's own link. A private link carries a short grant
- * the serving worker trades for a view cookie; a public one needs none.
- */
 const viewLink = async (ctx: OwnerContext, args: { slug: string }): Promise<{ url: string }> => {
   const base = baseUrlOf(ctx.env);
   const row = ctx.db.one<ShareRow>(
@@ -452,12 +401,6 @@ const fileKeyForSlug = (slug: string): string => `files/${slug}`;
 const inlineContentType = (contentType: string): boolean =>
   /^(?:image\/(?!svg)|video\/|audio\/|application\/pdf$)/i.test(contentType);
 
-/**
- * A public link to one of the owner's drive files. The file is copied to the
- * shares bucket, which the serving worker reads; the drive object it copied
- * is remembered, so sharing an unchanged file again hands back the same link
- * and sharing a changed one refreshes the copy behind it.
- */
 const shareFile = async (
   ctx: OwnerContext,
   args: { path: string },
@@ -557,7 +500,6 @@ const saveArgs = object({
   visibility: optional(literal("private", "public")),
 });
 
-/** `shares.save` for this Worker's own cloud `html` tool. */
 const saveFromCloud = (ctx: OwnerContext, raw: unknown): Promise<SavedCanvasShare> =>
   save(ctx, saveArgs(raw));
 
@@ -576,7 +518,6 @@ const revoke = async (ctx: OwnerContext, args: { slug: string }): Promise<{ revo
   return { revoked: true };
 };
 
-/** At a share's expiry: delete its object, then its row. A failed delete retries. */
 const expire = async (ctx: OwnerContext, payload: unknown): Promise<void> => {
   const slug = (payload as { slug?: unknown } | null)?.slug;
   if (typeof slug !== "string") return;
@@ -586,7 +527,6 @@ const expire = async (ctx: OwnerContext, payload: unknown): Promise<void> => {
   ctx.db.run("DELETE FROM shares WHERE slug = ?", slug);
 };
 
-/** Reset or deletion: every object, then its row and job, a batch at a time. */
 const purgeShares = async (ctx: OwnerContext): Promise<{ pending: boolean }> => {
   const rows = ctx.db.all<{ slug: string; r2_key: string }>(
     "SELECT slug, r2_key FROM shares LIMIT ?",
@@ -604,7 +544,6 @@ export const sharesDomain = {
   calls: {
     "shares.publish": {
       scope: "owner",
-      // JSON-escaped HTML runs larger than its byte cap.
       maxBodyBytes: SHARE_MAX_HTML_BYTES * 2,
       parse: object({
         html: string({ max: SHARE_MAX_HTML_BYTES }),

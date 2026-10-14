@@ -1,24 +1,3 @@
-/**
- * The user's drive as the cloud file tools see it: `/workspace/world/drive`.
- *
- * The drive is its own store — rows in the owner object, bytes in the drive's
- * R2 bucket — and the world never holds a copy of it. A sandbox keeps a
- * working copy on its own disk (hydrated before the agent runs, written back
- * when it stops); everything that runs without a sandbox reads and writes the
- * drive itself through this module, under the turn's owner generation:
- *
- *  - the cloud orchestrator's `Read`.
- *
- * So the same absolute path names the same bytes in every placement, and a
- * write here is in the user's drive the moment the tool returns. Nothing is
- * ever hydrated into the world and nothing has to be delivered afterwards.
- *
- * The drive's own write rule still applies: replacing a file the user
- * uploaded requires having read its current version. The session records the
- * version behind every path it stats or reads, and a write echoes it — the
- * same claim a sandbox makes for every file it hydrated.
- */
-
 import {
   isWorldDrivePath,
   WORLD_DRIVE_DIR,
@@ -28,7 +7,6 @@ import { executeWorldTool, type WorldToolFileApi } from "./world/tools.js";
 import type { WorldEntry, WorldToolCall, WorldToolResult } from "./world/types.js";
 import { WORLD_ROOT } from "./workspace.js";
 
-/** One drive row, as `drive.turnStat`/`drive.turnList`/`drive.turnRead` answer. */
 type DriveRow = {
   path: string;
   sizeBytes: number;
@@ -37,10 +15,8 @@ type DriveRow = {
   updatedAt: number;
 };
 
-/** An owner-object internal call under the turn's generation; throws on failure. */
 export type DriveOwnerCall = (name: string, args: unknown) => Promise<unknown>;
 
-/** Bytes one write may carry inline, matching the drive's inline limit. */
 const DRIVE_WRITE_MAX_BYTES = 8 * 1024 * 1024;
 
 const CONTENT_TYPES: Record<string, string> = {
@@ -90,7 +66,6 @@ const isNotFound = (error: unknown): boolean =>
   error !== null &&
   (error as { code?: unknown }).code === "NOT_FOUND";
 
-/** `drive/reports/a.md` → `reports/a.md`; the drive root → "". */
 const drivePathOf = (worldPath: string): string =>
   worldPath === WORLD_DRIVE_DIR ? "" : worldPath.slice(WORLD_DRIVE_DIR.length + 1);
 
@@ -111,15 +86,9 @@ const fileEntry = (row: DriveRow): WorldEntry => ({
 });
 
 export type DriveFileSession = WorldToolFileApi & {
-  /** Drive path → the row version this session last read or wrote. */
   readonly known: ReadonlyMap<string, number>;
 };
 
-/**
- * The drive subtree of the world, as a `WorldToolFileApi` over world-relative
- * `drive/...` paths. Folders are what the drive's paths imply: a listing
- * returns files only, and a folder exists while something is in it.
- */
 export const createDriveFileSession = (options: {
   call: DriveOwnerCall;
   turnId: string;
@@ -147,8 +116,6 @@ export const createDriveFileSession = (options: {
     stat,
     list: async (prefix, listOptions = {}) => {
       const drivePrefix = drivePathOf(prefix);
-      // The cursor is a world path. Every drive path sorts after anything
-      // below `drive/` and before anything above its range.
       const cursor = listOptions.cursor ?? "";
       const drivePrefixed = `${WORLD_DRIVE_DIR}/`;
       let after = "";
@@ -209,8 +176,6 @@ export const createDriveFileSession = (options: {
       };
       const landed = answer.files[0];
       if (landed) known.set(landed.path, landed.updatedAt);
-      // Saved, but not where the tool was asked to write: say so rather than
-      // report a write to a path that still holds the user's own bytes.
       const renamed = answer.renamed[0];
       if (renamed) throw new Error(renamed.reason);
       if (!landed) {
@@ -253,11 +218,6 @@ export const createDriveFileSession = (options: {
   };
 };
 
-/**
- * The whole world with the drive subtree served by `drive`: the world store
- * answers everything else. Only a listing of the world root spans both, and
- * merges them in path order under one cursor.
- */
 export const createWorldFilesWithDrive = (
   world: WorldToolFileApi,
   drive: WorldToolFileApi,
@@ -282,8 +242,6 @@ export const createWorldFilesWithDrive = (
         world.list("", { ...options, limit }),
         drive.list(WORLD_DRIVE_DIR, { ...options, limit }),
       ]);
-      // Each source has listed everything up to its own last path; past the
-      // smaller of those, the other may still have entries to interleave.
       const bounds = [
         stored.cursor ? stored.entries.at(-1)?.path : undefined,
         held.cursor ? held.entries.at(-1)?.path : undefined,
@@ -307,7 +265,6 @@ export const createWorldFilesWithDrive = (
   };
 };
 
-/** A world whose only contents are the drive: what a search of it should see. */
 const driveOnlyWorld = (drive: WorldToolFileApi): WorldToolFileApi => ({
   ...drive,
   stat: async (path) =>
@@ -324,7 +281,6 @@ const driveOnlyWorld = (drive: WorldToolFileApi): WorldToolFileApi => ({
         : { entries: [] },
 });
 
-/** Where a world tool call's paths land: the world store, the drive, or both. */
 type WorldToolReach = "world" | "drive" | "both";
 
 const resolvedWorldPath = (value: unknown): string | null => {
@@ -356,19 +312,11 @@ export const worldToolReach = (call: WorldToolCall): WorldToolReach => {
   return path !== null && isWorldDrivePath(path) ? "drive" : "world";
 };
 
-/** The world store's own tool entry point, plus the file calls it answers. */
 export type WorldStoreTools = WorldToolFileApi & {
   tool(call: WorldToolCall): Promise<WorldToolResult>;
   listWorkspaceApps?(): Promise<unknown>;
 };
 
-/**
- * One world tool call, run where its paths live. A call that never names the
- * drive runs inside the world store exactly as it always has; one that does
- * runs here over the merged file view. A search of the whole world runs both
- * ways and reports one result, so the world store's own search stays local
- * to its data.
- */
 export const runWorldToolWithDrive = async (
   call: WorldToolCall,
   world: WorldStoreTools,
@@ -377,8 +325,6 @@ export const runWorldToolWithDrive = async (
   const reach = worldToolReach(call);
   if (reach === "world") return await world.tool(call);
   if (call.name === "Grep" || call.name === "glob") {
-    // The same call over a world that holds only the drive, so a pattern
-    // relative to the root matches drive paths exactly as it would have.
     const fromDrive = await executeWorldTool(driveOnlyWorld(drive), call, WORLD_ROOT);
     if (reach === "drive") return fromDrive;
     const fromWorld = await world.tool(call);
@@ -405,7 +351,6 @@ export const runWorldToolWithDrive = async (
 
 const FOUND = "Found matches:\n\n";
 
-/** One search answer from two: the world store's and the drive's. */
 const mergeSearchResults = (
   name: "Grep" | "glob",
   world: WorldToolResult,

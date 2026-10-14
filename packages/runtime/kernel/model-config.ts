@@ -7,7 +7,6 @@ import { readFile } from "node:fs/promises";
 import type { Api, Model } from "@earendil-works/pi-ai";
 import AjvModule, { type AnySchema, type ErrorObject, type ValidateFunction } from "ajv";
 
-// ajv ships CommonJS; its default export is the class under either loader.
 const Ajv = ((AjvModule as unknown as { default?: typeof AjvModule }).default ??
   AjvModule) as typeof AjvModule;
 
@@ -26,11 +25,9 @@ const schemaValidator = (schema: AnySchema): ValidateFunction => {
   return validator;
 };
 
-/** Validate an unknown value without coercing it. */
 const isJsonSchemaValue = <T>(schema: AnySchema, value: unknown): value is T =>
   schemaValidator(schema)(value);
 
-/** ajv's validation failures for a value, empty when it is valid. */
 const getJsonSchemaValidationErrors = (
   schema: AnySchema,
   value: unknown,
@@ -421,7 +418,6 @@ export const getRemoteCatalogModelValidationErrors = (
         `${error.instancePath || "root"}: ${error.message ?? "is invalid"}`,
     );
 
-/** Strip JSONC line comments and trailing commas without touching strings. */
 const stripJsonComments = (value: string): string =>
   value
     .replace(/"(?:\\.|[^"\\])*"|\/\/[^\n]*/gu, (match) =>

@@ -1,14 +1,3 @@
-/**
- * Pure text-edit planning for the `Edit` tool: argument coercion, match
- * diagnostics, the legacy single replacement, and the multi-edit
- * (`edits[]`) form. Dependency-free (shared with the workerd cloud world).
- *
- * Every edit in one call is matched against the ORIGINAL content (never
- * after an earlier edit applied), overlapping edits are rejected, and the
- * result is applied in one pass, so a call either lands completely or not
- * at all. Text and anchor edits share that contract.
- */
-
 import { fuzzyFindText, normalizeToLF } from "./edit-diff.js";
 import {
   parseAnchor,
@@ -45,13 +34,6 @@ const looksLikeEdit = (value: unknown): value is Record<string, unknown> =>
     typeof value.oldText === "string" ||
     hasValue(value.anchor));
 
-/**
- * Normalize the `edits` argument in place of a schema-level coercion: some
- * models send `edits` as a JSON string or as one bare edit object. Legacy
- * top-level `old_string`/`anchor` fields sent ALONGSIDE `edits` are folded
- * in as one more edit. Calls without `edits` are returned unchanged so the
- * legacy single-edit path (and replayed transcripts) keep their behavior.
- */
 export const prepareEditArguments = (
   args: Record<string, unknown>,
 ): Record<string, unknown> => {
@@ -70,7 +52,6 @@ export const prepareEditArguments = (
     edits = [edits];
   }
   if (Array.isArray(edits)) {
-    // Pi-style `oldText`/`newText` entries → this schema's snake_case keys.
     const entries: unknown[] = edits.map((entry: unknown) => {
       if (!isRecord(entry)) return entry;
       const { oldText, newText, ...restEntry } = entry;
@@ -110,7 +91,6 @@ export const prepareEditArguments = (
   return { ...rest, edits };
 };
 
-/** Validate and parse coerced `edits` entries. */
 export const parseEditSpecs = (edits: unknown): EditSpec[] => {
   if (!Array.isArray(edits) || edits.length === 0) {
     throw new Error(
@@ -154,7 +134,6 @@ const snippetAt = (content: string, index: number): string => {
   return `L${lineNumber}: ${line.trim().replace(/\s+/g, " ").slice(0, 100)}`;
 };
 
-/** Error for an `old_string` that matches more than one location. */
 export const duplicateMatchError = (
   content: string,
   occurrences: number,
@@ -173,7 +152,6 @@ export const duplicateMatchError = (
   );
 };
 
-/** Error for an `old_string` that matches nowhere, with recovery hints. */
 export const missingTextError = (content: string, oldText: string): Error => {
   const oldAnchor = oldText
     .split("\n")
@@ -220,16 +198,9 @@ export const missingTextError = (content: string, oldText: string): Error => {
 export type StringReplacementResult = {
   content: string;
   replacements: number;
-  /** The edit is already present (idempotent replay); nothing to write. */
   noChange?: true;
 };
 
-/**
- * The legacy single `old_string`/`new_string` replacement on LF-normalized,
- * BOM-free content: exact match first (unique unless `replaceAll`), then a
- * fuzzy match that must also be unique. Offsets are always in the original
- * content, so only the matched span changes and every other byte survives.
- */
 export const applyStringReplacement = (
   content: string,
   oldString: string,
@@ -286,8 +257,6 @@ export const applyStringReplacement = (
   if (!matchResult.found) {
     throw missingTextError(content, normalizedOld);
   }
-  // A fuzzy match must be as unique as an exact one; never silently edit
-  // the first of several near-identical spans.
   if (matchResult.occurrences > 1) {
     throw duplicateMatchError(
       content,
@@ -297,9 +266,6 @@ export const applyStringReplacement = (
     );
   }
 
-  // Offsets are in the original content: only the matched span changes,
-  // so trailing whitespace and Unicode punctuation elsewhere survive a
-  // fuzzy match byte for byte.
   const replaced =
     content.substring(0, matchResult.index) +
     matchResult.leading +
@@ -355,7 +321,6 @@ const planAnchorEdit = (
   if (newText !== "") {
     return { start: starts[startIndex]!, end: lineEnd(endIndex), text: newText };
   }
-  // Deleting whole lines also removes one line separator.
   if (endIndex + 1 < lines.length) {
     return { start: starts[startIndex]!, end: starts[endIndex + 1]!, text: "" };
   }
@@ -367,15 +332,9 @@ const planAnchorEdit = (
 
 export type AppliedEditsSummary = {
   content: string;
-  /** 1-based first ORIGINAL line touched by each edit, in input order. */
   lines: number[];
 };
 
-/**
- * Apply `edits` to LF-normalized, BOM-free content. Each text edit must
- * match exactly one location (exact first, then fuzzy, offsets always in
- * the original content); anchors resolve against the original lines.
- */
 export const applyEditsToContent = (
   content: string,
   edits: readonly EditSpec[],

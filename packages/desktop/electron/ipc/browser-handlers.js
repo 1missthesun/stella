@@ -47,7 +47,6 @@ const normalizedImageOutputPath = (requestedPath, mimeType) => {
     return path.join(parsed.dir, `${parsed.name}${extension}`);
 };
 export const registerBrowserHandlers = (options) => {
-    // ── Media file operations ──
     handleIpc(IPC_MEDIA_SAVE_OUTPUT, async (event, payload) => {
         if (!options.assertPrivilegedSender(event, IPC_MEDIA_SAVE_OUTPUT)) {
             return { ok: false, error: "Blocked untrusted request." };
@@ -73,10 +72,6 @@ export const registerBrowserHandlers = (options) => {
             const validateExisting = expectedImageMime
                 ? async (candidate) => await validateDecodedImageFile(candidate, expectedImageMime)
                 : undefined;
-            // The terminal image_gen path materializes the same deterministic
-            // jobId-based filename before the renderer sees completion. Reuse the
-            // durable file so the sidebar/inline materializers do not download or
-            // create a second artifact for the same media job.
             const dataUriMatch = payload.url.match(/^data:([^;,]+);base64,(.+)$/is);
             if (dataUriMatch) {
                 const bytes = decodeBase64ImageBounded(dataUriMatch[2]);
@@ -200,8 +195,6 @@ export const registerBrowserHandlers = (options) => {
                 typeof payload?.mimeType === "string" ? payload.mimeType : "";
             const kind = typeof payload?.kind === "string" ? payload.kind : "";
             const dataUrl = url.startsWith("data:") ? url : "";
-            // A path either comes explicitly (disk-backed files) or as the
-            // attachment `url` when it isn't a data/remote URL.
             const filePath =
                 explicitPath ||
                 (url && !dataUrl && !/^https?:\/\//i.test(url) ? url : "");

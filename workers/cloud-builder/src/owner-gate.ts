@@ -168,25 +168,6 @@ import {
 } from "./owner-gate/support.js";
 import { OwnerGateCloudDispatch } from "./owner-gate/cloud-dispatch.js";
 
-/**
- * The owner gate: one Durable Object per owner, named by ownerId, that
- * answers "may this owner start a turn right now?" from its own tables.
- *
- * It is the owner's authority: the owner snapshot (generation, write fence,
- * identity, enforcement, plan and allowance, default execution, devices) is
- * built from its domains on every read. Its SQLite registry records running
- * turns for replay detection. Conversation and thread objects admit through it
- * and release on their terminal paths; a release that never arrives is bounded
- * by `TURN_TIMEOUT_MS` plus a grace, after which a running row is treated as
- * released, so a lost isolate can never wedge an owner permanently.
- *
- * Refusals are values, never thrown: an RPC caller maps them straight to the
- * turn-start error contract.
- *
- * Every public method of `OwnerGate` is its RPC surface; the helpers behind
- * them live in the `owner-gate/` layers it extends.
- */
-
 export type {
   OwnerGateAdmitInput,
   OwnerGateRefusalCode,
@@ -262,7 +243,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
       log,
     }));
   }
-  /** The owner's database: backend calls, live views and jobs. */
   ownerStore(): OwnerStore {
     return (this.ownerStoreState ??= new OwnerStore({
       ctx: this.ctx,
@@ -281,12 +261,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     }));
   }
 
-  /**
-   * Turn-plane events for this owner (see `src/owner-events.ts`): the
-   * conversation and agent-thread index, browser waits, and the terminal
-   * receipts mobile polls. Events from another owner or an owner generation
-   * since reset are dropped. Throws only when the producer should retry.
-   */
   async applyOwnerEvents(events: OwnerEvent[]): Promise<void> {
     const ownerId = this.ownerId();
     let generation: string | null = null;
@@ -304,7 +278,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     const store = this.ownerStore();
     const effects = applyOwnerEventsToStore(store.context(null), current);
     store.flush();
-    // A deleted conversation schedules its purge job.
     await this.scheduleAlarm(Date.now());
     for (const event of current) {
       if (event.kind !== "turn.event" || !event.terminal) continue;
@@ -327,11 +300,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
       await this.ownerHost().postConversationCard(card);
   }
 
-  /**
-   * `POST /api/rpc/<name>` for owner-scoped functions, verified by the Worker.
-   * A token from before the owner's last sign-out-everywhere is refused; any
-   * other notes the identity it claims.
-   */
   async ownerRpc(input: {
     name: string;
     args: unknown;
@@ -466,10 +434,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     return response;
   }
 
-  /**
-   * A server-internal operation (agent tools, Worker routes, the turn
-   * broker), refused unless `ownerGeneration` is the owner's current one.
-   */
   async ownerInternal(input: {
     name: string;
     args: unknown;
@@ -512,7 +476,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     return response;
   }
 
-  /** Cloud home's control operations (`memory.context`, `skills.*`) for `CloudHomeStore`. */
   async homeControl(input: {
     op: string;
     body: { ownerGeneration: string } & Record<string, unknown>;
@@ -524,10 +487,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     });
   }
 
-  /**
-   * Run every domain's purge hook for a reset or account deletion. Returns
-   * the domains that still have work and need another call.
-   */
   async purgeOwnerData(input: {
     mode: OwnerPurgeMode;
   }): Promise<{ pending: string[] }> {
@@ -539,14 +498,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     return { pending };
   }
 
-  // ── Billing ─────────────────────────────────────────────────────────────
-
-  /**
-   * A session capability for a client runtime, asked for by the model
-   * gateway. The abuse domain rules on admission (step-up, sybil pressure,
-   * suspension); this ledger reserves the
-   * budget, and this Worker signs the capability.
-   */
   async issueSessionCapability(
     request: SessionCapabilityRequest,
   ): Promise<BillingControlResult<GatewaySessionCapabilityResponse>> {
@@ -599,7 +550,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     };
   }
 
-  /** The gateway's settled usage for this owner. */
   async applyGatewayUsage(
     events: GatewayUsageEvent[],
   ): Promise<UsageBatchResult> {
@@ -613,34 +563,28 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     });
   }
 
-  /** The owner's enforcement, for the model gateway's bootstrap read (`BillingControl`). */
   async ownerEnforcement(): Promise<OwnerEnforcementState> {
     return readEnforcement(this.ownerStore().context(null));
   }
 
-  /** Set the owner's enforcement (admin). Pushes it to the model gateway. */
   async setOwnerEnforcement(
     input: SetEnforcementInput,
   ): Promise<OwnerEnforcementState> {
     return await this.billingWrite((ctx) => setEnforcement(ctx, input));
   }
 
-  /** Enforcement, risk score and risk windows (admin lookup). */
   async abuseState(): Promise<ReturnType<typeof abuseState>> {
     return abuseState(this.ownerStore().context(null));
   }
 
-  /** A verified Stripe event addressed to this owner. */
   async applyStripeEvent(event: StripeEvent): Promise<void> {
     await this.billingWrite((ctx) => applyStripeEvent(ctx, event));
   }
 
-  /** What this owner may spend now. */
   async billingAccess(): Promise<BillingAccess> {
     return billingAccess(this.ownerStore().context(null));
   }
 
-  /** Admin and test accounts: set the plan outside Stripe. */
   async setBillingPlan(input: {
     plan?: BillingPlan;
     usageMode?: "default" | "unlimited";
@@ -650,14 +594,10 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     await this.billingWrite((ctx) => setAdminPlan(ctx, input));
   }
 
-  /** Account deletion: end the Stripe customer and its subscription. */
   async closeBilling(): Promise<void> {
     await closeStripeCustomer(this.ownerStore().context(null));
   }
 
-  // ── Devices ─────────────────────────────────────────────────────────────
-
-  /** `/api/mobile/*` for phones, verified by the Worker. */
   async mobileRoute(
     input: MobileRouteInput,
   ): Promise<{ status: number; json: string }> {
@@ -667,7 +607,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     return { status: result.status, json: JSON.stringify(result.body) };
   }
 
-  /** `/api/user-asks/*` for every client, verified by the Worker. */
   async userAskRoute(
     input: UserAskRouteInput,
   ): Promise<{ status: number; json: string }> {
@@ -677,7 +616,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     return { status: result.status, json: JSON.stringify(result.body) };
   }
 
-  /** `/api/user-asks/<id>/reply` from a phone notification, verified by its reply token. */
   async userAskReply(input: {
     askId: string;
     body: Record<string, unknown>;
@@ -688,12 +626,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     return { status: result.status, json: JSON.stringify(result.body) };
   }
 
-  /**
-   * Account deletion, before the auth user row goes: close the owner for
-   * good, end Stripe, then run the first delete pass of the
-   * `account.purge` job now. A pass that leaves stores pending is retried by
-   * the job.
-   */
   async closeOwner(): Promise<{ pending: string[] }> {
     await this.billingWrite((ctx) => beginOwnerPurge(ctx, "delete"));
     await this.closeBilling();
@@ -877,8 +809,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
         billing = turnAllowance(ctx);
       } catch (error) {
         if (!(error instanceof BillingConfigError)) throw error;
-        // Unconfigured billing is a server error, not an empty allowance:
-        // turns on Stella's models are refused with `billing_unavailable`.
         log("error", "billing_unconfigured", {
           ownerId: this.ownerId(),
           message: error.message,
@@ -898,7 +828,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     }
   }
 
-  /** Record the identity a Worker-verified token claims, for the snapshot. */
   async noteIdentity(input: { identityLevel?: IdentityLevel }): Promise<void> {
     const store = this.ownerStore();
     try {
@@ -908,16 +837,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     }
   }
 
-  /**
-   * The snapshot read and one exact owner-fence `register` in a single round
-   * trip, for a caller that would otherwise make them back to back. The
-   * register runs only when the snapshot still authorizes the caller's
-   * generation, so a stale or fenced-off caller never leaves a lease behind,
-   * and it runs through the same fence host `POST /owner-fence/register`
-   * uses: the lease protocol is unchanged, only the transport is. A snapshot
-   * that cannot be obtained is returned as a value rather than thrown, so the
-   * caller can tell "nothing was registered" from a lost response.
-   */
   async snapshotWithFenceLease(input: {
     lease: OwnerGateFenceLeaseRequest;
     now?: number;
@@ -957,7 +876,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     return { snapshot, lease: await this.registerFenceLease(input.lease) };
   }
 
-  /** Admission policy and the colocated fence share one transport, not weaker checks. */
   async admitWithFenceLease(input: {
     admission: OwnerGateAdmitInput;
     lease: OwnerGateFenceLeaseRequest;
@@ -988,8 +906,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     }
     const lease = await this.registerFenceLease(input.lease);
     if (input.includeHomeContext && lease.status === "registered") {
-      // A context failure must not hide a successfully registered lease. The
-      // caller owns its receipt and may retry preparation through the normal path.
       const [homeContext, destinations] = await Promise.all([
         this.homeContext(input.lease.ownerGeneration, lease.generation).catch(
           () => undefined,
@@ -1109,7 +1025,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     return { ok: true, snapshot, replayed: false };
   }
 
-  /** Idempotent: a release for a turn the gate no longer tracks is a no-op. */
   async release(input: { turnId: string }): Promise<void> {
     this.ensureSchema();
     const turnId = input.turnId?.trim() ?? "";
@@ -1117,12 +1032,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     this.ctx.storage.sql.exec(`DELETE FROM running WHERE turn_id = ?`, turnId);
   }
 
-  /**
-   * Claim a slot for one agent container about to run a turn, up to
-   * `OWNER_AGENT_CONTAINER_LIMIT`. The same container claiming again (an
-   * attach retry, an OOM restart) keeps its slot. A slot whose release was
-   * lost expires with the turn it was claimed for.
-   */
   async acquireAgentContainer(input: {
     sandboxId: string;
     now?: number;
@@ -1160,7 +1069,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     };
   }
 
-  /** Idempotent: the container's turn ended and its container is stopping. */
   async releaseAgentContainer(input: { sandboxId: string }): Promise<void> {
     this.ensureSchema();
     const sandboxId = input.sandboxId?.trim() ?? "";
@@ -1171,7 +1079,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     );
   }
 
-  /** Every agent container holding a slot, for owner purge. */
   async agentContainers(): Promise<string[]> {
     this.ensureSchema();
     return this.ctx.storage.sql
@@ -1180,7 +1087,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
       .map((row) => row.sandbox_id);
   }
 
-  /** Diagnostics for tests and operators; never on a turn's path. */
   async status(now = Date.now()): Promise<{
     running: Array<{
       turnId: string;
@@ -1210,18 +1116,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     return { running };
   }
 
-  // ── Device presence sockets ───────────────────────────────────────────
-  //
-  // One hibernatable socket per device, tagged by device id. The device
-  // proves possession of the key the owner snapshot registered before it is
-  // told anything: a socket that never sends a valid `proof` is anonymous,
-  // receives no offer, and counts as no presence at all.
-
-  /**
-   * `GET /owners/me/devices/:deviceId/presence`, forwarded by the Worker with
-   * the owner and device it verified. Answers the 101 immediately and sends
-   * the challenge; nothing else is disclosed until the proof lands.
-   */
   override async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
     if (url.pathname.startsWith("/owner-fence/")) {
@@ -1482,14 +1376,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     this.closeSocket(socket, 1011, "socket_error");
   }
 
-  /**
-   * `GET /owners/me/devices`: registered destinations joined with presence.
-   *
-   * Everything the owner is signed in on appears, whether or not it will take
-   * work. The list is the answer to "what machines do I have"; `remoteExecution`
-   * is the separate answer to "which of them will run something for me", and
-   * the clients need both to offer the enable control at all.
-   */
   async devices(now = Date.now()): Promise<DevicesResponse> {
     this.ensureSchema();
     const snapshot = await this.snapshot({ now });
@@ -1509,13 +1395,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     };
   }
 
-  // ── Placement ─────────────────────────────────────────────────────────
-
-  /**
-   * Admit a dispatch and route it. The Worker has already authenticated the
-   * caller and (for mobile) verified its pairing proof; everything from the
-   * idempotency check down is decided here, from this object's own state.
-   */
   async submit(input: OwnerGateSubmitInput): Promise<OwnerGateDispatchResult> {
     const receivedAt = Date.now();
     const startedAt = performance.now();
@@ -1538,8 +1417,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     const requestingDeviceId = request.requestingDeviceId?.trim() || undefined;
     const pairGrantDeviceId = input.pairGrantDeviceId?.trim() || undefined;
     const requiredCapabilities = [...request.requiredCapabilities];
-    // Every routing fact a replay must match. A different one under the same
-    // key is a different request wearing its name.
     const fingerprint = JSON.stringify([
       request.kind,
       request.ingress,
@@ -1578,13 +1455,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
       };
     }
     const dispatchId = `dsp:${crypto.randomUUID()}`;
-    // A chat dispatch is never admitted here. Wherever it ends up, exactly
-    // one admission governs it: the conversation object's own, when the
-    // cloud branch starts the turn — and a run that lands on the owner's own
-    // computer costs the cloud windows nothing at all, which is what the
-    // implementation this replaces did too. An agent dispatch is the
-    // opposite: this gate admits it under the dispatch id and the build
-    // session consumes that admission rather than taking a second one.
     let snapshot: OwnerSnapshot;
     let gateHeld = false;
     if (request.kind === "agent") {
@@ -1663,8 +1533,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
         requiredCapabilities,
         now,
       });
-      // The named computer is reconnecting: the offer waits for it, and
-      // reaches it the moment it is back (`offerAgainTo`).
       if (
         candidates.length === 0 &&
         targetMode === "device" &&
@@ -1683,13 +1551,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
         }
       }
     }
-    /**
-     * The consent state of a device this dispatch was explicitly aimed at.
-     * Read whether or not the dispatch will end up refused, because the ask is
-     * owed to the owner either way: aiming portable work at an unconsented
-     * computer silently runs it in the cloud, and they would never learn that
-     * one tap was all that stood in the way.
-     */
     const targetConsent =
       targetMode === "device" && request.targetDeviceId
         ? await this.deviceRemoteExecution(request.targetDeviceId, now)
@@ -1890,8 +1751,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     };
   }
 
-  /** Queue delivery may race the admission response. Retain the exact turn
-   * receipt so the next status read can reconcile either delivery order. */
   async recordCloudDispatchTerminal(input: {
     ownerGeneration: string;
     turnId: string;
@@ -1968,17 +1827,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     };
   }
 
-  /**
-   * Stop, from the owner's side. Work a computer has not durably accepted is
-   * canceled outright; work that is running somewhere becomes
-   * `cancel_pending` and is settled by the terminal the executing side sends.
-   */
-  /**
-   * Hand new input to an agent a device accepted and is running, and wait
-   * for the device to say whether the agent took it. `unreachable` means no
-   * live socket for that device; `timeout` that it did not answer in time,
-   * so it may still have landed; `not_running` that the run already ended.
-   */
   async steerDispatch(input: {
     dispatchId: string;
     messageId: string;
@@ -2021,11 +1869,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     return answer ? { delivered: true } : { delivered: false, reason: "not_running" };
   }
 
-  /**
-   * Hand a framed message to an agent a device runs locally, and wait for the
-   * device to say how it landed. `unreachable` means no live socket;
-   * `timeout` that no answer came in time, so it may still have landed.
-   */
   async messageLocalAgent(input: {
     deviceId: string;
     threadId: string;

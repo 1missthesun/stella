@@ -17,17 +17,6 @@ import {
 import { GatewayError } from "./errors.js";
 import { createUpstreamController, type GatewayDeps } from "./request-util.js";
 
-/**
- * BYOK lane: a model request on a provider credential the owner saved to
- * their account. The caller's SDK built it with a placeholder key; this lane
- * checks where it goes, puts the owner's key in, and pipes the provider's
- * answer back untouched. Nothing here is billed to Stella and the key never
- * leaves the gateway except to the provider it belongs to.
- *
- * Only inference endpoints, only on the provider's own URLs. A turn
- * capability is held to the provider and model its turn was admitted with.
- */
-
 const ACCESS_MAX_CACHE_MS = 60_000;
 const ACCESS_EXPIRY_MARGIN_MS = 60_000;
 const MAX_BODY_BYTES = 32 * 1024 * 1024;
@@ -108,7 +97,6 @@ const startsWithBase = (url: string, base: string): boolean => {
   return url === trimmed || url.startsWith(`${trimmed}/`) || url.startsWith(`${trimmed}?`);
 };
 
-/** The provider URL this request goes to, or a refusal. */
 const upstreamTarget = (raw: string | null, access: ProviderAccessResponse): URL => {
   if (!raw) throw new GatewayError(400, "bad_request", `${GATEWAY_BYOK_UPSTREAM_HEADER} is required.`);
   let url: URL;

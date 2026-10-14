@@ -1,12 +1,3 @@
-/**
- * Reading a file or folder that lives on one of the owner's computers, from
- * a phone or from another computer (`file.read`, `file.stat`, `file.list`
- * device requests, `turn-plane/device-requests.ts`).
- *
- * A file larger than one relayed response is read in ranges: `file.stat`
- * first for its size, then `file.read` with `offset` and `length`.
- */
-
 export type DeviceFileStat = {
   kind: "file" | "directory";
   sizeBytes: number;
@@ -25,18 +16,14 @@ export type DeviceFolderEntry = {
 export type DeviceFolderListing = {
   path: string;
   entries: DeviceFolderEntry[];
-  /** More entries exist than the listing carries. */
   truncated: boolean;
 };
 
 export const DEVICE_FILE_READ_LIMITS = {
-  /** Bytes one ranged `file.read` asks for. */
   rangeBytes: 8 * 1024 * 1024,
-  /** Entries one `file.list` returns. */
   folderEntries: 500,
 } as const;
 
-/** What a folder's Drive manifest is typed as in the device-file records. */
 export const DEVICE_FOLDER_CONTENT_TYPE = "application/vnd.stella.folder+json";
 
 export const isDeviceFileStat = (value: unknown): value is DeviceFileStat => {
@@ -79,7 +66,6 @@ export const parseDeviceFolderListing = (
   return { path: listing.path, entries, truncated: listing.truncated === true };
 };
 
-/** The byte ranges a file of `sizeBytes` is read in. */
 export const deviceFileReadRanges = (
   sizeBytes: number,
   rangeBytes: number = DEVICE_FILE_READ_LIMITS.rangeBytes,

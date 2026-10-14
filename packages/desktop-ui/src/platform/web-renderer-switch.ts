@@ -4,15 +4,6 @@ import {
   subscribeBackendAccount,
 } from "@/platform/backend/backend-client";
 
-/**
- * Website builds only. An owner who changed Stella's UI on desktop has their
- * own browser renderer at `/chat-app/u/<fork>/<tree>/` (same origin, so the
- * session and storage carry over). Once the backend knows the account, ask
- * which renderer is theirs, remember it for the website's next boot, and move
- * this frame there when it isn't already on it. No renderer of their own
- * means the shared `/chat-app/`.
- */
-
 const STORAGE_KEY = "stella:web-renderer";
 const SHARED_BASE = "/chat-app/";
 
@@ -30,7 +21,7 @@ const check = async () => {
   try {
     result = await backendClient.call("appSource.webRenderer", {});
   } catch {
-    return; // Not signed in yet, or offline: stay where we are.
+    return;
   }
   const target = result ? `${SHARED_BASE}${result.path}` : SHARED_BASE;
   const current = new URL("./", window.location.href).pathname;
@@ -39,7 +30,6 @@ const check = async () => {
     remember(result ? target : null);
     return;
   }
-  // Only move to a renderer that is really there.
   const index = `${target}index.html`;
   const available = await fetch(index, { method: "HEAD", cache: "no-store" })
     .then((response) => response.ok)
@@ -51,6 +41,5 @@ const check = async () => {
 
 export const startWebRendererSwitch = (): void => {
   subscribeBackendAccount(() => void check());
-  // The account may have been set before this module loaded.
   if (readBackendAccountEpoch() > 0) void check();
 };

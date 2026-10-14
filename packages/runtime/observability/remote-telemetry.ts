@@ -20,14 +20,6 @@ import {
 } from "@stella/contracts/telemetry/events";
 import { Deferred, Effect, Layer, ManagedRuntime } from "effect";
 
-/**
- * Node/Electron-only remote telemetry delivery.
- *
- * The renderer must never import this module. Producers submit one of the
- * closed metadata-only event variants from `@stella/contracts`; arbitrary
- * objects cannot reach the network or durable spool.
- */
-
 const DEFAULT_MAX_QUEUED_EVENTS = 2_000;
 const DEFAULT_MAX_SPOOL_BYTES = 8 * 1024 * 1024;
 const DEFAULT_BATCH_SIZE = 100;
@@ -67,17 +59,11 @@ type Awaitable<T> = T | Promise<T>;
 
 export type RemoteTelemetryTransportConfig = {
   endpoint: string;
-  /** Raw bearer token. It is used only in-memory and is never logged/spooled. */
   authToken?: string;
-  /**
-   * Pseudonymous identity lane for authenticated durable queues. When the
-   * client itself is scoped, a transport for any other lane is refused.
-   */
   principalScope?: string;
 };
 
 export type RemoteTelemetryClientOptions = {
-  /** Absolute, process-specific `.jsonl` file. Main and worker must not share it. */
   spoolPath: string;
   getContext: () => Awaitable<TelemetryEventContext | null>;
   getTransportConfig: () => Awaitable<RemoteTelemetryTransportConfig | null>;
@@ -89,18 +75,11 @@ export type RemoteTelemetryClientOptions = {
   requestTimeoutMs?: number;
   initialRetryMs?: number;
   maxRetryMs?: number;
-  /** Test/development seam. Production endpoints must be HTTPS. */
   allowInsecureEndpoint?: boolean;
   random?: () => number;
   now?: () => number;
   eventId?: () => string;
-  /** Pseudonymous identity lane bound to this durable spool. */
   principalScope?: string;
-  /**
-   * The user's telemetry opt-out, consulted on every record and flush so a
-   * settings change takes effect without a restart. When it reports off,
-   * nothing is queued, spooled, or sent. Absent means enabled.
-   */
   isEnabled?: () => boolean;
 };
 
@@ -245,10 +224,6 @@ export class RemoteTelemetryClient {
     });
   }
 
-  /**
-   * Validate, envelope, and durably enqueue one metadata event. Never throws.
-   * Resolves to the idempotency key only after the spool append/compaction.
-   */
   async record(event: TelemetryEventBody): Promise<string | null> {
     if (this.options.isEnabled && !this.options.isEnabled()) {
       this.stats.rejected += 1;
@@ -321,11 +296,6 @@ export class RemoteTelemetryClient {
     }
   }
 
-  /**
-   * Drop every queued event and empty the spool without sending. The
-   * opt-out path: what was collected while telemetry was on is discarded,
-   * never delivered after the user turns it off.
-   */
   async discardQueued(): Promise<void> {
     await this.serializeSpool(async () => {
       await this.ready;
@@ -335,7 +305,6 @@ export class RemoteTelemetryClient {
     });
   }
 
-  /** Flush one bounded batch. Concurrent callers share the same attempt. */
   async flush(): Promise<boolean> {
     if (this.options.isEnabled && !this.options.isEnabled()) {
       await this.discardQueued().catch(() => undefined);
@@ -350,12 +319,6 @@ export class RemoteTelemetryClient {
     return await this.flushPromise;
   }
 
-  /**
-   * Stop timers, wait for pending spool writes, and make one final send attempt.
-   * Unsent events remain in the durable spool for the next process. With
-   * `send: false` (a relaunch, whose next process starts in seconds) nothing
-   * is sent: the spool alone carries the events over.
-   */
   async close(
     options: { timeoutMs?: number; send?: boolean } = {},
   ): Promise<boolean> {
@@ -518,8 +481,6 @@ export class RemoteTelemetryClient {
         }).pipe(Effect.timeout(this.options.requestTimeoutMs)),
       );
       ok = response.ok;
-      // Drop only payload errors. Auth, routing, and rate-limit failures can
-      // recover after a token refresh, Worker rollout, or backoff window.
       permanentRejection = [400, 413, 415, 422].includes(response.status);
       await response.body?.cancel().catch(() => undefined);
     } catch {
@@ -555,7 +516,6 @@ export class RemoteTelemetryClient {
       this.options.initialRetryMs * 2 ** exponent,
     );
     this.retryAttempt += 1;
-    // Full jitter avoids synchronized desktop retry waves after an outage.
     this.schedule(Math.max(1, Math.floor(this.options.random() * ceiling)));
   }
 

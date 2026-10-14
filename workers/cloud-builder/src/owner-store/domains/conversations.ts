@@ -1,16 +1,3 @@
-/**
- * The owner's conversation index. Each conversation's transcript lives in its
- * own `OrchestratorSession`; this table is what a client lists and selects
- * from. The orchestrator keeps it current through owner events
- * (`conversation.*`, `turn.started`), which `applyConversationEvent` applies.
- *
- * Delivery is at-least-once and may reorder, so index updates are fenced on
- * `(epoch, lastSeq)` and a deleted row stays as a tombstone: nothing that
- * arrives late can move a row backwards or bring it back. Deleting a row
- * schedules `conversations.purge` (`../purge.ts`), which confirms the
- * orchestrator's storage is gone and drops the threads under it.
- */
-
 import type {
   ConversationCalls,
   ConversationExport,
@@ -83,20 +70,11 @@ export const CONVERSATIONS_MIGRATION = {
   ],
 };
 
-/**
- * Fork and rewind are gone: nothing reserves conversation edits any more, so
- * their ledger has nothing left to describe.
- */
 export const CONVERSATIONS_DROP_EDITS_MIGRATION = {
   id: "conversations.2-drop-conversation-edits",
   statements: [`DROP TABLE IF EXISTS conversation_edits`],
 };
 
-/**
- * The account's main conversation: the one chat every client opens. One row,
- * pinned by `conversations.bootstrap` and re-pinned there when its
- * conversation is gone.
- */
 export const CONVERSATIONS_MAIN_MIGRATION = {
   id: "conversations.3-main-conversation",
   statements: [
@@ -133,7 +111,6 @@ export const readConversation = (db: OwnerDbReader, conversationId: string): Con
     conversationId,
   );
 
-/** A live conversation this owner has, or null. */
 export const liveConversation = (
   db: OwnerDbReader,
   ownerId: string,
@@ -156,11 +133,6 @@ const EXPORT_MAX_CONVERSATIONS = 50;
 const EXPORT_MAX_TOTAL_BYTES = 25 * 1024 * 1024;
 const EXPORT_MAX_CONVERSATION_BYTES = 10 * 1024 * 1024;
 
-/**
- * The owner's downloadable copy: every live conversation's journal, read
- * through each conversation's own history op (which decrypts it there).
- * Bounded so one click cannot materialize an unbounded transcript.
- */
 const exportData = async (ctx: OwnerContext): Promise<DataExport> => {
   enforceOwnerRateLimit(
     ctx.db,
@@ -266,18 +238,9 @@ const newestConversationId = (db: OwnerDbReader): string | null =>
       ORDER BY updated_at DESC, conversation_id DESC LIMIT 1`,
   )?.conversation_id ?? null;
 
-/**
- * The main conversation without pinning one: the pin while it is live, else
- * the conversation bootstrap would pin first (the most recently used).
- */
 export const readMainConversationId = (db: OwnerDbReader): string | null =>
   pinnedMainConversationId(db) ?? newestConversationId(db);
 
-/**
- * The pinned main conversation, pinning one when none is live: the client's
- * hint, else the most recently used conversation, else a new empty one. No
- * await between the read and the pin, so concurrent callers agree.
- */
 const resolveMainConversation = (
   ctx: OwnerContext,
   preferConversationId: string | undefined,
@@ -311,15 +274,12 @@ const resolveMainConversation = (
   return conversationId;
 };
 
-// ── Owner events from the orchestrator ────────────────────────────────────
-
 export type ConversationEvent =
   | ConversationCreatedEvent
   | ConversationIndexEvent
   | ConversationDeletedEvent
   | TurnStartedEvent;
 
-/** Apply one orchestrator event to the index. Safe to replay. */
 export const applyConversationEvent = (
   ctx: Pick<OwnerContext, "db" | "jobs" | "now">,
   event: ConversationEvent,
@@ -342,8 +302,6 @@ export const applyConversationEvent = (
     }
     case "conversation.index": {
       if (!row) {
-        // A lost row is rebuilt from what the orchestrator mirrors; without
-        // its creation time the row would sort wrong forever.
         if (event.createdAt === undefined) return;
         db.run(
           `INSERT INTO conversations
@@ -363,7 +321,6 @@ export const applyConversationEvent = (
         return;
       }
       if (row.deleted_at !== null) return;
-      // A delayed flush from an earlier journal epoch can't land.
       if (event.epoch < row.epoch) return;
       if (event.force !== true && event.epoch === row.epoch && event.lastSeq <= row.last_seq) return;
       db.run(
@@ -410,8 +367,6 @@ export const applyConversationEvent = (
       return;
     }
     case "turn.started": {
-      // A fresh turn sorts its conversation to the top before the
-      // orchestrator's first index flush.
       if (!row || row.deleted_at !== null) return;
       db.run(
         `UPDATE conversations SET

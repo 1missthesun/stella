@@ -3,7 +3,6 @@ import { createHash } from "node:crypto";
 import path from "node:path";
 import { chromium } from "playwright";
 
-// Extract rather than copy or approximate the shipping website noise shader.
 const sourcePath = path.resolve("../website/src/components/aurora-canvas.tsx");
 const source = await readFile(sourcePath, "utf8");
 function shader(name: string): string {

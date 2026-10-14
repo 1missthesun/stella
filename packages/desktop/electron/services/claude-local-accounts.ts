@@ -22,52 +22,20 @@ import {
 } from "@stella/runtime/kernel/integrations/external-cli-resolution";
 import type { EngineAccountAccess } from "./engine-account-access.js";
 
-/**
- * Claude Code logins on this computer. Stella never holds a Claude
- * credential: the default login is the CLI's own default config (the user's
- * normal `claude` login), and every additional login is a Stella-managed
- * `CLAUDE_CONFIG_DIR` under `<stellaDataDir>/claude-accounts/<configId>`,
- * signed in by running the real `claude auth login` with that directory.
- * Identity comes from `claude auth status --json`, which prints no tokens.
- * The CLI keys its stored credentials by config dir (on macOS, one keychain
- * item per dir), so the configs never share a login.
- *
- * Local Claude turns run on the login this computer uses: the account the
- * owner chose for every place (`engines.get`, `claude.chosenAccountId`)
- * while a config here is signed in to it, else Claude Code's default login,
- * else the first signed-in config. The backend resolves the same rule for
- * every place, so all clients can show what each one runs and why. This
- * computer reports which identities it holds (`engines.reportClaudeLogins`).
- *
- * Another device can sign this computer in (`startRemoteLogin`): the owner
- * holding a phone or another computer asks through Stella's cloud, this
- * computer runs its own `claude auth login` without opening a browser here,
- * and the code Anthropic shows on the user's device comes back the same way
- * (`finishRemoteLogin`) straight into the waiting CLI.
- */
-
 const ACCOUNTS_DIR = "claude-accounts";
 const DEFAULT_CONFIG_ID = "default";
-/** How long a sign-in may wait for the user. */
 const LOGIN_TIMEOUT_MS = 15 * 60_000;
-/** How long the CLI may take to print the sign-in URL. */
 const LOGIN_URL_TIMEOUT_MS = 30_000;
 const STATUS_TIMEOUT_MS = 20_000;
 const LOGOUT_TIMEOUT_MS = 30_000;
-/** Window focus re-reads the logins at most this often. */
 const FOCUS_REFRESH_MIN_INTERVAL_MS = 30_000;
-/** How long a sent report may wait for the owner's list to catch up. */
 const REPORT_SETTLE_MS = 15_000;
-/** How long a failed report waits before the same one is sent again. */
 const REPORT_RETRY_MIN_INTERVAL_MS = 60_000;
 
-/** Never let a credential from Stella's own environment reach the CLI. */
 const STRIPPED_ENV = ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN"];
 
 type ConfigStatus = ClaudeLocalConfig & {
-  /** The config dir; null for the CLI's default config. */
   dir: string | null;
-  /** False when `claude auth status` could not be read. */
   known: boolean;
   createdAt: number;
 };
@@ -82,7 +50,6 @@ type PendingLogin = {
   exited: Promise<number | null>;
   exitCode: number | null | undefined;
   timer: ReturnType<typeof setTimeout>;
-  /** Settles when the CLI exits: the signed-in config, or the CLI's error. */
   outcome: Promise<ClaudeLocalConfig>;
   finishing: boolean;
   canceled: boolean;
@@ -98,7 +65,6 @@ export type ClaudeLocalAccountsOptions = {
   stellaDataDir: string;
   engineAccounts: EngineAccountAccess;
   loadDeviceId: () => Promise<string | null>;
-  /** The state changed ("claudeAccounts:changed"). */
   onChanged: () => void;
 };
 
@@ -106,7 +72,6 @@ export type ClaudeLocalAccountsOptions = {
 const ANSI_PATTERN = /\u001b\][^\u0007\u001b]*(?:\u0007|\u001b\\)|\u001b\[[0-9;?]*[A-Za-z]/g;
 const stripAnsi = (text: string) => text.replace(ANSI_PATTERN, "");
 
-/** The sign-in URL the CLI printed: its OSC 8 hyperlink, else the first https URL. */
 export const parseClaudeLoginUrl = (output: string): string | null => {
   // eslint-disable-next-line no-control-regex
   const osc = /\u001b\]8;[^;]*;(https:\/\/[^\u0007\u001b\s]+)(?:\u0007|\u001b\\)/.exec(output);
@@ -115,7 +80,6 @@ export const parseClaudeLoginUrl = (output: string): string | null => {
   return plain ? plain[0] : null;
 };
 
-/** The CLI's own last error line, for a failed sign-in. */
 const lastErrorLine = (output: string): string | null => {
   const lines = stripAnsi(output)
     .split(/\r?\n/)
@@ -155,23 +119,16 @@ export class ClaudeLocalAccounts {
     return path.join(this.options.stellaDataDir, ACCOUNTS_DIR);
   }
 
-  /** Re-read every config's login, then the state. */
   async list(): Promise<ClaudeLocalAccountsState> {
     await this.refresh();
     return this.state();
   }
 
-  /** A window got focus: re-read the logins, throttled. */
   noteWindowFocus(): void {
     if (Date.now() - this.lastRefreshAt < FOCUS_REFRESH_MIN_INTERVAL_MS) return;
     void this.refresh().catch(() => undefined);
   }
 
-  /**
-   * The config the next local Claude turn runs on. Uses the last read of the
-   * logins; reads them again when there is none yet, or when the answer
-   * would be "not signed in" (the user may have signed in since).
-   */
   async configForTurn(): Promise<ClaudeCodeConfigForTurn> {
     if (!this.configs) await this.refresh().catch(() => undefined);
     let resolved = this.resolveForTurn();
@@ -200,13 +157,11 @@ export class ClaudeLocalAccounts {
     };
   }
 
-  /** Another device asked this computer to start its own Claude sign-in. */
   async startRemoteLogin(params: Record<string, unknown>): Promise<ClaudeLocalLoginStart> {
     const email = text(params.email);
     return await this.startLogin({ ...(email ? { email } : {}), remote: true });
   }
 
-  /** The code Anthropic showed on the other device, for that sign-in. */
   async finishRemoteLogin(params: Record<string, unknown>): Promise<{ email?: string }> {
     const loginId = text(params.loginId) ?? "";
     const code = typeof params.code === "string" ? params.code : "";
@@ -219,14 +174,6 @@ export class ClaudeLocalAccounts {
     return null;
   }
 
-  /**
-   * Start `claude auth login`. No `configId`: a new Stella-managed config
-   * dir; "default": the CLI's default config (only while it is signed out);
-   * an extra config id: sign that one in again. The CLI opens Anthropic's
-   * page itself and finishes on its own localhost redirect once the user
-   * approves (`waitLogin`). The URL it prints is its fallback page, which
-   * shows a code to paste instead (`finishLogin`).
-   */
   async startLogin(
     options: { configId?: string; email?: string; remote?: boolean } = {},
   ): Promise<ClaudeLocalLoginStart> {
@@ -256,7 +203,6 @@ export class ClaudeLocalAccounts {
       fs.mkdirSync(dir, { mode: 0o700 });
       isNew = true;
     }
-    // One sign-in per config at a time.
     for (const pending of this.logins.values()) {
       if (pending.configId === configId) this.endLogin(pending, { kill: true });
     }
@@ -268,7 +214,6 @@ export class ClaudeLocalAccounts {
       {
         env: {
           ...this.childEnv(executable, dir),
-          // Finished on another device: nobody is at this one's browser.
           ...(options.remote && process.platform !== "win32" ? { BROWSER: "true" } : {}),
         },
         stdio: ["pipe", "pipe", "pipe"],
@@ -337,22 +282,12 @@ export class ClaudeLocalAccounts {
     }
   }
 
-  /**
-   * The sign-in's outcome: resolves the signed-in config once the CLI exits
-   * signed in (approved in the browser, or a pasted code); rejects with the
-   * CLI's own error.
-   */
   async waitLogin(loginId: string): Promise<ClaudeLocalConfig> {
     const pending = this.logins.get(loginId);
     if (!pending) throw new Error("This Claude sign-in ended. Start it again.");
     return await pending.outcome;
   }
 
-  /**
-   * Hand the code Anthropic showed to the waiting CLI. Resolves the signed-in
-   * config; rejects with the CLI's own error. A code the CLI refuses before
-   * trying it (it asks again) leaves the sign-in waiting for another paste.
-   */
   async finishLogin(loginId: string, code: string): Promise<ClaudeLocalConfig> {
     const pending = this.logins.get(loginId);
     if (!pending || pending.exitCode !== undefined) {
@@ -387,7 +322,6 @@ export class ClaudeLocalAccounts {
     }
   }
 
-  /** Stop a sign-in in progress; whether there was one. */
   cancelLogin(loginId: string): { canceled: boolean } {
     const pending = this.logins.get(loginId);
     if (!pending) return { canceled: false };
@@ -396,7 +330,6 @@ export class ClaudeLocalAccounts {
     return { canceled: true };
   }
 
-  /** Sign an extra config out (`claude auth logout`) and delete it. Never the default. */
   async signOut(configId: string): Promise<{ ok: true }> {
     if (!configId || configId === DEFAULT_CONFIG_ID) {
       throw new Error("Stella doesn't sign Claude Code's own login out.");
@@ -416,8 +349,6 @@ export class ClaudeLocalAccounts {
     this.unsubscribe();
     for (const pending of [...this.logins.values()]) this.endLogin(pending, { kill: true });
   }
-
-  // --- internals ---------------------------------------------------------------
 
   private resolveCli(): string | null {
     try {
@@ -595,7 +526,6 @@ export class ClaudeLocalAccounts {
 
   private resolveForTurn(): ClaudeCodeConfigForTurn {
     const configs = this.configs ?? [];
-    // Not installed, or no login could be read: let the CLI speak for itself.
     if (!this.cliInstalled || !configs.some((config) => config.known)) {
       return { configDir: null, signedIn: true };
     }
@@ -624,7 +554,6 @@ export class ClaudeLocalAccounts {
       .catch(() => undefined);
   }
 
-  /** `claude auth logout` for an extra config (clears its stored login), then delete the dir. */
   private async removeConfigDir(dir: string): Promise<void> {
     if (path.dirname(dir) !== this.accountsDir) return;
     const executable = this.resolveCli();
@@ -634,7 +563,6 @@ export class ClaudeLocalAccounts {
     fs.rmSync(dir, { recursive: true, force: true });
   }
 
-  /** The CLI exited: the config it signed in, or its error. */
   private async settleLogin(pending: PendingLogin, code: number | null): Promise<ClaudeLocalConfig> {
     if (code !== 0 || pending.canceled) {
       this.endLogin(pending, { kill: false });
@@ -670,7 +598,6 @@ export class ClaudeLocalAccounts {
     if (options.kill && pending.exitCode === undefined) {
       pending.child.kill();
     }
-    // A new config that never signed in leaves nothing behind.
     if (pending.isNew && !options.succeeded && pending.dir) {
       const dir = pending.dir;
       const remove = () => {
@@ -692,15 +619,6 @@ export class ClaudeLocalAccounts {
     this.options.onChanged();
   }
 
-  /**
-   * Report this computer's logged-in identities whenever the owner's list
-   * disagrees with them. The comparison is against the list itself (the
-   * accounts this device is recorded as holding), not against what this
-   * process last sent, so a report that never landed and an account removed
-   * on any client both come back: the owner's Claude accounts are the
-   * identities their computers hold, and only a `claude auth logout` takes
-   * one away. A failed attempt waits before trying the same report again.
-   */
   private async reportIfChanged(): Promise<void> {
     if (!this.configs) return;
     if (this.reporting) {

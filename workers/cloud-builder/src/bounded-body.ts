@@ -50,11 +50,6 @@ export const readBoundedRequestBytes = async (
   return await readBoundedStreamBytes(request.body, maxBytes);
 };
 
-/**
- * Consume a stream into memory only while it stays inside an explicit bound.
- * This is shared by request ingress, bounded upstream responses, and the few
- * R2 metadata transforms that genuinely need random access to the body.
- */
 export const readBoundedStreamBytes = async (
   stream: ReadableStream<Uint8Array>,
   maxBytes: number,

@@ -8,11 +8,9 @@ export const STELLA_DEV_HARNESS_ADDRESS = "127.0.0.1" as const;
 export const STELLA_DEV_HARNESS_APP_NAME_PREFIX = "Stella v2 Harness" as const;
 
 export type DevHarnessOptions = {
-  /** Distinct macOS safeStorage / Keychain namespace for this profile. */
   appName: string;
   userDataDir: string;
   remoteDebuggingAddress: typeof STELLA_DEV_HARNESS_ADDRESS;
-  /** Canonical base-10 value, ready for Electron's appendSwitch API. */
   remoteDebuggingPort: string;
 };
 
@@ -162,11 +160,6 @@ const resolveRemoteDebuggingPort = (rawValue: string | undefined): string => {
   return String(port);
 };
 
-/**
- * Resolve the opt-in dev-harness settings without importing or mutating
- * Electron. The user's Stella and ordinary development ignore every harness
- * variable, including malformed values.
- */
 export const resolveDevHarnessOptions = ({
   isPackaged,
   workspaceDir,
@@ -195,7 +188,6 @@ export const resolveDevHarnessOptions = ({
   };
 };
 
-/** Apply a previously validated option set before Electron becomes ready. */
 export const applyDevHarnessOptions = (
   target: DevHarnessElectronTarget,
   options: DevHarnessOptions,

@@ -20,9 +20,6 @@ import { DEFAULT_LOCALE, type Locale } from "./locales";
 
 export type { Catalog };
 
-// A JSON `require` may hand back either the object itself or an ES-module
-// namespace with the object on `.default`, depending on how the bundle was
-// transformed. Normalise both.
 const unwrap = (mod: unknown): Catalog => {
   if (mod && typeof mod === "object" && "default" in (mod as object)) {
     const inner = (mod as { default: unknown }).default;
@@ -48,10 +45,6 @@ const readCatalog = (locale: Locale): Catalog => {
   return catalog;
 };
 
-/**
- * English is the fallback for every lookup, so it is loaded on first use and
- * then held for the life of the process.
- */
 export const getEnglishCatalog = (): Catalog => {
   const cached = catalogCache.get(DEFAULT_LOCALE);
   if (cached) return cached;
@@ -82,10 +75,6 @@ const interpolate = (template: string, params: TranslateParams): string =>
     return value === undefined || value === null ? match : String(value);
   });
 
-/**
- * Resolve `key` against `catalog` first, then English, then the key itself.
- * Interpolates `{name}` placeholders with `params`.
- */
 export const translate = (
   catalog: Catalog | undefined,
   key: string,
@@ -105,15 +94,6 @@ export const translate = (
   return key;
 };
 
-/**
- * CLDR plural categories, in the order `Intl.PluralRules` can emit them.
- * A pluralised catalog entry is an object keyed by these instead of a bare
- * string:
- *
- *   "lineCount": { "one": "{count} line", "other": "{count} lines" }
- *
- * `other` is the only required category.
- */
 const PLURAL_CATEGORIES = [
   "zero",
   "one",
@@ -166,8 +146,6 @@ const selectPluralForm = (
   locale: string,
   count: number,
 ): string | undefined => {
-  // `zero` is an explicit product override for count === 0 even where CLDR
-  // never emits that category (English says "other" for 0).
   if (count === 0 && typeof forms.zero === "string") return forms.zero;
 
   const rules = pluralRulesFor(locale);
@@ -179,14 +157,6 @@ const selectPluralForm = (
   return forms.other;
 };
 
-/**
- * Resolve a pluralised key using `locale`'s CLDR plural rules, then English,
- * then the key itself. `count` is interpolated as `{count}` on top of
- * `params`.
- *
- * Never hand-roll `n === 1 ? "item" : "items"` — that is only correct for
- * English and its close relatives.
- */
 export const translatePlural = (
   catalog: Catalog | undefined,
   locale: string,
@@ -201,14 +171,12 @@ export const translatePlural = (
     const form = selectPluralForm(value, locale, count);
     if (typeof form === "string") return interpolate(form, withCount);
   }
-  // Tolerate a key authored as a plain string rather than rendering the key.
   if (typeof value === "string") return interpolate(value, withCount);
 
   const english = getEnglishCatalog();
   if (catalog !== english) {
     const fallback = lookupPath(english, key);
     if (isPluralForms(fallback)) {
-      // English rules, because English copy is what we're rendering.
       const form = selectPluralForm(fallback, DEFAULT_LOCALE, count);
       if (typeof form === "string") return interpolate(form, withCount);
     }
@@ -217,10 +185,6 @@ export const translatePlural = (
   return key;
 };
 
-/**
- * Resolve a key whose value is an array of strings. Falls back to English,
- * then an empty array.
- */
 export const translateArray = (
   catalog: Catalog | undefined,
   key: string,

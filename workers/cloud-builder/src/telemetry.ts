@@ -14,14 +14,8 @@ type TelemetryEnv = Pick<Cloudflare.Env, "OWNER_GATES"> & {
   TELEMETRY?: unknown;
 };
 
-/** The owner a cloud-side telemetry event is about. */
 export type TelemetryOwner = { ownerId: string; ownerGeneration: string };
 
-/**
- * The owner's telemetry preference (Settings, `preferences.telemetryEnabled`)
- * is the one gate every cloud-side telemetry producer passes. Only an explicit
- * `true` reports: an unreadable preference reports nothing.
- */
 export const ownerAllowsTelemetry = async (
   env: Pick<Cloudflare.Env, "OWNER_GATES">,
   owner: TelemetryOwner,
@@ -41,11 +35,6 @@ export const ownerAllowsTelemetry = async (
   }
 };
 
-/**
- * Best-effort private Worker-to-Worker telemetry. Business delivery never
- * waits on analytics, and no turn/user identifiers or content leave Builder.
- * Nothing is sent for an owner who turned telemetry off.
- */
 export const emitCloudTurnTelemetry = (
   ctx: Pick<ExecutionContext, "waitUntil">,
   env: TelemetryEnv,

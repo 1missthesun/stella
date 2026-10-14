@@ -1,11 +1,3 @@
-/**
- * Renderer-side type declarations for `window.electronAPI`.
- *
- * The API type is derived from the preload bridge object
- * (`@stella/contracts/desktop/electron-api`), whose payload and result types
- * come from the typed IPC contract (`@stella/contracts/desktop/ipc-contract`).
- * Only what cannot be derived from it is declared here.
- */
 import type { ElectronAPI } from "@stella/contracts/desktop/electron-api";
 import type { Theme } from "@stella/theme";
 
@@ -38,11 +30,6 @@ export type ElectronLocalChatApi = ElectronApi["localChat"];
 declare global {
   interface Window {
     electronAPI?: ElectronApi;
-    /**
-     * Boot snapshot of the shared UI state KV, delivered before any app code
-     * runs (Electron preload `sendSync`, or the Vite dev server's injected
-     * inline script for plain-browser tabs).
-     */
     __stellaUiState?: Record<string, string>;
   }
 }

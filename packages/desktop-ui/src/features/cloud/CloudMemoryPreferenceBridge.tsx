@@ -10,9 +10,6 @@ function AccountMemoryPreferenceBridge() {
       ? preference.preference.memoryEnabled
       : false;
 
-  // A new account/session and every authority loss begin fail-closed. Never
-  // enable the local runtime until that false write is acknowledged, and keep
-  // retrying a rejected/false echo instead of leaving the prior owner enabled.
   useLayoutEffect(() => {
     let cancelled = false;
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
@@ -50,7 +47,6 @@ function AccountMemoryPreferenceBridge() {
   return null;
 }
 
-/** Keeps the local desktop runtime a rebuildable mirror of cloud authority. */
 export function CloudMemoryPreferenceBridge() {
   const mode = useCloudConversationSession();
   const key = mode.isCloudConversationReady

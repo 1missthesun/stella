@@ -77,7 +77,6 @@ export const slackCall = async <T extends SlackResponse = SlackResponse>(
   return parsed;
 };
 
-/** Same call, but a Slack-side refusal is logged and swallowed. */
 export const slackTry = async <T extends SlackResponse = SlackResponse>(
   token: string,
   method: string,
@@ -104,7 +103,6 @@ export const slackTry = async <T extends SlackResponse = SlackResponse>(
 
 const SLACK_TEXT_LIMIT = 11_500;
 
-/** Split long Markdown on paragraph, then line, boundaries. */
 export const splitForSlack = (
   text: string,
   limit = SLACK_TEXT_LIMIT,
@@ -122,7 +120,6 @@ export const splitForSlack = (
   return parts;
 };
 
-/** Download a private Slack file with the bot token, capped at `maxBytes`. */
 export const downloadSlackFile = async (
   token: string,
   url: string,
@@ -164,7 +161,6 @@ export const downloadSlackFile = async (
   return bytes;
 };
 
-/** Upload bytes into a channel or thread (files.getUploadURLExternal flow). */
 export const uploadSlackFile = async (
   token: string,
   args: {

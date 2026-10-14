@@ -1,4 +1,3 @@
-/** Monotonic, request-local durations. No prompt, token, URL or credential fields. */
 export class RelayTiming {
   private readonly started: number;
   private readonly startedAt = Date.now();

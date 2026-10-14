@@ -304,11 +304,6 @@ const readMacKeychainCredential = (service) => {
 
 const MIN_TOKEN_LIFETIME_MS = 30 * 60_000;
 
-/**
- * Who the borrowed login is (email and organization, from the CLI's own
- * `oauthAccount` record next to that credential), so `claude auth status`
- * in the run names the account as it does on the host. Identity only.
- */
 const claudeAccountIdentity = (source) => {
   const candidates = source.startsWith("macOS keychain")
     ? [path.join(os.homedir(), ".claude.json")]

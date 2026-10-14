@@ -1,13 +1,3 @@
-/**
- * Whether first run still needs the computer message.
- *
- * A computer signed in to the account reaches this phone on its own, so the
- * message only matters when there is none yet: a guest, an account with no
- * computer, or a device list we could not read.
- *
- * `null` until the answer is known, so the flow keeps the step until the probe
- * settles rather than flashing it away.
- */
 import { useEffect, useState } from "react";
 import { listExecutionDevices } from "../../lib/execution-placement";
 import { getPreferredPhoneAccess } from "../../lib/phone-access";

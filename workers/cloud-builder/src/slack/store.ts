@@ -1,5 +1,3 @@
-/** D1 access for the Slack tables (migrations/0009_slack.sql). */
-
 import { decryptToken, encryptToken, isCurrentTokenVersion } from "./crypto.js";
 
 const d1 = (env: Cloudflare.Env): D1Database => {
@@ -14,11 +12,8 @@ export type SlackInstallation = {
   appId: string;
   botUserId: string;
   botToken: string;
-  /** The Slack user who installed the app. */
   installedBy: string;
-  /** The installer's Stella account: it owns the workspace's home and pays for it. */
   ownerId: string | null;
-  /** The workspace home's folder in the owner's Drive. */
   homeFolder: string;
 };
 
@@ -141,7 +136,6 @@ const workspaceHomeFolder = (teamName: string, teamId: string): string => {
   return `Slack/${name || teamId}`;
 };
 
-/** The workspace's owner: the installer's Stella account, once they connect it. */
 export const setInstallationOwner = async (
   env: Cloudflare.Env,
   teamId: string,
@@ -153,7 +147,6 @@ export const setInstallationOwner = async (
     .run();
 };
 
-/** Uninstall or token revocation: the token is dropped, not just flagged. */
 export const revokeInstallation = async (
   env: Cloudflare.Env,
   teamId: string,
@@ -213,7 +206,6 @@ export const unlinkIdentity = async (
   return (result.meta.changes ?? 0) > 0;
 };
 
-/** Account deletion drops the links too; a reset keeps them but forgets every thread. */
 export const purgeSlackOwner = async (
   env: Cloudflare.Env,
   ownerId: string,
@@ -357,7 +349,6 @@ const toCached = (row: {
     : [],
 });
 
-/** A thread's root and replies, oldest first. */
 export const cachedThread = async (
   env: Cloudflare.Env,
   teamId: string,
@@ -376,7 +367,6 @@ export const cachedThread = async (
   return rows.results.map(toCached).reverse();
 };
 
-/** Recent top-level messages in a channel, oldest first. */
 export const cachedChannel = async (
   env: Cloudflare.Env,
   teamId: string,
@@ -395,7 +385,6 @@ export const cachedChannel = async (
   return rows.results.map(toCached).reverse();
 };
 
-/** True the first time an event id is seen. */
 export const claimEvent = async (
   env: Cloudflare.Env,
   eventId: string,

@@ -1,4 +1,3 @@
-/** Browsers discovery can read; the label is what the user sees on the pill. */
 export const BROWSERS = [
   { id: "chrome", label: "Google Chrome" },
   { id: "firefox", label: "Firefox" },

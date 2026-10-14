@@ -121,8 +121,6 @@ const newId = (): string => {
   return id;
 };
 
-// ── Settings ──────────────────────────────────────────────────────────────
-
 export type PreviewSettings = { access: SlackPreviewAccess; ttlDays: number };
 
 const isAccess = (value: unknown): value is SlackPreviewAccess => value === "public" || value === "members";
@@ -130,7 +128,6 @@ const isAccess = (value: unknown): value is SlackPreviewAccess => value === "pub
 export const isPreviewTtl = (value: unknown): value is number =>
   (SLACK_PREVIEW_TTL_DAYS_CHOICES as readonly number[]).includes(value as number);
 
-/** The workspace's settings, or the repository's (`owner/name`) where it has its own. */
 export const loadPreviewSettings = async (
   env: Cloudflare.Env,
   teamId: string,
@@ -174,7 +171,6 @@ export const savePreviewSettings = async (
     .run();
 };
 
-/** Live links across the workspace, each expiring by its repository's setting or the workspace's. */
 const usage = async (env: Cloudflare.Env, teamId: string): Promise<{ bytes: number; live: number }> => {
   const workspace = await loadPreviewSettings(env, teamId);
   const row = await d1(env)
@@ -194,7 +190,6 @@ const quotaFor = async (env: Cloudflare.Env, ownerId: string | null): Promise<nu
   return QUOTA_BYTES[access.audience as ManagedModelAudience] ?? 0;
 };
 
-/** Preview settings (the workspace's, or a repository's) and the workspace's usage, for stella.sh/crew. */
 export const describePreviews = async (
   env: Cloudflare.Env,
   teamId: string,
@@ -216,9 +211,6 @@ export const describePreviews = async (
   };
 };
 
-// ── Links ─────────────────────────────────────────────────────────────────
-
-/** `SITES_HOST` is a host pattern with one `*` for the site id, e.g. `*.stellasites.app` or `*-dev.stellasites.app`. */
 const sitesHost = (env: Cloudflare.Env): { before: string; after: string } | null => {
   const pattern = readVar(env, "SITES_HOST").trim().toLowerCase().replace(/^https?:\/\//u, "").replace(/\/.*$/u, "");
   const parts = pattern.split("*");
@@ -228,7 +220,6 @@ const sitesHost = (env: Cloudflare.Env): { before: string; after: string } | nul
 
 const sharedOrigin = (env: Cloudflare.Env): string => readVar(env, "SITES_SHARED_ORIGIN").replace(/\/+$/u, "");
 
-/** The preview's origin; in shared-origin mode, the one origin every preview uses. */
 const previewOrigin = (env: Cloudflare.Env, id: string): string | null => {
   const host = sitesHost(env);
   if (host) return `https://${host.before}${id}${host.after}`;
@@ -249,8 +240,6 @@ const safePath = (value: string | null): string =>
   value && value.startsWith("/") && !value.startsWith("//") && !value.startsWith("/\\") && value.length < 2_000
     ? value
     : "/";
-
-// ── Pages ─────────────────────────────────────────────────────────────────
 
 const escapeHtml = (value: string): string =>
   value.replace(/&/gu, "&amp;").replace(/</gu, "&lt;").replace(/>/gu, "&gt;").replace(/"/gu, "&quot;");
@@ -275,8 +264,6 @@ const page = (status: number, title: string, body: string, extra?: HeadersInit):
 const missing = (): Response =>
   page(404, "This preview isn't here", "<p>The link is wrong, or the preview expired. Ask Stella in Slack for a fresh one.</p>");
 
-// ── Cookies ───────────────────────────────────────────────────────────────
-
 const cookieValues = (request: Request, name: string): string[] => {
   const header = request.headers.get("cookie");
   if (!header) return [];
@@ -290,8 +277,6 @@ const cookieValues = (request: Request, name: string): string[] => {
 
 const hostCookie = (name: string, value: string, ttlMs: number): string =>
   `${name}=${value}; Path=/; Max-Age=${Math.floor(ttlMs / 1000)}; HttpOnly; Secure; SameSite=Lax`;
-
-// ── Publish capability and the container helper ───────────────────────────
 
 type PublishClaims = { team: string; conv: string };
 
@@ -313,11 +298,6 @@ const teamForConversation = async (env: Cloudflare.Env, conversationId: string):
       .first<{ team_id: string }>()
   )?.team_id ?? null;
 
-/**
- * Before a Slack conversation's agent starts: write its publish capability,
- * this deployment's origin and `stella-publish` into the container. Every
- * Slack agent gets them, with or without a repository.
- */
 export const prepareSlackPreviews = async (
   env: Partial<Cloudflare.Env>,
   session: Pick<ExecutionSession, "exec">,
@@ -357,8 +337,6 @@ export const prepareSlackPreviews = async (
     log("slack_preview_helper_failed", { message: error instanceof Error ? error.message.slice(0, 200) : String(error) });
   }
 };
-
-// ── Upload ────────────────────────────────────────────────────────────────
 
 const CONTENT_TYPES: Record<string, string> = {
   html: "text/html; charset=utf-8",
@@ -412,7 +390,6 @@ export const extensionOf = (path: string): string => {
 
 const contentTypeOf = (path: string): string => CONTENT_TYPES[extensionOf(path)] ?? "application/octet-stream";
 
-/** A clean relative path inside the site, or null for anything that could escape it. */
 export const cleanPath = (raw: string): string | null => {
   const parts: string[] = [];
   for (const part of raw.replace(/\\/gu, "/").split("/")) {
@@ -435,7 +412,6 @@ class UploadError extends Error {
   }
 }
 
-/** Pulls exact byte counts out of a stream. */
 class ByteReader {
   private chunks: Uint8Array[] = [];
   private buffered = 0;
@@ -511,7 +487,6 @@ const paxRecords = (bytes: Uint8Array): Record<string, string> => {
 
 type TarEntry = { path: string; data: Uint8Array };
 
-/** Regular files from a tar stream; links, devices and directories are skipped. */
 async function* tarFiles(stream: ReadableStream<Uint8Array>): AsyncGenerator<TarEntry> {
   const reader = new ByteReader(stream.getReader());
   let longName: string | null = null;
@@ -584,12 +559,6 @@ const UPLOAD: TokenKind = { prefix: "su1", domain: "stella.slack-preview-upload.
 const UPLOAD_TTL_MS = 30 * 60_000;
 const MAX_PARTS = 16;
 
-/**
- * One part of an upload (a gzipped tar). A site that doesn't fit one request
- * comes in several: the first starts the preview (a row that isn't served
- * until it's ready) and returns an upload token for the next, and the one
- * marked `final=1` checks the whole site and publishes the link.
- */
 const publish = async (request: Request, env: Cloudflare.Env): Promise<Response> => {
   const header = request.headers.get("authorization") ?? "";
   const claims = header.startsWith("Bearer ")
@@ -771,20 +740,12 @@ const publish = async (request: Request, env: Cloudflare.Env): Promise<Response>
   );
 };
 
-// ── Screenshots and recordings (visual proof for agents) ─────────────────
-
 const CAPTURE_PATH = `${SLACK_PREVIEWS_PATH}/capture`;
 const DEFAULT_VIEWS = [
   { name: "desktop", width: 1440, height: 900, scale: 1, mobile: false },
   { name: "phone", width: 390, height: 844, scale: 3, mobile: true },
 ];
 
-/**
- * Screenshots of a page at desktop and phone widths, and optionally a short
- * recording of steps on it, taken by a fresh profile-less cloud browser. The
- * page must be one of this workspace's previews, or a host the
- * conversation's network access reaches on its own.
- */
 const capture = async (request: Request, env: Cloudflare.Env): Promise<Response> => {
   const header = request.headers.get("authorization") ?? "";
   const claims = header.startsWith("Bearer ")
@@ -852,8 +813,6 @@ const capture = async (request: Request, env: Cloudflare.Env): Promise<Response>
   console.log(JSON.stringify({ event: "slack_preview_captured", teamId: claims.team, preview: preview?.id ?? null, recording: Boolean(recording) }));
   return new Response(upstream.body, { headers: { "content-type": "application/json", "cache-control": "no-store" } });
 };
-
-// ── Sign in with Slack (members-only previews) ────────────────────────────
 
 type PreviewRow = {
   id: string;
@@ -1055,8 +1014,6 @@ export const handleSlackPreviewRoute = async (request: Request, env: Cloudflare.
   return null;
 };
 
-// ── Serving (through the sites-host Worker) ─────────────────────────────
-
 const PREVIEW_CSP = "base-uri 'self'; object-src 'none'; form-action 'self' https:";
 
 export const servingHeaders = (object: R2Object, isPublic: boolean, html: boolean): Headers => {
@@ -1149,7 +1106,6 @@ const refererSite = (request: Request): string | null => {
   }
 };
 
-/** The preview a request is for, from its host or (shared origin) its first path segment. */
 const previewIdFor = (request: Request, env: Cloudflare.Env): string | null => {
   const host = new URL(request.url).hostname.toLowerCase();
   const pattern = sitesHost(env);
@@ -1247,7 +1203,6 @@ export const servePreview = async (request: Request, env: Cloudflare.Env, export
   return response;
 };
 
-/** What the sites-host Worker calls. Unreachable from the public internet. */
 export class SitesHost extends WorkerEntrypoint<Cloudflare.Env> {
   override async fetch(request: Request): Promise<Response> {
     try {
@@ -1264,9 +1219,6 @@ export class SitesHost extends WorkerEntrypoint<Cloudflare.Env> {
   }
 }
 
-// ── Expiry ────────────────────────────────────────────────────────────────
-
-/** Daily: delete the files of expired links (and of uninstalled workspaces). */
 export const sweepSlackPreviews = async (env: Cloudflare.Env): Promise<number> => {
   const now = Date.now();
   const { results } = await d1(env)

@@ -1,14 +1,3 @@
-/**
- * GPT-Live client-delegation protocol helpers for mobile voice.
- *
- * The voice model owns the spoken conversation and delegates every piece of
- * reasoning or tool use to Stella's text orchestrator. Instructions, voice and
- * startup history are set once when the backend creates the session, so this
- * module only builds the startup payload plus the data-channel events the
- * phone is allowed to send afterwards: `session.*.append`, microphone control
- * and `session.close`.
- */
-
 import {
   VOICE_APPEND_MAX_CHARS,
   VOICE_HISTORY_MAX_CHARS,
@@ -28,7 +17,6 @@ export type RealtimeVoiceHistoryItem = {
   toolCallId?: string;
 };
 
-/** What the connected computer reports about its current conversation. */
 export type RealtimeVoiceOrchestratorConfig = {
   instructions: string;
   history?: RealtimeVoiceHistoryItem[];
@@ -43,7 +31,6 @@ export type RealtimeVoiceActionCompletion = {
   failed: boolean;
 };
 
-/** One delegation the voice model opened; it carries no task text by design. */
 export type VoiceDelegation = {
   id: string;
   target: string;
@@ -95,7 +82,6 @@ const spokenConversationBrief = [
 export const clampVoiceInstructions = (instructions: string): string =>
   instructions.trim().slice(0, VOICE_INSTRUCTIONS_MAX_CHARS);
 
-/** The startup conversation-and-delegation brief, not Stella's system prompt. */
 export const buildVoiceSessionInstructions = (
   execution: "phone" | "computer",
 ): string =>
@@ -108,7 +94,6 @@ export const buildVoiceSessionInstructions = (
     ].join("\n"),
   );
 
-/** Trim startup history to the newest turns inside the contract's bounds. */
 export const boundVoiceHistory = (
   history: readonly VoiceHistoryMessage[],
 ): VoiceHistoryMessage[] => {
@@ -130,7 +115,6 @@ export const boundVoiceHistory = (
   return kept.reverse();
 };
 
-/** Startup history for the attached mobile chat. */
 export const buildAttachedChatVoiceHistory = (
   messages: readonly ChatMessage[],
 ): VoiceHistoryMessage[] =>
@@ -142,7 +126,6 @@ export const buildAttachedChatVoiceHistory = (
     })),
   );
 
-/** Startup history for the connected computer's current conversation. */
 export const buildComputerVoiceHistory = (
   config: RealtimeVoiceOrchestratorConfig,
 ): VoiceHistoryMessage[] =>
@@ -160,7 +143,6 @@ export const buildComputerVoiceHistory = (
     }),
   );
 
-/** Appends are capped per event, so longer text is split across appends. */
 export const splitVoiceAppendContent = (content: string): string[] => {
   const text = content.trim();
   if (!text) return [];
@@ -171,11 +153,6 @@ export const splitVoiceAppendContent = (content: string): string[] => {
   return chunks;
 };
 
-/**
- * `commentary` is said aloud (paraphrased), `thinking` is known but not
- * announced, `instructions` changes behaviour. `delegationId` is the task the
- * update belongs to, or null for session-wide context.
- */
 export const buildVoiceAppendEvent = (options: {
   kind: VoiceAppendKind;
   eventId: string;
@@ -244,7 +221,6 @@ const APPEND_ACK_TYPES = new Set([
   "session.instructions.appended",
 ]);
 
-/** Acks and their error variants, matched back to the outgoing `event_id`. */
 export const parseVoiceAppendAck = (
   event: Record<string, unknown>,
 ): VoiceAppendAck | null => {
@@ -264,11 +240,6 @@ export const parseVoiceAppendAck = (
   };
 };
 
-/**
- * A transcript fragment is not a complete turn, so deltas accumulate until the
- * turn is consumed. A fragment that starts before the last one ended belongs
- * to a new utterance, which resets the buffer.
- */
 export class VoiceTranscriptAccumulator {
   private buffer = "";
   private lastEndMs: number | null = null;
@@ -360,9 +331,6 @@ export const findVoiceActionCompletion = (
       [...spawnedTasks, ...referencedTasks].map((task) => [task.id, task]),
     ).values(),
   ];
-  // The journal and the separate canonical task query can arrive in either
-  // order. A completed spawn tool is proof that a task row is expected, so do
-  // not permanently consume the voice request during that propagation gap.
   if (completedSpawnCount > spawnedTasks.length) return null;
   if (
     referencedTaskIds.size > 0 &&

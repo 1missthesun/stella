@@ -1,13 +1,3 @@
-/**
- * Delivery of turn-plane events to the owner's object.
- *
- * The orchestrator, BuildSession and conversation objects hand their events
- * straight to `OwnerGate.applyOwnerEvents`. A delivery that throws is the
- * caller's to keep and retry (a durable batch with an alarm, or a lagging
- * index the next turn end catches up); applying is idempotent, so a retried
- * batch costs only the duplicate checks.
- */
-
 import {
   ownerReadsEvent,
   type OwnerEvent,

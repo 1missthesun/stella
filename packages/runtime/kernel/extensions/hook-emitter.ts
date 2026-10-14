@@ -2,12 +2,6 @@ import { Effect } from "effect";
 import type { HookEvent, HookDefinition, HookEventMap } from "./types.js";
 import { runExtensionEffect, tryExtensionOp } from "./effect-runtime.js";
 
-/**
- * Invoke one user-authored hook handler through the single promise seam,
- * isolating its failure exactly as the pre-Effect try/catch did: the error
- * is logged with the identical message and the emit continues with `null`
- * (treated as "no result").
- */
 const invokeHandlerIsolated = <E extends HookEvent>(
   event: E,
   hook: HookDefinition,
@@ -44,10 +38,6 @@ export class HookEmitter {
     }
   }
 
-  /**
-   * True if at least one hook is registered for `event`.
-   * Filter context is intentionally ignored; false positives are cheap.
-   */
   has(event: HookEvent): boolean {
     for (const hook of this.hooks) {
       if (hook.event === event) return true;
@@ -55,14 +45,6 @@ export class HookEmitter {
     return false;
   }
 
-  /**
-   * Emit an event and collect results from matching hooks.
-   * Hooks are called in registration order.
-   *
-   * `agent_end` results are shallow-merged. Other events keep
-   * last-result-wins semantics, except `before_tool` short-circuits on
-   * `cancel: true`. Use {@link emitAll} when every result must be composed.
-   */
   emit<E extends HookEvent>(
     event: E,
     payload: HookEventMap[E]["payload"],
@@ -104,15 +86,6 @@ export class HookEmitter {
             continue;
           }
           if (isMergeableEvent && typeof result === "object") {
-          // Filter `undefined` fields out of the result before
-          // spreading so a later hook returning `{ key: undefined }`
-          // doesn't erase an earlier hook's contribution. Plain
-          // object-spread copies undefined values verbatim, which
-          // contradicts the documented "later hooks override per-field;
-          // undefined is skipped" semantics — the docstring's "omits
-          // the key" path was fine, but the explicit-undefined path
-          // wasn't. Filtering here aligns runtime behavior with the
-          // contract.
             const filtered: Record<string, unknown> = {};
             for (const [key, value] of Object.entries(
               result as Record<string, unknown>,
@@ -141,12 +114,6 @@ export class HookEmitter {
     );
   }
 
-  /**
-   * Emit an event and collect ALL non-empty results in registration order.
-   *
-   * Used when downstream code composes every hook's output itself, such as
-   * `before_agent_start` prompt replacement plus appended prompt fragments.
-   */
   emitAll<E extends HookEvent>(
     event: E,
     payload: HookEventMap[E]["payload"],
@@ -189,12 +156,6 @@ export class HookEmitter {
     this.hooks = [];
   }
 
-  /**
-   * Selectively clear hooks by their `source` tag. Used by F1 (extension
-   * hot-reload) to drop user-extension hooks without touching bundled
-   * lifecycle behavior. Hooks without a `source` are treated as
-   * "extension" by default so legacy registrations are picked up.
-   */
   clearBySource(source: "bundled" | "extension"): void {
     this.hooks = this.hooks.filter((hook) => {
       const hookSource = hook.source ?? "extension";

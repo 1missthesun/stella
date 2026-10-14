@@ -1,10 +1,3 @@
-/**
- * SessionStore: the storage layer's public API. Chat reads and writes go
- * straight to `store.chat` (ChatLog) and `store.messageWindows`; the store
- * also carries the durable cloud outboxes (transcript, journal and
- * computer-agent records).
- */
-
 import {
   asTrimmedString,
   cachedStatements,
@@ -30,7 +23,6 @@ export type CloudTranscriptOutboxRecord = {
   kind: CloudTranscriptOutboxKind;
   conversationId: string;
   deviceId: string;
-  /** Null only for a pre-migration row, which delivery retires fail-closed. */
   ownerGeneration: string | null;
   localTurnId: string;
   payloadJson: string;
@@ -47,7 +39,6 @@ export type CloudJournalOutboxRecord = {
   id: string;
   conversationId: string;
   deviceId: string;
-  /** Null only for a pre-migration row, which delivery retires fail-closed. */
   ownerGeneration: string | null;
   appendId: string;
   payloadJson: string;
@@ -143,9 +134,7 @@ const COMPUTER_AGENT_CLOUD_OUTBOX_COLUMNS = `sequence,
 export class SessionStore {
   readonly db: SqliteDatabase;
   private readonly cached: CachedStatements;
-  /** Conversations and their chat entries; callers read and write it directly. */
   readonly chat: ChatLog;
-  /** Paged message windows over the chat log. */
   readonly messageWindows: MessageWindowReader;
   private readonly transcriptOutbox: OutboxRepo<CloudTranscriptOutboxRecord>;
   private readonly journalOutbox: OutboxRepo<CloudJournalOutboxRecord>;
@@ -184,10 +173,6 @@ export class SessionStore {
     );
   }
 
-  /* ------------------------------------------------------------------ */
-  /* Transactions                                                        */
-  /* ------------------------------------------------------------------ */
-
   withTransaction<T>(work: () => T): T {
     return this.withImmediateTransaction(work);
   }
@@ -213,10 +198,6 @@ export class SessionStore {
       this.inTransaction = false;
     }
   }
-
-  /* ------------------------------------------------------------------ */
-  /* Cloud transcript outbox (dev-only)                                  */
-  /* ------------------------------------------------------------------ */
 
   putCloudTranscriptOutbox(record: CloudTranscriptOutboxWrite): void {
     const now = Date.now();
@@ -293,12 +274,6 @@ export class SessionStore {
     this.transcriptOutbox.deadLetter(id, reason);
   }
 
-  /**
-   * Atomically redacts a rejected finish and persists the device-specific
-   * notice that explains the missing cloud output. A crash can therefore
-   * leave either the retryable finish or the notice, never a silent dead
-   * letter with its notification target already erased.
-   */
   deadLetterCloudTranscriptOutboxWithFailureNotice(args: {
     id: string;
     reason: string;
@@ -368,10 +343,6 @@ export class SessionStore {
     });
   }
 
-  /* ------------------------------------------------------------------ */
-  /* Cloud journal outbox (dev-only)                                     */
-  /* ------------------------------------------------------------------ */
-
   putCloudJournalOutbox(record: {
     id: string;
     conversationId: string;
@@ -424,8 +395,6 @@ export class SessionStore {
           now,
           now,
         );
-      // One cheap indexed cleanup per admission keeps this operational dedupe
-      // table bounded without coupling it to cloud delivery success.
       this.cached
         .prepare(
           `DELETE FROM cloud_journal_admission_receipts
@@ -455,10 +424,6 @@ export class SessionStore {
   deadLetterCloudJournalOutbox(id: string, reason: string): void {
     this.journalOutbox.deadLetter(id, reason);
   }
-
-  /* ------------------------------------------------------------------ */
-  /* Computer agent cloud records (dev-only)                             */
-  /* ------------------------------------------------------------------ */
 
   putComputerAgentCloudOutbox(record: {
     id: string;
@@ -659,9 +624,6 @@ export class SessionStore {
         return null;
       }
       if (existing && existing.ownerGeneration !== ownerGeneration) {
-        // A newly admitted epoch tombstones queued work from the prior epoch
-        // before rebinding the mutable thread id. Persist the tombstone first
-        // so a late retry cannot reverse the transition back to the old epoch.
         this.cached
           .prepare(
             `INSERT OR IGNORE INTO computer_agent_cloud_retired_generations (

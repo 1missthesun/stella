@@ -1,10 +1,3 @@
-/**
- * The sandbox-facing turn broker: the route the executor's own HTTP client
- * talks to, and the turn-state checkpoint it commits through.
- *
- * Extracted verbatim from `BuildSession`; every former `this.` is the `host`
- * argument. See `src/build-session/host.ts` for why the host is structural.
- */
 import { sha256BytesHex } from "../hash.js";
 import { serveAgentMoveRequest } from "./agent-move.js";
 import { serveAgentCodeConnectRequest } from "./agent-connect.js";
@@ -14,7 +7,6 @@ import {
 import { readThreadHistory, ThreadTranscriptError } from "../thread-transcript.js";
 import { answerOwnHistory, withoutThinking, type OwnHistoryRow } from "@stella/contracts/history-search";
 
-/** Every message an agent's `history.*` reads from its thread's transcript. */
 const THREAD_HISTORY_QUERY_ROWS = 100_000;
 import type { ThreadMessageInput } from "../thread-transcript.js";
 import {
@@ -133,9 +125,6 @@ export const resolveAgentTurnState = async (
     {
       threadId: turn.threadId,
       canonicalHistoryCursor,
-      // Builder validates the engine-specific native half below. Keeping the
-      // owner lookup permissive is what lets a pre-registry legacy thread be
-      // migrated without treating absence as a canonical empty checkpoint.
       requireNative: false,
     },
   );
@@ -223,7 +212,6 @@ export const publishAgentTurnWorkspace = async (
   const head = published?.workspaceHead;
   if (
     !published ||
-    // The orchestrator's native-only operation publishes no head.
     (turn.agentRole === "orchestrator"
       ? head !== undefined
       : !head ||
@@ -275,10 +263,6 @@ export const confirmAgentTurnStateRestore = async (
       throw new Error("Turn state restore confirmation was invalid.");
     }
   }
-  // Deletion begins only after both archives were restored and verified and
-  // the exact candidate was atomically promoted. A lost drain response is
-  // safe: retirement rows remain authoritative until DELETE+HEAD succeeds.
-  // So it runs beside the turn instead of ahead of it.
   host.ctx.waitUntil(
     host
       .callOwnerTurnState(turn, "drain", { limit: 32 })
@@ -312,8 +296,6 @@ export const abortUnpublishedTurnStateOperation = async (
   canonicalHistoryCursor: string,
 ): Promise<void> => {
   if (!operation.payload) {
-    // The broker claim was persisted before its body parsed, so no owner
-    // prepare or R2 write could have occurred. Retire only the local claim.
     await host.ctx.storage.delete(
       turnStateCheckpointOperationKey(operation.requestId),
     );
@@ -321,7 +303,6 @@ export const abortUnpublishedTurnStateOperation = async (
   }
   let operationId = operation.operationId;
   if (operation.state === "failed" && !operationId) {
-    // A pre-prepare validation denial has no owner registry/object state.
     await host.ctx.storage.delete(
       turnStateCheckpointOperationKey(operation.requestId),
     );
@@ -429,12 +410,6 @@ export const executeTurnStateCheckpoint = async (
   const { turn, operationKey, operation } = args;
   await host.assertTurnWritable(turn);
   host.assertAgentTurnIdentity(turn);
-  // The orchestrator's CLI thread never has the world on disk, so its
-  // checkpoint is native state only: it never seals the shared world, names
-  // no manifest, and its publication never creates or moves the owner's
-  // workspace head. A head is what tells the next agent turn its workspace
-  // is a restored checkpoint, so one seeded here would send that agent's
-  // Drive hydration into a world that never held a drive ledger.
   const nativeOnly = turn.agentRole === "orchestrator";
   const manifestId = nativeOnly
     ? undefined
@@ -509,9 +484,6 @@ export const executeTurnStateCheckpoint = async (
   const archiveSessionId = sessionName(
     `turn-state-${turn.turnId}-${operation.requestId}`,
   );
-  // An isolate may disappear after the archive command completed but before
-  // its response was observed. Replace only this deterministic helper
-  // session; global process cleanup would kill the awaiting agent executor.
   const session = await replaceTurnStateArchiveSession({
     sandbox,
     sessionId: archiveSessionId,
@@ -619,16 +591,6 @@ export const executeTurnStateCheckpoint = async (
 const driveJson = (body: unknown, status = 200): Response =>
   Response.json(body, { status, headers: { "cache-control": "no-store" } });
 
-/**
- * A turn's drive request, served by the owner's object under the turn's own
- * identity and owner generation. The sandbox sends the paths and bodies the
- * old control-plane routes took, and gets their answers: 200 with the result,
- * 413 when a write landed nothing (with the per-file reasons), and the owner
- * object's error status otherwise.
- *
- * Only an agent turn hydrates the drive into its workspace, which is what
- * lets a write report that it replaced a file it never opened.
- */
 export const serveTurnDriveRequest = async (
   env: Pick<Cloudflare.Env, "OWNER_GATES">,
   turn: Pick<TurnRequest, "ownerId" | "ownerGeneration" | "turnId" | "kind">,
@@ -690,10 +652,6 @@ export const serveTurnDriveRequest = async (
   return driveJson({ ok: true, ...(response.value as Record<string, unknown>) });
 };
 
-/**
- * A turn's web search, run and charged by the owner's object. The sandbox
- * sends `{query, category?}` and gets `{text, results}` back.
- */
 export const serveTurnSearchRequest = async (
   env: Pick<Cloudflare.Env, "OWNER_GATES">,
   turn: Pick<TurnRequest, "ownerId" | "ownerGeneration">,
@@ -783,34 +741,15 @@ export const serveTurnUserAskRequest = async (
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-/** Last event batch the conversation acknowledged, per exact attempt. */
 const orchestratorEventBatchSeqKey = (turn: TurnRequest): string =>
   `orchestratorEventBatchSeq:${turn.turnId}:${turn.attemptGeneration}`;
 
-/**
- * A conversation that could not take the frame right now. Not a broker
- * denial: the executor keeps its credential and may send again.
- */
 const orchestratorUnavailable = (): Response =>
   Response.json(
     { error: "The conversation is unavailable. Try again." },
     { status: 503, headers: { "cache-control": "no-store" } },
   );
 
-/**
- * The orchestrator CLI turn's two broker targets: a tool call the CLI made
- * through the executor's MCP host, and a batch of its stream events. Both
- * go to the conversation's OrchestratorSession, which owns the tools and the
- * journal. The identity on the forwarded frame is this session's own: the
- * stored turn whose exact attempt the claim's live fence just proved is
- * running. Nothing the executor sent names the turn.
- *
- * A conversation that answers 4xx no longer runs this attempt (or refused
- * the frame outright), so the broker is denied and the executor stops; a
- * 5xx, a rate limit or an unreachable object is answered 503 without the
- * denial, so the executor can retry (the DO de-duplicates tool calls by
- * `toolCallId` and batches by `batchSeq`).
- */
 const forwardOrchestratorBrokerRequest = async (
   host: TurnBrokerHost,
   turn: TurnRequest,
@@ -853,8 +792,6 @@ const forwardOrchestratorBrokerRequest = async (
     ) {
       return brokerFailure(400);
     }
-    // Batches are applied strictly in order. A replay of an acknowledged one
-    // still goes through (the conversation acks it again); a gap never does.
     const acknowledged =
       (await host.ctx.storage.get<number>(orchestratorEventBatchSeqKey(turn))) ??
       0;
@@ -904,7 +841,6 @@ const forwardOrchestratorBrokerRequest = async (
     return brokerFailure(410);
   }
   if (target.kind === "orchestrator-tool") {
-    // `CloudOrchestratorToolCallResponse`: both arms are HTTP 200.
     if (!isRecord(decoded) || typeof decoded.ok !== "boolean") {
       return orchestratorUnavailable();
     }
@@ -925,24 +861,6 @@ const forwardOrchestratorBrokerRequest = async (
   });
 };
 
-/**
- * The broker targets the BuildSession answers itself.
- *
- * `/api/cloud/events` and `/api/cloud/messages` are still the paths the
- * sandbox knows — that contract is stable and versioned with the executor —
- * but their destination moved here: the event stream gets an ordinal this
- * object assigns and the owner reads what it indexes, and the transcript is
- * committed to this thread's own table. Both are idempotent, which is what
- * lets the executor's unchanged single retry stay safe. The drive paths and
- * web search go to the owner's object (see `serveTurnDriveRequest` and
- * `serveTurnSearchRequest`); the claim's live fence already proved this
- * exact attempt is running.
- */
-/**
- * An agent's `history.*` from its sandbox: this object holds exactly one
- * thread, so its transcript is the agent's own history and nothing else's.
- * A refused query answers 200 with its reason, which the agent reads.
- */
 const serveThreadHistoryRequest = (sql: SqlStorage, body: Record<string, unknown>): Response => {
   const headers = { "cache-control": "no-store" };
   const args = body.args && typeof body.args === "object" && !Array.isArray(body.args) ? (body.args as Record<string, unknown>) : {};
@@ -985,8 +903,6 @@ const handleBrokerLocalRequest = async (
   }
   const body = decoded as Record<string, unknown>;
   try {
-    // The claim's live fence already bound this request to the turn; a
-    // search body names only its query.
     if (target.kind === "search") {
       return await serveTurnSearchRequest(host.env, turn, body);
     }
@@ -1037,8 +953,6 @@ const handleBrokerLocalRequest = async (
       ) {
         return brokerFailure(400);
       }
-      // A sandbox never decides a turn is over: terminal state is the
-      // Durable Object's one decision, taken in `deliverTerminal`.
       if (body.terminal === true) return brokerFailure(403);
       await host.emitTurnEvent(turn, body.kind, body.payload, {
         ...(seq === "auto" ? {} : { eventSeq: seq as number }),
@@ -1124,7 +1038,6 @@ export const handleTurnBroker = async (
   ) {
     return brokerFailure(403);
   }
-  // The conversation's tools and journal answer only its own CLI turn.
   if (
     (preflight.target.kind === "orchestrator-tool" ||
       preflight.target.kind === "orchestrator-events") &&
@@ -1224,11 +1137,6 @@ export const handleTurnBroker = async (
       claimed.target.kind === "orchestrator-tool" ||
       claimed.target.kind === "orchestrator-events"
     ) {
-      // The turn's events and its thread transcript are this object's own
-      // state now, and the drive and web search are the owner object's. The
-      // sandbox still asks for them by their old control-plane paths — that is the
-      // executor's stable contract — but the request stops here instead of
-      // crossing to the control plane.
       await host.ctx.storage.put(recordKey, claimed.record);
       return {
         kind: "local" as const,

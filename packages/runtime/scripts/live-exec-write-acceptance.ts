@@ -90,8 +90,6 @@ try {
   ] as const;
   const blockedSafetyReasons: Record<string, string> = {};
   for (const safetyCase of catastrophicSafetyCases) {
-    // Parser-only by construction: catastrophic strings are never handed to
-    // handleExecCommand or a subprocess by this acceptance harness.
     const reason = isDangerousCommand(safetyCase.command, root);
     assert.ok(reason, `safety gate allowed ${safetyCase.kind}`);
     blockedSafetyReasons[safetyCase.kind] = reason;

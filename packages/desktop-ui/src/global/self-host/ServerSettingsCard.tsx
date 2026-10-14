@@ -13,7 +13,6 @@ const hostOf = (origin: string | null) => {
   }
 };
 
-/** Settings → Account: which Stella server this computer uses. */
 export function ServerSettingsCard() {
   const t = useT();
   const state = useDesktopServerState();

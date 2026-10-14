@@ -1,19 +1,3 @@
-/**
- * A headless Stella chat on the new harness: the desktop's harness, over
- * one SQLite file, talking to the model gateway as the desktop does.
- *
- *   bun packages/agent/src/headless.ts --data-dir <dir> --test-account <email> --prompt "Hi"
- *   bun packages/agent/src/headless.ts --data-dir <dir> --test-account <email> --resume
- *   bun packages/agent/src/headless.ts --data-dir <dir> --test-account <email> --start-agent <description> --prompt "..."
- *
- * `--start-agent` starts an agent the way the app does for work nobody typed
- * (an app-source merge, memory sync): the prompt is the agent's brief, and
- * its report reaches the orchestrator like a spawned agent's.
- *
- * `--resume` reopens the conversation and waits for whatever an earlier
- * process left unanswered, which is how a killed run is picked up. Output
- * is JSON lines on stdout.
- */
 import { generateKeyPairSync, createPrivateKey, sign } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -59,7 +43,6 @@ if (!dataDir) throw new Error("--data-dir is required (use an isolated directory
 if (!values.prompt && !values.resume) throw new Error("Pass --prompt <text> or --resume.");
 const backendUrl = (values.backend ?? process.env.STELLA_BACKEND_URL ?? DEV_BACKEND).replace(/\/+$/, "");
 
-/** A Better Auth JWT: given, or minted for a dev test account. */
 async function authToken(): Promise<string> {
   const given = values["auth-token"] ?? process.env.STELLA_AUTH_TOKEN;
   if (given) return given;
@@ -74,8 +57,6 @@ async function authToken(): Promise<string> {
   });
   if (!response.ok) throw new Error(`Test account: ${response.status} ${await response.text()}`);
   const { token } = (await response.json()) as { token: string };
-  // An owner reads as anonymous until a signed-in call names it; the gateway
-  // refuses anonymous owners from hosting networks.
   await fetch(`${backendUrl}/api/rpc/owner.identity`, {
     method: "POST",
     headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
@@ -84,7 +65,6 @@ async function authToken(): Promise<string> {
   return token;
 }
 
-/** This data directory's device key; the real app keeps it in protected storage. */
 async function deviceSigner() {
   const file = path.join(dataDir!, "headless-device.json");
   let pkcs8: string;
@@ -161,8 +141,6 @@ async function main() {
     }
   });
 
-  // Recovered work starts here: a run the last process left mid-request
-  // resends the same committed request.
   harness.resume();
 
   const waiting: SubmissionRecord[] = [];
@@ -197,8 +175,6 @@ async function main() {
         : { kind: "unanswered", submissionId: record.id, requestId: record.requestId, reason: settled.status === "unanswered" ? settled.reason : undefined },
     );
   }
-  // Agents work in the background and report back as new orchestrator runs;
-  // wait until nothing at all is left running.
   for (;;) {
     await root.waitForIdle(context);
     const live = (await harness.inspect(context)).tasks;

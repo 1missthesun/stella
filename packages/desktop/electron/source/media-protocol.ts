@@ -48,11 +48,6 @@ const requestedMediaPath = (url: string): string | null => {
 
 let deviceFiles: DeviceFileSourceDeps | null = null;
 
-/**
- * Lets `stella-media:` play a file another of the user's devices produced:
- * when it is not on this computer, the copy that device put in the user's
- * Drive is streamed instead.
- */
 export const setDeviceMediaSource = (deps: DeviceFileSourceDeps | null) => {
   deviceFiles = deps;
 };
@@ -60,10 +55,6 @@ export const setDeviceMediaSource = (deps: DeviceFileSourceDeps | null) => {
 let peerFiles: PeerDeviceFiles | null = null;
 let activeConversation: () => string | null = () => null;
 
-/**
- * Lets `stella-media:` stream a file another of the user's computers has,
- * live from that computer while it is online.
- */
 export const setPeerMediaSource = (
   peers: PeerDeviceFiles | null,
   getConversationId: () => string | null,
@@ -100,7 +91,6 @@ const findPeerHolder = async (
   return found;
 };
 
-/** Where a `stella-media:` stream for this path comes from, without reading it. */
 export const describeMediaSource = async (
   requested: string,
 ): Promise<DeviceFileSource> => {
@@ -127,11 +117,6 @@ const parseRange = (
   return start <= end ? { start, end } : null;
 };
 
-/**
- * Serve a `stella-media:` request from the computer that has the file. A
- * player asks in byte ranges; each answer is at most one relayed read, so a
- * long video starts playing without being fetched whole.
- */
 const streamFromPeer = async (
   peers: PeerDeviceFiles,
   holder: PeerHolder,

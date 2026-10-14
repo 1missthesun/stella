@@ -69,18 +69,12 @@ const preferenceClient = createCloudMemoryPreferenceClient({
   write: (args) => backendClient.call("memory.setEnabled", args),
 });
 
-/** A view value echoing another owner is the previous account's, not ours. */
 const belongsToAnotherOwner = (value: unknown, subject: string): boolean =>
   typeof value === "object" &&
   value !== null &&
   typeof (value as { subject?: unknown }).subject === "string" &&
   (value as { subject: string }).subject !== subject;
 
-/**
- * One cloud-authoritative desktop Memory controller. The owner's live
- * `memory.preference` view is the canonical preference; the Electron-local bit
- * is only a privacy-conservative runtime mirror and never seeds this state.
- */
 export function useCloudMemoryPreference(): CloudMemoryPreferenceView {
   const mode = useCloudConversationSession();
   const identity = useMemo<AuthorityIdentity | null>(
@@ -183,9 +177,6 @@ export function useCloudMemoryPreference(): CloudMemoryPreferenceView {
         kind: "reload_then_write",
         memoryEnabled: attempt.memoryEnabled,
       };
-      // A same-generation actor advanced after this attempt. Even if the stale
-      // result tried to enable Memory, return the runtime to privacy-conservative
-      // false until the newer head is reconciled.
       void mirrorCloudMemoryPreferenceLocally(false).catch(() => false);
       setView({
         status: "error",
@@ -328,12 +319,6 @@ export function useCloudMemoryPreference(): CloudMemoryPreferenceView {
     runWriteRef.current = runWrite;
   }, [runWrite]);
 
-  /**
-   * Reconcile from the live view. A head the view already delivered is used
-   * directly (followed by a write toward `thenWrite` when it differs); a
-   * failed view is retried by reconnecting the live channel, and the value it
-   * delivers next is published by the subscription effect.
-   */
   const reconcile = useCallback(
     async (thenWrite?: boolean): Promise<boolean> => {
       const liveIdentity = currentIdentityRef.current;
@@ -437,7 +422,6 @@ export function useCloudMemoryPreference(): CloudMemoryPreferenceView {
         return;
       }
       if (!activeAttempt) {
-        // The subscription is the live authority.
         activeRequestIdRef.current = null;
         retryPlanRef.current = null;
         publishPreference(preference);

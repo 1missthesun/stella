@@ -56,7 +56,6 @@ import {
 } from "../device-files/linked-file-publisher.js";
 import { raceWithTimeoutError } from "./cloud-effect-runtime.js";
 
-/** Outlasts the cloud's wait for a device to acknowledge a delivery. */
 const AGENT_MESSAGE_TIMEOUT_MS = 15_000;
 const AGENT_SPAWN_TIMEOUT_MS = 30_000;
 
@@ -110,7 +109,6 @@ export const createRunnerContext = ({
       context.state?.backendUrl &&
         (context.state?.authToken ?? envAuthToken ?? "").trim(),
     );
-  /** The conversation Durable Objects live on the backend worker. */
   const cloudRealtimeBaseUrl = async (): Promise<string | null> =>
     context.state?.backendUrl ?? null;
 
@@ -140,7 +138,6 @@ export const createRunnerContext = ({
       (context.state?.authToken ?? envAuthToken ?? "").trim() || null,
     getBaseUrl: cloudRealtimeBaseUrl,
     getOwnerGeneration: getCloudOwnerGeneration,
-    // A pi-durable transcript's mirror re-adopts the turn it had open.
     isResumableTurn: (localTurnId: string) => localTurnId.startsWith("pi:"),
     ...(appendLocalChatEvent
       ? {
@@ -424,11 +421,6 @@ export const createRunnerContext = ({
       });
     },
     paths: {
-      // The stella-runtime extension (agent definitions, orchestrator hooks)
-      // ships in the app bundle and is loaded from there. The data dir has no
-      // extensions tier and nothing seeds one — pointing the loader at
-      // `<data>/extensions` silently drops every bundled agent, leaving the
-      // orchestrator with the fallback prompt and no tools.
       extensionsPath: resolveRuntimeSourceAsset("extensions"),
     },
     state: {
@@ -448,9 +440,6 @@ export const createRunnerContext = ({
     toolHost,
   });
 
-  // Needs both halves: the tool host owns the shell sessions, the agent
-  // manager owns the threads a wake resumes. Both are reachable now, so the
-  // wake is wired here rather than deferred to initialization.
   context.state.backgroundExitWake = createBackgroundExitWake({
     watchShellExit: toolHost.watchShellExit,
     readShellExitSnapshot: toolHost.readShellExitSnapshot,
@@ -568,9 +557,6 @@ export const resolveEffectiveAgentExecutionConfig = (
     subscriptionHarnessEnabled?: boolean;
   },
 ) => {
-  // A per-spawn engine selection wins over the preference-configured engine
-  // for this run only; saved preferences are never touched. Persisted
-  // snapshots restore the exact spawn-time selection on resume.
   const restoredSpawnEngine =
     args.spawnEngine ??
     restoreSpawnEngineFromModelConfig(args.modelConfigSnapshot);
@@ -579,8 +565,6 @@ export const resolveEffectiveAgentExecutionConfig = (
   const agentEngine =
     args.modelConfigSnapshot?.engine ??
     resolveAgentEngineForRun(configuredAgentEngine, restoredSpawnEngine);
-  // Codex snapshots from older builds may say native/false. Codex now always
-  // uses the in-process subscription transport, including restored runs.
   const subscriptionHarnessEnabled =
     agentEngine === "codex_cli" ||
     (args.modelConfigSnapshot

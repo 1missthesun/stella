@@ -1,19 +1,3 @@
-/**
- * `POST /owners/me/devices/:deviceId/requests`: a paired phone asks one of
- * the owner's computers for something (a file, an office preview, its voice
- * tools), relayed by the owner gate over that computer's presence socket.
- *
- * The user JWT proves the account; the pairing proof proves this phone was
- * paired with this computer and binds the proof to this exact request. The
- * computer then applies its own file-access policy.
- *
- * File reads (`DEVICE_FILE_REQUEST_METHODS`) reach further, because a linked
- * file lives on whichever of the owner's computers made it: a phone paired
- * with any of the owner's computers may ask any of them, its proof committing
- * to the computer asked, and one of the owner's computers may ask another,
- * signing with its registered device key.
- */
-
 import {
   DEVICE_REQUEST_DEVICE_HEADERS,
   DEVICE_REQUEST_DEVICE_PROOF_MAX_SKEW_MS,
@@ -161,8 +145,6 @@ export const handleDeviceRequestRoute = async (
     }
     asker = deviceRequesterLabel(requesterDeviceId);
   } else {
-    // A phone asks the computer it was paired with for anything, and any
-    // of the owner's other computers for a file.
     const mobileDeviceId =
       request.headers.get(MOBILE_PAIRING_HEADERS.mobileDeviceId)?.trim() ?? "";
     const pairedDesktopId =

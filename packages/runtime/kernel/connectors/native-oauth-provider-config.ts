@@ -47,10 +47,6 @@ const DEFAULT_CALLBACK_URL =
   process.env.STELLA_NATIVE_OAUTH_CALLBACK_URL?.trim() ||
   "http://127.0.0.1:48743/callback";
 
-/**
- * The website that hosts `/oauth/<provider>/callback` for providers that
- * only accept https redirect URIs (STELLA_WEB_URL, as in Electron main).
- */
 const HOSTED_OAUTH_ORIGIN = (() => {
   try {
     return new URL(process.env.STELLA_WEB_URL?.trim() || "https://stella.sh").origin;
@@ -869,13 +865,6 @@ export const hasNativeOAuthProviderTemplate = (id: string) => {
   );
 };
 
-/**
- * Affirmative, reviewed policy for generic OAuth-catalog dispatchers. Empty by
- * design today: the shipped local integrations are the separately enumerated
- * Google Workspace entries in native-integrations.ts. Adding a template or
- * OAuth config must never activate execution without a deliberate allowlist
- * change here.
- */
 const PRODUCTION_READY_LOCAL_OAUTH_PROVIDER_IDS = new Set<string>([]);
 
 export const isNativeOAuthLocalExecutionProductionReady = (id: string) =>
@@ -3363,10 +3352,6 @@ const BUILTIN_NATIVE_OAUTH: Record<string, NativeOAuthProviderConfig> = {
   },
 };
 
-/**
- * A desktop on a self-hosted server never sends a sign-in through stella.sh:
- * providers whose browser return link is Stella's website are off there.
- */
 export const isNativeOAuthBlockedOnSelfHostedServer = (
   config: NativeOAuthProviderConfig,
 ): boolean =>

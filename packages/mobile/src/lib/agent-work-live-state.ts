@@ -38,7 +38,6 @@ export const applyLiveAgentWorkState = (
   for (const task of tasks) statusById.set(task.id, task.status);
   if (statusById.size === 0) return messages;
 
-  // Latest card covering each agent id, in transcript order (later wins).
   const ownerByAgentId = new Map<string, ChatArtifact>();
   for (const message of messages) {
     for (const artifact of message.artifacts ?? []) {
@@ -99,8 +98,6 @@ const reconcileArtifact = (
   if (payload.state === "running" && payload.completed === completed) {
     return artifact;
   }
-  // Subtitle copy mirrors the desktop-side derivation in
-  // `local-chat-artifacts.ts` (`deriveAgentWorkPayload`).
   const subtitle =
     payload.total > 1
       ? `${completed} of ${payload.total} done`

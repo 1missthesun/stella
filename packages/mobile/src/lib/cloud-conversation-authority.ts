@@ -29,14 +29,12 @@ export class CloudAuthorityError extends Error {
   }
 }
 
-/** Everything the chat needs, in one read (`conversations.bootstrap`). */
 export type CloudChatBootstrap =
   | { status: "identity_pending" }
   | {
       status: "ready";
       ownerId: string;
       ownerGeneration: string;
-      /** The account's main conversation, the same one every client opens. */
       conversationId: string;
       realtime: CloudRealtimeConfig;
     };
@@ -45,13 +43,6 @@ export type CloudAuthorityPorts = {
   getBootstrap: () => Promise<CloudChatBootstrap>;
 };
 
-/**
- * Framework-free authority handshake used by the hook and focused tests.
- *
- * One read resolves everything. The server pins the account's main
- * conversation (creating it for a new account), so a clean install and every
- * other client open the same chat.
- */
 export const loadCloudConversationAuthority = async (
   identity: CloudConversationIdentity,
   expectedOwnerId: string,

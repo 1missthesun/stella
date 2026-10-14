@@ -1,9 +1,6 @@
 import { execFile } from 'child_process';
 import { resolveNativeHelperPath } from './native-helper-path.js';
 import { getFileLogger } from '@stella/runtime/observability/file-logger';
-// Some helpers (e.g. window_info) run on cursor-move loops. We only log on
-// failure, but a consistently-failing helper could still flap fast — throttle
-// to one log per helper per window so a broken helper can't spam the file.
 const FAILURE_LOG_THROTTLE_MS = 30_000;
 const SLOW_HELPER_LOG_THRESHOLD_MS = 500;
 const lastFailureLogAt = new Map();
@@ -92,15 +89,12 @@ export const runNativeHelperDetailed = async (helperName, args, options) => {
     }
     const circuit = getCircuit(helperName);
     if (circuit.openUntil > Date.now()) {
-        // Circuit open — skip the spawn entirely until the cooldown elapses.
         return circuitOpenResult(circuit);
     }
     const useGovernor = process.platform === 'win32';
     if (useGovernor) {
         await acquireWin32SpawnSlot();
     }
-    // The circuit may have opened while we waited for a spawn slot; re-check so a
-    // freshly-broken helper doesn't get spawned anyway after queueing.
     if (circuit.openUntil > Date.now()) {
         if (useGovernor)
             releaseWin32SpawnSlot();

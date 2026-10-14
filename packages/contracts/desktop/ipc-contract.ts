@@ -1,22 +1,3 @@
-/**
- * Typed Electron IPC contract.
- *
- * Every channel in `ipc-channels.ts` that the preload bridge uses is listed
- * here with its payload types, in one of three maps:
- *
- * - `IpcInvokeContract`: renderer → main request/response (`ipcRenderer.invoke`
- *   / `ipcMain.handle`). `req` is the argument tuple after the event, `res`
- *   what the handler resolves with.
- * - `IpcSendContract`: renderer → main fire-and-forget (`ipcRenderer.send` /
- *   `ipcMain.on`), as the argument tuple after the event.
- * - `IpcEventContract`: main → renderer pushes (`webContents.send` /
- *   `ipcRenderer.on`), as the single payload (`void` when there is none).
- *
- * Main registers handlers through the typed helpers in
- * `desktop/electron/ipc/typed-ipc.ts`; the preload bridge
- * (`desktop/electron-api.ts`) calls through `TypedIpcRenderer`. A payload
- * mismatch on either side is a compile error.
- */
 import type {
   AllUserSignalsResult,
   BrowserProfile,
@@ -418,14 +399,8 @@ import {
   IPC_WINDOW_SHOW,
 } from "./ipc-channels.js";
 
-// ---------------------------------------------------------------------------
-// Payload types shared by several channels
-// ---------------------------------------------------------------------------
-
-/** This device's telemetry switch, as stored next to its other preferences. */
 export type DesktopTelemetryState = {
   enabled: boolean;
-  /** Turned off here; the account still has to be written to false. */
   accountOffPending: boolean;
 };
 
@@ -470,7 +445,6 @@ export type DisplayPathStat = {
   sizeBytes: number;
   mimeType: string;
   modifiedAt: number;
-  /** Set when the path is on another of the user's computers. */
   deviceId?: string;
   deviceName?: string;
 };
@@ -558,7 +532,6 @@ export type RealtimeVoiceSession =
 export type DictationToggle = {
   startId?: string;
   action?: "toggle" | "start" | "stop" | "cancel";
-  /** Set when the global shortcut was routed to the companion window. */
   source?: "companion";
 };
 
@@ -566,7 +539,6 @@ export type RuntimeAvailabilitySnapshot = {
   connected: boolean;
   ready: boolean;
   reason?: string;
-  /** Runtime update detected but deferred until current work finishes. */
   pendingRuntimeRestart?: boolean;
 };
 
@@ -710,7 +682,6 @@ export type NativeIntegration = {
   catalogToolCount: number;
   availability: "ready";
   provider: "google-workspace" | "oauth-catalog" | "backend-composio";
-  /** Bundled execution is opt-in. Recovered OAuth entries are metadata only. */
   localExecution?: "production-ready" | "incomplete";
   toolPrefix?: string;
   sourceUrl?: string;
@@ -735,14 +706,9 @@ export type NativeIntegration = {
   actionCount?: number;
 };
 
-// ---------------------------------------------------------------------------
-// Contract
-// ---------------------------------------------------------------------------
-
 type Invoke<Req extends unknown[], Res> = { req: Req; res: Res };
 
 export type IpcInvokeContract = {
-  // Cloud home / memory sync / derived cloud cache
   [IPC_CLOUD_HOME_SCAN_LOCAL]: Invoke<
     [accountScope: string],
     LocalCloudHomeScan
@@ -779,7 +745,6 @@ export type IpcInvokeContract = {
     CloudConversationCachePurgeResult
   >;
 
-  // Window / UI
   [IPC_WINDOW_IS_MAXIMIZED]: Invoke<[], boolean>;
   [IPC_UI_GET_STATE]: Invoke<[], UiState>;
   [IPC_UI_SET_STATE]: Invoke<[partial: Partial<UiState>], UiState>;
@@ -795,7 +760,6 @@ export type IpcInvokeContract = {
   [IPC_SELF_HOST_PAIRING_STATUS]: Invoke<[pairingId: string], SelfHostPairingStatusResult>;
   [IPC_SELF_HOST_CANCEL_PAIRING]: Invoke<[pairingId: string], OkResult>;
 
-  // Display
   [IPC_DISPLAY_READ_FILE]: Invoke<
     [
       payload: {
@@ -856,7 +820,6 @@ export type IpcInvokeContract = {
     EvidenceCard[]
   >;
 
-  // Remote execution / app source
   [IPC_EXECUTION_ANSWER_REMOTE_REQUEST]: Invoke<
     [payload: { allow: boolean }],
     { allow: boolean }
@@ -872,7 +835,6 @@ export type IpcInvokeContract = {
   [IPC_APP_SOURCE_APPLY_UPSTREAM]: Invoke<[], AppSourceActionResult>;
   [IPC_APP_SOURCE_SKIP]: Invoke<[key: string], AppSourceActionResult>;
 
-  // Capture
   [IPC_CHAT_CONTEXT_GET]: Invoke<[], ChatContext | null>;
   [IPC_SCREENSHOT_CAPTURE]: Invoke<
     [point?: IpcPoint],
@@ -891,11 +853,9 @@ export type IpcInvokeContract = {
     { ok: true } | { cancelled: true }
   >;
 
-  // Voice
   [IPC_VOICE_ORCHESTRATOR_CHAT]: Invoke<
     [
       payload: {
-        /** Correlates the run's forwarded activity back to this request. */
         requestId: string;
         conversationId: string;
         message: string;
@@ -923,7 +883,6 @@ export type IpcInvokeContract = {
   [IPC_VOICE_RTC_GET_SHORTCUT]: Invoke<[], string>;
   [IPC_VOICE_GET_SESSION_ERROR_STATE]: Invoke<[], string>;
 
-  // Dictation
   [IPC_DICTATION_GET_SHORTCUT]: Invoke<[], string>;
   [IPC_DICTATION_SET_SHORTCUT]: Invoke<
     [shortcut: string],
@@ -940,7 +899,6 @@ export type IpcInvokeContract = {
     { text: string }
   >;
 
-  // Companion
   [IPC_COMPANION_GET_STATE]: Invoke<[], CompanionState | null>;
   [IPC_COMPANION_GET_VISIBLE]: Invoke<[], CompanionVisibility>;
   [IPC_COMPANION_SET_VISIBLE]: Invoke<[visible: boolean], CompanionVisibility>;
@@ -957,7 +915,6 @@ export type IpcInvokeContract = {
     { delivered: boolean }
   >;
 
-  // System / auth
   [IPC_DEVICE_GET_ID]: Invoke<[], string | null>;
   [IPC_HOST_CONFIGURE_RUNTIME]: Invoke<
     [config: { backendUrl: string }],
@@ -1008,7 +965,6 @@ export type IpcInvokeContract = {
   >;
   [IPC_SHELL_OPEN_PATH]: Invoke<[payload: { filePath: string }], OkErrorResult>;
 
-  // Preferences
   [IPC_PREFERENCES_GET_PREVENT_SLEEP]: Invoke<[], boolean>;
   [IPC_PREFERENCES_SET_PREVENT_SLEEP]: Invoke<
     [enabled: boolean],
@@ -1125,7 +1081,6 @@ export type IpcInvokeContract = {
     RuntimeModelCatalogSnapshot
   >;
 
-  // LLM credentials / engine accounts
   [IPC_LLM_CREDENTIALS_LIST]: Invoke<[], LocalLlmCredentialSummary[]>;
   [IPC_LLM_CREDENTIALS_LIST_OAUTH_PROVIDERS]: Invoke<
     [],
@@ -1181,7 +1136,6 @@ export type IpcInvokeContract = {
     [
       payload: {
         accountId?: string;
-        /** Reuse a registration another host of the owner made. */
         clientId?: string;
         enablePlanUsage?: boolean;
       },
@@ -1197,7 +1151,6 @@ export type IpcInvokeContract = {
     [
       payload: {
         profileId?: string;
-        /** Sign in with an issued client id another host of the owner shared. */
         sharedClientId?: string;
         enablePlanUsage?: boolean;
       },
@@ -1218,7 +1171,6 @@ export type IpcInvokeContract = {
     { revoked: boolean }
   >;
 
-  // User asks / connector prompts
   [IPC_USER_ASK_LIST]: Invoke<[], readonly UserAsk[]>;
   [IPC_USER_ASK_ANSWER]: Invoke<
     [answer: UserAskAnswer],
@@ -1250,7 +1202,6 @@ export type IpcInvokeContract = {
     OkErrorResult
   >;
 
-  // Onboarding / discovery
   [IPC_ONBOARDING_SYNTHESIZE]: Invoke<
     [payload: OnboardingSynthesisRequest],
     OnboardingSynthesisResponse
@@ -1327,7 +1278,6 @@ export type IpcInvokeContract = {
   >;
   [IPC_BROWSER_VIEW_REQUEST_EXTENSION_CONNECT]: Invoke<[], BrowserViewState>;
 
-  // Home
   [IPC_HOME_LIST_RECENT_APPS]: Invoke<
     [payload: { limit?: number }],
     ListRecentAppsResult
@@ -1341,7 +1291,6 @@ export type IpcInvokeContract = {
     AppWindowCapture
   >;
 
-  // Media
   [IPC_MEDIA_SAVE_OUTPUT]: Invoke<
     [payload: { url: string; fileName: string }],
     FileResult
@@ -1363,7 +1312,6 @@ export type IpcInvokeContract = {
     { ok: boolean; mode?: "image" | "path"; error?: string }
   >;
 
-  // Meetings
   [IPC_MEETINGS_STATUS]: Invoke<[], MeetingStatus>;
   [IPC_MEETINGS_START]: Invoke<
     [payload: { sessionId?: string; segmentSeconds?: number }],
@@ -1377,7 +1325,6 @@ export type IpcInvokeContract = {
     OkResult
   >;
 
-  // Schedule
   [IPC_SCHEDULE_LIST_CRON_JOBS]: Invoke<[], LocalCronJobRecord[]>;
   [IPC_SCHEDULE_LIST_HEARTBEATS]: Invoke<[], LocalHeartbeatConfigRecord[]>;
   [IPC_SCHEDULE_LIST_CONVERSATION_EVENTS]: Invoke<
@@ -1399,7 +1346,6 @@ export type IpcInvokeContract = {
     unknown
   >;
 
-  // Local chat
   [IPC_LOCAL_CHAT_GET_OR_CREATE_ID]: Invoke<[], string>;
   [IPC_LOCAL_CHAT_SET_ACTIVE_ID]: Invoke<
     [payload: { conversationId: string }],
@@ -1478,7 +1424,6 @@ export type IpcInvokeContract = {
     { files: EventRecord[] }
   >;
 
-  // Native integrations
   [IPC_NATIVE_INTEGRATIONS_LIST]: Invoke<[], NativeIntegration[]>;
   [IPC_NATIVE_INTEGRATIONS_ENABLE]: Invoke<
     [payload: { id: string }],
@@ -1489,16 +1434,13 @@ export type IpcInvokeContract = {
     NativeIntegration
   >;
 
-  // The desktop chat on pi-durable (`../pi-chat.js`)
   [IPC_PI_CHAT_REQUEST]: Invoke<[request: PiChatRequest], unknown>;
 };
 
 export type IpcSendContract = {
   [IPC_UI_STATE_KV_SNAPSHOT]: [];
-  /** Synchronous: whether the desktop chat runs on pi-durable. */
   [IPC_UI_STATE_KV_APPLY]: [changes: Record<string, string | null>];
   [IPC_UI_STATE_KV_CLEAR]: [];
-  /** The computer the chat's destination picker names, or null. */
   [IPC_DISPLAY_SET_SELECTED_DEVICE]: [deviceId: string | null];
   [IPC_WINDOW_MINIMIZE]: [];
   [IPC_WINDOW_MAXIMIZE]: [];
@@ -1624,11 +1566,6 @@ export type IpcSendArgs<C extends IpcSendChannel> = IpcSendContract[C];
 export type IpcEventChannel = keyof IpcEventContract;
 export type IpcEventPayload<C extends IpcEventChannel> = IpcEventContract[C];
 
-/**
- * The renderer side of the contract, implemented by the preload over
- * `ipcRenderer`. `on` hands the listener Electron's event object as an
- * opaque first argument and returns its own unsubscribe.
- */
 export type TypedIpcRenderer = {
   invoke: <C extends IpcInvokeChannel>(
     channel: C,

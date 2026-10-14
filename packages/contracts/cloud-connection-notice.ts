@@ -1,17 +1,3 @@
-/**
- * Gate for the transcript "reconnecting" notice on desktop and mobile.
- *
- * Every socket close passes through `offline` before the automatic reconnect,
- * so mirroring the raw status paints a banner for the few hundred milliseconds
- * of each foreground return or network blip and shifts the whole transcript
- * with it. The notice only carries information once the socket has stayed
- * unhealthy long enough that the backoff has visibly failed.
- *
- * The window opens at the first `offline`, survives the `connecting` attempts
- * between retries, and closes as soon as the socket is `live` again. `idle`
- * and `blocked` close it too: teardown is not an outage, and a blocked socket
- * has its own immediate notice.
- */
 export type CloudSocketStatus =
   | "idle"
   | "connecting"
@@ -19,11 +5,9 @@ export type CloudSocketStatus =
   | "offline"
   | "blocked";
 
-/** Continuous offline time before the notice may appear. */
 export const CLOUD_OFFLINE_NOTICE_DELAY_MS = 5_000;
 
 export type CloudOfflineWindow = {
-  /** When the current unhealthy stretch began, or null while healthy. */
   since: number | null;
 };
 
@@ -54,7 +38,6 @@ export function shouldShowCloudOfflineNotice(
   );
 }
 
-/** Absolute time the notice becomes due, or null when nothing is pending. */
 export function cloudOfflineNoticeDueAt(
   window: CloudOfflineWindow,
   status: CloudSocketStatus,

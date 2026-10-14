@@ -64,7 +64,6 @@ if (!prompt) {
 const waitSeconds = Number(flag("--wait", "180"));
 const agentRuntime = flag("--agent-runtime");
 const locale = flag("--locale");
-// A file already in the owner's drive, attached to the turn as a client attaches one.
 const attach = flag("--attach");
 const watchPi = args.includes("--watch-pi");
 const waitReport = args.includes("--wait-report");
@@ -133,7 +132,6 @@ const startedBody = await started.json().catch(() => null);
 console.log(JSON.stringify({ ownerId, email, conversationId, status: started.status, response: startedBody }));
 if (!started.ok) process.exit(1);
 
-// The pi view over the conversation socket, folded as a client folds it.
 let pi;
 if (watchPi) {
   const { emptyPiChat, reducePiChat, piMessageText, piUserHidden } = await import("../../../packages/contracts/pi-chat.ts");
@@ -171,10 +169,6 @@ if (watchPi) {
   socket.onclose = (event) => console.log(JSON.stringify({ pi: "socket-closed", code: event.code }));
 }
 
-// Poll `GET /conversations/:id/history` (the canonical window a local turn is
-// seeded from) and print each message that lands after the prompt. The turn
-// is done when the newest message is an assistant message that does not stop
-// for a tool call.
 const deadline = Date.now() + waitSeconds * 1000;
 let printed = -1;
 let promptAt = -1;

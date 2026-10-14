@@ -9,7 +9,6 @@ import type { OwnerSnapshot } from "@stella/contracts/turn-plane/owner-snapshot"
 import type { DevicePresenceState } from "../dispatch-policy.js";
 import { isRecord } from "./support.js";
 
-/** Device presence: socket attachments, proof of key, and availability. */
 /**
  * Everything a presence socket needs to be understood after a hibernation
  * eviction. There is deliberately no in-memory socket map: `getWebSockets()`
@@ -25,13 +24,11 @@ export type PresenceAttachment = {
   availability?: DeviceAvailability;
   phase: "challenged" | "begun" | "connected";
   lastSeenAtMs: number;
-  /** Set when this side closed the socket; it never counts as open again. */
   closedAtMs?: number;
 };
 
 export const presenceTag = (deviceId: string): string => `device:${deviceId}`;
 
-/** The exact bytes a device signs to prove it holds the registered key. */
 export const devicePresenceProofMessage = (args: {
   connectionId: string;
   nonce: string;
@@ -60,11 +57,6 @@ const exactBuffer = (bytes: Uint8Array): ArrayBuffer =>
     bytes.byteOffset + bytes.byteLength,
   ) as ArrayBuffer;
 
-/**
- * Ed25519 over the SPKI public key the owner snapshot registered. Any failure
- * — malformed material, unknown curve, bad signature — is one answer: the
- * proof is rejected. Telling them apart would only help an attacker.
- */
 export const verifyDevicePresenceProof = async (args: {
   publicKey: string;
   message: string;
@@ -141,7 +133,6 @@ export const presenceState = (row: PresenceRow): DevicePresenceState => ({
   lastSeenAt: row.last_seen_at,
 });
 
-/** One registered device as an execution destination, given its presence and whether it counts as online. */
 export const deviceDestination = (
   device: NonNullable<OwnerSnapshot["devices"]>[number],
   presence: DevicePresenceState | undefined,

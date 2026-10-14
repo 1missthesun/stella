@@ -311,10 +311,6 @@ const PanelScroll = createContext<ReturnType<typeof Gesture.Native> | null>(
   null,
 );
 
-/**
- * A sidebar's scroll view. It scrolls alongside the sidebar's swipe-to-close
- * instead of swallowing it, so a sideways swipe anywhere on the panel closes.
- */
 export const DrawerScrollView = forwardRef<ScrollView, ScrollViewProps>(
   function DrawerScrollView(props, ref) {
     const scroll = useContext(PanelScroll);

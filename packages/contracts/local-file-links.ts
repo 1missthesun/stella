@@ -41,11 +41,6 @@ const FENCE_LINE_RE = /^[ \t]{0,3}(`{3,}|~{3,})/;
 const LINE_MARKER_RE = /^\s*(?:(?:[-*+]|\d+[.)])\s+|>\s*)*/;
 const SEPARATORS_ONLY_RE = /^(?:\s|[·•∙|/\\,;:.&+*_~—–-]|\band\b|\bor\b)*$/i;
 
-/**
- * Rewrite a reply's prose line by line, leaving fenced code untouched.
- * `rewrite` returns the new line, or null to drop it; the blank lines a
- * dropped line leaves never stack up into an empty paragraph.
- */
 const rewriteProseLines = (
   markdown: string,
   rewrite: (line: string) => string | null,
@@ -84,10 +79,6 @@ const withoutLeadLabel = (line: string): string => {
   return words <= MAX_LEAD_LABEL_WORDS ? line.slice(match[0].length) : line;
 };
 
-/**
- * True when `line` is nothing but links to attached files plus separators,
- * optionally after a short lead-in label such as `Screenshots:`.
- */
 const isAttachmentOnlyLine = (
   line: string,
   isAttached: (filePath: string) => boolean,
@@ -106,15 +97,6 @@ const isAttachmentOnlyLine = (
   return linked && SEPARATORS_ONLY_RE.test(rest);
 };
 
-/**
- * Drop every line that is nothing but links to attached files plus separator
- * punctuation (`·`, `/`, `|`, `,`, dashes, "and"), such as a closing
- * `[Live homepage](…) · [Before](…) / [after](…)` or
- * `Screenshots: [Menu](…) · [Final](…)`: the attachments already show those
- * files, and keeping the line would leave dead labels or a stray `· /` behind.
- * A short lead-in label (up to five words before a colon) goes with the line;
- * lines with any other words are untouched.
- */
 export const dropAttachmentOnlyLines = (
   markdown: string,
   isAttached: (filePath: string) => boolean,
@@ -125,13 +107,6 @@ export const dropAttachmentOnlyLines = (
       )
     : markdown;
 
-/**
- * Present a reply whose linked files render as attachments: a line of nothing
- * but such links (after an optional short label like `Screenshots:`) goes, see
- * `dropAttachmentOnlyLines`; an image embed of one is dropped because the image
- * shows beside the message; a link inside a sentence stays a link, so its
- * words still open the file. Code blocks are left alone.
- */
 export const unlinkLocalFileLinks = (
   markdown: string,
   filePaths: readonly string[],
@@ -152,7 +127,6 @@ export const unlinkLocalFileLinks = (
   );
 };
 
-/** Every markdown link and image target outside code, in order. */
 export const extractMarkdownLinkTargets = (markdown: string): string[] =>
   markdown
     ? Array.from(
@@ -176,24 +150,14 @@ const uniqueParsed = (
   return out;
 };
 
-/**
- * Absolute paths a reply links. A `stella://drive/...` link is never one of
- * them: it names the owner's drive, not a file on any machine.
- */
 export const extractLocalFileLinkPaths = (markdown: string): string[] =>
   uniqueParsed(markdown, parseLocalFileLinkTarget);
 
-/**
- * A link target as a file reference: an absolute local path (a cloud world
- * path included), or the canonical `stella://drive/<path>` of a drive link.
- */
 export const parseFileLinkTarget = (url: string): string | null =>
   parseLocalFileLinkTarget(url) ?? parseDriveLinkTarget(url);
 
-/** Every file a reply links, local or in the drive, as `parseFileLinkTarget` names it. */
 export const extractFileLinkTargets = (markdown: string): string[] =>
   uniqueParsed(markdown, parseFileLinkTarget);
 
-/** Drive-relative paths of the drive files a reply links, in either link form. */
 export const extractDriveLinkPaths = (markdown: string): string[] =>
   uniqueParsed(markdown, driveLinkPath);

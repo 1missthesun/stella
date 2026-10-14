@@ -1,18 +1,3 @@
-/**
- * Music Library Discovery
- *
- * Extracts music taste signals from local music libraries:
- *
- * Windows:
- *   - iTunes: Parses "iTunes Music Library.xml" (XML plist with tracks, artists, genres, play counts)
- *
- * macOS:
- *   - Apple Music: Queries "Music Library.musiclibrary" SQLite database
- *   - iTunes (legacy): Falls back to XML if Apple Music DB not found
- *
- * Extracts: top genres, top artists, total track count — no file paths or personal playlists.
- */
-
 import { promises as fs } from "fs";
 import path from "path";
 import os from "os";
@@ -21,10 +6,6 @@ import { Effect } from "effect";
 import { runDiscovery, tryDiscovery, tryDiscoverySync } from "./effect-io.js";
 
 const log = (...args: unknown[]) => console.error("[music-library]", ...args);
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
 
 export type MusicArtist = {
   name: string;
@@ -42,10 +23,6 @@ export type MusicLibrarySignals = {
   topArtists: MusicArtist[];
   topGenres: MusicGenre[];
 };
-
-// ---------------------------------------------------------------------------
-// iTunes XML Parser (Windows + macOS legacy)
-// ---------------------------------------------------------------------------
 
 const ITUNES_XML_PATHS_WIN = (): string[] => {
   const home = os.homedir();
@@ -91,7 +68,6 @@ const parseItunesXml = async (xmlPath: string): Promise<MusicLibrarySignals> => 
   const genreCounts = new Map<string, number>();
   let totalTracks = 0;
 
-  // Find the Tracks dict section
   const tracksIdx = content.indexOf("<key>Tracks</key>");
   if (tracksIdx === -1) {
     return { source: "itunes", totalTracks: 0, topArtists: [], topGenres: [] };
@@ -123,7 +99,6 @@ const parseItunesXml = async (xmlPath: string): Promise<MusicLibrarySignals> => 
   }
 
   for (const block of trackBlocks) {
-    // Skip podcasts and audiobooks
     const podcastMatch = block.match(/<key>Podcast<\/key>\s*<true\/>/);
     if (podcastMatch) continue;
     const kindMatch = block.match(/<key>Kind<\/key>\s*<string>([^<]+)<\/string>/);
@@ -131,15 +106,12 @@ const parseItunesXml = async (xmlPath: string): Promise<MusicLibrarySignals> => 
 
     totalTracks++;
 
-    // Extract artist
     const artistMatch = block.match(/<key>Artist<\/key>\s*<string>([^<]+)<\/string>/);
     const artist = artistMatch?.[1];
 
-    // Extract genre
     const genreMatch = block.match(/<key>Genre<\/key>\s*<string>([^<]+)<\/string>/);
     const genre = genreMatch?.[1];
 
-    // Extract play count
     const playCountMatch = block.match(/<key>Play Count<\/key>\s*<integer>(\d+)<\/integer>/);
     const playCount = playCountMatch ? Number(playCountMatch[1]) : 0;
 
@@ -163,10 +135,6 @@ const parseItunesXml = async (xmlPath: string): Promise<MusicLibrarySignals> => 
 
   return { source: "itunes", totalTracks, topArtists, topGenres };
 };
-
-// ---------------------------------------------------------------------------
-// Apple Music SQLite (macOS modern)
-// ---------------------------------------------------------------------------
 
 type SqliteDatabase = {
   prepare(sql: string): { all(...params: unknown[]): unknown[] };
@@ -193,9 +161,6 @@ const findAppleMusicDb = async (): Promise<string | null> => {
 
 const SQLITE_HEADER = "SQLite format 3\0";
 
-// The header probe holds an open file handle: acquireRelease guarantees it
-// is closed (best-effort, swallowing close errors as before) on success,
-// failure, and interruption.
 const isSqliteDatabaseFileEffect = (
   dbPath: string,
 ): Effect.Effect<boolean> =>
@@ -213,8 +178,6 @@ const isSqliteDatabaseFileEffect = (
     }),
   ).pipe(Effect.catch(() => Effect.succeed(false)));
 
-// Fails with the original sqlite error (e.g. SQLITE_NOTADB) so the caller's
-// error branches observe the same codes; the db handle closes on every exit.
 const collectFromAppleMusicDbEffect = (
   dbPath: string,
 ): Effect.Effect<MusicLibrarySignals, unknown> =>
@@ -232,11 +195,9 @@ const collectFromAppleMusicDbEffect = (
       );
 
       return yield* tryDiscoverySync(() => {
-        // Total tracks
         const countRow = db.prepare("SELECT COUNT(*) as c FROM ZTRACK WHERE ZISPODCAST = 0").all() as { c: number }[];
         const totalTracks = countRow[0]?.c ?? 0;
 
-        // Top artists by play count
         const artistRows = db.prepare(`
       SELECT ZARTIST as name, SUM(ZPLAYCOUNT) as play_count
       FROM ZTRACK
@@ -246,7 +207,6 @@ const collectFromAppleMusicDbEffect = (
       LIMIT 20
     `).all() as { name: string; play_count: number }[];
 
-        // Top genres by track count
         const genreRows = db.prepare(`
       SELECT ZGENRE as name, COUNT(*) as track_count
       FROM ZTRACK
@@ -266,15 +226,10 @@ const collectFromAppleMusicDbEffect = (
     }),
   );
 
-// ---------------------------------------------------------------------------
-// Main Collection
-// ---------------------------------------------------------------------------
-
 const collectMusicLibraryEffect: Effect.Effect<
   MusicLibrarySignals | null,
   unknown
 > = Effect.gen(function* () {
-    // macOS: Try Apple Music SQLite first, then iTunes XML
     if (process.platform === "darwin") {
       const appleMusicDb = yield* tryDiscovery(() => findAppleMusicDb());
       if (appleMusicDb) {
@@ -303,7 +258,6 @@ const collectMusicLibraryEffect: Effect.Effect<
       }
     }
 
-    // Windows + macOS fallback: Try iTunes XML
     const itunesXml = yield* tryDiscovery(() => findItunesXml());
     if (itunesXml) {
       log(`Found iTunes library at: ${itunesXml}`);
@@ -327,10 +281,6 @@ const collectMusicLibraryEffect: Effect.Effect<
 
 export const collectMusicLibrary = async (): Promise<MusicLibrarySignals | null> =>
   runDiscovery(collectMusicLibraryEffect);
-
-// ---------------------------------------------------------------------------
-// Formatting
-// ---------------------------------------------------------------------------
 
 export const formatMusicLibraryForSynthesis = (signals: MusicLibrarySignals): string => {
   if (signals.totalTracks === 0) return "";

@@ -16,11 +16,6 @@ import {
   type SuggestionSlot,
 } from "@/features/chat/hooks/use-auto-context-chips";
 
-// ---------------------------------------------------------------------------
-// Attached chips — context the user has committed to sending. Lives INSIDE
-// the composer shell as a row above the textarea.
-// ---------------------------------------------------------------------------
-
 type ComposerContextRowProps = {
   variant?: "full" | "compact";
   chatContext: ChatContext | null;
@@ -71,11 +66,6 @@ export function ComposerContextRow({
 
 export type ComposerContextSuggestion = SuggestionSlot;
 
-/**
- * Auto-detected app/tab context prepared for the composer's + menu. Keeping
- * the polling hook at the composer level lets both responsive + buttons share
- * one snapshot instead of starting duplicate native-app polling loops.
- */
 export function useComposerContextSuggestions(
   active: boolean,
   chatContext: ChatContext | null,
@@ -132,15 +122,6 @@ export function useComposerContextSuggestions(
   return { suggestions, selectSuggestion };
 }
 
-/**
- * Lazy capture: kick off `captureAppWindow` and patch the running
- * `chatContext` when the screenshot lands. Only patches if the user hasn't
- * since detached or replaced the context (we keep the patch keyed on the
- * app name so we don't clobber a different context the user attached
- * mid-flight). Pass `pid` when known — the main process uses it as a
- * reliable selector against `CGWindowListCopyWindowInfo`; falls back to
- * name-matching against `desktopCapturer` window sources otherwise.
- */
 const captureAppWindowAsync = (
   target: { appName: string; pid: number | null },
   setChatContext: Dispatch<SetStateAction<ChatContext | null>>,
@@ -171,8 +152,6 @@ const captureAppWindowAsync = (
           ...prev,
           window: {
             ...prev.window,
-            // Prefer a freshly observed title over the one we attached
-            // eagerly (the running app may have switched windows since).
             title: capture.title || prev.window.title,
           },
           windowScreenshot: capture.screenshot,

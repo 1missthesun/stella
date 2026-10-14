@@ -1,20 +1,3 @@
-/**
- * The onboarding film stage.
- *
- * Every showcase in onboarding plays on one fixed 960×540 canvas that is
- * scaled to the card's width, so choreography can be written in canvas
- * pixels: a window sits at (480, 40), a cursor travels to (712, 318), the
- * camera pushes in on (700, 260) at 1.4×. Nothing reflows mid-shot, which is
- * what lets the motion be precise.
- *
- * The camera is a single transform on the scene layer, moved between shots
- * with a sampled spring (`springEasing`), so pans and pushes feel physical
- * and stay on the compositor. Windows, cursor and threads are positioned
- * absolutely inside the scene and animate with transforms and opacity only.
- *
- * Presentation-only: the cue timeline (`use-choreography`) decides what is on
- * screen; this file only knows how a state looks and how it moves.
- */
 import {
   useLayoutEffect,
   useRef,
@@ -29,14 +12,12 @@ import "./film.css";
 export const FILM_W = 960;
 export const FILM_H = 540;
 
-/** A camera framing: the canvas point at the center of the frame, and zoom. */
 export type Shot = { x: number; y: number; z: number };
 
 export const WIDE: Shot = { x: FILM_W / 2, y: FILM_H / 2, z: 1 };
 
 export type Has = (cue: string) => boolean;
 
-/** The latest shot whose cue has passed, else the opening shot. */
 export const pickShot = (
   has: Has,
   opening: Shot,
@@ -54,7 +35,6 @@ const SETTLE = springEasing(0.6, 0);
 const POP = springEasing(0.5, 0.28);
 const SNAP = springEasing(0.32, 0.18);
 
-/** Spring easings shared by every film element, as custom properties. */
 const SPRING_VARS = {
   "--film-camera": CAMERA.easing,
   "--film-camera-ms": `${CAMERA.ms}ms`,
@@ -66,7 +46,6 @@ const SPRING_VARS = {
   "--film-snap-ms": `${SNAP.ms}ms`,
 } as CSSProperties;
 
-/** Scale the fixed canvas to whatever width the card gives the film. */
 function useFitScale() {
   const ref = useRef<HTMLDivElement | null>(null);
   const [scale, setScale] = useState(0);
@@ -91,11 +70,9 @@ export function Film({
   tone,
 }: {
   shot: Shot;
-  /** Painted behind the camera so it never pans out of frame. */
   backdrop?: ReactNode;
   children: ReactNode;
   className?: string;
-  /** Optional mood hook for chapter-specific backdrops in CSS. */
   tone?: string;
 }) {
   const { ref, scale } = useFitScale();
@@ -124,8 +101,6 @@ export function Film({
   );
 }
 
-/* ── Building blocks ─────────────────────────────────────────────── */
-
 type Box = { x: number; y: number; w: number; h: number };
 
 const boxStyle = (box: Box, extra?: CSSProperties): CSSProperties => ({
@@ -136,11 +111,6 @@ const boxStyle = (box: Box, extra?: CSSProperties): CSSProperties => ({
   ...extra,
 });
 
-/**
- * Anything placed on the canvas. `from` is where it enters from, relative
- * to its resting box: agent windows are dealt out from behind Stella's
- * window, so they enter from the left, small and turned slightly.
- */
 export function Layer({
   box,
   visible,
@@ -154,7 +124,6 @@ export function Layer({
   box: Box;
   visible: boolean;
   from?: "rise" | "deal" | "drop" | "pop" | "fade" | "right";
-  /** Pushes the layer back while something else has focus. */
   dim?: boolean;
   z?: number;
   className?: string;
@@ -174,7 +143,6 @@ export function Layer({
   );
 }
 
-/** A plain app or browser window: traffic lights, a title or URL, a body. */
 export function Win({
   title,
   url,
@@ -186,7 +154,6 @@ export function Win({
   title?: ReactNode;
   url?: ReactNode;
   badge?: ReactNode;
-  /** Small app glyph before the title. */
   accent?: ReactNode;
   children: ReactNode;
   className?: string;
@@ -219,11 +186,6 @@ export function Win({
   );
 }
 
-/**
- * The one pointer on screen. It glides between targets on a spring and
- * presses when `click` is set; `owner="you"` marks the moments the user's
- * own hand acts (approving a purchase) rather than Stella's.
- */
 export function Cursor({
   x,
   y,
@@ -260,10 +222,6 @@ export function Cursor({
   );
 }
 
-/**
- * A thread from Stella to an agent she spawned: a soft curve that flows
- * while the agent works and settles when it reports back.
- */
 export function Thread({
   from,
   to,
@@ -294,7 +252,6 @@ export function Thread({
   );
 }
 
-/** Text that swaps with a short blur roll, so a label reads as changing. */
 export function Roll({ value, className }: { value: string; className?: string }) {
   return (
     <span className={`ofilm-roll${className ? ` ${className}` : ""}`}>

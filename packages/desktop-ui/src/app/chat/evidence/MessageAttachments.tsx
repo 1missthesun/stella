@@ -159,11 +159,6 @@ const MoreTile = ({ cards }: { cards: readonly EvidenceCard[] }) => (
   </DropdownMenu>
 );
 
-/**
- * A reply's attached files, in two parts: `media` is the rounded row of real
- * previews that sits directly under the bubble, `documents` the pills at the
- * bottom of the bubble.
- */
 const NO_DRIVE_CARDS: readonly EvidenceCard[] = [];
 
 export const MessageAttachments = ({
@@ -173,7 +168,6 @@ export const MessageAttachments = ({
 }: {
   filePaths: string[];
   part: "media" | "documents";
-  /** Previews of linked drive files, shown in the same media row. */
   driveCards?: readonly EvidenceCard[];
 }) => {
   const rowRef = useRef<HTMLDivElement | null>(null);

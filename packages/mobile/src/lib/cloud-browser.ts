@@ -75,12 +75,6 @@ let resetRequestId: string | null = null;
 
 const newRequestId = (): string => Crypto.randomUUID();
 
-/**
- * The cloud browser is a connected-account feature: every `browser.*`
- * backend function refuses the Better Auth anonymous owner, so hold off until
- * the session is a connected account. Mirrors desktop's
- * `hasConnectedAccount` gate.
- */
 const useCloudBrowserAccess = (): boolean => {
   const session = authClient.useSession();
   return Boolean(session.data);
@@ -142,9 +136,6 @@ export function useCurrentConversationBrowserInteraction(
       ),
     [conversationId, interactions],
   );
-  // Once the interaction is resuming, the card no longer renders any controls
-  // that need private detail. Avoid racing a final status fetch against the
-  // gateway's revision change after the user's decision.
   const detail = useCloudBrowserInteraction(
     summary?.state === "resuming" ? null : summary?.interactionId,
   );

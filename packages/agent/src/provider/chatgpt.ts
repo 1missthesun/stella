@@ -1,16 +1,3 @@
-/**
- * ChatGPT plan models (Sign in with ChatGPT) as one pi-ai provider,
- * `chatgpt`: OpenAI's Responses API with the account's access token. pi-ai's
- * Responses adapter keeps a request carrying a signed-in token to the plan's
- * limits (nothing stored, none of the fields the plan refuses), so the
- * provider runs its models through that adapter as OpenAI's. They stay under
- * their own provider, so the plan's token and an OpenAI API key never stand
- * in for each other, and the plan costs nothing per call.
- *
- * On the desktop a request goes to OpenAI with the user's token. In the
- * cloud a `transport` sends it to the model gateway's native lane, which puts
- * the owner's token on it.
- */
 import type { Api, Model } from "@earendil-works/pi-ai";
 import { openAIResponsesApi } from "@earendil-works/pi-ai/api/openai-responses.lazy";
 import { createProvider, type Provider } from "@earendil-works/pi-ai/models";
@@ -21,7 +8,6 @@ const OPENAI_BASE_URL = "https://api.openai.com/v1";
 /** The adapter's bearer when the transport sets the real one; not an `sk-` key, so the plan's limits apply. */
 const TRANSPORT_PLACEHOLDER_KEY = "stella-chatgpt-plan";
 
-/** Where a request goes instead of OpenAI, for the conversation it belongs to. */
 export type ChatGptTransport = {
   baseUrl: string;
   fetch(request: Request, route: { sessionId?: string }): Promise<Response>;
@@ -49,7 +35,6 @@ export const chatGptModel = (modelId: string): Model<"openai-responses"> | undef
   };
 };
 
-/** The `chatgpt` provider over `models`, sent to OpenAI or through `transport`. */
 export function chatGptProvider(options: {
   models: readonly Model<"openai-responses">[];
   transport?: ChatGptTransport;

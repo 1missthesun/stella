@@ -15,19 +15,6 @@ import { runnerOpsHandlers } from "./handlers/runner-ops.js";
 import { discoveryHandlers } from "./handlers/discovery.js";
 import { piChatHandlers } from "./handlers/pi-chat.js";
 
-/**
- * The runtime worker server: per-domain Effect services composed at this
- * entry, dispatched over JSON-RPC by the thin adapter in rpc.ts.
- *
- * Base (process-lifetime) services build once into a ManagedRuntime; the
- * per-initialize session graph (storage, brokers, cli bridge, runner, agent
- * runs, voice) is scope-managed by WorkerSessions — see
- * docs/effect-architecture.md.
- *
- * Signature-compatible with the old monolithic server.ts: same peer wiring,
- * same `{ interruptWork, holdsWorkerAlive, shutdown }` surface for the
- * worker entrypoint.
- */
 export const createRuntimeWorkerServer = (
   peer: WorkerPeerLike,
 ): {
@@ -55,7 +42,6 @@ export const createRuntimeWorkerServer = (
     ...piChatHandlers,
   });
 
-  // Warm the base layer so the sync holdsWorkerAlive path never has to build it.
   const ready = runtime.runPromise(Effect.void).catch(() => undefined);
 
   const holdsWorkerAlive = (): boolean =>

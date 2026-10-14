@@ -32,8 +32,6 @@ export class AudioSessionCoordinator {
     mode: MobileAudioMode = { playsInSilentMode: true },
   ): Promise<RecordingAudioLease | null> {
     const lease = ++this.nextLease;
-    // Claim synchronously. Playback requests queued before this point re-check
-    // the claim before touching the native session.
     this.activeRecordingLease = lease;
 
     return this.enqueue(async () => {
@@ -70,7 +68,6 @@ export class AudioSessionCoordinator {
     this.activeRecordingLease = null;
 
     return this.enqueue(async () => {
-      // A newer recording claim was made while this release waited in line.
       if (this.activeRecordingLease !== null) return;
       await this.applyAudioMode({ allowsRecording: false });
     });
@@ -86,9 +83,6 @@ export class AudioSessionCoordinator {
         allowsRecording: false,
         playsInSilentMode: true,
       });
-      // If recording claimed the session while the native call was in flight,
-      // its queued recording mode runs next. The playback caller must not start
-      // a player in the meantime.
       return this.activeRecordingLease === null;
     });
   }

@@ -2,14 +2,6 @@ import { execFile } from "node:child_process";
 import { Effect } from "effect";
 import { pollWithDeadline } from "./poll.js";
 
-/**
- * SIGTERM→grace→SIGKILL kill ladder, expressed as one effect per pid with
- * the pid-liveness polls as explicit Schedules (50ms spacing bounded by the
- * grace budget). Result shape and timing are identical to the old
- * hand-rolled ladder: `stopped` is only true once the pid is confirmed
- * dead, and `escalatedToSigkill` feeds restart-grace instrumentation.
- */
-
 const ALIVE_POLL_INTERVAL_MS = 50;
 const SIGKILL_CONFIRM_BUDGET_MS = 1_000;
 
@@ -32,10 +24,6 @@ const pidIsAlive = (pid: number): boolean => {
   }
 };
 
-/**
- * Poll until the pid is gone (true) or the budget — anchored before the
- * first aliveness check, like the old `graceDeadline` loops — ends (false).
- */
 const waitForPidExit = (
   pid: number,
   budgetMs: number,
@@ -52,13 +40,6 @@ const waitForPidExit = (
     onDeadline: () => new ExitConfirmDeadlineError(),
   }).pipe(Effect.catch(() => Effect.succeed(false)));
 
-/**
- * SIGTERM a worker pid, poll up to `graceMs` for a clean exit, then SIGKILL
- * and confirm the pid is actually dead before returning. The single shared
- * implementation behind both `stopPids` (orphan reaping) and
- * `stopRunningWorker` (restart/teardown) — callers differ only in their
- * grace budget.
- */
 export const killWorkerProcess = (
   pid: number,
   graceMs: number,
@@ -67,7 +48,6 @@ export const killWorkerProcess = (
     try {
       process.kill(pid, "SIGTERM");
     } catch {
-      // SIGTERM failed: the pid is already gone (or not ours).
       return { stopped: false, escalatedToSigkill: false };
     }
     if (yield* waitForPidExit(pid, graceMs)) {
@@ -81,16 +61,9 @@ export const killWorkerProcess = (
     if (yield* waitForPidExit(pid, SIGKILL_CONFIRM_BUDGET_MS)) {
       return { stopped: true, escalatedToSigkill: true };
     }
-    // SIGKILL was sent but the pid never confirmed dead within the budget.
-    // Report stopped:false so `worker.kill-latency` doesn't misreport a
-    // failed kill as a clean stop.
     return { stopped: false, escalatedToSigkill: true };
   });
 
-/**
- * Each pid runs its own SIGTERM→grace→SIGKILL concurrently, so the batch
- * wall-clock is the slowest single exit rather than the sum.
- */
 export const stopPids = (
   pids: number[],
   graceMs = 750,
@@ -102,12 +75,6 @@ export const stopPids = (
         discard: true,
       });
 
-/**
- * Enumerate live worker pids whose command line matches this exact worker
- * entry AND stella root — the guard against reaping an unrelated process
- * that recycled a stale pidfile's pid. Plain process-table scan (ps /
- * PowerShell CIM), resolving [] on any scan failure.
- */
 export const findSameRootWorkerPids = async (
   workerEntryPath: string,
   stellaAppDir: string,

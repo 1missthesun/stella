@@ -1,23 +1,10 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 
-// `import.meta.dirname` here is whichever output file esbuild inlines this
-// module into (each entry/chunk carries its own location), so it is only used
-// as a starting point for the marker-based walk-up below — never as a fixed
-// offset to other runtime files.
 const moduleDir = import.meta.dirname;
 
 let cachedRoot: string | null = null;
 
-/**
- * Repo root that contains the `packages/runtime/` source tree.
- *
- * Prefers `STELLA_APP_DIR` (set in the Electron main process and inherited by
- * spawned sidecar children); falls back to walking up from this module until a
- * `package.json` + `packages/runtime/` marker is found so any child without the
- * env still resolves. Stella runs from its source tree, so source-tree
- * assets always live under `<root>/packages/runtime/...`.
- */
 export function getStellaAppDir(): string {
   if (cachedRoot) return cachedRoot;
 

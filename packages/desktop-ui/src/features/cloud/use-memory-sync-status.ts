@@ -1,10 +1,6 @@
 import { useEffect, useState } from "react";
 import type { MemorySyncStatus } from "@stella/contracts/desktop/memory-sync";
 
-/**
- * This computer's memory sync as Electron main reports it (the sync runs
- * there, never here). Null outside the desktop app or before main answers.
- */
 export function useMemorySyncStatus(): MemorySyncStatus | null {
   const [status, setStatus] = useState<MemorySyncStatus | null>(null);
   useEffect(() => {
@@ -17,7 +13,6 @@ export function useMemorySyncStatus(): MemorySyncStatus | null {
     void api
       .getStatus()
       .then((current) => {
-        // A pushed status that arrived first is newer than this answer.
         if (live) setStatus((pushed) => pushed ?? current);
       })
       .catch(() => undefined);
@@ -29,7 +24,6 @@ export function useMemorySyncStatus(): MemorySyncStatus | null {
   return status;
 }
 
-/** Ask main for a pass now; resolves once it ends. No-op outside desktop. */
 export const requestMemorySync = (): Promise<void> =>
   (window.electronAPI?.memorySync?.syncNow() ?? Promise.resolve())
     .then(() => undefined)

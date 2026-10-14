@@ -54,7 +54,6 @@ const FUN_GREETINGS = [
     "What's the plan?",
     "Let's make something",
 ];
-// Probability the greeting is a random fun message instead of the time-of-day greeting.
 const FUN_GREETING_CHANCE = 0.25;
 function pickInitialGreetingState() {
     const fromStaticHome = typeof window === "undefined" ? undefined : window.__stellaStaticGreeting;
@@ -76,7 +75,6 @@ function useGreeting() {
     useEffect(() => {
         if (state.kind !== "time")
             return;
-        // Re-evaluate every minute so the time-of-day greeting stays accurate across boundaries.
         const interval = setInterval(() => forceTick((n) => n + 1), 60_000);
         return () => clearInterval(interval);
     }, [state.kind]);

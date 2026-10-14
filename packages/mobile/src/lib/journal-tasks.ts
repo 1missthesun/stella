@@ -21,11 +21,6 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
     ? (value as Record<string, unknown>)
     : null;
 
-/**
- * Stella's tools reach some engines under a namespaced name (Claude Code sees
- * `mcp__stella__spawn_agent`). The runtime matches on the bare name, so the
- * journal is read the same way.
- */
 export const bareToolName = (name: string): string =>
   name.includes("__") ? (name.split("__").at(-1) ?? name) : name;
 
@@ -71,23 +66,6 @@ const toolCallsById = (records: readonly JournalRecord[]) => {
   return calls;
 };
 
-/**
- * Background tasks as the conversation journal records them, in journal
- * order. A cloud-placed turn writes `agent-lifecycle` cards; a turn the
- * computer ran is mirrored with only its `spawn_agent` / `send_message` results
- * and the hidden wake prompt (`[Agent completed]` and friends) that reported
- * the outcome. Both read into the same task rows, so the chat can tell what
- * is running without a live connection to the computer that runs it.
- */
-/**
- * The server's running-agent snapshot as task rows.
- *
- * This is the only source that can name an agent whose start row sits below the
- * records this view holds — which, after any real time away, is most of them.
- * Marked `authoritativeRunning` so the chrome's staleness rule leaves them
- * alone: silence in the retained window is not evidence about an agent the
- * journal itself just said is working.
- */
 export const agentSnapshotTasks = (
   agents: readonly AgentActivityEntry[],
 ): MobileTask[] =>
@@ -151,21 +129,8 @@ export const settleUnlistedTasks = (
 
 export const collectJournalTasks = (
   records: readonly JournalRecord[],
-  /**
-   * Agents the server lists as running, over the whole conversation rather
-   * than these records.
-   *
-   * They are seeded as running rows before the fold so that a terminal row
-   * inside the window can settle them. Without the seed, an agent whose
-   * `agent-started` row sits below the loaded window has nothing for its
-   * `[Agent completed]` wake prompt to settle, so the completion is dropped and
-   * the server's snapshot keeps it running until the next connect.
-   */
   runningAgents: readonly AgentActivityEntry[] = [],
 ): MobileTask[] => {
-  // An agent with a start card is told by its cards alone. A terminal card
-  // without one settles a mirrored agent: the owner of its record writes it
-  // when the agent ended without a wake prompt (`foldAgentActivity`).
   const carded = new Set<string>();
   for (const record of records) {
     if (
@@ -338,14 +303,6 @@ const ledgerTask = (id: string, row: LedgerAgent, base?: MobileTask): MobileTask
   };
 };
 
-/**
- * The conversation's tasks with the agent ledger's word on each: an agent
- * it has a row for takes that row's status and title, whatever the journal
- * fold or the conversation's running list said, so a lost card can't leave
- * it running and a stopped one reads stopped. The ledger's other agents join
- * the list. An agent it has no row for (one from before ledger rows) keeps
- * the journal's word, as does every agent while the ledger has not loaded.
- */
 export const applyAgentLedger = (
   tasks: readonly MobileTask[],
   ledger: AgentLedger,

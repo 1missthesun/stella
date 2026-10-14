@@ -1,28 +1,16 @@
 import { agentStatusOf, isLiveAgentStatus, type AgentStatus } from "./agent-status.js";
 
-/**
- * What `agent_status` without a thread_id returns, and how `send_message`
- * frames a message between agents. Desktop and cloud both build their
- * listing from these rows and render it here, so the model sees the same
- * shape wherever it runs.
- */
-
-/** This conversation's orchestrator, as a `send_message` target. */
 export const STELLA_MESSAGE_TARGET = "stella";
 
 export const AGENT_MESSAGE_MAX_CHARS = 8_000;
 
-/** What the sender is to the receiver when it started the receiver. */
 export const AGENT_MESSAGE_STARTER_RELATION = "started you";
 
-/** Active agents listed at most; past this the rest are counted, not shown. */
 export const AGENT_ROSTER_ACTIVE_LIMIT = 200;
-/** Slots inactive agents fill once the active ones are listed. */
 export const AGENT_ROSTER_SLOTS = 16;
 
 const DIRECTORY_SESSION_LIMIT = 10;
 
-/** An agent's status as the directory lists it: the shared vocabulary. */
 export type AgentDirectoryStatus = AgentStatus;
 
 export type AgentDirectoryAgentRow = {
@@ -31,38 +19,28 @@ export type AgentDirectoryAgentRow = {
   parentThreadId?: string;
   description: string;
   status: AgentDirectoryStatus;
-  /** "this computer", "cloud", or a device's name. */
   where: string;
   updatedAt: number;
-  /** The computer it runs on is offline. */
   offline?: { lastSeenAt?: number };
-  /** It has not started: the computer it was sent to is asking its user to allow work from other devices. */
   awaitingConsent?: true;
 };
 
 export type AgentDirectorySessionRow = {
-  /** The conversation id, which is also its Stella's thread id. */
   conversationId: string;
   title: string;
   active: boolean;
-  /** "this computer" for a local-only chat, "cloud" for a synced one. */
   where: string;
   updatedAt: number;
 };
 
 export type AgentDirectoryCaller = {
   conversationId: string;
-  /** Absent when the caller is Stella itself. */
   threadId?: string;
   parentThreadId?: string;
 };
 
 export type AgentDirectoryStatusValue = string | undefined | null;
 
-/**
- * Any host's status word in the shared vocabulary. A word no host writes
- * reads as canceled: stopped, and resumable with a message.
- */
 export const normalizeAgentDirectoryStatus = (
   status: AgentDirectoryStatusValue,
 ): AgentDirectoryStatus => agentStatusOf(status) ?? "canceled";
@@ -80,11 +58,6 @@ const isLive = (status: AgentDirectoryStatus) => isLiveAgentStatus(status);
 const newestFirst = (a: AgentDirectoryAgentRow, b: AgentDirectoryAgentRow) =>
   b.updatedAt - a.updatedAt || a.threadId.localeCompare(b.threadId);
 
-/**
- * Which agents a list shows: every active one up to the active limit, newest
- * first, then the most recent inactive ones in whatever is left of the slots.
- * 12 active leaves room for 4 inactive; 16 or more active leaves none.
- */
 export const selectAgentRoster = (rows: readonly AgentDirectoryAgentRow[]) => {
   const unique = [...new Map(rows.map((row) => [row.threadId, row])).values()];
   const active = unique.filter((row) => isLive(row.status)).sort(newestFirst);
@@ -115,12 +88,10 @@ const awaitingConsentText = (row: AgentDirectoryAgentRow): string | undefined =>
     ? `not started yet: ${row.where} is waiting for the user to allow work from other devices on its screen, and the agent starts once they do (up to an hour after it was sent)`
     : undefined;
 
-/** Where an agent runs, unless that is the reader's own computer. */
 const placeOf = (where: string): string[] => (where === "this computer" ? [] : [where]);
 
 const oneLine = (text: string) => text.replace(/\s+/g, " ").trim().slice(0, 200);
 
-/** One agent as every listing shows it: one line, its description last. */
 const rosterLine = (
   row: AgentDirectoryAgentRow,
   now: number,
@@ -150,11 +121,6 @@ const sessionLine = (row: AgentDirectorySessionRow, now: number): string =>
     `last active ${formatAge(row.updatedAt, now)}`,
   ].join(" · ") + ` — ${oneLine(row.title) || "Untitled chat"}`;
 
-/**
- * The orchestrator's resident agent list: a snapshot taken where its context
- * starts (thread start, each compaction), so it says when it was taken and
- * points at agent_status for a live view. Undefined when there are no agents.
- */
 export const renderAgentRoster = (
   rows: readonly AgentDirectoryAgentRow[],
   now = Date.now(),
@@ -179,7 +145,6 @@ export const renderAgentRoster = (
   ].join("\n");
 };
 
-/** One agent as `agent_status` with its thread_id shows it. */
 export const agentDirectoryEntry = (row: AgentDirectoryAgentRow, now = Date.now()) => {
   const offline = offlineText(row, now);
   const waiting = awaitingConsentText(row);
@@ -195,7 +160,6 @@ export const agentDirectoryEntry = (row: AgentDirectoryAgentRow, now = Date.now(
   };
 };
 
-/** Another Stella session as `agent_status` with its thread_id shows it. */
 export const sessionDirectoryEntry = (row: AgentDirectorySessionRow, now = Date.now()) => ({
   thread_id: row.conversationId,
   description: row.title.trim() || "Untitled chat",
@@ -205,17 +169,11 @@ export const sessionDirectoryEntry = (row: AgentDirectorySessionRow, now = Date.
   relation: "another session",
 });
 
-/**
- * The model-facing listing, one line per agent or session. Agents are this
- * conversation's; sessions are the other conversations. Agents follow
- * `selectAgentRoster`; older work stays reachable through the history.
- */
 export const buildAgentDirectoryResult = (input: {
   caller: AgentDirectoryCaller;
   agents: AgentDirectoryAgentRow[];
   sessions: AgentDirectorySessionRow[];
   now?: number;
-  /** Why part of the listing is missing. */
   unavailable?: string;
 }): string => {
   const now = input.now ?? Date.now();
@@ -261,23 +219,13 @@ export const buildAgentDirectoryResult = (input: {
     : lines.join("\n");
 };
 export type AgentMessageSender = {
-  /** The sender's thread id; the conversation id when it is Stella. */
   threadId: string;
-  /** "Stella", or the sending agent's description. */
   label: string;
 };
 
 const escapeAttribute = (value: string) =>
   value.replace(/[\r\n]+/g, " ").replace(/"/g, "'").trim().slice(0, 200);
 
-/**
- * A message from Stella or another agent, as the receiver reads it. Every
- * message names its sender, so the receiver can answer with send_message to
- * `thread_id`. From the receiver's starter (`starter`) it is marked
- * `relation="started you"` and is an instruction; from anyone else it is a
- * peer's note, never the user's instruction. Chat readers know a message by
- * this framing (`isPiAgentText` in `pi-chat`) and never show it as the user's.
- */
 export const formatAgentMessage = (
   from: AgentMessageSender,
   text: string,
@@ -290,8 +238,4 @@ export const formatAgentMessage = (
 const FRAMED_AGENT_MESSAGE_RE =
   /^<agent-message from="[^"\n]*" thread_id="[^"\n]*"(?: relation="[^"\n]*")?>\n[\s\S]*\n<\/agent-message>$/u;
 
-/**
- * Text that is already one `formatAgentMessage` frame (or several, carried
- * together): a host relaying it says so (`framed`), so it is framed once.
- */
 export const isFramedAgentMessage = (text: string): boolean => FRAMED_AGENT_MESSAGE_RE.test(text.trim());

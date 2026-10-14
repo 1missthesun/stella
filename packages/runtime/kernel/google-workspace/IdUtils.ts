@@ -8,12 +8,6 @@ import { logToFile } from './logger.js';
 
 const DOC_ID_REGEX = /\/d\/([a-zA-Z0-9-_]+)/;
 
-/**
- * Extracts a Google Doc/Sheet/etc. ID from a Google Workspace URL.
- *
- * @param url The URL to parse.
- * @returns The extracted document ID, or undefined if no ID could be found.
- */
 export function extractDocId(url: string): string | undefined {
   logToFile(`[IdUtils] Attempting to extract doc ID from URL: ${url}`);
   if (!url || typeof url !== 'string') {

@@ -41,28 +41,12 @@ import { AskSlotContext, type AskSlot } from "./ask-slot";
 import { AttachmentTileRow, FileTile, ImageTile } from "./AttachmentTiles";
 import { fileDisplayName } from "@stella/contracts/file-display-name";
 
-// ---------------------------------------------------------------------------
-// Constants — mapped from desktop full-shell.composer.css
-// ---------------------------------------------------------------------------
-
-/** Horizontal inset from the true screen edge once shell padding is cancelled. */
 export const CHAT_HORIZONTAL_INSET = 12;
 
-/**
- * Content-height threshold for pill → expanded.
- * RN `onContentSizeChange` reports raw text height (no padding).
- * fontSize 16 × lineHeight ~22 ≈ 22 per line; trip on the second line so
- * wrapping immediately grows the composer instead of clipping behind the
- * send button.
- */
 const EXPAND_THRESHOLD = 30;
-/** Tallest the typed text area grows before it scrolls inside the composer. */
 const COMPOSER_INPUT_MAX_HEIGHT = 200;
-/** `composerWrap`'s top padding plus its gap between the card and the shell. */
 const ASK_SLOT_CHROME = 20;
-/** A card capped shorter than this still shows a question and its first option. */
 const ASK_MIN_HEIGHT = 160;
-/** LayoutAnimation config matching the same 350ms critically-damped spring. */
 export const LAYOUT_SPRING = {
   duration: 350,
   update: { type: LayoutAnimation.Types.spring, springDamping: 1 },
@@ -103,10 +87,6 @@ export type ComposerModelPickerConfig = {
   onSelectModel: (id: string) => void;
 };
 
-/**
- * The composer's text input — the only component a keystroke re-renders. It
- * subscribes to the draft store for its value and writes edits straight back.
- */
 function ComposerTextInput({
   draftStore,
   ref,
@@ -126,12 +106,6 @@ function ComposerTextInput({
   );
 }
 
-/**
- * Submit button that springs between enabled/disabled states like the
- * desktop `motion.button` in `ComposerPrimitives.tsx`:
- *   animate={{ opacity: canSubmit ? 1 : 0.4, scale: canSubmit ? 1 : 0.92 }}
- *   transition={{ type: "spring", duration: 0.2, bounce: 0 }}
- */
 function AnimatedSubmitButton({
   canSubmit,
   onPress,
@@ -194,12 +168,6 @@ function AnimatedSubmitButton({
   );
 }
 
-/**
- * Square stop affordance shown in place of the submit button while a reply is
- * streaming (chat) or pending (computer chat). Calling `onPress` cancels the
- * in-flight reply and cancels any queued messages. Canceled user bubbles stay
- * visible in the transcript with a Stopped label; resuming requires re-sending.
- */
 function StopButton({
   onPress,
   styles,
@@ -230,14 +198,6 @@ function StopButton({
     </Pressable>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Composer — the glass shell at the bottom of the chat: quote and attachment
-// strips, the text input (pill ⇄ expanded), dictation, and the toolbar. The
-// pane owns sending, dictation and the menus; this renders them. Memoized, so
-// the pane's scroll, keyboard and footer re-renders skip it: keep every prop's
-// identity stable.
-// ---------------------------------------------------------------------------
 
 export const Composer = memo(function Composer({
   colors,
@@ -278,25 +238,13 @@ export const Composer = memo(function Composer({
   colors: Colors;
   inputRef: RefObject<TextInput | null>;
   draftStore: ChatDraftStore;
-  /** Whether the composer accepts text (typing + sending). */
   enabled: boolean;
   placeholder: string;
-  /** Owner-approved intervention pinned immediately above the composer. */
   intervention?: ReactNode;
-  /**
-   * A question or secure card is open above the composer: the shell holds its
-   * compact pill shape so the card keeps the room.
-   */
   compact?: boolean;
-  /** The open card is folded to its one-line row. */
   askCollapsed?: boolean;
   onExpandAsk?: () => void;
-  /**
-   * Height between the top bar and the composer's lowest edge (above the
-   * keyboard), which a card above the composer must fit inside.
-   */
   interventionRoom?: number;
-  /** Bottom padding that keeps the shell clear of the home indicator. */
   bottomPad: number;
   draftEmpty: boolean;
   hasText: boolean;
@@ -311,7 +259,6 @@ export const Composer = memo(function Composer({
   onCancelDictation: () => void;
   onConfirmDictation: () => void;
   onStopAndSendVoice: () => void;
-  /** Realtime voice is offered (empty composer, idle dictation, a voice route). */
   showRealtimeVoice: boolean;
   onOpenRealtimeVoice: () => Promise<void>;
   modelPicker?: ComposerModelPickerConfig;
@@ -319,7 +266,6 @@ export const Composer = memo(function Composer({
   onPressModelPicker: () => void;
   quotes?: ComposerQuote[];
   onRemoveQuote?: (id: string) => void;
-  /** Pending attachments; absent when this transport takes none. */
   attachments?: ComposerAttachment[];
   onRemoveAttachment?: (id: string) => void;
   onRetryAttachment?: (id: string) => void;
@@ -331,7 +277,6 @@ export const Composer = memo(function Composer({
   const isListening = dictationStatus === "recording";
   const isTranscribing = dictationStatus === "transcribing";
 
-  // When the parent clears draft after send, collapse back to pill shape.
   useEffect(() => {
     if (expanded && draftEmpty) {
       LayoutAnimation.configureNext(LAYOUT_SPRING);
@@ -372,8 +317,6 @@ export const Composer = memo(function Composer({
   );
 
   const dictationCompact = compact && isListening;
-  // The text area stays as it is while dictating (the transcript lands there
-  // on stop); only the waveform row below it shows that dictation is on.
   const dictationBelow = !compact && isListening;
   const isExpandedComposed =
     !compact &&
@@ -385,10 +328,6 @@ export const Composer = memo(function Composer({
       hasQuotes: (quotes?.length ?? 0) > 0,
     });
 
-  // While dictating, the recording bar's leading slot carries cancel instead.
-  // Withheld here rather than only in the inline branch so the other dictation
-  // layout (recording bar below a composer that already has text) does not end
-  // up showing a + and an X at once — one leading control, one meaning.
   const plusButton =
     enabled && !isListening ? (
       <View collapsable={false}>
@@ -409,11 +348,6 @@ export const Composer = memo(function Composer({
       </View>
     ) : null;
 
-  // Shared mic / dictation control. Reused across the collapsed pill and the
-  // expanded toolbar. It is intentionally NOT gated on `streaming`: dictation
-  // stays available mid-run so a voice message can steer the active turn,
-  // exactly like typing + sending while busy. The branches that render it are
-  // mutually exclusive per render, so reusing the same element is safe.
   const micButton = serverFeatures.dictation ? (
     <Pressable
       onPress={() => void onToggleVoice()}
@@ -435,9 +369,6 @@ export const Composer = memo(function Composer({
     </Pressable>
   ) : null;
 
-  // Realtime voice is a distinct live-conversation mode, not dictation. Keep
-  // it immediately to the right of the mic only while the composer is empty;
-  // once text or an attachment exists, send remains the unambiguous action.
   const realtimeVoiceButton = showRealtimeVoice ? (
     <Pressable
       onPress={() => void onOpenRealtimeVoice()}
@@ -495,13 +426,7 @@ export const Composer = memo(function Composer({
       >
         <GlassSurface
           glass="regular"
-          // Interactive so a touch on the composer draws Apple's glow inside
-          // the glass, the way every other Liquid Glass control answers a
-          // tap. It does not take the touches: the input and buttons inside
-          // keep receiving them.
           interactive
-          // Softer than the menu tint: enough contrast for the input text
-          // while keeping the composer visibly glassy over scrolling chat.
           tintColor={fadeHex(colors.surface, 0.5)}
           radius={isExpandedComposed ? 20 : 999}
           fallbackColor={colors.surface}
@@ -592,10 +517,6 @@ export const Composer = memo(function Composer({
                     <Icon
                       name="x"
                       size={12}
-                      // The button's scrim is a fixed dark wash (it sits over
-                      // arbitrary photo content), so the glyph has to be a
-                      // fixed light colour too — `accentForeground` inverts
-                      // with the theme and goes near-black in every dark one.
                       color="#ffffff"
                       weight="bold"
                     />
@@ -614,11 +535,6 @@ export const Composer = memo(function Composer({
               />
             </View>
           ) : (
-            // Single TextInput, stable JSX position across pill ⇄ expanded so
-            // React reuses the same native UITextView when the shape swaps.
-            // Swapping between two separate <TextInput> instances dropped
-            // focus, which collapsed and re-summoned the keyboard on every
-            // expand — visible as a flicker whenever a line wrapped.
             <View>
               <View
                 style={
@@ -665,10 +581,6 @@ export const Composer = memo(function Composer({
                     accessibilityLabel="Send message"
                   />
                 ) : streaming && onStop ? (
-                  // Busy with an empty composer: keep the mic available so a
-                  // dictated message can steer the active turn, and keep Stop
-                  // reachable alongside it (mirrors the expanded toolbar,
-                  // which always shows the mic).
                   <View style={styles.pillTrailingCluster}>
                     {micButton}
                     {realtimeVoiceButton}
@@ -768,8 +680,6 @@ const makeComposerStyles = (colors: Colors) =>
       paddingHorizontal: CHAT_HORIZONTAL_INSET,
       paddingTop: 12,
     },
-    // Attachment rail inside the shell: sized by its content so the input
-    // below keeps its own height, scrolling sideways once thumbs overflow.
     attachmentStrip: {
       paddingBottom: 2,
       paddingHorizontal: 12,
@@ -817,8 +727,6 @@ const makeComposerStyles = (colors: Colors) =>
       overflow: "hidden",
       position: "relative",
     },
-    // Covers the whole tile while an upload is in flight or broken, so a chip
-    // never reads as ready when it is not.
     attachmentStatusScrim: {
       alignItems: "center",
       backgroundColor: "rgba(0,0,0,0.45)",

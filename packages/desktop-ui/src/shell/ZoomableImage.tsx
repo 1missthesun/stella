@@ -1,23 +1,8 @@
-/**
- * The sidebar image viewer's zoom surface.
- *
- * Click zooms in at the pointer (to the image's full resolution, at least 2x)
- * and click again zooms back out. While zoomed, dragging pans, the wheel pans,
- * and a trackpad pinch (ctrl+wheel) zooms around the pointer. At fit size a
- * horizontal drag past a threshold hands off to `onSwipe` instead of zooming,
- * so the viewer can step to the neighbouring file.
- *
- * Every pointer and wheel move writes the transform straight onto the image
- * element: a per-move React render would cost frames while a turn streams.
- */
-
 import { useCallback, useEffect, useRef } from "react";
 
 const MAX_SCALE = 8;
 const MIN_CLICK_SCALE = 2;
-/** Pointer travel under this is a click, not a drag. */
 const CLICK_SLOP_PX = 4;
-/** Horizontal drag at fit size that counts as a swipe to the next file. */
 const SWIPE_DISTANCE_PX = 60;
 
 type Transform = { scale: number; x: number; y: number };
@@ -48,7 +33,6 @@ export const ZoomableImage = ({
     originY: number;
     moved: boolean;
   } | null>(null);
-  // A drag that ended as a pan or a swipe still fires `click`; this swallows it.
   const suppressClickRef = useRef(false);
   const onSwipeRef = useRef(onSwipe);
   onSwipeRef.current = onSwipe;
@@ -83,7 +67,6 @@ export const ZoomableImage = ({
     [clamp],
   );
 
-  /** Zoom to `scale` keeping the point under (clientX, clientY) still. */
   const zoomAt = useCallback(
     (scale: number, clientX: number, clientY: number, animate: boolean) => {
       const frame = frameRef.current;
@@ -105,7 +88,6 @@ export const ZoomableImage = ({
     [apply],
   );
 
-  // A new image starts at fit size.
   useEffect(() => {
     apply(IDENTITY, false);
   }, [apply, src]);
@@ -201,10 +183,8 @@ export const ZoomableImage = ({
     const img = imgRef.current;
     const frame = frameRef.current;
     if (!img || !frame) return;
-    // Full resolution when the fitted image is shrunk, never less than 2x.
     const natural = img.offsetWidth > 0 ? img.naturalWidth / img.offsetWidth : 1;
     const scale = Math.min(MAX_SCALE, Math.max(MIN_CLICK_SCALE, natural));
-    // Keyboard activation has no pointer position: zoom on the centre.
     const fromPointer = event.detail > 0;
     const rect = frame.getBoundingClientRect();
     zoomAt(

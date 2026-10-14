@@ -1,24 +1,3 @@
-/**
- * `html` tool — write a self-contained HTML document under
- * `~/.stella/outputs/html/<slug>.html` and surface it inline in the chat as a
- * canvas artifact. The completed file is opened in the workspace panel's
- * Canvas tab. You should not describe the canvas contents in chat, because
- * the user can view the artifact directly.
- *
- * The file is always written: it is what the canvas renders from. The same
- * document is then saved to the canvas's link (`shares.save`), private until
- * the user makes it public, and the tool returns that URL. Signed out, with
- * no share domain configured, or when the save fails or is slow, the tool
- * returns the local file as it always did.
- *
- * Orchestrator-only. The orchestrator authors the full HTML document itself
- * and passes it in; this tool just writes and renders it. The general agent
- * builds real apps via Vite/HMR; this tool exists so the orchestrator can
- * answer with a richer-than-markdown artifact (planning, comparisons,
- * diagrams, dashboards, mockups, structured reports) without spawning an
- * agent.
- */
-
 import path from "node:path";
 import fs from "node:fs/promises";
 import { AGENT_IDS } from "@stella/contracts/agent-runtime";
@@ -41,13 +20,11 @@ export type HtmlToolOptions = {
   getCloudBackendAuth?: () => { baseUrl: string; authToken: string } | null;
 };
 
-/** The canvas is on screen already; the link is not worth a longer wait. */
 const SAVE_LINK_TIMEOUT_MS = 10_000;
 
 const asTrimmedString = (value: unknown): string =>
   typeof value === "string" ? value.trim() : "";
 
-/** The canvas's private link, or null when it cannot be made right now. */
 const saveCanvasLink = async (
   options: HtmlToolOptions,
   args: { canvas: string; html: string; title: string },
@@ -55,8 +32,6 @@ const saveCanvasLink = async (
   const auth = options.getCloudBackendAuth?.();
   if (!auth) return null;
   if (Buffer.byteLength(args.html, "utf8") > SHARE_MAX_HTML_BYTES) return null;
-  // One deadline for the whole save, including the 401 retry; aborting it
-  // also cancels the request instead of leaving it running.
   const signal = AbortSignal.timeout(SAVE_LINK_TIMEOUT_MS);
   const client = new BackendClient({
     baseUrl: auth.baseUrl,
@@ -74,8 +49,6 @@ export const createHtmlTool = (options: HtmlToolOptions): ToolDefinition => {
   const { stellaDataDir } = options;
   return {
     name: HTML_TOOL_NAME,
-    // The canvas file and its open event may already exist; the desktop has
-    // no per-call receipt to prove which.
     replay: "unsafe",
     agentTypes: [AGENT_IDS.ORCHESTRATOR],
     description: HTML_TOOL_DESCRIPTION,

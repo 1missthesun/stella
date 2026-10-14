@@ -1,11 +1,3 @@
-/**
- * Web search through Cloudflare's Web Search API, reached with the Worker's
- * AI binding through an AI Gateway on the same account, so it needs no
- * provider key. The provider is Exa unless `WEB_SEARCH_PROVIDER` names
- * another. The `search` owner domain meters it; this module only talks to the
- * provider.
- */
-
 import type {
   WebSearchHit,
   WebSearchResult,
@@ -13,7 +5,6 @@ import type {
 
 type Provider = "ceramic" | "exa" | "linkup";
 
-/** List price per request in micro-cents: $0.25, $7 and $5 per 1,000. */
 const PROVIDER_COST_MICRO_CENTS: Record<Provider, number> = {
   ceramic: 25_000,
   exa: 700_000,
@@ -29,7 +20,6 @@ const MAX_RESPONSE_BYTES = 5 * 1024 * 1024;
 
 export type WebSearchOutcome = {
   result: WebSearchResult;
-  /** What the provider billed us; zero when it did not serve the search. */
   costMicroCents: number;
 };
 
@@ -184,12 +174,6 @@ const configured = (env: unknown, name: string): string => {
   return typeof value === "string" ? value.trim() : "";
 };
 
-/**
- * Cloudflare's Web Search API (AI Gateway credits) on hosted Stella. An
- * owner-mode server searches through OpenRouter's web plugin when it has a
- * key, and through Cloudflare only when STELLA_WEB_SEARCH says so; Claude
- * Code turns search with their own tool either way.
- */
 export const webSearchBackend = (env: unknown): SearchBackend => {
   const chosen = configured(env, "STELLA_WEB_SEARCH").toLowerCase();
   if (chosen === "cloudflare" || chosen === "openrouter" || chosen === "off") return chosen;

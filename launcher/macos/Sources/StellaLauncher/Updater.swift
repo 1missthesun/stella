@@ -2,13 +2,9 @@ import AppKit
 import Darwin
 import Foundation
 
-/// One launcher per install root: an flock on `launcher.lock`, O_CLOEXEC so
-/// nothing the launcher spawns inherits it.
 enum InstanceLock {
     private static var fd: Int32 = -1
 
-    /// Take the lock, retrying for `wait` seconds (a launcher handing over to
-    /// this one may still be on its way out).
     static func acquire(_ url: URL, wait: TimeInterval) -> Bool {
         if fd < 0 { fd = open(url.path, O_CREAT | O_RDWR | O_CLOEXEC, 0o600) }
         guard fd >= 0 else { return false }
@@ -25,12 +21,6 @@ enum InstanceLock {
     }
 }
 
-/// Keeps the launcher itself current. CI publishes every launcher build to
-/// R2 launcher/stable/ with its run number in `VERSION`; a newer one is
-/// downloaded, checked (sha256, Developer ID, `--version`) and moved into
-/// the running bundle's place on disk. The first check runs as the launcher
-/// opens; Start waits for it and hands over to the new launcher, and a later
-/// one takes over when Electron restarts for an app update.
 final class LauncherUpdater {
     static let defaultBase = "\(Deployment.releasesURL)/launcher/stable"
     static let asset = "Stella-macos.zip"
@@ -38,21 +28,17 @@ final class LauncherUpdater {
         "anchor apple generic and certificate leaf[subject.OU] = \"\(Deployment.appleTeamID)\" and identifier \"com.stella.launcher\""
     static let interval: TimeInterval = 6 * 60 * 60
 
-    /// CFBundleVersion, which build.sh sets to CI's run number; 0 for a local build.
     static var ownVersion: Int {
         (Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String)
             .flatMap { Int($0.trimmingCharacters(in: .whitespaces)) } ?? 0
     }
 
     private let paths: LauncherPaths
-    /// Where VERSION, SHA256SUMS and the zip live; nil when this run never checks.
     private let base: String?
     private let requirement: String
     private let queue = DispatchQueue(label: "launcher-update", qos: .utility)
-    /// Guards `staged` and the bundle on disk while it is swapped or handed over.
     private let lock = NSLock()
     private var staged: Int?
-    /// Queue only: the bundle can't be replaced, so this run stops checking.
     private var stopped = false
     private let firstCheck = DispatchGroup()
     private var firstOutcome: CheckOutcome?
@@ -71,9 +57,6 @@ final class LauncherUpdater {
     private var previousDir: URL { paths.root.appendingPathComponent("launcher-previous") }
     var holdFile: URL { paths.root.appendingPathComponent("launcher-handover-hold.json") }
 
-    /// Checks run only for a CI build installed for real. Tests point
-    /// `STELLA_LAUNCHER_UPDATE_URL` at their own server, which may also
-    /// relax the signature requirement for ad-hoc builds.
     init(paths: LauncherPaths, selfTest: Bool) {
         self.paths = paths
         let env = ProcessInfo.processInfo.environment
@@ -130,9 +113,6 @@ final class LauncherUpdater {
         handler?(status, from, to)
     }
 
-    /// Stella started and became ready under this launcher: the bundle it
-    /// replaced is no longer needed. Kept while this run has staged one,
-    /// since then it is the launcher that is running.
     func startedSuccessfully() {
         queue.async { [self] in
             guard stagedVersion == nil, FileManager.default.fileExists(atPath: previousDir.path) else { return }
@@ -144,8 +124,6 @@ final class LauncherUpdater {
             }
         }
     }
-
-    // MARK: Checking
 
     private func schedule(after delay: TimeInterval) {
         queue.asyncAfter(wallDeadline: .now() + delay) { [self] in
@@ -227,7 +205,6 @@ final class LauncherUpdater {
         return version
     }
 
-    /// `sha256sum` format: `<hex>  <name>` (or ` *<name>` for binary mode).
     private func expectedSHA(_ base: String) throws -> String {
         let sums = try fetchText("\(base)/SHA256SUMS")
         for line in sums.split(whereSeparator: \.isNewline) {
@@ -250,8 +227,6 @@ final class LauncherUpdater {
         return String(decoding: data, as: UTF8.self)
     }
 
-    /// Signed by us (Developer ID, our team, our identifier), sealed, and it
-    /// runs and says it is the version VERSION announced.
     private func verify(_ app: URL, version: Int) throws {
         let sign = try Shell.run(
             "/usr/bin/codesign", ["--verify", "--deep", "--strict", "-R=\(requirement)", app.path],
@@ -265,21 +240,14 @@ final class LauncherUpdater {
         }
     }
 
-    // MARK: Staging
-
     private struct StageRefused: Error, CustomStringConvertible {
         let description: String
     }
 
-    /// Move the verified bundle into the running one's place. The running
-    /// process keeps its mapped image; the bundle it came from goes to
-    /// `launcher-previous/` until a later start under the new one succeeds.
     private func stage(_ app: URL, version: Int, at bundle: URL) throws {
         let fm = FileManager.default
         lock.lock()
         defer { lock.unlock() }
-        // The first stage of a run sets the running bundle aside; a later one
-        // replaces the earlier, never-started update.
         let aside: URL
         if staged == nil {
             try? fm.removeItem(at: previousDir)
@@ -304,12 +272,6 @@ final class LauncherUpdater {
         staged = version
     }
 
-    // MARK: Handover
-
-    /// Electron is restarting for an app update and a newer launcher is on
-    /// disk: open it with `--start` (and the held frame, so the update hold
-    /// carries over) and let it take over. True once the new launcher is
-    /// running or owns the lock; false to restart Stella with this launcher.
     func handOver(to version: Int, hold: [String: Any]?, showWindow: Bool = false) -> Bool {
         lock.lock()
         defer { lock.unlock() }
@@ -326,10 +288,8 @@ final class LauncherUpdater {
         config.activates = false
         config.addsToRecentItems = false
         config.arguments = args
-        // Only Stella's own settings (test roots and keys) carry over.
         config.environment = ProcessInfo.processInfo.environment.filter { $0.key.hasPrefix("STELLA_") }
 
-        // It takes the lock as it starts (retrying for a few seconds).
         InstanceLock.release()
         let opened = DispatchSemaphore(value: 0)
         var failure: Error?
@@ -355,12 +315,9 @@ final class LauncherUpdater {
             try? FileManager.default.removeItem(at: holdFile)
             return false
         }
-        // This launcher's hold stays up while the new one starts and shows its own.
         Thread.sleep(forTimeInterval: 2)
         return true
     }
-
-    // MARK: Helpers
 
     private static let toolEnv = ["PATH": "/usr/bin:/bin:/usr/sbin:/sbin"]
 

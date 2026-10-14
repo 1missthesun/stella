@@ -1,16 +1,3 @@
-/**
- * Wiring for the "canvas share" feature over the backend's `shares.*` calls.
- * Every canvas the agent writes already has a private link (only its owner
- * can open it); sharing is making that link public. A canvas without a link
- * yet (written signed out, or before links existed) gets one when it is made
- * public. The live list is the `shares.list` view (see
- * `useSharedCanvasLinks`), one canvas's link the `shares.canvas` view (see
- * `useCanvasLink`).
- *
- * The provider is mounted once inside the main app tree. Consumers render
- * nothing when `useCanvasShare()` returns `null`, so shared canvas rendering
- * remains safe outside that provider.
- */
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 import {
   SHARE_CANVAS_PATTERN,
@@ -28,14 +15,12 @@ export type SharedCanvasLink = ShareLink;
 export type CanvasLinkVisibility = ShareVisibility;
 
 export type CanvasShareContextValue = {
-  /** Public base URL for share links, or null when the domain is pending. */
   baseUrl: string | null;
   publish: (args: {
     html: string;
     title?: string;
   }) => Promise<PublishedCanvasShare>;
   revoke: (args: { slug: string }) => Promise<void>;
-  /** Save a canvas to its link (created on first save) at this visibility. */
   save: (args: {
     canvas: string;
     html: string;
@@ -46,7 +31,6 @@ export type CanvasShareContextValue = {
     slug: string;
     visibility: ShareVisibility;
   }) => Promise<SavedCanvasShare>;
-  /** A URL that opens the link in a browser as its owner. */
   viewLink: (args: { slug: string }) => Promise<string>;
 };
 
@@ -88,20 +72,13 @@ export function CanvasShareProvider({ children }: { children: ReactNode }) {
   );
 }
 
-/**
- * Returns the canvas-share API, or `null` when rendered outside the provider.
- * Callers must no-op or hide UI on `null`.
- */
 export const useCanvasShare = (): CanvasShareContextValue | null =>
   useContext(CanvasShareContext);
 
-/** The account's live shares, newest first. */
 export const useSharedCanvasLinks = () => useBackendView("shares.list", {});
 
-/** The canvas slug a link is saved under, or null when it has none. */
 export const canvasLinkKey = (slug: string | undefined): string | null =>
   slug && SHARE_CANVAS_PATTERN.test(slug) ? slug : null;
 
-/** One canvas's link (null before it has one); skipped without a key. */
 export const useCanvasLink = (canvas: string | null) =>
   useBackendView("shares.canvas", canvas ? { canvas } : "skip");

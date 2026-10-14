@@ -92,11 +92,6 @@ const parseStarters = (
   return { profileHighlights, starters };
 };
 
-/**
- * Discovery synthesis on this device: per-category analyses, then core
- * memory, then the welcome line and the finale's highlights and starters,
- * each a one-shot completion through the runtime's model routing.
- */
 const synthesize = async (
   runner: OneShotRunner,
   payload: OnboardingSynthesisRequest,
@@ -161,7 +156,6 @@ const synthesize = async (
   const startersPrompt = readRuntimePrompt("synthesis");
   const [welcomeMessage, finale] = await Promise.all([
     complete("welcome", welcomeTemplate.replace("{{coreMemory}}", coreMemory)),
-    // Best effort: core memory and the greeting are what the app depends on.
     startersPrompt
       ? complete(
           "welcome",

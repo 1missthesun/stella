@@ -10,11 +10,6 @@ import {
   useServerFeature,
 } from "@/platform/backend/server-discovery";
 
-/**
- * Mounted eagerly: a `stella://pair?…` link the OS hands to Stella opens the
- * connect dialog, which asks before anything happens. A link that started
- * Stella waits in main until this layer takes it.
- */
 export function SelfHostLayer() {
   const dialog = useSelfHostDialog();
   const selfHosted = useSelfHostedServer();

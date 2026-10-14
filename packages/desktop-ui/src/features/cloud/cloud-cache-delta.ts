@@ -1,5 +1,3 @@
-/** Reuse only records with the same immutable identity as the last successful
- * cache write. Any replaced content remains in the validated wire payload. */
 export function cloudCacheDelta<T extends { seq: number }>(
   previous: readonly T[],
   records: readonly T[],

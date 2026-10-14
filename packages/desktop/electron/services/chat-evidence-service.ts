@@ -63,11 +63,9 @@ type SourceEntry = {
   isDirectory: boolean;
   order: number;
   elsewhere?: boolean;
-  /** The other computer of the owner's that has an `elsewhere` entry. */
   holder?: { deviceId: string; modifiedAt: number };
 };
 
-/** How much of a file on another computer is fetched to draw its card. */
 const PEER_IMAGE_MAX_BYTES = 16 * 1024 * 1024;
 const PEER_VIDEO_HEAD_BYTES = 8 * 1024 * 1024;
 
@@ -412,11 +410,6 @@ const driveVideoPoster = async (
   }
 };
 
-/**
- * A preview card for one linked drive file, made from the bytes behind its
- * signed URL: an image's cover crop, or a video's poster frame. Anything
- * else, or a file too large to read, has no card and stays a pill.
- */
 const buildDriveCard = async (
   id: string,
   file: DriveEvidenceSource,
@@ -511,11 +504,6 @@ export const createChatEvidenceService = (options: {
     }
   };
 
-  /**
-   * The card for an image or video another of the owner's computers has:
-   * the image, or the head of the video, is fetched from it into the cache
-   * and drawn the way a local one is.
-   */
   const peerCard = async (entry: SourceEntry): Promise<EvidenceCard | null> => {
     const peers = options.peerDeviceFiles;
     const holder = entry.holder;

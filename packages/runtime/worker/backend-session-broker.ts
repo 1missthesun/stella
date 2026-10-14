@@ -28,12 +28,6 @@ const signedOut = (error: string): HttpResult => ({
   body: { error, code: "auth_required" },
 });
 
-/**
- * One backend call made with the worker's live Stella session, so a CLI
- * whose shell environment holds an expired token (a long wait, an agent
- * started long ago) still reaches the backend. A token the backend rejects
- * is refreshed from the host once and the call retried.
- */
 const withLiveSiteAuth = async (
   options: BackendSessionBrokerOptions,
   signedOutMessage: string,
@@ -54,7 +48,6 @@ const withLiveSiteAuth = async (
   return await send(refreshed);
 };
 
-/** `stella-media` calls (`media.request` on the CLI bridge). */
 export const createBackendMediaBroker =
   (options: BackendSessionBrokerOptions) =>
   async (
@@ -73,7 +66,6 @@ export const createBackendMediaBroker =
     );
   };
 
-/** `stella-x-api` calls (`x.request` on the CLI bridge). */
 export const createBackendXApiBroker =
   (options: BackendSessionBrokerOptions) =>
   async (
@@ -87,7 +79,6 @@ export const createBackendXApiBroker =
     );
   };
 
-/** The account's MCP server registry (`connector.accountMcp` on the CLI bridge). */
 export const createBackendAccountMcpBroker =
   (options: BackendSessionBrokerOptions) =>
   async (

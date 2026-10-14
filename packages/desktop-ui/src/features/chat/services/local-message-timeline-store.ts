@@ -579,9 +579,6 @@ async function readTail(entry: TimelineEntry) {
     advanceTailCursor(entry, result.nextCursor);
 
     const strict = strictMessagesAfter(changed, newest);
-    // A saturated tail response is intentionally collapsed to a fresh latest
-    // page. This can only happen after the renderer missed more than one page
-    // of updates while it was inactive; incremental streaming stays append-only.
     if (strict.length > MESSAGE_TIMELINE_PAGE_SIZE) {
       finishRead(entry, requestId);
       return readInitial(entry, "latest");
@@ -593,9 +590,6 @@ async function readTail(entry: TimelineEntry) {
       (message) =>
         currentIds.has(message._id) || compareMessageOrder(message, newest) > 0,
     );
-    // Always merge against the latest resident snapshot. If a notification or
-    // lazy-detail page landed while IPC was pending, preserve that newer local
-    // projection and replay the exact pushed events below.
     let messages =
       entry.mutationRevision === mutationRevision
         ? mergeOrderedMessages(current, eligibleChanged)
@@ -619,7 +613,6 @@ async function readTail(entry: TimelineEntry) {
     return true;
   } catch (error) {
     if (entry.requestId === requestId) {
-      // What waited for the read still lands, as it would have without it.
       for (const event of entry.pendingEventsDuringRead.values()) {
         if (event.type !== "user_message" && event.type !== "assistant_message") {
           patchNotifiedEvent(entry, event);
@@ -699,7 +692,6 @@ function rememberLiveToolEvent(
   entry.liveToolEventPins.set(messageId, pins);
 }
 
-/** Apply an in-place event upsert without reopening the durable tail. */
 function patchNotifiedEvent(
   entry: TimelineEntry,
   event: NonNullable<LocalChatUpdatedPayload["event"]>,

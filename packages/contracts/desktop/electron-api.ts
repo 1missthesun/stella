@@ -1,17 +1,3 @@
-/**
- * The `window.electronAPI` bridge, built over the typed IPC contract.
- *
- * The preload (`desktop/electron/preload.ts`) calls `createElectronApi` with
- * an `ipcRenderer`-backed `TypedIpcRenderer` and exposes the result; the
- * renderer's `window.electronAPI` type is `ElectronAPI`, derived from this
- * object. Payload and result types come from `ipc-contract.ts`, so a method
- * here, its main-process handler and every renderer caller are checked
- * against the same declaration.
- *
- * When adding a channel: add the constant to `ipc-channels.ts`, its types to
- * `ipc-contract.ts`, the method here, and the handler in main through
- * `electron/ipc/typed-ipc.ts`.
- */
 import type { DriveEvidenceSource } from "../chat-evidence.js";
 import type { ChatContext } from "../index.js";
 import type {
@@ -320,13 +306,8 @@ import {
   IPC_WINDOW_SHOW,
 } from "./ipc-channels.js";
 
-/** What the preload knows about its own process, outside of IPC. */
 export type ElectronApiHost = {
   platform: string;
-  /**
-   * Absolute on-disk path for a picker/drag-drop `File`, or "" for
-   * synthetic files (e.g. clipboard images).
-   */
   getPathForFile: (file: File) => string;
 };
 
@@ -334,27 +315,22 @@ export const createElectronApi = (
   ipc: TypedIpcRenderer,
   host: ElectronApiHost,
 ) => {
-  /** A method that forwards its arguments to an invoke channel unchanged. */
   const invoker =
     <C extends IpcInvokeChannel>(channel: C) =>
     (...args: IpcInvokeArgs<C>) =>
       ipc.invoke(channel, ...args);
-  /** A method that forwards its arguments to a send channel unchanged. */
   const sender =
     <C extends IpcSendChannel>(channel: C) =>
     (...args: IpcSendArgs<C>) =>
       ipc.send(channel, ...args);
-  /** Subscribe to a push channel, forwarding only the payload. */
   const on =
     <C extends IpcEventChannel>(channel: C) =>
     (callback: (payload: IpcEventPayload<C>) => void): (() => void) =>
       ipc.on(channel, (_event, payload) => callback(payload));
-  /** Subscribe to a push channel that carries no payload. */
   const onSignal =
     (channel: IpcEventChannel) =>
     (callback: () => void): (() => void) =>
       ipc.on(channel, () => callback());
-  /** Subscribe to a push channel, forwarding Electron's event as well. */
   const onWithEvent =
     <C extends IpcEventChannel>(channel: C) =>
     (
@@ -366,11 +342,6 @@ export const createElectronApi = (
     platform: host.platform,
 
     files: {
-      /**
-       * Absolute on-disk path for a picker/drag-drop `File`, or "" for
-       * synthetic files (e.g. clipboard images). Lets the composer attach
-       * images by path so the renderer never loads the original bytes.
-       */
       getPathForFile: (file: File) => host.getPathForFile(file),
     },
 
@@ -380,7 +351,6 @@ export const createElectronApi = (
       confirmImportOwnership: invoker(IPC_CLOUD_HOME_CONFIRM_IMPORT_OWNERSHIP),
     },
 
-    /** This computer's two-way memory sync with the cloud, run in main. */
     memorySync: {
       getStatus: invoker(IPC_MEMORY_SYNC_GET_STATUS),
       onStatus: on(IPC_MEMORY_SYNC_STATUS),
@@ -413,18 +383,7 @@ export const createElectronApi = (
     },
 
     display: {
-      /**
-       * Runtime-driven workspace panel updates. The payload is a structured
-       * `DisplayPayload`; callers pass it through `normalizeDisplayPayload`
-       * before routing it to the panel.
-       */
       onUpdate: on(IPC_DISPLAY_UPDATE),
-      /**
-       * Reads a file's raw bytes from the main process, transferred via
-       * structured clone (no base64 round-trip). `maxBytes` reads only a
-       * bounded prefix (and reports `truncated`), so a preview surface never
-       * has to pull a huge file through IPC in full.
-       */
       readFile: (
         filePath: string,
         options?: { conversationId?: string | null; maxBytes?: number },
@@ -434,59 +393,24 @@ export const createElectronApi = (
           conversationId: options?.conversationId,
           maxBytes: options?.maxBytes,
         }),
-      /**
-       * Where a `stella-media:` stream for this file comes from: this computer,
-       * the copy another device put in the user's Drive, or nowhere this
-       * computer can reach (and why). Answers without reading the file.
-       */
       mediaSource: (filePath: string) =>
         ipc.invoke(IPC_DISPLAY_MEDIA_SOURCE, { filePath }),
-      /**
-       * Whether a path is a file or a folder, on this computer or on the
-       * other computer of the user's that has it.
-       */
       statPath: (filePath: string, options?: { conversationId?: string | null }) =>
         ipc.invoke(IPC_DISPLAY_STAT_PATH, {
           filePath,
           conversationId: options?.conversationId,
         }),
-      /** A folder's entries, on this computer or on the computer that has it. */
       listFolder: (filePath: string, options?: { conversationId?: string | null }) =>
         ipc.invoke(IPC_DISPLAY_LIST_FOLDER, {
           filePath,
           conversationId: options?.conversationId,
         }),
-      /**
-       * The computer the destination picker names, which a file not on this
-       * computer is looked for on after the computer that produced it.
-       */
       setSelectedDevice: sender(IPC_DISPLAY_SET_SELECTED_DEVICE),
       listCanvasHtml: invoker(IPC_DISPLAY_LIST_CANVAS_HTML),
-      /**
-       * Fetches a shared canvas (`<CANVAS_SHARE_BASE_URL>/c/<slug>`) in main,
-       * materializes its HTML into the local canvas store, and returns a
-       * file-backed `canvas-html` payload. Resolves `null` when the URL is not
-       * a valid share link or the fetch fails.
-       */
       openSharedCanvas: invoker(IPC_DISPLAY_OPEN_SHARED_CANVAS),
-      /**
-       * A canvas-share link the main process caught (a new-window or
-       * navigation request). The renderer opens it the way a chat click
-       * does, asking the backend for the owner's grant first.
-       */
       onOpenShareLink: on(IPC_DISPLAY_OPEN_SHARE_LINK),
-      /**
-       * The `stella-canvas://` URL a canvas iframe loads a local HTML file
-       * from (its own origin and CSP, with the Ask Stella bridge injected).
-       * `missing` when the file is on no device that can serve it.
-       */
       canvasFileUrl: (filePath: string) =>
         ipc.invoke(IPC_DISPLAY_CANVAS_FILE_URL, { filePath }),
-      /**
-       * Holds `html` (a cloud canvas, a Drive document) in main and returns
-       * its `stella-canvas://` URL. With `drivePath` (the document's path in
-       * the owner's Drive) its relative assets load from that Drive folder.
-       */
       canvasHtmlUrl: (html: string, options?: { drivePath?: string }) =>
         ipc.invoke(IPC_DISPLAY_CANVAS_HTML_URL, {
           html,
@@ -524,13 +448,6 @@ export const createElectronApi = (
       hardReset: invoker(IPC_APP_HARD_RESET),
     },
 
-    /**
-     * This computer's own say over whether work sent from the owner's other
-     * devices may run here. Being signed in lists this machine; agreeing once
-     * is separate, and this is where that agreement is given on its own
-     * screen. A `false` answer records `declined`, so dismissing the prompt
-     * without choosing must not call `answer`.
-     */
     remoteExecution: {
       onRequest: on(IPC_EXECUTION_REMOTE_REQUEST),
       answer: (allow: boolean) =>
@@ -542,7 +459,6 @@ export const createElectronApi = (
       onSet: on(IPC_EXECUTION_TARGET_SET),
     },
 
-    /** The app's own checkout when running from source; state is null otherwise. */
     appSource: {
       getState: invoker(IPC_APP_SOURCE_GET_STATE),
       onState: on(IPC_APP_SOURCE_STATE),
@@ -567,12 +483,6 @@ export const createElectronApi = (
       submitRegionClick: sender(IPC_REGION_CLICK),
       getWindowCapture: invoker(IPC_REGION_GET_WINDOW_CAPTURE),
       cancelRegion: sender(IPC_REGION_CANCEL),
-      /**
-       * Composer "+ menu" capture entry point. Minimizes the active Stella
-       * window, opens the region overlay (click=window, drag=region), merges
-       * the result into `chatContext`, then restores the window. Resolves
-       * with `{ cancelled }` if the user dismissed the overlay.
-       */
       beginRegionCapture: invoker(IPC_CAPTURE_BEGIN_REGION_CAPTURE),
     },
 
@@ -591,12 +501,10 @@ export const createElectronApi = (
       listInstalled: invoker(IPC_THEME_LIST_INSTALLED),
     },
 
-    /** Origin of the marketing/billing site, honouring STELLA_WEB_URL in dev. */
     website: {
       getBaseUrl: invoker(IPC_WEBSITE_GET_BASE_URL),
     },
 
-    /** The Stella server this install uses, and pairing with self-hosted ones. */
     selfHost: {
       getState: invoker(IPC_SELF_HOST_GET_STATE),
       takePendingLink: invoker(IPC_SELF_HOST_TAKE_PENDING_LINK),
@@ -609,11 +517,6 @@ export const createElectronApi = (
       onPairLink: on(IPC_SELF_HOST_PAIR_LINK),
     },
 
-    /**
-     * Shared UI state KV (~/.stella/ui-state.json). The boot snapshot is
-     * exposed separately as `window.__stellaUiState`; this carries writes
-     * and remote changes.
-     */
     uiState: {
       apply: sender(IPC_UI_STATE_KV_APPLY),
       clear: sender(IPC_UI_STATE_KV_CLEAR),
@@ -621,16 +524,10 @@ export const createElectronApi = (
     },
 
     voice: {
-      /** Toggle the desktop realtime voice session. */
       toggleRtc: sender(IPC_VOICE_RTC_TOGGLE),
       persistTranscript: sender(IPC_VOICE_PERSIST_TRANSCRIPT),
       orchestratorChat: invoker(IPC_VOICE_ORCHESTRATOR_CHAT),
       getOrchestratorConfig: invoker(IPC_VOICE_ORCHESTRATOR_CONFIG),
-      /**
-       * Status and tool activity from a delegated orchestrator run. The voice
-       * runtime lives in the overlay window, which never receives the
-       * `agent:event` stream the full window gets.
-       */
       onOrchestratorActivity: on(IPC_VOICE_ORCHESTRATOR_ACTIVITY),
       createOpenAISession: invoker(IPC_VOICE_CREATE_OPENAI_SESSION),
       createXaiSession: invoker(IPC_VOICE_CREATE_XAI_SESSION),
@@ -639,58 +536,30 @@ export const createElectronApi = (
       pushRuntimeState: sender(IPC_VOICE_RUNTIME_STATE),
       setRtcShortcut: invoker(IPC_VOICE_RTC_SET_SHORTCUT),
       getRtcShortcut: invoker(IPC_VOICE_RTC_GET_SHORTCUT),
-      /**
-       * Report an actionable voice session error from the (hidden) overlay
-       * voice runtime so main can surface a toast in the visible app window.
-       */
       reportSessionError: sender(IPC_VOICE_REPORT_SESSION_ERROR),
-      /** Voice session error toasts routed to this window. */
       onSessionError: on(IPC_VOICE_SESSION_ERROR),
-      /**
-       * The last connection failure reason, for surfaces that must show why a
-       * call did not start. Separate from the toast channel, which only fires
-       * for failures the user has to act on.
-       */
       reportSessionErrorState: sender(IPC_VOICE_REPORT_SESSION_ERROR_STATE),
-      /** The last published failure reason, or "" when the call is healthy. */
       getSessionErrorState: invoker(IPC_VOICE_GET_SESSION_ERROR_STATE),
       onSessionErrorState: on(IPC_VOICE_SESSION_ERROR_STATE),
-      /** Realtime provider/auth route changed; recycle any warm session. */
       onPreferencesChanged: on(IPC_VOICE_PREFERENCES_CHANGED),
     },
 
     dictation: {
-      /**
-       * Presses of the global dictation shortcut routed to this window.
-       * `source: "companion"` marks a press that summoned the floating
-       * companion; its composer sends the transcript when the shortcut
-       * stops it.
-       */
       onToggle: on(IPC_DICTATION_TOGGLE),
-      /** The currently registered global shortcut accelerator. */
       getShortcut: invoker(IPC_DICTATION_GET_SHORTCUT),
-      /** Replace the accelerator; an empty string disables the shortcut. */
       setShortcut: invoker(IPC_DICTATION_SET_SHORTCUT),
       getSoundEffectsEnabled: invoker(IPC_DICTATION_GET_SOUND_EFFECTS_ENABLED),
       setSoundEffectsEnabled: invoker(IPC_DICTATION_SET_SOUND_EFFECTS_ENABLED),
-      /** Whether the user's own OpenRouter key is saved for dictation. */
       hasOpenRouterKey: invoker(IPC_DICTATION_HAS_OPENROUTER_KEY),
-      /** Transcribe a 16 kHz mono PCM16 WAV with the user's OpenRouter key. */
       transcribeWithOpenRouter: invoker(
         IPC_DICTATION_TRANSCRIBE_WITH_OPENROUTER,
       ),
-      /** Abort an own-key transcription that is still in flight. */
       cancelOpenRouter: sender(IPC_DICTATION_CANCEL_OPENROUTER),
       activeChanged: sender(IPC_DICTATION_ACTIVE_CHANGED),
       playSound: sender(IPC_DICTATION_PLAY_SOUND),
     },
 
-    /**
-     * Floating desktop companion. The companion windows are thin views; the
-     * full shell publishes `CompanionState` and executes the sends they relay.
-     */
     companion: {
-      // Window plumbing (companion renderers → main).
       hello: sender(IPC_COMPANION_HELLO),
       onLayout: on(IPC_COMPANION_LAYOUT),
       setHovered: sender(IPC_COMPANION_HOVER),
@@ -704,22 +573,18 @@ export const createElectronApi = (
       focus: sender(IPC_COMPANION_FOCUS),
       openMain: sender(IPC_COMPANION_OPEN_MAIN),
       showContextMenu: sender(IPC_COMPANION_SHOW_CONTEXT_MENU),
-      // Chat relay (companion → main → full shell).
       send: sender(IPC_COMPANION_SEND),
       stop: sender(IPC_COMPANION_STOP),
       getState: invoker(IPC_COMPANION_GET_STATE),
       onState: on(IPC_COMPANION_STATE),
-      // Brain side (full shell → main → companion).
       publishState: sender(IPC_COMPANION_PUBLISH_STATE),
       onSendRequested: on(IPC_COMPANION_SEND_REQUESTED),
       onStopRequested: onSignal(IPC_COMPANION_STOP_REQUESTED),
-      // Visibility (any window; drives the settings toggle).
       getVisible: invoker(IPC_COMPANION_GET_VISIBLE),
       setVisible: invoker(IPC_COMPANION_SET_VISIBLE),
       onVisibleChanged: on(IPC_COMPANION_VISIBLE_CHANGED),
     },
 
-    /** The desktop chat on pi-durable (`@stella/contracts/pi-chat`). */
     piChat: {
       request: invoker(IPC_PI_CHAT_REQUEST),
       onEvents: on(IPC_PI_CHAT_EVENTS),
@@ -727,16 +592,9 @@ export const createElectronApi = (
 
     agent: {
       sendInput: invoker(IPC_AGENT_SEND_INPUT),
-      /**
-       * Runtime client availability transitions. The host adapter fires this
-       * whenever the worker connection drops or reattaches, most notably
-       * after Electron restarts and reconnects to the still-running detached
-       * worker, so renderer hooks can re-trigger chat-resume right away.
-       */
       onAvailability: on(IPC_RUNTIME_AVAILABILITY),
     },
 
-    // The renderer reads asks as electronAPI.userAsk (user-ask-store).
     userAsk: {
       onOpened: onWithEvent(IPC_USER_ASK_OPENED),
       onUpdated: onWithEvent(IPC_USER_ASK_UPDATED),
@@ -833,18 +691,7 @@ export const createElectronApi = (
       listLlmOAuthCredentials: invoker(IPC_LLM_CREDENTIALS_LIST_OAUTH),
       loginLlmOAuthCredential: (provider: string) =>
         ipc.invoke(IPC_LLM_CREDENTIALS_LOGIN_OAUTH, { provider }),
-      /**
-       * Claude Code logins on this computer (the CLI's own; Stella never
-       * holds a Claude credential). Re-reads every config.
-       */
       listClaudeLocalAccounts: invoker(IPC_CLAUDE_ACCOUNTS_LIST),
-      /**
-       * Start `claude auth login`: no `configId` signs a NEW Stella-managed
-       * config in; "default" the CLI's default config (only while it is
-       * signed out); an existing extra config id signs that one in again.
-       * Main opens `authorizeUrl` itself; the user pastes back the code
-       * Anthropic shows.
-       */
       startClaudeLocalLogin: (options?: {
         configId?: string;
         email?: string;
@@ -853,21 +700,17 @@ export const createElectronApi = (
           configId: options?.configId,
           email: options?.email,
         }),
-      /** Settles when the sign-in's CLI exits: approved in the browser, or a pasted code. */
       waitClaudeLocalLogin: (loginId: string) =>
         ipc.invoke(IPC_CLAUDE_ACCOUNTS_WAIT_LOGIN, { loginId }),
-      /** Rejects with the CLI's own error (e.g. a wrong code). */
       finishClaudeLocalLogin: (loginId: string, code: string) =>
         ipc.invoke(IPC_CLAUDE_ACCOUNTS_FINISH_LOGIN, { loginId, code }),
       cancelClaudeLocalLogin: (loginId: string) =>
         ipc.invoke(IPC_CLAUDE_ACCOUNTS_CANCEL_LOGIN, { loginId }),
-      /** Extra configs only: `claude auth logout` with that config, then delete it. */
       signOutClaudeLocalConfig: (configId: string) =>
         ipc.invoke(IPC_CLAUDE_ACCOUNTS_SIGN_OUT, { configId }),
       onClaudeLocalAccountsChanged: onSignal(IPC_CLAUDE_ACCOUNTS_CHANGED),
       connectChatGptCloud: (options?: {
         accountId?: string;
-        /** Reuse a registration another host of the owner made. */
         clientId?: string;
         enablePlanUsage?: boolean;
       }) =>
@@ -882,7 +725,6 @@ export const createElectronApi = (
       listChatGptProfiles: invoker(IPC_CHATGPT_LIST_PROFILES),
       signInChatGpt: (options?: {
         profileId?: string;
-        /** Sign in with an issued client id another host of the owner shared. */
         sharedClientId?: string;
         enablePlanUsage?: boolean;
       }) =>
@@ -959,25 +801,10 @@ export const createElectronApi = (
     },
 
     home: {
-      /**
-       * Running user-facing apps with the frontmost one marked `isActive`.
-       * Resolves with an empty `apps` list when the native helper is
-       * unavailable so the UI can render an empty state.
-       */
       listRecentApps: (limit?: number) =>
         ipc.invoke(IPC_HOME_LIST_RECENT_APPS, { limit }),
-      /**
-       * The active tab of the given browser bundle id, or `{ tab: null }`
-       * when it isn't a known browser, has no windows, or AppleScript
-       * permission was denied.
-       */
       getActiveBrowserTab: (bundleId: string) =>
         ipc.invoke(IPC_HOME_GET_ACTIVE_BROWSER_TAB, { bundleId }),
-      /**
-       * A screenshot of the named app's topmost window and the title it
-       * matched, or `{ capture: null }` when no window source is available or
-       * screen recording permission is denied.
-       */
       captureAppWindow: (
         target: string | { appName?: string | null; pid?: number | null },
       ) =>
@@ -994,11 +821,6 @@ export const createElectronApi = (
         ipc.invoke(IPC_MEDIA_SAVE_OUTPUT, { url, fileName }),
       copyImage: (pngBase64: string) =>
         ipc.invoke(IPC_MEDIA_COPY_IMAGE, { pngBase64 }),
-      /**
-       * Copy a sent message's attachment to the system clipboard: an image
-       * (from its on-disk path or data URL) as a real image, or a non-image
-       * file's path as text. `mode` reports which path was taken.
-       */
       copyAttachment: invoker(IPC_MEDIA_COPY_ATTACHMENT),
     },
 
@@ -1029,17 +851,9 @@ export const createElectronApi = (
       getOrCreateDefaultConversationId: invoker(
         IPC_LOCAL_CHAT_GET_OR_CREATE_ID,
       ),
-      /**
-       * Record the conversation the user is viewing as the durable "active
-       * conversation" pointer restored on boot. Does not mint a new id.
-       */
       setActiveConversationId: invoker(IPC_LOCAL_CHAT_SET_ACTIVE_ID),
       listMessages: invoker(IPC_LOCAL_CHAT_LIST_MESSAGES),
       listMessagesBefore: invoker(IPC_LOCAL_CHAT_LIST_MESSAGES_BEFORE),
-      /**
-       * Changed rows strictly after the `(afterTimestampMs, afterId)` cursor,
-       * driving the chat's tail-only refresh on `localChat:updated`.
-       */
       listMessagesAfter: invoker(IPC_LOCAL_CHAT_LIST_MESSAGES_AFTER),
       listActivity: invoker(IPC_LOCAL_CHAT_LIST_ACTIVITY),
       listLineageMessages: invoker(IPC_LOCAL_CHAT_LIST_LINEAGE_MESSAGES),

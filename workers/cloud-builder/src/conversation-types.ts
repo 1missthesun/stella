@@ -4,22 +4,6 @@ import type {
   MessageRole,
   TurnPhase,
 } from "@stella/contracts/conversation-protocol";
-/**
- * The conversation transcript's shared vocabulary: tuning constants, the wire
- * protocol's record and frame shapes, and the two interfaces that split the
- * work in half.
- *
- * The split, stated once: STORAGE owns SQLite, R2, the agent loop and the turn
- * lifecycle, and calls `broadcastRecord` after every committed append. The HUB
- * owns sockets, auth and fan-out, and never writes to SQLite. Nothing else in
- * `workers/cloud-builder` may hold a durable conversation fact.
- *
- * This module is the seam. It is written once and then frozen: both halves
- * import it, so an edit here is an edit to both. The socket-facing constants,
- * close codes and enums are the clients' own wire contract
- * (`@stella/contracts/conversation-protocol`), re-exported here so the hub
- * and the clients read one definition.
- */
 
 export {
   BACKFILL_BATCH_RECORDS,
@@ -41,43 +25,11 @@ export {
 } from "@stella/contracts/conversation-protocol";
 export type { MessageRole, TurnPhase };
 
-/**
- * 2 adds `spills.bytes`; 3 added owner-move object tracking (since removed);
- * 4 adds durable append receipts so an acknowledged foreign write remains
- * idempotent after its hot journal rows roll into R2; 5 adds retired writer
- * fences so a delayed pre-rewind writer cannot recreate a removed suffix in
- * the new epoch; 6 adds atomic edit receipts for crash-safe rewind replay;
- * 7 adds retired turn fences; 8 moves transcript search into a
- * rollover-surviving FTS5 table; 9 searches agents' reports and messages too;
- * 10 keeps the resident set's rows, bytes and tokens on `meta`; 11 encrypts
- * payloads under a per-conversation key and hashes the search index.
- */
 export const JOURNAL_SCHEMA_VERSION = 12;
 
-// ---------------------------------------------------------------------------
-// Residency / rollover
-// ---------------------------------------------------------------------------
-
-/**
- * Residency follows the conversation's compaction checkpoint: everything from
- * the latest checkpoint on stays resident, because that is where every new
- * transcript starts (`journalStart`), and only what is older is archived.
- *
- * Before any host compacted, at least one full context window of the largest
- * model Stella runs stays resident: archiving waits until the resident model
- * context passes RESIDENT_ROLLOVER_TOKENS and then keeps the newest
- * RESIDENT_CONTEXT_TOKENS, so a cut moves a sizeable segment at once rather
- * than a sliver every turn.
- */
 export const RESIDENT_CONTEXT_TOKENS = 1_000_000;
 export const RESIDENT_ROLLOVER_TOKENS = 1_500_000;
-/**
- * Byte backstop: past this, rows older than the newest
- * RESIDENT_CONTEXT_TOKENS are archived even when a stale checkpoint would
- * keep them.
- */
 export const HOT_MAX_BYTES = 48 * 1024 * 1024;
-/** Rows one residency scan reads at a time, and at most in all. */
 export const CUT_SCAN_PAGE_ROWS = 1_000;
 export const CUT_SCAN_MAX_ROWS = 100_000;
 export const DB_PRESSURE_AGGRESSIVE_BYTES = 64 * 1024 * 1024;
@@ -89,42 +41,11 @@ export const MAX_ROW_BYTES = 1024 * 1024;
 /** Platform allows 6 simultaneous outgoing connections; leave room for R2 retries. */
 export const MAX_SEGMENTS_PER_READ = 4;
 
-// ---------------------------------------------------------------------------
-// Context window
-// ---------------------------------------------------------------------------
-
-/**
- * Hard ceiling on the metadata pass that picks the context window. The token
- * budget itself is CLOUD_HISTORY_TOKEN_BUDGET in @stella/executor-cloud.
- */
 export const CONTEXT_SCAN_ROW_CAP = 4_000;
-/** How many spilled payloads one window will pull back from R2. */
 export const CONTEXT_MAX_SPILL_HYDRATIONS = 3;
-/** How far back repair-on-load scans for an unanswered tool call. */
 export const REPAIR_SCAN_ROW_CAP = 400;
 
-// ---------------------------------------------------------------------------
-// Socket
-// ---------------------------------------------------------------------------
-
-/**
- * How far behind a resuming client may be and still have its delta replayed
- * exactly. Beyond this the hub serves the newest window with `reset: "window"`.
- *
- * A device away for a minute resumes seamlessly — that is the common case and
- * it stays exact. A device away for hours used to watch its whole missed delta
- * arrive oldest-first, which is both slow and backwards: the newest messages,
- * the only ones it opened the app to read, came last. Past this many records a
- * client is better served by landing on the latest window and pulling the rest
- * back through scrollback, which it already does for a compacted floor.
- */
 export { MAX_CATCHUP_RESUME_RECORDS as MAX_CATCH_UP_RECORDS } from "@stella/contracts/conversation-protocol";
-/**
- * Hot rows one statement of the running-agent fold reads. The fold is cached
- * in the object's memory and carried forward by newly appended rows, so the
- * full resident scan runs once per object lifetime, a page at a time; anything
- * older has rolled into R2 and cannot be waited on from the `ready` path.
- */
 export const AGENT_ACTIVITY_SCAN_ROWS = 1_000;
 export const BACKFILL_BATCH_BYTES = 512 * 1024;
 export const MAX_SOCKETS_PER_CONVERSATION = 16;
@@ -134,65 +55,24 @@ export const RATE_CANCEL_PER_MIN = 10;
 export const RATE_AUTH_PER_MIN = 10;
 export const RATE_TOTAL_PER_MIN = 60;
 
-// ---------------------------------------------------------------------------
-// Live turn state
-// ---------------------------------------------------------------------------
-
-/** Tool argument preview length on the advisory `tool` frame. */
 export const TOOL_ARGS_PREVIEW_MAX = 400;
-
-// ---------------------------------------------------------------------------
-// Appends
-// ---------------------------------------------------------------------------
 
 export const APPEND_MAX_ROWS = 256;
 export const APPEND_MAX_BYTES = 4 * 1024 * 1024;
 export const INBOX_MAX_ROWS = 200;
 export const INBOX_MAX_BYTES = 2 * 1024 * 1024;
 
-/**
- * The per-conversation append budget, and the reason it exists.
- *
- * `POST /conversations/:id/journal` is a live user-authenticated write path.
- * Per-request caps bound one request; nothing bounds a loop of them, and a
- * Durable Object's storage is billed and ceilinged per object. These are the
- * two limits that bound writes: a fixed window that caps the rate, and a
- * lifetime ceiling on everything the conversation has stored. R2 holds the
- * cold transcript tier, while the SQLite hot-set policy keeps resident journal
- * rows bounded. Only the FTS index over user and assistant text grows for the
- * lifetime of the conversation inside the object.
- *
- * The window is deliberately generous: it exists to stop a runaway client, not
- * to shape a plan. The ceiling is what a plan would parametrize.
- */
 export const APPEND_WINDOW_MS = 60_000;
 export const APPEND_WINDOW_MAX_REQUESTS = 60;
 export const APPEND_WINDOW_MAX_BYTES = 16 * 1024 * 1024;
 export const CONVERSATION_MAX_STORED_BYTES = 4 * 1024 * 1024 * 1024;
 
-// ---------------------------------------------------------------------------
-// Conversation index
-// ---------------------------------------------------------------------------
-
 export const PREVIEW_MAX_CHARS = 160;
-
-// ---------------------------------------------------------------------------
-// JWKS (consumed by the hub's auth module)
-// ---------------------------------------------------------------------------
 
 export const JWKS_MIN_REFETCH_MS = 60_000;
 export const CLOCK_SKEW_S = 60;
 
-// ---------------------------------------------------------------------------
-// Close codes
-// ---------------------------------------------------------------------------
-
-/** The 44xx/4503 codes are the shared ones above; this one is server-only. */
 export const CLOSE_INTERNAL = 1011;
-
-// ---------------------------------------------------------------------------
-// Records
-// ---------------------------------------------------------------------------
 
 export type ConversationCard =
   | CloudAgentLifecycleCard
@@ -217,13 +97,10 @@ export type JournalMessageRecord = {
   turnId: string;
   createdAtMs: number;
   role: MessageRole;
-  /** Render flag: no user bubble. Still model context. */
   hidden: boolean;
   /** Ties this committed row to the advisory deltas that preceded it. */
   streamId?: string;
-  /** Prompt rows only: resolves the client's optimistic echo. */
   clientMsgId?: string;
-  /** A serialized AgentMessage, or a `{ $spill: true }` stub for oversize rows. */
   payload: unknown;
 };
 
@@ -235,7 +112,6 @@ export type JournalTurnRecord = {
   phase: TurnPhase;
   lane?: string;
   source?: string;
-  /** User-facing text for every non-completed phase. Never a provider string. */
   notice?: string;
   promptSeq?: number;
   wallClockMs?: number;
@@ -254,15 +130,9 @@ export type JournalRecord =
   | JournalTurnRecord
   | JournalCardRecord;
 
-// ---------------------------------------------------------------------------
-// Reader surface the hub is given
-// ---------------------------------------------------------------------------
-
 export type JournalHead = {
   headSeq: number;
-  /** Lowest seq still resident in SQLite. Below this, reads go to R2. */
   windowStartSeq: number;
-  /** Lowest seq that exists at all — anything below is compacted or never was. */
   floorSeq: number;
   epoch: number;
   title: string;
@@ -272,12 +142,7 @@ export type JournalHead = {
 
 export type JournalRange = {
   records: JournalRecord[];
-  /** False when the caller's range was cut short by a batch limit. */
   complete: boolean;
-  /**
-   * Set when part of the requested range no longer exists (compacted past the
-   * archive, or never allocated). The hub turns this into a `gap` frame.
-   */
   missingBelowSeq?: number;
 };
 
@@ -309,7 +174,6 @@ export type ConversationOwnerRecord = {
 
 export interface JournalReader {
   head(): JournalHead;
-  /** "" when the DO has never been bound to an owner. */
   ownerId(): string;
   bindOwner(record: ConversationOwnerRecord): void;
   readRange(
@@ -319,42 +183,20 @@ export interface JournalReader {
   ): Promise<JournalRange>;
   newest(limit: number): JournalRecord[];
   liveTurn(): LiveTurnSnapshot | null;
-  /**
-   * Every agent the conversation has running, oldest start first: where pi
-   * has run, the list its owner records keep (pi's agents and the owner's
-   * agent threads); elsewhere, the whole journal's agent cards folded.
-   * Synchronous on purpose: `ready` is assembled with no await left to spend,
-   * and this answer comes from memory.
-   */
   runningAgents(limit: number): AgentActivityEntry[];
 }
 
-// ---------------------------------------------------------------------------
-// Hub surface storage is given
-// ---------------------------------------------------------------------------
-
-/** What the worker proved about the caller before the DO was ever addressed. */
 export type SocketIdentity = {
   ownerId: string;
   subject: string;
   sessionId?: string;
-  /** Epoch millis at which the presented JWT stops being valid. */
   authExpiresAtMs: number;
 };
 
-/**
- * The proven-identity headers the worker attaches when it forwards a verified
- * caller to a conversation DO. They live here, on the shared seam, because both
- * sides of it read them: the worker writes them after verifying the JWT, and
- * the DO rebuilds the identity from them. A client-supplied header of the same
- * name is stripped at the worker before forwarding — that stripping is the
- * whole reason the DO is allowed to trust these.
- */
 export const HEADER_OWNER = "x-stella-owner";
 export const HEADER_SUBJECT = "x-stella-subject";
 export const HEADER_SESSION = "x-stella-session";
 export const HEADER_TOKEN_EXP = "x-stella-token-exp";
-/** The verified token's identity level and `iat` (ms), for the owner object. */
 export const HEADER_IDENTITY_LEVEL = "x-stella-identity-level";
 export const HEADER_TOKEN_IAT = "x-stella-token-iat";
 /**
@@ -363,14 +205,8 @@ export const HEADER_TOKEN_IAT = "x-stella-token-iat";
  * issuer configuration — the worker's isolate globals are not the DO's.
  */
 export const HEADER_ISSUER = "x-stella-auth-issuer";
-/** Every header under this prefix is stripped from the client's own request. */
 export const STELLA_HEADER_PREFIX = "x-stella-";
 
-/**
- * Rebuild the verified identity on the DO side. Returns null when the headers
- * are absent or malformed, which can only mean the route was reached without
- * passing through the worker's verification — refuse rather than guess.
- */
 export const parseSocketIdentity = (
   request: Request,
 ): SocketIdentity | null => {
@@ -406,23 +242,12 @@ export interface ConversationHub {
     wasClean: boolean,
   ): Promise<void>;
   onError(ws: WebSocket, error: unknown): Promise<void>;
-  /** Called after every committed journal append. Must never throw. */
   broadcastRecord(record: JournalRecord): void;
-  /**
-   * Advisory tool lifecycle: lossy, never persisted, must never throw and
-   * never await. The only advisory frame left — assistant text reaches
-   * clients whole on `broadcastRecord`, never as deltas.
-   */
   broadcastTool(tool: ToolInput): void;
-  /** The running agents may have changed: every socket hears when they did. Must never throw. */
   agentsChanged(): void;
-  /** A batch of pi-durable events for the sockets watching the pi view. Must never throw. */
   broadcastPi(events: readonly unknown[]): void;
-  /** Where the conversation's Stella runs, after its holder changed. */
   broadcastBrain(record: import("@stella/contracts/turn-plane/pi-brain").PiBrainRecord | null): void;
-  /** How many sockets watch the pi view. */
   piSocketCount(): number;
-  /** A turn reached a terminal phase: drop any retained live state. */
   endTurn(turnId: string): void;
   closeAll(code: number): void;
 }
@@ -452,23 +277,14 @@ export interface ConversationHubDeps {
   onConnect: () => void;
   conversationId: () => string;
   log: ConversationLogger;
-  /** Verifies a mid-life `auth` frame's token with the worker's own keys. */
   verifyToken: (token: string) => Promise<import("./auth-jwt.js").VerifyResult>;
-  /** The pi-durable view, for conversations that run on it. */
   pi?: PiSocketSource;
 }
 
-/**
- * A pi-durable conversation's view for sockets that ask for it (`pi=1`):
- * the snapshot a socket starts from, its event batches (`broadcastPi`), and
- * older history on request (`@stella/contracts/pi-chat`).
- */
 export interface PiSocketSource {
   enabled(): Promise<boolean>;
-  /** A fresh snapshot; attaching also sends it to every pi socket as an event. */
   attach(): Promise<{ snapshot: unknown; hasOlder: boolean }>;
   older(beforeEntryId: number): Promise<{ entries: unknown[]; hasOlder: boolean }>;
-  /** No pi socket is left. */
   detach(): void;
 }
 
@@ -527,15 +343,6 @@ export const createConversationHub = (
 ): ConversationHub =>
   hubFactory ? hubFactory(deps) : new NullConversationHub();
 
-// ---------------------------------------------------------------------------
-// Shared helpers
-// ---------------------------------------------------------------------------
-
-/**
- * UTF-8 byte length without allocating a copy. Every budget in this module is
- * denominated in bytes, and a JS string length undercounts CJK by 3x — which
- * is exactly the transcript that would blow the row cap.
- */
 export const utf8Length = (value: string): number => {
   let bytes = 0;
   for (let index = 0; index < value.length; index += 1) {
@@ -550,12 +357,10 @@ export const utf8Length = (value: string): number => {
   return bytes;
 };
 
-/** Stub written in place of an oversize payload; the bytes live at spill_key. */
 export type SpillStub = {
   $spill: true;
   role: string;
   bytes: number;
-  /** UI-safe projection; full model payload remains at `spill_key`. */
   content?: Array<{ type: "text"; text: string }>;
   timestamp?: number;
   toolCallId?: string;

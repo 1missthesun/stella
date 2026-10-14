@@ -22,12 +22,6 @@ const PROVIDER_LABEL: Record<SocialProvider, string> = {
   google: "Google",
 };
 
-/**
- * Apple + Google sign-in buttons for the marketing site. Both use Better Auth's
- * redirect OAuth flow (`signIn.social`), the same flow the mobile app uses for
- * its non-native branch. Apple is listed first to match the mobile login screen
- * and Apple's own guidance.
- */
 export function SocialSignInButtons({ callbackURL }: SocialSignInButtonsProps) {
   const [pendingProvider, setPendingProvider] = useState<SocialProvider | null>(
     null,
@@ -40,8 +34,6 @@ export function SocialSignInButtons({ callbackURL }: SocialSignInButtonsProps) {
       setPendingProvider(provider);
 
       try {
-        // Absolute: the auth server is on another origin and would resolve
-        // a relative path against itself.
         const nextURL = new URL(
           callbackURL ?? window.location.href,
           window.location.origin,

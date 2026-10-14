@@ -11,11 +11,6 @@ export type CanonicalExecutionCancellationCommand = {
   reason: string;
 };
 
-/**
- * Reconstructs the exact durable cancellation identity after a clean restart.
- * The journal retains the server dispatch id; its owner-scoped status row
- * retains the original mobile idempotency key (and any prior cancel request).
- */
 export const cancelCanonicalCloudExecution = async <T>(args: {
   dispatchId: string;
   conversationId: string;

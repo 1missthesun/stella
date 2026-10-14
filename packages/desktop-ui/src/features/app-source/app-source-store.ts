@@ -8,13 +8,6 @@ import type {
 } from "@stella/contracts/desktop/app-source";
 import { isStellaDraft } from "@stella/contracts/desktop/app-source";
 
-/**
- * The app's own source state (drafts to apply, recent changes, the user's
- * other computers, published updates) when Stella runs from source. One
- * subscription for every card that shows a piece of it; `null` when Stella
- * doesn't run from source.
- */
-
 let snapshot: AppSourceState | null = null;
 let started = false;
 const listeners = new Set<() => void>();
@@ -50,20 +43,6 @@ export const useAppSourceState = () =>
 
 export const appSourceApi = () => window.electronAPI?.appSource ?? null;
 
-/**
- * Every button here calls one method and is finished with it. Git work the
- * app cannot do alone — a stale draft, a diverged merge, an undo later work
- * conflicts with — is recognised and handed to an agent by the main process,
- * which has the shas and the conflicts in hand. The renderer used to do that
- * by dispatching a sentence into the chat as a hidden user message, so the
- * user read themselves asking for something they had only pressed a button
- * for. Nothing here writes to the conversation now.
- */
-
-/**
- * The card whose action is running, by key. Shared, because the same card can
- * be mounted twice (the chat column under the home screen, and the home screen).
- */
 let pending: string | null = null;
 const pendingListeners = new Set<() => void>();
 const setPending = (next: string | null) => {
@@ -94,18 +73,11 @@ export const runAppSourceAction = async (
   }
 };
 
-/** What the chat shows for an agent's change to Stella. */
 export type AgentChange =
   | { kind: "ready"; draft: AppSourceDraft }
   | { kind: "stale"; draft: AppSourceDraft }
   | { kind: "applied"; commit: AppSourceCommit };
 
-/**
- * The newest thing an agent's change is on this computer: a draft to apply, a
- * draft whose base moved, or a commit already in the version (applied, or
- * undone again). A change made on another computer is offered by a
- * card above the composer and by the Updates tab.
- */
 export const agentChange = (
   state: AppSourceState,
   agentId: string,
@@ -116,25 +88,14 @@ export const agentChange = (
   if (ready) return { kind: "ready", draft: ready };
   const stale = state.stale.find(mine);
   if (stale) return { kind: "stale", draft: stale };
-  // `recent` is newest first.
   const commit = state.recent.find((entry) => entry.agentId === agentId);
   return commit ? { kind: "applied", commit } : null;
 };
 
-/**
- * The new version of Stella the top bar offers, when one is waiting (or
- * already being added). Skipped in the Updates tab, it leaves the top bar.
- */
 export const versionOffer = (state: AppSourceState) =>
   state.waiting.find(
     (offer): offer is Extract<AppSourceWaiting, { kind: "version" }> =>
       offer.kind === "version",
   ) ?? null;
 
-/**
- * An update Stella is taking by itself, as the state reports it. Whether it
- * needed a merge, and whether an agent is doing it, is the main process's
- * business: the renderer only knows that one is running and then that it
- * landed. There is nothing to press either way.
- */
 export const updateProgress = (state: AppSourceState) => state.update ?? null;

@@ -53,7 +53,6 @@ export function createDomTools() {
     const home = surface.parentElement?.querySelector('.full-body-home-overlay');
     const composerSurface = home && visible(home) ? home : surface;
     if (!visible(composerSurface)) return { surfaceFound: false, matchingMessageIds: [], notices: [], composerCleared: false };
-    // Include mounted offscreen rows in the baseline, but only visible rows as evidence.
     const rows = [...surface.querySelectorAll('.event-row--user[data-chat-row-id]')];
     const matching = rows.filter((row) => (row.querySelector('.event-item.user')?.textContent || '').trim() === text.trim());
     const composers = [...composerSurface.querySelectorAll('textarea.composer-input')].filter(visible);
@@ -75,7 +74,6 @@ export function compareObservations(before, after) {
   const state = Object.fromEntries([...new Set([...Object.keys(before.state), ...Object.keys(after.state)])]
     .filter((key) => JSON.stringify(before.state[key]) !== JSON.stringify(after.state[key]))
     .map((key) => [key, { before: before.state[key], after: after.state[key] }]));
-  // Multiset comparison preserves duplicate controls. Geometry changes appear as removal/addition.
   const difference = (left, right) => {
     const remaining = right.map((item) => JSON.stringify(item));
     return left.filter((item) => {

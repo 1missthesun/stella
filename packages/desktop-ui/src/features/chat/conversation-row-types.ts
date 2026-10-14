@@ -21,56 +21,29 @@ export type UserRowViewModel = {
   kind: "user";
   id: string;
   text: string;
-  /** Persisted created time (epoch ms) — feeds the hover timestamp. */
   timestampMs?: number;
-  /** True only for the freshly-sent user bubble — drives the entry animation. */
   justSent?: boolean;
   windowLabel?: string;
   windowPreviewImageUrl?: string;
-  /** One chip per attached selected-area context, in attach order. */
   appSelectionLabels?: string[];
   activityLabel?: string;
-  /** Descriptors for the "Pasted text" chips lifted out of the composer. */
   pastedTexts?: PastedTextDescriptor[];
-  /**
-   * Bounded preview of quoted / "Ask Stella" context for this turn. Rendered
-   * as a chip on the sent message; the full quote reached the model as a
-   * dedicated hidden context message and is never part of the visible body.
-   */
   quotedText?: string;
   reaction?: string;
   reactionAt?: number;
   attachments: Attachment[];
   channelEnvelope?: ChannelEnvelope;
-  /**
-   * Runtime wake prompt (`[Agent completed]` and friends) that renders no
-   * bubble. It must not start a new exchange for reply context.
-   */
   hidden?: boolean;
-  /** Agent threads whose spawn was anchored on this message's tool events. */
   spawnedThreadIds?: string[];
-  /** Descriptions of `spawn_agent` requests anchored here (see assistant rows). */
   spawnedDescriptions?: string[];
 };
 
 export type AssistantRowViewModel = {
   kind: "assistant";
-  /**
-   * React key for this row. Stable across the streaming -> persisted
-   * transition: a row that responds to user message `U` keeps the same
-   * `id` whether it is fed by the streaming buffer or loaded from the
-   * persisted `assistant_message`.
-   */
   id: string;
   text: string;
-  /** Persisted created time (epoch ms) — feeds the hover timestamp. */
   timestampMs?: number;
-  /**
-   * Stable Streamdown cache key. Same value across the streaming ->
-   * persisted handoff so the markdown parse cache is reused.
-   */
   cacheKey: string;
-  /** Durable row identity used for explicit, paginated tool-detail reads. */
   sourceMessageId?: string;
   sourceMessageSequence?: number;
   toolEventSummary?: {
@@ -83,147 +56,43 @@ export type AssistantRowViewModel = {
     detailHasMore?: boolean;
     livePinsPending?: boolean;
   };
-  /**
-   * Set for one paint on the reply that just entered the timeline, so it
-   * can play its arrival animation. A reply arrives whole, so this is a
-   * one-shot marker rather than a "still growing" flag.
-   */
   justArrived?: boolean;
-  /** True for a pre-tool assistant segment within a still-running turn. */
   isIntraTurn?: boolean;
   responseTarget?: AgentResponseTarget;
-  /**
-   * What this reply is about: earlier messages and/or agent threads the
-   * orchestrator cited (`reply-refs`). Rendered as the iMessage-style reply
-   * preview above the bubble; each entry opens focus on its target.
-   */
   replyRefs?: ReplyRef[];
-  /**
-   * Agents this row's reply pill names: set only where the conversation
-   * turns to a different agent (`@stella/contracts/agent-labels`).
-   */
   agentLabelIds?: string[];
-  /** User turn this assistant row belongs to (for inline-image coalescing). */
   replyToUserMessageId?: string;
-  /**
-   * Agent threads this row's tool events started (`agent-started`, or a
-   * `spawn_agent` / `send_message` result naming its thread). Feeds reply
-   * context even when no inline card is drawn for the spawn.
-   */
   spawnedThreadIds?: string[];
-  /**
-   * Descriptions of the `spawn_agent` requests on this row. When the journal
-   * carries no thread id for a spawn, reply context matches these against
-   * the task titles later reports cite.
-   */
   spawnedDescriptions?: string[];
   officePreviewRef?: OfficePreviewRef;
-  /**
-   * Files the reply text links (local paths, or the cloud world's drive),
-   * minus any a completion section on this row already shows. Rendered as
-   * pills under the bubble; a linked file never becomes a full card.
-   */
   linkedFiles?: ConversationFileEntry[];
   resourcePayload?: DisplayPayload;
-  /** Orchestrator image_gen inline cards — one group per tool call. */
   inlineImagePayloads?: DisplayPayload[];
-  /**
-   * Inline interactive map cards from this turn's `map` tool calls (the
-   * shared `map-route` artifact rendered via the hosted stella.sh embed).
-   * See `deriveTurnMapArtifacts`.
-   */
   mapArtifacts?: TurnMapArtifact[];
-  /** Compact records of this turn's answered orchestrator `ask_user` calls. */
   askRecords?: UserAskRecord[];
-  /**
-   * Developer-resource source-diff payloads for this turn, in edit
-   * order. Populated only when the developer-file-previews setting
-   * is on AND the turn touched at least one such file. `.length`
-   * doubles as the "N file changes" label; the payloads themselves
-   * are pushed into the singleton "Code changes" tab when the user
-   * clicks the inline link / summary card.
-   */
   sourceDiffPayloads?: DisplayPayload[];
-  /**
-   * Present on the visible assistant message a realtime voice session
-   * writes when it ends. Renders the polished "Voice session" summary
-   * card in place of the message text body.
-   */
   voiceSession?: VoiceSessionSummaryMetadata;
-  /** A reminder Stella delivered: the row carries its Done and Snooze. */
   reminder?: ReminderMark;
-  /**
-   * Collapsed, expandable trace of the tool calls this row's turn ran after
-   * its text (one summary line, Claude-Code-style: "Read 3 files and
-   * searched code"). Derived from the row's `toolEvents` slice, counting only
-   * settled calls — so it appears once the first tool returns and ticks up as
-   * each subsequent one finishes, while the in-flight call stays owned by the
-   * footer working indicator. Delegation tools are excluded — those surface
-   * through `backgroundWork` instead.
-   */
   toolActivity?: ToolActivityGroup;
-  /**
-   * Inline "background work" card for a turn that kicked off (or updated)
-   * one background-work occurrence (orchestrator `spawn_agent` /
-   * `spawn_agent` / `send_message`). Multiple starts in the same turn render
-   * as separate rows, preserving the distinct spawn and follow-up receipts.
-   * Lifecycle state is keyed by each persisted `agent-started` event id.
-   * Progress/completion/failure update this descriptor in place; completion
-   * sections (including generated files) therefore render on this original
-   * row rather than creating a second completion-time card.
-   */
   backgroundWork?: {
     threadIds: string[];
     completedThreadIds: string[];
     failedThreadIds?: string[];
-    /** Reload-safe subset whose latest `agent-canceled` postdates this card's
-     *  spawn (and any completion) — the thread was stopped (`stop_agent`
-     *  lands as a cancel; a stopped thread is resumable). The card renders a
-     *  "Stopped" label and stops its shimmer for these; a resume
-     *  (`send_message`) emits a fresh `agent-started` whose newer card
-     *  supersedes this one. */
     stoppedThreadIds?: string[];
     supersededThreadIds?: string[];
-    /** Per-thread work description (the spawn's user-friendly summary),
-     *  used as the card title — mirrors the sidebar Activity surface. */
     descriptions: Record<string, string>;
-    /** Per-thread follow-up text for threads re-activated via `send_message` on
-     *  this turn. A `send_message` reuses the thread's original `description`, so
-     *  this carries the follow-up's own message/description for the card title;
-     *  absent for plain spawns. See `getBackgroundWork`. */
     statusTexts?: Record<string, string>;
-    /** Raw run-scoped progress narration retained for event/history fidelity;
-     * summary cards intentionally do not present it. */
     progressTexts?: Record<string, string>;
-    /** Raw structured tool state retained for event/history fidelity;
-     * assistant-summary surfaces intentionally do not present it. */
     toolActivities?: Record<string, TaskToolActivity>;
-    /** Threads on this card that are `send_message` follow-ups (an update to an
-     *  already-spawned thread) rather than fresh spawns — drives the distinct
-     *  "follow-up" card variant. */
     followUpThreadIds?: string[];
-    /** Per-thread spawn/last-advanced time (ms). Lets the card presume a
-     *  long-silent thread with no live signal is settled rather than pinning
-     *  it as forever-working when its lifecycle aged out of the windows. */
     spawnedAtMs?: Record<string, number>;
-    /** Canonical occurrence identity and insertion anchor. `agentId` is a
-     * durable thread and `rootRunId` can cover several send_message cycles, so
-     * neither is sufficient by itself. */
     startEventIdsByThread: Record<string, string>;
-    /** Durable execution epoch captured by this `agent-started` occurrence. */
     attemptGenerationsByThread?: Record<string, number>;
     rootRunIdsByThread: Record<string, string>;
     terminalEventIdsByThread?: Record<string, string>;
     cardId: string;
-    /** Run-scoped done payload used for lifecycle correlation. The completion
-     * card itself is projected separately at the completion timeline anchor. */
     completionSections?: AgentCompletionSection[];
   };
-  /**
-   * Append-only completion attachment at the row where `agent-completed` was
-   * routed. The matching background-work receipt remains at its start anchor
-   * and settles without changing card type.
-   */
   agentCompletion?: {
     sections: AgentCompletionSection[];
   };

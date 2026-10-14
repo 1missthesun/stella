@@ -205,10 +205,6 @@ export type PermissionRequestResult = {
   alreadyGranted: boolean
 }
 
-/**
- * Trigger the native macOS permission prompt for a single permission kind.
- * Returns whether the permission is now granted.
- */
 export const requestMacPermission = async (kind: MacPermissionKind): Promise<PermissionRequestResult> => {
   if (process.platform !== 'darwin') return { granted: true, alreadyGranted: true }
 

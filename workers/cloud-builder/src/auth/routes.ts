@@ -1,10 +1,3 @@
-/**
- * `/api/auth/*`: Better Auth's handler behind CORS for the trusted browser
- * origins. Browsers keep the bearer themselves (`set-auth-token`), so the
- * response exposes it; preflights allow the captcha and app-integrity headers
- * the sign-in endpoints read.
- */
-
 import { APP_INTEGRITY_HEADER } from "@stella/contracts/app-integrity";
 import { AUTH_CAPTCHA_HEADER } from "@stella/contracts/auth-challenge";
 import { createAuth, trustedOrigins } from "./auth.js";

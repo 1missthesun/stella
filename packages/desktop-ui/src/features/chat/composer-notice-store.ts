@@ -1,21 +1,3 @@
-/**
- * Store for "you need to act before Stella can continue" notices — the
- * user is signed out, their plan ran out of room, a provider key is
- * missing, a model is gated behind an upgrade.
- *
- * These used to be error toasts. A toast is the wrong shape for them: it
- * slides in at the corner, auto-dismisses after a few seconds, and is
- * easy to miss, while the thing it describes blocks the very composer
- * the user is looking at. So chat surfaces render the current notice as
- * a card pinned directly above the composer (the same slot the
- * agent-initiated connector connect card uses), where it stays until the
- * user acts on it, dismisses it, sends again, or a reply in that chat
- * finishes without the failure.
- *
- * Transient failures (network blips, timeouts, a blocked prompt) are not
- * notices and keep using the toast.
- */
-
 import { useSyncExternalStore } from "react";
 import { showToast, type ToastOptions } from "@/ui/toast";
 
@@ -28,21 +10,12 @@ export type ComposerNoticeAction = {
 
 export type ComposerNotice = {
   id: string;
-  /**
-   * Owning chat. `null` = unscoped, shown on every surface — used by
-   * callers that know nothing about conversations (dictation, voice, the
-   * submit-time plan check).
-   */
   conversationId: string | null;
   kind: ComposerNoticeKind;
   title: string;
   description?: string;
   action?: ComposerNoticeAction;
   secondaryAction?: ComposerNoticeAction;
-  /**
-   * Claude Code on this computer needs a sign-in: the card's button runs
-   * the same Claude sign-in as Settings, in place, for `email` when named.
-   */
   claudeSignIn?: { email?: string };
 };
 
@@ -68,11 +41,6 @@ const subscribe = (listener: () => void) => {
 
 const getSnapshot = () => notices;
 
-/**
- * Show (or replace) the notice for a conversation scope. One notice per
- * scope: a fresh limit/auth failure supersedes the previous one rather
- * than stacking, since the newest reason is the one the user must act on.
- */
 export const showComposerNotice = (input: ComposerNoticeInput): string => {
   const id = input.id ?? `composer-notice-${++nextId}`;
   const next: ComposerNotice = { ...input, id };
@@ -90,12 +58,6 @@ export const dismissComposerNotice = (id: string): void => {
   emitChange();
 };
 
-/**
- * Drop every notice a new send or a finished reply in `conversationId`
- * makes stale: the one scoped to that chat plus any unscoped one, except
- * those `keep` holds on to. If the problem persists the failed run raises
- * a fresh notice.
- */
 export const clearComposerNotices = (
   conversationId: string | null | undefined,
   keep?: (notice: ComposerNotice) => boolean,
@@ -111,10 +73,6 @@ export const clearComposerNotices = (
   emitChange();
 };
 
-/**
- * The notice a chat surface should show: the one scoped to its chat,
- * else an unscoped one. Newest wins within a scope by construction.
- */
 export const selectComposerNotice = (
   entries: readonly ComposerNotice[],
   conversationId: string | null | undefined,
@@ -133,11 +91,6 @@ export const useComposerNotice = (
   return selectComposerNotice(entries, conversationId);
 };
 
-/**
- * Surfaces register while mounted so non-React callers can tell whether a
- * pinned notice would actually be visible somewhere. Windows without a
- * composer, such as the overlay, fall back to the toast.
- */
 export const registerComposerNoticeSurface = (): (() => void) => {
   mountedSurfaces += 1;
   return () => {
@@ -147,11 +100,6 @@ export const registerComposerNoticeSurface = (): (() => void) => {
 
 export const hasComposerNoticeSurface = (): boolean => mountedSurfaces > 0;
 
-/**
- * Pin `notice` above the composer when a chat surface is mounted;
- * otherwise show `fallback` (or the notice's own content) as a toast so
- * the user is never left without feedback.
- */
 export const presentComposerNotice = (
   notice: ComposerNoticeInput,
   fallback?: ToastOptions,

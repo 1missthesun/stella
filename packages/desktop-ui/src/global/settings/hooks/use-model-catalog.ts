@@ -52,10 +52,6 @@ const EMPTY_MANAGED: ManagedRuntimeCatalogPayload = {
   directModels: [],
 };
 
-/**
- * Per-audience Stella catalog, keyed by the auth audience. Fetched once per
- * launch and again (with its ETag) when `billing.status` moves the audience.
- */
 const stellaCatalogStore = createResourceStore<string, StellaCatalogPayload>({
   staleMs: MODEL_CATALOG_REFRESH_INTERVAL_MS,
   fetcher: async () => {
@@ -67,11 +63,6 @@ const stellaCatalogStore = createResourceStore<string, StellaCatalogPayload>({
   },
 });
 
-/**
- * Single worker-owned catalog for direct providers. The runtime restores its
- * persisted last-good catalog immediately and refreshes pi.dev in the
- * background, so the renderer never maintains a second provider registry.
- */
 const managedGatewayStore = createResourceStore<"default", ManagedRuntimeCatalogPayload>({
   staleMs: MODEL_CATALOG_REFRESH_INTERVAL_MS,
   accept: (next, current) => next.revision > current.revision,
@@ -79,9 +70,6 @@ const managedGatewayStore = createResourceStore<"default", ManagedRuntimeCatalog
     const data = await window.electronAPI?.system?.listLlmModels?.({
       forceRefresh: context.force,
     });
-    // Do not normalize a missing response into an empty catalog — that would
-    // cache `{revision: 0, directModels: []}` as a successful fetch for the
-    // whole stale window. Surface the missing bridge as an error instead.
     if (!data) throw new Error("Model catalog IPC bridge is unavailable.");
     return normalizeRuntimeCatalogSnapshot(data);
   },
@@ -164,9 +152,6 @@ export function useModelCatalog() {
     sessionCacheScope,
   ]);
 
-  // The key follows `billing.status` (plan and fallback), so a billing change
-  // that moves the audience refetches; the ETag makes an unchanged catalog a
-  // 304.
   const stellaCacheKey = authAudienceKey;
 
   const stellaQuery = useResourceStore(stellaCatalogStore, stellaCacheKey);
@@ -230,7 +215,6 @@ function buildAnonymousStellaCatalogKey(sessionData: AuthSessionData): string {
   return `${getSessionCacheKey(sessionData)}:audience:anonymous`;
 }
 
-/** Intent-hover warm for the sidebar Models popover and composer entry points. */
 export function preloadModelCatalogCache(): void {
   if (!isWebsiteHost()) void managedGatewayStore.ensure("default");
 

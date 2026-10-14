@@ -17,19 +17,6 @@ import {
 } from "./stella-file-links";
 import type { ChatArtifact } from "../types";
 
-/**
- * Every file Stella put in front of the user in one conversation, read from
- * that conversation's cloud journal: files linked in Stella's replies and in
- * the reports agents finished with, `files` cards, files the display tools
- * (`html`, `image_gen`) produced, and the attachments sent with the user's
- * own messages. These are the same records the desktop grants a paired
- * phone's file reads from (`cloud-conversation-file-grants.ts`).
- *
- * The journal names where each one lives. A drive path is in the cloud; an
- * absolute path is on the computer whose turn wrote the record, which the
- * turn id carries (`desktop:<deviceId>:…`).
- */
-
 export type ConversationFileSource =
   | { kind: "cloud" }
   | { kind: "computer"; deviceId: string | null }
@@ -40,9 +27,7 @@ export type ConversationFile = {
   artifact: ChatArtifact;
   createdAt: number;
   source: ConversationFileSource;
-  /** The name the file goes by, when it is not its path's last segment. */
   name?: string;
-  /** The drive folder a drive file sits in, when it is not at the root. */
   folder?: string;
 };
 
@@ -255,7 +240,6 @@ const toConversationFile = (
   };
 };
 
-/** Files in `entries`, newest first, first sighting of each file winning. */
 export const conversationFilesFromEntries = (
   entries: readonly JournalEntry[],
   conversationId: string,
@@ -274,7 +258,6 @@ export const conversationFilesFromEntries = (
   return out;
 };
 
-/** The dedupe key of an artifact the chat already holds, matching the journal's. */
 export const artifactFileKey = (artifact: ChatArtifact): string => {
   const filePath = artifactPrimaryFilePath(artifact.payload);
   if (!filePath) return `id:${artifact.id}`;
@@ -285,7 +268,6 @@ export const artifactFileKey = (artifact: ChatArtifact): string => {
   return drivePath ? `drive:${drivePath}` : `path:${filePath}`;
 };
 
-/** Where a file the chat holds lives, judged from its path alone. */
 export const artifactFileSource = (
   artifact: ChatArtifact,
 ): ConversationFileSource => {
@@ -324,10 +306,6 @@ export const entryFromRecord = (record: unknown): JournalEntry | null => {
   };
 };
 
-/**
- * The owner's Stella Drive as Files rows: every upload, agent output and
- * file any device put there, whether or not this conversation ever named it.
- */
 export const conversationFilesFromDrive = (
   files: readonly DriveFile[],
   conversationId: string,

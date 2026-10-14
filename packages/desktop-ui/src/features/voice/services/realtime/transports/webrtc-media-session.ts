@@ -1,18 +1,3 @@
-/**
- * Shared WebRTC plumbing for every realtime voice transport that speaks over
- * an RTCPeerConnection: peer setup, the SDP exchange, the JSON data channel,
- * shared-microphone acquisition, the input gate used by the echo guard, and
- * the mic/output analysers the overlay visualises.
- *
- * Two protocols sit on top of this:
- *   - `openai-webrtc-transport.ts` (OpenAI Realtime; BYOK only)
- *   - `gpt-live-webrtc-transport.ts` (GPT-Live; Stella-managed)
- *
- * Everything protocol-shaped — which events mean "ready", how the session is
- * configured, how it is closed gracefully — belongs to the transport. This
- * file only knows how to move bytes and audio.
- */
-
 import {
   acquireSharedMicrophone,
   type SharedMicrophoneLease,
@@ -24,11 +9,6 @@ const DEFAULT_RTC_CONFIGURATION: RTCConfiguration = {
   iceCandidatePoolSize: 1,
 };
 
-/**
- * The physical connection must finish before the managed authority's outer
- * ten-second lease can expire. This also bounds provider SDP requests that do
- * not otherwise have a client-side timeout.
- */
 export const CONNECT_DEADLINE_MS = 8_000;
 
 export const connectionAbortError = (): Error => {
@@ -42,7 +22,6 @@ export const abortReason = (signal: AbortSignal): Error =>
 
 let eventIdCounter = 0;
 
-/** Client event id used to match a provider ack back to our outgoing event. */
 export const createClientEventId = (prefix: string): string => {
   eventIdCounter += 1;
   const random = Math.random().toString(36).slice(2, 10);
@@ -50,30 +29,17 @@ export const createClientEventId = (prefix: string): string => {
 };
 
 export type WebRTCMediaSessionHandlers = {
-  /** The data channel is open; the protocol handshake may begin. */
   onChannelOpen: () => void;
-  /** One parsed JSON event from the provider. */
   onMessage: (event: Record<string, unknown>) => void;
-  /** The channel closed or errored; the transport decides what that means. */
   onChannelDown: (reason: string, kind: "close" | "error") => void;
 };
 
 export type WebRTCMediaSessionOptions = {
-  /** Data channel label. Both protocols use `oai-events`. */
   dataChannelLabel: string;
   sdpFetch: SdpAnswerFetcher;
-  /** Console tag so logs say which protocol produced them. */
   logPrefix: string;
 };
 
-/**
- * Owns the peer connection and the audio pipeline for one call.
- *
- * `open()` creates the data channel BEFORE generating the SDP offer, which
- * both protocols require, and resolves once the remote description is
- * applied. The caller then waits for whatever its protocol considers ready
- * before unmuting the microphone.
- */
 export class WebRTCMediaSession {
   private readonly options: WebRTCMediaSessionOptions;
   private handlers: WebRTCMediaSessionHandlers | null = null;
@@ -458,11 +424,6 @@ export class WebRTCMediaSession {
   }
 }
 
-/**
- * Runs one connect attempt under a hard deadline and a cancellable signal.
- * `isDestroyed` lets an intentional disconnect end an in-progress connect
- * without surfacing a new error, which both transports rely on.
- */
 export const runConnectWithDeadline = async (args: {
   deadlineMessage: string;
   isDestroyed: () => boolean;

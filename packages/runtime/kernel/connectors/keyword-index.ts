@@ -1,21 +1,3 @@
-/**
- * Keyword → connector index for the orchestrator's connector reminder.
- *
- * Checked mechanically against every incoming user message — no LLM
- * call, no network. The index is derived from the connector catalog
- * (bundled fallback + the disk-cached server catalog, so it stays in
- * sync with whatever the Store exposes) with a curated synonym layer on
- * top ("mail"/"email" → gmail AND outlook, "calendar" → google
- * calendar, …). Synonyms only activate for connectors that actually
- * exist in the catalog.
- *
- * Matching is whole-word/phrase based on a normalized copy of the
- * message: catalog names become phrase keywords ("google calendar"),
- * ids become single-token keywords, and a stoplist keeps generic
- * catalog words from matching on their own (those are the synonym
- * layer's job, with curated targets).
- */
-
 import type { NativeConnectorCatalogEntry } from "./native-integrations.js";
 import {
   buildMergedConnectorCatalog,
@@ -24,16 +6,10 @@ import {
 } from "./catalog-cache.js";
 
 export type ConnectorKeywordIndex = {
-  /** keyword (normalized, possibly multi-word) → connector ids. */
   keywords: Map<string, Set<string>>;
   entriesById: Map<string, NativeConnectorCatalogEntry>;
 };
 
-/**
- * Loose synonym sets layered over the catalog-derived keywords. Values
- * are connector ids; entries missing from the live catalog are dropped
- * at build time, so this table can safely over-specify.
- */
 export const CONNECTOR_KEYWORD_SYNONYMS: Record<string, readonly string[]> = {
   mail: ["gmail", "outlook"],
   email: ["gmail", "outlook"],
@@ -75,12 +51,6 @@ export const CONNECTOR_KEYWORD_SYNONYMS: Record<string, readonly string[]> = {
   todos: ["googletasks", "todoist"],
 };
 
-/**
- * Generic words that appear as (parts of) catalog names but must never
- * become standalone catalog-derived keywords — they'd fire on ordinary
- * conversation. The synonym layer covers the useful ones with curated
- * targets instead.
- */
 const GENERIC_KEYWORD_STOPLIST = new Set([
   "mail",
   "email",
@@ -168,14 +138,12 @@ export const buildConnectorKeywordIndex = (
   };
   for (const entry of catalog) {
     index.entriesById.set(entry.id, entry);
-    // Derived: the id as a single token ("gmail", "notion", "slack").
     if (
       entry.id.length >= MIN_KEYWORD_LENGTH &&
       !GENERIC_KEYWORD_STOPLIST.has(entry.id)
     ) {
       addKeyword(index, entry.id, entry.id);
     }
-    // Derived: the display name as a phrase ("google calendar", "linear").
     const namePhrase = normalizeKeywordText(entry.name).trim();
     if (
       namePhrase.length >= MIN_KEYWORD_LENGTH &&
@@ -184,7 +152,6 @@ export const buildConnectorKeywordIndex = (
       addKeyword(index, namePhrase, entry.id);
     }
   }
-  // Synonym layer, filtered to connectors that exist in this catalog.
   for (const [keyword, ids] of Object.entries(CONNECTOR_KEYWORD_SYNONYMS)) {
     for (const id of ids) {
       if (!index.entriesById.has(id)) continue;
@@ -194,12 +161,6 @@ export const buildConnectorKeywordIndex = (
   return index;
 };
 
-/**
- * Match a user message against the index. Returns the matched catalog
- * entries, longest-keyword hits first (a phrase like "google calendar"
- * outranks a loose synonym), capped so a keyword-dense message can't
- * flood the reminder.
- */
 export const matchConnectorsInMessage = (
   index: ConnectorKeywordIndex,
   message: string,
@@ -230,12 +191,6 @@ export const matchConnectorsInMessage = (
   return matches;
 };
 
-// ---------------------------------------------------------------------------
-// Cached index over the live catalog (bundled fallback + disk-cached server
-// catalog). Rebuilt when the disk cache file changes: the per-turn check is a
-// stat, not a read + JSON.parse of the whole cache.
-// ---------------------------------------------------------------------------
-
 type CachedIndexState = {
   stellaDataDir: string;
   cacheStamp: string;
@@ -247,8 +202,6 @@ let cachedIndex: CachedIndexState | null = null;
 export const getConnectorKeywordIndex = async (
   stellaDataDir: string,
 ): Promise<ConnectorKeywordIndex> => {
-  // Stamp before reading: a write racing the read leaves a stale stamp, so
-  // the next call re-reads rather than pinning old contents.
   const cacheStamp = await readCachedServerCatalogStamp(stellaDataDir);
   if (
     cachedIndex &&

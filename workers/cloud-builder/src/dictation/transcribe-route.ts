@@ -9,7 +9,6 @@ import { ownerGeneration, voiceInternal } from "../voice/routes.js";
 export const DICTATION_TRANSCRIBE_PATH = "/api/dictation/transcribe";
 
 const DEFAULT_MODEL = STELLA_MEDIA_MODELS.dictation;
-/** Scribe v2's list price on OpenRouter, for a response that reports no cost. */
 const FALLBACK_USD_PER_SECOND = 0.0000611;
 const TRANSCRIPTIONS_URL = "https://openrouter.ai/api/v1/audio/transcriptions";
 const SAMPLE_RATE = 16_000;

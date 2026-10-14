@@ -105,10 +105,6 @@ const nodeReplWorkerMain = async (
     });
   };
 
-  // Source filtering is only an early diagnostic because user code can build
-  // module names dynamically. Lock the worker-local builtin exports before the
-  // REPL starts so import(), createRequire(), Module._load, and vm code all see
-  // the same disabled process capabilities.
   const childProcessBuiltin = kernelRequire("node:child_process") as Record<
     string,
     unknown
@@ -407,9 +403,6 @@ const nodeReplWorkerMain = async (
         reject(error instanceof Error ? error : new Error(String(error)));
       }
     });
-    // Keep a handled settlement promise for every nested call. The user-facing
-    // promise remains unchanged, while evaluation can wait for calls the cell
-    // started without awaiting and surface their failures deterministically.
     pendingToolSettlements.add(
       call.then<ToolCallSettlement, ToolCallSettlement>(
         () => ({ ok: true }),
@@ -490,9 +483,6 @@ const nodeReplWorkerMain = async (
       return callTool("$describe", { ...options, name });
     },
   );
-  // `history.search` / `history.sql` / `history.read` ride the tool-call path
-  // as the `$history` intrinsic; the host answers them from the conversation's
-  // cloud journal.
   const history = Object.freeze({
     search: (text: string, options: Record<string, unknown> = {}) =>
       callTool("$history", { op: "search", text, options }),
@@ -506,8 +496,6 @@ const nodeReplWorkerMain = async (
         ...(options?.raw === true ? { raw: true } : {}),
       }),
   });
-  // `memory.read` / `memory.write` / `memory.list` ride the same path as the
-  // `$memory` intrinsic; only the orchestrator's REPL is given the global.
   const memory = Object.freeze({
     read: (path: string) => callTool("$memory", { op: "read", path }),
     write: (path: string, content: string, options?: { expectSha?: string }) =>
@@ -543,9 +531,6 @@ const nodeReplWorkerMain = async (
           : typeof property === "string"
             ? toolFunctions.get(property)
             : undefined;
-  // Reading a tool that does not exist throws an error naming close matches
-  // instead of a later bare "is not a function". `"name" in tools` still
-  // probes safely; Promise/JSON/inspect protocol reads stay undefined.
   const comparableToolName = (name: string) =>
     name.toLowerCase().replace(/[^a-z0-9]/g, "");
   const toolNameDistance = (left: string, right: string): number => {
@@ -563,7 +548,6 @@ const nodeReplWorkerMain = async (
     }
     return previous[right.length]!;
   };
-  // Common names models carry over from other harnesses.
   const toolNameAliases: Record<string, readonly string[]> = {
     bash: ["Bash"],
     shell: ["Bash"],
@@ -1072,8 +1056,6 @@ const nodeReplWorkerMain = async (
           timeoutError.name = "NodeReplDrainTimeoutError";
           throw timeoutError;
         }
-        // Every underlying call already settled (the deadline raced a
-        // microtask); collecting the batch now cannot block.
         settlements = await Promise.all(batch);
       }
       for (const settlement of batch) pendingToolSettlements.delete(settlement);

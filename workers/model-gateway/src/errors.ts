@@ -5,13 +5,6 @@ import {
   type GatewayQuotaScope,
 } from "@stella/contracts/gateway/api";
 
-/**
- * Every failure the gateway reports to a caller is a `GatewayErrorBody`. The
- * message is written for the caller, never for us: it must not carry provider
- * secrets, upstream hosts, binding names, or stack traces. Server-side detail
- * goes to `console` with the trace id so both sides can be joined.
- */
-
 const RESPONSE_HEADERS = {
   "cache-control": "no-store",
   "content-type": "application/json; charset=utf-8",
@@ -108,7 +101,6 @@ export const jsonResponse = (
 export const errorResponse = (error: GatewayError, traceId: string): Response =>
   jsonResponse(error.status, error.body(), traceId, error.extraHeaders);
 
-/** Wrap anything thrown into a GatewayError without leaking its message. */
 export const toGatewayError = (error: unknown): GatewayError => {
   if (isGatewayError(error)) return error;
   return new GatewayError(
@@ -128,11 +120,6 @@ const SECRET_VALUE_PATTERN =
 
 const MAX_UPSTREAM_ERROR_BYTES = 64 * 1024;
 
-/**
- * Scrub a provider error payload before echoing it: drop header maps and
- * credential-shaped keys, redact secret-looking strings, and redact the exact
- * key we sent (defensive: some gateways echo the offending header back).
- */
 export const scrubUpstreamJson = (
   value: unknown,
   secrets: readonly string[],
@@ -164,11 +151,6 @@ export const scrubUpstreamJson = (
   return value;
 };
 
-/**
- * Body for a non-2xx upstream reply. A JSON body is passed through scrubbed
- * so vendor SDKs keep parsing their native error shapes; anything else becomes
- * a `GatewayErrorBody` so the caller always receives JSON.
- */
 export const upstreamErrorBody = (
   status: number,
   text: string,

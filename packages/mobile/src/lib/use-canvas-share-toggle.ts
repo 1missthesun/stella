@@ -6,7 +6,6 @@ import {
 } from "@stella/contracts/backend/shares";
 import { getBackendClient } from "./backend";
 
-/** The canvas slug behind a canvas artifact: its own, else its file name. */
 export const canvasSlugFor = (
   slug: string | undefined,
   filePath: string,
@@ -17,21 +16,11 @@ export const canvasSlugFor = (
 };
 
 export type CanvasShareToggle = {
-  /** The link is public: anyone with it can open the canvas. */
   isPublic: boolean;
   busy: boolean;
-  /**
-   * Make the canvas public and copy its link, or make it private again.
-   * Resolves to whether the canvas ended up public.
-   */
   toggle: () => Promise<boolean>;
 };
 
-/**
- * Every canvas already has a private link; sharing is making it public, and
- * the link stays the same either way. A canvas never saved to a link gets one
- * here, public from the start.
- */
 export function useCanvasShareToggle(
   canvas: string | null,
   html: string | null,

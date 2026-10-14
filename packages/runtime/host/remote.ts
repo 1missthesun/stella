@@ -40,43 +40,29 @@ import { startOrAttachWorker } from "./lifecycle.js";
 
 export type RemoteRuntimeHostOptions = {
   initializeParams: RuntimeClientAttachParams["initializeParams"];
-  /** The callbacks this app serves for the runtime host. */
   hostHandlers: Partial<
     Record<RuntimeHostHandler, (...args: never[]) => unknown>
   >;
   disableLocalScheduler?: boolean;
-  /** The runtime entry to spawn; defaults to the bundled one. */
   workerEntryPath?: string;
   bunBinaryPath?: string;
 };
 
-/**
- * One socket to the runtime and the attachment it carries. Frames are only
- * applied while the connection is live: `retired` is set the moment it is
- * superseded, lost, or stopped, and every event and host callback must name
- * this connection's `attachmentId` (see the fencing note in
- * `client-protocol.ts`).
- */
 type Connection = {
   peer: JsonRpcPeer;
   dispose: () => void;
   pid: number;
   attachmentId: string;
-  /** The runtime instance this connection was fenced to, when known. */
   serverId: string | null;
   retired: boolean;
 };
 
-/** How many times one connect re-probes after the runtime was swapped under it. */
 const SERVER_MISMATCH_RETRIES = 2;
 
-/** At most one warning per drop reason per window, so a flood stays legible. */
 const FENCE_LOG_WINDOW_MS = 10_000;
 
-/** How long `stop({ shutdownRuntime })` waits for the runtime to exit. */
 const RUNTIME_EXIT_TIMEOUT_MS = 15_000;
 
-/** Backoff between reconnect attempts after the runtime goes away. */
 const RECONNECT_DELAYS_MS = [100, 250, 500, 1_000, 2_000, 5_000];
 const REAP_POLL_MS = 5;
 
@@ -84,24 +70,13 @@ type RuntimeHostCalls = {
   [K in RuntimeHostCall]: (...args: any[]) => Promise<any>;
 };
 
-// The calls are installed per instance in the constructor.
 export interface RemoteRuntimeHost extends RuntimeHostCalls {}
 
-/**
- * The app's handle on the runtime process. It spawns the runtime or attaches
- * to the one already running, forwards host calls and events, and serves the
- * host's callbacks. When the runtime goes away (a restart, a crash) it
- * reconnects with backoff, spawning a fresh runtime if needed.
- *
- * Emits the host's events plus its own `runtime-connected` and
- * `runtime-disconnected` for the socket.
- */
 export class RemoteRuntimeHost {
   private readonly events = new EventEmitter();
   private connection: Connection | null = null;
   private connecting: Promise<Connection> | null = null;
   private started = false;
-  /** Detached by `stop()`: calls fail instead of reattaching until `start()`. */
   private stopped = false;
   private reconnectTimer: HostTimerHandle | null = null;
   private reconnectAttempt = 0;
@@ -128,16 +103,9 @@ export class RemoteRuntimeHost {
     await this.ensureConnected();
   }
 
-  /**
-   * Detach from the runtime. The runtime keeps running for the next app,
-   * unless `shutdownRuntime` asks it to exit (quit, or a reset that deletes
-   * its files); then this returns once it has released everything, or after
-   * `exitTimeoutMs` with the runtime still finishing its own bounded exit.
-   */
   async stop(
     options: {
       shutdownRuntime?: boolean;
-      /** The app is quitting: the runtime interrupts its turns and exits once detached. */
       quit?: boolean;
       exitTimeoutMs?: number;
     } = {},
@@ -153,7 +121,6 @@ export class RemoteRuntimeHost {
     this.connection = null;
     if (connection) connection.retired = true;
     connection?.dispose();
-    // A connect still in flight lands after this; drop it unless restarted.
     void this.connecting?.then(
       (late) => {
         if (this.started || this.connection !== late) return;
@@ -164,7 +131,6 @@ export class RemoteRuntimeHost {
       () => undefined,
     );
     this.events.emit("runtime-disconnected", { reason: "stopped" });
-    // Detached first: a quitting runtime exits once its app has gone.
     if (shutdownRequested) {
       await this.waitForRuntimeExit(
         options.exitTimeoutMs ?? RUNTIME_EXIT_TIMEOUT_MS,
@@ -182,7 +148,6 @@ export class RemoteRuntimeHost {
   }
 
   private async waitForRuntimeExit(exitTimeoutMs: number): Promise<void> {
-    // The runtime drops its pidfile last, after its databases are closed.
     const stellaAppDir = this.options.initializeParams.stellaAppDir;
     const deadline = Date.now() + exitTimeoutMs;
     while (Date.now() < deadline && (await probeRunningWorker(stellaAppDir)) != null) {
@@ -191,8 +156,6 @@ export class RemoteRuntimeHost {
   }
 
   async call(method: RuntimeHostCall, args: unknown[]): Promise<any> {
-    // A late call (a window still polling while the app quits) must not
-    // reattach: a reattached app would hold the quitting runtime open.
     if (this.stopped) {
       throw createRuntimeUnavailableError("Stella's runtime has been stopped.");
     }
@@ -218,9 +181,6 @@ export class RemoteRuntimeHost {
       try {
         return await this.connectOnce();
       } catch (error) {
-        // The runtime that answered the probe was replaced before the attach
-        // landed on the peer socket. Probe again: the attach pipeline sees
-        // whichever runtime owns the socket now.
         if (!isServerMismatch(error) || attempt >= SERVER_MISMATCH_RETRIES) {
           throw error;
         }
@@ -243,8 +203,6 @@ export class RemoteRuntimeHost {
       // Under Electron, the runtime's child processes use this binary as
       // Node (ELECTRON_RUN_AS_NODE); a different binary respawns the runtime.
       ...(process.versions.electron ? { hostExecutablePath: process.execPath } : {}),
-      // Adopt only a runtime that proves it is this root's, the pidfile's,
-      // and booted with the environment this app shares with it.
       verifyIdentity: { launchEnv: readRuntimeLaunchEnv(process.env) },
     });
     const handle = attachJsonRpcPeerToStreams({
@@ -256,7 +214,6 @@ export class RemoteRuntimeHost {
     });
     const connection: Connection = {
       peer: handle.peer,
-      // Ending the socket is what tells the runtime this app has detached.
       dispose: () => {
         handle.dispose();
         attached.socket.end();
@@ -298,8 +255,6 @@ export class RemoteRuntimeHost {
           ...fence,
         } satisfies RuntimeClientAttachParams & RuntimeAttachFence,
       );
-      // The runtime must echo the instance and attachment this client
-      // fenced to; anything else is a route this client did not ask for.
       if (
         (connection.serverId &&
           result.serverId !== undefined &&
@@ -318,7 +273,6 @@ export class RemoteRuntimeHost {
       throw error;
     }
     if (connection.retired) {
-      // Lost while attaching; handleConnectionLost already ran.
       throw new RpcError(
         RPC_ERROR_CODES.RUNTIME_UNAVAILABLE,
         "The Stella runtime connection closed while attaching.",
@@ -339,13 +293,6 @@ export class RemoteRuntimeHost {
     return connection;
   }
 
-  /**
-   * Whether a frame from `connection` naming `attachmentId` may be applied.
-   * Frames on a retired connection (superseded, lost, or stopped), after
-   * stop(), or naming another attachment are dropped and logged. A frame without an attachment comes
-   * from a runtime that predates fencing (the identity handshake replaces
-   * those on connect) and is judged by its connection alone.
-   */
   private acceptsFrame(
     connection: Connection,
     attachmentId: string | undefined,
@@ -355,7 +302,6 @@ export class RemoteRuntimeHost {
     if (connection.retired) {
       reason = "retired-connection";
     } else if (!this.started) {
-      // stop() ran while this connection was still attaching.
       reason = "client-stopped";
     } else if (
       attachmentId !== undefined &&
@@ -400,12 +346,6 @@ export class RemoteRuntimeHost {
     if (this.started) this.scheduleReconnect(connection.pid);
   }
 
-  /**
-   * After a runtime goes away, the first attempt waits only for its process
-   * to be gone (a restart ends it within a few milliseconds of closing the
-   * socket), bounded by the first backoff; while it still runs, its pidfile
-   * would send the attempt down the slow stale-runtime path.
-   */
   private scheduleReconnect(gonePid?: number): void {
     if (this.reconnectTimer || !this.started) return;
     const delay =

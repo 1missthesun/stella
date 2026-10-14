@@ -1,12 +1,3 @@
-/**
- * Plan & usage — one dialog for everything money- and quota-shaped, opened
- * from the account menu.
- *
- * Two tabs rather than one long scroll: "Plan" is a decision surface
- * (what you're on, what else costs what) and "Usage" is an analytics
- * surface (what you've spent locally). Stacking them made the second one
- * feel like a footnote and buried the plan cards behind a scroll.
- */
 import { lazy, Suspense, useState } from "react";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import {

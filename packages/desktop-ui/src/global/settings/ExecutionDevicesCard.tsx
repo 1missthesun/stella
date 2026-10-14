@@ -6,7 +6,6 @@ import {
 import { Switch } from "@/ui/switch";
 import { useT } from "@/shared/i18n";
 
-/** The consent answer in the user's words; presence is reported separately. */
 const CONSENT_KEYS: Record<DeviceRemoteExecution, string> = {
   enabled: "settings.executionDevices.state.enabled",
   unconfigured: "settings.executionDevices.state.notEnabled",
@@ -14,13 +13,6 @@ const CONSENT_KEYS: Record<DeviceRemoteExecution, string> = {
   declined: "settings.executionDevices.state.declined",
 };
 
-/**
- * Every computer signed in to this account, and for each one whether work from
- * the user's other devices may run there.
- *
- * A row exists because that computer is signed in; the switch is a separate
- * answer, and the only way it changes here is the switch being flipped.
- */
 export function ExecutionDevicesCard() {
   const t = useT();
   const { devices, error, pendingDeviceId, setRemoteExecution } =

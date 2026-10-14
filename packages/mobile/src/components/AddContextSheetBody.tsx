@@ -8,7 +8,6 @@ import type { Colors } from "../theme/colors";
 import { fonts } from "../theme/fonts";
 import { useColors } from "../theme/theme-context";
 
-/** Everything below the sheet's grabber: header, the three tiles, read aloud. */
 export const ADD_CONTEXT_BODY_HEIGHT = 262;
 
 export function AddContextSheetBody({

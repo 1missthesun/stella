@@ -10,27 +10,14 @@ use tokio_tungstenite::tungstenite::Message;
 
 use super::cdp::client::InspectProxyHandle;
 
-/// Counter for unique attach IDs so concurrent connections don't collide.
 static ATTACH_ID: AtomicI64 = AtomicI64::new(-1000);
 
-/// Lightweight HTTP + WebSocket server for `stella-browser inspect`.
-///
-/// Serves two purposes:
-/// - `GET /` redirects to Chrome's built-in DevTools frontend with `ws=` pointing to this server
-/// - WebSocket connections create a dedicated CDP session via `Target.attachToTarget` and proxy
-///   CDP messages through the daemon's existing browser-level connection, injecting/stripping
-///   `sessionId` so the DevTools frontend sees a page-level view
 pub struct InspectServer {
     port: u16,
     _handle: tokio::task::JoinHandle<()>,
 }
 
 impl InspectServer {
-    /// Start the inspect proxy server.
-    ///
-    /// - `proxy_handle`: lightweight handle for sending/receiving raw CDP messages
-    /// - `target_id`: the CDP target ID of the page to inspect
-    /// - `chrome_host_port`: the Chrome debug server address (e.g. "127.0.0.1:9222")
     pub async fn start(
         proxy_handle: InspectProxyHandle,
         target_id: String,
@@ -120,7 +107,6 @@ async fn handle_connection(
         return handle_http_redirect(buf_reader, chrome_host_port, proxy_port).await;
     }
 
-    // Unknown request -- consume and respond 404
     let mut stream = stream;
     let mut discard = [0u8; 4096];
     let _ = stream.read(&mut discard).await;
@@ -199,7 +185,6 @@ async fn handle_ws_proxy(
         .await
         .map_err(|e| format!("Failed to send attachToTarget: {}", e))?;
 
-    // Wait for the attachToTarget response to extract the session ID
     let session_id = tokio::time::timeout(std::time::Duration::from_secs(5), async {
         while let Ok(raw_msg) = raw_rx.recv().await {
             if let Ok(val) = serde_json::from_str::<serde_json::Value>(&raw_msg.text) {
@@ -228,7 +213,6 @@ async fn handle_ws_proxy(
     let ws_tx_clone = ws_tx.clone();
     let session_id_clone = session_id.clone();
 
-    // Chrome -> DevTools: forward messages matching our session, strip sessionId
     let mut chrome_to_devtools = tokio::spawn(async move {
         loop {
             let raw_msg = match raw_rx.recv().await {
@@ -257,7 +241,6 @@ async fn handle_ws_proxy(
         }
     });
 
-    // DevTools -> Chrome: inject sessionId and forward
     let proxy_for_send = proxy.clone();
     let session_id_for_send = session_id.clone();
     let mut devtools_to_chrome = tokio::spawn(async move {
@@ -284,7 +267,6 @@ async fn handle_ws_proxy(
         },
     }
 
-    // Clean up the CDP session so Chrome doesn't leak attached targets
     let detach_cmd = format!(
         r#"{{"id":{},"method":"Target.detachFromTarget","params":{{"sessionId":"{}"}}}}"#,
         ATTACH_ID.fetch_sub(1, Ordering::SeqCst),

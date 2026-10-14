@@ -1,17 +1,3 @@
-/**
- * Desktop-side mirror of the backend's `ManagedModelAudience` notion.
- *
- * Source of truth for the audience values and plan label mapping lives in
- * `@stella/contracts/gateway/capability`. Which Stella models a restricted audience
- * may pick is NOT mirrored here: the `/api/stella/models` catalog reports
- * `allowedForAudience` per row and the UI reads that.
- */
-
-/**
- * Collapsing a managed audience onto the four the capability matrix is
- * keyed by is the contract's job, not ours — re-exported here so the
- * audience vocabulary stays in one place for callers.
- */
 export { toCapabilityAudience } from "@stella/contracts/capabilities";
 
 export type SubscriptionPlan = "free" | "go" | "pro";
@@ -47,10 +33,6 @@ const PLAN_LABELS: Record<ManagedModelAudience, string> = {
 export const getPlanLabel = (audience: ManagedModelAudience): string =>
   PLAN_LABELS[audience];
 
-/**
- * Every audience is a signed-in account one Stripe checkout away from more.
- * Model and capability restrictions both read the action from here.
- */
 export const getRestrictionActionKind = (
   _audience: ManagedModelAudience,
 ): "sign-in" | "upgrade" => "upgrade";
@@ -80,20 +62,12 @@ type BillingUsage = {
   weeklyLimitUsd: number;
   monthlyUsedUsd: number;
   monthlyLimitUsd: number;
-  /**
-   * Cumulative managed-model spend, and the ceiling it is measured
-   * against. Only present on plans the backend gives a lifetime
-   * allowance (Free) — see `lifetimeLimitUsd` in
-   * `workers/cloud-builder/src/billing/plans.ts`. Unlike the rolling / weekly /
-   * monthly windows this never refreshes.
-   */
   lifetimeUsedUsd?: number;
   lifetimeLimitUsd?: number | null;
 };
 
 type ResolvableBillingStatus = {
   plan: SubscriptionPlan;
-  /** Null when the backend reports no spend windows. */
   usage: BillingUsage | null;
   authenticated?: boolean;
 };
@@ -104,18 +78,6 @@ const isUsageExceeded = (usage: BillingUsage | null): boolean =>
   usage.weeklyUsedUsd >= usage.weeklyLimitUsd ||
   usage.monthlyUsedUsd >= usage.monthlyLimitUsd);
 
-/**
- * Resolves the desktop-side audience the same way the backend's
- * `resolveManagedModelAudience` does:
- * - signed-out → null (the app asks for an account before anything else)
- * - free plan → "free"
- * - paid plan over usage cap → "{plan}_fallback"
- * - paid plan otherwise → plan id
- *
- * Returns `null` when we don't yet know (billing query still loading for a
- * signed-in user) so callers can avoid firing toasts during a hydration
- * gap.
- */
 export const resolveBillingAudience = (args: {
   hasConnectedAccount: boolean;
   billingStatus: ResolvableBillingStatus | undefined;
@@ -138,12 +100,6 @@ export const resolveBillingAudience = (args: {
     : plan;
 };
 
-/**
- * The Free plan's lifetime allowance: a fixed number of dollars that is
- * spent once and never comes back. Returns `null` for every plan and
- * every status shape that has no lifetime ceiling, so callers can treat
- * a value here as "this account has a terminal budget".
- */
 export type FreeAllowance = {
   usedUsd: number;
   limitUsd: number;

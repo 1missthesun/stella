@@ -1,12 +1,5 @@
-/**
- * Which transcript rows are on screen, so looping demos can pause when the
- * user scrolls away from them. Rows report their layout, the scroll view
- * reports its offset and height, and a row's subscribers re-render only
- * when its visibility flips.
- */
 import { createContext, useContext, useSyncExternalStore } from "react";
 
-/** A row counts as visible once this much of it is inside the viewport. */
 const VISIBLE_MARGIN = 32;
 
 export type ViewportStore = {
@@ -40,7 +33,6 @@ export function createViewportStore(): ViewportStore {
     },
     isVisible: (id) => {
       const layout = layouts.get(id);
-      // Unmeasured rows are assumed visible: they just mounted at the tail.
       if (!layout || viewportHeight === 0) return true;
       return (
         layout.y + layout.height > scrollY + VISIBLE_MARGIN &&

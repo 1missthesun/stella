@@ -1,22 +1,7 @@
-/**
- * Where a browser shell keeps its Better Auth credential.
- *
- * Electron is deliberately excluded: the main process is the sole token
- * authority there, so every accessor below is inert when `electronAPI` exists.
- * A renderer copy of the bearer would be a second credential with no
- * revocation path.
- */
-
-/** Opaque signed bearer issued by Better Auth's `bearer` plugin. */
 export const BROWSER_SESSION_TOKEN_KEY = "better-auth_session_token";
 const BROWSER_IDENTITY_INTENT_KEY = "stella_auth_identity_intent";
 const BROWSER_CACHED_SESSION_KEY = "stella_auth_cached_session";
 
-/**
- * Keys written by the retired cross-domain cookie handoff. They are purged on
- * sight so an old mirrored session token cannot outlive the transport that
- * created it.
- */
 const LEGACY_STORAGE_KEYS = [
   "better-auth_cookie",
   "better-auth_session_data",

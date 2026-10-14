@@ -98,8 +98,6 @@ export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [submitState, setSubmitState] = useState<SubmitState>({ type: "idle" });
   const [activeLegal, setActiveLegal] = useState<LegalDoc>(null);
-  // Claim secret for the in-flight handoff. A ref so it never re-renders and
-  // is never persisted.
   const claimSecretRef = useRef<string | null>(null);
   const loginScrollRef = useRef<ScrollView>(null);
 
@@ -124,7 +122,6 @@ export default function LoginScreen() {
     setSubmitState({ type: "sending" });
 
     try {
-      // In memory for this attempt only; the server stores just the hash.
       const claimSecret = generateClaimSecret();
       claimSecretRef.current = claimSecret;
       const claimHash = await hashClaimSecret(claimSecret);
@@ -256,7 +253,6 @@ export default function LoginScreen() {
 
       enterMainShell(router, await loadLastMainTabHref());
     } catch (error) {
-      // User cancels surface as ERR_REQUEST_CANCELED — return silently.
       if (
         error &&
         typeof error === "object" &&
@@ -270,7 +266,6 @@ export default function LoginScreen() {
     }
   };
 
-  // Enable "resend" after a short grace once the link is sent.
   useEffect(() => {
     if (submitState.type !== "sent") {
       setCanResend(false);
@@ -282,15 +277,12 @@ export default function LoginScreen() {
   }, [submitState]);
 
   const editEmail = () => {
-    // Leaving "sent" cancels the poll via the polling effect's cleanup.
     setSubmitState({ type: "idle" });
   };
 
-  // Poll for magic link verification.
   useEffect(() => {
     if (submitState.type !== "sent") return;
     const { requestId } = submitState;
-    // Scoped per effect run so a resend's new poll can't revive this one.
     let cancelled = false;
 
     const poll = async () => {
@@ -309,8 +301,6 @@ export default function LoginScreen() {
             if (cancelled) return;
             setSubmitState({ type: "verifying" });
             try {
-              // /link/status carries no credential. Exchange the secret this
-              // device generated, which is the only thing that can claim it.
               const secret = claimSecretRef.current;
               const token = secret
                 ? await claimSessionToken(env.backendUrl, requestId, secret)
@@ -318,7 +308,6 @@ export default function LoginScreen() {
               if (!token) {
                 throw new Error("Handoff could not be claimed.");
               }
-              // The native bearer client attaches this token to every request.
               await SecureStore.setItemAsync(MOBILE_SESSION_TOKEN_KEY, token);
               claimSecretRef.current = null;
               // Nudge useSession() to re-fetch now that a credential exists.

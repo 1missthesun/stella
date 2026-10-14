@@ -63,9 +63,6 @@ export function mergeAgentFileEvents(
   return merged;
 }
 
-/** Cloud turns deliver `output_files` through the backend as `cloudDriveFiles` on
- *  the event payload; they never carry local response links, so the payload
- *  list is the only file signal for the cloud lane. */
 const cloudDriveFileCount = (event: EventRecord): number => {
   const payload = event.payload as { cloudDriveFiles?: unknown } | undefined;
   return Array.isArray(payload?.cloudDriveFiles)

@@ -45,16 +45,9 @@ export type ModelOption = {
   label: string;
   description?: string;
   selected: boolean;
-  /** False when the account's plan can't use this model. */
   available: boolean;
 };
 
-/**
- * What a chat can run on: one of Stella's built-in engines, or a provider
- * whose key or sign-in is saved to the account. Built-ins are keyed by their
- * engine; account providers by `provider:<id>`, so the Anthropic API key and
- * Claude Code never share an id.
- */
 export type Brain =
   | {
       id: ModelEngine;
@@ -84,7 +77,6 @@ const ENGINE_MARKS: Record<ModelEngine, string> = {
   chatgpt: "chatgpt",
 };
 
-/** Ids the engines own; an account provider with one of these is skipped. */
 const ENGINE_OWNED_PROVIDERS = new Set(["stella", "chatgpt"]);
 
 type ProviderModelsState =
@@ -111,7 +103,6 @@ const engineModelList = (
       ? engineModels.chatgpt
       : [];
 
-/** The first model an engine lands on when the user switches to it. */
 const defaultModelFor = (
   engine: ModelEngine,
   engineModels: EngineModelCatalog,
@@ -121,12 +112,6 @@ const defaultModelFor = (
     : (engineModelList(engineModels, engine)[0]?.id ??
       (engine === "anthropic" ? "default" : "gpt-6.1-sol"));
 
-/**
- * The account's model selection. Lists and the saved choice both come from
- * the server, never from a paired computer; the desktop mirrors the saved
- * choice into its local runtime, so one pick applies to cloud and computer
- * turns alike.
- */
 export function useCloudModelSettings(active: boolean) {
   const t = useT();
   const session = authClient.useSession();
@@ -138,7 +123,6 @@ export function useCloudModelSettings(active: boolean) {
   const scope = owner ? `${owner.identityKey}:${owner.identityRevision}` : null;
   const currentScope = useRef<string | null>(scope);
   const writePending = useRef(false);
-  /** The newest pick still to be saved; picks made mid-save collapse into it. */
   const desired = useRef<CloudExecutionSelection | null>(null);
   const readRevision = useRef(0);
   const [state, setState] = useState<LoadedState | null>(null);
@@ -175,12 +159,9 @@ export function useCloudModelSettings(active: boolean) {
           const [settings, catalog, chatgptModels, providerSettings] = await Promise.all([
             readBackendView("engines.get", {}),
             fetchStellaCatalog({ headers: { Authorization: `Bearer ${token}` } }),
-            // The cloud's ChatGPT account's own list; Stella's catalog
-            // stands in while none is signed in or the list is unavailable.
             getBackendClient()
               .call("engines.listModels", { provider: "chatgpt" })
               .catch(() => null),
-            // A server without account provider keys lists none.
             readBackendView("providers.get", {}).catch(() => null),
           ]);
           return {
@@ -209,11 +190,6 @@ export function useCloudModelSettings(active: boolean) {
   }, [owner, scope, active, t]);
   useEffect(() => { void refresh(); }, [refresh]);
 
-  /**
-   * A pick shows at once and is saved behind it. Picks made while a save is
-   * in flight are not dropped: the newest one is saved next. A failed save
-   * puts back the last selection the server accepted and says so.
-   */
   const apply = useCallback((next: CloudExecutionSelection) => {
     if (!active || !owner || !scope || !loaded) return;
     ++readRevision.current;
@@ -309,7 +285,6 @@ export function useCloudModelSettings(active: boolean) {
       if (!engineModelList(engineModels, targetEngine).some((entry) => entry.id === model)) {
         return;
       }
-      // The chosen effort carries over to the new engine, which maps it to its own levels.
       const reasoningEffort = effort;
       void apply(
         targetEngine === "anthropic"
@@ -328,9 +303,6 @@ export function useCloudModelSettings(active: boolean) {
     [engineModels, execution, selectEngineModel],
   );
 
-  // A self-hosted server without managed models can't run the "Stella"
-  // engine (the account default): move the chat to the Claude or ChatGPT
-  // subscription the owner connected, so turns don't fail.
   useEffect(() => {
     if (!loaded || loaded.execution.engine !== "stella") return;
     if (currentServerFeatures().managedModels) return;
@@ -350,7 +322,6 @@ export function useCloudModelSettings(active: boolean) {
   );
 
   const brains = useMemo((): Brain[] => {
-    // A self-hosted server without managed models has no "Stella" engine.
     const managed = currentServerFeatures().managedModels;
     const builtIn: Brain[] = MODEL_ENGINE_OPTIONS.filter(
       (option) => managed || option.id !== "stella",
@@ -400,8 +371,6 @@ export function useCloudModelSettings(active: boolean) {
       const targetEngine = target as ModelEngine;
       const selectedId = execution?.engine === targetEngine ? execution.model : null;
       if (targetEngine === "stella") {
-        // The opaque default is always selectable, even when the catalog
-        // lists no concrete model for this plan.
         const models = catalog.models.some((model) => model.id === STELLA_DEFAULT_MODEL)
           ? catalog.models
           : [
@@ -443,7 +412,6 @@ export function useCloudModelSettings(active: boolean) {
     return execution.engine === "anthropic" ? `Claude Code · ${name}` : name;
   }, [catalog, engineModels, execution, providerModels]);
 
-  // The compact composer picker only lists models this plan can use.
   const models = useMemo(
     () => modelsFor(brainId).filter((model) => model.available),
     [brainId, modelsFor],
@@ -477,10 +445,7 @@ export function useCloudModelSettings(active: boolean) {
       refresh,
       label,
       effort,
-      // Every engine takes the user's effort; only a provider model that
-      // cannot reason hides it.
       supportsEffortSelection,
-      /** Providers connected for cloud runs; undefined until loaded. */
       connectedProviders,
       models,
       modelsFor,

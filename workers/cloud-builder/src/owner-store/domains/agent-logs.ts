@@ -1,13 +1,3 @@
-/**
- * Every agent's conversation in the owner's cloud
- * (`@stella/contracts/backend/agent-logs`): append-only records per thread,
- * written step by step by the host that holds the agent and read back, after
- * a seq, only by a host that takes it over. The holder is the one writer:
- * `agentThreads.handoff` names the next one (`setAgentLogHolder`), and an
- * append from any other host is refused, so a host that lost the agent can
- * never write into it again.
- */
-
 import {
   AGENT_LOG_APPEND_MAX_BODY_BYTES,
   AGENT_LOG_CLOUD_HOLDER,
@@ -61,11 +51,6 @@ export const AGENT_LOGS_COLD_MIGRATION = {
   ],
 };
 
-/**
- * Every record wrote one more index row for its conversation, read only when
- * a conversation is deleted. That delete now finds the conversation's agents
- * in `agent_log_holders` and removes their records by thread.
- */
 export const AGENT_LOGS_LEAN_INDEX_MIGRATION = {
   id: "agent-logs.3-drop-conversation-index",
   statements: ["DROP INDEX IF EXISTS agent_log_records_conversation"],
@@ -174,7 +159,6 @@ const archivedPayloads = async (
   return payloads;
 };
 
-/** Response pages stay well under what one RPC answer carries. */
 const READ_PAGE_MAX_BYTES = 2 * 1024 * 1024;
 
 type RecordRow = {
@@ -191,7 +175,6 @@ type HolderRow = { holder: string; cwd: string | null };
 const readHolder = (db: OwnerDbReader, threadId: string): HolderRow | null =>
   db.one<HolderRow>("SELECT holder, cwd FROM agent_log_holders WHERE thread_id = ?", threadId);
 
-/** From now on only `holder` writes the agent's records (a move, or the agent's first holder). */
 export const setAgentLogHolder = (
   db: OwnerDb,
   args: { threadId: string; conversationId: string; holder: string; cwd?: string | null; now: number },
@@ -208,7 +191,6 @@ export const setAgentLogHolder = (
   );
 };
 
-/** Who holds an agent now, when anyone has written it. */
 export const agentLogHolder = (db: OwnerDbReader, threadId: string): string | null =>
   readHolder(db, threadId)?.holder ?? null;
 
@@ -218,7 +200,6 @@ const lastSeq = (db: OwnerDbReader, threadId: string): number =>
 const seqOfKey = (db: OwnerDbReader, threadId: string, key: string): number | undefined =>
   db.one<{ seq: number }>("SELECT seq FROM agent_log_records WHERE thread_id = ? AND record_key = ?", threadId, key)?.seq;
 
-/** A checkpoint names the first message it kept by seq, as every reader resolves it. */
 const normalizedCheckpoint = (
   db: OwnerDbReader,
   threadId: string,
@@ -355,10 +336,7 @@ const read = async (ctx: OwnerContext, args: ReadArgs): Promise<AgentLogCalls["a
   };
 };
 
-/** Delete one conversation's agent records, with its agents. */
 export const deleteConversationAgentLogs = (db: OwnerDb, jobs: OwnerJobs, conversationId: string): void => {
-  // Every append records its agent's holder first, so the holders list every
-  // thread with records in this conversation.
   const threads = db
     .all<{ thread_id: string }>("SELECT thread_id FROM agent_log_holders WHERE conversation_id = ?", conversationId)
     .map((row) => row.thread_id);
@@ -403,11 +381,6 @@ const readParser = object({
   limit: optional(number({ int: true, min: 1, max: AGENT_LOG_READ_MAX_RECORDS })),
 });
 
-/**
- * The cloud's own writes, for the agents it runs: refused like any other
- * holder's once the agent moved away, so a late write from a cloud turn
- * never lands in a log another host holds now.
- */
 const cloudAppend = (ctx: OwnerContext, raw: unknown) => {
   const args = cloudAppendParser(raw);
   return append(ctx, { ...args, holder: AGENT_LOG_CLOUD_HOLDER });

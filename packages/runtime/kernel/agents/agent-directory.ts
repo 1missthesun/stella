@@ -1,10 +1,5 @@
 import path from "node:path";
 
-/**
- * The folder a spawned agent starts in when its spawner named none:
- * `<dataDir>/agents/<YYYY-MM-DD>/<threadId>`, dated by the local day it
- * started. It is created on first use, and the agent may still work anywhere.
- */
 export const defaultAgentDirectory = (
   dataDir: string,
   threadId: string,

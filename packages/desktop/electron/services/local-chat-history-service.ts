@@ -157,12 +157,6 @@ export class LocalChatHistoryService {
     );
   }
 
-  /**
-   * Changed-rows query for the renderer's tail-only refresh: new
-   * user/assistant messages after the cursor plus existing rows whose turn
-   * gained tool-derived artifacts after it. The mobile-sync `sourceEvents`
-   * are dropped — the renderer merge only needs the message rows.
-   */
   listMessagesAfter(args: {
     conversationId: string;
     afterTimestampMs: number;
@@ -196,11 +190,6 @@ export class LocalChatHistoryService {
   }
 
 
-  /**
-   * Focus (lineage) page for one message or agent thread. Reads the
-   * `entry_ref` index the runtime writes with every assistant row, so the
-   * cost is proportional to the lineage, not the conversation.
-   */
   listLineageMessages(args: {
     conversationId: string;
     root: ConversationFocusRoot;

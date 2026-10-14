@@ -5,11 +5,6 @@ import {
   normalizeReasoningEffortLevel,
 } from "@stella/contracts/reasoning-effort";
 
-/**
- * The execution fields the binding validators read. Structurally satisfied
- * by a contracts `CloudExecutionSelection` and by the model gateway's
- * turn-token execution, whose `engine` and `provider` are typed independently.
- */
 export type CloudExecutionBinding = {
   engine: CloudExecutionSelection["engine"];
   provider: CloudExecutionSelection["provider"];
@@ -50,11 +45,6 @@ const nativeRequestedModel = (requestedModel: string): string | null => {
     : null;
 };
 
-/**
- * The efforts a request may carry for the authorized level: the level
- * itself, or a lower one the client mapped it to because the model has no
- * such level (ChatGPT has no `max`, so it sends `xhigh`).
- */
 const expectedNativeEfforts = (
   execution: CloudExecutionBinding,
 ): ReadonlySet<string> => {
@@ -84,11 +74,6 @@ const validateNativeReasoning = (args: {
   return null;
 };
 
-/**
- * Bind a ChatGPT relay request to the immutable route stored with its turn
- * token. This is deliberately pure so the authorization invariant can be
- * tested without constructing a gateway request context.
- */
 export const validateConnectedCloudBinding = (args: {
   execution?: CloudExecutionBinding;
   credentialProvider: "chatgpt";

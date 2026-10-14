@@ -45,7 +45,6 @@ export type WorkerManifest = {
   main: string;
   compatibilityDate: string;
   compatibilityFlags: string[];
-  /** The host the app is shown requests on (it never sees the preview's own); `localhost` unless set. */
   host: string;
   vars: Record<string, unknown>;
   bindings: {
@@ -68,7 +67,6 @@ const NAME = /^[A-Za-z_$][A-Za-z0-9_$]{0,63}$/u;
 const names = (value: unknown): string[] =>
   Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && NAME.test(item)).slice(0, 32) : [];
 
-/** A manifest from the upload, or a reason it can't run. */
 export const parseWorkerManifest = (raw: unknown): WorkerManifest | string => {
   if (!raw || typeof raw !== "object") return "stella-worker.json isn't valid JSON.";
   const value = raw as Record<string, unknown>;
@@ -121,12 +119,6 @@ export const parseWorkerManifest = (raw: unknown): WorkerManifest | string => {
   };
 };
 
-// ── The app's environment, inside its isolate ─────────────────────────────
-
-/**
- * Runs before the app's own modules: puts the stand-in bindings on the env
- * (the object `cloudflare:workers` exports and every handler receives).
- */
 const ENV_MODULE = String.raw`import { env } from "cloudflare:workers";
 const host = env.__STELLA_PREVIEW;
 const spec = JSON.parse(env.__STELLA_BINDINGS || "{}");
@@ -266,7 +258,6 @@ const mainModule = (main: string): string =>
 
 const fromBase64 = (value: string): Uint8Array => Uint8Array.from(atob(value), (char) => char.charCodeAt(0));
 
-/** The app's modules, for its isolate; read only when the loader starts one. */
 const loadModules = async (env: Cloudflare.Env, id: string, manifest: WorkerManifest): Promise<Record<string, WorkerLoaderModule | string>> => {
   const object = await previewBucket(env).get(`${KEY_PREFIX}/${id}/${WORKER_CODE}`);
   if (!object) throw new Error("The preview's server code is missing.");
@@ -287,8 +278,6 @@ const loadModules = async (env: Cloudflare.Env, id: string, manifest: WorkerMani
   modules["__stella_main.js"] = { js: mainModule(manifest.main) };
   return modules;
 };
-
-// ── Serving ───────────────────────────────────────────────────────────────
 
 type Exports = {
   SlackPreviewBindings: (options: { props: BindingProps }) => Fetcher;
@@ -314,7 +303,6 @@ const loadManifest = async (env: Cloudflare.Env, id: string): Promise<WorkerMani
   return parsed;
 };
 
-/** Hosts a preview's code may not reach: Stella's own. */
 const blockedHosts = (env: Cloudflare.Env): string[] => {
   const hosts = new Set(["stella.sh", "fromyou.workers.dev", "stellasites.app", "fromyou.ai"]);
   for (const name of ["CLOUD_BUILDER_PUBLIC_URL", "SLACK_PUBLIC_ORIGIN", "SITES_SHARED_ORIGIN"]) {
@@ -456,7 +444,6 @@ const workerFirst = (manifest: WorkerManifest, pathname: string): boolean => {
   return first;
 };
 
-/** A file of the preview's static assets for this path, or null. */
 export const findAsset = async (
   env: Cloudflare.Env,
   id: string,
@@ -494,7 +481,6 @@ const errorPage = (status: number, message: string): Response =>
     { status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex, nofollow" } },
   );
 
-/** Serve one request of a Worker preview: its static files, else its own code. */
 export const serveWorkerPreview = async (
   request: Request,
   env: Cloudflare.Env,
@@ -530,7 +516,6 @@ export const serveWorkerPreview = async (
   }
 };
 
-/** The preview's app in its own isolate (one per preview, kept warm by the loader). */
 const previewWorker = (env: Cloudflare.Env, bound: Exports, id: string, origins: Origins) =>
   env.LOADER.get(`slack-preview:${id}`, async () => {
     const loaded = await loadManifest(env, id);
@@ -555,8 +540,6 @@ const previewWorker = (env: Cloudflare.Env, bound: Exports, id: string, origins:
     };
   });
 
-// ── The stand-in bindings, on Stella's side ───────────────────────────────
-
 type Statement = { sql: string; params: unknown[] };
 type StatementResult = {
   columns: string[];
@@ -564,7 +547,6 @@ type StatementResult = {
   meta: Record<string, unknown>;
 };
 
-/** Delete a preview's D1, KV and R2-cap objects (its R2 files go with its prefix). */
 export const destroyPreviewData = async (env: Cloudflare.Env, id: string): Promise<void> => {
   const object = await previewBucket(env).get(`${KEY_PREFIX}/${id}/${WORKER_MANIFEST}`);
   if (!object) return;
@@ -610,7 +592,6 @@ const r2Meta = (object: R2Object, key: string): R2Meta => {
   };
 };
 
-/** What a preview's app calls for its D1, KV and R2 stand-ins; bound to one preview. */
 export class SlackPreviewBindings extends WorkerEntrypoint<Cloudflare.Env, BindingProps> {
   #id(): string {
     return this.ctx.props.id;
@@ -688,7 +669,6 @@ export class SlackPreviewBindings extends WorkerEntrypoint<Cloudflare.Env, Bindi
   }
 }
 
-/** The app's ASSETS binding: its uploaded static files. */
 export class SlackPreviewAssets extends WorkerEntrypoint<Cloudflare.Env, AssetProps> {
   override async fetch(request: Request): Promise<Response> {
     const { id, notFound } = this.ctx.props;
@@ -706,7 +686,6 @@ export class SlackPreviewAssets extends WorkerEntrypoint<Cloudflare.Env, AssetPr
   }
 }
 
-/** Every fetch a preview's code makes: the public internet, but none of Stella's hosts. */
 export class SlackPreviewOutbound extends WorkerEntrypoint<Cloudflare.Env, OutboundProps> {
   override async fetch(request: Request): Promise<Response> {
     let host = "";
@@ -737,8 +716,6 @@ export class SlackPreviewOutbound extends WorkerEntrypoint<Cloudflare.Env, Outbo
   }
 }
 
-// ── Per-preview data (D1 and KV stand-ins, the R2 size cap) ───────────────
-
 type SeedStatement = { sql: string; params?: unknown[] } | { exec: string };
 
 const decodeParam = (value: unknown): unknown => {
@@ -750,11 +727,6 @@ const decodeParam = (value: unknown): unknown => {
 
 const outValue = (value: unknown): unknown => (value instanceof ArrayBuffer ? Array.from(new Uint8Array(value)) : value);
 
-/**
- * One object per preview and database (`<id>:d1:<binding>`), KV namespace
- * (`<id>:kv:<binding>`) or the preview's R2 cap (`<id>:r2`). A database is
- * seeded from its snapshot on first use; its writes stay in the preview.
- */
 export class SlackPreviewData extends DurableObject<Cloudflare.Env> {
   #seeded = false;
 
@@ -918,7 +890,6 @@ export class SlackPreviewData extends DurableObject<Cloudflare.Env> {
     sql.exec("INSERT INTO __stella_r2 (key, size) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET size = excluded.size", key, bytes);
   }
 
-  /** When the preview expires: everything this object holds. */
   async destroy(): Promise<void> {
     await this.ctx.storage.deleteAll();
     this.#seeded = false;

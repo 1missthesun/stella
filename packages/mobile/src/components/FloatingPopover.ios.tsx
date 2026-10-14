@@ -25,13 +25,6 @@ const ARROW_ROOM = 16;
 const EDGE_GAP = 8;
 const MIN_BUBBLE_HEIGHT = 160;
 
-/**
- * iOS's own popover, pointing at what was tapped. SwiftUI presents it with
- * compact adaptation forced to `.popover`, so iPhone gets a real popover
- * rather than a sheet: system placement, tap-outside dismissal and VoiceOver
- * focus. The system surface itself wears the assistant fill, arrow included,
- * so the content and its footer of glass controls read as one card.
- */
 export function FloatingPopover({
   anchor,
   fallbackAnchor,

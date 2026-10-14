@@ -1,19 +1,4 @@
 #!/usr/bin/env node
-/**
- * Reports key drift between `en.json` and every other translation catalog.
- *
- *   node scripts/check-i18n-parity.mjs            # report and exit non-zero on drift
- *   node scripts/check-i18n-parity.mjs --json     # machine-readable report
- *
- * CI runs it through `bun run check:generated`. It prints the exact
- * missing/extra paths per locale so a backfill can be written straight from
- * its output.
- *
- * The mobile catalogs under `packages/mobile/src/i18n/locales` are generated
- * copies of the desktop ones (see packages/mobile/scripts/sync-i18n-catalogs.mjs),
- * so they are checked here too — drift there means the copies are stale and
- * `bun run i18n:sync` has not been run.
- */
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -40,8 +25,6 @@ const PLURAL_CATEGORIES = new Set([
   "other",
 ]);
 
-/** A plural node is a LEAF: which categories a language needs is a property
- * of the language, not of the key, so its forms are never compared as paths. */
 const isPluralNode = (value) => {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     return false;

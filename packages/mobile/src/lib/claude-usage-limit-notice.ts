@@ -3,7 +3,6 @@ import type { JournalRecord } from "@stella/contracts/conversation-protocol";
 import { CLAUDE_USAGE_LIMIT_RESUMED_TEXT } from "@stella/contracts/claude-usage-limit";
 import { dismissComposerNotice, showComposerNotice } from "./composer-notice";
 
-/** How old a journaled hold or resume can be and still be shown. */
 const STALE_MS = 15 * 60_000;
 const RESUMED_VISIBLE_MS = 8_000;
 
@@ -15,12 +14,6 @@ const resetTime = (until: number): string => {
   return `${at.toLocaleDateString(undefined, { weekday: "short", ...(far ? { month: "short", day: "numeric" } : {}) })} ${time}`;
 };
 
-/**
- * The cloud held Claude Code work in this conversation until the Claude
- * usage limit resets (a `usage-limit` card): the waiting card above the
- * composer while it is held, and one line when the work continues. The
- * newest such card in the journal says which.
- */
 export function useClaudeUsageLimitNotice(
   conversationId: string | null | undefined,
   records: readonly JournalRecord[],

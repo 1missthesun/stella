@@ -34,15 +34,6 @@ import {
   useConversationBrain,
 } from "@/features/execution-placement/conversation-brain";
 
-/**
- * Why a listed computer cannot be picked, said plainly. "Unavailable" used to
- * cover all of these, which told the user nothing and hid the one case they
- * can clear themselves: a computer that is simply not enabled yet.
- *
- * Enabling happens in the device list (Connect), never here — the picker reads
- * state and selects a target, and a tap meant as "run it there" must not be
- * read as consent for that machine.
- */
 const BLOCKER_LABELS: Record<DeviceExecutionBlocker, string> = {
   offline: "Offline",
   notEnabled: "Not enabled",
@@ -57,12 +48,6 @@ const moveErrorMessage = (error: unknown): string =>
     "",
   );
 
-/**
- * Where Stella runs. In the desktop app it is the open conversation's brain:
- * picking a place moves her there, as her own `switch_destination` does, so
- * every device's messages run there from then on. The website keeps a
- * per-send target.
- */
 export function GlobalExecutionTargetControl() {
   const isPrivate = useChatStorageMode() === "local";
   const { isCloudConversationReady: authCloudReady } = useCloudConversationSession();
@@ -80,15 +65,11 @@ export function GlobalExecutionTargetControl() {
   const { brain, moving, move } = useConversationBrain(brainConversationId);
   const brainTarget: DesktopExecutionTarget =
     !brain || brain.here ? AUTOMATIC_EXECUTION_TARGET : brain.target;
-  // Cloud and other computers need a signed-in account; signed out, sends
-  // run here (see `getExecutionTargetSnapshot`), so the picker says so.
   const target = !hasConnectedAccount
     ? AUTOMATIC_EXECUTION_TARGET
     : movesBrain
       ? brainTarget
       : storedTarget;
-  // Placement lives on the backend worker; the device list is an HTTPS read
-  // of the owner's gate there.
   const socketOrigin =
     isCloudConversationReady && hasConnectedAccount && backendUrl
       ? backendUrl
@@ -111,9 +92,6 @@ export function GlobalExecutionTargetControl() {
     );
   }, []);
 
-  // Every other computer that is present, plus whichever one is selected even
-  // when it is not. Being listed here says only "signed in and reachable";
-  // whether anything may be sent to it is the label's job.
   const otherDevices = useMemo(
     () =>
       (destinations ?? []).filter(
@@ -149,7 +127,6 @@ export function GlobalExecutionTargetControl() {
       return;
     }
     if (!brainConversationId) return;
-    // Picking where Stella already runs still makes it the home computer.
     void move(next).catch((error: unknown) => {
       showToast({
         title: "Stella couldn't move",
@@ -242,9 +219,6 @@ export function GlobalExecutionTargetControl() {
             );
           })}
           {hasConnectedAccount && hasDeviceToEnable ? (
-            // The answer lives in the device list, not here: enabling is a
-            // deliberate trip to Connect, never a side effect of a tap meant
-            // to choose where this message runs.
             <button
               type="button"
               className="execution-target-option"

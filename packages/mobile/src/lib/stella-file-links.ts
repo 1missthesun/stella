@@ -6,10 +6,6 @@ import {
 import { cloudFileArtifact } from "./cloud-file-payload";
 import type { ChatArtifact, MobileDisplayPayload } from "../types";
 
-/**
- * A tapped link as a file reference: an absolute path on a computer, or a
- * `stella://drive/...` link to the owner's drive.
- */
 export const parseStellaFileUrl = parseFileLinkTarget;
 
 const basenameOf = (filePath: string) => {
@@ -117,10 +113,6 @@ export const displayPayloadForStellaFile = (
   return { kind: "markdown", filePath, title, createdAt };
 };
 
-/**
- * A drive file as the viewer opens it: real media for media, else the
- * files-card shape. Either way the bytes come from an owner-scoped drive URL.
- */
 export const driveFileChatArtifact = (
   drivePath: string,
   conversationId: string,
@@ -172,8 +164,6 @@ export const stellaFileChatArtifact = (
   filePath: string,
   conversationId: string,
 ): ChatArtifact => {
-  // A drive link names a drive file, never one on the paired computer: it
-  // opens through a drive URL like a files-card pill.
   const drivePath = driveLinkPath(filePath);
   if (drivePath) {
     return driveFileChatArtifact(drivePath, conversationId, Date.now());

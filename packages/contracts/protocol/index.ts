@@ -71,7 +71,6 @@ export const METHOD_NAMES = {
   HOST_CONNECTOR_CONNECT_REQUEST: "host.connectorConnect.request",
   HOST_CONNECTOR_CONNECT_CANCEL: "host.connectorConnect.cancel",
   HOST_EXECUTION_DESTINATION_SWITCH: "host.executionDestination.switch",
-  /** A hidden note for a pi conversation's Stella where she runs elsewhere (`@stella/contracts/turn-plane/pi-brain`). */
   HOST_PI_BRAIN_NOTE: "host.piBrain.note",
   HOST_BROWSER_EXTENSION_CONNECT_REQUEST:
     "host.browserExtensionConnect.request",
@@ -105,14 +104,11 @@ export const METHOD_NAMES = {
   INTERNAL_WORKER_RUN_BLOCKING_AGENT: "internal.worker.runBlockingAgent",
   INTERNAL_WORKER_CANCEL_BLOCKING_AGENT: "internal.worker.cancelBlockingAgent",
   INTERNAL_WORKER_STEER_BLOCKING_AGENT: "internal.worker.steerBlockingAgent",
-  /** A `send_message` from the cloud for one of this computer's own agents. */
   INTERNAL_WORKER_DELIVER_AGENT_MESSAGE: "internal.worker.deliverAgentMessage",
-  /** A `stop_agent` from the cloud for one of this computer's own agents. */
   INTERNAL_WORKER_STOP_LOCAL_AGENT: "internal.worker.stopLocalAgent",
   INTERNAL_WORKER_CREATE_BACKGROUND_AGENT:
     "internal.worker.createBackgroundAgent",
   INTERNAL_WORKER_SEND_AGENT_INPUT: "internal.worker.sendAgentInput",
-  /** The pi-durable chat (`@stella/contracts/pi-chat`): submit, abort, watch. */
   INTERNAL_WORKER_PI_CHAT: "internal.worker.piChat",
   INTERNAL_WORKER_WEB_SEARCH: "internal.worker.webSearch",
   INTERNAL_WORKER_VOICE_PERSIST_TRANSCRIPT:
@@ -159,7 +155,6 @@ export const NOTIFICATION_NAMES = {
   RUNTIME_LAGGED: "runtime.lagged",
   VOICE_AGENT_EVENT: "voice.agentEvent",
   LOCAL_CHAT_UPDATED: "localChat.updated",
-  /** A watched pi-durable conversation's events (`PiChatEventsPayload`). */
   PI_CHAT_EVENTS: "piChat.events",
   THREAD_TRANSCRIPT_UPDATED: "localChat.threadTranscriptUpdated",
   SCHEDULE_UPDATED: "schedule.updated",
@@ -183,7 +178,6 @@ export type RuntimeInitializeResult = {
 };
 
 export type RuntimeConfigureParams = {
-  /** The Stella backend worker (auth, backend calls and live views). */
   backendUrl?: string | null;
   authToken?: string | null;
   hasConnectedAccount?: boolean;
@@ -197,19 +191,9 @@ export type HostLlmCredentialsRequest =
       operation: "get";
       kind: "api-key" | "oauth-api-key";
       provider: string;
-      /**
-       * OAuth only: mint a new access token from the stored refresh token
-       * even when the cached one has not reached its recorded expiry. Set
-       * after the provider rejected the cached token (401 / token_expired).
-       */
       forceRefresh?: boolean;
     }
   | {
-      /**
-       * Which Claude Code config the next local Claude turn runs on: the one
-       * signed in to the owner's active Claude account, else the CLI's
-       * default. Stella never handles the credential itself.
-       */
       operation: "claude-config";
     };
 
@@ -222,11 +206,8 @@ export type HostLlmCredentialsResult =
   | { ok: true; value: string | null }
   | {
       ok: true;
-      /** `CLAUDE_CONFIG_DIR` to run with; null for the CLI's default config. */
       configDir: string | null;
-      /** The owner's active Claude account, when one is chosen. */
       email?: string;
-      /** False while that account has no Claude Code login on this computer. */
       signedIn: boolean;
     }
   | { ok: false; reason: string };
@@ -245,36 +226,14 @@ import type { ChatContext } from "@stella/contracts";
 export type RuntimeAttachmentRef = {
   url: string;
   mimeType?: string;
-  /** Durable local copy used when an older image is pruned from model input. */
   sourcePath?: string;
-  /**
-   * Optional metadata preserved across the host/worker boundary so future
-   * non-image attachment paths (voice notes, documents, video) can branch
-   * on it. Today the image materializer only reads `url`/`mimeType` and
-   * silently drops everything that isn't an image — these fields exist so
-   * that adding non-image support later is a worker-only change rather
-   * than another round of contract plumbing.
-   */
   kind?: string;
   name?: string;
   size?: number;
   path?: string;
-  /**
-   * Drive-relative location of an attachment that came from the owner's Stella
-   * Drive (a turn sent from another device). Durable and device-independent,
-   * unlike `url` (a short-lived signed GET) and `sourcePath` (one machine's
-   * cache), so it is the only form of this attachment safe to persist in the
-   * cloud journal and resolvable by every client.
-   */
   drivePath?: string;
   transcript?: string;
   extractedText?: string;
-  /**
-   * Downscaled data URL generated at attach time. The model path always
-   * uses the full-resolution `url`; the chat display store persists the
-   * preview instead so user-message rows never decode (or store) tens of
-   * megabytes of base64 per turn.
-   */
   previewUrl?: string;
 };
 
@@ -283,10 +242,8 @@ export type RuntimePromptMessage = {
   uiVisibility?: "visible" | "hidden";
   messageType?: "message" | "user";
   customType?: string;
-  /** Structured dedup key retained on persisted runtime-internal messages. */
   eventId?: string;
   display?: boolean;
-  /** Optional caller-supplied timestamp for chronological prompt insertion. */
   timestamp?: number;
 };
 
@@ -300,24 +257,15 @@ export type RuntimeChatPayload = {
   deviceId?: string;
   platform?: string;
   timezone?: string;
-  /**
-   * BCP-47 locale tag for the user's preferred response language. Plumbed
-   * from the desktop renderer's `useI18n()` so the runtime can inject a
-   * "respond in X" directive into the agent system prompt. Optional —
-   * falls back to English when absent.
-   */
   locale?: string;
   mode?: string;
   messageMetadata?: Record<string, unknown>;
   attachments?: RuntimeAttachmentRef[];
   userMessageEventId?: string;
-  /** Original renderer send time; remains stable while a queued turn waits. */
   userMessageTimestamp?: number;
   agentType?: string;
   storageMode?: "cloud" | "local";
-  /** Exact owner-data epoch captured when this cloud turn was admitted. */
   ownerGeneration?: string;
-  /** Destination for this send. Omitted or automatic keeps local execution. */
   executionTarget?:
     | { mode: "automatic" }
     | { mode: "cloud" }
@@ -362,18 +310,6 @@ export type RuntimeActiveRun = {
   uiVisibility?: "visible" | "hidden";
 };
 
-/**
- * One-shot text completion request. Lets renderer surfaces (prompt shapers,
- * etc.) run a single completion through the runtime's BYOK-aware
- * route resolver — same path the orchestrator and subsidiary agents use —
- * instead of unconditionally hitting Stella's managed chat-completions endpoint.
- *
- * `agentType` picks which per-agent model override + provider to honor.
- * `fallbackAgentTypes` lets the caller fall through to a related agent's
- * configured model when no explicit override exists for `agentType` (e.g. an
- * internal helper falls back to `general` so the user's Assistant-tab BYOK
- * pick is respected even though the helper is not user-configurable).
- */
 export type RuntimeOneShotCompletionRequest = {
   agentType: string;
   systemPrompt?: string;
@@ -381,23 +317,11 @@ export type RuntimeOneShotCompletionRequest = {
   maxOutputTokens?: number;
   temperature?: number;
   fallbackAgentTypes?: string[];
-  /**
-   * Explicit model id (e.g. `stella/light`) that takes precedence over any
-   * per-agent override or `fallbackAgentTypes`. Lets internal helpers pin a
-   * tier alias so it resolves consistently across engines — notably so the
-   * Claude Code / Codex engines map `stella/light` to their own light models
-   * (Haiku / mini) instead of the user's expensive default.
-   */
   model?: string;
-  /** Internal-only effort pin for bounded utility passes. */
   reasoningEffort?: "none" | ReasoningEffortLevel;
-  /** Marks a non-user-facing automatic utility pass for engine policy. */
   utility?: boolean;
-  /** Stable key for a short-lived reusable utility session. */
   sessionKey?: string;
-  /** Close a previously-created reusable utility session without a model call. */
   closeSession?: boolean;
-  /** Safety cleanup for reusable sessions when lifecycle cleanup is missed. */
   sessionIdleTtlMs?: number;
 };
 
@@ -408,19 +332,10 @@ export type RuntimeOneShotCompletionResult = {
 export type RuntimeAutomationTurnRequest = {
   conversationId: string;
   userPrompt: string;
-  /**
-   * Fail closed instead of joining the shared orchestrator queue when another
-   * run already owns the lane. Leased remote executions use this so their
-   * external authority cannot outlive an unobservable queued entry.
-   */
   rejectIfBusy?: boolean;
-  /** Exact dispatch-scoped local owner for a desktop placement chat run. */
   executionPlacementRunId?: string;
-  /** Transcript authority for this automation turn. */
   storageMode?: "cloud" | "local";
-  /** Exact owner-data epoch captured at the turn's admission boundary. */
   ownerGeneration?: string;
-  /** Stable cloud-journal id used to deduplicate a retried external request. */
   userMessageId?: string;
   agentType?: string;
   modelOverride?: string;
@@ -432,28 +347,8 @@ export type RuntimeAutomationTurnRequest = {
     provider?: string;
     externalMessageId?: string;
   };
-  /**
-   * Chat-events id of the user message the caller already appended for
-   * display (connector turns). Lets the runtime exclude that event from the
-   * legacy pre-transition history shim so the message isn't duplicated into
-   * model context alongside the prompt.
-   */
   userMessageEventId?: string;
-  /**
-   * A person typed this prompt on another device and it was relayed here to
-   * run (a placement chat dispatch). The run itself still executes with
-   * hidden UI visibility — this computer publishes no run/event rows for it,
-   * because the sending client owns that presentation — but the user message
-   * mirrored into the cloud journal has to be visible: that row is the only
-   * copy every other client can read. Automation that no human typed (cron
-   * and trigger turns, connector deliveries) leaves this unset and keeps the
-   * hidden journal row it has always written.
-   */
   userAuthoredPrompt?: boolean;
-  /**
-   * A schedule's prompt the cloud placed here: journaled hidden, and marked
-   * so every reader shows Stella's answer to it.
-   */
   scheduled?: boolean;
 };
 
@@ -467,54 +362,28 @@ export type RuntimeLocalAgentRequest = {
   description: string;
   prompt: string;
   agentType?: string;
-  /** Exact caller-owned thread identity used for idempotent placement/cancel. */
   threadId?: string;
-  /**
-   * The placement fence for this one attempt, when a thread outlives it (a
-   * remote agent thread continued on this device). Defaults to `threadId`.
-   */
   executionId?: string;
-  /** The cloud thread this agent is, when another device placed it here. */
   remoteThreadId?: string;
-  /**
-   * Where that thread sits among Stella's agents (its depth and the agent
-   * that started it), from the owner's agent threads; absent, it is one of
-   * Stella's own.
-   */
   lineage?: AgentLineage;
-  /**
-   * The requester's `spawn_agent` model selector. A selector this device
-   * cannot run fails the agent with the reason.
-   */
   requestedModel?: string;
-  /**
-   * The spawning turn's attachments, already resolved by the host to
-   * short-lived signed drive GETs. The worker downloads them into the
-   * conversation's attachment cache and gives the agent absolute paths; a
-   * drive path on its own means nothing on a device.
-   */
   attachments?: RuntimeAttachmentRef[];
 };
 
 export type RuntimeLocalAgentSteerRequest = {
   agentId: string;
   text: string;
-  /** Stable across a retried steer, so the agent takes it once. */
   messageId: string;
 };
 
 export type RuntimeLocalAgentMessageRequest = {
-  /** The local agent id, which is also its cloud thread id. */
   threadId: string;
-  /** The framed `<agent-message>` text, delivered verbatim. */
   text: string;
-  /** Stable across redeliveries, so the agent takes it once. */
   messageId: string;
   ownerGeneration: string;
 };
 
 export type RuntimeLocalAgentStopRequest = {
-  /** The local agent id, which is also its cloud thread id. */
   threadId: string;
   ownerGeneration: string;
 };
@@ -522,7 +391,6 @@ export type RuntimeLocalAgentStopRequest = {
 export type RuntimeLocalAgentCancellationRequest = {
   agentId: string;
   reason?: string;
-  /** The attempt's placement fence; defaults to `agentId`. */
   executionId?: string;
 };
 
@@ -577,7 +445,6 @@ export type RuntimeAgentEventPayload = {
       };
   assistantMessageEventId?: string;
   assistantMessageText?: string;
-  /** Resolved citations for an `ASSISTANT_MESSAGE` boundary (`reply-refs`). */
   replyRefs?: ReplyRef[];
 };
 

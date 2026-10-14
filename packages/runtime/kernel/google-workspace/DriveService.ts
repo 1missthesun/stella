@@ -167,7 +167,6 @@ export class DriveService {
     let q = query;
     let isProcessed = false;
 
-    // Check if query is a Google Drive URL
     if (
       query &&
       (query.includes('drive.google.com') || query.includes('docs.google.com'))
@@ -550,7 +549,6 @@ export class DriveService {
       const drive = await this.getDriveClient();
       const id = extractDocumentId(fileId);
 
-      // 1. Check if it's a Google Doc (special handling required, export instead of download)
       const metadata = await drive.files.get({
         fileId: id,
         fields: 'id, name, mimeType',
@@ -602,7 +600,6 @@ export class DriveService {
         };
       }
 
-      // 2. Download media
       const response = await drive.files.get(
         {
           fileId: id,
@@ -614,14 +611,11 @@ export class DriveService {
 
       const buffer = Buffer.from(response.data as unknown as ArrayBuffer);
 
-      // 3. Save to localPath
         const absolutePath = path.isAbsolute(localPath)
           ? localPath
           : path.resolve(getProjectRoot(), localPath);
       const dir = path.dirname(absolutePath);
 
-      // One Effect pipeline on the shared google-workspace runtime;
-      // failures rethrow the original fs error object (M5 file-IO seam).
       await runGoogleWorkspaceEffect(
         tryGoogleWorkspaceOp(() =>
           fs.promises.mkdir(dir, { recursive: true }),

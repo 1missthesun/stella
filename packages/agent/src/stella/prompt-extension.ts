@@ -1,14 +1,3 @@
-/**
- * Stella's prompt as pi-durable sections.
- *
- * What the desktop pinned as resident startup documents and the cloud froze
- * per turn (personality, memory, skills, execution context, media access)
- * are named sections here. pi-durable renders them before each request and
- * stores only the ones that changed, as positional `pi.system` entries, so
- * an unchanged prompt costs nothing and a changed memory file sends just
- * that file again. Only the preamble stays in the system prompt; the rest is
- * sent as resident context after it (`resident-context.ts`).
- */
 import type { Context } from "@earendil-works/chord";
 import { defineExtension, section, type PromptInput, type PromptSection } from "@earendil-works/pi-durable";
 import {
@@ -32,7 +21,6 @@ import type { StellaAgentPromptId, StellaContextSources } from "./context.ts";
 
 export const STELLA_PROMPT_EXTENSION = "stella-prompt";
 
-/** The agent prompt's body: everything after its front matter. */
 export const promptBody = (source: string): string => {
   const match = /^---\r?\n[\s\S]*?\r?\n---\r?\n?/.exec(source);
   return (match ? source.slice(match[0].length) : source).trim();
@@ -43,7 +31,6 @@ const startupDoc = (path: string, content: string | undefined): string | undefin
     ? undefined
     : `<startup_doc path="${path}">\n${content.trim()}\n</startup_doc>`;
 
-/** A memory file as the model reads it on every host: comments stripped, secrets redacted, capped. */
 const memoryDoc = (path: string, raw: string | undefined, maxChars: number): string | undefined =>
   startupDoc(path, raw === undefined ? undefined : shapeResidentMemoryDoc(raw, maxChars));
 
@@ -53,14 +40,8 @@ const role = async (input: PromptInput, context: Context): Promise<StellaAgentRo
 const promptIdFor = (agent: StellaAgentRole): StellaAgentPromptId =>
   agent.agentType === "orchestrator" ? "agents/orchestrator.md" : "agents/general.md";
 
-/** How much of a project's AGENTS.md an agent is shown. */
 const AGENTS_MD_MAX_CHARS = 32_000;
 
-/**
- * Where a spawned agent starts, and that directory's AGENTS.md when it has
- * one. Read from the environment on each request, so an edit to the file
- * reaches the agent on its next step.
- */
 const workingDirectory: PromptSection["render"] = async (input, context) => {
   const cwd = input.agent.cwd;
   const env = input.env;
@@ -81,10 +62,6 @@ const workingDirectory: PromptSection["render"] = async (input, context) => {
   return lines.join("\n\n");
 };
 
-/**
- * An agent's own address and its starter's, so it can answer whoever wrote
- * to it without looking anyone up first.
- */
 const agentIdentity: PromptSection["render"] = async (input, context) => {
   const agent = await role(input, context);
   if (agent.agentType === "orchestrator" || !agent.threadId) return undefined;
@@ -100,7 +77,6 @@ const agentIdentity: PromptSection["render"] = async (input, context) => {
   ].join(" ");
 };
 
-/** Sections the orchestrator alone carries. */
 const orchestratorOnly = (
   render: (input: PromptInput, context: Context) => Promise<string | undefined>,
 ): PromptSection["render"] =>
@@ -110,7 +86,6 @@ export function stellaPromptExtension(sources: StellaContextSources) {
   const memory = (context: Context) => sources.memory(context);
   return defineExtension({
     name: STELLA_PROMPT_EXTENSION,
-    // Every Stella conversation selects this extension, so its requests all pass here.
     hooks: [processableImagesHook, residentContextHook, messageIdsHook],
     sections: [
       section(

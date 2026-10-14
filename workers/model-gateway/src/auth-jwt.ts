@@ -23,16 +23,10 @@ export const JWKS_MIN_REFETCH_MS = 60_000;
 export const CLOCK_SKEW_S = 60;
 
 export type VerifiedToken = {
-  /** `sub`: the Better Auth user id, which is the owner id. */
   ownerId: string;
   subject: string;
   sessionId: string;
   expiresAtMs: number;
-  /**
-   * The `tst` claim: a dev test account (`@test.stella.local`), which only a
-   * backend with test accounts on names. Honored only by a gateway with
-   * `STELLA_TEST_ACCOUNTS=1`.
-   */
   testAccount: boolean;
 };
 
@@ -60,12 +54,9 @@ type JwkEntry = { kid: string; jwk: JsonWebKey };
 type JwksCacheEntry = {
   keys: JwkEntry[];
   fetchedAtMs: number;
-  /** Imported CryptoKeys, keyed by kid, discarded whenever `keys` is replaced. */
   imported: Map<string, CryptoKey>;
 };
 
-// Module-global, so every request in this isolate shares one cache and one
-// in-flight fetch. A cold start just refetches.
 const jwksCache = new Map<string, JwksCacheEntry>();
 const jwksInflight = new Map<string, Promise<JwksCacheEntry>>();
 
@@ -209,8 +200,6 @@ export const verifyUserToken = async (
   const payload = decodeSegment(parts[1]!);
   if (!header || !payload) return fail("malformed");
 
-  // Checked before anything else: "alg":"none" and HMAC confusion both die
-  // here, before a key is ever selected.
   if (header.alg !== "RS256") return fail("unsupported_alg");
   const kid = typeof header.kid === "string" ? header.kid : "";
   if (!kid) return fail("no_kid");
@@ -284,12 +273,6 @@ export const verifyUserToken = async (
 
 const PREVIEW_HOST_LABEL = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/u;
 
-/**
- * The backend whose sign-in this exchange pins: `pinnedIssuer`, unless
- * `previewHostSuffix` is set (dev only) and the token claims a cloud-builder
- * Preview, `https://<name><suffix>`. The claim only picks which issuer's
- * keys verify the token; `verifyUserToken` still checks the signature.
- */
 export const sessionIssuerFor = (
   token: string,
   pinnedIssuer: string,

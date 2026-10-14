@@ -1,25 +1,8 @@
-/**
- * Signed OAuth `state` for flows whose callback lands on this Worker (X,
- * GitHub App installs, integration connects). The token is the routing
- * index: `<payload>.<sig>`, where `payload` is base64url JSON of
- * `{ownerId, kind, nonce, exp, extra?}` and `sig` an HMAC-SHA256 over it
- * keyed by `OAUTH_STATE_SECRET`.
- *
- * The signature proves this Worker issued the state for that owner; it does
- * not make it single-use. Each flow records `nonce` in the owner's object
- * when it signs, and the callback consumes it there exactly once, so a
- * replayed or stale state is refused by the owner object, not here.
- */
-
 export type OAuthState = {
   ownerId: string;
-  /** Which flow issued it, e.g. `x`, `github_install`. Callbacks check it. */
   kind: string;
-  /** Recorded in the owner object at sign time; consumed once by the callback. */
   nonce: string;
-  /** Epoch milliseconds after which the state is refused. */
   exp: number;
-  /** Small flow-specific values (no secrets: the payload is readable). */
   extra?: Record<string, string>;
 };
 
@@ -65,7 +48,6 @@ const constantTimeEqual = (a: string, b: string): boolean => {
   return diff === 0;
 };
 
-/** Sign a state. Throws when `OAUTH_STATE_SECRET` is missing. */
 export const signOAuthState = async (env: Cloudflare.Env, state: OAuthState): Promise<string> => {
   const payload = base64Url(
     encoder.encode(
@@ -81,7 +63,6 @@ export const signOAuthState = async (env: Cloudflare.Env, state: OAuthState): Pr
   return `${payload}.${await sign(secretOf(env), payload)}`;
 };
 
-/** The state when its signature holds and it has not expired; otherwise null. */
 export const verifyOAuthState = async (
   env: Cloudflare.Env,
   token: string,

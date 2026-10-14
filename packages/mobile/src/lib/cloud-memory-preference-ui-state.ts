@@ -35,7 +35,6 @@ export const savingMobileCloudMemoryPreference = (
   issue: null,
 });
 
-/** A failed save always rolls the visible switch back to server authority. */
 export const failedMobileCloudMemoryPreference = (
   preference: MobileCloudMemoryPreference | null,
   issue: "load" | "save",

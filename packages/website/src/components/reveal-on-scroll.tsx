@@ -2,15 +2,6 @@
 
 import { useEffect } from "react";
 
-/**
- * Mounts once per page. Adds `html.has-reveal` to opt the page into the
- * scroll-triggered reveal styles, then watches every `[data-reveal]`
- * element with an IntersectionObserver, applying `is-revealed` once the
- * element enters the viewport.
- *
- * Gated behind a class on <html> so server-rendered HTML stays visible
- * for users without JS or with `prefers-reduced-motion: reduce`.
- */
 export function RevealOnScroll() {
   useEffect(() => {
     const root = document.documentElement;
@@ -51,9 +42,6 @@ export function RevealOnScroll() {
         if (observed.has(node)) return;
         observed.add(node);
 
-        // Anything already well into view at mount (e.g. on a deep refresh
-        // or a back/forward restore) should reveal immediately, with no
-        // transition flash.
         const rect = node.getBoundingClientRect();
         const inView = rect.top < window.innerHeight * 0.92 && rect.bottom > 0;
         if (inView) {
@@ -67,7 +55,6 @@ export function RevealOnScroll() {
 
     observeNode(document.body);
 
-    // Watch for any sections rendered after hydration (dynamic imports, etc).
     const mutation = new MutationObserver((records) => {
       for (const record of records) {
         for (const added of record.addedNodes) {

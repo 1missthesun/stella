@@ -12,7 +12,6 @@ export const piChatHandlers: WorkerRpcHandlers = {
     Effect.gen(function* () {
       const session = yield* WorkerSessions.sessionOrFail(() => new RunnerUnavailableError());
       const hostBus = yield* HostBus.Service;
-      // Who is signed in lives on the runner.
       yield* session.runner.initialized;
       return yield* fromPromise(async () =>
         piChatRequest(session, hostBus, params as PiChatRequest | PiChatUsageRequest),

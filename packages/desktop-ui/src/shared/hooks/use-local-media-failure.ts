@@ -30,11 +30,6 @@ const explainLocalMediaFailure = async (
   return localMediaFailureMessage(source, filePath, noun);
 };
 
-/**
- * Why a `stella-media:` stream for `filePath` failed, asked only once the
- * player reports an error: moved or deleted, kept on another device, or
- * present but unplayable.
- */
 export const useLocalMediaFailure = (filePath: string, noun: LocalMediaNoun) => {
   const [failure, setFailure] = useState<{ filePath: string; message: string } | null>(
     null,

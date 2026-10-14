@@ -16,12 +16,6 @@ import type {
 import type { OwnerModelGrantFreezeRequest } from "./owner-model-grants.js";
 import type { Env } from "./build-session/shared/env.js";
 
-/**
- * Thin Durable Object shell for conversation sessions. The shell is what the
- * Worker and OwnerGate import on cold entry; the conversation implementation,
- * Agent runtime, tool definitions, and socket hub load only when this DO is
- * actually addressed.
- */
 export class OrchestratorSession extends DurableObject<Env> {
   private implementation?: Promise<
     import("./orchestrator-session-object.js").OrchestratorSessionObject
@@ -120,10 +114,6 @@ export class OrchestratorSession extends DurableObject<Env> {
     ).webSocketClose(ws, code, reason, wasClean);
   }
 
-  /**
-   * Dev verification only (the admin route checks `STELLA_TEST_ACCOUNTS`):
-   * restart this object as an eviction would, after the reply leaves.
-   */
   async restartForVerification(): Promise<{ restartScheduled: true }> {
     this.ctx.waitUntil(
       scheduler.wait(50).then(() => {

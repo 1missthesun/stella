@@ -1,21 +1,3 @@
-/**
- * Turn reconstruction for GPT-Live transcripts.
- *
- * GPT-Live reports speech as fragments: `session.input_transcript.delta` and
- * `session.output_transcript.delta` each carry a `delta` plus `start_ms` and
- * `end_ms` relative to the session clock. A fragment is explicitly NOT a
- * complete turn and there is no "transcript done" event, so anything that
- * needs a whole utterance — persisting history, matching a goodbye, building
- * a delegation request — has to accumulate here.
- *
- * A run of fragments is closed when any of these happens:
- *   - the other speaker starts (role switch),
- *   - the next fragment starts more than `TURN_GAP_MS` after the previous one
- *     ended, which is a pause long enough to be a new utterance,
- *   - no fragment arrives for `TURN_IDLE_MS` (the common case at end of turn),
- *   - the session asks for an explicit flush (disconnect, delegation).
- */
-
 export type TranscriptRole = "user" | "assistant";
 
 export type CompletedTranscriptTurn = {
@@ -58,14 +40,11 @@ export class TranscriptAccumulator {
 
   constructor(
     private readonly handlers: {
-      /** Every fragment, for live (non-final) UI. */
       onPartial: (role: TranscriptRole, text: string) => void;
-      /** One reconstructed utterance. */
       onTurn: (turn: CompletedTranscriptTurn) => void;
     },
   ) {}
 
-  /** Feed one `*_transcript.delta`. */
   push(args: {
     role: TranscriptRole;
     delta: string;
@@ -98,7 +77,6 @@ export class TranscriptAccumulator {
     this.armIdleTimer();
   }
 
-  /** Close the open run, if any, and report it as a completed turn. */
   flush(): CompletedTranscriptTurn | null {
     this.clearIdleTimer();
     const open = this.open;
@@ -122,7 +100,6 @@ export class TranscriptAccumulator {
     return turn;
   }
 
-  /** Completed turns, oldest first. Includes whatever is still open. */
   snapshot(): CompletedTranscriptTurn[] {
     const pending = this.open
       ? [
@@ -137,7 +114,6 @@ export class TranscriptAccumulator {
     return [...this.turns, ...pending];
   }
 
-  /** The most recent user speech, newest last, up to `limit` utterances. */
   recentUserTurns(limit: number): CompletedTranscriptTurn[] {
     return this.snapshot()
       .filter((turn) => turn.role === "user")

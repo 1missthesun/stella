@@ -1,16 +1,3 @@
-/**
- * The real cloud agent turn of a Claude agent: Claude Code's CLI running
- * headless in the sandbox as the spawned general agent, with Stella's tool
- * host behind it. Agents on Stella's models or the owner's ChatGPT plan run
- * on pi in their conversation instead.
- *
- * The BuildSession DO restores the workspace before invoking this and
- * checkpoints it after; this module only runs the turn. Events and
- * transcript writes go through the short-lived Builder broker capability;
- * no reusable turn token ever enters this process. The final line on
- * stdout is the structured report the DO parses.
- */
-
 import type { CloudTurnAttemptPaths } from "@stella/contracts/cloud-turn-attempt";
 import { constants as fsConstants, existsSync } from "node:fs";
 import {
@@ -106,10 +93,6 @@ import { cloudAgentToolContext } from "./cloud-tool-context.js";
 import { markTurnStep } from "./turn-timing.js";
 import { openClaudeKeeper } from "./claude-keeper-client.js";
 
-/**
- * turn-input.json. `role` (from the shared contract) says which loop runs:
- * an orchestrator turn also carries the DO's system prompt and tool catalog.
- */
 export type AgentTurnInput = CloudCliTurnRoleInput & {
   kind: "agent";
   ownerId: string;
@@ -119,34 +102,16 @@ export type AgentTurnInput = CloudCliTurnRoleInput & {
   turnId: string;
   attemptGeneration: number;
   prompt: string;
-  /** Builder-owned fact: this attempt restored a durable world backup. */
   workspaceRestored: boolean;
-  /** Builder-derived HMAC key; consumed before any model/tool process exists. */
   nativeStateIntegrityKey: string;
   nativeStatePreviousIntegrityKeys?: string[];
   rebuildNativeSession?: boolean;
-  /**
-   * Builder-written: another host's synced Claude Code session sits in the
-   * thread's native state root to resume natively (orchestrator turns).
-   */
   adoptedNativeSession?: { sessionId: string; cliVersion: string; hydrated?: true };
-  /** One-shot pointer to the Builder-owned, short-lived turn broker. */
   turnBroker: TurnBrokerInput;
-  /** Short-lived capability for exporting and pushing this world's projection. */
   world: WorldSyncAccess;
-  /**
-   * Which of the owner's container Claude Code logins the CLI runs on (a
-   * directory key and the account's email, never a credential).
-   */
   claudeAccount?: CloudClaudeAccountInput;
-  /** Prior thread transcript rows, oldest first (send_message continuations). */
   history?: AgentHistoryRow[];
-  /** Canonical model route authorized for this turn at dispatch. */
   execution: CloudExecutionSelection;
-  /**
-   * Version-pinned, owner-authorized skill packages materialized by the
-   * worker into this sandbox's ephemeral filesystem. Contains no R2 keys.
-   */
   skills?: GeneralAgentPromptSkills;
 };
 
@@ -155,20 +120,10 @@ export type AgentTurnTerminalResult = {
   ok: boolean;
   finalText: string;
   error?: string;
-  /**
-   * A pre-agent failure must not replace the last good checkpoint (or create
-   * an empty first checkpoint), so the same preflight can be retried safely.
-   */
   checkpointPolicy?: "preserve_prior" | "builder_fallback";
   usage: { inputTokens: number; outputTokens: number; llmCalls: number };
-  /** Builder-owned archive commit latency observed through the broker. */
   checkpointMs?: number;
-  /** Exact staged archive pair; Builder promotes it only after transcript ACK. */
   turnStateCheckpoint?: TurnBrokerTurnStateCheckpointReceipt;
-  /**
-   * All model-controlled writers were not proven joined in-process. Builder
-   * must kill the exact execution session, then archive and append these rows.
-   */
   builderFallback?: {
     historyCursor: string;
     messages: Array<{ ordinal: number; role: string; payloadJson: string }>;
@@ -246,9 +201,6 @@ export const prepareCloudToolFilesystem = async (args: {
         details.uid === CLOUD_TOOL_PROCESS_IDENTITY.uid &&
         details.gid === CLOUD_TOOL_PROCESS_IDENTITY.gid
       ) {
-        // A world materialized from its export (or made by the worker shell)
-        // carries 0755 directories; the tool account's own state directory
-        // is tightened rather than refused. Ownership is still checked below.
         await handle.chmod(0o700);
       }
     } finally {
@@ -256,8 +208,6 @@ export const prepareCloudToolFilesystem = async (args: {
     }
     await assertToolOwnedDirectory(target, 0o700);
   };
-  // The drive state dir lives under the world's drive directory, which an
-  // empty world does not carry yet; create that parent for the tool account.
   if (args.driveStateDir) {
     const driveRoot = path.dirname(args.driveStateDir);
     try {
@@ -301,13 +251,6 @@ export const commitTurnStateBeforeTranscript = async (args: {
   return receipt;
 };
 
-/**
- * The office CLI ships inside the image next to the runtime. The tool host
- * turns this into `STELLA_OFFICE_BIN`, so document work runs through `Bash`
- * rather than a dedicated tool. Both cloud tool hosts (this executor and the
- * attached daemon) configure it the same way, because both render the same
- * `general.md`, which tells the agent `stella-office` is there.
- */
 export const resolveOfficeBinPath = (): string | undefined => {
   const candidate =
     process.env.STELLA_OFFICE_BIN?.trim() ||
@@ -317,13 +260,6 @@ export const resolveOfficeBinPath = (): string | undefined => {
   return existsSync(candidate) ? candidate : undefined;
 };
 
-/**
- * The container path's prompt: `body` is the `general.md` render the worker
- * sent for this engine's tools, and the world is on disk with the drive
- * synchronized before the model ran, so it appends the materialized variant.
- * Kept as a named export because prompt tests assert on the sentences a given
- * `DriveSyncResult` produces.
- */
 export const CLOUD_GENERAL_PROMPT = (options: {
   body: string;
   threadId?: string;
@@ -354,12 +290,6 @@ export const hydrateDriveForAgentTurn = async (
   }
 };
 
-/**
- * The turn input sits in this attempt's root-only directory (see
- * cloud-turn-attempt.ts). The executor still consumes it and unlinks it at
- * once: the thread history, capabilities and broker handoff it carries are
- * executor inputs, never the agent's context.
- */
 export const runAgentTurn = (
   attempt: CloudTurnAttemptPaths,
 ): Effect.Effect<AgentTurnResult, Error> =>
@@ -385,8 +315,6 @@ export const runAgentTurn = (
         (client) => Effect.sync(() => client.close()),
       );
       markTurnStep("brokerReady");
-      // This loop builds an agent's own prompt and tools; an orchestrator
-      // turn runs the DO's, in its own executor mode.
       if (input.role === "orchestrator") {
         return yield* Effect.promise(() =>
           runOrchestratorTurn({ input, broker }),
@@ -403,7 +331,6 @@ export const runAgentTurn = (
           checkpointPolicy: "preserve_prior",
         };
       }
-      // Only Claude agents run in a container; the rest are pi agents.
       if (input.execution.engine !== "anthropic") {
         return {
           ok: false,
@@ -451,8 +378,6 @@ export const runAgentTurn = (
           checkpointPolicy: "preserve_prior",
         };
       }
-      // This thread's Claude may still be up from its last turn; the keeper
-      // that holds it (or a new one) is reached while the turn gets ready.
       const claudeKeeper = yield* Effect.acquireRelease(
         Effect.sync(() => {
           const opening = openClaudeKeeper(input.threadId);
@@ -506,8 +431,6 @@ export const runAgentTurn = (
           }),
       );
 
-      // Ordered, best-effort progress events; a lost event never fails the
-      // turn (the DO writes the terminal event either way).
       let eventChain: Promise<unknown> = Promise.resolve();
       const emitEvent = (kind: string, payload: unknown): void => {
         eventChain = eventChain
@@ -526,9 +449,6 @@ export const runAgentTurn = (
           });
       };
 
-      // Bring the drive into `world/drive` before any agent tool exists. Its
-      // hydration ledger lives in the contained Drive state directory created
-      // above, and lets a turn skip re-downloading a drive it already has.
       const hydration = yield* Effect.promise(async () => {
         try {
           return {
@@ -559,9 +479,6 @@ export const runAgentTurn = (
       }
       const driveSync = hydration.value;
       markTurnStep("driveHydrated");
-      // What the drive copy looks like before any agent process exists: the
-      // write-back saves what changes from here. An unreadable tree counts
-      // every file as changed, and the ledger still spares the unchanged.
       const driveBefore = yield* Effect.promise(() =>
         snapshotDriveTree(driveWorkspace.root).catch(() => new Map()),
       );
@@ -590,8 +507,6 @@ export const runAgentTurn = (
             askUser: userAsks.handlers.askUser,
             requestSecureInput: userAsks.handlers.requestSecureInput,
             useSecureValue: userAsks.handlers.useSecureValue,
-            // The agent's `history.*` reads its own thread, which its
-            // BuildSession holds and nothing else does.
             agentHistoryQuery: async (args) => {
               const response = await postJson("/api/cloud/history", { turnId: input.turnId, args });
               const body = (await response.json().catch(() => null)) as { ok?: boolean; result?: unknown; error?: string } | null;
@@ -632,8 +547,6 @@ export const runAgentTurn = (
         workspaceRoot,
         workspaceStateDir,
         toolHome,
-        // `code` reaches the turn's other tools as `tools.<name>`, as on the
-        // desktop.
         allowedToolNames: cloudGeneralToolNames(),
       });
 
@@ -708,8 +621,6 @@ export const runAgentTurn = (
         );
 
       markTurnStep("mcpHostReady");
-      // Messages sent to this agent while it works. It stops taking them
-      // when it finishes; a message that lands later is refused, never lost.
       const inbox = yield* Effect.acquireRelease(
         Effect.tryPromise({
           try: () => openAgentInbox(attempt.inbox),
@@ -743,8 +654,6 @@ export const runAgentTurn = (
                 conversationId: input.conversationId,
               }),
               prompt: input.prompt,
-              // Built-ins are off (`--tools ""`), the same as the cloud
-              // orchestrator's Claude Code turn, so it gets the same note.
               systemPrompt:
                 buildClaudeCodeNativeToolRuntimePrompt(cloudSystemPrompt),
               execution: nativeExecution,
@@ -810,8 +719,6 @@ export const runAgentTurn = (
         produced = native.messages;
         nativeStateCheckpoint = native.nativeStateCheckpoint;
       }
-      // The agent has stopped; nothing more is accepted for it. (A finished
-      // run already closed it; one that failed takes no more messages.)
       yield* Effect.promise(() => inbox.close().catch(() => []));
       const executorBoundaryPushFailure = yield* Effect.promise(async () => {
         try {
@@ -828,10 +735,6 @@ export const runAgentTurn = (
         execution.errorMessage = executorBoundaryPushFailure.message;
       }
       if (produced.length === 0) {
-        // A tool-only/error path can still mutate the workspace before an
-        // engine emits a transcript row. Give that physical turn an explicit
-        // canonical row instead of silently dropping its durable state or
-        // trying to replace a checkpoint under an unchanged cursor.
         const timestamp = Date.now();
         produced = [
           {
@@ -887,11 +790,6 @@ export const runAgentTurn = (
         execution.errorMessage = eventFailure.message;
       }
 
-      // The drive copy is not part of the world, so this is the only way the
-      // turn's drive work survives the sandbox: everything it created,
-      // changed or deleted under drive/ is written back to the drive now.
-      // Best-effort per file, and every file it could not save is named in
-      // the report rather than silently dropped.
       const outputs = yield* Effect.promise(
         async (): Promise<{
           files: ProducedFileReport[];
@@ -899,10 +797,6 @@ export const runAgentTurn = (
           notice: string;
         }> => {
           try {
-            // The card is the reply's own: markdown links in the turn's final
-            // assistant text, the same contract the local lane uses. Each
-            // linked path is still an agent-chosen string; the write-back
-            // reads every one beneath the descriptor boundary.
             const writeBack = await writeBackDrive({
               turnId: input.turnId,
               driveRoot: driveWorkspace.root,
@@ -938,8 +832,6 @@ export const runAgentTurn = (
       );
       if (outputs.files.length > 0) {
         emitEvent("output_files", {
-          // Every file on the card is in the drive with its bytes, which is
-          // what lets the chat surface offer it as a download.
           files: outputs.files.map((file) => ({
             ...toDriveFile(file),
             stored: outputs.stored.has(file.path),
@@ -968,10 +860,6 @@ export const runAgentTurn = (
         payloadJson: JSON.stringify(message),
       }));
 
-      // Freeze every model-controlled writer before the archive is built.
-      // ToolHost shutdown is joined and idempotent; closing the Claude MCP
-      // listener also prevents a surviving descendant from starting another
-      // tool call after the workspace snapshot begins.
       const shutdownFailures = yield* Effect.promise(async () => {
         const results = await Promise.allSettled([
           toolHost.shutdown(),
@@ -1003,10 +891,6 @@ export const runAgentTurn = (
       }
 
       {
-        // Workspace and optional native bytes are durably staged together
-        // before the transcript can make this exact cursor authoritative. An
-        // exact broker replay returns the already committed pair after a lost
-        // response; it never uploads a second archive.
         const checkpointStarted = performance.now();
         const checkpointAttempt = yield* Effect.promise(async () => {
           try {
@@ -1018,9 +902,6 @@ export const runAgentTurn = (
                   : {}),
                 broker,
                 appendTranscript: async () => {
-                  // One mutation owns the complete produced transcript: a
-                  // committed prefix would poison the next continuation's
-                  // canonical state.
                   let response = await postJson("/api/cloud/messages", {
                     conversationId: input.threadId,
                     turnId: input.turnId,
@@ -1047,9 +928,6 @@ export const runAgentTurn = (
         });
         checkpointMs = Math.round(performance.now() - checkpointStarted);
         if ("error" in checkpointAttempt) {
-          // A lost checkpoint/transcript response does not erase the model's
-          // completed report. Hand the exact transcript to Builder, which
-          // quiesces the process tree and resumes the idempotent journal.
           return createBuilderFallbackAgentTurnResult({
             finalText: execution.finalText,
             notice: outputs.notice,

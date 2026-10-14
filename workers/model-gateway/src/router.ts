@@ -63,7 +63,6 @@ import {
 import { assertAgentTypeAllowed, resolveManagedRoute } from "./resolve.js";
 import { sharedGatewayConfigStore } from "./shared-config.js";
 
-/** The owner object hosting this request, when it runs inside `OwnerRelayGate`. */
 export type LocalOwnerRelay = {
   matchesOwner(ownerId: string): boolean;
   accounting: OwnerRelayAccounting;
@@ -83,7 +82,6 @@ export type LocalOwnerRelay = {
   };
 };
 
-/** Runs `release` once the response body is fully consumed or canceled. */
 const releaseAfterBody = (
   response: Response,
   release: () => void,
@@ -125,17 +123,6 @@ const releaseAfterBody = (
   return new Response(body, response);
 };
 
-/**
- * Route table
- *
- *   GET  /healthz                    200 {ok:true}
- *   POST /v1/capabilities/session    Better Auth JWT -> session capability
- *   POST /v1/models/resolve          capability -> GatewayModelResolution
- *   POST /v1/relay/*                 capability -> managed lane or native lane
- *
- * Owner enforcement arrives over `ModelGatewayControl.applyOwnerEnforcement`.
- * Anything else is 404 `bad_request`; a wrong method is 405 `bad_request`.
- */
 const AGENT_TYPE_PATTERN = /^[A-Za-z0-9_][A-Za-z0-9_.-]{0,63}$/u;
 const MAX_DEVICE_PUBLIC_KEY_CHARS = 128;
 const MAX_DEVICE_SIGNATURE_CHARS = 256;
@@ -248,8 +235,6 @@ const handleSessionCapability = async (
   const deviceProof = await verifyDeviceKeyProof({
     proof: deviceKey,
     ownerId,
-    // This is the public origin in the URL the client called. Clients must
-    // sign that exact origin, without the capability-exchange path.
     gatewayOrigin: new URL(request.url).origin,
     now: deps.now(),
   });
@@ -293,7 +278,6 @@ const handleSessionCapability = async (
       }),
     );
   }
-  // Only an exchange that issues a capability counts against the allowances.
   let issuedAudience: string | undefined;
   try {
     const ipHash = await ipHashFrom(request);
@@ -409,8 +393,6 @@ const handleResolve = async (
     agentType,
     requestedModel,
   });
-  // /prepare acknowledges actual completion. /resolve keeps its historical
-  // nonblocking behavior, with failures observed instead of silently discarded.
   const ownerScoped =
     auth.claims.ledgerScope === "owner-relay-v2" && !auth.probe;
   const preparation = ownerScoped
@@ -518,8 +500,6 @@ const handleRelay = async (
     ) {
       await verifySessionDpop({ request, auth, now: deps.now() });
       forwarded = true;
-      // Inference and its exact accounting live in the same owner object.
-      // The original request is reauthenticated there; no header bypass exists.
       const response = await env.OWNER_RELAY_GATE.get(
         env.OWNER_RELAY_GATE.idFromName(auth.claims.sub),
       ).fetch(request);
@@ -564,8 +544,6 @@ const handleRelay = async (
     }
     return response;
   } catch (error) {
-    // A spent budget on a capability minted while the owner was out of
-    // room is the owner's usage limit, which the client must not retry.
     if (
       usageLimit &&
       isGatewayError(error) &&

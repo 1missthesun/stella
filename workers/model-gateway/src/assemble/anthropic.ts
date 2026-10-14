@@ -6,19 +6,6 @@ import {
   type AssembleOutcome,
 } from "./types.js";
 
-/**
- * Anthropic Messages stream -> `Message`.
- *
- *   message_start          the skeleton (`message` with empty `content`)
- *   content_block_start    appends `content_block` at `index`
- *   content_block_delta    text_delta / thinking_delta / signature_delta /
- *                          input_json_delta / citations_delta
- *   content_block_stop     finalizes accumulated tool input JSON
- *   message_delta          merges `delta` (stop_reason, stop_sequence, …)
- *                          and `usage` into the message
- *   message_stop           terminal
- *   error                  provider-side failure mid-stream
- */
 export const createAnthropicAssembler = (): Assembler => {
   let message: Record<string, unknown> | null = null;
   const blocks: Record<string, unknown>[] = [];
@@ -185,7 +172,6 @@ export const createAnthropicAssembler = (): Assembler => {
         detail: error,
       };
     }
-    // Sparse indexes (a skipped content_block_start) must not surface as holes.
     message.content = blocks.filter((block) => block !== undefined);
     return { ok: true, body: message };
   };

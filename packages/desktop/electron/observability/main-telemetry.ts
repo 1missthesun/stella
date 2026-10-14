@@ -7,19 +7,10 @@ import { getTelemetryEnabled } from "@stella/runtime/kernel/preferences/local-pr
 
 type MainTelemetryOptions = {
   stellaDataDirPath: string;
-  /**
-   * Which deployment this run reports to. Decided once, from who the install
-   * is (see app-identity) — never from packaging, which would have sent every
-   * installed user's telemetry to the development endpoint.
-   */
   environment: Extract<TelemetryEnvironment, "development" | "production">;
   getAuthToken: () => Promise<string | null>;
 };
 
-/**
- * Initialize metadata-only remote telemetry in Electron main. Network and
- * spool work deliberately stay outside the renderer's 16ms frame budget.
- */
 export const initMainProcessTelemetry = (options: MainTelemetryOptions) => {
   const environment = options.environment;
   const client = new RemoteTelemetryClient({

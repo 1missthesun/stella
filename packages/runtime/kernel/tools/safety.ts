@@ -1,7 +1,3 @@
-// No node builtins here on purpose: workerd imports this module for the cloud
-// `web` tool's secret refusal and page-text redaction. Path helpers that need
-// node live in `home-path.ts`.
-
 import { isUserAskSecretHandle } from "@stella/contracts/user-ask";
 import { redactWrappedSecretTokens } from "@stella/contracts/secret-redaction";
 

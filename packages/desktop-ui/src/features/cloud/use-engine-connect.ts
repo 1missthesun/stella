@@ -25,11 +25,8 @@ export type EngineConnectFlow =
     };
 
 export type EngineConnectOptions = {
-  /** Sign a saved cloud ChatGPT account in again. */
   accountId?: string;
-  /** Reuse a registration another of the owner's hosts made. */
   clientId?: string;
-  /** Ask ChatGPT for consent to use the plan after it was declined. */
   enablePlanUsage?: boolean;
 };
 
@@ -44,7 +41,6 @@ export function useEngineConnect() {
   const flowRef = useRef<EngineConnectFlow | null>(null);
   flowRef.current = flow;
 
-  /** End the flow: connected, cancelled, or failed (`start` rejects). */
   const settle = useCallback((outcome: boolean | Error) => {
     flowRef.current = null;
     setFlow(null);
@@ -67,7 +63,6 @@ export function useEngineConnect() {
     settle(false);
   }, [settle]);
 
-  /** Wait for the desktop app's own browser round trip to finish. */
   const runInMain = useCallback(
     (run: () => Promise<unknown>): Promise<boolean> => {
       const next: EngineConnectFlow = { kind: "browser", provider: "chatgpt" };
@@ -95,11 +90,6 @@ export function useEngineConnect() {
     [settle],
   );
 
-  /**
-   * Begin adding (or signing in again) a cloud ChatGPT account. Resolves
-   * true once it is connected, false when cancelled; throws when the flow
-   * could not start or the sign-in failed.
-   */
   const start = useCallback(
     async (options: EngineConnectOptions = {}): Promise<boolean> => {
       if (flowRef.current) cancel();
@@ -137,13 +127,11 @@ export function useEngineConnect() {
     [cancel, runInMain],
   );
 
-  /** In a browser: open the authorization page again. */
   const openAuthorizePage = useCallback(() => {
     const current = flowRef.current;
     if (current?.kind === "paste") openExternalUrl(current.authorizeUrl);
   }, []);
 
-  /** In a browser: the address the browser landed on after approval. */
   const finish = useCallback(
     async (pasted: string) => {
       const current = flowRef.current;
@@ -164,7 +152,6 @@ export function useEngineConnect() {
     [settle],
   );
 
-  // Leaving the surface abandons the attempt.
   useEffect(
     () => () => {
       const current = flowRef.current;

@@ -63,7 +63,6 @@ const readOptionalString = (
   return value;
 };
 
-/** Runtime validation for untrusted HTTP snapshots. */
 export const readAutomaticExecutionDispatch = (
   value: unknown,
   expected?: { idempotencyKey?: string; dispatchId?: string },
@@ -207,7 +206,6 @@ export const automaticExecutionCancellationCommand = (
       }
     : null;
 
-/** A rejected/stale grant is a pre-admission eligibility miss, not an outage. */
 export const isAutomaticExecutionPairCredentialRejection = (error: unknown) => {
   const message = error instanceof Error ? error.message : String(error);
   return /not paired|paired phone|pair proof|pairing credential|phone credential|desktop grant/i.test(
@@ -286,7 +284,6 @@ const waitForNextRead = (args: {
     arm(args.delayMs);
   });
 
-/** Pure reconnect loop; callers inject the authenticated status reader. */
 export const waitForAutomaticExecutionStatus = async <
   T extends AutomaticExecutionStatusSnapshot,
 >(args: {
@@ -306,11 +303,6 @@ export const waitForAutomaticExecutionStatus = async <
   for (;;) {
     if (args.signal?.aborted) throw new AutomaticExecutionWaitAbortedError();
     try {
-      // A stop can arrive after admission while this observer is already
-      // polling. Give the caller a chance to replay the same durable,
-      // idempotent cancel request before every bounded read. Transient cancel
-      // failures are retried by this loop; they never authorize another
-      // executor or placement fallback.
       await args.beforeRead?.();
       const dispatch = await args.readStatus(args.dispatchId);
       if (!dispatch) {
@@ -375,7 +367,6 @@ export const automaticExecutionResultText = (
 };
 
 export type AutomaticExecutionAdmissionInput = {
-  /** Persisted opt-in so pre-upgrade outbox retries keep their original hash. */
   userMessageEventId?: string;
   idempotencyKey: string;
   conversationId: string;
@@ -384,22 +375,13 @@ export type AutomaticExecutionAdmissionInput = {
   description?: string;
   parentTurnId?: string;
   threadId?: string;
-  /** What the work is about, never which executor runs it. */
   subject?: AutomaticExecutionSubject;
-  /** Which executor runs it, independent of subject. */
   target?: AutomaticExecutionTarget;
-  /** Exact cloud model chosen when this durable send was created. */
   execution?: CloudExecutionSelection;
   requiredCapabilities?: AutomaticExecutionCapability[];
-  /**
-   * Drive-relative paths of files already uploaded for this turn. References
-   * only: bytes would blow the envelope's 128 KB ceiling, and the placement
-   * service resolves a path on either placement.
-   */
   attachments?: readonly string[];
 };
 
-/** Mirrors the server's cap so a turn is never admitted and then truncated. */
 const AUTOMATIC_EXECUTION_MAX_ATTACHMENTS = 4;
 
 const validAttachmentPath = (path: string): boolean =>
@@ -438,15 +420,11 @@ export const buildAutomaticExecutionAdmission = (
   if (!attachments.every(validAttachmentPath)) {
     throw new Error("An attachment does not name a drive file.");
   }
-  // Exactly the bytes an executing device receives. The builder re-derives
-  // this string from the parsed payload with the same contract helper, so the
-  // hash the pair proof commits to is reproducible on both sides.
   const payload: DispatchPayload = {
     schemaVersion: 1,
     prompt,
     conversationId,
     clientMsgId: idempotencyKey,
-    // Echo the UI identity in the journal even when it beats admission back.
     ...(input.userMessageEventId ? { userMessageEventId: input.userMessageEventId } : {}),
     ...(input.execution && input.target?.mode !== "device" ? { execution: input.execution } : {}),
     ...(attachments.length ? { attachments } : {}),

@@ -1,9 +1,3 @@
-/**
- * Turn-plane events applied to the owner's own index. The orchestrator,
- * BuildSessions and conversation objects deliver them to
- * `OwnerGate.applyOwnerEvents` (see `src/owner-events.ts`).
- */
-
 import type { OwnerEvent } from "@stella/contracts/turn-plane/owner-events";
 import {
   applyAgentThreadEvent,
@@ -12,7 +6,6 @@ import {
 import { applyConversationEvent } from "./domains/conversations.js";
 import type { OwnerContext } from "./registry.js";
 
-/** Parents before children, so a batch never applies a child to a missing row. */
 const KIND_ORDER: Record<OwnerEvent["kind"], number> = {
   "conversation.created": 0,
   "turn.started": 1,

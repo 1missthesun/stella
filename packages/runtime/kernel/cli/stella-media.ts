@@ -173,14 +173,8 @@ const getAuth = (): MediaAuth => {
 const deviceIdFromEnv = (): string | undefined =>
   process.env.STELLA_DEVICE_ID?.trim() || undefined;
 
-/** The bridge reads one request line of at most 64 KiB. */
 const MAX_BRIDGE_REQUEST_BYTES = 60 * 1024;
 
-/**
- * Inside Stella the call goes through the runtime, which holds the live
- * session and refreshes it, so a token that expired in this shell's
- * environment never matters. Elsewhere it goes straight to the API.
- */
 const callMedia = async (operation: MediaOperation): Promise<unknown> => {
   const socketPath = process.env.STELLA_CLI_BRIDGE_SOCK?.trim();
   const deviceId = deviceIdFromEnv();
@@ -236,8 +230,6 @@ const submitJob = async (request: string): Promise<AcceptedMediaJob> =>
 const getJob = async (jobId: string): Promise<MediaJob> =>
   (await callMedia({ op: "job", jobId })) as MediaJob;
 
-// Effect-backed sleep (kernel/cli/effect-runtime.ts); poll pacing timing
-// is unchanged.
 const sleep = async (ms: number): Promise<void> => await sleepMs(ms);
 
 const waitForJob = async (
@@ -264,7 +256,6 @@ const waitForJob = async (
   );
 };
 
-/** The model's own complaint, which says what to change in the input. */
 const mediaFailure = (error: MediaJobError | undefined): string =>
   `Media generation failed: ${error?.message || "unknown error"}${error?.code ? ` (${error.code})` : ""}`;
 
@@ -292,7 +283,6 @@ const KIND_BY_KEY: Record<string, { kind: OutputFile["kind"]; ext: string }> = {
   audio_file: { kind: "audio", ext: "mp3" },
 };
 
-/** Every file the output names (`{ url }` anywhere in it), each once. */
 const outputUrls = (
   output: unknown,
 ): Array<{
@@ -318,7 +308,6 @@ const outputUrls = (
     const record = value as Record<string, unknown>;
     if (typeof record.url === "string" && /^https?:/i.test(record.url)) {
       if (!found.has(record.url)) {
-        // The model's own file name says what it is (`.glb`, `.wav`, …).
         const fileExt =
           typeof record.file_name === "string"
             ? record.file_name.match(/\.([a-z0-9]{2,5})$/i)?.[1]?.toLowerCase()

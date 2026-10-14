@@ -1,17 +1,5 @@
 import path from "node:path";
 
-/**
- * `installBrowserWorkerApi` as source for the Node REPL worker.
- *
- * That worker is started from a source string (computer-use/kernel-worker.ts),
- * so it cannot import worker-api.ts. Instead the module and the worker-api/
- * modules it imports are bundled into one self-contained expression when this
- * module loads: one Bun.build from the source tree per process, about 10ms,
- * with no build step and no generated file. The runtime always runs from
- * source on Bun; only Node-hosted tooling takes the esbuild fallback
- * below. A failed build surfaces when a kernel starts, not when this module
- * is imported.
- */
 const ENTRYPOINT = path.join(import.meta.dirname, "worker-api.ts");
 
 const selfContainedError = (packageImports: readonly string[]): Error =>
@@ -23,8 +11,6 @@ const bundleWithBun = async (bun: typeof Bun): Promise<string> => {
   const packageImports: string[] = [];
   const result = await bun.build({
     entrypoints: [ENTRYPOINT],
-    // Plain JavaScript with no Node runtime helpers: the worker API uses no
-    // platform APIs, and the eval worker has no module loader for them.
     target: "browser",
     format: "cjs",
     throw: false,
@@ -59,7 +45,6 @@ const bundleWithBun = async (bun: typeof Bun): Promise<string> => {
 // (workers/cloud-builder/scripts/prepare-image.mjs); the image runs on Bun.
 const ESBUILD = "esbuild";
 
-/** Same bundle under Node, where Bun.build does not exist. */
 const bundleWithEsbuild = async (): Promise<string> => {
   const esbuild: typeof import("esbuild") = await import(
     /* @vite-ignore */ ESBUILD
@@ -108,7 +93,6 @@ const bundled: Readonly<{ source: string } | { error: unknown }> =
     (error: unknown) => ({ error }),
   );
 
-/** An expression evaluating to `installBrowserWorkerApi`. */
 export const browserWorkerApiSource = (): string => {
   if ("error" in bundled) throw bundled.error;
   return bundled.source;

@@ -1,7 +1,3 @@
-/**
- * `image_gen` tool — run a still image job through the user's selected image
- * provider. The call stays pending through durable terminal settlement.
- */
 import { AGENT_IDS } from "@stella/contracts/agent-runtime";
 import { MAX_MANAGED_IMAGE_REFERENCE_ITEMS } from "../managed-image-references.js";
 import { createMediaToolHandlers } from "../media.js";
@@ -18,12 +14,7 @@ export const createImageGenTool = (
   const handler = handlers.image_gen as ToolHandler;
   return {
     name: "image_gen",
-    // The image operation store keys every job by (conversation, tool call)
-    // and reattaches to it; a BYOK submit is at-most-once behind its CAS.
     replay: "keyed",
-    // Audience declaration: image generation is for the orchestrator. The
-    // General agent (and any other subagent) is denied at both the catalog
-    // filter and executeTool via this gate.
     agentTypes: [AGENT_IDS.ORCHESTRATOR],
     description:
       "Generate a still image with the provider chosen in Settings (Stella managed, or the user's OpenAI, OpenRouter or Fal key). The call waits for the final outcome and the image appears in the chat, so don't describe or link its path unless asked. Never resubmit, poll or open it: a pending call is reattached after interruptions.",

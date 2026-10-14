@@ -10,13 +10,6 @@ import { forkDelayed } from "./effect-runtime.js";
 type RequestHandler = (params: unknown) => Promise<unknown> | unknown;
 type NotificationHandler = (params: unknown) => Promise<void> | void;
 
-/**
- * Minimal surface shared by `JsonRpcPeer` and `WorkerPeerBroker`. All
- * server-side helpers (notifyLocalChatUpdated, dispatchApplyBatch, etc.)
- * type their `peer` param against this so both single-peer (legacy
- * stdio embed) and multi-peer (detached UDS) wiring work
- * without any code-site changes.
- */
 export type WorkerPeerLike = {
   notify: (method: string, params?: unknown) => void;
   request: <TResult = unknown>(
@@ -30,10 +23,6 @@ export type WorkerPeerLike = {
     handler: NotificationHandler,
   ) => void;
   activeRequestHandlerCount?: () => number;
-  /**
-   * Attached RPC clients (the broker's live peer set — the same attach /
-   * detach events the lifecycle server's idle-shutdown counts).
-   */
   attachedCount?: () => number;
 };
 
@@ -48,25 +37,6 @@ type PeerEventListener<K extends keyof PeerEvents> = (
 
 const NO_HOST_TIMEOUT_MS = 30_000;
 
-/**
- * The worker's view of "the host." The runtime worker is conceptually
- * single-stream JSON-RPC, but with a detached process model we need to
- * cleanly hand off the connection across host restarts: the previous
- * Electron process dies → its stdio (or UDS) connection drops → a new
- * Electron starts and reattaches to the still-running worker.
- *
- * `WorkerPeerBroker` is the indirection that makes that handoff
- * transparent to the rest of `server.ts`. Internally it keeps a list of
- * attached peers (in attach-order) but always treats the most-recently
- * attached peer as authoritative for outgoing requests. Notifications
- * fan out to every attached peer so a transient observer (e.g. the
- * eventual `stella` CLI) can subscribe alongside Electron.
- *
- * Single-peer-at-a-time today is sufficient for Stella's topology
- * (one Electron host); the multi-attach surface is here so the future
- * "two clients during a brief overlap window" case (host A about to
- * exit while host B is establishing) doesn't drop notifications mid-flight.
- */
 export class WorkerPeerBroker {
   private readonly attachedPeers = new Set<JsonRpcPeer>();
   private readonly attachOrder: JsonRpcPeer[] = [];
@@ -167,9 +137,6 @@ export class WorkerPeerBroker {
     }
   }
 
-  /**
-   * Fan-out notification: every attached peer hears the event.
-   */
   notify(method: string, params?: unknown) {
     for (const peer of this.attachedPeers) {
       try {
@@ -251,10 +218,6 @@ export class WorkerPeerBroker {
     });
   }
 
-  /**
-   * Tear down every attached peer. Called during worker shutdown so
-   * pending RPCs reject instead of timing out individually.
-   */
   dispose() {
     const peers = [...this.attachedPeers];
     this.attachedPeers.clear();

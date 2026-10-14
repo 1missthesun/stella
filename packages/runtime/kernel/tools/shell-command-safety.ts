@@ -115,11 +115,6 @@ function readBacktickCommand(
   return null;
 }
 
-/**
- * A deliberately small shell lexer. It is not used to execute or rewrite the
- * command; it only separates actual command positions from inert quoted text.
- * Unknown or incomplete syntax is left as ordinary words rather than guessed.
- */
 function lexShell(input: string): LexedShell {
   const tokens: ShellToken[] = [];
   const nestedCommands: string[] = [];
@@ -230,8 +225,6 @@ function lexShell(input: string): LexedShell {
         word += next;
         index += 1;
       } else {
-        // Preserve Windows path separators. Executable-name matching also
-        // checks a POSIX-unescaped spelling, so r\m cannot evade detection.
         word += char;
       }
       wordStarted = true;
@@ -1163,7 +1156,6 @@ function inspectCommand(
   suppliedState?: AnalysisState,
 ): string | null {
   if (depth > MAX_NESTED_COMMAND_DEPTH) return null;
-  // This exact token sequence is shell grammar rather than a normal command.
   if (/^\s*:\s*\(\s*\)\s*\{\s*:\s*\|\s*:\s*&\s*\}\s*;\s*:\s*$/u.test(command)) {
     return "fork bomb";
   }
@@ -1232,11 +1224,6 @@ function inspectCommand(
   return null;
 }
 
-/**
- * Returns a reason only for catastrophic, host-wide shell operations. This is
- * a final footgun guard, not a sandbox, approval policy, or general-purpose
- * destructive-command filter.
- */
 export function getCatastrophicShellCommandReason(
   command: string,
   cwd?: string,

@@ -1,14 +1,3 @@
-/**
- * The finale — "Quickstart", or skip.
- *
- * Offered once everything else is set: Stella reads the browser (and
- * optionally the coding setup) once, writes a starting memory, and comes
- * back with what she picked up and a few requests written for this person.
- * Skipping goes straight into the chat. While it runs the card shows the
- * work as it happens, and the user can head into the chat at any point;
- * the job is a module store, so it finishes in the background and its
- * greeting still lands in the thread.
- */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { backendClient } from "@/platform/backend/backend-client";
 import { Button } from "@/ui/button";
@@ -43,7 +32,6 @@ type QuickstartCardProps = {
 
 const SUPPORTED_BROWSER_IDS = new Set<string>(BROWSERS.map((b) => b.id));
 
-/** Best-effort default-browser detection plus the selected browser's profiles. */
 function useBrowserChoice(enabled: boolean) {
   const [selectedBrowser, setSelectedBrowser] = useState<BrowserId | null>(null);
   const [profiles, setProfiles] = useState<BrowserProfile[]>([]);
@@ -103,7 +91,6 @@ function useBrowserChoice(enabled: boolean) {
   return { selectedBrowser, selectBrowser, profiles, selectedProfile, setSelectedProfile };
 }
 
-/** The three beats of the run, in order, keyed to the job's status. */
 const STAGES: { id: string; key: string; reached: DiscoveryJobStatus[] }[] = [
   {
     id: "read",
@@ -124,7 +111,6 @@ const STAGES: { id: string; key: string; reached: DiscoveryJobStatus[] }[] = [
 
 const STAGE_INDEX: Partial<Record<DiscoveryJobStatus, number>> = {
   collecting: 0,
-  // Read, and held on this computer until the user signs in after onboarding.
   waiting_for_account: 1,
   synthesizing: 1,
   saving: 2,
@@ -222,7 +208,6 @@ export function QuickstartCard({
     startDiscoveryJob({ categories, selectedBrowser, selectedProfile });
   }, []);
 
-  /* ── Offer ─────────────────────────────────────────────────────── */
   if (!started) {
     const canRun = Boolean(choice.selectedBrowser) || includeDev;
     return (
@@ -304,7 +289,6 @@ export function QuickstartCard({
     );
   }
 
-  /* ── Running / result ──────────────────────────────────────────── */
   const failed = job.status === "failed";
   const result = job.status === "done" ? job.result : null;
   const stageIndex = STAGE_INDEX[job.status] ?? (result ? 3 : 0);

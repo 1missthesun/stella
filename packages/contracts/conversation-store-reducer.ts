@@ -1,13 +1,3 @@
-/**
- * The pure core of a client's conversation view, shared by desktop and mobile.
- *
- * Each app keeps its own store class around these: subscription, socket
- * lifetime and whatever local replica it paints from are platform concerns.
- * What a view does with the socket's ordered record stream — contiguity,
- * the retained bound, scrollback splicing, and the live-turn bracket — is the
- * same everywhere, and lives here.
- */
-
 import {
   BACKFILL_BATCH_RECORDS,
   MAX_CLIENT_RECORDS,
@@ -16,40 +6,26 @@ import {
 } from "./conversation-protocol.js";
 import type { SocketStatus } from "./conversation-socket.js";
 
-/**
- * The turn running right now. There is no partial reply to hold: assistant
- * text arrives whole on a committed record, so all a running turn contributes
- * to the view is its identity and the tool it is currently inside.
- */
 export type LiveTurn = {
   turnId: string;
-  /** The tool currently running, for the working label. */
   toolName: string | null;
-  /** That tool's call id, which seeds its working label the same on every device. */
   toolCallId: string | null;
   toolLabel: string | null;
 };
 
-/** The fields every platform's conversation view carries. */
 export type ConversationViewState = {
   conversationId: string;
   status: SocketStatus;
   statusMessage: string | null;
   statusRetryable: boolean;
-  /** Durable journal generation reported by the DO; null before `ready`. */
   epoch: number | null;
-  /** DO head observed by the socket, including opaque/skipped records. */
   headSeq: number;
-  /** Ascending by `seq`, contiguous. */
   records: readonly JournalRecord[];
   live: LiveTurn | null;
   title: string;
-  /** Lowest seq that still exists. Nothing below it is ever fetchable. */
   floorSeq: number;
-  /** True while records exist below the oldest one loaded. */
   hasOlder: boolean;
   loadingOlder: boolean;
-  /** Why scrollback stopped, when it stopped for a reason worth saying. */
   olderNotice: string | null;
 };
 
@@ -73,11 +49,8 @@ export const initialConversationViewState = (
   olderNotice: null,
 });
 
-/** How long a scrollback request may sit unanswered before the spinner stops. */
 export const OLDER_TIMEOUT_MS = 15_000;
-/** How long the socket outlives its last watcher, to survive a remount. */
 export const TEARDOWN_GRACE_MS = 5_000;
-/** Conversations kept warm so switching back does not blank the view. */
 export const MAX_RETAINED_STORES = 8;
 
 export const OLDER_LIMIT_NOTICE =
@@ -87,10 +60,6 @@ export const OLDER_INCOMPLETE_NOTICE =
 export const OLDER_EXHAUSTED_NOTICE =
   "That's the start of what Stella still has.";
 
-/**
- * The renderer holds a bounded number of records; the server holds all of
- * them. True when one more scrollback batch would cross that bound.
- */
 export const olderWouldExceedRetainedLimit = (
   records: readonly JournalRecord[],
 ): boolean => records.length + BACKFILL_BATCH_RECORDS > MAX_CLIENT_RECORDS;
@@ -108,11 +77,6 @@ export const liveTurnFromReady = (
   };
 };
 
-/**
- * Applies an advisory `tool` frame. A tool frame can outrun the turn's
- * `started` row on a fresh connect, so it opens the live turn rather than
- * assuming one is already there.
- */
 export const liveTurnWithTool = (
   live: LiveTurn | null,
   tool: {
@@ -138,13 +102,6 @@ export const liveTurnWithTool = (
   };
 };
 
-/**
- * The turn's own journal rows bracket the working indicator. Nothing else
- * can: with replies delivered whole there is no per-token traffic to infer
- * liveness from, and a committed assistant row is not the end of a turn — a
- * preamble is followed by tools and another reply, so clearing on it would
- * blink the indicator out mid-turn.
- */
 export const liveTurnAfterRecords = (
   live: LiveTurn | null,
   records: readonly JournalRecord[],
@@ -163,19 +120,6 @@ export const liveTurnAfterRecords = (
   return next;
 };
 
-/**
- * Appends records the socket delivered in order.
- *
- * The socket keeps its own cursor, but a socket can be replaced (teardown and
- * remount, a config change) while these records stay. Contiguity is
- * re-checked here so the two can never disagree: a repeat is dropped, and a
- * jump means the rows between are gone, which restarts the window rather than
- * rendering a hole nobody named. `replaceRetained` discards the retained rows
- * outright, for a view painting unverified local bytes that the first
- * canonical frame must replace even at equal sequence numbers.
- *
- * Null when nothing in `incoming` is new.
- */
 export const appendJournalRecords = (
   view: Pick<
     ConversationViewState,
@@ -185,7 +129,6 @@ export const appendJournalRecords = (
   options: { replaceRetained?: boolean } = {},
 ): {
   records: readonly JournalRecord[];
-  /** The rows that were actually new, in order. */
   fresh: readonly JournalRecord[];
   hasOlder: boolean;
   headSeq: number;
@@ -215,11 +158,6 @@ export const appendJournalRecords = (
   };
 };
 
-/**
- * Whether a scrollback reply holds exactly the range it claims. Never splice
- * a partial archive page beside the retained window: that would turn missing
- * canonical rows into an invisible transcript hole.
- */
 export const olderRangeIsComplete = (
   incoming: readonly JournalRecord[],
   range?: { complete?: boolean; fromSeq?: number; toSeq?: number },
@@ -234,11 +172,6 @@ export const olderRangeIsComplete = (
   );
 };
 
-/**
- * Splices a complete scrollback page below the retained window. Null when the
- * page holds nothing older: `seq` is gapless, so an empty answer means those
- * rows are gone and the view should stop offering to ask again.
- */
 export const prependOlderRecords = (
   view: Pick<ConversationViewState, "records" | "floorSeq">,
   page: readonly JournalRecord[],

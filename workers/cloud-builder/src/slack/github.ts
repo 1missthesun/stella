@@ -1,29 +1,3 @@
-/**
- * Stella for Slack's GitHub connection, through its own read-only GitHub App
- * (`SLACK_GITHUB_APP_*` secrets, `projects/github.ts` with `app = "slack"`).
- * A workspace stores only installation ids, one per connected GitHub account
- * (`slack_github_connections`), so repositories of different owners can sit
- * side by side. Tokens are minted on demand and scoped to one repository: read-only for the page's
- * pickers; for agents, push plus reading deployments, statuses and checks,
- * traded per git operation for the container's repo capability
- * (`repo-capability.ts`, `repo-clone.ts`).
- *
- * Connecting, from the owner's page on stella.sh:
- *   1. `POST …/github/connect` records a nonce (D1 `slack_github_connects`)
- *      and returns GitHub's authorize URL with a signed state.
- *   2. GitHub returns to `GET /api/slack/github/callback` with a code. The
- *      callback lists the installations of the App that GitHub user can
- *      reach. With none, it sends the browser to install the App, whose
- *      Setup URL is the same callback; that comes back through authorize.
- *   3. The callback stores what it found and returns the browser to the page
- *      with the nonce, and the page spends it (`POST …/github/finish`). Only
- *      the Stella account that started step 1 can, so a connect link sent to
- *      someone else binds nothing.
- *
- * Uninstall and suspension come in on `POST /api/slack/github/webhook`, and
- * are also noticed whenever GitHub refuses the installation.
- */
-
 import {
   SLACK_GITHUB_ERROR_PARAM,
   SLACK_GITHUB_RESULT_PARAM,
@@ -69,12 +43,7 @@ const API = "https://api.github.com";
 const REPO_PAGES = 10;
 const BRANCH_PAGES = 5;
 const MAX_WEBHOOK_BYTES = 1_000_000;
-/** What the page needs: listing repositories and branches. */
 const PICKER_ACCESS = { contents: "read", metadata: "read" } as const;
-/**
- * What an agent gets for the workspace's one repository: push to it, and
- * read the deployments, statuses and checks its previews report through.
- */
 const AGENT_ACCESS = {
   contents: "write",
   metadata: "read",
@@ -104,15 +73,12 @@ export const describeGithub = (connection: SlackGithubConnection): SlackWorkspac
   manageUrl: githubManageUrl(connection),
 });
 
-// ── Connect ───────────────────────────────────────────────────────────────
-
 const callbackUrl = (env: Cloudflare.Env, request?: Request): string =>
   `${slackPublicOrigin(env, request)}${SLACK_GITHUB_CALLBACK_PATH}`;
 
 const randomNonce = (): string =>
   [...crypto.getRandomValues(new Uint8Array(24))].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 
-/** Step 1: the GitHub URL that starts connecting `teamId` for `ownerId`. */
 export const startGithubConnect = async (
   env: Cloudflare.Env,
   request: Request,
@@ -173,7 +139,6 @@ const back = (row: ConnectRow, param: string, value: string): Response => {
 
 const RESTART = "Start again from the Stella Crew page. Connect links work once and last 15 minutes.";
 
-/** Steps 2 and 3: GitHub's authorize callback and the App's Setup URL. */
 const callback = async (request: Request, env: Cloudflare.Env): Promise<Response> => {
   const url = new URL(request.url);
   const stateToken = url.searchParams.get("state")?.trim() ?? "";
@@ -240,7 +205,6 @@ export type FinishResult =
   | { ok: true; choices: SlackGithubInstallationChoice[] }
   | { ok: false; message: string };
 
-/** Step 3: the owner's page spends the nonce GitHub's callback handed it. */
 export const finishGithubConnect = async (
   env: Cloudflare.Env,
   args: { ownerId: string; teamId: string; code: string; installationId?: string },
@@ -275,12 +239,8 @@ export const finishGithubConnect = async (
   };
 };
 
-// ── Reading through the installation ──────────────────────────────────────
-
-/** GitHub says the repository (as reached) doesn't exist. */
 export class RepoNotFoundError extends GithubError {}
 
-/** Marks the workspaces on a refused installation and rethrows. */
 const minted = async (
   env: Cloudflare.Env,
   connection: SlackGithubConnection,
@@ -304,7 +264,6 @@ const minted = async (
   }
 };
 
-/** What GitHub says about the installation now; null when it didn't answer. */
 export const checkInstallation = async (
   env: Cloudflare.Env,
   connection: SlackGithubConnection,
@@ -319,7 +278,6 @@ export const checkInstallation = async (
   }
 };
 
-/** A GitHub API read, anonymous when `token` is null (public repositories). */
 const get = async <T>(token: string | null, path: string): Promise<{ status: number; body: T | null; next: boolean }> => {
   const headers = githubHeaders(token ? `Bearer ${token}` : "");
   if (!token) delete headers.authorization;
@@ -328,7 +286,6 @@ const get = async <T>(token: string | null, path: string): Promise<{ status: num
   return { status: response.status, body, next: /rel="next"/u.test(response.headers.get("link") ?? "") };
 };
 
-/** Repositories every active connection can see, merged. */
 export const listInstallationRepos = async (
   env: Cloudflare.Env,
   connections: SlackGithubConnection[],
@@ -370,7 +327,6 @@ const listConnectionRepos = async (
   return { repos, truncated };
 };
 
-/** Branches of a repository: through the installation when it owns it, else as public. */
 export const listRepoBranches = async (
   env: Cloudflare.Env,
   connection: SlackGithubConnection | null,
@@ -427,8 +383,6 @@ export const cloneToken = async (env: Cloudflare.Env, repo: SlackRepoSettings): 
   return repo.legacyToken;
 };
 
-// ── Agent access (repo-capability.ts) ─────────────────────────────────────
-
 export type SlackPreview =
   | { state: "ready"; url: string; source: string }
   | { state: "pending"; detail: string }
@@ -442,10 +396,6 @@ const DEPLOYISH = /pages|vercel|netlify|deploy|preview|workers|cloudflare|render
 const previewUrls = (...texts: Array<string | null | undefined>): string[] =>
   texts.flatMap((text) => (text ? [...text.matchAll(PREVIEW_HOST)].map((match) => match[0]!) : []));
 
-/**
- * The preview the repository's own pipeline published for `sha`: a GitHub
- * deployment's URL, or a preview URL in a deploy check run or status.
- */
 export const findPreview = async (token: string, fullName: string, sha: string): Promise<SlackPreview> => {
   let pending: string | null = null;
   let failed: { detail: string; url?: string } | null = null;
@@ -513,7 +463,6 @@ export const findPreview = async (token: string, fullName: string, sha: string):
   return { state: "none" };
 };
 
-/** The connection a capability may use, when the workspace still has that repository and its connection. */
 const agentConnection = async (
   env: Cloudflare.Env,
   request: Request,
@@ -561,8 +510,6 @@ const agentPreview = async (request: Request, env: Cloudflare.Env): Promise<Resp
     );
   }
 };
-
-// ── Webhook ───────────────────────────────────────────────────────────────
 
 const hmacHex = async (secret: string, body: string): Promise<string> => {
   const encoder = new TextEncoder();

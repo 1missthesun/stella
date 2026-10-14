@@ -7,7 +7,6 @@ import { backendOrigin, postJson } from "./http";
 const MOBILE_DEVICE_ID_KEY = "stella-mobile_phone-access.mobile-device-id";
 const PREFERRED_DESKTOP_DEVICE_ID_KEY =
   "stella-mobile_phone-access.preferred-desktop-device-id";
-/** JSON string array of desktop device ids (multiple computers per account). */
 const PAIRED_DESKTOP_IDS_KEY = "stella-mobile_phone-access.paired-desktop-ids";
 const DESKTOP_ACCESS_KEY_PREFIX = "stella-mobile_phone-access.desktop.";
 
@@ -155,9 +154,6 @@ export async function getPreferredPhoneAccess() {
   return readStoredPhoneAccess(stored);
 }
 
-/**
- * All desktops this phone has paired with (same account can have several machines).
- */
 export async function listStoredPairedPhoneAccess(): Promise<
   StoredPhoneAccess[]
 > {
@@ -214,14 +210,6 @@ export async function clearStoredPhoneAccess(desktopDeviceId: string) {
   }
 }
 
-/**
- * File a freshly granted credential exactly where every reader looks for it.
- *
- * Both ways in (a redeemed pairing code and a codeless attach) end here, so
- * the two cannot drift in what they store: the access record under the
- * desktop's id, the id in the paired-ids index, and this desktop as the
- * preferred one unless the caller keeps the one already preferred.
- */
 const storeGrantedPhoneAccess = async (
   args: {
     desktopDeviceId: string;
@@ -260,7 +248,6 @@ const storeGrantedPhoneAccess = async (
   return access;
 };
 
-/** This phone's stored credential for one desktop, if it holds one. */
 export async function getStoredPhoneAccess(
   desktopDeviceId: string,
 ): Promise<StoredPhoneAccess | null> {
@@ -271,17 +258,6 @@ export async function getStoredPhoneAccess(
   );
 }
 
-/**
- * Ask the backend for this phone's transport credential for one of the
- * account's computers, with no code to carry between the two screens.
- *
- * What this grants is *reach*: the pair secret is the HMAC key for the mobile
- * dispatch proof and for requests to that computer, standing in for the device
- * key a phone cannot have. It says nothing about whether that computer will
- * run anything — that is its remote-execution state, which only an explicit
- * enable (here or the prompt on its own screen) may change. Attaching must
- * never be read as consent.
- */
 export async function attachPhoneAccess(
   desktopDeviceId: string,
   options?: { displayName?: string; keepPreferred?: boolean },
@@ -310,11 +286,6 @@ export async function attachPhoneAccess(
   );
 }
 
-/**
- * The credential for reaching one of the account's computers to read a file
- * it made, attaching on demand without making it the computer new chats go
- * to.
- */
 export async function reachPhoneAccess(
   desktopDeviceId: string,
 ): Promise<StoredPhoneAccess> {
@@ -323,15 +294,6 @@ export async function reachPhoneAccess(
   return await attachPhoneAccess(desktopDeviceId, { keepPreferred: true });
 }
 
-/**
- * The credential for a desktop this phone is about to address, attaching on
- * demand when it holds none. Selecting or dispatching to a listed computer
- * goes through here, which is why there is no pairing step in the way.
- *
- * A failure keeps the message the old pairing check used, because callers
- * classify it: "not paired" is a permanent admission failure rather than
- * something to retry forever.
- */
 export async function ensurePhoneAccess(
   desktopDeviceId: string,
 ): Promise<StoredPhoneAccess> {
@@ -347,14 +309,6 @@ export async function ensurePhoneAccess(
   }
 }
 
-/**
- * Re-file this phone's stored pairing under the desktop's current device id.
- *
- * A desktop mints a new device id whenever its local keypair stops being
- * readable, and the backend moves the pairing onto the replacement. Until the
- * phone follows, it keeps asking about an id that will never be online again —
- * which reads here as a desktop that is permanently offline.
- */
 export async function adoptDesktopDeviceIdSuccession(
   previousDesktopDeviceId: string,
   nextDesktopDeviceId: string,
@@ -372,8 +326,6 @@ export async function adoptDesktopDeviceIdSuccession(
     return null;
   }
 
-  // The pair secret is unchanged by a desktop rotation — only the id it is
-  // filed under moves.
   const migrated: StoredPhoneAccess = { ...stored, desktopDeviceId: next };
   await SecureStore.setItemAsync(
     desktopAccessKey(next),
@@ -397,12 +349,6 @@ export async function adoptDesktopDeviceIdSuccession(
   return migrated;
 }
 
-/**
- * Follow a desktop's device-id succession: ask the backend what the stored id
- * resolves to now and, when it moved, re-file this phone's pairing under the
- * new id. Returns the access to use (the migrated one, or `null` when nothing
- * moved).
- */
 export async function followDesktopDeviceIdSuccession(
   desktopDeviceId: string,
 ): Promise<StoredPhoneAccess | null> {

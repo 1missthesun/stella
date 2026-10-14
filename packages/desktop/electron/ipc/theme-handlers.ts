@@ -20,8 +20,6 @@ const listInstalledThemes = async (stellaDataDir: string) => {
       try {
         const raw = await fs.readFile(path.join(themesDir, file), "utf-8");
         const theme = JSON.parse(raw) as Theme;
-        // A theme file missing any of these renders as a broken swatch in the
-        // picker, so drop it rather than surfacing it half-populated.
         if (theme.id && theme.name && theme.light && theme.dark) {
           themes.push(theme);
         }

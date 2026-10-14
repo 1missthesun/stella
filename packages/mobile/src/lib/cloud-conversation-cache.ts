@@ -12,13 +12,6 @@ import {
   saveChatSyncState,
 } from "./offline-chat-storage";
 
-/**
- * How much of the raw journal tail is kept on disk. It only has to cover what
- * the projection cache paints (the newest transcript window) so the seeded
- * store reproduces that paint exactly; older rows stay reachable through
- * scrollback. Bounded by count and by bytes so a run of large tool payloads
- * cannot turn the launch read into a multi-megabyte parse.
- */
 export const JOURNAL_CACHE_MAX_RECORDS = 1_000;
 export const JOURNAL_CACHE_MAX_BYTES = 4 * 1024 * 1024;
 
@@ -36,10 +29,8 @@ export type CloudConversationCacheMetadata = {
 };
 
 export type CloudConversationCacheReadPort = {
-  /** The encoded metadata the last rebuild committed, if any. */
   loadMetadata(): Promise<string | null>;
   loadMessages(): Promise<ChatMessage[]>;
-  /** The encoded raw journal tail the last rebuild committed, if any. */
   loadRecords?(): Promise<string | null>;
 };
 
@@ -49,26 +40,17 @@ export type CloudConversationCachePort = {
     messages: ChatMessage[],
     isCurrent: () => boolean,
   ): Promise<void>;
-  /** Replaces the raw journal tail; null drops it. */
   synchronizeRecords?(encoded: string | null): Promise<void>;
   saveMetadata(metadata: CloudConversationCacheMetadata): Promise<void>;
 };
 
-/** What a cold launch seeds the in-memory journal store with. */
 export type CloudJournalSeed = {
   epoch: number;
   headSeq: number;
   floorSeq: number;
-  /** Ascending, contiguous, ending exactly at `headSeq`. */
   records: JournalRecord[];
 };
 
-/**
- * The newest slice of the retained rows that fits the cache bounds. Returns
- * null when nothing fits or the tail does not reach the head the metadata
- * will claim, so a seed can never be published that the socket would have to
- * repair from its very first frame.
- */
 export const encodeCloudJournalTail = (
   records: readonly JournalRecord[],
   headSeq: number,
@@ -85,7 +67,6 @@ export const encodeCloudJournalTail = (
     if (encoded.length >= maxRecords) break;
     const record = records[index]!;
     const expected = headSeq - encoded.length;
-    // A hole in the retained rows ends the tail; never persist across it.
     if (record.seq !== expected) break;
     const json = JSON.stringify(record);
     if (bytes + json.length > maxBytes) break;
@@ -149,15 +130,9 @@ export const decodeCloudConversationCacheMetadata = (
   }
 };
 
-/**
- * Replaces the local projection only after a complete canonical snapshot is
- * available. Metadata is cleared first and committed last, so a crash can
- * discard the cache but can never make a partial cache look authoritative.
- */
 export const rebuildCloudConversationCache = async (args: {
   metadata: CloudConversationCacheMetadata;
   messages: ChatMessage[];
-  /** Retained journal rows the projection was built from. */
   records?: readonly JournalRecord[];
   port: CloudConversationCachePort;
   isCurrent?: () => boolean;
@@ -201,7 +176,6 @@ export const rebuildMobileCloudConversationCache = async (args: {
     },
   });
 
-/** The fence a cached projection must match before it may be shown. */
 export type CloudConversationCacheAuthority = Pick<
   CloudConversationCacheMetadata,
   "accountScope" | "ownerGeneration" | "conversationId" | "socketOrigin"
@@ -216,14 +190,6 @@ export const cloudConversationCacheMatches = (
   metadata.conversationId === authority.conversationId &&
   metadata.socketOrigin === authority.socketOrigin;
 
-/**
- * Reads the projection the last rebuild committed, for painting a returning
- * user's transcript before the journal socket reconnects. Metadata commits
- * last during a rebuild, so its presence proves the rows beside it are a
- * complete canonical snapshot; a fence mismatch (another account, an owner
- * reset, a different deployment) or an empty snapshot yields nothing rather
- * than a wrong or blank-then-filled transcript.
- */
 export const readCloudConversationCache = async (args: {
   authority: CloudConversationCacheAuthority;
   port: CloudConversationCacheReadPort;
@@ -249,14 +215,6 @@ export const readMobileCloudConversationCache = async (
 ): Promise<ChatMessage[] | null> =>
   readCloudConversationCache({ authority, port: mobileCacheReadPort });
 
-/**
- * The raw journal tail the last rebuild committed, for seeding the in-memory
- * store before its socket opens. Metadata commits last, so a matching fence
- * proves the rows beside it were written by the same rebuild; the tail must
- * still end exactly at the metadata's head, or the seed is refused and the
- * socket opens cold. A refused seed costs one newest-window download, never
- * a wrong transcript.
- */
 export const readCloudJournalCache = async (args: {
   authority: CloudConversationCacheAuthority;
   port: CloudConversationCacheReadPort;

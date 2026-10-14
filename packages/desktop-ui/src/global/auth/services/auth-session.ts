@@ -33,7 +33,6 @@ type AuthSessionResult = {
   data: unknown | null;
   isPending: boolean;
   error: Error | null;
-  /** Monotonic nonce that changes whenever the durable owner identity changes. */
   identityRevision: number;
 };
 
@@ -72,8 +71,6 @@ let currentSession: AuthSessionResult = {
 const listeners = new Set<() => void>();
 let inFlightRefresh: Promise<void> | null = null;
 let initialRefreshRequested = false;
-// Monotonic guard so a slow optimistic-then-revalidate sequence can never
-// clobber the result of a newer refresh (e.g. a sign-in fired mid-revalidation).
 let refreshVersion = 0;
 let browserRetryTimer: ReturnType<typeof setTimeout> | null = null;
 let browserRetryAttempt = 0;
@@ -205,24 +202,12 @@ const emit = () => {
 };
 
 type RefreshOptions = {
-  // When true, accept the host's optimistically-hydrated (cached) session on the
-  // first read so `isAuthenticated` can flip before the network settles, then
-  // re-read for the authoritative (revalidated) session. Used by the cold-start
-  // mount path. Sign-in / magic-link / deep-link callers leave this false so
-  // they always observe the authoritative network result directly.
   allowCached?: boolean;
-  // Background revalidation (window focus / regain, network reconnect): keep the
-  // last-known session visible instead of flipping `isPending` to true, so the
-  // signed-in/out gating and UI don't flash "loading" while we re-check with the
-  // server. The committed result only changes identity after a recognized
-  // server verdict; transport failures preserve the cached owner.
   silent?: boolean;
 };
 
 export const refreshAuthSession = async (options: RefreshOptions = {}) => {
   const allowCached = options.allowCached ?? false;
-  // Coalesce concurrent optimistic refreshes, but never let an authoritative
-  // refresh (e.g. post-sign-in) be swallowed by an in-flight optimistic one.
   if (inFlightRefresh && allowCached) {
     await inFlightRefresh;
     return;
@@ -329,25 +314,14 @@ export const refreshAuthSession = async (options: RefreshOptions = {}) => {
   }
   inFlightRefresh = configurePiRuntime()
     .then(async () => {
-      // First read. With optimistic hydration the host may return a persisted
-      // session immediately (no network) while it revalidates in the background.
       const first = await systemApi.getAuthSession({ allowCached });
       if (version !== refreshVersion) {
         return;
       }
       if (allowCached && getAuthSnapshotSession(first)) {
-        // Surface the cached session right away (isPending:false) so the backend
-        // client starts fetching the access token / running authenticated
-        // views before get-session revalidation settles.
         setCurrentSession({ snapshot: first, isPending: false });
         emit();
       }
-      // Authoritative follow-up read. The host returns the revalidated session
-      // here (joining its in-flight revalidation, or the recorded result),
-      // moving to reauth/signed-out only after a recognized verdict.
-      // This also protects authoritative callers (sign-in / link) from ever
-      // emitting a stale optimistic value: they skip the early emit above and
-      // only commit this revalidated result.
       const revalidated = await systemApi.getAuthSession();
       if (version !== refreshVersion) {
         return;
@@ -422,8 +396,6 @@ const redeemPendingBrowserAuthHandoff =
       return "none";
     }
     if (handoff.kind === "invalid") {
-      // The malformed credential was already erased. Treat it as a terminal
-      // handoff failure.
       console.error("Failed to finish browser sign-in.");
       return "failed";
     }
@@ -435,9 +407,6 @@ const redeemPendingBrowserAuthHandoff =
       if (result.error) {
         throw new Error("Browser auth handoff verification failed.");
       }
-      // The `bearer` plugin returns the session credential in
-      // `set-auth-token`, which the client's success hook has already written
-      // to local storage. Its absence means the exchange produced no session.
       if (!readBrowserSessionToken()) {
         throw new Error("Browser auth handoff did not establish a session.");
       }
@@ -456,9 +425,6 @@ const redeemPendingBrowserAuthHandoff =
     }
   };
 
-// Module initialization starts this before React mounts. The session
-// bootstrap awaits the same promise, so it cannot race a valid one-time-token
-// session handoff.
 const browserAuthHandoffPromise = redeemPendingBrowserAuthHandoff();
 
 export const waitForBrowserAuthHandoff =
@@ -471,9 +437,6 @@ export const signOutAuthSession = async () => {
     );
   }
   if (!window.electronAPI) {
-    // Send the credential first so the server can revoke the session row, then
-    // drop the local copy. Reversing the order would leave a live session with
-    // no client able to sign it out.
     await authClient.signOut();
     clearBrowserSessionToken();
     writeBrowserIdentityIntent("anonymous");
@@ -484,8 +447,6 @@ export const signOutAuthSession = async () => {
     }
     await window.electronAPI.system.signOutAuth();
   }
-  // Invalidate any in-flight optimistic refresh so a late revalidated emit
-  // can't resurrect the signed-out session.
   refreshVersion += 1;
   setCurrentSession({
     snapshot: {
@@ -531,9 +492,6 @@ export function getAuthSessionSnapshot(): AuthSessionResult {
   return currentSession;
 }
 
-// Stable subscribe for `useSyncExternalStore`: registers the store listener
-// and returns its unsubscribe. Defined at module scope so its identity never
-// changes across renders.
 export function subscribeAuthSession(listener: () => void): () => void {
   listeners.add(listener);
   return () => {
@@ -541,25 +499,11 @@ export function subscribeAuthSession(listener: () => void): () => void {
   };
 }
 
-// Background revalidation is event-driven rather than polled: the desktop
-// session store issues NO periodic `/api/auth/get-session` traffic while idle.
-// Instead we re-check the session on the events that can actually change auth
-// state out from under an idle window — the window/tab regaining focus and the
-// network coming back — plus the explicit auth mutations (sign-in / sign-out /
-// magic-link / deep-link) that already call `refreshAuthSession` directly. This
-// keeps sign-out (incl. from another device / server-side expiry) and
-// subscription/plan changes propagating promptly without a tight interval.
-//
-// Focus / visibility / online can fire in quick bursts (alt-tab storms, flaky
-// networks), so collapse them into at most one authoritative revalidation per
-// this window.
 const EVENT_REVALIDATE_THROTTLE_MS = 60_000;
 let lastEventRevalidateAt = 0;
 let revalidationListenersBound = false;
 
 const revalidateAuthSessionFromEvent = () => {
-  // Skip if a refresh (cold-start, mutation, or a prior event) is already in
-  // flight — that pending result is at least as fresh as this event.
   if (inFlightRefresh) {
     return;
   }
@@ -568,8 +512,6 @@ const revalidateAuthSessionFromEvent = () => {
     return;
   }
   lastEventRevalidateAt = now;
-  // Silent so the session gating never flashes back to "loading" on a routine
-  // focus/reconnect re-check.
   void refreshAuthSession({ silent: true });
 };
 
@@ -579,10 +521,6 @@ const handleVisibilityChange = () => {
   }
 };
 
-// Bind the focus/visibility/reconnect revalidation listeners exactly once for
-// this renderer. Intentionally never unbound: the listeners live for the app's
-// lifetime, and many components consume `useDesktopAuthSession`, so tying
-// removal to any single consumer's unmount would be wrong.
 function ensureAuthSessionRevalidationListeners() {
   if (revalidationListenersBound || typeof window === "undefined") {
     return;
@@ -595,11 +533,6 @@ function ensureAuthSessionRevalidationListeners() {
   }
 }
 
-/**
- * Kick off the cold-start session read once. Browser session discovery waits
- * for an OTT handoff to settle so an older cached identity is never
- * surfaced while the intended account exchange is still in flight.
- */
 function startAuthSessionBootstrap(): void {
   if (initialRefreshRequested) return;
   initialRefreshRequested = true;
@@ -610,33 +543,17 @@ function startAuthSessionBootstrap(): void {
   });
 }
 
-/**
- * Called by the full window's entry before React renders, so the session
- * IPC / HTTP round trip overlaps the first render and commit instead of
- * starting from the first mount effect.
- *
- * Only while the store has nothing to show: a browser shell with a cached
- * session renders (and starts backend auth) from that cache first, and a
- * non-silent refresh here would flip it back to pending before that render.
- * Its refresh stays on the mount path, as do the secondary windows'.
- */
 export function prefetchAuthSessionBeforeRender(): void {
   if (!currentSession.isPending) return;
   startAuthSessionBootstrap();
 }
 
 export function useDesktopAuthSession() {
-  // useSyncExternalStore subscribes and reads the snapshot in one atomic step,
-  // so an emit that lands between render and the mount effect can't be missed
-  // (React re-reads getSnapshot after subscribing) — the stale-snapshot /
-  // stuck-isPending gap of the old useState+useEffect pair is gone.
   const snapshot = useSyncExternalStore(
     subscribeAuthSession,
     getAuthSessionSnapshot,
   );
 
-  // Kick off a cold-start refresh on mount unless the entry already did. The
-  // guard keeps this from stacking on an in-flight refresh.
   useEffect(() => {
     startAuthSessionBootstrap();
     ensureAuthSessionRevalidationListeners();

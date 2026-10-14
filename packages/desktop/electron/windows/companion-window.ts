@@ -1,24 +1,3 @@
-/**
- * Companion windows — the floating desktop Stella.
- *
- * Two frameless, transparent, always-on-top windows share one screen anchor
- * (the center-bottom of the mark):
- *
- *   - the **mark** window: a small box holding the animated mark. It is the
- *     only permanent hit target and owns hover, click, drag, and the context
- *     menu. It never resizes.
- *   - the **panel** window: a fixed full-size box behind the mark that holds
- *     the arc of buttons, the mini composer, and the message bubbles. It is
- *     click-through until the mark is hovered or the panel has content to
- *     show, then it takes input; its transparent pixels never show.
- *
- * Nothing resizes and no window's input region changes while the pointer is
- * over it: the panel's input toggles while the pointer sits on the mark
- * window. That sidesteps XWayland's stale-buffer flash on resize and the
- * enter/leave storms a shape change under the pointer produces. Main holds
- * the combined interaction state (hover across both windows with a grace
- * period, panel wanted-visible) and broadcasts it to both renderers.
- */
 import {
   BrowserWindow,
   Menu,
@@ -76,18 +55,14 @@ export type CompanionWindowOptions = {
   electronDir: string;
   isQuitting: () => boolean;
   getStellaDataDir: () => string | null;
-  /** Bring the full shell forward (context menu "Open Stella", bubble click). */
   onOpenMain: () => void;
-  /** True while a full shell window exists (hidden or not). */
   hasMainWindow: () => boolean;
   onQuit: () => void;
   onVisibleChanged: (visible: boolean) => void;
 };
 
 const READY_TIMEOUT_MS = 4_000;
-/** Keep this much of the mark inside the work area when clamping. */
 const EDGE_MARGIN = 6;
-/** Hover survives this long after the pointer leaves both windows. */
 const HOVER_GRACE_MS = 340;
 
 const IDLE_ACTIVITY: CompanionActivity = {
@@ -109,7 +84,6 @@ type Slot = {
   kind: CompanionWindowKind;
   window: BrowserWindow | null;
   ready: boolean;
-  /** Renderer mounted and said hello. */
   hello: boolean;
   reloadTimer: ReturnType<typeof setTimeout> | null;
 };
@@ -153,7 +127,6 @@ export class CompanionWindowController {
   private boundsRepairs: number[] = [];
   private helloWaiters = new Map<CompanionWindowKind, Array<() => void>>();
 
-  // Interaction state.
   private markHovered = false;
   private panelHovered = false;
   private hoverGraceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -175,9 +148,6 @@ export class CompanionWindowController {
     onIpc(IPC_COMPANION_SHOW_CONTEXT_MENU, this.handleShowContextMenu);
   }
 
-  // ── Public API ────────────────────────────────────────────────────────
-
-  /** The panel window: where dictation and the composer live. */
   getPanelWindow(): BrowserWindow | null {
     return this.live(this.panel);
   }
@@ -191,7 +161,6 @@ export class CompanionWindowController {
     return Boolean(this.visible && mark && mark.isVisible());
   }
 
-  /** True when `sender` is one of the companion renderers. */
   isSender(sender: WebContents): boolean {
     return this.kindOf(sender) !== null;
   }
@@ -200,22 +169,15 @@ export class CompanionWindowController {
     return this.state;
   }
 
-  /** Cache + forward the full shell's snapshot to both renderers. */
   setState(state: CompanionState): void {
     this.state = state;
     this.sendToBoth(IPC_COMPANION_STATE, state);
   }
 
-  /** Send to the panel renderer (composer, dictation). */
   sendToPanel(channel: string, payload?: unknown): void {
     this.live(this.panel)?.webContents.send(channel, payload);
   }
 
-  /**
-   * Show the companion, creating both windows on first use. Resolves once
-   * the panel renderer is mounted so callers can immediately send it a
-   * message (the dictation shortcut relies on this).
-   */
   async show(
     options: { focus?: boolean; persist?: boolean } = {},
   ): Promise<boolean> {
@@ -234,7 +196,6 @@ export class CompanionWindowController {
     this.applyBounds();
     if (!panel.isVisible()) panel.showInactive();
     if (!mark.isVisible()) mark.showInactive();
-    // The mark must stack above the panel so it stays the hit target.
     mark.moveTop();
     this.applyPanelInteractivity();
     if (options.focus) panel.focus();
@@ -256,9 +217,6 @@ export class CompanionWindowController {
       const dir = this.options.getStellaDataDir();
       if (dir) setCompanionEnabled(dir, false);
     }
-    // With no full shell left, hidden companion windows would keep the
-    // process alive invisibly on Linux (no tray). Let `window-all-closed`
-    // decide.
     const destroyInstead =
       !this.options.hasMainWindow() && process.platform === "linux";
     for (const slot of [this.mark, this.panel]) {
@@ -303,8 +261,6 @@ export class CompanionWindowController {
     this.destroySlot(this.mark);
     this.destroySlot(this.panel);
   }
-
-  // ── Window lifecycle ──────────────────────────────────────────────────
 
   private live(slot: Slot): BrowserWindow | null {
     return slot.window && !slot.window.isDestroyed() ? slot.window : null;
@@ -352,8 +308,6 @@ export class CompanionWindowController {
       closable: false,
       skipTaskbar: true,
       hasShadow: false,
-      // The mark never needs the keyboard; keeping it unfocusable means a
-      // click on it never steals focus from the app the user is in.
       focusable: !isMark,
       show: false,
       title: STELLA_CAPTURE_EXCLUDED_TITLE_PREFIXES[0],
@@ -361,8 +315,6 @@ export class CompanionWindowController {
       webPreferences: createSharedWebPreferences({
         preloadPath: this.options.preloadPath,
         sessionPartition: this.options.sessionPartition,
-        // Always visible on top of everything, so throttling would only ever
-        // freeze the mark while a fullscreen app briefly covers it.
         backgroundThrottling: false,
       }),
     });
@@ -381,7 +333,6 @@ export class CompanionWindowController {
       win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
     }
     if (!isMark) {
-      // Click-through until hovered / wanted (see applyPanelInteractivity).
       win.setIgnoreMouseEvents(true);
     }
 
@@ -410,7 +361,6 @@ export class CompanionWindowController {
         this.scheduleReload(slot);
       },
     );
-    // The renderer's <title> must not replace the capture-exclusion title.
     win.on("page-title-updated", (event) => {
       event.preventDefault();
     });
@@ -525,8 +475,6 @@ export class CompanionWindowController {
     this.displayHandler = null;
   }
 
-  // ── Geometry ──────────────────────────────────────────────────────────
-
   private resolveAnchor(): CompanionAnchor {
     if (this.anchor) return this.anchor;
     const dir = this.options.getStellaDataDir();
@@ -543,7 +491,6 @@ export class CompanionWindowController {
     return this.anchor;
   }
 
-  /** Keep the mark itself fully inside the work area of its display. */
   private clampAnchor(anchor: CompanionAnchor): CompanionAnchor {
     const area = screen.getDisplayNearestPoint(anchor).workArea;
     const half = COMPANION_MARK_SIZE / 2;
@@ -563,13 +510,6 @@ export class CompanionWindowController {
     };
   }
 
-  /**
-   * Bounds for one window, with the mark pinned at `anchor`.
-   *
-   * The mark box is centered on the mark. The panel box keeps the mark box's
-   * edges that face the nearer screen borders and grows toward the screen
-   * center, so the panel can pin its content relative to those edges.
-   */
   private computeBounds(
     kind: CompanionWindowKind,
     anchor: CompanionAnchor,
@@ -597,7 +537,6 @@ export class CompanionWindowController {
     };
   }
 
-  /** Position both windows for the current anchor; re-send edges on change. */
   private applyBounds(): void {
     const anchor = this.resolveAnchor();
     let edges: { edgeH: CompanionEdgeH; edgeV: CompanionEdgeV } | null = null;
@@ -657,8 +596,6 @@ export class CompanionWindowController {
     }, 120);
   }
 
-  // ── Interaction state ─────────────────────────────────────────────────
-
   private resetInteraction(): void {
     if (this.hoverGraceTimer) {
       clearTimeout(this.hoverGraceTimer);
@@ -685,8 +622,6 @@ export class CompanionWindowController {
       return;
     }
     if (!this.hovered || this.hoverGraceTimer) return;
-    // Leaving one window for the other passes through a moment with neither
-    // hovered; the grace keeps the arc up across that hop.
     this.hoverGraceTimer = setTimeout(() => {
       this.hoverGraceTimer = null;
       if (this.markHovered || this.panelHovered) return;
@@ -715,14 +650,11 @@ export class CompanionWindowController {
     if (!panel) return;
     if (this.activity.panelActive) {
       panel.setIgnoreMouseEvents(false);
-      // Keep the mark on top: it is the hit target inside the panel's box.
       this.live(this.mark)?.moveTop();
     } else {
       panel.setIgnoreMouseEvents(true);
     }
   }
-
-  // ── IPC from the companion renderers ──────────────────────────────────
 
   private handleHello = (event: IpcMainEvent) => {
     const kind = this.kindOf(event.sender);
@@ -782,8 +714,6 @@ export class CompanionWindowController {
       offsetX: cursor.screenX - anchor.x,
       offsetY: cursor.screenY - anchor.y,
     };
-    // Dragging closes the composer: the panel follows the mark, and nothing
-    // should stay open while the user is moving it.
     this.sendToPanel(IPC_COMPANION_SET_EXPANDED, { expanded: false });
   };
 

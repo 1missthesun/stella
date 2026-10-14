@@ -1,16 +1,3 @@
-/**
- * `connector_status` for the cloud orchestrator — the device tool's exact
- * model-visible surface (see `defs/connector-status-def.ts`) over the
- * account's Store integrations.
- *
- * Same contract as the device: pure lookup plus the inline connect card,
- * blocking until the user connects, declines, or the card times out. The
- * card itself is delivered through the conversation (the Durable Object
- * publishes a pending connect request the clients render), and the user's
- * answer resolves the same account-level Composio connection the desktop
- * app would have made.
- */
-
 import type { TSchema } from "@sinclair/typebox";
 import {
   CONNECTOR_STATUS_SEARCH_TERMS,
@@ -46,7 +33,6 @@ export type CloudConnectorConnectionOutcome =
       reason: "declined" | "cancelled" | "timeout" | "unsupported" | string;
     }>;
 
-/** The cloud hop that renders the inline connect card and awaits the answer. */
 export type CloudConnectorConnectionRequester = (
   request: CloudConnectorConnectionRequest,
   signal?: AbortSignal,
@@ -148,8 +134,6 @@ export const createCloudConnectorStatusTool = (
     );
 
     if (outcome.ok) {
-      // The connect card resolved an account-level connection; the
-      // directory's connection snapshot for this turn is now stale.
       await options.directory.connections({ refresh: true }).catch(() => []);
       return text(
         `${connectorConnectedText(entry.name, entry.id)} The user approved the card.`,

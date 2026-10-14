@@ -1,12 +1,10 @@
 import type { ToolProcessIdentity } from "./types.js";
 
-/** Fixed image-owned privilege-drop binary. Never resolve this through PATH. */
 export const LINUX_SETPRIV_PATH = "/usr/bin/setpriv";
 
 export type IsolatedProcessLaunch = {
   command: string;
   args: string[];
-  /** Native uid/gid drop retained for non-cloud POSIX callers. */
   nativeIdentity?: Pick<ToolProcessIdentity, "uid" | "gid">;
 };
 

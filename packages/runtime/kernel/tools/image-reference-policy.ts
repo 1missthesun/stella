@@ -76,9 +76,7 @@ const readBoundedFromHandle = async (
 };
 
 type ReferenceReadHooks = {
-  /** Test-only race injection after the file descriptor is safely open. */
   afterOpen?: () => void | Promise<void>;
-  /** Test-only mutation injection between independent descriptor snapshots. */
   afterFirstRead?: () => void | Promise<void>;
 };
 
@@ -136,8 +134,6 @@ export const readValidatedImageFileNoFollow = async (
     }
     const bytes = await readBoundedFromHandle(handle);
     await options.hooks?.afterFirstRead?.();
-    // A second descriptor-positioned read prevents a same-length overwrite
-    // from producing a mixed snapshot even on coarse-timestamp filesystems.
     const verificationBytes = await readBoundedFromHandle(handle);
     const finalStat = await handle.stat();
     if (

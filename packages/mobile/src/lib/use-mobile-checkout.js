@@ -12,7 +12,6 @@ import { userFacingError } from "./user-facing-error";
 // browser result.
 const CHECKOUT_RETURN_URL = `${env.siteUrl}/billing`;
 
-/** The backend's `{ code, message }` for a refused call. */
 function backendErrorData(error) {
   if (error && typeof error === "object" && typeof error.code === "string") {
     return { code: error.code, message: error.message };
@@ -28,15 +27,6 @@ function messageFromError(error) {
   return userFacingError(error);
 }
 
-/**
- * Imperative side of the mobile subscription flow: create a Stripe Checkout
- * session, open it in the compliant external browser, and open the Stripe
- * customer portal. Purchase success is NOT inferred here — the calling section
- * observes the reactive entitlement and resolves the UI.
- *
- * Phases: "idle" -> "starting" -> "pending" (browser open / awaiting webhook)
- * and "error" on failure.
- */
 export function useMobileCheckout() {
   const createCheckout = useCallback(
     ({ plan, returnUrl, source, appStoreCountry }) =>
@@ -53,7 +43,7 @@ export function useMobileCheckout() {
     [],
   );
   const [phase, setPhase] = useState("idle");
-  const [error, setError] = useState(null); // { code, message } | null
+  const [error, setError] = useState(null);
   const inFlightRef = useRef(false);
   const checkoutRequestRef = useRef(null);
   const portalRequestRef = useRef(null);
@@ -67,7 +57,6 @@ export function useMobileCheckout() {
 
   const startCheckout = useCallback(
     async (plan, countryCode) => {
-      // Guard duplicate taps / overlapping sessions.
       if (inFlightRef.current) return;
       inFlightRef.current = true;
       setError(null);
@@ -96,8 +85,6 @@ export function useMobileCheckout() {
         setPhase("pending");
         await WebBrowser.openBrowserAsync(url, { dismissButtonStyle: "done" });
         checkoutRequestRef.current = null;
-        // Remain "pending": the section flips to success when the plan
-        // updates, or lets the user retry if they dismissed without paying.
       } catch (err) {
         const data = backendErrorData(err);
         setError({

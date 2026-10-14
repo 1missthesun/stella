@@ -1,11 +1,3 @@
-/**
- * A chat problem the user may act on (a Stop that did not land, a lost
- * cloud connection), pinned above the composer in the composer notice's
- * silhouette. It goes away on its own once the condition clears; the user
- * can also dismiss it, which hides that message until a different one
- * comes up.
- */
-
 import { useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useT } from "../i18n";
@@ -27,8 +19,6 @@ export function ChatIssueNotice({ issue }: { issue: ChatIssue | null }) {
   const [dismissed, setDismissed] = useState<string | null>(null);
   const message = issue?.message ?? null;
 
-  // A cleared condition forgets the dismissal, so the same problem coming
-  // back later shows again.
   useEffect(() => {
     if (message === null) setDismissed(null);
   }, [message]);

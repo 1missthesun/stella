@@ -29,20 +29,14 @@ const COLOR_SCHEMES: { id: ColorScheme; label: string }[] = [
 ];
 
 interface ThemePickerProps {
-  /** Render the picker as a full-width in-panel settings surface. */
   inline?: boolean;
   hideTrigger?: boolean;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   onThemeSelect?: () => void;
-  /** Custom trigger (e.g. icon button). Defaults to a text Button. */
   trigger?: ReactElement;
-  /** Used only when `trigger` is omitted. */
   triggerLabel?: string;
-  /** Which side of the trigger the popover opens on. Defaults to `top`
-   * (legacy: footer-anchored dropup). The title-bar variant uses `bottom`. */
   side?: "top" | "bottom";
-  /** Alignment of the popover relative to the trigger. Defaults to `end`. */
   align?: "start" | "center" | "end";
 }
 
@@ -82,8 +76,6 @@ export function ThemePicker({
   const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
   const setOpen = controlledOnOpenChange || setInternalOpen;
 
-  // Empty overlay themes (an unpopulated Custom) stay out of the list until
-  // they actually carry changes.
   const sortedThemes = useMemo(
     () =>
       [...themes]

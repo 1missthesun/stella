@@ -1,25 +1,3 @@
-/**
- * Managed media jobs: one `media_jobs` row per generation, run on Stella's
- * fal account and billed through this object's billing ledger.
- *
- * - **Models:** a request names a model from `@stella/contracts/media-models`
- *   and sends that model's own input, which goes to fal untouched apart from
- *   inline sources. Adding or swapping a model is an edit to that list.
- * - **Bytes:** inline sources and outputs live in `MEDIA` under
- *   `media/<sha256(owner)>/<job>/`; fal and clients read them through
- *   presigned GETs. A job's `output` keeps the model's shape with each file
- *   `url` swapped for a presigned URL and its `r2Key`.
- * - **Settling:** jobs are queued on fal with a webhook that carries a signed
- *   routing token. The webhook schedules `media.poll` with the result, and
- *   the poll (also armed 2 minutes after submission, with backoff) copies
- *   outputs, bills and settles the row. `media.expire` fails anything still
- *   open after 30 minutes.
- * - **Billing:** the model's `price` is checked against what the owner has
- *   left before the job starts and charged once it succeeds.
- * - **Crash rule:** a row left in `submitting` with no provider request id
- *   (the object restarted mid-submit) is failed, never resubmitted.
- */
-
 import type {
   MediaCalls,
   MediaGenerateAccepted,
@@ -58,17 +36,13 @@ const FIRST_POLL_MS = 2 * 60_000;
 const MAX_POLL_MS = 10 * 60_000;
 const EXPIRE_MS = 30 * 60_000;
 const RATE_LIMIT = { count: 20, windowMs: 5 * 60_000 };
-/** Before admitting a job whose price is not known yet, the owner must have this much left. */
 const ADMISSION_BUFFER_USD = 0.8;
 const MICRO_CENTS_PER_USD = 100_000_000;
-/** Inline sources and outputs above this are refused. */
 const MAX_OBJECT_BYTES = 2 * 1024 * 1024 * 1024;
 const MAX_OUTPUT_FILES = 16;
 /** R2 multipart parts other than the last must all be this size. */
 const MULTIPART_PART_BYTES = 10 * 1024 * 1024;
-/** fal fetches staged sources well within this. */
 const SOURCE_URL_SECONDS = 2 * 60 * 60;
-/** The longest a presigned URL may live; view values are signed at completion. */
 const OUTPUT_URL_SECONDS = 7 * 24 * 60 * 60;
 const LOOKUP_URL_SECONDS = 60 * 60;
 const MAX_REQUEST_BYTES = 24 * 1024 * 1024;
@@ -106,7 +80,6 @@ export const MEDIA_CHARGE_MIGRATION = {
   statements: ["ALTER TABLE media_jobs ADD COLUMN charge_pending INTEGER NOT NULL DEFAULT 0"],
 };
 
-/** Jobs name a model and every job runs on fal. */
 export const MEDIA_MODEL_MIGRATION = {
   id: "media.3-model",
   statements: [
@@ -116,7 +89,6 @@ export const MEDIA_MODEL_MIGRATION = {
   ],
 };
 
-/** The random token in a job's fal webhook URL; only that URL can settle it. */
 export const MEDIA_WEBHOOK_TOKEN_MIGRATION = {
   id: "media.4-webhook-token",
   statements: ["ALTER TABLE media_jobs ADD COLUMN webhook_token TEXT"],
@@ -140,16 +112,11 @@ type JobRow = {
   updated_at: number;
 };
 
-/** What `request_json` holds: the input as submitted plus its idempotency hash. */
 type StoredRequest = {
   input: Record<string, unknown>;
   hash: string;
 };
 
-/**
- * Jobs this isolate is submitting right now. A `submitting` row not in here
- * belongs to an object that restarted mid-submit (the crash rule).
- */
 const inFlight = new Set<string>();
 
 const log = (event: string, fields: Record<string, unknown>) =>
@@ -175,7 +142,6 @@ const signerOf = (ctx: Pick<OwnerContext, "env">): R2Signer => {
   return signer;
 };
 
-/** `media/<sha256(owner)>/`: everything this owner's media stores. */
 export const mediaOwnerPrefix = async (ownerId: string): Promise<string> =>
   `media/${await sha256Hex(ownerId)}/`;
 
@@ -236,8 +202,6 @@ const accepted = (row: JobRow, reattached: boolean): MediaGenerateAccepted => ({
   ...(row.status === "succeeded" && row.outputs_json ? { output: parseJson<unknown>(row.outputs_json) } : {}),
 });
 
-// ── Storage ──────────────────────────────────────────────────────────────
-
 const concat = (chunks: Uint8Array[], size: number): Uint8Array => {
   const out = new Uint8Array(size);
   let offset = 0;
@@ -248,10 +212,6 @@ const concat = (chunks: Uint8Array[], size: number): Uint8Array => {
   return out;
 };
 
-/**
- * Stream `body` into `key`: one PUT through a `FixedLengthStream` when the
- * length is known, a multipart upload of fixed-size parts otherwise.
- */
 const putStream = async (
   bucket: R2Bucket,
   key: string,
@@ -310,10 +270,6 @@ const dataUriParts = (value: string): { mimeType: string; bytes: Uint8Array } =>
   return { mimeType, bytes };
 };
 
-/**
- * fal cannot take megabytes of inline JSON and rows must stay small, so every
- * `data:` URI anywhere in the input becomes a staged object and a signed GET.
- */
 const stageSources = async (
   ctx: OwnerContext,
   jobPrefix: string,
@@ -339,7 +295,6 @@ const stageSources = async (
   return (await stage(input, 0)) as Record<string, unknown>;
 };
 
-/** The input as a row keeps it before staging: inline sources shortened to `data:`. */
 const withoutInlineSources = (value: unknown, depth = 0): unknown => {
   if (isDataUri(value)) return "data:";
   if (depth > 8) return value;
@@ -348,10 +303,6 @@ const withoutInlineSources = (value: unknown, depth = 0): unknown => {
   return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, withoutInlineSources(entry, depth + 1)]));
 };
 
-/**
- * Copy every file a provider payload names into the bucket, returning the
- * payload with each `url` replaced by a presigned GET and its `r2Key`.
- */
 const storeOutputs = async (ctx: OwnerContext, jobPrefix: string, payload: unknown): Promise<unknown> => {
   let index = 0;
   const now = Date.now();
@@ -385,7 +336,6 @@ const storeOutputs = async (ctx: OwnerContext, jobPrefix: string, payload: unkno
   return await visit(payload, 0);
 };
 
-/** Fresh signatures for a stored output, for callers that read it once. */
 const resignOutputs = async (ctx: OwnerContext, output: unknown): Promise<unknown> => {
   const signer = signerOf(ctx);
   const now = Date.now();
@@ -400,8 +350,6 @@ const resignOutputs = async (ctx: OwnerContext, output: unknown): Promise<unknow
   };
   return await visit(output, 0);
 };
-
-// ── Settling ─────────────────────────────────────────────────────────────
 
 const clearJobs = (ctx: OwnerContext, jobId: string): void => {
   ctx.jobs.cancel(pollJobId(jobId));
@@ -432,7 +380,6 @@ const errorOf = (error: unknown, fallback: string): MediaJobError => ({
 
 const microCents = (usd: number): number => Math.max(0, Math.round(usd * MICRO_CENTS_PER_USD));
 
-/** What a finished job costs, in micro-cents, or null when its price could not be worked out. */
 const jobCost = (row: JobRow, payload: unknown): number | null => {
   const model = mediaModel(row.model);
   const input = parseJson<StoredRequest>(row.request_json)?.input ?? {};
@@ -440,12 +387,10 @@ const jobCost = (row: JobRow, payload: unknown): number | null => {
   return usd === null ? null : microCents(usd);
 };
 
-/** Store the outputs, charge the job once and mark it succeeded. */
 const completeJob = async (ctx: OwnerContext, row: JobRow, payload: unknown): Promise<unknown> => {
   const prefix = `${await mediaOwnerPrefix(ctx.ownerId)}${row.job_id}/`;
   const output = await storeOutputs(ctx, prefix, payload);
   const current = getRow(ctx.db, row.job_id);
-  // Canceled while fal finished it: fal charged nothing Stella passes on.
   if (!current || TERMINAL.has(current.status)) return output;
   const cost = jobCost(row, payload);
   if (cost === null) log("media_job_unpriced", { jobId: row.job_id, model: row.model });
@@ -463,8 +408,6 @@ const completeJob = async (ctx: OwnerContext, row: JobRow, payload: unknown): Pr
   log("media_job_succeeded", { jobId: row.job_id, model: row.model, costMicroCents: cost });
   return output;
 };
-
-// ── Generating ───────────────────────────────────────────────────────────
 
 const admit = (ctx: OwnerContext, model: MediaModel, input: Record<string, unknown>): void => {
   const access = billingAccess(ctx);
@@ -517,8 +460,6 @@ const startJob = async (
   const webhookToken = mintWebhookToken();
   const now = Date.now();
   const summary = (input: unknown): string => JSON.stringify({ input, hash } as StoredRequest);
-  // No await between the key check above and this insert, so a concurrent
-  // retry under the same key reattaches instead of starting a second job.
   ctx.db.run(
     `INSERT INTO media_jobs (job_id, client_request_key, model, status, request_json, billed,
        webhook_token, conversation_id, turn_id, created_at, updated_at)
@@ -526,7 +467,6 @@ const startJob = async (
     jobId,
     clientRequestKey,
     model.id,
-    // Inline sources are swapped for their staged URLs below; rows stay small.
     summary(withoutInlineSources(request.input)),
     webhookToken,
     origin.conversationId ?? null,
@@ -574,8 +514,6 @@ const startJob = async (
         failJob(ctx, jobId, errorOf(error, "Media generation failed upstream."));
         throw new RpcError("BAD_REQUEST", `${model.id} refused the request: ${error.message} (see ${model.docsUrl})`);
       }
-      // fal may have accepted it: wait for the webhook (its URL names this
-      // job), and let `media.expire` close it if none comes. Never resubmit.
       ctx.db.run(
         "UPDATE media_jobs SET status = 'running', updated_at = ? WHERE job_id = ? AND status = 'submitting'",
         Date.now(),
@@ -617,18 +555,12 @@ const cancelJob = async (
   return { state: "canceled", jobId: row.job_id };
 };
 
-// ── Jobs ─────────────────────────────────────────────────────────────────
-
 const pollPayload = object({
   jobId: string({ max: 100 }),
   attempt: optional(number({ int: true, min: 0 })),
   result: optional(json({ maxBytes: MAX_WEBHOOK_RESULT_CHARS })),
 });
 
-/**
- * Settle a job from a webhook result, or ask fal where it stands. Also the
- * crash rule's enforcer: an orphaned `submitting` row fails here.
- */
 const runPoll = async (ctx: OwnerContext, raw: unknown): Promise<void> => {
   const payload = pollPayload(raw);
   const row = getRow(ctx.db, payload.jobId);
@@ -654,7 +586,6 @@ const runPoll = async (ctx: OwnerContext, raw: unknown): Promise<void> => {
         message: "Stella lost this request while submitting it and did not resubmit it.",
       });
     }
-    // An ambiguous submission waits for its webhook or `media.expire`.
     return;
   }
   const apiKey = secret(ctx.env, "FAL_KEY");
@@ -680,8 +611,6 @@ const runExpire = async (ctx: OwnerContext, raw: unknown): Promise<void> => {
   await cancelOnFal(ctx, row);
 };
 
-// ── Server-internal input ────────────────────────────────────────────────
-
 const generateArgs: Parser<MediaGenerateRequest> = (value, path = "") => {
   const parsed = object({
     model: string({ min: 1, max: 200 }),
@@ -706,10 +635,6 @@ const webhookArgs = object({
   body: json({ maxBytes: 4 * 1024 * 1024 }),
 });
 
-/**
- * fal settled a request. A result is handed to `media.poll` (run now), which
- * copies the outputs; the webhook answers at once so fal is not kept waiting.
- */
 const falWebhook = (ctx: OwnerContext, raw: unknown): { received: true; discarded?: string } => {
   const { jobId, token, body } = webhookArgs(raw);
   const row = getRow(ctx.db, jobId);
@@ -772,7 +697,6 @@ const generateForTurn = async (ctx: OwnerContext, raw: unknown): Promise<MediaGe
   });
 };
 
-/** One job with freshly signed outputs, for HTTP clients and agent tools. */
 const lookup = async (ctx: OwnerContext, raw: unknown): Promise<MediaJob | null> => {
   const row = findRow(ctx, lookupArgs(raw));
   if (!row) return null;
@@ -780,7 +704,6 @@ const lookup = async (ctx: OwnerContext, raw: unknown): Promise<MediaJob | null>
   return toJob(row, stored === undefined ? undefined : await resignOutputs(ctx, stored));
 };
 
-/** Admin delete: cancel an open job, then drop its row and its objects. */
 const deleteJob = async (
   ctx: OwnerContext,
   raw: unknown,
@@ -795,9 +718,6 @@ const deleteJob = async (
   return { deleted: true, kind: "media_job", id: jobId };
 };
 
-// ── Purge ────────────────────────────────────────────────────────────────
-
-/** Reset or deletion: cancel open fal requests, drop every row and every object. */
 const purgeMedia = async (ctx: OwnerContext): Promise<{ pending: boolean }> => {
   const rows = ctx.db.all<Pick<JobRow, "job_id" | "model" | "provider_request_id" | "status">>(
     "SELECT job_id, model, provider_request_id, status FROM media_jobs",
@@ -812,8 +732,6 @@ const purgeMedia = async (ctx: OwnerContext): Promise<{ pending: boolean }> => {
   if (listed.objects.length > 0) await bucket.delete(listed.objects.map((object) => object.key));
   return { pending: listed.truncated };
 };
-
-// ── Registration ─────────────────────────────────────────────────────────
 
 const statusArg = literal("queued", "running", "succeeded", "failed", "canceled");
 

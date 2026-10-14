@@ -1,14 +1,3 @@
-/**
- * Live browser screenshot acceptance for the complete model-facing path.
- *
- * This intentionally runs outside Vitest and uses the production BrowserSession,
- * trusted local Node kernel, public code tool, and the model tool adapter the
- * pi-durable harness runs Stella's tools through (`executeModelToolCall`). It creates one
- * task-owned external-browser tab, captures it, and finalizes that owner before
- * reporting. Run while the Stella browser bridge and extension are connected:
- *
- *   bun packages/runtime/scripts/live-browser-adapter-acceptance.ts
- */
 import { randomUUID } from "node:crypto";
 import { access } from "node:fs/promises";
 import path from "node:path";
@@ -178,9 +167,6 @@ const toolCallOptions: ModelToolCallOptions = {
   toolWorkspaceRoot: process.cwd(),
   agentDepth: 1,
   allowedToolNames: ["code"],
-  // This acceptance dispatches only code, whose production adapter does
-  // not touch durable runtime storage. Keep the store deliberately inert so
-  // the browser/REPL path remains the only exercised surface.
   store: {} as never,
   toolExecutor: async (
     toolName: string,
@@ -421,8 +407,6 @@ codeRuntime.reset()`;
     ),
   );
 } finally {
-  // Cleanup is keyed to each real BrowserSession, so it also covers a tab_new
-  // whose request timed out after dispatch and never returned a tab ID.
   await Promise.allSettled(sessionCleanups.map((cleanup) => cleanup()));
   await registry.dispose().catch(() => undefined);
   server.stop(true);

@@ -1,10 +1,5 @@
 "use client";
 
-/**
- * Fetch and cache the short-lived backend JWT (`GET /api/auth/token`) that
- * authorizes the site's backend calls and views.
- */
-
 import { authClient, hasSessionToken } from "./auth-client";
 
 let cachedToken: string | null = null;

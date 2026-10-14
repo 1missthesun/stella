@@ -56,18 +56,10 @@ export type OrchestratorCliAttempt = Readonly<{
   attemptGeneration: number;
 }>;
 
-/**
- * Names the spec inside the stored turn record, so a replayed dispatch is
- * still compared against exactly what was admitted.
- */
 export const orchestratorCliSpecDigest = (
   spec: CloudOrchestratorCliTurnSpec,
 ): Promise<string> => stableValueMarker(spec);
 
-/**
- * Store the admitted attempt's spec. Only one attempt runs on a thread at a
- * time, so any other attempt's spec is dropped with it.
- */
 export const storeOrchestratorCliSpec = (
   sql: SqlStorage,
   attempt: OrchestratorCliAttempt,
@@ -93,7 +85,6 @@ export const storeOrchestratorCliSpec = (
   }
 };
 
-/** The exact attempt's spec, revalidated, or null when it is gone. */
 export const readOrchestratorCliSpec = (
   sql: SqlStorage,
   attempt: OrchestratorCliAttempt,
@@ -125,10 +116,6 @@ export const readOrchestratorCliSpec = (
   }
 };
 
-/**
- * Remember how an attempt ended, before the frame is first sent. The spec is
- * no longer needed once the attempt is decided.
- */
 export const recordOrchestratorCliTerminal = (
   sql: SqlStorage,
   terminal: CloudCliTurnTerminal,
@@ -182,7 +169,6 @@ export const readOrchestratorCliTerminal = (
   }
 };
 
-/** Owner purge: the conversation's prompt and outcomes go with the rest. */
 export const purgeOrchestratorCliTurnStore = (sql: SqlStorage): void => {
   sql.exec(`DROP TABLE IF EXISTS orchestrator_cli_spec_chunks`);
   sql.exec(`DROP TABLE IF EXISTS orchestrator_cli_terminals`);

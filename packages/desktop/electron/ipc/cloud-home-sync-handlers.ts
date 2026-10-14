@@ -30,8 +30,6 @@ export const registerCloudHomeSyncHandlers = (
       if (!stellaDataDir) {
         throw new Error("Stella data is not ready for Cloud Home import.");
       }
-      // No renderer-supplied path is accepted. Tests exercise the pure scanner
-      // with a temporary fixture, while production always uses lifecycle state.
       return await scanOwnedLocalCloudHome(stellaDataDir, accountScope);
     },
   );

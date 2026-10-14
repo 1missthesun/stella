@@ -148,7 +148,6 @@ const streamedTextLines = async function* (
     yield* consume(streamDecoder.decode(bytes, { stream: true }));
   }
   yield* consume(streamDecoder.decode());
-  // Match String.prototype.split: a file ending in a newline has a final empty line.
   yield { number: lineNumber, text: pending };
 };
 
@@ -618,7 +617,6 @@ const handleGrep = async (
         }
       }
     } catch (error) {
-      // A binary file or an over-limit single line is skipped, but this must be visible.
       incomplete = true;
       if (!append(`[Skipped ${absolute}: ${asError(error)}]`)) break;
     }

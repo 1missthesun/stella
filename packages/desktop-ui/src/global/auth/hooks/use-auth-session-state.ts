@@ -19,7 +19,6 @@ type AuthSessionData =
   | null
   | undefined;
 
-/** A real (non-anonymous) account is signed in. Readable outside React. */
 export const isConnectedAccountSession = (data: unknown): boolean => {
   const sessionData = data as AuthSessionData;
   return Boolean(sessionData) && sessionData?.user?.isAnonymous !== true;

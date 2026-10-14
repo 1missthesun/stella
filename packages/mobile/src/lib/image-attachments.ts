@@ -1,19 +1,3 @@
-/**
- * Image format identification for outbound attachments.
- *
- * iOS photo-library picks (and share-sheet images) frequently arrive as HEIC
- * under a `image/jpeg` label: expo-image-picker's `quality` re-encode is
- * bypassed for HEIC, since its native `readDataAndFileExtension` returns the
- * raw bytes for `UTType.heic`. Model providers only accept jpeg/png/gif/webp,
- * and a mislabeled HEIC lands as "[Image omitted: it could not be decoded as a
- * valid image…]" with nothing to explain why.
- *
- * The bytes themselves no longer leave the phone through a prompt — they go to
- * the drive, and the drive row's content type is what both placements read. So
- * the one thing that matters is that the type recorded on that row comes from
- * the magic numbers rather than from what the picker claimed.
- */
-
 const ISO_BMFF_HEIC_BRANDS = new Set([
   "heic",
   "heix",
@@ -35,11 +19,6 @@ const ascii = (bytes: Uint8Array, start: number, length: number) => {
   return out;
 };
 
-/**
- * Identify an image format from its magic numbers. Returns null when the
- * bytes don't look like any format we know — callers should then fall back
- * to the declared mime type.
- */
 export const sniffImageMimeType = (bytes: Uint8Array): string | null => {
   if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
     return "image/jpeg";
@@ -79,14 +58,6 @@ export const sniffImageMimeType = (bytes: Uint8Array): string | null => {
   return null;
 };
 
-/**
- * The content type to record on the drive row for picked bytes. The declared
- * type is only a fallback: a HEIC mislabeled `image/jpeg` would otherwise reach
- * a model as JPEG and fail with nothing to explain it.
- *
- * A non-image keeps its declared type. Sniffing only knows image formats, and
- * a PDF is not improved by being called `application/octet-stream`.
- */
 export const attachmentContentType = (
   bytes: Uint8Array,
   declared: string,

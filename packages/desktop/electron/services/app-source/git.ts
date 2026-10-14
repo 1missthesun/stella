@@ -10,23 +10,14 @@ export type RunOptions = {
   cwd: string;
   env?: NodeJS.ProcessEnv;
   timeoutMs?: number;
-  /**
-   * Work nobody is waiting on (preparing an update before it is offered):
-   * lowest CPU priority, and idle disk priority where the system has a way to
-   * ask for it (`ionice` on Linux, `taskpolicy` on macOS). What it spawns
-   * inherits both.
-   */
   background?: boolean;
-  /** Stops the command; the run then rejects. */
   signal?: AbortSignal;
-  /** Written to the command's stdin, which is then closed. */
   input?: string;
 };
 
 const IONICE = "/usr/bin/ionice";
 const TASKPOLICY = "/usr/sbin/taskpolicy";
 
-/** The command line a background run starts with. */
 const backgroundCommand = (file: string, args: string[]): [string, string[]] => {
   if (process.platform === "linux" && existsSync(IONICE)) {
     return [IONICE, ["-c", "3", file, ...args]];
@@ -37,7 +28,6 @@ const backgroundCommand = (file: string, args: string[]): [string, string[]] => 
   return [file, args];
 };
 
-/** Run a command without a shell; resolves with its exit code, never throws on one. */
 export const run = (
   file: string,
   args: string[],
@@ -93,7 +83,6 @@ type GitOptions = {
 export const gitRaw = (cwd: string, args: string[], options: GitOptions = {}) =>
   run(gitBinary(), args, {
     cwd,
-    // Never prompt: a missing credential must fail, not hang main.
     env: { GIT_TERMINAL_PROMPT: "0", ...options.env },
     timeoutMs: options.timeoutMs,
     background: options.background,
@@ -101,7 +90,6 @@ export const gitRaw = (cwd: string, args: string[], options: GitOptions = {}) =>
     input: options.input,
   });
 
-/** Run git and return trimmed stdout; throws with git's message on failure. */
 export const git = async (cwd: string, args: string[], options: GitOptions = {}) => {
   const result = await gitRaw(cwd, args, options);
   if (result.code !== 0) {
@@ -112,7 +100,6 @@ export const git = async (cwd: string, args: string[], options: GitOptions = {})
   return result.stdout.trim();
 };
 
-/** `git merge-base --is-ancestor`: exit 0 yes, 1 no. */
 export const isAncestor = async (
   cwd: string,
   ancestor: string,
@@ -147,6 +134,5 @@ export const listWorktrees = async (cwd: string): Promise<Worktree[]> => {
 
 export const DRAFT_REF_PREFIX = "refs/heads/draft/";
 
-/** Draft names are one path segment: they name a branch and a directory. */
 export const isDraftName = (name: string) =>
   /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/.test(name) && !name.endsWith(".lock");

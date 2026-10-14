@@ -10,47 +10,15 @@ export type { EventRecord };
 import type { ChatContext } from "@/shared/types/electron";
 import type { ComposerMessageStore } from "@/features/chat/hooks/use-composer-message-state";
 
-/**
- * Stable per-conversation slice of the chat runtime.
- *
- * The high-frequency visible timeline (`MessageRecord[]`, mutated ~once
- * per animation frame while a reply streams) is intentionally NOT here —
- * it is published through `ChatMessagesContext` / `useChatMessages` so this
- * value keeps a stable identity across streamed frames and its consumers
- * (shell chrome, left sidebar) don't re-render per token.
- */
 export type ChatColumnConversation = {
-  /** Canonical cloud connection/send failures appended inside the timeline. */
   extraTail?: ReactNode;
-  /**
-   * The conversation's background-agent tasks: authoritative thread rows
-   * (runtime `runtime_agents` table via `useThreadActivity`) overlaid with
-   * live stream decoration by `buildActivityTasks`. Every task surface —
-   * Activity sidebar, composer pill, Now/Done sections, working indicator,
-   * mobile bridge — reads this single list; nothing folds lifecycle events
-   * into state anymore.
-   */
   tasks: TaskItem[];
-  /**
-   * Agent-lifecycle activity events for the conversation. Fed by
-   * `useConversationActivity` in local mode. Only file-derived surfaces
-   * read this now (per-agent file lists merge the `agent-completed` file
-   * rollups with the files window) — task state comes from `tasks`.
-   */
   activity: {
     activities: EventRecord[];
     hasOlder: boolean;
     isLoadingOlder: boolean;
     loadOlder: () => void;
   };
-  /**
-   * File-carrying events (`assistant_message` / `agent-completed`
-   * whose text plausibly carries markdown file links) for the
-   * conversation. Fed by `useConversationFiles` in local mode
-   * and a `displayEvents` filter for cloud conversations. The Recent Files
-   * surfaces and Activity tray search read from this rather than scanning
-   * `events`.
-   */
   files: {
     files: EventRecord[];
     hasOlder: boolean;
@@ -69,21 +37,10 @@ export type ChatColumnConversation = {
     } | null;
     hasToolActivity?: boolean;
     isToolActive?: boolean;
-    /**
-     * The run's final assistant message has landed. Set on the message
-     * boundary that no tool follows, so the indicator can hand off to the
-     * reply instead of lingering behind it.
-     */
     answerLanded?: boolean;
-    /** The engine is compacting the conversation; the indicator says so. */
     isCompacting?: boolean;
     pendingUserMessageId: string | null;
     queuedUserMessages: QueuedUserMessage[];
-    /**
-     * Removes a still-queued follow-up message from the pending-send queue
-     * by id. Wired to the hover-cancel control on a queued bubble; the
-     * surface pairs it with restoring the bubble's text to its own composer.
-     */
     removeQueuedUserMessage: (messageId: string) => void;
   };
   history: {
@@ -92,17 +49,11 @@ export type ChatColumnConversation = {
     isLoadingOlder: boolean;
     isLoadingNewer: boolean;
     isInitialLoading: boolean;
-    /** Page in older messages (a catch-up link to one not loaded yet). */
     loadOlder?: () => boolean | void | Promise<boolean>;
   };
 };
 
 export type ChatColumnComposer = {
-  /**
-   * Composer text as a store, not a string: only the composer leaf
-   * subscribes, so a keystroke never re-renders the chat column or the
-   * runtime consumers that receive this object.
-   */
   messageStore: ComposerMessageStore;
   setMessage: Dispatch<SetStateAction<string>>;
   chatContext: ChatContext | null;
@@ -116,46 +67,17 @@ export type ChatColumnComposer = {
   onStop: () => void;
 };
 
-/**
- * Scroll API for chat surfaces.
- *
- * Backed by `@legendapp/list/react` (Legend List v3 web entry):
- * the surface attaches `listRef` to the `<LegendList>`. The hook listens to
- * the native scroll node and drives custom scrollbar thumb state, "at bottom"
- * tracking, and `scrollToBottom` via the list's imperative API.
- */
 export type ChatColumnScroll = {
   listRef: RefObject<LegendListRef | null>;
   showScrollButton: boolean;
-  /** True when the user is at (or within ~1px of) the newest-content edge. */
   isAtBottom: boolean;
-  /**
-   * Generous "at bottom" flag: true while the freshest turn is still on screen
-   * (within `AT_BOTTOM_TOLERANCE_PX` of the readable bottom). Unlike
-   * `isFollowingLatest`, a barely-there upward nudge does not clear it, so the
-   * streaming reply peek only appears when the user is genuinely scrolled up.
-   */
   isNearBottom: boolean;
-  /** True while stream/send auto-follow is armed (intent latch, not raw scrollTop). */
   isFollowingLatest: boolean;
-  /** True during direct wheel/touch/keyboard/thumb scrolling and its short settle. */
   isUserScrolling: boolean;
-  /** Marks imperative scrollbar-thumb movement as direct user scrolling. */
   noteManualScroll: () => void;
   getIsFollowing: () => boolean;
   scrollToBottom: (behavior?: "instant" | "smooth") => void;
-  /**
-   * Callback ref for the custom scrollbar thumb node. The scroll hook
-   * writes the thumb's position/visibility straight to this element on
-   * each scroll frame (no React state) so panning stays smooth. Surfaces
-   * without a custom thumb just don't attach it.
-   */
   thumbRef: (el: HTMLDivElement | null) => void;
-  /**
-   * True while a just-opened conversation is still pinning to its bottom.
-   * The timeline is laid out but hidden then, so it first appears already
-   * at the bottom. Surfaces that don't pin on open leave it unset.
-   */
   isOpeningScroll?: boolean;
 };
 

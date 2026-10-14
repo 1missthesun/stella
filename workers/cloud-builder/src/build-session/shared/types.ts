@@ -16,31 +16,17 @@ export type Execution = {
 };
 
 export type TurnRequest = {
-  // "agent" runs a spawned general agent against a persistent workspace;
-  // other kinds are rejected at admission.
   kind?: string;
   ownerId: string;
   appId: string;
   turnId: string;
   prompt: string;
-  /** One short sentence describing the agent thread's work (agent turns). */
   description?: string;
-  /** Who asked for this attempt; decides whether the session projects `thread.spawned`. */
   source?: string;
-  /** Reliable-delivery id from the dispatcher; a replay names the same turn. */
   clientMsgId?: string;
-  /** The parent chat turn whose tool call spawned this thread. */
   parentTurnId?: string;
-  /** The direct parent agent thread, absent only for conversation spawns. */
   parentThreadId?: string;
-  /** One for conversation children, two for their children; zero for orchestrator turns. */
   agentDepth: number;
-  /**
-   * The OrchestratorSession's own chat turn, run by the Claude Code CLI with
-   * the DO's prompt and tools (`orchestratorCli`). Still `kind: "agent"`: it
-   * skips the spawned-thread projection, parent wake and world
-   * materialization, and reports its terminal to the DO.
-   */
   agentRole?: "orchestrator";
   /**
    * Present on the admitted dispatch when `agentRole` is `"orchestrator"`.
@@ -49,44 +35,26 @@ export type TurnRequest = {
    * turn-input.json is written.
    */
   orchestratorCli?: CloudOrchestratorCliTurnSpec;
-  /** `orchestratorCliSpecDigest` of the spec; kept in the stored record. */
   orchestratorCliDigest?: string;
-  /**
-   * Desktop that owns this thread's delivery. Present means the owner's
-   * projection wakes the parent conversation, so the session must not.
-   */
   originDeviceId?: string;
   originConversationId?: string;
-  /** The spawn's `workspace`: `"large"` starts the container `heavy`. */
   workspace?: "large";
   preflightDelayMs?: number;
   watchdogMs?: number;
   conversationId?: string;
   sessionId?: string;
   threadId?: string;
-  /** Exact immutable route selected by the owner gate for this turn. */
   execution?: CloudExecutionSelection;
-  /** Managed-model audience the owner gate resolved for the owner at dispatch. */
   audience: ManagedModelAudience;
-  /** Spend ceiling for this turn's model calls (`GATEWAY_BUDGET_UNLIMITED` allowed). */
   budgetMicroCents: number;
-  /** Owner-lifecycle generation captured before this dispatch. */
   ownerGeneration: string;
-  /** Monotonic generation of this exact reused agent thread attempt. */
   attemptGeneration?: number;
-  /** Trusted outer-router facts; never accepted from the dispatch body. */
   turnBrokerRoute?: {
     sessionId: string;
     endpoint: string;
   };
-  /** Worker-issued lease. Callers cannot choose this value. */
   ownerPurgeGeneration?: string;
   ownerPurgeLeaseId?: string;
-  /**
-   * The owner gate admitted this turn before dispatching it and releases it
-   * itself if the dispatch fails. Set from a trusted internal header, never
-   * from the body; the session still releases on its terminal paths.
-   */
   gateAdmittedByCaller?: boolean;
 };
 
@@ -115,15 +83,8 @@ export type BuildOwnerFenceLeaseSlot = {
 
 export type PendingAppBuildPublication = {
   turnId: string;
-  /**
-   * `"callback"` still names the step, but the step is now an owner event
-   * delivery — a permanent rejection is not visible here, so nothing falls
-   * from it into cleanup. `"cleanup"` is reached only by a build that failed
-   * after uploading bytes, and its job is to remove them and terminate.
-   */
   phase: "callback" | "cleanup";
   artifactPrefix: string;
-  /** Absent on a cleanup-only record: no build was ever recorded. */
   buildId?: string;
   callbackBody: Record<string, unknown>;
   completionSeq: number | "auto";
@@ -139,7 +100,6 @@ export type TurnStateCheckpointOperation =
       requestId: string;
       requestFingerprint: string;
       createdAt: number;
-      /** Persisted immediately after owner prepare, before either R2 upload. */
       operationId?: string;
       payload?: TurnBrokerTurnStateCheckpointRequest;
     }
@@ -189,11 +149,6 @@ export type AgentExecutionMarker = {
   startedAt: number;
 };
 
-/**
- * What recovery already knows about a lost turn, if anything: the transcript
- * the executor handed up before it died. Absent that, the fallback synthesizes
- * the two rows a thread needs to stay readable.
- */
 export type BuilderFallbackInput = {
   historyCursor?: string;
   messages?: Array<{ ordinal: number; role: string; payloadJson: string }>;
@@ -208,7 +163,6 @@ export type AgentExecutorResult = {
   usage?: Record<string, unknown>;
   checkpointPolicy?: "preserve_prior" | "builder_fallback";
   checkpointMs?: number;
-  /** When each executor step happened, epoch ms, for the timing log only. */
   timings?: Record<string, number>;
   turnStateCheckpoint?: TurnBrokerTurnStateCheckpointReceipt;
   builderFallback?: {
@@ -218,44 +172,15 @@ export type AgentExecutorResult = {
   };
 };
 
-/**
- * A terminal state that has been decided but may not have reached the owner yet.
- *
- * It is written to DO storage before the first delivery attempt so the alarm
- * can re-deliver exactly this, unchanged. Without it the success path was the
- * one terminal path with no retry, and it is the one carrying the only copy of
- * the agent's report.
- */
 export type PendingTerminal = {
-  /** Fences a stale payload against a successor turn on the same DO. */
   turnId: string;
-  /** Fences ABA reuse of the same thread/turn-shaped durable receipt. */
   attemptGeneration: number;
   kind: "completed" | "failed" | "canceled";
-  /** Optional turn-event kind when the thread status uses a coarser value. */
   eventKind?: "timeout";
   payload: Record<string, unknown>;
-  /** Message for the thread's final state; a completed turn sends its report. */
   threadError?: string;
-  /**
-   * Cancellation is not complete until the sandbox process is gone. This flag
-   * makes that requirement durable: if container teardown fails or the DO is
-   * evicted mid-cancel, the alarm retries teardown before it delivers the
-   * terminal state.
-   */
   terminateSandbox?: boolean;
-  /**
-   * The turn-event ordinal this terminal reserved. Remembered with the
-   * decision so a redelivery re-sends the same `turn.event` rather than
-   * minting a second one the owner would have to reconcile.
-   */
   eventSeq?: number;
-  /**
-   * When the thread was decided terminal. Fixed with the decision because the
-   * parent's wake carries it in `agentThreadControl.threadUpdatedAt`, which is
-   * part of that turn's idempotency fingerprint: a retry with a fresh clock
-   * would be refused as a different message under the same id.
-   */
   completedAt?: number;
 };
 
@@ -269,16 +194,6 @@ export type ConversationCaller = {
   issuedAtMs: number;
 };
 
-/**
- * Who may submit a dispatch, and as what.
- *
- * Three callers exist and they are told apart before anything is parsed: the
- * service secret (the owner schedules and cloud-originated work, any ingress), a
- * signed-in user whose request carries a mobile pairing proof (ingress
- * `mobile`, bound to the phone and the desktop the proof names), and a plain
- * signed-in user (ingress `desktop` or `browser` only — nothing else has a
- * device the worker can vouch for).
- */
 export type DispatchCaller =
   | { kind: "service"; ownerId: string; ownerGeneration: string }
   | { kind: "user"; ownerId: string }
@@ -296,8 +211,6 @@ export type NativeTransientBackup = {
 };
 
 export type WorkspaceBackupDebt = { backupIds: string[] };
-
-// ── Owner-scoped storage outside the owner object ───────────────────────────
 
 /**
  * THE LIST. Every store outside the owner object that holds data belonging to one owner,
@@ -342,27 +255,16 @@ export type WorkspaceBackupDebt = { backupIds: string[] };
  */
 export type OwnerPurgeRequest = {
   ownerId?: string;
-  /** Owner lifecycle generation; distinct from the external purge fence. */
   ownerGeneration?: string;
-  /** Issued by `beginOwnerPurge`; proves this owner is quiesced. */
   purgeGeneration?: string;
-  /** App slugs whose hosted route row must go. */
   appSlugs?: string[];
-  /** App build artifactPrefix values in APP_BUILDS. */
   buildPrefixes?: string[];
-  /** Private browser profiles that must be confirmed gone before row drain. */
   browserProfiles?: string[];
-  /**
-   * Reset or account deletion, from the owner's `account.purge` job. Present on the final
-   * owner-level pass, which also purges the owner object's own data
-   * (`OwnerGate.purgeOwnerData`); per-app passes omit it.
-   */
   mode?: "reset" | "delete";
 };
 
 export type OwnerPurgeReport = {
   ok: true;
   deleted: number;
-  /** Stores this pass did not finish. Non-empty means "ask again". */
   pending: string[];
 };

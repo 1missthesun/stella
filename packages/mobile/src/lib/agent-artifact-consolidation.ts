@@ -35,10 +35,6 @@ export const isAgentWorkArtifact = (
  * row into one independently keyed card per agent.
  */
 
-/**
- * Declared deliverables home (`~/.stella/outputs/**`, or `state/outputs/**`
- * in dev). Mirrors desktop `DECLARED_OUTPUTS_RE`.
- */
 const DECLARED_OUTPUTS_RE = /(?:^|[\\/])(?:\.stella|state)[\\/]outputs[\\/]/;
 
 export const isDeclaredOutputPath = (filePath: string): boolean =>
@@ -55,14 +51,6 @@ const extensionOf = (filePath: string): string | null => {
     : tail.slice(dot + 1).toLowerCase();
 };
 
-/**
- * Snapshot-detected produced files sweep up incidental writes (browser
- * profiles, launch logs, caches, scratch dirs) alongside real deliverables.
- * Filter those from every user-facing artifact surface. A dot-segment means a
- * hidden/profile/cache dir and is always noise, with one carve-out: `.stella`
- * itself, since `~/.stella/outputs/**` is the declared deliverables home.
- * Mirrors desktop `isNoiseProducedPath`.
- */
 export const isNoiseProducedPath = (filePath: string): boolean => {
   const trimmed = filePath.trim();
   if (!trimmed) return true;
@@ -75,18 +63,11 @@ export const isNoiseProducedPath = (filePath: string): boolean => {
   return ext != null && NOISE_EXTS.has(ext);
 };
 
-/** True when the artifact's primary file path is a noise write. Pathless
- *  payloads (generated text, URLs…) are never noise. */
 export const isNoiseFileArtifact = (artifact: ChatArtifact): boolean => {
   const filePath = artifactPrimaryFilePath(artifact.payload);
   return filePath != null && isNoiseProducedPath(filePath);
 };
 
-/**
- * Declared deliverables lead the list so any cap truncates incidental writes
- * instead of the files the user actually asked for. Stable within each group.
- * Mirrors desktop `rankDeliverablesFirst`.
- */
 export const rankDeliverablesFirst = (
   artifacts: ChatArtifact[],
 ): ChatArtifact[] => {
@@ -101,9 +82,7 @@ export const rankDeliverablesFirst = (
 };
 
 export type ConsolidatedRowArtifacts = {
-  /** The row's agent lifecycle cards — one per background task. */
   agentWork: AgentWorkChatArtifact[];
-  /** Inline map cards (self-contained, never folded). */
   maps: MapRouteChatArtifact[];
   /**
    * Fallback-only: files folded into the agent-work card as pills when the
@@ -112,34 +91,15 @@ export type ConsolidatedRowArtifacts = {
    * noise-filtered, deliverables first.
    */
   agentFiles: ChatArtifact[];
-  /**
-   * Files rendered as standalone cards. Rows with no background work keep
-   * the classic inline presentation; on bridge-consolidated rows (any
-   * agent-work card carrying an `agents` list) the remaining loose files are
-   * orchestrator-direct by contract and render standalone too.
-   */
   looseFiles: ChatArtifact[];
-  /**
-   * True once every agent-work card on the row reports `done` — the reveal
-   * gate for `agentFiles`, mirroring the desktop completion card (files show
-   * together at completion, never mid-run). Bridge-computed sections need no
-   * gate: they only exist once their agent completed.
-   */
   agentWorkSettled: boolean;
 };
 
-/** One pill group on the agent-work card. */
 export type AgentWorkCardSection = {
   key: string;
-  /** Owning background thread. Used by the activity hub to nest files under
-   *  the same task row as the desktop left sidebar. */
   agentId?: string;
-  /** Header naming the agent's task; omitted for fallback folding (the card
-   *  title already names the work). */
   title?: string;
   files: ChatArtifact[];
-  /** Compact result excerpt for a fileless/textual completion (desktop parity:
-   *  the AgentCompletionCard's summary). */
   summary?: string;
 };
 
@@ -157,8 +117,6 @@ export const agentWorkCardSections = (
   if (agents === undefined) return null;
   const sections: AgentWorkCardSection[] = [];
   for (const agent of agents) {
-    // Keep a section when it has files OR a result excerpt: a result-only
-    // (fileless) completion still surfaces its summary, matching desktop.
     if (agent.files.length === 0 && !agent.summary) continue;
     sections.push({
       key: `${artifact.id}:${agent.agentId}`,
@@ -175,26 +133,14 @@ export const agentWorkCardSections = (
   return sections;
 };
 
-/**
- * Sections for the INLINE chat card. Files appear on the finish card only,
- * matching desktop: each bridge section exists once ITS agent completed, but
- * the card itself can still be running (a multi-agent group with stragglers,
- * or a thread resumed via `send_message` keeps a prior run's rollup files), so
- * this gates on the whole card settling. Live mid-run files intentionally
- * remain on the activity pill/sheet, which reads the task stream — never
- * inline in the transcript.
- */
 export const inlineAgentWorkCardSections = (
   artifact: AgentWorkChatArtifact,
 ): AgentWorkCardSection[] | null =>
   artifact.payload.state === "done" ? agentWorkCardSections(artifact) : null;
 
-/** One independently updating agent-work card to render. */
 export type AgentWorkCardRender = {
-  /** Stable React key + card identity. */
   key: string;
   payload: Extract<MobileDisplayPayload, { kind: "agent-work" }>;
-  /** File pill groups for this card (bridge sections, already noise-safe). */
   sections: AgentWorkCardSection[];
 };
 
@@ -226,9 +172,6 @@ export const settledAgentWorkCards = (
     ]),
   ];
   if (agentIds.length <= 1) {
-    // Presentation-only annotation: a card settled by failure/cancel keeps
-    // the plain star instead of the done check. The task rows carry the
-    // authoritative terminal status; the synced payload doesn't.
     const singleTask = agentIds[0] ? taskById.get(agentIds[0]) : undefined;
     const settledUnsuccessfully =
       artifact.payload.state === "done" &&
@@ -269,9 +212,6 @@ export const settledAgentWorkCards = (
       completed: done ? 1 : 0,
       title: task?.title || rawSection?.title || "Background work",
       subtitle,
-      // Failure/cancel settles this member's row plain (star, no check).
-      // Members never inherit card-level flags — a multi-thread card is a
-      // plain spawn tally (the follow-up variant is single-thread only).
       followUp: undefined,
       failed:
         task && (task.status === "error" || task.status === "canceled")
@@ -297,9 +237,6 @@ export const settledAgentWorkCards = (
     };
     const splitArtifact: AgentWorkChatArtifact = {
       ...artifact,
-      // Preserve the aggregate's mounted insertion identity for its first
-      // member. Later members use their own durable agent ids, matching the
-      // live event cards and avoiding remounts when canonical sync lands.
       id: index === 0 ? artifact.id : agentWorkArtifactId([agentId]),
       payload,
     };
@@ -352,7 +289,6 @@ export const consolidateRowArtifacts = (
       files.push(artifact);
     }
   }
-  // A file already shown as a completion-card pill is not a second loose card.
   const sectionFileIds = new Set<string>();
   for (const artifact of agentWork) {
     for (const section of agentWorkCardSections(artifact) ?? []) {

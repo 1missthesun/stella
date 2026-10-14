@@ -17,11 +17,6 @@ import { useT } from "../../i18n";
 const hostOf = (entry: ServerEntry) =>
   entry.kind === "hosted" ? "stella.sh" : new URL(entry.origin).host;
 
-/**
- * Settings → Server: the servers this phone knows (Stella's service is
- * always there), which one is in use, switching (the app restarts on the
- * other server), adding one by pairing, and forgetting one.
- */
 export function ServerSection({
   styles,
   colors,

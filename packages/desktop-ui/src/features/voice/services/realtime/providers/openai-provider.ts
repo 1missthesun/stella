@@ -1,16 +1,3 @@
-/**
- * User-BYOK OpenAI Realtime provider.
- *
- * Token is minted in the main process using the user's stored OpenAI API key
- * (`voiceApi.createOpenAISession`) and the connection uses OpenAI's WebRTC
- * realtime endpoint.
- *
- * The Realtime API has no delegation channel, so the same two-brain shape is
- * expressed with function calling: exactly one tool, `ask_stella`, whose
- * handler runs the orchestrator. Not a tool catalog — the model still has no
- * actions of its own.
- */
-
 import { ASK_STELLA_SESSION_TOOLS } from "../ask-stella-tool";
 import { OpenAIWebRTCTransport } from "../transports/openai-webrtc-transport";
 import { bearerSdpFetcher } from "../transports/sdp-fetchers";

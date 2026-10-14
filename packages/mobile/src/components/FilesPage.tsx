@@ -52,7 +52,6 @@ import { NativeMenu } from "./NativeMenu";
 import type { NativeMenuItem } from "./NativeMenu.types";
 
 const EMPTY_ARTIFACTS: ChatArtifact[] = [];
-/** The owner's newest drive files the page lists beside the conversation's. */
 const DRIVE_VIEW_ARGS = { limit: 200 };
 const EMPTY_PAIRED: StoredPhoneAccess[] = [];
 const SEARCH_HEIGHT = 48;
@@ -174,16 +173,6 @@ const titledArtifact = (artifact: ChatArtifact, title: string): ChatArtifact => 
   return { ...artifact, payload: { ...payload, title } };
 };
 
-/**
- * The Files page: every file Stella produced or shared in the conversation,
- * wherever it lives (the cloud drive, one of the owner's computers, or an
- * attachment the user sent), plus everything in the owner's Stella Drive,
- * newest first. The conversation's files are read from its journal, so they
- * reach files the chat has long scrolled past; anything the chat holds that
- * the journal has not answered for yet shows too. Drive files come from the
- * live drive listing, so uploads and agent outputs from any device show even
- * when no reply ever linked them. Each opens in the chat's own viewer.
- */
 export function FilesPage() {
   const colors = useColors();
   const t = useT();
@@ -398,9 +387,6 @@ export function FilesPage() {
   const filtering =
     query.trim().length > 0 || sourceFilter !== "all" || activeType !== "all";
   const hasAnything = rows.length > 0;
-  // Older files are paged in by the list's onEndReached, which never mounts
-  // while nothing is resident; keep reaching back until a file turns up or
-  // the history runs out.
   const seekingOlder = !hasAnything && journal.hasMore;
   const firstLoad = (journal.loading || seekingOlder) && !hasAnything;
   const { loading: journalLoading, loadingMore, loadMore } = journal;

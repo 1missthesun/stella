@@ -37,9 +37,6 @@ const ENTER_DELAY_MS = 300;
 const EXIT_HOLD_MS = 300;
 const EXIT_ANIMATION_MS = 220;
 const EXIT_UNMOUNT_MS = 240;
-/** The assistant's message has already landed above the indicator, so the
- *  bubble has to be gone almost at once: a lingering indicator under a finished
- *  reply reads as a bug. Matches the desktop handoff. */
 const EXIT_HANDOFF_MS = 240;
 const SHELL_ENTER = 0;
 const SHELL_EXIT = 1;
@@ -51,27 +48,15 @@ const INDICATOR_PAD_BOTTOM = 0;
 const INDICATOR_VIEWPORT_SIZE = 28;
 const BUBBLE_PAD_VERTICAL = 4;
 
-/**
- * Reserved vertical space above the composer for the working indicator,
- * including the bubble's own padding and hairline border.
- */
 export const WORKING_INDICATOR_SLOT_HEIGHT =
   INDICATOR_VIEWPORT_SIZE + BUBBLE_PAD_VERTICAL * 2 + 2;
 
 interface WorkingIndicatorProps {
-  /** When true, the indicator is visible and the mark animates. */
   active: boolean;
-  /** Optional explicit status. Defaults to the same reasoning copy as desktop. */
   status?: string;
   toolName?: string;
   toolCallId?: string;
-  /**
-   * Skip the brief exit hold when deactivating. Set once this turn's answer
-   * message has landed so the indicator gets out of the way immediately
-   * instead of trailing the delivered reply (mirrors the desktop handoff).
-   */
   exitImmediately?: boolean;
-  /** False while the indicator is scrolled out of view; pauses the shimmer. */
   onScreen?: boolean;
 }
 
@@ -212,12 +197,6 @@ const STRETCH_MARKS_MS = [
   WORKING_INDICATOR_LONG_TOOL_MS,
 ];
 
-/**
- * How long the current stretch (a spell of thinking, or one tool call) has
- * run, re-rendering as it crosses each label threshold. A new stretch reads
- * zero from its first render, so a fresh tool never inherits the last one's
- * age.
- */
 function useStretchElapsedMs(stretch: string | null): number {
   const [started, setStarted] = useState<{
     stretch: string;
@@ -239,13 +218,6 @@ function useStretchElapsedMs(stretch: string | null): number {
   return Date.now() - started.at;
 }
 
-/**
- * Stella's working state above the composer, wearing an assistant-style bubble
- * that hugs its content so it reads as an incoming message.
- *
- * Entrance/exit is a plain opacity fade on the whole row, and the row is
- * unmounted after the desktop-matched hold so no animation remains active.
- */
 export const WorkingIndicator = memo(function WorkingIndicator({
   active,
   status,
@@ -256,14 +228,8 @@ export const WorkingIndicator = memo(function WorkingIndicator({
 }: WorkingIndicatorProps) {
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  // Per-activation seed so the no-tool reasoning/idle label varies across
-  // turns instead of always reading "Thinking" (mirrors the desktop's
-  // `reasoningSeed`). Refreshed on each rising edge of `active` below.
   const [reasoningSeed, setReasoningSeed] = useState(() => String(Date.now()));
   const wasActiveRef = useRef(false);
-  // One pose per rotation window of a tool call, dealt from the whole
-  // repertoire rather than read off the tool's name; a long call moves on to
-  // another pose every window and never repeats the one it just left.
   const appVisible = useAppVisible();
   const [poseEpoch, setPoseEpoch] = useState(0);
   useEffect(() => {
@@ -310,8 +276,6 @@ export const WorkingIndicator = memo(function WorkingIndicator({
     return {
       status: label,
       thinking: !toolStatus,
-      // The dots stand alone. Thinking that has lasted long enough to be
-      // named shows its label beside a full pose, as a tool does.
       characterState:
         pose === "thinking" && label
           ? pickWorkingIndicatorToolPose(seed, previousPoseRef.current)
@@ -330,26 +294,16 @@ export const WorkingIndicator = memo(function WorkingIndicator({
   );
   previousPoseRef.current = liveDisplay.characterState;
   const labelledDisplay = liveDisplay;
-  // The hold covers the mark as well as the label. Without it the character
-  // would flap between thinking and tool poses whenever a quick tool starts
-  // and ends.
-  // Thinking has no tool label worth reading out: a tool can replace it
-  // immediately.
   const heldDisplay = useMinimumVisibleValue(
     labelledDisplay,
     labelledDisplay.thinking ? 0 : STATUS_MIN_VISIBLE_MS,
     (a, b) => a.status === b.status && a.characterState === b.characterState,
   );
 
-  // Snapshot the label while active so the exit animation shows a stable
-  // last-known phrase even though the upstream activity clears the moment
-  // `active` flips false (mirrors the desktop's frozen props).
   const frozenDisplayRef = useRef(heldDisplay);
   if (active) frozenDisplayRef.current = heldDisplay;
   const display = active ? heldDisplay : frozenDisplayRef.current;
   const displayStatus = display.status;
-  // With no label there is nothing to read, so the mark itself carries the
-  // state as the thinking ellipsis. A label gets a full character pose.
   const hasLabel = displayStatus.length > 0;
   const characterState: WorkingIndicatorCharacterState = hasLabel
     ? display.characterState
@@ -403,7 +357,6 @@ export const WorkingIndicator = memo(function WorkingIndicator({
     if (active) {
       clearTimers();
       if (!renderShell) {
-        // A short run or cancellation clears this timer without showing dots.
         holdTimerRef.current = setTimeout(() => {
           holdTimerRef.current = null;
           setRenderShell(true);
@@ -457,9 +410,6 @@ export const WorkingIndicator = memo(function WorkingIndicator({
       }, unmountMs);
     };
 
-    // Skip the hold when the answer has landed so the indicator doesn't trail
-    // the delivered reply; otherwise hold briefly so a fast turn still flashes
-    // the indicator.
     if (exitImmediately) {
       startExit();
     } else {
@@ -540,8 +490,6 @@ const makeStyles = (colors: Colors) =>
       height: WORKING_INDICATOR_SLOT_HEIGHT,
       flexShrink: 0,
     },
-    // Inline at the chat tail the slot must take no space once the indicator
-    // has fully left, otherwise it leaves a permanent gap above the composer.
     slotCollapsed: {
       height: 0,
     },
@@ -551,16 +499,10 @@ const makeStyles = (colors: Colors) =>
       height: WORKING_INDICATOR_SLOT_HEIGHT,
       justifyContent: "flex-start",
       paddingBottom: INDICATOR_PAD_BOTTOM,
-      // Inline at the chat tail this row already inherits the list's horizontal
-      // inset, so its bubble must hug the left to line up with the assistant
-      // message text rather than floating in with an extra indent. Keep a right
-      // inset only so the status label has room before the edge.
       paddingLeft: 0,
       paddingRight: 18,
       paddingTop: INDICATOR_PAD_TOP,
     },
-    // The assistant bubble treatment (even, continuous corners like the reply
-    // bubble), sized to hug whatever the label currently is.
     bubble: {
       alignItems: "center",
       backgroundColor: colors.card,

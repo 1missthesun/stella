@@ -130,15 +130,9 @@ import {
 import { OrchestratorCloudAgents } from "./cloud-agents.js";
 import { resolveCloudSpawnExecution } from "../cloud-spawn-model.js";
 
-/**
- * pi-durable: the conversation's pi runtime, pi agents and threads, the
- * brain's placement, the journal checkpoint, and the running-agents view.
- */
 export abstract class OrchestratorPi extends OrchestratorCloudAgents {
-  /** The transport pi's Claude Code engine runs this conversation's CLI turns on. */
   protected abstract claudeCodeTransport(): import("./claude-code-transport.js").CloudClaudeCodeTransport;
 
-  /** A model grant from the owner, unless a freeze landed while it was issued. */
   protected async acquireOwnerModelGrant(
     expected: LocalOwnerModelGrantExpectation,
   ) {
@@ -162,13 +156,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     return { grant, expected };
   }
 
-  /**
-   * A pi agent's run held to the owner's purge fence as a chat turn is: an
-   * owner-fence lease for the run (the same lease when a resumed run asks
-   * again), and a model grant under the owner's current memory policy on
-   * each request. A purge or a privacy change freezes the grant and aborts
-   * the request in flight.
-   */
   protected async piAgentGuard(
     authority: import("../pi-runtime.js").PiAuthority,
     turnId: string,
@@ -249,12 +236,10 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     return this.env.MODEL_GATEWAY_URL?.trim() ?? "";
   }
 
-  /** Attaching for one more socket re-sends the snapshot to every pi socket. */
   protected async attachPiClients(): Promise<{
     snapshot: unknown;
     hasOlder: boolean;
   }> {
-    // This attach is the one the opening would otherwise start.
     const attaching = this.piClientsAttaching;
     this.piClientsAttaching = true;
     try {
@@ -269,7 +254,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     }
   }
 
-  /** This conversation's pi-durable harness, opened once per isolate. */
   protected async openPiRuntime(
     gatewayOrigin: string,
   ): Promise<import("../pi-runtime.js").PiConversationRuntime> {
@@ -310,8 +294,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
               );
             }
           },
-          // Every client draws the agents' rows from these cards, as it does
-          // the loop's; which of them run is pi's to say (`runningAgents`).
           agentStarted: (event) =>
             this.publishAgentLifecycleCard(event.turnId, Date.now(), {
               type: "agent-lifecycle",
@@ -327,9 +309,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
                 },
               },
             }),
-          // A stop reports nothing to the orchestrator, which is not woken
-          // for it; the agent's cards still end, or its row would read as
-          // running for good.
           agentStopped: (event) =>
             this.publishPiAgentTerminal(
               event.threadId,
@@ -361,7 +340,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
           claudeCode: this.claudeCodeTransport(),
           agentGuard: (authority, turnId) =>
             this.piAgentGuard(authority, turnId),
-          // Her brief continues there once this turn ends (`runPiTurn`).
           moveBrain: slack ? undefined : async (authority, host, brief) => {
             const handoff: BrainHandoff = {
               turnId: this.activeTurnId ?? "",
@@ -376,12 +354,9 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
               await this.setPiBrain(host);
               return;
             }
-            // No turn of this object's runs her: nothing to wait for.
             await this.setPiBrain(host);
             await this.placeOnPiBrain({ ...handoff, handoff: true });
           },
-          // What the agents reach beyond this conversation's harness: the
-          // owner's agent threads and other sessions, as the loop's do.
           agentDirectory: {
             list: async (authority, threadIds) =>
               await readAgentDirectory(
@@ -410,13 +385,10 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     );
     const runtime = await this.piRuntime;
     await runtime.open();
-    // From now on pi says which of its agents run here.
     if (!this.agentsView) {
       this.agentsView = { pi: [], owner: [] };
       this.refreshAgentsSoon();
     }
-    // Sockets that watched the pi view through an eviction get a new stream
-    // and a fresh snapshot.
     if (
       !runtime.watchingForClients &&
       !this.piClientsAttaching &&
@@ -443,12 +415,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     return runtime;
   }
 
-  /**
-   * An agent's report reaches the orchestrator as a hidden wake turn, through
-   * the same admission as any turn. Its request id is the turn's
-   * `clientMsgId`, so a report sent again after an eviction is a replay.
-   */
-  /** The owner's object, as the pi agents' directory reads and messages it. */
   protected piOwnerCaller(
     authority: import("../pi-runtime.js").PiAuthority,
   ): AgentMessagingCaller {
@@ -465,12 +431,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     };
   }
 
-  /**
-   * Agents a cloud pi conversation places on the owner's devices: started,
-   * messaged and stopped through the owner's agent threads, the loop's device
-   * agents' plane. The device runs one as a whole; its report comes back as
-   * the same wake turn. Control receipts are kept per thread.
-   */
   protected piDeviceAgents(): import("../pi-runtime.js").PiDeviceAgents {
     type Authority = import("../pi-runtime.js").PiAuthority;
     const caller = (
@@ -500,7 +460,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
       if (!prior) throw new Error(`No agent ${threadId} here.`);
       return prior;
     };
-    // The owner's agent threads replay by request id across conversations.
     const requestId = (authority: Authority, key: string) =>
       `pi:${authority.conversationId}:${key}`.slice(0, 128);
     return {
@@ -544,13 +503,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     };
   }
 
-  /**
-   * Agents a cloud pi conversation starts on a model of their own: each is
-   * one of the owner's agent threads on that execution (Claude Code or Codex
-   * in a container, a model on a key saved to the account, a Stella model),
-   * dispatched, messaged and stopped as the loop's own cloud agents are; its
-   * report comes back as a wake turn. Control receipts are kept per thread.
-   */
   protected piThreadAgents(): import("../pi-runtime.js").PiThreadAgents {
     type Authority = import("../pi-runtime.js").PiAuthority;
     const executionOf = (model: string, authority: Authority) =>
@@ -627,7 +579,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
             messageId: await scopedId(authority, parentTurnId, "message", args.key),
             text: args.message,
           };
-          // A pi agent here, or else an agent in its own container.
           const piSteered = await this.steerPiThread(steer);
           const steered =
             piSteered.accepted || piSteered.reason === "not_running"
@@ -693,7 +644,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     };
   }
 
-  /** A note one of this conversation's pi agents sent Stella, through the owner's report outbox. */
   protected async deliverPiAgentNote(
     note: import("@stella/agent/stella/agents").AgentNote,
     authority: import("../pi-runtime.js").PiAuthority,
@@ -718,12 +668,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     });
   }
 
-  /**
-   * One run of a pi agent here, in the owner's agent threads: its row, under
-   * the agent that started it, and how the run ended. The row is marked as
-   * the harness's, which keeps its attempts and reports. An end carries its
-   * start again, so a row whose start was lost still gets made first.
-   */
   protected async recordPiAgentRun(
     event: import("../pi-runtime.js").PiAgentLedgerEvent,
   ): Promise<void> {
@@ -779,7 +723,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     await this.deferOwnerEvents(events);
   }
 
-  /** The card that ends one of pi's agents' attempts, under `turnId` (its own, by default). */
   protected publishPiAgentTerminal(
     threadId: string,
     agent: import("../pi-runtime.js").PiAgentInfo,
@@ -820,14 +763,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     };
   }
 
-  /**
-   * Start one attempt of an agent thread as a pi agent here, right away: pi
-   * runs it in the background whatever turn this conversation is running,
-   * on the authority its dispatcher admitted. The attempt is recorded before
-   * pi has it, so a stop that arrives first stops it, and a retried
-   * dispatch hands it over once. The owner's agent threads learn it started
-   * once pi has it.
-   */
   async startPiThread(input: PiThreadStart): Promise<void> {
     const { attempt } = input;
     if (this.purged()) throw new Error("This conversation was deleted.");
@@ -862,7 +797,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
       record = { ...record, attempts: [...record.attempts, open] };
       await this.ctx.storage.put(piThreadKey(attempt.threadId), record);
     }
-    // Stopped before it started: it never starts.
     if (open.pausing) {
       await this.settlePiThreadAttempts(record, attempt.attemptGeneration, {
         status: "canceled",
@@ -892,7 +826,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
           budgetMicroCents: input.budgetMicroCents,
           execution: input.execution,
         },
-        // A ChatGPT plan agent runs on the plan's model, which the gateway does not resolve.
         ...(input.execution.engine === "stella"
           ? { model: piModelSpec("general", input.execution, input.audience) }
           : {}),
@@ -935,7 +868,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
         createdAt: now,
       },
     ]);
-    // Stopped while pi took it: it stops now, and settles as canceled.
     if (
       handed?.attempts.find(
         (entry) => entry.attemptGeneration === attempt.attemptGeneration,
@@ -943,7 +875,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     ) {
       await runtime.stopThreadAgent(attempt.threadId, contextFor());
     }
-    // Agents keep this object waking while they run.
     await this.piHeartbeat().catch(() => undefined);
     log("info", "pi_thread_attempt_started", {
       threadId: attempt.threadId,
@@ -967,11 +898,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     });
   }
 
-  /**
-   * A report of an agent thread's agent. It answers one attempt (the one
-   * whose message its run took; older open attempts are answered with it).
-   * A report without text settles an attempt only when it was stopped.
-   */
   protected async deliverPiThreadReport(
     report: import("../pi-runtime.js").PiThreadReport,
   ): Promise<void> {
@@ -1019,15 +945,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     });
   }
 
-  /**
-   * Settle an agent thread's attempts through `attemptGeneration` with one
-   * outcome, as a BuildSession settles its agent's: each attempt's terminal
-   * event and the thread's completion go to the owner's agent threads, and
-   * the conversation that started the thread is woken with the report
-   * (a computer's dispatch is delivered to it by the agent threads). The
-   * decision is kept before anything is sent, so a redelivered report
-   * repeats the same terminal and the same wake.
-   */
   protected async settlePiThreadAttempts(
     record: PiThreadRecord,
     attemptGeneration: number,
@@ -1147,10 +1064,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     });
   }
 
-  /**
-   * New input for the running attempt of an agent thread whose agent runs
-   * here; it reads it before its next step. `unknown` when none does.
-   */
   async steerPiThread(input: PiThreadSteer): Promise<PiThreadSteerResult> {
     const record = await this.ctx.storage.get<PiThreadRecord>(
       piThreadKey(input.threadId),
@@ -1184,11 +1097,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     };
   }
 
-  /**
-   * Stop one exact attempt of an agent thread whose agent runs here, and
-   * the agents it started. Its attempt settles as canceled once its run
-   * stops, or as it is handed over if pi does not have it yet.
-   */
   async stopPiThread(input: PiThreadStop): Promise<PiThreadStopResult> {
     const decided = await this.ctx.blockConcurrencyWhile(
       async (): Promise<PiThreadStopResult | "stop"> => {
@@ -1255,13 +1163,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     return await runtime.controlHarnessAgent(input, contextFor());
   }
 
-  /**
-   * While pi has work in flight here (agents running, their reports on the
-   * way), wake this object every {@link PI_HEARTBEAT_MS}. A wake after an
-   * eviction reopens the harness, which resumes that work.
-   */
   protected async piHeartbeat(): Promise<void> {
-    // Any conversation may hold pi work: its own, or a computer's cloud agent.
     const live = await this.ctx.storage.get<boolean>(PI_LIVE_KEY);
     if (!this.piRuntime && !live) return;
     const reopening = !this.piRuntime;
@@ -1277,10 +1179,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     if (busy) await this.armAlarmNoLaterThan(Date.now() + PI_HEARTBEAT_MS);
   }
 
-  /**
-   * Abort what pi is running for this conversation when no live turn here
-   * holds the run: a watchdog firing in an isolate that never resumed it.
-   */
   protected async abortPiConversation(): Promise<void> {
     if ((await this.ctx.storage.get<string>(AGENT_RUNTIME_KEY)) !== "pi")
       return;
@@ -1292,12 +1190,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     await root.abort(contextFor());
   }
 
-  /**
-   * Stella moved to one of the owner's computers during this turn, pi's or
-   * Claude Code's (`switch_destination`): now that the turn has ended, her
-   * brief continues there, as a computer's hand-off does. A turn the user
-   * stopped leaves her there with nothing to carry on.
-   */
   protected async placeBrainHandoff(
     turnId: string,
     stopped: boolean,
@@ -1330,12 +1222,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     }
   }
 
-  /**
-   * The latest checkpoint of this journal epoch, if a host published one.
-   * Rollover keeps every message after it resident; only storage pressure or
-   * the byte backstop archives past it, and then it is stale and a new
-   * transcript starts from the journal's window instead.
-   */
   protected async journalCheckpoint(): Promise<JournalCheckpoint | undefined> {
     const stored = await this.ctx.storage.get<
       JournalCheckpoint & { epoch: number }
@@ -1351,7 +1237,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     return parseJournalCheckpoint(stored);
   }
 
-  /** Where a new transcript of this conversation starts (`journalImportAfter`). */
   protected async journalStart(): Promise<JournalStart> {
     const checkpoint = await this.journalCheckpoint();
     return {
@@ -1363,12 +1248,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     };
   }
 
-  /**
-   * Keep a compaction as the conversation's checkpoint: its summary covers
-   * the journal up to the message before the first one it kept. Only a newer
-   * checkpoint replaces the one kept. Returns where it covers through, or
-   * undefined when the kept message is not in the journal.
-   */
   protected async storeJournalCheckpoint(
     summary: string,
     firstKept: JournalCheckpointFirstKept,
@@ -1402,12 +1281,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     return throughSeq;
   }
 
-  /**
-   * Store the brain record, and tell the conversation's sockets when its
-   * holder changed (a move, a claim, a takeover, back home), so clients learn
-   * it from the socket they already hold instead of polling GET pi-brain. A
-   * lease renewal keeps the holder and epoch and sends nothing.
-   */
   protected async storePiBrain(record: PiBrainRecord): Promise<void> {
     const prior = await this.ctx.storage.get<PiBrainRecord>(PI_BRAIN_KEY);
     await this.ctx.storage.put(PI_BRAIN_KEY, record);
@@ -1431,15 +1304,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     return record;
   }
 
-  /**
-   * The computer holding this conversation's brain as the owner gate sees
-   * it: whether it takes work from other devices now, as pi's
-   * `switch_destination` would refuse a move there (`refusal` undefined when
-   * it does), when its presence heartbeat was last heard while it was ready,
-   * which renews its lease, and whether it is gone: offline, or not among
-   * the owner's computers at all. Only a gone holder loses the brain to a
-   * takeover; one that is up and takes no work from elsewhere keeps it.
-   */
   protected async piBrainHolderState(
     ownerId: string,
     deviceId: string,
@@ -1461,17 +1325,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     };
   }
 
-  /**
-   * A host's claim on this conversation's brain for a turn it would answer:
-   * the record's holder renews its lease, a computer answering its own
-   * user's message (`claimFree`) while no host holds one claims it, a host
-   * that finds the holder gone or lapsed takes the lease over under the
-   * next epoch, and
-   * any other claim is refused (`decidePiBrainClaim`). `holder` is the
-   * holding computer's state, read before this so no request interleaves
-   * between the record read and its write; a record that moved meanwhile
-   * is weighed without it.
-   */
   protected async claimPiBrain(args: {
     claimant: PiBrainHost;
     claimEpoch: number | null;
@@ -1482,9 +1335,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
       gone?: true;
     };
     turnId?: string;
-    /** A device's turn on a message its user typed there: with no lease held, it claims one. */
     claimFree?: boolean;
-    /** The account's home computer, when it is up and ready (`piBrainHome`). */
     home?: Extract<PiBrainHost, { host: "device" }>;
   }): Promise<{
     decision: PiBrainClaimDecision;
@@ -1554,7 +1405,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
       await this.settleTakenOverTurn(prior);
       return { decision, record, takenOver: true };
     }
-    // The object's own claim on a live holder is routine: it places there.
     if (
       decision.kind === "elsewhere" &&
       record &&
@@ -1598,7 +1448,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     }
   }
 
-  /** The account's home computer while it is up and ready: the lease belongs there. */
   protected async piBrainHome(
     ownerId: string,
   ): Promise<Extract<PiBrainHost, { host: "device" }> | undefined> {
@@ -1614,11 +1463,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     };
   }
 
-  /**
-   * The lease back on the account's home computer, which is up: unless the
-   * holder is in the middle of a turn. It only ever moves the lease home; it
-   * never weighs whether the holder lapsed. The record as it stands after.
-   */
   protected async bringPiBrainHome(
     home: Extract<PiBrainHost, { host: "device" }>,
     turnId?: string,
@@ -1641,7 +1485,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     return homed;
   }
 
-  /** Whether a computer is in the middle of one of this conversation's turns. */
   protected async piBrainHolderBusy(deviceId: string): Promise<boolean> {
     const lease =
       await this.ctx.storage.get<LocalTurnLease>(LOCAL_TURN_LEASE_KEY);
@@ -1653,7 +1496,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     );
   }
 
-  /** The holding computer journaled or renewed a turn: it is up, so its lease runs on. */
   protected async renewPiBrainHolder(deviceId: string): Promise<void> {
     const record = await this.ctx.storage.get<PiBrainRecord>(PI_BRAIN_KEY);
     if (record?.host !== "device" || record.deviceId !== deviceId) return;
@@ -1661,11 +1503,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     if (renewed) await this.storePiBrain(renewed);
   }
 
-  /**
-   * What happened to this conversation's brain lease (a move, a takeover,
-   * a refused claim), logged and appended to the owner's agent event log
-   * under the lease's epoch, once per event.
-   */
   protected notePiBrainLease(
     kind: "claimed" | "moved" | "taken_over" | "refused",
     record: PiBrainRecord,
@@ -1728,11 +1565,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     );
   }
 
-  /**
-   * A chat for this conversation placed on the computer its Stella runs on,
-   * which answers it from the shared journal: a message the user sent from
-   * elsewhere, or Stella's own brief when she moved there.
-   */
   protected async placeOnPiBrain(args: {
     ownerId: string;
     ownerGeneration?: string;
@@ -1799,7 +1631,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     );
   }
 
-  /** Read the running agents again: one read at a time, and one more for what changed during it. */
   protected refreshAgentsSoon(): void {
     if (!this.agentsView || this.purged()) return;
     if (this.agentsRefresh) {
@@ -1825,17 +1656,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     this.ctx.waitUntil(refresh);
   }
 
-  /**
-   * The running agents of a conversation pi has run in, from the records of
-   * whoever runs them: Stella's own from pi's state here, everything else (a
-   * computer's agents, agents on a device, agent threads) from the owner's
-   * agent threads. Neither is folded from cards, so a card that was never
-   * written leaves nothing running; an agent that started before pi listed
-   * them and never ended is simply not listed. Clients hear the new list.
-   */
   protected async refreshAgents(): Promise<void> {
-    // pi's agents start and stop only while pi is open here: one it has not
-    // opened for, with none listed, has none running.
     const pi =
       this.piRuntime || this.agentsView?.pi.length
         ? await (async () => {
@@ -1862,7 +1683,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     this.hub.agentsChanged();
   }
 
-  /** The owner's agent threads this conversation lists as running. */
   protected async ownerRunningAgents(): Promise<AgentActivityEntry[]> {
     const ownerId = this.journal.ownerId();
     if (!ownerId) return [];
@@ -1943,7 +1763,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     const unownedSettled = Boolean(
       await this.ctx.storage.get<number>(AGENTS_UNOWNED_SETTLED_KEY),
     );
-    // Cards are rows: none lands inside a turn that started meanwhile.
     if (this.purged() || (await this.turnRunning())) return;
     for (const entry of running) {
       const thread = threads.get(entry.agentId);
@@ -1953,7 +1772,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
         body: string;
       } | null = null;
       if (thread) {
-        // An owner record behind the journal's newest start is not about that start.
         if (
           (thread.status === "completed" ||
             thread.status === "failed" ||
@@ -2007,12 +1825,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
       await this.ctx.storage.put(AGENTS_UNOWNED_SETTLED_KEY, startedAt);
   }
 
-  /**
-   * A pi-durable cloud agent's own tools: web, and code with the owner's
-   * connectors and the run's cloud browser (its files and shell are its
-   * container's). Built on the authority the agents keep, since they run
-   * between turns.
-   */
   protected async createPiAgentTools(
     authority: {
       ownerId: string;
@@ -2073,13 +1885,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     return [code, web, createCloudImageGenTool(media), createCloudVideoGenTool(media)];
   }
 
-  /**
-   * A pi agent's login handoff, shown to the user as the owner's browser
-   * interaction (every signed-in client lists `browser.pending`) and waited
-   * on until it ends. Polling is the wait, as for the connect card: the
-   * owner object closes the interaction when the user finishes or cancels
-   * it, or at its deadline. A stopped agent withdraws it.
-   */
   protected async awaitPiBrowserHandoff(
     handoff: import("../pi-runtime.js").PiBrowserHandoff,
     signal: AbortSignal | undefined,
@@ -2102,7 +1907,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
       toolCallId: handoff.toolCallId,
       suspension,
     });
-    // The owner's expiry job closes it at its deadline; this one is a backstop.
     const deadline = suspension.expiresAt + BROWSER_HANDOFF_GRACE_MS;
     while (true) {
       if (signal?.aborted || Date.now() >= deadline) {
@@ -2130,7 +1934,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
           safeMessage: state.safeMessage ?? "Browser access ended.",
         };
       }
-      // An abort just ends the wait; the loop's next check withdraws it.
       await sleepWithAbort(
         BROWSER_HANDOFF_POLL_MS,
         signal,
@@ -2139,7 +1942,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     }
   }
 
-  // Implemented further up the chain.
   protected abstract handleTurnStart(
     request: Request,
     handoff?: {

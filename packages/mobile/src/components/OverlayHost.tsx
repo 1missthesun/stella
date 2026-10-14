@@ -8,12 +8,6 @@ import {
 } from "react";
 import { StyleSheet, View } from "react-native";
 
-/**
- * A layer above the app's chrome (the top bar included) that screens can
- * render a popover into, so it may cover the whole window rather than only
- * the screen it was opened from.
- */
-
 type Layer = { id: string; node: ReactNode };
 
 let layers: Layer[] = [];
@@ -67,7 +61,6 @@ export function OverlayHost() {
   );
 }
 
-/** Renders `children` in the overlay host when one is mounted, else in place. */
 export function OverlayPortal({ children }: { children: ReactNode }) {
   const id = useId();
   const hosted = useSyncExternalStore(subscribe, hostCount) > 0;

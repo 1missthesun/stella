@@ -31,16 +31,6 @@ import {
 } from "./ChatGptBrand";
 import { useChatGptProfiles } from "./use-chatgpt-profiles";
 
-/**
- * Every ChatGPT account the owner has, in one list.
- *
- * Sign in with ChatGPT is per host by design: the tokens never leave the host
- * that signed in. So one account can be signed in on this computer, in the
- * owner's cloud, in both, or in neither — and the row says which. The cloud's
- * sign-in serves cloud agents; this computer's serves ChatGPT models run here.
- * Picking the row makes the account the active one wherever it is signed in.
- */
-
 const K = "settings.engineAccounts";
 
 const sameEmail = (a: string | undefined, b: string | undefined) =>
@@ -65,7 +55,6 @@ const matches = (
       sameEmail(account.email, candidate.email),
   );
 
-/** Cloud connections, this computer's profiles and other hosts' registrations, merged. */
 function mergeAccounts(
   cloudConnections: readonly EngineConnection[],
   localProfiles: readonly ChatGptProfileSummary[],
@@ -122,7 +111,6 @@ export function ChatGptAccountsSection({
 }: {
   settings: EngineSettings | undefined;
   refreshing: boolean;
-  /** The owner's cloud can hold a sign-in (they are signed in to Stella). */
   cloudAvailable: boolean;
 }) {
   const t = useT();

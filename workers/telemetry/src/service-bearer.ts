@@ -23,7 +23,6 @@ const fixedLengthEqual = (left: ArrayBuffer, right: ArrayBuffer): boolean => {
   return difference === 0;
 };
 
-/** Always performs two SHA-256 operations and one fixed-length comparison. */
 export const verifyServiceBearer = async (
   authorization: string | null,
   expectedSecret: string | null | undefined,

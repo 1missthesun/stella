@@ -1,11 +1,3 @@
-/**
- * The two rows of one reply's attachment strip.
- *
- * Pills are known from the path and render on the first frame. Media waits for
- * its native preview and, if that preview cannot be made — too large, offline,
- * a codec the device will not read — the file drops into the pill row rather
- * than showing a fake thumbnail.
- */
 import { useEffect, useMemo, useState } from "react";
 import { formatDuration } from "@stella/contracts/chat-evidence-naming";
 import {
@@ -29,7 +21,6 @@ import {
 } from "./chat-evidence-previews";
 import type { StoredPhoneAccess } from "./phone-access";
 
-/** Tile geometry is shared with the desktop strip. */
 export const EVIDENCE_MEDIA_CARD_HEIGHT = EVIDENCE_TILE_HEIGHT;
 
 type PreviewState =
@@ -108,8 +99,6 @@ export const useChatEvidence = (args: {
   access: StoredPhoneAccess | null;
 }): ChatEvidence => {
   const { conversationId, access } = args;
-  // Keyed on the paths themselves: a streamed row is replaced on every segment
-  // and must not restart the previews it already has.
   const pathKey = useMemo(() => args.filePaths.join("\n"), [args.filePaths]);
   const sources = useMemo(
     () => describeEvidenceSources(pathKey ? pathKey.split("\n") : []),

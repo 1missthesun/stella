@@ -1,12 +1,3 @@
-/**
- * Byte budget for `display:readFile`.
- *
- * Without `maxBytes` the handler keeps its original all-or-nothing contract:
- * files above the absolute cap are refused outright. A caller that only needs
- * a preview (spreadsheet tabs parse the first rows) passes `maxBytes` and gets
- * a bounded prefix instead, so a multi-hundred-MB CSV never has to be read and
- * parsed in full on the UI thread.
- */
 export const MAX_DISPLAY_FILE_BYTES = 200 * 1024 * 1024;
 
 export type DisplayReadBytePlan =

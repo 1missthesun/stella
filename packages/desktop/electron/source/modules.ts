@@ -3,15 +3,6 @@ import fs from "node:fs";
 import path from "node:path";
 import type { OxcTools } from "./tools.js";
 
-/**
- * The renderer's source modules: resolve an import the way the browser build
- * did, transform TS/JSX with oxc, expand `import.meta.glob`, and rewrite every
- * import to a URL the source server answers. Transforms are cached in memory,
- * and on disk by content and repo-relative path; their output names no
- * absolute path, so the checkout and every draft worktree share one cache and
- * a warm start transforms nothing.
- */
-
 export type ImportRef = {
   start: number;
   end: number;
@@ -23,9 +14,7 @@ export type TransformedModule = {
   code: string;
   map: string | null;
   imports: ImportRef[];
-  /** Exported names: "default" for the default export, "*" for `export *`. */
   exports: string[];
-  /** Specifiers named in `import.meta.hot.accept("<specifier>", ...)`. */
   hotAccepts: string[];
 };
 
@@ -54,7 +43,6 @@ const langFor = (file: string): "ts" | "tsx" | "jsx" => {
   const ext = path.extname(file);
   if (ext === ".ts" || ext === ".mts") return "ts";
   if (ext === ".tsx") return "tsx";
-  // Vite's React plugin let `.js` files carry JSX; `jsx` parses plain JS too.
   return "jsx";
 };
 
@@ -73,10 +61,6 @@ export type ModuleGraphOptions = {
   uiRoot: string;
   repoRoot: string;
   cacheDir: string;
-  /**
-   * Build the development JSX transform (filenames in the output) and React
-   * Fast Refresh registrations. A build mode, not a claim about the install.
-   */
   development: boolean;
   defines: Record<string, string>;
 };
@@ -84,8 +68,6 @@ export type ModuleGraphOptions = {
 export const createModuleGraph = (options: ModuleGraphOptions) => {
   const { uiRoot, repoRoot } = options;
   const { ResolverFactory, parse, transform } = options.tools;
-  // The app's `@/` alias, and React pinned to one copy (the tsconfig maps
-  // the JSX runtimes to type declarations, which only type checking wants).
   const reactFile = (name: string) => path.join(repoRoot, "node_modules", name);
   const resolver = new ResolverFactory({
     alias: {
@@ -114,10 +96,8 @@ export const createModuleGraph = (options: ModuleGraphOptions) => {
   const known = new Map<string, { mtimeMs: number; size: number; key: string }>();
   const resolutions = new Map<string, ResolvedImport>();
 
-  /** A file's path from the repository root, which the cache and the output name it by. */
   const repoPath = (file: string) => toPosix(path.relative(repoRoot, file));
 
-  /** The URL the source server answers for a file. */
   const urlForFile = (file: string): string => {
     if (isInside(uiRoot, file) && !isInNodeModules(file)) {
       return `/${toPosix(path.relative(uiRoot, file))}`;
@@ -126,7 +106,6 @@ export const createModuleGraph = (options: ModuleGraphOptions) => {
     return `/@fs${posix.startsWith("/") ? "" : "/"}${posix}`;
   };
 
-  // A draft may link the app checkout's packages, which resolve to there.
   const packagesRoot = (() => {
     try {
       return fs.realpathSync(path.join(repoRoot, "node_modules"));
@@ -135,7 +114,6 @@ export const createModuleGraph = (options: ModuleGraphOptions) => {
     }
   })();
 
-  /** The file a URL path names, or null when it is outside the repository and its packages. */
   const fileForUrlPath = (urlPath: string): string | null => {
     const decoded = decodeURIComponent(urlPath);
     const file = decoded.startsWith("/@fs/")
@@ -181,7 +159,6 @@ export const createModuleGraph = (options: ModuleGraphOptions) => {
           .map((match) => toPosix(match))
           .sort();
         const entries = matches.map((match) => {
-          // Keys read like the pattern: glob drops a leading "./" but keeps "../".
           const key = match.startsWith("../") ? match : `./${match}`;
           if (!eager) {
             const loader = importName
@@ -244,7 +221,6 @@ export const createModuleGraph = (options: ModuleGraphOptions) => {
         });
       }
     }
-    // A re-export can repeat a static import's span; keep each span once.
     const seen = new Set<number>();
     return {
       imports: imports
@@ -255,8 +231,6 @@ export const createModuleGraph = (options: ModuleGraphOptions) => {
   };
 
   const transformFile = async (file: string, source: string): Promise<TransformedModule> => {
-    // Development JSX bakes the filename into the output and the source map
-    // names it; the repo-relative path keeps both the same in every worktree.
     const result = await transform(repoPath(file), source, {
       lang: langFor(file),
       sourceType: "module",
@@ -264,7 +238,6 @@ export const createModuleGraph = (options: ModuleGraphOptions) => {
         runtime: "automatic",
         importSource: "react",
         development: options.development,
-        // React Fast Refresh registers through the module's hot context.
         ...(options.development && langFor(file) !== "ts"
           ? { refresh: { refreshReg: "__stella_hot.register", refreshSig: "__stella_hot.signature" } }
           : {}),
@@ -287,7 +260,6 @@ export const createModuleGraph = (options: ModuleGraphOptions) => {
     };
   };
 
-  /** A source module, transformed, from memory, disk, or oxc in that order. */
   const load = async (file: string): Promise<TransformedModule> => {
     const stat = await fs.promises.stat(file);
     const hit = memory.get(file);
@@ -305,7 +277,6 @@ export const createModuleGraph = (options: ModuleGraphOptions) => {
       }
     }
     const source = await fs.promises.readFile(file, "utf8");
-    // Globs read the directory, so their output is never cached by content.
     const cacheable = !source.includes("import.meta.glob");
     const key = createHash("sha256")
       .update(`${TRANSFORM_VERSION}\0${definesDigest}\0${repoPath(file)}\0${source}`)
@@ -329,10 +300,6 @@ export const createModuleGraph = (options: ModuleGraphOptions) => {
     return module;
   };
 
-  /**
-   * Rewrite a module's imports to the URLs `urlFor` gives them, behind
-   * `prefix` (kept on the first line, so only that line's columns shift).
-   */
   const render = (
     module: TransformedModule,
     file: string,
@@ -355,7 +322,6 @@ export const createModuleGraph = (options: ModuleGraphOptions) => {
       code = `${code.slice(0, ref.start)}${JSON.stringify(url)}${code.slice(ref.end)}`;
     }
     if (module.map) {
-      // Devtools shows the original source under the module's own URL.
       const map = module.map.replace(
         `"sources":[${JSON.stringify(repoPath(file))}]`,
         `"sources":[${JSON.stringify(urlForFile(file))}]`,
@@ -380,7 +346,6 @@ export const createModuleGraph = (options: ModuleGraphOptions) => {
     remember: (file: string, stamp: { mtimeMs: number; size: number; key: string }) => {
       known.set(file, stamp);
     },
-    /** Forget a changed file and every cached resolution (files may have moved). */
     invalidate: (file?: string) => {
       if (file) memory.delete(file);
       resolutions.clear();

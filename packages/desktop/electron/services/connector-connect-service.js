@@ -1,12 +1,3 @@
-// Brokers agent-initiated connect prompts (the orchestrator's
-// `connector_status` tool with a connection request) into an inline
-// connect card in the chat surfaces. Accepting the card runs the
-// exact same enable + OAuth flow as the Store (`ensureNativeCredential`
-// + `enableNativeConnector`), with the OAuth dialogs suppressed — the
-// card click IS the launch gesture, so the browser opens directly. The
-// requesting tool call blocks on the outcome, which is what lets the
-// agent continue the user's original task the moment the connection
-// lands.
 import { randomUUID } from "crypto";
 import { BrowserWindow, shell } from "electron";
 import { enableNativeConnector, getNativeConnectorTools, } from "@stella/runtime/kernel/connectors/native-integrations";
@@ -139,18 +130,9 @@ export class ConnectorConnectService {
         }
         return settled;
     }
-    /**
-     * Browser-extension flavor of the same card, triggered by the worker
-     * when a `stella-browser` command fails on the missing Chrome
-     * extension bridge. Accept opens the Chrome Web Store and waits for
-     * the extension install to appear on disk; the worker re-runs the
-     * failed command once this resolves `{ ok: true }`.
-     */
     async requestBrowserExtensionConnect(payload) {
         for (const meta of this.meta.values()) {
             if (meta.kind === "browser-extension") {
-                // One extension card at a time; the worker-side gate makes this
-                // rare, but a second concurrent agent can still race it.
                 return { ok: false, reason: "already_pending" };
             }
         }
@@ -220,8 +202,6 @@ export class ConnectorConnectService {
             return { ok: true };
         }
         if (payload.action === "cancel") {
-            // Cancel either dismisses a pending card or aborts an in-flight
-            // OAuth flow (the abort rejects the flow, whose catch settles).
             meta.oauthAbort.abort(new Error("Connection cancelled."));
             if (meta.state === "pending") {
                 this.settle(payload.requestId, { ok: false, reason: "cancelled" }, "cancelled");
@@ -247,11 +227,6 @@ export class ConnectorConnectService {
             this.settle(requestId, { ok: false, reason: "cancelled" }, "cancelled");
         }
     }
-    /**
-     * Turn-abort cancellation from the worker (`host.connectorConnect.cancel`).
-     * Settles a pending card as cancelled; an in-flight OAuth/install flow is
-     * aborted and settles through its own catch/loop.
-     */
     cancelByOfferId(offerId) {
         for (const [requestId, meta] of this.meta) {
             if (meta.offerId !== offerId)
@@ -274,11 +249,7 @@ export class ConnectorConnectService {
         const flowOptions = {
             getAuthToken: this.options.getAuthToken,
             getBackendUrl: this.options.getBackendUrl,
-            // Cancels the backend Composio completion wait too, so a
-            // dismissed/aborted card doesn't keep polling for minutes.
             abortSignal: meta.oauthAbort.signal,
-            // Headless: the card click was the launch gesture, so the browser
-            // opens directly instead of routing through the approval modal.
             requestPreregisteredOAuth: (payload) => credentialService.requestPreregisteredOAuth({
                 ...payload,
                 presentation: "headless",
@@ -288,8 +259,6 @@ export class ConnectorConnectService {
                 ...payload,
                 presentation: "headless",
             }),
-            // Device flow needs to show the user a pairing code, so it asks
-            // with a secure input card that carries the code.
             requestDeviceOAuth: (payload) => credentialService.requestDeviceOAuth(payload),
         };
         try {

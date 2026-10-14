@@ -15,10 +15,6 @@ public final class StellaStorefrontModule: Module {
 
     Events("onStorefrontChange")
 
-    // Resolves to the ISO 3166-1 alpha-3 code (e.g. "USA") of the current
-    // storefront, or nil when it cannot be established (no App Store
-    // account signed in, StoreKit unavailable). Callers must fail closed on
-    // nil.
     AsyncFunction("getStorefrontCountryCode") { () async -> String? in
       if #available(iOS 15.0, *) {
         let storefront = await Storefront.current
@@ -27,8 +23,6 @@ public final class StellaStorefrontModule: Module {
       return SKPaymentQueue.default().storefront?.countryCode
     }
 
-    // Emit whenever the storefront changes at runtime (e.g. the user
-    // switches App Store region) so the UI can re-gate without a restart.
     OnStartObserving {
       guard #available(iOS 15.0, *) else { return }
       self.storefrontObserver?.cancel()

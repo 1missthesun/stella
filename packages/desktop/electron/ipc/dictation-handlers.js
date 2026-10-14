@@ -1,16 +1,3 @@
-/**
- * Dictation IPC handlers.
- *
- * Owns the global speech-to-text shortcut. Every trigger is toggle-based: one
- * press starts recording, the next finishes it. Where the transcript lands
- * depends on focus — the full shell's composer when Stella is frontmost,
- * otherwise the floating companion, which is summoned if it is not showing
- * and sends the transcript as a message when the shortcut stops it.
- *
- * Bare Option/Alt cannot be registered through Electron's globalShortcut, so
- * on macOS a short tap of Option is recognised by the low-level input hook
- * (see input/mouse-hook.js) and routed to the same toggle.
- */
 import { app, BrowserWindow } from "electron";
 import { randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
@@ -38,7 +25,6 @@ import {
 const DEFAULT_DICTATION_SHORTCUT = "Alt";
 const DEFAULT_NON_MAC_DICTATION_SHORTCUT = "Control+M";
 const LEGACY_DEFAULT_DICTATION_SHORTCUT = "Control+M";
-/** Bare Option on macOS; recognised as a tap by the input hook. */
 const TAP_DICTATION_SHORTCUT = "Alt";
 const DICTATION_SOUND_VOLUME_BY_SOUND = {
     startRecording: "0.2",
@@ -49,7 +35,6 @@ const DICTATION_START_SOUND_MUTE_DELAY_MS = 220;
 const DICTATION_BRIDGE_TIMEOUT_MS = 2_000;
 const dictationBridgeIsSupported = () => process.platform === "darwin" || process.platform === "win32";
 const isUsableWindow = (window) => Boolean(window && !window.isDestroyed());
-/** The app runs from its source tree, which carries the sounds. */
 const soundPath = (stellaAppDir, sound) => path.join(stellaAppDir, "packages", "desktop", "resources", "audio", `${sound}.mp3`);
 const playDictationSound = (stellaAppDir, sound) => {
     if (process.platform !== "darwin")
@@ -79,11 +64,6 @@ export const registerDictationHandlers = (options) => {
             return;
         playDictationSound(options.stellaAppDir, sound);
     };
-    // ── System audio ducking (macOS/Windows native helper) ─────────────────
-    // Recording while Stella (or anything else) plays audio pollutes the
-    // transcript, so system output is muted for the duration of a recording
-    // and restored afterwards. Driven off the renderer's active/inactive
-    // reports so every dictation surface gets it.
     const muteOutputForDictation = () => {
         if (!dictationBridgeIsSupported())
             return;
@@ -127,7 +107,6 @@ export const registerDictationHandlers = (options) => {
             outputMutePromise = null;
         });
     };
-    /** Mute after the start cue has had a moment to play. */
     const muteOutputForDictationAfterStartCue = () => {
         if (!dictationBridgeIsSupported())
             return;
@@ -194,8 +173,6 @@ export const registerDictationHandlers = (options) => {
     const isRendererRecording = (window) => isUsableWindow(window) &&
         activeDictationSources.has(`renderer:${window.webContents.id}`);
     const pickFocusedStellaWindow = () => {
-        // Only the full shell counts as "in app". Anything else — another app,
-        // the desktop, or the companion itself — routes to the companion.
         if (process.platform === "darwin" && !app.isActive())
             return null;
         const focused = BrowserWindow.getFocusedWindow();
@@ -216,8 +193,6 @@ export const registerDictationHandlers = (options) => {
         if (!companion)
             return;
         playEnabledDictationSound(isRendererRecording(companion.getPanelWindow()) ? "stopRecording" : "startRecording");
-        // `show` resolves once the companion renderer is mounted, so the toggle
-        // reaches a listening `useDictation` even on a cold first summon.
         void companion
             .show({ focus: true })
             .then((shown) => {
@@ -364,7 +339,6 @@ export const registerDictationHandlers = (options) => {
         playEnabledDictationSound(payload.sound);
     });
     return {
-        /** Whether bare-Option taps should drive dictation (macOS only). */
         isEnabled: () => dictationBridgeIsSupported() &&
             process.platform === "darwin" &&
             currentShortcut === TAP_DICTATION_SHORTCUT,

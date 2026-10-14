@@ -8,16 +8,8 @@ import {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-/** The composer's own grow and shrink: a 350ms critically damped spring. */
 const COMPOSER_SPRING = { duration: 350, dampingRatio: 1 };
 
-/**
- * How much of the bottom of the screen an overlay must stay clear of, as a
- * UI-thread value: the keyboard as it moves, frame for frame, plus the
- * composer sitting on it, which eases with the composer's own spring when it
- * grows or shrinks. With no composer (`composerHeight` 0) it is the keyboard
- * or the home indicator, whichever is taller.
- */
 export function useBottomObstruction(
   composerHeight: number,
   composerOverlap = 0,

@@ -1,10 +1,3 @@
-/**
- * Model usage of the conversations that run on pi-durable, as the usage
- * dashboard lists it: one record per model call. Each conversation's SQLite
- * file keeps every call's usage on its assistant entry, so this reads the
- * files directly (read-only, beside the open harnesses) instead of opening
- * every conversation.
- */
 import { readdir } from "node:fs/promises";
 import path from "node:path";
 import type { PiChatUsageRequest } from "@stella/contracts/pi-chat";
@@ -25,7 +18,6 @@ type Usage = {
   cost?: { input?: number; output?: number; cacheRead?: number; cacheWrite?: number; total?: number };
 };
 
-/** An assistant entry's call, in the order `CALL_FIELDS` reads it. */
 type CallFields = [
   kind: unknown,
   timestamp: unknown,
@@ -55,7 +47,6 @@ const str = (value: unknown): string => (typeof value === "string" ? value : "")
 
 const num = (value: unknown): number => (typeof value === "number" && Number.isFinite(value) ? value : 0);
 
-/** A message's first text, as a label. */
 const labelOf = (content: string | null): string => {
   if (!content) return "";
   let text = "";
@@ -81,7 +72,6 @@ const readConversation = (
   const db = openSqliteConnection(file);
   try {
     db.exec("PRAGMA query_only = 1; PRAGMA busy_timeout = 2000;");
-    // Conversations by their owner: the root is the orchestrator, the rest its agents.
     const owners = new Map<number, number | null>();
     for (const row of db.prepare("SELECT id, owner_conversation_id AS owner FROM conversations").all() as Array<{
       id: number;
@@ -94,7 +84,6 @@ const readConversation = (
       for (let owner = owners.get(id); owner != null && depth < 16; owner = owners.get(owner)) depth += 1;
       return depth;
     };
-    // Each conversation's first prompt names it: the root's first message, an agent's brief.
     const labels = new Map<number, string>();
     for (const row of db
       .prepare(
@@ -108,7 +97,6 @@ const readConversation = (
     }
     const root = [...owners].find(([, owner]) => owner == null)?.[0];
     const title = (root !== undefined ? labels.get(root) : undefined) || conversationId;
-    // One parse per entry: the string match skips everything but assistant entries.
     const rows = db
       .prepare(
         `SELECT id, conversation_id AS conversation, json_extract(record, ${CALL_FIELDS}) AS fields
@@ -128,7 +116,6 @@ const readConversation = (
       const [kind, at, provider, api, model, responseModel, usage, stopReason, errorMessage] = fields;
       const timestamp = num(at);
       if (kind !== "pi.assistant" || !usage || timestamp < fromMs || timestamp > toMs) continue;
-      // A reply written without a model call (the onboarding greeting) cost nothing.
       if (!num(usage.totalTokens) && !num(usage.input) && !num(usage.output)) continue;
       const call = { id: row.id, conversation: row.conversation };
       const threadId = `pi:${conversationId}:${call.conversation}`;

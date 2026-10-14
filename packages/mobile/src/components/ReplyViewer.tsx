@@ -1,8 +1,3 @@
-/**
- * What a reply card opens: the message or task it points at and the replies
- * that follow from it, in a centred popover. The chain
- * is measured before the popover shows, so it opens at its final size.
- */
 import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import type { ReplyRef } from "@stella/contracts/reply-refs";

@@ -1,4 +1,3 @@
-/** An error whose message is safe to show the user verbatim. */
 export class AgentTurnError extends Error {
   constructor(readonly userMessage: string) {
     super(userMessage);
@@ -6,7 +5,6 @@ export class AgentTurnError extends Error {
   }
 }
 
-/** Exact attempt/token authority was revoked or could not be proven. */
 export class AgentTurnAuthorityLostError extends Error {
   constructor() {
     super("Cloud agent attempt authority was lost.");
@@ -14,7 +12,6 @@ export class AgentTurnAuthorityLostError extends Error {
   }
 }
 
-/** Exact app-turn/token authority was revoked or could not be proven. */
 export class AppTurnAuthorityLostError extends Error {
   constructor() {
     super("Cloud app attempt authority was lost.");

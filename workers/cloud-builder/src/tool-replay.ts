@@ -1,9 +1,3 @@
-/**
- * A tool's declared replay policy (`ToolReplayPolicy`, the field desktop
- * `ToolDefinition`s carry): whether a call its process never answered may
- * run again. An undeclared tool is `unsafe`.
- */
-
 import type {
   AgentTool,
 } from "@stella/runtime/kernel/agent-core/types.js";

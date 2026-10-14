@@ -1,26 +1,4 @@
 #!/usr/bin/env node
-// Stella's own code for the sandbox container, built at deploy time and
-// delivered when a container starts instead of being baked into the image.
-//
-// The image changes only when the OS, its tools or the third-party
-// dependencies change (Dockerfile + sandbox-image.bun.lock), so a deploy of
-// Stella source keeps the image digest and with it every owner's container
-// snapshot. This module packs the workspace sources the executor runs into one
-// deterministic tar.gz named by its SHA-256. The Worker serves it as a static
-// asset of its own version and compiles the same hash in, and the container
-// refuses any bytes whose hash differs (`sandbox-bin/stella-code-install`).
-//
-// The archive mirrors the image's old `/opt/stella` layout so the runtime's
-// root discovery (`package.json` + `packages/runtime`) and every
-// `import.meta`-relative path keep working:
-//
-//   package.json
-//   packages/{contracts,runtime,executor-cloud,model-catalog}/...
-//   packages/stella-office -> /opt/stella/packages/stella-office   (image)
-//   node_modules/@stella/<name> -> ../../packages/<name>
-//
-// The install step links every other `node_modules` entry to the image's
-// third-party install.
 
 import { createHash } from "node:crypto";
 import { lstat, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
@@ -35,7 +13,6 @@ const workerRoot = path.resolve(
 );
 const repoRoot = path.resolve(workerRoot, "..", "..");
 
-/** The workspace packages the cloud executor loads, as `@stella/<name>`. */
 export const SANDBOX_CODE_PACKAGES = Object.freeze([
   "contracts",
   "runtime",
@@ -44,7 +21,6 @@ export const SANDBOX_CODE_PACKAGES = Object.freeze([
   "agent",
 ]);
 
-/** Where the Worker's static assets live and where the bundle sits in them. */
 export const sandboxCodeAssetsDirectory = path.join(
   workerRoot,
   ".wrangler",
@@ -52,11 +28,6 @@ export const sandboxCodeAssetsDirectory = path.join(
 );
 export const SANDBOX_CODE_ASSET_PREFIX = "sandbox-code";
 
-/**
- * Never shipped: installs, VCS state, and tests, which nothing in a container
- * loads. Everything else in a package ships, because runtime code reads JSON
- * catalogs and markdown beside its sources.
- */
 const isExcluded = (relative) => {
   const segments = relative.split("/");
   return (
@@ -103,7 +74,6 @@ const collect = async (packageName) => {
 
 const encoder = new TextEncoder();
 
-/** One ustar header. Owner root, fixed mtime: the archive is a function of its contents. */
 const header = ({ name, mode, size, type, linkname = "" }) => {
   const block = new Uint8Array(512);
   let prefix = "";
@@ -182,10 +152,6 @@ const tar = (entries) => {
   return Buffer.concat(chunks);
 };
 
-/**
- * Pack the sandbox code and write it into the Worker's assets directory as
- * `sandbox-code/<sha256>.tar.gz`, replacing any earlier bundle there.
- */
 export const buildSandboxCode = async ({
   assetsDirectory = sandboxCodeAssetsDirectory,
 } = {}) => {
@@ -205,7 +171,6 @@ export const buildSandboxCode = async ({
         )}\n`,
       ),
     },
-    // The office CLI and its native binary stay in the image.
     {
       kind: "symlink",
       path: "packages/stella-office",

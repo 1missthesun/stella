@@ -1,8 +1,3 @@
-/**
- * Shared types for the streaming engine.
- * Separate file to avoid circular imports between
- * use-streaming-chat.ts and use-resume-agent-run.ts.
- */
 export type { AgentResponseTarget } from "@stella/contracts/agent-stream";
 
 import type { AgentResponseTarget } from "@stella/contracts/agent-stream";
@@ -38,17 +33,13 @@ export type StreamingAssistantOverlay = {
   indexInTurn: number;
   text: string;
   responseTarget?: AgentResponseTarget;
-  /** Resolved citations from the assistant-message boundary (`reply-refs`). */
   replyRefs?: ReplyRef[];
   timestamp: number;
   runId: string;
-  /** Exact persisted twin learned from the assistant-message boundary. */
   canonicalMessageId?: string;
-  /** This slot carries the message's full upstream text. */
   locked?: boolean;
 };
 
-/** Stable scroll-follow / React row key for an assistant slot in a turn. */
 export const assistantScrollFollowKey = (
   userMessageId: string,
   indexInTurn: number,

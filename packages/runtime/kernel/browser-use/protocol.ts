@@ -1,20 +1,9 @@
-/**
- * The browser protocol vocabulary and the argument rules both sides of the
- * code browser API enforce: `BrowserSession` (client.ts), which talks to the
- * daemon, and the Node REPL worker's `browser` object (worker-api.ts), which
- * agents call. The worker side is bundled into an eval worker
- * (worker-api-source.ts), so this module must stay import-free.
- */
-
 export const MAX_BROWSER_CHAIN_STEPS = 100;
 export const MAX_BROWSER_CHAIN_TIMEOUT_MS = 4 * 60_000;
-/** Ceiling for a chain's per-selector wait (`waitTimeout`). */
 export const MAX_BROWSER_CHAIN_WAIT_TIMEOUT_MS = 120_000;
-/** Delay between chain steps when a caller asks for one without bounds. */
 export const DEFAULT_BROWSER_CHAIN_DELAY_MIN_MS = 300;
 export const DEFAULT_BROWSER_CHAIN_DELAY_MAX_MS = 1_200;
 
-/** Backend a worker-issued command is bound to; stripped before the daemon. */
 export const WORKER_BOUND_BACKEND_PARAM = "__stellaBrowserBackend";
 
 // Mirrors packages/stella-browser/protocol/actions.json ("chain": true):

@@ -1,18 +1,3 @@
-/**
- * An agent's container, attached to tools that run outside it.
- *
- * A cloud pi agent (`pi-agent-compute.ts`) runs its file and shell tools
- * here. This brings the world up on the instance its lease reserved, hands
- * the daemon its broker capability through the same root-owned file the
- * container executor uses, starts the daemon, and then relays one tool call
- * at a time through a request file, a one-shot client process, and a result
- * file.
- *
- * Nothing here decides policy. It boots what it is told to boot and reports
- * what the daemon answered, so the failure of a container never becomes a
- * decision this module gets to make.
- */
-
 import type { ExecutionSession, Process } from "./sandbox-client.js";
 import { Effect } from "effect";
 import { runToolEffect } from "@stella/runtime/kernel/tools/effect-runtime.js";
@@ -39,7 +24,6 @@ export type AttachBoot = Readonly<{
 }>;
 
 export type SandboxAttachment = Readonly<{
-  /** Boot the instance the lease already names. Never mints an id. */
   boot(args: {
     sandboxId: string;
     instanceSize: InstanceSize;
@@ -55,7 +39,6 @@ export type SandboxAttachment = Readonly<{
     control: "boot_report" | "quiesce";
     turnId: string;
     attemptGeneration: number;
-    /** Required for `quiesce`: untrusted reply-linked paths to deliver. */
     linkedPaths?: readonly string[];
   }): Promise<AttachedToolControlResponse>;
   release(args: {
@@ -70,19 +53,12 @@ export type SandboxAttachment = Readonly<{
   }): Promise<void>;
 }>;
 
-/** The executor CLI from the code bundle the container installed at start. */
 const DAEMON_ARGV = [SANDBOX_EXECUTOR, "--attached-tool-host"] as const;
 
 const CLIENT_ARGV = [SANDBOX_EXECUTOR, "--attached-tool-client"] as const;
 
-/**
- * The working directory every executor process gets, as on the eager
- * container path. The Sandbox SDK applies no session working directory to a
- * background process, so the daemon names it explicitly.
- */
 const EXECUTOR_ROOT = "/opt/stella";
 
-/** Bounded because a daemon that never listens must fail, not hang the turn. */
 const READINESS_POLL_MS = 250;
 const READINESS_ATTEMPTS = 240;
 
@@ -98,7 +74,6 @@ const READINESS_READY_MARKER = "stella-attached-tool-host-ready";
 const readinessProbe = (socketPath: string): string =>
   `if test -S ${quoted([socketPath])}; then echo ${READINESS_READY_MARKER}; fi`;
 
-/** Enough of the daemon's stderr to name the failure, never a log dump. */
 const DAEMON_STDERR_EXCERPT_CHARS = 400;
 
 const DAEMON_TERMINAL_STATUSES: ReadonlySet<string> = new Set([
@@ -138,9 +113,6 @@ const describeDaemon = async (
   knownStatus?: string,
 ): Promise<{ status: string; stderr: string }> => {
   if (!daemon) return { status: "unknown", stderr: "" };
-  // Status and logs are independent SDK reads. Run them together, and reuse a
-  // terminal status already observed by the readiness loop rather than polling
-  // the dead process a second time solely to format the same failure.
   const [status, logs] = await Promise.all([
     knownStatus
       ? Promise.resolve(knownStatus)
@@ -168,11 +140,6 @@ export class AttachedToolHostUnavailableError extends Error {
   }
 }
 
-/**
- * What the daemon needs to know about the turn it is serving. Deliberately not
- * the executor's `turn-input.json`: the daemon runs no agent loop, so it gets
- * the drive-hydration inputs and its broker capability and nothing else.
- */
 export type AttachedToolHostHandoff = Readonly<{
   turnId: string;
   attemptGeneration: number;
@@ -189,11 +156,6 @@ export type AttachedToolHostHandoff = Readonly<{
 
 export type AgentSandboxAttachmentDeps = Readonly<{
   context: TurnExecutionContext;
-  /**
-   * Create the container's command session with this owner's world on disk.
-   * Shared with the eager container path so a mid-turn attach lands on exactly
-   * the disk an eager boot would have produced.
-   */
   attachWorld(args: {
     sandboxId: string;
     instanceSize: InstanceSize;
@@ -205,11 +167,6 @@ export type AgentSandboxAttachmentDeps = Readonly<{
       restoreMs: number;
     }>
   >;
-  /**
-   * Write the broker credential file and return the daemon's handoff record.
-   * Issuance stays with the caller because only it holds the storage the
-   * broker record has to be durable in before the container can present it.
-   */
   prepareBrokerHandoff(args: {
     session: ExecutionSession;
   }): Promise<AttachedToolHostHandoff>;
@@ -226,14 +183,12 @@ export type AgentSandboxAttachmentDeps = Readonly<{
     command: string,
     options: Readonly<{ cwd: string; processId: string }>,
   ) => Promise<Process>;
-  /** Release one turn: its session goes, and its container snapshots and stops. */
   release(args: {
     sandboxId: string;
     instanceSize: InstanceSize;
     sessionId: string;
     daemonDirectory: string;
   }): Promise<void>;
-  /** Destroy this agent's container only for OOM escalation or retirement. */
   destroy(args: {
     sandboxId: string;
     instanceSize: InstanceSize;
@@ -241,12 +196,6 @@ export type AgentSandboxAttachmentDeps = Readonly<{
   emitEvent?: (kind: string, payload: unknown) => void;
 }>;
 
-/**
- * The SDK's persistent shell exited underneath a call. It reports this as a
- * session-terminated error, and every later call on the same session id gets
- * a fresh, empty shell. Recognised by name and by the message the SDK writes,
- * so a wrapped or re-thrown copy is still classified.
- */
 const SESSION_TERMINATED_MESSAGE = /shell exited|session .* ended/iu;
 export const isSessionTerminatedError = (error: unknown): boolean =>
   error instanceof Error &&
@@ -263,11 +212,6 @@ const quoted = (argv: readonly string[]): string =>
     })
     .join(" ");
 
-/**
- * Reject an oversized frame before it is read into the isolate. The protocol
- * bound exists to keep a runaway tool result from taking the DO down with it,
- * so checking it after decoding would defeat the point.
- */
 const readBoundedFrame = async (
   session: ExecutionSession,
   path: string,
@@ -300,7 +244,6 @@ const readBoundedFrame = async (
   );
 };
 
-/** A client failure that means the daemon itself was not there to answer. */
 const DAEMON_UNREACHABLE =
   /ECONNREFUSED|ENOENT|EPIPE|ECONNRESET|unreachable|socket closed/iu;
 
@@ -372,7 +315,6 @@ export const createAgentSandboxAttachment = (
     const paths = attachedToolPathsForDirectory(daemonDirectory);
     deps.context.assertActive();
     try {
-      // The stale result may simply not exist yet; only a dead shell is news.
       await session.deleteFile(paths.result).catch((error) => {
         if (isSessionTerminatedError(error)) throw error;
       });
@@ -409,12 +351,6 @@ export const createAgentSandboxAttachment = (
     }
   };
 
-  /**
-   * The daemon reported ready and then stopped answering. The client's
-   * failure frame only says the socket refused; the daemon's own status and
-   * stderr say why it died, and this is the one place they can still be read.
-   * Reported once per attach so a turn's remaining calls do not repeat it.
-   */
   const reportDaemonLoss = async (
     response: AttachedToolResponse | AttachedToolControlResponse,
   ): Promise<void> => {
@@ -434,9 +370,6 @@ export const createAgentSandboxAttachment = (
       paths?.daemonStderr,
       attached,
     );
-    // What the container itself can still say about the bridge: the socket
-    // directory and the process table, bounded, so a dead daemon can be
-    // told apart from one that never listened or was replaced.
     const inspect = async (command: string): Promise<string> => {
       const result = await attached?.exec(command).catch(() => null);
       return (result?.success ? result.stdout : (result?.stderr ?? ""))
@@ -504,8 +437,6 @@ export const createAgentSandboxAttachment = (
       ) {
         return;
       }
-      // A daemon that already exited will never listen; say why now rather
-      // than after the whole readiness window.
       const status = await bounded(daemon?.getStatus?.(), "running");
       if (DAEMON_TERMINAL_STATUSES.has(status)) {
         throw await daemonFailure(
@@ -608,9 +539,6 @@ export const createAgentSandboxAttachment = (
               },
         ),
       );
-      // Its caller tolerates a failed control call (a quiesce that failed
-      // simply delivers no files), so this event is the only record of why
-      // the daemon could not answer it.
       if (response.status === "failed") {
         deps.emitEvent?.("attached_control_failed", {
           control: args.control,

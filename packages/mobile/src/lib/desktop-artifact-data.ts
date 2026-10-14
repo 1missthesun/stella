@@ -13,15 +13,6 @@ import {
 } from "./linked-device-files";
 import type { StoredPhoneAccess } from "./phone-access";
 
-/**
- * Files and office previews that live on the owner's computers. The phone asks
- * the cloud, the cloud asks the computer that has the file over its presence
- * connection, and the bytes stream back through without being stored anywhere.
- * Each computer decides what may be read (Stella's own outputs and files from
- * the conversation); see `linked-device-files.ts` for how the computer is
- * found and `device-requests.ts` for the offline and refusal errors.
- */
-
 export type DesktopFileReadResult =
   | {
       bytes: Uint8Array;
@@ -40,14 +31,6 @@ const assertActive = (signal?: AbortSignal): void => {
   throw error;
 };
 
-/**
- * A cloud-world path asked of the computer is a routing mistake, not a missing
- * file. `/workspace/...` is the cloud sandbox; the paired computer has no such
- * tree, so it would answer "missing" — which the viewer renders as "this file
- * is no longer available". The file is not gone; it was asked of the wrong
- * machine. Drive files never get here: `stellaFileChatArtifact` routes them to
- * the owner-scoped drive URL first.
- */
 export const assertReadableOnPairedComputer = (filePath: string): void => {
   if (!isCloudWorkspacePath(filePath)) return;
   throw new Error(
@@ -63,9 +46,6 @@ const missingResult = (filePath: string): DesktopFileReadResult => ({
   path: filePath,
 });
 
-// `async` so a refused path rejects rather than throwing synchronously: one
-// caller chains `.then().catch()` straight off this inside an effect, where a
-// synchronous throw would escape the catch and take the screen down.
 export const readLinkedArtifactFile = async (
   access: StoredPhoneAccess | null,
   conversationId: string,

@@ -1,29 +1,3 @@
-/**
- * The owner's drive: file records and uploads. The bytes live in `DRIVE`.
- *
- * - **Keys:** every object sits under `drive/<sha256(owner)>/`, derived here
- *   and never taken from a caller, so one owner cannot name another's bytes.
- *   Byte-bearing rows point at immutable keys (an upload's final copy, or one
- *   produced-files write), so a stale signed PUT or a redelivered batch can
- *   only ever create its own orphan, never overwrite live bytes.
- * - **Uploads:** `drive.prepareUpload` hands out a presigned PUT to a staging
- *   key and records the claimed size; `drive.finalizeUpload` reads the real
- *   size from storage, copies the bytes out of the staging key (whose PUT
- *   cannot be revoked) and installs the row. Quotas come from the billing
- *   plan in this same object; usage is a `SUM()` over the rows.
- * - **Cleanup:** `drive_uploads` doubles as the durable cleanup queue. Any
- *   object that may exist without a row (a pending or rejected upload, a
- *   replaced or deleted file, a write that lost a race) is a row there, and
- *   `drive.cleanup` deletes it once no file row names its key.
- * - **Turns:** agent and tool writes, workspace hydration and chat
- *   attachments are server-internal operations (`drive.turn*`), called by
- *   the turn broker and the orchestrator under the turn's owner generation.
- *   The drive is the only durable home of these files: a cloud world holds a
- *   working copy of some of them and never stores it, so every agent write
- *   carries its bytes here — inline below `DRIVE_INLINE_FILE_LIMIT_BYTES`,
- *   staged through a presigned PUT (`drive.turnStage`) above it.
- */
-
 import type {
   DeviceFileLocation,
   DriveFile,
@@ -61,9 +35,7 @@ const UNLIMITED_QUOTA: DriveQuota = {
   maxFileBytes: 2_048 * MB,
 };
 
-/** Bytes above this are staged through a presigned PUT, never inlined. */
 export const DRIVE_INLINE_FILE_LIMIT_BYTES = 8 * MB;
-/** Inline bytes one produced-files report may carry. */
 const DRIVE_INLINE_REQUEST_LIMIT_BYTES = 32 * MB;
 const DRIVE_MAX_FILES_PER_REPORT = 50;
 
@@ -75,47 +47,31 @@ const DEFAULT_LIST_LIMIT = 100;
 const DEFAULT_CONTENT_TYPE = "application/octet-stream";
 
 const DOWNLOAD_URL_EXPIRES_SECONDS = 900;
-/** A presigned PUT must start within this; a slow body may take longer. */
 const UPLOAD_URL_EXPIRES_SECONDS = 60 * 60;
-/**
- * How long a prepared upload stays claimable before cleanup reclaims what it
- * left. Generous: a slow phone uploading a large file must not be cut off.
- */
 const PENDING_UPLOAD_TTL_MS = 6 * 60 * 60_000;
-/** A failed cleanup is retried once its lease expires. */
 const CLEANUP_LEASE_MS = 5 * 60_000;
 const CLEANUP_BATCH = 100;
 /** Keep retired bytes alive for signed GETs already handed to a client. */
 const REPLACEMENT_GRACE_MS = DOWNLOAD_URL_EXPIRES_SECONDS * 1_000;
-/** Cleanup debt for an object being written must outlive the write. */
 const WRITE_DEBT_GRACE_MS = 15 * 60_000;
 
-/** What one turn hydrates; see `turnSync`. */
 const SYNC_MAX_FILES = 100;
 const SYNC_MAX_BYTES = 128 * MB;
 const SYNC_URL_EXPIRES_SECONDS = 1_800;
 const SYNC_MAX_INCLUDE = 25;
 const SYNC_MAX_DELETIONS = 100;
 const SYNC_MAX_PRESENCE = 500;
-/** One staging call; each entry is one presigned PUT. */
 const STAGE_MAX_FILES = 25;
-/** A staged PUT must start within this; the turn uploads right away. */
 const STAGE_URL_EXPIRES_SECONDS = 30 * 60;
-/** Unclaimed staged bytes are reclaimed after this. */
 const STAGE_TTL_MS = 2 * 60 * 60_000;
-/** Conditional deletes one turn report may carry. */
 const DELETE_MAX_FILES = 100;
-/** One resident read; matches the world's own read ceiling. */
 const READ_MAX_BYTES = 8 * MB;
-/** How long a deletion stays replayable to a workspace that has not synced. */
 const TOMBSTONE_TTL_MS = 30 * 24 * 60 * 60_000;
 const TOMBSTONE_PRUNE_EVERY_MS = 24 * 60 * 60_000;
 
-/** Chat-turn image attachments, bounded so the turn's prompt stays small. */
 const ATTACHMENT_MAX_COUNT = 4;
 const ATTACHMENT_MAX_BYTES = 3 * MB;
 const ATTACHMENT_URL_EXPIRES_SECONDS = 120;
-/** Reference images handed to the media provider. */
 const REFERENCE_MAX_COUNT = 4;
 const REFERENCE_URL_EXPIRES_SECONDS = 2 * 60 * 60;
 
@@ -220,15 +176,8 @@ type UploadRow = {
   lease_expires_at: number | null;
 };
 
-// ── Normalization ────────────────────────────────────────────────────────
-
 const invalid = (message: string) => new RpcError("BAD_REQUEST", message);
 
-/**
- * A drive-relative POSIX path. Refuses absolute paths, drive letters, `.` and
- * `..` segments and control characters, so a path can never escape the
- * owner's prefix or the workspace folder it maps to.
- */
 export const normalizeDrivePath = (raw: string): string => {
   const value = (raw ?? "").trim().replaceAll("\\", "/");
   if (!value) throw invalid("A drive path is required.");
@@ -284,7 +233,6 @@ const normalizeSize = (value: unknown): number => {
 
 const fileNameFromPath = (path: string): string => path.slice(path.lastIndexOf("/") + 1);
 
-/** A display name is never a path: separators and control bytes are stripped. */
 const normalizeFileName = (raw: string | undefined, path: string): string => {
   const value = (raw ?? "")
     .replaceAll("\\", "/")
@@ -296,11 +244,6 @@ const normalizeFileName = (raw: string | undefined, path: string): string => {
   return value || fileNameFromPath(path);
 };
 
-/**
- * Where an agent's version of a file goes when the drive holds bytes the user
- * uploaded that this turn never read: same folder, same extension, side by
- * side, so the user decides which one wins.
- */
 export const driveRevisionPath = (path: string): string => {
   const slash = path.lastIndexOf("/");
   const name = path.slice(slash + 1);
@@ -310,16 +253,12 @@ export const driveRevisionPath = (path: string): string => {
   return `${path.slice(0, slash + 1)}${revised}`;
 };
 
-// Sub-megabyte values round to "0 MB"; drop to KB below 1 MB, and say GB
-// from 1 GB up so a plan's ceiling reads the way the plan states it.
 const formatMb = (bytes: number): string =>
   bytes < MB
     ? `${Math.max(1, Math.round(bytes / 1024))} KB`
     : bytes < GB
       ? `${Math.round((bytes / MB) * 10) / 10} MB`
       : `${Math.round((bytes / GB) * 10) / 10} GB`;
-
-// ── Storage ──────────────────────────────────────────────────────────────
 
 const unavailable = () =>
   new RpcError("UNAVAILABLE", "The drive is unavailable right now. Try again shortly.", {
@@ -338,7 +277,6 @@ const signerOf = (ctx: Pick<OwnerContext, "env">): R2Signer => {
   return signer;
 };
 
-/** `drive/<sha256(owner)>/`: everything this owner's drive stores. */
 export const driveOwnerPrefix = async (ownerId: string): Promise<string> =>
   `drive/${await sha256Hex(ownerId)}/`;
 
@@ -361,8 +299,6 @@ const signGet = async (
     contentDisposition: attachmentDisposition(name),
     ...(now !== undefined ? { now } : {}),
   });
-
-// ── Rows ─────────────────────────────────────────────────────────────────
 
 export const getFile = (db: OwnerDbReader, path: string): FileRow | null =>
   db.one<FileRow>("SELECT * FROM drive_files WHERE path = ?", path);
@@ -387,11 +323,6 @@ const fileRecord = (row: FileRow): DriveFileRecord => ({
   updatedAt: row.updated_at,
 });
 
-/**
- * Arm a job at `at` unless it is already due sooner. Scheduling under a fixed
- * id replaces the pending run, so a later time must never displace an
- * earlier one.
- */
 const armJob = (ctx: OwnerContext, kind: string, at: number): void => {
   const pending = ctx.db.one<{ run_at: number }>(
     "SELECT run_at FROM owner_jobs WHERE id = ?",
@@ -401,10 +332,6 @@ const armJob = (ctx: OwnerContext, kind: string, at: number): void => {
   ctx.jobs.schedule(kind, at, null, { id: kind });
 };
 
-/**
- * Durable cleanup for an object that may exist without a row. The object is
- * deleted after `notBefore` unless a file row names its key by then.
- */
 const queueCleanup = (
   ctx: OwnerContext,
   entry: { path: string; r2Key: string; notBefore: number },
@@ -423,7 +350,6 @@ const queueCleanup = (
   return id;
 };
 
-/** A prepared upload that will never be finalized: its staging bytes become cleanup. */
 const retirePendingUpload = (ctx: OwnerContext, row: UploadRow, now: number): void => {
   // The presigned PUT cannot be revoked, so the staging key is reclaimed no
   // sooner than the original abandonment horizon.
@@ -437,10 +363,6 @@ const retirePendingUpload = (ctx: OwnerContext, row: UploadRow, now: number): vo
   armJob(ctx, DRIVE_CLEANUP_JOB, expiresAt);
 };
 
-/**
- * The record that a path is gone, so a workspace holding a hydrated copy can
- * be told to drop it. One row per path, refreshed rather than duplicated.
- */
 const recordTombstone = (ctx: OwnerContext, path: string, deletedAt: number): void => {
   ctx.db.run(
     `INSERT INTO drive_deletions (path, deleted_at) VALUES (?, ?)
@@ -451,10 +373,6 @@ const recordTombstone = (ctx: OwnerContext, path: string, deletedAt: number): vo
   armJob(ctx, DRIVE_PRUNE_JOB, deletedAt + TOMBSTONE_TTL_MS);
 };
 
-/**
- * Delete a row, leave its tombstone and queue its bytes. `expectedR2Key`
- * makes the delete conditional on the row still naming those bytes.
- */
 const deleteFileRow = (
   ctx: OwnerContext,
   path: string,
@@ -472,8 +390,6 @@ const deleteFileRow = (
   return true;
 };
 
-// ── Quota ────────────────────────────────────────────────────────────────
-
 type WriteCandidate = { path: string; sizeBytes: number };
 
 type WriteVerdict = {
@@ -481,11 +397,6 @@ type WriteVerdict = {
   skipped: Array<{ path: string; reason: string }>;
 };
 
-/**
- * Per-file plan quota. Replacing a path charges only the difference, so
- * re-saving a file never walks an owner into their ceiling; the files that
- * fit are accepted and the rest come back with the reason to show.
- */
 const partitionWrite = (
   ctx: Pick<OwnerContext, "db" | "env" | "now">,
   files: WriteCandidate[],
@@ -548,8 +459,6 @@ const partitionWrite = (
 const quotaExceeded = (message: string) =>
   new RpcError("FORBIDDEN", message, { reason: "quota_exceeded" });
 
-// ── Calls ────────────────────────────────────────────────────────────────
-
 const prepareUpload = async (
   ctx: OwnerContext,
   args: { path: string; sizeBytes: number; contentType?: string },
@@ -567,8 +476,6 @@ const prepareUpload = async (
   if (verdict.skipped.length > 0) throw quotaExceeded(verdict.skipped[0]!.reason);
   const signer = signerOf(ctx);
   const uploadId = crypto.randomUUID();
-  // Every upload has its own key, so an old signed PUT can only recreate its
-  // own orphan, never overwrite what a newer upload installed.
   const r2Key = `${await driveOwnerPrefix(ctx.ownerId)}uploads/${uploadId}/${path}`;
   const uploadUrl = await presignR2Url(signer, {
     method: "PUT",
@@ -576,8 +483,6 @@ const prepareUpload = async (
     expiresInSeconds: UPLOAD_URL_EXPIRES_SECONDS,
   });
   const now = Date.now();
-  // The claim is what makes the client's size enforceable at finalize, and
-  // what lets cleanup reclaim bytes that were never finalized.
   ctx.db.run(
     `INSERT INTO drive_uploads (upload_id, path, r2_key, status, claimed_bytes, created_at, expires_at)
      VALUES (?, ?, ?, 'pending', ?, ?, ?)`,
@@ -592,11 +497,6 @@ const prepareUpload = async (
   return { path, uploadId, uploadUrl, contentType: normalizeContentType(args.contentType) };
 };
 
-/**
- * Record a prepared upload from what storage holds, never from the claim.
- * Bytes past the claim are refused (the quota answered the claim), and the
- * row only ever names a server-made copy of the staging object.
- */
 const finalizeUpload = async (
   ctx: OwnerContext,
   args: { path: string; uploadId: string; contentType?: string; source?: string },
@@ -606,7 +506,6 @@ const finalizeUpload = async (
   if (!uploadId) throw invalid("An upload id is required.");
   const pendingRow = (): UploadRow | null =>
     ctx.db.one<UploadRow>("SELECT * FROM drive_uploads WHERE upload_id = ?", uploadId);
-  // A finalize whose response was lost answers from the row its upload installed.
   const replayOrMissing = (): DriveFileRecord => {
     const installed = getFile(ctx.db, path);
     if (installed?.upload_id === uploadId) return fileRecord(installed);
@@ -646,9 +545,6 @@ const finalizeUpload = async (
     refuse(quotaExceeded(preflight.skipped[0]?.reason ?? "Drive quota exceeded."));
   }
 
-  // One key per finalize attempt: concurrent retries each copy to their own
-  // key and only the commit winner is linked. Debt first, so a crash after
-  // the copy still reclaims it.
   const finalKey = `${await driveOwnerPrefix(ctx.ownerId)}files/${uploadId}/${crypto.randomUUID()}/${path}`;
   const debtId = queueCleanup(ctx, { path, r2Key: finalKey, notBefore: ctx.now + WRITE_DEBT_GRACE_MS });
   try {
@@ -661,7 +557,6 @@ const finalizeUpload = async (
     throw new RpcError("UNAVAILABLE", "Storage changed while the upload was being finalized. Retry it.");
   }
 
-  // Commit: no awaits from here, so nothing interleaves with the checks.
   const now = Date.now();
   const current = pendingRow();
   if (!current || current.status !== "pending") return replayOrMissing();
@@ -747,7 +642,6 @@ const listFiles = (
         `SELECT * FROM drive_files WHERE ${NOT_THUMBNAIL} ORDER BY updated_at DESC, path LIMIT ?`,
         limit,
       );
-  // The key namespace stays server-side; a signed URL is how bytes are read.
   return rows.map((row) => ({
     path: row.path,
     name: row.name,
@@ -867,8 +761,6 @@ const locateDeviceFiles = (
   return { files };
 };
 
-// ── Server-internal input ────────────────────────────────────────────────
-
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
@@ -887,8 +779,6 @@ const optionalString = (value: unknown, max: number): string | undefined =>
 
 const finiteNumber = (value: unknown): number | undefined =>
   typeof value === "number" && Number.isFinite(value) ? value : undefined;
-
-// ── Turn writes (produced files, html, images) ───────────────────────────
 
 type NormalizedReport = {
   path: string;
@@ -910,12 +800,6 @@ const decodeBase64 = (value: string): Uint8Array => {
   return bytes;
 };
 
-/**
- * Validate a produced-files report. Every file carries its bytes: inline,
- * capped per file and per request, or as a staged upload for anything larger.
- * There is no metadata-only row: a cloud world never stores the drive, so a
- * row without bytes here would name a file that exists nowhere.
- */
 const normalizeReport = (files: unknown): NormalizedReport[] => {
   if (!Array.isArray(files) || files.length === 0) throw invalid("files must be a non-empty array.");
   if (files.length > DRIVE_MAX_FILES_PER_REPORT) {
@@ -966,10 +850,6 @@ const normalizeReport = (files: unknown): NormalizedReport[] => {
   });
 };
 
-/**
- * The key a batch is recorded under, scoped to the turn that reported it, so
- * a redelivery of one batch is told apart from a second writer.
- */
 const driveWriteKey = (turnId: string, batchKey: unknown): string | undefined => {
   const value = typeof batchKey === "string" ? batchKey.trim() : "";
   return value ? `${turnId}:${value.slice(0, 64)}` : undefined;
@@ -980,13 +860,6 @@ type Baseline = Map<string, { origin: string; writeKey: string | null; updatedAt
 const renamedReason = (from: string, to: string): string =>
   `${from} is a file you uploaded that this turn did not read, so this version was saved as ${to}.`;
 
-/**
- * Bytes the user uploaded are only replaceable by a turn that read them:
- * a turn proves it did by echoing the row's `updatedAt`. Anything else is
- * diverted to an "(agent copy)" sibling so both versions survive. Agent
- * output stays freely overwritable. A row that already records this exact
- * write is this batch's own footprint, not a version it never saw.
- */
 const applyUploadWriteRule = (
   files: NormalizedReport[],
   baseline: Baseline,
@@ -1031,12 +904,6 @@ export type DriveTurnFilesResult = {
   replaced: DriveSkip[];
 };
 
-/**
- * Resolve a report's staged uploads against their claims. A staged write
- * whose response was lost already installed its row, and the row carries the
- * upload id wherever the upload rule filed it, so a redelivery of the same
- * batch answers from that row instead of claiming the upload twice.
- */
 const resolveStagedWrites = async (
   ctx: OwnerContext,
   files: NormalizedReport[],
@@ -1082,7 +949,6 @@ const resolveStagedWrites = async (
       });
       continue;
     }
-    // Storage, not the report, says how many bytes arrived.
     const head = await bucketOf(ctx).head(pending.r2_key);
     if (!head || head.size !== file.sizeBytes) {
       retirePendingUpload(ctx, pending, Date.now());
@@ -1098,13 +964,6 @@ const resolveStagedWrites = async (
   return { files: resolved, staged, replayed, renamed, skipped };
 };
 
-/**
- * A turn's produced files: agent output, html canvases, generated images.
- * Inline bytes are written to immutable keys and staged uploads are copied out
- * of their client-writable staging keys, then the rows land together,
- * re-checked against the quota. Nothing landing at all is the caller's to
- * report as a failure (`files` empty, `skipped` not).
- */
 const turnFiles = async (ctx: OwnerContext, raw: unknown): Promise<DriveTurnFilesResult> => {
   const input = record(raw);
   const turnId = optionalString(input.turnId, 512)?.trim();
@@ -1112,7 +971,6 @@ const turnFiles = async (ctx: OwnerContext, raw: unknown): Promise<DriveTurnFile
   const hydratesDrive = input.hydratesDrive === true;
   const writeKey = driveWriteKey(turnId, input.batchKey);
   const reported = optionalString(input.source, 200)?.trim().slice(0, 40) || "agent";
-  // "upload" sets a row's permanent provenance; only the user earns it.
   const source = reported === "upload" ? "agent" : reported;
   const stagedWrites = await resolveStagedWrites(ctx, normalizeReport(input.files), writeKey);
   let files = stagedWrites.files;
@@ -1133,8 +991,6 @@ const turnFiles = async (ctx: OwnerContext, raw: unknown): Promise<DriveTurnFile
   const acceptedSize = new Map(preflight.accepted.map((file) => [file.path, file.sizeBytes]));
   files = files.filter((file) => acceptedSize.get(file.path) === file.sizeBytes);
 
-  // Writes over a row of earlier agent output the turn never read. Only a
-  // turn that was shown the drive can be said to have skipped reading it.
   const replaced: DriveSkip[] = [];
   for (const file of hydratesDrive ? files : []) {
     const row = baseline.get(file.path);
@@ -1157,7 +1013,6 @@ const turnFiles = async (ctx: OwnerContext, raw: unknown): Promise<DriveTurnFile
   }
   if (entries.length > 0) {
     const bucket = bucketOf(ctx);
-    // Debt first, so a crash after any write or copy still reclaims it.
     for (const entry of entries) {
       entry.debtId = queueCleanup(ctx, {
         path: entry.path,
@@ -1183,15 +1038,10 @@ const turnFiles = async (ctx: OwnerContext, raw: unknown): Promise<DriveTurnFile
         if (!copied || copied.size !== entry.sizeBytes) throw unavailable();
       }
     } catch {
-      // Every key written so far is debt that cleanup reclaims, and the
-      // staged uploads are still pending, so the same report can be retried.
       throw unavailable();
     }
   }
 
-  // Commit: no awaits from here. The quota is re-checked against whatever
-  // landed while the bytes were being written; a file that no longer fits
-  // costs only itself, and its object becomes cleanup.
   const now = Date.now();
   const verdict = partitionWrite(
     { db: ctx.db, env: ctx.env, now },
@@ -1213,7 +1063,6 @@ const turnFiles = async (ctx: OwnerContext, raw: unknown): Promise<DriveTurnFile
         entry.sizeBytes,
         entry.contentType,
         source,
-        // Provenance only rises to "upload"; an agent edit never spends it.
         existing.origin,
         writeKey ?? null,
         entry.uploadId,
@@ -1278,11 +1127,6 @@ const turnFiles = async (ctx: OwnerContext, raw: unknown): Promise<DriveTurnFile
   };
 };
 
-/**
- * Presigned PUTs for files too large to carry inline. Each one claims its
- * size against the quota now and is checked again when the report naming it
- * lands; the staged object is reclaimed whether or not that report ever comes.
- */
 const turnStage = async (
   ctx: OwnerContext,
   raw: unknown,
@@ -1343,11 +1187,6 @@ const turnStage = async (
   return { uploads, skipped: verdict.skipped };
 };
 
-/**
- * A turn's deletions. A path is removed only while its row is still the
- * version the turn read: anything newer is somebody else's write, and a turn
- * deleting its own copy must not take that with it.
- */
 const turnDelete = (
   ctx: OwnerContext,
   raw: unknown,
@@ -1384,7 +1223,6 @@ const turnDelete = (
   return { deleted, kept };
 };
 
-/** One drive row as the cloud file tools see it. */
 export type DriveTurnEntry = {
   path: string;
   sizeBytes: number;
@@ -1401,10 +1239,6 @@ const turnEntry = (row: FileRow): DriveTurnEntry => ({
   updatedAt: row.updated_at,
 });
 
-/**
- * One path, as a file or as the folder its rows' paths imply. The drive is
- * flat; a folder is only ever the prefix of something in it.
- */
 const turnStat = (
   db: OwnerDbReader,
   raw: unknown,
@@ -1422,7 +1256,6 @@ const turnStat = (
   return { file: null, directory: child !== null };
 };
 
-/** Rows under `prefix`, in path order, strictly after `after`. */
 const turnList = (
   db: OwnerDbReader,
   raw: unknown,
@@ -1451,7 +1284,6 @@ const turnList = (
   return { files: rows.slice(0, limit).map(turnEntry), more: rows.length > limit };
 };
 
-/** A byte range of one file, for the cloud file tools that never hydrate. */
 const turnRead = async (
   ctx: OwnerContext,
   raw: unknown,
@@ -1477,8 +1309,6 @@ const turnRead = async (
   return { ...turnEntry(row), bytes: new Uint8Array(await object.arrayBuffer()) };
 };
 
-// ── Turn hydration (the workspace's view of the drive) ───────────────────
-
 export type DriveSyncManifest = {
   prefix: string;
   files: Array<{
@@ -1491,19 +1321,13 @@ export type DriveSyncManifest = {
     updatedAt: number;
     url: string;
   }>;
-  /** In the drive, deliberately not hydrated, with the version it has. */
   skipped: Array<{ path: string; sizeBytes: number; reason: string; updatedAt: number; origin: string }>;
-  /** Deletions since the caller's cursor; apply before materializing files. */
   deleted: Array<{ path: string; relativePath: string; deletedAt: number }>;
-  /** Of the paths the caller holds (`have`), the ones the drive has no row for. */
   absent: string[];
-  /** Cursor to send back as `since` on the next sync. */
   syncedAt: number;
-  /** False when deletions older than the caller's cursor may be missing. */
   deletedComplete: boolean;
 };
 
-/** Explicit references first, then the user's own uploads, then newest first. */
 const syncRank = (row: { path: string; origin: string }, wanted: Set<string>): number =>
   wanted.has(row.path) ? 0 : row.origin === "upload" ? 1 : 2;
 
@@ -1519,22 +1343,14 @@ const deletionsWindow = (
     SYNC_MAX_DELETIONS + (newestFirst ? 0 : 1),
   );
   const window = rows.slice(0, SYNC_MAX_DELETIONS);
-  // A path that has a row again is live; replaying its tombstone would
-  // delete the copy this very turn is about to hydrate.
   const deleted = window
     .filter((row) => !getFile(db, row.path))
     .map((row) => ({ path: row.path, deletedAt: row.deleted_at }));
   if (newestFirst || rows.length <= SYNC_MAX_DELETIONS) return { deleted, cursor: null };
-  // Resume where the window ended; a window inside one millisecond steps past it.
   const last = window[window.length - 1]!.deleted_at;
   return { deleted, cursor: last > since ? last : last + 1 };
 };
 
-/**
- * What a turn's workspace should hold before the agent runs: short-lived
- * GETs for the files that fit the turn's budget, the rows that did not,
- * deletions since the workspace's cursor, and which held paths are gone.
- */
 const turnSync = async (ctx: OwnerContext, raw: unknown): Promise<DriveSyncManifest> => {
   const input = record(raw);
   const prefix = "";
@@ -1554,8 +1370,6 @@ const turnSync = async (ctx: OwnerContext, raw: unknown): Promise<DriveSyncManif
   )) {
     byPath.set(row.path, row);
   }
-  // Named paths are looked up by name: on a drive larger than the window an
-  // older file would otherwise be named nowhere and written over unseen.
   for (const path of wanted) {
     if (byPath.has(path)) continue;
     const row = getFile(ctx.db, path);
@@ -1605,8 +1419,6 @@ const turnSync = async (ctx: OwnerContext, raw: unknown): Promise<DriveSyncManif
     });
   }
 
-  // Presence is answered per named path, never inferred from the capped
-  // listing: absence from a window is not absence from the drive.
   const listed = new Set([...files, ...skipped].map((entry) => entry.path));
   const asked = new Set<string>();
   for (const candidate of stringList(input.have).slice(0, SYNC_MAX_PRESENCE)) {
@@ -1620,8 +1432,6 @@ const turnSync = async (ctx: OwnerContext, raw: unknown): Promise<DriveSyncManif
   }
   const absent = [...asked].filter((path) => !getFile(ctx.db, path));
 
-  // The caller's cursor rides in a workspace the agent can write, so the
-  // answer also carries the most recent deletions, which need no cursor.
   const horizon = now - TOMBSTONE_TTL_MS;
   const since = finiteNumber(input.since);
   const cursor = since !== undefined && since > 0 ? Math.min(Math.floor(since), now) : 0;
@@ -1649,10 +1459,6 @@ const turnSync = async (ctx: OwnerContext, raw: unknown): Promise<DriveSyncManif
   };
 };
 
-/**
- * A chat turn's attached images, as short-lived GETs: images only, size
- * capped, by exact path.
- */
 const turnAttachments = async (ctx: OwnerContext, raw: unknown) => {
   const paths = stringList(record(raw).paths).slice(0, ATTACHMENT_MAX_COUNT);
   const attachments: Array<{ path: string; contentType: string; sizeBytes: number; url: string }> = [];
@@ -1682,11 +1488,6 @@ const turnAttachments = async (ctx: OwnerContext, raw: unknown) => {
   return { attachments, skipped };
 };
 
-/**
- * Reference images for the media provider, which cannot read the bucket.
- * `signedAt` lets a retried tool call sign the identical URLs, so its request
- * hash, and with it the provider job it reattaches to, stays the same.
- */
 const signImages = async (ctx: OwnerContext, raw: unknown): Promise<{ urls: string[] }> => {
   const input = record(raw);
   const paths = stringList(input.paths)
@@ -1697,7 +1498,6 @@ const signImages = async (ctx: OwnerContext, raw: unknown): Promise<{ urls: stri
   }
   const now = Date.now();
   const requested = finiteNumber(input.signedAt);
-  // Never older than a URL could still be useful, never in the future.
   const signedAt =
     requested !== undefined && requested <= now && now - requested < REFERENCE_URL_EXPIRES_SECONDS * 500
       ? Math.floor(requested)
@@ -1714,13 +1514,6 @@ const signImages = async (ctx: OwnerContext, raw: unknown): Promise<{ urls: stri
   return { urls };
 };
 
-// ── Jobs and purge ───────────────────────────────────────────────────────
-
-/**
- * Delete objects no row names: abandoned or rejected uploads, replaced and
- * deleted files, writes that lost a race. Leased, so a failed delete is
- * retried after the lease rather than forgotten.
- */
 const runCleanup = async (ctx: OwnerContext): Promise<void> => {
   const now = ctx.now;
   const due = ctx.db.all<UploadRow>(
@@ -1741,8 +1534,6 @@ const runCleanup = async (ctx: OwnerContext): Promise<void> => {
         row.upload_id,
       );
     }
-    // A pending claim past its horizon is an abandoned upload; one whose key
-    // a row names (only possible by a bug) keeps its bytes.
     const doomed = due.filter((row) => !isKeyReferenced(ctx.db, row.r2_key));
     let deleted = true;
     if (doomed.length > 0) {
@@ -1768,7 +1559,6 @@ const runCleanup = async (ctx: OwnerContext): Promise<void> => {
   if (typeof next === "number") ctx.jobs.schedule(DRIVE_CLEANUP_JOB, Math.max(next, now + 1_000), null, { id: DRIVE_CLEANUP_JOB });
 };
 
-/** Drop tombstones past the replay window; a workspace that old resyncs blind. */
 const pruneTombstones = (ctx: OwnerContext): void => {
   const now = ctx.now;
   ctx.db.run("DELETE FROM drive_deletions WHERE deleted_at < ?", now - TOMBSTONE_TTL_MS);
@@ -1783,7 +1573,6 @@ const pruneTombstones = (ctx: OwnerContext): void => {
   }
 };
 
-/** Reset or deletion: every row, then every object under the owner's prefix. */
 const purgeDrive = async (ctx: OwnerContext): Promise<{ pending: boolean }> => {
   ctx.db.run("DELETE FROM drive_files");
   ctx.db.run("DELETE FROM drive_uploads");
@@ -1798,8 +1587,6 @@ const purgeDrive = async (ctx: OwnerContext): Promise<{ pending: boolean }> => {
   }
   return { pending: listed.truncated };
 };
-
-// ── Registration ─────────────────────────────────────────────────────────
 
 const pathArg = string({ min: 1, max: 4_000 });
 
@@ -1831,8 +1618,6 @@ export const driveDomain = {
       parse: object({ path: pathArg }),
       handler: fileUrl,
     },
-    // Same reader as the `drive.files` view. A tool call wants one answer, and
-    // a device should not open a subscription to get it.
     "drive.list": {
       scope: "owner",
       parse: object({
@@ -1881,12 +1666,10 @@ export const driveDomain = {
     },
   },
   internal: {
-    /** What the drive holds against the plan's quota. */
     "drive.usage": (ctx: OwnerContext) => {
       const { plan, unlimited } = billingPlan(ctx);
       return { ...usage(ctx.db), plan, unlimited, quota: unlimited ? UNLIMITED_QUOTA : PLAN_QUOTAS[plan] };
     },
-    // The cloud `drive` tool's list and fetch, called with no caller.
     "drive.list": (ctx: OwnerContext, raw: unknown) => {
       const input = record(raw);
       const limit = finiteNumber(input.limit);

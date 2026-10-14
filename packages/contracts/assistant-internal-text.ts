@@ -68,14 +68,6 @@ const presentReportEcho = (text: string): string => {
   return rest ? `${summary}\n\n${rest}` : summary;
 };
 
-/**
- * Stella's reply as the desktop and the phone show it. A reply sometimes repeats what the
- * runtime told the model rather than the user: a tool's `<harness>`
- * diagnostics, or the header of an agent's report. Diagnostics outside code
- * show as their text, as a markdown sanitizer that drops the
- * unknown tag would, and an echoed report keeps its outcome, task and message but
- * not its internal thread and agent fields.
- */
 export const presentAssistantText = (text: string): string => {
   if (!text.includes("<harness>") && !PI_REPORT_RE.test(text.trimStart())) {
     return text;

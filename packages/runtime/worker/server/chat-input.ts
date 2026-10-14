@@ -1,11 +1,3 @@
-/**
- * What a desktop chat send gives the model, prepared off the UI thread:
- * composer images validated, sized to the target provider and spilled to
- * disk when over budget; file attachments materialized as local files; the
- * chat context (window, selection, browser, pasted text) as hidden prompt
- * messages; the window screenshot. Both runtimes start from it: the agent
- * loops (`agent-runs.ts`) and the pi-durable chat (`pi-chats.ts`).
- */
 import type {
   RuntimeChatPayload,
   RuntimePromptMessage,
@@ -30,13 +22,9 @@ export const prepareChatInput = async (
   payload: RuntimeChatPayload,
   options: {
     stellaDataDirPath: string;
-    /** The provider/model the turn will run on, so images fit its limits. */
     resolveImageTarget: () => Promise<ImageCapTarget | undefined>;
   },
 ) => {
-  // Resolve the provider/model this turn will run on so composer images
-  // are sized to that provider's real limits (best-effort; falls back to
-  // the safe conservative profile when no route resolves).
   let composerImageTarget: ImageCapTarget | undefined;
   try {
     composerImageTarget = await options.resolveImageTarget();
@@ -83,8 +71,6 @@ export const prepareChatInput = async (
     spilledImageAttachments = persistedImageAttachments;
     modelImageAttachments = [];
   }
-  // Where each spilled image's bytes are, by its index in the composer's
-  // attachments: the message carries no pixels for them, only these files.
   const spilledImagePaths = new Map<number, SpilledImageAttachment>();
   for (const [index, spilled] of spilledImageAttachments.entries()) {
     const source = materializedImageAttachments[spilled.attachmentIndex ?? index];

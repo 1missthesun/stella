@@ -47,7 +47,6 @@ async function domFrame(tabId, frame, options) {
   const refs = {};
   const renamed = new Map();
   try {
-    // Bound outstanding CDP requests while resolving exact nodes, not role matches.
     const entries = Object.entries(capture.refs || {});
     for (let offset = 0; offset < entries.length; offset += 12) {
       await Promise.all(
@@ -318,7 +317,6 @@ export async function captureFrameSnapshot(tabId, options = {}, kind = "dom") {
       break;
     }
   }
-  // Reject captures spanning a document replacement rather than publish wrong refs.
   const after = await getObservationFrames(tabId);
   if (after.attachmentId !== attachmentId)
     throw new Error(

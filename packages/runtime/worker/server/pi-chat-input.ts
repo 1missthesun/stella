@@ -1,11 +1,3 @@
-/**
- * A desktop composer send as pi-durable user input. The model gets what the
- * agent loops gave it: the typed text, the chat context and attachment
- * notices, and the images sized for it. Everything but the typed text is
- * marked hidden, and the first part carries what the message shows (image
- * previews, files, context chips), so the timeline renders the message as the
- * user sent it.
- */
 import type {
   RuntimeAttachmentRef,
   RuntimeChatPayload,
@@ -22,7 +14,6 @@ const imagePart = (url: string): PiUserPart | null => {
     : null;
 };
 
-/** The notice the agent loops add for attachments saved on this computer. */
 const attachmentNotice = (
   attachments: readonly RuntimeAttachmentRef[],
 ): string | undefined => {
@@ -43,7 +34,6 @@ const attachmentNotice = (
   return lines.length > 0 ? lines.join("\n") : undefined;
 };
 
-/** What the user's message shows: previews of what they attached, and its context chips. */
 const displayOf = (
   payload: RuntimeChatPayload,
   prepared: PreparedChatInput,
@@ -60,7 +50,6 @@ const displayOf = (
         ? -1
         : savedFiles.findIndex((saved) => saved.name === attachment.name);
       const saved = savedIndex >= 0 ? savedFiles.splice(savedIndex, 1)[0] : undefined;
-      // A spilled image's pixels are not in the message: its saved copy is.
       const spilled = image ? prepared.spilledImagePaths.get(index) : undefined;
       const localPath = spilled?.filePath ?? attachment.path ?? saved?.sourcePath;
       const mimeType = spilled?.mimeType || attachment.mimeType;

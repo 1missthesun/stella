@@ -1,10 +1,3 @@
-/**
- * The `write_stdin` tool's model-visible surface, split from the executable
- * definition for the reason described in `exec-command-def.ts`: the shell
- * handler behind it needs `node:child_process`, and the cloud `BuildSession`
- * DO must advertise the byte-identical tool from workerd.
- */
-
 export const WRITE_STDIN_TOOL_NAME = "write_stdin";
 
 export const WRITE_STDIN_TOOL_DESCRIPTION =
@@ -17,8 +10,6 @@ export const WRITE_STDIN_TOOL_PARAMETERS: Record<string, unknown> = {
   type: "object",
   properties: {
     session_id: {
-      // Stella allocates UUID session ids; advertised as `string` so strict
-      // tool validators don't reject the value the model echoes back.
       type: "string",
       description:
         "Identifier returned by Bash. Completed results keep it as shell_session_id provenance even when session_id becomes null.",
@@ -66,5 +57,4 @@ export const WRITE_STDIN_TOOL_PARAMETERS: Record<string, unknown> = {
   required: ["session_id"],
 };
 
-/** Replay policy (`ToolReplayPolicy` in ../types.ts). Input to a live process; the process (and its session) died with the call. */
 export const WRITE_STDIN_TOOL_REPLAY = "unsafe" as const;

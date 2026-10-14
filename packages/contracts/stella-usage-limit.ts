@@ -1,22 +1,10 @@
-/**
- * Stella's own usage limit: the owner's plan has no room left for Stella's
- * models. The Free plan's one-time allowance is spent (it never comes back),
- * or a plan window is used up (it resets). Trying again never helps;
- * upgrading does. Every place that refuses for this reason (the cloud turn
- * start, the model gateway, a turn that runs out midway) uses this code and
- * wording, so every client shows the same notice with an Upgrade action
- * instead of a generic failure.
- */
-
 export const STELLA_USAGE_LIMIT_CODE = "usage_limit" as const;
 
 export type StellaUsageLimitReason = "free_allowance" | "plan_limit";
 
 export type StellaUsageLimit = {
   reason: StellaUsageLimitReason;
-  /** The sentence to show, as the owner's billing words it. */
   message: string;
-  /** When a plan window resets; absent for the Free allowance, which never does. */
   retryAfterMs?: number;
 };
 
@@ -25,7 +13,6 @@ export const STELLA_USAGE_LIMIT_TITLES: Record<StellaUsageLimitReason, string> =
   plan_limit: "You've reached your plan's limit",
 };
 
-/** The notice's body under its title, the same on every client. */
 export const STELLA_USAGE_LIMIT_DESCRIPTIONS: Record<StellaUsageLimitReason, string> = {
   free_allowance: "Your free Stella allowance is spent. Upgrade to keep going.",
   plan_limit: "You've used what your plan includes for now. Upgrade to keep going, or wait until it resets.",
@@ -39,11 +26,6 @@ export const STELLA_USAGE_LIMIT_MESSAGES: Record<StellaUsageLimitReason, string>
 export const isStellaUsageLimitReason = (value: unknown): value is StellaUsageLimitReason =>
   value === "free_allowance" || value === "plan_limit";
 
-/**
- * Stella can't read the owner's plan (billing is not configured on this
- * server). Turns on Stella's models are refused with this instead of a silent
- * zero budget; the server logs `billing_unconfigured`.
- */
 export const BILLING_UNAVAILABLE_CODE = "billing_unavailable" as const;
 export const BILLING_UNAVAILABLE_MESSAGE =
   "Stella can't check your plan right now. We've been alerted and are fixing it; try again a little later.";

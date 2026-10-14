@@ -12,14 +12,6 @@ import {
 } from "@/features/app-source/AppSourceCards";
 import "./shell-topbar-update-pill.css";
 
-/**
- * New versions from the Stella team, one click: the pill shows once a new
- * version is waiting and pressing it takes it. Whether that means a
- * fast-forward, a merge with the user's own changes, or a merge an agent has
- * to look at is decided in the main process and never asked about here.
- * Changes the user made (here, by hand, or on another computer) are the
- * chat's (`AppSourceCards`); skipping a version is the Updates tab's.
- */
 export const ShellTopBarUpdatePill = memo(function ShellTopBarUpdatePill() {
   const t = useT();
   const state = useAppSourceState();

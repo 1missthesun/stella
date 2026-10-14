@@ -23,7 +23,6 @@ const USER_INSTALLATION_PAGES = 3;
 
 export const INSTALLATION_ID_PATTERN = /^[0-9]{1,20}$/;
 
-/** D1 `github_installations(installation_id, owner_id)`: routes webhooks to an owner. */
 export const installationIndex = (env: Cloudflare.Env): D1Database => {
   if (!env.DB) throw new Error("The DB binding is missing.");
   return env.DB;
@@ -37,7 +36,6 @@ type GithubSecret =
   | "GITHUB_APP_CLIENT_SECRET"
   | "GITHUB_WEBHOOK_SECRET";
 
-/** Which of Stella's GitHub Apps: projects (read-write) or Stella for Slack (read-only). */
 export type GithubAppKind = "projects" | "slack";
 
 export const githubSecret = (
@@ -48,7 +46,6 @@ export const githubSecret = (
   (env as unknown as Partial<Record<string, string>>)[app === "slack" ? `SLACK_${name}` : name]?.trim() ||
   undefined;
 
-/** A failure whose message is safe to show the user. */
 export class GithubError extends Error {
   constructor(message: string) {
     super(message);
@@ -56,7 +53,6 @@ export class GithubError extends Error {
   }
 }
 
-/** GitHub refused to mint for the installation: uninstalled (404) or suspended (403). */
 export class GithubInstallationGoneError extends GithubError {
   constructor(
     message: string,
@@ -69,7 +65,6 @@ export class GithubInstallationGoneError extends GithubError {
 
 const NOT_CONFIGURED = "GitHub projects aren't configured on this deployment yet.";
 
-/** Everything the connect handshake needs: minting, identity and the install URL. */
 export const githubAppConfigured = (env: Cloudflare.Env, app: GithubAppKind = "projects"): boolean =>
   Boolean(
     githubSecret(env, "GITHUB_APP_ID", app) &&
@@ -78,8 +73,6 @@ export const githubAppConfigured = (env: Cloudflare.Env, app: GithubAppKind = "p
       githubSecret(env, "GITHUB_APP_CLIENT_ID", app) &&
       githubSecret(env, "GITHUB_APP_CLIENT_SECRET", app),
   );
-
-// ── App JWT ───────────────────────────────────────────────────────────────
 
 const base64Url = (bytes: Uint8Array): string =>
   btoa(String.fromCharCode(...bytes))
@@ -112,7 +105,6 @@ const derTagged = (tag: number, body: Uint8Array): Uint8Array => {
   return out;
 };
 
-// AlgorithmIdentifier { rsaEncryption, NULL }.
 const RSA_ALGORITHM_IDENTIFIER = new Uint8Array([
   0x30, 0x0d, 0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x01, 0x05, 0x00,
 ]);
@@ -139,7 +131,6 @@ const appJwt = async (env: Cloudflare.Env, app: GithubAppKind = "projects"): Pro
   const appId = githubSecret(env, "GITHUB_APP_ID", app);
   const rawKey = githubSecret(env, "GITHUB_APP_PRIVATE_KEY", app);
   if (!appId || !rawKey) throw new GithubError(NOT_CONFIGURED);
-  // Secrets commonly carry the PEM with escaped newlines.
   const pem = rawKey.includes("\\n") ? rawKey.replaceAll("\\n", "\n") : rawKey;
   let key: CryptoKey;
   try {
@@ -188,12 +179,6 @@ const errorText = async (response: Response, fallback: string): Promise<string> 
   return payload?.message ? `${fallback} (${payload.message})` : fallback;
 };
 
-// ── Installations ─────────────────────────────────────────────────────────
-
-/**
- * An installation token, scoped to one repository when `repo` is given so a
- * leaked token can't reach the installation's other repositories.
- */
 export const mintInstallationToken = async (
   env: Cloudflare.Env,
   args: {
@@ -243,7 +228,6 @@ export const mintInstallationToken = async (
   };
 };
 
-/** Uninstall the App from the account. 404 counts as done. */
 export const revokeInstallation = async (env: Cloudflare.Env, installationId: string): Promise<void> => {
   if (!INSTALLATION_ID_PATTERN.test(installationId)) return;
   const response = await fetch(`${GITHUB_API_BASE}/app/installations/${encodeURIComponent(installationId)}`, {
@@ -265,7 +249,6 @@ const accountOf = (account?: { login?: string; type?: string; id?: number }): In
   accountId: typeof account?.id === "number" ? account.id : 0,
 });
 
-/** The App's own view of an installation, or null when GitHub won't say. */
 export const fetchInstallationAccount = async (
   env: Cloudflare.Env,
   installationId: string,
@@ -282,8 +265,6 @@ export const fetchInstallationAccount = async (
     return null;
   }
 };
-
-// ── The connecting user (handshake identity leg) ──────────────────────────
 
 export const githubAuthorizeUrl = (
   env: Cloudflare.Env,
@@ -308,10 +289,6 @@ export const githubInstallUrl = (env: Cloudflare.Env, state: string, app: Github
   return url.toString();
 };
 
-/**
- * Exchange the browser's `code` for a user-to-server token. The token is used
- * for the identity reads below and dropped; it is never stored or returned.
- */
 export const exchangeUserCode = async (
   env: Cloudflare.Env,
   code: string,
@@ -352,7 +329,6 @@ export const fetchOAuthUser = async (userToken: string): Promise<{ login: string
 
 export type UserInstallation = { id: number; account?: { login?: string; type?: string; id?: number } };
 
-/** The installations of the App behind `userToken` that its GitHub user can reach. */
 export const listUserInstallations = async (userToken: string): Promise<UserInstallation[]> => {
   const collected: UserInstallation[] = [];
   for (let page = 1; page <= USER_INSTALLATION_PAGES; page += 1) {

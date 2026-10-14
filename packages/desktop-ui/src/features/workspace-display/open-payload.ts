@@ -30,16 +30,6 @@ const getAdapter = (): WorkspaceDisplayPayloadAdapter => {
   return adapter;
 };
 
-/**
- * App-facing facade for payload-backed workspace tabs. The shell owns the
- * actual tab bodies; callers outside shell should only ask for a payload to
- * open.
- *
- * Mapping the payload already indexes the artifact and tells Files which file
- * it would show; what an *open* adds on top is pointing the panel at the Files
- * section. A passive registration (`activate: false`) deliberately stops short
- * of that, so a background refresh never steals the user's place.
- */
 export const openDisplayPayloadTab = (
   payload: DisplayTabPayload,
   opts?: OpenTabOptions,

@@ -1,21 +1,5 @@
 import { LAUNCHER_CHECKSUMS_URL, MAC_APP_ZIP, RELEASE_ASSETS, SITE_ORIGIN } from "@/lib/downloads";
 
-/**
- * `curl -fsSL https://stella.sh/install.sh | sh`
- *
- * POSIX sh (no bashisms) so it runs under dash/busybox ash, which is `/bin/sh`
- * on plenty of Linux systems. It installs the native launcher, verified
- * against the published SHA256SUMS, and starts it; the launcher installs and
- * updates the app itself. Re-running replaces the launcher in place.
- *
- * Linux puts the launcher where it installs itself
- * (`$XDG_DATA_HOME/stella/bin/stella-launcher`, see
- * `launcher/linux/stella-launcher.c`), so its first-run self-copy is a no-op;
- * on that first run it writes the `stella.desktop` menu entry. macOS unpacks
- * the universal `Stella.app` into `/Applications` (or `$STELLA_APPS_DIR`,
- * falling back to `~/Applications` when `/Applications` is not writable) and
- * opens it.
- */
 export const INSTALL_SCRIPT = `#!/bin/sh
 # Stella installer. ${SITE_ORIGIN}
 set -eu

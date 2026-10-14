@@ -14,12 +14,6 @@ import {
 } from "@/global/settings/lib/engine-model-routing";
 import { normalizeReasoningEffortLevel } from "@stella/contracts/reasoning-effort";
 
-/**
- * The account's model selection lives on the server (`cloud_engine_settings`)
- * so every client picks from one list and one choice. The desktop runtime
- * still reads its local preferences, so these helpers translate between the
- * two shapes in both directions.
- */
 export type MirroredModelPreferences = EngineRoutingPreferences &
   EngineReasoningPreferences;
 
@@ -47,11 +41,6 @@ export const sameCloudExecution = (
   left.model === right.model &&
   left.reasoningEffort === right.reasoningEffort;
 
-/**
- * The server selection equivalent to the local preferences, or null when the
- * local choice has no server form: a model on a provider whose key is only
- * on this computer (`accountProviders` lists the ones saved to the account).
- */
 export function cloudExecutionFromLocal(
   preferences: MirroredModelPreferences,
   accountProviders: ReadonlySet<string> = new Set(),
@@ -106,14 +95,11 @@ export function cloudExecutionFromLocal(
   }
 }
 
-/** The local preference write that applies a server selection. */
 export function localPatchForCloudExecution(
   preferences: MirroredModelPreferences,
   execution: CloudExecutionSelection,
 ): Partial<MirroredModelPreferences> & { codexModelExplicit?: boolean } {
   if (execution.engine === "stella" || execution.engine === "provider") {
-    // A provider model runs on this computer's own key, or on the account's
-    // through the model gateway when it has none.
     const selected = buildModelSelectionPatch(
       preferences,
       execution.engine === "provider"

@@ -31,39 +31,6 @@ import {
   type SyncedPair,
 } from "./memory-sync-plan.js";
 
-/**
- * Keeps this computer's memory files (`~/.stella/memories/**.md`,
- * `PERSONALITY.md`) the same as the owner's cloud copy in
- * their world, both ways. Every computer syncs with the cloud on its own;
- * the cloud is the hub. Runs in Electron main, off the UI thread.
- *
- * State (`<data>/memory-sync/state.json`): the account and memory epoch this
- * computer last synced in, and per file the sha each side had when they were
- * last the same. A pass lists both sides and carries out
- * `planMemorySync`; every write and delete on either side is
- * compare-and-set against what the pass saw, so a change made meanwhile is
- * never overwritten: the pass stops short and runs again.
- *
- * Conflicts (a file changed on both sides): the cloud's version is put in
- * place here, this computer's version is saved under
- * `<data>/memory-sync/conflicts/` (outside `memories/`, so no turn reads it as
- * memory), and a background agent is briefed to merge the two into the file.
- * Its edit is then an ordinary local change that the next pass uploads.
- *
- * Epochs: a wipe opens a new cloud memory epoch. Memory this computer kept
- * from before it goes up only once the owner allowed it
- * (`memory.authorizeReimport`); until then the sync holds (no upload, no
- * download) and offers to erase it here instead. A computer that never synced
- * joins the same way: its existing memory merges in unless the account was
- * wiped and not re-authorized. `~/.stella` is not per account, so this
- * computer's memory stays with the first account it synced with; signed in
- * to another, the sync holds rather than hand one account's memory to it.
- *
- * Passes run on sign-in, on local file changes (debounced watcher), every few
- * minutes, when a window gains focus, on request, and once more before quit.
- * Signed out, or memory off in the cloud: nothing syncs.
- */
-
 const STATE_DIR = "memory-sync";
 const STATE_FILE = "state.json";
 const CONFLICTS_DIR = "conflicts";
@@ -71,28 +38,22 @@ const CONFLICTS_DIR = "conflicts";
 const PERIODIC_MS = 3 * 60_000;
 const FOCUS_MIN_GAP_MS = 30_000;
 const LOCAL_DEBOUNCE_MS = 1_500;
-/** Stat polling for `PERSONALITY.md` and `memories/` itself. */
 const POLL_MS = 2_000;
 const SIGN_IN_DELAY_MS = 1_000;
-/** A pass that met a concurrent change runs again this soon, a few times. */
 const UNSETTLED_RETRY_MS = 5_000;
 const UNSETTLED_RETRIES = 3;
 const ERROR_RETRY_MIN_MS = 60_000;
 const ERROR_RETRY_MAX_MS = 30 * 60_000;
 const NOT_READY_RETRY_MS = 30_000;
-/** How long a handed-off merge counts as in progress. */
 const MERGE_SHOWN_MS = 24 * 60 * 60_000;
 
 type PendingMerge = MemoryMerge & { dispatchedAt: number | null };
 
 type SyncState = {
   version: 1;
-  /** The account this computer's memory syncs with. */
   owner: string | null;
-  /** The cloud memory epoch the files below were synced in. */
   epoch: string | null;
   files: Record<string, SyncedPair>;
-  /** Local shas the cloud refused (over a cap); retried once they change. */
   refused: Record<string, string>;
   merges: PendingMerge[];
   lastSyncedAt: number | null;
@@ -142,7 +103,6 @@ const parseState = (raw: string): SyncState => {
   };
 };
 
-/** Refusals that end a pass: the cloud's memory is not open to this sync. */
 const STOP_REASONS = new Set([
   "CLOUD_MEMORY_OFF",
   "CLOUD_MEMORY_WIPE_ACTIVE",
@@ -213,7 +173,6 @@ export type MemorySyncServiceOptions = {
   getBackendUrl: () => string | null;
   getAuthToken: () => Promise<string | null>;
   hasConnectedAccount: () => boolean;
-  /** Start a background agent on a brief; throws when none can start yet. */
   dispatchAgentBrief: (brief: {
     description: string;
     prompt: string;
@@ -246,7 +205,6 @@ export class MemorySyncService {
   private polled: Array<() => void> = [];
   private memoriesWatcher: FSWatcher | null = null;
   private disposed = false;
-  /** The account the running pass started in; its requests use only it. */
   private passSubject: string | null = null;
 
   constructor(private readonly options: MemorySyncServiceOptions) {
@@ -258,7 +216,6 @@ export class MemorySyncService {
     return this.status;
   }
 
-  /** The Stella session changed: start for a new account, stop when signed out. */
   noteAuthToken(token: string | null): void {
     const next = tokenSubject(token);
     if (next === this.subject || this.disposed) return;
@@ -281,7 +238,6 @@ export class MemorySyncService {
     this.request("full", 0);
   }
 
-  /** Run a full pass now and answer the status it ended in. */
   async syncNow(): Promise<MemorySyncStatus> {
     await this.running?.catch(() => undefined);
     this.request("full", 0);
@@ -290,10 +246,6 @@ export class MemorySyncService {
     return this.status;
   }
 
-  /**
-   * While held after a wipe: erase this computer's memory files and join the
-   * cloud's current memory instead of uploading them.
-   */
   async eraseLocal(): Promise<MemorySyncEraseResult> {
     await this.running?.catch(() => undefined);
     if (this.status.phase !== "held" || this.status.heldReason !== "wiped") {
@@ -323,11 +275,6 @@ export class MemorySyncService {
     return { ok: true };
   }
 
-  /**
-   * Before quit: push memory edited here that the cloud doesn't have yet,
-   * briefly. Nothing else is worth holding quit for: a pull or a retry runs
-   * at the next launch anyway.
-   */
   async flush(timeoutMs: number): Promise<void> {
     if (!this.subject || !(await this.hasUnsyncedEdits())) return;
     this.pendingMode ??= "local";
@@ -357,8 +304,6 @@ export class MemorySyncService {
     this.client = null;
   }
 
-  // ── Triggers ─────────────────────────────────────────────────────────────
-
   private start(): void {
     if (!this.periodic) {
       this.periodic = setInterval(
@@ -381,11 +326,6 @@ export class MemorySyncService {
     this.memoriesWatcher = null;
   }
 
-  /**
-   * `memories/` gets a recursive watcher. The two files beside it, and
-   * `memories/` itself appearing or going, are polled by stat instead: a
-   * watcher on `~/.stella` would wake on every database write there.
-   */
   private watchFiles(): void {
     const onChange = () => this.request("local", LOCAL_DEBOUNCE_MS);
     const memoriesDir = path.join(this.options.stellaDataDir, MEMORIES_DIR);
@@ -426,10 +366,6 @@ export class MemorySyncService {
     watchMemories();
   }
 
-  /**
-   * Ask for a pass. A full one supersedes a local one. Local edits debounce
-   * each other; otherwise a pass already due sooner keeps its time.
-   */
   private request(mode: "full" | "local", delayMs: number): void {
     if (this.disposed || !this.subject) return;
     if (mode === "full") {
@@ -460,7 +396,6 @@ export class MemorySyncService {
     this.timer = null;
     this.running = this.pass(mode)
       .catch((error: unknown) => {
-        // The account changed mid-pass; the new account's own pass follows.
         if (!(error instanceof PassStopped)) throw error;
         this.log("memory_sync.stopped", { reason: error.reason });
         this.request("full", UNSETTLED_RETRY_MS);
@@ -476,8 +411,6 @@ export class MemorySyncService {
       });
   }
 
-  // ── One pass ─────────────────────────────────────────────────────────────
-
   private backend(): BackendClient | null {
     const baseUrl = this.options.getBackendUrl();
     if (!baseUrl) return null;
@@ -487,8 +420,6 @@ export class MemorySyncService {
         baseUrl,
         value: new BackendClient({
           baseUrl,
-          // A pass is bound to the account it started in: a request made
-          // after a switch would carry another account's credentials.
           getToken: async () => {
             const token = await this.options.getAuthToken();
             if (!this.passSubject || tokenSubject(token) !== this.passSubject) {
@@ -507,7 +438,6 @@ export class MemorySyncService {
     const backend = this.backend();
     if (!subject || !backend || !this.options.hasConnectedAccount()) {
       this.publish({ phase: "signed_out", merging: 0, refused: [] });
-      // A session that is still settling (or a guest one) is looked at again.
       if (subject) this.request("full", NOT_READY_RETRY_MS);
       return;
     }
@@ -607,8 +537,6 @@ export class MemorySyncService {
         }
       }
     } catch (error) {
-      // Refused mid-pass (a wipe began, memory went off): keep only what
-      // already landed, under the epoch it landed in, and look again soon.
       if (error instanceof PassStopped) {
         await this.saveState({ ...state, files, refused, merges });
         this.log("memory_sync.stopped", { reason: error.reason });
@@ -650,7 +578,6 @@ export class MemorySyncService {
     if (settled) {
       this.unsettledRuns = 0;
     } else if (this.unsettledRuns < UNSETTLED_RETRIES) {
-      // Something changed while the pass ran; it stopped short of it.
       this.unsettledRuns += 1;
       this.request("full", UNSETTLED_RETRY_MS);
     }
@@ -682,7 +609,6 @@ export class MemorySyncService {
     this.request("full", delay);
   }
 
-  /** Whether nothing here changed since the last pass. */
   private matchesState(state: SyncState, local: Map<string, string>): boolean {
     if (Object.keys(state.files).some((file) => !local.has(file))) {
       return false;
@@ -710,7 +636,6 @@ export class MemorySyncService {
     }
   }
 
-  /** Carry out one action; false when the file moved under it. */
   private async apply(
     action: MemorySyncAction,
     context: {
@@ -816,7 +741,6 @@ export class MemorySyncService {
     }
   }
 
-  /** Save this computer's side of a conflict where no turn reads memory. */
   private async saveConflictCopy(
     relative: string,
     bytes: Uint8Array,
@@ -833,13 +757,6 @@ export class MemorySyncService {
     return copy;
   }
 
-  /**
-   * Brief one background agent with every conflict not yet handed off. A
-   * merge stays listed while its saved copy exists (the agent deletes it when
-   * done), for a day at most; an agent that cannot start yet is tried again
-   * next pass, and the saved copy keeps this computer's version safe either
-   * way.
-   */
   private async handOffMerges(merges: PendingMerge[]): Promise<PendingMerge[]> {
     const now = Date.now();
     const live: PendingMerge[] = [];
@@ -869,8 +786,6 @@ export class MemorySyncService {
     }
     return live;
   }
-
-  // ── State and status ─────────────────────────────────────────────────────
 
   private async loadState(): Promise<SyncState> {
     try {

@@ -24,22 +24,11 @@ import { WAKE_REPORT_INLINE_MAX_BYTES } from "./constants.js";
 import { errorMessage, log } from "./support.js";
 import { OrchestratorJournalProbe } from "./journal-probe.js";
 
-/**
- * Cloud agents: control receipts, wake reports, steering wakes into a running
- * turn, and agent cards.
- */
 type CardPayload = AppendCardInput["card"];
 
-/** Where a wake turn's staged cards are kept; the length keeps one turn's prefix from matching another's. */
 const wakeCardPrefix = (turnId: string): string => `wakeCard:${turnId.length}:${turnId}:`;
 
 export abstract class OrchestratorCloudAgents extends OrchestratorJournalProbe {
-  /**
-   * Advances the durable control receipt for one reusable cloud-agent thread.
-   * Attempt generation is the primary ABA fence; updatedAt orders state within
-   * an attempt. Older server responses are harmless, while two different
-   * states claiming the same exact revision fail closed as protocol damage.
-   */
   protected async rememberCloudAgentControlReceipt(
     value: unknown,
   ): Promise<CloudAgentControlReceipt> {
@@ -178,10 +167,6 @@ export abstract class OrchestratorCloudAgents extends OrchestratorJournalProbe {
       : cloudAgentTerminalCard(turn.agentThreadControl);
   }
 
-  /**
-   * This conversation's agents as the resident roster, for a context that
-   * starts here. A failed read renders the context without it.
-   */
   protected async agentRoster(
     turn: ChatTurnRequest,
   ): Promise<string | undefined> {
@@ -237,18 +222,6 @@ export abstract class OrchestratorCloudAgents extends OrchestratorJournalProbe {
     if (appended.inserted) this.publish(appended.record);
   }
 
-  /**
-   * A `files` card for drive files the orchestrator's own turn produced. The
-   * owner only files cards for spawned threads (`applyThreadCompleted`),
-   * so a direct tool such as `image_gen` publishes its own. Same card shape
-   * the clients already render for thread output.
-   */
-  /**
-   * A card for a wake turn's journal that must follow that turn's prompt
-   * (a pi agent's report wakes Stella, then its cards end the agent). The
-   * wake is queued before its prompt is written, so the card waits here
-   * until the prompt is in the journal, or the turn ends without one.
-   */
   protected async stageWakeCard(
     turnId: string,
     entry: { writerKey: string; createdAt: number; card: CardPayload },
@@ -262,7 +235,6 @@ export abstract class OrchestratorCloudAgents extends OrchestratorJournalProbe {
     }
   }
 
-  /** The cards staged for a wake turn, after its prompt (`stageWakeCard`). */
   protected async publishStagedWakeCards(turnId: string): Promise<void> {
     const staged = await this.ctx.storage.list<{
       writerKey: string;

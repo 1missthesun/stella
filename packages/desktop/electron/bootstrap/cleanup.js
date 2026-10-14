@@ -9,13 +9,6 @@ const RUNTIME_EXIT_TIMEOUT_MS = 2_500;
 const RUNTIME_TEARDOWN_TIMEOUT_MS = RUNTIME_SHELLS_SHUTDOWN_TIMEOUT_MS + RUNTIME_EXIT_TIMEOUT_MS + 500;
 export const registerBootstrapProcessCleanups = (context) => {
     const { processRuntime } = context.state;
-    // Quitting (a restart or an update included) stops the runtime with the
-    // app. Agent shells live in the runtime, so they are ended first, while
-    // the app is still attached. Then the runtime is asked to exit, which
-    // interrupts every in-flight turn instead of letting it run on unattended;
-    // pi keeps interrupted work pending for the next launch. The runtime bounds
-    // its own teardown, and these bounds keep a wedged runtime from holding
-    // quit hostage.
     let runtimeTeardown = null;
     const startRuntimeTeardown = () => {
         const runner = context.state.stellaHostRunner;
@@ -23,10 +16,6 @@ export const registerBootstrapProcessCleanups = (context) => {
             return Promise.resolve();
         }
         if (runtimeTeardown?.runner !== runner) {
-            // An update relaunch that left the runtime as it is detaches from
-            // it instead: it stays up, turns and agent shells included, and
-            // the next process attaches within seconds (it exits on its own
-            // 10 s after the last app goes, should none come).
             const keep = isRelaunching() && context.state.keepRuntimeAcrossRelaunch;
             const teardown = keep ? runner.stop({}).catch((error) => {
                 console.warn("[cleanup] Runtime detach failed:", error);
@@ -58,8 +47,6 @@ export const registerBootstrapProcessCleanups = (context) => {
         context.services.claudeLocalAccounts.dispose();
         context.services.engineAccountAccess.dispose();
     });
-    // A memory edit made just before quit still reaches the cloud. A relaunch
-    // leaves it to the next process, which syncs a second after it starts.
     processRuntime.registerCleanup("before-quit", "memory-sync", async () => {
         if (!isRelaunching()) {
             await context.services.memorySync.flush(3000);
@@ -72,8 +59,6 @@ export const registerBootstrapProcessCleanups = (context) => {
             component: "desktop-main",
             phase: "stopping",
         });
-        // A relaunch leaves the events in the spool for the next process,
-        // seconds away, instead of holding the restart on a network send.
         await context.services.telemetry.close({
             timeoutMs: 3000,
             send: !isRelaunching(),
@@ -119,23 +104,13 @@ export const registerBootstrapProcessCleanups = (context) => {
         const stellaDataDir = context.state.stellaDataDirPath ?? context.config.stellaDataDirPath;
         await stopOfficePreviewSessions(stellaDataDir);
     });
-    // Meeting capture finalizes any in-flight recording (patches WAV headers,
-    // writes session.json) before the daemon exits.
     processRuntime.registerCleanup("before-quit", "meeting-capture-daemon", async () => {
         await context.state.meetingCaptureController?.shutdown();
         context.state.meetingCaptureController = null;
     });
-    // The desktop_automation daemon is a long-lived child process spawned
-    // on demand by stella-computer. macOS doesn't reload an executable
-    // under a live process, so without killing it on quit a rebuilt
-    // binary would never be picked up until the user manually killed the
-    // old one. Stopping here also clears the per-session pidfiles +
-    // sockets so the next launch starts clean.
     processRuntime.registerCleanup("before-quit", "desktop-automation-daemon", async () => {
         await stopAllDesktopAutomationDaemons();
     });
-    // Long-lived `--serve` helper daemons (window_info, recent_apps). Kill them
-    // on quit so a rebuilt binary is picked up next launch and no orphan lingers.
     processRuntime.registerCleanup("before-quit", "native-helper-daemons", () => {
         stopNativeHelperDaemons();
     });
@@ -144,9 +119,6 @@ export const registerBootstrapProcessCleanups = (context) => {
         context.state.globalInputHooksStarted = false;
         context.state.globalInputHooksStartScheduled = false;
     });
-    // Registered last so it runs first. Teardown happens in the runtime, so
-    // starting it here overlaps it with every other cleanup instead of
-    // leaving it to whatever remains of the quit budget.
     processRuntime.registerCleanup("before-quit", "runtime-shells", () => {
         void startRuntimeTeardown();
     });

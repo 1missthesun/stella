@@ -25,7 +25,6 @@ import {
 } from "./client-protocol.js";
 import { forkDelayed, type HostTimerHandle } from "./effect-runtime.js";
 
-/** What the client server needs from the runtime host. */
 export type RuntimeClientServerHost = {
   start(): Promise<void>;
   stop(): Promise<unknown>;
@@ -44,28 +43,14 @@ export type RuntimeClientServerOptions = {
     params: RuntimeClientAttachParams,
     hostHandlers: RuntimeHostHandlers,
   ) => RuntimeClientServerHost;
-  /** How long a host callback waits for a client to attach. */
   clientWaitMs?: number;
-  /** A client asked the runtime to exit. */
   onShutdownRequested?: () => void;
-  /**
-   * The app is quitting: interrupt its work now and exit once it has
-   * detached. Without this, a quit is handled as `onShutdownRequested`.
-   */
   onQuitRequested?: () => Promise<void>;
-  /**
-   * This runtime's identity. When set, an attach naming another instance or
-   * root is refused, and the attach result reports the `serverId`.
-   */
   identity?: RuntimeServerIdentity;
 };
 
 const DEFAULT_CLIENT_WAIT_MS = 30_000;
 
-/**
- * Callbacks with nothing to return: a missing app just means nobody sees
- * them, so they settle instead of rejecting (the host fires some unawaited).
- */
 const BEST_EFFORT_HANDLERS = new Set<RuntimeHostHandler>([
   "displayUpdate",
   "showNotification",
@@ -119,18 +104,9 @@ const sameRoot = (
   a.initializeParams.stellaWorkspacePath ===
     b.initializeParams.stellaWorkspacePath;
 
-/**
- * The runtime side of the client protocol. It owns the runtime host: the
- * first client to attach creates and starts it, and it keeps running while
- * clients come and go. Host events go to every attached client; host
- * callbacks go to the newest one, and wait for a client when none is
- * attached (an app restart).
- */
 export class RuntimeClientServer {
   private readonly connections = new Set<JsonRpcPeer>();
-  /** Attached clients, oldest first. The newest serves host callbacks. */
   private readonly clients: JsonRpcPeer[] = [];
-  /** The live attachment of each attached connection. */
   private readonly attachments = new Map<JsonRpcPeer, string>();
   private readonly clientWaiters = new Set<() => void>();
   private host: RuntimeClientServerHost | null = null;
@@ -140,7 +116,6 @@ export class RuntimeClientServer {
 
   constructor(private readonly options: RuntimeClientServerOptions) {}
 
-  /** Take one connection from the transport. */
   attach(peer: JsonRpcPeer): void {
     if (this.closed) {
       peer.dispose();
@@ -162,7 +137,6 @@ export class RuntimeClientServer {
         await this.options.onQuitRequested();
         return { ok: true };
       }
-      // After the reply goes out.
       setImmediate(() => this.options.onShutdownRequested?.());
       return { ok: true };
     });
@@ -178,7 +152,6 @@ export class RuntimeClientServer {
     return this.clients.length;
   }
 
-  /** Stop the host, then drop every connection. */
   async close(): Promise<void> {
     if (this.closed) return;
     this.closed = true;
@@ -224,8 +197,6 @@ export class RuntimeClientServer {
         "This runtime serves a different Stella root; attach to that root's runtime.",
       );
     }
-    // Bind (or rebind) this connection's attachment before it can receive
-    // anything: every frame sent here from now on names it.
     const attachmentId = fence.attachmentId ?? randomUUID();
     const previousAttachment = this.attachments.get(peer);
     if (previousAttachment && previousAttachment !== attachmentId) {
@@ -235,8 +206,6 @@ export class RuntimeClientServer {
       });
     }
     this.attachments.set(peer, attachmentId);
-    // A client is a callback target before the host starts: starting reads
-    // the device identity through it.
     if (!this.clients.includes(peer)) this.clients.push(peer);
     for (const wake of this.clientWaiters) wake();
     this.clientWaiters.clear();
@@ -284,7 +253,6 @@ export class RuntimeClientServer {
       await host.ensureWorkerStarted();
     })();
     this.hostReady = ready;
-    // A host that failed to start is discarded, so the next attach retries.
     ready.catch(async () => {
       if (this.host !== host) return;
       this.host = null;
@@ -303,8 +271,6 @@ export class RuntimeClientServer {
       args?: unknown;
       attachmentId?: unknown;
     } | null;
-    // A call naming an attachment that is no longer this connection's live
-    // one was issued for a route that has since been replaced.
     const callAttachment = readAttachmentId(params?.attachmentId);
     const liveAttachment = this.attachments.get(peer);
     if (callAttachment && callAttachment !== liveAttachment) {
@@ -347,7 +313,6 @@ export class RuntimeClientServer {
     return handlers;
   }
 
-  /** Run one host callback on the newest client, waiting for one if needed. */
   private async requestClient(
     name: RuntimeHostHandler,
     args: unknown[],

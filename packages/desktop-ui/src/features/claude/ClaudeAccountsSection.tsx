@@ -35,19 +35,6 @@ import { useClaudeLocalAccounts } from "./use-claude-local-accounts";
 import { useClaudeLogin, type ClaudeLoginTarget } from "./use-claude-login";
 import "./claude-accounts.css";
 
-/**
- * The owner's Claude accounts, around one question: what does each place
- * run right now, and why. The owner makes one choice (an account, or each
- * computer's own Claude Code login) and it applies to every computer and
- * the cloud. Below it, every place shows the account it actually runs and
- * whether that is the choice or the computer's own login; a place without a
- * login for the chosen account says so and offers to sign it in, here, in
- * the cloud, or on another computer from this one.
- *
- * Stella keeps only identities. Every place signs in with Claude Code's own
- * `claude auth login`, on Anthropic's own page.
- */
-
 const K = "settings.engineAccounts";
 const C = "settings.engineAccounts.claude";
 
@@ -62,12 +49,10 @@ type PlaceView = {
   online: boolean;
   cliInstalled: boolean | undefined;
   inUseEmail?: string;
-  /** Something here is signed in, even when Claude Code didn't say who. */
   signedIn: boolean;
   reason?: "selected" | "own_login" | "other_login";
   ownLoginEmail?: string;
   missingChosen: boolean;
-  /** This place reported anything at all about Claude Code. */
   reported: boolean;
 };
 
@@ -78,7 +63,6 @@ export function ClaudeAccountsSection({
 }: {
   settings: EngineSettings | undefined;
   refreshing: boolean;
-  /** The owner's cloud can hold a sign-in (they are signed in to Stella). */
   cloudAvailable: boolean;
 }) {
   const t = useT();
@@ -181,8 +165,6 @@ export function ClaudeAccountsSection({
         : t(`${C}.automaticToast`),
     );
   };
-
-  // --- What each place runs ----------------------------------------------------
 
   const placeFromOverview = (place: ClaudePlaceStatus): PlaceView => ({
     key: place.kind === "cloud" ? "cloud" : `device:${place.deviceId}`,
@@ -301,8 +283,6 @@ export function ClaudeAccountsSection({
     return place.kind === "cloud" ? t(`${C}.reasonCloudLogin`) : t(`${C}.reasonOtherLogin`);
   };
 
-  // --- Adding an account ---------------------------------------------------------
-
   const otherOnline = places.filter(
     (place) => place.kind === "device" && place.online && place.cliInstalled !== false,
   );
@@ -361,8 +341,6 @@ export function ClaudeAccountsSection({
         {t(`${K}.addClaude`)}
       </Button>
     );
-
-  // --- Account rows --------------------------------------------------------------
 
   const accountRow = (account: EngineConnection) => {
     const config = localFor(account.email);

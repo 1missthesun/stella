@@ -63,15 +63,8 @@ import { useT } from "../src/i18n";
 
 const HERO_SIZE = 76;
 const HERO_ID = "hero";
-/** Same inset the chat list uses, so bubbles sit where they will in chat. */
 const HORIZONTAL_INSET = 12;
 
-/**
- * First run, as a conversation. Stella introduces herself in scripted
- * messages that look exactly like the chat; each carries a card the user
- * answers (or skips), and typing anything into the composer goes straight
- * to the real chat with that message sent.
- */
 export default function OnboardingScreen() {
   const colors = useColors();
   const t = useT();
@@ -106,12 +99,9 @@ export default function OnboardingScreen() {
   );
 
   const goSignIn = useCallback(() => {
-    // Progress is already saved on this step, so coming back from sign-in
-    // (signed in, or as a guest again) lands on this same message.
     router.replace("/login");
   }, [router]);
 
-  /* ── Viewport + scrolling ─────────────────────────────────────── */
   const [viewport] = useState(createViewportStore);
   const scrollRef = useRef<ScrollView | null>(null);
   const followEndRef = useRef(false);
@@ -127,14 +117,12 @@ export default function OnboardingScreen() {
     const firstRender = scrollIntentKeyRef.current === null;
     scrollIntentKeyRef.current = scrollIntentKey;
     if (firstRender && entries.length > 1) {
-      // Resumed mid-flow: open on the message waiting for an answer.
       const waiting = [...entries].reverse().find((entry) => entry.kind === "assistant");
       pendingEntryScrollRef.current = waiting?.id ?? null;
     } else if (typing) {
       followEndRef.current = true;
     } else if (lastEntry?.fresh && lastEntry.kind === "assistant") {
       followEndRef.current = false;
-      // The greeting sits right under the hero: leave the opening framed.
       if (entries.length > 1) pendingEntryScrollRef.current = lastEntry.id;
     } else if (lastEntry?.fresh) {
       followEndRef.current = true;
@@ -153,8 +141,6 @@ export default function OnboardingScreen() {
       viewport.setLayout(id, y, height);
       if (pendingEntryScrollRef.current !== id) return;
       pendingEntryScrollRef.current = null;
-      // Cards are tall: bring a new message in from its top (the scroll view
-      // clamps at the end of the transcript).
       const target = Math.max(0, y - 8);
       requestAnimationFrame(() => {
         scrollRef.current?.scrollTo({ y: target, animated: true });
@@ -170,11 +156,9 @@ export default function OnboardingScreen() {
     [viewport],
   );
 
-  // Voice-over hears each message as it arrives.
   const lastFreshAssistant =
     lastEntry?.kind === "assistant" && lastEntry.fresh ? lastEntry.step : null;
 
-  /* ── Prose + cards per step ───────────────────────────────────── */
   const proseFor = useCallback(
     (step: OnboardingStep): string =>
       step === "account" && signedIn
@@ -290,7 +274,6 @@ export default function OnboardingScreen() {
   const progress =
     (steps.indexOf(currentStep) + (finishing ? 1 : 0)) / steps.length;
 
-  /* ── Keyboard: the composer rides it on the UI thread ─────────── */
   const keyboard = useAnimatedKeyboard();
   const composerLift = useAnimatedStyle(() => ({
     transform: [

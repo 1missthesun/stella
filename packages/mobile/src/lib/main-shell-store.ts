@@ -4,43 +4,24 @@ import type { StoredPhoneAccess } from "./phone-access";
 import type { ModelSettings } from "./use-cloud-model-settings";
 import type { ChatArtifact, MobileTask } from "../types";
 
-/**
- * What the chat surface knows and the rest of the shell (sidebar, Files,
- * Settings) shows.
- *
- * The chat route owns the conversation thread and the paired-computer state,
- * but the surfaces that expose them are the `(main)` layout above it and the
- * sibling tab routes. The chat stays mounted under every tab, so a tiny
- * external store bridges them without threading props through the router:
- * the chat publishes, the others subscribe.
- */
 export type ActivityHubData = {
-  /** Background tasks in the conversation (running + settled). */
   tasks: MobileTask[];
-  /** Artifacts in the conversation, newest first. */
   artifacts: ChatArtifact[];
-  /** Desktop pairing used to load artifact contents for the viewer. */
   access: StoredPhoneAccess | null;
-  /** The cloud conversation whose journal lists every file it holds. */
   conversationId?: string | null;
-  /** Changes whenever the conversation gains a message. */
   revision?: string | null;
 };
 
-/** The paired computer and where turns run, for Settings' Computer section. */
 export type ComputerControl = {
-  /** Preferred paired computer; `null` while nothing is paired yet. */
   access: StoredPhoneAccess | null;
   pairedDesktops: StoredPhoneAccess[];
   platformLabel: string;
   statusLabel: string;
   statusAvailable: boolean | null;
   connecting: boolean;
-  /** Bubble a freshly-paired computer up so the chat re-targets it. */
   onRepaired: (access: StoredPhoneAccess) => void;
   executionTarget: AutomaticExecutionTarget;
   onExecutionTargetChange: (target: AutomaticExecutionTarget) => void;
-  /** The account's model selection, or `null` when its controls are hidden. */
   model: {
     label: string;
     settings: ModelSettings;
@@ -49,14 +30,7 @@ export type ComputerControl = {
   onComposerModelPinnedChange: (next: boolean) => void;
 };
 
-/**
- * A route-owned replacement for the shell's top-left back control. A detail
- * route that stacks its own in-place view (an open workspace app on the Apps
- * route) publishes one so the single shell chevron unwinds that view first
- * instead of popping the route, and Android hardware back does the same.
- */
 export type BackOverride = {
-  /** Localized accessibility label for the chevron while the override holds. */
   label: string;
   onPress: () => void;
 };
@@ -65,7 +39,6 @@ type ShellState = {
   activity: ActivityHubData | null;
   computer: ComputerControl | null;
   back: BackOverride | null;
-  /** A page's own control for the top bar's right-hand slot. */
   accessory: ReactNode;
 };
 
@@ -134,10 +107,6 @@ export function useActivityHub(): ActivityHubData | null {
 export function useComputerControl(): ComputerControl | null {
   return useSyncExternalStore(subscribe, readComputer, readComputer);
 }
-
-// ---------------------------------------------------------------------------
-// Sidebar open requests: the running-tasks pill in the chat asks the layout to
-// reveal the sidebar, where the activity now lives.
 
 const openRequestListeners = new Set<() => void>();
 

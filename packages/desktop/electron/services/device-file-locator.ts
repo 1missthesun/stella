@@ -36,7 +36,6 @@ export type DeviceFileLocator = {
     drivePath: string,
     maxBytes: number,
   ) => Promise<{ bytes: Uint8Array; sizeBytes: number; mimeType: string }>;
-  /** Which of `paths` `deviceId` recorded as files it shared. */
   recordedBy: (paths: readonly string[], deviceId: string) => Promise<Set<string>>;
 };
 

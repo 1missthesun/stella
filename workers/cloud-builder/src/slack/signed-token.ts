@@ -1,9 +1,3 @@
-/**
- * Small signed tokens for Stella for Slack: `<prefix>.<payload>.<signature>`,
- * an HMAC-SHA256 over a per-kind domain string with BUILDER_SERVICE_SECRET.
- * The payload is JSON with an `exp` (epoch ms); expired tokens don't verify.
- */
-
 import { builderServiceSecret, builderServiceSecrets } from "../secret-rotation.js";
 
 const base64Url = (bytes: Uint8Array): string => {

@@ -124,20 +124,13 @@ const getAuth = (): SiteAuth => {
   return { baseUrl, authToken };
 };
 
-/** The bridge reads one request line of at most 64 KiB. */
 const MAX_BRIDGE_REQUEST_BYTES = 60 * 1024;
 
-/** The bridge never received the call, so sending it directly cannot repeat it. */
 const bridgeNotReached = (error: unknown): boolean =>
   /ENOENT|ECONNREFUSED|EACCES|unsupported|unknown method/u.test(
     error instanceof Error ? error.message : String(error),
   );
 
-/**
- * Inside Stella the call goes through the runtime, which holds the live
- * session and refreshes it, so a token that expired in this shell's
- * environment never matters. Elsewhere it goes straight to the API.
- */
 const callX = async (operation: XApiOperation): Promise<unknown> => {
   const socketPath = process.env.STELLA_CLI_BRIDGE_SOCK?.trim();
   let result: XApiHttpResult | null = null;

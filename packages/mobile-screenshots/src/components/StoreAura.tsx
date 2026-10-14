@@ -3,19 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 
 export interface StoreAuraProps {
-  /** Zero-based position in the complete store sequence. */
   index: number;
-  /** Number of adjacent segments spanning the same panorama. */
   count: number;
   className?: string;
 }
 
-/**
- * The frozen website shader, with the OG's soft edge and reflected lower echo.
- * Both layers sample the same full-width panorama before their host clips it;
- * blur never runs on isolated tiles, so neighboring slides remain continuous.
- * Parent positions this band over white. Await data-aura-ready before export.
- */
 export function StoreAura({ index, count, className }: StoreAuraProps) {
   const host = useRef<HTMLSpanElement>(null);
   const [ready, setReady] = useState(false);

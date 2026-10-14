@@ -46,10 +46,6 @@ import {
 } from "./support.js";
 import { OwnerGateDeviceSockets } from "./device-sockets.js";
 
-/**
- * Dispatch placement: offers to devices, executor frames and claims, and the
- * alarm that expires them.
- */
 export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
   protected dispatchRow(dispatchId: string): DispatchRow | undefined {
     return this.ctx.storage.sql
@@ -67,7 +63,6 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
     this.send(socket, { type: "dispatch", dispatch: dispatchSummary(row) });
   }
 
-  /** Every transition goes through here: one revision bump. */
   protected async patchDispatch(
     row: DispatchRow,
     patch: Record<string, string | number | null>,
@@ -97,10 +92,6 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
     return next;
   }
 
-  /**
-   * A device attempt of an owner agent thread ended: hand the outcome to the
-   * thread ledger, which records it and wakes a cloud requester.
-   */
   protected async reportDeviceAgentSettled(row: DispatchRow): Promise<void> {
     const key =
       row.kind === "agent"
@@ -192,11 +183,6 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
     return eligible;
   }
 
-  /**
-   * The devices an offer for this dispatch may reach, before eligibility is
-   * consulted. One function so a submit and a re-offer after a release can
-   * never disagree about who the work was ever for.
-   */
   protected offerCandidateIds(
     row: Pick<
       DispatchRow,
@@ -226,8 +212,6 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
       (row.ingress === "desktop" ||
         row.ingress === "browser" ||
         row.ingress === "schedule" ||
-        // A cloud agent spawned onto a named device (agent threads only;
-        // the public submit route never admits cloud ingress).
         row.ingress === "cloud") &&
       row.requested_target_mode === "device" &&
       row.requested_executor_device_id
@@ -279,12 +263,6 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
     );
   }
 
-  /**
-   * A device that (re)connects ready gets the offers still open to it, bound
-   * to its new session. One sent to the session it had before never arrived
-   * or can no longer be claimed, so without this the work would wait out the
-   * window and fall back while the computer it was for is right here.
-   */
   protected offerAgainTo(attachment: PresenceAttachment, now: number): void {
     const presence = this.presenceRow(attachment.deviceId);
     if (!presence?.connected || !presence.ready) return;
@@ -319,12 +297,6 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
     }
   }
 
-  /**
-   * The named computer of a dispatch when it is between connections: its
-   * presence dropped within the reconnect grace and it was eligible as it
-   * stood. Work aimed at it waits for it rather than falling back at once.
-   * A computer that is connected but not taking work is not waited for.
-   */
   protected reconnectingDevice(args: {
     snapshot: OwnerSnapshot;
     deviceId: string;
@@ -357,11 +329,6 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
     return eligible ? presence : null;
   }
 
-  /**
-   * An offer to one named computer that lapsed while that computer had no
-   * live presence (it is reconnecting): how long to keep it open for it,
-   * or null to take the fallback now.
-   */
   protected reconnectDeadline(row: DispatchRow, now: number): number | null {
     if (
       row.requested_target_mode !== "device" ||
@@ -468,10 +435,6 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
       return await this.runCloudBranch(committed, now);
     }
     const explicitDevice = row.requested_target_mode === "device";
-    // No consent prompt is raised here. Reaching this path means an offer did
-    // go out, so the device had agreed at submit; a refusal now is the owner
-    // having just revoked it, and asking them again on the spot would be
-    // arguing with them. The message still says what happened.
     const refusal = explicitDevice
       ? this.selectedDeviceRefusal({
           deviceId: row.requested_executor_device_id,
@@ -514,13 +477,6 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
     return blocked;
   }
 
-  // ── The cloud branch ──────────────────────────────────────────────────
-
-  /**
-   * The owner checks a dispatch needs even when it takes no admission: the
-   * write fence and the generation the caller pinned. Same verdicts `admit`
-   * would have produced, without consuming a start or a slot.
-   */
   protected async submitSnapshot(
     expectedGeneration: string | undefined,
     now: number,
@@ -619,16 +575,12 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
         });
       }
     } catch (error) {
-      // The dispatch stays `cancel_pending`; the executing side's terminal
-      // still settles it, and the operator sees why the stop did not land.
       log("error", "dispatch_cloud_cancel_failed", {
         dispatchId: row.dispatch_id,
         message: error instanceof Error ? error.message : String(error),
       });
     }
   }
-
-  // ── Executor frames ───────────────────────────────────────────────────
 
   protected async handleExecutorFrame(
     socket: WebSocket,
@@ -668,9 +620,6 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
       await this.handleClaim(socket, attachment, row, frame, now);
       return;
     }
-    // Everything past a claim is bound to the exact proven session that holds
-    // it: a second device, or the same device after a reconnect, cannot move
-    // work it does not own.
     if (
       row.executor_device_id !== attachment.deviceId ||
       row.executor_presence_session_id !== attachment.presenceSessionId
@@ -697,9 +646,6 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
         now,
         { notifyExecutor: false },
       );
-      // Its own offer is spent, and a claim already withdrew everyone else's,
-      // so the dispatch takes the fallback the policy chose rather than
-      // re-offering the work to the computer that just declined it.
       this.ctx.storage.sql.exec(
         `UPDATE dispatch_offers SET status = 'withdrawn', updated_at = ?
           WHERE dispatch_id = ? AND device_id = ?`,
@@ -735,7 +681,6 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
         {
           state: "computer_accepted",
           placement: "computer",
-          // The desktop's local inbox is now the only copy.
           payload_json: null,
           payload_expires_at: null,
           lease_expires_at: now + DISPATCH_ACCEPTED_LEASE_MS,
@@ -780,10 +725,6 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
             ? "computer_running"
             : "computer_accepted"
           : row.state;
-      // The computer renews every 25 s. A lease with most of its time left
-      // is answered without rewriting the row, which was a large share of
-      // the owner object's writes while agents ran; it is extended once it
-      // falls below three quarters, so it never drops under a minute here.
       if (
         state === row.state &&
         row.lease_expires_at !== null &&
@@ -955,8 +896,6 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
     await this.scheduleAlarm(now);
   }
 
-  // ── Alarms ────────────────────────────────────────────────────────────
-
   /**
    * Arm the one alarm at the earliest deadline this object holds. Every
    * deadline comes from live state: open sockets (`sockets()` and the owner
@@ -972,7 +911,6 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
     options: {
       fenceDeadline?: number | null;
       preserveExisting?: boolean;
-      /** Set by `alarm()` for its own re-arm, the only place a loop can form. */
       afterAlarm?: boolean;
     } = {},
   ): Promise<void> {
@@ -997,12 +935,6 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
       add(source, at);
     };
     add("owner_store", this.ownerStore().nextDeadline(handledAt));
-    // A proven device going quiet needs no wake while nobody watches the
-    // device list: request-time readers check staleness against
-    // `presenceRow`, in-flight device calls have their own deadlines, and
-    // waking to re-check would undo hibernation. While `devices.list` is
-    // watched, a connection left half-open (a laptop asleep, its network
-    // gone) is reaped when it goes stale, so the pushed list shows it offline.
     const watched = this.ownerStore().watching("devices.list");
     for (const socket of this.sockets()) {
       const attachment = this.attachment(socket);
@@ -1056,8 +988,6 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
       next = Math.min(next, existingAlarm);
     }
     if (options.afterAlarm) {
-      // The object hibernates between alarms, so the streak is stored; it is
-      // written only while alarms keep re-arming at once, never otherwise.
       const stored =
         (await this.ctx.storage.get<number>(ALARM_HOT_STREAK_KEY)) ?? 0;
       if (Number.isFinite(next) && next - now < ALARM_HOT_REARM_MS) {
@@ -1070,7 +1000,6 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
             now +
               Math.min(ALARM_MAX_BACKOFF_MS, ALARM_MIN_DELAY_MS * 2 ** over),
           );
-          // Once per doubling, so a stuck deadline is found without flooding logs.
           if ((over & (over - 1)) === 0) {
             log("error", "owner_alarm_hot_loop", {
               ownerId: this.ownerId(),
@@ -1096,11 +1025,6 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
     }
   }
 
-  /**
-   * Leases, in one pass. An accepted or running computer dispatch whose lease
-   * lapses becomes `reconciliation_required` and stays there: rerouting work
-   * a computer has taken durable ownership of would run it twice.
-   */
   protected async expireDispatches(now: number): Promise<void> {
     const expired = this.ctx.storage.sql
       .exec<DispatchRow>(
@@ -1151,9 +1075,6 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
         );
         continue;
       }
-      // A start the builder refused as unavailable, retried once. This is the
-      // one case where `cloud_committed` is known not to have started, so
-      // replaying it cannot double-run a turn.
       if (
         row.state === "cloud_committed" &&
         row.cloud_retry_at !== null &&
@@ -1195,7 +1116,6 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
     }
   }
 
-  // Implemented further up the chain.
   abstract release(input: { turnId: string }): Promise<void>;
   protected abstract runCloudBranch(
     row: DispatchRow,

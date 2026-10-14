@@ -1,11 +1,3 @@
-/**
- * A message sent from here is admitted (its row reaches the record) before
- * its turn shows as running whenever Stella runs elsewhere: the record comes
- * live from the cloud, while another computer's turn reaches this one only
- * through the runtime's next journal read. The chat keeps working across that
- * hand-off, until the turn shows as running, a reply follows the message, or
- * the hold runs out.
- */
 import { useEffect, useRef, useState } from "react";
 import type { EventRecord } from "@stella/contracts/local-chat";
 
@@ -30,7 +22,6 @@ const isMessage = (record: EventRecord, messageId: string) =>
   record._id === messageId ||
   (record.payload as { originUserMessageId?: unknown } | undefined)?.originUserMessageId === messageId;
 
-/** Whether the message is in the record with no reply after it yet. */
 const awaitingReply = (records: readonly EventRecord[], messageId: string): boolean => {
   let found = false;
   for (const record of records) {

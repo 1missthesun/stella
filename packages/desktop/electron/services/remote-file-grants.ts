@@ -20,7 +20,6 @@ import type { LocalChatEventRecord } from "@stella/runtime/kernel/storage/shared
 export const isPathInside = (candidate: string, base: string): boolean =>
   candidate === base || candidate.startsWith(base.endsWith(path.sep) ? base : base + path.sep);
 
-/** The paths assistant replies and agent reports in local chat events link. */
 export const localChatLinkedPaths = (
   events: ReadonlyArray<LocalChatEventRecord>,
 ): string[] => {
@@ -39,7 +38,6 @@ export const localChatLinkedPaths = (
   return paths;
 };
 
-/** `requested` and every folder above it, nearest first. */
 export const pathAndAncestors = (requested: string): string[] => {
   const out: string[] = [];
   let current = path.resolve(requested);
@@ -55,10 +53,6 @@ export const pathAndAncestors = (requested: string): string[] => {
 const realOrNull = async (target: string): Promise<string | null> =>
   await fs.realpath(target).catch(() => null);
 
-/**
- * True when one of `linkedPaths` grants `resolved` (absolute, normalized).
- * Only paths that exist on this computer grant anything.
- */
 export const linkedPathsGrant = async (
   resolved: string,
   linkedPaths: readonly string[],

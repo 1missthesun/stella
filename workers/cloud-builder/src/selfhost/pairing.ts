@@ -1,23 +1,3 @@
-/**
- * Device pairing on an owner-mode server (`/api/auth/device-pairing/*`).
- *
- *   POST start   admin bearer or an owner session/JWT → {pairingId, secret, expiresAt, link}
- *   GET  status  same auth, ?pairingId= → {status, deviceName, claimedAt}
- *   POST cancel  same auth, {pairingId}
- *   POST claim   no auth, {pairingId, secret, deviceName?, platform?} → {sessionToken, userId, server}
- *
- * The secret is 256 random bits, kept only as its SHA-256 and compared in
- * constant time. A pairing lives PAIRING_TTL_MS, allows PAIRING_MAX_ATTEMPTS
- * wrong secrets, and is claimed at most once (a conditional UPDATE). Claims
- * are rate limited per IP. A claim mints the owner a normal Better Auth
- * session, signed like the bearer every sign-in hands out.
- *
- * Review codes (`{review: true, days}` on start; admin bearer, and only with
- * STELLA_REVIEW_PAIRING=1) are reusable until they expire or are canceled;
- * every claim still goes through the per-IP limit and the wrong-secret
- * lockout, and canceling one revokes each session it minted.
- */
-
 import {
   PAIRING_MAX_ATTEMPTS,
   PAIRING_TTL_MS,
@@ -122,7 +102,6 @@ const rateKeyForIp = (ip: string): string => {
   return `${groups.slice(0, 4).join(":")}::/64`;
 };
 
-/** Counts one event against `key`; false once the window's limit is reached. */
 const withinRate = async (env: Cloudflare.Env, key: string, limit: number, now: number): Promise<boolean> => {
   const windowStart = now - (now % CLAIM_WINDOW_MS);
   const row = await db(env)
@@ -271,7 +250,6 @@ const cancel = async (request: Request, env: Cloudflare.Env): Promise<Response> 
   return json({ canceled: Boolean(result.meta.changes), ...(signedOut ? { signedOut } : {}) });
 };
 
-/** Signs out every device a reusable code let in; their JWTs are refused at once. */
 const revokePairingSessions = async (env: Cloudflare.Env, pairingId: string, ownerUserId: string): Promise<number> => {
   const { results } = await db(env)
     .prepare(

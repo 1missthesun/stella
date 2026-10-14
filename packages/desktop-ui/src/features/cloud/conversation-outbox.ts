@@ -6,63 +6,36 @@ import type { JournalRecord } from "@stella/contracts/conversation-protocol";
 import type { CloudAttachment } from "./cloud-composer-store";
 import type { DesktopExecutionTarget } from "../execution-placement/execution-target-store";
 
-/** Exact authority that may read, mutate, or replay one persisted send. */
 export type CloudConversationOutboxAuthority = {
   accountScope: string;
   ownerGeneration: string;
 };
 
 export type PendingCloudTurnSubmission = {
-  /**
-   * Immutable conversation authority from the first send. On the desktop a
-   * send with no conversation open mints this id itself, so the first turn
-   * creates the conversation under an id the client already knows. `null`
-   * survives only on the web shell, where placement requires an open
-   * conversation. It must not be replaced after admission, or a retry would
-   * change payloads.
-   */
   requestedConversationId: string | null;
-  /** Exact model-visible prompt; retries must not redecorate it. */
   prompt: string;
-  /** Exact image paths sent with the idempotent mutation. */
   imagePaths: readonly string[];
-  /** Pasted and quoted text sent with it: read by the model, shown as chips. */
   context?: CloudTurnContext;
-  /** Immutable composer snapshot used for guarded post-success clearing. */
   attachments: readonly CloudAttachment[];
-  /** Frozen reply-language hint; null preserves the API's default behavior. */
   locale: string | null;
-  /** Frozen explicit provider/model route for idempotent retries. */
   execution: CloudExecutionSelection | null;
-  /** Frozen placement choice. Missing only on outbox rows from older builds. */
   executionTarget?: DesktopExecutionTarget;
 };
 
 export type PendingPrompt = {
-  /** Immutable auth subject scope that owns this optimistic row. */
   accountScope: string;
-  /** Immutable owner-lifecycle generation that admitted this send. */
   ownerGeneration: string;
   clientMsgId: string;
   text: string;
   createdAtMs: number;
-  /** Null until admission answers; then the canonical display conversation. */
   conversationId: string | null;
-  /** Null until admission answers. */
   turnId: string | null;
-  /** Placement identity; also becomes the canonical journal clientMsgId. */
   dispatchId: string | null;
-  /** Stop pressed before placement admission returned its dispatch id. */
   cancelRequested: boolean;
-  /** Set when the send failed; the row stays visible with a readable reason. */
   error: string | null;
-  /** A transport-ambiguous failure is re-armed once on the next process load. */
   retryOnNextActivation: boolean;
-  /** True while the exact retry payload is present in synchronous storage. */
   durable: boolean;
-  /** True after exact canonical admission/terminal evidence removed storage. */
   deliveryAcknowledged: boolean;
-  /** Frozen wire payload reused byte-for-byte by Retry. */
   submission: PendingCloudTurnSubmission;
 };
 
@@ -238,7 +211,6 @@ const persistedEntry = (entry: PendingPrompt): PersistedPendingPrompt => ({
   cancelRequested: entry.cancelRequested,
   error: entry.error,
   retryOnNextActivation: entry.retryOnNextActivation,
-  // Persisted rows are, by definition, still awaiting acknowledgement.
   deliveryAcknowledged: false,
   submission: entry.submission,
 });
@@ -337,8 +309,6 @@ export const createCloudConversationOutbox = (
       const raw = storage.getItem(key);
       const entry = raw === null ? null : parseEnvelope(raw);
       if (!entry || cloudConversationOutboxStorageKey(entry) !== key) {
-        // Corrupt or key-swapped records are never replayed under inferred
-        // authority. Cleanup is synchronous and must succeed before sending.
         storage.removeItem(key);
         continue;
       }
@@ -348,7 +318,6 @@ export const createCloudConversationOutbox = (
   };
 
   return {
-    /** Purges every other account/generation before hydrating this authority. */
     activate(authority: CloudConversationOutboxAuthority): PendingPrompt[] {
       const storage = requireStorage();
       const current: PendingPrompt[] = [];
@@ -369,7 +338,6 @@ export const createCloudConversationOutbox = (
       return current.sort((a, b) => a.createdAtMs - b.createdAtMs);
     },
 
-    /** Account-switch fence used before the new generation query resolves. */
     purgeOtherAccounts(accountScope: string): void {
       const storage = requireStorage();
       for (const entry of readAll()) {
@@ -379,7 +347,6 @@ export const createCloudConversationOutbox = (
       }
     },
 
-    /** Synchronous commit point. Callers may invoke the network only after it. */
     enqueue(entry: PendingPrompt): PendingPrompt {
       const storage = requireStorage();
       const all = readAll();
@@ -413,10 +380,6 @@ export const createCloudConversationOutbox = (
       return durable;
     },
 
-    /**
-     * Updates an existing exact-authority record. Missing means a stale async
-     * callback arrived after retirement; it must not recreate the outbox row.
-     */
     update(entry: PendingPrompt): PendingPrompt | null {
       const storage = requireStorage();
       const key = cloudConversationOutboxStorageKey(entry);
@@ -438,7 +401,6 @@ export const createCloudConversationOutbox = (
       return durable;
     },
 
-    /** Exact-authority removal for canonical acknowledgement or user discard. */
     remove(entry: PendingPrompt): boolean {
       const storage = requireStorage();
       const key = cloudConversationOutboxStorageKey(entry);
@@ -455,7 +417,6 @@ export const createCloudConversationOutbox = (
       return true;
     },
 
-    /** Test/acceptance visibility; production replay uses `activate`. */
     list(): PendingPrompt[] {
       return readAll().sort((a, b) => a.createdAtMs - b.createdAtMs);
     },
@@ -464,8 +425,6 @@ export const createCloudConversationOutbox = (
 
 export const cloudConversationOutbox =
   createCloudConversationOutbox(browserStorage);
-
-// ---------------------------------------------------------------- pending
 
 const pendingListeners = new Set<() => void>();
 let pending: readonly PendingPrompt[] = [];
@@ -601,7 +560,6 @@ export const pendingPrompts = {
       ) ?? null
     );
   },
-  /** The mutation answered: we now know where the prompt landed. */
   bind(
     authority: CloudConversationOutboxAuthority,
     clientMsgId: string,
@@ -644,7 +602,6 @@ export const pendingPrompts = {
     if (next.length !== pending.length) emitPending(next);
     inFlightPending.delete(pendingKey(authority, clientMsgId));
   },
-  /** Persists a storage-denied row if needed, then re-arms exact retry. */
   prepareRetry(
     authority: CloudConversationOutboxAuthority,
     clientMsgId: string,
@@ -681,7 +638,6 @@ export const pendingPrompts = {
       return null;
     }
   },
-  /** Removes persistence only after a matching canonical turn admission. */
   acknowledgeAdmission(
     authority: CloudConversationOutboxAuthority,
     clientMsgId: string,
@@ -721,7 +677,6 @@ export const pendingPrompts = {
     );
     return true;
   },
-  /** Placement terminal evidence can acknowledge even before a turn id exists. */
   acknowledgeTerminal(
     authority: CloudConversationOutboxAuthority,
     clientMsgId: string,
@@ -751,7 +706,6 @@ export const pendingPrompts = {
     );
     return true;
   },
-  /** Retires any echo the given canonical record supersedes. */
   resolve(
     authority: CloudConversationOutboxAuthority,
     record: JournalRecord,

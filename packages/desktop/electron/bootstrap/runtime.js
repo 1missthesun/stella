@@ -11,9 +11,6 @@ export const initializeBootstrapApplication = async (context) => {
     services.authService.registerAuthProtocol();
     services.authService.captureInitialAuthUrl(process.argv);
     await prepareBootstrapAppShell(context);
-    // Window first, then handlers, with no await in between: the renderer
-    // process launch and page load run while main registers every handler,
-    // and no renderer invoke can be dispatched until this task yields.
     createBootstrapInitialWindows(context);
     const ipcStartedAt = performance.now();
     registerBootstrapIpcHandlers(context, createBootstrapResetFlows(context, {
@@ -23,16 +20,6 @@ export const initializeBootstrapApplication = async (context) => {
         elapsedMs: Math.round(process.uptime() * 1000),
         durationMs: Math.round(performance.now() - ipcStartedAt),
     });
-    // Defer the host runner (worker spawn + model-catalog warm) off the open
-    // burst. Starting it inline here makes the Bun worker spawn + catalog fetch
-    // contend with the renderer's first paint, which reads as a multi-second
-    // stall right after the window appears. Instead we hand the starter to the
-    // deferred-startup sequence, which fires once the renderer has painted
-    // (did-finish-load, or the short fallback timeout). A chat started before
-    // the warm completes still spawns the worker on demand, so this only
-    // affects perceived open smoothness, not first-chat latency. Defined
-    // before the shell launches: after an update's relaunch, it starts the
-    // runtime at once.
     const hostRunnerResource = createManagedResource({
         processRuntime: context.state.processRuntime,
         canStart: () => !context.state.isQuitting,

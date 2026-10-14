@@ -1,13 +1,3 @@
-/**
- * Client-side device capability checks, used to scale back GPU/CPU-heavy
- * decorative effects (the hero aurora shader, scroll-reveal blur, infinite
- * marketing-mock animations) on low-end or GPU-less machines.
- *
- * Everything here is memoized and SSR-safe (returns conservative defaults on
- * the server). The core/memory heuristic lives in the inline `PerfInitScript`
- * so `<html data-low-power>` is set before first paint.
- */
-
 export type WebGLTier = "hardware" | "software" | "none";
 
 type WebGLProbe = {
@@ -54,7 +44,6 @@ function probeWebGL(): WebGLProbe {
     );
     const reliableHighp = !!fmt && fmt.precision >= 23 && fmt.rangeMax >= 127;
 
-    // Release the probe context immediately so we don't hold a GPU/context slot.
     gl.getExtension("WEBGL_lose_context")?.loseContext();
 
     const isSoftware =
@@ -76,16 +65,6 @@ function probeWebGL(): WebGLProbe {
   }
 }
 
-/**
- * Probe for a usable, hardware-accelerated WebGL context.
- *
- * - `"none"`    — no WebGL at all (context creation failed).
- * - `"software"`— a software rasterizer (SwiftShader / llvmpipe / etc.). These
- *                 technically run, but the aurora's 4-octave FBM shader crawls
- *                 at a few fps, so we treat them like "no GPU".
- * - `"hardware"`— a real GPU, or an unknown renderer (some browsers hide the
- *                 renderer string for privacy — we don't penalize those).
- */
 export function getWebGLTier(): WebGLTier {
   return probeWebGL().tier;
 }

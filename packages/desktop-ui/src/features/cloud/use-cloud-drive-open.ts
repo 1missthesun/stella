@@ -17,11 +17,6 @@ export const conversationFileOpenKind = (
     : "cloud-signed-url";
 };
 
-/**
- * One authority-aware open path for Recent Files and completion pills.
- * Cloud paths are never fed to the local display/Open-With machinery: the
- * sidebar viewer resolves an owner-scoped signed URL when reading the file.
- */
 export const useOpenConversationFile = (
   onOpened?: () => void,
 ): ((entry: ConversationFileEntry) => Promise<boolean>) => {

@@ -18,33 +18,15 @@ import {
 import * as HostBus from "../host-bus.js";
 import * as SessionConfig from "./config.js";
 
-/**
- * The session's SQLite database and every store carved out of it, as one
- * scoped resource. This layer sits at the bottom of the session chain so its
- * `db.close()` finalizer runs LAST on teardown: nothing may touch the db
- * after it, and the runner's finalizer is guaranteed to have completed first
- * by finalizer ordering.
- */
 export interface Interface {
   readonly db: SqliteDatabase;
   readonly chatStore: ChatStore;
   readonly runtimeStore: RuntimeStore;
-  /**
-   * Idle-time checkpoint / ANALYZE / one-time VACUUM of `stella.sqlite`.
-   * Started by WorkerSessions once the session is published (it needs the
-   * worker-wide idle signal and the attached-client count); its
-   * `holdsWorkerAlive()` is the idle-shutdown keep-alive. Stopped by this finalizer.
-   */
   readonly maintenance: DatabaseMaintenance;
-  /**
-   * LOCAL_CHAT_UPDATED fan-out, exactly as the old top-level
-   * `notifyLocalChatUpdated` helper emitted it.
-   */
   readonly notifyLocalChatUpdated: (
     conversationId?: string,
     event?: LocalChatEventRecord,
   ) => void;
-  /** appendEvent + LOCAL_CHAT_UPDATED notify in one step. */
   readonly appendChatEventAndNotify: (
     args: Parameters<ChatStore["chat"]["appendEvent"]>[0],
   ) => LocalChatEventRecord;
@@ -59,8 +41,6 @@ export const layer = Layer.effect(
   Effect.gen(function* () {
     const hostBus = yield* HostBus.Service;
     const config = yield* SessionConfig.Service;
-    // Boot timing: open vs. pragmas/migration, then the store (reported on
-    // the worker.ready.timing event).
     const db = createDesktopDatabase(config.get().stellaDataDirPath, {
       onTiming: (timing) => {
         recordBootStep("dbOpen", timing.openMs);
@@ -81,7 +61,6 @@ export const layer = Layer.effect(
 
     yield* Effect.addFinalizer(() =>
       Effect.sync(() => {
-        // Cancel ticks + PRAGMA optimize on the still-open connection.
         maintenance.stop();
         db.close();
       }),

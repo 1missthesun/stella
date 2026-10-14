@@ -5,7 +5,6 @@ import { useBackendView } from "@/platform/backend/use-backend-view";
 import { cloudConversationBelongsToOwnerSubject } from "./cloud-conversation-selection";
 import { cloudThreadReport } from "./use-cloud-activity";
 
-/** Subscribe only after hover/open intent; terminal results can change on rerun. */
 export function useCloudAgentReport(
   conversationId: string,
   threadId: string,
@@ -18,8 +17,6 @@ export function useCloudAgentReport(
     enabled && isCloudConversationReady ? { conversationId, threadId } : "skip",
   );
   if (!enabled || !isCloudConversationReady) return null;
-  // An unavailable backend costs the report, not the chat: local-only tasks
-  // still use the desktop report reader.
   if (report.status === "error") return null;
   if (report.status === "loading") return undefined;
   const thread = report.value;

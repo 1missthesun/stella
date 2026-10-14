@@ -5,7 +5,6 @@ import {
 } from "@stella/contracts/reminders";
 import { getBackendClient, useBackendView } from "./backend";
 
-/** Recent reminder deliveries by fire id; undefined until the first read. */
 export const useReminderFires = (
   enabled: boolean,
 ): ReadonlyMap<string, ReminderFire> | undefined => {

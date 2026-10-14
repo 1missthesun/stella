@@ -27,16 +27,6 @@ export type HistoryPaginationDecision = {
 
 type RequestPhase = "idle" | "awaiting-loading" | "loading";
 
-/**
- * Intent gate for older-history pagination.
- *
- * Legend List intentionally re-fires `onStartReached` when data changes while
- * the start threshold remains visible. That behavior is useful for ordinary
- * feeds, but a prepend turns one chat scroll gesture into a request cascade.
- * This gate makes a user action, rather than content identity, the unit of
- * pagination: an action id can be consumed at most once, and render/layout
- * updates never create an action.
- */
 export class ChatHistoryPaginationGate {
   private readonly edge: "start" | "end";
   private consumedActionIds = new Set<number>();
@@ -113,8 +103,6 @@ export class ChatHistoryPaginationGate {
       };
     }
 
-    // Consume near-top actions even when a guard blocks them. A wheel burst
-    // that overlaps request completion must not become a second request.
     this.consumedActionIds.add(actionId);
     if (this.consumedActionIds.size > 64) {
       const oldest = this.consumedActionIds.values().next().value;
@@ -132,10 +120,6 @@ export class ChatHistoryPaginationGate {
       };
     }
 
-    // A newly-created upward action is an explicit re-arm even if the user is
-    // still within the threshold after the previous prepend. Moving away and
-    // approaching again also arrives under a fresh input action; content and
-    // measurement updates never manufacture one.
     this.requestPhase = "awaiting-loading";
     return { request: true, reason: "request", thresholdVisible };
   }
@@ -177,7 +161,6 @@ export type ChatPrependAnchor = {
 const chatRows = (node: HTMLElement): HTMLElement[] =>
   Array.from(node.querySelectorAll<HTMLElement>("[data-chat-row-id]"));
 
-/** Capture the first painted row intersecting the viewport's top edge. */
 export const captureChatPrependAnchor = (
   node: HTMLElement,
 ): ChatPrependAnchor | null => {
@@ -189,8 +172,6 @@ export const captureChatPrependAnchor = (
     }))
     .filter(({ rect }) => rect.bottom > viewport.top)
     .sort((a, b) => a.rect.top - b.rect.top);
-  // Recycled Legend containers are not guaranteed to remain in visual DOM
-  // order, so geometry — not querySelector order — chooses the top anchor.
   const row = rows[0]?.candidate;
   const rowId = row?.dataset.chatRowId;
   if (!row || !rowId) return null;
@@ -317,7 +298,6 @@ export type ChatHistoryPaginationDebugEvent = {
   detail: Record<string, unknown>;
 };
 
-/** Opt-in live diagnostics used by the isolated dev harness. */
 export const emitChatHistoryPaginationDebug = (
   event: ChatHistoryPaginationDebugEvent,
 ): void => {

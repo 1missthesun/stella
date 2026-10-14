@@ -1,17 +1,3 @@
-/**
- * Chat-style onboarding: the flow definition and its durable bits.
- *
- * The onboarding is a scripted conversation. Each step is one assistant
- * message with an interactive card inside it; answering a card appends a
- * short user bubble and the next message arrives. Everything here is
- * renderer-side state — the rows are never persisted as chat messages.
- *
- * Value comes first: what Stella can do, that she can change herself, and
- * the one conversation. Then the asks: sign in, Gmail, a look, the extras, the
- * phone app. The
- * quickstart (discovery + synthesis) closes the flow as an offer the user
- * can run or skip; it keeps going in the background if they head in early.
- */
 import { uiState } from "@/platform/ui-state";
 
 export type OnboardingChatStep =
@@ -51,10 +37,6 @@ export const nextOnboardingChatStep = (
   const index = steps.indexOf(step);
   return index >= 0 && index < steps.length - 1 ? steps[index + 1]! : null;
 };
-
-/* ── Resume ──────────────────────────────────────────────────────────
- * Quitting mid-flow lands the user back on the same message with the
- * earlier ones already answered. Cleared on completion and on replay. */
 
 const PROGRESS_KEY = "stella-onboarding-chat-progress";
 

@@ -27,10 +27,6 @@ import {
   type WorkingDotsFrame,
 } from "@stella/contracts/working-dots-bounce";
 
-/**
- * Activities the mark can portray. The rig maps each to a silhouette, an eye
- * pose, and a motion profile; callers only ever name the activity.
- */
 export type StellaCharacterState =
   | "idle"
   | "listening"
@@ -70,8 +66,6 @@ export interface CreateStellaMarkOptions {
   interactive?: boolean;
   paused?: boolean;
 
-  /** Suspend the loop while the mark is scrolled out of view. Off for marks
-   * whose host is never laid out normally, e.g. a transformed overlay. */
   visibilityGate?: boolean;
 }
 
@@ -103,31 +97,8 @@ type Particle = {
   el: SVGPathElement | null;
 };
 
-/**
- * The Stella character rig: an imperative, self-driving SVG mark.
- *
- * `createStellaMark` mounts one `<svg>` into a host element and animates it
- * from its own rAF loop, so React only ever mounts the host and pokes the
- * returned handle when a prop changes. This replaces the WebGL aurora — one
- * animated mark can be mounted many times over (indicator and onboarding)
- * without a shared GPU context or a renderer pool to manage.
- *
- * The activity `state` is the rig's only real input: it selects a silhouette,
- * an eye pose, and a motion profile, and the rig eases between whatever it is
- * showing and whatever the new state asks for.
- *
- * The loop is suspended, not idled, whenever the mark cannot be seen: a paused
- * (window-blurred) or offscreen mark stops scheduling frames entirely rather
- * than rebuilding a 96-point outline for pixels nobody is looking at.
- */
-
 const SVGNS = "http://www.w3.org/2000/svg";
 
-/**
- * The ring is sampled at the same `N` angles every frame, so the sines and
- * cosines are constants. Precomputing them keeps the per-frame outline rebuild
- * to arithmetic on a flat buffer.
- */
 const RING_COS = new Float64Array(N);
 const RING_SIN = new Float64Array(N);
 const RING_SHIMMER_SIN = new Float64Array(N);
@@ -159,25 +130,15 @@ const easeInOutCubic = (t: number) =>
 const smoothstep = (t: number) => t * t * (3 - 2 * t);
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 
-/**
- * The thinking ellipsis: three dots, with the character mark itself as the
- * middle one. The rig only lays them out; their hop is the shared bounce
- * (`@stella/contracts/working-dots-bounce`) played by WAAPI on a wrapper per
- * dot, so a settled ellipsis costs the rig no frames at all.
- */
 const DOT_R = 22,
   DOT_X = 62,
   DOT_FUDGE = 1.02,
   DOT_STAGGER = 0.12;
-/** Three dots in a small box are tiny, so the whole group zooms in under
- *  `ZOOM_SMALL_PX`; the character alone needs no such help. */
 const DOTS_ZOOM = 1.5;
 
 const ZOOM_SMALL_PX = 44,
   ZOOM_LARGE_PX = 134;
 
-/** Weight at which the silhouette has finished becoming the orb, so the rest of
- *  the dots' ramp is spent spreading the side dots rather than reshaping. */
 const MORPH_END = 0.62;
 
 const ENV_W = 14,
@@ -185,14 +146,10 @@ const ENV_W = 14,
 const FADE_W = 11,
   FADE_Z = 1;
 
-/** The first crouch waits for the star to have mostly become the orb, so it
- *  reads as a dot's hop rather than the star's. */
 const BOUNCE_ENTRY_MS = 260;
-/** How long a dot takes to settle back to rest when thinking ends mid-hop. */
 const BOUNCE_RELEASE_MS = 220;
 const REDUCED_SAMPLES = 24;
 
-/** Each slot's centre and radius in the dots layout, in mark units. */
 const BOUNCE_SLOTS = [
   { x: C - DOT_X, r: DOT_R * DOT_FUDGE },
   { x: C, r: DOT_R },
@@ -201,12 +158,6 @@ const BOUNCE_SLOTS = [
 
 const VIEW_SPAN = C * 2 + BLEED * 2;
 
-/**
- * Each hopping thing is its own `<svg>` layer, so the bounce is a transform on
- * an element with a CSS box — composited, with no SVG layout per frame. That
- * box is the whole mark, so the dot's floor (its bottom edge, where the squash
- * pivots) and its lift are expressed as fractions of it, zoom included.
- */
 function bounceOrigin(slot: number, zoom: number) {
   const { x, r } = BOUNCE_SLOTS[slot];
   const at = (u: number) => (50 + ((u - VIEW_CENTER) * zoom * 100) / VIEW_SPAN).toFixed(3);
@@ -450,9 +401,6 @@ export function createStellaMark(
   svg.style.cssText =
     "display:block;position:relative;width:100%;height:auto;overflow:visible;user-select:none";
 
-  /** The mark is a stack of `<svg>` layers sharing one viewBox: the base
-   *  carries the decorations, and everything that hops gets a layer of its
-   *  own (see `bounceOrigin`). */
   const frameEl = document.createElement("span");
   frameEl.setAttribute("aria-hidden", "true");
   frameEl.style.cssText = "display:block;position:relative;width:100%";
@@ -552,8 +500,6 @@ export function createStellaMark(
   svg.appendChild(zoomG);
   zoomGs.push(zoomG);
 
-  /** Layers painted beneath the base (glow, side dots) and above it (the
-   *  body, then the burst), in stacking order. */
   const under: HTMLSpanElement[] = [];
   const over: HTMLSpanElement[] = [];
 
@@ -577,8 +523,6 @@ export function createStellaMark(
       ? `url(#${id}-ink)`
       : "var(--fg)";
 
-  /** The ellipsis' side dots. The middle one is the character itself, which the
-   *  silhouette morph turns into an orb. */
   const dotLayers = [layer(), layer()];
   const dots = dotLayers.map((l) => {
     under.push(l.el);
@@ -663,7 +607,6 @@ export function createStellaMark(
   over.push(bodyLayer.el);
   bodyLayer.g.appendChild(bodyG);
 
-  /** Every hopping wrapper with the ellipsis slot it rides. */
   const bounceTargets: [HTMLSpanElement, number][] = [
     [dotLayers[0].el, 0],
     [bodyLayer.el, 1],
@@ -717,9 +660,6 @@ export function createStellaMark(
     clock = 0;
   let boxW = o.size ?? 28,
     measuredAt = -1e9;
-  // Last written value of every attribute the frame touches. A write census
-  // over the working state found several of these carrying one value for the
-  // whole run, so each write is skipped when nothing changed.
   let lastPath = "",
     lastZoom = "";
   const lastEyePath = ["", ""];
@@ -748,12 +688,6 @@ export function createStellaMark(
     return 0;
   };
 
-  /**
-   * The ellipsis' hop runs on WAAPI rather than in the frame loop: it starts
-   * when thinking begins, pauses with the loop (blur, offscreen), and when
-   * thinking ends each dot eases from wherever it is back to rest instead of
-   * snapping out of the air.
-   */
   let bounce: Animation[] = [];
   function startBounce() {
     const zoom = 1 + (DOTS_ZOOM - 1) * smallness();
@@ -762,10 +696,6 @@ export function createStellaMark(
       const keyframes = bounceKeyframes(slot, zoom, reduced);
       const delay =
         BOUNCE_ENTRY_MS + slot * WORKING_DOTS_STAGGER * WORKING_DOTS_CYCLE_MS;
-      // Only the reduced-motion breath changes opacity. Its fade from full to
-      // the breath's first tone runs on the inner svg: an opacity animation
-      // still running on the wrapper when the loop starts would keep the loop
-      // off the compositor for good.
       const inner = el.firstElementChild;
       if (inner && reduced) {
         bounce.push(
@@ -926,9 +856,6 @@ export function createStellaMark(
     particles = next;
   }
 
-  // Point buffers for the outline, its warped copy and both eyes, allocated
-  // once and written in place. The frame runs at 60fps, so building fresh
-  // arrays here is a steady stream of garbage for no gain.
   const workProfile = new Float64Array(N);
   const workRing = Array.from({ length: N }, (): Point => [0, 0]);
   const warpedRing = Array.from({ length: N }, (): Point => [0, 0]);
@@ -988,9 +915,6 @@ export function createStellaMark(
     clock += dt * 1000;
     const t = clock;
 
-    // Fallback poll for environments without ResizeObserver. Where the
-    // observer exists it reports the width instead, keeping a forced layout
-    // out of the frame path entirely.
     if (!sizeObserver && now - measuredAt > 500) {
       measuredAt = now;
       setBoxW(frameEl.getBoundingClientRect().width);
@@ -1090,8 +1014,6 @@ export function createStellaMark(
       faceWarp = squeezeWarp(band, wSqueeze, SQ_FACE_GIVE);
     }
 
-    // Thinking inflates the silhouette all the way to the orb, so the character
-    // reads as the ellipsis' middle dot rather than as a shrunken star.
     const ring = buildRing(t, wTwinkle);
     const morph = clamp(wDots / MORPH_END, 0, 1);
     const layoutRing =
@@ -1231,8 +1153,6 @@ export function createStellaMark(
       }
     }
 
-    // The decorations are hidden and then selectively redrawn, so the blanket
-    // hide only has to run while something is (or just was) drawing them.
     const decorActive =
       wDots > 0.004 || wOrbit > 0.004 || wRadar > 0.004 || wProgress > 0.004;
     if (decorActive || !decorHidden) {
@@ -1267,11 +1187,7 @@ export function createStellaMark(
       blink.t === 1 &&
       Math.abs(blink.x - 1) < 0.002 &&
       shapeMix.x > 0.999;
-    // One frame always lands before the loop can suspend, so a mark that
-    // mounts blurred or offscreen shows the mark rather than an empty box.
     painted = true;
-    // A settled ellipsis is a still picture under its WAAPI bounce, so the
-    // loop parks until the next state change rather than redrawing it.
     const dotsAtRest =
       activity === "dots" && !prevActivity && Math.abs(fade.x - 1) < 0.001;
     if (suspended() || (settled && (reduced || dotsAtRest))) {
@@ -1282,11 +1198,6 @@ export function createStellaMark(
     raf = requestAnimationFrame(frame);
   }
 
-  /**
-   * The two side dots. Each appears on its own staggered slice of the dots
-   * ramp, springing outward with an ease-out-back so the ellipsis lays itself
-   * down left-to-right instead of arriving all at once.
-   */
   function drawDots(w: number) {
     const xs = [C - DOT_X, C + DOT_X];
     for (let i = 0; i < 2; i++) {
@@ -1359,8 +1270,6 @@ export function createStellaMark(
     track.setAttribute("opacity", (w * 0.9).toFixed(3));
   }
 
-  /** Every input that could change the picture calls this. It is a no-op while
-   *  suspended, except for the very first frame, which always gets to paint. */
   function wake() {
     if (destroyed || running || (suspended() && painted)) return;
     running = true;
@@ -1386,8 +1295,6 @@ export function createStellaMark(
     wake();
   };
 
-  // The mark's zoom depends on its rendered width. Observing it keeps the
-  // measurement out of the frame path, where reading it forced a layout.
   let sizeObserver: ResizeObserver | null = null;
   if (typeof ResizeObserver === "function") {
     sizeObserver = new ResizeObserver((entries) => {
@@ -1396,11 +1303,6 @@ export function createStellaMark(
     sizeObserver.observe(frameEl);
   }
 
-  /**
-   * An offscreen or display:none mark renders nothing, so freeze it rather than
-   * recomputing the outline 60 times a second for pixels nobody can see. Time is
-   * frozen (as with pause), so it resumes mid-motion instead of jumping.
-   */
   let viewObserver: IntersectionObserver | null = null;
   if (o.visibilityGate && typeof IntersectionObserver === "function") {
     viewObserver = new IntersectionObserver(
@@ -1456,8 +1358,6 @@ export function createStellaMark(
       wake();
     },
     sparkle: (n?: number) => burst(n),
-    // Pausing suspends the loop rather than idling it, and resuming resets the
-    // frame clock so motion continues from where it stopped instead of jumping.
     pause() {
       paused = true;
       syncBounce();

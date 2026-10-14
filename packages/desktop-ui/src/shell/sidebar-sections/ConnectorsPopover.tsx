@@ -1,12 +1,3 @@
-/**
- * Connectors — a popover for browsing the native-connector catalog (the
- * Composio-backed integrations the runtime exposes through
- * `nativeIntegrations.list`). Connectable entries can be switched on and
- * off in place; everything else just shows what the agent can reach.
- *
- * Open state can be controlled so the settings gear's destination menu can
- * open it against a hidden anchor rather than a visible trigger of its own.
- */
 import {
   useCallback,
   useEffect,
@@ -74,8 +65,6 @@ export function ConnectorsPopover({
 
   useEffect(() => {
     if (open) void load();
-    // Each opening starts from the full list rather than resuming a filter
-    // the user can no longer see.
     else setQuery("");
   }, [load, open]);
 

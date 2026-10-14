@@ -83,7 +83,6 @@ export interface XaiWebSocketTransportOptions {
   model: string;
   voice: string;
   instructions?: string;
-  /** The single delegation tool. Not a catalog; see ask-stella-tool.ts. */
   tools?: readonly RealtimeFunctionTool[];
   inputSampleRate?: number;
   outputSampleRate?: number;
@@ -299,8 +298,6 @@ export class XaiWebSocketTransport implements RealtimeTransport {
     this.destroyed = true;
     this.events = null;
 
-    // Revocation must cut the network transport synchronously. In particular,
-    // do not leave a CONNECTING socket alive while async audio contexts drain.
     const cancelPendingOpen = this.cancelPendingOpen;
     this.detachAndCloseWebSocket();
     cancelPendingOpen?.();
@@ -312,8 +309,6 @@ export class XaiWebSocketTransport implements RealtimeTransport {
 
     this.releaseMicrophoneCapture();
   }
-
-  // ── internals ────────────────────────────────────────────────────────
 
   private sendRaw(event: Record<string, unknown>): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
@@ -352,9 +347,6 @@ export class XaiWebSocketTransport implements RealtimeTransport {
     }
     const type = parsed.type;
 
-    // Audio deltas go straight to the PCM player; the session class
-    // doesn't need to see them. The player's queue state drives our
-    // synthesised speaking-start / speaking-end events.
     if (type === "response.output_audio.delta") {
       const audio = parsed.delta ?? parsed.audio;
       if (typeof audio === "string" && audio.length > 0) {
@@ -372,8 +364,6 @@ export class XaiWebSocketTransport implements RealtimeTransport {
       return;
     }
 
-    // Normalise xAI's beta text-delta name onto OpenAI's GA name so the
-    // session class only needs one vocabulary.
     if (type === "response.text.delta") {
       this.events?.onEvent({ ...parsed, type: "response.output_text.delta" });
       return;
@@ -454,8 +444,6 @@ export class XaiWebSocketTransport implements RealtimeTransport {
       this.mic.setSoftMute(false);
       return;
     }
-    // Clear xAI's server-side buffer so any accidental tail samples
-    // don't get committed as the user's next utterance.
     this.sendRaw({ type: "input_audio_buffer.clear" });
     this.releaseMicrophoneCapture();
   }

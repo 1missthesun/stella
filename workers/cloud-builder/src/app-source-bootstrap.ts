@@ -1,11 +1,3 @@
-/**
- * Public read access to the published app (the `upstream` Artifacts repo) for
- * callers without an account: signed-out desktops checking for updates and the
- * launcher's first install. Upstream is the published app anyway, so one read
- * token is shared: cached in the isolate and at the edge for about 50 minutes
- * instead of minted per caller.
- */
-
 import type { AppSourceRemote } from "@stella/contracts/backend/app-source";
 import { errorMessage, log } from "./build-session/shared/keys.js";
 
@@ -14,10 +6,8 @@ export const APP_SOURCE_BOOTSTRAP_PATH = "/api/app-source/bootstrap";
 const UPSTREAM_REPO = "upstream";
 const TOKEN_TTL_SECONDS = 60 * 60;
 const CACHE_TTL_MS = 50 * 60_000;
-/** A cached token is served only while it has at least this long left. */
 const MIN_REMAINING_MS = 10 * 60_000;
 const CACHE_NAME = "stella-app-source-bootstrap-v1";
-/** Per deployment: dev and prod workers share the workers.dev zone's cache. */
 const cacheKey = (host: string) => `https://app-source-bootstrap.internal/${host}/upstream`;
 
 let memo: AppSourceRemote | null = null;
@@ -87,7 +77,6 @@ const upstreamAccess = async (artifacts: Artifacts, host: string): Promise<AppSo
   return minted;
 };
 
-/** `POST /api/app-source/bootstrap` → `{ upstream: AppSourceRemote }`; null for other paths. */
 export const handleAppSourceBootstrap = async (
   request: Request,
   env: { ARTIFACTS: Artifacts },

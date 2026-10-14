@@ -11,7 +11,6 @@ type SessionUser = {
   isAnonymous?: boolean | null;
 };
 
-/** Session-aware half of the header account control, loaded after first paint. */
 export function SiteHeaderAccountInner() {
   const session = authClient.useSession();
   const desktopUser = useDesktopBridgeAuthUser();

@@ -79,10 +79,6 @@ export type EvidenceCardSet = {
   overflowCount: number;
 };
 
-/**
- * A drive file a reply links, for a preview made from its bytes: the
- * owner-scoped signed URL the renderer resolved, read by the main process.
- */
 export type DriveEvidenceSource = {
   drivePath: string;
   url: string;

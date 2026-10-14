@@ -1,17 +1,3 @@
-/**
- * GitHub App routes:
- *
- *   GET  /api/cloud/projects/github/callback   the App's Setup URL and OAuth callback
- *   POST /api/cloud/projects/github/webhook    installation lifecycle events
- *
- * The callback is a top-level redirect from github.com with no Stella
- * credential; the signed `state` (`src/oauth-state.ts`) routes it to the
- * owner's object, which spends the nonce. It proves which GitHub user can
- * reach the installation and ends by showing a connect code; the bind
- * happens only when the owner types that code into Stella
- * (`projects.finishGithubConnect`). See `owner-store/domains/projects.ts`.
- */
-
 import type { RpcResponse } from "@stella/contracts/backend/protocol";
 import { signOAuthState, verifyOAuthState } from "../oauth-state.js";
 import {
@@ -45,7 +31,6 @@ const escapeHtml = (value: string): string =>
     (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]!,
   );
 
-/** `detail` and `extra` are HTML; escape anything user- or GitHub-supplied. */
 const page = (title: string, detail: string, status = 200, extra = ""): Response =>
   new Response(
     `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">` +
@@ -100,8 +85,6 @@ const callback = async (request: Request, env: Cloudflare.Env): Promise<Response
       installationId = queryInstallationId;
       verifyNonce = verify.nonce;
       if (!code) {
-        // The installation id in the query string authorizes nothing; send
-        // the browser to GitHub to prove who is connecting.
         const verifyState = await signOAuthState(env, {
           ownerId: state.ownerId,
           kind: GITHUB_VERIFY_STATE_KIND,
@@ -112,7 +95,6 @@ const callback = async (request: Request, env: Cloudflare.Env): Promise<Response
         return Response.redirect(githubAuthorizeUrl(env, verifyState, redirectUri), 302);
       }
     } else if (state.kind === GITHUB_VERIFY_STATE_KIND && state.extra?.installationId && code) {
-      // The signed state, not the query string, names the installation.
       installationId = state.extra.installationId;
       verifyNonce = state.nonce;
     } else {
@@ -129,7 +111,6 @@ const callback = async (request: Request, env: Cloudflare.Env): Promise<Response
       verified.account.accountLogin || verified.account.accountType
         ? verified.account
         : ((await fetchInstallationAccount(env, installationId)) ?? EMPTY_ACCOUNT);
-    // The connecting user, for commit authorship; best effort.
     const connector = await fetchOAuthUser(userToken).catch(() => undefined);
     const claimed = await internal(env, state.ownerId, "projects.githubClaim", {
       nonce: verifyNonce,
@@ -140,9 +121,6 @@ const callback = async (request: Request, env: Cloudflare.Env): Promise<Response
     });
     const connectCode = claimed.ok ? (claimed.value as { connectCode: string } | null)?.connectCode : undefined;
     if (!connectCode) return page("Couldn't finish connecting GitHub", RESTART, 400);
-    // The code is shown, never redirected with: this handler has no Stella
-    // session, so typing the code into Stella is what supplies the other
-    // half of the proof.
     return page(
       "One step left",
       `Enter this code in Stella to finish connecting ${escapeHtml(account.accountLogin) || "GitHub"}. ` +
@@ -182,7 +160,6 @@ const constantTimeEqual = (left: string, right: string): boolean => {
   return diff === 0;
 };
 
-/** Without this a revoked installation stays listed and fails only at clone time. */
 const webhook = async (request: Request, env: Cloudflare.Env): Promise<Response> => {
   const secret = githubSecret(env, "GITHUB_WEBHOOK_SECRET");
   if (!secret) return json({ error: "Not configured" }, 503);

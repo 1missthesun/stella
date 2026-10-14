@@ -34,7 +34,6 @@ export const NODE_REPL_TOOL_MEMORY_NAME = "$memory";
 
 export type SkyMethod = keyof SkyClient;
 export type BrowserMethod = "command" | "chain" | "use";
-/** Methods of the in-REPL `connect` client, dispatched host-side. */
 export type ConnectMethod = "discover" | "connectors" | "addMcp" | "remove";
 
 export type SerializedError = {
@@ -45,12 +44,6 @@ export type SerializedError = {
 
 export type NodeReplImageDetail = "auto" | "low" | "high" | "original";
 
-/**
- * Typed output emitted by the REPL worker. The worker never manufactures
- * model-facing attachment markers; the host formats those only at the legacy
- * ToolResult boundary while retaining this structured representation for
- * resumable cells and future native multimodal delivery.
- */
 export type NodeReplContentItem =
   | { type: "text"; text: string }
   | {
@@ -59,7 +52,6 @@ export type NodeReplContentItem =
       mimeType?: "image/jpeg" | "image/png" | "image/gif" | "image/webp";
       detail?: NodeReplImageDetail;
       alreadyAttached?: boolean;
-      /** Kernel-owned temporary file; the outer adapter deletes it after read. */
       deleteAfterAttach?: boolean;
     }
   | {
@@ -102,9 +94,7 @@ export type NodeReplWorkerData = {
   maxPendingConnectCalls: number;
   maxToolDrainWaitMs: number;
   toolNames: string[];
-  /** Whether this REPL gets the `memory` global (the orchestrator's only). */
   memory: boolean;
-  /** Whether this REPL gets the `sky` and `browser` globals (agents only, not the orchestrator). */
   deviceControl: boolean;
 };
 
@@ -113,12 +103,6 @@ export type ParentToNodeReplWorkerMessage =
       type: "evaluate";
       evaluationId: number;
       code: string;
-      /**
-       * Current allowed tool names (exclusions already applied). Sent with
-       * every evaluate so the worker's `tools` object tracks tools that are
-       * added or removed mid-session; omitted → the worker keeps its
-       * current set.
-       */
       toolNames?: string[];
     }
   | {

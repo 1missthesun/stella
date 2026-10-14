@@ -28,7 +28,6 @@ export type ExecutionPlacementInboxRow = {
   presenceSessionId: string;
   kind: ExecutionKind;
   conversationId: string;
-  /** The claim request id this device used; names the exact handoff. */
   claimToken: string;
   payloadHash: string;
   payloadJson: string;
@@ -98,11 +97,6 @@ const fromInboxRow = (row: InboxDbRow): ExecutionPlacementInboxRow => ({
   updatedAt: row.updated_at,
 });
 
-/**
- * Durable ownership boundary. An owner-gate claim is acknowledged only after
- * the exact payload the offer carried is committed here in one SQLite
- * transaction: from `ack` on, this row is the only copy of the prompt.
- */
 export class ExecutionPlacementInbox {
   constructor(private readonly database: SqliteDatabase) {
     this.database.exec(`
@@ -189,10 +183,6 @@ export class ExecutionPlacementInbox {
     const presenceSessionId = `presence:${randomUUID()}`;
     this.database.exec("BEGIN IMMEDIATE;");
     try {
-      // A generation/session rotation can strand a worker effect that was
-      // started by the previous process. Persist the exact local cancellation
-      // obligation before changing ownership. openSession deliberately keeps
-      // these rows non-terminal until the cancellation RPC is acknowledged.
       this.database
         .prepare(
           `UPDATE execution_placement_inbox

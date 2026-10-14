@@ -133,12 +133,6 @@ const assertRegularPrivateFile = (
   }
 };
 
-/**
- * Claude may create ordinary config files with a permissive umask. Once the
- * CLI has exited, normalize every real directory/file before signing it. We
- * never repair ownership, links, or unsupported entry types: those are
- * integrity failures, not permission-hardening opportunities.
- */
 const hardenNativeStatePermissions = async (
   stateRoot: string,
   expectedOwner?: NativeStateOwner,
@@ -272,12 +266,6 @@ const collectNativeStateTreeEntries = async (
   return entries;
 };
 
-/**
- * Hash every byte plus every path, entry type, permission mode, owner, group,
- * and link count in the resumable native state. Symlinks and hard-linked files
- * are rejected instead of followed: either could make the signed tree depend
- * on bytes outside the private checkpoint.
- */
 export const nativeStateTree = async (
   stateRoot: string,
   expectedOwner?: NativeStateOwner,
@@ -388,7 +376,6 @@ export const createNativeStateAttestation = async (args: {
   sessionId: string;
   cursor: string;
   integrityKey: string;
-  /** Unit tests may override the production-required root owner. */
   expectedOwner?: NativeStateOwner;
 }): Promise<NativeStateAttestation> => {
   const unsigned = {
@@ -405,11 +392,6 @@ export const createNativeStateAttestation = async (args: {
   };
 };
 
-/**
- * Write only after the native CLI has exited. The manifest is excluded from
- * its own tree hash, and the sibling temporary file keeps a crash from
- * replacing the last valid attestation with a partial JSON document.
- */
 export const sealNativeState = async (args: {
   stateRoot: string;
   engine: PersistentNativeEngine;
@@ -417,7 +399,6 @@ export const sealNativeState = async (args: {
   sessionId: string;
   cursor: string;
   integrityKey: string;
-  /** Unit tests may override the production-required root owner. */
   expectedOwner?: NativeStateOwner;
 }): Promise<NativeStateAttestation> => {
   const parent = path.dirname(args.stateRoot);
@@ -498,7 +479,6 @@ export const assertNativeState = async (args: {
   expectedCursor: string;
   integrityKey: string;
   previousIntegrityKeys?: readonly string[];
-  /** Unit tests may override the production-required root owner. */
   expectedOwner?: NativeStateOwner;
 }): Promise<NativeStateAttestation> => {
   const stored = await readAttestation(args.stateRoot, args.expectedOwner);
@@ -545,7 +525,6 @@ export const assertNativeState = async (args: {
 
 export const assertFreshNativeState = async (
   stateRoot: string,
-  /** Unit tests may override the production-required root owner. */
   expectedOwner?: NativeStateOwner,
 ): Promise<void> => {
   try {

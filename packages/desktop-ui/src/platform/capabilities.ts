@@ -1,5 +1,3 @@
-/** Website vs desktop vs Vite-without-preload. Vite remaining a desktop
- * renderer host is intentional: do not infer website from a missing preload. */
 export type StellaHostKind = "desktop" | "website" | "browser-dev";
 
 const websiteBuild = import.meta.env.VITE_STELLA_WEB_BUILD === "1";

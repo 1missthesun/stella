@@ -1,35 +1,15 @@
-// Pain-point landing pages — /fix/<slug>.
-//
-// One entry per pain cluster from the pain-point knowledge graph
-// (launch-order clusters 1–25 shipped first). Each page targets people
-// searching for a specific computer problem who don't realize an agent can
-// just fix it, so the copy mirrors the searcher's own words — the `symptoms`
-// strings are real search queries, kept verbatim for ad relevance.
-//
-// Adding a page = appending one entry here. The template at
-// `src/app/fix/[slug]/page.tsx` and the sitemap pick it up automatically.
-
 export type FixPage = {
-  /** URL slug — /fix/<slug>. Keep it close to the searcher's own words. */
   slug: string;
-  /** Cluster name in the knowledge graph (internal reference only). */
   cluster: string;
-  /** Small mono eyebrow above the headline, e.g. "Fix it with Stella · Gaming". */
   eyebrow: string;
-  /** <title> without the " | Stella" suffix the layout template appends. */
   metaTitle: string;
   metaDescription: string;
-  /** Big serif H1; `headlineAccent` renders as the italic blue span. */
   headline: string;
   headlineAccent: string;
   lede: string;
-  /** Real searches this page answers, shown verbatim ("Sound familiar?"). */
   symptoms: string[];
-  /** Example of what you'd actually type to Stella. */
   prompt: string;
-  /** What Stella concretely does on your computer for this problem. */
   steps: string[];
-  /** Honest scope — what this fix is and isn't. Never overpromise. */
   scope: string;
   ctaHeadline: string;
 };

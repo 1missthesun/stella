@@ -9,14 +9,11 @@ import {
 } from "./app-registry";
 import "./topbar-nav.css";
 
-// App discovery happens in `./app-registry`, which owns the glob over
-// `desktop/src/app/<id>/metadata.ts` and exposes a subscribable snapshot.
 const useRegisteredApps = (): readonly AppMetadata[] =>
   useSyncExternalStore(subscribeToAppRegistry, getAppRegistrySnapshot);
 
 interface NavItemProps {
   app: AppMetadata;
-  /** Route-matched (drives re-entry click + selected text/aria). */
   active: boolean;
   badgeCount?: number;
 }
@@ -39,7 +36,6 @@ const NavItem = ({
         app.onActiveClick();
         return;
       }
-      // Entering from outside: the app may redirect its nav click.
       if (!active && app.resolveClickRoute) {
         const to = app.resolveClickRoute();
         if (to !== app.route) {
@@ -88,10 +84,6 @@ const NavItem = ({
 };
 
 type ShellTopBarPrimaryNavProps = {
-  /**
-   * Nav entry ids to suppress. The full-window bar omits surfaces owned by
-   * the right sidebar.
-   */
   omitIds?: readonly string[];
 };
 
@@ -113,8 +105,6 @@ export const ShellTopBarPrimaryNav = ({
 
   const matchRoute = useMatchRoute();
 
-  // The route-matched app drives the re-entry click + the plain-text
-  // selected state (stronger color + weight — deliberately no pill fill).
   const matchedApp = navApps.find((a) =>
     Boolean(matchRoute({ to: a.route, fuzzy: true })),
   );

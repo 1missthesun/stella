@@ -63,9 +63,6 @@ export const UiStateProvider = ({ children }: { children: ReactNode }) => {
     const unsubscribe = api.ui.onState((nextState) => {
       hasHydratedFromMainRef.current = true;
       pendingLocalStateRef.current = {};
-      // Main broadcasts the full state after every write from any window.
-      // Keep the previous object when nothing changed so an echo of our own
-      // write does not re-render every consumer of this context.
       setState((prev) =>
         isSameUiState(prev, nextState) ? prev : { ...nextState },
       );

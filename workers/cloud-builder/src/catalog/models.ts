@@ -12,16 +12,7 @@ import { verifyCaller } from "../http/caller.js";
 import { readManagedModelPrices } from "./prices.js";
 import { ownerGateStub } from "../rpc-release.js";
 
-/**
- * `GET /api/stella/models`: the public model catalog for Stella runtimes.
- * Which `stella/...` models the caller's audience may pick, the per-agent
- * defaults, each model's price, and where the model gateway lives. The
- * bearer is optional: without one the audience is Free; with one it is
- * the plan the owner's billing says. Clients revalidate with `If-None-Match`.
- */
-
 const CORS_HEADERS = {
-  // Public data behind an optional bearer, never cookies.
   "access-control-allow-origin": "*",
   "access-control-allow-methods": "GET",
   "access-control-allow-headers": "authorization, if-none-match, x-device-id",

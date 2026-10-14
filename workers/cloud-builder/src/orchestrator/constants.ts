@@ -1,50 +1,29 @@
 import type { TurnEventEvent } from "@stella/contracts/turn-plane/owner-events";
 import { APPEND_WINDOW_MAX_BYTES } from "../conversation-types.js";
 
-/** Desktop keeps a connect card up about this long before giving up. */
 export const CONNECT_CARD_WAIT_MS = 5 * 60_000;
 export const CONNECT_CARD_POLL_MS = 2_000;
-/** How often a waiting agent checks whether its browser handoff ended, and how long past its deadline it waits. */
 export const BROWSER_HANDOFF_POLL_MS = 2_000;
 export const BROWSER_HANDOFF_GRACE_MS = 60_000;
 export const WAKE_REPORT_INLINE_MAX_BYTES = 512 * 1024;
 
 export const CHAT_WATCHDOG_MS = 5 * 60_000;
-/** Durable key: this conversation runs on pi-durable (`pi-runtime.ts`). */
 export const AGENT_RUNTIME_KEY = "agentRuntime";
 
-/** Durable key prefix: a cloud pi agent on a device's control receipt, by thread id. */
 export const PI_DEVICE_AGENT_PREFIX = "pi:device-agent:";
 
-/** Durable key: an agent thread whose agent runs here, by thread id. */
 export const piThreadKey = (threadId: string): string =>
   `pi:thread:${threadId}`;
 
-/** Journal records read per batch when importing other writers' turns into pi. */
 export const PI_JOURNAL_IMPORT_BATCH = 200;
-/** The newest pi entry this conversation's journal has mirrored. */
 export const PI_MIRRORED_KEY = "piMirroredEntry";
-/** Set while pi has work in flight here, so a wake after eviction resumes it. */
 export const PI_LIVE_KEY = "piLive";
-/** Where this pi conversation's brain runs (`@stella/contracts/turn-plane/pi-brain`). */
 export const PI_BRAIN_KEY = "piBrain";
-/** The conversation's latest compaction checkpoint (`@stella/contracts/journal-checkpoint`). */
 export const JOURNAL_CHECKPOINT_KEY = "journalCheckpoint";
-/** How many of its own recent turns the cloud searches for the one a compaction kept. */
 export const CHECKPOINT_TURN_SCAN = 64;
-/**
- * Durable key: the brief a turn's `switch_destination` left for the computer
- * Stella moved to (pi's or Claude Code's), placed there once that turn ends.
- */
 export const BRAIN_HANDOFF_KEY = "brainHandoff";
 
-/** A connect checks the running agents against their owners at most this often. */
 export const AGENT_RECONCILE_INTERVAL_MS = 60_000;
-/**
- * Durable key: the running agents of a conversation pi has run in, as their
- * owners record them (`refreshAgents`). Absent where pi never ran: there
- * they are folded from the journal's agent cards.
- */
 export const AGENTS_VIEW_KEY = "runningAgentsView";
 
 /**
@@ -65,20 +44,11 @@ export const PI_HEARTBEAT_MS = 30_000;
  * the turn; without the beat a lost turn sat until its watchdog.
  */
 export const CHAT_TURN_HEARTBEAT_MS = 15_000;
-/** At most this many replacement isolates continue one chat turn. */
 export const CHAT_RESUME_MAX = 2;
-/** A turn older than this fails the way it always has instead of resuming. */
 export const CHAT_RESUME_MAX_AGE_MS = 15 * 60_000;
-/** Resuming this close to the watchdog would only buy a timeout mid-reply. */
 export const CHAT_RESUME_DEADLINE_MARGIN_MS = 30_000;
-/** `{ turnId, count }`: resumes spent by the turn under `turn`. */
 export const CHAT_TURN_RESUME_KEY = "turnResume";
-/** When the turn under `turn` was first claimed; bounds the resume age. */
 export const CHAT_TURN_STARTED_AT_KEY = "turnStartedAt";
-/**
- * The turn's model-gateway capability. A resumed turn presents the same token
- * so the gateway's per-capability ledger keeps counting the turn's spend.
- */
 export const CHAT_TURN_MODEL_CAPABILITY_KEY = "turnModelCapability";
 
 export const OWNER_PURGE_STALE_LEASE_GRACE_MS = 35_000;
@@ -108,21 +78,8 @@ export const chatTurnAdmissionKey = (clientMsgId: string): string =>
 const TURN_EVENT_SEQ_PREFIX = "turnEventSeq:";
 export const turnEventSeqKey = (turnId: string): string =>
   `${TURN_EVENT_SEQ_PREFIX}${turnId}`;
-/**
- * Set once `conversation.created` has been handed to the owner. Adoption
- * (binding the owner) happens at the first verified contact — a socket
- * connect or a turn — but there is nothing to index until a turn exists,
- * so the event is the first turn's job whichever contact came first.
- */
 export const CONVERSATION_PROJECTED_KEY = "conversationProjected";
-/**
- * The execution this conversation's latest chat turn was admitted with. A
- * wake (an agent's report or message) carries none of its own and goes on
- * on this one, so a conversation running on Claude Code answers its agents
- * on Claude Code too.
- */
 export const CONVERSATION_EXECUTION_KEY = "conversationExecution";
-/** Owner event batches the owner has not confirmed yet; the alarm retries them. */
 export const OWNER_EVENT_BATCH_PREFIX = "ownerEventBatch:";
 export const OWNER_EVENT_DEBT_RETRY_MS = 30_000;
 
@@ -141,14 +98,8 @@ export const TERMINAL_STATUS: Record<
   timeout: "failed",
 };
 
-/** How many tool entries the live snapshot keeps. Newest win. */
 export const LIVE_TOOL_LIMIT = 24;
 
-/**
- * The user-facing text for each non-completed terminal, in one place: the
- * watchdog's retry ladder has to deliver the same words the transcript already
- * shows, and two copies of a sentence is how they stop matching.
- */
 export const TERMINAL_NOTICE = {
   timeout: "This took longer than expected, so Stella stopped. Try again.",
   canceled: "Stopped.",

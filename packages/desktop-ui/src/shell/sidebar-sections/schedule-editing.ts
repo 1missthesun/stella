@@ -1,9 +1,3 @@
-/**
- * Editing a schedule's timing in the Schedule section: the simple shapes
- * people set (once at a moment, every N minutes/hours/days, a time on some
- * weekdays) round-trip through form fields; anything else keeps its cron
- * expression as text.
- */
 import type { LocalCronSchedule } from "@stella/contracts/scheduling";
 
 export type EveryUnit = "minutes" | "hours" | "days";
@@ -18,7 +12,6 @@ const pad = (value: number): string => String(value).padStart(2, "0");
 
 const UNIT_MS: Record<EveryUnit, number> = { minutes: 60_000, hours: 3_600_000, days: 86_400_000 };
 
-/** `YYYY-MM-DDTHH:MM` in the viewer's zone, for a datetime-local field. */
 export const toLocalInput = (atMs: number): string => {
   const date = new Date(atMs);
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
@@ -71,7 +64,6 @@ export const draftOf = (schedule: LocalCronSchedule): TimingDraft => {
 
 export type TimingError = "pickWhen" | "pickFuture" | "pickEvery" | "pickTime" | "pickDays" | "pickCron";
 
-/** The draft as a schedule, or which error to show under the field. */
 export const scheduleOf = (draft: TimingDraft): { schedule: LocalCronSchedule } | { error: TimingError } => {
   if (draft.kind === "at") {
     const atMs = new Date(draft.local).getTime();

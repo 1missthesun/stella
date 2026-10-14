@@ -27,10 +27,6 @@ type Status =
   | { kind: "sent" }
   | { kind: "failed"; message: string };
 
-/**
- * "Send feedback" in a page sheet: the same note desktop's feedback dialog
- * posts (`feedback.submit`), stored without the account attached.
- */
 export function FeedbackSheet({
   visible,
   onClose,

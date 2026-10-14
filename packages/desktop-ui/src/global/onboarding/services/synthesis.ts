@@ -1,10 +1,3 @@
-/**
- * Core Memory Synthesis Service
- *
- * Delegates synthesis through Electron host IPC, which runs the model work
- * on this device through the runtime.
- */
-
 import { getSynthesisPromptConfig } from "@/prompts";
 import type { DiscoveryCategory } from "@stella/contracts/discovery";
 import type { OnboardingSynthesisResponse } from "@stella/contracts/desktop/onboarding";

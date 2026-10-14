@@ -1,13 +1,3 @@
-/**
- * The models Stella knows, composed per provider: the vendored registry
- * (`@stella/contracts/model-registry`), pi.dev's refreshed provider catalogs,
- * the user's `models.json` (custom providers, their auth and headers, model
- * overrides), extension-registered providers and the Stella models the
- * backend publishes. It is what the model picker lists and what model routes
- * resolve against; requests run on upstream pi-ai (`llm-completion.ts`, and
- * `@stella/agent` for chats).
- */
-
 import fs from "node:fs";
 import path from "node:path";
 import { getLoadedModelRegistry } from "@stella/contracts/model-registry";
@@ -32,19 +22,9 @@ import {
 
 const DEFAULT_CATALOG_BASE_URL = "https://pi.dev";
 const REMOTE_CATALOG_REFRESH_INTERVAL_MS = 4 * 60 * 60 * 1_000;
-// Per provider, measured from the moment that provider's request is dispatched
-// rather than from the start of the batch, so one slow endpoint cannot spend
-// the budget belonging to the providers queued behind it.
 const REMOTE_CATALOG_TIMEOUT_MS = 15_000;
-// Every provider catalog lives on the same origin, so firing all of them at
-// once just queues them in the connection pool while their deadlines run.
 const REMOTE_CATALOG_CONCURRENCY = 6;
 
-/**
- * A bare AbortError reads as "The operation was aborted." no matter why it
- * fired, which made a per-provider timeout indistinguishable from a refresh the
- * caller had torn down. Name the cause instead.
- */
 class CatalogRefreshCancelledError extends Error {
   constructor(providerId: string) {
     super(`Model catalog refresh for ${providerId} was cancelled`);
@@ -57,8 +37,6 @@ const describeCatalogFetchFailure = (
   error: unknown,
   causes: { timeoutMs?: number; cancelled: boolean },
 ): Error => {
-  // A lifecycle teardown wins over the deadline: if both fired, the refresh was
-  // going away regardless and reporting a timeout would be misleading.
   if (causes.cancelled) return new CatalogRefreshCancelledError(providerId);
   if (causes.timeoutMs !== undefined) {
     return new Error(
@@ -134,13 +112,6 @@ const hasStaticAuthHeader = (
 
 const cloneModel = (model: Model<Api>): Model<Api> => structuredClone(model);
 
-/**
- * Composed catalog models are immutable and shared across recompositions and
- * snapshots instead of being deep-cloned on every recompose (835 models, 13%
- * of worker boot CPU when they were cloned). Public accessors that hand a
- * model to a caller who may mutate it (`getModel`, `getModels`,
- * `getAllModels`) still return clones.
- */
 const deepFreeze = <T>(value: T): T => {
   if (typeof value !== "object" || value === null || Object.isFrozen(value)) {
     return value;
@@ -150,26 +121,12 @@ const deepFreeze = <T>(value: T): T => {
   return value;
 };
 
-/** Own a caller-supplied model: an isolated, frozen copy. */
 const ownModel = (model: Model<Api>): Model<Api> =>
   deepFreeze(cloneModel(model));
 
-/**
- * A composed model built during recompose (models.json provider transport,
- * configured definitions, overrides, extension models) may share nested
- * objects with the parsed config or extension definitions. Clone those before
- * freezing so freezing never reaches objects the runtime does not own; models
- * carried over untouched are already frozen and are reused as-is.
- */
 const sealComposedModel = (model: Model<Api>): Model<Api> =>
   Object.isFrozen(model) ? model : ownModel(model);
 
-/**
- * Equality with JSON semantics (what the old `JSON.stringify` fingerprint
- * compared): keys whose value is `undefined` are treated as absent, and
- * identical references short-circuit, which is the common case for the
- * shared frozen models.
- */
 const jsonEqual = (a: unknown, b: unknown): boolean => {
   if (a === b) return true;
   if (
@@ -225,8 +182,6 @@ const validateRemoteCatalogEntries = (
     models.push({
       ...entry,
       provider: providerId,
-      // Remote catalog entries may omit cost (v2 treats them as free); default
-      // so every runtime Model carries a concrete cost.
       cost: entry.cost ?? { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     });
   }
@@ -346,10 +301,6 @@ const createConfiguredModel = (
     contextWindow:
       definition.contextWindow ?? metadataDefaults?.contextWindow ?? 128_000,
     maxTokens: definition.maxTokens ?? metadataDefaults?.maxTokens ?? 16_384,
-    // models.json header expressions remain credential-blind model metadata;
-    // they are resolved for each request by getConfiguredHeaders().
-    // Preserve only already-composed baseline headers for a same-ID model.
-    // models.json header expressions remain request-time-only below.
     headers: metadataDefaults?.headers
       ? { ...metadataDefaults.headers }
       : undefined,
@@ -387,10 +338,6 @@ export class ModelRuntime {
   private readonly builtins = new Map<string, Model<Api>[]>();
   private builtinsLoaded = false;
   private readonly dynamicCatalogs = new Map<string, RuntimeCatalogEntry>();
-  // Preserve the raw per-provider last-good payload separately from the
-  // validated composition view. If one cached provider needs online repair
-  // and that repair fails, a different provider's successful refresh must not
-  // serialize the filtered view over the unrepaired raw recovery payload.
   private readonly storedCatalogs = new Map<string, StoredCatalogEntry>();
   private readonly extensionProviders = new Map<
     string,
@@ -417,14 +364,8 @@ export class ModelRuntime {
   private catalogError?: string;
   private catalogBaseUrl = DEFAULT_CATALOG_BASE_URL;
   private catalogRequestTimeoutMs = REMOTE_CATALOG_TIMEOUT_MS;
-  // Timestamp-derived sequence remains ordered across worker restarts while
-  // still allowing multiple registry changes inside one millisecond.
   private revision = Date.now() * 1_000;
-  // Last published snapshot minus `revision`, compared structurally so the
-  // shared frozen models short-circuit on identity.
   private publishedContent?: Omit<ModelRuntimeSnapshot, "revision">;
-  // Header-stripped snapshot view of each composed (frozen) model, so repeated
-  // snapshots reuse the same objects instead of rebuilding 835 of them.
   private readonly snapshotModels = new WeakMap<Model<Api>, Model<Api>>();
   private readonly catalogChangeListeners = new Set<
     (snapshot: ModelRuntimeSnapshot) => void
@@ -490,9 +431,6 @@ export class ModelRuntime {
     } catch {
       // Missing/corrupt cache falls back to the built-in catalog.
     }
-    // The restored catalog is as fresh as its newest stored check, so a boot
-    // that skips every still-fresh provider reports that time rather than
-    // none.
     const checkedAts = [...this.dynamicCatalogs.values()]
       .map((entry) => entry.checkedAt)
       .filter((checkedAt): checkedAt is number => checkedAt !== undefined);
@@ -537,8 +475,6 @@ export class ModelRuntime {
       const composeProvider = (
         providerConfig: ModelsJsonProvider | undefined,
       ): Map<string, Model<Api>> => {
-        // Sources are frozen and already carry `provider: providerId`, so
-        // they are shared, not cloned.
         const models = new Map<string, Model<Api>>(
           (this.builtins.get(providerId) ?? []).map((model) => [
             model.id,
@@ -713,7 +649,6 @@ export class ModelRuntime {
     this.recompose();
   }
 
-  /** Resolves true when the provider's catalog was fetched, false if skipped. */
   private async refreshProviderOnce(
     providerId: string,
     options: { force?: boolean; lifecycleSignal?: AbortSignal },
@@ -745,7 +680,6 @@ export class ModelRuntime {
         ),
         { headers: { accept: "application/json" }, signal },
       );
-      // Reading the body can abort too, so it shares the request's deadline.
       payload = response.ok ? ((await response.json()) as unknown) : undefined;
     } catch (error) {
       throw describeCatalogFetchFailure(providerId, error, {
@@ -819,11 +753,6 @@ export class ModelRuntime {
     return promise;
   }
 
-  /**
-   * Resolve one model from a provider catalog, fetching that provider only
-   * when the requested model is absent. This prevents a cold first turn from
-   * racing the broader startup catalog warm.
-   */
   async ensureProviderModel(
     providerId: string,
     modelIds: readonly string[],
@@ -858,10 +787,6 @@ export class ModelRuntime {
     return findCandidate();
   }
 
-  /**
-   * Refresh providers through a bounded pool so one slow endpoint does not
-   * stall or spend the request deadline of the providers behind it.
-   */
   private async refreshProviders(
     providerIds: readonly string[],
     options: { force?: boolean; signal?: AbortSignal },
@@ -923,9 +848,6 @@ export class ModelRuntime {
           providerIds,
           options,
         );
-        // A torn-down refresh is not a catalog failure. Report nothing rather
-        // than one scary line per provider that never got its turn, and leave
-        // the previous error in place as the last thing we actually learned.
         if (options.signal?.aborted) return;
         const successCount = providerIds.length - failures.length;
         this.catalogError =
@@ -936,10 +858,6 @@ export class ModelRuntime {
           this.publishCatalogChangeIfNeeded();
           throw new Error(this.catalogError);
         }
-        // Providers whose cached catalog is still fresh are skipped without a
-        // request. Only an actual fetch advances `refreshedAt` and rewrites
-        // the store; otherwise a boot with a fresh cache would republish the
-        // whole catalog just to move this timestamp.
         if (successCount > 0 && fetchedCount > 0) {
           this.refreshedAt = Date.now();
           this.writeStoredCatalogs();

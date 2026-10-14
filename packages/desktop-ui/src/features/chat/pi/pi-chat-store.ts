@@ -1,11 +1,3 @@
-/**
- * The desktop chat on pi-durable.
- *
- * One `PiChatState` per watched conversation, folded with the shared reducer
- * from the runtime's event batches (`piChat:events`). Watching asks the
- * runtime for a snapshot; batches that arrive before it answers are held and
- * applied after it, so nothing is lost or applied out of order.
- */
 import type { LocalChatAgentReport } from "@stella/contracts/local-chat";
 import type { DesktopThreadActivityRecord } from "@/features/chat/thread-activity-types";
 import { presentStellaProviderError } from "@/features/chat/streaming/stella-provider-error-toast";
@@ -31,7 +23,6 @@ type Watched = {
   state: PiChatState;
   watchers: number;
   listeners: Set<() => void>;
-  /** Batches that arrived while the snapshot was on its way. */
   held?: PiChatEvent[][];
 };
 
@@ -41,7 +32,6 @@ let unsubscribeEvents: (() => void) | undefined;
 
 const api = () => (typeof window === "undefined" ? undefined : window.electronAPI?.piChat);
 
-/** Whether this runtime has pi-durable at all, whatever the engine. */
 export const piChatAvailable = (): boolean => api() !== undefined;
 
 const publish = (entry: Watched) => {
@@ -57,7 +47,6 @@ const entryFor = (conversationId: string): Watched => {
   return entry;
 };
 
-/** Ask the runtime for a conversation's snapshot and its events from then on. */
 const attach = (conversationId: string, entry: Watched) => {
   const chat = api();
   if (!chat) return;
@@ -86,7 +75,6 @@ const clearStaleNotices = (conversationId: string) => {
   clearComposerNotices(conversationId, (notice) => notice.id === usageLimit);
 };
 
-/** "11:30 PM" today, or "Sun 11:30 PM" on another day. */
 const resetTime = (until: number) => {
   const at = new Date(until);
   const time = at.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
@@ -95,11 +83,6 @@ const resetTime = (until: number) => {
   return `${at.toLocaleDateString(undefined, { weekday: "short", ...(far ? { month: "short", day: "numeric" } : {}) })} ${time}`;
 };
 
-/**
- * Claude Code work here is held until the Claude usage limit resets: a card
- * in the sign-in card's style with the reset time, which goes away with one
- * line when the held work resumes.
- */
 const presentUsageLimit = (conversationId: string, event: PiChatEvent & { type: "engine_status" }) => {
   const id = usageLimitNoticeId(conversationId);
   if (event.state === "usage-limit") {
@@ -145,7 +128,6 @@ const presentEvents = (conversationId: string, events: readonly PiChatEvent[]) =
   }
 };
 
-/** A reply shows once it is whole, so its streamed text changes nothing on screen. */
 const changesWhatShows = (event: PiChatEvent) => event.type !== "message_update";
 
 let runtimeReady = true;
@@ -163,7 +145,6 @@ const listen = () => {
     entry.state = reducePiChat(entry.state, events);
     if (events.some(changesWhatShows)) publish(entry);
   });
-  // A restarted runtime has no streams: watch again once it is back.
   window.electronAPI?.agent?.onAvailability?.((snapshot) => {
     const ready = snapshot.connected && snapshot.ready;
     if (ready && !runtimeReady) {
@@ -179,7 +160,6 @@ const listen = () => {
   });
 };
 
-/** Watch a conversation while the returned stop is not called. */
 export const watchPiChat = (conversationId: string): (() => void) => {
   const chat = api();
   if (!chat) return () => {};
@@ -205,7 +185,6 @@ export const subscribePiChat = (conversationId: string, listener: () => void): (
 export const piChatSnapshot = (conversationId: string | null): PiChatState =>
   (conversationId ? watched.get(conversationId)?.state : undefined) ?? EMPTY;
 
-/** Send a message; one the user pointed elsewhere comes back placed there. */
 export const submitPiChat = async (
   conversationId: string,
   requestId: string,
@@ -219,14 +198,12 @@ export const submitPiChat = async (
   return (result as Partial<PiChatPlacedResult> | undefined)?.placed;
 };
 
-/** Stella's greeting after onboarding, as a reply in the conversation. */
 export const submitPiWelcome = async (conversationId: string, message: string): Promise<void> => {
   const chat = api();
   if (!chat) throw new Error("Stella's runtime is not available.");
   await chat.request({ op: "welcome", conversationId, message });
 };
 
-/** Stop the conversation's run, and the placed turns it is running elsewhere. */
 export const abortPiChat = (conversationId: string): void => {
   const dispatchIds = (watched.get(conversationId)?.state.remote ?? []).flatMap((turn) =>
     turn.clientMsgId ? [turn.clientMsgId] : [],
@@ -236,7 +213,6 @@ export const abortPiChat = (conversationId: string): void => {
     .catch(() => undefined);
 };
 
-/** A conversation's pi agents as the task rows, cards and focus view read them. */
 export const piChatAgents = async (conversationId: string): Promise<DesktopThreadActivityRecord[]> => {
   const chat = api();
   if (!chat) return [];
@@ -262,7 +238,6 @@ export const piChatAgents = async (conversationId: string): Promise<DesktopThrea
   });
 };
 
-/** One agent's report as the task report shows it: its latest words, whole. */
 export const piAgentReport = async (
   conversationId: string,
   threadId: string,
@@ -281,6 +256,5 @@ export const piAgentReport = async (
   };
 };
 
-/** Batches of pi events for every watched conversation, as they arrive. */
 export const onPiChatEvents = (listener: (payload: PiChatEventsPayload) => void): (() => void) =>
   api()?.onEvents(listener) ?? (() => {});

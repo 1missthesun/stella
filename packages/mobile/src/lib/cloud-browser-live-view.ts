@@ -1,6 +1,5 @@
 const LIVE_VIEW_ORIGIN = "https://live.browser.run";
 
-/** Strict native-WebView boundary for Cloudflare's bearer Live View URL. */
 export function parseCloudBrowserLiveViewUrl(value: string): URL | null {
   try {
     const url = new URL(value);

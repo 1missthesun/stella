@@ -1,13 +1,3 @@
-/**
- * iMessage-style reply preview above an assistant bubble. A small muted
- * bubble quotes what Stella is replying to (the cited message, or the task
- * with its live status), joined
- * to the reply by a thin connector; tapping it opens focus on that target.
- * A task's full report is offered by the reply itself ("more").
- *
- * Whether a bubble appears at all is decided upstream by the shared
- * reply-context rule (`@stella/contracts/reply-context`).
- */
 import { useMemo } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import type { ReplyRef } from "@stella/contracts/reply-refs";

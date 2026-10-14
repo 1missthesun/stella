@@ -1,24 +1,3 @@
-/**
- * Stella's orchestrator → agent → agent hierarchy on pi-durable.
- *
- * Each agent is a conversation owned by a background **anchor** task in the
- * conversation that started it, so the starter's Stop and idle never wait on
- * it (pi-durable's example 23). Every message to an agent, the first prompt
- * included, is carried by a background **reporter** task in the starter: it
- * submits the message to the agent, waits for the agent's answer, and reports
- * it one level up. When the starter is the orchestrator, the report becomes
- * the orchestrator's next input (`[Agent completed] ...`); when the starter is
- * itself an agent, the report is a new message to that agent, carried by a
- * reporter in *its* starter, so a nested result climbs the chain one hop at a
- * time. Request ids derived from task ids make every hop exactly-once across
- * restarts.
- *
- * The tools are Stella's own descriptors: `spawn_agent`, `send_message`,
- * `agent_status`, `stop_agent`, and, for Stella in a conversation whose
- * brain can move, `switch_destination` (`StellaAgentsHost.execution`). An
- * agent placed on another computer or in the cloud runs there as a whole
- * (`StellaAgentsHost.remote`); nothing here runs another host's tools.
- */
 import type { Context } from "@earendil-works/chord";
 import { Type, type AssistantMessage, type ModelThinkingLevel, type TextContent } from "@earendil-works/pi-ai";
 import {
@@ -84,59 +63,30 @@ import {
 export const STELLA_AGENTS_EXTENSION = "stella-agents";
 
 type AgentRecord = {
-  /** Its conversation here; -1 for an agent that runs somewhere else. */
   conversationId: number;
   description: string;
   placement: { kind: "local" | "cloud" | "device"; deviceId?: string };
-  /** Answers already reported, so two messages answered by one run report once. */
   reported: number[];
-  /** It runs on another host as a whole (`StellaAgentsHost.remote`). */
   remote?: true;
-  /** It runs as a whole on another engine on this host (`StellaAgentsHost.engine`), by that engine's id. */
   engine?: string;
-  /** When a remote agent was started; a local one dates from its first entry. */
   startedAt?: number;
-  /**
-   * The reports that came back from a remote agent, by request id: one per
-   * message it was given (`noteRemoteReport`), so it runs while it has fewer.
-   */
   answered?: string[];
-  /** How its latest reported run ended. */
   outcome?: AgentAttemptOutcome;
-  /** Its latest report was a failure (written before `outcome`). */
   failed?: true;
-  /** It was started here for another host's orchestrator, which gets its reports. */
   origin?: AgentOrigin;
-  /** Messages its starter gave it that never reached it (refused, or withdrawn by a stop); they go with its next one. */
   held?: string[];
-  /** `stop_agent` stopped it; its next message clears this. */
   stopped?: true;
-  /** `stopped`, as builds before `stop_agent` wrote it. */
   paused?: true;
   steers?: Array<{ key: string; message: string }>;
   carried?: { runKey: string; messages: string[]; settled?: true };
-  /**
-   * It moved itself to another host (`switch_destination`): it is reached
-   * through the owner's agent threads from then on, wherever it runs, while
-   * its conversation here stays for when it comes back.
-   */
   moved?: true;
-  /** It moved away and does not run here now. */
   away?: true;
-  /** It came back here as an agent another host placed, under this key (`runPlacedAgent`). */
   placedAs?: string;
-  /** It moved here: its next run first takes what it did elsewhere from its log. */
   catchUp?: true;
 };
 
-/**
- * Who gets the reports of an agent started here for another host rather
- * than for this orchestrator: the owner's agent threads (one attempt of a
- * thread they track, which they hand on).
- */
 export type AgentOrigin = { agentThread: true };
 
-/** One of the orchestrator's agents as the app lists it. */
 export type StellaAgentRecord = {
   threadId: string;
   description: string;
@@ -144,38 +94,26 @@ export type StellaAgentRecord = {
   status: "running" | "completed" | "error";
   startedAt: number;
   updatedAt: number;
-  /** Its latest prose, oldest first. */
   assistantMessages: string[];
   error?: string;
-  /** It was stopped, or its latest run stopped before it answered. */
   stopped?: true;
-  /** Its status in the shared vocabulary, which `status` and `stopped` fold. */
   agentStatus: AgentStatus;
 };
 
-/** The agents a conversation started, by thread id. */
 export const StellaAgentsDoc = defineDoc<{
   agents: Record<string, AgentRecord>;
-  /** Tool task id → what that call did, so a rerun of the call does it once. */
   calls: Record<string, { threadId: string; reporter: number }>;
 }>({
   kind: "stella.agents",
   version: 1,
   scope: "conversation",
   history: "latest",
-  // A fork does not inherit the agents of the conversation it forked from.
   fork: "initial",
   initial: () => ({ agents: {}, calls: {} }),
 });
 
-/** The call that started an agent another host placed here (`runPlacedAgent`). */
 const PLACED_CALL_PREFIX = "placed:";
 
-/**
- * Whether an agent in this conversation is another host's: placed here by it,
- * or started here for its orchestrator. That host's records track it, so this
- * computer does not report it as its own.
- */
 export const isAnotherHostsAgent = (
   state: { agents: Record<string, AgentRecord>; calls: Record<string, { threadId: string }> } | undefined,
   threadId: string,
@@ -183,39 +121,24 @@ export const isAnotherHostsAgent = (
   state?.agents[threadId]?.origin !== undefined ||
   Object.entries(state?.calls ?? {}).some(([key, call]) => call.threadId === threadId && key.startsWith(PLACED_CALL_PREFIX));
 
-/** A message on its way to an agent. */
 export type AgentRun = {
   threadId: string;
   agentConversationId: ConversationId;
-  /** The conversation that started the agent; the reporter lives there. */
   parentConversationId: ConversationId;
-  /** Unique per message: `agent-run:<reporter task id>`. */
   runId: string;
-  /** The agent that started it; absent when Stella did. */
   parentThreadId?: string;
-  /** Its depth among Stella's agents: 1 for hers, one more for each level below. */
   depth: number;
-  /** Which of the messages its starter gave it this run answers, from 1: its attempt in the owner's records. */
   attempt: number;
   description: string;
 };
 
-/** How an agent's run ended, for the host that ran it. */
 export type AgentRunEnd = {
-  /** The answer's text, when the run answered. */
   answer?: string;
-  /** Stopped before it answered. */
   aborted?: true;
-  /** Why it failed: the host refused the run, it ended without an answer, or its answer is an error. */
   error?: string;
-  /**
-   * It answered while agents it started still run, so it is not done: its
-   * attempt stays open and nothing reports its end.
-   */
   waiting?: true;
 };
 
-/** How a run ended, for the owner's records; undefined when it did not settle (its host is closing). */
 export const agentRunOutcome = (
   end: AgentRunEnd | undefined,
 ): { outcome: AgentAttemptOutcome; text?: string } | undefined =>
@@ -227,7 +150,6 @@ export const agentRunOutcome = (
         ? { outcome: "completed", text: end.answer }
         : undefined;
 
-/** The attempt one reporter's message is: the messages given before it and its own. */
 const attemptOf = (
   state: { calls: Record<string, { threadId: string; reporter: number }> } | undefined,
   threadId: string,
@@ -239,56 +161,28 @@ const attemptOf = (
       .length,
   );
 
-/** The model an agent runs on, and at what thinking level. */
 export type RunsOn = { model?: ModelRef; thinkingLevel?: ModelThinkingLevel };
 
-/**
- * What an agent its caller named a model for runs on: a model this host
- * runs, another engine that runs it as a whole (`StellaAgentsHost.engine`),
- * or, for an agent placed elsewhere as a whole, the host there on that model.
- */
 export type AgentModelChoice = { runsOn: RunsOn } | { engine: string } | { there: true };
 
-/** An agent's report, arriving at the orchestrator. */
 export type AgentReport = {
   rootConversationId: ConversationId;
   threadId: string;
   text: string;
-  /**
-   * How the run it reports ended. Set on every report with text; readers use
-   * it, never the text's heading.
-   */
   status?: AgentAttemptOutcome;
-  /** Exactly-once key for the delivery. */
   requestId: string;
-  /** The agent was started here for another host's orchestrator: the report is for it. */
   origin?: AgentOrigin;
-  /**
-   * For an agent started for another host: one of its messages was answered
-   * within another report, or its run was stopped. No text; that host counts
-   * one report per message it sent.
-   */
   settled?: true;
   ledger?: true;
 };
 
-/** A note an agent sent its Stella (`send_message` to "stella"), arriving at the orchestrator. */
 export type AgentNote = {
   rootConversationId: ConversationId;
-  /** The sending agent. */
   threadId: string;
-  /** The framed `<agent-message>` Stella reads, which no reader shows. */
   text: string;
-  /** Exactly-once key for the delivery. */
   requestId: string;
 };
 
-/**
- * A report of a remote agent came back to the conversation that started it
- * (`StellaAgentsHost.remote`), or one of its messages was settled without
- * one. Once per `requestId`. False when the conversation never started that
- * agent: the report is not for it.
- */
 export const noteRemoteReport = async (
   tx: Pick<Tx, "doc">,
   conversationId: ConversationId,
@@ -307,11 +201,6 @@ export const noteRemoteReport = async (
   return true;
 };
 
-/**
- * The conversation holding the record of an agent that runs elsewhere:
- * Stella's own (`root`), or that of one of her agents here that started it.
- * Its reports and stops settle that record, wherever in the tree it sits.
- */
 export const remoteAgentHome = async (
   reader: Pick<ToolExecutionApi, "snapshot">,
   root: ConversationId,
@@ -332,62 +221,34 @@ export const remoteAgentHome = async (
   return await visit(root, 1);
 };
 
-/** How a remote agent's latest reported run ended, from its record. */
 const remoteOutcome = (agent: AgentRecord): AgentAttemptOutcome => agent.outcome ?? (agent.failed ? "failed" : "completed");
 
-/** The abort reason of a placed run `stop_agent` stopped, rather than one its host withdrew. */
 export const PLACED_AGENT_STOPPED = "placed-agent-stopped";
 
-/** How a placed run its host ended: stopped by `stop_agent`, or canceled. */
 const stoppedPlacedRun = (threadId: string, signal: AbortSignal): PlacedAgentResult =>
   signal.reason === PLACED_AGENT_STOPPED
     ? { threadId, status: "canceled", error: AGENT_STOPPED_REASON, stopped: true }
     : { threadId, status: "canceled", error: "Canceled." };
 
-/** An agent another host placed here, and one run of it (`runPlacedAgent`). */
 export type PlacedAgentRun = {
-  /** Where it sits among Stella's agents; absent, it is one of Stella's own. */
   lineage?: AgentLineage;
-  /** The agent's identity at the host that placed it, the same for each of its runs. */
   agentKey: string;
-  /** This run (a continued agent runs again under the same `agentKey`). */
   runKey: string;
-  /** Its thread id at the host that placed it, which names it everywhere else. */
   threadId?: string;
   description: string;
   prompt: string;
-  /** The model it runs on, when the host that placed it named one; otherwise the orchestrator's. */
   runsOn?: RunsOn;
-  /** The host that placed it canceled it: it stops, or never starts. */
   signal?: AbortSignal;
 };
 
 export type PlacedAgentResult = { threadId: string } & (
   | { status: "ok"; finalText: string }
-  /** It moved itself to another host, which runs it from now on. */
   | { status: "moved"; where: string }
   | { status: "error"; error: string }
-  /**
-   * Stopped before it answered: by `stop_agent` (`stopped`, which reports to
-   * no one), or because the host that placed it canceled it.
-   */
   | { status: "canceled"; error: string; stopped?: true }
 );
 
-/**
- * An agent that runs on another host as a whole, so it keeps working while
- * this one sleeps: the host starts it there and carries messages to it, and
- * its report reaches its starter the way that host's reports do (a wake
- * turn in the cloud, the conversation's journal on a computer, or a message
- * to the agent that started it, through the owner's agent threads).
- */
 export type RemoteAgentHost = {
-  /**
-   * Start it there. Its thread id there names it everywhere. Once per `key`.
-   * `model` is the one its caller asked for, which the host there runs it on.
-   * `parentThreadId`: the agent that starts it, when Stella does not; its
-   * reports go back to that agent wherever it runs.
-   */
   start(
     args: {
       key: string;
@@ -395,135 +256,55 @@ export type RemoteAgentHost = {
       prompt: string;
       model?: string;
       parentThreadId?: string;
-      /** `spawn_agent`'s `workspace`; only a cloud container uses it. */
       workspace?: AgentWorkspaceSize;
     },
     context: Context,
   ): Promise<{ threadId: string; waiting?: boolean }>;
-  /**
-   * Another message for it: steers it there, starts its next run, or is held
-   * for its offline computer. Once per `key`. `framed`: `message` is already
-   * framed as the agent reads it (`formatAgentMessage`), so the host there
-   * delivers it as it is.
-   */
   message(
     args: { key: string; threadId: string; message: string; framed?: boolean },
     context: Context,
   ): Promise<AgentMessageDelivery | void>;
-  /** Stop it there, and every agent it started, at any depth. */
   stop?(threadId: string, context: Context): Promise<AgentStopResult | void>;
 };
 
 export type StellaAgentsHost = {
-  /** Where an agent runs, given what the caller asked for and where the caller runs. */
   place(destination: SpawnDestination, caller: StellaPlacement): StellaPlacement | { error: string };
-  /** The host that runs agents placed there, when they run somewhere else as a whole. */
   remote?(placement: StellaPlacement): RemoteAgentHost | undefined;
-  /**
-   * What an agent whose caller named `requested` runs on: a model this host
-   * runs (a Stella alias, a model on the user's own key or plan), the id of
-   * another engine that runs it as a whole (`engine`), or, with `placement`
-   * (it runs elsewhere as a whole), the host there. Throws when nothing runs
-   * it, so it never runs on something else. Absent, only Stella's aliases
-   * run here, for a caller on Stella's models, and a host elsewhere takes the
-   * model as it is.
-   */
   agentModel?(
     requested: string,
     caller: RunsOn,
     placement: StellaPlacement | undefined,
     context: Context,
   ): Promise<AgentModelChoice>;
-  /**
-   * The model an agent runs on when its caller names none, where the
-   * caller's own cannot run an agent here; absent, it runs on the caller's.
-   */
   defaultAgentModel?(caller: RunsOn): string | undefined;
-  /** Another engine on this host that runs whole agents (Claude Code on a computer), by its id. */
   engine?(id: string): RemoteAgentHost | undefined;
-  /** Where the orchestrator itself runs. */
   rootPlacement: StellaPlacement;
-  /**
-   * Before a message goes to an agent, and after the agent's run settles:
-   * the cloud admits the run and binds its model capability here.
-   */
   beginAgentRun?(run: AgentRun, context: Context): Promise<void>;
-  /**
-   * A model an agent is started on that its caller's may not be (another
-   * Stella alias): the host registers it so the agent can resolve it.
-   */
   ensureModel?(model: ModelRef, context: Context): Promise<void>;
   endAgentRun?(run: AgentRun, context: Context, end?: AgentRunEnd): Promise<void>;
-  /**
-   * A report for the orchestrator. Default: a follow-up input to the root
-   * conversation. The cloud sends it through its turn plane instead.
-   */
   deliverReport?(report: AgentReport, context: Context): Promise<void>;
-  /**
-   * A note for the orchestrator. Default: a hidden follow-up input to the
-   * root conversation. The cloud sends it through its turn plane instead.
-   */
   deliverNote?(note: AgentNote, context: Context): Promise<void>;
   reportsFromLedger?(): boolean;
-  /** An agent's report reached the orchestrator: the desktop tells the user. */
   agentReported?(agent: {
     threadId: string;
     description: string;
-    /** How the run it reports ended. */
     status: AgentAttemptOutcome;
-    /** `status === "failed"`, for hosts that read only that. */
     failed: boolean;
     report: string;
   }): void;
-  /**
-   * One of the orchestrator's agents was stopped before it answered and is
-   * not running again, so no report goes up and the orchestrator is not
-   * woken: the host records that it stopped, where the conversation's other
-   * devices read what is running.
-   */
   agentStopped?(agent: { threadId: string; description: string }, context: Context): Promise<void>;
-  /** Who an agent can reach beyond this conversation's own agents. */
   directory?: AgentDirectoryHost;
-  /**
-   * Where a new agent whose tools run on this host starts working, when its
-   * caller named no directory: a fresh folder of its own rather than the
-   * user's home. Absent, it starts in the environment's default directory.
-   */
   agentDirectory?(threadId: string): string;
-  /**
-   * Why an agent can't start in `directory` on this host (it is missing, or
-   * not a folder); undefined when it can. Absent, the directory is not checked.
-   */
   directoryProblem?(directory: string): Promise<string | undefined>;
-  /**
-   * Where Stella can move herself (`switch_destination`), and how the
-   * owner's computers stand, for agents that run on one of them.
-   */
   execution?: StellaExecutionHost;
-  /**
-   * Every agent's conversation in the cloud (`agent-log-sync`): a sync after
-   * the agent's run here, and the import that brings an agent's transcript
-   * here up to its log before it runs here. Answers the folder it worked in
-   * where it ran last.
-   */
   agentLog?: {
     kick(conversationId: ConversationId): void;
     importInto(agentConversationId: ConversationId, threadId: string, context: Context): Promise<{ cwd?: string }>;
   };
 };
 
-/**
- * What `agent_status` lists and `send_message` reaches beyond the agents this
- * harness holds: the user's other Stella sessions, and this conversation's
- * agents that run elsewhere (the owner's agent threads).
- */
 export type AgentDirectoryHost = {
-  /** The conversation this harness is Stella for, as the other hosts name it. */
   conversationId(context: Context): Promise<string>;
-  /**
-   * Rows the harness does not hold, and the owner's own rows for `threadIds`
-   * (agents it holds as running elsewhere); `unavailable` says what could not be read.
-   */
   list(
     context: Context,
     options?: { threadIds?: string[] },
@@ -531,25 +312,12 @@ export type AgentDirectoryHost = {
     agents: AgentDirectoryAgentRow[];
     sessions: AgentDirectorySessionRow[];
     unavailable?: string;
-    /** `agents` holds every one of `threadIds` the owner's agent threads know. */
     threadIdsRead?: true;
   }>;
-  /**
-   * A note for a thread this harness does not hold, once per `key`: a
-   * session's Stella, or an agent elsewhere. With `remoteStella`, `to` is
-   * this conversation and the note is for its Stella on another host.
-   * Undefined when no one has that thread id.
-   */
   message(
     args: { key: string; to: string; text: string; from: AgentMessageSender; remoteStella?: true },
     context: Context,
   ): Promise<AgentMessageDelivery | undefined>;
-  /**
-   * Stop an agent this harness does not hold or reach itself, and every
-   * agent it started, wherever each runs and whichever host started it, once
-   * per `key`. `requesterThreadId`: the agent asking, which may stop only
-   * agents it started, at any depth.
-   */
   stop?(args: { key: string; threadId: string; requesterThreadId?: string }, context: Context): Promise<AgentStopResult>;
 };
 
@@ -575,11 +343,6 @@ const mintAgentId = (description: string, taken: Readonly<Record<string, unknown
 const textOf = (message: AssistantMessage | undefined): string =>
   (message?.content ?? []).map((part) => (part.type === "text" ? part.text : "")).join("").trim();
 
-/**
- * Whether an agent's newest work stopped before an answer: a run stopped
- * mid-request or mid-tool ends on an aborted request, a tool call or
- * its result, where a finished run ends on its answer. Entries newest first.
- */
 const stoppedShort = (entries: readonly { kind: string; model?: readonly unknown[] }[]): boolean => {
   const newest = entries.find((entry) => entry.kind === "pi.assistant" || entry.kind === "pi.tool-result");
   if (!newest) return false;
@@ -588,7 +351,6 @@ const stoppedShort = (entries: readonly { kind: string; model?: readonly unknown
   return stop === "aborted" || stop === "toolUse";
 };
 
-/** Mark one of the agents a conversation started stopped (`AgentRecord.stopped`). */
 const markStopped = async (
   store: Pick<ToolExecutionApi, "commit">,
   starter: ConversationId,
@@ -602,10 +364,8 @@ const markStopped = async (
   }, context);
 };
 
-/** Whether `stop_agent` stopped it since its last message. */
 const wasStopped = (agent: AgentRecord): boolean => agent.stopped === true || agent.paused === true;
 
-/** Any message's text: a user message's content may be a plain string. */
 const messageText = (message: { content?: unknown } | undefined): string =>
   typeof message?.content === "string"
     ? message.content
@@ -613,14 +373,11 @@ const messageText = (message: { content?: unknown } | undefined): string =>
       ? (message.content as Array<{ type?: string; text?: string }>).map((part) => (part.type === "text" ? (part.text ?? "") : "")).join("")
       : "";
 
-/** `agent_status` on a running agent the caller started: its report needs no waiting. */
 const RUNNING_STATUS_NOTE =
   "Still running. Its report arrives on its own in [Agent completed]: end your turn now instead of waiting or checking again.";
 
-/** `spawn_agent`'s result: the start is all there is to know until the report. */
 const STARTED_NOTE = "Its report arrives on its own as [Agent completed]; there is nothing to check before then.";
 
-/** How much of an agent's latest message `agent_status` shows. */
 const LATEST_PREVIEW_CHARS = 300;
 
 const MAX_REPORT_CHARS = AGENT_REPORT_MAX_CHARS;
@@ -632,7 +389,6 @@ export const completedReport = (args: {
   description: string;
   result: string;
   toParentAgent: boolean;
-  /** What the user wrote to the agent in its thread, when this answers it. */
   userMessage?: string;
 }): string =>
   [
@@ -658,7 +414,6 @@ const roleOf = async (
   context: Context,
 ): Promise<StellaAgentRole> => (await reader.snapshot(StellaAgentDoc, conversationId, context)) ?? { agentType: "orchestrator", depth: 0 };
 
-/** Owns one agent conversation. Completes at once; background, so its owner's Stop and idle stop here. */
 const Anchor = defineTask<null, { phase: "done" }, null>({
   name: "stella.agent-anchor",
   version: 1,
@@ -674,11 +429,8 @@ type ReporterInput = {
   threadId: string;
   conversationId: number;
   message: string;
-  /** The user wrote the message in the agent's thread, not the parent. */
   fromUser?: true;
-  /** The report of an agent it started: it wakes it, stopped or not. */
   report?: true;
-  /** A note from an agent that did not start it, which wakes it like a report. */
   note?: true;
 };
 type ReporterState =
@@ -689,29 +441,22 @@ type ReporterState =
   | {
       phase: "report";
       report?: string;
-      /** How the run ended; absent on a checkpoint written before it was recorded. */
       status?: AgentAttemptOutcome;
-      /** It was stopped before it answered: nothing reports. */
       stopped?: true;
-      /** Written as `stopped` by builds before `stop_agent`. */
       paused?: true;
-      /** It answered while agents it started still run: not done, so nothing reports. */
       waiting?: true;
-      /** Its notes to Stella that go out before the report (`settleNotes`). */
       notes?: StellaPendingNote[];
     };
 
 const REPORTER_TASK = "stella.agent-reporter";
 const LIVE_TASK_STATUSES = ["pending", "running", "waiting", "completing"] as const;
 
-/** What `agentsBusy` reads, from whichever handle the caller holds. */
 type BusyReader = {
   agents(conversationId: ConversationId): Promise<Readonly<{ agents: Readonly<Record<string, AgentRecord>> }> | undefined>;
   running(conversationId: ConversationId): Promise<boolean>;
   reporters(conversationId: ConversationId): Promise<ReadonlyArray<{ id: number; input: ReporterInput }>>;
 };
 
-/** Reporters still carrying a message in a conversation (one per message to one of its agents). */
 const liveReporters = async (
   tx: Pick<Tx, "scanTasks">,
   conversationId: ConversationId,
@@ -728,10 +473,6 @@ const liveReporters = async (
   return found;
 };
 
-/**
- * Whether any agent a conversation started is still at work: running, its
- * answer still on its way back, or waiting on agents of its own.
- */
 const agentsBusy = async (read: BusyReader, conversationId: ConversationId, depth = 0): Promise<boolean> => {
   const own = Object.entries((await read.agents(conversationId))?.agents ?? {}).filter(
     ([, agent]) => !agent.remote && agent.conversationId >= 0,
@@ -747,7 +488,6 @@ const agentsBusy = async (read: BusyReader, conversationId: ConversationId, dept
   return false;
 };
 
-/** `agentsBusy` through a handle that commits and returns (a tool call's api, the harness). */
 const busyReader = (
   store: Pick<ToolExecutionApi, "snapshot"> & { commit<T>(change: (tx: Tx) => Promise<T>, context: Context): Promise<T> },
   context: Context,
@@ -757,16 +497,12 @@ const busyReader = (
   reporters: (id) => store.commit((tx) => liveReporters(tx, id), context),
 });
 
-/** An agent somewhere under the orchestrator, and the conversation that started it. */
 type TreeAgent = {
   threadId: string;
   record: AgentRecord;
   parentConversationId: ConversationId;
-  /** The agent that started it; absent when Stella did. */
   parentThreadId?: string;
-  /** The messages its starter gave it. */
   given: number;
-  /** Its answers are reported to its starter (not run for another host, which reads them itself). */
   reports: boolean;
 };
 
@@ -777,7 +513,6 @@ const assertMessageSize = (message: string): void => {
   }
 };
 
-/** Who a note is from: an agent by its description, or Stella by the conversation's thread id. */
 const senderOf = (self: StellaAgentRole, stellaThreadId: string): AgentMessageSender =>
   self.agentType === "orchestrator" || !self.threadId
     ? { threadId: stellaThreadId, label: "Stella" }
@@ -806,19 +541,15 @@ const statusResult = (view: Record<string, unknown>) => ({
   content: [{ type: "text" as const, text: JSON.stringify(view) }],
 });
 
-/** The owner's agent threads as `agent_status` read them. */
 type DirectoryLedger = {
   agents: readonly AgentDirectoryAgentRow[];
   unavailable?: string;
   threadIdsRead?: true;
 };
 
-/** At most this many agents held elsewhere are asked about by id. */
 const DIRECTORY_THREAD_IDS_MAX = 200;
-/** A new agent's ledger row may lag its record by this much. */
 const DIRECTORY_SETTLE_MS = 2 * 60_000;
 
-/** What an agent is to the caller of `agent_status`. */
 const relationOf = (row: { threadId: string; parentThreadId?: string }, self: { threadId?: string }, parentThreadId?: string) =>
   (self.threadId ? row.parentThreadId === self.threadId : !row.parentThreadId)
     ? "you started it"
@@ -855,7 +586,6 @@ export function stellaAgents(host: StellaAgentsHost) {
           }, context);
           return;
         }
-        // It moved itself away: the message goes where it runs now.
         const current = (await runtime.snapshot(StellaAgentsDoc, runtime.conversationId, context))?.agents[threadId];
         if (current?.moved) {
           const remote = remoteHostOf(current);
@@ -880,9 +610,7 @@ export function stellaAgents(host: StellaAgentsHost) {
           description: siblings?.agents[threadId]?.description ?? threadId,
         };
         let settled: Awaited<ReturnType<Awaited<ReturnType<NonNullable<Awaited<ReturnType<typeof runtime.conversation>>>["submit"]>>["wait"]>> | undefined;
-        // A run the host refuses (admission, credentials) is reported as failed.
         let refused: string | undefined;
-        // How the run ended, for the host once its report is settled.
         let end: AgentRunEnd = {};
         let submitted = false;
         try {
@@ -890,7 +618,6 @@ export function stellaAgents(host: StellaAgentsHost) {
             await host.beginAgentRun?.(run, context);
             const agent = await runtime.conversation(agentConversationId, context);
             if (!agent) throw new Error(`Agent ${threadId} no longer exists.`);
-            // Its model may be one nothing registered since a restart (another Stella alias).
             const model = host.ensureModel ? (await runtime.snapshot(AgentDoc, agentConversationId, context))?.model : undefined;
             if (model) await host.ensureModel?.(model, context);
             if ((await runtime.snapshot(StellaAgentsDoc, runtime.conversationId, context))?.agents[threadId]?.catchUp) {
@@ -920,9 +647,6 @@ export function stellaAgents(host: StellaAgentsHost) {
           if (settled?.status === "unanswered" && settled.reason === "aborted") end = { aborted: true };
           else if (refused !== undefined || settled === undefined) end = { error: refused ?? "The agent did not run." };
           else if (settled.status === "unanswered") end = { error: settled.reason };
-          // Whether it answered with agents of its own still at work, or with
-          // more of their reports and notes still on their way to it: then it
-          // is not done.
           let busy = false;
           if (settled?.status === "done" && settled.type === "input" && !siblings?.agents[threadId]?.origin) {
             const read: BusyReader = {
@@ -958,12 +682,10 @@ export function stellaAgents(host: StellaAgentsHost) {
             })().catch(() => false);
           }
           if (settled?.status === "unanswered" && settled.reason === "aborted") await dropMove(runtime, agentConversationId, context);
-          // It asked to move: now that this run ended it goes, and reports from there.
           const move =
             settled?.status === "done" && settled.type === "input" ? await takeMove(runtime, agentConversationId, context) : undefined;
           if (move && settled?.status === "done" && settled.type === "input") {
             const answered = settled.answer;
-            // Its notes to Stella go out now; it reports from where it moves.
             for (const note of (await runtime.snapshot(StellaAgentDoc, agentConversationId, context))?.notes ?? []) {
               await deliverNote(runtime.conversationId, note, context, (id) => runtime.conversation(id, context)).catch(() => false);
             }
@@ -973,7 +695,6 @@ export function stellaAgents(host: StellaAgentsHost) {
               const agent = state.agents[threadId];
               if (agent && !agent.reported.includes(answered)) agent.reported.push(answered);
               if (agent && "moved" in move) {
-                // What it was given so far is settled here; what it is given from now on is answered there.
                 const given = Object.entries(state.calls).filter(([, call]) => call.threadId === threadId).map(([key]) => `moved:${key}`);
                 agent.remote = true;
                 agent.moved = true;
@@ -994,8 +715,6 @@ export function stellaAgents(host: StellaAgentsHost) {
             return;
           }
           await runtime.commit(async (tx) => {
-            // Its notes to Stella: sent in its last step before it finished,
-            // they are part of its report; otherwise they go out before it.
             const finished =
               settled?.status === "done" && settled.type === "input" && !busy ? settled.answer : undefined;
             const notes = await settleNotes(tx, agentConversationId, finished);
@@ -1011,8 +730,6 @@ export function stellaAgents(host: StellaAgentsHost) {
             const state = await tx.doc(StellaAgentsDoc, runtime.conversationId);
             const agent = state.agents[threadId];
             const description = agent?.description ?? threadId;
-            // A report or note a stop withdrew before it landed wakes the
-            // agent once the stop is done, with what else was withdrawn.
             if (agent && withdrawn && (reporter.input.report || reporter.input.note)) {
               await tx.createTask(
                 Reporter,
@@ -1026,7 +743,6 @@ export function stellaAgents(host: StellaAgentsHost) {
               return next(failedReport({ threadId, description, error: refused ?? "The agent did not run." }), "failed");
             }
             if (settled.status === "unanswered") {
-              // Stopped: nothing to report, but it is no longer running.
               if (settled.reason === "aborted") {
                 return { status: "running", checkpoint: { phase: "report", status: "canceled", stopped: true, ...(send(false).length ? { notes: send(false) } : {}) } };
               }
@@ -1069,7 +785,6 @@ export function stellaAgents(host: StellaAgentsHost) {
         for (const note of notes ?? []) {
           await deliverNote(runtime.conversationId, note, context, (id) => runtime.conversation(id, context));
         }
-        // Not done while agents it started still work: nothing reports its end.
         if (waiting) {
           await runtime.commit(() => ({ status: "terminal", outcome: { status: "completed", result: null } }), context);
           return;
@@ -1080,8 +795,6 @@ export function stellaAgents(host: StellaAgentsHost) {
             ? undefined
             : reportStatusOf({ status: reporter.state.checkpoint.status, text: report });
         const self = await roleOf(runtime, runtime.conversationId, context);
-        // A stop the orchestrator's own agent took, unless a message since
-        // has it running again.
         if (stopped && host.agentStopped && (self.agentType === "orchestrator" || self.parentConversationId === undefined)) {
           const live = await runtime.snapshot(LiveDoc, reporter.input.conversationId as ConversationId, context);
           if (live?.run === undefined) {
@@ -1140,8 +853,6 @@ export function stellaAgents(host: StellaAgentsHost) {
           }
         }
         await runtime.commit(async (tx) => {
-          // A report to an agent is the next message to that agent, carried
-          // by a reporter in the conversation that started it.
           if (!fromLedger && report !== undefined && self.agentType !== "orchestrator" && self.parentConversationId !== undefined && self.threadId) {
             await tx.createTask(
               Reporter,
@@ -1160,11 +871,6 @@ export function stellaAgents(host: StellaAgentsHost) {
     abort: (_reporter, runtime, context) => runtime.commit(() => ({ status: "terminal", outcome: { status: "aborted" } }), context),
   });
 
-  /**
-   * What an agent runs on, from its caller: Stella's alias as a general
-   * agent, or else the caller's own model, at the caller's thinking level
-   * either way (a ChatGPT plan turn is admitted for one reasoning effort).
-   */
   const childRun = (caller: RunsOn): RunsOn => {
     const parent = caller.model;
     const thinking = caller.thinkingLevel ? { thinkingLevel: caller.thinkingLevel } : {};
@@ -1178,12 +884,6 @@ export function stellaAgents(host: StellaAgentsHost) {
     };
   };
 
-  /**
-   * The model an agent placed elsewhere (another computer, or the cloud from
-   * a computer) runs on when its caller names none: Claude Code, with the
-   * caller's model and effort, when the caller runs on it; otherwise the
-   * default there.
-   */
   const sameEngine = (caller: RunsOn): string | undefined => {
     if (!onClaudeCode(caller.model)) return undefined;
     const modelId = caller.model?.modelId.trim();
@@ -1191,12 +891,6 @@ export function stellaAgents(host: StellaAgentsHost) {
     return `${CLAUDE_CODE_PROVIDER_ID}${modelId && modelId !== "default" ? `/${modelId}` : ""}${effort}`;
   };
 
-  /**
-   * What an agent its caller named `requested` for runs on, checked by the
-   * host. Without a host check, another Stella alias runs for a caller on
-   * Stella's models (a turn on the user's own model or plan is admitted for
-   * that model alone); anything else fails rather than running on another model.
-   */
   const chooseAgentModel = async (
     requested: string,
     caller: RunsOn,
@@ -1215,23 +909,12 @@ export function stellaAgents(host: StellaAgentsHost) {
     );
   };
 
-  /**
-   * An agent that moved away runs here again, in the conversation it kept
-   * here: it is no longer remote (its history reads, its subtree is walked)
-   * and it is placed where this orchestrator runs. Every host's return path
-   * goes through here (`createAgent` adopting it, `markCatchUp`).
-   */
   const runsHereAgain = (record: AgentRecord): void => {
     delete record.remote;
     const placement = host.rootPlacement;
     record.placement = { kind: placement.kind, ...(placement.kind === "device" ? { deviceId: placement.deviceId } : {}) };
   };
 
-  /**
-   * Create an agent under `parentConversationId` and its first reporter,
-   * once per `callKey`: an agent conversation owned by a background anchor,
-   * its role, placement and tools, and its entry in the parent's agents.
-   */
   const createAgent = async (
     tx: Tx,
     args: {
@@ -1242,21 +925,11 @@ export function stellaAgents(host: StellaAgentsHost) {
       prompt: string;
       runsOn: RunsOn;
       placement: StellaPlacement;
-      /** Its caller runs it and reads its answer itself; nothing reports here. */
       detached?: boolean;
-      /** The thread id another host chose for it, instead of one made here. */
       threadId?: string;
-      /** Started here for another host's orchestrator. */
       origin?: AgentOrigin;
-      /** The absolute directory its caller asked it to start in. */
       cwd?: string;
-      /** The agent or Stella that started it. */
       startedBy?: AgentMessageSender;
-      /**
-       * Placed here under `threadId`, which may be an agent this harness
-       * already has a conversation for (one that moved away and back): that
-       * conversation is the agent's, under the placing host's key.
-       */
       adoptAs?: string;
     },
   ): Promise<{ threadId: string; existing: boolean }> => {
@@ -1267,9 +940,6 @@ export function stellaAgents(host: StellaAgentsHost) {
     const known = args.adoptAs && args.threadId ? state.agents[args.threadId] : undefined;
     if (known && known.conversationId >= 0 && args.adoptAs) {
       known.placedAs = args.adoptAs;
-      // It moved away and came back: it runs here again, in its conversation
-      // here. It stays `moved`: the owner's agent threads placed it here and
-      // still reach it (`away` clears once it took what it did elsewhere).
       runsHereAgain(known);
       return { threadId: args.threadId!, existing: true };
     }
@@ -1282,18 +952,13 @@ export function stellaAgents(host: StellaAgentsHost) {
     const arriving = known && args.adoptAs ? known : undefined;
     const threadId =
       arriving || (args.threadId && !state.agents[args.threadId]) ? args.threadId! : mintAgentId(description, state.agents);
-    // It starts there, not confined there: its tools still take any path.
     const cwd = args.cwd ?? (placement.kind === "local" ? host.agentDirectory?.(threadId) : undefined);
     await configure(tx, child.id, {
       ...(cwd ? { cwd } : {}),
       ...(runsOn.model ? { model: runsOn.model } : {}),
       ...(runsOn.thinkingLevel ? { thinkingLevel: runsOn.thinkingLevel } : {}),
-      // An agent has file, shell and agent tools, not the orchestrator's
-      // (it copied the starter's selection); one at the depth limit cannot
-      // start agents.
       extensions: { ...agentToolSelection, ...engineExtensionChange(runsOn.model) },
       tools: {
-        // Only Stella's own agents move themselves; theirs run where they run.
         remove: [
           ...(depth >= MAX_AGENT_DEPTH ? [spawnAgent, stopAgent] : []),
           ...(switchDestination && !agentsMove ? [switchDestination] : []),
@@ -1336,7 +1001,6 @@ export function stellaAgents(host: StellaAgentsHost) {
     return { threadId, existing: false };
   };
 
-  /** POSIX or Windows absolute. */
   const isAbsolutePath = (value: string) => value.startsWith("/") || /^[A-Za-z]:[\\/]/.test(value) || value.startsWith("\\\\");
 
   const spawnAgent = defineTool({
@@ -1376,7 +1040,6 @@ export function stellaAgents(host: StellaAgentsHost) {
         }),
       ),
     }),
-    // A rerun finds this call's spawn in `calls` and does nothing again.
     replay: "safe",
     execute: async (args, api, context) => {
       const caller = await roleOf(api, api.conversationId, context);
@@ -1404,7 +1067,6 @@ export function stellaAgents(host: StellaAgentsHost) {
       if (!here && !placedRemote) throw new Error(`Agents can't start on ${describePlacement(placement)} from here.`);
       const named = args.model?.trim();
       const explicit = named && named !== "default" ? named : undefined;
-      // Elsewhere it runs on Stella's engine, as it would here: Claude Code when she runs on it.
       const requested = explicit ?? (placedRemote ? sameEngine(callerAgent) : undefined) ?? host.defaultAgentModel?.(callerAgent);
       const description = args.description.trim() || "agent";
       const choice = requested
@@ -1414,12 +1076,10 @@ export function stellaAgents(host: StellaAgentsHost) {
         throw new Error(`"${requested}" runs only where you are, not ${describePlacement(placement)}.`);
       }
       const runsOn = choice && "runsOn" in choice ? choice.runsOn : childRun(callerAgent);
-      // A model other than the caller's is registered before the agent runs on it.
       if (choice && runsOn.model) await host.ensureModel?.(runsOn.model, context);
       const engine = choice && "engine" in choice ? choice.engine : undefined;
       const engineHost = engine ? host.engine?.(engine) : undefined;
       if (engine && !engineHost) throw new Error(`"${requested}" runs on ${engine}, which this host cannot start agents on.`);
-      // Only Stella starts an agent on another engine; an agent's agent elsewhere answers to it.
       if (engineHost && !orchestrator) {
         throw new Error(`Only Stella can start an agent on "${requested}". Omit model to run this agent on yours.`);
       }
@@ -1515,13 +1175,6 @@ export function stellaAgents(host: StellaAgentsHost) {
     },
   });
 
-  /**
-   * `send_message` to "stella": a note for the orchestrator an agent works
-   * for, found up its chain of starters. It goes where the agent's reports
-   * go: to this conversation's Stella when they reach it, otherwise to the
-   * Stella on the host that started the agent (an agent started here for
-   * another host, or placed here by one); once per call, by the call's task id.
-   */
   const messageStella = async (api: ToolExecutionApi, message: string, context: Context) => {
     const { self, root, top } = await chainOf(api, context);
     if (self.agentType === "orchestrator" || !self.threadId) {
@@ -1541,9 +1194,6 @@ export function stellaAgents(host: StellaAgentsHost) {
         "The Stella you work for runs on another host, which send_message cannot reach from here. Put what it needs in your final report.",
       );
     }
-    // Stella's own agent: its report goes to the same Stella, so the note
-    // waits for its next step, and one sent as its last step is part of its
-    // report instead (`settleNotes`): a run reaches Stella once.
     if (self.depth === 1) {
       const note: StellaPendingNote = { callId: api.callId, key: String(api.taskId), message, from, ...(remote ? { remote: true as const } : {}) };
       await api.commit(async (tx) => {
@@ -1581,11 +1231,6 @@ export function stellaAgents(host: StellaAgentsHost) {
     };
   };
 
-  /**
-   * A note to Stella, once per key: to this conversation's Stella (`root`),
-   * or, `remote`, to the Stella on the host that started the agent. False
-   * when it could not go (nothing reaches that Stella from here).
-   */
   const deliverNote = async (
     root: ConversationId,
     note: StellaPendingNote,
@@ -1612,19 +1257,13 @@ export function stellaAgents(host: StellaAgentsHost) {
     }
     const stella = await open?.(root);
     if (!stella) return false;
-    // Read by the model, never shown: the user did not write it.
     const hidden: TextContent & { stella: { hidden: true } } = { type: "text", text: agentNote.text, stella: { hidden: true } };
     await stella.submit({ type: "input", content: [hidden], whenBusy: "followUp", requestId: agentNote.requestId }, context);
     return true;
   };
 
-  /** Notes this process already sent on an agent's next step; a repeat is harmless (once per key), only wasted. */
   const notesSent = new Set<string>();
 
-  /**
-   * Once an agent's model answers with more tool calls, it went on after its
-   * notes to Stella: they go out now.
-   */
   const notesHook = hook(GenerationTask, {
     afterResponse: async (message, api, context) => {
       if (message.stopReason !== "toolUse" || !message.content.some((part) => part.type === "toolCall")) return;
@@ -1632,7 +1271,6 @@ export function stellaAgents(host: StellaAgentsHost) {
       if (!role?.notes?.length || role.parentConversationId === undefined) return;
       for (const note of role.notes) {
         if (notesSent.has(note.key)) continue;
-        // Without a host delivery here, its run's end sends it.
         if (!note.remote && !host.deliverNote) continue;
         try {
           if (await deliverNote(role.parentConversationId as ConversationId, note, context)) notesSent.add(note.key);
@@ -1643,12 +1281,6 @@ export function stellaAgents(host: StellaAgentsHost) {
     },
   });
 
-  /**
-   * An agent's run ended: its notes to Stella settle. With `answer` (it
-   * finished, and its report goes up now), the ones it sent in its last step
-   * are part of that report (`closing`); the rest go out now, once per key.
-   * Clears them in `tx`.
-   */
   const settleNotes = async (
     tx: Tx,
     agentConversationId: ConversationId,
@@ -1666,7 +1298,6 @@ export function stellaAgents(host: StellaAgentsHost) {
     };
   };
 
-  /** The tool calls of the last step before an answer. */
   const lastStepCalls = async (tx: Tx, conversationId: ConversationId, answer: EntryId): Promise<Set<string>> => {
     let cursor: Parameters<Tx["scanEntries"]>[2];
     for (let pages = 0; pages < 20; pages += 1) {
@@ -1684,7 +1315,6 @@ export function stellaAgents(host: StellaAgentsHost) {
     return new Set();
   };
 
-  /** The answer of a run that finished, with what it sent Stella as its last step first. */
   const withClosingNotes = (closing: string[], answer: string): string => [...closing, answer].filter((part) => part.trim()).join("\n\n");
 
   const sendMessage = defineTool({
@@ -1733,7 +1363,6 @@ export function stellaAgents(host: StellaAgentsHost) {
     },
   });
 
-  /** A message given to a remote agent is answered by a report like its start, so it counts until one comes back. */
   const expectRemoteReport = (
     on: { commit: Harness["commit"] },
     conversationId: ConversationId,
@@ -1746,7 +1375,6 @@ export function stellaAgents(host: StellaAgentsHost) {
       state.calls[callKey] ??= { threadId, reporter: -1 };
     }, context);
 
-  /** The host a remote agent runs on as a whole: on a device, that device's own Stella. */
   const remoteHostOf = (agent: AgentRecord): RemoteAgentHost | undefined => {
     if (agent.engine) return host.engine?.(agent.engine);
     const placement = placementOf(agent.placement);
@@ -1754,10 +1382,6 @@ export function stellaAgents(host: StellaAgentsHost) {
     return host.remote?.(placement);
   };
 
-  /**
-   * The owner's computer a remote agent runs on, as the device list has it
-   * now. `seen` keeps one lookup per computer within a call.
-   */
   const computerOf = async (
     agent: AgentRecord,
     context: Context,
@@ -1792,18 +1416,12 @@ export function stellaAgents(host: StellaAgentsHost) {
     const call = message?.content.find((part) => part.type === "toolCall");
     return {
       ...(running.length ? { running_tools: running } : {}),
-      // A glance at what it is doing, never its result: that comes in its report.
       ...(text ? { latest_message_preview: text.length > LATEST_PREVIEW_CHARS ? `${text.slice(0, LATEST_PREVIEW_CHARS)}…` : text } : {}),
       ...(call && call.type === "toolCall" ? { latest_tool_call: call.name } : {}),
       ...(agent.held?.length ? { held_messages: agent.held.length } : {}),
     };
   };
 
-  /**
-   * The caller's role, the orchestrator conversation above it, the agent
-   * under the orchestrator its chain goes through (whose record says where
-   * reports go), and the agent that started the caller, if one did.
-   */
   const chainOf = async (api: Pick<ToolExecutionApi, "snapshot" | "conversationId">, context: Context) => {
     const self = await roleOf(api, api.conversationId, context);
     if (self.agentType === "orchestrator") return { self, root: api.conversationId as ConversationId | undefined, top: self };
@@ -1817,12 +1435,10 @@ export function stellaAgents(host: StellaAgentsHost) {
       top = parent;
       root = parent.parentConversationId as ConversationId | undefined;
     }
-    // Run here for an agent on another host (placed here, or moved here): that agent started it.
     if (parentThreadId === undefined && self.depth > 1) parentThreadId = self.startedBy?.threadId;
     return { self, root, top, ...(parentThreadId ? { parentThreadId } : {}) };
   };
 
-  /** Every agent under the orchestrator, with the conversation that started it. */
   const agentTree = async (reader: Pick<ToolExecutionApi, "snapshot">, root: ConversationId, context: Context): Promise<TreeAgent[]> => {
     const found: TreeAgent[] = [];
     const visit = async (conversationId: ConversationId, parentThreadId: string | undefined, depth: number) => {
@@ -1845,11 +1461,6 @@ export function stellaAgents(host: StellaAgentsHost) {
     return found;
   };
 
-  /**
-   * An agent under the orchestrator as `agent_status` lists it. A whole agent
-   * elsewhere is listed as the owner's agent threads (`ledger`) know it, the
-   * place it runs on and whether that is online; one here says so.
-   */
   const directoryRow = async (
     api: ToolExecutionApi,
     agent: TreeAgent,
@@ -1879,11 +1490,6 @@ export function stellaAgents(host: StellaAgentsHost) {
         };
       }
       const computer = await computerOf(record, context, seen);
-      // Its report may have reached this conversation while another host
-      // held it, so this record's own count is not the last word. A backend
-      // that could not be asked by id lists every live agent placed on a
-      // computer for this conversation, at any depth: one missing from it
-      // no longer runs. (Agents on another engine here may not be listed.)
       const notLive =
         ledger !== undefined &&
         !ledger.unavailable &&
@@ -1913,7 +1519,6 @@ export function stellaAgents(host: StellaAgentsHost) {
     const latest = recent.find((entry) => entry.kind === "pi.assistant")?.model?.[0] as AssistantMessage | undefined;
     const at = (recent[0]?.model?.[0] as { timestamp?: number } | undefined)?.timestamp;
     const stopped = live?.run === undefined && (wasStopped(record) || stoppedShort(recent));
-    // Idle while agents it started still work: it is not done.
     const waiting = live?.run === undefined && !stopped && (await agentsBusy(busyReader(api, context), id).catch(() => false));
     return {
       ...located,
@@ -1929,12 +1534,10 @@ export function stellaAgents(host: StellaAgentsHost) {
     };
   };
 
-  /** `agent_status` without a thread_id: everyone the caller can reach. */
   const directoryStatus = async (api: ToolExecutionApi, context: Context) => {
     const { self, root, parentThreadId } = await chainOf(api, context);
     const conversationId = (await host.directory?.conversationId(context).catch(() => undefined)) ?? STELLA_MESSAGE_TARGET;
     const tree = root === undefined ? [] : await agentTree(api, root, context);
-    // Asked for by id: the agents this harness holds as running elsewhere.
     const threadIds = tree
       .filter((agent) => agent.record.remote && (agent.record.answered?.length ?? 0) < agent.given)
       .map((agent) => agent.threadId)
@@ -1959,7 +1562,6 @@ export function stellaAgents(host: StellaAgentsHost) {
         ...(self.threadId ? { threadId: self.threadId } : {}),
         ...(parentThreadId ? { parentThreadId } : {}),
       },
-      // An agent this harness holds is listed as it knows it.
       agents: [...rows, ...(elsewhere?.agents ?? []).filter((row) => !known.has(row.threadId)).map((row) => ({ ...row, conversationId }))],
       sessions: elsewhere?.sessions ?? [],
       ...(elsewhere?.unavailable ? { unavailable: elsewhere.unavailable } : {}),
@@ -1967,15 +1569,6 @@ export function stellaAgents(host: StellaAgentsHost) {
     return { content: [{ type: "text" as const, text: listing }] };
   };
 
-  /**
-   * `send_message` to anyone the caller did not start: a note it weighs and
-   * can answer, never an instruction. An agent under this orchestrator takes
-   * it the way its starter's messages arrive (a reporter in the starter's
-   * conversation carries it), so it steers a running agent or resumes an
-   * idle one, and its report still goes to whoever started it. Anyone else
-   * (another session, an agent this harness does not hold, or one that
-   * answers another host) is the host's to reach. Once per call.
-   */
   const messageOther = async (
     api: ToolExecutionApi,
     threadId: string,
@@ -2095,8 +1688,6 @@ export function stellaAgents(host: StellaAgentsHost) {
         return statusResult({
           ...entry,
           relation: mine ? "you started it" : relationOf(row, self, parentThreadId),
-          // Models waited in place (a sleep, then this again); say plainly that
-          // its report comes on its own.
           ...(mine && entry.status === "running" ? { note: RUNNING_STATUS_NOTE } : {}),
           ...(reachable ? {} : { reachable: false }),
           ...(await agentDetails(api, threadId, found.record, context)),
@@ -2118,13 +1709,6 @@ export function stellaAgents(host: StellaAgentsHost) {
     },
   });
 
-  /**
-   * Stop an agent this harness holds and every agent below it, deepest
-   * first so none of them reports to one already stopped: each local run is
-   * aborted and recorded stopped, and each agent that runs elsewhere is
-   * stopped where it runs (which stops its own agents there). Nothing is
-   * deleted; a message resumes each.
-   */
   const stopSubtree = async (
     store: Pick<ToolExecutionApi, "snapshot" | "conversation"> & { commit<T>(change: (tx: Tx) => Promise<T>, context: Context): Promise<T> },
     target: TreeAgent,
@@ -2151,7 +1735,6 @@ export function stellaAgents(host: StellaAgentsHost) {
       await markStopped(store, agent.parentConversationId, agent.threadId, context);
       await (await store.conversation(id, context))?.abort(context);
       local.push(agent.threadId);
-      // Idle while agents it started worked, its attempt was still open: it ends stopped.
       if (waiting && agent.parentConversationId === rootConversationId) {
         await host.agentStopped?.({ threadId: agent.threadId, description: record.description }, context);
       }
@@ -2172,7 +1755,6 @@ export function stellaAgents(host: StellaAgentsHost) {
       const { self, root } = await chainOf(api, context);
       const stella = self.agentType === "orchestrator" || self.parentConversationId === undefined;
       if (!stella && threadId === self.threadId) throw new Error("That thread_id is you. To stop, end your turn.");
-      // Stella reaches every agent in her conversation; an agent only those it started, at any depth.
       const scope = stella ? root : (api.conversationId as ConversationId);
       const target = scope === undefined ? undefined : (await agentTree(api, scope, context)).find((agent) => agent.threadId === threadId);
       if (target) {
@@ -2189,8 +1771,6 @@ export function stellaAgents(host: StellaAgentsHost) {
           ],
         };
       }
-      // Started by another host, or out of this one's reach: the owner's
-      // agent threads stop it, and its agents, where they run.
       const stopped = await host.directory?.stop?.(
         { key: String(api.taskId), threadId, ...(stella || !self.threadId ? {} : { requesterThreadId: self.threadId }) },
         context,
@@ -2204,29 +1784,17 @@ export function stellaAgents(host: StellaAgentsHost) {
     },
   });
 
-  /**
-   * Start an agent the host asked for rather than a tool call (an app-source
-   * merge, memory sync, an agent thread another host started): under the
-   * orchestrator, at the depth its lineage gives (1 without one), reporting
-   * to it like a spawned agent. Once per `key`.
-   */
   const startAgent = async (
     harness: Harness,
     args: {
       key: string;
       description: string;
       prompt: string;
-      /** The thread id another host chose for it. */
       threadId?: string;
-      /** Started for another host's orchestrator, which gets its reports. */
       origin?: AgentOrigin;
-      /** The model it runs on, when that host chose it rather than this orchestrator's own. */
       model?: ModelRef;
-      /** The thinking level that host admitted it for, with `model`. */
       thinkingLevel?: ModelThinkingLevel;
-      /** It may have run elsewhere before (it moved here): its first run takes its log first. */
       catchUp?: boolean;
-      /** Where it sits among Stella's agents; absent, it is one of Stella's own. */
       lineage?: AgentLineage;
     },
     context: Context,
@@ -2257,14 +1825,12 @@ export function stellaAgents(host: StellaAgentsHost) {
     }, context);
   };
 
-  /** One of the orchestrator's agents that may have run elsewhere since: its next run takes its log first. */
   const markCatchUp = async (harness: Harness, threadId: string, context: Context): Promise<void> => {
     const root = await harness.root(context);
     await harness.commit(async (tx) => {
       const record = (await tx.doc(StellaAgentsDoc, root.id)).agents[threadId];
       if (!record) return undefined;
       record.catchUp = true;
-      // It moved away and came back: it runs here again.
       if (record.moved) {
         delete record.moved;
         delete record.away;
@@ -2274,26 +1840,15 @@ export function stellaAgents(host: StellaAgentsHost) {
     }, context);
   };
 
-  /** One of the orchestrator's agents at any depth, with the conversation that started it. */
   const treeAgent = async (harness: Harness, threadId: string, context: Context): Promise<TreeAgent | undefined> =>
     (await agentTree(harness, (await harness.root(context)).id, context)).find((agent) => agent.threadId === threadId);
 
-  /**
-   * Stop one of the orchestrator's agents, or one of theirs, and every agent
-   * below it, by thread id (for the host that started it, or a stop from
-   * another host). Undefined when no agent here has that id.
-   */
   const stopAgentByThread = async (harness: Harness, threadId: string, context: Context): Promise<{ local: string[]; elsewhere: AgentStopResult[] } | undefined> => {
     const found = await treeAgent(harness, threadId, context);
     if (!found) return undefined;
     return await stopSubtree(harness, found, (await harness.root(context)).id, context);
   };
 
-  /**
-   * Where one of the orchestrator's agents, or one of theirs, stands: its
-   * status as `agentRecords` reads it and its attempt, the messages its
-   * starter has given it. Undefined when no agent here has that id.
-   */
   const agentStanding = async (
     harness: Harness,
     threadId: string,
@@ -2319,7 +1874,6 @@ export function stellaAgents(host: StellaAgentsHost) {
     ]);
     const latest = recent.find((entry) => entry.kind === "pi.assistant")?.model?.[0] as AssistantMessage | undefined;
     const idleStopped = live?.run === undefined && (wasStopped(found.record) || stoppedShort(recent));
-    // Idle while agents it started still work: it is not done.
     const running =
       live?.run !== undefined ||
       (!idleStopped && (await agentsBusy(busyReader(harness, context), conversationId).catch(() => false)));
@@ -2332,16 +1886,10 @@ export function stellaAgents(host: StellaAgentsHost) {
     };
   };
 
-  /**
-   * The orchestrator's agents as the app lists them: each one's status,
-   * description, start and latest activity, and its latest prose.
-   */
   const agentRecords = async (harness: Harness, context: Context): Promise<StellaAgentRecord[]> => {
     const root = await harness.root(context);
     const state = await harness.snapshot(StellaAgentsDoc, root.id, context);
     const records: StellaAgentRecord[] = [];
-    // An agent that runs elsewhere is done once a report came back for each
-    // message it was given; what it said is what its reports carried.
     const remoteAgents = Object.entries(state?.agents ?? {}).filter(([, agent]) => agent.remote);
     const reports =
       remoteAgents.length === 0
@@ -2352,7 +1900,6 @@ export function stellaAgents(host: StellaAgentsHost) {
             .filter(({ text }) => /^\[(Agent completed|Task failed|Task canceled)\]/.test(text.trimStart()));
     for (const [threadId, agent] of remoteAgents) {
       const given = Object.values(state?.calls ?? {}).filter((call) => call.threadId === threadId).length;
-      // Newest first, as scanned.
       const back = reports.filter(({ text }) => text.includes(`\nthread_id: ${threadId}\n`));
       const at = (back[0]?.entry.model?.[0] as { timestamp?: number } | undefined)?.timestamp;
       const said = back
@@ -2401,7 +1948,6 @@ export function stellaAgents(host: StellaAgentsHost) {
       const prose = answers.map(textOf).filter((text) => text.trim()).reverse().slice(-5);
       const oldest = first?.model?.[0] as { timestamp?: number } | undefined;
       const idleStopped = live?.run === undefined && (wasStopped(agent) || stoppedShort(recent));
-      // Idle while agents it started still work: it is not done.
       const running =
         live?.run !== undefined ||
         (!idleStopped && (await agentsBusy(busyReader(harness, context), conversationId).catch(() => false)));
@@ -2428,22 +1974,14 @@ export function stellaAgents(host: StellaAgentsHost) {
     return records;
   };
 
-  /**
-   * A message from the user to one of the orchestrator's agents, carried
-   * like `send_message`: a reporter delivers it and reports the answer up.
-   * Once per `key`.
-   */
   const messageAgent = async (
     harness: Harness,
     args: {
       key: string;
       threadId: string;
       message: string;
-      /** The orchestrator that started it wrote this, not the user in its thread. */
       fromOrchestrator?: boolean;
-      /** The report of an agent it started, which wakes it. */
       report?: true;
-      /** That agent's thread id, when the delivery names it. */
       reportFrom?: string;
     },
     context: Context,
@@ -2465,7 +2003,6 @@ export function stellaAgents(host: StellaAgentsHost) {
       await expectRemoteReport(harness, root.id, `user:${args.key}`, args.threadId, context);
       return;
     }
-    // An agent's own agent takes it as its starter's messages arrive, and reports to that agent.
     const home = known ? root.id : (await treeAgent(harness, args.threadId, context))?.parentConversationId;
     if (home === undefined) throw new Error(`No agent ${args.threadId} here.`);
     await harness.commit(async (tx) => {
@@ -2474,9 +2011,6 @@ export function stellaAgents(host: StellaAgentsHost) {
       if (state.calls[callKey]) return undefined;
       const agent = state.agents[args.threadId];
       if (!agent) throw new Error(`No agent ${args.threadId} here.`);
-      // The report of an agent it started on another host answers that
-      // agent's record in its own conversation, as Stella's own do
-      // (`deliverReport`); unanswered, the record read as running for good.
       const reported = args.report
         ? (args.reportFrom ?? /\nthread_id: (\S+)/.exec(args.message)?.[1])
         : undefined;
@@ -2503,18 +2037,6 @@ export function stellaAgents(host: StellaAgentsHost) {
     }, context);
   };
 
-  /**
-   * Run an agent another host placed here (a cloud orchestrator's agent on
-   * this computer): under the orchestrator, at the depth its lineage gives
-   * (1 without one), answering its brief to the host that placed it rather
-   * than reporting here. Once per `key`;
-   * settles with its answer.
-   */
-  /**
-   * What an agent did elsewhere since it last ran here, from its log, into
-   * its conversation here; a few tries, and then it does not run without
-   * its memory.
-   */
   const catchUpFromLog = async (agentConversationId: ConversationId, threadId: string, context: Context): Promise<{ cwd?: string }> => {
     const agentLog = host.agentLog;
     if (!agentLog) return {};
@@ -2556,8 +2078,6 @@ export function stellaAgents(host: StellaAgentsHost) {
     const agent = record ? await harness.conversation(record.conversationId as ConversationId, context) : undefined;
     if (!agent) return { threadId, status: "error", error: "The agent could not start here." };
     if (args.signal?.aborted) return stoppedPlacedRun(threadId, args.signal);
-    // Whatever it did elsewhere since it last ran here (all of it, for an
-    // agent that moved here) comes first, from its log.
     if (host.agentLog) {
       let imported: { cwd?: string };
       try {
@@ -2584,9 +2104,6 @@ export function stellaAgents(host: StellaAgentsHost) {
       current.carried = { runKey: args.runKey, messages };
       return messages;
     }, context);
-    // Its notes to Stella settle once a run ends: the ones it sent as the
-    // last step of a run that finished are part of its answer, unless agents
-    // it started still work: that answer is not reported, so they go out now.
     const settle = async (answer?: EntryId): Promise<string[]> => {
       const waiting = answer !== undefined && (await agentsBusy(busyReader(harness, context), agent.id).catch(() => false));
       const notes = await harness.commit((tx) => settleNotes(tx, agent.id, waiting ? undefined : answer), context);
@@ -2619,8 +2136,6 @@ export function stellaAgents(host: StellaAgentsHost) {
       if (stopped) {
         await dropMove(harness, agent.id, context);
         await settle();
-        // The reports of its agents a stop withdrew before it read them wake
-        // it again, through the host that placed it, once that stop is done.
         const unsent: string[] = [];
         for (const report of rewake) {
           const from = parseAgentReportId(report.key)?.threadId;
@@ -2632,7 +2147,6 @@ export function stellaAgents(host: StellaAgentsHost) {
               : undefined;
           if (!sent) unsent.push(report.message);
         }
-        // One that cannot go that way goes with its next message.
         if (unsent.length > 0) {
           await harness.commit(async (tx) => {
             const current = (await tx.doc(StellaAgentsDoc, root.id)).agents[threadId];
@@ -2696,7 +2210,6 @@ export function stellaAgents(host: StellaAgentsHost) {
         steers.map((steer) => tx.submissionByRequest(record.conversationId as ConversationId, `steer:${steer.key}`)),
       );
       const unreadSteers = steers.filter((_, index) => unread(outcomes[index]));
-      // A stopped run's unread reports wake it again rather than wait for its next message.
       const rewake = stopped ? unreadSteers.filter((steer) => parseAgentReportId(steer.key) !== null) : [];
       const withdrawn = unreadSteers.filter((steer) => !rewake.includes(steer)).map((steer) => steer.message);
       const pending = steers.filter((_, index) => outcomes[index] === undefined || outcomes[index]?.status === "queued");
@@ -2710,7 +2223,6 @@ export function stellaAgents(host: StellaAgentsHost) {
     }, context);
   };
 
-  /** A message for an agent another host placed here, from that host; it reads it before its next step. */
   const steerPlacedAgent = async (
     harness: Harness,
     args: { key: string; agentKey: string; message: string },
@@ -2736,11 +2248,6 @@ export function stellaAgents(host: StellaAgentsHost) {
     return true;
   };
 
-  /**
-   * An agent's `switch_destination`: checked now (where to, its own agents,
-   * what its folder would leave behind), done once this run of it ends,
-   * when nothing is in flight (`takeMove`).
-   */
   const agentSwitch: AgentSwitch = async (args, api, context) => {
     const self = await roleOf(api, api.conversationId, context);
     if (!self.threadId) throw new Error("Only an agent moves itself this way.");
@@ -2784,11 +2291,6 @@ export function stellaAgents(host: StellaAgentsHost) {
     };
   };
 
-  /**
-   * After an agent's run here ended: the move it asked for, if any. Its
-   * transcript is in its log by then, and the host hands it over; `moved`
-   * says where it runs now, `failed` why it stays.
-   */
   const takeMove = async (
     store: Pick<ToolExecutionApi, "snapshot"> & { commit(change: (tx: Tx) => Promise<undefined>, context: Context): Promise<unknown> },
     agentConversationId: ConversationId,
@@ -2825,7 +2327,6 @@ export function stellaAgents(host: StellaAgentsHost) {
     return outcome;
   };
 
-  /** A move asked for in a run that was stopped instead of ending: it does not happen. */
   const dropMove = async (
     store: { commit(change: (tx: Tx) => Promise<undefined>, context: Context): Promise<unknown> },
     agentConversationId: ConversationId,
@@ -2837,7 +2338,6 @@ export function stellaAgents(host: StellaAgentsHost) {
       return undefined;
     }, context);
 
-  /** What an agent whose move failed reads, to carry on where it is. */
   const moveFailedText = (error: string) =>
     `[switch_destination: your move did not happen: ${error} You still run on ${describePlacement(host.rootPlacement)}, with everything as you left it; carry on with your work here.]`;
 

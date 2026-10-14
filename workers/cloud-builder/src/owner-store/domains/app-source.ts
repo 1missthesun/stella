@@ -1,11 +1,3 @@
-/**
- * The owner's copy of the app's source (v3). The release process publishes
- * the app to the `upstream` repo in this environment's Artifacts namespace;
- * each owner gets a fork of it on first use, which their local clone pushes
- * self-modifications to and merges upstream updates into. Git access is by
- * short-lived tokens minted per request.
- */
-
 import type { AppSourceCalls, AppSourceRemote, AppSourceViews } from "@stella/contracts/backend/app-source";
 import { empty, object, string } from "../args.js";
 import { RpcError } from "../errors.js";
@@ -29,7 +21,6 @@ export const APP_SOURCE_MIGRATION = {
   ],
 };
 
-/** The owner's browser renderer, by tree: the current one and the one before it. */
 export const APP_SOURCE_WEB_RENDERER_MIGRATION = {
   id: "app-source.2-web-renderer",
   statements: [
@@ -42,7 +33,6 @@ export const APP_SOURCE_WEB_RENDERER_MIGRATION = {
   ],
 };
 
-/** The last push any of the owner's computers made to the fork. */
 export const APP_SOURCE_FORK_PUSH_MIGRATION = {
   id: "app-source.3-fork-push",
   statements: [
@@ -54,7 +44,6 @@ export const APP_SOURCE_FORK_PUSH_MIGRATION = {
   ],
 };
 
-/** R2 (`APP_BUILDS`) prefix of a fork's browser renderers. */
 export const webRendererPrefix = (forkName: string) => `web-renderers/${forkName}/`;
 export const TREE_SHA_PATTERN = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
 
@@ -65,7 +54,6 @@ const artifactsCode = (error: unknown): string | null =>
     ? String((error as { code?: unknown }).code ?? "")
     : null;
 
-/** `u-<24 hex of sha256(owner)>`: stable, unguessable, and never the raw id. */
 const forkName = async (ownerId: string): Promise<string> => {
   const digest = new Uint8Array(
     await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`stella-app-fork-v1\0${ownerId}`)),
@@ -76,7 +64,6 @@ const forkName = async (ownerId: string): Promise<string> => {
 const unavailable = (message: string) =>
   new RpcError("UNAVAILABLE", message, { retryable: true, retryAfterMs: FORK_RETRY_MS });
 
-/** Run `work` against a repo handle and release it afterwards. */
 const withRepo = async <T>(artifacts: Artifacts, name: string, work: (repo: ArtifactsRepo) => Promise<T>): Promise<T> => {
   let repo: ArtifactsRepo;
   try {
@@ -106,12 +93,6 @@ const mintToken = async (repo: ArtifactsRepo, scope: "read" | "write") => {
 const readFork = (db: OwnerDbReader): ForkRow | null =>
   db.one<ForkRow>("SELECT name, remote, default_branch FROM app_source_fork WHERE id = 1");
 
-/**
- * The owner's fork, creating it from upstream the first time. The fork's name
- * is derived from the owner, so two first-time accesses that both get past the
- * empty read converge on the same fork; the row is written once and both read
- * the winner back.
- */
 const ensureFork = async (ctx: OwnerContext): Promise<ForkRow> => {
   const existing = readFork(ctx.db);
   if (existing) return existing;
@@ -123,13 +104,11 @@ const ensureFork = async (ctx: OwnerContext): Promise<ForkRow> => {
       upstream.fork(name, { defaultBranchOnly: true, readOnly: false }),
     );
     fork = { name: created.name, remote: created.remote, default_branch: created.defaultBranch };
-    // The creation token outlives the hour every other token gets.
     await withRepo(artifacts, name, (repo) => repo.revokeToken(created.token));
   } catch (error) {
     const code = artifactsCode(error);
     if (code === "FORK_IN_PROGRESS") throw unavailable("Your copy of Stella's source is still being prepared.");
     if (code !== "ALREADY_EXISTS") throw error;
-    // A fork whose response was lost: adopt it.
     const info = await withRepo(artifacts, name, (repo) => repo.info());
     fork = { name: info.name, remote: info.remote, default_branch: info.defaultBranch };
   }
@@ -172,7 +151,6 @@ const webRenderer = (ctx: OwnerContext): AppSourceCalls["appSource.webRenderer"]
   return fork && row ? { path: `u/${fork}/${row.tree_sha}/` } : null;
 };
 
-/** Record an uploaded renderer; returns the tree no longer kept, for the caller to delete. */
 const recordWebRenderer = (ctx: OwnerContext, args: unknown): { retired: string | null } => {
   const { treeSha } = object({ treeSha: string({ pattern: TREE_SHA_PATTERN }) })(args);
   const row = ctx.db.one<{ tree_sha: string; previous_tree_sha: string | null }>(
@@ -191,16 +169,11 @@ const recordWebRenderer = (ctx: OwnerContext, args: unknown): { retired: string 
   return { retired: retired && retired !== treeSha ? retired : null };
 };
 
-/**
- * One row write per push; the owner's open views rerun and the other
- * computers' `appSource.fork` subscriptions get the new value.
- */
 const forkPushed = (
   ctx: OwnerContext,
   args: AppSourceCalls["appSource.forkPushed"]["args"],
 ): AppSourceCalls["appSource.forkPushed"]["result"] => {
   enforceOwnerRateLimit(ctx.db, ctx.now, "appSource.forkPushed", { count: 30, windowMs: 60_000 }, "Too many source pushes. Please wait a moment.");
-  // Strictly increasing, so two pushes in one millisecond still differ.
   const last = ctx.db.one<{ pushed_at: number }>("SELECT pushed_at FROM app_source_fork_push WHERE id = 1");
   const pushedAt = Math.max(ctx.now, (last?.pushed_at ?? 0) + 1);
   ctx.db.run(
@@ -221,7 +194,6 @@ export const appSourceDomain = {
   name: "app-source",
   migrations: [APP_SOURCE_MIGRATION, APP_SOURCE_WEB_RENDERER_MIGRATION, APP_SOURCE_FORK_PUSH_MIGRATION],
   internal: {
-    /** The fork renderers upload under; null before the owner has one. */
     "appSource.webRendererFork": (ctx: OwnerContext) => ({ forkName: forkNameOf(ctx.db) }),
     "appSource.recordWebRenderer": recordWebRenderer,
   },

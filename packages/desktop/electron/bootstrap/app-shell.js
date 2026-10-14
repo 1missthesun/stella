@@ -32,11 +32,6 @@ const initializeWindowShell = (context) => {
     configureStellaSessionPermissions({
         appPartition: config.sessionPartition,
     });
-    // Every install runs the renderer from its source tree (see source/), so
-    // this is unconditional; only the build mode depends on who we are. The
-    // handle swaps updated files into the windows (`applyChanges`).
-    // After an update restart, the window opens in the hold's colors and its
-    // first page shows the held frame, never the launch splash.
     const hold = pendingHold(app.getPath("userData"));
     state.pendingUpdateHold = hold;
     state.rendererSource = serveRendererSource({
@@ -80,9 +75,6 @@ const initializeWindowShell = (context) => {
         },
         onVisibleChanged: (visible) => broadcastCompanionVisibility(visible),
     });
-    // Windows keeps Stella alive in the system tray after the user closes the
-    // main window. macOS already keeps the app running via the dock, so the
-    // tray is Windows-only.
     if (process.platform === "win32") {
         const trayController = new TrayController({
             electronDir: config.electronDir,
@@ -103,7 +95,6 @@ const initializeWindowShell = (context) => {
 };
 const finalizeWindowLaunch = (context) => {
     const { config, services, state } = context;
-    // No-op when createBootstrapInitialWindows already ran.
     state.windowManager.createInitialWindows();
     const fullWindow = state.windowManager.getFullWindow();
     let deferredStartupTriggered = false;
@@ -126,13 +117,8 @@ const finalizeWindowLaunch = (context) => {
             triggerDeferredStartup("first-paint");
         });
     }
-    // After an update that restarted Stella, the window opens on the frosted
-    // frame the last process left (bounded, so a stuck hold never hides it).
     const transition = state.updateTransition;
     if (fullWindow && transition?.hasPendingHold()) {
-        // Nobody sees this window paint: it is under the held frame until it
-        // is live. The runtime starts now, alongside the renderer, rather
-        // than after first paint, so Stella is back to usable sooner.
         triggerDeferredStartup("update-relaunch");
         void transition.resumeAfterRelaunch(fullWindow);
     }
@@ -142,8 +128,6 @@ const finalizeWindowLaunch = (context) => {
     context.state.processRuntime.setManagedTimeout(() => {
         triggerDeferredStartup("fallback");
     }, config.startupFirstPaintFallbackMs);
-    // If Accessibility was off at startup, deferred startup skips the hook; when
-    // the user enables it in System Settings and returns to Stella, retry start.
     if (process.platform === "darwin") {
         app.on("browser-window-focus", () => {
             if (context.state.isQuitting || !hasMacPermission("accessibility", false)) {
@@ -153,18 +137,7 @@ const finalizeWindowLaunch = (context) => {
         });
     }
 };
-/**
- * Create the full window (and start its renderer load) ahead of the rest of
- * bootstrap. Callers must register IPC handlers in the same synchronous task:
- * renderer IPC is only dispatched once main yields, so every handler is in
- * place before the renderer can invoke one, while the renderer process
- * launch and page load overlap with that registration work.
- */
 export const createBootstrapInitialWindows = (context) => {
-    // After an update restart the window opens in the hold's colors, and its
-    // first page is the held frame (see initializeWindowShell). It is not
-    // made hidden until then: a hidden window's pages paint late, so it would
-    // only add to the time with no window at all.
     const hold = context.state.pendingUpdateHold;
     context.state.windowManager.createInitialWindows(hold ? { backgroundColor: hold.backgroundColor } : undefined);
     const fullWindow = context.state.windowManager.getFullWindow();

@@ -291,8 +291,6 @@ export class UserAskService {
     policyCache = null;
     remoteWatchStop = null;
     remotePollTimer = null;
-    // True while the live socket is up and the open-asks view has delivered
-    // its value on it; the fallback poll runs only while this is false.
     remoteLive = false;
     claiming = new Set();
     fingerprintCache = null;
@@ -1031,10 +1029,6 @@ export class UserAskService {
         const ok = await this.saved.rename(typeof payload?.id === "string" ? payload.id : "", typeof payload?.label === "string" ? payload.label : "");
         return ok ? { ok: true } : { ok: false, error: "That saved value could not be renamed." };
     }
-    /**
-     * Read a secure value once, for this computer's own use (a connector
-     * key it saves itself). Never returned to an agent or the runtime.
-     */
     async takeSecureValue(handle) {
         if (!isUserAskSecretHandle(handle)) {
             return null;
@@ -1323,8 +1317,6 @@ export class UserAskService {
             client: new BackendClient({
                 baseUrl,
                 getToken: async () => (await this.options.getAuthToken?.()) ?? null,
-                // A reconnect re-subscribes and the view's next value marks
-                // it live again.
                 onConnectionChange: (connected) => {
                     if (!connected)
                         this.remoteLive = false;
@@ -1350,8 +1342,6 @@ export class UserAskService {
         }
         if (!this.remotePollTimer) {
             const timer = setInterval(() => {
-                // The live view carries every change, so a quiet but
-                // connected view needs no reads.
                 if (this.remoteLive) {
                     return;
                 }

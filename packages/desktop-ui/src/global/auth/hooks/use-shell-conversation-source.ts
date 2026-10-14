@@ -10,13 +10,6 @@ import type { useCloudConversationSession } from "./use-cloud-conversation-sessi
 
 type CloudConversationSession = ReturnType<typeof useCloudConversationSession>;
 
-/**
- * Every backend read the root shell makes to select a conversation: the
- * owner's recent conversations as a live view, plus exact lookups for the
- * routed and the main conversation when they aren't in that list. The owner
- * generation and the main conversation come from the session's verified
- * identity.
- */
 export function useShellConversationSource({
   session,
   isPrivate,
@@ -24,7 +17,6 @@ export function useShellConversationSource({
 }: {
   session: CloudConversationSession;
   isPrivate: boolean;
-  /** `?c=` on the chat route, else null. */
   routeConversationId: string | null;
 }) {
   const { accountScope, ownerSubject } = session;
@@ -33,8 +25,6 @@ export function useShellConversationSource({
     "conversations.recent",
     isCloudConversationReady ? {} : "skip",
   );
-  // A reloaded or restarted window starts from the last window's list
-  // (`window-handoff.ts`) until the view answers.
   const handoffKey =
     isCloudConversationReady && ownerSubject
       ? `conversations.recent:${accountScope}:${ownerSubject}`

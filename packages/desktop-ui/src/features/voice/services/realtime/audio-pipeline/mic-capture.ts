@@ -28,11 +28,8 @@ const DEFAULT_TARGET_RATE = 24000;
 const DEFAULT_BUFFER_SIZE = 4096;
 
 export interface MicCaptureOptions {
-  /** Target PCM sample rate. Must match the session.audio.input.format.rate. */
   targetSampleRate?: number;
-  /** ScriptProcessor buffer size. Smaller = lower latency, more CPU. */
   bufferSize?: number;
-  /** Called with each PCM16 chunk encoded as base64 (LE). */
   onChunk: (base64Pcm: string) => void;
 }
 
@@ -55,7 +52,6 @@ export class MicCapture {
     this.onChunk = options.onChunk;
   }
 
-  /** Attach a fresh MediaStream and (re)build the AudioGraph. */
   attach(stream: MediaStream): void {
     this.teardownNodes();
 
@@ -95,17 +91,14 @@ export class MicCapture {
     };
   }
 
-  /** Start streaming chunks to the onChunk callback. */
   start(): void {
     this.streaming = true;
   }
 
-  /** Stop streaming chunks (mic graph stays alive for fast resume). */
   stop(): void {
     this.streaming = false;
   }
 
-  /** Soft mute (gain ramp to 0). Streaming continues, just sends silence. */
   setSoftMute(muted: boolean): void {
     this.muted = muted;
     if (!this.gateGain || !this.audioContext) return;
@@ -119,13 +112,11 @@ export class MicCapture {
     return this.analyser;
   }
 
-  /** Detach but keep AudioContext alive (cheaper to reattach later). */
   detach(): void {
     this.streaming = false;
     this.teardownNodes();
   }
 
-  /** Tear everything down including the AudioContext. */
   async dispose(): Promise<void> {
     this.streaming = false;
     this.teardownNodes();
@@ -178,7 +169,6 @@ function toBase64(pcm16: Int16Array): string {
     pcm16.byteLength,
   );
   let binary = "";
-  // Chunked String.fromCharCode to avoid call-stack limits on long streams.
   const CHUNK = 0x8000;
   for (let i = 0; i < bytes.length; i += CHUNK) {
     binary += String.fromCharCode.apply(

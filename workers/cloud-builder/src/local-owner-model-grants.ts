@@ -143,8 +143,6 @@ export class LocalOwnerModelGrants {
     const now = this.now();
     for (const grant of args.grants) {
       const key = revokeKey(args.ownerId, args.ownerGeneration, grant.grantId);
-      // Expiry already prevents a new dispatch. Retain only useful future
-      // tombstones, while still aborting a request that began before expiry.
       if (grant.expiresAt > now) this.revoked.set(key, grant.expiresAt);
       for (const active of this.active) {
         if (

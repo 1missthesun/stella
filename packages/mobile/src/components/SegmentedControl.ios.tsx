@@ -12,10 +12,8 @@ import type { SegmentedControlProps } from "./SegmentedControl";
 
 export type { SegmentedOption, SegmentedControlProps } from "./SegmentedControl";
 
-/** The iOS 26 segmented control's intrinsic height. */
 const SEGMENTED_HEIGHT = 36;
 
-/** The system segmented control, in Stella's colour scheme. */
 export function SegmentedControl<T extends string>({
   options,
   value,

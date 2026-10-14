@@ -1,10 +1,3 @@
-/**
- * `GET /.well-known/stella`: what this server is and what it can do, for the
- * apps to connect to it and gate features. Served by every server, hosted
- * Stella included. Features are computed from the configured secrets and
- * vars; the model gateway reports its own (`ModelGatewayControl.capabilities`).
- */
-
 import {
   MIN_SUPPORTED_SERVER_API,
   SERVER_API_VERSION,

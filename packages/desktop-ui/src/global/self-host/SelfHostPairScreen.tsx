@@ -4,11 +4,6 @@ import { useT } from "@/shared/i18n";
 import { selfHostDialogs, useDesktopServerState } from "./self-host-store";
 import "./self-host.css";
 
-/**
- * A self-hosted server has no anonymous sign-in: a computer that isn't
- * paired (or was signed out) joins with a new pairing link from the server,
- * or goes back to Stella's own service.
- */
 export function SelfHostPairScreen() {
   const t = useT();
   const state = useDesktopServerState();

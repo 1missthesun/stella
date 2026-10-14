@@ -1,12 +1,3 @@
-/**
- * The platform-neutral core of projecting the conversation journal into a
- * transcript. Desktop renders `MessageRecord`s and mobile renders
- * `ChatMessage`s, so each keeps its own projection; what a journal row *means*
- * — which wake prompt names which task, where a citation points, whether the
- * window's first turn is whole, which notice ends a failed turn — is decided
- * here once, so the same journal reads the same on every device.
- */
-
 import {
   messageText,
   type JournalMessageRecord,
@@ -50,7 +41,6 @@ export const journalUserReactions = (
   return reactions;
 };
 
-/** The payload's own clock when it carries one, else the commit time. */
 export const journalMessageTimestamp = (
   record: JournalMessageRecord,
 ): number =>
@@ -152,15 +142,6 @@ export const journalMirroredWake = (
   return wake;
 };
 
-/**
- * Raw socket windows are record-count bounded and can therefore begin in the
- * middle of a turn. A leading turn whose prompt is still below the window has
- * no stable user owner for its replies, so it is not projected until its
- * prompt has been backfilled. A fragment holding only cards (a task's files or
- * lifecycle rows) has no reply to own and is kept, unless `dropCardOnly` asks
- * for the fragment to go too — mobile anchors a turn's file cards on that
- * turn's replies, so it has nowhere to put them.
- */
 export const hasIncompleteLeadingJournalTurn = (
   records: readonly JournalRecord[],
   hasOlder: boolean,
@@ -197,12 +178,6 @@ export const completeJournalWindowRecords = (
   return records.filter((record) => record.turnId !== incompleteTurnId);
 };
 
-/**
- * A turn that ended any way but `completed` carries its user-facing notice on
- * the terminal `turn` record. That record, when its notice should render as
- * the turn's closing reply: not when the turn already wrote the same text as
- * a reply. Without it a failed turn shows only the user's bubble.
- */
 export const journalTerminalNotice = (
   turnRecords: readonly JournalRecord[],
 ): (JournalTurnRecord & { notice: string }) | null => {
@@ -223,22 +198,11 @@ export const journalTerminalNotice = (
   return alreadyReplied ? null : { ...terminal, notice };
 };
 
-/**
- * Resolve the citations an assistant journal record carried against the
- * loaded journal window. The cloud journal has no `entry_ref` index, so this
- * is the client-side twin of the runtime's `resolveReplyRefs`: message
- * citations map to the record with that journal `seq` (under the id the
- * platform renders it with), agent citations keep their thread id (the live
- * title comes from thread activity), and a lifecycle turn that cited nothing
- * attaches to the agent named in its hidden prompt. The message directly
- * above the reply is never a reference.
- */
 export const resolveJournalReplyRefs = (args: {
   raw: readonly RawReplyRef[];
   recordsBySeq: ReadonlyMap<number, JournalRecord>;
   turnUserRecord: JournalMessageRecord | undefined;
   agentTitles?: ReadonlyMap<string, string>;
-  /** The id the platform's projection renders a message record under. */
   messageId: (record: JournalMessageRecord) => string;
 }): ReplyRef[] => {
   const refs: ReplyRef[] = [];
@@ -285,11 +249,6 @@ export const resolveJournalReplyRefs = (args: {
   return refs;
 };
 
-/**
- * The refs a desktop-executed turn persisted on its assistant payload
- * (`metadata.runtime.replyRefs`). Such a turn carries resolved refs instead of
- * a model fence.
- */
 export const storedJournalReplyRefs = (
   payload: Record<string, unknown>,
 ): ReplyRef[] => {

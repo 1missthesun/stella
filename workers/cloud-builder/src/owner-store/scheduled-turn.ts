@@ -1,11 +1,3 @@
-/**
- * Starts a scheduled prompt: through the gate's `submit()` for a named
- * desktop (which runs it in the cloud when that desktop can't take it), or
- * straight on the conversation's orchestrator otherwise, the same
- * service-authenticated start the gate's cloud branch makes. A start with
- * `agent` begins an agent of the orchestrator rather than a turn of it.
- */
-
 import { PLACEMENT_PROTOCOL } from "@stella/contracts/turn-plane/placement";
 import {
   TURN_OWNER_GENERATION_HEADER,
@@ -19,11 +11,6 @@ import { HEADER_TURN_AUTH_KIND } from "../turn-start-request.js";
 import type { GateHostDependencies } from "./gate-host.js";
 import type { ScheduledTurnStart } from "./registry.js";
 
-/**
- * A scheduled start that did not happen. `conversationGone` means the pinned
- * conversation was deleted or belongs elsewhere, so a fresh one should be
- * tried; `retryable` means trying the same start later can help.
- */
 export class ScheduledTurnError extends Error {
   readonly retryable: boolean;
   readonly conversationGone: boolean;
@@ -42,7 +29,6 @@ const startOnDesktop = async (
   const result = await deps.submit({
     request: {
       protocol: PLACEMENT_PROTOCOL,
-      // Stable per fire, so a retried fire replays instead of running twice.
       idempotencyKey: input.clientMsgId,
       kind: "chat",
       ingress: "schedule",
@@ -78,12 +64,9 @@ const startInCloud = async (
 ): Promise<void> => {
   const request: CloudTurnStartRequest = {
     protocol: TURN_PLANE_PROTOCOL,
-    // An agent's brief is the agent's, not the conversation's (`pia:`).
     clientMsgId: input.agent ? `pia:${input.clientMsgId}` : input.clientMsgId,
     prompt: input.prompt,
     lane: "schedule",
-    // The prompt is the model's own wake instruction, not the owner's
-    // words: journaled hidden, so every client shows only the answer.
     source: "schedule",
     hiddenMessage: true,
     ...(input.title.trim() ? { title: input.title.trim().slice(0, TURN_TITLE_MAX_CHARS) } : {}),
@@ -134,7 +117,6 @@ const startInCloud = async (
   );
 };
 
-/** One agent per fire, so a retried start finds the agent the first one began. */
 const scheduledAgentThreadId = (clientMsgId: string): string =>
   `thr-${clientMsgId.replace(/[^A-Za-z0-9]/g, "").slice(-24)}`;
 

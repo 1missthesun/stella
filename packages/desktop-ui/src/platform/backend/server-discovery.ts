@@ -7,13 +7,6 @@ import {
 } from "@stella/contracts/self-host";
 import { backendUrl } from "./backend-url";
 
-/**
- * What the backend says about itself (`/.well-known/stella`). A self-hosted
- * server runs in owner mode: no plans or billing, and only the features it
- * reports. Without an answer (an older backend) this is Stella's own hosted
- * service and everything stays as it is.
- */
-
 const launchedSelfHosted =
   (import.meta.env.VITE_STELLA_SELF_HOSTED as string | undefined) === "1";
 
@@ -51,7 +44,6 @@ export const getServerDiscovery = (): ServerDiscovery | null => discovery;
 export const isSelfHostedServer = (): boolean =>
   launchedSelfHosted || discovery?.ownerMode === true;
 
-/** A feature is off only when a self-hosted server says so. */
 export const serverFeatureOn = (feature: keyof ServerFeatures): boolean =>
   !isSelfHostedServer() || discovery?.features[feature] === true;
 

@@ -1,23 +1,4 @@
 #!/usr/bin/env node
-// Install only the dependencies a kind of work needs:
-//
-//   bun run deps <kind> [<kind>...] [-- <extra bun install args>]
-//
-//   runtime  packages/runtime + agent + contracts: runtime/agent typecheck,
-//            check:boundary, runtime headless. No Electron binary.
-//   backend  every workers/* + executor-cloud + model-catalog (+ runtime):
-//            worker typechecks, build:dry-run, wrangler, Previews.
-//   desktop  root + desktop + desktop-ui (+ runtime): electron:typecheck,
-//            desktop-ui tsc, verify-stella desktop runs.
-//   mobile   packages/mobile (+ contracts, theme): mobile:typecheck/lint,
-//            Metro, expo export.
-//   website  website + desktop (its build compiles the desktop renderer).
-//   full     everything: CI-equivalent, lint:promises, releases, OTA.
-//
-// Kinds combine (`bun run deps desktop backend`) and installs are additive:
-// a later kind keeps what an earlier one installed. Packages are hardlinked
-// from bun's global cache, so a worktree costs little disk either way; the
-// filter mainly saves time, inodes and postinstall work.
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 

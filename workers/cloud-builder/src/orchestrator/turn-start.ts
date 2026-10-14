@@ -70,11 +70,6 @@ import {
 } from "./support.js";
 import { OrchestratorLocalTurn } from "./local-turn.js";
 
-/**
- * Messages the user typed that this object placed on the computer holding
- * Stella, until that computer journals them. One that never gets there (the
- * computer failed it, refused it, or never took it) this object answers itself.
- */
 const PI_PLACED_KEY = "piPlacedChats";
 const PI_PLACED_CHECK_MS = 15_000;
 const PI_PLACED_GIVE_UP_MS = 3 * 60_000;
@@ -94,7 +89,6 @@ function unplacedCancelRequestId(clientMsgId: string): string {
   return `pi-brain-unplaced:${clientMsgId}`.slice(0, 128);
 }
 
-/** Turn start: admission, idempotency, ownership, and the owner gate. */
 export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
   private async followPlacedChat(placed: PiPlacedChat): Promise<void> {
     const pending =
@@ -105,12 +99,6 @@ export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
     await this.armAlarmNoLaterThan(Date.now() + PI_PLACED_CHECK_MS);
   }
 
-  /**
-   * Whether each placed message reached the conversation. One the computer
-   * ended without journaling it, or that waited too long, this object
-   * answers itself, as it answers a message the holder could not take.
-   * A Stop (the dispatch canceled on request) is the user's own word.
-   */
   protected async checkPlacedChats(): Promise<void> {
     const pending =
       (await this.ctx.storage.get<PiPlacedChat[]>(PI_PLACED_KEY)) ?? [];
@@ -178,7 +166,6 @@ export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
     }
   }
 
-  /** A placed message the holder never journaled, answered here as a turn of this object's own. */
   private async answerUnplacedChat(placed: PiPlacedChat): Promise<boolean> {
     const owner = await this.resolveOwnerForCaller({ ownerId: placed.ownerId });
     if (!owner) return false;
@@ -259,8 +246,6 @@ export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
       }
     }
     const lane: CloudTurnLane = start.lane ?? "chat";
-    // A wake is an agent's report (with agentThreadControl) or an agent's
-    // message to this Stella (without); no other lane carries a control.
     if (lane !== "wake" && start.agentThreadControl !== undefined) {
       return turnStartErrorResponse(
         "bad_request",
@@ -317,19 +302,9 @@ export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
           false,
         );
       }
-      // Stella runs on one of the owner's computers: a message the user
-      // sent from elsewhere is placed there, and this object answers none.
-      // While that computer is gone (offline, no longer the owner's) or its
-      // lease lapsed, this object takes the brain over under the next epoch
-      // and answers it; the computer, once back, finds the lease moved. One
-      // that is up but takes no work from other devices keeps the brain:
-      // this object answers the message once without the lease, as the
-      // owner gate answers work aimed at a computer that has not said yes.
       const placedHere = authKind === "service" && start.source === "placement";
       const weighsBrain =
         (authKind === "user" || placedHere) && lane === "chat" && !start.piAgent;
-      // While the account's home computer is up, the lease goes back to it
-      // first (unless its holder is mid-turn), and the message goes there.
       const home = weighsBrain ? await this.piBrainHome(ownerId) : undefined;
       if (home) await this.bringPiBrainHome(home);
       const brain = weighsBrain
@@ -403,8 +378,6 @@ export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
               202,
             );
           } catch (error) {
-            // Gone meanwhile, this object takes the brain over; still up,
-            // it keeps the brain.
             log("info", "pi_brain_turn_unplaced", {
               deviceId: placeOn.deviceId,
               message: errorMessage(error),
@@ -420,8 +393,6 @@ export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
           }
         }
         if (claim.record?.host === "device") {
-          // The computer is up but could not take it: this object answers
-          // once without the lease, as a computer from before the lease would.
           log("info", "pi_brain_turn_unleased", {
             deviceId: claim.record.deviceId,
             epoch: claim.record.epoch,
@@ -477,9 +448,6 @@ export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
             202,
           );
         }
-        // The intent is keyed by clientMsgId, so a retry after a lost
-        // response reaches this exact identity before it can mint a second
-        // turn id or owner-fence lease.
         receipt = stored;
       }
       const turnId = receipt?.turnId ?? imported?.turnId ?? crypto.randomUUID();
@@ -500,9 +468,6 @@ export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
       let combinedGeneration: string | undefined;
       let admittedHomeContext = handoff?.preparation.homeContext;
       let admittedDestinations = handoff?.preparation.destinations;
-      // Existing conversations know the generation needed to persist an exact
-      // lease intent before the combined remote call. Cold starts and uncertain
-      // receipt replays retain the discovery/reconciliation path below.
       if (
         !imported &&
         !receipt &&
@@ -561,9 +526,6 @@ export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
         } catch (error) {
           const result = observed.result;
           if (result?.lease.status === "skipped") {
-            // A definite refusal/skipped register created no external lease.
-            // Remove only this fresh attempt's local intent. A lost response
-            // must never take this branch: its original identity stays durable.
             await this.ctx.blockConcurrencyWhile(async () => {
               const key = orchestratorFenceLeaseReceiptKey(leaseId);
               const local =
@@ -577,9 +539,6 @@ export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
             });
             receipt = undefined;
             admission = result.admission;
-            // A user may race a reset. The returned current snapshot resumes
-            // ordinary registration under its new generation; service callers
-            // still receive admit's expected-generation refusal.
           } else {
             await this.releaseOwnerGate({ ownerId, turnId });
             return turnStartErrorResponse(
@@ -654,11 +613,6 @@ export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
           false,
         );
       }
-      // Stella's models spend the owner's allowance. With none left the turn
-      // would fail at its first model call, so it is refused here with the
-      // plan's own wording; the owner's own engines still run. A wake (an
-      // agent's report) isn't refused: its sender would only redeliver it,
-      // and the turn ends on the same usage-limit notice in the chat.
       if (execution.engine === "stella" && lane !== "wake") {
         if (snapshot.billingUnavailable) {
           log("error", "turn_refused_billing_unavailable", {
@@ -683,12 +637,6 @@ export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
         }
       }
 
-      // Adoption. Conversation ids are client-minted UUIDs, so the first
-      // verified caller is the client that minted the id. A socket connect
-      // may already have bound the owner; the conversation is "created" for
-      // the owner by whichever turn first projects it. Bound here, before the
-      // fence, so a crash between the two leaves an owned conversation with a
-      // `registering` intent rather than an unowned turn.
       const now = Date.now();
       const createdConversation =
         receipt?.createdConversation ??
@@ -703,12 +651,8 @@ export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
         });
         log("info", "conversation_adopted", { conversationId, via: "turn" });
       } else if (start.title || !this.journal.meta().title) {
-        // `setTitle` only fills an empty title: a socket-adopted conversation
-        // has none yet, and an explicit hint never overwrites a chosen one.
         this.journal.setTitle(conversationTitleFor(start));
       }
-      // Every conversation runs on pi-durable: one the loop started moves to
-      // pi at its next turn, whose first pi turn imports its journal whole.
       if ((await this.ctx.storage.get<string>(AGENT_RUNTIME_KEY)) !== "pi") {
         await this.ctx.storage.put(AGENT_RUNTIME_KEY, "pi");
         if (!createdConversation) {
@@ -743,7 +687,6 @@ export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
           : {}),
         ...(start.source ? { source: start.source } : {}),
         ...(start.title ? { title: start.title } : {}),
-        // A computer's agent brief is context for the agent, not a message.
         ...(start.hiddenMessage || start.piAgent
           ? { hiddenMessage: true }
           : {}),
@@ -789,15 +732,9 @@ export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
           createdAt: now,
           updatedAt: now,
         };
-        // Persist the full request/owner/lease binding before the external
-        // register boundary. A crash at any later prequeue point can only
-        // resume this intent; a changed payload is a conflict.
         await this.putTurnState({ [receiptKey]: receipt });
       }
 
-      // An idle conversation can prepare read-only context while its exact
-      // admission receipt and owner lease commit. No provider call occurs.
-      // Busy queues load context when dequeued instead, avoiding stale work.
       if (
         !this.activeTurnId &&
         this.turnExecutions.size === 0 &&
@@ -809,8 +746,6 @@ export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
         const harnessExecution =
           turn.execution.engine === "anthropic" ? undefined : turn.execution;
         if (!harnessExecution) {
-          // Claude Code runs this turn in the orchestrator container; wake it
-          // while admission commits instead of minting a capability here.
           this.prewarmCliContainer(turn.ownerId, turn.conversationId);
         }
         const work = (
@@ -862,10 +797,6 @@ export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
               return result;
             },
           ));
-        // A successful register already validated the exact live owner fence.
-        // Replays only read a local receipt, so they still need a remote check.
-        // The admission commit below rechecks local lease retirement, and
-        // runTurn always checks the live fence again before touching history.
         if (!registeredNow) await this.assertOwnerTurn(turn);
         freshAdmission = registeredNow && admittedHomeContext !== undefined;
       } catch (error) {
@@ -900,23 +831,12 @@ export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
         performance.now() - registrationStarted,
       );
       const commitStarted = performance.now();
-      // Accept and run in the background. The exact request receipt, queued
-      // turn, and owner generation commit together before the 202, so a lost
-      // response/restart can replay without registering a new owner fence or
-      // overwriting the original lease/payload.
       let heldForLocalTurn = false;
       await this.ctx.blockConcurrencyWhile(async () => {
-        // Owner-purge cancellation marks the durable lease receipt retiring in
-        // this same DO. Recheck inside the admission critical section so a
-        // register/assert winner cannot persist after its orphan was retired.
         await this.assertOwnerFenceLeaseReceiptActive(turn);
         if (turn.ownerPurgeLeaseId !== receipt!.leaseId) {
           throw new OwnerPurgeFenceError();
         }
-        // A completion wake queues behind the currently executing model turn.
-        // Publish its validated lifecycle fact now so that turn's agent_status
-        // sees completion instead of polling a stale running receipt forever.
-        // The shared receipt merge preserves attempt-generation monotonicity.
         if (turn.agentThreadControl) {
           await this.rememberCloudAgentControlReceipt(turn.agentThreadControl);
         }
@@ -948,9 +868,6 @@ export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
       });
       const admissionCommitMs = Math.round(performance.now() - commitStarted);
       const projectionStarted = performance.now();
-      // Projections, after the durable commit and before the 202: the queue
-      // is durable, so once these are enqueued (or debted) the owner will learn
-      // of the conversation and the turn no matter what this isolate does next.
       const projections: OwnerEvent[] = [];
       if (createdConversation) {
         const meta = this.journal.meta();

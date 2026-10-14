@@ -84,7 +84,6 @@ const objectSegment = (value: string): Record<string, unknown> | null => {
 const matchesAudience = (value: unknown): boolean =>
   value === "stella" || (Array.isArray(value) && value.includes("stella"));
 
-/** A Stella JWT: RS256 from `${issuer}/api/auth/jwks`, aud "stella"; the owner id is `sub`. */
 export const verifyUserToken = async (token: string, configuredIssuer: string): Promise<VerifyResult> => {
   const issuer = configuredIssuer.replace(/\/+$/, "");
   if (!issuer) return fail("issuer_not_configured", true);

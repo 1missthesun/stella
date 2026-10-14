@@ -1,25 +1,3 @@
-/**
- * Motion math for the realtime voice character. Pure worklet arithmetic, like
- * `motion.ts`, so the rig evaluates it on the UI thread from one shared clock
- * and the tests evaluate it directly.
- *
- * The voice overlay used to show the silhouette breathing with a scale tied to
- * mic/output level. Those levels are coarse (the session publishes a fixed
- * floor while someone talks), so the mark barely moved and every phase looked
- * the same. Each phase now has its own read-at-a-glance behaviour:
- *
- * - connecting: a slow, dim breathe — the character is not awake yet.
- * - listening: an alert, upright breathe with a gentle head sway.
- * - hearing (the user is speaking): leans in and holds still — sound is
- *   arriving.
- * - talking (Stella is speaking): a syllabic squash-and-stretch with a bob and
- *   sway.
- * - error: droops and sits still.
- *
- * Real level, when it is above the floor, scales the amplitude of hearing and
- * talking so a loud moment still reads louder.
- */
-
 import { BREATHE_AMPLITUDE, BREATHE_MS } from "./motion";
 
 export type VoiceCharacterPhase =
@@ -38,13 +16,9 @@ export type VoiceBodyMotion = {
   opacity: number;
 };
 
-/** Syllable rhythm of the talking squash. */
 export const TALK_SYLLABLE_MS = 260;
-/** Slower phrase envelope layered over the syllables so speech has pauses. */
 export const TALK_PHRASE_MS = 1900;
-/** Peak vertical stretch while talking, in scale units. */
 export const TALK_STRETCH = 0.075;
-/** How far the body leans in while the user speaks, in scale units. */
 export const HEARING_LEAN = 0.06;
 
 const TAU = Math.PI * 2;
@@ -90,8 +64,6 @@ export function voiceBodyMotion(
     };
   }
   if (phase === "listening") {
-    // Alert and upright: full breathe, a slow head sway so it is obviously
-    // awake, no squash.
     const sway = Math.sin((timeMs / 2400) * TAU);
     return {
       translateX: sway * 0.012,
@@ -103,8 +75,6 @@ export function voiceBodyMotion(
     };
   }
   if (phase === "hearing") {
-    // Leans in toward the speaker and holds very still, with a faint
-    // level-driven tremor so it reads as receiving sound rather than frozen.
     const tremor = Math.sin((timeMs / 140) * TAU) * 0.008 * gain;
     const lean = 1 + HEARING_LEAN * gain;
     return {
@@ -116,7 +86,6 @@ export function voiceBodyMotion(
       opacity: 1,
     };
   }
-  // talking
   const syllable = 0.5 + 0.5 * Math.sin((timeMs / TALK_SYLLABLE_MS) * TAU);
   const phrase = 0.55 + 0.45 * Math.sin((timeMs / TALK_PHRASE_MS) * TAU);
   const jitter = 0.85 + 0.15 * Math.sin(timeMs * 0.0071);

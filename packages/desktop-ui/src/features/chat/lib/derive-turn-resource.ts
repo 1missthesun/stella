@@ -15,7 +15,6 @@ import {
 } from "@/features/workspace-display/path-to-viewer";
 import { isToolResult, type EventRecord } from "./event-transforms";
 
-/** Image-gen jobs also carry the `capability` they ran under. */
 type MediaPayload = Extract<DisplayPayload, { kind: "media" }> & {
   capability?: string;
 };
@@ -121,7 +120,6 @@ const orchestratorHtmlPayload = (
       ...(title ? { title } : {}),
       ...(slug ? { slug } : {}),
       createdAt: createdAtNum,
-      // A cloud turn's canvas lives in the owner's drive.
       ...(record.driveBacked === true ? { driveBacked: true } : {}),
     };
   }
@@ -339,10 +337,6 @@ export const deriveTurnResource = (
     }
   }
 
-  // Files the reply merely links render as pills under the bubble (see
-  // `linkedFiles` on the assistant row); the end-resource card is for what
-  // this turn's own tools produced (an html canvas, image_gen output, an
-  // office preview session).
   const candidatePaths = [
     ...imagePayloads.keys(),
     ...referencedFromOffice.keys(),

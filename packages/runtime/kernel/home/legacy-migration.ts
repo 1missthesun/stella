@@ -105,7 +105,6 @@ const fileHash = async (filePath: string): Promise<string | null> => {
   }
 };
 
-/** The old whole-directory hash unit: sorted rel paths + contents, NUL-joined. */
 const directoryHash = async (dir: string): Promise<string | null> => {
   const files: string[] = [];
   const walk = async (current: string, rel: string): Promise<void> => {
@@ -169,7 +168,6 @@ const migrateSkills = async (skillsDir: string): Promise<void> => {
     if (hash === entry.lastSyncedHash) {
       await fs.rm(skillDir, { recursive: true, force: true });
     }
-    // Modified skills stay in place and win the shared-root collision policy.
   }
   await fs.rm(path.join(skillsDir, BUNDLED_MANIFEST_FILENAME), {
     force: true,
@@ -205,24 +203,12 @@ const migratePersonality = async (stellaDataDir: string): Promise<void> => {
     const filePath = path.join(stellaDataDir, "PERSONALITY.md");
     const hash = await fileHash(filePath);
     if (hash !== null && hash === recorded) {
-      // Unmodified: live composition from the selected preset takes over.
       await fs.rm(filePath, { force: true });
     }
   }
   await fs.rm(manifestPath, { force: true });
 };
 
-/**
- * Migrate legacy manifest-owned content without touching user memory.
- *
- * Historical local runtimes wrote MEMORY.md, memory_map.md, profile.md, and
- * other user Markdown before Cloud Home existed. The connected-account import
- * bridge claims and scans that corpus later in startup, after Electron has
- * seeded the runtime home. Deleting any of those files here would race that
- * ownership check and irreversibly erase the only copy before Cloud Home can
- * capture it. Leave all memory artifacts in place: Cloud Home is additive,
- * owner-fenced, and retains the local source after either success or failure.
- */
 export const migrateLegacyHomeLayout = async (
   stellaDataDir: string,
 ): Promise<void> => {

@@ -19,10 +19,6 @@ export type SegmentedControlProps<T extends string> = {
   disabled?: boolean;
 };
 
-/**
- * One-of-many choice as a single segmented track: the system control on iOS
- * (`SegmentedControl.ios.tsx`), this drawn equivalent elsewhere.
- */
 export function SegmentedControl<T extends string>({
   options,
   value,

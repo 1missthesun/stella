@@ -1,27 +1,3 @@
-/**
- * The owner's integrations: Composio connections, X, and the connect cards
- * cloud turns wait on. The catalog itself is global (D1, see
- * `src/integrations/catalog.ts`); this object holds what belongs to the
- * account.
- *
- * - **Composio:** one principal (`stella_<hash>`) per owner and one tool
- *   router session per connected integration. Sessions are created lazily
- *   by the first connect link; status and execution read them. Connections
- *   survive a reset and are revoked at Composio on account deletion.
- * - **Runs** are single-use by request id (`integration_call_receipts`), so
- *   a retried HTTP request can never execute a destructive action twice.
- * - **Connect cards** (`connect_requests`) are created by the orchestrator
- *   (`connect.request`), watched by clients (`connect.pending`), answered by
- *   the user (`connect.decide`) and polled by the waiting turn
- *   (`connect.poll`, which settles `connecting` once Composio reports the
- *   account). An `connect.expire` job moves an unanswered card out of the
- *   live states at its deadline.
- * - **X:** OAuth 2 + PKCE. `x.connectUrl` records a nonce with the PKCE
- *   verifier and signs the state; the callback route verifies the signature
- *   and `x.completeOAuth` consumes the nonce once. Tokens live in `x_tokens`
- *   (Durable Object storage is encrypted at rest) and refresh on use.
- */
-
 import type {
   IntegrationCalls,
   XConnection,
@@ -181,8 +157,6 @@ type XTokenRow = {
   updated_at: number;
 };
 
-// ── Shared helpers ────────────────────────────────────────────────────────
-
 const requireComposio = (env: Cloudflare.Env): ComposioConfig => {
   const config = composioConfig(env);
   if (!config) throw new RpcError("UNAVAILABLE", "Integrations are not configured on this server.");
@@ -218,7 +192,6 @@ const principalOf = async (ctx: OwnerContext): Promise<string> => {
   return userId;
 };
 
-/** The integration's session, created on first use. */
 const ensureSession = async (
   ctx: OwnerContext,
   config: ComposioConfig,
@@ -227,7 +200,6 @@ const ensureSession = async (
   const existing = connectionOf(ctx.db, integration.id);
   if (existing) return existing.session_id;
   const sessionId = await createComposioSession(config, await principalOf(ctx), integration.toolkit);
-  // Another request may have created one while this create was in flight.
   const raced = connectionOf(ctx.db, integration.id);
   if (raced) {
     await deleteComposioSession(config, sessionId).catch(() => undefined);
@@ -243,7 +215,6 @@ const ensureSession = async (
   return sessionId;
 };
 
-/** Whether the owner's session for an integration has a connected account now. */
 const isConnected = async (ctx: OwnerContext, integrationId: string): Promise<boolean> => {
   const connection = connectionOf(ctx.db, integrationId);
   const config = composioConfig(ctx.env);
@@ -299,8 +270,6 @@ const listConnections = async (
     ),
   };
 };
-
-// ── Runs ──────────────────────────────────────────────────────────────────
 
 const settleReceipt = (db: OwnerDb, requestId: string, state: string, now: number): void => {
   db.run(
@@ -370,7 +339,6 @@ const runAction = async (
     );
   } catch (error) {
     if (error instanceof RpcError) throw error;
-    // Only a provider rejection proves nothing ran; anything else may have.
     settleReceipt(ctx.db, args.requestId, composioDefinitelyRejected(error) ? "failed" : "unknown", Date.now());
     console.error(JSON.stringify({
       event: "integration_run_failed",
@@ -384,8 +352,6 @@ const runAction = async (
   return proxy ? normalizeGoogleAdsProxyResponse(payload) : payload;
 };
 
-// ── Connect cards ─────────────────────────────────────────────────────────
-
 const toRequest = (row: ConnectRow, now: number): CloudConnectorConnectRequest => ({
   schemaVersion: 1,
   requestId: row.request_id,
@@ -397,7 +363,6 @@ const toRequest = (row: ConnectRow, now: number): CloudConnectorConnectRequest =
   ...(row.icon_url ? { iconUrl: row.icon_url } : {}),
   ...(row.category ? { category: row.category } : {}),
   ...(row.reason ? { reason: row.reason } : {}),
-  // A deadline the expiry job has not reached yet still reads expired.
   state:
     LIVE_STATES.includes(row.state as CloudConnectorConnectState) && row.expires_at <= now
       ? "expired"
@@ -411,7 +376,6 @@ const toRequest = (row: ConnectRow, now: number): CloudConnectorConnectRequest =
 const connectRow = (db: OwnerDbReader, requestId: string) =>
   db.one<ConnectRow>("SELECT * FROM connect_requests WHERE request_id = ?", requestId);
 
-/** Move a card to `state` if it is still in one of `from`. Answers the card as it is now. */
 const settleConnect = (
   ctx: OwnerContext,
   requestId: string,
@@ -422,8 +386,6 @@ const settleConnect = (
   const row = connectRow(ctx.db, requestId);
   if (!row) return null;
   const current = toRequest(row, ctx.now);
-  // Expiry moves a card that is live in storage; every other move needs it
-  // live by the clock too.
   const fromState = state === "expired" ? (row.state as CloudConnectorConnectState) : current.state;
   if (!from.includes(fromState)) return current;
   ctx.db.run(
@@ -459,7 +421,6 @@ const parseConnectCreate = object({
 const createConnectRequest = (ctx: OwnerContext, raw: unknown): CloudConnectorConnectRequest => {
   const args = parseConnectCreate(raw);
   const integrationId = args.integrationId.trim().toLowerCase();
-  // One live card per (turn, integration): a retried tool call finds it.
   const live = ctx.db
     .all<ConnectRow>(
       "SELECT * FROM connect_requests WHERE turn_id = ? AND integration_id = ? ORDER BY created_at DESC LIMIT 4",
@@ -494,7 +455,6 @@ const createConnectRequest = (ctx: OwnerContext, raw: unknown): CloudConnectorCo
 
 const parseRequestId = object({ requestId: string({ min: 1, max: 128 }) });
 
-/** The waiting turn's poll: settles `expired` and, once connected, `connected`. */
 const pollConnectRequest = async (
   ctx: OwnerContext,
   raw: unknown,
@@ -550,7 +510,6 @@ const decideConnectRequest = async (
     }));
     throw new RpcError("UNAVAILABLE", "Could not create the connection link.");
   }
-  // The link took a network round trip; settle against the clock now.
   const request =
     settleConnect({ ...ctx, now: Date.now() }, args.requestId, "connecting", LIVE_STATES, args.decisionRequestId) ??
     current;
@@ -566,8 +525,6 @@ const pendingConnectRequests = (db: OwnerDbReader, now: number): CloudConnectorC
       MAX_PENDING_REQUESTS,
     )
     .map((row) => toRequest(row, now));
-
-// ── X ─────────────────────────────────────────────────────────────────────
 
 const requireXClient = (env: Cloudflare.Env) => {
   const client = xClient(env);
@@ -623,7 +580,6 @@ const parseCompleteOAuth = object({
   error: optional(string({ max: 512 })),
 });
 
-/** The X callback, after the route verified the signed state. */
 const completeXOAuth = async (ctx: OwnerContext, raw: unknown): Promise<{ username: string }> => {
   const args = parseCompleteOAuth(raw);
   const nonce = ctx.db.one<{ data: string | null; expires_at: number }>(
@@ -631,7 +587,6 @@ const completeXOAuth = async (ctx: OwnerContext, raw: unknown): Promise<{ userna
     args.nonce,
     X_STATE_KIND,
   );
-  // Consumed before anything else: a state works once.
   ctx.db.run("DELETE FROM oauth_nonces WHERE nonce = ?", args.nonce);
   if (!nonce || nonce.expires_at <= ctx.now) {
     throw new RpcError("CONFLICT", "Invalid or expired OAuth state. Please start the X connection again.");
@@ -709,7 +664,6 @@ const xConnections = (db: OwnerDbReader): { connections: XConnection[] } => {
   };
 };
 
-/** The owner's X access token, refreshed when it is about to expire. */
 const xAccessToken = async (ctx: OwnerContext): Promise<string> => {
   const row = ctx.db.one<XTokenRow>("SELECT * FROM x_tokens WHERE id = 1");
   if (!row) throw new RpcError("FORBIDDEN", "X is not connected. Run `stella-x-api connect` first.");
@@ -780,13 +734,6 @@ const xRequest = async (
   return { status: upstream.status, payload };
 };
 
-// ── Purge ─────────────────────────────────────────────────────────────────
-
-/**
- * Reset keeps the account's connections (Composio and X), like any account
- * setting; deletion revokes every Composio account the principal holds and
- * drops everything.
- */
 const purgeIntegrations = async (
   ctx: OwnerContext,
   mode: "reset" | "delete",
@@ -832,8 +779,6 @@ const purgeIntegrations = async (
   ctx.db.run("DELETE FROM x_tokens");
   return { pending: false };
 };
-
-// ── Registration ──────────────────────────────────────────────────────────
 
 const integrationId = (): Parser<string> => (value, path) => {
   const id = string({ min: 1, max: 128 })(value, path).trim().toLowerCase();
@@ -931,14 +876,11 @@ export const integrationsDomain = {
     },
   },
   internal: {
-    /** The orchestrator shows a connect card. */
     "connect.request": createConnectRequest,
     "connect.poll": pollConnectRequest,
     "connect.cancel": (ctx, raw) => settleConnect(ctx, parseRequestId(raw).requestId, "canceled", LIVE_STATES),
-    /** `cloud-connect-client.ts`: the cloud orchestrator's `connect.*`. */
     "integrations.connections": (ctx) => listConnections(ctx),
     "integrations.run": (ctx, raw) => runAction(ctx, parseRun(raw)),
-    /** `GET /api/x/oauth_callback`, after the signed state verified. */
     "x.completeOAuth": completeXOAuth,
   },
   purge: purgeIntegrations,

@@ -1,10 +1,3 @@
-/**
- * Display-sidebar tab for a folder a reply linked. The folder may be on this
- * computer or on another of the user's computers; main lists it from
- * wherever it is (`display:listFolder`), and a file in it opens in its own
- * viewer the same way a linked file does.
- */
-
 import { useCallback, useEffect, useState } from "react";
 import type { DisplayFolderListing } from "@stella/contracts/desktop/ipc-contract";
 import { useT } from "@/shared/i18n";

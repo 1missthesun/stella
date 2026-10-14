@@ -1,11 +1,3 @@
-/**
- * A scaled-down copy of the real chat for the showcase: the same bubbles,
- * working pill, activity rows and composer, at demo size. Every piece takes
- * its colors from the theme so the demo re-tints with the app.
- *
- * Like the desktop films, a piece arrives by fading into place and nothing
- * already on screen springs around to make room for it.
- */
 import { memo, useEffect, useMemo, useState, type ReactNode } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import Animated, {
@@ -65,7 +57,6 @@ export function MiniAssistantBubble({ children }: { children: string }) {
   );
 }
 
-/** The working pill: the mark doing its thing beside a status line. */
 export function MiniWorking({
   label,
   animating,
@@ -96,10 +87,6 @@ export function MiniWorking({
   );
 }
 
-/**
- * One agent activity line: a quiet star while it runs, a check that pops in
- * when it lands.
- */
 export function MiniReceipt({
   icon,
   label,
@@ -109,10 +96,6 @@ export function MiniReceipt({
   icon: IconName;
   label: string;
   done: boolean;
-  /**
-   * The row holds its place from the moment the block appears, so a later
-   * receipt fades into a slot it already owns instead of pushing the thread.
-   */
   shown: boolean;
 }) {
   const colors = useColors();
@@ -151,7 +134,6 @@ export function MiniReceipt({
   );
 }
 
-/** A live window onto what an agent is doing, inline in the thread. */
 export function MiniAgentWindow({
   title,
   icon,
@@ -216,10 +198,6 @@ function LiveDot({ live }: { live: boolean }) {
   );
 }
 
-/**
- * The "with your OK" moment: the purchase waits on an approval card, the
- * button takes a press, and it settles to confirmed.
- */
 export function MiniConfirm({
   title,
   detail,
@@ -303,10 +281,6 @@ export function MiniConfirm({
   );
 }
 
-/**
- * The composer, typing the request out a few characters at a time. Isolated
- * so only this line re-renders while it types.
- */
 export const MiniComposer = memo(function MiniComposer({
   text,
   placeholder,

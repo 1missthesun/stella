@@ -52,14 +52,11 @@ const TABBABLE_SELECTOR = [
 
 const isVisible = (element: HTMLElement) => {
   if (element.hidden || element.closest("[hidden]") !== null) return false;
-  // `checkVisibility` covers `display:none`/`visibility:hidden` ancestors
-  // without forcing layout. Anything older simply keeps the element.
   const check = (element as HTMLElement & { checkVisibility?: () => boolean })
     .checkVisibility;
   return typeof check === "function" ? check.call(element) : true;
 };
 
-/** Tabbable descendants of `root`, in document order. */
 export function getTabbableElements(root: HTMLElement): HTMLElement[] {
   return Array.from(
     root.querySelectorAll<HTMLElement>(TABBABLE_SELECTOR),
@@ -73,20 +70,11 @@ export function getTabbableElements(root: HTMLElement): HTMLElement[] {
   );
 }
 
-/**
- * Open modals, innermost last. Escape and the background-inert bookkeeping
- * both read this so nested modals behave (only the top one closes, and the
- * page is un-inerted only once the last one goes away).
- */
 const modalStack: HTMLElement[] = [];
 
 const isTopmost = (panel: HTMLElement | null) =>
   panel !== null && modalStack[modalStack.length - 1] === panel;
 
-/**
- * Mark everything outside `root` as inert for assistive tech and for the
- * tab order. Returns the undo.
- */
 function inertBackground(root: HTMLElement): () => void {
   const undo: Array<() => void> = [];
   let node: HTMLElement | null = root;
@@ -116,41 +104,19 @@ function inertBackground(root: HTMLElement): () => void {
 }
 
 export type ModalProps = {
-  /** Called for Escape, a backdrop click, or any caller-driven dismissal. */
   onClose: () => void;
   children: ReactNode;
-  /** Id of the element naming the dialog. Prefer this over `label`. */
   labelledBy?: string;
-  /** Literal accessible name, when no visible title element exists. */
   label?: string;
-  /** Id of the element describing the dialog. */
   describedBy?: string;
-  /** Class for the `role="dialog"` panel — this is the visual surface. */
   className?: string;
-  /** Inline style for the `role="dialog"` panel. */
   style?: CSSProperties;
-  /** Class for the backdrop element that wraps the panel. */
   backdropClassName?: string;
-  /** Inline style for the backdrop element. */
   backdropStyle?: CSSProperties;
-  /** Extra data-/aria- attributes for the backdrop (test ids, hooks). */
   backdropProps?: Record<string, string | undefined>;
-  /** Focus this on open instead of the first tabbable element. */
   initialFocusRef?: RefObject<HTMLElement | null>;
-  /** Pointer-down on the backdrop itself dismisses. Default true. */
   closeOnBackdropClick?: boolean;
-  /**
-   * True (default) for a real modal: `aria-modal`, a focus trap, and an
-   * inert page behind it. Pass false for a dialog that deliberately
-   * leaves a surface outside it usable (the chat focus overlay keeps the
-   * composer live) — it still gets the dialog role, Escape, focus-in and
-   * focus restore, just not the trap or the inert background.
-   */
   modal?: boolean;
-  /**
-   * Where to render. `null` (default) keeps the modal inline, in the
-   * caller's own layout box; pass an element to portal there.
-   */
   container?: HTMLElement | null;
 };
 
@@ -174,8 +140,6 @@ export function Modal({
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
 
-  // Register in the stack and inert the background before paint, so a
-  // screen reader never sees the page in its "both are live" state.
   useLayoutEffect(() => {
     const panel = panelRef.current;
     if (!panel) return;
@@ -192,7 +156,6 @@ export function Modal({
     };
   }, [modal]);
 
-  // Move focus in once the content has mounted.
   useEffect(() => {
     const panel = panelRef.current;
     if (!panel) return;
@@ -215,8 +178,6 @@ export function Modal({
       if (event.key !== "Tab" || !modal) return;
       const tabbables = getTabbableElements(panel);
       if (tabbables.length === 0) {
-        // Nothing to land on — keep focus on the panel rather than
-        // letting it escape into the inert page behind.
         event.preventDefault();
         panel.focus({ preventScroll: true });
         return;
@@ -260,7 +221,6 @@ export function Modal({
         aria-labelledby={labelledBy}
         aria-label={labelledBy ? undefined : label}
         aria-describedby={describedBy}
-        // The panel is the focus fallback when it holds nothing tabbable.
         tabIndex={-1}
         className={className}
         style={style}

@@ -1,8 +1,3 @@
-/**
- * Where a cloud conversation's Stella runs changed, as its conversation
- * socket says: a `brain` frame, or a reconnect after which a change may have
- * been missed. `useConversationBrain` reads again on it, so nothing polls.
- */
 type Listener = (conversationId: string) => void;
 
 const listeners = new Set<Listener>();

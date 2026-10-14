@@ -2,12 +2,6 @@ import { launch } from "@cloudflare/playwright";
 import type { BrowserGatewayEnv } from "./profile-session-core.js";
 import { GatewayError } from "./errors.js";
 
-/**
- * A still of an owner's workspace app for the chat's app card. The caller
- * (cloud-builder, over the service binding) mints a short-lived signed app
- * URL and stores the image; this only loads that one page in a throwaway
- * browser with no profile, waits for it to settle, and returns a JPEG.
- */
 const VIEWPORT = { width: 1280, height: 800 };
 const NAVIGATION_TIMEOUT_MS = 20_000;
 const SETTLE_MS = 900;

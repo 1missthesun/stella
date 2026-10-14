@@ -1,9 +1,3 @@
-/**
- * The "Show more" under a reply's text, placed like a user message's
- * toggle. One per reply, however many tasks it relays (or cites, once they
- * have settled): it opens all of their full reports together. Nothing
- * renders while no quoted task has a report yet.
- */
 import { memo } from "react";
 import type { ReplyRef } from "@stella/contracts/reply-refs";
 import type { AgentCompletionSection } from "@/features/chat/lib/agent-completion";
@@ -39,8 +33,6 @@ export const ReplyReportLinks = memo(function ReplyReportLinks({
     [primaryLocal?.description, primary?.title],
     primaryLocal?.status,
   );
-  // One agent can relay more than once in a turn (a mid-run message, then
-  // its report); it is one report, carrying its latest relayed text.
   const latestCompletions = [
     ...new Map(completions.map((section) => [section.agentId, section])).values(),
   ];

@@ -1,5 +1,3 @@
-/** Unpadded base64url, for byte values that travel in URLs and JSON. */
-
 const BASE64_URL_ALPHABET =
   "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 const BASE64_URL_LOOKUP = new Map(

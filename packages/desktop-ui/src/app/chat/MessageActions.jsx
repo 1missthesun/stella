@@ -1,29 +1,3 @@
-/**
- * Per-message actions, as small buttons beside the bubble.
- *
- * This used to be a row of icon buttons rendered BELOW the message. That row
- * reserved its height at all times (the reveal had to not move the bubble, so
- * it could not be `display: none`), which meant every single message paid ~32px
- * of empty vertical space — the "huge gap between messages". The control is now
- * one 24px button in the message's own horizontal line, to the side of the
- * bubble: it costs nothing vertically, so the gap between messages is purely
- * the timeline's own rhythm (see the ROW_GAP family in ChatTimeline.tsx).
- *
- * - User messages: Reply + Copy as direct buttons; the time rides on Copy's
- *   tooltip.
- * - Assistant messages: Copy + Read aloud (on-demand TTS) in the ellipsis menu,
- *   because three inline buttons overflow the free space beside a full-width
- *   bubble at narrow widths. Only a turn's FINAL assistant message gets them. Intra-turn segments (preambles that ended in a
- *   tool call) never mount this control at all (see the `isIntraTurn` gate in
- *   `AssistantMessageRow`).
- *
- * The button only fades in on row hover / keyboard focus (or while its menu is
- * open, or its read-aloud is active). It never changes its own footprint, so
- * revealing it cannot shift row geometry, which the chat's scroll-follow logic
- * depends on. The exact send time rides along as the menu's header — per-message
- * stamps under the bubble are gone, replaced by the periodic centered divider
- * the timeline renders (see ChatTimeDivider).
- */
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import {
   Check,
@@ -51,7 +25,6 @@ import "./message-actions.css";
 
 const COPIED_RESET_MS = 1600;
 
-/** How long "Copied" stays on screen before the menu dismisses itself. */
 const COPIED_MENU_CLOSE_MS = 700;
 
 /**
@@ -105,17 +78,12 @@ function MessageActionsImpl({
 
   const handleCopySelect = useCallback(
     async (event) => {
-      // Hold the menu open just long enough to show the "Copied" state.
       event.preventDefault();
       const value = text.trim();
       let ok = false;
       if (value) {
-        // Text takes priority, including mixed text + attachment messages.
         ok = await copyTextToClipboard(value);
       } else if (copyAttachment) {
-        // Attachment-only message: hand it to main, which writes an image
-        // (from the on-disk path or data URL) or falls back to the file
-        // path as text.
         const result =
           await window.electronAPI?.media?.copyAttachment?.(copyAttachment);
         ok = Boolean(result?.ok);
@@ -149,8 +117,6 @@ function MessageActionsImpl({
   const isPlaying = readAloudStatus !== "idle";
   const hasCopyable = Boolean(text.trim() || copyAttachment);
 
-  // Local-timezone "h:mm AM/PM" (e.g. "3:07 PM") for the menu header, so the
-  // exact time of one message stays reachable without a per-message stamp.
   const timestampLabel =
     typeof timestampMs === "number" && Number.isFinite(timestampMs)
       ? new Date(timestampMs).toLocaleTimeString([], {

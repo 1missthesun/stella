@@ -10,10 +10,6 @@ import { selfHostServersAvailable } from "../../src/lib/native-capabilities";
 import { useColors, useTheme } from "../../src/theme/theme-context";
 import { useT } from "../../src/i18n";
 
-/**
- * First screen for a signed-out phone: Stella's hosted service (today's
- * sign-in, unchanged) or a server of your own (pairing).
- */
 export default function WelcomeScreen() {
   const colors = useColors();
   const { isDark } = useTheme();

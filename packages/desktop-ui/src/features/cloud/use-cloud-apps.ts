@@ -11,9 +11,6 @@ export type CloudAppsState = {
   error: string | null;
   httpOrigin: string | null;
 };
-// Every poll is a backend round trip against the owner's objects, so this
-// refreshes slowly and only while the window is actually being looked at; a
-// window that comes back to the foreground refreshes immediately.
 const APPS_REFRESH_MS = 60_000;
 export function useCloudApps(): CloudAppsState {
   const { isCloudConversationReady, accountScope } =

@@ -13,7 +13,6 @@ export type VoiceCatalogPickerProps = {
   ) => void;
   readAloudProvider?: ReadAloudVoiceProvider;
   onSelectReadAloudProvider?: (provider: ReadAloudVoiceProvider) => void;
-  /** Gemini read-aloud voice; persisted to `realtimeVoice.voices.gemini`. */
   onSelectReadAloudVoice?: (voiceId: string) => void;
   disabled?: boolean;
 };

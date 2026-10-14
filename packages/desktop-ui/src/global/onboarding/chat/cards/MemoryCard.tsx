@@ -1,11 +1,3 @@
-/**
- * "One conversation" — the chatbot-versus-Stella card.
- *
- * Plays the experience everyone knows first: a sidebar full of threads and
- * an assistant that can't remember last week. One click morphs the same
- * window into Stella, where the same question just gets answered. The
- * point is made by the contrast, not by copy.
- */
 import { useCallback, useState } from "react";
 import { Button } from "@/ui/button";
 import { ArrowRight, MessageSquare } from "@/ui/icons";

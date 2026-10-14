@@ -1,10 +1,5 @@
 import type { ThemeTokens } from "./tokens";
 
-/**
- * Every derived token, keyed by the CSS custom property it lands on. The
- * derivation itself lives in `@stella/theme` so mobile reads the identical
- * values; this table is only the CSS naming, shared by desktop and the web build's static first paint.
- */
 export const THEME_CSS_VARS: ReadonlyArray<readonly [string, keyof ThemeTokens]> = [
   ["--background", "background"],
   ["--background-strong", "backgroundStrong"],

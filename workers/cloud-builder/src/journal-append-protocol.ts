@@ -49,11 +49,6 @@ const hasMessageShape = (
   );
 };
 
-/**
- * `/journal` is a user-authenticated network write path. It accepts only the
- * exact voice message envelope produced by the desktop writer; lifecycle rows
- * and declared/payload role mismatches fail closed.
- */
 export const parseVoiceJournalRecords = (
   value: unknown,
 ): ParsedVoiceJournalRecord[] | null => {

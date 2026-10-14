@@ -1,14 +1,3 @@
-/**
- * Push-to-talk dictation. Signed-in users stream 16 kHz mono PCM through
- * Stella's authenticated dictation relay (the transcript lands on stop); without
- * streaming the whole utterance is recorded locally and transcribed in one
- * authenticated request on stop.
- *
- * Mirrors desktop's dictation UX: while recording the leaf recording bar polls
- * this recorder for its waveform/timer, and on stop we wait for the transcript
- * before resolving so the caller can paste it into the composer.
- */
-
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AudioModule } from "expo-audio";
 import { AudioStudioModule } from "@siteed/audio-studio";
@@ -41,9 +30,7 @@ import {
   pushDictationLevels,
 } from "./dictation-meter";
 
-/** Minimum elapsed time before we bother round-tripping audio to the server. */
 const MIN_RECORDING_MS = 300;
-/** Under this the route answers an empty transcript anyway. */
 const MIN_PCM_BYTES = DICTATION_SAMPLE_RATE / 5;
 
 export type DictationStatus = "idle" | "recording" | "transcribing";
@@ -53,7 +40,6 @@ export type UseDictationOptions = {
   headers?: Record<string, string>;
   /** Optional BCP-47 hint reserved for future language biasing. */
   language?: string;
-  /** Fired once a transcript comes back. */
   onTranscript: (text: string) => void;
 };
 
@@ -61,26 +47,17 @@ export type UseDictationResult = {
   status: DictationStatus;
   isRecording: boolean;
   isTranscribing: boolean;
-  /** Resolves `true` only if recording actually began (consent + mic granted). */
   start: () => Promise<boolean>;
-  /** Resolves with the transcript, or null on no result. */
   stop: () => Promise<string | null>;
   cancel: () => Promise<string | null>;
   toggle: () => Promise<void>;
 };
 
-/**
- * One recording's captured PCM, in native delivery order. Capture starts
- * before the transport is chosen; until then (and for the batch route) the
- * audio stays in `chunks`, and the live route takes all of it.
- */
 type DictationCapture = {
   chunks: ArrayBuffer[];
   bytes: number;
-  /** Set once the 15-minute ceiling is reached; capture stops there. */
   full: boolean;
   live: DictationLive | null;
-  /** Settles once the transport is chosen and `live` is set if streaming. */
   routed: Promise<void>;
   pressedAt: number;
   firstAudioAt: number;
@@ -88,9 +65,7 @@ type DictationCapture = {
 
 type DictationLive = {
   stream: DictationStream;
-  /** Settles when the provider acknowledged the handshake (or failed). */
   opened: Promise<void>;
-  /** Holds audio losslessly until the handshake, then paces it out. */
   pacer: DictationIngressPacer;
 };
 
@@ -138,7 +113,6 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
     }
   }, []);
 
-  /** Forget captured audio so a cancelled or stale recording cannot be sent. */
   const discardCapture = useCallback((capture: DictationCapture | null) => {
     if (!capture) return;
     if (captureRef.current === capture) captureRef.current = null;
@@ -185,8 +159,6 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
       return false;
     }
     const pressedAt = Date.now();
-    // Terminal TTS stop before any permission/consent work so a late chunk
-    // cannot restart playback after the user has already asked to speak.
     stopReadAloudForDictation();
     operationInFlightRef.current = true;
     // Apple 5.1.1(i): voice audio is sent to a third-party AI transcription
@@ -199,10 +171,6 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
     }
     let phase: "permission" | "audio-session" | "relay" | "recorder" =
       "permission";
-    // The user starts talking on the press, so nothing on the network may
-    // stand between the press and the recorder. The transport is chosen (and
-    // the relay connected) alongside the recorder's start; whatever is
-    // captured first waits in `chunks` and goes out in order.
     const current: DictationCapture = {
       chunks: [],
       bytes: 0,
@@ -310,8 +278,6 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
           current.bytes += bytes.byteLength;
         }
         if (current.bytes < DICTATION_MAX_PCM_BYTES) return;
-        // The route refuses more than fifteen minutes. Stop here and keep what
-        // was said rather than losing the whole recording to a 413.
         current.full = true;
         if (statusRef.current === "recording") void stopRecordingRef.current?.();
       });
@@ -338,10 +304,6 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
       cancelledRef.current = false;
       startedAtRef.current = Date.now();
       startDictationMeter(startedAtRef.current);
-      // The recorder is running. Speech from the press onward is already
-      // captured, so this confirms the recording rather than asking the user
-      // to wait for it; it fires here rather than on the press so it never
-      // promises a recording that consent or a denied mic then refuses.
       tapMedium();
       safeSetStatus("recording");
       operationInFlightRef.current = false;
@@ -376,9 +338,6 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
       operationInFlightRef.current = true;
       const durationMs = Date.now() - startedAtRef.current;
       cancelledRef.current = !commit;
-      // Recording ended. Lighter than the start: this one closes the gesture
-      // rather than opening it. `finalize` is the single exit for both stop
-      // and cancel, so every way out of recording is covered once.
       tapLight();
       safeSetStatus(commit ? "transcribing" : "idle");
 
@@ -391,8 +350,6 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
       } catch (error) {
         console.warn("[dictation] stop failed", error);
       }
-      // The recorder's final buffers can still arrive until the subscription
-      // is gone; keep the capture current so the listener appends them.
       await releaseAudioMode();
       audioSubscriptionRef.current?.remove();
       audioSubscriptionRef.current = null;
@@ -402,8 +359,6 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
       if (captureRef.current === capture) captureRef.current = null;
       const live = capture?.live ?? null;
       live?.pacer.stopPadding();
-      // The recorder is configured without file output, but delete anything it
-      // produced anyway: the audio we send is the PCM we captured.
       if (uri) {
         try {
           new File(uri).delete();
@@ -437,9 +392,6 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
               (error instanceof Error
                 ? error
                 : new Error("Could not transcribe that audio. Try again."));
-            // Partials are cumulative, so whatever the provider recognized
-            // before it dropped the session is still worth pasting rather than
-            // making the user repeat everything they said.
             text = live.stream.partialTranscript.trim();
             console.warn("[dictation] transcription failed", failure);
             if (mountedRef.current && !cancelledRef.current) {
@@ -499,8 +451,6 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
     }
   }, [status, start, stop]);
 
-  // On unmount, stop native capture and release the audio session so the mic
-  // light cannot remain on after navigating away or during Fast Refresh.
   useEffect(() => {
     mountedRef.current = true;
     return () => {
@@ -553,20 +503,10 @@ const audioEventToPcm16 = (
   return pcm.buffer;
 };
 
-/** Samples per RMS window: 8 ms at 16 kHz, close to desktop's worklet frame. */
 const LEVEL_FRAME_SAMPLES = 128;
-/** Samples per waveform bar: 80 ms at 16 kHz, desktop's level cadence. */
 const LEVEL_SLICE_SAMPLES = (DICTATION_SAMPLE_RATE * 80) / 1000;
-/** RMS during normal speech sits around 0.05–0.15; desktop's `LEVEL_GAIN`. */
 const LEVEL_GAIN = 6;
 
-/**
- * Cuts the recorder's chunks into 80 ms slices and returns one 0..1 level per
- * slice: the peak RMS across short windows, on desktop's scale (one RMS over
- * the whole slice averages the syllables away). A partial slice at the end of
- * a chunk is carried into the next, so the bar rate matches the audio exactly
- * whatever size the recorder's chunks are.
- */
 const createLevelSlicer = () => {
   let carry = new Int16Array(0);
   return (bytes: ArrayBuffer): number[] => {

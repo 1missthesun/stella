@@ -1,7 +1,3 @@
-/**
- * Shared type definitions for the tools system.
- */
-
 import type { TaskLifecycleStatus } from "@stella/contracts/agent-runtime";
 import type {
   AgentModelConfigSnapshot,
@@ -15,37 +11,14 @@ import type {
 } from "@stella/contracts/scheduling";
 import type { ToolReplayPolicy } from "./defs/replay-policy.js";
 
-/**
- * Trusted-host-only OS identity for model-authored child processes. This is
- * never a tool argument: a cloud host can drop shell privileges while its
- * executor retains access to private orchestration state.
- */
 export type ToolProcessIdentity = {
   uid: number;
   gid: number;
-  /**
-   * HOME for the dropped-credential child, and what `~` means to the file
-   * tools. It must sit inside `toolWorkspaceRoot`, the context's
-   * `stellaDataDir`, or the trusted `toolStateRoot` the host declared; the
-   * shell refuses anything else.
-   */
   home: string;
   user: string;
-  /**
-   * Linux cloud boundary: launch through the fixed `setpriv` trampoline so
-   * the child has no supplementary groups, capability sets, or privilege
-   * regain path. The trusted host sets this; it is never a tool argument.
-   */
   requireNoNewPrivileges?: true;
 };
 
-/**
- * Bytes already read through a trusted workspace descriptor boundary.
- *
- * This is intentionally carried on a symbol-keyed ToolResult field: normal
- * result serialization must never turn an authorized byte read back into a
- * pathname that a more-privileged adapter reopens later.
- */
 export type AuthorizedToolImage = {
   data: Uint8Array;
   mimeType: "image/png" | "image/jpeg" | "image/gif" | "image/webp";
@@ -57,54 +30,30 @@ export const TOOL_RESULT_AUTHORIZED_IMAGES = Symbol(
 );
 
 export type ToolContext = {
-  /** Where tools execute; independent from where the conversation is stored. */
   executionHost: "device" | "sandbox";
   conversationId: string;
   deviceId: string;
   requestId: string;
   runId?: string;
   rootRunId?: string;
-  /** Fences tool side effects to the active execution attempt for an agent. */
   attemptGeneration?: number;
   agentType?: string;
-  /** Agent execution root. Kept separate from install and durable-data paths. */
   workingDirectory?: string;
   stellaAppDir?: string;
   stellaDataDir?: string;
   toolWorkspaceRoot?: string;
-  /** A spawned agent's start directory; shell commands without a workdir run there. */
   agentWorkingDirectory?: string;
-  /** POSIX child credential drop selected only by the trusted runtime host. */
   toolProcessIdentity?: ToolProcessIdentity;
-  /**
-   * A host-validated directory outside the workspace for the tool account's
-   * caches, config and state: the shell points XDG and the common tool caches
-   * into it instead of HOME. The cloud's HOME is the checkpointed world, and
-   * this keeps caches out of it; the executor verifies the directory's
-   * ownership and mode before naming it here. Like `toolProcessIdentity`,
-   * only the trusted host sets this.
-   */
   toolStateRoot?: string;
   storageMode?: "cloud" | "local";
-  /** Exact owner-data epoch for cloud computer-agent lifecycle writes. */
   ownerGeneration?: string;
   agentId?: string;
-  /**
-   * Thread of the agent that spawned this one. Set only for a parent-owned
-   * thread; a root-spawned agent has no agent parent. Drives the ownership
-   * tier that withholds the orchestration tools.
-   */
   parentAgentId?: string;
   agentDepth?: number;
   maxAgentDepth?: number;
-  /**
-   * Set only by the host when the user typed this input into an agent's
-   * thread: `send_message` then delivers it as the owner's instruction.
-   */
   fromUser?: boolean;
   modelConfigSnapshot?: AgentModelConfigSnapshot;
   allowedToolNames?: string[];
-  /** External adapters acknowledge image delivery after transcript storage. */
   deferImageDeliveryAck?: boolean;
   connectorDeliveryTarget?: {
     requestId: string;
@@ -118,12 +67,7 @@ export type ToolResult = {
   result?: unknown;
   details?: unknown;
   error?: string;
-  /**
-   * Tool-specific model-facing text budget. The raw result is still returned
-   * and persisted; provider context assembly applies this limit later.
-   */
   modelOutputTokens?: number;
-  /** Trusted-host-only image bytes; omitted from JSON, logs, and transcripts. */
   [TOOL_RESULT_AUTHORIZED_IMAGES]?: readonly AuthorizedToolImage[];
 };
 
@@ -140,40 +84,17 @@ export type ToolMetadata = {
   workingText?: string;
   description: string;
   parameters: Record<string, unknown>;
-  /** Optional JSON Schema for a successful tool result. */
   outputSchema?: Record<string, unknown>;
-  /** Optional alternate result contract used by some extension/tool SDKs. */
   resultSchema?: Record<string, unknown>;
-  /** Existing approval policy metadata, when the tool source provides it. */
   approval?: unknown;
-  /** Existing side-effect metadata, when the tool source provides it. */
   sideEffects?: unknown;
-  /**
-   * What recovery may do with a call cut off by process loss (the
-   * definition's `replay`; omitted means `"unsafe"`).
-   */
   replay?: ToolReplayPolicy;
-  /** Existing reversibility hint, when the tool source provides it. */
   reversible?: boolean;
-  /** MCP-style callable annotations, when the tool source provides them. */
   annotations?: Record<string, unknown>;
-  /**
-   * Demoted tools leave the model's direct tool list whenever `code`
-   * is available for the agent and become callable only as
-   * `tools.<name>(args)` inside the REPL, advertised through the
-   * token-budgeted signature catalog in code's description and
-   * discoverable via `tools.$search`. Agents without code get the tool
-   * in their direct list as usual (never stranded).
-   */
   demoted?: {
     searchTerms?: readonly string[];
     requiredConnectorProvider?: string;
   };
-  /**
-   * Optional declarative gate: when set, only the listed agent types may see
-   * the tool in their catalog and run it via executeTool. Replaces in-line
-   * `agentType === ORCHESTRATOR` checks at the tool-handler layer.
-   */
   agentTypes?: readonly string[];
   awaitsUser?: boolean;
 };
@@ -194,7 +115,6 @@ export type AgentToolSnapshot = {
   id: string;
   status: TaskLifecycleStatus;
   description: string;
-  /** Durable engine/model evidence for this agent thread. */
   modelConfigSnapshot?: AgentModelConfigSnapshot;
   startedAt: number;
   completedAt: number | null;
@@ -210,24 +130,9 @@ export type AgentToolSnapshot = {
 
 export type ToolHostOptions = {
   stellaAppDir: string;
-  /**
-   * Disable startup recovery of stale credential mounts. Cloud hosts keep
-   * their model-writable HOME separate from this root and must never let a
-   * prior turn plant recovery records for the privileged host to consume.
-   */
   recoverStaleSecrets?: boolean;
-  /**
-   * Disable host-written command shims. A cloud image already provides its
-   * fixed binaries and keeps host state root-owned, so model shells must not
-   * depend on files materialized by the privileged process.
-   */
   enableShellShims?: boolean;
-  /**
-   * Trusted cloud-only opt-in for the persistent code tool in sandbox
-   * execution; without it a sandbox context is refused `code`.
-   */
   allowCloudCode?: boolean;
-  /** Privileged browser transport injected by a cloud executor. */
   browserSessionFactory?: import("../browser-use/client.js").BrowserSessionFactory;
   stellaBrowserBinPath?: string;
   stellaOfficeBinPath?: string;
@@ -235,14 +140,9 @@ export type ToolHostOptions = {
   stellaMediaCliPath?: string;
   stellaXApiCliPath?: string;
   cliBridgeSocketPath?: string;
-  /** This computer's device id (the account's MCP registry names it by this). */
   deviceId?: string;
   scheduleApi?: ScheduleToolApi;
   extensionTools?: import("../extensions/types.js").ToolDefinition[];
-  /**
-   * Optional handler for Stella's search-backed `web` tool. When omitted,
-   * search mode is unavailable.
-   */
   webSearch?: (
     query: string,
     options?: { category?: string },
@@ -250,31 +150,13 @@ export type ToolHostOptions = {
     text: string;
     results?: Array<{ title: string; url: string; snippet: string }>;
   }>;
-  /**
-   * Optional authenticated Stella site access for tool surfaces like `image_gen`
-   * that call the managed media HTTP API.
-   */
   getStellaSiteAuth?: () => { baseUrl: string; authToken: string } | null;
-  /**
-   * The cloud backend worker origin and the runtime's auth token, or null
-   * while signed out. Backs `history.sql` / `history.read` in `code`.
-   */
   getCloudBackendAuth?: () => { baseUrl: string; authToken: string } | null;
-  /**
-   * The in-`code` `connect` client and `history` handler, for a host that
-   * reaches them its own way: the cloud container, which has neither the CLI
-   * bridge nor backend auth, answers both through its turn broker. Absent,
-   * `connect` uses the CLI bridge and `history` the cloud backend auth.
-   */
   codeConnectClient?: import("../connectors/connect-service.js").ReplConnectClient;
   codeHistoryQuery?: (
     args: Record<string, unknown>,
     context: ToolContext,
   ) => Promise<unknown>;
-  /**
-   * An agent's `history.*`: its own thread, never the conversation it was
-   * started from. Absent, an agent's `history` rejects.
-   */
   agentHistoryQuery?: (
     args: Record<string, unknown>,
     context: ToolContext,
@@ -284,12 +166,6 @@ export type ToolHostOptions = {
   requestSecureInput?: import("./user.js").UserToolsConfig["requestSecureInput"];
   useSecureValue?: import("./user.js").UserToolsConfig["useSecureValue"];
   revealSecureValueForFill?: import("./user.js").UserToolsConfig["revealSecureValueForFill"];
-  /**
-   * Optional desktop hop for `Bash`: render an inline "connect the
-   * Stella browser extension" card in the chat when a stella-browser command
-   * fails on the missing extension bridge, resolving once the user connects
-   * or declines so the tool can re-run the command automatically.
-   */
   requestBrowserExtensionConnect?: import("./browser-extension-offer.js").BrowserExtensionConnectRequester;
   requestComputerUseAppApproval?: (payload: {
     bundleIdentifier: string;
@@ -302,16 +178,7 @@ export type ToolHostOptions = {
     | { decision: "approved"; scope: "session" | "persistent" }
     | { decision: "declined"; scope: "none" }
   >;
-  /**
-   * Optional desktop hop for the orchestrator's `connector_status` tool:
-   * render the inline connector connect card and resolve with the user's
-   * outcome (same ConnectorConnectService flow the CLI bridge uses).
-   */
   requestConnectorConnection?: import("./defs/connector-status.js").ConnectorConnectionRequester;
-  /**
-   * Desktop hop for the orchestrator's `switch_destination` tool: flip the
-   * app's execution target and continue the conversation there.
-   */
 };
 
 export type ScheduleToolApi = {
@@ -341,89 +208,28 @@ export type ToolHandler = (
   extras?: ToolHandlerExtras,
 ) => Promise<ToolResult>;
 
-/** @see ./defs/replay-policy.ts */
 export type { ToolReplayPolicy };
 
-/**
- * Self-contained tool definition. One file per tool under
- * `runtime/kernel/tools/defs/` exports either a `ToolDefinition` directly (for
- * stateless tools) or a `createXxxTool(options)` factory that returns one (for
- * tools that need wired dependencies like `webSearch`, `agentApi`, etc.).
- *
- * The host imports every def and builds a single Map<name, ToolDefinition>
- * that drives both:
- *   - the catalog the model sees (name, description, parameters, promptSnippet)
- *   - the handler the runtime dispatches (execute)
- *
- * No central description/schema map. No name-string lookup with placeholder
- * fallback. If a tool isn't in the registry, the agent loop simply doesn't
- * see it.
- */
 export type ToolDefinition = {
-  /** Tool name surfaced to the model (e.g. `web`, `Bash`). */
   name: string;
-  /** Human-readable label surfaced to the UI. */
   label?: string;
-  /** User-facing status text while the tool is running. */
   workingText?: string;
-  /** Description string shown in the model's tool list. */
   description: string;
-  /** JSON Schema for tool arguments. */
   parameters: Record<string, unknown>;
-  /** Optional JSON Schema for a successful tool result. */
   outputSchema?: Record<string, unknown>;
-  /** Optional alternate result contract used by some extension/tool SDKs. */
   resultSchema?: Record<string, unknown>;
-  /** Approval policy metadata supplied by the tool source. */
   approval?: unknown;
-  /** Side-effect metadata supplied by the tool source. */
   sideEffects?: unknown;
-  /**
-   * What recovery may do with a call that was in flight when its process was
-   * lost. Omitted means `"unsafe"`. See {@link ToolReplayPolicy}.
-   */
   replay?: ToolReplayPolicy;
-  /** Reversibility hint supplied by the tool source. */
   reversible?: boolean;
-  /** MCP-style callable annotations supplied by the tool source. */
   annotations?: Record<string, unknown>;
-  /**
-   * Optional declarative agent-type gate. When set, the tool is hidden from
-   * agents not in the list (catalog filter) and rejected at executeTool if
-   * the call still slips through. Prefer this over per-handler `agentType`
-   * checks: it keeps gating colocated with the tool definition and makes the
-   * surface area easy to audit.
-   */
   agentTypes?: readonly string[];
   awaitsUser?: boolean;
-  /**
-   * Optional one-line snippet for an auto-generated "Available tools" block in
-   * the agent's system prompt. Tools omit this when their use is so context-
-   * specific that an unconditional snippet would be misleading.
-   */
   promptSnippet?: string;
-  /**
-   * Demoted tools are dropped from the model's direct tool list whenever
-   * `code` is available for the agent; they remain callable inside the
-   * REPL as `tools.<name>(args)` and are advertised through the signature
-   * catalog appended to code's description (plus `tools.$search` and
-   * on-demand full docs via `tools.$describe`).
-   * `requiredConnectorProvider` gates context-specific tools to matching
-   * connector-delivery turns; `searchTerms` feed `$search` scoring.
-   * Agents without code get demoted tools in their direct list as
-   * normal tools, so nothing is ever stranded.
-   *
-   * Reachability rule: demoted tools are gated by `agentTypes`/catalog
-   * scoping and connector context, NOT by per-agent frontmatter allowlists;
-   * flagging a tool demoted exposes it to every agent type its definition
-   * allows (matching the old deferred mechanism, which was gated by
-   * tool_search presence rather than frontmatter).
-   */
   demoted?: {
     searchTerms?: readonly string[];
     requiredConnectorProvider?: string;
   };
-  /** Handler invoked when the model calls the tool. */
   execute: ToolHandler;
 };
 

@@ -6,13 +6,6 @@ import {
 } from "./conversation-files";
 import { postJson } from "./http";
 
-/**
- * Reads of one conversation's cloud journal for the Files page, through the
- * same `history/query` route the desktop uses to list a conversation's files.
- * Resident rows are filtered in SQL so only rows that can carry a file cross
- * the network; older, archived rows are read in record batches.
- */
-
 const HOT_PAGE_ROWS = 250;
 const COLD_READ_RECORDS = 200;
 const ARCHIVE_READS_PER_BATCH = 4;
@@ -42,7 +35,6 @@ const FILE_ROWS_FILTER = `(
 
 export type ResidentWindow = { lowestSeq: number; headSeq: number };
 
-/** The seq range the conversation still holds in its fast, queryable store. */
 export const readResidentWindow = async (
   conversationId: string,
   signal?: AbortSignal,
@@ -59,10 +51,6 @@ export const readResidentWindow = async (
   return { lowestSeq: lo, headSeq: hi };
 };
 
-/**
- * Resident journal rows that can carry a file, newest first, strictly between
- * `afterSeq` and `beforeSeq`.
- */
 export const readResidentFileEntries = async (
   conversationId: string,
   range: { afterSeq: number; beforeSeq: number },
@@ -89,10 +77,6 @@ export const readResidentFileEntries = async (
   };
 };
 
-/**
- * One archived batch ending just below `beforeSeq`. `nextBeforeSeq` is where
- * the next older batch ends, or null once nothing older can be served.
- */
 export const readArchivedEntries = async (
   conversationId: string,
   beforeSeq: number,

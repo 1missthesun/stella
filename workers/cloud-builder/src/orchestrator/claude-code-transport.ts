@@ -1,20 +1,3 @@
-/**
- * Claude Code as pi's engine in the cloud: the `ClaudeCodeTransport` the
- * conversation's pi runtime runs Stella's Claude Code turns on.
- *
- * Each CLI turn runs in the conversation's orchestrator container, dispatched
- * to its BuildSession as an orchestrator agent turn, exactly as before. What
- * changed is who answers it: the CLI's tool calls come back here and are
- * answered by pi's own tool tasks (`executeTool` waits for pi's result), and
- * its finished assistant messages become the stream pi's generation reads.
- * The CLI keeps none of its built-ins in the cloud, so every file and shell
- * call is one of pi's tools, which run wherever the conversation's tools run:
- * the cloud, or one of the owner's computers through pi's execution host.
- *
- *   pi generation --runTurn--> BuildSession --> executor --> claude
- *   claude --MCP--> executor --> BuildSession --tool--> here --> pi's tool task
- *   claude --stream-json--> executor --> BuildSession --events--> here --> pi
- */
 import { claudeUsageLimitOf } from "@stella/contracts/claude-usage-limit";
 import {
   CLAUDE_CODE_SESSION_LOST,
@@ -46,7 +29,6 @@ import {
 } from "../orchestrator-cli-turn.js";
 import { isSlackConversationId } from "../slack/conversation-id.js";
 
-/** The chat turn a Claude Code turn runs for. */
 export type CloudClaudeCodeTurn = {
   turnId: string;
   ownerId: string;
@@ -61,36 +43,28 @@ export type CloudClaudeCodeHost = {
   env: BuildSessionEnv;
   /** The chat turn running now; waits briefly for one to bind. */
   turn(signal: AbortSignal): Promise<CloudClaudeCodeTurn>;
-  /** The next attempt on the conversation's orchestrator thread, kept across evictions. */
   nextAttempt(): Promise<number>;
-  /** A session another host ran for this conversation and synced, for one that has none here. */
   adoption(turn: CloudClaudeCodeTurn): Promise<CloudOrchestratorCliAdoptedSession | null>;
-  /** Leave a session written from the journal where the BuildSession takes it (`claudeHydratedSessionKey`). */
   stageSession(turn: CloudClaudeCodeTurn, sessionId: string, transcript: string): Promise<void>;
-  /** What the CLI last reported about its models, kept across evictions. */
   models: { read(): Promise<CloudClaudeCodeModels | undefined>; write(models: CloudClaudeCodeModels): Promise<void> };
   sleep(ms: number, signal: AbortSignal): Promise<void>;
   log(event: string, fields: Record<string, unknown>): void;
 };
 
-/** The model each alias runs on, and each model's context window, as the CLI reported them. */
 export type CloudClaudeCodeModels = { resolved: Record<string, string>; windows: Record<string, number> };
 
 type Attempt = {
   identity: CloudCliTurnIdentity;
   turn: CloudClaudeCodeTurn;
   spec: ClaudeCodeTurnSpec;
-  /** It resumed a session another host synced. */
   adopted: boolean;
   appliedBatchSeq: number;
-  /** Tool calls by the CLI's tool_use id, with the arguments they came with. */
   calls: Map<string, { args: string; outcome: Promise<ClaudeCodeToolOutcome> }>;
   resolve(result: { text: string; sessionId: string }): void;
   reject(error: Error): void;
   finished: boolean;
 };
 
-/** A frame's answer: its HTTP status and JSON body. */
 export type FrameAnswer = { status: number; body: unknown };
 
 const BUSY_RETRY_MS = 2_000;
@@ -107,7 +81,6 @@ const STOP_REASONS: Record<CloudCliAssistantMessage["stopReason"], string> = {
   aborted: "end_turn",
 };
 
-/** One finished CLI message as the stream events the engine reads (`stream_event` lines). */
 const streamEventsOf = (message: CloudCliAssistantMessage): Record<string, unknown>[] => {
   const event = (inner: Record<string, unknown>) => ({ type: "stream_event", event: inner });
   const events: Record<string, unknown>[] = [
@@ -179,26 +152,19 @@ const toolContent = (outcome: ClaudeCodeToolOutcome): CloudOrchestratorToolConte
 const errorText = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
 export type CloudClaudeCodeTransport = ClaudeCodeTransport & {
-  /** `CLOUD_CLI_TURN_DO_PATHS.tool`. */
   tool(forward: CloudCliTurnToolForward): Promise<FrameAnswer>;
-  /** `CLOUD_CLI_TURN_DO_PATHS.events`. */
   events(forward: CloudCliTurnEventsForward): FrameAnswer;
-  /** `CLOUD_CLI_TURN_DO_PATHS.terminal`. */
   terminal(terminal: CloudCliTurnTerminal): FrameAnswer;
   resolvedModel(alias: string): string | undefined;
   contextWindow(model: string): number | undefined;
-  /** The user-safe reason the chat turn's last Claude Code turn failed, once. */
   takeFailure(turnId: string): string | undefined;
 };
 
 export const createCloudClaudeCodeTransport = (host: CloudClaudeCodeHost): CloudClaudeCodeTransport => {
   const attempts = new Map<string, Attempt>();
   const failures = new Map<string, string>();
-  /** A synced session to resume on the next dispatch, by conversation. */
   const adopting = new Map<string, CloudOrchestratorCliAdoptedSession>();
-  /** Conversations whose synced session the container could not resume: they start from the journal. */
   const adoptionFailed = new Set<string>();
-  /** A session written from the journal for the next dispatch of a CLI session, by its key. */
   const hydrated = new Map<string, string>();
   let models: CloudClaudeCodeModels = { resolved: {}, windows: {} };
   void host.models
@@ -277,8 +243,6 @@ export const createCloudClaudeCodeTransport = (host: CloudClaudeCodeHost): Cloud
       return await result;
     }
     const startFresh = !spec.resumeSessionId && !adoptSession && !hydrateSession;
-    // Only the user's own message runs as one of the CLI's commands; in a
-    // Slack conversation it comes from whoever wrote in the channel.
     const prompt = isSlackConversationId(turn.conversationId) && spec.prompt.startsWith("/") ? ` ${spec.prompt}` : spec.prompt;
     const started = performance.now();
     try {
@@ -291,7 +255,6 @@ export const createCloudClaudeCodeTransport = (host: CloudClaudeCodeHost): Cloud
             audience: turn.audience,
             budgetMicroCents: turn.budgetMicroCents,
             identity,
-            // A `/compact` runs on the outgoing model: the one the turn moves to may not hold the history.
             execution: spec.compact ? { ...turn.execution, model: spec.model } : turn.execution,
             prompt,
             spec: {
@@ -351,11 +314,6 @@ export const createCloudClaudeCodeTransport = (host: CloudClaudeCodeHost): Cloud
     return { sessionId: adoption.sessionId, restored: true };
   };
 
-  /**
-   * The CLI resumes a session written from the conversation's journal, as on
-   * a computer: the BuildSession puts it in the container in place of
-   * whatever session the thread had.
-   */
   const hydrate: NonNullable<ClaudeCodeTransport["hydrate"]> = async (session, transcript) => {
     if (session.role !== "orchestrator") {
       throw new Error("In the cloud, Claude Code runs only Stella's own turns; her agents run in containers of their own.");

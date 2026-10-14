@@ -22,9 +22,6 @@ const runDeferredStartupTask = async (context, task) => {
 };
 const scheduleOverlayWarmup = (context) => {
     const { state } = context;
-    // The overlay self-creates on demand via `ensureReady()`, so skipping the
-    // warm on a low-memory Windows device only trades first-summon latency for
-    // not carrying a second renderer the session may never use.
     if (isLowMemoryWindowsDevice()) {
         getMainLogger()?.process("startup.overlay-warmup.skipped-low-memory-windows", {
             totalMemoryMb: getTotalSystemMemoryMb(),
@@ -48,17 +45,8 @@ const scheduleOverlayWarmup = (context) => {
 };
 const createDeferredStartupTasks = (context) => {
     const { config, state } = context;
-    // Perf: the overlay's cold second-renderer is no longer eagerly built here.
-    // Every overlay show entrypoint (voice/region-capture/screen-guide/
-    // window-highlight) self-creates the window via
-    // `OverlayWindowController.ensureReady()`. Startup schedules a delayed warm
-    // so first use is usually ready without competing with first paint.
     return [
         {
-            // Spin up the runtime worker (and warm the model catalog) only after
-            // the renderer has painted, so the spawn + catalog fetch don't contend
-            // with first paint. `startHostRunner` is idempotent and the worker is
-            // spawned on demand if a chat beats this, so deferring is safe.
             label: "host-runner",
             run: () => {
                 getMainLogger()?.process("startup.host-runner.kickoff", {
@@ -68,9 +56,6 @@ const createDeferredStartupTasks = (context) => {
             },
         },
         {
-            // A previous Stella killed without quitting (a crash, a force
-            // quit) left its helpers running; stop them now rather than at the
-            // next quit. In the background: nothing here waits on it.
             label: "orphaned-helpers",
             afterAppPaint: true,
             run: () => {
@@ -86,8 +71,6 @@ const createDeferredStartupTasks = (context) => {
             },
         },
         {
-            // Drafts, undo and fork sync for the app's own checkout (from
-            // source only). Every git call is async.
             label: "app-source",
             afterAppPaint: true,
             run: () => {
@@ -102,8 +85,6 @@ const createDeferredStartupTasks = (context) => {
             },
         },
         {
-            // Bring the floating companion back if the user left it on. Runs
-            // after first paint so its renderer never contends with the shell's.
             label: "companion-restore",
             afterAppPaint: true,
             run: () => {

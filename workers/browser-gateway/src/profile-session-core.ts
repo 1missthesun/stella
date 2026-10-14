@@ -175,7 +175,6 @@ const boundedInteger = (
 const safeLocatorSelector = (value: unknown): string =>
   parseAgentSelector(value, { allowRef: true });
 
-/** Verification runs again in a fresh session, where a ref means nothing. */
 const safeVerificationSelector = (value: unknown): string =>
   parseAgentSelector(value, { allowRef: false });
 
@@ -1248,9 +1247,6 @@ export class BrowserProfileSessionCore {
       }
     }
 
-    // Receipts make a retried command idempotent. Large reads and anything
-    // that can carry cookies or page secrets are not kept: a replay runs again
-    // instead of leaving those bytes in plaintext SQLite.
     if (!UNRECEIPTED_ACTIONS.has(envelope.command.action)) {
       this.store.putReceipt({
         requestId: envelope.command.requestId,
@@ -1494,8 +1490,6 @@ export class BrowserProfileSessionCore {
       ),
       resumeUrl: String(interaction.verification?.resumeUrl ?? ""),
     };
-    // Consume the one-use key before external I/O. A failed import leaves the
-    // original remote handoff untouched and the client can mint a fresh key.
     interaction = {
       ...interaction,
       verification: {
@@ -1831,8 +1825,6 @@ export class BrowserProfileSessionCore {
         terminalState = "expired";
         receiptResult = "expired";
       } else {
-        // An invalid grant must never be treated as proof that this interaction
-        // owns a successful authorization.
         terminalState = "failed";
         receiptResult = "failed";
       }
@@ -1921,8 +1913,6 @@ export class BrowserProfileSessionCore {
 
     state = await this.checkpoint(state);
     state = await this.closeBrowser(state);
-    // Deliberately acquire a new Browser Run session and restore only the
-    // encrypted storage snapshot before automation regains control.
     state = await this.ensureBrowser(state);
     const verification = interaction.verification as TrustedVerification;
     this.validateObservation(
@@ -2012,8 +2002,6 @@ export class BrowserProfileSessionCore {
       allowedOrigins: [],
       updatedAt: this.now(),
     };
-    // Revoke the old epoch and every pending handoff synchronously before any
-    // browser or R2 I/O can yield.
     this.store.putState(updated);
     this.store.deleteReceipts();
     this.store.deleteInteractions();

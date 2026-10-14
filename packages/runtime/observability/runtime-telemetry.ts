@@ -36,11 +36,6 @@ const environmentFor = (value: RuntimeTelemetryConfig) =>
     value.isDev ?? process.env.STELLA_TELEMETRY_ENVIRONMENT !== "production",
   );
 
-/**
- * Stable, non-reversible lane for one authenticated principal. JWT refreshes
- * retain the same issuer/subject lane; opaque or malformed credentials are
- * isolated by a hash of the complete credential instead of sharing a spool.
- */
 export const resolveRuntimeTelemetryPrincipalScope = (
   authToken: string | null | undefined,
 ): string | null => {
@@ -113,11 +108,6 @@ const createClient = (next: RuntimeTelemetryBinding): RemoteTelemetryClient =>
     isEnabled: () => getTelemetryEnabled(next.root),
   });
 
-/**
- * Configure the worker-owned telemetry client from the authenticated host
- * session. The runtime process is the only network owner; renderer code never
- * imports this module.
- */
 export const configureRuntimeTelemetry = (
   next: RuntimeTelemetryConfig,
 ): void => {
@@ -132,8 +122,6 @@ export const configureRuntimeTelemetry = (
     binding.root === nextBinding.root &&
     binding.principalScope === nextBinding.principalScope
   ) {
-    // Same principal, refreshed credential/config. Mutating this private
-    // binding is safe because this client owns only that principal's spool.
     Object.assign(binding, nextBinding);
     return;
   }
@@ -142,8 +130,6 @@ export const configureRuntimeTelemetry = (
   binding = nextBinding;
   client = nextBinding ? createClient(nextBinding) : null;
 
-  // v1 had no principal binding and therefore cannot be attributed safely.
-  // Never migrate it into a scoped queue.
   void unlink(
     path.join(resolvedRoot, "telemetry", "runtime-worker-v1.jsonl"),
   ).catch(() => undefined);

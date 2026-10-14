@@ -1,12 +1,3 @@
-/**
- * "Two quick extras" — the housekeeping step, folded into one card.
- *
- *  - macOS only: the Accessibility and Screen Recording permissions Stella
- *    needs to act on the screen. Enabled inline; a screen grant needs a
- *    relaunch, which the card offers rather than nags about.
- *  - The optional Chrome extension, which brings the user's browser logins
- *    into Stella and lets it act inside their own tabs.
- */
 import { useCallback, useState } from "react";
 import { Button } from "@/ui/button";
 import { AppWindowMac, Check, Eye, Globe } from "@/ui/icons";

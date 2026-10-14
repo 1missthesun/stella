@@ -1,11 +1,3 @@
-/**
- * SQLite authority for one owner-fence Durable Object's bounded leases.
- *
- * The store is deliberately synchronous: callers can compose these operations
- * with KV fence metadata inside one `DurableObjectStorage.transaction()`.
- * Remote I/O must happen before or after that transaction, never inside it.
- */
-
 export const OWNER_FENCE_LEASE_SCHEMA_VERSION = 1;
 export const OWNER_FENCE_DEFAULT_MAX_LEASE_MS = 30 * 60_000;
 /**
@@ -15,7 +7,6 @@ export const OWNER_FENCE_DEFAULT_MAX_LEASE_MS = 30 * 60_000;
  * rejected, which is what lets a caller ask for the full maximum TTL.
  */
 export const OWNER_FENCE_CLOCK_SKEW_MS = 5 * 60_000;
-/** Retired leases are kept only long enough to answer a retried register. */
 export const OWNER_FENCE_RETIRED_RETENTION_MS = 2 * 60 * 60_000;
 export const OWNER_FENCE_RETIRED_PRUNE_LIMIT = 256;
 export const OWNER_FENCE_LEGACY_GRACE_MS = 60 * 60_000;
@@ -253,7 +244,6 @@ export class OwnerFenceStore {
     }
   }
 
-  /** Call from constructor initialization before any lease operation. */
   initialize(now = Date.now()): void {
     assertSafeTime(now, "now");
     for (const statement of DDL) this.sql.exec(statement);
@@ -584,11 +574,6 @@ export class OwnerFenceStore {
     };
   }
 
-  /**
-   * Delete retired leases that no retry can still refer to. Without this the
-   * table grows for the lifetime of the object: one production object held
-   * about 70,000 retired rows.
-   */
   pruneRetiredLeases(
     now = Date.now(),
     retainMs = OWNER_FENCE_RETIRED_RETENTION_MS,
@@ -615,10 +600,6 @@ export class OwnerFenceStore {
     );
   }
 
-  /**
-   * Clamp a caller-derived expiry into this object's own bounds, tolerating a
-   * caller clock that runs ahead by up to the configured skew.
-   */
   private boundedExpiry(
     expiresAt: number,
     now: number,

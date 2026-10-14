@@ -27,11 +27,6 @@ import { recordBootStep } from "../../observability/boot-timing.js";
 
 const logger = createRuntimeLogger("runtime-init");
 
-/**
- * Pipeable: report an initialization phase's duration to the worker boot
- * timeline (`worker.ready.timing`). A no-op outside a worker boot,
- * including extension hot reloads.
- */
 const timedBootStep =
   (name: string) =>
   <A, E>(effect: Effect.Effect<A, E>): Effect.Effect<A, E> =>
@@ -46,20 +41,9 @@ const timedBootStep =
       );
     });
 
-/**
- * Requirements-free runtime + scope for this module's timer fibers (watch
- * debounces, busy-retry, the compaction drain bound). House convention:
- * one module-level ManagedRuntime, work carries its context via closures.
- * The fibers are short-lived sleeps; `stopExtensionWatcher` interrupts any
- * pending one, so nothing outlives `stop()`.
- */
 const initRuntime = ManagedRuntime.make(Layer.empty);
 const initTimersScope = Scope.makeUnsafe();
 
-/**
- * Fork `fn` to run after `ms` on the shared timer scope. The returned
- * fiber's `interruptUnsafe` is the Effect replacement for `clearTimeout`.
- */
 const forkAfter = (ms: number, fn: () => void): Fiber.Fiber<void> =>
   initRuntime.runSync(
     Effect.forkIn(
@@ -76,12 +60,6 @@ type ExtensionReloadResult = {
 
 type LoadedExtensions = Awaited<ReturnType<typeof loadExtensions>>;
 
-/**
- * Narrow dependency seam for the runner's startup transaction. Production
- * uses the concrete extension/model runtimes and filesystem watchers below;
- * deterministic lifecycle tests replace only the operations that need a
- * settlement barrier.
- */
 export type RuntimeInitializationLifecycleOverrides = {
   loadExtensions?: (args: {
     signal: AbortSignal;
@@ -158,11 +136,6 @@ export const isExtensionWatchChangeRelevant = (
   return !basename.startsWith(".") && !basename.endsWith("~");
 };
 
-/**
- * Coalesce filesystem bursts into one reload. A busy runtime is retried, but
- * only the first busy result in a pending reload cycle is allowed to log;
- * silent retries keep the runtime log useful during long-running agents.
- */
 export const createExtensionReloadScheduler = (
   reload: (options: { logBusy: boolean }) => Promise<ExtensionReloadResult>,
   options: { debounceMs?: number; busyRetryMs?: number } = {},
@@ -196,8 +169,6 @@ export const createExtensionReloadScheduler = (
       failed = true;
       failure = error;
     } finally {
-      // A rejected reload must never leave the scheduler permanently busy.
-      // Future filesystem changes need to be able to start a fresh cycle.
       inFlight = false;
     }
     if (!pending) return;
@@ -207,10 +178,6 @@ export const createExtensionReloadScheduler = (
         error: failure instanceof Error ? failure.message : String(failure),
       });
       if (generation !== attemptedGeneration) {
-        // A real change arrived while the failed attempt was in flight. Its
-        // debounce timer may already have fired and observed `inFlight`, so
-        // explicitly preserve that newer generation without auto-retrying the
-        // failed one forever.
         queueAttempt(debounceMs);
       } else {
         pending = false;
@@ -301,9 +268,6 @@ export const createRuntimeInitialization = (
       providers: extensions.providers.length,
       prompts: extensions.prompts.length,
     });
-    // System prompts come from the backend worker (bundle as fallback).
-    // Bind the store now and start the first conditional fetch off the
-    // critical path; every orchestrator turn revalidates again.
     configureRemotePrompts({
       stellaDataDir: context.stellaDataDir,
       getBackendUrl: () => context.state.backendUrl ?? null,
@@ -311,11 +275,6 @@ export const createRuntimeInitialization = (
     scheduleRemotePromptRevalidation();
   };
 
-  /**
-   * Build the runtime services object once. Forwarded to every extension
-   * factory invocation (initial load + every F1 reload) so factories can
-   * close over the services they need at registration time.
-   */
   const extensionRuntimeApi = createExtensionRuntimeApi({
     stellaDataDir: context.stellaDataDir,
     stellaAppDir: context.stellaAppDir,
@@ -340,9 +299,6 @@ export const createRuntimeInitialization = (
       initializationGeneration === generation &&
       initializationScope === scope;
 
-    // Stella's lifecycle hooks (memory, scheduling, and others) live in the
-    // home-loaded stella-runtime extension and register through the same path
-    // as any other user extension. The engine has no bundled extension tier.
     const extensionsLoad = interruptAndJoinPromise((signal) =>
       lifecycle?.loadExtensions
         ? lifecycle.loadExtensions({
@@ -375,8 +331,6 @@ export const createRuntimeInitialization = (
       }),
       timedBootStep("runnerExtensions"),
     );
-    // models.json + the cached catalog (allowNetwork: false). The network
-    // refresh below is forked after initialization and never gates ready.
     const modelsLoad = interruptAndJoinPromise((signal) =>
       lifecycle?.initializeModels
         ? lifecycle.initializeModels({
@@ -449,10 +403,7 @@ export const createRuntimeInitialization = (
         throw Cause.squash(exit.cause);
       });
     context.state.initializationPromise = completion;
-    // Wake boot-window waiters parked on the readiness latch.
     context.state.initializationStarted.open();
-    // `start()` is intentionally void. Attach a rejection observer without
-    // replacing the shared promise that readiness callers await.
     void completion.catch((error) => {
       if (!isCurrentGeneration()) return;
       logger.warn("runtime-initialization.failed", {
@@ -463,18 +414,6 @@ export const createRuntimeInitialization = (
     return completion;
   };
 
-  /**
-   * F1 entry point. Idle-checks, sweeps user-extension hooks/tools, and
-   * re-runs the loader. Bundled hooks and built-in tools are untouched.
-   * Returns one of:
-   *   - "reloaded"        success
-   *   - "busy"            runtime is mid-run; caller may retry on idle
-   *   - "not-initialized" runtime hasn't finished startup yet
-   *   - "load-failed"     disk read failed; old extensions stay live and
-   *                       `reason` carries the underlying error message
-   *                       so callers (UI, IPC) can surface it instead of
-   *                       silently treating it as a successful reload.
-   */
   const reloadUserExtensions = async (
     options: { logBusy?: boolean } = {},
   ): Promise<ExtensionReloadResult> => {
@@ -499,13 +438,6 @@ export const createRuntimeInitialization = (
         buildExtensionServices(),
       );
     } catch (error) {
-      // Disk-read failure: leave the old extension state in place. The
-      // initial-load behavior of falling back to bundled agents only
-      // applies to startup; a partial reload that wipes the running
-      // registry would be worse than no reload. Surface the failure
-      // distinctly from "reloaded" so the watcher's busy-retry loop
-      // doesn't masquerade a persistent disk problem as success and so
-      // any future UI-driven reload affordance can show the error.
       const reason = error instanceof Error ? error.message : String(error);
       logger.warn("extensions.reload.load-failed", { error: reason });
       return { status: "load-failed", reason };
@@ -520,12 +452,6 @@ export const createRuntimeInitialization = (
     return { status: "reloaded" };
   };
 
-  /**
-   * F1 file watcher. Debounces filesystem events on the extensions
-   * directory and calls `reloadUserExtensions`. If the runtime is busy
-   * when a change lands, the watcher schedules a retry on a short timer
-   * so the reload eventually applies after the in-flight run completes.
-   */
   let resourceWatchers: FSWatcher[] = [];
   let modelConfigWatcher: FSWatcher | null = null;
   let modelConfigDebounce: Fiber.Fiber<void> | null = null;
@@ -541,15 +467,7 @@ export const createRuntimeInitialization = (
 
   const startExtensionWatcher = () => {
     if (resourceWatchers.length > 0) return;
-    // Watch both the extension code tree and the user-editable agent prompts
-    // under `~/.stella/agents/`. A change in either triggers the same reload,
-    // which re-registers agents with fresh prompt body AND frontmatter
-    // (tools / model / maxAgentDepth) — so prompt edits apply without a
-    // restart, mirroring pi's watch→reload model.
     const agentsPath = path.join(context.stellaDataDir, "agents");
-    // A brand-new/private harness data directory may not have user agents yet.
-    // Create the watched directory so startup is quiet and later agent-file
-    // creation is observed without requiring a runtime restart.
     try {
       mkdirSync(agentsPath, { recursive: true });
     } catch (error) {
@@ -708,19 +626,13 @@ export const createRuntimeInitialization = (
     stopExtensionWatcher();
     context.state.isRunning = false;
     context.state.isInitialized = false;
-    // Re-arm the boot latch so a restarted runner's waiters park again
-    // instead of observing the previous generation as already open.
     context.state.initializationStarted.reset();
     // This join is deliberately before the backend client, tool-host, and ultimately
     // session-storage teardown. Even a user extension factory that ignores its
     // abort signal must settle before its captured services can be closed.
     await stopInitialization();
     deps.disposeBackendClient();
-    // The cloud journal writer holds a retry timer and an in-memory queue,
-    // dropped here alongside the client it depends on.
     context.cloudTranscript.stop();
-    // Disarm before tool-host shutdown can terminate a watched shell: those
-    // exits are teardown noise and must not wake an agent.
     context.state.backgroundExitWake?.dispose();
     const tasksShutdown = Promise.resolve(deps.shutdownTasks()).catch(
       (error) => {

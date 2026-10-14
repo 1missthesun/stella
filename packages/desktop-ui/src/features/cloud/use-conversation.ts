@@ -1,19 +1,4 @@
 import { useChatStorageMode } from "@/features/chat/services/chat-storage-preference";
-/**
- * The one hook the cloud chat surface consumes.
- *
- * It binds three things that arrive on different clocks — the conversation id
- * (a backend view), the builder origin (another backend view), and the socket
- * (a long-lived connection) — into a single snapshot, and owns the outbound
- * side: sending a turn, cancelling one, and paging backwards.
- *
- * Turn *starts* deliberately do not go over the socket. On the desktop they
- * are an authenticated `POST /conversations/:id/turns` to the builder (the
- * conversation Durable Object owns admission: idempotency, owner adoption,
- * owner policy, journaling); in the web shell they go to the owner gate's placement
- * routes on the same builder, which decide between a paired computer and the
- * cloud. A socket verb would be a way around all of that.
- */
 
 import type { CloudTurnContext } from "@stella/contracts/turn-plane/turn-start";
 import {
@@ -78,9 +63,7 @@ import { getExecutionTargetSnapshot } from "../execution-placement/execution-tar
 import { waitForCloudAttachmentUploads } from "./browser-chat-attachments";
 
 export type CloudRealtimeConfig = {
-  /** Builder origin the socket connects to. Null disables realtime. */
   socketBaseUrl: string | null;
-  /** False while the query is still in flight. */
   resolved: boolean;
 };
 
@@ -94,10 +77,6 @@ const UNSUPPORTED_CONFIG: CloudRealtimeConfig = {
   resolved: true,
 };
 
-/**
- * The conversation socket lives on the backend worker, whose origin is
- * build-time config: there is nothing to look up.
- */
 export const useCloudRealtimeConfig = (): CloudRealtimeConfig => {
   const { isCloudConversationReady } = useCloudConversationSession();
   const config = useMemo(() => {
@@ -137,12 +116,10 @@ const noLocalExecution = (): null => null;
 export type CloudConversationView = {
   state: ConversationState;
   status: SocketStatus;
-  /** Optimistic prompts belonging to this conversation (or not yet placed). */
   pending: readonly PendingPrompt[];
   send: (prompt: string, context?: CloudTurnContext) => Promise<void>;
   retrySend: (clientMsgId: string) => Promise<void>;
   dismissSend: (clientMsgId: string) => void;
-  /** False when the stop could not be delivered — the caller must say so. */
   cancelTurn: (turnId: string) => Promise<boolean>;
   cancelPending: (clientMsgId: string) => Promise<boolean>;
   loadOlder: () => void;
@@ -174,15 +151,12 @@ type RenderedAcceptanceAuthorityMetadata = {
 
 declare global {
   interface Window {
-    /** Dev-only deterministic barrier for rendered stale-generation proof. */
     __STELLA_RENDERED_ACCEPTANCE_BEFORE_BROWSER_DISPATCH__?: (
       metadata: RenderedAcceptanceBrowserDispatchMetadata,
     ) => Promise<void>;
-    /** Dev-only hash receipt for the held browser mutation's exact outcome. */
     __STELLA_RENDERED_ACCEPTANCE_AFTER_BROWSER_DISPATCH__?: (
       metadata: RenderedAcceptanceBrowserDispatchOutcome,
     ) => void;
-    /** Dev-only hash receipt for exact renderer authority activation. */
     __STELLA_RENDERED_ACCEPTANCE_AUTHORITY__?: (
       metadata: RenderedAcceptanceAuthorityMetadata,
     ) => void;
@@ -227,8 +201,6 @@ const waitForRenderedAcceptanceBrowserDispatch = async (
 const serializedErrorPayload = (
   error: unknown,
 ): Record<string, unknown> | null => {
-  // The owner gate answers with a typed client error carrying the contract's
-  // code; a structured `data.code` and an embedded JSON body still parse.
   if (error instanceof PlacementClientError) return { code: error.code };
   const data = (error as { data?: unknown })?.data;
   if (data && typeof data === "object" && !Array.isArray(data)) {
@@ -293,7 +265,6 @@ const reportRenderedAcceptanceAuthority = (
 
 export const useConversation = (
   conversationId: string | null,
-  /** Applied to the prompt before it is sent (drive attachments, etc.). */
   decoratePrompt: (
     prompt: string,
     attachments: readonly CloudAttachment[],
@@ -310,8 +281,6 @@ export const useConversation = (
   const storageMode = useChatStorageMode();
   const isCloudConversationReady = authCloudReady && storageMode === "cloud";
   const webShell = isWebShell();
-  // The session's verified identity is the send authority: its generation
-  // fences every queued turn against an owner reset.
   const authority = useMemo<CloudConversationOutboxAuthority | null>(() => {
     if (!isCloudConversationReady || !ownerGeneration) return null;
     return { accountScope, ownerGeneration };
@@ -374,9 +343,6 @@ export const useConversation = (
     pendingPrompts.getServerSnapshot,
   );
 
-  // A dropped socket is normal on a laptop lid or a network change.
-  // The browser tells us when that changed; asking then is what makes the
-  // reconnect feel immediate without any polling.
   useEffect(() => {
     if (!store) return;
     const wake = () => store.wake();
@@ -416,17 +382,9 @@ export const useConversation = (
       if (!pendingPrompts.claimDispatch(sendAuthority, clientMsgId)) return;
       const isCurrentAuthority = () =>
         activeAuthorityKeyRef.current === sendAuthorityKey;
-      // Attached drive images ride as model-visible image blocks in addition
-      // to the path list in the prompt text. The submission was frozen before
-      // the first mutation so an idempotent retry cannot change its payload.
-      // The extension filter is only a hint — the server re-checks the stored
-      // content type before signing anything.
       try {
         if (!isCurrentAuthority()) return;
         if (!webShell) {
-          // The conversation id was minted on this client (at send time for
-          // a new conversation, or by New Chat) and frozen into the
-          // submission, so a retry replays into the same conversation.
           const targetConversationId = submission.requestedConversationId;
           if (!targetConversationId) {
             throw new Error("Open a cloud conversation before sending.");
@@ -444,17 +402,12 @@ export const useConversation = (
             getToken: (options) => getAuthToken(options ?? {}),
           });
           if (!isCurrentAuthority()) return;
-          // Route validation must accept the client-minted id before the
-          // backend has projected the conversation row.
           if (result.createdConversation) {
             markCloudConversationCreated(
               result.conversationId,
               entry.accountScope,
             );
           }
-          // A replayed admission is the same success: the first attempt
-          // landed and this is the receipt the dropped response never
-          // delivered.
           pendingPrompts.bind(
             sendAuthority,
             clientMsgId,
@@ -485,20 +438,12 @@ export const useConversation = (
           conversationId: requestedConversationId,
           submission,
         });
-        // Building the request is asynchronous. Re-fence immediately before
-        // the first external side effect so a same-account generation
-        // rotation cannot send a retired payload.
         if (!isCurrentAuthority()) return;
         const renderedAcceptanceBarrier =
           import.meta.env.DEV && typeof window !== "undefined"
             ? window.__STELLA_RENDERED_ACCEPTANCE_BEFORE_BROWSER_DISPATCH__
             : undefined;
         if (renderedAcceptanceBarrier) {
-          // The development harness deliberately holds the exact request after
-          // the normal client fence, then rotates the owner generation. There
-          // is intentionally no second client check after release: the proof
-          // is that the owner gate itself rejects the retired generation. This
-          // branch is absent from production and receives hashes only.
           await waitForRenderedAcceptanceBrowserDispatch(
             entry,
             renderedAcceptanceBarrier,
@@ -636,15 +581,8 @@ export const useConversation = (
     [config.socketBaseUrl, onSent, webShell],
   );
 
-  // A fresh renderer hydrates only the exact current lifecycle generation.
-  // Error-free rows are the two ambiguous windows: the process died before
-  // admission, or the server committed before its response reached us. The
-  // stable claim prevents StrictMode/multi-mount duplicate dispatchers.
   useEffect(() => {
     if (!authority || !pendingPrompts.isAuthorityReady(authority)) return;
-    // Every surface now posts straight to the builder; until its origin is
-    // known a hydrated row would fail for no reason. The effect re-runs when
-    // the realtime config resolves.
     if (!config.resolved) return;
     for (const entry of allPending) {
       if (
@@ -693,10 +631,6 @@ export const useConversation = (
       const selectedExecution =
         getCloudExecutionSelectionSnapshot() ?? cloudSelection ?? null;
       if (!authority) return;
-      // Desktop: a send with no conversation open starts one, and the id is
-      // ours to pick. Frozen into the submission so every retry addresses
-      // the same conversation. The web shell keeps placement's rule that a
-      // conversation must already be open.
       const requestedConversationId =
         conversationId ?? (webShell ? null : newCloudConversationId());
       const submission: PendingCloudTurnSubmission = {
@@ -744,8 +678,6 @@ export const useConversation = (
       if (!entry || !authority) return;
       const retry = pendingPrompts.prepareRetry(authority, clientMsgId);
       if (!retry) return;
-      // Same `clientMsgId`: if the first attempt actually landed, the server
-      // dedupes it instead of starting a second turn.
       await dispatch(retry);
     },
     [authority, dispatch, pending],
@@ -762,8 +694,6 @@ export const useConversation = (
       const entry = pendingPrompts.find(authority, clientMsgId);
       if (!entry) return false;
       if (!entry.dispatchId) {
-        // The submit mutation is still in flight. Its response handler observes
-        // this durable-in-renderer intent before it starts status polling.
         pendingPrompts.requestCancel(authority, clientMsgId);
         return true;
       }
@@ -839,16 +769,12 @@ export const useConversation = (
   };
 };
 
-/** The message the failing layer wrote, or a generic retry prompt. */
 const friendlySendError = (error: unknown): string => {
   if (error instanceof Error && error.message) return error.message;
   return "That didn't send. Try again.";
 };
 
-/** True only when the server may have committed before transport failed. */
 const isAmbiguousTransportFailure = (error: unknown): boolean => {
-  // The builder answered: nothing was committed, so the exact payload can be
-  // retried by hand but must not re-arm itself on the next launch.
   if (error instanceof CloudTurnStartClientError) return false;
   if (error instanceof CloudTurnStartTransportError) return true;
   if (error instanceof TypeError) return true;

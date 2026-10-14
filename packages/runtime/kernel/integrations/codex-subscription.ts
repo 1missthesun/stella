@@ -18,11 +18,6 @@ const normalizeCodexReasoningEffort = (
 ): CodexReasoningEffort | undefined =>
   value === "none" ? "none" : parseReasoningEffortLevel(value);
 
-/**
- * Resolve the ChatGPT subscription model settings a Codex selection captures
- * (an agent `spawn_agent` places in the cloud with `model: codex`). No Codex
- * executable is involved.
- */
 export const getCodexSubscriptionPreferences = (
   stellaDataDir?: string,
   stellaModel?: string,

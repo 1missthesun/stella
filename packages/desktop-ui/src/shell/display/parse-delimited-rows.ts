@@ -1,17 +1,9 @@
-/**
- * Bounded CSV/TSV parsing for the spreadsheet preview tab.
- *
- * The preview only ever renders the first screenfuls of a table, so both the
- * byte read and the row parse are capped: a several-hundred-MB export must not
- * be decoded and split into cells on the UI thread just to show its head.
- */
 export const DELIMITED_PREVIEW_MAX_COLUMNS = 100;
 export const DELIMITED_PREVIEW_MAX_ROWS = 1_000;
 export const DELIMITED_PREVIEW_MAX_BYTES = 2 * 1024 * 1024;
 
 export type DelimitedParseResult = {
   rows: string[][];
-  /** True when `maxRows` stopped the parse before the text ran out. */
   hitLimit: boolean;
   columnsTruncated?: boolean;
 };
@@ -85,7 +77,6 @@ export const parseDelimitedRows = (
   return { rows, hitLimit: false, columnsTruncated };
 };
 
-/** Drop the last row when a byte cap may have torn it mid-line. */
 export const rowsForDelimitedPreview = (
   parsed: DelimitedParseResult,
   truncated: boolean,

@@ -26,8 +26,6 @@ export const resolveVoiceErrorToast = (
 ): ToastOptions | null => {
   const message = (errorMessage ?? "").trim();
   if (!message) return null;
-  // Sign-in takes precedence: a 401 reads as "needs setup" too, but the
-  // actionable fix for an unauthenticated user is signing in, not Settings.
   if (VOICE_NEEDS_SIGN_IN.test(message)) {
     return {
       title: t("features.voice.signInTitle"),

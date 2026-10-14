@@ -1,10 +1,3 @@
-/**
- * What `OwnerGate` lends the owner-store domains: its snapshot, and direct
- * calls into the BuildSession and OrchestratorSession objects the domains
- * start, stop and annotate. These used to be control-plane callbacks over the
- * service secret; now they are object-to-object calls.
- */
-
 import { AGENT_STOP_WIRE_REASON } from "@stella/contracts/agent-status";
 import type { OwnerSnapshot } from "@stella/contracts/turn-plane/owner-snapshot";
 import { PLACEMENT_PROTOCOL, type DeviceDestination } from "@stella/contracts/turn-plane/placement";
@@ -38,7 +31,6 @@ import { DispatchError, type AgentTurnDispatch, type OwnerHost } from "./registr
 import { startScheduledTurn } from "./scheduled-turn.js";
 import { AGENT_REPORT_TARGET_PATH, parseAgentReportTarget } from "../agent-report-target.js";
 
-/** Idempotency keys of the dispatches the agent-thread ledger submits. */
 export const DEVICE_AGENT_DISPATCH_PREFIX = "agent-thread:";
 
 export const deviceAgentDispatchKey = (turnId: string, requeue = 0): string =>
@@ -67,33 +59,21 @@ export type GateHostDependencies = {
   snapshot: () => Promise<OwnerSnapshot>;
   admit: (input: OwnerGateAdmitInput) => Promise<OwnerGateAdmission>;
   release: (input: { turnId: string }) => Promise<void>;
-  /** The gate's own desktop dispatch. */
   submit: (input: OwnerGateSubmitInput) => Promise<OwnerGateDispatchResult>;
-  /** The gate's steer of a running device agent. */
   steerDispatch: OwnerHost["steerDeviceAgentTurn"];
-  /** The gate's message to an agent a device runs locally. */
   messageLocalAgent: OwnerHost["messageLocalAgent"];
-  /** The gate's stop of an agent a device runs locally. */
   stopLocalAgent: OwnerHost["stopLocalAgent"];
   askDeviceConsent: OwnerHost["askDeviceConsent"];
-  /** The gate's own cloud-to-computer request relay. */
   relayDeviceRequest: OwnerHost["relayDeviceRequest"];
-  /** The gate's own dispatch cancellation. */
   cancelDispatch: (input: OwnerGateCancelInput) => Promise<OwnerGateStatusResult>;
-  /** The gate's devices, with live presence. */
   devices: () => Promise<{ devices: DeviceDestination[] }>;
-  /** Invalidate the gate's cached home context. */
   homeChanged: (ownerGeneration: string, revision: number) => Promise<void>;
-  /** The gate's memory policy change, refusals as `RpcError`. */
   changeMemoryPolicy: OwnerHost["changeMemoryPolicy"];
-  /** The gate's own `applyOwnerEvents`, called in-process. */
   applyOwnerEvents: (events: OwnerEvent[]) => Promise<void>;
-  /** One reset or deletion pass across every store. */
   purgeOwner: OwnerHost["purgeOwner"];
   log: (level: "info" | "error", event: string, fields: Record<string, unknown>) => void;
 };
 
-/** A service-authenticated turn start on a conversation's orchestrator. */
 const startOrchestratorTurn = async (
   deps: GateHostDependencies,
   target: { conversationId: string; ownerGeneration: string },
@@ -126,11 +106,9 @@ export const createGateHost = (deps: GateHostDependencies): OwnerHost => ({
     const result = await deps.submit({
       request: {
         protocol: PLACEMENT_PROTOCOL,
-        // One dispatch per recorded attempt, so a retried job replays it.
         idempotencyKey: deviceAgentDispatchKey(input.turnId, input.requeue ?? 0),
         kind: "agent",
         ingress: input.requestingDeviceId ? "desktop" : "cloud",
-        // The requester named this device; never hand the work to the cloud.
         subject: "computer",
         targetMode: "device",
         targetDeviceId: input.targetDeviceId,
@@ -147,8 +125,6 @@ export const createGateHost = (deps: GateHostDependencies): OwnerHost => ({
           threadId: input.threadId,
           ...(input.model ? { model: input.model } : {}),
           lineage: input.lineage,
-          // Same key and shape the chat placement uses, so the device's
-          // `placementAttachmentPaths` reads both dispatch kinds identically.
           ...(input.attachments?.length
             ? { attachments: [...input.attachments] }
             : {}),
@@ -322,7 +298,6 @@ export const createGateHost = (deps: GateHostDependencies): OwnerHost => ({
           ...(input.lineage.startedBy
             ? { parentThreadId: input.lineage.startedBy.threadId, parentLabel: input.lineage.startedBy.label }
             : {}),
-          // The caller's depth: one above the thread's.
           agentDepth: input.lineage.depth - 1,
         },
         attempt: {
@@ -384,8 +359,6 @@ export const createGateHost = (deps: GateHostDependencies): OwnerHost => ({
       }
       return response.ok;
     } catch (error) {
-      // A card is a receipt for work that already happened; losing one must
-      // never fail anything else.
       deps.log("error", "conversation_card_failed", {
         conversationId: input.conversationId,
         message: error instanceof Error ? error.message : String(error),

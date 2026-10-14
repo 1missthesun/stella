@@ -201,7 +201,6 @@ export const decodeCloudMemoryWipeStatus = (
     return invalidResponse();
   }
   if (value.subject !== subject) return invalidResponse();
-  // "" until the owner's first cloud-home write.
   const ownerGeneration =
     value.ownerGeneration === "" ? "" : normalizedToken(value.ownerGeneration);
   const memoryEpoch = normalizedToken(value.memoryEpoch);
@@ -334,8 +333,6 @@ export const normalizeCloudMemoryWipeError = (
   error: unknown,
 ): CloudMemoryWipeError => {
   if (error instanceof CloudMemoryWipeError) return error;
-  // Anything that is not a backend refusal is a transport failure, and the
-  // exact attempt (same request id) is safe to replay.
   if (!(error instanceof BackendRequestError)) {
     return new CloudMemoryWipeError("unavailable", true);
   }
@@ -354,7 +351,6 @@ export const normalizeCloudMemoryWipeError = (
   if (error.code === "UNAUTHENTICATED" || error.code === "FORBIDDEN") {
     return new CloudMemoryWipeError("unauthorized");
   }
-  // Includes MEMORY_POLICY_CHANGING: retrying the same request id settles it.
   return new CloudMemoryWipeError("unavailable", true);
 };
 

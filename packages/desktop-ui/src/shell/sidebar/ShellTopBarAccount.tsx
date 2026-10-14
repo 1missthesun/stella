@@ -106,9 +106,7 @@ export const ShellTopBarAccount = ({ onSignIn }: ShellTopBarAccountProps) => {
       window.removeEventListener(SUBSCRIPTION_UPGRADED_EVENT, handler);
   }, []);
 
-  // A self-hosted server has no plans: no plan label, no Plan & usage.
   const selfHosted = useSelfHostedServer();
-  // A live view of the owner's billing ledger; upgrades land on their own.
   void billingRefreshKey;
   const billingStatus: BillingStatusLite | undefined = useBackendValue(
     "billing.status",
@@ -118,9 +116,6 @@ export const ShellTopBarAccount = ({ onSignIn }: ShellTopBarAccountProps) => {
   const pendingSignOutRef = useRef(false);
   const [signOutConfirmOpen, setSignOutConfirmOpen] = useState(false);
 
-  // Settings destinations are folded into this menu while signed in, so its
-  // close handler has to service both handoffs: a queued Theme/Connectors
-  // popover and the sign-out confirmation.
   const {
     destinations: settingsDestinations,
     connectHint,

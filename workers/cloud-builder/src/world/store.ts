@@ -161,7 +161,6 @@ const rowEntry = (row: EntryRow): WorldEntry => ({
   ...(row.target !== null ? { target: row.target } : {}),
 });
 
-/** Refuse a write into the drive's subtree, which the world never stores. */
 const assertStoredPath = (path: string): void => {
   if (isWorldDrivePath(path)) {
     throw new Error(
@@ -170,7 +169,6 @@ const assertStoredPath = (path: string): void => {
   }
 };
 
-/** Bytes a listing charges against the world quota; the drive is not one. */
 const storedBytes = (
   entries: Iterable<Pick<WorldEntry, "kind" | "path" | "size">>,
 ): number => {
@@ -183,10 +181,6 @@ const storedBytes = (
   return total;
 };
 
-/**
- * Whether two entries hold the same thing. A directory's mtime moves with
- * every child and a file's with every save, so neither alone is a change.
- */
 const sameWorldContent = (
   existing: WorldEntry,
   incoming: WorldListingEntry,
@@ -411,10 +405,6 @@ export class WorldSqlStore implements WorldToolFileApi {
     this.pendingChanges.paths.set(path, kind);
   }
 
-  /**
-   * One live-manifest operation owns one revision. Later operations win for
-   * the same path; there are deliberately no file locks or merge checks.
-   */
   private async mutate<T>(
     fork: string | undefined,
     operation: () => Promise<T> | T,
@@ -1238,9 +1228,6 @@ export class WorldSqlStore implements WorldToolFileApi {
       )
       .toArray()[0];
     if (existing) {
-      // The id names exactly these contents, so the live entries become the
-      // sealed copy's: a memory wipe may have purged paths from it
-      // (`purgeHistory`), and the live manifest is rebuilt from it below.
       this.sql.exec(
         "DELETE FROM world_dirents WHERE manifest_id = ?",
         manifestId,
@@ -1301,12 +1288,6 @@ export class WorldSqlStore implements WorldToolFileApi {
     return { manifestId, forkId };
   }
 
-  /**
-   * Drop `inputs` and everything under them from every checkpoint, leaving
-   * the live manifest alone (`remove` handles it), so no earlier checkpoint
-   * keeps erased content reachable. The blobs only they held go with the
-   * next garbage collection. Returns the checkpoint entries dropped.
-   */
   purgeHistory(inputs: readonly string[]): number {
     const live = this.liveManifest();
     let dropped = 0;
@@ -1385,21 +1366,6 @@ export class WorldSqlStore implements WorldToolFileApi {
     };
   }
 
-  /**
-   * Apply one container's own changes: what it created, changed or deleted on
-   * its disk since it last agreed with the world. Every agent has its own
-   * container and they all push into this one world, so a push names only
-   * the paths its container changed and touches nothing else. An entry the
-   * world already holds with the same content is skipped, and a deletion
-   * never removes what the container did not know about: a directory that
-   * still has children after the push's own deletions stays. Per path, the
-   * later push wins.
-   *
-   * `previousRevision` is the world's revision just before this push. When it
-   * is the revision the container last pulled, nothing else landed in
-   * between and the container may move its marker to `revision`; otherwise
-   * its next pull still owes it the revisions in between.
-   */
   async pushChanges(input: {
     entries: WorldListingEntry[];
     deleted: string[];
@@ -1415,7 +1381,6 @@ export class WorldSqlStore implements WorldToolFileApi {
     const missing = new Set<string>();
     for (const entry of input.entries) {
       const path = normalizeWorldPath(entry.path);
-      // A sandbox's working copy of the drive is not part of the world.
       if (isWorldDrivePath(path)) continue;
       if (
         !Number.isSafeInteger(entry.mode) ||
@@ -1603,13 +1568,6 @@ export class WorldSqlStore implements WorldToolFileApi {
     };
   }
 
-  /**
-   * Apply a code cell's `fs` change set, but only if nothing it read or
-   * wrote changed after `baseRevision`. The check and the apply happen in one
-   * call, so under the Durable Object's single-writer rule no other mutation
-   * lands between them. A refused commit changes nothing, and the caller may
-   * run the command again against the newer world.
-   */
   async commitShell(input: {
     baseRevision: number;
     reads: { paths: readonly string[]; children: readonly string[] };
@@ -1722,9 +1680,6 @@ export class WorldSqlStore implements WorldToolFileApi {
       // Only a world that stored the drive before it moved out can name it
       // here, and a sandbox's working copy is not the world's to change.
       if (isWorldDrivePath(row.path)) continue;
-      // Every path is reported as it is now, whichever way this revision
-      // touched it: a deletion a later push undid must not delete the path
-      // again from a container that pulls this revision late.
       const entry = this.entryRow(row.path, this.liveManifest(forkId));
       if (entry) entries.push(rowEntry(entry));
       else deleted.push(row.path);

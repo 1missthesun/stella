@@ -111,23 +111,16 @@ type ArtifactViewerProps = {
   access: StoredPhoneAccess | null;
   visible: boolean;
   onClose: () => void;
-  /** Height of the composer the sheet must end above, when there is one. */
   bottomReserve?: number;
 } & ArtifactSwipeProps &
   ArtifactDeviceProps;
 
 type ArtifactDeviceProps = {
-  /** The computer an artifact's file is known to be on, when the opener knows. */
   deviceIdOf?: (artifact: ChatArtifact) => string | null;
 };
 
 type ArtifactSwipeProps = {
-  /**
-   * The list the artifact was opened from, in display order. An image can be
-   * swiped to the images before and after it in this list.
-   */
   siblings?: readonly ChatArtifact[];
-  /** Show another artifact in place of the current one. */
   onNavigate?: (artifact: ChatArtifact) => void;
 };
 
@@ -141,7 +134,6 @@ type ArtifactViewerContentProps = {
 const isImageArtifact = (artifact: ChatArtifact): boolean =>
   artifact.payload.kind === "media" && artifact.payload.asset.kind === "image";
 
-/** The images on either side of `artifact` in `siblings`. */
 const imageNeighbours = (
   artifact: ChatArtifact | null,
   siblings: readonly ChatArtifact[] | undefined,
@@ -161,18 +153,12 @@ const imageNeighbours = (
 type LoadedArtifact =
   | { kind: "html"; html: string }
   | { kind: "canvas-html"; html: string }
-  /**
-   * A print-style HTML *document* (canvas HTML, office preview). Rendered on
-   * a paper-white surface regardless of app theme; see html-document-preview.
-   */
   | { kind: "html-document"; html: string }
   | { kind: "url"; uri: string }
   | { kind: "markdown"; text: string }
   | { kind: "text"; text: string }
   | { kind: "image"; uri: string }
-  /** A `file://` PDF handed to the platform's own full-page PDF renderer. */
   | { kind: "pdf"; uri: string }
-  /** A `file://` clip played by the native transport in `AudioPlayerView`. */
   | { kind: "audio"; uri: string }
   | { kind: "video"; uri: string; posterUri: string | null }
   | {
@@ -183,7 +169,6 @@ type LoadedArtifact =
     };
 
 const CANVAS_ASSET_MAX_BYTES = 16 * 1024 * 1024;
-/** All of a markdown preview's inlined images together, before base64. */
 const MARKDOWN_IMAGES_MAX_BYTES = 32 * 1024 * 1024;
 const VIEWER_MEDIA_MAX_BYTES = 2 * 1024 * 1024 * 1024;
 
@@ -428,7 +413,6 @@ const viewerCacheKey = (
   else if (payload.kind === "office") target = `office:${payload.previewRef.sessionId}`;
   else if (payload.kind === "pdf" && payload.localUri) target = payload.localUri;
   else if (payload.kind === "media" && payload.asset.kind === "text") return null;
-  // A diff that carries its patch is already in memory; nothing to cache.
   else if (payload.kind === "source-diff" && payload.patch) return null;
   else target = artifactPrimaryFilePath(payload);
   if (!target) return null;
@@ -463,12 +447,6 @@ const loadedStillThere = (loaded: LoadedArtifact): boolean => {
   }
 };
 
-/**
- * Whether a reread shows the same thing as the cached load, so the viewer
- * keeps what is on screen instead of re-rendering it. Text and documents
- * compare by content; files and links by their revision (a URI, or the size
- * and modification time of a file the viewer wrote).
- */
 const sameLoad = (
   cached: { value: LoadedArtifact; revision: string | null },
   next: LoadedArtifact,
@@ -492,11 +470,6 @@ const fileSize = (uri: string): number => {
 const loadedTextChars = (loaded: LoadedArtifact): number =>
   "html" in loaded ? loaded.html.length : "text" in loaded ? loaded.text.length : 0;
 
-/**
- * The artifact display itself: the rendered preview over a footer with the
- * file's name and its copy, share and link actions. Pulling the footer up
- * closes the sheet. `ArtifactViewer` hosts it in the top sheet.
- */
 export function ArtifactViewerContent({
   artifact: openedArtifact,
   access,
@@ -609,8 +582,6 @@ export function ArtifactViewerContent({
   const swipeable =
     Boolean(onNavigate) && Boolean(neighbours.previous || neighbours.next);
 
-  // A paired-computer video shows its poster while it loads: the chat row
-  // usually made one already, and the request for it is shared.
   const isVideo =
     artifact.payload.kind === "media" && artifact.payload.asset.kind === "video";
   const [pendingPoster, setPendingPoster] = useState<string | null>(null);
@@ -868,19 +839,12 @@ export function ArtifactViewerContent({
     }
   }, [artifact.payload.kind, canvas, canvasShare, copy, fileActions, loaded, shareFile]);
 
-  // A cached load paints at once, but the file may have changed since (an
-  // agent rewrites the same path), so the viewer always rereads it and swaps
-  // the new content in only when it differs.
   useEffect(() => {
     const settled = resultRef.current;
     if (settled?.loaded && cacheKey !== null && settled.key === cacheKey) return;
     let cancelled = false;
     const controller = new AbortController();
-    // PDFs and audio are handed to native renderers as real files. The viewer
-    // cache takes them over when it keeps the load; otherwise they live only
-    // as long as this artifact is on screen.
     let materialized: ArtifactMediaFile | null = null;
-    // The modification time of the computer file this load read, when known.
     let sourceModifiedAt: number | null = null;
 
     const materialize = (
@@ -902,8 +866,6 @@ export function ArtifactViewerContent({
       if (payload.kind === "media" && payload.asset.kind === "text") {
         return { kind: "text" as const, text: payload.asset.text };
       }
-      // On-device PDF (cloud chat's `pdf` tool) — the file is already on disk,
-      // so hand its URI straight to the viewer; the computer is not involved.
       if (payload.kind === "pdf" && payload.localUri) {
         return { kind: "pdf" as const, uri: payload.localUri };
       }
@@ -913,8 +875,6 @@ export function ArtifactViewerContent({
           return { kind: "image" as const, uri: filePath };
         }
       }
-      // A cloud canvas (`html` in a cloud turn) lives in the owner's drive:
-      // resolve its signed URL and render the document; no desktop needed.
       if (payload.kind === "canvas-html" && payload.driveBacked) {
         const uri = await resolveCloudDriveFileUri(payload.filePath);
         const response = await fetch(uri, { signal: controller.signal });
@@ -924,9 +884,6 @@ export function ArtifactViewerContent({
           html: prepareDocumentHtml(await response.text()),
         };
       }
-      // Any other file the cloud journal reported lives in the owner's drive
-      // too: resolve its signed URL and render it here, never over the
-      // paired computer (desktop opens the same signed URL).
       if ("driveBacked" in payload && payload.driveBacked === true) {
         const drivePath = artifactPrimaryFilePath(payload);
         if (!drivePath) {
@@ -950,7 +907,6 @@ export function ArtifactViewerContent({
               html: delimitedToHtml(colors, await fetchText(), delimiter),
             };
           }
-          // Office documents render in the platform web view from the URL.
           return { kind: "url" as const, uri };
         }
         if (payload.kind === "media") {
@@ -1059,8 +1015,6 @@ export function ArtifactViewerContent({
       }
 
       if (payload.kind === "media" && payload.asset.kind === "video") {
-        // The chat row's preview already pulled this clip onto the phone and
-        // made its poster; play that copy rather than reading it again.
         const preview = await requestEvidencePreview({
           filePath,
           kind: "video",
@@ -1233,7 +1187,6 @@ export function ArtifactViewerContent({
           ? `file:${fileBytes}:${sourceModifiedAt ?? ""}`
           : uri;
         if (cachedEntry && sameLoad(cachedEntry, next, revision)) {
-          // Unchanged: keep the cached load (and its file) on screen.
           materialized?.remove();
           materialized = null;
           setResult({ artifact, key: cacheKey, loaded: cachedEntry.value, error: null });
@@ -1253,7 +1206,6 @@ export function ArtifactViewerContent({
       })
       .catch((caught: unknown) => {
         if (cancelled) return;
-        // A failed reread (computer offline, say) keeps the cached load.
         if (cachedEntry) return;
         setResult({
           artifact,
@@ -1335,10 +1287,6 @@ export function ArtifactViewerContent({
               onOpen={openFolderEntry}
             />
           ) : loaded?.kind === "pdf" ? (
-            // Loading the file at the top level (rather than in an iframe)
-            // hands it to the platform's own PDF renderer, which fits the page
-            // to the width, scrolls through pages, and pinch-zooms — the same
-            // full-bleed treatment HTML documents get.
             <WebView
               originWhitelist={["*"]}
               source={{ uri: loaded.uri }}
@@ -1399,11 +1347,6 @@ export function ArtifactViewerContent({
   );
 }
 
-/**
- * The artifact viewer opened from chat cards, links and Files: the top sheet
- * that slides down from the top of the screen, with no dimming behind it.
- * The last artifact stays on screen while the sheet slides away.
- */
 export function ArtifactViewer({
   artifact,
   access,

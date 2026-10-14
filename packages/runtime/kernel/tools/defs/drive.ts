@@ -1,21 +1,3 @@
-/**
- * `drive` on a device: the owner's Stella Drive, read through the same
- * authenticated backend client this device already uses, and materialized into
- * the conversation's attachment cache so the agent's next step is `Read` on a
- * real local path.
- *
- * Owner scoping is not enforced here and must not be. The tool sends a
- * drive-relative path and nothing else — never an owner id, never an R2 key,
- * never a URL it constructed. The owner is derived from the bearer token
- * inside the owner object, every object key is namespaced under a hash of that
- * owner, and `normalizeDrivePath` runs there. So a device that asked for
- * something it should not see gets the same refusal as anyone else, and this
- * file holds no authority it could leak.
- *
- * The signed GET never reaches the model. It is fetched here and dropped; only
- * the local path is returned, which also keeps it out of transcripts and logs.
- */
-
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
@@ -35,11 +17,6 @@ export type DriveToolOptions = {
   getCloudBackendAuth?: () => { baseUrl: string; authToken: string } | null;
 };
 
-/**
- * What a device will pull out of the drive in one call. Generous next to the
- * cloud's per-session hydration budget, because a device has the real
- * filesystem; the refusal names this number rather than implying a shared one.
- */
 const MAX_FETCH_BYTES = 50 * 1024 * 1024;
 const DEFAULT_LIST_LIMIT = 50;
 const MAX_LIST_LIMIT = 200;
@@ -132,9 +109,6 @@ export const createDriveTool = (
           "drive fetch cannot store the file: this session has no data directory.",
         );
       }
-      // Resolved by the owner object, which is where the owner is known and
-      // where the path is validated. A path outside the owner's drive fails
-      // there, not here.
       const file = await client.call("drive.fileUrl", { path: drivePath });
       if (file.sizeBytes > MAX_FETCH_BYTES) {
         return failure(
@@ -171,9 +145,6 @@ export const createDriveTool = (
         },
       };
     } catch (error) {
-      // Never surface a signed URL, and never guess at the reason: the owner
-      // object's own message says whether the path was invalid, missing, or
-      // refused.
       return failure(
         `The user's drive refused that request: ${
           error instanceof Error ? error.message : String(error)

@@ -6,23 +6,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { DepTools } from "./tools.js";
 
-/**
- * Pre-bundles the renderer's npm dependencies into ESM chunks the source
- * server hands out at `/@deps/<entry>.js`. One entry per resolved dependency
- * file (two packages can depend on different copies of the same name), all
- * built together so shared code like React is one instance.
- *
- * An ESM entry keeps its own exports. A CommonJS entry gets a facade that
- * names its exports (found statically, the way Node finds them), so source
- * modules can `import { useState } from "react"`.
- *
- * The bundle is cached on disk, keyed by the lockfile and the entry set, and
- * only rebuilt when either changes.
- */
-
 export type DepBundle = {
   dir: string;
-  /** Resolved dependency file → entry file name inside `dir`. */
   entries: Map<string, string>;
 };
 
@@ -49,7 +34,6 @@ const hasModuleSyntax = (tools: DepTools, file: string): boolean => {
   }
 };
 
-/** The names a CommonJS file exports, following `module.exports = require(...)`. */
 const commonJsExportNames = (
   tools: DepTools,
   file: string,
@@ -102,7 +86,6 @@ export const fileDigest = (file: string): string => {
   }
 };
 
-/** Builds in flight by key: sources on several partitions share the cache. */
 const building = new Map<string, Promise<DepBundle>>();
 
 export const bundleDependencies = (options: {
@@ -112,7 +95,6 @@ export const bundleDependencies = (options: {
   lockfile: string;
   mode: string;
   log: (message: string) => void;
-  /** Build in a short-lived process instead of this one (see `buildDependenciesApart`). */
   apart?: boolean;
 }): Promise<DepBundle> => {
   const files = [...new Set(options.files)].sort();
@@ -172,10 +154,6 @@ const spawnBuilder = (): ChildProcessWithoutNullStreams =>
 
 let spare: ChildProcessWithoutNullStreams | null = null;
 
-/**
- * Start a builder before its request is known, when a rebuild is likely,
- * so the build doesn't wait for a process to start and load rolldown.
- */
 export const prewarmDependencyBuilder = () => {
   if (spare) return;
   try {
@@ -190,7 +168,6 @@ export const prewarmDependencyBuilder = () => {
   }
 };
 
-/** A prewarmed builder that turned out not to be needed. */
 export const releaseDependencyBuilder = () => {
   spare?.kill();
   spare = null;

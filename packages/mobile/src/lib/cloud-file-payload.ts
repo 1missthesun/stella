@@ -1,9 +1,3 @@
-/**
- * A file the cloud journal reports (`files` card) as an openable artifact
- * payload. Every one of these lives in the owner's cloud drive, so each is
- * marked `driveBacked`: the artifact viewer resolves it through a signed
- * drive URL and never through the desktop bridge.
- */
 import type { ChatArtifact, MobileDisplayPayload } from "../types";
 import type { JournalFile } from "@stella/contracts/conversation-protocol";
 import { artifactId } from "./mobile-artifacts";
@@ -21,7 +15,6 @@ export const cloudFilePayload = (
     return { kind: "pdf", filePath: path, title: file.name, driveBacked: true };
   }
   if (extension === "html" || extension === "htm") {
-    // A cloud `html` canvas: the orchestrator wrote it into the drive.
     const slug = file.name.replace(/\.html?$/i, "");
     return {
       kind: "canvas-html",
@@ -71,11 +64,6 @@ export const cloudFilePayload = (
   };
 };
 
-/**
- * The openable artifact for one journal file. Ids are the path-keyed
- * `artifactId`, so the same file dedupes between a completion card's
- * section, the row's loose artifacts, and the activity hub's file list.
- */
 export const cloudFileArtifact = (
   file: JournalFile,
   conversationId: string,

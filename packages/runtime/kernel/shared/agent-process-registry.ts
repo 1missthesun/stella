@@ -10,17 +10,6 @@ import {
 import path from "node:path";
 import { terminateProcessTree } from "./process-tree.js";
 
-/**
- * Agent CLIs (Claude Code) run as children of the runtime worker. When the
- * worker dies they must die too: an orphaned CLI keeps working, editing
- * files, with nobody reading its output. Two lanes guarantee it.
- *
- * - The worker kills every tracked CLI's process group as it exits.
- * - Each live CLI is recorded on disk with its start-time identity, so a
- *   worker that died without running exit handlers (SIGKILL, OOM, a native
- *   crash) has its leftovers reaped by the next worker before it serves.
- */
-
 export type AgentProcessRecord = {
   pid: number;
   label: string;
@@ -28,7 +17,6 @@ export type AgentProcessRecord = {
   startedAt: number;
   /** Kernel start time (Linux) or `ps lstart` (macOS); guards pid reuse. */
   identity: string | null;
-  /** The CLI leads its own process group, so its tools die with it. */
   processGroup: boolean;
 };
 
@@ -79,7 +67,6 @@ const persist = () => {
   }
 };
 
-/** Where this worker records its agent CLIs. Call once, after reaping. */
 export const configureAgentProcessRegistry = (file: string): void => {
   registryFile = file;
   persist();
@@ -109,7 +96,6 @@ export const trackAgentProcess = (
   });
 };
 
-/** The tracked CLIs, for crash and warning context. */
 export const describeAgentProcesses = (): Array<{
   pid: number;
   label: string;

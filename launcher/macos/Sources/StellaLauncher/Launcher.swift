@@ -3,25 +3,16 @@ import Foundation
 
 struct Options {
     var selfTest = false
-    /// `--start`: start Stella right away, window hidden (a launcher taking
-    /// over after an update). Slow steps still bring the window up.
     var startNow = false
     var showWindow = false
-    /// The update hold the previous launcher was showing, to keep on screen.
     var holdWindow: URL?
-    /// A local path or git URL to clone instead of the upstream bootstrap.
     var source: String?
     var sourceRef: String?
-    /// `--backend` or `STELLA_LAUNCHER_BACKEND_URL`: wins over `server.json`.
     var backend: String? = ProcessInfo.processInfo.environment["STELLA_LAUNCHER_BACKEND_URL"]
         .flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
-    /// Self-test: stay up this long after `ready` before asking Electron to quit.
     var hold: TimeInterval = 0
-    /// Self-test: the recovery button to click on the first failure.
     var recoveryChoice: RecoveryChoice?
-    /// Save PNGs of the launcher's own windows here.
     var captureDir: URL?
-    /// Adopt this Bun binary instead of downloading (offline testing).
     var localBun: String?
     var readyTimeout: TimeInterval = Options.seconds("STELLA_LAUNCHER_READY_TIMEOUT_SECONDS", 90)
     var stableSeconds: TimeInterval = Options.seconds("STELLA_LAUNCHER_STABLE_SECONDS", 60)
@@ -41,21 +32,15 @@ enum RecoveryChoice: String {
     case quit
 }
 
-/// Waits for Start, then install → verify → prepare → spawn → supervise,
-/// looping on relaunch requests, crashes and recovery choices.
 final class Launcher {
     static let relaunchExitCode: Int32 = 75
     static let knownGoodRef = "refs/stella/known-good"
 
     private let options: Options
     private var paths: LauncherPaths
-    /// The launcher's window: Start, progress, running, failure, Settings.
     let ui: LauncherWindow
     private let commands = EventQueue<LauncherCommand>()
-    /// An update that restarts Stella: the frosted frame held between processes.
     private let hold = HoldWindow()
-    /// The launcher's own updates, and the `hold` message that restarted
-    /// Stella, which a newer launcher taking over keeps showing.
     private let updater: LauncherUpdater
     private var lastHold: [String: Any]?
     private var state: LauncherState
@@ -76,12 +61,9 @@ final class Launcher {
         updater = LauncherUpdater(paths: paths, selfTest: options.selfTest)
     }
 
-    // MARK: Main loop
-
     func run() -> Int32 {
         log("launcher: start root=\(paths.root.path) server=\(paths.server?.origin ?? "default") version=\(LauncherUpdater.ownVersion) selfTest=\(options.selfTest) start=\(options.startNow) pid=\(getpid())")
         if let file = options.holdWindow {
-            // The previous launcher's update hold, until this one's Electron is ready.
             if let data = try? Data(contentsOf: file),
                let message = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
                let held = UpdateHold(message) {
@@ -99,12 +81,10 @@ final class Launcher {
             $0.hasKnownGood = facts.hasKnownGood
         }
         if options.startNow { commands.post(.start) }
-        // Self-test: the home screen, then Start as if pressed.
         if options.selfTest {
             ui.capture("home.png", after: 1) { [ui] in ui.perform("start", after: 0) }
         }
 
-        // Closing the window quits: cleanly from idle, as a failure after one.
         var closeCode: Int32 = 0
         while let command = commands.next(until: nil) {
             switch command {
@@ -169,9 +149,6 @@ final class Launcher {
         Thread.sleep(forTimeInterval: 2.5)
     }
 
-    /// Prepare, spawn and supervise until Stella quits (nil) or can't keep
-    /// running. Relaunch requests and a single early crash restart it without
-    /// showing the window.
     private func launch() -> (reason: String, output: [String])? {
         while true {
             ui.update {
@@ -192,7 +169,6 @@ final class Launcher {
                     return nil
                 case .relaunch:
                     log("launcher: relaunch requested")
-                    // A newer launcher is on disk: it restarts Stella instead.
                     if let version = updater.stagedVersion, updater.handOver(to: version, hold: lastHold) {
                         log("launcher: exit 0 (handed over to \(version))")
                         exit(0)
@@ -211,18 +187,12 @@ final class Launcher {
                     return (reason, output)
                 }
             } catch {
-                // First line is the message; any detail (a command's output)
-                // goes to Settings > Last error.
                 let lines = "\(error)".split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
                 return (lines.first ?? "\(error)", Array(lines.dropFirst().suffix(40)))
             }
         }
     }
 
-    /// Install progress; the slow steps bring a hidden window front. The
-    /// install steps report what they do in technical terms ("Downloading git
-    /// 2.53.0…"); the window says it in plain words, with the part of setup
-    /// each step covers, in the order they run.
     private func status(_ text: String) {
         let steps: [(prefix: String, status: String, from: Double, to: Double)] = [
             ("Downloading git", "Getting things ready…", 0.02, 0.10),
@@ -244,13 +214,8 @@ final class Launcher {
         }
     }
 
-    // MARK: Install, verify, prepare
-
-    /// The backend Stella installs from and talks to.
     private var backend: String { options.backend ?? paths.server?.origin ?? Pins.defaultBackendURL }
 
-    /// Stella may have picked another server (or gone back to the default)
-    /// before asking to relaunch: follow `server.json` to that install.
     private func followServerFile() {
         guard options.backend == nil else { return }
         let next = ServerConfig.load(paths.serverFile)
@@ -268,7 +233,6 @@ final class Launcher {
 
         if !fm.fileExists(atPath: paths.app.appendingPathComponent(".git").path) {
             try Install.cloneSource(paths: paths, git: git, source: source, progress: status)
-            // The initial clone is signed at install.
             try signer.signHead(git: git, app: paths.app, expected: nil)
             state = LauncherState()
             state.installedAt = ISO8601DateFormatter().string(from: Date())
@@ -290,7 +254,6 @@ final class Launcher {
                                state: &state, progress: status)
     }
 
-    /// The managed git and the tree signer, set up once.
     private func tools() throws -> (GitTool, TreeSigner) {
         for dir in [paths.root, paths.logs, paths.runtimes, paths.bundles] {
             try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -302,8 +265,6 @@ final class Launcher {
         return (git, signer)
     }
 
-    /// What Settings shows before anything starts: the installed version and
-    /// whether there is a last working one. Never downloads anything.
     private func installFacts() -> (version: String, hasKnownGood: Bool) {
         let gitBin = paths.runtimes.appendingPathComponent("git-\(Pins.gitVersion)/bin/git")
         if git == nil, FileManager.default.isExecutableFile(atPath: gitBin.path) {
@@ -334,8 +295,6 @@ final class Launcher {
         }
     }
 
-    /// The environment for git, bun and Electron: the managed runtimes first
-    /// on PATH, and none of the launcher's own secrets.
     private func baseEnvironment() -> [String: String] {
         var env = ProcessInfo.processInfo.environment
         let usesTestKey = !(env["STELLA_LAUNCHER_KEY_FILE"] ?? "").isEmpty
@@ -343,10 +302,6 @@ final class Launcher {
                         "STELLA_V2_DEV_DATA_DIR", "STELLA_APP_DIR", "STELLA_RUNTIME_STATE_DIR",
                         "STELLA_DEV_RESTART_REQUEST_FILE", "STELLA_DEV_USER_QUIT_REQUEST_FILE",
                         "STELLA_ELECTRON_DEV_RUNNER_PID", "STELLA_ELECTRON_READY_FILE", "NODE_OPTIONS"]
-        // The dev harness (own profile, file-backed safeStorage, remote
-        // debugging) passes through only for a test root signed with a test
-        // key file: it opens Electron to debugging, so it must never apply
-        // to an install whose key is the real keychain key.
         let harness = ["STELLA_DEV_HARNESS", "STELLA_DEV_HARNESS_STORAGE_KEY", "STELLA_V2_DEV_USER_DATA_DIR",
                        "STELLA_REMOTE_DEBUG_PORT", "STELLA_DEV_HARNESS_SESSION_TOKEN"]
         if !(paths.isolated && usesTestKey) { stripped += harness }
@@ -370,9 +325,7 @@ final class Launcher {
     private func electronEnvironment() -> [String: String] {
         var env = baseEnvironment()
         env["STELLA_LAUNCHER"] = "1"
-        // The backend this launcher installs from is the one the app talks to.
         env["VITE_STELLA_BACKEND_URL"] = backend
-        // Where Stella writes `server.json`; also tells it this launcher reads one.
         env["STELLA_LAUNCHER_DATA_DIR"] = paths.root.path
         env.removeValue(forKey: "STELLA_LAUNCHER_SERVER_ID")
         env.removeValue(forKey: "STELLA_LAUNCHER_SERVER_NAME")
@@ -386,15 +339,12 @@ final class Launcher {
         }
         if let signer { env["STELLA_LAUNCHER_PUBKEY"] = signer.publicKeySPKIBase64 }
         if paths.isolated {
-            // A test root never touches the real profile or Stella home.
             env["STELLA_LAUNCHER_USER_DATA_DIR"] = paths.isolatedUserData.path
             env["STELLA_DATA_DIR"] = paths.isolatedHome.path
             env["STELLA_V2_DEV_DATA_DIR"] = paths.isolatedHome.path
         }
         return env
     }
-
-    // MARK: Supervision
 
     enum Outcome {
         case quit
@@ -450,7 +400,6 @@ final class Launcher {
                     process.after(options.stableSeconds, "stable")
                     updater.startedSuccessfully()
                     if options.selfTest {
-                        // The running window and Settings are captured before Stella quits.
                         if options.captureDir != nil { ui.captureRunning() }
                         process.after(options.captureDir != nil ? max(options.hold, 4) : options.hold, "self-test-quit")
                     }
@@ -536,10 +485,6 @@ final class Launcher {
         return .failed("Lost track of Stella.", [])
     }
 
-    /// Stella installed the dependencies and ran prepare-install.mjs for the
-    /// checkout it is about to relaunch into: note it, so the relaunch's own
-    /// prepare finds that work done instead of repeating it. Only what still
-    /// matches the checkout is taken.
     private func adoptPrepared(_ message: [String: Any], git: GitTool) {
         var noted: [String] = []
         if let lockHash = message["lockHash"] as? String,
@@ -570,15 +515,11 @@ final class Launcher {
         }
     }
 
-    // MARK: Recovery
-
     private func hasKnownGood() -> Bool {
         guard let git else { return false }
         return (try? git.raw(["rev-parse", "--verify", "--quiet", "\(Launcher.knownGoodRef)^{commit}"], cwd: paths.app).code) == 0
     }
 
-    /// "Stella couldn't start" in the window; the user's choice arrives as a
-    /// command. The self-test makes the choice itself.
     private func recover(reason: String, output: [String]) {
         recoveryCount += 1
         hold.hide(after: 0)
@@ -595,8 +536,6 @@ final class Launcher {
         guard options.selfTest else { return }
         if let choice = options.recoveryChoice, recoveryCount == 1 {
             switch choice {
-            // "return" is the primary recovery, a reinstall when there is no
-            // known-good version yet.
             case .returnToKnownGood: ui.perform(facts.hasKnownGood ? "return" : "reinstall", after: 2)
             case .reinstall: ui.perform("reinstall", after: 2)
             case .retry: ui.perform("start", after: 2)
@@ -608,8 +547,6 @@ final class Launcher {
         }
     }
 
-    /// A forward commit back to the known-good tree: nothing is rewritten, so
-    /// the fork still fast-forwards. Uncommitted edits are stashed, not lost.
     private func returnToKnownGood() throws {
         let (git, signer) = try tools()
         guard hasKnownGood() else {
@@ -636,7 +573,6 @@ final class Launcher {
         try signer.signHead(git: git, app: app, expected: nil)
     }
 
-    /// No known-good version yet: move the checkout aside and clone again.
     private func reinstall() throws {
         let (git, signer) = try tools()
         let fm = FileManager.default

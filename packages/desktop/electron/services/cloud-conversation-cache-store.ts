@@ -595,11 +595,6 @@ const versionsEqual = (
     left.floorSeq === right.floorSeq &&
     left.revision === right.revision);
 
-/**
- * Separate, bounded SQLite cache for raw canonical cloud-journal records.
- * Nothing in the runtime imports this class; it is reachable only through the
- * privileged desktop IPC bridge.
- */
 export class CloudConversationCacheStore {
   private activeAccountScope: string | null = null;
   private activeOwnerGeneration: string | null = null;
@@ -748,8 +743,6 @@ export class CloudConversationCacheStore {
   }
 
   replace(value: unknown): CloudConversationCacheReplaceResult {
-    // Validate at the storage boundary, including direct service/test callers.
-    // Worker dispatch keeps this traversal and all SQLite work off main.
     const input = parseCloudConversationCacheReplaceInput(value);
     if (!this.isActive(input)) return { status: "inactive", current: null };
     return this.withImmediateTransaction(() => {

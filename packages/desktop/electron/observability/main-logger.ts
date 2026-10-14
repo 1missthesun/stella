@@ -12,15 +12,6 @@ import {
   startDesktopNetworkLogging,
 } from "./desktop-debug-logging.js";
 
-/**
- * Electron main-process diagnostics wiring.
- *
- * Routes uncaught errors / crashes and process lifecycle (app + child
- * process crashes) into the shared local log files under
- * `~/.stella/logs/<rootHash>/`. These are local debug artifacts and may
- * contain the full context supplied by diagnostic call sites.
- */
-
 let registered = false;
 
 const safe = (fn: () => string): string => {
@@ -45,12 +36,7 @@ export const initMainProcessLogging = (stellaAppDir: string): FileLogger => {
     node: process.versions.node ?? "",
     platform: process.platform,
     arch: process.arch,
-    // Who this run is, not whether it is packaged: nothing is packaged, so
-    // `isPackaged` was a constant false in both the product and a checkout and
-    // told a reader of these logs nothing.
     install: resolveAppInstall({ isPackaged: app.isPackaged }),
-    // Process launch to bootstrap: dominated by compiling and evaluating the
-    // main bundle, which the V8 compile cache (see launch.ts) exists to cut.
     startupMs: Math.round(process.uptime() * 1000),
     compileCache: safe(() => (getCompileCacheDir() ? "on" : "off")),
   });
@@ -59,10 +45,7 @@ export const initMainProcessLogging = (stellaAppDir: string): FileLogger => {
     void startDesktopNetworkLogging();
     logger.process("main.ready", {
       pid: process.pid,
-      // Time-to-ready since process launch — a cheap boot-regression signal.
       startupMs: Math.round(process.uptime() * 1000),
-      // Where Electron writes native minidumps for GPU/renderer crashes,
-      // so a crash in the error log can be cross-referenced with a dump.
       crashDumps: safe(() => app.getPath("crashDumps")),
     });
   });
@@ -70,7 +53,6 @@ export const initMainProcessLogging = (stellaAppDir: string): FileLogger => {
     logger.process("main.quit", { pid: process.pid, exitCode });
   });
 
-  // GPU / utility / pepper / renderer subprocess crashes.
   app.on("child-process-gone", (_event, details) => {
     logger.error("main.child-process-gone", {
       processType: details.type,

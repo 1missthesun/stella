@@ -1,16 +1,5 @@
 import { webContents } from "electron";
 import { IPC_PREFERENCES_MODELS_UPDATED, IPC_RUNTIME_AVAILABILITY, } from "@stella/contracts/desktop/ipc-channels";
-/**
- * Forwards `RuntimeHostAdapter.onAvailabilityChange` to every renderer
- * via the `runtime:availability` IPC channel. The renderer's
- * `useResumeAgentRun` hook subscribes so it can re-run the chat-resume
- * flow whenever the host adapter reattaches to a detached worker (e.g.
- * after Electron itself restarted while the worker kept streaming).
- *
- * Idempotent across runner-changed events: if the lifecycle swaps the
- * runner instance (rare), we tear down the old subscription before
- * attaching the new one so we don't leak listeners.
- */
 export const registerRuntimeAvailabilityBridge = ({ getStellaHostRunner, onStellaHostRunnerChanged, }) => {
     let unsubscribeFromRunner = null;
     let unsubscribeFromModelCatalog = null;

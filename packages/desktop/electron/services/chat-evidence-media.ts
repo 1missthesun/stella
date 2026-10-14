@@ -207,11 +207,6 @@ export const videoPosterRaster = async (
   return await quickLookRaster(filePath, boxWidth, boxHeight);
 };
 
-/**
- * A poster frame and duration for a video read straight from an https URL.
- * ffmpeg seeks with range requests, so a long recording costs a few reads,
- * not a download.
- */
 export const remoteVideoPoster = async (
   url: string,
   boxWidth: number,

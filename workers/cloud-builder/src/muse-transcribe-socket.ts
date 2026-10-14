@@ -20,14 +20,8 @@ export type PreparedSession = {
   maxAudioBytes?: number;
 };
 
-/** The usage allowance refused the session; the message is shown to the user. */
 export class DictationUsageError extends Error {}
 
-/**
- * Sizes and charges a session against the owner's allowance (the voice
- * domain's `dictation.prepare` and `dictation.settle`). `prepare` throws
- * `DictationUsageError` when the allowance refuses.
- */
 export type MuseControl = {
   prepare(sessionId: string): Promise<PreparedSession>;
   settle(usage: {
@@ -88,7 +82,6 @@ type MuseRelayArgs = {
   env: MuseRelayEnv;
   control: MuseControl;
   waitUntil: (promise: Promise<unknown>) => void;
-  /** Startup timings for the `dictation_socket_timing` log line. */
   timing?: { requestId: string; receivedAt: number; authMs: number };
 };
 
@@ -128,21 +121,11 @@ type ProviderStart =
         success: boolean,
       ) => Promise<void>;
       handshakeSentAt: number;
-      /** Provider frames (the handshake ack) that arrived during prepare. */
       early: EarlyUpstreamFrame[];
-      /** Stop buffering provider frames; the bridge takes over. */
       detach: () => void;
     }
   | { ok: false; usageMessage?: string; status: number; message: string };
 
-/**
- * Reserve a Stella session and start the provider session in parallel. The
- * upgrade and the handshake go out while the owner reserves the session, so the
- * provider's session setup overlaps the reservation instead of following it.
- * No audio is forwarded until the reservation has committed (the bridge only
- * starts after this resolves), and a refused reservation closes the provider
- * session having sent it nothing but the handshake.
- */
 const startProvider = async (
   args: MuseRelayArgs,
   apiKey: string,
@@ -239,8 +222,6 @@ const startProvider = async (
     durationMs: number,
     success: boolean,
   ) => {
-    // Reuse identical settlement bytes on retry; the durable session receipt
-    // makes a lost successful response safe to repeat.
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
         await args.control.settle({
@@ -282,11 +263,6 @@ const startProvider = async (
   };
 };
 
-/**
- * Relay an accepted client socket to a started provider session: meter and
- * cap audio, forward transcripts, and settle usage once. `pending` frames the
- * client sent before the provider was ready are replayed in order.
- */
 const bridge = (
   args: MuseRelayArgs,
   gateway: WebSocket,
@@ -323,8 +299,6 @@ const bridge = (
       closeBoth(1011, "Muse transcription failed");
       return;
     }
-    // No more billable audio is admitted. Allow a bounded provider flush so
-    // reaching the allowance returns the transcript already recorded.
     cancelDeadline = forkAbortTimer(10_000, () => {
       closeBoth(1011, "Transcription took too long to finish");
     });
@@ -413,8 +387,6 @@ const bridge = (
     closeSocket(upstream, event.code, event.reason);
   });
 
-  // The handshake went out during prepare; replay what the provider sent
-  // meanwhile, then audio the client sent before the provider was ready.
   for (const frame of start.early.splice(0)) onUpstreamFrame(frame.data, frame.at);
   for (const frame of pending) onClientFrame(frame);
 };
@@ -436,9 +408,7 @@ const acceptClientSocket = () => {
   };
 };
 
-/** A warm socket must send `start` within this long or it is closed. */
 const DEFERRED_START_IDLE_MS = 60_000;
-/** Client frames held while a deferred start reaches the provider. */
 const DEFERRED_START_MAX_PENDING_BYTES = 8 * PCM_BYTES_PER_SECOND;
 
 const isStartFrame = (value: unknown): boolean => {
@@ -451,12 +421,6 @@ const isStartFrame = (value: unknown): boolean => {
   }
 };
 
-/**
- * `?start=deferred`: accept the client socket right away and reserve nothing
- * until the client sends `{"type":"start"}`. Clients open this on mic hover
- * or focus, so a press skips the connection, TLS, and auth round trips. Audio
- * sent after `start` is held until the provider session is live.
- */
 const handleDeferredStart = (
   args: MuseRelayArgs,
   apiKey: string,
@@ -493,7 +457,6 @@ const handleDeferredStart = (
       return;
     }
     if (phase === "closed") {
-      // The client left while the session started: nothing was sent.
       closeSocket(start.upstream, 1000, "Dictation cancelled");
       args.waitUntil(start.reportUsage(0, 0, false));
       return;

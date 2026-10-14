@@ -19,7 +19,6 @@ type Exchange = {
   reply: string;
 };
 
-// Each request chip fires its own exchange into the one chat.
 const EXCHANGES: Exchange[] = [
   {
     icon: CalendarCheck,
@@ -54,7 +53,6 @@ const EXCHANGES: Exchange[] = [
 
 export function HomeSingleChat() {
   const sectionRef = useRef<HTMLElement>(null);
-  // Chips: < activeIndex are done, === activeIndex is firing, > are idle.
   const [activeIndex, setActiveIndex] = useState(-1);
   const onActiveIndexChange = useCallback((index: number) => {
     setActiveIndex(index);

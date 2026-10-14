@@ -394,10 +394,6 @@ const waitWithSignal = async <T>(promise: Promise<T>, signal?: AbortSignal) => {
   });
 };
 
-// Effect-backed abortable sleep (kernel/cli/effect-runtime.ts): identical
-// timing, and the abort path rejects with the same
-// `windowsCancellationError(signal)` object as the old hand-rolled
-// `setTimeout` + abort-listener version.
 const delayWithSignal = (ms: number, signal?: AbortSignal) =>
   sleepWithAbort(ms, signal, windowsCancellationError);
 
@@ -478,13 +474,10 @@ export const connectWindowsPipe = (
         socket.destroy();
         reject(error);
       } else {
-        // Guard the handoff between connection and request handler installation.
         socket.on("error", ignoreWindowsPipeError);
         resolve(socket);
       }
     };
-    // Effect-backed timeout fiber (kernel/cli/effect-runtime.ts) with the
-    // old `setTimeout`/`clearTimeout` semantics and identical timing.
     const cancelTimer = forkTimeoutFiber(timeoutMs, () => {
       finish(
         new Error(
@@ -545,7 +538,6 @@ const windowsPipeAcceptingConnections = async (
   }
 };
 
-/** Wait until both the killed helper and its named-pipe server are gone. */
 export const waitForWindowsDaemonTeardown = async (
   pid: number | null,
   pipeName: string,
@@ -642,8 +634,6 @@ export const spawnWindowsDaemonProcess = async (
     };
 
     child.once("spawn", onSpawn);
-    // Deliberately retained after startup so a later ChildProcess error can never
-    // become an unhandled EventEmitter error in the long-lived host.
     child.on("error", onError);
     signal?.addEventListener("abort", onAbort, { once: true });
   });
@@ -651,12 +641,6 @@ export const spawnWindowsDaemonProcess = async (
   return child;
 };
 
-/**
- * Start or reconnect to the per-session helper and return the connected pipe
- * that proved it is ready. The old flow closed this readiness connection and
- * immediately raced a second connection against the helper's single pipe
- * instance, which could surface as EPIPE before the real request was written.
- */
 const connectWindowsDaemon = async (
   sessionId: string,
   signal = getComputerExecutionSignal(),
@@ -699,7 +683,6 @@ const connectWindowsDaemon = async (
           return await connectWindowsPipe(pipeName, 100, signal);
         } catch (error) {
           if (signal?.aborted) throw error;
-          // Keep waiting until the named-pipe server accepts connections.
         }
       }
       await delayWithSignal(50, signal);
@@ -861,8 +844,6 @@ export const exchangeWindowsDaemonRequest = (
       options.onTimeoutOrAbort?.();
       settle(windowsCancellationError(signal));
     };
-    // Effect-backed timeout fiber (kernel/cli/effect-runtime.ts) with the
-    // old `setTimeout`/`clearTimeout` semantics and identical timing.
     const cancelTimer = forkTimeoutFiber(options.timeoutMs, () => {
       options.onTimeoutOrAbort?.();
       settle(
@@ -1202,7 +1183,6 @@ const splitWindowsArgs = (args: string[]) => {
       index += 1;
       continue;
     }
-    // `--option=value` carries its value inline (see getOptionValue).
     if (booleanOptions.has(arg) || valueOptions.has(arg.split("=", 1)[0]!)) {
       continue;
     }

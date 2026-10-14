@@ -1,16 +1,3 @@
-/**
- * Where Stella herself runs. Everything a conversation does runs on the host
- * that holds it: its tools, its files, its agents' processes. An agent meant
- * for another computer, or for the cloud, starts there as a whole
- * (`spawn_agent` with a destination), so nothing here runs one host's tools
- * for a conversation on another.
- *
- * In a conversation stored in the cloud, Stella can move herself
- * (`switch_destination`): another host (the conversation's object in the
- * cloud, or one of the owner's computers) takes the conversation's turns
- * from then on and carries on from the shared journal with her brief
- * (`@stella/contracts/turn-plane/pi-brain`).
- */
 import type { Context } from "@earendil-works/chord";
 import { Type } from "@earendil-works/pi-ai";
 import { defineTool, type ConversationId, type ToolExecutionApi } from "@earendil-works/pi-durable";
@@ -21,37 +8,17 @@ import { describePlacement, parseSpawnDestination, samePlacement, type StellaPla
 export const SWITCH_DESTINATION_TOOL_NAME = "switch_destination";
 
 export type StellaExecutionHost = {
-  /**
-   * Stella's brain moves to `target`: from now on that host takes the
-   * conversation's turns, and `brief` continues there once this turn ends.
-   * Answers where it went, named for her; absent, she stays on this host.
-   */
   moveBrain?(target: StellaPlacement, brief: string, context: Context): Promise<{ moved: StellaPlacement } | { error: string }>;
-  /** One of the owner's computers as the device list has it now; undefined when the list can't be read. */
   standing?(deviceId: string, context: Context): Promise<DeviceStanding | undefined>;
-  /**
-   * Whether one of this host's agents can move to `deviceId` now
-   * (`switch_destination`), `AGENT_MOVE_CLOUD` for the cloud: that place by
-   * its id and name, `here` when it is this one, or why not (offline, not
-   * ready, not taking work, not signed in to Claude Code for an agent on it).
-   */
   agentTarget?(
     deviceId: string,
     needs: { claudeCode: boolean },
     context: Context,
   ): Promise<{ deviceId: string; name: string; here?: true } | { error: string }>;
-  /** What an agent moving away leaves in `cwd` (uncommitted or unpushed work), in one line; undefined when nothing. */
   leftBehind?(cwd: string): Promise<string | undefined>;
-  /**
-   * Move one of this host's agents, once its run here ended: its log has
-   * everything, and the computer it moves to holds it and continues it from
-   * `brief`. Answers where it runs now, or why it could not move.
-   */
   moveAgent?(move: AgentMove, context: Context): Promise<{ where: string } | { error: string }>;
 };
 
-/** An agent moving itself, as `StellaExecutionHost.moveAgent` takes it. */
-/** The `deviceId` of a move to the cloud. */
 export const AGENT_MOVE_CLOUD = "cloud";
 
 export type AgentMove = {
@@ -60,15 +27,12 @@ export type AgentMove = {
   deviceId: string;
   name: string;
   brief: string;
-  /** Once per move: the `switch_destination` call that asked for it. */
   key: string;
-  /** What it runs on here, which it runs on there. */
   model?: { provider: string; modelId: string };
   thinkingLevel?: string;
   cwd?: string;
 };
 
-/** The framed brief an agent continues from after a move. */
 export const movedAgentBrief = (from: string, brief: string, held: readonly string[] = []): string =>
   [
     `[You moved yourself here from ${from} with switch_destination, and you run here now: your conversation so far is above. Files in your old working folder stayed on ${from}. This is your brief, not a new message from anyone.]`,
@@ -76,7 +40,6 @@ export const movedAgentBrief = (from: string, brief: string, held: readonly stri
     ...held,
   ].join("\n\n");
 
-/** A computer's name, whether it is online, and when it was last seen. */
 export type DeviceStanding = {
   name: string;
   online: boolean;
@@ -91,7 +54,6 @@ export const deviceStanding = (device: DeviceDestination): DeviceStanding => ({
   ...(device.lastSeenAt !== undefined ? { lastSeenAt: device.lastSeenAt } : {}),
 });
 
-/** Why a listed computer cannot take Stella now; undefined when it can. */
 export const deviceRefusal = (device: DeviceDestination, name: string): string | undefined => {
   if (!device.online) {
     return `${name} is offline, so you can't move there now. Tell the user, or start an agent there with spawn_agent if the work can wait for it to come back.`;
@@ -112,18 +74,12 @@ export const deviceRefusal = (device: DeviceDestination, name: string): string |
   return undefined;
 };
 
-/** What an agent's own `switch_destination` does (`stellaAgents`), from the call's arguments. */
 export type AgentSwitch = (
   args: { destination: string; prompt?: string; leave_files?: boolean },
   api: ToolExecutionApi,
   context: Context,
 ) => Promise<{ content: Array<{ type: "text"; text: string }>; details?: Record<string, string> }>;
 
-/**
- * `switch_destination`: Stella moves her brain (`moveBrain`), an agent moves
- * itself as a whole (`agentSwitch`), each in a conversation stored in the
- * cloud.
- */
 export const switchDestinationTool = (
   host: StellaExecutionHost,
   rootPlacement: StellaPlacement,
@@ -147,7 +103,6 @@ export const switchDestinationTool = (
         }),
       ),
     }),
-    // Moving to one place twice is moving there once.
     replay: "safe",
     execute: async (args, api, context) => {
       const self = (await api.snapshot(StellaAgentDoc, api.conversationId, context)) ?? { agentType: "orchestrator" };

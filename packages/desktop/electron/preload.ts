@@ -4,7 +4,6 @@ import { createElectronApi } from "@stella/contracts/desktop/electron-api";
 import type { TypedIpcRenderer } from "@stella/contracts/desktop/ipc-contract";
 import { IPC_UI_STATE_KV_SNAPSHOT } from "@stella/contracts/desktop/ipc-channels";
 
-/** Electron wraps handler errors as "Error invoking remote method 'ch': Error: …" — unwrap for UI. */
 const unwrapIpcInvokeError = (error: unknown): Error => {
   if (!(error instanceof Error)) {
     return new Error(String(error));
@@ -56,8 +55,6 @@ const api = createElectronApi(ipc, {
   },
 });
 
-// Shared UI state (~/.stella/ui-state.json) snapshot, read synchronously so
-// the boot script and module-load preference reads see it before first paint.
 contextBridge.exposeInMainWorld(
   "__stellaUiState",
   (() => {

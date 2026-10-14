@@ -6,31 +6,6 @@ import type {
   DeviceRequestServerFrame,
 } from "./device-requests.js";
 
-/**
- * Execution placement on the owner gate.
- *
- * A dispatch is "run this prompt somewhere": on the owner's desktop when one
- * is present and capable, else in Stella's cloud. The per-owner Durable
- * Object (OwnerGate) owns the dispatch row, the device presence sockets, the
- * offer window, the claim/ack handoff, and the cloud fallback.
- *
- * Routes on the cloud-builder worker:
- *   POST /owners/me/dispatches                 submit (user JWT, or service secret + owner headers)
- *   GET  /owners/me/dispatches/:dispatchId     status (user JWT / service)
- *   POST /owners/me/dispatches/:dispatchId/cancel
- *   GET  /owners/me/devices/:deviceId/presence WebSocket (user JWT), the device presence socket
- *   POST /owners/me/devices/:deviceId/requests a paired phone's request, relayed over that socket
- *                                              (see `device-requests.ts`)
- *
- * A cloud agent's tool calls for one of the owner's computers reach the gate
- * by RPC from the conversation's object and cross the same socket (see
- * `device-tools.ts`).
- *
- * Mobile submits carry the pairing proof headers the mobile app already
- * sends; the worker verifies them against the owner snapshot's paired
- * devices before forwarding with `ingress: "mobile"`.
- */
-
 export const PLACEMENT_PROTOCOL = 1 as const;
 
 export const DISPATCH_SUBMIT_PATH = "/owners/me/dispatches" as const;
@@ -40,36 +15,14 @@ export const dispatchCancelPath = (dispatchId: string): string =>
   `${dispatchPath(dispatchId)}/cancel`;
 export const devicePresencePath = (deviceId: string): string =>
   `/owners/me/devices/${encodeURIComponent(deviceId)}/presence`;
-/** `GET /owners/me/devices`: the owner's execution destinations with live presence. */
 export const DEVICES_PATH = "/owners/me/devices" as const;
 
-/**
- * Whether a device has agreed to run work dispatched to it from elsewhere.
- *
- * Being listed and being willing are different facts, and this is the second
- * one. Signing in puts a computer in `devices`; nothing may be dispatched to
- * it until the owner has said yes once, either on that computer's own screen
- * when something first tries (`asking`) or from any signed-in session with the
- * enable control. Collapsing this into "is registered" would delete the only
- * step that stops a fresh sign-in from silently becoming a remote shell.
- *
- * - `unconfigured`: listed, never asked, never answered.
- * - `asking`: a consent prompt is open on that device's own screen.
- * - `enabled`: the owner said yes; dispatch may offer work to it.
- * - `declined`: the owner said no there; it stays listed and stays refused.
- */
 export type DeviceRemoteExecution =
   | "unconfigured"
   | "asking"
   | "enabled"
   | "declined";
 
-/**
- * A dispatch's `errorCode` when the only thing in the way is that the target
- * device has not agreed to run remote work. Distinct from offline and from
- * not-ready because it is the one case the owner can clear with a tap, and
- * because agent work treats it as worth waiting for.
- */
 export const SELECTED_DEVICE_NEEDS_CONSENT =
   "SELECTED_DEVICE_NEEDS_CONSENT" as const;
 
@@ -84,9 +37,7 @@ export type DeviceDestination = {
    */
   remoteExecutionEnabled: boolean;
   remoteExecution: DeviceRemoteExecution;
-  /** When the prompt on that device's screen was last raised. */
   remoteExecutionAskedAt?: number;
-  /** The account's home computer: Stella's brain stays on it, or comes back to it, while it is up. */
   brainHome?: true;
   online: boolean;
   presenceSessionId?: string;
@@ -155,10 +106,6 @@ export type ExecutionIngress =
 export type ExecutionSubject = "portable" | "computer" | "cloud";
 export type ExecutionTargetMode = "automatic" | "cloud" | "device";
 export type ExecutionKind = "chat" | "agent";
-/**
- * What an executor can do. `claude-code`: Claude Code is signed in there, so
- * agents on Claude Code can run there.
- */
 export const EXECUTION_CAPABILITIES = [
   "chat",
   "agent",
@@ -170,7 +117,6 @@ export const EXECUTION_CAPABILITIES = [
 ] as const;
 export type ExecutionCapability = (typeof EXECUTION_CAPABILITIES)[number];
 
-/** The capabilities this protocol knows from a list, deduplicated; newer clients' others are ignored. */
 export const knownExecutionCapabilities = (values: readonly unknown[]): ExecutionCapability[] => [
   ...new Set(
     values.filter((value): value is ExecutionCapability =>
@@ -185,13 +131,6 @@ export const CLOUD_CAPABILITIES: readonly ExecutionCapability[] = [
   "attachments",
 ];
 
-/**
- * The argument shape of the backend call `devices.register`, shared so the
- * desktop bridge that sends it and the backend that accepts it cannot drift
- * apart again. The bridge once sent `publicKey`/`label` against a validator
- * that wanted `devicePublicKey`/`deviceName`, and every registration failed
- * with an opaque server error.
- */
 export type ExecutionDeviceRegistration = {
   deviceId: string;
   devicePublicKey: string;
@@ -235,14 +174,7 @@ export const TERMINAL_DISPATCH_STATES: readonly DispatchState[] = [
   "blocked",
 ];
 
-/** Dispatch timings. */
 export const DISPATCH_OFFER_WINDOW_MS = 4_000;
-/**
- * How long an offer aimed at one named computer waits for it when that
- * computer is reconnecting (no live presence when the window lapses). It is
- * offered again the moment it is back; past this the dispatch takes its
- * fallback, as an unanswered offer does.
- */
 export const DISPATCH_RECONNECT_GRACE_MS = 20_000;
 export const DISPATCH_CLAIM_LEASE_MS = 30_000;
 export const DISPATCH_ACCEPTED_LEASE_MS = 120_000;
@@ -250,7 +182,6 @@ export const DISPATCH_PAYLOAD_TTL_MS = 900_000;
 export const DEVICE_PRESENCE_PING_INTERVAL_MS = 10_000;
 export const DEVICE_PRESENCE_STALE_AFTER_MS = 60_000;
 
-/** The prompt bytes a device or the cloud receives; hashed and order-sensitive. */
 export type DispatchPayload = {
   schemaVersion: 1;
   prompt: string;
@@ -261,35 +192,11 @@ export type DispatchPayload = {
   attachments?: string[];
   context?: CloudTurnContext;
   execution?: CloudExecutionSelection | null;
-  /** Agent dispatches only. */
   description?: string;
-  /**
-   * Agent dispatches only: the owner's agent thread this attempt belongs to.
-   * The device keeps one local thread per remote thread, so a follow-up
-   * continues with its history.
-   */
   threadId?: string;
-  /**
-   * Agent dispatches only: the requester's `spawn_agent` model selector. The
-   * device runs the agent on it, or fails the agent saying why it can't.
-   */
   model?: string;
-  /**
-   * Agent dispatches only: where the thread sits among Stella's agents (its
-   * depth and the agent that started it), so the device runs it as that.
-   */
   lineage?: AgentLineage;
-  /**
-   * Chat dispatches only: the orchestrator moved itself here with
-   * `switch_destination`, so the prompt is its own brief rather than a
-   * message the user typed. It is journaled hidden.
-   */
   handoff?: true;
-  /**
-   * Chat dispatches from a schedule only: start the prompt as an agent of
-   * the conversation's orchestrator, without an orchestrator turn. Its
-   * report comes back to the orchestrator like any finished job.
-   */
   scheduledAgent?: { description: string };
 };
 
@@ -301,7 +208,6 @@ export type DispatchSubmitRequest = {
   subject: ExecutionSubject;
   targetMode?: ExecutionTargetMode;
   targetDeviceId?: string;
-  /** Mobile: the paired phone; desktop/browser: the originating device. */
   requestingDeviceId?: string;
   conversationId: string;
   parentTurnId?: string;
@@ -331,7 +237,6 @@ export type DispatchSummary = {
   cancelReason?: string;
   errorCode?: string;
   errorMessage?: string;
-  /** Cloud placement: the admitted turn (chat) or thread turn (agent). */
   cloudTurnId?: string;
   cloudThreadId?: string;
   resultJson?: string;
@@ -365,7 +270,6 @@ export type DispatchErrorCode =
   | "owner_purged"
   | "generation_stale"
   | "capability_unavailable"
-  /** The caller must sign in to continue. */
   | "sign_in_required"
   | "subscription_required"
   | "owner_suspended"
@@ -380,16 +284,8 @@ export type DispatchError = {
   };
 };
 
-// ---------------------------------------------------------------------------
-// Device presence socket
-// ---------------------------------------------------------------------------
-
 export const DEVICE_PRESENCE_SUBPROTOCOL = "stella.v1" as const;
 export const DEVICE_PRESENCE_PROTOCOL_VERSION = 1 as const;
-/**
- * A dispatch payload's canonical JSON, at most: the cloud stores it and hands
- * it to the executing device whole, so a sender checks it first and says why.
- */
 export const DISPATCH_PAYLOAD_MAX_BYTES = 1024 * 1024;
 export const DEVICE_PRESENCE_MAX_FRAME_BYTES = 1536 * 1024;
 export const DEVICE_TERMINAL_RESULT_MAX_BYTES = 1_000_000;
@@ -406,12 +302,6 @@ export type AgentMessageDeviceOutcome =
   | "not_found"
   | "refused";
 
-/**
- * How an `agent-pause` (a `stop_agent`) landed: `stopped` stopped a running
- * agent and the agents it started here, `not_running` found it idle,
- * `not_found` found no such agent here. Builds before `stop_agent` answer
- * `paused` for `stopped`.
- */
 export type AgentStopDeviceOutcome =
   | "stopped"
   | "paused"
@@ -419,7 +309,6 @@ export type AgentStopDeviceOutcome =
   | "not_found"
   | "refused";
 
-/** Server -> device. */
 export type DevicePresenceServerFrame =
   | {
       type: "challenge";
@@ -450,7 +339,6 @@ export type DevicePresenceServerFrame =
       reason: string;
     }
   | {
-      /** New input for an agent the device accepted and is running. */
       type: "steer";
       dispatchId: string;
       messageId: string;
@@ -458,51 +346,27 @@ export type DevicePresenceServerFrame =
     }
   | { type: "dispatch"; dispatch: DispatchSummary }
   | {
-      /**
-       * A `send_message` for an agent this device runs locally (started by
-       * its own Stella, so there is no dispatch). The device steers it if it
-       * is running, resumes it if idle, and answers with `agent-message.ack`.
-       * `messageId` is stable across redeliveries; the device dedupes on it.
-       */
       type: "agent-message";
       messageId: string;
       threadId: string;
       ownerGeneration: string;
-      /** The framed `<agent-message>` text the agent reads. */
       text: string;
     }
   | {
-      /**
-       * A `stop_agent` for an agent this device runs locally, from wherever
-       * the conversation runs now (named before pause became stop). The
-       * device stops it and the agents it started here, and answers with
-       * `agent-pause.ack`. `commandId` is stable across
-       * redeliveries; the device dedupes on it.
-       */
       type: "agent-pause";
       commandId: string;
       threadId: string;
       ownerGeneration: string;
     }
   | {
-      /**
-       * Something tried to dispatch work here and this device has not agreed
-       * to accept any. The device asks on its own screen and answers with a
-       * `consent` frame. The dispatch that triggered this does not wait on the
-       * socket: a human tap is not on the offer window's timescale, so the
-       * attempt is refused with `SELECTED_DEVICE_NEEDS_CONSENT` and agent work
-       * retries while the prompt is up.
-       */
       type: "consent.request";
       requestedAt: number;
-      /** What asked, when the gate knows it, for the prompt's wording. */
       requesterLabel?: string;
     }
   | { type: "pong"; serverTimeMs: number }
   | { type: "error"; code: string; message: string; retryable: boolean }
   | DeviceRequestServerFrame;
 
-/** Device -> server. Every frame after `proof` is bound to the proven session. */
 export type DevicePresenceDeviceFrame =
   | {
       type: "begin";
@@ -511,7 +375,6 @@ export type DevicePresenceDeviceFrame =
       availability: DeviceAvailability;
     }
   | {
-      /** Ed25519 signature over `stella-device-presence\0${connectionId}\0${nonce}` by the device key. */
       type: "proof";
       signature: string;
     }
@@ -520,32 +383,24 @@ export type DevicePresenceDeviceFrame =
   | { type: "release"; dispatchId: string; reason?: string }
   | { type: "ack"; dispatchId: string }
   | {
-      /** Whether a `steer` reached the running agent. */
       type: "steer.ack";
       dispatchId: string;
       messageId: string;
       delivered: boolean;
     }
   | {
-      /** How an `agent-message` landed; `not_found` means no such local agent. */
       type: "agent-message.ack";
       messageId: string;
       threadId: string;
       outcome: AgentMessageDeviceOutcome;
     }
   | {
-      /** How an `agent-pause` landed. */
       type: "agent-pause.ack";
       commandId: string;
       threadId: string;
       outcome: AgentStopDeviceOutcome;
     }
   | {
-      /**
-       * The answer to `consent.request`, given on this device's own screen.
-       * It arrives on the proven presence socket, so the gate knows it came
-       * from the machine being asked about and not merely from the account.
-       */
       type: "consent";
       allow: boolean;
     }
@@ -564,7 +419,6 @@ export type DevicePresenceDeviceFrame =
 
 export const DEVICE_PRESENCE_PROOF_PREFIX = "stella-device-presence" as const;
 
-/** Close codes on the device socket. */
 export const DEVICE_PRESENCE_CLOSE = {
   replaced: 4001,
   stale: 4002,

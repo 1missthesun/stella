@@ -18,11 +18,6 @@ const timestampOf = (
     ? payload.timestamp
     : fallback;
 
-/**
- * Agent completion wakes are durable hidden user rows. A files card keyed to
- * the wake turn belongs to that agent, so this stable marker lets the Files
- * projection retain per-agent attribution without consulting desktop SQLite.
- */
 const agentThreadIdFromWakePrompt = (
   record: Extract<JournalRecord, { kind: "message" }>,
 ): string | null => {
@@ -32,13 +27,6 @@ const agentThreadIdFromWakePrompt = (
   return /\(thread ([^)]+)\)/u.exec(messageText(record.payload))?.[1] ?? null;
 };
 
-/**
- * The agent a turn's files card belongs to. The outbox files a completed
- * task's card under the conversation turn that spawned it, whose
- * `agent-started` card names the task (the first one on the turn claims it,
- * the same rule the mobile projection uses); a card on a completion wake turn
- * belongs to the agent the wake prompt names.
- */
 const agentThreadIdsByTurn = (
   records: readonly JournalRecord[],
 ): ReadonlyMap<string, string> => {
@@ -136,11 +124,6 @@ export const journalLifecycleEvent = (
       }
     : null;
 
-/**
- * Projects the canonical Durable Object journal into the legacy event shape
- * consumed by Activity's file attribution and diagnostic trace surfaces.
- * These are read-only view records and are never persisted to desktop SQLite.
- */
 export const journalRecordsToCloudActivityEvents = (
   records: readonly JournalRecord[],
 ): EventRecord[] => {
@@ -204,11 +187,6 @@ const localEventIsWithinOverlayWindow = (
   event.timestamp <= nowMs + LOCAL_CLOUD_EVENT_MAX_FUTURE_SKEW_MS &&
   event.timestamp + maxAgeMs > nowMs;
 
-/**
- * Returns the next wall-clock instant at which a currently visible local row
- * must retire. The renderer uses this to expire an overlay even when no new
- * SQLite or journal event arrives to trigger another render.
- */
 export const nextLocalCloudEventOverlayExpiry = (
   local: readonly EventRecord[],
   nowMs: number,

@@ -1,11 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 
-/**
- * Containment for the cloud surfaces that depend on optional backend
- * domains (drive, projects). A deployment
- * missing one of those functions must cost the user that one surface — not
- * the sidebar or the settings tab hosting it.
- */
 export class CloudBoundary extends Component<
   { children: ReactNode; fallback?: ReactNode },
   { failed: boolean }

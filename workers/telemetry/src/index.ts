@@ -150,7 +150,6 @@ const flattenEvent = (
     source: item.source,
     release: item.release ?? null,
     installation_id_sha256: item.installationIdSha256 ?? null,
-    // Never trust a producer-supplied owner hash; bind every event to auth.
     owner_id_sha256: ownerIdSha256,
     principal_kind: principalKind,
     event_type: item.event.type,
@@ -454,10 +453,6 @@ export const fetchHandler = async (
 };
 
 export class TelemetryService extends WorkerEntrypoint<Env> {
-  /**
-   * Events about one owner from a trusted Worker (cloud-builder's billing
-   * ledger), pseudonymized under that owner like a signed-in client's.
-   */
   async ingestForOwner(ownerId: string, events: TelemetryEventV1[]): Promise<void> {
     if (typeof ownerId !== "string" || !ownerId.trim()) {
       throw new TypeError("Invalid telemetry owner.");

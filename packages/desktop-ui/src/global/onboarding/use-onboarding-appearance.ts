@@ -5,11 +5,7 @@ import { isHiddenOverlay } from "@stella/theme";
 export function useOnboardingAppearance() {
   const { selectedThemeId, themes, colorMode, gradientMode, gradientColor, forcedMode } =
     useTheme();
-  // While Custom is unpopulated the user is always on it; surface the stock
-  // theme it's displaying as the "selected" one for the onboarding pills.
   const themeId = selectedThemeId;
-  // Overlay themes (Custom) inherit their forced mode from the base; the
-  // context resolves this for us.
   const isForcedTheme = forcedMode !== undefined;
   const {
     setTheme,

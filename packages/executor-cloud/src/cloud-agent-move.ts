@@ -1,10 +1,3 @@
-/**
- * `switch_destination` for an agent the cloud runs on Claude Code: it asks
- * its BuildSession to move it to one of the owner's computers once this turn
- * ends. The session checks the computer and keeps the request; the move
- * itself (the agent's log, the owner's hand-off) happens after the turn's
- * transcript is saved, so the computer continues with all of it.
- */
 import type { ToolMetadata, ToolResult } from "@stella/runtime/kernel/tools/types.js";
 import { CLOUD_AGENT_MOVE_PATH, CLOUD_AGENT_MOVE_TOOL } from "./cloud-agent-move-protocol.js";
 

@@ -1,14 +1,3 @@
-/**
- * The owner object's list row for a DO-resident conversation.
- *
- * The owner keeps one derived row because a per-conversation Durable Object
- * cannot list an owner's conversations. Full-text search stays inside the
- * object. Each `conversation.index` event is fenced on `(epoch, lastSeq)` so
- * reordered delivery cannot move the row backwards. Once the durable owner
- * event batch accepts an event, `meta.index_synced_seq` advances; a later turn boundary or
- * socket connect retries a refused enqueue.
- */
-
 import {
   OWNER_EVENT_VERSION,
   type ConversationIndexEvent,
@@ -26,18 +15,15 @@ export type IndexFlushOptions = {
 };
 
 export type IndexFlushResult = {
-  /** The index row event for this flush's `(epoch, lastSeq)` was enqueued. */
   accepted: boolean;
 };
 
-/** Who the projection belongs to; null until the conversation is bound. */
 export type IndexIdentity = {
   ownerId: string;
   ownerGeneration: string;
 };
 
 export type IndexFlushDeps = {
-  /** Hand the events to the owner (durably); throws when that failed. */
   enqueue: (events: OwnerEvent[]) => Promise<void>;
   /** The durable tombstone or in-memory seal that survives `deleteAll()`. */
   purged: () => boolean;
@@ -53,13 +39,11 @@ export class ConversationIndex {
     private readonly deps: IndexFlushDeps,
   ) {}
 
-  /** True when the owner-list row is behind the canonical journal head. */
   lagging(): boolean {
     const meta = this.journal.meta();
     return meta.index_synced_seq < meta.next_seq - 1;
   }
 
-  /** Turn end and socket connect share one enqueue when they race. */
   flush(options: IndexFlushOptions): Promise<IndexFlushResult> {
     if (this.inFlight) return this.inFlight;
     const tracked = this.run(options).finally(() => {
@@ -104,7 +88,6 @@ export class ConversationIndex {
       return idle;
     }
 
-    // The conversation may be purged while the send is in flight.
     if (this.deps.purged()) return idle;
     this.journal.setIndexSyncedSeq(lastSeq);
     return { accepted: true };

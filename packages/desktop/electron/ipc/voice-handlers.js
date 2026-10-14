@@ -45,11 +45,6 @@ export const registerVoiceHandlers = (options) => {
         const d = new Date();
         return `${d.toLocaleTimeString("en-US", { hour12: false })}.${String(d.getMilliseconds()).padStart(3, "0")}`;
     };
-    /**
-     * The delegated orchestrator's own progress, for the voice runtime, which
-     * lives in the hidden overlay window; without it GPT-Live would have to
-     * guess what the backend is doing.
-     */
     const emitVoiceOrchestratorActivity = (activity) => {
         for (const window of options.windowManager.getAllWindows()) {
             if (window.isDestroyed())
@@ -69,24 +64,10 @@ export const registerVoiceHandlers = (options) => {
         : null;
     const errorMessage = (value) => value instanceof Error ? value.message : String(value ?? "Unknown error");
     const requireCurrentVoiceConversation = (value) => requireMatchingCloudConversationId(value, options.uiState.conversationId);
-    /**
-     * The desktop renderer is fenced to the conversation main currently
-     * exposes (a stale renderer must not write elsewhere). A paired phone,
-     * reaching this computer through the cloud relay, instead names its own
-     * conversation: it may talk to any owner conversation regardless of what
-     * the desktop window shows, and the cloud journal/history endpoints
-     * enforce ownership with this desktop's own token.
-     */
     const resolveVoiceConversation = (remote, value) => remote
         ? requireRequestedCloudConversationId(value, options.getActiveCloudConversationCacheAuthority?.() ?? null)
         : requireCurrentVoiceConversation(value);
     const CLOUD_VOICE_APPEND_ID_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/;
-    /**
-     * Cloud-mode transcript persistence requires a stable append id and a
-     * timestamp. The renderer may supply both (so retries dedupe); the
-     * desktop renderer's fire-and-forget send historically supplied neither,
-     * which made every desktop voice transcript append fail silently.
-     */
     const withTranscriptIdentity = (payload) => {
         const eventId = typeof payload?.eventId === "string" &&
             CLOUD_VOICE_APPEND_ID_PATTERN.test(payload.eventId.trim())
@@ -131,10 +112,6 @@ export const registerVoiceHandlers = (options) => {
             window.webContents.send(IPC_VOICE_RUNTIME_STATE, runtimeState);
         }
     };
-    // The voice runtime lives in the hidden, screen-spanning overlay window, so
-    // a toast raised there is painted where the user can never see it. Route
-    // actionable voice errors to the full app window, where the toast and its
-    // sign-in/settings CTA work as expected.
     const emitVoiceSessionErrorToast = (message) => {
         const trimmed = typeof message === "string" ? message.trim() : "";
         if (!trimmed)
@@ -147,9 +124,6 @@ export const registerVoiceHandlers = (options) => {
     onIpc(IPC_VOICE_REPORT_SESSION_ERROR, (_event, message) => {
         emitVoiceSessionErrorToast(message);
     });
-    // Why a call failed, for surfaces that must show the reason rather than an
-    // empty card. Every window gets it, and the last value is readable on
-    // mount so a late-rendering surface still has it.
     let lastVoiceSessionError = "";
     onIpc(IPC_VOICE_REPORT_SESSION_ERROR_STATE, (_event, message) => {
         lastVoiceSessionError = typeof message === "string" ? message.trim() : "";
@@ -232,8 +206,6 @@ export const registerVoiceHandlers = (options) => {
                     instructions: typeof payload?.instructions === "string"
                         ? payload.instructions
                         : undefined,
-                    // The single ask_stella tool is applied client-side with
-                    // session.update, alongside the rest of the session config.
                     audio: {
                         output: {
                             voice,
@@ -429,9 +401,7 @@ export const registerVoiceHandlers = (options) => {
         broadcastRuntimeState();
     });
     return {
-        /** A paired phone's voice setup, relayed through the cloud. */
         configForRequest: (payload) => voiceConfig(true, payload),
-        /** A paired phone's voice tool call, relayed through the cloud. */
         executeToolForRequest: (payload) => executeVoiceTool(true, payload),
     };
 };

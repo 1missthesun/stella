@@ -1,17 +1,4 @@
 #!/usr/bin/env node
-// The adapter `retire-sandbox-instances.mjs --apply --adapter <this file>`
-// invokes once per exact instance. It receives one JSON argument naming the
-// instance's exact tuple and posts it to the deployed Worker's operator route.
-// Wrangler cannot stop one container instance and only the sandbox
-// Durable Object holds the container handle, so this is the only stop path.
-//
-// Environment:
-//   CLOUD_BUILDER_URL        the Worker origin for the deployment being reaped
-//   BUILDER_SERVICE_SECRET   the Worker's service bearer (never printed)
-//
-// Exits non-zero when the Worker does not confirm the retirement, so the
-// calling script stops before the next instance rather than reporting a
-// mutation it did not achieve.
 
 const [rawArgument] = process.argv.slice(2);
 if (!rawArgument) {
@@ -38,8 +25,6 @@ if (
   process.exit(2);
 }
 
-// A durable export can supply the exact workload when an old platform record
-// lacks the SDK-visible sandbox id. An empty candidate list remains unresolved.
 const EXACT_WORKLOADS = new Set(["app-build", "world"]);
 const resolveWorkload = (plan) => {
   if (EXACT_WORKLOADS.has(plan.workload)) return plan.workload;

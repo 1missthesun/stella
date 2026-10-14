@@ -23,12 +23,10 @@ const fetchAgentReport = (
 ): Promise<LocalChatAgentReport | null> => {
   const cached = reportCache.get(threadId);
   if (cached) return cached;
-  // An agent's report is in the conversation's harness.
   const request = piChatAvailable()
     ? piAgentReport(conversationId, threadId).catch(() => null)
     : Promise.resolve(null);
   reportCache.set(threadId, request);
-  // A running task's report changes; only a settled one is worth keeping.
   void request.then((report) => {
     if (!report || report.status === "running") reportCache.delete(threadId);
   });
@@ -42,22 +40,11 @@ export type TaskReportEntry = {
   reference: AgentRef;
   status?: TaskStatus;
   liveTitle?: string;
-  /**
-   * The report as the conversation recorded it. Agents a cloud chat runs on
-   * Stella's own models report only into the conversation, so neither the
-   * backend nor this computer has another copy.
-   */
   journalReport?: string;
 };
 
-/** What a report section shows; `body` is null while it loads. */
 type LoadedReport = { title: string; body: string | null };
 
-/**
- * Loads one task's report once the reader shows intent (hover, focus or
- * open) and hands its title and text to the popover. Renders nothing, so
- * every report of a reply loads in parallel behind the one control.
- */
 function TaskReportLoader({
   entry: { reference, status, liveTitle, journalReport },
   conversationId,
@@ -99,7 +86,6 @@ function TaskReportLoader({
     if (requested && !fetchedRef.current) fetchReport();
   }, [fetchReport, requested]);
 
-  // A running task finishing while the report is open swaps in the result.
   useEffect(() => {
     if (
       status === "completed" &&
@@ -129,12 +115,6 @@ function TaskReportLoader({
   return null;
 }
 
-/**
- * The one "Show more" under a reply, placed like a user message's toggle.
- * It opens a single popover with the full report of every task the reply
- * relays or cites: one report reads as before, several stack as titled
- * sections in one scroll.
- */
 export function TaskReportMore({
   reports,
   conversationId,

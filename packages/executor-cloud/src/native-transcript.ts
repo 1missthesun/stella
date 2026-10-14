@@ -1,13 +1,3 @@
-/**
- * A cloud Claude Code turn as the messages it really had: every assistant
- * message with its thinking (signature and all), text and tool calls, each
- * tool's result, and the messages taken in while it worked, in order. The
- * thread keeps them, and its log carries them to wherever the agent runs
- * next, so the conversation continues there with its reasoning intact.
- *
- * Tool results and call arguments are clipped and images left out, so one
- * row stays well inside the thread's row bound.
- */
 import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
 import type { AgentMessage } from "@stella/runtime/kernel/agent-core/types.js";
 
@@ -18,7 +8,6 @@ type Usage = { inputTokens: number; outputTokens: number; llmCalls: number };
 const MCP_PREFIX = "mcp__stella__";
 const RESULT_MAX_CHARS = 16_000;
 const ARGUMENTS_MAX_CHARS = 64_000;
-/** A turn recorded in full stays well inside one transcript write and the history the next turn reads. */
 const TURN_MAX_CHARS = 2_000_000;
 
 const asRecord = (value: unknown): Block | undefined =>
@@ -168,10 +157,6 @@ export const createNativeTranscript = (args: { prompt: string; inputPrompt: stri
       if (event.type === "assistant" && event.parent_tool_use_id == null) assistant(event);
       else if (event.type === "user" && event.parent_tool_use_id == null) user(event);
     },
-    /**
-     * The turn's messages, opening with its prompt; undefined when the CLI
-     * produced none, so the caller keeps its plain record of the turn.
-     */
     messages(result: { finalText: string; error?: string; usage: Usage }): AgentMessage[] | undefined {
       if (assistantCount === 0) return undefined;
       const turn: AgentMessage[] = [

@@ -406,9 +406,7 @@ export interface BuildSessionInternals {
     execution: TurnExecutionContext;
     sandbox: ReturnType<BuildSessionInternals["sandbox"]>;
     size: InstanceSize;
-    /** Latest canonical owner world manifest, shared across all threads. */
     turnStateWorkspaceRestore?: TurnStateWorkspaceHead;
-    /** Canonical transcript/native state for this exact thread only. */
     turnStateThreadRestore?: TurnStateCandidate;
     turnStateThreadRestoreConfirmationRequired: boolean;
     history: AgentHistoryRow[];

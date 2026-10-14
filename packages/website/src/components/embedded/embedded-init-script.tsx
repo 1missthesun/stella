@@ -86,8 +86,6 @@ const EMBEDDED_INIT_SCRIPT = /* javascript */ `
 export function EmbeddedInitScript() {
   return (
     <script
-      // Synchronous, blocking inline script — must run before the body
-      // paints so embedded mode never flashes the default gradient.
       dangerouslySetInnerHTML={{ __html: EMBEDDED_INIT_SCRIPT }}
     />
   );

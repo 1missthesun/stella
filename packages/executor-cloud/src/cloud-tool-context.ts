@@ -1,29 +1,12 @@
 import type { ToolContext } from "@stella/runtime/kernel/tools/types.js";
 import { CLOUD_TOOL_PROCESS_IDENTITY } from "./cloud-process-isolation.js";
 
-/**
- * The one tool context both cloud execution entry points build: the eager
- * container executor (`agent-turn.ts`) and the lazily attached tool-host
- * daemon (`attached-tool-host.ts`). Keeping it in one place is what lets a
- * single test run the runtime's real identity guard against exactly what the
- * cloud sends, so the two paths cannot drift apart in what the shell accepts.
- *
- * HOME is the world itself, so `~` and `~/.stella` mean in the cloud what
- * they mean on a device. Caches, config and state go to `toolHome` instead,
- * beside the checkpointed world and owned by the tool account (validated by
- * `prepareCloudToolFilesystem` before this context is used), which is
- * therefore declared as the trusted `toolStateRoot`.
- */
 export const cloudAgentToolContext = (args: {
   threadId: string;
   workspaceRoot: string;
   workspaceStateDir: string;
   toolHome: string;
   requestId?: string;
-  /**
-   * The tools a `code` cell may call as `tools.<name>`. The REPL offers
-   * exactly this list (minus `code` itself); without it `tools` is empty.
-   */
   allowedToolNames?: readonly string[];
 }): ToolContext => ({
   ...(args.allowedToolNames

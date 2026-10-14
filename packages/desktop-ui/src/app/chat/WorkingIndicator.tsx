@@ -23,23 +23,16 @@ import "./indicators.css";
 
 const INDICATOR_MARK_SIZE_PX = 24;
 
-/** Punches the eyes out of the mark so they read as holes, not paint. */
 const INDICATOR_EYE_COLOR = "var(--surface-base)";
 
 interface WorkingIndicatorProps {
   status?: string;
   toolName?: string;
-  /** Stable id of the in-flight tool call. Used as a seed for the
-   * friendly variation picker so the label doesn't flicker on each
-   * re-render. */
   toolCallId?: string;
   compacting?: boolean;
   isReasoning?: boolean;
-  /** Per-turn seed so the reasoning/idle label varies across turns
-   * instead of always landing on the first variation ("Thinking"). */
   reasoningSeed?: string;
   className?: string;
-  /** Stops persistent motion while the shell finishes its finite exit. */
   animationActive?: boolean;
   minimumVisibleMs?: number;
 }
@@ -50,12 +43,6 @@ const STRETCH_MARKS_MS = [
   WORKING_INDICATOR_LONG_TOOL_MS,
 ];
 
-/**
- * How long the current stretch (a spell of thinking, or one tool call) has
- * run, re-rendering as it crosses each label threshold. A new stretch reads
- * zero from its first render, so a fresh tool never inherits the last one's
- * age.
- */
 function useStretchElapsedMs(stretch: string | null): number {
   const [started, setStarted] = useState<{
     stretch: string;
@@ -91,9 +78,6 @@ export function WorkingIndicator({
   const windowFocused = useWindowFocus();
   const animationPaused = !animationActive || !windowFocused;
 
-  // One pose per rotation window of a tool call, dealt from the whole
-  // repertoire rather than read off the tool's name; a long call moves on to
-  // another pose every window and never repeats the one it just left.
   const [poseEpoch, setPoseEpoch] = useState(0);
   useEffect(() => {
     if (animationPaused) return;
@@ -117,9 +101,6 @@ export function WorkingIndicator({
   const longTool =
     Boolean(toolName) && stretchMs >= WORKING_INDICATOR_LONG_TOOL_MS;
 
-  // Pose and label are held as one tuple so they can never disagree: holding
-  // them separately would let a stale label sit under the next activity's
-  // pose for the remainder of its floor.
   const liveDisplay = useMemo(() => {
     const seed = `${toolCallId ?? reasoningSeed ?? ""}:${poseEpoch}`;
     const basePose = getWorkingIndicatorCharacterState({
@@ -129,8 +110,6 @@ export function WorkingIndicator({
       avoid: previousPoseRef.current,
     });
     const reasoning = basePose === "thinking";
-    // The dots stand alone. Thinking that has lasted long enough to be named,
-    // and compaction, show their label beside a full pose, as a tool does.
     const characterState =
       reasoning && (thinkingText || compacting)
         ? pickWorkingIndicatorToolPose(seed, previousPoseRef.current)
@@ -161,16 +140,11 @@ export function WorkingIndicator({
     longTool,
   ]);
   previousPoseRef.current = liveDisplay.characterState;
-  // Thinking has no tool label worth reading out: a tool can replace it
-  // immediately.
   const held = useMinimumVisibleValue(
     liveDisplay,
     liveDisplay.reasoning ? 0 : minimumVisibleMs,
     (a, b) => a.status === b.status && a.characterState === b.characterState,
   );
-  // Short thinking shows as the mark alone; a stretch that lasts gets its
-  // calm label. Engine-side compaction is named from the start: it is a
-  // minutes-long wait.
   const dotsOnly =
     held.characterState === "thinking" && !held.status && !compacting;
 

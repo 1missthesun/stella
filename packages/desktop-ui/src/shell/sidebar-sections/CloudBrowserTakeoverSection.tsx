@@ -79,8 +79,6 @@ function CloudBrowserLiveView({
         if (!disposed) setIssue(t("cloudBrowser.errors.liveView"));
       });
 
-    // The JIT bearer URL exists only in this mounted frame component. Hidden
-    // tabs and a closed display panel do not keep it alive in React state.
     return () => {
       disposed = true;
       setCapability(null);

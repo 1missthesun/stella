@@ -91,12 +91,6 @@ export type NativeIntegrationHandlersOptions = {
   ) => boolean;
 };
 
-/**
- * The subset of the handler options that the credential/enable flow
- * actually consumes. Exported so the in-chat connect card service can
- * run the exact Store connect flow with its own (headless) OAuth
- * callbacks instead of the modal-backed ones.
- */
 export type NativeCredentialFlowOptions = Pick<
   NativeIntegrationHandlersOptions,
   | "requestPreregisteredOAuth"
@@ -105,10 +99,6 @@ export type NativeCredentialFlowOptions = Pick<
   | "getAuthToken"
   | "getBackendUrl"
 > & {
-  /**
-   * Abort hook for the backend Composio completion wait (the in-chat
-   * connect card threads its cancel/abort controller through here).
-   */
   abortSignal?: AbortSignal;
 };
 
@@ -159,9 +149,6 @@ export const loadConfiguredOAuthProviders = async (
       accept: "application/json",
       authorization: `Bearer ${authToken}`,
     },
-    // Bounded: this runs inside connect flows whose card must never be
-    // stranded by a hung request; a slow backend degrades to "no
-    // configured providers" instead of blocking.
     signal: AbortSignal.timeout(10_000),
   }).catch(() => null);
   if (!response?.ok) return emptyConfiguredOAuthProviders();
@@ -175,19 +162,12 @@ export const loadConfiguredOAuthProviders = async (
       typeof provider.id === "string" ? provider.id.trim().toLowerCase() : "";
     if (!id) continue;
     backend.add(id);
-    // The hosted stella.sh OAuth callback route is provider-generic. Once a
-    // provider has a server-side token exchange configured, an external
-    // callback config can use the same bridge without another desktop code
-    // change.
     if (provider.externalCallbackReady !== false) externalCallback.add(id);
   }
   return { backend, externalCallback };
 };
 
 const createBackendIntegrationConnectLink = async (
-  // Pre-resolved auth: the caller carries the SAME values into the
-  // completion-status wait afterwards, so a transient auth loss between
-  // link creation and polling can't silently skip the confirmation.
   auth: { backendUrl: string; authToken: string },
   id: string,
   signal?: AbortSignal,
@@ -207,8 +187,6 @@ const createBackendIntegrationConnectLink = async (
       signal: signal ? AbortSignal.any([timeout, signal]) : timeout,
     },
   ).catch(() => {
-    // Distinguishes a hung/failed request from an HTTP error below; the
-    // connect flow surfaces this on the card instead of hanging.
     throw new Error(
       "Stella's backend did not respond while creating the connection link.",
     );
@@ -315,10 +293,6 @@ export const ensureNativeCredential = async (
     if (!options.requestExternalOAuthApproval) {
       throw new Error(`${entry.name} connection is unavailable.`);
     }
-    // Resolve auth ONCE and reuse it for both the connect link and the
-    // completion wait below. Re-reading it after the browser hop could
-    // silently come back empty (transient auth loss / sign-out) and must
-    // not turn into an implicit "connected".
     const backendUrl = options.getBackendUrl?.()?.trim().replace(/\/+$/u, "");
     if (!backendUrl) throw new Error("Stella backend is unavailable.");
     const authToken = await options.getAuthToken?.();

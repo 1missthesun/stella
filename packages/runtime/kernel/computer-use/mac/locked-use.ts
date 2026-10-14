@@ -37,11 +37,6 @@ import {
   type SessionPaths,
 } from "./session-paths.js";
 
-// Cross-process serialization for argv commands (directory locks keyed by
-// target app, the global HID, and the session), plus locked-screen computer
-// use: the native authorization plug-in installer and the per-action unlock
-// lease opened through the daemon.
-
 type LockedUsePayload = {
   ok: boolean;
   enabled: boolean;
@@ -257,8 +252,6 @@ const runProcessCapture = async (
       cancelTimer();
       resolve(result);
     };
-    // The capture deadline is a forked timeout fiber interrupted by settle
-    // (the clearTimeout analogue); duration and kill path unchanged.
     const cancelTimer = forkCancelableTimeout(timeoutMs, () => {
       killProcessGroup(child.pid);
       settle({

@@ -9,7 +9,6 @@ import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
 import type { PendingCloudTurnSubmission } from "./conversation-outbox";
 import type { DesktopExecutionTarget } from "../execution-placement/execution-target-store";
 
-/** The gate's dispatch row, as the browser reads it. */
 export type BrowserExecutionDispatch = DispatchSummary;
 
 const routingFields = (
@@ -24,7 +23,6 @@ const routingFields = (
   };
 };
 
-/** Only the four fields the gate carries, in a stable key order. */
 const canonicalExecution = (
   execution: CloudExecutionSelection | null,
 ): CloudExecutionSelection | null =>
@@ -37,11 +35,6 @@ const canonicalExecution = (
       } as CloudExecutionSelection)
     : null;
 
-/**
- * Exactly the bytes an executing device receives. The owner gate hashes this
- * object, hands it to whichever computer claims the offer, and deletes its
- * copy on ack — so an idempotent retry must rebuild it identically.
- */
 export const browserExecutionPayload = (args: {
   clientMsgId: string;
   conversationId: string;
@@ -75,7 +68,6 @@ export const sha256Hex = async (value: string): Promise<string> => {
     .join("");
 };
 
-/** The `POST /owners/me/dispatches` body for one browser-originated turn. */
 export const browserExecutionSubmitArgs = async (args: {
   clientMsgId: string;
   conversationId: string;
@@ -105,10 +97,6 @@ export type BrowserExecutionWaitResult =
   | { status: "terminal"; dispatch: BrowserExecutionDispatch }
   | { status: "stale" };
 
-/**
- * Polls the owner gate until placement produces a turn to subscribe to, or
- * the dispatch settles. The caller injects the authenticated status reader.
- */
 export const waitForBrowserExecutionTurn = async (args: {
   dispatchId: string;
   queryStatus: (dispatchId: string) => Promise<BrowserExecutionDispatch | null>;

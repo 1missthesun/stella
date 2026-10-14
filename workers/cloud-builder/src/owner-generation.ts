@@ -25,14 +25,6 @@ export type OwnerPurgeBeginDisposition =
     }
   | { action: "reject" };
 
-/**
- * Decides whether a purge begin request creates, resumes, or rejoins a fence.
- *
- * `rejoinedFromGeneration` makes the rejoin acknowledgement itself replayable:
- * if the response carrying the replacement generation is lost, retrying with
- * the released generation returns the same blocked fence instead of opening a
- * second one or stranding the caller on a 409.
- */
 export const ownerPurgeBeginDisposition = (args: {
   state: "open" | "blocked";
   mode?: "temporary" | "permanent";
@@ -64,11 +56,6 @@ export const ownerPurgeBeginDisposition = (args: {
       : { action: "reject" };
   }
 
-  // Before the caller has durably recorded the first generation, an
-  // initial begin response can be lost. The immutable lifecycle operation id
-  // is the only authority available on that retry: exact replay returns the
-  // same blocked fence, while another operation id cannot adopt it. A delete
-  // upgrade is monotonic and therefore safe for the same operation.
   if (!expectedGeneration) {
     return requestId === args.beginRequestId
       ? {
@@ -88,8 +75,6 @@ export const ownerPurgeBeginDisposition = (args: {
   if (expectedGeneration === args.rejoinedFromGeneration) {
     return {
       action: "resume",
-      // The caller has not yet acknowledged the replacement generation, so a
-      // replay may recover it but cannot upgrade the fence to permanent.
       upgradeToPermanent: false,
       rejoined: true,
     };

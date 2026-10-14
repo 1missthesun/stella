@@ -40,17 +40,8 @@ import {
   type AppFrame,
 } from "../lib/app-cache";
 
-// Every refresh is a backend round trip against the owner's objects, so the
-// list refreshes slowly; returning to the library or to the foreground
-// refreshes it immediately, which is what makes a slow interval enough.
 const APPS_REFRESH_MS = 60_000;
 
-/**
- * Agent-authored apps are raw web pages. Pin them to a device-width, unzoomable
- * viewport and stop the document itself from overscrolling so an app scrolls
- * like a native screen instead of panning the whole page. Injected scripts run
- * outside the app's CSP sandbox.
- */
 const NATIVE_FEEL_SCRIPT = `(() => {
   const viewport = "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no";
   const apply = () => {
@@ -75,10 +66,8 @@ const NATIVE_FEEL_SCRIPT = `(() => {
 })();
 true;`;
 
-/** Owned by the shell: navigating away must not discard the library or WebViews. */
 export function PersistentAppsHost({ visible }: { visible: boolean }) {
   const { data: session, isPending } = authClient.useSession();
-  // Apps are served from the backend worker, whose origin is build config.
   const origin = env.backendUrl || null;
   const owner = session?.user.id;
   if (!owner || !origin)
@@ -179,8 +168,6 @@ function AppsHost({
     };
   }, [cacheKey]);
 
-  // Preload once at shell entry. Poll only while the library is visible and
-  // foregrounded; returning triggers a refresh without hiding cached content.
   useEffect(() => {
     if (!active || (!visible && preloaded.current)) return;
     preloaded.current = true;
@@ -292,7 +279,6 @@ function AppsHost({
       }
     }
   };
-  // An app card or link in the chat asked to open this app.
   const pendingOpen = usePendingAppOpen();
   const openPending = useEffectEvent((slug: string) => {
     const app = apps?.find(
@@ -309,8 +295,6 @@ function AppsHost({
     const app = apps?.find((entry) => entry.slug === selected);
     if (app) void open(app);
   });
-  // Retained pages outlive a navigation visit. Renew their one-hour access
-  // before it expires, including when returning from a long background stay.
   useEffect(() => {
     if (!visible || !active || !frame) return;
     const timer = setTimeout(

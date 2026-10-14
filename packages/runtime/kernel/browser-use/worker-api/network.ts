@@ -1,8 +1,3 @@
-/**
- * `tab.network`: observe the tab's traffic, rewrite its outgoing requests,
- * and make authenticated requests from the page's own origin.
- */
-
 import type { BrowserWorkerNetwork } from "../worker-api.js";
 import {
   requireNonNegativeInteger,

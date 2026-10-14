@@ -1,12 +1,3 @@
-/**
- * CompanionMarkRoot — the small always-on-top window holding the mark.
- *
- * This window is the companion's only permanent hit target: hovering it
- * summons the panel behind it (arc, composer, bubbles), clicking toggles the
- * composer, dragging moves the whole companion, right-click opens the menu.
- * It never resizes and never takes keyboard focus; everything it learns
- * about the panel (expanded, recording) arrives from main as activity.
- */
 import { useMemo, useRef } from "react";
 import { COMPANION_MARK_SIZE } from "@stella/contracts/desktop/companion";
 import { useUiState } from "@/context/ui-state";
@@ -37,9 +28,6 @@ export function CompanionMarkRoot() {
   const voiceActive = Boolean(uiState.isVoiceRtcActive);
   const voice = useVoiceSpeakingState(voiceActive);
   const documentVisible = useDocumentVisible();
-  // Hiding the companion hides this window without changing its document
-  // visibility (see `useCompanionVisible`), so gate on main's signal too;
-  // otherwise the mark kept rebuilding its outline at 60fps while hidden.
   const companionVisible = useCompanionVisible();
   const markHandleRef = useRef<StellaMarkHandle | null>(null);
 
@@ -47,7 +35,6 @@ export function CompanionMarkRoot() {
     markHandleRef.current?.sparkle(),
   );
 
-  // ── Mood ─────────────────────────────────────────────────────────────
   const markState = useMemo<StellaCharacterState>(() => {
     if (dragging) return "happy";
     if (activity.recording) return "listening";

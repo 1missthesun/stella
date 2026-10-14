@@ -74,8 +74,6 @@ export const registerCaptureHandlers = (options) => {
         }
         return options.captureService.captureScreenshot(point);
     });
-    // Composer capture entry point: hide the full shell, run the overlay, merge
-    // any capture, then restore the shell's previous visibility/focus state.
     handleIpc(IPC_CAPTURE_BEGIN_REGION_CAPTURE, async (event) => {
         if (!options.assertPrivilegedSender(event, IPC_CAPTURE_BEGIN_REGION_CAPTURE)) {
             throw new Error("Blocked untrusted request.");

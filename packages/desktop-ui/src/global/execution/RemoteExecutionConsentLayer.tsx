@@ -18,16 +18,6 @@ type PendingRemoteExecutionRequest = {
   requesterLabel?: string;
 };
 
-/**
- * The "accept work from your other devices?" question, asked on the screen of
- * the computer it is about.
- *
- * It is a dialog and not a toast because an answer is wanted: something is
- * waiting on it, and a notice that scrolls away would leave the device looking
- * merely un-asked. Both answers are recorded — Allow enables this computer,
- * Not now records that it was declined — while closing the dialog answers
- * nothing, so the next attempt may ask again.
- */
 export const RemoteExecutionConsentLayer = () => {
   const t = useT();
   const [pending, setPending] = useState<PendingRemoteExecutionRequest | null>(
@@ -39,9 +29,6 @@ export const RemoteExecutionConsentLayer = () => {
   useEffect(() => {
     const remoteExecution = getElectronApi()?.remoteExecution;
     if (!remoteExecution?.onRequest) return;
-    // Main sends this fire-and-forget, so the subscription has to outlive any
-    // particular surface being open; `App` mounts this layer eagerly. A
-    // question raised before this window was listening is asked for once.
     let received = false;
     const unsubscribe = remoteExecution.onRequest((request) => {
       received = true;
@@ -67,8 +54,6 @@ export const RemoteExecutionConsentLayer = () => {
       await remoteExecution.answer(allow);
       setPending(null);
     } catch {
-      // Keep the prompt up: the answer the user gave was not recorded, and
-      // guessing either way would be worse than asking again.
       setFailed(true);
     } finally {
       setAnswering(false);
@@ -88,7 +73,6 @@ export const RemoteExecutionConsentLayer = () => {
     <Dialog
       open
       onOpenChange={(next) => {
-        // Dismissing is not declining; it leaves the question unanswered.
         if (!next && !answering) setPending(null);
       }}
     >

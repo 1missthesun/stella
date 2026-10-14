@@ -1,15 +1,3 @@
-/**
- * Catch-ups: a very short summary of a conversation's busy stretch (done,
- * ongoing, waiting on the user), asked for from the composer's "Catch up"
- * pill on any device and kept here so every device scrolls the same history.
- *
- * A request records a pending entry and runs one background job: it reads
- * the conversation's newest messages and running agents from its journal
- * (`OrchestratorSession.catchUpSource`), has Stella's light model write the
- * summary, and fills the entry in. The list view carries it to clients.
- * Nothing runs unless someone asks.
- */
-
 import type { Tool, ToolCall } from "@earendil-works/pi-ai";
 import { createModels } from "@earendil-works/pi-ai/models";
 import type { TSchema } from "@sinclair/typebox";
@@ -43,14 +31,11 @@ const KEPT_PER_CONVERSATION = 60;
 const LISTED = 40;
 const PENDING_STALE_MS = 3 * 60_000;
 
-/** New messages a catch-up reads at most, newest kept. */
 const MAX_NEW_MESSAGES = 60;
 const MAX_NEW_CHARS = 40_000;
 const NEW_MESSAGE_CHARS = 1_200;
-/** Without an earlier catch-up: the last few hours, at least this many. */
 const FIRST_WINDOW_MS = 6 * 60 * 60_000;
 const FIRST_MIN_MESSAGES = 20;
-/** Messages before the new ones, for context only. */
 const CONTEXT_MESSAGES = 6;
 const CONTEXT_MESSAGE_CHARS = 400;
 const MAX_ITEMS = 8;
@@ -128,7 +113,6 @@ const toCatchUp = (row: Row): CatchUp => ({
   ...(row.error ? { error: row.error } : {}),
 });
 
-/** Oldest first. A failed one shows only while it is the newest, for its retry. */
 const listFor = (db: OwnerDbReader, conversationId: string): CatchUp[] => {
   const rows = db
     .all<Row>(
@@ -172,7 +156,6 @@ const request = async (
       ORDER BY created_at DESC LIMIT 1`,
     args.conversationId,
   );
-  // Two devices asking at once share one summary.
   if (pending && ctx.now - pending.created_at < PENDING_STALE_MS) {
     return { catchUpId: pending.catch_up_id };
   }
@@ -204,7 +187,6 @@ const request = async (
   return { catchUpId };
 };
 
-/** The messages a catch-up covers, and the ones before them for context. */
 export const selectMessages = (
   messages: readonly CatchUpSourceMessage[],
   previous: { throughSeq: number } | null,
@@ -352,7 +334,6 @@ const promptFor = (input: {
   return sections.join("\n\n");
 };
 
-/** The previous catch-up's open items, which the prompt names p1, p2, … */
 const carriedItems = (previous: Body): CatchUpItem[] => [...previous.ongoing, ...previous.waiting];
 
 const itemsFrom = (
@@ -370,7 +351,6 @@ const itemsFrom = (
       const match = /^\[?([mp])(\d+)\]?$/iu.exec(String(id).trim());
       if (!match) continue;
       const index = Number(match[2]) - 1;
-      // A carried item keeps the links it had.
       const found: CatchUpLink[] =
         match[1]!.toLowerCase() === "p"
           ? (carried[index]?.links ?? [])
@@ -401,11 +381,6 @@ const bodyFrom = (raw: Record<string, unknown>, input: SummarizeInput): Body => 
   };
 };
 
-/**
- * Who writes it: someone on Claude Code gets Claude Code itself (Haiku at
- * medium effort, on their own Claude login in Stella's cloud); everyone else,
- * and Claude Code when that login is missing or fails, Stella's light model.
- */
 const summarize = async (
   ctx: OwnerContext,
   input: SummarizeInput,
@@ -562,7 +537,6 @@ const generate = async (ctx: OwnerContext, payload: unknown): Promise<void> => {
       Date.now(),
     );
     if (fresh.length === 0) {
-      // Nothing new since the last one: that one still stands.
       ctx.db.run(`DELETE FROM catch_ups WHERE catch_up_id = ?`, catchUpId);
       return;
     }

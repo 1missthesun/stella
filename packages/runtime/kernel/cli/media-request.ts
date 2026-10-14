@@ -32,7 +32,6 @@ const MIME_TYPES: Record<string, string> = {
   flac: "audio/flac",
 };
 
-/** Every `file://` URL in the input, read and sent inline as a data URI. */
 export const inlineLocalFiles = async (value: unknown): Promise<unknown> => {
   if (typeof value === "string" && value.startsWith("file://")) {
     const filePath = new URL(value).pathname;
@@ -67,7 +66,6 @@ const readBody = async (response: Response): Promise<unknown> => {
   }
 };
 
-/** One call to Stella's media API with the given bearer, as status and JSON body. */
 export const sendMediaRequest = async (
   auth: MediaAuth,
   operation: MediaOperation,

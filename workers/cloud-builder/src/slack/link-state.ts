@@ -1,10 +1,3 @@
-/**
- * Signed, short-lived tokens for the Slack flows, on the shared
- * `OAUTH_STATE_SECRET` signer. The subject field carries a Slack identity
- * (`slack:<team>:<user>`) before linking, and the proven Stella owner id on
- * the confirm step.
- */
-
 import { signOAuthState, verifyOAuthState } from "../oauth-state.js";
 
 export const LINK_KIND = "slack_link";
@@ -72,9 +65,7 @@ export const verifyConfirmToken = async (
 };
 
 export type SlackInstallState = {
-  /** The signed-in Stella account that started the install on stella.sh. */
   ownerId?: string;
-  /** Where the install returns when it began on stella.sh. */
   returnTo?: string;
 };
 

@@ -26,15 +26,11 @@ import {
 
 const log = (...args: unknown[]) => console.error("[firefox-data]", ...args);
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 export type FirefoxDomainVisit = {
   domain: string;
   visits: number;
   frecency: number;
-  lastVisit: number; // ms since epoch
+  lastVisit: number;
 };
 
 export type FirefoxBookmark = {
@@ -47,10 +43,6 @@ export type FirefoxSignals = {
   domains: FirefoxDomainVisit[];
   bookmarks: FirefoxBookmark[];
 };
-
-// ---------------------------------------------------------------------------
-// Profile Detection
-// ---------------------------------------------------------------------------
 
 const getFirefoxProfilesDir = (): string => {
   const home = os.homedir();
@@ -68,14 +60,12 @@ const getFirefoxProfilesDir = (): string => {
   }
 };
 
-/** Find the active Firefox profile directory */
 const findActiveProfile = async (): Promise<string | null> => {
   const profilesDir = getFirefoxProfilesDir();
 
   try {
     const entries = await fs.readdir(profilesDir);
 
-    // Prefer .default-release (active profile), then .default
     const preferred = entries.find((e) => e.endsWith(".default-release"))
       ?? entries.find((e) => e.endsWith(".default"))
       ?? entries.find((e) => e.includes("default"));
@@ -91,7 +81,6 @@ const findActiveProfile = async (): Promise<string | null> => {
       }
     }
 
-    // Fallback: find any profile with places.sqlite
     for (const entry of entries) {
       const placesPath = path.join(profilesDir, entry, "places.sqlite");
       try {
@@ -108,10 +97,6 @@ const findActiveProfile = async (): Promise<string | null> => {
   return null;
 };
 
-// ---------------------------------------------------------------------------
-// SQLite Helper
-// ---------------------------------------------------------------------------
-
 type SqliteDatabase = {
   prepare(sql: string): {
     all(...params: unknown[]): unknown[];
@@ -127,10 +112,6 @@ const openDatabase = async (dbPath: string): Promise<SqliteDatabase> => {
   const uri = `${pathToFileURL(dbPath).href}?immutable=1`;
   return new Database(uri, { readonly: true }) as SqliteDatabase;
 };
-
-// ---------------------------------------------------------------------------
-// Data Queries
-// ---------------------------------------------------------------------------
 
 const DOMAINS_QUERY = `
 SELECT
@@ -165,10 +146,6 @@ ORDER BY b.lastModified DESC
 LIMIT 100
 `;
 
-// ---------------------------------------------------------------------------
-// Main Collection
-// ---------------------------------------------------------------------------
-
 const collectFirefoxDataEffect: Effect.Effect<FirefoxSignals | null, unknown> =
   Effect.gen(function* () {
     const profilePath = yield* tryDiscovery(() => findActiveProfile());
@@ -186,7 +163,6 @@ const collectFirefoxDataEffect: Effect.Effect<FirefoxSignals | null, unknown> =
         const db = yield* acquireCloseable(() => openDatabase(sourcePath));
 
         return yield* tryDiscoverySync(() => {
-          // Query domains
           const domainRows = db.prepare(DOMAINS_QUERY).all() as {
             domain: string;
             visits: number;
@@ -202,7 +178,6 @@ const collectFirefoxDataEffect: Effect.Effect<FirefoxSignals | null, unknown> =
             lastVisit: r.last_visit ? Math.floor(r.last_visit / 1000) : 0,
           }));
 
-          // Query bookmarks
           const bookmarkRows = db.prepare(BOOKMARKS_QUERY).all() as {
             bookmark_title: string;
             url: string;
@@ -233,10 +208,6 @@ const collectFirefoxDataEffect: Effect.Effect<FirefoxSignals | null, unknown> =
 export const collectFirefoxData = async (): Promise<FirefoxSignals | null> =>
   runDiscovery(collectFirefoxDataEffect);
 
-// ---------------------------------------------------------------------------
-// Formatting
-// ---------------------------------------------------------------------------
-
 export const formatFirefoxDataForSynthesis = (signals: FirefoxSignals): string => {
   const sections: string[] = ["## Firefox"];
 
@@ -255,20 +226,17 @@ export const formatFirefoxDataForSynthesis = (signals: FirefoxSignals): string =
   }
 
   if (signals.bookmarks.length > 0) {
-    // Group by folder
     const foldered = signals.bookmarks.filter((b) => b.folder);
     const unfoldered = signals.bookmarks.filter((b) => !b.folder);
 
     if (foldered.length > 0 || unfoldered.length > 0) {
       sections.push("\n### Bookmarks");
 
-      // Show folder names as categories
       const folders = [...new Set(foldered.map((b) => b.folder!))];
       if (folders.length > 0) {
         sections.push("Folders: " + folders.slice(0, 15).join(", "));
       }
 
-      // Show top bookmarks
       const topBookmarks = signals.bookmarks.slice(0, 15);
       sections.push(
         topBookmarks

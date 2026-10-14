@@ -190,8 +190,6 @@ const openDatabase = (stellaDataDir: string): PortableSqliteDatabase => {
       );
     }
     if (!aliasColumns.has("identity_version")) {
-      // Rows from releases before canonical external-engine identities are
-      // eligible for exactly one request-hash migration reattachment.
       db.exec(
         "ALTER TABLE image_tool_operation_aliases ADD COLUMN identity_version INTEGER NOT NULL DEFAULT 1",
       );
@@ -266,10 +264,6 @@ export const reserveDurableImageOperation = (args: {
       return toOperation(alias, true);
     }
 
-    // Pre-canonical external-engine aliases get one migration reattachment by
-    // request hash. Current aliases never use this fallback: a different
-    // canonical tool-call identity is an intentional new invocation, even if
-    // its arguments happen to be identical.
     const recoverable = db
       .prepare(
         `SELECT operation_id, job_id, state, submission_state,
@@ -328,11 +322,6 @@ export const reserveDurableImageOperation = (args: {
   }
 };
 
-/**
- * Durable local at-most-once boundary for BYOK providers. Once this CAS wins,
- * a restart may reattach a persisted provider request id, but it must never
- * blindly repeat an ambiguous direct POST.
- */
 export const claimImageOperationSubmission = (args: {
   stellaDataDir: string;
   operationId: string;

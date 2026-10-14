@@ -121,8 +121,6 @@ export function uiStateSharedStore(): Plugin {
         });
       };
 
-      // Changes flushed by the other host (Electron main) or another process
-      // surface through the file watcher.
       const unsubscribe = sharedStore.onExternalChange(
         (changes: UiStateChanges) => broadcast({ clientId: null, changes }),
       );

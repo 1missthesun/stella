@@ -1,25 +1,3 @@
-/**
- * DiscoveryService — the Effect-native orchestrator for the user-signal
- * sweep. Owns the collector fan-out (an `Effect.forEach` with an explicit
- * concurrency cap and an optional per-collector timeout) and the synthesis
- * formatting pipeline.
- *
- * Parity notes (do not change without measuring the old sweep):
- * - The pre-Effect sweep ran collectors strictly sequentially (a for-loop of
- *   awaits) with no per-collector timeout. Those are the defaults here —
- *   `concurrency: 1`, no timeout — so collection completeness and timing are
- *   unchanged unless a caller opts into different budgets.
- * - Per-collector failure isolation is byte-identical: the same `.catch`
- *   fallbacks guard the same collectors (bookmarks/firefox/safari/
- *   system/steam/music/messagesNotes degrade to the same partial shapes),
- *   and the unguarded collectors (browser/devProjects) still fail the
- *   sweep, which `collectAllSignals` converts to the same `{ data: null,
- *   error }` result.
- *
- * The plain-Promise facade with the historical export names lives in
- * `collect-all.ts`.
- */
-
 import path from "path";
 import { Cause, Context, Effect, Layer } from "effect";
 import {
@@ -85,7 +63,6 @@ import type { BrowserType } from "@stella/contracts";
 
 const log = (...args: unknown[]) => console.error("[collect-all]", ...args);
 
-// Default categories (Category 4 is opt-in)
 export const DEFAULT_CATEGORIES: DiscoveryCategory[] = [
   "browsing_bookmarks",
   "dev_environment",
@@ -124,10 +101,6 @@ const persistSelectedCategories = async (
   }
 };
 
-// ---------------------------------------------------------------------------
-// Extended Signals Type
-// ---------------------------------------------------------------------------
-
 export type ExtendedUserSignals = AllUserSignals & {
   bookmarks?: BrowserBookmarks | null;
   safari?: SafariData | null;
@@ -139,34 +112,10 @@ export type ExtendedUserSignals = AllUserSignals & {
   musicLibrary?: MusicLibrarySignals | null;
 };
 
-// ---------------------------------------------------------------------------
-// Fan-out Options
-// ---------------------------------------------------------------------------
-
-/**
- * Budgets for the collector fan-out. The defaults reproduce the pre-Effect
- * sweep's observable behavior exactly; both knobs exist so callers can opt
- * into bounded sweeps without another rewrite.
- */
 export type DiscoveryCollectionOptions = {
-  /**
-   * Maximum collectors in flight. Default `1` — the pre-Effect sweep awaited
-   * each collector before starting the next.
-   */
   readonly concurrency?: number | "unbounded";
-  /**
-   * Per-collector timeout in milliseconds. Default: none — the pre-Effect
-   * sweep never timed a collector out. When set, a lapsed collector fails
-   * with `TimeoutException`, which propagates exactly like a collector
-   * rejection (guarded collectors keep their fallback shapes via their own
-   * `.catch`; unguarded ones fail the sweep).
-   */
   readonly collectorTimeoutMs?: number;
 };
-
-// ---------------------------------------------------------------------------
-// Main Collection
-// ---------------------------------------------------------------------------
 
 const collectAllUserSignalsEffect = (
   StellaDataDir: string,
@@ -181,10 +130,6 @@ const collectAllUserSignalsEffect = (
     if (selectedProfile) log("Selected browser profile:", selectedProfile);
     const start = Date.now();
 
-    // Build lazy tasks so selecting multiple categories does not launch every
-    // local database, filesystem, and browser collector at once during
-    // onboarding. Each task keeps the exact `.catch` isolation the pre-Effect
-    // sweep gave it.
     const tasks: Record<string, () => Promise<unknown>> = {};
 
     if (categories.includes("browsing_bookmarks")) {
@@ -217,7 +162,6 @@ const collectAllUserSignalsEffect = (
           });
       }
 
-      // Only run Firefox/Safari if no specific browser selected, or if that browser is selected
       if (!selectedBrowser || selectedBrowser === "firefox") {
         tasks.firefox = () =>
           collectFirefoxData().catch((e) => {
@@ -269,11 +213,6 @@ const collectAllUserSignalsEffect = (
         });
     }
 
-    // Fan-out: explicit concurrency cap (default 1 = the old sequential
-    // for-loop, preserving order and fail-fast) and optional per-collector
-    // timeout (default none). With the default cap a failing unguarded
-    // collector stops the sweep before later collectors start — exactly the
-    // pre-Effect behavior.
     const keys = Object.keys(tasks);
     const results: Record<string, unknown> = {};
     const collectorTimeoutMs = options?.collectorTimeoutMs;
@@ -297,7 +236,6 @@ const collectAllUserSignalsEffect = (
     log(`Collection complete in ${elapsed}ms`);
 
     return {
-      // Existing signals (may be undefined if category not selected)
       browser: (results.browser as AllUserSignals["browser"]) ?? {
         browser: null,
         clusterDomains: [],
@@ -311,7 +249,6 @@ const collectAllUserSignalsEffect = (
         projectPaths: [],
         toolsUsed: [],
       },
-      // New signals
       bookmarks: results.bookmarks as BrowserBookmarks | null | undefined,
       safari: results.safari as SafariData | null | undefined,
       firefox: results.firefox as FirefoxSignals | null | undefined,
@@ -322,10 +259,6 @@ const collectAllUserSignalsEffect = (
     };
   });
 
-// ---------------------------------------------------------------------------
-// Formatting for LLM Synthesis
-// ---------------------------------------------------------------------------
-
 const formatSignalsForSynthesisWithSections = async (
   data: ExtendedUserSignals,
   categories: DiscoveryCategory[] = DEFAULT_CATEGORIES,
@@ -335,7 +268,6 @@ const formatSignalsForSynthesisWithSections = async (
 }> => {
   const formattedSections: FormattedCategorySections = {};
 
-  // --- Category 1: Browsing & Bookmarks ---
   if (categories.includes("browsing_bookmarks")) {
     const categorySections: string[] = [];
 
@@ -367,7 +299,6 @@ const formatSignalsForSynthesisWithSections = async (
     }
   }
 
-  // --- Category 2: Development Environment ---
   if (categories.includes("dev_environment")) {
     const categorySections: string[] = [];
 
@@ -380,7 +311,6 @@ const formatSignalsForSynthesisWithSections = async (
     }
   }
 
-  // --- Category 3: Apps & System ---
   if (categories.includes("apps_system")) {
     const categorySections: string[] = [];
 
@@ -405,7 +335,6 @@ const formatSignalsForSynthesisWithSections = async (
     }
   }
 
-  // --- Category 4: Messages & Notes ---
   if (categories.includes("messages_notes") && data.messagesNotes) {
     const messagesSection = formatMessagesNotesForSynthesis(data.messagesNotes);
     if (messagesSection) {
@@ -419,7 +348,6 @@ const formatSignalsForSynthesisWithSections = async (
       Boolean(section && section.trim().length > 0),
     );
 
-  // Post-process: filter low-signal domains, then tier for synthesis priority
   let formatted = orderedSections.join("\n\n");
   formatted = filterLowSignalDomains(formatted);
   formatted = tierFormattedSignals(formatted);
@@ -430,15 +358,7 @@ const formatSignalsForSynthesisWithSections = async (
   };
 };
 
-// ---------------------------------------------------------------------------
-// Service
-// ---------------------------------------------------------------------------
-
 export interface Interface {
-  /**
-   * Collect all user signals, filtered by selected categories. Fails with
-   * the first unguarded collector error, exactly like the pre-Effect sweep.
-   */
   readonly collectAllUserSignals: (
     stellaDataDir: string,
     categories?: DiscoveryCategory[],
@@ -446,11 +366,6 @@ export interface Interface {
     selectedProfile?: string | null,
     options?: DiscoveryCollectionOptions,
   ) => Effect.Effect<ExtendedUserSignals, unknown>;
-  /**
-   * Collect and format all signals. Never fails: any sweep error (including
-   * defects) degrades to `{ data: null, formatted: null, formattedSections:
-   * null, error }` with the original error message.
-   */
   readonly collectAllSignals: (
     stellaDataDir: string,
     categories?: DiscoveryCategory[],

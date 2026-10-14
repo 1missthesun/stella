@@ -37,21 +37,6 @@ const stellaAppDirFromProjectRoot = () => {
   return projectRoot.slice(0, -suffix.length);
 };
 
-/**
- * Small auth adapter for the existing Google Workspace service classes.
- *
- * The old implementation had its own plaintext token file, cloud-function
- * exchange, and browser opener. Store-native integrations now own OAuth:
- * tokens live in connector protected storage and browser launch is brokered
- * by the shared connector dialog before this class is ever asked for a client.
- *
- * M5: the token/profile IO runs as Effects on the shared
- * `googleWorkspaceRuntime`; the public methods stay plain-Promise facades
- * that reject with the original failure objects (tagged parity errors carry
- * the exact pre-Effect messages). The `client.on("tokens")` persistence
- * callback stays a plain async closure because google-auth-library invokes it from
- * non-Effect land.
- */
 export class AuthManager {
   private client: OAuth2Client | null = null;
   private readonly clientId = loadConfig().clientId;

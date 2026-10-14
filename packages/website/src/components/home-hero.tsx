@@ -3,10 +3,6 @@ import { DownloadButton } from "./download-button";
 import { WindowsInstallNote } from "./windows-install-note";
 import styles from "./home-hero.module.css";
 
-/* Editorial hero ported from the fromyou-ai landing page: a single
- * left-aligned content block (headline, body, download) sitting on an aurora
- * that pours in from the right. The whole block reveals together on landing
- * (a soft blur + rise) in lockstep with the desktop mock below. */
 export function HomeHero() {
   return (
     <main className={styles.hero} aria-labelledby="hero-title">

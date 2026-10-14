@@ -34,7 +34,6 @@ export type NativeConnectorCatalogEntry = {
   catalogToolCount: number;
   availability: NativeConnectorAvailability;
   provider: "google-workspace" | "oauth-catalog" | "backend-composio";
-  /** Bundled execution is opt-in. Recovered OAuth entries are metadata only. */
   localExecution?: "production-ready" | "incomplete";
   toolPrefix?: string;
   description: string;
@@ -45,7 +44,6 @@ export type NativeConnectorCatalogEntry = {
     type: "composio";
     toolkit: string;
   };
-  /** Authoritative executable action map supplied by the Store catalog. */
   actions?: readonly NativeConnectorCatalogAction[];
   oauthConfig?: NativeOAuthProviderConfig;
   oauthSetupGroup?: {
@@ -192,9 +190,6 @@ const GOOGLE_WORKSPACE_CONNECTOR_CATALOG: NativeConnectorCatalogEntry[] = [
   },
 ];
 
-// Lazily derived from the OAuth catalog's summary sidecar (~50KB; no `tools`),
-// so listing/matching connectors never parses the ~12MB full catalog. Memoized
-// after first build.
 let cachedNativeConnectorCatalog: NativeConnectorCatalogEntry[] | null = null;
 
 const getNativeConnectorCatalog = (): NativeConnectorCatalogEntry[] => {
@@ -231,15 +226,6 @@ const getNativeConnectorCatalog = (): NativeConnectorCatalogEntry[] => {
   return cachedNativeConnectorCatalog;
 };
 
-/**
- * Bundled catalog with optional server entries overlaid (server wins by
- * id; new server entries are appended). The overlay deliberately does
- * NOT replace the bundled catalog: locally-owned entries (Google
- * Workspace, recovered OAuth providers) must stay resolvable even when
- * the backend catalog only carries its Composio set — otherwise Gmail
- * could be offered by discovery yet fail to resolve in the Store/connect
- * paths that pass the server catalog through.
- */
 export const buildNativeConnectorCatalog = (
   serverCatalog?: NativeConnectorCatalogOverride,
 ): NativeConnectorCatalogEntry[] => {
@@ -649,10 +635,6 @@ export const enableNativeConnector = async (
     source,
   };
   await writeState(stellaAppDir, state);
-  // `toolCount` mirrors what `listNativeConnectors` returns so the
-  // website can drop the updated entry straight into its local state
-  // without re-listing. Omitting it would briefly render "undefined
-  // actions" on the just-enabled card until the next list refresh.
   return {
     ...entry,
     ...setup,

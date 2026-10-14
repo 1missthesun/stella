@@ -11,9 +11,6 @@ export const AGENT_HISTORY_MAX_ROWS = 400;
 export const AGENT_HISTORY_MAX_BYTES = 4 * 1024 * 1024;
 export const AGENT_HISTORY_ROW_MAX_BYTES = 512 * 1024;
 
-// Cloud history is its own serialized AgentMessage boundary, not a desktop
-// SQLite row. Keep this validator local and dependency-free so a resident
-// Durable Object wake does not initialize the desktop storage schemas.
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === "object" && !Array.isArray(value);
 
@@ -181,11 +178,6 @@ const parseAgentHistoryMessage = (value: string): AgentMessage | undefined => {
 const utf8Bytes = (value: string): number =>
   new TextEncoder().encode(value).byteLength;
 
-/**
- * Treat backend thread history as authoritative input, not best-effort cache.
- * Any malformed row rejects the whole preflight so an agent can never run on
- * silently truncated/corrupted context.
- */
 export const parseAuthoritativeAgentHistory = (
   value: unknown,
 ): AgentMessage[] => {

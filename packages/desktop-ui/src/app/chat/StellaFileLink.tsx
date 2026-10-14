@@ -1,20 +1,3 @@
-/**
- * Inline clickable rendering for `stella://file/...` references in
- * assistant chat text.
- *
- * Renders as ordinary underlined link text inside the sentence — no chip
- * or card chrome — matching how a normal hyperlink reads. Clicking opens
- * the file in the matching workspace-panel viewer (canvas for HTML,
- * media/PDF/markdown/office viewers for those types) via the same
- * `openDisplayPayloadTab` path the end-resource pill uses; folders and
- * types with no in-app viewer go to the OS (see `openLocalPath`).
- *
- * The element arrives from `remarkStellaFileLinks` as a custom
- * `<stella-file path label>` node, so no real `href` ever exists — an
- * href-less `<a role="button">` avoids both navigation and the
- * bubble-highlight regression documented in `Markdown.tsx`.
- */
-
 import { useCallback, useMemo, useState } from "react";
 import type { KeyboardEvent } from "react";
 import {
@@ -37,12 +20,6 @@ type StellaFileLinkProps = {
   node?: unknown;
 };
 
-/**
- * A drive link (`stella://drive/...`, or a cloud turn's
- * `/workspace/world/drive/...`) names a drive file, never one on this
- * machine: it opens through the same owner-scoped drive path the sidebar and
- * completion pills use.
- */
 const CloudDriveFileLink = ({
   drivePath,
   display,
@@ -111,9 +88,6 @@ const LocalStellaFileLink = ({
   const t = useT();
   const [failed, setFailed] = useState(false);
   const display = rawLabel || (filePath ? basenameOf(filePath) : "");
-  // A world path the drive rule rejected (`/workspace/world/projects/x.md`,
-  // a fork's world, the app build root). It is still a cloud path, so it has
-  // no local file behind it — see `assertNotCloudWorkspacePath`.
   const cloudOnly = filePath ? isCloudWorkspacePath(filePath) : false;
 
   const open = useCallback(() => {
@@ -141,8 +115,6 @@ const LocalStellaFileLink = ({
     [open],
   );
 
-  // A reference the remark plugin let through without a usable path
-  // degrades to plain text instead of a dead control.
   if (!filePath || !display) {
     return <span>{display || null}</span>;
   }

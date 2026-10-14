@@ -15,11 +15,6 @@ export const CLOUD_BUILDER_BODY_LIMITS = {
   localTurnBegin: 8 * MiB,
 } as const;
 
-/**
- * Buffer and validate one JSON request while retaining its exact bytes for a
- * downstream Durable Object. Chunked requests are counted as they stream; the
- * Content-Length header is only an early rejection hint, never authority.
- */
 export const bufferBoundedJsonRequest = async (
   request: Request,
   maxBytes: number,

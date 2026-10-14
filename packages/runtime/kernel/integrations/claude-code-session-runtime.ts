@@ -49,10 +49,8 @@ import type {
   ToolUpdateCallback,
 } from "../tools/types.js";
 
-/** One parsed stream-json line from the CLI: untrusted JSON, read defensively. */
 export type ClaudeStreamEvent = Record<string, any>;
 type ClaudeToolArgs = Record<string, any>;
-/** One Stella or native tool call a step started, for side-effect reconciliation. */
 type McpCallRecord = {
   toolCallId: string;
   toolName: string;
@@ -70,9 +68,7 @@ type ClaudeToolUseTruncation = {
 };
 type ClaudeCodeStatusChange =
   | { state: "running" | "compacting" | "model-fallback"; text: string }
-  /** The turn is held until the Claude usage limit resets (`until`, when the CLI named it). */
   | { state: "usage-limit"; text: string; until?: number }
-  /** The hold ended: the turn resumed, or it was stopped while held. */
   | { state: "usage-limit-end"; text: string; resumed: boolean };
 type ClaudeCodeImage = { mimeType: string; data: string };
 type ClaudeCodeUsage = {
@@ -115,12 +111,6 @@ export type ClaudeCodeTurnRequest = {
   resumeFallbackPrompt?: string;
   systemPrompt?: string;
   cwd?: string;
-  /**
-   * The CLI's `--setting-sources`: which of the user's, the project's and the
-   * local settings it loads, and with them which CLAUDE.md files (user,
-   * project, local). Unset loads all of them; `[]` loads none, while
-   * Stella's own `--settings` (its hooks) always apply.
-   */
   settingSources?: readonly ("user" | "project" | "local")[];
   attachments?: readonly { url: string; mimeType?: string }[];
   tools: readonly ToolMetadata[];
@@ -128,23 +118,9 @@ export type ClaudeCodeTurnRequest = {
   nativeToolCallIds?: boolean;
   boundToolInactivity?: boolean;
   allowEmptyFinal?: boolean;
-  /**
-   * No message the user wrote waits for a reply: when the CLI asks itself
-   * for a visible answer after an empty one, the step ends there instead,
-   * with the empty answer.
-   */
   quietFinal?: boolean;
-  /**
-   * Context capacity the CLI compacts against (`CLAUDE_CODE_AUTO_COMPACT_WINDOW`).
-   * The CLI clamps it to the model's own window, so a smaller model keeps
-   * its default. Unset leaves the CLI's default.
-   */
   autoCompactWindowTokens?: number;
   abortSignal?: AbortSignal;
-  /**
-   * On a Claude usage limit, hold the turn until the limit resets and then
-   * carry on, rather than failing it. Off, the limit fails the turn at once.
-   */
   holdOnUsageLimit?: boolean;
   executeTool(
     toolCallId: string,
@@ -175,35 +151,11 @@ export type ClaudeCodeTurnRequest = {
   }): void;
   onTurnControl?(control: {
     inject: (input: ClaudeCodeInjectInput) => boolean;
-    /**
-     * End the step where it stands, at a tool boundary, without its answer:
-     * the CLI is stopped and the turn goes on as `toolSetAfterStep` says,
-     * on a CLI resuming the same session. False when the step can't end
-     * that way (it already ended, was stopped, or the turn took its last
-     * tool-set change).
-     */
     endStep: () => boolean;
   }): (() => void) | undefined;
   onIntermediateResult?(result: ClaudeCodeStepResult): void;
-  /**
-   * Asked as each step ends: the tool set the session runs with now, when it
-   * changed while the step ran (tools were added or removed), with what the
-   * agent reads as it carries on. The CLI
-   * restarts on the new set with --resume and the same turn goes on; the
-   * step's own answer reaches the host as an intermediate reply.
-   */
   toolSetAfterStep?(): ClaudeCodeToolSetChange | undefined;
-  /**
-   * The session's CLI started a query of its own because a background
-   * command it ran finished. Kept for the session past this turn: the host
-   * wakes the agent, whose next turn takes that query over.
-   */
   onBackgroundWake?(wake: ClaudeCodeBackgroundWake): void;
-  /**
-   * This turn exists to take over the CLI's own query about a finished
-   * background command: when that query is held, the prompt is not sent,
-   * since the CLI was told about the command itself.
-   */
   backgroundWake?: boolean;
   onSessionId?(sessionId: string): void;
   onSessionCheckpoint?(checkpoint: {
@@ -221,10 +173,6 @@ export type ClaudeCodeTurnRequest = {
     mcpServers: { name?: string; status?: string }[];
   }): void;
 };
-/**
- * Background commands the CLI ran that finished while no step waited on it:
- * the CLI started a query about them on its own (`holdAdrift`).
- */
 export type ClaudeCodeBackgroundWake = {
   id: string;
   tasks: { summary: string; status?: string; outputFile?: string }[];
@@ -235,14 +183,8 @@ export type ClaudeCodeToolSetChange = {
   systemPrompt?: string;
   prompt: string;
 };
-/** Tool-set changes one turn takes before it stops asking. */
 const MAX_TOOL_SET_CHANGES_PER_TURN = 4;
 
-/**
- * Agents (not the orchestrator) compact at about 400k tokens: the CLI fires
- * 33k below this window, keeping that much for the summary, and keeps the
- * model's own window when it is smaller.
- */
 export const CLAUDE_CODE_AGENT_AUTO_COMPACT_WINDOW = 433_000;
 type ClaudeCodeInjection = {
   consumed: boolean;
@@ -257,7 +199,6 @@ type NativeToolCall = {
   toolArgs: ClaudeToolArgs;
   settled?: boolean;
 };
-/** One prompt written to the CLI and still waiting on its `result` line. */
 type PendingStep = {
   request: ClaudeCodeTurnRequest;
   resolve: (result: ClaudeCodeStepResult) => void;
@@ -287,21 +228,17 @@ type ClaudeCodeProcessState = {
   compactionCount: number;
   launchConfig: string;
   claudeConfigDir: string | null;
-  /** Handles one stdout line as if it arrived now (`replayAdrift`). */
   handleLine?: (line: ClaudeStreamEvent) => "stop" | undefined;
-  /** A query the CLI started on its own with no step waiting, held whole. */
   adrift?: {
     lines: ClaudeStreamEvent[];
     woke: boolean;
     tasks: BackgroundTask[];
   };
-  /** Background commands that finished while a step ran. */
   finished?: BackgroundTask[];
 };
 type BackgroundTask = ClaudeCodeBackgroundWake["tasks"][number] & {
   id?: string;
 };
-/** A finished background command, from the CLI's `task_notification`. */
 const backgroundTaskOf = (
   line: ClaudeStreamEvent,
 ): BackgroundTask | undefined => {
@@ -344,14 +281,10 @@ type ClaudeCodeSession = {
   modelOverride?: string;
   fableSafetyFailures?: number;
   allowEmptyNativeFinal?: boolean;
-  /** Set to [] at every turn start, before any step can consume steering. */
   consumedSteeringTexts?: string[];
-  /** Tool-set changes the running turn took (`MAX_TOOL_SET_CHANGES_PER_TURN`). */
   toolSetChanges?: number;
-  /** Background commands the CLI says are still running. */
   backgroundTasks?: number;
   onBackgroundWake?: (wake: ClaudeCodeBackgroundWake) => void;
-  /** Stella tool calls from a held query, waiting for the turn that takes it over. */
   mcpTurnWaiters?: Set<(turn: ClaudeCodeToolMcpActiveTurn) => void>;
   modelFallbackNotified?: boolean;
   claudeLoginEmail?: string;
@@ -359,18 +292,7 @@ type ClaudeCodeSession = {
 };
 type ClaudeCodeError = Error & { code?: string; status?: number };
 const CLAUDE_CODE_MODEL_PREFIX = "claude-code/";
-/**
- * Model the fable fallback policy switches a turn to after the configured
- * fable model exhausts its attempts.
- */
 const CLAUDE_CODE_FALLBACK_MODEL = "claude-opus-4-8";
-/**
- * Total consecutive attempts the configured fable model gets on a safety
- * refusal before the turn swaps to CLAUDE_CODE_FALLBACK_MODEL (1 initial +
- * 2 retries). Refusals are stochastic enough that a plain retry often clears
- * them; the swap is the last resort, and the configured model comes back
- * next turn.
- */
 const SAFETY_ABORT_FABLE_ATTEMPTS = 3;
 /**
  * CLI error text for a model-side refusal (safety / Usage Policy stop) or
@@ -443,28 +365,9 @@ const DEFAULT_STEP_IDLE_TIMEOUT_MS = 5 * 60 * 1000;
 // executeToolWithInactivityBound; this only backstops native tools and
 // leaked tracking.)
 const DEFAULT_STEP_TOOL_IDLE_TIMEOUT_MS = 20 * 60 * 1000;
-/**
- * How long a new CLI may take to list Stella's MCP catalog. The CLI itself
- * gives a server about 30 seconds to connect, retrying meanwhile, and then
- * runs without it; waiting past that would only wait on a CLI that dropped
- * Stella's tools.
- */
 const DEFAULT_TOOL_CATALOG_TIMEOUT_MS = 40 * 1000;
-/**
- * Lines of a CLI query nobody claimed yet kept at most. Past this the CLI
- * is stopped: an unattended query that long is better resumed than held.
- */
 const MAX_ADRIFT_LINES = 50_000;
-/**
- * How long a Stella tool call from a held query waits for the agent's turn
- * that takes the query over; past it the call fails as one with no turn.
- */
 const ADRIFT_TOOL_TURN_WAIT_MS = 2 * 60 * 1000;
-/**
- * The turn a Stella tool call runs in. A query the CLI started on its own
- * has none until the agent's woken turn takes it over, so its calls wait for
- * that turn rather than fail.
- */
 const activeMcpTurnFor = (
   session: ClaudeCodeSession,
 ):
@@ -515,7 +418,6 @@ const CLAUDE_CODE_COMPACTION_LOOP_MESSAGE =
  * Past the budget the turn fails to the caller with an actionable message.
  */
 const MAX_STEP_RECOVERIES_PER_TURN = 2;
-/** What the CLI asks itself when an answer ended without visible text. */
 const CLAUDE_CODE_VISIBLE_OUTPUT_NUDGE =
   "[Your previous response had no visible output. Please continue and produce a user-visible response.]";
 export const isClaudeCodeVisibleOutputNudge = (event: ClaudeStreamEvent): boolean => {
@@ -546,10 +448,6 @@ const summarizeMcpLedgerValue = (value: unknown, maxChars: number) => {
     ? `${serialized.slice(0, maxChars)}...[truncated]`
     : serialized;
 };
-/**
- * The CLI process ended (exit, spawn stream teardown) while a step was still
- * waiting on its `result` line. `exitCode` 0 means a clean-but-early exit.
- */
 export class ClaudeCodeProcessEndedError extends Error {
   exitCode: number | null;
 
@@ -598,23 +496,10 @@ export class ClaudeCodeCompactionLoopError extends Error {
     this.mcpCalls = mcpCalls;
   }
 }
-/**
- * Which login Claude Code runs on. Stella never holds a Claude credential:
- * the CLI always runs on its own login, in its default config or in the
- * Stella-managed `CLAUDE_CONFIG_DIR` signed in to the owner's active Claude
- * account (the host picks it; `getClaudeCodeConfig`).
- */
 const claudeLoginLabel = (email: string | undefined) =>
   email
     ? `the Claude Code login for ${email}`
     : "the Claude Code login on this computer";
-/**
- * Pre-flight the login Claude Code will run on, so a caller can say "this
- * will fail, and here is what to do" BEFORE spawning an agent that would 401
- * and die. Only the knowable case: the owner's active Claude account has no
- * Claude Code login on this computer. A login Anthropic rejects is reported
- * when the step fails.
- */
 export const checkClaudeCodeAuth = async () => {
   const config = await getClaudeCodeConfig();
   if (config.signedIn) return { status: "ok" };
@@ -626,10 +511,6 @@ export const checkClaudeCodeAuth = async () => {
   };
 };
 
-/**
- * A subscription limit (5-hour or weekly window) in a CLI result, with the
- * reset time when the CLI printed one.
- */
 export const claudeCodeSubscriptionLimitOf = (
   error: unknown,
 ): ClaudeUsageLimit | null => claudeUsageLimitOf(error);
@@ -662,11 +543,6 @@ const asRecoverableStepError = (error: unknown) =>
   error instanceof ClaudeCodeMalformedResultError
     ? error
     : null;
-/**
- * Corrective prompt for a malformed step result. The CLI session is still
- * alive and already has the full step context (including any tool result we
- * just forwarded), so the nudge only needs to ask for a well-formed restate.
- */
 /**
  * Recovery prompt for a step that died AFTER side-effecting work was already
  * observed. Blind-replaying the original prompt (or the history-seeded
@@ -713,12 +589,6 @@ const buildSideEffectReconciliationPrompt = (
 };
 const buildResultRetryPrompt = () =>
   "Your previous reply produced no result text. Provide your complete final answer to the pending request now.";
-/**
- * Anthropic rejected the login the CLI ran on. Stella holds no credential to
- * refresh, so a human signs that config in again. `code` lets callers (agent
- * retry classification, the orchestrator) treat this as auth rather than
- * re-deriving it from prose.
- */
 const withClaudeLoginRejected = (error: unknown, email: string | undefined) => {
   const failure: ClaudeCodeError = new Error(
     `${withPeriod(normalizeErrorMessage(error))} Anthropic rejected ${claudeLoginLabel(email)}. Sign in again in Settings › Account.`,
@@ -727,10 +597,6 @@ const withClaudeLoginRejected = (error: unknown, email: string | undefined) => {
   failure.status = 401;
   return failure;
 };
-/**
- * The shared recovery budget ran out. Auth rejections and usage limits never
- * reach here (they are reported or held at once), so the CLI is the suspect.
- */
 const withStepRecoveryExhausted = (error: unknown) =>
   new Error(
     `${normalizeErrorMessage(error)} Stella retried ${MAX_STEP_RECOVERIES_PER_TURN} time(s) but Claude Code kept ending the step without a usable result. Try the request again; if it keeps failing, check that \`claude --version\` runs on this computer.`,
@@ -739,18 +605,12 @@ const describeClaudeUsageLimit = (limit: ClaudeUsageLimit) =>
   typeof limit.resetsAt === "number" && Number.isFinite(limit.resetsAt)
     ? `Claude usage limit reached. It resets at ${formatClaudeUsageLimitReset(limit.resetsAt)}.`
     : "Claude usage limit reached for this account.";
-/**
- * A Claude subscription usage limit, named as such. Inform only: Stella never
- * switches accounts.
- */
 const withClaudeSubscriptionLimitReported = (limit: ClaudeUsageLimit) => {
   const failure: ClaudeCodeError = new Error(describeClaudeUsageLimit(limit));
   failure.code = "CLAUDE_CODE_USAGE_LIMIT";
   return failure;
 };
-/** How long a hold lasts when the CLI named no reset time: then it asks again. */
 const USAGE_LIMIT_UNKNOWN_RESET_HOLD_MS = 30 * 60 * 1000;
-/** Margin past the named reset, so the first step after it is not refused again. */
 const USAGE_LIMIT_RESET_MARGIN_MS = 30 * 1000;
 const USAGE_LIMIT_MIN_HOLD_MS = 5 * 60 * 1000;
 const USAGE_LIMIT_MAX_MIN_HOLD_MS = 60 * 60 * 1000;
@@ -780,8 +640,6 @@ const waitUntil = (until: number, signal: AbortSignal | undefined) =>
 const buildClaudeCodeHookSettingsObject = () => {
   const command = `"${process.execPath}" -e ""`;
   return {
-    // Keep the CLI's built-in workflow/keyword-trigger feature from hijacking
-    // sub-agent turns whose prompts merely mention workflow-related keywords.
     workflowKeywordTriggerEnabled: false,
     disableWorkflows: true,
     hooks: {
@@ -812,27 +670,7 @@ const buildClaudeCodeRedactingSettings = (
   ];
   return JSON.stringify(settings);
 };
-/**
- * Message-level stop reasons that mean the model's stream ended BEFORE the
- * content block it was generating was complete. `refusal` is a mid-stream
- * safety stop (the API cuts generation the moment a classifier fires);
- * `max_tokens` is the output budget running out. In both cases the CLI still
- * repairs the partial `input_json_delta` into syntactically valid JSON and
- * dispatches the tool call, so a half-written string argument arrives here
- * looking exactly like a complete one.
- */
 const TRUNCATING_STOP_REASONS = new Set(["refusal", "max_tokens"]);
-/**
- * Detects an `assistant` stream event whose trailing content block is a
- * `tool_use` that was cut off mid-generation.
- *
- * The CLI emits one `assistant` event per finalized content block, stamping
- * each with the message-level `stop_reason`. A truncating stop always cuts the
- * block that was in flight, which is the LAST block of the message — so a
- * `tool_use` that is followed by another block completed normally and must not
- * be flagged. Requiring the tool_use to be last keeps this free of false
- * positives on multi-block messages.
- */
 export const getClaudeCodeTruncatedToolUseFromStreamEvent = (
   event: ClaudeStreamEvent,
 ): ClaudeToolUseTruncation | null => {
@@ -894,13 +732,6 @@ const claudeToolKey = (toolName: string, toolArgs: ClaudeToolArgs) => {
     .update(stableToolArgs(toolArgs))
     .digest("hex");
 };
-/**
- * Re-creates the CLI's own repair of a cut-off `input_json_delta` stream:
- * close the string the cursor was inside and every open bracket, so a partial
- * argument blob parses to exactly the object the CLI would dispatch. Returns
- * undefined when no such repair parses — callers must then fail open, never
- * guess.
- */
 export const repairPartialToolInputJson = (
   text: string,
 ): object | undefined => {
@@ -919,7 +750,6 @@ export const repairPartialToolInputJson = (
       else if (ch === "{" || ch === "[") stack.push(ch === "{" ? "}" : "]");
       else if (ch === "}" || ch === "]") stack.pop();
     }
-    // A dangling escape backslash would swallow the closing quote we append.
     let repaired = escaped ? candidate.slice(0, -1) : candidate;
     if (inString) repaired += '"';
     while (stack.length) repaired += stack.pop();
@@ -932,8 +762,6 @@ export const repairPartialToolInputJson = (
   };
   const direct = attempt(text);
   if (direct !== undefined) return direct;
-  // A trailing structural fragment (`,`, `:`, or an unfinished bare literal
-  // like `tru`) keeps the closers from parsing; strip it and retry once.
   const trimmed = text.replace(/[\s,]*[A-Za-z0-9+\-.]*[\s,]*$/, "");
   if (trimmed && trimmed !== text) return attempt(trimmed);
   return undefined;
@@ -967,9 +795,7 @@ export const createClaudeNativeToolUseCorrelator = () => {
   const queued = new Map<string, string[]>();
   const waiters = new Map<string, ((id: string) => void)[]>();
   const observedIds = new Set<string>();
-  /** Keys of tool_use blocks a finalized assistant event proved truncated. */
   const truncatedKeys = new Map<string, ClaudeToolUseTruncation>();
-  /** Keys a finalized assistant event has adjudicated (truncated or clean). */
   const settledKeys = new Set<string>();
   const integrityWaiters = new Map<string, (() => void)[]>();
   const settleKey = (key: string) => {
@@ -1014,7 +840,7 @@ export const createClaudeNativeToolUseCorrelator = () => {
       if (!pending.partialJson.trim()) continue;
       try {
         JSON.parse(pending.partialJson);
-        continue; // Complete args; never refuse on the settle race.
+        continue;
       } catch {
         // Unparseable partial: candidate for a repaired dispatch.
       }
@@ -1051,12 +877,6 @@ export const createClaudeNativeToolUseCorrelator = () => {
   };
   return {
     observe,
-    /**
-     * Records the integrity verdict a finalized `assistant` event carries for
-     * the tool_use blocks it contains. Returns the truncation when this event
-     * proved one, so the caller can also surface it to the user (the call may
-     * already be executing, in which case the gate below cannot stop it).
-     */
     observeAssistantMessage(event: ClaudeStreamEvent) {
       if (event.type !== "assistant") return null;
       const content = asObject(event.message)?.content;
@@ -1079,11 +899,6 @@ export const createClaudeNativeToolUseCorrelator = () => {
       }
       return truncated;
     },
-    /**
-     * Verdict for an inbound MCP call: the truncation that cut its arguments,
-     * or undefined when the arguments are whole OR when no finalized event
-     * arrived in time to say. Fails open by design — see the settle constant.
-     */
     async resolveToolUseIntegrity(
       toolName: string,
       toolArgs: ClaudeToolArgs,
@@ -1420,7 +1235,6 @@ export const buildClaudeCodeNativeToolRuntimePrompt = (
     .filter((section) => section.trim().length > 0)
     .join("\n\n");
 };
-/** Text of one stream-json `tool_result` block, for Stella's own journal. */
 const nativeToolResultText = (block: ClaudeStreamEvent | null) => {
   const content = block?.content;
   if (typeof content === "string") return content;
@@ -1437,13 +1251,6 @@ const nativeToolResultText = (block: ClaudeStreamEvent | null) => {
     .filter(Boolean)
     .join("\n");
 };
-/**
- * Mirror the CLI's own built-in tool calls into Stella's tool events. Native
- * calls never pass through the MCP host, so without this the journal, the
- * working indicator, and crash-recovery reconciliation would not know a
- * Bash or Edit ran. Returns true when the event announced or settled a
- * native call.
- */
 const observeNativeToolCalls = (
   event: ClaudeStreamEvent,
   pending: PendingStep,
@@ -1522,11 +1329,6 @@ const observeNativeToolCalls = (
   }
   return changed;
 };
-/**
- * One stream-json user line. Claude Code's stream-json input accepts Anthropic
- * image content blocks directly, so screenshots reach vision without enabling
- * any Claude-native file or shell tools outside Stella's tool boundary.
- */
 const buildStreamJsonUserMessage = (
   sessionId: string,
   text: string,
@@ -1560,10 +1362,6 @@ const asObject = (value: unknown): Record<string, any> | null =>
   value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, any>)
     : null;
-/**
- * Hand steering back to the host newest-first, so its prepends keep the
- * original order.
- */
 const dropInjections = (
   pending: PendingStep,
   shouldDrop: (injection: ClaudeCodeInjection) => boolean,
@@ -1578,10 +1376,6 @@ const dropInjections = (
     }
   }
 };
-/**
- * A fresh session seeded from the turn's history must still see the steering
- * the lost session had already taken in this turn.
- */
 const withConsumedSteering = (session: ClaudeCodeSession, prompt: string) =>
   session.consumedSteeringTexts?.length
     ? [prompt, ...session.consumedSteeringTexts].join("\n\n")
@@ -1788,7 +1582,6 @@ export const getClaudeCodeStatusChangeFromStreamEvent = (
   }
   return null;
 };
-/** Diagnostic boundary: one finalized Claude assistant message is one model round. */
 export const getClaudeCodeModelRoundFromStreamEvent = (
   event: ClaudeStreamEvent,
 ) => {
@@ -1962,11 +1755,6 @@ class ClaudeCodeSessionRuntime {
       this.pumpSession(request.sessionKey, session);
     });
   }
-  /**
-   * Diagnostic/test hook: whether a live CLI child is tracked for the
-   * session key. Guards against restart races where a stale close handler
-   * would otherwise evict the replacement child from tracking.
-   */
   hasActiveProcess(sessionKey: string) {
     const child = this.activeProcesses.get(sessionKey);
     return Boolean(child && !child.killed && child.exitCode === null);
@@ -2037,8 +1825,6 @@ class ClaudeCodeSessionRuntime {
     const now = Date.now();
     for (const [sessionKey, session] of this.sessions.entries()) {
       if (session.running || session.queue.length > 0) continue;
-      // The CLI's background commands and its own query about them live
-      // in its process.
       if ((session.backgroundTasks ?? 0) > 0 || session.process?.adrift) {
         continue;
       }
@@ -2075,8 +1861,6 @@ class ClaudeCodeSessionRuntime {
     session: ClaudeCodeSession,
     request: ClaudeCodeTurnRequest,
   ): Promise<ClaudeCodeTurnResult> {
-    // Vanilla mode sends the prompt to stock Claude Code untouched: no
-    // Stella runtime contract, no system-prompt override.
     const effectiveSystemPrompt = request.vanilla
       ? ""
       : buildClaudeCodeNativeToolRuntimePrompt(
@@ -2084,16 +1868,11 @@ class ClaudeCodeSessionRuntime {
           request.nativeTools,
         );
     const prompt = buildInitialPrompt(session, request);
-    // Every user message reattempts the configured model: a fallback from a
-    // previous turn does not stick to the session. The next
-    // ensureStreamingProcess sees the config change and restarts the CLI on
-    // the configured model with --resume.
     session.modelOverride = undefined;
     session.fableSafetyFailures = 0;
     session.allowEmptyNativeFinal = false;
     session.consumedSteeringTexts = [];
     session.toolSetChanges = 0;
-    // The compaction loop breaker counts per Stella turn.
     if (session.process) {
       session.process.compacting = false;
       session.process.compactionCount = 0;
@@ -2103,9 +1882,6 @@ class ClaudeCodeSessionRuntime {
       const nativeToolUseCorrelator = createClaudeNativeToolUseCorrelator();
       session.activeNativeToolUseCorrelator = nativeToolUseCorrelator;
       session.activeMcpTurn = {
-        // The persisted Claude session is the conversation boundary. Native
-        // tool_use.id distinguishes invocations within it; Stella run IDs can
-        // change during crash recovery and must not alter replay identity.
         identityScope: request.sessionKey,
         ...(request.nativeToolCallIds ? { nativeToolCallIds: true } : {}),
         claimNativeToolUseId: (toolName, toolArgs, signal) =>
@@ -2209,8 +1985,6 @@ class ClaudeCodeSessionRuntime {
             ? { systemPrompt: change.systemPrompt }
             : {}),
         };
-        // The launch config changes with the tool set, so the next step
-        // restarts the CLI on it and resumes the same conversation.
         response = await this.executeStepWithRecovery(
           session,
           current,
@@ -2305,9 +2079,6 @@ class ClaudeCodeSessionRuntime {
           throw withClaudeLoginRejected(error, session.claudeLoginEmail);
         }
 
-        // A normal refusal/overload can retry the configured model and then
-        // fall back. Once any tool call started, the same prompt is never
-        // replayed: even an aborted/errored call may already have committed.
         if (
           !hasPossibleSideEffects &&
           this.applyFableFallbackPolicy(session, request, error)
@@ -2340,11 +2111,6 @@ class ClaudeCodeSessionRuntime {
       }
     }
   }
-  /**
-   * Hold a turn the Claude usage limit stopped until the limit resets: the
-   * host shows it as waiting, not failed, and the caller then resends the
-   * step. A stop while held ends the turn as stopped.
-   */
   async holdForUsageLimit(
     request: ClaudeCodeTurnRequest,
     limit: ClaudeUsageLimit,
@@ -2470,8 +2236,6 @@ class ClaudeCodeSessionRuntime {
     observedMcpCalls: McpCallRecord[] = [],
   ): Promise<ClaudeCodeStepResult> {
     const buildReseedPrompt = (mcpCalls: McpCallRecord[]) => {
-      // Read at recovery time: steering consumed during the failed attempt
-      // must reach the fresh session too.
       const reseedBase = withConsumedSteering(
         session,
         request.resumeFallbackPrompt ?? prompt,
@@ -2588,8 +2352,6 @@ class ClaudeCodeSessionRuntime {
     mcpHost: ClaudeCodeToolMcpHost | undefined,
     cliHasSystemPromptSnapshot = false,
   ) {
-    // A turn-scoped fallback override (fable exhausted its attempts) beats
-    // the configured model; executeTurn clears it at every turn start.
     const modelName =
       session.modelOverride ?? parseClaudeCodeModel(request.modelId);
     const args = [
@@ -2612,12 +2374,6 @@ class ClaudeCodeSessionRuntime {
       if (!mcpHost || !session.mcpConfigPath) {
         throw new Error("Claude Code native tool host is unavailable.");
       }
-      // Native takeover: Claude owns the tool loop. Only the built-ins the
-      // caller asked for stay on (file and shell tools that are far cheaper
-      // in-process than over MCP; none for a bare catalog); every other
-      // built-in and all ambient/user MCP servers remain disabled, so besides
-      // those the run-private, token-authenticated Stella server is all
-      // that is visible.
       const nativeTools = normalizeNativeTools(request.nativeTools);
       const allowedTools = [
         ...nativeTools,
@@ -2638,12 +2394,6 @@ class ClaudeCodeSessionRuntime {
     }
     if (effectiveSystemPrompt.trim()) {
       args.push("--system-prompt", effectiveSystemPrompt.trim());
-      // The CLI otherwise records a conversation's system prompt on its
-      // first request and sends that record on every resume until the
-      // conversation compacts, so an updated prompt (new tools, new rules)
-      // would not reach a long-lived conversation for days. Stella restarts
-      // the CLI only when the prompt it renders changes, so sending it as
-      // given costs one cache write per change.
       if (cliHasSystemPromptSnapshot) {
         args.push("--system-prompt-snapshot", "off");
       }
@@ -2695,9 +2445,6 @@ class ClaudeCodeSessionRuntime {
     if (session.mcpHost && session.mcpToolCatalogKey === catalogKey) {
       return session.mcpHost;
     }
-    // A process spawned against the old immutable catalog cannot be pointed
-    // at a replacement listener in place. Stop it before rotating the host;
-    // the caller resumes the same Claude conversation on the new process.
     this.resetStreamingProcess(request.sessionKey, session);
     if (session.mcpHost) {
       await session.mcpHost.close().catch(() => undefined);
@@ -2746,8 +2493,6 @@ class ClaudeCodeSessionRuntime {
       effectiveSystemPrompt,
       mcpHost,
     );
-    // The config the owner's active Claude account is signed in to here
-    // (null: the CLI's default config). A change restarts the process.
     const claudeConfig = await getClaudeCodeConfig();
     const claudeConfigDir = claudeConfig.configDir ?? null;
     if (
@@ -2774,16 +2519,10 @@ class ClaudeCodeSessionRuntime {
         // picks the new configuration up.
         return session.process;
       }
-      // The request wants a different CLI configuration (the user changed
-      // the model / effort mid-session, or the mode flipped). Restart the
-      // process; `useResume` continues the same CLI conversation on the
-      // new configuration.
       this.resetStreamingProcess(request.sessionKey, session);
     }
     const executablePath = resolveExternalCliPath("claude");
     const effortLevel = request.effortLevel?.trim();
-    // The Stella shell environment is the base, so the CLI's own directory
-    // still leads its PATH and the credential scrub below still applies.
     const childEnv = buildExternalCliChildEnv(
       executablePath,
       request.shellEnv ? { ...process.env, ...request.shellEnv } : process.env,
@@ -2901,8 +2640,6 @@ class ClaudeCodeSessionRuntime {
           });
         } catch {}
       }
-      // The init event names the model the CLI actually resolved the
-      // requested alias to (e.g. default -> claude-opus-4-8[1m]).
       if (
         parsedLine.type === "system" &&
         parsedLine.subtype === "init" &&
@@ -2943,8 +2680,6 @@ class ClaudeCodeSessionRuntime {
       }
       const status = getClaudeCodeStatusChangeFromStreamEvent(parsedLine);
       if (status) {
-        // Count discrete compactions (compacting -> running transitions),
-        // not every compaction-related stream event.
         if (status.state === "compacting" && !processState.compacting) {
           processState.compacting = true;
           processState.compactionCount += 1;
@@ -2956,10 +2691,6 @@ class ClaudeCodeSessionRuntime {
           processState.compacting = false;
         }
       }
-      // The CLI switched the session to the --fallback-model (configured
-      // model overloaded). The switch is sticky for the session, so
-      // surface it once as a heads-up toast (latch on the session so we
-      // don't spam).
       const modelFallback =
         getClaudeCodeModelFallbackFromStreamEvent(parsedLine);
       const current = processState.pending[0];
@@ -3181,19 +2912,11 @@ class ClaudeCodeSessionRuntime {
         );
       }
     });
-    // Claude accepts stdin before it has discovered the private MCP catalog.
-    // Do not let the first tool-bearing prompt race that discovery.
     if (mcpHost && request.tools.length > 0) {
       await this.waitForToolCatalog(session, processState, mcpHost, request);
     }
     return processState;
   }
-  /**
-   * Wait until the new CLI has listed Stella's MCP catalog. A CLI that exits
-   * first fails the step with its own reason (a missing session to resume, a
-   * rejected login), which the step's recovery reads; one that never lists
-   * it is stopped and fails the step as ended, so recovery starts a new one.
-   */
   async waitForToolCatalog(
     session: ClaudeCodeSession,
     processState: ClaudeCodeProcessState,
@@ -3273,9 +2996,6 @@ class ClaudeCodeSessionRuntime {
               pending.answeredMcpCallCount,
             );
             if (unfinishedCalls.length === 0) {
-              // No Stella tool ran for it yet: settle with that answer and
-              // requeue the steering no completed query answered, so it runs
-              // next as its own prompt (and meets any persistent error there).
               dropInjections(pending, (injection) => !injection.answered);
               resolve({ ...pending.intermediateResult, delivered: true });
               return;
@@ -3312,7 +3032,6 @@ class ClaudeCodeSessionRuntime {
         emitStreamDelta: createClaudeCodeStreamEmitter(request.onStream),
         mcpCalls: [],
         activeNativeToolUseIds: new Set(),
-        /** Built-in tool calls seen on the stream, keyed by tool_use id. */
         nativeToolCalls: new Map(),
         injections: new Map(),
       };
@@ -3335,15 +3054,9 @@ class ClaudeCodeSessionRuntime {
         }
       }
       processState.pending.push(pending);
-      // A query the CLI started on its own is this step's first: its prompt
-      // follows it as steering, or, for a turn that exists to take it over,
-      // is not sent at all.
       const held = processState.adrift;
       processState.adrift = undefined;
       const adrift = held?.woke ? held : undefined;
-      // Until the CLI is seen starting it, a query of its own may still run
-      // before this prompt; as steering, the prompt keeps the step open
-      // past that query's result.
       const ownQueryFirst = Boolean(held || processState.finished);
       const sendsPrompt = !adrift || !request.backgroundWake;
       const steeringId =
@@ -3367,8 +3080,6 @@ class ClaudeCodeSessionRuntime {
             processState.pending.splice(index, 1);
           }
           this.detachAbortListener(pending);
-          // A failed stdin write means the process died under us (EPIPE);
-          // classify it as process-ended so the step recovery can respawn.
           reject(
             new ClaudeCodeProcessEndedError(
               `Failed to write Claude Code prompt: ${normalizeErrorMessage(error)}`,
@@ -3401,14 +3112,6 @@ class ClaudeCodeSessionRuntime {
       }
     });
   }
-  /**
-   * The CLI runs background commands itself and, when one finishes, starts
-   * a query of its own about it: at once when no step waits on the CLI, or
-   * after the step's result when one finished while the step ran (unless
-   * the step took the news in). With no step waiting, that query is held
-   * here, whole, for the next step to take over, and the host is asked once
-   * to wake the agent for it. True for a line held.
-   */
   holdAdrift(
     sessionKey: string,
     session: ClaudeCodeSession,
@@ -3465,11 +3168,6 @@ class ClaudeCodeSessionRuntime {
     }
     return true;
   }
-  /**
-   * Hand a held query to the step that took it over, line by line as if it
-   * arrived now. Once that step has its answer, whatever the CLI did next
-   * is held again for the step after.
-   */
   replayAdrift(
     sessionKey: string,
     session: ClaudeCodeSession,
@@ -3499,21 +3197,8 @@ class ClaudeCodeSessionRuntime {
     }
     pending.detachTurnControl?.();
     pending.detachTurnControl = undefined;
-    // The turn ended without the CLI taking these in (abort, process death,
-    // a recovery restart), so the next prompt or the abnormal-end replies
-    // carry them instead.
     dropInjections(pending, (injection) => !injection.consumed);
   }
-  /**
-   * Write steering input into the query that is still running, the way the
-   * interactive CLI handles a message typed mid-turn. Claude Code folds it in
-   * at its next tool boundary, or runs it as the next query on this stream if
-   * the current one is already answering. `--replay-user-messages` echoes each
-   * message back by uuid once the CLI takes it into context, which is what
-   * `onConsumed` reports and what keeps this pending open across that extra
-   * query. Returns false when the turn can no longer take input, so the caller
-   * keeps the message queued for its next prompt instead.
-   */
   injectIntoPendingTurn(
     session: ClaudeCodeSession,
     processState: ClaudeCodeProcessState,
@@ -3546,13 +3231,6 @@ class ClaudeCodeSessionRuntime {
     );
     return true;
   }
-  /**
-   * End a step at a tool boundary instead of with its answer: the CLI is
-   * stopped before it reads the results it waits on, and the step resolves
-   * with no answer of its own, so the turn goes on with the step
-   * `toolSetAfterStep` names. Its tools changed, and the CLI must not take
-   * one more call with the set it started with.
-   */
   endPendingStep(
     session: ClaudeCodeSession,
     processState: ClaudeCodeProcessState,
@@ -3605,12 +3283,6 @@ class ClaudeCodeSessionRuntime {
       return;
     }
   }
-  /**
-   * The query ended while steering input was still waiting in the CLI, which
-   * now runs it as the next query on this stream. The pending turn stays open
-   * for that query's result; this answer is handed to the host as its own
-   * reply.
-   */
   reportIntermediateResult(
     session: ClaudeCodeSession,
     processState: ClaudeCodeProcessState,
@@ -3628,7 +3300,6 @@ class ClaudeCodeSessionRuntime {
     } catch {
       return;
     }
-    // Every query that took steering in so far has now been answered.
     for (const injection of pending.injections.values()) {
       if (injection.consumed) injection.answered = true;
     }
@@ -3813,8 +3484,6 @@ export const listClaudeCodeModels = async (
     const resolved = resolvedModels[alias];
     models.set(alias, {
       id: alias,
-      // Show the CLI-reported real model behind the alias when we've seen
-      // one (e.g. "Default · Opus 4.8 (1M context)").
       displayName: resolved
         ? `${labels.displayName} · ${formatClaudeCodeResolvedModel(resolved)}`
         : labels.displayName,
@@ -3822,8 +3491,6 @@ export const listClaudeCodeModels = async (
       source: "alias",
     });
   }
-  // Only an API key lists the endpoint's models. A subscription sign-in
-  // belongs to the Claude Code CLI, so it gets the aliases above.
   const apiKey = auth?.apiKey?.trim() || process.env.ANTHROPIC_API_KEY?.trim();
   if (!apiKey) return { models: [...models.values()] };
   try {

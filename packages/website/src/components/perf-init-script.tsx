@@ -31,8 +31,6 @@ const PERF_INIT_SCRIPT = /* javascript */ `
 export function PerfInitScript() {
   return (
     <script
-      // Synchronous, blocking inline script so the low-power class is present
-      // before the body paints any animated content.
       dangerouslySetInnerHTML={{ __html: PERF_INIT_SCRIPT }}
     />
   );

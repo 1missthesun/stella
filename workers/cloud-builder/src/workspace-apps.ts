@@ -23,8 +23,6 @@ export function parseAppManifest(text: string, slug: string) {
     !REVISION.test(value.revision)
   )
     throw new Error("Invalid stella.app.json.");
-  // The optional icon is a short emoji for the app's tile; anything else is
-  // dropped rather than failing the build.
   const icon =
     typeof value.icon === "string" &&
     value.icon.trim() &&
@@ -40,11 +38,9 @@ export function parseAppManifest(text: string, slug: string) {
   };
 }
 
-/** Largest stored preview; a bigger capture is served once, never kept. */
 const MAX_PREVIEW_BYTES = 1_500_000;
 type StoredPreview = { revision: string; bytes: Uint8Array };
 
-/** One owner workspace supervises isolated app facets, never passing host bindings. */
 export class WorkspaceApps {
   private bundles = new Map<
     string,
@@ -154,7 +150,6 @@ export class WorkspaceApps {
           );
         }
         const result = await this.bundle(files);
-        // Ensure the manifest was not replaced while npm dependencies were resolving.
         const current = decoder.decode(
           (await this.world.readFile(entry.path))!,
         );
@@ -220,7 +215,6 @@ export class WorkspaceApps {
     return JSON.parse(decoder.decode(bytes));
   }
 
-  /** The stored still of `slug` at `revision`, if one was captured. */
   async preview(slug: string, revision: string): Promise<Uint8Array | null> {
     const stored = await this.ctx.storage.get<StoredPreview>(
       `workspace-app-preview:${slug}`,
@@ -253,7 +247,6 @@ export class WorkspaceApps {
         revision: release.app.revision,
         result: await this.bundle(await this.readReleaseFiles(slug, release)),
       };
-      // Bound per-isolate bundle retention; source remains durable.
       if (this.bundles.size >= 8)
         this.bundles.delete(this.bundles.keys().next().value!);
       this.bundles.set(slug, cached);

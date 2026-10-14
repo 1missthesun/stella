@@ -68,7 +68,6 @@ export const createDevHarnessSafeStorage = (
   };
 };
 
-/** The consumed key, so a relaunch can hand it to the next process. */
 let consumedHarnessKey: string | null = null;
 
 export const configureDevHarnessProtectedStorage = ({

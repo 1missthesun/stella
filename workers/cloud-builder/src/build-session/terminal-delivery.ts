@@ -70,11 +70,6 @@ export type TerminalDeliveryHost = Pick<
   | "unregisterTurnLease"
 >;
 
-/**
- * Atomically claim this DO's one terminal decision. Cancel, timeout and the
- * normal process unwind are separate async paths; a read-then-write fence
- * lets the loser overwrite the winner between awaits.
- */
 export const claimTerminalDecision = async (
   host: TerminalDeliveryHost,
   turn: TurnRequest,
@@ -109,24 +104,6 @@ export const claimTerminalDecision = async (
   });
 };
 
-/**
- * Decide a turn's terminal state and deliver it, durably.
- *
- * Delivery is two callbacks — the terminal event, then the thread's final
- * state — and either can fail on a transient delivery error. Both are recorded
- * in DO storage before the first attempt and retried by a re-armed alarm:
- * the success path used to throw straight into the failure handler, which
- * reported "The agent hit a problem and stopped" over a completed,
- * checkpointed turn and discarded the agent's report with it.
- *
- * Redelivery is safe: the thread record rejects every event after the first terminal
- * one (answering `terminalAccepted: false` rather than an error) and the
- * thread mutation is a no-op once the thread is terminal, so a retry can
- * never produce a second terminal state.
- *
- * Returns whether the state is known to have landed; storage (and its
- * alarm) must stay intact when it has not.
- */
 export const deliverTerminal = async (
   host: TerminalDeliveryHost,
   turn: TurnRequest,
@@ -134,9 +111,6 @@ export const deliverTerminal = async (
   options: { preservePendingTerminal?: boolean } = {},
 ): Promise<boolean> => {
   let pending = pendingInput;
-  // Fencing: a stale turn may still deliver its own outcome (the thread
-  // record sorts out which one is terminal), but it must not write over the successor's
-  // storage or arm the successor's alarm.
   const owns = await host.ownsExactTurn(turn);
   // The second callback is *thread*-scoped, and the only thing that fences
   // it on the receiving side is the thread not being "running" — which a successor
@@ -166,9 +140,6 @@ export const deliverTerminal = async (
     });
     return false;
   }
-  // Both are fixed before the decision is claimed, so a redelivery repeats
-  // the same event ordinal and the same wake fingerprint instead of minting
-  // new ones the control plane would have to reconcile.
   const decided: PendingTerminal = {
     ...pending,
     eventSeq:
@@ -194,10 +165,6 @@ export const deliverTerminal = async (
     }
   }
   try {
-    // Turn-scoped and unconditional: this is what gives the turn — orphaned
-    // or not — its one terminal state, and the thread record rejects a second one.
-    // (An orchestrator turn's event stays here: its conversation owns the
-    // projection, see `emitTurnEvent`.)
     await host.event(
       turn,
       pending.eventSeq ?? "auto",
@@ -206,8 +173,6 @@ export const deliverTerminal = async (
       true,
     );
     if (turn.agentRole === "orchestrator") {
-      // No agent thread to complete and no parent to wake: the outcome goes
-      // straight back to the conversation whose chat turn this is.
       await deliverOrchestratorCliTerminal(host, turn, pending);
     } else if (turn.kind === "agent" && turn.threadId) {
       if (supersededThread) {
@@ -261,9 +226,6 @@ export const deliverTerminal = async (
         }
       });
     }
-    // The owner's agent slot goes back the moment the outcome is durable —
-    // every terminal path (normal unwind, watchdog, cancel, recovery)
-    // funnels through here, so this is the one release that matters.
     await host.releaseOwnerGate(turn);
     return true;
   } catch (error) {
@@ -285,8 +247,6 @@ export const deliverTerminal = async (
       }
       attempts = ((await txn.get<number>("alarmAttempts")) ?? 0) + 1;
       await txn.put("alarmAttempts", attempts);
-      // A chat reply is waiting on an orchestrator turn's frame: its first
-      // retries come quickly.
       await txn.setAlarm(
         Date.now() +
           (turn.agentRole === "orchestrator" && attempts <= 5 ? 2_000 : 30_000),
@@ -310,7 +270,6 @@ const usageCount = (value: unknown): number =>
     ? value
     : 0;
 
-/** The `CloudCliTurnTerminal` frame for one decided orchestrator attempt. */
 export const orchestratorCliTerminal = (
   turn: TurnRequest,
   pending: PendingTerminal,
@@ -343,14 +302,6 @@ export const orchestratorCliTerminal = (
   };
 };
 
-/**
- * Hand a decided orchestrator attempt back to its conversation. The frame is
- * recorded first, so `/orchestrator-turn/status` can answer for it after the
- * turn record is gone. Thrown means "retry": `deliverTerminal` keeps the
- * decision and re-arms its alarm. A refusal that names this frame as one
- * the conversation will never take (any 4xx but a timeout or rate limit) is
- * final.
- */
 export const deliverOrchestratorCliTerminal = async (
   host: TerminalDeliveryHost,
   turn: TurnRequest,
@@ -386,17 +337,6 @@ export const deliverOrchestratorCliTerminal = async (
   });
 };
 
-/**
- * `POST /orchestrator-turn/status` `{ threadId, turnId, attemptGeneration }`:
- * how an orchestrator attempt stands, for a conversation that lost track of
- * it (DO eviction). Never starts or changes anything, except that a decided
- * but undelivered frame has its delivery retried now.
- *
- *   200 { state: "running" }
- *   200 { state: "terminal", terminal: CloudCliTurnTerminal }
- *   200 { state: "unknown" }  this session has no record of the attempt
- *   400 malformed body
- */
 export const handleOrchestratorTurnStatus = async (
   host: TerminalDeliveryHost,
   request: Request,
@@ -451,12 +391,6 @@ export const handleOrchestratorTurnStatus = async (
   return json({ state: "unknown" });
 };
 
-/**
- * Fail a turn whose executor was lost and whose report cannot be recovered.
- * The exact terminal decision is claimed first, then the container is torn
- * down, then the terminal is delivered; a step that cannot complete re-arms
- * the alarm instead of leaving the thread without a terminal.
- */
 export const deliverExecutorLossTerminal = async (
   host: TerminalDeliveryHost,
   turn: TurnRequest,
@@ -510,15 +444,6 @@ export const deliverExecutorLossTerminal = async (
   }
 };
 
-/**
- * Operator-only: expire the current agent turn now instead of at its
- * watchdog. Nothing here delivers a terminal directly. The watchdog deadline
- * is moved to now, a hung local fiber gets the bounded interrupt a Stop
- * would, and the alarm is re-armed so
- * the ordinary timeout path (which tolerates a container that will not die)
- * fails the thread. The optional body names the exact turn the operator
- * looked at, so a stale request cannot expire a successor.
- */
 export const expireCurrentAgentTurn = async (
   host: TerminalDeliveryHost,
   request: Request,
@@ -594,12 +519,6 @@ export const expireCurrentAgentTurn = async (
   });
 };
 
-/**
- * Placement and `stop_agent` cancellation share this exact boundary. A
- * request that has not reached the DO gets a durable pre-admission
- * tombstone; a current turn is acknowledged only after its sandbox is gone
- * and every in-isolate promise for that exact turn has joined.
- */
 export const cancelExactAgentTurn = async (
   host: TerminalDeliveryHost,
   request: ExactTurnCancellationRequest,
@@ -669,10 +588,6 @@ export const cancelExactAgentTurn = async (
           pending.turnId !== request.turnId ||
           pending.kind !== "canceled"
         ) {
-          // The outcome is immutable, but its callback may only be waiting
-          // on a distant watchdog after an isolate/process failure. A stop
-          // cannot replace that decision; it can safely wake its idempotent
-          // delivery so the thread converges instead of appearing live.
           await host.ctx.storage.setAlarm(Date.now());
           return {
             response: json(
@@ -792,8 +707,6 @@ export const cancelExactAgentTurn = async (
       );
     }
     if (pending.terminateSandbox) {
-      // A restarted isolate has no live Effect fiber/finalizer, but may still
-      // own the durable sandbox id. Teardown remains mandatory in that case.
       if (!agentExecution) {
         await host.terminateCurrentAgentSession(turn);
       }
@@ -867,9 +780,6 @@ export const cancelExactAgentTurn = async (
     const cleanupTurn = await host.ctx.storage.get<TurnRequest>("turn");
     if (cleanupTurn && exactTurnIdentityMatches(cleanupTurn, turn)) {
       try {
-        // The joined executor can no longer produce a checkpoint. Reuse the
-        // normal terminal-alarm retirement path immediately so its durable
-        // execution marker does not survive until the old watchdog.
         await host.runAlarmWithLease({ ...cleanupTurn });
       } catch (error) {
         log("error", "cancel_terminal_cleanup_deferred", {
@@ -928,11 +838,6 @@ export const cancelForOwnerPurge = async (
       stored.ownerPurgeGeneration !== generation ||
       stored.ownerPurgeLeaseId !== leaseId)
   ) {
-    // A delayed generation-N purge callback must never terminalize, destroy,
-    // or erase a generation-N+1 attempt that reused this Durable Object. It
-    // may still retire its own exact stale lease; leaving that lease active
-    // would make the owner-purge coordinator retry this harmless callback
-    // forever while the successor remains present.
     if (!(await host.unregisterTurnLease(leaseTurn, leaseId, generation))) {
       return json(
         { canceled: false, reason: "stale_owner_purge_identity", turnId },
@@ -947,10 +852,6 @@ export const cancelForOwnerPurge = async (
     });
   }
   if (!stored) {
-    // Registration can win and the isolate can die before a turn is durably
-    // admitted. In that case there is no execution or transient state to
-    // destroy; remove only the exact orphaned owner-fence lease. Never run
-    // deleteAll() against a DO that may later admit a successor.
     const retired = await host.unregisterTurnLease(
       leaseTurn,
       leaseId,
@@ -1006,9 +907,6 @@ export const cancelForOwnerPurge = async (
       return json({ error: "Owner turn is still unwinding." }, 409);
     }
   } else if (!turnExecution) {
-    // No promise means this lease was recovered after isolate loss (or the
-    // turn ended before clearing its durable registration). An outbound
-    // callback dispatched by the old isolate may still be completing.
     const key = `ownerPurgeCancelAt:${leaseId}`;
     const startedAt = (await host.ctx.storage.get<number>(key)) ?? Date.now();
     await host.ctx.storage.put(key, startedAt);
@@ -1020,13 +918,9 @@ export const cancelForOwnerPurge = async (
 
   await host.cleanupTransientWrites(turn);
   await host.deleteTurnStoragePreservingExactCancellations(turn, true);
-  // The thread transcript is this owner's private job state and lives in
-  // SQL tables the key-value sweep above cannot see.
   purgeThreadTranscript(host.ctx.storage.sql);
   purgeOrchestratorCliTurnStore(host.ctx.storage.sql);
   await host.releaseOwnerGate(turn);
-  // Do not depend on a vanished run's `finally`: remove the exact durable
-  // lease idempotently from the owner fence here.
   return (await host.unregisterTurnLease(turn, leaseId, generation))
     ? json({ canceled: true, turnId, unregistered: true })
     : json({ error: "Owner lease retirement is pending." }, 409);
@@ -1041,12 +935,6 @@ export const acknowledgeExactAgentTurnCancellation = async (
   );
 };
 
-/**
- * An alarm is itself tracked under the turn id. More than one tracked
- * promise therefore proves the original run (or another exact lifecycle
- * task) has not joined yet. A replacement isolate has no such promise and
- * may durably acknowledge the already-stopped cancellation after delivery.
- */
 export const acknowledgeExactCancellationFromAlarm = async (
   host: TerminalDeliveryHost,
   turn: TurnRequest,

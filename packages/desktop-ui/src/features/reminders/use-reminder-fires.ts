@@ -7,7 +7,6 @@ import { backendClient } from "@/platform/backend/backend-client";
 import { useBackendView } from "@/platform/backend/use-backend-view";
 import { useAuthSessionState } from "@/global/auth/hooks/use-auth-session-state";
 
-/** The owner's recent reminder deliveries by fire id; undefined until the first read. */
 export const useReminderFires = (): ReadonlyMap<string, ReminderFire> | undefined => {
   const { hasConnectedAccount } = useAuthSessionState();
   const fires = useBackendView(

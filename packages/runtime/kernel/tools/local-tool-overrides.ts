@@ -1,12 +1,3 @@
-/**
- * Local tool implementations for tools that don't need the server.
- *
- * These replace the backend passthrough (`callBackendTool`) for tools
- * that can execute entirely in the Electron process:
- * - WebFetch: direct fetch() + HTML-to-text
- * - NoResponse: immediate return
- */
-
 import { normalizeSafeExternalUrl } from "./network-guards.js";
 import { containsSecretLikeToken, sanitizeToolVisibleText } from "./safety.js";
 
@@ -39,18 +30,14 @@ const PROMPT_STOP_WORDS = new Set([
   "with",
 ]);
 
-// WebFetch
-
 export type WebFetchFormat = "text" | "markdown" | "html";
 
-// parse5 and turndown load lazily; see html-conversion.ts.
 type HtmlConversion = typeof import("./html-conversion.js");
 let htmlConversionLoad: Promise<HtmlConversion> | null = null;
 const loadHtmlConversion = (): Promise<HtmlConversion> => {
   const pending =
     htmlConversionLoad ??
     import("./html-conversion.js").catch((error: unknown) => {
-      // Let the next fetch retry instead of caching a failed load.
       htmlConversionLoad = null;
       throw error;
     });
@@ -135,11 +122,6 @@ const boundedText = (text: string, maxChars: number): string => {
   return `${text.slice(0, headChars)}${marker}${text.slice(-tailChars)}`;
 };
 
-/**
- * Select prompt-relevant windows from a long page before it becomes model
- * context. The extraction is deterministic and intentionally conservative:
- * when no useful term matches, the normal bounded head/tail projection wins.
- */
 export const extractRelevantWebText = (
   text: string,
   prompt?: string,
@@ -278,8 +260,6 @@ export const localWebFetch = async (args: {
       if (format === "markdown") text = htmlToMarkdown(rawBody);
     }
 
-    // Prompt extraction is useful for readable text/Markdown, but would
-    // destroy the structural validity of callers explicitly requesting HTML.
     text =
       format === "html"
         ? boundedText(text, MAX_FETCH_BODY_CHARS)
@@ -302,8 +282,6 @@ export const localWebFetch = async (args: {
     args.signal?.removeEventListener("abort", stop);
   }
 };
-
-// NoResponse
 
 export const localNoResponse = async (): Promise<string> => {
   return "";

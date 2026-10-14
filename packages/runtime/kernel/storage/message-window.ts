@@ -1,12 +1,3 @@
-/**
- * Message windows over the chat log: the timeline pages the chat UI renders
- * (visible messages with their turn's tool events attached), the tool-event
- * pages behind one message, and a message or agent's reply lineage.
- *
- * Reads only; every row comes from `entry` through ChatLog's cursor and row
- * helpers.
- */
-
 import { isUiHiddenChatMessagePayload } from "@stella/contracts/chat-event-visibility";
 import type { ConversationFocusRoot } from "@stella/contracts/reply-refs";
 import {
@@ -70,11 +61,6 @@ function cursorFromRow(row: {
     : null;
 }
 
-/**
- * Group a turn-ordered run of chat rows into message records: tool rows
- * attach to the visible assistant reply they follow, or to the turn's user
- * message when no reply has started yet.
- */
 export function assembleMessageWindow(rows: LocalChatEventRecord[]): {
   messages: ChatMessageRecord[];
   visibleMessageCount: number;
@@ -217,10 +203,6 @@ export class MessageWindowReader {
   ) {
     this.cached = cachedStatements(db);
   }
-
-  /* ------------------------------------------------------------------ */
-  /* Timeline windows                                                    */
-  /* ------------------------------------------------------------------ */
 
   private fetchEntryRows(args: {
     conversationId: string;
@@ -435,8 +417,6 @@ export class MessageWindowReader {
     conversationId: string,
     until: Cursor | null = null,
   ): Cursor | null {
-    // Legacy non-event rows never anchor a cursor, so the result does not
-    // depend on whether they are still present.
     const clauses = [
       "entry.conversation_id = ?",
       `entry.type NOT IN (${placeholders(NON_EVENT_TYPES)})`,
@@ -854,19 +834,6 @@ export class MessageWindowReader {
     };
   }
 
-  /* ------------------------------------------------------------------ */
-  /* Lineage                                                             */
-  /* ------------------------------------------------------------------ */
-
-  /**
-   * The lineage of one message or one agent thread: the root itself, the
-   * turn that spawned the agent, and every reply that cited either. A
-   * message root also carries its own turn's replies and every update on
-   * the tasks that turn spawned — from the user's side the task is the ask,
-   * and completions cite the task rather than the message. Newest first,
-   * keyset-paged on `beforeSequence`, so a long-lived thread the user keeps
-   * steering pages exactly like the main timeline.
-   */
   listLineageMessages(
     conversationId: string,
     args: {
@@ -938,8 +905,6 @@ export class MessageWindowReader {
       }>;
       for (const start of starts) {
         if (typeof start.turnSeq === "number") rootSeqs.push(start.turnSeq);
-        // The visible row the spawn card is anchored on: the turn's last
-        // visible chat message before the start event, if any.
         const anchor = this.cached
           .prepare(
             `SELECT seq FROM entry
@@ -1008,9 +973,6 @@ export class MessageWindowReader {
           ? { sequence: record.sequence }
           : {}),
       };
-      // Same range the main timeline attaches to an anchor: from the turn's
-      // user message when this is the turn's first assistant reply,
-      // otherwise from the row itself, up to the next visible chat message.
       const previous = this.findPreviousVisibleMessageCursor(
         conversationId,
         cursor,
@@ -1035,9 +997,6 @@ export class MessageWindowReader {
       };
     });
     if (args.root.kind === "agent" && messages.length > 0) {
-      // A completion event lands between an unrelated row and the reply that
-      // cites the agent; pull the thread's lifecycle events onto the nearest
-      // preceding lineage row so the spawn and completion cards still render.
       const lifecycle = this.cached
         .prepare(
           `SELECT ${ENTRY_SELECT} FROM entry

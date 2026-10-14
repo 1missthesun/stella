@@ -94,7 +94,6 @@ const isInstallResult = (value: string | null): value is SlackInstallResult =>
 const errorText = (error: unknown): string =>
   error instanceof Error && error.message ? error.message : "Something went wrong. Try again.";
 
-/** What GitHub handed back after "Connect GitHub" for one workspace. */
 type GithubReturn = { teamId: string; code: string | null; error: string | null };
 
 type Boot = { mock: SlackMockMode | null; result: SlackInstallResult | null; github: GithubReturn | null };
@@ -144,7 +143,6 @@ export function CrewClient() {
   return <SessionGate installResult={boot.result} githubReturn={boot.github} />;
 }
 
-/** The page frame: title row, then whatever the state calls for. */
 function Shell({ action, children }: { action?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className={s.shell}>
@@ -425,7 +423,6 @@ function WorkspaceBar({
   );
 }
 
-/** What can be edited for a repository, or for work without one (`key` ""). */
 type TargetDraft = {
   branch: string;
   rules: string;
@@ -451,7 +448,6 @@ type Draft = {
   targets: Record<string, TargetDraft>;
 };
 
-/** A repository, or (`repo` null, `key` "") work that isn't about one. */
 type Target = {
   key: string;
   repo: SlackWorkspaceRepo | null;
@@ -572,7 +568,6 @@ const targetInvalid = (t: Target, d: TargetDraft | undefined): boolean =>
 type NavChild = { id: string; label: string; onSelect?: () => void; current?: boolean };
 type NavItem = { id: string; label: string; children?: NavChild[] };
 
-/** The id of the last section whose top has scrolled past the header. */
 function useActiveSection(ids: string[], enabled: boolean): string | null {
   const [active, setActive] = useState<string | null>(ids[0] ?? null);
   const key = ids.join(" ");
@@ -700,7 +695,6 @@ function Group({
   );
 }
 
-/** One setting: its name and explanation on the left, the control on the right. */
 function Row({
   label,
   hint,
@@ -788,7 +782,6 @@ function Switch({ checked, onChange, label }: { checked: boolean; onChange: (nex
 
 type Loaded<T> = { key: string } & ({ value: T } | { message: string });
 
-/** The result for `key`, or loading while the latest result is for another key. */
 const loadable = <T,>(key: string | null, loaded: Loaded<T> | null) =>
   !key
     ? ({ state: "idle" } as const)
@@ -798,7 +791,6 @@ const loadable = <T,>(key: string | null, loaded: Loaded<T> | null) =>
         ? ({ state: "ready", value: loaded.value } as const)
         : ({ state: "error", message: loaded.message } as const);
 
-/** Repositories the workspace's GitHub connections can see. */
 function useGithubRepos(teamId: string, connected: boolean, refresh: number) {
   const [loaded, setLoaded] = useState<Loaded<SlackGithubRepoOption[]> | null>(null);
   const key = connected ? `${teamId}:${refresh}` : null;
@@ -885,7 +877,6 @@ function WorkspaceSettings({
     }));
   };
 
-  /** The page after a change saved elsewhere (GitHub, add, remove): unsaved edits stay. */
   const rebase = useCallback(
     (next: SlackWorkspace) => {
       onUpdated(next);

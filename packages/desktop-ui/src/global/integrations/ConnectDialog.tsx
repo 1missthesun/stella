@@ -20,15 +20,6 @@ interface ConnectDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-/**
- * The phone app and the account's computers, and nothing else.
- *
- * A phone signed in to the same account reaches these computers on its own,
- * so there is no pairing step: the dialog offers the app's store link as a QR
- * code, and lists every computer with the switch that lets it accept work.
- * The dialog sizes to its content and only the body scrolls, so the header
- * stays put on a short window.
- */
 export const ConnectDialog = ({ open, onOpenChange }: ConnectDialogProps) => {
   const t = useT();
   const navigate = useNavigate();

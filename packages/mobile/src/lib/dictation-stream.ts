@@ -2,19 +2,13 @@ import { getAuthToken } from "./auth-token";
 import { socketCredentialProtocol } from "@stella/contracts/socket-ticket";
 import { getBackendClient } from "./backend";
 
-// The relay accepts at most one second of 16 kHz mono signed PCM per frame.
 const MAX_PCM_FRAME_BYTES = 16_000 * 2;
 
 type RealtimeConfig = { relayOrigin: string; modelId: string };
 
-/** The relay origin only changes with a deploy; re-check it now and then. */
 const CONFIG_TTL_MS = 10 * 60_000;
 let cachedConfig: { value: Promise<RealtimeConfig>; at: number } | null = null;
 
-/**
- * The realtime config is a round trip on the path to the socket. Reuse it
- * across presses so a press only waits on the (cached) token and the socket.
- */
 export const loadDictationRealtimeConfig = (): Promise<RealtimeConfig> => {
   if (cachedConfig && Date.now() - cachedConfig.at < CONFIG_TTL_MS) {
     return cachedConfig.value;
@@ -30,11 +24,6 @@ export const loadDictationRealtimeConfig = (): Promise<RealtimeConfig> => {
   return entry.value;
 };
 
-/**
- * Provider error frames are forwarded verbatim by the relay. Reword the ones
- * a person cannot act on; the pacer in `dictation-pacer.ts` exists to keep the
- * first from happening.
- */
 export const describeDictationProviderError = (message: string): string => {
   const trimmed = message.trim();
   if (/slower than real[- ]?time|ingress/iu.test(trimmed)) {
@@ -70,16 +59,10 @@ export class DictationStream {
     return this.hasFinalTranscript;
   }
 
-  /** The terminal error, if the relay or provider ended the session. */
   get failure(): Error | null {
     return this.streamError;
   }
 
-  /**
-   * The latest cumulative transcript the provider sent. Partials replace
-   * each other, so this is everything recognized so far even when the
-   * session ends before a final frame.
-   */
   get partialTranscript(): string {
     return this.hasFinalTranscript ? this.finalTranscript : this.transcript;
   }
@@ -137,8 +120,6 @@ export class DictationStream {
       }, 10_000);
       this.rejectOpening = failOpening;
       socket.binaryType = "arraybuffer";
-      // The relay forwards Muse's handshake acknowledgment unchanged. A
-      // WebSocket upgrade alone does not mean the provider accepted its key.
       socket.onopen = () => undefined;
       socket.onerror = () => {
         this.fail(
@@ -192,8 +173,6 @@ export class DictationStream {
                 : this.transcript;
           this.transcript = transcript;
           if (frame.final === true) {
-            // The relay uses PUSH_TO_TALK: final ends the entire session,
-            // including when the relay ended input at the allowance limit.
             this.finalTranscript = transcript;
             this.hasFinalTranscript = true;
             if (!this.cancelled && this.socket === socket) this.onFinal?.();
@@ -226,9 +205,6 @@ export class DictationStream {
       this.fail(new Error("The microphone returned invalid audio."));
       return;
     }
-    // Native delivery can coalesce beyond the requested interval (including
-    // the final flush). Preserve PCM sample boundaries/order while enforcing
-    // the relay's frame limit independently of native callback timing.
     try {
       for (
         let offset = 0;
@@ -249,8 +225,6 @@ export class DictationStream {
   async finish(): Promise<string> {
     this.throwIfFailed();
     const socket = this.socket;
-    // Provider completion can precede native stopRecording's final flush and
-    // close the socket before the hook reaches finish(). Keep that success.
     if (this.hasFinalTranscript) {
       this.socket = null;
       if (socket) {

@@ -11,8 +11,6 @@ const REDUCED_SAMPLES = 24;
 let bounceFrames: Keyframe[] | null = null;
 let reducedFrames: Keyframe[] | null = null;
 
-/** Lift is in dot diameters, and a translate percentage is of the dot's own
- *  box, so the keyframes fit any dot size unchanged. */
 function keyframes(reduced: boolean): Keyframe[] {
   if (reduced) {
     reducedFrames ??= Array.from({ length: REDUCED_SAMPLES + 1 }, (_, i) => ({
@@ -33,12 +31,6 @@ function keyframes(reduced: boolean): Keyframe[] {
   return bounceFrames;
 }
 
-/**
- * Three plain dots running the thinking ellipsis' shared bounce
- * (`@stella/contracts/working-dots-bounce`) on a WAAPI transform, so they
- * animate on the compositor at full opacity. Each child is a dot; size and colour stay
- * with the caller's CSS.
- */
 export function WorkingDots({
   className,
   label,

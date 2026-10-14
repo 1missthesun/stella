@@ -6,7 +6,6 @@ import {
 import type { ConversationState } from "./cloud-conversation-store";
 import { cloudTurnActivity } from "./cloud-journal-projection";
 
-/** Eligibility belongs to fresh sends on this surface, never restored history. */
 export class ReplyArrivalHaptics {
   private pending = new Set<string>();
 
@@ -72,7 +71,6 @@ export class ReplyArrivalHaptics {
         message.sequence === undefined
           ? undefined
           : bySequence.get(message.sequence);
-      // Optimistic error/cancel bubbles and synthetic terminal notices are not replies.
       if (!record || record.kind !== "message" || record.role !== "assistant")
         continue;
       if (

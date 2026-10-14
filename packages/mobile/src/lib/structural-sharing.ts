@@ -8,12 +8,6 @@ const isPlainObject = (value: unknown): value is Record<string, unknown> => {
   return prototype === Object.prototype || prototype === null;
 };
 
-/**
- * Returns `next`, reusing every part of `previous` that is structurally equal
- * to it: `previous` itself when the two are deep-equal, otherwise a copy of
- * `next` whose equal branches are the previous objects. Only plain objects and
- * arrays are walked; anything else is compared by identity.
- */
 export const replaceEqualDeep = <T>(previous: unknown, next: T): T => {
   if (previous === next) return next;
   if (Array.isArray(previous) && Array.isArray(next)) {
@@ -39,17 +33,6 @@ export const replaceEqualDeep = <T>(previous: unknown, next: T): T => {
   return next;
 };
 
-/**
- * Keeps transcript rows referentially stable across re-projections.
- *
- * The journal projection rebuilds every row from the raw records whenever one
- * record lands, so without this each committed record handed the list a new
- * object for every message: every mounted row re-rendered, and every memo
- * keyed on a row's artifacts or steps recomputed. Rows are matched by id (an
- * insertion shifts indexes); an unchanged row is the previous object, a
- * changed row still shares its unchanged branches, and an unchanged transcript
- * is the previous array itself so downstream memos skip entirely.
- */
 export const reuseEqualChatMessages = (
   previous: readonly ChatMessage[] | null,
   next: ChatMessage[],

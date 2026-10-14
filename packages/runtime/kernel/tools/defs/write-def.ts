@@ -1,10 +1,3 @@
-/**
- * The `Write` tool's model-visible surface, split from the executable
- * definition so workerd hosts advertise the byte-identical tool. The Node
- * host applies the runtime file-access policy; the cloud world Durable Object
- * serves the same surface over its own filesystem.
- */
-
 export const WRITE_TOOL_NAME = "Write";
 
 export const WRITE_TOOL_DESCRIPTION =
@@ -26,5 +19,4 @@ export const WRITE_TOOL_PARAMETERS: Record<string, unknown> = {
   required: ["file_path", "content"],
 };
 
-/** Replay policy (`ToolReplayPolicy` in ../types.ts). The file may already hold this content, or newer content written after it. */
 export const WRITE_TOOL_REPLAY = "unsafe" as const;

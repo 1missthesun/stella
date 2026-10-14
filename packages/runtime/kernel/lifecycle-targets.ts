@@ -22,7 +22,6 @@ export type StellaHostRunnerTarget = {
     runAutomationTurn: (
       payload: RuntimeAutomationTurnRequest,
     ) => Promise<RuntimeAutomationTurnResult>;
-    /** Start an agent of the conversation's orchestrator, without a turn of it. Once per `key`. */
     startAgent?: (payload: {
       conversationId: string;
       key: string;

@@ -2,12 +2,6 @@ import type { ElectronBrowserViewApi } from "@/shared/types/electron";
 import { sidebarSections } from "@/features/workspace-display/sidebar-sections";
 import { displayTabs } from "@/features/workspace-display/tab-store";
 
-/**
- * Chat markdown links are Stella-browser destinations, not OS-browser ones:
- * an unmodified primary click hands the URL to the in-app browser section so
- * the page stays inside the workspace. Modifier and middle clicks keep the
- * anchor's native behaviour (Electron's external-link handlers own those).
- */
 type WebLinkBrowserApi = Pick<
   ElectronBrowserViewApi,
   "createTab" | "getState" | "selectTab"

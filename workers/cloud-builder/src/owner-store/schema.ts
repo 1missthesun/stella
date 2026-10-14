@@ -12,7 +12,6 @@
 
 const MISSING_SCHEMA = /no such (?:table|column)/i;
 
-/** A SQLite error from schema this version expects but the database lacks. */
 export const isMissingSchema = (error: unknown): boolean =>
   error instanceof Error && MISSING_SCHEMA.test(error.message);
 

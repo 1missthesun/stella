@@ -5,26 +5,6 @@ import net from "node:net";
 import { restoreDevHarnessStorageKeyForRelaunch } from "./bootstrap/dev-harness-protected-storage.js";
 import { git, gitRaw } from "./services/app-source/git.js";
 
-/**
- * Electron's side of the native launcher (launcher/{macos,windows,linux}).
- *
- * The launcher passes `STELLA_LAUNCHER=1` and an inherited channel: fd 3 (a
- * socketpair end) on macOS and Linux, the named pipe in `STELLA_LAUNCHER_PIPE`
- * on Windows. Messages are newline-delimited JSON:
- *
- * - to the launcher: `{"op":"ready"}` when the main window is ready to show,
- *   `{"op":"sign","id":n,"commit":sha}` after the checkout's HEAD changed,
- *   `{"op":"failed","reason":"..."}` when Stella can't keep running,
- *   `{"op":"exiting","code":0|75}` just before a clean exit;
- * - from the launcher: `{"op":"sign-result","id":n,"ok":true,"commit":sha}`
- *   or `{"op":"sign-result","id":n,"ok":false,"error":"..."}`, and
- *   `{"op":"quit"}` (self-test).
- *
- * Exit code 75 asks the launcher to relaunch (after preparing and verifying
- * the tree again); 0 means the user quit. Without a launcher (`electron:dev`)
- * every function here is a no-op and relaunching uses `app.relaunch()`.
- */
-
 export const LAUNCHER_RELAUNCH_EXIT_CODE = 75;
 const SIGNED_NOTES_REF = "stella-signed";
 const SIGN_TIMEOUT_MS = 30_000;
@@ -87,7 +67,6 @@ const rejectAllPending = (reason: string) => {
   }
 };
 
-/** Open the channel and send `ready` once the main window can be shown. */
 export const connectLauncher = () => {
   if (channel || !isLauncherPresent()) return;
   const socket =
@@ -118,13 +97,11 @@ export const connectLauncher = () => {
     channel = null;
     rejectAllPending("The launcher channel closed.");
   });
-  // The channel must never keep Electron alive on its own.
   socket.unref();
 
   app.on("browser-window-created", (_event, window: BrowserWindow) => {
     if (readySent) return;
     window.once("ready-to-show", () => {
-      // Hidden helper windows (overlay, a companion's hidden shell) don't count.
       if (readySent || window.isDestroyed() || !window.isVisible()) return;
       readySent = true;
       send({ op: "ready" });
@@ -132,11 +109,6 @@ export const connectLauncher = () => {
   });
 };
 
-/**
- * Hand the launcher the frosted frame of an update that restarts Stella, so
- * it holds the window on screen between this process and the next (see
- * UpdateTransition). The launcher lets go once the next window is ready.
- */
 export const holdForRelaunch = (hold: {
   image: string;
   mark: string;
@@ -148,27 +120,15 @@ export const holdForRelaunch = (hold: {
   send({ op: "hold", ...hold });
 };
 
-/**
- * Before a relaunch: this process installed the dependencies for the lockfile
- * hashed `lockHash`, and ran prepare-install.mjs for `head`, so the
- * launcher's own prepare on the way back up can skip both. The launcher takes
- * only what still matches the checkout. No-op without a launcher.
- */
 export const reportPrepared = (prepared: { lockHash?: string; head?: string }) => {
   if (!prepared.lockHash && !prepared.head) return;
   send({ op: "prepared", ...prepared });
 };
 
-/** Tell the launcher Stella can't keep running; it shows the recovery screen. */
 export const reportFailed = (reason: string) => {
   send({ op: "failed", reason: reason.slice(0, 4_000) });
 };
 
-/**
- * Ask the launcher to sign the checkout's HEAD (after an apply, undo, remote
- * or upstream update). The launcher checks HEAD is still `commit` and the tree
- * is clean, then stores the note. No-op without a launcher.
- */
 export const signHead = async (cwd: string): Promise<void> => {
   if (!isLauncherPresent()) return;
   const commit = await git(cwd, ["rev-parse", "HEAD"]);
@@ -188,13 +148,6 @@ export const signHead = async (cwd: string): Promise<void> => {
   });
 };
 
-/**
- * Refuse to act on a HEAD the launcher didn't sign: an agent that committed
- * directly in the checkout must not get its commit signed by riding on the
- * next apply. Verifies `refs/notes/stella-signed` against the launcher's
- * public key (`STELLA_LAUNCHER_PUBKEY`, base64 SPKI DER). No-op without a
- * launcher.
- */
 export const assertHeadSigned = async (cwd: string): Promise<void> => {
   if (!isLauncherPresent()) return;
   const encodedKey = process.env.STELLA_LAUNCHER_PUBKEY?.trim();
@@ -223,10 +176,6 @@ export const assertHeadSigned = async (cwd: string): Promise<void> => {
   if (!valid) throw unsigned;
 };
 
-/**
- * Relaunch Electron. Under a launcher, quit with exit code 75 so the launcher
- * prepares, verifies and respawns; otherwise `app.relaunch()`.
- */
 export const relaunchApp = () => {
   relaunching = true;
   if (isLauncherPresent()) {
@@ -239,14 +188,8 @@ export const relaunchApp = () => {
   app.quit();
 };
 
-/** This quit is a relaunch: the next process starts right after it. */
 export const isRelaunching = () => relaunching;
 
-/**
- * The exit code for a clean quit (75 when a relaunch was requested), also
- * announced to the launcher as `{"op":"exiting","code"}` so a process whose
- * teardown then hangs is killed and treated as that exit, not a crash.
- */
 export const launcherExitCode = () => {
   const code =
     relaunchRequested && isLauncherPresent() ? LAUNCHER_RELAUNCH_EXIT_CODE : 0;

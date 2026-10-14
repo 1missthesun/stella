@@ -18,13 +18,6 @@ import {
   type DeviceFolderListing,
 } from "@stella/contracts/device-file-reads";
 
-/**
- * This computer reading a file another of the owner's computers has, relayed
- * by the cloud over that computer's presence socket. The request is signed
- * with this computer's device key; the other computer applies its own
- * file-access policy, exactly as it does for a phone.
- */
-
 const REQUEST_TIMEOUT_MS = 60_000;
 const DEVICES_CACHE_MS = 10_000;
 const PROBE_TIMEOUT_MS = 8_000;
@@ -58,11 +51,6 @@ export type PeerDeviceFiles = {
     filePath: string,
     conversationId?: string | null,
   ) => Promise<DeviceFolderListing>;
-  /**
-   * The online computer that has `filePath`: `preferred` (the computer that
-   * produced it) when it has it, then the computer the destination picker
-   * names, then whichever other online computer of the owner answers first.
-   */
   findHolder: (
     filePath: string,
     options?: { preferred?: string | null; conversationId?: string | null },

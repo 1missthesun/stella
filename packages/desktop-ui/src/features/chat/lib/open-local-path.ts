@@ -12,17 +12,6 @@ const ipcErrorMessage = (caught: unknown): string =>
     "",
   );
 
-/**
- * Open a local path a chat reply links to, the way every chat entry point
- * (inline link, attachment pill, overflow menu) should: a type with an
- * in-app viewer opens in the side panel, which finds the file on this
- * computer, the computer that produced it, the selected computer or the copy
- * in the Drive, and explains a file it can't find. Anything else (a folder,
- * an unknown type) goes to the OS when it is on this computer, so a folder
- * opens in the file manager; a folder on another of the user's computers
- * opens as a listing in the side panel, and a file there says where it is.
- * Resolves to the reason it could not open, or null.
- */
 export const openLocalPath = async (filePath: string): Promise<string | null> => {
   const payload = displayPayloadForStellaFile(filePath, Date.now());
   if (payload) {

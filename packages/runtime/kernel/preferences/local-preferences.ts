@@ -1,16 +1,3 @@
-/**
- * Local preferences — reads/writes `~/.stella/preferences.json`.
- *
- * Serves as the local source of truth for user preferences. Model routing
- * preferences live here only; the backend does not own or sync them.
- *
- * Effect-native internals (M5): the mtime-cached load and the private-file
- * save live on a `LocalPreferences` service run by one module-level
- * `ManagedRuntime`. Every exported symbol keeps its pre-Effect synchronous
- * signature; failures rethrow the ORIGINAL error object via `Cause.squash`
- * so escaping messages stay byte-identical (host/lifecycle.ts pattern).
- */
-
 import fs from "fs";
 import path from "path";
 import {
@@ -70,121 +57,40 @@ export type {
 } from "@stella/contracts/local-preferences";
 
 export type LocalPreferences = {
-  /** Default models keyed by agent type. */
   defaultModels: Record<string, string>;
-  /** Model overrides keyed by agent type, e.g. "orchestrator" -> "anthropic/claude-opus-4.6" */
   modelOverrides: Record<string, string>;
-  /**
-   * Agent keys whose current entry in `modelOverrides` was written by
-   * Assistant-tab auto-propagation (not by an explicit per-agent pick).
-   * The Assistant tab in `AgentModelPicker` writes orchestrator + general
-   * directly and broadcasts the same model to every other configurable
-   * agent (except chronicle, which is intentionally explicit-opt-in). We
-   * track which keys were propagation-written so switching Assistant back
-   * to Stella only clears those, never user-intentional per-agent picks.
-   */
   assistantPropagatedAgents: string[];
-  /** Reasoning effort overrides keyed by agent type. */
   reasoningEfforts: Record<string, ReasoningEffort>;
-  /** Conversation routes to restore when leaving a local runtime engine. */
   stellaConversationModelOverrides: Record<string, string>;
-  /** Stella-scoped conversation reasoning restored with its routes. */
   stellaConversationReasoningEfforts: Record<string, ReasoningEffort>;
-  /** Runtime engine shared by every local agent. */
   agentRuntimeEngine: AgentEngine;
-  /** Claude-only opt-out of Stella's subscription harness. */
   useNativeClaudeCodeRuntime: boolean;
-  /** Subscription model id used when ChatGPT/Codex is selected. */
   codexModel: string;
-  /**
-   * True once the user actively picks a Codex/ChatGPT model in a picker
-   * surface. Distinguishes an explicit pick from a materialized default that
-   * legacy prefs.json bake into `codexModel`. Only an explicit pick makes
-   * Stella Light honor the saved model instead of downgrading to the light
-   * model. Absent/false on legacy files => treated as non-explicit.
-   */
   codexModelExplicit: boolean;
-  /** Codex reasoning effort used when the Codex engine is selected. */
   codexReasoningEffort: ReasoningEffort;
-  /** Codex service tier ("standard" | "fast") used when the Codex engine is selected. */
   codexServiceTier: CodexServiceTier;
-  /** Claude Code model or alias used when the Claude Code engine is selected. */
   claudeCodeModel: string;
-  /** Claude Code effort/thinking level used when the Claude Code engine is selected. */
   claudeCodeReasoningEffort: ReasoningEffort;
-  /** Shared max concurrency across all agent task execution */
   maxAgentConcurrency: number;
-  /** Image generation provider/model. Stella is the managed default. */
   imageGeneration: ImageGenerationPreferences;
-  /** Realtime voice provider/model. Stella is the managed default. */
   realtimeVoice: RealtimeVoicePreferences;
-  /** Master toggle for memory injection into agent context. */
   memoryEnabled: boolean;
-  /** Global accelerator used for OS-wide and in-app dictation. Empty disables it. */
   dictationShortcut: string;
-  /** Global accelerator used to open the voice agent. Empty disables it. */
   voiceRtcShortcut: string;
-  /** Prevents the computer from sleeping while Stella is running. */
   preventComputerSleep: boolean;
-  /** Allows Stella computer use to continue through the macOS lock screen. */
   lockedComputerUseEnabled: boolean;
-  /** Allows desktop notification sounds for agent completion. */
   soundNotificationsEnabled: boolean;
-  /** Allows start/stop sound effects for dictation. */
   dictationSoundEffectsEnabled: boolean;
-  /**
-   * Metadata-only product telemetry (never message content). The account-wide
-   * backend preference mirrors this; the local bit is what the desktop and
-   * runtime producers check before recording or sending anything.
-   */
   telemetryEnabled: boolean;
-  /**
-   * Telemetry was turned off here but the account preference couldn't be
-   * written yet. While set, the account value is never mirrored onto this
-   * device; the account write to false is retried until it succeeds.
-   */
   telemetryAccountOffPending: boolean;
-  /**
-   * Reads finalized assistant messages aloud via one-shot TTS. Off by
-   * default — the user opts in from a speaker toggle in the chat UI. The
-   * provider is `realtimeVoice.readAloudProvider` (defaults to Gemini),
-   * independent from the realtime voice agent.
-   */
   readAloudEnabled: boolean;
-  /**
-   * Floating desktop companion — the always-on-top Stella mark that carries a
-   * mini composer, dictation, and the latest reply. Off until the user turns
-   * it on; the setting survives restarts so the companion comes back.
-   */
   companionEnabled: boolean;
-  /**
-   * Screen-space anchor (center-bottom of the mark) the user dragged the
-   * companion to. `null` until the first drag; main falls back to the
-   * bottom-right of the primary display's work area.
-   */
   companionAnchor: { x: number; y: number } | null;
-  /**
-   * Live Memory (Chronicle screen capture/OCR) is opt-in. Onboarding may
-   * stage an enable while waiting for sign-in, then promote it after auth.
-   */
   chronicleEnabled: boolean;
   chroniclePendingEnable: boolean;
-  /**
-   * "Hey Stella" wake-word listener — when enabled, a background
-   * native helper continuously listens for the wake word and starts
-   * the realtime voice agent on detection. Mic buttons / keybinds
-   * remain dictation-only; voice is wake-word-gated.
-   */
   wakeWordEnabled: boolean;
-  /**
-   * First-run onboarding completion. Stored in ~/.stella/preferences.json so
-   * installer repair flows preserve it even if Electron web storage
-   * is rebuilt.
-   */
   onboardingCompleted: boolean;
-  /** Wake-word detection threshold (0–1). Higher = stricter. */
   wakeWordThreshold: number;
-  /** `{ <agentId>: <presetId> }` user prompt-preset picks; "default" is implicit. */
   promptPresetSelections: Record<string, string>;
   userAskEscalationPolicy: UserAskEscalationPolicy;
 };
@@ -218,7 +124,6 @@ const DEFAULT_PREFERENCES: LocalPreferences = {
   defaultModels: {},
   modelOverrides: {},
   assistantPropagatedAgents: [],
-  // Missing entries use DEFAULT_REASONING_EFFORT.
   reasoningEfforts: {},
   stellaConversationModelOverrides: {},
   stellaConversationReasoningEfforts: {},
@@ -254,10 +159,6 @@ const DEFAULT_PREFERENCES: LocalPreferences = {
   userAskEscalationPolicy: DEFAULT_USER_ASK_ESCALATION_POLICY,
 };
 
-/**
- * `{ <agentId>: <presetId> }`. Only well-formed slug pairs survive; anything
- * else falls back to the shipped prompt rather than failing a load.
- */
 const normalizePromptPresetSelections = (
   value: unknown,
 ): Record<string, string> => {
@@ -281,8 +182,6 @@ const RETIRED_MODEL_PROVIDERS = new Set([
   "mistral",
   "fal",
 ]);
-// Keep dedicated ChatGPT/Codex subscription ids valid; only migrate routing
-// references removed from the maintained OAuth catalog.
 const RETIRED_OPENAI_CODEX_MODELS = new Set([
   "gpt-5.1",
   "gpt-5.1-codex-max",
@@ -295,11 +194,6 @@ const RETIRED_OPENAI_CODEX_MODELS = new Set([
 const prefsPath = (stellaDataDir: string) =>
   path.join(stellaDataDir, "preferences.json");
 
-/**
- * Coerce whatever `preferences.json` holds into a fully-normalized
- * `LocalPreferences`. Pure — the field-by-field rules are unchanged from the
- * pre-Effect loader.
- */
 const normalizeStoredPreferences = (
   parsed: Partial<LocalPreferences>,
 ): LocalPreferences => ({
@@ -317,9 +211,6 @@ const normalizeStoredPreferences = (
     parsed.stellaConversationReasoningEfforts,
   ),
   agentRuntimeEngine: normalizeEngine(parsed.agentRuntimeEngine),
-  // The short-lived global native-runtime opt-out is migrated for Claude
-  // Code only. Codex now always uses Stella's subscription-backed harness;
-  // saving the normalized object strips the retired Codex/native keys.
   useNativeClaudeCodeRuntime:
     typeof parsed.useNativeClaudeCodeRuntime === "boolean"
       ? parsed.useNativeClaudeCodeRuntime
@@ -377,8 +268,6 @@ const normalizeStoredPreferences = (
   ),
 });
 
-// ── Effect service ────────────────────────────────────────────────────────
-
 /**
  * Identity of the preferences file as last read or written. Electron main and
  * the worker both write this file (each process has its own cache), so every
@@ -402,7 +291,6 @@ type FileKey = {
 type CacheEntry = {
   readonly prefs: LocalPreferences;
   readonly key: FileKey | null;
-  /** Wall clock taken before the stat that produced `key`. */
   readonly observedAtMs: number;
 };
 
@@ -453,7 +341,6 @@ export class Service extends Context.Service<Service, Interface>()(
 export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
-    // Single cache slot (last-loaded-file-wins) keyed on the file identity.
     const cache = yield* Ref.make<CacheEntry | null>(null);
 
     const load = Effect.fn("LocalPreferences.load")(function* (
@@ -478,8 +365,6 @@ export const layer = Layer.effect(
         },
         catch: (error) => error,
       }).pipe(
-        // Missing/unreadable/corrupt file falls back to defaults, cache
-        // untouched — identical to the old catch-all.
         Effect.catch(() => Effect.succeed<CacheEntry | null>(null)),
       );
       if (loaded === null) {
@@ -496,8 +381,6 @@ export const layer = Layer.effect(
       prefs: LocalPreferences,
     ) {
       const filePath = prefsPath(stellaDataDir);
-      // Write failures propagate the ORIGINAL fs error to the caller and
-      // leave the cache untouched (the file was not replaced).
       yield* Effect.try({
         try: () => {
           const dir = path.dirname(filePath);
@@ -523,11 +406,8 @@ export const layer = Layer.effect(
   }),
 );
 
-// ── Sync facade over one module-level ManagedRuntime ──────────────────────
-
 const preferencesRuntime = ManagedRuntime.make(layer);
 
-/** Run a preferences Effect, rethrowing the original failure object. */
 const runPreferences = <A, E>(effect: Effect.Effect<A, E, Service>): A => {
   const exit = preferencesRuntime.runSyncExit(effect);
   if (Exit.isSuccess(exit)) {
@@ -754,12 +634,6 @@ export const getTelemetryState = (stellaDataDir: string): TelemetryState => {
   }
 };
 
-/**
- * Write this device's telemetry switch. `mirrorAccount` writes copy the
- * account preference: while an off is still pending for the account an
- * account `true` is ignored, so off on this device stays off until the user
- * turns it on, and an account `false` settles the pending off.
- */
 export const setTelemetryEnabled = (
   stellaDataDir: string,
   enabled: boolean,
@@ -899,8 +773,6 @@ export const setOnboardingCompleted = (
     onboardingCompleted: completed,
   });
 };
-
-// ── Normalization helpers ─────────────────────────────────────────────────
 
 const normalizeEngine = (value: unknown): AgentEngine => {
   return coerceAgentRuntimeEngine(value);
@@ -1075,11 +947,6 @@ export const normalizeRealtimeVoicePreferences = (
   return result;
 };
 
-/**
- * Resolve the voice id that should be used for the active session, given
- * the user's preferences and the underlying provider that will actually
- * run the session.
- */
 export const resolveRealtimeVoiceId = (
   prefs: RealtimeVoicePreferences,
   underlyingProvider: RealtimeVoiceUnderlyingProvider,

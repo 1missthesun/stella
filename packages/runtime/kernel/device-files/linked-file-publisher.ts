@@ -114,14 +114,6 @@ const readBounded = async (
   }
 };
 
-/**
- * The images, video, audio, stylesheets and scripts a linked HTML document
- * (or the images a markdown one) loads from its own folder, so every viewer
- * can render it whole from Drive while its computer is offline. Only what the
- * document references is copied, never the rest of its folder; each must
- * really live inside that folder (symlinks resolved), be an asset type, and
- * stay under the Drive copy limit like any other linked file.
- */
 const htmlDocumentAssets = async (documentPath: string): Promise<string[]> => {
   const bytes = await readBounded(
     documentPath,
@@ -152,14 +144,8 @@ const htmlDocumentAssets = async (documentPath: string): Promise<string[]> => {
   return assets;
 };
 
-/** Files of a linked folder copied to Drive, at most. */
 const FOLDER_COPY_FILES = 50;
 
-/**
- * A linked folder's listing and the files in it worth copying: its own
- * regular files (not hidden, not reached through a symlink out of it), up
- * to `FOLDER_COPY_FILES`. Subfolders are listed, not copied.
- */
 const folderContents = async (
   folderPath: string,
 ): Promise<{ listing: DeviceFolderListing; files: string[] }> => {

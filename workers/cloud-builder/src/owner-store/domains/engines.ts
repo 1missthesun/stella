@@ -120,11 +120,6 @@ export const ENGINES_MIGRATION = {
   ],
 };
 
-/**
- * Several accounts per provider. Each existing single credential becomes that
- * provider's first, active account; its ciphertext is unchanged (the
- * additional data is owner + provider, not the row).
- */
 export const ENGINE_ACCOUNTS_MIGRATION = {
   id: "engines.2-accounts",
   statements: [
@@ -156,13 +151,6 @@ export const ENGINE_ACCOUNTS_MIGRATION = {
   ],
 };
 
-/**
- * Claude signs in and refreshes on the owner's devices; the server keeps
- * tokens and leases. Its expiry moves out of the ciphertext so views can
- * show when an account is due (an existing Claude row reads as due now, and
- * the first device to see it refreshes). Server-side Claude connect attempts
- * are gone; ChatGPT's still use `engine_connects`.
- */
 export const ENGINE_DEVICE_REFRESH_MIGRATION = {
   id: "engines.3-device-refresh",
   statements: [
@@ -178,14 +166,6 @@ export const ENGINE_DEVICE_REFRESH_MIGRATION = {
   ],
 };
 
-/**
- * ChatGPT moves to Sign in with ChatGPT: accounts connected through the old
- * Codex client can't be refreshed or used on the public API, so they go
- * (no users yet). Accounts gain a sign-in status, the holder's name and
- * whether plan usage was granted; the provider settings row keeps the
- * cloud's host id; a connect attempt keeps everything one authorization
- * needs until its callback.
- */
 export const ENGINE_CHATGPT_SIWC_MIGRATION = {
   id: "engines.4-chatgpt-siwc",
   statements: [
@@ -212,14 +192,6 @@ export const ENGINE_CHATGPT_SIWC_MIGRATION = {
   ],
 };
 
-/**
- * Stella stops holding Claude credentials: every stored Claude token goes,
- * with the refresh lease table, the expiry columns and the cooldown/auto-
- * switch state (no account ever switches on its own now). Claude accounts
- * come back as identities only, reported by the owner's computers and the
- * cloud's own Claude Code login, with where each is signed in. ChatGPT
- * registrations (issued client ids) become shareable between hosts.
- */
 export const ENGINE_CLI_LOGINS_MIGRATION = {
   id: "engines.5-cli-logins",
   statements: [
@@ -253,23 +225,11 @@ export const ENGINE_CLI_LOGINS_MIGRATION = {
   ],
 };
 
-/**
- * A selection can name a model on an account provider key. Clients older
- * than provider keys read `execution`; it keeps the last selection they
- * understand (`legacy_execution`) while the account runs on a provider.
- */
 export const ENGINE_PROVIDER_SELECTION_MIGRATION = {
   id: "engines.6-provider-selection",
   statements: [`ALTER TABLE engine_settings ADD COLUMN legacy_execution TEXT`],
 };
 
-/**
- * Each place (the cloud, each computer) uses its own Claude account, so one
- * computer's login never takes over another's. A place runs the account
- * chosen for it while it holds a login for it, else its Claude Code default
- * login, else its oldest. The account-wide choice becomes the choice of
- * every place that holds a login for it.
- */
 export const ENGINE_CLAUDE_PER_PLACE_MIGRATION = {
   id: "engines.7-claude-per-place",
   statements: [
@@ -288,13 +248,6 @@ export const ENGINE_CLAUDE_PER_PLACE_MIGRATION = {
   ],
 };
 
-/**
- * One Claude choice for every place: the account chosen anywhere (any
- * computer, the phone, the web) is the one the cloud and every computer run
- * while they hold a login for it. The latest per-place choice becomes it.
- * Computers also say whether they have a `claude` CLI, so one with no login
- * still shows up as a place.
- */
 export const ENGINE_CLAUDE_ONE_CHOICE_MIGRATION = {
   id: "engines.8-claude-one-choice",
   statements: [
@@ -312,7 +265,6 @@ export const ENGINE_CLAUDE_ONE_CHOICE_MIGRATION = {
 };
 
 const CONNECT_TTL_MS = 15 * 60_000;
-/** Accounts one provider may hold. */
 const MAX_ACCOUNTS_PER_PROVIDER = 10;
 
 const PROVIDER_LABELS: Record<EngineProvider, string> = {
@@ -323,30 +275,17 @@ const PROVIDER_LABELS: Record<EngineProvider, string> = {
 export const DEFAULT_EXECUTION: LegacyCloudExecutionSelection = {
   engine: "stella",
   provider: "stella",
-  // Opaque managed default; the cloud-model endpoint resolves it per audience.
   model: "stella/default",
   reasoningEffort: DEFAULT_REASONING_EFFORT,
 };
 
-// --- Encryption (AES-256-GCM under OWNER_SECRETS_KEK) ---------------------
-
-/**
- * Ciphertexts carry the key version they were written under: `v1` under
- * OWNER_SECRETS_KEK, `v2` under OWNER_SECRETS_KEK_V2.
- */
-
 type StoredEnginePayload = {
   access: string;
   refresh: string;
-  /** Epoch ms after which `access` must be refreshed. */
   expires: number;
-  /** The registration's issued client id (one per user and workspace). */
   clientId?: string;
-  /** The validated ID-token subject. */
   subject?: string;
-  /** Granted scopes. */
   scopes?: string[];
-  /** Epoch ms before which a refresh isn't needed. */
   earliestRefreshAt?: number;
 };
 
@@ -400,7 +339,6 @@ const isCurrentKeyVersion = (env: Cloudflare.Env, encrypted: string): boolean =>
   return !keks || encrypted.startsWith(`${keks.current}.`);
 };
 
-/** Bound to the owner and provider, so a row copied elsewhere won't decrypt. */
 const additionalData = (ownerId: string, provider: EngineProvider) =>
   new TextEncoder().encode(`${ownerId}:${provider}`);
 
@@ -438,12 +376,8 @@ const decryptPayload = async (
   return JSON.parse(new TextDecoder().decode(plaintext)) as StoredEnginePayload;
 };
 
-// --- Execution selection ---------------------------------------------------
-
 const EXECUTION_ENGINES = ["stella", "anthropic", "chatgpt"] as const;
-/** A provider's model id: catalog ids include `/`, `:` and `~` (OpenRouter). */
 const PROVIDER_MODEL_ID = /^[A-Za-z0-9~][A-Za-z0-9._:/@~+-]{0,191}$/;
-/** Every level, plus the legacy values older clients and stored rows carry. */
 const REASONING_EFFORTS = ["none", ...REASONING_EFFORT_LEVELS, "default", "auto", "minimal"] as const;
 
 const normalizeExecutionEffort = (
@@ -470,7 +404,6 @@ const parseProviderExecutionShape = object({
   reasoningEffort: literal(...REASONING_EFFORTS),
 });
 
-/** The shape check plus the relationships a shape can't express. */
 const parseExecution = (value: unknown, path?: string): CloudExecutionSelection => {
   if (
     value &&
@@ -520,17 +453,13 @@ type SettingsRow = { execution: string; legacy_execution: string | null; updated
 type AccountRow = {
   account_id: string;
   provider: string;
-  /** ChatGPT: the encrypted tokens. Claude: always empty. */
   payload: string;
   label: string;
-  /** ChatGPT: the issued client id. Claude: the lowercased email. */
   identity: string | null;
   email: string | null;
   plan: string | null;
-  /** ChatGPT: null while signed in, else "signed_out" or "reauth_required". */
   status: string | null;
   name: string | null;
-  /** ChatGPT: 0 when the sign-in didn't grant plan usage. */
   plan_usage: number | null;
   created_at: number;
   updated_at: number;
@@ -551,9 +480,7 @@ type ConnectRow = {
 };
 
 type Selection = {
-  /** The saved selection, a provider model included. */
   selection: CloudExecutionSelection;
-  /** The last saved selection older clients understand. */
   execution: LegacyCloudExecutionSelection;
   selectedAt: number | null;
 };
@@ -587,7 +514,6 @@ const ACCOUNT_COLUMNS =
 
 const accountsOf = (db: OwnerDbReader, provider: EngineProvider): AccountRow[] =>
   db.all<AccountRow>(
-    // Connection order; rowid breaks ties between same-millisecond connects.
     `SELECT ${ACCOUNT_COLUMNS} FROM engine_accounts WHERE provider = ? ORDER BY created_at, rowid`,
     provider,
   );
@@ -598,13 +524,8 @@ const providerSettings = (db: OwnerDbReader, provider: EngineProvider): Provider
     provider,
   );
 
-/** ChatGPT: signed in, with plan usage granted. Claude: always (it's an identity). */
 const isServable = (row: AccountRow): boolean => row.status === null && row.plan_usage !== 0;
 
-/**
- * The account that serves: the chosen one, else the oldest. A ChatGPT
- * account that is signed out or lacks plan usage never serves.
- */
 const activeAccountOf = (
   accounts: readonly AccountRow[],
   settings: ProviderSettingsRow | null,
@@ -653,12 +574,6 @@ const readSettings = (db: OwnerDbReader): EngineSettings => {
   };
 };
 
-/**
- * The owner gate's engine fields: the engines the cloud can run, and the
- * default execution, which falls back to the managed engine when the
- * selected engine can't run in the cloud. Claude runs when the owner's
- * container holds a Claude Code login.
- */
 const connectedEnginesOf = (db: OwnerDbReader): NonNullable<OwnerSnapshot["connectedEngines"]> => {
   const claudeInCloud = claudeActiveByPlace(db).has(CLOUD_PLACE);
   return ENGINE_PROVIDERS.filter((provider) =>
@@ -674,16 +589,11 @@ const connectedEnginesOf = (db: OwnerDbReader): NonNullable<OwnerSnapshot["conne
   );
 };
 
-/** Account providers with a credential that can serve a turn (`providers.ts`). */
 const connectedProvidersOf = (db: OwnerDbReader): string[] =>
   db
     .all<{ provider: string }>("SELECT provider FROM provider_credentials WHERE status = 'ok' ORDER BY provider")
     .map((row) => row.provider);
 
-/**
- * Owner-mode servers default to the owner's own subscription: Stella's
- * managed models need an OpenRouter key the server may not have.
- */
 const ownerModeDefault = (
   connectedEngines: NonNullable<OwnerSnapshot["connectedEngines"]>,
 ): CloudExecutionSelection =>
@@ -730,7 +640,6 @@ const writeSelection = (ctx: OwnerContext, execution: CloudExecutionSelection): 
   );
 };
 
-/** A provider's credential went: a selection on it falls back to Stella's default. */
 export const resetExecutionForProvider = (ctx: OwnerContext, provider: string): void => {
   const { selection } = readSelection(ctx.db);
   if (selection.engine === "provider" && selection.provider === provider) {
@@ -754,8 +663,6 @@ const writeActiveAccount = (
   );
 };
 
-// --- Accounts ------------------------------------------------------------------
-
 const badRequest = (message: string) => new RpcError("BAD_REQUEST", message);
 
 type AccountIdentity = { identity?: string; email?: string; plan?: string; name?: string };
@@ -763,11 +670,6 @@ type AccountIdentity = { identity?: string; email?: string; plan?: string; name?
 const text = (value: unknown, max = 320): string | undefined =>
   typeof value === "string" && value.trim() ? value.trim().slice(0, max) : undefined;
 
-/**
- * Store a connected ChatGPT login. The same registration signing in again
- * replaces its own account; a new one is added. A sign-in with plan usage
- * becomes the active account, as signing in does in ChatGPT's own apps.
- */
 const writeAccount = (
   ctx: OwnerContext,
   provider: EngineProvider,
@@ -827,19 +729,12 @@ const writeAccount = (
   return accountId;
 };
 
-// --- Claude: identities and where each has a Claude Code login -------------------
-
 const CLOUD_PLACE = "cloud";
-/** The `engine_claude_choices` row of the one choice every place follows. */
 const EVERY_PLACE = "*";
 const devicePlace = (deviceId: string) => `device:${deviceId}`;
 
 const claudeIdentity = (email: string): string => email.trim().toLowerCase();
 
-/**
- * The Claude account for this email, added when it isn't known yet. Never
- * changes which account any place uses.
- */
 const ensureClaudeAccount = (
   ctx: OwnerContext,
   login: { email: string; plan?: string },
@@ -912,11 +807,6 @@ const heldClaudeLogins = (db: OwnerDbReader): Map<string, HeldLogin[]> => {
   return byPlace;
 };
 
-/**
- * What one place runs: the chosen account while it holds a login for it,
- * else its Claude Code default login, else its oldest. Desktops resolve the
- * same rule from `places[].active` (`claude-local-accounts.ts`).
- */
 const resolveClaudePlace = (
   rows: readonly HeldLogin[],
   chosen: string | null,
@@ -946,7 +836,6 @@ type ClaudeDeviceRow = {
   updated_at: number;
 };
 
-/** The one choice, and for the cloud and every computer what it runs and why. */
 const readClaudeOverview = (db: OwnerDbReader): ClaudeOverview => {
   const chosen = chosenClaudeAccount(db);
   const held = heldClaudeLogins(db);
@@ -1099,7 +988,6 @@ const reportClaudeLogins = (
       );
     }
   }
-  // This computer no longer holds the logins it didn't report.
   for (const row of ctx.db.all<{ account_id: string; identity: string | null }>(
     `SELECT p.account_id AS account_id, a.identity AS identity FROM engine_claude_places p
        JOIN engine_accounts a ON a.account_id = p.account_id WHERE p.place = ?`,
@@ -1156,7 +1044,6 @@ const finishClaudeCloud = async (
   if (!pending || pending.expires_at <= ctx.now) {
     throw badRequest("This sign-in expired. Start signing in to Claude again.");
   }
-  // One answer per attempt: the CLI reads exactly one code.
   ctx.db.run("DELETE FROM engine_claude_logins WHERE login_id = ?", args.loginId);
   const finished = await finishClaudeCloudLogin(ctx.env, ctx.ownerId, args.loginId, args.code.trim());
   if (!finished.ok) throw badRequest(finished.error);
@@ -1211,7 +1098,6 @@ const claudeAccount = (db: OwnerDbReader, accountId: string): AccountRow | null 
     accountId,
   );
 
-/** `claude auth logout` in the container for this account, and forget the place. */
 const signOutClaudeCloudRow = async (ctx: OwnerContext, row: AccountRow): Promise<void> => {
   if (row.email) {
     await signOutClaudeCloudAccount(ctx.env, ctx.ownerId, await claudeCloudAccountKey(row.email));
@@ -1233,11 +1119,6 @@ const signOutClaudeCloud = async (
   return null;
 };
 
-/**
- * `engines.claudeCloudAccount`: which config directory in the owner's
- * container a Claude cloud turn runs on — the account the cloud uses, among
- * the logins it holds. Never a credential; the CLI reads its own.
- */
 export const claudeCloudAccount = async (
   ctx: OwnerContext,
 ): Promise<{ key: string; email: string } | { missing: true; email?: string }> => {
@@ -1246,8 +1127,6 @@ export const claudeCloudAccount = async (
   if (!active?.email) return { missing: true };
   return { key: await claudeCloudAccountKey(active.email), email: active.email };
 };
-
-// --- ChatGPT registrations shared between the owner's hosts -----------------------
 
 const shareRegistration = (
   ctx: OwnerContext,
@@ -1298,9 +1177,6 @@ const readRegistrations = (db: OwnerDbReader): ChatGptSharedRegistration[] =>
       updatedAt: row.updated_at,
     }));
 
-// --- ChatGPT sign-in for the owner's cloud (Sign in with ChatGPT) --------------
-
-/** The cloud's `ext_agent_host_id`, created once and kept with its credentials. */
 const cloudHostId = (ctx: OwnerContext): string => {
   const row = ctx.db.one<{ host_id: string | null }>(
     "SELECT host_id FROM engine_provider_settings WHERE provider = 'chatgpt'",
@@ -1323,7 +1199,6 @@ const chatGptAccount = (db: OwnerDbReader, accountId: string): AccountRow | null
     accountId,
   );
 
-/** A ChatGPT failure as the caller should see it. */
 const chatGptRpcError = (error: unknown): RpcError => {
   if (error instanceof RpcError) return error;
   if (error instanceof ChatGptError) {
@@ -1336,15 +1211,6 @@ const chatGptRpcError = (error: unknown): RpcError => {
   });
 };
 
-/**
- * Begin one authorization for the cloud host: fresh state, nonce and PKCE,
- * the cloud's host id, and a 127.0.0.1 loopback redirect (the caller's
- * listener port, or the documented default for a pasted URL). Signing a
- * saved account in again reuses its issued client id with its email as
- * `login_hint`; ID tokens stay here, so no `id_token_hint` is sent. A
- * registration another of the owner's hosts made (`clientId`) is reused the
- * same way, under the cloud's own host id, instead of registering again.
- */
 const startConnect = async (
   ctx: OwnerContext,
   args: EngineCalls["engines.startConnect"]["args"],
@@ -1356,7 +1222,6 @@ const startConnect = async (
     { count: 20, windowMs: 10 * 60_000 },
     "Too many connect attempts. Try again in a few minutes.",
   );
-  // Fail before the OAuth dance if the result couldn't be stored.
   await currentCredentialKey(ctx.env).key;
   let saved: { accountId?: string; clientId: string; loginHint?: string } | undefined;
   if (!args.accountId && args.clientId) {
@@ -1435,7 +1300,6 @@ const startConnect = async (
   return { connectId, authorizeUrl, redirectUri };
 };
 
-/** A registration with no usable tokens yet (or anymore): sign in again. */
 const reauthPayload = (clientId: string, subject?: string): StoredEnginePayload => ({
   access: "",
   refresh: "",
@@ -1444,15 +1308,6 @@ const reauthPayload = (clientId: string, subject?: string): StoredEnginePayload 
   ...(subject ? { subject } : {}),
 });
 
-/**
- * Finish the authorization with the URL the browser landed on: check the
- * state and the issued client id, keep a new registration before the
- * one-time code exchange (so a failed exchange signs in again with the same
- * client instead of registering another), exchange the code, validate the ID
- * token (and, signing a saved account in again, that it's the same account),
- * and store the tokens encrypted. Without plan usage the sign-in is kept but
- * never serves turns.
- */
 const finishConnect = async (
   ctx: OwnerContext,
   args: EngineCalls["engines.finishConnect"]["args"],
@@ -1477,10 +1332,8 @@ const finishConnect = async (
     }
     throw chatGptRpcError(error);
   }
-  // One exchange per attempt, even when two clients finish it at once.
   ctx.db.run("DELETE FROM engine_connects WHERE connect_id = ?", args.connectId);
 
-  // A registration this cloud already keeps signs in again in place.
   let accountId =
     connect.account_id ??
     ctx.db.one<{ account_id: string }>(
@@ -1551,7 +1404,6 @@ const finishConnect = async (
   return { accountId, planUsage: registration.planUsage };
 };
 
-/** `engines.listModels`: the cloud's active ChatGPT account's model list. */
 const listModels = async (
   ctx: OwnerContext,
   _args: EngineCalls["engines.listModels"]["args"],
@@ -1572,11 +1424,6 @@ const listModels = async (
   }
 };
 
-/**
- * End a ChatGPT account's session: revoke its refresh token (best effort,
- * retried once) and keep only the registration, so signing in later reuses
- * the issued client id. Resolves whether the revocation was confirmed.
- */
 const signOutChatGpt = async (ctx: OwnerContext, row: AccountRow): Promise<boolean> => {
   let payload: StoredEnginePayload | null = null;
   try {
@@ -1618,8 +1465,6 @@ const disconnect = async (
       if (args.forget) ctx.db.run("DELETE FROM engine_accounts WHERE account_id = ?", row.account_id);
     }
   } else {
-    // Forget the identity; the cloud signs out of it too. Computers keep
-    // their own Claude Code logins (and would report them again).
     for (const row of targets) {
       const inCloud = ctx.db.one(
         "SELECT 1 AS present FROM engine_claude_places WHERE account_id = ? AND place = 'cloud'",
@@ -1639,7 +1484,6 @@ const disconnect = async (
       writeActiveAccount(ctx, args.provider, servable[0]?.account_id ?? null);
     }
   }
-  // Fall back to the managed engine if the provider's last usable account went.
   if (servable.length === 0 && readSelection(ctx.db).selection.engine === args.provider) {
     writeSelection(ctx, DEFAULT_EXECUTION);
   }
@@ -1689,14 +1533,6 @@ const chooseClaudeAccount = (
   return null;
 };
 
-// --- Signing another computer in, from the device the user is holding ------------
-
-/**
- * Ask a computer to run part of its own `claude auth login`. It must be
- * online and accept work from the owner's other devices: a sign-in decides
- * which Claude account its agents run on, which is no more than the work
- * those devices may already send it.
- */
 const relayClaudeLogin = async (
   ctx: OwnerContext,
   deviceId: string,
@@ -1798,17 +1634,13 @@ const setExecution = (
   return null;
 };
 
-// --- The cloud's ChatGPT access token (native lane only) ------------------------
-
 /**
  * One resolution per owner at a time: a ChatGPT refresh can rotate and
  * invalidate its input token, so concurrent callers share it.
  */
 const resolving = new Map<string, Promise<EngineAccessResult>>();
 
-/** A ChatGPT token with less than this left is refreshed before it's served. */
 const ACCESS_MIN_VALIDITY_MS = 10 * 60_000;
-/** A token this close to its expiry is no longer served. */
 const ACCESS_EXPIRY_MARGIN_MS = 60_000;
 /**
  * A forced refresh this soon after the account's last token write serves that
@@ -1822,12 +1654,6 @@ const toAccess = (payload: StoredEnginePayload, engineAccountId: string): Engine
   expiresAt: payload.expires,
 });
 
-/**
- * The active ChatGPT account's access token, refreshed here (the cloud being
- * the host that owns it) when close to expiry (not before the token
- * response's `earliest_refresh_at` unless forced). A refresh the provider
- * refuses for good marks the account for a new sign-in.
- */
 const resolveAccess = async (
   ctx: OwnerContext,
   forceRefresh = false,
@@ -1904,8 +1730,6 @@ const resolveAccess = async (
       : {}),
   };
   const encrypted = await encryptPayload(ctx, provider, next);
-  // A sign-out or reconnect during the refresh wins: never recreate or
-  // overwrite a row that is no longer the one refreshed.
   const current = ctx.db.one<{ payload: string }>(
     "SELECT payload FROM engine_accounts WHERE account_id = ?",
     row.account_id,
@@ -1933,11 +1757,6 @@ const sharedAccess = async (
   return await run;
 };
 
-/**
- * `engines.access`: the native lane's ChatGPT token; `needsSignIn` once the
- * cloud's ChatGPT sign-in ended; null when not connected or a refresh failed
- * for now. Claude is never served: no Claude credential is held here.
- */
 const engineAccess = async (ctx: OwnerContext, raw: unknown): Promise<EngineAccessResult> => {
   object({ provider: literal("chatgpt") })(raw);
   return await sharedAccess(ctx);

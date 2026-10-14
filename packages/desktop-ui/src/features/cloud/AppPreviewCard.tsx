@@ -10,11 +10,6 @@ import { openCloudAppPanel } from "./open-cloud-app-panel";
 import { loadCloudAppPreview, useLinkedCloudApp } from "./workspace-app-links";
 import "./app-preview-card.css";
 
-/**
- * A cloud app a reply links (`stella://app/<slug>`): a still of the app on
- * top, then its icon, name and "App", with a menu. Clicking opens the app in
- * the side panel. Renders nothing for a slug that is not a ready app.
- */
 export const AppPreviewCard = memo(function AppPreviewCard({
   slug,
 }: {

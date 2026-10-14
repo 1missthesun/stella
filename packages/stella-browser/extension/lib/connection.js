@@ -1,14 +1,3 @@
-/**
- * Native messaging connection to the Stella bridge (Chrome native host → localhost TCP).
- *
- * connectNative spawns a native host process (plus a cmd.exe shim on
- * Windows), so we never blind-reconnect: while disconnected we poll the
- * daemon's bridge port with a plain fetch() — zero processes — and only spawn
- * the host once Stella's daemon is actually listening. The host exits when the
- * daemon goes away, so nothing of Stella lingers in Task Manager when the app
- * is closed. An alarm keeps polling alive across service-worker suspensions.
- */
-
 import { STELLA_NATIVE_HOST_NAME } from "./native-host-name.js";
 
 /** Must match the daemon's bridge port (STELLA_BROWSER_BRIDGE_PORT / DEFAULT_EXT_PORT). */
@@ -41,10 +30,6 @@ export function onStatus(callback) {
   statusCallback = callback;
 }
 
-/**
- * Connect to the Stella bridge: probe for the daemon and attach via native
- * messaging once it's up (no port/token setup).
- */
 export function connect() {
   if (
     shouldConnect &&
@@ -57,9 +42,6 @@ export function connect() {
   probeThenConnect(generation);
 }
 
-/**
- * Disconnect from the bridge.
- */
 export function disconnect() {
   shouldConnect = false;
   connectionGeneration += 1;
@@ -121,10 +103,6 @@ async function isDaemonUp() {
   }
 }
 
-/**
- * Probe for the daemon; attach via native messaging when it's up, otherwise
- * keep polling. fetch() is process-free, so Stella being closed costs nothing.
- */
 async function probeThenConnect(generation = connectionGeneration) {
   if (
     !shouldConnect ||
@@ -235,8 +213,6 @@ function doConnect(generation) {
 
     nativePort = null;
     setStatus(false);
-    // Host exited (Stella closed, or the daemon restarted). Go back to
-    // process-free polling; we reattach as soon as the daemon answers.
     probeThenConnect(generation);
   });
 
@@ -265,8 +241,6 @@ chrome.alarms.onAlarm.addListener((alarm) => {
     if (isConnected()) {
       send({ type: "ping" });
     } else {
-      // The alarm revives a suspended service worker (which loses its probe
-      // timer); probeThenConnect dedupes against any pending timer/probe.
       if (shouldConnect) probeThenConnect(connectionGeneration);
     }
   }

@@ -1,17 +1,3 @@
-/**
- * Apps — the cloud app library, and the apps themselves.
- *
- * Sub-location (`sidebarSections` → `locations.apps`) is a cloud-app location
- * (`cloud:<appId>`), or `null` for the library list.
- *
- * `<PersistentCloudAppsHost />` renders here as a sibling of the library, not
- * inside the branch that shows the open app, and it is never conditioned on
- * which app is open. App surfaces have to be mounted in their final home and
- * only ever hidden: portalling or re-parenting a live subtree preserves React
- * state but destroys iframe browsing contexts and resets `<video>`/`<canvas>`
- * and scroll position. Everything about where the host sits in this tree
- * exists to keep its DOM nodes still.
- */
 import { useNavigate } from "@tanstack/react-router";
 import { useCallback } from "react";
 import { CloudAppsLibrary } from "@/features/cloud/CloudAppsLibrary";
@@ -45,11 +31,6 @@ export function AppsSection() {
     </>
   );
 }
-/**
- * Hands the user to chat with the "what can you build me" prompt already in
- * the composer. The compose event only lands on a mounted composer, so the
- * navigation has to settle first.
- */
 function AppsEmpty() {
   const navigate = useNavigate();
   const t = useT();

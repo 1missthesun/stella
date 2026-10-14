@@ -1,12 +1,6 @@
 import { getDomain } from "tldts";
 import { GatewayError } from "./errors.js";
 
-/**
- * Browser Run guardrails apply to every request, including same-site API calls.
- * Derive that egress boundary from the verified top-level site instead of
- * accepting model-supplied dependency hosts. Both the registrable domain and
- * its subdomains are allowed; unrelated registrable domains remain denied.
- */
 export const browserGuardrailDomains = (
   allowedOrigins: readonly string[],
 ): readonly string[] => {

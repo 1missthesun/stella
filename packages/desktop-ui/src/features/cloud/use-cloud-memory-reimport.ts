@@ -58,7 +58,6 @@ const reimportClient = createCloudMemoryReimportClient({
   authorize: (args) => backendClient.call("memory.authorizeReimport", args),
 });
 
-/** A view value echoing another owner is the previous account's, not ours. */
 const belongsToAnotherOwner = (value: unknown, subject: string): boolean =>
   typeof value === "object" &&
   value !== null &&
@@ -68,12 +67,6 @@ const belongsToAnotherOwner = (value: unknown, subject: string): boolean =>
 const statusIsEligible = (status: MemoryWipeStatus | null): boolean =>
   status?.state === "open" && status.importDisposition === "explicit_required";
 
-/**
- * Explicit, account-fenced authorization for the memory computers kept from
- * before a wipe to sync into the fresh epoch (`memory.authorizeReimport`).
- * Until it is given, the desktop memory sync holds on those computers. It
- * does not authorize skills.
- */
 export function useCloudMemoryReimport(): CloudMemoryReimportView {
   const mode = useCloudConversationSession();
   const identity = useMemo<CloudMemoryReimportIdentity | null>(
@@ -104,7 +97,6 @@ export function useCloudMemoryReimport(): CloudMemoryReimportView {
     identity,
   );
   const statusRef = useRef<MemoryWipeStatus | null>(null);
-  /** The last status the view delivered; null once it fails. */
   const liveStatusRef = useRef<MemoryWipeStatus | null>(null);
   const activeRequestIdRef = useRef<string | null>(null);
   const activeAttemptRef = useRef<CloudMemoryReimportAttempt | null>(null);
@@ -173,7 +165,6 @@ export function useCloudMemoryReimport(): CloudMemoryReimportView {
       statusRef.current = status;
       setView({ phase: "authorized", status, issueCode: null });
       cloudHomeSyncRetryStore.request();
-      // This computer's held memory goes up on the pass this starts.
       void requestMemorySync();
       return true;
     },
@@ -225,8 +216,6 @@ export function useCloudMemoryReimport(): CloudMemoryReimportView {
         return completeAuthorization(status);
       }
       if (status.importDisposition === "explicit_required") {
-        // This is the unchanged pre-authorization head. It cannot resolve an
-        // ambiguous mutation and must not replace its exact-attempt retry.
         return false;
       }
       activeRequestIdRef.current = null;
@@ -283,15 +272,8 @@ export function useCloudMemoryReimport(): CloudMemoryReimportView {
     [completeAuthorization, publishError, requestIsCurrent],
   );
 
-  /**
-   * Republish from the live view. A failed view is retried by reconnecting
-   * the live channel; the status it delivers next is published by the
-   * subscription effect.
-   */
   const load = useCallback(async (): Promise<boolean> => {
     const current = currentIdentityRef.current;
-    // An ambiguous authorization owns its exact retry until it resolves. A
-    // generic refresh must not discard that plan or strand the attempt.
     if (!current || authorizingRef.current || activeAttemptRef.current) {
       return false;
     }

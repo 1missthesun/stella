@@ -147,17 +147,6 @@ export function useFullShellChat({
 }) {
   const { cloudFeaturesEnabled, storageMode } = useChatStore();
   const { accountScope } = useCloudConversationSession();
-  // Message state + always-current mirror ref, synced at WRITE time. The
-  // dictate-and-submit commit is rAF-deferred and can fire before React
-  // flushes the render that carries the appended transcript — a ref synced in
-  // the render body would still hold the pre-transcript text at that point,
-  // so the send would go out empty (and silently no-op), leaving the
-  // transcript sitting in the composer unsent. See use-composer-message-state.
-  //
-  // The text lives in a store rather than this hook's state: this hook owns
-  // the whole chat runtime, so state here re-rendered the provider and every
-  // runtime consumer (root chrome, sidebars, bridges) on each keystroke. Only
-  // the composer leaf subscribes to the text; this hook reads derived facts.
   const {
     store: composerMessageStore,
     setMessage,
@@ -189,7 +178,6 @@ export function useFullShellChat({
       current === conversationId ? current : conversationId,
     );
   }, []);
-  // Text the onboarding hand-off asked to submit as soon as the composer can.
   const pendingAutoSendTextRef = useRef<string | null>(null);
   // Auth scope is a hard renderer privacy boundary. Clear composer content,
   // attachment handles, and per-tab memories in a layout effect so no frame
@@ -233,14 +221,9 @@ export function useFullShellChat({
     if (activeConversationId) {
       const remembered =
         composerMemoryByConversationRef.current.get(activeConversationId);
-      // First-run onboarding can leave a draft for the first conversation:
-      // the starter the user tapped, or what they typed to skip ahead. It
-      // never overrides a tab's own remembered text.
       const pendingDraft = remembered?.message
         ? null
         : takePendingComposerDraft();
-      // Arm the hand-off before writing the text so the auto-send readiness
-      // subscription below observes both in the same store notification.
       pendingAutoSendTextRef.current = pendingDraft?.send
         ? pendingDraft.text
         : null;
@@ -301,10 +284,6 @@ export function useFullShellChat({
     () => buildActivityTasks(threadActivityRecords),
     [threadActivityRecords],
   );
-  // A conversation shows one record: the journal for one stored in the
-  // cloud, the chat log for one kept on this computer. Pi adds only what
-  // that record does not hold yet, so a model pick never changes what the
-  // chat, Activity or Files show.
   const piChat = usePiChat(activeConversationId);
   const cloudChat = useCloudChatBridge({
     conversationId: activeConversationId,
@@ -378,9 +357,6 @@ export function useFullShellChat({
         : cloudChat.persistedMessages,
     [cloudChat.persistedMessages, piPending.messages],
   );
-  // Cloud placement can acknowledge IPC before its journal reaches this
-  // window. Keep pending sends working until canonical history takes over,
-  // and retire their overlays even when no SQLite write occurs on this device.
   useEffect(() => {
     acknowledgeLocalMessages(persistedMessages);
   }, [acknowledgeLocalMessages, persistedMessages, localOptimisticEvents]);
@@ -390,10 +366,6 @@ export function useFullShellChat({
       (event) => event.type === "user_message" && !persistedIds.has(event._id),
     );
   }, [localOptimisticEvents, persistedMessages]);
-  // Activity and Files read the same record plus the agents pi ran in this
-  // conversation (pi's agents keep their lifecycle in its transcript), and a
-  // cloud conversation's Files also take the links in its replies, as the
-  // chat log's do for one kept on this computer.
   const piAgentEvents = useMemo(
     () => piAgentActivityEvents(threadActivityRecords),
     [threadActivityRecords],
@@ -457,10 +429,7 @@ export function useFullShellChat({
   });
   const isStreaming =
     turnRunning || awaitingMessageAdmission || awaitingTurnHandoff;
-  // The committed reply hands off before the terminal turn frame arrives.
   const answerLanded = !awaitingMessageAdmission && piChat.answerLanded;
-  // The sent bubble pops in on the frame it first paints, so its id comes from
-  // the send itself, not from pi starting the turn a few frames later.
   const pendingUserMessageId = cloudChat.isWebShell
     ? cloudChat.pendingUserMessageId
     : localPendingUserMessageId;
@@ -474,7 +443,6 @@ export function useFullShellChat({
     ? cloudChat.sendMessage
     : localSendMessage;
   const cancelCurrentStream = piChat.cancelCurrentStream;
-  // Page only the selected history; local and cloud cursors never mix.
   const hasOlderMessages = isPrivateChat
     ? localMessageFeed.hasOlderMessages
     : cloudChat.conversation.state.hasOlder;
@@ -508,7 +476,6 @@ export function useFullShellChat({
   const loadOlderActivity = isPrivateChat
     ? localActivityFeed.loadOlder
     : cloudChat.loadOlderActivity;
-  // Older replies' files come with the record's older pages.
   const hasOlderFiles = isPrivateChat
     ? localFileFeed.hasOlderFiles
     : cloudChat.conversation.state.hasOlder;
@@ -518,11 +485,6 @@ export function useFullShellChat({
   const loadOlderFiles = isPrivateChat
     ? localFileFeed.loadOlder
     : cloudChat.conversation.loadOlder;
-  // Visible chat timeline: SQLite-backed `persistedMessages` plus the
-  // synthetic overlays (optimistic users, in-memory streaming
-  // assistants, scheduler-pending) that drop off as their persisted
-  // counterparts land. Lives in its own hook so the overlay-
-  // composition concerns stay next to each other.
   const displayMessages = useConversationDisplayMessages({
     conversationId: activeConversationId,
     persistedMessages,
@@ -546,9 +508,6 @@ export function useFullShellChat({
     activeConversationId,
     hasOpenQuestion,
   });
-  // Focus the composer on mount and whenever the user navigates onto the
-  // chat route (covers both home content and the full chat surface), so
-  // the user can start typing without clicking first.
   useEffect(() => {
     if (!isOnChatRoute) return;
     setComposerFocusRequestId((id) => id + 1);
@@ -566,11 +525,6 @@ export function useFullShellChat({
     sendContextlessMessage,
     sendAgentInputMessage,
   });
-  /**
-   * Scroll: backed by Legend List (web entry). The list owns scrolling
-   * and content geometry; the hook adapts list state into the surface
-   * UI concerns (at-bottom, custom thumb, scroll-to-bottom button).
-   */
   const {
     listRef,
     isAtBottom,
@@ -658,7 +612,6 @@ export function useFullShellChat({
         const settle = () => {
           settleRaf = null;
           const node = listRef.current?.getScrollableNode();
-          // Bail once the user has scrolled away — never yank them back.
           if (!node || !getIsFollowing()) {
             markScrollSettled(conversationId);
             return;
@@ -698,15 +651,6 @@ export function useFullShellChat({
     displayMessages.length > 0 &&
     settledScrollConversationId !== activeConversationId;
   const handleSend = useCallback(async () => {
-    // Follow the send to the bottom whenever the freshest turn is on
-    // screen — near/at bottom OR meaningfully scrolled up but still within
-    // the 300px send gate. `getIsEffectivelyAtBottom` is distance-based
-    // (latch-independent), so a stray upward nudge near the bottom still
-    // follows. Only a genuine read-history position (neither) stays put.
-    //
-    // While a stream is already in flight, the send queues as a follow-up
-    // chip at the keyed tail of the event list (not yet a sent user row).
-    // That item is the end of content too, so the same follow frames it.
     const shouldFollowSend =
       showHomeContent || getIsEffectivelyAtBottom() || getShouldFollowSend();
     const submittedConversationId = activeConversationId;
@@ -741,8 +685,6 @@ export function useFullShellChat({
         if (activeConversationIdRef.current !== submittedConversationId) return;
         enterChatSurfaceForInteraction();
         resetIdleTimer();
-        // Follow the optimistic row before runtime acceptance. Waiting for
-        // sendMessage here makes the viewport lag behind the visible message.
         if (shouldFollowSend) {
           followAfterSend();
         } else if (!isStreaming) {
@@ -812,9 +754,6 @@ export function useFullShellChat({
     conversationId: activeConversationId,
     requireConversationId: true,
   });
-  // Submit the onboarding hand-off once the composer is live with that exact
-  // text. A rejected send restores the text through the normal path, so the
-  // user still sees their draft rather than losing it.
   const autoSendDraftReady = useComposerMessageSelector(
     composerMessageStore,
     (text) =>
@@ -961,13 +900,6 @@ export function useFullShellChat({
       thumbRef,
     ],
   );
-  // The visible message timeline (`displayMessages`) is the only field
-  // that changes whenever a provider chunk arrives while a reply streams. It is
-  // returned separately and published through `ChatMessagesContext` rather
-  // than folded into `runtime`, so the `runtime` value below keeps a stable
-  // identity across streamed chunks. That stops every `useChatRuntime()`
-  // consumer (shell chrome, left sidebar, mobile bridge) from re-rendering
-  // per chunk — only the timeline renderers subscribe to the message channel.
   const conversation = useMemo(
     () => ({
       ...chatColumnConversation,

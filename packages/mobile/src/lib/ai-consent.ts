@@ -41,11 +41,6 @@ export function hasAiConsent(): boolean {
   return cached === true;
 }
 
-/**
- * Imperatively ask the host to show the consent modal. Used from places
- * (like dictation) that cannot mount the modal themselves but need to
- * gate a third-party AI call behind explicit user permission.
- */
 export function requestAiConsent(): void {
   for (const listener of requestListeners) listener();
 }

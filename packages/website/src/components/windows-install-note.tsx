@@ -3,13 +3,6 @@
 import { usePlatform } from "./download-button";
 import styles from "./windows-install-note.module.css";
 
-/**
- * A small, calm helper shown only to Windows visitors near a download CTA.
- * The launcher is signed by FromYou, LLC, but SmartScreen can still flag a
- * new download until the file builds reputation; this explains how to proceed.
- * Gated on the same client-side platform detection as the download button, so
- * Mac and Linux visitors never see the (irrelevant) warning copy.
- */
 export function WindowsInstallNote({ className }: { className?: string }) {
   const platform = usePlatform();
   if (platform !== "windows") return null;

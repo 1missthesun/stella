@@ -1,5 +1,3 @@
-/** Slack text in, Stella prompt out. */
-
 import type { CachedSlackMessage } from "./store.js";
 
 export type NameResolver = (userId: string) => Promise<string>;
@@ -88,11 +86,6 @@ export type ContextLine = {
 
 const PROMPT_BUDGET = 7_600;
 
-/**
- * The turn's prompt: what the person wrote, then a `<slack>` block with where
- * it came from, how replies are delivered, and the thread so far. Everything
- * fits the 8,000-character turn limit; context is trimmed oldest first.
- */
 export const composePrompt = (args: {
   requestText: string;
   requesterName: string;
@@ -151,7 +144,6 @@ export const composePrompt = (args: {
   return `${head}${contextBlock}${tail}`.slice(0, 7_990);
 };
 
-/** A short, friendly label for a tool call in the progress message. */
 export const toolLabel = (name: string): string => {
   const key = name.toLowerCase();
   if (key === "spawn_agent") return "Starting a background agent";

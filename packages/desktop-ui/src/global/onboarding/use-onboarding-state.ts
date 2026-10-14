@@ -20,13 +20,6 @@ const writeLocalOnboardingCompleted = (completed: boolean) => {
   uiState.removeItem(ONBOARDING_COMPLETE_KEY);
 };
 
-/**
- * Module-level subscription so multiple consumers (`FullShell`, the
- * onboarding overlay hook, anything else) share a single pair of
- * `storage`/custom-event listeners on `window`. Previously each call
- * site registered its own pair, racing two independent boolean copies
- * for the same flag.
- */
 const subscribers = new Set<() => void>();
 let listenersAttached = false;
 let durableHydrated = false;
@@ -151,8 +144,6 @@ export function useOnboardingState() {
     durableCompleted = true;
     durableHydrated = true;
     writeLocalOnboardingCompleted(true);
-    // Seed the one-time post-onboarding sidebar hints.
-    // Idempotent — re-completing onboarding without a reset is a no-op.
     seedPostOnboardingHints();
     window.dispatchEvent(new Event(ONBOARDING_COMPLETE_EVENT));
     notifyAll();
@@ -168,8 +159,6 @@ export function useOnboardingState() {
     durableCompleted = false;
     durableHydrated = true;
     writeLocalOnboardingCompleted(false);
-    // Reset clears the seeded marker too so the next completion re-shows
-    // the post-onboarding hints, matching brand-new-install behavior.
     clearPostOnboardingHints();
     window.dispatchEvent(new Event(ONBOARDING_COMPLETE_EVENT));
     notifyAll();

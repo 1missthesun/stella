@@ -36,9 +36,6 @@ export const SelectableMarkdownText = memo(function SelectableMarkdownText({ nod
   }), italicFontWeights), [node, colors, fontSize, flattened.fontFamily, flattened.color]);
   const runsJSON = useMemo(() => JSON.stringify(runs), [runs]);
   if (!NativeText) return null;
-  // RN's attributed Text measures the complete block synchronously with Yoga.
-  // UIKit sits over that same layout, so no JS height callback can move the
-  // transcript after mount. The measuring copy is invisible and inaccessible.
   return <View style={{ alignSelf: "stretch", flexShrink: 1 }}>
     <Text allowFontScaling={false} accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants"
       pointerEvents="none" style={{ opacity: 0, fontFamily: flattened.fontFamily ?? fonts.sans.regular, fontSize, lineHeight: fontSize * 1.5 }}>

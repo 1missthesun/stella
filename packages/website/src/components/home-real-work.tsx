@@ -56,17 +56,12 @@ import chat from "./stella-mini-chat.module.css";
 import styles from "./home-real-work.module.css";
 import { useMiniChatScroll } from "./use-mini-chat-scroll";
 
-/* ------------------------------------------------------------------ */
-/*  Transcript model                                                   */
-/* ------------------------------------------------------------------ */
-
 type WorkState = "running" | "done";
 
 type Work = {
   id: string;
   title: string;
   state: WorkState;
-  /** Trailing status, e.g. "Marcus Hale · Tue" or "ends Oct 31". */
   meta?: string;
 };
 
@@ -74,7 +69,6 @@ type ConnectPhase = "offer" | "connecting" | "connected";
 
 type Connect = {
   phase: ConnectPhase;
-  /** Brief pressed look on the Connect button before the hand-off. */
   pressed?: boolean;
 };
 
@@ -88,14 +82,11 @@ type Entry =
       phase?: "reserved" | "thinking" | "streaming" | "complete";
       works?: Work[];
       connect?: Connect;
-      /** A little page Stella made, shown as a chip with an Open affordance. */
       page?: string;
     };
 
 type Pill = { state: "running"; count: number } | { state: "done" };
 
-/* What the action window is showing. The chat is how you ask; this is
-   the work itself. */
 type MailStep = "inbox" | "filtered" | "thread" | "reply" | "sent";
 type BrowserStep = "account" | "form" | "offer" | "confirm" | "done";
 
@@ -109,10 +100,6 @@ type Action =
 type Cursor = { at: string; click?: boolean } | null;
 
 type Layout = "wide" | "stacked";
-
-/* ------------------------------------------------------------------ */
-/*  Script content                                                     */
-/* ------------------------------------------------------------------ */
 
 const ASK_EMAIL =
   "Find the email from my landlord about renewing the lease — tell him we're in, but ask if he can keep rent the same.";
@@ -301,8 +288,6 @@ const APARTMENTS = [
   },
 ] as const;
 
-/* Tiny façade thumbnails: sky, a building with a window grid, a roofline and
-   ground, tinted per listing. Reads as a listing photo at 36–44 px. */
 const APT_TONES = [
   { sky: "#dbe9f7", wall: "#c9a97e", trim: "#8f6f47", ground: "#9bb08a" },
   { sky: "#e3edf5", wall: "#9fb58a", trim: "#5f7a4c", ground: "#c7b48c" },
@@ -348,8 +333,6 @@ const ACTS = [
   { label: "Works in your browser" },
 ] as const;
 
-/* The settled frame reduced-motion visitors see instead of the animation:
-   the first two beats in their finished state, and the page Stella built. */
 const FINAL_ENTRIES: Entry[] = [
   { kind: "user", text: ASK_EMAIL },
   { kind: "assistant", text: REPLY_NEED, connect: { phase: "connected" } },
@@ -384,13 +367,6 @@ const SUMMARY =
   `You: ${ASK_APTS} (${ASK_APTS_ATTACHMENT}) Stella: ${REPLY_SEC} Then: ${REPLY_APTS_DONE} A page called ${PAGE_NAME} opens, listing five apartments with rent, commute and true monthly cost; Elm St is marked best value. ` +
   `You: ${ASK_GYM} Stella: ${REPLY_GYM} In the browser, Stella opens the membership page, fills in the cancellation form, declines the stay offer, and confirms. Stella: ${REPLY_GYM_DONE}`;
 
-/* ------------------------------------------------------------------ */
-/*  Product-accurate chat pieces                                       */
-/* ------------------------------------------------------------------ */
-
-/* The working glyph on an in-progress row: a quiet spinner arc. Slow and
-   low-contrast; under reduced motion it holds still and reads as a
-   progress ring. */
 function WorkingGlyph() {
   return (
     <svg
@@ -457,9 +433,6 @@ function WorkRow({ work }: { work: Work }) {
   );
 }
 
-/* The app's inline connect card: an offer with Not now / Connect, a
-   waiting state while you finish signing in, then a quiet connected
-   state — after which the reply simply continues. */
 function ConnectCard({ connect }: { connect: Connect }) {
   const { phase } = connect;
   return (
@@ -548,10 +521,6 @@ function ActivityPill({ pill }: { pill: Pill | null }) {
   );
 }
 
-/* ------------------------------------------------------------------ */
-/*  Action window: shared chrome                                       */
-/* ------------------------------------------------------------------ */
-
 function Pointer() {
   return (
     <svg
@@ -573,10 +542,6 @@ function Pointer() {
   );
 }
 
-/* Stella's pointer. It finds its target by `data-target` inside the action
-   window and glides there, so every mock can be laid out freely without
-   hand-tuned coordinates. Positions are design pixels: the stage scales
-   them along with everything else. */
 function StellaCursor({
   cursor,
   windowRef,
@@ -606,8 +571,6 @@ function StellaCursor({
       const fy = parseFloat(target.dataset.targetY ?? "0.5");
       const x = (r.left + r.width * fx - w.left) / scale;
       const y = (r.top + r.height * fy - w.top) / scale;
-      /* Keep the label off the UI she's about to use: flip it to the left
-         near the right edge. */
       setPos({ x, y, flip: x > w.width / scale - 150 });
     };
     measure();
@@ -681,10 +644,6 @@ function Avatar({
   );
 }
 
-/* ------------------------------------------------------------------ */
-/*  Browser chrome (shared by the consent screen and the gym site)    */
-/* ------------------------------------------------------------------ */
-
 function ChromeFrame({
   tabTitle,
   site,
@@ -697,7 +656,6 @@ function ChromeFrame({
   site: "google" | "ridgeline" | "newtab";
   host?: string;
   path?: string;
-  /** Empty omnibox (new tab): placeholder instead of a URL. */
   placeholder?: string;
   children: React.ReactNode;
 }) {
@@ -749,9 +707,6 @@ function ChromeFrame({
   );
 }
 
-/* Before anything is asked, your browser is simply open on a new tab — so
-   the stage is a complete desktop from the first frame. The consent page
-   then loads into this same window. */
 const NTP_SHORTCUTS = [
   { label: "Gmail", initial: "M", bg: "#fde7e3", fg: "#c5221f" },
   { label: "Calendar", initial: "C", bg: "#e3ecfb", fg: "#1a56c4" },
@@ -802,8 +757,6 @@ function NewTabApp() {
   );
 }
 
-/* The Google consent page that opens while Gmail connects — the "finish
-   signing in in your browser" step, seen from the browser's side. */
 function ConsentApp({ allowed }: { allowed: boolean }) {
   return (
     <ChromeFrame
@@ -856,10 +809,6 @@ function ConsentApp({ allowed }: { allowed: boolean }) {
     </ChromeFrame>
   );
 }
-
-/* ------------------------------------------------------------------ */
-/*  Act 1 — Gmail                                                      */
-/* ------------------------------------------------------------------ */
 
 function GmailM() {
   return (
@@ -1220,10 +1169,6 @@ function MailApp({
   );
 }
 
-/* ------------------------------------------------------------------ */
-/*  Act 2 — the page Stella made                                       */
-/* ------------------------------------------------------------------ */
-
 function PageApp({ rows, tag, verdict }: { rows: number; tag: boolean; verdict: boolean }) {
   return (
     <div className={styles.app} data-kind="page">
@@ -1333,10 +1278,6 @@ function PageApp({ rows, tag, verdict }: { rows: number; tag: boolean; verdict: 
   );
 }
 
-/* ------------------------------------------------------------------ */
-/*  Act 3 — your browser                                               */
-/* ------------------------------------------------------------------ */
-
 const SITE_NAV = ["Overview", "Membership", "Billing", "Check-ins", "Settings"] as const;
 
 function BrowserApp({
@@ -1358,7 +1299,6 @@ function BrowserApp({
       : step === "done"
         ? "/account/membership/canceled"
         : "/account/membership/cancel";
-  /* The retention modal sits over the form; only real page changes remount. */
   const pageKey = step === "offer" ? "form" : step;
   return (
     <ChromeFrame
@@ -1659,10 +1599,6 @@ function BrowserApp({
   );
 }
 
-/* ------------------------------------------------------------------ */
-/*  Section                                                            */
-/* ------------------------------------------------------------------ */
-
 const WIDE = { w: 1120, h: 600 };
 const STACKED_H = 944;
 
@@ -1683,10 +1619,6 @@ export function HomeRealWork() {
   const [gymEmail, setGymEmail] = useState("");
   const [layout, setLayout] = useState<Layout>("wide");
 
-  /* The stage is laid out in fixed design pixels and scaled to the column,
-     so every width shows the same composition — nothing reflows or clips.
-     Wide: chat beside the action window. Stacked (narrow): the action
-     window above the chat, drawn 1:1 where possible so type stays legible. */
   useLayoutEffect(() => {
     const el = stageRef.current;
     if (!el) return;
@@ -1708,9 +1640,6 @@ export function HomeRealWork() {
     return () => observer.disconnect();
   }, []);
 
-  /* Between plays the last window stays up — like a desktop, the previous
-     app is simply still there until she opens the next one — so the stage
-     never goes dark at the seam. (The very first play starts empty.) */
   const reset = useCallback(() => {
     setEntries([]);
     setComposerTyped("");
@@ -1809,7 +1738,6 @@ export function HomeRealWork() {
         await sleep(260);
       };
 
-      /* Beat 1 — email. Her first time in your inbox, so she asks. */
       await sleep(240);
       await ask(ASK_EMAIL, REPLY_NEED, undefined, 12);
       await sleep(320);
@@ -1819,7 +1747,6 @@ export function HomeRealWork() {
       await sleep(1100);
       patchAssistant({ connect: { phase: "offer", pressed: true } });
       await sleep(180);
-      // Connecting opens Google's consent page in your browser.
       patchAssistant({ connect: { phase: "connecting" } });
       setActiveBeat(0);
       setAction({ scene: "consent", allowed: false });
@@ -1829,7 +1756,6 @@ export function HomeRealWork() {
       patchAssistant({ connect: { phase: "connected" } });
       await sleep(380);
 
-      // The inbox opens the moment she has it.
       setAction({ scene: "mail", step: "inbox" });
       await sleep(700);
       await reply(REPLY_ON_IT, 520);
@@ -1867,7 +1793,6 @@ export function HomeRealWork() {
       setPill(null);
       await sleep(1400);
 
-      /* Beat 2 — something messy in, something to look at out. */
       await ask(ASK_APTS, REPLY_SEC, ASK_APTS_ATTACHMENT);
       await sleep(380);
       await reply(REPLY_SEC, 600);
@@ -1901,7 +1826,6 @@ export function HomeRealWork() {
       setPill(null);
       await sleep(2200);
 
-      /* Beat 3 — your browser, your logins, her hands. */
       await ask(ASK_GYM, REPLY_GYM);
       await sleep(380);
       await reply(REPLY_GYM);
@@ -1947,8 +1871,6 @@ export function HomeRealWork() {
       setPill(null);
       await sleep(2600);
 
-      // Breathe the conversation out before the loop resets it. The browser
-      // stays up until the reset so the stage never goes dark mid-seam.
       setClearing(true);
       await sleep(450);
     },
@@ -1958,8 +1880,6 @@ export function HomeRealWork() {
 
   const shownEntries = reduced ? FINAL_ENTRIES : entries;
   const shownAction = reduced ? FINAL_ACTION : action;
-  /* The static frame parks the pointer on the verdict so the window still
-     reads as Stella's doing. */
   const shownCursor: Cursor = reduced ? { at: "pageVerdict" } : cursor;
   const shownBeat = reduced ? 1 : activeBeat;
   const actsLive = reduced || activeBeat >= 0;

@@ -1,11 +1,6 @@
 const bytesToHex = (bytes: Uint8Array): string =>
   Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 
-/**
- * Canonical one-way owner key. Authenticated ingestion applies this transform
- * before the environment-scoped HMAC, so one person's desktop and backend
- * events stay joinable without exposing their account key.
- */
 export const canonicalUserOwnerKey = async (
   ownerId: string,
 ): Promise<string> => {

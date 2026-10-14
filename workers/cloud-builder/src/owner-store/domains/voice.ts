@@ -1,22 +1,3 @@
-/**
- * Live voice, read-aloud and dictation metering for one owner.
- *
- * - **Live voice (Pro):** `voice.session` records a lease holding the
- *   GPT-Live session config; the SDP route (`voice.sdp`) creates the session
- *   on OpenAI and keeps its session id, so the server can always close it.
- *   GPT-Live bills session duration at a flat rate, so there is nothing to
- *   report per response: when the lease closes (client end, supersession, or
- *   `voice.reap` after 2 minutes without a heartbeat) the session is closed
- *   through a sideband and its open time is charged. The orchestrator's own
- *   model spend is metered through the normal agent path. The object is
- *   single-threaded, so there is no dispatch-lease ledger.
- * - **Read-aloud:** free on every plan, bounded by a rate limit and a daily
- *   character allowance. `tts.prepare` mints an HLS ticket and runs one
- *   synthesis job that writes segments to `MEDIA` at `tts/<ticket>/`.
- * - **Dictation:** the Muse relay sizes a session with `dictation.prepare`
- *   and charges its audio once with `dictation.settle`.
- */
-
 import { Deferred, Effect } from "effect";
 import {
   GPT_LIVE_MODEL,
@@ -46,14 +27,9 @@ import {
   settleReservation,
 } from "./billing.js";
 
-// ── Constants ──────────────────────────────────────────────────────────────
-
 const VOICE_SESSION_RATE = { count: 10, windowMs: 60_000 };
-/** A heartbeat renews the lease this far ahead; clients poll every 2 s. */
 const LEASE_TTL_MS = 10_000;
-/** A realtime session ends after this. */
 const SESSION_MAX_MS = 5 * 60_000;
-/** `voice.reap` closes open leases with no heartbeat for this long. */
 const IDLE_REAP_MS = 2 * 60_000;
 const CLOSED_LEASE_RETENTION_MS = 24 * 60 * 60_000;
 /**
@@ -73,7 +49,6 @@ const liveAttachUrl = (sessionId: string): string =>
 const TTS_RATE = { count: 20, windowMs: 60_000 };
 const TTS_MAX_INPUT_CHARS = 8_000;
 const TTS_DAILY_CHARS = { free: 60_000, go: 300_000, pro: 1_000_000 } as const;
-/** A long clip plays in real time, so its ticket outlives synthesis. */
 const TTS_TICKET_TTL_MS = 15 * 60_000;
 
 const MUSE_DICTATION_MODEL = "muse-voice-transcribe-1.0";
@@ -144,8 +119,6 @@ const secret = (env: Cloudflare.Env, name: string): string | null => {
 const readLease = (ctx: OwnerContext, leaseId: string): LeaseRow | null =>
   ctx.db.one<LeaseRow>("SELECT * FROM voice_leases WHERE lease_id = ?", leaseId);
 
-// ── Live voice ─────────────────────────────────────────────────────────────
-
 /**
  * Startup history for the live session. GPT-Live takes one text part per
  * message, `input_text` for developer and user and `output_text` for the
@@ -171,12 +144,6 @@ const buildSessionInput = (history: VoiceHistoryMessage[]): unknown[] => {
   }));
 };
 
-/**
- * Close a live session from the server: attach a sideband to the running
- * session and send `session.close`. This is the revocation boundary that a
- * managed session needs — the client cannot keep a session alive once the
- * lease is gone.
- */
 const closeLiveSession = async (env: Cloudflare.Env, sessionId: string): Promise<boolean> => {
   const apiKey = secret(env, "OPENAI_API_KEY");
   if (!apiKey) return false;
@@ -187,13 +154,10 @@ const closeLiveSession = async (env: Cloudflare.Env, sessionId: string): Promise
     });
     socket = response.webSocket;
     if (!socket) {
-      // A session that is already gone answers the attach without upgrading.
       await response.body?.cancel().catch(() => undefined);
       return response.status === 404;
     }
     socket.accept();
-    // Listeners register before the send, so no reply can slip past them;
-    // the first outcome wins and the wait gives up after 10 seconds.
     const outcome = Deferred.makeUnsafe<boolean>();
     const settle = (value: boolean) => {
       Deferred.doneUnsafe(outcome, Effect.succeed(value));
@@ -230,13 +194,7 @@ const scheduleReap = (ctx: OwnerContext, at: number): void => {
   ctx.jobs.schedule(VOICE_REAP_JOB, at, null, { id: VOICE_REAP_JOB });
 };
 
-/**
- * Close an open lease: charge the envelope for the session's open time up to
- * `closedAt`, less what is already charged, then close the session. State
- * changes before the close's await, so a concurrent call sees it closed.
- */
 const closeLease = async (ctx: OwnerContext, leaseId: string, reason: string, closedAt: number): Promise<void> => {
-  // Read it here: another close may have run while the caller awaited.
   const lease = readLease(ctx, leaseId);
   if (lease?.status !== "open") return;
   const now = Date.now();
@@ -301,9 +259,6 @@ const openSession = async (
   if (!instructions) throw new RpcError("BAD_REQUEST", "instructions is required.");
   const model = args.model?.trim() || GPT_LIVE_MODEL;
   const voice = args.voice?.trim() || DEFAULT_GPT_LIVE_VOICE;
-  // Client delegation: Stella's orchestrator is the backend agent, so the
-  // session carries no tools and no turn-detection config of its own.
-  // WebRTC negotiates the audio format, so `audio.format` is omitted.
   const sessionConfig = JSON.stringify({
     model,
     instructions,
@@ -313,7 +268,6 @@ const openSession = async (
     store: false,
   });
 
-  // One realtime session per owner: a new one supersedes the rest.
   for (const lease of ctx.db.all<LeaseRow>("SELECT * FROM voice_leases WHERE status = 'open'")) {
     await closeLease(ctx, lease.lease_id, "superseded", Date.now());
   }
@@ -356,7 +310,6 @@ const leaseEvent = async (
   return { directive: "continue", leaseExpiresAt: Math.min(ctx.now + LEASE_TTL_MS, deadline), reason: null };
 };
 
-/** Create the lease's live session from the client's SDP offer; returns the answer. */
 const createCall = async (ctx: OwnerContext, raw: unknown): Promise<{ sdp: string }> => {
   const args = object({ leaseId: string({ min: 1, max: 200 }), sdp: string({ min: 10, max: 1_000_000 }) })(raw);
   const lease = readLease(ctx, args.leaseId);
@@ -395,7 +348,6 @@ const createCall = async (ctx: OwnerContext, raw: unknown): Promise<{ sdp: strin
   if (!response.ok) {
     const detail = await response.text().catch(() => "");
     log("error", "voice_session_create_failed", { leaseId: lease.lease_id, status: response.status, detail: detail.slice(0, 500) });
-    // No session exists, so nothing is charged.
     ctx.db.run("UPDATE voice_leases SET call_started_at = NULL WHERE lease_id = ?", lease.lease_id);
     await closeLease(ctx, lease.lease_id, `openai_session_${response.status}`, Date.now());
     throw new RpcError("UNAVAILABLE", "Failed to create the live voice session.", { retryable: response.status >= 500 });
@@ -412,7 +364,6 @@ const createCall = async (ctx: OwnerContext, raw: unknown): Promise<{ sdp: strin
   return { sdp: created.sdp };
 };
 
-/** The session id and SDP answer from `POST /v1/live/sessions`. */
 const readLiveSession = async (response: Response): Promise<{ sessionId: string; sdp: string } | null> => {
   const body = (await response.json().catch(() => null)) as {
     session?: { id?: unknown };
@@ -424,7 +375,6 @@ const readLiveSession = async (response: Response): Promise<{ sessionId: string;
   return { sessionId, sdp };
 };
 
-/** Close idle leases, retry failed session closes, prune old rows, then rearm. */
 const reap = async (ctx: OwnerContext): Promise<void> => {
   const now = Date.now();
   for (const lease of ctx.db.all<LeaseRow>("SELECT * FROM voice_leases WHERE status = 'open'")) {
@@ -452,11 +402,8 @@ const reap = async (ctx: OwnerContext): Promise<void> => {
   else if (pendingHangup > 0) scheduleReap(ctx, now + 60_000);
 };
 
-// ── Read-aloud ─────────────────────────────────────────────────────────────
-
 const utcDay = (now: number): string => new Date(now).toISOString().slice(0, 10);
 
-/** Rate limit plus the plan's daily character allowance. */
 const admitTts = (ctx: OwnerContext, chars: number): void => {
   enforceOwnerRateLimit(ctx.db, ctx.now, "tts", TTS_RATE, "Too many read-aloud requests. Try again in a minute.");
   const day = utcDay(ctx.now);
@@ -478,7 +425,6 @@ const admitTts = (ctx: OwnerContext, chars: number): void => {
   ctx.db.run("DELETE FROM tts_daily WHERE day < ?", day);
 };
 
-/** The text read-aloud synthesizes: trimmed and bounded. */
 export const ttsText = (text: string): string => text.trim().slice(0, TTS_MAX_INPUT_CHARS);
 
 const prepareTts = async (
@@ -492,8 +438,6 @@ const prepareTts = async (
   }
   admitTts(ctx, text.length);
   const ticket = await mintTtsTicket(ctx.ownerId, ctx.now + TTS_TICKET_TTL_MS);
-  // The stream's objects are what make its ticket valid: an empty manifest
-  // exists before the ticket is handed out (synthesis fills it in).
   await ctx.env.MEDIA.put(
     ttsObjectKey(ticket.ticket, HLS_MANIFEST_FILE),
     JSON.stringify({ segments: [], done: false, error: false } satisfies HlsManifest),
@@ -539,8 +483,6 @@ const synthesize = async (ctx: OwnerContext, payload: unknown): Promise<void> =>
     durationMs: Date.now() - startedAt,
   });
 };
-
-// ── Dictation ──────────────────────────────────────────────────────────────
 
 const prepareDictation = (ctx: OwnerContext, raw: unknown) => {
   const { sessionId } = object({ sessionId: string({ pattern: DICTATION_SESSION_ID }) })(raw);
@@ -639,8 +581,6 @@ const settleDictation = (ctx: OwnerContext, raw: unknown) => {
   return { costMicroCents };
 };
 
-// ── Purge ──────────────────────────────────────────────────────────────────
-
 const purgeVoice = async (ctx: OwnerContext, mode: OwnerPurgeMode): Promise<{ pending: boolean }> => {
   const calls = ctx.db.all<{ call_id: string }>(
     "SELECT call_id FROM voice_leases WHERE call_id IS NOT NULL AND (status = 'open' OR hangup_pending = 1)",
@@ -657,8 +597,6 @@ const purgeVoice = async (ctx: OwnerContext, mode: OwnerPurgeMode): Promise<{ pe
   if (listed.objects.length > 0) await bucket.delete(listed.objects.map((object) => object.key));
   return { pending: listed.truncated };
 };
-
-// ── Registration ───────────────────────────────────────────────────────────
 
 const historyArg: Parser<VoiceHistoryMessage> = object({
   role: literal("developer", "user", "assistant"),

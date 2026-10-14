@@ -34,27 +34,11 @@ type UseStreamingChatOptions = {
   conversationId: string | null;
   locale: string;
   notifyTierRestrictedModel?: () => void | Promise<void>;
-  /**
-   * SQLite-persisted message stream (no optimistic / scheduled overlay).
-   * Used to detect (a) an assistant reply for the pending user message,
-   * (b) optimistic events that have been persisted (can be dropped),
-   * (c) queued user messages that have been persisted.
-   *
-   * Must be the un-overlaid source — passing in the merged display
-   * stream would loop optimistic events through this hook into
-   * displayMessages.
-   */
   persistedMessages: MessageRecord[];
 };
 
 const createLocalMessageId = () => `local-${crypto.randomUUID()}`;
 
-/**
- * Bounded preview of quoted / "Ask Stella" context stored on the sent message.
- * Mirrors the runtime's `QUOTED_TEXT_PREVIEW_MAX_CHARS` so the optimistic value
- * matches what persistence recomputes, keeping the chip stable across the
- * optimistic → persisted swap. See `runtime/kernel/chat-prompt-context.ts`.
- */
 const QUOTED_TEXT_PREVIEW_MAX_CHARS = 4_000;
 
 export const buildContextMessageMetadata = (
@@ -73,12 +57,6 @@ export const buildContextMessageMetadata = (
     .map((text) => text?.trim() ?? "")
     .filter((text) => text.length > 0)
     .map(toPastedTextDescriptor);
-  // Quoted / "Ask Stella" selection. The runtime persists this same bounded
-  // preview onto the user message once it lands, but the optimistic row is
-  // rendered before then — without carrying it here the just-sent message drops
-  // its quoted-text chip until persistence catches up. Reads the composer's
-  // `selectedText` and falls back to `chatContext.selectedText`, matching the
-  // runtime's own resolution order.
   const quotedSource =
     selectedText?.trim() || chatContext?.selectedText?.trim() || "";
   const quotedText = quotedSource
@@ -235,9 +213,6 @@ export function useStreamingChatCore({
     [setPendingUserMessageId],
   );
 
-  // A send placed where Stella runs that never reached the conversation, and
-  // that this computer could not answer either: the bubble stops waiting and
-  // the reason shows.
   useEffect(() => {
     if (!activeConversationId) return;
     return onPiChatEvents(({ conversationId, events }) => {
@@ -270,11 +245,6 @@ export function useStreamingChatCore({
     if (!activeConversationId) return;
     if (drainingQueuedMessageIdRef.current) return;
     if (queueDrainPausedRef.current) return;
-    // Flush the ENTIRE queue in one drain: every message still waiting when
-    // the app goes idle is combined (in queue order) into a single turn so
-    // the assistant answers them together instead of running one full
-    // response turn per queued message. A lone queued message passes through
-    // `combineQueuedSendPayloads` untouched.
     const drainable = orderQueuedMessages(
       queuedStreamPayloadsRef.current.filter(
         (message) => message.conversationId === activeConversationId,
@@ -387,9 +357,6 @@ export function useStreamingChatCore({
   useEffect(() => {
     if (!pendingUserMessageId) return;
 
-    // Once a persisted assistant_message targets the pending user message,
-    // drop `pendingUserMessageId` so composer / scroll gating logic stops
-    // treating the turn as in-flight.
     const hasAssistantReply = persistedMessages.some((message) => {
       if (message.type !== "assistant_message") return false;
       if (!message.payload || typeof message.payload !== "object") return false;
@@ -521,11 +488,6 @@ export function useStreamingChatCore({
           return false;
         }
 
-        // Fire-and-forget: surface a "model not available on your plan"
-        // toast for restricted tiers (anonymous/free/go) when the user has a
-        // saved non-default override for orchestrator/general. The backend
-        // silently coerces to the tier-default model regardless. Deduped so
-        // it doesn't spam on every send.
         void notifyTierRestrictedModel?.();
 
         console.log(

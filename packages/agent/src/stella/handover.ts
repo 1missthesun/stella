@@ -17,7 +17,6 @@ import type { Message } from "@earendil-works/pi-ai";
 import { estimateMessageTokens } from "@earendil-works/pi-ai/utils/estimate";
 import { CompactionEntry, type ContextView, type Conversation, type Harness } from "@earendil-works/pi-durable";
 
-/** The share of the incoming window the handed-over context may fill, before the reply's reserve. */
 const HEADROOM = 0.8;
 const REPLY_RESERVE_TOKENS = 16_384;
 const COMPACTION_ATTEMPTS = 3;
@@ -25,13 +24,8 @@ const COMPACTION_ATTEMPTS = 3;
 export const TRUNCATED_CONTEXT_NOTICE =
   "Older context before this point was dropped without a summary: the conversation moved to a model whose context window could not hold it, and summarizing it failed. Only the recent part follows. Search the conversation's history for anything earlier.";
 
-/** How pi opens a summary it placed (pi-durable `harness/compaction`). */
 const PI_SUMMARY_PREFIX = "The conversation history before this point was compacted into the following summary:";
 
-/**
- * Whether `message` opens a context pi compacted or truncated itself (an
- * engine's own compaction is recorded in that engine's words instead).
- */
 export const isPiCompactionBoundary = (message: Message): boolean => {
   if (message.role !== "user") return false;
   const text =
@@ -46,7 +40,6 @@ export type HandoverFit = { fit: "fits" | "compacted" | "truncated"; window: num
 const contextTokens = (messages: readonly Message[]): number =>
   messages.reduce((sum, message) => sum + estimateMessageTokens(message), 0);
 
-/** The most context, in tokens, a model with `window` is handed. */
 export const handoverBudget = (window: number): number => Math.max(0, Math.floor(window * HEADROOM) - REPLY_RESERVE_TOKENS);
 
 const compactionInstructions = (budget: number) =>
@@ -68,11 +61,6 @@ const truncationHead = (view: ContextView, budget: number): number | undefined =
   return head ?? last;
 };
 
-/**
- * Make `conversation` fit a model with a context window of `window` tokens
- * before it takes over. Run while the outgoing model is still configured:
- * `Conversation.compact()` summarizes with the conversation's own model.
- */
 export async function fitForHandover(args: {
   harness: Harness;
   conversation: Conversation;

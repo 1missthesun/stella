@@ -143,11 +143,8 @@ export type MaintenanceSettings = {
   intervalMs: number;
   walTruncateBytes: number;
   analyzeIdleTicks: number;
-  /** Idle ticks before the reclaim starts; it only ever runs detached. */
   reclaimIdleTicks: number;
-  /** Per-tick time budget for the run_event sweep with a client attached. */
   sweepBudgetMs: number;
-  /** Per-tick sweep budget with zero clients (nobody waits on the loop). */
   sweepDetachedBudgetMs: number;
   reclaimMinFreelistBytes: number;
   reclaimMinFreelistRatio: number;
@@ -167,11 +164,8 @@ export const MAINTENANCE_DEFAULTS: Readonly<MaintenanceSettings> = {
   reclaimMinFreelistBytes: 512 * MiB,
   reclaimMinFreelistRatio: 0.25,
   reclaimDiskHeadroomBytes: 1 * GiB,
-  /** Lock-acquisition retry window (SQLite's busy handler) for heavy steps. */
   busyTimeoutMs: 2_000,
-  /** Checkpoints must not park the event loop waiting on readers. */
   checkpointBusyTimeoutMs: 100,
-  /** Rows sampled per index by ANALYZE / optimize (SQLite recommends 100–1000). */
   analysisLimit: 400,
 };
 
@@ -243,13 +237,8 @@ export type ReclaimPolicy = {
   checkpointBusyTimeoutMs: number;
   diskSpace: DiskSpaceProbe;
   tempDirectory: string;
-  /** Test seam: the default runs `VACUUM`. */
   vacuum?: (connection: SqliteDatabase) => void;
 };
-
-// ---------------------------------------------------------------------------
-// Primitives (exported for tests)
-// ---------------------------------------------------------------------------
 
 export const isSqliteBusyError = (error: unknown): boolean => {
   const code = (error as { code?: unknown } | null)?.code;
@@ -300,7 +289,6 @@ export const readDatabaseHealth = (
   };
 };
 
-/** Run `fn` with a temporary busy_timeout, restoring the previous one. */
 export const withBusyTimeout = <A>(
   db: SqliteDatabase,
   timeoutMs: number,
@@ -358,7 +346,6 @@ const tableExists = (db: SqliteDatabase, name: string): boolean =>
       .get(name),
   );
 
-/** Run `fn` inside `BEGIN IMMEDIATE`, rolling back on any failure. */
 const inImmediateTransaction = <A>(db: SqliteDatabase, fn: () => A): A => {
   db.exec("BEGIN IMMEDIATE;");
   try {
@@ -409,7 +396,6 @@ export const recoverPendingFtsRebuild = (
   });
 };
 
-/** One bounded ANALYZE per schema version. Returns false when already done. */
 export const analyzeOncePerSchemaVersion = (
   db: SqliteDatabase,
   analysisLimit: number = MAINTENANCE_DEFAULTS.analysisLimit,
@@ -444,7 +430,6 @@ export const buildSearchTextIndex = (
   options: {
     busyTimeoutMs: number;
     analysisLimit: number;
-    /** Test seam: the default runs `SEARCH_TEXT_INDEX_SQL`. */
     create?: (connection: SqliteDatabase) => void;
   },
 ): SearchIndexOutcome => {
@@ -516,7 +501,6 @@ export const defaultDiskSpaceProbe: DiskSpaceProbe = (directory) => {
   }
 };
 
-/** Where SQLite's unix/win VFS puts VACUUM's temp database. */
 export const sqliteTempDirectory = (): string =>
   process.env.SQLITE_TMPDIR || os.tmpdir();
 
@@ -557,10 +541,6 @@ export const checkReclaimDiskSpace = (
       };
 };
 
-/**
- * The reclaim's cheap preconditions (meta, freelist thresholds, statfs):
- * `null` when a VACUUM would run now, else the skip outcome.
- */
 export const evaluateReclaim = (
   connection: SqliteDatabase,
   databasePath: string,
@@ -589,11 +569,6 @@ export const evaluateReclaim = (
   return { ready: true, health };
 };
 
-/**
- * The one-time freelist reclaim. `connection` must be a dedicated
- * connection (not the worker's shared one): it is switched to
- * `temp_store = FILE` so VACUUM's copy never lands in RAM.
- */
 export const reclaimFreelist = (
   connection: SqliteDatabase,
   databasePath: string,
@@ -659,7 +634,6 @@ export const reclaimFreelist = (
         return rebuilt;
       });
     } catch (error) {
-      // The pending marker survives; the next idle tick rebuilds.
       if (isSqliteBusyError(error)) {
         return { status: "deferred", reason: "busy", step: "fts-rebuild" };
       }
@@ -687,12 +661,7 @@ export const reclaimFreelist = (
   });
 };
 
-// ---------------------------------------------------------------------------
-// Scheduler
-// ---------------------------------------------------------------------------
-
 export type DatabaseMaintenanceOptions = {
-  /** The worker's long-lived connection (used only for PRAGMA optimize). */
   db: SqliteDatabase;
   databasePath: string;
   openConnection?: (databasePath: string) => SqliteDatabase;
@@ -700,26 +669,19 @@ export type DatabaseMaintenanceOptions = {
   diskSpace?: DiskSpaceProbe;
   tempDirectory?: string;
   vacuum?: (connection: SqliteDatabase) => void;
-  /** Test seam: the default runs `SEARCH_TEXT_INDEX_SQL`. */
   createSearchIndex?: (connection: SqliteDatabase) => void;
-  /** Rows per legacy run_event batch transaction (default 5k). */
   sweepBatchSize?: number;
-  /** Clock for the sweep budget (test seam; default performance.now). */
   now?: () => number;
 } & Partial<MaintenanceSettings>;
 
 export type MaintenanceStartOptions = {
-  /** No run/agent/voice work and no in-flight RPC. Cheap + sync. */
   isIdle: () => boolean;
-  /** RPC clients (Electron hosts) attached to the worker right now. */
   attachedClientCount: () => number;
 };
 
-/** `STELLA_DB_RECLAIM=0` disables only the one-time VACUUM reclaim. */
 export const reclaimKillSwitchEngaged = (): boolean =>
   process.env.STELLA_DB_RECLAIM === "0";
 
-/** Consecutive BUSY deferrals, while detached, before giving up for the session. */
 const MAX_DETACHED_RECLAIM_DEFERRALS = 3;
 const MAX_DETACHED_SEARCH_INDEX_DEFERRALS = 3;
 
@@ -738,18 +700,13 @@ export class DatabaseMaintenance {
   private sweepDrained = false;
   private sweepCursor: string | null = null;
   private reclaimDone = false;
-  /** A non-BUSY reclaim failure (e.g. disk full) disables it for this session. */
   private reclaimDisabled = false;
-  /** Preconditions held on the last evaluation; waiting for zero clients. */
   private reclaimReady = false;
   private reclaimRunning = false;
   private detachedDeferrals = 0;
-  /** The search-text index exists (or was built this session). */
   private searchIndexDone = false;
-  /** Seen missing on an idle tick; waiting for (or retrying in) the detached window. */
   private searchIndexPending = false;
   private searchIndexRunning = false;
-  /** Three BUSY deferrals or a non-BUSY failure: stop trying this session. */
   private searchIndexDisabled = false;
   private searchIndexDeferrals = 0;
   private readonly loggedSkips = new Set<string>();
@@ -764,7 +721,6 @@ export class DatabaseMaintenance {
       : this.options.logger;
   }
 
-  /** Begin idle ticking. */
   start(hooks: MaintenanceStartOptions): void {
     if (this.disposed || this.cancelTicks) return;
     this.hooks = hooks;
@@ -805,12 +761,6 @@ export class DatabaseMaintenance {
     return safeCount(this.hooks.attachedClientCount) === 0;
   }
 
-  /**
-   * Cancel the tick fiber, close the maintenance connection, and run
-   * `PRAGMA optimize` on the worker connection. Ticks are synchronous on
-   * this thread, so none can be mid-flight here: cancel is the join.
-   * Call before closing `db`.
-   */
   stop(): void {
     if (this.disposed) return;
     this.disposed = true;
@@ -840,7 +790,6 @@ export class DatabaseMaintenance {
     }
   }
 
-  /** One tick of the fixed-rate fiber. Never throws. Exposed for tests. */
   runIdleTick(): void {
     if (this.disposed || !this.hooks) return;
     let idle = false;
@@ -901,7 +850,6 @@ export class DatabaseMaintenance {
       });
     }
 
-    // Heavy step 1: finish an interrupted reclaim before anything else.
     const recoverStartedAt = performance.now();
     const recovered = recoverPendingFtsRebuild(connection);
     if (recovered) {
@@ -934,7 +882,6 @@ export class DatabaseMaintenance {
       }
     }
 
-    // Heavy, detached only, and before the reclaim so VACUUM compacts it.
     const searchIndex = this.searchIndexStep(connection);
 
     // Readiness is evaluated on every idle tick (cheap: pragmas + statfs)
@@ -946,11 +893,6 @@ export class DatabaseMaintenance {
     }
   }
 
-  /**
-   * "settled": the index exists or this session gave up on it; "waiting":
-   * missing, not in the detached window yet; "ran": this tick built it or
-   * deferred on BUSY (the tick's one heavy step).
-   */
   private searchIndexStep(
     connection: SqliteDatabase,
   ): "settled" | "waiting" | "ran" {
@@ -1042,17 +984,6 @@ export class DatabaseMaintenance {
     });
   }
 
-  /**
-   * Drain legacy `run_event` rows in `deleteLegacyRunEventBatch` batches
-   * (<= 5k rows, one immediate transaction each) for up to a per-tick time
-   * budget: 250 ms with a client attached, 2 s with none. Between batches
-   * the loop stops when the budget is spent or the idle predicate no longer
-   * holds. Drained is proven only by a batch that started from the first
-   * conversation and found nothing left (a resumed batch ending at null
-   * triggers one confirming walk), and is recorded in `meta` so later
-   * sessions skip the sweep. Reclaim waits for it: deleted rows only return
-   * disk space through VACUUM.
-   */
   private sweepLegacyRunEvents(connection: SqliteDatabase): void {
     if (this.sweepDrained) return;
     if (readMeta(connection, MAINTENANCE_META_KEYS.runEventSweepDrained) !== null) {
@@ -1201,8 +1132,6 @@ export class DatabaseMaintenance {
       case "deferred":
         this.detachedDeferrals += 1;
         if (this.detachedDeferrals >= MAX_DETACHED_RECLAIM_DEFERRALS) {
-          // Something outside this process keeps the lock; stop pinning
-          // the worker alive for it. The next session tries again.
           this.reclaimDisabled = true;
         }
         this.logOnce(`deferred:${outcome.step}`, "storage.maintenance.deferred", {

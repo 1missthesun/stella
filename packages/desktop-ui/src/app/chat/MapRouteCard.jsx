@@ -6,15 +6,6 @@ import { notifyAssistantScrollFollowLayoutChange } from "@/shell/chat-scroll-fol
 import { useT, useTPlural } from "@/shared/i18n";
 import { useSelfHostedServer } from "@/platform/backend/server-discovery";
 import "./map-route-card.css";
-/**
- * Inline interactive map card for the orchestrator's `map` tool.
- *
- * The map itself is the hosted stella.sh embed page (Google Map, key stays
- * site-side) in an iframe, keyed by the artifact payload + the current theme
- * mode. The footer is native: route distance/duration or pin count on the
- * left, an "Open in Apple Maps" handoff (plain `<a target="_blank">` → OS
- * browser → Apple Maps turn-by-turn) on the right.
- */
 const MODE_LABEL_KEYS = {
     driving: "app.chat.mapCard.modeDriving",
     walking: "app.chat.mapCard.modeWalking",
@@ -68,11 +59,7 @@ const MapCard = ({ map }) => {
     const tPlural = useTPlural();
     const { resolvedColorMode } = useTheme();
     const [frameFailed, setFrameFailed] = useState(false);
-    // The interactive map is a stella.sh page; a self-hosted server's
-    // conversations never load it, and keep the Apple Maps handoff.
     const selfHosted = useSelfHostedServer();
-    // Theme mode is captured per URL; a theme switch swaps the iframe src and
-    // the embed re-renders in the matching palette.
     const embedUrl = useMemo(() => mapsEmbedUrl(map, {
         mode: resolvedColorMode,
         siteBaseUrl: import.meta.env.VITE_STELLA_WEB_URL?.trim() || undefined,

@@ -1,36 +1,10 @@
-/**
- * Cold storage for pi-durable's transcript entries, the other half of what a
- * long-lived conversation keeps in its Durable Object.
- *
- * pi-durable (the harness the cloud orchestrator and its cloud agents run on)
- * shares this object's SQLite and never deletes an entry: its root
- * conversation mirrors the whole journal (`importJournal`) and every agent
- * conversation keeps its full transcript. A compaction only moves the head
- * marker, so the model never reads an entry below the latest marker's head
- * again. In Rahul's main chat those entries were 34 MB of the object's 98 MB
- * (2026-10-13) and grew every turn.
- *
- * Entries below a conversation's context (its latest head marker's `head`,
- * less a margin) move to R2 here, in the journal's own pattern: the manifest
- * row records the intent, the object is written, and only then are the rows
- * deleted, in one transaction with the manifest's commit. A crash leaves rows
- * resident and the range marked `uploading`; the next pass uploads it again.
- *
- * What is moved stays readable: `read()` serves it to the two readers of old
- * entries, an agent's own `history.*` and the clients' older-history page.
- * Objects are gzip JSONL, sealed under the conversation's key when it has one.
- */
-
 import { Buffer } from "node:buffer";
 import type { ConversationLogger } from "./conversation-types.js";
 
-/** Entries kept below a context's head anyway, for scans that start there. */
 const KEEP_BELOW_HEAD = 64;
-/** Fewer prunable entries than this wait for a later pass. */
 const MIN_ARCHIVE_ROWS = 128;
 const OBJECT_MAX_ROWS = 2_000;
 const OBJECT_MAX_BYTES = 8 * 1024 * 1024;
-/** Objects one pass may write; a backlog drains over successive turns. */
 const OBJECTS_PER_PASS = 4;
 const R2_TIMEOUT_MS = 30_000;
 
@@ -64,7 +38,6 @@ type EntryRow = {
   record: string;
 };
 
-/** An archived entry as pi-durable stored it: `record` is its EntryRecord. */
 export type ArchivedPiEntry = { id: number; record: unknown };
 
 export type PiEntrySealer = {
@@ -116,7 +89,6 @@ export class PiEntryArchive {
     );
   }
 
-  /** Every object this conversation's pi entries were moved to, for the purge. */
   allKeys(): string[] {
     if (!this.hasTable("pi_entry_archives")) return [];
     return this.sql
@@ -125,10 +97,6 @@ export class PiEntryArchive {
       .map((row) => row.r2_key);
   }
 
-  /**
-   * Move what no context reads any more. `stop()` is checked between objects:
-   * a purge or a tombstone ends the pass. Returns the entries moved.
-   */
   async prune(prefix: string, stop: () => boolean, now: number): Promise<number> {
     if (!this.hasTable("entries") || !this.hasTable("conversations")) return 0;
     this.sql.exec(DDL);
@@ -153,12 +121,6 @@ export class PiEntryArchive {
     return moved;
   }
 
-  /**
-   * Per conversation, the entry id below which nothing is read: its latest
-   * head marker's head, less a margin. Left alone: a conversation with a task
-   * still going (a run may hold an older head), and one that another
-   * conversation forks from (the fork reads the parent's entries).
-   */
   private prunable(): Array<{ conversationId: number; below: number }> {
     const conversations = this.sql
       .exec<{ id: number; record: string }>(`SELECT id, record FROM conversations`)
@@ -206,7 +168,6 @@ export class PiEntryArchive {
     return out;
   }
 
-  /** The next object's range of `conversationId` below `below`, recorded as intent. */
   private nextRange(
     conversationId: number,
     below: number,
@@ -260,7 +221,6 @@ export class PiEntryArchive {
     return range;
   }
 
-  /** Phase 2 and 3: write the object, then drop the rows with the commit. */
   private async upload(range: ArchiveRow): Promise<number> {
     const rows = this.sql
       .exec<EntryRow>(
@@ -272,7 +232,6 @@ export class PiEntryArchive {
       )
       .toArray();
     if (rows.length === 0) {
-      // Already committed by a pass whose manifest update never landed.
       this.sql.exec(
         `UPDATE pi_entry_archives SET state = 'committed' WHERE first_id = ?`,
         range.first_id,
@@ -314,7 +273,6 @@ export class PiEntryArchive {
     return rows.length;
   }
 
-  /** Whether `conversationId` has archived entries below `beforeId` (any, if omitted). */
   hasArchived(conversationId: number, beforeId?: number): boolean {
     if (!this.hasTable("pi_entry_archives")) return false;
     return (
@@ -329,10 +287,6 @@ export class PiEntryArchive {
     );
   }
 
-  /**
-   * Archived entries of `conversationId`, oldest first: all of them, or the
-   * newest `limit` below `beforeId`. `hasOlder` says whether more lie below.
-   */
   async read(
     conversationId: number,
     options: { beforeId?: number; limit?: number } = {},

@@ -75,18 +75,6 @@ function NavItemLink({
   );
 }
 
-/**
- * Primary site navigation used in every marketing-page header.
- *
- * On wide screens each top-level tab is a footer-style category (Product,
- * Resources, Community) that reveals its links in a popover on hover or
- * keyboard focus.
- *
- * On narrow screens (<= 860px) the tabs collapse into a hamburger sheet that
- * lists every category and its links. The `SiteHeaderAccount` sign-in button
- * stays in the header bar at all widths — auth is the single most important
- * CTA.
- */
 export function SiteNav() {
   const [open, setOpen] = useState(false);
 

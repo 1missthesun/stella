@@ -6,7 +6,6 @@ import {
 
 type Operation = "retain" | "activate" | "read" | "replace" | "purge" | "close";
 
-/** Serial worker mailbox preserves lifecycle ordering and SQLite CAS semantics. */
 export class CloudConversationCacheClient {
   private readonly worker: Worker;
   private nextId = 0;
@@ -68,8 +67,6 @@ export class CloudConversationCacheClient {
     if (this.failure) return Promise.reject(this.failure);
     if (this.closing)
       return Promise.reject(new Error("Cloud cache is closing."));
-    // Cheap ingress limits only. Recursive validation and serialization belong
-    // to the worker, exactly once, immediately before the database operation.
     if (
       operation !== "close" &&
       (!payload || typeof payload !== "object" || Array.isArray(payload))
@@ -117,8 +114,6 @@ export class CloudConversationCacheClient {
     if (!this.closing) {
       this.authority = null;
       this.closing = this.request("close", null)
-        // An exited worker has already lost its connection. Terminate below
-        // also handles failure during a queued close, without blocking reset.
         .catch((error: unknown) => {
           if (!this.failure) throw error;
         })

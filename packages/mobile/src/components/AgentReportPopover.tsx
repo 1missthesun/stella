@@ -18,7 +18,6 @@ const PLACEHOLDERS = new Set([
   "Couldn’t load the report. Close and reopen it to retry.",
 ]);
 
-/** Loads one task's report and hands it to the popover; renders nothing. */
 function ReportLoader({
   conversationId,
   threadId,
@@ -35,11 +34,6 @@ function ReportLoader({
   return null;
 }
 
-/**
- * The full reports behind a reply's one "Show more", in the floating popover
- * that points at it: one task's report, or several stacked under their
- * titles.
- */
 export function AgentReportPopover({
   references,
   conversationId,
@@ -52,12 +46,9 @@ export function AgentReportPopover({
   references: readonly AgentReplyRef[];
   conversationId: string;
   colors: Colors;
-  /** Each report as the conversation recorded it, when the backend has none. */
   journalReports?: Readonly<Record<string, string | undefined>>;
-  /** Window point of the tap that opened the report. */
   anchor: TouchAnchor | null;
   onClose: () => void;
-  /** Room the chrome above takes; a popover without an anchor points below it. */
   topInset?: number;
 }) {
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();

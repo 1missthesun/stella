@@ -9,26 +9,6 @@ import { TOP_BAR_BAR_HEIGHT } from "./AppBackdrop";
 import type { Colors } from "../theme/colors";
 import { useColors } from "../theme/theme-context";
 
-/**
- * What the top-bar indicator opens: the agents that are in progress right now,
- * one line each, capped at the shared menu cap. The desktop indicator opens
- * the same list with the same cap.
- *
- * It lists only running work on purpose — it is the detail behind "N things in
- * progress", not the activity index. Everything else (settled agents, their
- * files, the conversation's own files) still lives in the sidebar.
- *
- * The sheet itself is anchored to the very top of the screen, so its content
- * is pushed clear of the status bar and the top bar — otherwise the first row
- * draws under the notch and the clock.
- *
- * The rows are a read-out, not a menu: they name what is running and nothing
- * more. They used to be buttons that closed the sheet and opened the sidebar,
- * which is a surprising place to be sent from here.
- *
- * Each row leads with the lifecycle status icon desktop's own activity rows
- * use, so the two top bars label the same work the same way.
- */
 export function StellaActivityMenu({
   visible,
   running,

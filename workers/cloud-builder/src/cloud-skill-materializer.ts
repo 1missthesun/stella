@@ -12,21 +12,10 @@ import { WORLD_ROOT } from "./workspace.js";
 
 export const CLOUD_SKILL_SANDBOX_ROOT = "/tmp/stella-cloud-skills";
 
-/**
- * The same skills where a device keeps them: `~/.stella/skills/<slug>`, HOME
- * being the world. The world sync leaves this subtree out
- * (`WORLD_UNSYNCED_PATHS`), so the bodies never reach the world store.
- */
 export const CLOUD_SKILL_HOME_ROOT = `${WORLD_ROOT}/.stella/skills`;
 
 const SKILL_SLUG = /^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$/u;
 
-/**
- * Run as the tool account, so nothing an agent did to the tree can turn the
- * copy into a write anywhere else. The new copies are built inside the
- * skills directory, which the sync never sees, and renamed into place.
- * Arguments: the skills directory, then slug and version root pairs.
- */
 const MIRROR_SKILLS_SCRIPT = `set -eu
 umask 022
 skills=$1
@@ -44,10 +33,6 @@ for entry in "$stage"/*; do
 done
 rm -rf -- "$stage" "$old"`;
 
-/**
- * Put a materialized catalog at `~/.stella/skills/<slug>` too, replacing
- * whatever an earlier turn left there.
- */
 export const mirrorCloudSkillsIntoHome = async (args: {
   session: Pick<ExecutionSession, "exec">;
   catalog: MaterializedCloudSkillCatalog;
@@ -78,7 +63,6 @@ const SAFE_SKILL_PATH =
   /^(?!\/)(?!.*(?:^|\/)\.{1,2}(?:\/|$))(?!.*\\)(?!.*(?:^|\/)\.)[^\u0000-\u001f\u007f]+$/u;
 
 type SandboxFileWriter = {
-  /** Reads what an earlier turn left; without it every file is written. */
   exec?(
     command: string,
     options?: { origin?: "internal" },
@@ -131,11 +115,6 @@ const base64Bytes = (bytes: Uint8Array): string => {
 
 const SKILL_WRITE_CONCURRENCY = 8;
 
-/**
- * Digests of the skill files already in the container, by path: only
- * root-owned regular files that nothing else may write, under directories
- * root owns. Anything else is written again.
- */
 const presentSkillFiles = async (
   session: SandboxFileWriter,
 ): Promise<Map<string, string>> => {
@@ -159,19 +138,10 @@ const directoryOf = (filePath: string): string =>
   filePath.slice(0, Math.max(0, filePath.lastIndexOf("/"))) ||
   CLOUD_SKILL_SANDBOX_ROOT;
 
-/**
- * Materializes an immutable catalog snapshot — the mirror of the owner's
- * canonical device skills root — into the sandbox's ephemeral filesystem. The
- * device root decides membership; nothing here narrows it. The turn input
- * contains only safe
- * display metadata and local paths: no R2 locators, service credentials, or
- * host-machine paths cross into the model process.
- */
 export const materializeCloudSkillSnapshot = async (args: {
   home: Pick<CloudHomeStore, "readSkillFile">;
   snapshot: CloudSkillCatalogSnapshot;
   session: SandboxFileWriter;
-  /** Exact-turn admission latch; checked around every external operation. */
   assertActive: () => void;
 }): Promise<MaterializedCloudSkillCatalog> => {
   args.assertActive();
@@ -225,7 +195,6 @@ export const materializeCloudSkillSnapshot = async (args: {
     for (const file of entry.files) {
       const relative = safeRelativePath(file.path);
       const target = `${root}/${relative}`;
-      // An earlier turn's copy of these exact bytes stays as it is.
       if (present.get(target) === file.sha256) continue;
       writes.push(async () => {
         args.assertActive();

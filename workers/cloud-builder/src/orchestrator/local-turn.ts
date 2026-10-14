@@ -76,20 +76,9 @@ import {
 } from "./support.js";
 import { OrchestratorJournalWrites } from "./journal-writes.js";
 
-/**
- * Desktop-local turns (begin, renew, finish), history reads, and the pi
- * workspace and brain routes.
- */
-/** Newest usage-limit cards read to rebuild the holds. */
 const USAGE_LIMIT_HOLD_SCAN = 200;
 
 export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
-  /**
-   * The local half of localTurnOwner for a new admission: who is calling and
-   * which owner this conversation is bound to, with no gate round trip. The
-   * gate snapshot (write fence, current generation) is applied by the caller
-   * once it arrives together with the fence registration.
-   */
   protected localTurnCaller(request: Request): { ownerId: string } | Response {
     const identity = parseSocketIdentity(request);
     if (!identity) return json({ error: "Unauthorized." }, 401);
@@ -111,13 +100,6 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
     return { ownerId: bound };
   }
 
-  /**
-   * The owner for a read (the brain record, the history): the generation
-   * this object already holds, as reads over the conversation socket use,
-   * asking the owner gate only when it holds none. A read grants no write
-   * capability, so it needs no fresh fence, and computers poll these every
-   * few seconds: a gate snapshot each time kept the owner's object awake.
-   */
   protected async readerOwner(
     request: Request,
   ): Promise<{ ownerId: string; ownerGeneration: string } | Response> {
@@ -147,16 +129,10 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
         410,
       );
     }
-    // A new local turn is a new write capability, so it must refresh the
-    // owner generation even when this DO already has one cached. Renewal of
-    // an admitted exact lease keeps the generation that lease was fenced with.
     const isNewAdmission = suppliedLeaseToken === undefined;
     const ownerRecord = await this.resolveOwnerForCaller(identity, {
       refreshGeneration: isNewAdmission,
     });
-    // A refused resolution (not the owner, owner not writable) must never be
-    // turned into a new write capability by cached DO fields. Exact renewals
-    // instead remain bound to their admitted lease.
     if (isNewAdmission && !ownerRecord) {
       return json({ error: "Conversation not found." }, 404);
     }
@@ -212,9 +188,6 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
   protected async handleCanonicalHistory(request: Request): Promise<Response> {
     const owner = await this.readerOwner(request);
     if (owner instanceof Response) return owner;
-    // No lease is acquired and no journal state is mutated. The empty
-    // exclusion key cannot match a real turn id, so this is the same bounded,
-    // spill-hydrated canonical window used to seed a local cloud turn.
     const checkpoint = await this.journalCheckpoint();
     return json({
       ...(await this.localTurnHistory("")),
@@ -250,7 +223,6 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
     );
     if (owner instanceof Response) return owner;
     if (deviceId) {
-      // Only the brain's holder compacts the conversation for every host.
       const brain = await this.ctx.storage.get<PiBrainRecord>(PI_BRAIN_KEY);
       if (brain && !samePiBrainHost(brain, { host: "device", deviceId })) {
         return this.piBrainElsewhereResponse(brain);
@@ -273,16 +245,6 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
     return json({ ok: true, throughSeq });
   }
 
-  /**
-   * The desktop code tool's `history.sql` / `history.read`, answered with
-   * exactly what the cloud code tool's history client runs.
-   */
-  /**
-   * Where this conversation's Stella runs: `GET` reads the record, `POST`
-   * moves her (a computer's user flipping it, or her own `switch_destination`
-   * there). From then on that host takes the conversation's turns, while
-   * it can.
-   */
   protected async handlePiBrain(request: Request): Promise<Response> {
     const owner =
       request.method === "GET"
@@ -301,7 +263,6 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
     return json({ record } satisfies PiBrainResponse);
   }
 
-  /** A computer's turn or write refused because another host holds the brain. */
   protected piBrainElsewhereResponse(record: PiBrainRecord): Response {
     return json(
       {
@@ -324,13 +285,6 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
     }
   }
 
-  /**
-   * The Claude Code work this conversation's journal shows held on the Claude
-   * usage limit now: the newest `usage-limit` card of Stella's turn and of
-   * each agent, where that card is a hold rather than its resume. A client
-   * that starts reading after the cards were written rebuilds its waiting
-   * card from this.
-   */
   protected usageLimitHolds(): Array<{ threadId?: string; until?: number; createdAtMs: number }> {
     const rows = this.ctx.storage.sql
       .exec<{ seq: number; created_at: number; payload_json: string }>(
@@ -416,11 +370,6 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
     throw new Error('history query op must be "search", "sql", "read" or "usageLimitHolds".');
   }
 
-  /**
-   * Completes the durable half of begin. Every writer key is stable, so a
-   * retry after an isolate died between storing the lease and returning the
-   * response repairs the same rows instead of creating another prompt.
-   */
   protected async initializeLocalTurn(
     lease: LocalTurnLease,
     userMessage: AgentMessage,
@@ -430,7 +379,6 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
     history: string[];
     contextStartSeq: number;
     contextEndSeq: number;
-    /** The journal seq of the turn's prompt, its `message #N` id. */
     promptSeq: number;
   }> {
     for (const repaired of this.journal.repairTail(Date.now())) {
@@ -471,8 +419,6 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
       userMessageJson,
       `turn:${lease.turnId}:prompt`,
     );
-    // The prompt spill above may have yielded to an owner-purge cancel; the
-    // durable lease records it, so no remote fence assert is needed.
     const admitted =
       await this.ctx.storage.get<LocalTurnLease>(LOCAL_TURN_LEASE_KEY);
     if (
@@ -491,8 +437,6 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
       role: "user",
       message: sizedPrompt.message,
       payloadJson: sizedPrompt.payloadJson,
-      // A desktop-run lifecycle wake (`[Agent completed]` and friends) is a
-      // hidden prompt on every client, exactly like a cloud-run wake.
       ...(options?.hidden ? { hidden: true } : {}),
       ...(sizedPrompt.spillKey ? { spillKey: sizedPrompt.spillKey } : {}),
       ...(lease.clientMsgId ? { clientMsgId: lease.clientMsgId } : {}),
@@ -687,7 +631,6 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
       clientMsgId?: string;
       leaseToken?: string;
       renewOnly?: boolean;
-      /** The prompt is a lifecycle wake the clients never show. */
       hidden?: boolean;
       /** The computer's claim on the brain lease (`PiBrainClaim`); absent from a computer from before the lease. */
       brain?: unknown;
@@ -732,9 +675,6 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
       return json({ code: "bad_request", message: "Malformed request." }, 400);
     }
     const promptHidden = body.hidden === true;
-    // The gate snapshot that used to be read here now arrives with the fence
-    // registration below, in one gate round trip. Only the local half of the
-    // owner check runs before the request is validated.
     const caller = this.localTurnCaller(request);
     if (caller instanceof Response) return caller;
     markTiming("ownerLookupMs");
@@ -881,8 +821,6 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
         ? pending
         : await this.ctx.storage.get<LocalTurnLease>(LOCAL_TURN_LEASE_KEY);
     if (existing) {
-      // A replay is rare and renews a lease an earlier register fenced, so it
-      // keeps the separate snapshot refresh.
       const replayOwner = await this.localTurnOwner(
         request,
         undefined,
@@ -1049,10 +987,6 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
         lease,
         beginFingerprint,
       );
-      // The checks localTurnOwner made before the gate read moved here: the
-      // write fence and adoption first, then the generation the desktop
-      // expects. The gate registers nothing for a snapshot that refuses the
-      // caller; a replayed registration that no longer qualifies is released.
       const owner = await this.adoptOwnerSnapshot(
         caller.ownerId,
         registration.snapshot,
@@ -1071,8 +1005,6 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
       lease.ownerPurgeGeneration = registration.generation;
       markTiming("ownerFenceRegisterMs");
     } catch (error) {
-      // A snapshot the gate could not obtain propagates as the separate
-      // snapshot read used to.
       if (error instanceof OwnerGateSnapshotError) throw error;
       if (error instanceof OwnerFenceLeaseConflictError) {
         return json(
@@ -1204,11 +1136,6 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
         { hidden: promptHidden },
       );
       markTiming("initializeMs");
-      // No remote fence assert here. An owner purge that began after the
-      // register above reaches this object through `/owner-purge-cancel`,
-      // which cancels the exact local lease before the purge can report
-      // quiescence, so the durable lease below is the fence. The phase keeps
-      // its `finalFenceMs` name so existing dashboards still line up.
       const finalLease =
         await this.ctx.storage.get<LocalTurnLease>(LOCAL_TURN_LEASE_KEY);
       if (
@@ -1256,12 +1183,6 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
     }
   }
 
-  /**
-   * A computer's running turn started or finished tools. Nothing is journaled:
-   * the frames only keep the other devices' working indicators as current as
-   * the computer's own, the way a cloud turn's tools reach them. Its lease is
-   * the credential, and a lease that is not the running turn's is ignored.
-   */
   protected async handleLocalTurnTool(request: Request): Promise<Response> {
     const parsed = parseLocalTurnTools(await request.json().catch(() => null));
     if (!parsed) {

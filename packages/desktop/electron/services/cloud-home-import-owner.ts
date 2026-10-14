@@ -109,10 +109,6 @@ export const getLocalCloudHomeImportOwnership = async (
   return marker === digest ? "owned" : "other_owner";
 };
 
-/**
- * Atomically binds this local corpus to its first explicitly confirmed cloud
- * account. A different account can never replace the marker implicitly.
- */
 export const confirmLocalCloudHomeImportOwnership = async (
   stellaDataDir: string,
   accountScope: string,

@@ -1,28 +1,3 @@
-/**
- * Direct scheduling tools — `schedule_add`, `schedule_list`,
- * `schedule_update`, `schedule_remove`.
- *
- * These replace the retired plain-language `Schedule` relay tool and its
- * schedule specialist agent. The orchestrator owns scheduling directly;
- * spawned agents can also reach these tools so a watch-setup agent can
- * register the sensor it just authored and verified.
- *
- * Deferred surface: all four are `demoted`, so they stay out of the
- * always-loaded tool list whenever node_repl is available and are
- * discovered via `tools.$search` / the node_repl demoted-tool catalog,
- * then called as `tools.schedule_add({...})` etc. Agents without
- * node_repl get them as normal direct tools.
- *
- * Three trigger kinds, one local schedule store:
- *  - reminder — plain message at fire time (notification + chat line, no LLM)
- *  - task     — stored intent fires as an orchestrator turn
- *  - watch    — verified deterministic sensor script; diffs and failures
- *               escalate to an orchestrator turn, unchanged runs are silent
- *
- * The model-visible descriptors live in `schedule-manage-def.ts` so the
- * cloud host advertises the byte-identical tools.
- */
-
 import { AGENT_IDS } from "@stella/contracts/agent-runtime";
 import {
   handleScheduleAdd,
@@ -43,7 +18,6 @@ export type ScheduleManageOptions = {
   scheduleApi?: ScheduleToolApi;
 };
 
-/** Orchestrator owns scheduling; General can register a watch it just built. */
 const SCHEDULE_AGENT_TYPES = [
   AGENT_IDS.ORCHESTRATOR,
   AGENT_IDS.GENERAL,
@@ -54,7 +28,6 @@ export const createScheduleManageTools = (
 ): ToolDefinition[] => [
   {
     ...SCHEDULE_ADD_TOOL_DESCRIPTOR,
-    // The local cron store has no per-call request id; a rerun adds a twin.
     replay: "unsafe",
     agentTypes: SCHEDULE_AGENT_TYPES,
     demoted: { searchTerms: SCHEDULE_SEARCH_TERMS },

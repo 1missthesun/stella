@@ -27,7 +27,6 @@ const readTurnstileMessage = (value: unknown): TurnstileMessage | null => {
   return { type: "stella-turnstile", token, state };
 };
 
-/** Opens the public challenge route and accepts one state-bound token. */
 export const getWebsiteChallengeToken = async (): Promise<
   string | undefined
 > => {

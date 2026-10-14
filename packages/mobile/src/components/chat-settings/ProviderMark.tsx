@@ -25,11 +25,6 @@ const BRAND_TINTS: Record<string, string> = {
   openrouter: "#6467f2",
 };
 
-/**
- * A provider's own mark, as desktop draws it: Stella's gradient star,
- * Claude's starburst in its clay, every other brand from the shared glyph set,
- * monochrome ones in the text colour.
- */
 export function ProviderMark({
   provider,
   size = 24,

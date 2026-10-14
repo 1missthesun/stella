@@ -33,7 +33,6 @@ export const resolveSetStateAction = <T,>(
 
 export interface ComposerMessageState {
   message: string;
-  /** Drop-in `Dispatch<SetStateAction<string>>`; also syncs `messageRef`. */
   setMessage: Dispatch<SetStateAction<string>>;
   /** Always-current mirror of the message — safe to read from rAF/microtask
    *  callbacks that may run before React flushes the corresponding render. */
@@ -57,20 +56,13 @@ export function useComposerMessageState(
   return { message, setMessage, messageRef };
 }
 
-/**
- * Read-only subscription handle for composer text held outside React state.
- * Only the leaf that paints the textarea subscribes to the full string;
- * owners subscribe to derived facts (e.g. "has text") that change rarely.
- */
 export interface ComposerMessageStore {
   getSnapshot: () => string;
   subscribe: (listener: () => void) => () => void;
 }
 
 export interface ComposerMessageStoreState {
-  /** Stable for the owner's lifetime. */
   store: ComposerMessageStore;
-  /** Drop-in `Dispatch<SetStateAction<string>>`; also syncs `messageRef`. */
   setMessage: Dispatch<SetStateAction<string>>;
   /** Always-current mirror of the message (same contract as above). */
   messageRef: MutableRefObject<string>;
@@ -116,14 +108,9 @@ export function useComposerMessageStore(
   return state;
 }
 
-/** Subscribes to the full composer text. Use only in the composer leaf. */
 export const useComposerMessage = (store: ComposerMessageStore): string =>
   useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
 
-/**
- * Subscribes to a derived value of the composer text. The component
- * re-renders only when `select` returns a different primitive.
- */
 export const useComposerMessageSelector = <T,>(
   store: ComposerMessageStore,
   select: (message: string) => T,

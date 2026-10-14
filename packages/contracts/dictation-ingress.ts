@@ -19,7 +19,6 @@
 
 export const DICTATION_PCM_BYTES_PER_MS = 32;
 export const DICTATION_INGRESS_AHEAD_MS = 4_000;
-/** The relay accepts at most one second of audio per frame. */
 export const DICTATION_MAX_FRAME_BYTES = 1_000 * DICTATION_PCM_BYTES_PER_MS;
 const DRAIN_INTERVAL_MS = 100;
 
@@ -53,12 +52,10 @@ export class DictationIngressQueue {
     private readonly aheadMs: number = DICTATION_INGRESS_AHEAD_MS,
   ) {}
 
-  /** Audio captured but not yet released to the relay. */
   get queuedMs(): number {
     return this.queuedBytes / DICTATION_PCM_BYTES_PER_MS;
   }
 
-  /** Audio released to the relay so far. */
   get sentMs(): number {
     return this.sentBytes / DICTATION_PCM_BYTES_PER_MS;
   }
@@ -67,7 +64,6 @@ export class DictationIngressQueue {
     return this.clockStartedAt !== null;
   }
 
-  /** Queue captured audio; it goes out as soon as the pace allows. */
   push(bytes: ArrayBuffer | ArrayBufferView): void {
     if (this.closed || bytes.byteLength === 0) return;
     this.queue.push(ownedBytes(bytes));
@@ -75,7 +71,6 @@ export class DictationIngressQueue {
     this.drain();
   }
 
-  /** The provider acknowledged its session: its real-time clock starts now. */
   start(at: number = this.now()): void {
     if (this.closed || this.clockStartedAt !== null) return;
     this.clockStartedAt = at;
@@ -83,13 +78,11 @@ export class DictationIngressQueue {
     this.drain();
   }
 
-  /** Resolves once everything pushed so far has been released (or closed). */
   flushed(): Promise<void> {
     if (this.queuedBytes === 0 || this.closed) return Promise.resolve();
     return new Promise((resolve) => this.waiters.push(resolve));
   }
 
-  /** Stop releasing audio and forget whatever is still queued. */
   close(): void {
     this.closed = true;
     if (this.timer !== null) clearInterval(this.timer);

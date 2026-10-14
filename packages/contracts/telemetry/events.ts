@@ -1,11 +1,3 @@
-/**
- * Metadata-only telemetry contract shared by Stella producers and ingestion.
- *
- * This is intentionally a closed schema. It has no arbitrary `fields`,
- * `properties`, message, stack, prompt, response, URL, path, or tool-argument
- * escape hatch. New metadata must be reviewed and added as a named field.
- */
-
 export const TELEMETRY_SCHEMA_VERSION = 1 as const;
 export const TELEMETRY_PROJECT = "stella" as const;
 
@@ -41,7 +33,6 @@ export type AppErrorTelemetry = {
   severity: "warning" | "error" | "fatal";
   errorClass?: string;
   errorCode?: string;
-  /** Stable hash/fingerprint only; never the original message or stack. */
   fingerprint?: string;
   recovered?: boolean;
 };
@@ -86,7 +77,6 @@ export type ProviderTransportTelemetry = {
   type: "provider.transport";
   provider: string;
   model: string;
-  /** SHA-256 lowercase hex. Raw provider request IDs are forbidden. */
   requestIdSha256: string;
   phase:
     | "request-admitted"
@@ -151,7 +141,6 @@ export type TelemetryEventV1 = {
   environment: TelemetryEnvironment;
   source: TelemetrySource;
   release?: string;
-  /** SHA-256 pseudonyms only. Raw installation/owner identifiers are forbidden. */
   installationIdSha256?: string;
   ownerIdSha256?: string;
   event: TelemetryEventBody;
@@ -217,12 +206,6 @@ const isBoundedLabel = (value: unknown, max = 160): value is string =>
 const isOptionalLabel = (value: unknown, max = 160): boolean =>
   value === undefined || isBoundedLabel(value, max);
 
-/**
- * Provider and model identifiers are the only remote labels allowed to use
- * slash-delimited namespaces (for example `anthropic/claude-sonnet-4`). Empty,
- * dot, and dot-dot path segments as well as URL/absolute-path forms cannot
- * match this grammar.
- */
 const isProviderModelId = (value: unknown, max = 160): value is string =>
   typeof value === "string" &&
   value.length > 0 &&

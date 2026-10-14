@@ -1,22 +1,3 @@
-/**
- * Linear chat row components.
- *
- * Each message renders as a single row in chronological order, with no
- * per-turn user/assistant grouping. Tool-derived artifacts (web-search
- * badge, office preview, end-resource pill) attach to
- * the assistant row that immediately followed the producing tool events.
- *
- * A reply is delivered whole, so a row is never partially written. The
- * runtime's in-memory `MessageRecord` overlay puts the finished message on
- * screen ahead of SQLite under a stable
- * `assistant-{userMessageId}-{indexInTurn}` key; when the persisted
- * `assistant_message` lands it reuses that same React key, so the row does
- * not remount. `justArrived` below marks the single paint on which the row
- * plays its arrival animation.
- *
- * Reasoning text is intentionally NOT rendered anywhere in this surface
- * (the underlying data still flows through state for model history).
- */
 import { UserAskRecordCard } from "@/features/user-ask/UserAskRecordCard";
 import {
   Fragment,
@@ -117,11 +98,6 @@ const getAttachmentLabel = (
 
 const IMAGE_FILE_EXT_RE = /\.(?:png|jpe?g|gif|webp|svg|avif|bmp|ico|tiff?|heic|heif)$/i;
 
-/**
- * Whether a sent attachment should render as an image thumbnail. Routing
- * mistakes here previously fed PDFs into an `<img>`, producing a broken
- * image plus clipped alt text.
- */
 const isImageAttachment = (attachment: Attachment, safeUrl: string): boolean => {
   if (attachment.kind === "file") return false;
   const mimeType = attachment.mimeType?.trim().toLowerCase();
@@ -137,7 +113,6 @@ const isImageAttachment = (attachment: Attachment, safeUrl: string): boolean => 
   return true;
 };
 
-/** Display name for a sent non-image attachment chip. */
 const getFileAttachmentName = (
   attachment: Attachment,
   t: Translate,
@@ -184,12 +159,6 @@ const summarizeReactions = (
   });
 };
 
-/**
- * Window context chip inside the user bubble. The screenshot preview is
- * portaled to `document.body` (via `ChipPreviewPortal`) so it escapes the
- * scrolling chat container's clip rect — a plain absolutely-positioned
- * popover gets cropped to the message bubble / scroll viewport.
- */
 function UserWindowContextChip({
   label,
   previewImageUrl,
@@ -226,12 +195,6 @@ function UserWindowContextChip({
   );
 }
 
-/**
- * Pasted-text chip inside the user bubble. Mirrors the composer's
- * `PastedTextChip`: hovering (or focusing) reveals the pasted content in a
- * scrollable portaled card so the user can read what they attached. The
- * body comes from the bounded preview persisted on the message metadata.
- */
 function UserPastedTextChip({
   descriptor,
 }: {
@@ -247,13 +210,6 @@ function UserPastedTextChip({
   );
 }
 
-/**
- * Quoted / "Ask Stella" context chip inside the user bubble. Mirrors the
- * composer's selected-text chip: the quoted content is delivered to the model
- * as a dedicated hidden context message, never folded into the visible body,
- * so this chip is the display side of that decoupling. Hovering (or focusing)
- * reveals the quoted text in a scrollable portaled card.
- */
 function UserQuotedTextChip({ quotedText }: { quotedText: string }) {
   const t = useT();
   const { triggerRef, open, previewProps } = useHoverPreview<HTMLSpanElement>();
@@ -289,26 +245,13 @@ function UserQuotedTextChip({ quotedText }: { quotedText: string }) {
 
 type ContextChip = { key: string; node: ReactNode };
 
-// The chips sit above the bubble and are capped to the same 85% of the
-// message-row column that the bubble uses (`.event-item.user max-width: 85%`),
-// so the overflow math matches what the user sees. `CHIP_GAP` mirrors the
-// chip row's `gap: 6px`.
 const BUBBLE_MAX_FRACTION = 0.85;
 const CHIP_GAP = 6;
 
-/**
- * Lays out the user-bubble context chips on a single line. When they would
- * overflow the bubble's max width, the trailing chips collapse into a
- * "+N" pill; hovering / focusing it reveals the rest in a portaled popover
- * (portaled so it escapes the scrolling chat container's clip rect).
- */
 function UserContextChips({ chips }: { chips: ContextChip[] }) {
   const t = useT();
   const rootRef = useRef<HTMLDivElement | null>(null);
   const measureRef = useRef<HTMLDivElement | null>(null);
-  // The "+N" trigger mounts only after the measurement pass collapses chips,
-  // so its hover listeners must be plain React props (a mount-time ref hook
-  // would bind to a null element and never fire).
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const [overflowOpen, setOverflowOpen] = useState(false);
   const [visibleCount, setVisibleCount] = useState(chips.length);
@@ -325,7 +268,6 @@ function UserContextChips({ chips }: { chips: ContextChip[] }) {
       const available = columnWidth * BUBBLE_MAX_FRACTION;
       const items = Array.from(measure.children) as HTMLElement[];
       if (items.length === 0) return;
-      // Last measure child is the "+N" template; the rest map to `chips`.
       const overflowEl = items[items.length - 1];
       const chipEls = items.slice(0, items.length - 1);
       if (chipEls.length <= 1) {
@@ -416,11 +358,6 @@ function UserContextChips({ chips }: { chips: ContextChip[] }) {
   );
 }
 
-/**
- * A user-attached image inside the sent message. Presentation reuses the
- * composer's compact, uniform image chip while retaining the shared
- * full-window lightbox.
- */
 function AttachmentImage({
   attachment,
   index,
@@ -451,9 +388,6 @@ export const UserMessageRow = memo(
     const t = useT();
     const reply = useMessageReply();
     const { text, windowLabel, attachments, channelEnvelope } = row;
-    // Attachment the Copy action falls back to when the message has no text
-    // (image → clipboard image; other file → path as text). Memoized so the
-    // memoized action row keeps a stable prop.
     const copyAttachment = useMemo(
       () => primaryCopyAttachment(attachments),
       [attachments],
@@ -701,9 +635,6 @@ export const AssistantMessageRow = memo(
     const unpreviewableFiles = linkedFiles.filter(
       (file) => file.cloudDriveFile || !evidencePathSet.has(file.path),
     );
-    // A file this turn produced is an attachment of the reply, not a
-    // citation of it: it belongs in the same strip under the bubble that the
-    // reply's other files use, never in the reply-preview chip above it.
     const resourcePayload = row.resourcePayload;
     const resourceShownElsewhere =
       !resourcePayload ||
@@ -740,8 +671,6 @@ export const AssistantMessageRow = memo(
           : !evidencePathSet.has(file.path)) &&
         all.findIndex((other) => fileKey(other) === fileKey(file)) === index,
     );
-    // Links whose files the reply attaches stay clickable inside a sentence;
-    // a line made only of such links, even after a short "Label:", goes.
     const hiddenFileKeys = linkedFiles
       .map(fileKey)
       .concat(evidencePaths.map((filePath) => `local:${filePath}`))
@@ -770,8 +699,6 @@ export const AssistantMessageRow = memo(
           payloads={inlineImages}
         />
       ) : null;
-    // Shared predicate with ChatTimeline (which drops renderless rows
-    // before virtualization) — see assistant-row-content.ts.
     if (!assistantRowHasVisibleContent(row)) {
       return null;
     }
@@ -799,10 +726,6 @@ export const AssistantMessageRow = memo(
             <UserAskRecordCard key={record.id} record={record} />
           ))}
           {hasBody && (
-            // Bubble + its hover control share one horizontal line, so the
-            // ellipsis sits to the RIGHT of the bubble and reserves no height.
-            // Only a turn's final assistant message carries it: mid-turn
-            // preambles render no control at all.
             <div className="message-line message-line--assistant">
               <div className="assistant-message-text chat-bubble-text">
                 <Markdown text={bodyText} cacheKey={row.cacheKey} hideHorizontalRules

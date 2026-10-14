@@ -1,43 +1,9 @@
-/**
- * Client delegation: the voice model asks, Stella's text orchestrator answers.
- *
- * One controller serves both protocols, because the work is identical and only
- * the two ends differ:
- *
- *   - **How the request arrives.** GPT-Live sends
- *     `session.delegation.created`, which carries `delegation.id`,
- *     `delegation.target` and `offset_ms` and deliberately NO task text — the
- *     model has decided the backend should handle the current request, and it
- *     is our job to say what that was. The Realtime routes (OpenAI BYOK, xAI)
- *     instead call the single `ask_stella` function, which does state the
- *     request. Either way the transcript supplies the surrounding context.
- *   - **How the result goes back.** That is the `DelegationChannel`:
- *     commentary/thinking appends on GPT-Live, `function_call_output` plus
- *     `response.create` on Realtime.
- *
- * The work itself always runs through the bridge that already existed for
- * voice: `voice.orchestratorChat` → `VoiceRuntimeService.orchestratorChat` →
- * `handleLocalChat({ agentType: "orchestrator" })`, which queues, persists to
- * the journal, and emits tool and lifecycle events.
- *
- * Two rules the two-brain design makes easy to get wrong:
- *
- *   - **Interrupting speech does not cancel backend work.** Barge-in stops the
- *     model talking; the orchestrator keeps going. The task is tracked here so
- *     a later request cannot start the same work twice.
- *   - **A changed request supersedes the old one.** The superseded task is
- *     completed on its channel immediately — a Realtime function call left
- *     unanswered would wedge the conversation — but its eventual result is
- *     dropped rather than spoken, because the user has moved on.
- */
-
 import {
   ASK_STELLA_TOOL_NAME,
   parseAskStellaRequest,
 } from "./ask-stella-tool";
 import type { TranscriptAccumulator } from "./transcript-accumulator";
 
-/** Progress forwarded from the orchestrator's own run, over IPC. */
 export type VoiceOrchestratorActivity = {
   requestId: string;
   kind: "status" | "tool-start" | "tool-end";
@@ -52,16 +18,9 @@ export type DelegationOutcome = {
   text: string;
 };
 
-/**
- * How one protocol returns delegated work. `taskId` is the GPT-Live
- * delegation id or the Realtime function call id.
- */
 export type DelegationChannel = {
-  /** Context at task start. Omitted where the protocol has no quiet channel. */
   announceStart?: (taskId: string, request: string) => void;
-  /** In-flight progress. Omitted where the protocol has no quiet channel. */
   reportProgress?: (taskId: string, text: string) => void;
-  /** Terminal. Must answer the task on protocols that expect a reply. */
   complete: (taskId: string, outcome: DelegationOutcome) => void;
 };
 
@@ -74,7 +33,6 @@ export type DelegationControllerDeps = {
   channel: DelegationChannel;
   transcript: TranscriptAccumulator;
   getConversationId: () => string | null;
-  /** True while the user's live voice turn is active. */
   isInputActive: () => boolean;
   runOrchestrator: (args: {
     requestId: string;
@@ -89,12 +47,10 @@ export type DelegationControllerDeps = {
 
 const RECENT_USER_TURNS = 3;
 const MAX_REQUEST_CHARS = 4_000;
-/** Progress notes are a courtesy, not a feed. One every this often, at most. */
 const PROGRESS_MIN_INTERVAL_MS = 1_200;
 
 type DelegationStart = {
   taskId: string;
-  /** What the model said it wants, when the protocol lets it say so. */
   statedRequest?: string;
   target?: string;
   offsetMs?: number | null;
@@ -130,7 +86,6 @@ export class DelegationController {
     });
   }
 
-  /** The task an unsolicited context append should be filed under. */
   get activeDelegationId(): string | null {
     return this.active?.taskId ?? null;
   }
@@ -139,10 +94,6 @@ export class DelegationController {
     return this.active !== null;
   }
 
-  /**
-   * GPT-Live's delegation event. Returns false when the event was something
-   * else, so the caller can keep routing.
-   */
   handleDelegationEvent(event: Record<string, unknown>): boolean {
     if (event.type !== "session.delegation.created") return false;
 
@@ -173,12 +124,6 @@ export class DelegationController {
     return true;
   }
 
-  /**
-   * A Realtime `ask_stella` call. Both event shapes land here: OpenAI reports
-   * the completed call inside `response.output_item.done`, xAI emits
-   * `response.function_call_arguments.done` at the top level, and a provider
-   * may send both for the same call — the task id dedupe covers that.
-   */
   handleFunctionCallEvent(event: Record<string, unknown>): boolean {
     const call = readFunctionCall(event);
     if (!call) return false;
@@ -212,23 +157,13 @@ export class DelegationController {
     this.unsubscribeActivity = null;
   }
 
-  // ── internals ────────────────────────────────────────────────────────
-
   private begin(start: DelegationStart): void {
     if (this.handledTaskIds.has(start.taskId)) return;
     this.handledTaskIds.add(start.taskId);
     void this.run(start);
   }
 
-  /**
-   * The request the orchestrator receives. On GPT-Live there is no task text
-   * at all, so the user's recent speech IS the request; on Realtime the model
-   * states it and the speech around it disambiguates pronouns and follow-ups
-   * ("do that too", "the second one").
-   */
   private buildRequest(start: DelegationStart): string {
-    // Close whatever is still open so the sentence that triggered this is part
-    // of the request rather than stranded mid-run.
     this.deps.transcript.flush();
     const turns = this.deps.transcript.recentUserTurns(RECENT_USER_TURNS);
     const spoken = turns
@@ -295,10 +230,6 @@ export class DelegationController {
 
     const request = this.buildRequest(start);
 
-    // A new request while one is in flight means the user changed their mind.
-    // The old task keeps running — it cannot be cancelled — but its result is
-    // no longer what the user wants to hear, and on Realtime its function call
-    // still has to be answered or the conversation stalls.
     const previous = this.active;
     if (previous) {
       previous.superseded = true;
@@ -357,11 +288,6 @@ export class DelegationController {
     }
   }
 
-  /**
-   * Forward the orchestrator's own progress so the voice model can say what is
-   * happening instead of inventing it, rate-limited so the session is not
-   * flooded. Tool cards still reach the overlay through the session's events.
-   */
   private handleActivity(activity: VoiceOrchestratorActivity): void {
     const task = this.active;
     if (!task || activity.requestId !== task.requestId) return;
@@ -400,7 +326,6 @@ export class DelegationController {
     this.deps.channel.reportProgress(task.taskId, text);
   }
 
-  /** The request text of the task currently in flight, for diagnostics. */
   get pendingRequest(): string {
     return this.active ? this.active.request : this.lastDelegatedRequest;
   }

@@ -54,29 +54,13 @@ import {
 } from "../slack/workspace.js";
 import { createSlackRepoTool } from "../slack/repo-tool.js";
 
-/** The orchestrator's tool set and connector connection requests. */
 export abstract class OrchestratorTools extends OrchestratorPi {
-  /**
-   * The cloud orchestrator's own tools for pi: the desktop orchestrator's
-   * model-visible contract (`orchestrator.md`'s allowlist — code, html,
-   * image_gen, video_gen, web, map, Read — plus the demoted schedule_* and
-   * connector_status tools reachable inside code, and the `connect`,
-   * `history` and `memory` clients inside code). The agent tools and
-   * `switch_destination` are pi's own. The model reads one description and
-   * calls one shape on either host; only the execution behind each tool
-   * differs, and every cloud-specific difference is stated in the cloud
-   * session overlay.
-   *
-   * Code-pinned on purpose — frontmatter allowlists are agent-writable home
-   * data on desktop; in the cloud the execution surface is never data-driven.
-   */
   protected async createTools(
     turn: ChatTurnRequest,
     agentHome: AgentHome,
     skillCatalog: CloudSkillCatalogSnapshot,
     memoryEnabled: boolean,
   ): Promise<{
-    /** Code and every other tool, demoted ones included. */
     catalog: readonly CloudCodeSourceAgentTool[];
   }> {
     const toolContext = {
@@ -92,9 +76,6 @@ export abstract class OrchestratorTools extends OrchestratorPi {
           }),
         ),
     };
-    // Resolved on first use: a turn that never reads a world file never
-    // touches the world Durable Object. `drive/` is not in the world: a Read
-    // under it reaches the user's drive itself (`world-drive-files.ts`).
     const worldBinding = this.env.WORLDS as typeof this.env.WORLDS | undefined;
     const world = worldBinding
       ? (() => {
@@ -123,8 +104,6 @@ export abstract class OrchestratorTools extends OrchestratorPi {
               name: "Read";
               arguments: Record<string, unknown>;
             }) => await runWorldToolWithDrive(call, worldTools, drive),
-            // Read's image branch: the world's own Read is line-oriented and
-            // refuses binaries, so pixels come from the files directly.
             stat: async (path: string) =>
               await files.stat(worldRelativeToolPath(path, WORLD_ROOT)),
             readFile: async (
@@ -138,10 +117,6 @@ export abstract class OrchestratorTools extends OrchestratorPi {
           };
         })()
       : undefined;
-    // Connectors belong to the account: the same Store integrations the
-    // desktop app connected, from the global catalog and the owner object.
-    // One directory per turn memoizes the catalog and the owner's live
-    // connections for every connect.* call and status check.
     const connectors = new CloudConnectorDirectory({
       source: {
         catalog: () => listIntegrationCatalog(this.env),
@@ -270,9 +245,6 @@ export abstract class OrchestratorTools extends OrchestratorPi {
           ),
       }),
     ];
-    // The orchestrator's memory files are world files; with memory off it has
-    // no `memory` client at all. Each write holds to the memory epoch it
-    // started in, so one running when a wipe begins cannot undo it.
     const memory =
       memoryEnabled && worldBinding
         ? createWorldMemory(
@@ -291,7 +263,6 @@ export abstract class OrchestratorTools extends OrchestratorPi {
     return { catalog: [codeTool, ...tools] };
   }
 
-  /** `history` inside code: this conversation's own journal. */
   private historyClient() {
     return {
       search: async (text: string, options: unknown) => {
@@ -309,14 +280,6 @@ export abstract class OrchestratorTools extends OrchestratorPi {
     };
   }
 
-  /**
-   * Show the inline connect card and wait for the answer. The card is a
-   * pending request row in the owner object that every signed-in client
-   * watches (`connect.pending`); the user's answer
-   * either finishes the account-level Composio connection or declines.
-   * Polling is the wait: the turn holds the tool call open while the row
-   * moves through pending → connecting → connected/declined/expired.
-   */
   protected async requestCloudConnectorConnection(
     turn: ChatTurnRequest,
     ownerInternal: (name: string, args: unknown) => Promise<unknown>,
@@ -400,7 +363,6 @@ export abstract class OrchestratorTools extends OrchestratorPi {
         await cancel();
         return { ok: false, reason: "timeout" };
       }
-      // An abort just ends the wait; the loop's next check cancels the card.
       await sleepWithAbort(
         CONNECT_CARD_POLL_MS,
         signal,

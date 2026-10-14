@@ -20,11 +20,6 @@ export type AgentFailureDiagnosticCode =
   | "container_start"
   | "unknown";
 
-/**
- * Collapse executor/turn failures to an allowlisted status code. The source
- * text can contain provider or user-controlled details, so callers must never
- * surface it directly in acceptance receipts or client-visible errors.
- */
 export const classifyAgentFailureDiagnostic = (
   detail: string,
 ): AgentFailureDiagnosticCode => {
@@ -139,11 +134,6 @@ const AGENT_FAILURE_REASONS: Partial<Record<AgentFailureDiagnosticCode, string>>
   capture_exit: "its session exited unexpectedly",
 };
 
-/**
- * The sentence a person sees for a failed cloud turn: a reason written for
- * them from the allowlisted code, never the source text, and the turn id so
- * the failure can be found in the logs.
- */
 export const agentFailureMessage = (
   code: AgentFailureDiagnosticCode,
   turnId: string,

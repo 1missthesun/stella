@@ -21,7 +21,6 @@ const formatTime = (ms: number): string => {
     : date.toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" });
 };
 
-/** Done and Snooze under a reminder Stella delivered; the same state on every device. */
 export const ReminderActions = memo(function ReminderActions({
   mark,
   colors,

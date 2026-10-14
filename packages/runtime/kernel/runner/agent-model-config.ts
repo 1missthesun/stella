@@ -61,7 +61,6 @@ export const captureEffectiveModelConfig = (args: {
   subscriptionHarnessEnabled?: boolean;
   configuredModel?: string;
   engineModelOverride?: string;
-  /** Engine preferences, including an intentional absent effort, were frozen. */
   engineConfigSampled?: boolean;
   spawnEngine?: SpawnEngineSelection;
   resolvedLlm: ResolvedLlmRoute;

@@ -1,9 +1,3 @@
-/**
- * Managed shell sessions: the worker-wide session map, each record's output
- * cursors and exit latch, owner-scoped access, the per-session interaction
- * queue, and the joined shutdown.
- */
-
 import { Deferred, Effect } from "effect";
 import { createHash } from "node:crypto";
 import { StringDecoder } from "node:string_decoder";
@@ -45,11 +39,8 @@ import {
 
 export type ShellState = {
   shells: Map<string, ManagedShellRecord>;
-  /** One-shot foreground commands still running (`runShell`). */
   foregroundShells: Set<SpawnedShell>;
-  /** Changes whenever the runtime worker reconstructs its in-memory state. */
   workerGeneration: string;
-  /** Compact receipts retained after completed shell records are pruned. */
   prunedSessions: Map<string, PrunedShellSession>;
   secretStateRoot: string;
   stellaBrowserBinPath?: string;
@@ -60,40 +51,24 @@ export type ShellState = {
   nodeShimDir?: string;
   windowsCliShimDir?: string;
   getStellaSiteAuth?: () => { baseUrl: string; authToken: string } | null;
-  /** The backend origin and auth token, for `stella-media`. */
   getCloudBackendAuth?: () => { baseUrl: string; authToken: string } | null;
-  /**
-   * Per-root CLI bridge UDS path (worker-side). Forwarded into the PTY
-   * env as `STELLA_CLI_BRIDGE_SOCK` so sidecar CLIs (e.g. `stella-computer`)
-   * can call back into the host for approvals and daemon spawns.
-   */
   cliBridgeSocketPath?: string;
   lastDeferredDeleteSweepAt: number;
 };
 
-/**
- * Which thread started a shell session. Sessions outlive the run that
- * created them and live in one worker-wide map, so the record has to carry
- * its own provenance — that's what lets a background command's exit be
- * delivered back to the agent that started it.
- */
 export type ShellSessionOwner = {
   conversationId: string;
-  /** Durable agent thread id. Absent for non-subagent callers. */
   agentId?: string;
   agentType?: string;
-  /** Origin-run provenance only; later runs in the same thread retain access. */
   runId?: string;
   rootRunId?: string;
 };
 
-/** Authorization key for accessing conversation-scoped shell state. */
 export type ShellSessionAccess = {
   conversationId: string;
   agentId?: string;
 };
 
-/** What a caller learns when a background session finally exits. */
 export type ShellExitSnapshot = {
   sessionId: string;
   command: string;
@@ -101,7 +76,6 @@ export type ShellExitSnapshot = {
   exitCode: number | null;
   startedAt: number;
   completedAt: number;
-  /** Captured output, raw-capped with equal head and tail retention. */
   output: string;
   owner?: ShellSessionOwner;
 };
@@ -112,29 +86,15 @@ export type ManagedShellRecord = ShellRecord & {
   unreadOutputBuffer: HeadTailOutputBuffer;
   outputVersion: number;
   waiters: Set<() => void>;
-  /**
-   * Persistent exit listeners, distinct from `waiters`: those are one-shot
-   * and fire on any activity, these fire once when the process is gone.
-   */
   exitWatchers: Set<() => void>;
   child?: SpawnedShell;
   pty?: SpawnedPtyShell;
   stdinOpen: boolean;
   owner?: ShellSessionOwner;
-  /**
-   * Completed exactly once, when the child's `close`/`error` event fires
-   * (pre-completed for records that never spawned). The kill ladder,
-   * `waitForShellExit`, and the joined shutdown await this instead of
-   * polling `running`.
-   */
   exitLatch: Deferred.Deferred<void>;
-  /** Total UTF-8 bytes observed since process start. */
   outputCursorBytes: number;
-  /** Cursor at which the next interaction-result drain begins. */
   unreadCursorStart: number;
-  /** Monotonic receipt sequence shared by stream updates and final drains. */
   chunkSequence: number;
-  /** Monotonic exec/write interaction number for this shell. */
   interactionSequence: number;
   activeInteractionSequence: number | null;
   activeInteractionReceipt?: ShellInteractionReceipt;
@@ -183,11 +143,6 @@ const retainPrunedSessionReceipt = (
   }
 };
 
-/**
- * Keep the active-shell map bounded. Running shells and records with queued
- * interactions are never candidates; the release path retries pruning after
- * the interaction completes.
- */
 export const pruneCompletedShellSessions = (
   state: ShellState,
   now = Date.now(),
@@ -219,7 +174,6 @@ export const pruneCompletedShellSessions = (
   }
 };
 
-/** Opportunistic TTL/count cleanup for hosts and focused harness checks. */
 export const cleanupShellSessions = (
   state: ShellState,
   now = Date.now(),
@@ -357,12 +311,6 @@ export const readShellExitSnapshot = (
   };
 };
 
-/**
- * Call `listener` once the session's process is gone, and return a
- * disposer. Sessions that already exited resolve on the next microtask so
- * callers never have to special-case the race between "still running when
- * I checked" and "exited before I subscribed".
- */
 export const watchShellExit = (
   state: ShellState,
   sessionId: string,
@@ -385,12 +333,6 @@ export const watchShellExit = (
   };
 };
 
-/**
- * Every running session an agent thread owns, whichever of its runs started
- * them. Scoping a thread's background work by owner rather than by "what
- * the last run touched" is what keeps a job started three turns ago — and
- * not polled since — from being forgotten.
- */
 export const listRunningShellSessionsOwnedBy = (
   state: ShellState,
   access: ShellSessionAccess,
@@ -405,7 +347,6 @@ export const listRunningShellSessionsOwnedBy = (
   return owned;
 };
 
-/** Stamp the calling thread onto a freshly started session. */
 export const setShellOwner = (
   record: Pick<ShellRecord, "id">,
   context?: ToolContext,
@@ -420,13 +361,6 @@ export const setShellOwner = (
   };
 };
 
-/**
- * Model-addressable shell sessions are private to the thread that created
- * them. Run ids are deliberately not part of the access key: a background
- * process commonly outlives one turn/run and must remain usable on the next.
- * Calls without a ToolContext can only address likewise-unowned sessions,
- * preserving direct harness/internal use without opening owned sessions.
- */
 const shellOwnerMatchesAccess = (
   owner: ShellSessionOwner | undefined,
   access: ShellSessionAccess | null,
@@ -453,13 +387,6 @@ export const shellOwnerMatchesContext = (
       : null,
   );
 
-/**
- * Wait for new shell activity (or completion), bounded by `timeoutMs`, as a
- * scoped effect. The activity waiter is an `acquireRelease` resource (always
- * removed from `record.waiters` on success, timeout, and abort alike) and
- * the caller's signal crosses in through `acquireAbortLatch`; an abort fails
- * the effect with the legacy reason (`signal.reason ?? new Error("Aborted")`).
- */
 export const waitForShellActivityEffect = (
   record: ManagedShellRecord,
   observedVersion: number,
@@ -479,8 +406,6 @@ export const waitForShellActivityEffect = (
         Effect.sync(() => record.waiters.add(finish)),
         () => Effect.sync(() => record.waiters.delete(finish)),
       );
-      // Close the check-then-subscribe race: output or exit can land between
-      // the optimistic check above and waiter registration.
       if (!record.running || record.outputVersion !== observedVersion) {
         Deferred.doneUnsafe(activity, Effect.void);
       }
@@ -539,7 +464,6 @@ const waitForInteractionTurnEffect = (
     }),
   );
 
-/** Serialize write/poll/drain interactions for one session, not all shells. */
 export const acquireShellInteraction = async (
   state: ShellState,
   record: ManagedShellRecord,
@@ -615,7 +539,6 @@ export const startShell = (
 
   const failedRecord = (message: string, exitCode: number) => {
     const safeLaunchError = sanitizeToolVisibleText(message);
-    // Never spawned: the exit latch is born completed so joins are no-ops.
     const exitLatch = Deferred.makeUnsafe<void>();
     Deferred.doneUnsafe(exitLatch, Effect.void);
     const record: ManagedShellRecord = {
@@ -685,9 +608,6 @@ export const startShell = (
   };
 
   const append = (chunk: string, sanitizeImmediately: boolean) => {
-    // Pipe output is sanitized chunk-by-chunk for compatibility. PTY escape
-    // sequences can straddle native read boundaries, so retain those chunks
-    // until the existing payload-level sanitizer sees the complete drain.
     const delta = appendShellOutput(
       record,
       sanitizeImmediately ? sanitizeToolVisibleText(chunk) : chunk,
@@ -855,12 +775,6 @@ export const startShell = (
   return record;
 };
 
-/**
- * Await a managed shell's exit (close/error already reflected in
- * `record.running`), bounded by `timeoutMs`. Resolves either way — the
- * bound exists so a wedged process can never hang a caller; the kill
- * ladder's SIGKILL has already been dispatched by then.
- */
 export const waitForShellExit = (
   record: ManagedShellRecord,
   timeoutMs: number,
@@ -877,19 +791,6 @@ export const waitForShellExit = (
     }),
   );
 
-/**
- * Joined, bounded teardown of every managed shell and every foreground
- * command still running. `kill()` alone only
- * *starts* the TERM→1s→KILL ladders — a worker that exits right after would
- * strand TERM-ignoring children as orphans. This joins every running
- * shell's exit latch and its whole-tree termination (process group and
- * escaped descendants, which can outlive the shell itself) in parallel
- * under a single 3s bound (comfortably past the ladder); anything still
- * alive at the bound is logged and left to the OS, as the ladder's KILL
- * already fired.
- * Conversation-scoped shells are deliberately worker-lifetime resources:
- * they die here, never earlier.
- */
 export const shutdownManagedShells = (state: ShellState): Promise<void> =>
   runToolEffect(
     Effect.gen(function* () {

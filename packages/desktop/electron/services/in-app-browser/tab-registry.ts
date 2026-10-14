@@ -17,7 +17,6 @@ export type ManagedTab = {
   loading: boolean;
   agentActive?: boolean;
   agentIdleTimer?: ReturnType<typeof setTimeout>;
-  /** A `stella-preview://` tab: the app's own UI from a draft worktree. */
   preview?: { name: string; dispose: () => void };
 };
 
@@ -54,20 +53,11 @@ const tabState = (tab: ManagedTab): BrowserViewTabState => {
   };
 };
 
-/**
- * Every managed tab, grouped by owner (the manual browser or one agent
- * conversation/session), plus which owner the panel shows. Pure bookkeeping:
- * mounting views, emitting state and per-owner errors stay with the service.
- */
 export class BrowserTabRegistry {
   private readonly tabs = new Map<string, ManagedTab>();
   private readonly owners = new Map<string, OwnerTabRegistry>();
   private latestOwnerId: string | undefined;
   visibleOwnerId = MANUAL_OWNER_ID;
-  /**
-   * `undefined` preserves the legacy single-owner view, `null` exposes every
-   * owner, and a string pins the view to one conversation/session owner.
-   */
   scopedOwnerId: string | null | undefined;
 
   get(tabId: string) {
@@ -118,7 +108,6 @@ export class BrowserTabRegistry {
     return tab;
   }
 
-  /** Registers a tab as its owner's active one and its owner as the latest. */
   add(tab: ManagedTab, activate?: boolean) {
     this.tabs.set(tab.id, tab);
     const owner = this.getOrCreateOwner(tab.ownerId);
@@ -138,11 +127,6 @@ export class BrowserTabRegistry {
     }
   }
 
-  /**
-   * Drops a tab. A closed tab hands activation to its neighbour; a destroyed
-   * one to the owner's last tab. Returns true when that emptied (and removed)
-   * the owner.
-   */
   remove(tab: ManagedTab, nextActive: "neighbor" | "last"): boolean {
     const owner = this.owners.get(tab.ownerId);
     const orderedIds = owner ? [...owner.tabIds] : [];
@@ -176,7 +160,6 @@ export class BrowserTabRegistry {
     this.owners.clear();
   }
 
-  /** The owner the current scope shows; also settles `visibleOwnerId` to it. */
   settleScopedOwner() {
     this.visibleOwnerId =
       typeof this.scopedOwnerId === "string"
@@ -228,7 +211,6 @@ export class BrowserTabRegistry {
     );
   }
 
-  /** Live tabs of one owner, in creation order. */
   ownerTabStates(ownerId: string): BrowserViewTabState[] {
     const owner = this.owners.get(ownerId);
     return owner

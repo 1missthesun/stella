@@ -1,15 +1,4 @@
 #!/usr/bin/env node
-// Downloads platform-relevant native helpers from R2 into
-// desktop/native/out/<platform>/. New manifests publish per-file refs so updates
-// only download changed files; older manifests still use the platform tarball
-// fallback.
-//
-// Usage:
-//   bun run native:download [--manifest-url <url>] [--platform <key>] [--force]
-//
-// Defaults to the canonical R2 manifest URL and the host platform. Installed
-// helpers are compared with the manifest on every run, so a new build replaces
-// them; pass --force to reinstall even when they already match.
 
 import { createHash } from "node:crypto";
 import {
@@ -72,8 +61,6 @@ const platformKey =
         : "");
 
 if (!platformKey) {
-  // Nothing is published for this platform, so there is nothing to fetch:
-  // reporting that as a failure made every launch on it retry setup.
   process.stdout.write(
     `No native helpers are published for ${process.platform}/${process.arch}; nothing to download. Pass --platform to fetch another platform's.\n`,
   );

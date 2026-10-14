@@ -2,8 +2,6 @@ import { promises as fsPromises } from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
-// Photon itself is lazy-loaded inside resizeImage, so this import adds no
-// WASM parse cost to the worker-ready path.
 import { resizeImage } from "../../kernel/shared/image-resize.js";
 import {
   resolveImageCaps,
@@ -102,9 +100,6 @@ export const materializeImageAttachments = async (
   target?: ImageCapTarget,
 ): Promise<MaterializedImageAttachment[]> => {
   const materialized: MaterializedImageAttachment[] = [];
-  // Resize composer attachments to the resolved target provider's limits
-  // (e.g. Anthropic's 2576px high-res tier) rather than a blunt global cap.
-  // Falls back to the safe conservative profile when the target is unknown.
   const caps = resolveImageCaps({
     ...(target ?? {}),
     imageCount: (attachments ?? []).length,
@@ -121,21 +116,12 @@ export const materializeImageAttachments = async (
       continue;
     }
 
-    // Carry the composer's identity onto the materialized ref. Only `url` and
-    // `mimeType` reach the model as pixels, but `kind` is what tells the
-    // prompt builder this is a user-attached image rather than an ambient
-    // context capture (a window screenshot), so it can name the on-disk copy
-    // and let the turn delegate it. `drivePath` survives for the same reason
-    // a name does: the bytes become a data URL here, and that path is the only
-    // durable record of where this image actually lives.
     const identity = {
       kind: "image" as const,
       ...(attachment.name ? { name: attachment.name } : {}),
       ...(attachment.drivePath ? { drivePath: attachment.drivePath } : {}),
     };
 
-    // Path-backed composer attachments: the renderer keeps only the
-    // path + preview; the original bytes are read and resized here.
     if (isLocalFileAttachmentUrl(url)) {
       try {
         const localImage = await materializeLocalFileImage(url, caps);
@@ -223,15 +209,6 @@ export const materializeImageAttachments = async (
   return materialized;
 };
 
-/** Documents are downloaded by the worker, never decoded in the renderer.
- * Hosted URLs are owner-authorized signed URLs resolved by the placement host.
- * Keep the resulting files under this profile's conversation attachment cache.
- *
- * `includeImages` is what a placed agent needs. A chat turn inlines its images
- * as pixels and only documents need a path, but an agent receives a prompt and
- * nothing else, so every attachment has to become a file it can Read. Images
- * keep `kind: "image"` so the announcement names them accurately.
- */
 export const MAX_FILE_ATTACHMENT_BYTES = 50 * 1024 * 1024;
 export const materializeFileAttachments = async (args: {
   attachments?: RuntimeAttachmentRef[];
@@ -305,8 +282,6 @@ export const materializeFileAttachments = async (args: {
         kind: isImage ? "image" : "file",
       });
     } catch (error) {
-      // Fail explicitly rather than silently claiming an inaccessible document
-      // was supplied. Never log a signed download URL.
       throw new Error(`Unable to prepare attachment ${JSON.stringify(name)}: ${error instanceof Error ? error.message : "unknown error"}`);
     }
   }

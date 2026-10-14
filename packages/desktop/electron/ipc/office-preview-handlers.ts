@@ -37,13 +37,9 @@ type OfficePreviewHandlersOptions = {
   getStellaDataDir: () => string | null;
   localChatHistoryService?: LocalChatHistoryService;
   getAuthToken?: () => Promise<string | null>;
-  /** Files Stella produced or displayed in a conversation, per its cloud journal. */
   cloudFileGrants?: CloudConversationFileGrants;
-  /** On pi-durable: the local files Stella linked in a conversation's transcript. */
   piLinkedFiles?: (conversationId: string) => Promise<readonly string[]>;
-  /** Says which device has a file that is not on this computer. */
   deviceFiles?: DeviceFileSourceDeps;
-  /** Reads a document another of the owner's computers has, live. */
   peerDeviceFiles?: PeerDeviceFiles;
   getActiveConversationId?: () => string | null;
   assertPrivilegedSender: (
@@ -59,16 +55,11 @@ type MobileOfficePreviewPolicy = {
 
 const PREVIEW_ROOT_DIRNAME = "office-previews";
 const MAX_PEER_OFFICE_BYTES = 64 * 1024 * 1024;
-/** How long a phone's preview request waits for the render to finish. */
 const REMOTE_PREVIEW_TIMEOUT_MS = 40_000;
 const REMOTE_PREVIEW_POLL_MS = 500;
 const SESSION_MANIFEST_NAME = "session.json";
 const SESSION_HTML_NAME = "preview.html";
 
-/**
- * The OfficeCLI binary ships in the source tree every install runs from; there
- * is no packaged `resourcesPath` copy to prefer.
- */
 export const resolveOfficePreviewBinaryPath = (
   stellaAppDir: string,
   binaryName: string,
@@ -222,10 +213,6 @@ const isMobileOfficePreviewPathAllowed = (
 export const registerOfficePreviewHandlers = (
   options: OfficePreviewHandlersOptions,
 ) => {
-  /**
-   * The remote (paired phone) policy: previews are limited to files Stella
-   * displayed or produced in the named conversation.
-   */
   const requireRemoteConversationFileEvents = async (
     payload: { conversationId?: unknown } | undefined,
     channel: string,
@@ -248,8 +235,6 @@ export const registerOfficePreviewHandlers = (
           )
         : [],
     );
-    // The conversation's cloud journal is the source of truth for what Stella
-    // produced or displayed there, whichever conversation this window shows.
     if (options.cloudFileGrants) {
       for (const filePath of await resolveCanonicalConversationFilePaths(
         await options.cloudFileGrants.listPaths(conversationId),
@@ -300,8 +285,6 @@ export const registerOfficePreviewHandlers = (
       );
     }
 
-    // A document on another of the owner's computers is copied from it into
-    // this preview's session and rendered from there.
     let fetched: Uint8Array | null = null;
     const stats = await fs.stat(sourcePath).catch(async (caught: unknown) => {
       if ((caught as NodeJS.ErrnoException | null)?.code !== "ENOENT")
@@ -416,11 +399,6 @@ export const registerOfficePreviewHandlers = (
   );
 
   return {
-    /**
-     * A paired phone's `officePreview.render`, relayed through the cloud:
-     * start a preview of `filePath` (or follow an existing `sessionId`) under
-     * the remote policy and resolve with its HTML once it is ready.
-     */
     renderForRequest: async (payload: {
       filePath?: unknown;
       sessionId?: unknown;

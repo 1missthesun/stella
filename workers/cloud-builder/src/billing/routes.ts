@@ -1,9 +1,3 @@
-/**
- * Billing's HTTP surface on the Worker.
- *
- *   POST /api/stripe/webhook           Stripe, verified by the endpoint secret
- */
-
 import { StripeError, stripeRequest, verifyStripeWebhook, type StripeEvent } from "./stripe.js";
 import { ownerGateStub } from "../rpc-release.js";
 
@@ -20,10 +14,6 @@ const metadataOwner = (value: unknown): string | null => {
   return typeof owner === "string" && owner.trim() ? owner.trim() : null;
 };
 
-/**
- * The owner a Stripe event belongs to. Checkout, subscriptions and customers
- * carry `metadata.ownerId`; anything else is traced through its customer.
- */
 const ownerForEvent = async (env: Cloudflare.Env, event: StripeEvent): Promise<string | null> => {
   const object = event.data.object;
   const direct =
@@ -68,7 +58,6 @@ const stripeWebhook = async (request: Request, env: Cloudflare.Env): Promise<Res
   return json({ received: true });
 };
 
-/** Billing routes, or null when the request is not one. */
 export const handleBillingRoute = async (
   request: Request,
   env: Cloudflare.Env,

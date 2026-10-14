@@ -70,8 +70,6 @@ import { useCloudConversationSession } from "@/global/auth/hooks/use-cloud-conve
 import { useT } from "@/shared/i18n";
 import "./chat-sidebar.css";
 
-// Legend List sums numeric paddings into its content length; passing
-// strings (`"10px"`) breaks the math. Keep these as numbers.
 const SIDEBAR_CONTENT_STYLE = {
   paddingLeft: 10,
   paddingRight: 10,
@@ -79,7 +77,6 @@ const SIDEBAR_CONTENT_STYLE = {
   paddingBottom: 12,
 } as const;
 
-/** Centered column when the display panel owns the full content area. */
 const WIDE_PANEL_CONTENT_STYLE = {
   maxWidth: "min(50rem, 100%)",
   marginLeft: "auto",
@@ -91,9 +88,7 @@ const WIDE_PANEL_CONTENT_STYLE = {
 } as const;
 
 interface ChatSidebarOpenOptions {
-  /** When provided, attaches/replaces the current chat context before opening. */
   chatContext?: ChatContext | null;
-  /** When provided, sets the composer text (replaces existing input). */
   prefillText?: string;
 }
 
@@ -106,7 +101,6 @@ interface ChatPanelTabProps {
   messages: MessageRecord[];
   conversationId?: string | null;
   isStreaming: boolean;
-  /** The run's final assistant message landed (no tool followed it). */
   answerLanded?: boolean;
   runtimeStatusText?: string | null;
   isCompacting?: boolean;
@@ -115,7 +109,6 @@ interface ChatPanelTabProps {
   isToolActive?: boolean;
   pendingUserMessageId: string | null;
   queuedUserMessages?: QueuedUserMessage[];
-  /** Removes a still-queued follow-up from the shared send queue by id. */
   removeQueuedUserMessage?: (messageId: string) => void;
   hasOlderMessages: boolean;
   hasNewerMessages: boolean;
@@ -133,16 +126,9 @@ interface ChatPanelTabProps {
     onOptimisticStart?: () => void,
   ) => boolean | Promise<boolean>;
   onStop?: () => void;
-  /** When the display sidebar is expanded to full width. */
   wideLayout?: boolean;
 }
 
-/**
- * Keep every independent composer field inside the authenticated account
- * boundary. The wrapper remains mounted while the keyed surface is replaced,
- * so an owner change cannot paint (or later replay) the previous owner's
- * draft text, captured context, or selected text.
- */
 export function ChatPanelTab(props: ChatPanelTabProps) {
   const { accountScope } = useCloudConversationSession();
   const previousAccountScopeRef = useRef(accountScope);
@@ -194,15 +180,6 @@ function AccountScopedChatPanelTab({
   onSend,
   onStop,
 }: ChatPanelTabProps) {
-  // Input state + always-current mirror ref, synced at WRITE time. The
-  // dictate-and-submit commit is rAF-deferred and can fire before React
-  // flushes the render carrying the appended transcript — a ref synced in the
-  // render body would still hold the pre-transcript text at that point, so
-  // `sendCurrentMessage` would see `canSubmit === false` and silently no-op,
-  // leaving the transcript in the composer. See use-composer-message-state.
-  //
-  // Store-backed: only `SidebarComposerForm` subscribes to the text, so a
-  // keystroke re-renders the form and not this whole panel.
   const {
     store: inputTextStore,
     setMessage: setInputText,
@@ -214,12 +191,6 @@ function AccountScopedChatPanelTab({
   useEscapeToStop({ active: showStop, stop: requestStop, inputRef });
   const restoredConversationScrollRef = useRef<string | null>(null);
 
-  // Perf: the auto-context suggestion strip polls native window/AX
-  // enumeration on an interval. Only treat the composer surface as "active"
-  // (and thus pollable) while this window is focused and visible — otherwise
-  // a backgrounded/hidden renderer keeps spawning the macOS
-  // helper + osascript for chips nobody can see. The hook also self-gates on
-  // visibility, but unmounting the poll setup here avoids even arming it.
   const [surfaceActive, setSurfaceActive] = useState(
     () =>
       typeof document === "undefined" ||
@@ -242,12 +213,6 @@ function AccountScopedChatPanelTab({
     chatRuntime?.conversation.tasks ?? [],
   );
 
-  /*
-   * Own scroll-management instance for the sidebar list. Mirrors the
-   * full chat (`useFullShellChat` → `useChatScrollManagement`) so the
-   * sidebar gets the same Legend-List-backed at-bottom tracking and
-   * thumb behavior as the home full chat.
-   */
   const sidebarScroll = useChatScrollManagement({
     hasOlderEvents: hasOlderMessages,
     isLoadingOlder,
@@ -317,11 +282,6 @@ function AccountScopedChatPanelTab({
   );
 
   useReadAloud(messages);
-  // The indicator hands off to the reply once the run's final assistant
-  // message lands; a preamble followed by a tool keeps it up.
-  // Memoized like ChatColumn's: a fresh object every render (each keystroke
-  // in this composer) busted the memoized timeline and rebuilt its list items.
-  // Stable while unchanged so the memoized lead row skips keystrokes.
   const {
     visible: replyPeekVisible,
     previewText: replyPeekText,
@@ -377,9 +337,6 @@ function AccountScopedChatPanelTab({
   const shellRef = useRef<HTMLDivElement | null>(null);
   const shellContentRef = useRef<HTMLDivElement | null>(null);
 
-  // Drag-and-drop file attach stays live at all times, including while the
-  // turn is streaming or agents are busy — dropped files attach to
-  // `chatContext` just as when idle; submit/queue behavior is unchanged.
   const { isDragOver, dropHandlers } = useFileDrop({
     setChatContext,
   });
@@ -409,9 +366,6 @@ function AccountScopedChatPanelTab({
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
-      // Only clear the composer draft when Escape targets the composer itself.
-      // Otherwise Escape used to dismiss unrelated UI (dropdowns, previews,
-      // dialogs) would wipe an in-progress draft.
       if (event.defaultPrevented) return;
       if (
         event.target !== inputRef.current &&
@@ -441,10 +395,6 @@ function AccountScopedChatPanelTab({
       selectedText,
     });
     if (!canSubmit) return;
-    // Follow to the bottom when the user is within the 300px send gate;
-    // deliberate scrollback stays put. Mid-stream, the send lands as the
-    // queued follow-up item at the end of the list, so the same follow
-    // frames it.
     const shouldFollowSend = sidebarScroll.getShouldFollowSend();
     const accepted = await onSend(
       trimmedMessage,
@@ -578,8 +528,6 @@ function AccountScopedChatPanelTab({
   );
 }
 
-// Stable props while typing (dictation callbacks, primitive flags), so a
-// keystroke skips their icon and motion subtrees.
 const MemoComposerMicButton = memo(ComposerMicButton);
 const MemoComposerSubmitButton = memo(ComposerSubmitButton);
 
@@ -600,11 +548,6 @@ type SidebarComposerFormProps = {
   onSend: () => void;
 };
 
-/**
- * The panel composer's form. The only subscriber to the draft text, so a
- * keystroke re-renders this form instead of the whole panel (timeline host,
- * scroll management, cards). Dictation lives here because it tracks the text.
- */
 const SidebarComposerForm = memo(function SidebarComposerForm({
   messageStore,
   setMessage: setInputText,
@@ -627,9 +570,6 @@ const SidebarComposerForm = memo(function SidebarComposerForm({
 
   const dictation = useDictation({
     setMessage: setInputText,
-    // Dictation stays available even while the orchestrator is busy
-    // (mid-turn / streaming) — the mic is intentionally NOT gated on
-    // `isStreaming`. See `submitComposer` for the in-flight submit flow.
     onTranscriptCommitted: () => {
       requestAnimationFrame(() => {
         inputRef.current?.focus();
@@ -640,13 +580,6 @@ const SidebarComposerForm = memo(function SidebarComposerForm({
     },
   });
 
-  // Submitting while a recording/transcription is still in flight must not
-  // race ahead of the dictated text. `commitAndSend` stops + finalizes the
-  // recording, waits for the pending transcript to be appended to the
-  // composer, and only then fires `onCommit` (→ sendCurrentMessage). For the
-  // idle case it sends immediately. Transcription is time-bounded (see the
-  // dictation service's per-segment timeout), so a stalled request fails into
-  // a recoverable error and fires the commit instead of wedging submit.
   const submitComposer = useCallback(() => {
     if (dictation.isRecording || dictation.isTranscribing) {
       dictation.commitAndSend();
@@ -664,10 +597,6 @@ const SidebarComposerForm = memo(function SidebarComposerForm({
     chatContext,
     selectedText,
   });
-  // A dictation in flight makes the composer submittable on its own — the
-  // pending transcript is the content. Without this the submit arrow stays
-  // disabled while the text is empty, so a press during transcription is
-  // swallowed and the message is never sent/queued.
   const dictationInFlight = dictation.isRecording || dictation.isTranscribing;
   const canSubmitWithDictation = composerState.canSubmit || dictationInFlight;
   useDictationPaste({
@@ -675,14 +604,10 @@ const SidebarComposerForm = memo(function SidebarComposerForm({
     setMessage: setInputText,
     setChatContext,
   });
-  // The textarea stays as it is while dictating (the transcript lands there
-  // on stop); only the waveform row below it shows that dictation is on.
   const dictationBelow = dictation.isRecordingVisible;
   const dictationOwnsControls = dictationBelow && dictation.showControls;
   const formExpanded = sidebarExpanded || dictationBelow;
 
-  // Keep the pill shape in sync when `inputText` changes outside of
-  // onChange (e.g. cleared by send, or set by dictation).
   useEffect(() => {
     const raf = requestAnimationFrame(() => {
       updateComposerTextareaExpansion(inputRef.current, setSidebarExpanded);

@@ -7,7 +7,6 @@ import {
 } from "@stella/contracts/turn-plane/pairing-proof";
 import type { StoredPhoneAccess } from "./phone-access";
 
-/** Lowercase hex SHA-256 of a UTF-8 string. */
 export const sha256HexUtf8 = (value: string): string =>
   bytesToHex(sha256(utf8ToBytes(value)));
 
@@ -42,7 +41,6 @@ export const signPhonePairingProof = (
   };
 };
 
-/** The proof's headers, ready to spread into a request. */
 export const phonePairingProofHeaders = (
   access: StoredPhoneAccess,
   challenge: string,

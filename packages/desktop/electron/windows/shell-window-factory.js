@@ -1,8 +1,6 @@
 import fs from 'fs';
 import path from 'path';
 import { loadWindow } from './window-load.js';
-// Explicit opt-in, available in any install: there is no packaging step whose
-// absence could stand in for "a human is debugging this".
 const shouldOpenDevTools = process.env.STELLA_OPEN_DEVTOOLS === '1';
 const loadShellMainWindow = (window, options) => {
     loadWindow(window, { mode: options.mode });
@@ -48,12 +46,6 @@ export const reloadShellMainWindow = (window, options) => {
     }
     loadShellMainWindow(window, options);
 };
-/**
- * Resolves `recovery.html` from the source tree. The esbuild bundle does not
- * copy static assets, and `electronDir` is
- * `packages/desktop/dist-electron/electron`, so the source file is
- * `../../electron/recovery.html`.
- */
 const resolveRecoveryHtmlPath = (electronDir) => {
     const candidates = [
         path.join(electronDir, 'recovery.html'),

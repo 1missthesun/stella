@@ -1,48 +1,22 @@
-/**
- * Reply references: the orchestrator's way of saying what a reply is about.
- *
- * The model ends a reply with a fenced block tagged `refs`, one target per
- * line. Messages are cited by their conversation sequence number (`#142`),
- * agents by their durable thread id (`agent:pricing-research`). The block is
- * stripped from every user-facing copy of the text and resolved against the
- * conversation before it is stored; the model's own thread history keeps the
- * block verbatim so it can see its previous usage.
- *
- *   ```refs
- *   #142
- *   agent:pricing-research
- *   ```
- *
- * The model learns message numbers from a trailing `<system-reminder>` tag on
- * each user turn (`formatMessageRefTag`), the same channel the timestamp tag
- * already uses.
- */
 import { SYSTEM_REMINDER_TAG } from "@stella/contracts/system-reminders";
 
 export const REPLY_REFS_FENCE_TAG = "refs";
 
-/** A citation as the model wrote it, before validation. */
 export type RawReplyRef =
   | { kind: "message"; sequence: number }
   | { kind: "agent"; threadId: string };
 
-/** A citation that resolved against the conversation. */
 export type ReplyRef =
   | {
       kind: "message";
-      /** Conversation sequence number the model cited. */
       sequence: number;
-      /** Durable entry id of the cited message. */
       id: string;
-      /** Role of the cited message; drives the preview bubble style. */
       role: "user" | "assistant";
-      /** Bounded plain-text excerpt of the cited message. */
       preview: string;
     }
   | {
       kind: "agent";
       threadId: string;
-      /** Task description at the time the reply was stored. */
       title: string;
     };
 
@@ -119,11 +93,6 @@ const parseRefLine = (line: string): RawReplyRef | null => {
   return null;
 };
 
-/**
- * Split a reply into its user-facing text and the citations it carried.
- * Only a trailing fence counts; a `refs` block quoted mid-message stays as
- * text. A malformed block is still removed so it never reaches the user.
- */
 export const splitReplyRefs = (
   text: string,
 ): { text: string; refs: RawReplyRef[]; reactions: ReplyReaction[] } => {
@@ -177,12 +146,6 @@ const contentTexts = (content: unknown): string[] => {
   return texts;
 };
 
-/**
- * `splitReplyRefs` for a whole assistant message. A message can carry more
- * than one reply (a provider that keeps one message open while new input
- * arrives mid-turn), each in its own text block and each ending in its own
- * `refs` fence, so every text block is split on its own.
- */
 export const splitMessageReplyRefs = (
   message: { content?: unknown } | undefined,
 ): { text: string; refs: RawReplyRef[]; reactions: ReplyReaction[] } => {
@@ -213,7 +176,6 @@ export const splitMessageReplyRefs = (
   };
 };
 
-/** Trailing tag that tells the model a user message's sequence number. */
 export const formatMessageRefTag = (sequence: number): string =>
   `<${SYSTEM_REMINDER_TAG}>message #${sequence}</${SYSTEM_REMINDER_TAG}>`;
 
@@ -222,33 +184,26 @@ export const MESSAGE_REF_TAG_RE = new RegExp(
   "gi",
 );
 
-/** Append the sequence tag to a user prompt that will reach the model. */
 export const appendMessageRefTag = (text: string, sequence: number): string => {
   const body = text.replace(/\s+$/, "");
   if (!body) return text;
   return `${body}\n\n${formatMessageRefTag(sequence)}`;
 };
 
-/** Remove the sequence tag from any user-facing copy of a user message. */
 export const stripMessageRefTag = (text: string): string =>
   text.replace(MESSAGE_REF_TAG_RE, "");
 
-/** Root of a focus (lineage) view: one message or one agent thread. */
 export type ConversationFocusRoot =
   | { kind: "message"; id: string }
   | { kind: "agent"; threadId: string };
 
-/** Reply counts per referenced target, for the "N replies" affordance. */
 export type ReplyCounts = {
-  /** Keyed by the cited message's entry id. */
   messages: Record<string, number>;
-  /** Keyed by agent thread id. */
   agents: Record<string, number>;
 };
 
 const PREVIEW_MAX_CHARS = 160;
 
-/** Collapse a message body to a one-line excerpt for a reply preview. */
 export const toReplyPreview = (text: string): string => {
   const compact = text
     .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/gi, " ")

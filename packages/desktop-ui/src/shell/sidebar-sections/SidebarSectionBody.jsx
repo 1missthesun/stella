@@ -1,16 +1,3 @@
-/**
- * Renders the panel body for the open sidebar tabs (browser-tab model).
- *
- * Files and Home are genuinely per-item: each open tab of those kinds gets its
- * OWN mounted instance (its file viewer, its launcher), so multiple can coexist
- * and keep their state. Every instance stays mounted and only the active one is
- * visible — that is load-bearing, not an optimization: a Files tab hosts canvas
- * iframes whose browsing context is destroyed by an unmount.
- *
- * Apps and Browser are shared singletons — a running app process and the single
- * embedded browser webview can't be duplicated per tab — so one instance of
- * each renders the ACTIVE apps/browser tab's item. (See report notes.)
- */
 import {
   useActiveSidebarSection,
   useSidebarActiveTabId,
@@ -63,7 +50,7 @@ export function SidebarSectionBody() {
       <FileSidebarTabExistenceReconciler />
       {tabs.map((tab) => {
         const Body = PER_ITEM_BODIES[tab.kind];
-        if (!Body) return null; // apps / browser / updates / email / schedule handled by shared instances
+        if (!Body) return null;
         return (
           <SectionHost
             key={tab.id}

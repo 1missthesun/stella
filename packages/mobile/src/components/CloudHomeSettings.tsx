@@ -23,10 +23,6 @@ type CloudHomeSettingsProps = {
   onSignIn: () => void;
 };
 
-/**
- * Cloud Home's own page. The app shell draws the back arrow for every pushed
- * page, so this draws only the title.
- */
 export function CloudHomeSettings({
   identity,
   onSignIn,

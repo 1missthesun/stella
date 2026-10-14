@@ -44,9 +44,7 @@ const delay = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
 export type ReadImageFileSettledOptions = {
-  /** Maximum number of read attempts (>= 1). Defaults to 6. */
   maxAttempts?: number;
-  /** Injectable sleep, for tests. Defaults to a real timer. */
   sleep?: (ms: number) => Promise<void>;
 };
 

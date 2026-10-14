@@ -1,21 +1,11 @@
-/**
- * Reminders: text Stella wrote when the reminder was set, delivered at fire
- * time with no model and no turn. A fire is three things at once: a push to
- * the phone, an in-app notice on the desktop, and a `reminder` card in the
- * conversation's journal, which every client shows as Stella's message with
- * Done and Snooze, and every host reads as Stella's own line.
- */
-
 export const REMINDER_CARD_TYPE = "reminder";
 export const REMINDER_PUSH_KIND = "reminder";
 export const REMINDER_PUSH_CATEGORY = "reminder";
 export const REMINDER_ACTION_DONE = "reminder.done";
 export const REMINDER_ACTION_SNOOZE = "reminder.snooze";
 
-/** What a push's Snooze and the default in-app Snooze wait. */
 export const REMINDER_DEFAULT_SNOOZE_MINUTES = 10;
 export const REMINDER_MAX_SNOOZE_MINUTES = 7 * 24 * 60;
-/** A delivery this much later than it was due says when it was due. */
 export const REMINDER_LATE_MS = 10 * 60_000;
 
 export type ReminderCard = {
@@ -23,7 +13,6 @@ export type ReminderCard = {
   fireId: string;
   scheduleId: string;
   text: string;
-  /** Set when it went out late (the cloud or the account was away): when it was due. */
   dueAt?: number;
 };
 
@@ -31,17 +20,14 @@ export type ReminderMark = { fireId: string; scheduleId: string; dueAt?: number 
 
 export type ReminderFireState = "open" | "done" | "snoozed";
 
-/** One delivery of a reminder, as `schedules.reminders` lists it. */
 export type ReminderFire = {
   fireId: string;
   scheduleId: string;
   conversationId?: string;
   text: string;
   firedAt: number;
-  /** Set when it went out late: when it was due. */
   dueAt?: number;
   state: ReminderFireState;
-  /** Set while snoozed: when it comes back. */
   snoozedUntil?: number;
   updatedAt: number;
 };
@@ -77,18 +63,12 @@ export const parseReminderMark = (value: unknown): ReminderMark | null => {
   return fireId && scheduleId ? { fireId, scheduleId, ...(dueAt !== undefined ? { dueAt } : {}) } : null;
 };
 
-/** The mark a reminder card gives its line. */
 export const reminderMarkOf = (card: ReminderCard): ReminderMark => ({
   fireId: card.fireId,
   scheduleId: card.scheduleId,
   ...(card.dueAt !== undefined ? { dueAt: card.dueAt } : {}),
 });
 
-/**
- * The reminder as a line Stella said: what a host's transcript imports, so
- * the model knows it was delivered, and what a timeline renders, with the
- * `reminder` mark that brings Done and Snooze.
- */
 export const reminderAssistantMessage = (card: ReminderCard, createdAtMs: number) => ({
   role: "assistant" as const,
   content: [{ type: "text" as const, text: card.text }],
@@ -124,7 +104,6 @@ export const parseReminderPushData = (value: unknown): ReminderPushData | null =
   };
 };
 
-/** The next 9:00 local after `now`, for "Tomorrow morning". */
 export const tomorrowMorningMinutes = (now: Date): number => {
   const next = new Date(now);
   next.setDate(next.getDate() + 1);

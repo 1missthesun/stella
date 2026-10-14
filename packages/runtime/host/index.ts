@@ -137,7 +137,6 @@ export type StellaRuntimeHostOptions = {
   workerMode?: "child" | "inproc";
   workerEntryPath?: string;
   disableLocalScheduler?: boolean;
-  /** Required for `workerMode: "inproc"`. */
   inprocWorker?: {
     attach: InprocWorkerAttach;
     restartProcess: (reason: string) => void;
@@ -160,9 +159,7 @@ type WorkerRequestOptions = {
   rpc?: Parameters<JsonRpcPeer["request"]>[2];
 };
 type PlacedChatPayload = RuntimeChatPayload & {
-  /** The orchestrator moved this chat here; the prompt is its brief. */
   handoff?: boolean;
-  /** A second placement of one send (the first one ended unanswered): its own dispatch key. */
   idempotencyKey?: string;
 };
 type PlacedChatTarget =
@@ -176,15 +173,6 @@ type PlacedDispatch = {
   userMessageId: string;
   subscription: DispatchWatchHandle | null;
 };
-/*
- * Host-side Effect boundary: the staleness/build-stamp handshake, the
- * quiescence poll, and every host timer (reload debounce and ack/flush
- * debounces) run on the shared `hostRuntime`
- * (host/effect-runtime.ts) as fibers cancelled through HostTimerHandle.
- * The StellaRuntimeHost API below stays plain Promise/data — no Effect type
- * escapes this file (check-boundary.mjs enforces the package fence, this
- * comment enforces the signature fence).
- */
 const requireRuntime = createRequire(import.meta.url);
 const loadSqliteDatabaseCtorSync = (): new (path: string) => SqliteDatabase => {
   if (process.versions.bun) {
@@ -212,18 +200,9 @@ const parseDisplayUpdateParams = (params: unknown) => {
   }
   throw new Error("Invalid host display update payload.");
 };
-/**
- * "Busy" for the purposes of stale-worker restarts: a pi turn or agent in
- * flight, which a worker kill would visibly interrupt. A `null` health
- * snapshot means the worker is unreachable, so there is nothing to preserve.
- */
 export const isWorkerBusyForRestart = (
   health: WorkerHealthSnapshot | null | undefined,
 ) => health != null && health.piBusy === true;
-/**
- * The host's event bus, plus a tap on every event so the runtime can forward
- * them to its clients without keeping a list of names.
- */
 class HostEvents extends EventEmitter {
   anyListeners = new Set<(eventName: string, payload: unknown) => void>();
   emit(eventName: string, ...args: unknown[]) {
@@ -237,11 +216,6 @@ class HostEvents extends EventEmitter {
     return super.emit(eventName, ...args);
   }
 }
-/**
- * A placement that failed because where it went is out of reach (no network,
- * placement not ready here, the cloud failing), not one the owner gate
- * refused for the request itself.
- */
 const placementUnavailable = (error: unknown) =>
   !(error instanceof PlacementRouteError) || error.retryable;
 export class StellaRuntimeHost {
@@ -255,25 +229,10 @@ export class StellaRuntimeHost {
   cloudScheduleUnsubscribe: (() => void) | null = null;
   cloudSchedules: CloudSchedules | null = null;
   deferredRuntimeReload = false;
-  // Coalescing for the requested-reload path only: while a
-  // scheduled reload's restart is queued or running, further reload requests
-  // collapse into a single trailing re-run instead of stacking one full restart
-  // per request. This does NOT guard direct restartWorker() callers (e.g.
-  // the runtime.restartWorker IPC action) — those run their own full restart;
-  // the controller's stop/start promises keep concurrent calls safe.
   restartInProgress = false;
   restartRequestedDuringRestart = false;
-  /**
-   * Set when the connected worker is known to be running stale runtime code
-   * (build-stamp mismatch detected on reattach) but the restart was deferred because work is in
-   * flight. Mirrored to `pendingWorkerRestartFile` on disk so the flag
-   * survives an Electron restart; cleared whenever a freshly spawned worker
-   * connects (fresh worker == current code).
-   */
   pendingStaleWorkerRestart: PendingWorkerRestartRecord | null = null;
   staleWorkerQuiescencePollFiber: Fiber.Fiber<void, never> | null = null;
-  // Serializes the single gated flush (`flushWorkerRestart`) so concurrent
-  // triggers/hooks don't stack overlapping health probes or restarts.
   workerRestartCheckInFlight = false;
   reloadQueue: Promise<void> = Promise.resolve();
   configCache: RuntimeConfigureParams = {};
@@ -288,26 +247,18 @@ export class StellaRuntimeHost {
   hostBackendClientUrl: string | null = null;
   hostAuthTokenForcePromise: Promise<string> | null = null;
   deviceSuccessionClaimPromise: Promise<void> | null = null;
-  /** Backend URL and token the signed-in host services last synchronized for. */
   hostAccountServicesKey: string | null = null;
   hostExecutionPlacementBridge: ExecutionPlacementBridge | null = null;
   hostExecutionPlacementSyncQueue: Promise<void> = Promise.resolve();
   hostExecutionPlacementRetryTimer: HostTimerHandle | null = null;
   hostExecutionPlacementRetryAttempt = 0;
   placedDispatchByRunId = new Map<string, PlacedDispatch>();
-  /** What each conversation runs elsewhere, for Stop (`ConversationPlacements`). */
   placements = new ConversationPlacements();
-  /** Whether Claude Code is signed in on this computer, as last read, for what this computer advertises. */
   claudeCodeLogin: { signedIn: boolean; at: number; pending?: Promise<void> } = { signedIn: false, at: 0 };
   pendingDestinationHandoffs = new Map<string, { canceled: boolean }>();
-  /** The desktop database the execution placement bridge keeps its proofs in. */
   hostDatabase: SqliteDatabase | null = null;
   constructor(options: StellaRuntimeHostOptions) {
     this.options = options;
-    // "inproc": the worker shares this process. That is the runtime
-    // process, where the host runs for the desktop, and restarting the
-    // worker restarts the process. "child" (default): a private stdio
-    // worker owned by this host, for headless and test hosts.
     this.workerMode = this.options.workerMode === "inproc" ? "inproc" : "child";
     const onWorkerRpcError = (error: unknown) => {
       console.error("[runtime-host] worker RPC error:", error);
@@ -326,14 +277,9 @@ export class StellaRuntimeHost {
     this.workerController = new RuntimeWorkerLifecycleController({
       workerEntryPath: resolveDefaultWorkerEntryPath(this.options),
       isHostStarted: () => this.started,
-      // A child worker is owned by this host, so every stop kills it. An
-      // in-process worker only detaches; nothing outlives the process.
       killWorkerOnStop: this.workerMode === "inproc" ? () => false : () => true,
       createConnectionAsync,
       initializeConnection: async (connection) => {
-        // Fence every worker frame to this connection: once it is no
-        // longer the controller's live one (stopped, replaced, exited),
-        // its late notifications and callbacks are dropped, not applied.
         const fencedPeer = this.fenceWorkerPeer(connection.peer);
         this.registerHostHandlers(fencedPeer);
         this.registerNotifications(fencedPeer);
@@ -387,9 +333,6 @@ export class StellaRuntimeHost {
         }
       },
       onAfterStop: async (reason) => {
-        // "idle" closes the IPC channel but leaves the worker alive for the
-        // next host to reattach — routine churn, not a real stop. Only log
-        // when the worker process is actually being torn down.
         if (reason !== "idle") {
           getFileLogger()?.process("host.worker-stopped", { reason });
         }
@@ -414,33 +357,11 @@ export class StellaRuntimeHost {
       },
     });
   }
-  /*
-   * In the runtime process, the host and its services (the scheduler and
-   * execution placement) run beside the worker and keep running while the app restarts. Only the
-   * callbacks that need the app wait for it to reattach.
-   */
-  /**
-   * The app applied an update that changed runtime code: restart the
-   * runtime as soon as it is idle (between turns).
-   */
   async requestRuntimeRestart() {
     this.deferredRuntimeReload = true;
     void this.flushWorkerRestart();
     return { ok: true };
   }
-  /*
-   * ---- Stale-worker detection + idle/deferred restart -------------------
-   *
-   * The runtime process survives app restarts by design, so without this
-   * machinery runtime code changes would never reach it.
-   *
-   * When an app attaches we compare the process's boot-time build stamp with
-   * the on-disk runtime tree. Stale + idle => restart now. Stale + busy =>
-   * mark "restart pending" (persisted, survives further app restarts) and
-   * restart the moment the runtime goes quiescent, checked on every
-   * RUN_FINISHED plus a slow safety poll. Deferral means in-flight work is
-   * never killed.
-   */
   getRuntimeControlPaths() {
     return resolveRuntimePaths(this.options.initializeParams.stellaAppDir);
   }
@@ -498,27 +419,12 @@ export class StellaRuntimeHost {
     this.staleWorkerQuiescencePollFiber = null;
     hostRuntime.runFork(Fiber.interrupt(fiber));
   }
-  /**
-   * Reconnect handshake: decide whether the worker we just connected to is
-   * running stale runtime code. Runs from `onConnectionStarted` after the
-   * health snapshot is cached.
-   */
   async evaluateWorkerStalenessOnConnect(_connection: WorkerConnection) {
     if (this.workerMode === "child") {
-      // A stdio child always runs the current on-disk code, and the
-      // on-disk pending-restart bookkeeping belongs to the desktop's
-      // runtime process; an ephemeral headless host leaves it alone.
       return;
     }
-    // This process just started its worker, so it runs the code on disk:
-    // a restart deferred by the previous runtime process is satisfied.
     await this.clearPendingWorkerRestart();
   }
-  /**
-   * In-process mode: a client just attached, possibly an app updated since
-   * this runtime started. Compare the code this process loaded with the
-   * tree on disk and schedule a restart for when the runtime is idle.
-   */
   async checkRuntimeStaleness() {
     if (this.workerMode !== "inproc" || !this.started) return;
     const verdict = await hostRuntime.runPromise(
@@ -540,33 +446,12 @@ export class StellaRuntimeHost {
     });
     await this.markPendingWorkerRestart(verdict.reason);
   }
-  /**
-   * Unified gate for restarting the runtime worker. A restart may only proceed
-   * when the worker is not busy (an agent run / voice request is in flight).
-   * Both restart triggers (a requested restart, stale-worker detection)
-   * and every unblock hook route through this, so a requested restart honors
-   * the worker-busy deferral exactly like the stale-worker path.
-   */
   canRestartWorkerNow(health = this.workerHealthCache) {
     return !isWorkerBusyForRestart(health);
   }
-  /**
-   * Whether some trigger wants the worker restarted: a requested runtime
-   * restart (`deferredRuntimeReload`) or a persisted stale-worker restart
-   * (`pendingStaleWorkerRestart`).
-   */
   hasPendingWorkerRestartIntent() {
     return this.deferredRuntimeReload || this.pendingStaleWorkerRestart != null;
   }
-  /**
-   * The single flush path for BOTH restart triggers and every unblock hook
-   * (worker idle / RUN_FINISHED, quiescence poll). Re-evaluates
-   * {@link canRestartWorkerNow} against fresh
-   * worker health and restarts once every blocker has cleared. A single
-   * restart satisfies both intents: `restartWorker()` clears the
-   * deferred-reload flag and a freshly spawned worker clears the pending flag
-   * on reconnect.
-   */
   async flushWorkerRestart() {
     if (!this.started || !this.hasPendingWorkerRestartIntent()) return;
     if (this.workerRestartCheckInFlight) return;
@@ -586,12 +471,6 @@ export class StellaRuntimeHost {
       this.workerRestartCheckInFlight = false;
     }
   }
-  /**
-   * Perform the gated restart through the shared reload queue / in-progress
-   * coalescing. Re-checks {@link canRestartWorkerNow} against fresh health
-   * immediately before the kill so a run that started while queued is never
-   * cut down — the pending intent stays set and a later flush retries.
-   */
   executeWorkerRestart() {
     if (this.restartInProgress) {
       this.restartRequestedDuringRestart = true;
@@ -620,8 +499,6 @@ export class StellaRuntimeHost {
           try {
             await this.restartWorker(reason);
           } catch (error) {
-            // A failed restart did not satisfy the request. Preserve it
-            // for the next explicit readiness/recovery attempt.
             if (consumedDeferredRuntimeReload) {
               this.deferredRuntimeReload = true;
             }
@@ -665,12 +542,6 @@ export class StellaRuntimeHost {
     this.hostBackendClient = null;
     this.hostBackendClientUrl = null;
   }
-  /**
-   * Mint a token newer than the configured one, for a forced refresh. The
-   * host only caches what the desktop pushed, so answering a forced call
-   * from that cache would re-present the token the backend already rejected
-   * or is asking to replace. Single-flight; throws rather than falling back.
-   */
   async forceHostAuthToken(): Promise<string> {
     if (this.hostAuthTokenForcePromise) {
       return await this.hostAuthTokenForcePromise;
@@ -707,7 +578,6 @@ export class StellaRuntimeHost {
       }
     }
   }
-  /** The backend worker client for owner-object calls; the token is read per request. */
   ensureHostBackendClient() {
     const baseUrl = this.getConfiguredHostBackendUrl();
     if (!baseUrl) {
@@ -728,7 +598,6 @@ export class StellaRuntimeHost {
     this.hostBackendClientUrl = baseUrl;
     return this.hostBackendClient;
   }
-  /** Follows the owner's schedules on the current client (and sign-in). */
   resubscribeCloudSchedules() {
     this.cloudScheduleUnsubscribe?.();
     this.cloudScheduleUnsubscribe = null;
@@ -785,8 +654,6 @@ export class StellaRuntimeHost {
         deviceId,
       });
     } catch (error) {
-      // A CONFLICT means the retired id was already succeeded elsewhere;
-      // there is nothing left to claim, so stop retrying it.
       const code = error instanceof BackendRequestError ? error.code : null;
       if (code !== "CONFLICT" && code !== "BAD_REQUEST") {
         console.warn(
@@ -813,11 +680,6 @@ export class StellaRuntimeHost {
     );
     return await operation;
   }
-  /**
-   * A bridge that could not start (no network at launch or on wake) is tried
-   * again with backoff, so the computer never stays offline to the cloud
-   * until the app restarts.
-   */
   scheduleHostExecutionPlacementRetry() {
     if (this.hostExecutionPlacementRetryTimer) return;
     const attempt = this.hostExecutionPlacementRetryAttempt++;
@@ -865,9 +727,6 @@ export class StellaRuntimeHost {
       try {
         await previous.stop();
       } catch (error) {
-        // Keep the stopped bridge as the only retry owner. A later sync
-        // must finish its durable cancellation/drain barrier before it
-        // can establish a replacement proof sequence.
         this.hostExecutionPlacementBridge = previous;
         throw error;
       }
@@ -879,13 +738,8 @@ export class StellaRuntimeHost {
     const bridge = createExecutionPlacementBridge({
       client,
       database: this.hostDatabase,
-      // Eligibility above requires the device identity.
       deviceIdentity: this.deviceIdentity!,
-      // The Ed25519 device key never enters the host. Electron main (or
-      // the headless host) signs the presence nonce through the same
-      // delegate the worker's DPoP path uses.
       signPresenceProof: async (message) => {
-        // Eligibility above requires a signer.
         const signed =
           await this.options.hostHandlers.signDeviceInput!(message);
         if (
@@ -902,9 +756,6 @@ export class StellaRuntimeHost {
       platform: process.platform,
       getAuthToken: () => this.getConfiguredHostAuthToken(),
       onRemoteExecutionRequest: (request) => {
-        // Raise it on this machine's screen and return. The dispatch
-        // that asked has already been refused with a retryable code;
-        // nothing is blocked on the user answering.
         void Promise.resolve(
           this.options.hostHandlers.notifyRemoteExecutionRequest?.(request),
         ).catch((error) =>
@@ -994,7 +845,6 @@ export class StellaRuntimeHost {
       runExecution: async ({ dispatch, payload, ownerGeneration }) => {
         const prompt =
           typeof payload.prompt === "string" ? payload.prompt.trim() : "";
-        // A chat can be only what the user pasted or attached.
         const contextOnly =
           dispatch.kind === "chat" &&
           (Boolean(
@@ -1010,9 +860,6 @@ export class StellaRuntimeHost {
             error: "The accepted execution payload did not contain a prompt.",
           };
         }
-        // The cloud journal echoes this id as the turn's clientMsgId, and
-        // mobile binds its optimistic bubble to the dispatch id, so the
-        // two must be the same string or the phone shows the user row twice.
         const userMessageEventId =
           typeof payload.userMessageEventId === "string" &&
           payload.userMessageEventId.trim()
@@ -1028,8 +875,6 @@ export class StellaRuntimeHost {
             ),
         });
         if (dispatch.kind === "agent") {
-          // An agent placed here is someone else's background work:
-          // its brief is not a message the user typed in this chat.
           const description =
             typeof payload.description === "string" &&
             payload.description.trim()
@@ -1069,10 +914,6 @@ export class StellaRuntimeHost {
                 : {
                     threadId: placementLocalAgentThreadId(dispatch.dispatchId),
                   }),
-              // Resolved above for both dispatch kinds. The chat
-              // branch has always used them; discarding them here is
-              // what left a placed agent searching the local
-              // filesystem for a drive path it could not resolve.
               ...(attachments.length > 0 ? { attachments } : {}),
             },
             {
@@ -1098,7 +939,6 @@ export class StellaRuntimeHost {
           };
         }
         const handoff = payload.handoff === true;
-        // A schedule's prompt is runtime input, not a message the user typed.
         const scheduled = dispatch.ingress === "schedule";
         const scheduledAgent =
           scheduled &&
@@ -1108,8 +948,6 @@ export class StellaRuntimeHost {
             ? (payload.scheduledAgent as { description: string })
             : null;
         if (scheduledAgent) {
-          // Straight to an agent of this conversation's orchestrator: no
-          // orchestrator turn now; its report wakes the orchestrator later.
           await this.createBackgroundAgent({
             conversationId: dispatch.conversationId,
             threadId: dispatch.dispatchId,
@@ -1119,26 +957,15 @@ export class StellaRuntimeHost {
           return { status: "ok", finalText: "" };
         }
         const userAuthored = !handoff && !scheduled;
-        // A placed chat's conversation is stored in the cloud: its journal
-        // is its one record, which the turn below writes. A copy in this
-        // computer's chat log would show beside it.
         const result = await this.requestWorker<RuntimeAutomationTurnResult>(
           METHOD_NAMES.INTERNAL_WORKER_RUN_AUTOMATION,
           {
             conversationId: dispatch.conversationId,
             userPrompt: prompt,
             userMessageEventId,
-            // A placed chat dispatch is a message the user typed on
-            // another device, not automation this computer invented.
-            // The run stays hidden (the sending client owns its own
-            // presentation), but the journal's user row must be
-            // visible or no other client can ever render the message.
             userAuthoredPrompt: userAuthored,
             ...(scheduled ? { scheduled: true } : {}),
             ...(handoff ? { handoff: true } : {}),
-            // A desktop/voice turn may be in flight when the phone
-            // sends. The runtime queues this exact accepted execution;
-            // background agents must not make the computer offline.
             rejectIfBusy: false,
             executionPlacementRunId: placementLocalChatRunId(
               dispatch.dispatchId,
@@ -1293,11 +1120,6 @@ export class StellaRuntimeHost {
       this.scheduleHostExecutionPlacementRetry();
     }
   }
-  /**
-   * Services that follow the signed-in account: the device-identity
-   * succession claim (retried on every sync until acknowledged) and the
-   * cloud schedule feed, re-followed whenever the backend or token changes.
-   */
   syncHostAccountServices() {
     const authToken = this.getConfiguredHostAuthToken();
     const backendUrl = this.getConfiguredHostBackendUrl();
@@ -1320,7 +1142,6 @@ export class StellaRuntimeHost {
       this.events.removeListener(eventName, listener);
     };
   }
-  /** Every event, as `(eventName, payload)`. */
   onAny(listener: (eventName: string, payload: unknown) => void) {
     this.events.anyListeners.add(listener);
     return () => {
@@ -1344,8 +1165,6 @@ export class StellaRuntimeHost {
     this.deferredRuntimeReload = false;
     this.restartInProgress = false;
     this.restartRequestedDuringRestart = false;
-    // The on-disk pending-restart flag intentionally survives host stop so
-    // the next host's reconnect handshake picks the deferral back up.
     this.pendingStaleWorkerRestart = null;
     this.stopStaleWorkerQuiescencePoll();
     await this.workerController.stop(
@@ -1376,8 +1195,6 @@ export class StellaRuntimeHost {
     const startedAt = Date.now();
     this.events.emit("runtime-reloading", { reason: "worker-restart" });
     if (this.workerMode === "inproc") {
-      // The worker is this process. It exits once this returns, and the
-      // attached client starts a fresh one.
       getFileLogger()?.process("host.runtime-restart", { reason });
       this.options.inprocWorker!.restartProcess(reason);
       return { ok: true };
@@ -1386,9 +1203,6 @@ export class StellaRuntimeHost {
     const stoppedAt = Date.now();
     await this.workerController.ensureStarted();
     const readyAt = Date.now();
-    // Restart-latency breakdown: stopMs (drain + kill grace) vs startMs (spawn
-    // + cold parse + initialization exchange). Pairs with the worker-side
-    // `worker.kill-latency` and `startup.post-ready-complete` lines.
     getFileLogger()?.process("host.worker-restart-latency", {
       stopMs: stoppedAt - startedAt,
       startMs: readyAt - stoppedAt,
@@ -1397,12 +1211,6 @@ export class StellaRuntimeHost {
     });
     return { ok: true };
   }
-  /**
-   * Proactively spawn the worker process without forcing a model-catalog
-   * fetch. The worker self-warms its catalog on init/configure (debounced),
-   * so this is just the process spin-up — kept off the open burst by the
-   * caller (deferred-startup) so it doesn't contend with first paint.
-   */
   async ensureWorkerStarted() {
     await this.workerController.ensureStarted();
     return { ok: true };
@@ -1456,7 +1264,6 @@ export class StellaRuntimeHost {
       ? payload.attachments.slice(0, 4)
       : [];
     if (attachments.length === 0) return [];
-    // The drive lives in the owner's object; the backend client reaches it.
     const drive = this.ensureHostBackendClient();
     if (!drive) {
       throw new Error("Cross-device execution is not ready on this computer.");
@@ -1510,10 +1317,6 @@ export class StellaRuntimeHost {
       this.placements.submitted(submitting);
     }
   }
-  /**
-   * Whether Claude Code is signed in here, read again at most once a minute:
-   * agents on Claude Code that another computer places here need it.
-   */
   private async claudeCodeSignedIn(): Promise<boolean> {
     const known = this.claudeCodeLogin;
     if (Date.now() - known.at >= 60_000 && !known.pending) {
@@ -1556,14 +1359,10 @@ export class StellaRuntimeHost {
     const attachmentsMs = Math.round(performance.now() - attachmentAt);
     const prompt =
       typeof payload.userPrompt === "string" ? payload.userPrompt.trim() : "";
-    // Pasted and quoted text, selections, the active window: read by the
-    // model hidden and shown as the message's chips, as a send here is.
     const context = payload.handoff === true ? undefined : placedChatContext(payload);
     if (!prompt && !context?.text && attachments.length === 0) {
       throw new Error("A prompt is required.");
     }
-    // Exactly the bytes the executing device (this one, another computer,
-    // or the cloud) receives. The owner gate hashes and hands them over.
     const dispatchPayload: DispatchPayload = {
       schemaVersion: 1,
       prompt,
@@ -1609,14 +1408,10 @@ export class StellaRuntimeHost {
     if (!dispatch?.dispatchId)
       throw new Error("Execution placement returned an invalid dispatch.");
     this.placements.submitted(submitting, dispatch.dispatchId);
-    // Stop came while this send was being submitted: the turn has started
-    // (its prompt is in the conversation), and stops now, as it would have.
     if (submitting.stopped) void this.stopPlacedDispatches([dispatch.dispatchId]);
     void this.forgetEndedPlacements(payload.conversationId, dispatch.dispatchId);
     const runId = `placed:${dispatch.dispatchId}`;
     const requestId = payload.requestId;
-    // Cloud admission uses the dispatch identity for its journal row.
-    // Start/status/finish events and the acceptance reply must agree.
     const userMessageId =
       target.mode === "cloud"
         ? dispatch.dispatchId
@@ -1643,29 +1438,20 @@ export class StellaRuntimeHost {
       if (isDispatchEnded(status)) {
         this.placements.ended(status.dispatchId);
         finish();
-        // Refused, or failed where it was placed: the message may never
-        // have reached the conversation. A Stop is the user's own word.
         if (status.state === "failed" || status.state === "blocked") {
           onUntaken?.(status);
         }
         return;
       }
-      // Taken, then lost with the computer that took it: nothing follows it
-      // from here, so the sender hears it now rather than never.
       if (status.state === "reconciliation_required") {
         finish();
         onUntaken?.(status);
         return;
       }
-      // The placement run ends at hand-off. The conversation socket owns the
-      // cloud turn's subsequent liveness, and `placements` keeps its
-      // dispatch for Stop until it ends.
       if (isCloudHandedOff(status)) finish();
     };
     placed.subscription = bridge.watchDispatch(dispatch.dispatchId, onStatus);
     onStatus(dispatch);
-    // Cloud admission journals the placement dispatch id, rather than the
-    // desktop's optimistic id. Return that identity to the sending renderer.
     return { runId, userMessageId };
   }
   async healthCheck() {
@@ -1679,13 +1465,6 @@ export class StellaRuntimeHost {
       { ensureWorker: true, recordActivity: false },
     );
   }
-  /**
-   * The orchestrator's `switch_destination`: the same target change the
-   * user makes in the picker, then the rest of the request continues there
-   * as a placed chat once this computer's turn for the conversation ends.
-   * A pi chat moving Stella herself (`brain`) moves that conversation only:
-   * its object records where she runs, and the picker stays as it is.
-   */
   async switchExecutionDestination(
     params:
       | {
@@ -1782,11 +1561,6 @@ export class StellaRuntimeHost {
     });
     return { ok: true };
   }
-  /**
-   * What Stella reads hidden (an agent's report or note) in a pi
-   * conversation whose brain runs elsewhere: placed there as a chat, as
-   * this computer places its user's sends, once per `id`.
-   */
   async placePiBrainNote(
     params:
       | {
@@ -1833,14 +1607,12 @@ export class StellaRuntimeHost {
           requestId: id,
           userMessageEventId: id,
           storageMode: "cloud",
-          // Journaled hidden there: the user did not write it.
           handoff: true,
         },
         target,
       );
       return { ok: true };
     } catch (error) {
-      // Out of reach: the conversation here takes it instead.
       return {
         ok: false,
         ...(placementUnavailable(error) ? { unavailable: true } : {}),
@@ -1848,13 +1620,6 @@ export class StellaRuntimeHost {
       };
     }
   }
-  /**
-   * Where a conversation's Stella runs when not here: the host holding its
-   * brain lease, while that host can take turns (`@stella/contracts/turn-plane/pi-brain`).
-   * Null when this computer answers: it holds the lease, there is none, or
-   * the holder can't answer and this computer's turn takes the lease over.
-   * Both engines ask the same: pi's chat and the agent loops' Claude Code.
-   */
   async brainTarget(
     conversationId: string,
     storageMode: unknown,
@@ -1872,14 +1637,6 @@ export class StellaRuntimeHost {
     ).catch(() => null);
     return brain && brain.here === false && brain.target ? brain.target : null;
   }
-  /**
-   * A send placed where Stella runs that ended there without being answered
-   * (refused, failed, or taken by a computer that then went away). One that
-   * was refused or failed is answered here, as a send is that could not be
-   * placed at all; the worker skips it if the conversation already has it.
-   * One a computer still holds, or that could not be answered here either,
-   * comes back to the app with the reason, never left waiting.
-   */
   private async answerUntakenSend(
     request: Extract<PiChatRequest, { op: "submit" }>,
     send: PiChatSend,
@@ -1918,7 +1675,6 @@ export class StellaRuntimeHost {
       return;
     }
     try {
-      // Where it was placed may have put it in the conversation before failing.
       const known = (await pi({
         op: "journaled",
         conversationId: request.conversationId,
@@ -1927,7 +1683,6 @@ export class StellaRuntimeHost {
       if (known?.journaled) return;
       const here = await this.brainTarget(request.conversationId, send.storageMode);
       if (!here) {
-        // Stella runs here now (the holder is gone): this computer answers.
         await this.requestWorker(
           METHOD_NAMES.INTERNAL_WORKER_PI_CHAT,
           { ...request, send: { ...send, followSender: true } },
@@ -1935,10 +1690,6 @@ export class StellaRuntimeHost {
         );
         return;
       }
-      // The host holding Stella is up but did not answer it: the cloud
-      // answers it once without taking her over, as it does a phone's send
-      // that holder fails. The cloud journals it under its own id, which
-      // the app's pending message moves to.
       const moved = await this.startPlacedChat(
         {
           conversationId: request.conversationId,
@@ -1985,14 +1736,7 @@ export class StellaRuntimeHost {
       },
     );
   }
-  /** The pi-durable chat (`@stella/contracts/pi-chat`). */
   async piChat(request: PiChatRequest) {
-    // A conversation whose Stella runs elsewhere (the cloud, another
-    // computer, wherever the user's picker or her own switch moved her)
-    // answers there as a placed chat: this computer takes none of its turns
-    // while that host can take them. Its turn reaches this computer's
-    // transcript through the journal, which the worker reads closely until
-    // it shows.
     const target =
       request?.op === "submit"
         ? await this.brainTarget(
@@ -2036,11 +1780,6 @@ export class StellaRuntimeHost {
           placed: { runId: placed.runId, userMessageId: placed.userMessageId },
         };
       } catch (error) {
-        // Where Stella runs is out of reach: this computer answers, and its
-        // turn takes the brain lease over from that host. A computer that
-        // refused it is not the end of the message either: sent here, a turn
-        // the cloud refuses goes on through the conversation in the cloud,
-        // which places it or answers it.
         if (target.mode !== "device" && !placementUnavailable(error)) throw error;
         console.warn(
           "[pi-chat] Where Stella runs could not take this message; this computer answers it.",
@@ -2063,11 +1802,6 @@ export class StellaRuntimeHost {
       },
     );
   }
-  /**
-   * Stop what a conversation runs elsewhere: the chats this computer placed,
-   * and the placed turns the app saw running there (`dispatchIds`), which
-   * the cloud may have taken over from their placement.
-   */
   async cancelPiPlacements(conversationId: string, dispatchIds: unknown) {
     const ids = new Set(
       Array.isArray(dispatchIds)
@@ -2083,7 +1817,6 @@ export class StellaRuntimeHost {
     }
     await this.stopPlacedDispatches([...ids]);
   }
-  /** Cancel exact dispatches; one already ended stays ended and is forgotten. */
   private async stopPlacedDispatches(dispatchIds: readonly string[]) {
     const bridge = this.hostExecutionPlacementBridge;
     if (!bridge) return;
@@ -2104,7 +1837,6 @@ export class StellaRuntimeHost {
       ),
     );
   }
-  /** The conversation's earlier placements that have ended since, forgotten. */
   private async forgetEndedPlacements(conversationId: string, except: string) {
     const bridge = this.hostExecutionPlacementBridge;
     if (!bridge) return;
@@ -2232,10 +1964,6 @@ export class StellaRuntimeHost {
       { ensureWorker: true, recordActivity: false },
     );
   }
-  /**
-   * Reminders and tasks live in the owner's object (see cloud-schedules.ts);
-   * watches stay on the local scheduler. Callers see one list either way.
-   */
   getCloudSchedules() {
     if (!this.cloudSchedules) {
       this.cloudSchedules = createCloudSchedules({
@@ -2264,14 +1992,6 @@ export class StellaRuntimeHost {
   async listHeartbeats() {
     return this.ensureScheduler().listHeartbeats();
   }
-  /**
-   * Direct mutation surface used by the renderer-side schedule chip / dialog
-   * (Run now, Pause/Resume, Delete). Same in-process scheduler the
-   * Schedule subagent talks to via tools — both paths converge on
-   * `LocalSchedulerService` and emit the shared `schedule.updated`
-   * notification on success, so the chat surface and the Up next list
-   * refresh together.
-   */
   async runCronJob(jobId: string) {
     if (isCloudScheduleId(jobId)) {
       return await this.getCloudSchedules().runNow(jobId);
@@ -2357,9 +2077,6 @@ export class StellaRuntimeHost {
     const hostDatabase = new HostDatabase(
       getDesktopDatabasePath(this.options.initializeParams.stellaDataDirPath),
     );
-    // Synchronous on the host's thread (Electron main in the desktop app):
-    // a pending schema migration blocks it for the migration's duration.
-    // Timed so that cost is visible next to the worker's boot timing.
     const dbInit = initializeDesktopDatabase(hostDatabase);
     getFileLogger()?.process("host.services-init.timing", {
       deviceIdentityMs: Math.round(dbStartedAt - identityStartedAt),
@@ -2406,9 +2123,6 @@ export class StellaRuntimeHost {
             }),
         }),
       },
-      // Pop a native banner whenever a scheduled fire delivers a message.
-      // Routed through the same Electron handler the runtime uses for
-      // in-app notifications (sound preference + grouping respected).
       ...(showNotificationHandler
         ? {
             showNotification: ({ title, body }) => {
@@ -2479,11 +2193,6 @@ export class StellaRuntimeHost {
       { ensureWorker: true, recordActivity: true },
     );
   }
-  /**
-   * This computer's own answer to the "accept work from your other devices?"
-   * prompt. Goes out on the presence socket, which is proven with the device
-   * key, so the gate knows the machine itself answered.
-   */
   async answerRemoteExecutionRequest(
     params: { allow?: unknown } | null | undefined,
   ) {
@@ -2542,13 +2251,6 @@ export class StellaRuntimeHost {
       busy: workerHealth?.piBusy === true,
     };
   }
-  /**
-   * The registration surface of a worker peer, gated on that peer still
-   * being the controller's live connection. A worker that was stopped or
-   * replaced (a restarted stdio child still draining, a detached in-process
-   * peer) can otherwise land run events or host callbacks on the new
-   * generation's state.
-   */
   fenceWorkerPeer(peer: JsonRpcPeer): WorkerPeerRegistrar {
     const isLive = () => this.workerController.getConnection()?.peer === peer;
     const generation = this.workerGeneration + 1;

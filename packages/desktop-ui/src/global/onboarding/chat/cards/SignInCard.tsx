@@ -1,23 +1,3 @@
-/**
- * "Sign in" — how Stella thinks.
- *
- * Four ways in, any of which is enough: a Stella account (Google or email,
- * the same dialog as the top bar), the Claude or ChatGPT plan the user
- * already pays for, or their own provider API key. Claude runs through Claude
- * Code on Claude Code's own sign-in: in the desktop app this computer's
- * `claude` signs in (approve on Anthropic's page and it finishes by itself);
- * on the website the owner's cloud signs in, with the code Anthropic's page
- * shows pasted here. ChatGPT is Sign in with ChatGPT: in the desktop app this
- * computer signs in on its own; on the website it signs in Stella's cloud.
- * Connecting one also makes
- * it the engine Stella runs on, the same switch the model picker makes; a
- * lens slides to whichever one is in use, and tapping another connected row
- * moves it.
- *
- * All of it is optional here: onboarding runs without an account, and the
- * app asks for a Stella account once onboarding ends, before the first chat.
- * Continuing with only a provider connected moves the engine onto it.
- */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/ui/button";
 import { BrandIcon } from "@/ui/brand-icon";
@@ -140,19 +120,11 @@ export function SignInCard({ active, answered, onAnswer }: SignInCardProps) {
   const { isAuthenticated } = useAuthState();
   const engines = useCloudEngines(isAuthenticated);
   const connect = useEngineConnect();
-  // ChatGPT: this computer's own sign-in in the desktop app; in a browser,
-  // the sign-in of Stella's cloud.
   const chatgpt = useChatGptProfiles();
-  // Claude: this computer's Claude Code in the desktop app; in a browser,
-  // the owner's cloud.
   const claudeLocal = useClaudeLocalAccounts();
   const credentials = useLlmCredentials();
   const apiKeysAvailable = Boolean(window.electronAPI?.system?.saveLlmCredential);
-  // A self-hosted server without Stella's own models offers only the
-  // user's Claude, ChatGPT or API key.
   const managedModels = useServerFeature("managedModels");
-  // On a paired self-hosted server the owner is already signed in: this step
-  // only picks the engine.
   const selfHosted = useSelfHostedServer();
   const discovery = useServerDiscovery();
   const options = useMemo(() => {
@@ -214,7 +186,6 @@ export function SignInCard({ active, answered, onAnswer }: SignInCardProps) {
     selfHosted,
     session.hasConnectedAccount,
   ]);
-  // A self-hosted server with its own models answers without an engine.
   const serverModels = selfHosted && managedModels;
   const anyConnected =
     serverModels ||
@@ -227,7 +198,6 @@ export function SignInCard({ active, answered, onAnswer }: SignInCardProps) {
       ? "apikey"
       : ENGINE_TO_OPTION[engine]
     : null;
-  // The lens only marks a choice the user can see is real.
   const lensOn: OptionId | null = inUse && connected[inUse] ? inUse : null;
 
   const { start: startConnect, cancel: cancelConnect } = connect;
@@ -289,7 +259,6 @@ export function SignInCard({ active, answered, onAnswer }: SignInCardProps) {
     },
   });
   const { start: startClaudeLogin } = claudeLogin;
-  // A Claude sign-in is open until it finishes or is canceled, not a promise.
   const busyOption: OptionId | null = pending ?? (claudeLogin.open ? "claude" : null);
 
   const handleRow = useCallback(
@@ -322,8 +291,6 @@ export function SignInCard({ active, answered, onAnswer }: SignInCardProps) {
       }
       setPending(option.id);
       try {
-        // Resolves false (null) when the user cancels; the live account
-        // list marks the row connected on its own.
         if (option.id === "chatgpt" && chatgpt.available) {
           const profile = await signInChatGpt();
           if (profile?.planUsage) {
@@ -361,7 +328,6 @@ export function SignInCard({ active, answered, onAnswer }: SignInCardProps) {
     else if (pending === "chatgpt") cancelConnect();
   }, [cancelChatGptSignIn, cancelConnect, chatgpt.available, pending]);
 
-  /* ── The lens: one highlight that glides to the row in use ─────── */
   const listRef = useRef<HTMLDivElement | null>(null);
   const [lens, setLens] = useState<{ top: number; height: number } | null>(null);
   useLayoutEffect(() => {

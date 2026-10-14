@@ -1,14 +1,3 @@
-/**
- * `Bash` tool (formerly `exec_command`) — shell execution for Stella agents, with opt-in PTY.
- *
- * Returns immediate output, or a `session_id` when the process is still
- * running so the model can poll / interact via `write_stdin`.
- *
- * The model-visible surface (name, description, parameters) lives in
- * `exec-command-def.ts` so workerd hosts expose the identical tool; this file
- * adds the executable handler for tool-host consumers.
- */
-
 import {
   maybeOfferBrowserExtensionConnect,
   type BrowserExtensionConnectRequester,
@@ -24,12 +13,6 @@ import {
 } from "./exec-command-def.js";
 
 export type ExecCommandToolOptions = {
-  /**
-   * Desktop hop that renders the inline "connect the Stella browser
-   * extension" card in the chat and resolves when the user connects,
-   * declines, or the card times out. When omitted, extension-bridge
-   * failures surface as plain command output.
-   */
   requestBrowserExtensionConnect?: BrowserExtensionConnectRequester;
 };
 
@@ -54,9 +37,6 @@ export const createExecCommandTool = (
     const result = await run();
     const command = typeof args.cmd === "string" ? args.cmd : "";
     if (!command || !options.requestBrowserExtensionConnect) return result;
-    // stella-browser dead-ends on a missing Chrome extension. Offer the
-    // inline connect card and, once the user connects, re-run the exact
-    // command so the agent continues transparently.
     return await maybeOfferBrowserExtensionConnect({
       result,
       command,

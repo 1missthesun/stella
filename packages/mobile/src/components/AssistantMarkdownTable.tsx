@@ -182,10 +182,6 @@ export function AssistantMarkdownTable({
   );
 }
 
-// An open, rule-divided table matching desktop: no frame, fills or column
-// dividers; a firm rule under the header and hairlines between rows, with the
-// first column flush to the prose. Cell padding still totals 24pt so
-// `estimateMarkdownTableColumnWidths` stays accurate.
 const makeStyles = (colors: Colors) =>
   StyleSheet.create({
     container: {

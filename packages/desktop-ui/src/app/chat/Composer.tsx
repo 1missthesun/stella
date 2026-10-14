@@ -1,7 +1,3 @@
-/**
- * Composer: Input bar, attachment handling, send/stream logic, stop button, context chips.
- */
-
 import type { Dispatch, SetStateAction } from "react";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import type { ChatContext } from "@/shared/types/electron";
@@ -57,9 +53,6 @@ import { BrowserAttachmentTray } from "./BrowserAttachmentTray";
 import { platformCapabilities } from "@/platform/capabilities";
 import { useRealtimeVoiceVisible } from "@/shared/lib/realtime-voice-visibility";
 
-// The toolbar buttons take only stable props (dictation callbacks, primitive
-// flags), so memoizing them keeps a keystroke from reconciling their icon and
-// motion subtrees.
 const MemoComposerMicButton = memo(ComposerMicButton);
 const MemoComposerSubmitButton = memo(ComposerSubmitButton);
 
@@ -78,7 +71,6 @@ type ComposerProps = {
   onStop: () => void;
   isDragOver?: boolean;
   replyPeek?: AssistantReplyPeekProps | null;
-  /** Shows the "Catch up" pill above the composer (the main chat only). */
   catchUp?: boolean;
   suggestionsActive?: boolean;
 };
@@ -126,9 +118,6 @@ function ComposerImpl({
 
   const dictation = useDictation({
     setMessage,
-    // Dictation stays available even while the orchestrator is busy
-    // (mid-turn / streaming) — the mic is intentionally NOT gated on
-    // `isStreaming`. See `submitComposer` for the in-flight submit flow.
     onTranscriptCommitted: () => {
       requestAnimationFrame(() => {
         textareaRef.current?.focus();
@@ -139,13 +128,6 @@ function ComposerImpl({
     },
   });
 
-  // Submitting while a recording/transcription is still in flight must not
-  // race ahead of the dictated text. `commitAndSend` stops + finalizes the
-  // recording, waits for the pending transcript to be appended to the
-  // composer, and only then fires `onCommit` (→ onSend). For the idle case
-  // it sends immediately. Transcription is time-bounded (see the dictation
-  // service's per-segment timeout), so a stalled request fails into a
-  // recoverable error and fires the commit instead of wedging submit.
   const submitComposer = () => {
     if (!canSubmit && !dictation.isRecording && !dictation.isTranscribing) {
       return;
@@ -165,11 +147,6 @@ function ComposerImpl({
     requireConversationId: true,
   });
   const { placeholder } = composerState;
-  // A dictation in flight makes the composer submittable on its own: the
-  // pending transcript is the content. Without this the submit arrow stays
-  // disabled (canSubmit is false while the text is still empty), so a press
-  // during transcription is swallowed and `submitComposer` never runs —
-  // the transcription finishes but the message is never sent/queued.
   const dictationInFlight = dictation.isRecording || dictation.isTranscribing;
   const canSubmitWithDictation = canSubmit || dictationInFlight;
   useEscapeToStop({
@@ -184,13 +161,8 @@ function ComposerImpl({
     setChatContext,
   });
   const hasText = message.trim().length > 0;
-  // The textarea stays as it is while dictating (the transcript lands there
-  // on stop); only the waveform row below it shows that dictation is on.
   const dictationBelow = dictation.isRecordingVisible;
   const dictationOwnsControls = dictationBelow && dictation.showControls;
-  // A pinned model picker keeps the toolbar row visible even while the
-  // textarea is empty. Dictation also needs the expanded shape: its waveform
-  // row sits under the text area.
   const modelPinned = useComposerModelPinned();
   const isExpanded =
     composerExpanded || dictation.isRecordingVisible || modelPinned;
@@ -209,8 +181,6 @@ function ComposerImpl({
     return () => cancelAnimationFrame(raf);
   }, [dictation.isRecording, focusRequestId]);
 
-  // Keep the pill shape in sync when `message` changes outside of onChange
-  // (e.g. cleared by the parent after send, or set by dictation).
   useEffect(() => {
     const raf = requestAnimationFrame(() => {
       updateComposerTextareaExpansion(textareaRef.current, setComposerExpanded);
@@ -477,11 +447,4 @@ function ComposerImpl({
   );
 }
 
-/**
- * Memoized so the chat surface re-rendering on every streamed frame (it
- * subscribes to the live message timeline) does not reconcile the whole
- * composer subtree. All props are shallow-comparable; during streaming they
- * stay referentially stable, so the composer only re-renders on real input
- * (typed text, context chips, focus requests, an active reply-peek).
- */
 export const Composer = memo(ComposerImpl);

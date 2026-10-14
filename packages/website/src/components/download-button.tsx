@@ -46,10 +46,6 @@ function LinuxIcon({ size = 18 }: { size?: number }) {
   );
 }
 
-// User-facing download URLs live on the trusted stella.sh domain (handled by
-// `src/app/download/[platform]/route.ts`) instead of the raw, no-reputation
-// Cloudflare R2 bucket host. The route 302-redirects to the real R2 asset, so
-// the bytes are unchanged but the click origin the browser sees is stella.sh.
 const DOWNLOADS = {
   macArm64: "/download/mac-arm64",
   macX64: "/download/mac-x64",
@@ -82,8 +78,6 @@ function detectPlatform(): Platform {
   if (typeof navigator === "undefined") return "macArm64";
   const ua = navigator.userAgent.toLowerCase();
   if (ua.includes("mac")) return "macArm64";
-  // Desktop Linux only: exclude Android (and ChromeOS), which report "linux"
-  // in the userAgent but should keep their existing mobile/generic path.
   if (
     ua.includes("linux") &&
     !ua.includes("android") &&
@@ -94,10 +88,6 @@ function detectPlatform(): Platform {
   return "windows";
 }
 
-// Client-only platform resolution shared by the download button and the
-// Windows install-warning note. useSyncExternalStore keeps the SSR markup
-// stable ("macArm64") and swaps to the real platform after hydration without a
-// cascading setState-in-useEffect re-render.
 export function usePlatform(): Platform {
   return useSyncExternalStore<Platform>(
     subscribeNoop,
@@ -106,18 +96,6 @@ export function usePlatform(): Platform {
   );
 }
 
-/**
- * Linux install choices.
- *
- * The primary action is the copyable `curl … | sh` one-liner: it installs the
- * architecture-matched launcher, verified against the published checksums,
- * and starts it, and the launcher adds Stella to the application menu. The
- * raw launcher downloads stay available as secondary links; they need a
- * manual `chmod +x` before the first run.
- *
- * Exported separately from `DownloadButton` so it can be rendered — and
- * asserted on — without user-agent platform detection.
- */
 export function LinuxInstallOptions({
   onSelectAsset,
 }: {

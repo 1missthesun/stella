@@ -1,18 +1,3 @@
-/**
- * "Here's what that looks like" — the showcase card, the centerpiece of the
- * onboarding.
- *
- * Five short chapters, each a real request typed into a mini copy of the
- * chat, then Stella's agents visibly doing the work (an agent window
- * animating the job, activity rows ticking in, an approval when money is
- * involved), then the reply. The chapter strip jumps to or replays any
- * chapter, chapters auto-advance after a short hold, and Continue is never
- * gated on watching.
- *
- * Only the active chapter mounts, and its timeline pauses whenever the card
- * scrolls out of view, the app leaves the foreground, or the step is done.
- * Under reduced motion each chapter shows its finished state at once.
- */
 import {
   useCallback,
   useEffect,
@@ -78,7 +63,6 @@ const STAGE_HEIGHT = 344;
 type ShowcaseCardProps = {
   active: boolean;
   answered: boolean;
-  /** The card is inside the visible part of the transcript. */
   onScreen: boolean;
   onContinue: () => void;
 };
@@ -260,7 +244,6 @@ function Chapter({
   const ct = (field: string) => t(chapterKey(spec.id, field));
   const prompt = ct("prompt");
   const sendAt = spec.cues.find((cue) => cue.id === "send")?.at ?? 1500;
-  // Long translations type a little faster so the send still lands on cue.
   const charMs = Math.max(
     12,
     Math.min(TYPE_CHAR_MS, (sendAt - TYPE_START_DELAY_MS - 180) / Math.max(1, prompt.length)),
@@ -270,7 +253,6 @@ function Chapter({
   const pressed = spec.confirm ? has("confirm-press") : false;
   const pressedRef = useRef(pressed);
   useEffect(() => {
-    // The approval tap is the demo's one physical moment: feel it too.
     if (pressed && !pressedRef.current && playing) selectionTick();
     pressedRef.current = pressed;
   }, [pressed, playing]);
@@ -293,8 +275,6 @@ function Chapter({
           />
         ) : null;
       case "receipts": {
-        // The block lands whole, so a second receipt arriving later cannot
-        // push a scene that is already on screen above it.
         const opening = spec.receipts[0]?.cue;
         if (!opening || !has(opening)) return null;
         return spec.receipts.map((receipt) => (
@@ -339,11 +319,6 @@ function Chapter({
   );
 }
 
-/**
- * The thread's stage. Parts stack from the top, so one arriving never moves
- * the ones already on screen, and the whole thread pans as a single block on
- * a damped spring only once a chapter has outgrown the stage.
- */
 function ThreadStage({
   instant,
   children,
@@ -406,7 +381,6 @@ function ChapterTab({
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const progress = useSharedValue(complete ? 1 : 0);
 
-  // A fresh run of this chapter starts the track over.
   useEffect(() => {
     if (!active) return;
     cancelAnimation(progress);

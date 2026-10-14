@@ -1,10 +1,3 @@
-/**
- * The onboarding composer: the real composer's shell, field, and send
- * button (same primitives, same classes, same spring-animated pill), without
- * the chat-runtime-bound extras (context chips, dictation, model picker,
- * the activity pill). Anything typed here ends onboarding and becomes the
- * first message of the real conversation.
- */
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import {
   ComposerAddButton,

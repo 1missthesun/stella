@@ -19,15 +19,12 @@ const unavailable: AppSourceActionResult = {
   error: "Updates are not available here.",
 };
 
-/** Present on every build; the service exists only when running from source. */
 export const registerAppSourceHandlers = (
   options: PrivilegedIpcOptions & {
     getService: () => AppSourceService | null;
     appPartition: string;
   },
 ) => {
-  // Draft previews share the app's preload and origin but not its session;
-  // they may look at the state but never change the checkout.
   const service = (event: IpcMainInvokeEvent) =>
     event.sender.session === session.fromPartition(options.appPartition)
       ? options.getService()

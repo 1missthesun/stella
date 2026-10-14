@@ -3,10 +3,6 @@ import path from "node:path";
 import { Context, Effect, Layer } from "effect";
 import { METHOD_NAMES } from "@stella/contracts/protocol";
 import { resolveBundledRuntimeFile } from "../../../kernel/shared/runtime-paths.js";
-// Runner subgraph imported as types only — the values are loaded lazily by
-// RunnerModule (a dynamic import the entry starts right after the transport
-// attaches) so this ~68%-of-bundle subgraph isn't parsed before the
-// transport is up.
 import type { StellaHostRunnerOptions } from "../../../kernel/runner.js";
 import { RunnerUnavailableError } from "../errors.js";
 import {
@@ -41,7 +37,6 @@ const resolveDesktopCliEntrypoint = (
   return path.join(stellaAppDir, "packages", packageName, "bin", entrypoint);
 };
 
-// Resolve a runtime CLI: its TypeScript source, or the packaged bundle.
 const resolveRuntimeCliPath = (fileName: string) =>
   resolveBundledRuntimeFile(`kernel/cli/${fileName}`);
 
@@ -69,15 +64,8 @@ export interface Interface {
     RuntimeRunner,
     RunnerUnavailableError | Error
   >;
-  /**
-   * Promise flavor of `initialized` for imperative pipelines that need the
-   * old `await ensureRunnerInitialized()` shape (startChat image-target
-   * probing swallows its failure, matching the old try/catch).
-   */
   readonly ensureInitialized: () => Promise<RuntimeRunner>;
-  /** Resolves when the background build settles (null = build failed). */
   readonly awaitBuildSettled: () => Promise<RuntimeRunner | null>;
-  /** Message of the background build failure, if the build has failed. */
   readonly readyError: () => string | null;
 }
 
@@ -252,20 +240,11 @@ export const layer = Layer.effect(
       stellaComputerCliPath: resolveRuntimeCliPath("stella-computer.js"),
       stellaMediaCliPath: resolveRuntimeCliPath("stella-media.js"),
       stellaXApiCliPath: resolveRuntimeCliPath("stella-x-api.js"),
-      // The bridge is already listening (its layer builds before this one).
-      // Advertise the stable socket path so shells can call back into the
-      // host without rebuilding the runner.
       ...(cliBridge.socketPath
         ? { cliBridgeSocketPath: cliBridge.socketPath }
         : {}),
     };
 
-    // Build the runner in the background instead of on the worker-ready path:
-    // initialize returns without awaiting this; turn handlers join the same
-    // promise via `initialized`. The module comes from RunnerModule, which
-    // is usually already importing (prefetched at transport attach).
-    // Message of a failed background build; surfaced instead of the generic
-    // "Runtime worker is not ready." and as the AgentHealth not-ready reason.
     let runnerReadyError: string | null = null;
     const buildPromise: Promise<RuntimeRunner | null> = (async () => {
       const { createStellaHostRunner } = await runnerModule.load();
@@ -289,17 +268,10 @@ export const layer = Layer.effect(
       console.error("[runtime-worker] Runner failed to start:", message);
       throw error;
     });
-    // Prevent an unobserved rejection from crashing the worker; real awaiters
-    // (initialized access / the finalizer / the post-ready block) surface it.
     const settled = buildPromise.catch(() => null);
 
     yield* Effect.addFinalizer(() =>
       Effect.promise(async () => {
-        // If the runner is still building (lazy chunk import), wait for it to
-        // finish so we don't strand a started-but-unreferenced runner. Then
-        // stop it — `runner.stop()` awaits a bounded drain of the background
-        // compaction scheduler so SQLite writes complete before the storage
-        // finalizer closes the db.
         await settled;
         const runner = runnerCell.get();
         runnerCell.set(null);
@@ -309,8 +281,6 @@ export const layer = Layer.effect(
 
     const tryCurrent = () => runnerCell.get();
 
-    // The old `ensureRunner()` throw: the captured build-failure message when
-    // the build has failed, else "Runtime worker is not ready.".
     const notReadyError = (): RunnerUnavailableError | Error =>
       runnerReadyError ? new Error(runnerReadyError) : new RunnerUnavailableError();
 

@@ -21,10 +21,8 @@ import { execFile } from "node:child_process";
 import { Effect } from "effect";
 
 export type TerminateProcessTreeOptions = {
-  /** Whether the root process itself is still running. */
   isRootRunning: () => boolean;
   graceSignal?: NodeJS.Signals;
-  /** How long survivors get after the grace signal before SIGKILL. */
   forceAfterMs?: number;
 };
 

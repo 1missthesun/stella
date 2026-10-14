@@ -51,7 +51,6 @@ const dialogActionsStyle = {
   marginTop: 20,
 };
 
-/** Dedicated destructive surface; the Memory toggle stays independent. */
 export function CloudMemoryWipeSettings() {
   const t = useT();
   const {

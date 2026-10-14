@@ -1,17 +1,3 @@
-/**
- * Where a Claude Code thread keeps its native session state
- * (`CLAUDE_CONFIG_DIR`) inside a cloud world container.
- *
- * One container serves every thread of an owner's world, so each thread has
- * its own root under the image's root-only anchor. The session marker, the
- * attestation bound to the thread id, the checkpoint archive and its restore
- * swap are all per root; two threads never share or swap the same directory.
- *
- * `threadHash` is the lowercase hex SHA-256 of the UTF-8 thread id, the same
- * hash the turn-state registry keys threads by.
- */
-
-/** Root-owned 0700 directory the image creates; every thread root sits in it. */
 export const CLOUD_NATIVE_STATE_ANCHOR = "/home/stella-native-state";
 
 export const CLOUD_NATIVE_STATE_ROOT_PATTERN =
@@ -24,45 +10,16 @@ export const cloudNativeStateRoot = (threadHash: string): string => {
   return `${CLOUD_NATIVE_STATE_ANCHOR}/anthropic-${threadHash}`;
 };
 
-/**
- * Where, inside a thread's emptied root, the BuildSession writes another
- * host's synced Claude Code session (`<session>.jsonl` and its folder, by
- * their synced paths) for the executor to move under the CLI's working
- * folder and resume.
- */
 export const CLOUD_ADOPTED_SESSION_DIR = ".adopted-session";
 
-/**
- * Where in backup storage the conversation's pi runtime leaves a Claude Code
- * session it wrote from the conversation's journal
- * (`CloudOrchestratorCliTurnSpec.hydrateSession`), until the BuildSession
- * puts it in the container and deletes it.
- */
 export const claudeHydratedSessionKey = (ownerId: string, conversationId: string, sessionId: string): string =>
   `claude-code-hydrated/v1/${encodeURIComponent(ownerId)}/${encodeURIComponent(conversationId)}/${sessionId}.jsonl`;
 
-/**
- * Root-only (0700) parent of the owner's cloud Claude Code logins, one
- * `CLAUDE_CONFIG_DIR` per account named by the hex SHA-256 of the account's
- * lowercased email. `claude auth login` writes its credential there and
- * Claude turns point `CLAUDE_SECURESTORAGE_CONFIG_DIR` at it; Stella never
- * reads what is inside. Model-authored commands run as `stella-tools` and
- * cannot traverse `/home/stella-host-state`.
- */
 export const CLOUD_CLAUDE_ACCOUNTS_ROOT = "/home/stella-host-state/claude-accounts";
 
-/**
- * Pending `claude auth login` attempts, beside the account directories
- * (root-only, never backed up).
- */
 export const CLOUD_CLAUDE_LOGINS_ROOT = "/home/stella-host-state/claude-logins";
 
 export const isCloudClaudeAccountKey = (value: unknown): value is string =>
   typeof value === "string" && /^[0-9a-f]{64}$/u.test(value);
 
-/**
- * Key prefix of the owner's opaque Claude Code login archive in backup
- * storage (`<prefix>/<hash>.tgz`), separate from every session checkpoint.
- * Only the owner's container writes and reads its bytes.
- */
 export const CLOUD_CLAUDE_LOGIN_BACKUP_PREFIX = "claude-code-logins/v1";

@@ -1,23 +1,3 @@
-/**
- * useDictation wires a DictationSession to the composer textarea.
- *
- * Flow:
- *   - First toggle: start recording. The composer swaps in a recording
- *     bar (waveform + timer + cancel/confirm) driven by the `levels`,
- *     `elapsedMs`, and `cancel` values returned here.
- *   - Confirm (or the shortcut again): stop. The whole recording is
- *     transcribed, then we append it to whatever the composer text was at the
- *     moment we started recording.
- *   - A Stella without managed dictation and no saved OpenRouter key opens
- *     the key dialog instead of recording; saving the key starts recording.
- *   - Cancel (X): tear down the stream without appending anything.
- *
- * The global dictation shortcut dispatches a window event the hook listens
- * for, so any composer with `useDictation` mounted toggles itself when the
- * user is on its window. Every trigger is a toggle — press to start, press
- * again to stop.
- */
-
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ensureDictationSuperFastWarm,
@@ -50,8 +30,6 @@ type DictationToggleEventDetail = {
   source?: "companion";
 };
 
-/** How many waveform bars we retain. The session emits ~12.5 ticks/sec, so
- *  this buffers ~20 s of recent activity before older bars scroll off. */
 const MAX_LEVEL_BARS = 256;
 
 type Setter<T> = (next: T | ((prev: T) => T)) => void;
@@ -61,42 +39,21 @@ interface UseDictationOptions {
   disabled?: boolean;
   onError?: (error: string) => void;
   onTranscriptCommitted?: () => void;
-  /**
-   * Invoked when `commitAndSend` finishes — i.e. the recording has stopped,
-   * any pending transcription has been appended to the composer message, and
-   * the caller should now submit the composer. Reads the latest `setMessage`
-   * via ref so it always sees the post-transcript value.
-   */
   onCommit?: () => void;
-  /**
-   * When the global shortcut stops a recording, submit the transcript (fire
-   * `onCommit`) instead of leaving it in the composer. The companion uses
-   * this so "press to talk, press again" sends without another tap.
-   */
   commitOnShortcutStop?: boolean;
 }
 
 interface UseDictationResult {
-  /** Connect ahead of a likely press; wire to mic hover and focus. */
   prewarm: () => void;
   isRecording: boolean;
   isRecordingVisible: boolean;
   isTranscribing: boolean;
   showControls: boolean;
   state: DictationSessionState;
-  /** Toggle recording: start → stop+transcribe (or stop+transcribe → start). */
   toggle: () => void;
-  /** Stop recording without uploading or appending anything. */
   cancel: () => void;
-  /**
-   * Stop, transcribe (if necessary), and then fire `onCommit`. Used by the
-   * composer's send-arrow affordance so the user can dictate-and-submit in a
-   * single tap.
-   */
   commitAndSend: () => void;
-  /** Rolling buffer of recent input levels in 0..1, oldest first. */
   levels: number[];
-  /** Elapsed time of the current recording, in milliseconds. */
   elapsedMs: number;
   error: string | null;
 }
@@ -133,15 +90,8 @@ export const useDictation = ({
   const stateRef = useRef<DictationSessionState>("idle");
   const disabledRef = useRef(disabled);
   disabledRef.current = disabled;
-  /**
-   * When true, the next time we land on idle (whether after a successful
-   * transcription or a no-audio short-circuit), we should fire `onCommit`.
-   * Cleared every time we either fire it or transition out of idle for a
-   * new recording.
-   */
   const sendAfterCommitRef = useRef(false);
   const warmedRef = useRef(false);
-  /** This composer's press opened the key dialog; start once a key is saved. */
   const awaitingKeyRef = useRef(false);
 
   setMessageRef.current = setMessage;
@@ -168,8 +118,6 @@ export const useDictation = ({
 
   stateRef.current = state;
 
-  // Keep the dictation route (managed or own key) and auth token warm while
-  // the composer is up, and again whenever the window regains focus.
   useEffect(() => {
     if (disabled) return;
     prewarmDictation();
@@ -177,9 +125,6 @@ export const useDictation = ({
     return () => window.removeEventListener("focus", prewarmDictation);
   }, [disabled]);
 
-  // While listening, tick a 4-Hz timer for the visible mm:ss display.
-  // The initial 0:00 paint is set in `start()` before the session begins
-  // so this effect only owns the running interval, not the reset.
   useEffect(() => {
     if (state !== "listening") return;
     const startedAt = performance.now();
@@ -255,9 +200,6 @@ export const useDictation = ({
       setError(null);
       setLevels([]);
       setElapsedMs(0);
-      // The shortcut path stays quiet (no cancel/confirm buttons — the
-      // shortcut itself commits), but the bar is always shown so a keyboard
-      // start is never invisible.
       setShowControls(source === "button");
       setShowRecordingBar(true);
 
@@ -352,7 +294,6 @@ export const useDictation = ({
       window.electronAPI?.dictation?.playSound({ sound: "stopRecording" });
       void stop();
     } else if (current === "transcribing") {
-      // Upload in flight — ignore presses until it resolves.
       return;
     } else {
       sendAfterCommitRef.current = false;
@@ -372,9 +313,6 @@ export const useDictation = ({
       sendAfterCommitRef.current = true;
       return;
     }
-    // Already idle (or in an error state with no live session) — fire the
-    // commit immediately; the parent will submit whatever is in the
-    // composer right now.
     onCommitRef.current?.();
   }, [stop]);
 
@@ -411,8 +349,6 @@ export const useDictation = ({
         sendAfterCommitRef.current = commitOnShortcutStopRef.current;
         void stop();
       } else if (current === "transcribing") {
-        // Upload in flight: a second press while the composer would auto-send
-        // just confirms that intent.
         if (commitOnShortcutStopRef.current) sendAfterCommitRef.current = true;
       } else {
         sendAfterCommitRef.current = false;
@@ -434,13 +370,10 @@ export const useDictation = ({
     };
   }, []);
 
-  // Stable so the memoized mic button skips re-rendering on every keystroke.
   const prewarm = useCallback(() => {
     const route = cachedDictationRoute();
     if (route === "streaming") prewarmDictationSocket();
     else prewarmDictation();
-    // Opening the microphone takes up to two seconds on macOS. Open it while
-    // the pointer is on its way to the button so the press loses nothing.
     if (!disabledRef.current && route !== null && route !== "needs-key") {
       warmDictationMicrophone();
     }

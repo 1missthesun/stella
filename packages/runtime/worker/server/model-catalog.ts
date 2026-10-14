@@ -5,32 +5,11 @@ import { forkDelayed, type WorkerTimerHandle } from "../effect-runtime.js";
 import * as HostBus from "./host-bus.js";
 import type { RuntimeRunner } from "./types.js";
 
-/**
- * Owns the lazy `kernel/model-runtime` module: the catalog-changed subscription
- * (forwarded to the host as MODEL_CATALOG_UPDATED) and the debounced
- * background catalog warm.
- *
- * The module import stays dynamic so the model registry isn't parsed on the
- * worker-ready path, exactly as before.
- */
 export interface Interface {
-  /**
-   * Import the model runtime (memoized) and install the catalog-changed
-   * subscription once. Safe to call repeatedly; no-ops the subscription
-   * after dispose so a shutting-down worker doesn't re-subscribe.
-   */
   readonly ensureSubscription: () => Promise<
     (typeof import("../../kernel/model-runtime.js"))["modelRuntime"]
   >;
-  /**
-   * Warm the Stella model catalog in the background whenever an input to its
-   * cache key changes (auth identity, device, backend).
-   * Debounced so a `configure` call touching multiple fields only warms
-   * once, and best-effort so a network failure never affects config
-   * application. No-ops when the runner isn't built yet.
-   */
   readonly scheduleWarm: (getRunner: () => RuntimeRunner | null) => void;
-  /** Unsubscribe and refuse future subscriptions (worker shutdown). */
   readonly dispose: () => void;
 }
 
@@ -63,9 +42,6 @@ export const layer = Layer.effect(
 
     const scheduleWarm = (getRunner: () => RuntimeRunner | null) => {
       if (!getRunner()) return;
-      // Debounce as a forked 50ms fiber (the old `clearTimeout` +
-      // `setTimeout` pair): a re-schedule cancels the pending fiber, so a
-      // configure call touching multiple fields still warms once.
       if (warmTimer) warmTimer.cancel();
       warmTimer = forkDelayed(50, () => {
         warmTimer = null;

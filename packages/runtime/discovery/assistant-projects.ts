@@ -1,4 +1,3 @@
-/** Bounded reads of local assistant metadata. Never returns prompts or messages. */
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -24,7 +23,6 @@ export type AssistantProject = {
   activityCount: number;
 };
 
-/** Read only a bounded tail; discard an incomplete first record. */
 const readBounded = async (file: string, tail = false): Promise<string> => {
   const handle = await fs.open(file, "r");
   try {
@@ -57,8 +55,6 @@ export async function collectAssistantProjects({
     });
   };
 
-  // Claude's history has directory and timestamp metadata on each entry. Read
-  // at most 512 KiB and count distinct sessions, discarding all prompt fields.
   try {
     const text = await readBounded(path.join(env.CLAUDE_CONFIG_DIR || path.join(home, ".claude"), "history.jsonl"), true);
     const seen = new Set<string>();
@@ -75,8 +71,6 @@ export async function collectAssistantProjects({
     }
   } catch { /* Tool not installed or history unreadable. */ }
 
-  // Read indexed session metadata, never the messages tables. LIMIT bounds
-  // materialization; each query uses the tool's activity/start-time index.
   const readSessions = async (file: string, source: string, queries: string[]) => {
     if (!(await fs.stat(file).catch(() => null))?.isFile()) return;
     try {
@@ -100,7 +94,6 @@ export async function collectAssistantProjects({
 
   const codexHome = env.CODEX_HOME || path.join(home, ".codex");
   try {
-    // A handful of versioned stores can coexist after upgrades. Use newest.
     const dir = await fs.opendir(codexHome);
     const stores: string[] = [];
     let visited = 0;
@@ -118,8 +111,6 @@ export async function collectAssistantProjects({
     "SELECT cwd, started_at AS activity FROM sessions WHERE started_at >= ? ORDER BY started_at DESC LIMIT ?",
   ]);
 
-  // OpenClaw exposes configured workspace directories. Configuration mtime is
-  // not activity: let the repository's metadata establish recency later.
   const openClawHome = env.OPENCLAW_STATE_DIR || path.join(home, ".openclaw");
   try {
     const raw = await readBounded(env.OPENCLAW_CONFIG_PATH || path.join(openClawHome, "openclaw.json"));

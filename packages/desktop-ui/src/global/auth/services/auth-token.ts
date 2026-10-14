@@ -1,12 +1,3 @@
-/**
- * The short-lived owner JWT every backend request carries as its bearer.
- *
- * Electron main mints it from the Better Auth session it owns
- * (`auth:getToken`); a browser shell mints it from its own session through
- * Better Auth's JWT plugin (`GET /api/auth/token`). The JWT's `sub` is the
- * owner id.
- */
-
 import { configurePiRuntime } from "@/platform/electron/device";
 import { getStellaInteriorBridge } from "@/platform/interior/interior-bridge";
 import { getJwtExpMs, parseJwtPayload } from "@/shared/lib/jwt";
@@ -17,9 +8,6 @@ let tokenExpiresAt = 0;
 let inflightTokenPromise: Promise<string | null> | null = null;
 let tokenRequestVersion = 0;
 
-// JWT lifetime is ~15 minutes (server-minted); refresh 60s before the token's
-// own `exp` (read dynamically below) to avoid races. The margin adapts to
-// whatever expiry the token actually carries.
 const REFRESH_MARGIN_MS = 60_000;
 
 type GetAuthTokenOptions = {
@@ -33,10 +21,6 @@ const invalidateTokenCache = (): void => {
   inflightTokenPromise = null;
 };
 
-/**
- * Get a valid owner JWT for use in backend Authorization headers.
- * Caches the token and refreshes it before expiry.
- */
 export async function getAuthToken(
   options: GetAuthTokenOptions = {},
 ): Promise<string | null> {
@@ -70,8 +54,6 @@ export async function getAuthToken(
         await configurePiRuntime();
         token = await systemApi.getAuthToken();
       } else {
-        // Standalone web has no Electron host. Better Auth's JWT plugin mints
-        // the same short-lived owner JWT directly from the browser session.
         const result = await authClient.token();
         token = result.data?.token ?? null;
       }
@@ -99,7 +81,6 @@ export async function getAuthToken(
           scopedTokenExpiresAt - REFRESH_MARGIN_MS,
         );
       } else {
-        // Parse JWT exp claim for precise refresh timing
         try {
           tokenExpiresAt = getJwtExpMs(token) - REFRESH_MARGIN_MS;
         } catch (err) {
@@ -129,7 +110,6 @@ export async function getAuthToken(
   return inflightTokenPromise;
 }
 
-/** The owner id (`sub`) a token was minted for. */
 const tokenSubject = (token: string): string | null => {
   try {
     const payload = parseJwtPayload<{ sub?: unknown }>(token);
@@ -139,11 +119,6 @@ const tokenSubject = (token: string): string | null => {
   }
 };
 
-/**
- * Returns a bearer token only when its signed subject matches the renderer's
- * immutable cloud owner. One forced refresh closes the common
- * account-switch cache race; a second mismatch fails closed.
- */
 export async function getAuthTokenForSubject(
   expectedSubject: string,
 ): Promise<string | null> {
@@ -156,9 +131,6 @@ export async function getAuthTokenForSubject(
   return token && tokenSubject(token) === expected ? token : null;
 }
 
-/**
- * Build headers for authenticated HTTP requests to backend endpoints.
- */
 export async function getAuthHeaders(
   extra?: Record<string, string>,
 ): Promise<Record<string, string>> {
@@ -169,7 +141,6 @@ export async function getAuthHeaders(
   };
 }
 
-/** Clear cached token (e.g. on sign-out). */
 export function clearCachedToken(): void {
   invalidateTokenCache();
 }

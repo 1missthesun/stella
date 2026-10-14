@@ -36,11 +36,9 @@ import {
 import { worldName } from "./workspace.js";
 import type { WorldEntry, WorldListingEntry } from "./world/types.js";
 
-/** The world directory that stands for the desktop's `~/.stella`. */
 export const WORLD_STELLA_DIR = ".stella";
 export const WORLD_PERSONALITY_FILE = PERSONALITY_FILE;
 
-/** What memory needs from the owner's `WorldStore`. */
 export type MemoryWorld = Readonly<{
   head(): Promise<{ revision: number }>;
   stat(path: string): Promise<WorldEntry | null>;
@@ -60,11 +58,9 @@ export type MemoryWorld = Readonly<{
     entries: WorldListingEntry[];
     deleted: string[];
   }): Promise<{ status: string }>;
-  /** Drop paths from every earlier checkpoint (`WorldSqlStore.purgeHistory`). */
   purgeHistory(paths: readonly string[]): Promise<number>;
 }>;
 
-/** The owner's one world, as memory reaches it. */
 export const ownerMemoryWorld = async (
   worlds: Cloudflare.Env["WORLDS"],
   ownerId: string,
@@ -82,13 +78,11 @@ export const ownerMemoryWorld = async (
   };
 };
 
-/** The world path of a `~/.stella`-relative path. */
 export const worldStellaPath = (relative: string): string =>
   `${WORLD_STELLA_DIR}/${relative}`;
 
 const decoder = new TextDecoder();
 
-/** One `~/.stella`-relative file's text, or null when it does not exist. */
 export const readWorldStellaText = async (
   world: MemoryWorld,
   relative: string,
@@ -99,17 +93,11 @@ export const readWorldStellaText = async (
 
 const COMMIT_ATTEMPTS = 3;
 
-/**
- * The owner's open memory epoch, read fresh; throws while a wipe runs. A write takes it when it starts and lands only while it
- * still holds, so a write already running when a wipe began cannot put
- * erased memory back.
- */
 export type MemoryEpochFence = () => Promise<string>;
 
 const ERASED_WHILE_WRITING =
   "memory: Stella's memory was erased while this was being written; nothing was written.";
 
-/** Delete one world file only while it still holds `expectSha`. */
 const removeIfUnchanged = async (
   target: MemoryWorld,
   path: string,
@@ -126,7 +114,6 @@ const removeIfUnchanged = async (
     if (current.kind !== "file" || current.sha256 !== expectSha) {
       return { status: "conflict", actualSha: current.sha256 ?? null };
     }
-    // Lands only if nothing wrote this path after `revision`.
     const committed = await target.commitShell({
       baseRevision: revision,
       reads: { paths: [path], children: [] },
@@ -167,8 +154,6 @@ const createWorldMemoryStore = (
         }),
         { sha256: sha, size: bytes.byteLength },
       );
-      // Lands only if nothing wrote this path after `revision`, so the
-      // comparison above still holds when the file changes.
       const committed = await store.commitShell({
         baseRevision: revision,
         reads: { paths: [path], children: [] },
@@ -213,10 +198,6 @@ const createWorldMemoryStore = (
   list: async () => (await listWorldMemoryFiles(await world())).files,
 });
 
-/**
- * The memory files in the world (`PERSONALITY.md`,
- * `memories/**`), and whether the `memories/` listing was cut short.
- */
 const listWorldMemoryFiles = async (
   store: MemoryWorld,
 ): Promise<{ files: MemoryFileInfo[]; cutShort: boolean }> => {
@@ -243,10 +224,6 @@ const listWorldMemoryFiles = async (
   };
 };
 
-/**
- * The memory client over the owner's world. With `fence`, each write holds
- * to the memory epoch it started in.
- */
 export const createWorldMemory = (
   world: () => Promise<MemoryWorld>,
   fence?: MemoryEpochFence,
@@ -272,7 +249,6 @@ export const createWorldMemoryFile = async (
   return outcome.ok ? sha : null;
 };
 
-/** Largest file the desktop sync reads back; written files are far smaller. */
 export const MEMORY_SYNC_READ_MAX_BYTES = 512 * 1024;
 
 export class MemorySyncFileError extends Error {}
@@ -286,20 +262,9 @@ const syncedPath = (path: string): string => {
   return path;
 };
 
-/**
- * What a desktop's memory sync does to the owner's world: the synced files
- * (`isSyncedMemoryPath`) with their shas, and compare-and-set writes and
- * deletes. Writes go through the same redaction and caps as `memory.write`
- * (`prepareMemoryWrite`); `expectSha: null` writes only a file that does
- * not exist yet.
- */
 export const createWorldMemorySync = (world: () => Promise<MemoryWorld>) => {
   const store = createWorldMemoryStore(world);
   return {
-    /**
-     * Every synced file. Refuses rather than answer a listing cut short,
-     * which a computer would read as deletions.
-     */
     list: async (): Promise<MemoryFileInfo[]> => {
       const { files, cutShort } = await listWorldMemoryFiles(await world());
       if (cutShort) {
@@ -374,17 +339,11 @@ export const createWorldMemorySync = (world: () => Promise<MemoryWorld>) => {
   };
 };
 
-/** Everything a memory wipe erases, as world paths. */
 export const WORLD_MEMORY_WIPE_PATHS: readonly string[] = [
   worldStellaPath(MEMORIES_DIR),
   worldStellaPath(WORLD_PERSONALITY_FILE),
 ];
 
-/**
- * Erase the owner's memory files from their world, the earlier checkpoints
- * included, so nothing keeps the erased content reachable; the live paths
- * removed.
- */
 export const wipeWorldMemory = async (world: MemoryWorld): Promise<number> => {
   let removed = 0;
   for (const path of WORLD_MEMORY_WIPE_PATHS) {

@@ -25,7 +25,6 @@ pub struct AuthProfile {
     pub last_login_at: Option<String>,
 }
 
-// Keep legacy Credential alias for backward compatibility
 pub type Credential = AuthProfile;
 
 fn validate_profile_name(name: &str) -> Result<(), String> {
@@ -80,8 +79,6 @@ fn parse_key_hex(hex_str: &str) -> Option<Vec<u8>> {
     Some(bytes)
 }
 
-/// Read the encryption key from STELLA_BROWSER_ENCRYPTION_KEY env var or
-/// ~/.stella-browser/.encryption-key file (matching the Node.js implementation).
 fn get_encryption_key() -> Result<Vec<u8>, String> {
     if let Ok(key_hex) = std::env::var(ENCRYPTION_KEY_ENV) {
         return parse_key_hex(&key_hex).ok_or_else(|| {
@@ -111,7 +108,6 @@ fn get_encryption_key() -> Result<Vec<u8>, String> {
     ))
 }
 
-/// Ensure an encryption key exists, auto-generating one if needed.
 fn ensure_encryption_key() -> Result<Vec<u8>, String> {
     if let Ok(key) = get_encryption_key() {
         return Ok(key);
@@ -148,7 +144,6 @@ fn ensure_encryption_key() -> Result<Vec<u8>, String> {
     Ok(key.to_vec())
 }
 
-/// Encrypt a profile to the JSON+base64 format compatible with Node.js.
 fn encrypt_profile(profile: &AuthProfile) -> Result<String, String> {
     let key = ensure_encryption_key()?;
     let cipher =
@@ -181,7 +176,6 @@ fn encrypt_profile(profile: &AuthProfile) -> Result<String, String> {
         .map_err(|e| format!("Failed to serialize payload: {}", e))
 }
 
-/// JSON envelope written by Node.js encryption (src/encryption.ts).
 #[derive(Deserialize)]
 struct EncryptedPayload {
     #[allow(dead_code)]
@@ -228,7 +222,6 @@ fn decrypt_profile(data: &[u8]) -> Result<AuthProfile, String> {
         return serde_json::from_str(&json_str).map_err(|e| format!("Invalid profile data: {}", e));
     }
 
-    // Fallback: try as plain unencrypted JSON profile
     serde_json::from_str::<AuthProfile>(text)
         .map_err(|_| "Profile is not a valid encrypted or unencrypted payload".to_string())
 }
@@ -479,8 +472,6 @@ mod tests {
                 last_login_at: None,
             };
 
-            // Encrypt with aes_gcm, then manually build the JSON payload
-            // to simulate what Node.js would produce
             let cipher = Aes256Gcm::new_from_slice(&key).unwrap();
             let mut iv = [0u8; 12];
             getrandom::getrandom(&mut iv).unwrap();

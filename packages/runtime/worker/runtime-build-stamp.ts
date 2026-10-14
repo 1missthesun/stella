@@ -30,7 +30,6 @@ import path from "node:path";
  * and `packages/contracts`, minus tests and scripts the runtime never loads.
  */
 
-/** Sentinel returned when the stamp cannot be computed (missing tree, IO error). */
 export const RUNTIME_BUILD_STAMP_UNAVAILABLE = "unavailable";
 
 const STAMPED_FILE_SUFFIXES = [".js", ".mjs", ".cjs", ".ts", ".mts", ".cts"];
@@ -52,15 +51,9 @@ const hasStampedSuffix = (name: string): boolean => {
   );
 };
 
-/**
- * The worker entry lives at `<bundleRoot>/worker/entry.js` (bundled) or
- * `<repoRoot>/packages/runtime/worker/entry.ts` (unbundled source). Either way the
- * runtime tree root is one directory up from the entry's directory.
- */
 export const resolveRuntimeBundleRoot = (workerEntryPath: string): string =>
   path.resolve(path.dirname(workerEntryPath), "..");
 
-/** The trees whose code the runtime loads: the source tree adds contracts. */
 export const resolveRuntimeCodeRoots = (workerEntryPath: string): string[] => {
   const runtimeRoot = resolveRuntimeBundleRoot(workerEntryPath);
   return workerEntryPath.endsWith(".ts")
@@ -99,11 +92,6 @@ const collectStampLines = (
   }
 };
 
-/**
- * Compute the runtime build stamp for the tree containing `workerEntryPath`.
- * Returns `RUNTIME_BUILD_STAMP_UNAVAILABLE` when the tree can't be walked —
- * callers must treat that as "unknown", never as a definite mismatch.
- */
 export const computeRuntimeBuildStamp = (workerEntryPath: string): string => {
   const trimmedEntry = workerEntryPath?.trim();
   if (!trimmedEntry) return RUNTIME_BUILD_STAMP_UNAVAILABLE;

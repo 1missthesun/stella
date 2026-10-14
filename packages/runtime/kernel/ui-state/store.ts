@@ -45,10 +45,8 @@ const FLUSH_DEBOUNCE_MS = 150;
 const WATCH_DEBOUNCE_MS = 50;
 const PRIVATE_FILE_MODE = 0o600;
 
-/** Shared runtime for every store instance; per-store state lives in `makeCore`. */
 const uiStateRuntime = ManagedRuntime.make(Layer.empty);
 
-/** Run a store Effect synchronously, rethrowing the original failure object. */
 const runStore = <A, E>(effect: Effect.Effect<A, E>): A => {
   const exit = uiStateRuntime.runSyncExit(effect);
   if (Exit.isSuccess(exit)) {
@@ -105,13 +103,8 @@ const makeCore = Effect.fn("UiStateStore.make")(function* (
   let flushFiber: Fiber.Fiber<void> | null = null;
   let watchFiber: Fiber.Fiber<void> | null = null;
 
-  /** Owns the fs watcher and the stat-poll registration (see below). */
   const scope = Scope.makeUnsafe();
 
-  /**
-   * Syncs memory to `next` (the authoritative on-disk state plus our pending
-   * deltas) and emits the diff. Self-writes produce an empty diff.
-   */
   const reconcileMemory = (next: Map<string, string>) => {
     const changes: UiStateChanges = {};
     for (const [key, value] of next) {
@@ -145,7 +138,6 @@ const makeCore = Effect.fn("UiStateStore.make")(function* (
     }
   };
 
-  /** Expected on-disk state with our unflushed deltas layered on top. */
   const mergePendingOntoDisk = (): Map<string, string> => {
     const next = pendingClear
       ? new Map<string, string>()
@@ -220,10 +212,6 @@ const makeCore = Effect.fn("UiStateStore.make")(function* (
   };
 
   const watchReadEffect = Effect.fn("UiStateStore.watchRead")(function* () {
-    // Expected state = on-disk content with our unflushed deltas on top.
-    // Diffing that against memory means our own flushes (file == memory)
-    // and pending-key overlaps never emit; only genuinely external
-    // changes do.
     const next = yield* Effect.sync(mergePendingOntoDisk);
     yield* Effect.sync(() => reconcileMemory(next));
   });
@@ -339,8 +327,6 @@ const makeCore = Effect.fn("UiStateStore.make")(function* (
         watchFiber = null;
         fiber.interruptUnsafe();
       }
-      // Releases the fs watcher and the stat-poll registration; both
-      // finalizers are synchronous, so the close settles inline.
       runStore(Scope.close(scope, Exit.void));
       listeners.clear();
     },
@@ -363,25 +349,18 @@ export class UiStateStore {
     return this.core.get(key);
   }
 
-  /**
-   * Applies a batch of changes (null = remove). Returns the subset that
-   * actually changed in-memory state, for broadcasting to renderers.
-   */
   apply(changes: UiStateChanges): UiStateChanges {
     return this.core.apply(changes);
   }
 
-  /** Removes every key. Returns the removal change set for broadcasting. */
   clear(): UiStateChanges {
     return this.core.clear();
   }
 
-  /** Listener for changes written by another host (or another process). */
   onExternalChange(listener: (changes: UiStateChanges) => void): () => void {
     return this.core.onExternalChange(listener);
   }
 
-  /** Synchronously persists pending deltas (shutdown path). */
   flushSync(): void {
     this.core.flushSync();
   }

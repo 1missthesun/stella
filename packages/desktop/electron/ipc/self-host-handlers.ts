@@ -24,8 +24,6 @@ export const registerSelfHostHandlers = (
   },
 ) => {
   const { service } = options;
-  // Draft previews share the preload but not the app's session: they may
-  // read the state, never switch servers or start a pairing.
   const fromApp = (event: IpcMainInvokeEvent) =>
     event.sender.session === session.fromPartition(options.appPartition);
 

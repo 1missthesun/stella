@@ -5,10 +5,8 @@ import { AddContextSheetBody } from "./AddContextSheetBody";
 import type { AddContextSheetProps } from "./AddContextSheet.types";
 import { useColors } from "../theme/theme-context";
 
-/** Matches the Modal's slide-out, so a picker opens after the sheet is gone. */
 const DISMISS_MS = 320;
 
-/** Android and web: a sliding sheet with the same content as the iOS one. */
 export function AddContextSheet(props: AddContextSheetProps) {
   const colors = useColors();
   const insets = useSafeAreaInsets();

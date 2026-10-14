@@ -16,18 +16,6 @@ import {
 } from "@stella/contracts/cloud-orchestrator-cli";
 import { sha256Hex } from "./hash.js";
 
-/**
- * No control-plane credential ever crosses the BuildSession boundary. A
- * sandbox gets this independently random, short-lived capability instead; it
- * can only ask the owning BuildSession to perform one of the bounded
- * turn-scoped requests below. The session performs each itself: the turn's
- * event stream and its thread transcript are the session's own state, and
- * the drive and web search are the owner object's.
- *
- * Model traffic does not pass through here. The sandbox holds a separate
- * turn capability that is only valid at the model gateway, and speaks to the
- * gateway directly.
- */
 export const TURN_BROKER_MAX_TTL_MS = 30 * 60_000;
 export const TURN_BROKER_MAX_REQUESTS = 4_096;
 
@@ -38,15 +26,8 @@ const MAX_CALLBACK_BODY_BYTES = 16 * 1024 * 1024;
 const MAX_CONTROL_BODY_BYTES = 64 * 1024;
 const MAX_TURN_STATE_CHECKPOINT_BODY_BYTES = 5 * 1024 * 1024;
 
-/** Web search, served by the owner's object and charged to the owner. */
 export const TURN_BROKER_SEARCH_PATH = "/api/cloud/web-search";
 
-/**
- * The owner's drive: the turn reads what its workspace should hold, and
- * saves what it changed there — files (inline, or staged through a presigned
- * PUT for anything larger) and deletions. Served by the BuildSession through
- * the owner's object, under the turn's own identity.
- */
 export const TURN_BROKER_DRIVE_PATHS = {
   files: "/api/cloud/drive/files",
   stage: "/api/cloud/drive/stage",
@@ -55,21 +36,16 @@ export const TURN_BROKER_DRIVE_PATHS = {
 } as const;
 const DRIVE_PATHS = new Set<string>(Object.values(TURN_BROKER_DRIVE_PATHS));
 
-/** The turn's event stream. Handled by the BuildSession. */
 export const TURN_BROKER_EVENTS_PATH = "/api/cloud/events";
-/** The thread transcript. Written to the BuildSession's own table. */
 export const TURN_BROKER_MESSAGES_PATH = "/api/cloud/messages";
-/** The agent's `history.*`, answered from its own thread's transcript. */
 export const TURN_BROKER_HISTORY_PATH = "/api/cloud/history";
 
 export const TURN_BROKER_USER_ASK_PATH = "/api/cloud/user-ask";
 
-/** An agent's `switch_destination`, kept by its BuildSession for the turn's end. */
 export const TURN_BROKER_AGENT_MOVE_PATH = CLOUD_AGENT_MOVE_PATH;
 
 export const TURN_BROKER_CODE_CONNECT_PATH = CLOUD_CODE_CONNECT_PATH;
 
-/** Raw-token-free durable state owned by one BuildSession. */
 export type TurnBrokerRecord = TurnBrokerIdentity & {
   version: typeof TURN_BROKER_VERSION;
   capabilityHash: string;
@@ -213,7 +189,6 @@ const capabilityFromAuthorization = (headers: Headers): string | null => {
   return CAPABILITY_PATTERN.test(capability) ? capability : null;
 };
 
-/** Fixed-work comparison for already-hashed, equal-length capability values. */
 const equalHash = (left: string, right: string): boolean => {
   if (left.length !== right.length) return false;
   let difference = 0;
@@ -342,8 +317,6 @@ const exactPath = (targetPath: string): URL | null => {
   try {
     const parsed = new URL(targetPath, "https://turn-broker.invalid");
     const rawPathname = targetPath.split("?", 1)[0]!;
-    // URL normalisation must not turn traversal or alternate encodings into an
-    // allowed route after the policy check.
     if (
       parsed.origin !== "https://turn-broker.invalid" ||
       parsed.pathname !== rawPathname ||
@@ -357,10 +330,6 @@ const exactPath = (targetPath: string): URL | null => {
   }
 };
 
-/**
- * Every broker target is an exact-path POST with no query string. Anything
- * else — including the retired model relay paths — is denied.
- */
 export const validateTurnBrokerTarget = (
   methodValue: unknown,
   targetPath: unknown,
@@ -463,11 +432,6 @@ export const validateTurnBrokerTarget = (
   return null;
 };
 
-/**
- * Engine-scoped targets. Callbacks are engine-agnostic; the orchestrator
- * routes exist only for the Claude Code CLI's turn (the session also
- * requires the turn's `agentRole`).
- */
 export const turnBrokerTargetMatchesEngine = (
   target: TurnBrokerTarget,
   engine: TurnBrokerEngine,
@@ -488,11 +452,6 @@ const integerHeader = (headers: Headers, name: string): number | null => {
   return Number.isSafeInteger(value) ? value : null;
 };
 
-/**
- * Cheap authentication before reading a potentially large streaming body.
- * The full claim repeats these checks after the body hash and live fences are
- * available, so this is an anti-DoS gate rather than the authority decision.
- */
 export const preflightTurnBrokerRequest = async (args: {
   record: TurnBrokerRecord;
   headers: Headers;
@@ -664,7 +623,6 @@ export class TurnBrokerBodyTooLargeError extends Error {
   }
 }
 
-/** Bounded streaming read; Content-Length is advisory, never the only gate. */
 export const readTurnBrokerRequestBody = async (
   request: Request,
   maxBytes: number,

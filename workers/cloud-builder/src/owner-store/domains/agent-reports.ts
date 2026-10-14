@@ -29,15 +29,9 @@ const LIVE_STATUSES = new Set([
   "waiting_for_helpers",
   "waiting_for_user",
 ]);
-/**
- * A helper still working, which a finished agent's report waits for. One
- * waiting on the user is not among them: the user may never answer, and its
- * own report reaches its parent whenever it does finish.
- */
 const WORKING_STATUSES_SQL =
   "('queued', 'pending', 'running', 'resuming', 'waiting_for_helpers')";
 const REPORTABLE = new Set<string>(["completed", "failed", "canceled"]);
-/** As the desktop bounds a report (`MAX_PARENT_AGENT_REPORT_CHARS`); longer says so. */
 const REPORT_TEXT_MAX_CHARS = AGENT_REPORT_MAX_CHARS;
 
 const boundReportText = (text: string, threadId: string): string =>
@@ -241,10 +235,7 @@ export const deriveAgentReport = (
 ): void => {
   const thread = readThread(db, threadId);
   if (!thread || !REPORTABLE.has(thread.status)) return;
-  // A stopped attempt reports to no one: whoever stopped it knows, and the
-  // agent that started it was stopped with it or asked for the stop.
   if (thread.status === "canceled" && isAgentStopReason(thread.error_message)) return;
-  // Its device already took this attempt's report (`agentThreads.acknowledgeDelivery`).
   if (thread.origin_delivery_ack_at !== null) return;
   const reportId = agentReportId(thread.thread_id, thread.attempt_generation);
   if (
@@ -680,12 +671,6 @@ const noteParser = object({
   text: string({ min: 1, max: 40_000 }),
 });
 
-/**
- * `stop_agent` replaced `pause_agent`: a paused agent is a stopped one (a
- * canceled attempt with the stop's reason, which reports to no one), a held
- * pause command is a held stop, and the reports a paused parent held go to
- * it now, waking it, as every report does.
- */
 export const AGENT_REPORTS_STOP_MIGRATION = {
   id: "agent-reports.2-stop-replaces-pause",
   statements: [

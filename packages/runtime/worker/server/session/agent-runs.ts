@@ -14,14 +14,7 @@ import {
   HOST_DEVICE_SIGNING_METHOD,
 } from "../../../host/device-signing-method.js";
 
-/** A placed agent's attachments, and one-shot completions (titles, reviews). */
 export interface Interface {
-  /**
-   * Turn a placed agent's attachments into real local files before the agent
-   * starts. The host resolved each one to a short-lived signed drive GET; the
-   * bytes land in this profile's conversation attachment cache and the agent
-   * is handed absolute paths, which is the only form it can act on.
-   */
   readonly materializeAgentAttachments: (payload: {
     conversationId: string;
     attachments?: RuntimeAttachmentRef[];
@@ -59,7 +52,6 @@ export const layer = Layer.effect(
       return pending;
     };
 
-    // Loaded on first use: it shares much of the runner's module graph.
     let oneShotCompletionModule: Promise<
       typeof import("../../../kernel/agent-runtime/one-shot-completion.js")
     > | null = null;

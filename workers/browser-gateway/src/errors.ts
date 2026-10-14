@@ -35,7 +35,6 @@ export class GatewayError extends Error {
   readonly code: GatewayErrorCode;
   readonly status: number;
 
-  /** Agent-facing detail, such as the page's own error for a failed script. */
   readonly detail: string | undefined;
 
   constructor(code: GatewayErrorCode, status: number, detail?: string) {

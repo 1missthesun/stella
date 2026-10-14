@@ -127,7 +127,6 @@ export const kindForExtension = (
   if (MODEL3D_EXTS.has(extension)) return "model3d";
   return null;
 };
-/** A text file the markdown viewer shows as-is rather than rendering. */
 export const isPlainTextPath = (filePath: string): boolean => {
   const extension = extensionOf(filePath);
   return extension != null && PLAIN_TEXT_EXTS.has(extension);

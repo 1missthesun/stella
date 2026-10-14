@@ -1,11 +1,3 @@
-// Direct answers to the questions people and AI agents search for when they
-// are looking for something like Stella. One source of truth for the landing
-// FAQ, the /ai/<slug> answer pages, their FAQPage JSON-LD, and the agent
-// markdown (llms.txt, llms-full.txt, faq.md).
-//
-// Every answer leads with the direct answer in its first sentence, states
-// only what Stella ships today, and keeps multi-agent work on Pro.
-
 export type Answer = { q: string; a: string };
 
 export const FAQ: Answer[] = [
@@ -81,13 +73,11 @@ export const FAQ: Answer[] = [
 
 export type AnswerPage = {
   slug: string;
-  /** Searches this page is written to answer. Shapes the copy; not rendered. */
   queries: string[];
   metaTitle: string;
   metaDescription: string;
   eyebrow: string;
   headline: string;
-  /** The direct answer, first thing on the page. */
   answer: string;
   points: { title: string; body: string }[];
   questions: Answer[];

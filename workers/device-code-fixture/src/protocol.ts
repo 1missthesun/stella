@@ -14,7 +14,6 @@ export type DeviceAuthorizationRequest = Readonly<{
 
 export type DeviceAuthorization = Readonly<{
   schemaVersion: 1;
-  /** Sensitive. This field exists only on the named service-binding RPC. */
   deviceCode: string;
   userCode: string;
   verificationUri: string;
@@ -26,17 +25,11 @@ export type DeviceAuthorization = Readonly<{
 export type DeviceGrantRequest = Readonly<{
   schemaVersion: 1;
   userCode: string;
-  /** Sensitive. Never place this value in an HTTP URL or public response. */
   deviceCode: string;
 }>;
 
 export type DeviceGrantConsumeRequest = DeviceGrantRequest &
   Readonly<{
-    /**
-     * Gateway-owned interaction identity. The fixture records it with the
-     * terminal consume so an exact retry can recover a lost success response
-     * without making the grant reusable by a different interaction.
-     */
     consumerId: string;
   }>;
 
@@ -64,7 +57,6 @@ export type DeviceGrantConsumeResponse = Readonly<{
     | "invalid_grant";
 }>;
 
-/** The only methods exposed to the browser gateway service binding. */
 export interface DeviceCodeFixtureBinding {
   authorize(value: unknown): Promise<DeviceAuthorization>;
   status(value: unknown): Promise<DeviceGrantStatusResponse>;

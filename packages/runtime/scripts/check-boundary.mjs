@@ -2,30 +2,8 @@ import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { isEntryPoint } from "../../../scripts/lib/entry-point.mjs";
 
-// The Effect fence (M5): Effect implementation code lives in packages/runtime,
-// packages/executor-cloud, and workers/cloud-builder. Effect is still banned
-// from model-facing runtime definitions and every client/backend package so
-// their contracts stay portable. The tool EXECUTION infrastructure
-// (kernel/tools/ outside defs/) went Effect-native in the M5 completion pass
-// (shell scopes, kill ladders, joined shutdown — see
-// docs/effect-architecture.md §6), so the runtime fence covers the
-// model-facing definition subtrees: kernel/tools/defs/ and kernel/prompts/.
-// Every source-bearing file in the inspected packages is scanned — source,
-// scripts, and configs — not just the app entry roots.
 const isEffectImport = (specifier) =>
   specifier === "effect" || specifier.startsWith("effect/");
-// Runtime modules whose EXPORTED SIGNATURES carry Effect/Scope types. The
-// runtime package.json blocks the host subpaths outright (null export
-// targets), and the fence flags any attempted import from the Effect-free
-// packages so a violation reads as a boundary error, not a resolution
-// failure. The plain-Promise facades (@stella/runtime/host,
-// @stella/runtime/host/lifecycle) stay importable.
-//
-// The per-area Effect runtime modules from the M5 completion pass are fenced
-// the same way: `host/effect-runtime`, `worker/effect-runtime`, every
-// `kernel/**/effect-runtime`, and `kernel/runner/cloud-effect-runtime`
-// export ManagedRuntimes and Effect combinators — never facades — so their
-// Effect-typed exports must not leak into desktop/desktop-ui/contracts.
 const isEffectBearingRuntimeImport = (specifier) =>
   specifier === "@stella/runtime/kernel/home/home-service" ||
   specifier === "@stella/runtime/kernel/home/home-service.js" ||
@@ -61,8 +39,6 @@ const ignoredDirectories = new Set([
   "dist",
   "dist-electron",
   "coverage",
-  // Stale packaged-build output a checkout may still have from before the
-  // native launchers.
   "release",
 ]);
 const sourceSuffixes = new Set([
@@ -81,7 +57,7 @@ const walk = async (directory) => {
   try {
     entries = await readdir(directory, { withFileTypes: true });
   } catch {
-    return []; // an optional package root may not exist
+    return [];
   }
   const files = [];
   for (const entry of entries) {
@@ -108,9 +84,6 @@ const moduleSpecifiers = (text) => {
   return specifiers;
 };
 
-/**
- * Scan a repo tree for workspace-boundary violations.
- */
 export const checkBoundaries = async (repoRoot) => {
   const offenders = [];
   const inspect = async (root, isForbidden) => {
@@ -126,9 +99,6 @@ export const checkBoundaries = async (repoRoot) => {
     }
   };
 
-  // packages/runtime — the shared Effect-bearing package, minus the
-  // tool/prompt definition subtrees. Runtime is below the cloud executor in
-  // the dependency graph and must never import back up into it.
   await inspect(
     path.join(repoRoot, "packages", "runtime"),
     (specifier, file) => {
@@ -173,9 +143,6 @@ export const checkBoundaries = async (repoRoot) => {
     },
   );
 
-  // packages/executor-cloud — Effect-bearing server execution code. It may
-  // depend on runtime/contracts, but never on the Worker above it or desktop
-  // client packages.
   await inspect(
     path.join(repoRoot, "packages", "executor-cloud"),
     (specifier) => {
@@ -193,9 +160,6 @@ export const checkBoundaries = async (repoRoot) => {
     },
   );
 
-  // workers/cloud-builder — the top Effect-bearing cloud package. It can
-  // compose executor/runtime/contracts but must not pull Electron or renderer
-  // code into the Worker bundle.
   await inspect(
     path.join(repoRoot, "workers", "cloud-builder"),
     (specifier) => {
@@ -206,9 +170,6 @@ export const checkBoundaries = async (repoRoot) => {
     },
   );
 
-  // packages/desktop-ui — the whole package is Effect-free. The stricter
-  // contracts/theme import rule applies to renderer src (tests intentionally
-  // exercise @stella/runtime/worker/* internals; configs use build tooling).
   await inspect(
     path.join(repoRoot, "packages", "desktop-ui"),
     (specifier, file) => {
@@ -240,9 +201,6 @@ export const checkBoundaries = async (repoRoot) => {
     },
   );
 
-  // packages/desktop — the whole package (electron, preload, scripts, vite,
-  // configs) is Effect-free; Electron main additionally must not reach into
-  // runtime internals by relative path.
   await inspect(
     path.join(repoRoot, "packages", "desktop"),
     (specifier, file) => {
@@ -265,7 +223,6 @@ export const checkBoundaries = async (repoRoot) => {
     },
   );
 
-  // packages/contracts — the stable seam stays Effect-free.
   await inspect(path.join(repoRoot, "packages", "contracts"), (specifier) => {
     if (isEffectImport(specifier)) {
       return "Effect is fenced from contracts";
@@ -279,8 +236,6 @@ export const checkBoundaries = async (repoRoot) => {
     return null;
   });
 
-  // Shared theme math and palettes execute in clients; keep them independent
-  // of Effect and host/runtime packages, just like renderer code.
   await inspect(path.join(repoRoot, "packages", "theme"), (specifier) => {
     if (isEffectImport(specifier)) return "Effect is fenced from theme";
     if (specifier.startsWith("@stella/")) {
@@ -289,7 +244,6 @@ export const checkBoundaries = async (repoRoot) => {
     return null;
   });
 
-  // packages/mobile is another Effect-free client surface.
   await inspect(path.join(repoRoot, "packages", "mobile"), (specifier) => {
     if (isEffectImport(specifier)) {
       return "Effect is fenced from mobile";

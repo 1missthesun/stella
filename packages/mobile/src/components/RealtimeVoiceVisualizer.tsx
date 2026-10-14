@@ -28,22 +28,13 @@ type Props = {
   isAssistantSpeaking: boolean;
   micLevel: number;
   outputLevel: number;
-  /** The overlay background, used to punch the character's eyes through. */
   faceColor: string;
 };
 
-/** How fast the mark chases a new audio level. */
 const ENERGY_RAMP_MS = 90;
-/** How long a phase hand-off takes; motion cross-fades rather than snapping. */
 const PHASE_BLEND_MS = 320;
-/** Fraction of the stage the body occupies. */
 const BODY_FRACTION = 0.62;
 
-/**
- * Collapse the session snapshot into the character's phase. Assistant speech
- * wins over user speech (the assistant is the one animating), user speech wins
- * over plain listening, and anything before the peer is live is "connecting".
- */
 export const voiceCharacterPhase = ({
   phase,
   isConnected,
@@ -60,10 +51,6 @@ export const voiceCharacterPhase = ({
   return "listening";
 };
 
-/**
- * One 0..1 level for the character to scale its motion on, from whichever
- * side of the conversation currently holds the floor.
- */
 export const realtimeVoiceEnergy = ({
   characterPhase,
   micLevel,
@@ -86,17 +73,6 @@ const PHASE_ORDER: VoiceCharacterPhase[] = [
   "error",
 ];
 
-/**
- * The voice overlay's character: the Stella mark with eyes, animated per
- * conversation phase so the user can tell at a glance whether Stella is
- * connecting, listening, hearing them, or talking.
- *
- * Everything runs on the UI thread from one shared clock plus three retargeted
- * shared values (phase, energy, blend), so a busy call never re-renders React
- * at frame rate. Phase changes cross-fade: the old motion eases out over
- * `PHASE_BLEND_MS` while the new one eases in, so a hand-off between hearing
- * and talking reads as one body changing its mind rather than a cut.
- */
 export function RealtimeVoiceVisualizer({
   size,
   phase,
@@ -126,9 +102,7 @@ export function RealtimeVoiceVisualizer({
 
   const clock = useSharedValue(0);
   const energy = useSharedValue(0);
-  /** Index into PHASE_ORDER, retargeted on each phase change. */
   const phaseIndex = useSharedValue(PHASE_ORDER.indexOf(characterPhase));
-  /** 0 at the moment of a phase change, easing to 1 as the new motion settles. */
   const blend = useSharedValue(1);
 
   useEffect(() => {
@@ -177,7 +151,6 @@ export function RealtimeVoiceVisualizer({
     }
     const current = PHASE_ORDER[Math.round(phaseIndex.value)] ?? "listening";
     const frame = voiceBodyMotion(current, clock.value, energy.value);
-    // Ease the new phase's pose in from rest so the switch never pops.
     const k = blend.value;
     const mix = (value: number, rest: number) => rest + (value - rest) * k;
     return {

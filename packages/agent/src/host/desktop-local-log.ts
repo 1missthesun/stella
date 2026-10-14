@@ -1,12 +1,3 @@
-/**
- * A conversation kept on this computer, on pi-durable and on the agent loops'
- * chat log at once. The log is what the Claude Code engine answers from and
- * what the app shows under it, so the user can move between engines and keep
- * one conversation: what pi's turns said (the user's messages, Stella's
- * replies) is written into the log as it lands, and what the log gained
- * meanwhile (Claude Code's turns) is written into the transcript before pi
- * answers again.
- */
 import type { Context } from "@earendil-works/chord";
 import type { AssistantMessage, Message, TextContent } from "@earendil-works/pi-ai";
 import {
@@ -35,7 +26,6 @@ import { splitMessageReplyRefs } from "@stella/contracts/reply-refs";
 import { lifecycleWakeOutcome, lifecycleWakeTask } from "@stella/contracts/conversation-journal-projection";
 import { NO_MESSAGE_ID, recordMessageId } from "../stella/message-ids.ts";
 
-/** The task a `spawn_agent` result started, by its thread id. */
 const spawnedThreadId = (details: unknown, text: string): string | undefined => {
   const fromDetails = (details as { thread_id?: unknown } | undefined)?.thread_id;
   if (typeof fromDetails === "string" && fromDetails) return fromDetails;
@@ -47,33 +37,19 @@ const spawnedThreadId = (details: unknown, text: string): string | undefined => 
   }
 };
 
-/** One message the log holds that pi did not write. */
 export type LocalLogMessage = { id: string; seq: number; role: "user" | "assistant"; text: string; timestamp: number };
 
-/** The conversation's chat log, as this computer keeps it. */
 export type DesktopLocalLog = {
-  /**
-   * Messages after `afterSeq`, ascending, at most `limit` rows read: the ones
-   * pi did not write, and the last row read (`throughSeq`).
-   */
   read(afterSeq: number, limit: number): Promise<{ messages: LocalLogMessage[]; throughSeq: number; complete: boolean }>;
-  /** One of pi's rows, written once per `key`; resolves with the row's id and seq. */
   write(message: LocalLogWrite): Promise<{ id: string; seq?: number }>;
 };
 
-/**
- * A row of pi's in the log, as the agent loops write theirs: the user's
- * message as sent (its id the one the composer gave it, and what it showed),
- * Stella's replies, her tool calls and their results, and how a turn ended
- * when its reply did not finish.
- */
 export type LocalLogWrite =
   | {
       key: string;
       role: "user";
       text: string;
       timestamp: number;
-      /** The id the sending client gave the message, kept as its row id. */
       clientMsgId?: string;
       display?: PiUserDisplay;
     }
@@ -82,11 +58,8 @@ export type LocalLogWrite =
       role: "assistant";
       text: string;
       timestamp: number;
-      /** An answer's user message (its row id). */
       replyTo?: string;
-      /** An answer Stella went on from with a tool call. */
       followedByToolCall?: boolean;
-      /** How the turn ended (failed, stopped), not words of Stella's. */
       notice?: true;
     }
   | {
@@ -124,12 +97,10 @@ export type LocalLogWrite =
     };
 
 export type LocalLogMirror = {
-  /** Write what the log gained since the last import into the transcript. */
   importNow(): Promise<void>;
   stop(): Promise<void>;
 };
 
-/** How far each direction got: the log's last row imported, pi's last entry written to the log. */
 const LocalLogSyncDoc = defineDoc<{ importedSeq?: number; mirrored?: number; replyTo?: string }>({
   kind: "stella.local-log",
   version: 1,
@@ -141,23 +112,13 @@ const LocalLogSyncDoc = defineDoc<{ importedSeq?: number; mirrored?: number; rep
 
 const PAGE = 200;
 const RELAY_SCAN_PAGE = 4;
-/** Log rows imported per commit. */
 const IMPORT_PAGE = 1000;
-/** A log message to import, and its text. */
 type Imported = { message: LocalLogMessage; text: string };
-/** Events after which the transcript may have something for the log. */
 const MIRRORED_EVENTS = new Set(["entry_appended", "message_end", "run_end"]);
 
-/** What the log's message was written as: kept on the entry, so it is never written back. */
 const fromLog = (entry: { data?: unknown }): boolean =>
   typeof (entry.data as { localLog?: unknown } | undefined)?.localLog === "string";
 
-/**
- * A reply written into a transcript without a model call (the onboarding
- * greeting, a reply from the chat log). It carries an empty usage: pi reads
- * the last reply's usage to size the context, and the usage dashboard skips a
- * call that cost nothing.
- */
 export const writtenReply = (text: string, timestamp: number, model: string): AssistantMessage =>
   ({
     role: "assistant",
@@ -177,7 +138,6 @@ export const writtenReply = (text: string, timestamp: number, model: string): As
     timestamp,
   }) as AssistantMessage;
 
-/** A log message's text as a user part, marked with its seq (its `message #N` id). */
 const userPart = (text: string, seq: number): TextContent => {
   const part = { type: "text" as const, text, stella: { seq } };
   return part;
@@ -200,7 +160,6 @@ export async function localLogMirror(args: {
       return undefined;
     }, context);
 
-  /** The entry a log message is written as. */
   const entryOf = ({ message, text }: Imported): EntryDraft => ({
     kind: message.role === "user" ? "pi.user" : "pi.assistant",
     model: [
@@ -210,20 +169,10 @@ export async function localLogMirror(args: {
     ],
     data: { localLog: message.id },
   });
-  /** The request a message goes through pi's inbox under, so it is never written twice. */
   const requestOf = (message: LocalLogMessage) => `legacy:${message.id}`;
 
-  /**
-   * A page of the log written into the transcript in one commit, with how far
-   * the import got: a crash keeps both or neither, so each row is written
-   * once. False, writing nothing, while pi answers or has writes queued: a
-   * run reads the transcript between its steps, so those go through its inbox.
-   */
   const importPage = (page: Imported[], through: number) =>
     harness.commit(async (tx) => {
-      // A page that went through the inbox (as every page did in older
-      // builds) and was cut short: each message it wrote has a request, its
-      // first message first.
       const written = new Set<string>();
       if (page[0] && (await tx.submissionByRequest(root.id, requestOf(page[0].message)))) {
         for (const { message } of page) {
@@ -241,19 +190,16 @@ export async function localLogMirror(args: {
         if (item.message.seq <= imported || written.has(item.message.id)) continue;
         newest = (await tx.appendEntry(root.id, entryOf(item))).id;
       }
-      // Nothing of pi's waits for the log, so what came from it needs no pass.
       if ((state.mirrored ?? 0) >= last) state.mirrored = newest;
       state.importedSeq = Math.max(imported, through);
       return true;
     }, context);
 
-  /** The log imported through `through`. */
   const advance = (through: number) =>
     save((state) => {
       state.importedSeq = Math.max(state.importedSeq ?? -1, through);
     });
 
-  /** A page through pi's inbox: placed at its run's next step, one write each. */
   const submitPage = async (page: Imported[], through: number) => {
     for (const item of page) {
       await root.submit({ type: "write", requestId: requestOf(item.message), entry: entryOf(item) }, context);
@@ -271,7 +217,6 @@ export async function localLogMirror(args: {
           const text = message.text.trim();
           return text ? [{ message, text }] : [];
         });
-        // Most often only pi's own messages, written back: nothing to import.
         if (page.length === 0) await advance(read.throughSeq);
         else if (!(await importPage(page, read.throughSeq))) await submitPage(page, read.throughSeq);
       }
@@ -279,14 +224,11 @@ export async function localLogMirror(args: {
       after = read.throughSeq;
     }
   };
-  /** One import at a time; a caller during one waits for it. */
   const importNow = () =>
     (importing ??= importOnce().finally(() => {
       importing = undefined;
     }));
 
-  // A conversation from before its turns were mirrored starts from here:
-  // what it already holds came from the log, or stays on pi.
   if ((await doc()).mirrored === undefined) {
     const last = await harness.commit(
       async (tx) => (await tx.scanEntries({ conversationId: root.id, order: "descending" }, 1)).items[0],
@@ -299,15 +241,7 @@ export async function localLogMirror(args: {
 
   let running = false;
   let again = false;
-  /** A `spawn_agent` call's description, by call id, for the task its result starts (often a later pass). */
   const spawned = new Map<string, string>();
-  /**
-   * Whether a reply that did not finish (failed or stopped) is how its turn
-   * ended: it waits for the run to end, and a reply after it in the same turn
-   * means the run went on (a retry after a failed request, a reply that
-   * finished after a Stop marker from `stopStella`), so only the turn's last
-   * reply says how it ended, as the journal and the transcript view say it.
-   */
   const unfinishedReplyEnding = (entryId: EntryId) =>
     harness.commit(async (tx): Promise<"pending" | "superseded" | "stands"> => {
       if ((await tx.doc(LiveDoc, root.id)).run !== undefined) return "pending";
@@ -321,7 +255,6 @@ export async function localLogMirror(args: {
       }
       return "stands";
     }, context);
-  /** How an agent's task ended, from its report (a hidden pi.user entry), as the log writes it. */
   const taskEnded = (entry: Pick<EntryRecord, "id" | "kind" | "model">): LocalLogWrite | undefined => {
     const message = entry.model?.[0];
     if (entry.kind !== "pi.user" || message?.role !== "user" || !piUserHidden(message as PiUserMessage)) return undefined;
@@ -342,7 +275,6 @@ export async function localLogMirror(args: {
       },
     };
   };
-  /** A pi.assistant entry the log writes as a reply bubble. */
   const isReply = (entry: Pick<EntryRecord, "kind" | "model">): boolean => {
     const message = entry.model?.[0];
     return (
@@ -351,13 +283,6 @@ export async function localLogMirror(args: {
       splitMessageReplyRefs(message).text.trim().length > 0
     );
   };
-  /**
-   * The reply that relays an agent's report: the first one after it, before
-   * the next input. In the journal the report opens its own turn, whose
-   * reply carries how the task ended; the log has no turn for a hidden
-   * input, so that reply writes the task's end after itself and the log
-   * groups the two the same way. "pending" while the run answering it goes on.
-   */
   const relayOf = (entryId: EntryId) =>
     harness.commit(async (tx): Promise<"pending" | "relayed" | "none"> => {
       if ((await tx.doc(LiveDoc, root.id)).run !== undefined) return "pending";
@@ -371,7 +296,6 @@ export async function localLogMirror(args: {
       }
       return "none";
     }, context);
-  /** The report a reply relays, if the reply is the first after one (`relayOf`). */
   const relayedReport = (entryId: EntryId) =>
     harness.commit(async (tx): Promise<LocalLogWrite | undefined> => {
       let cursor: Cursor | undefined;
@@ -409,22 +333,17 @@ export async function localLogMirror(args: {
           if (entry.kind === "pi.user" && message.role === "user") {
             const { text, display } = piUserView(message as PiUserMessage);
             const hidden = piUserHidden(message as PiUserMessage);
-            // An agent's report is how its task ended, as the loops log a task's end.
             const ended = taskEnded(entry);
             if (ended) {
               const relay = await relayOf(entry.id);
               if (relay === "pending") {
-                // Taken up again when the run ends (`run_end`).
                 held = true;
                 break;
               }
-              // A reply that relays it writes it after itself.
               if (relay === "none") await log.write(ended);
             }
-            // An agent's report or note and a prompt the app sent are not the user's words.
             if (!text.trim() && !hidden) {
               const { clientMsgId } = piJournalUserMessage(message as PiUserMessage);
-              // Nothing of it goes in the log, so it has no id there.
               if (clientMsgId) await recordMessageId(harness, root.id, clientMsgId, NO_MESSAGE_ID, context);
             }
             if (text.trim() && !hidden) {
@@ -462,7 +381,6 @@ export async function localLogMirror(args: {
                 ...(replyTo ? { replyTo } : {}),
                 ...(calls.length > 0 ? { followedByToolCall: true } : {}),
               });
-              // The log's timeline orders by time: the task's end goes just after the reply relaying it.
               const relayed = await relayedReport(entry.id);
               if (relayed) await log.write({ ...relayed, timestamp: Math.max(relayed.timestamp, message.timestamp + 1) });
             }
@@ -481,7 +399,6 @@ export async function localLogMirror(args: {
             const terminal = piTerminalNotice(message);
             const ending = terminal ? await unfinishedReplyEnding(entry.id) : "stands";
             if (ending === "pending") {
-              // Taken up again when the run ends (`run_end`).
               held = true;
               break;
             }
@@ -533,7 +450,6 @@ export async function localLogMirror(args: {
       const through = mirrored;
       const reply = replyTo;
       await save((current) => {
-        // An import meanwhile may have moved it past what it wrote.
         current.mirrored = Math.max(current.mirrored ?? 0, through);
         if (reply) current.replyTo = reply;
       });
@@ -556,16 +472,12 @@ export async function localLogMirror(args: {
     })();
   };
 
-  // What the log gained while the conversation was closed, all of a long
-  // one's history on its first open, comes in before anything watches the
-  // transcript: a watched transcript's view is copied per entry appended.
   await importNow().catch(report);
 
   const stream: AgentEventStream = await watchEvents(harness, root.id, context);
   stream.start(async (events) => {
     if ((events as Array<{ type: string }>).some((event) => MIRRORED_EVENTS.has(event.type))) sync();
   });
-  // What a previous process added and never wrote to the log.
   sync();
 
   return {

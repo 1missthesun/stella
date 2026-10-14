@@ -1,19 +1,3 @@
-/**
- * CompanionPanelRoot — the fixed-size window behind the mark that carries
- * everything but the mark itself:
- *
- *   ┌ bubbles: the latest exchange, iMessage style, fading after a dwell
- *   ├ composer: the prompt pill, open on click / dictation
- *   └ hull: a disc around the mark's spot holding the arc of buttons
- *           (read aloud · dictate · voice); the mark window sits on top of
- *           its center, so moving mark → button never crosses a gap
- *
- * Main keeps this window click-through until the mark is hovered or the
- * panel reports it has something to show, so its transparent area never
- * blocks the apps underneath while idle. The window is positioned so that
- * one horizontal and one vertical edge coincide with the mark window's; the
- * layout message says which, and everything is pinned to those edges.
- */
 import {
   useCallback,
   useEffect,
@@ -45,9 +29,6 @@ import { useCompanionWindow } from "./use-companion-window";
 import { useMarkPress } from "./use-mark-press";
 import "./companion.css";
 
-/** Arc geometry, in px around the mark's center. The arc opens toward the
- *  screen center (away from the anchored edges) so every button stays inside
- *  the window. */
 const ARC_RADIUS = 72;
 const ARC_ANGLES_BY_EDGE: Record<
   CompanionEdgeH,
@@ -71,10 +52,6 @@ const arcButtonStyle = (
   } as CSSProperties;
 };
 
-/**
- * Mark position as CSS, relative to the two anchored window edges. Expressed
- * with `100%` so it re-resolves without waiting for main.
- */
 const anchorVars = (
   edgeH: CompanionEdgeH,
   edgeV: CompanionEdgeV,
@@ -110,9 +87,7 @@ export function CompanionPanelRoot() {
 
   useDictationToggleBridge();
 
-  // ── Composer + dictation ─────────────────────────────────────────────
   const { message, setMessage, messageRef } = useComposerMessageState();
-  /** Collapse once the send lands when dictation opened the composer. */
   const collapseAfterSendRef = useRef(false);
 
   const sendCurrent = useCallback(() => {
@@ -143,7 +118,6 @@ export function CompanionPanelRoot() {
     });
   }, [dictation.isRecording]);
 
-  // Main relays the mark's click (and closes us when a drag starts).
   useEffect(() => {
     if (!api) return;
     return api.onSetExpanded(({ expanded: next }) => {
@@ -152,7 +126,6 @@ export function CompanionPanelRoot() {
     });
   }, [api]);
 
-  // ── Bubbles + what main needs to know ────────────────────────────────
   const { bubbles, visible: bubblesVisible } = useCompanionBubbles(
     state,
     hovered || expanded || bubblesHovered,
@@ -180,10 +153,6 @@ export function CompanionPanelRoot() {
     setFocusRequestId((id) => id + 1);
   }, [api, expanded]);
 
-  // Losing OS focus closes the composer — unless a recording is in flight,
-  // which the user may have started with the shortcut from another app, or
-  // the window manager never granted us focus in the first place (a blur we
-  // never earned would otherwise snap the composer shut as it opens).
   const focusedSinceExpandRef = useRef(false);
   useEffect(() => {
     if (expanded) focusedSinceExpandRef.current = document.hasFocus();
@@ -221,12 +190,8 @@ export function CompanionPanelRoot() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [collapse]);
 
-  // The panel may end up stacked above the mark window (compositors differ),
-  // so it carries its own hit area at the mark's spot with the same
-  // click-or-drag behaviour; whichever window is on top responds.
   const { dragging, handlers: markPressHandlers } = useMarkPress();
 
-  // ── Arc actions ──────────────────────────────────────────────────────
   const arcVisible = hovered || expanded;
   const showVoice = useRealtimeVoiceVisible();
   const toggleVoice = useCallback(() => {

@@ -32,7 +32,6 @@ final class TreeSigner {
         }
     }
 
-    /// Base64 SPKI DER: the value of `STELLA_LAUNCHER_PUBKEY` for Electron.
     var publicKeySPKIBase64: String { key.publicKey.derRepresentation.base64EncodedString() }
 
     static func message(tree: String) -> Data { Data("stella-tree-v1\n\(tree)\n".utf8) }
@@ -64,8 +63,6 @@ final class TreeSigner {
         }
     }
 
-    /// Before every spawn: HEAD's note must verify and the tree must be clean
-    /// (untracked files count, because the renderer globs the source tree).
     func verifyHead(git: GitTool, app: URL) throws -> Verdict {
         let dirty = try changedFiles(git: git, app: app)
         if !dirty.isEmpty { return .dirty(dirty) }
@@ -76,7 +73,6 @@ final class TreeSigner {
         return verify(tree: tree, note: note.stdout) ? .signed : .badSignature(head: head)
     }
 
-    /// Sign HEAD after checking it is `expected` (when given) and clean.
     @discardableResult
     func signHead(git: GitTool, app: URL, expected: String?) throws -> String {
         let head = try git.run(["rev-parse", "HEAD"], cwd: app)
@@ -99,8 +95,6 @@ final class TreeSigner {
         try git.run(["status", "--porcelain=v1", "--untracked-files=all"], cwd: app)
             .split(separator: "\n").map { String($0) }.filter { !$0.isEmpty }
     }
-
-    // MARK: Key storage
 
     private static func loadOrCreateFileKey(_ url: URL) throws -> P256.Signing.PrivateKey {
         if FileManager.default.fileExists(atPath: url.path) {

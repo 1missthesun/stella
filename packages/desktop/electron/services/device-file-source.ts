@@ -45,11 +45,6 @@ const wasOnThisComputer = async (requested: string): Promise<boolean> => {
   return parent?.isDirectory() ?? false;
 };
 
-/**
- * Where `requested` can be read from. A file on this computer is read here;
- * otherwise the device records say which computer has it and whether it put
- * a copy in the user's Drive. Nothing is downloaded.
- */
 export const resolveDeviceFileSource = async (
   requested: string,
   deps: DeviceFileSourceDeps | null,

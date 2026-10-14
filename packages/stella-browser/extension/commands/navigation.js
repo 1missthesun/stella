@@ -1,6 +1,3 @@
-/**
- * Navigation command handlers.
- */
 import { getActiveTab } from "./tabs.js";
 import { ensureDebugger } from "../lib/debugger.js";
 import {
@@ -102,7 +99,6 @@ export async function handleNavigate(command) {
   const updated = await chrome.tabs.get(tab.id);
   markCommandMutationOutcomeKnown(command);
 
-  // Pre-warm debugger for subsequent commands (click, fill, eval, etc.)
   try {
     await ensureDebugger(updated.id);
   } catch {}
@@ -117,9 +113,6 @@ export async function handleNavigate(command) {
 async function navigateHistory(command, navigate) {
   throwIfCommandAborted(command);
   const tab = await getActiveTab(command);
-  // Listen before dispatch so cached and same-document navigations cannot
-  // finish before we subscribe. Keep the old grace period for pages that emit
-  // no navigation event, but return as soon as the browser confirms a commit.
   const events = [
     chrome.webNavigation.onCommitted,
     chrome.webNavigation.onHistoryStateUpdated,
@@ -169,7 +162,6 @@ export async function handleReload(command) {
   const updated = await chrome.tabs.get(tab.id);
   markCommandMutationOutcomeKnown(command);
 
-  // Pre-warm debugger for subsequent commands
   try {
     await ensureDebugger(updated.id);
   } catch {}

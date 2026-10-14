@@ -43,10 +43,6 @@ const MAX_REGISTERED_CANVASES = 32;
 const MAX_REGISTERED_BYTES = 64 * 1024 * 1024;
 const MAX_DOCUMENT_DIRECTORIES = 256;
 const MAX_CANVAS_ASSET_BYTES = 256 * 1024 * 1024;
-/**
- * The most a whole (unranged) read of an asset kept on another device may
- * be: an image, stylesheet or script. Video and audio are read in ranges.
- */
 const MAX_REMOTE_ASSET_BYTES = 32 * 1024 * 1024;
 
 const ASSET_TYPES: Record<string, string> = {
@@ -130,8 +126,6 @@ const canvasResponse = (
 export const isCanvasUrl = (url: string): boolean =>
   url.startsWith(`${CANVAS_SCHEME}:`);
 
-// Insertion order is recency: a lookup re-inserts, eviction takes the first.
-/** Where a registered document's folder lives: another device, or Drive. */
 export type CanvasDocumentAssetSource = "device" | "drive";
 
 const registered = new Map<
@@ -163,14 +157,6 @@ const memoryUrl = (id: string, documentPath: string | null) =>
     ? `${CANVAS_SCHEME}://${MEMORY_HOST}/${id}/${encodeURIComponent(documentNameOf(documentPath))}`
     : `${CANVAS_SCHEME}://${MEMORY_HOST}/${id}`;
 
-/**
- * Hold `html` in memory and return the `stella-canvas://` URL that serves it.
- * With `documentPath` (a document kept on another device), the URL stands for
- * that document's folder too: its relative assets are read on request through
- * the reader `setCanvasDocumentAssetReader` installs for `assetSource`, held
- * to that folder. A Drive document's path is its drive path with a leading
- * `/` (`/reports/x.html`), so a file at the Drive root has a folder too.
- */
 export const registerCanvasHtml = (
   html: string,
   documentPath: string | null = null,
@@ -229,7 +215,6 @@ const documentAssetReaders = new Map<
   CanvasDocumentAssetReader
 >();
 
-/** How a registered document's relative assets are read, per where they live. */
 export const setCanvasDocumentAssetReader = (
   reader: CanvasDocumentAssetReader | null,
   source: CanvasDocumentAssetSource = "device",
@@ -251,7 +236,6 @@ const isHtmlPath = (target: string) => {
   return extension === ".html" || extension === ".htm";
 };
 
-// Insertion order is recency, as for `registered` above.
 const directoryByToken = new Map<string, string>();
 const tokenByDirectory = new Map<string, string>();
 
@@ -273,11 +257,6 @@ const tokenForDirectory = (directory: string) => {
   return token;
 };
 
-/**
- * The `stella-canvas://dir/...` URL for an `.html` file on this computer, or
- * null when there is no such file here. Symlinks are resolved first, so the
- * folder its assets load from is the one the file really lives in.
- */
 export const canvasUrlForLocalFile = async (
   filePath: string,
 ): Promise<string | null> => {
@@ -300,10 +279,6 @@ type CanvasDocument =
       assetSource: CanvasDocumentAssetSource;
     };
 
-/**
- * The path `segments` name inside a registered document's folder, written in
- * the document's own separator style, or null when it is not an asset there.
- */
 const documentAssetPath = (
   documentPath: string,
   segments: string[],
@@ -460,7 +435,6 @@ const documentAssetResponse = async (
   });
 };
 
-/** Serve canvases on a session partition (each renderer partition needs it). */
 export const serveCanvasProtocol = (partition: string) => {
   const partitionSession = session.fromPartition(partition);
   if (partitionSession.protocol.isProtocolHandled(CANVAS_SCHEME)) return;

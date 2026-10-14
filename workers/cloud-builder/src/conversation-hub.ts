@@ -77,45 +77,22 @@ import { READY_RUNNING_AGENTS_LIMIT, type AgentActivityEntry } from "@stella/con
 import { sha256Hex } from "./hash.js";
 import type { PiBrainRecord } from "@stella/contracts/turn-plane/pi-brain";
 
-// ---------------------------------------------------------------------------
-// Wire frames
-// ---------------------------------------------------------------------------
-
 export type ReadyFrame = {
   type: "ready";
   protocol: number;
   conversationId: string;
   epoch: number;
   headSeq: number;
-  /**
-   * First seq delivered on this connect — the client's scrollback anchor, and
-   * the point below which it must ask for a backfill to see more.
-   */
   windowStartSeq: number;
-  /** Lowest seq any future backfill can ever resolve. Below it is a `gap`. */
   floorSeq: number;
   title: string;
   activity: "idle" | "running";
   authExpiresAtMs: number;
   serverTimeMs: number;
   live: LiveTurnSnapshot | null;
-  /**
-   * Every agent this conversation has running (`JournalReader.runningAgents`),
-   * whatever window this connect delivers; `agents` frames carry it on.
-   *
-   * A client cannot derive this for itself: an agent started before anything it
-   * holds leaves no row in its window, so folding what it has would report that
-   * nothing is in progress while several agents work. The authority knows, so
-   * the authority says.
-   */
   agents: AgentActivityEntry[];
 };
 
-/**
- * The running agents again, whenever they change: a client lists these and
- * no others. Its cards only draw the agents' rows. `atMs` is when the list
- * was read, so a start card newer than it is not yet in it.
- */
 export type AgentsFrame = { type: "agents"; agents: AgentActivityEntry[]; atMs: number };
 
 export type RecordFrame = { type: "record" } & JournalRecord;
@@ -163,10 +140,6 @@ export type DeltasDroppedFrame = {
 
 export type AuthExpiringFrame = { type: "auth.expiring"; atMs: number };
 
-/**
- * Where this conversation's Stella runs (`@stella/contracts/turn-plane/pi-brain`),
- * sent whenever its holder changes, so a client never has to poll for it.
- */
 export type BrainFrame = { type: "brain"; record: PiBrainRecord | null };
 
 export type ErrorFrame = {
@@ -177,7 +150,6 @@ export type ErrorFrame = {
   ref?: string;
 };
 
-/** The pi-durable view (`pi=1` sockets): its snapshot, then its event batches. */
 export type PiSnapshotFrame = { type: "pi.snapshot"; snapshot: unknown; hasOlder: boolean };
 export type PiEventsFrame = { type: "pi.events"; events: readonly unknown[] };
 export type PiOlderFrame = { type: "pi.older"; requestId: string; entries: unknown[]; hasOlder: boolean };
@@ -204,10 +176,6 @@ export type ClientFrame =
   | { type: "backfill"; requestId: string; fromSeq: number; toSeq: number }
   | { type: "cancel"; turnId: string }
   | { type: "pi.older"; requestId: string; beforeEntryId: number };
-
-// ---------------------------------------------------------------------------
-// Worker → DO handoff
-// ---------------------------------------------------------------------------
 
 /**
  * Identity headers the worker sets after verifying the JWT, and which it
@@ -279,10 +247,6 @@ export const trustedInternalRequest = (
   });
 };
 
-// ---------------------------------------------------------------------------
-// Refusals
-// ---------------------------------------------------------------------------
-
 const CLOSE_REASONS: Record<number, string> = {
   [CLOSE_BAD_REQUEST]: "bad_request",
   [CLOSE_UNAUTHENTICATED]: "unauthenticated",
@@ -349,11 +313,6 @@ export const refuseUpgrade = (
 export const isWebSocketUpgrade = (request: Request): boolean =>
   (request.headers.get("upgrade") ?? "").toLowerCase() === "websocket";
 
-/**
- * Pull the socket credential out of `Sec-WebSocket-Protocol`, never out of the
- * query string: a short-lived `stella.ticket.` from current clients, or the
- * raw JWT older clients still send.
- */
 export const tokenFromSubprotocol = (
   request: Request,
 ): { token: string; ticket: string; offered: boolean } => {
@@ -373,10 +332,6 @@ export const tokenFromSubprotocol = (
   return { token, ticket, offered };
 };
 
-// ---------------------------------------------------------------------------
-// Socket attachment
-// ---------------------------------------------------------------------------
-
 /**
  * Everything the DO must know about a socket after an eviction. Kept small on
  * purpose: it is rewritten on every INCOMING frame (never on outgoing ones, or
@@ -391,13 +346,11 @@ type SocketAttachment = {
   authExpiresAtMs: number;
   protocol: number;
   connectedAtMs: number;
-  /** Rolling one-minute rate window. */
   rateWindowStartMs: number;
   rateTotal: number;
   rateBackfill: number;
   rateCancel: number;
   rateAuth: number;
-  /** Watches the pi-durable view. */
   pi?: boolean;
 };
 
@@ -420,41 +373,19 @@ const rollRateWindow = (attachment: SocketAttachment, nowMs: number): void => {
   attachment.rateAuth = 0;
 };
 
-// ---------------------------------------------------------------------------
-// Live tool state (in-memory, advisory, never durable)
-// ---------------------------------------------------------------------------
-
 const MAX_TRACKED_TURNS = 4;
 const MAX_TRACKED_TOOLS = 16;
 
-/**
- * The open tool calls of one turn. This is all the live state the hub keeps
- * now: assistant text is delivered whole on the committed `record`, so there
- * is no partial reply to buffer, coalesce, budget or replay.
- */
 type TurnToolState = {
   turnId: string;
   tools: Map<string, ToolInput>;
 };
 
-// ---------------------------------------------------------------------------
-// The hub
-// ---------------------------------------------------------------------------
-
 class ConversationHubImpl implements ConversationHub {
   private readonly turns = new Map<string, TurnToolState>();
-  /**
-   * Which expiry we have already warned a socket about. Weak on purpose: after
-   * an eviction the socket object is new, the entry is gone, and the worst
-   * consequence is one redundant (free) `auth.expiring` frame.
-   */
   private readonly warned = new WeakMap<WebSocket, number>();
 
   constructor(private readonly deps: ConversationHubDeps) {
-    // Idempotent, and setting it in the hub's constructor — which runs in the
-    // DO's constructor — means the answer to "does auto-response survive
-    // eviction?" never has to be known: a rehydrated DO sets it again before
-    // it can service a single frame.
     try {
       this.deps.ctx.setWebSocketAutoResponse(
         new WebSocketRequestResponsePair("ping", "pong"),
@@ -465,8 +396,6 @@ class ConversationHubImpl implements ConversationHub {
       });
     }
   }
-
-  // ── Upgrade ──────────────────────────────────────────────────────────────
 
   async upgrade(request: Request, identity: SocketIdentity): Promise<Response> {
     const conversationId = this.deps.conversationId();
@@ -495,10 +424,6 @@ class ConversationHubImpl implements ConversationHub {
       );
     }
 
-    // Unbound means the session decides: conversation ids are client-minted
-    // UUIDs, so the first VERIFIED connector is the client that minted the id
-    // and becomes the owner. An unverified request never reaches here — the
-    // worker stripped and re-stamped every identity header before forwarding.
     let ownerId = this.deps.reader.ownerId();
     if (!ownerId) {
       let record: Awaited<ReturnType<typeof this.deps.lookupOwner>>;
@@ -528,8 +453,6 @@ class ConversationHubImpl implements ConversationHub {
       head = this.deps.reader.head();
     }
     if (ownerId !== identity.ownerId) {
-      // 404, not 403: a distinct code would confirm to a prober that the
-      // conversation exists and merely belongs to somebody else.
       return refuseUpgrade(
         request,
         CLOSE_NOT_FOUND,
@@ -546,7 +469,6 @@ class ConversationHubImpl implements ConversationHub {
       );
     }
 
-    // Settled before the last await below, like everything the accept needs.
     const pi =
       url.searchParams.get("pi") === "1" &&
       (await this.deps.pi?.enabled().catch(() => false)) === true;
@@ -621,9 +543,6 @@ class ConversationHubImpl implements ConversationHub {
     if (delivered >= 0 && fresh.headSeq > delivered) {
       for (const record of this.deps.reader.newest(INITIAL_WINDOW_RECORDS)) {
         if (record.seq <= delivered) continue;
-        // Contiguity is the client's whole gap-detection contract; if the
-        // top-up cannot extend the window without a hole, stop and let the
-        // client ask for the rest by seq.
         if (record.seq !== delivered + 1) break;
         records.push(record);
         delivered = record.seq;
@@ -682,22 +601,11 @@ class ConversationHubImpl implements ConversationHub {
     });
   }
 
-  /**
-   * Free a slot if one can be freed, and report whether the newcomer fits.
-   * Reaping is lazy — on this path and on real events only — because a sweep
-   * timer would be exactly the kind of idle cost hibernation exists to avoid.
-   */
   private reserveSocketSlot(): boolean {
     let sockets = this.deps.ctx.getWebSockets();
     if (sockets.length < MAX_SOCKETS_PER_CONVERSATION) return true;
     const now = Date.now();
 
-    // Reaping is MINIMAL and ordered, not a sweep. A client's keepalive `ping`
-    // is the only liveness signal there is, and a backgrounded client is told
-    // not to send one — so "no recent ping" does not prove a socket is dead.
-    // Closing every silent socket would let one new tab kill fifteen live ones.
-    // Instead: rank by staleness, close oldest-first, and stop the moment the
-    // newcomer fits.
     const candidates = sockets
       .map((ws) => {
         const seen = this.deps.ctx.getWebSocketAutoResponseTimestamp(ws);
@@ -718,7 +626,6 @@ class ConversationHubImpl implements ConversationHub {
         entry.ws.close(1001, "stale");
         freed += 1;
       } catch {
-        // Already gone; it frees a slot either way.
         freed += 1;
       }
     }
@@ -748,16 +655,8 @@ class ConversationHubImpl implements ConversationHub {
     if (epochRaw !== null && Number(epochRaw) !== head.epoch) {
       return { ...newest(), reset: "epoch" };
     }
-    // The client claims a seq we never allocated: its cache belongs to a
-    // previous incarnation of this object.
     if (since > head.headSeq) return { ...newest(), reset: "epoch" };
     if (since + 1 < head.floorSeq) return { ...newest(), reset: "window" };
-    // Too far behind to be worth replaying. Reading the delta row by row would
-    // hand the client its oldest unseen messages first and the ones it actually
-    // opened for last, over a window it does not even retain. `reset: "window"`
-    // plus the newest records is the same answer a compacted floor already
-    // gives, and the client lands on the latest immediately and pulls earlier
-    // history back through scrollback.
     if (head.headSeq - since > MAX_CATCH_UP_RECORDS) {
       return { ...newest(), reset: "window" };
     }
@@ -781,8 +680,6 @@ class ConversationHubImpl implements ConversationHub {
     return { records: range.records, reset: null, gap };
   }
 
-  // ── Sending ──────────────────────────────────────────────────────────────
-
   private rawSend(ws: WebSocket, payload: string): void {
     try {
       ws.send(payload);
@@ -796,12 +693,6 @@ class ConversationHubImpl implements ConversationHub {
     this.sendSerialized(ws, JSON.stringify(frame));
   }
 
-  /**
-   * The single enforcement point for token expiry. Doing it here rather than on
-   * a timer is what keeps an idle conversation free: expiry can only ever
-   * revoke a send that was about to happen, never grant one, and a socket that
-   * is sending nothing needs no supervision.
-   */
   private sendSerialized(
     ws: WebSocket,
     payload: string,
@@ -849,15 +740,12 @@ class ConversationHubImpl implements ConversationHub {
     this.rawSend(ws, payload);
   }
 
-  /** Serialized once, not once per listener. */
   private broadcast(frame: ServerFrame): void {
     const sockets = this.deps.ctx.getWebSockets();
     if (sockets.length === 0) return;
     const payload = JSON.stringify(frame);
     for (const ws of sockets) this.sendSerialized(ws, payload);
   }
-
-  // ── The pi-durable view ─────────────────────────────────────────────────
 
   private piSockets(): WebSocket[] {
     return this.deps.ctx.getWebSockets().filter((ws) => readAttachment(ws)?.pi === true);
@@ -911,15 +799,12 @@ class ConversationHubImpl implements ConversationHub {
     this.sendFrame(ws, { type: "pi.older", requestId, ...page });
   }
 
-  // ── Records ──────────────────────────────────────────────────────────────
-
   broadcastRecord(record: JournalRecord): void {
     try {
       if (record.kind === "turn" && record.phase === "started") {
         this.turnState(record.turnId);
       }
       this.broadcast({ type: "record", ...record });
-      // A journal folded for its running agents changes with its rows.
       this.agentsChanged();
       // Storage also calls endTurn explicitly. Doing it here as well costs
       // nothing (it is idempotent) and means a missed call upstream leaks a
@@ -936,9 +821,6 @@ class ConversationHubImpl implements ConversationHub {
     }
   }
 
-  // ── Running agents ───────────────────────────────────────────────────────
-
-  /** The list the sockets last heard, by what a client shows of each agent. */
   private agentsHeard: string | undefined;
 
   agentsChanged(): void {
@@ -960,8 +842,6 @@ class ConversationHubImpl implements ConversationHub {
     }
   }
 
-  // ── The brain ────────────────────────────────────────────────────────────
-
   broadcastBrain(record: PiBrainRecord | null): void {
     try {
       this.broadcast({ type: "brain", record });
@@ -972,8 +852,6 @@ class ConversationHubImpl implements ConversationHub {
       });
     }
   }
-
-  // ── Tools ────────────────────────────────────────────────────────────────
 
   broadcastTool(tool: ToolInput): void {
     try {
@@ -1040,12 +918,6 @@ class ConversationHubImpl implements ConversationHub {
     };
   }
 
-  /**
-   * The authoritative running-agent list for `ready` and `agents`. Synchronous
-   * and bounded: it reads memory, which is why it can sit on the connect path
-   * with no await left to spend. A reader that cannot answer costs the client
-   * its activity list for one connect, never the connect itself.
-   */
   private runningAgents(): AgentActivityEntry[] {
     try {
       return this.deps.reader.runningAgents(READY_RUNNING_AGENTS_LIMIT);
@@ -1057,8 +929,6 @@ class ConversationHubImpl implements ConversationHub {
       return [];
     }
   }
-
-  // ── Incoming ─────────────────────────────────────────────────────────────
 
   async onMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
     try {
@@ -1087,8 +957,6 @@ class ConversationHubImpl implements ConversationHub {
       this.closeWith(ws, CLOSE_BAD_REQUEST, "Unsupported message.");
       return;
     }
-    // Char count first because it is free and, since UTF-8 bytes are never
-    // fewer than chars, it rejects every oversized frame without scanning one.
     if (
       message.length > MAX_INCOMING_FRAME_BYTES ||
       utf8Length(message) > MAX_INCOMING_FRAME_BYTES
@@ -1234,8 +1102,6 @@ class ConversationHubImpl implements ConversationHub {
       );
       return;
     }
-    // A socket must never change identity mid-life. Anything else would let a
-    // second user's token silently inherit an already-authorized stream.
     if (
       verified.token.subject !== attachment.subject ||
       verified.token.ownerId !== attachment.ownerId
@@ -1307,9 +1173,6 @@ class ConversationHubImpl implements ConversationHub {
         reason: "compacted",
       });
     }
-    // The frame is capped here regardless of what the reader returns: a
-    // batch limit expressed only in rows says nothing about a transcript of
-    // large tool results.
     const records: JournalRecord[] = [];
     let bytes = 0;
     let truncated = false;
@@ -1362,8 +1225,6 @@ class ConversationHubImpl implements ConversationHub {
     }
   }
 
-  // ── Lifecycle ────────────────────────────────────────────────────────────
-
   async onClose(
     ws: WebSocket,
     code: number,
@@ -1379,7 +1240,6 @@ class ConversationHubImpl implements ConversationHub {
       // Already closed; the accounting below is the only thing left to do.
     }
     this.warned.delete(ws);
-    // The last pi watcher gone: the pi view's stream can stop.
     if (readAttachment(ws)?.pi && this.piSockets().every((socket) => socket === ws)) {
       try {
         this.deps.pi?.detach();
@@ -1446,8 +1306,6 @@ class ConversationHubImpl implements ConversationHub {
   }
 }
 
-// Importing this module is what turns the socket layer on; without it the DO
-// falls back to NullConversationHub and keeps every non-socket behaviour.
 registerConversationHubFactory((deps: ConversationHubDeps) =>
   new ConversationHubImpl(deps),
 );

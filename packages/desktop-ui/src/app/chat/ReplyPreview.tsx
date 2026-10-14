@@ -1,20 +1,3 @@
-/**
- * iMessage-style reply preview above an assistant bubble.
- *
- * For each reply reference the row carries, a small muted bubble quotes
- * what Stella is replying to — the cited message, or the task (title and
- * live status) for an agent — joined to the reply by a thin connector.
- * Clicking a preview opens focus on that target. A task's full report is
- * offered by the reply itself, as a quiet "more" link after its text.
- *
- * A task whose result this reply relays is quoted the same way. Its
- * produced files ride inside the reply bubble itself (see MessageRow), so
- * the quote stays a single line.
- *
- * Whether a reference is worth quoting at all is decided upstream by the
- * shared reply-context rule (`@stella/contracts/reply-context`): a row only
- * reaches here with references that point outside the current exchange.
- */
 import { memo, useCallback, useState } from "react";
 import type { ReplyRef } from "@stella/contracts/reply-refs";
 import { AgentLifecycleStatusIcon } from "@/features/chat/components/AgentLifecycleStatusIcon";
@@ -29,7 +12,6 @@ const MAX_STACKED_PREVIEWS = 3;
 
 type ReplyPreviewProps = {
   refs: readonly ReplyRef[];
-  /** Tasks whose results this reply relays. */
   completions?: readonly AgentCompletionSection[];
   conversationId: string;
 };
@@ -45,8 +27,6 @@ export const ReplyPreview = memo(function ReplyPreview({
 }: ReplyPreviewProps) {
   const t = useT();
   const [expanded, setExpanded] = useState(false);
-  // A completed task is quoted once: its completion wins over
-  // a bare citation of the same thread.
   const completedThreadIds = new Set(completions.map((section) => section.agentId));
   const entries: PreviewEntry[] = [
     ...completions.map((section): PreviewEntry => ({ kind: "completion", section })),
@@ -159,7 +139,6 @@ function AgentReplyPreview({
   conversationId: string;
   status?: "running" | "completed" | "error" | "canceled";
   liveTitle?: string;
-  /** Replay diagnostics identity of the completion this bubble quotes. */
   completionEventId?: string;
 }) {
   const t = useT();
@@ -178,8 +157,6 @@ function AgentReplyPreview({
       title,
     });
   }, [conversationId, reference.threadId, title]);
-  // The glyph alone carries the task's state; a word beside it said the
-  // same thing twice. Its meaning stays available to assistive tech.
   const statusLabel =
     shownStatus === "running"
       ? t("app.chat.replyPreview.statusRunning")

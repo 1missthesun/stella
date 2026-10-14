@@ -10,7 +10,6 @@ export const usesCloudModelSettings = (
   paired: boolean,
 ): boolean => target.mode === "cloud" || !paired;
 
-/** Do not issue a request after token resolution crosses an account boundary. */
 export async function runOwnerBoundModelRequest<T>(args: {
   getToken: () => Promise<string>;
   isCurrent: () => boolean;
@@ -22,7 +21,6 @@ export async function runOwnerBoundModelRequest<T>(args: {
   return args.isCurrent() ? result : undefined;
 }
 
-/** Read the optional persisted route without promoting corrupt outbox data. */
 export function parseCloudModelSelection(value: unknown): CloudExecutionSelection | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
   const row = value as Record<string, unknown>;

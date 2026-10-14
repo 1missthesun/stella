@@ -43,12 +43,7 @@ export type ResolvedLlmRoute = {
    */
   credentialless?: boolean;
   getApiKey: () => Promise<string | undefined> | string | undefined;
-  /** A credential in place of `rejected`, the one the provider just refused. */
   refreshApiKey?: (rejected?: string) => Promise<string | undefined> | string | undefined;
-  /**
-   * A Stella route's lane to the model gateway and the model it asks for
-   * there: the `stella` provider (`@stella/agent`) runs its requests.
-   */
   stella?: { access: StellaGatewayAccess; spec: StellaModelSpec };
 };
 
@@ -109,15 +104,6 @@ const parseLocalModelId = (
   };
 };
 
-/**
- * Conservative credentialless check: only routes that EXPLICITLY declare
- * `credentialless` (the `local/` provider, origin-verified credentialless
- * proxies) qualify. The previous heuristic — any direct-provider route with
- * a non-empty baseUrl — matched every registry model (they all carry their
- * provider's baseUrl, e.g. https://api.anthropic.com), so a missing or
- * unreadable key silently fell through as "credentialless" and surfaced
- * later as the provider's raw "No API key for provider: …" error.
- */
 export const resolvedLlmSupportsCredentiallessCalls = (
   resolved: ResolvedLlmRoute,
 ): boolean =>
@@ -145,12 +131,6 @@ const getLocalProviderApiKey = async (
   return oauthKey || modelRuntime.getRuntimeManagedApiKey(providerId);
 };
 
-/**
- * The provider rejected the credential it was just given (401 or an
- * explicit token_expired). A static API key cannot be refreshed, so only an
- * OAuth credential is re-minted; a failed mint is reported as "no key" and
- * the original provider error stands.
- */
 const refreshLocalProviderApiKey = async (
   stellaAppDir: string,
   providerId: string,
@@ -171,11 +151,6 @@ const refreshLocalProviderApiKey = async (
   }
 };
 
-/**
- * Per-provider quirks — registry name + credential name + model-id aliases.
- * Most providers map 1:1 between the model-id prefix, the registry key, and
- * the credential key. The exceptions get an entry here.
- */
 const getDirectProviderCandidates = (
   provider: string,
   modelId: string,
@@ -236,11 +211,6 @@ const getDirectProviderCandidates = (
         ]),
       };
     default: {
-      // Plugin providers register themselves in the AI registry; if they show
-      // up there, treat them as direct providers without hard-coding here.
-      // (`getModels(provider).length > 0` without deep-cloning every model
-      // of the provider on each route resolution: the registry drops
-      // providers that have no models, so membership is the same answer.)
       if (getModelProviders().includes(provider)) {
         return {
           credentialProvider: provider,
@@ -334,8 +304,6 @@ const synthesizeGatewayModelFromTemplate = (
   registryProvider: string,
   modelId: string,
 ): Model<Api> | null => {
-  // ChatGPT's models are whatever the signed-in account lists
-  // (`GET /v1/models`), so a slug the static catalog doesn't know still routes.
   if (!isOpenEndedGatewayProvider(registryProvider) && registryProvider !== "chatgpt") {
     return null;
   }
@@ -360,18 +328,10 @@ const synthesizeGatewayModelFromTemplate = (
   };
 };
 
-/**
- * Outcome of trying to satisfy an explicit direct-provider (BYOK / local)
- * selection. Every non-route outcome names *why* it failed so the caller can
- * surface a specific, actionable message instead of silently re-routing.
- */
 type DirectProviderRouteResult =
   | { kind: "route"; route: ResolvedLlmRoute }
-  // The `<provider>/` prefix isn't a provider Stella can talk to directly.
   | { kind: "unsupported-provider" }
-  // Provider is known but the model id isn't in its registry (typo / dropped).
   | { kind: "unknown-model" }
-  // Provider + model are valid, but there's no usable key/credential for it.
   | { kind: "missing-credential" };
 
 const resolveDirectProviderRoute = (args: {
@@ -388,7 +348,6 @@ const resolveDirectProviderRoute = (args: {
       route: {
         model: createLocalOpenAICompatibleModel(local.modelId, local.baseUrl),
         route: "direct-provider",
-        // A local OpenAI-compatible endpoint needs no credential by design.
         credentialless: true,
         getApiKey: () => "",
       },
@@ -499,8 +458,6 @@ const resolveDirectProviderRoute = (args: {
       route: {
         model: routedModel,
         route: "direct-provider",
-        // Origin-verified credentialless proxy (models.json origin, no auth
-        // requirement): authentication travels entirely in configured headers.
         credentialless: true,
         getApiKey: () => {
           applyConfiguredHeaders();
@@ -576,7 +533,6 @@ const resolveLlmRouteResult = (args: {
     ),
   );
 
-  // No model specified → let the backend choose from agent type + audience.
   if (!parsed) {
     const route = createStellaRoute({
       site: args.site,
@@ -588,8 +544,6 @@ const resolveLlmRouteResult = (args: {
       : { ok: false, failure: { kind: "no-stella-route" } };
   }
 
-  // Explicit Stella prefix (`stella/<alias>` or `stella/<provider>/<model>`):
-  // route through Stella with the original id intact.
   if (parsed.provider === STELLA_PROVIDER) {
     let route = createStellaRoute({
       site: args.site,
@@ -605,8 +559,6 @@ const resolveLlmRouteResult = (args: {
         site: args.site,
         agentType: args.agentType,
         modelId: parsed.fullModelId,
-        // Provisional only: the catalog-enrichment layer must replace this
-        // exact id or throw before the route can be used.
         resolvedModelId: parsed.modelId,
       });
     }
@@ -643,10 +595,6 @@ const resolveLlmRouteResult = (args: {
   if (direct.kind === "route") {
     return { ok: true, route: direct.route };
   }
-  // The three non-route outcomes map 1:1 onto the failure kind
-  // (`unsupported-provider` | `unknown-model` | `missing-credential`) and
-  // share the same provider/model context; only missing-credential also
-  // reports the pre-normalization selection.
   if (direct.kind === "missing-credential") {
     return {
       ok: false,
@@ -654,9 +602,6 @@ const resolveLlmRouteResult = (args: {
         kind: "missing-credential",
         provider: parsed.provider,
         model: parsed.fullModelId,
-        // Carry the user's own reference so a normalized provider segment
-        // (`codex/` and `codex-cli/` both become `chatgpt/`) is reported as a
-        // rewrite rather than as the selection they made.
         ...(requestedModel && requestedModel !== parsed.fullModelId
           ? { requestedModel }
           : {}),
@@ -673,12 +618,6 @@ const resolveLlmRouteResult = (args: {
   };
 };
 
-/**
- * An explicit pick on the user's own key (`<provider>/<model>`, not Stella),
- * resolved as the model picker lists it: models.json and extension
- * providers, builtin overrides, their keys and configured headers. Desktop
- * chats (`@stella/agent`) run their BYOK models on it.
- */
 export const resolveDirectLlmRoute = (args: {
   stellaAppDir: string;
   modelName: string;
@@ -715,10 +654,6 @@ export const canResolveLlmRoute = (args: {
   const result = resolveLlmRouteResult({ ...args, agentType });
   if (result.ok) return true;
 
-  // An unhonorable explicit model pick does NOT make the orchestrator unready:
-  // the run still starts and surfaces a toast for the bad pick, then the user
-  // switches models. Readiness only fails when there's no route at all — i.e.
-  // no Stella account to run anything on.
   if (result.failure.kind === "no-stella-route") {
     return false;
   }

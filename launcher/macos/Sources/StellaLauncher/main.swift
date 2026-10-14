@@ -2,8 +2,6 @@ import AppKit
 import Darwin
 import Foundation
 
-// The build number, before anything else: the updater probes a downloaded
-// launcher this way, so it must not touch the install, the lock or AppKit.
 if CommandLine.arguments.dropFirst().contains("--version") {
     print(LauncherUpdater.ownVersion)
     exit(0)
@@ -73,8 +71,6 @@ try? FileManager.default.createDirectory(at: paths.logs, withIntermediateDirecto
 Logger.shared = Logger(url: paths.launcherLog)
 let options = parseOptions()
 
-// One launcher per install root. With --start, the launcher handing over to
-// this one may still be exiting: wait for it a little.
 if !InstanceLock.acquire(paths.lockFile, wait: options.startNow ? 10 : 0) {
     log("launcher: another launcher owns \(paths.root.path); exiting")
     exit(options.selfTest ? 1 : 0)
@@ -82,7 +78,6 @@ if !InstanceLock.acquire(paths.lockFile, wait: options.startNow ? 10 : 0) {
 
 let launcher = Launcher(options: options, paths: paths)
 
-// Forward termination to Electron, then go.
 var signalSources: [DispatchSourceSignal] = []
 for sig in [SIGTERM, SIGINT, SIGHUP] {
     signal(sig, SIG_IGN)
@@ -107,8 +102,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// Opened again from Finder, Launchpad or Spotlight while running: show
-    /// the window in its current phase (e.g. "Stella is running").
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         log("launcher: reopened")
         launcher.ui.update(show: .front) { _ in }

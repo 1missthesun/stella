@@ -1,28 +1,3 @@
-/**
- * Cloud home: the owner's memory policy and mirrored skills metadata. Skill
- * bytes stay in `AGENT_HOME`, under `agent-home/<sha256(owner)>/generations/
- * <sha256(generation)>/`. Memory itself is plain files in the owner's world
- * (`world-memory.ts`); this domain only governs it.
- *
- * - **Memory policy:** one `home_state` row holds the memory switch, the
- *   memory epoch and the wipe/import state. Changes to the switch and wipes go
- *   through the gate's `OwnerMemoryPolicy` (it closes model grants first), whose
- *   transport is `readMemoryPolicy` / `applyMemoryPolicyChange` below.
- * - **Skill writes are R2-first:** `skills.begin` reserves exact object keys
- *   and digests, the caller uploads and verifies those bytes, and
- *   `skills.commit` advances the head. Reservations that never commit are
- *   reclaimed by `home.intentSweep`.
- * - **Wipe:** `home.memoryWipe` erases the memory files from the owner's
- *   world, then opens a new memory epoch.
- * - **Desktop sync:** `memory.files.*` let each of the owner's computers keep
- *   its `~/.stella` memory the same as the world's, by compare-and-set, only
- *   while memory is on, and only in the epoch the computer listed. Memory a
- *   computer kept from before a wipe goes up only once the owner allowed it
- *   (`memory.authorizeReimport`).
- * - **Context:** every skill or policy change bumps `content_revision` and
- *   tells the gate (`host.homeChanged`) so cached turn context is rebuilt.
- */
-
 import type {
   CloudSkillHead,
 } from "@stella/contracts/cloud-home-sync";
@@ -67,17 +42,13 @@ import type {
   OwnerDomain,
 } from "../registry.js";
 
-// ── Limits ────────────────────────────────────────────────────────────────
-
 const WRITE_INTENT_TTL_MS = 15 * 60_000;
-/** Bytes a writer reserved may land a little after its reservation expired. */
 const INTENT_SWEEP_GRACE_MS = 5 * 60_000;
 const MAX_SKILLS = 50;
 const SKILL_MAX_FILES = 256;
 const SKILL_MAX_FILE_BYTES = 5 * 1024 * 1024;
 const SKILL_MAX_TOTAL_BYTES = 25 * 1024 * 1024;
 const WIPE_RETRY_MAX_MS = 15 * 60_000;
-/** Before any write, every owner starts in this epoch. Opaque, never ordered. */
 const INITIAL_MEMORY_EPOCH = "initial";
 
 const SHA256 = /^[0-9a-f]{64}$/;
@@ -222,8 +193,6 @@ const HOME_TABLES = [
   "skill_write_intents",
 ] as const;
 
-// ── Errors ────────────────────────────────────────────────────────────────
-
 const conflict = (reason: string, message: string) =>
   new RpcError("CONFLICT", message, { reason, retryable: false });
 
@@ -237,8 +206,6 @@ const epochStale = () =>
 
 const generationStale = () =>
   conflict("owner_generation_stale", "This request is from before your cloud data was reset.");
-
-// ── Validation ────────────────────────────────────────────────────────────
 
 const sha256Arg = (value: string): string => {
   const digest = value.trim().toLowerCase();
@@ -272,7 +239,6 @@ type SkillSource = (typeof SKILL_SOURCES)[number];
 const SKILL_AVAILABILITY = ["orchestrator", "general", "both"] as const;
 type SkillAvailability = (typeof SKILL_AVAILABILITY)[number];
 
-/** A safe relative path: no absolute, parent, hidden or control-character segments. */
 const safeRelativePath = (value: string, label: string): string => {
   const path = value.normalize("NFC").trim();
   if (
@@ -307,8 +273,6 @@ const normalizeSlug = (value: string): string => {
   return slug;
 };
 
-// ── Identities and object keys ───────────────────────────────────────────
-
 const generationPrefix = async (ownerId: string, ownerGeneration: string): Promise<string> => {
   const [ownerHash, generationHash] = await Promise.all([sha256Hex(ownerId), sha256Hex(ownerGeneration)]);
   return `agent-home/${ownerHash}/generations/${generationHash}/`;
@@ -319,8 +283,6 @@ const skillIdOf = async (ownerId: string, slug: string) =>
 
 const skillVersionId = async (ownerId: string, skillId: string, idempotencyKey: string, treeSha256: string) =>
   `skillver-${(await sha256Hex(`${ownerId}\0${skillId}\0${idempotencyKey}\0${treeSha256}`)).slice(0, 40)}`;
-
-// ── Home state ────────────────────────────────────────────────────────────
 
 type StateRow = {
   owner_generation: string;
@@ -361,7 +323,6 @@ const stateRow = (db: OwnerDbReader): StateRow | null =>
 
 const readState = (db: OwnerDbReader): StateRow => stateRow(db) ?? DEFAULT_STATE;
 
-/** Upsert the state row, stamped with the generation the write ran under. */
 const writeState = (db: OwnerDb, ownerGeneration: string, patch: Partial<StateRow>): StateRow => {
   const next: StateRow = { ...readState(db), ...patch, owner_generation: ownerGeneration };
   db.run(
@@ -373,7 +334,6 @@ const writeState = (db: OwnerDb, ownerGeneration: string, patch: Partial<StateRo
   return next;
 };
 
-/** Note a content or policy change; the caller then awaits `announce`. */
 const bumpContent = (db: OwnerDb, ownerGeneration: string): number =>
   writeState(db, ownerGeneration, { content_revision: readState(db).content_revision + 1 }).content_revision;
 
@@ -381,7 +341,6 @@ const announce = async (ctx: OwnerContext, ownerGeneration: string, revision: nu
   await ctx.host.homeChanged(ownerGeneration, revision);
 };
 
-/** The open memory epoch, refused while a wipe runs or after it moved on. */
 const assertMemoryOpen = (db: OwnerDbReader, expectedEpoch?: string): StateRow => {
   const state = readState(db);
   if (state.memory_state === "wiping") throw wipeActive();
@@ -391,7 +350,6 @@ const assertMemoryOpen = (db: OwnerDbReader, expectedEpoch?: string): StateRow =
   return state;
 };
 
-/** The policy an owner's turns run under. Refused while a wipe runs. */
 export const readMemoryPolicy = (db: OwnerDbReader, ownerGeneration: string): MemoryPolicy => {
   const state = readState(db);
   if (state.memory_state === "wiping") {
@@ -405,8 +363,6 @@ export const readMemoryPolicy = (db: OwnerDbReader, ownerGeneration: string): Me
     updatedAt: state.policy_updated_at,
   };
 };
-
-// ── Memory wipe ──────────────────────────────────────────────────────────
 
 type WipeRow = {
   operation_id: string;
@@ -435,8 +391,6 @@ const wipeStatus = (
   const wipe = readWipe(db);
   return {
     subject,
-    // An owner with no home write yet has no stored generation; the caller's
-    // checked one stands in for it.
     ownerGeneration: state.owner_generation || callerGeneration,
     state: state.memory_state as MemoryLifecycleState,
     memoryEpoch: state.memory_epoch,
@@ -524,7 +478,6 @@ const currentWipe = (db: OwnerDbReader, operationId: string): WipeRow | null => 
     : null;
 };
 
-/** Open the next memory epoch once the files are gone. Synchronous: one write. */
 const finishWipe = (ctx: OwnerContext, wipe: WipeRow, filesDeleted: number): number => {
   writeState(ctx.db, wipe.owner_generation, {
     memory_epoch: wipe.next_epoch,
@@ -544,11 +497,6 @@ const finishWipe = (ctx: OwnerContext, wipe: WipeRow, filesDeleted: number): num
   return bumpContent(ctx.db, wipe.owner_generation);
 };
 
-/**
- * Erase the memory files (`memories/`, `PERSONALITY.md`
- * under `.stella/`) from the owner's world, then open the next epoch. A
- * failure retries with backoff and stays visible in the status.
- */
 const runMemoryWipe = async (ctx: OwnerContext, rawPayload: unknown): Promise<void> => {
   const payload = parseWipePayload(rawPayload);
   if (!currentWipe(ctx.db, payload.operationId)) return;
@@ -558,7 +506,6 @@ const runMemoryWipe = async (ctx: OwnerContext, rawPayload: unknown): Promise<vo
     await eraseLegacyMemory(ctx);
     deleted = await wipeWorldMemory(await ownerMemoryWorld(ctx.env.WORLDS, ctx.ownerId));
   } catch {
-    // World errors can carry internal paths; keep only the class.
     failure = "MEMORY_WIPE_STORAGE_FAILURE";
   }
   const now = Date.now();
@@ -581,12 +528,6 @@ const runMemoryWipe = async (ctx: OwnerContext, rawPayload: unknown): Promise<vo
   await announce(ctx, current.owner_generation, revision);
 };
 
-// ── Memory policy changes (the gate's `OwnerMemoryPolicy` transport) ─────
-
-/**
- * Apply a memory switch change or start a wipe, under the generation the gate
- * verified. Idempotent on `requestId`. Throws `RpcError` refusals.
- */
 export const applyMemoryPolicyChange = async (
   ctx: OwnerContext,
   change: MemoryPolicyChange,
@@ -621,13 +562,6 @@ export const applyMemoryPolicyChange = async (
   await announce(ctx, ownerGeneration, bumpContent(ctx.db, ownerGeneration));
 };
 
-/**
- * The generation a client's request runs under. A client acts on what the
- * views showed it: the generation the home state was last written under, or
- * `""` before the first write (a new owner, or after a reset purged it). A
- * request naming anything else is from before a reset. The write is stamped
- * with the owner's current generation.
- */
 const requestGeneration = async (ctx: OwnerContext, expected: string): Promise<string> => {
   const { ownerGeneration } = await ctx.host.snapshot();
   if (expected === ownerGeneration || expected === readState(ctx.db).owner_generation) return ownerGeneration;
@@ -639,8 +573,6 @@ const callerSubject = (ctx: { caller: { ownerId: string } | null; ownerId: strin
 
 const generationArg = string({ min: 1, max: 512 });
 
-// ── Memory sync ──────────────────────────────────────────────────────────
-
 const memoryOff = () =>
   conflict("CLOUD_MEMORY_OFF", "Memory is off for this account.");
 
@@ -650,7 +582,6 @@ const reimportRequired = () =>
     "Cloud memory was erased. Memory a computer kept from before goes up only after you allow it.",
   );
 
-/** Sync runs while memory is on and open, in the epoch the caller listed. */
 const assertSyncOpen = (db: OwnerDbReader, expectedEpoch?: string): StateRow => {
   const state = assertMemoryOpen(db, expectedEpoch);
   if (state.memory_enabled !== 1) throw memoryOff();
@@ -735,7 +666,6 @@ const markLegacyImportDone = (db: OwnerDb, now: number, imported: number): void 
   );
 };
 
-/** Delete every legacy memory row's R2 copy, then the legacy tables. */
 const eraseLegacyMemory = async (ctx: OwnerContext): Promise<void> => {
   if (!hasLegacyMemory(ctx.db)) return;
   const keys = [
@@ -755,7 +685,6 @@ const eraseLegacyMemory = async (ctx: OwnerContext): Promise<void> => {
   for (const table of LEGACY_MEMORY_TABLES) ctx.db.run(`DROP TABLE IF EXISTS ${table}`);
 };
 
-/** Where a legacy document lives in the world, or null when the layout keeps no such file. */
 const legacyWorldPath = (displayPath: string): string | null => {
   if (!displayPath.startsWith(LEGACY_DISPLAY_PREFIX)) return null;
   const path = displayPath.slice(LEGACY_DISPLAY_PREFIX.length);
@@ -766,7 +695,6 @@ const legacyWorldPath = (displayPath: string): string | null => {
 const importLegacyMemory = async (ctx: OwnerContext): Promise<number> => {
   if (!hasLegacyMemory(ctx.db) || legacyImportDone(ctx.db)) return 0;
   const state = readState(ctx.db);
-  // The wipe erases legacy memory itself.
   if (state.memory_state === "wiping") return 0;
   const rows = ctx.db.all<LegacyDocRow>("SELECT display_path, memory_epoch, r2_key, sha256 FROM memory_docs");
   const bucket = ctx.env.AGENT_HOME;
@@ -774,8 +702,6 @@ const importLegacyMemory = async (ctx: OwnerContext): Promise<number> => {
   const world = () => ownerMemoryWorld(ctx.env.WORLDS, ctx.ownerId);
   const written: { path: string; sha: string }[] = [];
   for (const row of rows) {
-    // Imported and user Markdown copies have no place in the world layout;
-    // they stay where they are.
     const path = legacyWorldPath(row.display_path);
     if (!path || row.memory_epoch !== state.memory_epoch || !bucket) continue;
     const object = await bucket.get(row.r2_key);
@@ -802,8 +728,6 @@ const importLegacyMemory = async (ctx: OwnerContext): Promise<number> => {
 const syncPathArg = string({ min: 1, max: 240 });
 const syncEpochArg = string({ min: 1, max: 128 });
 const syncShaArg = string({ pattern: SHA256 });
-
-// ── Skills ────────────────────────────────────────────────────────────────
 
 type SkillFile = { path: string; r2Key: string; sha256: string; sizeBytes: number; contentType: string };
 
@@ -857,7 +781,6 @@ type SkillIntentRow = {
   expires_at: number;
 };
 
-/** A tombstoned head reads as absent: the next upload starts at revision 1. */
 const liveSkill = (db: OwnerDbReader, skillId: string): { row: SkillRow | null; live: SkillRow | null } => {
   const row = db.one<SkillRow>("SELECT * FROM skills WHERE skill_id = ?", skillId);
   return { row, live: row && row.deleted_at === null ? row : null };
@@ -1067,8 +990,6 @@ const commitSkillWrite = async (ctx: OwnerContext, raw: unknown) => {
   if (intent.status === "conflict") return skillReceipt(intent);
   const { live } = liveSkill(ctx.db, intent.skill_id);
   if (intent.status === "committed") {
-    // A later device-root deletion may have tombstoned this head. Restoring
-    // the identical package replays this key, so republish the head.
     if (live) return skillReceipt(intent);
   } else {
     if (intent.status !== "prepared") {
@@ -1154,10 +1075,6 @@ const liveSkills = (db: OwnerDbReader): SkillRow[] =>
 const skillVersion = (db: OwnerDbReader, versionId: string | null): SkillVersionRow | null =>
   versionId ? db.one<SkillVersionRow>("SELECT * FROM skill_versions WHERE version_id = ?", versionId) : null;
 
-/**
- * The skills a cloud turn may materialize: exactly what the owner's device
- * root holds, mirrored, with the exact file allowlist of each version.
- */
 const skillCatalog = (db: OwnerDbReader, agentType: "orchestrator" | "general") =>
   liveSkills(db).flatMap((skill) => {
     if (skill.availability !== "both" && skill.availability !== agentType) return [];
@@ -1193,7 +1110,6 @@ const skillCatalog = (db: OwnerDbReader, agentType: "orchestrator" | "general") 
     ];
   });
 
-/** Mirror heads for the device's reconciliation. No object keys. */
 const skillHeads = (db: OwnerDbReader): CloudSkillHead[] =>
   liveSkills(db).map((skill) => {
     const version = skillVersion(db, skill.version_id);
@@ -1219,11 +1135,6 @@ const skillHeads = (db: OwnerDbReader): CloudSkillHead[] =>
     };
   });
 
-/**
- * Tombstone a mirrored skill the device root stopped holding. A head that
- * moved past the revision the device saw is left alone, so one device never
- * erases another device's newer upload.
- */
 const deleteMirroredSkill = async (
   ctx: OwnerContext,
   args: HomeCalls["skills.deleteMirrored"]["args"],
@@ -1239,8 +1150,6 @@ const deleteMirroredSkill = async (
   await announce(ctx, ownerGeneration, bumpContent(ctx.db, ownerGeneration));
   return { skillId, status: "deleted", revision: live.revision };
 };
-
-// ── Generated connector skills ───────────────────────────────────────────
 
 const sweepGeneratedConnectorSkills = async (ctx: OwnerContext): Promise<void> => {
   const bucket = ctx.env.AGENT_HOME;
@@ -1290,9 +1199,6 @@ const sweepGeneratedConnectorSkills = async (ctx: OwnerContext): Promise<void> =
   }
 };
 
-// ── Intent sweep ──────────────────────────────────────────────────────────
-
-/** Arm the sweep for the earliest reservation that never committed. */
 const scheduleIntentSweep = (ctx: OwnerContext): void => {
   const next = ctx.db.one<{ at: number | null }>(
     "SELECT MIN(expires_at) AS at FROM skill_write_intents WHERE status != 'committed'",
@@ -1302,11 +1208,6 @@ const scheduleIntentSweep = (ctx: OwnerContext): void => {
   }
 };
 
-/**
- * Reservations that never committed: expire them, delete the bytes they may
- * have uploaded unless a committed version also uses that key, and drop the
- * rows. Committed receipts stay for idempotent replay.
- */
 const runIntentSweep = async (ctx: OwnerContext): Promise<void> => {
   const cutoff = ctx.now - INTENT_SWEEP_GRACE_MS;
   const skills = ctx.db.all<{ intent_id: string; manifest_r2_key: string; files_json: string }>(
@@ -1331,7 +1232,6 @@ const runIntentSweep = async (ctx: OwnerContext): Promise<void> => {
     }
   }
   for (const intent of skills) ctx.db.run("DELETE FROM skill_write_intents WHERE intent_id = ?", intent.intent_id);
-  // `+ 1`: the run that is finishing keeps its own job row until it returns.
   const next = ctx.db.one<{ at: number | null }>(
     "SELECT MIN(expires_at) AS at FROM skill_write_intents WHERE status != 'committed'",
   )?.at;
@@ -1345,12 +1245,9 @@ const runIntentSweep = async (ctx: OwnerContext): Promise<void> => {
   }
 };
 
-// ── Internal operations ───────────────────────────────────────────────────
-
 const generationOnly = object({ ownerGeneration: generationArg });
 
 const internal: Record<string, InternalDef> = {
-  /** The policy a turn runs under. Refused while a wipe runs. */
   "memory.context": (ctx, raw) => {
     const args = generationOnly(raw);
     assertMemoryOpen(ctx.db);
@@ -1374,8 +1271,6 @@ const internal: Record<string, InternalDef> = {
   "skills.begin": beginSkillWrite,
   "skills.commit": commitSkillWrite,
 };
-
-// ── Domain ────────────────────────────────────────────────────────────────
 
 const epochRequest = object({
   requestId: string({ min: 1, max: 128 }),
@@ -1453,7 +1348,6 @@ export const homeDomain = {
         await importLegacyMemory(ctx);
         const before = assertSyncOpen(ctx.db);
         const files = await fileRefusal(() => memorySync(ctx).list());
-        // The listing holds only for the epoch it was taken in.
         const state = assertSyncOpen(ctx.db, before.memory_epoch);
         return {
           memoryEpoch: state.memory_epoch,
@@ -1475,7 +1369,6 @@ export const homeDomain = {
       parse: object({
         path: syncPathArg,
         expectedMemoryEpoch: syncEpochArg,
-        // The shared caps refuse anything longer once redacted.
         content: string({ max: 200_000 }),
         expectSha: nullable(syncShaArg),
         importing: boolean(),
@@ -1536,7 +1429,6 @@ export const homeDomain = {
     [INTENT_SWEEP_JOB]: { run: (ctx) => runIntentSweep(ctx), maxAttempts: 50 },
   },
   internal,
-  /** R2 bytes go with the owner prefix sweep in `/owners/purge`. */
   purge: (ctx) => {
     const wipe = readWipe(ctx.db);
     if (wipe) ctx.jobs.cancel(wipeJobId(wipe.operation_id));

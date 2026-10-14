@@ -1,57 +1,19 @@
-/**
- * The mobile pairing proof a phone attaches to a placement submit.
- *
- * A paired phone has no Stella device key of its own that the cloud can
- * verify; what it has is the pairing secret the desktop showed it once. Both
- * sides keep only `sha256(pairSecret)` — the *pairing key* — and the phone
- * proves possession by HMAC-ing a canonical message with it. The owner
- * snapshot carries that key as `pairedDevices[].mobilePublicKey`, so the
- * cloud-builder can verify a submit without an extra round trip.
- *
- * The phone and the worker both import this module, so they agree on the
- * scheme without a second implementation:
- *
- *   pairingKey = lowercase-hex sha256(pairSecret)
- *   challenge  = "execution-placement-v1:{idempotencyKey}:{conversationId}
- *                 :{payloadHash}:{kind}:{subject}"                  (6 parts)
- *              + ":{targetMode}:{targetDeviceId}"  when a destination was named
- *   message    = "stella-mobile-bridge-pair-proof-v1\n{desktopDeviceId}
- *                 \n{mobileDeviceId}\n{challenge}\n{mobilePublicKey}
- *                 \n{issuedAt}"
- *   proof      = lowercase-hex HMAC-SHA256(key = utf8(pairingKey),
- *                                          message = utf8(message))
- *
- * `mobilePublicKey` inside the message is an optional extra key the proof
- * binds (empty today; the field and the `-bridge-` in the version string are
- * kept so the wire format does not change); the HMAC key is always the
- * pairing key. The same scheme signs a phone's requests to a computer, with
- * the challenge from `device-requests.ts`.
- *
- * Everything here is WebCrypto only: no node builtins, no third-party hashes,
- * so the same file runs in the worker and in React Native.
- */
-
 import type { DispatchPayload } from "./placement.js";
 
 export const MOBILE_PAIRING_PROOF_VERSION =
   "stella-mobile-bridge-pair-proof-v1" as const;
 
-/** Prefix of the placement challenge the proof signs. */
 export const MOBILE_PAIRING_CHALLENGE_VERSION =
   "execution-placement-v1" as const;
 
-/** A proof older or newer than this is refused outright. */
 export const MOBILE_PAIRING_PROOF_MAX_SKEW_MS = 5 * 60_000;
 
-/** Headers a mobile submit carries. Lowercase: `Headers` is case-insensitive. */
 export const MOBILE_PAIRING_HEADERS = {
   mobileDeviceId: "x-stella-mobile-device-id",
-  /** The paired desktop this proof is scoped to (the grant). */
   desktopDeviceId: "x-stella-mobile-desktop-device-id",
   proof: "x-stella-mobile-pair-proof",
   issuedAt: "x-stella-mobile-pair-proof-issued-at",
   challenge: "x-stella-mobile-pair-proof-challenge",
-  /** Optional bridge public key bound into the proof. */
   mobilePublicKey: "x-stella-mobile-public-key",
 } as const;
 
@@ -65,15 +27,9 @@ export const MOBILE_PAIRING_LIMITS = {
 export type MobilePairingChallengeInput = {
   idempotencyKey: string;
   conversationId: string;
-  /** Lowercase hex sha256 of the exact payload JSON bytes. */
   payloadHash: string;
   kind: "chat" | "agent";
   subject: "portable" | "computer" | "cloud";
-  /**
-   * Destination intent. Omit both to sign the six-field challenge; naming
-   * either appends `targetMode` and `targetDeviceId` (empty when absent), so
-   * a phone can never have its destination rewritten under a signed proof.
-   */
   targetMode?: "automatic" | "cloud" | "device";
   targetDeviceId?: string;
 };
@@ -99,12 +55,10 @@ export type MobilePairingProofMessageInput = {
   desktopDeviceId: string;
   mobileDeviceId: string;
   challenge: string;
-  /** The phone's bridge public key, when it has one. */
   mobilePublicKey?: string;
   issuedAt: number;
 };
 
-/** A tuple joined by newlines: no key ordering to disagree about. */
 export const buildMobilePairingProofMessage = (
   input: MobilePairingProofMessageInput,
 ): string =>
@@ -117,20 +71,14 @@ export const buildMobilePairingProofMessage = (
     String(input.issuedAt),
   ].join("\n");
 
-// ---------------------------------------------------------------------------
-// WebCrypto primitives
-// ---------------------------------------------------------------------------
-
 const encoder = new TextEncoder();
 
 const toHex = (bytes: Uint8Array): string =>
   Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 
-/** Lowercase hex SHA-256 of a UTF-8 string. */
 export const sha256Hex = async (value: string): Promise<string> =>
   toHex(new Uint8Array(await crypto.subtle.digest("SHA-256", encoder.encode(value))));
 
-/** Lowercase hex HMAC-SHA256; the key is the UTF-8 bytes of `key`. */
 export const hmacSha256Hex = async (
   key: string,
   message: string,
@@ -149,7 +97,6 @@ export const hmacSha256Hex = async (
   );
 };
 
-/** Length-checked first, then constant time over the compared bytes. */
 export const constantTimeEqualHex = (a: string, b: string): boolean => {
   if (a.length !== b.length) return false;
   let diff = 0;
@@ -158,10 +105,6 @@ export const constantTimeEqualHex = (a: string, b: string): boolean => {
   }
   return diff === 0;
 };
-
-// ---------------------------------------------------------------------------
-// Signing (phones and tests) and verification (the worker)
-// ---------------------------------------------------------------------------
 
 export type MobilePairingProofFields = {
   mobileDeviceId: string;
@@ -172,7 +115,6 @@ export type MobilePairingProofFields = {
   mobilePublicKey?: string;
 };
 
-/** The headers a signed proof travels in, ready to spread into a fetch init. */
 export const mobilePairingProofHeaders = (
   fields: MobilePairingProofFields,
 ): Record<string, string> => ({
@@ -191,17 +133,12 @@ const bounded = (value: string | null, max: number): string => {
   return trimmed.length > 0 && trimmed.length <= max ? trimmed : "";
 };
 
-/** True when a request even claims to be a mobile submit. */
 export const hasMobilePairingProofHeaders = (headers: Headers): boolean =>
   Boolean(
     headers.get(MOBILE_PAIRING_HEADERS.proof)?.trim() ||
       headers.get(MOBILE_PAIRING_HEADERS.mobileDeviceId)?.trim(),
   );
 
-/**
- * Pull the proof out of a request's headers. Returns `null` when a required
- * field is missing or out of bounds — never a partially trusted object.
- */
 export const readMobilePairingProofHeaders = (
   headers: Headers,
 ): MobilePairingProofFields | null => {
@@ -331,16 +268,6 @@ export const verifyMobilePairingProof = async (input: {
   };
 };
 
-// ---------------------------------------------------------------------------
-// What the challenge commits to
-// ---------------------------------------------------------------------------
-
-/**
- * The exact payload bytes a dispatch carries. The proof signs a hash of this
- * string, and the owner gate stores and hands over these same bytes, so every
- * side has to serialize a payload the same way: declaration order, absent
- * optionals omitted rather than written as `null`.
- */
 export const canonicalDispatchPayloadJson = (
   payload: DispatchPayload,
 ): string =>
@@ -356,8 +283,6 @@ export const canonicalDispatchPayloadJson = (
     ...(payload.attachments && payload.attachments.length > 0
       ? { attachments: payload.attachments }
       : {}),
-    // Pasted and quoted text sent with a chat: left out, a placed message
-    // reached the computer running it as only its typed line.
     ...(payload.context && (payload.context.text || payload.context.display)
       ? {
           context: {

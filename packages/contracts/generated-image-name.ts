@@ -49,11 +49,6 @@ const titleFromPrompt = (prompt: string | undefined): string => {
     : FALLBACK_TITLE;
 };
 
-/**
- * The name a generated image goes by in Files and the drive: the opening
- * words of its prompt, numbered when one call made several images. Storage
- * paths stay keyed by the job so a reattached call finds its own files.
- */
 export const generatedImageFileName = (args: {
   prompt: string | undefined;
   index: number;

@@ -28,14 +28,11 @@ import { detectImageMediaType } from "@stella/runtime/kernel/shared/image-payloa
 export type FittedImage = {
   bytes: Uint8Array;
   mimeType: string;
-  /** The source image's size, which the Read result names. */
   originalWidth: number;
   originalHeight: number;
-  /** Present when the image was downscaled or re-encoded. */
   note?: string;
 };
 
-/** Shrink passes after the first, before giving up (0.75^8 ≈ 10% of the edge). */
 const MAX_SHRINK_PASSES = 8;
 
 const streamOf = (bytes: Uint8Array): ReadableStream<Uint8Array> =>
@@ -52,11 +49,6 @@ const dimensionsOf = async (
   return { width: info.width, height: info.height };
 };
 
-/**
- * The image as `caps` allow: untouched when it already fits, otherwise
- * downscaled (aspect kept) and re-encoded under the byte cap, with a note.
- * Null only when the Images service cannot decode it.
- */
 export const fitImageWithImagesBinding = async (
   images: ImagesBinding,
   bytes: Uint8Array,

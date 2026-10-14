@@ -1,10 +1,3 @@
-/**
- * Cloud agent threads projected into the exact Activity row model the local
- * runtime produces (C10). A thread that ran in the cloud is the same kind of
- * work as one that ran on this Mac — it lists in the same Activity section,
- * with the same expand/updates/open affordances. Only a small placement
- * badge says where it ran.
- */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ledgerThreadTaskStatus } from "@stella/contracts/agent-ledger";
 import { CONVERSATION_AGENT_THREADS_MAX } from "@stella/contracts/backend/agent-threads";
@@ -20,11 +13,9 @@ import { useBackendView } from "@/platform/backend/use-backend-view";
 import { cloudConversationBelongsToOwnerSubject } from "./cloud-conversation-selection";
 import type { CloudAgentThread } from "./cloud-api";
 
-/** Human label for where a thread ran. */
 export const cloudPlacementLabel = (placement: string): string =>
   placement === "computer" ? "Computer" : "Cloud";
 
-/** The agent's own report — the same prose a local agent leaves behind. */
 export const cloudThreadReport = (
   thread: CloudAgentThread,
 ): string | undefined => {
@@ -35,7 +26,6 @@ export const cloudThreadReport = (
         return parsed.finalText.trim();
       }
     } catch {
-      // A non-JSON result is still the agent's own text.
       return thread.resultJson;
     }
   }
@@ -67,7 +57,6 @@ export const cloudThreadToTask = (thread: CloudAgentThread): TaskItem => {
 export type CloudActivity = {
   threads: CloudAgentThread[];
   tasks: TaskItem[];
-  /** taskId → placement label, rendered as the row's placement badge. */
   placements: ReadonlyMap<string, string>;
   threadsById: ReadonlyMap<string, CloudAgentThread>;
   hasRunning: boolean;
@@ -103,21 +92,13 @@ const projectCloudActivity = (
 };
 
 export type CloudConversationActivity = CloudActivity & {
-  /** False only while the authenticated conversation query is unresolved. */
   hasLoaded: boolean;
-  /**
-   * The agent ledger answered for this conversation. False while it loads,
-   * when it cannot be reached, and for a chat it holds nothing for; the chat
-   * then reads its agents from the journal.
-   */
   ledgerReady: boolean;
-  /** True while an older cursor exists or that cursor is being loaded. */
   hasOlder: boolean;
   isLoadingOlder: boolean;
   loadOlder: () => void;
 };
 
-/** Match the historical first-page size while making every older row reachable. */
 export const CLOUD_ACTIVITY_PAGE_SIZE = 30;
 
 export const cloudThreadsForOwnerSubject = (
@@ -144,20 +125,12 @@ export const mergeCloudThreadSnapshots = (
   );
 };
 
-/**
- * Canonical agent-thread state for one conversation. Unlike the global
- * sidebar query, this projection can drive every conversation-scoped Activity
- * consumer (composer pill, mobile bridge, and presence) in a browser.
- */
 export const useCloudConversationActivity = (
   conversationId: string | null,
 ): CloudConversationActivity => {
   const { isCloudConversationReady, ownerSubject } =
     useCloudConversationSession();
   const enabled = isCloudConversationReady && Boolean(conversationId);
-  // History is the conversation's newest threads as one live view; "older"
-  // raises the window. Running threads are their own view so a long-running
-  // one never falls out behind newer completions.
   const [limit, setLimit] = useState(CLOUD_ACTIVITY_PAGE_SIZE);
   useEffect(() => setLimit(CLOUD_ACTIVITY_PAGE_SIZE), [conversationId]);
   const page = useBackendView(
@@ -171,8 +144,6 @@ export const useCloudConversationActivity = (
   );
   const pageThreads = page.value?.threads;
   const runningThreads = running.value;
-  // The backend authorizes every read. This second owner check keeps a value
-  // from the previous account out of even one transition frame.
   const ownedThreads = useMemo(
     () =>
       pageThreads
@@ -209,8 +180,6 @@ export const useCloudConversationActivity = (
     pageScopeIsCurrent &&
     runningHasLoaded &&
     (!enabled || page.status !== "loading");
-  // A raised window loads as a fresh subscription; until it lands the
-  // previous rows stay on screen.
   const isLoadingOlder =
     pageScopeIsCurrent &&
     page.status === "loading" &&
@@ -245,13 +214,6 @@ export const useCloudConversationActivity = (
   );
 };
 
-/**
- * Cloud rows own durable identity/status. Desktop runtime rows only decorate
- * a matching running row with lower-latency operational detail, or bridge the
- * brief interval before the cloud row becomes observable. A runtime row under
- * the placement id a device ran a cloud thread by is that thread's row, so an
- * agent never lists twice.
- */
 export const mergeCloudConversationTasks = (
   canonical: readonly TaskItem[],
   operational: readonly TaskItem[],
@@ -284,10 +246,6 @@ export const mergeCloudConversationTasks = (
   return merged;
 };
 
-/**
- * A cloud conversation's agents folded from its journal: what the chat shows
- * only while the agent ledger cannot be reached.
- */
 export const journalActivityTasks = (
   records: readonly AgentActivityRecordInput[],
 ): TaskItem[] =>

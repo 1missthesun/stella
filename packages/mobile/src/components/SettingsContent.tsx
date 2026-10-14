@@ -70,19 +70,11 @@ const GRADIENT_OPTIONS: { value: GradientMode; labelKey: string }[] = [
   { value: "flat", labelKey: "mobile.settings.background.flat" },
 ];
 
-// Mirrors desktop's "Gradient Color" control (ThemePicker.tsx).
 const GRADIENT_COLOR_OPTIONS: { value: GradientColor; labelKey: string }[] = [
   { value: "relative", labelKey: "mobile.settings.backgroundColor.relative" },
   { value: "strong", labelKey: "mobile.settings.backgroundColor.strong" },
 ];
 
-/**
- * The Settings tab: everything about the account and the app on one page,
- * top to bottom from who you are to the fine print — Account (identity and
- * plan), Computer (status, where turns run, pairing), Cloud, Appearance,
- * Notifications, About, then sign-out and deletion. The Computer section's
- * live state is the chat's, published through the shell store.
- */
 export function SettingsContent() {
   const colors = useColors();
   const t = useT();
@@ -99,8 +91,6 @@ export function SettingsContent() {
     gradientColor,
     setGradientColor,
   } = useTheme();
-  // Flat themes (Default) paint no blob — disable the Soft option so the
-  // toggle reflects the actual rendered surface instead of misleading the user.
   const gradientLocked = flat;
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const settingsStyles = useMemo(() => makeSettingsStyles(colors), [colors]);
@@ -124,16 +114,12 @@ export function SettingsContent() {
   useEffect(() => subscribeVoiceEnabled(setVoiceEnabledLocal), []);
 
   const user = session.data?.user;
-  // A self-hosted owner's account email is synthetic
-  // (owner-…@selfhost.stella.local): name the server they own instead.
   const email =
     launchServer.kind === "self-hosted"
       ? t("mobile.selfHost.ownerOf", { name: launchServer.name })
       : (user?.email ?? "");
   const userName = user?.name?.trim() ?? "";
 
-  // Appearance, notifications, and legal work without a session; everything
-  // that needs an identity (plan, computers, cloud, sign-out) hides.
   const isSignedIn = Boolean(user);
   const showFeedback = isSignedIn && !isSelfHostedLaunch;
   const showLoadingHeader = session.isPending && !user;
@@ -177,10 +163,6 @@ export function SettingsContent() {
     void setNotificationsMuted(!next);
   };
 
-  // Local state carries the departing account's data — chat transcripts in
-  // AsyncStorage and desktop pairing secrets in SecureStore. Wipe it so the
-  // next sign-in on this device can't inherit (or re-send as chat history)
-  // the previous user's messages or reconnect with their computers.
   const clearLocalAccountState = async () => {
     const paired = await listStoredPairedPhoneAccess().catch(
       () => [] as StoredPhoneAccess[],
@@ -414,8 +396,6 @@ export function SettingsContent() {
 
         <View style={styles.themeDots}>
           {themes.map((th) => {
-            // Resolve through the shared catalog so forced-mode themes preview
-            // in the appearance they actually render.
             const preview = resolveThemeColors(th, isDark).colors;
             const isActive = th.id === selectedThemeId;
             return (
@@ -718,8 +698,6 @@ const makeStyles = (colors: Colors) =>
       gap: 12,
       marginBottom: 14,
     },
-    // The label shares the row with the mode switch, so it drops its own
-    // bottom gap and centres against the control.
     appearanceLabel: { flex: 1, marginBottom: 0 },
     modeControl: { width: 220 },
     surfaceControls: { flexDirection: "row", gap: 10, marginTop: 26 },

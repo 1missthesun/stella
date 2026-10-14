@@ -1,11 +1,3 @@
-/**
- * Field-wise equality helpers for the linear chat row view-model graph.
- *
- * Lifted out of the row component file so the `useEventRows` stable-rows
- * pipeline can share the same comparator that `<UserMessageRow>` /
- * `<AssistantMessageRow>` `memo()` use, without dragging React component
- * imports into the hook (Fast Refresh).
- */
 import { replyRefsKey } from "@/features/chat/lib/reply-refs";
 import type {
   Attachment,
@@ -403,9 +395,6 @@ const assistantRowEqual = (
   (a.toolEventSummary?.detailCursor?.sequence ?? null) ===
     (b.toolEventSummary?.detailCursor?.sequence ?? null) &&
   Boolean(a.justArrived) === Boolean(b.justArrived) &&
-  // Controls the Copy/Read-aloud strip: flips when a locked overlay's
-  // persisted twin lands with `followedByToolCall`, with no other field
-  // changing — must participate so the strip actually unmounts.
   Boolean(a.isIntraTurn) === Boolean(b.isIntraTurn) &&
   (a.replyToUserMessageId ?? null) === (b.replyToUserMessageId ?? null) &&
   JSON.stringify(a.responseTarget ?? null) ===

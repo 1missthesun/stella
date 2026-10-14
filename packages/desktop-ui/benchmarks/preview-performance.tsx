@@ -1,7 +1,3 @@
-/** Synthetic file transport; real preview components, worker, CSS, and scrolling.
- * Open /benchmarks/preview-performance.html on the desktop Vite server.
- * This measures renderer work; it does not certify Electron IPC or file selection.
- */
 import { LocalI18nProvider } from "../src/shared/i18n/I18nProvider";
 import { useState } from "react";
 import { createRoot } from "react-dom/client";

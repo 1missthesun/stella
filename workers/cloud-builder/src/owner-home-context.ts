@@ -3,12 +3,6 @@ import type { MemoryPolicy } from "@stella/contracts/turn-plane/memory-policy";
 
 export type OwnerHomeContext = {
   revision: number;
-  /**
-   * Fingerprint of the skills the worker adds in code (not owner data), so a
-   * deploy that changes a built-in skill invalidates the durable snapshot.
-   * The home domain never bumps `revision` for those: it only knows owner
-   * content.
-   */
   builtins?: string;
   memory: Awaited<ReturnType<CloudHomeStore["getMemoryContext"]>>;
   skills: Awaited<ReturnType<CloudHomeStore["loadSkillCatalog"]>>;
@@ -16,8 +10,6 @@ export type OwnerHomeContext = {
 const CACHE = "homeContext:cache:v1";
 const VERSION = "homeContext:revision:v1:";
 
-/** Content changes invalidate metadata; permission changes are checked locally
- * by the owner policy coordinator, including pending wipes and fence changes. */
 export class OwnerHomeContextCache {
   private resident?: OwnerHomeContext;
   constructor(private readonly storage: DurableObjectStorage) {}
@@ -37,7 +29,6 @@ export class OwnerHomeContextCache {
 
   async load(args: {
     ownerGeneration: string;
-    /** Built-in skill fingerprint the caller expects; "" when none. */
     builtins?: string;
     assertPolicy(policy: MemoryPolicy): Promise<void>;
     fetch(): Promise<Omit<OwnerHomeContext, "revision">>;
@@ -55,7 +46,6 @@ export class OwnerHomeContextCache {
       ) {
         try {
           await args.assertPolicy(cached.memory.preference);
-          // Policy validation can yield to a notification.
           if (
             ((await this.storage.get<number>(VERSION + args.ownerGeneration)) ??
               0) === revision

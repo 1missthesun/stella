@@ -1,6 +1,5 @@
 import UIKit
 
-/// Keeps UIKit's attributed text selection and handles, with Stella's two actions.
 final class StellaSelectionTextView: UITextView, UIGestureRecognizerDelegate {
   var onAskStella: ((String) -> Void)?
   private static weak var selectedView: StellaSelectionTextView?
@@ -102,8 +101,6 @@ final class StellaSelectionTextView: UITextView, UIGestureRecognizerDelegate {
 
   func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
     guard selectedRange.length > 0, let touchedView = touch.view else { return false }
-    // UIKit owns taps on selected words and drags on selection handles. The
-    // observer only sees taps outside this text view and never consumes them.
     guard !touchedView.isDescendant(of: self) else { return false }
     if #available(iOS 17.0, *) {
       for interaction in interactions {

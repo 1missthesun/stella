@@ -1,11 +1,3 @@
-/**
- * The `connector_status` tool's model-visible surface, split from the
- * executable definition so workerd hosts advertise the byte-identical tool.
- * The device implementation resolves the catalog from disk and shows the
- * card over Electron IPC; the cloud Durable Object resolves it from the
- * Store backend and shows the card through the conversation journal.
- */
-
 export const CONNECTOR_STATUS_TOOL_NAME = "connector_status";
 
 export const CONNECTOR_STATUS_TOOL_LABEL = "Connector status";
@@ -56,5 +48,4 @@ export const CONNECTOR_STATUS_TOOL_PARAMETERS: Record<string, unknown> = {
   additionalProperties: false,
 };
 
-/** Replay policy (`ToolReplayPolicy` in ../types.ts). A status read. The connect card it may show is not a durable effect on desktop (it dies with the process) and is deduplicated per turn and integration in the cloud. */
 export const CONNECTOR_STATUS_TOOL_REPLAY = "safe" as const;

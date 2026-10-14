@@ -13,18 +13,6 @@ import { CAPABILITIES, hasCapability } from "./capabilities";
 import { resolveFreeAllowance } from "./audience";
 import "./BillingScreen.css";
 
-/**
- * Native Plan & Billing surface.
- *
- * This used to be an embedded stella.sh `<webview>` (a holdover from the
- * self-modifying-app era, when billing had to live out of the agent's
- * reach). It reads the owner's billing ledger (`billing.status`, a live
- * backend view) like the website does; the only surfaces that leave the app
- * are Stripe-hosted Checkout and the Stripe Customer Portal, which open in
- * the system browser. Plan changes land back here as Stripe webhooks update
- * the ledger.
- */
-
 type BillingPlan = "free" | "go" | "pro";
 type PaidBillingPlan = Exclude<BillingPlan, "free">;
 
@@ -46,7 +34,6 @@ type BillingUsage = {
   weeklyLimitUsd: number;
   monthlyUsedUsd: number;
   monthlyLimitUsd: number;
-  /** Cumulative spend and the one-shot Free allowance it counts against. */
   lifetimeUsedUsd: number;
   lifetimeLimitUsd: number | null;
 };
@@ -104,20 +91,9 @@ type UsageMeter = {
   limitUsd: number;
 };
 
-/**
- * One matrix, one order. Each card renders only the rows it includes —
- * a card never shows a feature struck through or dashed out, so every
- * line on this surface is something you get.
- *
- * The matrix is still the single source of truth rather than three hand
- * -written lists: keeping the order shared means the rows all three
- * plans have in common land in the same sequence in every column, so a
- * card that includes more simply runs longer than the one beside it.
- */
 type PlanFeature = { key: string; plans: readonly BillingPlan[] };
 
 const ALL_PLANS: readonly BillingPlan[] = ["free", "go", "pro"];
-/** All-plan features that the paid media capability matrix doesn't model. */
 const BASE_PLAN_FEATURES: readonly PlanFeature[] = [
   { key: "billing.features.assistant", plans: ALL_PLANS },
   { key: "billing.features.codingAgent", plans: ALL_PLANS },
@@ -125,21 +101,10 @@ const BASE_PLAN_FEATURES: readonly PlanFeature[] = [
   { key: "billing.features.dictationReadAloud", plans: ALL_PLANS },
 ];
 
-/**
- * Available across plans, but intentionally marketed only with Pro.
- * This is presentation, not an entitlement gate.
- */
 const MARKETED_PLAN_FEATURES: readonly PlanFeature[] = [
   { key: "billing.features.multipleAgents", plans: ["pro"] },
 ];
 
-/**
- * Capability rows are *derived* from the shared matrix, so the copy on
- * this screen cannot drift from what the app enforces: a capability
- * appears on exactly the cards whose plan the matrix grants it to. This
- * is why Pro reads as "more things", not "more tokens" — the rows that
- * only Pro carries are the capabilities themselves.
- */
 const CAPABILITY_PLAN_FEATURES: readonly PlanFeature[] = CAPABILITIES.map(
   (capability) => ({
     key: `billing.capability.${capability}`,
@@ -147,11 +112,6 @@ const CAPABILITY_PLAN_FEATURES: readonly PlanFeature[] = CAPABILITIES.map(
   }),
 ).filter((feature) => feature.plans.length > 0);
 
-/**
- * Widest reach first (stable within a tier). That single rule is what
- * keeps the columns nested — every row a cheaper plan has appears above
- * every row it doesn't — no matter how the matrix is later re-cut.
- */
 const PLAN_FEATURE_MATRIX: readonly PlanFeature[] = [
   ...BASE_PLAN_FEATURES,
   ...MARKETED_PLAN_FEATURES,
@@ -164,24 +124,14 @@ const PLAN_FEATURE_MATRIX: readonly PlanFeature[] = [
   )
   .map(({ feature }) => feature);
 
-/**
- * Amounts are denominated in USD regardless of where the user is —
- * that's a billing fact, not a display choice — but the *presentation*
- * (digit grouping, decimal separator, symbol placement, calendar order)
- * belongs to the reader's locale. So the currency stays "USD" while the
- * formatter's locale tracks the active UI language: a German user sees
- * `1.234,56 $` and `5. Januar 2026`, not `$1,234.56` and `January 5, 2026`.
- */
 const useBillingFormatters = (locale: string) =>
   useMemo(
     () => ({
-      /** Whole-dollar plan prices. */
       currency: new Intl.NumberFormat(locale, {
         style: "currency",
         currency: "USD",
         maximumFractionDigits: 0,
       }),
-      /** Cent-precise balances and usage meters. */
       usd: new Intl.NumberFormat(locale, {
         style: "currency",
         currency: "USD",
@@ -210,12 +160,6 @@ const toUsagePercent = (usedUsd: number, limitUsd: number) => {
 const getErrorMessage = (error: unknown, fallback: string) =>
   error instanceof Error && error.message ? error.message : fallback;
 
-/**
- * Stripe redirects back to the website's /billing after Checkout/Portal —
- * the browser tab shows the confirmation while the plan flows into the app
- * reactively over the backend's live socket. Base URL comes from main so the
- * STELLA_WEB_URL override keeps working in dev.
- */
 const getBillingReturnUrl = async (): Promise<string> => {
   let baseUrl =
     (import.meta.env.VITE_STELLA_WEB_URL as string | undefined)?.trim() ||
@@ -249,11 +193,7 @@ export function BillingPanel() {
 
   const formatUsagePercent = useCallback(
     (usedUsd: number, limitUsd: number) => {
-      // Intl percent formatting takes a fraction, not 0-100.
       const fraction = toUsagePercent(usedUsd, limitUsd) / 100;
-      // Any nonzero usage should read as "some", never as a rounded-down
-      // 0%. `<` is a math symbol, so it needs no translation and the bidi
-      // algorithm places it correctly under `dir="rtl"`.
       if (fraction > 0 && fraction < 0.01) {
         return `<${formatters.percent.format(0.01)}`;
       }
@@ -320,8 +260,6 @@ export function BillingPanel() {
     !billingStatus.isAnonymous,
   );
   const isLoadingStatus = hasConnectedAccount && billingStatus === undefined;
-  // Active paid subscribers change/cancel plans through the Stripe portal —
-  // createCheckoutSession rejects them with CONFLICT.
   const isActivePaidSubscriber = hasAccount && currentPlan !== "free";
   const currentPlanRank = PLAN_ORDER.indexOf(currentPlan);
 
@@ -504,13 +442,6 @@ export function BillingPanel() {
   const currentPlanCatalogEntry = planCatalog?.[currentPlan];
   const rollingWindowHours = currentPlanCatalogEntry?.rollingWindowHours ?? 5;
 
-  /**
-   * The Free plan's allowance is a lifetime budget, so it must not be
-   * shown through the rolling / weekly / monthly windows: three bars
-   * that visibly refill would promise a reset that never comes. When an
-   * allowance is present it replaces the windows entirely with a single
-   * meter that only ever fills.
-   */
   const freeAllowance = usage
     ? resolveFreeAllowance({ plan: currentPlan, usage })
     : null;
@@ -561,18 +492,6 @@ export function BillingPanel() {
       : t("billing.renewal.renews", { date: periodEndLabel })
     : null;
 
-  /**
-   * Cancelling does not cut access — Stripe keeps the plan live to the
-   * end of the paid period. What happens *after* is the part worth
-   * saying out loud: the Free allowance is granted once, so a subscriber
-   * whose cumulative spend already passed it lands on a plan with
-   * nothing left in it and Stella simply stops. Better read here, while
-   * the plan is still running, than discovered the morning it lapses.
-   *
-   * Gated on the actual numbers rather than assumed: a subscriber still
-   * under the Free cap really does keep a usable remainder, and telling
-   * them otherwise would be wrong.
-   */
   const freeLifetimeCapUsd = billingStatus?.plans.free.lifetimeLimitUsd ?? null;
   const lapseEndsAccess =
     billingStatus?.cancelAtPeriodEnd === true &&
@@ -710,10 +629,6 @@ export function BillingPanel() {
         {PLAN_ORDER.map((plan) => {
           const display = getPlanDisplay(plan);
           const isCurrentPlan = plan === currentPlan;
-          // An intro rate is a first-subscription offer. Showing it to
-          // someone who already pays turns the Go card into "downgrade
-          // and get a discount" — an offer Stripe would not honour
-          // through the portal anyway.
           const introCents =
             plan === "go" &&
             typeof display.introFirstMonthPriceCents === "number" &&
@@ -751,7 +666,6 @@ export function BillingPanel() {
           const handlePlanClick = () => {
             if (isCurrentPlan) return;
             if (isActivePaidSubscriber) {
-              // Plan changes and cancellation both go through the portal.
               void handleOpenPortal();
               return;
             }

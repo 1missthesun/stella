@@ -39,26 +39,13 @@ const MAX_SETTLED_CALL_LEDGER_ENTRIES = 512;
 const MAX_HOOK_BODY_BYTES = 32 * 1024 * 1024;
 
 export type ClaudeCodeToolMcpActiveTurn = {
-  /** Stable Stella run identity; survives a Claude process restart. */
   identityScope?: string;
-  /** Resolve the engine-persisted Anthropic tool_use id for this MCP call. */
   claimNativeToolUseId?: (
     toolName: string,
     args: Record<string, unknown>,
     signal: AbortSignal,
   ) => Promise<string>;
-  /**
-   * Every call executes under Claude's own `tool_use` id, claimed through
-   * `claimNativeToolUseId` and passed to `executeTool` unchanged, so an
-   * executor that journals calls elsewhere matches the CLI transcript.
-   * Without it only `image_gen` claims a native id.
-   */
   nativeToolCallIds?: boolean;
-  /**
-   * Resolves to a truncation when the model's stream ended mid-argument for
-   * this call (safety refusal, output budget), or undefined when the arguments
-   * are whole or unadjudicated. Truncated calls are rejected, never executed.
-   */
   checkToolUseIntegrity?: (
     toolName: string,
     args: Record<string, unknown>,
@@ -81,7 +68,6 @@ export type ClaudeCodeToolMcpActiveTurn = {
     toolName: string;
     result: ToolResult;
   }) => void;
-  /** Called only after the MCP HTTP response has been flushed to the socket. */
   onToolResponseWritten?: (args: {
     toolCallId: string;
     toolName: string;
@@ -89,47 +75,28 @@ export type ClaudeCodeToolMcpActiveTurn = {
 };
 
 export type ClaudeCodeToolMcpHost = {
-  /** Authenticated, loopback-only Streamable HTTP MCP endpoint. */
   url: string;
-  /** Header value rather than the raw token so callers never need to format it. */
   authorizationHeader: string;
-  /** Stable digest of the immutable tool catalog exposed by this host. */
   toolCatalogHash: string;
-  /** Loopback endpoint for Claude Code's PostToolUse HTTP hook, which redacts built-in tool output. */
   postToolUseHook: { url: string; headers: { Authorization: string } };
-  /** Object accepted as one entry in Claude Code's `mcpServers` config. */
   mcpServerConfig: {
     type: "http";
     url: string;
     headers: { Authorization: string };
   };
-  /** Abort tools owned by a dying Claude process without closing the host. */
   abortActiveCalls: (reason?: unknown) => void;
-  /** Wait until the spawned Claude process has initialized this MCP catalog. */
   waitForClientReady: (
     signal?: AbortSignal,
     timeoutMs?: number,
   ) => Promise<void>;
-  /** Drop MCP transports owned by a dead Claude process generation. */
   resetClientSessions: (reason?: unknown) => Promise<void>;
   close: () => Promise<void>;
 };
 
 export type CreateClaudeCodeToolMcpHostOptions = {
   tools: readonly ToolMetadata[];
-  /** Persisted Stella session identity, not an MCP transport session id. */
   identityScope?: string;
-  /**
-   * Local runtimes may still consume legacy path markers from trusted device
-   * tools. Cloud must set this false: model-controlled tool output is never
-   * authority for the root MCP host to reopen an absolute path.
-   */
   allowLegacyImagePathReopen?: boolean;
-  /**
-   * Resolved for every native MCP call. The host is session-scoped while the
-   * execution callback and cancellation boundary are turn-scoped. A promise
-   * when the turn the call belongs to is still on its way.
-   */
   getActiveTurn: () =>
     | ClaudeCodeToolMcpActiveTurn
     | undefined
@@ -312,13 +279,6 @@ const closeHttpServer = (
     for (const socket of sockets) socket.destroy();
   });
 
-/**
- * Creates one private MCP host for a Claude Code takeover session.
- *
- * The catalog is copied at creation and cannot change. Tool calls are handed
- * to the currently active turn, keeping Stella's existing execution policy,
- * hooks, lifecycle events, and side-effect tracking in the worker.
- */
 export const createClaudeCodeToolMcpHost = async (
   options: CreateClaudeCodeToolMcpHostOptions,
 ): Promise<ClaudeCodeToolMcpHost> => {
@@ -356,9 +316,6 @@ export const createClaudeCodeToolMcpHost = async (
   const endpointPath = `/mcp/${crypto.randomBytes(32).toString("base64url")}`;
   const hookPath = `/hooks/${crypto.randomBytes(32).toString("base64url")}`;
   const activeCalls = new Set<AbortController>();
-  // Streamable HTTP clients may retry a JSON-RPC request after losing its
-  // response. Retain the original promise for the session so a successful
-  // mutation is never executed twice under the same native request ID.
   const callLedger = new Map<string, Promise<CallToolResult>>();
   const responseDelivery = new AsyncLocalStorage<{
     acknowledgements: Set<() => void | Promise<void>>;
@@ -401,12 +358,6 @@ export const createClaudeCodeToolMcpHost = async (
           Promise.resolve(options.getActiveTurn()),
           extra.signal,
         );
-        // A safety refusal or an exhausted output budget cuts the model's
-        // stream mid-argument, and the CLI repairs the partial JSON and
-        // dispatches the call anyway — a half-written `prompt` or `message`
-        // is indistinguishable from a complete one by the time it lands here.
-        // Refuse it loudly so the model resends whole arguments instead of
-        // silently shipping half an instruction to an agent.
         const integrityCheck = turn?.checkToolUseIntegrity?.(
           request.params.name,
           request.params.arguments ?? {},
@@ -437,8 +388,6 @@ export const createClaudeCodeToolMcpHost = async (
           .update("\0")
           .update(stableJson(request.params.arguments ?? {}))
           .digest("hex");
-        // With native ids for every call, the claim happens inside the
-        // execution below (after the transport-retry ledger) instead.
         const claimNativeId =
           turn?.nativeToolCallIds === true && turn.claimNativeToolUseId
             ? turn.claimNativeToolUseId
@@ -564,8 +513,6 @@ export const createClaudeCodeToolMcpHost = async (
               callAbort.signal,
             );
           } catch (error) {
-            // A client cancellation already has its own MCP lifecycle; do not turn
-            // it into a misleading model-visible tool failure.
             if (callAbort.signal.aborted) throw error;
             return {
               content: [
@@ -698,9 +645,6 @@ export const createClaudeCodeToolMcpHost = async (
           return;
         }
       } else {
-        // A fresh Claude process initializes a fresh MCP client session on the
-        // same private host. This lets process/compaction recovery preserve
-        // the immutable catalog URL without reusing stale transport state.
         state = await createClientSession();
       }
       const delivery = {
@@ -798,8 +742,6 @@ export const createClaudeCodeToolMcpHost = async (
     );
     callLedger.clear();
     settledCallLedgerKeys.clear();
-    // Tear down sockets concurrently: an in-flight HTTP call can otherwise
-    // keep the protocol close waiting for the response it is itself aborting.
     await Promise.allSettled([
       resetPromise,
       closeHttpServer(httpServer, sockets),

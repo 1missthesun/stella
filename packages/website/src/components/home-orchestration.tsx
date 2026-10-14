@@ -10,19 +10,13 @@ import chat from "./stella-mini-chat.module.css";
 import styles from "./home-orchestration.module.css";
 import { useMiniChatScroll } from "./use-mini-chat-scroll";
 
-/* ------------------------------------------------------------------ */
-/*  Transcript model                                                   */
-/* ------------------------------------------------------------------ */
-
 type WorkState = "running" | "done";
 
 type Work = {
   id: string;
   title: string;
   state: WorkState;
-  /** Trailing status, e.g. "page 12 of 30" or "8:05 AM · $214". */
   meta?: string;
-  /** Produced files, shown as pills under a finished row. */
   files?: string[];
 };
 
@@ -46,10 +40,6 @@ type Entry =
   | { id?: string; kind: "time"; label: string };
 
 type Pill = { state: "running"; count: number } | { state: "done" };
-
-/* ------------------------------------------------------------------ */
-/*  Script content                                                     */
-/* ------------------------------------------------------------------ */
 
 const ASK_THREE =
   "Book the 8:05 flight, summarize the PDF, and chase that $42 refund.";
@@ -84,8 +74,6 @@ const SCHEDULE_BRIEF: Schedule = {
   next: "tomorrow 8:00 AM",
 };
 
-/* The settled frame reduced-motion visitors see instead of the animation:
-   every beat in its finished state, trimmed to fit the window. */
 const FINAL_ENTRIES: Entry[] = [
   { kind: "user", text: ASK_THREE },
   {
@@ -133,13 +121,6 @@ const SUMMARY =
   `You: ${ASK_MAYA} Stella: ${REPLY_MAYA} Later, Stella: ${REPLY_REFUND} ` +
   `You: ${ASK_BRIEF} Stella: ${REPLY_BRIEF} Scheduled: ${SCHEDULE_BRIEF.name}, ${SCHEDULE_BRIEF.cadence}, next ${SCHEDULE_BRIEF.next}.`;
 
-/* ------------------------------------------------------------------ */
-/*  Product-accurate pieces                                            */
-/* ------------------------------------------------------------------ */
-
-/* The working glyph on an in-progress row: a quiet spinner arc. Slow and
-   low-contrast; under reduced motion it holds still and reads as a
-   progress ring. */
 function WorkingGlyph() {
   return (
     <svg
@@ -255,10 +236,6 @@ function ActivityPill({ pill }: { pill: Pill | null }) {
   );
 }
 
-/* ------------------------------------------------------------------ */
-/*  Section                                                            */
-/* ------------------------------------------------------------------ */
-
 export function HomeOrchestration() {
   const sectionRef = useRef<HTMLElement>(null);
   const { viewportRef, trackRef } = useMiniChatScroll();
@@ -309,8 +286,6 @@ export function HomeOrchestration() {
             ? { ...entry, works: [...(entry.works ?? []), work] }
             : entry,
         );
-      // If ask() reserved this reply, revealing thinking reuses that stable
-      // slot. Unprompted follow-ups create their own slot once, at reply time.
       const reply = async (text: string, thinkMs = 760) => {
         const replyId = nextId("assistant");
         setEntries((prev) => {
@@ -363,7 +338,6 @@ export function HomeOrchestration() {
         ]);
       };
 
-      /* Beat 1 — three requests in one message, progress inline. */
       setActiveBeat(0);
       await sleep(420);
       await ask(ASK_THREE, REPLY_THREE);
@@ -378,7 +352,6 @@ export function HomeOrchestration() {
       setPill({ state: "running", count: 3 });
       await sleep(900);
 
-      /* The chat never goes busy — a second request lands mid-flight. */
       await ask(ASK_MAYA, REPLY_MAYA);
       await sleep(300);
       patchWork("pdf", { meta: "page 12 of 30" });
@@ -400,7 +373,6 @@ export function HomeOrchestration() {
       setPill({ state: "running", count: 1 });
       await sleep(1400);
 
-      /* Beat 2 — a slow one reports back later, unprompted. */
       setActiveBeat(1);
       push({ kind: "time", label: "2:14 PM" });
       await sleep(560);
@@ -412,7 +384,6 @@ export function HomeOrchestration() {
       setPill(null);
       await sleep(1100);
 
-      /* Beat 3 — set it once, it recurs. */
       setActiveBeat(2);
       await ask(ASK_BRIEF, REPLY_BRIEF);
       await sleep(380);
@@ -425,7 +396,6 @@ export function HomeOrchestration() {
       );
       await sleep(3600);
 
-      // Breathe the conversation out before the loop resets it.
       setClearing(true);
       await sleep(450);
     },

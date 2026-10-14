@@ -1,23 +1,3 @@
-/**
- * The owner's agent threads: cloud agents (each a `BuildSession`) and
- * desktop agents ("computer" placement), for Activity, the running pill,
- * reports and the originating desktop's delivery.
- *
- * Cloud threads are written from two directions. A desktop's spawn, continue
- * and cancel calls land here first and record the attempt before dispatching
- * it; the BuildSession's owner events (`turn.started`, `turn.event`,
- * `thread.spawned`, `thread.completed`) then confirm it. Every write is fenced
- * on the thread's `attempt_generation`, so a late event from an older attempt
- * never rewrites a newer one.
- *
- * A thread with an `executor_device_id` runs on one of the owner's paired
- * devices for someone else: a desktop, the cloud orchestrator or a cloud
- * agent. Its attempts go to that device through the gate's dispatch offer
- * instead of a BuildSession, and the gate reports each terminal dispatch
- * back here. A desktop requester receives the result through its own
- * `forDevice` delivery; a cloud requester is woken (see `settleDeviceAttempt`).
- */
-
 import {
   CLAUDE_USAGE_LIMIT_RESUME_PROMPT,
   claudeUsageLimitOf,
@@ -175,8 +155,6 @@ export const AGENT_THREADS_MIGRATION = {
     "CREATE INDEX agent_threads_updated ON agent_threads (updated_at DESC)",
     `CREATE INDEX agent_threads_device ON agent_threads (origin_device_id, owner_generation, updated_at DESC)
        WHERE origin_delivery_ack_at IS NULL`,
-    // Agent attempts only: the spawn replay key, the running turn a cancel
-    // targets, and the files a completed thread produced.
     `CREATE TABLE agent_turns (
        turn_id TEXT PRIMARY KEY,
        thread_id TEXT,
@@ -214,13 +192,6 @@ const DISPATCH_MAX_ATTEMPTS = 3;
 const DISPATCH_RETRY_MS = 15_000;
 const DEVICE_AVAILABILITY_RETRY_MS = 10_000;
 const DEVICE_AVAILABILITY_WAIT_MS = 60 * 60_000;
-/**
- * Blocked dispatches worth retrying rather than failing: the device may be
- * about to come back, finish starting up, or — for consent — have someone tap
- * allow on its screen. Waiting is what lets a spawn aimed at a computer that
- * has not agreed yet simply start once it does, instead of making the
- * requester notice the refusal and ask again.
- */
 const DEVICE_AVAILABILITY_CODES = new Set<string>([
   "SELECTED_DEVICE_OFFLINE",
   "SELECTED_DEVICE_UNAVAILABLE",
@@ -229,11 +200,6 @@ const DEVICE_AVAILABILITY_CODES = new Set<string>([
 const COMMAND_JOB = "agentThreads.deviceMessage";
 const COMMAND_RETRY_MS = 10_000;
 const commandJobId = (commandId: string): string => `devmsg:${commandId}`;
-/**
- * How long a held command waits for its computer: a message is stale after
- * an hour, while a stop holds until the computer is back, so an agent on a
- * laptop that slept over the weekend still stops when it wakes.
- */
 const COMMAND_WAIT_MS: Record<AgentControlCommand["kind"], number> = {
   message: 60 * 60_000,
   resume: 60 * 60_000,
@@ -244,11 +210,6 @@ const COMMAND_TTL_MS = 8 * 24 * 60 * 60_000;
 const TERMINAL_STATUSES = new Set(["completed", "failed", "canceled", "paused"]);
 type TerminalStatus = "completed" | "failed" | "canceled";
 
-/**
- * The error an ended attempt is recorded with: a stop's (`stop_agent`, in
- * any build's words) is `AGENT_STOPPED_REASON`, which no report is derived
- * for, so a stopped agent never wakes the one that started it.
- */
 const endedError = (
   reported: { status: string; errorMessage?: string | null; errorCode?: string | null },
 ): string | null =>
@@ -257,7 +218,6 @@ const endedError = (
     : (reported.errorMessage ?? null);
 const ACTIVE_STATUSES = new Set(["running", "resuming"]);
 
-/** Threads that run on one of the owner's devices for someone else. */
 export const AGENT_THREADS_DEVICE_EXECUTOR_MIGRATION = {
   id: "agent-threads.4-device-executor",
   statements: [
@@ -267,16 +227,11 @@ export const AGENT_THREADS_DEVICE_EXECUTOR_MIGRATION = {
   ],
 };
 
-/** The model a device thread's requester asked for; the device runs it or fails. */
 export const AGENT_THREADS_REQUESTED_MODEL_MIGRATION = {
   id: "agent-threads.5-requested-model",
   statements: ["ALTER TABLE agent_threads ADD COLUMN requested_model TEXT"],
 };
 
-/**
- * Agents a conversation's pi harness runs (`ThreadSpawnedEvent.harness`):
- * one row each, so every agent has one, while the harness keeps its attempts.
- */
 export const AGENT_THREADS_HARNESS_MIGRATION = {
   id: "agent-threads.9-harness",
   statements: ["ALTER TABLE agent_threads ADD COLUMN harness TEXT"],
@@ -315,13 +270,10 @@ export const AGENT_COMMANDS_MIGRATION = {
   ],
 };
 
-/** Agents no longer get isolated world forks. */
 export const AGENT_THREADS_DROP_WORKSPACE_FORK_MIGRATION = {
   id: "agent-threads.3-drop-workspace-fork",
   statements: ["ALTER TABLE agent_threads DROP COLUMN workspace_fork_id"],
 };
-
-// ── Projections ───────────────────────────────────────────────────────────
 
 const summary = (row: ThreadRow, ownerId: string): AgentThreadSummary => ({
   ownerId,
@@ -352,11 +304,6 @@ const control = (row: ThreadRow): AgentThreadControl => ({
 const readThread = (db: OwnerDbReader, threadId: string): ThreadRow | null =>
   db.one<ThreadRow>("SELECT * FROM agent_threads WHERE thread_id = ?", threadId);
 
-/**
- * Where a thread sits among Stella's agents, from its parent chain: one level
- * below the agent that started it, and 1 when Stella did. No move changes
- * the chain, so whichever host runs the thread is told the same thing.
- */
 const threadLineage = (db: OwnerDbReader, thread: ThreadRow): AgentLineage => {
   if (!thread.parent_thread_id) return { depth: 1 };
   const parent = readThread(db, thread.parent_thread_id);
@@ -418,9 +365,6 @@ const sha256Hex = async (text: string): Promise<string> =>
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
 
-// ── Journal records of agents no turn reports ─────────────────────────────
-
-/** Report text a terminal card carries: enough to say what happened, not the report. */
 const CARD_REPORT_MAX_CHARS = 2_000;
 
 /**
@@ -463,7 +407,6 @@ const agentLifecycleCard = (
   };
 };
 
-/** The cloud conversation whose journal shows a thread, or null for one kept on a computer. */
 const journalConversationOf = (db: OwnerDbReader, row: ThreadRow): string | null => {
   const conversationId = row.origin_conversation_id ?? row.conversation_id;
   return db.one<{ conversation_id: string }>(
@@ -474,11 +417,6 @@ const journalConversationOf = (db: OwnerDbReader, row: ThreadRow): string | null
     : null;
 };
 
-/**
- * Post one attempt's card to the conversation's journal. Best effort, as every
- * card is. A subagent's are not posted: the conversation counts the agents
- * Stella started, as its own turns list them.
- */
 const postAgentLifecycleCard = async (
   ctx: OwnerContext,
   row: ThreadRow,
@@ -493,8 +431,6 @@ const postAgentLifecycleCard = async (
     ...agentLifecycleCard(row, outcome),
   });
 };
-
-// ── Fences ────────────────────────────────────────────────────────────────
 
 const assertGeneration = async (ctx: OwnerContext, ownerGeneration: string): Promise<void> => {
   const snapshot = await ctx.host.snapshot();
@@ -514,8 +450,6 @@ const threadChanged = (threadId: string): RpcError =>
     `That cloud thread changed while this request was in flight. Refresh ${threadId} and try again.`,
     { reason: "thread_changed" },
   );
-
-// ── Cloud dispatch from a desktop ─────────────────────────────────────────
 
 type DispatchJob = {
   threadId: string;
@@ -632,8 +566,6 @@ const runDispatch = async (ctx: OwnerContext, job: DispatchJob): Promise<void> =
   }
 };
 
-// ── Device threads ────────────────────────────────────────────────────────
-
 const recordSteered = (
   ctx: OwnerContext,
   threadId: string,
@@ -658,11 +590,6 @@ const recordSteered = (
   );
 };
 
-/**
- * The device a spawn names, checked while the caller is still waiting so a
- * wrong id or an offline device comes back as the tool's error instead of a
- * failed report later. The gate checks again when it offers the attempt.
- */
 const assertDeviceDestination = async (
   ctx: OwnerContext,
   targetDeviceId: string,
@@ -684,10 +611,6 @@ const assertDeviceDestination = async (
     );
   }
   const name = device.label || device.deviceId;
-  // A device that has turned remote work down is a definite no, and failing
-  // the spawn now says so while the caller is still there to hear it. One that
-  // simply has not been asked is not a no: the gate raises the prompt on its
-  // screen when the attempt goes out, so this waits for the tap instead.
   if (device.remoteExecution === "declined") {
     throw new RpcError("CONFLICT", `${name} is set not to accept work from other devices.`, {
       reason: "device_remote_execution_declined",
@@ -727,7 +650,6 @@ const waitForAvailableDevice = (
 const deviceWaitExpiredMessage = (message: string): string =>
   `${message} It did not become available within ${Math.round(DEVICE_AVAILABILITY_WAIT_MS / 60_000)} minutes, so this agent never started.`;
 
-/** Offer one recorded attempt to the thread's device. */
 /**
  * The stored attachment list, or none. A row written before this column
  * existed, or a value that no longer parses, degrades to an agent without
@@ -807,11 +729,6 @@ const runDeviceDispatch = async (
   }
 };
 
-/**
- * Record the terminal outcome of one device attempt and, for a cloud
- * requester, deliver it. Only the attempt the thread is on moves the
- * thread; a late outcome for an older attempt updates just its turn row.
- */
 const settleDeviceAttempt = async (
   ctx: OwnerContext,
   turnId: string,
@@ -855,7 +772,6 @@ const settleDeviceAttempt = async (
   );
 };
 
-/** The gate reports every terminal dispatch it ran for a device thread. */
 const deviceSettled = async (ctx: OwnerContext, raw: unknown): Promise<{ settled: boolean }> => {
   const args = object({
     turnId: id(),
@@ -890,7 +806,6 @@ const deviceSettled = async (ctx: OwnerContext, raw: unknown): Promise<{ settled
   return { settled: true };
 };
 
-/** A device thread of a cloud requester's conversation, whoever started it, or not found. */
 const readCloudDeviceThread = (
   ctx: OwnerContext,
   args: { threadId: string; conversationId: string; ownerGeneration: string },
@@ -902,11 +817,6 @@ const readCloudDeviceThread = (
   return thread;
 };
 
-/**
- * Spawn an agent on one of the owner's devices for the cloud orchestrator
- * or a cloud agent. `clientMsgId` is the caller's tool-scoped id, so a
- * retried tool call returns the thread it already started.
- */
 const spawnOnDeviceForCloud = async (ctx: OwnerContext, raw: unknown): Promise<AgentThreadControl> => {
   const args = object({
     ownerGeneration: generation,
@@ -923,8 +833,6 @@ const spawnOnDeviceForCloud = async (ctx: OwnerContext, raw: unknown): Promise<A
     ),
   })(raw);
   assertPrompt(args.prompt, args.description);
-  // Validated here, where the owner is known, so a path that is not a drive
-  // path never reaches a device as something to resolve.
   const attachments = (args.attachments ?? []).map((path) =>
     normalizeDrivePath(path),
   );
@@ -938,8 +846,6 @@ const spawnOnDeviceForCloud = async (ctx: OwnerContext, raw: unknown): Promise<A
       args.targetDeviceId,
       args.description,
       args.prompt,
-      // In the fingerprint so a retry that would hand over a different set is
-      // a different intent rather than a replay of the first one.
       attachments,
     ]),
   );
@@ -1002,7 +908,6 @@ const spawnOnDeviceForCloud = async (ctx: OwnerContext, raw: unknown): Promise<A
   return { ...control(thread), ...(destination.waiting ? { waitingForDevice: true } : {}) };
 };
 
-/** A cloud requester's view of its device thread. */
 const deviceThreadForCloud = (ctx: OwnerContext, raw: unknown): AgentThreadSummary => {
   const args = object({ ownerGeneration: generation, conversationId: id(), threadId: id() })(raw);
   return summary(readCloudDeviceThread(ctx, args), ctx.ownerId);
@@ -1016,7 +921,6 @@ const devicePresence = async (ctx: OwnerContext): Promise<Map<string, DeviceDest
   }
 };
 
-/** The owner's device names by id; empty when the gate can't list them. */
 const deviceLabels = async (ctx: OwnerContext): Promise<Map<string, string>> => {
   const labels = new Map<string, string>();
   try {
@@ -1029,7 +933,6 @@ const deviceLabels = async (ctx: OwnerContext): Promise<Map<string, string>> => 
   return labels;
 };
 
-/** A cloud requester's follow-up to a device thread of its conversation: steered, or its next attempt. */
 const continueDeviceForCloud = async (ctx: OwnerContext, raw: unknown): Promise<AgentThreadControl> => {
   const args = object({
     ownerGeneration: generation,
@@ -1064,7 +967,6 @@ const continueDeviceForCloud = async (ctx: OwnerContext, raw: unknown): Promise<
   };
 };
 
-/** A cloud requester's stop of a device thread of its conversation, with the agents it started. */
 const cancelDeviceForCloud = async (
   ctx: OwnerContext,
   raw: unknown,
@@ -1088,11 +990,6 @@ const cancelDeviceForCloud = async (
   return { canceled: true, control: control(readThread(ctx.db, thread.thread_id)!) };
 };
 
-/**
- * Stop the device attempt a thread is on: withdraw its dispatch (or the
- * queued job that would send it) and mark it canceled now. The gate's own
- * terminal report then finds the turn already settled.
- */
 const stopDeviceAttempt = async (
   ctx: OwnerContext,
   thread: ThreadRow,
@@ -1102,9 +999,6 @@ const stopDeviceAttempt = async (
   if (!ACTIVE_STATUSES.has(thread.status)) return;
   const turn = runningTurn(ctx.db, thread);
   if (!turn) return;
-  // Settle first: the gate reports the withdrawn dispatch as canceled, and
-  // that report must find this attempt already closed rather than report
-  // anything for a stop the requester asked for.
   ctx.jobs.cancel(`dispatch:${turn.turn_id}`);
   ctx.db.run("DELETE FROM agent_dispatch_prompts WHERE turn_id = ?", turn.turn_id);
   recordAgentChange(
@@ -1195,7 +1089,6 @@ const beginNextAttempt = (
   );
 };
 
-/** Record one attempt and queue its dispatch. */
 const startAttempt = (
   ctx: OwnerContext,
   input: {
@@ -1205,7 +1098,6 @@ const startAttempt = (
     fingerprint: string;
     prompt: string;
     attachments?: readonly string[];
-    /** The spawn's `workspace`, for a cloud thread's first attempt. */
     workspace?: AgentWorkspaceSize;
   },
 ): void => {
@@ -1244,7 +1136,6 @@ const startAttempt = (
   );
 };
 
-/** A retried request with the same id: return the attempt it already started. */
 const replayAttempt = (
   db: OwnerDbReader,
   clientMsgId: string,
@@ -1349,9 +1240,7 @@ const spawnFromDesktop = async (ctx: OwnerContext, args: SpawnArgs): Promise<Age
     (conversation?.execution_json
       ? (JSON.parse(conversation.execution_json) as CloudExecutionSelection)
       : snapshot.execution);
-  // A device runs the agent on its own models.
   if (!targetDeviceId) await assertExecutionAvailable(ctx, execution);
-  // A replay may have landed during the awaits above.
   const raced = replayAttempt(ctx.db, args.clientMsgId, fingerprint, args.ownerGeneration);
   if (raced) return raced;
 
@@ -1427,25 +1316,15 @@ const spawnFromDesktop = async (ctx: OwnerContext, args: SpawnArgs): Promise<Age
   return { ...control(thread), ...(destination?.waiting ? { waitingForDevice: true } : {}) };
 };
 
-// ── Agents moving themselves ──────────────────────────────────────────────
-
 type HandoffArgs = AgentThreadCalls["agentThreads.handoff"]["args"];
 type HandoffResult = AgentThreadCalls["agentThreads.handoff"]["result"];
 
-/** Who asks to move an agent: the computer that holds it, or the cloud that runs it. */
 type MoveFrom = { kind: "device"; deviceId: string } | { kind: "cloud" };
 
 type MoveInput = Omit<HandoffArgs, "fromDeviceId"> & { from: MoveFrom };
 
 const CLOUD_DESTINATION = "cloud";
 
-/**
- * An agent's `switch_destination`, from the host that holds it once its run
- * there ended: the target (one of the owner's computers, or the cloud) holds
- * its log from now on, and the thread's next attempt runs there with the
- * agent's brief, the same thread with the same reports, messages and stops,
- * now routed to the target. Idempotent per `handoffId`.
- */
 const moveThread = async (ctx: OwnerContext, args: MoveInput): Promise<HandoffResult> => {
   if (!CONTROL_REQUEST_ID_PATTERN.test(args.handoffId)) {
     throw new RpcError("BAD_REQUEST", "That move could not be sent. Try again.");
@@ -1576,23 +1455,13 @@ const handoffThread = async (ctx: OwnerContext, args: HandoffArgs): Promise<Hand
 };
 
 
-// ── Agent directory and messages ──────────────────────────────────────────
-
 const DIRECTORY_AGENTS_RECENT = 50;
 const DIRECTORY_SESSIONS_RECENT = 20;
 const LIVE_STATUSES_SQL = "('running', 'resuming', 'waiting_for_user')";
-/** The agents a directory caller may ask about by id, and how many one query binds. */
 export const DIRECTORY_THREAD_IDS_MAX = 200;
 const DIRECTORY_THREAD_IDS_PER_QUERY = 50;
 const AGENT_MESSAGE_RECEIPT_TTL_MS = 24 * 60 * 60_000;
 
-/**
- * Where a thread's attempts run, which is where every control for it goes:
- * its BuildSession or pi agent in the cloud, the device a dispatch offered
- * it to, or the desktop whose own Stella started it there. Messages and
- * stops both route by this, whoever sends them and wherever the
- * conversation runs now.
- */
 type ThreadExecutor =
   | { kind: "cloud" }
   | { kind: "harness" }
@@ -1608,7 +1477,6 @@ const threadExecutor = (row: ThreadRow): ThreadExecutor =>
         ? { kind: "harness" }
         : { kind: "cloud" };
 
-/** The device a thread runs on, or null for the cloud. */
 const threadDeviceId = (row: ThreadRow): string | null => {
   const executor = threadExecutor(row);
   return executor.kind === "cloud" || executor.kind === "harness" ? null : executor.deviceId;
@@ -1616,19 +1484,11 @@ const threadDeviceId = (row: ThreadRow): string | null => {
 
 type DirectoryResult = AgentThreadCalls["agentThreads.directory"]["result"];
 
-/**
- * One conversation's agents from every placement, matched by the cloud
- * conversation or the desktop conversation that started them, and the
- * owner's other cloud conversations. Every live agent is kept; the rest are
- * the newest few.
- */
 const agentDirectory = async (
   ctx: OwnerContext,
   args: { conversationId: string; threadIds?: string[] },
 ): Promise<DirectoryResult> => {
   const rows = new Map<string, ThreadRow>();
-  // The agents the caller holds as running elsewhere, however old: one that
-  // ended out of the recent few would otherwise read as still running there.
   const asked = [...new Set(args.threadIds ?? [])];
   for (let at = 0; at < asked.length; at += DIRECTORY_THREAD_IDS_PER_QUERY) {
     const chunk = asked.slice(at, at + DIRECTORY_THREAD_IDS_PER_QUERY);
@@ -1702,16 +1562,6 @@ const agentDirectory = async (
 type MessageArgs = AgentThreadCalls["agentThreads.message"]["args"];
 type MessageDelivery = AgentThreadCalls["agentThreads.message"]["result"];
 
-/**
- * `send_message` through the owner's agent threads, from any host. A cloud
- * conversation id queues a hidden wake turn on that conversation's Stella;
- * an agent takes it through {@link controlAgent}: a running one reads it
- * before its next model call, an idle one resumes with it as its next
- * attempt, under the same parent, so its report still goes where it always
- * did. It always names its sender: from whoever started the agent it is
- * marked as theirs and is an instruction, from anyone else it is a note.
- * `"stella"` from an agent is its conversation. Idempotent per `messageId`.
- */
 const messageAgent = async (ctx: OwnerContext, args: MessageArgs): Promise<MessageDelivery> => {
   if (!CONTROL_REQUEST_ID_PATTERN.test(args.messageId)) {
     throw new RpcError("BAD_REQUEST", "That message could not be sent. Try again.");
@@ -1780,7 +1630,6 @@ const messageAgent = async (ctx: OwnerContext, args: MessageArgs): Promise<Messa
 
 const messageDelivery = (result: AgentControlResult): MessageDelivery => agentMessageDelivery(result);
 
-/** The conversation a thread id is or works in, when this owner has it. */
 const conversationOfThread = (ctx: OwnerContext, threadId: string): string | null => {
   const direct = ctx.db.one<{ conversation_id: string }>(
     "SELECT conversation_id FROM conversations WHERE conversation_id = ?",
@@ -1791,28 +1640,17 @@ const conversationOfThread = (ctx: OwnerContext, threadId: string): string | nul
   return readThread(ctx.db, id)?.conversation_id ?? null;
 };
 
-/** A Slack workspace's Stella and the owner's own Stella don't reach each other. */
 const crossesSlackBoundary = (ctx: OwnerContext, from: string, to: string): boolean => {
   const fromConversation = conversationOfThread(ctx, from) ?? from;
   const toConversation = conversationOfThread(ctx, to) ?? to;
   return isSlackConversationId(fromConversation) !== isSlackConversationId(toConversation);
 };
 
-/**
- * Whether the sender is the one that started the thread: its conversation's
- * Stella, or the agent that spawned it. Their message is an instruction to
- * it, wherever the conversation runs now; anyone else's is a note.
- */
 const sentByStarter = (thread: ThreadRow, from: AgentMessageSender): boolean =>
   thread.parent_thread_id !== null
     ? from.threadId === thread.parent_thread_id
     : from.threadId === thread.conversation_id || from.threadId === thread.origin_conversation_id;
 
-/**
- * `"stella"` from an agent: the conversation it works in (its thread's, or
- * the caller's `conversationId`), whose Stella it reaches as a note. Any
- * other target is returned as it is.
- */
 const senderStella = (
   ctx: OwnerContext,
   to: string,
@@ -1845,7 +1683,6 @@ const deliverAgentMessage = async (
     to: string;
     text: string;
     from: AgentMessageSender;
-    /** `text` is already framed as the receiver reads it. */
     framed?: boolean;
     kind: "message" | "resume";
     source: string;
@@ -2303,9 +2140,6 @@ const routeStop = async (
   deviceId: string | null,
 ): Promise<Routed> => {
   const { thread } = input;
-  // Waiting on the user (a question, a usage-limit hold): nothing runs, but
-  // it is not over either, so the stop ends the wait. Left waiting, it would
-  // hold back the report of the agent that started it.
   if (thread.status === "waiting_for_user") {
     await markWaitingThreadStopped(ctx, thread, input.source, input.commandId);
     return { outcome: "stopped" };
@@ -2463,7 +2297,6 @@ const recordMessageLanded = (
 
 const RETRY_REASONS = new Set(["thread_changed", "thread_starting", "thread_busy", "device_unreachable"]);
 
-/** One more offer of a held command, rescheduled until its executor takes it. */
 const runCommand = async (ctx: OwnerContext, payload: { messageId?: unknown }): Promise<void> => {
   if (typeof payload?.messageId !== "string") return;
   const row = ctx.db.one<CommandRow>(
@@ -2533,7 +2366,6 @@ const dropCommand = (ctx: OwnerContext, row: CommandRow, reason: string): void =
   });
 };
 
-/** A device just proved its presence: offer it every command held for it, oldest first. */
 const flushDeviceCommands = (ctx: OwnerContext, raw: unknown): { scheduled: number } => {
   const { deviceId } = object({ deviceId: id(256) })(raw);
   let scheduled = 0;
@@ -2606,12 +2438,9 @@ const controlRequest = async (ctx: OwnerContext, args: ControlArgs): Promise<Age
   });
 };
 
-// ── Stop, from any of the owner's hosts ───────────────────────────────────
-
 type StopArgs = AgentThreadCalls["agentThreads.stop"]["args"];
 type StopResult = AgentThreadCalls["agentThreads.stop"]["result"];
 
-/** The running turn of a thread's current attempt. */
 const runningTurn = (db: OwnerDbReader, thread: ThreadRow): TurnRow | null =>
   db.one<TurnRow>(
     `SELECT * FROM agent_turns WHERE thread_id = ? AND attempt_generation = ?
@@ -2620,10 +2449,6 @@ const runningTurn = (db: OwnerDbReader, thread: ThreadRow): TurnRow | null =>
     thread.attempt_generation,
   );
 
-/**
- * Stop the attempt a cloud thread is on, wherever its runtime is (its pi
- * agent or its BuildSession), and record it stopped.
- */
 const stopCloudAttempt = async (
   ctx: OwnerContext,
   thread: ThreadRow,
@@ -2673,7 +2498,6 @@ const stopCloudAttempt = async (
   ctx.jobs.cancel(`dispatch:${turn.turn_id}`);
 };
 
-/** A local thread its computer stopped for a `stop_agent`: recorded, with its journal card. */
 const markLocalThreadStopped = async (
   ctx: OwnerContext,
   thread: ThreadRow,
@@ -2746,7 +2570,6 @@ const markWaitingThreadStopped = async (
   }
 };
 
-/** A device's name and whether it is connected now; unknown reads as offline. */
 const deviceStanding = async (
   ctx: OwnerContext,
   deviceId: string,
@@ -2764,7 +2587,6 @@ const deviceStanding = async (
   }
 };
 
-/** The threads below one, at any depth, that may still run: deepest first, so none reports to one already stopped. */
 const runningDescendants = (db: OwnerDbReader, threadId: string): ThreadRow[] =>
   db.all<ThreadRow>(
     `WITH RECURSIVE tree(thread_id, depth) AS (
@@ -2782,11 +2604,6 @@ const runningDescendants = (db: OwnerDbReader, threadId: string): ThreadRow[] =>
     threadId,
   );
 
-/**
- * A stop for a thread and every thread below it, at any depth, each routed
- * to where it runs; deepest first. A descendant that cannot be reached now
- * does not keep the others from stopping.
- */
 const stopTree = async (
   ctx: OwnerContext,
   input: Omit<ControlInput, "kind">,
@@ -2814,7 +2631,6 @@ const stopTree = async (
   return { result, descendants };
 };
 
-/** Whether `ancestor` started `thread`, at any depth. */
 const startedBy = (db: OwnerDbReader, thread: ThreadRow, ancestor: string): boolean => {
   const seen = new Set([thread.thread_id]);
   for (let id = thread.parent_thread_id; id && !seen.has(id) && seen.size < 32; id = readThread(db, id)?.parent_thread_id ?? null) {
@@ -2824,14 +2640,6 @@ const startedBy = (db: OwnerDbReader, thread: ThreadRow, ancestor: string): bool
   return false;
 };
 
-/**
- * `stop_agent` for any agent the owner has, from any host: authorized by
- * the owner, not by which device started the agent, and routed to where
- * it and every agent below it run through {@link stopTree}. A computer that
- * is offline gets the stop when it reconnects; the result says which
- * happened. An agent asking (`requesterThreadId`) stops only agents it
- * started, at any depth.
- */
 const stopAgent = async (ctx: OwnerContext, args: StopArgs): Promise<StopResult> => {
   if (!CONTROL_REQUEST_ID_PATTERN.test(args.controlRequestId)) {
     throw new RpcError("BAD_REQUEST", "That stop request could not be sent. Try again.");
@@ -3027,8 +2835,6 @@ const acknowledgeDelivery = (
   return { acknowledged: true, superseded: false };
 };
 
-// ── Desktop ("computer") threads ──────────────────────────────────────────
-
 const rejectStart = (reason: string, message: string): RpcError =>
   new RpcError("CONFLICT", message, { reason });
 
@@ -3059,9 +2865,6 @@ const startComputerThread = async (
       }
       return { threadId: existing.thread_id };
     }
-    // Fencing is monotonic, not dense: the desktop advances its generation
-    // both when it invalidates an unwinding attempt and when the next one
-    // starts, so a follow-up can skip numbers.
     if (args.attemptGeneration < existing.attempt_generation) {
       throw rejectStart("attempt_stale", "A newer attempt of this agent already started.");
     }
@@ -3226,21 +3029,15 @@ const computerRecord = (row: ThreadRow): ComputerThreadRecord => {
   };
 };
 
-// ── Owner events from BuildSessions and the orchestrator ──────────────────
-
 export type AgentThreadEvent =
   | TurnStartedEvent
   | TurnEventEvent
   | ThreadSpawnedEvent
   | ThreadCompletedEvent;
 
-// ── Claude usage limit holds ──────────────────────────────────────────────
-
 export const USAGE_LIMIT_AGENT_JOB = "agentThreads.usageLimitResume";
 export const USAGE_LIMIT_CONVERSATION_JOB = "agentThreads.usageLimitResumeConversation";
-/** How long a hold lasts when the CLI named no reset time: then the work tries again. */
 const USAGE_LIMIT_UNKNOWN_RESET_HOLD_MS = 30 * 60_000;
-/** Margin past the named reset, so the resumed work is not refused again. */
 const USAGE_LIMIT_RESET_MARGIN_MS = 30_000;
 const USAGE_LIMIT_HOLD_PREFIX = "Waiting for the Claude usage limit to reset";
 
@@ -3281,11 +3078,6 @@ const usageLimitHoldMessage = (limit: ClaudeUsageLimit): string =>
     ? `${USAGE_LIMIT_HOLD_PREFIX} at ${new Date(limit.resetsAt).toISOString()}; it continues automatically then.`
     : `${USAGE_LIMIT_HOLD_PREFIX}; it continues automatically once it does.`;
 
-/**
- * A cloud agent's attempt ended on the Claude usage limit: the thread waits
- * (not failed, so no failure is reported) and an owner job, the durable
- * timer, resumes it once the limit resets. Its conversation shows the hold.
- */
 const holdAgentForUsageLimit = (
   db: OwnerDb,
   jobs: OwnerJobs,
@@ -3331,7 +3123,6 @@ const postUsageLimitResumed = async (
   });
 };
 
-/** The limit reset: the held agent's next attempt continues its work. */
 const resumeAgentAfterUsageLimit = async (ctx: OwnerContext, raw: unknown): Promise<void> => {
   const payload = raw as { threadId?: unknown; attemptGeneration?: unknown } | null;
   if (typeof payload?.threadId !== "string" || typeof payload.attemptGeneration !== "number") return;
@@ -3367,12 +3158,6 @@ const resumeAgentAfterUsageLimit = async (ctx: OwnerContext, raw: unknown): Prom
   }
 };
 
-/**
- * Stella's own Claude Code turn in a cloud conversation ended on the Claude
- * usage limit: hold it with an owner job, the durable timer, that starts its
- * continuation once the limit resets. One hold per conversation; a later one
- * replaces it.
- */
 const holdConversationForUsageLimit = (ctx: OwnerContext, raw: unknown): { resumeAt: number } => {
   const args = object({ conversationId: string(), ownerGeneration: string(), resetsAt: optional(number()) })(raw);
   const resumeAt = usageLimitResumeAt(
@@ -3390,7 +3175,6 @@ const holdConversationForUsageLimit = (ctx: OwnerContext, raw: unknown): { resum
   return { resumeAt };
 };
 
-/** The limit reset: Stella's held turn continues as a wake turn. */
 const resumeConversationAfterUsageLimit = async (ctx: OwnerContext, raw: unknown): Promise<void> => {
   const payload = raw as { conversationId?: unknown; ownerGeneration?: unknown; resumeAt?: unknown } | null;
   if (typeof payload?.conversationId !== "string" || typeof payload.ownerGeneration !== "string") return;
@@ -3414,11 +3198,9 @@ const resumeConversationAfterUsageLimit = async (ctx: OwnerContext, raw: unknown
 };
 
 export type AgentThreadEffects = {
-  /** Cards to post once the events are applied. */
   cards: Array<{ conversationId: string; ownerGeneration: string; sourceTurnId: string; card: unknown }>;
 };
 
-/** The newest entry per path across the thread's last three attempts. */
 const threadOutputFiles = (db: OwnerDbReader, threadId: string): unknown[] => {
   const turns = db.all<{ turn_id: string }>(
     "SELECT turn_id FROM agent_turns WHERE thread_id = ? ORDER BY created_at DESC LIMIT 3",
@@ -3438,7 +3220,6 @@ const threadOutputFiles = (db: OwnerDbReader, threadId: string): unknown[] => {
 
 const ownerEventKey = (event: AgentThreadEvent): string => `owner-event:${event.kind}:${event.key}`;
 
-/** Apply one event. Safe to replay; late events from older attempts are dropped. */
 export const applyAgentThreadEvent = (
   db: OwnerDb,
   event: AgentThreadEvent,
@@ -3564,16 +3345,12 @@ export const applyAgentThreadEvent = (
         );
         return;
       }
-      // A pi harness's older agent ids are unique only within its
-      // conversation: another agent's row with the same id is not this one.
       if (
         event.harness !== undefined &&
         (thread.harness !== event.harness || thread.conversation_id !== event.conversationId)
       ) {
         return;
       }
-      // An attempt this object already recorded (a desktop spawn) or an
-      // older one arriving late.
       if (event.attemptGeneration <= thread.attempt_generation) {
         if (event.attemptGeneration === thread.attempt_generation && thread.parent_turn_id === null) {
           recordAgentChange(db, { ...change, kind: "parent_linked" }, () =>
@@ -3655,8 +3432,6 @@ export const applyAgentThreadEvent = (
             thread.thread_id,
           ),
       );
-      // A desktop-dispatched thread reports through that desktop, which may
-      // be asleep: its conversation's journal still learns it ended.
       const journalConversation =
         thread.origin_device_id !== null && thread.parent_thread_id === null && status !== "waiting_for_user"
           ? journalConversationOf(db, thread)
@@ -3671,9 +3446,6 @@ export const applyAgentThreadEvent = (
           ),
         });
       }
-      // A desktop-dispatched thread delivers through that desktop; any
-      // other completed thread files its outputs under the turn that
-      // started it, where both clients attribute them.
       if (event.status === "completed" && thread.origin_device_id === null) {
         const files = threadOutputFiles(db, thread.thread_id);
         if (files.length > 0) {
@@ -3690,13 +3462,6 @@ export const applyAgentThreadEvent = (
   }
 };
 
-// ── Views ─────────────────────────────────────────────────────────────────
-
-/**
- * A conversation's agents for its clients: the ones it holds and the ones it
- * started whose rows sit in another cloud conversation (a desktop's cloud
- * agents), so each client reads one list.
- */
 const conversationThreadRows = (
   db: OwnerDbReader,
   conversationId: string,
@@ -3749,8 +3514,6 @@ const deviceThreads = (
       originConversationId: row.origin_conversation_id ?? row.conversation_id,
       ownerGeneration: row.owner_generation!,
     }));
-
-// ── Registration ──────────────────────────────────────────────────────────
 
 const id = (max = 128) => string({ min: 1, max });
 const generation = id(512);
@@ -3825,9 +3588,6 @@ export const agentThreadsDomain = {
     AGENT_THREADS_DEVICE_EXECUTOR_MIGRATION,
     AGENT_THREADS_REQUESTED_MODEL_MIGRATION,
     {
-      // Alongside the prompt, with the same lifecycle: both are what the
-      // dispatch job still needs after the spawn call returned, and both are
-      // dropped once the attempt is dispatched or settled.
       id: "agent-threads.3-dispatch-attachments",
       statements: [
         "ALTER TABLE agent_dispatch_prompts ADD COLUMN attachments TEXT",
@@ -3849,8 +3609,6 @@ export const agentThreadsDomain = {
       ],
     },
     {
-      // `send_message` for an agent a desktop runs locally while that
-      // desktop is offline, kept until it reconnects or an hour passes.
       id: "agent-threads.7-device-messages",
       statements: [
         `CREATE TABLE agent_device_messages (
@@ -3868,7 +3626,6 @@ export const agentThreadsDomain = {
       ],
     },
     {
-      // The same outbox carries a `stop_agent` for an offline computer.
       id: "agent-threads.8-device-commands",
       statements: [
         "ALTER TABLE agent_device_messages ADD COLUMN kind TEXT NOT NULL DEFAULT 'message'",
@@ -3905,8 +3662,6 @@ export const agentThreadsDomain = {
       ],
     },
     {
-      // The spawn's `workspace` (`spawn_agent`): the container size the
-      // cloud thread's first attempt asks for. Same lifecycle as the prompt.
       id: "agent-threads.13-dispatch-workspace",
       statements: [
         "ALTER TABLE agent_dispatch_prompts ADD COLUMN workspace TEXT",
@@ -4129,11 +3884,6 @@ export const agentThreadsDomain = {
     "agentThreads.pause": async (ctx, raw) => await legacyPauseAgent(ctx, pauseParser(raw)),
     "agentThreads.flushDeviceMessages": flushDeviceCommands,
     "agentThreads.control": async (ctx, raw) => await controlRequest(ctx, controlParser(raw)),
-    /**
-     * Where each of a conversation's agents stands in these records, for the
-     * conversation to settle the ones its journal still shows as running
-     * that already ended. Threads it does not know are left out.
-     */
     "agentThreads.statuses": async (ctx, raw) => {
       const args = object({
         ownerGeneration: generation,
@@ -4184,8 +3934,6 @@ export const agentThreadsDomain = {
   },
   jobs: {
     "agentThreads.dispatch": {
-      // Retries are scheduled by the job itself so the last failure can mark
-      // the attempt failed; the store-level backoff is only for crashes.
       maxAttempts: 3,
       run: async (ctx, payload) => await runDispatch(ctx, payload as DispatchJob),
     },

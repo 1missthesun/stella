@@ -18,7 +18,6 @@ type AgentReportInboxOptions = {
     ownerGeneration: string;
     reportId: string;
   }) => Promise<unknown>;
-  /** Stella reads it hidden, once per `requestId`. */
   deliver: (note: {
     conversationId: string;
     requestId: string;
@@ -72,7 +71,6 @@ const parseReport = (value: unknown): DeviceAgentReport | null => {
 
 const MAX_REPORT_ERROR_CHARS = 30_000;
 
-/** What Stella reads for one report: the agent's outcome, hidden from the user. */
 export const agentReportText = (report: DeviceAgentReport): string => {
   const lines = [
     report.outcome === "completed"

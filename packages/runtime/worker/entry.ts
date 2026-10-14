@@ -37,27 +37,6 @@ import {
   startWorkerTransport,
 } from "./transport.js";
 
-/**
- * Worker entrypoint. Two execution modes:
- *
- *   bun run runtime/worker/entry.js
- *     -> default stdio mode. Parent process owns the worker; lifecycle is
- *        tied to stdin/stdout. Used by the legacy embedded
- *        worker codepath, and by the host adapter when the lifecycle
- *        manager spawns the worker as a regular child process.
- *
- *   bun run runtime/worker/entry.js --listen unix:///path/to/runtime.sock
- *   bun run runtime/worker/entry.js --listen pipe://\\.\pipe\stella-runtime-...
- *     -> the runtime process. The runtime host runs here beside the worker,
- *        reaching it in process; the socket speaks the client protocol
- *        (`@stella/contracts/protocol/runtime-client`) to the app. It writes
- *        pid+lock beneath the runtime root and self-shuts-down 10s after the
- *        last client disconnects, so an app restart loses nothing.
- *
- *   ... --stella-root /path                    [required for detached mode]
- *   ... --idle-shutdown-ms 10000               [detached mode only]
- */
-
 type ParsedArgs = {
   listenUrl: string;
   stellaAppDir: string | null;
@@ -93,7 +72,6 @@ const parseEntryArgs = (argv: string[]): ParsedArgs => {
   return { listenUrl, stellaAppDir, idleShutdownMs };
 };
 
-/** How long a shutdown may spend closing before the process exits regardless. */
 const SHUTDOWN_DEADLINE_MS = 5_000;
 
 const main = async () => {
@@ -106,13 +84,6 @@ const main = async () => {
   }
   const transport = transportResult.transport;
 
-  // The process root scope: every boot-owned resource — peer broker,
-  // runtime server, transport listener — is acquired into this scope, and
-  // ALL teardown paths (signal, idle shutdown) are one `Scope.close` whose
-  // LIFO finalizers replay the old teardown order exactly:
-  //   transport close → runtimeServer.shutdown() → broker.dispose().
-  // `createRuntimeWorkerServer`'s `shutdown()` (surface 1) is the join
-  // point; each finalizer stays best-effort like the old try/catch chain.
   const rootScope = Scope.makeUnsafe();
   let rootScopeClosed = false;
   const closeRootScope = async () => {
@@ -177,10 +148,6 @@ const main = async () => {
       killAgentProcessesSync();
     });
     logger.process("worker.starting", { pid: process.pid });
-    // Snapshot the runtime tree's identity as loaded by THIS process
-    // (process.argv[1] is the entry file the host spawned). The host compares
-    // this stamp against the on-disk tree when it reattaches to detect a
-    // worker running stale code after a desktop update.
     const runtimeBuildStamp = computeRuntimeBuildStamp(process.argv[1] ?? "");
     lifecycle = new WorkerLifecycleServer({
       stellaAppDir: cliArgs.stellaAppDir,
@@ -193,9 +160,6 @@ const main = async () => {
       interruptWork: () => runtimeServer.interruptWork(),
       shouldKeepAlive: () => runtimeServer.holdsWorkerAlive(),
       onShutdown: async (reason) => {
-        // Closing interrupts in-flight turns and ends their commands; pi
-        // keeps the interrupted work pending for the next launch. A teardown
-        // that still wedges must not keep the process alive past the bound.
         const startedAt = Date.now();
         const closed = await workerRuntime.runPromise(
           Effect.raceFirst(
@@ -257,8 +221,6 @@ const main = async () => {
     });
   }
 
-  // Stdio: the parent is the host and talks to the worker directly. The
-  // runtime process instead hosts the runtime host itself and serves apps.
   let attachPeer = (peer: JsonRpcPeer) => broker.attach(peer);
   let protocolVersion: string | undefined;
   if (lifecycle) {
@@ -284,8 +246,6 @@ const main = async () => {
                       broker.attach(peer);
                       return () => broker.detach(peer);
                     },
-                    // Exit once the restart call returns; the attached app
-                    // starts a fresh runtime when it reconnects.
                     restartProcess: () => {
                       setImmediate(() => {
                         void runtimeLifecycle.shutdown("restart");
@@ -330,9 +290,6 @@ const main = async () => {
     ),
   );
 
-  // The transport is up: start loading the runner module now so it overlaps
-  // the host's connect/initialize latency instead of running inside
-  // initialize. Owned by the runtime server's base scope.
   runtimeServer.prefetchRunner();
 
   if (detachedMode) {
@@ -345,8 +302,6 @@ const main = async () => {
     if (shuttingDown) return;
     shuttingDown = true;
     if (lifecycle) {
-      // The lifecycle server closes the root scope through its onShutdown
-      // hook, then releases pid/lock files.
       await lifecycle.shutdown("signal");
     } else {
       await closeRootScope();
@@ -366,7 +321,6 @@ void main().catch((error) => {
 });
 
 export {
-  // Re-exports for external callers.
   WorkerPeerBroker,
   parseWorkerListenUrl,
   startWorkerTransport,

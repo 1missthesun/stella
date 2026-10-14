@@ -39,15 +39,6 @@ const RESIZE_TIMING = { duration: 240, easing: Easing.out(Easing.cubic) };
 export const fileViewerPanelWidth = (screenWidth: number): number =>
   Math.min(screenWidth - SIDE_MARGIN * 2, MAX_WIDTH);
 
-/**
- * The centred popover reply and task chains open in. It takes `preferredHeight`
- * on its very first frame, so a caller that knows the content's size never
- * shows a max-size frame first; later content changes ease to the new size.
- * Without a preferred height it fills the room between the top of the screen
- * and the composer. The keyboard and the composer shrink that room as they
- * move, on the UI thread, so the popover keeps pace with them frame for frame.
- * `ready={false}` keeps it invisible while the caller measures.
- */
 export function FileViewerPanel({
   onClose,
   closeLabel,

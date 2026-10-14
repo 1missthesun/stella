@@ -81,15 +81,11 @@ type DisplayHandlersOptions = {
   getStellaDataDir: () => string | null;
   localChatHistoryService?: LocalChatHistoryService;
   getAuthToken?: () => Promise<string | null>;
-  /** Files Stella produced or displayed in a conversation, per its cloud journal. */
   cloudFileGrants?: CloudConversationFileGrants;
   deviceFileLocator?: DeviceFileLocator;
   getDeviceId?: () => string | null;
-  /** On pi-durable: the local files Stella linked in a conversation's transcript. */
   piLinkedFiles?: (conversationId: string) => Promise<readonly string[]>;
-  /** Reads a file another of the owner's computers has, live. */
   peerDeviceFiles?: PeerDeviceFiles;
-  /** The conversation this window shows, for reads that don't name one. */
   getActiveConversationId?: () => string | null;
   assertPrivilegedSender: (
     event: IpcMainEvent | IpcMainInvokeEvent,
@@ -136,7 +132,6 @@ const MIME_BY_EXTENSION: Record<string, string> = {
   ".xml": "application/xml",
   ".yaml": "application/yaml",
   ".yml": "application/yaml",
-  // Images
   ".png": "image/png",
   ".jpg": "image/jpeg",
   ".jpeg": "image/jpeg",
@@ -146,23 +141,19 @@ const MIME_BY_EXTENSION: Record<string, string> = {
   ".avif": "image/avif",
   ".ico": "image/x-icon",
   ".bmp": "image/bmp",
-  // Fonts
   ".woff": "font/woff",
   ".woff2": "font/woff2",
   ".ttf": "font/ttf",
   ".otf": "font/otf",
-  // Audio
   ".mp3": "audio/mpeg",
   ".wav": "audio/wav",
   ".ogg": "audio/ogg",
   ".m4a": "audio/mp4",
   ".flac": "audio/flac",
-  // Video
   ".mp4": "video/mp4",
   ".webm": "video/webm",
   ".mov": "video/quicktime",
   ".m4v": "video/mp4",
-  // 3D / generic
   ".glb": "model/gltf-binary",
   ".gltf": "model/gltf+json",
   ".obj": "text/plain",
@@ -172,7 +163,6 @@ const MIME_BY_EXTENSION: Record<string, string> = {
 
 const ALLOWED_EXTENSIONS = new Set(Object.keys(MIME_BY_EXTENSION));
 
-/** The most one ranged read returns; a relayed response must stay well under its cap. */
 const MAX_RANGE_READ_BYTES = 2 * DEVICE_FILE_READ_LIMITS.rangeBytes;
 const MAX_FOLDER_MANIFEST_BYTES = 1024 * 1024;
 
@@ -209,14 +199,9 @@ const listLocalFolder = async (
   };
 };
 
-/** Head of a canvas document; the `<title>` is written near the top of it. */
 const CANVAS_TITLE_SCAN_BYTES = 8192;
 const CANVAS_TITLE_RE = /<title[^>]*>([\s\S]*?)<\/title>/i;
 
-/**
- * The title the canvas itself declares, which is what the author named it —
- * the slug is a filename, and reads as one in a file list.
- */
 const canvasDocumentTitle = async (
   filePath: string,
 ): Promise<string | null> => {
@@ -283,14 +268,8 @@ export const isDisplayReadPathInLocalChatFiles = (
  */
 const MOBILE_READABLE_DATA_SUBDIRS = ["outputs", "media"] as const;
 
-/**
- * Marks an error as "this was refused because the caller is the phone, not
- * because anything is broken". The phone shows the message as is, so a
- * refusal reads as a policy answer rather than a broken file.
- */
 export const REMOTE_VIEW_DENIAL_PREFIX = "Not available in phone view: ";
 
-/** True when `candidate` is `base` itself or sits underneath it. */
 const isPathInside = (candidate: string, base: string): boolean =>
   candidate === base || candidate.startsWith(base + path.sep);
 
@@ -307,7 +286,6 @@ const isPathInside = (candidate: string, base: string): boolean =>
 const resolveThroughSymlinks = async (target: string): Promise<string> => {
   let current = target;
   const trailing: string[] = [];
-  // Bounded by the path depth; `path.dirname` is a fixed point at the root.
   for (;;) {
     try {
       return path.join(await fs.realpath(current), ...trailing.reverse());
@@ -375,12 +353,6 @@ export const registerDisplayHandlers = (options: DisplayHandlersOptions) => {
     return stellaDataDir;
   };
 
-  /**
-   * `display:readFile` for the desktop renderer (`remote: false`) and for a
-   * phone's or another computer's `file.read` relayed through the cloud
-   * (`remote: true`), which is held to Stella's own outputs, the
-   * conversation's linked files and folders, and what this computer shared.
-   */
   const deviceFileDeps = (): DeviceFileSourceDeps | null =>
     options.deviceFileLocator
       ? {
@@ -446,10 +418,6 @@ export const registerDisplayHandlers = (options: DisplayHandlersOptions) => {
     return { bytes, mimeType };
   };
 
-  /**
-   * The computer that has a file this one does not: the one its device
-   * record names first, then any other online computer of the owner.
-   */
   const findPeerHolder = async (
     requestedPath: string,
     conversationId: string,
@@ -577,9 +545,6 @@ export const registerDisplayHandlers = (options: DisplayHandlersOptions) => {
             }).files,
           )
         : [],
-    // Any conversation of this owner, not just the one this window shows:
-    // a file Stella produced or displayed there, per the cloud journal, is
-    // one the user has already been shown.
     async () =>
       options.cloudFileGrants
         ? await options.cloudFileGrants.listPaths(conversationId)
@@ -590,7 +555,6 @@ export const registerDisplayHandlers = (options: DisplayHandlersOptions) => {
         : [],
   ];
 
-  /** Files and folders this computer itself shared from a reply or report. */
   const sharedByThisComputer = async (resolved: string): Promise<boolean> => {
     const deviceId = options.getDeviceId?.() ?? null;
     if (!deviceId || !options.deviceFileLocator) return false;
@@ -600,18 +564,10 @@ export const registerDisplayHandlers = (options: DisplayHandlersOptions) => {
     return recorded.size > 0 && (await linkedPathsGrant(resolved, [...recorded]));
   };
 
-  /**
-   * `granted`: read it here. `elsewhere`: it is not on this computer, so the
-   * computer that has it decides, under its own policy.
-   */
   const remoteAccess = async (
     resolved: string,
     conversationId: string,
   ): Promise<"granted" | "elsewhere"> => {
-    // Stella's own artifact directories are readable without a
-    // conversation: apps rendered in the phone's mirrored UI (and the
-    // shell's media viewers) read their result files directly, and have
-    // no conversation to attribute the read to.
     if (await isMobileReadableStellaPath(resolved, options.getStellaDataDir())) {
       return "granted";
     }
@@ -694,12 +650,6 @@ export const registerDisplayHandlers = (options: DisplayHandlersOptions) => {
     const viewerConversation =
       conversationId || (access.remote ? "" : (options.getActiveConversationId?.() ?? ""));
 
-    // Paths can outlive the file they point at — e.g. an `image_gen` /
-    // tool-result registered a path in `generatedMediaItems`, and the
-    // underlying file was later moved or deleted (especially for paths
-    // outside `~/.stella/`). Treat ENOENT as a soft "missing" result so the
-    // renderer can render a placeholder instead of surfacing the raw
-    // IPC error to the console / UI.
     let stats: Awaited<ReturnType<typeof fs.stat>> | null = null;
     if (!elsewhere) {
       try {
@@ -791,7 +741,6 @@ export const registerDisplayHandlers = (options: DisplayHandlersOptions) => {
     MIME_BY_EXTENSION[path.extname(filePath).toLowerCase()] ??
     "application/octet-stream";
 
-  /** Where a path is and what it is: a file or a folder, here or on another computer. */
   const statPath = async (
     payload: { filePath?: unknown; conversationId?: unknown } | undefined,
     access: { remote: boolean },
@@ -844,7 +793,6 @@ export const registerDisplayHandlers = (options: DisplayHandlersOptions) => {
     );
   };
 
-  /** A folder's entries, here or on the computer that has it. */
   const listFolder = async (
     payload: { filePath?: unknown; conversationId?: unknown } | undefined,
     access: { remote: boolean },
@@ -1002,11 +950,6 @@ export const registerDisplayHandlers = (options: DisplayHandlersOptions) => {
     },
   );
 
-  // Canvases render from `stella-canvas://` (source/canvas-protocol.ts). A
-  // file on this computer is served from disk with its own folder, so its
-  // relative images, styles and scripts load; a file kept on another device
-  // is read through the display lane above and held in memory, like a cloud
-  // canvas's HTML.
   handleIpc(
     IPC_DISPLAY_CANVAS_FILE_URL,
     async (event, payload?: { filePath?: unknown }) => {
@@ -1047,9 +990,6 @@ export const registerDisplayHandlers = (options: DisplayHandlersOptions) => {
     },
   );
 
-  // The relative assets of a canvas document kept on another device: read
-  // through the same lane as the document (live from the computer that has
-  // it, else the copy it put in Drive), under that computer's grant.
   setCanvasDocumentAssetReader(async (filePath, range, maxBytes) => {
     const payload = range
       ? { filePath, offset: range.offset, length: range.length }
@@ -1061,10 +1001,6 @@ export const registerDisplayHandlers = (options: DisplayHandlersOptions) => {
     return { bytes: read.bytes, sizeBytes: read.sizeBytes, mimeType: read.mimeType };
   });
 
-  // The relative assets of a Drive document: read from the owner's Drive by
-  // signed URL, ranged for video and audio, held to the document's folder by
-  // the canvas protocol. The document path is the drive path with a leading
-  // `/`, so the asset's drive path is the rest.
   setCanvasDocumentAssetReader(async (filePath, range, maxBytes) => {
     const locator = options.deviceFileLocator;
     const drivePath = filePath.replace(/^\/+/u, "");
@@ -1167,7 +1103,6 @@ export const registerDisplayHandlers = (options: DisplayHandlersOptions) => {
   );
 
   return {
-    /** A phone's or another computer's `file.read`, under the remote read policy. */
     readFileForRequest: (payload: {
       filePath?: unknown;
       conversationId?: unknown;

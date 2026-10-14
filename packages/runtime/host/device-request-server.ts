@@ -1,12 +1,3 @@
-/**
- * This computer's half of a paired phone's request, relayed by the owner gate
- * over the presence socket (`@stella/contracts/turn-plane/device-requests`).
- *
- * The app answers the request (it owns the file-access policy and the voice
- * runtime); this module only frames the answer: a `response.start`, the body
- * in base64 chunks small enough for a presence frame, then `response.end`.
- */
-
 import {
   DEVICE_REQUEST_LIMITS,
   isDeviceRequestMethod,
@@ -19,7 +10,6 @@ export type DeviceRequestAnswer =
   | {
       ok: true;
       contentType: string;
-      /** The response body, base64-encoded. */
       bodyBase64: string;
     }
   | { ok: false; code: DeviceRequestErrorCode; message: string };
@@ -42,7 +32,6 @@ const ERROR_CODES = new Set<DeviceRequestErrorCode>([
   "failed",
 ]);
 
-/** Keep each chunk's base64 a multiple of 4 so every chunk decodes alone. */
 const CHUNK_BASE64_CHARS =
   Math.floor((DEVICE_REQUEST_LIMITS.chunkBytes * 4) / 3 / 4) * 4;
 
@@ -62,7 +51,6 @@ export class DeviceRequestServer {
     if (this.active.has(requestId)) this.canceled.add(requestId);
   }
 
-  /** Answer one request without blocking the socket's frame loop. */
   handle(frame: {
     requestId: string;
     method: unknown;
@@ -153,8 +141,6 @@ export class DeviceRequestServer {
         data: body.slice(offset, offset + CHUNK_BASE64_CHARS),
       });
       if (!sent) return;
-      // Yield between chunks so a large file never starves the socket's
-      // pings or the dispatch frames sharing it.
       if ((offset / CHUNK_BASE64_CHARS) % 16 === 15) {
         await new Promise<void>((resolve) => setImmediate(resolve));
       }

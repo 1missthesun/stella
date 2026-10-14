@@ -1,7 +1,6 @@
 import type { CallArgs } from "@stella/contracts/backend/api";
 import { backendClient } from "@/platform/backend/backend-client";
 
-/** Hosted-browser handoffs, served by the owner's object (`browser.*`). */
 export const cloudBrowserApi = {
   getInteraction: (args: CallArgs<"browser.detail">) =>
     backendClient.call("browser.detail", args),

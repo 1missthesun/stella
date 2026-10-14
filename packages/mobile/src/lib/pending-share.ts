@@ -1,9 +1,5 @@
 import type { PickedAttachment } from "./chat-attachments";
 
-/**
- * Content shared into Stella from another app (share sheet), parked here
- * until the chat screen is mounted and ready to prefill the composer.
- */
 export type PendingShare = {
   text?: string;
   attachments?: PickedAttachment[];
@@ -17,7 +13,6 @@ export function setPendingShare(share: PendingShare) {
   for (const listener of listeners) listener();
 }
 
-/** Returns and clears the parked share. */
 export function consumePendingShare(): PendingShare | null {
   const out = pending;
   pending = null;

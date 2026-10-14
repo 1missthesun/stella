@@ -1,17 +1,12 @@
-/**
- * Shared debugger management - attach/detach chrome.debugger and dispatch CDP events.
- * Used by interaction.js, network.js, capture.js (PDF), etc.
- */
-
-const debuggerAttachments = new Map(); // tabId -> true
+const debuggerAttachments = new Map();
 /**
  * Tabs that must stay attached regardless of idle time. A long-running capture
  * (HAR recording) receives CDP events without issuing commands, so the idle
  * timer would otherwise detach mid-recording and silently end it.
  */
-const detachHolds = new Set(); // tabId
+const detachHolds = new Set();
 let detachTimer = null;
-const DETACH_TIMEOUT = 300000; // Auto-detach after 5min idle
+const DETACH_TIMEOUT = 300000;
 
 function scheduleIdleDetach() {
   // The handle is a bare number in the service worker, where `unref` is absent
@@ -38,10 +33,6 @@ export function releaseDebugger(tabId) {
   detachHolds.delete(tabId);
 }
 
-/**
- * Detach every tab that is not explicitly held, then keep watching if any hold
- * remains so a released tab still idles out later.
- */
 async function detachIdleDebuggers() {
   detachTimer = null;
   for (const [tabId] of [...debuggerAttachments]) {
@@ -105,9 +96,6 @@ export async function evaluateRuntime(tabId, expression, options = {}) {
   return result.result?.value;
 }
 
-/**
- * Detach debugger from all tabs.
- */
 export async function detachAllDebuggers() {
   clearTimeout(detachTimer);
   detachTimer = null;
@@ -133,13 +121,9 @@ export function isDebuggerAttached(tabId) {
   return debuggerAttachments.has(tabId);
 }
 
-// --- CDP Event Dispatch ---
-
-// Map of "tabId:method" -> Set<callback>
 const eventListeners = new Map();
 const attachedFrameSessions = new Map();
 
-/** Sessions may predate an observation because network capture also auto-attaches. */
 export function getAttachedFrameSessions(tabId) {
   return new Map(attachedFrameSessions.get(tabId) || []);
 }
@@ -226,7 +210,6 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   clearCdpEvents(tabId);
 });
 
-// Clean up when debugger is detached externally (e.g. user closes DevTools)
 chrome.debugger.onDetach.addListener((source) => {
   if (source.tabId) {
     attachedFrameSessions.delete(source.tabId);

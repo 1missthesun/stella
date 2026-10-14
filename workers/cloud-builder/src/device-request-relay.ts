@@ -30,15 +30,12 @@ type Pending = {
   method: DeviceRequestMethod;
   socket: WebSocket;
   bytes: number;
-  /** Cancels the pending start or idle deadline. */
   cancelTimer: (() => void) | null;
-  /** Set until the computer starts answering. */
   resolveStart: ((response: Response) => void) | null;
   controller: ReadableStreamDefaultController<Uint8Array> | null;
 };
 
 export type DeviceRequestRelayHost = {
-  /** The device's one proven presence socket, when it is online. */
   liveSocket: (deviceId: string) => WebSocket | null;
   send: (socket: WebSocket, frame: DeviceRequestServerFrame) => void;
   log: (level: "info" | "error", event: string, fields: Record<string, unknown>) => void;
@@ -76,7 +73,6 @@ export class DeviceRequestRelay {
 
   constructor(private readonly host: DeviceRequestRelayHost) {}
 
-  /** Relay one request to `deviceId` and resolve with the phone's response. */
   async open(input: {
     deviceId: string;
     mobileDeviceId: string;
@@ -122,12 +118,9 @@ export class DeviceRequestRelay {
     });
   }
 
-  /** A response frame from `deviceId`'s presence socket. */
   onFrame(socket: WebSocket, deviceId: string, frame: DeviceRequestDeviceFrame): void {
     const requestId = typeof frame.requestId === "string" ? frame.requestId : "";
     const entry = this.pending.get(requestId);
-    // A frame for a request this socket was not asked (or one already over)
-    // is dropped: a device can only answer what it was sent.
     if (!entry || entry.deviceId !== deviceId || entry.socket !== socket) return;
     switch (frame.type) {
       case "response.start": {
@@ -146,7 +139,6 @@ export class DeviceRequestRelay {
             entry.controller = controller;
           },
           cancel: () => {
-            // The phone went away mid-stream.
             this.finish(entry);
             this.host.send(entry.socket, { type: "request.cancel", requestId: entry.requestId });
           },
@@ -184,7 +176,6 @@ export class DeviceRequestRelay {
       }
       case "response.end": {
         if (entry.resolveStart) {
-          // An empty body that never started: answer it as empty.
           entry.resolveStart(new Response(null, { status: 200, headers: noStore }));
           entry.resolveStart = null;
         } else {
@@ -212,7 +203,6 @@ export class DeviceRequestRelay {
     }
   }
 
-  /** The device's socket closed: everything it was answering ends now. */
   onDeviceGone(deviceId: string, socket?: WebSocket): void {
     for (const entry of [...this.pending.values()]) {
       if (entry.deviceId !== deviceId) continue;
@@ -234,10 +224,6 @@ export class DeviceRequestRelay {
     this.pending.delete(entry.requestId);
   }
 
-  /**
-   * End a request with an error: a JSON error when nothing was sent yet, a
-   * broken stream otherwise. `tellDevice` asks the computer to stop sending.
-   */
   private fail(
     entry: Pending,
     code: DeviceRequestErrorCode,

@@ -1,8 +1,3 @@
-/**
- * Element query command handlers: innertext, innerhtml, inputvalue,
- * boundingbox, waitforurl, scrollintoview, isvisible, isenabled,
- * ischecked, count, styles.
- */
 import { getActiveTab } from "./tabs.js";
 import {
   resolveSelector,
@@ -271,7 +266,6 @@ export async function handleStyles(command) {
     };
   `;
 
-  // For CSS selectors, support multiple elements via CDP Runtime.evaluate
   if (!resolved.isRef) {
     const allMatches = buildComposedCssMatcherAllScript(resolved.css);
     const script = `(() => {
@@ -290,7 +284,6 @@ export async function handleStyles(command) {
     };
   }
 
-  // For refs, single element
   const element = await queryElement(
     tab.id,
     command.ownerId,
@@ -309,16 +302,11 @@ export async function handleStyles(command) {
   return { id: command.id, success: true, data: { elements: [element] } };
 }
 
-/**
- * Check if a URL matches a pattern (glob-style with * wildcards).
- */
 function urlMatches(url, pattern) {
   if (!pattern) return true;
 
-  // Exact match
   if (url === pattern) return true;
 
-  // Convert glob to regex: * matches anything except nothing
   const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&");
   const regex = new RegExp("^" + escaped.replace(/\*/g, ".*") + "$");
   return regex.test(url);

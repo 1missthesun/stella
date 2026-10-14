@@ -5,7 +5,6 @@ export type AppFrame = Pick<WorkspaceApp, "slug" | "revision" | "title"> & {
   expiresAt: number;
 };
 
-// Persist only library metadata. Signed session URLs stay in memory.
 export const appListCacheKey = (owner: string, origin: string) =>
   `stella.apps.v1:${encodeURIComponent(origin)}:${encodeURIComponent(owner)}`;
 
@@ -22,7 +21,6 @@ export function reusableAppFrame(
   );
 }
 
-/** Keep the two most recently used pages, bounding native WebView memory. */
 export function retainAppFrame(
   frames: AppFrame[],
   frame: AppFrame,

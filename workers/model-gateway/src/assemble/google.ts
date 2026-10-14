@@ -6,16 +6,6 @@ import {
   type AssembleOutcome,
 } from "./types.js";
 
-/**
- * Google Generative AI `streamGenerateContent?alt=sse` -> `GenerateContentResponse`.
- *
- * Chunks are merged per candidate `index`: consecutive text parts with the
- * same `thought` flag concatenate (a `thoughtSignature` on a later fragment is
- * kept on the merged part), `functionCall` / `inlineData` / `executableCode`
- * parts are kept whole, `finishReason` and `usageMetadata` come from the last
- * chunk carrying them (Gemini reports cumulative usage), and
- * `promptFeedback` / `modelVersion` / `responseId` are carried through.
- */
 type Candidate = {
   index: number;
   role: string | undefined;

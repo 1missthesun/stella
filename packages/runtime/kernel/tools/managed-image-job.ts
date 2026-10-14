@@ -19,8 +19,6 @@ import {
 } from "./image-decode-validation.js";
 import { sleepWithAbort } from "./effect-runtime.js";
 
-// fal permits inference to run for up to one hour and may continue retrying a
-// webhook for two hours. Keep the terminal waiter beyond both envelopes.
 export const MANAGED_IMAGE_JOB_TIMEOUT_MS = 3 * 60 * 60_000 + 15 * 60_000;
 export const MANAGED_IMAGE_ARTIFACT_GRACE_MS = 60_000;
 const INITIAL_POLL_MS = 750;
@@ -136,11 +134,6 @@ export const hashManagedImageRequestBody = (
 ): string =>
   createHash("sha256").update(JSON.stringify(requestBody)).digest("hex");
 
-/**
- * Stable across worker/Electron restarts and external-engine continuation.
- * The durable operation ledger supplies `operationId`; run and process-local
- * tool-call ids intentionally do not participate.
- */
 export const createManagedImageIdempotencyKey = (
   context: ToolContext,
   operationId = context.requestId,
@@ -356,9 +349,6 @@ const cancelRequest = async (args: {
   baseUrl: string;
   headers: Record<string, string>;
 }): Promise<boolean> => {
-  // Cancellation uses an independent signal because the tool's signal is
-  // already aborted. Repeating DELETE is safe: the gateway persists one
-  // owner-scoped tombstone before attempting provider cancellation.
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
       const response = await args.fetchImpl(
@@ -462,9 +452,6 @@ export const submitAndWaitForManagedImageJob = async (
   };
 
   try {
-    // A prior desktop process may have lost every POST response and then
-    // exited before it could observe the owner-scoped lookup. Reconcile the
-    // durable operation before issuing any new POST on reattachment.
     if (!accepted && operation.reattached) {
       accepted = await reconcileAcceptance();
     }
@@ -668,7 +655,6 @@ export const submitAndWaitForManagedImageJob = async (
         }
       } catch (error) {
         throwIfAborted(signal);
-        // Transient lookup/JSON/network failures reattach on the next poll.
       }
 
       await sleep(Math.min(pollMs, Math.max(1, deadline - now())), signal);

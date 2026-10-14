@@ -1,11 +1,3 @@
-/**
- * A cloud watch's check: the watch's own script, run with no model in a
- * Worker isolate of its own (`LOADER`). The script is an ES module whose
- * default export takes `{ state }` and returns `{ found?, state? }`; it may
- * `fetch`, and nothing else of the owner's is in reach. A run is bounded in
- * time, CPU and subrequests, and its state in size.
- */
-
 import { WATCH_STATE_MAX_BYTES } from "@stella/contracts/backend/schedules";
 import { sha256Hex } from "../hash.js";
 

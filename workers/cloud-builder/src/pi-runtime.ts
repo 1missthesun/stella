@@ -1,34 +1,3 @@
-/**
- * Stella's pi-durable harness inside the conversation's Durable Object.
- *
- * The harness lives on this object's SQLite (`openDurableObjectSqliteStorage`),
- * beside the journal; pi's tables (`conversations`, `entries`, `tasks`,
- * `submissions`, `documents`, ...) do not collide with the journal's. The
- * orchestrator chat is pi's root conversation; the agents it starts are
- * conversations under it, each run in a cloud container of its own.
- *
- * Model requests are routed by the provider session id pi-durable puts on
- * each one:
- *
- * - The root conversation's go through the running chat turn: its model
- *   capability and guarded gateway transport (owner fence, model grant,
- *   managed cancellation, all unchanged). Work the root runs without a bound
- *   turn, such as a request recovered right after an eviction, waits briefly
- *   for the resumed turn to bind again.
- * - An agent's go through its run. Every message to an agent is one run:
- *   admitted by the owner gate on the `agent` lane, with a capability of its
- *   own for the `general` agent type, released when the agent answers.
- *
- * An agent's file and shell tools run in its own cloud container. An agent
- * placed on one of the owner's computers runs there as a whole, on that
- * computer's own Stella, through the owner's agent threads (`deviceAgents`).
- *
- * What an agent needs between turns (the owner's authority, the model specs,
- * its prompt material) is kept in this object's storage, so an agent can
- * finish after the turn that started it, and after an eviction.
- *
- * Loaded lazily, like the rest of the loop, so object wake stays lean.
- */
 import { BACKGROUND_CONTEXT, withAbortSignal } from "@earendil-works/chord/context";
 import type { Context } from "@earendil-works/chord";
 import type { Api, Model, ModelThinkingLevel } from "@earendil-works/pi-ai";
@@ -195,64 +164,41 @@ import { ownerGateStub } from "./rpc-release.js";
 
 /** How long recovered work waits for its turn or agent run to bind a transport. */
 const BINDING_WAIT_MS = 120_000;
-/** A run's capability is minted again when less than this is left of it. */
 const CAPABILITY_RENEW_MS = 60_000;
-/** How long an agent waits for one of the owner's container slots. */
 const CONTAINER_SLOT_WAIT_MS = 10 * 60_000;
 const CONTAINER_SLOT_POLL_MS = 5_000;
-/** How long a stop holds its turn: the runs are marked at once, then wind down on their own. */
 const ORIGIN_STOP_HOLD_MS = 5_000;
-/** A command without its own timeout. */
-/** Storage key of what agents need between turns. */
 const PI_AGENT_STATE_KEY = "piAgentState";
-/** The newest entries a client starts from, and per older page. */
 const CLIENT_HISTORY_PAGE = 200;
-/** A client frame of entries stays well under the socket's message limit. */
 const CLIENT_FRAME_BYTES = 512 * 1024;
 
-/**
- * A turn pi runs: on Stella's models, on the owner's ChatGPT plan through the
- * gateway's native lane, on a provider key saved to the owner's account
- * through its BYOK lane, or on Claude Code, whose CLI runs in the
- * conversation's orchestrator container (`PiRuntimeOptions.claudeCode`).
- */
 export type PiExecution = CloudExecutionSelection;
 
-/** The scope the Claude Code engine knows this object's conversations by. */
 const CLAUDE_CODE_SCOPE = "cloud";
-/** Storage key prefix of each Claude Code session's record, by pi session id. */
 const CLAUDE_CODE_SESSION_KEY = "claudeCodeSession:";
 
-/** Whose agents these are, as the latest chat turn admitted them. */
 export type PiAuthority = {
   ownerId: string;
   ownerGeneration: string;
-  /** The Stella conversation (this object's name). */
   conversationId: string;
   audience: ManagedModelAudience;
   budgetMicroCents: number;
   execution: PiExecution;
 };
 
-/** What an agent needs when no turn is bound: kept in storage. */
 type PiAgentState = {
   version: 1;
   authority: PiAuthority;
-  /** The `stella` provider's models: the orchestrator's and the general agent's (none on a ChatGPT turn). */
   models: StellaModelSpec[];
   skillsCatalog?: string;
   executionContext: ExecutionContextSnapshot;
-  /** The orchestrator's tools as the latest turn offered them, for work recovered before a turn binds. */
   tools?: StellaToolSpec[];
-  /** The agents' own tools, likewise. */
   agentTools?: StellaToolSpec[];
   locale?: string;
-  /** The latest turn bound, which an agent a reporter starts after it belongs to. */
   lastTurnId?: string;
 };
 
 export type PiDeviceAgents = {
-  /** `parentThreadId`: the agent that starts it, which its reports go back to; absent for Stella's own. */
   start(
     args: { key: string; deviceId: string; description: string; prompt: string; model?: string; parentThreadId?: string },
     authority: PiAuthority,
@@ -263,19 +209,10 @@ export type PiDeviceAgents = {
     authority: PiAuthority,
     parentTurnId: string,
   ): Promise<AgentMessageDelivery | undefined>;
-  /** Stop it, and every agent it started, wherever they run. */
   stop(args: { key: string; threadId: string }, authority: PiAuthority, parentTurnId: string): Promise<AgentStopResult | void>;
 };
 
-/**
- * Agents Stella starts here on a model of their own (Claude Code in a
- * container, Codex, a model on a key saved to the account, another Stella
- * model for a caller off Stella's models): each runs as one of the owner's
- * agent threads on that execution, as the loop's are, and its report comes
- * back as a wake turn.
- */
 export type PiThreadAgents = {
-  /** Throws when nothing in the cloud runs `model`. */
   check(model: string, authority: PiAuthority): void;
   start(
     args: {
@@ -283,71 +220,47 @@ export type PiThreadAgents = {
       description: string;
       prompt: string;
       model: string;
-      /** `spawn_agent`'s `workspace`: the size its container starts at. */
       workspace?: import("@stella/contracts/turn-plane/turn-start").AgentWorkspaceSize;
     },
     authority: PiAuthority,
     parentTurnId: string,
   ): Promise<{ threadId: string }>;
   message(args: { key: string; threadId: string; message: string }, authority: PiAuthority, parentTurnId: string): Promise<void>;
-  /** Stop it, and every agent it started, wherever they run. */
   stop(args: { key: string; threadId: string }, authority: PiAuthority, parentTurnId: string): Promise<AgentStopResult | void>;
 };
 
-/** The engine id of `PiThreadAgents` agents in pi's records. */
 const THREAD_AGENT_ENGINE = "agent-thread";
 
-/**
- * One run of an agent pi runs here, at any depth, for the owner's agent
- * threads: every agent gets one row, under the agent that started it. An
- * agent thread's own agent is left out; its thread records its attempts.
- */
 export type PiAgentLedgerEvent = {
   threadId: string;
-  /** The message of its starter's this run answers, from 1. */
   attempt: number;
   description: string;
-  /** The agent that started it; absent for Stella's own. */
   parentThreadId?: string;
-  /** Its depth among Stella's agents: 1 for hers, one more for each level below. */
   depth: number;
-  /** The turn it started during or just after. */
   turnId: string;
   authority: PiAuthority;
-  /** How the run ended; absent when it started. */
   ended?: { outcome: import("@stella/contracts/agent-status").AgentAttemptOutcome; text?: string };
 };
 
-/** One of the orchestrator's agents, as its lifecycle cards name it. */
 export type PiAgentInfo = {
   description: string;
-  /** How many messages it has been given: 1 for the spawn, then one more per follow-up. */
   attempt: number;
-  /** Started for another host's orchestrator (a computer's, or an agent thread's), whose own turns show it. */
   origin?: AgentOrigin;
-  /** What its latest run saved to the owner's drive and linked in its answer. */
   files?: PiDeliveredFile[];
-  /** A message since has it working again: a report or stop of an earlier run does not end it. */
   running?: boolean;
 };
 
-/** A file an agent delivered: in the owner's drive, for the conversation's files card. */
 export type PiDeliveredFile = { path: string; name: string; sizeBytes: number; contentType: string };
 
 export type PiAgentFileDelivery = { threadId: string; deliver: (files: PiDeliveredFile[]) => Promise<void> };
 
-/** A report of an agent thread's agent (`PiConversationRuntime.threadAttempt`). */
 export type PiThreadReport = {
   threadId: string;
   requestId: string;
   text: string;
-  /** How the run it reports ended. */
   status?: import("@stella/contracts/agent-status").AgentAttemptOutcome;
-  /** One of its messages was answered within another report, or its run was stopped. */
   settled?: true;
-  /** The attempt whose message it answers, when known. */
   attemptGeneration?: number;
-  /** What the run saved to the owner's drive and linked in its answer. */
   files?: PiDeliveredFile[];
 };
 
@@ -357,9 +270,7 @@ export type PiTurnSources = {
   memory: StellaMemory;
   skillsCatalog: string | undefined;
   executionContext: ExecutionContextSnapshot;
-  /** The conversation's reply language. */
   locale?: string;
-  /** Whether `code` reads this conversation's history; absent, it does while memory is on. */
   history?: boolean;
 };
 
@@ -368,11 +279,9 @@ export type PiTurnBinding = {
   capability: string;
   fetch: typeof fetch;
   authority: PiAuthority;
-  /** On Stella's models: the orchestrator's, and the same alias for its agents. */
   stellaModels?: { model: StellaModelSpec; agentModel: StellaModelSpec };
   thinkingLevel: ModelThinkingLevel;
   sources: PiTurnSources;
-  /** The turn's orchestrator tools (web, html, image_gen, Read, drive, …), code excluded. */
   tools(): Promise<readonly CloudCodeSourceAgentTool[]>;
 };
 
@@ -394,33 +303,20 @@ export type PiRuntimeEnv = Pick<
     >
   >;
 
-/** A login handoff an agent's `code` asked for, held open until the user finishes it. */
 export type PiBrowserHandoff = {
   authority: PiAuthority;
-  /** The authority the handoff's command ran under, which the gateway bound it to. */
   browser: CloudBrowserAuthority;
-  /** The agent's `code` call the handoff answers. */
   toolCallId: string;
   suspension: CloudBrowserSuspension;
 };
 
-/** How a handoff ended, as the gateway's resume receipt says. */
 export type PiBrowserHandoffEnd = Pick<CloudBrowserResumeReceipt, "result" | "safeMessage">;
 
 export type PiRuntimeOptions = {
   storage: DurableObjectStorage;
   env: PiRuntimeEnv;
   gatewayOrigin: string;
-  /**
-   * Where the root transcript is seeded from, as a computer's transcript is:
-   * the conversation's latest checkpoint, or the journal's context start.
-   */
   journalStart(): Promise<JournalStart>;
-  /**
-   * Entries this object moved to R2 (`PiEntryArchive`): those of
-   * `piConversationId`, oldest first, all of them or the newest `limit` below
-   * `beforeId`. Absent where nothing is archived.
-   */
   archivedEntries?: {
     read(
       piConversationId: number,
@@ -431,42 +327,15 @@ export type PiRuntimeOptions = {
   waitUntil(work: Promise<unknown>): void;
   report(error: unknown): void;
   log(event: string, fields: Record<string, unknown>): void;
-  /** A note an agent sent the orchestrator (`send_message` to "stella"), through the owner's report outbox. */
   deliverNote(note: AgentNote, authority: PiAuthority): Promise<void>;
-  /**
-   * A report of an agent a computer's orchestrator started here: it goes
-   * back to that computer (an `agent-report` card in the journal), not to
-   * this conversation's orchestrator. `turnId` is the latest turn.
-   */
   noteLedgerReport(report: AgentReport, turnId: string, agent: PiAgentInfo): void;
-  /**
-   * A report of an agent thread's agent: it settles the thread's attempt in
-   * the owner's agent threads, which hand it to whoever started the thread.
-   */
   deliverThreadReport?(report: PiThreadReport): Promise<void>;
-  /** An agent started work (a spawn or a follow-up), during or just after `turnId`. */
   agentStarted?(event: PiAgentInfo & { threadId: string; turnId: string }): void;
-  /**
-   * An agent was stopped before it answered and is not running again: no
-   * report wakes the orchestrator, but its lifecycle cards still end.
-   */
   agentStopped?(event: PiAgentInfo & { threadId: string; turnId: string }): void;
-  /** One of Stella's own agents started or stopped running: `runningAgents` changed. */
   agentsChanged?(): void;
-  /** A run of an agent here started or ended (`PiAgentLedgerEvent`). */
   agentLedger?(event: PiAgentLedgerEvent): void;
-  /**
-   * Agents on the owner's devices, run there as a whole through the owner's
-   * agent threads as the loop's are; their reports come back as wake turns.
-   */
   deviceAgents?: PiDeviceAgents;
-  /** Agents started here on a model of their own, as the owner's agent threads. */
   threadAgents?: PiThreadAgents;
-  /**
-   * The owner's agent threads, for the agents' directory (`agent-messaging`):
-   * this conversation's agents elsewhere and the owner's other sessions, and
-   * a note for one of them.
-   */
   agentDirectory?: {
     list(
       authority: PiAuthority,
@@ -481,48 +350,22 @@ export type PiRuntimeOptions = {
       args: { controlRequestId: string; threadId: string; requesterThreadId?: string },
     ): Promise<AgentStopResult>;
   };
-  /**
-   * Stella moves herself to one of the owner's computers: the conversation's
-   * record names it, and her brief continues there as a chat placed on it.
-   */
   moveBrain?(authority: PiAuthority, host: Extract<PiBrainHost, { host: "device" }>, brief: string): Promise<void>;
-  /** Keep this object waking while agents run. */
   heartbeat(): void;
-  /**
-   * An agent's own tools (web, code with connectors), on the agents'
-   * authority; `browser` is the calling run's cloud browser, which its code
-   * drives; `history` is the calling agent's own thread, which its code reads.
-   */
   agentTools(
     authority: PiAuthority,
     browser?: CloudBrowserClient,
     history?: CloudHistoryClient,
     delivery?: PiAgentFileDelivery,
   ): Promise<readonly CloudCodeSourceAgentTool[]>;
-  /**
-   * Show a login handoff to the user and wait until it ends: the user
-   * finished, canceled, or it expired. An abort of `signal` withdraws it.
-   */
   browserHandoff?(handoff: PiBrowserHandoff, signal: AbortSignal | undefined): Promise<PiBrowserHandoffEnd>;
-  /**
-   * Holds one agent run to the owner's purge fence, as a chat turn is held:
-   * a lease while it runs, and a model grant (under the owner's memory
-   * policy) on each of its requests, revoked by a purge or privacy change.
-   */
   agentGuard?(authority: PiAuthority, turnId: string): Promise<PiAgentGuard>;
-  /**
-   * Runs one Claude Code CLI turn of the orchestrator in the conversation's
-   * orchestrator container, for a turn on the `anthropic` execution.
-   */
   claudeCode?: ClaudeCodeTransport & {
-    /** The model the CLI resolved an alias to, as it last reported. */
     resolvedModel?(alias: string): string | undefined;
-    /** The context window the CLI last reported for a model. */
     contextWindow?(model: string): number | undefined;
   };
 };
 
-/** A tool the root conversation started or finished, for clients' live view. */
 export type PiToolActivity = {
   toolCallId: string;
   name: string;
@@ -531,21 +374,14 @@ export type PiToolActivity = {
   isError?: boolean;
 };
 
-/** One agent run's hold on the owner's purge fence (`PiRuntimeOptions.agentGuard`). */
 export type PiAgentGuard = {
-  /** A model request, sent only under a valid grant. */
   fetch(request: Request): Promise<Response>;
   release(): Promise<void>;
 };
 
-/** A pi call context: cancelled with `signal`, which only cancels that call or wait. */
 export const contextFor = (signal?: AbortSignal): Context =>
   signal ? withAbortSignal(signal, BACKGROUND_CONTEXT) : BACKGROUND_CONTEXT;
 
-/**
- * The thinking level of a turn's reasoning effort, for every engine alike.
- * A stored legacy value reads as medium.
- */
 export const thinkingLevelFor = (effort: AgentModelReasoningEffort | string): ModelThinkingLevel =>
   effort === "none" ? "off" : normalizeReasoningEffortLevel(effort);
 
@@ -584,67 +420,43 @@ const waitFor = async (ms: number, signal?: AbortSignal): Promise<void> => {
   signal?.throwIfAborted();
 };
 
-/** One message an agent is working on: admitted, with its own capability. */
 type ActiveRun = {
   run: AgentRun;
-  /** Whose run it is: the agents', or an agent thread's own (`threadAttempt`). */
   authority: PiAuthority;
-  /** Owner gate and capability turn id; unique across the owner's conversations. */
   turnId: string;
   sessionId: string;
   capability: { token: string; expiresAt: number };
   guard?: PiAgentGuard;
-  /** The run's cloud browser, from its first use; its profile is saved when the run ends. */
   browser?: CloudBrowserClient;
-  /** When it was admitted: when the agent started running, as its listing says. */
   startedAt: number;
 };
 
-/** An agent's container, from the start of its run until its last run ends. */
 type AgentLease = {
   lease: PiComputeLease;
   threadId: string;
-  /** Tool calls on it now: a lease is renewed only between them. */
   inFlight: number;
-  /** Whether any call reached it, so its work is saved when the run ends. */
   used: boolean;
-  /** What the answers of runs that ended before its last one link, delivered with the last one's. */
   linked: Set<string>;
 };
 
-/** How long saving a run's browser profile may take when the run ends. */
 const BROWSER_CHECKPOINT_MS = 30_000;
 
-/** A lease is renewed before its credentials run out, when no call is on it. */
 const LEASE_RENEW_MS = 3 * 60_000;
-/** How long a released lease's container is given to stop coming up. */
 const LEASE_STOP_WAIT_MS = 30_000;
-/** The files an agent's latest run delivered, until its report carries them. */
 const deliveredFilesKey = (threadId: string) => `piAgentFiles:${threadId}`;
-/** The most a report waits for its agent's other runs to end and deliver their files. */
 const REPORT_FILES_WAIT_MS = 15 * 60_000;
 
-/** The files an answer links, as paths in the agent's container (its home is the world). */
 const answerLinkedPaths = (answer: string): string[] => [
   ...extractLocalFileLinkPaths(answer).map((linkedPath) =>
     linkedPath === "~" || linkedPath.startsWith("~/") ? `${WORLD_ROOT}${linkedPath.slice(1)}` : linkedPath,
   ),
   ...extractDriveLinkPaths(answer).map((drivePath) => `${WORLD_ROOT}/drive/${drivePath}`),
 ];
-/** The key an agent thread's attempt is given to its agent under. */
 const threadCallKey = (threadId: string, attemptGeneration: number) => `thread:${threadId}:${attemptGeneration}`;
-/** Storage key prefix: an agent thread's own authority and model, by thread id. */
 const THREAD_AGENT_PREFIX = "piThreadAgent:";
 
-/**
- * An agent thread's agent runs on the authority and model its dispatcher
- * admitted, not the latest turn's: a turn on another model would otherwise
- * pin its capability to a model the agent does not run on. One on the
- * owner's ChatGPT plan runs on its execution's model and has no Stella model.
- */
 type ThreadAgent = { authority: PiAuthority; model?: StellaModelSpec };
 
-/** The ChatGPT plan models an execution runs on (none for Stella's). */
 const planModels = (executions: Iterable<PiExecution | undefined>): Model<"openai-responses">[] => {
   const plans = new Map<string, Model<"openai-responses">>();
   for (const execution of executions) {
@@ -655,7 +467,6 @@ const planModels = (executions: Iterable<PiExecution | undefined>): Model<"opena
   return [...plans.values()];
 };
 
-/** Account provider models executions run on, by provider (none for Stella's or a ChatGPT plan). */
 const providerModels = (executions: Iterable<PiExecution | undefined>): Map<string, Model<Api>[]> => {
   const byProvider = new Map<string, Model<Api>[]>();
   for (const execution of executions) {
@@ -681,7 +492,6 @@ type Opened = {
   agents: Pick<OpenStellaHarness, "startAgent" | "messageAgent" | "stopAgent" | "agentStanding" | "markCatchUp">;
 };
 
-/** A cloud tool as the harness offers it. */
 const toolSpec = (tool: CloudCodeSourceAgentTool): StellaToolSpec => ({
   name: tool.name,
   description: tool.description,
@@ -692,7 +502,6 @@ const toolSpec = (tool: CloudCodeSourceAgentTool): StellaToolSpec => ({
     : {}),
 });
 
-/** A journal record as `importJournal` reads it; messages are imported, and reminders as Stella's lines. */
 export type JournalRecordLike = {
   seq: number;
   kind: string;
@@ -707,36 +516,21 @@ export type JournalRecordLike = {
 export class PiConversationRuntime {
   readonly #options: PiRuntimeOptions;
   readonly #models = createModels();
-  /** Claude Code as a pi engine, when this object can run its CLI. */
   readonly #claudeCode: ClaudeCodeEngine | undefined;
   #opening: Promise<Opened> | undefined;
   #binding: PiTurnBinding | undefined;
-  /** The bound turn's tools, built once per turn. */
   #turnTools: { binding: PiTurnBinding; tools: Promise<readonly CloudCodeSourceAgentTool[]> } | undefined;
   #state: PiAgentState | undefined;
-  /** Agent threads' own authority and model, by thread id (loaded on open). */
   readonly #threadAgents = new Map<string, ThreadAgent>();
   #modelKey: string | undefined;
-  /** Agent runs by their conversation's provider session id. */
   readonly #runs = new Map<string, ActiveRun[]>();
-  /** Agents' containers by their conversation. */
   readonly #leases = new Map<number, Promise<AgentLease>>();
-  /**
-   * Agents with runs here that have not finished ending (their lease's files
-   * not yet delivered), by thread id: a report waits for them.
-   */
   readonly #ending = new Map<string, { runs: number; ended: Promise<void>; resolve: () => void }>();
-  /** Leases whose daemon may call the broker, by `turnId:attemptGeneration` (until released). */
   readonly #live = new Map<string, AgentLease>();
-  /** Broker claims, one at a time. */
   #brokerClaims: Promise<unknown> = Promise.resolve();
-  /** Requests waiting for a transport: `root`, or an agent's session id. */
   readonly #waiting = new Map<string, Set<() => void>>();
-  /** The root conversation's events for clients watching the pi view. */
   #clientStream: AgentEventStream | undefined;
-  /** The harness once open, for the agents' log sync. */
   #harnessRef: Harness | undefined;
-  /** Every agent's conversation, written to its log in the owner's cloud at each step. */
   readonly #agentLog = agentLogSync({
     harness: () => this.#harnessRef,
     transport: () => this.#agentLogTransport(),
@@ -768,9 +562,6 @@ export class PiConversationRuntime {
       engine.onStatus((session, status) =>
         options.log("claude_code_status", { role: session.role, state: status.state }),
       );
-      // Claude Code compacts its own context; pi never does for it. Its
-      // summary is the root's compaction, which the turn then publishes as
-      // the conversation's checkpoint.
       engine.onCompaction((session, compaction) => {
         if (session.role !== "orchestrator" || session.threadId) return;
         void (async () => {
@@ -788,17 +579,13 @@ export class PiConversationRuntime {
     }
   }
 
-  /** The chat turn bound now; waits for one while `signal` allows. */
   async boundTurn(signal: AbortSignal): Promise<PiTurnBinding> {
     return await this.#turn(signal);
   }
 
-  /** Stop the Claude Code CLI turns this object runs, with the conversation's run. */
   stopClaudeCode(): void {
     this.#claudeCode?.abort(CLAUDE_CODE_SCOPE, { agents: true });
   }
-
-  // ---- transports ---------------------------------------------------------
 
   #notify(key: string): void {
     const waiters = this.#waiting.get(key);
@@ -858,7 +645,6 @@ export class PiConversationRuntime {
 
   async #mint(authority: PiAuthority, turnId: string): Promise<{ token: string; expiresAt: number }> {
     const execution = authority.execution;
-    // A Claude Code turn's agents run as agent threads, never on a model here.
     if (execution.engine === "anthropic") throw new Error("Agents of a Claude Code turn run in containers of their own.");
     const minted = await mintTurnCapability(this.#options.env, {
       ownerId: authority.ownerId,
@@ -873,7 +659,6 @@ export class PiConversationRuntime {
     return { token: minted.token, expiresAt: minted.expiresAt };
   }
 
-  /** An agent's request: its run's capability over the gateway, cancellable there. */
   async #agentFetch(active: ActiveRun, request: Request): Promise<Response> {
     const { env } = this.#options;
     const gateway = env.MODEL_GATEWAY;
@@ -881,7 +666,6 @@ export class PiConversationRuntime {
     if (!gateway || !control) throw new Error("Model gateway is not configured.");
     const capability = await this.#runCapability(active);
     const send = (value: Request) => (active.guard ? active.guard.fetch(value) : gateway.fetch(value));
-    // The native lane serves a plan's request as one stream; the managed lane's cancellation is Stella's own.
     if (active.authority.execution.engine !== "stella") return await send(withBearer(request, capability));
     return await fetchWithManagedCancellation({
       request: withBearer(request, capability),
@@ -895,7 +679,6 @@ export class PiConversationRuntime {
   #access(): StellaGatewayAccess {
     return {
       relayBaseUrl: gatewayRelayBaseUrl(this.#options.gatewayOrigin),
-      // The bearer is set per request below, by the conversation it is for.
       capability: async () => "stella-routed",
       fetch: async (input: string | URL | Request, init?: RequestInit, route?: StellaRequestRoute) => {
         const request = input instanceof Request ? new Request(input, init) : new Request(String(input), init);
@@ -909,8 +692,6 @@ export class PiConversationRuntime {
     };
   }
 
-  // ---- what agents keep between turns --------------------------------------
-
   async #agentState(): Promise<PiAgentState> {
     this.#state ??= await this.#options.storage.get<PiAgentState>(PI_AGENT_STATE_KEY);
     if (!this.#state) throw new Error("No Stella turn has run in this conversation yet.");
@@ -919,7 +700,6 @@ export class PiConversationRuntime {
 
   #setModels(state: Pick<PiAgentState, "models" | "authority"> | undefined): void {
     if (!state && this.#threadAgents.size === 0) return;
-    // Agent threads' models stay known whatever model the latest turn runs on.
     const models = [...(state?.models ?? [])];
     for (const { model } of this.#threadAgents.values()) {
       if (model && !models.some((known) => known.agentType === model.agentType && known.alias === model.alias)) {
@@ -963,7 +743,6 @@ export class PiConversationRuntime {
     this.#modelKey = key;
   }
 
-  /** The orchestrator's model for a turn's execution. */
   #rootModel(execution: PiExecution) {
     if (execution.engine === "anthropic") {
       if (!this.#claudeCode) throw new Error("Claude Code can't run in this conversation's cloud.");
@@ -977,7 +756,6 @@ export class PiConversationRuntime {
   }
 
   #sources(): StellaContextSources {
-    // The orchestrator answers only inside a turn; agents also between turns.
     const turn = async (): Promise<PiTurnSources> => (await this.#turn()).sources;
     return {
       env: "cloud",
@@ -985,7 +763,7 @@ export class PiConversationRuntime {
         id === "agents/orchestrator.md"
           ? (await turn()).orchestratorPrompt
           : id === "agents/general.md"
-            ? // Where an agent's work lives and how what it makes reaches the user, as the cloud's agents are told.
+            ?
               `${bundledPrompt(id).trim()}\n\n${generalAgentWorldGuidance()}`
             : bundledPrompt(id),
       personality: async () => (await turn()).personality,
@@ -994,7 +772,6 @@ export class PiConversationRuntime {
       executionContext: async () =>
         this.#binding?.sources.executionContext ?? (await this.#agentState()).executionContext,
       locale: async () => (this.#binding ? this.#binding.sources.locale : (await this.#agentState()).locale),
-      // Stella reads the journal while memory is on; an agent reads its own thread.
       codeHistory: async (agentType) => {
         if (agentType !== "orchestrator") return true;
         const sources = await turn();
@@ -1002,8 +779,6 @@ export class PiConversationRuntime {
       },
     };
   }
-
-  // ---- Stella's tools ---------------------------------------------------------
 
   #turnToolsFor(binding: PiTurnBinding): Promise<readonly CloudCodeSourceAgentTool[]> {
     if (this.#turnTools?.binding !== binding) {
@@ -1021,9 +796,7 @@ export class PiConversationRuntime {
       specs: (role) => (role === "orchestrator" ? this.#state?.tools : this.#state?.agentTools) ?? [],
       run: async (call, context) => {
         const signal = context.abortSignal;
-        // An agent's code drives its run's cloud browser.
         const active = call.role === "orchestrator" ? undefined : this.#runOf(call.threadId);
-        // The orchestrator's tools are its turn's: recovered work waits for the turn to bind again.
         const tools =
           call.role === "orchestrator"
             ? await this.#turnToolsFor(await this.#turn(signal))
@@ -1059,7 +832,6 @@ export class PiConversationRuntime {
     };
   }
 
-  /** An agent's `history.*`, bound to its own thread: never Stella's conversation or another agent's. */
   #ownHistory(threadId: string): CloudHistoryClient {
     const query = async (args: Record<string, unknown>) => {
       const { harness, root } = await this.open();
@@ -1086,9 +858,6 @@ export class PiConversationRuntime {
     };
   }
 
-  // ---- the cloud browser -----------------------------------------------------
-
-  /** The run an agent is working in, if it is working. */
   #runOf(threadId: string | undefined): ActiveRun | undefined {
     if (!threadId) return undefined;
     for (const runs of this.#runs.values()) {
@@ -1098,12 +867,6 @@ export class PiConversationRuntime {
     return undefined;
   }
 
-  /**
-   * A run's cloud browser: the private Browser Gateway under the run's own
-   * authority, the way a chat turn holds the model gateway. Without a run
-   * (the tools as offered, or a call recovered before its run binds) every
-   * command says why it cannot run.
-   */
   #browser(active: ActiveRun | undefined): CloudBrowserClient | undefined {
     const gateway = this.#options.env.BROWSER_GATEWAY;
     if (!gateway || !this.#options.browserHandoff) return undefined;
@@ -1128,7 +891,6 @@ export class PiConversationRuntime {
     return active.browser;
   }
 
-  /** Whose a run's browser commands are: its own turn, one attempt per run. */
   #browserAuthority(active: ActiveRun): CloudBrowserAuthority {
     return {
       ownerId: active.authority.ownerId,
@@ -1140,11 +902,6 @@ export class PiConversationRuntime {
     };
   }
 
-  /**
-   * The agent's code handed the browser to the user. Its `code` call stays
-   * open while they sign in on their device, and answers with how the
-   * handoff ended; the run then carries on, signed in or not.
-   */
   async #handBrowserToUser(
     active: ActiveRun,
     toolCallId: string,
@@ -1170,8 +927,6 @@ export class PiConversationRuntime {
         ...(end.result === "approved" ? {} : { isError: true }),
       };
     } catch (error) {
-      // A handoff that could not be shown, or was withdrawn, gives the profile
-      // back now rather than at its deadline; one already decided stays so.
       const gateway = this.#options.env.BROWSER_GATEWAY;
       if (gateway) await cancelGatewayHandoff(gateway, browser, suspension).catch(() => undefined);
       this.#options.log("pi_browser_handoff_failed", {
@@ -1183,8 +938,6 @@ export class PiConversationRuntime {
       active.browser?.resumed();
     }
   }
-
-  // ---- agents ---------------------------------------------------------------
 
   async #providerSession(harness: Harness, conversationId: ConversationId, context: Context): Promise<string> {
     const existing = await harness.snapshot(ProviderDoc, conversationId, context);
@@ -1205,16 +958,12 @@ export class PiConversationRuntime {
   #agents(): StellaAgentsHost {
     return {
       rootPlacement: { kind: "cloud" },
-      // An agent runs here, in the cloud, or as a whole on one of the
-      // owner's devices, on that device's own Stella, through the owner's agent threads.
       place: (destination) => {
         if (destination.kind !== "device") return { kind: "cloud" };
         if (this.#options.deviceAgents) return { kind: "device", deviceId: destination.deviceId };
         return { error: `This conversation cannot start an agent on device ${destination.deviceId}.` };
       },
       remote: (placement) => (placement.kind === "device" ? this.#deviceAgentHost(placement.deviceId) : undefined),
-      // Another Stella model runs here for a caller on Stella's models; any
-      // other model runs as an agent thread on its own execution.
       agentModel: async (requested, caller, placement) => {
         if (placement) return { there: true };
         if (requested.startsWith("stella/") && caller.model?.provider === STELLA_PROVIDER_ID) {
@@ -1232,8 +981,6 @@ export class PiConversationRuntime {
         threads.check(requested, (await this.#agentState()).authority);
         return { engine: THREAD_AGENT_ENGINE };
       },
-      // Claude Code's CLI runs only Stella's own turns here: her agents run
-      // as agent threads on her execution, in containers of their own.
       defaultAgentModel: (caller) => (caller.model?.provider === CLAUDE_CODE_PROVIDER_ID ? "default" : undefined),
       engine: (id) => (id === THREAD_AGENT_ENGINE ? this.#threadAgentHost() : undefined),
       execution: this.#execution(),
@@ -1278,13 +1025,10 @@ export class PiConversationRuntime {
         this.#notify(active.sessionId);
         this.#options.heartbeat();
         this.#options.log("pi_agent_run_started", { threadId: run.threadId, turnId });
-        // The agent's container comes up while its first model call runs.
         void this.#lease(run.agentConversationId as ConversationId, active, context).catch((error: unknown) =>
           this.#options.report(error),
         );
         await this.#recordAgentRun(run, authority, turnId, context).catch((error: unknown) => this.#options.report(error));
-        // Stella's own agents, not their subagents: those report to the agent
-        // that started them, so nothing in this conversation would end their cards.
         if (run.parentConversationId !== root.id) return;
         const info = await this.#agentInfo(run.threadId, context);
         const cardTurnId = this.#cardTurnId(run.threadId, info);
@@ -1306,15 +1050,11 @@ export class PiConversationRuntime {
           break;
         }
         if (run.parentConversationId === (await this.open()).root.id) this.#options.agentsChanged?.();
-        // A run that used the cloud browser saves its profile (its sign-ins) for the agent's next runs.
         if (ended?.browser?.used()) {
           await ended.browser
             .checkpoint(AbortSignal.timeout(BROWSER_CHECKPOINT_MS))
             .catch((error: unknown) => this.#options.report(error));
         }
-        // The agent's last run: its container's work is saved and delivered
-        // while the run still holds its admission, then the container goes.
-        // An earlier one's answer is kept for it, so what it links is delivered too.
         try {
           const busy = [...this.#runs.values()].some((runs) =>
             runs.some((active) => active.run.agentConversationId === run.agentConversationId),
@@ -1332,7 +1072,6 @@ export class PiConversationRuntime {
         const authority = ended?.authority ?? this.#state?.authority;
         if (!authority) return;
         const outcome = agentRunOutcome(end);
-        // Answered with agents of its own still at work: its attempt stays open.
         if (outcome && !end?.waiting) {
           await this.#recordAgentRun(run, authority, ended?.turnId ?? `pi:${authority.conversationId}:${run.runId}`, context, outcome).catch(
             (error: unknown) => this.#options.report(error),
@@ -1348,7 +1087,6 @@ export class PiConversationRuntime {
         await this.#agentRunsEnded(report.threadId);
         const { authority } = await this.#agentState();
         if (report.origin) {
-          // What the run delivered goes with the report that settles its attempt.
           const filesKey = deliveredFilesKey(report.threadId);
           const files = report.settled ? undefined : await this.#options.storage.get<PiDeliveredFile[]>(filesKey);
           const attemptGeneration = await this.#threadAttemptOf(report.requestId, context);
@@ -1364,9 +1102,7 @@ export class PiConversationRuntime {
           if (files) await this.#options.storage.delete(filesKey);
           return;
         }
-        // Only the host that started it counts what settled without a report.
         if (report.settled) return;
-        // What the agent's run delivered goes with its report, once.
         const filesKey = deliveredFilesKey(report.threadId);
         const files = await this.#options.storage.get<PiDeliveredFile[]>(filesKey);
         const info = await this.#agentInfo(report.threadId, context);
@@ -1386,11 +1122,6 @@ export class PiConversationRuntime {
     };
   }
 
-  /**
-   * Who the agents reach beyond this harness, through the owner's agent
-   * threads. A note for this conversation's Stella (from an agent another
-   * host started here) queues a wake turn here, as any other session's does.
-   */
   #directory(threads: NonNullable<PiRuntimeOptions["agentDirectory"]>): AgentDirectoryHost {
     return {
       conversationId: async () => (await this.#agentState()).authority.conversationId,
@@ -1421,7 +1152,6 @@ export class PiConversationRuntime {
     };
   }
 
-  /** The host of agents started here on a model of their own (`PiThreadAgents`). */
   #threadAgentHost(): RemoteAgentHost | undefined {
     const threads = this.#options.threadAgents;
     if (!threads) return undefined;
@@ -1446,7 +1176,6 @@ export class PiConversationRuntime {
     };
   }
 
-  /** The host of agents on one of the owner's devices. */
   #deviceAgentHost(deviceId: string): RemoteAgentHost | undefined {
     const devices = this.#options.deviceAgents;
     if (!devices) return undefined;
@@ -1457,7 +1186,6 @@ export class PiConversationRuntime {
     return {
       start: async (args) => {
         const { authority, parentTurnId } = await scope();
-        // An agent on Claude Code runs on that computer's own Claude login.
         if (args.model && /^claude-code(?:[/:]|$)/u.test(args.model)) {
           const listed = await this.#gate(authority)
             .devices()
@@ -1483,7 +1211,6 @@ export class PiConversationRuntime {
     };
   }
 
-  /** A run's start or end, for the owner's agent threads (`PiAgentLedgerEvent`). */
   async #recordAgentRun(
     run: AgentRun,
     authority: PiAuthority,
@@ -1507,7 +1234,6 @@ export class PiConversationRuntime {
     });
   }
 
-  /** What an agent's lifecycle cards say about it. */
   async #agentInfo(threadId: string, context: Context): Promise<PiAgentInfo> {
     const { harness, root } = await this.open();
     const state = await harness.snapshot(StellaAgentsDoc, root.id, context);
@@ -1523,21 +1249,10 @@ export class PiConversationRuntime {
     };
   }
 
-  /**
-   * The turn an agent's lifecycle cards go under: the orchestrator turn that
-   * started it, or, for a computer's agent (whose own turns show it), one of
-   * its own that no client draws. An agent thread's agent has none: it is
-   * listed in the owner's agent threads, not in this conversation.
-   */
   #cardTurnId(threadId: string, info: PiAgentInfo): string | undefined {
     if (info.origin) return undefined;
     return this.#binding?.turnId ?? this.#state?.lastTurnId;
   }
-
-  // ---- agent containers -----------------------------------------------------
-
-  /** The ExecutionEnv of a conversation: its container for a cloud agent; none for the orchestrator. */
-  // ---- agents' containers ---------------------------------------------------
 
   #owner(authority: PiAuthority): PiComputeOwner {
     return { ownerId: authority.ownerId, ownerGeneration: authority.ownerGeneration, conversationId: authority.conversationId };
@@ -1555,7 +1270,6 @@ export class PiConversationRuntime {
     };
   }
 
-  /** One of the owner's agent container slots, waited for. */
   async #takeSlot(owner: PiComputeOwner, sandboxId: string, signal: AbortSignal): Promise<void> {
     const deadline = Date.now() + CONTAINER_SLOT_WAIT_MS;
     for (;;) {
@@ -1570,7 +1284,6 @@ export class PiConversationRuntime {
     }
   }
 
-  /** A cloud agent's file or shell tool call, run in its execution environment: its container or a computer. */
   async #attachedTool(call: PiAttachedToolCall, context: Context): Promise<SerializedAgentToolResult> {
     const { harness } = await this.open();
     const agentConversationId = call.conversationId as ConversationId;
@@ -1578,8 +1291,6 @@ export class PiConversationRuntime {
     const active = await this.#agentRun(sessionId, context.abortSignal);
     const held = await this.#lease(agentConversationId, active, context);
     held.inFlight += 1;
-    // A stop while the command runs takes the container's work down
-    // with it, unsaved, rather than waiting for the command to finish.
     const signal = context.abortSignal;
     const stop = () => {
       void this.#endLease(agentConversationId, { aborted: true }).catch((error: unknown) => this.#options.report(error));
@@ -1590,7 +1301,6 @@ export class PiConversationRuntime {
       held.used = true;
       return await held.lease.call({ toolCallId: call.callId, toolName: call.toolName, params: call.params });
     } catch (error) {
-      // A container that did not come up, or went down, is let go: the next call starts a fresh one.
       void this.#dropLease(agentConversationId, held).catch((dropError: unknown) => this.#options.report(dropError));
       throw error;
     } finally {
@@ -1599,10 +1309,6 @@ export class PiConversationRuntime {
     }
   }
 
-  /**
-   * Where Stella can move herself (one of the owner's computers that is
-   * online, ready and enabled for remote work), and how those computers stand.
-   */
   #execution(): StellaExecutionHost {
     return {
       agentTarget: async (deviceId, needs) => {
@@ -1665,7 +1371,6 @@ export class PiConversationRuntime {
     };
   }
 
-  /** The owner's object, for one of the agents' internal calls. */
   async #ownerCall<T>(authority: PiAuthority, name: string, args: unknown): Promise<T> {
     const response = (await this.#gate(authority).ownerInternal({
       name,
@@ -1676,7 +1381,6 @@ export class PiConversationRuntime {
     return response.value;
   }
 
-  /** The agents' logs in the owner's cloud, written as the cloud's; none before any authority is known. */
   #agentLogTransport(): AgentLogTransport | undefined {
     const authority = this.#state?.authority;
     if (!authority) return undefined;
@@ -1693,11 +1397,6 @@ export class PiConversationRuntime {
     };
   }
 
-  /**
-   * One of the agents here moving itself to one of the owner's computers,
-   * once its run here ended: its log first, then the owner's hand-off, after
-   * which that computer runs it and reports for it.
-   */
   async #moveAgent(move: AgentMove): Promise<{ where: string } | { error: string }> {
     if (move.deviceId === AGENT_MOVE_CLOUD) return { error: "You already run in the cloud." };
     try {
@@ -1722,10 +1421,6 @@ export class PiConversationRuntime {
     return { where: moved.where };
   }
 
-  /**
-   * The agent's lease: the one it holds, or a new one when it holds none or
-   * its credentials are near their end with nothing running on it.
-   */
   async #lease(agentConversationId: ConversationId, active: ActiveRun, context: Context): Promise<AgentLease> {
     const current = this.#leases.get(agentConversationId);
     if (current) {
@@ -1759,7 +1454,6 @@ export class PiConversationRuntime {
     return await opening;
   }
 
-  /** A run of the agent began here: its report waits until it has ended. */
   #runStarted(threadId: string): void {
     const current = this.#ending.get(threadId);
     if (current) {
@@ -1771,7 +1465,6 @@ export class PiConversationRuntime {
     this.#ending.set(threadId, { runs: 1, ended, resolve });
   }
 
-  /** A run of the agent finished ending: with its lease's files delivered when it was the last. */
   #runEnded(threadId: string): void {
     const current = this.#ending.get(threadId);
     if (!current) return;
@@ -1781,11 +1474,6 @@ export class PiConversationRuntime {
     current.resolve();
   }
 
-  /**
-   * Until every run of the agent here has ended, its lease's files
-   * delivered: a run a message steered into the same answer ends after the
-   * one that reports it, and its files go with that report.
-   */
   async #agentRunsEnded(threadId: string): Promise<void> {
     const deadline = Date.now() + REPORT_FILES_WAIT_MS;
     for (let current = this.#ending.get(threadId); current; current = this.#ending.get(threadId)) {
@@ -1798,7 +1486,6 @@ export class PiConversationRuntime {
     }
   }
 
-  /** The agent's last run ended: its lease is quiesced (unless it was stopped) and released. */
   async #endLease(agentConversationId: number, end: AgentRunEnd): Promise<void> {
     const current = this.#leases.get(agentConversationId);
     if (!current) return;
@@ -1807,7 +1494,6 @@ export class PiConversationRuntime {
     if (held) await this.#releaseLease(agentConversationId, held, end);
   }
 
-  /** Let a broken lease go, if it is still the agent's, with nothing saved from it. */
   async #dropLease(agentConversationId: number, held: AgentLease): Promise<void> {
     const current = this.#leases.get(agentConversationId);
     if (!current || (await current.catch(() => undefined)) !== held) return;
@@ -1816,15 +1502,9 @@ export class PiConversationRuntime {
     await this.#releaseLease(agentConversationId, held, { aborted: true });
   }
 
-  /**
-   * Quiesce a lease the agent worked in (the world pushed, the drive written
-   * back, the files the answer links delivered), then release it. A stopped
-   * run's lease, or one never used, is only released.
-   */
   async #releaseLease(agentConversationId: number, held: AgentLease, end: AgentRunEnd): Promise<void> {
     const { lease } = held;
     const { record } = lease;
-    // A stopped run aborts a container still coming up now, not after it is up.
     if (end.aborted) lease.abort();
     const up = !end.aborted && held.used && (await lease.ready.then(() => true, () => false));
     if (up) {
@@ -1836,7 +1516,6 @@ export class PiConversationRuntime {
         this.#options.report(error);
       }
     }
-    // A container still coming up stops first, so nothing it creates outlives the release.
     lease.abort();
     await Promise.race([lease.ready.catch(() => undefined), scheduler.wait(LEASE_STOP_WAIT_MS)]);
     await lease.release({ warm: !end.aborted }).catch((error: unknown) => this.#options.report(error));
@@ -1846,7 +1525,6 @@ export class PiConversationRuntime {
     );
   }
 
-  /** Leases an eviction dropped: their sessions and slots are released, their records forgotten. */
   async #sweepLeases(): Promise<void> {
     const left = await this.#options.storage.list<PiComputeRecord>({ prefix: "piCompute:" });
     for (const [key, record] of left) {
@@ -1858,12 +1536,6 @@ export class PiConversationRuntime {
     }
   }
 
-  /**
-   * A request from an agent's container daemon, presented with its lease's
-   * one-shot credential (`/sessions/pi:<conversation>/turn-broker`): the
-   * drive's sync, writes and deletes, and the lease's events (its delivered
-   * files). Nothing else is served here.
-   */
   async handleBroker(request: Request): Promise<Response> {
     const turnId = request.headers.get(TURN_BROKER_HEADERS.turnId) ?? "";
     const attemptGeneration = Number(request.headers.get(TURN_BROKER_HEADERS.attemptGeneration));
@@ -1877,7 +1549,6 @@ export class PiConversationRuntime {
     if (request.method !== target.method) return brokerFailure(403);
     const held = this.#live.get(`${turnId}:${attemptGeneration}`);
     if (!held) return brokerFailure(410);
-    // A computer's container may call before any turn ran here; its targets match every engine.
     const engine = this.#state?.authority.execution.engine ?? "stella";
     if ((target.kind !== "drive" && target.kind !== "turn-event") || !turnBrokerTargetMatchesEngine(target, engine)) {
       return brokerFailure(403);
@@ -1892,7 +1563,6 @@ export class PiConversationRuntime {
       .map((byte) => byte.toString(16).padStart(2, "0"))
       .join("");
     const { owner } = held.lease.record;
-    // One claim at a time: each consumes the record's next sequence.
     const claim = this.#brokerClaims.then(async () => {
       const record = await this.#options.storage.get<TurnBrokerRecord>(recordKey);
       if (!record) return undefined;
@@ -1939,7 +1609,6 @@ export class PiConversationRuntime {
           payload,
         );
       }
-      // A container never decides that work is over.
       if (payload.terminal === true) return brokerFailure(403);
       if (payload.kind === "output_files") await this.#noteDeliveredFiles(held.threadId, payload.payload);
       else this.#options.log("pi_agent_turn_event", { threadId: held.threadId, kind: String(payload.kind).slice(0, 64) });
@@ -1960,7 +1629,6 @@ export class PiConversationRuntime {
     };
   }
 
-  /** The files a lease's quiesce delivered, kept for the agent's report. */
   async #noteDeliveredFiles(threadId: string, payload: unknown): Promise<void> {
     const listed = (payload as { files?: unknown } | undefined)?.files;
     if (!Array.isArray(listed)) return;
@@ -1983,9 +1651,6 @@ export class PiConversationRuntime {
     await this.#options.storage.put(key, [...byPath.values()].slice(-50));
   }
 
-  // ---- harness --------------------------------------------------------------
-
-  /** Opens pi on this object's SQLite, once per isolate, and lets recovered work run. */
   open(): Promise<Opened> {
     this.#opening ??= (async () => {
       const kept = await this.#options.storage.get<PiAgentState>(PI_AGENT_STATE_KEY);
@@ -2002,7 +1667,6 @@ export class PiConversationRuntime {
           sources: this.#sources(),
           agents: this.#agents(),
           tools: this.#tools(),
-          // An agent's file and shell tools run in its container, through the attached tool host.
           extensions: [
             piAttachedCoding((call, context) => this.#attachedTool(call, context)),
             ...(this.#claudeCode ? [this.#claudeCode.extension(CLAUDE_CODE_SCOPE)] : []),
@@ -2014,14 +1678,11 @@ export class PiConversationRuntime {
       );
       this.#harnessRef = harness;
       const root = await harness.root(BACKGROUND_CONTEXT);
-      // Before recovered work runs: a root seeded with the whole journal is
-      // too large to read back into one model request.
       const { contextStartSeq } = await this.#options.journalStart();
       if (await alignJournalContext(harness, root, contextStartSeq, BACKGROUND_CONTEXT)) {
         this.#options.log("pi_root_context_aligned", {});
       }
       const rootSession = await this.#providerSession(harness, root.id, BACKGROUND_CONTEXT);
-      // Work an eviction cut off held containers this isolate never leased.
       await this.#sweepLeases().catch((error: unknown) => this.#options.report(error));
       harness.resume();
       return {
@@ -2038,10 +1699,6 @@ export class PiConversationRuntime {
     return this.#opening;
   }
 
-  /**
-   * Bind a running turn: its transport, model and prompt material. What
-   * agents need later is kept. Returns the unbind for the turn's `finally`.
-   */
   async bind(binding: PiTurnBinding): Promise<() => void> {
     const offered = (tools: readonly CloudCodeSourceAgentTool[]) =>
       tools.filter((tool) => !STELLA_HARNESS_TOOL_NAMES.has(tool.name)).map(toolSpec);
@@ -2071,14 +1728,11 @@ export class PiConversationRuntime {
     };
   }
 
-  /** The root conversation is the orchestrator: the turn's model and the orchestrator's tools. */
   async configureRoot(binding: PiTurnBinding, context: Context): Promise<void> {
     const { harness, root } = await this.open();
     const agent = await root.agent(context);
     const model = this.#rootModel(binding.authority.execution);
     if (agent.model && (agent.model.provider !== model.provider || agent.model.modelId !== model.modelId)) {
-      // The incoming model starts from the conversation's history; the outgoing one compacts it first
-      // when that is more than the incoming window holds.
       const window =
         model.provider === CLAUDE_CODE_PROVIDER_ID
           ? (this.#claudeCode?.contextWindow(model.modelId) ?? 0)
@@ -2104,18 +1758,12 @@ export class PiConversationRuntime {
     }
   }
 
-  /** Whether pi has work in flight here: agents running, reports on their way. */
   async busy(context: Context): Promise<boolean> {
     const { harness } = await this.open();
     const inspection = await harness.inspect(context);
     return inspection.tasks.length > 0 || inspection.submissions.length > 0;
   }
 
-  /**
-   * A schedule's agent started here (a `piAgent` turn), under its own thread
-   * id, for this conversation's own orchestrator. The turn is marked this
-   * conversation's own, so its prompt is not imported as someone else's.
-   */
   async scheduledAgent(
     request: { threadId: string; description?: string },
     prompt: string,
@@ -2142,24 +1790,13 @@ export class PiConversationRuntime {
     );
   }
 
-  /**
-   * An attempt of one of the owner's agent threads, run here as an agent
-   * whose reports go to the agent threads, right away and without a turn:
-   * the first attempt starts it under the thread's id on the model its
-   * dispatcher admitted, a later one messages it. Once per attempt. The call
-   * key names the attempt, so each report is matched to the attempt whose
-   * message it answers (`#threadAttemptOf`). In a conversation no turn has
-   * bound yet, the thread's authority is the agents' until one does.
-   */
   async threadAttempt(
     attempt: {
       threadId: string;
       description: string;
       attemptGeneration: number;
-      /** Where it sits among Stella's agents, from its parent chain in the owner's agent threads. */
       lineage: AgentLineage;
       authority: PiAuthority;
-      /** The Stella model it runs on; none on the owner's ChatGPT plan. */
       model?: StellaModelSpec;
       executionContext: ExecutionContextSnapshot;
     },
@@ -2217,7 +1854,6 @@ export class PiConversationRuntime {
     );
   }
 
-  /** The model an agent thread's agent runs on: its plan's, or the Stella model it was admitted on. */
   #threadModel(execution: PiExecution, model: StellaModelSpec | undefined) {
     if (execution.engine === "chatgpt") return { provider: CHATGPT_PROVIDER_ID, modelId: execution.model };
     if (execution.engine === "provider") return { provider: execution.provider, modelId: execution.model };
@@ -2226,10 +1862,6 @@ export class PiConversationRuntime {
     return stellaModelRef("general", model.alias);
   }
 
-  /**
-   * Whose run an agent's is: its agent thread's, for that thread's agent and
-   * the agents it starts; otherwise the agents' (the latest turn's).
-   */
   async #runAuthority(run: AgentRun, context: Context): Promise<PiAuthority> {
     const { harness, root } = await this.open();
     let threadId: string | undefined = run.threadId;
@@ -2247,7 +1879,6 @@ export class PiConversationRuntime {
     return (await this.#agentState()).authority;
   }
 
-  /** New input for an agent thread's running attempt, read before its next step. Once per `messageId`. */
   async steerThreadAgent(
     args: { threadId: string; attemptGeneration: number; messageId: string; text: string },
     context: Context,
@@ -2264,17 +1895,10 @@ export class PiConversationRuntime {
     );
   }
 
-  /**
-   * Stella's own agents that run here and are running now, as the
-   * conversation lists them: from the harness itself, not from its cards.
-   * Their agents are theirs to list. One on the owner's devices, and an
-   * agent thread's, are in the owner's agent threads, which list them.
-   */
   async runningAgents(context: Context): Promise<AgentActivityEntry[]> {
     const { harness, root } = await this.open();
     const state = await harness.snapshot(StellaAgentsDoc, root.id, context);
     const calls = Object.values(state?.calls ?? {});
-    // A run admitted here may not have reached the agent's conversation yet.
     const admitted = new Map<number, ActiveRun>();
     for (const runs of this.#runs.values()) {
       for (const active of runs) admitted.set(active.run.agentConversationId, active);
@@ -2285,7 +1909,6 @@ export class PiConversationRuntime {
       const conversationId = agent.conversationId as ConversationId;
       const active = admitted.get(conversationId);
       if (!active && (await harness.snapshot(LiveDoc, conversationId, context))?.run === undefined) continue;
-      // A run an eviction cut off dates from the agent's first entry.
       const first = active
         ? undefined
         : await harness.commit(async (tx) => (await tx.scanEntries({ conversationId, order: "ascending" }, 1)).items[0], context);
@@ -2303,11 +1926,6 @@ export class PiConversationRuntime {
     return running;
   }
 
-  /**
-   * Every agent under this conversation that still runs, at any depth: an
-   * agent's own agents are in its conversation's agents doc. Deepest first,
-   * so no parent is woken by a child that is still going.
-   */
   async runningAgentTree(context: Context): Promise<Array<{ threadId: string; conversationId: ConversationId; depth: number }>> {
     const { harness, root } = await this.open();
     const found: Array<{ threadId: string; conversationId: ConversationId; depth: number }> = [];
@@ -2327,13 +1945,11 @@ export class PiConversationRuntime {
     return found.sort((a, b) => b.depth - a.depth);
   }
 
-  /** Abort one agent's run wherever it sits in the tree; it reports nothing. */
   async abortAgentConversation(conversationId: ConversationId, context: Context): Promise<void> {
     const { harness } = await this.open();
     await (await harness.conversation(conversationId, context))?.abort(context);
   }
 
-  /** Stop an agent thread's agent and the agents below it: the runs are marked at once, then wind down on their own. */
   async stopThreadAgent(threadId: string, context: Context): Promise<void> {
     const { agents } = await this.open();
     const stopped = agents.stopAgent(threadId, context);
@@ -2374,7 +1990,6 @@ export class PiConversationRuntime {
     return running ? "steered" : "resumed";
   }
 
-  /** The attempt an agent thread's report answers, from the call key its message was given under. */
   async #threadAttemptOf(requestId: string, context: Context): Promise<number | undefined> {
     const reporter = Number(/^agent-report:(\d+)$/.exec(requestId)?.[1]);
     if (!Number.isSafeInteger(reporter)) return undefined;
@@ -2388,13 +2003,6 @@ export class PiConversationRuntime {
     return undefined;
   }
 
-  /**
-   * Write what other writers journaled into the root conversation before a
-   * turn answers: a computer's mirrored turns, another engine's. A record of
-   * a turn this conversation ran itself (submitted as `turn:<id>`) is its own,
-   * and so is the turn about to run. `read` gives journal records after a
-   * seq. Returns the seq the transcript now holds the journal through.
-   */
   async importJournal(
     read: (afterSeq: number) => Promise<{ records: readonly JournalRecordLike[]; complete: boolean }>,
     currentTurnId: string,
@@ -2440,11 +2048,6 @@ export class PiConversationRuntime {
     }
   }
 
-  /**
-   * A newer conversation checkpoint (another host's compaction) becomes this
-   * transcript's context start, so what it covers leaves the context and the
-   * archive can move it out of the object. Never fails the turn.
-   */
   async #adoptCheckpoint(harness: Harness, root: Conversation, context: Context): Promise<void> {
     try {
       const { checkpoint } = await this.#options.journalStart();
@@ -2457,11 +2060,6 @@ export class PiConversationRuntime {
     }
   }
 
-  /**
-   * The root's newest compaction, kept as the conversation's checkpoint for
-   * every other host (`checkpointToPublish`). One of its own prompts is the
-   * input of one of `ownTurnIds`, submitted as `turn:<id>`.
-   */
   async publishCheckpoint(
     ownTurnIds: () => readonly string[],
     store: (summary: string, firstKept: JournalCheckpointFirstKept) => Promise<number | undefined>,
@@ -2485,7 +2083,6 @@ export class PiConversationRuntime {
     await noteCheckpointPublished(harness, root, pending.markerId, context);
   }
 
-  /** Entries of the root conversation as they commit, from `afterEntryId` on. */
   async follow(
     afterEntryId: number,
     onEntry: (entry: EntryRecord) => void,
@@ -2527,14 +2124,6 @@ export class PiConversationRuntime {
     return assistantText(await root.commit((tx) => tx.entry(AssistantEntry, settled.answer), context));
   }
 
-  // ---- the clients' view (`@stella/contracts/pi-chat`) ----------------------
-
-  /**
-   * (Re)attach the root conversation's event stream for clients: every batch
-   * goes to `onEvents`, the new snapshot first, so a client attached to an
-   * older stream misses nothing. Returns the snapshot widened to the newest
-   * page of the whole history.
-   */
   async watchForClients(
     onEvents: (events: PiChatEvent[]) => void,
     context: Context,
@@ -2563,7 +2152,6 @@ export class PiConversationRuntime {
     return { snapshot: { ...snapshot, entries }, hasOlder: page.next !== undefined || trimmed || archived };
   }
 
-  /** Whether the clients' stream is attached in this isolate. */
   get watchingForClients(): boolean {
     return this.#clientStream !== undefined;
   }
@@ -2574,7 +2162,6 @@ export class PiConversationRuntime {
     await stream?.stop().catch(() => undefined);
   }
 
-  /** History before `beforeEntryId`, as clients receive it. */
   async olderForClients(beforeEntryId: number, context: Context): Promise<{ entries: PiEntry[]; hasOlder: boolean }> {
     const { root } = await this.open();
     const page = await root.entries(
@@ -2585,7 +2172,6 @@ export class PiConversationRuntime {
     );
     let items = [...page.items].reverse() as unknown as PiEntry[];
     let hasOlder = page.next !== undefined;
-    // Below what the store holds: the entries moved to R2, newest first.
     const archive = this.#options.archivedEntries;
     if (!hasOlder && archive && items.length < CLIENT_HISTORY_PAGE) {
       const below = Math.min(beforeEntryId, page.items.at(-1)?.id ?? beforeEntryId);
@@ -2597,7 +2183,6 @@ export class PiConversationRuntime {
     return { entries, hasOlder: hasOlder || trimmed };
   }
 
-  /** Closes pi's in-memory side. Its durable state is untouched. */
   async close(): Promise<void> {
     const opening = this.#opening;
     this.#opening = undefined;
@@ -2605,11 +2190,6 @@ export class PiConversationRuntime {
     await opened?.harness.close(BACKGROUND_CONTEXT);
   }
 
-  /**
-   * The conversation is being purged: stop every run here, and let go of
-   * what they hold (leases, owner admissions, containers). Its storage goes
-   * with the object's.
-   */
   async discard(): Promise<number> {
     const runs = [...this.#runs.values()].flat();
     this.#runs.clear();
@@ -2618,7 +2198,6 @@ export class PiConversationRuntime {
     const leases = [...this.#leases.keys()];
     await this.close();
     const authority = this.#state?.authority;
-    // Nothing a purged conversation's agents did is saved anywhere.
     await Promise.all(
       leases.map((agentConversationId) =>
         this.#endLease(agentConversationId, { aborted: true }).catch((error: unknown) => this.#options.report(error)),

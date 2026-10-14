@@ -1,14 +1,3 @@
-/**
- * The one client for the Stella backend, shared by desktop, mobile, the
- * website and the runtime. It has no framework dependency; each app wraps
- * `watch` in its own hook.
- *
- * Calls are plain HTTP. Views share one socket per client: identical
- * subscriptions (same view and arguments) share one server subscription and
- * fan out locally, a reconnect resubscribes everything, and a token refresh
- * happens in place when the server asks for one.
- */
-
 import { socketCredentialProtocol } from "../socket-ticket.js";
 import type {
   CallArgs,
@@ -45,16 +34,10 @@ export class BackendRequestError extends Error {
   }
 }
 
-/** `force` asks for a token newer than any cached one. */
 export type TokenProvider = (options?: {
   force?: boolean;
 }) => Promise<string | null>;
 
-/**
- * The `exp` of a backend JWT in epoch milliseconds, or null when the token is
- * absent or carries no readable expiry. Both sides of a reauthentication
- * compare expiries, so neither re-presents a token the other already holds.
- */
 export const backendTokenExpiryMs = (
   token: string | null | undefined,
 ): number | null => {
@@ -85,16 +68,13 @@ type SocketLike = {
 
 type SocketConstructor = new (url: string, protocols: string[]) => SocketLike;
 
-/** The slice of `fetch` the client uses; runtimes' `typeof fetch` differ. */
 type FetchLike = (input: string, init: RequestInit) => Promise<Response>;
 
 export type BackendClientOptions = {
-  /** Backend worker origin, e.g. `https://api.stella.sh`. */
   baseUrl: string;
   getToken: TokenProvider;
   fetch?: FetchLike;
   WebSocket?: SocketConstructor;
-  /** Upper bound on reconnect backoff. */
   maxReconnectDelayMs?: number;
   onConnectionChange?: (connected: boolean) => void;
 };
@@ -121,7 +101,6 @@ const IDLE_CLOSE_DELAY_MS = 5_000;
 const subscriptionKey = (view: string, args: unknown): string =>
   `${view}\u0000${stableStringify(args)}`;
 
-/** JSON with sorted object keys, so `{a,b}` and `{b,a}` share a subscription. */
 export const stableStringify = (value: unknown): string => {
   if (value === null || typeof value !== "object") {
     return JSON.stringify(value) ?? "null";
@@ -183,7 +162,6 @@ export class BackendClient {
     this.onConnectionChange = options.onConnectionChange;
   }
 
-  /** Run a backend function once. Throws `BackendRequestError`. */
   async call<K extends CallName>(
     name: K,
     args: CallArgs<K>,
@@ -206,11 +184,6 @@ export class BackendClient {
     return body.value;
   }
 
-  /**
-   * Subscribe to a view. `onValue` fires with the current value (immediately
-   * if another subscriber already has it) and again on every change.
-   * Returns the unsubscribe function.
-   */
   watch<K extends ViewName>(
     view: K,
     args: ViewArgs<K>,
@@ -252,7 +225,6 @@ export class BackendClient {
     };
   }
 
-  /** Close the socket and drop every subscription. */
   dispose(): void {
     this.disposed = true;
     this.subscriptions.clear();
@@ -261,11 +233,6 @@ export class BackendClient {
     this.closeSocket(1000, "client_disposed");
   }
 
-  /**
-   * Reconnect now with a freshly fetched token, e.g. after the signed-in
-   * account changed. Cached values are dropped, so no listener added from
-   * here on sees the previous account's data.
-   */
   reconnect(): void {
     for (const subscription of this.subscriptions.values()) {
       subscription.hasValue = false;
@@ -447,8 +414,6 @@ export class BackendClient {
           if (!token) return;
           const expiry = backendTokenExpiryMs(token);
           const current = this.socketTokenExpiryMs;
-          // Re-presenting a token the server already holds would leave its
-          // reauth deadline past due, so it is never sent.
           if (expiry !== null && current !== null && expiry <= current) return;
           this.socketTokenExpiryMs = expiry;
           this.sendFrame({ t: "auth", token });
@@ -472,7 +437,6 @@ export class BackendClient {
     this.sendRaw(JSON.stringify(frame));
   }
 
-  /** Answered by the platform, so a ping never wakes the owner's object. */
   private sendKeepalive(): void {
     this.sendRaw(SOCKET_KEEPALIVE_PING);
   }

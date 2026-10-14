@@ -16,21 +16,13 @@ export const ensureDatabaseStateRoot = (stellaDataDir: string) => {
 export const getDesktopDatabasePath = (stellaDataDir: string) =>
   path.join(ensureDatabaseStateRoot(stellaDataDir), DB_FILE);
 
-/** How long connection init took and whether it ran a migration. */
 export type DesktopDatabaseInitTiming = {
-  /** `PRAGMA user_version` before init; -1 when it could not be read. */
   fromVersion: number;
   toVersion: number;
   migrated: boolean;
-  /** Pragmas + version check + any migration. */
   durationMs: number;
 };
 
-/**
- * Read the schema version without side effects. Failure (e.g. a legacy
- * rollback-journal database locked by another opener) is reported as -1 and
- * never escapes: the real migration below owns lock handling.
- */
 const readUserVersionSafely = (db: SqliteDatabase): number => {
   try {
     const row = db.prepare("PRAGMA user_version;").get() as
@@ -42,19 +34,6 @@ const readUserVersionSafely = (db: SqliteDatabase): number => {
   }
 };
 
-/**
- * Initialize a freshly opened connection to the desktop database: apply the
- * per-connection pragmas and bring the schema to the current version. A
- * database that is already current performs no writes here — migrations
- * (including the one-time legacy import) run exactly once, guarded by
- * `PRAGMA user_version`.
- *
- * A pending migration logs `storage.migration.start` before it runs and
- * `storage.migration.complete` / `storage.migration.failed` after, so a long
- * migration (minutes on a large legacy database) is visible in the process
- * log of whichever process ran it — including Electron main, which
- * initializes the same database for the connector outbox.
- */
 export const initializeDesktopDatabase = (
   db: SqliteDatabase,
 ): DesktopDatabaseInitTiming => {

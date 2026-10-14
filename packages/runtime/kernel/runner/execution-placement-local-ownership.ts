@@ -34,11 +34,6 @@ const cancellationSettingKey = (
     executionId,
   )}`;
 
-/**
- * Persist-before-ack half of the local run/cancel admission fence. SessionStore
- * writes settings synchronously in SQLite, so a worker restart after this call
- * cannot resurrect a delayed placement RPC.
- */
 export const persistPlacementCancellation = (args: {
   store: DurableSettingStore;
   kind: PlacementLocalExecutionKind;
@@ -55,7 +50,6 @@ export const persistPlacementCancellation = (args: {
   return reason;
 };
 
-/** Fail-closed read half of the same fence. */
 export const getPlacementCancellation = (args: {
   store: DurableSettingStore;
   kind: PlacementLocalExecutionKind;

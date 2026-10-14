@@ -1,17 +1,3 @@
-/**
- * A conversation's agents as the owner's agent ledger records them
- * (`agentThreads.forConversation`, `agentThreads.running`, and
- * `agentThreads.get` for one agent): status, title and which of them run.
- * Clients read these here instead of folding journal cards and wake prompts.
- * Journal cards stay where an agent's report sits in the chat and join this
- * by agent id, in whatever order they arrived.
- *
- * The journal fold is the fallback, agent by agent: for a chat stored only on
- * this computer (no ledger), for an agent from before ledger rows (the ledger
- * answers that it has no row), and while the ledger has not answered or
- * cannot be reached.
- */
-
 import type { TaskLifecycleStatus } from "./agent-runtime.js";
 import {
   agentStatusOf,
@@ -36,13 +22,7 @@ export type LedgerAgent = {
 };
 
 export type AgentLedger = {
-  /** The conversation's agent list has loaded. False for a chat with no ledger, or one still loading or unreachable. */
   ready: boolean;
-  /**
-   * What the ledger answered per agent id, including the placement ids older
-   * transcripts cite an agent by: its row, or null when it has none.
-   * An id it has not answered for is absent.
-   */
   agents: ReadonlyMap<string, LedgerAgent | null>;
 };
 
@@ -51,7 +31,6 @@ export const EMPTY_AGENT_LEDGER: AgentLedger = {
   agents: new Map(),
 };
 
-/** How many agents one client looks up singly, beyond the conversation's list. */
 export const LEDGER_LOOKUP_LIMIT = 24;
 
 export const ledgerAgentFromThread = (
@@ -70,16 +49,9 @@ export const ledgerAgentFromThread = (
     : {}),
 });
 
-/**
- * Whether an agent is one of the orchestrator's own: Stella started it, so it
- * has no parent agent. Only these count toward push notifications, the
- * top-bar agents list and the in-progress count; an agent's own agents never
- * do, whatever engine runs them and wherever they run.
- */
 export const isTopLevelAgent = (agent: { parentAgentId?: string }): boolean =>
   !agent.parentAgentId;
 
-/** An agent's status as a task's: anything still working reads as running. */
 export const agentTaskStatus = (status: AgentStatus): TaskLifecycleStatus => {
   switch (status) {
     case "completed":
@@ -92,16 +64,9 @@ export const agentTaskStatus = (status: AgentStatus): TaskLifecycleStatus => {
   }
 };
 
-/** A ledger row's status word as a task's status. */
 export const ledgerThreadTaskStatus = (status: string): TaskLifecycleStatus =>
   agentTaskStatus(agentStatusOf(status) ?? "failed");
 
-/**
- * The ledger from what a client has read: the conversation's lists (newest
- * row wins), single lookups (null where the ledger has no row), and the
- * placement ids the transcript cites, resolved to the cloud thread they
- * hash from.
- */
 export const buildAgentLedger = (args: {
   ready: boolean;
   lists: readonly (readonly AgentThreadSummary[] | undefined)[];
@@ -140,11 +105,6 @@ export const buildAgentLedger = (args: {
   return { ready: args.ready, agents };
 };
 
-/**
- * The agents worth asking the ledger about one by one: ones the transcript
- * cites or the journal shows running that the conversation's list does not
- * hold. The newest-cited first, at most `limit` of them.
- */
 export const ledgerLookupIds = (
   ledger: AgentLedger,
   ids: Iterable<string>,

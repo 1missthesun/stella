@@ -42,10 +42,8 @@ import {
 import { buildCanvasOwnerOpenUrl } from "../../../packages/contracts/canvas-share.js";
 
 const KEY_PREFIX = "shares";
-/** Slugs are 128-bit base64url tokens (~22 chars); be lenient but strict. */
 const SLUG_PATTERN = /^[A-Za-z0-9_-]{16,64}$/;
 
-/** Content-Security-Policy applied to every served share. */
 const SHARE_CSP =
   "sandbox allow-scripts allow-popups allow-forms allow-downloads;";
 
@@ -77,7 +75,6 @@ const viewSecretOf = (env: Env): string | null => {
   return trimmed || null;
 };
 
-/** An http(s) origin; plain http only for a local site. */
 const siteOrigin = (value: unknown): string | null => {
   if (typeof value !== "string" || !value.trim()) return null;
   let url: URL;
@@ -91,7 +88,6 @@ const siteOrigin = (value: unknown): string | null => {
   return url.origin;
 };
 
-/** Where this object's owner signs in to open it, if anywhere. */
 const ownerOpenUrlOf = (
   env: Env,
   metadata: Record<string, string> | undefined,
@@ -169,22 +165,17 @@ const privatePage = (method: string, ownerOpenUrl: string | null): Response =>
   });
 
 const parseSlug = (pathname: string): string | null => {
-  // Expect exactly `/c/<slug>`.
   const match = /^\/c\/([^/]+)\/?$/.exec(pathname);
   if (!match) return null;
   let slug: string;
   try {
     slug = decodeURIComponent(match[1]);
   } catch {
-    // Malformed percent-encoding is an invalid public route, not a Worker
-    // failure. Keep the response indistinguishable from every other invalid
-    // or missing share slug.
     return null;
   }
   return SLUG_PATTERN.test(slug) ? slug : null;
 };
 
-/** No scripts at all for a shared file, unlike a canvas. */
 const FILE_CSP = "sandbox; default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'";
 
 const INLINE_FILE_TYPE = /^(?:image\/(?!svg)[a-z0-9.+-]+|video\/[a-z0-9.+-]+|audio\/[a-z0-9.+-]+|application\/pdf)$/;
@@ -292,8 +283,6 @@ export default {
     const object = await env.SHARES_BUCKET.get(key);
     if (!object) return notFound();
 
-    // Enforce expiry from custom metadata (epoch-ms string). Past-due objects
-    // 404 and are lazily deleted so storage doesn't linger before the cron.
     const expiresAtRaw = object.customMetadata?.["expires-at"];
     if (expiresAtRaw) {
       const expiresAt = Number(expiresAtRaw);

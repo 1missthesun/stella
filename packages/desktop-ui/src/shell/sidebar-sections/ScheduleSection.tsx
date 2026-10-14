@@ -1,10 +1,3 @@
-/**
- * Schedule — every schedule the owner has, wherever it runs (the cloud, or
- * this computer for a watch that needs it), read live. The user can pause,
- * resume, delete and edit each one here; changes write back the same way
- * Stella's own do, so every device shows them at once. Rows read the same
- * as on the phone (`@stella/contracts/schedule-format`).
- */
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import {
   getCronTriggerKind,

@@ -58,12 +58,6 @@ export const groupEventsIntoMessages = (
   let currentAssistant: MessageRecord | null = null;
   let pendingPreAssistantTools: EventRecord[] = [];
 
-  /**
-   * End-of-turn flush: any tools that fired in this turn without ever
-   * seeing an assistant message fall back to the user_message anchor
-   * (preserves the inline-artifact path for turns whose only output is
-   * a fire-and-forget tool result).
-   */
   const finalizePreAssistantTools = () => {
     if (pendingPreAssistantTools.length > 0 && turnUserMessage) {
       turnUserMessage.toolEvents = [
@@ -87,11 +81,6 @@ export const groupEventsIntoMessages = (
       const message = toMessageRecord(event);
       messages.push(message);
       const hidden = isUiHiddenChatMessagePayload(event.payload ?? null);
-      // Tools that fired before any assistant in this turn belong to
-      // the first assistant message (so e.g. an `image_gen` tool fired
-      // before the preamble text still surfaces as an inline artifact
-      // on the preamble bubble). Tools that fire after this assistant
-      // attach to whichever assistant is current at that moment.
       if (!hidden && pendingPreAssistantTools.length > 0) {
         message.toolEvents = [
           ...message.toolEvents,

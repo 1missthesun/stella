@@ -35,13 +35,6 @@ export function listChatGptCatalogModels(
   return models.filter((model) => model.provider === CHATGPT_PROVIDER);
 }
 
-/**
- * ChatGPT is directly selectable: the only real gate is OpenAI auth, never a
- * forced model pick. When the requested/saved model isn't in the live catalog
- * we auto-match to the closest available OpenAI model instead of dead-ending
- * the user — preferring the exact request, then the default, then the first
- * available id. Returns null only when the catalog is genuinely empty.
- */
 export function resolveChatGptModelSelection(
   requested: string | undefined,
   available: readonly string[],
@@ -56,7 +49,6 @@ export function resolveChatGptModelSelection(
 }
 
 export type ChatGptModelResolution =
-  /** Saved model is present in the live model/list — use it as-is. */
   | { kind: "available"; modelId: string }
   /**
    * Saved model is registry-routable but momentarily absent from the live
@@ -64,9 +56,7 @@ export type ChatGptModelResolution =
    * switching the user; it resolves normally once the live list returns.
    */
   | { kind: "transient-gap"; modelId: string }
-  /** Saved model is gone from both the live list and the registry. */
   | { kind: "rerouted"; modelId: string; savedModel: string }
-  /** No OpenAI models are available at all. */
   | { kind: "unavailable" };
 
 /**
@@ -105,15 +95,6 @@ export function fromChatGptModelId(modelId: string): string | null {
   return modelId.startsWith(prefix) ? modelId.slice(prefix.length) : null;
 }
 
-/**
- * Build the single preference write that changes the runtime engine and its
- * conversation model routing. ChatGPT is intentionally asymmetric:
- * orchestrator resolves through the existing OpenAI OAuth provider, while
- * general stays on that in-process provider in managed mode and is intercepted
- * through `agentRuntimeEngine` only after an explicit native-runtime opt-in.
- * Both overrides stay provider-routable so managed mode never requires a local
- * Codex executable.
- */
 export function buildEngineRoutingPatch(
   preferences: EngineRoutingPreferences,
   engine: ModelPickerEngine,
@@ -181,7 +162,6 @@ const RECENT_ENGINE_PREFIXES = {
   claude_code_local: "claude-code/",
 } as const satisfies Record<Exclude<ModelPickerEngine, "default">, string>;
 
-/** Decode the engine-prefixed ids persisted by the shared recent-model list. */
 export function parseRecentEngineModelId(
   modelId: string,
 ): RecentEngineModelSelection | null {
@@ -197,13 +177,6 @@ export function parseRecentEngineModelId(
   return null;
 }
 
-/**
- * Inverse of `parseRecentEngineModelId`. Engine panels commit through
- * `buildEngineRoutingPatch` rather than the catalog select path, so they have
- * to encode their pick themselves to land in the shared recent-model list —
- * without this, switching between Claude Code / ChatGPT models never grows the
- * recents and the compact pickers look stuck at one row per engine.
- */
 export function formatRecentEngineModelId(
   engine: ModelPickerEngine,
   modelId: string | undefined,
@@ -220,18 +193,6 @@ export type ActiveEngineModelPreferences = {
   claudeCodeModel?: string;
 };
 
-/**
- * The model a committed engine will actually run, as an engine-prefixed id
- * (`claude-code/…`, `codex-cli/…`), or null when Stella's own runtime owns
- * the selection.
- *
- * Every picker surface has to derive "what is selected" from this rather
- * than from `modelOverrides`. Each engine remembers its own model so that
- * switching back restores it — `buildEngineRoutingPatch` even writes the
- * remembered Stella override back into `modelOverrides` while a local engine
- * is committed — so reading the overrides alone reports an inactive model as
- * a second, equally-checked selection.
- */
 export function getActiveEngineModelId(
   preferences: ActiveEngineModelPreferences | null | undefined,
 ): string | null {
@@ -258,18 +219,6 @@ type ModelSelectionTarget =
 
 const isStellaModelId = (modelId: string): boolean =>
   modelId === "" || modelId.startsWith("stella/");
-/**
- * Full preference patch for picking a catalog model (extracted from the
- * sidebar picker so the composer's pinned mini picker applies selections
- * identically). Picking any model outside the engine panels routes back
- * through Stella's own runtime, so a committed ChatGPT/Claude Code engine is
- * reverted in the same write (selection implies engine).
- *
- * `target` is either the Assistant surface
- * (`{ assistant: true, configurableAgentKeys }`) — which dual-writes
- * orchestrator + general and broadcasts non-Stella picks to every other
- * configurable agent — or a single Settings tab (`{ agentKey }`).
- */
 export function buildModelSelectionPatch(
   preferences: ModelSelectionPreferences,
   value: string,
@@ -291,12 +240,6 @@ export function buildModelSelectionPatch(
     const nextOverrides = { ...previousOverrides };
     let nextPropagated = previousPropagated;
     if (target.assistant) {
-        // Rebuild propagation from scratch on every Assistant pick: first
-        // unwind whatever the last propagation wrote (so switching from
-        // Anthropic -> Stella cleans every previously-broadcasted agent),
-        // then re-apply against the new pick. User-intentional per-agent
-        // overrides are left alone because they were never in
-        // `previousPropagated` to begin with.
         for (const propagatedKey of previousPropagated) {
             delete nextOverrides[propagatedKey];
         }
@@ -309,8 +252,6 @@ export function buildModelSelectionPatch(
             }
         }
         if (value !== "" && !isStellaModelId(value)) {
-            // Broadcast to every other configurable agent that doesn't have
-            // an explicit user-intentional override.
             const propagateTargets = target.configurableAgentKeys.filter((key) => !CONVERSATION_AGENT_KEYS.some((agentKey) => agentKey === key));
             const written = [];
             for (const key of propagateTargets) {
@@ -328,9 +269,6 @@ export function buildModelSelectionPatch(
         }
     }
     else {
-        // Single-agent path (Settings tabs other than Assistant). The user
-        // is explicitly setting this agent, so remove it from the
-        // propagated set — it's owned by them now.
         if (value === "") {
             delete nextOverrides[target.agentKey];
         }
@@ -339,8 +277,6 @@ export function buildModelSelectionPatch(
         }
         nextPropagated = previousPropagated.filter((key) => key !== target.agentKey);
     }
-    // After the (possible) engine revert the effective engine is always
-    // "default", so the Stella conversation mirror syncs unconditionally.
     const nextStellaConversationModelOverrides = {
         ...(basePreferences.stellaConversationModelOverrides ?? {}),
     };
@@ -354,13 +290,6 @@ export function buildModelSelectionPatch(
     }
     return {
         ...(engineRevertPatch ?? {}),
-        // Selection implies engine: a catalog / custom-id pick always routes
-        // through the default (Stella) runtime. Assert it unconditionally —
-        // not just when this renderer's copy of the preferences says an
-        // engine is committed — so a stale engine view (e.g. a
-        // per-conversation engine restore racing the pick) can never leave a
-        // committed Claude Code / ChatGPT engine silently swallowing the
-        // newly picked model.
         agentRuntimeEngine: "default" as const,
         modelOverrides: nextOverrides,
         assistantPropagatedAgents: nextPropagated,
@@ -372,11 +301,6 @@ type RecentModelSelectionPreferences = ModelSelectionPreferences & {
   codexModelExplicit?: boolean;
 };
 
-/**
- * Apply a shared recent-model id, including engine-prefixed Codex and Claude
- * Code rows. Keeping this beside the routing builders prevents compact picker
- * surfaces from accidentally treating engine aliases as provider overrides.
- */
 export function buildRecentModelSelectionPatch(
   preferences: RecentModelSelectionPreferences,
   modelId: string,

@@ -5,14 +5,6 @@ import { resolveExecutionBuilderOrigin } from "./execution-placement";
 import type { StoredPhoneAccess } from "./phone-access";
 import type { RealtimeVoiceOrchestratorConfig } from "./realtime-voice-protocol";
 
-/**
- * Realtime voice in "computer" mode: the GPT-Live session runs on the phone
- * and delegates its work to the paired computer's orchestrator. The computer's
- * current conversation is fetched once as startup history (phone -> cloud ->
- * computer, over its presence connection); the transcript is written straight
- * to the cloud journal, where every device reads it.
- */
-
 const DESKTOP_VOICE_SETUP_TIMEOUT_MS = 30_000;
 
 export type DesktopRealtimeVoice = {
@@ -38,7 +30,6 @@ export const connectDesktopRealtimeVoice = async (
   return { access, config };
 };
 
-/** The journal's `deviceId` pattern; a stored id outside it is reshaped. */
 const JOURNAL_DEVICE_ID_PATTERN = /^[A-Za-z0-9._-]{1,64}$/;
 const JOURNAL_APPEND_ID_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/;
 
@@ -57,17 +48,10 @@ const emptyVoiceUsage = () => ({
   cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
 });
 
-/**
- * Append one voice transcript line to the conversation's cloud journal. The
- * message shape is the one the computer's own voice runtime writes, so both
- * read back identically; `eventId` is the idempotent append id, so a retry
- * never duplicates a line.
- */
 export const persistDesktopRealtimeVoiceTranscript = async (
   voice: DesktopRealtimeVoice,
   payload: {
     conversationId: string;
-    /** Stable append id; the journal dedupes retries on it. */
     eventId: string;
     timestamp: number;
     role: "user" | "assistant";

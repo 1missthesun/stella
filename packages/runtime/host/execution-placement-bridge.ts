@@ -50,7 +50,6 @@ import {
 } from "./execution-placement-inbox.js";
 import { ExecutionPlacementLeases } from "./execution-placement-leases.js";
 
-// Existing importers still open the inbox through the bridge module.
 export { ExecutionPlacementInbox };
 import {
   forkDelayed,
@@ -58,11 +57,8 @@ import {
   type HostTimerHandle,
 } from "./effect-runtime.js";
 
-/** A claim the gate does not answer inside the offer window lost its race. */
 const CLAIM_RESPONSE_TIMEOUT_MS = DISPATCH_OFFER_WINDOW_MS + 1_000;
-/** How long a `complete` frame waits for the owner gate's terminal echo. */
 const COMPLETE_ACK_TIMEOUT_MS = 10_000;
-/** Reconnect — and therefore re-authenticate — before the JWT expires. */
 const TOKEN_REFRESH_MARGIN_MS = 60_000;
 const MIN_TOKEN_REFRESH_DELAY_MS = 30_000;
 const HTTP_TIMEOUT_MS = 15_000;
@@ -83,17 +79,11 @@ export type ExecutionPlacementDesktopSubmit = {
   requestedTargetMode: ExecutionTargetMode;
   requestedExecutorDeviceId?: string;
   requiredCapabilities: PlacementCapability[];
-  /** Exactly the bytes the executing device receives. */
   payload: DispatchPayload;
 };
 
 export type ExecutionPlacementAvailability = DeviceAvailability;
 
-/**
- * How a gate-side cancel is recorded: a stop (the gate's cancel reason is a
- * stop's) keeps its stop code, so the local run and the agents it started
- * stop, and the attempt reports to no one.
- */
 const remoteCancellation = (
   remote: Pick<DispatchSummary, "cancelReason"> | null | undefined,
 ): { errorCode?: string; errorMessage: string } =>
@@ -103,20 +93,13 @@ const remoteCancellation = (
 
 export type ExecutionPlacementRunResult = {
   status: "ok" | "error" | "canceled";
-  /** With `canceled`: `stop_agent` stopped it before it answered; it resumes with a message. */
   stopped?: boolean;
   finalText?: string;
   error?: string;
 };
 
-/**
- * The backend calls the bridge still needs: who the owner is, where the
- * owner gate lives, and this device's public key. Every placement verb is a
- * socket frame or an owner-gate route.
- */
 export type ExecutionPlacementClient = Pick<BackendClient, "call">;
 
-/** Minimal `ws` shape; the tests drive a real socket against a fake gate. */
 export type ExecutionPlacementSocket = {
   readonly readyState: number;
   send(data: string): void;
@@ -131,11 +114,6 @@ export type ExecutionPlacementSocket = {
   on(event: "error", listener: (error: unknown) => void): unknown;
 };
 
-/**
- * The public half of the device identity. The Ed25519 private key stays with
- * whoever loaded the identity (Electron main or the headless host) and is only
- * reachable through `signPresenceProof`, so the bridge never holds key bytes.
- */
 type DeviceIdentity = {
   deviceId: string;
   publicKey: string;
@@ -145,17 +123,10 @@ type PlacementBridgeOptions = {
   client: ExecutionPlacementClient;
   database: SqliteDatabase;
   deviceIdentity: DeviceIdentity;
-  /**
-   * Signs the presence challenge
-   * (`stella-device-presence\0<connectionId>\0<nonce>`, UTF-8) with the device
-   * key and returns the Ed25519 signature as base64url. The owner gate checks
-   * it against the public key this device registered.
-   */
   signPresenceProof: (message: string) => Promise<string>;
   appVersion: string;
   deviceName?: string;
   platform?: string;
-  /** The same Better Auth JWT the host presents to the backend. */
   getAuthToken?: () => string | null;
   getAvailability: () =>
     | ExecutionPlacementAvailability
@@ -169,63 +140,34 @@ type PlacementBridgeOptions = {
     dispatchId: string;
     kind: PlacementKind;
     conversationId: string;
-    /** The accepted payload, for an agent thread's own local id. */
     payload?: Record<string, unknown>;
-    /** The gate withdrew it for a `stop_agent`: the agents it started here stop too. */
     stopped?: boolean;
   }) => Promise<void>;
-  /**
-   * New input for an accepted agent run. Resolves whether the running agent
-   * took it; `messageId` is stable across a retried steer.
-   */
   steerExecution?: (args: {
     dispatchId: string;
     payload: Record<string, unknown>;
     messageId: string;
     text: string;
   }) => Promise<boolean>;
-  /**
-   * A `send_message` for an agent this computer runs on its own (no
-   * dispatch): steer it if running, resume it if idle. `messageId` is stable
-   * across redeliveries.
-   */
   deliverAgentMessage?: (args: {
     threadId: string;
     messageId: string;
     text: string;
     ownerGeneration: string;
   }) => Promise<AgentMessageDeviceOutcome>;
-  /**
-   * A `stop_agent` for an agent this computer runs on its own (no
-   * dispatch), from wherever the conversation runs now: stop it and the
-   * agents it started here.
-   */
   stopLocalAgent?: (args: {
     threadId: string;
     ownerGeneration: string;
   }) => Promise<AgentStopDeviceOutcome>;
-  /**
-   * Something tried to dispatch work here and this computer has not agreed to
-   * accept any. The host shows the question on this machine's own screen and
-   * calls `answerRemoteExecutionRequest` with what its user said.
-   */
   onRemoteExecutionRequest?: (request: {
     requestedAt: number;
     requesterLabel?: string;
   }) => void;
-  /**
-   * Answer a paired phone's request (a file, an office preview, voice tools)
-   * that the owner gate relayed over the presence socket. The app applies its
-   * own access policy; absent, every request is refused.
-   */
   serveDeviceRequest?: ServeDeviceRequest;
   log?: (level: "warn" | "error", message: string, error?: unknown) => void;
   now?: () => number;
-  /** Test seam; production uses the accepted execution lease duration. */
   leaseRenewalGraceMs?: number;
-  /** Test seam for deterministic claim-ACK retry/backoff coverage. */
   claimAckRetryBaseMs?: number;
-  /** Test seams for the owner-gate transport. */
   createSocket?: (url: string, protocols: string[]) => ExecutionPlacementSocket;
   fetch?: typeof fetch;
 };
@@ -233,11 +175,9 @@ type PlacementBridgeOptions = {
 const sha256 = (value: string) =>
   createHash("sha256").update(value, "utf8").digest("hex");
 
-/** Stable, dispatch-scoped ID for the exact blocking local-agent run. */
 export const placementLocalAgentThreadId = (dispatchId: string) =>
   `placement-agent:${sha256(dispatchId).slice(0, 32)}`;
 
-/** Stable, dispatch-scoped ID for the exact local automation/chat run. */
 export const placementLocalChatRunId = (dispatchId: string) =>
   `placement-chat:${sha256(dispatchId).slice(0, 32)}`;
 
@@ -297,7 +237,6 @@ const terminalResultJson = (finalText: string) =>
     JSON.stringify({ finalText: withOmissionNote(text, omittedChars) }),
   );
 
-/** The owner gate refused this device's authority; only a fresh identity helps. */
 const isOwnerLifecycleFenceError = (error: unknown) => {
   const record =
     error && typeof error === "object"
@@ -326,7 +265,6 @@ const isOwnerLifecycleFenceError = (error: unknown) => {
   );
 };
 
-/** One owner-gate route refusal, carrying the contract's error code. */
 export class PlacementRouteError extends Error {
   readonly code: string;
   readonly status: number;
@@ -348,7 +286,6 @@ export class PlacementRouteError extends Error {
 const socketOriginOf = (builderOrigin: string) =>
   builderOrigin.replace(/^http/u, "ws");
 
-/** `exp` of a Better Auth JWT, in epoch milliseconds. */
 const jwtExpiryMs = (token: string): number | null => {
   const segments = token.split(".");
   if (segments.length < 2 || !segments[1]) return null;
@@ -379,16 +316,6 @@ type ServerFrameHandlers = {
   ) => void | Promise<void>;
 };
 
-/**
- * Device presence + durable claim/ack runtime against the owner gate.
- *
- * One authenticated WebSocket carries every placement verb. The device proves
- * possession of its key once per connection (Ed25519 over the gate's nonce);
- * after that, `claim` / `ack` / `running` / `renew` / `complete` are plain
- * frames bound to the proven session. The SQLite inbox — not the socket — is
- * the durable boundary: a claim is acknowledged only once the payload is
- * committed locally, and from `ack` on this device owns the only copy.
- */
 export class ExecutionPlacementBridge {
   readonly client: ExecutionPlacementClient;
   private readonly inbox: ExecutionPlacementInbox;
@@ -447,7 +374,6 @@ export class ExecutionPlacementBridge {
     return this.started && !this.stopped;
   }
 
-  /** The owner gate this bridge is bound to, once identity has resolved. */
   get ownerGateOrigin(): string | null {
     return this.builderOrigin;
   }
@@ -482,10 +408,6 @@ export class ExecutionPlacementBridge {
   private isLiveEpoch(epoch: number) {
     return this.started && !this.stopped && epoch === this.lifecycleEpoch;
   }
-
-  // -------------------------------------------------------------------------
-  // Owner-gate routes
-  // -------------------------------------------------------------------------
 
   private async ownerGateRequest(
     path: string,
@@ -541,12 +463,6 @@ export class ExecutionPlacementBridge {
     });
   }
 
-  /**
-   * Desktop-originated dispatch. The owner gate decides placement; when it
-   * commits to this computer the response already names it, and the payload
-   * this process submitted becomes the inbox row without a second copy ever
-   * crossing the network.
-   */
   async submitDesktopExecution(
     args: ExecutionPlacementDesktopSubmit,
   ): Promise<DispatchSummary> {
@@ -599,7 +515,6 @@ export class ExecutionPlacementBridge {
     return dispatch;
   }
 
-  /** One status read of a dispatch this owner owns. */
   async getDispatchStatus(dispatchId: string): Promise<DispatchSummary | null> {
     const response = await this.ownerGateRequest(dispatchPath(dispatchId), {
       method: "GET",
@@ -633,11 +548,6 @@ export class ExecutionPlacementBridge {
     return dispatch;
   }
 
-  /**
-   * Follows one dispatch to its terminal state. `dispatch` frames arrive over
-   * the presence socket for dispatches this device requested; the poll is the
-   * failsafe for a socket that is down.
-   */
   watchDispatch(
     dispatchId: string,
     onStatus: (dispatch: DispatchSummary) => void,
@@ -686,15 +596,6 @@ export class ExecutionPlacementBridge {
     }
   }
 
-  // -------------------------------------------------------------------------
-  // Presence socket
-  // -------------------------------------------------------------------------
-
-  /**
-   * The platform answers this without waking the owner's object, which is
-   * what lets it hibernate between heartbeats. The gate reads the time of the
-   * last answer as this device's last-seen time.
-   */
   private sendKeepalive(): void {
     const socket = this.socket;
     if (!socket || socket.readyState !== 1 || !this.socketProven) return;
@@ -832,8 +733,6 @@ export class ExecutionPlacementBridge {
       }
       this.sendKeepalive();
     });
-    // A JWT that dies mid-connection cannot be replaced in place: the gate
-    // authenticates on the handshake, so re-authentication is a reconnect.
     const expiresAt = jwtExpiryMs(token);
     if (expiresAt !== null) {
       const delay = Math.max(
@@ -891,10 +790,6 @@ export class ExecutionPlacementBridge {
     });
   }
 
-  /**
-   * A dead link can look open for minutes until TCP gives up, so silence past
-   * a few keepalives ends the socket here and reconnects right away.
-   */
   private dropSocket(socket: ExecutionPlacementSocket, code?: number, reason?: string) {
     if (this.socket !== socket) return;
     this.socket = null;
@@ -916,7 +811,6 @@ export class ExecutionPlacementBridge {
     this.scheduleReconnect();
   }
 
-  /** `begin` announces the session and availability; `proof` signs the nonce. */
   private async proveConnection(
     socket: ExecutionPlacementSocket,
     presenceSessionId: string,
@@ -931,8 +825,6 @@ export class ExecutionPlacementBridge {
       availability,
     };
     socket.send(JSON.stringify(begin));
-    // `stella-device-presence\0<connectionId>\0<nonce>`: NUL-separated so no
-    // connection can borrow another connection's nonce by concatenation.
     const message = [
       DEVICE_PRESENCE_PROOF_PREFIX,
       challenge.connectionId,
@@ -942,8 +834,6 @@ export class ExecutionPlacementBridge {
     try {
       signature = await this.options.signPresenceProof(message);
     } catch (error) {
-      // An unsigned connection is never proven: the gate closes it and the
-      // ordinary reconnect path retries, rather than the bridge dying here.
       this.log("warn", "The device presence proof could not be signed.", error);
       return;
     }
@@ -953,11 +843,6 @@ export class ExecutionPlacementBridge {
     this.advertisedAvailability = JSON.stringify(availability);
   }
 
-  /**
-   * One handler per server frame type. `challenge` is the handshake and is
-   * answered by `openSocket` itself; every other frame reaches its handler
-   * only while its socket is still the live one.
-   */
   private readonly serverFrameHandlers: ServerFrameHandlers = {
     connected: async () => {
       this.socketProven = true;
@@ -996,9 +881,6 @@ export class ExecutionPlacementBridge {
       await this.stopLocalAgent(frame);
     },
     "consent.request": (frame) => {
-      // Only raise the question. This computer answers when its own user
-      // does, and the attempt that triggered the ask has already been told
-      // to come back later, so there is nothing here to keep waiting on.
       this.options.onRemoteExecutionRequest?.({
         requestedAt: frame.requestedAt,
         ...(frame.requesterLabel
@@ -1040,7 +922,6 @@ export class ExecutionPlacementBridge {
     await handler(frame, socket);
   }
 
-  /** Hand a steer to the accepted agent run it names, then report back. */
   private async steerAccepted(
     dispatchId: string,
     messageId: string,
@@ -1063,7 +944,6 @@ export class ExecutionPlacementBridge {
     this.send({ type: "steer.ack", dispatchId, messageId, delivered });
   }
 
-  /** Hand a message to one of this computer's own agents, then report back. */
   private async deliverAgentMessage(
     frame: Extract<DevicePresenceServerFrame, { type: "agent-message" }>,
   ): Promise<void> {
@@ -1089,7 +969,6 @@ export class ExecutionPlacementBridge {
     this.send({ type: "agent-message.ack", messageId, threadId, outcome });
   }
 
-  /** Stop one of this computer's own agents and those it started, then report back. */
   private async stopLocalAgent(
     frame: Extract<DevicePresenceServerFrame, { type: "agent-pause" }>,
   ): Promise<void> {
@@ -1198,10 +1077,6 @@ export class ExecutionPlacementBridge {
     }
   }
 
-  // -------------------------------------------------------------------------
-  // Availability
-  // -------------------------------------------------------------------------
-
   private async currentAvailability(): Promise<DeviceAvailability> {
     const availability = await this.options.getAvailability();
     return {
@@ -1227,7 +1102,6 @@ export class ExecutionPlacementBridge {
     });
   }
 
-  /** Publishes availability only when it actually changed. */
   private async publishAvailability() {
     if (!this.socketProven) return;
     const availability = await this.currentAvailability();
@@ -1237,10 +1111,6 @@ export class ExecutionPlacementBridge {
       this.advertisedAvailability = serialized;
     }
   }
-
-  // -------------------------------------------------------------------------
-  // Identity and lifecycle
-  // -------------------------------------------------------------------------
 
   private async readIdentity() {
     const identity = parseRecord(
@@ -1268,7 +1138,6 @@ export class ExecutionPlacementBridge {
     };
   }
 
-  /** One idempotent registration of this device's key and capabilities. */
   private async registerDevice() {
     const availability = await this.options.getAvailability();
     await this.client.call(
@@ -1307,8 +1176,6 @@ export class ExecutionPlacementBridge {
     this.started = true;
     const cancellationsAcknowledged = await this.retryPendingCancellations();
     if (!cancellationsAcknowledged) {
-      // Stay alive only as a cancellation reconciler. No presence socket
-      // exists until a later heartbeat has joined every exact run.
       this.leases.startHeartbeat(() => {
         void this.heartbeat();
       });
@@ -1333,8 +1200,6 @@ export class ExecutionPlacementBridge {
     try {
       await task;
     } catch (error) {
-      // The durable cancellation outbox remains pending. Let the host retry
-      // this same stopped bridge; it must not create a replacement first.
       if (this.stopTask === task) this.stopTask = null;
       throw error;
     }
@@ -1349,8 +1214,6 @@ export class ExecutionPlacementBridge {
     this.leases.clearLeaseHistory();
     this.dispatchWatchers.clear();
 
-    // No replacement bridge may take over presence until every continuation
-    // already admitted by this instance has crossed the stop fence.
     await this.leases.joinHeartbeat();
     await Promise.allSettled([...this.offerTasks]);
 
@@ -1392,8 +1255,6 @@ export class ExecutionPlacementBridge {
         );
       }
     }
-    // Closing the proven socket is the drain: the gate marks this device
-    // offline and re-places anything it still owns.
     this.closeSocket(1000, "desktop_stopped");
     this.rejectPendingWaits("The execution placement bridge stopped.");
     this.lifecycleEpoch += 1;
@@ -1404,12 +1265,6 @@ export class ExecutionPlacementBridge {
     }
   }
 
-  /**
-   * A new bridge instance has no in-memory Promise that can still own a
-   * pre-crash execution. Persist that ambiguity before presence is announced,
-   * then let the exact-run cancellation outbox join it. A gate-side Stop that
-   * already won keeps the truthful canceled outcome.
-   */
   private async stageRestartCancellations() {
     const now = this.now();
     for (const row of this.inbox.listAllUnfinished()) {
@@ -1426,8 +1281,6 @@ export class ExecutionPlacementBridge {
         remoteCanceled =
           remote?.state === "cancel_pending" || remote?.state === "canceled";
       } catch (error) {
-        // The local execution is still ambiguous even if the status read is
-        // unavailable. Fail closed and reconcile its terminal meaning later.
         this.log(
           "warn",
           "Execution placement restart status reconciliation was deferred.",
@@ -1499,10 +1352,6 @@ export class ExecutionPlacementBridge {
     this.openSocket();
     await this.reconcileInbox();
   }
-
-  // -------------------------------------------------------------------------
-  // Heartbeat: lease renewal, claim-ACK retry, terminal receipts
-  // -------------------------------------------------------------------------
 
   private heartbeat(): Promise<void> {
     return this.leases.heartbeat(() =>
@@ -1657,9 +1506,6 @@ export class ExecutionPlacementBridge {
         afterLocalCancel.ownerGeneration !== this.ownerGeneration ||
         afterLocalCancel.presenceSessionId !== this.presenceSessionId
       ) {
-        // Owner rotation already retired the presence session that owned this
-        // handoff. The durable local cancel joined the effect, so orphan the
-        // old receipt instead of speaking for a session the gate forgot.
         this.inbox.acknowledgeCancellation(
           afterLocalCancel.dispatchId,
           this.now(),
@@ -1667,8 +1513,6 @@ export class ExecutionPlacementBridge {
         return true;
       }
       if (afterLocalCancel.state === "claimed") {
-        // Never acknowledged: hand the dispatch straight back so the gate can
-        // re-place it instead of waiting out the claim lease.
         if (
           !this.send({
             type: "release",
@@ -1706,10 +1550,6 @@ export class ExecutionPlacementBridge {
       return true;
     });
   }
-
-  // -------------------------------------------------------------------------
-  // Offers, claims, and the local run
-  // -------------------------------------------------------------------------
 
   private async handleOffer(frame: {
     dispatch: DispatchSummary;
@@ -1791,8 +1631,6 @@ export class ExecutionPlacementBridge {
         now: this.now(),
       });
     } catch (error) {
-      // The payload lives only in the offer until it is committed here. If the
-      // transaction failed, hand it straight back rather than acknowledging.
       this.send({
         type: "release",
         dispatchId: dispatch.dispatchId,
@@ -1815,13 +1653,6 @@ export class ExecutionPlacementBridge {
     this.launchLocal(local, dispatch);
   }
 
-  /**
-   * Desktop ingress commits to this computer without an offer round-trip: the
-   * gate answers `computer_accepted` and drops its copy of the payload at that
-   * moment, so the payload this process submitted must become the inbox row
-   * here — it is the only copy left. A gate that answers `computer_claimed`
-   * instead still gets an `ack` first.
-   */
   private async adoptCommittedDispatch(
     dispatch: DispatchSummary,
     payload: DispatchPayload,
@@ -1853,14 +1684,11 @@ export class ExecutionPlacementBridge {
       now: this.now(),
     });
     if (dispatch.state === "computer_accepted") {
-      // The gate already recorded acceptance; a second `ack` would be a
-      // protocol error, so the row goes straight to accepted.
       this.inbox.markAccepted(dispatch.dispatchId, dispatch, this.now());
     }
     this.launchLocal(this.inbox.get(dispatch.dispatchId)!, dispatch);
   }
 
-  /** Re-drives every unfinished row after a reconnect. */
   private async resumeAfterConnect() {
     await this.publishAvailability().catch((error) =>
       this.log("warn", "Execution placement availability failed.", error),
@@ -1934,15 +1762,10 @@ export class ExecutionPlacementBridge {
         continue;
       }
       if (remote.state === "cancel_pending") {
-        // A cancellation can arrive while the desktop is down. Recover it
-        // before classifying an in-flight local row as an interrupted failure,
-        // and let it override a not-yet-accepted terminal receipt.
         await this.launchLocal(row, remote);
       } else if (row.state === "terminal_pending") {
         void this.flushTerminal(row).catch(() => undefined);
       } else if (row.state === "running") {
-        // The process boundary erased the Promise that owned this run. Never
-        // replay it: cancel any surviving worker run and report the ambiguity.
         this.inbox.stageCancellation(row.dispatchId, {
           outcome: "failed",
           errorCode: "LOCAL_EXECUTION_INTERRUPTED",
@@ -1992,7 +1815,6 @@ export class ExecutionPlacementBridge {
         return;
       }
       if (row.state === "claimed") {
-        // The payload is committed locally; taking ownership is one frame.
         if (!this.send({ type: "ack", dispatchId: row.dispatchId })) {
           this.leases.noteClaimAckFailure(row.dispatchId);
           return;
@@ -2130,9 +1952,6 @@ export class ExecutionPlacementBridge {
         current.state !== "terminal_pending" &&
         current.state !== "terminal"
       ) {
-        // A thrown execution call may be an ambiguous worker-transport result:
-        // the effect can still exist even though the caller lost its response.
-        // Cancel/reconcile that exact owner before reporting a failed receipt.
         this.inbox.stageCancellation(row.dispatchId, {
           outcome: "failed",
           errorCode: "LOCAL_EXECUTION_FAILED",
@@ -2166,14 +1985,6 @@ export class ExecutionPlacementBridge {
     await this.retryCancellation(row.dispatchId);
   }
 
-  /**
-   * Reports one terminal outcome. The row stays `terminal_pending` until the
-   * gate echoes a terminal `dispatch` frame (or a status read confirms one),
-   * so a dropped socket replays the same receipt instead of losing it.
-   *
-   * Single-flight per dispatch: the local run and the cancellation path can
-   * both reach a settled row, and the gate must see one receipt, not two.
-   */
   private flushTerminal(row: ExecutionPlacementInboxRow): Promise<void> {
     const existing = this.terminalFlushes.get(row.dispatchId);
     if (existing) return existing;
@@ -2224,8 +2035,6 @@ export class ExecutionPlacementBridge {
     try {
       dispatch = await acknowledged;
     } catch {
-      // The gate may have committed the outcome without echoing it. One status
-      // read settles the row; anything else replays on the next heartbeat.
       dispatch = await this.getDispatchStatus(row.dispatchId).catch(() => null);
       if (dispatch && !isTerminalState(dispatch.state)) dispatch = null;
     }

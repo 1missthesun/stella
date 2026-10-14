@@ -7,7 +7,6 @@ import {
 import { createManagedResource } from "../managed-resource.js";
 import { BROWSER_BRIDGE_MISSING_ERROR } from "../utils/register-stella-native-messaging-host.js";
 import {
-  shouldEmitBrowserBridgeGlobalToast,
   type StellaBrowserBridgeFailureReason,
   type StellaBrowserBridgeStatus,
 } from "@stella/contracts/browser-bridge-status";
@@ -39,10 +38,7 @@ export const createStellaBrowserBridgeResource = (options: {
   let hasConnected = false;
 
   const publishStatus = (status: StellaBrowserBridgeStatus) => {
-    currentStatus = {
-      ...status,
-      notifyUser: shouldEmitBrowserBridgeGlobalToast(status),
-    };
+    currentStatus = status;
     options.onStatus(currentStatus);
   };
 

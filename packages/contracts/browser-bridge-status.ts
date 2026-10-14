@@ -25,14 +25,4 @@ export type StellaBrowserBridgeStatus = {
   nextRetryMs?: number;
   error?: string;
   reason?: StellaBrowserBridgeFailureReason;
-  notifyUser?: boolean;
 };
-
-export const shouldEmitBrowserBridgeGlobalToast = (_status: {
-  state?: string;
-  reason?: string;
-  notifyUser?: boolean;
-  error?: string;
-  attempt?: number;
-  nextRetryMs?: number;
-}): boolean => false;

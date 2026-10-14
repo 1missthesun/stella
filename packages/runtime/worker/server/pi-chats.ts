@@ -773,7 +773,8 @@ export const cancelPiPlacedAgent = async (
 ): Promise<boolean> => {
   persistPiCancel(session, "agent", cancel.runKey, cancel.reason);
   const chats = await chatsBySession.get(session)?.catch(() => undefined);
-  return chats?.cancelPlacedAgent(cancel.agentKey, cancel.runKey, isAgentStopReason(cancel.reason)) === true;
+  chats?.cancelPlacedAgent(cancel.agentKey, cancel.runKey, isAgentStopReason(cancel.reason));
+  return true;
 };
 
 /**

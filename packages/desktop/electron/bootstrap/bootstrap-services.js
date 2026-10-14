@@ -184,6 +184,7 @@ export const createBootstrapServices = (options) => {
         windowManagerTarget: lifecycle,
         getStellaAppDir: () => lifecycle.getStellaDataDir(),
         connectorCredentialService,
+        isBrowserExtensionConnected: options.isBrowserExtensionConnected,
         getAuthToken: () => authService.getAuthToken(),
         getBackendUrl: () => authService.getBackendUrl(),
     });

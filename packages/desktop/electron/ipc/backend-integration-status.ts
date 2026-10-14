@@ -9,11 +9,6 @@ export type BackendIntegrationWaitResult =
   | "timeout"
   | "cancelled"
   | "unsupported"
-  /**
-   * backendUrl/authToken missing — completion cannot be confirmed. Callers
-   * must treat this as a failure, never as an optimistic success (only
-   * the explicit 404/405 "unsupported" rollout path may degrade).
-   */
   | "auth_unavailable";
 
 const readConnected = (payload: unknown): boolean =>
@@ -54,10 +49,7 @@ export const probeBackendIntegrationConnection = async (options: {
     },
   ).catch(() => null);
   if (!response) return "error";
-  if (response.status === 404 || response.status === 405) {
-    // Endpoint not deployed yet — completion can't be confirmed.
-    return "unsupported";
-  }
+  if (response.status === 404 || response.status === 405) return "unsupported";
   if (!response.ok) return "error";
   const payload = (await response.json().catch(() => null)) as unknown;
   return readConnected(payload) ? "connected" : "not_connected";

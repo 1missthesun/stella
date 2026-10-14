@@ -211,12 +211,6 @@ export class ConnectorCredentialService {
         if (headless) {
             if (payload.kind === "external_approval") {
                 if (payload.resourceUrl) {
-                    // NOTE: `ok: true` here means "browser opened with the user's
-                    // consent", NOT "authorization completed" — external approvals
-                    // finish on a hosted page with no callback to the desktop.
-                    // Callers that need real completion (backend Composio enables)
-                    // confirm it afterwards via the backend status poll
-                    // (`waitForBackendIntegrationConnection`).
                     void shell
                         .openExternal(payload.resourceUrl)
                         .then(() => {

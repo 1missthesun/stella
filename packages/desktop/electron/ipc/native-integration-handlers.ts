@@ -304,9 +304,6 @@ export const ensureNativeCredential = async (
       id,
       options.abortSignal,
     );
-    // "ok" here only means the browser was opened with the user's
-    // consent — Composio OAuth finishes on a hosted page with no
-    // deep-link back to the desktop, so completion is confirmed below.
     const approved = await options.requestExternalOAuthApproval({
       tokenKey: `backend-integration:${id}`,
       displayName: entry.name,
@@ -316,18 +313,18 @@ export const ensureNativeCredential = async (
     if (!approved.ok) {
       throw new Error(`Could not connect ${entry.name}: ${approved.reason}`);
     }
-    // Real completion signal: poll the backend for the Composio
-    // account status (with the auth carried from link creation) instead
-    // of assuming success. ONLY "unsupported" (status endpoint not
-    // deployed yet, 404/405) may degrade to the previous optimistic
-    // behavior; every other non-connected outcome fails the enable.
     const wait = await waitForBackendIntegrationConnection({
       backendUrl,
       authToken,
       id,
       ...(options.abortSignal ? { signal: options.abortSignal } : {}),
     });
-    if (wait === "connected" || wait === "unsupported") return;
+    if (wait === "connected") return;
+    if (wait === "unsupported") {
+      throw new Error(
+        `This Stella server can't confirm ${entry.name} connections. Update the server, then try connecting again.`,
+      );
+    }
     if (wait === "cancelled") {
       throw new Error(`Could not connect ${entry.name}: cancelled`);
     }

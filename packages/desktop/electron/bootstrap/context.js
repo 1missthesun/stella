@@ -98,6 +98,13 @@ export const createBootstrapContext = (config) => {
         state,
         getAllWindows: () => getAllWindows(context),
         loadDeviceId: async () => (await import("./host-runner.js")).loadStellaDeviceId(context),
+        isBrowserExtensionConnected: async () => {
+            (await import("./aux-runtime.js")).startStellaBrowserBridge(context);
+            const bridge = state.stellaBrowserBridgeService;
+            if (bridge?.getStatus?.().state !== "connected")
+                return false;
+            return await bridge.getExtensionStatus().catch(() => false);
+        },
     });
     registerBootstrapProcessCleanups(context);
     return context;

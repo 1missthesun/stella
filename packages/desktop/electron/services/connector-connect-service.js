@@ -2,7 +2,6 @@ import { randomUUID } from "crypto";
 import { BrowserWindow, shell } from "electron";
 import { enableNativeConnector, getNativeConnectorTools, } from "@stella/runtime/kernel/connectors/native-integrations";
 import { STELLA_BROWSER_EXTENSION_ID } from "@stella/runtime/kernel/tools/stella-browser-bridge-config";
-import { isStellaExtensionInstalled } from "./stella-browser-bridge-service.js";
 import { ensureNativeCredential, loadConfiguredOAuthProviders, resolveDesktopNativeConnectorEntry, } from "../ipc/native-integration-handlers.js";
 import { PendingRequestStore } from "./pending-request-store.js";
 import {
@@ -12,15 +11,8 @@ import {
 // Under Claude Code's 5-minute MCP tool idle timeout so the card always
 // resolves (and disappears) before the agent-side wait gives up.
 const CARD_TIMEOUT_MS = 4.5 * 60 * 1000;
-// Browser-extension flavor: how the install wait behaves after the user
-// accepts. Detection is the same cheap profile-directory scan the bridge
-// service uses at startup; the grace delays give the freshly installed
-// extension time to boot and dial the native messaging host before the
-// worker re-runs the failed stella-browser command.
 const BROWSER_EXTENSION_WEB_STORE_URL = `https://chromewebstore.google.com/detail/${STELLA_BROWSER_EXTENSION_ID}`;
 const EXTENSION_POLL_INTERVAL_MS = 2_000;
-const EXTENSION_CONNECT_GRACE_MS = 6_000;
-const EXTENSION_ALREADY_INSTALLED_GRACE_MS = 8_000;
 const EXTENSION_FLOW_TIMEOUT_MS = 4 * 60 * 1000;
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const isCanonicalConnectorConnectable = (entry) => Boolean(entry &&
@@ -291,46 +283,26 @@ export class ConnectorConnectService {
     }
     async runBrowserExtensionFlow(requestId, meta) {
         const signal = meta.oauthAbort.signal;
-        const settleCancelled = () => this.settle(requestId, { ok: false, reason: "cancelled" }, "cancelled");
-        const alreadyInstalled = isStellaExtensionInstalled();
-        void shell
-            .openExternal(BROWSER_EXTENSION_WEB_STORE_URL)
-            .catch(() => undefined);
-        if (alreadyInstalled) {
-            // Extension files exist — it's likely disabled or the browser is
-            // closed. Give the user a moment with the Web Store page (which
-            // shows the enable state), then let the worker's re-run test
-            // whether the bridge is actually back.
-            await sleep(EXTENSION_ALREADY_INSTALLED_GRACE_MS);
-            if (!this.pending.has(requestId))
-                return;
-            if (signal.aborted) {
-                settleCancelled();
-                return;
-            }
+        const isConnected = async () => (await this.options.isBrowserExtensionConnected?.().catch(() => false)) === true;
+        if (await isConnected()) {
             this.settle(requestId, { ok: true, status: "already_connected" }, "connected");
             return;
         }
+        void shell
+            .openExternal(BROWSER_EXTENSION_WEB_STORE_URL)
+            .catch(() => undefined);
         const deadline = Date.now() + EXTENSION_FLOW_TIMEOUT_MS;
         while (Date.now() < deadline) {
             if (!this.pending.has(requestId))
                 return;
             if (signal.aborted) {
-                settleCancelled();
+                this.settle(requestId, { ok: false, reason: "cancelled" }, "cancelled");
                 return;
             }
-            if (isStellaExtensionInstalled()) {
-                // Freshly installed: give the extension time to boot and dial
-                // the native messaging host before the worker re-runs the
-                // failed command.
-                await sleep(EXTENSION_CONNECT_GRACE_MS);
-                if (!this.pending.has(requestId))
-                    return;
-                if (signal.aborted) {
-                    settleCancelled();
-                    return;
+            if (await isConnected()) {
+                if (this.pending.has(requestId)) {
+                    this.settle(requestId, { ok: true, status: "connected" }, "connected");
                 }
-                this.settle(requestId, { ok: true, status: "connected" }, "connected");
                 return;
             }
             await sleep(EXTENSION_POLL_INTERVAL_MS);

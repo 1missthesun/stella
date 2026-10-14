@@ -163,8 +163,7 @@ impl ExtensionBridge {
         let listener = match bind_reuse(self.port) {
             Ok(l) => l,
             Err(_) => {
-                // Port is actively held by a stale process — kill it and retry
-                kill_process_on_port(self.port);
+                kill_stale_stella_browser_on_port(self.port);
                 let mut bound = None;
                 for _ in 0..20 {
                     tokio::time::sleep(Duration::from_millis(250)).await;
@@ -176,10 +175,12 @@ impl ExtensionBridge {
                         Err(_) => continue,
                     }
                 }
-                bound.ok_or_else(|| format!(
-                    "Failed to bind extension bridge on port {} — stale process could not be killed",
-                    self.port
-                ))?
+                bound.ok_or_else(|| {
+                    format!(
+                        "Failed to bind extension bridge on port {}: it is held by another process",
+                        self.port
+                    )
+                })?
             }
         };
 
@@ -886,15 +887,134 @@ fn bind_reuse(port: u16) -> Result<TcpListener, String> {
         .map_err(|e| format!("Failed to convert to tokio listener: {}", e))
 }
 
-/// Kill any process currently listening on the given port.
-pub fn kill_process_on_port(port: u16) {
+fn current_exe_stem() -> Option<String> {
+    let exe = std::env::current_exe().ok()?;
+    Some(exe.file_stem()?.to_string_lossy().to_lowercase())
+}
+
+fn session_arg<I: IntoIterator<Item = String>>(args: I) -> Option<String> {
+    let mut args = args.into_iter();
+    while let Some(arg) = args.next() {
+        if arg == "--session" {
+            return args.next();
+        }
+        if let Some(value) = arg.strip_prefix("--session=") {
+            return Some(value.to_string());
+        }
+    }
+    None
+}
+
+fn stem_of(path: &str) -> Option<String> {
+    std::path::Path::new(path)
+        .file_stem()
+        .map(|s| s.to_string_lossy().to_lowercase())
+}
+
+#[cfg(target_os = "linux")]
+fn process_exe_and_args(pid: u32) -> Option<(String, Vec<String>)> {
+    let exe = std::fs::read_link(format!("/proc/{}/exe", pid)).ok()?;
+    let cmdline = std::fs::read(format!("/proc/{}/cmdline", pid)).ok()?;
+    let args = cmdline
+        .split(|byte| *byte == 0)
+        .filter(|arg| !arg.is_empty())
+        .map(|arg| String::from_utf8_lossy(arg).into_owned())
+        .collect();
+    Some((exe.to_string_lossy().into_owned(), args))
+}
+
+#[cfg(all(unix, not(target_os = "linux")))]
+fn process_exe_and_args(pid: u32) -> Option<(String, Vec<String>)> {
+    let ps = |field: &str| {
+        std::process::Command::new("ps")
+            .args(["-p", &pid.to_string(), "-o", field])
+            .output()
+            .ok()
+            .map(|out| String::from_utf8_lossy(&out.stdout).trim().to_string())
+            .filter(|value| !value.is_empty())
+    };
+    let exe = ps("comm=")?;
+    let args = ps("command=")?
+        .split_whitespace()
+        .map(str::to_string)
+        .collect();
+    Some((exe, args))
+}
+
+#[cfg(target_os = "linux")]
+fn listening_pids(port: u16) -> Vec<u32> {
+    const TCP_LISTEN: &str = "0A";
+    let mut inodes = std::collections::HashSet::new();
+    for table in ["/proc/net/tcp", "/proc/net/tcp6"] {
+        let Ok(content) = std::fs::read_to_string(table) else {
+            continue;
+        };
+        for line in content.lines().skip(1) {
+            let fields: Vec<&str> = line.split_whitespace().collect();
+            let (Some(local), Some(state), Some(inode)) =
+                (fields.get(1), fields.get(3), fields.get(9))
+            else {
+                continue;
+            };
+            let local_port = local
+                .rsplit(':')
+                .next()
+                .and_then(|hex| u16::from_str_radix(hex, 16).ok());
+            if *state == TCP_LISTEN && local_port == Some(port) {
+                inodes.insert(format!("socket:[{}]", inode));
+            }
+        }
+    }
+    if inodes.is_empty() {
+        return Vec::new();
+    }
+    let Ok(procs) = std::fs::read_dir("/proc") else {
+        return Vec::new();
+    };
+    procs
+        .filter_map(|entry| entry.ok()?.file_name().to_str()?.parse::<u32>().ok())
+        .filter(|pid| {
+            std::fs::read_dir(format!("/proc/{}/fd", pid))
+                .map(|fds| {
+                    fds.filter_map(|fd| std::fs::read_link(fd.ok()?.path()).ok())
+                        .any(|target| inodes.contains(target.to_string_lossy().as_ref()))
+                })
+                .unwrap_or(false)
+        })
+        .collect()
+}
+
+#[cfg(all(unix, not(target_os = "linux")))]
+fn listening_pids(port: u16) -> Vec<u32> {
+    std::process::Command::new("lsof")
+        .args(["-ti", &format!("tcp:{}", port), "-s", "tcp:listen"])
+        .output()
+        .map(|out| {
+            String::from_utf8_lossy(&out.stdout)
+                .lines()
+                .filter_map(|line| line.trim().parse::<u32>().ok())
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Stop a leftover daemon of this same session still listening on `port`.
+/// Anything else holding the port is left running and the bind reports the
+/// conflict.
+pub fn kill_stale_stella_browser_on_port(port: u16) {
+    let (Some(stem), Some(session)) = (current_exe_stem(), session_arg(std::env::args())) else {
+        return;
+    };
+    let own_pid = std::process::id();
+
     #[cfg(windows)]
     {
         use std::process::Command;
-        // Use PowerShell with base64-encoded command to avoid escaping issues
+        let quote = |value: &str| value.replace('\'', "''");
         let script = format!(
-            "Get-NetTCPConnection -LocalPort {} -State Listen -ErrorAction SilentlyContinue | ForEach-Object {{ Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }}",
-            port
+            "Get-NetTCPConnection -LocalPort {port} -State Listen -ErrorAction SilentlyContinue | ForEach-Object {{ $p = Get-CimInstance Win32_Process -Filter \"ProcessId=$($_.OwningProcess)\"; if ($p -and $p.ProcessId -ne {own_pid} -and [IO.Path]::GetFileNameWithoutExtension($p.Name).ToLower() -eq '{stem}' -and ($p.CommandLine -like '* --session {session}' -or $p.CommandLine -like '* --session {session} *')) {{ Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue }} }}",
+            stem = quote(&stem),
+            session = quote(&session),
         );
         let utf16: Vec<u8> = script
             .encode_utf16()
@@ -908,17 +1028,24 @@ pub fn kill_process_on_port(port: u16) {
 
     #[cfg(unix)]
     {
-        use std::process::Command;
-        let out = match Command::new("lsof")
-            .args(["-ti", &format!("tcp:{}", port), "-s", "tcp:listen"])
-            .output()
+        for pid in listening_pids(port)
+            .into_iter()
+            .filter(|pid| *pid != own_pid)
         {
-            Ok(o) => o,
-            Err(_) => return,
-        };
-        let stdout = String::from_utf8_lossy(&out.stdout);
-        for pid in stdout.trim().lines().filter(|l| !l.is_empty()) {
-            let _ = Command::new("kill").args(["-9", pid]).output();
+            let same_session_daemon = process_exe_and_args(pid).is_some_and(|(exe, args)| {
+                stem_of(&exe).as_deref() == Some(stem.as_str())
+                    && session_arg(args).as_deref() == Some(session.as_str())
+            });
+            if same_session_daemon {
+                unsafe {
+                    libc::kill(pid as libc::pid_t, libc::SIGKILL);
+                }
+            } else {
+                eprintln!(
+                    "[stella-browser] port {} is held by pid {}, which is not a stella-browser daemon of session {}; leaving it running",
+                    port, pid, session
+                );
+            }
         }
     }
 }

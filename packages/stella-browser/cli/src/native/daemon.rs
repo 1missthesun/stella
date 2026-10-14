@@ -659,6 +659,7 @@ async fn run_socket_server(
 
     let (reset_tx, mut reset_rx) = mpsc::channel::<()>(64);
     let reset_tx = idle_timeout_ms.map(|_| Arc::new(reset_tx));
+    let mut teardown = true;
 
     loop {
         let sleep_future = idle_timeout_ms.map(|ms| tokio::time::sleep(Duration::from_millis(ms)));
@@ -688,25 +689,26 @@ async fn run_socket_server(
                     std::future::pending::<()>().await
                 }
             }, if idle_timeout_ms.is_some() => {
-                shutdown_daemon(state.clone(), false).await;
                 break;
             }
             _ = reset_rx.recv(), if idle_timeout_ms.is_some() => {
                 continue;
             }
             shutdown = shutdown_rx.recv() => {
-                if shutdown.is_some() {
-                    shutdown_daemon(state.clone(), false).await;
-                }
+                teardown = shutdown.is_some();
                 break;
             }
             _ = shutdown_signal() => {
-                shutdown_daemon(state.clone(), false).await;
                 break;
             }
         }
     }
 
+    drop(listener);
+    let _ = fs::remove_file(socket_path);
+    if teardown {
+        shutdown_daemon(state.clone(), false).await;
+    }
     Ok(())
 }
 
@@ -723,8 +725,8 @@ async fn run_socket_server(
 
     let port = get_port_for_session(session);
 
-    // Retry binding with delays — on Windows, sockets from a dead daemon can
-    // linger in CLOSE_WAIT for up to 2 minutes, blocking the port.
+    // Windows can keep a dead daemon's sockets in CLOSE_WAIT for up to two
+    // minutes, refusing the bind meanwhile.
     let addr = format!("127.0.0.1:{}", port);
     let mut listener: Option<TcpListener> = None;
     for attempt in 0..15 {
@@ -737,9 +739,8 @@ async fn run_socket_server(
                 if attempt == 14 {
                     return Err(format!("Failed to bind TCP: {}", e));
                 }
-                // Kill any stale process on the port and wait
                 if attempt == 0 {
-                    super::extension_bridge::kill_process_on_port(port);
+                    super::extension_bridge::kill_stale_stella_browser_on_port(port);
                 }
                 tokio::time::sleep(Duration::from_secs(2)).await;
             }
@@ -761,6 +762,7 @@ async fn run_socket_server(
 
     let (reset_tx, mut reset_rx) = mpsc::channel::<()>(64);
     let reset_tx = idle_timeout_ms.map(|_| Arc::new(reset_tx));
+    let mut teardown = true;
 
     loop {
         let sleep_future = idle_timeout_ms.map(|ms| tokio::time::sleep(Duration::from_millis(ms)));
@@ -790,28 +792,26 @@ async fn run_socket_server(
                     std::future::pending::<()>().await
                 }
             }, if idle_timeout_ms.is_some() => {
-                shutdown_daemon(state.clone(), false).await;
-                let _ = fs::remove_file(&port_path);
                 break;
             }
             _ = reset_rx.recv(), if idle_timeout_ms.is_some() => {
                 continue;
             }
             shutdown = shutdown_rx.recv() => {
-                if shutdown.is_some() {
-                    shutdown_daemon(state.clone(), false).await;
-                }
-                let _ = fs::remove_file(&port_path);
+                teardown = shutdown.is_some();
                 break;
             }
             _ = shutdown_signal() => {
-                shutdown_daemon(state.clone(), false).await;
-                let _ = fs::remove_file(&port_path);
                 break;
             }
         }
     }
 
+    drop(listener);
+    let _ = fs::remove_file(&port_path);
+    if teardown {
+        shutdown_daemon(state.clone(), false).await;
+    }
     Ok(())
 }
 

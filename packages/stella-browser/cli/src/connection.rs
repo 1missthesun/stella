@@ -204,15 +204,9 @@ fn configure_daemon_command(cmd: &mut Command, session: &str) {
 
 pub fn ensure_daemon(session: &str) -> Result<DaemonResult, String> {
     if is_daemon_running(session) && daemon_ready(session) {
-        // Double-check it's actually responsive by waiting and checking again
-        // This handles the race condition where daemon is shutting down
-        // (daemon has a 100ms shutdown delay, so we wait longer)
-        thread::sleep(Duration::from_millis(150));
-        if daemon_ready(session) {
-            return Ok(DaemonResult {
-                already_running: true,
-            });
-        }
+        return Ok(DaemonResult {
+            already_running: true,
+        });
     }
 
     cleanup_stale_files(session);

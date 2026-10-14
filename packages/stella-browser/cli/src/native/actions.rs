@@ -3151,14 +3151,11 @@ async fn handle_launch(cmd: &Value, state: &mut DaemonState) -> Result<Value, St
     if let Some(provider) = requested_provider(Some(cmd)) {
         match provider.to_lowercase().as_str() {
             "extension" => {
-                if matches!(state.backend_type, BackendType::Extension) {
-                    if let Some(ref bridge) = state.extension_bridge {
-                        if bridge.is_connected().await {
-                            return Ok(
-                                json!({ "launched": true, "provider": "extension", "reused": true }),
-                            );
-                        }
-                    }
+                if state.extension_bridge.is_some() {
+                    state.backend_type = BackendType::Extension;
+                    return Ok(
+                        json!({ "launched": true, "provider": "extension", "reused": true }),
+                    );
                 }
 
                 let ext_port = env::var("STELLA_BROWSER_EXT_PORT")

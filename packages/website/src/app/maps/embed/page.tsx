@@ -7,7 +7,7 @@ import "./maps-embed.css";
  * /maps/embed — the hosted interactive map behind Stella's inline chat map
  * cards (desktop iframe + mobile WebView). Renders a Google Map from the
  * `map-route` artifact passed via the `?d=` query param (base64url JSON);
- * see `src/lib/maps/map-artifact.ts` for the payload and
+ * see `@stella/contracts/map-artifact` for the payload and
  * `/api/maps/resolve` for how it gets produced.
  *
  * The Google browser key used here is HTTP-referrer-restricted to stella.sh

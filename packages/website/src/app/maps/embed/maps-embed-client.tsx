@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import {
   decodeMapArtifactParam,
   type MapRouteArtifact,
-} from "@/lib/maps/map-artifact";
+} from "@stella/contracts/map-artifact";
 
 const BROWSER_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY?.trim();
 

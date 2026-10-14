@@ -77,6 +77,22 @@ const toBase64Url = (json: string): string => {
   return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 };
 
+export const decodeMapArtifactParam = (
+  param: string | null | undefined,
+): MapRouteArtifact | null => {
+  if (!param) return null;
+  try {
+    const base64 = param.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
+    const binary = atob(padded);
+    const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+    const parsed: unknown = JSON.parse(new TextDecoder().decode(bytes));
+    return isMapRouteArtifact(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
 export const mapsEmbedUrl = (
   artifact: MapRouteArtifact,
   options?: { mode?: "light" | "dark"; siteBaseUrl?: string },

@@ -5,7 +5,7 @@ import type {
   MapArtifactRouteStep,
   MapRouteArtifact,
   MapTravelMode,
-} from "@/lib/maps/map-artifact";
+} from "@stella/contracts/map-artifact";
 
 export const runtime = "nodejs";
 

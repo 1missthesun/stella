@@ -15,6 +15,7 @@ import {
 } from "react-native-safe-area-context";
 import { env } from "../config/env";
 import { isSelfHostedLaunch } from "../lib/server-registry";
+import { useServerFeatures } from "../lib/server-features";
 import { type Colors } from "../theme/colors";
 import { useColors } from "../theme/theme-context";
 import { fonts } from "../theme/fonts";
@@ -29,6 +30,8 @@ type Props = {
 export function AiConsentModal({ visible, onAccept, onDecline }: Props) {
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const features = useServerFeatures();
+  const voice = features.dictation || features.realtimeVoice;
 
   return (
     <Modal
@@ -62,9 +65,10 @@ export function AiConsentModal({ visible, onAccept, onDecline }: Props) {
                   <Text style={styles.body}>
                     When you send a message, Stella transmits your message text,
                     conversation history from the current session, and any images
-                    you attach to an AI model for processing. If you use voice,
-                    Stella also transmits either your recording for transcription or
-                    live microphone audio for a realtime conversation.
+                    you attach to an AI model for processing.
+                    {voice
+                      ? " If you use voice, Stella also transmits either your recording for transcription or live microphone audio for a realtime conversation."
+                      : ""}
                   </Text>
                 </View>
 
@@ -81,11 +85,15 @@ export function AiConsentModal({ visible, onAccept, onDecline }: Props) {
                     such as <Text style={styles.bold}>DeepSeek</Text>,{" "}
                     <Text style={styles.bold}>Anthropic</Text>,{" "}
                     <Text style={styles.bold}>OpenAI</Text>, or{" "}
-                    <Text style={styles.bold}>Google</Text>. Voice features, where
-                    the server offers them, use the providers the owner added keys
-                    for: <Text style={styles.bold}>OpenRouter</Text>,{" "}
-                    <Text style={styles.bold}>Meta Muse</Text> for transcription, or{" "}
-                    <Text style={styles.bold}>OpenAI</Text> for realtime voice.
+                    <Text style={styles.bold}>Google</Text>.
+                    {voice ? (
+                      <>
+                        {" "}Voice uses the providers the owner added keys for:{" "}
+                        <Text style={styles.bold}>OpenRouter</Text>,{" "}
+                        <Text style={styles.bold}>Meta Muse</Text> for transcription, or{" "}
+                        <Text style={styles.bold}>OpenAI</Text> for realtime voice.
+                      </>
+                    ) : null}
                   </Text>
                 </View>
 

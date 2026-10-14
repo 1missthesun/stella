@@ -163,7 +163,7 @@ if (bunRuntimeVersion !== imageBunVersion) {
  */
 const EXECUTOR_ENTRY = path.join(repoRoot, "packages/executor-cloud/src/cli.ts");
 const tracedImports = async (declared) => {
-  const esbuild = createRequire(path.join(repoRoot, "package.json"))("esbuild");
+  const esbuild = createRequire(path.join(workerRoot, "package.json"))("esbuild");
   // Bun lists some npm packages (undici, ws) as built-ins and Node does not.
   // A name a manifest declares is always a package, so either runtime traces
   // the same set.

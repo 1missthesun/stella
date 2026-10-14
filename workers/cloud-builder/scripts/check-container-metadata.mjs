@@ -15,7 +15,8 @@
 // `--config` refuses to deploy a config that would upload without containers
 // or the code bundle's assets. `--deployed` reads the version actually
 // receiving traffic and fails when its metadata lost either.
-// `bun run containers:check` runs both.
+// `bun run containers:check` runs both. `--wrangler-config <path>` checks
+// another config (a self-hosted install's generated one, scripts/selfhost.mjs).
 
 import { spawnSync } from "node:child_process";
 import path from "node:path";
@@ -34,6 +35,7 @@ const option = (name) => {
   return index >= 0 ? args[index + 1] : undefined;
 };
 const environment = option("env") ?? "";
+const configPath = path.resolve(option("wrangler-config") ?? path.join(workerRoot, "wrangler.jsonc"));
 const checkConfig = flag("config") || !flag("deployed");
 const checkDeployed = flag("deployed") || !flag("config");
 
@@ -43,7 +45,7 @@ const fail = (message) => {
 };
 
 const { rawConfig } = experimental_readRawConfig({
-  config: path.join(workerRoot, "wrangler.jsonc"),
+  config: configPath,
 });
 const envConfig = environment ? rawConfig.env?.[environment] : rawConfig;
 if (!envConfig) fail(`wrangler.jsonc has no environment ${environment}.`);
@@ -105,6 +107,8 @@ const wrangler = (commandArgs) => {
     [
       path.join(workerRoot, "node_modules/wrangler/bin/wrangler.js"),
       ...commandArgs,
+      "--config",
+      configPath,
       ...(environment ? ["--env", environment] : ["--env", ""]),
       "--json",
     ],

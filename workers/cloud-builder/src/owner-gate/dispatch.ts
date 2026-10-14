@@ -30,7 +30,9 @@ import {
 import type { DispatchRow } from "./types.js";
 import {
   DISPATCH_RENEW_WRITE_BELOW_MS,
+  ALARM_BACKOFF_KEY,
   ALARM_HOT_STREAK_KEY,
+  type AlarmBackoff,
   ALARM_HOT_REARM_MS,
   ALARM_HOT_STREAK_LIMIT,
   ALARM_MAX_BACKOFF_MS,
@@ -981,8 +983,20 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
     for (const [column, at] of Object.entries(rows ?? {})) {
       add(`dispatch_${column}`, at);
     }
+    // A backoff in force holds back the sources that were looping, on every
+    // re-arm: a request that re-armed them at the floor undid the alarm's own
+    // backoff, which is how a looping source still woke the object every
+    // second or two while requests kept arriving.
+    const backoff =
+      (await this.ctx.storage.get<AlarmBackoff>(ALARM_BACKOFF_KEY)) ?? null;
+    const heldUntil = (source: string): number =>
+      backoff && backoff.until > now && backoff.sources.includes(source)
+        ? backoff.until
+        : Number.NEGATIVE_INFINITY;
     let next = Number.POSITIVE_INFINITY;
-    for (const [, at] of deadlines) next = Math.min(next, at);
+    for (const [source, at] of deadlines) {
+      next = Math.min(next, Math.max(at, heldUntil(source)));
+    }
     const existingAlarm = await this.ctx.storage.getAlarm();
     if (options.preserveExisting !== false && existingAlarm !== null) {
       next = Math.min(next, existingAlarm);
@@ -995,23 +1009,26 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
         await this.ctx.storage.put(ALARM_HOT_STREAK_KEY, streak);
         const over = streak - ALARM_HOT_STREAK_LIMIT;
         if (over > 0) {
-          next = Math.max(
-            next,
-            now +
-              Math.min(ALARM_MAX_BACKOFF_MS, ALARM_MIN_DELAY_MS * 2 ** over),
-          );
+          const hot = deadlines
+            .filter(([, at]) => at - now <= ALARM_HOT_REARM_MS)
+            .map(([source]) => source);
+          const until =
+            now + Math.min(ALARM_MAX_BACKOFF_MS, ALARM_MIN_DELAY_MS * 2 ** over);
+          next = Math.max(next, until);
+          await this.ctx.storage.put(ALARM_BACKOFF_KEY, {
+            until,
+            sources: [...new Set([...hot, ...(backoff?.sources ?? [])])],
+          } satisfies AlarmBackoff);
           if ((over & (over - 1)) === 0) {
             log("error", "owner_alarm_hot_loop", {
               ownerId: this.ownerId(),
               streak,
-              sources: deadlines
-                .filter(([, at]) => at - now <= ALARM_HOT_REARM_MS)
-                .map(([source]) => source),
+              sources: hot,
             });
           }
         }
-      } else if (stored > 0) {
-        await this.ctx.storage.delete(ALARM_HOT_STREAK_KEY);
+      } else if (stored > 0 || backoff) {
+        await this.ctx.storage.delete([ALARM_HOT_STREAK_KEY, ALARM_BACKOFF_KEY]);
       }
     }
     if (!Number.isFinite(next)) return;

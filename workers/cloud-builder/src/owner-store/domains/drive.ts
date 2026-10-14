@@ -50,7 +50,15 @@ const DOWNLOAD_URL_EXPIRES_SECONDS = 900;
 const UPLOAD_URL_EXPIRES_SECONDS = 60 * 60;
 const PENDING_UPLOAD_TTL_MS = 6 * 60 * 60_000;
 const CLEANUP_LEASE_MS = 5 * 60_000;
-const CLEANUP_BATCH = 100;
+/** R2 deletes at most 1,000 keys per call. */
+const CLEANUP_BATCH = 1_000;
+const CLEANUP_MAX_BATCHES_PER_RUN = 20;
+/**
+ * The least time between cleanup runs. Objects retired by a burst of writes
+ * come due one by one a grace period later; without this floor each one woke
+ * the owner alarm on its own, a second apart.
+ */
+const CLEANUP_CONTINUE_MS = 60_000;
 /** Keep retired bytes alive for signed GETs already handed to a client. */
 const REPLACEMENT_GRACE_MS = DOWNLOAD_URL_EXPIRES_SECONDS * 1_000;
 const WRITE_DEBT_GRACE_MS = 15 * 60_000;
@@ -1514,17 +1522,22 @@ const signImages = async (ctx: OwnerContext, raw: unknown): Promise<{ urls: stri
   return { urls };
 };
 
+/**
+ * Deletes every retired object that is due, one R2 batch delete per
+ * `CLEANUP_BATCH` keys, in this one run.
+ */
 const runCleanup = async (ctx: OwnerContext): Promise<void> => {
   const now = ctx.now;
-  const due = ctx.db.all<UploadRow>(
-    `SELECT * FROM drive_uploads
-     WHERE expires_at <= ? AND (lease_expires_at IS NULL OR lease_expires_at <= ?)
-     ORDER BY expires_at LIMIT ?`,
-    now,
-    now,
-    CLEANUP_BATCH,
-  );
-  if (due.length > 0) {
+  for (let batch = 0; batch < CLEANUP_MAX_BATCHES_PER_RUN; batch += 1) {
+    const due = ctx.db.all<UploadRow>(
+      `SELECT * FROM drive_uploads
+       WHERE expires_at <= ? AND (lease_expires_at IS NULL OR lease_expires_at <= ?)
+       ORDER BY expires_at LIMIT ?`,
+      now,
+      now,
+      CLEANUP_BATCH,
+    );
+    if (due.length === 0) break;
     const leaseId = crypto.randomUUID();
     for (const row of due) {
       ctx.db.run(
@@ -1535,28 +1548,31 @@ const runCleanup = async (ctx: OwnerContext): Promise<void> => {
       );
     }
     const doomed = due.filter((row) => !isKeyReferenced(ctx.db, row.r2_key));
-    let deleted = true;
     if (doomed.length > 0) {
       try {
         await bucketOf(ctx).delete([...new Set(doomed.map((row) => row.r2_key))]);
       } catch {
-        deleted = false;
+        // The lease holds these rows back until it lapses, then they retry.
+        break;
       }
     }
-    if (deleted) {
-      for (const row of due) {
-        ctx.db.run(
-          "DELETE FROM drive_uploads WHERE upload_id = ? AND lease_id = ?",
-          row.upload_id,
-          leaseId,
-        );
-      }
+    for (const row of due) {
+      ctx.db.run(
+        "DELETE FROM drive_uploads WHERE upload_id = ? AND lease_id = ?",
+        row.upload_id,
+        leaseId,
+      );
     }
+    if (due.length < CLEANUP_BATCH) break;
   }
   const next = ctx.db.one<{ at: number | null }>(
     `SELECT MIN(MAX(expires_at, COALESCE(lease_expires_at, 0))) AS at FROM drive_uploads`,
   )?.at;
-  if (typeof next === "number") ctx.jobs.schedule(DRIVE_CLEANUP_JOB, Math.max(next, now + 1_000), null, { id: DRIVE_CLEANUP_JOB });
+  if (typeof next === "number") {
+    ctx.jobs.schedule(DRIVE_CLEANUP_JOB, Math.max(next, now + CLEANUP_CONTINUE_MS), null, {
+      id: DRIVE_CLEANUP_JOB,
+    });
+  }
 };
 
 const pruneTombstones = (ctx: OwnerContext): void => {

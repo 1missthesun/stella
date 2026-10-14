@@ -27,6 +27,7 @@ const LIVE_REAUTH_LEAD_MS = 2 * 60_000;
 const LIVE_REAUTH_RETRY_BASE_MS = 5_000;
 const LIVE_REAUTH_RETRY_MAX_MS = 60_000;
 const JOB_BATCH = 32;
+const JOB_MAX_PASSES = 16;
 const FLUSH_COALESCE_MS = 250;
 const CLOCK_VIEW_REFRESH_MS = 30_000;
 const FLUSH_LOG_ROWS = 1_000;
@@ -34,6 +35,8 @@ const QUERY_TABLES_CACHE_MAX = 4_096;
 const JOB_DEFAULT_MAX_ATTEMPTS = 20;
 const CONTRACTING_STATEMENT = /\bDROP\s+(?:TABLE|COLUMN)\b|\bRENAME\b/i;
 const JOB_MAX_BACKOFF_MS = 60 * 60_000;
+/** A failed job's first retry; well above the alarm floor so retries never stack into a burst. */
+const JOB_RETRY_BASE_MS = 5_000;
 
 const PLATFORM_DDL = [
   `CREATE TABLE IF NOT EXISTS _owner_migrations (
@@ -869,15 +872,33 @@ export class OwnerStore {
     await this.runDueJobs(now);
   }
 
+  /**
+   * Runs every job due at `now`, in batches, so one alarm clears a backlog
+   * rather than a batch per wake. A job that reschedules itself into the past
+   * runs once per call; the next alarm picks it up.
+   */
   async runDueJobs(now = Date.now()): Promise<number> {
     this.ensureSchema();
-    const due = this.sql
-      .exec<JobRow>(
-        "SELECT * FROM owner_jobs WHERE run_at <= ? ORDER BY run_at LIMIT ?",
-        now,
-        JOB_BATCH,
-      )
-      .toArray();
+    const ran = new Set<string>();
+    for (let pass = 0; pass < JOB_MAX_PASSES; pass += 1) {
+      const due = this.sql
+        .exec<JobRow>(
+          "SELECT * FROM owner_jobs WHERE run_at <= ? ORDER BY run_at LIMIT ?",
+          now,
+          JOB_BATCH + ran.size,
+        )
+        .toArray()
+        .filter((job) => !ran.has(job.id))
+        .slice(0, JOB_BATCH);
+      if (due.length === 0) break;
+      for (const job of due) ran.add(job.id);
+      await this.runJobs(due, now);
+    }
+    this.flush();
+    return ran.size;
+  }
+
+  private async runJobs(due: JobRow[], now: number): Promise<void> {
     for (const job of due) {
       const def = this.registry.jobs.get(job.kind);
       if (!def) {
@@ -900,7 +921,7 @@ export class OwnerStore {
           this.log("error", "owner_job_dropped", { id: job.id, kind: job.kind, attempts, message });
           this.sql.exec("DELETE FROM owner_jobs WHERE id = ?", job.id);
         } else {
-          const backoff = Math.min(JOB_MAX_BACKOFF_MS, 1_000 * 2 ** (attempts - 1));
+          const backoff = Math.min(JOB_MAX_BACKOFF_MS, JOB_RETRY_BASE_MS * 2 ** (attempts - 1));
           this.log("error", "owner_job_failed", { id: job.id, kind: job.kind, attempts, message });
           this.sql.exec(
             "UPDATE owner_jobs SET attempts = ?, run_at = ? WHERE id = ? AND run_at = ?",
@@ -912,7 +933,5 @@ export class OwnerStore {
         }
       }
     }
-    this.flush();
-    return due.length;
   }
 }

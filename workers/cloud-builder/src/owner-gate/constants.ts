@@ -49,6 +49,9 @@ export const AGENT_MESSAGE_OUTCOMES: ReadonlySet<string> =
 export const ALARM_MIN_DELAY_MS = 1_000;
 export const ALARM_HOT_REARM_MS = 2_000;
 export const ALARM_HOT_STREAK_KEY = "alarmHotStreak";
+/** The backoff in force: deadlines from `sources` wait until `until`. */
+export const ALARM_BACKOFF_KEY = "alarmBackoff";
+export type AlarmBackoff = { until: number; sources: string[] };
 /**
  * Alarm runs in a row that may each re-arm within `ALARM_HOT_REARM_MS` before
  * the re-arm backs off. Enough for legitimate catch-up (a batch of expired

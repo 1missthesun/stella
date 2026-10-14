@@ -1,6 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { ChatMessage, MobileTask } from "../types";
-import { RUNNING_TASK_STALE_MS } from "./activity-hub-model";
 import type { ToolStep } from "./tool-activity";
 import {
   desktopChatOutboxStorageKeys,
@@ -424,17 +423,13 @@ function parseStoredTasks(value: unknown): MobileTask[] {
       typeof record.resultText === "string" ? record.resultText.trim() : "";
     const errorMessage =
       typeof record.errorMessage === "string" ? record.errorMessage.trim() : "";
-    const settledStale =
-      status === "running" &&
-      Date.now() - (updatedAt ?? completedAt ?? createdAt) >
-        RUNNING_TASK_STALE_MS;
     tasks.push({
       id,
       title,
       ...(agentType ? { agentType } : {}),
       ...(parentAgentId ? { parentAgentId } : {}),
-      status: settledStale ? "completed" : (status as MobileTask["status"]),
-      ...(statusText && !settledStale ? { statusText } : {}),
+      status: status as MobileTask["status"],
+      ...(statusText ? { statusText } : {}),
       ...(reasoningSummaries.length > 0 ? { reasoningSummaries } : {}),
       createdAt,
       ...(updatedAt !== undefined ? { updatedAt } : {}),

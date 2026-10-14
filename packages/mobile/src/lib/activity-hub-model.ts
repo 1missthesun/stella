@@ -7,54 +7,6 @@ import {
 } from "./agent-artifact-consolidation";
 import type { ChatArtifact, ChatMessage, MobileTask } from "../types";
 
-/**
- * A `running` snapshot with no fresher evidence than this is treated as
- * settled.
- *
- * The phone's task list is a fold of whatever snapshots reached it — synced
- * message rows and journal records — and nothing guarantees the terminal one
- * ever arrives: the loaded window can simply start after an agent spawned and
- * end before it finished, and a computer that has since gone away reports no
- * authoritative rows to correct it. Those orphans used to read as running
- * forever, which is what put a phantom tally in the top bar and kept the
- * sidebar's rows shimmering with nothing actually in flight.
- *
- * Desktop never had the problem because its rows come straight from the
- * runtime's own lifecycle. The window matches the one the desktop projection
- * and the persisted loader already use (`AGENT_WORK_STALE_MS`), so all three
- * agree on when silence counts as finished.
- */
-export const RUNNING_TASK_STALE_MS = 5 * 60_000;
-
-const lastSeenAt = (task: MobileTask): number =>
-  task.updatedAt ?? task.completedAt ?? task.createdAt;
-
-/**
- * Settle `running` tasks that have gone quiet past the stale window.
- *
- * Applied once, where the hub is published, so every surface reading it — the
- * top-bar indicator, its menu, the sidebar's rows and group summaries — agrees
- * without each having to re-derive liveness. Deliberately NOT folded into the
- * task merge itself: that merge's rules let a terminal snapshot beat a running
- * one, so settling there could stop a genuinely long agent's authoritative row
- * from winning. Here it only ever affects what the chrome displays.
- */
-export const settleStaleHubTasks = (
-  tasks: readonly MobileTask[],
-  nowMs: number = Date.now(),
-): MobileTask[] =>
-  tasks.map((task) => {
-    if (task.status !== "running") return task;
-    // The journal itself says this agent is working. Silence in the rows this
-    // device happens to hold says nothing about that, and settling it here is
-    // exactly how a phone that had been closed for a while came back claiming
-    // nothing was in progress while several agents were.
-    if (task.authoritativeRunning) return task;
-    if (nowMs - lastSeenAt(task) <= RUNNING_TASK_STALE_MS) return task;
-    const { statusText: _statusText, ...rest } = task;
-    return { ...rest, status: "completed" as const };
-  });
-
 const hubTaskActivityAt = (task: MobileTask): number =>
   Math.max(task.createdAt, task.updatedAt ?? 0, task.completedAt ?? 0);
 

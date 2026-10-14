@@ -60,7 +60,6 @@ import {
   publishComputerControl,
   requestOpenSidebar,
 } from "../../src/lib/main-shell-store";
-import { settleStaleHubTasks } from "../../src/lib/activity-hub-model";
 import { useColors } from "../../src/theme/theme-context";
 import { fonts } from "../../src/theme/fonts";
 import { ChatPane } from "../../src/components/ChatPane";
@@ -79,7 +78,6 @@ import type { ChatArtifact } from "../../src/types";
 import { useT } from "../../src/i18n";
 
 const STATUS_POLL_MS = 20_000;
-const HUB_STALE_RECHECK_MS = 30_000;
 const HANDOFF_SEND_RETRY_MS = 400;
 const HANDOFF_SEND_MAX_ATTEMPTS = 150;
 
@@ -417,41 +415,20 @@ function ChatSurface(props: {
   }, [status.available]);
 
   const { conversationTasks, conversationArtifacts } = thread;
-  // Stale `running` rows are settled on the way in (see `settleStaleHubTasks`),
-  // so the chrome never reports work the fold only *believes* is still going.
-  // Staleness is a function of elapsed time rather than of any state change, so
-  // a task can cross the window with nothing to re-render it — hence the coarse
-  // re-publish, armed only while something still claims to be running.
   const hubConversationId = thread.conversationId ?? null;
   const lastMessage = thread.messages.at(-1);
   const hubRevision = lastMessage
     ? `${thread.messages.length}:${lastMessage.id}:${lastMessage.text.length}`
     : null;
-  const hasRunningConversationTask = conversationTasks.some(
-    (task) => task.status === "running",
-  );
   useEffect(() => {
-    const publish = () => {
-      publishActivityHub({
-        tasks: settleStaleHubTasks(conversationTasks),
-        artifacts: conversationArtifacts,
-        access,
-        conversationId: hubConversationId,
-        revision: hubRevision,
-      });
-    };
-    publish();
-    if (!hasRunningConversationTask) return undefined;
-    const timer = setInterval(publish, HUB_STALE_RECHECK_MS);
-    return () => clearInterval(timer);
-  }, [
-    conversationTasks,
-    conversationArtifacts,
-    access,
-    hubConversationId,
-    hubRevision,
-    hasRunningConversationTask,
-  ]);
+    publishActivityHub({
+      tasks: conversationTasks,
+      artifacts: conversationArtifacts,
+      access,
+      conversationId: hubConversationId,
+      revision: hubRevision,
+    });
+  }, [conversationTasks, conversationArtifacts, access, hubConversationId, hubRevision]);
   useEffect(
     () => () => {
       publishActivityHub(null);

@@ -93,25 +93,24 @@ You have exactly one tool: \`ask_stella\`. It is how you reach Stella's backend,
     id: "synthesis.profile.system",
     module: "synthesis",
     title: "Profile Synthesis Prompt",
-    defaultText: `You write the first entries of Stella's memory about a new user. Stella is a personal assistant whose agents act for the user, so they need to know who the user is, which tools and accounts to reach for, and what the user is busy with. Your input is a small summary computed on the user's device: the sites they used on at least three different days in the last month, grouped by purpose, with a few page titles for work tools, plus their signed-in accounts, time zone and activity hours. Other short signals may follow it.
+    defaultText: `You write the first entries of Stella's memory about a new user. Stella is a personal assistant whose agents act for the user, so they need to know who the user is, which tools and accounts to reach for, what the user is busy with, and what they care about. Your input is a small summary computed on the user's device: the sites they used on at least three separate days in the last month, grouped by purpose, with page titles; search terms they came back to on three or more days; recent bookmarks; their signed-in accounts, time zone and activity hours. Other short signals may follow it.
 
-Write 10 to 20 lines. Each line is one short, durable fact starting with "- ", written as terse notes rather than sentences about "they": no headings, no bold, no emoji, no em dashes. Name the specific person, company, product, tool or account. For example:
+Write 10 to 20 lines. Each line is one short, durable fact starting with "- ", written as terse notes rather than sentences about "they": no headings, no bold, no emoji, no em dashes. Name the specific person, company, product, tool, account, channel or community. For example:
 - Jane Doe, founder of Acme (acme.io), a scheduling app.
 - Email: Gmail (jane@acme.io, jane.doe@gmail.com); calendar: Google Calendar.
 - Work tools: Slack (Acme workspace), Linear, Notion.
+- Watches climbing and woodworking videos on YouTube; active in r/bouldering.
 
 Include, when the evidence supports it:
-- First, one line on who they are: name, what they do, their companies and products. The user's own products often show up as the most-used sites outside the known categories, with admin or dashboard pages. Take the name from an account with a person's full name; accounts named after a team or product are the user's other workspaces, not the user.
+- First, one line on who they are: name, what they do, their companies and products. The user's own products often show up among the unrecognized sites, with admin or dashboard pages. Take the name from an account with a person's full name; accounts named after a team or product are the user's other workspaces, not the user.
 - The services they actually use, one line per purpose, so an agent knows which to reach for: email (with addresses) and calendar, chat and work tools, developer and cloud tools, AI tools, payments and banking, shopping, travel. Say what they use a tool for only when the evidence shows it; never describe a product's generic features.
 - What they are working on lately, from activity that recurs across days.
+- What they care about outside work: topics they keep searching, what they watch, the communities and people they follow, what they bookmark.
 - Practical details: time zone, typical active hours, language.
-- At most two lines of strong, recurring personal interests.
 
 Leave out:
-- Lists of sites, visit or day counts, and phrasing like "visits X" or "uses the X website". State what the user does or uses, not where they browsed.
-- Generic sites (search, video, social feeds, news) unless the evidence shows they are a work tool.
-- Anything seen only once or only lightly, and anything you are unsure of. Omit rather than guess, and never pad to reach a count.
-- Sensitive categories, even when the signal is strong: health, specific financial details (amounts, balances, transactions), politics, religion, sexuality, adult content.
+- Lists of sites, visit or day counts, and phrasing like "visits X" or "uses the X website". State what the user does, uses or cares about, not where they browsed.
+- Anything that rests on a single page, search or bookmark, and anything you are unsure of. Omit rather than guess, and never pad to reach a count.
 - The repositories under "Recent repositories". Stella records them separately; use them only to understand what the user works on, and never list or restate them.
 
 Output only the lines.`,

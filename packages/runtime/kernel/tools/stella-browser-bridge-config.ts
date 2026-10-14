@@ -1,5 +1,12 @@
 import { randomUUID } from "node:crypto";
-import { chmodSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  linkSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
@@ -16,12 +23,17 @@ export const STELLA_BROWSER_MANAGED_BRIDGE = "1";
 
 export const STELLA_NATIVE_MESSAGING_HOST_NAME = "com.stella.browser_bridge";
 
+const errorCode = (error: unknown): string | undefined =>
+  error && typeof error === "object" && "code" in error
+    ? String((error as { code: unknown }).code)
+    : undefined;
+
 const readBridgeToken = (tokenPath: string): string | null => {
   try {
-    const token = readFileSync(tokenPath, "utf8").trim();
-    return token || null;
-  } catch {
-    return null;
+    return readFileSync(tokenPath, "utf8").trim();
+  } catch (error) {
+    if (errorCode(error) === "ENOENT") return null;
+    throw error;
   }
 };
 
@@ -85,54 +97,54 @@ const getBridgeTokenPath = (): string => {
   return path.join(socketDir, `${STELLA_BROWSER_BRIDGE_SESSION}.ext-token`);
 };
 
-const persistBridgeToken = (
-  tokenPath: string,
-  token: string,
-  overwriteExisting = false,
-): void => {
-  writeFileSync(tokenPath, token, { flag: overwriteExisting ? "w" : "wx" });
-  if (process.platform !== "win32") {
-    try {
-      chmodSync(tokenPath, 0o600);
-    } catch {
-      // Best-effort permissions tightening on Unix-like systems.
-    }
+const publishNewBridgeToken = (tokenPath: string): void => {
+  const token = randomUUID();
+  const temporary = `${tokenPath}.${token}.tmp`;
+  writeFileSync(temporary, token, { flag: "wx", mode: 0o600 });
+  try {
+    linkSync(temporary, tokenPath);
+  } catch (error) {
+    if (errorCode(error) !== "EEXIST") throw error;
+  } finally {
+    rmSync(temporary, { force: true });
   }
 };
 
 const getOrCreateBridgeToken = (): string => {
   const tokenPath = getBridgeTokenPath();
-  const existingToken = readBridgeToken(tokenPath);
-  if (existingToken) {
-    return existingToken;
+  let token = readBridgeToken(tokenPath);
+  if (token === null) {
+    publishNewBridgeToken(tokenPath);
+    token = readBridgeToken(tokenPath);
   }
-
-  const nextToken = randomUUID();
-
+  if (token) return token;
+  const aside = `${tokenPath}.${randomUUID()}.empty`;
   try {
-    persistBridgeToken(tokenPath, nextToken);
-    return nextToken;
-  } catch {
-    const persistedToken = readBridgeToken(tokenPath);
-    if (persistedToken) {
-      return persistedToken;
-    }
-
-    // Recover from a stale zero-byte/truncated token file so startup can heal itself.
+    renameSync(tokenPath, aside);
+  } catch (error) {
+    if (errorCode(error) !== "ENOENT") throw error;
+  }
+  const moved = readBridgeToken(aside);
+  if (moved) {
     try {
-      persistBridgeToken(tokenPath, nextToken, true);
-      const repairedToken = readBridgeToken(tokenPath);
-      if (repairedToken) {
-        return repairedToken;
-      }
-    } catch {
-      // Fall through to the descriptive error below.
+      linkSync(aside, tokenPath);
+    } catch (error) {
+      if (errorCode(error) !== "EEXIST") throw error;
     }
-
+  } else {
+    console.warn(
+      `[stella-browser] Replacing an empty bridge token file at ${tokenPath}.`,
+    );
+    publishNewBridgeToken(tokenPath);
+  }
+  rmSync(aside, { force: true });
+  token = readBridgeToken(tokenPath);
+  if (!token) {
     throw new Error(
       `Failed to initialize persistent Stella browser bridge token at ${tokenPath}.`,
     );
   }
+  return token;
 };
 
 export const STELLA_BROWSER_BRIDGE_TOKEN = getOrCreateBridgeToken();

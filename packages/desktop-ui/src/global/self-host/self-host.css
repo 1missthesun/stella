@@ -29,6 +29,10 @@
   color: var(--text-base);
 }
 
+.self-host-dialog [data-slot="dialog-description"].self-host-dialog__text {
+  padding: 0;
+}
+
 .self-host-dialog__meta {
   font-size: var(--font-size-sm);
   color: var(--text-weak);

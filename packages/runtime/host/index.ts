@@ -606,19 +606,7 @@ export class StellaRuntimeHost {
       this.events.emit("schedule-updated", undefined);
     });
   }
-  /**
-   * Hand the backend this machine's retired device id so its paired phones
-   * and remote-execution answer move onto the current identity.
-   *
-   * A rotation happens whenever the local keypair stops being readable, and
-   * every phone-facing record is keyed by the device id — without this, each
-   * rotation strands every paired phone on an id that will never be online
-   * again, which reads on the phone as a permanently offline desktop.
-   *
-   * Best-effort and idempotent: the retired id stays on disk until the
-   * backend acknowledges, so a claim that fails while offline is retried
-   * when authenticated host services next synchronize.
-   */
+  /** Move the retired device id's pairings onto this identity; retried until the backend accepts. */
   async claimDeviceIdentitySuccession(): Promise<void> {
     const previousDeviceId = this.deviceIdentity?.supersededDeviceId;
     const deviceId = this.deviceIdentity?.deviceId;

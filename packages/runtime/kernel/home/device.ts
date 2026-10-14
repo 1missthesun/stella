@@ -12,7 +12,7 @@ import { Effect } from "effect";
 import {
   deleteProtectedValue,
   protectValue,
-  unprotectValue,
+  readProtectedValue,
 } from "../shared/protected-storage.js";
 import { ensurePrivateDir, writePrivateFile } from "../shared/private-fs.js";
 import { getFileLogger } from "../../observability/file-logger.js";
@@ -22,12 +22,6 @@ type DeviceRecord = {
   deviceId: string;
   publicKey?: string;
   privateKeyProtected?: string;
-  /**
-   * The device id this record replaced, retained until the backend has been
-   * told about the succession. Persisted rather than held in memory because a
-   * rotation can happen while signed out or offline, and losing the link would
-   * strand every paired phone on the retired id permanently.
-   */
   supersededDeviceId?: string;
 };
 
@@ -48,18 +42,8 @@ const DEVICE_FILE = "device.json";
 const DEVICE_PRIVATE_KEY_SCOPE = "device-private-key";
 const deviceSignerCache = new Map<string, DeviceSigner>();
 
-/**
- * Why a stored identity could not be reused.
- *
- * Regenerating mints a new `deviceId`, which the backend treats as a different
- * machine — so every one of these is a user-visible event, not a detail. They
- * used to be indistinguishable: a single bare `catch` swallowed all of them,
- * leaving nothing to tell a missing file apart from a key the OS refused to
- * decrypt, and no way to know which path a rotation in the wild took.
- */
 type DeviceIdentityRegenerationReason =
   | "no-record"
-  | "unreadable-record"
   | "malformed-record"
   | "incomplete-record"
   | "undecryptable-private-key";
@@ -199,41 +183,26 @@ const createAndStoreDeviceIdentityEffect = (
 
 const readPersistedDeviceRecord = (
   recordPath: string,
-): Effect.Effect<{
-  parsed: DeviceRecord | undefined;
-  reason: DeviceIdentityRegenerationReason;
-}> =>
-  tryIO(
-    async (): Promise<{
-      parsed: DeviceRecord | undefined;
-      reason: DeviceIdentityRegenerationReason;
-    }> => {
-      let raw: string;
-      try {
-        raw = await fs.readFile(recordPath, "utf-8");
-      } catch (error) {
-        return {
-          parsed: undefined,
-          reason:
-            (error as NodeJS.ErrnoException | undefined)?.code === "ENOENT"
-              ? "no-record"
-              : "unreadable-record",
-        };
+): Effect.Effect<
+  { parsed: DeviceRecord | undefined; reason: DeviceIdentityRegenerationReason },
+  unknown
+> =>
+  tryIO(async () => {
+    let raw: string;
+    try {
+      raw = await fs.readFile(recordPath, "utf-8");
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException | undefined)?.code === "ENOENT") {
+        return { parsed: undefined, reason: "no-record" as const };
       }
-      try {
-        return { parsed: JSON.parse(raw) as DeviceRecord, reason: "no-record" };
-      } catch {
-        return { parsed: undefined, reason: "malformed-record" };
-      }
-    },
-  ).pipe(
-    Effect.catch(() =>
-      Effect.succeed({
-        parsed: undefined,
-        reason: "unreadable-record" as DeviceIdentityRegenerationReason,
-      }),
-    ),
-  );
+      throw error;
+    }
+    try {
+      return { parsed: JSON.parse(raw) as DeviceRecord, reason: "no-record" as const };
+    } catch {
+      return { parsed: undefined, reason: "malformed-record" as const };
+    }
+  });
 
 export const getOrCreateDeviceIdentityEffect = (
   statePath: string,
@@ -243,48 +212,30 @@ export const getOrCreateDeviceIdentityEffect = (
     const { parsed, reason: readReason } =
       yield* readPersistedDeviceRecord(recordPath);
     const previousPrivateKeyProtected = parsed?.privateKeyProtected;
-    // Carried into the replacement identity so the backend can move this
-    // machine's pairings and remote-execution answer onto the new id. The
-    // id itself is not a secret, and the replacement is an ordinary device with
-    // its own keypair, so nothing about the key binding is relaxed by this.
-    // Captured before the decrypt attempt, which is precisely the case whose
-    // predecessor we need to keep.
     const supersededDeviceId = parsed?.deviceId ? parsed.deviceId : undefined;
     let reason = readReason;
-    const existing = yield* Effect.try({
-      try: (): DeviceIdentity | null => {
-        if (
-          parsed?.deviceId &&
-          parsed.publicKey &&
-          parsed.privateKeyProtected
-        ) {
-          const decryptedPrivateKey = unprotectValue(
-            DEVICE_PRIVATE_KEY_SCOPE,
-            parsed.privateKeyProtected,
-          );
-          // A record that cannot be decrypted is unusable: fall through to
-          // create a fresh identity (the pre-Effect code threw here and was
-          // caught by the same fall-through).
-          if (!decryptedPrivateKey) {
-            reason = "undecryptable-private-key";
-            return null;
-          }
-          return {
-            deviceId: parsed.deviceId,
-            publicKey: parsed.publicKey,
-            privateKey: decryptedPrivateKey,
-            ...(parsed.supersededDeviceId
-              ? { supersededDeviceId: parsed.supersededDeviceId }
-              : {}),
-          };
-        }
-        if (parsed) {
-          reason = "incomplete-record";
-        }
-        return null;
-      },
-      catch: (error) => error,
-    }).pipe(Effect.catch(() => Effect.succeed(null)));
+    let existing: DeviceIdentity | null = null;
+    if (parsed?.deviceId && parsed.publicKey && parsed.privateKeyProtected) {
+      const privateKey = readProtectedValue(DEVICE_PRIVATE_KEY_SCOPE, parsed.privateKeyProtected);
+      if (privateKey.ok) {
+        existing = {
+          deviceId: parsed.deviceId,
+          publicKey: parsed.publicKey,
+          privateKey: privateKey.value,
+          ...(parsed.supersededDeviceId
+            ? { supersededDeviceId: parsed.supersededDeviceId }
+            : {}),
+        };
+      } else if (privateKey.reason === "unavailable") {
+        return yield* Effect.fail(
+          new Error("OS protected storage is unavailable; keeping this device's identity until it is."),
+        );
+      } else {
+        reason = "undecryptable-private-key";
+      }
+    } else if (parsed) {
+      reason = "incomplete-record";
+    }
     if (existing) return existing;
     yield* Effect.sync(() =>
       logDeviceIdentityRegeneration(reason, supersededDeviceId),
@@ -307,7 +258,9 @@ export const resetDeviceIdentityEffect = (
 ): Effect.Effect<DeviceIdentity, unknown> =>
   Effect.gen(function* () {
     const recordPath = getDeviceRecordPath(statePath);
-    const { parsed } = yield* readPersistedDeviceRecord(recordPath);
+    const { parsed } = yield* readPersistedDeviceRecord(recordPath).pipe(
+      Effect.catch(() => Effect.succeed({ parsed: undefined })),
+    );
     const supersededDeviceId =
       options.preservePairings && parsed?.deviceId ? parsed.deviceId : undefined;
     const identity = yield* createAndStoreDeviceIdentityEffect(

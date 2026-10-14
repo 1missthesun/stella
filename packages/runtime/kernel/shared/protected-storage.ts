@@ -52,26 +52,31 @@ export const protectValue = (scope: string, plaintext: string): string => {
   return `${prefixForScope(scope)}${encrypted.toString("base64url")}`;
 };
 
-export const unprotectValue = (scope: string, value: string): string | null => {
-  if (typeof value !== "string") {
-    return null;
-  }
+export type ProtectedValueRead =
+  | { ok: true; value: string }
+  | { ok: false; reason: "unavailable" | "undecryptable" };
 
+export const readProtectedValue = (scope: string, value: string): ProtectedValueRead => {
   const prefix = prefixForScope(scope);
-  if (!value.startsWith(prefix)) {
-    return null;
-  }
-  const encoded = value.slice(prefix.length);
-  if (!encoded) {
-    return null;
-  }
-
+  const encoded =
+    typeof value === "string" && value.startsWith(prefix) ? value.slice(prefix.length) : "";
+  if (!encoded) return { ok: false, reason: "undecryptable" };
+  let safeStorage: SafeStorageLike;
   try {
-    const safeStorage = getSafeStorage();
-    return safeStorage.decryptString(Buffer.from(encoded, "base64url"));
+    safeStorage = getSafeStorage();
   } catch {
-    return null;
+    return { ok: false, reason: "unavailable" };
   }
+  try {
+    return { ok: true, value: safeStorage.decryptString(Buffer.from(encoded, "base64url")) };
+  } catch {
+    return { ok: false, reason: "undecryptable" };
+  }
+};
+
+export const unprotectValue = (scope: string, value: string): string | null => {
+  const read = readProtectedValue(scope, value);
+  return read.ok ? read.value : null;
 };
 
 export const deleteProtectedValue = (scope: string, value: string): void => {

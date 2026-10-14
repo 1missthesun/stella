@@ -1,4 +1,5 @@
 import { STELLA_MEDIA_MODELS } from "@stella/contracts/media-models";
+import { ownerModeEnabled } from "../selfhost/owner-mode.js";
 import { readBodyBytes } from "../http/body.js";
 import { requireCaller } from "../http/caller.js";
 import { fail, failRpcError, json } from "../http/response.js";
@@ -95,14 +96,14 @@ const transcribeSegment = async (
   model: string,
   pcm: Uint8Array,
   signal: AbortSignal,
+  attribution: boolean,
 ): Promise<{ text: string; costUsd: number | undefined }> => {
   const response = await fetch(TRANSCRIPTIONS_URL, {
     method: "POST",
     headers: {
       authorization: `Bearer ${key}`,
       "content-type": "application/json",
-      "HTTP-Referer": "https://stella.sh",
-      "X-OpenRouter-Title": "Stella",
+      ...(attribution ? { "HTTP-Referer": "https://stella.sh", "X-OpenRouter-Title": "Stella" } : {}),
     },
     body: JSON.stringify({ model, input_audio: { data: toBase64(wavFromPcm(pcm)), format: "wav" } }),
     signal: AbortSignal.any([signal, AbortSignal.timeout(SEGMENT_TIMEOUT_MS)]),
@@ -155,7 +156,7 @@ export const handleDictationTranscribeRoute = async (
   try {
     for (let offset = 0, segment = 0; offset < pcm.byteLength; offset += SEGMENT_BYTES, segment += 1) {
       const slice = pcm.subarray(offset, offset + SEGMENT_BYTES);
-      const result = await transcribeSegment(key, model, slice, request.signal);
+      const result = await transcribeSegment(key, model, slice, request.signal, !ownerModeEnabled(env));
       await call("dictation.settleSegment", {
         sessionId,
         segment,

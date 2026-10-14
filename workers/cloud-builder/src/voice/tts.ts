@@ -1,4 +1,5 @@
 import { Mp3Encoder } from "@breezystack/lamejs";
+import { ownerModeEnabled } from "../selfhost/owner-mode.js";
 import { STELLA_MEDIA_MODELS } from "@stella/contracts/media-models";
 import { DEFAULT_GEMINI_TTS_VOICE, isGeminiTtsVoice } from "@stella/contracts/realtime-voice-catalog";
 import { Effect, Fiber } from "effect";
@@ -87,14 +88,14 @@ const openRouterSpeechChunk = async (
   text: string,
   voice: string,
   signal: AbortSignal,
+  attribution = true,
 ): Promise<Uint8Array> => {
   const response = await fetch(OPENROUTER_SPEECH_URL, {
     method: "POST",
     headers: {
       authorization: `Bearer ${apiKey}`,
       "content-type": "application/json",
-      "HTTP-Referer": "https://stella.sh",
-      "X-OpenRouter-Title": "Stella",
+      ...(attribution ? { "HTTP-Referer": "https://stella.sh", "X-OpenRouter-Title": "Stella" } : {}),
     },
     body: JSON.stringify({ model: TTS_MODEL, input: text, voice, response_format: "pcm" }),
     signal,
@@ -243,7 +244,12 @@ export const openTtsPcm = async (
   const picked = ttsProvider(env);
   if (!picked) throw new Error("Read-aloud is not configured.");
   args.signal.throwIfAborted();
-  const request = picked.provider === "openrouter" ? openRouterSpeechChunk : falSpeechChunk;
+  const attribution = !ownerModeEnabled(env);
+  const request =
+    picked.provider === "openrouter"
+      ? (key: string, text: string, voice: string, signal: AbortSignal) =>
+          openRouterSpeechChunk(key, text, voice, signal, attribution)
+      : falSpeechChunk;
   const synthesize = (text: string) =>
     Effect.tryPromise({
       try: (interrupted) => request(picked.apiKey, text, args.voice, AbortSignal.any([args.signal, interrupted])),

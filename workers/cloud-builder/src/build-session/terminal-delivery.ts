@@ -112,21 +112,6 @@ export const deliverTerminal = async (
 ): Promise<boolean> => {
   let pending = pendingInput;
   const owns = await host.ownsExactTurn(turn);
-  // The second callback is *thread*-scoped, and the only thing that fences
-  // it on the receiving side is the thread not being "running" — which a successor
-  // continuation has just undone. So a stale payload replayed here (the
-  // orphan in acceptAgentTurn) would complete the thread out from under the
-  // turn now running on it: the user is told the agent stopped, and the
-  // live turn's own report is later dropped as a duplicate. Read the
-  // successor once, before either callback, so a mid-delivery takeover
-  // cannot flip the decision halfway through.
-  const successor = owns
-    ? undefined
-    : await host.ctx.storage.get<TurnRequest>("turn");
-  const supersededThread =
-    successor !== undefined &&
-    !exactTurnIdentityMatches(successor, turn) &&
-    successor.threadId === turn.threadId;
   if (
     (turn.kind === "agent" &&
       (!Number.isSafeInteger(turn.attemptGeneration) ||
@@ -175,43 +160,35 @@ export const deliverTerminal = async (
     if (turn.agentRole === "orchestrator") {
       await deliverOrchestratorCliTerminal(host, turn, pending);
     } else if (turn.kind === "agent" && turn.threadId) {
-      if (supersededThread) {
-        log("info", "terminal_thread_completion_skipped", {
-          turnId: turn.turnId,
+      const finalText =
+        typeof pending.payload.finalText === "string"
+          ? pending.payload.finalText
+          : "";
+      const completedAt = pending.completedAt ?? Date.now();
+      const resultJson =
+        pending.kind === "completed"
+          ? JSON.stringify({ finalText })
+          : undefined;
+      const errorMessage =
+        pending.kind === "completed"
+          ? undefined
+          : (pending.threadError ?? "The agent stopped.");
+      await host.deliverOwnerEventsDurable([
+        {
+          ...host.ownerEventBase(
+            turn,
+            `${turn.threadId}:${turn.turnId}:${turn.attemptGeneration ?? 1}`,
+          ),
+          kind: "thread.completed",
           threadId: turn.threadId,
-          kind: pending.kind,
-        });
-      } else {
-        const finalText =
-          typeof pending.payload.finalText === "string"
-            ? pending.payload.finalText
-            : "";
-        const completedAt = pending.completedAt ?? Date.now();
-        const resultJson =
-          pending.kind === "completed"
-            ? JSON.stringify({ finalText })
-            : undefined;
-        const errorMessage =
-          pending.kind === "completed"
-            ? undefined
-            : (pending.threadError ?? "The agent stopped.");
-        await host.deliverOwnerEventsDurable([
-          {
-            ...host.ownerEventBase(
-              turn,
-              `${turn.threadId}:${turn.turnId}:${turn.attemptGeneration ?? 1}`,
-            ),
-            kind: "thread.completed",
-            threadId: turn.threadId,
-            turnId: turn.turnId,
-            attemptGeneration: turn.attemptGeneration ?? 1,
-            status: agentAttemptOutcomeOf({ status: pending.kind }),
-            ...(resultJson ? { resultJson } : {}),
-            ...(errorMessage ? { errorMessage } : {}),
-            completedAt,
-          } satisfies ThreadCompletedEvent,
-        ]);
-      }
+          turnId: turn.turnId,
+          attemptGeneration: turn.attemptGeneration ?? 1,
+          status: agentAttemptOutcomeOf({ status: pending.kind }),
+          ...(resultJson ? { resultJson } : {}),
+          ...(errorMessage ? { errorMessage } : {}),
+          completedAt,
+        } satisfies ThreadCompletedEvent,
+      ]);
     }
     if (owns) {
       await host.ctx.storage.transaction(async (txn) => {

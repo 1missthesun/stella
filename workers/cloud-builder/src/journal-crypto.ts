@@ -28,6 +28,9 @@ import { ownerKekFor, type OwnerKeks } from "./secret-rotation.js";
 const PREFIX = "enc1.";
 const WRAPPED_V2_PREFIX = "kek2.";
 const AAD = Buffer.from("stella-journal-v1", "utf8");
+/** First byte of `sealBytes` output; a plain (unsealed) blob starts with 0x00. */
+export const SEALED_BYTES_V1 = 0x01;
+export const PLAIN_BYTES_V1 = 0x00;
 
 const bytesToBase64 = (bytes: Uint8Array): string => {
   let binary = "";
@@ -135,6 +138,35 @@ export class JournalCrypto {
   decryptText(stored: string): string {
     if (!isEncryptedJournalValue(stored)) return stored;
     return new TextDecoder().decode(decryptWith(this.dek, stored));
+  }
+
+  /**
+   * Binary envelope for bytes kept as BLOBs or R2 objects:
+   * `0x01 | iv(12) | tag(16) | ciphertext`, AES-256-GCM under the same DEK
+   * and AAD as the text form, without its base64 overhead.
+   */
+  sealBytes(plain: Uint8Array): Uint8Array {
+    const iv = randomBytes(12);
+    const cipher = createCipheriv("aes-256-gcm", this.dek, iv);
+    cipher.setAAD(AAD);
+    const ciphertext = Buffer.concat([cipher.update(plain), cipher.final()]);
+    const tag = cipher.getAuthTag();
+    return new Uint8Array(
+      Buffer.concat([Buffer.from([SEALED_BYTES_V1]), iv, tag, ciphertext]),
+    );
+  }
+
+  openBytes(sealed: Uint8Array): Uint8Array {
+    if (sealed[0] !== SEALED_BYTES_V1 || sealed.byteLength < 29) {
+      throw new Error("Unreadable sealed journal bytes.");
+    }
+    const bytes = Buffer.from(sealed.buffer, sealed.byteOffset, sealed.byteLength);
+    const decipher = createDecipheriv("aes-256-gcm", this.dek, bytes.subarray(1, 13));
+    decipher.setAAD(AAD);
+    decipher.setAuthTag(bytes.subarray(13, 29));
+    return new Uint8Array(
+      Buffer.concat([decipher.update(bytes.subarray(29)), decipher.final()]),
+    );
   }
 
   /** One searchable word as its keyed, stemmed index token. */

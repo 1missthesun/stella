@@ -163,11 +163,24 @@ export function OnboardingChat({ isAuthenticated, onComplete }: OnboardingChatPr
       scroller.scrollTo({ top: scroller.scrollHeight, behavior });
     };
     if (first) {
-      // Cards above settle their heights over the first frames (fonts,
-      // measured films), so land now and again once they have.
       land("auto");
-      const settle = window.setTimeout(() => land("auto"), 300);
-      return () => window.clearTimeout(settle);
+      const content = contentRef.current;
+      if (!content) return;
+      const observer = new ResizeObserver(() => land("auto"));
+      observer.observe(content);
+      const release = () => observer.disconnect();
+      const options = { once: true, passive: true } as const;
+      scroller.addEventListener("wheel", release, options);
+      scroller.addEventListener("touchstart", release, options);
+      scroller.addEventListener("pointerdown", release, options);
+      scroller.addEventListener("keydown", release, options);
+      return () => {
+        release();
+        scroller.removeEventListener("wheel", release);
+        scroller.removeEventListener("touchstart", release);
+        scroller.removeEventListener("pointerdown", release);
+        scroller.removeEventListener("keydown", release);
+      };
     }
     const frame = window.requestAnimationFrame(() => land("smooth"));
     return () => window.cancelAnimationFrame(frame);

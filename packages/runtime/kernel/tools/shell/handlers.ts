@@ -627,26 +627,3 @@ export const handleShellStatus = async (
 
   return { result };
 };
-
-export const handleKillShell = async (
-  state: ShellState,
-  args: Record<string, unknown>,
-  context?: ToolContext,
-): Promise<ToolResult> => {
-  const shellId = String(args.shell_id ?? "");
-  const record = state.shells.get(shellId);
-  if (!record || !shellOwnerMatchesContext(record.owner, context)) {
-    return { error: `Shell not found: ${shellId}` };
-  }
-  if (!record.running) {
-    return {
-      result: `Shell ${shellId} already completed.\nExit: ${record.exitCode ?? "?"}`,
-    };
-  }
-  record.kill();
-  return {
-    result: `Killed shell ${shellId}.\n\nOutput:\n${truncate(
-      sanitizeToolVisibleText(record.output),
-    )}`,
-  };
-};

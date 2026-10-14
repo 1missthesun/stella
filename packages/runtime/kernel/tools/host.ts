@@ -32,11 +32,7 @@ import {
   type ShellSessionAccess,
   type ShellState,
 } from "./shell.js";
-import {
-  createShellToolHandlers,
-  mergeToolHandlers,
-  registerExtensionToolHandlers,
-} from "./registry.js";
+import { registerExtensionToolHandlers } from "./registry.js";
 import { buildBuiltinTools } from "./defs/index.js";
 import { AGENT_CONTROL_TOOL_NAMES } from "./defs/agent-orchestration-def.js";
 import type { ToolDefinition as BuiltinToolDefinition } from "./types.js";
@@ -429,12 +425,7 @@ export const createToolHost = ({
       });
   }
 
-  // Legacy companion handlers (no schema in the catalog; reachable only by
-  // direct executeTool calls from non-model code paths). These predate the
-  // def-driven surface and stay until their callers are folded in.
-  const handlers: Record<string, ToolHandler> = mergeToolHandlers(
-    createShellToolHandlers(shellState),
-  );
+  const handlers: Record<string, ToolHandler> = {};
 
   const builtinTools: BuiltinToolDefinition[] = buildBuiltinTools({
     stellaAppDir,

@@ -1,6 +1,5 @@
 export {
   handleExecCommand,
-  handleKillShell,
   handleShellStatus,
   handleWriteStdin,
 } from "./shell/handlers.js";

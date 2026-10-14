@@ -218,7 +218,19 @@ const meteredResponse = (args: {
       await reader.cancel(reason);
     },
   });
-  return new Response(body, {
+  // A plain ReadableStream has no length, so the container would get the
+  // response close-delimited with no Content-Length, which apt reads as an
+  // empty file ("Clearsigned file isn't valid, got 'NOSPLIT'"). Keep the
+  // upstream's length when the body is passed through unencoded.
+  const encoding = args.response.headers.get("content-encoding");
+  const length = boundedContentLength(args.response);
+  const sized =
+    length !== null &&
+    typeof FixedLengthStream === "function" &&
+    (!encoding || encoding.toLowerCase() === "identity")
+      ? body.pipeThrough(new FixedLengthStream(length))
+      : body;
+  return new Response(sized, {
     status: args.response.status,
     statusText: args.response.statusText,
     headers: args.response.headers,

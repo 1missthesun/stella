@@ -121,6 +121,8 @@ const CONTAINERS_CA = "/etc/cloudflare/certs/cloudflare-containers-ca.crt";
 const SYSTEM_BUNDLE = "/etc/ssl/certs/ca-certificates.crt";
 const TOOL_UID = 42424;
 const SETUP_DIR = "/opt/stella-env";
+/** Outside SETUP_DIR, which each run replaces. */
+const SETUP_LOCK = "/opt/stella-env.lock";
 const SETUP_TIMEOUT_S = 600;
 const SETUP_LOG_CHARS = 16_000;
 const POLICY_CACHE_MS = 5_000;
@@ -722,15 +724,11 @@ export const prepareSlackEnvironment = async (
   if (!script) return { env: agentEnv };
 
   const key = (await sha256Hex(`${repoId}\0${script}\0${environment.envVars}\0${environment.network}`)).slice(0, 16);
-  const marker = `${SETUP_DIR}/done-${key}`;
-  const carried = `${SETUP_DIR}/carried-${key}`;
-  const already = await session.exec(
-    `[ -f ${marker} ] && [ "$(cat ${marker})" = "$(cat /proc/sys/kernel/random/boot_id)" ] && cat ${carried}`,
-    { origin: "internal", timeout: 30_000 } as Parameters<ExecutionSession["exec"]>[1],
-  );
-  if (already.success) {
-    return { env: { ...agentEnv, ...decodeEnvDump(already.stdout) } };
-  }
+  // One run per container start. Agents that start together (one thread
+  // starting two at once) wait on the lock for the first one's run and take
+  // its result, so the script runs, is recorded and is reported once.
+  const ran = `${SETUP_DIR}/ran-${key}`;
+  const savedEnv = `${SETUP_DIR}/env-${key}`;
 
   const scriptEnv: Record<string, string> = {
     PATH: BASE_PATH,
@@ -750,7 +748,20 @@ cd ${shellQuote(cwd)} 2>/dev/null || cd ${shellQuote(WORLD_ROOT)}
   const envArgs = Object.entries(scriptEnv)
     .map(([name, value]) => `${name}=${shellQuote(value)}`)
     .join(" ");
+  const report = [
+    `tail -c ${SETUP_LOG_CHARS} ${SETUP_DIR}/log`,
+    `printf '\\n__STELLA_SETUP_EXIT__%s' "$code"`,
+    "exit 0",
+  ];
   const command = [
+    `exec 9>${SETUP_LOCK} && chmod 0600 ${SETUP_LOCK}`,
+    `flock -w ${SETUP_TIMEOUT_S + 30} 9 || { printf "__STELLA_SETUP_CACHED__Another agent's setup run didn't finish.\\n__STELLA_SETUP_EXIT__"; exit 0; }`,
+    "boot=$(cat /proc/sys/kernel/random/boot_id)",
+    `if [ -f ${ran} ] && [ "$(sed -n 1p ${ran})" = "$boot" ]; then`,
+    `  code=$(sed -n 2p ${ran})`,
+    "  printf '__STELLA_SETUP_CACHED__'",
+    ...report.map((line) => `  ${line}`),
+    "fi",
     "set -e",
     `rm -rf ${SETUP_DIR} && mkdir -p ${out}`,
     `chmod 0755 ${SETUP_DIR} && chown ${TOOL_UID}:${TOOL_UID} ${out} && chmod 0700 ${out}`,
@@ -759,49 +770,56 @@ cd ${shellQuote(cwd)} 2>/dev/null || cd ${shellQuote(WORLD_ROOT)}
     "set +e",
     `env -i ${envArgs} timeout -k 10 ${SETUP_TIMEOUT_S}s /usr/bin/setpriv --reuid=${TOOL_UID} --regid=${TOOL_UID} --clear-groups --no-new-privs --bounding-set=-all --inh-caps=-all --ambient-caps=-all -- /bin/bash ${SETUP_DIR}/run.sh > ${SETUP_DIR}/log 2>&1 < /dev/null`,
     "code=$?",
-    `tail -c ${SETUP_LOG_CHARS} ${SETUP_DIR}/log`,
-    `printf '\\n__STELLA_SETUP_EXIT__%s' "$code"`,
-    `exit 0`,
+    // A root-owned copy of what the script exported, for agents that start later.
+    `if [ "$code" = 0 ]; then install -m 0600 ${out}/env ${savedEnv} 2>/dev/null || : > ${savedEnv}; fi`,
+    `printf '%s\\n%s\\n' "$boot" "$code" > ${ran}`,
+    ...report,
   ].join("\n");
   const started = Date.now();
   const result = await session.exec(command, {
     origin: "internal",
-    timeout: (SETUP_TIMEOUT_S + 60) * 1000,
+    timeout: (2 * SETUP_TIMEOUT_S + 90) * 1000,
   } as Parameters<ExecutionSession["exec"]>[1]);
   const ms = Date.now() - started;
-  const exitMatch = /__STELLA_SETUP_EXIT__(\d+)$/u.exec(result.stdout);
-  const exitCode = exitMatch ? Number(exitMatch[1]) : null;
-  const output = (exitMatch ? result.stdout.slice(0, exitMatch.index) : `${result.stdout}${result.stderr}`)
+  const cached = result.stdout.startsWith("__STELLA_SETUP_CACHED__");
+  const stdout = cached ? result.stdout.slice("__STELLA_SETUP_CACHED__".length) : result.stdout;
+  const exitMatch = /__STELLA_SETUP_EXIT__(\d*)$/u.exec(stdout);
+  const exitCode = exitMatch?.[1] ? Number(exitMatch[1]) : null;
+  const output = (exitMatch ? stdout.slice(0, exitMatch.index) : `${stdout}${result.stderr}`)
     .replace(/\n$/u, "")
     .slice(-SETUP_LOG_CHARS);
   const succeeded = exitCode === 0;
   const timedOut = exitCode === 124 || exitCode === 137;
-  await recordSetup(env, thread.team_id, repoId, {
-    status: succeeded ? "succeeded" : "failed",
-    exitCode,
-    at: started,
-    ms,
-    log: timedOut ? `${output}\n\n(Stopped after ${SETUP_TIMEOUT_S / 60} minutes.)` : output,
-  }).catch(() => undefined);
-  log(succeeded ? "slack_setup_succeeded" : "slack_setup_failed", { team: thread.team_id, repo: repoId, exitCode, ms });
+  if (!cached) {
+    await recordSetup(env, thread.team_id, repoId, {
+      status: succeeded ? "succeeded" : "failed",
+      exitCode,
+      at: started,
+      ms,
+      log: timedOut ? `${output}\n\n(Stopped after ${SETUP_TIMEOUT_S / 60} minutes.)` : output,
+    }).catch(() => undefined);
+    log(succeeded ? "slack_setup_succeeded" : "slack_setup_failed", { team: thread.team_id, repo: repoId, exitCode, ms });
+  }
   if (!succeeded) {
     const reason = timedOut
       ? `didn't finish within ${SETUP_TIMEOUT_S / 60} minutes`
       : exitCode === null
         ? "couldn't run"
         : `failed (exit ${exitCode})`;
-    const lastLine = output.trim().split("\n").pop()?.slice(0, 200) ?? "";
-    await noteInThread(
-      env,
-      thread,
-      `:warning: The setup script for the *${environment.name}* environment ${reason}${lastLine ? `: \`${lastLine.replace(/`/gu, "'")}\`` : ""}. Continuing without it. The full log is on stella.sh/crew.`,
-    ).catch(() => undefined);
+    if (!cached) {
+      const lastLine = output.trim().split("\n").pop()?.slice(0, 200) ?? "";
+      await noteInThread(
+        env,
+        thread,
+        `:warning: The setup script for the *${environment.name}* environment ${reason}${lastLine ? `: \`${lastLine.replace(/`/gu, "'")}\`` : ""}. Continuing without it. The full log is on stella.sh/crew.`,
+      ).catch(() => undefined);
+    }
     return {
       env: agentEnv,
       notice: `The environment's setup script ${reason}, so tools it installs may be missing. The end of its log:\n${output.slice(-1500)}`,
     };
   }
-  const after = await session.exec(`cat ${out}/env`, { origin: "internal", timeout: 30_000 } as Parameters<
+  const after = await session.exec(`cat ${savedEnv}`, { origin: "internal", timeout: 30_000 } as Parameters<
     ExecutionSession["exec"]
   >[1]);
   const exported = after.success ? decodeEnvDump(after.stdout) : {};
@@ -813,17 +831,5 @@ cd ${shellQuote(cwd)} 2>/dev/null || cd ${shellQuote(WORLD_ROOT)}
       changed[name] = value;
     }
   }
-  const dump = Object.entries(changed)
-    .map(([name, value]) => `${name}=${value}`)
-    .join("\0");
-  await session
-    .exec(
-      [
-        writeFile(carried, dump, "0600"),
-        `cat /proc/sys/kernel/random/boot_id > ${marker}`,
-      ].join(" && "),
-      { origin: "internal", timeout: 30_000 } as Parameters<ExecutionSession["exec"]>[1],
-    )
-    .catch(() => undefined);
   return { env: { ...agentEnv, ...changed } };
 };

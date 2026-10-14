@@ -6,7 +6,8 @@ import b from "./skin-blocks.module.css";
 
 const BLOCK = 8;
 const COLS = 34;
-const ROWS = 18;
+const ROWS = 22;
+const LIFT = 4;
 
 type Kind =
   | "grass"
@@ -87,8 +88,9 @@ function paintBlock(ctx: CanvasRenderingContext2D, kind: Kind, bx: number, by: n
   }
 }
 
-const SURFACE = [11, 11, 12, 13, 13, 13, 13, 13, 12, 11, 11, 10, 10, 10, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 10, 10, 9, 9, 10, 10, 11, 11, 12];
-const SEA = 12;
+const SURFACE = [11, 11, 12, 13, 13, 13, 13, 13, 12, 11, 11, 10, 10, 10, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 12, 13, 14, 14, 13, 11, 10, 11, 11, 12].map((v) => v + LIFT);
+const SEA = 12 + LIFT;
+const LAKE = { from: 24, to: 28, level: 11 + LIFT };
 
 function world() {
   const cells: (Kind | null)[][] = Array.from({ length: ROWS }, () => Array<Kind | null>(COLS).fill(null));
@@ -102,6 +104,10 @@ function world() {
       cells[y][x] = k;
     }
     if (top > SEA) for (let y = SEA; y < top; y += 1) cells[y][x] = "water";
+    if (x >= LAKE.from && x <= LAKE.to) {
+      for (let y = LAKE.level; y < top; y += 1) cells[y][x] = "water";
+      cells[top][x] = "sand";
+    }
   }
   const tree = (x: number) => {
     const top = SURFACE[x];
@@ -122,7 +128,7 @@ function world() {
 
 function cabin(): [number, number, Kind][] {
   const out: [number, number, Kind][] = [];
-  const ground = 11;
+  const ground = 11 + LIFT;
   const left = 17;
   const right = 23;
   for (let y = ground - 1; y >= ground - 4; y -= 1) {
@@ -145,6 +151,20 @@ function cabin(): [number, number, Kind][] {
 const WORLD = world();
 const CABIN = cabin();
 const BUILD_MS = 1500;
+const CHIMNEY = { x: 22 * BLOCK + 4, y: (1 + LIFT) * BLOCK };
+
+function paintSmoke(ctx: CanvasRenderingContext2D, seconds: number) {
+  for (let i = 0; i < 7; i += 1) {
+    const age = ((seconds + i * 0.55) % 3.85) / 3.85;
+    const size = Math.round(3 + age * 5);
+    const x = Math.round(CHIMNEY.x + Math.sin(age * 5 + i) * 2 + age * 9 - size / 2);
+    const y = Math.round(CHIMNEY.y - 2 - age * 38);
+    ctx.globalAlpha = Math.min(1, (1 - age) * 1.4) * 0.85;
+    ctx.fillStyle = i % 2 ? "#e8e8e8" : "#cfcfcf";
+    ctx.fillRect(x, y, size, size);
+  }
+  ctx.globalAlpha = 1;
+}
 
 const ICONS: { p: string; m: string[] }[] = [
   { p: "a#fff7d1,b#e0c36a,c#6b5130", m: ["........", ".bbbbbb.", ".baaaab.", ".abaaba.", ".aabbaa.", ".aaaaaa.", ".bbbbbb.", "........"] },
@@ -212,35 +232,47 @@ export function BlocksSkin() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const built = useRef(-1);
 
+  const baseRef = useRef<HTMLCanvasElement | null>(null);
+
   const draw = (count: number) => {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
-    if (!canvas || !ctx || built.current === count) return;
-    built.current = count;
+    if (!canvas || !ctx) return;
     const W = COLS * BLOCK;
     const H = ROWS * BLOCK;
-    const bands = ["#6c9bff", "#74a2ff", "#7ca9ff", "#85b0ff", "#8db7ff", "#97beff", "#a1c6ff", "#abcdff", "#b5d3ff", "#bed9ff", "#c6deff", "#cee3ff"];
-    for (let i = 0; i < bands.length; i += 1) {
-      ctx.fillStyle = bands[i];
-      ctx.fillRect(0, Math.floor((i * H) / bands.length), W, Math.ceil(H / bands.length) + 1);
+    if (!baseRef.current) {
+      baseRef.current = document.createElement("canvas");
+      baseRef.current.width = W;
+      baseRef.current.height = H;
     }
-    ctx.fillStyle = "#fffbe0";
-    ctx.fillRect(27 * BLOCK, 1 * BLOCK, BLOCK * 2, BLOCK * 2);
-    ctx.fillStyle = "#fff3a8";
-    ctx.fillRect(27 * BLOCK + 3, 1 * BLOCK + 3, BLOCK * 2 - 6, BLOCK * 2 - 6);
-    for (let y = 0; y < ROWS; y += 1)
-      for (let x = 0; x < COLS; x += 1) {
-        const k = WORLD[y][x];
-        if (k) paintBlock(ctx, k, x, y, 3);
+    const base = baseRef.current.getContext("2d");
+    if (!base) return;
+    if (built.current !== count) {
+      built.current = count;
+      const bands = ["#6c9bff", "#74a2ff", "#7ca9ff", "#85b0ff", "#8db7ff", "#97beff", "#a1c6ff", "#abcdff", "#b5d3ff", "#bed9ff", "#c6deff", "#cee3ff"];
+      for (let i = 0; i < bands.length; i += 1) {
+        base.fillStyle = bands[i];
+        base.fillRect(0, Math.floor((i * H) / bands.length), W, Math.ceil(H / bands.length) + 1);
       }
-    for (let i = 0; i < count && i < CABIN.length; i += 1) {
-      const [x, y, k] = CABIN[i];
-      paintBlock(ctx, k, x, y, 5);
+      base.fillStyle = "#fffbe0";
+      base.fillRect(27 * BLOCK, 2 * BLOCK, BLOCK * 2, BLOCK * 2);
+      base.fillStyle = "#fff3a8";
+      base.fillRect(27 * BLOCK + 3, 2 * BLOCK + 3, BLOCK * 2 - 6, BLOCK * 2 - 6);
+      for (let y = 0; y < ROWS; y += 1)
+        for (let x = 0; x < COLS; x += 1) {
+          const k = WORLD[y][x];
+          if (k) paintBlock(base, k, x, y, 3);
+        }
+      for (let i = 0; i < count && i < CABIN.length; i += 1) {
+        const [x, y, k] = CABIN[i];
+        paintBlock(base, k, x, y, 5);
+      }
     }
+    ctx.drawImage(baseRef.current, 0, 0);
   };
 
   useEffect(() => {
-    draw(0);
+    if (built.current < 0) draw(CABIN.length);
   });
 
   useLayerLive(rootRef, (live) => {
@@ -248,7 +280,7 @@ export function BlocksSkin() {
     if (!root) return;
     root.dataset.play = live ? "1" : "0";
     if (!live) {
-      draw(0);
+      draw(CABIN.length);
       return;
     }
     if (prefersReducedMotion()) {
@@ -257,9 +289,14 @@ export function BlocksSkin() {
     }
     const start = performance.now() + 900;
     const tick = (now: number) => {
+      if (root.dataset.play !== "1") return;
       const t = Math.max(0, Math.min(1, (now - start) / BUILD_MS));
       draw(Math.round(t * CABIN.length));
-      if (t < 1 && root.dataset.play === "1") requestAnimationFrame(tick);
+      if (t >= 1) {
+        const ctx = canvasRef.current?.getContext("2d");
+        if (ctx) paintSmoke(ctx, (now - start - BUILD_MS) / 1000);
+      }
+      requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
   });
@@ -270,8 +307,7 @@ export function BlocksSkin() {
       <div className={b.clouds}>
         <i style={{ left: "6%", top: "9%", width: "14%" }} />
         <i style={{ left: "40%", top: "5%", width: "10%" }} />
-        <i style={{ left: "62%", top: "15%", width: "16%" }} />
-        <i style={{ left: "88%", top: "7%", width: "11%" }} />
+        <i style={{ left: "78%", top: "13%", width: "15%" }} />
       </div>
       <div className={b.bar}>
         <span className={b.lights}>

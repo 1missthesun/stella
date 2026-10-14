@@ -25,7 +25,7 @@ const NODES = [
 ];
 
 const TICKER =
-  "[DIR0417]RightGauge=389139452456bg=bg|ROUTE=files.sort;lvl=3|LeftToyBox=48395127454|zone=Downloads;n=214;dst=9|[DIR0418]resv.query=party:4;t=FRI2000;r=1.2km|agent.spawn=TABLE-03|sync.cal=OK|[DIR0419]notify=SAM,PRIYA|STELLA-01 >> ALL SYSTEMS NOMINAL //";
+  "DIRECTIVE 0417 ▸ FILES-02 SORTED 214 INTO 9 ▸ 3.2 GB RECLAIMED   ///   DIRECTIVE 0418 ▸ TABLE-03 DEPLOYED ▸ LUCIA 20:00 FRI CONFIRMED ▸ CAL-04 SYNCED ▸ SAM, PRIYA NOTIFIED   ///   STELLA-01 ▸ ALL SYSTEMS NOMINAL   ///   ";
 
 const BARS = [
   { label: "MAIL", d: "1.3s" },
@@ -121,6 +121,9 @@ export function OpsSkin() {
 
         <section className={o.log}>
           <span className={o.logTag}>COMMS{" // "}STELLA</span>
+          <span className={o.watermark} aria-hidden="true">
+            応答
+          </span>
           <div className={o.thread}>
             <div className={o.directive}>
               <span className={o.tab}>MAYA ▶ DIRECTIVE 0416</span>

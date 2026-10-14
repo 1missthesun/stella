@@ -14,6 +14,7 @@ export function LandingHeader({ getHref = "#get" }: { getHref?: string }) {
     if (!header) return;
     let sections: HTMLElement[] = [];
     let frame = 0;
+    const root = document.querySelector<HTMLElement>("[data-landing-root]");
 
     const collect = () => {
       sections = Array.from(document.querySelectorAll<HTMLElement>("main [data-tone], footer[data-tone]"));
@@ -26,7 +27,7 @@ export function LandingHeader({ getHref = "#get" }: { getHref?: string }) {
       for (const section of sections) {
         const rect = section.getBoundingClientRect();
         if (rect.top <= probe && rect.bottom > probe) {
-          tone = section.dataset.tone || "light";
+          tone = (section.hasAttribute("data-tone-follow") ? root?.dataset.scene : null) || section.dataset.tone || "light";
           break;
         }
       }
@@ -44,6 +45,7 @@ export function LandingHeader({ getHref = "#get" }: { getHref?: string }) {
     for (const section of sections) {
       mo.observe(section, { attributes: true, attributeFilter: ["data-tone"] });
     }
+    if (root) mo.observe(root, { attributes: true, attributeFilter: ["data-scene"] });
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", collect);
     return () => {

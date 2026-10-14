@@ -9,6 +9,7 @@ import { MakesAct } from "./makes-act";
 import { ModelsAct } from "./models-act";
 import { Opening } from "./opening";
 import { ParallelAct } from "./parallel-act";
+import { Showcase } from "./showcase";
 import l from "./landing.module.css";
 
 export function Landing() {
@@ -18,6 +19,7 @@ export function Landing() {
       <LandingHeader />
       <main>
         <Opening />
+        <Showcase />
         <ComputerAct />
         <ParallelAct />
         <DevicesAct />

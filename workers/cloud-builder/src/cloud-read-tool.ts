@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 import type { TSchema } from "@sinclair/typebox";
 import { Effect } from "effect";
 import {
@@ -37,15 +38,6 @@ const MAX_READ_LINES = 5000;
 const IMAGE_READ_CHUNK_BYTES = 4 * 1024 * 1024;
 
 const IMAGE_READ_DEADLINE_MS = 60_000;
-
-const base64FromBytes = (bytes: Uint8Array): string => {
-  let binary = "";
-  const chunk = 0x8000;
-  for (let offset = 0; offset < bytes.length; offset += chunk) {
-    binary += String.fromCharCode(...bytes.subarray(offset, offset + chunk));
-  }
-  return btoa(binary);
-};
 
 export type CloudReadToolOptions = Readonly<{
   images?: ImagesBinding;
@@ -166,7 +158,7 @@ const readImage = async (
       },
       {
         type: "image" as const,
-        data: base64FromBytes(fitted.bytes),
+        data: Buffer.from(fitted.bytes).toString("base64"),
         mimeType: fitted.mimeType,
       },
     ],

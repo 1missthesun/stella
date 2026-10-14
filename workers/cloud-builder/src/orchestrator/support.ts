@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 import { reportStatusOf, type AgentAttemptOutcome } from "@stella/contracts/agent-status";
 import type { DevicesResponse } from "@stella/contracts/turn-plane/placement";
 import { resolveManagedModelDescriptor } from "@stella/model-catalog/gateway-resolution";
@@ -186,16 +187,8 @@ export const log = (
   );
 };
 
-// workerd has no Buffer; chunked so String.fromCharCode never sees an
-// argument list long enough to overflow the stack.
-export const base64FromBytes = (bytes: Uint8Array): string => {
-  let binary = "";
-  const CHUNK = 0x8000;
-  for (let offset = 0; offset < bytes.length; offset += CHUNK) {
-    binary += String.fromCharCode(...bytes.subarray(offset, offset + CHUNK));
-  }
-  return btoa(binary);
-};
+export const base64FromBytes = (bytes: Uint8Array): string =>
+  Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).toString("base64");
 
 /**
  * Degrades an oversize payload in place. Used only on the synchronous

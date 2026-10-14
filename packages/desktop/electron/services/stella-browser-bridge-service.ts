@@ -50,6 +50,12 @@ import {
   resolveStellaBrowserRoot,
 } from "../utils/stella-browser-paths.js";
 import { stopChildProcessTree } from "../process-runtime.js";
+import {
+  forgetOwnedProcess,
+  reapLegacyOrphanedBrowserDaemons,
+  reapOrphanedOwnedProcesses,
+  registerOwnedProcess,
+} from "./owned-process-registry.js";
 import type {
   BrowserExtensionClientsState,
   BrowserExtensionRouting,
@@ -182,6 +188,10 @@ const findOrphanedBundledDaemonPids = async (): Promise<number[]> => {
 };
 
 export const stopOrphanedStellaBrowserDaemons = async () => {
+  await reapOrphanedOwnedProcesses(DAEMON_SHUTDOWN_TIMEOUT_MS).catch(() => undefined);
+  await reapLegacyOrphanedBrowserDaemons(DAEMON_SHUTDOWN_TIMEOUT_MS).catch(
+    () => [],
+  );
   const pids = await findOrphanedBundledDaemonPids();
   if (pids.length === 0) return;
   if (process.platform === "win32") {
@@ -790,7 +800,15 @@ export class StellaBrowserBridgeService {
       }
     });
 
+    registerOwnedProcess({
+      kind: "stella-browser-daemon",
+      pid: daemon.pid,
+      executable: binPath,
+      commandFragments: ["service", "run", "--session", STELLA_BROWSER_BRIDGE_SESSION],
+      ownerAppDir: this.stellaAppDir,
+    });
     daemon.once("exit", (code, signal) => {
+      forgetOwnedProcess(daemon.pid);
       if (this.daemonProcess !== daemon) {
         return;
       }
@@ -896,6 +914,14 @@ export class StellaBrowserBridgeService {
       }
       void this.revokeAgentExtensionDelegate(backend).catch(() => undefined);
     };
+    registerOwnedProcess({
+      kind: "stella-browser-daemon",
+      pid: daemon.pid,
+      executable: binPath,
+      commandFragments: ["service", "run", "--session", bridgeSessionId],
+      ownerAppDir: this.stellaAppDir,
+    });
+    daemon.once("exit", () => forgetOwnedProcess(daemon.pid));
     daemon.once("exit", forgetBackend);
     daemon.once("error", forgetBackend);
 

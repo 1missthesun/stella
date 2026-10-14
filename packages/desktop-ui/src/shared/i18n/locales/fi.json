@@ -2978,15 +2978,14 @@
       "submit": "Send securely",
       "submitting": "Sending…",
       "decline": "Decline",
-      "declineReason": "Reason for declining",
-      "declineReasonPlaceholder": "Reason, optional (e.g. wrong account)",
-      "declineBack": "Back",
-      "declineConfirm": "Decline request",
       "remember": "Muista tällä tietokoneella",
       "rememberRelayed": "Muista kysyneellä tietokoneella",
       "rememberOn": "Tallennettu nimellä ”{label}”. Agentit käyttävät sitä uudelleen kysymättä sinulta; voit poistaa sen milloin tahansa asetuksista.",
       "rememberOff": "Käytetään kerran ja poistetaan sitten.",
-      "replacing": "Kohteen ”{label}” tallennettu arvo ei toiminut. Anna oikea arvo; se korvaa tallennetun."
+      "replacing": "Kohteen ”{label}” tallennettu arvo ei toiminut. Anna oikea arvo; se korvaa tallennetun.",
+      "note": "Lisää huomautus (valinnainen)",
+      "provided": "Annettu",
+      "declined": "Hylätty"
     }
   },
   "schedule": {

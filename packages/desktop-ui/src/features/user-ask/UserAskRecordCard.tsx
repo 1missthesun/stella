@@ -13,15 +13,23 @@ export function UserAskRecordCard({ record }: { record: UserAskRecord }) {
             className="user-ask-record__answer"
             data-kind={answer.kind}
           >
-            {answer.kind === "skipped"
-              ? t("userAsk.question.skipped")
-              : answer.answer}
+            {answer.kind === "provided" || answer.kind === "declined" ? (
+              t(`userAsk.secureInput.${answer.kind}`)
+            ) : answer.kind === "skipped" ? (
+              t("userAsk.question.skipped")
+            ) : (
+              answer.answer
+            )}
             {record.defaulted ? (
               <span className="user-ask-record__tag">
                 {t("userAsk.question.default")}
               </span>
             ) : null}
           </p>
+          {(answer.kind === "provided" || answer.kind === "declined") &&
+          answer.answer ? (
+            <p className="user-ask-record__note">{answer.answer}</p>
+          ) : null}
         </div>
       ))}
     </div>

@@ -2960,15 +2960,14 @@
       "submit": "Send securely",
       "submitting": "Sending…",
       "decline": "Decline",
-      "declineReason": "Reason for declining",
-      "declineReasonPlaceholder": "Reason, optional (e.g. wrong account)",
-      "declineBack": "Back",
-      "declineConfirm": "Decline request",
       "remember": "จำไว้ในคอมพิวเตอร์เครื่องนี้",
       "rememberRelayed": "จำไว้ในคอมพิวเตอร์ที่ขอข้อมูล",
       "rememberOn": "บันทึกเป็น “{label}” แล้ว เอเจนต์จะใช้ซ้ำโดยไม่ถามคุณอีก และคุณลบได้ทุกเมื่อในการตั้งค่า",
       "rememberOff": "ใช้ครั้งเดียวแล้วลบทิ้ง",
-      "replacing": "ค่าที่บันทึกไว้สำหรับ “{label}” ใช้ไม่ได้ ใส่ค่าที่ถูกต้อง แล้วค่านี้จะแทนที่ค่าที่บันทึกไว้"
+      "replacing": "ค่าที่บันทึกไว้สำหรับ “{label}” ใช้ไม่ได้ ใส่ค่าที่ถูกต้อง แล้วค่านี้จะแทนที่ค่าที่บันทึกไว้",
+      "note": "เพิ่มหมายเหตุ (ไม่บังคับ)",
+      "provided": "ให้แล้ว",
+      "declined": "ปฏิเสธแล้ว"
     }
   },
   "schedule": {

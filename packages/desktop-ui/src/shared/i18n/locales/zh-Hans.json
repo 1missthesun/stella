@@ -2960,15 +2960,14 @@
       "submit": "Send securely",
       "submitting": "Sending…",
       "decline": "Decline",
-      "declineReason": "Reason for declining",
-      "declineReasonPlaceholder": "Reason, optional (e.g. wrong account)",
-      "declineBack": "Back",
-      "declineConfirm": "Decline request",
       "remember": "在这台电脑上记住",
       "rememberRelayed": "在提问的那台电脑上记住",
       "rememberOn": "已保存为「{label}」。智能体之后会直接复用，不再问你；你可以随时在设置中删除。",
       "rememberOff": "仅使用一次，然后删除。",
-      "replacing": "为「{label}」保存的值无效。请输入正确的值，它会替换已保存的值。"
+      "replacing": "为「{label}」保存的值无效。请输入正确的值，它会替换已保存的值。",
+      "note": "添加备注（可选）",
+      "provided": "已提供",
+      "declined": "已拒绝"
     }
   },
   "schedule": {

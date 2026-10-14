@@ -2960,15 +2960,14 @@
       "submit": "Send securely",
       "submitting": "Sending…",
       "decline": "Decline",
-      "declineReason": "Reason for declining",
-      "declineReasonPlaceholder": "Reason, optional (e.g. wrong account)",
-      "declineBack": "Back",
-      "declineConfirm": "Decline request",
       "remember": "在這台電腦上記住",
       "rememberRelayed": "在提問的那台電腦上記住",
       "rememberOn": "已儲存為「{label}」。代理程式之後會直接重複使用，不再詢問你；你可以隨時在設定中刪除。",
       "rememberOff": "僅使用一次，然後刪除。",
-      "replacing": "為「{label}」儲存的值無效。請輸入正確的值，它會取代已儲存的值。"
+      "replacing": "為「{label}」儲存的值無效。請輸入正確的值，它會取代已儲存的值。",
+      "note": "新增備註（選填）",
+      "provided": "已提供",
+      "declined": "已拒絕"
     }
   },
   "schedule": {

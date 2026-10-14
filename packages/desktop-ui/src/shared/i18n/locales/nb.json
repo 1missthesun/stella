@@ -2978,15 +2978,14 @@
       "submit": "Send securely",
       "submitting": "Sending…",
       "decline": "Decline",
-      "declineReason": "Reason for declining",
-      "declineReasonPlaceholder": "Reason, optional (e.g. wrong account)",
-      "declineBack": "Back",
-      "declineConfirm": "Decline request",
       "remember": "Husk på denne datamaskinen",
       "rememberRelayed": "Husk på datamaskinen som spurte",
       "rememberOn": "Lagret som «{label}». Agenter bruker den igjen uten å spørre deg på nytt; du kan slette den når som helst i Innstillinger.",
       "rememberOff": "Brukt én gang og deretter slettet.",
-      "replacing": "Den lagrede verdien for «{label}» fungerte ikke. Skriv inn den riktige; den erstatter den lagrede."
+      "replacing": "Den lagrede verdien for «{label}» fungerte ikke. Skriv inn den riktige; den erstatter den lagrede.",
+      "note": "Legg til et notat (valgfritt)",
+      "provided": "Gitt",
+      "declined": "Avslått"
     }
   },
   "schedule": {

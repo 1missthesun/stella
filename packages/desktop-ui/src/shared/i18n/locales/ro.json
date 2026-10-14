@@ -2994,15 +2994,14 @@
       "submit": "Send securely",
       "submitting": "Sending…",
       "decline": "Decline",
-      "declineReason": "Reason for declining",
-      "declineReasonPlaceholder": "Reason, optional (e.g. wrong account)",
-      "declineBack": "Back",
-      "declineConfirm": "Decline request",
       "remember": "Ține minte pe acest computer",
       "rememberRelayed": "Ține minte pe computerul care a cerut",
       "rememberOn": "Salvat ca „{label}”. Agenții îl refolosesc fără să te mai întrebe; îl poți șterge oricând din Setări.",
       "rememberOff": "Folosit o dată, apoi șters.",
-      "replacing": "Valoarea salvată pentru „{label}” nu a funcționat. Introdu-o pe cea corectă; o va înlocui pe cea salvată."
+      "replacing": "Valoarea salvată pentru „{label}” nu a funcționat. Introdu-o pe cea corectă; o va înlocui pe cea salvată.",
+      "note": "Adaugă o notă (opțional)",
+      "provided": "Furnizat",
+      "declined": "Refuzat"
     }
   },
   "schedule": {

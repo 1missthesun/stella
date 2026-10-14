@@ -2978,15 +2978,14 @@
       "submit": "Send securely",
       "submitting": "Sending…",
       "decline": "Decline",
-      "declineReason": "Reason for declining",
-      "declineReasonPlaceholder": "Reason, optional (e.g. wrong account)",
-      "declineBack": "Back",
-      "declineConfirm": "Decline request",
       "remember": "Απομνημόνευση σε αυτόν τον υπολογιστή",
       "rememberRelayed": "Απομνημόνευση στον υπολογιστή που το ζήτησε",
       "rememberOn": "Αποθηκεύτηκε ως «{label}». Οι πράκτορες το ξαναχρησιμοποιούν χωρίς να σας ρωτήσουν ξανά· μπορείτε να το διαγράψετε όποτε θέλετε από τις Ρυθμίσεις.",
       "rememberOff": "Χρησιμοποιείται μία φορά και μετά διαγράφεται.",
-      "replacing": "Η αποθηκευμένη τιμή για «{label}» δεν λειτούργησε. Εισαγάγετε τη σωστή· θα αντικαταστήσει την αποθηκευμένη."
+      "replacing": "Η αποθηκευμένη τιμή για «{label}» δεν λειτούργησε. Εισαγάγετε τη σωστή· θα αντικαταστήσει την αποθηκευμένη.",
+      "note": "Προσθέστε σημείωση (προαιρετικό)",
+      "provided": "Δόθηκε",
+      "declined": "Απορρίφθηκε"
     }
   },
   "schedule": {

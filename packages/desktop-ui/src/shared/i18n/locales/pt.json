@@ -2994,15 +2994,14 @@
       "submit": "Send securely",
       "submitting": "Sending…",
       "decline": "Decline",
-      "declineReason": "Reason for declining",
-      "declineReasonPlaceholder": "Reason, optional (e.g. wrong account)",
-      "declineBack": "Back",
-      "declineConfirm": "Decline request",
       "remember": "Memorizar neste computador",
       "rememberRelayed": "Memorizar no computador que pediu",
       "rememberOn": "Guardado como “{label}”. Os agentes reutilizam-no sem voltar a perguntar; pode apagá-lo a qualquer momento nas Definições.",
       "rememberOff": "Usado uma vez e depois apagado.",
-      "replacing": "O valor guardado para “{label}” não funcionou. Introduza o correto; substitui o que estava guardado."
+      "replacing": "O valor guardado para “{label}” não funcionou. Introduza o correto; substitui o que estava guardado.",
+      "note": "Adicione uma nota (opcional)",
+      "provided": "Fornecido",
+      "declined": "Recusado"
     }
   },
   "schedule": {

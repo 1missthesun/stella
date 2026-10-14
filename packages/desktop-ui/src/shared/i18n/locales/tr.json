@@ -2978,15 +2978,14 @@
       "submit": "Send securely",
       "submitting": "Sending…",
       "decline": "Decline",
-      "declineReason": "Reason for declining",
-      "declineReasonPlaceholder": "Reason, optional (e.g. wrong account)",
-      "declineBack": "Back",
-      "declineConfirm": "Decline request",
       "remember": "Bu bilgisayarda hatırla",
       "rememberRelayed": "Soran bilgisayarda hatırla",
       "rememberOn": "“{label}” olarak kaydedildi. Ajanlar size tekrar sormadan yeniden kullanır; istediğiniz zaman Ayarlar’dan silebilirsiniz.",
       "rememberOff": "Bir kez kullanılır, sonra silinir.",
-      "replacing": "“{label}” için kayıtlı değer çalışmadı. Doğrusunu girin; kayıtlı olanın yerini alır."
+      "replacing": "“{label}” için kayıtlı değer çalışmadı. Doğrusunu girin; kayıtlı olanın yerini alır.",
+      "note": "Not ekle (isteğe bağlı)",
+      "provided": "Verildi",
+      "declined": "Reddedildi"
     }
   },
   "schedule": {

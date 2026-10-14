@@ -3010,15 +3010,14 @@
       "submit": "Send securely",
       "submitting": "Sending…",
       "decline": "Decline",
-      "declineReason": "Reason for declining",
-      "declineReasonPlaceholder": "Reason, optional (e.g. wrong account)",
-      "declineBack": "Back",
-      "declineConfirm": "Decline request",
       "remember": "Запомнить на этом компьютере",
       "rememberRelayed": "Запомнить на компьютере, который спрашивает",
       "rememberOn": "Сохранено как «{label}». Агенты будут использовать это снова, не спрашивая вас; удалить можно в любой момент в настройках.",
       "rememberOff": "Используется один раз, затем удаляется.",
-      "replacing": "Сохранённое значение для «{label}» не подошло. Введите правильное — оно заменит сохранённое."
+      "replacing": "Сохранённое значение для «{label}» не подошло. Введите правильное — оно заменит сохранённое.",
+      "note": "Добавить заметку (необязательно)",
+      "provided": "Предоставлено",
+      "declined": "Отклонено"
     }
   },
   "schedule": {

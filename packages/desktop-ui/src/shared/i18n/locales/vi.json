@@ -2960,15 +2960,14 @@
       "submit": "Send securely",
       "submitting": "Sending…",
       "decline": "Decline",
-      "declineReason": "Reason for declining",
-      "declineReasonPlaceholder": "Reason, optional (e.g. wrong account)",
-      "declineBack": "Back",
-      "declineConfirm": "Decline request",
       "remember": "Ghi nhớ trên máy tính này",
       "rememberRelayed": "Ghi nhớ trên máy tính đã hỏi",
       "rememberOn": "Đã lưu thành “{label}”. Các tác tử sẽ dùng lại mà không hỏi lại bạn; bạn có thể xóa bất cứ lúc nào trong Cài đặt.",
       "rememberOff": "Dùng một lần rồi xóa.",
-      "replacing": "Giá trị đã lưu cho “{label}” không dùng được. Hãy nhập giá trị đúng; nó sẽ thay thế giá trị đã lưu."
+      "replacing": "Giá trị đã lưu cho “{label}” không dùng được. Hãy nhập giá trị đúng; nó sẽ thay thế giá trị đã lưu.",
+      "note": "Thêm ghi chú (không bắt buộc)",
+      "provided": "Đã cung cấp",
+      "declined": "Đã từ chối"
     }
   },
   "schedule": {

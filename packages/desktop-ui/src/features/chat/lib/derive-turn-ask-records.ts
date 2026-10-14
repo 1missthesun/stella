@@ -21,7 +21,13 @@ export const deriveTurnAskRecords = (
           error?: unknown;
         }
       | undefined;
-    if (!payload || payload.toolName !== "ask_user") continue;
+    if (
+      !payload ||
+      (payload.toolName !== "ask_user" &&
+        payload.toolName !== "request_secure_input")
+    ) {
+      continue;
+    }
     if (typeof payload.error === "string" && payload.error) continue;
     if (
       typeof payload.agentType === "string" &&

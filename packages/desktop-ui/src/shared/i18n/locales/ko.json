@@ -2960,15 +2960,14 @@
       "submit": "Send securely",
       "submitting": "Sending…",
       "decline": "Decline",
-      "declineReason": "Reason for declining",
-      "declineReasonPlaceholder": "Reason, optional (e.g. wrong account)",
-      "declineBack": "Back",
-      "declineConfirm": "Decline request",
       "remember": "이 컴퓨터에 기억하기",
       "rememberRelayed": "요청한 컴퓨터에 기억하기",
       "rememberOn": "“{label}”(으)로 저장했어요. 에이전트가 다시 묻지 않고 재사용해요. 설정에서 언제든지 삭제할 수 있어요.",
       "rememberOff": "한 번 사용한 뒤 삭제돼요.",
-      "replacing": "“{label}”에 저장된 값이 작동하지 않았어요. 올바른 값을 입력하면 저장된 값을 대체해요."
+      "replacing": "“{label}”에 저장된 값이 작동하지 않았어요. 올바른 값을 입력하면 저장된 값을 대체해요.",
+      "note": "메모 추가 (선택)",
+      "provided": "제공함",
+      "declined": "거절함"
     }
   },
   "schedule": {

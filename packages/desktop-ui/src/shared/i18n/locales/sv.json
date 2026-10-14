@@ -2978,15 +2978,14 @@
       "submit": "Send securely",
       "submitting": "Sending…",
       "decline": "Decline",
-      "declineReason": "Reason for declining",
-      "declineReasonPlaceholder": "Reason, optional (e.g. wrong account)",
-      "declineBack": "Back",
-      "declineConfirm": "Decline request",
       "remember": "Kom ihåg på den här datorn",
       "rememberRelayed": "Kom ihåg på datorn som frågade",
       "rememberOn": "Sparat som ”{label}”. Agenter återanvänder det utan att fråga dig igen; du kan radera det när som helst i Inställningar.",
       "rememberOff": "Används en gång och raderas sedan.",
-      "replacing": "Det sparade värdet för ”{label}” fungerade inte. Ange det rätta; det ersätter det sparade."
+      "replacing": "Det sparade värdet för ”{label}” fungerade inte. Ange det rätta; det ersätter det sparade.",
+      "note": "Lägg till en anteckning (valfritt)",
+      "provided": "Angivet",
+      "declined": "Avböjt"
     }
   },
   "schedule": {

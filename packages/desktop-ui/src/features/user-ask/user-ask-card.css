@@ -624,7 +624,31 @@
   }
 }
 
-.user-ask__decline {
+/* Optional note under the secure fields, styled like the question card's
+   "Something else" row: quiet until hovered or focused. */
+.user-ask__note {
   display: flex;
-  flex-direction: column;
+  min-height: 36px;
+  margin: -2px 0 0;
+  padding: 0 12px;
+  border-radius: 12px;
+  transition: background-color 120ms ease;
+}
+
+.user-ask__note:hover,
+.user-ask__note:focus-within {
+  background: var(--select-fill);
+}
+
+.user-ask__note .user-ask__other-input {
+  padding: 8px 0;
+  font-size: var(--font-size-base);
+}
+
+.user-ask-record__note {
+  margin: 0;
+  color: var(--text-strong);
+  font-size: var(--font-size-lg);
+  line-height: 1.4;
+  text-wrap: pretty;
 }

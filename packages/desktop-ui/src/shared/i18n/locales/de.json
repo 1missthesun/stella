@@ -2978,15 +2978,14 @@
       "submit": "Send securely",
       "submitting": "Sending…",
       "decline": "Decline",
-      "declineReason": "Reason for declining",
-      "declineReasonPlaceholder": "Reason, optional (e.g. wrong account)",
-      "declineBack": "Back",
-      "declineConfirm": "Decline request",
       "remember": "Auf diesem Computer merken",
       "rememberRelayed": "Auf dem anfragenden Computer merken",
       "rememberOn": "Gespeichert als „{label}“. Agenten verwenden den Wert wieder, ohne dich erneut zu fragen; du kannst ihn jederzeit in den Einstellungen löschen.",
       "rememberOff": "Einmal verwendet, dann gelöscht.",
-      "replacing": "Der gespeicherte Wert für „{label}“ hat nicht funktioniert. Gib den richtigen ein; er ersetzt den gespeicherten."
+      "replacing": "Der gespeicherte Wert für „{label}“ hat nicht funktioniert. Gib den richtigen ein; er ersetzt den gespeicherten.",
+      "note": "Notiz hinzufügen (optional)",
+      "provided": "Angegeben",
+      "declined": "Abgelehnt"
     }
   },
   "schedule": {

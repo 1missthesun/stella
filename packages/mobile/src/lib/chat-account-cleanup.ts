@@ -1,59 +1,21 @@
-import {
-  clearMessageIndex,
-  ensureMessageIndexRebuildIntent,
-  rebuildMessageIndex,
-} from "./chat-message-index";
+import { deleteLegacyChatIndex } from "./legacy-chat-index";
 import {
   beginAccountChatCleanupIntent,
   finalizeAccountChatCleanup,
   markAccountCanonicalChatCleared,
-  markAccountChatIndexCleared,
 } from "./chat-account-cleanup-state";
 import {
   clearAllChatStorage,
   invalidateChatStorageForAccountCleanup,
 } from "./offline-chat-storage";
 
-type ChatAccountCleanupOperations = {
-  beginCleanupIntent: () => Promise<string>;
-  invalidateMountedOwners: () => void;
-  beginIndexRebuild: () => Promise<void>;
-  clearCanonicalStorage: () => Promise<void>;
-  markCanonicalCleared: (token: string) => Promise<void>;
-  rebuildIndex: () => Promise<void>;
-  clearIndex: () => Promise<void>;
-  markIndexCleared: (token: string) => Promise<void>;
-  finalizeCleanup: (token: string) => Promise<boolean>;
-};
-
-const defaultOperations: ChatAccountCleanupOperations = {
-  beginCleanupIntent: beginAccountChatCleanupIntent,
-  invalidateMountedOwners: invalidateChatStorageForAccountCleanup,
-  beginIndexRebuild: ensureMessageIndexRebuildIntent,
-  clearCanonicalStorage: clearAllChatStorage,
-  markCanonicalCleared: markAccountCanonicalChatCleared,
-  rebuildIndex: rebuildMessageIndex,
-  clearIndex: clearMessageIndex,
-  markIndexCleared: markAccountChatIndexCleared,
-  finalizeCleanup: finalizeAccountChatCleanup,
-};
-
-export async function clearAccountChatData(
-  operations: ChatAccountCleanupOperations = defaultOperations,
-): Promise<void> {
-  const token = await operations.beginCleanupIntent();
-  operations.invalidateMountedOwners();
-  try {
-    await operations.beginIndexRebuild();
-    await operations.clearCanonicalStorage();
-    await operations.markCanonicalCleared(token);
-  } catch (error) {
-    await operations.rebuildIndex().catch(() => {});
-    throw error;
-  }
-  await operations.clearIndex();
-  await operations.markIndexCleared(token);
-  if (!(await operations.finalizeCleanup(token))) {
+export async function clearAccountChatData(): Promise<void> {
+  const token = await beginAccountChatCleanupIntent();
+  invalidateChatStorageForAccountCleanup();
+  await deleteLegacyChatIndex();
+  await clearAllChatStorage();
+  await markAccountCanonicalChatCleared(token);
+  if (!(await finalizeAccountChatCleanup(token))) {
     throw new Error("Local chat account cleanup did not finalize");
   }
 }

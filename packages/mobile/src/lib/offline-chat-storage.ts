@@ -11,8 +11,8 @@ import {
   loadAccountChatCleanupIntent,
   loadAccountChatCleanupProgress,
   markAccountCanonicalChatCleared,
-  markAccountChatIndexCleared,
 } from "./chat-account-cleanup-state";
+import { deleteLegacyChatIndex } from "./legacy-chat-index";
 import {
   accountChatMetadataReadsBlocked,
   beginAccountChatMetadataCleanup,
@@ -272,17 +272,11 @@ async function recoverInterruptedAccountCleanup(): Promise<void> {
   if (accountCleanupRecovery) return accountCleanupRecovery;
   accountCleanupRecovery = (async () => {
     const progress = await loadAccountChatCleanupProgress(token);
-    const messageIndex = await import("./chat-message-index");
     if (!progress.canonicalCleared) {
       invalidateChatStorageForAccountCleanup();
-      await messageIndex.ensureMessageIndexRebuildIntent();
+      await deleteLegacyChatIndex();
       await clearAllChatStorage();
       await markAccountCanonicalChatCleared(token);
-    }
-    const latestProgress = await loadAccountChatCleanupProgress(token);
-    if (!latestProgress.indexCleared) {
-      await messageIndex.clearMessageIndex();
-      await markAccountChatIndexCleared(token);
     }
     if (!(await finalizeAccountChatCleanup(token))) {
       if ((await loadAccountChatCleanupIntent()) === token) {
@@ -308,6 +302,7 @@ async function openTranscriptDb(): Promise<SQLiteDatabase | null> {
     TRANSCRIPT_DB_NAME,
   )) as unknown as SQLiteDatabase;
   await db.execAsync(TRANSCRIPT_SCHEMA);
+  void deleteLegacyChatIndex().catch(() => {});
   return db;
 }
 

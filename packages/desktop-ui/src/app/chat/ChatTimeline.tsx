@@ -100,8 +100,7 @@ const isCardRow = (row: EventRowViewModel): boolean =>
       row.sourceDiffPayloads?.length ||
       row.inlineImagePayloads?.length ||
       row.officePreviewRef ||
-      row.backgroundWork ||
-      row.customSlot,
+      row.backgroundWork,
   );
 
 const hasReplyPreview = (row: EventRowViewModel): boolean =>

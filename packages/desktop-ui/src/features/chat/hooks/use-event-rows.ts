@@ -402,8 +402,7 @@ const isImageOnlyInlineRow = (row: AssistantRowViewModel): boolean =>
   !row.sourceDiffPayloads?.length &&
   !row.voiceSession &&
   !row.backgroundWork &&
-  !row.agentCompletion?.sections.length &&
-  !row.customSlot;
+  !row.agentCompletion?.sections.length;
 
 const coalesceInlineImageRows = (
   rows: EventRowViewModel[],
@@ -422,8 +421,7 @@ const coalesceInlineImageRows = (
       !prev.resourcePayload &&
       !prev.sourceDiffPayloads?.length &&
       !prev.backgroundWork &&
-      !prev.agentCompletion?.sections.length &&
-      !prev.customSlot
+      !prev.agentCompletion?.sections.length
     ) {
       out[out.length - 1] = {
         ...prev,
@@ -447,8 +445,7 @@ const isVoiceOnlyRow = (row: AssistantRowViewModel): boolean =>
   !row.inlineImagePayloads?.length &&
   !row.sourceDiffPayloads?.length &&
   !row.backgroundWork &&
-  !row.agentCompletion?.sections.length &&
-  !row.customSlot;
+  !row.agentCompletion?.sections.length;
 
 const coalesceVoiceSessionRows = (
   rows: EventRowViewModel[],

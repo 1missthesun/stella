@@ -313,17 +313,10 @@ const mapArtifactsEqual = (
   if (a === b) return true;
   if (!a || !b) return (a?.length ?? 0) === (b?.length ?? 0);
   if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i += 1) {
-    if (a[i].id !== b[i].id) return false;
-    // Artifacts are immutable once persisted; id + marker count + polyline
-    // identity is enough to detect a different payload on the same slot.
-    if (a[i].map.markers.length !== b[i].map.markers.length) return false;
-    if (
-      (a[i].map.route?.polyline ?? null) !== (b[i].map.route?.polyline ?? null)
-    )
-      return false;
-  }
-  return true;
+  return a.every(
+    (artifact, index) =>
+      artifact.id === b[index].id && artifact.map === b[index].map,
+  );
 };
 
 const appSelectionLabelsEqual = (
@@ -405,12 +398,7 @@ const assistantRowEqual = (
   agentCompletionEqual(a.agentCompletion, b.agentCompletion) &&
   (a.voiceSession?.durationMs ?? null) ===
     (b.voiceSession?.durationMs ?? null) &&
-  (a.reminder?.fireId ?? null) === (b.reminder?.fireId ?? null) &&
-  // Compare a stable key for the custom slot (the ReactNode itself
-  // changes identity on each render of the Store thread). Surfaces
-  // that mount a custom slot must supply a key derived from the
-  // payload, not from the rendered node.
-  (a.customSlotKey ?? null) === (b.customSlotKey ?? null);
+  (a.reminder?.fireId ?? null) === (b.reminder?.fireId ?? null);
 
 export const eventRowEqual = (
   a: EventRowViewModel,

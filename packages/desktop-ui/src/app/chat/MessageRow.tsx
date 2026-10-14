@@ -801,7 +801,6 @@ export const AssistantMessageRow = memo(
               payloads={row.sourceDiffPayloads}
             />
           ) : null}
-          {row.customSlot ? row.customSlot : null}
         </div>
       </div>
     );

@@ -594,14 +594,10 @@ fn write_file_atomic(path: &str, bytes: &[u8]) -> std::io::Result<()> {
         file.sync_all()?;
     }
 
-    if let Err(err) = std::fs::rename(&tmp_path, &target) {
-        // Rename failed (e.g. cross-device): clean up the temp file and fall
-        // back to a direct write so the screenshot still lands.
+    std::fs::rename(&tmp_path, &target).map_err(|err| {
         let _ = std::fs::remove_file(&tmp_path);
-        std::fs::write(&target, bytes).map_err(|_| err)?;
-    }
-
-    Ok(())
+        err
+    })
 }
 
 fn round(value: f64) -> i64 {

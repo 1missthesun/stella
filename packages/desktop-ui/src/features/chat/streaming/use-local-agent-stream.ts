@@ -6,6 +6,7 @@ import {
   resolveStellaProviderErrorToast,
 } from "./stella-provider-error-toast";
 import { abortPiChat, submitPiChat } from "@/features/chat/pi/pi-chat-store";
+import { chatSendContext } from "@stella/contracts/pi-chat";
 import type { ChatContext } from "@/shared/types/electron";
 import type { AttachmentRef } from "./chat-types";
 
@@ -88,17 +89,8 @@ export function useLocalAgentStream({
       }
       const attemptId = ++startAttemptRef.current;
       const startChatAttachments = attachmentsForStartChat(args.attachments);
-      // The composer's attached images/files already travel as
-      // `attachments` — shipping them again inside chatContext doubles a
-      // potentially huge base64 payload across the IPC bridge for fields
-      // the runtime never reads (it only consumes windowScreenshot,
-      // window/AX, selection, and pasted text from chatContext).
       const startChatContext = args.chatContext
-        ? {
-            ...args.chatContext,
-            regionScreenshots: undefined,
-            files: undefined,
-          }
+        ? chatSendContext(args.chatContext)
         : args.chatContext;
       try {
         await Promise.resolve();

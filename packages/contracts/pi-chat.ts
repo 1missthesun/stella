@@ -1,4 +1,5 @@
 import type { AgentStatus } from "./agent-status.js";
+import type { ChatContext } from "./index.js";
 import { parseAgentReportEnvelope, type AgentReportEnvelope } from "./agent-wake-prompt.js";
 import { drivePathFromSignedDriveUrl } from "./attachment-content-type.js";
 import { stellaUsageLimitText } from "./stella-usage-limit.js";
@@ -141,9 +142,17 @@ export type PiRemoteTurn = {
   clientMsgId?: string;
 };
 
+export type ChatSendContext = Omit<ChatContext, "regionScreenshots" | "files">;
+
+export const chatSendContext = ({
+  regionScreenshots: _regionScreenshots,
+  files: _files,
+  ...context
+}: ChatContext): ChatSendContext => context;
+
 export type PiChatSend = {
   selectedText?: string | null;
-  chatContext?: unknown;
+  chatContext?: ChatSendContext | null;
   attachments?: unknown[];
   deviceId?: string;
   platform?: string;

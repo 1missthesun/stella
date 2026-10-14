@@ -1699,7 +1699,7 @@ export class StellaRuntimeHost {
           idempotencyKey: `${request.requestId}:cloud`.slice(0, 128),
           ...(typeof send.selectedText === "string" ? { selectedText: send.selectedText } : {}),
           ...(send.chatContext && typeof send.chatContext === "object"
-            ? { chatContext: send.chatContext as RuntimeChatPayload["chatContext"] }
+            ? { chatContext: send.chatContext }
             : {}),
           ...(Array.isArray(send.attachments) && send.attachments.length
             ? { attachments: send.attachments as RuntimeAttachmentRef[] }
@@ -1758,7 +1758,7 @@ export class StellaRuntimeHost {
               ? { selectedText: send.selectedText }
               : {}),
             ...(send.chatContext && typeof send.chatContext === "object"
-              ? { chatContext: send.chatContext as RuntimeChatPayload["chatContext"] }
+              ? { chatContext: send.chatContext }
               : {}),
             ...(Array.isArray(send.attachments) && send.attachments.length
               ? { attachments: send.attachments as RuntimeAttachmentRef[] }

@@ -383,8 +383,7 @@ headers verbatim, and `Sec-WebSocket-Protocol` carries socket tickets (and, from
 clients that predate tickets, the JWT). Console logs, errors and traces still
 arrive. Every Stella Worker sets `redact_query_string: true`; it is a
 script-level setting, so `PATCH .../workers/scripts/<name>/script-settings`
-changes it without a new version (the `stella-v2-apps-auth-*` Workers have no
-config in this repo and were set that way).
+changes it without a new version.
 
 cloud-builder and canvas-share set `observability.redact_query_string`, so
 stored logs and traces keep paths but never query strings (magic-link

@@ -127,7 +127,7 @@ export const serverDiscovery = async (env: Cloudflare.Env): Promise<ServerDiscov
       canvasShare: origin(read(env, "CANVAS_SHARE_BASE_URL")),
       sites: sitesUrl(env),
       appsHost: origin(read(env, "APPS_HOST_BASE_URL")),
-      appsAuthHost: origin(read(env, "TRUSTED_APPS_HOST_BASE_URL")),
+      appsAuthHost: null,
     },
   };
 };

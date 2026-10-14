@@ -19,6 +19,10 @@ export async function runScheduled(
     ["auth tables", () => sweepAuthTables(env)],
     ["anonymous users", () => sweepAnonymousUsers(env)],
     ["slack previews", () => sweepSlackPreviews(env)],
+    [
+      "device pairings",
+      async () => (await import("./selfhost/pairing.js")).sweepDevicePairings(env as unknown as Cloudflare.Env),
+    ],
   ];
   for (const [name, sweep] of sweeps) {
     try {

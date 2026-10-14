@@ -9,6 +9,7 @@
  */
 
 import { ownerGateStub } from "../rpc-release.js";
+import { ownerModeEnabled } from "../selfhost/owner-mode.js";
 
 const DAY_MS = 24 * 60 * 60_000;
 const ANONYMOUS_STALE_MS = 30 * DAY_MS;
@@ -36,11 +37,14 @@ export const sweepAuthTables = async (env: SweepEnv, now = Date.now()): Promise<
 
 export const sweepAnonymousUsers = async (env: SweepEnv, now = Date.now()): Promise<void> => {
   const nowIso = new Date(now).toISOString();
+  const keepOwner = ownerModeEnabled(env)
+    ? ` AND u."id" NOT IN (SELECT owner_user_id FROM selfhost_server)`
+    : "";
   const { results } = await db(env)
     .prepare(
       `SELECT u."id" AS id FROM "user" u
         WHERE u."isAnonymous" = 1 AND u."updatedAt" < ?
-          AND NOT EXISTS (SELECT 1 FROM "session" s WHERE s."userId" = u."id" AND s."expiresAt" > ?)
+          AND NOT EXISTS (SELECT 1 FROM "session" s WHERE s."userId" = u."id" AND s."expiresAt" > ?)${keepOwner}
         LIMIT ?`,
     )
     .bind(new Date(now - ANONYMOUS_STALE_MS).toISOString(), nowIso, ANONYMOUS_PER_RUN)

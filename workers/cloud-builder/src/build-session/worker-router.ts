@@ -1027,6 +1027,14 @@ app.get("/readyz", (c) => {
   );
 });
 app.get(STELLA_PROMPTS_PATH, (c) => stellaPromptsResponse(c.req.raw));
+app.get("/.well-known/stella", async (c) => {
+  const { discoveryRoute } = await import("../selfhost/discovery.js");
+  return await discoveryRoute(c.env as unknown as Cloudflare.Env);
+});
+app.all("/api/auth/device-pairing/:name", async (c) => {
+  const { handleDevicePairingRoute } = await import("../selfhost/pairing.js");
+  return await handleDevicePairingRoute(c.req.raw, c.env as unknown as Cloudflare.Env);
+});
 // Identity: Better Auth, loaded on first use to keep it off other wakes.
 app.all("/api/auth/:rest{.*}", async (c) => {
   const { handleAuthRoute } = await import("../auth/routes.js");

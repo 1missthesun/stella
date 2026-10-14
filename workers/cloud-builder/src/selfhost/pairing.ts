@@ -1,0 +1,378 @@
+/**
+ * Device pairing on an owner-mode server (`/api/auth/device-pairing/*`).
+ *
+ *   POST start   admin bearer or an owner session/JWT → {pairingId, secret, expiresAt, link}
+ *   GET  status  same auth, ?pairingId= → {status, deviceName, claimedAt}
+ *   POST cancel  same auth, {pairingId}
+ *   POST claim   no auth, {pairingId, secret, deviceName?, platform?} → {sessionToken, userId, server}
+ *
+ * The secret is 256 random bits, kept only as its SHA-256 and compared in
+ * constant time. A pairing lives PAIRING_TTL_MS, allows PAIRING_MAX_ATTEMPTS
+ * wrong secrets, and is claimed at most once (a conditional UPDATE). Claims
+ * are rate limited per IP. A claim mints the owner a normal Better Auth
+ * session, signed like the bearer every sign-in hands out.
+ */
+
+import {
+  PAIRING_MAX_ATTEMPTS,
+  PAIRING_TTL_MS,
+  formatPairingLink,
+  type PairingClaimRequest,
+  type PairingClaimResponse,
+  type PairingStartResponse,
+  type PairingStatusResponse,
+} from "@stella/contracts/self-host";
+import { makeSignature } from "better-auth/crypto";
+import { bearerCredential } from "../../../shared/bearer.js";
+import { adminAccessDenied } from "../admin/access.js";
+import { createAuth, backendUrl } from "../auth/auth.js";
+import { verifyUserToken } from "../auth-jwt.js";
+import { fail, json } from "../http/response.js";
+import { fixedWorkSha256SecretEqual } from "../service-bearer.js";
+import { serverDiscovery } from "./discovery.js";
+import { ownerModeEnabled } from "./owner-mode.js";
+import { readServerIdentity, type ServerIdentity } from "./owner.js";
+
+export const DEVICE_PAIRING_PREFIX = "/api/auth/device-pairing/";
+
+const CLAIM_WINDOW_MS = 10 * 60_000;
+const CLAIMS_PER_IP_PER_WINDOW = 10;
+const STARTS_PER_WINDOW = 30;
+const DEVICE_NAME_MAX = 80;
+const PLATFORMS = new Set(["ios", "android", "macos", "windows", "linux", "web", "cli"]);
+const ID_PATTERN = /^[A-Za-z0-9_-]{8,64}$/u;
+const SECRET_PATTERN = /^[A-Za-z0-9_-]{32,128}$/u;
+
+type PairingRow = {
+  id: string;
+  owner_user_id: string;
+  secret_hash: string;
+  status: string;
+  attempts: number;
+  expires_at: number;
+  device_name: string | null;
+  claimed_at: number | null;
+};
+
+const db = (env: Cloudflare.Env): D1Database => {
+  if (!env.DB) throw new Error("D1 is not bound.");
+  return env.DB;
+};
+
+const base64url = (bytes: Uint8Array): string =>
+  btoa(String.fromCharCode(...bytes)).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/u, "");
+
+const randomToken = (bytes: number): string => base64url(crypto.getRandomValues(new Uint8Array(bytes)));
+
+const sha256Hex = async (value: string): Promise<string> =>
+  Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value))), (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("");
+
+const constantTimeEqual = (left: string, right: string): boolean => {
+  if (left.length !== right.length) return false;
+  let difference = 0;
+  for (let index = 0; index < left.length; index += 1) difference |= left.charCodeAt(index) ^ right.charCodeAt(index);
+  return difference === 0;
+};
+
+const refuse = (status: number, code: string, error: string): Response => fail(status, error, { code });
+
+const clientIp = (request: Request): string =>
+  request.headers.get("cf-connecting-ip")?.trim() || request.headers.get("x-real-ip")?.trim() || "unknown";
+
+const rateKeyForIp = (ip: string): string => {
+  if (!ip.includes(":")) return ip;
+  const [head = "", tail = ""] = ip.toLowerCase().split("::");
+  const left = head ? head.split(":") : [];
+  const right = tail ? tail.split(":") : [];
+  const groups = ip.includes("::") ? [...left, ...Array(8 - left.length - right.length).fill("0"), ...right] : left;
+  return `${groups.slice(0, 4).join(":")}::/64`;
+};
+
+/** Counts one event against `key`; false once the window's limit is reached. */
+const withinRate = async (env: Cloudflare.Env, key: string, limit: number, now: number): Promise<boolean> => {
+  const windowStart = now - (now % CLAIM_WINDOW_MS);
+  const row = await db(env)
+    .prepare(
+      `INSERT INTO device_pairing_rate (key, window_start, count) VALUES (?, ?, 1)
+       ON CONFLICT(key) DO UPDATE SET
+         count = CASE WHEN window_start = excluded.window_start THEN count + 1 ELSE 1 END,
+         window_start = excluded.window_start
+       RETURNING count`,
+    )
+    .bind(key, windowStart)
+    .first<{ count: number }>();
+  return (row?.count ?? 0) <= limit;
+};
+
+type Starter = { kind: "admin" } | { kind: "owner"; sessionId: string };
+
+const authorizeStarter = async (
+  request: Request,
+  env: Cloudflare.Env,
+  identity: ServerIdentity,
+): Promise<Starter | Response> => {
+  const credential = bearerCredential(request.headers.get("authorization")) ?? "";
+  if (!credential) return refuse(401, "unauthenticated", "Sign in to connect a device.");
+  const rawSecret = (env as unknown as Record<string, unknown>).STELLA_ADMIN_API_SECRET;
+  const adminSecret = typeof rawSecret === "string" ? rawSecret.trim() : "";
+  if (adminSecret && (await fixedWorkSha256SecretEqual(credential, adminSecret))) {
+    const denied = await adminAccessDenied(request, env);
+    return denied ?? { kind: "admin" };
+  }
+  if (credential.split(".").length === 3) {
+    const verified = await verifyUserToken(credential, env);
+    if (verified.ok && verified.token.ownerId === identity.ownerUserId) {
+      return { kind: "owner", sessionId: verified.token.sessionId };
+    }
+    if (!verified.ok && verified.retryable) return refuse(503, "unavailable", "Couldn't check your sign-in. Try again.");
+  } else {
+    const session = (await createAuth(env)
+      .api.getSession({ headers: new Headers({ authorization: `Bearer ${credential}` }) })
+      .catch(() => null)) as { user?: { id?: string }; session?: { id?: string } } | null;
+    if (session?.user?.id === identity.ownerUserId && session.session?.id) {
+      return { kind: "owner", sessionId: session.session.id };
+    }
+  }
+  return refuse(403, "forbidden", "Only this server's owner can connect devices.");
+};
+
+const ownerIdentity = async (env: Cloudflare.Env): Promise<ServerIdentity | Response> => {
+  if (!ownerModeEnabled(env)) return refuse(404, "owner_mode_off", "This server doesn't use device pairing.");
+  const identity = await readServerIdentity(env, true);
+  return identity ?? refuse(409, "owner_missing", "This server has no owner yet. Run setup first.");
+};
+
+const start = async (request: Request, env: Cloudflare.Env): Promise<Response> => {
+  const identity = await ownerIdentity(env);
+  if (identity instanceof Response) return identity;
+  const starter = await authorizeStarter(request, env, identity);
+  if (starter instanceof Response) return starter;
+  const now = Date.now();
+  if (!(await withinRate(env, `start:${identity.ownerUserId}`, STARTS_PER_WINDOW, now))) {
+    return refuse(429, "pairing_rate_limited", "Too many pairing codes. Wait a few minutes.");
+  }
+  const pairingId = randomToken(16);
+  const secret = randomToken(32);
+  const expiresAt = now + PAIRING_TTL_MS;
+  await db(env)
+    .prepare(
+      `INSERT INTO device_pairings (id, owner_user_id, secret_hash, status, attempts, created_by, created_at, expires_at)
+       VALUES (?, ?, ?, 'pending', 0, ?, ?, ?)`,
+    )
+    .bind(
+      pairingId,
+      identity.ownerUserId,
+      await sha256Hex(secret),
+      starter.kind === "admin" ? "admin" : `session:${starter.sessionId}`,
+      now,
+      expiresAt,
+    )
+    .run();
+  console.log(JSON.stringify({ event: "device_pairing_started", by: starter.kind }));
+  const body: PairingStartResponse = {
+    pairingId,
+    secret,
+    expiresAt,
+    link: formatPairingLink({ server: backendUrl(env), pairingId, secret }),
+  };
+  return json(body);
+};
+
+const statusOf = (row: PairingRow, now: number): PairingStatusResponse["status"] => {
+  if (row.status === "claimed") return "claimed";
+  if (row.status === "canceled") return "canceled";
+  if (row.expires_at <= now || row.attempts >= PAIRING_MAX_ATTEMPTS) return "expired";
+  return "pending";
+};
+
+const loadPairing = async (env: Cloudflare.Env, pairingId: string, ownerUserId: string): Promise<PairingRow | null> =>
+  await db(env)
+    .prepare("SELECT * FROM device_pairings WHERE id = ? AND owner_user_id = ?")
+    .bind(pairingId, ownerUserId)
+    .first<PairingRow>();
+
+const status = async (request: Request, env: Cloudflare.Env): Promise<Response> => {
+  const identity = await ownerIdentity(env);
+  if (identity instanceof Response) return identity;
+  const starter = await authorizeStarter(request, env, identity);
+  if (starter instanceof Response) return starter;
+  const pairingId = new URL(request.url).searchParams.get("pairingId") ?? "";
+  if (!ID_PATTERN.test(pairingId)) return refuse(400, "bad_request", "Missing pairingId.");
+  const row = await loadPairing(env, pairingId, identity.ownerUserId);
+  if (!row) return refuse(404, "pairing_invalid", "No such pairing.");
+  const body: PairingStatusResponse = {
+    status: statusOf(row, Date.now()),
+    deviceName: row.device_name,
+    claimedAt: row.claimed_at,
+  };
+  return json(body);
+};
+
+const cancel = async (request: Request, env: Cloudflare.Env): Promise<Response> => {
+  const identity = await ownerIdentity(env);
+  if (identity instanceof Response) return identity;
+  const starter = await authorizeStarter(request, env, identity);
+  if (starter instanceof Response) return starter;
+  const body = (await request.json().catch(() => null)) as { pairingId?: unknown } | null;
+  const pairingId = typeof body?.pairingId === "string" ? body.pairingId : "";
+  if (!ID_PATTERN.test(pairingId)) return refuse(400, "bad_request", "Missing pairingId.");
+  const result = await db(env)
+    .prepare("UPDATE device_pairings SET status = 'canceled' WHERE id = ? AND owner_user_id = ? AND status = 'pending'")
+    .bind(pairingId, identity.ownerUserId)
+    .run();
+  return json({ canceled: Boolean(result.meta.changes) });
+};
+
+const signedSessionToken = async (env: Cloudflare.Env, token: string): Promise<string> => {
+  const context = await createAuth(env).$context;
+  return encodeURIComponent(`${token}.${await makeSignature(token, context.secret)}`);
+};
+
+const readClaim = async (request: Request): Promise<PairingClaimRequest | null> => {
+  const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
+  if (!body || typeof body.pairingId !== "string" || typeof body.secret !== "string") return null;
+  if (!ID_PATTERN.test(body.pairingId) || !SECRET_PATTERN.test(body.secret)) return null;
+  const deviceName =
+    typeof body.deviceName === "string"
+      ? body.deviceName.replace(/[\u0000-\u001f\u007f]/gu, "").trim().slice(0, DEVICE_NAME_MAX) || undefined
+      : undefined;
+  const platform =
+    typeof body.platform === "string" && PLATFORMS.has(body.platform)
+      ? (body.platform as PairingClaimRequest["platform"])
+      : undefined;
+  return {
+    pairingId: body.pairingId,
+    secret: body.secret,
+    ...(deviceName ? { deviceName } : {}),
+    ...(platform ? { platform } : {}),
+  };
+};
+
+const claim = async (request: Request, env: Cloudflare.Env): Promise<Response> => {
+  if (!ownerModeEnabled(env)) return refuse(404, "owner_mode_off", "This server doesn't use device pairing.");
+  const now = Date.now();
+  const ipKey = `claim:${await sha256Hex(rateKeyForIp(clientIp(request)))}`;
+  if (!(await withinRate(env, ipKey, CLAIMS_PER_IP_PER_WINDOW, now))) {
+    console.warn(JSON.stringify({ event: "device_pairing_rate_limited" }));
+    return refuse(429, "pairing_rate_limited", "Too many tries. Wait a few minutes and scan a fresh code.");
+  }
+  const input = await readClaim(request);
+  if (!input) return refuse(400, "bad_request", "That pairing code isn't valid.");
+  const attempt = await db(env)
+    .prepare(
+      `UPDATE device_pairings SET attempts = attempts + 1
+       WHERE id = ? AND status = 'pending' AND expires_at > ? AND attempts < ?
+       RETURNING secret_hash, owner_user_id, attempts`,
+    )
+    .bind(input.pairingId, now, PAIRING_MAX_ATTEMPTS)
+    .first<{ secret_hash: string; owner_user_id: string; attempts: number }>();
+  const providedHash = await sha256Hex(input.secret);
+  if (!attempt) {
+    const row = await db(env).prepare("SELECT * FROM device_pairings WHERE id = ?").bind(input.pairingId).first<PairingRow>();
+    if (!row) return refuse(404, "pairing_invalid", "That pairing code isn't valid.");
+    const state = statusOf(row, now);
+    if (state === "claimed") return refuse(410, "pairing_claimed", "This pairing code was already used.");
+    if (state === "canceled") return refuse(410, "pairing_canceled", "This pairing code was canceled.");
+    if (row.attempts >= PAIRING_MAX_ATTEMPTS) {
+      return refuse(403, "pairing_too_many_attempts", "Too many wrong tries. Make a new pairing code.");
+    }
+    return refuse(410, "pairing_expired", "This pairing code expired. Make a new one.");
+  }
+  if (!constantTimeEqual(providedHash, attempt.secret_hash)) {
+    console.warn(JSON.stringify({ event: "device_pairing_wrong_secret", attempts: attempt.attempts }));
+    return attempt.attempts >= PAIRING_MAX_ATTEMPTS
+      ? refuse(403, "pairing_too_many_attempts", "Too many wrong tries. Make a new pairing code.")
+      : refuse(401, "pairing_invalid", "That pairing code isn't valid.");
+  }
+  const claimed = await db(env)
+    .prepare(
+      `UPDATE device_pairings SET status = 'claimed', claimed_at = ?, device_name = ?, platform = ?
+       WHERE id = ? AND status = 'pending' AND secret_hash = ? RETURNING owner_user_id`,
+    )
+    .bind(now, input.deviceName ?? null, input.platform ?? null, input.pairingId, attempt.secret_hash)
+    .first<{ owner_user_id: string }>();
+  if (!claimed) return refuse(410, "pairing_claimed", "This pairing code was already used.");
+  try {
+    const context = await createAuth(env).$context;
+    const session = (await context.internalAdapter.createSession(claimed.owner_user_id, false, {
+      ipAddress: clientIp(request),
+      userAgent: [input.deviceName, input.platform, request.headers.get("user-agent")]
+        .filter(Boolean)
+        .join(" · ")
+        .slice(0, 400),
+    })) as { id: string; token: string } | null;
+    if (!session?.token) throw new Error("No session was created.");
+    await db(env)
+      .prepare("UPDATE device_pairings SET session_id = ? WHERE id = ?")
+      .bind(session.id, input.pairingId)
+      .run();
+    console.log(JSON.stringify({ event: "device_pairing_claimed", platform: input.platform ?? null }));
+    const body: PairingClaimResponse = {
+      sessionToken: await signedSessionToken(env, session.token),
+      userId: claimed.owner_user_id,
+      server: await serverDiscovery(env),
+    };
+    return json(body);
+  } catch (error) {
+    await db(env)
+      .prepare("UPDATE device_pairings SET status = 'pending', claimed_at = NULL WHERE id = ? AND session_id IS NULL")
+      .bind(input.pairingId)
+      .run();
+    console.error(
+      JSON.stringify({
+        event: "device_pairing_claim_failed",
+        message: error instanceof Error ? error.message : String(error),
+      }),
+    );
+    return refuse(503, "pairing_unavailable", "Couldn't finish connecting. Try again.");
+  }
+};
+
+export const sweepDevicePairings = async (env: Cloudflare.Env, now = Date.now()): Promise<void> => {
+  if (!ownerModeEnabled(env)) return;
+  await db(env).batch([
+    db(env).prepare("DELETE FROM device_pairings WHERE expires_at < ?").bind(now - 24 * 60 * 60_000),
+    db(env).prepare("DELETE FROM device_pairing_rate WHERE window_start < ?").bind(now - CLAIM_WINDOW_MS),
+  ]);
+};
+
+const ROUTES: Record<string, { method: string; run: (request: Request, env: Cloudflare.Env) => Promise<Response> }> = {
+  start: { method: "POST", run: start },
+  status: { method: "GET", run: status },
+  cancel: { method: "POST", run: cancel },
+  claim: { method: "POST", run: claim },
+};
+
+const CORS = {
+  "access-control-allow-origin": "*",
+  "access-control-allow-methods": "GET, POST, OPTIONS",
+  "access-control-allow-headers": "authorization, content-type",
+  "access-control-max-age": "600",
+};
+
+export const handleDevicePairingRoute = async (request: Request, env: Cloudflare.Env): Promise<Response> => {
+  const name = new URL(request.url).pathname.slice(DEVICE_PAIRING_PREFIX.length);
+  if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
+  const route = ROUTES[name];
+  let response: Response;
+  if (!route) response = refuse(404, "not_found", "Not found.");
+  else if (request.method !== route.method) response = refuse(405, "method_not_allowed", "Method not allowed.");
+  else {
+    try {
+      response = await route.run(request, env);
+    } catch (error) {
+      console.error(
+        JSON.stringify({
+          event: "device_pairing_failed",
+          route: name,
+          message: error instanceof Error ? error.message : String(error),
+        }),
+      );
+      response = refuse(503, "pairing_unavailable", "Pairing is unavailable right now. Try again.");
+    }
+  }
+  for (const [key, value] of Object.entries(CORS)) response.headers.set(key, value);
+  return response;
+};

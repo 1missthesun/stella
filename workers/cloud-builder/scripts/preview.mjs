@@ -45,6 +45,9 @@ const wrangler = (wranglerArgs, { input, capture = false, allowFailure = false }
   return result;
 };
 
+const extraVars = () =>
+  args.flatMap((arg, index) => (arg === "--var" && args[index + 1]?.includes(":") ? [args[index + 1]] : []));
+
 const branchName = () => {
   const result = spawnSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd: workerRoot, encoding: "utf8" });
   const branch = result.status === 0 ? result.stdout.trim() : "";
@@ -129,6 +132,7 @@ const up = () => {
         `${branchName() || name} @ ${spawnSync("git", ["rev-parse", "--short", "HEAD"], { cwd: workerRoot, encoding: "utf8" }).stdout.trim()}`,
         "--var",
         `CLOUD_BUILDER_PUBLIC_URL:${url}`,
+        ...extraVars().flatMap((entry) => ["--var", entry]),
         "--json",
       ],
       { capture: true },

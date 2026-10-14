@@ -166,7 +166,9 @@ const OPEN_BILLING_CONFIG: BillingConfig = {
 
 const loadBillingConfig = (env: Cloudflare.Env): BillingConfig => {
   const read = reader(env);
-  if (BILLING_SWITCHES.every((name) => read(name) === undefined)) return OPEN_BILLING_CONFIG;
+  if (read("STELLA_OWNER_MODE") === "1" || BILLING_SWITCHES.every((name) => read(name) === undefined)) {
+    return OPEN_BILLING_CONFIG;
+  }
   const utilizationRate = required(read, "STELLA_INCLUDED_USAGE_UTILIZATION_RATE");
   if (utilizationRate <= 0 || utilizationRate > 1) {
     throw new BillingConfigError("STELLA_INCLUDED_USAGE_UTILIZATION_RATE must be in (0, 1].");

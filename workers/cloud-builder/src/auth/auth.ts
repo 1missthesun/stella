@@ -43,6 +43,7 @@ import { integrityErrorMessage, integrityPurposeForPath, verifyAuthRequestProof 
 import { oauthStateBinding } from "./oauth-binding.js";
 import { ottCookieHeader } from "./ott-cookie.js";
 import { ownerGateStub } from "../rpc-release.js";
+import { ownerModeRefusesAuthPath } from "../selfhost/owner-mode.js";
 import { betterAuthCipherKey, betterAuthKeys } from "../secret-rotation.js";
 
 type AuthEnv = Cloudflare.Env;
@@ -340,6 +341,44 @@ const revokedTokenFloor = (env: AuthEnv): BetterAuthPlugin => ({
   },
 });
 
+/**
+ * Revoking one session (a lost device, from the Sessions list) also refuses
+ * the JWTs it already minted and ends its push registrations.
+ */
+const revokedSessionTeardown = (env: AuthEnv): BetterAuthPlugin => ({
+  id: "stella-revoked-session-teardown",
+  hooks: {
+    before: [
+      {
+        matcher: (ctx) => ctx.path === "/revoke-session",
+        handler: createAuthMiddleware(async (ctx) => {
+          const caller = await endingSession(ctx as never);
+          const token = typeof (ctx.body as { token?: unknown } | undefined)?.token === "string"
+            ? (ctx.body as { token: string }).token
+            : "";
+          if (!caller || !token) return;
+          const target = (await ctx.context.internalAdapter.findSession(token).catch(() => null)) as
+            | { session?: { id?: unknown; userId?: unknown } }
+            | null;
+          const sessionId = typeof target?.session?.id === "string" ? target.session.id : "";
+          if (!sessionId || target?.session?.userId !== caller.userId) return;
+          await ownerInternalCall(env, caller.userId, "account.sessionRevoked", { sessionId });
+          await ownerInternalCall(env, caller.userId, "devices.pushSessionEnded", { sessionId }).catch(
+            (error: unknown) => {
+              console.error(
+                JSON.stringify({
+                  event: "auth_revoke_session_push_teardown_failed",
+                  message: error instanceof Error ? error.message : String(error),
+                }),
+              );
+            },
+          );
+        }),
+      },
+    ],
+  },
+});
+
 const pushSignOutTeardown = (env: AuthEnv): BetterAuthPlugin => ({
   id: "stella-push-sign-out-teardown",
   hooks: {
@@ -352,6 +391,9 @@ const pushSignOutTeardown = (env: AuthEnv): BetterAuthPlugin => ({
             console.warn(JSON.stringify({ event: "auth_push_teardown_skipped", reason: "no_session" }));
             return;
           }
+          await ownerInternalCall(env, ending.userId, "account.sessionRevoked", {
+            sessionId: ending.sessionId,
+          }).catch(() => undefined);
           await ownerInternalCall(env, ending.userId, "devices.pushSessionEnded", {
             sessionId: ending.sessionId,
           }).catch((error: unknown) => {
@@ -478,6 +520,12 @@ const buildOptions = (env: AuthEnv) => {
     },
     hooks: {
       before: createAuthMiddleware(async (ctx) => {
+        if (ownerModeRefusesAuthPath(env, ctx.path)) {
+          throw new APIError("FORBIDDEN", {
+            code: "owner_mode",
+            message: "This Stella server connects devices by pairing. Ask its owner for a pairing code.",
+          });
+        }
         if (ctx.path === "/magic-link/verify") {
           await upgradeAnonymousOnMagicLink(env, ctx as never);
           return;
@@ -530,7 +578,7 @@ const buildOptions = (env: AuthEnv) => {
               if (!adapter) return;
               const user = await adapter.findUserById(session.userId).catch(() => null);
               const email = typeof user?.email === "string" ? user.email : "";
-              if (!email || user?.isAnonymous || email.endsWith("@anon.stella.local")) return;
+              if (!email || user?.isAnonymous || email.endsWith(".stella.local")) return;
               if (testAccountsEnabled(env) && email.endsWith(TEST_ACCOUNT_EMAIL_SUFFIX)) return;
               const sessions = await adapter.listSessions(session.userId).catch(() => []);
               const prior = sessions.filter((candidate) => candidate.id !== session.id);
@@ -561,6 +609,7 @@ const buildOptions = (env: AuthEnv) => {
       oauthStateBinding(),
       bearer({ requireSignature: true }),
       revokedTokenFloor(env),
+      revokedSessionTeardown(env),
       pushSignOutTeardown(env),
       oneTimeToken({ storeToken: "hashed", expiresIn: 3, disableClientRequest: true, setOttHeaderOnNewSession: true }),
       nativeOttRedirect(),

@@ -38,6 +38,7 @@ import {
   type OwnerEnforcementStatus,
 } from "@stella/contracts/gateway/usage";
 import type { OwnerSnapshot } from "@stella/contracts/turn-plane/owner-snapshot";
+import { ownerModeEnabled } from "../../selfhost/owner-mode.js";
 import { dollarsToMicroCents } from "@stella/model-catalog/pricing";
 import { billingConfig } from "../../billing/plans.js";
 import { log } from "../../build-session/shared/keys.js";
@@ -348,7 +349,7 @@ export const recordRiskSignals = (ctx: OwnerContext, delta: RiskDelta, identityL
     ctx.jobs.schedule(ABUSE_RISK_JOB, ctx.now, null, { id: ABUSE_RISK_JOB });
   }
   const status = score >= 80 ? "throttled" : score >= 60 ? "challenged" : null;
-  if (!status || identityLevel >= 3) return;
+  if (!status || identityLevel >= 3 || ownerModeEnabled(ctx.env)) return;
   const current = readEnforcement(ctx).enforcement.status;
   if (current === "suspended" || current === "throttled" || (current === "challenged" && status === "challenged")) {
     return;
@@ -635,6 +636,12 @@ export const admitSession = async (
     : input.paying
       ? 3
       : (Math.min(2, Math.max(1, snapshot.identityLevel)) as IdentityLevel);
+  if (ownerModeEnabled(ctx.env) && !isAnonymous) {
+    return {
+      ok: true,
+      body: { ownerGeneration: snapshot.ownerGeneration, isAnonymous, identityLevel: 3 },
+    };
+  }
   if (isAnonymous && inClass(GATEWAY_NETWORK_POLICY.anonymousRefused, input.networkClass)) {
     return refuse("sign_in_required", 403);
   }

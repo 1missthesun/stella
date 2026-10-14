@@ -40,6 +40,18 @@ const ACCOUNT_MIGRATION = {
   ],
 };
 
+const ACCOUNT_REVOKED_SESSIONS_MIGRATION = {
+  id: "account.2-revoked-sessions",
+  statements: [
+    `CREATE TABLE revoked_sessions (
+       session_id TEXT PRIMARY KEY,
+       until_ms INTEGER NOT NULL
+     )`,
+  ],
+};
+
+const REVOKED_SESSION_HOLD_MS = 20 * 60_000;
+
 export type OwnerState = {
   generation: string;
   writable: boolean;
@@ -105,10 +117,21 @@ export const noteCallerIdentity = (
 };
 
 /** True when the caller's token predates the owner's last sign-out-everywhere. */
-export const callerSessionRevoked = (db: OwnerDb, caller: Pick<OwnerCaller, "issuedAtMs">): boolean => {
+export const callerSessionRevoked = (
+  db: OwnerDb,
+  caller: Pick<OwnerCaller, "issuedAtMs"> & { sessionId?: string },
+): boolean => {
   const { minIatMs } = readOwnerState(db);
   // JWT `iat` has second precision.
-  return minIatMs > 0 && (caller.issuedAtMs ?? 0) < Math.floor(minIatMs / 1000) * 1000;
+  if (minIatMs > 0 && (caller.issuedAtMs ?? 0) < Math.floor(minIatMs / 1000) * 1000) return true;
+  if (!caller.sessionId) return false;
+  return (
+    db.one<{ until_ms: number }>(
+      "SELECT until_ms FROM revoked_sessions WHERE session_id = ? AND until_ms > ?",
+      caller.sessionId,
+      Date.now(),
+    ) !== null
+  );
 };
 
 /**
@@ -182,7 +205,7 @@ const parseSessionsRevoked = (args: unknown): { minIatMs: number } => {
 
 export const accountDomain: OwnerDomain = {
   name: "account",
-  migrations: [ACCOUNT_MIGRATION],
+  migrations: [ACCOUNT_MIGRATION, ACCOUNT_REVOKED_SESSIONS_MIGRATION],
   calls: {
     "account.reset": {
       scope: "owner",
@@ -197,6 +220,20 @@ export const accountDomain: OwnerDomain = {
       const { minIatMs } = parseSessionsRevoked(args);
       readOwnerState(ctx.db);
       ctx.db.run("UPDATE owner_state SET min_iat_ms = MAX(min_iat_ms, ?) WHERE id = 1", minIatMs);
+      return null;
+    },
+    /** Better Auth's revoke-session: refuse that session's tokens until they have all expired. */
+    "account.sessionRevoked": (ctx, args) => {
+      const sessionId = (args as { sessionId?: unknown } | null)?.sessionId;
+      if (typeof sessionId !== "string" || !sessionId || sessionId.length > 256) {
+        throw new RpcError("BAD_REQUEST", "sessionId is required.");
+      }
+      ctx.db.run("DELETE FROM revoked_sessions WHERE until_ms <= ?", ctx.now);
+      ctx.db.run(
+        "INSERT OR REPLACE INTO revoked_sessions (session_id, until_ms) VALUES (?, ?)",
+        sessionId,
+        ctx.now + REVOKED_SESSION_HOLD_MS,
+      );
       return null;
     },
   },

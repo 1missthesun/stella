@@ -11,6 +11,7 @@
  *   POST /api/admin/test-accounts/session       {email?, plan?, usageMode?, allowance?: "spent"} → a signed-in test user (dev only)
  *   POST /api/admin/test-accounts/conversation-restart  {conversationId} → restart that conversation's object (dev only)
  *   POST /api/admin/test-accounts/email-digest-probe  {ownerId, messages, simulate?} → one digest check on given mail (dev only)
+ *   POST /api/admin/selfhost/owner              {name?} → the owner-mode server's owner, created once
  *   GET  /api/admin/secret-rotation/status      D1 rows still under BETTER_AUTH_SECRET (jwks, Slack)
  *   POST /api/admin/secret-rotation/reencrypt   re-encrypt them under BETTER_AUTH_SECRET_V2
  *
@@ -407,6 +408,11 @@ const ROUTES: Record<string, { method: "GET" | "POST"; run: (request: Request, u
   "/api/admin/billing/plan": { method: "POST", run: (request, _url, env) => billingPlan(request, env) },
   "/api/admin/delete": { method: "POST", run: (request, _url, env) => remove(request, env) },
   "/api/admin/test-accounts/session": { method: "POST", run: (request, _url, env) => testAccountSession(request, env) },
+  "/api/admin/selfhost/owner": {
+    method: "POST",
+    run: async (request, _url, env) =>
+      (await import("../selfhost/owner.js")).bootstrapOwnerRoute(request, env as unknown as Cloudflare.Env),
+  },
   "/api/admin/test-accounts/conversation-restart": {
     method: "POST",
     run: (request, _url, env) => conversationRestart(request, env),

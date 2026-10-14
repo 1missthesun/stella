@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { build } from "esbuild";
+import { execFileSync } from "node:child_process";
 import { builtinModules } from "node:module";
 import {
   copyFile,
@@ -24,6 +25,34 @@ export const workerBuildDirectory = path.join(
   ".wrangler",
   "worker-build",
 );
+
+const git = (...args) => {
+  try {
+    return execFileSync("git", args, { cwd: workerRoot, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+  } catch {
+    return "";
+  }
+};
+
+export const serverRelease = () => {
+  const commit = git("rev-parse", "HEAD") || null;
+  if (!commit) return { version: null, releasedAt: null, commit: null };
+  const dirty = git("status", "--porcelain", "--untracked-files=no", "--", "../..") !== "";
+  const releasedAt = git("show", "-s", "--format=%cI", "HEAD") || null;
+  const tag = dirty
+    ? ""
+    : git("tag", "--points-at", "HEAD", "--list", "server-*")
+        .split("\n")
+        .filter(Boolean)
+        .sort()
+        .at(-1) ?? "";
+  const day = releasedAt ? new Date(releasedAt).toISOString().slice(0, 10).replaceAll("-", ".") : "unknown";
+  return {
+    version: tag || `dev-${day}-${commit.slice(0, 9)}${dirty ? "-dirty" : ""}`,
+    releasedAt: releasedAt ? new Date(releasedAt).toISOString() : null,
+    commit,
+  };
+};
 
 /** Keep real import() boundaries; Wrangler's normal bundle flattens them. */
 export const buildWorker = async ({ outdir = workerBuildDirectory } = {}) => {
@@ -57,6 +86,7 @@ export const buildWorker = async ({ outdir = workerBuildDirectory } = {}) => {
     external: ["cloudflare:*", "node:*", ...builtinModules],
     define: {
       "process.env.NODE_ENV": '"production"',
+      __STELLA_RELEASE__: JSON.stringify(serverRelease()),
       __STELLA_SANDBOX_CODE__: JSON.stringify({
         sha256: sandboxCode.sha256,
         bytes: sandboxCode.bytes,

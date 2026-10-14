@@ -22,7 +22,7 @@ import {
 } from "./hashline.js";
 import { isBlockedPath } from "./command-safety.js";
 import { sanitizeToolVisibleText } from "./safety.js";
-import { withFileWriteLock, writeFileWithNulGuard } from "./file-write-lock.js";
+import { replaceFileText, withFileWriteLock } from "./file-write-lock.js";
 import {
   imageMimeTypeFromPath,
   resolveImageMimeType,
@@ -93,7 +93,8 @@ export const resolveFilePath = (
 const writeToolFile = async (
   filePath: string,
   content: string,
-  context?: ToolContext,
+  context: ToolContext | undefined,
+  expected: string | null,
 ): Promise<void> => {
   const scopedRoot = context?.toolWorkspaceRoot?.trim();
   if (scopedRoot) {
@@ -105,8 +106,7 @@ const writeToolFile = async (
     );
     return;
   }
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
-  await writeFileWithNulGuard(filePath, content);
+  await replaceFileText(filePath, content, { expected });
 };
 
 export const writeTextFile = async (
@@ -121,26 +121,24 @@ export const writeTextFile = async (
   }
 
   return withFileWriteLock(filePath, async () => {
-    let existed = false;
-    let originalEnding: "\r\n" | "\n" = "\n";
-
+    let previous: string | null = null;
     try {
-      const rawContent = await fs.readFile(filePath, "utf-8");
-      existed = true;
-      const { text } = stripBom(rawContent);
-      originalEnding = detectLineEnding(text);
+      previous = await fs.readFile(filePath, "utf-8");
     } catch {
-      existed = false;
+      previous = null;
     }
 
-    const normalizedContent = normalizeToLF(content);
-    const finalContent = existed
-      ? restoreLineEndings(normalizedContent, originalEnding)
-      : content;
+    const finalContent =
+      previous === null
+        ? content
+        : restoreLineEndings(
+            normalizeToLF(content),
+            detectLineEnding(stripBom(previous).text),
+          );
 
-    await writeToolFile(filePath, finalContent, context);
+    await writeToolFile(filePath, finalContent, context, previous);
 
-    return { path: filePath, created: !existed };
+    return { path: filePath, created: previous === null };
   });
 };
 
@@ -182,7 +180,7 @@ export const replaceTextInFile = async (
     }
 
     const final = bom + restoreLineEndings(applied.content, originalEnding);
-    await writeToolFile(filePath, final, context);
+    await writeToolFile(filePath, final, context, rawContent);
 
     return { path: filePath, replacements: applied.replacements };
   });
@@ -236,7 +234,7 @@ export const applyAnchoredEditToFile = async (
     }
 
     const final = bom + restoreLineEndings(applied.content, originalEnding);
-    await writeToolFile(filePath, final, context);
+    await writeToolFile(filePath, final, context, rawContent);
     return { path: filePath, ...applied };
   });
 };
@@ -264,7 +262,7 @@ export const applyEditsToFile = async (
     const originalEnding = detectLineEnding(text);
     const applied = applyEditsToContent(normalizeToLF(text), specs);
     const final = bom + restoreLineEndings(applied.content, originalEnding);
-    await writeToolFile(filePath, final, context);
+    await writeToolFile(filePath, final, context, rawContent);
     return { path: filePath, edits: specs.length, lines: applied.lines };
   });
 };

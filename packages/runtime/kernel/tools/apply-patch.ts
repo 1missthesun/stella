@@ -5,9 +5,9 @@ import { isBlockedPath } from "./command-safety.js";
 import type { ToolContext, ToolResult } from "./types.js";
 import { expandHomePath, toolContextHome } from "./utils.js";
 import {
+  replaceFileText,
   withFileWriteLock,
   withFileWriteLocks,
-  writeFileWithNulGuard,
 } from "./file-write-lock.js";
 import {
   readWorkspaceFileNoFollow,
@@ -555,9 +555,10 @@ const readPatchText = async (
 const writePatchText = async (
   filePath: string,
   content: string,
-  context?: ToolContext,
-  exclusive = false,
+  context: ToolContext | undefined,
+  options: { exclusive?: boolean; expected?: string } = {},
 ): Promise<void> => {
+  const exclusive = options.exclusive ?? false;
   const workspaceRoot = scopedWorkspaceRoot(context);
   if (workspaceRoot) {
     await writeWorkspaceFileNoFollow(filePath, workspaceRoot, content, {
@@ -568,10 +569,7 @@ const writePatchText = async (
     });
     return;
   }
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
-  await writeFileWithNulGuard(filePath, content, {
-    ...(exclusive ? { flag: "wx" } : {}),
-  });
+  await replaceFileText(filePath, content, options);
 };
 
 const deletePatchFile = async (
@@ -642,7 +640,7 @@ const applyUpdate = async (
         }
       }
     } else {
-      await writePatchText(op.path, newContent, context);
+      await writePatchText(op.path, newContent, context, { expected: original });
     }
 
     return {
@@ -662,7 +660,7 @@ const applyAdd = async (
   if (block) throw new Error(block);
   return withFileWriteLock(op.path, async () => {
     const content = op.lines.join("\n") + (op.lines.length > 0 ? "\n" : "");
-    await writePatchText(op.path, content, context, true);
+    await writePatchText(op.path, content, context, { exclusive: true });
     return { kind: "add" as const, path: op.path };
   });
 };

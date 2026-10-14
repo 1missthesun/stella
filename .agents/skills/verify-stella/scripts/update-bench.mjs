@@ -36,6 +36,17 @@ const bun = process.env.STELLA_BUN_PATH?.trim() || "bun";
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const git = (cwd, gitArgs, input) =>
   execFileSync("git", gitArgs, { cwd, encoding: "utf8", input, maxBuffer: 64 * 1024 * 1024 }).trim();
+const USAGE = `update-bench: how long Update takes until Stella is back and usable, on an isolated sandbox clone.
+
+  setup                     clone this checkout's HEAD into the sandbox and install
+  sync [--ref r]            move the sandbox to this checkout's HEAD or r (reinstalls on a lock change)
+  launch [--mode m]         start the sandbox's Stella (m: production | development renderer)
+  run --variation v [--iterations n] [--label l]
+                            v: renderer | main | runtime | deps | stale | undo
+  report [--label l]        medians per label and variation
+  stop                      stop the sandbox's Stella
+
+Results append to ~/.stella/outputs/update-bench/results.jsonl.`;
 const log = (message) => process.stderr.write(`[update-bench] ${message}\n`);
 
 const install = () => {
@@ -706,7 +717,7 @@ try {
   else if (command === "report") report();
   else if (command === "stop") await stop();
   else {
-    console.log(readFileSync(fileURLToPath(import.meta.url), "utf8").split("*/")[0]);
+    console.log(USAGE);
     process.exit(command ? 1 : 0);
   }
   socket?.close();

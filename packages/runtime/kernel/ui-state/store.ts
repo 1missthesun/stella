@@ -1,26 +1,8 @@
 /**
- * Shared UI state store — owns `~/.stella/ui-state.json`, the renderer's
- * durable key/value state (formerly per-origin localStorage).
- *
- * Two hosts run an instance of this store against the same file at once: the
- * Electron main process and the Vite dev server (for plain-browser tabs).
- * Convergence model:
- *   - Writes are per-key read-merge-write: a flush re-reads the file and
- *     applies only this host's pending deltas on top, so concurrent hosts
- *     converge last-write-wins per key instead of clobbering whole maps.
- *   - Each host watches the file and emits external diffs to its renderers.
- *     Self-writes never emit: after a flush the file equals memory, so the
- *     watcher's diff is empty (content-based suppression, no timing games).
- *
- * Effect-native internals (M5): the debounce timers are Effect fibers
- * (`Effect.sleep` + fork) instead of `setTimeout`, and the fs watchers are
- * scope-managed resources (`Effect.acquireRelease` into a per-store Scope)
- * released by `dispose()`. The public `UiStateStore` API is unchanged —
- * synchronous plain TS, no Effect types — backed by one module-level
- * `ManagedRuntime` (host/lifecycle.ts / supervised-scope.ts pattern).
- * The debounce fibers are forked detached (not into the store Scope) so the
- * synchronous `flushSync`/`dispose` contract can interrupt them without an
- * async scope-close handshake; `dispose()` interrupts them explicitly.
+ * Owns `~/.stella/ui-state.json`, the renderer's durable key/value state.
+ * Electron main and the dev server's plain-browser host each run one against
+ * the same file: a flush re-reads it and applies only this host's pending
+ * changes, which stay queued until a write succeeds.
  */
 
 import fs from "fs";
@@ -42,6 +24,7 @@ import {
 } from "@stella/contracts/ui-state";
 
 const FLUSH_DEBOUNCE_MS = 150;
+const FLUSH_RETRY_MAX_MS = 30_000;
 const WATCH_DEBOUNCE_MS = 50;
 const PRIVATE_FILE_MODE = 0o600;
 
@@ -99,6 +82,7 @@ const makeCore = Effect.fn("UiStateStore.make")(function* (
   const pending = new Map<string, string | null>();
   const listeners = new Set<(changes: UiStateChanges) => void>();
   let pendingClear = false;
+  let failedFlushes = 0;
   let disposed = false;
   let flushFiber: Fiber.Fiber<void> | null = null;
   let watchFiber: Fiber.Fiber<void> | null = null;
@@ -174,13 +158,7 @@ const makeCore = Effect.fn("UiStateStore.make")(function* (
     });
 
   const flushEffect = Effect.fn("UiStateStore.flush")(function* () {
-    // Read-merge-write: start from the file's current state (another host
-    // may have flushed since our last read) unless this flush carries a
-    // clear, then layer only our pending deltas on top.
     const next = yield* Effect.sync(mergePendingOntoDisk);
-    pending.clear();
-    pendingClear = false;
-
     const wrote = yield* writeAtomic(next).pipe(
       Effect.map(() => true),
       Effect.catch((error) =>
@@ -193,18 +171,26 @@ const makeCore = Effect.fn("UiStateStore.make")(function* (
         }),
       ),
     );
-    if (!wrote) return;
-
-    // The merge may have pulled in another host's keys; sync memory to the
-    // written state and surface those external diffs to our renderers.
+    if (!wrote) {
+      failedFlushes += 1;
+      scheduleFlush();
+      return;
+    }
+    failedFlushes = 0;
+    pending.clear();
+    pendingClear = false;
     yield* Effect.sync(() => reconcileMemory(next));
   });
 
   const scheduleFlush = () => {
     if (flushFiber || disposed) return;
+    const delay = Math.min(
+      FLUSH_RETRY_MAX_MS,
+      FLUSH_DEBOUNCE_MS * 2 ** Math.min(failedFlushes, 10),
+    );
     flushFiber = uiStateRuntime.runFork(
       Effect.gen(function* () {
-        yield* Effect.sleep(FLUSH_DEBOUNCE_MS);
+        yield* Effect.sleep(delay);
         flushFiber = null;
         yield* flushEffect();
       }),

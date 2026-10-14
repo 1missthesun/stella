@@ -3,8 +3,11 @@ use std::io::{BufRead, BufReader};
 use std::net::TcpListener;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+
+use tokio::sync::Notify;
 
 use super::discovery::discover_cdp_url_with_timeout;
 
@@ -13,6 +16,7 @@ const LIGHTPANDA_POLL_INTERVAL: Duration = Duration::from_millis(100);
 const LIGHTPANDA_DISCOVERY_TIMEOUT: Duration = Duration::from_millis(500);
 const LIGHTPANDA_SESSION_TIMEOUT_SECS: u64 = 604800;
 const MAX_LOG_LINES: usize = 40;
+const LIGHTPANDA_LOG_EOF_TIMEOUT: Duration = Duration::from_millis(500);
 
 pub struct LightpandaProcess {
     child: Child,
@@ -63,9 +67,29 @@ fn build_lightpanda_serve_args(port: u16, proxy: Option<&str>) -> Vec<String> {
 struct LaunchLogBuffer {
     stdout: Arc<Mutex<VecDeque<String>>>,
     stderr: Arc<Mutex<VecDeque<String>>>,
+    streams_at_eof: Arc<AtomicUsize>,
+    eof_notify: Arc<Notify>,
 }
 
 impl LaunchLogBuffer {
+    fn mark_stream_eof(&self) {
+        self.streams_at_eof.fetch_add(1, Ordering::SeqCst);
+        self.eof_notify.notify_waiters();
+    }
+
+    async fn wait_for_eof(&self, timeout: Duration) -> bool {
+        let all_closed = async {
+            loop {
+                let notified = self.eof_notify.notified();
+                if self.streams_at_eof.load(Ordering::SeqCst) >= 2 {
+                    return;
+                }
+                notified.await;
+            }
+        };
+        tokio::time::timeout(timeout, all_closed).await.is_ok()
+    }
+
     fn push_stdout(&self, line: String) {
         push_bounded(&self.stdout, line);
     }
@@ -210,10 +234,14 @@ fn start_log_drainers(
     let stdout_logs = logs.clone();
     let stderr_logs = logs.clone();
 
-    let stdout_handle =
-        std::thread::spawn(move || drain_reader(stdout, move |line| stdout_logs.push_stdout(line)));
-    let stderr_handle =
-        std::thread::spawn(move || drain_reader(stderr, move |line| stderr_logs.push_stderr(line)));
+    let stdout_handle = std::thread::spawn(move || {
+        drain_reader(stdout, |line| stdout_logs.push_stdout(line));
+        stdout_logs.mark_stream_eof();
+    });
+    let stderr_handle = std::thread::spawn(move || {
+        drain_reader(stderr, |line| stderr_logs.push_stderr(line));
+        stderr_logs.mark_stream_eof();
+    });
 
     Ok((logs, vec![stdout_handle, stderr_handle]))
 }
@@ -242,15 +270,16 @@ async fn wait_for_lightpanda_ready(
 
     loop {
         if let Ok(Some(status)) = child.try_wait() {
-            // Give the drainer threads a brief window to flush the last log lines
-            // before we snapshot them.  This is best-effort: lines written just
-            // before exit may still be missing, but the most useful output (early
-            // startup errors) will already be in the buffer.
-            tokio::time::sleep(Duration::from_millis(25)).await;
+            let logs_complete = logs.wait_for_eof(LIGHTPANDA_LOG_EOF_TIMEOUT).await;
             return Err(lightpanda_launch_error(
                 &format!(
-                    "Lightpanda exited before CDP became ready (status: {})",
-                    status
+                    "Lightpanda exited before CDP became ready (status: {}){}",
+                    status,
+                    if logs_complete {
+                        ""
+                    } else {
+                        "; its output pipes were still open, so the log below may be incomplete"
+                    }
                 ),
                 logs,
                 last_probe_error.as_deref(),

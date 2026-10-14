@@ -3,14 +3,9 @@ import { createHash } from "node:crypto";
 import path from "node:path";
 import { chromium } from "playwright";
 
-const sourcePath = path.resolve("../website/src/components/aurora-canvas.tsx");
-const source = await readFile(sourcePath, "utf8");
-function shader(name: string): string {
-  const match = source.match(new RegExp(`const ${name} = /\\* glsl \\*/ \\x60([\\s\\S]*?)\\x60;`));
-  if (!match) throw new Error(`Could not locate canonical ${name} shader`);
-  return match[1];
-}
-const vertex = shader("vertex"), fragment = shader("fragment");
+import { vertex, fragment } from "./store-aura-shader";
+
+const source = await readFile(path.resolve("scripts/store-aura-shader.ts"), "utf8");
 const width = 6144, height = 1600;
 const domainStart = 0.4, domainEnd = 1;
 const uniforms = { uTime: 8, uAspect: width / height / (domainEnd - domainStart),
@@ -56,7 +51,7 @@ try {
   const output = path.join(directory, "store-aura-panorama.png");
   await writeFile(output, bytes);
   await writeFile(path.join(directory, "store-aura-provenance.json"), JSON.stringify({
-    source: "packages/website/src/components/aurora-canvas.tsx",
+    source: "packages/mobile-screenshots/scripts/store-aura-shader.ts",
     sourceSha256: createHash("sha256").update(source).digest("hex"),
     vertexSha256: createHash("sha256").update(vertex).digest("hex"),
     fragmentSha256: createHash("sha256").update(fragment).digest("hex"),

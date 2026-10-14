@@ -51,7 +51,7 @@ cp public/supporting/shopping.png public/chrome-store/checkout.png
 
 Restore the reviewed `public/chrome-store/connected-popup.png` from the capture handoff, or capture the installed extension's actual Connected popup afresh. The website and popup PNGs remain ignored. Record source hashes and review freshness before exporting; these commands alone do not approve captures.
 
-First-party assets in `public/brand` are committed: the gradient cursor is the exact asset embedded in `packages/stella-browser/extension/lib/agent-cursor.js` (`CURSOR_ASSET`), also used by native desktop automation. The aura panorama and its provenance are generated from the canonical website shader. To regenerate the aura with installed Chrome:
+First-party assets in `public/brand` are committed: the gradient cursor is the exact asset embedded in `packages/stella-browser/extension/lib/agent-cursor.js` (`CURSOR_ASSET`), also used by native desktop automation. The aura panorama and its provenance are generated from the former stella.sh hero shader, kept in `scripts/store-aura-shader.ts`. To regenerate the aura with installed Chrome:
 
 ```sh
 bun scripts/render-store-aura.ts

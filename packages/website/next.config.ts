@@ -117,7 +117,7 @@ const nextConfig: NextConfig = {
       },
       {
         source:
-          "/:asset(stella-logo|stella-logo-ui|stella-wallpaper).:ext(png|jpg|svg)",
+          "/:asset(stella-logo|stella-logo-ui).:ext(png|jpg|svg)",
         headers: [{ key: "Cache-Control", value: REVALIDATING_ASSET_CACHE }],
       },
       {
@@ -126,7 +126,7 @@ const nextConfig: NextConfig = {
       },
       {
         source:
-          "/:folder(mock-app-icons|doc-mocks|app-mocks|demos)/:path*.:ext(png|jpg|jpeg|webp|avif|svg)",
+          "/:folder(mock-app-icons|app-mocks|demos)/:path*.:ext(png|jpg|jpeg|webp|avif|svg)",
         headers: [{ key: "Cache-Control", value: REVALIDATING_ASSET_CACHE }],
       },
     ];

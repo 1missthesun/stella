@@ -416,23 +416,34 @@ export const useLineageMessages = (
   conversationId: string | null | undefined,
   root: ConversationFocusRoot | null | undefined,
 ) => {
-  const rootKey = root ? focusRootKey(root) : null;
+  const rootKind = root?.kind;
+  const rootId = !root
+    ? null
+    : root.kind === "message"
+      ? root.id
+      : root.threadId;
+  const stableRoot = useMemo((): ConversationFocusRoot | null => {
+    if (!rootKind || rootId === null) return null;
+    return rootKind === "message"
+      ? { kind: "message", id: rootId }
+      : { kind: "agent", threadId: rootId };
+  }, [rootKind, rootId]);
   const [snapshot, setSnapshotState] =
     useState<LineageSnapshot>(EMPTY_SNAPSHOT);
   useEffect(() => {
-    if (!conversationId || !root) {
+    if (!conversationId || !stableRoot) {
       setSnapshotState(EMPTY_SNAPSHOT);
       return;
     }
-    return subscribeToLineageMessages(conversationId, root, setSnapshotState);
-    // `rootKey` stands in for the root object identity.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversationId, rootKey]);
+    return subscribeToLineageMessages(
+      conversationId,
+      stableRoot,
+      setSnapshotState,
+    );
+  }, [conversationId, stableRoot]);
   const loadOlder = useCallback(() => {
-    if (!conversationId || !root) return false;
-    return loadOlderLineageMessages(conversationId, root);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversationId, rootKey]);
+    if (!conversationId || !stableRoot) return false;
+    return loadOlderLineageMessages(conversationId, stableRoot);
+  }, [conversationId, stableRoot]);
   return useMemo(() => ({ ...snapshot, loadOlder }), [snapshot, loadOlder]);
 };
-

@@ -332,6 +332,7 @@ export class ExecutionPlacementBridge {
   private lifecycleEpoch = 0;
   private socket: ExecutionPlacementSocket | null = null;
   private socketProven = false;
+  private pendingConsent: boolean | null = null;
   private socketPingTimer: HostTimerHandle | null = null;
   private socketHeardAt = 0;
   private socketTokenTimer: HostTimerHandle | null = null;
@@ -848,6 +849,7 @@ export class ExecutionPlacementBridge {
       this.socketProven = true;
       this.leases.resetReconnectBackoff();
       this.sendKeepalive();
+      this.sendPendingConsent();
       await this.resumeAfterConnect();
     },
     offer: (frame) => {
@@ -1085,21 +1087,22 @@ export class ExecutionPlacementBridge {
     };
   }
 
-  /**
-   * Answer this computer's own "accept work from your other devices?" prompt.
-   *
-   * Sent on the presence socket when there is one, because that socket is
-   * already proven with the device key and so carries the fact that the answer
-   * came from this machine. With the socket down it falls back to the backend
-   * call, which is authorized by the account alone — weaker, but the honest
-   * alternative is losing the answer the user just gave.
-   */
   async answerRemoteExecutionRequest(allow: boolean): Promise<void> {
-    if (this.socketProven && this.send({ type: "consent", allow })) return;
-    await this.client.call("devices.setRemoteExecution", {
-      deviceId: this.options.deviceIdentity.deviceId,
-      enabled: allow,
-    });
+    this.pendingConsent = allow;
+    this.sendPendingConsent();
+    if (this.pendingConsent === false) {
+      await this.client.call("devices.setRemoteExecution", {
+        deviceId: this.options.deviceIdentity.deviceId,
+        enabled: false,
+      });
+    }
+  }
+
+  private sendPendingConsent() {
+    if (this.pendingConsent === null || !this.socketProven) return;
+    if (this.send({ type: "consent", allow: this.pendingConsent })) {
+      this.pendingConsent = null;
+    }
   }
 
   private async publishAvailability() {

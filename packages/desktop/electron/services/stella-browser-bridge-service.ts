@@ -28,7 +28,9 @@ import {
   readBrowserBridgeBinaryIdentity,
   readBrowserBridgeDaemonPid,
   readBrowserBridgeOwner,
+  refreshBrowserBridgeOwner,
   releaseBrowserBridgeOwner,
+  withBrowserBridgeClaimLock,
   writeBrowserBridgeOwner,
   type BrowserBridgeBinaryIdentity,
   type BrowserBridgeNamespace,
@@ -543,7 +545,7 @@ export class StellaBrowserBridgeService {
     await stopChildProcessTree(daemon);
     await this.stopOrphanedBundledDaemons();
     this.daemonProcess = null;
-    releaseBrowserBridgeOwner(
+    await releaseBrowserBridgeOwner(
       this.namespace.socketDir,
       STELLA_BROWSER_BRIDGE_SESSION,
     );
@@ -559,9 +561,6 @@ export class StellaBrowserBridgeService {
     try {
       const takeover = await this.claimNamespace();
       if (this.stopped) return;
-      // Claim it before clearing it, so a concurrent launch in the same
-      // namespace sees a live owner and defers instead of racing this one.
-      this.recordOwnership();
 
       if (this.namespace.ownsExtensionChannel) {
         const registration = await registerStellaNativeMessagingHost();
@@ -580,7 +579,7 @@ export class StellaBrowserBridgeService {
       const extPort = this.namespace.extPort ?? (await pickFreeLoopbackPort());
       if (this.stopped) return;
       this.spawnDaemon(extPort);
-      this.recordOwnership();
+      await this.recordOwnership();
       await this.waitForDaemonReady();
       await this.sendCommand({
         id: randomUUID(),
@@ -609,15 +608,36 @@ export class StellaBrowserBridgeService {
     this.binaryIdentity = binaryPath
       ? await readBrowserBridgeBinaryIdentity(binaryPath)
       : null;
-    const owner = readBrowserBridgeOwner(
+    const { owner, decision } = await withBrowserBridgeClaimLock(
       this.namespace.socketDir,
       STELLA_BROWSER_BRIDGE_SESSION,
+      () => {
+        const owner = readBrowserBridgeOwner(
+          this.namespace.socketDir,
+          STELLA_BROWSER_BRIDGE_SESSION,
+        );
+        const decision = decideBrowserBridgeTakeover({
+          namespace: this.namespace,
+          owner,
+          binary: this.binaryIdentity,
+        });
+        if (decision.action !== "defer" && !this.stopped) {
+          try {
+            writeBrowserBridgeOwner(
+              this.namespace.socketDir,
+              STELLA_BROWSER_BRIDGE_SESSION,
+              this.ownershipRecord(),
+            );
+          } catch (error) {
+            console.warn(
+              "[stella-browser-bridge] Could not record bridge ownership:",
+              error instanceof Error ? error.message : error,
+            );
+          }
+        }
+        return { owner, decision };
+      },
     );
-    const decision = decideBrowserBridgeTakeover({
-      namespace: this.namespace,
-      owner,
-      binary: this.binaryIdentity,
-    });
     if (decision.action === "defer") {
       console.warn(`[stella-browser-bridge] ${decision.reason}`);
       throw new Error(decision.reason);
@@ -636,29 +656,39 @@ export class StellaBrowserBridgeService {
     };
   }
 
-  private recordOwnership() {
+  private ownershipRecord(): BrowserBridgeOwnerRecord {
     const daemonPid = this.daemonProcess?.pid ?? null;
+    return {
+      version: 1,
+      instanceId: BROWSER_BRIDGE_INSTANCE_ID,
+      ownerPid: process.pid,
+      ownerStartedAtMs: ownStartedAtMs(),
+      daemonPid,
+      daemonStartedAtMs:
+        daemonPid === null ? null : processStartedAtMs(daemonPid),
+      mode: this.namespace.mode,
+      claim: this.namespace.claim,
+      packaged: this.namespace.packaged,
+      dataDir: this.namespace.dataDir,
+      stellaAppDir: this.stellaAppDir,
+      binary: this.binaryIdentity,
+      recordedAtMs: Date.now(),
+    };
+  }
+
+  private async recordOwnership() {
     try {
-      writeBrowserBridgeOwner(
-        this.namespace.socketDir,
-        STELLA_BROWSER_BRIDGE_SESSION,
-        {
-          version: 1,
-          instanceId: BROWSER_BRIDGE_INSTANCE_ID,
-          ownerPid: process.pid,
-          ownerStartedAtMs: ownStartedAtMs(),
-          daemonPid,
-          daemonStartedAtMs:
-            daemonPid === null ? null : processStartedAtMs(daemonPid),
-          mode: this.namespace.mode,
-          claim: this.namespace.claim,
-          packaged: this.namespace.packaged,
-          dataDir: this.namespace.dataDir,
-          stellaAppDir: this.stellaAppDir,
-          binary: this.binaryIdentity,
-          recordedAtMs: Date.now(),
-        },
-      );
+      if (
+        !(await refreshBrowserBridgeOwner(
+          this.namespace.socketDir,
+          STELLA_BROWSER_BRIDGE_SESSION,
+          this.ownershipRecord(),
+        ))
+      ) {
+        console.warn(
+          "[stella-browser-bridge] Another Stella claimed the browser bridge during launch; not recording this daemon.",
+        );
+      }
     } catch (error) {
       console.warn(
         "[stella-browser-bridge] Could not record bridge ownership:",

@@ -12,6 +12,10 @@ import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
+import {
+  releaseOwnerLock,
+  tryAcquireOwnerLock,
+} from "@stella/runtime/host/lifecycle/owner-lock";
 import { isInstalledProduct } from "../app-identity.js";
 import { resolveDesktopStellaDataDirForInstall } from "../data-paths.js";
 import { processIdentityIsLive } from "./process-identity.js";
@@ -240,17 +244,71 @@ export const writeBrowserBridgeOwner = (
   renameSync(temp, target);
 };
 
-/** Remove the record only if this instance wrote it. */
-export const releaseBrowserBridgeOwner = (
+const CLAIM_LOCK_TIMEOUT_MS = 2_000;
+const RELEASE_LOCK_TIMEOUT_MS = 250;
+const CLAIM_LOCK_RETRY_MS = 10;
+
+export const withBrowserBridgeClaimLock = async <T>(
   socketDir: string,
   session: string,
-): void => {
-  const current = readBrowserBridgeOwner(socketDir, session);
-  if (current?.instanceId !== BROWSER_BRIDGE_INSTANCE_ID) return;
+  section: () => T,
+  timeoutMs = CLAIM_LOCK_TIMEOUT_MS,
+): Promise<T> => {
+  mkdirSync(socketDir, { recursive: true });
+  const lockFile = `${ownerRecordPath(socketDir, session)}.lock`;
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const lock = tryAcquireOwnerLock(lockFile);
+    if (lock.acquired) {
+      try {
+        return section();
+      } finally {
+        releaseOwnerLock(lockFile, lock.owner);
+      }
+    }
+    if (Date.now() >= deadline) {
+      throw new Error(
+        `Timed out waiting for ${lockFile} (held by pid ${lock.holder?.pid ?? "unknown"}).`,
+      );
+    }
+    await new Promise<void>((resolve) => setTimeout(resolve, CLAIM_LOCK_RETRY_MS));
+  }
+};
+
+/** Rewrites the record only while this instance still owns it. */
+export const refreshBrowserBridgeOwner = (
+  socketDir: string,
+  session: string,
+  record: BrowserBridgeOwnerRecord,
+): Promise<boolean> =>
+  withBrowserBridgeClaimLock(socketDir, session, () => {
+    const current = readBrowserBridgeOwner(socketDir, session);
+    if (current && current.instanceId !== BROWSER_BRIDGE_INSTANCE_ID) return false;
+    writeBrowserBridgeOwner(socketDir, session, record);
+    return true;
+  });
+
+/** Best effort: a record left behind names a dead owner, which the next claimant treats as an orphan. */
+export const releaseBrowserBridgeOwner = async (
+  socketDir: string,
+  session: string,
+): Promise<void> => {
   try {
-    unlinkSync(ownerRecordPath(socketDir, session));
-  } catch {
-    // Already gone.
+    await withBrowserBridgeClaimLock(
+      socketDir,
+      session,
+      () => {
+        const current = readBrowserBridgeOwner(socketDir, session);
+        if (current?.instanceId !== BROWSER_BRIDGE_INSTANCE_ID) return;
+        unlinkSync(ownerRecordPath(socketDir, session));
+      },
+      RELEASE_LOCK_TIMEOUT_MS,
+    );
+  } catch (error) {
+    console.warn(
+      "[stella-browser-bridge] Left the bridge ownership record in place:",
+      error instanceof Error ? error.message : error,
+    );
   }
 };
 

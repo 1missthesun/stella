@@ -17,6 +17,10 @@ import {
 } from "node:net";
 import path from "node:path";
 import { z } from "zod";
+import {
+  releaseOwnerLock,
+  tryAcquireOwnerLock,
+} from "@stella/runtime/host/lifecycle/owner-lock";
 
 import {
   getStellaInAppBrowserInitEndpoint,
@@ -34,59 +38,11 @@ type FileIdentity = Readonly<{ device: number; inode: number }>;
 const delay = (durationMs: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, durationMs));
 
-const processIsAlive = (pid: number): boolean => {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    return (error as NodeJS.ErrnoException).code === "EPERM";
-  }
-};
-
-const acquireDiscoveryLock = async (
-  lockPath: string,
-  ownerId: string,
-): Promise<() => void> => {
-  const lockValue = JSON.stringify({ ownerId, pid: process.pid });
+const acquireDiscoveryLock = async (lockPath: string): Promise<() => void> => {
   const deadline = Date.now() + DISCOVERY_LOCK_TIMEOUT_MS;
-  while (true) {
-    try {
-      writeFileSync(lockPath, lockValue, {
-        encoding: "utf8",
-        flag: "wx",
-        mode: 0o600,
-      });
-      return () => {
-        try {
-          if (readFileSync(lockPath, "utf8") === lockValue) {
-            rmSync(lockPath, { force: true });
-          }
-        } catch {
-          // A missing/replaced lock is no longer ours to release.
-        }
-      };
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
-    }
-
-    try {
-      const existing = JSON.parse(readFileSync(lockPath, "utf8")) as {
-        pid?: unknown;
-      };
-      if (
-        typeof existing.pid !== "number" ||
-        !Number.isSafeInteger(existing.pid) ||
-        existing.pid <= 0 ||
-        !processIsAlive(existing.pid)
-      ) {
-        rmSync(lockPath, { force: true });
-        continue;
-      }
-    } catch {
-      // A creator can briefly exist before its contents are observable. Wait
-      // for it unless the bounded acquisition deadline is exhausted.
-    }
-
+  for (;;) {
+    const lock = tryAcquireOwnerLock(lockPath);
+    if (lock.acquired) return () => releaseOwnerLock(lockPath, lock.owner);
     if (Date.now() >= deadline) {
       throw new Error(
         `Timed out acquiring browser bootstrap discovery lock: ${lockPath}`,
@@ -216,10 +172,7 @@ export class InAppBrowserBootstrapServer {
     this.server = null;
     for (const socket of this.sockets) socket.destroy();
     this.sockets.clear();
-    const releaseDiscoveryLock = await acquireDiscoveryLock(
-      this.discoveryLockPath,
-      this.ownerId,
-    );
+    const releaseDiscoveryLock = await acquireDiscoveryLock(this.discoveryLockPath);
     try {
       if (server?.listening) {
         await this.closeServerPreservingForeignEndpoint(server);
@@ -232,10 +185,7 @@ export class InAppBrowserBootstrapServer {
 
   private async startInternal(): Promise<void> {
     mkdirSync(path.dirname(this.tokenPath), { recursive: true });
-    const releaseDiscoveryLock = await acquireDiscoveryLock(
-      this.discoveryLockPath,
-      this.ownerId,
-    );
+    const releaseDiscoveryLock = await acquireDiscoveryLock(this.discoveryLockPath);
     try {
       const filesystemEndpointPath = this.filesystemEndpointPath();
       if (filesystemEndpointPath) {

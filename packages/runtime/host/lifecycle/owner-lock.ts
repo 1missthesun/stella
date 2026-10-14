@@ -11,7 +11,11 @@ import {
   readProcessIdentity,
 } from "../../kernel/shared/process-identity.js";
 
-export type LockOwner = Readonly<{ pid: number; identity: string | null }>;
+export type LockOwner = Readonly<{
+  pid: number;
+  identity: string | null;
+  nonce?: string;
+}>;
 
 export type OwnerLockResult =
   | { readonly acquired: true; readonly owner: LockOwner }
@@ -32,13 +36,18 @@ const readOwner = (file: string): { raw: string; owner: LockOwner | null } | nul
     return { raw, owner: { pid: Number(trimmed), identity: null } };
   }
   try {
-    const parsed = JSON.parse(trimmed) as { pid?: unknown; identity?: unknown };
+    const parsed = JSON.parse(trimmed) as {
+      pid?: unknown;
+      identity?: unknown;
+      nonce?: unknown;
+    };
     if (typeof parsed.pid === "number" && Number.isInteger(parsed.pid) && parsed.pid > 0) {
       return {
         raw,
         owner: {
           pid: parsed.pid,
           identity: typeof parsed.identity === "string" ? parsed.identity : null,
+          ...(typeof parsed.nonce === "string" ? { nonce: parsed.nonce } : {}),
         },
       };
     }
@@ -99,10 +108,14 @@ export const readLiveLockOwner = (lockFile: string): LockOwner | null => {
   return owner && processIdentityIsLive(owner.pid, owner.identity) ? owner : null;
 };
 
+let ownIdentity: string | null | undefined;
+
 export const tryAcquireOwnerLock = (lockFile: string): OwnerLockResult => {
+  if (ownIdentity === undefined) ownIdentity = readProcessIdentity(process.pid);
   const owner: LockOwner = {
     pid: process.pid,
-    identity: readProcessIdentity(process.pid),
+    identity: ownIdentity,
+    nonce: Math.random().toString(36).slice(2),
   };
   const content = JSON.stringify(owner);
   for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -117,6 +130,12 @@ export const tryAcquireOwnerLock = (lockFile: string): OwnerLockResult => {
 
 export const releaseOwnerLock = (lockFile: string, owner: LockOwner): void => {
   const read = readOwner(lockFile);
-  if (read?.owner?.pid !== owner.pid || read.owner.identity !== owner.identity) return;
+  if (
+    read?.owner?.pid !== owner.pid ||
+    read.owner.identity !== owner.identity ||
+    read.owner.nonce !== owner.nonce
+  ) {
+    return;
+  }
   removeQuietly(lockFile);
 };

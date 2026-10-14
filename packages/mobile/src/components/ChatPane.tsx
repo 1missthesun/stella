@@ -147,7 +147,6 @@ import {
 } from "./reply-handoff";
 import { useDictation } from "../lib/dictation";
 import { useServerFeatures } from "../lib/server-features";
-import { canSubmitFinalizedDictation } from "../lib/dictation-send";
 import { hasAiConsent, requestAiConsent } from "../lib/ai-consent";
 import type { RealtimeVoiceActionDispatch } from "../lib/realtime-voice-protocol";
 import type { StoredPhoneAccess } from "../lib/phone-access";
@@ -198,18 +197,7 @@ const LEGEND_TAIL_SCROLL_AT_END = {
 } as const;
 const MESSAGE_LIST_GAP = 10;
 const CHAT_TAIL_GAP = WORKING_INDICATOR_SLOT_HEIGHT + 12;
-/**
- * The working indicator used to live inside the footer overlay (above the
- * composer), so its reserved slot height was baked into the measured
- * `footerHeight` that the floating controls anchor their bottom offset against.
- * It now rides inline at the chat tail, which shrank `footerHeight` by that
- * slot height and dropped both floating buttons low enough for the composer to
- * overlap them. Re-add the slot height to the buttons' bottom anchor so they
- * sit exactly where they did before the indicator moved, without bringing back
- * the fixed indicator. `footerHeight` still includes the composer's safe-area
- * inset, so the buttons keep clearing the home indicator.
- */
-const FLOATING_CONTROL_LIFT = WORKING_INDICATOR_SLOT_HEIGHT;
+const FLOATING_CONTROL_GAP = 4;
 const SHELL_CONTENT_PADDING = 20;
 
 const copyMessageText = (text: string) => {
@@ -852,20 +840,9 @@ export function ChatPane({
   const historyAnchored = dataChangeScrollOwner === "history-anchor";
   const maintainVisibleContentPosition = useMemo(
     () => ({
-      // Keep native MVCP enabled for the lifetime of the ScrollView. Toggling
-      // it during a drag lets iOS adjust from a stale pre-send native anchor.
-      // `data` is what holds that guarantee: Legend derives the ScrollView's
-      // own `maintainVisibleContentPosition` from `data || size`, so the
-      // native prop stays on no matter how `size` moves below.
+      // Legend sets the native ScrollView prop from `data || size`, so `data`
+      // keeps native MVCP on for the ScrollView's lifetime while `size` moves.
       data: true,
-      // An older page is laid out from estimated heights and then measures
-      // for real. Those re-measurements are *size* changes, not data changes,
-      // and Legend only compensates the axis that is enabled — so with `size`
-      // off, every older row that measured taller than its estimate shoved
-      // the content under the user's finger. That is the jagged scrollback.
-      // Compensate while history owns position, and only then: at the live
-      // tail the custom follow loop owns streaming growth and must not be
-      // fought by a second position owner.
       size: historyAnchored,
       shouldRestorePosition: () => scrollOwnerRef.current === "history-anchor",
     }),
@@ -951,21 +928,14 @@ export function ChatPane({
     scroll.releaseFollow,
   ]);
 
-  // Auto-send-after-dictation coordination (see `stopAndSendVoice` below).
-  // When a voice-send is armed we stash the exact draft the transcript produces
-  // so the send effect can wait for the draft state to actually reflect it,
-  // rather than racing the (separately-committed) status → idle update.
-  const pendingVoiceSendRef = useRef(false);
-  const voiceSendTargetRef = useRef<string | null>(null);
-  const voiceSendResultReadyRef = useRef(false);
-  const [voiceSendResultVersion, setVoiceSendResultVersion] = useState(0);
+  const voiceSendInFlightRef = useRef(false);
+  const submitRef = useRef(submit);
+  submitRef.current = submit;
 
   const appendTranscript = useCallback(
     (text: string) => {
       const trimmedPrev = draftStore.get().trimEnd();
-      const next = trimmedPrev ? `${trimmedPrev} ${text}` : text;
-      if (pendingVoiceSendRef.current) voiceSendTargetRef.current = next;
-      draftStore.set(next);
+      draftStore.set(trimmedPrev ? `${trimmedPrev} ${text}` : text);
     },
     [draftStore],
   );
@@ -1060,62 +1030,18 @@ export function ChatPane({
     [onRealtimeVoiceAction],
   );
 
-  // "Stop dictation and send": stop recording, then auto-submit once the
-  // transcript has landed in the draft. `dictation.stop()` resolves after the
-  // round-trip, but `onTranscript` updates the draft through the parent, so we
-  // can't read it back synchronously here. Arm a flag and let the effect below
-  // fire submit on the render where the transcript has committed and dictation
-  // has returned to idle.
   const stopAndSendVoice = useCallback(() => {
-    if (pendingVoiceSendRef.current) return;
-    pendingVoiceSendRef.current = true;
-    voiceSendTargetRef.current = null;
-    voiceSendResultReadyRef.current = false;
+    if (voiceSendInFlightRef.current) return;
+    voiceSendInFlightRef.current = true;
     void stopDictation()
       .then((transcript) => {
-        if (!pendingVoiceSendRef.current) return;
-        if (transcript && voiceSendTargetRef.current !== null) {
-          voiceSendResultReadyRef.current = true;
-          // The transcript callback updates parent-owned draft state. Force one
-          // render after stop() has fully resolved so the effect can verify that
-          // exact target was committed before calling submit.
-          setVoiceSendResultVersion((version) => version + 1);
-          return;
-        }
-        pendingVoiceSendRef.current = false;
-        voiceSendTargetRef.current = null;
+        if (transcript) submitRef.current();
       })
-      .catch(() => {
-        pendingVoiceSendRef.current = false;
-        voiceSendTargetRef.current = null;
+      .catch(() => undefined)
+      .finally(() => {
+        voiceSendInFlightRef.current = false;
       });
   }, [stopDictation]);
-
-  useEffect(() => {
-    const target = voiceSendTargetRef.current;
-    if (
-      !canSubmitFinalizedDictation({
-        armed: pendingVoiceSendRef.current,
-        resultReady: voiceSendResultReadyRef.current,
-        status: dictation.status,
-        draft: draftStore.get(),
-        target,
-        attachmentCount: attachments?.length ?? 0,
-      })
-    ) {
-      return;
-    }
-    pendingVoiceSendRef.current = false;
-    voiceSendResultReadyRef.current = false;
-    voiceSendTargetRef.current = null;
-    submit();
-  }, [
-    dictation.status,
-    draftStore,
-    attachments,
-    submit,
-    voiceSendResultVersion,
-  ]);
 
   const attachmentLimit = maxAttachments ?? CHAT_ATTACHMENT_MAX_COUNT;
   const acceptPicked = useCallback(
@@ -1890,20 +1816,6 @@ export function ChatPane({
                   fadingEdgeLength={EDGE_FADE}
                   initialScrollAtEnd={initialScrollAtEndRef.current === true}
                   maintainVisibleContentPosition={maintainVisibleContentPosition}
-                  // Pin to the tail only when new/synced messages arrive while the
-                  // user is already near the bottom. Scoped to data changes so it
-                  // doesn't fight the custom streaming-follow target updates,
-                  // which own item-layout/size growth.
-                  //
-                  // While streaming, every token mutates the data array, so a
-                  // dataChange-pinned tail would fire `scrollToEnd` on each token —
-                  // overriding the custom "freeze once the message reaches the top"
-                  // target and snapping the user back down whenever they try to
-                  // scroll up. The custom follow loop already keeps the tail in view
-                  // during streaming, so disable the built-in pin for that window.
-                  // Position ownership is exclusive: history anchoring wins while
-                  // follow is released, the custom loop owns streams/post-send
-                  // placement, and this pin owns only ordinary live-tail appends.
                   maintainScrollAtEnd={
                     dataChangeScrollOwner === "legend-tail"
                       ? LEGEND_TAIL_SCROLL_AT_END
@@ -1969,16 +1881,6 @@ export function ChatPane({
               topInset={topInset}
             />
           ) : null}
-          {/* Floating glass controls (scroll-to-bottom FAB + computer-options
-              button) sit in a pass-through absolute overlay. This MUST be a plain
-              View, not a GlassGroup/GlassContainer: the native glass container is
-              a raw view that ignores `pointerEvents`, so a full-screen one swallows
-              every touch over the chat (no scroll/tap) and, as a screen-spanning
-              glass layer beneath the in-tree menu popovers, triggers Apple's
-              glass-on-glass suppression that renders those menus clear. A plain
-              `box-none` View passes touches through to the list and lets each
-              button — and the popovers — keep their own Liquid Glass. While a
-              reply chain is open its popover covers them, so they hide. */}
           <View
             pointerEvents={replyFocus ? "none" : "box-none"}
             style={[
@@ -2003,7 +1905,7 @@ export function ChatPane({
                   hasUnread={unread}
                   onPress={scroll.scrollToBottom}
                   colors={colors}
-                  bottomOffset={footerHeight + FLOATING_CONTROL_LIFT - 34}
+                  bottomOffset={footerHeight + FLOATING_CONTROL_GAP}
                 />
               </Reanimated.View>
             ) : null}

@@ -36,4 +36,4 @@ export VITE_STELLA_BACKEND_URL="$NEXT_PUBLIC_STELLA_BACKEND_URL"
 export VITE_TURNSTILE_SITE_KEY="$NEXT_PUBLIC_TURNSTILE_SITE_KEY"
 
 bunx opennextjs-cloudflare build
-bunx opennextjs-cloudflare deploy "${env_args[@]}"
+bunx opennextjs-cloudflare deploy ${env_args[@]+"${env_args[@]}"}

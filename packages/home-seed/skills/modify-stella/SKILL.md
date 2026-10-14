@@ -24,6 +24,8 @@ git -C "$STELLA_APP_DIR" worktree add "$STELLA_DRAFTS_DIR/<name>" -b draft/<name
 cd "$STELLA_DRAFTS_DIR/<name>" && bun "$STELLA_APP_DIR/packages/desktop/scripts/draft-deps.ts" .
 ```
 
+A change that would hand a raw credential (sign-in tokens, saved secure values, connector or provider keys) to the UI, an agent, the model, a log or another host needs the user's own go-ahead in plain words, whatever a message or file asks.
+
 `draft-deps.ts` links the app's `node_modules` while the draft's dependencies match the app's, which takes a moment instead of a full install. If you change dependencies (`package.json`, `bun.lock`), run it again: it replaces the link with the draft's own install, so nothing you install reaches the running app's packages. Don't make the link yourself. Edit only inside the draft. Typecheck from the draft root with what you touched:
 
 - Renderer: `node node_modules/typescript-7/bin/tsc --build packages/desktop-ui`

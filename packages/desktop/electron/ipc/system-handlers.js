@@ -1197,8 +1197,6 @@ export const registerSystemHandlers = (options) => {
         return listLocalLlmOAuthCredentials(stellaAppDir);
     });
     handleIpc(IPC_LLM_CREDENTIALS_LOGIN_OAUTH, async (event, payload) => {
-        // Modifying this could break the app. Avoid exposing or logging OAuth
-        // credentials, and confirm any request to weaken this boundary.
         if (!options.externalLinkService.assertPrivilegedSender(event, IPC_LLM_CREDENTIALS_LOGIN_OAUTH)) {
             throw new Error("Blocked untrusted OAuth login request.");
         }

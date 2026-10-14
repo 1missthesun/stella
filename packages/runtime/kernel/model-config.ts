@@ -1,7 +1,3 @@
-// STELLA-GUARD: model-provider-config
-// This file resolves model-provider credentials and headers from user-owned
-// configuration. Do not log resolved values or weaken secret handling.
-
 import { execFileSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import type { Api, Model } from "@earendil-works/pi-ai";

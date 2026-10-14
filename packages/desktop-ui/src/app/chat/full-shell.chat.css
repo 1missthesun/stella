@@ -124,6 +124,7 @@
   animation:
     bubble-pop 360ms var(--bubble-spring) both,
     bubble-pop-fade 120ms ease-out both;
+  animation-delay: var(--entrance-delay, 0ms);
   transform-origin: left bottom;
   will-change: opacity, transform;
 }
@@ -315,6 +316,7 @@
   animation:
     bubble-pop 360ms var(--bubble-spring) both,
     bubble-pop-fade 120ms ease-out both;
+  animation-delay: var(--entrance-delay, 0ms);
   transform-origin: right bottom;
   will-change: opacity, transform;
   contain: paint;

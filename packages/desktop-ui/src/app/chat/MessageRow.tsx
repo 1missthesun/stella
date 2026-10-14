@@ -6,8 +6,10 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  type CSSProperties,
   type ReactNode,
 } from "react";
+import { useEntrance } from "@/features/chat/lib/message-entry-animation-state";
 
 import {
   pastedTextPreview,
@@ -382,9 +384,22 @@ type UserRowProps = {
   row: UserRowViewModel;
 };
 
+const MESSAGE_ENTRANCE_MS = 360;
+const MESSAGE_ENTRANCE_ANIMATION = "bubble-pop";
+
+const entranceStyle = (delayMs: number | null): CSSProperties | undefined =>
+  delayMs === null
+    ? undefined
+    : ({ "--entrance-delay": `${delayMs}ms` } as CSSProperties);
+
 export const UserMessageRow = memo(
   function UserMessageRow({ row }: UserRowProps) {
     const t = useT();
+    const entrance = useEntrance(
+      row.arrivedAt,
+      MESSAGE_ENTRANCE_MS,
+      MESSAGE_ENTRANCE_ANIMATION,
+    );
     const reply = useMessageReply();
     const { text, windowLabel, attachments, channelEnvelope } = row;
     const copyAttachment = useMemo(
@@ -503,7 +518,9 @@ export const UserMessageRow = memo(
 
     return (
       <div
-        className={`event-row event-row--user${row.justSent ? " event-row--user--just-sent" : ""}`}
+        className={`event-row event-row--user${entrance.delayMs === null ? "" : " event-row--user--just-sent"}`}
+        style={entranceStyle(entrance.delayMs)}
+        onAnimationEnd={entrance.onAnimationEnd}
         data-chat-row-id={row.id}
       >
         {chips.length > 0 && <UserContextChips chips={chips} />}
@@ -570,7 +587,12 @@ export const AssistantMessageRow = memo(
   }: AssistantRowProps) {
     const reply = useMessageReply();
     const rowRef = useRef<HTMLDivElement>(null);
-    useReplyHandoffArrival(rowRef, Boolean(row.justArrived), !row.isIntraTurn);
+    const entrance = useEntrance(
+      row.arrivedAt,
+      MESSAGE_ENTRANCE_MS,
+      MESSAGE_ENTRANCE_ANIMATION,
+    );
+    useReplyHandoffArrival(rowRef, entrance.delayMs !== null, !row.isIntraTurn);
     const text = row.text;
     const hasText = text.trim().length > 0;
     const hasMapArtifacts = (row.mapArtifacts?.length ?? 0) > 0;
@@ -702,7 +724,9 @@ export const AssistantMessageRow = memo(
     return (
       <div
         ref={rowRef}
-        className={`event-row event-row--assistant${row.justArrived ? " event-row--assistant--just-arrived" : ""}`}
+        className={`event-row event-row--assistant${entrance.delayMs === null ? "" : " event-row--assistant--just-arrived"}`}
+        style={entranceStyle(entrance.delayMs)}
+        onAnimationEnd={entrance.onAnimationEnd}
         data-chat-row-id={row.id}
         data-scroll-follow-key={row.id}
         data-react-key={row.id}

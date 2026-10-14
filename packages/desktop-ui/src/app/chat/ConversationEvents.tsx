@@ -1,11 +1,5 @@
 import type { ChatListBinding } from "@/shell/use-chat-scroll-management";
-import {
-  memo,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { memo, useLayoutEffect, useMemo, useReducer, useRef } from "react";
 import type { MessageRecord } from "@stella/contracts/local-chat";
 import { useEventRows } from "@/features/chat/hooks/use-event-rows";
 import { useThreadActivity } from "@/features/chat/hooks/use-thread-activity";
@@ -14,21 +8,12 @@ import { useDriveAttachmentPreviews } from "@/features/cloud/drive-attachment-pr
 import { ChatTimeline, type LegendContentStyle } from "./ChatTimeline";
 import type { InlineWorkingIndicatorMountProps } from "./InlineWorkingIndicator";
 import type { QueuedUserMessage } from "@/features/chat/hooks/use-streaming-chat";
-import { hasQueuedMessageEntryPlayed } from "@/features/chat/lib/message-entry-animation-state";
+import {
+  messageArrivedAt,
+  recordMessageArrival,
+  recordPresentMessage,
+} from "@/features/chat/lib/message-entry-animation-state";
 import type { EventRowViewModel } from "@/features/chat/conversation-row-types";
-
-const USER_MESSAGE_ENTER_MS = 360;
-const ASSISTANT_MESSAGE_ENTER_MS = 360;
-
-/**
- * Tracks message ids whose enter animation has already played. Module
- * scope so a home→chat transition (ConversationEvents remount) or a
- * dev remount doesn't replay the fade/grow on the same bubble.
- */
-const justSentPlayedIds = new Set<string>();
-const justSentActiveUntil = new Map<string, number>();
-const assistantEnterPlayedIds = new Set<string>();
-const assistantEnterActiveUntil = new Map<string, number>();
 
 type Props = {
   messages: MessageRecord[];
@@ -51,74 +36,12 @@ type Props = {
   onLoadOlder?: () => boolean | void | Promise<boolean>;
 };
 
-/**
- * Returns the set of row ids whose one-shot enter animation is still
- * playing this frame. Registration runs synchronously during render so the
- * CSS enter animation starts on the row's first paint — the previous
- * `useEffect` path painted the row at full opacity, then added the
- * class a frame later, which read as a double appear/re-render on
- * the first send after a cold load (especially when ConversationEvents
- * mounts for the first time on home→chat).
- *
- * The played/expiry maps are parameters rather than module constants so the
- * sent-bubble and arriving-reply animations keep separate ledgers.
- */
-function useOneShotIds(
-  ids: readonly string[],
-  durationMs: number,
-  playedIds: Set<string> = justSentPlayedIds,
-  activeUntil: Map<string, number> = justSentActiveUntil,
-): Set<string> {
-  const key = useMemo(() => [...new Set(ids)].sort().join("\n"), [ids]);
-  const [tick, setTick] = useState(0);
-
-  const active = useMemo(() => {
-    void tick;
-    const now = performance.now();
-    const set = new Set<string>();
-    for (const id of key ? key.split("\n") : []) {
-      if (!id) continue;
-      if (!playedIds.has(id)) {
-        playedIds.add(id);
-        activeUntil.set(id, now + durationMs);
-      }
-      const until = activeUntil.get(id) ?? 0;
-      if (until > now) {
-        set.add(id);
-      }
-    }
-    return set;
-  }, [activeUntil, durationMs, key, playedIds, tick]);
-
-  useEffect(() => {
-    if (active.size === 0) return;
-    const now = performance.now();
-    let delayMs = durationMs;
-    for (const id of active) {
-      const until = activeUntil.get(id) ?? 0;
-      delayMs = Math.min(delayMs, Math.max(0, until - now));
-    }
-    const timeoutId = window.setTimeout(() => {
-      setTick((current) => current + 1);
-    }, delayMs + 1);
-    return () => window.clearTimeout(timeoutId);
-  }, [active, activeUntil, durationMs]);
-
-  return active;
-}
-
-/**
- * Marks the tail assistant row as newly arrived, for one play.
- *
- * A reply arrives whole, so the only cue that it is new is that it wasn't
- * there a frame ago. Loading an existing conversation would otherwise animate
- * its last reply as if it had just been written, so the first row seen for a
- * conversation is seeded as already-played.
- */
-function useAssistantArrivalIds(
+function useMessageArrivals(
   rows: readonly EventRowViewModel[],
   conversationId: string | null | undefined,
-): Set<string> {
+  pendingUserMessageId: string | null | undefined,
+): number {
+  const [version, bump] = useReducer((current: number) => current + 1, 0);
   const seededConversationRef = useRef<string | null | undefined>(undefined);
   const tailAssistantId = useMemo(() => {
     for (let index = rows.length - 1; index >= 0; index -= 1) {
@@ -128,22 +51,27 @@ function useAssistantArrivalIds(
     return null;
   }, [rows]);
 
-  if (seededConversationRef.current !== conversationId) {
-    seededConversationRef.current = conversationId;
-    if (tailAssistantId) assistantEnterPlayedIds.add(tailAssistantId);
-  }
-
-  const candidates = useMemo(
-    () => (tailAssistantId ? [tailAssistantId] : []),
-    [tailAssistantId],
-  );
-  return useOneShotIds(
-    candidates,
-    ASSISTANT_MESSAGE_ENTER_MS,
-    assistantEnterPlayedIds,
-    assistantEnterActiveUntil,
-  );
+  useLayoutEffect(() => {
+    let changed = false;
+    if (seededConversationRef.current !== conversationId) {
+      seededConversationRef.current = conversationId;
+      if (tailAssistantId) recordPresentMessage(tailAssistantId);
+    } else if (tailAssistantId) {
+      changed = recordMessageArrival(tailAssistantId);
+    }
+    if (pendingUserMessageId) {
+      changed = recordMessageArrival(pendingUserMessageId) || changed;
+    }
+    if (changed) bump();
+  }, [conversationId, pendingUserMessageId, tailAssistantId]);
+  return version;
 }
+
+const withArrival = (row: EventRowViewModel): EventRowViewModel => {
+  if (row.kind !== "user" && row.kind !== "assistant") return row;
+  const arrivedAt = messageArrivedAt(row.id);
+  return arrivedAt === undefined ? row : { ...row, arrivedAt };
+};
 
 export const ConversationEvents = memo(function ConversationEvents({
   messages,
@@ -187,35 +115,21 @@ export const ConversationEvents = memo(function ConversationEvents({
     agentParents,
   });
 
-  const justSentCandidates = useMemo(
-    () =>
-      pendingUserMessageId && !hasQueuedMessageEntryPlayed(pendingUserMessageId)
-        ? [pendingUserMessageId]
-        : [],
-    [pendingUserMessageId],
-  );
-  const animatingJustSentIds = useOneShotIds(
-    justSentCandidates,
-    USER_MESSAGE_ENTER_MS,
-  );
-  const animatingArrivalIds = useAssistantArrivalIds(
+  const arrivalVersion = useMessageArrivals(
     projectedRows,
     conversationId,
+    pendingUserMessageId,
   );
-
-  const rows =
-    animatingJustSentIds.size > 0 || animatingArrivalIds.size > 0
-      ? projectedRows.map((row) => {
-          if (row.kind === "user") {
-            return animatingJustSentIds.has(row.id)
-              ? { ...row, justSent: true }
-              : row;
-          }
-          return animatingArrivalIds.has(row.id)
-            ? { ...row, justArrived: true }
-            : row;
-        })
-      : projectedRows;
+  const rows = useMemo(() => {
+    void arrivalVersion;
+    let changed = false;
+    const next = projectedRows.map((row) => {
+      const annotated = withArrival(row);
+      if (annotated !== row) changed = true;
+      return annotated;
+    });
+    return changed ? next : projectedRows;
+  }, [arrivalVersion, projectedRows]);
 
   return (
     <ChatTimeline

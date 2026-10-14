@@ -1,24 +1,19 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useReducer, useRef, useState } from "react";
 import type { QueuedUserMessage } from "@/features/chat/hooks/use-streaming-chat";
 import { X } from "@/ui/icons";
 import {
-  hasQueuedMessageEntryPlayed,
-  markQueuedMessageEntryPlayed,
+  messageArrivedAt,
+  recordMessageArrival,
+  useEntrance,
 } from "@/features/chat/lib/message-entry-animation-state";
 import { UserMessageBody } from "./UserMessageBody";
 import { useT } from "@/shared/i18n";
 
 const EXIT_MS = 100;
+const QUEUED_ENTRANCE_MS = 280;
 
 type VisibleItem = QueuedUserMessage & { leaving: boolean };
 
-/**
- * Legend may reconstruct a keyed virtual item while adjacent streaming rows
- * and measurements settle. Keep the playback record outside the item subtree
- * so that reconstruction cannot replay the queued bubble's CSS animation.
- * Message ids are renderer-owned and remain stable through queue reconciliation
- * and the queued-to-sent handoff.
- */
 const toVisibleItem = (message: QueuedUserMessage): VisibleItem => ({
   ...message,
   leaving: false,
@@ -37,20 +32,26 @@ function QueuedMessageBubble({
   onCancel?: (message: QueuedUserMessage) => void;
 }) {
   const t = useT();
-  // Latched for this bubble's mount so the entrance plays through once even
-  // though the id is registered as played right after commit; a Legend
-  // reconstruction of an already-seen message mounts settled, and the sent
-  // row skips its own entrance for an id that already appeared here.
-  const enteringRef = useRef(!hasQueuedMessageEntryPlayed(item.id));
+  const [, bump] = useReducer((version: number) => version + 1, 0);
   useLayoutEffect(() => {
-    markQueuedMessageEntryPlayed(item.id);
+    if (recordMessageArrival(item.id)) bump();
   }, [item.id]);
+  const entrance = useEntrance(
+    messageArrivedAt(item.id),
+    QUEUED_ENTRANCE_MS,
+    "composer-queued-enter",
+  );
 
   return (
     <div
       style={
-        !enteringRef.current && !item.leaving ? { animation: "none" } : undefined
+        item.leaving
+          ? undefined
+          : entrance.delayMs === null
+            ? { animation: "none" }
+            : { animationDelay: `${entrance.delayMs}ms` }
       }
+      onAnimationEnd={entrance.onAnimationEnd}
       className={
         "composer-queued-message" +
         (item.leaving ? " composer-queued-message--leaving" : "")

@@ -332,7 +332,7 @@ const userRowEqual = (a: UserRowViewModel, b: UserRowViewModel): boolean =>
   a.id === b.id &&
   a.text === b.text &&
   (a.timestampMs ?? null) === (b.timestampMs ?? null) &&
-  Boolean(a.justSent) === Boolean(b.justSent) &&
+  a.arrivedAt === b.arrivedAt &&
   (a.windowLabel ?? null) === (b.windowLabel ?? null) &&
   (a.windowPreviewImageUrl ?? null) === (b.windowPreviewImageUrl ?? null) &&
   appSelectionLabelsEqual(a.appSelectionLabels, b.appSelectionLabels) &&
@@ -377,7 +377,7 @@ const assistantRowEqual = (
     (b.toolEventSummary?.detailCursor?.id ?? null) &&
   (a.toolEventSummary?.detailCursor?.sequence ?? null) ===
     (b.toolEventSummary?.detailCursor?.sequence ?? null) &&
-  Boolean(a.justArrived) === Boolean(b.justArrived) &&
+  a.arrivedAt === b.arrivedAt &&
   Boolean(a.isIntraTurn) === Boolean(b.isIntraTurn) &&
   (a.replyToUserMessageId ?? null) === (b.replyToUserMessageId ?? null) &&
   JSON.stringify(a.responseTarget ?? null) ===

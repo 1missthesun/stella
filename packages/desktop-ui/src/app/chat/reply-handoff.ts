@@ -77,9 +77,11 @@ export function useReplyHandoffArrival(
   finalAnswer: boolean,
 ) {
   const controller = useReplyHandoffController();
-  const arrivedOnMountRef = useRef(justArrived && finalAnswer);
+  const announcedRef = useRef(false);
   useLayoutEffect(() => {
-    if (!controller || !rowRef.current || !arrivedOnMountRef.current) return;
+    if (announcedRef.current || !justArrived || !finalAnswer) return;
+    if (!controller || !rowRef.current) return;
+    announcedRef.current = true;
     controller.replyArrived();
-  }, [controller, rowRef]);
+  }, [controller, finalAnswer, justArrived, rowRef]);
 }

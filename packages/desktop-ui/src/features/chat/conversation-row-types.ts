@@ -20,7 +20,7 @@ export type UserRowViewModel = {
   id: string;
   text: string;
   timestampMs?: number;
-  justSent?: boolean;
+  arrivedAt?: number;
   windowLabel?: string;
   windowPreviewImageUrl?: string;
   appSelectionLabels?: string[];
@@ -54,7 +54,7 @@ export type AssistantRowViewModel = {
     detailHasMore?: boolean;
     livePinsPending?: boolean;
   };
-  justArrived?: boolean;
+  arrivedAt?: number;
   isIntraTurn?: boolean;
   responseTarget?: AgentResponseTarget;
   replyRefs?: ReplyRef[];

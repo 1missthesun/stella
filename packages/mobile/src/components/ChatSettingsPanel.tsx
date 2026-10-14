@@ -133,10 +133,9 @@ export function ChatSettingsPanel({ width }: { width: number }) {
               </Rise>
             ) : null}
 
-            <View style={styles.spacer} />
-
             {accountsFor ? (
               <Rise i={i++} animated from="end">
+                <Hairline space={14} />
                 <EngineAccountRow
                   provider={accountsFor}
                   onPress={() => go({ name: "accounts" })}
@@ -288,10 +287,6 @@ const makeStyles = (colors: Colors) =>
     content: {
       minHeight: "100%",
       paddingHorizontal: KIT.gutter,
-    },
-    spacer: {
-      flex: 1,
-      minHeight: 24,
     },
     firstSection: {
       height: 24,

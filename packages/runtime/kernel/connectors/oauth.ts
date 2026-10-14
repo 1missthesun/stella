@@ -126,20 +126,42 @@ const credentialScope = (tokenKey: string) =>
 
 const emptyStore = (): TokenStore => ({ version: 2, tokens: {} });
 
-const readTokenStore = (stellaAppDir: string): Effect.Effect<TokenStore> =>
-  tryConnectorOp(async () => {
-    const parsed = JSON.parse(
-      await fs.readFile(tokenFile(stellaAppDir), "utf-8"),
-    ) as TokenStore;
-    return parsed?.version === 2 &&
-      parsed.tokens &&
-      typeof parsed.tokens === "object"
-      ? parsed
-      : emptyStore();
-  }).pipe(
-    // Missing/corrupt stores read as empty, exactly as before.
-    Effect.catch(() => Effect.succeed(emptyStore())),
+const isTokenStore = (value: unknown): value is TokenStore =>
+  Boolean(
+    value &&
+      typeof value === "object" &&
+      (value as TokenStore).version === 2 &&
+      (value as TokenStore).tokens &&
+      typeof (value as TokenStore).tokens === "object",
   );
+
+const readTokenStore = (
+  stellaAppDir: string,
+): Effect.Effect<TokenStore, unknown> =>
+  tryConnectorOp(async () => {
+    const file = tokenFile(stellaAppDir);
+    let raw: string;
+    try {
+      raw = await fs.readFile(file, "utf-8");
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return emptyStore();
+      throw error;
+    }
+    let parsed: unknown = null;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      parsed = null;
+    }
+    if (isTokenStore(parsed)) return parsed;
+    const quarantined = `${file}.corrupt-${Date.now()}`;
+    await fs.rename(file, quarantined);
+    console.warn("[connectors] Moved an unreadable credential store aside.", {
+      quarantined: path.basename(quarantined),
+      bytes: raw.length,
+    });
+    return emptyStore();
+  });
 
 const writeTokenStore = (
   stellaAppDir: string,

@@ -94,9 +94,7 @@ at Stella's account:
 
 The URLs in the vars follow the worker names: `https://<worker name>.<sub>.workers.dev`.
 In prod the model gateway is `stella-v2-model-gateway` and telemetry is
-`stella-v2-telemetry` (no `-prod`). `TRUSTED_APPS_HOST_BASE_URL` only has to be
-an https origin different from `APPS_HOST_BASE_URL`; the `apps-auth` name is
-fine as is.
+`stella-v2-telemetry` (no `-prod`).
 
 After editing a worker's `wrangler.jsonc`, `bun run types:generate` in that
 worker refreshes its generated types (only typechecks need them).

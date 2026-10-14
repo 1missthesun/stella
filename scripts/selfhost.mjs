@@ -221,7 +221,6 @@ const names = (prefix) => ({
     canvasShare: `${prefix}-share`,
     sites: `${prefix}-sites`,
   },
-  appsAuth: `${prefix}-apps-auth`,
   container: `${prefix}-cloud-builder-sandbox-do`,
   d1: `${prefix}-db`,
   kv: {
@@ -398,7 +397,6 @@ const urlsFor = (subdomain) => {
     backend: at(N.workers.cloudBuilder),
     modelGateway: at(N.workers.modelGateway),
     appsHost: at(N.workers.appsHost),
-    appsAuth: at(N.appsAuth),
     canvasShare: at(N.workers.canvasShare),
     sites: at(N.workers.sites),
   };
@@ -455,7 +453,6 @@ const buildConfigs = (state, { billing }) => {
   Object.assign(vars, {
     TELEMETRY_ENVIRONMENT: "production",
     APPS_HOST_BASE_URL: urls.appsHost,
-    TRUSTED_APPS_HOST_BASE_URL: urls.appsAuth,
     MODEL_GATEWAY_URL: urls.modelGateway,
     CAPABILITY_SIGNING_KID: CAPABILITY_KID,
     CLOUD_BUILDER_PUBLIC_URL: urls.backend,

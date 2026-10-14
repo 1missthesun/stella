@@ -1,6 +1,5 @@
 import { useSyncExternalStore } from "react";
 import type { DisplayPayload } from "@stella/contracts/desktop/display-payload";
-import { displayTabs } from "./tab-store";
 
 export type SourceDiffBatch = {
   id: string;
@@ -41,18 +40,6 @@ export const useSourceDiffBatches = (): Snapshot =>
   useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 
 export const sourceDiffBatches = {
-  push(batch: SourceDiffBatch): void {
-    if (batch.payloads.length === 0) return;
-    const existing = state.batches.findIndex((entry) => entry.id === batch.id);
-    if (existing >= 0) {
-      const nextBatches = state.batches.slice();
-      nextBatches[existing] = batch;
-      emit({ batches: nextBatches, activeBatchId: state.activeBatchId });
-      return;
-    }
-    const nextBatches = [batch, ...state.batches].slice(0, MAX_BATCHES);
-    emit({ batches: nextBatches, activeBatchId: batch.id });
-  },
   pushAndActivate(batch: SourceDiffBatch): void {
     if (batch.payloads.length === 0) return;
     const existing = state.batches.findIndex((entry) => entry.id === batch.id);
@@ -74,18 +61,4 @@ export const sourceDiffBatches = {
     if (state.batches.length === 0 && state.activeBatchId === null) return;
     emit(EMPTY);
   },
-};
-
-/**
- * Push a batch and open (or activate) the singleton tab. The tab
- * spec itself comes from the caller so we don't pull `tab-content`
- * into this module (which would create a cycle —
- * `tab-content.tsx` already imports from this file).
- */
-export const pushAndOpenSourceDiffBatch = (
-  batch: SourceDiffBatch,
-  spec: Parameters<typeof displayTabs.openTab>[0],
-): void => {
-  sourceDiffBatches.pushAndActivate(batch);
-  displayTabs.openTab(spec);
 };

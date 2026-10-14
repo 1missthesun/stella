@@ -3,7 +3,7 @@ import { isFilesPayload } from "./payload-kind";
 import { sidebarSections } from "./sidebar-sections";
 import { displayTabs } from "./tab-store";
 import {
-  pushAndOpenSourceDiffBatch,
+  sourceDiffBatches,
   type SourceDiffBatch,
 } from "./source-diff-batches";
 import type { DisplayTabSpec, OpenTabOptions } from "./types";
@@ -43,5 +43,8 @@ export const openDisplayPayloadTab = (
 };
 
 export const openSourceDiffBatch = (batch: SourceDiffBatch): void => {
-  pushAndOpenSourceDiffBatch(batch, getAdapter().createSourceDiffTabSpec());
+  sourceDiffBatches.pushAndActivate(batch);
+  const spec = getAdapter().createSourceDiffTabSpec();
+  displayTabs.openTab(spec);
+  sidebarSections.openLocation("files", spec.id);
 };

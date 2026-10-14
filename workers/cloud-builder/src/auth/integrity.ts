@@ -83,7 +83,6 @@ export const turnstileSecret = (env: unknown): string | undefined =>
 
 /** Which proof purpose an auth path needs, or null when it needs none. */
 export const integrityPurposeForPath = (path: string | undefined): AppIntegrityPurpose | null => {
-  if (path === "/sign-in/anonymous") return "anonymous-sign-in";
   if (path === "/sign-in/magic-link" || path === "/link/send") return "magic-link";
   return null;
 };

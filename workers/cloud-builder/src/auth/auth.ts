@@ -4,14 +4,15 @@
  * - Sessions are long-lived opaque bearers (desktop and mobile keep them on
  *   disk); `GET /api/auth/token` mints the 15-minute RS256 JWT every other
  *   route verifies (`iss` = this worker's URL, `aud` = "stella", `sub` = the
- *   user id, which is the owner id; claims `sid`, `anon`, `idl`), and
+ *   user id, which is the owner id; claims `sid`, `idl`), and
  *   `GET /api/auth/jwks` publishes its public keys. The private keys are in
  *   D1's `jwks` table, encrypted under BETTER_AUTH_SECRET. DEPLOY.md,
  *   "Rotating server secrets", covers BETTER_AUTH_SECRET_V2.
- * - Anonymous users, magic links (Resend), Google and Apple, one-time tokens
- *   for browser-to-app returns, and the `stellaHandoff` endpoints.
- * - Mobile integrity and web Turnstile guard anonymous sign-in and magic
- *   links (src/auth/integrity.ts).
+ * - Magic links (Resend), Google and Apple, one-time tokens for
+ *   browser-to-app returns, and the `stellaHandoff` endpoints. There is no
+ *   anonymous sign-in.
+ * - Mobile integrity and web Turnstile guard magic links
+ *   (src/auth/integrity.ts).
  * - Deleting a user closes its owner object first (`OwnerGate.closeOwner`).
  *
  * One instance per isolate.
@@ -21,7 +22,7 @@
 import "reflect-metadata";
 import { betterAuth, type BetterAuthOptions, type BetterAuthPlugin } from "better-auth";
 import { APIError, createAuthMiddleware, getSessionFromCtx } from "better-auth/api";
-import { anonymous, bearer, jwt, magicLink, oneTimeToken } from "better-auth/plugins";
+import { bearer, jwt, magicLink, oneTimeToken } from "better-auth/plugins";
 import { expo } from "@better-auth/expo";
 
 // Loaded after this module's static imports (reflect-metadata first): the
@@ -418,55 +419,6 @@ const pushSignOutTeardown = (env: AuthEnv): BetterAuthPlugin => ({
   },
 });
 
-/**
- * A magic link sent with an anonymous bearer for an unused email (see
- * `stellaHandoff`) upgrades that anonymous user when it is opened: the user
- * takes the email, so the verification signs in to it with a fresh session.
- */
-const upgradeAnonymousOnMagicLink = async (env: AuthEnv, ctx: {
-  query?: Record<string, unknown>;
-  context: { internalAdapter: { findVerificationValue(identifier: string): Promise<{ value: string; expiresAt: Date } | null>; findUserByEmail(email: string): Promise<unknown>; updateUser(id: string, data: Record<string, unknown>): Promise<unknown> } };
-}): Promise<void> => {
-  const token = typeof ctx.query?.token === "string" ? ctx.query.token : "";
-  const callback = typeof ctx.query?.callbackURL === "string" ? ctx.query.callbackURL : "";
-  if (!token || !callback || !env.DB) return;
-  let requestId: string | null = null;
-  try {
-    const url = new URL(decodeURIComponent(callback), backendUrl(env));
-    if ([backendUrl(env), authUrl(env)].includes(url.origin) && url.pathname === "/api/auth/link/verify") {
-      requestId = url.searchParams.get("requestId");
-    }
-  } catch {
-    return;
-  }
-  if (!requestId) return;
-  const row = await env.DB
-    .prepare("SELECT email, from_user_id AS fromUserId FROM auth_link_requests WHERE request_id = ? AND status = 'pending'")
-    .bind(requestId)
-    .first<{ email: string; fromUserId: string | null }>();
-  if (!row?.fromUserId) return;
-  const verification = await ctx.context.internalAdapter.findVerificationValue(token);
-  if (!verification || verification.expiresAt < new Date()) return;
-  let email = "";
-  try {
-    email = String((JSON.parse(verification.value) as { email?: unknown }).email ?? "").toLowerCase();
-  } catch {
-    return;
-  }
-  if (email !== row.email || (await ctx.context.internalAdapter.findUserByEmail(email))) return;
-  const anonymousUser = await env.DB
-    .prepare('SELECT "isAnonymous" FROM "user" WHERE "id" = ?')
-    .bind(row.fromUserId)
-    .first<{ isAnonymous: number | null }>();
-  if (anonymousUser?.isAnonymous !== 1) return;
-  await ctx.context.internalAdapter.updateUser(row.fromUserId, {
-    email,
-    emailVerified: true,
-    isAnonymous: false,
-    identityLevel: 1,
-  });
-};
-
 const buildOptions = (env: AuthEnv) => {
   const backend = backendUrl(env);
   if (!backend) throw new Error("CLOUD_BUILDER_PUBLIC_URL is required for auth.");
@@ -506,8 +458,9 @@ const buildOptions = (env: AuthEnv) => {
     },
     user: {
       additionalFields: {
-        // The identity ladder: 0 anonymous, 1 email, 2 social. Paying (3) is
-        // the billing ledger's to say, not the user row's.
+        // The identity ladder: 1 email, 2 social. Paying (3) is the billing
+        // ledger's to say, not the user row's.
+        isAnonymous: { type: "boolean", required: false, defaultValue: false, input: false },
         identityLevel: { type: "number", required: false, defaultValue: 0, input: false },
       },
       deleteUser: {
@@ -532,8 +485,6 @@ const buildOptions = (env: AuthEnv) => {
       // oauthStateBinding() binds it to the browser with its own cookie.
       storeStateStrategy: "database",
       skipStateCookieCheck: true,
-      // An anonymous user links a provider account whose email is not its
-      // placeholder address.
       accountLinking: { enabled: true, allowDifferentEmails: true },
     },
     hooks: {
@@ -543,10 +494,6 @@ const buildOptions = (env: AuthEnv) => {
             code: "owner_mode",
             message: "This Stella server connects devices by pairing. Ask its owner for a pairing code.",
           });
-        }
-        if (ctx.path === "/magic-link/verify") {
-          await upgradeAnonymousOnMagicLink(env, ctx as never);
-          return;
         }
         const purpose = integrityPurposeForPath(ctx.path);
         if (!purpose || !ctx.request) return;
@@ -564,18 +511,16 @@ const buildOptions = (env: AuthEnv) => {
         create: {
           before: async (user, ctx) => {
             const social = ctx?.path?.startsWith("/callback") === true;
-            const identityLevel = (user as { isAnonymous?: boolean }).isAnonymous ? 0 : social ? 2 : 1;
-            return { data: { ...user, identityLevel } };
+            return { data: { ...user, isAnonymous: false, identityLevel: social ? 2 : 1 } };
           },
         },
       },
       account: {
         create: {
-          // A provider account makes the user a social account, including an
-          // anonymous user linking one in place.
+          // A provider account makes the user a social account.
           after: async (account, ctx) => {
             if (account.providerId !== "google" && account.providerId !== "apple") return;
-            await ctx?.context.internalAdapter.updateUser(account.userId, { isAnonymous: false, identityLevel: 2 });
+            await ctx?.context.internalAdapter.updateUser(account.userId, { identityLevel: 2 });
           },
         },
       },
@@ -631,7 +576,6 @@ const buildOptions = (env: AuthEnv) => {
       pushSignOutTeardown(env),
       oneTimeToken({ storeToken: "hashed", expiresIn: 3, disableClientRequest: true, setOttHeaderOnNewSession: true }),
       nativeOttRedirect(),
-      anonymous({ emailDomainName: "anon.stella.local", disableDeleteAnonymousUser: true }),
       magicLink({ storeToken: "hashed", sendMagicLink: ({ email, url }) => sendMagicLinkEmail(env, email, url) }),
       jwt({
         jwks: { keyPairConfig: { alg: "RS256", modulusLength: 2048 } },
@@ -641,7 +585,7 @@ const buildOptions = (env: AuthEnv) => {
           expirationTime: "15m",
           definePayload: ({ user, session }) => ({
             sid: session.id,
-            anon: user.isAnonymous === true,
+            ...(user.isAnonymous === true ? { anon: true } : {}),
             idl: typeof user.identityLevel === "number" ? user.identityLevel : 0,
             ...(testAccountsEnabled(env) && user.email?.endsWith(TEST_ACCOUNT_EMAIL_SUFFIX) ? { tst: true } : {}),
           }),
@@ -667,7 +611,6 @@ const buildOptions = (env: AuthEnv) => {
         env,
         backendUrl: authUrl(env),
         websiteUrl: websiteUrl(env),
-        secret: authKeys.current,
         cipherKey: betterAuthCipherKey(authKeys),
         api,
       }),

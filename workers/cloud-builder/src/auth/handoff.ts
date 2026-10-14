@@ -18,23 +18,14 @@
  * and stores it encrypted under BETTER_AUTH_SECRET, and only the holder of the
  * secret can claim it.
  *
- * The caller's bearer may be its session token or its Stella JWT.
- *
- * Anonymous upgrade happens in place. A magic link sent with an anonymous
- * session's bearer for an email nobody uses gives that user the email when
- * the link is opened (the `/magic-link/verify` before-hook in auth.ts). A
- * social start with an anonymous bearer links the provider account to the
- * anonymous user (`linkSocialAccount`); the claim then returns the same,
- * now connected, session. When the email or provider account already belongs
- * to someone, it is an ordinary sign-in and the anonymous data is abandoned.
+ * The starts take no bearer. Older clients still send one (and
+ * `requireAnonymousOwner`); both are ignored.
  */
 
 import { isAppIntegrityPurpose } from "@stella/contracts/app-integrity";
 import type { BetterAuthPlugin } from "better-auth";
-import { createAuthEndpoint, getSessionFromCtx } from "better-auth/api";
-import { makeSignature, symmetricDecrypt, symmetricEncrypt, type SecretConfig } from "better-auth/crypto";
-import { bearerCredential } from "../../../shared/bearer.js";
-import { verifyUserToken } from "../auth-jwt.js";
+import { createAuthEndpoint } from "better-auth/api";
+import { symmetricDecrypt, symmetricEncrypt, type SecretConfig } from "better-auth/crypto";
 import { isDisposableEmail } from "./disposable-email-domains.js";
 import { issueIntegrityNonce } from "./integrity.js";
 import { readOttCookie, withClearedOttCookie } from "./ott-cookie.js";
@@ -47,21 +38,12 @@ export type HandoffApi = {
     headers: Headers;
     returnHeaders: true;
   }): Promise<{ headers: Headers; response: { user?: { id?: unknown } } }>;
-  linkSocialAccount(input: {
-    body: { provider: "google"; callbackURL: string; errorCallbackURL: string; disableRedirect: true };
-    headers: Headers;
-  }): Promise<{ url?: string }>;
-  signInSocial(input: {
-    body: { provider: "google"; callbackURL: string; disableRedirect: true };
-    headers: Headers;
-  }): Promise<{ url?: string }>;
 };
 
 export type HandoffConfig = {
   env: Cloudflare.Env;
   backendUrl: string;
   websiteUrl: string;
-  secret: string;
   cipherKey: string | SecretConfig;
   api: () => HandoffApi;
 };
@@ -153,67 +135,6 @@ const normalizeReturnTarget = (rawReturnTo: string, requestOrigin: string): stri
   }
 };
 
-type Endpoint = Parameters<typeof getSessionFromCtx>[0] & {
-  body?: unknown;
-  query?: Record<string, unknown>;
-  request?: Request;
-  headers?: Headers;
-};
-
-type BearerSession = { userId: string; anonymous: boolean; bearer: string };
-
-/**
- * The session behind a bearer: a session token, or a Stella JWT whose `sid`
- * names a live session. Either way the result carries the signed session
- * token, which is what Better Auth's own endpoints accept.
- */
-const bearerSession = async (ctx: Endpoint, config: HandoffConfig, bearer: string): Promise<BearerSession | null> => {
-  if (bearer.split(".").length !== 3) {
-    const session = await getSessionFromCtx(ctx).catch(() => null);
-    if (!session) return null;
-    return {
-      userId: session.user.id,
-      anonymous: (session.user as { isAnonymous?: unknown }).isAnonymous === true,
-      bearer,
-    };
-  }
-  const verified = await verifyUserToken(bearer, config.env);
-  if (!verified.ok || !verified.token.sessionId || !config.env.DB) return null;
-  const row = await config.env.DB
-    .prepare(
-      `SELECT s."token" AS token, u."isAnonymous" AS isAnonymous FROM "session" s JOIN "user" u ON u."id" = s."userId"
-        WHERE s."id" = ? AND s."userId" = ? AND s."expiresAt" > ?`,
-    )
-    .bind(verified.token.sessionId, verified.token.subject, new Date().toISOString())
-    .first<{ token: string; isAnonymous: number | null }>();
-  if (!row) return null;
-  return {
-    userId: verified.token.subject,
-    anonymous: row.isAnonymous === 1,
-    bearer: `${row.token}.${await makeSignature(row.token, config.secret)}`,
-  };
-};
-
-/**
- * The anonymous user a request may upgrade: from its own bearer, never from
- * anything in the body. A bearer that does not verify is refused outright.
- */
-const anonymousCaller = async (
-  ctx: Endpoint,
-  config: HandoffConfig,
-  requireAnonymous: boolean,
-): Promise<{ userId?: string; bearer?: string } | Response> => {
-  const authorization = ctx.headers?.get("authorization")?.trim() ?? "";
-  const bearer = bearerCredential(authorization);
-  if (authorization && !bearer) return fail(401, "The anonymous session could not be verified.");
-  const session = bearer ? await bearerSession(ctx, config, bearer) : null;
-  if (bearer && !session) return fail(401, "The anonymous session could not be verified.");
-  if (requireAnonymous && !session?.anonymous) {
-    return fail(401, "An authenticated anonymous session is required to preserve this conversation.");
-  }
-  return session?.anonymous ? { userId: session.userId, bearer: session.bearer } : {};
-};
-
 const sessionTokenOf = (result: { headers: Headers; response: { user?: { id?: unknown } } }) => ({
   token: result.headers.get("set-auth-token")?.trim() ?? "",
   userId: typeof result.response?.user?.id === "string" ? result.response.user.id : "",
@@ -230,29 +151,15 @@ export const stellaHandoff = (config: HandoffConfig) => {
   const linkRow = (requestId: string) =>
     db().prepare("SELECT * FROM auth_link_requests WHERE request_id = ?").bind(requestId).first<LinkRow>();
 
-  const insertLinkRequest = async (row: {
-    requestId: string;
-    email: string;
-    fromUserId?: string;
-    claimHash: string;
-    tokenEnc?: string;
-  }) => {
+  const insertLinkRequest = async (row: { requestId: string; email: string; claimHash: string }) => {
     const now = Date.now();
     await db()
       .prepare(
         `INSERT INTO auth_link_requests
            (request_id, email, status, from_user_id, claim_hash, token_enc, expires_at, created_at)
-         VALUES (?, ?, 'pending', ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, 'pending', NULL, ?, NULL, ?, ?)`,
       )
-      .bind(
-        row.requestId,
-        row.email,
-        row.fromUserId ?? null,
-        row.claimHash,
-        row.tokenEnc ?? null,
-        now + MAGIC_LINK_EXPIRY_MS,
-        now,
-      )
+      .bind(row.requestId, row.email, row.claimHash, now + MAGIC_LINK_EXPIRY_MS, now)
       .run();
   };
 
@@ -280,30 +187,6 @@ export const stellaHandoff = (config: HandoffConfig) => {
     }
   };
 
-  /** An in-place link failed (the account belongs to someone else): sign in normally instead. */
-  const fallBackToSignIn = async (callbackURL: string): Promise<Response> => {
-    const started = await config.api().signInSocial({
-      body: { provider: "google", callbackURL, disableRedirect: true },
-      headers: new Headers({ origin: config.backendUrl }),
-    });
-    return started.url ? bridgeResponse(302, started.url) : bridgeResponse(400);
-  };
-
-  /** Start a social sign-in that links to the anonymous caller, or none without one. */
-  const linkSocial = async (bearer: string | undefined, callbackURL: string): Promise<string | undefined> => {
-    if (!bearer) return undefined;
-    const linked = await config.api().linkSocialAccount({
-      body: { provider: "google", callbackURL, errorCallbackURL: `${callbackURL}&fallback=1`, disableRedirect: true },
-      headers: new Headers({ authorization: `Bearer ${bearer}`, origin: config.backendUrl }),
-    });
-    return linked.url;
-  };
-
-  const userIsAnonymous = async (userId: string): Promise<boolean> => {
-    const row = await db().prepare('SELECT "isAnonymous" FROM "user" WHERE "id" = ?').bind(userId).first<{ isAnonymous: number | null }>();
-    return row?.isAnonymous === 1;
-  };
-
   return {
     id: "stella-handoff",
     endpoints: {
@@ -315,21 +198,8 @@ export const stellaHandoff = (config: HandoffConfig) => {
         if (isDisposableEmail(email)) return reply({ error: "email_not_supported" }, 400);
         const claimHash = text(body.claimHash);
         if (!CLAIM_HASH_PATTERN.test(claimHash)) return fail(400, "A valid claimHash is required");
-        if (body.requireAnonymousOwner !== undefined && typeof body.requireAnonymousOwner !== "boolean") {
-          return fail(400, "requireAnonymousOwner must be a boolean.");
-        }
-        const caller = await anonymousCaller(ctx as Endpoint, config, body.requireAnonymousOwner === true);
-        if (caller instanceof Response) return caller;
-        // Upgrade in place only into an email nobody uses; otherwise this is
-        // an ordinary sign-in to the account that has it.
-        const taken = await ctx.context.internalAdapter.findUserByEmail(email);
         const requestId = crypto.randomUUID();
-        await insertLinkRequest({
-          requestId,
-          email,
-          ...(caller.userId && !taken ? { fromUserId: caller.userId } : {}),
-          claimHash,
-        });
+        await insertLinkRequest({ requestId, email, claimHash });
         try {
           await config.api().signInMagicLink({
             body: { email, callbackURL: `${config.backendUrl}/api/auth/link/verify?requestId=${encodeURIComponent(requestId)}` },
@@ -409,49 +279,19 @@ export const stellaHandoff = (config: HandoffConfig) => {
         if (!body) return fail(400, "Invalid JSON body");
         const claimHash = text(body.claimHash);
         if (!CLAIM_HASH_PATTERN.test(claimHash)) return fail(400, "A valid claimHash is required");
-        const caller = await anonymousCaller(ctx as Endpoint, config, false);
-        if (caller instanceof Response) return caller;
         const requestId = crypto.randomUUID();
         const callbackURL = `${config.backendUrl}/api/auth/desktop-social/verify?requestId=${encodeURIComponent(requestId)}`;
-        const url = caller.userId ? await linkSocial(caller.bearer, callbackURL) : undefined;
-        await insertLinkRequest({
-          requestId,
-          email: "desktop-social:google",
-          claimHash,
-          // A successful link keeps the anonymous session, now connected:
-          // the claim hands back that same session token.
-          ...(url && caller.userId && caller.bearer
-            ? { fromUserId: caller.userId, tokenEnc: await encrypt(caller.bearer) }
-            : {}),
-        });
-        return reply({ requestId, callbackURL, ...(url ? { url } : {}) });
+        await insertLinkRequest({ requestId, email: "desktop-social:google", claimHash });
+        return reply({ requestId, callbackURL });
       }),
 
       desktopSocialVerify: createAuthEndpoint("/desktop-social/verify", { method: "GET" }, async (ctx) => {
         const requestId = text(ctx.query?.requestId);
         const ott = readOttCookie(ctx.headers);
         const row = REQUEST_ID_PATTERN.test(requestId) ? await linkRow(requestId) : null;
-        if (row && row.status === "pending" && row.expires_at > Date.now()) {
-          if (ott) {
-            const { token, userId } = await exchangeOtt(ott);
-            if (token && userId) await completeLinkRequest(requestId, token, userId);
-          } else if (row.from_user_id && ctx.query?.fallback !== undefined) {
-            await db()
-              .prepare("UPDATE auth_link_requests SET from_user_id = NULL, token_enc = NULL WHERE request_id = ?")
-              .bind(requestId)
-              .run();
-            return await fallBackToSignIn(
-              `${config.backendUrl}/api/auth/desktop-social/verify?requestId=${encodeURIComponent(requestId)}`,
-            );
-          } else if (row.from_user_id && row.token_enc && !(await userIsAnonymous(row.from_user_id))) {
-            await db()
-              .prepare(
-                `UPDATE auth_link_requests SET status = 'completed', to_user_id = from_user_id, completed_at = ?
-                  WHERE request_id = ? AND status = 'pending'`,
-              )
-              .bind(Date.now(), requestId)
-              .run();
-          }
+        if (row && row.status === "pending" && row.expires_at > Date.now() && ott) {
+          const { token, userId } = await exchangeOtt(ott);
+          if (token && userId) await completeLinkRequest(requestId, token, userId);
         }
         return withClearedOttCookie(doneRedirect());
       }),
@@ -462,54 +302,38 @@ export const stellaHandoff = (config: HandoffConfig) => {
         if (!body) return fail(400, "Invalid JSON body");
         const returnTo = normalizeReturnTarget(text(body.returnTo), origin);
         if (!returnTo) return fail(400, "Invalid browser auth return target.");
-        const caller = await anonymousCaller(ctx as Endpoint, config, true);
-        if (caller instanceof Response) return caller;
         const requestId = crypto.randomUUID();
         const now = Date.now();
         const callbackURL = `${config.backendUrl}/api/auth/browser-social/verify?requestId=${encodeURIComponent(requestId)}`;
-        const url = await linkSocial(caller.bearer, callbackURL);
         await db()
           .prepare(
             `INSERT INTO auth_browser_handoffs
                (request_id, provider, from_user_id, return_origin, return_to, status, expires_at, created_at)
-             VALUES (?, 'google', ?, ?, ?, ?, ?, ?)`,
+             VALUES (?, 'google', '', ?, ?, 'pending', ?, ?)`,
           )
-          .bind(requestId, caller.userId ?? "", origin, returnTo, url ? "linking" : "pending", now + BROWSER_SOCIAL_HANDOFF_EXPIRY_MS, now)
+          .bind(requestId, origin, returnTo, now + BROWSER_SOCIAL_HANDOFF_EXPIRY_MS, now)
           .run();
-        return reply({ callbackURL, ...(url ? { url } : {}) });
+        return reply({ callbackURL });
       }),
 
       // The provider hook sets the one-time credential as a cookie. This
       // no-render route consumes it before any app shell loads and returns to
-      // the registered target with the credential in a fragment, once. A
-      // completed in-place link returns without one: the browser's session is
-      // the same, now connected.
+      // the registered target with the credential in a fragment, once.
       browserSocialVerify: createAuthEndpoint("/browser-social/verify", { method: "GET" }, async (ctx) => {
         const requestId = text(ctx.query?.requestId);
         const ott = readOttCookie(ctx.headers);
-        if (!REQUEST_ID_PATTERN.test(requestId) || (ott && !OTT_PATTERN.test(ott))) return bridgeResponse(400);
-        const callbackURL = `${config.backendUrl}/api/auth/browser-social/verify?requestId=${encodeURIComponent(requestId)}`;
-        if (!ott && ctx.query?.fallback !== undefined) {
-          const switched = await db()
-            .prepare(
-              `UPDATE auth_browser_handoffs SET status = 'pending' WHERE request_id = ? AND status = 'linking' AND expires_at > ?`,
-            )
-            .bind(requestId, Date.now())
-            .run();
-          return (switched.meta.changes ?? 0) > 0 ? await fallBackToSignIn(callbackURL) : bridgeResponse(410);
-        }
+        if (!REQUEST_ID_PATTERN.test(requestId) || !ott || !OTT_PATTERN.test(ott)) return bridgeResponse(400);
         const consumed = await db()
           .prepare(
             `UPDATE auth_browser_handoffs SET status = 'consumed', consumed_at = ?
-              WHERE request_id = ? AND status = ? AND expires_at > ?
+              WHERE request_id = ? AND status = 'pending' AND expires_at > ?
               RETURNING return_origin AS returnOrigin, return_to AS returnTo`,
           )
-          .bind(Date.now(), requestId, ott ? "pending" : "linking", Date.now())
+          .bind(Date.now(), requestId, Date.now())
           .first<{ returnOrigin: string; returnTo: string }>();
         if (!consumed) return bridgeResponse(410);
         const returnTo = normalizeReturnTarget(consumed.returnTo, consumed.returnOrigin);
         if (!returnTo) return bridgeResponse(400);
-        if (!ott) return bridgeResponse(302, returnTo);
         const target = new URL(returnTo);
         target.hash = new URLSearchParams({ ott }).toString();
         return withClearedOttCookie(bridgeResponse(302, target.toString()));

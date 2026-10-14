@@ -3,14 +3,14 @@
  *
  * - Setup creates the owner with the admin bearer (`owner.ts`); devices join
  *   by one-time pairing (`pairing.ts`), which mints a normal session for it.
- * - Anonymous, magic-link and social sign-in are refused unless the server
- *   lists them in `STELLA_OWNER_MODE_SIGN_IN` (`anonymous`, `email`, `social`).
+ * - Magic-link and social sign-in are refused unless the server lists them
+ *   in `STELLA_OWNER_MODE_SIGN_IN` (`email`, `social`).
  * - Billing, abuse gates and push are off; the owner is never swept.
  *
  * Off (the hosted default), nothing here changes behavior.
  */
 
-export type OwnerModeSignIn = "anonymous" | "email" | "social";
+export type OwnerModeSignIn = "email" | "social";
 
 const read = (env: unknown, name: string): string => {
   const value = (env as Record<string, unknown> | null | undefined)?.[name];
@@ -32,7 +32,6 @@ export const signInAllowed = (env: unknown, method: OwnerModeSignIn): boolean =>
 /** Better Auth paths that sign someone in or start doing so, by method. */
 export const signInMethodForAuthPath = (path: string | undefined): OwnerModeSignIn | null => {
   if (!path) return null;
-  if (path === "/sign-in/anonymous") return "anonymous";
   if (path === "/sign-in/magic-link" || path === "/magic-link/verify" || path.startsWith("/link/")) return "email";
   if (
     path === "/sign-in/social" ||

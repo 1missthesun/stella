@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { chromiumUserDataRoots } from "../utils/chromium-browsers.js";
 import { execFile, spawn, type ChildProcess } from "node:child_process";
 import {
   accessSync,
@@ -1302,43 +1303,6 @@ const agentBackendResult = (
 const getSocketPath = (session: string) =>
   path.join(getSocketDir(), `${session}.sock`);
 
-/**
- * Per-browser user-data roots that hold installed extensions under
- * `<root>/<profile>/Extensions/<id>`. Mirrors the browser list in
- * register-stella-native-messaging-host's installUnix/Windows helpers.
- */
-const getChromiumUserDataRoots = (): string[] => {
-  const homedir = os.homedir();
-  const plat = os.platform();
-  if (plat === "darwin") {
-    const appSupport = path.join(homedir, "Library", "Application Support");
-    return [
-      path.join(appSupport, "Google", "Chrome"),
-      path.join(appSupport, "Microsoft Edge"),
-      path.join(appSupport, "BraveSoftware", "Brave-Browser"),
-      path.join(appSupport, "Chromium"),
-    ];
-  }
-  if (plat === "win32") {
-    const localAppData =
-      process.env.LOCALAPPDATA?.trim() ||
-      path.join(homedir, "AppData", "Local");
-    return [
-      path.join(localAppData, "Google", "Chrome", "User Data"),
-      path.join(localAppData, "Microsoft", "Edge", "User Data"),
-      path.join(localAppData, "BraveSoftware", "Brave-Browser", "User Data"),
-      path.join(localAppData, "Chromium", "User Data"),
-    ];
-  }
-  const cfg = path.join(homedir, ".config");
-  return [
-    path.join(cfg, "google-chrome"),
-    path.join(cfg, "microsoft-edge"),
-    path.join(cfg, "BraveSoftware", "Brave-Browser"),
-    path.join(cfg, "chromium"),
-  ];
-};
-
 export const isStellaBrowserBridgeBinaryInstalled = (): boolean => {
   try {
     const stellaBrowserRoot = resolveStellaBrowserRoot();
@@ -1351,7 +1315,7 @@ export const isStellaBrowserBridgeBinaryInstalled = (): boolean => {
 };
 
 export const isStellaExtensionInstalled = (): boolean => {
-  for (const root of getChromiumUserDataRoots()) {
+  for (const root of chromiumUserDataRoots()) {
     let entries;
     try {
       entries = readdirSync(root, { withFileTypes: true });

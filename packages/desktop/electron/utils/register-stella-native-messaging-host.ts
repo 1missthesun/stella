@@ -13,6 +13,10 @@ import {
   activateStagedStellaBrowserBinary,
   resolveStellaBrowserBinaryPath,
 } from "./stella-browser-paths.js";
+import {
+  chromiumUserDataRoots,
+  chromiumWindowsRegistryVendorKeys,
+} from "./chromium-browsers.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -109,12 +113,10 @@ exec ${quotedBinaryPath} native-host "$@"
 }
 
 async function installWindowsRegistry(manifestPath: string) {
-  const keys = [
-    `HKCU\\Software\\Google\\Chrome\\NativeMessagingHosts\\${STELLA_NATIVE_MESSAGING_HOST_NAME}`,
-    `HKCU\\Software\\Microsoft\\Edge\\NativeMessagingHosts\\${STELLA_NATIVE_MESSAGING_HOST_NAME}`,
-    `HKCU\\Software\\BraveSoftware\\Brave-Browser\\NativeMessagingHosts\\${STELLA_NATIVE_MESSAGING_HOST_NAME}`,
-    `HKCU\\Software\\Chromium\\NativeMessagingHosts\\${STELLA_NATIVE_MESSAGING_HOST_NAME}`,
-  ];
+  const keys = chromiumWindowsRegistryVendorKeys().map(
+    (vendor) =>
+      `HKCU\\Software\\${vendor}\\NativeMessagingHosts\\${STELLA_NATIVE_MESSAGING_HOST_NAME}`,
+  );
 
   await Promise.allSettled(
     keys.map(async (key) => {
@@ -132,38 +134,13 @@ async function installWindowsRegistry(manifestPath: string) {
 }
 
 function installUnixSymlinks(manifest: Record<string, unknown>) {
-  const homedir = os.homedir();
   const plat = os.platform();
-
-  const dirs: string[] = [];
-  if (plat === "darwin") {
-    dirs.push(
-      path.join(
-        homedir,
-        "Library/Application Support/Google/Chrome/NativeMessagingHosts",
-      ),
-      path.join(
-        homedir,
-        "Library/Application Support/Microsoft Edge/NativeMessagingHosts",
-      ),
-      path.join(
-        homedir,
-        "Library/Application Support/BraveSoftware/Brave-Browser/NativeMessagingHosts",
-      ),
-      path.join(
-        homedir,
-        "Library/Application Support/Chromium/NativeMessagingHosts",
-      ),
-    );
-  } else if (plat === "linux") {
-    const cfg = path.join(homedir, ".config");
-    dirs.push(
-      path.join(cfg, "google-chrome/NativeMessagingHosts"),
-      path.join(cfg, "microsoft-edge/NativeMessagingHosts"),
-      path.join(cfg, "BraveSoftware/Brave-Browser/NativeMessagingHosts"),
-      path.join(cfg, "chromium/NativeMessagingHosts"),
-    );
-  }
+  const dirs =
+    plat === "darwin" || plat === "linux"
+      ? chromiumUserDataRoots().map((root) =>
+          path.join(root, "NativeMessagingHosts"),
+        )
+      : [];
 
   const fileName = `${STELLA_NATIVE_MESSAGING_HOST_NAME}.json`;
   const payload = `${JSON.stringify(manifest, null, 2)}\n`;

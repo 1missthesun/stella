@@ -20,23 +20,14 @@ export const runDiscovery = async <A>(
 };
 
 export const tryDiscovery = <A>(
-  op: () => Promise<A>,
+  op: (signal: AbortSignal) => Promise<A>,
 ): Effect.Effect<A, unknown> =>
-  Effect.tryPromise({ try: op, catch: (error) => error });
+  Effect.tryPromise({ try: (signal) => op(signal), catch: (error) => error });
 
 export const tryDiscoverySync = <A>(op: () => A): Effect.Effect<A, unknown> =>
   Effect.try({ try: op, catch: (error) => error });
 
-/**
- * Parity port of the collectors' `withTimeout` helper — `Promise.race`
- * against a timer that RESOLVES with `fallback`:
- *
- * - a settlement (success or failure) before `ms` wins the race;
- * - after `ms` the fallback value wins. The losing collector is interrupted,
- *   but its promise-based leaves keep running to completion in the
- *   background and clean up after themselves, exactly as the abandoned
- *   `Promise.race` loser did.
- */
+/** On timeout the collector is interrupted, aborting the signal its leaves received. */
 export const timeoutFallback = <A, E, R>(
   effect: Effect.Effect<A, E, R>,
   ms: number,

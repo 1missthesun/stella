@@ -21,9 +21,9 @@ import type {
 
 const log = (...args: unknown[]) => console.error("[system-signals]", ...args);
 
-const execAsync = (command: string): Promise<string> => {
+const execAsync = (command: string, signal?: AbortSignal): Promise<string> => {
   return new Promise((resolve, reject) => {
-    exec(command, { encoding: "utf-8", maxBuffer: 5 * 1024 * 1024, windowsHide: true }, (error, stdout) => {
+    exec(command, { encoding: "utf-8", maxBuffer: 5 * 1024 * 1024, windowsHide: true, signal }, (error, stdout) => {
       if (error) reject(error);
       else resolve(stdout.trim());
     });
@@ -46,7 +46,7 @@ const openDatabase = async (dbPath: string): Promise<SqliteDatabase> => {
   return new Database(uri, { readonly: true }) as SqliteDatabase;
 };
 
-async function collectUserIdentity(): Promise<UserIdentitySignal | null> {
+async function collectUserIdentity(signal: AbortSignal): Promise<UserIdentitySignal | null> {
   const identity: UserIdentitySignal = {};
 
   try {
@@ -59,10 +59,10 @@ async function collectUserIdentity(): Promise<UserIdentitySignal | null> {
 
   try {
     if (os.platform() === "darwin") {
-      const fullName = await execAsync("id -F");
+      const fullName = await execAsync("id -F", signal);
       if (fullName) identity.fullName = fullName;
     } else if (os.platform() === "win32") {
-      const fullName = await execAsync("powershell -NoProfile -Command \"[Environment]::UserName\"");
+      const fullName = await execAsync("powershell -NoProfile -Command \"[Environment]::UserName\"", signal);
       if (fullName) identity.fullName = fullName;
     }
   } catch {
@@ -74,14 +74,14 @@ async function collectUserIdentity(): Promise<UserIdentitySignal | null> {
     : null;
 }
 
-async function collectDockPins(): Promise<DockPin[]> {
+async function collectDockPins(signal: AbortSignal): Promise<DockPin[]> {
   if (os.platform() !== "darwin") {
     return [];
   }
 
   try {
     const dockPlistPath = path.join(os.homedir(), "Library/Preferences/com.apple.dock.plist");
-    const output = await execAsync(`plutil -convert json -o - "${dockPlistPath}"`);
+    const output = await execAsync(`plutil -convert json -o - "${dockPlistPath}"`, signal);
     const plist = JSON.parse(output);
 
     const persistentApps = plist["persistent-apps"] || [];
@@ -311,7 +311,7 @@ const collectAppUsageEffect: Effect.Effect<AppUsageSummary[]> = Effect.suspend(
   },
 );
 
-async function collectDevice(): Promise<DeviceSignals> {
+async function collectDevice(signal: AbortSignal): Promise<DeviceSignals> {
   const platform = os.platform();
   const cpus = os.cpus();
   const cpu = cpus[0]?.model?.trim() || undefined;
@@ -330,13 +330,13 @@ async function collectDevice(): Promise<DeviceSignals> {
 
   if (platform === "darwin") {
     try {
-      const product = (await execAsync("sw_vers -productVersion")).trim();
+      const product = (await execAsync("sw_vers -productVersion", signal)).trim();
       if (product) osLabel = `macOS ${product}`;
     } catch {
       // Keep the os.release() fallback.
     }
     try {
-      model = (await execAsync("sysctl -n hw.model")).trim() || undefined;
+      model = (await execAsync("sysctl -n hw.model", signal)).trim() || undefined;
     } catch {
       // Model is optional.
     }
@@ -344,7 +344,8 @@ async function collectDevice(): Promise<DeviceSignals> {
     try {
       const caption = (
         await execAsync(
-          'powershell -NoProfile -Command "(Get-CimInstance Win32_OperatingSystem).Caption"'
+          'powershell -NoProfile -Command "(Get-CimInstance Win32_OperatingSystem).Caption"',
+          signal,
         )
       ).trim();
       if (caption) osLabel = caption;
@@ -354,7 +355,8 @@ async function collectDevice(): Promise<DeviceSignals> {
     try {
       const winModel = (
         await execAsync(
-          'powershell -NoProfile -Command "(Get-CimInstance Win32_ComputerSystem).Model"'
+          'powershell -NoProfile -Command "(Get-CimInstance Win32_ComputerSystem).Model"',
+          signal,
         )
       ).trim();
       model = winModel || undefined;
@@ -369,10 +371,10 @@ async function collectDevice(): Promise<DeviceSignals> {
 const collectSystemSignalsEffect: Effect.Effect<SystemSignals, unknown> =
   Effect.all(
     [
-      timeoutFallback(tryDiscovery(() => collectUserIdentity()), 2000, null),
-      timeoutFallback(tryDiscovery(() => collectDockPins()), 3000, []),
+      timeoutFallback(tryDiscovery(collectUserIdentity), 2000, null),
+      timeoutFallback(tryDiscovery(collectDockPins), 3000, []),
       timeoutFallback(collectAppUsageEffect, 10000, []),
-      timeoutFallback(tryDiscovery(() => collectDevice()), 4000, null),
+      timeoutFallback(tryDiscovery(collectDevice), 4000, null),
     ],
     { concurrency: "unbounded" },
   ).pipe(

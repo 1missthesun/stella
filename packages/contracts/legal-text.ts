@@ -231,7 +231,7 @@ Our model relay may temporarily cache assembled response content, including text
 
 AI providers have their own retention, safety, and account policies. Some API routes use provider-side response storage or continuation features. Stella does not guarantee zero retention for every provider or route, nor does using your own key guarantee it. Check the selected provider's terms and available account controls. Our commitment not to train models on your conversation content does not substitute for a third party's separate policy; Google API data is additionally protected by section 6.
 
-Official apps present an AI data-sharing disclosure and request the applicable consent when setting up AI use. You can decline and avoid those AI features. To stop sharing through a particular route, stop using it, change your engine, or disconnect it where supported. Changes do not recall data already sent. Consent to AI use is not consent to use Google API data for advertising or generalized model training.
+The mobile app presents an AI data-sharing disclosure and consent control when setting up AI use. You can decline and avoid those AI features. To stop sharing through a particular route, stop using it, change your engine, or disconnect it where supported. Changes do not recall data already sent. Consent to AI use is not consent to use Google API data for advertising or generalized model training.
 
 4. Credentials and secure-input features
 

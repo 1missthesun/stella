@@ -1,4 +1,5 @@
 type HistoryPageState = {
+  conversationId: string | null;
   offsetY: number;
   contentHeight: number;
   layoutHeight: number;
@@ -12,8 +13,10 @@ export class ChatHistoryPaging {
   private scrolling = false;
   private requested = false;
   private momentumPending = false;
+  private gestureConversationId: string | null = null;
 
-  beginDrag(): void {
+  beginDrag(conversationId: string | null): void {
+    this.gestureConversationId = conversationId;
     this.scrolling = true;
     this.requested = false;
     this.momentumPending = false;
@@ -40,6 +43,7 @@ export class ChatHistoryPaging {
     if (
       !this.scrolling ||
       this.requested ||
+      state.conversationId !== this.gestureConversationId ||
       state.loading ||
       state.layoutHeight <= 0
     ) {

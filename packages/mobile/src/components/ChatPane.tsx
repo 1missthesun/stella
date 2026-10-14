@@ -1449,15 +1449,11 @@ export function ChatPane({
   // instant no-op pulls on every tab return never flash the pill.
   const catchUpVisible = useCatchUpIndicatorVisible(catchingUp);
 
-  // Discard a previous conversation's gesture even if this pane stays mounted.
-  const historyPaging = useMemo(
-    () => new ChatHistoryPaging(),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [conversationId],
-  );
+  const [historyPaging] = useState(() => new ChatHistoryPaging());
   const requestHistoryNearPosition = useCallback(
     ({ contentOffset, contentSize, layoutMeasurement }: NativeScrollEvent) => {
       const page = historyPaging.takePage({
+        conversationId,
         offsetY: contentOffset.y,
         contentHeight: contentSize.height,
         layoutHeight: layoutMeasurement.height,
@@ -1469,6 +1465,7 @@ export function ChatPane({
       if (page === "newer") void onLoadNewerHistory?.();
     },
     [
+      conversationId,
       historyPaging,
       hasOlderHistory,
       hasNewerHistory,
@@ -1683,12 +1680,13 @@ export function ChatPane({
       if (selectingMessageIdRef.current != null) stopSelectingMessage();
       pendingSendNudgeRef.current = null;
       scroll.onScrollBeginDrag();
-      historyPaging.beginDrag();
+      historyPaging.beginDrag(conversationId);
       // A short page may already be at the boundary and never cross a list
       // threshold. The drag itself requests one page.
       requestHistoryNearPosition(e.nativeEvent);
     },
     [
+      conversationId,
       historyPaging,
       requestHistoryNearPosition,
       scroll.onScrollBeginDrag,

@@ -61,7 +61,6 @@ export function useChatScroll(
     placedRowHeightPx: number | null;
     staleAtMs: number;
   } | null>(null);
-  const placeLatestTurnRafRef = useRef(0);
   const trailingMessageIdRef = useRef(trailingMessageId);
   trailingMessageIdRef.current = trailingMessageId;
   const assistantLayoutBaselineRef = useRef<number | null>(null);
@@ -95,9 +94,6 @@ export function useChatScroll(
       stopFollowLoop();
       if (manualScrollSettleTimerRef.current) {
         clearTimeout(manualScrollSettleTimerRef.current);
-      }
-      if (placeLatestTurnRafRef.current) {
-        cancelAnimationFrame(placeLatestTurnRafRef.current);
       }
     },
     [stopFollowLoop],
@@ -338,10 +334,6 @@ export function useChatScroll(
     const measurement = latestUserLayoutRef.current;
     const isInitialPlacement = pending.placedRowHeightPx === null;
 
-    // If the optimistic row is no longer the list tail (for example, an
-    // assistant placeholder landed immediately after it), settling forward
-    // once is safer than using another row's height and framing the wrong
-    // turn — and later row-height changes must not re-anchor either.
     if (trailingMessageIdRef.current !== pending.userMessageId) {
       pendingSendAnchorRef.current = null;
       if (isInitialPlacement) setFollowTarget(maxOffset, true);
@@ -362,19 +354,6 @@ export function useChatScroll(
     setFollowTarget(target, true);
   }, [setFollowTarget]);
 
-  /** Coalesced two-frame delay so placement reads post-layout list metrics. */
-  const schedulePlaceLatestTurn = useCallback(() => {
-    if (placeLatestTurnRafRef.current) {
-      cancelAnimationFrame(placeLatestTurnRafRef.current);
-    }
-    placeLatestTurnRafRef.current = requestAnimationFrame(() => {
-      placeLatestTurnRafRef.current = requestAnimationFrame(() => {
-        placeLatestTurnRafRef.current = 0;
-        placeLatestTurn();
-      });
-    });
-  }, [placeLatestTurn]);
-
   const onListContentSizeChange = useCallback(
     (_width: number, height: number) => {
       const previousHeight = contentHeightRef.current;
@@ -387,10 +366,6 @@ export function useChatScroll(
         pending.userMessageId === trailingMessageIdRef.current &&
         Date.now() <= pending.staleAtMs
       ) {
-        if (placeLatestTurnRafRef.current) {
-          cancelAnimationFrame(placeLatestTurnRafRef.current);
-          placeLatestTurnRafRef.current = 0;
-        }
         placeLatestTurn();
         return;
       }
@@ -429,14 +404,10 @@ export function useChatScroll(
         pending.placedRowHeightPx === null ||
         Math.abs(pending.placedRowHeightPx - height) > 1
       ) {
-        // Start moving now; the list's content size may still be a frame
-        // behind, so re-place from settled metrics two frames on (a changed
-        // target just retargets the native scroll).
         placeLatestTurn();
-        schedulePlaceLatestTurn();
       }
     },
-    [placeLatestTurn, schedulePlaceLatestTurn],
+    [placeLatestTurn],
   );
 
   const nudgeAfterSend = useCallback(
@@ -449,9 +420,9 @@ export function useChatScroll(
       followRearmBlockedRef.current = false;
       setFollowArmed(true);
       stopFollowLoop();
-      schedulePlaceLatestTurn();
+      placeLatestTurn();
     },
-    [schedulePlaceLatestTurn, setFollowArmed, stopFollowLoop],
+    [placeLatestTurn, setFollowArmed, stopFollowLoop],
   );
 
   return {

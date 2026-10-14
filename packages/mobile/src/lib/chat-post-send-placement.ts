@@ -37,14 +37,9 @@ export function resolvePostSendTarget({
 }
 
 /**
- * Post-send anchor for the latest user row, derived from live list geometry.
  * `trailingSlackPx` is everything below the row (the chat tail plus the
  * reserved bottom inset), so `contentHeightPx - trailingSlackPx` is the row's
  * bottom.
- *
- * Recomputed whenever the row's measured height settles (e.g. the four-line
- * user-message clamp collapsing a tall row after its first unclamped-ish
- * paint), so the committed scroll target always matches the final geometry.
  */
 export function resolvePostSendPlacement({
   contentHeightPx,

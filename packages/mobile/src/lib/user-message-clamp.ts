@@ -1,11 +1,5 @@
 export const USER_MESSAGE_COLLAPSE_LINES = 4;
 
-/**
- * Line cap used while measuring overflow. One line beyond the collapse cap is
- * enough to distinguish "fits in four lines" from "overflows", so a long sent
- * message never paints at full height first — which used to briefly inflate
- * the row and skew the post-send scroll anchor before the clamp collapsed it.
- */
 export const USER_MESSAGE_MEASURE_LINES = USER_MESSAGE_COLLAPSE_LINES + 1;
 
 

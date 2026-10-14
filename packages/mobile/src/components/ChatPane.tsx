@@ -70,7 +70,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AddContextSheet } from "./AddContextSheet";
 import { Icon } from "./Icon";
 import {
-  formatTimestampHeader,
   readReceipt,
   timestampHeaders,
 } from "../lib/message-time-labels";
@@ -86,7 +85,12 @@ import {
   useConversationUserAskRecords,
   useConversationUserAsks,
 } from "../lib/user-asks";
-import { UserAskRecordView } from "./UserAskCard";
+import {
+  ChatListRow,
+  createChatRowEnvStore,
+  INLINE_ASK_RECORD_PREFIX,
+  type ChatRowEnv,
+} from "./chat/ChatListRow";
 import { consolidateRowArtifacts } from "../lib/agent-artifact-consolidation";
 import {
   ASSISTANT_ROW_PAD_VERTICAL,
@@ -126,7 +130,6 @@ import { ChatHistoryPaging } from "../lib/chat-history-paging";
 import {
   isStandInArtifactRow,
   markPrependedMessagesSeen,
-  shouldAnimateMessageEntry,
   visibleChatMessages,
 } from "../lib/message-row-identity";
 import { SHOW_AGENT_CARDS } from "../lib/agent-cards";
@@ -341,7 +344,6 @@ const NO_ATTACHMENTS: ChatPaneAttachments = {};
 const NO_QUOTES: ChatPaneQuotes = {};
 const NO_REALTIME_VOICE: ChatPaneRealtimeVoice = {};
 
-const INLINE_ASK_RECORD_PREFIX = "inline-ask-record:";
 
 const askRecordSignature = (record: UserAskRecord): string =>
   record.answers.map((answer) => answer.question).join("\u0000");
@@ -1445,93 +1447,68 @@ export function ChatPane({
     }),
     [stopSelectingMessage, quoteMessage],
   );
-  const renderItem = useCallback(
-    ({ item }: LegendListRenderItemProps<ChatMessage>) => {
-      if (item.id.startsWith(INLINE_ASK_RECORD_PREFIX) && item.askRecords) {
-        return (
-          <View>
-            {item.askRecords.map((record) => (
-              <UserAskRecordView key={record.id} record={record} />
-            ))}
-          </View>
-        );
-      }
-      const isActiveAssistant = item.id === activeAssistantId;
-      const isLatestUser =
-        item.id === latestUserMessageId || item.id === placingReplyId;
-      const animate = shouldAnimateMessageEntry(
-        seenMessageIdsRef.current,
-        item.id,
-      );
-      return (
-        <MessageEntry
-          key={item.id}
-          animate={animate && item.role !== "assistant"}
-          onLayout={
-            isActiveAssistant && item.id !== placingReplyId
-              ? onActiveAssistantLayout
-              : isLatestUser
-                ? (event) => onLatestUserLayout(item.id, event)
-                : undefined
-          }
-        >
-          {timeHeaders.has(item.id) ? (
-            <Text
-              style={styles.timestampHeader}
-              maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
-            >
-              {formatTimestampHeader(timeHeaders.get(item.id)!)}
-            </Text>
-          ) : null}
-          <ChatMessageRow
-            item={item}
-            conversationId={conversationId ?? ""}
-            animate={animate && item.id === lastMessage?.id && !historyLoading}
-            styles={rowStyles}
-            colors={colors}
-            menuActive={item.id === activeMenuMessageId}
-            isSelecting={item.id === selectingMessageId}
-            anySelecting={selectingMessageId != null}
-            actions={rowActions}
-            contextRef={replyContexts.contexts.get(item.id)}
-            contextStatus={contextStatusFor(
-              replyContexts,
-              replyContexts.contexts.get(item.id),
-            )}
-            desktopAccess={desktopAccess}
-            receiptLabel={receipt?.id === item.id ? receipt.label : null}
-            carriedQuotes={quoteCarry.carried.get(item.id)}
-            quotesForwarded={quoteCarry.forwarded.has(item.id)}
-            hideAgentChips={!SHOW_AGENT_CARDS || hiddenAgentChipIds.has(item.id)}
-          />
-        </MessageEntry>
-      );
-    },
-    [
+  const rowEnv = useMemo<ChatRowEnv>(
+    () => ({
+      conversationId: conversationId ?? "",
+      colors,
+      rowStyles,
+      timestampHeaderStyle: styles.timestampHeader,
+      actions: rowActions,
+      desktopAccess,
       timeHeaders,
-      hiddenAgentChipIds,
       receipt,
       replyContexts,
-      quoteCarry,
-      contextStatusFor,
-      lastMessage?.id,
+      carriedQuotes: quoteCarry.carried,
+      forwardedQuotes: quoteCarry.forwarded,
+      hiddenAgentChipIds,
+      showAgentCards: SHOW_AGENT_CARDS,
+      lastMessageId: lastMessage?.id ?? null,
       historyLoading,
-      styles,
-      rowStyles,
-      colors,
-      rowActions,
-      latestUserMessageId,
-      onLatestUserLayout,
-      onActiveAssistantLayout,
       activeAssistantId,
+      latestUserMessageId,
       placingReplyId,
       activeMenuMessageId,
       selectingMessageId,
-      desktopAccess,
+      seenMessageIds: seenMessageIdsRef.current,
+      onActiveAssistantLayout,
+      onLatestUserLayout,
+    }),
+    [
       conversationId,
+      colors,
+      rowStyles,
+      styles.timestampHeader,
+      rowActions,
+      desktopAccess,
+      timeHeaders,
+      receipt,
+      replyContexts,
+      quoteCarry,
+      hiddenAgentChipIds,
+      lastMessage?.id,
+      historyLoading,
+      activeAssistantId,
+      latestUserMessageId,
+      placingReplyId,
+      activeMenuMessageId,
+      selectingMessageId,
+      onActiveAssistantLayout,
+      onLatestUserLayout,
     ],
   );
-  const listExtraData = renderItem;
+  // Rows read the env from this store, so `renderItem` never changes and the
+  // list never re-renders every mounted row when the pane does. Staged during
+  // render so a row mounting in this commit reads it; published after commit
+  // so only rows whose slice changed re-render.
+  const [rowEnvStore] = useState(() => createChatRowEnvStore(rowEnv));
+  rowEnvStore.stage(rowEnv);
+  useLayoutEffect(() => rowEnvStore.publish(), [rowEnv, rowEnvStore]);
+  const renderItem = useCallback(
+    ({ item }: LegendListRenderItemProps<ChatMessage>) => {
+      return <ChatListRow item={item} store={rowEnvStore} />;
+    },
+    [rowEnvStore],
+  );
   const renderSeparator = useCallback(
     () => <View style={styles.itemSeparator} />,
     [styles],
@@ -1754,7 +1731,6 @@ export function ChatPane({
                   style={styles.messageList}
                   contentContainerStyle={listContentContainerStyle}
                   data={listMessages}
-                  extraData={listExtraData}
                   estimatedItemSize={64}
                   renderItem={renderItem}
                   keyExtractor={keyExtractor}

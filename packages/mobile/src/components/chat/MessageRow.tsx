@@ -455,7 +455,7 @@ const generatedImageStyles = StyleSheet.create({
   tile: { borderRadius: 14, maxWidth: 320, overflow: "hidden", width: "100%" },
 });
 
-type CompletionQuote = {
+export type CompletionQuote = {
   key: string;
   artifactId: string;
   ref: AgentReplyRef;

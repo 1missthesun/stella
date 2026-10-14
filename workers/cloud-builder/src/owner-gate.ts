@@ -1,4 +1,4 @@
-import { CloudHomeStore } from "./cloud-home-store.js";
+import { CloudHomeStore, isHomeControlOp, type HomeControlOp } from "./cloud-home-store.js";
 import { builtinCloudAppSkill } from "./builtin-cloud-app-skill.js";
 import type { OwnerHomeContext } from "./owner-home-context.js";
 import {
@@ -11,6 +11,7 @@ import { OwnerStore } from "./owner-store/store.js";
 import type {
   OwnerCaller,
   OwnerHost,
+  OwnerCredentialKind,
   OwnerPurgeMode,
 } from "./owner-store/registry.js";
 import { createGateHost } from "./owner-store/gate-host.js";
@@ -439,12 +440,32 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     args: unknown;
     ownerGeneration: string;
   }): Promise<RpcResponse> {
+    return await this.#atOwnerGeneration(input.ownerGeneration, input.name, () =>
+      this.ownerStore().internalCall(input.name, input.args),
+    );
+  }
+
+  async ownerCredential(input: {
+    kind: OwnerCredentialKind;
+    args: unknown;
+    ownerGeneration: string;
+  }): Promise<RpcResponse> {
+    return await this.#atOwnerGeneration(input.ownerGeneration, `credential:${input.kind}`, () =>
+      this.ownerStore().credentialCall(input.kind, input.args),
+    );
+  }
+
+  async #atOwnerGeneration(
+    ownerGeneration: string,
+    name: string,
+    run: () => Promise<RpcResponse>,
+  ): Promise<RpcResponse> {
     let current: string;
     try {
       current = (await this.snapshot()).ownerGeneration;
     } catch (error) {
       log("error", "owner_internal_snapshot_failed", {
-        name: input.name,
+        name,
         message: error instanceof Error ? error.message : String(error),
       });
       return {
@@ -454,7 +475,7 @@ export class OwnerGate extends OwnerGateCloudDispatch {
         ),
       };
     }
-    if (current !== input.ownerGeneration) {
+    if (current !== ownerGeneration) {
       return {
         ok: false,
         error: toBackendError(
@@ -468,18 +489,21 @@ export class OwnerGate extends OwnerGateCloudDispatch {
         ),
       };
     }
-    const response = await this.ownerStore().internalCall(
-      input.name,
-      input.args,
-    );
+    const response = await run();
     await this.scheduleAlarm(Date.now());
     return response;
   }
 
   async homeControl(input: {
-    op: string;
+    op: HomeControlOp;
     body: { ownerGeneration: string } & Record<string, unknown>;
   }): Promise<RpcResponse> {
+    if (!isHomeControlOp(input.op)) {
+      return {
+        ok: false,
+        error: toBackendError(new RpcError("NOT_FOUND", `Unknown home operation ${String(input.op)}.`)),
+      };
+    }
     return await this.ownerInternal({
       name: input.op,
       args: input.body,

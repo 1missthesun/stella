@@ -21,8 +21,21 @@ export const CLOUD_SKILL_RUNTIME_MAX_SKILLS = 20;
 export const CLOUD_SKILL_RUNTIME_MAX_FILES = 1_000;
 export const CLOUD_SKILL_RUNTIME_MAX_BYTES = 50 * 1024 * 1024;
 
+export const HOME_CONTROL_OPS = [
+  "memory.context",
+  "memory.legacyImport",
+  "skills.catalog",
+  "skills.begin",
+  "skills.commit",
+] as const;
+
+export type HomeControlOp = (typeof HOME_CONTROL_OPS)[number];
+
+export const isHomeControlOp = (op: string): op is HomeControlOp =>
+  (HOME_CONTROL_OPS as readonly string[]).includes(op);
+
 export type HomeControl = (
-  op: string,
+  op: HomeControlOp,
   body: { ownerGeneration: string } & Record<string, unknown>,
 ) => Promise<RpcResponse>;
 
@@ -359,7 +372,7 @@ export class CloudHomeStore {
     }
   }
 
-  private async control(op: string, body: Record<string, unknown>) {
+  private async control(op: HomeControlOp, body: Record<string, unknown>) {
     const response = await this.endpoint.control(op, {
       ...body,
       ownerGeneration: this.endpoint.ownerGeneration,

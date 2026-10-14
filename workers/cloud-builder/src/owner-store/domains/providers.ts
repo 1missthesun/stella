@@ -880,8 +880,8 @@ export const providersDomain = {
       handler: listModels,
     },
   },
-  internal: {
-    "providers.access": providerAccess,
+  credentials: {
+    provider: providerAccess,
   },
   purge: async (ctx) => {
     for (const [key, flow] of flows) {

@@ -263,6 +263,8 @@ export type InternalDef = (ctx: OwnerContext, args: unknown) => unknown;
 
 export type OwnerInternalCall = (name: string, args: unknown) => Promise<unknown>;
 
+export type OwnerCredentialKind = "chatgpt" | "provider";
+
 export type OwnerPurgeMode = "reset" | "delete";
 
 export type PurgeDef = (
@@ -277,6 +279,7 @@ export type OwnerDomain = {
   views?: { [K in ViewName]?: ViewDef<K> };
   jobs?: Record<string, JobDef>;
   internal?: Record<string, InternalDef>;
+  credentials?: Partial<Record<OwnerCredentialKind, InternalDef>>;
   purge?: PurgeDef;
 };
 
@@ -286,6 +289,7 @@ export type OwnerRegistry = {
   views: Map<string, ViewDef<ViewName>>;
   jobs: Map<string, JobDef>;
   internal: Map<string, InternalDef>;
+  credentials: Map<OwnerCredentialKind, InternalDef>;
   purges: Map<string, PurgeDef>;
 };
 
@@ -296,6 +300,7 @@ export const createOwnerRegistry = (domains: OwnerDomain[]): OwnerRegistry => {
     views: new Map(),
     jobs: new Map(),
     internal: new Map(),
+    credentials: new Map(),
     purges: new Map(),
   };
   const migrationIds = new Set<string>();
@@ -324,6 +329,10 @@ export const createOwnerRegistry = (domains: OwnerDomain[]): OwnerRegistry => {
     for (const [name, def] of Object.entries(domain.internal ?? {})) {
       if (registry.internal.has(name)) throw new Error(`Duplicate internal operation ${name}.`);
       registry.internal.set(name, def);
+    }
+    for (const [kind, def] of Object.entries(domain.credentials ?? {}) as [OwnerCredentialKind, InternalDef][]) {
+      if (registry.credentials.has(kind)) throw new Error(`Duplicate credential ${kind}.`);
+      registry.credentials.set(kind, def);
     }
     if (domain.purge) {
       if (registry.purges.has(domain.name)) throw new Error(`Duplicate purge for ${domain.name}.`);

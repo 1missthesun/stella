@@ -1916,8 +1916,10 @@ export const enginesDomain = {
       handler: listModels,
     },
   },
+  credentials: {
+    chatgpt: engineAccess,
+  },
   internal: {
-    "engines.access": engineAccess,
     "engines.claudeCloudAccount": (ctx) => claudeCloudAccount(ctx),
   },
   purge: async (ctx) => {

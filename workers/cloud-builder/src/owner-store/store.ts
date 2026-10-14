@@ -10,8 +10,10 @@ import {
 import { forkAbortTimer } from "@stella/runtime/kernel/tools/effect-runtime.js";
 import { RpcError, toBackendError } from "./errors.js";
 import type {
+  InternalDef,
   OwnerCaller,
   OwnerContext,
+  OwnerCredentialKind,
   OwnerDb,
   OwnerHost,
   OwnerJobs,
@@ -380,7 +382,18 @@ export class OwnerStore {
   }
 
   async internalCall(name: string, args: unknown): Promise<RpcResponse> {
-    const def = this.registry.internal.get(name);
+    return await this.runInternal(this.registry.internal.get(name), name, args);
+  }
+
+  async credentialCall(kind: OwnerCredentialKind, args: unknown): Promise<RpcResponse> {
+    return await this.runInternal(this.registry.credentials.get(kind), `credential:${kind}`, args);
+  }
+
+  private async runInternal(
+    def: InternalDef | undefined,
+    name: string,
+    args: unknown,
+  ): Promise<RpcResponse> {
     if (!def) {
       return {
         ok: false,

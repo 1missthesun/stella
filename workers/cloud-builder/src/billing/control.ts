@@ -88,8 +88,8 @@ export class BillingControl extends WorkerEntrypoint<Env> implements BillingCont
       return { ok: false, status: 400, code: "bad_request", retryable: false };
     }
     try {
-      const response = (await ownerGateStub(this.env.OWNER_GATES, request.ownerId).ownerInternal({
-        name: "engines.access",
+      const response = (await ownerGateStub(this.env.OWNER_GATES, request.ownerId).ownerCredential({
+        kind: "chatgpt",
         args: { provider: request.provider },
         ownerGeneration: request.ownerGeneration,
       })) as unknown as RpcResponse;
@@ -132,8 +132,8 @@ export class BillingControl extends WorkerEntrypoint<Env> implements BillingCont
       return { ok: false, status: 400, code: "bad_request", retryable: false };
     }
     try {
-      const response = (await ownerGateStub(this.env.OWNER_GATES, request.ownerId).ownerInternal({
-        name: "providers.access",
+      const response = (await ownerGateStub(this.env.OWNER_GATES, request.ownerId).ownerCredential({
+        kind: "provider",
         args: { provider: request.provider },
         ownerGeneration: request.ownerGeneration,
       })) as unknown as RpcResponse;

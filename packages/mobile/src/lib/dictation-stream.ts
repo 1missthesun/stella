@@ -31,6 +31,122 @@ export const describeDictationProviderError = (message: string): string => {
   }
   return trimmed || "Dictation failed.";
 };
+const WARM_SOCKET_TTL_MS = 50_000;
+const OPEN_TIMEOUT_MS = 10_000;
+
+const connectRelay = async (): Promise<WebSocket> => {
+  const [config, token] = await Promise.all([
+    loadDictationRealtimeConfig(),
+    getAuthToken(),
+  ]);
+  if (!token) throw new Error("Sign in to Stella to use dictation.");
+  const url = new URL("/dictation/socket", config.relayOrigin);
+  url.searchParams.set("start", "deferred");
+  if (url.protocol === "https:") url.protocol = "wss:";
+  else if (url.protocol === "http:") url.protocol = "ws:";
+  const credential = await socketCredentialProtocol({
+    socketUrl: url.toString(),
+    token,
+    purpose: "dictation",
+  });
+  return await new Promise<WebSocket>((resolve, reject) => {
+    const socket = new WebSocket(url.toString(), ["stella.v1", credential]);
+    socket.binaryType = "arraybuffer";
+    const settle = (error: Error | null) => {
+      clearTimeout(timer);
+      socket.onopen = null;
+      socket.onerror = null;
+      socket.onclose = null;
+      if (!error) {
+        resolve(socket);
+        return;
+      }
+      try {
+        socket.close();
+      } catch {
+        /* The peer may already be gone. */
+      }
+      reject(error);
+    };
+    const timer = setTimeout(() => {
+      settle(new Error("Dictation took too long to connect."));
+    }, OPEN_TIMEOUT_MS);
+    socket.onopen = () => settle(null);
+    socket.onerror = () => settle(new Error("Could not connect to dictation."));
+    socket.onclose = () => settle(new Error("Could not connect to dictation."));
+  });
+};
+
+let warmSocket: { socket: Promise<WebSocket>; expiresAt: number } | null =
+  null;
+
+const closeQuietly = (socket: WebSocket, reason: string) => {
+  socket.onclose = null;
+  try {
+    socket.close(1000, reason);
+  } catch {
+    /* Already closed. */
+  }
+};
+
+export const warmDictationSocket = (): void => {
+  if (warmSocket && Date.now() < warmSocket.expiresAt - 5_000) return;
+  releaseWarmDictationSocket();
+  const entry = {
+    socket: connectRelay(),
+    expiresAt: Date.now() + WARM_SOCKET_TTL_MS,
+  };
+  warmSocket = entry;
+  entry.socket.then(
+    (socket) => {
+      if (warmSocket !== entry) {
+        closeQuietly(socket, "Dictation idle");
+        return;
+      }
+      socket.onclose = () => {
+        if (warmSocket === entry) warmSocket = null;
+      };
+      setTimeout(() => {
+        if (warmSocket !== entry) return;
+        warmSocket = null;
+        closeQuietly(socket, "Dictation idle");
+      }, Math.max(0, entry.expiresAt - Date.now()));
+    },
+    () => {
+      if (warmSocket === entry) warmSocket = null;
+    },
+  );
+};
+
+export const releaseWarmDictationSocket = (): void => {
+  const entry = warmSocket;
+  warmSocket = null;
+  void entry?.socket.then(
+    (socket) => closeQuietly(socket, "Dictation idle"),
+    () => undefined,
+  );
+};
+
+const takeWarmSocket = (): Promise<WebSocket> | null => {
+  const entry = warmSocket;
+  warmSocket = null;
+  if (!entry) return null;
+  if (Date.now() >= entry.expiresAt) {
+    void entry.socket.then(
+      (socket) => closeQuietly(socket, "Dictation idle"),
+      () => undefined,
+    );
+    return null;
+  }
+  return entry.socket.then(
+    (socket) => {
+      socket.onclose = null;
+      return socket.readyState === WebSocket.OPEN ? socket : connectRelay();
+    },
+    () => connectRelay(),
+  );
+};
+
 type TranscriptFrame = {
   type?: unknown;
   sessionId?: unknown;
@@ -81,25 +197,18 @@ export class DictationStream {
   }
 
   async open(): Promise<void> {
-    const [config, token] = await Promise.all([
-      loadDictationRealtimeConfig(),
-      getAuthToken(),
-    ]);
     if (this.cancelled) throw new Error("Dictation cancelled.");
-    const relayOrigin = config.relayOrigin;
-    const url = new URL("/dictation/socket", relayOrigin);
-    if (url.protocol === "https:") url.protocol = "wss:";
-    else if (url.protocol === "http:") url.protocol = "ws:";
-    if (!token) throw new Error("Sign in to Stella to use dictation.");
-    const credential = await socketCredentialProtocol({
-      socketUrl: url.toString(),
-      token,
-      purpose: "dictation",
-    });
-    if (this.cancelled) throw new Error("Dictation cancelled.");
+    const socket = await (takeWarmSocket() ?? connectRelay());
+    if (this.cancelled) {
+      try {
+        socket.close(1000, "Cancelled");
+      } catch {
+        /* Already closed. */
+      }
+      throw new Error("Dictation cancelled.");
+    }
+    this.socket = socket;
     await new Promise<void>((resolve, reject) => {
-      const socket = new WebSocket(url.toString(), ["stella.v1", credential]);
-      this.socket = socket;
       const failOpening = (error: Error) => {
         clearTimeout(timer);
         this.rejectOpening = null;
@@ -119,8 +228,7 @@ export class DictationStream {
         failOpening(new Error("Dictation took too long to connect."));
       }, 10_000);
       this.rejectOpening = failOpening;
-      socket.binaryType = "arraybuffer";
-      socket.onopen = () => undefined;
+      socket.onopen = null;
       socket.onerror = () => {
         this.fail(
           new Error(
@@ -187,6 +295,11 @@ export class DictationStream {
           );
         }
       };
+      try {
+        socket.send(JSON.stringify({ type: "start" }));
+      } catch {
+        failOpening(new Error("Could not connect to dictation."));
+      }
     });
   }
 

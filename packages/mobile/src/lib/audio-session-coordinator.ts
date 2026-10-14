@@ -30,12 +30,14 @@ export class AudioSessionCoordinator {
 
   acquireRecording(
     mode: MobileAudioMode = { playsInSilentMode: true },
+    options: { apply?: boolean } = {},
   ): Promise<RecordingAudioLease | null> {
     const lease = ++this.nextLease;
     this.activeRecordingLease = lease;
 
     return this.enqueue(async () => {
       if (this.activeRecordingLease !== lease) return null;
+      if (options.apply === false) return lease;
       try {
         await this.applyAudioMode({
           ...mode,

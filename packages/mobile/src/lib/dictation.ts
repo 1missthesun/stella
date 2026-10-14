@@ -3,13 +3,22 @@ import { AudioModule } from "expo-audio";
 import { AudioStudioModule } from "@siteed/audio-studio";
 import { LegacyEventEmitter, type EventSubscription } from "expo-modules-core";
 import { File } from "expo-file-system";
-import { Alert, Linking } from "react-native";
+import { Alert, AppState, Linking } from "react-native";
 import { hasAiConsent, requestAiConsent } from "./ai-consent";
 import {
   acquireRecordingAudioSession,
+  prewarmDictationAudioSession,
   releaseRecordingAudioSession,
   type RecordingAudioLease,
 } from "./mobile-audio-session";
+import {
+  DICTATION_RECORDING_OPTIONS,
+  PREWARMED_RECORDING_OPTIONS,
+  claimPreparedDictationRecorder,
+  keepScreenAwakeForDictation,
+  releaseClaimedDictationRecorder,
+  releaseDictationRecorderPrewarm,
+} from "./dictation-prewarm";
 import { stopReadAloudForDictation } from "./read-aloud";
 import {
   DICTATION_MAX_PCM_BYTES,
@@ -21,6 +30,8 @@ import {
 import {
   DictationStream,
   loadDictationRealtimeConfig,
+  releaseWarmDictationSocket,
+  warmDictationSocket,
 } from "./dictation-stream";
 import { DictationIngressPacer } from "./dictation-pacer";
 import { tapLight, tapMedium } from "./haptics";
@@ -37,6 +48,7 @@ export type DictationStatus = "idle" | "recording" | "transcribing";
 
 export type UseDictationOptions = {
   onTranscript: (text: string) => void;
+  prewarm?: boolean;
 };
 
 export type UseDictationResult = {
@@ -47,6 +59,7 @@ export type UseDictationResult = {
   stop: () => Promise<string | null>;
   cancel: () => Promise<string | null>;
   toggle: () => Promise<void>;
+  prewarm: () => void;
 };
 
 type DictationCapture = {
@@ -57,6 +70,7 @@ type DictationCapture = {
   routed: Promise<void>;
   pressedAt: number;
   firstAudioAt: number;
+  marks: Record<string, number>;
 };
 
 type DictationLive = {
@@ -94,6 +108,24 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
   const stopRecordingRef = useRef<(() => Promise<string | null>) | null>(null);
   const onTranscriptRef = useRef(options.onTranscript);
   onTranscriptRef.current = options.onTranscript;
+  const prewarmEnabled = options.prewarm === true;
+  const prewarmEnabledRef = useRef(prewarmEnabled);
+  prewarmEnabledRef.current = prewarmEnabled;
+  const claimedRecorderRef = useRef(false);
+
+  const prewarm = useCallback(() => {
+    if (!prewarmEnabledRef.current || !mountedRef.current) return;
+    if (AppState.currentState !== "active" || !hasAiConsent()) return;
+    if (statusRef.current !== "idle" || operationInFlightRef.current) return;
+    prewarmDictationAudioSession();
+    void loadDictationStreamingAvailable()
+      .then((available) => {
+        if (available && prewarmEnabledRef.current && mountedRef.current) {
+          warmDictationSocket();
+        }
+      })
+      .catch(() => undefined);
+  }, []);
 
   const safeSetStatus = useCallback((next: DictationStatus) => {
     statusRef.current = next;
@@ -159,6 +191,12 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
     const pressedAt = Date.now();
     stopReadAloudForDictation();
     operationInFlightRef.current = true;
+    const prewarmed =
+      prewarmEnabledRef.current && hasAiConsent()
+        ? await claimPreparedDictationRecorder()
+        : false;
+    claimedRecorderRef.current = prewarmed;
+    const prewarmMark = prewarmed ? 1 : 0;
     // Apple 5.1.1(i): voice audio is sent to a third-party AI transcription
     // transcription service. Don't even start the recorder until the user has
     // explicitly agreed to the data-sharing disclosure.
@@ -167,6 +205,11 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
       operationInFlightRef.current = false;
       return false;
     }
+    const releaseClaim = () => {
+      if (!claimedRecorderRef.current) return;
+      claimedRecorderRef.current = false;
+      releaseClaimedDictationRecorder();
+    };
     let phase: "permission" | "audio-session" | "relay" | "recorder" =
       "permission";
     const current: DictationCapture = {
@@ -177,10 +220,13 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
       routed: Promise.resolve(),
       pressedAt,
       firstAudioAt: 0,
+      marks: { prewarmed: prewarmMark, pressedAt },
     };
     let capture: DictationCapture | null = current;
     captureRef.current = current;
-    const permission = AudioModule.requestRecordingPermissionsAsync();
+    const permission = prewarmed
+      ? Promise.resolve({ granted: true, canAskAgain: true })
+      : AudioModule.requestRecordingPermissionsAsync();
     current.routed = Promise.all([
       loadDictationStreamingAvailable().catch(() => false),
       permission.then(
@@ -191,6 +237,11 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
       if (!streaming || !granted || captureRef.current !== current) return;
       const live = openLive();
       current.live = live;
+      if (__DEV__) {
+        void live.opened.then(() => {
+          current.marks.socket = Date.now() - pressedAt;
+        });
+      }
       for (const chunk of current.chunks.splice(0)) live.pacer.send(chunk);
     });
     try {
@@ -225,14 +276,23 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
         return false;
       }
       if (!mountedRef.current) {
+        if (prewarmed) {
+          await AudioStudioModule.stopRecording().catch(() => undefined);
+          releaseClaim();
+        }
         discardCapture(current);
         operationInFlightRef.current = false;
         return false;
       }
 
+      current.marks.permission = Date.now() - pressedAt;
       phase = "audio-session";
-      const lease = await acquireRecordingAudioSession();
+      const lease = await acquireRecordingAudioSession(undefined, {
+        prewarmed,
+      });
       if (lease === null) {
+        if (prewarmed) await AudioStudioModule.stopRecording().catch(() => undefined);
+        releaseClaim();
         discardCapture(current);
         operationInFlightRef.current = false;
         return false;
@@ -245,6 +305,7 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
         return false;
       }
 
+      current.marks.session = Date.now() - pressedAt;
       phase = "recorder";
       const sliceLevels = createLevelSlicer();
       const emitter = new LegacyEventEmitter(AudioStudioModule);
@@ -261,9 +322,10 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
         if (current.firstAudioAt === 0) {
           current.firstAudioAt = Date.now();
           if (__DEV__) {
-            console.info(
-              `[dictation] first audio ${current.firstAudioAt - current.pressedAt}ms after press`,
-            );
+            current.marks.firstAudio = current.firstAudioAt - current.pressedAt;
+            setTimeout(() => {
+              console.info(`[dictation] timing ${JSON.stringify(current.marks)}`);
+            }, 1500);
           }
         }
         pushDictationLevels(sliceLevels(bytes));
@@ -279,17 +341,16 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
         current.full = true;
         if (statusRef.current === "recording") void stopRecordingRef.current?.();
       });
-      await AudioStudioModule.startRecording({
-        sampleRate: DICTATION_SAMPLE_RATE,
-        channels: 1,
-        encoding: "pcm_16bit",
-        interval: 80,
-        keepAwake: true,
-        output: { primary: { enabled: false } },
-      });
+      await AudioStudioModule.startRecording(
+        prewarmed ? PREWARMED_RECORDING_OPTIONS : DICTATION_RECORDING_OPTIONS,
+      );
+      if (prewarmed) keepScreenAwakeForDictation(true);
+      current.marks.recorder = Date.now() - pressedAt;
 
       if (!mountedRef.current) {
         await AudioStudioModule.stopRecording().catch(() => undefined);
+        keepScreenAwakeForDictation(false);
+        releaseClaim();
         discardCapture(current);
         audioSubscriptionRef.current?.remove();
         audioSubscriptionRef.current = null;
@@ -310,6 +371,8 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
     } catch (error) {
       console.warn(`[dictation] start failed during ${phase}`, error);
       await AudioStudioModule.stopRecording().catch(() => undefined);
+      keepScreenAwakeForDictation(false);
+      releaseClaim();
       discardCapture(capture);
       audioSubscriptionRef.current?.remove();
       audioSubscriptionRef.current = null;
@@ -347,6 +410,19 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
         uri = recording.fileUri ?? null;
       } catch (error) {
         console.warn("[dictation] stop failed", error);
+      }
+      keepScreenAwakeForDictation(false);
+      if (claimedRecorderRef.current) {
+        claimedRecorderRef.current = false;
+        releaseClaimedDictationRecorder();
+      }
+      const stoppedCapture = captureRef.current;
+      if (__DEV__ && stoppedCapture) {
+        const heldMs = Date.now() - stoppedCapture.pressedAt;
+        const capturedMs = Math.round(stoppedCapture.bytes / 32);
+        console.info(
+          `[dictation] held ${heldMs}ms captured ${capturedMs}ms missing ${heldMs - capturedMs}ms`,
+        );
       }
       await releaseAudioMode();
       audioSubscriptionRef.current?.remove();
@@ -441,6 +517,30 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
       .catch(() => undefined);
   }, []);
 
+  useEffect(() => {
+    if (status === "idle") prewarm();
+  }, [prewarm, status]);
+
+  useEffect(() => {
+    if (!prewarmEnabled) return;
+    prewarm();
+    const subscription = AppState.addEventListener("change", (next) => {
+      if (next === "active") {
+        prewarm();
+      } else if (next === "background" && statusRef.current === "idle") {
+        void releaseDictationRecorderPrewarm();
+        releaseWarmDictationSocket();
+      }
+    });
+    return () => {
+      subscription.remove();
+      if (statusRef.current === "idle" && !operationInFlightRef.current) {
+        void releaseDictationRecorderPrewarm();
+      }
+      releaseWarmDictationSocket();
+    };
+  }, [prewarm, prewarmEnabled]);
+
   const toggle = useCallback(async () => {
     if (status === "idle") {
       await start();
@@ -465,6 +565,11 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
       stopDictationMeter();
       if (ownsRecorder) {
         void AudioStudioModule.stopRecording().catch(() => undefined);
+        keepScreenAwakeForDictation(false);
+      }
+      if (claimedRecorderRef.current) {
+        claimedRecorderRef.current = false;
+        releaseClaimedDictationRecorder();
       }
       void releaseAudioMode();
     };
@@ -478,6 +583,7 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
     stop,
     cancel,
     toggle,
+    prewarm,
   };
 }
 

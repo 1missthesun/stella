@@ -24,6 +24,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { useIsFocused } from "expo-router";
 import {
   Alert,
   type GestureResponderEvent,
@@ -923,7 +924,12 @@ export function ChatPane({
     [draftStore],
   );
 
-  const dictation = useDictation({ onTranscript: appendTranscript });
+  const screenFocused = useIsFocused();
+  const dictation = useDictation({
+    onTranscript: appendTranscript,
+    prewarm: screenFocused,
+  });
+  const prewarmDictation = dictation.prewarm;
 
   const {
     status: dictationStatus,
@@ -1665,12 +1671,13 @@ export function ChatPane({
       dictationStatus === "idle",
   );
   const onComposerFocus = useCallback(() => {
+    prewarmDictation();
     if (selectingMessageIdRef.current != null) stopSelectingMessage();
     if (askActiveRef.current && !askCollapsedRef.current) {
       LayoutAnimation.configureNext(LAYOUT_SPRING);
       setAskCollapsed(true);
     }
-  }, [stopSelectingMessage]);
+  }, [prewarmDictation, stopSelectingMessage]);
   const interventionRoom =
     paneHeight > 0
       ? paneHeight - topInset - ASK_TOP_GAP - keyboardExtra

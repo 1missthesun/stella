@@ -33,12 +33,18 @@ export type CloudBuilderRotationField =
   | "OWNER_SECRETS_KEK_V2";
 
 export type CloudBuilderReadinessInput = Partial<
-  Record<CloudBuilderRequiredField | CloudBuilderRotationField, unknown>
+  Record<
+    | CloudBuilderRequiredField
+    | CloudBuilderRotationField
+    | "OWNER_SECRETS_KEK"
+    | "STELLA_PLAINTEXT_STORAGE",
+    unknown
+  >
 >;
 
 export type CloudBuilderReadiness = {
   ready: boolean;
-  missing: CloudBuilderRequiredField[];
+  missing: Array<CloudBuilderRequiredField | "OWNER_SECRETS_KEK">;
   invalid: Array<CloudBuilderRequiredField | CloudBuilderRotationField>;
 };
 
@@ -135,7 +141,7 @@ const validators: Readonly<
 export const evaluateCloudBuilderReadiness = (
   input: CloudBuilderReadinessInput,
 ): CloudBuilderReadiness => {
-  const missing: CloudBuilderRequiredField[] = [];
+  const missing: CloudBuilderReadiness["missing"] = [];
   const invalid: Array<CloudBuilderRequiredField | CloudBuilderRotationField> = [];
   const serviceSecretV2 = isPresent(input.BUILDER_SERVICE_SECRET_V2);
   for (const field of CLOUD_BUILDER_REQUIRED_FIELDS) {
@@ -153,6 +159,14 @@ export const evaluateCloudBuilderReadiness = (
   for (const field of Object.keys(rotationValidators) as CloudBuilderRotationField[]) {
     const value = input[field];
     if (isPresent(value) && !rotationValidators[field](value)) invalid.push(field);
+  }
+
+  if (
+    !isPresent(input.OWNER_SECRETS_KEK) &&
+    !isPresent(input.OWNER_SECRETS_KEK_V2) &&
+    input.STELLA_PLAINTEXT_STORAGE !== "1"
+  ) {
+    missing.push("OWNER_SECRETS_KEK");
   }
 
   const appsHost = normalizedHttpsOrigin(input.APPS_HOST_BASE_URL);

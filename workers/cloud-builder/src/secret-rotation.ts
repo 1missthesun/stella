@@ -52,5 +52,17 @@ export const ownerKeks = (env: unknown): OwnerKeks | null => {
   return { current: v2 ? "v2" : "v1", v1, v2 };
 };
 
+export const plaintextStorageAllowed = (env: unknown): boolean =>
+  trimmed(env, "STELLA_PLAINTEXT_STORAGE") === "1";
+
+/** Keys for conversation storage: required unless the deployment declares STELLA_PLAINTEXT_STORAGE=1. */
+export const storageKeks = (env: unknown): OwnerKeks | null => {
+  const keks = ownerKeks(env);
+  if (keks || plaintextStorageAllowed(env)) return keks;
+  throw new Error(
+    "OWNER_SECRETS_KEK is not configured, so conversation storage would be unencrypted. Set it, or set STELLA_PLAINTEXT_STORAGE=1 for a deliberately unencrypted deployment.",
+  );
+};
+
 export const ownerKekFor = (keks: OwnerKeks, tag: string): string | undefined =>
   tag === "v2" ? keks.v2 : tag === "v1" ? keks.v1 : undefined;

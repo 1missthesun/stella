@@ -53,6 +53,7 @@ const PRODUCTION_FORBIDDEN_VARS = [
   "STELLA_LOCAL_DEV_ORIGINS",
   "PREVIEW_BACKEND_HOST_SUFFIX",
   "ENABLE_DEV_ACCEPTANCE_PROBES",
+  "STELLA_PLAINTEXT_STORAGE",
 ];
 
 /** Bindings the dev and production deployments intentionally share. */

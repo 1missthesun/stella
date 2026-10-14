@@ -469,6 +469,7 @@
       "vars": {
         "TELEMETRY_ENVIRONMENT": "development",
         "STELLA_LOCAL_DEV_ORIGINS": "1",
+        "STELLA_PLAINTEXT_STORAGE": "1",
         "TURN_TIMEOUT_MS": "900000",
         "SANDBOX_IDLE_TIMEOUT_MS": "600000",
         "SANDBOX_PREWARM_IDLE_TIMEOUT_MS": "90000",

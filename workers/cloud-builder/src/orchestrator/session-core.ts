@@ -1,4 +1,4 @@
-import { ownerKeks } from "../secret-rotation.js";
+import { storageKeks } from "../secret-rotation.js";
 import type { DevicesResponse } from "@stella/contracts/turn-plane/placement";
 import { DurableObject } from "cloudflare:workers";
 import type {
@@ -131,7 +131,7 @@ export abstract class OrchestratorSessionCore extends DurableObject<Env> {
     this.journal = new Journal(
       ctx,
       log,
-      ownerKeks(env),
+      storageKeks(env),
     );
     this.archive = new ConversationArchive(
       env.CONVERSATION_ARCHIVE,

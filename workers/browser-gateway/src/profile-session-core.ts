@@ -165,13 +165,6 @@ const boundedInteger = (
   return Number(value);
 };
 
-/**
- * Model-authored selectors are narrower than Playwright's locator language:
- * refs, ids, classes, test ids, and exact role or text matches only (see
- * `selectors.ts`). That keeps hidden values and redacted text from becoming a
- * success/failure oracle through attribute operators, substring or regex
- * text, pseudos, combinators, or raw form-control selectors.
- */
 const safeLocatorSelector = (value: unknown): string =>
   parseAgentSelector(value, { allowRef: true });
 

@@ -749,14 +749,15 @@ export const handleManagedRelay = async (args: {
       env as unknown as Readonly<Record<string, string | undefined>>,
     );
     if (!apiKey) {
-      throw new GatewayError(
-        503,
-        "internal",
-        ownerModeEnabled(env)
-          ? "Stella's own models aren't set up on this server. Use your Claude or ChatGPT account, or add an OpenRouter key to the server."
-          : "The model provider is not configured.",
-        { retryable: false },
-      );
+      if (ownerModeEnabled(env)) {
+        throw new GatewayError(
+          403,
+          "model_forbidden",
+          "Stella's own models aren't set up on this server. Use your Claude or ChatGPT account, or add an OpenRouter key to the server.",
+          { retryable: false },
+        );
+      }
+      throw new GatewayError(503, "internal", "The model provider is not configured.", { retryable: false });
     }
     const {
       url: target,

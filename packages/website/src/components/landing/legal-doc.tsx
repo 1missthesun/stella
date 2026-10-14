@@ -30,7 +30,7 @@ function parse(source: string) {
   return { updated, intro, blocks };
 }
 
-export function LegalDoc({ title, source }: { title: string; source: string }) {
+export function LegalDoc({ title, source, deletionRequest = false }: { title: string; source: string; deletionRequest?: boolean }) {
   const { updated, intro, blocks } = parse(source);
   const headings = blocks.filter((b): b is Extract<Block, { kind: "heading" }> => b.kind === "heading");
 
@@ -40,6 +40,11 @@ export function LegalDoc({ title, source }: { title: string; source: string }) {
         <p className={pg.eyebrow}>Stella · FromYou LLC</p>
         <h1 className={pg.title}>{title}</h1>
         {updated ? <p className={d.updated}>Last updated {updated}</p> : null}
+        {deletionRequest ? (
+          <p className={d.intro}>
+            <a href="mailto:contact@fromyou.ai?subject=Delete%20my%20Stella%20account">Request account deletion by email</a>
+          </p>
+        ) : null}
         {intro.map((text) => (
           <p key={text} className={d.intro}>
             {text}

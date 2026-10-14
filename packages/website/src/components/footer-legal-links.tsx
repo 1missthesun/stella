@@ -13,6 +13,9 @@ export function FooterLegalLinks() {
           <a href="/terms">Terms of Service</a>
         </li>
         <li>
+          <a href="/delete-account">Delete account</a>
+        </li>
+        <li>
           <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>
         </li>
       </ul>

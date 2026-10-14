@@ -1,7 +1,7 @@
 export const SELF_HOST_MD = `# Run Stella on your own server
 
 > For AI agents setting up a self-hosted Stella for their user. Read this whole page before you start.
-> Stella's source: https://github.com/1missthesun/stella-v2 (Apache 2.0). The script this page describes is \`scripts/selfhost.mjs\` in it.
+> Stella's source: https://github.com/1missthesun/stella-v2 (MIT License). The script this page describes is \`scripts/selfhost.mjs\` in it.
 
 A self-hosted Stella is the same Stella, with its server running on your user's own Cloudflare account instead of stella.sh. Conversations, files, memory and settings stay there. The phone and desktop apps connect to it by scanning a one-time code: there is no Stella account, no email and no password. Whoever has the Cloudflare login owns the server.
 

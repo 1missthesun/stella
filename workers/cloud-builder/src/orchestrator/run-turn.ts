@@ -361,12 +361,6 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
       log("info", "chat_turn_dropped_deleted", { turnId: turn.turnId });
       return json({ ok: false, deleted: true });
     }
-    // Exactly-once, defensively. The queued key below closes the restart path;
-    // this closes the remaining one — a duplicated dispatch of the same
-    // turnId, which would otherwise replay the whole loop and burn a second
-    // turn's tokens against one accepted turn. The dequeue happens here too:
-    // a turn nothing will ever run again must not be re-enqueued by every
-    // future cold start.
     if (this.journal.turnState(turn.turnId)?.state === "terminal") {
       log("info", "chat_turn_duplicate_ignored", { turnId: turn.turnId });
       await this.ctx.storage.delete(`queued:${turn.turnId}`);
@@ -390,19 +384,6 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
       await this.releaseOwnerGate(stale);
       this.recordTerminal(stale, "failed", interrupted);
     }
-    // Claim first, dequeue second, and never the other way round. Between the
-    // two writes is the only moment a restart can see this turn twice; before
-    // the swap it saw it not at all, which is unrecoverable — an accepted turn
-    // in neither durable record is a user message that never reaches the
-    // transcript and a owner row stuck "running" forever. Seeing it twice
-    // costs a re-run of a turn that has produced nothing yet.
-    //
-    // The stale-turn recovery above deliberately sits outside the window: it
-    // yields on the owner delivery, and it needs the previous turn to still be
-    // under `turn` in order to recover it at all.
-    // The same turn claimed again (a resume, or a restart that lost it
-    // before its prompt was journaled) keeps its original watchdog and start:
-    // neither the deadline nor the resume age bound is reset by a loss.
     const reclaimed = stale?.turnId === turn.turnId;
     const [storedWatchdogAt, storedStartedAt] = reclaimed
       ? await Promise.all([
@@ -443,10 +424,7 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
         terminalDelivered: false,
         terminalOwed: null,
         alarmAttempts: 0,
-      });
-      if (this.ctx.storage.kv)
-        this.ctx.storage.kv.delete(`queued:${turn.turnId}`);
-      else await this.ctx.storage.delete(`queued:${turn.turnId}`);
+      }, [`queued:${turn.turnId}`]);
     });
     if (preCanceled) {
       return await this.finishPreCanceledTurn(turn, preCanceled);

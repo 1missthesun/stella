@@ -260,22 +260,22 @@ export abstract class OrchestratorSessionCore extends DurableObject<Env> {
       : await this.ctx.storage.get<T>(key);
   }
 
-  /**
-   * SQLite writes batch until the next I/O boundary. Cloudflare's output gate
-   * still holds external requests/responses until the writes are durable.
-   * The async fallback supports storage implementations without synchronous KV.
-   */
   protected async putTurnState(
     entries: Record<string, unknown>,
+    removals: readonly string[] = [],
   ): Promise<void> {
     const { storage } = this.ctx;
     if (storage.kv) {
       storage.transactionSync(() => {
         for (const [key, value] of Object.entries(entries))
           storage.kv.put(key, value);
+        for (const key of removals) storage.kv.delete(key);
       });
     } else {
-      await storage.put(entries);
+      await storage.transaction(async (txn) => {
+        await txn.put(entries);
+        if (removals.length > 0) await txn.delete([...removals]);
+      });
     }
   }
 

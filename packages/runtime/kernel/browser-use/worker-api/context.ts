@@ -123,12 +123,11 @@ export const chainStepData = (value: unknown, index: number): unknown => {
   return fieldOrSelf(step, "result");
 };
 
-// Tab and Locator keep their methods on a frozen prototype, which
-// Object.keys()/console.log cannot see; agents probing the API then
-// conclude the objects have no methods and never find the keyboard or
-// press(). Mirror the public surface onto every instance as enumerable own
-// properties (same functions/getters, so behavior and identity are
-// unchanged) before the instance is frozen.
+export const publicApiNames = <Api>(
+  names: { readonly [Name in keyof Api & string]: true },
+): readonly (keyof Api & string)[] =>
+  Object.freeze(Object.keys(names) as (keyof Api & string)[]);
+
 export const exposePublicApi = (
   instance: object,
   names: readonly string[],

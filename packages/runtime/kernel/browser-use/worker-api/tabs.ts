@@ -16,6 +16,7 @@ import {
 import {
   delay,
   exposePublicApi,
+  publicApiNames,
   field,
   fieldOrSelf,
   isLegacyTabGeneration,
@@ -126,30 +127,30 @@ const axLineDiff = (before: string, after: string): string | null => {
     .join("\n");
 };
 
-const TAB_PUBLIC_API = Object.freeze([
-  "backend",
-  "id",
-  "generation",
-  "playwright",
-  "keyboard",
-  "network",
-  "press",
-  "goto",
-  "back",
-  "forward",
-  "reload",
-  "close",
-  "markDeliverable",
-  "markHandoff",
-  "show",
-  "url",
-  "title",
-  "snapshot",
-  "axSnapshot",
-  "screenshot",
-  "scroll",
-  "expectNewTab",
-] as const);
+const TAB_PUBLIC_API = publicApiNames<BrowserWorkerTab>({
+  backend: true,
+  id: true,
+  generation: true,
+  playwright: true,
+  keyboard: true,
+  network: true,
+  press: true,
+  goto: true,
+  back: true,
+  forward: true,
+  reload: true,
+  close: true,
+  markDeliverable: true,
+  markHandoff: true,
+  show: true,
+  url: true,
+  title: true,
+  snapshot: true,
+  axSnapshot: true,
+  screenshot: true,
+  scroll: true,
+  expectNewTab: true,
+});
 
 type NormalizedTabList = {
   tabs: readonly BrowserWorkerTab[];

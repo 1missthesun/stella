@@ -47,11 +47,17 @@ export type SandboxInstanceSize = InstanceSize;
 /**
  * A Slack workspace's network rules for one agent container
  * (`slack/environment.ts`). Every HTTP and HTTPS request the container sends
- * goes through `SandboxEgress`, which reads the workspace's current
+ * goes through `SandboxEgress`, which reads the repository's current
  * environment for each one; `internet` is whether other ports reach the
  * Internet directly, fixed when the container starts.
  */
-export type SandboxEgressPolicy = { kind: "slack"; team: string; internet: boolean };
+export type SandboxEgressPolicy = {
+  kind: "slack";
+  team: string;
+  /** The repository whose environment applies ("" for none). */
+  repo?: string;
+  internet: boolean;
+};
 export type SandboxWorkloadKind = "world" | "app-build";
 
 /** What a caller asks for when its call may need a running container. */
@@ -284,6 +290,7 @@ type EgressProps = {
   containerId: string;
   policy: "general" | "sealed" | "slack";
   team?: string;
+  repo?: string;
 };
 
 /**
@@ -292,12 +299,13 @@ type EgressProps = {
  */
 export class SandboxEgress extends WorkerEntrypoint<Env, EgressProps> {
   async fetch(request: Request): Promise<Response> {
-    const { containerId, policy, team } = this.ctx.props;
+    const { containerId, policy, team, repo } = this.ctx.props;
     if (policy === "slack" && team) {
       const { slackEgress } = await import("./slack/environment.js");
       return await slackEgress(request, this.env as unknown as Cloudflare.Env, {
         containerId,
         team,
+        repo: repo ?? "",
         loopback: (forwarded) => this.ctx.exports.default.fetch(forwarded),
         general: (forwarded) => generalAgentEgress(forwarded, this.env, { containerId }),
       });
@@ -426,7 +434,10 @@ export class Sandbox extends DurableObject<Env> {
     const same =
       booted === null
         ? policy === null
-        : policy !== null && booted.team === policy.team && booted.internet === policy.internet;
+        : policy !== null &&
+          booted.team === policy.team &&
+          (booted.repo ?? "") === (policy.repo ?? "") &&
+          booted.internet === policy.internet;
     if (same) return { restarted: false };
     await this.destroy({ keepSnapshot: true });
     return { restarted: true };
@@ -452,7 +463,7 @@ export class Sandbox extends DurableObject<Env> {
         : null;
     const handler = this.ctx.exports.SandboxEgress({
       props: egress
-        ? { containerId: this.ctx.id.toString(), policy: "slack", team: egress.team }
+        ? { containerId: this.ctx.id.toString(), policy: "slack", team: egress.team, repo: egress.repo ?? "" }
         : { containerId: this.ctx.id.toString(), policy },
     });
     if (egress) await container.interceptOutboundHttps("*", handler);

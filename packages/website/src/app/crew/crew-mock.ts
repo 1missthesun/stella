@@ -1,6 +1,13 @@
 "use client";
 
 import type {
+  SlackRepoAdd,
+  SlackRepoAddResponse,
+  SlackRepoUpdate,
+  SlackWorkspaceEnvironment,
+  SlackWorkspaceEnvironmentUpdate,
+  SlackWorkspacePreviews,
+  SlackWorkspaceRepo,
   SlackGithubBranchesResponse,
   SlackGithubConnectResponse,
   SlackGithubFinishResponse,
@@ -44,32 +51,44 @@ const options: SlackWorkspaceOptions = {
   limitedHosts: ["github.com", "*.github.com", "registry.npmjs.org", "pypi.org", "files.pythonhosted.org", "bun.sh"],
 };
 
-const acmeGithub = (status: SlackWorkspaceGithub["status"]): SlackWorkspaceGithub => ({
-  account: "acme",
+const githubAccount = (
+  account: string,
+  installationId: string,
+  status: SlackWorkspaceGithub["status"],
+): SlackWorkspaceGithub => ({
+  installationId,
+  account,
   accountType: "Organization",
   status,
-  manageUrl: "https://github.com/organizations/acme/settings/installations/1",
+  manageUrl: `https://github.com/organizations/${account}/settings/installations/${installationId}`,
 });
 
-const base: SlackWorkspace = {
-  teamId: "T0MOCK123",
-  teamName: "Acme Robotics",
-  homeFolder: "Slack/Acme Robotics",
-  installedAt: Date.now() - 3 * 86_400_000,
-  engine: "stella",
-  model: "stella/default",
-  effort: "medium",
-  slackCommands: true,
-  github: null,
-  repo: null,
-  previews: {
-    access: "members",
-    ttlDays: 14,
-    usedBytes: 38 * 1024 * 1024,
-    quotaBytes: 5 * 1024 * 1024 * 1024,
-    live: 6,
-    maxPreviewBytes: 100 * 1024 * 1024,
-  },
+const previews: SlackWorkspacePreviews = {
+  access: "members",
+  ttlDays: 14,
+  usedBytes: 38 * 1024 * 1024,
+  quotaBytes: 5 * 1024 * 1024 * 1024,
+  live: 6,
+  maxPreviewBytes: 100 * 1024 * 1024,
+};
+
+const defaultEnvironment = (): SlackWorkspaceEnvironment => ({
+  name: "Default",
+  network: "full",
+  allowedHosts: [],
+  secrets: [],
+  setupScript: "",
+  envVars: "",
+  lastSetup: null,
+});
+
+const firmware = (access: SlackWorkspaceRepo["access"]): SlackWorkspaceRepo => ({
+  id: "r0000000000a1",
+  fullName: "acme/robot-firmware",
+  branch: "",
+  access,
+  rules: "Never push to main; open a branch per change.",
+  channels: [{ id: "C0FIRM", name: "#firmware" }],
   environment: {
     name: "Acme firmware",
     network: "limited",
@@ -82,12 +101,38 @@ const base: SlackWorkspace = {
       exitCode: 1,
       at: Date.now() - 6 * 60_000,
       ms: 4200,
-      log: "+ curl -fsSL https://bun.sh/install\ncurl: (22) The requested URL returned error: 403\nBlocked: this Slack workspace's environment has Limited network access, which doesn't include example.org.",
+      log: "+ curl -fsSL https://bun.sh/install\ncurl: (22) The requested URL returned error: 403\nBlocked: this environment has Limited network access, which doesn't include example.org.",
     },
   },
+  previews,
+});
+
+const dashboard: SlackWorkspaceRepo = {
+  id: "r0000000000b2",
+  fullName: "clearshelf/web",
+  branch: "develop",
+  access: "github",
+  rules: "",
+  channels: [],
+  environment: defaultEnvironment(),
+  previews: { ...previews, access: "public", ttlDays: 7 },
+};
+
+const base: SlackWorkspace = {
+  teamId: "T0MOCK123",
+  teamName: "Acme Robotics",
+  homeFolder: "Slack/Acme Robotics",
+  installedAt: Date.now() - 3 * 86_400_000,
+  engine: "stella",
+  model: "stella/default",
+  effort: "medium",
+  slackCommands: true,
+  githubAccounts: [],
+  repos: [],
+  previews,
+  environment: defaultEnvironment(),
   rules: "Only Priya can ask for deploys.\nKeep answers in threads.",
-  memory:
-    "Standup is at 9:30 in #eng.\nThe firmware release train ships every second Tuesday.",
+  memory: "Standup is at 9:30 in #eng.\nThe firmware release train ships every second Tuesday.",
   slackUrl: "https://app.slack.com/client/T0MOCK123",
 };
 
@@ -97,11 +142,15 @@ const current = (mode: SlackMockMode | null): SlackWorkspace => {
   if (workspace) return workspace;
   workspace =
     mode === "github"
-      ? { ...base, github: acmeGithub("active"), repo: { fullName: "acme/robot-firmware", branch: "", access: "github" } }
+      ? {
+          ...base,
+          githubAccounts: [githubAccount("acme", "1", "active"), githubAccount("clearshelf", "3", "active")],
+          repos: [firmware("github"), dashboard],
+        }
       : mode === "revoked"
-        ? { ...base, github: acmeGithub("revoked"), repo: { fullName: "acme/robot-firmware", branch: "", access: "public" } }
+        ? { ...base, githubAccounts: [githubAccount("acme", "1", "revoked")], repos: [firmware("public")] }
         : mode === "legacy"
-          ? { ...base, repo: { fullName: "acme/robot-firmware", branch: "", access: "token" } }
+          ? { ...base, repos: [firmware("token")] }
           : base;
   return workspace;
 };
@@ -115,8 +164,35 @@ const REPOS = [
   { fullName: "acme/robot-firmware", private: true, defaultBranch: "main" },
   { fullName: "acme/fleet-dashboard", private: true, defaultBranch: "main" },
   { fullName: "acme/docs", private: false, defaultBranch: "trunk" },
-  { fullName: "acme/sim", private: true, defaultBranch: "develop" },
+  { fullName: "clearshelf/web", private: true, defaultBranch: "main" },
+  { fullName: "muse/app", private: true, defaultBranch: "main" },
 ];
+
+const applyEnvironment = (
+  now: SlackWorkspaceEnvironment | null,
+  update: SlackWorkspaceEnvironmentUpdate | undefined,
+): SlackWorkspaceEnvironment | null => {
+  if (!update || !now) return now;
+  const { secrets, ...fields } = update;
+  const kept = now.secrets.filter((secret) => !secrets?.remove?.includes(secret.id));
+  const added = (secrets?.add ?? []).map((secret) => ({
+    id: crypto.randomUUID(),
+    name: secret.name,
+    host: secret.host,
+    header: secret.header || "Authorization",
+  }));
+  return { ...now, ...fields, secrets: [...kept, ...added] };
+};
+
+const accessFor = (w: SlackWorkspace, fullName: string): SlackWorkspaceRepo["access"] =>
+  w.githubAccounts.some((account) => fullName.toLowerCase().startsWith(`${account.account.toLowerCase()}/`))
+    ? "github"
+    : "public";
+
+const save = (next: SlackWorkspace): Promise<SlackWorkspaceUpdateResponse> => {
+  workspace = next;
+  return wait({ workspace: next });
+};
 
 export const mockSlackApi = {
   list(mode: SlackMockMode): Promise<SlackWorkspacesResponse> {
@@ -128,30 +204,55 @@ export const mockSlackApi = {
     });
   },
   update(_teamId: string, update: SlackWorkspaceUpdate): Promise<SlackWorkspaceUpdateResponse> {
-    const { repo, previews, environment, ...rest } = update;
+    const { previews: previewUpdate, environment, ...rest } = update;
     const now = current(mockMode());
-    let next: SlackWorkspace = { ...now, ...rest, previews: { ...now.previews, ...previews } };
-    if (environment && now.environment) {
-      const { secrets, ...fields } = environment;
-      const kept = now.environment.secrets.filter((secret) => !secrets?.remove?.includes(secret.id));
-      const added = (secrets?.add ?? []).map((secret) => ({
-        id: crypto.randomUUID(),
-        name: secret.name,
-        host: secret.host,
-        header: secret.header || "Authorization",
-      }));
-      next = { ...next, environment: { ...now.environment, ...fields, secrets: [...kept, ...added] } };
+    return save({
+      ...now,
+      ...rest,
+      previews: { ...now.previews, ...previewUpdate },
+      environment: applyEnvironment(now.environment, environment),
+    });
+  },
+  addRepo(_teamId: string, add: SlackRepoAdd): Promise<SlackRepoAddResponse> {
+    const now = current(mockMode());
+    if (now.repos.some((repo) => repo.fullName.toLowerCase() === add.fullName.toLowerCase())) {
+      return Promise.reject(new Error(`${add.fullName} is already in this workspace.`));
     }
-    if (repo === null) next = { ...next, repo: null };
-    else if (repo) {
-      const viaGithub = Boolean(next.github && repo.fullName.startsWith(`${next.github.account}/`));
-      next = {
-        ...next,
-        repo: { fullName: repo.fullName, branch: repo.branch ?? "", access: viaGithub ? "github" : "public" },
-      };
-    }
+    const repo: SlackWorkspaceRepo = {
+      id: `r${Math.random().toString(16).slice(2, 14).padEnd(12, "0")}`,
+      fullName: add.fullName,
+      branch: add.branch ?? "",
+      access: accessFor(now, add.fullName),
+      rules: "",
+      channels: [],
+      environment: defaultEnvironment(),
+      previews: now.previews,
+    };
+    const next = { ...now, repos: [...now.repos, repo] };
     workspace = next;
-    return wait({ workspace: next });
+    return wait({ workspace: next, repoId: repo.id });
+  },
+  updateRepo(_teamId: string, repoId: string, update: SlackRepoUpdate): Promise<SlackWorkspaceUpdateResponse> {
+    const now = current(mockMode());
+    return save({
+      ...now,
+      repos: now.repos.map((repo) =>
+        repo.id !== repoId
+          ? repo
+          : {
+              ...repo,
+              ...(update.branch !== undefined ? { branch: update.branch } : {}),
+              ...(update.rules !== undefined ? { rules: update.rules } : {}),
+              previews: { ...repo.previews, ...update.previews },
+              environment: applyEnvironment(repo.environment, update.environment),
+              channels: repo.channels.filter((channel) => !update.removeChannels?.includes(channel.id)),
+            },
+      ),
+    });
+  },
+  removeRepo(_teamId: string, repoId: string): Promise<SlackWorkspaceUpdateResponse> {
+    const now = current(mockMode());
+    return save({ ...now, repos: now.repos.filter((repo) => repo.id !== repoId) });
   },
   install(returnTo: string): Promise<SlackInstallStartResponse> {
     const url = new URL(returnTo);
@@ -170,18 +271,23 @@ export const mockSlackApi = {
       return wait({
         choices: [
           { installationId: "1", account: "acme", accountType: "Organization" },
-          { installationId: "2", account: "priya", accountType: "User" },
+          { installationId: "4", account: "muse", accountType: "Organization" },
         ],
       });
     }
-    const next = { ...current(mockMode()), github: acmeGithub("active") };
-    workspace = next;
-    return wait({ workspace: next });
+    const now = current(mockMode());
+    const account = installationId === "4" ? "muse" : "acme";
+    const accounts = [...now.githubAccounts.filter((a) => a.installationId !== installationId), githubAccount(account, installationId, "active")];
+    const next = { ...now, githubAccounts: accounts };
+    return save({ ...next, repos: next.repos.map((repo) => ({ ...repo, access: accessFor(next, repo.fullName) })) });
   },
-  disconnectGithub(): Promise<SlackWorkspaceUpdateResponse> {
-    const next = { ...current(mockMode()), github: null, repo: null };
-    workspace = next;
-    return wait({ workspace: next });
+  disconnectGithub(installationId: string): Promise<SlackWorkspaceUpdateResponse> {
+    const now = current(mockMode());
+    const next = { ...now, githubAccounts: now.githubAccounts.filter((a) => a.installationId !== installationId) };
+    return save({
+      ...next,
+      repos: next.repos.map((repo) => ({ ...repo, access: repo.access === "token" ? "token" : accessFor(next, repo.fullName) })),
+    });
   },
   repos(): Promise<SlackGithubReposResponse> {
     return wait({ repos: REPOS, truncated: false });

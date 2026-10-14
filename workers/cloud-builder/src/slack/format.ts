@@ -165,6 +165,7 @@ export const toolLabel = (name: string): string => {
   if (key.includes("html")) return "Making a page";
   if (key.includes("schedule")) return "Setting up a schedule";
   if (key.includes("memory")) return "Checking notes";
+  if (key.endsWith("slack_repo")) return "Choosing the repository";
   if (key === "read") return "Reading a file";
   return `Using ${name}`;
 };

@@ -1,8 +1,9 @@
 /**
- * Stella for Slack's repository: before an agent of a Slack workspace starts
- * in its container, the workspace's GitHub repository is cloned (or brought
- * up to date) under `/workspace/repos/<name>` on the workspace's branch,
- * outside the owner's world so it never syncs into their files.
+ * Stella for Slack's repositories: before an agent of a Slack workspace starts
+ * in its container, the repository its conversation works in (`repos.ts`) is
+ * cloned (or brought up to date) under `/workspace/repos/<name>` on that
+ * repository's branch, outside the owner's world so it never syncs into
+ * their files.
  *
  * Through the workspace's GitHub connection the agent can push: the clone's
  * git asks `stella-git-credential` for a token on every operation, which
@@ -16,7 +17,7 @@
 import type { ExecutionSession } from "../sandbox-client.js";
 import { cloneToken } from "./github.js";
 import { issueSlackRepoCapability } from "./repo-capability.js";
-import { repoForConversation, repoOwnedBy } from "./settings.js";
+import { repoForConversation, repoOwnedBy } from "./repos.js";
 import { SLACK_REPO_ROOT, isSlackConversationId } from "./workspace.js";
 
 const TOOL_UID = 42424;
@@ -132,7 +133,7 @@ export const prepareSlackRepo = async (
     `mkdir -p ${SLACK_REPO_ROOT}`,
     `chown ${TOOL_UID}:${TOOL_UID} ${SLACK_REPO_ROOT}`,
     `chmod 0750 ${SLACK_REPO_ROOT}`,
-    `if [ -d ${shellQuote(`${dir}/.git`)} ]; then`,
+    `if [ -d ${shellQuote(`${dir}/.git`)} ] && [ "$(git -c safe.directory='*' -C ${shellQuote(dir)} remote get-url origin 2>/dev/null)" = ${shellQuote(url)} ]; then`,
     `  ${git} -C ${shellQuote(dir)} fetch --quiet --depth 50 origin ${branch || "HEAD"}`,
     `  if ${git} -C ${shellQuote(dir)} diff --quiet HEAD; then ${git} -C ${shellQuote(dir)} merge --ff-only --quiet FETCH_HEAD || true; fi`,
     "else",

@@ -22,6 +22,8 @@ import {
   SLACK_ENV_VARS_MAX_CHARS,
   SLACK_MEMORY_MAX_CHARS,
   SLACK_PREVIEW_TTL_DAYS_CHOICES,
+  SLACK_REPO_RULES_MAX_CHARS,
+  SLACK_REPOS_MAX,
   SLACK_RULES_MAX_CHARS,
   SLACK_SETUP_SCRIPT_MAX_CHARS,
   type SlackNetworkLevel,
@@ -30,6 +32,10 @@ import {
   type SlackWorkspaceEnvironmentUpdate,
   type SlackGithubInstallationChoice,
   type SlackPreviewAccess,
+  type SlackRepoUpdate,
+  type SlackWorkspaceGithub,
+  type SlackWorkspacePreviews,
+  type SlackWorkspaceRepo,
   type SlackGithubRepoOption,
   type SlackInstallResult,
   type SlackWorkspace,
@@ -42,13 +48,16 @@ import { openSignInDialog } from "@/components/auth/sign-in-dialog";
 import { authClient } from "@/lib/auth-client";
 import { isBackendConfigured } from "@/lib/backend-url";
 import {
+  addSlackRepo,
   connectGithub,
   disconnectGithub,
   finishGithub,
   listGithubBranches,
   listGithubRepos,
   listSlackWorkspaces,
+  removeSlackRepo,
   startSlackInstall,
+  updateSlackRepo,
   updateSlackWorkspace,
 } from "./crew-api";
 import { readMockMode, type SlackMockMode } from "./crew-mock";
@@ -416,17 +425,13 @@ function WorkspaceBar({
   );
 }
 
-type Draft = {
-  engine: SlackWorkspaceEngine;
-  model: string;
-  effort: ReasoningEffortLevel;
-  slackCommands: boolean;
-  repoName: string;
-  repoBranch: string;
+/** What can be edited for a repository, or for work without one (`key` ""). */
+type TargetDraft = {
+  branch: string;
+  rules: string;
+  removeChannels: string[];
   previewAccess: SlackPreviewAccess;
   previewTtlDays: number;
-  rules: string;
-  memory: string;
   envName: string;
   network: SlackNetworkLevel;
   allowedHosts: string;
@@ -436,6 +441,33 @@ type Draft = {
   secretsRemove: string[];
 };
 
+type Draft = {
+  engine: SlackWorkspaceEngine;
+  model: string;
+  effort: ReasoningEffortLevel;
+  slackCommands: boolean;
+  rules: string;
+  memory: string;
+  targets: Record<string, TargetDraft>;
+};
+
+/** A repository, or (`repo` null, `key` "") work that isn't about one. */
+type Target = {
+  key: string;
+  repo: SlackWorkspaceRepo | null;
+  environment: SlackWorkspaceEnvironment | null;
+  previews: SlackWorkspacePreviews;
+};
+
+const NO_REPO = "";
+
+const targetsOf = (w: SlackWorkspace): Target[] => [
+  ...w.repos.map((repo) => ({ key: repo.id, repo, environment: repo.environment, previews: repo.previews })),
+  { key: NO_REPO, repo: null, environment: w.environment, previews: w.previews },
+];
+
+const targetLabel = (target: Target): string => target.repo?.fullName ?? "Without a repository";
+
 const hostsText = (hosts: string[]): string => hosts.join("\n");
 const hostsList = (text: string): string[] =>
   text
@@ -443,8 +475,35 @@ const hostsList = (text: string): string[] =>
     .map((host) => host.trim())
     .filter(Boolean);
 
-const environmentDiff = (w: SlackWorkspace, d: Draft): SlackWorkspaceEnvironmentUpdate | null => {
-  const e = w.environment;
+const targetDraftFrom = (t: Target): TargetDraft => ({
+  branch: t.repo?.branch ?? "",
+  rules: t.repo?.rules ?? "",
+  removeChannels: [],
+  previewAccess: t.previews.access,
+  previewTtlDays: t.previews.ttlDays,
+  envName: t.environment?.name ?? "",
+  network: t.environment?.network ?? "full",
+  allowedHosts: hostsText(t.environment?.allowedHosts ?? []),
+  setupScript: t.environment?.setupScript ?? "",
+  envVars: t.environment?.envVars ?? "",
+  secretsAdd: [],
+  secretsRemove: [],
+});
+
+const draftFrom = (w: SlackWorkspace): Draft => ({
+  engine: w.engine,
+  model: w.model,
+  effort: w.effort,
+  slackCommands: w.slackCommands,
+  rules: w.rules,
+  memory: w.memory,
+  targets: Object.fromEntries(targetsOf(w).map((target) => [target.key, targetDraftFrom(target)])),
+});
+
+const environmentDiff = (
+  e: SlackWorkspaceEnvironment | null,
+  d: TargetDraft,
+): SlackWorkspaceEnvironmentUpdate | null => {
   if (!e) return null;
   const update: SlackWorkspaceEnvironmentUpdate = {};
   if (d.envName.trim() !== e.name) update.name = d.envName.trim();
@@ -461,27 +520,15 @@ const environmentDiff = (w: SlackWorkspace, d: Draft): SlackWorkspaceEnvironment
   return Object.keys(update).length ? update : null;
 };
 
-const draftFrom = (w: SlackWorkspace): Draft => ({
-  engine: w.engine,
-  model: w.model,
-  effort: w.effort,
-  slackCommands: w.slackCommands,
-  repoName: w.repo?.fullName ?? "",
-  repoBranch: w.repo?.branch ?? "",
-  previewAccess: w.previews.access,
-  previewTtlDays: w.previews.ttlDays,
-  rules: w.rules,
-  memory: w.memory,
-  envName: w.environment?.name ?? "",
-  network: w.environment?.network ?? "full",
-  allowedHosts: hostsText(w.environment?.allowedHosts ?? []),
-  setupScript: w.environment?.setupScript ?? "",
-  envVars: w.environment?.envVars ?? "",
-  secretsAdd: [],
-  secretsRemove: [],
-});
+const previewsDiff = (p: SlackWorkspacePreviews, d: TargetDraft): SlackWorkspaceUpdate["previews"] | null =>
+  d.previewAccess !== p.access || d.previewTtlDays !== p.ttlDays
+    ? {
+        ...(d.previewAccess !== p.access ? { access: d.previewAccess } : {}),
+        ...(d.previewTtlDays !== p.ttlDays ? { ttlDays: d.previewTtlDays } : {}),
+      }
+    : null;
 
-const diff = (w: SlackWorkspace, d: Draft): SlackWorkspaceUpdate => {
+const workspaceDiff = (w: SlackWorkspace, d: Draft): SlackWorkspaceUpdate => {
   const update: SlackWorkspaceUpdate = {};
   if (d.engine !== w.engine) update.engine = d.engine;
   if (d.model !== w.model) update.model = d.model;
@@ -489,25 +536,41 @@ const diff = (w: SlackWorkspace, d: Draft): SlackWorkspaceUpdate => {
   if (d.slackCommands !== w.slackCommands) update.slackCommands = d.slackCommands;
   if (d.rules !== w.rules) update.rules = d.rules;
   if (d.memory !== w.memory) update.memory = d.memory;
-  if (d.previewAccess !== w.previews.access || d.previewTtlDays !== w.previews.ttlDays) {
-    update.previews = {
-      ...(d.previewAccess !== w.previews.access ? { access: d.previewAccess } : {}),
-      ...(d.previewTtlDays !== w.previews.ttlDays ? { ttlDays: d.previewTtlDays } : {}),
-    };
-  }
-  const environment = environmentDiff(w, d);
-  if (environment) update.environment = environment;
-  const name = d.repoName.trim();
-  const branch = d.repoBranch.trim();
-  if (name) {
-    if (!w.repo || name !== w.repo.fullName || branch !== w.repo.branch) update.repo = { fullName: name, branch };
-  } else if (w.repo) {
-    update.repo = null;
+  const own = d.targets[NO_REPO];
+  if (own) {
+    const previews = previewsDiff(w.previews, own);
+    if (previews) update.previews = previews;
+    const environment = environmentDiff(w.environment, own);
+    if (environment) update.environment = environment;
   }
   return update;
 };
 
-type NavItem = { id: string; label: string; children?: Array<{ id: string; label: string }> };
+const repoDiff = (repo: SlackWorkspaceRepo, d: TargetDraft | undefined): SlackRepoUpdate => {
+  const update: SlackRepoUpdate = {};
+  if (!d) return update;
+  if (d.branch.trim() !== repo.branch) update.branch = d.branch.trim();
+  if (d.rules !== repo.rules) update.rules = d.rules;
+  if (d.removeChannels.length) update.removeChannels = d.removeChannels;
+  const previews = previewsDiff(repo.previews, d);
+  if (previews) update.previews = previews;
+  const environment = environmentDiff(repo.environment, d);
+  if (environment) update.environment = environment;
+  return update;
+};
+
+const targetInvalid = (t: Target, d: TargetDraft | undefined): boolean =>
+  Boolean(
+    d &&
+      ((t.environment !== null && !d.envName.trim()) ||
+        d.envName.length > SLACK_ENV_NAME_MAX_CHARS ||
+        d.setupScript.length > SLACK_SETUP_SCRIPT_MAX_CHARS ||
+        d.envVars.length > SLACK_ENV_VARS_MAX_CHARS ||
+        d.rules.length > SLACK_REPO_RULES_MAX_CHARS),
+  );
+
+type NavChild = { id: string; label: string; onSelect?: () => void; current?: boolean };
+type NavItem = { id: string; label: string; children?: NavChild[] };
 
 /** The id of the last section whose top has scrolled past the header. */
 function useActiveSection(ids: string[], enabled: boolean): string | null {
@@ -542,12 +605,15 @@ function useActiveSection(ids: string[], enabled: boolean): string | null {
   return active;
 }
 
+const scrollToId = (id: string) =>
+  requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }));
+
 function SectionNav({ items, active }: { items: NavItem[]; active: string | null }) {
-  const go = (event: React.MouseEvent<HTMLAnchorElement>, id: string) => {
-    const target = document.getElementById(id);
-    if (!target) return;
+  const go = (event: React.MouseEvent<HTMLAnchorElement>, id: string, onSelect?: () => void) => {
+    if (!document.getElementById(id)) return;
     event.preventDefault();
-    target.scrollIntoView({ behavior: "smooth", block: "start" });
+    onSelect?.();
+    scrollToId(id);
   };
   return (
     <nav className={s.sectionNav} aria-label="Settings sections">
@@ -565,11 +631,12 @@ function SectionNav({ items, active }: { items: NavItem[]; active: string | null
             {item.children ? (
               <ul className={s.sectionNavSub}>
                 {item.children.map((child) => (
-                  <li key={child.id}>
+                  <li key={`${child.id}-${child.label}`}>
                     <a
                       href={`#${child.id}`}
-                      aria-current={active === child.id ? "true" : undefined}
-                      onClick={(event) => go(event, child.id)}
+                      className={child.onSelect ? s.navRepo : undefined}
+                      aria-current={(child.onSelect ? child.current : active === child.id) ? "true" : undefined}
+                      onClick={(event) => go(event, child.id, child.onSelect)}
                     >
                       {child.label}
                     </a>
@@ -587,17 +654,20 @@ function SectionNav({ items, active }: { items: NavItem[]; active: string | null
 function Section({
   id,
   title,
+  eyebrow,
   description,
   children,
 }: {
   id: string;
   title: string;
+  eyebrow?: string;
   description?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <section className={s.section} id={id} aria-labelledby={`${id}-title`}>
       <header className={s.sectionHead}>
+        {eyebrow ? <p className={s.sectionEyebrow}>{eyebrow}</p> : null}
         <h2 className={s.sectionTitle} id={`${id}-title`}>
           {title}
         </h2>
@@ -716,6 +786,40 @@ function Switch({ checked, onChange, label }: { checked: boolean; onChange: (nex
   );
 }
 
+type Loaded<T> = { key: string } & ({ value: T } | { message: string });
+
+/** The result for `key`, or loading while the latest result is for another key. */
+const loadable = <T,>(key: string | null, loaded: Loaded<T> | null) =>
+  !key
+    ? ({ state: "idle" } as const)
+    : !loaded || loaded.key !== key
+      ? ({ state: "loading" } as const)
+      : "value" in loaded
+        ? ({ state: "ready", value: loaded.value } as const)
+        : ({ state: "error", message: loaded.message } as const);
+
+/** Repositories the workspace's GitHub connections can see. */
+function useGithubRepos(teamId: string, connected: boolean, refresh: number) {
+  const [loaded, setLoaded] = useState<Loaded<SlackGithubRepoOption[]> | null>(null);
+  const key = connected ? `${teamId}:${refresh}` : null;
+  useEffect(() => {
+    if (!key) return;
+    let cancelled = false;
+    listGithubRepos(teamId).then(
+      ({ repos }) => {
+        if (!cancelled) setLoaded({ key, value: repos });
+      },
+      (failure) => {
+        if (!cancelled) setLoaded({ key, message: errorText(failure) });
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [key, teamId]);
+  return loadable(key, loaded);
+}
+
 function WorkspaceSettings({
   active,
   workspace,
@@ -735,9 +839,29 @@ function WorkspaceSettings({
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
+  const [selected, setSelected] = useState<string>(() => workspace.repos[0]?.id ?? NO_REPO);
+  const [reposRefresh, setReposRefresh] = useState(0);
 
-  const update = useMemo(() => diff(workspace, draft), [workspace, draft]);
-  const dirty = Object.keys(update).length > 0;
+  const targets = useMemo(() => targetsOf(workspace), [workspace]);
+  const target = targets.find((t) => t.key === selected) ?? targets[0]!;
+  const targetDraft = draft.targets[target.key] ?? targetDraftFrom(target);
+
+  const workspaceUpdate = useMemo(() => workspaceDiff(workspace, draft), [workspace, draft]);
+  const repoUpdates = useMemo(
+    () =>
+      workspace.repos
+        .map((repo) => ({ repo, update: repoDiff(repo, draft.targets[repo.id]) }))
+        .filter((entry) => Object.keys(entry.update).length > 0),
+    [workspace, draft],
+  );
+  const dirty = Object.keys(workspaceUpdate).length > 0 || repoUpdates.length > 0;
+  const dirtyKeys = new Set([
+    ...repoUpdates.map((entry) => entry.repo.id),
+    ...(workspaceUpdate.environment || workspaceUpdate.previews ? [NO_REPO] : []),
+  ]);
+
+  const connectedAccounts = workspace.githubAccounts.filter((account) => account.status === "active");
+  const githubRepos = useGithubRepos(workspace.teamId, connectedAccounts.length > 0, reposRefresh);
 
   useEffect(() => {
     if (savedAt === null) return;
@@ -749,6 +873,31 @@ function WorkspaceSettings({
     setSavedAt(null);
     setDraft((current) => ({ ...current, [key]: value }));
   };
+
+  const setTarget = <K extends keyof TargetDraft>(key: K, value: TargetDraft[K]) => {
+    setSavedAt(null);
+    setDraft((current) => ({
+      ...current,
+      targets: {
+        ...current.targets,
+        [target.key]: { ...(current.targets[target.key] ?? targetDraftFrom(target)), [key]: value },
+      },
+    }));
+  };
+
+  /** The page after a change saved elsewhere (GitHub, add, remove): unsaved edits stay. */
+  const rebase = useCallback(
+    (next: SlackWorkspace) => {
+      onUpdated(next);
+      setDraft((current) => {
+        const fresh = draftFrom(next);
+        const kept: Record<string, TargetDraft> = {};
+        for (const key of Object.keys(fresh.targets)) kept[key] = current.targets[key] ?? fresh.targets[key]!;
+        return { ...current, targets: kept };
+      });
+    },
+    [onUpdated],
+  );
 
   const models = options.models[draft.engine] ?? [];
   const modelKnown = models.some((m) => m.id === draft.model);
@@ -763,25 +912,77 @@ function WorkspaceSettings({
     });
   };
 
-  const repoName = draft.repoName.trim();
-  const repoInvalid = repoName !== "" && !REPO_PATTERN.test(repoName);
   const rulesOver = draft.rules.length > SLACK_RULES_MAX_CHARS;
   const memoryOver = draft.memory.length > SLACK_MEMORY_MAX_CHARS;
-  const environmentInvalid =
-    (workspace.environment !== null && !draft.envName.trim()) ||
-    draft.envName.length > SLACK_ENV_NAME_MAX_CHARS ||
-    draft.setupScript.length > SLACK_SETUP_SCRIPT_MAX_CHARS ||
-    draft.envVars.length > SLACK_ENV_VARS_MAX_CHARS;
-  const invalid = repoInvalid || rulesOver || memoryOver || environmentInvalid || !draft.model;
+  const invalid =
+    rulesOver || memoryOver || !draft.model || targets.some((t) => targetInvalid(t, draft.targets[t.key]));
 
-  const commit = async (patch: SlackWorkspaceUpdate) => {
+  const save = async () => {
+    if (!dirty || invalid || saving) return;
+    setSaving(true);
+    setSaveError(null);
+    let latest: SlackWorkspace | null = null;
+    const saved = new Set<string>();
+    try {
+      if (Object.keys(workspaceUpdate).length) {
+        latest = (await updateSlackWorkspace(workspace.teamId, workspaceUpdate)).workspace;
+        saved.add(NO_REPO);
+      }
+      for (const { repo, update } of repoUpdates) {
+        latest = (await updateSlackRepo(workspace.teamId, repo.id, update)).workspace;
+        saved.add(repo.id);
+      }
+      setSavedAt(Date.now());
+    } catch (error) {
+      setSaveError(errorText(error));
+    } finally {
+      if (latest) {
+        const next = latest;
+        onUpdated(next);
+        setDraft((current) => {
+          const fresh = draftFrom(next);
+          if (saved.has(NO_REPO)) {
+            for (const field of ["engine", "model", "effort", "slackCommands", "rules", "memory"] as const) {
+              (current as Record<string, unknown>)[field] = fresh[field];
+            }
+          }
+          const nextTargets: Record<string, TargetDraft> = {};
+          for (const key of Object.keys(fresh.targets)) {
+            nextTargets[key] = saved.has(key) ? fresh.targets[key]! : (current.targets[key] ?? fresh.targets[key]!);
+          }
+          return { ...current, targets: nextTargets };
+        });
+      }
+      setSaving(false);
+    }
+  };
+
+  const discard = () => {
+    setSaveError(null);
+    setDraft(draftFrom(workspace));
+  };
+
+  const id = (name: string) => `${workspace.teamId}-${name}`;
+
+  const selectTarget = (key: string) => setSelected(key);
+
+  const added = (next: SlackWorkspace, repoId: string) => {
+    rebase(next);
+    setSelected(repoId);
+    scrollToId(id("repo"));
+  };
+
+  const removeSelected = async () => {
+    const repo = target.repo;
+    if (!repo) return;
+    const message = `Remove ${repo.fullName} from ${workspace.teamName}? Its environment, secrets and rules are deleted, and new agents can't work in it.`;
+    if (!window.confirm(message)) return;
     setSaving(true);
     setSaveError(null);
     try {
-      const { workspace: next } = await updateSlackWorkspace(workspace.teamId, patch);
-      onUpdated(next);
-      setDraft(draftFrom(next));
-      setSavedAt(Date.now());
+      const { workspace: next } = await removeSlackRepo(workspace.teamId, repo.id);
+      rebase(next);
+      setSelected(next.repos[0]?.id ?? NO_REPO);
     } catch (error) {
       setSaveError(errorText(error));
     } finally {
@@ -789,37 +990,21 @@ function WorkspaceSettings({
     }
   };
 
-  const save = () => {
-    if (!dirty || invalid || saving) return;
-    void commit(update);
-  };
-
-  const disconnectRepo = () => {
-    if (!workspace.repo) {
-      setDraft((current) => ({ ...current, repoName: "", repoBranch: "" }));
-      return;
-    }
-    if (!window.confirm(`Disconnect ${workspace.repo.fullName}? New agents in this workspace will start without it.`)) return;
-    void commit({ repo: null });
-  };
-
-  const githubChanged = useCallback(
-    (next: SlackWorkspace) => {
-      onUpdated(next);
-      setDraft((current) => ({
-        ...current,
-        repoName: next.repo?.fullName ?? "",
-        repoBranch: next.repo?.branch ?? "",
-      }));
-    },
-    [onUpdated],
-  );
-
-  const id = (name: string) => `${workspace.teamId}-${name}`;
+  const label = targetLabel(target);
   const nav: NavItem[] = [
     { id: id("general"), label: "General" },
-    { id: id("repository"), label: "Repository" },
-    ...(workspace.environment
+    ...(githubAvailable ? [{ id: id("github"), label: "GitHub" }] : []),
+    {
+      id: id("repos"),
+      label: "Repositories",
+      children: targets.map((t) => ({
+        id: id("repo"),
+        label: t.repo ? (t.repo.fullName.split("/")[1] ?? t.repo.fullName) : "Without a repository",
+        current: t.key === target.key,
+        onSelect: () => selectTarget(t.key),
+      })),
+    },
+    ...(target.environment
       ? [
           {
             id: id("environment"),
@@ -834,11 +1019,11 @@ function WorkspaceSettings({
         ]
       : []),
     { id: id("previews"), label: "Previews" },
-    { id: id("rules"), label: "Rules" },
+    { id: id("rules"), label: "Workspace rules" },
     { id: id("memory"), label: "Memory" },
   ];
   const activeSection = useActiveSection(
-    nav.flatMap((item) => [item.id, ...(item.children ?? []).map((child) => child.id)]),
+    nav.flatMap((item) => [item.id, ...(item.children ?? []).filter((child) => !child.onSelect).map((child) => child.id)]),
     active,
   );
 
@@ -905,47 +1090,137 @@ function WorkspaceSettings({
           </Row>
         </Section>
 
-        <GithubSection
-          id={id("repository")}
+        {githubAvailable ? (
+          <GithubSection
+            id={id("github")}
+            workspace={workspace}
+            githubReturn={githubReturn}
+            dirty={dirty}
+            onWorkspace={(next) => {
+              rebase(next);
+              setReposRefresh((key) => key + 1);
+            }}
+            onRefresh={() => setReposRefresh((key) => key + 1)}
+          />
+        ) : null}
+
+        <ReposSection
+          id={id("repos")}
           workspace={workspace}
-          available={githubAvailable}
-          githubReturn={githubReturn}
-          repoName={draft.repoName}
-          repoBranch={draft.repoBranch}
-          dirty={dirty}
-          saving={saving}
-          onRepo={(repoName, repoBranch) => {
-            setSavedAt(null);
-            setDraft((current) => ({ ...current, repoName, repoBranch }));
+          targets={targets}
+          selected={target.key}
+          dirtyKeys={dirtyKeys}
+          githubRepos={githubRepos}
+          connected={connectedAccounts.length > 0}
+          onSelect={(key) => {
+            selectTarget(key);
+            scrollToId(id("repo"));
           }}
-          onBranch={(branch) => set("repoBranch", branch)}
-          onDisconnectRepo={disconnectRepo}
-          onWorkspace={githubChanged}
+          onAdded={added}
         />
 
-        {workspace.environment ? (
+        <Section
+          id={id("repo")}
+          eyebrow={target.repo ? "Repository" : undefined}
+          title={label}
+          description={
+            target.repo
+              ? accessHint(target.repo, githubAvailable)
+              : "Requests that aren't about any of the repositories, like research or writing, run here."
+          }
+        >
+          {target.repo ? (
+            <>
+              <Row label="Branch" hint="Where agents start and push their work, unless someone names another branch.">
+                <BranchPicker
+                  teamId={workspace.teamId}
+                  repo={target.repo.fullName}
+                  defaultHint=""
+                  value={targetDraft.branch}
+                  onChange={(branch) => setTarget("branch", branch)}
+                />
+              </Row>
+              <Row
+                label="Default in channels"
+                hint="Threads in these channels use this repository unless the request is about another. Ask @Stella in a channel to use it by default there."
+              >
+                {target.repo.channels.length ? (
+                  <div className={s.chips}>
+                    {target.repo.channels.map((channel) => {
+                      const removed = targetDraft.removeChannels.includes(channel.id);
+                      return (
+                        <span key={channel.id} className={s.chip} data-removed={removed ? "" : undefined}>
+                          {channel.name}
+                          <button
+                            type="button"
+                            className={s.chipButton}
+                            aria-label={removed ? `Keep ${channel.name}` : `Remove ${channel.name}`}
+                            title={removed ? "Keep" : "Remove"}
+                            onClick={() =>
+                              setTarget(
+                                "removeChannels",
+                                removed
+                                  ? targetDraft.removeChannels.filter((channelId) => channelId !== channel.id)
+                                  : [...targetDraft.removeChannels, channel.id],
+                              )
+                            }
+                          >
+                            {removed ? <Undo2 size={13} aria-hidden="true" /> : <X size={13} aria-hidden="true" />}
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <span className={s.muted}>None yet</span>
+                )}
+              </Row>
+              <Row label="Rules" hint="Followed for all work in this repository, on top of the workspace rules." stack>
+                <TextArea
+                  value={targetDraft.rules}
+                  max={SLACK_REPO_RULES_MAX_CHARS}
+                  placeholder={"Open a pull request for every change; never push to main.\nRun bun test before pushing."}
+                  onChange={(value) => setTarget("rules", value)}
+                  label={`Rules for ${target.repo.fullName}`}
+                />
+              </Row>
+              <Row label="Remove" hint="Deletes its environment, secrets and rules here. Nothing changes on GitHub.">
+                <button type="button" className={s.dangerLink} onClick={() => void removeSelected()} disabled={saving}>
+                  Remove {target.repo.fullName}
+                </button>
+              </Row>
+            </>
+          ) : null}
+        </Section>
+
+        {target.environment ? (
           <EnvironmentSection
+            key={target.key}
             id={id}
-            environment={workspace.environment}
+            eyebrow={label}
+            hasRepo={target.repo !== null}
+            environment={target.environment}
             options={options}
-            draft={draft}
-            set={set}
+            draft={targetDraft}
+            set={setTarget}
           />
         ) : null}
 
         <PreviewsSection
           id={id("previews")}
-          workspace={workspace}
-          access={draft.previewAccess}
-          ttlDays={draft.previewTtlDays}
-          onAccess={(access) => set("previewAccess", access)}
-          onTtlDays={(days) => set("previewTtlDays", days)}
+          eyebrow={label}
+          teamName={workspace.teamName}
+          previews={target.previews}
+          access={targetDraft.previewAccess}
+          ttlDays={targetDraft.previewTtlDays}
+          onAccess={(access) => setTarget("previewAccess", access)}
+          onTtlDays={(days) => setTarget("previewTtlDays", days)}
         />
 
         <Section
           id={id("rules")}
-          title="Rules"
-          description="Plain-language rules Stella follows for everyone in this workspace."
+          title="Workspace rules"
+          description="Plain-language rules Stella follows for everyone in this workspace, in every repository."
         >
           <TextArea
             value={draft.rules}
@@ -984,6 +1259,9 @@ function WorkspaceSettings({
                 ) : (
                   <>
                     Unsaved<span className={s.wideOnly}> changes</span>
+                    {dirtyKeys.size > 1 || (dirtyKeys.size === 1 && !dirtyKeys.has(target.key)) ? (
+                      <span className={s.wideOnly}> in {dirtyKeys.size === 1 ? "another repository" : `${dirtyKeys.size} places`}</span>
+                    ) : null}
                   </>
                 )
               ) : (
@@ -994,18 +1272,15 @@ function WorkspaceSettings({
             </span>
             {dirty || saveError ? (
               <div className={s.saveActions}>
-                <button
-                  type="button"
-                  className={s.ghost}
-                  disabled={!dirty || saving}
-                  onClick={() => {
-                    setSaveError(null);
-                    setDraft(draftFrom(workspace));
-                  }}
-                >
+                <button type="button" className={s.ghost} disabled={!dirty || saving} onClick={discard}>
                   Discard
                 </button>
-                <button type="button" className={s.primary} disabled={!dirty || invalid || saving} onClick={save}>
+                <button
+                  type="button"
+                  className={s.primary}
+                  disabled={!dirty || invalid || saving}
+                  onClick={() => void save()}
+                >
                   {saving ? "Saving…" : "Save changes"}
                 </button>
               </div>
@@ -1017,11 +1292,178 @@ function WorkspaceSettings({
   );
 }
 
+const accessHint = (repo: SlackWorkspaceRepo, githubAvailable: boolean): string =>
+  repo.access === "github"
+    ? "Agents get it cloned, work on its branch and push through GitHub, each in this repository's environment."
+    : repo.access === "token"
+      ? `Cloned with an access token saved earlier; agents can't push.${githubAvailable ? " Connect the GitHub account that owns it to replace the token." : ""}`
+      : `Cloned as a public repository; agents can't push.${githubAvailable ? " Connect the GitHub account that owns it to let them." : ""}`;
+
+const ACCESS_LABEL: Record<SlackWorkspaceRepo["access"], string> = {
+  github: "Push",
+  public: "Read-only",
+  token: "Token",
+};
+
+function ReposSection({
+  id,
+  workspace,
+  targets,
+  selected,
+  dirtyKeys,
+  githubRepos,
+  connected,
+  onSelect,
+  onAdded,
+}: {
+  id: string;
+  workspace: SlackWorkspace;
+  targets: Target[];
+  selected: string;
+  dirtyKeys: Set<string>;
+  githubRepos: ReturnType<typeof useGithubRepos>;
+  connected: boolean;
+  onSelect: (key: string) => void;
+  onAdded: (workspace: SlackWorkspace, repoId: string) => void;
+}) {
+  const [adding, setAdding] = useState<{ fullName: string; branch: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const repoOptions = githubRepos.state === "ready" ? githubRepos.value : [];
+  const taken = new Set(workspace.repos.map((repo) => repo.fullName.toLowerCase()));
+  const available = repoOptions.filter((repo) => !taken.has(repo.fullName.toLowerCase()));
+  const name = adding ? normalizeRepo(adding.fullName) : "";
+  const valid = REPO_PATTERN.test(name) && !taken.has(name.toLowerCase());
+  const chosen = repoOptions.find((repo) => repo.fullName.toLowerCase() === name.toLowerCase());
+  const maxed = workspace.repos.length >= SLACK_REPOS_MAX;
+
+  const add = async () => {
+    if (!adding || !valid || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const { workspace: next, repoId } = await addSlackRepo(workspace.teamId, {
+        fullName: name,
+        branch: adding.branch,
+      });
+      setAdding(null);
+      onAdded(next, repoId);
+    } catch (failure) {
+      setError(errorText(failure));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Section
+      id={id}
+      title="Repositories"
+      description="Stella works out which repository a request is about from the message, the thread and the channel, and asks in the thread when she can't tell. Each repository has its own environment, previews and rules."
+    >
+      <div className={s.table} role="listbox" aria-label="Repositories">
+        {targets.map((target) => (
+          <button
+            key={target.key}
+            type="button"
+            role="option"
+            aria-selected={target.key === selected}
+            className={s.repoItem}
+            data-selected={target.key === selected ? "" : undefined}
+            onClick={() => onSelect(target.key)}
+          >
+            <span className={s.repoMark}>
+              {target.repo ? <GithubMark /> : <Globe size={15} aria-hidden="true" />}
+            </span>
+            <span className={s.repoText}>
+              <span className={s.repoName}>{targetLabel(target)}</span>
+              <span className={s.repoDetail}>
+                {target.repo
+                  ? [
+                      target.repo.branch || "default branch",
+                      target.environment ? `${NETWORK_LABEL[target.environment.network]} network` : null,
+                      target.repo.channels.length
+                        ? target.repo.channels.length === 1
+                          ? `default in ${target.repo.channels[0]!.name}`
+                          : `default in ${target.repo.channels.length} channels`
+                        : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")
+                  : "Requests that aren't about a repository"}
+              </span>
+            </span>
+            <span className={s.repoMeta}>
+              {dirtyKeys.has(target.key) ? <span className={s.badge}>Edited</span> : null}
+              {target.repo ? <span className={s.repoAccess}>{ACCESS_LABEL[target.repo.access]}</span> : null}
+              <ChevronRight size={15} aria-hidden="true" />
+            </span>
+          </button>
+        ))}
+        {adding ? (
+          <div className={s.secretForm}>
+            <div className={s.formGrid}>
+              <div className={s.field}>
+                <span className={s.fieldLabel}>Repository</span>
+                <RepoPicker
+                  value={adding.fullName}
+                  repos={available}
+                  loading={githubRepos.state === "loading"}
+                  connected={connected}
+                  onChange={(fullName) => setAdding({ fullName, branch: "" })}
+                />
+                {githubRepos.state === "error" ? <span className={s.fieldError}>{githubRepos.message}</span> : null}
+              </div>
+              <div className={s.field}>
+                <span className={s.fieldLabel}>Branch</span>
+                <BranchPicker
+                  teamId={workspace.teamId}
+                  repo={REPO_PATTERN.test(name) ? name : ""}
+                  defaultHint={chosen?.defaultBranch ?? ""}
+                  value={adding.branch}
+                  onChange={(branch) => setAdding({ ...adding, branch })}
+                />
+              </div>
+            </div>
+            {name && taken.has(name.toLowerCase()) ? (
+              <span className={s.fieldError}>{name} is already in this workspace.</span>
+            ) : null}
+            {error ? <span className={s.fieldError}>{error}</span> : null}
+            <div className={s.formActions}>
+              <button type="button" className={s.ghost} onClick={() => setAdding(null)} disabled={busy}>
+                Cancel
+              </button>
+              <button type="button" className={s.primary} disabled={!valid || busy} onClick={() => void add()}>
+                {busy ? "Adding…" : "Add repository"}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            className={s.tableAdd}
+            disabled={maxed}
+            onClick={() => {
+              setError(null);
+              setAdding({ fullName: "", branch: "" });
+            }}
+          >
+            <Plus size={15} aria-hidden="true" />
+            {maxed ? `Up to ${SLACK_REPOS_MAX} repositories` : "Add repository"}
+          </button>
+        )}
+      </div>
+    </Section>
+  );
+}
+
+const NETWORK_LABEL: Record<SlackNetworkLevel, string> = { none: "No", limited: "Limited", full: "Full" };
+
 const NETWORK_CHOICES: Array<Choice<SlackNetworkLevel>> = [
   {
     id: "none",
     label: "None",
-    detail: "Only Stella, the model and this workspace's repository on GitHub.",
+    detail: "Only Stella, the model and this repository on GitHub.",
   },
   {
     id: "limited",
@@ -1048,16 +1490,20 @@ const EMPTY_SECRET: SlackNetworkSecretInput = { name: "", host: "", header: "Aut
 
 function EnvironmentSection({
   id,
+  eyebrow,
+  hasRepo,
   environment,
   options,
   draft,
   set,
 }: {
   id: (name: string) => string;
+  eyebrow: string;
+  hasRepo: boolean;
   environment: SlackWorkspaceEnvironment;
   options: SlackWorkspaceOptions;
-  draft: Draft;
-  set: <K extends keyof Draft>(key: K, value: Draft[K]) => void;
+  draft: TargetDraft;
+  set: <K extends keyof TargetDraft>(key: K, value: TargetDraft[K]) => void;
 }) {
   const [adding, setAdding] = useState<SlackNetworkSecretInput | null>(null);
   const [logOpen, setLogOpen] = useState(environment.lastSetup?.status === "failed");
@@ -1083,8 +1529,13 @@ function EnvironmentSection({
   return (
     <Section
       id={id("environment")}
+      eyebrow={eyebrow}
       title="Environment"
-      description="What every agent Stella starts from this workspace runs with."
+      description={
+        hasRepo
+          ? "What every agent Stella starts for this repository runs with."
+          : "What agents run with when the request isn't about a repository."
+      }
     >
       <Row label="Name" htmlFor={id("env-name")} hint="Shown in Slack when an agent starts.">
         <input
@@ -1105,7 +1556,13 @@ function EnvironmentSection({
         <RadioList
           label="Network access"
           value={draft.network}
-          choices={NETWORK_CHOICES}
+          choices={
+            hasRepo
+              ? NETWORK_CHOICES
+              : NETWORK_CHOICES.map((choice) =>
+                  choice.id === "none" ? { ...choice, detail: "Only Stella and the model." } : choice,
+                )
+          }
           onChange={(network) => set("network", network)}
         />
         {draft.network === "limited" ? (
@@ -1266,7 +1723,7 @@ function EnvironmentSection({
       <Group
         id={id("setup")}
         title="Setup script"
-        description="Bash that runs when an agent's container starts, before the agent, in the repository's checkout, as the agent's user (not root) and under the network access above. Make it safe to run again. Variables it exports, PATH included, carry over to the agent."
+        description="Bash that runs when an agent's container starts, before the agent, in the repository's checkout (or the home folder without one), as the agent's user (not root) and under the network access above. Make it safe to run again. Variables it exports, PATH included, carry over to the agent."
       >
         <div className={s.editor}>
           <textarea
@@ -1345,26 +1802,29 @@ const ttlLabel = (days: number): string => (days === 1 ? "1 day" : `${days} days
 
 function PreviewsSection({
   id,
-  workspace,
+  eyebrow,
+  teamName,
+  previews,
   access,
   ttlDays,
   onAccess,
   onTtlDays,
 }: {
   id: string;
-  workspace: SlackWorkspace;
+  eyebrow: string;
+  teamName: string;
+  previews: SlackWorkspacePreviews;
   access: SlackPreviewAccess;
   ttlDays: number;
   onAccess: (access: SlackPreviewAccess) => void;
   onTtlDays: (days: number) => void;
 }) {
-  const { previews } = workspace;
   const share = previews.quotaBytes > 0 ? Math.min(1, previews.usedBytes / previews.quotaBytes) : 0;
   const choices: Array<Choice<SlackPreviewAccess>> = [
     {
       id: "members",
       label: "Workspace members",
-      detail: `Visitors sign in with Slack and must be in ${workspace.teamName}.`,
+      detail: `Visitors sign in with Slack and must be in ${teamName}.`,
       icon: <Lock size={14} aria-hidden="true" />,
     },
     {
@@ -1377,6 +1837,7 @@ function PreviewsSection({
   return (
     <Section
       id={id}
+      eyebrow={eyebrow}
       title="Previews"
       description="When an agent changes a website, Stella posts a preview link in the thread: the repository's own preview when it has one, otherwise a build Stella hosts for you."
     >
@@ -1404,7 +1865,7 @@ function PreviewsSection({
           ))}
         </select>
       </Row>
-      <Row label="Storage" hint={`Up to ${formatBytes(previews.maxPreviewBytes)} per preview.`}>
+      <Row label="Storage" hint={`Shared by the whole workspace. Up to ${formatBytes(previews.maxPreviewBytes)} per preview.`}>
         <div className={s.usage}>
           <div className={s.usageText}>
             <span>
@@ -1428,57 +1889,26 @@ function PreviewsSection({
   );
 }
 
-type Loaded<T> = { key: string } & ({ value: T } | { message: string });
-
-/** The result for `key`, or loading while the latest result is for another key. */
-const loadable = <T,>(key: string | null, loaded: Loaded<T> | null) =>
-  !key
-    ? ({ state: "idle" } as const)
-    : !loaded || loaded.key !== key
-      ? ({ state: "loading" } as const)
-      : "value" in loaded
-        ? ({ state: "ready", value: loaded.value } as const)
-        : ({ state: "error", message: loaded.message } as const);
-
 function GithubSection({
   id,
   workspace,
-  available,
   githubReturn,
-  repoName,
-  repoBranch,
   dirty,
-  saving,
-  onRepo,
-  onBranch,
-  onDisconnectRepo,
   onWorkspace,
+  onRefresh,
 }: {
   id: string;
   workspace: SlackWorkspace;
-  available: boolean;
   githubReturn: GithubReturn | null;
-  repoName: string;
-  repoBranch: string;
   dirty: boolean;
-  saving: boolean;
-  onRepo: (repoName: string, repoBranch: string) => void;
-  onBranch: (branch: string) => void;
-  onDisconnectRepo: () => void;
   onWorkspace: (workspace: SlackWorkspace) => void;
+  onRefresh: () => void;
 }) {
   const teamId = workspace.teamId;
-  const github = workspace.github;
-  const active = github?.status === "active";
-  const [busy, setBusy] = useState<"connect" | "finish" | "disconnect" | null>(
-    githubReturn?.code ? "finish" : null,
-  );
+  const accounts = workspace.githubAccounts;
+  const [busy, setBusy] = useState<string | null>(githubReturn?.code ? "finish" : null);
   const [error, setError] = useState<string | null>(githubReturn?.error ?? null);
   const [choices, setChoices] = useState<SlackGithubInstallationChoice[] | null>(null);
-  const [reposKey, setReposKey] = useState(0);
-  const [reposLoaded, setReposLoaded] = useState<Loaded<SlackGithubRepoOption[]> | null>(null);
-  const reposFor = active ? `${teamId}:${reposKey}` : null;
-  const repos = loadable(reposFor, reposLoaded);
   const finishing = useRef(false);
 
   const finish = useCallback(
@@ -1492,7 +1922,6 @@ function GithubSection({
         else {
           setChoices(null);
           onWorkspace(result.workspace);
-          setReposKey((key) => key + 1);
         }
       } catch (failure) {
         setError(errorText(failure));
@@ -1508,22 +1937,6 @@ function GithubSection({
     finishing.current = true;
     void finish();
   }, [finish, githubReturn]);
-
-  useEffect(() => {
-    if (!reposFor) return;
-    let cancelled = false;
-    listGithubRepos(teamId).then(
-      ({ repos: value }) => {
-        if (!cancelled) setReposLoaded({ key: reposFor, value });
-      },
-      (failure) => {
-        if (!cancelled) setReposLoaded({ key: reposFor, message: errorText(failure) });
-      },
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [reposFor, teamId]);
 
   const connect = async () => {
     if (dirty && !window.confirm("Connecting GitHub leaves this page. Discard your unsaved changes?")) return;
@@ -1541,17 +1954,18 @@ function GithubSection({
     }
   };
 
-  const disconnect = async () => {
-    if (!github) return;
-    const repoGoes = workspace.repo?.access === "github";
-    const message = repoGoes
-      ? `Disconnect GitHub (${github.account})? ${workspace.repo!.fullName} is removed too, so new agents start without it.`
-      : `Disconnect GitHub (${github.account})?`;
+  const disconnect = async (account: SlackWorkspaceGithub) => {
+    const owned = workspace.repos.filter((repo) =>
+      repo.fullName.toLowerCase().startsWith(`${account.account.toLowerCase()}/`),
+    );
+    const message = owned.length
+      ? `Disconnect GitHub (${account.account})? ${owned.map((repo) => repo.fullName).join(", ")} stay${owned.length === 1 ? "s" : ""}, but agents can only read ${owned.length === 1 ? "it" : "them"} if public, and can't push.`
+      : `Disconnect GitHub (${account.account})?`;
     if (!window.confirm(message)) return;
-    setBusy("disconnect");
+    setBusy(`disconnect:${account.installationId}`);
     setError(null);
     try {
-      onWorkspace((await disconnectGithub(teamId)).workspace);
+      onWorkspace((await disconnectGithub(teamId, account.installationId)).workspace);
     } catch (failure) {
       setError(errorText(failure));
     } finally {
@@ -1559,92 +1973,84 @@ function GithubSection({
     }
   };
 
-  const repoOptions = repos.state === "ready" ? repos.value : [];
-  const chosen = repoOptions.find((repo) => repo.fullName.toLowerCase() === repoName.toLowerCase());
-  const saved = workspace.repo && repoName === workspace.repo.fullName ? workspace.repo : null;
-
   return (
     <Section
       id={id}
-      title="Repository"
-      description="Every agent Stella starts here begins with this repository cloned in, on this branch. Agents commit and push their changes there and post your repository's preview link in the thread."
+      title="GitHub"
+      description="Connect the GitHub accounts and organizations that own your repositories, so agents can clone private ones, push their work and share previews. Public repositories work without connecting, read-only."
     >
-      {available ? (
-        github && !active ? (
-          <div className={`${s.callout} ${s.callout_warn}`} role="status">
-            <AlertTriangle size={16} aria-hidden="true" />
-            <div className={s.calloutBody}>
-              <p className={s.calloutTitle}>
-                {github.status === "suspended"
-                  ? `GitHub access is suspended on ${github.account}`
-                  : `Stella lost access to GitHub (${github.account})`}
-              </p>
-              <p className={s.calloutText}>
-                {github.status === "suspended"
-                  ? "Someone suspended Stella Crew on GitHub. Unsuspend it there, or reconnect with another account."
-                  : "Stella Crew was uninstalled or its access was removed. Reconnect to keep cloning private repositories."}
-              </p>
-              <div className={s.calloutActions}>
-                <button type="button" className={s.primary} onClick={() => void connect()} disabled={busy !== null}>
-                  {busy === "connect" ? "Opening GitHub…" : "Reconnect GitHub"}
+      {accounts.length ? (
+        <div className={s.table}>
+          {accounts.map((account) => (
+            <div key={account.installationId} className={s.account} data-status={account.status}>
+              <span className={s.connectionMark}>
+                <GithubMark />
+              </span>
+              <span className={s.connectionText}>
+                <span className={s.connectionTitle}>{account.account}</span>
+                <span className={s.connectionDetail}>
+                  {account.status === "active"
+                    ? account.accountType === "Organization"
+                      ? "Organization"
+                      : "Personal account"
+                    : account.status === "suspended"
+                      ? "Suspended on GitHub. Unsuspend Stella Crew there, or reconnect."
+                      : "Stella lost access: the app was uninstalled or its access removed. Reconnect."}
+                </span>
+              </span>
+              <span className={s.connectionActions}>
+                {account.status === "active" ? (
+                  <a className={s.textLink} href={account.manageUrl} target="_blank" rel="noopener noreferrer">
+                    Choose repositories
+                    <ArrowUpRight size={14} aria-hidden="true" />
+                  </a>
+                ) : (
+                  <button type="button" className={s.textLink} onClick={() => void connect()} disabled={busy !== null}>
+                    Reconnect
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className={s.textLink}
+                  onClick={() => void disconnect(account)}
+                  disabled={busy !== null}
+                >
+                  {busy === `disconnect:${account.installationId}` ? "Disconnecting…" : "Disconnect"}
                 </button>
-                <button type="button" className={s.ghost} onClick={() => void disconnect()} disabled={busy !== null}>
-                  Disconnect
-                </button>
-              </div>
+              </span>
             </div>
-          </div>
-        ) : github ? (
-          <div className={s.connection}>
-            <span className={s.connectionMark}>
-              <GithubMark />
-            </span>
-            <span className={s.connectionText}>
-              <span className={s.connectionTitle}>GitHub</span>
-              <span className={s.connectionDetail}>
-                Connected to <strong>{github.account}</strong>
-              </span>
-            </span>
-            <span className={s.connectionActions}>
-              <a className={s.textLink} href={github.manageUrl} target="_blank" rel="noopener noreferrer">
-                Choose repositories
-                <ArrowUpRight size={14} aria-hidden="true" />
-              </a>
-              <button
-                type="button"
-                className={s.textLink}
-                onClick={() => setReposKey((key) => key + 1)}
-                disabled={busy !== null}
-              >
-                Refresh
-              </button>
-              <button type="button" className={s.textLink} onClick={() => void disconnect()} disabled={busy !== null}>
-                {busy === "disconnect" ? "Disconnecting…" : "Disconnect"}
-              </button>
-            </span>
-          </div>
-        ) : (
-          <div className={s.connection}>
-            <span className={s.connectionMark}>
-              <GithubMark />
-            </span>
-            <span className={s.connectionText}>
-              <span className={s.connectionTitle}>Connect GitHub so agents can push and share previews</span>
-              <span className={s.connectionDetail}>
-                You choose which repositories Stella can see, and you never paste a token. Public repositories
-                work without connecting, read-only.
-              </span>
-            </span>
-            <button type="button" className={s.primary} onClick={() => void connect()} disabled={busy !== null}>
-              {busy === "connect" ? "Opening GitHub…" : busy === "finish" ? "Connecting…" : "Connect GitHub"}
+          ))}
+          <div className={s.accountFoot}>
+            <button type="button" className={s.tableAdd} onClick={() => void connect()} disabled={busy !== null}>
+              <Plus size={15} aria-hidden="true" />
+              {busy === "connect" ? "Opening GitHub…" : busy === "finish" ? "Connecting…" : "Connect another account"}
+            </button>
+            <button type="button" className={s.textLink} onClick={onRefresh} disabled={busy !== null}>
+              Refresh repositories
             </button>
           </div>
-        )
-      ) : null}
+        </div>
+      ) : (
+        <div className={s.connection}>
+          <span className={s.connectionMark}>
+            <GithubMark />
+          </span>
+          <span className={s.connectionText}>
+            <span className={s.connectionTitle}>Connect GitHub so agents can push and share previews</span>
+            <span className={s.connectionDetail}>
+              You choose which repositories Stella can see, and you never paste a token. Connect each account or
+              organization that owns a repository you add.
+            </span>
+          </span>
+          <button type="button" className={s.primary} onClick={() => void connect()} disabled={busy !== null}>
+            {busy === "connect" ? "Opening GitHub…" : busy === "finish" ? "Connecting…" : "Connect GitHub"}
+          </button>
+        </div>
+      )}
 
       {choices ? (
-        <div className={s.table} role="group" aria-label="Choose a GitHub account">
-          <p className={s.tableCaption}>Which GitHub account should Stella use?</p>
+        <div className={`${s.table} ${s.choices}`} role="group" aria-label="Choose a GitHub account">
+          <p className={s.tableCaption}>Which GitHub account should Stella connect?</p>
           {choices.map((choice) => (
             <button
               key={choice.installationId}
@@ -1655,7 +2061,13 @@ function GithubSection({
             >
               <GithubMark />
               <span className={s.choiceName}>{choice.account || `Installation ${choice.installationId}`}</span>
-              <span className={s.choiceType}>{choice.accountType === "Organization" ? "Organization" : "Personal"}</span>
+              <span className={s.choiceType}>
+                {accounts.some((account) => account.installationId === choice.installationId)
+                  ? "Connected"
+                  : choice.accountType === "Organization"
+                    ? "Organization"
+                    : "Personal"}
+              </span>
               <ChevronRight size={15} aria-hidden="true" />
             </button>
           ))}
@@ -1663,47 +2075,6 @@ function GithubSection({
       ) : null}
 
       {error ? <p className={`${s.banner} ${s.banner_error}`}>{error}</p> : null}
-
-      <Row
-        label="Repository"
-        hint={
-          saved?.access === "token" ? (
-            <>
-              Uses an access token saved earlier.
-              {available ? " Connect GitHub and pick the repository again to replace it." : null}
-            </>
-          ) : saved?.access === "public" ? (
-            "Cloned as a public repository. Agents can't push to it."
-          ) : saved?.access === "github" ? (
-            "Agents can push to this branch through GitHub."
-          ) : (
-            "owner/name, or pick one Stella can see on GitHub."
-          )
-        }
-      >
-        <RepoPicker
-          value={repoName}
-          repos={repoOptions}
-          loading={repos.state === "loading"}
-          connected={active}
-          onChange={(fullName) => onRepo(fullName, "")}
-        />
-        {repos.state === "error" ? <span className={s.fieldError}>{repos.message}</span> : null}
-        {workspace.repo || repoName ? (
-          <button type="button" className={s.textLink} onClick={onDisconnectRepo} disabled={saving}>
-            Remove repository
-          </button>
-        ) : null}
-      </Row>
-      <Row label="Branch">
-        <BranchPicker
-          teamId={teamId}
-          repo={REPO_PATTERN.test(repoName) ? repoName : ""}
-          defaultHint={chosen?.defaultBranch ?? ""}
-          value={repoBranch}
-          onChange={onBranch}
-        />
-      </Row>
     </Section>
   );
 }

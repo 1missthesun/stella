@@ -1,16 +1,18 @@
 /**
  * Stella for Slack environments: what every agent container started from a
- * workspace's Slack runs with. One per workspace (migrations/0015), edited by
- * its owner on stella.sh/crew beside the repository it checks out.
+ * workspace's Slack runs with. One per repository, plus one (`repo_id` '')
+ * for work that isn't about a repository (migrations/0015, 0016), edited by
+ * the owner on stella.sh/crew. A container runs in the environment of the
+ * repository its conversation works in (`repos.ts`).
  *
  * Network access is enforced by the container's network, not by the agent.
  * A Slack agent's container sends every HTTP and HTTPS request through
  * `SandboxEgress` (HTTPS is intercepted with a per-container CA the container
- * trusts), which calls `slackEgress` here. It reads the workspace's current
+ * trusts), which calls `slackEgress` here. It reads the repository's current
  * environment (cached for seconds) and allows or refuses each request:
  *
- *   none     Stella itself, the engine's model API and the workspace's own
- *            repository on GitHub; nothing else
+ *   none     Stella itself, the engine's model API and the repository on
+ *            GitHub; nothing else
  *   limited  also package registries, GitHub and other build hosts
  *            (`LIMITED_HOSTS`), the owner's extra hosts and the secrets' hosts
  *   full     everything; other ports reach the Internet directly too
@@ -52,6 +54,7 @@ import { WORLD_ROOT } from "../workspace.js";
 import { slackTry } from "./api.js";
 import { decryptToken, encryptToken } from "./crypto.js";
 import { loadInstallation } from "./store.js";
+import { resolveConversationRepo } from "./repos.js";
 
 /** Hosts `limited` allows: package registries, source hosts and toolchain downloads. */
 export const LIMITED_HOSTS: readonly string[] = [
@@ -135,6 +138,7 @@ const d1 = (env: Cloudflare.Env): D1Database => {
 
 type EnvironmentRow = {
   team_id: string;
+  repo_id: string;
   name: string;
   network: string;
   allowed_hosts: string;
@@ -163,14 +167,22 @@ const parseHosts = (raw: string): string[] => {
   }
 };
 
-export const loadEnvironment = async (env: Cloudflare.Env, teamId: string): Promise<SlackEnvironment> => {
+/** `repoId` "" is the environment of work that isn't about a repository. */
+export const loadEnvironment = async (
+  env: Cloudflare.Env,
+  teamId: string,
+  repoId: string,
+): Promise<SlackEnvironment> => {
   const [row, secrets] = await Promise.all([
-    d1(env).prepare("SELECT * FROM slack_environments WHERE team_id = ?").bind(teamId).first<EnvironmentRow>(),
+    d1(env)
+      .prepare("SELECT * FROM slack_environments WHERE team_id = ? AND repo_id = ?")
+      .bind(teamId, repoId)
+      .first<EnvironmentRow>(),
     d1(env)
       .prepare(
-        "SELECT id, name, host, header FROM slack_environment_secrets WHERE team_id = ? ORDER BY created_at",
+        "SELECT id, name, host, header FROM slack_environment_secrets WHERE team_id = ? AND repo_id = ? ORDER BY created_at",
       )
-      .bind(teamId)
+      .bind(teamId, repoId)
       .all<SlackNetworkSecret>(),
   ]);
   return {
@@ -398,22 +410,24 @@ export const validateEnvironmentUpdate = (
 export const saveEnvironment = async (
   env: Cloudflare.Env,
   teamId: string,
+  repoId: string,
   patch: EnvironmentPatch,
 ): Promise<void> => {
   const db = d1(env);
-  const current = await loadEnvironment(env, teamId);
+  const current = await loadEnvironment(env, teamId, repoId);
   const now = Date.now();
   const statements: D1PreparedStatement[] = [
     db
       .prepare(
-        `INSERT INTO slack_environments (team_id, name, network, allowed_hosts, setup_script, env_vars, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT (team_id) DO UPDATE SET name = excluded.name, network = excluded.network,
+        `INSERT INTO slack_environments (team_id, repo_id, name, network, allowed_hosts, setup_script, env_vars, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT (team_id, repo_id) DO UPDATE SET name = excluded.name, network = excluded.network,
            allowed_hosts = excluded.allowed_hosts, setup_script = excluded.setup_script,
            env_vars = excluded.env_vars, updated_at = excluded.updated_at`,
       )
       .bind(
         teamId,
+        repoId,
         patch.name ?? current.name,
         patch.network ?? current.network,
         JSON.stringify(patch.allowedHosts ?? current.allowedHosts),
@@ -423,20 +437,24 @@ export const saveEnvironment = async (
       ),
   ];
   for (const id of patch.removeSecrets ?? []) {
-    statements.push(db.prepare("DELETE FROM slack_environment_secrets WHERE team_id = ? AND id = ?").bind(teamId, id));
+    statements.push(
+      db
+        .prepare("DELETE FROM slack_environment_secrets WHERE team_id = ? AND repo_id = ? AND id = ?")
+        .bind(teamId, repoId, id),
+    );
   }
   for (const secret of patch.addSecrets ?? []) {
     statements.push(
       db
         .prepare(
-          `INSERT INTO slack_environment_secrets (team_id, id, name, host, header, value_enc, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO slack_environment_secrets (team_id, repo_id, id, name, host, header, value_enc, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         )
-        .bind(teamId, crypto.randomUUID(), secret.name, secret.host, secret.header, await encryptToken(env, secret.value), now),
+        .bind(teamId, repoId, crypto.randomUUID(), secret.name, secret.host, secret.header, await encryptToken(env, secret.value), now),
     );
   }
   await db.batch(statements);
-  policyCache.delete(teamId);
+  policyCache.delete(policyKey(teamId, repoId));
 };
 
 const NETWORK_SUMMARY: Record<SlackNetworkLevel, string> = {
@@ -475,18 +493,23 @@ type EgressPolicy = {
 };
 
 const policyCache = new Map<string, { at: number; policy: Promise<EgressPolicy> }>();
+const policyKey = (team: string, repoId: string): string => `${team}:${repoId}`;
 
-const loadPolicy = async (env: Cloudflare.Env, team: string): Promise<EgressPolicy> => {
+const loadPolicy = async (env: Cloudflare.Env, team: string, repoId: string): Promise<EgressPolicy> => {
   const [environment, sealed, repo] = await Promise.all([
-    loadEnvironment(env, team),
+    loadEnvironment(env, team, repoId),
     d1(env)
-      .prepare("SELECT id, name, host, header, value_enc FROM slack_environment_secrets WHERE team_id = ?")
-      .bind(team)
+      .prepare(
+        "SELECT id, name, host, header, value_enc FROM slack_environment_secrets WHERE team_id = ? AND repo_id = ?",
+      )
+      .bind(team, repoId)
       .all<SecretRow>(),
-    d1(env)
-      .prepare("SELECT repo_full_name FROM slack_workspace_settings WHERE team_id = ?")
-      .bind(team)
-      .first<{ repo_full_name: string | null }>(),
+    repoId
+      ? d1(env)
+          .prepare("SELECT full_name FROM slack_repos WHERE team_id = ? AND id = ?")
+          .bind(team, repoId)
+          .first<{ full_name: string }>()
+      : Promise.resolve(null),
   ]);
   const secrets: EgressPolicy["secrets"] = [];
   for (const row of sealed.results ?? []) {
@@ -497,17 +520,18 @@ const loadPolicy = async (env: Cloudflare.Env, team: string): Promise<EgressPoli
     network: environment.network,
     allowed: environment.allowedHosts,
     secrets,
-    repo: repo?.repo_full_name?.toLowerCase() ?? null,
+    repo: repo?.full_name?.toLowerCase() ?? null,
   };
 };
 
-const cachedPolicy = (env: Cloudflare.Env, team: string): Promise<EgressPolicy> => {
+const cachedPolicy = (env: Cloudflare.Env, team: string, repoId: string): Promise<EgressPolicy> => {
   const now = Date.now();
-  const hit = policyCache.get(team);
+  const key = policyKey(team, repoId);
+  const hit = policyCache.get(key);
   if (hit && now - hit.at < POLICY_CACHE_MS) return hit.policy;
-  const policy = loadPolicy(env, team);
-  policyCache.set(team, { at: now, policy });
-  policy.catch(() => policyCache.delete(team));
+  const policy = loadPolicy(env, team, repoId);
+  policyCache.set(key, { at: now, policy });
+  policy.catch(() => policyCache.delete(key));
   return policy;
 };
 
@@ -520,6 +544,8 @@ const repoRequest = (url: URL, repo: string | null): boolean => {
 export type SlackEgressDeps = {
   containerId: string;
   team: string;
+  /** The repository whose environment applies; "" for none. */
+  repo: string;
   /** This Worker itself, for requests to Stella's own origin. */
   loopback: (request: Request) => Promise<Response>;
   /** The general agent policy, metered, for plain HTTP. */
@@ -539,7 +565,7 @@ export const slackEgress = async (
   if (host === own) return await deps.loopback(request);
   let policy: EgressPolicy;
   try {
-    policy = await cachedPolicy(env, deps.team);
+    policy = await cachedPolicy(env, deps.team, deps.repo);
   } catch {
     return new Response("Stella couldn't read this workspace's network settings. Try again.\n", { status: 503 });
   }
@@ -556,6 +582,7 @@ export const slackEgress = async (
     JSON.stringify({
       event: "slack_egress",
       team: deps.team,
+      repo: deps.repo,
       network: policy.network,
       decision: allowed ? "allow" : "deny",
       scheme: url.protocol.replace(":", ""),
@@ -565,7 +592,7 @@ export const slackEgress = async (
   );
   if (!allowed) {
     return new Response(
-      `Blocked: this Slack workspace's environment has ${LEVEL_LABEL[policy.network]} network access, which doesn't include ${host}. The workspace owner can allow it at stella.sh/crew.\n`,
+      `Blocked: this environment has ${LEVEL_LABEL[policy.network]} network access, which doesn't include ${host}. The workspace owner can allow it at stella.sh/crew.\n`,
       { status: 403, headers: { "content-type": "text/plain; charset=utf-8", "x-stella-egress": "blocked" } },
     );
   }
@@ -585,6 +612,15 @@ const threadOf = async (env: Cloudflare.Env, conversationId: string): Promise<Th
     .bind(conversationId)
     .first<ThreadRow>();
 
+/** The repository (id, "" for none) whose environment a conversation's agents run in. */
+const repoIdFor = async (env: Cloudflare.Env, conversationId: string, thread: ThreadRow): Promise<string> => {
+  const resolved = await resolveConversationRepo(env, conversationId, {
+    teamId: thread.team_id,
+    channelId: thread.channel_id,
+  });
+  return resolved?.repo?.id ?? "";
+};
+
 /** The network rules a Slack conversation's agent containers start under. */
 export const egressForConversation = async (
   env: Cloudflare.Env,
@@ -592,8 +628,9 @@ export const egressForConversation = async (
 ): Promise<SandboxEgressPolicy | null> => {
   const thread = await threadOf(env, conversationId);
   if (!thread) return null;
-  const environment = await loadEnvironment(env, thread.team_id);
-  return { kind: "slack", team: thread.team_id, internet: environment.network === "full" };
+  const repo = await repoIdFor(env, conversationId, thread);
+  const environment = await loadEnvironment(env, thread.team_id, repo);
+  return { kind: "slack", team: thread.team_id, repo, internet: environment.network === "full" };
 };
 
 const shellQuote = (value: string): string => `'${value.replace(/'/gu, `'\\''`)}'`;
@@ -637,13 +674,13 @@ const baseAgentEnv = (environment: SlackEnvironment): Record<string, string> => 
   ...Object.fromEntries(environment.secrets.map((secret) => [secret.name, SECRET_PLACEHOLDER])),
 });
 
-const recordSetup = async (env: Cloudflare.Env, teamId: string, run: SlackSetupRun): Promise<void> => {
+const recordSetup = async (env: Cloudflare.Env, teamId: string, repoId: string, run: SlackSetupRun): Promise<void> => {
   await d1(env)
     .prepare(
       `UPDATE slack_environments SET setup_status = ?, setup_exit_code = ?, setup_at = ?, setup_ms = ?, setup_log = ?
-       WHERE team_id = ?`,
+       WHERE team_id = ? AND repo_id = ?`,
     )
-    .bind(run.status, run.exitCode, run.at, run.ms, run.log, teamId)
+    .bind(run.status, run.exitCode, run.at, run.ms, run.log, teamId, repoId)
     .run();
 };
 
@@ -677,13 +714,14 @@ export const prepareSlackEnvironment = async (
 ): Promise<PreparedEnvironment | null> => {
   const thread = await threadOf(env, conversationId);
   if (!thread) return null;
-  const environment = await loadEnvironment(env, thread.team_id);
+  const repoId = await repoIdFor(env, conversationId, thread);
+  const environment = await loadEnvironment(env, thread.team_id, repoId);
   const { vars } = parseEnvVars(environment.envVars);
   const agentEnv: Record<string, string> = { ...baseAgentEnv(environment), ...vars };
   const script = environment.setupScript.trim() ? environment.setupScript : "";
   if (!script) return { env: agentEnv };
 
-  const key = (await sha256Hex(`${script}\0${environment.envVars}\0${environment.network}`)).slice(0, 16);
+  const key = (await sha256Hex(`${repoId}\0${script}\0${environment.envVars}\0${environment.network}`)).slice(0, 16);
   const marker = `${SETUP_DIR}/done-${key}`;
   const carried = `${SETUP_DIR}/carried-${key}`;
   const already = await session.exec(
@@ -738,14 +776,14 @@ cd ${shellQuote(cwd)} 2>/dev/null || cd ${shellQuote(WORLD_ROOT)}
     .slice(-SETUP_LOG_CHARS);
   const succeeded = exitCode === 0;
   const timedOut = exitCode === 124 || exitCode === 137;
-  await recordSetup(env, thread.team_id, {
+  await recordSetup(env, thread.team_id, repoId, {
     status: succeeded ? "succeeded" : "failed",
     exitCode,
     at: started,
     ms,
     log: timedOut ? `${output}\n\n(Stopped after ${SETUP_TIMEOUT_S / 60} minutes.)` : output,
   }).catch(() => undefined);
-  log(succeeded ? "slack_setup_succeeded" : "slack_setup_failed", { team: thread.team_id, exitCode, ms });
+  log(succeeded ? "slack_setup_succeeded" : "slack_setup_failed", { team: thread.team_id, repo: repoId, exitCode, ms });
   if (!succeeded) {
     const reason = timedOut
       ? `didn't finish within ${SETUP_TIMEOUT_S / 60} minutes`
@@ -760,7 +798,7 @@ cd ${shellQuote(cwd)} 2>/dev/null || cd ${shellQuote(WORLD_ROOT)}
     ).catch(() => undefined);
     return {
       env: agentEnv,
-      notice: `This workspace's setup script ${reason}, so tools it installs may be missing. The end of its log:\n${output.slice(-1500)}`,
+      notice: `The environment's setup script ${reason}, so tools it installs may be missing. The end of its log:\n${output.slice(-1500)}`,
     };
   }
   const after = await session.exec(`cat ${out}/env`, { origin: "internal", timeout: 30_000 } as Parameters<

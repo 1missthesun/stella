@@ -4,7 +4,13 @@ import {
   SLACK_INSTALL_START_PATH,
   SLACK_WORKSPACES_PATH,
   slackGithubPath,
+  slackRepoPath,
+  slackReposPath,
   slackWorkspacePath,
+  type SlackGithubDisconnectRequest,
+  type SlackRepoAdd,
+  type SlackRepoAddResponse,
+  type SlackRepoUpdate,
   type SlackGithubBranchesResponse,
   type SlackGithubConnectRequest,
   type SlackGithubConnectResponse,
@@ -84,6 +90,25 @@ export function updateSlackWorkspace(
   });
 }
 
+export function addSlackRepo(teamId: string, add: SlackRepoAdd): Promise<SlackRepoAddResponse> {
+  if (readMockMode()) return mockSlackApi.addRepo(teamId, add);
+  return request<SlackRepoAddResponse>(slackReposPath(teamId), { method: "POST", body: add });
+}
+
+export function updateSlackRepo(
+  teamId: string,
+  repoId: string,
+  update: SlackRepoUpdate,
+): Promise<SlackWorkspaceUpdateResponse> {
+  if (readMockMode()) return mockSlackApi.updateRepo(teamId, repoId, update);
+  return request<SlackWorkspaceUpdateResponse>(slackRepoPath(teamId, repoId), { method: "POST", body: update });
+}
+
+export function removeSlackRepo(teamId: string, repoId: string): Promise<SlackWorkspaceUpdateResponse> {
+  if (readMockMode()) return mockSlackApi.removeRepo(teamId, repoId);
+  return request<SlackWorkspaceUpdateResponse>(`${slackRepoPath(teamId, repoId)}/remove`, { method: "POST" });
+}
+
 export function startSlackInstall(returnTo: string): Promise<SlackInstallStartResponse> {
   if (readMockMode()) return mockSlackApi.install(returnTo);
   const body: SlackInstallStartRequest = { returnTo };
@@ -106,9 +131,10 @@ export function finishGithub(
   return request<SlackGithubFinishResponse>(slackGithubPath(teamId, "finish"), { method: "POST", body });
 }
 
-export function disconnectGithub(teamId: string): Promise<SlackWorkspaceUpdateResponse> {
-  if (readMockMode()) return mockSlackApi.disconnectGithub();
-  return request<SlackWorkspaceUpdateResponse>(slackGithubPath(teamId, "disconnect"), { method: "POST" });
+export function disconnectGithub(teamId: string, installationId: string): Promise<SlackWorkspaceUpdateResponse> {
+  if (readMockMode()) return mockSlackApi.disconnectGithub(installationId);
+  const body: SlackGithubDisconnectRequest = { installationId };
+  return request<SlackWorkspaceUpdateResponse>(slackGithubPath(teamId, "disconnect"), { method: "POST", body });
 }
 
 export function listGithubRepos(teamId: string): Promise<SlackGithubReposResponse> {

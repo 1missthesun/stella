@@ -52,6 +52,7 @@ import {
   isSlackConversationId,
   SLACK_CONNECTOR_SOURCE,
 } from "../slack/workspace.js";
+import { createSlackRepoTool } from "../slack/repo-tool.js";
 
 /** The orchestrator's tool set and connector connection requests. */
 export abstract class OrchestratorTools extends OrchestratorPi {
@@ -197,6 +198,11 @@ export abstract class OrchestratorTools extends OrchestratorPi {
         createSlackMemoryTool({
           turnId: turn.turnId,
           ownerInternal: toolContext.ownerInternal,
+          context: () => this.slack().workspace(),
+        }),
+        createSlackRepoTool({
+          env: this.env as unknown as Cloudflare.Env,
+          conversationId: turn.conversationId,
           context: () => this.slack().workspace(),
         }),
       ];

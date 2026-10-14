@@ -533,6 +533,11 @@
   grid-template-columns: minmax(0, 1fr);
 }
 
+.row[data-stack] .rowControl {
+  justify-items: stretch;
+  padding-top: 10px;
+}
+
 .rowText {
   display: grid;
   align-content: start;
@@ -1094,6 +1099,202 @@
   color: var(--faint);
 }
 
+
+/* Repositories: a bordered list to pick one, then its settings below */
+
+.main .sectionEyebrow {
+  margin: 0 0 2px;
+  font-family: var(--l-mono), ui-monospace, monospace;
+  font-size: 12.5px;
+  color: var(--faint);
+}
+
+.repoItem {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 60px;
+  padding: 10px 12px 10px 14px;
+  border: 0;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+
+.repoItem:hover {
+  background: var(--surface);
+}
+
+.repoItem[data-selected] {
+  background: var(--surface);
+  box-shadow: inset 2px 0 0 var(--ink);
+}
+
+.repoMark {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.repoItem[data-selected] .repoMark {
+  background: #fff;
+}
+
+.repoText {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.repoName {
+  overflow: hidden;
+  font-weight: 580;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.repoDetail {
+  overflow: hidden;
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.repoMeta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--faint);
+}
+
+.repoAccess {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.sectionNavSub a.navRepo {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* GitHub accounts */
+
+.account {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px 14px;
+  padding: 12px 14px;
+}
+
+.account:not([data-status="active"]) {
+  background: rgba(236, 178, 46, 0.1);
+}
+
+.account:not([data-status="active"]) .connectionDetail {
+  color: #6b4b06;
+}
+
+.accountFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-right: 14px;
+}
+
+.accountFoot .tableAdd {
+  width: auto;
+}
+
+.choices {
+  margin-top: 12px;
+}
+
+/* Channel defaults */
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 6px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 28px;
+  padding: 0 4px 0 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.chip[data-removed] {
+  color: var(--faint);
+  text-decoration: line-through;
+}
+
+.chipButton {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.chipButton:hover {
+  background: rgba(10, 10, 13, 0.06);
+  color: var(--ink);
+}
+
+.muted {
+  padding-top: 8px;
+  font-size: 13.5px;
+  color: var(--faint);
+}
+
+.dangerLink {
+  appearance: none;
+  margin-top: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--danger);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 560;
+  text-decoration: underline;
+  text-decoration-color: rgba(180, 35, 47, 0.3);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.dangerLink:hover:not(:disabled) {
+  text-decoration-color: currentColor;
+}
+
+.dangerLink:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 /* Domains */
 
 .details {
@@ -1477,6 +1678,18 @@
 
   .formGrid {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .account {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .account > :last-child {
+    grid-column: 1 / -1;
+  }
+
+  .repoAccess {
+    display: none;
   }
 
   .secret {

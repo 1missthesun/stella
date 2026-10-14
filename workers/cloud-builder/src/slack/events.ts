@@ -54,8 +54,16 @@ import {
 } from "./store.js";
 import { publishHome, sendSetupPrompt } from "./ui.js";
 import { ownerGateStub } from "../rpc-release.js";
-import { loadWorkspaceSettings, repoOwnedBy, workspaceExecution } from "./settings.js";
-import type { SlackPerson, SlackWorkspaceContext } from "./workspace.js";
+import { loadWorkspaceSettings, workspaceExecution } from "./settings.js";
+import {
+  connectionFor,
+  conversationChoseNone,
+  listChannelDefaults,
+  listGithubConnections,
+  listRepos,
+  resolveConversationRepo,
+} from "./repos.js";
+import type { SlackPerson, SlackRepoContext, SlackWorkspaceContext } from "./workspace.js";
 
 type SlackFile = {
   id: string;
@@ -472,27 +480,48 @@ const handleMessage = async (
       if (participants.length >= 8) break;
     }
   }
-  const [settings, environment] = await Promise.all([
+  const environments = slackEnvironmentsEnabled(env);
+  const [settings, environment, repos, connections, current] = await Promise.all([
     loadWorkspaceSettings(env, install.teamId),
-    slackEnvironmentsEnabled(env) ? loadEnvironment(env, install.teamId) : null,
+    environments ? loadEnvironment(env, install.teamId, "") : null,
+    listRepos(env, install.teamId),
+    listGithubConnections(env, install.teamId),
+    resolveConversationRepo(env, conversationId, { teamId: install.teamId, channelId }),
   ]);
+  const channelDefault = (await listChannelDefaults(env, install.teamId)).find(
+    (entry) => entry.channelId === channelId,
+  );
+  const repoContexts: SlackRepoContext[] = await Promise.all(
+    repos.map(async (repo) => {
+      const github = connectionFor(connections, repo.fullName);
+      return {
+        fullName: repo.fullName,
+        branch: repo.branch,
+        push: github?.status === "active",
+        ...(environments
+          ? { environment: environmentSummary(await loadEnvironment(env, install.teamId, repo.id)) }
+          : {}),
+        ...(repo.rules.trim() ? { rules: repo.rules.trim() } : {}),
+      };
+    }),
+  );
+  const channelRepo = repos.find((repo) => repo.id === channelDefault?.repoId)?.fullName;
   const workspace: SlackWorkspaceContext = {
+    teamId: install.teamId,
     teamName: install.teamName,
     homeFolder: install.homeFolder,
     channelId,
     place,
     requester: { id: userId, name: requester.name },
     participants,
-    ...(settings.repo
-      ? {
-          repo: settings.repo.branch
-            ? `${settings.repo.fullName}@${settings.repo.branch}`
-            : settings.repo.fullName,
-          repoPush: Boolean(
-            settings.github?.status === "active" && repoOwnedBy(settings.github, settings.repo.fullName),
-          ),
-        }
+    ...(repoContexts.length ? { repos: repoContexts } : {}),
+    ...(current?.repo && current.source !== "none"
+      ? { currentRepo: current.repo.fullName, currentRepoSource: current.source }
       : {}),
+    ...(current && !current.repo && current.source === "none" && (await conversationChoseNone(env, conversationId))
+      ? { noRepo: true }
+      : {}),
+    ...(channelRepo ? { channelRepo } : {}),
     ...(environment ? { environment: environmentSummary(environment) } : {}),
   };
 

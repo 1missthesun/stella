@@ -8,6 +8,7 @@ type SlackColumn = { table: string; column: string; keys: string[] };
 const SLACK_COLUMNS: SlackColumn[] = [
   { table: "slack_installations", column: "bot_token_enc", keys: ["team_id"] },
   { table: "slack_workspace_settings", column: "repo_token_enc", keys: ["team_id"] },
+  { table: "slack_repos", column: "token_enc", keys: ["team_id", "id"] },
   { table: "slack_environment_secrets", column: "value_enc", keys: ["team_id", "id"] },
 ];
 

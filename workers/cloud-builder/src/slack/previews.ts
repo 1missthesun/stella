@@ -17,7 +17,8 @@
  * too. Without it, every site shares `SITES_SHARED_ORIGIN`, and
  * `/__stella/open/<id>` picks the one a browser sees through a cookie.
  *
- * Access is the workspace owner's choice (`slack_preview_settings`):
+ * Access is the workspace owner's choice, per repository (`slack_repos`,
+ * for previews built from one) or for the workspace (`slack_preview_settings`):
  * anyone with the link, or members only. A members-only preview sends the
  * visitor to Sign in with Slack (OpenID) restricted to the workspace; the
  * callback hands the preview origin a short grant, which it trades for an
@@ -41,6 +42,7 @@ import { slackTry } from "./api.js";
 import { SLACK_PATHS, slackPublicOrigin, slackSecret } from "./config.js";
 import { signToken, verifyToken, type TokenKind } from "./signed-token.js";
 import { loadInstallation } from "./store.js";
+import { resolveConversationRepo } from "./repos.js";
 import { isSlackConversationId } from "./workspace.js";
 import publishScript from "./stella-publish.cjs.txt";
 
@@ -116,14 +118,31 @@ const isAccess = (value: unknown): value is SlackPreviewAccess => value === "pub
 export const isPreviewTtl = (value: unknown): value is number =>
   (SLACK_PREVIEW_TTL_DAYS_CHOICES as readonly number[]).includes(value as number);
 
-export const loadPreviewSettings = async (env: Cloudflare.Env, teamId: string): Promise<PreviewSettings> => {
-  const row = await d1(env)
-    .prepare("SELECT access, ttl_days FROM slack_preview_settings WHERE team_id = ?")
-    .bind(teamId)
-    .first<{ access: string; ttl_days: number }>();
-  return {
+/** The workspace's settings, or the repository's (`owner/name`) where it has its own. */
+export const loadPreviewSettings = async (
+  env: Cloudflare.Env,
+  teamId: string,
+  repo?: string | null,
+): Promise<PreviewSettings> => {
+  const [row, repoRow] = await Promise.all([
+    d1(env)
+      .prepare("SELECT access, ttl_days FROM slack_preview_settings WHERE team_id = ?")
+      .bind(teamId)
+      .first<{ access: string; ttl_days: number }>(),
+    repo
+      ? d1(env)
+          .prepare("SELECT preview_access, preview_ttl_days FROM slack_repos WHERE team_id = ? AND full_name = ? COLLATE NOCASE")
+          .bind(teamId, repo)
+          .first<{ preview_access: string | null; preview_ttl_days: number | null }>()
+      : Promise.resolve(null),
+  ]);
+  const workspace: PreviewSettings = {
     access: isAccess(row?.access) ? row.access : SLACK_PREVIEW_ACCESS_DEFAULT,
     ttlDays: row && row.ttl_days > 0 ? row.ttl_days : SLACK_PREVIEW_TTL_DAYS_DEFAULT,
+  };
+  return {
+    access: isAccess(repoRow?.preview_access) ? repoRow.preview_access : workspace.access,
+    ttlDays: repoRow?.preview_ttl_days && repoRow.preview_ttl_days > 0 ? repoRow.preview_ttl_days : workspace.ttlDays,
   };
 };
 
@@ -143,17 +162,16 @@ export const savePreviewSettings = async (
     .run();
 };
 
-const usage = async (
-  env: Cloudflare.Env,
-  teamId: string,
-  ttlDays: number,
-): Promise<{ bytes: number; live: number }> => {
+/** Live links across the workspace, each expiring by its repository's setting or the workspace's. */
+const usage = async (env: Cloudflare.Env, teamId: string): Promise<{ bytes: number; live: number }> => {
+  const workspace = await loadPreviewSettings(env, teamId);
   const row = await d1(env)
     .prepare(
-      `SELECT COALESCE(SUM(bytes), 0) AS bytes, COUNT(*) AS live FROM slack_previews
-       WHERE team_id = ? AND deleted_at IS NULL AND created_at > ?`,
+      `SELECT COALESCE(SUM(p.bytes), 0) AS bytes, COUNT(*) AS live FROM slack_previews p
+       LEFT JOIN slack_repos r ON r.team_id = p.team_id AND r.full_name = p.repo COLLATE NOCASE
+       WHERE p.team_id = ? AND p.deleted_at IS NULL AND p.created_at + COALESCE(r.preview_ttl_days, ?) * ? > ?`,
     )
-    .bind(teamId, Date.now() - ttlDays * DAY_MS)
+    .bind(teamId, workspace.ttlDays, DAY_MS, Date.now())
     .first<{ bytes: number; live: number }>();
   return { bytes: row?.bytes ?? 0, live: row?.live ?? 0 };
 };
@@ -164,15 +182,16 @@ const quotaFor = async (env: Cloudflare.Env, ownerId: string | null): Promise<nu
   return QUOTA_BYTES[access.audience as ManagedModelAudience] ?? 0;
 };
 
-/** The workspace's preview settings and usage, for stella.sh/crew. */
+/** Preview settings (the workspace's, or a repository's) and the workspace's usage, for stella.sh/crew. */
 export const describePreviews = async (
   env: Cloudflare.Env,
   teamId: string,
   ownerId: string | null,
+  repo?: string,
 ): Promise<SlackWorkspacePreviews> => {
-  const settings = await loadPreviewSettings(env, teamId);
+  const settings = await loadPreviewSettings(env, teamId, repo);
   const [used, quotaBytes] = await Promise.all([
-    usage(env, teamId, settings.ttlDays),
+    usage(env, teamId),
     quotaFor(env, ownerId).catch(() => 0),
   ]);
   return {
@@ -560,8 +579,13 @@ const publish = async (request: Request, env: Cloudflare.Env): Promise<Response>
   }
   if (!request.body) return Response.json({ error: "Send the site as a gzipped tar." }, { status: 400 });
 
-  const settings = await loadPreviewSettings(env, claims.team);
-  const [used, quota] = await Promise.all([usage(env, claims.team, settings.ttlDays), quotaFor(env, install.ownerId)]);
+  const url = new URL(request.url);
+  const commit = (url.searchParams.get("commit") ?? "").slice(0, 40);
+  const repo =
+    (url.searchParams.get("repo") ?? "").slice(0, 200) ||
+    ((await resolveConversationRepo(env, claims.conv).catch(() => null))?.repo?.fullName ?? "");
+  const settings = await loadPreviewSettings(env, claims.team, repo || null);
+  const [used, quota] = await Promise.all([usage(env, claims.team), quotaFor(env, install.ownerId)]);
   if (used.live >= MAX_LIVE_PREVIEWS) {
     return Response.json(
       { error: `This workspace has ${used.live} live previews, the most it can hold. Older ones free up as they expire.` },
@@ -578,9 +602,6 @@ const publish = async (request: Request, env: Cloudflare.Env): Promise<Response>
     );
   }
 
-  const url = new URL(request.url);
-  const commit = (url.searchParams.get("commit") ?? "").slice(0, 40);
-  const repo = (url.searchParams.get("repo") ?? "").slice(0, 200);
   const id = newId();
   const prefix = `${KEY_PREFIX}/${id}/`;
   const seen = new Set<string>();
@@ -660,12 +681,19 @@ const publish = async (request: Request, env: Cloudflare.Env): Promise<Response>
 
 // ── Sign in with Slack (members-only previews) ────────────────────────────
 
-type PreviewRow = { id: string; team_id: string; created_at: number; spa: number; deleted_at: number | null };
+type PreviewRow = {
+  id: string;
+  team_id: string;
+  created_at: number;
+  spa: number;
+  repo: string | null;
+  deleted_at: number | null;
+};
 
 const loadPreview = async (env: Cloudflare.Env, id: string): Promise<PreviewRow | null> => {
   if (!ID_PATTERN.test(id)) return null;
   const row = await d1(env)
-    .prepare("SELECT id, team_id, created_at, spa, deleted_at FROM slack_previews WHERE id = ?")
+    .prepare("SELECT id, team_id, created_at, spa, repo, deleted_at FROM slack_previews WHERE id = ?")
     .bind(id)
     .first<PreviewRow>();
   return row && !row.deleted_at ? row : null;
@@ -981,7 +1009,7 @@ export const servePreview = async (request: Request, env: Cloudflare.Env): Promi
   const preview = id ? await loadPreview(env, id) : null;
   if (!preview) return missing();
   const [settings, install] = await Promise.all([
-    loadPreviewSettings(env, preview.team_id),
+    loadPreviewSettings(env, preview.team_id, preview.repo),
     loadInstallation(env, preview.team_id),
   ]);
   if (!install || preview.created_at + settings.ttlDays * DAY_MS <= Date.now()) return missing();
@@ -1028,9 +1056,10 @@ export const sweepSlackPreviews = async (env: Cloudflare.Env): Promise<number> =
     .prepare(
       `SELECT p.id FROM slack_previews p
        LEFT JOIN slack_preview_settings s ON s.team_id = p.team_id
+       LEFT JOIN slack_repos r ON r.team_id = p.team_id AND r.full_name = p.repo COLLATE NOCASE
        LEFT JOIN slack_installations i ON i.team_id = p.team_id AND i.revoked_at IS NULL
        WHERE p.deleted_at IS NULL
-         AND (i.team_id IS NULL OR p.created_at + COALESCE(s.ttl_days, ?) * ? <= ?)
+         AND (i.team_id IS NULL OR p.created_at + COALESCE(r.preview_ttl_days, s.ttl_days, ?) * ? <= ?)
        LIMIT 300`,
     )
     .bind(SLACK_PREVIEW_TTL_DAYS_DEFAULT, DAY_MS, now)

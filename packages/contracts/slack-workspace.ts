@@ -15,6 +15,13 @@ export const slackWorkspacePath = (teamId: string): string =>
 
 export type SlackGithubAction = "connect" | "finish" | "disconnect" | "repos" | "branches";
 
+/** `POST` adds a repository (`SlackRepoAdd`). */
+export const slackReposPath = (teamId: string): string => `${slackWorkspacePath(teamId)}/repos`;
+
+/** `POST` changes one repository (`SlackRepoUpdate`); `POST …/remove` removes it. */
+export const slackRepoPath = (teamId: string, repoId: string): string =>
+  `${slackReposPath(teamId)}/${encodeURIComponent(repoId)}`;
+
 /** `slackWorkspacePath(teamId)/github/<action>`. */
 export const slackGithubPath = (teamId: string, action: SlackGithubAction): string =>
   `${slackWorkspacePath(teamId)}/github/${action}`;
@@ -34,24 +41,15 @@ export type SlackWorkspaceOptions = {
   limitedHosts: string[];
 };
 
-export type SlackWorkspaceRepo = {
-  /** `owner/name` on github.com. */
-  fullName: string;
-  /** Empty means the repository's default branch. */
-  branch: string;
-  /**
-   * How agents get it: through the workspace's GitHub connection, as a
-   * public repository, or with an access token pasted before GitHub
-   * connections existed (kept until the owner picks a repository again).
-   */
-  access: "github" | "public" | "token";
-};
-
 /**
- * The workspace's connection to GitHub through the "Stella for Slack" App.
- * `revoked` means the App was uninstalled or lost access: reconnect.
+ * One GitHub account (user or organization) the workspace connected through
+ * the Stella Crew GitHub App. A workspace can connect several, so repositories
+ * of different owners sit side by side; each repository uses the connection
+ * whose account owns it. `revoked` means the App was uninstalled or lost
+ * access: reconnect.
  */
 export type SlackWorkspaceGithub = {
+  installationId: string;
   account: string;
   accountType: string;
   status: "active" | "suspended" | "revoked";
@@ -119,8 +117,9 @@ export type SlackSetupRun = {
 };
 
 /**
- * The workspace's environment: what every agent container started from
- * Slack runs with. One per workspace, beside its repository.
+ * An environment: what an agent container started from Slack runs with.
+ * Each repository has its own; the workspace has one more for work that
+ * isn't about any repository.
  */
 export type SlackWorkspaceEnvironment = {
   name: string;
@@ -158,6 +157,37 @@ export const SLACK_ALLOWED_HOSTS_MAX = 100;
 export const SLACK_NETWORK_SECRETS_MAX = 50;
 export const SLACK_NETWORK_SECRET_MAX_CHARS = 8_000;
 
+/** A channel (or DM) whose threads default to a repository. */
+export type SlackRepoChannel = { id: string; name: string };
+
+/**
+ * One of the workspace's repositories. Stella picks which one a request is
+ * about (from the request, the thread and the channel's default) and every
+ * agent she starts for it gets it cloned, with its own environment.
+ */
+export type SlackWorkspaceRepo = {
+  /** Stable id, used in `slackRepoPath`. */
+  id: string;
+  /** `owner/name` on github.com. */
+  fullName: string;
+  /** Empty means the repository's default branch. */
+  branch: string;
+  /**
+   * How agents get it: through one of the workspace's GitHub connections, as
+   * a public repository, or with an access token pasted before GitHub
+   * connections existed (kept until the owner picks the repository again).
+   */
+  access: "github" | "public" | "token";
+  /** Rules for work in this repository, on top of the workspace's rules. */
+  rules: string;
+  /** Channels whose threads use this repository unless Stella picks another. */
+  channels: SlackRepoChannel[];
+  /** Null where this deployment doesn't offer environments yet. */
+  environment: SlackWorkspaceEnvironment | null;
+  /** Previews built from this repository. Usage is the workspace's. */
+  previews: SlackWorkspacePreviews;
+};
+
 export type SlackWorkspace = {
   teamId: string;
   teamName: string;
@@ -169,10 +199,16 @@ export type SlackWorkspace = {
   effort: ReasoningEffortLevel;
   /** People in Slack may switch engine, model and effort with `/stella`. */
   slackCommands: boolean;
-  github: SlackWorkspaceGithub | null;
-  repo: SlackWorkspaceRepo | null;
+  /** Connected GitHub accounts, oldest first. */
+  githubAccounts: SlackWorkspaceGithub[];
+  /** The workspace's repositories, oldest first. */
+  repos: SlackWorkspaceRepo[];
+  /** Previews of work that isn't about a repository (and the workspace's usage). */
   previews: SlackWorkspacePreviews;
-  /** Null where this deployment doesn't offer environments yet. */
+  /**
+   * The environment of work that isn't about any repository. Null where this
+   * deployment doesn't offer environments yet.
+   */
   environment: SlackWorkspaceEnvironment | null;
   /** Plain-language rules Stella follows in this workspace (`memories/rules.md`). */
   rules: string;
@@ -201,20 +237,42 @@ export type SlackInstallStartResponse = { url: string };
 
 /**
  * `POST slackWorkspacePath(teamId)`. Only the fields present change.
- * `repo: null` disconnects the repository. A repository is reached through
- * the workspace's GitHub connection when it can see it, else as public.
+ * `previews` and `environment` are those of work that isn't about a
+ * repository; each repository's are changed with `SlackRepoUpdate`.
  */
 export type SlackWorkspaceUpdate = {
   engine?: SlackWorkspaceEngine;
   model?: string;
   effort?: ReasoningEffortLevel;
   slackCommands?: boolean;
-  repo?: { fullName: string; branch?: string } | null;
   previews?: { access?: SlackPreviewAccess; ttlDays?: number };
   environment?: SlackWorkspaceEnvironmentUpdate;
   rules?: string;
   memory?: string;
 };
+
+/**
+ * `POST slackReposPath(teamId)` → `SlackWorkspaceUpdateResponse`. A
+ * repository is reached through the GitHub connection whose account owns it,
+ * else as public. It starts with the default environment (full network).
+ */
+export type SlackRepoAdd = { fullName: string; branch?: string };
+
+/** `POST slackReposPath(teamId)` → the workspace, and the new repository's id. */
+export type SlackRepoAddResponse = { workspace: SlackWorkspace; repoId: string };
+
+/** `POST slackRepoPath(teamId, repoId)` → `SlackWorkspaceUpdateResponse`. Only the fields present change. */
+export type SlackRepoUpdate = {
+  branch?: string;
+  rules?: string;
+  previews?: { access?: SlackPreviewAccess; ttlDays?: number };
+  environment?: SlackWorkspaceEnvironmentUpdate;
+  /** Channel ids that stop defaulting to this repository. */
+  removeChannels?: string[];
+};
+
+export const SLACK_REPOS_MAX = 50;
+export const SLACK_REPO_RULES_MAX_CHARS = 4000;
 
 export type SlackWorkspaceUpdateResponse = { workspace: SlackWorkspace };
 
@@ -253,7 +311,10 @@ export type SlackGithubRepoOption = {
   defaultBranch: string;
 };
 
-/** `GET slackGithubPath(teamId, "repos")`: what the connection can see. */
+/** `POST slackGithubPath(teamId, "disconnect")`: which connection to remove. */
+export type SlackGithubDisconnectRequest = { installationId: string };
+
+/** `GET slackGithubPath(teamId, "repos")`: what the workspace's connections can see. */
 export type SlackGithubReposResponse = { repos: SlackGithubRepoOption[]; truncated: boolean };
 
 /** `GET slackGithubPath(teamId, "branches")?repo=owner/name`. */

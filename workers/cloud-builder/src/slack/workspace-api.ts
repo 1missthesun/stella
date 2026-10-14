@@ -3,8 +3,11 @@
  * (`@stella/contracts/slack-workspace`). Bearer-authenticated; a workspace is
  * listed and changed only by the Stella account that owns it.
  *
- *   GET  /api/slack/workspaces            the caller's workspaces, settings and choices
- *   POST /api/slack/workspaces/:teamId    change settings, rules or notes
+ *   GET    /api/slack/workspaces                    the caller's workspaces, settings and choices
+ *   POST   /api/slack/workspaces/:teamId            change settings, rules or notes
+ *   POST   /api/slack/workspaces/:teamId/repos      add a repository
+ *   POST   /api/slack/workspaces/:teamId/repos/:id  change a repository's branch, rules, environment, previews
+ *   POST   /api/slack/workspaces/:teamId/repos/:id/remove  remove a repository
  *   POST /api/slack/install/start         the "Add to Slack" URL for this account
  *   POST /api/slack/workspaces/:teamId/github/connect|finish|disconnect
  *   GET  /api/slack/workspaces/:teamId/github/repos|branches
@@ -16,11 +19,16 @@ import type { ManagedModelAudience } from "@stella/contracts/gateway/capability"
 import {
   type SlackGithubAction,
   type SlackGithubBranchesResponse,
+  type SlackGithubDisconnectRequest,
   type SlackGithubFinishRequest,
   type SlackGithubFinishResponse,
+  type SlackRepoAdd,
+  type SlackRepoUpdate,
   type SlackWorkspaceRepo,
   SLACK_INSTALL_START_PATH,
   SLACK_MEMORY_MAX_CHARS,
+  SLACK_REPO_RULES_MAX_CHARS,
+  SLACK_REPOS_MAX,
   SLACK_RULES_MAX_CHARS,
   SLACK_WORKSPACES_PATH,
   type SlackWorkspace,
@@ -50,13 +58,28 @@ import {
   loadWorkspaceSettings,
   parseBranch,
   parseRepoName,
-  repoOwnedBy,
   resolveModelChoice,
   saveWorkspaceSettings,
-  type SlackWorkspaceSettings,
   workspaceOptions,
   type SettingsPatch,
 } from "./settings.js";
+import {
+  addRepo,
+  connectionFor,
+  deleteGithubConnection,
+  findRepoByName,
+  listChannelDefaults,
+  listGithubConnections,
+  listRepos,
+  loadRepo,
+  removeChannelDefaults,
+  removeRepo,
+  saveGithubConnection,
+  updateRepo,
+  type RepoPatch,
+  type SlackGithubConnection,
+  type SlackRepoRecord,
+} from "./repos.js";
 import { describePreviews, isPreviewTtl, savePreviewSettings } from "./previews.js";
 import {
   loadEnvironment,
@@ -141,24 +164,51 @@ const ownedTeamIds = async (env: Cloudflare.Env, ownerId: string): Promise<Array
   return (rows.results ?? []).map((row) => ({ teamId: row.team_id, installedAt: row.installed_at }));
 };
 
+const repoAccess = (
+  repo: SlackRepoRecord,
+  connections: SlackGithubConnection[],
+): SlackWorkspaceRepo["access"] => {
+  const github = connectionFor(connections, repo.fullName);
+  return github && github.status !== "revoked" ? "github" : repo.hasToken ? "token" : "public";
+};
+
 const describe = async (
   env: Cloudflare.Env,
   install: SlackInstallation,
   installedAt: number,
 ): Promise<SlackWorkspace> => {
   const ownerId = install.ownerId!;
-  const [loaded, rules, memory] = await Promise.all([
+  const environments = slackEnvironmentsEnabled(env);
+  const [settings, rules, memory, repos, channels, stored] = await Promise.all([
     loadWorkspaceSettings(env, install.teamId),
     readText(env, ownerId, rulesPath(install.homeFolder)),
     readText(env, ownerId, workspaceNotesPath(install.homeFolder)),
+    listRepos(env, install.teamId),
+    listChannelDefaults(env, install.teamId),
+    listGithubConnections(env, install.teamId),
   ]);
-  let settings = loaded;
-  if (settings.github && slackGithubConfigured(env)) {
-    const status = await checkInstallation(env, settings.github);
-    if (status && status !== settings.github.status) {
-      settings = { ...settings, github: { ...settings.github, status } };
-    }
-  }
+  const connections = slackGithubConfigured(env)
+    ? await Promise.all(
+        stored.map(async (connection) => {
+          const status = await checkInstallation(env, connection);
+          return status && status !== connection.status ? { ...connection, status } : connection;
+        }),
+      )
+    : stored;
+  const repoViews: SlackWorkspaceRepo[] = await Promise.all(
+    repos.map(async (repo) => ({
+      id: repo.id,
+      fullName: repo.fullName,
+      branch: repo.branch,
+      access: repoAccess(repo, connections),
+      rules: repo.rules,
+      channels: channels
+        .filter((channel) => channel.repoId === repo.id)
+        .map((channel) => ({ id: channel.channelId, name: channel.channelName || channel.channelId })),
+      environment: environments ? await loadEnvironment(env, install.teamId, repo.id) : null,
+      previews: await describePreviews(env, install.teamId, install.ownerId, repo.fullName),
+    })),
+  );
   return {
     teamId: install.teamId,
     teamName: install.teamName,
@@ -168,27 +218,14 @@ const describe = async (
     model: settings.model,
     effort: settings.effort,
     slackCommands: settings.slackCommands,
-    github: describeGithub(settings.github),
-    repo: repoView(settings),
+    githubAccounts: connections.map(describeGithub),
+    repos: repoViews,
     previews: await describePreviews(env, install.teamId, install.ownerId),
-    environment: slackEnvironmentsEnabled(env) ? await loadEnvironment(env, install.teamId) : null,
+    environment: environments ? await loadEnvironment(env, install.teamId, "") : null,
     rules,
     memory,
     slackUrl: `https://app.slack.com/client/${encodeURIComponent(install.teamId)}`,
   };
-};
-
-const repoView = (settings: SlackWorkspaceSettings): SlackWorkspaceRepo | null => {
-  const repo = settings.repo;
-  if (!repo) return null;
-  const github = settings.github;
-  const access: SlackWorkspaceRepo["access"] =
-    github && github.status !== "revoked" && repoOwnedBy(github, repo.fullName)
-      ? "github"
-      : repo.hasToken
-        ? "token"
-        : "public";
-  return { fullName: repo.fullName, branch: repo.branch, access };
 };
 
 const ownedInstallation = async (
@@ -251,41 +288,12 @@ const update = async (
     patch.effort = input.effort;
   }
   if (input.slackCommands !== undefined) patch.slackCommands = input.slackCommands === true;
-  if (input.repo === null) patch.repo = null;
-  else if (input.repo !== undefined) {
-    const fullName = parseRepoName(String(input.repo.fullName ?? ""));
-    if (!fullName) return fail(400, "Enter the repository as owner/name.");
-    const branch = parseBranch(input.repo.branch);
-    if (branch === null) return fail(400, "That branch name isn't valid.");
-    const unchanged = current.repo?.fullName === fullName && current.repo.branch === branch;
-    let viaGithub = false;
-    if (!unchanged) {
-      try {
-        const found = await listRepoBranches(env, current.github, fullName);
-        viaGithub = found.viaGithub;
-        if (branch && !found.truncated && !found.branches.includes(branch)) {
-          return fail(400, `GitHub can't find the branch ${branch} in ${fullName}.`);
-        }
-      } catch (error) {
-        if (error instanceof RepoNotFoundError) return fail(400, error.message);
-      }
-    }
-    patch.repo = { fullName, branch, dropToken: viaGithub };
-  }
   const previews = input.previews;
-  if (previews !== undefined) {
-    if (!previews || typeof previews !== "object") return fail(400, "Unknown preview settings.");
-    if (previews.access !== undefined && previews.access !== "public" && previews.access !== "members") {
-      return fail(400, "Previews are either public or for workspace members.");
-    }
-    if (previews.ttlDays !== undefined && !isPreviewTtl(previews.ttlDays)) {
-      return fail(400, "That expiry isn't one of the choices.");
-    }
-  }
+  const previewProblem = checkPreviews(previews);
+  if (previewProblem) return fail(400, previewProblem);
   let environmentPatch: EnvironmentPatch | null = null;
   if (input.environment !== undefined) {
-    if (!slackEnvironmentsEnabled(env)) return fail(400, "Environments aren't available yet.");
-    const checked = validateEnvironmentUpdate(input.environment, await loadEnvironment(env, teamId));
+    const checked = await checkEnvironment(env, teamId, "", input.environment);
     if (!checked.ok) return fail(400, checked.message);
     environmentPatch = checked.patch;
   }
@@ -302,22 +310,155 @@ const update = async (
       ...(previews.ttlDays !== undefined ? { ttlDays: previews.ttlDays } : {}),
     });
   }
-  if (environmentPatch && Object.keys(environmentPatch).length) {
-    await saveEnvironment(env, teamId, environmentPatch);
-    console.log(
-      JSON.stringify({
-        event: "slack_environment_changed",
-        teamId,
-        fields: Object.keys(environmentPatch),
-      }),
-    );
-  }
+  if (environmentPatch) await applyEnvironment(env, teamId, "", environmentPatch);
   const { install } = owned;
   if (input.rules !== undefined) await writeText(env, caller.ownerId, rulesPath(install.homeFolder), String(input.rules));
   if (input.memory !== undefined) {
     await writeText(env, caller.ownerId, workspaceNotesPath(install.homeFolder), String(input.memory));
   }
   return ok({ workspace: await describe(env, install, owned.installedAt) });
+};
+
+const checkPreviews = (previews: SlackWorkspaceUpdate["previews"]): string | null => {
+  if (previews === undefined) return null;
+  if (!previews || typeof previews !== "object") return "Unknown preview settings.";
+  if (previews.access !== undefined && previews.access !== "public" && previews.access !== "members") {
+    return "Previews are either public or for workspace members.";
+  }
+  if (previews.ttlDays !== undefined && !isPreviewTtl(previews.ttlDays)) return "That expiry isn't one of the choices.";
+  return null;
+};
+
+const checkEnvironment = async (
+  env: Cloudflare.Env,
+  teamId: string,
+  repoId: string,
+  input: NonNullable<SlackWorkspaceUpdate["environment"]>,
+): Promise<{ ok: true; patch: EnvironmentPatch } | { ok: false; message: string }> => {
+  if (!slackEnvironmentsEnabled(env)) return { ok: false, message: "Environments aren't available yet." };
+  return validateEnvironmentUpdate(input, await loadEnvironment(env, teamId, repoId));
+};
+
+const applyEnvironment = async (
+  env: Cloudflare.Env,
+  teamId: string,
+  repoId: string,
+  patch: EnvironmentPatch,
+): Promise<void> => {
+  if (!Object.keys(patch).length) return;
+  await saveEnvironment(env, teamId, repoId, patch);
+  console.log(JSON.stringify({ event: "slack_environment_changed", teamId, repoId, fields: Object.keys(patch) }));
+};
+
+const readJson = async <T>(request: Request): Promise<T | null> => {
+  try {
+    const body = (await request.json()) as T;
+    return body && typeof body === "object" ? body : null;
+  } catch {
+    return null;
+  }
+};
+
+/** Checks `fullName` and `branch` on GitHub; a message when they're wrong, else whether a connection reaches it. */
+const checkRepo = async (
+  env: Cloudflare.Env,
+  connections: SlackGithubConnection[],
+  fullName: string,
+  branch: string,
+): Promise<{ ok: true; viaGithub: boolean } | { ok: false; message: string }> => {
+  try {
+    const found = await listRepoBranches(env, connectionFor(connections, fullName), fullName);
+    if (branch && !found.truncated && !found.branches.includes(branch)) {
+      return { ok: false, message: `GitHub can't find the branch ${branch} in ${fullName}.` };
+    }
+    return { ok: true, viaGithub: found.viaGithub };
+  } catch (error) {
+    if (error instanceof RepoNotFoundError) return { ok: false, message: error.message };
+    // GitHub didn't answer: keep what the owner typed.
+    return { ok: true, viaGithub: false };
+  }
+};
+
+const addRepoRoute = async (
+  request: Request,
+  env: Cloudflare.Env,
+  caller: OwnerCaller,
+  teamId: string,
+): Promise<Response> => {
+  const owned = await ownedInstallation(env, caller.ownerId, teamId);
+  if (!owned) return fail(404, "That workspace isn't connected to your Stella account.");
+  const input = await readJson<SlackRepoAdd>(request);
+  if (!input) return fail(400, "The request wasn't valid JSON.");
+  const fullName = parseRepoName(String(input.fullName ?? ""));
+  if (!fullName) return fail(400, "Enter the repository as owner/name.");
+  const branch = parseBranch(input.branch);
+  if (branch === null) return fail(400, "That branch name isn't valid.");
+  const repos = await listRepos(env, teamId);
+  if (repos.length >= SLACK_REPOS_MAX) return fail(400, `A workspace can have up to ${SLACK_REPOS_MAX} repositories.`);
+  if (await findRepoByName(env, teamId, fullName)) return fail(409, `${fullName} is already in this workspace.`);
+  const checked = await checkRepo(env, await listGithubConnections(env, teamId), fullName, branch);
+  if (!checked.ok) return fail(400, checked.message);
+  const repo = await addRepo(env, teamId, { fullName, branch });
+  console.log(JSON.stringify({ event: "slack_repo_added", teamId, repoId: repo.id, viaGithub: checked.viaGithub }));
+  return ok({ workspace: await describe(env, owned.install, owned.installedAt), repoId: repo.id });
+};
+
+const updateRepoRoute = async (
+  request: Request,
+  env: Cloudflare.Env,
+  caller: OwnerCaller,
+  teamId: string,
+  repoId: string,
+  remove: boolean,
+): Promise<Response> => {
+  const owned = await ownedInstallation(env, caller.ownerId, teamId);
+  if (!owned) return fail(404, "That workspace isn't connected to your Stella account.");
+  const repo = await loadRepo(env, teamId, repoId);
+  if (!repo) return fail(404, "That repository isn't in this workspace any more.");
+  if (remove) {
+    await removeRepo(env, teamId, repoId);
+    console.log(JSON.stringify({ event: "slack_repo_removed", teamId, repoId }));
+    return ok({ workspace: await describe(env, owned.install, owned.installedAt) });
+  }
+  const input = await readJson<SlackRepoUpdate>(request);
+  if (!input) return fail(400, "The request wasn't valid JSON.");
+  const patch: RepoPatch = {};
+  if (input.branch !== undefined) {
+    const branch = parseBranch(input.branch);
+    if (branch === null) return fail(400, "That branch name isn't valid.");
+    if (branch !== repo.branch) {
+      const checked = await checkRepo(env, await listGithubConnections(env, teamId), repo.fullName, branch);
+      if (!checked.ok) return fail(400, checked.message);
+      patch.branch = branch;
+      if (checked.viaGithub) patch.dropToken = true;
+    }
+  }
+  if (input.rules !== undefined) {
+    const rules = String(input.rules);
+    if (rules.length > SLACK_REPO_RULES_MAX_CHARS) {
+      return fail(400, `Repository rules are limited to ${SLACK_REPO_RULES_MAX_CHARS} characters.`);
+    }
+    patch.rules = rules.trim();
+  }
+  const previewProblem = checkPreviews(input.previews);
+  if (previewProblem) return fail(400, previewProblem);
+  if (input.previews?.access !== undefined) patch.previewAccess = input.previews.access;
+  if (input.previews?.ttlDays !== undefined) patch.previewTtlDays = input.previews.ttlDays;
+  let environmentPatch: EnvironmentPatch | null = null;
+  if (input.environment !== undefined) {
+    const checked = await checkEnvironment(env, teamId, repoId, input.environment);
+    if (!checked.ok) return fail(400, checked.message);
+    environmentPatch = checked.patch;
+  }
+  if (input.removeChannels !== undefined && !Array.isArray(input.removeChannels)) {
+    return fail(400, "removeChannels must be a list of channel ids.");
+  }
+  await updateRepo(env, teamId, repoId, patch);
+  if (environmentPatch) await applyEnvironment(env, teamId, repoId, environmentPatch);
+  if (input.removeChannels?.length) {
+    await removeChannelDefaults(env, teamId, repoId, input.removeChannels.map(String).slice(0, 200));
+  }
+  return ok({ workspace: await describe(env, owned.install, owned.installedAt) });
 };
 
 const allowedReturnOrigins = (env: Cloudflare.Env): Set<string> =>
@@ -354,7 +495,7 @@ const githubAction = async (
   if (!slackGithubConfigured(env)) return fail(503, "GitHub isn't set up for Stella Crew on this deployment.");
   const owned = await ownedInstallation(env, caller.ownerId, teamId);
   if (!owned) return fail(404, "That workspace isn't connected to your Stella account.");
-  const settings = await loadWorkspaceSettings(env, teamId);
+  const connections = await listGithubConnections(env, teamId);
   const described = async () => await describe(env, owned.install, owned.installedAt);
   try {
     if (action === "connect" && request.method === "POST") {
@@ -377,23 +518,27 @@ const githubAction = async (
       });
       if (!result.ok) return fail(400, result.message);
       if ("choices" in result) return ok({ choices: result.choices } satisfies SlackGithubFinishResponse);
-      await saveWorkspaceSettings(env, teamId, { github: result.connection });
+      await saveGithubConnection(env, teamId, result.connection);
       return ok({ workspace: await described() } satisfies SlackGithubFinishResponse);
     }
     if (action === "disconnect" && request.method === "POST") {
-      const github = settings.github;
-      const dropRepo = Boolean(github && settings.repo && repoOwnedBy(github, settings.repo.fullName));
-      await saveWorkspaceSettings(env, teamId, { github: null, ...(dropRepo ? { repo: null } : {}) });
+      // Repositories stay, reached as public until a connection covers them again.
+      const input = await readJson<Partial<SlackGithubDisconnectRequest>>(request);
+      const installationId = String(input?.installationId ?? (connections.length === 1 ? connections[0]!.installationId : ""));
+      if (!installationId) return fail(400, "Say which GitHub account to disconnect.");
+      if (!(await deleteGithubConnection(env, teamId, installationId))) {
+        return fail(404, "That GitHub account isn't connected to this workspace.");
+      }
       return ok({ workspace: await described() });
     }
     if (action === "repos" && request.method === "GET") {
-      if (!settings.github) return fail(409, "Connect GitHub first.");
-      return ok(await listInstallationRepos(env, settings.github));
+      if (!connections.length) return fail(409, "Connect GitHub first.");
+      return ok(await listInstallationRepos(env, connections));
     }
     if (action === "branches" && request.method === "GET") {
       const fullName = parseRepoName(new URL(request.url).searchParams.get("repo") ?? "");
       if (!fullName) return fail(400, "Pick a repository as owner/name.");
-      const { viaGithub: _, ...found } = await listRepoBranches(env, settings.github, fullName);
+      const { viaGithub: _, ...found } = await listRepoBranches(env, connectionFor(connections, fullName), fullName);
       return ok(found satisfies SlackGithubBranchesResponse);
     }
   } catch (error) {
@@ -437,6 +582,15 @@ export const handleSlackWorkspaceApi = async (request: Request, env: Cloudflare.
     const teamId = decodeURIComponent(rawTeam ?? "");
     if (!/^[A-Z0-9]{2,32}$/u.test(teamId)) return fail(404, "Unknown workspace.");
     if (section === undefined && request.method === "POST") return await update(request, env, caller, teamId);
+    if (section === "repos" && action === undefined && request.method === "POST") {
+      return await addRepoRoute(request, env, caller, teamId);
+    }
+    const removing = rest.length === 1 && rest[0] === "remove";
+    if (section === "repos" && action && (rest.length === 0 || removing) && request.method === "POST") {
+      const repoId = decodeURIComponent(action);
+      if (!/^r[0-9a-f]{12}$/u.test(repoId)) return fail(404, "Unknown repository.");
+      return await updateRepoRoute(request, env, caller, teamId, repoId, removing);
+    }
     if (
       section === "github" &&
       rest.length === 0 &&

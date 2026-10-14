@@ -32,14 +32,29 @@ export {
   SLACK_CONVERSATION_PREFIX,
 } from "./conversation-id.js";
 export const SLACK_MEMORY_TOOL_NAME = "slack_memory";
-/** Where a workspace's repository is cloned in its agents' containers. */
+/** Where a workspace's repositories are cloned in its agents' containers. */
 export const SLACK_REPO_ROOT = "/workspace/repos";
 /** The reply that posts nothing: a thread reply that wasn't for Stella. */
 export const SLACK_NO_REPLY = "<no-reply/>";
 
 export type SlackPerson = { id: string; name: string };
 
+/** One of the workspace's repositories, as the prompt lists it. */
+export type SlackRepoContext = {
+  /** `owner/name`. */
+  fullName: string;
+  /** Empty for the default branch. */
+  branch: string;
+  /** Agents can push to it, through a GitHub connection. */
+  push: boolean;
+  /** One line on its environment (`environment.ts`). */
+  environment?: string;
+  /** The owner's rules for work in it. */
+  rules?: string;
+};
+
 export type SlackWorkspaceContext = {
+  teamId?: string;
   teamName: string;
   /** Drive-relative folder of the workspace's home. */
   homeFolder: string;
@@ -48,11 +63,17 @@ export type SlackWorkspaceContext = {
   requester: SlackPerson;
   /** Other people active in the thread, newest first. */
   participants: SlackPerson[];
-  /** The GitHub repository agents start with, as `owner/name` (and `@branch`). */
-  repo?: string;
-  /** Agents can push to it, through the workspace's GitHub connection. */
-  repoPush?: boolean;
-  /** One line on the workspace's environment (`environment.ts`), for the prompt. */
+  /** The workspace's repositories. */
+  repos?: SlackRepoContext[];
+  /** The repository this conversation works in, when there is one (`repos.ts`). */
+  currentRepo?: string;
+  /** How it was decided: Stella chose it, the channel's default, or the only one. */
+  currentRepoSource?: "chosen" | "channel" | "only";
+  /** Whether the conversation chose to work in no repository. */
+  noRepo?: boolean;
+  /** The channel's default repository, if it has one. */
+  channelRepo?: string;
+  /** One line on the environment of work that isn't about a repository. */
   environment?: string;
 };
 
@@ -101,19 +122,79 @@ export const parseSlackWorkspaceContext = (
         .filter((person): person is SlackPerson => person !== null)
         .slice(0, 12)
     : [];
-  const repo = shortText(record.repo, 320);
-  const repoPush = record.repoPush === true;
+  const repos = Array.isArray(record.repos)
+    ? record.repos
+        .map((value): SlackRepoContext | null => {
+          const entry = (value ?? {}) as Record<string, unknown>;
+          const fullName = shortText(entry.fullName, 200);
+          if (!fullName) return null;
+          const environment = shortText(entry.environment, 3000);
+          const rules = shortText(entry.rules, 4000);
+          return {
+            fullName,
+            branch: shortText(entry.branch, 200) ?? "",
+            push: entry.push === true,
+            ...(environment ? { environment } : {}),
+            ...(rules ? { rules } : {}),
+          };
+        })
+        .filter((entry): entry is SlackRepoContext => entry !== null)
+        .slice(0, 50)
+    : [];
+  const currentRepo = shortText(record.currentRepo, 200);
+  const source = record.currentRepoSource;
+  const currentRepoSource = source === "chosen" || source === "channel" || source === "only" ? source : undefined;
+  const channelRepo = shortText(record.channelRepo, 200);
   const environment = shortText(record.environment, 3000);
+  const teamId = shortText(record.teamId, 32);
   return {
+    ...(teamId ? { teamId } : {}),
     teamName,
     homeFolder,
     channelId,
     place,
     requester,
     participants,
-    ...(repo ? { repo, ...(repoPush ? { repoPush } : {}) } : {}),
+    ...(repos.length ? { repos } : {}),
+    ...(currentRepo ? { currentRepo, ...(currentRepoSource ? { currentRepoSource } : {}) } : {}),
+    ...(record.noRepo === true ? { noRepo: true } : {}),
+    ...(channelRepo ? { channelRepo } : {}),
     ...(environment ? { environment } : {}),
   };
+};
+
+/** Where a repository is cloned in an agent's container. */
+export const repoCheckout = (fullName: string): string => `${SLACK_REPO_ROOT}/${fullName.split("/")[1] ?? fullName}`;
+
+const repoLine = (repo: SlackRepoContext): string =>
+  [
+    `- ${repo.fullName}: branch ${repo.branch || "(the default branch)"}; ${repo.push ? "agents can commit and push" : "agents can't push (no GitHub connection for it)"}.`,
+    repo.environment ? `  Environment: ${repo.environment}` : "",
+    repo.rules ? `  Rules for this repository:\n${repo.rules.split("\n").map((line) => `    ${line}`).join("\n")}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+const SOURCE_LABEL: Record<NonNullable<SlackWorkspaceContext["currentRepoSource"]>, string> = {
+  chosen: "chosen earlier in this conversation",
+  channel: "this channel's default",
+  only: "the workspace's only repository",
+};
+
+const repositoryBlock = (context: SlackWorkspaceContext): string => {
+  const repos = context.repos ?? [];
+  if (!repos.length) return "Repositories: none connected";
+  const current = context.currentRepo
+    ? `This conversation works in ${context.currentRepo} (${SOURCE_LABEL[context.currentRepoSource ?? "chosen"]}): every agent you start has it cloned at ${repoCheckout(context.currentRepo)}, in its environment.`
+    : context.noRepo
+      ? "This conversation works in no repository (chosen earlier): agents start without one."
+      : "This conversation hasn't picked a repository yet. Agents you start get none until you pick one with slack_repo.";
+  return [
+    `Repositories (${repos.length}):`,
+    ...repos.map(repoLine),
+    ...(context.channelRepo ? [`This channel's default repository: ${context.channelRepo}`] : []),
+    current,
+  ].join("\n");
 };
 
 const NOTE_MAX_CHARS = 6_000;
@@ -237,10 +318,8 @@ export const renderSlackSystemPrompt = async (
     `Where: ${placeLabel(context.place)} (channel id ${context.channelId})`,
     `Latest request from: @${context.requester.name} (${context.requester.id})`,
     `Others in this thread: ${participants}`,
-    context.repo
-      ? `Repository: github.com/${context.repo.split("@")[0]} — every agent you start has it cloned at ${SLACK_REPO_ROOT}/${context.repo.split("@")[0]!.split("/")[1]}, on branch ${context.repo.split("@")[1] ?? "(the default branch)"}. ${context.repoPush ? "Agents can commit and push to that branch." : "Agents can't push to it (no GitHub connection for it)."}`
-      : "Repository: none connected",
-    ...(context.environment ? [`Environment: ${context.environment}`] : []),
+    repositoryBlock(context),
+    ...(context.environment ? [`Environment without a repository: ${context.environment}`] : []),
   ].join("\n");
   return [
     slackPrompt.trim(),

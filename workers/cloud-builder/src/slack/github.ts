@@ -1,8 +1,9 @@
 /**
  * Stella for Slack's GitHub connection, through its own read-only GitHub App
  * (`SLACK_GITHUB_APP_*` secrets, `projects/github.ts` with `app = "slack"`).
- * A workspace stores only the installation id. Tokens are minted on demand
- * and scoped to the workspace's one repository: read-only for the page's
+ * A workspace stores only installation ids, one per connected GitHub account
+ * (`slack_github_connections`), so repositories of different owners can sit
+ * side by side. Tokens are minted on demand and scoped to one repository: read-only for the page's
  * pickers; for agents, push plus reading deployments, statuses and checks,
  * traded per git operation for the container's repo capability
  * (`repo-capability.ts`, `repo-clone.ts`).
@@ -48,12 +49,14 @@ import {
 import { slackPublicOrigin } from "./config.js";
 import { verifySlackRepoCapability } from "./repo-capability.js";
 import {
-  loadWorkspaceSettings,
+  connectionFor,
+  findRepoByName,
+  listGithubConnections,
   repoOwnedBy,
   setGithubStatus,
   type SlackGithubConnection,
   type SlackRepoSettings,
-} from "./settings.js";
+} from "./repos.js";
 
 export const SLACK_GITHUB_CALLBACK_PATH = "/api/slack/github/callback";
 export const SLACK_GITHUB_WEBHOOK_PATH = "/api/slack/github/webhook";
@@ -93,15 +96,13 @@ export const githubManageUrl = (connection: SlackGithubConnection): string =>
     ? `https://github.com/organizations/${encodeURIComponent(connection.account)}/settings/installations/${connection.installationId}`
     : `https://github.com/settings/installations/${connection.installationId}`;
 
-export const describeGithub = (connection: SlackGithubConnection | null): SlackWorkspaceGithub | null =>
-  connection
-    ? {
-        account: connection.account,
-        accountType: connection.accountType,
-        status: connection.status,
-        manageUrl: githubManageUrl(connection),
-      }
-    : null;
+export const describeGithub = (connection: SlackGithubConnection): SlackWorkspaceGithub => ({
+  installationId: connection.installationId,
+  account: connection.account,
+  accountType: connection.accountType,
+  status: connection.status,
+  manageUrl: githubManageUrl(connection),
+});
 
 // ── Connect ───────────────────────────────────────────────────────────────
 
@@ -327,7 +328,26 @@ const get = async <T>(token: string | null, path: string): Promise<{ status: num
   return { status: response.status, body, next: /rel="next"/u.test(response.headers.get("link") ?? "") };
 };
 
+/** Repositories every active connection can see, merged. */
 export const listInstallationRepos = async (
+  env: Cloudflare.Env,
+  connections: SlackGithubConnection[],
+): Promise<SlackGithubReposResponse> => {
+  const repos: SlackGithubRepoOption[] = [];
+  let truncated = false;
+  const active = connections.filter((connection) => connection.status === "active");
+  for (const connection of active) {
+    const found = await listConnectionRepos(env, connection);
+    truncated ||= found.truncated;
+    for (const repo of found.repos) {
+      if (!repos.some((seen) => seen.fullName.toLowerCase() === repo.fullName.toLowerCase())) repos.push(repo);
+    }
+  }
+  repos.sort((a, b) => a.fullName.localeCompare(b.fullName));
+  return { repos, truncated };
+};
+
+const listConnectionRepos = async (
   env: Cloudflare.Env,
   connection: SlackGithubConnection,
 ): Promise<SlackGithubReposResponse> => {
@@ -493,7 +513,7 @@ export const findPreview = async (token: string, fullName: string, sha: string):
   return { state: "none" };
 };
 
-/** The connection a capability may use, when the workspace still has it on that repository. */
+/** The connection a capability may use, when the workspace still has that repository and its connection. */
 const agentConnection = async (
   env: Cloudflare.Env,
   request: Request,
@@ -501,15 +521,15 @@ const agentConnection = async (
   const header = request.headers.get("authorization") ?? "";
   const claims = header.startsWith("Bearer ") ? await verifySlackRepoCapability(env, header.slice(7).trim()) : null;
   if (!claims) return Response.json({ error: "Unauthorized" }, { status: 401 });
-  const settings = await loadWorkspaceSettings(env, claims.team);
-  const github = settings.github;
-  if (!settings.repo || settings.repo.fullName !== claims.repo || !github || !repoOwnedBy(github, claims.repo)) {
+  const repo = await findRepoByName(env, claims.team, claims.repo);
+  const github = repo ? connectionFor(await listGithubConnections(env, claims.team), repo.fullName) : null;
+  if (!repo || !github) {
     return Response.json({ error: "This workspace no longer gives agents this repository." }, { status: 403 });
   }
   if (github.status !== "active") {
-    return Response.json({ error: "GitHub access for this workspace was removed. The owner needs to reconnect it." }, { status: 403 });
+    return Response.json({ error: `GitHub access to ${github.account} was removed. The workspace owner needs to reconnect it.` }, { status: 403 });
   }
-  return { connection: github, fullName: claims.repo, branch: settings.repo.branch };
+  return { connection: github, fullName: repo.fullName, branch: repo.branch };
 };
 
 const agentToken = async (request: Request, env: Cloudflare.Env): Promise<Response> => {

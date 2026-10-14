@@ -1,7 +1,7 @@
 /**
  * Stella for Slack environments: what every agent container started from a
  * workspace's Slack runs with. One per workspace (migrations/0015), edited by
- * its owner on stella.sh/slack beside the repository it checks out.
+ * its owner on stella.sh/crew beside the repository it checks out.
  *
  * Network access is enforced by the container's network, not by the agent.
  * A Slack agent's container sends every HTTP and HTTPS request through
@@ -565,7 +565,7 @@ export const slackEgress = async (
   );
   if (!allowed) {
     return new Response(
-      `Blocked: this Slack workspace's environment has ${LEVEL_LABEL[policy.network]} network access, which doesn't include ${host}. The workspace owner can allow it at stella.sh/slack.\n`,
+      `Blocked: this Slack workspace's environment has ${LEVEL_LABEL[policy.network]} network access, which doesn't include ${host}. The workspace owner can allow it at stella.sh/crew.\n`,
       { status: 403, headers: { "content-type": "text/plain; charset=utf-8", "x-stella-egress": "blocked" } },
     );
   }
@@ -756,7 +756,7 @@ cd ${shellQuote(cwd)} 2>/dev/null || cd ${shellQuote(WORLD_ROOT)}
     await noteInThread(
       env,
       thread,
-      `:warning: The setup script for the *${environment.name}* environment ${reason}${lastLine ? `: \`${lastLine.replace(/`/gu, "'")}\`` : ""}. Continuing without it. The full log is on stella.sh/slack.`,
+      `:warning: The setup script for the *${environment.name}* environment ${reason}${lastLine ? `: \`${lastLine.replace(/`/gu, "'")}\`` : ""}. Continuing without it. The full log is on stella.sh/crew.`,
     ).catch(() => undefined);
     return {
       env: agentEnv,

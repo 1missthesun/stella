@@ -394,7 +394,7 @@ const commands = async (
         ? `\nChange it with \`${slash} engine stella|claude-code\`, \`${slash} model <name>\` or \`${slash} effort <level>\`.`
         : "") +
       (installer
-        ? `\n\`${slash} connect\` switches the Stella account she runs on; \`${slash} disconnect\` turns her off. Everything else is on stella.sh/slack.`
+        ? `\n\`${slash} connect\` switches the Stella account she runs on; \`${slash} disconnect\` turns her off. Everything else is on stella.sh/crew.`
         : ""),
   );
 };
@@ -408,7 +408,7 @@ const settingCommand = async (
 ): Promise<string> => {
   const settings = await loadWorkspaceSettings(env, installation.teamId);
   if (!settings.slackCommands) {
-    return "Changing Stella's engine, model or effort from Slack is turned off for this workspace. Its owner can turn it on at stella.sh/slack.";
+    return "Changing Stella's engine, model or effort from Slack is turned off for this workspace. Its owner can turn it on at stella.sh/crew.";
   }
   const audience = (
     await ownerGateStub(env.OWNER_GATES, installation.ownerId!).billingAccess({

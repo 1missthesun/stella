@@ -164,7 +164,7 @@ const quotaFor = async (env: Cloudflare.Env, ownerId: string | null): Promise<nu
   return QUOTA_BYTES[access.audience as ManagedModelAudience] ?? 0;
 };
 
-/** The workspace's preview settings and usage, for stella.sh/slack. */
+/** The workspace's preview settings and usage, for stella.sh/crew. */
 export const describePreviews = async (
   env: Cloudflare.Env,
   teamId: string,
@@ -572,7 +572,7 @@ const publish = async (request: Request, env: Cloudflare.Env): Promise<Response>
   if (room <= 0) {
     return Response.json(
       {
-        error: `This workspace's previews use ${formatMb(used.bytes)} of its ${formatMb(quota)} on the owner's plan. Older previews free up space as they expire, or the owner can shorten how long they last on stella.sh/slack.`,
+        error: `This workspace's previews use ${formatMb(used.bytes)} of its ${formatMb(quota)} on the owner's plan. Older previews free up space as they expire, or the owner can shorten how long they last on stella.sh/crew.`,
       },
       { status: 413 },
     );

@@ -78,9 +78,10 @@ const nextConfig: NextConfig = {
       // (rather than Next's default 308 for `permanent`) is what Google Ads /
       // Search expect for a retired page.
       { source: "/go", destination: "/", statusCode: 301 },
-      // The Slack settings page became the Crew page. Slack, GitHub and
-      // Stella's own messages still link to /slack; query strings (install
-      // and GitHub return params) pass through.
+      // The Slack settings page became the Crew page. Stella's own messages
+      // now link to /crew, but old messages and the Slack and GitHub app
+      // listings still point at /slack; query strings (install and GitHub
+      // return params) pass through.
       { source: "/slack", destination: "/crew", permanent: true },
     ];
   },

@@ -59,7 +59,7 @@ Each run makes a new link; links stop working after the time the workspace's own
 
 ## Environment
 
-`<workspace>` describes the environment every agent you start runs in. Its owner sets it on stella.sh/slack; nobody in Slack can change it.
+`<workspace>` describes the environment every agent you start runs in. Its owner sets it on stella.sh/crew; nobody in Slack can change it.
 
 - **Network access** is enforced by the container's network, not by the agent. With limited or no access, a blocked request fails with a 403 that names the host. Tell agents which access they have when the work needs the network, so they don't retry a blocked host or try to get around it. When the work needs a blocked host, say so in the thread and suggest the owner allow it.
 - **Network secrets** are credentials agents use without seeing them. Requests to the secret's host get its header set in flight. Each secret also appears to agents as an environment variable with a placeholder value, so clients that need a key still start. An agent can't read, print or move a secret value, and you can't either. Tell agents which secret covers the API they need.

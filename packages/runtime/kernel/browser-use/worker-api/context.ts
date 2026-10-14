@@ -149,7 +149,31 @@ export type BrowserWorkerContext = ReturnType<
 >;
 
 export const createBrowserWorkerContext = (callBrowser: BrowserWorkerCall) => {
+  // Until browser.use() or the first browser call, the backend is unresolved;
+  // ensureBackend() asks the host, which prefers the connected extension.
   let selectedBackend: BrowserWorkerBackend = "in-app";
+  let backendResolved = false;
+  let resolvingBackend: Promise<BrowserWorkerBackend> | undefined;
+  const ensureBackend = async (): Promise<BrowserWorkerBackend> => {
+    if (backendResolved) return selectedBackend;
+    resolvingBackend ??= callBrowser("use", ["default"]).then(
+      (result) => {
+        const backend = isPlainObject(result) ? result.backend : undefined;
+        if (!backendResolved) {
+          if (backend === "in-app" || backend === "external") {
+            selectedBackend = backend;
+          }
+          backendResolved = true;
+        }
+        return selectedBackend;
+      },
+      (error: unknown) => {
+        resolvingBackend = undefined;
+        throw error;
+      },
+    );
+    return await resolvingBackend;
+  };
   const currentTabGeneration = new Map<string, string>();
   const generationKey = (
     backend: BrowserWorkerBackend,
@@ -246,7 +270,9 @@ export const createBrowserWorkerContext = (callBrowser: BrowserWorkerCall) => {
     },
     set selectedBackend(backend: BrowserWorkerBackend) {
       selectedBackend = backend;
+      backendResolved = true;
     },
+    ensureBackend,
     assertCurrentTabGeneration,
     normalizeTabGeneration,
     rememberTabGeneration,

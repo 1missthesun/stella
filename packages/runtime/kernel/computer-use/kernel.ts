@@ -1678,6 +1678,13 @@ class NodeReplKernel {
     message: Extract<WorkerToNodeReplParentMessage, { type: "browser-call" }>,
   ): Promise<unknown> {
     if (message.method === "use") {
+      if (message.args.length === 1 && message.args[0] === "default") {
+        const result = this.browser.resolveDefaultBackend
+          ? await this.browser.resolveDefaultBackend()
+          : { backend: this.browserBackend };
+        this.browserBackend = result.backend;
+        return result;
+      }
       if (
         message.args.length !== 1 ||
         (message.args[0] !== "in-app" && message.args[0] !== "external")

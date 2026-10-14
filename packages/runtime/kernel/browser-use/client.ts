@@ -193,6 +193,9 @@ export interface BrowserSessionClient {
   selectBackend?(
     backend: BrowserBackend,
   ): Promise<Readonly<{ backend: BrowserBackend }>>;
+  /** The backend used until one is selected: "external" while the Stella
+   * Browser extension is connected, else "in-app". */
+  resolveDefaultBackend?(): Promise<Readonly<{ backend: BrowserBackend }>>;
   beginTurn?(turnId: string): void;
   endTurn?(turnId: string, behavior: BrowserTurnEndBehavior): Promise<void>;
   dispose(): Promise<void>;
@@ -1047,6 +1050,7 @@ export class BrowserSession implements BrowserSessionClient {
   }>;
   private executionConfig?: ResolvedExecutionConfig;
   private selectedBackend: BrowserBackend = "in-app";
+  private backendChosen = false;
   private readonly activeTurnBackends = new Set<BrowserBackend>();
   private socket?: Socket;
   private connectingSocket?: Socket;
@@ -1269,7 +1273,35 @@ export class BrowserSession implements BrowserSessionClient {
     return await this.enqueue(async () => {
       this.assertOpen();
       this.selectedBackend = backend;
+      this.backendChosen = true;
       return Object.freeze({ backend });
+    });
+  }
+
+  /**
+   * Picks the session's backend on first use when none was selected: the
+   * user's own browser while the extension is connected (it carries their
+   * logins), else Stella's browser. The choice sticks for the session so
+   * handles keep routing to one browser.
+   */
+  async resolveDefaultBackend(): Promise<
+    Readonly<{ backend: BrowserBackend }>
+  > {
+    this.assertOpen();
+    if (this.backendChosen) {
+      return Object.freeze({ backend: this.selectedBackend });
+    }
+    const connected = await readStellaBrowserExtensionStatus({
+      env: this.resolveExecutionConfig().env,
+      ...(this.signal ? { signal: this.signal } : {}),
+      timeoutMs: EXTERNAL_ATTACH_PREFLIGHT_TIMEOUT_MS,
+    }).catch(() => undefined);
+    return await this.enqueue(async () => {
+      if (!this.backendChosen) {
+        this.selectedBackend = connected === true ? "external" : "in-app";
+        this.backendChosen = true;
+      }
+      return Object.freeze({ backend: this.selectedBackend });
     });
   }
 

@@ -814,9 +814,10 @@ export const createTabs = (
   Object.freeze(Tab.prototype);
 
   const tabs: BrowserWorkerTabs = Object.freeze({
-    list: async () => (await listTabsInternal()).tabs,
+    list: async () =>
+      (await listTabsInternal(await context.ensureBackend())).tabs,
     new: async (url?: string) => {
-      const backend = context.selectedBackend;
+      const backend = await context.ensureBackend();
       const params: Record<string, unknown> = {};
       if (url !== undefined) {
         params.url = requireString(url, "url", { maxLength: 16_384 });
@@ -844,7 +845,7 @@ export const createTabs = (
       );
     },
     selected: async () => {
-      const listed = await listTabsInternal();
+      const listed = await listTabsInternal(await context.ensureBackend());
       const selected =
         listed.tabs.find((tab) => tab.id === listed.activeTabId) ??
         listed.tabs.find((tab) => tabState.get(tab as object)?.active);
@@ -853,7 +854,7 @@ export const createTabs = (
     },
     get: (id: number) => getTab(id),
     finalize: async (entries: unknown = []) => {
-      const defaultBackend = context.selectedBackend;
+      const defaultBackend = await context.ensureBackend();
       const input = Array.isArray(entries) ? entries : [entries];
       const normalized = input.map((entry, index) => {
         let tabId: unknown;

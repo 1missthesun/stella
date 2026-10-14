@@ -348,7 +348,7 @@ export function installBrowserWorkerApi(
           `steps must contain at most ${MAX_BROWSER_CHAIN_STEPS} actions.`,
         );
       }
-      const backend = context.selectedBackend;
+      const backend = await context.ensureBackend();
       const steps = Object.freeze(
         rawSteps.map((step, index) =>
           sanitizeChainStep(context, step, index, backend),

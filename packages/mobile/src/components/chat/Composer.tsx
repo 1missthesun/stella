@@ -289,12 +289,6 @@ export const Composer = memo(function Composer({
   // 1 line in expanded shape — flipping back to pill would re-wrap and
   // oscillate forever. Collapse happens only when the parent clears the
   // draft (see the `useEffect` above) or via dedicated dictation handlers.
-  // Trigger expand purely on measured content height crossing the threshold.
-  // We used to gate on a `hasMounted` ref to skip the first event, but on
-  // screens where the composer's host re-renders shortly after mount (e.g.
-  // Computer tab settling `paired: null → true`) the *useful* first event —
-  // the one that already exceeds the threshold — could be the one that got
-  // swallowed, leaving the pill stuck at one line forever.
   const handleContentSizeChange = useCallback(
     (e: { nativeEvent: { contentSize: { height: number } } }) => {
       if (expanded) return;

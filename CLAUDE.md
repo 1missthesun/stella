@@ -106,8 +106,13 @@ without asking.
   to an older bun (mise's 1.3.14 on omarchy); Stella's own is
   `~/.local/share/stella/runtimes/bun-1.4.0/bun`. EAS builds and OTAs need
   exactly the pin (`bun run eas:check-bun` in `packages/mobile`).
-- **Repo conventions.** Use `bun`, never `npm` or `pnpm`. Don't leave
-  comments in the code you write. Search with `rg` / `rg --files` first.
+- **Comments are exceptions.** Prefer names, types and structure; keep only
+  non-obvious external/platform/security constraints and public API
+  contracts. No narration, history or TODOs; fix internal workarounds rather
+  than explaining them. Agents copy what exists, so a comment explaining a
+  workaround reads as permission for the next one.
+- **Repo conventions.** Use `bun`, never `npm` or `pnpm`. Search with `rg` /
+  `rg --files` first.
   Others work in this checkout alongside you: changes, staged files or commits
   you didn't make are theirs, so don't revert, incorporate or clean them up,
   and commit only your own files by explicit path (never `git add -A` or

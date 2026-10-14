@@ -1378,18 +1378,6 @@ impl BrowserManager {
     pub async fn upload_files(&self, selector: &str, files: &[String]) -> Result<(), String> {
         let session_id = self.active_session_id()?;
 
-        let node_result = self
-            .client
-            .send_command(
-                "DOM.querySelector",
-                Some(json!({
-                    "nodeId": 1,
-                    "selector": selector,
-                })),
-                Some(session_id),
-            )
-            .await;
-
         let result: EvaluateResult = self
             .client
             .send_command_typed(
@@ -1425,9 +1413,6 @@ impl BrowserManager {
             .and_then(|n| n.get("backendNodeId"))
             .and_then(|v| v.as_i64())
             .ok_or("Could not get backendNodeId for file input")?;
-
-        // Suppress unused variable warning
-        let _ = node_result;
 
         self.client
             .send_command(

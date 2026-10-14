@@ -27,16 +27,18 @@ import { CONTENT_MAX_FONT_SCALE } from "../lib/setup-text-defaults";
 const BASE_FONT_SIZE = 17;
 
 async function openLink(url: string): Promise<boolean> {
+  if (!/^[a-z][a-z\d+.-]*:/i.test(url)) return false;
   try {
     if (/^https?:\/\//i.test(url)) {
       await WebBrowser.openBrowserAsync(await canvasShareOpenUrl(url));
     } else {
       await Linking.openURL(url);
     }
-  } catch {
-    // Swallow — link target may be malformed mid-stream.
+    return true;
+  } catch (error) {
+    console.warn("[markdown] link open failed", url, error);
+    return false;
   }
-  return false;
 }
 
 function buildTheme(colors: Colors): PartialMarkdownTheme {
@@ -220,10 +222,12 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
         }
         return false;
       }
-      void openLink(url);
+      void openLink(url).then((opened) => {
+        if (!opened) Alert.alert(t("shell.display.canvasShare.toasts.openFailed"), url);
+      });
       return false;
     },
-    [onStellaFileLink],
+    [onStellaFileLink, t],
   );
 
   const renderers = useMemo<CustomRenderers>(

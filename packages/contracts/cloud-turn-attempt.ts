@@ -7,6 +7,7 @@ export type CloudTurnAttemptPaths = {
   directory: string;
   input: string;
   result: string;
+  resultStaging: string;
   inbox: string;
 };
 
@@ -14,6 +15,7 @@ const pathsFor = (directory: string): CloudTurnAttemptPaths => ({
   directory,
   input: `${directory}/turn-input.json`,
   result: `${directory}/result.json`,
+  resultStaging: `${directory}/result.json.staging`,
   inbox: `${directory}/inbox`,
 });
 

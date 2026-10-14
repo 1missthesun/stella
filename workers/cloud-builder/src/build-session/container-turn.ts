@@ -172,25 +172,49 @@ const readCloudAgentTurnResultText = async (
   session: Pick<ExecutionSession, "readFile">,
   resultPath: string,
 ): Promise<string | undefined> => {
+  let recorded: { content: string };
   try {
-    const recorded = await session.readFile(resultPath, {
-      encoding: "base64",
-    });
-    const bytes = Uint8Array.from(atob(recorded.content), (character) =>
-      character.charCodeAt(0),
-    );
-    try {
-      if (bytes.byteLength > 4 * 1024 * 1024) return undefined;
-      return new TextDecoder("utf-8", {
-        fatal: true,
-        ignoreBOM: false,
-      }).decode(bytes);
-    } finally {
-      bytes.fill(0);
-    }
+    recorded = await session.readFile(resultPath, { encoding: "base64" });
   } catch {
     return undefined;
   }
+  const bytes = Uint8Array.from(atob(recorded.content), (character) =>
+    character.charCodeAt(0),
+  );
+  try {
+    if (bytes.byteLength > 4 * 1024 * 1024) {
+      throw new MalformedExecutorResultError("exceeds 4 MiB");
+    }
+    return new TextDecoder("utf-8", { fatal: true, ignoreBOM: false }).decode(
+      bytes,
+    );
+  } catch (error) {
+    if (error instanceof MalformedExecutorResultError) throw error;
+    throw new MalformedExecutorResultError("is not UTF-8");
+  } finally {
+    bytes.fill(0);
+  }
+};
+
+export class MalformedExecutorResultError extends Error {
+  constructor(detail: string) {
+    super(`The agent executor published a result that ${detail}.`);
+    this.name = "MalformedExecutorResultError";
+  }
+}
+
+const parsePublishedExecutorResult = (text: string): AgentExecutorResult => {
+  let decoded: unknown;
+  try {
+    decoded = JSON.parse(text) as unknown;
+  } catch {
+    throw new MalformedExecutorResultError("is not JSON");
+  }
+  const result = parseAgentExecutorResult(decoded);
+  if (!result) {
+    throw new MalformedExecutorResultError("does not match the result schema");
+  }
+  return result;
 };
 
 export const waitForCloudAgentTurnResultText = async (
@@ -220,19 +244,8 @@ export const waitForCloudAgentTurnResultText = async (
     const afterReadReason = abortError();
     if (afterReadReason) throw afterReadReason;
     if (recorded !== undefined) {
-      // `writeFile()` can make the destination visible before every byte has
-      // landed. Never let a partial-but-readable root result win the race and
-      // trigger executor quiescence; wait until the same strict decoder used
-      // after capture accepts the complete payload.
-      try {
-        if (
-          parseAgentExecutorResult(JSON.parse(recorded) as unknown) !== null
-        ) {
-          return recorded;
-        }
-      } catch {
-        // The executor is still publishing the file. Poll the fixed path again.
-      }
+      parsePublishedExecutorResult(recorded);
+      return recorded;
     }
     const signalDelay = sleepWithAbort(250, combinedSignal, (activeSignal) =>
       activeSignal.reason instanceof Error
@@ -1837,7 +1850,10 @@ export const runAgentAttempt = async (
     recordedExecutorResultText ??= await readCloudAgentTurnResultText(
       session,
       attemptPaths.result,
-    );
+    ).catch((error: unknown) => {
+      capturedExecutionError ??= error;
+      return undefined;
+    });
     if (credentialsPath) {
       await session.deleteFile(credentialsPath).catch(() => undefined);
     }
@@ -1866,11 +1882,11 @@ export const runAgentAttempt = async (
   let recordedExecutorResult: AgentExecutorResult | null = null;
   if (recordedExecutorResultText) {
     try {
-      recordedExecutorResult = parseAgentExecutorResult(
-        JSON.parse(recordedExecutorResultText) as unknown,
+      recordedExecutorResult = parsePublishedExecutorResult(
+        recordedExecutorResultText,
       );
-    } catch {
-      recordedExecutorResult = null;
+    } catch (error) {
+      capturedExecutionError ??= error;
     }
   }
   if (

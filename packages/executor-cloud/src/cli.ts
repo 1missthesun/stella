@@ -6,7 +6,7 @@ import { loadModelRegistry } from "@stella/contracts/model-registry";
 import "@stella/runtime/kernel/shared/http-proxy.js";
 import { forkAbortTimer } from "@stella/runtime/kernel/tools/effect-runtime.js";
 import { Effect } from "effect";
-import { readFile, rm, writeFile } from "node:fs/promises";
+import { readFile, rename, rm, writeFile } from "node:fs/promises";
 import { runAgentTurn } from "./agent-turn.js";
 import {
   attachedToolClientPaths,
@@ -92,10 +92,11 @@ if (!attempt) {
 const result = await Effect.runPromise(runAgentTurn(attempt));
 markTurnStep("turnFinished");
 const serialized = JSON.stringify({ ...result, timings: turnTimings() });
-await writeFile(attempt.result, `${serialized}\n`, {
+await writeFile(attempt.resultStaging, `${serialized}\n`, {
   encoding: "utf8",
   mode: 0o600,
 });
+await rename(attempt.resultStaging, attempt.result);
 const cancelForcedExit = forkAbortTimer(1_000, () => process.exit(0));
 process.stdout.write(`${serialized}\n`, () => {
   cancelForcedExit();

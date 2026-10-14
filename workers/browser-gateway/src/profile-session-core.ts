@@ -1128,9 +1128,7 @@ export class BrowserProfileSessionCore {
           state: "human_control",
           ...authorityDigests,
           attemptGeneration: envelope.authority.attemptGeneration,
-          // Neutral broker request identity only. Builder binds the suspension
-          // to the authoritative outer Code tool-call identity.
-          toolCallId: envelope.command.requestId,
+          brokerRequestId: envelope.command.requestId,
           requestDigest,
           displayOrigin,
           ...(value.displayTitle === undefined
@@ -1161,7 +1159,7 @@ export class BrowserProfileSessionCore {
             interactionId,
             interactionRevision: 1,
             interactionKind: "login_takeover",
-            toolCallId: interaction.toolCallId,
+            toolCallId: interaction.brokerRequestId,
             requestDigest,
             profileId: PROFILE_ID,
             profileEpoch: state.profileEpoch,
@@ -1203,7 +1201,7 @@ export class BrowserProfileSessionCore {
           state: "pending",
           ...authorityDigests,
           attemptGeneration: envelope.authority.attemptGeneration,
-          toolCallId: envelope.command.requestId,
+          brokerRequestId: envelope.command.requestId,
           requestDigest,
           displayOrigin,
           displayTitle: "Device authorization",
@@ -1234,7 +1232,7 @@ export class BrowserProfileSessionCore {
             interactionId,
             interactionRevision: 1,
             interactionKind: "device_code",
-            toolCallId: interaction.toolCallId,
+            toolCallId: interaction.brokerRequestId,
             requestDigest,
             profileId: PROFILE_ID,
             profileEpoch: state.profileEpoch,
@@ -1654,7 +1652,7 @@ export class BrowserProfileSessionCore {
   private resumeReceipt(
     interaction: InteractionRecord,
     result: "approved" | "canceled" | "expired" | "failed",
-    interactionRevision = interaction.revision,
+    claimedRevision: number,
   ) {
     const safeMessage =
       result === "approved"
@@ -1669,12 +1667,10 @@ export class BrowserProfileSessionCore {
     return {
       schemaVersion: 1 as const,
       interactionId: interaction.interactionId,
-      // This is the revision atomically claimed by the control plane, not an
-      // internal transition counter advanced while completing the decision.
-      interactionRevision,
+      interactionRevision: claimedRevision,
       profileId: PROFILE_ID,
       profileEpoch: state.profileEpoch,
-      toolCallId: interaction.toolCallId,
+      toolCallId: interaction.brokerRequestId,
       requestDigest: interaction.requestDigest,
       result,
       safeMessage,

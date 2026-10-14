@@ -40,7 +40,7 @@ export type InteractionRecord = Readonly<{
   threadDigest: string;
   turnDigest: string;
   attemptGeneration: number;
-  toolCallId: string;
+  brokerRequestId: string;
   requestDigest: string;
   displayOrigin: string;
   displayTitle?: string;
@@ -283,7 +283,7 @@ export class SqliteProfileStore implements ProfileStore {
       threadDigest: row.thread_digest,
       turnDigest: row.turn_digest,
       attemptGeneration: row.attempt_generation,
-      toolCallId: row.tool_call_id,
+      brokerRequestId: row.tool_call_id,
       requestDigest: row.request_digest,
       displayOrigin: row.display_origin,
       ...(row.display_title ? { displayTitle: row.display_title } : {}),
@@ -326,7 +326,7 @@ export class SqliteProfileStore implements ProfileStore {
       interaction.threadDigest,
       interaction.turnDigest,
       interaction.attemptGeneration,
-      interaction.toolCallId,
+      interaction.brokerRequestId,
       interaction.requestDigest,
       interaction.displayOrigin,
       interaction.displayTitle ?? null,

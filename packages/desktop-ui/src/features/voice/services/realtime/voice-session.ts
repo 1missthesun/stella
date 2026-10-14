@@ -37,7 +37,6 @@ import { requireVoiceSessionAuthority } from "./providers/types";
 import type {
   RealtimeProviderKey,
   VoiceSessionAuthority,
-  VoiceSessionToken,
 } from "./providers/types";
 import type { RealtimeTransport } from "./transports/types";
 
@@ -219,7 +218,7 @@ const normalizeSpoken = (text: string): string =>
 
 export class RealtimeVoiceSession {
   private transport: RealtimeTransport | null = null;
-  private sessionToken: VoiceSessionToken | null = null;
+  private managedAuthority: VoiceSessionAuthority | null = null;
   private sessionProvider: RealtimeProviderKey = "stella";
 
   private destroyed = false;
@@ -343,11 +342,10 @@ export class RealtimeVoiceSession {
       }
 
       this.transport = transport;
-      this.sessionToken = token;
       this.sessionProvider = providerKey;
       if (providerKey === "stella") {
-        Object.assign(token, requireVoiceSessionAuthority(token));
-        this.startLeaseReporting();
+        this.managedAuthority = requireVoiceSessionAuthority(token);
+        this.startLeaseReporting(this.managedAuthority);
         if (this.destroyed) {
           throw new Error(
             this.authorityTerminationError ??
@@ -412,7 +410,7 @@ export class RealtimeVoiceSession {
       const terminalRequest = this.claimTerminalLeaseRequest("lost");
       const transportClose = this.disconnectTransportImmediately();
       await this.finishVoiceClosure(terminalRequest, transportClose);
-      this.sessionToken = null;
+      this.managedAuthority = null;
       this.stopDelegation();
       this.stopConversationUpdates();
       const runtime = getVoiceRuntimeState();
@@ -608,13 +606,8 @@ export class RealtimeVoiceSession {
   }
 
   private buildLeaseRequest(event: VoiceLeaseEvent): VoiceLeaseRequest | null {
-    if (this.sessionProvider !== "stella" || !this.sessionToken) return null;
-    try {
-      const { leaseId } = requireVoiceSessionAuthority(this.sessionToken);
-      return { leaseId, event };
-    } catch {
-      return null;
-    }
+    const authority = this.managedAuthority;
+    return authority ? { leaseId: authority.leaseId, event } : null;
   }
 
   private async postLeaseRequest(
@@ -685,19 +678,7 @@ export class RealtimeVoiceSession {
     if (request) await this.reportClosedLeaseRequest(request);
   }
 
-  private startLeaseReporting() {
-    if (this.sessionProvider !== "stella" || !this.sessionToken) return;
-
-    // `connect` already validates this before opening the transport. Keep the
-    // guard so a future call-site cannot start an unleased managed session.
-    let authority: VoiceSessionAuthority;
-    try {
-      authority = requireVoiceSessionAuthority(this.sessionToken);
-    } catch {
-      void this.terminateForAuthority(null, "Realtime voice lease was invalid");
-      return;
-    }
-
+  private startLeaseReporting(authority: VoiceSessionAuthority) {
     this.stopLeaseReporting();
     this.leaseTerminalReported = false;
     this.leaseHeartbeatInFlight = false;
@@ -733,7 +714,7 @@ export class RealtimeVoiceSession {
     if (
       generation !== this.leaseReportingGeneration ||
       this.leaseTerminalReported ||
-      !this.sessionToken
+      !this.managedAuthority
     ) {
       return false;
     }
@@ -805,8 +786,11 @@ export class RealtimeVoiceSession {
         );
         return;
       }
-      if (this.sessionToken) {
-        this.sessionToken.leaseExpiresAt = response.leaseExpiresAt;
+      if (this.managedAuthority) {
+        this.managedAuthority = {
+          ...this.managedAuthority,
+          leaseExpiresAt: response.leaseExpiresAt,
+        };
       }
       this.updateLocalAuthorityExpiry(response.leaseExpiresAt);
       this.scheduleLeaseExpiry(generation);
@@ -855,7 +839,7 @@ export class RealtimeVoiceSession {
       this.stopConversationUpdates();
       this.transcript.reset();
 
-      this.sessionToken = null;
+      this.managedAuthority = null;
       this.sessionProvider = "stella";
       this.authorityLocalExpiresAt = null;
       this.inputEnergyBuffer = null;
@@ -1037,7 +1021,7 @@ export class RealtimeVoiceSession {
     this.transcript.reset();
 
     await finishClosure;
-    this.sessionToken = null;
+    this.managedAuthority = null;
     this.sessionProvider = "stella";
     this.inputEnergyBuffer = null;
     this.outputEnergyBuffer = null;

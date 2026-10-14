@@ -20,6 +20,7 @@ import {
   waitForBrowserAuthHandoff,
 } from "@/global/auth/services/auth-session";
 import { SIGN_IN_TOAST_ACTION } from "@/shared/lib/auth-cta";
+import { isSelfHostedServer } from "@/platform/backend/server-discovery";
 import { showToast } from "@/ui/toast";
 
 export type AuthBootstrapStatus =
@@ -27,6 +28,7 @@ export type AuthBootstrapStatus =
   | "creating_anonymous_session"
   | "ready"
   | "reauth_required"
+  | "needs_pairing"
   | "failed";
 
 type AuthBootstrapState = {
@@ -130,6 +132,13 @@ function DesktopAuthRuntimeEffects({
         // Better Auth's JWT plugin; neither needs the renderer to hand a token
         // anywhere before the shell may open.
         setAuthBootstrapState({ status: "ready", error: null });
+        return;
+      }
+
+      // A self-hosted server has no anonymous accounts: this computer joins
+      // with a pairing link instead.
+      if (isSelfHostedServer()) {
+        setAuthBootstrapState({ status: "needs_pairing", error: null });
         return;
       }
 

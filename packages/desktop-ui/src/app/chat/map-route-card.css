@@ -20,6 +20,10 @@
   background: color-mix(in oklch, var(--foreground) 6%, transparent);
 }
 
+.map-route-card__frame[data-compact] {
+  height: 72px;
+}
+
 .map-route-card__iframe {
   position: absolute;
   inset: 0;

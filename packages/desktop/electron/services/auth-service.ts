@@ -13,6 +13,7 @@ import path from "node:path";
 import { isDevHarness } from "../app-identity.js";
 import type { PiRunnerTarget } from "@stella/runtime/kernel/lifecycle-targets";
 import { readConfiguredBackendUrl } from "@stella/contracts/stella-api";
+import { parsePairingLink } from "@stella/contracts/self-host";
 import {
   getAuthSessionIdentityIntent,
   getAuthSnapshotSession,
@@ -78,6 +79,49 @@ const AUTH_IDENTITY_INTENT_STORAGE_KEY = "auth_identity_intent";
  */
 const BACKEND_URL_STORAGE_KEY = "backend_url";
 const AUTH_BASE_PATH = "/api/auth";
+const SERVER_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+
+/** The self-hosted server the launcher started this install for, if any. */
+export const launcherServerId = (): string | null => {
+  const id = process.env.STELLA_LAUNCHER_SERVER_ID?.trim() ?? "";
+  return SERVER_ID_PATTERN.test(id) ? id : null;
+};
+
+/**
+ * Each self-hosted server keeps its own sign-in beside the stella.sh one, so
+ * switching servers never signs either account out.
+ */
+export const authStoragePathForServer = (serverId: string | null): string => {
+  const userData = app.getPath("userData");
+  return serverId && SERVER_ID_PATTERN.test(serverId)
+    ? path.join(userData, "servers", serverId, AUTH_STORAGE_FILE)
+    : path.join(userData, AUTH_STORAGE_FILE);
+};
+
+/** Sign a server's install in before Stella relaunches into it. */
+export const writeServerSession = (
+  serverId: string,
+  backendUrl: string,
+  sessionToken: string,
+) => {
+  if (!SERVER_ID_PATTERN.test(serverId)) throw new Error("Invalid server id.");
+  const values: Record<string, string> = {
+    [BETTER_AUTH_TOKEN_STORAGE_KEY]: sessionToken,
+    [AUTH_IDENTITY_INTENT_STORAGE_KEY]: "connected",
+    [BACKEND_URL_STORAGE_KEY]: backendUrl,
+  };
+  const encoded = Object.fromEntries(
+    Object.entries(values).map(([key, value]) => [
+      key,
+      protectValue(AUTH_STORAGE_SCOPE, value),
+    ]),
+  );
+  const file = authStoragePathForServer(serverId);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const staging = `${file}.${process.pid}.tmp`;
+  fs.writeFileSync(staging, JSON.stringify(encoded, null, 2), { mode: 0o600 });
+  fs.renameSync(staging, file);
+};
 const DESKTOP_AUTH_ORIGIN = "http://127.0.0.1:57314";
 const DEFAULT_STELLA_WEB_URL = "https://stella.sh";
 const CHALLENGE_INTERACTION_DELAY_MS = 3_000;
@@ -146,6 +190,8 @@ type AuthServiceOptions = {
   sessionPartition: string;
   runnerTarget: PiRunnerTarget;
   onAuthCallback: (url: string) => void;
+  /** A `stella://pair?…` link from a self-hosted server's setup. */
+  onPairingLink?: (url: string) => void;
   onSecondInstanceFocus: () => void;
   /**
    * Main reached a new auth verdict while no renderer request was pending.
@@ -206,7 +252,7 @@ export class AuthService {
   }
 
   private getAuthStoragePath() {
-    return path.join(app.getPath("userData"), AUTH_STORAGE_FILE);
+    return authStoragePathForServer(launcherServerId());
   }
 
   private encodeAuthStorageValue(value: string): string {
@@ -1130,6 +1176,10 @@ export class AuthService {
     }
     if (this.resolveChallengeCallback(url)) {
       return "challenge";
+    }
+    if (this.options.onPairingLink && parsePairingLink(url)) {
+      this.options.onPairingLink(url);
+      return "auth";
     }
     if (!this.isTrustedAuthCallbackUrl(url)) {
       console.warn("[security] Rejected untrusted auth callback URL.");

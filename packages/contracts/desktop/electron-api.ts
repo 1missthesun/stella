@@ -304,6 +304,15 @@ import {
   IPC_VOICE_SESSION_ERROR,
   IPC_VOICE_SESSION_ERROR_STATE,
   IPC_WEBSITE_GET_BASE_URL,
+  IPC_SELF_HOST_GET_STATE,
+  IPC_SELF_HOST_TAKE_PENDING_LINK,
+  IPC_SELF_HOST_INSPECT_LINK,
+  IPC_SELF_HOST_CONNECT,
+  IPC_SELF_HOST_USE_DEFAULT,
+  IPC_SELF_HOST_START_PAIRING,
+  IPC_SELF_HOST_PAIRING_STATUS,
+  IPC_SELF_HOST_CANCEL_PAIRING,
+  IPC_SELF_HOST_PAIR_LINK,
   IPC_WINDOW_CLOSE,
   IPC_WINDOW_IS_MAXIMIZED,
   IPC_WINDOW_MAXIMIZE,
@@ -586,6 +595,19 @@ export const createElectronApi = (
     /** Origin of the marketing/billing site, honouring STELLA_WEB_URL in dev. */
     website: {
       getBaseUrl: invoker(IPC_WEBSITE_GET_BASE_URL),
+    },
+
+    /** The Stella server this install uses, and pairing with self-hosted ones. */
+    selfHost: {
+      getState: invoker(IPC_SELF_HOST_GET_STATE),
+      takePendingLink: invoker(IPC_SELF_HOST_TAKE_PENDING_LINK),
+      inspectLink: invoker(IPC_SELF_HOST_INSPECT_LINK),
+      connect: invoker(IPC_SELF_HOST_CONNECT),
+      useDefault: invoker(IPC_SELF_HOST_USE_DEFAULT),
+      startPairing: invoker(IPC_SELF_HOST_START_PAIRING),
+      pairingStatus: invoker(IPC_SELF_HOST_PAIRING_STATUS),
+      cancelPairing: invoker(IPC_SELF_HOST_CANCEL_PAIRING),
+      onPairLink: on(IPC_SELF_HOST_PAIR_LINK),
     },
 
     /**

@@ -49,6 +49,7 @@ import { loadStellaDeviceId, loadStellaDeviceSigner } from "./host-runner.js";
 import path from "path";
 import { BROWSER_BRIDGE_MISSING_ERROR } from "../utils/register-stella-native-messaging-host.js";
 import { registerAppSourceHandlers } from "../ipc/app-source-handlers.js";
+import { registerSelfHostHandlers } from "../ipc/self-host-handlers.js";
 import { AppSourceService } from "../services/app-source/app-source-service.js";
 import { UpdateTransition } from "../services/app-source/update-transition.js";
 import { t } from "../services/i18n-service.js";
@@ -500,6 +501,11 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
             appSourceService.dispose();
         });
     }
+    registerSelfHostHandlers({
+        service: services.selfHostService,
+        appPartition: config.sessionPartition,
+        assertPrivilegedSender: (event, channel) => services.externalLinkService.assertPrivilegedSender(event, channel),
+    });
     registerAppSourceHandlers({
         getService: () => state.appSourceService ?? null,
         appPartition: config.sessionPartition,

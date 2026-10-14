@@ -33,6 +33,7 @@ import {
 } from "./bootstrap/dev-harness-options.js";
 import { connectLauncher } from "./launcher-client.js";
 import { applyDesktopIdentityEnv } from "./source/env.js";
+import { applySelfHostedServerEnv } from "./services/self-host-service.js";
 import { resolveRendererBuildMode } from "./source/renderer-protocol.js";
 const __dirname = import.meta.dirname;
 // Who this process is: the user's Stella, the harness, or a developer's
@@ -92,6 +93,7 @@ process.env.STELLA_DATA_DIR = stellaDataDirPath;
 process.env.STELLA_TELEMETRY_ENVIRONMENT = usesDevelopmentData
   ? "development"
   : "production";
+applySelfHostedServerEnv();
 applyDesktopIdentityEnv(
   path.join(stellaAppDir, "packages", "desktop-ui"),
   resolveRendererBuildMode({ isInstalledProduct }),

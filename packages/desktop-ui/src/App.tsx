@@ -9,6 +9,7 @@ import { CloudMemoryPreferenceBridge } from "./features/cloud/CloudMemoryPrefere
 import { CloudModelSelectionBridge } from "./features/cloud/CloudModelSelectionBridge";
 import { TelemetryPreferenceBridge } from "./features/cloud/TelemetryPreferenceBridge";
 import { platformCapabilities } from "./platform/capabilities";
+import { SelfHostLayer } from "./global/self-host/SelfHostLayer";
 
 const AUTO_REPAIR_SIGNATURE_KEY = "stella:auto-repair:last-signature";
 
@@ -49,6 +50,7 @@ function App() {
           {platformCapabilities.nativeBridges ? (
             <RemoteExecutionConsentLayer />
           ) : null}
+          {platformCapabilities.nativeBridges ? <SelfHostLayer /> : null}
           <FullShell />
         </ChatStoreProvider>
       </div>

@@ -4,6 +4,7 @@ import { useTheme } from "@/context/theme-context";
 import { appleMapsUrl, mapsEmbedUrl, } from "@stella/contracts/map-artifact";
 import { notifyAssistantScrollFollowLayoutChange } from "@/shell/chat-scroll-follow";
 import { useT, useTPlural } from "@/shared/i18n";
+import { useSelfHostedServer } from "@/platform/backend/server-discovery";
 import "./map-route-card.css";
 /**
  * Inline interactive map card for the orchestrator's `map` tool.
@@ -67,6 +68,9 @@ const MapCard = ({ map }) => {
     const tPlural = useTPlural();
     const { resolvedColorMode } = useTheme();
     const [frameFailed, setFrameFailed] = useState(false);
+    // The interactive map is a stella.sh page; a self-hosted server's
+    // conversations never load it, and keep the Apple Maps handoff.
+    const selfHosted = useSelfHostedServer();
     // Theme mode is captured per URL; a theme switch swaps the iframe src and
     // the embed re-renders in the matching palette.
     const embedUrl = useMemo(() => mapsEmbedUrl(map, {
@@ -77,8 +81,10 @@ const MapCard = ({ map }) => {
     const title = cardTitle(map, tPlural);
     const summary = cardSummary(map, t, tPlural);
     return (<div className="map-route-card">
-      <div className="map-route-card__frame">
-        {frameFailed ? (<div className="map-route-card__offline" role="status">
+      <div className="map-route-card__frame" data-compact={selfHosted || undefined}>
+        {selfHosted ? (<div className="map-route-card__offline" role="status">
+            <span>{map.markers.map((marker) => marker.name).join(" · ")}</span>
+          </div>) : frameFailed ? (<div className="map-route-card__offline" role="status">
             <AlertCircle size={15} aria-hidden/>
             <span>{t("app.chat.mapCard.previewFailed")}</span>
           </div>) : (<iframe className="map-route-card__iframe" src={embedUrl} title={t("app.chat.mapCard.frameTitle", { title })} loading="lazy" referrerPolicy="no-referrer" sandbox="allow-scripts allow-same-origin" onLoad={notifyAssistantScrollFollowLayoutChange} onError={() => setFrameFailed(true)}/>)}

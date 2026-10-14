@@ -1,6 +1,8 @@
 import path from "path";
 import { app } from "electron";
 import { AuthService } from "../services/auth-service.js";
+import { SelfHostService } from "../services/self-host-service.js";
+import { isLauncherPresent, relaunchApp } from "../launcher-client.js";
 import { CaptureService } from "../services/capture-service.js";
 import { MouseHookManager } from "../input/mouse-hook.js";
 import { UserAskService } from "../services/user-ask-service.js";
@@ -19,6 +21,7 @@ import {
   IPC_LOCAL_CHAT_UPDATED,
   IPC_DISPLAY_OPEN_SHARE_LINK,
   IPC_CLAUDE_ACCOUNTS_CHANGED,
+  IPC_SELF_HOST_PAIR_LINK,
 } from "@stella/contracts/desktop/ipc-channels";
 import { LocalChatHistoryService } from "../services/local-chat-history-service.js";
 import { SecurityPolicyService } from "../services/security-policy-service.js";
@@ -66,6 +69,7 @@ export const createBootstrapServices = (options) => {
         windowManagerTarget: lifecycle,
     });
     let connectorCredentialService = null;
+    let selfHostService = null;
     // NOTE: setPreventComputerSleep is applied post-appReady in
     // registerBootstrapIpcHandlers (ipc.ts) so the first preferences.json read
     // and the power toggle don't run on the synchronous pre-paint path.
@@ -83,6 +87,9 @@ export const createBootstrapServices = (options) => {
             }
             console.warn("[security] Rejected unhandled protocol callback URL.");
         },
+        onPairingLink: (url) => {
+            selfHostService?.receiveLink(url);
+        },
         onSecondInstanceFocus: () => {
             state.windowManager?.getFullWindow()?.focus();
         },
@@ -90,6 +97,26 @@ export const createBootstrapServices = (options) => {
             for (const window of options.getAllWindows()) {
                 if (!window.isDestroyed()) {
                     window.webContents.send(IPC_AUTH_SESSION_INVALIDATED, null);
+                }
+            }
+        },
+    });
+    selfHostService = new SelfHostService({
+        getBackendUrl: () => authService.getBackendUrl(),
+        getAuthToken: () => authService.getAuthToken(),
+        applySessionToken: (token) => authService.applySessionToken(token),
+        relaunch: () => relaunchApp(),
+        canRelaunchThroughLauncher: () => isLauncherPresent(),
+        onPairingLink: (link) => {
+            const full = state.windowManager?.getFullWindow();
+            if (full && !full.isDestroyed()) {
+                if (full.isMinimized()) full.restore();
+                full.show();
+                full.focus();
+            }
+            for (const window of options.getAllWindows()) {
+                if (!window.isDestroyed()) {
+                    window.webContents.send(IPC_SELF_HOST_PAIR_LINK, { link });
                 }
             }
         },
@@ -196,6 +223,7 @@ export const createBootstrapServices = (options) => {
     const globalInputHook = new MouseHookManager();
     return {
         authService,
+        selfHostService,
         captureService,
         globalInputHook,
         userAskService,

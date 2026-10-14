@@ -1,4 +1,5 @@
 import { planUsageDialog } from "@/global/billing/plan-usage-dialog-store";
+import { useSelfHostedServer } from "@/platform/backend/server-discovery";
 import { useBackendValue } from "@/platform/backend/use-backend-view";
 import {
   Fragment,
@@ -105,11 +106,13 @@ export const ShellTopBarAccount = ({ onSignIn }: ShellTopBarAccountProps) => {
       window.removeEventListener(SUBSCRIPTION_UPGRADED_EVENT, handler);
   }, []);
 
+  // A self-hosted server has no plans: no plan label, no Plan & usage.
+  const selfHosted = useSelfHostedServer();
   // A live view of the owner's billing ledger; upgrades land on their own.
   void billingRefreshKey;
   const billingStatus: BillingStatusLite | undefined = useBackendValue(
     "billing.status",
-    hasConnectedAccount && billingQueryReady ? {} : "skip",
+    hasConnectedAccount && billingQueryReady && !selfHosted ? {} : "skip",
   );
 
   const pendingSignOutRef = useRef(false);
@@ -168,7 +171,7 @@ export const ShellTopBarAccount = ({ onSignIn }: ShellTopBarAccountProps) => {
     (user.name ?? user.email ?? t("sidebar.account")).trim() ||
     t("sidebar.account");
   const displayLabel = nickname.trim() || accountName;
-  const sidebarPlanLabel = billingQueryReady
+  const sidebarPlanLabel = billingQueryReady && !selfHosted
     ? planLabel(billingStatus?.plan, billingStatus)
     : null;
 
@@ -242,7 +245,7 @@ export const ShellTopBarAccount = ({ onSignIn }: ShellTopBarAccountProps) => {
                   </span>
                   {label}
                 </DropdownMenuItem>
-                {index === 0 ? (
+                {index === 0 && !selfHosted ? (
                   <DropdownMenuItem
                     onClick={() => planUsageDialog.open()}
                     onMouseEnter={preloadBillingScreen}

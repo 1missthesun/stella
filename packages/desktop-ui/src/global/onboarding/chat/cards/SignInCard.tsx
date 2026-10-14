@@ -49,6 +49,8 @@ import {
   type ModelPickerEngine,
 } from "@/global/settings/lib/engine-model-routing";
 import type { OnboardingChatAnswer } from "../onboarding-chat-flow";
+import { selfHostDialogs, useDesktopServerState } from "@/global/self-host/self-host-store";
+import "@/global/self-host/self-host.css";
 
 type SignInCardProps = {
   active: boolean;
@@ -151,6 +153,7 @@ export function SignInCard({ active, answered, onAnswer }: SignInCardProps) {
     [apiKeysAvailable],
   );
   const [authOpen, setAuthOpen] = useState(false);
+  const serverState = useDesktopServerState();
   const [pending, setPending] = useState<OptionId | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [engine, setEngine] = useState<ModelPickerEngine | null>(null);
@@ -531,6 +534,18 @@ export function SignInCard({ active, answered, onAnswer }: SignInCardProps) {
         <span className="obc-actions__spacer" />
         <span className="obc-actions__hint">{t("onboarding.chat.signin.hint")}</span>
       </div>
+      {serverState?.canSwitch && !serverState.selfHosted ? (
+        <p className="obc-card__fine">
+          <button
+            type="button"
+            className="self-host-signin-link"
+            disabled={!active}
+            onClick={() => selfHostDialogs.openConnect()}
+          >
+            {t("selfHost.onboarding.link")}
+          </button>
+        </p>
+      ) : null}
     </div>
   );
 }

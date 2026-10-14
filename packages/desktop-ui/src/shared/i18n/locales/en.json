@@ -3037,5 +3037,58 @@
         "pickCron": "Enter a cron expression."
       }
     }
+  },
+  "selfHost": {
+    "connect": {
+      "title": "Connect to your own server",
+      "intro": "Paste the pairing link your server's setup gave you. It starts with stella://pair and works once, for 10 minutes.",
+      "linkLabel": "Pairing link",
+      "checking": "Checking…",
+      "version": "Server version from {date}",
+      "ownerNotice": "This server is run by its owner, not by Stella. Your conversations, files and sign-in live on it, and Stella can't see or recover them.",
+      "hostedNotice": "This is a Stella server run by Stella.",
+      "restartNotice": "Stella restarts on this server. Your stella.sh install and account stay as they are, and you can switch back in Settings.",
+      "connect": "Connect",
+      "connecting": "Connecting…",
+      "restartingTitle": "Connected to {name}",
+      "restarting": "Restarting Stella on your server. The first start downloads Stella from it, which can take a few minutes.",
+      "unavailable": "This version of Stella can't connect to other servers."
+    },
+    "device": {
+      "title": "Connect a device",
+      "intro": "Scan this with the Stella app on your phone, or open the link on another computer. It works once, for 10 minutes.",
+      "qrAlt": "Pairing QR code",
+      "copy": "Copy link",
+      "copied": "Copied",
+      "expires": "Expires in {time}",
+      "expired": "This code expired. Make a new one to connect a device.",
+      "newCode": "New code",
+      "claimed": "A new device is connected.",
+      "claimedNamed": "{name} is connected.",
+      "done": "Done"
+    },
+    "settings": {
+      "title": "Server",
+      "hostedName": "Stella",
+      "hostedDesc": "Stella's own service at stella.sh",
+      "selfHostedDesc": "Your own server at {host}",
+      "connectDevice": "Connect a device",
+      "ownServerLabel": "Your own server",
+      "otherServerLabel": "Another server",
+      "ownServerDesc": "Run Stella on your own Cloudflare account and connect this computer with a pairing link.",
+      "connect": "Connect…",
+      "useHosted": "Switch back to stella.sh",
+      "switching": "Switching…",
+      "switchFailed": "Couldn't switch servers"
+    },
+    "screen": {
+      "title": "Connect this computer to {name}",
+      "yourServer": "your server",
+      "body": "This computer isn't signed in to your server. Make a pairing link on a device that's already connected (Settings → Connect a device), or with your server's setup, then paste it here.",
+      "paste": "Paste a pairing link"
+    },
+    "onboarding": {
+      "link": "Have your own Stella server? Connect it"
+    }
   }
 }

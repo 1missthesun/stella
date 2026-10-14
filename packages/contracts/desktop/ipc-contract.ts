@@ -39,6 +39,13 @@ import type {
 } from "../auth-session.js";
 import type { StellaBrowserBridgeStatus } from "../browser-bridge-status.js";
 import type {
+  DesktopServerState,
+  SelfHostConnectResult,
+  SelfHostInspectResult,
+  SelfHostPairingStartResult,
+  SelfHostPairingStatusResult,
+} from "./self-host.js";
+import type {
   DriveEvidenceSource,
   EvidenceCard,
   EvidenceCardSet,
@@ -395,6 +402,15 @@ import {
   IPC_VOICE_SESSION_ERROR,
   IPC_VOICE_SESSION_ERROR_STATE,
   IPC_WEBSITE_GET_BASE_URL,
+  IPC_SELF_HOST_GET_STATE,
+  IPC_SELF_HOST_TAKE_PENDING_LINK,
+  IPC_SELF_HOST_INSPECT_LINK,
+  IPC_SELF_HOST_CONNECT,
+  IPC_SELF_HOST_USE_DEFAULT,
+  IPC_SELF_HOST_START_PAIRING,
+  IPC_SELF_HOST_PAIRING_STATUS,
+  IPC_SELF_HOST_CANCEL_PAIRING,
+  IPC_SELF_HOST_PAIR_LINK,
   IPC_WINDOW_CLOSE,
   IPC_WINDOW_IS_MAXIMIZED,
   IPC_WINDOW_MAXIMIZE,
@@ -771,6 +787,14 @@ export type IpcInvokeContract = {
   [IPC_APP_HARD_RESET]: Invoke<[], OkResult>;
   [IPC_THEME_LIST_INSTALLED]: Invoke<[], unknown[]>;
   [IPC_WEBSITE_GET_BASE_URL]: Invoke<[], string>;
+  [IPC_SELF_HOST_GET_STATE]: Invoke<[], DesktopServerState>;
+  [IPC_SELF_HOST_TAKE_PENDING_LINK]: Invoke<[], string | null>;
+  [IPC_SELF_HOST_INSPECT_LINK]: Invoke<[text: string], SelfHostInspectResult>;
+  [IPC_SELF_HOST_CONNECT]: Invoke<[text: string], SelfHostConnectResult>;
+  [IPC_SELF_HOST_USE_DEFAULT]: Invoke<[], SelfHostConnectResult>;
+  [IPC_SELF_HOST_START_PAIRING]: Invoke<[], SelfHostPairingStartResult>;
+  [IPC_SELF_HOST_PAIRING_STATUS]: Invoke<[pairingId: string], SelfHostPairingStatusResult>;
+  [IPC_SELF_HOST_CANCEL_PAIRING]: Invoke<[pairingId: string], OkResult>;
 
   // Display
   [IPC_DISPLAY_READ_FILE]: Invoke<
@@ -1550,6 +1574,7 @@ export type IpcEventContract = {
   };
   [IPC_EXECUTION_TARGET_SET]: { target: ExecutionTarget };
   [IPC_APP_SOURCE_STATE]: AppSourceState;
+  [IPC_SELF_HOST_PAIR_LINK]: { link: string };
   [IPC_CHAT_CONTEXT_UPDATED]: ChatContextUpdate | null;
   [IPC_CAPTURE_REGION_FAILED]: void;
   [IPC_OVERLAY_START_REGION_CAPTURE]: { mode?: "capture" | "window-attach" };

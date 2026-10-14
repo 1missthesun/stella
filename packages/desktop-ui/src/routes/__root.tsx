@@ -92,6 +92,7 @@ import { FullShellDialogs } from "@/shell/full-shell-dialogs";
 import { SettingsDialogHost } from "@/shell/SettingsDialogHost";
 import { FeedbackDialogHost } from "@/shell/FeedbackDialogHost";
 import { PlanUsageDialogHost } from "@/shell/PlanUsageDialogHost";
+import { SelfHostPairScreen } from "@/global/self-host/SelfHostPairScreen";
 import {
   STELLA_COMPOSE_TEXT_EVENT,
   type StellaComposeTextDetail,
@@ -430,7 +431,8 @@ function RootLayout() {
     shellIsLive ||
     Boolean(authBootstrapError) ||
     showsMainConversationFailure ||
-    authBootstrapStatus === "reauth_required";
+    authBootstrapStatus === "reauth_required" ||
+    authBootstrapStatus === "needs_pairing";
   useEffect(() => {
     if (shouldDismissLaunchSplash) dismissLaunchSplash();
   }, [shouldDismissLaunchSplash]);
@@ -442,6 +444,10 @@ function RootLayout() {
         onRetry={() => setPrivateSelectionAttempt((attempt) => attempt + 1)}
       />
     );
+  }
+
+  if (authBootstrapStatus === "needs_pairing") {
+    return <SelfHostPairScreen />;
   }
 
   if (!isPrivate && authBootstrapError) {

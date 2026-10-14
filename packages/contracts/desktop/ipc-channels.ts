@@ -131,6 +131,19 @@ export const IPC_THEME_LIST_INSTALLED = "theme:listInstalled" as const;
 
 export const IPC_WEBSITE_GET_BASE_URL = "website:getBaseUrl" as const;
 
+// ── Self-hosted servers ─────────────────────────────────────────────────────
+
+export const IPC_SELF_HOST_GET_STATE = "selfHost:getState" as const;
+export const IPC_SELF_HOST_TAKE_PENDING_LINK = "selfHost:takePendingLink" as const;
+export const IPC_SELF_HOST_INSPECT_LINK = "selfHost:inspectLink" as const;
+export const IPC_SELF_HOST_CONNECT = "selfHost:connect" as const;
+export const IPC_SELF_HOST_USE_DEFAULT = "selfHost:useDefault" as const;
+export const IPC_SELF_HOST_START_PAIRING = "selfHost:startPairing" as const;
+export const IPC_SELF_HOST_PAIRING_STATUS = "selfHost:pairingStatus" as const;
+export const IPC_SELF_HOST_CANCEL_PAIRING = "selfHost:cancelPairing" as const;
+/** Main → renderer: a `stella://pair?…` link opened while Stella runs. */
+export const IPC_SELF_HOST_PAIR_LINK = "selfHost:pairLink" as const;
+
 // ── Voice ───────────────────────────────────────────────────────────────────
 
 export const IPC_VOICE_PERSIST_TRANSCRIPT = "voice:persistTranscript" as const;

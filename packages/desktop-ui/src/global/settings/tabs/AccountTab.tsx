@@ -20,6 +20,7 @@ import { CloudBoundary } from "@/features/cloud/CloudBoundary";
 import { ProviderAccountsCard } from "@/features/cloud/ProviderAccountsCard";
 import { SessionsCard } from "./SessionsCard";
 import { PasskeysCard } from "./PasskeysCard";
+import { ServerSettingsCard } from "@/global/self-host/ServerSettingsCard";
 
 type AccountDeleteAction = "data" | "account";
 
@@ -161,6 +162,7 @@ export function AccountTab({ onSignOut, onOpenLegal }: AccountTabProps) {
 
   return (
     <div className="settings-tab-content settings-tab-content--account">
+      <ServerSettingsCard />
       <CloudBoundary>
         <ProviderAccountsCard />
       </CloudBoundary>

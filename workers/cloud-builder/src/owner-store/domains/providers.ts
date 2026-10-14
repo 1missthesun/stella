@@ -469,6 +469,8 @@ const signInMessage = (error: unknown): string => {
   return message.length > 300 ? `${message.slice(0, 300)}…` : message;
 };
 
+const GITHUB_PUBLIC_DOMAIN = "";
+
 const startDeviceFlow = async (ctx: OwnerContext, entry: CatalogEntry, oauth: OAuthAuth): Promise<ProviderOAuthFlow> => {
   const flowId = crypto.randomUUID();
   const signal = newChangeSignal();
@@ -493,9 +495,8 @@ const startDeviceFlow = async (ctx: OwnerContext, entry: CatalogEntry, oauth: OA
     try: (abortSignal) =>
       oauth.login({
         signal: abortSignal,
-        // GitHub asks for an Enterprise domain first; a phone sign-in is github.com.
         prompt: async (prompt) => {
-          if (prompt.type === "text") return "";
+          if (entry.id === "github-copilot" && prompt.type === "text") return GITHUB_PUBLIC_DOMAIN;
           throw new Error("This sign-in needs input Stella can't give it here.");
         },
         notify: (event) => {

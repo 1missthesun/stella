@@ -9,8 +9,71 @@ import {
 
 const BROWSER_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY?.trim();
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-type GoogleMaps = any;
+type LatLngLiteral = { lat: number; lng: number };
+type LatLng = { lat(): number; lng(): number };
+type MapsEventListener = { remove(): void };
+
+type GoogleMap = {
+  setCenter(center: LatLng | LatLngLiteral): void;
+  setZoom(zoom: number): void;
+  getZoom(): number | undefined;
+  fitBounds(bounds: LatLngBounds, padding?: number): void;
+};
+type LatLngBounds = {
+  extend(point: LatLng | LatLngLiteral): LatLngBounds;
+  getCenter(): LatLng;
+};
+type MarkerLabel = { text: string; color?: string; fontSize?: string };
+type Marker = {
+  addListener(eventName: "click", handler: () => void): MapsEventListener;
+};
+type InfoWindow = {
+  setContent(content: string): void;
+  open(options: { map: GoogleMap; anchor: Marker }): void;
+};
+type MapStyle = {
+  featureType?: string;
+  elementType?: string;
+  stylers: Record<string, string | number>[];
+};
+
+type GoogleMaps = {
+  Map: new (
+    container: HTMLElement,
+    options: {
+      center: LatLngLiteral;
+      zoom: number;
+      disableDefaultUI?: boolean;
+      zoomControl?: boolean;
+      gestureHandling?: "cooperative" | "greedy" | "none" | "auto";
+      clickableIcons?: boolean;
+      styles?: MapStyle[];
+    },
+  ) => GoogleMap;
+  LatLngBounds: new () => LatLngBounds;
+  InfoWindow: new () => InfoWindow;
+  Marker: new (options: {
+    map: GoogleMap;
+    position: LatLngLiteral;
+    title?: string;
+    label?: MarkerLabel;
+  }) => Marker;
+  Polyline: new (options: {
+    map: GoogleMap;
+    path: LatLng[];
+    strokeColor?: string;
+    strokeOpacity?: number;
+    strokeWeight?: number;
+  }) => unknown;
+  geometry: { encoding: { decodePath(encoded: string): LatLng[] } };
+  event: {
+    addListenerOnce(
+      instance: GoogleMap,
+      eventName: "idle",
+      handler: () => void,
+    ): MapsEventListener;
+  };
+};
 
 declare global {
   interface Window {
@@ -51,7 +114,7 @@ const loadGoogleMaps = (): Promise<GoogleMaps> => {
   return mapsLoader;
 };
 
-const DARK_MAP_STYLES = [
+const DARK_MAP_STYLES: MapStyle[] = [
   { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
   { elementType: "labels.text.fill", stylers: [{ color: "#8b95a5" }] },
   { elementType: "labels.text.stroke", stylers: [{ color: "#1a2230" }] },

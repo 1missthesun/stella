@@ -640,7 +640,6 @@ function ChatSurface(props: {
           onAdd: thread.addQuote,
           onRemove: thread.removeQuote,
         }}
-        dictation={{}}
         onOpenArtifact={openArtifact}
         conversationId={thread.conversationId}
         activityTasks={thread.conversationTasks}

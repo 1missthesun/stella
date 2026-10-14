@@ -329,10 +329,6 @@ export type ChatPaneQuotes = {
   onRemove?: (id: string) => void;
 };
 
-export type ChatPaneDictation = {
-  headers?: Record<string, string>;
-};
-
 export type ChatPaneRealtimeVoice = {
   conversationId?: string | null;
   execution?: "phone" | "computer";
@@ -351,7 +347,6 @@ export type ChatPaneProps = {
   composer: ChatPaneComposer;
   attachments?: ChatPaneAttachments;
   quotes?: ChatPaneQuotes;
-  dictation: ChatPaneDictation;
   realtimeVoice?: ChatPaneRealtimeVoice;
   desktopAccess?: StoredPhoneAccess | null;
 
@@ -429,7 +424,6 @@ export function ChatPane({
   composer,
   attachments: attachmentsGroup,
   quotes: quotesGroup = NO_QUOTES,
-  dictation: { headers: dictationHeaders },
   realtimeVoice = NO_REALTIME_VOICE,
   desktopAccess: desktopAccessProp = null,
   onOpenArtifact,
@@ -967,11 +961,6 @@ export function ChatPane({
     scroll.releaseFollow,
   ]);
 
-  const dictationHeadersMemo = useMemo(
-    () => dictationHeaders,
-    [dictationHeaders],
-  );
-
   // Auto-send-after-dictation coordination (see `stopAndSendVoice` below).
   // When a voice-send is armed we stash the exact draft the transcript produces
   // so the send effect can wait for the draft state to actually reflect it,
@@ -991,10 +980,7 @@ export function ChatPane({
     [draftStore],
   );
 
-  const dictation = useDictation({
-    headers: dictationHeadersMemo,
-    onTranscript: appendTranscript,
-  });
+  const dictation = useDictation({ onTranscript: appendTranscript });
 
   const {
     status: dictationStatus,

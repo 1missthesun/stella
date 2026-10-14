@@ -36,10 +36,6 @@ const MIN_PCM_BYTES = DICTATION_SAMPLE_RATE / 5;
 export type DictationStatus = "idle" | "recording" | "transcribing";
 
 export type UseDictationOptions = {
-  /** Retained for caller compatibility with the retired batch endpoint. */
-  headers?: Record<string, string>;
-  /** Optional BCP-47 hint reserved for future language biasing. */
-  language?: string;
   onTranscript: (text: string) => void;
 };
 

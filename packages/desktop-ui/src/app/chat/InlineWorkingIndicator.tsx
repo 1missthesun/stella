@@ -221,10 +221,13 @@ export function InlineWorkingIndicator({
   );
 
   const showInner = renderShell;
+  // Hold the indicator's height through its show delay so the send's scroll
+  // already reaches it; it then fades into space that is already there.
+  const reserving = active && !renderShell && !replyHeld;
 
   return (
     <div
-      className={`inline-working-indicator${entering ? " inline-working-indicator--entering" : ""}${leaving ? " inline-working-indicator--leaving" : ""}${leaving && handoff ? " inline-working-indicator--handoff" : ""}${showInner ? "" : " inline-working-indicator--vacated"}`}
+      className={`inline-working-indicator${entering ? " inline-working-indicator--entering" : ""}${leaving ? " inline-working-indicator--leaving" : ""}${leaving && handoff ? " inline-working-indicator--handoff" : ""}${showInner ? "" : reserving ? " inline-working-indicator--reserved" : " inline-working-indicator--vacated"}`}
       aria-live="polite"
     >
       {showInner && (

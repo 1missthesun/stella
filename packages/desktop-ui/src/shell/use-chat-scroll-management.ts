@@ -46,7 +46,97 @@ type ChatScrollManagementOptions = {
 
 type FollowApi = {
   followToEnd: () => void;
+  followSend: () => void;
   cancel: () => void;
+};
+
+const SEND_ENTRANCE_ANIMATION = "bubble-pop";
+const SEND_ROW_SELECTOR = ".event-row--user--just-sent .event-item.user";
+const SEND_ROW_WAIT_FRAMES = 8;
+const SEND_FALLBACK_DURATION_MS = 360;
+
+type SendClock = {
+  progress: () => number | null;
+  ease: (progress: number) => number;
+};
+
+// Evaluates a CSS `linear(...)` easing (as returned by getKeyframes) so the
+// scroll can ride the exact curve the sent bubble uses.
+const parseLinearEasing = (
+  easing: string,
+): ((progress: number) => number) | null => {
+  const match = /^linear\((.*)\)$/.exec(easing.trim());
+  if (!match?.[1]) return null;
+  const stops: Array<{ value: number; at: number | null }> = [];
+  for (const part of match[1].split(",")) {
+    const [value, ...positions] = part.trim().split(/\s+/);
+    const parsedValue = Number(value);
+    if (!Number.isFinite(parsedValue)) return null;
+    if (positions.length === 0) {
+      stops.push({ value: parsedValue, at: null });
+      continue;
+    }
+    for (const position of positions) {
+      if (!position.endsWith("%")) return null;
+      const at = Number(position.slice(0, -1)) / 100;
+      if (!Number.isFinite(at)) return null;
+      stops.push({ value: parsedValue, at });
+    }
+  }
+  if (stops.length < 2) return null;
+  stops[0]!.at ??= 0;
+  stops[stops.length - 1]!.at ??= 1;
+  for (let index = 1; index < stops.length - 1; index += 1) {
+    if (stops[index]!.at !== null) continue;
+    let next = index + 1;
+    while (stops[next]!.at === null) next += 1;
+    const from = stops[index - 1]!.at!;
+    const to = stops[next]!.at!;
+    for (let fill = index; fill < next; fill += 1) {
+      stops[fill]!.at = from + ((to - from) * (fill - index + 1)) / (next - index + 1);
+    }
+  }
+  return (progress) => {
+    if (progress <= stops[0]!.at!) return stops[0]!.value;
+    for (let index = 1; index < stops.length; index += 1) {
+      const right = stops[index]!;
+      if (progress > right.at!) continue;
+      const left = stops[index - 1]!;
+      const span = right.at! - left.at!;
+      return span <= 0
+        ? right.value
+        : left.value + ((right.value - left.value) * (progress - left.at!)) / span;
+    }
+    return stops[stops.length - 1]!.value;
+  };
+};
+
+const easeOutCubic = (progress: number) => 1 - (1 - progress) ** 3;
+
+const findSendEntrance = (node: HTMLElement): SendClock | null => {
+  const bubbles = node.querySelectorAll<HTMLElement>(SEND_ROW_SELECTOR);
+  const bubble = bubbles[bubbles.length - 1];
+  if (!bubble) return null;
+  const animation = bubble
+    .getAnimations()
+    .find(
+      (candidate): candidate is CSSAnimation =>
+        candidate instanceof CSSAnimation &&
+        candidate.animationName === SEND_ENTRANCE_ANIMATION,
+    );
+  if (!animation?.effect) return null;
+  const effect = animation.effect;
+  const easing =
+    effect instanceof KeyframeEffect
+      ? effect.getKeyframes()[0]?.easing
+      : undefined;
+  return {
+    progress: () => {
+      if (animation.playState === "finished" || !bubble.isConnected) return 1;
+      return effect.getComputedTiming().progress ?? null;
+    },
+    ease: (easing && parseLinearEasing(easing)) || easeOutCubic,
+  };
 };
 
 export type ChatListBinding = {
@@ -415,7 +505,7 @@ export function useChatScrollManagement({
 
   const followAfterSend = useCallback(() => {
     setFollow(true);
-    followApi.current?.followToEnd();
+    followApi.current?.followSend();
   }, [setFollow]);
 
   useEffect(() => {
@@ -559,10 +649,89 @@ export function useChatScrollManagement({
 
       let followRaf = 0;
       let lastStepFrom: number | null = null;
+      let sendMotion: {
+        clock: SendClock | null;
+        firstProgress: number | null;
+        from: number | null;
+        startedAt: number | null;
+        waitedFrames: number;
+      } | null = null;
       const stopLoop = () => {
         if (followRaf) cancelAnimationFrame(followRaf);
         followRaf = 0;
         lastStepFrom = null;
+        sendMotion = null;
+      };
+
+      // One motion for a send: the scroll starts on the frame the sent bubble
+      // starts to move and follows the bubble's own clock and curve, aiming at
+      // the live end each frame so late layout lands inside the same motion.
+      // The bubble's first frames hold still while the list may still show an
+      // estimated height for the new row, so the scroll holds still with it.
+      const stepSend = (now: number) => {
+        followRaf = 0;
+        const motion = sendMotion;
+        if (!attached || !followRef.current || !motion) {
+          sendMotion = null;
+          return;
+        }
+        motion.clock ??= findSendEntrance(attached);
+        const waiting = motion.waitedFrames < SEND_ROW_WAIT_FRAMES;
+        if (!motion.clock && waiting) {
+          motion.waitedFrames += 1;
+          followRaf = requestAnimationFrame(stepSend);
+          return;
+        }
+        let progress = motion.clock?.progress() ?? null;
+        if (motion.clock && motion.from === null && waiting) {
+          if (
+            progress === null ||
+            motion.firstProgress === null ||
+            progress === motion.firstProgress
+          ) {
+            motion.firstProgress ??= progress;
+            motion.waitedFrames += 1;
+            followRaf = requestAnimationFrame(stepSend);
+            return;
+          }
+        }
+        const end = Math.max(0, attached.scrollHeight - attached.clientHeight);
+        motion.from ??= attached.scrollTop;
+        motion.startedAt ??= now;
+        if (!motion.clock) {
+          progress = Math.min(
+            1,
+            (now - motion.startedAt) / SEND_FALLBACK_DURATION_MS,
+          );
+        }
+        if (progress === null) {
+          followRaf = requestAnimationFrame(stepSend);
+          return;
+        }
+        if (progress >= 1) {
+          attached.scrollTop = end;
+          sendMotion = null;
+          return;
+        }
+        const eased = Math.min(
+          1,
+          (motion.clock?.ease ?? easeOutCubic)(progress),
+        );
+        attached.scrollTop = motion.from + (end - motion.from) * eased;
+        followRaf = requestAnimationFrame(stepSend);
+      };
+
+      const followSend = () => {
+        if (!attached || !followRef.current) return;
+        stopLoop();
+        sendMotion = {
+          clock: null,
+          firstProgress: null,
+          from: null,
+          startedAt: null,
+          waitedFrames: 0,
+        };
+        followRaf = requestAnimationFrame(stepSend);
       };
 
       const stepFollow = () => {
@@ -593,7 +762,7 @@ export function useChatScrollManagement({
         followRaf = requestAnimationFrame(stepFollow);
       };
 
-      followApi.current = { followToEnd, cancel: stopLoop };
+      followApi.current = { followToEnd, followSend, cancel: stopLoop };
 
       const followContentGrowth = () => {
         if (!attached || !followRef.current) return;

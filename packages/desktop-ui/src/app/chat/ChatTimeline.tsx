@@ -13,6 +13,7 @@ import {
 import {
   LegendList,
   type LegendListRenderItemProps,
+  type MaintainVisibleContentPositionConfig,
 } from "@legendapp/list/react";
 import { AssistantMessageRow, UserMessageRow } from "@/app/chat/MessageRow";
 import { ChatTimeDivider } from "@/app/chat/ChatTimeDivider";
@@ -164,6 +165,17 @@ const useChatDrawDistance = (dataKey: string | null): number => {
     ? CHAT_DRAW_DISTANCE_WARM_PX
     : CHAT_DRAW_DISTANCE_COLD_PX;
 };
+
+// Rows that only ever sit at the tail never anchor the list: a message
+// inserted above them would otherwise shift the scroll by its own height in
+// one frame, ahead of the send's scroll motion.
+const KEEP_VISIBLE_POSITION: MaintainVisibleContentPositionConfig<TimelineListItem> =
+  {
+    data: true,
+    size: true,
+    shouldRestorePosition: (item) =>
+      item.type !== "working-indicator" && item.type !== "queued-users",
+  };
 
 const ItemSeparator = ({ leadingItem }: { leadingItem: TimelineListItem }) => (
   <div style={{ height: leadingItem.gapAfter }} aria-hidden="true" />
@@ -477,7 +489,7 @@ export const ChatTimeline = memo(function ChatTimeline({
         recycleItems={recycleItems}
         data-rendered-row-count={renderedMessageRowCount}
         alignItemsAtEnd={alignItemsAtEnd}
-        maintainVisibleContentPosition
+        maintainVisibleContentPosition={KEEP_VISIBLE_POSITION}
         initialScrollAtEnd
         ListHeaderComponent={ListHeader ?? undefined}
         ListFooterComponent={ListFooter}

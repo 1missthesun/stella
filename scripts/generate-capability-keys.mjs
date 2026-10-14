@@ -8,7 +8,7 @@
  * CAPABILITY_SIGNING_KEY) and the public JWK entry to append to the model
  * gateway's CAPABILITY_JWKS var.
  */
-import { generateCapabilityKeyPair } from "../packages/contracts/gateway/jwt.ts";
+import { generateCapabilityKeyPair } from "./lib/capability-keys.mjs";
 
 const kid = process.argv[2];
 if (!kid || !/^[a-z0-9-]{3,64}$/.test(kid)) {

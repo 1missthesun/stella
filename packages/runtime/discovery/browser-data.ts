@@ -19,6 +19,7 @@ import type {
 import { openSqliteSnapshot } from "./sqlite-snapshot.js";
 import type {
   BrowserAccount,
+  BrowserBookmark,
   BrowserVisit,
   BrowserVisitSource,
 } from "./browsing-digest.js";
@@ -740,6 +741,44 @@ const readChromiumProfileHints = async (
   }
 };
 
+type ChromiumBookmarkNode = {
+  type?: string;
+  name?: string;
+  url?: string;
+  date_added?: string;
+  children?: ChromiumBookmarkNode[];
+};
+
+const readChromiumBookmarks = async (historyPath: string): Promise<BrowserBookmark[]> => {
+  const raw = await fs
+    .readFile(path.join(path.dirname(historyPath), "Bookmarks"), "utf-8")
+    .catch(() => null);
+  if (!raw) return [];
+  const bookmarks: BrowserBookmark[] = [];
+  const walk = (node: ChromiumBookmarkNode, folder: string | undefined) => {
+    if (node.type === "url" && node.url) {
+      const addedUs = Number(node.date_added ?? 0);
+      bookmarks.push({
+        title: node.name ?? "",
+        url: node.url,
+        ...(folder ? { folder } : {}),
+        ...(addedUs > 0 ? { addedAt: addedUs / 1000 - CHROME_EPOCH_OFFSET_MS } : {}),
+      });
+      return;
+    }
+    for (const child of node.children ?? []) walk(child, node.type === "folder" ? node.name : folder);
+  };
+  try {
+    const parsed = JSON.parse(raw) as { roots?: Record<string, ChromiumBookmarkNode> };
+    for (const root of Object.values(parsed.roots ?? {})) {
+      if (root && typeof root === "object") walk(root, undefined);
+    }
+  } catch {
+    return [];
+  }
+  return bookmarks;
+};
+
 export const readChromiumVisits = (
   options: BrowserCollectionOptions,
   sinceMs: number,
@@ -767,8 +806,9 @@ export const readChromiumVisits = (
         ),
       );
       const hints = yield* tryDiscovery(() => readChromiumProfileHints(browser.historyPath));
-      log(`Read ${visits.length} visits from ${browser.type}`);
-      return { browser: browser.type, visits, ...hints };
+      const bookmarks = yield* tryDiscovery(() => readChromiumBookmarks(browser.historyPath));
+      log(`Read ${visits.length} visits and ${bookmarks.length} bookmarks from ${browser.type}`);
+      return { browser: browser.type, visits, bookmarks, ...hints };
     }),
   );
 

@@ -75,6 +75,16 @@ ORDER BY v.visit_date DESC
 LIMIT 60000
 `;
 
+const BOOKMARKS_QUERY = `
+SELECT b.title AS title, p.url AS url, parent.title AS folder, b.dateAdded / 1000 AS addedAt
+FROM moz_bookmarks b
+JOIN moz_places p ON b.fk = p.id
+LEFT JOIN moz_bookmarks parent ON b.parent = parent.id
+WHERE b.type = 1 AND p.url NOT LIKE 'place:%'
+ORDER BY b.dateAdded DESC
+LIMIT 200
+`;
+
 export const readFirefoxVisits = (sinceMs: number): Promise<BrowserVisitSource | null> =>
   runDiscovery(
     Effect.gen(function* () {
@@ -84,13 +94,26 @@ export const readFirefoxVisits = (sinceMs: number): Promise<BrowserVisitSource |
       const visits = yield* Effect.scoped(
         Effect.gen(function* () {
           const db = yield* acquireCloseable(() => openSqliteSnapshot(sourcePath));
-          return yield* tryDiscoverySync(
-            () => db.prepare(RECENT_VISITS_QUERY).all(sinceMs * 1000) as BrowserVisit[],
-          );
+          return yield* tryDiscoverySync(() => ({
+            visits: db.prepare(RECENT_VISITS_QUERY).all(sinceMs * 1000) as BrowserVisit[],
+            bookmarks: (
+              db.prepare(BOOKMARKS_QUERY).all() as {
+                title: string | null;
+                url: string;
+                folder: string | null;
+                addedAt: number | null;
+              }[]
+            ).map((row) => ({
+              title: row.title ?? "",
+              url: row.url,
+              ...(row.folder ? { folder: row.folder } : {}),
+              ...(row.addedAt ? { addedAt: row.addedAt } : {}),
+            })),
+          }));
         }),
       );
-      log(`Read ${visits.length} Firefox visits`);
-      return { browser: "firefox", visits, accounts: [], languages: null } satisfies BrowserVisitSource;
+      log(`Read ${visits.visits.length} Firefox visits`);
+      return { browser: "firefox", ...visits, accounts: [], languages: null } satisfies BrowserVisitSource;
     }).pipe(
       Effect.catch((error) =>
         Effect.sync(() => {

@@ -1,4 +1,5 @@
 import { promises as fs } from "fs";
+import { execFile } from "child_process";
 import path from "path";
 import os from "os";
 import { Effect } from "effect";
@@ -9,7 +10,7 @@ import {
   tryDiscoverySync,
 } from "./effect-io.js";
 import { openSqliteSnapshot } from "./sqlite-snapshot.js";
-import type { BrowserVisit, BrowserVisitSource } from "./browsing-digest.js";
+import type { BrowserBookmark, BrowserVisit, BrowserVisitSource } from "./browsing-digest.js";
 
 const log = (...args: unknown[]) => console.error("[safari-data]", ...args);
 
@@ -23,6 +24,45 @@ WHERE hv.visit_time > ?
 ORDER BY hv.visit_time DESC
 LIMIT 60000
 `;
+
+type SafariBookmarkNode = {
+  Title?: string;
+  URLString?: string;
+  URIDictionary?: { title?: string };
+  Children?: SafariBookmarkNode[];
+  WebBookmarkType?: string;
+};
+
+const readSafariBookmarks = (): Promise<BrowserBookmark[]> =>
+  new Promise((resolve) => {
+    const file = path.join(os.homedir(), "Library", "Safari", "Bookmarks.plist");
+    execFile("plutil", ["-convert", "json", "-o", "-", file], { maxBuffer: 20 * 1024 * 1024 }, (error, stdout) => {
+      if (error) {
+        resolve([]);
+        return;
+      }
+      const bookmarks: BrowserBookmark[] = [];
+      const walk = (node: SafariBookmarkNode, folder: string | undefined) => {
+        if (node.WebBookmarkType === "WebBookmarkTypeProxy") return;
+        if (node.URLString) {
+          bookmarks.push({
+            title: node.URIDictionary?.title ?? node.Title ?? "",
+            url: node.URLString,
+            ...(folder ? { folder } : {}),
+          });
+          return;
+        }
+        for (const child of node.Children ?? []) walk(child, node.Title || folder);
+      };
+      try {
+        walk(JSON.parse(stdout) as SafariBookmarkNode, undefined);
+      } catch {
+        resolve([]);
+        return;
+      }
+      resolve(bookmarks.reverse());
+    });
+  });
 
 export const readSafariVisits = (sinceMs: number): Promise<BrowserVisitSource | null> =>
   runDiscovery(
@@ -42,8 +82,9 @@ export const readSafariVisits = (sinceMs: number): Promise<BrowserVisitSource | 
             );
           }),
         );
+        const bookmarks = yield* tryDiscovery(() => readSafariBookmarks());
         log(`Read ${visits.length} Safari visits`);
-        return { browser: "safari", visits, accounts: [], languages: null };
+        return { browser: "safari", visits, bookmarks, accounts: [], languages: null };
       }).pipe(
         Effect.catch((error) =>
           Effect.sync(() => {

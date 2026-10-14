@@ -4,9 +4,12 @@ export type BrowserVisit = { url: string; title: string | null; time: number };
 
 export type BrowserAccount = { name?: string; email?: string };
 
+export type BrowserBookmark = { title: string; url: string; folder?: string; addedAt?: number };
+
 export type BrowserVisitSource = {
   browser: string;
   visits: BrowserVisit[];
+  bookmarks: BrowserBookmark[];
   accounts: BrowserAccount[];
   languages: string | null;
 };
@@ -17,10 +20,13 @@ export const BROWSING_WINDOW_DAYS = 30;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MIN_ACTIVE_DAYS = 3;
 const MAX_SITES = 40;
-const MAX_TITLED_UNKNOWN_SITES = 8;
+const MAX_TITLED_UNKNOWN_SITES = 12;
 const MAX_TITLES_PER_SITE = 4;
 const MAX_TITLE_LENGTH = 70;
+const MAX_FEED_TITLES_PER_SITE = 6;
 const MAX_ACCOUNTS = 6;
+const MAX_SEARCH_TERMS = 15;
+const MAX_BOOKMARKS = 25;
 
 type Kind =
   | "email"
@@ -38,6 +44,10 @@ type Kind =
   | "food"
   | "music"
   | "news"
+  | "search"
+  | "video"
+  | "social"
+  | "other"
   | "drop";
 
 type KnownSite = { label: string; kind: Kind };
@@ -177,7 +187,7 @@ const KNOWN_SITES: Record<string, KnownSite> = {
   "walmart.com": site("Walmart", "shopping"),
   "costco.com": site("Costco", "shopping"),
   "bestbuy.com": site("Best Buy", "shopping"),
-  "apple.com": site("Apple", "drop"),
+  "apple.com": site("Apple", "other"),
   "instacart.com": site("Instacart", "food"),
   "doordash.com": site("DoorDash", "food"),
   "ubereats.com": site("Uber Eats", "food"),
@@ -204,48 +214,48 @@ const KNOWN_SITES: Record<string, KnownSite> = {
   "spotify.com": site("Spotify", "music"),
   "music.apple.com": site("Apple Music", "music"),
   "soundcloud.com": site("SoundCloud", "music"),
-  "google.com": site("Google Search", "drop"),
-  "bing.com": site("Bing", "drop"),
-  "duckduckgo.com": site("DuckDuckGo", "drop"),
-  "search.brave.com": site("Brave Search", "drop"),
-  "ecosia.org": site("Ecosia", "drop"),
-  "startpage.com": site("Startpage", "drop"),
-  "yahoo.com": site("Yahoo", "drop"),
-  "baidu.com": site("Baidu", "drop"),
-  "yandex.ru": site("Yandex", "drop"),
+  "google.com": site("Google Search", "search"),
+  "bing.com": site("Bing", "search"),
+  "duckduckgo.com": site("DuckDuckGo", "search"),
+  "search.brave.com": site("Brave Search", "search"),
+  "ecosia.org": site("Ecosia", "search"),
+  "startpage.com": site("Startpage", "search"),
+  "yahoo.com": site("Yahoo", "search"),
+  "baidu.com": site("Baidu", "search"),
+  "yandex.ru": site("Yandex", "search"),
   "accounts.google.com": site("Google sign-in", "drop"),
   "myaccount.google.com": site("Google account", "drop"),
-  "chromewebstore.google.com": site("Chrome Web Store", "drop"),
-  "chrome.google.com": site("Chrome Web Store", "drop"),
-  "translate.google.com": site("Google Translate", "drop"),
-  "maps.google.com": site("Google Maps", "drop"),
+  "chromewebstore.google.com": site("Chrome Web Store", "other"),
+  "chrome.google.com": site("Chrome Web Store", "other"),
+  "translate.google.com": site("Google Translate", "other"),
+  "maps.google.com": site("Google Maps", "other"),
   "news.google.com": site("Google News", "news"),
-  "youtube.com": site("YouTube", "drop"),
-  "youtu.be": site("YouTube", "drop"),
-  "twitch.tv": site("Twitch", "drop"),
-  "netflix.com": site("Netflix", "drop"),
-  "hulu.com": site("Hulu", "drop"),
-  "disneyplus.com": site("Disney+", "drop"),
-  "primevideo.com": site("Prime Video", "drop"),
-  "max.com": site("Max", "drop"),
-  "vimeo.com": site("Vimeo", "drop"),
-  "x.com": site("X", "drop"),
-  "twitter.com": site("X", "drop"),
+  "youtube.com": site("YouTube", "video"),
+  "youtu.be": site("YouTube", "video"),
+  "twitch.tv": site("Twitch", "video"),
+  "netflix.com": site("Netflix", "video"),
+  "hulu.com": site("Hulu", "video"),
+  "disneyplus.com": site("Disney+", "video"),
+  "primevideo.com": site("Prime Video", "video"),
+  "max.com": site("Max", "video"),
+  "vimeo.com": site("Vimeo", "video"),
+  "x.com": site("X", "social"),
+  "twitter.com": site("X", "social"),
   "t.co": site("X", "drop"),
-  "facebook.com": site("Facebook", "drop"),
-  "instagram.com": site("Instagram", "drop"),
-  "threads.net": site("Threads", "drop"),
-  "tiktok.com": site("TikTok", "drop"),
-  "reddit.com": site("Reddit", "drop"),
-  "linkedin.com": site("LinkedIn", "drop"),
-  "pinterest.com": site("Pinterest", "drop"),
-  "snapchat.com": site("Snapchat", "drop"),
-  "tumblr.com": site("Tumblr", "drop"),
-  "quora.com": site("Quora", "drop"),
-  "wikipedia.org": site("Wikipedia", "drop"),
-  "web.whatsapp.com": site("WhatsApp", "drop"),
-  "web.telegram.org": site("Telegram", "drop"),
-  "messenger.com": site("Messenger", "drop"),
+  "facebook.com": site("Facebook", "social"),
+  "instagram.com": site("Instagram", "social"),
+  "threads.net": site("Threads", "social"),
+  "tiktok.com": site("TikTok", "social"),
+  "reddit.com": site("Reddit", "social"),
+  "linkedin.com": site("LinkedIn", "social"),
+  "pinterest.com": site("Pinterest", "social"),
+  "snapchat.com": site("Snapchat", "social"),
+  "tumblr.com": site("Tumblr", "social"),
+  "quora.com": site("Quora", "social"),
+  "wikipedia.org": site("Wikipedia", "other"),
+  "web.whatsapp.com": site("WhatsApp", "social"),
+  "web.telegram.org": site("Telegram", "social"),
+  "messenger.com": site("Messenger", "social"),
   "bit.ly": site("bit.ly", "drop"),
   "cfapi.net": site("Cloudflare", "drop"),
   "googleusercontent.com": site("Google", "drop"),
@@ -277,15 +287,36 @@ const KIND_ORDER: Kind[] = [
   "food",
   "travel",
   "music",
+  "video",
+  "social",
   "news",
+  "other",
 ];
 
-const TITLED_KINDS = new Set<Kind>(["docs", "work", "dev", "cloud", "ai", "design", "payments"]);
+const UNTITLED_KINDS = new Set<Kind | "unknown">(["email", "calendar", "search"]);
+const FEED_KINDS = new Set<Kind | "unknown">(["video", "social", "news"]);
+const PLUMBING_PATH = /\/(oauth2?|callback|authorize|signin|sign-in|sign_in|login|logout|sso|auth)(\/|$)/i;
+
+const SEARCH_PARAMS: { match: (host: string, pathname: string) => boolean; param: string }[] = [
+  { match: (h, p) => (h === "google.com" || h.startsWith("google.")) && p.startsWith("/search"), param: "q" },
+  { match: (h) => h === "bing.com", param: "q" },
+  { match: (h) => h === "duckduckgo.com", param: "q" },
+  { match: (h) => h === "search.brave.com", param: "q" },
+  { match: (h) => h === "ecosia.org", param: "q" },
+  { match: (h) => h === "startpage.com", param: "query" },
+  { match: (h) => h.endsWith("search.yahoo.com"), param: "p" },
+  { match: (h, p) => h === "youtube.com" && p.startsWith("/results"), param: "search_query" },
+  { match: (h, p) => (h === "x.com" || h === "twitter.com") && p.startsWith("/search"), param: "q" },
+  { match: (h, p) => h === "reddit.com" && p.includes("/search"), param: "q" },
+  { match: (h, p) => (h === "amazon.com" || h.startsWith("amazon.")) && p.startsWith("/s"), param: "k" },
+  { match: (h, p) => h === "perplexity.ai" && p.startsWith("/search"), param: "q" },
+];
+
+const STOPWORDS = new Set(
+  "the and for with how what why when where who which does did can are was were you your from that this into about best near vs not get use using make new top free online one two all any per via its our out has have had will just than then them they there their".split(" "),
+);
 
 const NO_SITE_HOSTS = [/^(login|auth|oauth|signin|sso|id|accounts?)\./, /^(api|cdn|static|assets|img|images)\./];
-
-const SENSITIVE =
-  /\b(health|clinic|medical|medic|pharma\w*|hospital|therap\w*|doctor|patient|dental|dentist|mental|mychart|webmd|diagnos\w*|symptom\w*|pregnan\w*|fertility|rehab|std|hiv|cancer|diet|weight[- ]?loss|democrat\w*|republican\w*|gop|maga|election\w*|ballot|politic\w*|church|bible|quran|koran|mosque|synagogue|temple|prayer|religio\w*|porn\w*|xxx|nsfw|sex\w*|onlyfans|escort\w*|dating|tinder|grindr|hinge|bumble|lgbt\w*|gay|lesbian|queer|trans|casino|gambl\w*|betting|loan|debt|bankrupt\w*|lawyer|divorce)\b/i;
 
 const MULTI_PART_TLDS = new Set(["co", "com", "org", "net", "ac", "gov", "edu", "ne", "or"]);
 
@@ -311,7 +342,7 @@ const knownSiteFor = (host: string, pathname: string): { key: string; known: Kno
   return null;
 };
 
-const parseVisitUrl = (raw: string): { host: string; pathname: string } | null => {
+const parseVisitUrl = (raw: string): { host: string; pathname: string; params: URLSearchParams } | null => {
   let parsed: URL;
   try {
     parsed = new URL(raw);
@@ -323,7 +354,7 @@ const parseVisitUrl = (raw: string): { host: string; pathname: string } | null =
   if (!host.includes(".") || /^[\d.]+$/.test(host) || host.endsWith(".local") || host.endsWith(".localhost")) {
     return null;
   }
-  return { host, pathname: parsed.pathname };
+  return { host, pathname: parsed.pathname, params: parsed.searchParams };
 };
 
 const EMAIL_PATTERN = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
@@ -343,8 +374,6 @@ const cleanTitle = (title: string, label: string): string | null => {
   if (/^(sign in|log in|login|loading|redirecting|just a moment|new tab|untitled|home)\b/i.test(cleaned)) return null;
   if (/^https?:\/\//i.test(cleaned) || /^\S+\/\S+$/.test(cleaned)) return null;
   if (cleaned.toLowerCase() === label.toLowerCase()) return null;
-  if (/[$€£¥]\s?\d/.test(cleaned)) return null;
-  if (SENSITIVE.test(cleaned)) return null;
   return cleaned.length > MAX_TITLE_LENGTH ? `${cleaned.slice(0, MAX_TITLE_LENGTH - 1).trimEnd()}…` : cleaned;
 };
 
@@ -420,6 +449,53 @@ const describeAccounts = (accounts: BrowserAccount[]): string | null => {
   return lines.length > 0 ? lines.join("; ") : null;
 };
 
+const describeSearchTerms = (searches: { query: string; day: string }[]): string[] => {
+  const terms = new Map<string, { days: Set<string>; queries: Map<string, number> }>();
+  for (const { query, day } of searches) {
+    const words = new Set(
+      query
+        .toLowerCase()
+        .split(/[^\p{L}\p{N}+#.]+/u)
+        .map((word) => word.replace(/^\.+|\.+$/g, ""))
+        .filter((word) => word.length >= 3 && !STOPWORDS.has(word) && !/^\d+$/.test(word)),
+    );
+    for (const word of words) {
+      let entry = terms.get(word);
+      if (!entry) {
+        entry = { days: new Set(), queries: new Map() };
+        terms.set(word, entry);
+      }
+      entry.days.add(day);
+      entry.queries.set(query, (entry.queries.get(query) ?? 0) + 1);
+    }
+  }
+  return [...terms.entries()]
+    .filter(([, entry]) => entry.days.size >= MIN_ACTIVE_DAYS)
+    .sort((a, b) => b[1].days.size - a[1].days.size)
+    .slice(0, MAX_SEARCH_TERMS)
+    .map(([word, entry]) => {
+      const examples = [...entry.queries.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 2)
+        .map(([query]) => `"${query.length > MAX_TITLE_LENGTH ? `${query.slice(0, MAX_TITLE_LENGTH - 1)}…` : query}"`);
+      return `- ${word}: ${entry.days.size}d; ${examples.join(", ")}`;
+    });
+};
+
+const describeBookmarks = (bookmarks: BrowserBookmark[]): string[] => {
+  const seen = new Set<string>();
+  const lines: string[] = [];
+  for (const bookmark of [...bookmarks].sort((a, b) => (b.addedAt ?? 0) - (a.addedAt ?? 0))) {
+    const parsed = parseVisitUrl(bookmark.url);
+    if (!parsed || seen.has(bookmark.url)) continue;
+    seen.add(bookmark.url);
+    const title = bookmark.title.replace(/\s+/g, " ").trim().slice(0, 60) || parsed.host;
+    lines.push(`- ${title} (${parsed.host})${bookmark.folder ? ` [${bookmark.folder}]` : ""}`);
+    if (lines.length >= MAX_BOOKMARKS) break;
+  }
+  return lines;
+};
+
 export const buildBrowsingDigest = (
   sources: BrowserVisitSource[],
   now = Date.now(),
@@ -428,18 +504,24 @@ export const buildBrowsingDigest = (
   const visits = sources.flatMap((source) =>
     source.visits.filter((visit) => typeof visit.time === "number" && visit.time >= since && visit.time <= now),
   );
-  if (visits.length === 0) return null;
+  if (visits.length === 0 && sources.every((source) => source.bookmarks.length === 0)) return null;
 
   const sites = new Map<string, SiteStats>();
+  const searches: { query: string; day: string }[] = [];
   for (const visit of visits) {
     const parsed = parseVisitUrl(visit.url);
     if (!parsed) continue;
     const match = knownSiteFor(parsed.host, parsed.pathname);
     if (!match && NO_SITE_HOSTS.some((pattern) => pattern.test(parsed.host))) continue;
+    if (PLUMBING_PATH.test(parsed.pathname)) continue;
     const key = match?.known.label ?? baseDomain(parsed.host);
     const kind = match?.known.kind ?? "unknown";
     if (kind === "drop") continue;
-    if (kind === "unknown" && SENSITIVE.test(key.replace(/[.-]/g, " "))) continue;
+    const searchSpec = SEARCH_PARAMS.find((spec) => spec.match(parsed.host, parsed.pathname));
+    const query = searchSpec ? parsed.params.get(searchSpec.param)?.trim() : undefined;
+    if (query && query.length >= 2 && query.length <= 100) {
+      searches.push({ query: query.replace(/\s+/g, " "), day: dayKey(visit.time) });
+    }
     let stats = sites.get(key);
     if (!stats) {
       stats = {
@@ -463,6 +545,7 @@ export const buildBrowsingDigest = (
       for (const email of title.match(EMAIL_PATTERN) ?? []) stats.emails.add(email.toLowerCase());
       continue;
     }
+    if (query) continue;
     const cleaned = cleanTitle(title, stats.label);
     if (cleaned) stats.titles.set(cleaned, (stats.titles.get(cleaned) ?? 0) + 1);
   }
@@ -471,7 +554,6 @@ export const buildBrowsingDigest = (
     .filter((stats) => stats.days.size >= MIN_ACTIVE_DAYS)
     .sort((a, b) => b.days.size - a.days.size || b.visits - a.visits)
     .slice(0, MAX_SITES);
-  if (recurring.length === 0) return null;
 
   const titledUnknown = new Set(
     recurring
@@ -484,12 +566,13 @@ export const buildBrowsingDigest = (
     const parts = [`${stats.label}: ${stats.days.size}d active, last ${recencyLabel(stats.lastVisit, now)}`];
     if (stats.emails.size > 0) parts.push(`accounts ${[...stats.emails].slice(0, 4).join(", ")}`);
     const showTitles =
-      (stats.kind !== "unknown" && TITLED_KINDS.has(stats.kind)) || titledUnknown.has(stats.key);
+      stats.kind === "unknown" ? titledUnknown.has(stats.key) : !UNTITLED_KINDS.has(stats.kind);
     if (showTitles) {
+      const feed = FEED_KINDS.has(stats.kind);
       const titles = [...stats.titles.entries()]
-        .filter(([, count]) => count >= 2)
+        .filter(([, count]) => feed || count >= 2)
         .sort((a, b) => b[1] - a[1])
-        .slice(0, MAX_TITLES_PER_SITE)
+        .slice(0, feed ? MAX_FEED_TITLES_PER_SITE : MAX_TITLES_PER_SITE)
         .map(([title]) => `"${title}"`);
       if (titles.length > 0) parts.push(`pages ${titles.join(", ")}`);
     }
@@ -498,7 +581,7 @@ export const buildBrowsingDigest = (
 
   const lines: string[] = [];
   const browsers = [...new Set(sources.map((source) => source.browser))];
-  lines.push(`## Browser activity (${browsers.join(", ")}, last ${BROWSING_WINDOW_DAYS} days, recurring sites only)`);
+  lines.push(`## Browser activity (${browsers.join(", ")}, last ${BROWSING_WINDOW_DAYS} days, sites used on ${MIN_ACTIVE_DAYS}+ separate days)`);
 
   const accounts = describeAccounts(sources.flatMap((source) => source.accounts));
   if (accounts) lines.push(`Accounts signed in to the browser: ${accounts}`);
@@ -516,14 +599,27 @@ export const buildBrowsingDigest = (
       .join("; "),
   );
 
+  const listed = recurring.filter((stats) => stats.kind !== "search");
   const groups: [string, SiteStats[]][] = [
-    ...KIND_ORDER.map((kind) => [kind, recurring.filter((stats) => stats.kind === kind)] as [string, SiteStats[]]),
-    ["other (user's own sites or niche tools)", recurring.filter((stats) => stats.kind === "unknown")],
+    ...KIND_ORDER.map((kind) => [kind, listed.filter((stats) => stats.kind === kind)] as [string, SiteStats[]]),
+    ["unrecognized sites (often the user's own products, niche tools or communities)", listed.filter((stats) => stats.kind === "unknown")],
   ];
   for (const [kind, entries] of groups) {
     if (entries.length === 0) continue;
     lines.push(`\n### ${kind}`);
     lines.push(...entries.map(formatSite));
+  }
+
+  const searchTerms = describeSearchTerms(searches);
+  if (searchTerms.length > 0) {
+    lines.push(`\n### recurring search terms (searched on ${MIN_ACTIVE_DAYS}+ separate days, with example queries)`);
+    lines.push(...searchTerms);
+  }
+
+  const bookmarks = describeBookmarks(sources.flatMap((source) => source.bookmarks));
+  if (bookmarks.length > 0) {
+    lines.push("\n### bookmarks (most recently added first)");
+    lines.push(...bookmarks);
   }
 
   return { browsers, visitCount: visits.length, text: lines.join("\n") };

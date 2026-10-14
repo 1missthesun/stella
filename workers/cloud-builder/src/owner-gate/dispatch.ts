@@ -934,7 +934,7 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
       if (handledAt !== undefined && at <= handledAt) return;
       add(source, at);
     };
-    add("owner_store", this.ownerStore().nextDeadline(handledAt));
+    add("owner_store", this.ownerStore().nextDeadline());
     const watched = this.ownerStore().watching("devices.list");
     for (const socket of this.sockets()) {
       const attachment = this.attachment(socket);

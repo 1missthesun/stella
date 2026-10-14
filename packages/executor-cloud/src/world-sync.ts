@@ -823,6 +823,9 @@ const establishedBase = async (root: string): Promise<WorldIndex> => {
   );
 };
 
+export const worldBaseEstablished = async (root: string): Promise<boolean> =>
+  (await readIndex(statePaths(root).index))?.complete === true;
+
 export const pullWorldProjection = async (args: {
   root: string;
   access: WorldSyncAccess;
@@ -1058,14 +1061,9 @@ const uploadBatches = async (
 /**
  * Send the world what this disk changed since its base, and nothing else:
  * every file created or changed here, every path the base had that is gone.
- * Other agents push into the same world from their own containers, so a
- * file this disk merely has an older copy of is never sent, and a file it
- * never saw is never deleted. Per path, the later push wins.
- *
- * A cold disk whose first pull never ran has only a seed for a base; then
- * every file reads as created, the world skips what it already holds, and
- * an older copy here can overwrite a newer one there. That is the one case
- * a push can undo another agent's write.
+ * A file this disk merely has an older copy of is never sent, and a file it
+ * never saw is never deleted. Per path, the later push wins. Refuses on a
+ * disk whose base a pull has not established yet.
  */
 export const pushWorldProjection = async (args: {
   root: string;
@@ -1075,7 +1073,12 @@ export const pushWorldProjection = async (args: {
   await withWorldSyncLock(args.root, async () => {
     const marker = await readWorldMarker(args.root);
     const stored = await readIndex(statePaths(args.root).index);
-    const base = stored?.entries ?? (await indexRestoredNodeModules(args.root));
+    if (!stored?.complete) {
+      throw new Error(
+        "This workspace has not synced with the world yet, so nothing was sent to it.",
+      );
+    }
+    const base = stored.entries;
     const projection = await listWorldProjection(
       args.root,
       base,

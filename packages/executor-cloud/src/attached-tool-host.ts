@@ -54,7 +54,11 @@ import {
   worldDriveWorkspace,
   WORLD_ROOT,
 } from "./workspace-paths.js";
-import { pullWorldProjection, pushWorldProjection } from "./world-sync.js";
+import {
+  pullWorldProjection,
+  pushWorldProjection,
+  worldBaseEstablished,
+} from "./world-sync.js";
 
 export type AttachedToolHostInput = Readonly<{
   turnId: string;
@@ -484,6 +488,13 @@ export const runAttachedToolHost = (
             console.error(`world pull failed: ${message}`);
             syncNotices.push(`pull failed: ${message}`);
           });
+          if (!(await worldBaseEstablished(workspaceRoot))) {
+            const error = new Error(
+              `The workspace could not sync with the world, so ${toolName} did not run. ${syncNotices.join(" ")}`.trim(),
+            );
+            calls.set(key, { kind: "lost", error: error.message });
+            throw error;
+          }
         }
         let result: ToolResult;
         try {

@@ -79,7 +79,7 @@ export function OpenSourceAct() {
       >
         github.com/1missthesun/stella-v2
       </a>
-      <span className={o.license}>Apache-2.0</span>
+      <span className={o.license}>MIT</span>
     </section>
   );
 }

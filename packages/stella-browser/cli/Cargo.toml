@@ -3,7 +3,7 @@ name = "stella-browser"
 version = "0.9.1"
 edition = "2021"
 description = "Native browser service for Stella"
-license = "Apache-2.0"
+license = "MIT"
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }

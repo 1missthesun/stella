@@ -13,7 +13,7 @@ These Terms of Service ("Terms") govern the Stella service operated by FROMYOU, 
 
 By using the Service, you agree to these Terms. If you use it for an organization, you represent that you have authority to bind that organization; "you" then includes that organization. If you do not agree, do not use the Service.
 
-Open source and self-hosting are different. Stella's code is provided under the MIT License, except components identified as having other licenses. Your rights to use, copy, modify, distribute, and self-host that code come from those licenses, not these Terms. These Terms do not restrict those rights or govern a server that you or another independent operator runs. They do govern your use of our hosted Service and official applications, including an official application's connection to an independently operated server. Connecting an official app does not make FROMYOU the operator of that server. Section 12 explains this distinction further.
+Stella's code is provided under the MIT License, except components identified as having other licenses. These Terms do not restrict rights granted by those licenses. Section 12 addresses self-hosting.
 
 Our Privacy Policy explains our handling of personal information. It is not permission to use your data for purposes beyond those described there.
 
@@ -111,11 +111,7 @@ Modifying an app or installing a third-party skill, extension, or MCP server can
 
 12. Independently operated and self-hosted servers
 
-If you deploy Stella on your own Cloudflare account or use another independently operated server, that server is operated by its owner, not FROMYOU. The operator is responsible for hosting costs, security, updates, backups, credentials, configured AI providers, deletion, and applicable data-protection duties. Self-hosting does not include our hosted plans, credits, support commitments, or uptime guarantees unless separately agreed.
-
-For personal information processed in the self-hosted service, its operator determines purposes and means and is the controller or other responsible operator to the extent applicable data-protection law applies. FROMYOU does not become the controller of that server's data merely because it wrote the software or supplies an official client. Operator responsibilities depend on the use and jurisdiction, including any personal or household exemptions.
-
-Data you independently send to FROMYOU's hosted features, or to an external model provider or connected service, is subject to that recipient's terms and privacy practices. Connecting to your own server is not a guarantee that every configured feature operates offline or without third parties. Our Privacy Policy applies to personal information we actually receive, not to data held solely by an independent server.
+When you run Stella on your own server, you operate it and control its data; FROMYOU does not receive or process that server's data. These Terms and our Privacy Policy cover only our hosted Service and official apps, not your server. Official apps may still contact app stores or Expo for downloads and OTA updates, and, if you enable it, our push relay for notification delivery. Those limited official-app services remain subject to these Terms and our Privacy Policy.
 
 13. Account deletion and ending use
 
@@ -173,7 +169,9 @@ FROMYOU, LLC, a Delaware limited liability company ("FROMYOU," "we," "us," or "o
 
 Stella is privacy-first, but it is not a local-only or entirely offline assistant. Our hosted service requires an account. It stores authoritative conversation and task records, including when work runs on your computer or uses your own model account or API key. Content relevant to a task can be sent to AI providers, connected services, or recipients you choose. We do not sell your personal information, use your conversations to serve advertising, or use your conversation content to train AI models. Our Google API commitments are stated in section 6.
 
-This policy applies to personal information FROMYOU actually receives. If you connect an official app to a self-hosted or independently operated Stella server, that server's operator is responsible for its own data processing. Its policies, configured providers, and deletion controls apply. FROMYOU is not the operator or controller of data held solely by that server merely because it provides the code or official client. A self-hosted operator determines the purposes and means of its processing and is the controller or other responsible operator to the extent applicable law applies, including any personal or household exemptions. External providers still receive data when configured features use them.
+Self-hosting
+
+When you run Stella on your own server, you operate it and control its data; FROMYOU does not receive or process that server's data. These Terms and this policy cover only our hosted service and official apps, not your server. Official apps may still contact app stores or Expo for downloads and OTA updates, and, if you enable it, our push relay for notification delivery. Those services process the update or notification information needed to deliver them.
 
 2. Information we collect and where it is stored
 
@@ -291,7 +289,7 @@ No Sale, Advertising, or Credit Use — We do not sell or rent data received fro
 
 Restricted Human Access — FROMYOU personnel do not read data obtained through the Google connector, except where you give explicit consent to view specific data (for example, for support you request), where necessary for security purposes such as investigating abuse, where required to comply with applicable law, or where the data has been aggregated and anonymized for internal operations.
 
-Retention, Deletion, and Revocation — Google tokens are retained while the connection remains active. Disconnecting the service removes the associated credentials. Google content included in conversation history or task records follows the retention and deletion practices described below; disconnecting a service does not delete that history. You can revoke Stella's access at any time from your Google Account under Security → Third-party access (https://myaccount.google.com/permissions), which invalidates the tokens held both on your device and in the vault; you can also disconnect individual services within Stella to remove just those services' access.
+Retention, Deletion, and Revocation — Google tokens are retained while the connection remains active. Disconnecting the service removes the associated credentials. Google content included in conversation history or task records follows the retention and deletion practices described below; disconnecting a service does not delete that history. You can revoke Stella's access at any time from your Google Account under Security → Third-party access (https://myaccount.google.com/permissions), which invalidates the tokens held both on your device and in the vault; you can also disconnect individual services within Stella so Stella stops using those services. Disabling an individual service is not necessarily revocation of its OAuth scopes in a shared Google grant; use your Google Account controls to revoke the grant itself.
 
 Limited Use — Stella's use and transfer to any other app of information received from Google APIs will adhere to the Google API Services User Data Policy (https://developers.google.com/terms/api-services-user-data-policy), including the Limited Use requirements.
 
@@ -332,7 +330,7 @@ We use this measurement for advertising measurement and campaign optimization, n
 
 We use reasonable technical and organizational measures appropriate to the data and feature. These include TLS for hosted communications, encryption in server-side credential vaults, access controls tied to accounts and devices, device identity signatures, rate limiting, and application-level encryption of conversation records. Conversation encryption uses conversation-specific keys protected by our key system; deletion of a conversation removes its active key material. This does not mean every stored metadata record, media job, file, or public share has the same encryption scheme, or that the Service is end-to-end encrypted against FROMYOU.
 
-Stella attempts to redact known secrets from model-visible or stored outputs, but redaction cannot guarantee recognition of every secret. Protect credentials and do not put them in ordinary chat or public files. Independent servers can have different security configurations.
+Stella attempts to redact known secrets from model-visible or stored outputs, but redaction cannot guarantee recognition of every secret. Protect credentials and do not put them in ordinary chat or public files.
 
 Current admin and support interfaces expose account, billing, and enforcement metadata rather than general conversation, memory, or file-content browsing. The privacy settings include time-limited support grants, with a 24-hour expiry, and a visible recent support-access audit log. A grant is not routine staff access to your content. Google-data human access remains limited to the exceptions in section 6.
 
@@ -364,7 +362,6 @@ Account deletion initiates removal of eligible hosted account content and creden
 • Manage sessions: account settings let you review active sessions and sign devices out. Security emails may notify you of new sign-ins.
 • Control connected accounts and engines: disconnect services in Stella and revoke their authorization at the provider; change engines or remove your keys where supported. Google-specific controls are in section 6.
 • Control telemetry, discovery, and notifications: use privacy and onboarding choices and your device's notification settings. Notifications can expose information on a lock screen; choose settings appropriate to your use.
-• Self-hosted servers: contact the server operator for access, export, deletion, and retention. Decommissioning an owner-mode server is different from deleting a hosted Stella account.
 
 Depending on where you live and which laws apply, you may have rights to access or know the personal information we hold, obtain a copy or portability, correct it, delete it, restrict processing, object to processing, withdraw consent, or appeal a decision about your request. We will handle eligible requests as required by law, verify identity as appropriate, and explain any lawful exception. An authorized agent may make a request where permitted. We will not discriminate against you for exercising applicable privacy rights.
 
@@ -414,11 +411,10 @@ Account deletion initiates removal of eligible Stella account information, conve
 
 Local files and credentials on your computers, data held by connected AI or integration providers, messages and repository history in Slack or GitHub, organizational records, and copies others downloaded are separate. Deleting your account cannot recall those copies. Contact the relevant provider or organization about its records, and remove remaining local data separately. Contact us if a public publication still hosted by FROMYOU needs removal.
 
-4. Subscriptions and independently operated servers
+4. Subscriptions
 
 Hosted account deletion closes the account's Stripe customer record as part of the backend process; this is different from ordinary end-of-period subscription cancellation. To cancel renewal without deleting your account, use the available billing-management controls first. Uninstalling Stella does not cancel a subscription. If store billing is offered, manage that subscription with Apple or Google as well. Mandatory refund and consumer rights still apply; contact us about billing questions.
 
-For a self-hosted or independently operated server, contact its operator. Owner-mode accounts do not use the hosted account-deletion flow; the operator manages data removal and server decommissioning on its own Cloudflare account. FROMYOU cannot delete data held solely by an independent operator.
 
 5. Contact
 
@@ -431,6 +427,6 @@ export const AI_DATA_SHARING = {
   "intro": "Stella uses third-party AI services to respond and carry out tasks. By choosing \"I Understand & Agree,\" you allow the AI data sharing described below for the features you use. You can choose \"Don't Agree\" and avoid AI use. This is not consent to advertising or model training on your conversation content.",
   "data": "Stella sends the content needed for your request: your message, relevant conversation and memory, instructions, attached images and files, and task context such as file excerpts, screenshots, and tool results. If you use voice, recorded audio may be sent for transcription or live microphone audio for realtime voice. Media features can send prompts and source files for generation.",
   "hostedRecipients": "FROMYOU's Stella infrastructure on Cloudflare processes and stores conversation and task data. Depending on the selected route, AI content is sent to Anthropic, OpenAI, Google, xAI, DeepSeek, or Meta, directly or through OpenRouter or Fireworks. Meta's transcription service can receive recorded audio, and OpenAI can receive realtime voice audio. Media features can send prompts and files to fal.ai and the selected media provider. Only providers used for the chosen feature receive that feature's request. User-configured routes can also send data to GitHub Copilot, Moonshot AI/Kimi, or Z.AI when selected. If you configure another supported provider or connect an external service, that recipient also receives the data needed for the action you choose.",
-  "selfHostedRecipients": "Your selected Stella server runs on its operator's Cloudflare account. The operator and its configured AI providers process the data needed for your request. Connected Claude and ChatGPT accounts use Anthropic and OpenAI; an OpenRouter key routes to OpenRouter and its selected model provider. Supported configured routes can also use Google, xAI, DeepSeek, Meta, Fireworks, GitHub Copilot, Moonshot AI/Kimi, or Z.AI. Voice and media use the providers configured by that operator, including Meta, OpenAI, OpenRouter, or fal.ai when enabled. Review the operator's settings and policy. Data held solely on that server is not sent to FROMYOU merely because you use an official app; a feature deliberately using a FROMYOU-hosted endpoint or another external service has a separate data flow.",
+  "selfHostedRecipients": "Your server's operator receives task data on its own Cloudflare account, not FROMYOU. Its configured AI recipients can include Anthropic, OpenAI, Google, xAI, DeepSeek, Meta, OpenRouter, Fireworks, GitHub Copilot, Moonshot AI/Kimi, Z.AI, or fal.ai, depending on the feature selected. The operator controls its server and data. Official apps may still contact app stores or Expo for updates and, if you enable it where available, FROMYOU's push relay for notification delivery.",
   "handling": "Hosted conversation and task records sync across your devices, even if your own model login or key is used. On an independent server, its operator stores those records. AI services separately process and may retain inputs and outputs under their own policies and account settings. Stella does not promise zero retention by every recipient. Stop using or disconnect a route to stop future requests; this does not recall data already sent. Read the full Privacy Policy at https://stella.sh/privacy."
 } as const;

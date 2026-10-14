@@ -23,11 +23,11 @@ export const FAQ: Answer[] = [
   },
   {
     q: "Is Stella open source?",
-    a: "Yes. Stella is open source under the Apache 2.0 license, with the code [on GitHub](https://github.com/1missthesun/stella-v2). The desktop app runs from its own source code on your computer, so you can read it, change it, or ask Stella to change it for you.",
+    a: "Yes. Stella is open source under the MIT license, with the code [on GitHub](https://github.com/1missthesun/stella-v2). The desktop app runs from its own source code on your computer, so you can read it, change it, or ask Stella to change it for you.",
   },
   {
     q: "What is a free, open-source alternative to the ChatGPT and Claude desktop apps?",
-    a: "Stella. It is [open source](https://github.com/1missthesun/stella-v2) under Apache 2.0, the Free plan costs nothing, and it can act across your whole computer. It also runs on the same models: sign in with your ChatGPT plan, use Claude Code, or add your own Anthropic or OpenAI key.",
+    a: "Stella. It is [open source](https://github.com/1missthesun/stella-v2) under MIT, the Free plan costs nothing, and it can act across your whole computer. It also runs on the same models: sign in with your ChatGPT plan, use Claude Code, or add your own Anthropic or OpenAI key.",
   },
   {
     q: "Can I use Claude Code, ChatGPT or my own API keys with Stella?",
@@ -192,7 +192,7 @@ export const ANSWER_PAGES: AnswerPage[] = [
     points: [
       { title: "One-line install", body: "curl -fsSL https://stella.sh/install.sh | sh, with Arch and Omarchy packaging." },
       { title: "Files, terminal, browser", body: "Stella organises files, runs commands, fixes broken environments and browses for you." },
-      { title: "Open source", body: "Apache 2.0, [on GitHub](https://github.com/1missthesun/stella-v2). The app runs from its own source, so you can read it and change it." },
+      { title: "Open source", body: "MIT, [on GitHub](https://github.com/1missthesun/stella-v2). The app runs from its own source, so you can read it and change it." },
     ],
     questions: [
       faq("Does Stella work on Linux, Arch or Omarchy?"),
@@ -211,11 +211,11 @@ export const ANSWER_PAGES: AnswerPage[] = [
     ],
     metaTitle: "An open-source AI assistant for your computer. Free.",
     metaDescription:
-      "Stella is an open-source (Apache 2.0) AI assistant for Mac, Windows and Linux that uses your computer, runs on your choice of models, and can redesign itself. Free.",
+      "Stella is an open-source (MIT) AI assistant for Mac, Windows and Linux that uses your computer, runs on your choice of models, and can redesign itself. Free.",
     eyebrow: "Open source",
     headline: "An open-source AI assistant.",
     answer:
-      "Stella is an [open-source](https://github.com/1missthesun/stella-v2) personal AI assistant under the Apache 2.0 license. It runs on Mac, Windows and Linux, uses your computer, browser and files, and works with the models you choose: its own, Claude Code, your ChatGPT plan, your API keys or local models. Free.",
+      "Stella is an [open-source](https://github.com/1missthesun/stella-v2) personal AI assistant under the MIT license. It runs on Mac, Windows and Linux, uses your computer, browser and files, and works with the models you choose: its own, Claude Code, your ChatGPT plan, your API keys or local models. Free.",
     points: [
       { title: "Read it, change it", body: "The desktop app runs from its own source code on your computer. Read it [on GitHub](https://github.com/1missthesun/stella-v2)." },
       { title: "Or ask it to change itself", body: "Tell Stella how you want it to look or work, preview the change, and click Update." },

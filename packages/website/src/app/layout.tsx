@@ -145,7 +145,7 @@ const jsonLd = {
         "Dictation and “Hey Stella” wake word",
         "Runs on Stella's models, Claude Code, a ChatGPT plan, your own API keys or local models",
         "Redesigns its own interface on request",
-        "Open source under Apache 2.0",
+        "Open source under MIT",
       ],
       offers: [
         { "@type": "Offer", name: "Free", price: "0", priceCurrency: "USD" },

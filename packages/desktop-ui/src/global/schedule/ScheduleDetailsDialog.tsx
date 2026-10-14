@@ -194,21 +194,8 @@ function ScheduleDialogRow({
   };
 
   const onDelete = () => {
-    if (!api) return;
-    if (row.kind === "cron") {
-      void callMutation("delete", () => api.removeCronJob({ jobId: row.id }));
-    } else if (row.conversationId) {
-      // Heartbeats can't be deleted outright — disabling is the closest
-      // affordance (`upsertHeartbeat({ enabled: false })`). We frame the
-      // action as Delete in the UI for parity with crons; the user can
-      // re-enable from the same dialog later.
-      void callMutation("delete", () =>
-        api.upsertHeartbeat({
-          conversationId: row.conversationId!,
-          enabled: false,
-        }),
-      );
-    }
+    if (!api || row.kind !== "cron") return;
+    void callMutation("delete", () => api.removeCronJob({ jobId: row.id }));
   };
 
   const badge = row.enabled
@@ -254,16 +241,18 @@ function ScheduleDialogRow({
                 ? t("global.schedule.pause")
                 : t("global.schedule.resume")}
         </Button>
-        <Button
-          type="button"
-          className="pill-btn pill-btn--danger"
-          disabled={state.busy !== "none"}
-          onClick={onDelete}
-        >
-          {state.busy === "delete"
-            ? t("global.schedule.removing")
-            : t("global.schedule.delete")}
-        </Button>
+        {row.kind === "cron" ? (
+          <Button
+            type="button"
+            className="pill-btn pill-btn--danger"
+            disabled={state.busy !== "none"}
+            onClick={onDelete}
+          >
+            {state.busy === "delete"
+              ? t("global.schedule.removing")
+              : t("global.schedule.delete")}
+          </Button>
+        ) : null}
       </div>
       {state.error && (
         <p className="schedule-details-dialog__row-error" role="alert">

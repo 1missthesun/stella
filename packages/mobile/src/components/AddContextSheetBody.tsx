@@ -70,6 +70,7 @@ export function AddContextSheetBody({
         </View>
       ) : null}
 
+      {onReadAloudChange ? (
       <View style={styles.row}>
         <Icon
           name={readAloud ? "volume-2" : "volume-x"}
@@ -83,6 +84,7 @@ export function AddContextSheetBody({
           accessibilityLabel={t("chat.attachments.readAloud")}
         />
       </View>
+      ) : null}
     </View>
   );
 }

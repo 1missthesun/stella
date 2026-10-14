@@ -1,16 +1,32 @@
+import { launchServer } from "../lib/server-registry";
+
 const cleanUrl = (value: string | undefined): string =>
   (value ?? "").trim().replace(/\/+$/, "");
 
+/** The build's own backend: Stella's hosted service. */
+const hostedBackendUrl = cleanUrl(process.env.EXPO_PUBLIC_STELLA_BACKEND_URL);
+
+/**
+ * A self-hosted server, when this launch talks to one (Settings → Server).
+ * Its discovery document names its own auth and share hosts.
+ */
+const selfHosted = launchServer.kind === "self-hosted" ? launchServer : null;
+
 export const env = {
   /** The Stella backend worker: auth, backend calls, live views, sockets. */
-  backendUrl: cleanUrl(process.env.EXPO_PUBLIC_STELLA_BACKEND_URL),
-  /** The website: map embeds and the billing return page. */
+  backendUrl: selfHosted ? selfHosted.origin : hostedBackendUrl,
+  /** Stella's hosted backend, whatever server is active. */
+  hostedBackendUrl,
+  /** The website: map embeds, legal pages and the billing return page. */
   siteUrl: cleanUrl(process.env.EXPO_PUBLIC_STELLA_SITE_URL) || "https://stella.sh",
-  authUrl: cleanUrl(process.env.EXPO_PUBLIC_STELLA_AUTH_URL),
+  authUrl: selfHosted
+    ? cleanUrl(selfHosted.discovery?.urls.auth ?? selfHosted.origin)
+    : cleanUrl(process.env.EXPO_PUBLIC_STELLA_AUTH_URL),
   /** Where canvas links live: `<this>/c/<slug>`. */
-  canvasShareBaseUrl:
-    cleanUrl(process.env.EXPO_PUBLIC_CANVAS_SHARE_BASE_URL) ||
-    "https://stellashare.app",
+  canvasShareBaseUrl: selfHosted
+    ? cleanUrl(selfHosted.discovery?.urls.canvasShare ?? selfHosted.origin)
+    : cleanUrl(process.env.EXPO_PUBLIC_CANVAS_SHARE_BASE_URL) ||
+      "https://stellashare.app",
   playIntegrityProjectNumber:
     process.env.EXPO_PUBLIC_PLAY_INTEGRITY_PROJECT_NUMBER?.trim() ?? "",
   mobileScheme:

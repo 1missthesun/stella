@@ -14,6 +14,9 @@ import { Icon, type IconName } from "./Icon";
 import { SubscriptionSection } from "./SubscriptionSection";
 import { FeedbackSheet } from "./FeedbackSheet";
 import { UserAskEscalationSection } from "./settings/UserAskEscalationSection";
+import { ServerSection } from "./settings/ServerSection";
+import { useServerFeatures } from "../lib/server-features";
+import { isSelfHostedLaunch } from "../lib/server-registry";
 import {
   makeSettingsStyles,
   type SettingsStyles,
@@ -105,6 +108,7 @@ export function SettingsContent() {
   const router = useRouter();
   const bottomInset = useSafeAreaInsets().bottom;
   const session = authClient.useSession();
+  const features = useServerFeatures();
   const guest = isGuest();
   const [isResettingCloudBrowser, setIsResettingCloudBrowser] = useState(false);
   const { resetProfile: resetCloudBrowserProfile } = useCloudBrowserActions();
@@ -322,11 +326,13 @@ export function SettingsContent() {
         </View>
       </View>
 
-      {isSignedIn ? (
+      {isSignedIn && features.billing ? (
         <View style={settingsStyles.section}>
           <SubscriptionSection />
         </View>
       ) : null}
+
+      <ServerSection styles={settingsStyles} colors={colors} />
 
       {isSignedIn ? (
         <View style={settingsStyles.section}>
@@ -480,6 +486,7 @@ export function SettingsContent() {
         </View>
       </View>
 
+      {features.push ? (
       <View style={settingsStyles.section}>
         <Text style={settingsStyles.sectionLabel}>
           {t("mobile.settings.notificationsSection")}
@@ -502,12 +509,14 @@ export function SettingsContent() {
           </View>
         </View>
       </View>
+      ) : null}
 
       <UserAskEscalationSection
         enabled={isSignedIn}
         styles={settingsStyles}
       />
 
+      {features.realtimeVoice ? (
       <View style={settingsStyles.section}>
         <Text style={settingsStyles.sectionLabel}>
           {t("mobile.settings.voiceSection")}
@@ -530,6 +539,7 @@ export function SettingsContent() {
           </View>
         </View>
       </View>
+      ) : null}
 
       <View style={settingsStyles.section}>
         <Text style={settingsStyles.sectionLabel}>
@@ -587,6 +597,9 @@ export function SettingsContent() {
             </Pressable>
           </View>
 
+          {/* A self-hosted account belongs to the server's owner; it is
+              removed on the server, not from a paired phone. */}
+          {isSelfHostedLaunch ? null : (
           <Pressable
             onPress={confirmDeleteAccount}
             disabled={isDeletingAccount || isSigningOut}
@@ -603,6 +616,7 @@ export function SettingsContent() {
                 : t("mobile.settings.deleteAccount")}
             </Text>
           </Pressable>
+          )}
         </View>
       ) : null}
       <FeedbackSheet

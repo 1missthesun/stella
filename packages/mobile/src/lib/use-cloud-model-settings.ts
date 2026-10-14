@@ -27,6 +27,7 @@ import {
 } from "./stella-model-catalog";
 import { notifyError } from "./haptics";
 import { userFacingError } from "./user-facing-error";
+import { currentServerFeatures } from "./server-features";
 
 export type ModelEngine = Exclude<CloudExecutionSelection["engine"], "provider">;
 
@@ -335,7 +336,11 @@ export function useCloudModelSettings(active: boolean) {
   );
 
   const brains = useMemo((): Brain[] => {
-    const builtIn: Brain[] = MODEL_ENGINE_OPTIONS.map((option) => ({
+    // A self-hosted server without managed models has no "Stella" engine.
+    const managed = currentServerFeatures().managedModels;
+    const builtIn: Brain[] = MODEL_ENGINE_OPTIONS.filter(
+      (option) => managed || option.id !== "stella",
+    ).map((option) => ({
       id: option.id,
       kind: "engine",
       engine: option.id,

@@ -4,6 +4,7 @@ import { WebView } from "react-native-webview";
 import { utf8ToBytes } from "@noble/hashes/utils.js";
 import { Icon } from "./Icon";
 import { env } from "../config/env";
+import { useServerFeatures } from "../lib/server-features";
 import type { MobileDisplayPayload } from "../types";
 import { bytesToBase64Url } from "../lib/base64url";
 import { artifactSubtitle, artifactTitle } from "../lib/mobile-artifacts";
@@ -76,8 +77,13 @@ export function MapRouteCard({ payload, colors }: MapRouteCardProps) {
   const title = artifactTitle(payload);
   const subtitle = artifactSubtitle(payload);
 
+  // Self-hosted servers send no place data to stella.sh: no embed there,
+  // just the card with the Apple Maps handoff.
+  const embedAllowed = useServerFeatures().maps;
+
   return (
     <View style={styles.card}>
+      {embedAllowed ? (
       <View style={styles.mapWrap}>
         <WebView
           source={{ uri }}
@@ -95,6 +101,7 @@ export function MapRouteCard({ payload, colors }: MapRouteCardProps) {
           androidLayerType="hardware"
         />
       </View>
+      ) : null}
       <View style={styles.footer}>
         <View style={styles.meta}>
           <Text

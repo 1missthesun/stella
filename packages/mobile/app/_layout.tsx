@@ -25,6 +25,10 @@ import {
   setPushDeliveryOwner,
 } from "../src/lib/notifications";
 import { installTextDefaults } from "../src/lib/setup-text-defaults";
+import { selfHostServersAvailable } from "../src/lib/native-capabilities";
+import { isSelfHostedLaunch } from "../src/lib/server-registry";
+import { currentServerFeatures } from "../src/lib/server-features";
+import { ServerStatusGate } from "../src/components/self-host/ServerStatusGate";
 import { markSplashHidden } from "../src/lib/splash-state";
 import {
   takeMainChatRequest,
@@ -170,6 +174,8 @@ function RootStack() {
       <Stack.Screen name="index" />
       <Stack.Screen name="(auth)" />
       <Stack.Screen name="onboarding" />
+      <Stack.Screen name="connect-server" />
+      <Stack.Screen name="pair" />
       <Stack.Screen name="(main)" />
       <Stack.Screen name="dev-test-session" />
     </Stack>
@@ -304,8 +310,12 @@ function AuthenticatedLayout() {
     }
 
     const onLogin = pathname === "/login";
+    const onWelcome = pathname === "/welcome";
     const onIndex = pathname === "/" || pathname === "";
     const onOnboarding = pathname === "/onboarding";
+    // Pairing a server works signed in or out; the screen owns its exits.
+    const onServerConnect =
+      pathname === "/connect-server" || pathname === "/pair";
     const onMain = [
       "/chat",
       "/schedule",
@@ -316,7 +326,7 @@ function AuthenticatedLayout() {
       "/engine-accounts",
     ].some((route) => pathname.startsWith(route));
 
-    if (onOnboarding) {
+    if (onOnboarding || onServerConnect) {
       return;
     }
 
@@ -331,8 +341,10 @@ function AuthenticatedLayout() {
       const anonymous = session.data.user?.isAnonymous === true;
       if (isGuest() !== anonymous) void setGuestMode(anonymous);
       const subject = anonymous ? "" : (session.data.user?.id ?? "");
-      setPushDeliveryOwner(subject || null);
-      if (subject) void registerForPushNotifications(subject);
+      // No push from self-hosted servers yet (they can't send through ours).
+      const pushOwner = currentServerFeatures().push ? subject : "";
+      setPushDeliveryOwner(pushOwner || null);
+      if (pushOwner) void registerForPushNotifications(pushOwner);
       // Anonymous users still need to reach Login when they choose "Sign in"
       // from Settings. Their anonymous Better Auth session must not bounce
       // them straight back to Chat before they can upgrade the account.
@@ -346,13 +358,23 @@ function AuthenticatedLayout() {
       if (mainChatRequested && openMainChat()) {
         return;
       }
-      if (onLogin || onIndex) {
+      if (onLogin || onWelcome || onIndex) {
         enterMainShell(router, initialMainHref);
       }
       return;
     }
 
     setPushDeliveryOwner(null);
+
+    // Signed out of a self-hosted server: there is no sign-in page there,
+    // only a new pairing (or going back to Stella's service).
+    if (isSelfHostedLaunch) {
+      router.replace({
+        pathname: "/connect-server",
+        params: { reason: "signed-out" },
+      });
+      return;
+    }
 
     if (isGuest()) {
       // Guests may open /login from Sign in buttons — don't bounce them back to chat.
@@ -372,8 +394,9 @@ function AuthenticatedLayout() {
       return;
     }
 
-    if (onMain || onIndex || (mainChatRequested && !onLogin)) {
-      router.replace("/login");
+    if (onMain || onIndex || (mainChatRequested && !onLogin && !onWelcome)) {
+      // Builds that can pair a server ask "Stella or your own server?" first.
+      router.replace(selfHostServersAvailable ? "/welcome" : "/login");
     }
   }, [
     mainChatRequested,
@@ -438,10 +461,10 @@ function AuthenticatedLayout() {
   ]);
 
   return (
-    <>
+    <ServerStatusGate>
       <ShareIntentHandler />
       <RootStack />
-    </>
+    </ServerStatusGate>
   );
 }
 

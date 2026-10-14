@@ -36,6 +36,7 @@ import type { ComposerQuote } from "../../types";
 import { DictationRecordingBar } from "../DictationRecordingBar";
 import { GlassSurface } from "../glass";
 import { Icon } from "../Icon";
+import { useServerFeatures } from "../../lib/server-features";
 import { AskSlotContext, type AskSlot } from "./ask-slot";
 import { AttachmentTileRow, FileTile, ImageTile } from "./AttachmentTiles";
 import { fileDisplayName } from "@stella/contracts/file-display-name";
@@ -323,6 +324,7 @@ export const Composer = memo(function Composer({
   onRemoveAttachment?: (id: string) => void;
   onRetryAttachment?: (id: string) => void;
 }) {
+  const serverFeatures = useServerFeatures();
   const styles = useMemo(() => makeComposerStyles(colors), [colors]);
   const t = useT();
   const [expanded, setExpanded] = useState(false);
@@ -412,7 +414,7 @@ export const Composer = memo(function Composer({
   // stays available mid-run so a voice message can steer the active turn,
   // exactly like typing + sending while busy. The branches that render it are
   // mutually exclusive per render, so reusing the same element is safe.
-  const micButton = (
+  const micButton = serverFeatures.dictation ? (
     <Pressable
       onPress={() => void onToggleVoice()}
       accessibilityRole="button"
@@ -431,7 +433,7 @@ export const Composer = memo(function Composer({
         filled={isListening}
       />
     </Pressable>
-  );
+  ) : null;
 
   // Realtime voice is a distinct live-conversation mode, not dictation. Keep
   // it immediately to the right of the mic only while the composer is empty;

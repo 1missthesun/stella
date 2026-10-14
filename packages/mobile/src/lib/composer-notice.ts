@@ -20,7 +20,13 @@ import {
   stellaUsageLimitOf,
 } from "@stella/contracts/stella-usage-limit";
 
-export type ComposerNoticeKind = "sign-in" | "upgrade" | "limit" | "provider";
+export type ComposerNoticeKind =
+  | "sign-in"
+  | "upgrade"
+  | "limit"
+  | "provider"
+  /** A self-hosted server older than this app ("unknown function"). */
+  | "server";
 
 export type ComposerNotice = {
   id: string;

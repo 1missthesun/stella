@@ -11,6 +11,8 @@ import {
 } from "@stella/contracts/backend/client";
 import { env } from "../config/env";
 import { getAuthToken } from "./auth-token";
+import { isSelfHostedLaunch } from "./server-registry";
+import { noteBackendError } from "./server-features";
 
 /**
  * The app's one connection to the Stella backend worker: calls over HTTP and
@@ -24,11 +26,31 @@ export function getBackendClient(): BackendClient {
   if (!env.backendUrl) {
     throw new Error("EXPO_PUBLIC_STELLA_BACKEND_URL is not configured.");
   }
-  cachedClient = new BackendClient({
+  const client = new BackendClient({
     baseUrl: env.backendUrl,
     getToken: (options) =>
       getAuthToken(options?.force ? { forceRefresh: true } : undefined),
   });
+  if (isSelfHostedLaunch) {
+    // A self-hosted server can be older than this app: note "unknown
+    // function/view" answers so the shell can say the server needs an update.
+    const call = client.call.bind(client);
+    client.call = (async (name, args) => {
+      try {
+        return await call(name, args);
+      } catch (error) {
+        noteBackendError(error);
+        throw error;
+      }
+    }) as typeof client.call;
+    const watch = client.watch.bind(client);
+    client.watch = ((view, args, onValue, onError) =>
+      watch(view, args, onValue, (error) => {
+        noteBackendError(error);
+        onError?.(error);
+      })) as typeof client.watch;
+  }
+  cachedClient = client;
   return cachedClient;
 }
 

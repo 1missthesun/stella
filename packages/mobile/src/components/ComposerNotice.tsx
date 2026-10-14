@@ -14,6 +14,8 @@ import {
   type ComposerNoticeKind,
 } from "../lib/composer-notice";
 import { useT } from "../i18n";
+import { useServerFeatures } from "../lib/server-features";
+import { isSelfHostedLaunch } from "../lib/server-registry";
 import { useColors } from "../theme/theme-context";
 import type { Colors } from "../theme/colors";
 import { fonts } from "../theme/fonts";
@@ -24,6 +26,7 @@ const KIND_ICON: Record<ComposerNoticeKind, IconName> = {
   upgrade: "arrow-up-circle",
   limit: "alert-circle",
   provider: "alert-circle",
+  server: "refresh-cw",
 };
 
 export function ComposerNotice({
@@ -36,20 +39,30 @@ export function ComposerNotice({
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const router = useRouter();
   const notice = useComposerNotice(conversationId);
+  const features = useServerFeatures();
 
   if (!notice) return null;
 
   const dismiss = () => dismissComposerNotice(notice.id);
+  const title =
+    notice.kind === "server" ? t("mobile.selfHost.behindTitle") : notice.title;
+  const description =
+    notice.kind === "server" ? t("mobile.selfHost.behindBody") : notice.description;
   const primary =
     notice.kind === "sign-in"
       ? {
           label: "Sign in",
           onPress: () => {
             dismiss();
-            router.replace("/login");
+            // A self-hosted server has no sign-in page: pair again.
+            router.replace(
+              isSelfHostedLaunch
+                ? { pathname: "/connect-server", params: { reason: "signed-out" } }
+                : "/login",
+            );
           },
         }
-      : notice.kind === "upgrade"
+      : notice.kind === "upgrade" && features.billing
         ? {
             label: "Upgrade",
             onPress: () => {
@@ -69,9 +82,9 @@ export function ComposerNotice({
         <Icon name={KIND_ICON[notice.kind]} size={17} color={colors.text} />
       </View>
       <View style={styles.body}>
-        <Text style={styles.title}>{notice.title}</Text>
-        {notice.description ? (
-          <Text style={styles.description}>{notice.description}</Text>
+        <Text style={styles.title}>{title}</Text>
+        {description ? (
+          <Text style={styles.description}>{description}</Text>
         ) : null}
       </View>
       <Pressable

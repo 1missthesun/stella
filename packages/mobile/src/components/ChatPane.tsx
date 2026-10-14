@@ -149,6 +149,7 @@ import {
   ReplyHandoffContext,
 } from "./reply-handoff";
 import { useDictation } from "../lib/dictation";
+import { useServerFeatures } from "../lib/server-features";
 import { canSubmitFinalizedDictation } from "../lib/dictation-send";
 import { hasAiConsent, requestAiConsent } from "../lib/ai-consent";
 import type { RealtimeVoiceActionDispatch } from "../lib/realtime-voice-protocol";
@@ -609,7 +610,12 @@ export function ChatPane({
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const t = useT();
-  const readAloud = useReadAloudPreference();
+  const serverFeatures = useServerFeatures();
+  const readAloudPreference = useReadAloudPreference();
+  // A server without read-aloud never speaks, whatever the saved toggle says.
+  const readAloud = serverFeatures.readAloud
+    ? readAloudPreference
+    : { ...readAloudPreference, enabled: false };
   const insets = useSafeAreaInsets();
   const bottomInset = insets.bottom;
   const safeAreaTop = insets.top;
@@ -2019,6 +2025,7 @@ export function ChatPane({
   // Realtime voice sits beside the mic only while the composer is empty.
   const showRealtimeVoice = Boolean(
     voiceEnabled &&
+      serverFeatures.realtimeVoice &&
       realtimeVoiceConversationId &&
       (onRealtimeVoiceAction || realtimeVoiceDesktopAccess) &&
       composerEnabled &&
@@ -2376,7 +2383,11 @@ export function ChatPane({
               : undefined
           }
           readAloud={readAloud.enabled}
-          onReadAloudChange={(next) => void readAloud.setEnabled(next)}
+          onReadAloudChange={
+            serverFeatures.readAloud
+              ? (next) => void readAloud.setEnabled(next)
+              : undefined
+          }
         />
         {summaryOpen && conversationId ? (
           <SummaryPopover

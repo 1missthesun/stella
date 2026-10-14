@@ -9,5 +9,6 @@ export type AddContextSheetProps = {
   onPhotos?: () => void;
   onFiles?: () => void;
   readAloud: boolean;
-  onReadAloudChange: (next: boolean) => void;
+  /** Omitted when the server can't read replies aloud. */
+  onReadAloudChange?: (next: boolean) => void;
 };

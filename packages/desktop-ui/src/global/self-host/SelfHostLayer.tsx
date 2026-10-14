@@ -2,7 +2,13 @@ import { useEffect } from "react";
 import { ConnectDeviceDialog } from "./ConnectDeviceDialog";
 import { ConnectServerDialog } from "./ConnectServerDialog";
 import { selfHostDialogs, useSelfHostDialog } from "./self-host-store";
-import { loadServerDiscovery } from "@/platform/backend/server-discovery";
+import { ManagedModelsFallback } from "./ManagedModelsFallback";
+import {
+  loadServerDiscovery,
+  useSelfHostedServer,
+  useServerDiscovery,
+  useServerFeature,
+} from "@/platform/backend/server-discovery";
 
 /**
  * Mounted eagerly: a `stella://pair?…` link the OS hands to Stella opens the
@@ -11,6 +17,10 @@ import { loadServerDiscovery } from "@/platform/backend/server-discovery";
  */
 export function SelfHostLayer() {
   const dialog = useSelfHostDialog();
+  const selfHosted = useSelfHostedServer();
+  const discovered = useServerDiscovery() !== null;
+  const managedModels = useServerFeature("managedModels");
+  const fallback = selfHosted && discovered && !managedModels ? <ManagedModelsFallback /> : null;
 
   useEffect(() => {
     void loadServerDiscovery();
@@ -30,15 +40,23 @@ export function SelfHostLayer() {
 
   if (dialog?.kind === "connect") {
     return (
-      <ConnectServerDialog
-        key={dialog.link ?? "manual"}
-        initialLink={dialog.link}
-        onClose={() => selfHostDialogs.close()}
-      />
+      <>
+        {fallback}
+        <ConnectServerDialog
+          key={dialog.link ?? "manual"}
+          initialLink={dialog.link}
+          onClose={() => selfHostDialogs.close()}
+        />
+      </>
     );
   }
   if (dialog?.kind === "device") {
-    return <ConnectDeviceDialog onClose={() => selfHostDialogs.close()} />;
+    return (
+      <>
+        {fallback}
+        <ConnectDeviceDialog onClose={() => selfHostDialogs.close()} />
+      </>
+    );
   }
-  return null;
+  return fallback;
 }

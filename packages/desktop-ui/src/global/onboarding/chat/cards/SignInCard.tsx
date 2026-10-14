@@ -50,6 +50,8 @@ import {
 } from "@/global/settings/lib/engine-model-routing";
 import type { OnboardingChatAnswer } from "../onboarding-chat-flow";
 import { selfHostDialogs, useDesktopServerState } from "@/global/self-host/self-host-store";
+import { useServerFeature } from "@/platform/backend/server-discovery";
+import { switchEngine } from "@/global/settings/lib/switch-engine";
 import "@/global/self-host/self-host.css";
 
 type SignInCardProps = {
@@ -99,20 +101,6 @@ const readSelection = async (): Promise<{
   };
 };
 
-/** The same engine switch the model picker commits. */
-const switchEngine = async (engine: ModelPickerEngine): Promise<boolean> => {
-  const system = window.electronAPI?.system;
-  const preferences = await system?.getLocalModelPreferences?.();
-  if (!system?.setLocalModelPreferences || !preferences) return false;
-  if (preferences.agentRuntimeEngine === engine) return true;
-  await system.setLocalModelPreferences({
-    ...buildEngineRoutingPatch(preferences, engine),
-    ...buildEngineTransitionReasoningPatch(preferences, engine),
-  });
-  window.dispatchEvent(new CustomEvent("stella:local-model-preferences-changed"));
-  return true;
-};
-
 const routeToApiKeyProvider = async (provider: string): Promise<boolean> => {
   const system = window.electronAPI?.system;
   const preferences = await system?.getLocalModelPreferences?.();
@@ -148,10 +136,13 @@ export function SignInCard({ active, answered, onAnswer }: SignInCardProps) {
   const claudeLocal = useClaudeLocalAccounts();
   const credentials = useLlmCredentials();
   const apiKeysAvailable = Boolean(window.electronAPI?.system?.saveLlmCredential);
-  const options = useMemo(
-    () => (apiKeysAvailable ? [...BASE_OPTIONS, API_KEY_OPTION] : BASE_OPTIONS),
-    [apiKeysAvailable],
-  );
+  // A self-hosted server without Stella's own models offers only the
+  // user's Claude, ChatGPT or API key.
+  const managedModels = useServerFeature("managedModels");
+  const options = useMemo(() => {
+    const base = managedModels ? BASE_OPTIONS : BASE_OPTIONS.filter((option) => option.id !== "stella");
+    return apiKeysAvailable ? [...base, API_KEY_OPTION] : base;
+  }, [apiKeysAvailable, managedModels]);
   const [authOpen, setAuthOpen] = useState(false);
   const serverState = useDesktopServerState();
   const [pending, setPending] = useState<OptionId | null>(null);
@@ -181,7 +172,7 @@ export function SignInCard({ active, answered, onAnswer }: SignInCardProps) {
   const connected = useMemo<Record<OptionId, boolean>>(() => {
     const connections = engines?.connections ?? [];
     return {
-      stella: session.hasConnectedAccount,
+      stella: managedModels && session.hasConnectedAccount,
       claude: claudeLocal.available
         ? claudeLocal.signedIn
         : connections.some((row) => row.provider === "anthropic" && isEngineConnectionUsable(row)),
@@ -198,6 +189,7 @@ export function SignInCard({ active, answered, onAnswer }: SignInCardProps) {
     claudeLocal.signedIn,
     connectedApiKeyProvider,
     engines?.connections,
+    managedModels,
     session.hasConnectedAccount,
   ]);
   const anyConnected =

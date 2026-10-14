@@ -46,6 +46,7 @@ import { SLACK_PATHS, slackPublicOrigin, slackSecret } from "./config.js";
 import { signToken, verifyToken, type TokenKind } from "./signed-token.js";
 import { loadInstallation } from "./store.js";
 import { meteredCapture } from "../browser-billing.js";
+import { hostingPause, pausedHostingPage, recordHosting, type HostingSku } from "../hosting-meter.js";
 import { resolveConversationRepo } from "./repos.js";
 import { isSlackConversationId } from "./workspace.js";
 import { conversationAllowsHost } from "./environment.js";
@@ -1137,7 +1138,12 @@ const hasView = async (request: Request, env: Cloudflare.Env, teamId: string): P
   return false;
 };
 
-export const servePreview = async (request: Request, env: Cloudflare.Env, exports?: unknown): Promise<Response> => {
+export const servePreview = async (
+  request: Request,
+  env: Cloudflare.Env,
+  exports?: unknown,
+  waiter?: { waitUntil(promise: Promise<unknown>): void },
+): Promise<Response> => {
   const url = new URL(request.url);
   const readOnly = request.method === "GET" || request.method === "HEAD";
   const shared = !sitesHost(env);
@@ -1201,14 +1207,22 @@ export const servePreview = async (request: Request, env: Cloudflare.Env, export
       `<p>This preview is for members of the ${escapeHtml(install.teamName)} Slack workspace.</p><a class="button" href="${escapeHtml(target.toString())}">Sign in</a>`,
     );
   }
+  const paused = install.ownerId ? hostingPause(install.ownerId) : null;
+  if (paused) return pausedHostingPage(`This preview is paused. ${paused}`);
+  const startedAt = Date.now();
+  const meter = (sku: HostingSku) => {
+    if (install.ownerId && waiter) recordHosting(env, waiter, install.ownerId, sku, sku === "static-site" ? 0 : Date.now() - startedAt);
+  };
   if (isWorker) {
     if (shared) return page(503, "This preview can't run here", "<p>Live previews of apps need their own sites domain on this Stella server.</p>");
     const response = await serveWorkerPreview(request, env, exports, preview.id, isPublic);
+    meter("dynamic-worker");
     response.headers.delete("service-worker-allowed");
     return response;
   }
   const pathname = shared ? url.pathname.slice(preview.id.length + 1) || "/" : url.pathname;
   const response = await serveFile(request, env, preview, pathname, isPublic);
+  meter("static-site");
   response.headers.delete("service-worker-allowed");
   return response;
 };
@@ -1216,7 +1230,7 @@ export const servePreview = async (request: Request, env: Cloudflare.Env, export
 export class SitesHost extends WorkerEntrypoint<Cloudflare.Env> {
   override async fetch(request: Request): Promise<Response> {
     try {
-      return await servePreview(request, this.env, this.ctx.exports);
+      return await servePreview(request, this.env, this.ctx.exports, this.ctx);
     } catch (error) {
       console.error(
         JSON.stringify({

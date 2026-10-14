@@ -3,6 +3,7 @@ import { worldName } from "./workspace.js";
 import { readBoundedRequestText } from "./bounded-body.js";
 import { builderServiceSecret, builderServiceSecrets } from "./secret-rotation.js";
 import { meteredCapture } from "./browser-billing.js";
+import { hostingPause, pausedHostingPage, recordHosting } from "./hosting-meter.js";
 const encoder = new TextEncoder();
 const base64 = (bytes: Uint8Array) =>
   btoa(String.fromCharCode(...bytes))
@@ -51,6 +52,7 @@ export async function mintWorkspaceAppAccess(
 export async function serveWorkspaceApp(
   request: Request,
   env: Env,
+  waiter: { waitUntil(promise: Promise<unknown>): void },
 ): Promise<Response> {
   const url = new URL(request.url);
   const match =
@@ -115,6 +117,8 @@ export async function serveWorkspaceApp(
     "sandbox allow-scripts allow-forms; default-src 'none'; script-src 'unsafe-inline' https:; style-src 'unsafe-inline' https:; img-src data: https:; font-src https:; connect-src https:; base-uri 'none'; form-action 'none'",
   );
   if (request.method === "OPTIONS") return new Response(null, { headers });
+  const paused = hostingPause(claims.ownerId);
+  if (paused) return pausedHostingPage(`This app is paused. ${paused}`);
   const target = new URL(match[3] || "/", "https://app.internal");
   target.search = url.search;
   const forwarded = new Headers();
@@ -126,10 +130,12 @@ export async function serveWorkspaceApp(
     request.method === "GET" || request.method === "HEAD"
       ? undefined
       : await readBoundedRequestText(request, 1024 * 1024);
+  const startedAt = Date.now();
   const response = await env.WORLDS.getByName(claims.world).fetchWorkspaceApp(
     claims.slug,
     new Request(target, { method: request.method, headers: forwarded, body }),
   );
+  recordHosting(env, waiter, claims.ownerId, "dynamic-worker", Date.now() - startedAt);
   const contentType = response.headers.get("content-type");
   if (contentType) headers.set("content-type", contentType);
   return new Response(response.body, { status: response.status, headers });

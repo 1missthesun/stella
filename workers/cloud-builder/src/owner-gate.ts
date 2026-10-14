@@ -53,6 +53,7 @@ import {
   CLOUD_SANDBOX_SUBSCRIPTION_REQUIRED_MESSAGE,
 } from "@stella/contracts/backend/billing";
 import { PLAN_CATALOG } from "@stella/contracts/billing-plans";
+import { TARIFF_VERSION, hostingCostMicroCents } from "@stella/contracts/billing-tariffs";
 import {
   applyGatewayUsage,
   applyStripeEvent,
@@ -157,6 +158,10 @@ import type {
 } from "./owner-gate/types.js";
 import {
   HEADER_PRESENCE_DEVICE_ID,
+  HOSTING_BUDGET_MESSAGE,
+  HOSTING_CAP_MESSAGE,
+  HOSTING_DAILY_REQUEST_CAP,
+  HOSTING_DAY_KEY,
   OWNER_GATE_RUNNING_GRACE_MS,
   SNAPSHOT_TTL_MS,
   STEER_ACK_TIMEOUT_MS,
@@ -666,6 +671,48 @@ export class OwnerGate extends OwnerGateCloudDispatch {
 
   async releaseSpend(id: string): Promise<void> {
     await this.billingWrite((ctx) => releaseSpend(ctx, id));
+  }
+
+  // Requests and CPU the owner's hosted apps and Crew previews served,
+  // charged in batches. Serving stops while the budget is out, and past a
+  // daily request cap that backstops a traffic spike.
+  async settleHosting(input: {
+    receiptId: string;
+    sku: "dynamic-worker" | "static-site";
+    requests: number;
+    cpuMs: number;
+  }): Promise<{ serving: boolean; message: string }> {
+    const requests = Math.max(0, Math.floor(input.requests));
+    const cpuMs = Math.max(0, Math.round(input.cpuMs));
+    const day = new Date().toISOString().slice(0, 10);
+    const counted = this.ctx.storage.kv.get<{ day: string; requests: number }>(HOSTING_DAY_KEY);
+    const today = (counted?.day === day ? counted.requests : 0) + requests;
+    this.ctx.storage.kv.put(HOSTING_DAY_KEY, { day, requests: today });
+    const microCents = hostingCostMicroCents({ requests, cpuMs });
+    const access = await this.billingWrite((ctx) => {
+      settleSpend(ctx, {
+        receiptId: input.receiptId,
+        chargeMicroCents: microCents,
+        cost: {
+          id: input.receiptId,
+          category: "hosting",
+          provider: "cloudflare",
+          sku: input.sku,
+          quantity: { requests, cpuMs },
+          providerCostMicroCents: microCents,
+          basis: "estimated",
+          outcome: "succeeded",
+          tariffVersion: TARIFF_VERSION,
+        },
+      });
+      return billingAccess(ctx);
+    });
+    if (today > HOSTING_DAILY_REQUEST_CAP) {
+      return { serving: false, message: HOSTING_CAP_MESSAGE };
+    }
+    return access.allowed
+      ? { serving: true, message: "" }
+      : { serving: false, message: HOSTING_BUDGET_MESSAGE };
   }
 
   async setBillingPlan(input: {

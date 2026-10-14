@@ -3037,5 +3037,58 @@
         "pickCron": "Adj meg egy cron-kifejezést."
       }
     }
+  },
+  "selfHost": {
+    "connect": {
+      "title": "Csatlakozás a saját szerveredhez",
+      "intro": "Illeszd be a szervered beállítása által adott párosítási linket. stella://pair kezdetű, és egyszer működik, 10 percig.",
+      "linkLabel": "Párosítási link",
+      "checking": "Ellenőrzés…",
+      "version": "Szerververzió: {date}",
+      "ownerNotice": "Ezt a szervert a tulajdonosa üzemelteti, nem a Stella. A beszélgetéseid, fájljaid és a bejelentkezésed rajta vannak, a Stella nem látja és nem tudja helyreállítani őket.",
+      "hostedNotice": "Ez egy Stella által üzemeltetett Stella-szerver.",
+      "restartNotice": "A Stella újraindul ezen a szerveren. A stella.sh-telepítésed és a fiókod változatlan marad, és a Beállításokban visszaválthatsz.",
+      "connect": "Csatlakozás",
+      "connecting": "Csatlakozás…",
+      "restartingTitle": "Csatlakozva: {name}",
+      "restarting": "A Stella újraindul a szervereden. Első indításkor a Stella onnan töltődik le, ami néhány percig tarthat.",
+      "unavailable": "A Stella ezen verziója nem tud más szerverekhez csatlakozni."
+    },
+    "device": {
+      "title": "Eszköz csatlakoztatása",
+      "intro": "Olvasd be a telefonod Stella alkalmazásával, vagy nyisd meg a linket egy másik számítógépen. Egyszer működik, 10 percig.",
+      "qrAlt": "Párosítási QR-kód",
+      "copy": "Link másolása",
+      "copied": "Másolva",
+      "expires": "Lejár: {time}",
+      "expired": "Ez a kód lejárt. Hozz létre újat egy eszköz csatlakoztatásához.",
+      "newCode": "Új kód",
+      "claimed": "Új eszköz csatlakozott.",
+      "claimedNamed": "{name} csatlakozott.",
+      "done": "Kész"
+    },
+    "settings": {
+      "title": "Szerver",
+      "hostedName": "Stella",
+      "hostedDesc": "A Stella saját szolgáltatása a stella.sh-n",
+      "selfHostedDesc": "Saját szervered: {host}",
+      "connectDevice": "Eszköz csatlakoztatása",
+      "ownServerLabel": "Saját szerver",
+      "otherServerLabel": "Másik szerver",
+      "ownServerDesc": "Futtasd a Stellát a saját Cloudflare-fiókodban, és csatlakoztasd ezt a számítógépet egy párosítási linkkel.",
+      "connect": "Csatlakozás…",
+      "useHosted": "Vissza a stella.sh-ra",
+      "switching": "Váltás…",
+      "switchFailed": "Nem sikerült szervert váltani"
+    },
+    "screen": {
+      "title": "Csatlakoztasd ezt a számítógépet: {name}",
+      "yourServer": "saját szerveredhez",
+      "body": "Ez a számítógép nincs bejelentkezve a szerveredre. Hozz létre párosítási linket egy már csatlakoztatott eszközön (Beállítások → Eszköz csatlakoztatása) vagy a szerver beállításával, és illeszd be ide.",
+      "paste": "Párosítási link beillesztése"
+    },
+    "onboarding": {
+      "link": "Van saját Stella-szervered? Csatlakoztasd"
+    }
   }
 }

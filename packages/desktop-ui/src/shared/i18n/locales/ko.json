@@ -3019,5 +3019,58 @@
         "pickCron": "cron 표현식을 입력하세요."
       }
     }
+  },
+  "selfHost": {
+    "connect": {
+      "title": "내 서버에 연결",
+      "intro": "서버 설정에서 받은 페어링 링크를 붙여 넣으세요. stella://pair로 시작하며 10분 동안 한 번만 사용할 수 있습니다.",
+      "linkLabel": "페어링 링크",
+      "checking": "확인 중…",
+      "version": "서버 버전: {date}",
+      "ownerNotice": "이 서버는 Stella가 아닌 소유자가 운영합니다. 대화, 파일, 로그인 정보는 이 서버에 저장되며 Stella는 이를 보거나 복구할 수 없습니다.",
+      "hostedNotice": "Stella가 운영하는 Stella 서버입니다.",
+      "restartNotice": "Stella가 이 서버에서 다시 시작됩니다. stella.sh 설치와 계정은 그대로 유지되며 설정에서 다시 돌아갈 수 있습니다.",
+      "connect": "연결",
+      "connecting": "연결 중…",
+      "restartingTitle": "{name}에 연결됨",
+      "restarting": "Stella가 서버에서 다시 시작되는 중입니다. 처음에는 서버에서 Stella를 다운로드하므로 몇 분 정도 걸릴 수 있습니다.",
+      "unavailable": "이 버전의 Stella는 다른 서버에 연결할 수 없습니다."
+    },
+    "device": {
+      "title": "기기 연결",
+      "intro": "휴대폰의 Stella 앱으로 스캔하거나 다른 컴퓨터에서 링크를 여세요. 10분 동안 한 번만 사용할 수 있습니다.",
+      "qrAlt": "페어링 QR 코드",
+      "copy": "링크 복사",
+      "copied": "복사됨",
+      "expires": "{time} 후 만료",
+      "expired": "이 코드는 만료되었습니다. 기기를 연결하려면 새 코드를 만드세요.",
+      "newCode": "새 코드",
+      "claimed": "새 기기가 연결되었습니다.",
+      "claimedNamed": "{name}이(가) 연결되었습니다.",
+      "done": "완료"
+    },
+    "settings": {
+      "title": "서버",
+      "hostedName": "Stella",
+      "hostedDesc": "stella.sh의 Stella 공식 서비스",
+      "selfHostedDesc": "{host}의 내 서버",
+      "connectDevice": "기기 연결",
+      "ownServerLabel": "내 서버",
+      "otherServerLabel": "다른 서버",
+      "ownServerDesc": "내 Cloudflare 계정에서 Stella를 실행하고 페어링 링크로 이 컴퓨터를 연결하세요.",
+      "connect": "연결…",
+      "useHosted": "stella.sh로 돌아가기",
+      "switching": "전환 중…",
+      "switchFailed": "서버를 전환하지 못했습니다"
+    },
+    "screen": {
+      "title": "이 컴퓨터를 {name}에 연결",
+      "yourServer": "내 서버",
+      "body": "이 컴퓨터는 서버에 로그인되어 있지 않습니다. 이미 연결된 기기(설정 → 기기 연결)나 서버 설정에서 페어링 링크를 만들어 여기에 붙여 넣으세요.",
+      "paste": "페어링 링크 붙여 넣기"
+    },
+    "onboarding": {
+      "link": "나만의 Stella 서버가 있나요? 연결하기"
+    }
   }
 }

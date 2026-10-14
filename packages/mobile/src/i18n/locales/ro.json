@@ -3053,5 +3053,58 @@
         "pickCron": "Introdu o expresie cron."
       }
     }
+  },
+  "selfHost": {
+    "connect": {
+      "title": "Conectează-te la propriul server",
+      "intro": "Lipește linkul de asociere primit din configurarea serverului. Începe cu stella://pair și funcționează o singură dată, timp de 10 minute.",
+      "linkLabel": "Link de asociere",
+      "checking": "Se verifică…",
+      "version": "Versiunea serverului din {date}",
+      "ownerNotice": "Acest server este administrat de proprietarul lui, nu de Stella. Conversațiile, fișierele și autentificarea ta sunt pe el, iar Stella nu le poate vedea sau recupera.",
+      "hostedNotice": "Acesta este un server Stella administrat de Stella.",
+      "restartNotice": "Stella repornește pe acest server. Instalarea stella.sh și contul tău rămân neschimbate și poți reveni din Setări.",
+      "connect": "Conectează",
+      "connecting": "Se conectează…",
+      "restartingTitle": "Conectat la {name}",
+      "restarting": "Stella repornește pe serverul tău. La prima pornire, Stella se descarcă de pe el, ceea ce poate dura câteva minute.",
+      "unavailable": "Această versiune Stella nu se poate conecta la alte servere."
+    },
+    "device": {
+      "title": "Conectează un dispozitiv",
+      "intro": "Scanează codul cu aplicația Stella de pe telefon sau deschide linkul pe alt computer. Funcționează o singură dată, timp de 10 minute.",
+      "qrAlt": "Cod QR de asociere",
+      "copy": "Copiază linkul",
+      "copied": "Copiat",
+      "expires": "Expiră în {time}",
+      "expired": "Acest cod a expirat. Creează unul nou pentru a conecta un dispozitiv.",
+      "newCode": "Cod nou",
+      "claimed": "Un dispozitiv nou este conectat.",
+      "claimedNamed": "{name} este conectat.",
+      "done": "Gata"
+    },
+    "settings": {
+      "title": "Server",
+      "hostedName": "Stella",
+      "hostedDesc": "Serviciul Stella de pe stella.sh",
+      "selfHostedDesc": "Propriul tău server la {host}",
+      "connectDevice": "Conectează un dispozitiv",
+      "ownServerLabel": "Propriul tău server",
+      "otherServerLabel": "Alt server",
+      "ownServerDesc": "Rulează Stella în propriul cont Cloudflare și conectează acest computer cu un link de asociere.",
+      "connect": "Conectează…",
+      "useHosted": "Revino la stella.sh",
+      "switching": "Se schimbă…",
+      "switchFailed": "Serverul nu a putut fi schimbat"
+    },
+    "screen": {
+      "title": "Conectează acest computer la {name}",
+      "yourServer": "serverul tău",
+      "body": "Acest computer nu este conectat la serverul tău. Creează un link de asociere pe un dispozitiv deja conectat (Setări → Conectează un dispozitiv) sau din configurarea serverului și lipește-l aici.",
+      "paste": "Lipește un link de asociere"
+    },
+    "onboarding": {
+      "link": "Ai propriul server Stella? Conectează-l"
+    }
   }
 }

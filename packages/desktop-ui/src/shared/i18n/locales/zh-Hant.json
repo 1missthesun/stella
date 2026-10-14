@@ -3019,5 +3019,58 @@
         "pickCron": "請輸入 Cron 運算式。"
       }
     }
+  },
+  "selfHost": {
+    "connect": {
+      "title": "連線到你自己的伺服器",
+      "intro": "貼上伺服器設定時提供的配對連結。它以 stella://pair 開頭，10 分鐘內只能使用一次。",
+      "linkLabel": "配對連結",
+      "checking": "正在檢查…",
+      "version": "伺服器版本：{date}",
+      "ownerNotice": "此伺服器由其擁有者營運，而不是 Stella。你的對話、檔案和登入資訊都儲存在那裡，Stella 無法查看或復原。",
+      "hostedNotice": "這是由 Stella 營運的 Stella 伺服器。",
+      "restartNotice": "Stella 將在此伺服器上重新啟動。你的 stella.sh 安裝和帳號保持不變，可以隨時在設定中切換回來。",
+      "connect": "連線",
+      "connecting": "正在連線…",
+      "restartingTitle": "已連線到 {name}",
+      "restarting": "Stella 正在你的伺服器上重新啟動。首次啟動時會從伺服器下載 Stella，可能需要幾分鐘。",
+      "unavailable": "此版本的 Stella 無法連線到其他伺服器。"
+    },
+    "device": {
+      "title": "連線裝置",
+      "intro": "用手機上的 Stella App 掃描，或在另一台電腦上開啟連結。10 分鐘內只能使用一次。",
+      "qrAlt": "配對 QR 碼",
+      "copy": "複製連結",
+      "copied": "已複製",
+      "expires": "{time} 後到期",
+      "expired": "此代碼已到期。請建立新代碼來連線裝置。",
+      "newCode": "新代碼",
+      "claimed": "新裝置已連線。",
+      "claimedNamed": "{name} 已連線。",
+      "done": "完成"
+    },
+    "settings": {
+      "title": "伺服器",
+      "hostedName": "Stella",
+      "hostedDesc": "Stella 在 stella.sh 上的官方服務",
+      "selfHostedDesc": "你在 {host} 的伺服器",
+      "connectDevice": "連線裝置",
+      "ownServerLabel": "你自己的伺服器",
+      "otherServerLabel": "其他伺服器",
+      "ownServerDesc": "在你自己的 Cloudflare 帳號中執行 Stella，並用配對連結連線這台電腦。",
+      "connect": "連線…",
+      "useHosted": "切換回 stella.sh",
+      "switching": "正在切換…",
+      "switchFailed": "無法切換伺服器"
+    },
+    "screen": {
+      "title": "將這台電腦連線到 {name}",
+      "yourServer": "你的伺服器",
+      "body": "這台電腦尚未登入你的伺服器。請在已連線的裝置上（設定 → 連線裝置）或透過伺服器設定建立配對連結，然後貼到這裡。",
+      "paste": "貼上配對連結"
+    },
+    "onboarding": {
+      "link": "有自己的 Stella 伺服器？連線它"
+    }
   }
 }

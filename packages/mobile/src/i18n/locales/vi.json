@@ -3019,5 +3019,58 @@
         "pickCron": "Nhập biểu thức cron."
       }
     }
+  },
+  "selfHost": {
+    "connect": {
+      "title": "Kết nối với máy chủ của bạn",
+      "intro": "Dán liên kết ghép nối mà phần thiết lập máy chủ đưa cho bạn. Liên kết bắt đầu bằng stella://pair và chỉ dùng được một lần trong 10 phút.",
+      "linkLabel": "Liên kết ghép nối",
+      "checking": "Đang kiểm tra…",
+      "version": "Phiên bản máy chủ ngày {date}",
+      "ownerNotice": "Máy chủ này do chủ sở hữu vận hành, không phải Stella. Cuộc trò chuyện, tệp và thông tin đăng nhập của bạn nằm trên đó, và Stella không thể xem hay khôi phục chúng.",
+      "hostedNotice": "Đây là máy chủ Stella do Stella vận hành.",
+      "restartNotice": "Stella sẽ khởi động lại trên máy chủ này. Bản cài đặt stella.sh và tài khoản của bạn vẫn giữ nguyên, và bạn có thể quay lại trong Cài đặt.",
+      "connect": "Kết nối",
+      "connecting": "Đang kết nối…",
+      "restartingTitle": "Đã kết nối với {name}",
+      "restarting": "Stella đang khởi động lại trên máy chủ của bạn. Lần đầu, Stella sẽ được tải xuống từ đó, có thể mất vài phút.",
+      "unavailable": "Phiên bản Stella này không thể kết nối với máy chủ khác."
+    },
+    "device": {
+      "title": "Kết nối thiết bị",
+      "intro": "Quét mã bằng ứng dụng Stella trên điện thoại hoặc mở liên kết trên máy tính khác. Chỉ dùng được một lần trong 10 phút.",
+      "qrAlt": "Mã QR ghép nối",
+      "copy": "Sao chép liên kết",
+      "copied": "Đã sao chép",
+      "expires": "Hết hạn sau {time}",
+      "expired": "Mã này đã hết hạn. Hãy tạo mã mới để kết nối thiết bị.",
+      "newCode": "Mã mới",
+      "claimed": "Đã kết nối một thiết bị mới.",
+      "claimedNamed": "Đã kết nối {name}.",
+      "done": "Xong"
+    },
+    "settings": {
+      "title": "Máy chủ",
+      "hostedName": "Stella",
+      "hostedDesc": "Dịch vụ của Stella tại stella.sh",
+      "selfHostedDesc": "Máy chủ của bạn tại {host}",
+      "connectDevice": "Kết nối thiết bị",
+      "ownServerLabel": "Máy chủ của bạn",
+      "otherServerLabel": "Máy chủ khác",
+      "ownServerDesc": "Chạy Stella trong tài khoản Cloudflare của bạn và kết nối máy tính này bằng liên kết ghép nối.",
+      "connect": "Kết nối…",
+      "useHosted": "Quay lại stella.sh",
+      "switching": "Đang chuyển…",
+      "switchFailed": "Không thể chuyển máy chủ"
+    },
+    "screen": {
+      "title": "Kết nối máy tính này với {name}",
+      "yourServer": "máy chủ của bạn",
+      "body": "Máy tính này chưa đăng nhập vào máy chủ của bạn. Hãy tạo liên kết ghép nối trên một thiết bị đã kết nối (Cài đặt → Kết nối thiết bị) hoặc bằng phần thiết lập máy chủ, rồi dán vào đây.",
+      "paste": "Dán liên kết ghép nối"
+    },
+    "onboarding": {
+      "link": "Bạn có máy chủ Stella riêng? Kết nối ngay"
+    }
   }
 }

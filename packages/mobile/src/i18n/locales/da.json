@@ -3037,5 +3037,58 @@
         "pickCron": "Indtast et cron-udtryk."
       }
     }
+  },
+  "selfHost": {
+    "connect": {
+      "title": "Forbind til din egen server",
+      "intro": "Indsæt det parringslink, som din servers opsætning gav dig. Det starter med stella://pair og virker én gang i 10 minutter.",
+      "linkLabel": "Parringslink",
+      "checking": "Kontrollerer…",
+      "version": "Serverversion fra {date}",
+      "ownerNotice": "Denne server drives af sin ejer, ikke af Stella. Dine samtaler, filer og dit login ligger på den, og Stella kan hverken se eller gendanne dem.",
+      "hostedNotice": "Dette er en Stella-server, der drives af Stella.",
+      "restartNotice": "Stella genstarter på denne server. Din stella.sh-installation og din konto forbliver som de er, og du kan skifte tilbage i Indstillinger.",
+      "connect": "Forbind",
+      "connecting": "Forbinder…",
+      "restartingTitle": "Forbundet til {name}",
+      "restarting": "Stella genstarter på din server. Første gang hentes Stella derfra, hvilket kan tage et par minutter.",
+      "unavailable": "Denne version af Stella kan ikke forbinde til andre servere."
+    },
+    "device": {
+      "title": "Forbind en enhed",
+      "intro": "Scan dette med Stella-appen på din telefon, eller åbn linket på en anden computer. Det virker én gang i 10 minutter.",
+      "qrAlt": "QR-kode til parring",
+      "copy": "Kopiér link",
+      "copied": "Kopieret",
+      "expires": "Udløber om {time}",
+      "expired": "Denne kode er udløbet. Lav en ny for at forbinde en enhed.",
+      "newCode": "Ny kode",
+      "claimed": "En ny enhed er forbundet.",
+      "claimedNamed": "{name} er forbundet.",
+      "done": "Færdig"
+    },
+    "settings": {
+      "title": "Server",
+      "hostedName": "Stella",
+      "hostedDesc": "Stellas egen tjeneste på stella.sh",
+      "selfHostedDesc": "Din egen server på {host}",
+      "connectDevice": "Forbind en enhed",
+      "ownServerLabel": "Din egen server",
+      "otherServerLabel": "En anden server",
+      "ownServerDesc": "Kør Stella på din egen Cloudflare-konto, og forbind denne computer med et parringslink.",
+      "connect": "Forbind…",
+      "useHosted": "Skift tilbage til stella.sh",
+      "switching": "Skifter…",
+      "switchFailed": "Kunne ikke skifte server"
+    },
+    "screen": {
+      "title": "Forbind denne computer til {name}",
+      "yourServer": "din server",
+      "body": "Denne computer er ikke logget ind på din server. Lav et parringslink på en enhed, der allerede er forbundet (Indstillinger → Forbind en enhed), eller med din servers opsætning, og indsæt det her.",
+      "paste": "Indsæt et parringslink"
+    },
+    "onboarding": {
+      "link": "Har du din egen Stella-server? Forbind den"
+    }
   }
 }

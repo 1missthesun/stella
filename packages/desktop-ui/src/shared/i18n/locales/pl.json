@@ -3069,5 +3069,58 @@
         "pickCron": "Wpisz wyrażenie cron."
       }
     }
+  },
+  "selfHost": {
+    "connect": {
+      "title": "Połącz z własnym serwerem",
+      "intro": "Wklej link parowania z konfiguracji swojego serwera. Zaczyna się od stella://pair i działa raz, przez 10 minut.",
+      "linkLabel": "Link parowania",
+      "checking": "Sprawdzanie…",
+      "version": "Wersja serwera z {date}",
+      "ownerNotice": "Ten serwer prowadzi jego właściciel, a nie Stella. Twoje rozmowy, pliki i logowanie są na nim, a Stella nie może ich zobaczyć ani odzyskać.",
+      "hostedNotice": "To serwer Stella prowadzony przez Stellę.",
+      "restartNotice": "Stella uruchomi się ponownie na tym serwerze. Twoja instalacja stella.sh i konto pozostaną bez zmian, a wrócić możesz w Ustawieniach.",
+      "connect": "Połącz",
+      "connecting": "Łączenie…",
+      "restartingTitle": "Połączono z {name}",
+      "restarting": "Stella uruchamia się ponownie na Twoim serwerze. Przy pierwszym uruchomieniu Stella jest z niego pobierana, co może potrwać kilka minut.",
+      "unavailable": "Ta wersja Stelli nie może łączyć się z innymi serwerami."
+    },
+    "device": {
+      "title": "Połącz urządzenie",
+      "intro": "Zeskanuj to aplikacją Stella w telefonie albo otwórz link na innym komputerze. Działa raz, przez 10 minut.",
+      "qrAlt": "Kod QR do parowania",
+      "copy": "Kopiuj link",
+      "copied": "Skopiowano",
+      "expires": "Wygasa za {time}",
+      "expired": "Ten kod wygasł. Utwórz nowy, aby połączyć urządzenie.",
+      "newCode": "Nowy kod",
+      "claimed": "Połączono nowe urządzenie.",
+      "claimedNamed": "{name} jest połączone.",
+      "done": "Gotowe"
+    },
+    "settings": {
+      "title": "Serwer",
+      "hostedName": "Stella",
+      "hostedDesc": "Własna usługa Stelli na stella.sh",
+      "selfHostedDesc": "Twój własny serwer pod adresem {host}",
+      "connectDevice": "Połącz urządzenie",
+      "ownServerLabel": "Twój własny serwer",
+      "otherServerLabel": "Inny serwer",
+      "ownServerDesc": "Uruchom Stellę na własnym koncie Cloudflare i połącz ten komputer linkiem parowania.",
+      "connect": "Połącz…",
+      "useHosted": "Wróć do stella.sh",
+      "switching": "Przełączanie…",
+      "switchFailed": "Nie udało się zmienić serwera"
+    },
+    "screen": {
+      "title": "Połącz ten komputer z {name}",
+      "yourServer": "Twoim serwerem",
+      "body": "Ten komputer nie jest zalogowany na Twoim serwerze. Utwórz link parowania na już połączonym urządzeniu (Ustawienia → Połącz urządzenie) lub w konfiguracji serwera i wklej go tutaj.",
+      "paste": "Wklej link parowania"
+    },
+    "onboarding": {
+      "link": "Masz własny serwer Stella? Połącz go"
+    }
   }
 }

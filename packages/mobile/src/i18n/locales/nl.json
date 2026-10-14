@@ -3037,5 +3037,58 @@
         "pickCron": "Voer een cron-expressie in."
       }
     }
+  },
+  "selfHost": {
+    "connect": {
+      "title": "Verbinden met je eigen server",
+      "intro": "Plak de koppellink die de installatie van je server heeft gegeven. Hij begint met stella://pair en werkt één keer, 10 minuten lang.",
+      "linkLabel": "Koppellink",
+      "checking": "Controleren…",
+      "version": "Serverversie van {date}",
+      "ownerNotice": "Deze server wordt beheerd door de eigenaar, niet door Stella. Je gesprekken, bestanden en aanmelding staan erop, en Stella kan ze niet zien of herstellen.",
+      "hostedNotice": "Dit is een Stella-server die door Stella wordt beheerd.",
+      "restartNotice": "Stella start opnieuw op deze server. Je stella.sh-installatie en account blijven zoals ze zijn, en je kunt terugschakelen in Instellingen.",
+      "connect": "Verbinden",
+      "connecting": "Verbinden…",
+      "restartingTitle": "Verbonden met {name}",
+      "restarting": "Stella start opnieuw op je server. De eerste keer wordt Stella daarvandaan gedownload, wat een paar minuten kan duren.",
+      "unavailable": "Deze versie van Stella kan geen verbinding maken met andere servers."
+    },
+    "device": {
+      "title": "Apparaat verbinden",
+      "intro": "Scan dit met de Stella-app op je telefoon, of open de link op een andere computer. Hij werkt één keer, 10 minuten lang.",
+      "qrAlt": "QR-code om te koppelen",
+      "copy": "Link kopiëren",
+      "copied": "Gekopieerd",
+      "expires": "Verloopt over {time}",
+      "expired": "Deze code is verlopen. Maak een nieuwe om een apparaat te verbinden.",
+      "newCode": "Nieuwe code",
+      "claimed": "Er is een nieuw apparaat verbonden.",
+      "claimedNamed": "{name} is verbonden.",
+      "done": "Klaar"
+    },
+    "settings": {
+      "title": "Server",
+      "hostedName": "Stella",
+      "hostedDesc": "Stella's eigen dienst op stella.sh",
+      "selfHostedDesc": "Je eigen server op {host}",
+      "connectDevice": "Apparaat verbinden",
+      "ownServerLabel": "Je eigen server",
+      "otherServerLabel": "Een andere server",
+      "ownServerDesc": "Draai Stella op je eigen Cloudflare-account en verbind deze computer met een koppellink.",
+      "connect": "Verbinden…",
+      "useHosted": "Terug naar stella.sh",
+      "switching": "Wisselen…",
+      "switchFailed": "Kan niet van server wisselen"
+    },
+    "screen": {
+      "title": "Verbind deze computer met {name}",
+      "yourServer": "je server",
+      "body": "Deze computer is niet aangemeld bij je server. Maak een koppellink op een apparaat dat al verbonden is (Instellingen → Apparaat verbinden) of met de installatie van je server en plak hem hier.",
+      "paste": "Koppellink plakken"
+    },
+    "onboarding": {
+      "link": "Heb je je eigen Stella-server? Verbind hem"
+    }
   }
 }

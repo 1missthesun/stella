@@ -3053,5 +3053,58 @@
         "pickCron": "Introduce una expresión cron."
       }
     }
+  },
+  "selfHost": {
+    "connect": {
+      "title": "Conectar con tu propio servidor",
+      "intro": "Pega el enlace de vinculación que te dio la configuración de tu servidor. Empieza por stella://pair y funciona una sola vez, durante 10 minutos.",
+      "linkLabel": "Enlace de vinculación",
+      "checking": "Comprobando…",
+      "version": "Versión del servidor del {date}",
+      "ownerNotice": "Este servidor lo gestiona su propietario, no Stella. Tus conversaciones, archivos e inicio de sesión están en él, y Stella no puede verlos ni recuperarlos.",
+      "hostedNotice": "Este es un servidor de Stella gestionado por Stella.",
+      "restartNotice": "Stella se reinicia en este servidor. Tu instalación de stella.sh y tu cuenta se mantienen igual, y puedes volver desde Ajustes.",
+      "connect": "Conectar",
+      "connecting": "Conectando…",
+      "restartingTitle": "Conectado a {name}",
+      "restarting": "Stella se está reiniciando en tu servidor. El primer inicio descarga Stella desde él, lo que puede tardar unos minutos.",
+      "unavailable": "Esta versión de Stella no puede conectarse a otros servidores."
+    },
+    "device": {
+      "title": "Conectar un dispositivo",
+      "intro": "Escanéalo con la app de Stella en tu teléfono o abre el enlace en otro ordenador. Funciona una sola vez, durante 10 minutos.",
+      "qrAlt": "Código QR de vinculación",
+      "copy": "Copiar enlace",
+      "copied": "Copiado",
+      "expires": "Caduca en {time}",
+      "expired": "Este código ha caducado. Crea uno nuevo para conectar un dispositivo.",
+      "newCode": "Nuevo código",
+      "claimed": "Se ha conectado un dispositivo nuevo.",
+      "claimedNamed": "{name} está conectado.",
+      "done": "Listo"
+    },
+    "settings": {
+      "title": "Servidor",
+      "hostedName": "Stella",
+      "hostedDesc": "El servicio de Stella en stella.sh",
+      "selfHostedDesc": "Tu propio servidor en {host}",
+      "connectDevice": "Conectar un dispositivo",
+      "ownServerLabel": "Tu propio servidor",
+      "otherServerLabel": "Otro servidor",
+      "ownServerDesc": "Ejecuta Stella en tu propia cuenta de Cloudflare y conecta este ordenador con un enlace de vinculación.",
+      "connect": "Conectar…",
+      "useHosted": "Volver a stella.sh",
+      "switching": "Cambiando…",
+      "switchFailed": "No se pudo cambiar de servidor"
+    },
+    "screen": {
+      "title": "Conecta este ordenador a {name}",
+      "yourServer": "tu servidor",
+      "body": "Este ordenador no tiene la sesión iniciada en tu servidor. Crea un enlace de vinculación en un dispositivo ya conectado (Ajustes → Conectar un dispositivo) o con la configuración de tu servidor y pégalo aquí.",
+      "paste": "Pegar un enlace de vinculación"
+    },
+    "onboarding": {
+      "link": "¿Tienes tu propio servidor de Stella? Conéctalo"
+    }
   }
 }

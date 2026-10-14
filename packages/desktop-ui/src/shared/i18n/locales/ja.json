@@ -3019,5 +3019,58 @@
         "pickCron": "cron式を入力してください。"
       }
     }
+  },
+  "selfHost": {
+    "connect": {
+      "title": "自分のサーバーに接続",
+      "intro": "サーバーのセットアップで表示されたペアリングリンクを貼り付けてください。stella://pair で始まり、10分間に1回だけ使えます。",
+      "linkLabel": "ペアリングリンク",
+      "checking": "確認中…",
+      "version": "サーバーのバージョン：{date}",
+      "ownerNotice": "このサーバーは Stella ではなく所有者が運営しています。会話、ファイル、サインイン情報はそのサーバーに保存され、Stella は閲覧も復元もできません。",
+      "hostedNotice": "これは Stella が運営する Stella サーバーです。",
+      "restartNotice": "Stella はこのサーバーで再起動します。stella.sh のインストールとアカウントはそのまま残り、設定からいつでも戻せます。",
+      "connect": "接続",
+      "connecting": "接続中…",
+      "restartingTitle": "{name} に接続しました",
+      "restarting": "Stella をサーバー上で再起動しています。初回はサーバーから Stella をダウンロードするため、数分かかることがあります。",
+      "unavailable": "このバージョンの Stella は他のサーバーに接続できません。"
+    },
+    "device": {
+      "title": "デバイスを接続",
+      "intro": "スマートフォンの Stella アプリでスキャンするか、別のコンピューターでリンクを開いてください。10分間に1回だけ使えます。",
+      "qrAlt": "ペアリング用 QR コード",
+      "copy": "リンクをコピー",
+      "copied": "コピーしました",
+      "expires": "残り {time}",
+      "expired": "このコードは期限切れです。新しいコードを作成してデバイスを接続してください。",
+      "newCode": "新しいコード",
+      "claimed": "新しいデバイスが接続されました。",
+      "claimedNamed": "{name} が接続されました。",
+      "done": "完了"
+    },
+    "settings": {
+      "title": "サーバー",
+      "hostedName": "Stella",
+      "hostedDesc": "stella.sh の Stella 公式サービス",
+      "selfHostedDesc": "{host} の自分のサーバー",
+      "connectDevice": "デバイスを接続",
+      "ownServerLabel": "自分のサーバー",
+      "otherServerLabel": "別のサーバー",
+      "ownServerDesc": "自分の Cloudflare アカウントで Stella を動かし、ペアリングリンクでこのコンピューターを接続します。",
+      "connect": "接続…",
+      "useHosted": "stella.sh に戻す",
+      "switching": "切り替え中…",
+      "switchFailed": "サーバーを切り替えられませんでした"
+    },
+    "screen": {
+      "title": "このコンピューターを {name} に接続",
+      "yourServer": "あなたのサーバー",
+      "body": "このコンピューターはサーバーにサインインしていません。接続済みのデバイス（設定 → デバイスを接続）またはサーバーのセットアップでペアリングリンクを作成し、ここに貼り付けてください。",
+      "paste": "ペアリングリンクを貼り付け"
+    },
+    "onboarding": {
+      "link": "自分の Stella サーバーをお持ちですか？接続する"
+    }
   }
 }

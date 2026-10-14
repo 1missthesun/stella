@@ -3037,5 +3037,58 @@
         "pickCron": "Gib einen Cron-Ausdruck ein."
       }
     }
+  },
+  "selfHost": {
+    "connect": {
+      "title": "Mit deinem eigenen Server verbinden",
+      "intro": "Füge den Kopplungslink ein, den die Einrichtung deines Servers erstellt hat. Er beginnt mit stella://pair und funktioniert einmal, 10 Minuten lang.",
+      "linkLabel": "Kopplungslink",
+      "checking": "Wird geprüft…",
+      "version": "Serverversion vom {date}",
+      "ownerNotice": "Dieser Server wird von seinem Eigentümer betrieben, nicht von Stella. Deine Unterhaltungen, Dateien und deine Anmeldung liegen dort, und Stella kann sie weder sehen noch wiederherstellen.",
+      "hostedNotice": "Dies ist ein Stella-Server, der von Stella betrieben wird.",
+      "restartNotice": "Stella startet auf diesem Server neu. Deine stella.sh-Installation und dein Konto bleiben unverändert, und du kannst in den Einstellungen zurückwechseln.",
+      "connect": "Verbinden",
+      "connecting": "Wird verbunden…",
+      "restartingTitle": "Mit {name} verbunden",
+      "restarting": "Stella startet auf deinem Server neu. Beim ersten Start wird Stella von dort heruntergeladen, das kann einige Minuten dauern.",
+      "unavailable": "Diese Version von Stella kann sich nicht mit anderen Servern verbinden."
+    },
+    "device": {
+      "title": "Gerät verbinden",
+      "intro": "Scanne dies mit der Stella-App auf deinem Handy oder öffne den Link auf einem anderen Computer. Er funktioniert einmal, 10 Minuten lang.",
+      "qrAlt": "QR-Code zum Koppeln",
+      "copy": "Link kopieren",
+      "copied": "Kopiert",
+      "expires": "Läuft ab in {time}",
+      "expired": "Dieser Code ist abgelaufen. Erstelle einen neuen, um ein Gerät zu verbinden.",
+      "newCode": "Neuer Code",
+      "claimed": "Ein neues Gerät ist verbunden.",
+      "claimedNamed": "{name} ist verbunden.",
+      "done": "Fertig"
+    },
+    "settings": {
+      "title": "Server",
+      "hostedName": "Stella",
+      "hostedDesc": "Stellas eigener Dienst unter stella.sh",
+      "selfHostedDesc": "Dein eigener Server unter {host}",
+      "connectDevice": "Gerät verbinden",
+      "ownServerLabel": "Dein eigener Server",
+      "otherServerLabel": "Ein anderer Server",
+      "ownServerDesc": "Betreibe Stella in deinem eigenen Cloudflare-Konto und verbinde diesen Computer mit einem Kopplungslink.",
+      "connect": "Verbinden…",
+      "useHosted": "Zurück zu stella.sh",
+      "switching": "Wird gewechselt…",
+      "switchFailed": "Server konnte nicht gewechselt werden"
+    },
+    "screen": {
+      "title": "Diesen Computer mit {name} verbinden",
+      "yourServer": "deinem Server",
+      "body": "Dieser Computer ist nicht bei deinem Server angemeldet. Erstelle einen Kopplungslink auf einem bereits verbundenen Gerät (Einstellungen → Gerät verbinden) oder mit der Einrichtung deines Servers und füge ihn hier ein.",
+      "paste": "Kopplungslink einfügen"
+    },
+    "onboarding": {
+      "link": "Hast du deinen eigenen Stella-Server? Verbinde ihn"
+    }
   }
 }

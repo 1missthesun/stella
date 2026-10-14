@@ -3037,5 +3037,58 @@
         "pickCron": "Bir cron ifadesi girin."
       }
     }
+  },
+  "selfHost": {
+    "connect": {
+      "title": "Kendi sunucuna bağlan",
+      "intro": "Sunucu kurulumunun verdiği eşleştirme bağlantısını yapıştır. stella://pair ile başlar ve 10 dakika boyunca bir kez çalışır.",
+      "linkLabel": "Eşleştirme bağlantısı",
+      "checking": "Kontrol ediliyor…",
+      "version": "{date} tarihli sunucu sürümü",
+      "ownerNotice": "Bu sunucuyu Stella değil, sahibi işletiyor. Sohbetlerin, dosyaların ve oturumun orada durur; Stella bunları göremez veya kurtaramaz.",
+      "hostedNotice": "Bu, Stella tarafından işletilen bir Stella sunucusu.",
+      "restartNotice": "Stella bu sunucuda yeniden başlar. stella.sh kurulumun ve hesabın olduğu gibi kalır; Ayarlar'dan geri dönebilirsin.",
+      "connect": "Bağlan",
+      "connecting": "Bağlanıyor…",
+      "restartingTitle": "{name} sunucusuna bağlandı",
+      "restarting": "Stella sunucunda yeniden başlıyor. İlk açılışta Stella oradan indirilir, bu birkaç dakika sürebilir.",
+      "unavailable": "Stella'nın bu sürümü başka sunuculara bağlanamaz."
+    },
+    "device": {
+      "title": "Cihaz bağla",
+      "intro": "Bunu telefonundaki Stella uygulamasıyla tara veya bağlantıyı başka bir bilgisayarda aç. 10 dakika boyunca bir kez çalışır.",
+      "qrAlt": "Eşleştirme QR kodu",
+      "copy": "Bağlantıyı kopyala",
+      "copied": "Kopyalandı",
+      "expires": "{time} içinde sona eriyor",
+      "expired": "Bu kodun süresi doldu. Cihaz bağlamak için yeni bir kod oluştur.",
+      "newCode": "Yeni kod",
+      "claimed": "Yeni bir cihaz bağlandı.",
+      "claimedNamed": "{name} bağlandı.",
+      "done": "Bitti"
+    },
+    "settings": {
+      "title": "Sunucu",
+      "hostedName": "Stella",
+      "hostedDesc": "Stella'nın stella.sh'deki kendi hizmeti",
+      "selfHostedDesc": "{host} adresindeki kendi sunucun",
+      "connectDevice": "Cihaz bağla",
+      "ownServerLabel": "Kendi sunucun",
+      "otherServerLabel": "Başka bir sunucu",
+      "ownServerDesc": "Stella'yı kendi Cloudflare hesabında çalıştır ve bu bilgisayarı bir eşleştirme bağlantısıyla bağla.",
+      "connect": "Bağlan…",
+      "useHosted": "stella.sh'ye geri dön",
+      "switching": "Değiştiriliyor…",
+      "switchFailed": "Sunucu değiştirilemedi"
+    },
+    "screen": {
+      "title": "Bu bilgisayarı {name} sunucusuna bağla",
+      "yourServer": "sunucun",
+      "body": "Bu bilgisayar sunucunda oturum açmamış. Zaten bağlı bir cihazda (Ayarlar → Cihaz bağla) veya sunucu kurulumuyla bir eşleştirme bağlantısı oluştur ve buraya yapıştır.",
+      "paste": "Eşleştirme bağlantısı yapıştır"
+    },
+    "onboarding": {
+      "link": "Kendi Stella sunucun mu var? Bağla"
+    }
   }
 }

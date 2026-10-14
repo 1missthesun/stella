@@ -3069,5 +3069,58 @@
         "pickCron": "Zadejte výraz cron."
       }
     }
+  },
+  "selfHost": {
+    "connect": {
+      "title": "Připojit k vlastnímu serveru",
+      "intro": "Vložte párovací odkaz, který vám dalo nastavení serveru. Začíná na stella://pair a funguje jednou, po dobu 10 minut.",
+      "linkLabel": "Párovací odkaz",
+      "checking": "Ověřování…",
+      "version": "Verze serveru z {date}",
+      "ownerNotice": "Tento server provozuje jeho vlastník, ne Stella. Vaše konverzace, soubory a přihlášení jsou na něm a Stella je nemůže zobrazit ani obnovit.",
+      "hostedNotice": "Toto je server Stella provozovaný Stellou.",
+      "restartNotice": "Stella se na tomto serveru restartuje. Vaše instalace stella.sh a účet zůstanou beze změny a zpět můžete přepnout v Nastavení.",
+      "connect": "Připojit",
+      "connecting": "Připojování…",
+      "restartingTitle": "Připojeno k {name}",
+      "restarting": "Stella se restartuje na vašem serveru. Při prvním spuštění se Stella stáhne z něj, což může trvat několik minut.",
+      "unavailable": "Tato verze Stelly se nemůže připojit k jiným serverům."
+    },
+    "device": {
+      "title": "Připojit zařízení",
+      "intro": "Naskenujte to aplikací Stella v telefonu nebo otevřete odkaz na jiném počítači. Funguje jednou, po dobu 10 minut.",
+      "qrAlt": "QR kód pro párování",
+      "copy": "Kopírovat odkaz",
+      "copied": "Zkopírováno",
+      "expires": "Vyprší za {time}",
+      "expired": "Platnost kódu vypršela. Vytvořte nový a připojte zařízení.",
+      "newCode": "Nový kód",
+      "claimed": "Nové zařízení je připojeno.",
+      "claimedNamed": "{name} je připojeno.",
+      "done": "Hotovo"
+    },
+    "settings": {
+      "title": "Server",
+      "hostedName": "Stella",
+      "hostedDesc": "Vlastní služba Stelly na stella.sh",
+      "selfHostedDesc": "Váš vlastní server na {host}",
+      "connectDevice": "Připojit zařízení",
+      "ownServerLabel": "Váš vlastní server",
+      "otherServerLabel": "Jiný server",
+      "ownServerDesc": "Provozujte Stellu na vlastním účtu Cloudflare a připojte tento počítač párovacím odkazem.",
+      "connect": "Připojit…",
+      "useHosted": "Přepnout zpět na stella.sh",
+      "switching": "Přepínání…",
+      "switchFailed": "Server se nepodařilo přepnout"
+    },
+    "screen": {
+      "title": "Připojte tento počítač k {name}",
+      "yourServer": "vašemu serveru",
+      "body": "Tento počítač není přihlášen k vašemu serveru. Vytvořte párovací odkaz na již připojeném zařízení (Nastavení → Připojit zařízení) nebo v nastavení serveru a vložte ho sem.",
+      "paste": "Vložit párovací odkaz"
+    },
+    "onboarding": {
+      "link": "Máte vlastní server Stella? Připojte ho"
+    }
   }
 }

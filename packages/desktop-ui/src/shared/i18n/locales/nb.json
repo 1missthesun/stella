@@ -3037,5 +3037,58 @@
         "pickCron": "Skriv inn et cron-uttrykk."
       }
     }
+  },
+  "selfHost": {
+    "connect": {
+      "title": "Koble til din egen server",
+      "intro": "Lim inn paringslenken som serveroppsettet ditt ga deg. Den starter med stella://pair og virker én gang, i 10 minutter.",
+      "linkLabel": "Paringslenke",
+      "checking": "Sjekker…",
+      "version": "Serverversjon fra {date}",
+      "ownerNotice": "Denne serveren drives av eieren, ikke av Stella. Samtalene, filene og innloggingen din ligger der, og Stella kan verken se eller gjenopprette dem.",
+      "hostedNotice": "Dette er en Stella-server som drives av Stella.",
+      "restartNotice": "Stella starter på nytt på denne serveren. stella.sh-installasjonen og kontoen din forblir som de er, og du kan bytte tilbake i Innstillinger.",
+      "connect": "Koble til",
+      "connecting": "Kobler til…",
+      "restartingTitle": "Koblet til {name}",
+      "restarting": "Stella starter på nytt på serveren din. Første gang lastes Stella ned derfra, og det kan ta noen minutter.",
+      "unavailable": "Denne versjonen av Stella kan ikke koble til andre servere."
+    },
+    "device": {
+      "title": "Koble til en enhet",
+      "intro": "Skann dette med Stella-appen på telefonen, eller åpne lenken på en annen datamaskin. Den virker én gang, i 10 minutter.",
+      "qrAlt": "QR-kode for paring",
+      "copy": "Kopier lenke",
+      "copied": "Kopiert",
+      "expires": "Utløper om {time}",
+      "expired": "Denne koden er utløpt. Lag en ny for å koble til en enhet.",
+      "newCode": "Ny kode",
+      "claimed": "En ny enhet er koblet til.",
+      "claimedNamed": "{name} er koblet til.",
+      "done": "Ferdig"
+    },
+    "settings": {
+      "title": "Server",
+      "hostedName": "Stella",
+      "hostedDesc": "Stellas egen tjeneste på stella.sh",
+      "selfHostedDesc": "Din egen server på {host}",
+      "connectDevice": "Koble til en enhet",
+      "ownServerLabel": "Din egen server",
+      "otherServerLabel": "En annen server",
+      "ownServerDesc": "Kjør Stella på din egen Cloudflare-konto og koble denne datamaskinen til med en paringslenke.",
+      "connect": "Koble til…",
+      "useHosted": "Bytt tilbake til stella.sh",
+      "switching": "Bytter…",
+      "switchFailed": "Kunne ikke bytte server"
+    },
+    "screen": {
+      "title": "Koble denne datamaskinen til {name}",
+      "yourServer": "serveren din",
+      "body": "Denne datamaskinen er ikke logget inn på serveren din. Lag en paringslenke på en enhet som allerede er tilkoblet (Innstillinger → Koble til en enhet) eller med serveroppsettet, og lim den inn her.",
+      "paste": "Lim inn en paringslenke"
+    },
+    "onboarding": {
+      "link": "Har du din egen Stella-server? Koble den til"
+    }
   }
 }

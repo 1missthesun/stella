@@ -3037,5 +3037,58 @@
         "pickCron": "Ange ett cron-uttryck."
       }
     }
+  },
+  "selfHost": {
+    "connect": {
+      "title": "Anslut till din egen server",
+      "intro": "Klistra in kopplingslänken som din servers installation gav dig. Den börjar med stella://pair och fungerar en gång, i 10 minuter.",
+      "linkLabel": "Kopplingslänk",
+      "checking": "Kontrollerar…",
+      "version": "Serverversion från {date}",
+      "ownerNotice": "Den här servern drivs av sin ägare, inte av Stella. Dina konversationer, filer och din inloggning finns där, och Stella kan inte se eller återställa dem.",
+      "hostedNotice": "Det här är en Stella-server som drivs av Stella.",
+      "restartNotice": "Stella startar om på den här servern. Din stella.sh-installation och ditt konto förblir som de är, och du kan byta tillbaka i Inställningar.",
+      "connect": "Anslut",
+      "connecting": "Ansluter…",
+      "restartingTitle": "Ansluten till {name}",
+      "restarting": "Stella startar om på din server. Första gången hämtas Stella därifrån, vilket kan ta några minuter.",
+      "unavailable": "Den här versionen av Stella kan inte ansluta till andra servrar."
+    },
+    "device": {
+      "title": "Anslut en enhet",
+      "intro": "Skanna detta med Stella-appen i telefonen, eller öppna länken på en annan dator. Den fungerar en gång, i 10 minuter.",
+      "qrAlt": "QR-kod för koppling",
+      "copy": "Kopiera länk",
+      "copied": "Kopierad",
+      "expires": "Upphör om {time}",
+      "expired": "Koden har upphört. Skapa en ny för att ansluta en enhet.",
+      "newCode": "Ny kod",
+      "claimed": "En ny enhet är ansluten.",
+      "claimedNamed": "{name} är ansluten.",
+      "done": "Klar"
+    },
+    "settings": {
+      "title": "Server",
+      "hostedName": "Stella",
+      "hostedDesc": "Stellas egen tjänst på stella.sh",
+      "selfHostedDesc": "Din egen server på {host}",
+      "connectDevice": "Anslut en enhet",
+      "ownServerLabel": "Din egen server",
+      "otherServerLabel": "En annan server",
+      "ownServerDesc": "Kör Stella på ditt eget Cloudflare-konto och anslut den här datorn med en kopplingslänk.",
+      "connect": "Anslut…",
+      "useHosted": "Byt tillbaka till stella.sh",
+      "switching": "Byter…",
+      "switchFailed": "Det gick inte att byta server"
+    },
+    "screen": {
+      "title": "Anslut den här datorn till {name}",
+      "yourServer": "din server",
+      "body": "Den här datorn är inte inloggad på din server. Skapa en kopplingslänk på en enhet som redan är ansluten (Inställningar → Anslut en enhet) eller med serverns installation och klistra in den här.",
+      "paste": "Klistra in en kopplingslänk"
+    },
+    "onboarding": {
+      "link": "Har du en egen Stella-server? Anslut den"
+    }
   }
 }

@@ -3019,5 +3019,58 @@
         "pickCron": "Masukkan ekspresi cron."
       }
     }
+  },
+  "selfHost": {
+    "connect": {
+      "title": "Hubungkan ke server Anda sendiri",
+      "intro": "Tempel tautan pemasangan dari pengaturan server Anda. Tautan diawali stella://pair dan hanya berlaku sekali selama 10 menit.",
+      "linkLabel": "Tautan pemasangan",
+      "checking": "Memeriksa…",
+      "version": "Versi server dari {date}",
+      "ownerNotice": "Server ini dijalankan oleh pemiliknya, bukan oleh Stella. Percakapan, file, dan info masuk Anda tersimpan di sana, dan Stella tidak dapat melihat atau memulihkannya.",
+      "hostedNotice": "Ini adalah server Stella yang dijalankan oleh Stella.",
+      "restartNotice": "Stella akan dimulai ulang di server ini. Instalasi stella.sh dan akun Anda tetap seperti semula, dan Anda bisa kembali dari Pengaturan.",
+      "connect": "Hubungkan",
+      "connecting": "Menghubungkan…",
+      "restartingTitle": "Terhubung ke {name}",
+      "restarting": "Stella sedang dimulai ulang di server Anda. Saat pertama kali, Stella diunduh dari server tersebut, yang mungkin memerlukan beberapa menit.",
+      "unavailable": "Versi Stella ini tidak dapat terhubung ke server lain."
+    },
+    "device": {
+      "title": "Hubungkan perangkat",
+      "intro": "Pindai dengan aplikasi Stella di ponsel Anda, atau buka tautan di komputer lain. Hanya berlaku sekali selama 10 menit.",
+      "qrAlt": "Kode QR pemasangan",
+      "copy": "Salin tautan",
+      "copied": "Disalin",
+      "expires": "Kedaluwarsa dalam {time}",
+      "expired": "Kode ini sudah kedaluwarsa. Buat kode baru untuk menghubungkan perangkat.",
+      "newCode": "Kode baru",
+      "claimed": "Perangkat baru terhubung.",
+      "claimedNamed": "{name} terhubung.",
+      "done": "Selesai"
+    },
+    "settings": {
+      "title": "Server",
+      "hostedName": "Stella",
+      "hostedDesc": "Layanan Stella sendiri di stella.sh",
+      "selfHostedDesc": "Server Anda sendiri di {host}",
+      "connectDevice": "Hubungkan perangkat",
+      "ownServerLabel": "Server Anda sendiri",
+      "otherServerLabel": "Server lain",
+      "ownServerDesc": "Jalankan Stella di akun Cloudflare Anda sendiri dan hubungkan komputer ini dengan tautan pemasangan.",
+      "connect": "Hubungkan…",
+      "useHosted": "Kembali ke stella.sh",
+      "switching": "Beralih…",
+      "switchFailed": "Tidak dapat beralih server"
+    },
+    "screen": {
+      "title": "Hubungkan komputer ini ke {name}",
+      "yourServer": "server Anda",
+      "body": "Komputer ini belum masuk ke server Anda. Buat tautan pemasangan di perangkat yang sudah terhubung (Pengaturan → Hubungkan perangkat) atau dengan pengaturan server, lalu tempel di sini.",
+      "paste": "Tempel tautan pemasangan"
+    },
+    "onboarding": {
+      "link": "Punya server Stella sendiri? Hubungkan"
+    }
   }
 }

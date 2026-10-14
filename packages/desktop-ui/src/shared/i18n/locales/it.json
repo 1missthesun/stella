@@ -3053,5 +3053,58 @@
         "pickCron": "Inserisci un'espressione cron."
       }
     }
+  },
+  "selfHost": {
+    "connect": {
+      "title": "Connettiti al tuo server",
+      "intro": "Incolla il link di abbinamento fornito dalla configurazione del tuo server. Inizia con stella://pair e funziona una sola volta, per 10 minuti.",
+      "linkLabel": "Link di abbinamento",
+      "checking": "Verifica in corso…",
+      "version": "Versione del server del {date}",
+      "ownerNotice": "Questo server è gestito dal suo proprietario, non da Stella. Le tue conversazioni, i tuoi file e il tuo accesso sono lì, e Stella non può vederli né recuperarli.",
+      "hostedNotice": "Questo è un server Stella gestito da Stella.",
+      "restartNotice": "Stella si riavvia su questo server. La tua installazione di stella.sh e il tuo account restano invariati, e puoi tornare indietro nelle Impostazioni.",
+      "connect": "Connetti",
+      "connecting": "Connessione in corso…",
+      "restartingTitle": "Connesso a {name}",
+      "restarting": "Stella si sta riavviando sul tuo server. Al primo avvio Stella viene scaricata da lì, e può richiedere qualche minuto.",
+      "unavailable": "Questa versione di Stella non può connettersi ad altri server."
+    },
+    "device": {
+      "title": "Connetti un dispositivo",
+      "intro": "Scansionalo con l'app Stella sul telefono o apri il link su un altro computer. Funziona una sola volta, per 10 minuti.",
+      "qrAlt": "Codice QR di abbinamento",
+      "copy": "Copia link",
+      "copied": "Copiato",
+      "expires": "Scade tra {time}",
+      "expired": "Questo codice è scaduto. Creane uno nuovo per connettere un dispositivo.",
+      "newCode": "Nuovo codice",
+      "claimed": "Un nuovo dispositivo è connesso.",
+      "claimedNamed": "{name} è connesso.",
+      "done": "Fine"
+    },
+    "settings": {
+      "title": "Server",
+      "hostedName": "Stella",
+      "hostedDesc": "Il servizio di Stella su stella.sh",
+      "selfHostedDesc": "Il tuo server su {host}",
+      "connectDevice": "Connetti un dispositivo",
+      "ownServerLabel": "Il tuo server",
+      "otherServerLabel": "Un altro server",
+      "ownServerDesc": "Esegui Stella sul tuo account Cloudflare e connetti questo computer con un link di abbinamento.",
+      "connect": "Connetti…",
+      "useHosted": "Torna a stella.sh",
+      "switching": "Cambio in corso…",
+      "switchFailed": "Impossibile cambiare server"
+    },
+    "screen": {
+      "title": "Connetti questo computer a {name}",
+      "yourServer": "il tuo server",
+      "body": "Questo computer non ha effettuato l'accesso al tuo server. Crea un link di abbinamento su un dispositivo già connesso (Impostazioni → Connetti un dispositivo) o con la configurazione del server, poi incollalo qui.",
+      "paste": "Incolla un link di abbinamento"
+    },
+    "onboarding": {
+      "link": "Hai un tuo server Stella? Connettilo"
+    }
   }
 }

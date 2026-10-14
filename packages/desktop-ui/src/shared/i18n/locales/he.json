@@ -3053,5 +3053,58 @@
         "pickCron": "הזינו ביטוי cron."
       }
     }
+  },
+  "selfHost": {
+    "connect": {
+      "title": "התחברות לשרת משלך",
+      "intro": "הדבק את קישור הצימוד שקיבלת בהגדרת השרת. הוא מתחיל ב-stella://pair ופועל פעם אחת במשך 10 דקות.",
+      "linkLabel": "קישור צימוד",
+      "checking": "בודק…",
+      "version": "גרסת השרת מ-{date}",
+      "ownerNotice": "את השרת הזה מפעיל הבעלים שלו, לא Stella. השיחות, הקבצים וההתחברות שלך נמצאים בו, ו-Stella לא יכולה לראות או לשחזר אותם.",
+      "hostedNotice": "זהו שרת Stella שמופעל על ידי Stella.",
+      "restartNotice": "Stella תופעל מחדש בשרת הזה. ההתקנה של stella.sh והחשבון שלך נשארים כמו שהם, ואפשר לחזור מההגדרות.",
+      "connect": "התחברות",
+      "connecting": "מתחבר…",
+      "restartingTitle": "מחובר ל-{name}",
+      "restarting": "Stella מופעלת מחדש בשרת שלך. בפעם הראשונה Stella מורדת ממנו, וזה עשוי לקחת כמה דקות.",
+      "unavailable": "גרסה זו של Stella לא יכולה להתחבר לשרתים אחרים."
+    },
+    "device": {
+      "title": "חיבור מכשיר",
+      "intro": "סרוק באפליקציית Stella בטלפון, או פתח את הקישור במחשב אחר. פועל פעם אחת במשך 10 דקות.",
+      "qrAlt": "קוד QR לצימוד",
+      "copy": "העתקת קישור",
+      "copied": "הועתק",
+      "expires": "יפוג בעוד {time}",
+      "expired": "תוקף הקוד פג. צור קוד חדש כדי לחבר מכשיר.",
+      "newCode": "קוד חדש",
+      "claimed": "מכשיר חדש חובר.",
+      "claimedNamed": "{name} חובר.",
+      "done": "סיום"
+    },
+    "settings": {
+      "title": "שרת",
+      "hostedName": "Stella",
+      "hostedDesc": "השירות של Stella ב-stella.sh",
+      "selfHostedDesc": "השרת שלך ב-{host}",
+      "connectDevice": "חיבור מכשיר",
+      "ownServerLabel": "שרת משלך",
+      "otherServerLabel": "שרת אחר",
+      "ownServerDesc": "הפעל את Stella בחשבון Cloudflare שלך וחבר את המחשב הזה באמצעות קישור צימוד.",
+      "connect": "התחברות…",
+      "useHosted": "חזרה ל-stella.sh",
+      "switching": "מחליף…",
+      "switchFailed": "לא ניתן להחליף שרת"
+    },
+    "screen": {
+      "title": "חבר את המחשב הזה ל-{name}",
+      "yourServer": "השרת שלך",
+      "body": "המחשב הזה לא מחובר לשרת שלך. צור קישור צימוד במכשיר שכבר מחובר (הגדרות ← חיבור מכשיר) או בהגדרת השרת, והדבק אותו כאן.",
+      "paste": "הדבקת קישור צימוד"
+    },
+    "onboarding": {
+      "link": "יש לך שרת Stella משלך? חבר אותו"
+    }
   }
 }

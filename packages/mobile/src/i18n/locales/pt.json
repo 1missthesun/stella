@@ -3053,5 +3053,58 @@
         "pickCron": "Digite uma expressão cron."
       }
     }
+  },
+  "selfHost": {
+    "connect": {
+      "title": "Conectar ao seu próprio servidor",
+      "intro": "Cole o link de pareamento gerado pela configuração do seu servidor. Ele começa com stella://pair e funciona uma vez, por 10 minutos.",
+      "linkLabel": "Link de pareamento",
+      "checking": "Verificando…",
+      "version": "Versão do servidor de {date}",
+      "ownerNotice": "Este servidor é operado pelo dono, não pela Stella. Suas conversas, arquivos e login ficam nele, e a Stella não pode vê-los nem recuperá-los.",
+      "hostedNotice": "Este é um servidor Stella operado pela Stella.",
+      "restartNotice": "A Stella reinicia neste servidor. Sua instalação do stella.sh e sua conta continuam como estão, e você pode voltar nos Ajustes.",
+      "connect": "Conectar",
+      "connecting": "Conectando…",
+      "restartingTitle": "Conectado a {name}",
+      "restarting": "Reiniciando a Stella no seu servidor. Na primeira vez, a Stella é baixada dele, o que pode levar alguns minutos.",
+      "unavailable": "Esta versão da Stella não consegue se conectar a outros servidores."
+    },
+    "device": {
+      "title": "Conectar um dispositivo",
+      "intro": "Escaneie com o app Stella no celular ou abra o link em outro computador. Funciona uma vez, por 10 minutos.",
+      "qrAlt": "QR code de pareamento",
+      "copy": "Copiar link",
+      "copied": "Copiado",
+      "expires": "Expira em {time}",
+      "expired": "Este código expirou. Crie um novo para conectar um dispositivo.",
+      "newCode": "Novo código",
+      "claimed": "Um novo dispositivo foi conectado.",
+      "claimedNamed": "{name} está conectado.",
+      "done": "Concluído"
+    },
+    "settings": {
+      "title": "Servidor",
+      "hostedName": "Stella",
+      "hostedDesc": "O serviço da própria Stella em stella.sh",
+      "selfHostedDesc": "Seu próprio servidor em {host}",
+      "connectDevice": "Conectar um dispositivo",
+      "ownServerLabel": "Seu próprio servidor",
+      "otherServerLabel": "Outro servidor",
+      "ownServerDesc": "Rode a Stella na sua própria conta da Cloudflare e conecte este computador com um link de pareamento.",
+      "connect": "Conectar…",
+      "useHosted": "Voltar para o stella.sh",
+      "switching": "Trocando…",
+      "switchFailed": "Não foi possível trocar de servidor"
+    },
+    "screen": {
+      "title": "Conecte este computador a {name}",
+      "yourServer": "seu servidor",
+      "body": "Este computador não está conectado ao seu servidor. Crie um link de pareamento em um dispositivo já conectado (Ajustes → Conectar um dispositivo) ou na configuração do servidor e cole aqui.",
+      "paste": "Colar um link de pareamento"
+    },
+    "onboarding": {
+      "link": "Tem seu próprio servidor Stella? Conecte-o"
+    }
   }
 }

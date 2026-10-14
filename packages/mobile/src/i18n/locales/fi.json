@@ -3037,5 +3037,58 @@
         "pickCron": "Anna cron-lauseke."
       }
     }
+  },
+  "selfHost": {
+    "connect": {
+      "title": "Yhdistä omaan palvelimeesi",
+      "intro": "Liitä palvelimesi asennuksen antama yhdistämislinkki. Se alkaa stella://pair ja toimii kerran, 10 minuutin ajan.",
+      "linkLabel": "Yhdistämislinkki",
+      "checking": "Tarkistetaan…",
+      "version": "Palvelinversio {date}",
+      "ownerNotice": "Tätä palvelinta ylläpitää sen omistaja, ei Stella. Keskustelusi, tiedostosi ja kirjautumisesi ovat siellä, eikä Stella voi nähdä tai palauttaa niitä.",
+      "hostedNotice": "Tämä on Stellan ylläpitämä Stella-palvelin.",
+      "restartNotice": "Stella käynnistyy uudelleen tällä palvelimella. stella.sh-asennuksesi ja tilisi pysyvät ennallaan, ja voit vaihtaa takaisin Asetuksissa.",
+      "connect": "Yhdistä",
+      "connecting": "Yhdistetään…",
+      "restartingTitle": "Yhdistetty: {name}",
+      "restarting": "Stella käynnistyy uudelleen palvelimellasi. Ensimmäisellä kerralla Stella ladataan sieltä, mikä voi kestää muutaman minuutin.",
+      "unavailable": "Tämä Stellan versio ei voi yhdistää muihin palvelimiin."
+    },
+    "device": {
+      "title": "Yhdistä laite",
+      "intro": "Skannaa tämä puhelimesi Stella-sovelluksella tai avaa linkki toisella tietokoneella. Se toimii kerran, 10 minuutin ajan.",
+      "qrAlt": "Yhdistämisen QR-koodi",
+      "copy": "Kopioi linkki",
+      "copied": "Kopioitu",
+      "expires": "Vanhenee {time} kuluttua",
+      "expired": "Koodi on vanhentunut. Luo uusi yhdistääksesi laitteen.",
+      "newCode": "Uusi koodi",
+      "claimed": "Uusi laite on yhdistetty.",
+      "claimedNamed": "{name} on yhdistetty.",
+      "done": "Valmis"
+    },
+    "settings": {
+      "title": "Palvelin",
+      "hostedName": "Stella",
+      "hostedDesc": "Stellan oma palvelu osoitteessa stella.sh",
+      "selfHostedDesc": "Oma palvelimesi osoitteessa {host}",
+      "connectDevice": "Yhdistä laite",
+      "ownServerLabel": "Oma palvelimesi",
+      "otherServerLabel": "Toinen palvelin",
+      "ownServerDesc": "Aja Stellaa omalla Cloudflare-tililläsi ja yhdistä tämä tietokone yhdistämislinkillä.",
+      "connect": "Yhdistä…",
+      "useHosted": "Vaihda takaisin stella.sh:hon",
+      "switching": "Vaihdetaan…",
+      "switchFailed": "Palvelimen vaihto epäonnistui"
+    },
+    "screen": {
+      "title": "Yhdistä tämä tietokone: {name}",
+      "yourServer": "palvelimesi",
+      "body": "Tämä tietokone ei ole kirjautunut palvelimellesi. Luo yhdistämislinkki jo yhdistetyllä laitteella (Asetukset → Yhdistä laite) tai palvelimen asennuksella ja liitä se tähän.",
+      "paste": "Liitä yhdistämislinkki"
+    },
+    "onboarding": {
+      "link": "Onko sinulla oma Stella-palvelin? Yhdistä se"
+    }
   }
 }

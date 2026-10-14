@@ -118,7 +118,7 @@ export async function playReadAloudStream(
   let started = false;
   let readerDone = false;
   let endOfStreamSignaled = false;
-  let forceEvict = false;
+  let waitingForPlayback = false;
 
   const teardown = () => {
     if (torn) return;
@@ -179,34 +179,27 @@ export async function playReadAloudStream(
       }
     };
 
-    const needsEvict = (): boolean => {
-      if (!sourceBuffer || sourceBuffer.buffered.length === 0) return false;
+    const playedRange = (slack: number): [number, number] | null => {
+      if (!sourceBuffer || sourceBuffer.buffered.length === 0) return null;
       const start = sourceBuffer.buffered.start(0);
-      const removeEnd = audio.currentTime - KEEP_BEHIND_SECONDS;
-      return removeEnd > start + 0.5;
+      const end = audio.currentTime - KEEP_BEHIND_SECONDS;
+      return end > start + slack ? [start, end] : null;
     };
 
-    // Runs exactly one SourceBuffer operation (remove or append) per idle
-    // cycle; each operation's `updateend` re-enters this pump.
+    const removePlayed = (slack: number): boolean => {
+      const range = playedRange(slack);
+      if (!range || !sourceBuffer) return false;
+      try {
+        sourceBuffer.remove(range[0], range[1]);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
     const pump = () => {
       if (torn || !sourceBuffer || sourceBuffer.updating) return;
-
-      if (forceEvict || needsEvict()) {
-        forceEvict = false;
-        try {
-          const start = sourceBuffer.buffered.start(0);
-          const removeEnd = Math.max(
-            start,
-            audio.currentTime - KEEP_BEHIND_SECONDS,
-          );
-          if (removeEnd > start) {
-            sourceBuffer.remove(start, removeEnd);
-            return;
-          }
-        } catch {
-          /* fall through to append */
-        }
-      }
+      if (removePlayed(0.5)) return;
 
       const chunk = queue.shift();
       if (chunk) {
@@ -214,10 +207,8 @@ export async function playReadAloudStream(
           sourceBuffer.appendBuffer(chunk as BufferSource);
         } catch (error) {
           if ((error as DOMException)?.name === "QuotaExceededError") {
-            // Buffer full: put the chunk back and evict played audio first.
             queue.unshift(chunk);
-            forceEvict = true;
-            pump();
+            if (!removePlayed(0)) waitingForPlayback = true;
             return;
           }
           fail(error);
@@ -261,6 +252,11 @@ export async function playReadAloudStream(
       options.onEnded?.();
     };
     audio.onerror = () => fail(new Error("read-aloud audio element error"));
+    audio.ontimeupdate = () => {
+      if (!waitingForPlayback) return;
+      waitingForPlayback = false;
+      pump();
+    };
 
     mediaSource.addEventListener(
       "sourceopen",

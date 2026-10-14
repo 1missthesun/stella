@@ -20,17 +20,17 @@ export const INSTANCE_TIERS: Record<
   }
 > = {
   small: {
-    instance: { vcpu: 1, memoryMib: 3 * 1024, diskMb: 12_000 },
-    instanceType: "custom-1-3g-12g",
+    instance: { vcpu: 1, memoryMib: 4 * 1024, diskMb: 12_000 },
+    instanceType: "custom-1-4g-12g",
     vCpu: 1,
-    memoryBytes: 3 * 1024 ** 3,
+    memoryBytes: 4 * 1024 ** 3,
     diskBytes: 12_000 * 1000 ** 2,
   },
   heavy: {
-    instance: { vcpu: 1, memoryMib: 3 * 1024, diskMb: 20_000 },
-    instanceType: "custom-1-3g-20g",
+    instance: { vcpu: 1, memoryMib: 4 * 1024, diskMb: 20_000 },
+    instanceType: "custom-1-4g-20g",
     vCpu: 1,
-    memoryBytes: 3 * 1024 ** 3,
+    memoryBytes: 4 * 1024 ** 3,
     diskBytes: 20_000 * 1000 ** 2,
   },
   large: {

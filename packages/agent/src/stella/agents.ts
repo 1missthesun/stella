@@ -1036,7 +1036,7 @@ export function stellaAgents(host: StellaAgentsHost) {
       workspace: Type.Optional(
         Type.Literal("large", {
           description:
-            'Cloud agents only. A cloud agent\'s container has 3 GiB of memory and a 12 GB disk; "large" gives it a 20 GB disk, for installing or building a big repository (several GB of dependencies, like a monorepo). An agent whose container runs out of memory or disk gets a larger one for its next run.',
+            'Cloud agents only. A cloud agent\'s container has 4 GiB of memory and a 12 GB disk; "large" gives it a 20 GB disk, for installing or building a big repository (several GB of dependencies, like a monorepo). An agent whose container runs out of memory or disk gets a larger one for its next run.',
         }),
       ),
     }),

@@ -2,6 +2,7 @@ use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::future::Future;
+use std::io::Write as _;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::{broadcast, Mutex};
@@ -338,6 +339,7 @@ impl BrowserManager {
             initialize_lightpanda_manager(ws_url, process).await?
         } else {
             let client = Arc::new(CdpClient::connect(&ws_url).await?);
+            spawn_dialog_auto_handler(&client);
             let mut manager = Self {
                 client,
                 browser_process: Some(process),
@@ -406,6 +408,7 @@ impl BrowserManager {
     pub async fn connect_cdp(url: &str) -> Result<Self, String> {
         let ws_url = resolve_cdp_url(url).await?;
         let client = Arc::new(CdpClient::connect(&ws_url).await?);
+        spawn_dialog_auto_handler(&client);
         let mut manager = Self {
             client,
             browser_process: None,
@@ -513,25 +516,72 @@ impl BrowserManager {
             }
 
             self.active_page_index = 0;
-            let Some(active_page) = self.pages.first() else {
+            if self.pages.is_empty() {
                 if live_target_ids.is_empty() {
                     return Ok(());
                 }
                 continue;
-            };
-            let active_target_id = active_page.target_id.clone();
-            let session_id = active_page.session_id.clone();
-            match self.enable_domains(&session_id).await {
-                Ok(()) if !target_churn_observed => return Ok(()),
-                Ok(()) => continue,
-                Err(error) => {
-                    if !is_target_churn_error(&error) {
-                        return Err(error);
+            }
+            let mut enabled = false;
+            let mut unresponsive = Vec::new();
+            let mut index = 0;
+            while index < self.pages.len() {
+                let target_id = self.pages[index].target_id.clone();
+                let session_id = self.pages[index].session_id.clone();
+                let mut attempt = self.enable_domains(&session_id).await;
+                if attempt
+                    .as_ref()
+                    .is_err_and(|error| !is_target_churn_error(error))
+                {
+                    let dismissed = self
+                        .client
+                        .send_command(
+                            "Page.handleJavaScriptDialog",
+                            Some(json!({ "accept": false })),
+                            Some(&session_id),
+                        )
+                        .await
+                        .is_ok();
+                    if dismissed {
+                        let _ = writeln!(
+                            std::io::stderr(),
+                            "[stella-browser] dismissed a dialog that was blocking {}",
+                            self.pages[index].url
+                        );
+                        attempt = self.enable_domains(&session_id).await;
                     }
-                    last_error = Some(error);
-                    self.remove_page_by_target_id(&active_target_id);
-                    quarantined_target_ids.insert(active_target_id);
                 }
+                match attempt {
+                    Ok(()) => {
+                        self.active_page_index = index;
+                        enabled = true;
+                        break;
+                    }
+                    Err(error) if is_target_churn_error(&error) => {
+                        last_error = Some(error);
+                        target_churn_observed = true;
+                        self.remove_page_by_target_id(&target_id);
+                        quarantined_target_ids.insert(target_id);
+                    }
+                    Err(error) => {
+                        unresponsive.push(format!("{} ({})", self.pages[index].url, error));
+                        last_error = Some(error);
+                        index += 1;
+                    }
+                }
+            }
+            if !unresponsive.is_empty() {
+                let _ = writeln!(
+                    std::io::stderr(),
+                    "[stella-browser] skipped unresponsive tabs while attaching: {}",
+                    unresponsive.join("; ")
+                );
+            }
+            if target_churn_observed {
+                continue;
+            }
+            if enabled || !self.pages.is_empty() {
+                return Ok(());
             }
         }
 
@@ -577,7 +627,9 @@ impl BrowserManager {
         self.pages
             .get(self.active_page_index)
             .map(|p| p.session_id.as_str())
-            .ok_or_else(|| "No active page".to_string())
+            .ok_or_else(|| {
+                "No open tab in this browser session. Open one with browser.tabs.new().".to_string()
+            })
     }
 
     pub async fn navigate(&mut self, url: &str, wait_until: WaitUntil) -> Result<Value, String> {
@@ -865,7 +917,9 @@ impl BrowserManager {
         self.pages
             .get(self.active_page_index)
             .map(|p| p.target_id.as_str())
-            .ok_or_else(|| "No active page".to_string())
+            .ok_or_else(|| {
+                "No open tab in this browser session. Open one with browser.tabs.new().".to_string()
+            })
     }
 
     pub fn is_cdp_connection(&self) -> bool {
@@ -1192,7 +1246,7 @@ impl BrowserManager {
         }
 
         if self.pages.len() <= 1 {
-            return Err("Cannot close the last tab".to_string());
+            return Err("Cannot close the last tab: it is your only open tab in Stella's browser, so it stays open. Reuse it with tab.goto(), or leave it: unmarked tabs close automatically when your turn ends (browser.tabs.finalize([]) closes them now).".to_string());
         }
 
         let page = self.pages.remove(target_index);
@@ -2282,4 +2336,60 @@ mod tests {
             .unwrap_err()
             .contains("Timeout waiting for networkidle"));
     }
+}
+
+fn spawn_dialog_auto_handler(client: &Arc<CdpClient>) {
+    let mut events = client.subscribe();
+    let weak = Arc::downgrade(client);
+    tokio::spawn(async move {
+        loop {
+            let event = match events.recv().await {
+                Ok(event) => event,
+                Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
+                Err(_) => break,
+            };
+            if event.method != "Page.javascriptDialogOpening" {
+                continue;
+            }
+            let Some(client) = weak.upgrade() else {
+                break;
+            };
+            let kind = event
+                .params
+                .get("type")
+                .and_then(Value::as_str)
+                .unwrap_or("alert")
+                .to_string();
+            let message = event
+                .params
+                .get("message")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .chars()
+                .take(200)
+                .collect::<String>();
+            let accept = kind == "beforeunload";
+            let session_id = event.session_id.clone();
+            tokio::spawn(async move {
+                let result = client
+                    .send_command(
+                        "Page.handleJavaScriptDialog",
+                        Some(json!({ "accept": accept })),
+                        session_id.as_deref(),
+                    )
+                    .await;
+                let _ = writeln!(
+                    std::io::stderr(),
+                    "[stella-browser] auto-{} {} dialog \"{}\"{}",
+                    if accept { "accepted" } else { "dismissed" },
+                    kind,
+                    message,
+                    result
+                        .err()
+                        .map(|e| format!(" (failed: {})", e))
+                        .unwrap_or_default()
+                );
+            });
+        }
+    });
 }

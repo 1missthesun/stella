@@ -189,7 +189,7 @@ impl CdpClient {
             }
             Err(_) => {
                 self.pending.lock().await.remove(&id);
-                return Err(format!("CDP command timed out: {}", method));
+                return Err(format!("CDP command timed out: {}. The page did not respond: it may be showing a dialog, be frozen, or still be loading. Navigate the tab again (tab.goto), or close it and open a new tab with browser.tabs.new().", method));
             }
         };
 

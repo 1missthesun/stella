@@ -500,7 +500,10 @@ const buildOptions = (env: AuthEnv) => {
         "/integrity/challenge": { window: 60, max: 30 },
       },
     },
-    advanced: { ipAddress: { ipAddressHeaders: ["cf-connecting-ip"] } },
+    advanced: {
+      ipAddress: { ipAddressHeaders: ["cf-connecting-ip"] },
+      database: { validateSchema: false },
+    },
     user: {
       additionalFields: {
         // The identity ladder: 0 anonymous, 1 email, 2 social. Paying (3) is

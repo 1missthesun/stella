@@ -273,16 +273,15 @@ export type MobilePairingProofResult =
  * carries for this (mobile, desktop) pair — absent means "not paired", which
  * is refused before any HMAC work so an unpaired phone learns nothing.
  *
- * `expectedChallenge` is the challenge the *server* derived from the request
- * it is about to act on. Passing it is what stops a proof minted for one
- * payload from authorizing another; omitting it verifies only that the phone
- * holds the pairing key.
+ * `expectedChallenge` is the challenge the server derived from the request it
+ * is about to act on, so a proof minted for one payload never authorizes
+ * another.
  */
 export const verifyMobilePairingProof = async (input: {
   headers?: Headers;
   fields?: MobilePairingProofFields | null;
   publicKey?: string | null;
-  expectedChallenge?: string;
+  expectedChallenge: string;
   now?: number;
   maxSkewMs?: number;
 }): Promise<MobilePairingProofResult> => {
@@ -305,10 +304,7 @@ export const verifyMobilePairingProof = async (input: {
   if (!(fields.issuedAt > 0) || Math.abs(now - fields.issuedAt) > skew) {
     return { ok: false, reason: "expired" };
   }
-  if (
-    input.expectedChallenge !== undefined &&
-    input.expectedChallenge !== fields.challenge
-  ) {
+  if (input.expectedChallenge !== fields.challenge) {
     return { ok: false, reason: "challenge_mismatch" };
   }
   const expected = await hmacSha256Hex(

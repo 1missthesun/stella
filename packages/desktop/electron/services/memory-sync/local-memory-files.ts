@@ -24,15 +24,38 @@ const errorCode = (error: unknown): string | undefined =>
 type CachedHash = { mtimeMs: number; size: number; ino: number; sha: string };
 
 /**
+ * `moved`: the file was not at the expected sha and nothing changed.
+ * `displaced`: another version was taken off the path and given to `preserve`.
+ */
+export type LocalMutation =
+  | { status: "done" }
+  | { status: "moved" }
+  | { status: "displaced" };
+
+/** Keeps bytes another writer put at `relative`; must be durable on return. */
+export type PreserveDisplaced = (
+  relative: string,
+  bytes: Uint8Array,
+) => Promise<void>;
+
+/**
  * This computer's side of the memory sync: the synced files under
- * `~/.stella` (`isSyncedMemoryPath`), read, written and deleted only by
- * compare-and-set. Writes land through a temporary sibling and a rename, as
- * `disk-memory.ts` writes them, so a turn never reads half a file.
+ * `~/.stella` (`isSyncedMemoryPath`).
+ *
+ * Other programs edit these files with ordinary writes, so no check can
+ * promise the file is unchanged at the instant of a rename. Instead nothing
+ * here destroys bytes it has not inspected: a new file is published with
+ * link(), which fails rather than replace one; a replaced or deleted file is
+ * first held under a hidden sibling and read, and any version other than the
+ * expected one goes to `preserve`.
  */
 export class LocalMemoryFiles {
   private readonly hashes = new Map<string, CachedHash>();
 
-  constructor(private readonly stellaDataDir: string) {}
+  constructor(
+    private readonly stellaDataDir: string,
+    private readonly preserve: PreserveDisplaced,
+  ) {}
 
   absolute(relative: string): string {
     return path.join(this.stellaDataDir, ...relative.split("/"));
@@ -122,68 +145,109 @@ export class LocalMemoryFiles {
     return bytes === null ? null : sha256Hex(bytes);
   }
 
-  /** Write `bytes` only while the file's sha is `expectSha` (`null`: absent). */
+  private sibling(relative: string, suffix: string): string {
+    const file = this.absolute(relative);
+    return path.join(
+      path.dirname(file),
+      `.${path.basename(file)}.${randomUUID()}.${suffix}`,
+    );
+  }
+
+  private async release(
+    relative: string,
+    held: string,
+    expectSha: string,
+  ): Promise<boolean> {
+    const bytes = await fs.readFile(held).then(
+      (buffer) => new Uint8Array(buffer),
+      () => null,
+    );
+    const displaced = bytes !== null && sha256Hex(bytes) !== expectSha;
+    if (displaced) await this.preserve(relative, bytes);
+    await fs.rm(held, { force: true });
+    return displaced;
+  }
+
+  /** Put `bytes` at `relative` if its sha is `expectSha` (`null`: absent). */
   async write(
     relative: string,
     bytes: Uint8Array,
     expectSha: string | null,
-  ): Promise<boolean> {
-    if ((await this.currentSha(relative)) !== expectSha) return false;
+  ): Promise<LocalMutation> {
+    if ((await this.currentSha(relative)) !== expectSha) {
+      return { status: "moved" };
+    }
     const file = this.absolute(relative);
-    const directory = path.dirname(file);
-    await fs.mkdir(directory, { recursive: true });
+    await fs.mkdir(path.dirname(file), { recursive: true });
     const mode =
       expectSha === null
         ? 0o644
         : ((await fs.stat(file).catch(() => null))?.mode ?? 0o644) & 0o777;
-    const temporary = path.join(
-      directory,
-      `.${path.basename(file)}.${randomUUID()}.tmp`,
-    );
+    const temporary = this.sibling(relative, "tmp");
     try {
       await fs.writeFile(temporary, bytes, { mode });
-      // Look again right before the rename: a local edit landing during the
-      // prep above must not be replaced.
-      if ((await this.currentSha(relative)) !== expectSha) {
-        await fs.rm(temporary, { force: true });
-        return false;
+      if (expectSha === null) {
+        try {
+          await fs.link(temporary, file);
+        } catch (error) {
+          if (errorCode(error) === "EEXIST") return { status: "moved" };
+          throw error;
+        }
+        this.hashes.delete(relative);
+        return { status: "done" };
       }
-      await fs.rename(temporary, file);
-    } catch (error) {
+      const held = this.sibling(relative, "replaced");
+      try {
+        await fs.link(file, held);
+      } catch (error) {
+        if (errorCode(error) === "ENOENT") return { status: "moved" };
+        throw error;
+      }
+      try {
+        await fs.rename(temporary, file);
+      } catch (error) {
+        await fs.rm(held, { force: true }).catch(() => undefined);
+        throw error;
+      }
+      this.hashes.delete(relative);
+      return (await this.release(relative, held, expectSha))
+        ? { status: "displaced" }
+        : { status: "done" };
+    } finally {
       await fs.rm(temporary, { force: true }).catch(() => undefined);
-      throw error;
     }
-    this.hashes.delete(relative);
-    return true;
   }
 
-  /** Delete the file only while its sha is `expectSha`; true when it is gone. */
-  async remove(relative: string, expectSha: string): Promise<boolean> {
+  /** Delete `relative` if its sha is `expectSha`; done when it is gone. */
+  async remove(relative: string, expectSha: string): Promise<LocalMutation> {
     const current = await this.currentSha(relative);
-    if (current === null) return true;
-    if (current !== expectSha) return false;
-    // Move the file aside first and check what was actually moved, so an edit
-    // landing between the check above and the delete is never lost.
+    if (current === null) return { status: "done" };
+    if (current !== expectSha) return { status: "moved" };
     const file = this.absolute(relative);
-    const aside = path.join(
-      path.dirname(file),
-      `.${path.basename(file)}.${randomUUID()}.deleting`,
-    );
+    const held = this.sibling(relative, "deleting");
     try {
-      await fs.rename(file, aside);
+      await fs.rename(file, held);
     } catch (error) {
-      if (errorCode(error) === "ENOENT") return true;
+      if (errorCode(error) === "ENOENT") return { status: "done" };
       throw error;
     }
     this.hashes.delete(relative);
-    const moved = await fs.readFile(aside).catch(() => null);
-    if (moved === null || sha256Hex(new Uint8Array(moved)) === expectSha) {
-      await fs.rm(aside, { force: true });
-      return true;
+    const moved = await fs.readFile(held).then(
+      (buffer) => sha256Hex(new Uint8Array(buffer)) !== expectSha,
+      () => false,
+    );
+    if (!moved) {
+      await fs.rm(held, { force: true });
+      return { status: "done" };
     }
-    // Changed meanwhile: put it back unless something newer took its place.
-    await fs.link(aside, file).catch(() => undefined);
-    await fs.rm(aside, { force: true });
-    return false;
+    try {
+      await fs.link(held, file);
+    } catch (error) {
+      if (errorCode(error) !== "EEXIST") throw error;
+      await this.release(relative, held, expectSha);
+      return { status: "displaced" };
+    }
+    await fs.rm(held, { force: true });
+    return { status: "moved" };
   }
 }

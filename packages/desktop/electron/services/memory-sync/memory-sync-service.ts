@@ -6,6 +6,7 @@ import {
   type FSWatcher,
   type Stats,
 } from "node:fs";
+import { randomUUID } from "node:crypto";
 import path from "node:path";
 
 import {
@@ -206,9 +207,17 @@ export class MemorySyncService {
   private memoriesWatcher: FSWatcher | null = null;
   private disposed = false;
   private passSubject: string | null = null;
+  private preserved: PendingMerge[] = [];
 
   constructor(private readonly options: MemorySyncServiceOptions) {
-    this.local = new LocalMemoryFiles(options.stellaDataDir);
+    this.local = new LocalMemoryFiles(
+      options.stellaDataDir,
+      async (relative, bytes) => {
+        const copy = await this.saveConflictCopy(relative, bytes);
+        this.preserved.push({ path: relative, copy, dispatchedAt: null });
+        this.log("memory_sync.conflict", { path: relative, displaced: true });
+      },
+    );
     this.stateDir = path.join(options.stellaDataDir, STATE_DIR);
   }
 
@@ -507,7 +516,8 @@ export class MemorySyncService {
     const failed: Array<{ path: string; error: unknown }> = [];
     let failedStep: MemorySyncFailure["step"] | null = null;
     try {
-      for (const action of actions) {
+      try {
+        for (const action of actions) {
         try {
           if (!(await this.apply(action, context))) settled = false;
         } catch (error) {
@@ -535,6 +545,9 @@ export class MemorySyncService {
             message: detail.message,
           });
         }
+      }
+      } finally {
+        merges.push(...this.preserved.splice(0));
       }
     } catch (error) {
       if (error instanceof PassStopped) {
@@ -691,9 +704,8 @@ export class MemorySyncService {
         );
         if (remote === null) return false;
         const bytes = encoder.encode(remote.content);
-        if (!(await this.local.write(action.path, bytes, action.expectLocal))) {
-          return false;
-        }
+        const wrote = await this.local.write(action.path, bytes, action.expectLocal);
+        if (wrote.status === "moved") return false;
         files[action.path] = { local: sha256Hex(bytes), cloud: remote.sha };
         return true;
       }
@@ -710,7 +722,7 @@ export class MemorySyncService {
         return true;
       }
       case "deleteLocal":
-        if (!(await this.local.remove(action.path, action.expectLocal))) {
+        if ((await this.local.remove(action.path, action.expectLocal)).status !== "done") {
           return false;
         }
         delete files[action.path];
@@ -729,7 +741,7 @@ export class MemorySyncService {
         }
         const copy = await this.saveConflictCopy(action.path, mine);
         const bytes = encoder.encode(remote.content);
-        if (!(await this.local.write(action.path, bytes, action.localSha))) {
+        if ((await this.local.write(action.path, bytes, action.localSha)).status === "moved") {
           await fs.rm(copy, { force: true }).catch(() => undefined);
           return false;
         }
@@ -745,7 +757,7 @@ export class MemorySyncService {
     relative: string,
     bytes: Uint8Array,
   ): Promise<string> {
-    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const stamp = `${new Date().toISOString().replace(/[:.]/g, "-")}-${randomUUID().slice(0, 8)}`;
     const copy = path.join(
       this.stateDir,
       CONFLICTS_DIR,
@@ -753,7 +765,13 @@ export class MemorySyncService {
       ...relative.split("/"),
     );
     await fs.mkdir(path.dirname(copy), { recursive: true });
-    await fs.writeFile(copy, bytes, { mode: 0o600 });
+    const handle = await fs.open(copy, "wx", 0o600);
+    try {
+      await handle.writeFile(bytes);
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
     return copy;
   }
 

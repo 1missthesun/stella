@@ -4,7 +4,7 @@ import {
   createRuntimeUnavailableError,
   JsonRpcPeer,
 } from "@stella/contracts/protocol/rpc-peer";
-import type { WorkerConnection } from "./worker-lifecycle.js";
+import type { WorkerConnection, WorkerProcess } from "./worker-lifecycle.js";
 
 export const createInprocPeerPair = (
   options: { onError?: (error: unknown) => void } = {},
@@ -33,33 +33,27 @@ export const createInprocPeerPair = (
 
 export type InprocWorkerAttach = (peer: JsonRpcPeer) => () => void;
 
-const buildInprocProcessShim = (
-  disconnect: () => void,
-): WorkerConnection["process"] => {
-  const emitter = new EventEmitter() as WorkerConnection["process"];
-  const state = { exitCode: null as number | null };
-  const exit = () => {
-    if (state.exitCode != null) return;
-    state.exitCode = 0;
-    disconnect();
-    emitter.emit("exit", 0, null);
-  };
-  Object.defineProperty(emitter, "exitCode", {
-    get: () => state.exitCode,
-  });
-  Object.assign(emitter, {
-    pid: process.pid,
-    signalCode: null,
-    stdin: { end: exit },
-    stdout: new EventEmitter(),
-    stderr: new EventEmitter(),
-    kill: () => {
-      exit();
-      return true;
-    },
-  });
-  return emitter;
-};
+class InprocWorkerProcess extends EventEmitter implements WorkerProcess {
+  exitCode: number | null = null;
+  readonly signalCode = null;
+  readonly stdin = { end: () => this.exit() };
+
+  constructor(private readonly disconnect: () => void) {
+    super();
+  }
+
+  kill(): boolean {
+    this.exit();
+    return true;
+  }
+
+  private exit(): void {
+    if (this.exitCode != null) return;
+    this.exitCode = 0;
+    this.disconnect();
+    this.emit("exit", 0, null);
+  }
+}
 
 export const buildInprocConnectionFactory = (
   attachWorker: InprocWorkerAttach,
@@ -69,7 +63,7 @@ export const buildInprocConnectionFactory = (
     const pair = createInprocPeerPair(options);
     const detach = attachWorker(pair.right);
     return {
-      process: buildInprocProcessShim(() => {
+      process: new InprocWorkerProcess(() => {
         detach();
         pair.close();
       }),

@@ -50,10 +50,7 @@ export const buildStdioConnectionFactory = (
         }),
     });
     return {
-      // The lifecycle controller only reads pid/exitCode/kill()/events from
-      // this shape; a real stdio child satisfies it directly (stderr is
-      // inherited rather than piped, hence the cast).
-      process: child as unknown as WorkerConnection["process"],
+      process: child,
       peer,
       pid: child.pid ?? -1,
       attachedToExistingWorker: false,

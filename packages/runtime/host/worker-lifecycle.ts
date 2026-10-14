@@ -1,4 +1,3 @@
-import { type ChildProcessWithoutNullStreams } from "node:child_process";
 import { Deferred, Effect, Fiber } from "effect";
 import {
   createRuntimeUnavailableError,
@@ -10,8 +9,23 @@ import type {
 } from "@stella/contracts/protocol";
 import { hostRuntime, runHostEffect } from "./effect-runtime.js";
 
+export interface WorkerProcess {
+  readonly exitCode: number | null;
+  readonly signalCode: NodeJS.Signals | null;
+  readonly stdin: { end(): void } | null;
+  kill(signal?: NodeJS.Signals): boolean;
+  once(
+    event: "exit",
+    listener: (code: number | null, signal: NodeJS.Signals | null) => void,
+  ): this;
+  off(
+    event: "exit",
+    listener: (code: number | null, signal: NodeJS.Signals | null) => void,
+  ): this;
+}
+
 export type WorkerConnection = {
-  process: ChildProcessWithoutNullStreams;
+  process: WorkerProcess;
   peer: JsonRpcPeer;
   pid: number;
   attachedToExistingWorker?: boolean;
@@ -32,7 +46,7 @@ export type WorkerHealthSnapshot = {
 };
 
 const waitForWorkerProcessExitEffect = (
-  child: ChildProcessWithoutNullStreams,
+  child: WorkerProcess,
   timeoutMs: number,
 ): Effect.Effect<void> =>
   Effect.raceFirst(
@@ -62,7 +76,7 @@ const waitForWorkerProcessExitEffect = (
   );
 
 const disconnectWorkerEffect = (
-  child: ChildProcessWithoutNullStreams,
+  child: WorkerProcess,
   timeoutMs: number,
 ): Effect.Effect<void> =>
   Effect.suspend(() => {

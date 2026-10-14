@@ -1593,6 +1593,7 @@ const destroy = async () => {
   if (problems.length) fail(step, `Some things couldn't be deleted (state kept so you can run destroy again):\n  ${problems.join("\n  ")}`);
   if (state) rmSync(statePath(accountId), { force: true });
   rmSync(path.join(STATE_DIR, `pair-${PREFIX}.svg`), { force: true });
+  rmSync(path.join(STATE_DIR, `review-${PREFIX}.svg`), { force: true });
   rmSync(GEN_DIR, { recursive: true, force: true });
   emit(step, "ready", `Everything named ${PREFIX}-* is gone from ${account.name}.`);
 };

@@ -695,7 +695,7 @@ const ownerModeDefault = (
 
 export const snapshotEngines = (
   db: OwnerDbReader,
-  options: { ownerMode?: boolean } = {},
+  options: { ownerMode?: boolean; managedModels?: boolean } = {},
 ): Pick<OwnerSnapshot, "execution" | "connectedEngines" | "connectedProviders"> => {
   const connectedEngines = readOrDefault(() => connectedEnginesOf(db), []);
   const connectedProviders = readOrDefault(() => connectedProvidersOf(db), [] as string[]);
@@ -706,7 +706,10 @@ export const snapshotEngines = (
       ? connectedProviders.includes(selection.provider)
       : connectedEngines.includes(selection.engine));
   const fallback = options.ownerMode ? ownerModeDefault(connectedEngines) : DEFAULT_EXECUTION;
-  const usesDefault = !runnable || (selection.engine === "stella" && selection.model === DEFAULT_EXECUTION.model);
+  const usesDefault =
+    !runnable ||
+    (selection.engine === "stella" &&
+      (selection.model === DEFAULT_EXECUTION.model || options.managedModels === false));
   return {
     execution: usesDefault && options.ownerMode ? fallback : runnable ? selection : DEFAULT_EXECUTION,
     connectedEngines,

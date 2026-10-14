@@ -123,6 +123,7 @@ import {
 } from "./dispatch-policy.js";
 import type { OwnerModelGrant } from "./owner-model-grants.js";
 import { ownerModeEnabled } from "./selfhost/owner-mode.js";
+import { gatewayCapabilities } from "./selfhost/discovery.js";
 import { MemoryPolicyError } from "./memory-policy.js";
 import type {
   MemoryPolicy,
@@ -865,6 +866,8 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     options: { refresh?: boolean; now?: number } = {},
   ): Promise<OwnerSnapshot> {
     await this.ensureTestClaude();
+    const ownerMode = ownerModeEnabled(this.env);
+    const managedModels = ownerMode ? (await gatewayCapabilities(this.env))?.managedModels : undefined;
     const now = options.now ?? Date.now();
     const store = this.ownerStore();
     const ctx = store.context(null, now);
@@ -886,7 +889,7 @@ export class OwnerGate extends OwnerGateCloudDispatch {
           budgetMicroCents: 0,
         },
         ...snapshotDevices(ctx.db),
-        ...snapshotEngines(ctx.db, { ownerMode: ownerModeEnabled(ctx.env) }),
+        ...snapshotEngines(ctx.db, { ownerMode, ...(managedModels === undefined ? {} : { managedModels }) }),
         ...snapshotTimeZone(ctx.db),
         fetchedAt: now,
         ttlMs: SNAPSHOT_TTL_MS,

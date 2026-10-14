@@ -41,7 +41,7 @@ const GATEWAY_TIMEOUT_MS = 2_000;
 const CAPABILITY_CACHE_MS = 60_000;
 let gatewayCache: { at: number; value: GatewayCapabilities | null } | undefined;
 
-export const gatewayCapabilities = async (env: Cloudflare.Env): Promise<GatewayCapabilities | null> => {
+export const gatewayCapabilities = async (env: unknown): Promise<GatewayCapabilities | null> => {
   if (gatewayCache && Date.now() - gatewayCache.at < CAPABILITY_CACHE_MS) return gatewayCache.value;
   const control = (env as { MODEL_GATEWAY_CONTROL?: { capabilities?: () => Promise<GatewayCapabilities> } })
     .MODEL_GATEWAY_CONTROL;

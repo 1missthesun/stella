@@ -163,6 +163,7 @@ import {
 } from "./turn-credential-broker.js";
 import { ownerGateStub } from "./rpc-release.js";
 import { BROWSER_BUDGET_MESSAGE } from "./browser-billing.js";
+import { containerBudgetMessage } from "./container-meter.js";
 
 /** How long recovered work waits for its turn or agent run to bind a transport. */
 const BINDING_WAIT_MS = 120_000;
@@ -1299,7 +1300,10 @@ export class PiConversationRuntime {
     const agentConversationId = call.conversationId as ConversationId;
     const sessionId = await this.#providerSession(harness, agentConversationId, context);
     const active = await this.#agentRun(sessionId, context.abortSignal);
-    const held = await this.#lease(agentConversationId, active, context);
+    const held = await this.#lease(agentConversationId, active, context).catch((error: unknown) => {
+      const budget = containerBudgetMessage(error);
+      throw budget ? new Error(budget) : error;
+    });
     held.inFlight += 1;
     const signal = context.abortSignal;
     const stop = () => {
@@ -1312,7 +1316,8 @@ export class PiConversationRuntime {
       return await held.lease.call({ toolCallId: call.callId, toolName: call.toolName, params: call.params });
     } catch (error) {
       void this.#dropLease(agentConversationId, held).catch((dropError: unknown) => this.#options.report(dropError));
-      throw error;
+      const budget = containerBudgetMessage(error);
+      throw budget ? new Error(budget) : error;
     } finally {
       signal?.removeEventListener("abort", stop);
       held.inFlight -= 1;

@@ -40,6 +40,7 @@ import {
   type UpdatePlan,
 } from "./update-plan.js";
 import {
+  buildOnScratch,
   checkMergedUpdate,
   prebuildElectronBundles,
   prepareInstallAhead,
@@ -694,6 +695,21 @@ export class AppSourceService {
     this.mark("diff");
     const install = installs(paths);
     const restart = relaunches(paths);
+    let bundles = prepared?.bundles && prepared.to === to ? prepared.dir : undefined;
+    if (restart && !bundles) {
+      bundles = `${this.options.updateScratchDir}-apply-bundles`;
+      const built = await buildOnScratch({
+        cwd,
+        commit: to,
+        scratch: `${this.options.updateScratchDir}-apply`,
+        keep: bundles,
+      });
+      this.mark("build");
+      if (!built.ok) {
+        this.options.log("app-source.apply-build-failed", { to: to.slice(0, 12), output: built.output });
+        throw new Error("This version of Stella would not start, so it wasn't applied.");
+      }
+    }
     const visible =
       !restart &&
       paths.some(
@@ -712,8 +728,6 @@ export class AppSourceService {
     }
     this.mark("sign");
     const settling = settle?.() ?? Promise.resolve();
-    // Failing here leaves the change applied but its swap undone; awaited
-    // where it is reported instead.
     settling.catch(() => undefined);
     this.options.log("app-source.applied", { files: paths.length });
     if (restart) {
@@ -727,14 +741,12 @@ export class AppSourceService {
         await (await holding)?.release();
         throw error;
       }
-      // A main that does not build is left to the next launch, which fails
-      // the same way and shows the launcher's recovery.
       const [, setUp] = await Promise.all([
         prebuildElectronBundles(
           cwd,
           `${this.options.updateScratchDir}-prebuild.mjs`,
           this.options.log,
-          prepared?.bundles && prepared.to === to ? prepared.dir : undefined,
+          bundles,
         ),
         this.options.launcherPreparesOnRelaunch
           ? prepareInstallAhead(cwd, this.options.log)

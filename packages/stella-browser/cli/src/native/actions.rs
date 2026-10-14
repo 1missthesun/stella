@@ -1885,7 +1885,7 @@ async fn dispatch_action(
 ) -> Result<Value, String> {
     match action {
         "healthcheck" => Ok(json!({ "status": "ok" })),
-        "extension_status" => Ok(handle_extension_status(state).await),
+        "extension_status" => Ok(handle_extension_status(state, cmd).await),
         "extension_reconnect" => Ok(handle_extension_reconnect(state).await),
         "launch" => handle_launch(cmd, state).await,
         "navigate" => handle_navigate(cmd, state).await,
@@ -2640,17 +2640,26 @@ async fn handle_chain(cmd: &Value, state: &mut DaemonState, id: &str) -> Value {
     response
 }
 
-async fn handle_extension_status(state: &DaemonState) -> Value {
-    let connection_generation = match state.extension_bridge.as_ref() {
-        Some(bridge) => bridge.verified_connection_generation().await,
-        None => None,
+async fn handle_extension_status(state: &DaemonState, cmd: &Value) -> Value {
+    let owner = cmd.get("ownerId").and_then(Value::as_str);
+    let mut status = match state.extension_bridge.as_ref() {
+        Some(bridge) => {
+            let generation = bridge.verified_connection_generation().await;
+            let mut status = bridge.status_for(owner).await;
+            status["connected"] = json!(generation.is_some());
+            status["authorized"] = json!(generation.is_some());
+            status["connectionGeneration"] = json!(generation);
+            status
+        }
+        None => json!({
+            "connected": false,
+            "authorized": false,
+            "connectionGeneration": null,
+            "clients": [],
+        }),
     };
-    json!({
-        "connected": connection_generation.is_some(),
-        "authorized": connection_generation.is_some(),
-        "connectionGeneration": connection_generation,
-        "daemonGeneration": std::process::id(),
-    })
+    status["daemonGeneration"] = json!(std::process::id());
+    status
 }
 
 async fn handle_extension_reconnect(state: &DaemonState) -> Value {
@@ -2812,6 +2821,9 @@ async fn forward_targeted_extension_command(cmd: &Value, state: &DaemonState) ->
         return error_response(&id, "External frame snapshots are unavailable with a configured domain allowlist. Use the in-app browser, which validates each frame's domain before capture.");
     }
     if let Some(ref bridge) = state.extension_bridge {
+        if cmd.get("action").and_then(Value::as_str) == Some("extension_status") {
+            return success_response(&id, handle_extension_status(state, cmd).await);
+        }
         return forward_extension_command(cmd, bridge).await;
     }
     let Some(proxy) = state.extension_proxy.clone() else {

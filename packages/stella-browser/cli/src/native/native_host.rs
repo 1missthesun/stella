@@ -16,7 +16,9 @@ const BRIDGE_IDLE_TICK: Duration = Duration::from_millis(500);
 
 fn read_bridge_token(session: &str) -> Option<String> {
     let token_path = get_socket_dir().join(format!("{}.ext-token", session));
-    fs::read_to_string(&token_path).ok().map(|s| s.trim().to_string())
+    fs::read_to_string(&token_path)
+        .ok()
+        .map(|s| s.trim().to_string())
 }
 
 fn read_bridge_port(session: &str) -> u16 {
@@ -27,10 +29,89 @@ fn read_bridge_port(session: &str) -> u16 {
         .unwrap_or(DEFAULT_PORT)
 }
 
+fn parent_pid() -> Option<u32> {
+    #[cfg(unix)]
+    {
+        let pid = unsafe { libc::getppid() };
+        if pid > 1 {
+            return Some(pid as u32);
+        }
+    }
+    None
+}
+
+fn process_command_line(pid: u32) -> Option<(String, Vec<String>)> {
+    #[cfg(target_os = "linux")]
+    {
+        let exe = fs::read_link(format!("/proc/{}/exe", pid)).ok()?;
+        let raw = fs::read(format!("/proc/{}/cmdline", pid)).ok()?;
+        let args = raw
+            .split(|b| *b == 0)
+            .filter(|a| !a.is_empty())
+            .map(|a| String::from_utf8_lossy(a).into_owned())
+            .collect();
+        return Some((exe.to_string_lossy().into_owned(), args));
+    }
+    #[cfg(all(unix, not(target_os = "linux")))]
+    {
+        let output = std::process::Command::new("ps")
+            .args(["-p", &pid.to_string(), "-o", "command="])
+            .output()
+            .ok()?;
+        let command = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if command.is_empty() {
+            return None;
+        }
+        let exe = match command.find(" --") {
+            Some(index) => command[..index].to_string(),
+            None => command.clone(),
+        };
+        let args = command
+            .split(" --")
+            .skip(1)
+            .map(|arg| format!("--{}", arg.trim()))
+            .collect();
+        return Some((exe, args));
+    }
+    #[allow(unreachable_code)]
+    {
+        let _ = pid;
+        None
+    }
+}
+
+fn client_identity() -> Value {
+    let origin = std::env::args()
+        .skip(1)
+        .find(|a| a.starts_with("chrome-extension://"));
+    let bundle_id = std::env::var("__CFBundleIdentifier").ok();
+    let ppid = parent_pid();
+    let (parent_exe, user_data_dir) = match ppid.and_then(process_command_line) {
+        Some((exe, args)) => {
+            let dir = args.iter().find_map(|arg| {
+                arg.strip_prefix("--user-data-dir=")
+                    .map(|v| v.trim().trim_matches('"').to_string())
+            });
+            (Some(exe), dir)
+        }
+        None => (None, None),
+    };
+    json!({
+        "origin": origin,
+        "bundleId": bundle_id,
+        "parentPid": ppid,
+        "parentExe": parent_exe,
+        "userDataDir": user_data_dir,
+    })
+}
+
 fn inject_token_if_needed(payload: &mut Value, token: &str) {
     if let Some(obj) = payload.as_object_mut() {
         if obj.get("type").and_then(|v| v.as_str()) != Some("hello") {
             return;
+        }
+        if !obj.contains_key("client") {
+            obj.insert("client".to_string(), client_identity());
         }
         let current = obj
             .get("token")
@@ -86,8 +167,7 @@ fn set_tcp_keepalive(stream: &TcpStream) {
 }
 
 fn send_frame_to_tcp(tcp: &mut TcpStream, buf: &[u8], bridge_token: &str) -> bool {
-    let needs_injection = !bridge_token.is_empty()
-        && buf.windows(b"\"hello\"".len()).any(|w| w == b"\"hello\"");
+    let needs_injection = buf.windows(b"\"hello\"".len()).any(|w| w == b"\"hello\"");
 
     let written = if needs_injection {
         let mut value: Value = match serde_json::from_slice(buf) {
@@ -204,11 +284,7 @@ pub fn run_native_host() -> Result<(), String> {
 
     let mut tcp = match connect_to_daemon(&session) {
         Some(tcp) => tcp,
-        None => {
-            return Err(
-                "Stella browser bridge is not running. Open Stella first.".to_string(),
-            )
-        }
+        None => return Err("Stella browser bridge is not running. Open Stella first.".to_string()),
     };
 
     set_tcp_keepalive(&tcp);

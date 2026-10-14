@@ -895,6 +895,58 @@ async fn handle_connection<S>(
                     }
                 }
 
+                if action == Some("extension_routing_set") {
+                    let response = match authorization {
+                        Err(ref response) => response.clone(),
+                        Ok(()) if is_extension_delegation => serde_json::json!({
+                            "id": cmd.get("id").and_then(Value::as_str).unwrap_or(""),
+                            "success": false,
+                            "error": "Only Stella's desktop app may change which browser is used",
+                        }),
+                        Ok(()) => {
+                            let bridge = state.lock().await.extension_bridge.clone();
+                            let preferred = cmd
+                                .get("preferredKey")
+                                .and_then(Value::as_str)
+                                .map(str::to_string);
+                            let disabled = cmd
+                                .get("disabledKeys")
+                                .and_then(Value::as_array)
+                                .map(|keys| {
+                                    keys.iter()
+                                        .filter_map(Value::as_str)
+                                        .map(str::to_string)
+                                        .collect::<Vec<_>>()
+                                })
+                                .unwrap_or_default();
+                            match bridge {
+                                Some(bridge) => {
+                                    bridge.set_routing(preferred, disabled).await;
+                                    let mut data = bridge.status().await;
+                                    data["daemonGeneration"] =
+                                        serde_json::json!(std::process::id());
+                                    serde_json::json!({
+                                        "id": cmd.get("id").and_then(Value::as_str).unwrap_or(""),
+                                        "success": true,
+                                        "data": data,
+                                    })
+                                }
+                                None => serde_json::json!({
+                                    "id": cmd.get("id").and_then(Value::as_str).unwrap_or(""),
+                                    "success": false,
+                                    "error": "The browser extension bridge is not running",
+                                }),
+                            }
+                        }
+                    };
+                    let mut resp = serde_json::to_string(&response).unwrap_or_default();
+                    resp.push('\n');
+                    if writer.write_all(resp.as_bytes()).await.is_err() {
+                        break;
+                    }
+                    continue;
+                }
+
                 if action == Some("subscribe_events") {
                     match authorization {
                         Err(response) => {
@@ -1192,7 +1244,8 @@ mod tests {
     async fn test_stream_extension_events_emits_lag_notice_when_overflowed() {
         let (tx, rx) = broadcast::channel::<String>(2);
         for i in 0..5 {
-            tx.send(format!("{{\"type\":\"event\",\"n\":{}}}", i)).unwrap();
+            tx.send(format!("{{\"type\":\"event\",\"n\":{}}}", i))
+                .unwrap();
         }
         let (mut client, server) = tokio::io::duplex(4096);
         let (server_read, mut server_write) = tokio::io::split(server);

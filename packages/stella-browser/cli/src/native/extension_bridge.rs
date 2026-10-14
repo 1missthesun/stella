@@ -1,5 +1,9 @@
 use serde_json::{json, Value};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap, HashSet};
+
+use super::extension_clients::{
+    find_profile_with_marker, probe_marker, read_profile_identity, ActivityRanker, ClientInfo,
+};
 use std::env;
 use std::fs;
 use std::io::Write as IoWrite;
@@ -77,17 +81,71 @@ struct PendingCommand {
     generation: u64,
 }
 
+struct Connection {
+    cmd_tx: mpsc::Sender<String>,
+    info: ClientInfo,
+    connected_at_ms: u64,
+    last_health_check: Instant,
+    missed_health_checks: u32,
+}
+
 struct BridgeInner {
-    connected: bool,
+    connections: BTreeMap<u64, Connection>,
     last_connection_error: Option<String>,
-    cmd_tx: Option<mpsc::Sender<String>>,
-    connection_generation: Option<u64>,
     next_generation: u64,
     pending: HashMap<String, PendingCommand>,
-    last_health_check: Instant,
+    owner_routes: HashMap<String, String>,
+    known_labels: HashMap<String, String>,
+    preferred_key: Option<String>,
+    disabled_keys: HashSet<String>,
+}
+
+impl BridgeInner {
+    fn enabled(&self, connection: &Connection) -> bool {
+        !self.disabled_keys.contains(&connection.info.key())
+    }
+
+    fn has_enabled_connection(&self) -> bool {
+        self.connections.values().any(|c| self.enabled(c))
+    }
+
+    fn newest_with_key(&self, key: &str) -> Option<u64> {
+        self.connections
+            .iter()
+            .rev()
+            .find(|(_, c)| c.info.key() == key && self.enabled(c))
+            .map(|(generation, _)| *generation)
+    }
+
+    fn labels(&self) -> String {
+        let labels: Vec<String> = self
+            .connections
+            .iter()
+            .map(|(generation, c)| {
+                let off = if self.enabled(c) { "" } else { ", turned off" };
+                format!("\"{}\" (id {}{})", c.info.label(), generation, off)
+            })
+            .collect();
+        labels.join(", ")
+    }
 }
 
 const EVENT_BROADCAST_CAPACITY: usize = 256;
+const DIALOG_GUARD: &str = "(() => { const w = window; const native = (f) => typeof f === 'function' && /\\[native code\\]/.test(Function.prototype.toString.call(f)); if (!Array.isArray(w.__stellaDialogs)) w.__stellaDialogs = []; const rec = (type, message, result) => { w.__stellaDialogs.push({ type, message: String(message ?? '').slice(0, 300), answer: result === undefined ? 'ok' : result }); return result; }; if (native(w.alert)) w.alert = function (m) { rec('alert', m, undefined); }; if (native(w.confirm)) w.confirm = function (m) { return rec('confirm', m, false); }; if (native(w.prompt)) w.prompt = function (m) { return rec('prompt', m, null); }; return w.__stellaDialogs.splice(0); })()";
+const DISARM_BEFOREUNLOAD: &str = "(() => { try { window.onbeforeunload = null; } catch (e) {} try { Object.defineProperty(window, 'onbeforeunload', { configurable: true, get() { return null; }, set() {} }); } catch (e) {} try { const proto = BeforeUnloadEvent.prototype; Object.defineProperty(proto, 'returnValue', { configurable: true, get() { return ''; }, set() {} }); Object.defineProperty(proto, 'preventDefault', { configurable: true, value() {} }); } catch (e) {} return true; })()";
+const LIFECYCLE_ACTIONS: [&str; 4] = [
+    "finalize_tabs",
+    "close_owner",
+    "release_owner_lease",
+    "close",
+];
+
+fn now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
 
 #[derive(Clone)]
 pub struct ExtensionBridge {
@@ -97,7 +155,6 @@ pub struct ExtensionBridge {
     connected_notify: Arc<Notify>,
     shutdown_tx: Option<mpsc::Sender<()>>,
     events_tx: broadcast::Sender<String>,
-    missed_health_checks: Arc<std::sync::Mutex<(u64, u32)>>,
 }
 
 impl ExtensionBridge {
@@ -121,18 +178,18 @@ impl ExtensionBridge {
             port,
             token,
             inner: Arc::new(Mutex::new(BridgeInner {
-                connected: false,
+                connections: BTreeMap::new(),
                 last_connection_error: None,
-                cmd_tx: None,
-                connection_generation: None,
                 next_generation: 0,
                 pending: HashMap::new(),
-                last_health_check: Instant::now() - Duration::from_secs(60),
+                owner_routes: HashMap::new(),
+                known_labels: HashMap::new(),
+                preferred_key: None,
+                disabled_keys: HashSet::new(),
             })),
             connected_notify: Arc::new(Notify::new()),
             shutdown_tx: None,
             events_tx: broadcast::channel(EVENT_BROADCAST_CAPACITY).0,
-            missed_health_checks: Arc::new(std::sync::Mutex::new((0, 0))),
         }
     }
 
@@ -243,252 +300,568 @@ impl ExtensionBridge {
     }
 
     pub async fn wait_for_connection(&self) -> bool {
-        {
-            let guard = self.inner.lock().await;
-            if guard.connected && guard.cmd_tx.is_some() {
-                return true;
+        let deadline = tokio::time::Instant::now() + Duration::from_millis(DEFAULT_WAIT_TIMEOUT_MS);
+        loop {
+            let notified = self.connected_notify.notified();
+            {
+                let guard = self.inner.lock().await;
+                if guard.has_enabled_connection() {
+                    return true;
+                }
+                if !guard.connections.is_empty() {
+                    return false;
+                }
             }
-        }
-
-        let timeout = Duration::from_millis(DEFAULT_WAIT_TIMEOUT_MS);
-        tokio::select! {
-            _ = self.connected_notify.notified() => {
-                let guard = self.inner.lock().await;
-                guard.connected && guard.cmd_tx.is_some()
-            },
-            _ = tokio::time::sleep(timeout) => {
-                let guard = self.inner.lock().await;
-                guard.connected && guard.cmd_tx.is_some()
+            tokio::select! {
+                _ = notified => {},
+                _ = tokio::time::sleep_until(deadline) => {
+                    return self.inner.lock().await.has_enabled_connection();
+                }
             }
         }
     }
 
     pub async fn is_connected(&self) -> bool {
-        let guard = self.inner.lock().await;
-        guard.connected
+        self.inner.lock().await.has_enabled_connection()
     }
 
     pub async fn verified_connection_generation(&self) -> Option<u64> {
-        let (alive, generation) = self.verify_connection().await;
-        let generation = generation?;
-        if alive {
-            self.reset_missed_health_checks();
-            return Some(generation);
+        for _ in 0..4 {
+            let generation = self.select_generation(None, None, false).await.ok()?;
+            if self.check_health(generation).await {
+                return Some(generation);
+            }
+            if self
+                .inner
+                .lock()
+                .await
+                .connections
+                .contains_key(&generation)
+            {
+                return Some(generation);
+            }
         }
-        if self.record_missed_health_check(generation) < DEAD_AFTER_MISSED_HEALTH_CHECKS {
-            return Some(generation);
-        }
-        self.reset_missed_health_checks();
-        deactivate_connection(&self.inner, generation).await;
         None
     }
 
     pub async fn force_reconnect(&self) -> bool {
-        let generation = {
+        let generations: Vec<u64> = self
+            .inner
+            .lock()
+            .await
+            .connections
+            .keys()
+            .copied()
+            .collect();
+        let mut retired = false;
+        for generation in generations {
+            retired |= deactivate_connection(&self.inner, generation).await;
+        }
+        retired
+    }
+
+    pub async fn set_routing(&self, preferred_key: Option<String>, disabled_keys: Vec<String>) {
+        let mut guard = self.inner.lock().await;
+        guard.preferred_key = preferred_key.filter(|key| !key.trim().is_empty());
+        guard.disabled_keys = disabled_keys.into_iter().collect();
+        let disabled = guard.disabled_keys.clone();
+        guard.owner_routes.retain(|_, key| !disabled.contains(key));
+        drop(guard);
+        self.connected_notify.notify_waiters();
+    }
+
+    pub async fn status(&self) -> Value {
+        self.status_for(None).await
+    }
+
+    pub async fn status_for(&self, owner: Option<&str>) -> Value {
+        let in_use = self.select_generation(None, None, false).await.ok();
+        let guard = self.inner.lock().await;
+        let owner_key = owner
+            .and_then(|owner| guard.owner_routes.get(owner))
+            .cloned();
+        let clients: Vec<Value> = guard
+            .connections
+            .iter()
+            .map(|(generation, connection)| {
+                let mut client = connection.info.to_json();
+                if let Some(object) = client.as_object_mut() {
+                    object.insert("id".to_string(), json!(generation.to_string()));
+                    object.insert(
+                        "connectedAtMs".to_string(),
+                        json!(connection.connected_at_ms),
+                    );
+                    object.insert("enabled".to_string(), json!(guard.enabled(connection)));
+                    object.insert("inUse".to_string(), json!(in_use == Some(*generation)));
+                    if owner.is_some() {
+                        object.insert(
+                            "current".to_string(),
+                            json!(owner_key.as_deref() == Some(connection.info.key().as_str())),
+                        );
+                    }
+                }
+                client
+            })
+            .collect();
+        let mut disabled: Vec<&String> = guard.disabled_keys.iter().collect();
+        disabled.sort();
+        json!({
+            "connected": in_use.is_some(),
+            "authorized": in_use.is_some(),
+            "connectionGeneration": in_use,
+            "preferredKey": guard.preferred_key,
+            "disabledKeys": disabled,
+            "clients": clients,
+        })
+    }
+
+    async fn select_generation(
+        &self,
+        owner: Option<&str>,
+        target: Option<&str>,
+        remember: bool,
+    ) -> Result<u64, String> {
+        let (candidates, preferred) = {
             let guard = self.inner.lock().await;
-            guard.connection_generation
+            if let Some(target) = target.map(str::trim).filter(|t| !t.is_empty()) {
+                let needle = target.to_lowercase();
+                let found = guard
+                    .connections
+                    .iter()
+                    .rev()
+                    .find(|(generation, c)| {
+                        generation.to_string() == target || c.info.key() == target
+                    })
+                    .or_else(|| {
+                        guard
+                            .connections
+                            .iter()
+                            .rev()
+                            .find(|(_, c)| c.info.label().to_lowercase().contains(&needle))
+                    });
+                return match found {
+                    Some((_, c)) if !guard.enabled(c) => Err(format!(
+                        "The browser \"{}\" is turned off in Stella's Settings (Browser extension). Use another browser or ask the user to turn it back on.",
+                        c.info.label()
+                    )),
+                    Some((generation, _)) => {
+                        let generation = *generation;
+                        drop(guard);
+                        if remember {
+                            self.remember_route(owner, generation).await;
+                        }
+                        Ok(generation)
+                    }
+                    None if guard.connections.is_empty() => Err(not_connected_error(&guard)),
+                    None => Err(format!(
+                        "No connected browser matches \"{}\". Connected browsers: {}. Use one of these with browser.use(\"external\", {{ browser: \"<label>\" }}).",
+                        target,
+                        guard.labels()
+                    )),
+                };
+            }
+            if let Some(key) = owner.and_then(|owner| guard.owner_routes.get(owner)) {
+                if let Some(generation) = guard.newest_with_key(key) {
+                    return Ok(generation);
+                }
+            }
+            if let Some(key) = guard.preferred_key.clone() {
+                if let Some(generation) = guard.newest_with_key(&key) {
+                    drop(guard);
+                    if remember {
+                        self.remember_route(owner, generation).await;
+                    }
+                    return Ok(generation);
+                }
+            }
+            let candidates: Vec<(u64, ClientInfo, u64)> = guard
+                .connections
+                .iter()
+                .filter(|(_, c)| guard.enabled(c))
+                .map(|(generation, c)| (*generation, c.info.clone(), c.connected_at_ms))
+                .collect();
+            if candidates.is_empty() {
+                return Err(if guard.connections.is_empty() {
+                    not_connected_error(&guard)
+                } else {
+                    format!(
+                        "The Stella Browser extension is connected only in browsers turned off in Stella's Settings (Browser extension): {}. Ask the user to turn one on, or use Stella's own browser with browser.use(\"in-app\").",
+                        guard.labels()
+                    )
+                });
+            }
+            (candidates, guard.preferred_key.clone())
         };
-        self.reset_missed_health_checks();
-        match generation {
-            Some(generation) => deactivate_connection(&self.inner, generation).await,
-            None => false,
+        let _ = preferred;
+        let generation = if candidates.len() == 1 {
+            candidates[0].0
+        } else {
+            tokio::task::spawn_blocking(move || {
+                let mut ranker = ActivityRanker::new();
+                let mut ranked: Vec<((usize, usize, std::cmp::Reverse<u64>), u64)> = candidates
+                    .iter()
+                    .map(|(generation, info, connected_at)| {
+                        let (app, profile) = ranker.rank(info);
+                        (
+                            (app, profile, std::cmp::Reverse(*connected_at)),
+                            *generation,
+                        )
+                    })
+                    .collect();
+                ranked.sort();
+                ranked[0].1
+            })
+            .await
+            .map_err(|e| format!("Failed to choose a browser: {}", e))?
+        };
+        if remember {
+            self.remember_route(owner, generation).await;
+        }
+        Ok(generation)
+    }
+
+    async fn wait_for_owner_browser(&self, owner: &str) -> Result<(), String> {
+        let start = Instant::now();
+        loop {
+            let missing = {
+                let guard = self.inner.lock().await;
+                match guard.owner_routes.get(owner) {
+                    Some(key) if guard.newest_with_key(key).is_none() => Some(key.clone()),
+                    _ => None,
+                }
+            };
+            let Some(key) = missing else {
+                return Ok(());
+            };
+            if start.elapsed() >= Duration::from_millis(RECONNECT_WAIT_MS) {
+                let guard = self.inner.lock().await;
+                let disabled = guard.disabled_keys.contains(&key);
+                let name = guard
+                    .known_labels
+                    .get(&key)
+                    .cloned()
+                    .unwrap_or_else(|| key.trim_start_matches("browser:").to_string());
+                return Err(if disabled {
+                    format!(
+                        "This task's tabs are in {}, which the user turned off in Stella's Settings. Nothing was sent. Open a new tab with browser.tabs.new() to continue in another browser.",
+                        name
+                    )
+                } else {
+                    format!(
+                        "This task's tabs are in {}, whose Stella Browser extension disconnected and did not come back within {}s (the browser may have quit). Nothing was sent. Open a new tab with browser.tabs.new() to continue in another connected browser, or browser.use(\"in-app\") for Stella's own.",
+                        name,
+                        RECONNECT_WAIT_MS / 1000
+                    )
+                });
+            }
+            tokio::time::sleep(Duration::from_millis(250)).await;
         }
     }
 
-    fn record_missed_health_check(&self, generation: u64) -> u32 {
-        let mut missed = self
-            .missed_health_checks
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        if missed.0 != generation {
-            *missed = (generation, 0);
+    async fn remember_route(&self, owner: Option<&str>, generation: u64) {
+        let Some(owner) = owner.filter(|o| !o.is_empty()) else {
+            return;
+        };
+        let mut guard = self.inner.lock().await;
+        if let Some(connection) = guard.connections.get(&generation) {
+            let key = connection.info.key();
+            let label = connection.info.label();
+            guard.known_labels.insert(key.clone(), label);
+            guard.owner_routes.insert(owner.to_string(), key);
         }
-        missed.1 += 1;
-        missed.1
     }
 
-    fn reset_missed_health_checks(&self) {
-        let mut missed = self
-            .missed_health_checks
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        *missed = (0, 0);
+    async fn check_health(&self, generation: u64) -> bool {
+        let stale = {
+            let guard = self.inner.lock().await;
+            match guard.connections.get(&generation) {
+                Some(c) => {
+                    c.last_health_check.elapsed() > Duration::from_millis(HEALTH_CHECK_TTL_MS)
+                }
+                None => return false,
+            }
+        };
+        if !stale {
+            return true;
+        }
+        let alive = send_to_generation(
+            &self.inner,
+            generation,
+            json!({ "action": "healthcheck", "id": format!("_hc_{}", Uuid::new_v4().simple()) }),
+            Duration::from_secs(3),
+        )
+        .await
+        .is_ok_and(|response| response.get("success").and_then(Value::as_bool) == Some(true));
+        let mut guard = self.inner.lock().await;
+        let Some(connection) = guard.connections.get_mut(&generation) else {
+            return false;
+        };
+        if alive {
+            connection.last_health_check = Instant::now();
+            connection.missed_health_checks = 0;
+            return true;
+        }
+        connection.missed_health_checks += 1;
+        if connection.missed_health_checks < DEAD_AFTER_MISSED_HEALTH_CHECKS {
+            return false;
+        }
+        drop(guard);
+        deactivate_connection(&self.inner, generation).await;
+        false
     }
 
     pub async fn execute_command(&self, command: &Value) -> Result<Value, String> {
         {
-            let guard = self.inner.lock().await;
-            if !guard.connected || guard.cmd_tx.is_none() {
-                drop(guard);
-                if !self.wait_for_connection().await {
+            let has_any = !self.inner.lock().await.connections.is_empty();
+            if !has_any && !self.wait_for_connection().await {
+                let guard = self.inner.lock().await;
+                return Err(guard
+                    .last_connection_error
+                    .clone()
+                    .unwrap_or_else(|| not_connected_error(&guard)));
+            }
+        }
+
+        let action = command.get("action").and_then(Value::as_str).unwrap_or("");
+        let owner = command.get("ownerId").and_then(Value::as_str);
+        let target = command.get("browserTarget").and_then(Value::as_str);
+
+        let mut forwarded = command.clone();
+        if let Some(object) = forwarded.as_object_mut() {
+            object.remove("browserTarget");
+            object.remove("type");
+        }
+
+        if LIFECYCLE_ACTIONS.contains(&action) && target.is_none() {
+            let routed = match owner {
+                Some(owner) => {
                     let guard = self.inner.lock().await;
-                    return Err(guard.last_connection_error.clone().unwrap_or_else(||
-                        "Extension not connected. Install the Stella Browser Bridge extension and connect it to use your real browser or its logins; Stella's in-app browser works without it.".to_string()
-                    ));
+                    guard
+                        .owner_routes
+                        .get(owner)
+                        .and_then(|key| guard.newest_with_key(key))
                 }
-            }
-        }
-
-        let needs_health_check = {
-            let guard = self.inner.lock().await;
-            guard.last_health_check.elapsed() > Duration::from_millis(HEALTH_CHECK_TTL_MS)
-        };
-
-        if needs_health_check {
-            let (mut alive, mut checked_generation) = self.verify_connection().await;
-            if !alive && checked_generation.is_some() {
-                (alive, checked_generation) = self.verify_connection().await;
-            }
-            if !alive {
-                if let Some(generation) = checked_generation {
-                    deactivate_connection(&self.inner, generation).await;
-                }
-
-                let start = Instant::now();
-                let mut reconnected = false;
-                while start.elapsed() < Duration::from_millis(RECONNECT_WAIT_MS) {
-                    let is_connected = {
-                        let guard = self.inner.lock().await;
-                        guard.connected && guard.cmd_tx.is_some()
-                    };
-                    if is_connected {
-                        let (alive, _) = self.verify_connection().await;
-                        if alive {
-                            reconnected = true;
-                            break;
-                        }
-                    }
-                    tokio::time::sleep(Duration::from_millis(500)).await;
-                }
-
-                if !reconnected {
-                    return Err(
-                        "Extension connection is dead (service worker terminated). The extension will auto-reconnect shortly — try again.".to_string()
-                    );
-                }
-            }
-        }
-
-        let id = command
-            .get("id")
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .to_string();
-
-        let msg = json!({
-            "type": "command",
-            "id": id,
-            "action": command.get("action").and_then(|v| v.as_str()).unwrap_or(""),
-        });
-
-        let mut msg_obj = msg.as_object().unwrap().clone();
-        if let Some(cmd_obj) = command.as_object() {
-            for (k, v) in cmd_obj {
-                if k != "type" {
-                    msg_obj.insert(k.clone(), v.clone());
-                }
-            }
-        }
-        let msg_str = serde_json::to_string(&Value::Object(msg_obj))
-            .map_err(|e| format!("Failed to serialize command: {}", e))?;
-
-        let (tx, rx) = oneshot::channel();
-        let generation;
-
-        {
-            let mut guard = self.inner.lock().await;
-            generation = match guard.connection_generation {
-                Some(generation) if guard.connected && guard.cmd_tx.is_some() => generation,
-                _ => return Err("Extension not connected".to_string()),
+                None => None,
             };
-            guard
-                .pending
-                .insert(id.clone(), PendingCommand { tx, generation });
-
-            if let Some(ref cmd_tx) = guard.cmd_tx {
-                if cmd_tx.send(msg_str).await.is_err() {
-                    remove_pending_for_generation(&mut guard, &id, generation);
-                    return Err("Extension connection closed".to_string());
-                }
-            } else {
-                remove_pending_for_generation(&mut guard, &id, generation);
-                return Err("Extension not connected".to_string());
+            if routed.is_none() {
+                return self.broadcast(&forwarded).await;
             }
         }
 
-        let command_timeout_ms = if command.get("action").and_then(Value::as_str) == Some("chain") {
+        if target.is_none() {
+            if let Some(owner) = owner {
+                if let Err(error) = self.wait_for_owner_browser(owner).await {
+                    if action != "tab_new" {
+                        return Err(error);
+                    }
+                    self.inner.lock().await.owner_routes.remove(owner);
+                }
+            }
+        }
+        let mut generation = self.select_generation(owner, target, true).await?;
+        if !self.check_health(generation).await {
+            let key = self
+                .inner
+                .lock()
+                .await
+                .connections
+                .get(&generation)
+                .map(|c| (c.info.key(), c.info.label()));
+            let start = Instant::now();
+            let mut recovered = None;
+            while start.elapsed() < Duration::from_millis(RECONNECT_WAIT_MS) {
+                if let Ok(next) = self.select_generation(owner, target, true).await {
+                    if self.check_health(next).await {
+                        recovered = Some(next);
+                        break;
+                    }
+                }
+                tokio::time::sleep(Duration::from_millis(500)).await;
+            }
+            generation = recovered.ok_or_else(|| {
+                format!(
+                    "The Stella Browser extension{} stopped responding (its background worker was suspended or the browser is busy) and did not reconnect within {}s. Nothing was sent. Retry once; if it fails again, ask the user to click the Stella Browser extension icon to wake it, or continue in Stella's own browser with browser.use(\"in-app\").",
+                    key.map(|(_, label)| format!(" in {}", label)).unwrap_or_default(),
+                    RECONNECT_WAIT_MS / 1000
+                )
+            })?;
+        }
+
+        let leaves_page = |name: &str| {
+            matches!(
+                name,
+                "navigate" | "back" | "forward" | "reload" | "tab_close"
+            )
+        };
+        let chain_leaves_page = action == "chain"
+            && forwarded
+                .get("steps")
+                .and_then(Value::as_array)
+                .is_some_and(|steps| {
+                    steps.iter().any(|step| {
+                        step.get("action")
+                            .and_then(Value::as_str)
+                            .is_some_and(leaves_page)
+                    })
+                });
+        if leaves_page(action) || chain_leaves_page {
+            let _ = self
+                .run_page_script(generation, &forwarded, "unload", DISARM_BEFOREUNLOAD, 1500)
+                .await;
+        }
+
+        let interaction = |name: &str| {
+            matches!(
+                name,
+                "click"
+                    | "dblclick"
+                    | "press"
+                    | "keydown"
+                    | "keyup"
+                    | "mouseup"
+                    | "check"
+                    | "uncheck"
+                    | "select"
+                    | "tap"
+            )
+        };
+        let chain_interacts = action == "chain"
+            && forwarded
+                .get("steps")
+                .and_then(Value::as_array)
+                .is_some_and(|steps| {
+                    steps.iter().any(|step| {
+                        step.get("action")
+                            .and_then(Value::as_str)
+                            .is_some_and(interaction)
+                    })
+                });
+        let guard_dialogs = interaction(action) || chain_interacts;
+        if guard_dialogs {
+            let _ = self
+                .run_page_script(generation, &forwarded, "guard", DIALOG_GUARD, 1500)
+                .await;
+        }
+
+        let timeout_ms = if action == "chain" {
             CHAIN_COMMAND_TIMEOUT_MS
         } else {
             DEFAULT_COMMAND_TIMEOUT_MS
         };
-        match tokio::time::timeout(Duration::from_millis(command_timeout_ms), rx).await {
-            Ok(Ok(response)) => {
-                {
-                    let mut guard = self.inner.lock().await;
-                    if guard.connection_generation == Some(generation) {
-                        guard.last_health_check = Instant::now();
+        let mut response = send_to_generation(
+            &self.inner,
+            generation,
+            forwarded.clone(),
+            Duration::from_millis(timeout_ms),
+        )
+        .await?;
+        if guard_dialogs {
+            if let Some(Value::Array(dialogs)) = self
+                .run_page_script(generation, &forwarded, "dialogs", DIALOG_GUARD, 1500)
+                .await
+                .and_then(|r| r.pointer("/data/result").cloned())
+            {
+                if !dialogs.is_empty() {
+                    if let Some(object) = response.as_object_mut() {
+                        let data = object
+                            .entry("data".to_string())
+                            .or_insert_with(|| json!({}));
+                        if let Some(data) = data.as_object_mut() {
+                            data.insert("dialogs".to_string(), Value::Array(dialogs));
+                        } else {
+                            object.insert("dialogs".to_string(), Value::Array(dialogs));
+                        }
                     }
                 }
-                Ok(response)
-            }
-            Ok(Err(_)) => {
-                let mut guard = self.inner.lock().await;
-                remove_pending_for_generation(&mut guard, &id, generation);
-                Err("Extension disconnected while waiting for response".to_string())
-            }
-            Err(_) => {
-                let mut guard = self.inner.lock().await;
-                remove_pending_for_generation(&mut guard, &id, generation);
-                Err(format!("Command timed out after {}ms", command_timeout_ms))
             }
         }
+        Ok(response)
     }
 
-    async fn verify_connection(&self) -> (bool, Option<u64>) {
-        let hc_id = format!("_hc_{}", Instant::now().elapsed().as_micros());
-        let msg = json!({
-            "type": "command",
-            "action": "healthcheck",
-            "id": hc_id,
-        });
-        let msg_str = match serde_json::to_string(&msg) {
-            Ok(s) => s,
-            Err(_) => return (false, None),
+    async fn run_page_script(
+        &self,
+        generation: u64,
+        base: &Value,
+        suffix: &str,
+        script: &str,
+        timeout_ms: u64,
+    ) -> Option<Value> {
+        let mut command = base.clone();
+        let object = command.as_object_mut()?;
+        for field in [
+            "url",
+            "waitUntil",
+            "timeout",
+            "index",
+            "steps",
+            "selector",
+            "key",
+            "value",
+            "values",
+            "text",
+        ] {
+            object.remove(field);
+        }
+        let id = object
+            .get("id")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string();
+        object.insert("id".to_string(), json!(format!("{}#{}", id, suffix)));
+        object.insert("action".to_string(), json!("evaluate"));
+        object.insert("expression".to_string(), json!(script));
+        object.insert("timeout".to_string(), json!(timeout_ms));
+        send_to_generation(
+            &self.inner,
+            generation,
+            command,
+            Duration::from_millis(timeout_ms + 1000),
+        )
+        .await
+        .ok()
+        .filter(|r| r.get("success").and_then(Value::as_bool) == Some(true))
+    }
+
+    async fn broadcast(&self, command: &Value) -> Result<Value, String> {
+        let generations: Vec<u64> = {
+            let guard = self.inner.lock().await;
+            guard.connections.keys().copied().collect()
         };
-
-        let (tx, rx) = oneshot::channel();
-        let generation;
-
-        {
-            let mut guard = self.inner.lock().await;
-            generation = match guard.connection_generation {
-                Some(generation) if guard.connected && guard.cmd_tx.is_some() => generation,
-                _ => return (false, None),
-            };
-            guard
-                .pending
-                .insert(hc_id.clone(), PendingCommand { tx, generation });
-            if let Some(ref cmd_tx) = guard.cmd_tx {
-                if cmd_tx.send(msg_str).await.is_err() {
-                    remove_pending_for_generation(&mut guard, &hc_id, generation);
-                    return (false, Some(generation));
+        let id = command
+            .get("id")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string();
+        let mut first_ok = None;
+        let mut first_err = None;
+        for (index, generation) in generations.iter().enumerate() {
+            let mut each = command.clone();
+            if index > 0 {
+                if let Some(object) = each.as_object_mut() {
+                    object.insert("id".to_string(), json!(format!("{}#{}", id, index)));
+                }
+            }
+            match send_to_generation(&self.inner, *generation, each, Duration::from_secs(10)).await
+            {
+                Ok(mut response) => {
+                    if let Some(object) = response.as_object_mut() {
+                        object.insert("id".to_string(), json!(id));
+                    }
+                    if response.get("success").and_then(Value::as_bool) == Some(true) {
+                        first_ok.get_or_insert(response);
+                    } else {
+                        first_err.get_or_insert(Ok(response));
+                    }
+                }
+                Err(error) => {
+                    first_err.get_or_insert(Err(error));
                 }
             }
         }
-
-        match tokio::time::timeout(Duration::from_secs(3), rx).await {
-            Ok(Ok(response)) if response.get("success").and_then(Value::as_bool) == Some(true) => {
-                let mut guard = self.inner.lock().await;
-                if guard.connection_generation == Some(generation) {
-                    guard.last_health_check = Instant::now();
-                }
-                (true, Some(generation))
-            }
-            _ => {
-                let mut guard = self.inner.lock().await;
-                remove_pending_for_generation(&mut guard, &hc_id, generation);
-                (false, Some(generation))
-            }
+        match (first_ok, first_err) {
+            (Some(ok), _) => Ok(ok),
+            (None, Some(err)) => err,
+            (None, None) => Ok(json!({ "id": id, "success": true, "data": {} })),
         }
     }
 
@@ -498,11 +871,10 @@ impl ExtensionBridge {
         }
 
         let mut guard = self.inner.lock().await;
-        guard.connected = false;
         guard.last_connection_error = None;
-        guard.cmd_tx = None;
-        guard.connection_generation = None;
+        guard.connections.clear();
         guard.pending.clear();
+        guard.owner_routes.clear();
     }
 
     pub fn get_port(&self) -> u16 {
@@ -514,6 +886,93 @@ impl ExtensionBridge {
     }
 }
 
+fn not_connected_error(guard: &BridgeInner) -> String {
+    guard.last_connection_error.clone().unwrap_or_else(|| {
+        "Extension not connected. Install the Stella Browser Bridge extension and connect it to use your real browser or its logins; Stella's in-app browser works without it.".to_string()
+    })
+}
+
+async fn send_to_generation(
+    inner: &Arc<Mutex<BridgeInner>>,
+    generation: u64,
+    command: Value,
+    timeout: Duration,
+) -> Result<Value, String> {
+    let id = command
+        .get("id")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_string();
+    let mut message = serde_json::Map::new();
+    message.insert("type".to_string(), json!("command"));
+    message.insert("id".to_string(), json!(id));
+    message.insert(
+        "action".to_string(),
+        json!(command.get("action").and_then(Value::as_str).unwrap_or("")),
+    );
+    if let Some(object) = command.as_object() {
+        for (key, value) in object {
+            if key != "type" {
+                message.insert(key.clone(), value.clone());
+            }
+        }
+    }
+    let line = serde_json::to_string(&Value::Object(message))
+        .map_err(|e| format!("Failed to serialize command: {}", e))?;
+
+    let (tx, rx) = oneshot::channel();
+    let label = {
+        let mut guard = inner.lock().await;
+        let Some(connection) = guard.connections.get(&generation) else {
+            return Err(
+                "Extension disconnected before the command was sent. Nothing was sent; retry."
+                    .to_string(),
+            );
+        };
+        let cmd_tx = connection.cmd_tx.clone();
+        let label = connection.info.label();
+        guard
+            .pending
+            .insert(id.clone(), PendingCommand { tx, generation });
+        if cmd_tx.send(line).await.is_err() {
+            remove_pending_for_generation(&mut guard, &id, generation);
+            return Err(
+                "Extension connection closed before the command was sent. Nothing was sent; retry."
+                    .to_string(),
+            );
+        }
+        label
+    };
+
+    match tokio::time::timeout(timeout, rx).await {
+        Ok(Ok(response)) => {
+            let mut guard = inner.lock().await;
+            if let Some(connection) = guard.connections.get_mut(&generation) {
+                connection.last_health_check = Instant::now();
+                connection.missed_health_checks = 0;
+            }
+            Ok(response)
+        }
+        Ok(Err(_)) => {
+            let mut guard = inner.lock().await;
+            remove_pending_for_generation(&mut guard, &id, generation);
+            Err(format!(
+                "Extension disconnected while waiting for the response from {}",
+                label
+            ))
+        }
+        Err(_) => {
+            let mut guard = inner.lock().await;
+            remove_pending_for_generation(&mut guard, &id, generation);
+            Err(format!(
+                "{} did not answer within {}ms. The page may be blocked by a dialog (\"Leave site?\", alert or confirm) or busy. The outcome is unknown: check the tab before retrying a mutating action.",
+                label,
+                timeout.as_millis()
+            ))
+        }
+    }
+}
+
 const HEALTH_PROBE_RESPONSE: &str =
     "HTTP/1.1 204 No Content\r\nAccess-Control-Allow-Origin: *\r\nConnection: close\r\n\r\n";
 
@@ -522,7 +981,11 @@ fn remove_pending_for_generation(
     id: &str,
     generation: u64,
 ) -> Option<PendingCommand> {
-    if inner.pending.get(id).map(|pending| pending.generation) == Some(generation) {
+    if inner
+        .pending
+        .get(id)
+        .is_some_and(|pending| pending.generation == generation)
+    {
         inner.pending.remove(id)
     } else {
         None
@@ -536,63 +999,149 @@ fn take_pending_for_generation(inner: &mut BridgeInner, generation: u64) -> Vec<
         .filter(|(_, pending)| pending.generation == generation)
         .map(|(id, _)| id.clone())
         .collect();
-
     ids.into_iter()
         .filter_map(|id| inner.pending.remove(&id))
         .collect()
 }
 
-fn fail_pending_commands(pending: Vec<PendingCommand>) {
+fn fail_pending_commands(pending: Vec<PendingCommand>, label: &str) {
     for pending in pending {
         let _ = pending.tx.send(json!({
             "success": false,
-            "error": "Extension disconnected",
+            "error": format!(
+                "Extension disconnected: the Stella Browser extension in {} dropped its connection before answering (the browser closed, the extension restarted, or the computer slept). The command's outcome is unknown: check the tab's state before retrying a mutating action.",
+                label
+            ),
         }));
     }
 }
 
-async fn activate_connection(inner: &Arc<Mutex<BridgeInner>>, cmd_tx: mpsc::Sender<String>) -> u64 {
-    let (generation, displaced_pending) = {
-        let mut guard = inner.lock().await;
-        guard.next_generation = guard
-            .next_generation
-            .checked_add(1)
-            .expect("extension connection generation overflow");
-        let generation = guard.next_generation;
-        let displaced_pending = guard.pending.drain().map(|(_, pending)| pending).collect();
-
-        guard.connected = true;
-        guard.last_connection_error = None;
-        guard.cmd_tx = Some(cmd_tx);
-        guard.connection_generation = Some(generation);
-        (generation, displaced_pending)
-    };
-
-    fail_pending_commands(displaced_pending);
+async fn activate_connection(
+    inner: &Arc<Mutex<BridgeInner>>,
+    cmd_tx: mpsc::Sender<String>,
+    info: ClientInfo,
+) -> u64 {
+    let mut guard = inner.lock().await;
+    guard.next_generation = guard
+        .next_generation
+        .checked_add(1)
+        .expect("extension connection generation overflow");
+    let generation = guard.next_generation;
+    guard.last_connection_error = None;
+    guard.connections.insert(
+        generation,
+        Connection {
+            cmd_tx,
+            info,
+            connected_at_ms: now_ms(),
+            last_health_check: Instant::now(),
+            missed_health_checks: 0,
+        },
+    );
     generation
 }
 
 async fn deactivate_connection(inner: &Arc<Mutex<BridgeInner>>, generation: u64) -> bool {
-    let pending = {
+    let (pending, label) = {
         let mut guard = inner.lock().await;
-        if guard.connection_generation != Some(generation) {
+        let Some(connection) = guard.connections.remove(&generation) else {
             return false;
-        }
-
-        guard.connected = false;
-        guard.cmd_tx = None;
-        guard.connection_generation = None;
-        guard.last_health_check = Instant::now() - Duration::from_secs(60);
-        take_pending_for_generation(&mut guard, generation)
+        };
+        (
+            take_pending_for_generation(&mut guard, generation),
+            connection.info.label(),
+        )
     };
 
-    fail_pending_commands(pending);
+    fail_pending_commands(pending, &label);
     true
 }
 
 async fn should_shutdown_for_disconnect(inner: &Arc<Mutex<BridgeInner>>, generation: u64) -> bool {
     let guard = inner.lock().await;
-    !guard.connected && guard.connection_generation.is_none() && guard.next_generation == generation
+    guard.connections.is_empty() && guard.next_generation == generation
+}
+
+async fn identify_connection(inner: Arc<Mutex<BridgeInner>>, generation: u64) {
+    let info = match inner.lock().await.connections.get(&generation) {
+        Some(connection) => connection.info.clone(),
+        None => return,
+    };
+    let marker = probe_marker();
+    let pattern = format!("{}.invalid", marker);
+    let set = send_to_generation(
+        &inner,
+        generation,
+        json!({
+            "action": "site_mod_set",
+            "id": format!("_probe_{}", marker),
+            "pattern": pattern,
+            "css": format!("/*{}*/", marker),
+            "label": "Stella profile check",
+        }),
+        Duration::from_secs(5),
+    )
+    .await;
+    let profile_dir = if set.is_ok_and(|r| r.get("success").and_then(Value::as_bool) == Some(true))
+    {
+        let lookup_info = info.clone();
+        let lookup_marker = marker.clone();
+        tokio::task::spawn_blocking(move || find_profile_with_marker(&lookup_info, &lookup_marker))
+            .await
+            .ok()
+            .flatten()
+    } else {
+        None
+    };
+    let _ = send_to_generation(
+        &inner,
+        generation,
+        json!({
+            "action": "site_mod_remove",
+            "id": format!("_probe_rm_{}", marker),
+            "pattern": pattern,
+        }),
+        Duration::from_secs(5),
+    )
+    .await;
+    let Some(profile_dir) = profile_dir else {
+        return;
+    };
+    let identity_dir = profile_dir.clone();
+    let (profile, email) =
+        tokio::task::spawn_blocking(move || read_profile_identity(&identity_dir))
+            .await
+            .unwrap_or((None, None));
+    let duplicates: Vec<u64> = {
+        let mut guard = inner.lock().await;
+        let old_key = match guard.connections.get_mut(&generation) {
+            Some(connection) => {
+                let old_key = connection.info.key();
+                connection.info.profile_dir = Some(profile_dir);
+                connection.info.profile = profile;
+                connection.info.email = email;
+                old_key
+            }
+            None => return,
+        };
+        let key = guard.connections[&generation].info.key();
+        let label = guard.connections[&generation].info.label();
+        guard.known_labels.insert(key.clone(), label);
+        for route in guard.owner_routes.values_mut() {
+            if *route == old_key {
+                *route = key.clone();
+            }
+        }
+        guard
+            .connections
+            .iter()
+            .filter(|(other, c)| **other < generation && c.info.key() == key)
+            .map(|(other, _)| *other)
+            .collect()
+    };
+    for duplicate in duplicates {
+        deactivate_connection(&inner, duplicate).await;
+    }
 }
 
 async fn handle_extension_connection(
@@ -649,8 +1198,7 @@ async fn handle_extension_connection(
                     if generation == 0 {
                         continue;
                     }
-                    let live = writer_inner.lock().await.connection_generation;
-                    if live != Some(generation) {
+                    if !writer_inner.lock().await.connections.contains_key(&generation) {
                         break;
                     }
                 }
@@ -720,7 +1268,8 @@ async fn handle_extension_connection(
 
                 if token_matches || expected_token.is_empty() {
                     authenticated = true;
-                    let generation = activate_connection(&inner, cmd_tx.clone()).await;
+                    let info = ClientInfo::from_hello(&parsed, &extension_version);
+                    let generation = activate_connection(&inner, cmd_tx.clone(), info).await;
                     connection_generation = Some(generation);
                     active_generation.store(generation, Ordering::Release);
                     connected_notify.notify_waiters();
@@ -733,6 +1282,7 @@ async fn handle_extension_connection(
                         "protocolVersion": EXTENSION_PROTOCOL_VERSION,
                     });
                     let _ = cmd_tx.send(serde_json::to_string(&welcome).unwrap()).await;
+                    tokio::spawn(identify_connection(inner.clone(), generation));
                 } else {
                     let err = json!({
                         "type": "auth_error",
@@ -763,7 +1313,10 @@ async fn handle_extension_connection(
                     continue;
                 };
                 if let Some(pending) = remove_pending_for_generation(&mut guard, &id, generation) {
-                    guard.last_health_check = Instant::now();
+                    if let Some(connection) = guard.connections.get_mut(&generation) {
+                        connection.last_health_check = Instant::now();
+                        connection.missed_health_checks = 0;
+                    }
 
                     let response = normalize_extension_command_response(&id, &parsed);
 

@@ -10,14 +10,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
+  Animated,
+  PanResponder,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
   useWindowDimensions,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
+  type PanResponderGestureState,
 } from "react-native";
 import type { CatchUp, CatchUpItem, CatchUpLink } from "@stella/contracts/backend/catch-ups";
 import { CATCH_UP_MIN_NEW_MESSAGES, catchUpOffer, catchUpRows } from "@stella/contracts/catch-up";
@@ -317,7 +318,6 @@ export function SummaryPopover({
   const maxHeight = Math.min(MAX_HEIGHT, Math.round(screenHeight * MAX_HEIGHT_RATIO));
   const [pageWidth, setPageWidth] = useState(0);
   const [index, setIndex] = useState(Math.max(0, catchUps.length - 1));
-  const scrollRef = useRef<ScrollView | null>(null);
   const requestedRef = useRef(false);
   const total = catchUps.length;
   const shown = Math.min(index, Math.max(0, total - 1));
@@ -341,25 +341,39 @@ export function SummaryPopover({
     void request();
   }, [request, requestNew]);
 
-  // The page an arrow is sliding to: scroll events on the way there must
-  // not move the count, and a quick second tap steps on from it.
-  const targetRef = useRef<number | null>(null);
+  // The pages sit in one row that slides under a clip. Swipes are read in
+  // JS (a pan responder) rather than by a native horizontal scroller: inside
+  // the iOS popover's host, a native sideways scroll left the popover
+  // ignoring every touch after it.
+  const slide = useRef(new Animated.Value(0)).current;
   const [positioned, setPositioned] = useState(false);
+  const indexRef = useRef(shown);
+  indexRef.current = shown;
+  const widthRef = useRef(pageWidth);
+  widthRef.current = pageWidth;
+  const totalRef = useRef(total);
+  totalRef.current = total;
+
   const goTo = useCallback(
     (next: number, animated = true) => {
-      if (pageWidth === 0) return;
-      const target = Math.max(0, Math.min(next, total - 1));
-      targetRef.current = animated ? target : null;
-      if (animated) {
-        // In case the slide's last scroll event lands short of the page.
-        setTimeout(() => {
-          if (targetRef.current === target) targetRef.current = null;
-        }, 700);
-      }
+      const width = widthRef.current;
+      if (width === 0) return;
+      const target = Math.max(0, Math.min(next, totalRef.current - 1));
+      indexRef.current = target;
       setIndex(target);
-      scrollRef.current?.scrollTo({ x: target * pageWidth, animated });
+      slide.stopAnimation();
+      if (animated) {
+        Animated.spring(slide, {
+          toValue: -target * width,
+          useNativeDriver: true,
+          speed: 22,
+          bounciness: 0,
+        }).start();
+      } else {
+        slide.setValue(-target * width);
+      }
     },
-    [pageWidth, total],
+    [slide],
   );
 
   // Open on the newest page, and follow a new one as it lands or fills in.
@@ -370,64 +384,40 @@ export function SummaryPopover({
     if (pageWidth === 0 || !newestKey || shownKeyRef.current === newestKey) return;
     const animated = shownKeyRef.current !== null;
     shownKeyRef.current = newestKey;
-    requestAnimationFrame(() => {
-      goTo(total - 1, animated);
-      setPositioned(true);
-    });
+    goTo(total - 1, animated);
+    setPositioned(true);
   }, [goTo, newestKey, pageWidth, total]);
 
-  const onScroll = useCallback(
-    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      if (pageWidth === 0) return;
-      const x = event.nativeEvent.contentOffset.x;
-      offsetRef.current = x;
-      if (targetRef.current !== null) {
-        if (Math.abs(x - targetRef.current * pageWidth) > 2) return;
-        targetRef.current = null;
-      }
-      const next = Math.round(x / pageWidth);
-      setIndex((current) => (current === next ? current : next));
-    },
-    [pageWidth],
-  );
-
-  // Land on a whole page however the swipe ended: the popover's host has
-  // been seen to leave a paged scroller resting between two pages.
-  const offsetRef = useRef(0);
-  const settleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const settleAt = useCallback(
-    (x: number) => {
-      if (pageWidth === 0 || targetRef.current !== null) return;
-      const target = Math.max(0, Math.min(Math.round(x / pageWidth), total - 1));
-      setIndex(target);
-      if (Math.abs(x - target * pageWidth) > 1) {
-        scrollRef.current?.scrollTo({ x: target * pageWidth, animated: true });
-      }
-    },
-    [pageWidth, total],
-  );
-  const onDragBegin = useCallback(() => {
-    // A finger on the pages takes over from any arrow slide.
-    targetRef.current = null;
-  }, []);
-  const onDragEnd = useCallback(() => {
-    if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
-    settleTimerRef.current = setTimeout(() => settleAt(offsetRef.current), 450);
-  }, [settleAt]);
-  const onMomentumEnd = useCallback(
-    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
-      targetRef.current = null;
-      settleAt(event.nativeEvent.contentOffset.x);
-    },
-    [settleAt],
-  );
-  useEffect(
-    () => () => {
-      if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
-    },
-    [],
-  );
+  const pan = useMemo(() => {
+    let start = 0;
+    const horizontal = (gesture: PanResponderGestureState) =>
+      Math.abs(gesture.dx) > 8 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.2;
+    return PanResponder.create({
+      onMoveShouldSetPanResponderCapture: (_event, gesture) => horizontal(gesture),
+      onMoveShouldSetPanResponder: (_event, gesture) => horizontal(gesture),
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderGrant: () => {
+        slide.stopAnimation();
+        start = -indexRef.current * widthRef.current;
+      },
+      onPanResponderMove: (_event, gesture) => {
+        const min = -(totalRef.current - 1) * widthRef.current;
+        let x = start + gesture.dx;
+        // Resist past either end.
+        if (x > 0) x = x / 3;
+        else if (x < min) x = min + (x - min) / 3;
+        slide.setValue(x);
+      },
+      onPanResponderRelease: (_event, gesture) => {
+        const width = widthRef.current;
+        let next = indexRef.current;
+        if (gesture.dx < -width * 0.22 || gesture.vx < -0.35) next += 1;
+        else if (gesture.dx > width * 0.22 || gesture.vx > 0.35) next -= 1;
+        goTo(next);
+      },
+      onPanResponderTerminate: () => goTo(indexRef.current),
+    });
+  }, [goTo, slide]);
 
   const current = catchUps[shown];
   return (
@@ -454,7 +444,7 @@ export function SummaryPopover({
                   accessibilityState={{ disabled: shown === 0 }}
                   disabled={shown === 0}
                   hitSlop={6}
-                  onPress={() => goTo((targetRef.current ?? shown) - 1)}
+                  onPress={() => goTo(indexRef.current - 1)}
                   style={({ pressed }) => [styles.nav, pressed && styles.navPressed]}
                   testID="summary-previous"
                 >
@@ -473,7 +463,7 @@ export function SummaryPopover({
                   accessibilityState={{ disabled: shown === total - 1 }}
                   disabled={shown === total - 1}
                   hitSlop={6}
-                  onPress={() => goTo((targetRef.current ?? shown) + 1)}
+                  onPress={() => goTo(indexRef.current + 1)}
                   style={({ pressed }) => [styles.nav, pressed && styles.navPressed]}
                   testID="summary-next"
                 >
@@ -487,24 +477,17 @@ export function SummaryPopover({
             ) : null}
           </View>
           {pageWidth > 0 ? (
-            <ScrollView
-              ref={scrollRef}
-              horizontal
-              snapToInterval={pageWidth}
-              snapToAlignment="start"
-              decelerationRate="fast"
-              disableIntervalMomentum
-              directionalLockEnabled
-              showsHorizontalScrollIndicator={false}
-              onScroll={onScroll}
-              onScrollEndDrag={onDragEnd}
-              onMomentumScrollEnd={onMomentumEnd}
-              scrollEventThrottle={32}
-              onScrollBeginDrag={onDragBegin}
+            <View
               style={[styles.pages, { width: pageWidth, opacity: positioned ? 1 : 0 }]}
-              contentContainerStyle={[styles.pagesRow, { width: pageWidth * total }]}
               testID="summary-pages"
+              {...pan.panHandlers}
             >
+              <Animated.View
+                style={[
+                  styles.pagesRow,
+                  { width: pageWidth * total, transform: [{ translateX: slide }] },
+                ]}
+              >
               {catchUps.map((catchUp, pageIndex) => (
                 <SummaryPage
                   key={catchUp.catchUpId}
@@ -522,7 +505,8 @@ export function SummaryPopover({
                   colors={colors}
                 />
               ))}
-            </ScrollView>
+              </Animated.View>
+            </View>
           ) : null}
         </View>
       )}
@@ -611,7 +595,7 @@ const makeStyles = (colors: Colors) =>
       minWidth: 44,
       textAlign: "center",
     },
-    pages: { flexGrow: 0, flexShrink: 1 },
+    pages: { flexGrow: 0, flexShrink: 1, overflow: "hidden" },
     pagesRow: { alignItems: "flex-start", flexDirection: "row" },
     page: { paddingBottom: 14, paddingHorizontal: 18, paddingTop: 6 },
     status: { color: colors.textMuted, fontFamily: fonts.sans.regular, fontSize: 15 },

@@ -188,8 +188,6 @@ const repoPreview = (root) => {
   return null;
 };
 
-// ---- finding the app ----------------------------------------------------------
-
 const FRAMEWORKS = [
   { dep: "next", name: "Next.js", outputs: ["out"] },
   { dep: "nuxt", name: "Nuxt", outputs: [".output/public", "dist"], script: "generate" },
@@ -293,8 +291,6 @@ const findProject = (top, cwd, options, config) => {
   return chosen.dir;
 };
 
-// ---- building -------------------------------------------------------------------
-
 const LOCKFILES = ["bun.lock", "bun.lockb", "pnpm-lock.yaml", "yarn.lock", "package-lock.json"];
 
 const lockDirFor = (dir, top) => {
@@ -359,7 +355,6 @@ const findIndex = (dir, candidates, since) => {
   return null;
 };
 
-/** The wrangler.json a build generated (Cloudflare's Vite plugin, Astro's adapter...), newest first. */
 const generatedWorker = (dir, since) => {
   const found = [];
   const walk = (current, depth) => {
@@ -435,8 +430,6 @@ const build = (dir, top, options, config) => {
   }
   return { info, started, framework, built: Boolean(command) };
 };
-
-// ---- Worker apps ----------------------------------------------------------------
 
 const MODULE_TYPES = { ".js": "js", ".mjs": "js", ".cjs": "cjs", ".wasm": "wasm64", ".txt": "text", ".html": "text", ".sql": "text", ".md": "text", ".bin": "data64", ".json": "json" };
 
@@ -557,7 +550,6 @@ const migrationFiles = (dir) =>
         .map((name) => path.join(dir, name))
     : [];
 
-/** A database's starting point: the local one (from the dev server) when there is one, else the migrations. */
 const seedDatabase = (database, configDir, projectDir, onlyBinding) => {
   const sqlite = loadSqlite();
   const migrations = migrationFiles(path.resolve(configDir, database.migrations_dir || path.relative(configDir, path.join(projectDir, "migrations"))));
@@ -685,7 +677,6 @@ const stageWorker = (worker, projectDir, options, previewConfig) => {
   return stage;
 };
 
-/** A Worker build, or null. */
 const findWorker = (dir, started) => {
   const generated = generatedWorker(dir, started);
   if (generated) {
@@ -714,7 +705,6 @@ const findWorker = (dir, started) => {
   return { config, configDir: path.dirname(file), serverDir: outdir, mainRel };
 };
 
-/** Assets-only Workers (a wrangler config with assets and no main): a static site. */
 const assetsOnly = (dir) => {
   const file = wranglerFile(dir);
   if (!file) return null;
@@ -734,8 +724,6 @@ const serverOnlyReason = (info, framework) => {
   }
   return null;
 };
-
-// ---- uploading ------------------------------------------------------------------
 
 const EXCLUDED = new Set([".git", "node_modules", ".DS_Store", ".github", ".vscode", ".idea", "stella.preview.json", ".wrangler", ".dev.vars"]);
 
@@ -834,8 +822,6 @@ const upload = async (dir, root, kind) => {
   say("For screenshots of a page: stella-shot " + result.url + " --out <folder>");
   process.stdout.write(result.url + "\n");
 };
-
-// ---- main -----------------------------------------------------------------------
 
 const main = async () => {
   const options = parseArgs(process.argv.slice(2));

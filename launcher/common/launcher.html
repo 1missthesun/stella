@@ -126,7 +126,6 @@
         outline-offset: 2px;
       }
 
-      /* ── Views ── */
       .view {
         position: absolute;
         inset: 0;
@@ -153,10 +152,6 @@
         transform: translateX(12px);
       }
 
-      /* ── Home ── */
-      /* Everything sits in fixed slots, so no state's text moves anything:
-         the brand (and a two-line reason under it) up top, and at the bottom
-         one line, one control (button or progress bar) and one row of links. */
       #home {
         align-items: center;
         padding: 0 32px 46px;
@@ -368,7 +363,6 @@
         display: grid;
       }
 
-      /* ── Settings ── */
       #settings {
         padding: 18px 20px 20px;
       }
@@ -594,9 +588,6 @@
         };
         let confirmingReinstall = false;
 
-        // The bar: what's done, easing toward the current step's end while it
-        // runs (most steps can't report their own progress). It never goes
-        // backwards within one start.
         let shown = 0;
         let stepFrom = 0;
         let stepTo = 0;
@@ -663,7 +654,6 @@
           $("reinstall-hint").textContent = busy ? "Shut Stella down first." : "Download Stella again. Your data stays.";
           if (busy) setConfirming(false);
 
-          // The whole reason (home shows two lines of it), then Stella's output.
           const lines = state.output || [];
           const log = [state.reason, lines.join("\n")].filter(Boolean).join("\n\n");
           $("log").hidden = !log;
@@ -697,7 +687,6 @@
             if (panel) panel.click();
           }
         });
-        // Undecorated windows (Linux) move by dragging the background.
         document.addEventListener("mousedown", (event) => {
           if (state.platform !== "linux" || event.button !== 0) return;
           if (event.target.closest("button, pre")) return;

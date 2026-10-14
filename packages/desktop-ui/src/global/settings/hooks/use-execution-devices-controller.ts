@@ -21,7 +21,7 @@ export function useExecutionDevicesController() {
   const [currentDeviceId, setCurrentDeviceId] = useState<string | null>(null);
   const [error, setError] = useState<ExecutionDevicesError | null>(null);
   const [pendingDeviceId, setPendingDeviceId] = useState<string | null>(null);
-  const socketOrigin = hasConnectedAccount && backendUrl ? backendUrl : null;
+  const httpOrigin = hasConnectedAccount && backendUrl ? backendUrl : null;
   const lastWriteAt = useRef(0);
 
   useEffect(() => {
@@ -31,11 +31,11 @@ export function useExecutionDevicesController() {
   }, []);
 
   useEffect(() => {
-    if (!socketOrigin) setDevices(null);
-  }, [socketOrigin]);
+    if (!httpOrigin) setDevices(null);
+  }, [httpOrigin]);
 
   useExecutionDeviceList({
-    socketOrigin,
+    httpOrigin,
     onDevices: (next, startedAt) => {
       if (startedAt < lastWriteAt.current) return;
       setDevices(next);

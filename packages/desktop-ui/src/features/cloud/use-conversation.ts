@@ -10,7 +10,7 @@ import {
 } from "react";
 import { useCloudConversationSession } from "@/global/auth/hooks/use-cloud-conversation-session";
 import { getAuthToken } from "@/global/auth/services/auth-token";
-import { backendSocketUrl } from "@/platform/backend/backend-client";
+import { backendSocketUrl, backendUrl } from "@/platform/backend/backend-client";
 import { useCloudEngines } from "./cloud-engines-api";
 import { markCloudConversationCreated } from "./cloud-conversation-selection";
 import {
@@ -64,16 +64,19 @@ import { waitForCloudAttachmentUploads } from "./browser-chat-attachments";
 
 export type CloudRealtimeConfig = {
   socketBaseUrl: string | null;
+  httpOrigin: string | null;
   resolved: boolean;
 };
 
 const OFFLINE_CONFIG: CloudRealtimeConfig = {
   socketBaseUrl: null,
+  httpOrigin: null,
   resolved: false,
 };
 
 const UNSUPPORTED_CONFIG: CloudRealtimeConfig = {
   socketBaseUrl: null,
+  httpOrigin: null,
   resolved: true,
 };
 
@@ -82,7 +85,7 @@ export const useCloudRealtimeConfig = (): CloudRealtimeConfig => {
   const config = useMemo(() => {
     if (!isCloudConversationReady) return OFFLINE_CONFIG;
     if (!backendSocketUrl) return UNSUPPORTED_CONFIG;
-    return { socketBaseUrl: backendSocketUrl, resolved: true };
+    return { socketBaseUrl: backendSocketUrl, httpOrigin: backendUrl, resolved: true };
   }, [isCloudConversationReady]);
   useEffect(() => {
     if (!isCloudConversationReady || !config.resolved) return;
@@ -389,14 +392,14 @@ export const useConversation = (
           if (!targetConversationId) {
             throw new Error("Open a cloud conversation before sending.");
           }
-          const socketOrigin = config.socketBaseUrl;
-          if (!socketOrigin) {
+          const httpOrigin = config.httpOrigin;
+          if (!httpOrigin) {
             throw new Error(
               "Stella's cloud isn't reachable yet. Try again in a moment.",
             );
           }
           const result = await startCloudTurn({
-            socketOrigin,
+            httpOrigin,
             conversationId: targetConversationId,
             request: cloudTurnStartRequest(clientMsgId, submission, entry.text),
             getToken: (options) => getAuthToken(options ?? {}),
@@ -427,7 +430,7 @@ export const useConversation = (
         if (!requestedConversationId) {
           throw new Error("Open a cloud conversation before sending.");
         }
-        const placementOrigin = config.socketBaseUrl;
+        const placementOrigin = config.httpOrigin;
         if (!placementOrigin) {
           throw new Error(
             "Stella's cloud isn't reachable yet. Try again in a moment.",
@@ -454,7 +457,7 @@ export const useConversation = (
             return {
               accepted: true as const,
               result: await submitDispatch({
-                socketOrigin: placementOrigin,
+                httpOrigin: placementOrigin,
                 request: submitArgs,
                 getToken: (options) => getAuthToken(options ?? {}),
               }),
@@ -497,7 +500,7 @@ export const useConversation = (
         const current = pendingPrompts.find(sendAuthority, clientMsgId);
         if (current?.cancelRequested) {
           const canceled = await cancelDispatch({
-            socketOrigin: placementOrigin,
+            httpOrigin: placementOrigin,
             getToken: (options) => getAuthToken(options ?? {}),
             ...browserExecutionCancelArgs(result.dispatchId),
           });
@@ -517,7 +520,7 @@ export const useConversation = (
           dispatchId: result.dispatchId,
           queryStatus: (dispatchId) =>
             getDispatchStatus({
-              socketOrigin: placementOrigin,
+              httpOrigin: placementOrigin,
               dispatchId,
               getToken: (options) => getAuthToken(options ?? {}),
             }),
@@ -578,7 +581,7 @@ export const useConversation = (
         pendingPrompts.releaseDispatch(sendAuthority, clientMsgId);
       }
     },
-    [config.socketBaseUrl, onSent, webShell],
+    [config.httpOrigin, onSent, webShell],
   );
 
   useEffect(() => {
@@ -697,11 +700,11 @@ export const useConversation = (
         pendingPrompts.requestCancel(authority, clientMsgId);
         return true;
       }
-      const placementOrigin = config.socketBaseUrl;
+      const placementOrigin = config.httpOrigin;
       if (!placementOrigin) return false;
       try {
         const canceled = await cancelDispatch({
-          socketOrigin: placementOrigin,
+          httpOrigin: placementOrigin,
           getToken: (options) => getAuthToken(options ?? {}),
           ...browserExecutionCancelArgs(entry.dispatchId),
         });
@@ -718,7 +721,7 @@ export const useConversation = (
         return false;
       }
     },
-    [authority, config.socketBaseUrl],
+    [authority, config.httpOrigin],
   );
   const cancelTurn = useCallback(
     async (turnId: string): Promise<boolean> => {
@@ -734,11 +737,11 @@ export const useConversation = (
         (journalDispatchId?.kind === "message"
           ? journalDispatchId.clientMsgId
           : undefined);
-      const placementOrigin = config.socketBaseUrl;
+      const placementOrigin = config.httpOrigin;
       if (dispatchId && placementOrigin) {
         try {
           await cancelDispatch({
-            socketOrigin: placementOrigin,
+            httpOrigin: placementOrigin,
             getToken: (options) => getAuthToken(options ?? {}),
             ...browserExecutionCancelArgs(dispatchId),
           });
@@ -750,7 +753,7 @@ export const useConversation = (
       // Compatibility for a turn created before browser placement shipped.
       return store?.cancelTurn(turnId) ?? false;
     },
-    [config.socketBaseUrl, state.records, store],
+    [config.httpOrigin, state.records, store],
   );
   const loadOlder = useCallback(() => store?.loadOlder(), [store]);
   const retryConnection = useCallback(() => store?.retry(), [store]);

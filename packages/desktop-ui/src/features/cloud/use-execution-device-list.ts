@@ -5,23 +5,23 @@ import { backendClient } from "@/platform/backend/backend-client";
 import { getAuthToken } from "@/global/auth/services/auth-token";
 
 export function useExecutionDeviceList(options: {
-  socketOrigin: string | null;
+  httpOrigin: string | null;
   onDevices(devices: DeviceDestination[], startedAt: number): void;
   onError?(): void;
 }): void {
   const callbacks = useRef(options);
   callbacks.current = options;
-  const { socketOrigin } = options;
+  const { httpOrigin } = options;
 
   useEffect(() => {
-    if (!socketOrigin) return;
+    if (!httpOrigin) return;
     let active = true;
     let pushed = false;
     let fallbackRead = false;
     const read = () => {
       const startedAt = Date.now();
       void listExecutionDevices({
-        socketOrigin,
+        httpOrigin,
         getToken: (tokenOptions) => getAuthToken(tokenOptions ?? {}),
       })
         .then((response) => {
@@ -51,5 +51,5 @@ export function useExecutionDeviceList(options: {
       active = false;
       stop();
     };
-  }, [socketOrigin]);
+  }, [httpOrigin]);
 }

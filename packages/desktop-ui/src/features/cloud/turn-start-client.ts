@@ -244,18 +244,12 @@ const isStartResponse = (
 };
 
 export type StartCloudTurnArgs = {
-  socketOrigin: string;
+  httpOrigin: string;
   conversationId: string;
   request: CloudTurnStartRequest;
   getToken: CloudTurnStartGetToken;
   fetch?: typeof fetch;
 };
-
-const turnStartHttpOrigin = (origin: string): string =>
-  origin
-    .replace(/\/+$/, "")
-    .replace(/^wss:\/\//i, "https://")
-    .replace(/^ws:\/\//i, "http://");
 
 const postOnce = async (
   args: StartCloudTurnArgs,
@@ -264,7 +258,7 @@ const postOnce = async (
   const fetchImpl = args.fetch ?? globalThis.fetch;
   try {
     return await fetchImpl(
-      `${turnStartHttpOrigin(args.socketOrigin)}${turnStartPath(args.conversationId)}`,
+      `${args.httpOrigin}${turnStartPath(args.conversationId)}`,
       {
         method: "POST",
         headers: {

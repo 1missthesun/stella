@@ -18,18 +18,6 @@ import { notifyCloudSubscriptionRequired } from "./turn-start-client";
 
 export const PLACEMENT_REQUEST_TIMEOUT_MS = 30_000;
 
-/**
- * The gate's HTTP origin for the dispatch and device routes. The realtime
- * config hands out the presence socket's `wss://` origin; the same host serves
- * these routes over HTTPS, and `fetch` refuses websocket schemes outright, so
- * every request goes through this normalization.
- */
-export const placementHttpOrigin = (origin: string): string =>
-  origin
-    .replace(/\/+$/, "")
-    .replace(/^wss:\/\//i, "https://")
-    .replace(/^ws:\/\//i, "http://");
-
 export type PlacementTokenOptions = { forceRefresh?: boolean };
 export type PlacementGetToken = (
   options?: PlacementTokenOptions,
@@ -194,7 +182,7 @@ const isDispatchSummary = (value: unknown): value is DispatchSummary => {
 };
 
 export type PlacementRequestBase = {
-  socketOrigin: string;
+  httpOrigin: string;
   getToken: PlacementGetToken;
   fetch?: typeof fetch;
 };
@@ -210,7 +198,7 @@ const requestOnce = async (
   const fetchImpl = args.fetch ?? globalThis.fetch;
   try {
     return await fetchImpl(
-      `${placementHttpOrigin(args.socketOrigin)}${args.path}`,
+      `${args.httpOrigin}${args.path}`,
       {
         method: args.method,
         headers: {

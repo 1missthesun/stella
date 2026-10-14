@@ -70,7 +70,7 @@ export function GlobalExecutionTargetControl() {
     : movesBrain
       ? brainTarget
       : storedTarget;
-  const socketOrigin =
+  const httpOrigin =
     isCloudConversationReady && hasConnectedAccount && backendUrl
       ? backendUrl
       : null;
@@ -79,9 +79,9 @@ export function GlobalExecutionTargetControl() {
   >(undefined);
 
   useExecutionDeviceList({
-    socketOrigin:
+    httpOrigin:
       open && isCloudConversationReady && hasConnectedAccount
-        ? socketOrigin
+        ? httpOrigin
         : null,
     onDevices: (devices) => setDestinations(devices),
   });

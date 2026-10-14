@@ -1,4 +1,5 @@
 import fs from "fs";
+import { createRequire } from "node:module";
 import { randomBytes } from "node:crypto";
 import path from "path";
 import tailwindcss from "@tailwindcss/vite";
@@ -54,61 +55,15 @@ const PDF_WORKER_PUBLIC_ABS = path.resolve(
   PDF_WORKER_PUBLIC_REL,
 );
 
-/**
- * Copies the pdfjs-dist worker into `public/vendor/pdfjs/` so the renderer
- * can load it as a static asset served by Vite's dev server.
- *
- * We can't rely on Vite/Rolldown to resolve the deep package path with
- * `?url`: the bun-managed node_modules layout hides pdfjs-dist behind
- * `.bun/node_modules/` and the deep path probe (`new URL("pdfjs-dist/...")`)
- * only sees Vite's import-map resolver, which doesn't expose deep file
- * paths through that channel. Copying via Node's resolver is the most
- * portable path: it works under bun's symlink layout, npm's flat layout,
- * and pnpm's strict-peer layout.
- */
 function pdfWorkerAsset(): Plugin {
-  const candidatePaths = [
-    // wojtekmaj/react-pdf nests pdfjs-dist as its own dependency, which is
-    // the most stable resolution target across package managers.
-    path.resolve(
-      STELLA_REPO_ROOT,
-      "node_modules",
-      ".bun",
-      "node_modules",
-      "pdfjs-dist",
-      "build",
-      "pdf.worker.min.mjs",
-    ),
-    path.resolve(
-      STELLA_REPO_ROOT,
-      "node_modules",
-      "pdfjs-dist",
-      "build",
-      "pdf.worker.min.mjs",
-    ),
-  ];
-
-  const resolveSource = (): string | null => {
-    for (const candidate of candidatePaths) {
-      try {
-        if (fs.statSync(candidate).isFile()) {
-          return candidate;
-        }
-      } catch {
-        /* try next */
-      }
-    }
-    return null;
+  const resolveSource = (): string => {
+    const fromRoot = createRequire(path.join(STELLA_REPO_ROOT, "package.json"));
+    const fromReactPdf = createRequire(fromRoot.resolve("react-pdf"));
+    return fromReactPdf.resolve("pdfjs-dist/build/pdf.worker.min.mjs");
   };
 
   const ensureWorkerCopied = () => {
     const sourcePath = resolveSource();
-    if (!sourcePath) {
-      console.warn(
-        "[pdf-worker-asset] Could not locate pdfjs-dist/build/pdf.worker.min.mjs; PDF previews will not render.",
-      );
-      return;
-    }
     const destPath = PDF_WORKER_PUBLIC_ABS;
     fs.mkdirSync(path.dirname(destPath), { recursive: true });
 

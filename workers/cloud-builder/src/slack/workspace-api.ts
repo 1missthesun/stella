@@ -24,6 +24,7 @@ import { requireCaller } from "../http/caller.js";
 import type { OwnerCaller } from "../owner-store/registry.js";
 import { unwrapRpc } from "../owner-store/errors.js";
 import { ownerGateStub } from "../rpc-release.js";
+import { crewScopeForInstall } from "./scope.js";
 import { SLACK_BOT_SCOPES, SLACK_PATHS, slackConfigured, slackPublicOrigin, slackSecret } from "./config.js";
 import { signInstallState } from "./link-state.js";
 import { GithubError } from "../projects/github.js";
@@ -86,18 +87,27 @@ const fail = (status: number, message: string): Response =>
 const ok = (body: unknown): Response =>
   Response.json(body, { headers: { "cache-control": "no-store" } });
 
-const ownerInternal = async (env: Cloudflare.Env, ownerId: string, name: string, args: unknown): Promise<unknown> => {
+type CrewInstall = { teamId: string; homeFolder: string };
+
+/** A drive call in the Slack workspace's own space, never the owner's personal Drive. */
+const ownerInternal = async (
+  env: Cloudflare.Env,
+  ownerId: string,
+  install: CrewInstall,
+  name: string,
+  args: unknown,
+): Promise<unknown> => {
   const gate = ownerGateStub(env.OWNER_GATES, ownerId);
   const { ownerGeneration } = await gate.snapshot();
-  return unwrapRpc(await gate.ownerInternal({ name, args, ownerGeneration }));
+  return unwrapRpc(await gate.ownerInternal({ name, args, ownerGeneration, crew: crewScopeForInstall(install) }));
 };
 
 const audienceOf = async (env: Cloudflare.Env, caller: OwnerCaller): Promise<ManagedModelAudience> =>
   (await ownerGateStub(env.OWNER_GATES, caller.ownerId).billingAccess()).audience;
 
-const readText = async (env: Cloudflare.Env, ownerId: string, path: string): Promise<string> => {
+const readText = async (env: Cloudflare.Env, ownerId: string, install: CrewInstall, path: string): Promise<string> => {
   try {
-    const file = (await ownerInternal(env, ownerId, "drive.turnRead", { path, length: 64_000 })) as {
+    const file = (await ownerInternal(env, ownerId, install, "drive.turnRead", { path, length: 64_000 })) as {
       bytes: Uint8Array;
     };
     return new TextDecoder().decode(file.bytes).trim();
@@ -114,10 +124,16 @@ const encodeBase64 = (bytes: Uint8Array): string => {
   return btoa(binary);
 };
 
-const writeText = async (env: Cloudflare.Env, ownerId: string, path: string, text: string): Promise<void> => {
+const writeText = async (
+  env: Cloudflare.Env,
+  ownerId: string,
+  install: CrewInstall,
+  path: string,
+  text: string,
+): Promise<void> => {
   const content = text.trim();
   const bytes = new TextEncoder().encode(content ? `${content}\n` : "");
-  const result = (await ownerInternal(env, ownerId, "drive.turnFiles", {
+  const result = (await ownerInternal(env, ownerId, install, "drive.turnFiles", {
     turnId: `slack-settings:${crypto.randomUUID()}`,
     hydratesDrive: false,
     source: "slack",
@@ -165,8 +181,8 @@ const describe = async (
   const environments = slackEnvironmentsEnabled(env);
   const [settings, rules, memory, repos, channels, stored] = await Promise.all([
     loadWorkspaceSettings(env, install.teamId),
-    readText(env, ownerId, rulesPath(install.homeFolder)),
-    readText(env, ownerId, workspaceNotesPath(install.homeFolder)),
+    readText(env, ownerId, install, rulesPath(install.homeFolder)),
+    readText(env, ownerId, install, workspaceNotesPath(install.homeFolder)),
     listRepos(env, install.teamId),
     listChannelDefaults(env, install.teamId),
     listGithubConnections(env, install.teamId),
@@ -296,9 +312,9 @@ const update = async (
   }
   if (environmentPatch) await applyEnvironment(env, teamId, "", environmentPatch);
   const { install } = owned;
-  if (input.rules !== undefined) await writeText(env, caller.ownerId, rulesPath(install.homeFolder), String(input.rules));
+  if (input.rules !== undefined) await writeText(env, caller.ownerId, install, rulesPath(install.homeFolder), String(input.rules));
   if (input.memory !== undefined) {
-    await writeText(env, caller.ownerId, workspaceNotesPath(install.homeFolder), String(input.memory));
+    await writeText(env, caller.ownerId, install, workspaceNotesPath(install.homeFolder), String(input.memory));
   }
   return ok({ workspace: await describe(env, install, owned.installedAt) });
 };

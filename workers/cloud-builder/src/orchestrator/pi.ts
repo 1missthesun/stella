@@ -127,6 +127,7 @@ import {
   isSlackConversationId,
   SLACK_CONNECTOR_SOURCE,
 } from "../slack/workspace.js";
+import { crewScopeForConversation } from "../slack/scope.js";
 import { OrchestratorCloudAgents } from "./cloud-agents.js";
 import { resolveCloudSpawnExecution } from "../cloud-spawn-model.js";
 
@@ -1835,12 +1836,15 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     history?: import("../cloud-code-tool.js").CloudHistoryClient,
     delivery?: import("../pi-runtime.js").PiAgentFileDelivery,
   ): Promise<CloudCodeSourceAgentTool[]> {
+    // A Stella Crew agent works in its Slack workspace's own drive space.
+    const crewScope = await crewScopeForConversation(this.env, authority.conversationId);
     const ownerInternal = async (name: string, args: unknown) =>
       unwrapRpc(
         await this.ownerGate(authority.ownerId).ownerInternal({
           name,
           args,
           ownerGeneration: authority.ownerGeneration,
+          ...(crewScope ? { crew: crewScope } : {}),
         }),
       );
     const web = createCloudWebTool({ ownerInternal });
@@ -1873,6 +1877,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
       conversationId: authority.conversationId,
       turnId: `pi-agent:${delivery?.threadId ?? "unbound"}`,
       ownerInternal,
+      ...(crewScope ? { driveRoot: crewScope.home } : {}),
       downloadLinks: true,
       publishFiles: async (
         _writerKey: string,

@@ -1604,7 +1604,13 @@ export class PiConversationRuntime {
       if (target.kind === "drive") {
         return await serveTurnDriveRequest(
           this.#options.env,
-          { ownerId: owner.ownerId, ownerGeneration: owner.ownerGeneration, turnId, kind: "agent" },
+          {
+            ownerId: owner.ownerId,
+            ownerGeneration: owner.ownerGeneration,
+            turnId,
+            kind: "agent",
+            conversationId: owner.conversationId,
+          },
           target.path,
           payload,
         );

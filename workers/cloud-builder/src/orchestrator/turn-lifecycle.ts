@@ -3,6 +3,7 @@ import type { AgentMessage } from "@stella/runtime/kernel/agent-core/types.js";
 import { assistantMessageHasUsableOutput } from "@stella/runtime/kernel/agent-runtime/run-shared.js";
 import type { TurnEventEvent } from "@stella/contracts/turn-plane/owner-events";
 import { deliverOwnerEvents } from "../owner-events.js";
+import { crewScopeForConversation } from "../slack/scope.js";
 import { unwrapRpc } from "../owner-store/errors.js";
 import {
   CONTEXT_MAX_SPILL_HYDRATIONS,
@@ -194,11 +195,13 @@ export abstract class OrchestratorTurnLifecycle extends OrchestratorOwner {
     if (paths.length === 0) return [];
     try {
       signal?.throwIfAborted();
+      const crew = await crewScopeForConversation(this.env, turn.conversationId);
       const payload = unwrapRpc(
         await this.ownerGate(turn.ownerId).ownerInternal({
           name: "drive.turnAttachments",
           args: { paths },
           ownerGeneration: turn.ownerGeneration,
+          ...(crew ? { crew } : {}),
         }),
       ) as {
         attachments?: Array<{ path: string; contentType: string; url: string }>;

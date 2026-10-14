@@ -17,6 +17,8 @@ const MAX_HTML_BYTES = 6 * 1024 * 1024;
 export type CloudHtmlToolContext = Readonly<{
   turnId: string;
   ownerInternal: OwnerInternalCall;
+  /** Drive folder the canvas goes under (a Crew workspace's home); the drive root when absent. */
+  driveRoot?: string;
   publishFiles: (
     writerKey: string,
     files: Array<{
@@ -70,7 +72,9 @@ export const createCloudHtmlTool = (
         `The canvas is ${bytes.byteLength} bytes; keep it under ${MAX_HTML_BYTES}.`,
       );
     }
-    const path = cloudHtmlDrivePath(slug);
+    const path = context.driveRoot
+      ? `${context.driveRoot}/${cloudHtmlDrivePath(slug)}`
+      : cloudHtmlDrivePath(slug);
     const name = `${slug}.html`;
     let result: DriveTurnFilesResult;
     try {

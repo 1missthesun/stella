@@ -20,6 +20,7 @@ import { prepareSlackPreviews } from "./slack/previews.js";
 import { prepareSlackRepo } from "./slack/repo-clone.js";
 import { egressForConversation, prepareSlackEnvironment, slackEnvironmentsEnabled } from "./slack/environment.js";
 import { isSlackConversationId } from "./slack/conversation-id.js";
+import { conversationWorldName } from "./slack/scope.js";
 import { startTurnExecution } from "./turn-cancellation.js";
 import type { InstanceSize } from "./instance-size.js";
 import { issueWorldCapability } from "./world-capability.js";
@@ -107,13 +108,17 @@ const quoted = (value: string) => `'${value.replace(/'/gu, `'"'"'`)}'`;
  * right after the snapshot). Each step is best-effort; a container that is
  * not running holds none of them.
  */
+/** The owner's world, or the Slack workspace's own world for a Stella Crew agent. */
+const piWorldName = async (host: PiComputeHost, owner: PiComputeOwner): Promise<string> =>
+  await conversationWorldName(host.env, owner.ownerId, owner.conversationId, worldName);
+
 export const releasePiCompute = async (
   host: PiComputeHost,
   record: PiComputeRecord,
   options: { warm?: boolean } = {},
 ) => {
   await host.releaseSlot(record.owner, record.sandboxId).catch(() => undefined);
-  const sandbox = sandboxFor(host, record.sandboxId, INSTANCE_SIZE, await worldName(record.owner.ownerId));
+  const sandbox = sandboxFor(host, record.sandboxId, INSTANCE_SIZE, await piWorldName(host, record.owner));
   const running = await sandbox
     .getState()
     .then((state) => state.status === "running")
@@ -159,12 +164,17 @@ export const openPiComputeLease = async (
     owner,
     turnId,
     attemptGeneration,
-    sandboxId: await agentSandboxId(owner.ownerId, `pi:${owner.conversationId}:${threadId}`),
+    // Crew agents moved off the owner's world: a fresh container, never one
+    // that already holds the owner's files on disk.
+    sandboxId: await agentSandboxId(
+      owner.ownerId,
+      `${isSlackConversationId(owner.conversationId) ? "crew-world:" : ""}pi:${owner.conversationId}:${threadId}`,
+    ),
     sessionId: `pi-agent-${hash}`,
     daemonDirectory: attachedToolPathsForDirectory(`/workspace/attached/pi-${hash}-${attemptGeneration}`).directory,
   };
   await host.storage.put(piComputeKey(agentConversationId), record);
-  const world = await worldName(owner.ownerId);
+  const world = await piWorldName(host, owner);
   let released!: () => void;
   const held = new Promise<void>((resolve) => {
     released = resolve;

@@ -74,6 +74,7 @@ import type {
   TurnBrokerTurnStateCheckpointRequest,
 } from "@stella/contracts/turn-credential-broker";
 import { ownerGateStub } from "../rpc-release.js";
+import { conversationWorldName, crewScopeForConversation } from "../slack/scope.js";
 
 export type TurnBrokerHost = Pick<
   BuildSessionInternals,
@@ -415,7 +416,12 @@ export const executeTurnStateCheckpoint = async (
     ? undefined
     : (
         await host.env.WORLDS.getByName(
-          await worldName(turn.ownerId),
+          await conversationWorldName(
+            host.env,
+            turn.ownerId,
+            turn.conversationId ?? turn.originConversationId,
+            worldName,
+          ),
         ).checkpoint({ historyCursor: operation.payload.historyCursor })
       ).manifestId;
 
@@ -592,8 +598,9 @@ const driveJson = (body: unknown, status = 200): Response =>
   Response.json(body, { status, headers: { "cache-control": "no-store" } });
 
 export const serveTurnDriveRequest = async (
-  env: Pick<Cloudflare.Env, "OWNER_GATES">,
-  turn: Pick<TurnRequest, "ownerId" | "ownerGeneration" | "turnId" | "kind">,
+  env: Pick<Cloudflare.Env, "OWNER_GATES" | "DB">,
+  turn: Pick<TurnRequest, "ownerId" | "ownerGeneration" | "turnId" | "kind"> &
+    Partial<Pick<TurnRequest, "conversationId" | "originConversationId">>,
   path: string,
   body: Record<string, unknown>,
 ): Promise<Response> => {
@@ -625,9 +632,12 @@ export const serveTurnDriveRequest = async (
               }
             : null;
   if (!call) return brokerFailure(403);
+  // A Stella Crew turn's drive is its Slack workspace's own space.
+  const crew = await crewScopeForConversation(env, turn.conversationId ?? turn.originConversationId);
   const response = (await ownerGateStub(env.OWNER_GATES, turn.ownerId).ownerInternal({
     ...call,
     ownerGeneration: turn.ownerGeneration,
+    ...(crew ? { crew } : {}),
   })) as RpcResponse;
   if (!response.ok) {
     return driveJson(

@@ -99,6 +99,12 @@ export const loadInstallation = async (
   let homeFolder = row.home_folder;
   if (!homeFolder) {
     homeFolder = workspaceHomeFolder(row.team_name, row.team_id);
+    // Two workspaces with the same name never share a folder.
+    const taken = await d1(env)
+      .prepare("SELECT 1 FROM slack_installations WHERE home_folder = ? AND team_id <> ? LIMIT 1")
+      .bind(homeFolder, row.team_id)
+      .first();
+    if (taken) homeFolder = `${homeFolder} (${row.team_id})`;
     await d1(env)
       .prepare(
         "UPDATE slack_installations SET home_folder = ? WHERE team_id = ? AND home_folder IS NULL",

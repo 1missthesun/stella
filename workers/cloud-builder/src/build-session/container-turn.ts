@@ -53,6 +53,7 @@ import {
   worldName,
 } from "../workspace.js";
 import { issueWorldCapability } from "../world-capability.js";
+import { conversationWorldName } from "../slack/scope.js";
 import { worldMaterializationCommand, worldMaterializationFailure } from "../world-materialization.js";
 import {
   SANDBOX_EXECUTOR,
@@ -167,6 +168,18 @@ export type ContainerTurnHost = Pick<
   | "terminateCurrentAgentSession"
   | "unregisterTurn"
 >;
+
+/** The owner's world, or the Slack workspace's own world for a Stella Crew turn. */
+const turnWorldName = async (
+  env: { DB?: D1Database },
+  turn: Pick<TurnRequest, "ownerId" | "conversationId" | "originConversationId">,
+): Promise<string> =>
+  await conversationWorldName(
+    env,
+    turn.ownerId,
+    turn.conversationId ?? turn.originConversationId,
+    worldName,
+  );
 
 const readCloudAgentTurnResultText = async (
   session: Pick<ExecutionSession, "readFile">,
@@ -519,7 +532,7 @@ export const runContainerAgentTurn = async (
   const commandTimeoutMs = Number(host.env.TURN_TIMEOUT_MS);
   const requestStarted = performance.now();
   const turnStartedAt = Date.now();
-  const ownerWorld = await worldName(turn.ownerId);
+  const ownerWorld = await turnWorldName(host.env, turn);
   const idleTimeoutMs = turnSleepAfterMs(host.env, turn);
   let sandbox = host.sandbox(
     sandboxId,
@@ -1215,7 +1228,7 @@ export const attachAgentWorld = async (
   const coldStarted = performance.now();
   await host.assertAgentExecutionActive(turn, turnExecution);
   const worldNameStarted = performance.now();
-  const worldNamePreparation = worldName(turn.ownerId).then(
+  const worldNamePreparation = turnWorldName(host.env, turn).then(
     (name) => ({ ok: true as const, name }),
     (error: unknown) => ({ ok: false as const, error }),
   );
@@ -1613,10 +1626,10 @@ export const runAgentAttempt = async (
         turnBroker: { credentialsPath: brokerCredentialsPath },
         world: {
           origin: host.env.CLOUD_BUILDER_PUBLIC_URL.replace(/\/+$/u, ""),
-          name: await worldName(turn.ownerId),
+          name: await turnWorldName(host.env, turn),
           capability: await issueWorldCapability({
             secret: builderServiceSecret(host.env),
-            worldName: await worldName(turn.ownerId),
+            worldName: await turnWorldName(host.env, turn),
             turnId: turn.turnId,
             attemptGeneration: turn.attemptGeneration!,
             now: Date.now(),

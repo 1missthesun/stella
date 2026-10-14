@@ -14,6 +14,7 @@ import type {
   OwnerCaller,
   OwnerContext,
   OwnerCredentialKind,
+  OwnerCrewScope,
   OwnerDb,
   OwnerHost,
   OwnerJobs,
@@ -405,8 +406,8 @@ export class OwnerStore {
     }
   }
 
-  async internalCall(name: string, args: unknown): Promise<RpcResponse> {
-    return await this.runInternal(this.registry.internal.get(name), name, args);
+  async internalCall(name: string, args: unknown, crew?: OwnerCrewScope): Promise<RpcResponse> {
+    return await this.runInternal(this.registry.internal.get(name), name, args, crew);
   }
 
   async credentialCall(kind: OwnerCredentialKind, args: unknown): Promise<RpcResponse> {
@@ -417,6 +418,7 @@ export class OwnerStore {
     def: InternalDef | undefined,
     name: string,
     args: unknown,
+    crew?: OwnerCrewScope,
   ): Promise<RpcResponse> {
     if (!def) {
       return {
@@ -425,7 +427,7 @@ export class OwnerStore {
       };
     }
     try {
-      const value = await def(this.context(null), args ?? {});
+      const value = await def({ ...this.context(null), ...(crew ? { crew } : {}) }, args ?? {});
       return { ok: true, value: value ?? null };
     } catch (error) {
       if (!(error instanceof RpcError)) {

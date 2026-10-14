@@ -35,6 +35,7 @@ import { STOP_ACTION, stopValue } from "./interactivity.js";
 import { loadInstallation, type SlackInstallation } from "./store.js";
 import { SLACK_NO_REPLY, type SlackWorkspaceContext } from "./workspace.js";
 import { ownerGateStub } from "../rpc-release.js";
+import { crewScopeForInstall } from "./scope.js";
 
 export type SlackRelayBinding = {
   teamId: string;
@@ -737,6 +738,7 @@ export class SlackRelay {
             name: "drive.fileUrl",
             args: { path: file.path },
             ownerGeneration,
+            crew: crewScopeForInstall(install),
           }),
         ) as { url: string; contentType?: string };
         const response = await fetch(located.url);

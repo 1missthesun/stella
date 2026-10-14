@@ -35,6 +35,7 @@ import {
 } from "./store.js";
 import { publishHome, sendSetupPrompt } from "./ui.js";
 import { ownerGateStub } from "../rpc-release.js";
+import { crewScopeForInstall } from "./scope.js";
 import { loadWorkspaceSettings, workspaceExecution } from "./settings.js";
 import {
   connectionFor,
@@ -238,8 +239,10 @@ const safeFileName = (name: string): string =>
     .replace(/^\.+/u, "_")
     .slice(0, 120) || "file";
 
+/** A drive call in the Slack workspace's own space, never the owner's personal Drive. */
 const ownerInternal = async (
   env: Cloudflare.Env,
+  install: SlackInstallation,
   ownerId: string,
   ownerGeneration: string,
   name: string,
@@ -250,6 +253,7 @@ const ownerInternal = async (
       name,
       args,
       ownerGeneration,
+      crew: crewScopeForInstall(install),
     }),
   );
 
@@ -284,6 +288,7 @@ const importFiles = async (
     try {
       const result = (await ownerInternal(
         env,
+        install,
         ownerId,
         ownerGeneration,
         "drive.turnFiles",

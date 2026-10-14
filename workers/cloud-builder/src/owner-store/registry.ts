@@ -204,10 +204,15 @@ export class DispatchError extends Error {
   }
 }
 
+/** A Stella Crew workspace a call runs for: its own drive space and home folder. */
+export type OwnerCrewScope = { space: string; home: string };
+
 export type OwnerContext = {
   ownerId: string;
   host: OwnerHost;
   caller: OwnerCaller | null;
+  /** Set only by the owner gate for a Stella Crew caller; pins drive calls to its space. */
+  crew?: OwnerCrewScope;
   db: OwnerDb;
   jobs: OwnerJobs;
   env: Cloudflare.Env;

@@ -53,6 +53,7 @@ import {
   SLACK_CONNECTOR_SOURCE,
 } from "../slack/workspace.js";
 import { createSlackRepoTool } from "../slack/repo-tool.js";
+import { conversationWorldName, crewScopeForConversation } from "../slack/scope.js";
 
 export abstract class OrchestratorTools extends OrchestratorPi {
   protected async createTools(
@@ -63,6 +64,11 @@ export abstract class OrchestratorTools extends OrchestratorPi {
   ): Promise<{
     catalog: readonly CloudCodeSourceAgentTool[];
   }> {
+    const slack = isSlackConversationId(turn.conversationId);
+    // Stella Crew works in its Slack workspace's own drive space and world.
+    const crewScope = slack
+      ? await crewScopeForConversation(this.env, turn.conversationId)
+      : undefined;
     const toolContext = {
       ownerId: turn.ownerId,
       ownerGeneration: turn.ownerGeneration,
@@ -73,14 +79,18 @@ export abstract class OrchestratorTools extends OrchestratorPi {
             name,
             args,
             ownerGeneration: turn.ownerGeneration,
+            ...(crewScope ? { crew: crewScope } : {}),
           }),
         ),
     };
+    let turnWorld: Promise<string> | undefined;
+    const turnWorldName = () =>
+      (turnWorld ??= conversationWorldName(this.env, turn.ownerId, turn.conversationId, worldName));
     const worldBinding = this.env.WORLDS as typeof this.env.WORLDS | undefined;
     const world = worldBinding
       ? (() => {
           const store = async () =>
-            worldBinding.getByName(await worldName(turn.ownerId));
+            worldBinding.getByName(await turnWorldName());
           const worldTools: WorldStoreTools = {
             tool: async (call) => await (await store()).tool(call),
             stat: async (path) => await (await store()).stat(path),
@@ -132,7 +142,6 @@ export abstract class OrchestratorTools extends OrchestratorPi {
         : { mcp: ownerMcpSource(toolContext.ownerInternal) }),
     });
 
-    const slack = isSlackConversationId(turn.conversationId);
     if (slack) {
       const tools: CloudCodeSourceAgentTool[] = [
         createCloudWebTool({ ownerInternal: toolContext.ownerInternal }),
@@ -141,6 +150,7 @@ export abstract class OrchestratorTools extends OrchestratorPi {
           conversationId: turn.conversationId,
           turnId: turn.turnId,
           ownerInternal: toolContext.ownerInternal,
+          ...(crewScope ? { driveRoot: crewScope.home } : {}),
           publishFiles: (writerKey, files) =>
             this.publishTurnFilesCard(turn.turnId, writerKey, files),
         }),
@@ -149,12 +159,14 @@ export abstract class OrchestratorTools extends OrchestratorPi {
           conversationId: turn.conversationId,
           turnId: turn.turnId,
           ownerInternal: toolContext.ownerInternal,
+          ...(crewScope ? { driveRoot: crewScope.home } : {}),
           publishFiles: (writerKey, files) =>
             this.publishTurnFilesCard(turn.turnId, writerKey, files),
         }),
         createCloudHtmlTool({
           turnId: turn.turnId,
           ownerInternal: toolContext.ownerInternal,
+          ...(crewScope ? { driveRoot: crewScope.home } : {}),
           publishFiles: (writerKey, files) =>
             this.publishTurnFilesCard(turn.turnId, writerKey, files),
         }),

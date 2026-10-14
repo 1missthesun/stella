@@ -19,6 +19,8 @@ export type CloudMediaToolContext = {
   turnId: string;
   ownerInternal: OwnerInternalCall;
   publishFiles: (writerKey: string, files: CloudMediaDriveFile[]) => void | Promise<void>;
+  /** Drive folder generated files go under (a Crew workspace's home); the drive root when absent. */
+  driveRoot?: string;
   downloadLinks?: boolean;
   fetchImpl?: typeof fetch;
   now?: () => number;

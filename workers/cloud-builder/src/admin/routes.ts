@@ -338,7 +338,54 @@ const emailDigestProbeRoute = async (request: Request, env: AdminEnv): Promise<R
   return response.ok ? json(response.value) : fail(rpcErrorStatus(response.error.code), response.error.message);
 };
 
+/**
+ * Moves every Stella Crew workspace's folder out of its owner's personal Drive
+ * into the workspace's own drive space (the gate adopts it on the first Crew
+ * call), and reports what each space and personal Drive now hold there.
+ */
+const crewDriveSpaces = async (env: AdminEnv): Promise<Response> => {
+  const { results } = await db(env)
+    .prepare(
+      `SELECT team_id, owner_id, home_folder FROM slack_installations
+        WHERE revoked_at IS NULL AND owner_id IS NOT NULL AND home_folder IS NOT NULL`,
+    )
+    .all<{ team_id: string; owner_id: string; home_folder: string }>();
+  const { crewScopeForInstall } = await import("../slack/scope.js");
+  const report: Array<Record<string, unknown>> = [];
+  for (const row of results) {
+    const owner = await ownerGate(env, row.owner_id);
+    if (owner.response) {
+      report.push({ teamId: row.team_id, error: "owner unavailable" });
+      continue;
+    }
+    const crew = crewScopeForInstall({ teamId: row.team_id, homeFolder: row.home_folder });
+    const ownerGeneration = owner.snapshot.ownerGeneration;
+    const inSpace = (await owner.gate.ownerInternal({
+      name: "drive.turnList",
+      args: { prefix: row.home_folder, limit: 200 },
+      ownerGeneration,
+      crew,
+    })) as RpcResponse<{ files: unknown[]; more: boolean }>;
+    const personal = (await owner.gate.ownerInternal({
+      name: "drive.turnList",
+      args: { prefix: row.home_folder, limit: 200 },
+      ownerGeneration,
+    })) as RpcResponse<{ files: unknown[] }>;
+    report.push({
+      teamId: row.team_id,
+      space: crew.space,
+      home: row.home_folder,
+      ...(inSpace.ok
+        ? { spaceFiles: inSpace.value.files.length, spaceMore: inSpace.value.more }
+        : { spaceError: inSpace.error.message }),
+      ...(personal.ok ? { personalFilesLeft: personal.value.files.length } : { personalError: personal.error.message }),
+    });
+  }
+  return json({ installations: report });
+};
+
 const ROUTES: Record<string, { method: "GET" | "POST"; run: (request: Request, url: URL, env: AdminEnv) => Promise<Response> }> = {
+  "/api/admin/slack/crew-drive-spaces": { method: "POST", run: (_request, _url, env) => crewDriveSpaces(env) },
   "/api/admin/owners/lookup": { method: "GET", run: (_request, url, env) => lookup(url, env) },
   "/api/admin/owners/top": { method: "GET", run: (_request, url, env) => top(url, env) },
   "/api/admin/owners/storage": { method: "GET", run: (_request, url, env) => storage(url, env) },

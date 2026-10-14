@@ -17,6 +17,7 @@ import {
   renderSlackSystemPrompt,
   slackSkillCatalog,
 } from "../slack/workspace.js";
+import { crewScopeForConversation, ownerCallFor } from "../slack/scope.js";
 import type { AgentMessage } from "@stella/runtime/kernel/agent-core/types.js";
 import {
   assertTurnExecutionActive,
@@ -939,14 +940,12 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
     const slackPrompt = slack
       ? await renderSlackSystemPrompt(
           await this.slack().workspace(),
-          async (name, args) =>
-            unwrapRpc(
-              await this.ownerGate(turn.ownerId).ownerInternal({
-                name,
-                args,
-                ownerGeneration: turn.ownerGeneration,
-              }),
-            ),
+          ownerCallFor(
+            this.env,
+            turn.ownerId,
+            turn.ownerGeneration,
+            await crewScopeForConversation(this.env, turn.conversationId),
+          ),
         )
       : null;
     const skillCatalog = slack

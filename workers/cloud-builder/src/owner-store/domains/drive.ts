@@ -142,6 +142,66 @@ export const DRIVE_DEVICE_FILES_MIGRATION = {
   ],
 };
 
+/**
+ * Drive spaces: '' is the owner's personal Drive; `crew:<teamId>` is a Stella
+ * Crew workspace's own storage. Every row belongs to one space and every query
+ * names its space, so no caller sees another space's files. The owner's own
+ * clients, devices and agents always use ''. Crew callers are pinned to their
+ * space by the owner gate (`crew` on `ownerInternal`), never by arguments.
+ */
+export const DRIVE_SPACES_MIGRATION = {
+  id: "drive.3-spaces",
+  statements: [
+    `CREATE TABLE drive_files_spaced (
+       space TEXT NOT NULL DEFAULT '',
+       path TEXT NOT NULL,
+       r2_key TEXT NOT NULL,
+       name TEXT NOT NULL,
+       size_bytes INTEGER NOT NULL,
+       content_type TEXT NOT NULL,
+       source TEXT NOT NULL,
+       origin TEXT NOT NULL,
+       write_key TEXT,
+       upload_id TEXT,
+       created_at INTEGER NOT NULL,
+       updated_at INTEGER NOT NULL,
+       PRIMARY KEY (space, path)
+     )`,
+    `INSERT INTO drive_files_spaced (space, path, r2_key, name, size_bytes, content_type, source, origin,
+       write_key, upload_id, created_at, updated_at)
+     SELECT '', path, r2_key, name, size_bytes, content_type, source, origin,
+       write_key, upload_id, created_at, updated_at FROM drive_files`,
+    `DROP TABLE drive_files`,
+    `ALTER TABLE drive_files_spaced RENAME TO drive_files`,
+    `CREATE INDEX drive_files_updated_at ON drive_files (space, updated_at)`,
+    `CREATE INDEX drive_files_r2_key ON drive_files (r2_key)`,
+    `CREATE TABLE drive_deletions_spaced (
+       space TEXT NOT NULL DEFAULT '',
+       path TEXT NOT NULL,
+       deleted_at INTEGER NOT NULL,
+       PRIMARY KEY (space, path)
+     )`,
+    `INSERT INTO drive_deletions_spaced (space, path, deleted_at)
+     SELECT '', path, deleted_at FROM drive_deletions`,
+    `DROP TABLE drive_deletions`,
+    `ALTER TABLE drive_deletions_spaced RENAME TO drive_deletions`,
+    `CREATE INDEX drive_deletions_deleted_at ON drive_deletions (deleted_at)`,
+    `ALTER TABLE drive_uploads ADD COLUMN space TEXT NOT NULL DEFAULT ''`,
+    `CREATE TABLE drive_space_adoptions (
+       space TEXT NOT NULL,
+       home TEXT NOT NULL,
+       moved INTEGER NOT NULL,
+       adopted_at INTEGER NOT NULL,
+       PRIMARY KEY (space, home)
+     )`,
+  ],
+};
+
+export const PERSONAL_DRIVE_SPACE = "";
+
+/** The space a call works in: a Crew workspace's, else the owner's personal Drive. */
+const spaceOf = (ctx: Pick<OwnerContext, "crew">): string => ctx.crew?.space ?? PERSONAL_DRIVE_SPACE;
+
 const MAX_DEVICE_FILE_SOURCE_CHARS = 4_000;
 const MAX_DEVICE_FILES_PER_RECORD = 50;
 const MAX_DEVICE_FILE_ROWS = 20_000;
@@ -174,6 +234,7 @@ type FileRow = {
 
 type UploadRow = {
   upload_id: string;
+  space: string;
   path: string;
   r2_key: string;
   status: "pending" | "cleanup";
@@ -308,8 +369,8 @@ const signGet = async (
     ...(now !== undefined ? { now } : {}),
   });
 
-export const getFile = (db: OwnerDbReader, path: string): FileRow | null =>
-  db.one<FileRow>("SELECT * FROM drive_files WHERE path = ?", path);
+export const getFile = (db: OwnerDbReader, space: string, path: string): FileRow | null =>
+  db.one<FileRow>("SELECT * FROM drive_files WHERE space = ? AND path = ?", space, path);
 
 const NOT_THUMBNAIL = `path NOT LIKE '${EVIDENCE_THUMBNAIL_DRIVE_ROOT}/%'`;
 
@@ -346,9 +407,10 @@ const queueCleanup = (
 ): string => {
   const id = `cleanup-${crypto.randomUUID()}`;
   ctx.db.run(
-    `INSERT INTO drive_uploads (upload_id, path, r2_key, status, claimed_bytes, created_at, expires_at)
-     VALUES (?, ?, ?, 'cleanup', 0, ?, ?)`,
+    `INSERT INTO drive_uploads (upload_id, space, path, r2_key, status, claimed_bytes, created_at, expires_at)
+     VALUES (?, ?, ?, ?, 'cleanup', 0, ?, ?)`,
     id,
+    spaceOf(ctx),
     entry.path,
     entry.r2Key,
     ctx.now,
@@ -371,10 +433,11 @@ const retirePendingUpload = (ctx: OwnerContext, row: UploadRow, now: number): vo
   armJob(ctx, DRIVE_CLEANUP_JOB, expiresAt);
 };
 
-const recordTombstone = (ctx: OwnerContext, path: string, deletedAt: number): void => {
+const recordTombstone = (ctx: OwnerContext, space: string, path: string, deletedAt: number): void => {
   ctx.db.run(
-    `INSERT INTO drive_deletions (path, deleted_at) VALUES (?, ?)
-     ON CONFLICT (path) DO UPDATE SET deleted_at = excluded.deleted_at`,
+    `INSERT INTO drive_deletions (space, path, deleted_at) VALUES (?, ?, ?)
+     ON CONFLICT (space, path) DO UPDATE SET deleted_at = excluded.deleted_at`,
+    space,
     path,
     deletedAt,
   );
@@ -387,11 +450,12 @@ const deleteFileRow = (
   now: number,
   expectedR2Key?: string,
 ): boolean => {
-  const row = getFile(ctx.db, path);
+  const space = spaceOf(ctx);
+  const row = getFile(ctx.db, space, path);
   if (!row) return false;
   if (expectedR2Key !== undefined && row.r2_key !== expectedR2Key) return false;
-  ctx.db.run("DELETE FROM drive_files WHERE path = ?", path);
-  recordTombstone(ctx, path, now);
+  ctx.db.run("DELETE FROM drive_files WHERE space = ? AND path = ?", space, path);
+  recordTombstone(ctx, space, path, now);
   queueCleanup(ctx, { path, r2Key: row.r2_key, notBefore: now + REPLACEMENT_GRACE_MS });
   const thumbnail = evidenceThumbnailDrivePath(path);
   if (thumbnail) deleteFileRow(ctx, thumbnail, now);
@@ -406,7 +470,7 @@ type WriteVerdict = {
 };
 
 const partitionWrite = (
-  ctx: Pick<OwnerContext, "db" | "env" | "now">,
+  ctx: Pick<OwnerContext, "db" | "env" | "now" | "crew">,
   files: WriteCandidate[],
 ): WriteVerdict => {
   const { plan, unlimited } = billingPlan(ctx);
@@ -440,7 +504,7 @@ const partitionWrite = (
       });
       continue;
     }
-    const prior = getFile(ctx.db, file.path)?.size_bytes ?? null;
+    const prior = getFile(ctx.db, spaceOf(ctx), file.path)?.size_bytes ?? null;
     const nextFileCount = prior === null ? fileCount + 1 : fileCount;
     const nextTotalBytes = totalBytes - (prior ?? 0) + file.sizeBytes;
     if (nextFileCount > quota.maxFiles) {
@@ -492,9 +556,10 @@ const prepareUpload = async (
   });
   const now = Date.now();
   ctx.db.run(
-    `INSERT INTO drive_uploads (upload_id, path, r2_key, status, claimed_bytes, created_at, expires_at)
-     VALUES (?, ?, ?, 'pending', ?, ?, ?)`,
+    `INSERT INTO drive_uploads (upload_id, space, path, r2_key, status, claimed_bytes, created_at, expires_at)
+     VALUES (?, ?, ?, ?, 'pending', ?, ?, ?)`,
     uploadId,
+    spaceOf(ctx),
     path,
     r2Key,
     sizeBytes,
@@ -514,8 +579,9 @@ const finalizeUpload = async (
   if (!uploadId) throw invalid("An upload id is required.");
   const pendingRow = (): UploadRow | null =>
     ctx.db.one<UploadRow>("SELECT * FROM drive_uploads WHERE upload_id = ?", uploadId);
+  const space = spaceOf(ctx);
   const replayOrMissing = (): DriveFileRecord => {
-    const installed = getFile(ctx.db, path);
+    const installed = getFile(ctx.db, space, path);
     if (installed?.upload_id === uploadId) return fileRecord(installed);
     throw new RpcError("NOT_FOUND", "That upload is no longer pending. Start the upload again.", {
       reason: "upload_not_found",
@@ -523,7 +589,9 @@ const finalizeUpload = async (
   };
   const pending = pendingRow();
   if (!pending || pending.status !== "pending") return replayOrMissing();
-  if (pending.path !== path) throw invalid("Upload id does not belong to that drive path.");
+  if (pending.path !== path || pending.space !== space) {
+    throw invalid("Upload id does not belong to that drive path.");
+  }
 
   const bucket = bucketOf(ctx);
   const signer = signerOf(ctx);
@@ -568,19 +636,19 @@ const finalizeUpload = async (
   const now = Date.now();
   const current = pendingRow();
   if (!current || current.status !== "pending") return replayOrMissing();
-  const verdict = partitionWrite({ db: ctx.db, env: ctx.env, now }, [{ path, sizeBytes: stagedBytes }]);
+  const verdict = partitionWrite({ db: ctx.db, env: ctx.env, now, crew: ctx.crew }, [{ path, sizeBytes: stagedBytes }]);
   if (verdict.accepted.length === 0) {
     refuse(quotaExceeded(verdict.skipped[0]?.reason ?? "Drive quota exceeded."));
   }
   const contentType = normalizeContentType(args.contentType ?? copied.httpMetadata?.contentType);
   const source = args.source === "agent" ? "agent" : "upload";
   const name = fileNameFromPath(path);
-  const existing = getFile(ctx.db, path);
+  const existing = getFile(ctx.db, space, path);
   if (existing) {
     ctx.db.run(
       `UPDATE drive_files SET r2_key = ?, name = ?, size_bytes = ?, content_type = ?, source = ?,
          origin = ?, upload_id = ?, write_key = NULL, updated_at = ?
-       WHERE path = ?`,
+       WHERE space = ? AND path = ?`,
       finalKey,
       name,
       stagedBytes,
@@ -589,6 +657,7 @@ const finalizeUpload = async (
       source === "upload" ? "upload" : existing.origin,
       uploadId,
       now,
+      space,
       path,
     );
     if (existing.r2_key !== finalKey) {
@@ -596,9 +665,10 @@ const finalizeUpload = async (
     }
   } else {
     ctx.db.run(
-      `INSERT INTO drive_files (path, r2_key, name, size_bytes, content_type, source, origin,
+      `INSERT INTO drive_files (space, path, r2_key, name, size_bytes, content_type, source, origin,
          write_key, upload_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)`,
+      space,
       path,
       finalKey,
       name,
@@ -619,7 +689,7 @@ const finalizeUpload = async (
 
 const fileUrl = async (ctx: OwnerContext, args: { path: string }): Promise<DriveFileUrl> => {
   const path = normalizeDrivePath(args.path);
-  const row = getFile(ctx.db, path);
+  const row = getFile(ctx.db, spaceOf(ctx), path);
   if (!row) throw new RpcError("NOT_FOUND", "That file is not in your drive.");
   const now = Date.now();
   return {
@@ -634,6 +704,7 @@ const fileUrl = async (ctx: OwnerContext, args: { path: string }): Promise<Drive
 
 const listFiles = (
   db: OwnerDbReader,
+  space: string,
   args: { prefix?: string; limit?: number },
 ): DriveFile[] => {
   const prefix = normalizeDrivePrefix(args.prefix);
@@ -641,13 +712,15 @@ const listFiles = (
   const hidden = isEvidenceThumbnailDrivePath(prefix) ? "" : ` AND ${NOT_THUMBNAIL}`;
   const rows = prefix
     ? db.all<FileRow>(
-        `SELECT * FROM drive_files WHERE path >= ? AND path < ?${hidden} ORDER BY path LIMIT ?`,
+        `SELECT * FROM drive_files WHERE space = ? AND path >= ? AND path < ?${hidden} ORDER BY path LIMIT ?`,
+        space,
         prefix,
         `${prefix}￿`,
         limit,
       )
     : db.all<FileRow>(
-        `SELECT * FROM drive_files WHERE ${NOT_THUMBNAIL} ORDER BY updated_at DESC, path LIMIT ?`,
+        `SELECT * FROM drive_files WHERE space = ? AND ${NOT_THUMBNAIL} ORDER BY updated_at DESC, path LIMIT ?`,
+        space,
         limit,
       );
   return rows.map((row) => ({
@@ -699,7 +772,7 @@ const recordDeviceFiles = (
   for (const file of args.files) {
     const sourcePath = sourcePathOf(file.sourcePath);
     const drivePath = file.drivePath ? normalizeDrivePath(file.drivePath) : null;
-    if (drivePath && !getFile(ctx.db, drivePath)) {
+    if (drivePath && !getFile(ctx.db, PERSONAL_DRIVE_SPACE, drivePath)) {
       throw invalid("A device file's drive copy must already be in the drive.");
     }
     const name = sourcePath.slice(Math.max(sourcePath.lastIndexOf("/"), sourcePath.lastIndexOf("\\")) + 1);
@@ -753,7 +826,7 @@ const locateDeviceFiles = (
       MAX_DEVICES_PER_SOURCE_PATH,
     );
     for (const row of rows) {
-      const usableCopy = row.drive_path ? getFile(db, row.drive_path) : null;
+      const usableCopy = row.drive_path ? getFile(db, PERSONAL_DRIVE_SPACE, row.drive_path) : null;
       files.push({
         sourcePath: row.source_path,
         deviceId: row.device_id,
@@ -934,7 +1007,8 @@ const resolveStagedWrites = async (
       continue;
     }
     const installed = ctx.db.one<FileRow>(
-      "SELECT * FROM drive_files WHERE upload_id = ? LIMIT 1",
+      "SELECT * FROM drive_files WHERE space = ? AND upload_id = ? LIMIT 1",
+      spaceOf(ctx),
       file.uploadId,
     );
     if (installed && writeKey !== undefined && installed.write_key === writeKey) {
@@ -948,6 +1022,7 @@ const resolveStagedWrites = async (
     if (
       !pending ||
       pending.status !== "pending" ||
+      pending.space !== spaceOf(ctx) ||
       pending.path !== file.path ||
       file.sizeBytes > pending.claimed_bytes
     ) {
@@ -984,9 +1059,10 @@ const turnFiles = async (ctx: OwnerContext, raw: unknown): Promise<DriveTurnFile
   let files = stagedWrites.files;
   const { staged } = stagedWrites;
 
+  const space = spaceOf(ctx);
   const baseline: Baseline = new Map();
   for (const path of new Set(files.flatMap((file) => [file.path, driveRevisionPath(file.path)]))) {
-    const row = getFile(ctx.db, path);
+    const row = getFile(ctx.db, space, path);
     if (row) {
       baseline.set(path, { origin: row.origin, writeKey: row.write_key, updatedAt: row.updated_at });
     }
@@ -1052,7 +1128,7 @@ const turnFiles = async (ctx: OwnerContext, raw: unknown): Promise<DriveTurnFile
 
   const now = Date.now();
   const verdict = partitionWrite(
-    { db: ctx.db, env: ctx.env, now },
+    { db: ctx.db, env: ctx.env, now, crew: ctx.crew },
     entries.map(({ path, sizeBytes }) => ({ path, sizeBytes })),
   );
   skipped.push(...verdict.skipped);
@@ -1060,12 +1136,12 @@ const turnFiles = async (ctx: OwnerContext, raw: unknown): Promise<DriveTurnFile
   const written: typeof entries = [];
   for (const entry of entries) {
     if (fits.get(entry.path) !== entry.sizeBytes) continue;
-    const existing = getFile(ctx.db, entry.path);
+    const existing = getFile(ctx.db, space, entry.path);
     if (existing) {
       ctx.db.run(
         `UPDATE drive_files SET r2_key = ?, name = ?, size_bytes = ?, content_type = ?, source = ?,
            origin = ?, write_key = ?, upload_id = ?, updated_at = ?
-         WHERE path = ?`,
+         WHERE space = ? AND path = ?`,
         entry.r2Key,
         entry.name,
         entry.sizeBytes,
@@ -1075,6 +1151,7 @@ const turnFiles = async (ctx: OwnerContext, raw: unknown): Promise<DriveTurnFile
         writeKey ?? null,
         entry.uploadId,
         now,
+        space,
         entry.path,
       );
       if (existing.r2_key !== entry.r2Key) {
@@ -1086,9 +1163,10 @@ const turnFiles = async (ctx: OwnerContext, raw: unknown): Promise<DriveTurnFile
       }
     } else {
       ctx.db.run(
-        `INSERT INTO drive_files (path, r2_key, name, size_bytes, content_type, source, origin,
+        `INSERT INTO drive_files (space, path, r2_key, name, size_bytes, content_type, source, origin,
            write_key, upload_id, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        space,
         entry.path,
         entry.r2Key,
         entry.name,
@@ -1175,9 +1253,10 @@ const turnStage = async (
       now,
     });
     ctx.db.run(
-      `INSERT INTO drive_uploads (upload_id, path, r2_key, status, claimed_bytes, created_at, expires_at)
-       VALUES (?, ?, ?, 'pending', ?, ?, ?)`,
+      `INSERT INTO drive_uploads (upload_id, space, path, r2_key, status, claimed_bytes, created_at, expires_at)
+       VALUES (?, ?, ?, ?, 'pending', ?, ?, ?)`,
       uploadId,
+      spaceOf(ctx),
       claim.path,
       r2Key,
       claim.sizeBytes,
@@ -1213,7 +1292,7 @@ const turnDelete = (
     if (typeof file.path !== "string") throw invalid("Every deleted file needs a path.");
     const path = normalizeDrivePath(file.path);
     const knownUpdatedAt = finiteNumber(file.knownUpdatedAt);
-    const row = getFile(ctx.db, path);
+    const row = getFile(ctx.db, spaceOf(ctx), path);
     if (!row) {
       deleted.push(path);
       continue;
@@ -1249,15 +1328,17 @@ const turnEntry = (row: FileRow): DriveTurnEntry => ({
 
 const turnStat = (
   db: OwnerDbReader,
+  space: string,
   raw: unknown,
 ): { file: DriveTurnEntry | null; directory: boolean } => {
   const input = record(raw);
   if (typeof input.path !== "string") throw invalid("A drive path is required.");
   const path = normalizeDrivePath(input.path);
-  const row = getFile(db, path);
+  const row = getFile(db, space, path);
   if (row) return { file: turnEntry(row), directory: false };
   const child = db.one<{ present: number }>(
-    "SELECT 1 AS present FROM drive_files WHERE path > ? AND path < ? LIMIT 1",
+    "SELECT 1 AS present FROM drive_files WHERE space = ? AND path > ? AND path < ? LIMIT 1",
+    space,
     `${path}/`,
     `${path}/￿`,
   );
@@ -1266,6 +1347,7 @@ const turnStat = (
 
 const turnList = (
   db: OwnerDbReader,
+  space: string,
   raw: unknown,
 ): { files: DriveTurnEntry[]; more: boolean } => {
   const input = record(raw);
@@ -1278,14 +1360,16 @@ const turnList = (
   );
   const rows = prefix
     ? db.all<FileRow>(
-        `SELECT * FROM drive_files WHERE path > ? AND path >= ? AND path < ? AND ${NOT_THUMBNAIL} ORDER BY path LIMIT ?`,
+        `SELECT * FROM drive_files WHERE space = ? AND path > ? AND path >= ? AND path < ? AND ${NOT_THUMBNAIL} ORDER BY path LIMIT ?`,
+        space,
         after,
         prefix,
         `${prefix}￿`,
         limit + 1,
       )
     : db.all<FileRow>(
-        `SELECT * FROM drive_files WHERE path > ? AND ${NOT_THUMBNAIL} ORDER BY path LIMIT ?`,
+        `SELECT * FROM drive_files WHERE space = ? AND path > ? AND ${NOT_THUMBNAIL} ORDER BY path LIMIT ?`,
+        space,
         after,
         limit + 1,
       );
@@ -1299,7 +1383,7 @@ const turnRead = async (
   const input = record(raw);
   if (typeof input.path !== "string") throw invalid("A drive path is required.");
   const path = normalizeDrivePath(input.path);
-  const row = getFile(ctx.db, path);
+  const row = getFile(ctx.db, spaceOf(ctx), path);
   if (!row) throw new RpcError("NOT_FOUND", "That file is not in your drive.");
   const offset = Math.max(0, Math.floor(finiteNumber(input.offset) ?? 0));
   const available = Math.max(0, row.size_bytes - offset);
@@ -1341,18 +1425,20 @@ const syncRank = (row: { path: string; origin: string }, wanted: Set<string>): n
 
 const deletionsWindow = (
   db: OwnerDbReader,
+  space: string,
   since: number,
   newestFirst: boolean,
 ): { deleted: Array<{ path: string; deletedAt: number }>; cursor: number | null } => {
   const rows = db.all<{ path: string; deleted_at: number }>(
-    `SELECT path, deleted_at FROM drive_deletions WHERE deleted_at >= ?
+    `SELECT path, deleted_at FROM drive_deletions WHERE space = ? AND deleted_at >= ?
      ORDER BY deleted_at ${newestFirst ? "DESC" : "ASC"} LIMIT ?`,
+    space,
     Math.max(0, since),
     SYNC_MAX_DELETIONS + (newestFirst ? 0 : 1),
   );
   const window = rows.slice(0, SYNC_MAX_DELETIONS);
   const deleted = window
-    .filter((row) => !getFile(db, row.path))
+    .filter((row) => !getFile(db, space, row.path))
     .map((row) => ({ path: row.path, deletedAt: row.deleted_at }));
   if (newestFirst || rows.length <= SYNC_MAX_DELETIONS) return { deleted, cursor: null };
   const last = window[window.length - 1]!.deleted_at;
@@ -1361,6 +1447,7 @@ const deletionsWindow = (
 
 const turnSync = async (ctx: OwnerContext, raw: unknown): Promise<DriveSyncManifest> => {
   const input = record(raw);
+  const space = spaceOf(ctx);
   const prefix = "";
   const now = Date.now();
   const wanted = new Set<string>();
@@ -1373,14 +1460,15 @@ const turnSync = async (ctx: OwnerContext, raw: unknown): Promise<DriveSyncManif
   }
   const byPath = new Map<string, FileRow>();
   for (const row of ctx.db.all<FileRow>(
-    `SELECT * FROM drive_files WHERE ${NOT_THUMBNAIL} ORDER BY updated_at DESC LIMIT ?`,
+    `SELECT * FROM drive_files WHERE space = ? AND ${NOT_THUMBNAIL} ORDER BY updated_at DESC LIMIT ?`,
+    space,
     MAX_LIST_LIMIT,
   )) {
     byPath.set(row.path, row);
   }
   for (const path of wanted) {
     if (byPath.has(path)) continue;
-    const row = getFile(ctx.db, path);
+    const row = getFile(ctx.db, space, path);
     if (row) byPath.set(path, row);
   }
   const rows = [...byPath.values()].filter(
@@ -1438,13 +1526,13 @@ const turnSync = async (ctx: OwnerContext, raw: unknown): Promise<DriveSyncManif
     }
     if (path.startsWith(prefix) && !listed.has(path)) asked.add(path);
   }
-  const absent = [...asked].filter((path) => !getFile(ctx.db, path));
+  const absent = [...asked].filter((path) => !getFile(ctx.db, space, path));
 
   const horizon = now - TOMBSTONE_TTL_MS;
   const since = finiteNumber(input.since);
   const cursor = since !== undefined && since > 0 ? Math.min(Math.floor(since), now) : 0;
-  const ascending = deletionsWindow(ctx.db, Math.max(cursor, horizon), false);
-  const recent = deletionsWindow(ctx.db, horizon, true);
+  const ascending = deletionsWindow(ctx.db, space, Math.max(cursor, horizon), false);
+  const recent = deletionsWindow(ctx.db, space, horizon, true);
   const seen = new Set<string>();
   const deleted: DriveSyncManifest["deleted"] = [];
   for (const entry of [...ascending.deleted, ...recent.deleted]) {
@@ -1467,13 +1555,65 @@ const turnSync = async (ctx: OwnerContext, raw: unknown): Promise<DriveSyncManif
   };
 };
 
+/**
+ * Moves a Crew workspace's folder out of the owner's personal Drive into the
+ * workspace's own space, once per (space, home folder). Files keep their
+ * paths; the personal Drive records them as deleted, so the owner's devices
+ * and agents drop them. A path already in the space keeps the space's copy.
+ */
+export const adoptCrewSpace = (
+  ctx: OwnerContext,
+  crew: { space: string; home: string },
+): { moved: number; adopted: boolean } => {
+  if (!crew.space.startsWith("crew:")) throw invalid("Only a Crew space can adopt a folder.");
+  const home = normalizeDrivePath(crew.home);
+  const done = ctx.db.one<{ moved: number }>(
+    "SELECT moved FROM drive_space_adoptions WHERE space = ? AND home = ?",
+    crew.space,
+    home,
+  );
+  if (done) return { moved: 0, adopted: false };
+  const now = Date.now();
+  const rows = ctx.db.all<FileRow>(
+    "SELECT * FROM drive_files WHERE space = ? AND path >= ? AND path < ?",
+    PERSONAL_DRIVE_SPACE,
+    `${home}/`,
+    `${home}/￿`,
+  );
+  let moved = 0;
+  for (const row of rows) {
+    if (getFile(ctx.db, crew.space, row.path)) {
+      // The space already has this path: the personal copy goes, its bytes with it.
+      ctx.db.run("DELETE FROM drive_files WHERE space = ? AND path = ?", PERSONAL_DRIVE_SPACE, row.path);
+      queueCleanup(ctx, { path: row.path, r2Key: row.r2_key, notBefore: now + REPLACEMENT_GRACE_MS });
+    } else {
+      ctx.db.run(
+        "UPDATE drive_files SET space = ? WHERE space = ? AND path = ?",
+        crew.space,
+        PERSONAL_DRIVE_SPACE,
+        row.path,
+      );
+      moved += 1;
+    }
+    recordTombstone(ctx, PERSONAL_DRIVE_SPACE, row.path, now);
+  }
+  ctx.db.run(
+    "INSERT INTO drive_space_adoptions (space, home, moved, adopted_at) VALUES (?, ?, ?, ?)",
+    crew.space,
+    home,
+    moved,
+    now,
+  );
+  return { moved, adopted: true };
+};
+
 const turnAttachments = async (ctx: OwnerContext, raw: unknown) => {
   const paths = stringList(record(raw).paths).slice(0, ATTACHMENT_MAX_COUNT);
   const attachments: Array<{ path: string; contentType: string; sizeBytes: number; url: string }> = [];
   const skipped: DriveSkip[] = [];
   const now = Date.now();
   for (const path of paths) {
-    const row = getFile(ctx.db, path);
+    const row = getFile(ctx.db, spaceOf(ctx), path);
     if (!row) {
       skipped.push({ path, reason: "not in the drive" });
       continue;
@@ -1512,7 +1652,7 @@ const signImages = async (ctx: OwnerContext, raw: unknown): Promise<{ urls: stri
       : now;
   const urls: string[] = [];
   for (const path of paths) {
-    const row = getFile(ctx.db, path);
+    const row = getFile(ctx.db, spaceOf(ctx), path);
     if (!row) throw invalid(`${path} is not in the user's drive.`);
     if (!row.content_type.toLowerCase().startsWith("image/")) {
       throw invalid(`${path} is not an image (${row.content_type}).`);
@@ -1608,7 +1748,7 @@ const pathArg = string({ min: 1, max: 4_000 });
 
 export const driveDomain = {
   name: "drive",
-  migrations: [DRIVE_MIGRATION, DRIVE_DEVICE_FILES_MIGRATION],
+  migrations: [DRIVE_MIGRATION, DRIVE_DEVICE_FILES_MIGRATION, DRIVE_SPACES_MIGRATION],
   calls: {
     "drive.prepareUpload": {
       scope: "owner",
@@ -1643,7 +1783,7 @@ export const driveDomain = {
       handler: (
         ctx: OwnerContext,
         args: { prefix?: string; limit?: number },
-      ) => ({ files: listFiles(ctx.db, args) }),
+      ) => ({ files: listFiles(ctx.db, PERSONAL_DRIVE_SPACE, args) }),
     },
     "drive.recordDeviceFiles": {
       scope: "owner",
@@ -1678,7 +1818,7 @@ export const driveDomain = {
         prefix: optional(string({ max: 4_000 })),
         limit: optional(number({ min: 1, max: 100_000 })),
       }),
-      read: (ctx, args) => listFiles(ctx.db, args),
+      read: (ctx, args) => listFiles(ctx.db, PERSONAL_DRIVE_SPACE, args),
     },
   },
   internal: {
@@ -1690,7 +1830,7 @@ export const driveDomain = {
       const input = record(raw);
       const limit = finiteNumber(input.limit);
       return {
-        files: listFiles(ctx.db, {
+        files: listFiles(ctx.db, spaceOf(ctx), {
           ...(typeof input.prefix === "string" ? { prefix: input.prefix.slice(0, 4_000) } : {}),
           ...(limit !== undefined ? { limit } : {}),
         }),
@@ -1704,12 +1844,16 @@ export const driveDomain = {
     "drive.turnFiles": turnFiles,
     "drive.turnStage": turnStage,
     "drive.turnDelete": turnDelete,
-    "drive.turnStat": (ctx: OwnerContext, raw: unknown) => turnStat(ctx.db, raw),
-    "drive.turnList": (ctx: OwnerContext, raw: unknown) => turnList(ctx.db, raw),
+    "drive.turnStat": (ctx: OwnerContext, raw: unknown) => turnStat(ctx.db, spaceOf(ctx), raw),
+    "drive.turnList": (ctx: OwnerContext, raw: unknown) => turnList(ctx.db, spaceOf(ctx), raw),
     "drive.turnRead": turnRead,
     "drive.turnSync": turnSync,
     "drive.turnAttachments": turnAttachments,
     "drive.signImages": signImages,
+    "drive.adoptCrewSpace": (ctx: OwnerContext) => {
+      if (!ctx.crew) throw invalid("drive.adoptCrewSpace runs for a Crew workspace.");
+      return adoptCrewSpace(ctx, ctx.crew);
+    },
   },
   jobs: {
     [DRIVE_CLEANUP_JOB]: { run: (ctx: OwnerContext) => runCleanup(ctx) },

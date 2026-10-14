@@ -1644,7 +1644,12 @@ const conversationOfThread = (ctx: OwnerContext, threadId: string): string | nul
 const crossesSlackBoundary = (ctx: OwnerContext, from: string, to: string): boolean => {
   const fromConversation = conversationOfThread(ctx, from) ?? from;
   const toConversation = conversationOfThread(ctx, to) ?? to;
-  return isSlackConversationId(fromConversation) !== isSlackConversationId(toConversation);
+  // A Stella Crew conversation reaches only its own agents; nothing else
+  // reaches it.
+  if (isSlackConversationId(fromConversation) || isSlackConversationId(toConversation)) {
+    return fromConversation !== toConversation;
+  }
+  return false;
 };
 
 const sentByStarter = (thread: ThreadRow, from: AgentMessageSender): boolean =>

@@ -22,7 +22,7 @@ import {
 import { empty, literal, object, optional, string } from "../args.js";
 import { RpcError } from "../errors.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
-import { getFile, normalizeDrivePath } from "./drive.js";
+import { getFile, normalizeDrivePath, PERSONAL_DRIVE_SPACE } from "./drive.js";
 import type { OwnerContext, OwnerDbReader, OwnerDomain } from "../registry.js";
 
 const SHARE_TTL_MS = 90 * 24 * 60 * 60 * 1000;
@@ -408,7 +408,7 @@ const shareFile = async (
   const shares = bucketOf(ctx.env);
   const base = baseUrlOf(ctx.env);
   const path = normalizeDrivePath(args.path);
-  const file = getFile(ctx.db, path);
+  const file = getFile(ctx.db, PERSONAL_DRIVE_SPACE, path);
   if (!file) throw new RpcError("NOT_FOUND", "That file is not in your drive.");
   const existing = ctx.db.one<ShareRow>(
     "SELECT * FROM shares WHERE file_path = ? AND expires_at > ?",

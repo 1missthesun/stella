@@ -283,7 +283,7 @@ export const createCloudImageGenTool = (
           if (!mimeType) throw new Error("Image artifact was partial or had an unsupported MIME type.");
           const extension = extensionForMime(mimeType);
           files.push({
-            path: generatedDrivePath(DRIVE_OUTPUT_PREFIX, job.jobId, index, extension, now()),
+            path: generatedDrivePath(context.driveRoot ? `${context.driveRoot}/${DRIVE_OUTPUT_PREFIX}` : DRIVE_OUTPUT_PREFIX, job.jobId, index, extension, now()),
             name: generatedImageFileName({ prompt, index, count: images.length, extension }),
             contentType: mimeType,
             bytes,

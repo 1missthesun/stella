@@ -257,7 +257,7 @@ export const createCloudVideoGenTool = (context: CloudMediaToolContext): Replaya
           kind: "video",
           files: [
             {
-              path: generatedDrivePath(DRIVE_OUTPUT_PREFIX, job.jobId, 0, sniffed.extension, now()),
+              path: generatedDrivePath(context.driveRoot ? `${context.driveRoot}/${DRIVE_OUTPUT_PREFIX}` : DRIVE_OUTPUT_PREFIX, job.jobId, 0, sniffed.extension, now()),
               name: generatedImageFileName({ prompt, index: 0, count: 1, extension: sniffed.extension }),
               contentType: sniffed.mimeType,
               bytes,

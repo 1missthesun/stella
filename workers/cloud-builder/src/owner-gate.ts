@@ -16,6 +16,8 @@ import type {
 } from "./owner-store/registry.js";
 import { createGateHost } from "./owner-store/gate-host.js";
 import { RpcError, toBackendError } from "./owner-store/errors.js";
+import { crewRefusal } from "./owner-store/crew-scope.js";
+import type { OwnerCrewScope } from "./owner-store/registry.js";
 import { applyOwnerEventsToStore } from "./owner-store/owner-events.js";
 import type { RpcResponse } from "@stella/contracts/backend/protocol";
 import {
@@ -441,11 +443,29 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     name: string;
     args: unknown;
     ownerGeneration: string;
+    /**
+     * A Stella Crew caller: the call runs in that workspace's drive space and
+     * may only be one of `CREW_OWNER_CALLS`. Set by server code from the
+     * Slack installation, never from a request body.
+     */
+    crew?: OwnerCrewScope;
   }): Promise<RpcResponse> {
-    return await this.#atOwnerGeneration(input.ownerGeneration, input.name, () =>
-      this.ownerStore().internalCall(input.name, input.args),
-    );
+    const crew = input.crew;
+    if (crew !== undefined) {
+      const refused = crewRefusal(crew, input.name);
+      if (refused) return { ok: false, error: toBackendError(new RpcError("FORBIDDEN", refused)) };
+    }
+    return await this.#atOwnerGeneration(input.ownerGeneration, input.name, async () => {
+      if (crew && !crew.space.startsWith("crew:unplaced-") && !this.#adoptedCrewSpaces.has(`${crew.space}\0${crew.home}`)) {
+        const adopted = await this.ownerStore().internalCall("drive.adoptCrewSpace", {}, crew);
+        if (!adopted.ok) return adopted;
+        this.#adoptedCrewSpaces.add(`${crew.space}\0${crew.home}`);
+      }
+      return await this.ownerStore().internalCall(input.name, input.args, crew);
+    });
   }
+
+  #adoptedCrewSpaces = new Set<string>();
 
   async ownerCredential(input: {
     kind: OwnerCredentialKind;

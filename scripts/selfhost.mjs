@@ -1059,6 +1059,17 @@ const deployCloudBuilder = async (state, file, secrets, release) => {
 const publishAppSource = async (state) => {
   const step = "app-source";
   emit(step, "start", `Publishing the desktop app's source to Artifacts namespace ${N.artifacts}…`);
+  const nsPath = `/accounts/${state.accountId}/artifacts/namespaces`;
+  const nsReady = async () => (await cf("GET", `${nsPath}/${encodeURIComponent(N.artifacts)}`)).ok;
+  if (!(await nsReady())) {
+    const created = await cf("POST", nsPath, { namespace: N.artifacts });
+    if (!created.ok) log(`artifacts namespace create: ${cfErrors(created)}`);
+    const started = Date.now();
+    while (!(await nsReady())) {
+      if (Date.now() - started > 3 * 60_000) fail(step, `Artifacts namespace ${N.artifacts} isn't available: ${cfErrors(created)}`);
+      await sleep(5_000);
+    }
+  }
   const result = await run(
     nodeBin(),
     ["scripts/publish-app-source.mjs", "--namespace", N.artifacts, "--backend", state.urls.backend],

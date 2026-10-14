@@ -198,12 +198,16 @@ const advancePending = async (env: Cloudflare.Env, row: DeletionRow, now: number
     await cancelAccountDeletion(env, row.user_id);
     return;
   }
-  if (row.email && row.confirmation_sent_at === null) {
-    await sendDeletionEmail(env, row.email, "requested", row.due_at);
-    await d1(env)
-      .prepare("UPDATE account_deletions SET confirmation_sent_at = ? WHERE user_id = ?")
-      .bind(now, row.user_id)
-      .run();
+  if (row.email && row.confirmation_sent_at === null && row.due_at > now) {
+    try {
+      await sendDeletionEmail(env, row.email, "requested", row.due_at);
+      await d1(env)
+        .prepare("UPDATE account_deletions SET confirmation_sent_at = ? WHERE user_id = ?")
+        .bind(now, row.user_id)
+        .run();
+    } catch (error) {
+      log("error", "account_deletion_confirmation_failed", { message: messageOf(error) });
+    }
   }
   if (row.due_at > now) {
     await ownerGateStub(env.OWNER_GATES, row.user_id).stopRenewal();

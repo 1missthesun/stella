@@ -22,6 +22,12 @@ export class RpcError extends Error {
   }
 }
 
+export class RpcTimeoutError extends RpcError {
+  constructor(method: string) {
+    super(RPC_ERROR_CODES.INTERNAL_ERROR, `RPC request timed out: ${method}`);
+  }
+}
+
 export const createRuntimeUnavailableError = (
   message = "Runtime is not available.",
   data?: unknown,
@@ -136,7 +142,7 @@ export class JsonRpcPeer {
           : setTimeout(
               () =>
                 fail(
-                  new RpcError(RPC_ERROR_CODES.INTERNAL_ERROR, `RPC request timed out: ${method}`),
+                  new RpcTimeoutError(method),
                 ),
               timeoutMs,
             );
@@ -181,7 +187,7 @@ export class JsonRpcPeer {
             misses = 0;
           },
           (error: unknown) => {
-            if (!(error instanceof RpcError) || !/^RPC request timed out:/.test(error.message)) {
+            if (!(error instanceof RpcTimeoutError)) {
               misses = 0;
               return;
             }

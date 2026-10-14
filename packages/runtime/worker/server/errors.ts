@@ -2,13 +2,6 @@ import * as Cause from "effect/Cause";
 import * as Data from "effect/Data";
 import { STELLA_RUNTIME_PROTOCOL_VERSION } from "@stella/contracts/protocol";
 
-/**
- * Tagged failures for the worker RPC surface. The JSON-RPC peer serializes a
- * rejected handler as `error.message` (contracts protocol/rpc-peer.ts), so
- * every message here is byte-identical to the string the pre-Effect
- * `worker/server.ts` threw. Do not reword them.
- */
-
 export class WorkerNotInitializedError extends Data.TaggedError(
   "@stella/runtime/worker/WorkerNotInitializedError",
 ) {

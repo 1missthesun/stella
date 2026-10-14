@@ -1,13 +1,6 @@
 import * as Cause from "effect/Cause";
 import * as Data from "effect/Data";
 
-/**
- * Tagged failures for the host-side worker lifecycle. The plain-Promise
- * facade in `host/lifecycle.ts` rethrows these across the Effect boundary,
- * so every escaping message is byte-identical to the string the pre-Effect
- * `host/lifecycle.ts` threw. Do not reword them.
- */
-
 export class HostLockTimeoutError extends Data.TaggedError(
   "@stella/runtime/host/HostLockTimeoutError",
 )<{

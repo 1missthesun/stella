@@ -95,3 +95,22 @@ export const activityExpansionStore = {
     uiState.setItem(STORAGE_KEY, JSON.stringify(map));
   },
 };
+
+export type ActivityExpansionState = {
+  conversationId: string | null;
+  seenTaskIds: ReadonlySet<string>;
+  overrides: ReadonlyMap<string, boolean>;
+};
+
+export const loadActivityExpansion = (
+  conversationId: string | null,
+): ActivityExpansionState => {
+  const snapshot = conversationId
+    ? activityExpansionStore.load(conversationId)
+    : EMPTY_ACTIVITY_EXPANSION;
+  return {
+    conversationId,
+    seenTaskIds: new Set(snapshot.seenTaskIds),
+    overrides: new Map(Object.entries(snapshot.taskOverrides)),
+  };
+};

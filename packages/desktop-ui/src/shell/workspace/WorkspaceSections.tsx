@@ -24,8 +24,8 @@ import {
   useSectionCollapsed,
 } from "@/shell/section-collapse-store";
 import {
-  EMPTY_ACTIVITY_EXPANSION,
   activityExpansionStore,
+  loadActivityExpansion,
 } from "@/shell/activity-expansion-store";
 import {
   activityRowKey,
@@ -631,83 +631,55 @@ export const WorkspaceSections = memo(function WorkspaceSections({
 
   const [openScheduleEntry, setOpenScheduleEntry] =
     useState<ScheduleEntry | null>(null);
-  const seenRunningTasksRef = useRef<ReadonlySet<string>>(new Set());
-  const [expandOverrides, setExpandOverrides] = useState<
-    ReadonlyMap<string, boolean>
-  >(() => new Map());
+  const [storedExpansion, setStoredExpansion] = useState(() =>
+    loadActivityExpansion(conversationId),
+  );
+  let expansion = storedExpansion;
+  if (storedExpansion.conversationId !== conversationId) {
+    expansion = loadActivityExpansion(conversationId);
+    setStoredExpansion(expansion);
+  }
+  const { seenTaskIds, overrides: expandOverrides } = expansion;
   const isTaskExpanded = useCallback(
-    (task: TaskItem): boolean => {
-      const override = expandOverrides.get(task.id);
-      return (
-        override ??
-        (task.status === "running" || seenRunningTasksRef.current.has(task.id))
-      );
-    },
-    [expandOverrides],
+    (task: TaskItem): boolean =>
+      expandOverrides.get(task.id) ??
+      (task.status === "running" || seenTaskIds.has(task.id)),
+    [expandOverrides, seenTaskIds],
   );
   const isCompactTaskExpanded = useCallback(
     (task: TaskItem): boolean => expandOverrides.get(task.id) ?? false,
     [expandOverrides],
   );
   const toggleTask = useCallback((taskId: string, nextExpanded: boolean) => {
-    setExpandOverrides((prev) => {
-      const next = new Map(prev);
-      next.set(taskId, nextExpanded);
-      return next;
+    setStoredExpansion((prev) => {
+      const overrides = new Map(prev.overrides);
+      overrides.set(taskId, nextExpanded);
+      return { ...prev, overrides };
     });
   }, []);
 
-  // Re-seed every piece of expansion state from the persisted store whenever
-  // the active conversation changes (including first mount). Without this, a
-  // relaunch loads every task as "already completed, never seen running" and
-  // collapses rows that were open — with their files visible — moments before
-  // quitting. Render-phase reset (the sanctioned derived-state pattern) so
-  // seeded values are in place before the roll-forward memo below runs.
-  const [seededConversationId, setSeededConversationId] = useState<
-    string | null | undefined
-  >(undefined);
-  if (seededConversationId !== conversationId) {
-    setSeededConversationId(conversationId);
-    const snapshot = conversationId
-      ? activityExpansionStore.load(conversationId)
-      : EMPTY_ACTIVITY_EXPANSION;
-    seenRunningTasksRef.current = new Set(snapshot.seenTaskIds);
-    setExpandOverrides(new Map(Object.entries(snapshot.taskOverrides)));
-  }
+  const tasksLoaded = chat.conversation.tasksLoaded;
+  useEffect(() => {
+    if (!tasksLoaded) return;
+    setStoredExpansion((prev) => {
+      if (prev.conversationId !== conversationId) return prev;
+      const seen = updateSeenRunningTaskIds(prev.seenTaskIds, allTasks);
+      return seen === prev.seenTaskIds ? prev : { ...prev, seenTaskIds: seen };
+    });
+  }, [allTasks, conversationId, tasksLoaded]);
 
-  // Roll the seen-running sets forward in a memo (same idempotent-mutation
-  // pattern as `runningOrderRef`) so they're current before any row computes
-  // its expansion; pruned to ids still present in the task list so they
-  // can't grow unboundedly.
-  useMemo(() => {
-    // An empty list usually means the activity feed hasn't loaded yet (cold
-    // start / conversation switch) — pruning against it would wipe the
-    // persisted seen-running state we just seeded, so wait for real data.
-    if (allTasks.length === 0) return;
-    seenRunningTasksRef.current = updateSeenRunningTaskIds(
-      seenRunningTasksRef.current,
-      allTasks,
-    );
-  }, [allTasks]);
+  useEffect(() => {
+    if (!expansion.conversationId || !tasksLoaded) return;
+    activityExpansionStore.save(expansion.conversationId, {
+      seenTaskIds: [...expansion.seenTaskIds],
+      taskOverrides: Object.fromEntries(expansion.overrides),
+    });
+  }, [expansion, tasksLoaded]);
 
   const groupedRows = useMemo(
     () => groupActivityTasks(allTasks.filter(isTopLevelAgent)),
     [allTasks],
   );
-
-  // Persist the expansion state so a relaunch (which restores this
-  // conversation) brings the Activity rows back exactly as they looked —
-  // a finished agent's row keeps showing its files across restarts, not just
-  // across completions. Runs after the roll-forward memo above, so the saved
-  // sets are already pruned to the current activity window. Skipped while the
-  // task list is empty for the same cold-start reason as the pruning guards.
-  useEffect(() => {
-    if (!conversationId || allTasks.length === 0) return;
-    activityExpansionStore.save(conversationId, {
-      seenTaskIds: [...seenRunningTasksRef.current],
-      taskOverrides: Object.fromEntries(expandOverrides),
-    });
-  }, [conversationId, allTasks, expandOverrides]);
 
   const matchingActivityKeys = useMemo(() => {
     if (!searching) return null;

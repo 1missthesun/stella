@@ -13,6 +13,7 @@ import type { ComposerMessageStore } from "@/features/chat/hooks/use-composer-me
 export type ChatColumnConversation = {
   extraTail?: ReactNode;
   tasks: TaskItem[];
+  tasksLoaded: boolean;
   activity: {
     activities: EventRecord[];
     hasOlder: boolean;

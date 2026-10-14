@@ -618,6 +618,7 @@ export function useFullShellChat({
     () => ({
       conversationId: activeConversationId,
       tasks,
+      tasksLoaded: cloudChat.tasksLoaded,
       extraTail: cloudChat.extraTail,
       activity: {
         activities,
@@ -658,6 +659,7 @@ export function useFullShellChat({
       activeConversationId,
       activities,
       cloudChat.extraTail,
+      cloudChat.tasksLoaded,
       activeToolCallId,
       activeToolName,
       latestCompletedTool,

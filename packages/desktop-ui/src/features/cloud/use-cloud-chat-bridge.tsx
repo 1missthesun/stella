@@ -295,6 +295,7 @@ export type CloudChatBridge = {
   activities: EventRecord[];
   files: EventRecord[];
   tasks: TaskItem[];
+  tasksLoaded: boolean;
   hasOlderActivity: boolean;
   isLoadingOlderActivity: boolean;
   loadOlderActivity: () => void;
@@ -582,6 +583,7 @@ export function useCloudChatBridge({
     activities,
     files,
     tasks,
+    tasksLoaded: enabled ? cloudActivity.hasLoaded : isPrivate,
     hasOlderActivity: cloudActivity.hasOlder,
     isLoadingOlderActivity: cloudActivity.isLoadingOlder,
     loadOlderActivity: cloudActivity.loadOlder,

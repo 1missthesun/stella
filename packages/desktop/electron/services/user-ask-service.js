@@ -37,6 +37,7 @@ import {
   isWithinQuietHours,
   normalizeUserAskEscalationPolicy,
   normalizeUserAskDeclineReason,
+  normalizeUserAskNote,
   normalizeUserAskQuestions,
   normalizeSavedValuePart,
   savedValueLabel,
@@ -486,10 +487,12 @@ export class UserAskService {
                 }
                 : { fieldId, kind: "plain", value });
         }
+        const note = normalizeUserAskNote(payload.note);
         return {
             kind: "fields",
             fields,
             ...(typeof payload.remember === "boolean" ? { remember: payload.remember } : {}),
+            ...(note ? { note } : {}),
         };
     }
     async postMirroredAnswer(ask, answer) {
@@ -929,12 +932,14 @@ export class UserAskService {
             };
         }
         this.fingerprintCache = null;
+        const userNote = normalizeUserAskNote(payload.note);
         return {
             outcome: "answered",
             askId,
             ...(Object.keys(values).length > 0 ? { values } : {}),
             ...(Object.keys(handles).length > 0 ? { handles } : {}),
             ...(savedNote ? { saved: savedNote } : {}),
+            ...(userNote ? { userNote } : {}),
             answeredAt,
             ...(late ? { late: true } : {}),
         };
@@ -959,6 +964,7 @@ export class UserAskService {
                 : {}),
             ...(answered.values ? { values: answered.values } : {}),
             ...(answered.handles ? { handles: answered.handles } : {}),
+            ...(answered.userNote ? { userNote: answered.userNote } : {}),
         };
         const message = [
             `${PI_LATE_ANSWER_PREFIX} A late answer arrived for the ask you already continued past: "${title}".`,

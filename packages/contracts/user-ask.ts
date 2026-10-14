@@ -66,7 +66,8 @@ export const USER_ASK_MIN_TIMEOUT_MS = 30_000;
 export const USER_ASK_MAX_TIMEOUT_MS = 3 * 60_000;
 export const USER_ASK_BLOCKING_TTL_MS = 24 * 60 * 60_000;
 export const USER_ASK_SECURE_INPUT_TTL_MS = 60 * 60_000;
-export const USER_ASK_MAX_DECLINE_REASON = 200;
+export const USER_ASK_MAX_NOTE = 300;
+export const USER_ASK_MAX_DECLINE_REASON = USER_ASK_MAX_NOTE;
 
 export const userAskTtlMs = (kind: UserAskKind): number =>
   kind === "secure_input" ? USER_ASK_SECURE_INPUT_TTL_MS : USER_ASK_BLOCKING_TTL_MS;
@@ -75,6 +76,9 @@ export const normalizeUserAskDeclineReason = (value: unknown): string =>
   typeof value === "string"
     ? value.replace(/\s+/g, " ").trim().slice(0, USER_ASK_MAX_DECLINE_REASON)
     : "";
+
+/** The user's optional free-text note on a secure-input answer or decline. Plain text, never a secret. */
+export const normalizeUserAskNote = normalizeUserAskDeclineReason;
 
 export const userAskDeclinedNote = (reason: string): string =>
   reason
@@ -287,6 +291,7 @@ export type UserAskAnswer =
       kind: "fields";
       fields: readonly UserAskAnswerFieldValue[];
       remember?: boolean;
+      note?: string;
       answeredOnDeviceId?: string;
     }>;
 
@@ -307,6 +312,7 @@ export type UserAskResolution =
       values?: Readonly<Record<string, string>>;
       handles?: Readonly<Record<string, string>>;
       saved?: UserAskSavedValueNote;
+      userNote?: string;
       answeredAt: number;
       late?: boolean;
     }>

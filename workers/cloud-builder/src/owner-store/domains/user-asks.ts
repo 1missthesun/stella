@@ -19,6 +19,8 @@ import {
   clampUserAskTimeoutMs,
   effectiveEscalationCeiling,
   normalizeUserAskDeclineReason,
+  normalizeUserAskNote,
+  USER_ASK_MAX_NOTE,
   userAskTtlMs,
   nextEscalationLevel,
   normalizeUserAskEscalationPolicy,
@@ -403,6 +405,7 @@ const readAnswer = (db: OwnerDbReader, askId: string): StoredAnswer | null => {
           ...(row.remember === 0 || row.remember === 1
             ? { remember: row.remember === 1 }
             : {}),
+          ...(row.answer_text ? { note: row.answer_text } : {}),
           ...answeredOnDeviceId,
         }
       : {
@@ -619,6 +622,7 @@ const answerParser: Parser<UserAskAnswer> = (value, path = "") => {
       kind: literal("fields"),
       fields: array(answerFieldParser, { max: USER_ASK_MAX_FIELDS }),
       remember: optional(boolean()),
+      note: optional(string({ max: USER_ASK_MAX_NOTE * 4 })),
       answeredOnDeviceId: optional(string({ max: 256 })),
     })(value, path);
   }
@@ -1165,9 +1169,10 @@ const answerAsk = (ctx: OwnerContext, askId: string, answer: UserAskAnswer) => {
     `INSERT INTO user_ask_answers
        (ask_id, answer_kind, choice_id, answer_text, fields, answered_on_device_id, late,
         answered_at, answer_revision, responses, remember)
-     VALUES (?, ?, NULL, NULL, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?)`,
     askId,
     answer.kind,
+    answer.kind === "fields" ? normalizeUserAskNote(answer.note) || null : null,
     answer.kind === "fields" ? JSON.stringify(answer.fields) : null,
     answer.answeredOnDeviceId ?? null,
     late ? 1 : 0,

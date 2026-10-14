@@ -175,10 +175,16 @@ const savedValueNote = (saved: UserAskSavedValueNote): string => {
   return "The user chose not to remember this: each private handle works once and is deleted after you use it.";
 };
 
+/**
+ * `request` (the secure card's purpose) goes into `details` only, so the
+ * chat can show "Provided"/"Declined" with the user's note under it.
+ */
 export const userAskResolutionResult = (
   resolution: UserAskResolution,
   questions: readonly UserAskQuestion[] = [],
+  request?: string,
 ): { result: Record<string, unknown>; details: Record<string, unknown> } => {
+  const shown = request ? { request } : {};
   if (resolution.outcome === "answered") {
     const shared = {
       ...(resolution.values ? { values: resolution.values } : {}),
@@ -186,6 +192,7 @@ export const userAskResolutionResult = (
       ...(resolution.saved
         ? { saved: resolution.saved, note: savedValueNote(resolution.saved) }
         : {}),
+      ...(resolution.userNote ? { userNote: resolution.userNote } : {}),
       ...(resolution.late ? { late: true } : {}),
     };
     return {
@@ -202,6 +209,7 @@ export const userAskResolutionResult = (
           ? { answers: userAskReadableAnswers(questions, resolution.responses) }
           : {}),
         ...shared,
+        ...shown,
       },
     };
   }
@@ -222,7 +230,7 @@ export const userAskResolutionResult = (
   const ended = {
     outcome: resolution.outcome,
     note: resolution.note,
-    ...(resolution.reason ? { reason: resolution.reason } : {}),
+    ...(resolution.reason ? { userNote: resolution.reason } : {}),
   };
-  return { result: ended, details: ended };
+  return { result: ended, details: { ...ended, ...shown } };
 };

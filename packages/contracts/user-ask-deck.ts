@@ -109,10 +109,14 @@ export const userAskDeckAnswers = (
   }));
 };
 
+/**
+ * `provided` / `declined` are secure-input outcomes: `question` is the
+ * request's purpose and `answer` only the user's optional note, never a value.
+ */
 export type UserAskRecordAnswer = Readonly<{
   question: string;
   answer: string;
-  kind: "option" | "text" | "skipped";
+  kind: "option" | "text" | "skipped" | "provided" | "declined";
 }>;
 
 export type UserAskRecord = Readonly<{
@@ -141,6 +145,34 @@ const recordAnswerOf = (input: unknown): UserAskRecordAnswer | null => {
   return label ? { question, answer: label, kind: "option" } : null;
 };
 
+const secureRecordAnswer = (
+  purpose: string,
+  outcome: "provided" | "declined",
+  note: unknown,
+): UserAskRecordAnswer => ({
+  question: purpose.trim(),
+  answer: typeof note === "string" ? note.trim() : "",
+  kind: outcome,
+});
+
+export const userAskSecureRecord = (
+  ask: UserAsk,
+  outcome: "provided" | "declined",
+  note: string,
+): UserAskRecord => ({
+  id: ask.askId,
+  ...(ask.toolCallId ? { toolCallId: ask.toolCallId } : {}),
+  createdAt: ask.createdAt,
+  defaulted: false,
+  answers: [
+    secureRecordAnswer(
+      ask.detail.kind === "secure_input" ? ask.detail.purpose : "",
+      outcome,
+      note,
+    ),
+  ],
+});
+
 export const parseAskUserToolResult = (
   input: unknown,
 ): { defaulted: boolean; answers: readonly UserAskRecordAnswer[] } | null => {
@@ -160,6 +192,19 @@ export const parseAskUserToolResult = (
   const nested =
     source.result && typeof source.result === "object" ? source.result : null;
   if (nested && !Array.isArray(source.answers)) return parseAskUserToolResult(nested);
+  if (typeof source.request === "string" && source.request.trim()) {
+    if (source.outcome !== "answered" && source.outcome !== "declined") return null;
+    return {
+      defaulted: false,
+      answers: [
+        secureRecordAnswer(
+          source.request,
+          source.outcome === "answered" ? "provided" : "declined",
+          source.userNote,
+        ),
+      ],
+    };
+  }
   if (source.outcome !== "answered" && source.outcome !== "defaulted") return null;
   const answers = (Array.isArray(source.answers) ? source.answers : [])
     .map(recordAnswerOf)

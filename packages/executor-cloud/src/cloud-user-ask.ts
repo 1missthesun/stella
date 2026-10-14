@@ -4,6 +4,7 @@ import {
   clampUrgency,
   clampUserAskTimeoutMs,
   normalizeUserAskDeclineReason,
+  normalizeUserAskNote,
   USER_ASK_EXPIRED_NOTE,
   userAskDeclinedNote,
   userAskDefaultedResolution,
@@ -63,10 +64,12 @@ const answeredResolution = (
   for (const field of answer.fields) {
     if (field.kind === "plain") values[field.fieldId] = field.value;
   }
+  const userNote = normalizeUserAskNote(answer.note);
   return {
     outcome: "answered",
     askId,
     ...(Object.keys(values).length > 0 ? { values } : {}),
+    ...(userNote ? { userNote } : {}),
     answeredAt,
     ...(read.late ? { late: true } : {}),
   };

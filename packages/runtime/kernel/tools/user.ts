@@ -279,7 +279,7 @@ export const handleRequestSecureInput = async (
       urgency: clampUrgency(args.urgency),
       ...contextFields(context, args),
     }, signal);
-    return userAskResolutionResult(resolution);
+    return userAskResolutionResult(resolution, [], purpose);
   } catch (error) {
     return { error: (error as Error).message || "Secure input failed." };
   }

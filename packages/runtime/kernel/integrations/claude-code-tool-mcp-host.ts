@@ -315,7 +315,8 @@ export const createClaudeCodeToolMcpHost = async (
   const bearer = `Bearer ${crypto.randomBytes(32).toString("base64url")}`;
   const endpointPath = `/mcp/${crypto.randomBytes(32).toString("base64url")}`;
   const hookPath = `/hooks/${crypto.randomBytes(32).toString("base64url")}`;
-  let callGeneration = new AbortController();
+  const nextCallGeneration = () => new AbortController();
+  let callGeneration = nextCallGeneration();
   const callLedger = new Map<string, Promise<CallToolResult>>();
   const responseDelivery = new AsyncLocalStorage<{
     acknowledgements: Set<() => void | Promise<void>>;
@@ -687,7 +688,7 @@ export const createClaudeCodeToolMcpHost = async (
   const url = `http://${HOST}:${port}${endpointPath}`;
   const abortActiveCalls = (reason?: unknown) => {
     const ending = callGeneration;
-    callGeneration = new AbortController();
+    callGeneration = nextCallGeneration();
     ending.abort(reason);
   };
   const resetClientSessions = async (reason?: unknown) => {

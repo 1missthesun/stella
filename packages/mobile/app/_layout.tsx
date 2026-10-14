@@ -36,8 +36,7 @@ import {
 } from "../src/lib/main-chat-request";
 
 installTextDefaults();
-import { loadGuestMode, isGuest, setGuestMode } from "../src/lib/guest-mode";
-import { signInMobileAnonymous } from "../src/lib/anonymous-sign-in";
+import { clearLegacyGuestMode } from "../src/lib/guest-mode";
 import { loadAiConsent } from "../src/lib/ai-consent";
 import { loadNotificationsMuted } from "../src/lib/notifications-prefs";
 import { loadVoiceEnabled } from "../src/lib/voice-visibility";
@@ -216,11 +215,11 @@ function AuthenticatedLayout() {
   const [guestReady, setGuestReady] = useState(false);
   const [initialMainHref, setInitialMainHref] = useState<string | null>(null);
   const splashHiddenRef = useRef(false);
-  const anonymousBootstrapStartedRef = useRef(false);
+  const legacyGuestSignOutStartedRef = useRef(false);
 
   useEffect(() => {
     void Promise.all([
-      loadGuestMode(),
+      clearLegacyGuestMode(),
       loadAiConsent(),
       loadNotificationsMuted(),
       loadVoiceEnabled(),
@@ -233,60 +232,43 @@ function AuthenticatedLayout() {
     });
   }, []);
 
-  // Older builds stored guest intent locally without creating an auth
-  // principal. Upgrade that state in place so an existing guest lands in the
-  // anonymous canonical conversation instead of the retired sign-in wall.
+  // Stella needs an account now. A guest (anonymous) session from an older
+  // build is signed out here, which sends the user to the login screen.
+  const legacyGuest =
+    (session.data?.user as { isAnonymous?: boolean | null } | undefined)
+      ?.isAnonymous === true;
   useEffect(() => {
-    if (
-      session.isPending ||
-      !guestReady ||
-      session.data ||
-      !isGuest() ||
-      anonymousBootstrapStartedRef.current
-    ) {
-      return;
-    }
-
-    anonymousBootstrapStartedRef.current = true;
-    void signInMobileAnonymous()
-      .then(async (result) => {
-        if (result.error) {
-          throw new Error(
-            result.error.message ?? "Could not start an anonymous session.",
-          );
-        }
-        await setGuestMode(true);
-      })
-      .catch(async () => {
-        await setGuestMode(false);
-        router.replace("/login");
-      })
+    if (!legacyGuest || legacyGuestSignOutStartedRef.current) return;
+    legacyGuestSignOutStartedRef.current = true;
+    void authClient
+      .signOut()
+      .catch(() => {})
       .finally(() => {
-        anonymousBootstrapStartedRef.current = false;
+        legacyGuestSignOutStartedRef.current = false;
       });
-  }, [guestReady, router, session.data, session.isPending]);
+  }, [legacyGuest]);
+  const signedInSession = legacyGuest ? null : (session.data ?? null);
 
   // Start the account-authority handshake the moment the session is known,
   // while the native splash is still up. The chat screen reads the same
   // process-level result, so by the time the splash lifts it is usually ready
   // instead of starting six round trips behind a spinner.
   const cloudIdentity = useMemo(
-    () => observeCloudConversationIdentity(session.data),
-    [session.data],
+    () => observeCloudConversationIdentity(signedInSession),
+    [signedInSession],
   );
   const cloudIdentityKey = cloudIdentity?.identityKey ?? null;
-  const cloudAnonymous = session.data?.user?.isAnonymous === true;
   useEffect(() => {
     if (session.isPending) return;
     if (!cloudIdentity) {
       resetCloudConversationAuthority();
       return;
     }
-    primeCloudConversationAuthority(cloudIdentity, cloudAnonymous);
+    primeCloudConversationAuthority(cloudIdentity);
     // Keyed on the identity key: a refetched session object with the same
     // identity must not restart (or even re-poke) the handshake.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cloudAnonymous, cloudIdentityKey, session.isPending]);
+  }, [cloudIdentityKey, session.isPending]);
 
   useEffect(() => {
     let dispose: (() => void) | null = null;
@@ -337,20 +319,12 @@ function AuthenticatedLayout() {
       return true;
     };
 
-    if (session.data) {
-      const anonymous = session.data.user?.isAnonymous === true;
-      if (isGuest() !== anonymous) void setGuestMode(anonymous);
-      const subject = anonymous ? "" : (session.data.user?.id ?? "");
+    if (signedInSession) {
+      const subject = signedInSession.user?.id ?? "";
       // No push from self-hosted servers yet (they can't send through ours).
       const pushOwner = currentServerFeatures().push ? subject : "";
       setPushDeliveryOwner(pushOwner || null);
       if (pushOwner) void registerForPushNotifications(pushOwner);
-      // Anonymous users still need to reach Login when they choose "Sign in"
-      // from Settings. Their anonymous Better Auth session must not bounce
-      // them straight back to Chat before they can upgrade the account.
-      if (onLogin && anonymous) {
-        return;
-      }
       if (!hasSeenOnboarding()) {
         router.replace("/onboarding");
         return;
@@ -376,24 +350,6 @@ function AuthenticatedLayout() {
       return;
     }
 
-    if (isGuest()) {
-      // Guests may open /login from Sign in buttons — don't bounce them back to chat.
-      if (onLogin) {
-        return;
-      }
-      if (!hasSeenOnboarding()) {
-        router.replace("/onboarding");
-        return;
-      }
-      if (mainChatRequested && openMainChat()) {
-        return;
-      }
-      if (onIndex) {
-        enterMainShell(router, initialMainHref);
-      }
-      return;
-    }
-
     if (onMain || onIndex || (mainChatRequested && !onLogin && !onWelcome)) {
       // Builds that can pair a server ask "Stella or your own server?" first.
       router.replace(selfHostServersAvailable ? "/welcome" : "/login");
@@ -402,7 +358,7 @@ function AuthenticatedLayout() {
     mainChatRequested,
     pathname,
     router,
-    session.data,
+    signedInSession,
     session.isPending,
     guestReady,
     initialMainHref,

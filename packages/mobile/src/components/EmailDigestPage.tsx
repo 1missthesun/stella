@@ -13,7 +13,6 @@ import type { EmailDigest } from "@stella/contracts/backend/email-digest";
 import { useLocale, useT } from "../i18n";
 import { authClient } from "../lib/auth-client";
 import { getBackendClient, useBackendView } from "../lib/backend";
-import { isGuest } from "../lib/guest-mode";
 import { tapLight } from "../lib/haptics";
 import { CONTENT_MAX_FONT_SCALE } from "../lib/setup-text-defaults";
 import { useAppVisible } from "../lib/use-app-visible";
@@ -60,7 +59,7 @@ export function EmailDigestPage() {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const bottomInset = useSafeAreaInsets().bottom;
   const session = authClient.useSession();
-  const signedIn = Boolean(session.data?.user) && !isGuest();
+  const signedIn = Boolean(session.data?.user);
   const appVisible = useAppVisible();
   const [connection, setConnection] = useState<Connection>("checking");
   const [waiting, setWaiting] = useState(false);

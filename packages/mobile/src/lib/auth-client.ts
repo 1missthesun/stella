@@ -1,6 +1,5 @@
 import { createAuthClient } from "better-auth/react";
 import {
-  anonymousClient,
   jwtClient,
   magicLinkClient,
 } from "better-auth/client/plugins";
@@ -20,7 +19,6 @@ const plugins = [
   nativeBearerClient({
     scheme: env.mobileScheme,
   }),
-  anonymousClient(),
   magicLinkClient(),
   jwtClient(),
 ];

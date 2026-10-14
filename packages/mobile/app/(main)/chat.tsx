@@ -93,8 +93,7 @@ type DeviceStatus = {
 };
 
 /**
- * The one chat. Its transcript belongs to the current connected or anonymous
- * session, and each turn's execution placement is decided server-side: the
+ * The one chat. Its transcript belongs to the signed-in account, and each turn's execution placement is decided server-side: the
  * paired computer is offered first and cloud takes the turn when no computer
  * is reachable. Pairing
  * therefore only changes what Stella can reach, never where the conversation
@@ -304,7 +303,6 @@ function ChatSurface(props: {
   const colors = useColors();
   const t = useT();
   const session = authClient.useSession();
-  const anonymous = session.data?.user?.isAnonymous === true;
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const offline = useIsOffline();
   const isFocused = useIsFocused();
@@ -686,7 +684,7 @@ function ChatSurface(props: {
           onAdd: thread.addQuote,
           onRemove: thread.removeQuote,
         }}
-        dictation={{ anonymous }}
+        dictation={{}}
         onOpenArtifact={openArtifact}
         conversationId={thread.conversationId}
         activityTasks={thread.conversationTasks}

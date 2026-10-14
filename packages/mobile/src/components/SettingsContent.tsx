@@ -26,7 +26,6 @@ import { authClient } from "../lib/auth-client";
 import { clearAiConsent } from "../lib/ai-consent";
 import { clearCachedToken } from "../lib/auth-token";
 import { clearAccountChatData } from "../lib/chat-account-cleanup";
-import { isGuest } from "../lib/guest-mode";
 import { useCloudBrowserActions } from "../lib/cloud-browser";
 import { tapLight } from "../lib/haptics";
 import { tearDownPushNotifications } from "../lib/notifications";
@@ -109,7 +108,6 @@ export function SettingsContent() {
   const bottomInset = useSafeAreaInsets().bottom;
   const session = authClient.useSession();
   const features = useServerFeatures();
-  const guest = isGuest();
   const [isResettingCloudBrowser, setIsResettingCloudBrowser] = useState(false);
   const { resetProfile: resetCloudBrowserProfile } = useCloudBrowserActions();
   const [notificationsMuted, setMutedLocal] = useState(() =>
@@ -136,9 +134,9 @@ export function SettingsContent() {
 
   // Appearance, notifications, and legal work without a session; everything
   // that needs an identity (plan, computers, cloud, sign-out) hides.
-  const isSignedIn = Boolean(user) && !guest;
+  const isSignedIn = Boolean(user);
   const showFeedback = isSignedIn && !isSelfHostedLaunch;
-  const showLoadingHeader = !guest && session.isPending && !user;
+  const showLoadingHeader = session.isPending && !user;
 
   const runResetCloudBrowser = async () => {
     if (isResettingCloudBrowser) return;

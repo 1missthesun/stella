@@ -411,7 +411,7 @@ export const subscribeOpenUserAsks = (
 
 const useConnectedAccountAccess = (): boolean => {
   const session = authClient.useSession();
-  return Boolean(session.data) && session.data?.user?.isAnonymous !== true;
+  return Boolean(session.data);
 };
 
 const LIVE_VIEW_ARGS = {} as const;

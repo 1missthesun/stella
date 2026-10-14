@@ -24,7 +24,6 @@ import {
   type ConversationFile,
 } from "../lib/conversation-files";
 import { useBackendView } from "../lib/backend";
-import { isGuest } from "../lib/guest-mode";
 import { tapLight } from "../lib/haptics";
 import {
   publishTopBarAccessory,
@@ -193,7 +192,7 @@ export function FilesPage() {
   const hub = useActivityHub();
   const computer = useComputerControl();
   const session = authClient.useSession();
-  const signedIn = Boolean(session.data?.user) && !isGuest();
+  const signedIn = Boolean(session.data?.user);
   const hubArtifacts = hub?.artifacts ?? EMPTY_ARTIFACTS;
   const preferredAccess = hub?.access ?? null;
   const pairedDesktops = computer?.pairedDesktops ?? EMPTY_PAIRED;

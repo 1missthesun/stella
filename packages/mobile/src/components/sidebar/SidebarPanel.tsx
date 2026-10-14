@@ -5,7 +5,6 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useT } from "../../i18n";
 import { authClient } from "../../lib/auth-client";
-import { isGuest } from "../../lib/guest-mode";
 import type { MainTabId } from "../../lib/last-main-tab";
 import { useActivityHub } from "../../lib/main-shell-store";
 import { CONTENT_MAX_FONT_SCALE } from "../../lib/setup-text-defaults";
@@ -43,7 +42,7 @@ export function SidebarPanel({
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const session = authClient.useSession();
   const hub = useActivityHub();
-  const user = isGuest() ? null : session.data?.user;
+  const user = session.data?.user;
   const name = user?.name?.trim() ?? "";
   const image = user?.image ?? null;
   const accountLabel = t("mobile.nav.account");

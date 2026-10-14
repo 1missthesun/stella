@@ -83,7 +83,7 @@ const newRequestId = (): string => Crypto.randomUUID();
  */
 const useCloudBrowserAccess = (): boolean => {
   const session = authClient.useSession();
-  return Boolean(session.data) && session.data?.user?.isAnonymous !== true;
+  return Boolean(session.data);
 };
 
 export function usePendingCloudBrowserInteractions(): readonly CloudBrowserInteractionSummary[] {

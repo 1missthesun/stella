@@ -27,7 +27,6 @@ import {
 } from "./sidebar/SidebarPanel";
 import { authClient } from "../lib/auth-client";
 import { useDrawerOpen, useDrawerSide } from "../lib/drawer";
-import { isGuest } from "../lib/guest-mode";
 import { tapLight } from "../lib/haptics";
 import { useComputerControl } from "../lib/main-shell-store";
 import { CONTENT_MAX_FONT_SCALE } from "../lib/setup-text-defaults";
@@ -64,7 +63,7 @@ export function ChatSettingsPanel({ width }: { width: number }) {
   const computer = useComputerControl();
   const open = useDrawerOpen();
   const active = useDrawerSide() === "end" && open;
-  const signedIn = Boolean(session.data?.user) && !isGuest();
+  const signedIn = Boolean(session.data?.user);
   const showDestinations = computer !== null || signedIn;
   const contentWidth = width - KIT.gutter * 2;
   const [route, setRoute] = useState<Route>({ name: "home" });

@@ -15,10 +15,10 @@ export type { CloudConnectorConnectRequest } from "@stella/contracts/cloud-conne
 const EMPTY: readonly CloudConnectorConnectRequest[] = [];
 const decisionRequestIds = new Map<string, string>();
 
-/** Connect cards are a connected-account feature; anonymous owners skip. */
+/** Connect cards need a signed-in account. */
 const useConnectedAccountAccess = (): boolean => {
   const session = authClient.useSession();
-  return Boolean(session.data) && session.data?.user?.isAnonymous !== true;
+  return Boolean(session.data);
 };
 
 export function usePendingCloudConnectRequests(): readonly CloudConnectorConnectRequest[] {

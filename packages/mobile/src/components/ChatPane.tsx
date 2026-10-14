@@ -116,7 +116,6 @@ import {
 } from "./chat/ConversationSummary";
 import type { CatchUpLink } from "@stella/contracts/backend/catch-ups";
 import { CATCH_UP_ENABLED, CATCH_UP_MIN_NEW_MESSAGES } from "@stella/contracts/catch-up";
-import { isGuest } from "../lib/guest-mode";
 import {
   type AnchorRect,
   type PlusMenuOption,
@@ -406,8 +405,7 @@ export type ChatPaneQuotes = {
 };
 
 export type ChatPaneDictation = {
-  anonymous: boolean;
-  /** Headers passed to the dictation upload (e.g. mobile device id for guests). */
+  /** Headers passed to the dictation upload. */
   headers?: Record<string, string>;
 };
 
@@ -418,7 +416,7 @@ export type ChatPaneRealtimeVoice = {
   execution?: "phone" | "computer";
   /** Paired desktop credentials used only by Computer realtime voice. */
   desktopAccess?: StoredPhoneAccess | null;
-  /** Show sign-in before starting capture for an anonymous cloud user. */
+  /** Show sign-in before starting capture when no account is signed in. */
   signInRequired?: boolean;
   /** Dispatches one action request into the attached text chat. */
   onAction?: (request: string) => Promise<RealtimeVoiceActionDispatch>;
@@ -554,7 +552,7 @@ export function ChatPane({
   composer,
   attachments: attachmentsGroup,
   quotes: quotesGroup = NO_QUOTES,
-  dictation: { anonymous: dictationAnonymous, headers: dictationHeaders },
+  dictation: { headers: dictationHeaders },
   realtimeVoice = NO_REALTIME_VOICE,
   desktopAccess: desktopAccessProp = null,
   onOpenArtifact,
@@ -1159,7 +1157,6 @@ export function ChatPane({
   );
 
   const dictation = useDictation({
-    anonymous: dictationAnonymous,
     headers: dictationHeadersMemo,
     onTranscript: appendTranscript,
   });
@@ -1944,7 +1941,7 @@ export function ChatPane({
   const summaries = useConversationSummaries(
     conversationId,
     visibleMessages,
-    CATCH_UP_ENABLED && Boolean(conversationId) && !isGuest(),
+    CATCH_UP_ENABLED && Boolean(conversationId),
   );
   const [summaryOpen, setSummaryOpen] = useState<{ requestNew: boolean } | null>(null);
   const [summaryJump, setSummaryJump] = useState<{ link: CatchUpLink; pages: number } | null>(null);

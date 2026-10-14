@@ -26,7 +26,6 @@ import { tapLight } from "../lib/haptics";
 import { timeOfDay, upcomingSection } from "../lib/list-sections";
 import { CONTENT_MAX_FONT_SCALE } from "../lib/setup-text-defaults";
 import { authClient } from "../lib/auth-client";
-import { isGuest } from "../lib/guest-mode";
 import { startChatWith } from "../lib/ask-stella";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "../theme/theme-context";
@@ -46,7 +45,7 @@ export function SchedulePage() {
   const rowStyles = useMemo(() => makeScheduleRowStyles(colors), [colors]);
   const bottomInset = useSafeAreaInsets().bottom;
   const session = authClient.useSession();
-  const signedIn = Boolean(session.data?.user) && !isGuest();
+  const signedIn = Boolean(session.data?.user);
 
   const loaded = useMobileSchedules(signedIn);
   const schedules = loaded ?? EMPTY;

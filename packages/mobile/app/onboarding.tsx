@@ -79,8 +79,7 @@ export default function OnboardingScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const session = authClient.useSession();
-  const anonymous = session.data?.user?.isAnonymous === true;
-  const signedIn = Boolean(session.data?.user) && !anonymous;
+  const signedIn = Boolean(session.data?.user);
   const email = signedIn ? (session.data?.user?.email ?? null) : null;
 
   const splashHidden = useSplashHidden();

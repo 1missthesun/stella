@@ -17,7 +17,6 @@ import {
 } from "../../src/lib/ai-consent";
 import { authClient } from "../../src/lib/auth-client";
 import { tearDownPushNotifications } from "../../src/lib/notifications";
-import { isGuest, setGuestMode } from "../../src/lib/guest-mode";
 import { useReportTimeZone } from "../../src/lib/schedule-zone";
 import {
   SafeAreaView,
@@ -132,7 +131,7 @@ export default function MainLayout() {
   const { isDark } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const session = authClient.useSession();
-  useReportTimeZone(Boolean(session.data?.user) && !isGuest());
+  useReportTimeZone(Boolean(session.data?.user));
 
   useEffect(() => {
     if (!hasAiConsent()) {
@@ -154,9 +153,8 @@ export default function MainLayout() {
         await tearDownPushNotifications();
         await authClient.signOut();
       } catch {
-        /* ignore — guests have nothing to sign out of */
+        /* ignore — the local session is gone either way */
       }
-      await setGuestMode(false);
       router.replace("/login");
     })();
   }, [router]);

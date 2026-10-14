@@ -75,7 +75,7 @@ function CarPlayBridgeIOS() {
       <StaticHome state={session.isPending ? { kind: "connecting" } : { kind: "signedOut" }} />
     );
   }
-  return <CarPlayCloudChatGate anonymous={session.data.user?.isAnonymous === true} />;
+  return <CarPlayCloudChatGate />;
 }
 
 function StaticHome({ state }: { state: CarPlayHomeState }) {
@@ -84,7 +84,7 @@ function StaticHome({ state }: { state: CarPlayHomeState }) {
   return null;
 }
 
-function CarPlayCloudChatGate({ anonymous }: { anonymous: boolean }) {
+function CarPlayCloudChatGate() {
   const authority = useCloudConversationAuthority();
   if (authority.status !== "ready") return <StaticHome state={{ kind: "connecting" }} />;
   return (
@@ -92,7 +92,6 @@ function CarPlayCloudChatGate({ anonymous }: { anonymous: boolean }) {
       key={`${authority.authority.accountScope}:${authority.authority.ownerGeneration}:${authority.authority.conversationId}`}
       authority={authority.authority}
       reloadAuthority={authority.retry}
-      anonymous={anonymous}
     />
   );
 }
@@ -100,11 +99,9 @@ function CarPlayCloudChatGate({ anonymous }: { anonymous: boolean }) {
 function CarPlayVoiceLoop({
   authority,
   reloadAuthority,
-  anonymous,
 }: {
   authority: CloudConversationAuthority;
   reloadAuthority: () => void;
-  anonymous: boolean;
 }) {
   const thread = useCloudCanonicalChatThread(authority, {
     reloadAuthority,
@@ -251,7 +248,7 @@ function CarPlayVoiceLoop({
     [setDraft, refreshPhase],
   );
 
-  const dictation = useDictation({ anonymous, onTranscript });
+  const dictation = useDictation({ onTranscript });
   dictationStatusRef.current = dictation.status;
 
   useEffect(() => {

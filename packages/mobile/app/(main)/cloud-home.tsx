@@ -3,14 +3,11 @@ import { CloudHomeSettings } from "../../src/components/CloudHomeSettings";
 import { MainDetailSurface } from "../../src/components/MainScreenSurface";
 import { authClient } from "../../src/lib/auth-client";
 import { observeCloudConversationIdentity } from "../../src/lib/cloud-conversation-auth";
-import { isGuest } from "../../src/lib/guest-mode";
 
 export default function CloudHomeScreen() {
   const router = useRouter();
   const session = authClient.useSession();
-  const identity = !isGuest()
-    ? observeCloudConversationIdentity(session.data ?? null)
-    : null;
+  const identity = observeCloudConversationIdentity(session.data ?? null);
 
   return (
     <MainDetailSurface>

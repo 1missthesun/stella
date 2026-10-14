@@ -225,7 +225,16 @@ export class JsonRpcPeer {
     }
   }
 
-  async handleMessage(message: JsonRpcMessage) {
+  /** Never rejects: inbound failures go to `onError`, transport failures dispose the peer. */
+  async handleMessage(message: JsonRpcMessage): Promise<void> {
+    try {
+      await this.dispatchMessage(message);
+    } catch (error) {
+      if (!this.disposed) this.options.onError?.(error);
+    }
+  }
+
+  private async dispatchMessage(message: JsonRpcMessage) {
     if ("method" in message) {
       if ("id" in message) {
         await this.handleRequest(message);
@@ -254,25 +263,10 @@ export class JsonRpcPeer {
     );
   }
 
-  /**
-   * Send a response to an inbound request, swallowing transport-send
-   * failures. `handleMessage` is invoked as `void rpcPeer.handleMessage(...)`
-   * (see jsonl.ts), so a throw from a mid-request transport close would
-   * escape as an unhandled rejection. Route any send failure to onError
-   * instead of letting it propagate.
-   */
-  private sendResponse(message: JsonRpcSuccess | JsonRpcFailure) {
-    try {
-      this.sendMessageSafely(message);
-    } catch (error) {
-      this.options.onError?.(error);
-    }
-  }
-
   private async handleRequest(message: JsonRpcRequest) {
     const handler = this.requestHandlers.get(message.method);
     if (!handler) {
-      this.sendResponse({
+      this.sendMessageSafely({
         id: message.id,
         error: {
           code: RPC_ERROR_CODES.METHOD_NOT_FOUND,
@@ -284,7 +278,7 @@ export class JsonRpcPeer {
 
     try {
       const result = await handler(message.params);
-      this.sendResponse({
+      this.sendMessageSafely({
         id: message.id,
         result: result === undefined ? null : result,
       } satisfies JsonRpcSuccess);
@@ -296,7 +290,8 @@ export class JsonRpcPeer {
               RPC_ERROR_CODES.INTERNAL_ERROR,
               error instanceof Error ? error.message : String(error),
             );
-      this.sendResponse({
+      this.options.onError?.(error);
+      this.sendMessageSafely({
         id: message.id,
         error: {
           code: rpcError.code,
@@ -304,7 +299,6 @@ export class JsonRpcPeer {
           ...(rpcError.data === undefined ? {} : { data: rpcError.data }),
         },
       } satisfies JsonRpcFailure);
-      this.options.onError?.(error);
     }
   }
 

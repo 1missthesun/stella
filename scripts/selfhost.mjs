@@ -1426,8 +1426,8 @@ const destroy = async () => {
   for (const bucket of buckets) found.push(`R2 ${bucket}`);
   const queues = (await cfList(`/accounts/${accountId}/queues`)).filter((queue) => Object.values(N.queues).includes(queue.queue_name));
   for (const queue of queues) found.push(`queue ${queue.queue_name}`);
-  const artifacts = await wrangler(["artifacts", "namespaces", "get", N.artifacts, "--json"], { accountId, quiet: true });
-  const hasArtifacts = artifacts.status === 0;
+  const artifactsPath = `/accounts/${accountId}/artifacts/namespaces/${encodeURIComponent(N.artifacts)}`;
+  const hasArtifacts = (await cf("GET", artifactsPath)).ok;
   if (hasArtifacts) found.push(`Artifacts namespace ${N.artifacts}`);
   if (found.length === 0 && !state) {
     emit(step, "ok", `Nothing named ${PREFIX}-* exists on ${account.name}.`);
@@ -1439,6 +1439,14 @@ const destroy = async () => {
     return;
   }
   const problems = [];
+  for (const queue of queues) {
+    const consumers = await cf("GET", `/accounts/${accountId}/queues/${queue.queue_id}/consumers`);
+    for (const consumer of consumers.ok ? consumers.json.result ?? [] : []) {
+      const id = consumer.consumer_id ?? consumer.id;
+      const res = await cf("DELETE", `/accounts/${accountId}/queues/${queue.queue_id}/consumers/${id}`);
+      if (!res.ok) problems.push(`queue ${queue.queue_name} consumer: ${cfErrors(res)}`);
+    }
+  }
   for (const name of [N.workers.sites, N.workers.canvasShare, N.workers.appsHost, N.workers.modelGateway, N.workers.cloudBuilder, N.workers.browserGateway]) {
     if (!workerNames.includes(name)) continue;
     const res = await cf("DELETE", `/accounts/${accountId}/workers/scripts/${name}?force=true`);
@@ -1476,7 +1484,13 @@ const destroy = async () => {
     else emit(step, "ok", `Deleted queue ${queue.queue_name}`);
   }
   if (hasArtifacts) {
-    const res = await cf("DELETE", `/accounts/${accountId}/artifacts/namespaces/${N.artifacts}`);
+    const repos = await cf("GET", `${artifactsPath}/repos?per_page=1000`);
+    const repoList = repos.ok ? (Array.isArray(repos.json.result) ? repos.json.result : repos.json.result?.repos ?? []) : [];
+    for (const repo of repoList) {
+      const res = await cf("DELETE", `${artifactsPath}/repos/${encodeURIComponent(repo.name)}`);
+      if (!res.ok) problems.push(`Artifacts repo ${repo.name}: ${cfErrors(res)}`);
+    }
+    const res = await cf("DELETE", artifactsPath);
     if (!res.ok) problems.push(`Artifacts ${N.artifacts}: ${cfErrors(res)} (delete it in the dashboard under Artifacts)`);
     else emit(step, "ok", `Deleted Artifacts namespace ${N.artifacts}`);
   }

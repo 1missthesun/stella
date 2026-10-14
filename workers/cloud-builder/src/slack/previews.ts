@@ -951,6 +951,13 @@ const signinCallback = async (request: Request, env: Cloudflare.Env): Promise<Re
  * say): the workspace's bot DMs a one-time link to the member with that
  * email. The page never says whether the email belongs to a member.
  */
+const appMessagesLink = (install: { appId: string; teamId: string }): string => {
+  const link = new URL("https://slack.com/app_redirect");
+  link.searchParams.set("app", install.appId);
+  link.searchParams.set("team", install.teamId);
+  return link.toString();
+};
+
 const sendDmLink = async (request: Request, env: Cloudflare.Env): Promise<Response> => {
   const form = await request.formData().catch(() => null);
   const preview = await loadPreview(env, String(form?.get("p") ?? ""));
@@ -962,7 +969,7 @@ const sendDmLink = async (request: Request, env: Cloudflare.Env): Promise<Respon
   const sent = page(
     200,
     "Check Slack",
-    `<p>If ${escapeHtml(email || "that email")} belongs to a member of ${escapeHtml(install.teamName)}, Stella just sent them a sign-in link in a direct message. It works for 15 minutes.</p>`,
+    `<p>If ${escapeHtml(email || "that email")} belongs to a member of ${escapeHtml(install.teamName)}, Stella just sent them a sign-in link in a direct message. It works for 15 minutes.</p><p>Find it in Slack under Apps, in Stella's Messages tab.</p><a class="button" href="${escapeHtml(appMessagesLink(install))}">Open Stella in Slack</a>`,
   );
   if (!/^[^@\s]+@[^@\s]+$/u.test(email)) return sent;
   const found = await slackTry<{ ok: boolean; user?: { id: string; team_id?: string; deleted?: boolean; is_bot?: boolean } }>(

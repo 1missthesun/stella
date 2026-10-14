@@ -667,29 +667,33 @@ export class CloudConversationCacheStore {
   read(value: unknown): CloudConversationCacheSnapshot | null {
     const authority = parseCloudConversationCacheAuthority(value);
     if (!this.isActive(authority)) return null;
-    try {
-      const row = this.readMeta(authority);
-      if (!row) return null;
-      const recordRows = this.db
-        .prepare(
-          `SELECT seq, record_json, record_bytes
-           FROM cloud_conversation_cache_records
-           WHERE account_scope = ?
-             AND owner_generation = ?
-             AND conversation_id = ?
-             AND epoch = ?
-           ORDER BY seq ASC`,
-        )
-        .all(
-          authority.accountScope,
-          authority.ownerGeneration,
-          authority.conversationId,
-          row.epoch,
-        ) as Array<{
-        seq?: unknown;
-        record_json?: unknown;
-        record_bytes?: unknown;
-      }>;
+    const storedMeta = this.selectMeta(authority);
+    if (storedMeta === undefined) return null;
+    const row = this.decodeStored(authority, () =>
+      parseMetaRow(storedMeta, authority),
+    );
+    if (!row) return null;
+    const recordRows = this.db
+      .prepare(
+        `SELECT seq, record_json, record_bytes
+         FROM cloud_conversation_cache_records
+         WHERE account_scope = ?
+           AND owner_generation = ?
+           AND conversation_id = ?
+           AND epoch = ?
+         ORDER BY seq ASC`,
+      )
+      .all(
+        authority.accountScope,
+        authority.ownerGeneration,
+        authority.conversationId,
+        row.epoch,
+      ) as Array<{
+      seq?: unknown;
+      record_json?: unknown;
+      record_bytes?: unknown;
+    }>;
+    return this.decodeStored(authority, () => {
       const records = recordRows.map((record, index) => {
         if (typeof record.record_json !== "string") {
           throw new TypeError(`Stored record ${index} is not text.`);
@@ -734,9 +738,16 @@ export class CloudConversationCacheStore {
         cachedAtMs: row.cached_at_ms,
         records: validated.records,
       };
+    });
+  }
+
+  private decodeStored<T>(
+    authority: CloudConversationCacheAuthority,
+    decode: () => T,
+  ): T | null {
+    try {
+      return decode();
     } catch {
-      // A partial/corrupt derived cache is disposable. Delete it and let the
-      // canonical DO rebuild the view instead of surfacing a silent hole.
       this.withImmediateTransaction(() => this.deleteExact(authority));
       return null;
     }
@@ -746,14 +757,14 @@ export class CloudConversationCacheStore {
     const input = parseCloudConversationCacheReplaceInput(value);
     if (!this.isActive(input)) return { status: "inactive", current: null };
     return this.withImmediateTransaction(() => {
-      let currentRow: CacheMetaRow | null;
-      try {
-        currentRow = this.readMeta(input);
-      } catch {
-        // Corrupt derived state is equivalent to cache loss. Delete the exact
-        // authority window and force callers through the normal null-CAS path.
-        this.deleteExact(input);
-        currentRow = null;
+      const storedMeta = this.selectMeta(input);
+      let currentRow: CacheMetaRow | null = null;
+      if (storedMeta !== undefined) {
+        try {
+          currentRow = parseMetaRow(storedMeta, input);
+        } catch {
+          this.deleteExact(input);
+        }
       }
       const current = currentRow ? versionOf(currentRow) : null;
       if (!versionsEqual(current, input.expected)) {
@@ -911,10 +922,8 @@ export class CloudConversationCacheStore {
     );
   }
 
-  private readMeta(
-    authority: CloudConversationCacheAuthority,
-  ): CacheMetaRow | null {
-    const row = this.db
+  private selectMeta(authority: CloudConversationCacheAuthority): unknown {
+    return this.db
       .prepare(
         `SELECT account_scope, owner_generation, conversation_id, epoch,
                 head_seq, floor_seq, revision, title, cached_at_ms, record_count
@@ -928,7 +937,6 @@ export class CloudConversationCacheStore {
         authority.ownerGeneration,
         authority.conversationId,
       );
-    return row === undefined ? null : parseMetaRow(row, authority);
   }
 
   private deleteExact(authority: CloudConversationCacheAuthority): void {

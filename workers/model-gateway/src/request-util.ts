@@ -158,9 +158,6 @@ export const createUpstreamController = (args: {
   let durationTimer: ReturnType<typeof setTimeout> | null = null;
   let idleTimer: ReturnType<typeof setTimeout> | null = null;
   const onClientAbort = (): void => abort("client");
-  // Releasing timers and the client listener is idempotent, and happens on
-  // abort as well as on explicit dispose, so a controller never outlives the
-  // call it guards.
   const dispose = (): void => {
     if (disposed) return;
     disposed = true;
@@ -191,4 +188,37 @@ export const createUpstreamController = (args: {
     cause: () => cause,
     dispose,
   };
+};
+
+/**
+ * Streams `body` to the client and disposes `controller` exactly once, when
+ * the body ends, fails, or the client cancels it.
+ */
+export const ownedResponseBody = (
+  body: ReadableStream<Uint8Array>,
+  controller: { dispose(): void },
+): ReadableStream<Uint8Array> => {
+  const reader = body.getReader();
+  return new ReadableStream<Uint8Array>({
+    async pull(stream) {
+      let chunk: ReadableStreamReadResult<Uint8Array>;
+      try {
+        chunk = await reader.read();
+      } catch (error) {
+        controller.dispose();
+        stream.error(error);
+        return;
+      }
+      if (chunk.done) {
+        controller.dispose();
+        stream.close();
+        return;
+      }
+      stream.enqueue(chunk.value);
+    },
+    async cancel(reason) {
+      controller.dispose();
+      await reader.cancel(reason).catch(() => undefined);
+    },
+  });
 };

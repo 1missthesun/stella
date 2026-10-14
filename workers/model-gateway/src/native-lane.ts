@@ -33,6 +33,7 @@ import { GatewayError } from "./errors.js";
 import {
   agentTypeFrom,
   createUpstreamController,
+  ownedResponseBody,
   readJsonObject,
   requestIdFrom,
   type GatewayDeps,
@@ -433,17 +434,8 @@ export const handleNativeRelay = async (args: {
     );
   } else {
     enqueue(outcome, unreported, upstream.status);
-    // The pipe outlives this handler. The controller stays wired to the
-    // client's abort (which cancels the upstream fetch) and releases its
-    // timers on its own when the body ends or the ceiling fires.
     if (upstream.body) {
-      responseBody = upstream.body.pipeThrough(
-        new TransformStream<Uint8Array, Uint8Array>({
-          flush() {
-            controller.dispose();
-          },
-        }),
-      );
+      responseBody = ownedResponseBody(upstream.body, controller);
     } else {
       controller.dispose();
     }

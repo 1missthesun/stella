@@ -15,7 +15,11 @@ import {
   verifySessionDpop,
 } from "./capability.js";
 import { GatewayError } from "./errors.js";
-import { createUpstreamController, type GatewayDeps } from "./request-util.js";
+import {
+  createUpstreamController,
+  ownedResponseBody,
+  type GatewayDeps,
+} from "./request-util.js";
 
 const ACCESS_MAX_CACHE_MS = 60_000;
 const ACCESS_EXPIRY_MARGIN_MS = 60_000;
@@ -317,18 +321,10 @@ export const handleByokRelay = async (args: {
     responseHeaders.set(GATEWAY_BYOK_REJECTION_HEADER, encodeURIComponent(reason));
     return new Response(errorText, { status: upstream.status, headers: responseHeaders });
   }
-  let responseBody: ReadableStream<Uint8Array> | null = upstream.body;
-  if (upstream.body) {
-    responseBody = upstream.body.pipeThrough(
-      new TransformStream<Uint8Array, Uint8Array>({
-        flush() {
-          controller.dispose();
-        },
-      }),
-    );
-  } else {
-    controller.dispose();
-  }
+  const responseBody = upstream.body
+    ? ownedResponseBody(upstream.body, controller)
+    : null;
+  if (!upstream.body) controller.dispose();
   console.log(
     `[model-gateway] trace=${traceId} byok=${provider} kind=${claims.kind} model=${model} host=${target.host} status=${upstream.status} ms=${deps.now() - startedAt}`,
   );

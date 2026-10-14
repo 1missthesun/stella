@@ -234,6 +234,7 @@ export type PiReportDelivery = (report: {
   conversationId: string;
   requestId: string;
   text: string;
+  agentReport?: import("@stella/contracts/agent-wake-prompt").AgentReportEnvelope;
 }) => Promise<void>;
 
 export type PiCloudAgentThreads = {

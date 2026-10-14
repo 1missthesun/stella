@@ -53,8 +53,10 @@ import {
   type PiChatRequest,
   type PiChatWatchResult,
   type PiEntry,
+  type PiPartMarks,
   type PiUserMessage,
 } from "@stella/contracts/pi-chat";
+import type { AgentReportEnvelope } from "@stella/contracts/agent-wake-prompt";
 import type { DeviceSigner } from "@stella/runtime/kernel/home/device";
 import {
   offersAgentTools,
@@ -242,6 +244,8 @@ export type DesktopEngineAgents = {
   message(args: { key: string; threadId: string; description: string; message: string; framed?: boolean }): Promise<"steered" | "resumed">;
   stop(threadId: string): Promise<AgentStopResult | void>;
 };
+
+type DeliveredReport = { requestId: string; text: string; agentReport?: AgentReportEnvelope };
 
 type Chat = {
   harness: Harness;
@@ -812,8 +816,8 @@ export function desktopChats(options: DesktopChatsOptions) {
     };
   };
 
-  const noteEngineReport = async (conversationId: string, report: { requestId: string; text: string }) => {
-    const threadId = /\nthread_id: (\S+)/.exec(report.text)?.[1];
+  const noteEngineReport = async (conversationId: string, report: DeliveredReport) => {
+    const threadId = report.agentReport?.threadId;
     if (!threadId) return;
     const chat = await ready(conversationId);
     const agent = (await chat.harness.snapshot(StellaAgentsDoc, chat.root.id, context))?.agents[threadId];
@@ -1948,7 +1952,7 @@ export function desktopChats(options: DesktopChatsOptions) {
       return record.status === "running" ? "steered" : "resumed";
     },
     stopAgent: stopLocalAgent,
-    async deliverReport(conversationId: string, report: { requestId: string; text: string }): Promise<void> {
+    async deliverReport(conversationId: string, report: DeliveredReport): Promise<void> {
       await noteEngineReport(conversationId, report);
       if (await noteOnBrain(conversationId, report.requestId, report.text)) return;
       const chat = await ready(conversationId);
@@ -1961,10 +1965,14 @@ export function desktopChats(options: DesktopChatsOptions) {
         : undefined;
       const receipt = reportId && parseAgentReportId(reportId) ? agentReportReceipt(reportId) : undefined;
       if (receipt && (await transcriptHasPrompt(chat, receipt))) return;
-      const hidden: TextContent & { stella: { hidden: true; clientMsgId?: string } } = {
+      const hidden: TextContent & { stella: PiPartMarks & { hidden: true } } = {
         type: "text",
         text: report.text,
-        stella: { hidden: true, ...(receipt ? { clientMsgId: receipt } : {}) },
+        stella: {
+          hidden: true,
+          ...(receipt ? { clientMsgId: receipt } : {}),
+          ...(report.agentReport ? { agentReport: report.agentReport } : {}),
+        },
       };
       const submission = await chat.root.submit(
         { type: "input", content: [hidden], whenBusy: "followUp", requestId: report.requestId },

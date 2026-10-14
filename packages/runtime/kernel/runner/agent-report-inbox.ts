@@ -2,6 +2,7 @@ import type {
   AgentReportOutcome,
   DeviceAgentReport,
 } from "@stella/contracts/backend/agent-reports";
+import type { AgentReportEnvelope } from "@stella/contracts/agent-wake-prompt";
 import { boundParentAgentReport } from "./agent-report-bounds.js";
 import { forkDelayedCall } from "./cloud-effect-runtime.js";
 
@@ -22,6 +23,7 @@ type AgentReportInboxOptions = {
     conversationId: string;
     requestId: string;
     text: string;
+    agentReport?: AgentReportEnvelope;
   }) => Promise<void>;
   canStart?: () => boolean;
 };
@@ -128,6 +130,12 @@ export const createAgentReportInbox = (options: AgentReportInboxOptions) => {
               conversationId: report.conversationId,
               requestId: `agent-report:${report.reportId}`,
               text: agentReportText(report),
+              agentReport: {
+                threadId: report.threadId,
+                attemptGeneration: report.attemptGeneration,
+                outcome: report.outcome,
+                ...(report.description ? { description: report.description } : {}),
+              },
             },
       );
       await options.acknowledge({

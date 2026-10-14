@@ -1,4 +1,5 @@
 import type { AgentStatus } from "./agent-status.js";
+import { parseAgentReportEnvelope, type AgentReportEnvelope } from "./agent-wake-prompt.js";
 import { drivePathFromSignedDriveUrl } from "./attachment-content-type.js";
 import { stellaUsageLimitText } from "./stella-usage-limit.js";
 
@@ -8,6 +9,7 @@ export type PiPartMarks = {
   clientMsgId?: string;
   seq?: number;
   source?: "schedule";
+  agentReport?: AgentReportEnvelope;
 };
 
 export type PiUserDisplay = {
@@ -457,6 +459,16 @@ export const piUserHidden = (message: PiUserMessage): boolean => {
   );
 };
 
+export const piAgentReport = (message: PiUserMessage): AgentReportEnvelope | null => {
+  if (typeof message.content === "string") return null;
+  for (const part of message.content) {
+    if (part.type !== "text") continue;
+    const envelope = parseAgentReportEnvelope(part.stella?.agentReport);
+    if (envelope) return envelope;
+  }
+  return null;
+};
+
 export const piJournalUserMessage = (
   message: PiUserMessage,
 ): { message: Record<string, unknown>; hidden: boolean; clientMsgId?: string } => {
@@ -468,6 +480,7 @@ export const piJournalUserMessage = (
           (part.type === "text" || part.type === "image") && part.stella?.clientMsgId ? [part.stella.clientMsgId] : [],
         )[0];
   const hidden = piUserHidden(message);
+  const agentReport = hidden ? piAgentReport(message) : null;
   const images: PiContentBlock[] = [];
   const files: Array<Record<string, unknown>> = [];
   const drivePaths: string[] = [];
@@ -500,6 +513,7 @@ export const piJournalUserMessage = (
       ...(files.length > 0 ? { attachments: files } : {}),
       ...(providerAttachments.length > 0 ? { providerContext: { attachments: providerAttachments } } : {}),
       ...(display?.context ? { metadata: { context: display.context } } : {}),
+      ...(agentReport ? { agentReport } : {}),
     },
   };
 };

@@ -25,6 +25,7 @@ import {
   persistPlacementCancellation,
   type PlacementLocalExecutionKind,
 } from "../../kernel/runner/execution-placement-local-ownership.js";
+import type { PiReportDelivery } from "../../kernel/runner/types.js";
 import { prepareStoredLocalChatPayload } from "../../kernel/storage/local-chat-payload.js";
 import { prepareChatInput } from "./chat-input.js";
 import { piUserContent } from "./pi-chat-input.js";
@@ -649,11 +650,12 @@ export const piAgentHistory = async (
 export const piDeliverReport = async (
   session: OpenSession,
   hostBus: HostBus.Interface,
-  report: { conversationId: string; requestId: string; text: string },
+  report: Parameters<PiReportDelivery>[0],
 ): Promise<void> =>
   await (await piChatsFor(session, hostBus)).deliverReport(report.conversationId, {
     requestId: report.requestId,
     text: report.text,
+    ...(report.agentReport ? { agentReport: report.agentReport } : {}),
   });
 
 export const piPlacementCanceled = (

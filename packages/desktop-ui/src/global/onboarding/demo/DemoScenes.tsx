@@ -1,5 +1,5 @@
 import { History } from "@/ui/icons";
-import { StellaLogoIcon } from "@/ui/stella-logo-icon";
+import { InlineStellaMark } from "@/ui/inline-stella-mark";
 import "./demo-scenes.css";
 
 export type Has = (cue: string) => boolean;
@@ -44,7 +44,7 @@ export function StellaMemoryMock({ has }: { has: Has }) {
   return (
     <div className="ostella">
       <div className="ostella__bar">
-        <StellaLogoIcon size={11} aria-hidden />
+        <InlineStellaMark size={11} aria-hidden />
         <span>One conversation</span>
       </div>
       <div className="ostella__main">

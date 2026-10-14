@@ -11,7 +11,7 @@ import {
   Star,
   type IconComponent,
 } from "@/ui/icons";
-import { StellaLogoIcon } from "@/ui/stella-logo-icon";
+import { InlineStellaMark } from "@/ui/inline-stella-mark";
 import {
   DemoBubble,
   DemoChat,
@@ -433,7 +433,7 @@ function ShoppingFilm({ has, typed, typing }: { has: Has; typed: string; typing:
               <CreditCard size={11} /> Visa ·· 6411
             </span>
             <span className="ofc-checkout__hold">
-              <StellaLogoIcon size={10} aria-hidden /> Paused for your OK
+              <InlineStellaMark size={10} aria-hidden /> Paused for your OK
             </span>
           </div>
         </Win>
@@ -825,7 +825,7 @@ function RoutineFilm({ has, typed, typing }: { has: Has; typed: string; typing: 
       <Layer box={{ x: 590, y: 40, w: 330, h: 66 }} visible={has("brief")} from="drop" z={16}>
         <div className="ofc-banner">
           <span className="ofc-banner__app">
-            <StellaLogoIcon size={14} aria-hidden />
+            <InlineStellaMark size={14} aria-hidden />
           </span>
           <span className="ofc-banner__text">
             <b>Morning brief</b>

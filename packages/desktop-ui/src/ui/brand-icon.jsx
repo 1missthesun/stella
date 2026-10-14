@@ -1,6 +1,6 @@
 import { Box } from "@/ui/icons";
 import { ClaudeLogoIcon } from "@/ui/claude-logo-icon";
-import { StellaLogoIcon } from "@/ui/stella-logo-icon";
+import { InlineStellaMark } from "@/ui/inline-stella-mark";
 import { BRAND_ICON_COLOR_MARKUP, BRAND_ICON_MARKUP, } from "@stella/theme/brand-icons";
 const BRAND_KEY_ALIASES = {
     "chatgpt": "openai",
@@ -14,7 +14,7 @@ const BRAND_TINTS = {
 };
 export function BrandIcon({ brand, size = 16, className }) {
     if (brand === "stella") {
-        return <StellaLogoIcon size={size} className={className} aria-hidden/>;
+        return <InlineStellaMark size={size} className={className} aria-hidden/>;
     }
     if (brand === "anthropic") {
         return (<ClaudeLogoIcon size={size} variant="mark" className={className} aria-hidden/>);

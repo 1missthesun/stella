@@ -10,7 +10,7 @@ import {
   Plus,
   Settings,
 } from "@/ui/icons";
-import { StellaLogoIcon } from "@/ui/stella-logo-icon";
+import { InlineStellaMark } from "@/ui/inline-stella-mark";
 import { useTheme } from "@/context/theme-context";
 import { ShiftingGradient } from "@/shell/background/ShiftingGradient";
 import "./demo-shell.css";
@@ -132,7 +132,7 @@ export function DemoWorking({
 }) {
   return (
     <div className="odemo-working" data-visible={visible || undefined}>
-      <StellaLogoIcon size={11} aria-hidden />
+      <InlineStellaMark size={11} aria-hidden />
       <span className="odemo-working__label">{label}</span>
     </div>
   );

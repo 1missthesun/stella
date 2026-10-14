@@ -1,12 +1,6 @@
 import { SOCKET_TICKET_PATH } from "@stella/contracts/socket-ticket";
 import { SLACK_INSTALL_START_PATH, SLACK_WORKSPACES_PATH } from "@stella/contracts/slack-workspace";
-// Keep these aligned with the browser origins Better Auth trusts (src/auth).
-const BROWSER_ORIGINS = new Set([
-  "https://stella.sh",
-  "stella-app://desktop",
-  "http://localhost:57314",
-  "http://127.0.0.1:57314",
-]);
+import { browserClientOrigins } from "./auth/auth.js";
 const ALLOWED_HEADERS = new Set([
   "authorization",
   "content-type",
@@ -32,15 +26,15 @@ const isBrowserRoute = (path: string): boolean =>
   path.startsWith(SLACK_WORKSPACES_PATH) ||
   path === SLACK_INSTALL_START_PATH;
 
-const websiteOrigin = (env: unknown): string | null => {
-  const value = (env as { STELLA_WEBSITE_URL?: unknown } | undefined)?.STELLA_WEBSITE_URL;
-  if (typeof value !== "string" || !value.trim()) return null;
-  try {
-    return new URL(value.trim()).origin;
-  } catch {
-    return null;
-  }
-};
+const isBrowserClientOrigin = (env: unknown, origin: string): boolean =>
+  browserClientOrigins(env).some((trusted) => {
+    if (!/^https?:/u.test(trusted)) return trusted === origin;
+    try {
+      return new URL(trusted).origin === origin;
+    } catch {
+      return false;
+    }
+  });
 
 export async function withBrowserCors(
   request: Request,
@@ -64,8 +58,7 @@ export async function withBrowserCors(
   // Packaged Electron has an opaque file origin; isolated dev runs use random
   // loopback ports. These routes require a bearer JWT and never use cookies.
   const allowed =
-    BROWSER_ORIGINS.has(origin) ||
-    origin === websiteOrigin(env) ||
+    isBrowserClientOrigin(env, origin) ||
     (appRoute &&
       (origin === "null" ||
         /^http:\/\/(localhost|127\.0\.0\.1):[0-9]+$/.test(origin)));

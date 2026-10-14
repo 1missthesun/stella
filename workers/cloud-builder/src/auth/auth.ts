@@ -54,12 +54,21 @@ export const backendUrl = (env: Pick<AuthEnv, "CLOUD_BUILDER_PUBLIC_URL">): stri
 export const authUrl = (env: AuthEnv): string =>
   (configured(env, "STELLA_AUTH_URL") ?? backendUrl(env)).replace(/\/+$/, "");
 
+const localDevOriginsEnabled = (env: unknown): boolean => configured(env, "STELLA_LOCAL_DEV_ORIGINS") === "1";
+
 export const websiteUrl = (env: unknown): string =>
   (configured(env, "STELLA_WEBSITE_URL") ?? DEFAULT_WEBSITE_URL).replace(/\/+$/, "");
 
-export const testAccountsEnabled = (env: unknown): boolean => configured(env, "STELLA_TEST_ACCOUNTS") === "1";
+/** Origins of Stella's own browser-hosted clients; both auth and CORS trust exactly these. */
+export const browserClientOrigins = (env: unknown): string[] => [
+  websiteUrl(env),
+  DEFAULT_WEBSITE_URL,
+  ...(localDevOriginsEnabled(env) ? ["http://localhost:3000", "http://localhost:57314"] : []),
+  "http://127.0.0.1:57314",
+  "stella-app://desktop",
+];
 
-const localDevOriginsEnabled = (env: unknown): boolean => configured(env, "STELLA_LOCAL_DEV_ORIGINS") === "1";
+export const testAccountsEnabled = (env: unknown): boolean => configured(env, "STELLA_TEST_ACCOUNTS") === "1";
 
 export const trustedOrigins = (env: AuthEnv): string[] => {
   const scheme = configured(env, "STELLA_MOBILE_SCHEME") ?? "stella-mobile";
@@ -67,11 +76,7 @@ export const trustedOrigins = (env: AuthEnv): string[] => {
     new Set([
       backendUrl(env),
       authUrl(env),
-      websiteUrl(env),
-      DEFAULT_WEBSITE_URL,
-      ...(localDevOriginsEnabled(env) ? ["http://localhost:3000", "http://localhost:57314"] : []),
-      "http://127.0.0.1:57314",
-      "stella-app://desktop",
+      ...browserClientOrigins(env),
       // Native callbacks; platforms serialize the empty path with two or three slashes.
       `${scheme}://`,
       `${scheme}:///`,

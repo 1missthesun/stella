@@ -1,6 +1,9 @@
 import type { GatewayModelPrice } from "@stella/contracts/gateway/usage";
 import { listManagedModelIds } from "@stella/model-catalog/model";
-import { STATIC_MANAGED_MODEL_PRICE_OVERRIDES } from "@stella/model-catalog/pricing";
+import {
+  effectiveReasoningRate,
+  STATIC_MANAGED_MODEL_PRICE_OVERRIDES,
+} from "@stella/model-catalog/pricing";
 
 const MODELS_DEV_API_URL = "https://models.dev/api.json";
 const MODELS_DEV_TIMEOUT_MS = 30_000;
@@ -99,8 +102,10 @@ const database = (env: Pick<Cloudflare.Env, "DB">): D1Database => {
   return env.DB;
 };
 
-const toNumber = (value: unknown) =>
-  typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : 0;
+const publishedRate = (value: unknown): number | undefined =>
+  typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined;
+
+const toNumber = (value: unknown) => publishedRate(value) ?? 0;
 
 const modalityList = (modalities?: string[]): string[] => {
   if (!Array.isArray(modalities)) return ["text"];
@@ -126,9 +131,10 @@ const buildPriceRows = (data: ModelsDevApi, modelIds: string[], syncedAt: number
         outputPerMillionUsd: toNumber(cost?.output),
         cacheReadPerMillionUsd: toNumber(cost?.cache_read),
         cacheWritePerMillionUsd: toNumber(cost?.cache_write),
-        // models.dev publishes `cost.reasoning` for few models; bill the rest
-        // at the output rate rather than zero.
-        reasoningPerMillionUsd: toNumber(cost?.reasoning) || toNumber(cost?.output),
+        reasoningPerMillionUsd: effectiveReasoningRate(
+          publishedRate(cost?.reasoning),
+          toNumber(cost?.output),
+        ),
         modalitiesInput: modalityList(resolved.entry.modalities?.input),
         modalitiesOutput: modalityList(resolved.entry.modalities?.output),
         sourceUpdatedAt: resolved.entry.last_updated?.trim() ?? "",
@@ -150,7 +156,10 @@ const buildPriceRows = (data: ModelsDevApi, modelIds: string[], syncedAt: number
       outputPerMillionUsd: fill.outputPerMillionUsd,
       cacheReadPerMillionUsd: fill.cacheReadPerMillionUsd ?? 0,
       cacheWritePerMillionUsd: fill.cacheWritePerMillionUsd ?? 0,
-      reasoningPerMillionUsd: fill.reasoningPerMillionUsd ?? fill.outputPerMillionUsd,
+      reasoningPerMillionUsd: effectiveReasoningRate(
+        fill.reasoningPerMillionUsd,
+        fill.outputPerMillionUsd,
+      ),
       modalitiesInput: modalityList(fill.modalitiesInput),
       modalitiesOutput: modalityList(fill.modalitiesOutput),
       sourceUpdatedAt: "",
@@ -255,7 +264,10 @@ export async function readManagedModelPrices(env: Pick<Cloudflare.Env, "DB">): P
       outputPerMillionUsd: fill.outputPerMillionUsd,
       cacheReadPerMillionUsd: fill.cacheReadPerMillionUsd ?? 0,
       cacheWritePerMillionUsd: fill.cacheWritePerMillionUsd ?? 0,
-      reasoningPerMillionUsd: fill.reasoningPerMillionUsd ?? fill.outputPerMillionUsd,
+      reasoningPerMillionUsd: effectiveReasoningRate(
+        fill.reasoningPerMillionUsd,
+        fill.outputPerMillionUsd,
+      ),
     });
   }
   const value = { prices, updatedAt };

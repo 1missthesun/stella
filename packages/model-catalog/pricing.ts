@@ -30,87 +30,81 @@ export const centsToMicroCents = (cents: number) =>
 export const dollarsToMicroCents = (dollars: number) =>
   centsToMicroCents(dollars * CENTS_PER_DOLLAR);
 
-/**
- * Price one managed completion.
- *
- * Token conventions — every caller must normalize to these before calling,
- * because this function derives the billable buckets by subtraction:
- *
- * - `inputTokens` is GROSS: it includes `cachedInputTokens` and
- *   `cacheWriteInputTokens`. Providers disagree here (OpenAI's
- *   `prompt_tokens` and Google's `promptTokenCount` are gross, Anthropic's
- *   `input_tokens` is already net of both cache buckets), so the parsers
- *   are responsible for adding cache counts back in.
- * - `outputTokens` is GROSS: it includes `reasoningTokens`. Again providers
- *   disagree (OpenAI's `output_tokens` includes reasoning, Google's
- *   `candidatesTokenCount` excludes `thoughtsTokenCount`), so the parsers
- *   normalize to the inclusive form.
- *
- * Passing already-net counts double-discounts them and can silently bill a
- * request at zero.
- */
-export type UsageCostArgs = {
-  model: string;
-  /** Gross prompt tokens, including cached reads and cache writes. */
+export type GrossTokenUsage = {
+  /** Includes cached reads and cache writes. */
   inputTokens: number;
-  /** Gross completion tokens, including reasoning tokens. */
+  /** Includes reasoning tokens. */
   outputTokens: number;
   cachedInputTokens?: number;
   cacheWriteInputTokens?: number;
-  /**
-   * The part of `cacheWriteInputTokens` written to a 1-hour cache entry
-   * (Anthropic `ttl: "1h"`, reported as
-   * `cache_creation.ephemeral_1h_input_tokens`). Anthropic bills these at 2x
-   * the input rate; the remaining (5-minute) writes keep the catalog's
-   * cache-write rate, which models.dev publishes as 1.25x input.
-   */
+  /** The part of `cacheWriteInputTokens` written to a 1-hour cache entry. */
   cacheWrite1hInputTokens?: number;
   reasoningTokens?: number;
-  price?: TokenPriceConfig;
 };
 
-/** Anthropic's 1-hour cache writes cost twice the base input rate. */
+declare const billableTokensBrand: unique symbol;
+
+export type BillableTokens = {
+  readonly uncachedInput: number;
+  readonly cacheRead: number;
+  readonly cacheWrite5m: number;
+  readonly cacheWrite1h: number;
+  readonly textOutput: number;
+  readonly reasoning: number;
+  readonly [billableTokensBrand]: true;
+};
+
+const count = (value: number | undefined): number =>
+  value !== undefined && Number.isFinite(value) ? Math.max(0, value) : 0;
+
+export const billableTokens = (usage: GrossTokenUsage): BillableTokens => {
+  const cacheRead = count(usage.cachedInputTokens);
+  const cacheWrite = count(usage.cacheWriteInputTokens);
+  const cacheWrite1h = Math.min(cacheWrite, count(usage.cacheWrite1hInputTokens));
+  const reasoning = count(usage.reasoningTokens);
+  return {
+    uncachedInput: Math.max(0, count(usage.inputTokens) - cacheRead - cacheWrite),
+    cacheRead,
+    cacheWrite5m: cacheWrite - cacheWrite1h,
+    cacheWrite1h,
+    textOutput: Math.max(0, count(usage.outputTokens) - reasoning),
+    reasoning,
+  } as BillableTokens;
+};
+
+/** Anthropic bills 1-hour cache writes at twice the base input rate. */
 export const LONG_CACHE_WRITE_INPUT_MULTIPLIER = 2;
 
-export const computeUsageCostMicroCents = (
-  args: UsageCostArgs & {
-    catalog?: TokenPriceCatalog;
-  },
-) => {
+/** Reasoning tokens are output tokens: no provider bills them below the output rate. */
+export const effectiveReasoningRate = (
+  published: number | undefined,
+  outputPerMillionUsd: number,
+): number => Math.max(published ?? 0, outputPerMillionUsd);
+
+export const computeUsageCostMicroCents = (args: {
+  model: string;
+  tokens: BillableTokens;
+  price?: TokenPriceConfig;
+  catalog?: TokenPriceCatalog;
+}) => {
   const catalog = args.catalog ?? DEFAULT_TOKEN_PRICE_CATALOG;
   const price = args.price ?? catalog.models[args.model] ?? catalog.default;
-  const cachedInputTokens = Math.max(0, args.cachedInputTokens ?? 0);
-  const cacheWriteInputTokens = Math.max(0, args.cacheWriteInputTokens ?? 0);
-  const cacheWrite1hInputTokens = Math.min(
-    cacheWriteInputTokens,
-    Math.max(0, args.cacheWrite1hInputTokens ?? 0),
-  );
-  const billableInputTokens = Math.max(
-    0,
-    args.inputTokens - cachedInputTokens - cacheWriteInputTokens,
-  );
-  const reasoningTokens = Math.max(0, args.reasoningTokens ?? 0);
-  const textOutputTokens = Math.max(0, args.outputTokens - reasoningTokens);
-
-  const inputUsd = (billableInputTokens / 1_000_000) * price.inputPerMillionUsd;
-  const cachedInputUsd =
-    (cachedInputTokens / 1_000_000) * (price.cacheReadPerMillionUsd ?? 0);
-  const cacheWriteUsd =
-    ((cacheWriteInputTokens - cacheWrite1hInputTokens) / 1_000_000) *
-      (price.cacheWritePerMillionUsd ?? 0) +
-    (cacheWrite1hInputTokens / 1_000_000) *
-      (LONG_CACHE_WRITE_INPUT_MULTIPLIER * price.inputPerMillionUsd);
-  const outputUsd = (textOutputTokens / 1_000_000) * price.outputPerMillionUsd;
-  // A zero reasoning rate means "not published", not "free" — models.dev
-  // omits `cost.reasoning` for most models and the sync stores 0. No provider
-  // bills reasoning below its output rate, so fall back to it rather than
-  // handing out reasoning-heavy completions for nothing.
-  const reasoningUsd =
-    (reasoningTokens / 1_000_000) *
-    (price.reasoningPerMillionUsd || price.outputPerMillionUsd);
-
+  const { tokens } = args;
+  const perToken = (rate: number) => rate / 1_000_000;
   return dollarsToMicroCents(
-    inputUsd + cachedInputUsd + cacheWriteUsd + outputUsd + reasoningUsd,
+    tokens.uncachedInput * perToken(price.inputPerMillionUsd) +
+      tokens.cacheRead * perToken(price.cacheReadPerMillionUsd ?? 0) +
+      tokens.cacheWrite5m * perToken(price.cacheWritePerMillionUsd ?? 0) +
+      tokens.cacheWrite1h *
+        perToken(LONG_CACHE_WRITE_INPUT_MULTIPLIER * price.inputPerMillionUsd) +
+      tokens.textOutput * perToken(price.outputPerMillionUsd) +
+      tokens.reasoning *
+        perToken(
+          effectiveReasoningRate(
+            price.reasoningPerMillionUsd,
+            price.outputPerMillionUsd,
+          ),
+        ),
   );
 };
 

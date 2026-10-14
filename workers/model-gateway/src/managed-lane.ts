@@ -38,7 +38,10 @@ import {
   getManagedGatewayConfig,
   resolveManagedGatewayApiKeyFromEnv,
 } from "@stella/model-catalog/managed-gateway";
-import { computeUsageCostMicroCents } from "@stella/model-catalog/pricing";
+import {
+  billableTokens,
+  computeUsageCostMicroCents,
+} from "@stella/model-catalog/pricing";
 import {
   estimateRequestTokens,
   requestedModelFromGooglePath,
@@ -682,8 +685,10 @@ export const handleManagedRelay = async (args: {
     const estimate = estimateRequestTokens(cappedRequestJson);
     const estimatedMicroCents = computeUsageCostMicroCents({
       model: route.resolvedModel,
-      inputTokens: estimate.inputTokens,
-      outputTokens: estimate.outputTokens,
+      tokens: billableTokens({
+        inputTokens: estimate.inputTokens,
+        outputTokens: estimate.outputTokens,
+      }),
       price,
     });
     if (!(estimatedMicroCents > 0)) {
@@ -888,27 +893,30 @@ export const handleManagedRelay = async (args: {
       if (usage.costMicroCents !== undefined) return usage.costMicroCents;
       return computeUsageCostMicroCents({
         model: route.resolvedModel,
-        inputTokens: usage.inputTokens ?? 0,
-        outputTokens: usage.outputTokens ?? 0,
-        cachedInputTokens: usage.cachedInputTokens,
-        cacheWriteInputTokens: usage.cacheWriteInputTokens,
-        cacheWrite1hInputTokens: usage.cacheWrite1hInputTokens,
-        reasoningTokens: usage.reasoningTokens,
+        tokens: billableTokens({
+          inputTokens: usage.inputTokens ?? 0,
+          outputTokens: usage.outputTokens ?? 0,
+          cachedInputTokens: usage.cachedInputTokens,
+          cacheWriteInputTokens: usage.cacheWriteInputTokens,
+          cacheWrite1hInputTokens: usage.cacheWrite1hInputTokens,
+          reasoningTokens: usage.reasoningTokens,
+        }),
         price,
       });
     };
     const inputEstimateMicroCents = computeUsageCostMicroCents({
       model: route.resolvedModel,
-      inputTokens: estimate.inputTokens,
-      outputTokens: 0,
+      tokens: billableTokens({
+        inputTokens: estimate.inputTokens,
+        outputTokens: 0,
+      }),
       price,
     });
     const runningCostFor = (outputTokens: number): number =>
       inputEstimateMicroCents +
       computeUsageCostMicroCents({
         model: route.resolvedModel,
-        inputTokens: 0,
-        outputTokens,
+        tokens: billableTokens({ inputTokens: 0, outputTokens }),
         price,
       });
 

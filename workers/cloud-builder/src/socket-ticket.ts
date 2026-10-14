@@ -18,7 +18,7 @@ type SocketTicketClaims = {
   s: string;
   i: string;
   x: number;
-  a: 0 | 1;
+  a: 0;
   l: VerifiedToken["identityLevel"];
   t: number;
   e: number;
@@ -99,7 +99,7 @@ export const issueSocketTicket = async (args: {
     s: args.token.subject,
     i: args.token.sessionId,
     x: args.token.expiresAtMs,
-    a: args.token.isAnonymous ? 1 : 0,
+    a: 0,
     l: args.token.identityLevel,
     t: args.token.issuedAtMs,
     e: expiresAtMs,
@@ -167,7 +167,7 @@ export const verifySocketTicket = async (args: {
     typeof value.i !== "string" ||
     !Number.isSafeInteger(value.x) ||
     Number(value.x) <= args.now ||
-    (value.a !== 0 && value.a !== 1) ||
+    value.a !== 0 ||
     (value.l !== 0 && value.l !== 1 && value.l !== 2 && value.l !== 3) ||
     !Number.isSafeInteger(value.t) ||
     !Number.isSafeInteger(value.e) ||
@@ -183,7 +183,6 @@ export const verifySocketTicket = async (args: {
     subject: value.s,
     sessionId: value.i,
     expiresAtMs: Number(value.x),
-    isAnonymous: value.a === 1,
     identityLevel: value.l,
     issuedAtMs: Number(value.t),
   };

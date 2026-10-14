@@ -28,8 +28,6 @@ export type VerifiedToken = {
   subject: string;
   sessionId: string;
   expiresAtMs: number;
-  /** The `anon` claim: an anonymous Better Auth user. Absent means an account. */
-  isAnonymous: boolean;
   /**
    * The `tst` claim: a dev test account (`@test.stella.local`), which only a
    * backend with test accounts on names. Honored only by a gateway with
@@ -270,6 +268,7 @@ export const verifyUserToken = async (
     return fail("verify_threw");
   }
   if (!valid) return fail("bad_signature");
+  if (payload.anon === true) return fail("anonymous");
 
   return {
     ok: true,
@@ -278,7 +277,6 @@ export const verifyUserToken = async (
       subject,
       sessionId: typeof payload.sid === "string" ? payload.sid : "",
       expiresAtMs: exp * 1000,
-      isAnonymous: payload.anon === true,
       testAccount: payload.tst === true,
     },
   };

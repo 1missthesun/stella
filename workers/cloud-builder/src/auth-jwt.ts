@@ -28,8 +28,7 @@ export type VerifiedToken = {
   subject: string;
   sessionId: string;
   expiresAtMs: number;
-  isAnonymous: boolean;
-  /** 0 anonymous, 1 email, 2 social. */
+  /** 1 email, 2 social. */
   identityLevel: IdentityLevel;
   /** `iat` in ms; 0 when absent. */
   issuedAtMs: number;
@@ -214,7 +213,7 @@ export const verifyUserToken = async (token: string, env: Cloudflare.Env): Promi
     return fail("verify_threw");
   }
   if (!valid) return fail("bad_signature");
-  const anonymous = payload.anon === true;
+  if (payload.anon === true) return fail("anonymous");
   const idl = payload.idl;
   return {
     ok: true,
@@ -223,8 +222,7 @@ export const verifyUserToken = async (token: string, env: Cloudflare.Env): Promi
       subject,
       sessionId: typeof payload.sid === "string" ? payload.sid : "",
       expiresAtMs: exp * 1000,
-      isAnonymous: anonymous,
-      identityLevel: anonymous ? 0 : idl === 1 || idl === 2 || idl === 3 ? idl : 1,
+      identityLevel: idl === 1 || idl === 2 || idl === 3 ? idl : 1,
       issuedAtMs: iat * 1000,
     },
   };

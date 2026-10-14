@@ -3,18 +3,18 @@
  *
  * - Expired rows: Better Auth's verification values and sessions, its rate
  *   limit counters, the handoff tables and integrity nonces.
- * - Stale anonymous users: no live session and no update for 30 days. Each
- *   one's owner object is closed (which purges its data), then the user row
- *   goes, taking its sessions and accounts with it.
+ * - Anonymous users, left from before anonymous sign-in was removed: all of
+ *   them, live sessions or not, in bounded batches per run. Each one's owner
+ *   object is closed (which purges its data), then the user row goes, taking
+ *   its sessions and accounts with it.
  */
 
 import { ownerGateStub } from "../rpc-release.js";
 import { ownerModeEnabled } from "../selfhost/owner-mode.js";
 
 const DAY_MS = 24 * 60 * 60_000;
-const ANONYMOUS_STALE_MS = 30 * DAY_MS;
 /** Upper bound on anonymous users one run closes; the next run takes the rest. */
-const ANONYMOUS_PER_RUN = 50;
+const ANONYMOUS_PER_RUN = 200;
 
 type SweepEnv = Pick<Cloudflare.Env, "DB" | "OWNER_GATES">;
 
@@ -35,19 +35,17 @@ export const sweepAuthTables = async (env: SweepEnv, now = Date.now()): Promise<
   ]);
 };
 
-export const sweepAnonymousUsers = async (env: SweepEnv, now = Date.now()): Promise<void> => {
-  const nowIso = new Date(now).toISOString();
+export const sweepAnonymousUsers = async (env: SweepEnv): Promise<void> => {
   const keepOwner = ownerModeEnabled(env)
     ? ` AND u."id" NOT IN (SELECT owner_user_id FROM selfhost_server)`
     : "";
   const { results } = await db(env)
     .prepare(
       `SELECT u."id" AS id FROM "user" u
-        WHERE u."isAnonymous" = 1 AND u."updatedAt" < ?
-          AND NOT EXISTS (SELECT 1 FROM "session" s WHERE s."userId" = u."id" AND s."expiresAt" > ?)${keepOwner}
+        WHERE u."isAnonymous" = 1${keepOwner}
         LIMIT ?`,
     )
-    .bind(new Date(now - ANONYMOUS_STALE_MS).toISOString(), nowIso, ANONYMOUS_PER_RUN)
+    .bind(ANONYMOUS_PER_RUN)
     .all<{ id: string }>();
   let closed = 0;
   for (const { id } of results) {
@@ -64,5 +62,7 @@ export const sweepAnonymousUsers = async (env: SweepEnv, now = Date.now()): Prom
       );
     }
   }
-  if (results.length > 0) console.log(JSON.stringify({ event: "anonymous_users_closed", closed }));
+  if (results.length > 0) {
+    console.log(JSON.stringify({ event: "anonymous_users_closed", closed, batch: results.length }));
+  }
 };

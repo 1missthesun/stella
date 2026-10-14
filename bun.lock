@@ -483,9 +483,10 @@
     "bun",
   ],
   "patchedDependencies": {
+    "react-native@0.86.3": "patches/react-native@0.86.3.patch",
+    "@legendapp/list@3.6.0": "patches/@legendapp%2Flist@3.6.0.patch",
     "@siteed/audio-studio@3.2.0": "patches/@siteed%2Faudio-studio@3.2.0.patch",
     "@earendil-works/pi-durable@1.1.0": "patches/@earendil-works%2Fpi-durable@1.1.0.patch",
-    "react-native@0.86.3": "patches/react-native@0.86.3.patch",
     "react-native-nitro-markdown@0.6.2": "patches/react-native-nitro-markdown@0.6.2.patch",
     "expo-modules-jsi@57.1.1": "patches/expo-modules-jsi@57.1.1.patch",
     "streamdown@2.7.0": "patches/streamdown@2.7.0.patch",

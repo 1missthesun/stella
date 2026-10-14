@@ -96,7 +96,6 @@ export function createChatRowEnvStore(initial: ChatRowEnv): ChatRowEnvStore {
 
 type RowView = {
   timeHeader: number | undefined;
-  layout: "assistant" | "user" | null;
   menuActive: boolean;
   isSelecting: boolean;
   anySelecting: boolean;
@@ -124,8 +123,6 @@ const selectRowView = (
   id: string,
   previous: RowView | null,
 ): RowView => {
-  const isActiveAssistant = id === env.activeAssistantId;
-  const isLatestUser = id === env.latestUserMessageId || id === env.placingReplyId;
   const contextRef = env.replyContexts.contexts.get(id);
   const stable =
     previous &&
@@ -150,12 +147,6 @@ const selectRowView = (
         };
   return {
     timeHeader: env.timeHeaders.get(id),
-    layout:
-      isActiveAssistant && id !== env.placingReplyId
-        ? "assistant"
-        : isLatestUser
-          ? "user"
-          : null,
     menuActive: id === env.activeMenuMessageId,
     isSelecting: id === env.selectingMessageId,
     anySelecting: env.selectingMessageId != null,
@@ -171,6 +162,14 @@ const selectRowView = (
     env: stable,
   };
 };
+
+/** Which scroll measurement a row's layout feeds, read when the layout lands. */
+const rowLayoutRole = (env: ChatRowEnv, id: string): "assistant" | "user" | null =>
+  id === env.activeAssistantId && id !== env.placingReplyId
+    ? "assistant"
+    : id === env.latestUserMessageId || id === env.placingReplyId
+      ? "user"
+      : null;
 
 const sameRowView = (a: RowView, b: RowView): boolean => {
   for (const key of Object.keys(a) as (keyof RowView)[]) {
@@ -235,21 +234,21 @@ function ChatMessageListRow({
   });
   const { env } = view;
   const id = item.id;
-  const onLatestUserLayout = env.onLatestUserLayout;
-  const onUserLayout = useCallback(
-    (event: LayoutChangeEvent) => onLatestUserLayout(id, event),
-    [onLatestUserLayout, id],
+  // Always attached and resolved when the layout lands: swapping the handler
+  // as roles move would re-render the previous rows after every arrival.
+  const onRowLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      const current = store.get();
+      const role = rowLayoutRole(current, id);
+      if (role === "assistant") current.onActiveAssistantLayout(event);
+      else if (role === "user") current.onLatestUserLayout(id, event);
+    },
+    [store, id],
   );
   return (
     <MessageEntry
       animate={entry.fresh && item.role !== "assistant"}
-      onLayout={
-        view.layout === "assistant"
-          ? env.onActiveAssistantLayout
-          : view.layout === "user"
-            ? onUserLayout
-            : undefined
-      }
+      onLayout={onRowLayout}
     >
       {view.timeHeader !== undefined ? (
         <Text

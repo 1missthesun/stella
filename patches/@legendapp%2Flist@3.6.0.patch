@@ -1,0 +1,270 @@
+diff --git a/react-native.js b/react-native.js
+index 0b730ec..ae384cb 100644
+--- a/react-native.js
++++ b/react-native.js
+@@ -246,8 +246,24 @@ function set$(ctx, signalName, value) {
+   const { listeners, values } = ctx;
+   if (values.get(signalName) !== value) {
+     values.set(signalName, value);
++    if (ctx.deferredSignals) {
++      ctx.deferredSignals.add(signalName);
++      return;
++    }
++    const setListeners = listeners.get(signalName);
++    if (setListeners) {
++      for (const listener of setListeners) {
++        listener(value);
++      }
++    }
++  }
++}
++function flushDeferredSignals$(ctx, signalNames) {
++  const { listeners, values } = ctx;
++  for (const signalName of signalNames) {
+     const setListeners = listeners.get(signalName);
+     if (setListeners) {
++      const value = values.get(signalName);
+       for (const listener of setListeners) {
+         listener(value);
+       }
+@@ -6060,6 +6076,7 @@ function ContainerSlotBase({
+   id,
+   horizontal,
+   recycleItems,
++  renderEpoch: _renderEpoch,
+   ItemSeparatorComponent,
+   getRenderedItem: getRenderedItem2,
+   stickyHeaderConfig,
+@@ -6135,6 +6152,7 @@ var ContainersLayer = typedMemo(function ContainersLayer2({
+ });
+ var Containers = typedMemo(function Containers2({
+   freshDataTransitionEpoch,
++  renderEpoch,
+   horizontal,
+   recycleItems,
+   ItemSeparatorComponent,
+@@ -6154,6 +6172,7 @@ var Containers = typedMemo(function Containers2({
+           id: i,
+           key: i,
+           recycleItems,
++          renderEpoch,
+           stickyHeaderConfig
+         }
+       )
+@@ -6297,6 +6316,7 @@ var AlignItemsAtEndSpacer = typedMemo(function AlignItemsAtEndSpacer2({ horizont
+ var ListComponent = typedMemo(function ListComponent2({
+   canRender,
+   freshDataTransitionEpoch,
++  renderEpoch,
+   style,
+   contentContainerStyle,
+   horizontal,
+@@ -6413,6 +6433,7 @@ var ListComponent = typedMemo(function ListComponent2({
+       Containers,
+       {
+         freshDataTransitionEpoch,
++        renderEpoch,
+         getRenderedItem: getRenderedItem2,
+         horizontal,
+         ItemSeparatorComponent,
+@@ -6505,7 +6526,7 @@ function useDevChecksNoop(_props) {
+ var useDevChecks = IS_DEV ? useDevChecksImpl : useDevChecksNoop;
+ 
+ // src/core/checkResetContainers.ts
+-function checkResetContainers(ctx, dataProp, { didColumnsChange = false } = {}) {
++function checkResetContainers(ctx, dataProp, { didColumnsChange = false, placedInRender = false } = {}) {
+   const state = ctx.state;
+   const { previousData } = state;
+   const { maintainScrollAtEnd } = state.props;
+@@ -6519,7 +6540,9 @@ function checkResetContainers(ctx, dataProp, { didColumnsChange = false } = {})
+     state.positionRecalculationStartIndex = 0;
+     state.scrollForNextCalculateItemsInView = void 0;
+   }
+-  calculateItemsInView(ctx, { dataChanged: true, doMVCP: true });
++  if (!placedInRender) {
++    calculateItemsInView(ctx, { dataChanged: true, doMVCP: true });
++  }
+   const shouldMaintainScrollAtEnd = !didColumnsChange && (maintainScrollAtEnd == null ? void 0 : maintainScrollAtEnd.onDataChange);
+   const didMaintainScrollAtEnd = shouldMaintainScrollAtEnd && doMaintainScrollAtEnd(ctx);
+   if (!didMaintainScrollAtEnd && previousData && dataProp.length > previousData.length) {
+@@ -7880,6 +7903,25 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
+       set$(ctx, "totalSize", 0);
+     }
+   }
++  if (IsNewArchitecture && !isFirstLocal && didDataChangeLocal && !state.didColumnsChange && !shouldResetFreshDataLayout && dataProp.length > 0 && peek$(ctx, "numContainers") > 0 && state.didFinishInitialScroll && !hasActiveInitialScroll(state) && !anchoredEndSpace && state.placedInRenderEpoch !== dataChangeEpoch) {
++    const deferredSignals = state.deferredSignals || /* @__PURE__ */ new Set();
++    ctx.deferredSignals = deferredSignals;
++    try {
++      initializeStateVars(true);
++      calculateItemsInView(ctx, { dataChanged: true, doMVCP: true });
++    } finally {
++      ctx.deferredSignals = void 0;
++    }
++    state.deferredSignals = deferredSignals;
++    state.placedInRenderEpoch = dataChangeEpoch;
++  }
++  React2.useEffect(() => {
++    const deferredSignals = state.deferredSignals;
++    if (deferredSignals) {
++      state.deferredSignals = void 0;
++      flushDeferredSignals$(ctx, deferredSignals);
++    }
++  });
+   if (IS_DEV) {
+     useDevChecks(props);
+   }
+@@ -8002,7 +8044,10 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
+     } = state;
+     const didAllocateContainers = data.length > 0 && doInitialAllocateContainers(ctx);
+     if (!didAllocateContainers && !isFirst && (didDataChange || didColumnsChange)) {
+-      checkResetContainers(ctx, data, { didColumnsChange });
++      checkResetContainers(ctx, data, {
++        didColumnsChange,
++        placedInRender: !didColumnsChange && state.placedInRenderEpoch === state.dataChangeEpoch
++      });
+     }
+     if (didDataChange) {
+       state.pendingDataComparison = void 0;
+@@ -8114,6 +8159,7 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
+       contentContainerStyle,
+       contentInset,
+       freshDataTransitionEpoch: state.freshDataTransitionEpoch,
++      renderEpoch: state.placedInRenderEpoch,
+       getRenderedItem: fns.getRenderedItem,
+       horizontal,
+       initialContentOffset,
+diff --git a/react-native.mjs b/react-native.mjs
+index a3d8d9a..7ae0276 100644
+--- a/react-native.mjs
++++ b/react-native.mjs
+@@ -225,8 +225,24 @@ function set$(ctx, signalName, value) {
+   const { listeners, values } = ctx;
+   if (values.get(signalName) !== value) {
+     values.set(signalName, value);
++    if (ctx.deferredSignals) {
++      ctx.deferredSignals.add(signalName);
++      return;
++    }
++    const setListeners = listeners.get(signalName);
++    if (setListeners) {
++      for (const listener of setListeners) {
++        listener(value);
++      }
++    }
++  }
++}
++function flushDeferredSignals$(ctx, signalNames) {
++  const { listeners, values } = ctx;
++  for (const signalName of signalNames) {
+     const setListeners = listeners.get(signalName);
+     if (setListeners) {
++      const value = values.get(signalName);
+       for (const listener of setListeners) {
+         listener(value);
+       }
+@@ -6039,6 +6055,7 @@ function ContainerSlotBase({
+   id,
+   horizontal,
+   recycleItems,
++  renderEpoch: _renderEpoch,
+   ItemSeparatorComponent,
+   getRenderedItem: getRenderedItem2,
+   stickyHeaderConfig,
+@@ -6114,6 +6131,7 @@ var ContainersLayer = typedMemo(function ContainersLayer2({
+ });
+ var Containers = typedMemo(function Containers2({
+   freshDataTransitionEpoch,
++  renderEpoch,
+   horizontal,
+   recycleItems,
+   ItemSeparatorComponent,
+@@ -6133,6 +6151,7 @@ var Containers = typedMemo(function Containers2({
+           id: i,
+           key: i,
+           recycleItems,
++          renderEpoch,
+           stickyHeaderConfig
+         }
+       )
+@@ -6276,6 +6295,7 @@ var AlignItemsAtEndSpacer = typedMemo(function AlignItemsAtEndSpacer2({ horizont
+ var ListComponent = typedMemo(function ListComponent2({
+   canRender,
+   freshDataTransitionEpoch,
++  renderEpoch,
+   style,
+   contentContainerStyle,
+   horizontal,
+@@ -6392,6 +6412,7 @@ var ListComponent = typedMemo(function ListComponent2({
+       Containers,
+       {
+         freshDataTransitionEpoch,
++        renderEpoch,
+         getRenderedItem: getRenderedItem2,
+         horizontal,
+         ItemSeparatorComponent,
+@@ -6484,7 +6505,7 @@ function useDevChecksNoop(_props) {
+ var useDevChecks = IS_DEV ? useDevChecksImpl : useDevChecksNoop;
+ 
+ // src/core/checkResetContainers.ts
+-function checkResetContainers(ctx, dataProp, { didColumnsChange = false } = {}) {
++function checkResetContainers(ctx, dataProp, { didColumnsChange = false, placedInRender = false } = {}) {
+   const state = ctx.state;
+   const { previousData } = state;
+   const { maintainScrollAtEnd } = state.props;
+@@ -6498,7 +6519,9 @@ function checkResetContainers(ctx, dataProp, { didColumnsChange = false } = {})
+     state.positionRecalculationStartIndex = 0;
+     state.scrollForNextCalculateItemsInView = void 0;
+   }
+-  calculateItemsInView(ctx, { dataChanged: true, doMVCP: true });
++  if (!placedInRender) {
++    calculateItemsInView(ctx, { dataChanged: true, doMVCP: true });
++  }
+   const shouldMaintainScrollAtEnd = !didColumnsChange && (maintainScrollAtEnd == null ? void 0 : maintainScrollAtEnd.onDataChange);
+   const didMaintainScrollAtEnd = shouldMaintainScrollAtEnd && doMaintainScrollAtEnd(ctx);
+   if (!didMaintainScrollAtEnd && previousData && dataProp.length > previousData.length) {
+@@ -7859,6 +7882,25 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
+       set$(ctx, "totalSize", 0);
+     }
+   }
++  if (IsNewArchitecture && !isFirstLocal && didDataChangeLocal && !state.didColumnsChange && !shouldResetFreshDataLayout && dataProp.length > 0 && peek$(ctx, "numContainers") > 0 && state.didFinishInitialScroll && !hasActiveInitialScroll(state) && !anchoredEndSpace && state.placedInRenderEpoch !== dataChangeEpoch) {
++    const deferredSignals = state.deferredSignals || /* @__PURE__ */ new Set();
++    ctx.deferredSignals = deferredSignals;
++    try {
++      initializeStateVars(true);
++      calculateItemsInView(ctx, { dataChanged: true, doMVCP: true });
++    } finally {
++      ctx.deferredSignals = void 0;
++    }
++    state.deferredSignals = deferredSignals;
++    state.placedInRenderEpoch = dataChangeEpoch;
++  }
++  useEffect(() => {
++    const deferredSignals = state.deferredSignals;
++    if (deferredSignals) {
++      state.deferredSignals = void 0;
++      flushDeferredSignals$(ctx, deferredSignals);
++    }
++  });
+   if (IS_DEV) {
+     useDevChecks(props);
+   }
+@@ -7981,7 +8023,10 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
+     } = state;
+     const didAllocateContainers = data.length > 0 && doInitialAllocateContainers(ctx);
+     if (!didAllocateContainers && !isFirst && (didDataChange || didColumnsChange)) {
+-      checkResetContainers(ctx, data, { didColumnsChange });
++      checkResetContainers(ctx, data, {
++        didColumnsChange,
++        placedInRender: !didColumnsChange && state.placedInRenderEpoch === state.dataChangeEpoch
++      });
+     }
+     if (didDataChange) {
+       state.pendingDataComparison = void 0;
+@@ -8093,6 +8138,7 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
+       contentContainerStyle,
+       contentInset,
+       freshDataTransitionEpoch: state.freshDataTransitionEpoch,
++      renderEpoch: state.placedInRenderEpoch,
+       getRenderedItem: fns.getRenderedItem,
+       horizontal,
+       initialContentOffset,

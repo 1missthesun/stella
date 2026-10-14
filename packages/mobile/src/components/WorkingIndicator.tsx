@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Easing, StyleSheet, View } from "react-native";
 import { Text } from "./Text";
 import Reanimated, {
@@ -59,6 +59,8 @@ interface WorkingIndicatorProps {
   toolCallId?: string;
   exitImmediately?: boolean;
   onScreen?: boolean;
+  /** A reply landing in this render takes the indicator's place in the same commit. */
+  vacateFor?: string | null;
 }
 
 function SwapText({
@@ -223,6 +225,7 @@ export const WorkingIndicator = memo(function WorkingIndicator({
   toolCallId,
   exitImmediately = false,
   onScreen = true,
+  vacateFor = null,
 }: WorkingIndicatorProps) {
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -314,31 +317,48 @@ export const WorkingIndicator = memo(function WorkingIndicator({
   const leavingRef = useRef(false);
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const leaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Collapsing during render keeps the slot change in the reply's own commit;
+  // a handoff from the bubble's layout effect would cost a second commit.
+  const [vacated, setVacated] = useState<{ id: string; shown: boolean } | null>(
+    null,
+  );
+  if (vacateFor !== null && vacated?.id !== vacateFor) {
+    setVacated({ id: vacateFor, shown: renderShell });
+    if (renderShell) setRenderShell(false);
+  }
   const renderShellRef = useRef(renderShell);
   renderShellRef.current = renderShell;
   const handoffController = useReplyHandoffController();
+
+  const resetShell = useCallback(() => {
+    if (holdTimerRef.current !== null) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+    if (leaveTimerRef.current !== null) {
+      clearTimeout(leaveTimerRef.current);
+      leaveTimerRef.current = null;
+    }
+    cancelAnimation(shellT);
+    shellT.value = 0;
+    enteredRef.current = false;
+    leavingRef.current = false;
+  }, [shellT]);
+
+  useEffect(() => {
+    if (vacated?.shown) resetShell();
+  }, [vacated, resetShell]);
 
   useEffect(() => {
     if (!handoffController) return;
     return handoffController.attachIndicator({
       shown: () => renderShellRef.current,
       vacate: () => {
-        if (holdTimerRef.current !== null) {
-          clearTimeout(holdTimerRef.current);
-          holdTimerRef.current = null;
-        }
-        if (leaveTimerRef.current !== null) {
-          clearTimeout(leaveTimerRef.current);
-          leaveTimerRef.current = null;
-        }
-        cancelAnimation(shellT);
-        shellT.value = 0;
-        enteredRef.current = false;
-        leavingRef.current = false;
+        resetShell();
         setRenderShell(false);
       },
     });
-  }, [handoffController, shellT]);
+  }, [handoffController, resetShell]);
 
   useEffect(() => {
     const clearTimers = () => {

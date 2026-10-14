@@ -1529,13 +1529,13 @@ export function ChatPane({
   useLayoutEffect(() => rowEnvStore.publish(), [rowEnv, rowEnvStore]);
   const renderItem = useCallback(
     ({ item }: LegendListRenderItemProps<ChatMessage>) => {
-      return <ChatListRow item={item} store={rowEnvStore} />;
+      return (
+        <View style={styles.listRow}>
+          <ChatListRow item={item} store={rowEnvStore} />
+        </View>
+      );
     },
-    [rowEnvStore],
-  );
-  const renderSeparator = useCallback(
-    () => <View style={styles.itemSeparator} />,
-    [styles],
+    [rowEnvStore, styles.listRow],
   );
   const getItemType = useCallback(
     (item: ChatMessage) =>
@@ -1553,10 +1553,17 @@ export function ChatPane({
           toolName={workingIndicator?.toolName}
           toolCallId={workingIndicator?.toolCallId}
           onScreen={!scroll.tailOffscreen}
+          vacateFor={landingReplyId}
         />
       </View>
     ),
-    [streaming, workingIndicator, styles.chatTail, scroll.tailOffscreen],
+    [
+      streaming,
+      workingIndicator,
+      styles.chatTail,
+      scroll.tailOffscreen,
+      landingReplyId,
+    ],
   );
 
   const search = useChatSearch();
@@ -1759,7 +1766,6 @@ export function ChatPane({
                   renderItem={renderItem}
                   keyExtractor={keyExtractor}
                   getItemType={getItemType}
-                  ItemSeparatorComponent={renderSeparator}
                   ListFooterComponent={listFooter}
                   onScroll={handleListScroll}
                   onScrollBeginDrag={handleListScrollBeginDrag}
@@ -2061,10 +2067,12 @@ const makeStyles = (colors: Colors) =>
     list: {
       paddingHorizontal: CHAT_HORIZONTAL_INSET,
     },
-    itemSeparator: { height: MESSAGE_LIST_GAP },
+    // Every row carries the gap below it, the last one too, so a new row never
+    // resizes the one before it. The tail is shorter by the same gap.
+    listRow: { paddingBottom: MESSAGE_LIST_GAP },
     chatTail: {
-      minHeight: CHAT_TAIL_GAP,
-      paddingTop: MESSAGE_LIST_GAP + ASSISTANT_ROW_PAD_VERTICAL,
+      minHeight: CHAT_TAIL_GAP - MESSAGE_LIST_GAP,
+      paddingTop: ASSISTANT_ROW_PAD_VERTICAL,
       justifyContent: "flex-start",
     },
     emptyState: {

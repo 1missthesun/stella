@@ -148,25 +148,26 @@ export function useOnboardingChat({
     [],
   );
 
-  const introStartedRef = useRef(false);
+  const [introPending, setIntroPending] = useState(!initial.resumed);
   useEffect(() => {
-    if (initial.resumed || !started || introStartedRef.current) return;
-    introStartedRef.current = true;
+    if (!introPending || !started) return;
     const greet = () => {
+      setIntroPending(false);
       setTyping(false);
       setHandoff(true);
       setEntries([assistantEntry("hello", true)]);
       busyRef.current = false;
     };
-    if (reducedMotion) {
-      schedule(120, greet);
-      return;
-    }
-    schedule(INTRO_TYPING_AT_MS, () => setTyping(true));
-    schedule(INTRO_TYPING_AT_MS + TYPING_HOLD_MS, greet);
-    // Once, when the screen first shows.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [started]);
+    const timers = reducedMotion
+      ? [setTimeout(greet, 120)]
+      : [
+          setTimeout(() => setTyping(true), INTRO_TYPING_AT_MS),
+          setTimeout(greet, INTRO_TYPING_AT_MS + TYPING_HOLD_MS),
+        ];
+    return () => {
+      for (const id of timers) clearTimeout(id);
+    };
+  }, [introPending, reducedMotion, started]);
 
   const answer = useCallback(
     (step: OnboardingStep, kind: OnboardingAnswer) => {

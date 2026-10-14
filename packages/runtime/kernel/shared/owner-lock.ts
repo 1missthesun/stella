@@ -9,7 +9,7 @@ import {
 import {
   processIdentityIsLive,
   readProcessIdentity,
-} from "../../kernel/shared/process-identity.js";
+} from "./process-identity.js";
 
 export type LockOwner = Readonly<{
   pid: number;

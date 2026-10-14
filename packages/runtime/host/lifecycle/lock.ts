@@ -4,7 +4,7 @@ import {
   type LockOwner,
   releaseOwnerLock,
   tryAcquireOwnerLock,
-} from "./owner-lock.js";
+} from "../../kernel/shared/owner-lock.js";
 import { pollWithDeadline } from "./poll.js";
 
 const ACQUIRE_POLL_INTERVAL_MS = 50;

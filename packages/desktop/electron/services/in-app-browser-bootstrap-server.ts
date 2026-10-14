@@ -20,7 +20,7 @@ import { z } from "zod";
 import {
   releaseOwnerLock,
   tryAcquireOwnerLock,
-} from "@stella/runtime/host/lifecycle/owner-lock";
+} from "@stella/runtime/kernel/shared/owner-lock";
 
 import {
   getStellaInAppBrowserInitEndpoint,

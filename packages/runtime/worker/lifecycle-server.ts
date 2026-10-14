@@ -4,7 +4,7 @@ import {
   readLiveLockOwner,
   releaseOwnerLock,
   tryAcquireOwnerLock,
-} from "../host/lifecycle/owner-lock.js";
+} from "../kernel/shared/owner-lock.js";
 import { getFileLogger } from "../observability/file-logger.js";
 import { forkDelayed, type WorkerTimerHandle } from "./effect-runtime.js";
 import {

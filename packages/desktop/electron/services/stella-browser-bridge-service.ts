@@ -50,6 +50,17 @@ import {
   resolveStellaBrowserRoot,
 } from "../utils/stella-browser-paths.js";
 import { stopChildProcessTree } from "../process-runtime.js";
+import type {
+  BrowserExtensionClientsState,
+  BrowserExtensionRouting,
+} from "@stella/contracts/desktop/browser-view";
+import {
+  buildBrowserExtensionClientsState,
+  parseDaemonExtensionClients,
+  readBrowserExtensionRouting,
+  rememberBrowserExtensionClients,
+  saveBrowserExtensionRouting,
+} from "./browser-extension-routing-store.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -202,6 +213,7 @@ export const stopOrphanedStellaBrowserDaemons = async () => {
 
 type StellaBrowserBridgeServiceOptions = {
   stellaAppDir: string;
+  stellaDataDir: string;
   onUnexpectedExit?: (error: string) => void;
 };
 
@@ -254,6 +266,7 @@ type DaemonResponse = {
 
 export class StellaBrowserBridgeService {
   private readonly stellaAppDir: string;
+  private readonly stellaDataDir: string;
   private readonly onUnexpectedExit?: (error: string) => void;
 
   private daemonProcess: ChildProcess | null = null;
@@ -292,6 +305,7 @@ export class StellaBrowserBridgeService {
 
   constructor(options: StellaBrowserBridgeServiceOptions) {
     this.stellaAppDir = options.stellaAppDir;
+    this.stellaDataDir = options.stellaDataDir;
     this.onUnexpectedExit = options.onUnexpectedExit;
   }
 
@@ -306,6 +320,39 @@ export class StellaBrowserBridgeService {
       "connected" in response.data &&
       response.data.connected === true
     );
+  }
+
+  async getExtensionClients(): Promise<BrowserExtensionClientsState> {
+    const response = await this.sendCommand({
+      id: randomUUID(),
+      action: "extension_status",
+    });
+    const connected = parseDaemonExtensionClients(response.data);
+    const record = rememberBrowserExtensionClients(
+      this.stellaDataDir,
+      connected,
+    );
+    return buildBrowserExtensionClientsState(record, connected);
+  }
+
+  async setExtensionRouting(
+    routing: BrowserExtensionRouting,
+  ): Promise<BrowserExtensionClientsState> {
+    saveBrowserExtensionRouting(this.stellaDataDir, routing);
+    await this.applyExtensionRouting();
+    return await this.getExtensionClients();
+  }
+
+  private async applyExtensionRouting() {
+    const { preferredKey, disabledKeys } = readBrowserExtensionRouting(
+      this.stellaDataDir,
+    );
+    await this.sendCommand({
+      id: randomUUID(),
+      action: "extension_routing_set",
+      preferredKey,
+      disabledKeys,
+    }).catch(() => undefined);
   }
 
   async reconnectExtension(): Promise<boolean> {
@@ -580,6 +627,7 @@ export class StellaBrowserBridgeService {
         action: "launch",
         provider: "extension",
       });
+      await this.applyExtensionRouting();
       await Promise.all(
         Array.from(this.agentBackends.values(), (backend) =>
           this.registerAgentExtensionDelegate(backend),

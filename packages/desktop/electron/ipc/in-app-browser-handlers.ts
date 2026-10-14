@@ -1,11 +1,17 @@
 import { ipcMain } from "electron";
 import { z } from "zod";
-import type { BrowserViewLayout } from "@stella/contracts/desktop/browser-view";
+import type {
+  BrowserExtensionClientsState,
+  BrowserExtensionRouting,
+  BrowserViewLayout,
+} from "@stella/contracts/desktop/browser-view";
 import type {
   IpcInvokeChannel,
   IpcInvokeResult,
 } from "@stella/contracts/desktop/ipc-contract";
 import {
+  IPC_BROWSER_EXTENSION_GET_CLIENTS,
+  IPC_BROWSER_EXTENSION_SET_ROUTING,
   IPC_BROWSER_VIEW_CLOSE_TAB,
   IPC_BROWSER_VIEW_CONNECT,
   IPC_BROWSER_VIEW_CREATE_TAB,
@@ -28,6 +34,12 @@ import { handleIpc } from "./typed-ipc.js";
 type RegisterInAppBrowserHandlersOptions = {
   service: InAppBrowserService;
   ensureAgentRouting?: () => Promise<void>;
+  extensionClients: {
+    get: () => Promise<BrowserExtensionClientsState>;
+    setRouting: (
+      routing: BrowserExtensionRouting,
+    ) => Promise<BrowserExtensionClientsState>;
+  };
   assertPrivilegedSender: (
     event: Electron.IpcMainInvokeEvent,
     channel: string,
@@ -79,6 +91,11 @@ const createTabPayloadSchema = z
 const ownerScopePayloadSchema = z
   .object({ ownerId: optionalStringField })
   .catch({});
+
+const extensionRoutingSchema = z.strictObject({
+  preferredKey: z.string().min(1).max(4096).nullable(),
+  disabledKeys: z.array(z.string().min(1).max(4096)).max(64),
+});
 
 const ownerField = (record: Record<string, unknown>) =>
   record.ownerId === undefined
@@ -209,6 +226,13 @@ export const registerInAppBrowserHandlers = (
   });
   register(IPC_BROWSER_VIEW_REQUEST_EXTENSION_CONNECT, () =>
     options.service.requestExtensionConnect(),
+  );
+
+  register(IPC_BROWSER_EXTENSION_GET_CLIENTS, () =>
+    options.extensionClients.get(),
+  );
+  register(IPC_BROWSER_EXTENSION_SET_ROUTING, (payload) =>
+    options.extensionClients.setRouting(extensionRoutingSchema.parse(payload)),
   );
 
   return () => {

@@ -56,6 +56,7 @@ import { t } from "../services/i18n-service.js";
 import { buildAndUploadWebRenderer } from "../services/app-source/web-renderer.js";
 import { assertHeadSigned, signHead } from "../launcher-client.js";
 import { getMainLogger } from "../observability/main-logger.js";
+import { buildBrowserExtensionClientsState, readBrowserExtensionRouting, saveBrowserExtensionRouting, } from "../services/browser-extension-routing-store.js";
 import { openDraftPreview } from "../services/app-source/draft-preview.js";
 import { holdForRelaunch, isLauncherPresent, relaunchApp, reportPrepared, } from "../launcher-client.js";
 import {
@@ -181,6 +182,22 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
     state.inAppBrowserHandlersDispose = registerInAppBrowserHandlers({
         service: state.inAppBrowserService,
         ensureAgentRouting: ensureInAppBrowserAgentRouting,
+        extensionClients: {
+            get: async () => {
+                const resource = state.stellaBrowserBridgeService;
+                if (resource?.getExtensionClients)
+                    return await resource.getExtensionClients();
+                return buildBrowserExtensionClientsState(readBrowserExtensionRouting(state.stellaDataDirPath ?? config.stellaDataDirPath), []);
+            },
+            setRouting: async (routing) => {
+                const resource = state.stellaBrowserBridgeService;
+                if (resource?.setExtensionRouting)
+                    return await resource.setExtensionRouting(routing);
+                const dataDir = state.stellaDataDirPath ?? config.stellaDataDirPath;
+                saveBrowserExtensionRouting(dataDir, routing);
+                return buildBrowserExtensionClientsState(readBrowserExtensionRouting(dataDir), []);
+            },
+        },
         assertPrivilegedSender: (event, channel) => services.externalLinkService.assertPrivilegedSender(event, channel),
     });
     let postReadyNativeServicesScheduled = false;

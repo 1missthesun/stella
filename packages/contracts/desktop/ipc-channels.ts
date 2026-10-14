@@ -331,6 +331,10 @@ export const IPC_BROWSER_VIEW_RELOAD = "browserView:reload" as const;
 export const IPC_BROWSER_VIEW_REQUEST_EXTENSION_CONNECT =
   "browserView:requestExtensionConnect" as const;
 export const IPC_BROWSER_VIEW_STATE = "browserView:state" as const;
+export const IPC_BROWSER_EXTENSION_GET_CLIENTS =
+  "browserExtension:getClients" as const;
+export const IPC_BROWSER_EXTENSION_SET_ROUTING =
+  "browserExtension:setRouting" as const;
 
 export const IPC_HOME_LIST_RECENT_APPS = "home:listRecentApps" as const;
 export const IPC_HOME_GET_ACTIVE_BROWSER_TAB =

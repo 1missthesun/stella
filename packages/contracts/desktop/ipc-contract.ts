@@ -86,7 +86,12 @@ import type {
   UserAskStoredSecureValue,
 } from "../user-ask.js";
 import type { AppSourceActionResult, AppSourceState } from "./app-source.js";
-import type { BrowserViewLayout, BrowserViewState } from "./browser-view.js";
+import type {
+  BrowserExtensionClientsState,
+  BrowserExtensionRouting,
+  BrowserViewLayout,
+  BrowserViewState,
+} from "./browser-view.js";
 import type {
   CompanionActivity,
   CompanionDragMove,
@@ -143,6 +148,8 @@ import {
   IPC_BROWSER_VIEW_HIDE,
   IPC_BROWSER_VIEW_NAVIGATE,
   IPC_BROWSER_VIEW_RELOAD,
+  IPC_BROWSER_EXTENSION_GET_CLIENTS,
+  IPC_BROWSER_EXTENSION_SET_ROUTING,
   IPC_BROWSER_VIEW_REQUEST_EXTENSION_CONNECT,
   IPC_BROWSER_VIEW_SELECT_TAB,
   IPC_BROWSER_VIEW_SET_LAYOUT,
@@ -1286,6 +1293,11 @@ export type IpcInvokeContract = {
     BrowserViewState
   >;
   [IPC_BROWSER_VIEW_REQUEST_EXTENSION_CONNECT]: Invoke<[], BrowserViewState>;
+  [IPC_BROWSER_EXTENSION_GET_CLIENTS]: Invoke<[], BrowserExtensionClientsState>;
+  [IPC_BROWSER_EXTENSION_SET_ROUTING]: Invoke<
+    [payload: BrowserExtensionRouting],
+    BrowserExtensionClientsState
+  >;
 
   [IPC_HOME_LIST_RECENT_APPS]: Invoke<
     [payload: { limit?: number }],

@@ -7,6 +7,7 @@ export const startStellaBrowserBridge = (context) => {
     }
     const service = createStellaBrowserBridgeResource({
         stellaAppDir: context.config.stellaAppDir,
+        stellaDataDir: context.state.stellaDataDirPath ?? context.config.stellaDataDirPath,
         processRuntime: context.state.processRuntime,
         onStatus: (status) => {
             broadcastStellaBrowserBridgeStatus(context, status);

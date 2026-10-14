@@ -11,6 +11,16 @@ import {
   type StellaBrowserBridgeStatus,
 } from "@stella/contracts/browser-bridge-status";
 
+import type {
+  BrowserExtensionClientsState,
+  BrowserExtensionRouting,
+} from "@stella/contracts/desktop/browser-view";
+import {
+  buildBrowserExtensionClientsState,
+  readBrowserExtensionRouting,
+  saveBrowserExtensionRouting,
+} from "../services/browser-extension-routing-store.js";
+
 export type { StellaBrowserBridgeStatus };
 
 export type StellaBrowserBridgeResource = {
@@ -19,6 +29,10 @@ export type StellaBrowserBridgeResource = {
   getStatus: () => StellaBrowserBridgeStatus;
   getExtensionStatus: () => Promise<boolean>;
   reconnectExtension: () => Promise<boolean>;
+  getExtensionClients: () => Promise<BrowserExtensionClientsState>;
+  setExtensionRouting: (
+    routing: BrowserExtensionRouting,
+  ) => Promise<BrowserExtensionClientsState>;
   connectCdp: (cdpUrl: string) => Promise<void>;
   connectAgentCdp: (
     capability: StellaBrowserAgentCapability,
@@ -28,6 +42,7 @@ export type StellaBrowserBridgeResource = {
 
 export const createStellaBrowserBridgeResource = (options: {
   stellaAppDir: string;
+  stellaDataDir: string;
   processRuntime: ProcessRuntime;
   onStatus: (status: StellaBrowserBridgeStatus) => void;
 }): StellaBrowserBridgeResource => {
@@ -41,6 +56,12 @@ export const createStellaBrowserBridgeResource = (options: {
     currentStatus = status;
     options.onStatus(currentStatus);
   };
+
+  const storedClients = () =>
+    buildBrowserExtensionClientsState(
+      readBrowserExtensionRouting(options.stellaDataDir),
+      [],
+    );
 
   const classifyFailure = (error: string): StellaBrowserBridgeFailureReason => {
     const normalized = error.toLowerCase();
@@ -69,6 +90,8 @@ export const createStellaBrowserBridgeResource = (options: {
       | "getStatus"
       | "getExtensionStatus"
       | "reconnectExtension"
+      | "getExtensionClients"
+      | "setExtensionRouting"
       | "connectCdp"
       | "connectAgentCdp"
     >
@@ -78,6 +101,7 @@ export const createStellaBrowserBridgeResource = (options: {
       create: ({ onUnexpectedExit }) =>
         new StellaBrowserBridgeService({
           stellaAppDir: options.stellaAppDir,
+          stellaDataDir: options.stellaDataDir,
           onUnexpectedExit,
         }),
       start: (s) => s.start(),
@@ -131,6 +155,25 @@ export const createStellaBrowserBridgeResource = (options: {
         getExtensionStatus: async () =>
           getService()?.getExtensionStatus() ?? false,
         reconnectExtension: async () => requireService().reconnectExtension(),
+        getExtensionClients: async () => {
+          const service = getService();
+          if (service && currentStatus.state === "connected") {
+            try {
+              return await service.getExtensionClients();
+            } catch {
+              return storedClients();
+            }
+          }
+          return storedClients();
+        },
+        setExtensionRouting: async (routing: BrowserExtensionRouting) => {
+          const service = getService();
+          if (service && currentStatus.state === "connected") {
+            return await service.setExtensionRouting(routing);
+          }
+          saveBrowserExtensionRouting(options.stellaDataDir, routing);
+          return storedClients();
+        },
         connectCdp: async (cdpUrl: string) =>
           requireService().connectCdp(cdpUrl),
         connectAgentCdp: async (

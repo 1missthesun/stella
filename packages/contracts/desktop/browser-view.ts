@@ -49,3 +49,30 @@ export type BrowserViewLayout = {
   pageBounds: BrowserViewBounds;
   surfaceBounds: BrowserViewBounds;
 };
+
+export type BrowserExtensionClientStatus =
+  | "in_use"
+  | "connected"
+  | "not_connected"
+  | "off";
+
+export type BrowserExtensionClient = {
+  key: string;
+  browser: string;
+  profile: string | null;
+  email: string | null;
+  connected: boolean;
+  enabled: boolean;
+  inUse: boolean;
+  status: BrowserExtensionClientStatus;
+  lastSeenAtMs: number;
+};
+
+export type BrowserExtensionRouting = {
+  preferredKey: string | null;
+  disabledKeys: string[];
+};
+
+export type BrowserExtensionClientsState = BrowserExtensionRouting & {
+  clients: BrowserExtensionClient[];
+};

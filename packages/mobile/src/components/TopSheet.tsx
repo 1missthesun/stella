@@ -131,16 +131,13 @@ export function TopSheet({
   const awaitingOpen = useRef(visible);
   const shown = useRef(false);
 
-  const startOpen = () => {
-    awaitingOpen.current = false;
-    progress.value = withTiming(1, OPEN_TIMING);
-  };
-  const maybeStartOpen = () => {
+  const maybeStartOpen = useCallback(() => {
     if (awaitingOpen.current && shown.current && sheetHeight.current !== null) {
       hideDistance.value = sheetHeight.current + SHADOW_CLEARANCE;
-      startOpen();
+      awaitingOpen.current = false;
+      progress.value = withTiming(1, OPEN_TIMING);
     }
-  };
+  }, [hideDistance, progress]);
 
   useEffect(() => {
     if (!overlay || !visible) return;
@@ -156,17 +153,9 @@ export function TopSheet({
       dragY.value = 0;
       awaitingOpen.current = true;
       if (overlay) shown.current = true;
-      if (rendered) {
-        maybeStartOpen();
-        return;
-      }
       setRendered(true);
-      if (overlay) return;
-      const fallback = setTimeout(() => {
-        shown.current = true;
-        maybeStartOpen();
-      }, SHOW_FALLBACK_MS);
-      return () => clearTimeout(fallback);
+      maybeStartOpen();
+      return;
     }
     awaitingOpen.current = false;
     if (!rendered) return;
@@ -180,9 +169,16 @@ export function TopSheet({
     progress.value = withTiming(0, CLOSE_TIMING, (finished) => {
       if (finished) runOnJS(setRendered)(false);
     });
-    // Only visibility drives the slide; the shared values are stable.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible]);
+  }, [dragY, hideDistance, maybeStartOpen, overlay, progress, rendered, visible]);
+
+  useEffect(() => {
+    if (!visible || !rendered || overlay) return;
+    const fallback = setTimeout(() => {
+      shown.current = true;
+      maybeStartOpen();
+    }, SHOW_FALLBACK_MS);
+    return () => clearTimeout(fallback);
+  }, [maybeStartOpen, overlay, rendered, visible]);
 
   useEffect(() => {
     if (!rendered) {

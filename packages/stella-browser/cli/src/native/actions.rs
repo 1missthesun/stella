@@ -44,6 +44,7 @@ use crate::connection;
 pub struct PendingConfirmation {
     pub action: String,
     pub cmd: Value,
+    confirmed: Vec<String>,
 }
 
 // The command vocabulary is contract-checked against
@@ -1480,6 +1481,13 @@ impl DaemonState {
 }
 
 pub async fn execute_command(cmd: &Value, state: &mut DaemonState) -> Value {
+    execute_authorized(cmd, state, &[]).await
+}
+
+/// `confirmed` lists the actions of this exact command the owner already
+/// confirmed; policy and confirm-actions stay in force for everything else.
+async fn execute_authorized(cmd: &Value, state: &mut DaemonState, confirmed: &[String]) -> Value {
+    let is_confirmed = |name: &str| confirmed.iter().any(|done| done == name);
     let action = cmd.get("action").and_then(|v| v.as_str()).unwrap_or("");
     let id = cmd
         .get("id")
@@ -1637,10 +1645,12 @@ pub async fn execute_command(cmd: &Value, state: &mut DaemonState) -> Value {
                         &format!("Action '{}' denied by policy: {}", policy_action, reason),
                     );
                 }
+                PolicyResult::RequiresConfirmation if is_confirmed(policy_action) => {}
                 PolicyResult::RequiresConfirmation => {
                     state.pending_confirmation = Some(PendingConfirmation {
                         action: (*policy_action).to_string(),
                         cmd: cmd.clone(),
+                        confirmed: confirmed.to_vec(),
                     });
                     return json!({
                         "id": id,
@@ -1655,10 +1665,11 @@ pub async fn execute_command(cmd: &Value, state: &mut DaemonState) -> Value {
     if action != "confirm" && action != "deny" {
         if let Some(ref ca) = state.confirm_actions {
             for confirm_action in &actions_to_authorize {
-                if ca.requires_confirmation(confirm_action) {
+                if ca.requires_confirmation(confirm_action) && !is_confirmed(confirm_action) {
                     state.pending_confirmation = Some(PendingConfirmation {
                         action: (*confirm_action).to_string(),
                         cmd: cmd.clone(),
+                        confirmed: confirmed.to_vec(),
                     });
                     return json!({
                         "id": id,
@@ -8472,27 +8483,31 @@ async fn handle_auth_login(cmd: &Value, state: &mut DaemonState) -> Result<Value
     Ok(json!({ "loggedIn": true, "name": name }))
 }
 
-async fn handle_confirm(_cmd: &Value, state: &mut DaemonState) -> Result<Value, String> {
+fn take_pending_confirmation(
+    cmd: &Value,
+    state: &mut DaemonState,
+) -> Result<PendingConfirmation, String> {
     let pending = state
         .pending_confirmation
         .take()
         .ok_or("No pending confirmation")?;
+    if command_owner_id(&pending.cmd) != command_owner_id(cmd) {
+        state.pending_confirmation = Some(pending);
+        return Err("The pending confirmation belongs to another owner".to_string());
+    }
+    Ok(pending)
+}
 
-    // Temporarily remove policy and confirm_actions to avoid re-triggering confirmation
-    let policy = state.policy.take();
-    let confirm_actions = state.confirm_actions.take();
-    let result = Box::pin(execute_command(&pending.cmd, state)).await;
-    state.policy = policy;
-    state.confirm_actions = confirm_actions;
-
+async fn handle_confirm(cmd: &Value, state: &mut DaemonState) -> Result<Value, String> {
+    let pending = take_pending_confirmation(cmd, state)?;
+    let mut confirmed = pending.confirmed;
+    confirmed.push(pending.action.clone());
+    let result = Box::pin(execute_authorized(&pending.cmd, state, &confirmed)).await;
     Ok(json!({ "confirmed": true, "action": pending.action, "result": result }))
 }
 
-async fn handle_deny(_cmd: &Value, state: &mut DaemonState) -> Result<Value, String> {
-    let pending = state
-        .pending_confirmation
-        .take()
-        .ok_or("No pending confirmation")?;
+async fn handle_deny(cmd: &Value, state: &mut DaemonState) -> Result<Value, String> {
+    let pending = take_pending_confirmation(cmd, state)?;
 
     Ok(json!({ "denied": true, "action": pending.action }))
 }

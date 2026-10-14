@@ -1,4 +1,5 @@
 import fs from "fs";
+import { randomBytes } from "node:crypto";
 import type { Socket } from "node:net";
 import path from "path";
 import tailwindcss from "@tailwindcss/vite";
@@ -139,22 +140,17 @@ function pdfWorkerAsset(): Plugin {
   };
 }
 
-/**
- * Vite injects an inline React Refresh init script into `index.html`
- * during dev (`<script type="module">injectIntoGlobalHook(window);…</script>`).
- * Our production CSP doesn't allow `'unsafe-inline'`, so the inline
- * script gets blocked → React Refresh fails to register and HMR breaks
- * for component state. Strip the `<meta http-equiv="Content-Security-Policy">`
- * tag in dev only; prod builds keep the strict CSP intact.
- */
-function devCspRelax(): Plugin {
+const DEV_CSP_NONCE = randomBytes(16).toString("base64");
+
+function devCspNonce(): Plugin {
   return {
-    name: "dev-csp-relax",
+    name: "dev-csp-nonce",
     apply: "serve",
+    config: () => ({ html: { cspNonce: DEV_CSP_NONCE } }),
     transformIndexHtml(html) {
       return html.replace(
-        /<meta\s+http-equiv=["']Content-Security-Policy["'][^>]*>\s*/i,
-        "",
+        /(http-equiv=["']Content-Security-Policy["'][\s\S]*?script-src)/i,
+        `$1 'nonce-${DEV_CSP_NONCE}'`,
       );
     },
   };
@@ -243,7 +239,7 @@ export default defineConfig({
     TanStackRouterVite(ROUTER_CONFIG),
     react(),
     tailwindcss(),
-    devCspRelax(),
+    devCspNonce(),
     backendPreconnectHint(),
     bunHttpServerCloseFix(),
     uiStateSharedStore(),

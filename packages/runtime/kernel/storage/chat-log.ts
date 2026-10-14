@@ -1,3 +1,4 @@
+import { parseChannelEnvelope } from "@stella/contracts/local-chat";
 import { isUiHiddenChatMessagePayload } from "@stella/contracts/chat-event-visibility";
 import {
   type ReplyCounts,
@@ -724,7 +725,8 @@ export class ChatLog {
     const eventId =
       asTrimmedString(args.eventId) || `local-${generateLocalId()}`;
     const payload = asObject(args.payload) ?? undefined;
-    const channelEnvelope = asObject(args.channelEnvelope) ?? undefined;
+    const channelEnvelope =
+      parseChannelEnvelope(args.channelEnvelope) ?? undefined;
     const deviceId = asTrimmedString(args.deviceId) || undefined;
     const requestId = asTrimmedString(args.requestId) || undefined;
     const targetDeviceId = asTrimmedString(args.targetDeviceId) || undefined;
@@ -863,7 +865,9 @@ export class ChatLog {
   }
 
   deserializeEventRow(row: EntryRow): LocalChatEventRecord {
-    const envelope = parseJsonRecord(row.channelEnvelopeJson);
+    const envelope = parseChannelEnvelope(
+      parseJsonRecord(row.channelEnvelopeJson),
+    );
     const payload = parseJsonRecord(row.payloadJson);
     return {
       _id: row._id,

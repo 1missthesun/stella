@@ -1,10 +1,5 @@
 import type { IpcMainEvent, IpcMainInvokeEvent } from "electron";
-import type {
-  EventRecord,
-  LocalChatLineageWindow,
-  LocalChatMessageWindow,
-  LocalModelUsagePage,
-} from "@stella/contracts/local-chat";
+import type { LocalModelUsagePage } from "@stella/contracts/local-chat";
 import type { ConversationFocusRoot } from "@stella/contracts/reply-refs";
 import {
   IPC_CLOUD_CONVERSATION_CACHE_ACTIVATE_AUTHORITY,
@@ -66,12 +61,6 @@ const withLocalChatClient = async <T>(
   return await action(options.localChatHistoryService);
 };
 
-/**
- * Rows from the runtime store type `channelEnvelope` as the raw JSON it was
- * persisted from. It is only ever written from a `ChannelEnvelope`, and the
- * contract hands rows to the renderer as the `@stella/contracts/local-chat`
- * row types (the `as` casts on the row-listing handlers below).
- */
 export const registerLocalChatHandlers = (
   options: LocalChatHandlersOptions,
 ) => {
@@ -169,7 +158,7 @@ export const registerLocalChatHandlers = (
             conversationId: payload?.conversationId ?? "",
             maxVisibleMessages: payload?.maxVisibleMessages,
           }),
-      )) as LocalChatMessageWindow,
+      )),
   );
 
   handleIpc(
@@ -197,7 +186,7 @@ export const registerLocalChatHandlers = (
             beforeId: payload?.beforeId ?? "",
             maxVisibleMessages: payload?.maxVisibleMessages,
           }),
-      )) as LocalChatMessageWindow,
+      )),
   );
 
   handleIpc(
@@ -227,7 +216,7 @@ export const registerLocalChatHandlers = (
             afterSequence: payload?.afterSequence,
             maxVisibleMessages: payload?.maxVisibleMessages,
           }),
-      )) as LocalChatMessageWindow,
+      )),
   );
 
   handleIpc(
@@ -255,7 +244,7 @@ export const registerLocalChatHandlers = (
                 : undefined,
             beforeId: payload?.beforeId,
           }),
-      )) as { activities: EventRecord[] },
+      )),
   );
 
   handleIpc(
@@ -289,7 +278,7 @@ export const registerLocalChatHandlers = (
               : {}),
           });
         },
-      )) as LocalChatLineageWindow,
+      )),
   );
 
   handleIpc(
@@ -351,7 +340,7 @@ export const registerLocalChatHandlers = (
                 : undefined,
             beforeId: payload?.beforeId,
           }),
-      )) as { files: EventRecord[] },
+      )),
   );
 
 };

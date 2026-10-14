@@ -186,6 +186,90 @@ export type ChannelEnvelope = {
   providerPayload?: unknown;
 };
 
+const CHANNEL_ENVELOPE_KINDS: ReadonlySet<ChannelEnvelope["kind"]> = new Set([
+  "message",
+  "reaction",
+  "edit",
+  "delete",
+  "system",
+]);
+
+const recordOf = (value: unknown): Record<string, unknown> | null =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+
+const optionalString = (value: unknown): string | undefined =>
+  typeof value === "string" ? value : undefined;
+
+const optionalNumber = (value: unknown): number | undefined =>
+  typeof value === "number" && Number.isFinite(value) ? value : undefined;
+
+const parseAttachment = (value: unknown): Attachment | null => {
+  const record = recordOf(value);
+  if (!record) return null;
+  const attachment: Attachment = {};
+  for (const key of ["id", "url", "mimeType", "name", "kind", "path"] as const) {
+    const text = optionalString(record[key]);
+    if (text !== undefined) attachment[key] = text;
+  }
+  const size = optionalNumber(record.size);
+  if (size !== undefined) attachment.size = size;
+  if (record.providerMeta !== undefined) {
+    attachment.providerMeta = record.providerMeta;
+  }
+  return attachment;
+};
+
+const parseReaction = (value: unknown): ChannelReaction | null => {
+  const record = recordOf(value);
+  if (!record || typeof record.emoji !== "string") return null;
+  if (record.action !== "add" && record.action !== "remove") return null;
+  const targetMessageId = optionalString(record.targetMessageId);
+  return {
+    emoji: record.emoji,
+    action: record.action,
+    ...(targetMessageId !== undefined ? { targetMessageId } : {}),
+  };
+};
+
+export const parseChannelEnvelope = (
+  value: unknown,
+): ChannelEnvelope | null => {
+  const record = recordOf(value);
+  if (!record || typeof record.provider !== "string") return null;
+  const kind = record.kind as ChannelEnvelope["kind"];
+  if (!CHANNEL_ENVELOPE_KINDS.has(kind)) return null;
+  const envelope: ChannelEnvelope = { provider: record.provider, kind };
+  for (const key of [
+    "chatType",
+    "externalUserId",
+    "externalChatId",
+    "externalMessageId",
+    "threadId",
+    "text",
+  ] as const) {
+    const text = optionalString(record[key]);
+    if (text !== undefined) envelope[key] = text;
+  }
+  if (Array.isArray(record.attachments)) {
+    envelope.attachments = record.attachments
+      .map(parseAttachment)
+      .filter((attachment): attachment is Attachment => attachment !== null);
+  }
+  if (Array.isArray(record.reactions)) {
+    envelope.reactions = record.reactions
+      .map(parseReaction)
+      .filter((reaction): reaction is ChannelReaction => reaction !== null);
+  }
+  const sourceTimestamp = optionalNumber(record.sourceTimestamp);
+  if (sourceTimestamp !== undefined) envelope.sourceTimestamp = sourceTimestamp;
+  if (record.providerPayload !== undefined) {
+    envelope.providerPayload = record.providerPayload;
+  }
+  return envelope;
+};
+
 export type MessagePayload = {
   text?: string;
   contextText?: string;

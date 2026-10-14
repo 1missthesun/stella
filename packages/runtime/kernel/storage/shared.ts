@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import type { ChannelEnvelope } from "@stella/contracts/local-chat";
 import type {
   ImageContent,
 } from "@earendil-works/pi-ai";
@@ -14,7 +15,7 @@ export type LocalChatEventRecord = {
   requestId?: string;
   targetDeviceId?: string;
   payload?: Record<string, unknown>;
-  channelEnvelope?: Record<string, unknown>;
+  channelEnvelope?: ChannelEnvelope;
 };
 
 export type LocalChatMessageRecord = LocalChatEventRecord & {

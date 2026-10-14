@@ -81,6 +81,7 @@ const bundleConfigFiles = [
   "packages/desktop/package.json",
   "packages/desktop/tsconfig.electron.json",
   "packages/desktop/tsconfig.preload.json",
+  "packages/desktop/tsconfig.browser-pages.json",
   "packages/runtime/package.json",
   ...desktopEnvFiles("development").map((name) => `packages/desktop-ui/${name}`),
 ];
@@ -122,6 +123,42 @@ const pruneDependencyPackageMetadataPlugin = {
   },
 };
 
+const BROWSER_SCRIPT_PREFIX = "browser-script:";
+
+const browserScriptPlugin = {
+  name: "browser-script",
+  setup(build) {
+    build.onResolve({ filter: /^browser-script:/ }, (args) => ({
+      path: path.resolve(
+        args.resolveDir,
+        args.path.slice(BROWSER_SCRIPT_PREFIX.length),
+      ),
+      namespace: "browser-script",
+    }));
+    build.onLoad(
+      { filter: /.*/, namespace: "browser-script" },
+      async (args) => {
+        const result = await runEsbuildBuild({
+          absWorkingDir: repoRootDir,
+          entryPoints: [args.path],
+          bundle: true,
+          write: false,
+          format: "iife",
+          platform: "browser",
+          target: "es2022",
+          charset: "ascii",
+          logLevel: "warning",
+          tsconfig: path.join("packages", "desktop", "tsconfig.browser-pages.json"),
+        });
+        return {
+          contents: `export default ${JSON.stringify(result.outputFiles[0].text)};`,
+          loader: "js",
+        };
+      },
+    );
+  },
+};
+
 const buildOptions = [
   {
     absWorkingDir: repoRootDir,
@@ -147,7 +184,7 @@ const buildOptions = [
     format: "esm",
     metafile: true,
     logLevel: "warning",
-    plugins: [pruneDependencyPackageMetadataPlugin],
+    plugins: [pruneDependencyPackageMetadataPlugin, browserScriptPlugin],
     outdir: path.join("packages", "desktop", outdir),
     platform: "node",
     target: nodeTarget,

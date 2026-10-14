@@ -10,15 +10,16 @@ import { APP_RELAUNCHING_EVENT } from "@stella/contracts/desktop/app-source";
 import { springEasing } from "@stella/contracts/desktop/spring";
 import { STELLA_STAR_PATH } from "@stella/contracts/stella-mark";
 import { diffRegions, type LiveRect, type Rect } from "./picture-diff.js";
-import {
-  TRANSITION_PAGE_URL,
-  type FocusInMotion,
-  type FocusPullMotion,
-  type FrostMotion,
-  type HoldOptions,
-  type RevealItem,
-  type RevealReport,
-} from "./update-transition-page.js";
+import { TRANSITION_PAGE_URL } from "./update-transition-page.js";
+import type {
+  FocusInMotion,
+  FocusPullMotion,
+  FrostMotion,
+  HoldOptions,
+  MotionTiming,
+  RevealItem,
+  UpdateTransitionApi,
+} from "./update-transition-protocol.js";
 
 export type CoveredWindow = {
   reveal<T>(swap: () => Promise<T>): Promise<T>;
@@ -105,11 +106,14 @@ const edges = (rect: Rect, feather: number, vw: number, vh: number): RevealItem[
 
 const VISIBLE_REST = 0.01;
 
-const spring = (duration: number, bounce: number, extra: KeyframeTiming = {}) => {
+const spring = (
+  duration: number,
+  bounce: number,
+  extra: Pick<MotionTiming, "delay" | "fill"> = {},
+): MotionTiming => {
   const { easing, ms } = springEasing(duration, bounce, VISIBLE_REST);
   return { duration: ms, easing, ...extra };
 };
-type KeyframeTiming = { delay?: number; fill?: string };
 
 const focusPull = (): FocusPullMotion => ({
   out: {
@@ -334,7 +338,7 @@ export class UpdateTransition {
           const compared = performance.now();
           const letThrough = this.letInputThrough(view, win);
           const report = items.length
-            ? ((await this.call(view, "reveal", items, whole, focusPull()).finally(letThrough)) as RevealReport)
+            ? await this.call(view, "reveal", items, whole, focusPull()).finally(letThrough)
             : null;
           if (!items.length) letThrough();
           this.options.log("app-source.transition", {
@@ -383,12 +387,9 @@ export class UpdateTransition {
       step("capture");
       await this.call(view, "cover", jpegUrl(before), []);
       step("show");
-      const { frosted, dark } = (await this.call(view, "frost", frost())) as {
-        frosted: string;
-        dark: boolean;
-      };
+      const { frosted, dark } = await this.call(view, "frost", frost());
       step("frost");
-      const mark = (await this.call(view, "renderMark", MARK_SVG, dark, HOLD_MARK_PX)) as string;
+      const mark = await this.call(view, "renderMark", MARK_SVG, dark, HOLD_MARK_PX);
       const hold: UpdateHold = {
         image: path.join(this.options.holdDir, HOLD_IMAGE),
         mark: path.join(this.options.holdDir, HOLD_MARK),
@@ -613,7 +614,11 @@ export class UpdateTransition {
     await timeout(contents.executeJavaScript(PAINTED_SCRIPT), 1_000, "Waiting for paint").catch(() => {});
   }
 
-  private call(view: WebContentsView, method: string, ...args: unknown[]) {
+  private call<Method extends keyof UpdateTransitionApi>(
+    view: WebContentsView,
+    method: Method,
+    ...args: Parameters<UpdateTransitionApi[Method]>
+  ): Promise<Awaited<ReturnType<UpdateTransitionApi[Method]>>> {
     const script = `window.__updateTransition.${method}(...${JSON.stringify(args)})`;
     return timeout(view.webContents.executeJavaScript(script), STEP_TIMEOUT_MS, `Transition ${method}`);
   }

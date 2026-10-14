@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Pressable,
   StyleSheet,
@@ -26,19 +26,7 @@ export function AssistantTextSelection({
   onDismiss: () => void;
 }) {
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const inputRef = useRef<TextInput>(null);
   const [selection, setSelection] = useState({ start: 0, end: text.length });
-  // A tapped action button blurs the TextInput first; guard the blur-dismiss so
-  // the button's own handler runs (and owns the dismiss) instead of racing it.
-  const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const cancelPendingDismiss = () => {
-    if (dismissTimerRef.current !== null) {
-      clearTimeout(dismissTimerRef.current);
-      dismissTimerRef.current = null;
-    }
-  };
-
   const selectedText = () => {
     const slice = text.slice(selection.start, selection.end);
     return slice.length > 0 ? slice : text;
@@ -51,7 +39,6 @@ export function AssistantTextSelection({
   };
 
   const handleCopy = () => {
-    cancelPendingDismiss();
     void Clipboard.setStringAsync(selectedText()).then((ok) => {
       if (ok) notifySuccess();
     });
@@ -59,17 +46,9 @@ export function AssistantTextSelection({
   };
 
   const handleAsk = () => {
-    cancelPendingDismiss();
     tapLight();
     onAskStella?.(selectedText());
     onDismiss();
-  };
-
-  const scheduleDismiss = () => {
-    cancelPendingDismiss();
-    // Blurred by a tap elsewhere / scroll — leave selection mode, unless an
-    // action button claimed the blur (it cancels this first).
-    dismissTimerRef.current = setTimeout(onDismiss, 150);
   };
 
   return (
@@ -88,7 +67,6 @@ export function AssistantTextSelection({
         <ToolbarButton label="Copy" onPress={handleCopy} styles={styles} />
       </View>
       <TextInput
-        ref={inputRef}
         value={text}
         // Read-only: never mutate the reply. `editable` is required for
         // selection handles on iOS, so edits are neutralised by the fixed
@@ -103,7 +81,6 @@ export function AssistantTextSelection({
         autoFocus
         selection={selection}
         onSelectionChange={handleSelectionChange}
-        onBlur={scheduleDismiss}
         style={styles.body}
         maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
         accessibilityLabel="Assistant message, selecting text"

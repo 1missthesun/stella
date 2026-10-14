@@ -1,9 +1,9 @@
 import { promises as fs } from "fs";
 import path from "path";
 import os from "os";
-import { pathToFileURL } from "node:url";
 import { Effect } from "effect";
 import { runDiscovery, tryDiscovery, tryDiscoverySync } from "./effect-io.js";
+import { openSqliteSnapshot } from "./sqlite-snapshot.js";
 
 const log = (...args: unknown[]) => console.error("[music-library]", ...args);
 
@@ -183,13 +183,9 @@ const collectFromAppleMusicDbEffect = (
 ): Effect.Effect<MusicLibrarySignals, unknown> =>
   Effect.scoped(
     Effect.gen(function* () {
-      const { Database } = yield* tryDiscovery(() => import("bun:sqlite"));
-      // Read the live DB directly via an immutable URI: skips locking and reads
-      // the main file without its WAL sidecars. Best-effort one-time snapshot.
-      const uri = `${pathToFileURL(dbPath).href}?immutable=1`;
       const db = yield* Effect.acquireRelease(
-        tryDiscoverySync(
-          () => new Database(uri, { readonly: true }) as SqliteDatabase,
+        tryDiscovery(
+          () => openSqliteSnapshot(dbPath) as Promise<SqliteDatabase>,
         ),
         (openDb) => Effect.sync(() => openDb.close()),
       );

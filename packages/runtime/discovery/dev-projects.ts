@@ -2,7 +2,6 @@ import { promises as fs } from "fs";
 import path from "path";
 import os from "os";
 import { exec, execFile } from "child_process";
-import { pathToFileURL } from "node:url";
 import { collectAssistantProjects } from "./assistant-projects.js";
 import { Effect } from "effect";
 import {
@@ -12,6 +11,7 @@ import {
 } from "./effect-io.js";
 
 import type { DevProject } from "./types.js";
+import { openSqliteSnapshot } from "./sqlite-snapshot.js";
 
 const log = (...args: unknown[]) => console.error("[dev-projects]", ...args);
 
@@ -490,20 +490,16 @@ const collectFromEditorsEffect = (
 ): Effect.Effect<number, unknown> =>
   Effect.gen(function* () {
     let count = 0;
-    const { Database } = yield* tryDiscovery(() => import("bun:sqlite"));
 
     for (const config of getEditorConfigs()) {
       if (!(yield* tryDiscovery(() => fileExists(config.dbPath)))) continue;
 
       yield* Effect.scoped(
         Effect.gen(function* () {
-          // Read the live DB directly via an immutable URI: editors hold a WAL
-          // lock on state.vscdb while running; immutable skips locking.
           const db = yield* Effect.acquireRelease(
-            tryDiscoverySync(() => {
-              const uri = `${pathToFileURL(config.dbPath).href}?immutable=1`;
-              return new Database(uri, { readonly: true }) as SqliteDatabase;
-            }),
+            tryDiscovery(
+              () => openSqliteSnapshot(config.dbPath) as Promise<SqliteDatabase>,
+            ),
             (openDb) => Effect.sync(() => openDb.close()),
           );
 

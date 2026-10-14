@@ -2,7 +2,6 @@ import { promises as fs } from "fs";
 import path from "path";
 import os from "os";
 import { exec } from "child_process";
-import { pathToFileURL } from "node:url";
 import { z } from "zod";
 import { Effect } from "effect";
 import { mainMemoryPath } from "../kernel/memory/memory-layout.js";
@@ -22,6 +21,7 @@ import type {
   ClusterKeyword,
   SearchQuery,
 } from "@stella/contracts";
+import { openSqliteSnapshot } from "./sqlite-snapshot.js";
 
 export type {
   BrowserType,
@@ -40,14 +40,8 @@ type SqliteDatabase = {
   close(): void;
 };
 
-const openDatabase = async (dbPath: string): Promise<SqliteDatabase> => {
-  const { Database } = await import("bun:sqlite");
-  // Read the live DB directly via an immutable URI: skips locking (no
-  // SQLITE_BUSY while the browser runs) and reads the main file without its
-  // WAL sidecars (no SQLITE_CANTOPEN). Best-effort one-time snapshot.
-  const uri = `${pathToFileURL(dbPath).href}?immutable=1`;
-  return new Database(uri, { readonly: true }) as SqliteDatabase;
-};
+const openDatabase = (dbPath: string): Promise<SqliteDatabase> =>
+  openSqliteSnapshot(dbPath);
 
 const log = (...args: unknown[]) => console.error("[browser-data]", ...args);
 

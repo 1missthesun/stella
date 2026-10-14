@@ -1,7 +1,6 @@
 import { promises as fs } from "fs";
 import path from "path";
 import os from "os";
-import { pathToFileURL } from "node:url";
 import { Effect } from "effect";
 import {
   acquireCloseable,
@@ -17,6 +16,7 @@ import type {
   NoteFolder,
   CalendarSummary,
 } from "./discovery-types.js";
+import { openSqliteSnapshot } from "./sqlite-snapshot.js";
 
 const log = (...args: unknown[]) => console.error("[messages-notes]", ...args);
 
@@ -27,13 +27,8 @@ type SqliteDatabase = {
   prepare(sql: string): { all(...params: unknown[]): unknown[] };
   close(): void;
 };
-const openDatabase = async (dbPath: string): Promise<SqliteDatabase> => {
-  const { Database } = await import("bun:sqlite");
-  // Read the live DB directly via an immutable URI: skips locking and reads
-  // the main file without its WAL sidecars. Best-effort one-time snapshot.
-  const uri = `${pathToFileURL(dbPath).href}?immutable=1`;
-  return new Database(uri, { readonly: true }) as SqliteDatabase;
-};
+const openDatabase = (dbPath: string): Promise<SqliteDatabase> =>
+  openSqliteSnapshot(dbPath);
 
 const collectIMessageMetadataEffect: Effect.Effect<{
   contacts: ContactFrequency[];

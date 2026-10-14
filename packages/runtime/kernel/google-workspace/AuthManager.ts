@@ -57,9 +57,7 @@ export class AuthManager {
     OAuth2Client,
     unknown
   > {
-    // eslint-disable-next-line @typescript-eslint/no-this-alias
-    const self = this;
-    return Effect.gen(function* () {
+    return Effect.gen({ self: this }, function* () {
       const stellaAppDir = yield* tryGoogleWorkspaceSync(
         stellaAppDirFromProjectRoot,
       );
@@ -71,7 +69,7 @@ export class AuthManager {
       }
 
       const savedScopes = new Set(payload.scopes ?? []);
-      const missingScopes = self.scopes.filter(
+      const missingScopes = this.scopes.filter(
         (scope) => !savedScopes.has(scope),
       );
       if (missingScopes.length > 0) {
@@ -81,7 +79,7 @@ export class AuthManager {
         return yield* Effect.fail(new GoogleWorkspaceReconnectRequiredError());
       }
 
-      const client = new OAuth2Client({ clientId: self.clientId });
+      const client = new OAuth2Client({ clientId: this.clientId });
       client.setCredentials({
         access_token: payload.accessToken,
         refresh_token: payload.refreshToken,
@@ -100,14 +98,14 @@ export class AuthManager {
             payload.refreshToken ??
             undefined,
           expiresAt: tokens.expiry_date ?? current?.expiresAt,
-          clientId: self.clientId,
+          clientId: this.clientId,
           tokenEndpoint: TOKEN_ENDPOINT,
           scopes: tokens.scope
             ? tokens.scope.split(/\s+/u).filter(Boolean)
             : (current?.scopes ?? payload.scopes),
         });
       });
-      self.client = client;
+      this.client = client;
       return client;
     });
   }
@@ -117,11 +115,9 @@ export class AuthManager {
   }
 
   public clearAuth(): Promise<void> {
-    // eslint-disable-next-line @typescript-eslint/no-this-alias
-    const self = this;
     return runGoogleWorkspaceEffect(
-      Effect.gen(function* () {
-        self.client = null;
+      Effect.gen({ self: this }, function* () {
+        this.client = null;
         const stellaAppDir = yield* tryGoogleWorkspaceSync(
           stellaAppDirFromProjectRoot,
         );
@@ -133,12 +129,10 @@ export class AuthManager {
   }
 
   public refreshToken(): Promise<void> {
-    // eslint-disable-next-line @typescript-eslint/no-this-alias
-    const self = this;
     return runGoogleWorkspaceEffect(
-      Effect.gen(function* () {
-        self.onStatusUpdate?.("Refreshing Google Workspace connection...");
-        const client = yield* self.getAuthenticatedClientEffect();
+      Effect.gen({ self: this }, function* () {
+        this.onStatusUpdate?.("Refreshing Google Workspace connection...");
+        const client = yield* this.getAuthenticatedClientEffect();
         const response = yield* tryGoogleWorkspaceOp(() =>
           client.refreshAccessToken(),
         );
@@ -153,11 +147,11 @@ export class AuthManager {
               client.credentials.refresh_token ??
               undefined,
             expiresAt: response.credentials.expiry_date ?? undefined,
-            clientId: self.clientId,
+            clientId: this.clientId,
             tokenEndpoint: TOKEN_ENDPOINT,
             scopes:
               response.credentials.scope?.split(/\s+/u).filter(Boolean) ??
-              self.scopes,
+              this.scopes,
           }),
         );
       }),

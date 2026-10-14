@@ -1,10 +1,15 @@
 import fs from "node:fs/promises";
-import type { Dirent } from "node:fs";
+import { watch, type Dirent, type FSWatcher } from "node:fs";
 import type { FileHandle } from "node:fs/promises";
 import path from "node:path";
-import type { IpcMainEvent, IpcMainInvokeEvent } from "electron";
+import {
+  BrowserWindow,
+  type IpcMainEvent,
+  type IpcMainInvokeEvent,
+} from "electron";
 import {
   IPC_DISPLAY_CANVAS_FILE_URL,
+  IPC_DISPLAY_CANVAS_HTML_CHANGED,
   IPC_DISPLAY_CANVAS_HTML_URL,
   IPC_DISPLAY_LIST_CANVAS_HTML,
   IPC_DISPLAY_LIST_FOLDER,
@@ -360,6 +365,27 @@ export const registerDisplayHandlers = (options: DisplayHandlersOptions) => {
           getDeviceId: () => options.getDeviceId?.() ?? null,
         }
       : null;
+
+  let canvasHtmlWatcher: { dir: string; watcher: FSWatcher } | null = null;
+  const watchCanvasHtmlDir = async (htmlDir: string) => {
+    if (canvasHtmlWatcher?.dir === htmlDir) return;
+    canvasHtmlWatcher?.watcher.close();
+    canvasHtmlWatcher = null;
+    await fs.mkdir(htmlDir, { recursive: true });
+    const watcher = watch(htmlDir, { persistent: false }, (_type, name) => {
+      if (name && !name.endsWith(".html")) return;
+      for (const window of BrowserWindow.getAllWindows()) {
+        if (!window.isDestroyed()) {
+          window.webContents.send(IPC_DISPLAY_CANVAS_HTML_CHANGED);
+        }
+      }
+    });
+    watcher.on("error", () => {
+      watcher.close();
+      if (canvasHtmlWatcher?.watcher === watcher) canvasHtmlWatcher = null;
+    });
+    canvasHtmlWatcher = { dir: htmlDir, watcher };
+  };
 
   const conversationOf = (payload: { conversationId?: unknown } | undefined) =>
     typeof payload?.conversationId === "string"
@@ -893,6 +919,7 @@ export const registerDisplayHandlers = (options: DisplayHandlersOptions) => {
     }
 
     const htmlDir = path.join(requireStellaDataDir(), "outputs", "html");
+    await watchCanvasHtmlDir(htmlDir);
     let entries: Dirent<string>[];
     try {
       entries = await fs.readdir(htmlDir, { withFileTypes: true });

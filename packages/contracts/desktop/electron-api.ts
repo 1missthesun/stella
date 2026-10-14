@@ -131,6 +131,7 @@ import {
   IPC_DISCOVERY_LIST_BROWSER_PROFILES,
   IPC_DISCOVERY_WRITE_CORE_MEMORY,
   IPC_DISPLAY_CANVAS_FILE_URL,
+  IPC_DISPLAY_CANVAS_HTML_CHANGED,
   IPC_DISPLAY_CANVAS_HTML_URL,
   IPC_DISPLAY_LIST_CANVAS_HTML,
   IPC_DISPLAY_LIST_FOLDER,
@@ -408,6 +409,7 @@ export const createElectronApi = (
         }),
       setSelectedDevice: sender(IPC_DISPLAY_SET_SELECTED_DEVICE),
       listCanvasHtml: invoker(IPC_DISPLAY_LIST_CANVAS_HTML),
+      onCanvasHtmlChanged: onSignal(IPC_DISPLAY_CANVAS_HTML_CHANGED),
       openSharedCanvas: invoker(IPC_DISPLAY_OPEN_SHARED_CANVAS),
       onOpenShareLink: on(IPC_DISPLAY_OPEN_SHARE_LINK),
       canvasFileUrl: (filePath: string) =>

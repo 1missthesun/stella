@@ -53,10 +53,7 @@ import { useCloudConversationSession } from "@/global/auth/hooks/use-cloud-conve
 import { useBackendValue } from "@/platform/backend/use-backend-view";
 import { cloudDriveEntry } from "@/features/workspace-display/derive-conversation-files";
 import { displayTabKindForPayload } from "@/features/workspace-display/payload-kind";
-import {
-  loadCanvasHtmlHistory,
-  removeCanvasHtmlItem,
-} from "@/shell/display/canvas-tab/canvas-items";
+import { removeCanvasHtmlItem } from "@/shell/display/canvas-tab/canvas-items";
 import { removeGeneratedMediaItem } from "@/shell/display/payload-to-tab-spec";
 import { bucketByRecency } from "@/shared/lib/recency-buckets";
 import { ChevronRight, Eye, LayoutList, Search, X } from "@/ui/icons";
@@ -295,13 +292,6 @@ export function WorkList({ section = "files", idleContent = null }) {
     setExpandedGroupIds(new Set());
   }, [state.conversationId]);
   const dragCounterRef = useRef(0);
-  // Canvases are files on disk that no store hears about until someone reads
-  // the directory, so re-read it every time this list is shown rather than
-  // once per launch — otherwise a canvas written after the list first mounted
-  // stays invisible for the rest of the session.
-  useEffect(() => {
-    void loadCanvasHtmlHistory();
-  }, [activeSection, panelOpen, section]);
   useEffect(() => {
     if (!showSearch) return;
     if (!searchOpen) {

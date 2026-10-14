@@ -147,56 +147,65 @@ export const removeCanvasHtmlItem = (
   return snapshot;
 };
 
-let historyLoadInFlight: Promise<void> | null = null;
+let historyLoad: Promise<void> | null = null;
+let historyStale = false;
 
-/**
- * Re-read `~/.stella/outputs/html/` into the index. Every mount of the Files
- * list calls this: a canvas written after launch is on disk and nowhere in
- * renderer memory until something looks, so a one-shot load at startup left
- * the whole session's canvases invisible. Concurrent callers share one
- * enumeration; a later call always re-reads.
- */
-export const loadCanvasHtmlHistory = async (): Promise<void> => {
-  if (historyLoadInFlight) return historyLoadInFlight;
-  const listCanvasHtml = window.electronAPI?.display?.listCanvasHtml;
-  if (typeof listCanvasHtml !== "function") return;
-
-  historyLoadInFlight = (async () => {
-    try {
-      const discovered = await listCanvasHtml();
-      let changed = false;
-      for (const entry of discovered) {
-        const existing = itemsByPath.get(entry.filePath);
-        if (existing) {
-          // A rewritten canvas keeps its entry but must re-render: `createdAt`
-          // is the viewer's refresh key.
-          if (entry.createdAt > existing.createdAt) {
-            existing.createdAt = entry.createdAt;
-            existing.title = entry.title;
-            changed = true;
-          }
-          continue;
-        }
-        seedItem({
-          id: entry.filePath,
-          filePath: entry.filePath,
-          title: entry.title,
-          slug: entry.slug,
-          createdAt: entry.createdAt,
-        });
+const readCanvasHtmlHistory = async (
+  listCanvasHtml: () => Promise<
+    Array<{ filePath: string; slug: string; title: string; createdAt: number }>
+  >,
+): Promise<void> => {
+  const discovered = await listCanvasHtml();
+  let changed = false;
+  for (const entry of discovered) {
+    const existing = itemsByPath.get(entry.filePath);
+    if (existing) {
+      if (entry.createdAt > existing.createdAt) {
+        existing.createdAt = entry.createdAt;
+        existing.title = entry.title;
         changed = true;
       }
-      if (changed) emit();
+      continue;
+    }
+    seedItem({
+      id: entry.filePath,
+      filePath: entry.filePath,
+      title: entry.title,
+      slug: entry.slug,
+      createdAt: entry.createdAt,
+    });
+    changed = true;
+  }
+  if (changed) emit();
+};
+
+const loadCanvasHtmlHistory = (): Promise<void> => {
+  const listCanvasHtml = window.electronAPI?.display?.listCanvasHtml;
+  if (typeof listCanvasHtml !== "function") return Promise.resolve();
+  if (historyLoad) {
+    historyStale = true;
+    return historyLoad;
+  }
+  historyLoad = (async () => {
+    try {
+      do {
+        historyStale = false;
+        await readCanvasHtmlHistory(listCanvasHtml);
+      } while (historyStale);
     } catch (error) {
       console.warn("[canvas] listing saved canvases failed", error);
     } finally {
-      historyLoadInFlight = null;
+      historyLoad = null;
     }
   })();
-  return historyLoadInFlight;
+  return historyLoad;
 };
 
 for (const item of readPersistedItems()) {
   seedItem(item);
 }
 refreshSnapshot();
+window.electronAPI?.display?.onCanvasHtmlChanged?.(() => {
+  void loadCanvasHtmlHistory();
+});
+void loadCanvasHtmlHistory();

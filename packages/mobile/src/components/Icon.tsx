@@ -50,6 +50,7 @@ export type IconName =
   | "eye-off"
   | "copy"
   | "share"
+  | "download"
   | "wifi-off"
   | "camera"
   | "smartphone"
@@ -133,6 +134,7 @@ const FEATHER_NAMES: Record<
   "eye-off": "eye-off",
   copy: "copy",
   share: "share",
+  download: "download",
   "wifi-off": "wifi-off",
   camera: "camera",
   smartphone: "smartphone",
@@ -216,6 +218,7 @@ const SYMBOL_NAMES: Record<IconName, SymbolViewProps["name"]> = {
   "eye-off": "eye.slash",
   copy: "doc.on.doc",
   share: "square.and.arrow.up",
+  download: "arrow.down.to.line",
   "wifi-off": "wifi.slash",
   camera: "camera",
   smartphone: "iphone",

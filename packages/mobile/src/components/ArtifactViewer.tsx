@@ -16,8 +16,7 @@ import {
   cachedEvidenceSourceUri,
   requestEvidencePreview,
 } from "../lib/chat-evidence-previews";
-import * as Sharing from "expo-sharing";
-import { Directory, File, Paths } from "expo-file-system";
+import { File } from "expo-file-system";
 import { WebView, type WebViewMessageEvent } from "react-native-webview";
 import { getRandomBytes } from "expo-crypto";
 import {
@@ -40,6 +39,7 @@ import { canvasSlugFor, useCanvasShareToggle } from "../lib/use-canvas-share-tog
 import type { ChatArtifact } from "../types";
 import type { StoredPhoneAccess } from "../lib/phone-access";
 import {
+  artifactFileName,
   artifactPrimaryFilePath,
   artifactTitle,
   viewedArtifact,
@@ -74,7 +74,14 @@ import {
   embedRelativeHtmlAssets,
   rewriteRelativeMarkdownImages,
 } from "@stella/contracts/html-relative-assets";
-import { sharePdf } from "../lib/chat-pdf";
+import {
+  namedLocalCopy,
+  publicFileLink,
+  saveFileToDevice,
+  shareLink,
+  writeTextCopy,
+} from "../lib/file-sheet-actions";
+import { contentTypeFromName } from "@stella/contracts/attachment-content-type";
 import {
   createArtifactMediaFile,
   writeArtifactMediaFile,
@@ -403,20 +410,11 @@ th { position: sticky; top: 0; background: ${colors.muted}; font-weight: 600; }
 </html>`;
 };
 
-const sharedImageFile = async (uri: string): Promise<string> => {
-  if (uri.startsWith("file:")) return uri;
-  const directory = new Directory(Paths.cache, "artifact-share");
-  directory.create({ intermediates: true, idempotent: true });
-  const name = decodeURIComponent(uri.split(/[?#]/)[0]?.split("/").pop() ?? "") || "image";
-  const target = new File(directory, `${Date.now()}-${name.replace(/[^\w.\-]+/g, "_")}`);
-  const downloaded = await File.downloadFileAsync(uri, target, { idempotent: true });
-  return downloaded.uri;
-};
-
 const imageBase64 = async (uri: string): Promise<string> => {
   const inline = /^data:[^,]*;base64,(.*)$/s.exec(uri);
   if (inline?.[1]) return inline[1];
-  return await new File(await sharedImageFile(uri)).base64();
+  if (uri.startsWith("file:")) return await new File(uri).base64();
+  return await new File(await namedLocalCopy(uri, "image")).base64();
 };
 
 const viewerCacheKey = (
@@ -639,28 +637,35 @@ export function ArtifactViewerContent({
     };
   }, [artifact, access]);
 
-  // On-device PDFs carry a local file URI we can hand straight to the OS share
-  // sheet (save to Files / open in another app), without asking the computer.
-  const localPdf =
-    artifact.payload.kind === "pdf" &&
-    artifact.payload.localUri
-      ? artifact.payload
-      : null;
   const [sharing, setSharing] = useState(false);
-  const shareFile = useCallback(
-    async (run: () => Promise<unknown>, failure: string) => {
-      if (sharing) return;
-      setSharing(true);
+  const [saving, setSaving] = useState(false);
+  const [linking, setLinking] = useState(false);
+  const runBusy = useCallback(
+    async (
+      busy: boolean,
+      setBusy: (value: boolean) => void,
+      run: () => Promise<unknown>,
+      failure: string,
+    ) => {
+      if (busy) return false;
+      setBusy(true);
       try {
         await run();
+        return true;
       } catch {
         notifyError();
         Alert.alert(failure);
+        return false;
       } finally {
-        setSharing(false);
+        setBusy(false);
       }
     },
-    [sharing],
+    [],
+  );
+  const shareFile = useCallback(
+    (run: () => Promise<unknown>, failure: string) =>
+      runBusy(sharing, setSharing, run, failure),
+    [runBusy, sharing],
   );
   const copy = useCallback(
     async (run: () => Promise<unknown>, failure: string) => {
@@ -683,10 +688,90 @@ export function ArtifactViewerContent({
     loaded?.kind === "canvas-html" ? loaded.html : null,
     canvas?.title,
   );
+
+  const fileTarget = useMemo(() => {
+    const payload = artifact.payload;
+    if (!loaded || loaded.kind === "folder" || payload.kind === "url") return null;
+    const primary = artifactPrimaryFilePath(payload);
+    const driveBacked = "driveBacked" in payload && payload.driveBacked === true;
+    const shown = loadedUri(loaded);
+    const localUri = shown && /^(?:file|data|https?):/i.test(shown) ? shown : null;
+    const text = "text" in loaded ? loaded.text : null;
+    const drivePath = primary && driveBacked ? primary : null;
+    const devicePath = primary && !driveBacked && isDevicePath(primary) ? primary : null;
+    if (!drivePath && !devicePath && !localUri && text === null) return null;
+    const name = artifactFileName(payload);
+    const mimeType =
+      contentTypeFromName(name) ??
+      (loaded.kind === "image"
+        ? "image/png"
+        : loaded.kind === "pdf"
+          ? "application/pdf"
+          : text !== null
+            ? "text/plain"
+            : "application/octet-stream");
+    return { drivePath, devicePath, localUri, text, name, mimeType };
+  }, [artifact.payload, loaded]);
+
+  const fileActions = useMemo<PopoverAction[]>(() => {
+    if (!fileTarget) return [];
+    const { drivePath, devicePath, localUri, text, name, mimeType } = fileTarget;
+    const bytesUri = async (): Promise<string> => {
+      if (localUri) return localUri;
+      if (text !== null) return writeTextCopy(text, name);
+      const located =
+        drivePath ?? (devicePath ? ((await locateDeviceFile(devicePath))?.drivePath ?? null) : null);
+      if (!located) throw new Error("This file can't be saved from the phone.");
+      return await resolveCloudDriveFileUri(located);
+    };
+    return [
+      {
+        key: "download",
+        icon: "download",
+        accessibilityLabel: "Download",
+        loading: saving,
+        onPress: () =>
+          runBusy(
+            saving,
+            setSaving,
+            async () => saveFileToDevice(await bytesUri(), { name, mimeType }),
+            "Couldn't save the file",
+          ),
+      },
+      ...(canvasShare
+        ? []
+        : [
+            {
+              key: "share",
+              icon: "share" as const,
+              accessibilityLabel: "Share link",
+              loading: linking,
+              onPress: () =>
+                runBusy(
+                  linking,
+                  setLinking,
+                  async () => {
+                    const url = await publicFileLink({
+                      drivePath,
+                      devicePath,
+                      localUri: localUri ?? (text !== null ? writeTextCopy(text, name) : null),
+                      name,
+                      mimeType,
+                    });
+                    await shareLink(url, name);
+                  },
+                  "Couldn't share the file",
+                ),
+            },
+          ]),
+    ];
+  }, [canvasShare, fileTarget, linking, runBusy, saving]);
+
   const actions = useMemo<PopoverAction[]>(() => {
     if (!loaded) return [];
     if (canvas && canvasShare) {
       return [
+        ...fileActions,
         {
           key: "canvas-link",
           icon: "globe",
@@ -714,7 +799,6 @@ export function ArtifactViewerContent({
     switch (loaded.kind) {
       case "image": {
         const uri = loaded.uri;
-        const shareable = /^(?:file|https?):/i.test(uri);
         return [
           {
             key: "copy",
@@ -727,25 +811,7 @@ export function ArtifactViewerContent({
                 "Couldn't copy the image",
               ),
           },
-          ...(shareable
-            ? [
-                {
-                  key: "share",
-                  icon: "share" as const,
-                  accessibilityLabel: "Share image",
-                  loading: sharing,
-                  onPress: () =>
-                    shareFile(
-                      async () =>
-                        Sharing.shareAsync(await sharedImageFile(uri), {
-                          mimeType: "image/*",
-                          dialogTitle: "Share image",
-                        }),
-                      "Couldn't share the image",
-                    ),
-                },
-              ]
-            : []),
+          ...fileActions,
         ];
       }
       case "markdown":
@@ -760,19 +826,24 @@ export function ArtifactViewerContent({
             onPress: () =>
               copy(() => Clipboard.setStringAsync(text), "Couldn't copy the text"),
           },
-          {
-            key: "share",
-            icon: "share",
-            accessibilityLabel: "Share text",
-            onPress: () =>
-              shareFile(
-                () => Share.share({ message: text }),
-                "Couldn't share the text",
-              ),
-          },
+          ...(fileActions.length > 0
+            ? fileActions
+            : [
+                {
+                  key: "share",
+                  icon: "share" as const,
+                  accessibilityLabel: "Share text",
+                  onPress: () =>
+                    shareFile(
+                      () => Share.share({ message: text }),
+                      "Couldn't share the text",
+                    ),
+                },
+              ]),
         ];
       }
       case "url": {
+        if (artifact.payload.kind !== "url") return fileActions;
         const url = loaded.uri;
         return [
           {
@@ -792,56 +863,10 @@ export function ArtifactViewerContent({
           },
         ];
       }
-      case "pdf": {
-        const uri = loaded.uri;
-        return [
-          {
-            key: "share",
-            icon: "share",
-            accessibilityLabel: "Save or share PDF",
-            loading: sharing,
-            onPress: () =>
-              shareFile(async () => {
-                if (localPdf) {
-                  const result = await sharePdf(localPdf);
-                  if (!result.ok) throw new Error(result.error);
-                  return;
-                }
-                await Sharing.shareAsync(uri, {
-                  mimeType: "application/pdf",
-                  UTI: "com.adobe.pdf",
-                  dialogTitle: "Share PDF",
-                });
-              }, "Couldn't share the PDF"),
-          },
-        ];
-      }
-      case "audio":
-      case "video": {
-        const uri = loaded.uri;
-        const kind = loaded.kind;
-        return /^file:/i.test(uri)
-          ? [
-              {
-                key: "share",
-                icon: "share",
-                accessibilityLabel: kind === "video" ? "Share video" : "Share audio",
-                loading: sharing,
-                onPress: () =>
-                  shareFile(
-                    () => Sharing.shareAsync(uri, { dialogTitle: "Share" }),
-                    kind === "video"
-                      ? "Couldn't share the video"
-                      : "Couldn't share the audio",
-                  ),
-              },
-            ]
-          : [];
-      }
       default:
-        return [];
+        return fileActions;
     }
-  }, [canvas, canvasShare, copy, loaded, localPdf, shareFile, sharing]);
+  }, [artifact.payload.kind, canvas, canvasShare, copy, fileActions, loaded, shareFile]);
 
   // A cached load paints at once, but the file may have changed since (an
   // agent rewrites the same path), so the viewer always rereads it and swaps

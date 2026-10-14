@@ -1,5 +1,5 @@
 import { Context, Effect, Layer } from "effect";
-import { METHOD_NAMES } from "@stella/contracts/protocol";
+import { METHOD_NAMES, type HostRuntimeAuthRefreshResult } from "@stella/contracts/protocol";
 import { sweepStaleConnectorBridgeProcesses } from "../../../kernel/connectors/process-registry.js";
 import {
   setConnectorTokenStoreBroker,
@@ -72,20 +72,17 @@ export const layer = Layer.effect(
         METHOD_NAMES.HOST_RUNTIME_AUTH_REFRESH,
         { source: "connector" },
         { retryOnDisconnect: true },
-      )) as {
-        authenticated: boolean;
-        token: string | null;
-        hasConnectedAccount: boolean;
-      };
+      )) as HostRuntimeAuthRefreshResult;
+      if (!result.authenticated && result.reason === "unavailable") return null;
       config.patch({
-        authToken: result.authenticated ? result.token : null,
+        authToken: result.token,
         hasConnectedAccount: result.hasConnectedAccount,
       });
       const runner = runnerCell.get();
-      runner?.setAuthToken(result.authenticated ? result.token : null);
+      runner?.setAuthToken(result.token);
       runner?.setHasConnectedAccount(result.hasConnectedAccount);
       const baseUrl = config.get().backendUrl?.trim();
-      const authToken = result.authenticated ? result.token?.trim() : null;
+      const authToken = result.token?.trim();
       return baseUrl && authToken ? { baseUrl, authToken } : null;
     };
 

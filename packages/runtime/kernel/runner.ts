@@ -188,6 +188,7 @@ export const createStellaHostRunner = (
           authenticated: false,
           token: null,
           hasConnectedAccount: false,
+          reason: "signed_out",
         }
       );
     };

@@ -74,11 +74,14 @@ export const createHeadlessHostHandlers = (
     }),
     requestRuntimeAuthRefresh: async () => {
       const token = auth.authToken?.trim() || null;
-      return {
-        authenticated: Boolean(token),
-        token,
-        hasConnectedAccount: false,
-      };
+      return token
+        ? { authenticated: true as const, token, hasConnectedAccount: false }
+        : {
+            authenticated: false as const,
+            token: null,
+            hasConnectedAccount: false,
+            reason: "signed_out" as const,
+          };
     },
     requestLlmCredentials: async (request: {
       operation: string;

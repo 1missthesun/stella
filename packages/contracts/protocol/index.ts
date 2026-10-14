@@ -215,11 +215,14 @@ export type HostLlmCredentialsResult =
 export type RuntimeAuthRefreshSource =
   "heartbeat" | "subscription" | "register" | "stella_provider" | "connector";
 
-export type HostRuntimeAuthRefreshResult = {
-  authenticated: boolean;
-  token: string | null;
-  hasConnectedAccount: boolean;
-};
+export type HostRuntimeAuthRefreshResult =
+  | { authenticated: true; token: string; hasConnectedAccount: boolean }
+  | {
+      authenticated: false;
+      token: null;
+      hasConnectedAccount: boolean;
+      reason: "signed_out" | "unavailable";
+    };
 
 import type { ChatContext } from "@stella/contracts";
 

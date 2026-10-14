@@ -2308,6 +2308,7 @@ export class StellaRuntimeHost {
             authenticated: false,
             token: null,
             hasConnectedAccount: false,
+            reason: "signed_out",
           }
         );
       },

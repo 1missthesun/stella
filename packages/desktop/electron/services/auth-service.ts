@@ -993,10 +993,13 @@ export class AuthService {
 
   private getRuntimeAuthState(): HostRuntimeAuthRefreshResult {
     const token = this.hostAuthToken?.trim() || null;
+    const hasConnectedAccount = this.hostHasConnectedAccount;
+    if (token) return { authenticated: true, token, hasConnectedAccount };
     return {
-      authenticated: Boolean(token),
-      token,
-      hasConnectedAccount: this.hostHasConnectedAccount,
+      authenticated: false,
+      token: null,
+      hasConnectedAccount,
+      reason: this.getBearerToken() ? "unavailable" : "signed_out",
     };
   }
 
@@ -1262,17 +1265,6 @@ export class AuthService {
         }
         if (this.getBearerToken()) {
           await this.mintHostAuthToken();
-          // The runtime treats authenticated:false as an authoritative
-          // teardown, so a transient mint failure inside the
-          // post-credential-change window gets one inline retry before a
-          // verdict is reported.
-          if (
-            this.pendingCredentialResync &&
-            !this.hostAuthToken?.trim() &&
-            this.getBearerToken()
-          ) {
-            await this.mintHostAuthToken();
-          }
         }
       }
       if (this.credentialEpoch !== epoch) {

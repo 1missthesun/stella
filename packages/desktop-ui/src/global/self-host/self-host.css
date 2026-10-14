@@ -1,5 +1,6 @@
-[data-slot="dialog-content"].self-host-dialog {
+[data-component="dialog"] [data-slot="dialog-content"].self-host-dialog {
   width: min(460px, calc(100vw - 48px));
+  max-width: 100%;
   background: var(--panel-glass-bg);
   backdrop-filter: var(--panel-glass-blur);
   -webkit-backdrop-filter: var(--panel-glass-blur);
@@ -12,6 +13,9 @@
 }
 
 .self-host-dialog__body {
+  align-self: stretch;
+  min-width: 0;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -137,6 +141,7 @@
 }
 
 .self-host-link {
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 8px;

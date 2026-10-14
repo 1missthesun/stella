@@ -1,4 +1,5 @@
 import { captureAppPreview } from "./app-preview.js";
+import { captureSite } from "./site-capture.js";
 import { BrowserProfileSession } from "./browser-profile-session.js";
 import { GatewayError, publicErrorResponse, safeErrorCode } from "./errors.js";
 import type { BrowserGatewayEnv } from "./profile-session-core.js";
@@ -24,6 +25,7 @@ const ROUTES = new Set([
   "/internal/owners/profile/reset",
   "/internal/owners/purge",
   "/internal/apps/preview",
+  "/internal/sites/capture",
 ]);
 
 const profileOwnerFromBody = (
@@ -61,6 +63,8 @@ export default {
       // A profile-less page load; it never touches an owner's browser.
       if (path === "/internal/apps/preview")
         return await captureAppPreview(env, body);
+      if (path === "/internal/sites/capture")
+        return await captureSite(env, body);
       const { ownerId, parsed } = profileOwnerFromBody(path, body);
       const objectName = await profileObjectName(ownerId, PROFILE_ID);
       const stub = env.BROWSER_PROFILE_SESSIONS.getByName(objectName);

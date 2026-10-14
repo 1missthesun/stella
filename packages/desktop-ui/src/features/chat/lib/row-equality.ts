@@ -279,7 +279,7 @@ const agentCompletionEqual = (
     if (as.completionEventId !== bs.completionEventId) return false;
     if (as.rootRunId !== bs.rootRunId) return false;
     if (as.completedAtMs !== bs.completedAtMs) return false;
-    if (as.summary !== bs.summary) return false;
+    if (as.result !== bs.result) return false;
     if (as.files.length !== bs.files.length) return false;
     for (let j = 0; j < as.files.length; j += 1) {
       const af = as.files[j]!;

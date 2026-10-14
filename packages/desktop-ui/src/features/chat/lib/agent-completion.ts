@@ -39,7 +39,6 @@ export type AgentCompletionSection = {
   rootRunId?: string;
   completedAtMs: number;
   files: ConversationFileEntry[];
-  summary?: string;
   result?: string;
 };
 
@@ -66,94 +65,6 @@ export function deriveAgentCompletionFiles(
   return deriveAgentFilesMap(toolEvents, isAgentCompletedEvent);
 }
 
-const SUMMARY_MAX_CHARS = 200;
-
-const SUMMARY_BOUNDARY_SLACK = 32;
-
-const graphemeSegmenter =
-  typeof Intl !== "undefined" && "Segmenter" in Intl
-    ? new Intl.Segmenter(undefined, { granularity: "grapheme" })
-    : null;
-
-const truncateAtGrapheme = (value: string, max: number): string => {
-  if (value.length <= max) return value;
-  if (!graphemeSegmenter) {
-    const cut = value.slice(0, max);
-    return /[\uD800-\uDBFF]$/.test(cut) ? cut.slice(0, -1) : cut;
-  }
-  let end = 0;
-  for (const { index, segment } of graphemeSegmenter.segment(value)) {
-    if (index + segment.length > max) break;
-    end = index + segment.length;
-  }
-  return value.slice(0, end);
-};
-
-const stripBlockMarkdown = (text: string): string =>
-  text
-    .split(/\r?\n/)
-    .filter((line) => !/^\s*(?:```|~~~)/.test(line))
-    .map((line) =>
-      line
-        .replace(/^\s{0,3}#{1,6}\s+/, "")
-        .replace(/^\s*(?:>\s?)+/, "")
-        .replace(/^\s*(?:[-*+]|\d{1,3}[.)])\s+/, "")
-        .replace(/^\s*(?:[-*_]\s*){3,}$/, ""),
-    )
-    .join("\n");
-
-const removeLastOccurrence = (text: string, marker: string): string => {
-  const index = text.lastIndexOf(marker);
-  if (index === -1) return text;
-  return text.slice(0, index) + text.slice(index + marker.length);
-};
-
-const countOccurrences = (text: string, marker: string): number =>
-  text.split(marker).length - 1;
-
-/**
- * The excerpt cut can land mid-construct, leaving an unclosed `**` /
- * `` ` `` / `~~` / `*` that would style (or, for a code span, swallow) the
- * rest of the rendered excerpt. Drop the dangling opener so the truncated
- * tail renders as plain text. Approximate on purpose: pair-counting is
- * exact enough for a one-line 200-char excerpt and avoids a full inline-
- * markdown parse. Underscores are deliberately left alone — they're
- * overwhelmingly `snake_case` identifiers here, and intraword `_` never
- * triggers emphasis anyway.
- */
-const dropDanglingInlineMarkers = (text: string): string => {
-  let out = text;
-  if (countOccurrences(out, "`") % 2 === 1) {
-    out = removeLastOccurrence(out, "`");
-  }
-  if (countOccurrences(out, "**") % 2 === 1) {
-    out = removeLastOccurrence(out, "**");
-  }
-  if (countOccurrences(out, "~~") % 2 === 1) {
-    out = removeLastOccurrence(out, "~~");
-  }
-  const singleStars =
-    countOccurrences(out, "*") - 2 * countOccurrences(out, "**");
-  if (singleStars % 2 === 1) {
-    out = removeLastOccurrence(out, "*");
-  }
-  return out;
-};
-
-const toSummaryExcerpt = (result: string): string => {
-  const compact = stripBlockMarkdown(result).replace(/\s+/g, " ").trim();
-  if (compact.length <= SUMMARY_MAX_CHARS) {
-    return dropDanglingInlineMarkers(compact);
-  }
-  const head = truncateAtGrapheme(compact, SUMMARY_MAX_CHARS);
-  const lastSpace = head.lastIndexOf(" ");
-  const cut =
-    lastSpace >= SUMMARY_MAX_CHARS - SUMMARY_BOUNDARY_SLACK
-      ? head.slice(0, lastSpace)
-      : head;
-  return `${dropDanglingInlineMarkers(cut.trimEnd()).trimEnd()}…`;
-};
-
 export function buildAgentCompletionSections(
   toolEvents: ReadonlyArray<EventRecord>,
   agentMetaById: ReadonlyMap<string, AgentMeta>,
@@ -164,7 +75,6 @@ export function buildAgentCompletionSections(
   const completedAtByAgent = new Map<string, number>();
   const completionEventIdByAgent = new Map<string, string>();
   const rootRunIdByAgent = new Map<string, string>();
-  const summaryByAgent = new Map<string, string>();
   const resultByAgent = new Map<string, string>();
   for (const event of toolEvents) {
     if (!isAgentCompletedEvent(event)) continue;
@@ -179,13 +89,8 @@ export function buildAgentCompletionSections(
       if (rootRunId) rootRunIdByAgent.set(agentId, rootRunId);
       else rootRunIdByAgent.delete(agentId);
       const result = asNonEmptyString(event.payload.result);
-      if (result) {
-        summaryByAgent.set(agentId, toSummaryExcerpt(result));
-        resultByAgent.set(agentId, result);
-      } else {
-        summaryByAgent.delete(agentId);
-        resultByAgent.delete(agentId);
-      }
+      if (result) resultByAgent.set(agentId, result);
+      else resultByAgent.delete(agentId);
     }
   }
 
@@ -196,7 +101,6 @@ export function buildAgentCompletionSections(
       meta?.description?.trim() ||
       fallbackTaskDescription(agentId);
     const entries = files.get(agentId) ?? [];
-    const summary = summaryByAgent.get(agentId);
     const result = resultByAgent.get(agentId);
     sections.push({
       agentId,
@@ -210,7 +114,6 @@ export function buildAgentCompletionSections(
         ? { rootRunId: rootRunIdByAgent.get(agentId) }
         : {}),
       files: rankDeliverablesFirst([...entries]),
-      ...(summary ? { summary } : {}),
       ...(result ? { result } : {}),
     });
   }

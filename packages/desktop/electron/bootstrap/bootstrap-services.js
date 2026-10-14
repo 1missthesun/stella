@@ -44,7 +44,6 @@ export const createBootstrapServices = (options) => {
             }
         },
     });
-    externalLinkService.setDevBuild(config.isDeveloperInstance);
     externalLinkService.trustRendererOrigin(RENDERER_ORIGIN);
     // A canvas-share link (`<CANVAS_SHARE_BASE_URL>/c/<slug>`) that reaches
     // main as a new-window or navigation request goes to the renderer, which

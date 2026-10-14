@@ -11,11 +11,7 @@ export class ExternalLinkService {
     { windowStartMs: number; count: number; lastOpenedAtMs: number }
   >()
 
-  /** When set (the renderer served from source), this origin may use privileged IPC. */
   private trustedDevOrigin: string | null = null
-
-  /** Dev-only: allow privileged IPC when sender URL is missing (Electron edge cases). */
-  private isDevBuild = false
 
   /**
    * Optional interceptor for canvas-share links. When it returns true the URL
@@ -65,10 +61,6 @@ export class ExternalLinkService {
   /** Trust the origin the renderer is served from when it runs from source. */
   trustRendererOrigin(origin: string) {
     this.trustedDevOrigin = origin
-  }
-
-  setDevBuild(isDev: boolean) {
-    this.isDevBuild = isDev
   }
 
   isTrustedRendererUrl(url: string) {
@@ -133,19 +125,9 @@ export class ExternalLinkService {
     this.externalOpenRateBySender.clear()
   }
 
-  getSenderUrl(event: IpcMainEvent | IpcMainInvokeEvent) {
-    return event.senderFrame?.url || event.sender.getURL() || ''
-  }
-
   assertPrivilegedSender(event: IpcMainEvent | IpcMainInvokeEvent, channel: string) {
-    const senderUrl = this.getSenderUrl(event)
+    const senderUrl = event.senderFrame?.url ?? ''
     if (this.isTrustedRendererUrl(senderUrl)) {
-      return true
-    }
-    if (this.isDevBuild && !senderUrl.trim()) {
-      console.warn(
-        `[security] Dev: privileged IPC ${channel} with empty sender URL (allowing)`,
-      )
       return true
     }
     console.warn(`[security] Blocked untrusted IPC call to ${channel} from ${senderUrl}`)

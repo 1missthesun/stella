@@ -11,9 +11,9 @@ const KINDS = {
     filters: ["./workers/*", "@stella/executor-cloud", "@stella/model-catalog"],
     omitPeer: true,
   },
-  desktop: { filters: desktop, omitPeer: true, electron: true },
+  desktop: { filters: desktop, omitPeer: false, electron: true },
   mobile: { filters: ["stella-mobile"], omitPeer: false },
-  website: { filters: [...desktop, "stella-website"], omitPeer: true, electron: true },
+  website: { filters: [...desktop, "stella-website"], omitPeer: false, electron: true },
   full: { filters: null, omitPeer: false, electron: true },
 };
 

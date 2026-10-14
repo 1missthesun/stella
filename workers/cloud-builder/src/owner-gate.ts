@@ -707,12 +707,21 @@ export class OwnerGate extends OwnerGateCloudDispatch {
       });
       return billingAccess(ctx);
     });
-    if (today > HOSTING_DAILY_REQUEST_CAP) {
-      return { serving: false, message: HOSTING_CAP_MESSAGE };
-    }
-    return access.allowed
-      ? { serving: true, message: "" }
-      : { serving: false, message: HOSTING_BUDGET_MESSAGE };
+    return this.hostingVerdict(access.allowed, today);
+  }
+
+  async hostingStatus(): Promise<{ serving: boolean; message: string }> {
+    const day = new Date().toISOString().slice(0, 10);
+    const counted = this.ctx.storage.kv.get<{ day: string; requests: number }>(HOSTING_DAY_KEY);
+    return this.hostingVerdict(
+      billingAccess(this.ownerStore().context(null)).allowed,
+      counted?.day === day ? counted.requests : 0,
+    );
+  }
+
+  private hostingVerdict(allowed: boolean, requestsToday: number): { serving: boolean; message: string } {
+    if (requestsToday > HOSTING_DAILY_REQUEST_CAP) return { serving: false, message: HOSTING_CAP_MESSAGE };
+    return allowed ? { serving: true, message: "" } : { serving: false, message: HOSTING_BUDGET_MESSAGE };
   }
 
   async setBillingPlan(input: {

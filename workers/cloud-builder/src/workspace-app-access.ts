@@ -117,7 +117,7 @@ export async function serveWorkspaceApp(
     "sandbox allow-scripts allow-forms; default-src 'none'; script-src 'unsafe-inline' https:; style-src 'unsafe-inline' https:; img-src data: https:; font-src https:; connect-src https:; base-uri 'none'; form-action 'none'",
   );
   if (request.method === "OPTIONS") return new Response(null, { headers });
-  const paused = hostingPause(claims.ownerId);
+  const paused = await hostingPause(env, claims.ownerId);
   if (paused) return pausedHostingPage(`This app is paused. ${paused}`);
   const target = new URL(match[3] || "/", "https://app.internal");
   target.search = url.search;

@@ -1207,7 +1207,7 @@ export const servePreview = async (
       `<p>This preview is for members of the ${escapeHtml(install.teamName)} Slack workspace.</p><a class="button" href="${escapeHtml(target.toString())}">Sign in</a>`,
     );
   }
-  const paused = install.ownerId ? hostingPause(install.ownerId) : null;
+  const paused = install.ownerId ? await hostingPause(env, install.ownerId) : null;
   if (paused) return pausedHostingPage(`This preview is paused. ${paused}`);
   const startedAt = Date.now();
   const meter = (sku: HostingSku) => {

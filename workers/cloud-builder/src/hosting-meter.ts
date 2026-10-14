@@ -18,12 +18,37 @@ const pausedUntil = new Map<string, { until: number; message: string }>();
 type Waiter = { waitUntil(promise: Promise<unknown>): void };
 type OwnerEnv = { OWNER_GATES: Cloudflare.Env["OWNER_GATES"] };
 
-export const hostingPause = (ownerId: string): string | null => {
-  const paused = pausedUntil.get(ownerId);
-  if (!paused) return null;
-  if (paused.until > Date.now()) return paused.message;
-  pausedUntil.delete(ownerId);
-  return null;
+const STATUS_CACHE_ORIGIN = "https://hosting-status.stella.internal/";
+
+const remember = async (ownerId: string, status: { serving: boolean; message: string }): Promise<void> => {
+  pausedUntil.set(ownerId, { until: Date.now() + PAUSE_RECHECK_MS, message: status.serving ? "" : status.message });
+  await caches.default
+    .put(
+      STATUS_CACHE_ORIGIN + encodeURIComponent(ownerId),
+      Response.json(status, { headers: { "cache-control": `max-age=${PAUSE_RECHECK_MS / 1000}` } }),
+    )
+    .catch(() => undefined);
+};
+
+// Whether the owner's hosting is paused, and why. Each isolate learns it at
+// most once a minute: from its own last flush, else from the colo cache that
+// any isolate's flush or check filled, else from the owner gate.
+export const hostingPause = async (env: OwnerEnv, ownerId: string): Promise<string | null> => {
+  const known = pausedUntil.get(ownerId);
+  if (known && known.until > Date.now()) return known.message || null;
+  const cached = await caches.default.match(STATUS_CACHE_ORIGIN + encodeURIComponent(ownerId)).catch(() => undefined);
+  let status: { serving: boolean; message: string } | undefined;
+  if (cached) {
+    status = (await cached.json().catch(() => undefined)) as typeof status;
+    if (status) pausedUntil.set(ownerId, { until: Date.now() + PAUSE_RECHECK_MS, message: status.serving ? "" : status.message });
+  }
+  if (!status) {
+    status = await ownerGateStub(env.OWNER_GATES, ownerId)
+      .hostingStatus()
+      .catch(() => ({ serving: true, message: "" }));
+    await remember(ownerId, status);
+  }
+  return status.serving ? null : status.message;
 };
 
 const flush = async (env: OwnerEnv, ownerId: string, sku: HostingSku): Promise<void> => {
@@ -38,8 +63,7 @@ const flush = async (env: OwnerEnv, ownerId: string, sku: HostingSku): Promise<v
       requests: batch.requests,
       cpuMs: batch.cpuMs,
     });
-    if (!result.serving) pausedUntil.set(ownerId, { until: Date.now() + PAUSE_RECHECK_MS, message: result.message });
-    else pausedUntil.delete(ownerId);
+    await remember(ownerId, result);
   } catch (error) {
     const current = batches.get(key);
     batches.set(key, {

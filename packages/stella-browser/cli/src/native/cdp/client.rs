@@ -84,8 +84,6 @@ impl CdpClient {
                     Err(_) => break,
                 };
 
-                // Broadcast raw message for inspect proxy subscribers before typed parse,
-                // so messages with negative IDs (used by the inspect proxy) are still delivered.
                 if raw_tx_clone.receiver_count() > 0 {
                     let session_id = serde_json::from_str::<serde_json::Value>(&msg)
                         .ok()
@@ -98,15 +96,15 @@ impl CdpClient {
 
                 let parsed: CdpMessage = match serde_json::from_str(&msg) {
                     Ok(m) => m,
-                    // Expected for inspect proxy messages with negative IDs
-                    // (CdpMessage.id is u64); handled via raw broadcast above.
                     Err(_) => continue,
                 };
 
                 if let Some(id) = parsed.id {
-                    let mut pending = pending_clone.lock().await;
-                    if let Some(tx) = pending.remove(&id) {
-                        let _ = tx.send(parsed);
+                    if let Ok(id) = u64::try_from(id) {
+                        let mut pending = pending_clone.lock().await;
+                        if let Some(tx) = pending.remove(&id) {
+                            let _ = tx.send(parsed);
+                        }
                     }
                 } else if let Some(ref method) = parsed.method {
                     if method == "Target.detachedFromTarget" {

@@ -58,7 +58,7 @@ pub struct CdpCommand {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CdpMessage {
-    pub id: Option<u64>,
+    pub id: Option<i64>,
     pub result: Option<Value>,
     pub error: Option<CdpError>,
     pub method: Option<String>,

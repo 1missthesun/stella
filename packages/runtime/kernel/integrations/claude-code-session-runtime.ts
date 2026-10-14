@@ -93,10 +93,6 @@ type ClaudeCodeInjectInput = {
   onConsumed?: () => void;
   onDropped?: () => void;
 };
-/**
- * Callbacks use method syntax so callers may declare narrower argument
- * shapes for what they read.
- */
 export type ClaudeCodeTurnRequest = {
   runId?: string;
   sessionKey: string;
@@ -122,56 +118,56 @@ export type ClaudeCodeTurnRequest = {
   autoCompactWindowTokens?: number;
   abortSignal?: AbortSignal;
   holdOnUsageLimit?: boolean;
-  executeTool(
+  executeTool: (
     toolCallId: string,
     toolName: string,
     toolArgs: Record<string, unknown>,
     signal?: AbortSignal,
     onUpdate?: ToolUpdateCallback,
-  ): Promise<ToolResult>;
-  onToolUpdate?(args: {
+  ) => Promise<ToolResult>;
+  onToolUpdate?: (args: {
     toolCallId: string;
     toolName: string;
     update: ToolResult;
-  }): void;
-  onToolResponseWritten?(args: {
+  }) => void;
+  onToolResponseWritten?: (args: {
     toolCallId: string;
     toolName: string;
-  }): void | Promise<void>;
-  onNativeToolStart?(args: {
+  }) => void | Promise<void>;
+  onNativeToolStart?: (args: {
     toolCallId: string;
     toolName: string;
     toolArgs: ClaudeToolArgs;
-  }): void;
-  onNativeToolEnd?(args: {
+  }) => void;
+  onNativeToolEnd?: (args: {
     toolCallId: string;
     toolName: string;
     result: string;
     isError: boolean;
-  }): void;
-  onTurnControl?(control: {
+  }) => void;
+  onTurnControl?: (control: {
     inject: (input: ClaudeCodeInjectInput) => boolean;
     endStep: () => boolean;
-  }): (() => void) | undefined;
-  onIntermediateResult?(result: ClaudeCodeStepResult): void;
-  toolSetAfterStep?(): ClaudeCodeToolSetChange | undefined;
-  onBackgroundWake?(wake: ClaudeCodeBackgroundWake): void;
+  }) => (() => void) | undefined;
+  onIntermediateResult?: (result: ClaudeCodeStepResult) => void;
+  toolSetAfterStep?: () => ClaudeCodeToolSetChange | undefined;
+  onBackgroundWake?: (wake: ClaudeCodeBackgroundWake) => void;
   backgroundWake?: boolean;
-  onSessionId?(sessionId: string): void;
-  onSessionCheckpoint?(checkpoint: {
+  onSessionId?: (sessionId: string) => void;
+  onSessionCheckpoint?: (checkpoint: {
     sessionId: string;
     configDir: string | null;
     cwd: string;
     final: boolean;
-  }): void;
-  onStatusChange?(status: ClaudeCodeStatusChange): void;
-  onStream?(chunk: string): void;
-  onStreamEvent?(event: ClaudeStreamEvent): void;
-  onModelRound?(round: { messageId?: string; toolCallCount: number }): void;
-  onProtocolInit?(init: {
+  }) => void;
+  onStatusChange?: (status: ClaudeCodeStatusChange) => void;
+  onStream?: (chunk: string) => void;
+  onStreamEvent?: (event: ClaudeStreamEvent) => void;
+  onModelRound?: (round: { messageId?: string; toolCallCount: number }) => void;
+  onProtocolInit?: (init: {
     tools: string[];
     mcpServers: { name?: string; status?: string }[];
-  }): void;
+  }) => void;
 };
 export type ClaudeCodeBackgroundWake = {
   id: string;

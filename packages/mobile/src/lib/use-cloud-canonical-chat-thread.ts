@@ -49,14 +49,15 @@ import {
   type ConversationStore,
 } from "./cloud-conversation-store";
 import {
+  acknowledgedCloudDispatchIds,
   activeCloudTurnId,
   canonicalCloudDispatchIdForTurn,
-  canonicalCloudDispatchIds,
   mergeCanonicalCloudMessages,
   projectCloudConversationMessages,
-  latestDestinationSwitch,
+  latestJournalDestinationSwitch,
   rebindCanonicalCloudMessages,
 } from "./cloud-journal-projection";
+import { journalIndex } from "./journal-index";
 import { getBackendClient } from "./backend";
 import { env } from "../config/env";
 import {
@@ -65,13 +66,14 @@ import {
   getAutomaticExecutionStatus,
   type AutomaticExecutionTarget,
 } from "./execution-placement";
-import { collectActivityHubArtifacts } from "./activity-hub-model";
+import { createActivityHubArtifacts } from "./activity-hub-model";
 import { useTurnHandoff } from "./use-turn-handoff";
 import { createTurnStatusWake } from "./turn-status-wake";
 import { canonicalWorkingState } from "./canonical-working-state";
 import {
   applyAgentLedger,
   collectJournalTasks,
+  JOURNAL_TASK_RECORDS,
   markAuthoritativeRunning,
   settleUnlistedTasks,
 } from "./journal-tasks";
@@ -79,7 +81,10 @@ import { useConversationAgentLedger } from "./use-conversation-agent-ledger";
 import { mergeJournalTasks } from "./mobile-task-merge";
 import { planCloudTranscriptDisplay } from "./cloud-transcript-display";
 import { useChatAttachmentPreviews } from "./use-chat-attachment-previews";
-import { useClaudeUsageLimitNotice } from "./claude-usage-limit-notice";
+import {
+  USAGE_LIMIT_CARDS,
+  useClaudeUsageLimitNotice,
+} from "./claude-usage-limit-notice";
 import { useStellaUsageLimitNotice } from "./stella-usage-limit-notice";
 import { reuseEqualChatMessages } from "./structural-sharing";
 import { TrailingTask } from "./trailing-task";
@@ -448,6 +453,10 @@ export const useCloudCanonicalChatThread = (
     store.getSnapshot,
     emptySnapshot,
   );
+  const journalWindow = useMemo(
+    () => journalIndex(authority.conversationId, state.records),
+    [authority.conversationId, state.records],
+  );
   const lastSeq = state.records.at(-1)?.seq ?? -1;
   const caughtUp =
     state.epoch !== null && (state.headSeq < 0 || lastSeq >= state.headSeq);
@@ -542,29 +551,27 @@ export const useCloudCanonicalChatThread = (
   }, [dispatchBindings, local.messages, local.sending]);
 
   const destinationSwitch = useMemo(
-    () => latestDestinationSwitch(state.records),
-    [state.records],
+    () => latestJournalDestinationSwitch(journalWindow),
+    [journalWindow],
   );
 
   useClaudeUsageLimitNotice(
     threadId === "cloud" ? authority.conversationId : null,
-    state.records,
+    journalWindow.view(USAGE_LIMIT_CARDS),
   );
   useStellaUsageLimitNotice(
     threadId === "cloud" ? authority.conversationId : null,
     state.records,
   );
 
-  const projected = useStableChatMessages(
-    useMemo(
-      () =>
-        projectCloudConversationMessages({
-          conversationId: authority.conversationId,
-          records: state.records,
-          hasOlder: state.hasOlder,
-        }),
-      [authority.conversationId, state.hasOlder, state.records],
-    ),
+  const projected = useMemo(
+    () =>
+      projectCloudConversationMessages({
+        conversationId: authority.conversationId,
+        records: state.records,
+        hasOlder: state.hasOlder,
+      }),
+    [authority.conversationId, state.hasOlder, state.records],
   );
 
   const cacheAuthority = useMemo(
@@ -636,8 +643,8 @@ export const useCloudCanonicalChatThread = (
   const displayedProjection = display.messages;
 
   const acknowledgedDispatchIds = useMemo(
-    () => canonicalCloudDispatchIds(state.records),
-    [state.records],
+    () => acknowledgedCloudDispatchIds(journalWindow, dispatchBindings),
+    [dispatchBindings, journalWindow],
   );
   const canonical = useMemo(
     () => rebindCanonicalCloudMessages(displayedProjection, dispatchBindings),
@@ -678,8 +685,8 @@ export const useCloudCanonicalChatThread = (
       replyHaptics.reset();
       return;
     }
-    for (const _requestId of replyHaptics.take(messages, state.records)) notifySuccess();
-  }, [cacheVisible, clientAuthorityReady, messages, replyHaptics, state.records, threadId]);
+    for (const _requestId of replyHaptics.take(messages, journalWindow)) notifySuccess();
+  }, [cacheVisible, clientAuthorityReady, journalWindow, messages, replyHaptics, threadId]);
 
   const cacheWriteGenerationRef = useRef(0);
   const cacheWriteQueueRef = useRef<Promise<void>>(Promise.resolve());
@@ -741,12 +748,12 @@ export const useCloudCanonicalChatThread = (
     [authority.accountScope, authority.conversationId],
   );
   const activeTurnId = useMemo(
-    () => activeCloudTurnId(state.records, state.live),
-    [state.live, state.records],
+    () => activeCloudTurnId(journalWindow, state.live),
+    [journalWindow, state.live],
   );
   const runningDispatchId = useMemo(
-    () => canonicalCloudDispatchIdForTurn(state.records, activeTurnId),
-    [activeTurnId, state.records],
+    () => canonicalCloudDispatchIdForTurn(journalWindow, activeTurnId),
+    [activeTurnId, journalWindow],
   );
   const [stopIssue, setStopIssue] = useState<{
     turnId: string;
@@ -853,7 +860,7 @@ export const useCloudCanonicalChatThread = (
   const sendMessageId = local.activeSendMessageId ?? handoffMessageId;
   const { sending, workingIndicator } = useMemo(
     () => canonicalWorkingState({
-      records: state.records,
+      index: journalWindow,
       live: state.live,
       localSending: local.sending || handoffMessageId !== null,
       localIndicator: local.workingIndicator,
@@ -868,16 +875,18 @@ export const useCloudCanonicalChatThread = (
     }),
     [caughtUp, dispatchBindings, handoffMessageId, local.sending, sendMessageId,
       local.workingIndicator, local.messages, state.activity, state.live,
-      state.records],
+      journalWindow],
   );
+  const [activityHubArtifacts] = useState(createActivityHubArtifacts);
   const conversationArtifacts = useMemo(
-    () => collectActivityHubArtifacts(messages),
-    [messages],
+    () => activityHubArtifacts(messages),
+    [activityHubArtifacts, messages],
   );
   const runningAgents = state.runningAgents;
+  const taskRecords = journalWindow.view(JOURNAL_TASK_RECORDS);
   const journalTasks = useMemo(
-    () => collectJournalTasks(state.records, runningAgents),
-    [state.records, runningAgents],
+    () => collectJournalTasks(taskRecords, runningAgents),
+    [taskRecords, runningAgents],
   );
   const localConversationTasks = local.conversationTasks;
   const foldedTasks = useMemo(

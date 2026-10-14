@@ -4,7 +4,8 @@ import {
   type JournalRecord,
 } from "@stella/contracts/conversation-protocol";
 import type { ConversationState } from "./cloud-conversation-store";
-import { cloudTurnActivity } from "./cloud-journal-projection";
+import { cloudTurnActivity, journalTurnUnsuccessful } from "./cloud-journal-projection";
+import type { JournalIndex } from "./journal-index";
 
 export class ReplyArrivalHaptics {
   private pending = new Set<string>();
@@ -31,31 +32,16 @@ export class ReplyArrivalHaptics {
       this.reset();
   }
 
-  take(
-    messages: readonly ChatMessage[],
-    records: readonly JournalRecord[],
-  ): string[] {
+  take(messages: readonly ChatMessage[], index: JournalIndex): string[] {
     if (this.pending.size === 0) return [];
-    const bySequence = new Map(records.map((record) => [record.seq, record]));
-    const unsuccessful = new Set(
-      records.flatMap((record) =>
-        record.kind === "turn" &&
-        record.phase !== "started" &&
-        record.phase !== "completed"
-          ? [record.turnId]
-          : [],
-      ),
-    );
+    const recordOf = (message: ChatMessage) =>
+      message.sequence === undefined ? undefined : index.recordAt(message.sequence);
+    const unsuccessful = (turnId: string) => journalTurnUnsuccessful(index, turnId);
     const arrived: string[] = [];
     for (const message of messages) {
-      const record =
-        message.sequence === undefined
-          ? undefined
-          : bySequence.get(message.sequence);
-      if (
-        message.role === "user" &&
-        (message.stopped || (record && unsuccessful.has(record.turnId)))
-      ) {
+      if (message.role !== "user" || !this.pending.has(message.id)) continue;
+      const record = recordOf(message);
+      if (message.stopped || (record && unsuccessful(record.turnId))) {
         this.pending.delete(message.id);
       }
     }
@@ -67,15 +53,12 @@ export class ReplyArrivalHaptics {
         !this.pending.has(requestId)
       )
         continue;
-      const record =
-        message.sequence === undefined
-          ? undefined
-          : bySequence.get(message.sequence);
+      const record = recordOf(message);
       if (!record || record.kind !== "message" || record.role !== "assistant")
         continue;
       if (
         message.stopped ||
-        unsuccessful.has(record.turnId) ||
+        unsuccessful(record.turnId) ||
         record.payload.isError === true ||
         record.payload.stopReason === "error" ||
         record.payload.stopReason === "aborted"
@@ -87,7 +70,8 @@ export class ReplyArrivalHaptics {
         record.hidden ||
         hasToolCalls(record.payload) ||
         !message.text.trim() ||
-        !cloudTurnActivity(records, record.turnId).answerLanded
+        !cloudTurnActivity(index.turn(record.turnId)?.records ?? [], record.turnId)
+          .answerLanded
       )
         continue;
       this.pending.delete(requestId);

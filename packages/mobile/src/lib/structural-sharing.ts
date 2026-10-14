@@ -51,27 +51,58 @@ export const replaceEqualDeep = <T>(previous: unknown, next: T): T => {
   return next;
 };
 
+const NEARBY = 8;
+const TAIL = 4;
+
+/**
+ * Keeps the previous object for every message that didn't change. Messages are
+ * matched by position, following the shift when rows leave the top or arrive
+ * at the bottom; an id lookup is built only for bigger moves, and new rows at
+ * the tail never need it.
+ */
 export const reuseEqualChatMessages = (
   previous: readonly ChatMessage[] | null,
   next: ChatMessage[],
 ): ChatMessage[] => {
   if (!previous || previous === next || previous.length === 0) return next;
-  let previousById: Map<string, ChatMessage> | null = null;
+  let previousIndex: Map<string, number> | null = null;
+  let offset = 0;
   const priorFor = (message: ChatMessage, index: number) => {
-    const aligned = previous[index];
-    if (aligned?.id === message.id) return aligned;
-    if (!previousById) {
-      previousById = new Map();
-      for (const entry of previous) previousById.set(entry.id, entry);
+    const expected = index + offset;
+    if (previous[expected]?.id === message.id) return previous[expected];
+    for (let step = 1; step <= NEARBY; step += 1) {
+      for (const at of [expected + step, expected - step]) {
+        if (previous[at]?.id !== message.id) continue;
+        offset = at - index;
+        return previous[at];
+      }
     }
-    return previousById.get(message.id);
+    if (!previousIndex) {
+      if (index >= next.length - TAIL) return undefined;
+      previousIndex = new Map();
+      previous.forEach((entry, at) => previousIndex!.set(entry.id, at));
+    }
+    const at = previousIndex.get(message.id);
+    if (at === undefined) return undefined;
+    offset = at - index;
+    return previous[at];
   };
+  // Rows above the newest change usually come through as the very same
+  // objects; skip them with a plain loop before any per-row matching.
+  const limit = Math.min(previous.length, next.length);
+  let start = 0;
+  while (start < limit && next[start] === previous[start]) start += 1;
+  if (start === next.length) {
+    return previous.length === next.length ? (previous as ChatMessage[]) : next;
+  }
   let same = previous.length === next.length;
-  const shared = next.map((message, index) => {
+  let shared: ChatMessage[] | null = null;
+  for (let index = start; index < next.length; index += 1) {
+    const message = next[index]!;
     const prior = priorFor(message, index);
     const kept = prior ? replaceEqualDeep(prior, message) : message;
     if (kept !== previous[index]) same = false;
-    return kept;
-  });
-  return same ? (previous as ChatMessage[]) : shared;
+    if (kept !== message) (shared ??= next.slice())[index] = kept;
+  }
+  return same ? (previous as ChatMessage[]) : (shared ?? next);
 };

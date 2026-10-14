@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from "react";
 import type { JournalRecord } from "@stella/contracts/conversation-protocol";
 import { CLAUDE_USAGE_LIMIT_RESUMED_TEXT } from "@stella/contracts/claude-usage-limit";
 import { dismissComposerNotice, showComposerNotice } from "./composer-notice";
+import type { JournalView } from "./journal-index";
 
 const STALE_MS = 15 * 60_000;
 const RESUMED_VISIBLE_MS = 8_000;
@@ -12,6 +13,12 @@ const resetTime = (until: number): string => {
   if (at.toDateString() === new Date().toDateString()) return time;
   const far = until - Date.now() > 6 * 24 * 60 * 60 * 1000;
   return `${at.toLocaleDateString(undefined, { weekday: "short", ...(far ? { month: "short", day: "numeric" } : {}) })} ${time}`;
+};
+
+/** Usage-limit cards, the only records the notice reads. */
+export const USAGE_LIMIT_CARDS: JournalView = {
+  id: "usage-limit-cards",
+  test: (record) => record.kind === "card" && record.card.type === "usage-limit",
 };
 
 export function useClaudeUsageLimitNotice(

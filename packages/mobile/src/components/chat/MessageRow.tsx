@@ -554,6 +554,75 @@ export const carryCompletionQuotes = (
   return { carried, forwarded };
 };
 
+type CompletionQuoteCarry = ReturnType<typeof carryCompletionQuotes>;
+
+/**
+ * `carryCompletionQuotes` over the rows `skip` doesn't drop, for a transcript
+ * that changes mostly at its end: it refolds only from the last row before
+ * the change where nothing was pending. Unchanged input returns the previous
+ * result.
+ */
+export const createCompletionQuoteCarry = () => {
+  let previous: {
+    messages: readonly ChatMessage[];
+    carried: { at: number; id: string; quotes: CompletionQuote[] }[];
+    forwarded: { at: number; id: string }[];
+    result: CompletionQuoteCarry;
+  } | null = null;
+  return (
+    messages: readonly ChatMessage[],
+    skip: (message: ChatMessage) => boolean,
+  ): CompletionQuoteCarry => {
+    let kept = 0;
+    if (previous) {
+      const shared = Math.min(messages.length, previous.messages.length);
+      while (kept < shared && messages[kept] === previous.messages[kept]) kept += 1;
+      if (kept === messages.length && kept === previous.messages.length) return previous.result;
+    }
+    let settled = -1;
+    for (let at = kept - 1; at >= 0; at -= 1) {
+      const message = messages[at]!;
+      if (skip(message)) continue;
+      if (message.role !== "assistant" || messageHasText(message)) {
+        settled = at;
+        break;
+      }
+    }
+    const carried = (previous?.carried ?? []).filter((entry) => entry.at <= settled);
+    const forwarded = (previous?.forwarded ?? []).filter((entry) => entry.at <= settled);
+    let pending: { ids: string[]; quotes: CompletionQuote[] } = { ids: [], quotes: [] };
+    for (let at = settled + 1; at < messages.length; at += 1) {
+      const message = messages[at]!;
+      if (skip(message)) continue;
+      if (message.role !== "assistant") {
+        pending = { ids: [], quotes: [] };
+        continue;
+      }
+      if (messageHasText(message)) {
+        if (pending.quotes.length > 0) {
+          carried.push({ at, id: message.id, quotes: pending.quotes });
+          for (const id of pending.ids) forwarded.push({ at, id });
+        }
+        pending = { ids: [], quotes: [] };
+        continue;
+      }
+      const quotes = messageCompletionQuotes(message);
+      if (quotes.length > 0) {
+        pending = {
+          ids: [...pending.ids, message.id],
+          quotes: [...pending.quotes, ...quotes],
+        };
+      }
+    }
+    const result: CompletionQuoteCarry = {
+      carried: new Map(carried.map((entry) => [entry.id, entry.quotes])),
+      forwarded: new Set(forwarded.map((entry) => entry.id)),
+    };
+    previous = { messages, carried, forwarded, result };
+    return result;
+  };
+};
+
 export const ChatMessageRow = memo(function ChatMessageRow({
   item,
   conversationId,

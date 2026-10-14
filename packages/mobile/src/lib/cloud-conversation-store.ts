@@ -23,6 +23,7 @@ import {
   olderRangeIsComplete,
   olderWouldExceedRetainedLimit,
   prependOlderRecords,
+  trimRetainedRecords,
   type ConversationViewState,
 } from "@stella/contracts/conversation-store-reducer";
 
@@ -30,7 +31,10 @@ let appActive = true;
 
 export const setCloudConversationAppActive = (active: boolean): void => {
   appActive = active;
-  if (!active) return;
+  if (!active) {
+    for (const store of stores.values()) store.trimRetained();
+    return;
+  }
   for (const store of stores.values()) store.wake();
 };
 
@@ -45,6 +49,13 @@ export type ConversationState = ConversationViewState & {
 const EMPTY_AGENTS: readonly AgentActivityEntry[] = [];
 
 const EMIT_COALESCE_MS = 16;
+/**
+ * Appends may run this far past the retention cap; the window is cut back
+ * once the chat goes quiet (or the app leaves the foreground), so an arrival
+ * in a full chat only appends instead of also dropping the oldest records.
+ */
+const RETAINED_OVERFLOW = 400;
+const TRIM_IDLE_MS = 8_000;
 const TURN_END_HOLD_MS = 120;
 
 const awaitsTurnEnd = (
@@ -89,6 +100,7 @@ class ConversationStore {
   private emitTimer: ReturnType<typeof setTimeout> | null = null;
   private lastEmitMs = 0;
   private turnEndHold: ReturnType<typeof setTimeout> | null = null;
+  private trimTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     conversationId: string,
@@ -271,8 +283,30 @@ class ConversationStore {
     this.turnEndHold = null;
   }
 
+  trimRetained(): void {
+    if (this.trimTimer) clearTimeout(this.trimTimer);
+    this.trimTimer = null;
+    const trimmed = trimRetainedRecords(this.state);
+    if (trimmed) this.patch(trimmed);
+  }
+
+  private scheduleTrim(): void {
+    if (this.state.records.length <= MAX_CLIENT_RECORDS) return;
+    if (this.trimTimer) clearTimeout(this.trimTimer);
+    this.trimTimer = setTimeout(() => {
+      this.trimTimer = null;
+      if (this.state.loadingOlder) {
+        this.scheduleTrim();
+        return;
+      }
+      this.trimRetained();
+    }, TRIM_IDLE_MS);
+  }
+
   private teardown(): void {
     this.releaseTurnEndHold();
+    if (this.trimTimer) clearTimeout(this.trimTimer);
+    this.trimTimer = null;
     this.socket?.stop();
     this.socket = null;
     if (this.olderTimer) clearTimeout(this.olderTimer);
@@ -385,7 +419,9 @@ class ConversationStore {
   }
 
   private appendRecords(incoming: readonly JournalRecord[]): void {
-    const appended = appendJournalRecords(this.state, incoming);
+    const appended = appendJournalRecords(this.state, incoming, {
+      overflow: RETAINED_OVERFLOW,
+    });
     if (!appended) return;
     const heldTurnId = this.turnEndHold ? this.state.live?.turnId ?? null : null;
     const live = liveTurnAfterRecords(this.state.live, appended.fresh);
@@ -399,6 +435,7 @@ class ConversationStore {
       live,
       headSeq: appended.headSeq,
     };
+    this.scheduleTrim();
     if (!this.turnEndHold && awaitsTurnEnd(appended.fresh.at(-1), live?.turnId ?? null)) {
       this.turnEndHold = setTimeout(() => {
         this.turnEndHold = null;

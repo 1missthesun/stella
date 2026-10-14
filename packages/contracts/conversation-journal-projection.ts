@@ -24,6 +24,10 @@ const recordReactions = new WeakMap<
   readonly { sequence: number; emoji: string }[]
 >();
 
+export const journalRecordReactions = (
+  record: JournalMessageRecord,
+): readonly { sequence: number; emoji: string }[] => reactionsOf(record);
+
 const reactionsOf = (
   record: JournalMessageRecord,
 ): readonly { sequence: number; emoji: string }[] => {
@@ -169,7 +173,7 @@ export const journalTerminalNotice = (
 
 export const resolveJournalReplyRefs = (args: {
   raw: readonly RawReplyRef[];
-  recordsBySeq: ReadonlyMap<number, JournalRecord>;
+  recordsBySeq: Pick<ReadonlyMap<number, JournalRecord>, "get">;
   turnUserRecord: JournalMessageRecord | undefined;
   agentTitles?: ReadonlyMap<string, string>;
   messageId: (record: JournalMessageRecord) => string;

@@ -1,14 +1,19 @@
 import { reminderMarkOf } from "@stella/contracts/reminders";
 import { parseAskUserToolResult, type UserAskRecord } from "@stella/contracts/user-ask-deck";
-import { projectMobileLifecycle } from "./mobile-reply-context";
+import { projectMobileLifecycle, type ProjectedTurn } from "./mobile-reply-context";
+import {
+  journalIndex,
+  type JournalIndex,
+  type JournalTurn,
+  type JournalView,
+} from "./journal-index";
 import { cloudFileArtifact } from "./cloud-file-payload";
 import type { ChatArtifact, ChatMessage } from "../types";
 import { splitMessageReplyRefs } from "@stella/contracts/reply-refs";
 import {
-  completeJournalWindowRecords,
   journalMessageTimestamp as timestampOf,
+  journalRecordReactions,
   journalTerminalNotice,
-  journalUserReactions,
   resolveJournalReplyRefs,
   storedJournalReplyRefs,
 } from "@stella/contracts/conversation-journal-projection";
@@ -23,6 +28,7 @@ import {
 import type { LiveTurn } from "./cloud-conversation-store";
 import { withAttachmentPreamble } from "./chat-attachments";
 import type { SentMessageAnchors } from "@stella/contracts/sent-message-anchors";
+import { replaceEqualDeep } from "./structural-sharing";
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value)
@@ -295,7 +301,7 @@ const projectTurn = (
   turn: readonly JournalRecord[],
   context: {
     conversationId?: string;
-    recordsBySeq: () => ReadonlyMap<number, JournalRecord>;
+    recordsBySeq: () => Pick<ReadonlyMap<number, JournalRecord>, "get">;
     reactions: ReadonlyMap<number, { emoji: string; at: number }>;
   },
 ): ChatMessage[] => {
@@ -529,153 +535,284 @@ const projectTurn = (
   return out;
 };
 
-type TurnProjection = {
-  records: readonly JournalRecord[];
+type TurnProjection = ProjectedTurn & {
   reactionsKey: string;
-  windowKey: string | null;
-  messages: ChatMessage[];
+  lookups: readonly (readonly [number, JournalRecord | undefined])[];
 };
-const turnProjections = new Map<string, Map<string, TurnProjection>>();
-const MAX_CACHED_CONVERSATIONS = 4;
 
-const sameRecords = (
-  a: readonly JournalRecord[],
-  b: readonly JournalRecord[],
-): boolean => a.length === b.length && a.every((record, i) => record === b[i]);
+const REACTORS: JournalView = {
+  id: "reactors",
+  test: (record) =>
+    record.kind === "message" &&
+    record.role === "assistant" &&
+    !record.hidden &&
+    journalRecordReactions(record).length > 0,
+};
 
-const turnReactionsKey = (
-  turn: readonly JournalRecord[],
-  reactions: ReadonlyMap<number, { emoji: string; at: number }>,
-): string => {
-  let key = "";
-  for (const record of turn) {
-    if (record.kind !== "message" || record.role !== "user") continue;
-    const reaction = reactions.get(record.seq);
-    if (reaction) key += `${record.seq}:${reaction.emoji}:${reaction.at};`;
+type WindowReactions = {
+  bySeq: Map<number, { emoji: string; at: number }>;
+  keyByTurn: Map<string, string>;
+};
+
+const NO_REACTIONS: WindowReactions = { bySeq: new Map(), keyByTurn: new Map() };
+
+/**
+ * Reactions on visible user messages, as `journalUserReactions` reads them,
+ * from just the assistant records that carry one.
+ */
+const reactionsByView = new WeakMap<
+  readonly JournalRecord[],
+  { first: JournalRecord | undefined; reactions: WindowReactions }
+>();
+
+const windowReactions = (index: JournalIndex): WindowReactions => {
+  const reactors = index.view(REACTORS);
+  if (!reactors.length) return NO_REACTIONS;
+  const cached = reactionsByView.get(reactors);
+  if (cached && cached.first === index.records[0]) return cached.reactions;
+  const reactions = collectWindowReactions(index, reactors);
+  reactionsByView.set(reactors, { first: index.records[0], reactions });
+  return reactions;
+};
+
+const collectWindowReactions = (
+  index: JournalIndex,
+  reactors: readonly JournalRecord[],
+): WindowReactions => {
+  const bySeq = new Map<number, { emoji: string; at: number }>();
+  for (const record of reactors) {
+    if (record.kind !== "message") continue;
+    for (const reaction of journalRecordReactions(record)) {
+      const target = index.recordAt(reaction.sequence);
+      if (
+        !target ||
+        target.kind !== "message" ||
+        target.role !== "user" ||
+        target.hidden ||
+        target.seq >= record.seq
+      ) {
+        continue;
+      }
+      bySeq.set(reaction.sequence, {
+        emoji: reaction.emoji,
+        at: timestampOf(record),
+      });
+    }
   }
-  return key;
+  const keyByTurn = new Map<string, string>();
+  for (const seq of [...bySeq.keys()].sort((a, b) => a - b)) {
+    const reaction = bySeq.get(seq)!;
+    const turnId = index.recordAt(seq)!.turnId;
+    keyByTurn.set(
+      turnId,
+      `${keyByTurn.get(turnId) ?? ""}${seq}:${reaction.emoji}:${reaction.at};`,
+    );
+  }
+  return { bySeq, keyByTurn };
 };
+
+const leadingTurnLacksPrompt = (turn: JournalTurn): boolean =>
+  !turn.records.some(
+    (record) =>
+      (record.kind === "message" && record.role === "user") ||
+      (record.kind === "card" && record.card.type === "reminder"),
+  );
+
+/** The turns a window shows: all but a leading turn cut off from its prompt. */
+export const displayedJournalTurns = (
+  index: JournalIndex,
+  hasOlder: boolean,
+): readonly JournalTurn[] => {
+  const first = index.turns[0];
+  return hasOlder && first && leadingTurnLacksPrompt(first)
+    ? index.turns.slice(1)
+    : index.turns;
+};
+
+const projectionOf = (
+  turn: JournalTurn,
+  index: JournalIndex,
+  conversationId: string | undefined,
+  reactions: WindowReactions,
+): TurnProjection => {
+  const reactionsKey = reactions.keyByTurn.get(turn.turnId) ?? "";
+  const cached = turn.memo.projection as TurnProjection | undefined;
+  if (
+    cached &&
+    cached.reactionsKey === reactionsKey &&
+    cached.lookups.every(([seq, record]) => index.recordAt(seq) === record)
+  ) {
+    return cached;
+  }
+  const lookups: (readonly [number, JournalRecord | undefined])[] = [];
+  const tracked = {
+    get: (seq: number) => {
+      const record = index.recordAt(seq);
+      lookups.push([seq, record]);
+      return record;
+    },
+  };
+  const messages = projectTurn(turn.turnId, turn.records, {
+    conversationId,
+    recordsBySeq: () => tracked,
+    reactions: reactions.bySeq,
+  });
+  const memo = turn.memo as {
+    projection?: TurnProjection;
+    prior?: { projection?: TurnProjection };
+  };
+  const before = (cached ?? memo.prior?.projection)?.messages;
+  delete memo.prior;
+  const projection: TurnProjection = {
+    turnId: turn.turnId,
+    reactionsKey,
+    lookups,
+    messages: before ? shareUnchanged(before, messages) : messages,
+  };
+  memo.projection = projection;
+  return projection;
+};
+
+/** Keeps the previous object for each message of a re-projected turn that didn't change. */
+const shareUnchanged = (
+  before: readonly ChatMessage[],
+  after: ChatMessage[],
+): ChatMessage[] =>
+  after.map((message) => {
+    const prior = before.find((candidate) => candidate.id === message.id);
+    return prior ? replaceEqualDeep(prior, message) : message;
+  });
 
 export const projectCloudConversationMessages = (args: {
   conversationId?: string;
   records: readonly JournalRecord[];
   hasOlder?: boolean;
 }): ChatMessage[] => {
-  const records = completeJournalWindowRecords(
-    args.records,
-    args.hasOlder === true,
-    { dropCardOnly: true },
-  );
-  let bySeq: Map<number, JournalRecord> | null = null;
-  const recordsBySeq = () =>
-    (bySeq ??= new Map(args.records.map(record => [record.seq, record])));
-  const reactions = journalUserReactions(args.records);
-  const byTurn = new Map<string, JournalRecord[]>();
-  for (const record of records) {
-    const turn = byTurn.get(record.turnId);
-    if (turn) turn.push(record);
-    else byTurn.set(record.turnId, [record]);
-  }
+  const index = journalIndex(args.conversationId ?? "", args.records);
+  const reactions = windowReactions(index);
+  const displayed = displayedJournalTurns(index, args.hasOlder === true);
+  const dropped = displayed === index.turns ? undefined : index.turns[0];
+  const turns: ProjectedTurn[] = displayed.map((turn) =>
+    projectionOf(turn, index, args.conversationId, reactions));
+  return projectMobileLifecycle(turns, index, args.conversationId ?? "", (turnId) => {
+    const turn = index.turn(turnId);
+    return turn && turn !== dropped
+      ? (turn.memo as { projection?: TurnProjection }).projection
+      : undefined;
+  });
+};
 
-  const cacheKey = args.conversationId ?? "";
-  const previous = turnProjections.get(cacheKey);
-  const next = new Map<string, TurnProjection>();
-  const windowKey = `${args.hasOlder === true}:${args.records[0]?.seq ?? ""}`;
-  const messages: ChatMessage[] = [];
-  for (const [turnId, turn] of byTurn) {
-    const reactionsKey = turnReactionsKey(turn, reactions);
-    const cached = previous?.get(turnId);
-    let projection: TurnProjection;
-    if (
-      cached &&
-      (cached.windowKey === null || cached.windowKey === windowKey) &&
-      cached.reactionsKey === reactionsKey &&
-      sameRecords(cached.records, turn)
-    ) {
-      projection = cached;
-    } else {
-      let readWindow = false;
-      const messages = projectTurn(turnId, turn, {
-        conversationId: args.conversationId,
-        recordsBySeq: () => {
-          readWindow = true;
-          return recordsBySeq();
-        },
-        reactions,
-      });
-      projection = {
-        records: turn,
-        reactionsKey,
-        windowKey: readWindow ? windowKey : null,
-        messages,
-      };
+type TurnPhases = { last?: string; firstAt: number; failed: boolean };
+
+const turnPhases = (turn: JournalTurn): TurnPhases => {
+  const memo = turn.memo as { phases?: TurnPhases };
+  if (!memo.phases) {
+    const phases: TurnPhases = { firstAt: Infinity, failed: false };
+    for (const record of turn.records) {
+      if (record.kind !== "turn") continue;
+      if (phases.last === undefined) phases.firstAt = record.seq;
+      phases.last = record.phase;
+      if (record.phase !== "started" && record.phase !== "completed") phases.failed = true;
     }
-    next.set(turnId, projection);
-    messages.push(...projection.messages);
+    memo.phases = phases;
   }
-  turnProjections.delete(cacheKey);
-  turnProjections.set(cacheKey, next);
-  while (turnProjections.size > MAX_CACHED_CONVERSATIONS) {
-    const oldest = turnProjections.keys().next().value;
-    if (oldest === undefined) break;
-    turnProjections.delete(oldest);
-  }
+  return memo.phases;
+};
 
-  return projectMobileLifecycle(
-    messages,
-    args.records,
-    args.conversationId ?? "",
-  );
+/** Whether the turn ended in anything other than completion. */
+export const journalTurnUnsuccessful = (index: JournalIndex, turnId: string): boolean => {
+  const turn = index.turn(turnId);
+  return turn ? turnPhases(turn).failed : false;
 };
 
 export const activeCloudTurnId = (
-  records: readonly JournalRecord[],
+  index: JournalIndex,
   live: LiveTurn | null,
 ): string | null => {
-  const phases = new Map<string, string>();
-  for (const record of records) {
-    if (record.kind === "turn") phases.set(record.turnId, record.phase);
+  if (live) {
+    const turn = index.turn(live.turnId);
+    const last = turn ? turnPhases(turn).last : undefined;
+    if (last === undefined || last === "started") return live.turnId;
   }
-  if (live && (!phases.has(live.turnId) || phases.get(live.turnId) === "started")) {
-    return live.turnId;
+  let active: { turnId: string; at: number } | null = null;
+  for (const turn of index.turns) {
+    const phases = turnPhases(turn);
+    if (phases.last === "started" && (!active || phases.firstAt > active.at)) {
+      active = { turnId: turn.turnId, at: phases.firstAt };
+    }
   }
-  for (const [turnId, phase] of [...phases].reverse()) {
-    if (phase === "started") return turnId;
-  }
-  return null;
+  return active?.turnId ?? null;
 };
 
 export { journalWorkingActivity as cloudTurnActivity } from "@stella/contracts/journal-working-activity";
 
 export const canonicalCloudDispatchIdForTurn = (
-  records: readonly JournalRecord[],
+  index: JournalIndex,
   turnId: string | null,
 ): string | null => {
-  if (!turnId) return null;
-  for (let index = records.length - 1; index >= 0; index -= 1) {
-    const record = records[index]!;
-    if (
-      record.turnId === turnId &&
-      record.kind === "message" &&
-      record.role === "user" &&
-      record.clientMsgId
-    ) {
+  const records = turnId ? index.turn(turnId)?.records : undefined;
+  if (!records) return null;
+  for (let at = records.length - 1; at >= 0; at -= 1) {
+    const record = records[at]!;
+    if (record.kind === "message" && record.role === "user" && record.clientMsgId) {
       return record.clientMsgId;
     }
   }
   return null;
 };
 
-export const canonicalCloudDispatchIds = (
-  records: readonly JournalRecord[],
-): ReadonlySet<string> =>
-  new Set(
-    records.flatMap((record) =>
-      record.kind === "message" && record.role === "user" && record.clientMsgId
-        ? [record.clientMsgId]
-        : [],
-    ),
-  );
+const turnDispatchIds = (turn: JournalTurn): readonly string[] => {
+  const memo = turn.memo as { dispatchIds?: readonly string[] };
+  return (memo.dispatchIds ??= turn.records.flatMap((record) =>
+    record.kind === "message" && record.role === "user" && record.clientMsgId
+      ? [record.clientMsgId]
+      : []));
+};
+
+/** The bound dispatch ids the journal already holds a user record for. */
+export const acknowledgedCloudDispatchIds = (
+  index: JournalIndex,
+  dispatchBindings: ReadonlyMap<string, string | null>,
+): ReadonlySet<string> => {
+  const wanted = new Set<string>();
+  for (const dispatchId of dispatchBindings.values()) {
+    if (dispatchId) wanted.add(dispatchId);
+  }
+  const found = new Set<string>();
+  for (let at = index.turns.length - 1; at >= 0 && found.size < wanted.size; at -= 1) {
+    for (const id of turnDispatchIds(index.turns[at]!)) {
+      if (wanted.has(id)) found.add(id);
+    }
+  }
+  return found;
+};
+
+const SWITCH_RECORDS: JournalView = {
+  id: "destination-switches",
+  test: (record) => {
+    if (record.kind !== "message") return false;
+    if (record.role === "assistant") {
+      return toolCalls(record).some((call) => call.name === "switch_destination");
+    }
+    if (record.role !== "toolResult") return false;
+    const toolName = record.payload.toolName;
+    return typeof toolName !== "string" || toolName.includes("switch_destination");
+  },
+};
+
+const switches = new WeakMap<readonly JournalRecord[], DestinationSwitch | null>();
+
+export const latestJournalDestinationSwitch = (
+  index: JournalIndex,
+): DestinationSwitch | null => {
+  const records = index.view(SWITCH_RECORDS);
+  let latest = switches.get(records);
+  if (latest === undefined) {
+    latest = latestDestinationSwitch(records);
+    switches.set(records, latest);
+  }
+  return latest;
+};
 
 export const mergeCanonicalCloudMessages = (args: {
   canonical: readonly ChatMessage[];
@@ -684,6 +821,13 @@ export const mergeCanonicalCloudMessages = (args: {
   acknowledgedDispatchIds: ReadonlySet<string>;
   sentAnchors?: SentMessageAnchors;
 }): ChatMessage[] => {
+  if (
+    args.local.length === 0 &&
+    !args.sentAnchors?.size &&
+    ownersPrecede(args.canonical)
+  ) {
+    return args.canonical as ChatMessage[];
+  }
   const canonicalIds = new Set(args.canonical.map((message) => message.id));
   const canonicalAssistantOwners = new Set(
     args.canonical.flatMap((message) =>
@@ -788,6 +932,21 @@ export const mergeCanonicalCloudMessages = (args: {
   return merged;
 };
 
+/**
+ * Whether every reply already follows the message it answers, so placing
+ * replies after their owners leaves the order as it is.
+ */
+const ownersPrecede = (messages: readonly ChatMessage[]): boolean => {
+  const positions = new Map<string, number>();
+  messages.forEach((message, at) => positions.set(message.id, at));
+  return messages.every((message, at) => {
+    const owner = message.requestId;
+    if (!owner) return true;
+    const ownerAt = positions.get(owner);
+    return ownerAt === undefined || ownerAt < at;
+  });
+};
+
 export const rebindCanonicalCloudMessages = (
   canonical: readonly ChatMessage[],
   dispatchBindings: ReadonlyMap<string, string | null>,
@@ -796,6 +955,7 @@ export const rebindCanonicalCloudMessages = (
   for (const [localId, dispatchId] of dispatchBindings) {
     if (dispatchId) localByDispatch.set(dispatchId, localId);
   }
+  if (localByDispatch.size === 0) return canonical as ChatMessage[];
   return canonical.map((message) => {
     const localId = localByDispatch.get(message.id);
     const localRequestId = message.requestId

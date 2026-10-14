@@ -1,17 +1,15 @@
 import type { ReplyRef } from "@stella/contracts/reply-refs";
+import { agentIdsOf, type AgentLabelRow } from "@stella/contracts/agent-labels";
 import {
-  agentIdCanonicalizer,
-  agentIdsOf,
-  projectAgentLabels,
-  type AgentLabelRow,
-} from "@stella/contracts/agent-labels";
-import { createReplyContextProjector } from "@stella/contracts/reply-context";
+  isPlacementThreadId,
+  placementAliases,
+} from "@stella/contracts/placement-thread-id";
 import { ReplyViewer, type AgentReplyRef } from "./ReplyViewer";
 import { AgentReportPopover } from "./AgentReportPopover";
 import type { ReportAnchor } from "./AgentReport";
 import { type ReplyAgentStatus } from "./ReplyPreview";
 import {
-  mobileReplyContexts,
+  createMobileReplyContexts,
   type MobileReplyContexts,
 } from "../lib/mobile-reply-context";
 import { useAgentReplyTitles } from "../lib/use-agent-reply-titles";
@@ -98,7 +96,7 @@ import {
   ChatMessageRow,
   messageCompletionQuotes,
   MessageEntry,
-  carryCompletionQuotes,
+  createCompletionQuoteCarry,
   makeMessageRowStyles,
   type MessageMenuRequest,
   type MessageRowActions,
@@ -129,9 +127,9 @@ import { stellaFileChatArtifact } from "../lib/stella-file-links";
 import { useCatchUpIndicatorVisible } from "../lib/catch-up-indicator";
 import { ChatHistoryPaging } from "../lib/chat-history-paging";
 import {
+  createVisibleChatMessages,
   isStandInArtifactRow,
   markPrependedMessagesSeen,
-  visibleChatMessages,
 } from "../lib/message-row-identity";
 import { SHOW_AGENT_CARDS } from "../lib/agent-cards";
 import { RealtimeVoiceOverlay } from "./RealtimeVoiceOverlay";
@@ -386,6 +384,8 @@ const withInlineAskRecords = (
 
 const REPLY_PLACEMENT_PIN_SUPPRESS_MS = 1500;
 
+const keepEveryRow = () => false;
+
 const agentLabelRows = new WeakMap<
   ChatMessage,
   { context: ReplyRef | undefined; row: AgentLabelRow }
@@ -413,6 +413,127 @@ const agentLabelRow = (
   }
   agentLabelRows.set(message, { context, row });
   return row;
+};
+
+/**
+ * The rows whose agent chip is hidden because the row before already names
+ * that agent (`projectAgentLabels`), for a transcript that changes mostly at
+ * its end: the label fold resumes after the unchanged rows unless a new
+ * placement alias renames an agent an earlier row shows.
+ */
+const createHiddenAgentChips = () => {
+  let previous: {
+    messages: readonly ChatMessage[];
+    contexts: ReadonlyMap<string, ReplyRef>;
+    rows: AgentLabelRow[];
+    contextAt: (ReplyRef | undefined)[];
+    ids: string[];
+    idSet: Set<string>;
+    aliases: Map<string, string>;
+    current: (string | null)[];
+    labels: (string[] | undefined)[];
+    result: Set<string>;
+  } | null = null;
+  return (
+    messages: readonly ChatMessage[],
+    contexts: ReadonlyMap<string, ReplyRef>,
+  ): Set<string> => {
+    let kept = 0;
+    if (previous) {
+      const shared = Math.min(messages.length, previous.messages.length);
+      while (kept < shared && messages[kept] === previous.messages[kept]) kept += 1;
+      if (previous.contexts !== contexts) {
+        for (let at = 0; at < kept; at += 1) {
+          const message = messages[at]!;
+          if (message.role !== "assistant") continue;
+          if (contexts.get(message.id) !== previous.contextAt[at]) {
+            kept = at;
+            break;
+          }
+        }
+      }
+      if (kept === messages.length && kept === previous.messages.length) {
+        previous.contexts = contexts;
+        return previous.result;
+      }
+    }
+    const rows = previous ? previous.rows.slice(0, kept) : [];
+    const contextAt = previous ? previous.contextAt.slice(0, kept) : [];
+    for (let at = kept; at < messages.length; at += 1) {
+      const message = messages[at]!;
+      const context = contexts.get(message.id);
+      contextAt.push(context);
+      rows.push(agentLabelRow(message, context));
+    }
+    let ids: string[];
+    let idSet: Set<string>;
+    if (previous && kept === previous.messages.length) {
+      ids = previous.ids.slice();
+      idSet = new Set(previous.idSet);
+      for (let at = kept; at < rows.length; at += 1) {
+        for (const id of rows[at]!.agentIds ?? []) {
+          if (idSet.has(id)) continue;
+          idSet.add(id);
+          ids.push(id);
+        }
+      }
+    } else {
+      ids = agentIdsOf(rows);
+      idSet = new Set(ids);
+    }
+    const aliases = placementAliases(ids);
+    let resume = kept;
+    if (previous) {
+      for (const [alias, id] of aliases) {
+        if (previous.aliases.get(alias) === id) continue;
+        if (previous.idSet.has(alias)) {
+          resume = 0;
+          break;
+        }
+      }
+      for (const alias of previous.aliases.keys()) {
+        if (!aliases.has(alias) && previous.idSet.has(alias)) {
+          resume = 0;
+          break;
+        }
+      }
+    }
+    const canonical = (id: string) =>
+      isPlacementThreadId(id) ? (aliases.get(id) ?? id) : id;
+    const current = previous ? previous.current.slice(0, resume) : [];
+    const labels = previous ? previous.labels.slice(0, resume) : [];
+    let carried = resume > 0 ? current[resume - 1]! : null;
+    for (let at = resume; at < rows.length; at += 1) {
+      const row = rows[at]!;
+      let label: string[] | undefined;
+      if (!row.hidden && row.role === "assistant" && row.agentIds?.length) {
+        const seen = new Set<string>();
+        const fresh: string[] = [];
+        for (const raw of row.agentIds) {
+          const id = canonical(raw);
+          if (seen.has(id)) continue;
+          seen.add(id);
+          if (id !== carried) fresh.push(raw);
+        }
+        if (fresh.length > 0) {
+          label = fresh;
+          carried = canonical(fresh[fresh.length - 1]!);
+        }
+      }
+      labels.push(label);
+      current.push(carried);
+    }
+    const labeled = new Set<string>();
+    labels.forEach((label, at) => {
+      if (label) labeled.add(rows[at]!.id);
+    });
+    const result = new Set<string>();
+    for (const row of rows) {
+      if (row.agentIds?.length && !labeled.has(row.id)) result.add(row.id);
+    }
+    previous = { messages, contexts, rows, contextAt, ids, idSet, aliases, current, labels, result };
+    return result;
+  };
 };
 
 export function ChatPane({
@@ -555,27 +676,27 @@ export function ChatPane({
 
   const assistantTextLenRef = useRef(0);
   const assistantIdRef = useRef<string | null>(null);
-  const [projectReplyContextRows] = useState(createReplyContextProjector);
+  const [projectReplyContexts] = useState(createMobileReplyContexts);
   const replyContexts = useMemo(
-    () => mobileReplyContexts(messages, projectReplyContextRows),
-    [messages, projectReplyContextRows],
+    () => projectReplyContexts(messages),
+    [messages, projectReplyContexts],
   );
+  const [filterVisibleMessages] = useState(createVisibleChatMessages);
   const visibleMessages = useMemo(
     () =>
-      visibleChatMessages(messages, {
+      filterVisibleMessages(messages, {
         contextMessageIds: replyContexts.contexts,
         canOpenArtifacts: Boolean(onOpenArtifact),
       }),
-    [messages, replyContexts, onOpenArtifact],
+    [filterVisibleMessages, messages, replyContexts, onOpenArtifact],
   );
+  const [carryQuotes] = useState(createCompletionQuoteCarry);
   const quoteCarry = useMemo(
     () =>
-      carryCompletionQuotes(
-        SHOW_AGENT_CARDS
-          ? visibleMessages
-          : messages.filter((message) => !isStandInArtifactRow(message)),
-      ),
-    [messages, visibleMessages],
+      SHOW_AGENT_CARDS
+        ? carryQuotes(visibleMessages, keepEveryRow)
+        : carryQuotes(messages, isStandInArtifactRow),
+    [carryQuotes, messages, visibleMessages],
   );
   const { questions: openQuestionAsks, secureInput: openSecureAsk } =
     useConversationUserAsks(conversationId);
@@ -584,17 +705,11 @@ export function ChatPane({
     () => withInlineAskRecords(visibleMessages, sessionAskRecords),
     [sessionAskRecords, visibleMessages],
   );
-  const hiddenAgentChipIds = useMemo(() => {
-    const rows = listMessages.map((message) =>
-      agentLabelRow(message, replyContexts.contexts.get(message.id)),
-    );
-    const labeled = projectAgentLabels(rows, agentIdCanonicalizer(agentIdsOf(rows)));
-    const hidden = new Set<string>();
-    for (const row of rows) {
-      if (row.agentIds?.length && !labeled.has(row.id)) hidden.add(row.id);
-    }
-    return hidden;
-  }, [listMessages, replyContexts]);
+  const [hiddenAgentChips] = useState(createHiddenAgentChips);
+  const hiddenAgentChipIds = useMemo(
+    () => hiddenAgentChips(listMessages, replyContexts.contexts),
+    [hiddenAgentChips, listMessages, replyContexts],
+  );
   const askActive = openQuestionAsks.length > 0 || openSecureAsk !== null;
   const [askCollapsed, setAskCollapsed] = useState(false);
   const askActiveRef = useRef(askActive);

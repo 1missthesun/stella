@@ -12,8 +12,14 @@ export function useChatAttachmentPreviews(
   messages: ChatMessage[],
   authorityScope: string,
 ): ChatMessage[] {
-  const pathKey = useMemo(() => JSON.stringify([...new Set(messages.flatMap((message) =>
-    message.attachmentPaths ?? []))].sort()), [messages]);
+  const pathKey = useMemo(() => {
+    const paths = new Set<string>();
+    for (const message of messages) {
+      if (!message.attachmentPaths) continue;
+      for (const path of message.attachmentPaths) paths.add(path);
+    }
+    return JSON.stringify([...paths].sort());
+  }, [messages]);
   const paths = useMemo(() => JSON.parse(pathKey) as string[], [pathKey]);
   const cacheRef = useRef({ scope: authorityScope, entries: new Map<string, DrivePreview>() });
   if (cacheRef.current.scope !== authorityScope) {
@@ -78,9 +84,26 @@ export function useChatAttachmentPreviews(
     };
   }, [authorityScope, paths, refresh]);
 
+  const resolvedRef = useRef<{
+    key: string;
+    byMessage: WeakMap<ChatMessage, ChatMessage>;
+  } | null>(null);
   return useMemo(() => {
     const entries = cacheRef.current.entries;
-    return messages.map((message) => {
+    const key = `${authorityScope}\u0000${revision}\u0000${refresh}`;
+    if (resolvedRef.current?.key !== key) {
+      resolvedRef.current = { key, byMessage: new WeakMap() };
+    }
+    const resolvedByMessage = resolvedRef.current.byMessage;
+    const resolve = (message: ChatMessage): ChatMessage => {
+      let resolved = resolvedByMessage.get(message);
+      if (!resolved) {
+        resolved = withPreviews(message);
+        resolvedByMessage.set(message, resolved);
+      }
+      return resolved;
+    };
+    const withPreviews = (message: ChatMessage): ChatMessage => {
       const attachmentPaths = message.attachmentPaths;
       if (!attachmentPaths?.length) return message;
       const resolved = attachmentPaths.flatMap((path) => {
@@ -116,6 +139,8 @@ export function useChatAttachmentPreviews(
           documentNames: [...new Set([...(message.documentNames ?? []), ...documents.map((preview) => preview.name)])],
         } : {}),
       };
-    });
+    };
+    return messages.map((message) =>
+      message.attachmentPaths?.length ? resolve(message) : message);
   }, [messages, authorityScope, revision, refresh]);
 }

@@ -54,6 +54,20 @@ const payloadText = (payload: Record<string, unknown>): string => {
     .join("\n");
 };
 
+const resultJsons = new WeakMap<AgentTitleRecord, Record<string, unknown> | null>();
+
+const resultJson = (
+  record: AgentTitleRecord,
+  payload: Record<string, unknown>,
+): Record<string, unknown> | null => {
+  let json = resultJsons.get(record);
+  if (json === undefined) {
+    json = parseJson(payloadText(payload));
+    resultJsons.set(record, json);
+  }
+  return json;
+};
+
 const parseJson = (text: string): Record<string, unknown> | null => {
   try {
     return asRecord(JSON.parse(text));
@@ -79,7 +93,23 @@ const cardStatus = (type: string, payload: Record<string, unknown> | null): Task
 
 const LIVE_DELIVERIES = new Set(["steered", "resumed", "delivered_agent_still_working"]);
 
+const wakeAgents = new WeakMap<
+  AgentTitleRecord,
+  { threadId: string; title?: string; status: TaskLifecycleStatus } | null
+>();
+
 const wakeAgent = (
+  record: AgentTitleRecord,
+): { threadId: string; title?: string; status: TaskLifecycleStatus } | null => {
+  let agent = wakeAgents.get(record);
+  if (agent === undefined) {
+    agent = readWakeAgent(record);
+    wakeAgents.set(record, agent);
+  }
+  return agent;
+};
+
+const readWakeAgent = (
   record: AgentTitleRecord,
 ): { threadId: string; title?: string; status: TaskLifecycleStatus } | null => {
   const wake = wakePromptOf(record.payload, record.clientMsgId);
@@ -102,6 +132,9 @@ export const agentNoteSender = (
 };
 
 const agentRecordFlags = new WeakMap<AgentTitleRecord, boolean>();
+
+export const journalRecordTouchesAgents = (record: AgentTitleRecord): boolean =>
+  touchesAgents(record);
 
 const touchesAgents = (record: AgentTitleRecord): boolean => {
   if (record.kind !== "message" || !record.payload) return record.kind === "card";
@@ -229,7 +262,7 @@ export const journalAgents = (
       continue;
     }
     if (record.role === "toolResult") {
-      const json = parseJson(payloadText(payload));
+      const json = resultJson(record, payload);
       const callId = nonEmpty(payload.toolCallId);
       const threadId = resultThreadId(
         payload,

@@ -62,8 +62,18 @@ export const sha256Hex = (input: string): string => {
 
 export const PLACEMENT_THREAD_PREFIX = "placement-agent:thread:";
 
-export const placementRemoteThreadAgentId = (cloudThreadId: string): string =>
-  `${PLACEMENT_THREAD_PREFIX}${sha256Hex(cloudThreadId).slice(0, 32)}`;
+const remoteThreadAgentIds = new Map<string, string>();
+const MAX_REMOTE_THREAD_AGENT_IDS = 2048;
+
+export const placementRemoteThreadAgentId = (cloudThreadId: string): string => {
+  let agentId = remoteThreadAgentIds.get(cloudThreadId);
+  if (agentId === undefined) {
+    agentId = `${PLACEMENT_THREAD_PREFIX}${sha256Hex(cloudThreadId).slice(0, 32)}`;
+    if (remoteThreadAgentIds.size >= MAX_REMOTE_THREAD_AGENT_IDS) remoteThreadAgentIds.clear();
+    remoteThreadAgentIds.set(cloudThreadId, agentId);
+  }
+  return agentId;
+};
 
 export const isPlacementThreadId = (threadId: string): boolean =>
   threadId.startsWith(PLACEMENT_THREAD_PREFIX);

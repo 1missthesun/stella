@@ -126,7 +126,7 @@ export const appendJournalRecords = (
     "records" | "hasOlder" | "floorSeq" | "headSeq"
   >,
   incoming: readonly JournalRecord[],
-  options: { replaceRetained?: boolean } = {},
+  options: { replaceRetained?: boolean; overflow?: number } = {},
 ): {
   records: readonly JournalRecord[];
   fresh: readonly JournalRecord[];
@@ -145,7 +145,7 @@ export const appendJournalRecords = (
   let hasOlder = options.replaceRetained
     ? fresh[0]!.seq > view.floorSeq
     : view.hasOlder || restart;
-  if (records.length > MAX_CLIENT_RECORDS) {
+  if (records.length > MAX_CLIENT_RECORDS + (options.overflow ?? 0)) {
     records = records.slice(records.length - MAX_CLIENT_RECORDS);
     hasOlder = true;
   }
@@ -170,6 +170,18 @@ export const olderRangeIsComplete = (
     incoming.length === toSeq - fromSeq + 1 &&
     incoming.every((record, index) => record.seq === fromSeq + index)
   );
+};
+
+/**
+ * The window cut back to the retention cap, for a store that lets appends run
+ * past it (`overflow`) and trims later; null when nothing needs trimming.
+ */
+export const trimRetainedRecords = (
+  view: Pick<ConversationViewState, "records" | "floorSeq">,
+): { records: readonly JournalRecord[]; hasOlder: boolean } | null => {
+  if (view.records.length <= MAX_CLIENT_RECORDS) return null;
+  const records = view.records.slice(view.records.length - MAX_CLIENT_RECORDS);
+  return { records, hasOlder: true };
 };
 
 export const prependOlderRecords = (

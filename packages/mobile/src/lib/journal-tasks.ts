@@ -4,7 +4,11 @@ import {
   type AgentActivityEntry,
 } from "@stella/contracts/conversation-agent-activity";
 import type { MobileTask } from "../types";
-import type { JournalRecord } from "@stella/contracts/conversation-protocol";
+import {
+  hasToolCalls,
+  type JournalRecord,
+} from "@stella/contracts/conversation-protocol";
+import type { JournalView } from "./journal-index";
 import {
   agentTaskStatus,
   type AgentLedger,
@@ -90,6 +94,18 @@ const journalTask = (
   ...(entry.result ? { resultText: entry.result } : {}),
   ...(entry.error ? { errorMessage: entry.error } : {}),
 });
+
+/** The records `foldAgentActivity` reads; the rest of the journal never changes a task. */
+export const JOURNAL_TASK_RECORDS: JournalView = {
+  id: "journal-tasks",
+  test: (record) => {
+    if (record.kind === "card") return true;
+    if (record.kind !== "message") return false;
+    if (record.role === "toolResult") return true;
+    if (record.role === "user") return record.hidden;
+    return record.role === "assistant" && hasToolCalls(record.payload);
+  },
+};
 
 export const collectJournalTasks = (
   records: readonly JournalRecord[],

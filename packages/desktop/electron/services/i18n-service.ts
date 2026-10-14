@@ -5,7 +5,7 @@ import {
   isSupportedLocale,
   LOCALE_STORAGE_KEY,
   type Locale,
-} from "../../../desktop-ui/src/shared/i18n/locales.js";
+} from "@stella/contracts/locales";
 
 export type MainCatalog = Record<string, unknown>;
 export type MainTranslateParams = Record<string, string | number>;

@@ -20,10 +20,6 @@
  *     a production EAS build work: EAS uploads the git-tracked tree, so the
  *     catalogs are present before `npm install` or any build hook runs.
  *
- * `src/i18n/locales.ts` is ALSO copied verbatim (it is a dependency-free
- * module) so the supported-locale list, `matchSupportedLocale` matching
- * rules, RTL set and storage key can never drift from desktop.
- *
  * Run: `node scripts/sync-i18n-catalogs.mjs` (wired into the mobile
  * `start` / `ios` / `android` / `typecheck` scripts).
  */
@@ -52,23 +48,11 @@ const banner = (source) =>
   `// by packages/mobile/scripts/sync-i18n-catalogs.mjs.\n`;
 
 export const buildI18nCatalogOutputs = ({ desktopI18nRoot }) => {
-  const localesSource = readFileSync(
-    join(desktopI18nRoot, "locales.ts"),
-    "utf8",
-  );
-  if (/^\s*import\s/m.test(localesSource)) {
-    throw new Error(
-      "desktop locales.ts grew an import; it can no longer be copied verbatim.",
-    );
-  }
-
   const catalogDir = join(desktopI18nRoot, "locales");
   const catalogFiles = readdirSync(catalogDir)
     .filter((name) => name.endsWith(".json"))
     .sort();
-  const outputs = new Map([
-    ["locales.ts", `${banner("locales.ts")}\n${localesSource}`],
-  ]);
+  const outputs = new Map();
 
   for (const name of catalogFiles) {
     const parsed = JSON.parse(readFileSync(join(catalogDir, name), "utf8"));
@@ -146,7 +130,7 @@ export const syncI18nCatalogs = ({
       return { ok: false, catalogCount: catalogFiles.length, drift };
     }
     logger.log(
-      `[i18n] verified ${catalogFiles.length} catalogs + locales.ts in src/i18n/`,
+      `[i18n] verified ${catalogFiles.length} catalogs in src/i18n/`,
     );
     return { ok: true, catalogCount: catalogFiles.length, drift };
   }
@@ -160,7 +144,7 @@ export const syncI18nCatalogs = ({
   }
 
   logger.log(
-    `[i18n] synced ${catalogFiles.length} catalogs + locales.ts into src/i18n/`,
+    `[i18n] synced ${catalogFiles.length} catalogs into src/i18n/`,
   );
   return { ok: true, catalogCount: catalogFiles.length, drift: [] };
 };

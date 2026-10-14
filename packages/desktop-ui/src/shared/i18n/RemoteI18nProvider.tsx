@@ -6,7 +6,7 @@ import {
   I18nProviderBase,
   type I18nProviderProps,
 } from "./I18nProvider";
-import type { Locale } from "./locales";
+import type { Locale } from "@stella/contracts/locales";
 
 type PersistRemoteLocale = (locale: Locale) => void | Promise<unknown>;
 

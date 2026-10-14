@@ -16,7 +16,7 @@
 
 import { CATALOG_LOADERS } from "./catalog-registry.generated";
 import type { Catalog } from "./catalog-types";
-import { DEFAULT_LOCALE, type Locale } from "./locales";
+import { DEFAULT_LOCALE, type Locale } from "@stella/contracts/locales";
 
 export type { Catalog };
 

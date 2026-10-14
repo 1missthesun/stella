@@ -25,7 +25,7 @@
  */
 
 import { I18nManager } from "react-native";
-import { isRtlLocale, type Locale } from "./locales";
+import { isRtlLocale, type Locale } from "@stella/contracts/locales";
 
 export const needsDirectionFlip = (locale: Locale): boolean =>
   isRtlLocale(locale) !== I18nManager.isRTL;

@@ -26,7 +26,7 @@ import {
   type Locale,
   resolveBestLocale,
   SUPPORTED_LOCALES,
-} from "./locales";
+} from "@stella/contracts/locales";
 import { applyLayoutDirection, needsDirectionFlip, syncLayoutDirection } from "./rtl";
 
 type I18nContextValue = {

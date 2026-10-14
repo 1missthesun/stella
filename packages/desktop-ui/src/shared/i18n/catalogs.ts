@@ -1,4 +1,4 @@
-import { DEFAULT_LOCALE, type Locale } from "./locales";
+import { DEFAULT_LOCALE, type Locale } from "@stella/contracts/locales";
 import enCatalog from "./locales/en.json";
 
 export type Catalog = Record<string, unknown>;

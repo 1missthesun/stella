@@ -26,7 +26,7 @@ import {
   localeDir,
   resolveBestLocale,
   SUPPORTED_LOCALES,
-} from "./locales";
+} from "@stella/contracts/locales";
 
 type I18nContextValue = {
   locale: Locale;

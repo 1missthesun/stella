@@ -14,7 +14,7 @@ export const classifyCanvasNavigation = (href: string): CanvasNavigation => {
       return { kind: "external", url: url.href };
     }
   } catch {
-    // Relative URLs have nowhere meaningful to go from a single-file canvas.
+    // The canvas bridge only sends absolute web URLs.
   }
   return { kind: "blocked" };
 };

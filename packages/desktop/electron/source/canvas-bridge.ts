@@ -9,27 +9,36 @@
  */
 const CANVAS_BRIDGE_SCRIPT = String.raw`
 (() => {
-  const navigate = (rawHref) => {
-    const href = rawHref.trim();
-    if (href.startsWith("#")) {
-      const fragment = decodeURIComponent(href.slice(1));
-      if (!fragment) {
-        window.scrollTo({ top: 0, behavior: "auto" });
-        return;
-      }
-      const target = document.getElementById(fragment) ||
-        document.querySelector('[name="' + CSS.escape(fragment) + '"]');
-      target?.scrollIntoView();
+  const scrollToFragment = (hash) => {
+    const fragment = decodeURIComponent(hash.replace(/^#/, ""));
+    if (!fragment) {
+      window.scrollTo({ top: 0, behavior: "auto" });
       return;
     }
+    const target = document.getElementById(fragment) ||
+      document.querySelector('[name="' + CSS.escape(fragment) + '"]');
+    target?.scrollIntoView();
+  };
+
+  // Links resolve against the document (or its <base>): web destinations open
+  // externally, links into this same document scroll, and every other
+  // destination, including sibling documents in the canvas folder, is refused.
+  const navigate = (rawHref) => {
+    let url;
     try {
-      const url = new URL(href);
-      if (url.protocol === "http:" || url.protocol === "https:") {
-        parent.postMessage({ type: "stella:canvas-open-external", url: url.href }, "*");
-      }
+      url = new URL(rawHref.trim(), document.baseURI);
     } catch {
-      // A relative destination cannot exist outside this single-file canvas.
+      return;
     }
+    if (url.protocol === "http:" || url.protocol === "https:") {
+      parent.postMessage({ type: "stella:canvas-open-external", url: url.href }, "*");
+      return;
+    }
+    if (url.href.split("#")[0] === location.href.split("#")[0]) {
+      scrollToFragment(url.hash);
+      return;
+    }
+    console.warn("Stella canvas: only web links and links within this document open:", url.href);
   };
 
   document.addEventListener("click", (event) => {

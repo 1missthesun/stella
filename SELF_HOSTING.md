@@ -363,6 +363,12 @@ money is reachable without a session.
 3. Phone: Stella app → **Connect your own server** → scan. Desktop: open the
    link, or Stella → **Connect to your own server** and paste it.
 
+Models: without an OpenRouter key the owner connects their Claude or ChatGPT
+account in the app (Settings → Engines); cloud turns use it by default
+(Claude first, then ChatGPT, then Stella's models if a key is set). The owner
+account can't be deleted from a device; `bun scripts/selfhost.mjs destroy`
+removes the whole server.
+
 `<backend>/.well-known/stella` describes the server to the apps (name, owner
 mode, version, features, URLs). Lost every device? With the Cloudflare login,
 `bun scripts/selfhost.mjs recover` rotates `STELLA_ADMIN_API_SECRET` with

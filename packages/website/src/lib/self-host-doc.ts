@@ -96,7 +96,7 @@ Each code works **once** and expires after **10 minutes**. Make a new one for ev
 
 Treat the link like a password until it's used or expired. Don't post it anywhere.
 
-Then the user connects their Claude or ChatGPT subscription in the app when it asks: that's where the models come from.
+Then the user connects their Claude or ChatGPT account in the app (Settings → **Engines**): that's where the models come from, and cloud turns use it by default. Without it, and without an OpenRouter key, chats on the server have no model to answer with.
 
 **Done means:** the last line said \`ready\`, and the user's phone or computer shows their server's name after scanning.
 
@@ -112,6 +112,7 @@ Then the user connects their Claude or ChatGPT subscription in the app when it a
 
 Add the same \`--prefix\` (and \`--account-id\`) to every command if you used one at setup.
 
+- **Deleting:** the owner account can't be deleted from a phone or computer; \`destroy\` is how the server and everything on it go away.
 - **Updates:** Stella publishes server releases tagged \`server-YYYY.MM.DD\`. The apps keep working with a server up to about 90 days old; after that the phone app shows **Update your server**. Run \`update\` then.
 - **The computer that ran setup** holds the server's admin key in \`~/.config/stella-server/<account id>-<prefix>.json\` (readable only by the user). Anyone with that key can pair devices, so keep it private. Another computer with the Cloudflare login can always run \`recover\` instead. Logs of every run are in \`~/.config/stella-server/logs/\`.
 - **What it doesn't need from Stella:** the server never reports to stella.sh. Desktop telemetry is off for self-hosted servers. The official phone app still downloads its own app updates from Expo.

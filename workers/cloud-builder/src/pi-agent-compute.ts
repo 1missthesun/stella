@@ -38,7 +38,7 @@ import { isSlackConversationId } from "./slack/conversation-id.js";
 import { startTurnExecution } from "./turn-cancellation.js";
 import type { InstanceSize } from "./instance-size.js";
 import { issueWorldCapability } from "./world-capability.js";
-import { worldMaterializationCommand } from "./world-materialization.js";
+import { worldMaterializationCommand, worldMaterializationFailure } from "./world-materialization.js";
 import { agentSandboxId, WORLD_ROOT, worldName } from "./workspace.js";
 
 export type PiComputeEnv = Pick<
@@ -277,7 +277,7 @@ export const openPiComputeLease = async (
         stderr: materialized.stderr.trim().slice(-1500),
         stdout: materialized.stdout.trim().slice(-500),
       });
-      throw new Error("Stella could not bring this world into the agent's workspace.");
+      throw new Error(worldMaterializationFailure(materialized));
     }
     // Materialization replaces the world root, including the drive directory the daemon expects.
     await normalizeToolWorkspaceRoot(session, WORLD_ROOT);

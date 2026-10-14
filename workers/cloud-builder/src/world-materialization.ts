@@ -33,7 +33,7 @@ export const worldMaterializationCommand = (args: {
       `find ${shellQuote(args.worldRoot)} -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +`,
       `curl --fail --silent --show-error --dump-header "$headers" -H ${shellQuote(`Authorization: Bearer ${args.capability}`)} ${shellQuote(args.exportUrl)} | tar -x -f - -C ${shellQuote(args.worldRoot)}`,
       `manifest=${shellQuote(args.manifestId)}`,
-      'revision="$(awk \'BEGIN { IGNORECASE=1 } /^x-stella-world-revision:/ { gsub("\\r", "", $2); print $2 }\' "$headers" | tail -1)"',
+      `revision="$(tr -d '\\r' <"$headers" | awk -F': *' 'tolower($1) == "x-stella-world-revision" { print $2 }' | tail -1)"`,
       'case "$revision" in ""|*[!0-9]*) { echo "The world export named no revision. Its response headers:"; cut -d: -f1 "$headers"; } >&2; exit 1;; esac',
       `mkdir -p ${shellQuote(`${args.worldRoot}/.stella`)}`,
       `printf '{"manifestId":"%s","revision":%s}\\n' "$manifest" "$revision" > "$marker"`,
@@ -46,4 +46,13 @@ export const worldMaterializationCommand = (args: {
       "fi",
     ].join("\n"),
   );
+};
+
+/** Why a materialization failed, in words the agent and the user can act on. */
+export const worldMaterializationFailure = (result: { stderr: string; exitCode?: number }): string => {
+  const detail = result.stderr.trim().split("\n").at(-1)?.trim().slice(0, 300) ?? "";
+  if (/no space left on device/iu.test(result.stderr)) {
+    return "Stella could not bring this world into the agent's workspace: the workspace's disk is full. Remove large files from the world, or start the agent with a large workspace.";
+  }
+  return `Stella could not bring this world into the agent's workspace${detail ? `: ${detail}` : ` (exit ${result.exitCode ?? "unknown"})`}.`;
 };

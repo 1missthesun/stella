@@ -60,7 +60,7 @@ import {
   worldName,
 } from "../workspace.js";
 import { issueWorldCapability } from "../world-capability.js";
-import { worldMaterializationCommand } from "../world-materialization.js";
+import { worldMaterializationCommand, worldMaterializationFailure } from "../world-materialization.js";
 import {
   SANDBOX_EXECUTOR,
   SANDBOX_PAGE_CACHE_WARM_COMMAND,
@@ -1392,7 +1392,7 @@ export const attachAgentWorld = async (
       { origin: "internal", timeout: args.commandTimeoutMs },
     );
     if (!materialized.success)
-      throw new AgentTurnError("Stella could not materialize this world.");
+      throw new AgentTurnError(worldMaterializationFailure(materialized));
     // Materialization replaces everything under the world root, including
     // the drive directory the daemon expects, so the boundary is normalized
     // again.

@@ -26,19 +26,23 @@ export function useBackendValue<K extends ViewName>(
   view: K,
   args: ViewArgs<K> | "skip",
 ): ViewResult<K> | undefined {
-  const key = args === "skip" ? null : `${view}\u0000${stableStringify(args)}`;
+  const argsJson = args === "skip" ? null : stableStringify(args);
+  const key = argsJson === null ? null : `${view}\u0000${argsJson}`;
   const [state, setState] = useState<{ key: string | null; value?: ViewResult<K> }>({
     key: null,
   });
   useEffect(() => {
-    if (args === "skip" || key === null || !isBackendConfigured()) return;
-    const unwatch = getBackendClient().watch(view, args, (value) => setState({ key, value }), () => {});
+    if (key === null || argsJson === null || !isBackendConfigured()) return;
+    const unwatch = getBackendClient().watch(
+      view,
+      JSON.parse(argsJson) as ViewArgs<K>,
+      (value) => setState({ key, value }),
+      () => {},
+    );
     return () => {
       unwatch();
       setState({ key: null });
     };
-    // `key` captures `args`.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, view]);
+  }, [key, view, argsJson]);
   return state.key === key ? state.value : undefined;
 }

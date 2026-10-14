@@ -879,22 +879,18 @@ export const useCloudCanonicalChatThread = (
     () => collectJournalTasks(state.records, runningAgents),
     [state.records, runningAgents],
   );
-  const authoritativeTasks = useMemo(
-    () => markAuthoritativeRunning(journalTasks, runningAgents),
-    [journalTasks, runningAgents],
-  );
   const localConversationTasks = local.conversationTasks;
   const foldedTasks = useMemo(
     () =>
       settleUnlistedTasks(
         markAuthoritativeRunning(
-          mergeJournalTasks(authoritativeTasks, localConversationTasks),
+          mergeJournalTasks(journalTasks, localConversationTasks),
           runningAgents,
         ),
         runningAgents,
         state.runningAgentsAtMs,
       ),
-    [authoritativeTasks, localConversationTasks, runningAgents, state.runningAgentsAtMs],
+    [journalTasks, localConversationTasks, runningAgents, state.runningAgentsAtMs],
   );
   const ledgerCheckIds = useMemo(
     () => [

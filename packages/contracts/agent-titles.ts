@@ -1,11 +1,13 @@
 import type { TaskLifecycleStatus } from "./agent-runtime";
 import { agentTaskStatus } from "./agent-ledger";
-import { isAgentAttemptOutcome, legacyReportStatus } from "./agent-status";
+import { isAgentAttemptOutcome } from "./agent-status";
+import { wakePromptOf } from "./agent-wake-prompt";
 
 export type AgentTitleRecord = {
   kind: string;
   role?: string;
   payload?: Record<string, unknown>;
+  clientMsgId?: string;
   card?: unknown;
 };
 
@@ -60,11 +62,6 @@ const parseJson = (text: string): Record<string, unknown> | null => {
   }
 };
 
-const WAKE_KIND_RE = /^\[(Agent completed|Task failed|Task canceled|Subagent paused)\]/m;
-const WAKE_THREAD_RE =
-  /^\[(?:Agent completed|Task failed|Task canceled|Subagent paused)\][\s\S]*?(?:^thread_id:\s*(\S+)|\(thread ([^)]+)\))/m;
-const WAKE_DESCRIPTION_RE =
-  /^\[(?:Agent completed|Task failed|Task canceled|Subagent paused)\][\s\S]*?^description:\s*(.+)$/m;
 const AGENT_NOTE_RE = /^<agent-message from="([^"\n]*)" thread_id="([^"\n]*)"(?: relation="[^"\n]*")?>/;
 
 const CARD_STATUS: Record<string, TaskLifecycleStatus> = {
@@ -83,14 +80,15 @@ const cardStatus = (type: string, payload: Record<string, unknown> | null): Task
 const LIVE_DELIVERIES = new Set(["steered", "resumed", "delivered_agent_still_working"]);
 
 const wakeAgent = (
-  text: string,
+  record: AgentTitleRecord,
 ): { threadId: string; title?: string; status: TaskLifecycleStatus } | null => {
-  const kind = WAKE_KIND_RE.exec(text)?.[1];
-  const match = WAKE_THREAD_RE.exec(text);
-  const threadId = nonEmpty(match?.[1] ?? match?.[2]);
-  if (!kind || !threadId) return null;
-  const title = nonEmpty(WAKE_DESCRIPTION_RE.exec(text)?.[1]);
-  return { threadId, ...(title ? { title } : {}), status: agentTaskStatus(legacyReportStatus(text)) };
+  const wake = wakePromptOf(record.payload, record.clientMsgId);
+  if (!wake) return null;
+  return {
+    threadId: wake.threadId,
+    ...(wake.description ? { title: wake.description } : {}),
+    status: agentTaskStatus(wake.outcome),
+  };
 };
 
 export const agentNoteSender = (
@@ -219,7 +217,7 @@ export const journalAgents = (
     }
     if (record.role === "user") {
       const text = payloadText(payload);
-      const wake = wakeAgent(text);
+      const wake = wakeAgent(record);
       if (wake) {
         if (!followUps.get(wake.threadId)?.has(wake.title ?? "")) hint(wake.threadId, wake.title);
         settle(wake.threadId, wake.status);

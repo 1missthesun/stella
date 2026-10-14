@@ -1,70 +1,15 @@
-import type { AgentActivityEntry } from "@stella/contracts/conversation-agent-activity";
+import {
+  emptyAgentActivityState,
+  foldAgentActivity,
+  type AgentActivityEntry,
+} from "@stella/contracts/conversation-agent-activity";
 import type { MobileTask } from "../types";
-import {
-  messageText,
-  type JournalMessageRecord,
-  type JournalRecord,
-} from "@stella/contracts/conversation-protocol";
-import {
-  lifecycleWakeOutcome,
-  lifecycleWakeTask,
-} from "@stella/contracts/conversation-journal-projection";
+import type { JournalRecord } from "@stella/contracts/conversation-protocol";
 import {
   agentTaskStatus,
   type AgentLedger,
   type LedgerAgent,
 } from "@stella/contracts/agent-ledger";
-import { cloudAgentLifecycleStatus } from "@stella/contracts/cloud-agent-lifecycle";
-
-const asRecord = (value: unknown): Record<string, unknown> | null =>
-  value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
-
-export const bareToolName = (name: string): string =>
-  name.includes("__") ? (name.split("__").at(-1) ?? name) : name;
-
-const toolResultThreadId = (record: JournalMessageRecord): string | null => {
-  const details = asRecord(record.payload.details);
-  if (typeof details?.thread_id === "string" && details.thread_id) {
-    return details.thread_id;
-  }
-  try {
-    const parsed = asRecord(JSON.parse(messageText(record.payload)));
-    return typeof parsed?.thread_id === "string" && parsed.thread_id
-      ? parsed.thread_id
-      : null;
-  } catch {
-    return null;
-  }
-};
-
-type ToolCall = { name: string; description?: string; threadId?: string };
-
-const toolCallsById = (records: readonly JournalRecord[]) => {
-  const calls = new Map<string, ToolCall>();
-  for (const record of records) {
-    if (record.kind !== "message" || record.role !== "assistant") continue;
-    const content = record.payload.content;
-    if (!Array.isArray(content)) continue;
-    for (const entry of content) {
-      const block = asRecord(entry);
-      if (block?.type !== "toolCall" || typeof block.id !== "string") continue;
-      if (typeof block.name !== "string") continue;
-      const args = asRecord(block.arguments);
-      calls.set(block.id, {
-        name: bareToolName(block.name),
-        ...(typeof args?.description === "string" && args.description.trim()
-          ? { description: args.description.trim() }
-          : {}),
-        ...(typeof args?.thread_id === "string" && args.thread_id
-          ? { threadId: args.thread_id }
-          : {}),
-      });
-    }
-  }
-  return calls;
-};
 
 export const agentSnapshotTasks = (
   agents: readonly AgentActivityEntry[],
@@ -127,154 +72,34 @@ export const settleUnlistedTasks = (
   });
 };
 
+const journalTask = (
+  entry: AgentActivityEntry,
+  listed: ReadonlySet<string>,
+): MobileTask => ({
+  id: entry.agentId,
+  title: entry.title,
+  status: entry.status,
+  createdAt: entry.createdAtMs,
+  updatedAt: entry.updatedAtMs,
+  ...(entry.status === "running" && listed.has(entry.agentId)
+    ? { authoritativeRunning: true as const }
+    : {}),
+  ...(entry.agentType ? { agentType: entry.agentType } : {}),
+  ...(entry.statusText ? { statusText: entry.statusText } : {}),
+  ...(entry.completedAtMs !== undefined ? { completedAt: entry.completedAtMs } : {}),
+  ...(entry.result ? { resultText: entry.result } : {}),
+  ...(entry.error ? { errorMessage: entry.error } : {}),
+});
+
 export const collectJournalTasks = (
   records: readonly JournalRecord[],
   runningAgents: readonly AgentActivityEntry[] = [],
 ): MobileTask[] => {
-  const carded = new Set<string>();
-  for (const record of records) {
-    if (
-      record.kind === "card" &&
-      record.card.type === "agent-lifecycle" &&
-      record.card.event.type === "agent-started"
-    ) {
-      carded.add(record.card.event.payload.agentId);
-    }
-  }
-  const calls = toolCallsById(records);
-  const tasks = new Map<string, MobileTask>();
-  for (const task of agentSnapshotTasks(runningAgents)) tasks.set(task.id, task);
-  const generations = new Map<string, number>();
-  const settledGenerations = new Map<string, number>();
-
-  const start = (
-    id: string,
-    title: string | undefined,
-    at: number,
-    extra: Partial<MobileTask> = {},
-  ) => {
-    const existing = tasks.get(id);
-    const resolvedTitle = title?.trim() || existing?.title;
-    if (!resolvedTitle) return;
-    tasks.set(id, {
-      id,
-      title: resolvedTitle,
-      status: "running",
-      createdAt: at,
-      updatedAt: at,
-      ...(existing?.agentType ? { agentType: existing.agentType } : {}),
-      ...extra,
-    });
-  };
-
-  const settle = (
-    id: string,
-    status: MobileTask["status"],
-    at: number,
-    outcome: { resultText?: string; errorMessage?: string } = {},
-  ) => {
-    const existing = tasks.get(id);
-    if (!existing || existing.status !== "running") return;
-    const { statusText: _statusText, ...rest } = existing;
-    const resultText = outcome.resultText?.trim();
-    const errorMessage = outcome.errorMessage?.trim();
-    tasks.set(id, {
-      ...rest,
-      status,
-      completedAt: at,
-      updatedAt: at,
-      ...(resultText ? { resultText } : {}),
-      ...(errorMessage ? { errorMessage } : {}),
-    });
-  };
-
-  for (const record of records) {
-    if (record.kind === "card") {
-      if (record.card.type !== "agent-lifecycle") continue;
-      const { event } = record.card;
-      const id = event.payload.agentId;
-      const generation = event.payload.attemptGeneration;
-      const current = generations.get(id) ?? 0;
-      if (event.type === "agent-started") {
-        if (generation < current) continue;
-        if (generation <= (settledGenerations.get(id) ?? 0)) continue;
-        generations.set(id, generation);
-        start(id, event.payload.description, record.createdAtMs, {
-          ...(event.payload.agentType ? { agentType: event.payload.agentType } : {}),
-          ...(event.payload.statusText?.trim()
-            ? { statusText: event.payload.statusText.trim() }
-            : {}),
-        });
-        continue;
-      }
-      if (event.type !== "agent-progress") {
-        settledGenerations.set(id, Math.max(generation, settledGenerations.get(id) ?? 0));
-      }
-      if (generation !== current && generations.has(id)) continue;
-      if (event.type === "agent-progress") {
-        if (!generations.has(id)) continue;
-        const existing = tasks.get(id);
-        const statusText = event.payload.statusText.trim();
-        if (existing?.status === "running" && statusText) {
-          tasks.set(id, { ...existing, statusText, updatedAt: record.createdAtMs });
-        }
-        continue;
-      }
-      settle(
-        id,
-        agentTaskStatus(cloudAgentLifecycleStatus(event)),
-        record.createdAtMs,
-        event.type === "agent-completed"
-          ? { resultText: event.payload.result }
-          : { errorMessage: event.payload.error },
-      );
-      continue;
-    }
-    if (record.kind !== "message") continue;
-
-    if (record.role === "user" && record.hidden) {
-      const text = messageText(record.payload);
-      const task = lifecycleWakeTask(text);
-      const outcome = lifecycleWakeOutcome(text);
-      if (!task || !outcome || carded.has(task.threadId)) continue;
-      settle(
-        task.threadId,
-        agentTaskStatus(outcome.kind),
-        record.createdAtMs,
-        outcome?.kind === "completed"
-          ? { resultText: outcome.body }
-          : { errorMessage: outcome.body },
-      );
-      continue;
-    }
-
-    if (record.role !== "toolResult" || record.payload.isError === true) continue;
-    const callId =
-      typeof record.payload.toolCallId === "string" ? record.payload.toolCallId : "";
-    const call = calls.get(callId);
-    const toolName =
-      typeof record.payload.toolName === "string"
-        ? bareToolName(record.payload.toolName)
-        : call?.name;
-    if (toolName !== "spawn_agent" && toolName !== "send_message") continue;
-    const threadId = toolResultThreadId(record) ?? call?.threadId ?? null;
-    if (!threadId || carded.has(threadId)) continue;
-    if (toolName === "send_message") {
-      if (tasks.get(threadId)?.status === "running") continue;
-      start(threadId, undefined, record.createdAtMs);
-      continue;
-    }
-    const details = asRecord(record.payload.details);
-    start(
-      threadId,
-      call?.description ??
-        (typeof details?.description === "string" ? details.description : undefined),
-      record.createdAtMs,
-      { agentType: "general" },
-    );
-  }
-
-  return [...tasks.values()];
+  const state = emptyAgentActivityState();
+  for (const agent of runningAgents) state.entries.set(agent.agentId, agent);
+  foldAgentActivity(state, records, { outcomes: true });
+  const listed = new Set(runningAgents.map((agent) => agent.agentId));
+  return [...state.entries.values()].map((entry) => journalTask(entry, listed));
 };
 
 const ledgerTask = (id: string, row: LedgerAgent, base?: MobileTask): MobileTask => {

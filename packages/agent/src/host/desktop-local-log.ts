@@ -23,7 +23,7 @@ import {
   type PiUserMessage,
 } from "@stella/contracts/pi-chat";
 import { splitMessageReplyRefs } from "@stella/contracts/reply-refs";
-import { lifecycleWakeOutcome, lifecycleWakeTask } from "@stella/contracts/conversation-journal-projection";
+import { wakePromptOf } from "@stella/contracts/agent-wake-prompt";
 import { NO_MESSAGE_ID, recordMessageId } from "../stella/message-ids.ts";
 
 const spawnedThreadId = (details: unknown, text: string): string | undefined => {
@@ -258,20 +258,18 @@ export async function localLogMirror(args: {
   const taskEnded = (entry: Pick<EntryRecord, "id" | "kind" | "model">): LocalLogWrite | undefined => {
     const message = entry.model?.[0];
     if (entry.kind !== "pi.user" || message?.role !== "user" || !piUserHidden(message as PiUserMessage)) return undefined;
-    const report = piMessageText(message);
-    const task = lifecycleWakeTask(report);
-    const outcome = task ? lifecycleWakeOutcome(report) : null;
-    if (!task || !outcome) return undefined;
+    const wake = wakePromptOf(piJournalUserMessage(message as PiUserMessage).message);
+    if (!wake) return undefined;
     return {
-      key: `${root.id}:${entry.id}:agent-${outcome.kind}`,
+      key: `${root.id}:${entry.id}:agent-${wake.outcome}`,
       role: "lifecycle",
-      type: outcome.kind === "completed" ? "agent-completed" : outcome.kind === "failed" ? "agent-failed" : "agent-canceled",
+      type: wake.outcome === "completed" ? "agent-completed" : wake.outcome === "failed" ? "agent-failed" : "agent-canceled",
       timestamp: message.timestamp,
-      agentId: task.threadId,
+      agentId: wake.threadId,
       payload: {
-        agentId: task.threadId,
-        ...(task.description ? { description: task.description } : {}),
-        ...(outcome.kind === "completed" ? { result: outcome.body } : outcome.body ? { error: outcome.body } : {}),
+        agentId: wake.threadId,
+        ...(wake.description ? { description: wake.description } : {}),
+        ...(wake.outcome === "completed" ? { result: wake.body } : wake.body ? { error: wake.body } : {}),
       },
     };
   };

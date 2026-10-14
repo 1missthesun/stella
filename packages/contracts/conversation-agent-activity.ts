@@ -1,29 +1,5 @@
-/**
- * Who is working in a conversation right now, folded from its journal.
- *
- * Both sides of the conversation socket need the same answer. The client used
- * to derive it from the records it happened to be holding, which made "what is
- * running" a function of how much transcript a device had scrolled through: an
- * agent whose `agent-started` card sat below the retained window simply did not
- * exist. The journal is the authority, so the fold lives here, next to the
- * lifecycle card contract, and the Durable Object answers from the whole
- * journal while a client folds the rows it has on top of that answer.
- *
- * Two kinds of evidence, because two placements record agents differently:
- *  - a cloud-placed turn writes `agent-lifecycle` cards;
- *  - a turn a computer ran is mirrored with its `spawn_agent` / `send_message`
- *    tool results and the hidden wake prompt (`[Agent completed]` and friends)
- *    that reported the outcome.
- * A lifecycle card always wins: when an agent has a start card, its mirrored
- * rows are the same facts said less precisely. A terminal card alone, from
- * whoever owns the agent's record (the owner's agent threads for a computer's
- * agents, the conversation's object for its own), settles a mirrored agent:
- * it is how an agent that ended without a wake prompt stops reading as
- * running.
- */
-
 import { agentTaskStatus } from "./agent-ledger.js";
-import { legacyReportStatus } from "./agent-status.js";
+import { wakePromptOf } from "./agent-wake-prompt.js";
 import {
   cloudAgentLifecycleStatus,
   parseCloudAgentLifecycleCard,
@@ -45,6 +21,8 @@ export type AgentActivityEntry = {
   updatedAtMs: number;
   completedAtMs?: number;
   attemptGeneration?: number;
+  result?: string;
+  error?: string;
 };
 
 export type AgentActivityState = {
@@ -59,6 +37,7 @@ export type AgentActivityRecordInput = {
   createdAtMs: number;
   role?: string | undefined;
   hidden?: boolean | undefined;
+  clientMsgId?: string | undefined;
   payload?: Record<string, unknown> | undefined;
   card?: unknown;
 };
@@ -69,30 +48,6 @@ export const emptyAgentActivityState = (): AgentActivityState => ({
   settledGenerations: new Map(),
   carded: new Set(),
 });
-
-const WAKE_THREAD_RE =
-  /^\[(?:Agent completed|Task failed|Task canceled|Subagent paused)\][\s\S]*?(?:^thread_id:\s*(\S+)|\(thread ([^)]+)\))/mu;
-const WAKE_DESCRIPTION_RE =
-  /^\[(?:Agent completed|Task failed|Task canceled|Subagent paused)\][\s\S]*?^description:\s*(.+)$/mu;
-
-/**
- * The agent named by a hidden lifecycle wake prompt, with its description when
- * the prompt carried one. A mirrored turn has no lifecycle card, so this is the
- * only place such an agent's title comes from.
- */
-export const lifecycleWakeTarget = (
-  text: string,
-): { threadId: string; description?: string } | null => {
-  const match = WAKE_THREAD_RE.exec(text);
-  const threadId = (match?.[1] ?? match?.[2])?.trim();
-  if (!threadId) return null;
-  const description = WAKE_DESCRIPTION_RE.exec(text)?.[1]?.trim();
-  return description ? { threadId, description } : { threadId };
-};
-
-/** A wake prompt's outcome, read from its heading: the fallback for chats with no ledger row. */
-const wakeStatus = (text: string): AgentActivityStatus =>
-  agentTaskStatus(legacyReportStatus(text));
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value)
@@ -116,7 +71,7 @@ export const agentActivityMessageText = (
 export const bareToolName = (name: string): string =>
   name.includes("__") ? (name.split("__").at(-1) ?? name) : name;
 
-const toolResultThreadId = (
+export const agentToolResultThreadId = (
   payload: Record<string, unknown> | undefined,
 ): string | null => {
   const details = asRecord(payload?.details);
@@ -185,7 +140,7 @@ const collectToolCalls = (
 export const foldAgentActivity = (
   state: AgentActivityState,
   records: readonly AgentActivityRecordInput[],
-  options?: { toolCalls?: Map<string, ToolCall> },
+  options?: { toolCalls?: Map<string, ToolCall>; outcomes?: boolean },
 ): AgentActivityState => {
   for (const record of records) {
     if (record.kind !== "card") continue;
@@ -220,15 +175,20 @@ export const foldAgentActivity = (
     agentId: string,
     status: AgentActivityStatus,
     at: number,
+    outcome: { result?: string; error?: string } = {},
   ): void => {
     const existing = state.entries.get(agentId);
     if (!existing || existing.status !== "running") return;
     const { statusText: _statusText, ...rest } = existing;
+    const result = options?.outcomes ? outcome.result?.trim() : undefined;
+    const error = options?.outcomes ? outcome.error?.trim() : undefined;
     state.entries.set(agentId, {
       ...rest,
       status,
       completedAtMs: at,
       updatedAtMs: at,
+      ...(result ? { result } : {}),
+      ...(error ? { error } : {}),
     });
   };
 
@@ -277,16 +237,25 @@ export const foldAgentActivity = (
         }
         continue;
       }
-      settle(agentId, agentTaskStatus(cloudAgentLifecycleStatus(event)), record.createdAtMs);
+      settle(
+        agentId,
+        agentTaskStatus(cloudAgentLifecycleStatus(event)),
+        record.createdAtMs,
+        event.type === "agent-completed" ? { result: event.payload.result } : { error: event.payload.error },
+      );
       continue;
     }
     if (record.kind !== "message") continue;
 
     if (record.role === "user" && record.hidden) {
-      const text = agentActivityMessageText(record.payload);
-      const target = lifecycleWakeTarget(text);
-      if (!target || state.carded.has(target.threadId)) continue;
-      settle(target.threadId, wakeStatus(text), record.createdAtMs);
+      const wake = wakePromptOf(record.payload, record.clientMsgId);
+      if (!wake || state.carded.has(wake.threadId)) continue;
+      settle(
+        wake.threadId,
+        agentTaskStatus(wake.outcome),
+        record.createdAtMs,
+        wake.outcome === "completed" ? { result: wake.body } : { error: wake.body },
+      );
       continue;
     }
 
@@ -303,7 +272,7 @@ export const foldAgentActivity = (
         ? bareToolName(record.payload.toolName)
         : call?.name;
     if (toolName !== "spawn_agent" && toolName !== "send_message") continue;
-    const threadId = toolResultThreadId(record.payload) ?? call?.threadId ?? null;
+    const threadId = agentToolResultThreadId(record.payload) ?? call?.threadId ?? null;
     if (!threadId || state.carded.has(threadId)) continue;
     if (toolName === "send_message") {
       const delivered = toolResultField(record.payload, "delivered");

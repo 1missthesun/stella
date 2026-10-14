@@ -7,6 +7,10 @@ import type {
 import { isPiAgentText } from "@stella/contracts/pi-chat";
 import { parseReminderCard, reminderMarkOf } from "@stella/contracts/reminders";
 import { journalAgentTitles } from "@stella/contracts/agent-titles";
+import {
+  agentToolResultThreadId,
+  bareToolName,
+} from "@stella/contracts/conversation-agent-activity";
 import { groupEventsIntoMessages } from "@/features/chat/lib/group-events-into-messages";
 import { withAttachmentPreamble } from "./cloud-composer-store";
 import { driveAttachmentRef } from "./drive-attachment-previews";
@@ -65,23 +69,12 @@ const startCardedAgentIds = (records: readonly JournalRecord[]): Set<string> => 
 
 const spawnResultThreadId = (
   record: JournalMessageRecord,
-): string | null => {
-  if (record.role !== "toolResult" || record.payload.toolName !== "spawn_agent") {
-    return null;
-  }
-  const details = asRecord(record.payload.details);
-  if (typeof details?.thread_id === "string" && details.thread_id) {
-    return details.thread_id;
-  }
-  // A locally executed turn mirrors the tool's JSON text without details.
-  try {
-    const parsed = JSON.parse(messageText(record.payload)) as unknown;
-    const threadId = asRecord(parsed)?.thread_id;
-    return typeof threadId === "string" && threadId ? threadId : null;
-  } catch {
-    return null;
-  }
-};
+): string | null =>
+  record.role === "toolResult" &&
+  typeof record.payload.toolName === "string" &&
+  bareToolName(record.payload.toolName) === "spawn_agent"
+    ? agentToolResultThreadId(record.payload)
+    : null;
 
 /**
  * Lifecycle events for a turn the desktop executed and mirrored into the

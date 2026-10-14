@@ -5,6 +5,7 @@ import {
   type JournalTurnRecord,
 } from "./conversation-protocol.js";
 import type { AgentAttemptOutcome } from "./agent-status.js";
+import { wakePromptOf } from "./agent-wake-prompt.js";
 import {
   splitMessageReplyRefs,
   toReplyPreview,
@@ -49,69 +50,6 @@ export const journalMessageTimestamp = (
     ? record.payload.timestamp
     : record.createdAtMs;
 
-const WAKE_THREAD_RE =
-  /^\[(?:Agent completed|Agent failed|Agent canceled|Task failed|Task canceled|Subagent paused)\][\s\S]*?(?:^thread_id:\s*(\S+)|\(thread ([^)]+)\))/mu;
-const WAKE_DESCRIPTION_RE =
-  /^\[(?:Agent completed|Agent failed|Agent canceled|Task failed|Task canceled|Subagent paused)\][\s\S]*?^description:\s*(.+)$/mu;
-
-/**
- * The task named by a hidden lifecycle wake prompt (`[Agent completed]` and
- * friends): its thread id — from a `thread_id:` line or a `(thread …)`
- * mention — and, when the prompt carries one, its description. A locally
- * executed turn mirrored into the journal has no lifecycle card, so this
- * prompt is where the task's title comes from.
- */
-export const lifecycleWakeTask = (
-  text: string,
-): { threadId: string; description?: string } | null => {
-  const match = WAKE_THREAD_RE.exec(text);
-  const threadId = (match?.[1] ?? match?.[2])?.trim();
-  if (!threadId) return null;
-  const description = WAKE_DESCRIPTION_RE.exec(text)?.[1]?.trim();
-  return description ? { threadId, description } : { threadId };
-};
-
-const WAKE_KIND_RE =
-  /^\[(Agent completed|Agent failed|Agent canceled|Task failed|Task canceled|Subagent paused)\]/m;
-const WAKE_OUTCOMES: Readonly<Record<string, AgentAttemptOutcome>> = {
-  "Agent completed": "completed",
-  "Agent failed": "failed",
-  "Agent canceled": "canceled",
-  "Task failed": "failed",
-  "Task canceled": "canceled",
-  "Subagent paused": "canceled",
-};
-const WAKE_TRAILER_RE = /^(?:agent_state|presentation|routing|error):/;
-
-/**
- * The `result:` body of an `[Agent completed]` wake prompt (the lines after
- * `result:` up to the runtime's trailing instructions), or the `error:`
- * line of a failed / canceled one.
- */
-export const lifecycleWakeOutcome = (
-  text: string,
-): { kind: AgentAttemptOutcome; body: string } | null => {
-  const kind = WAKE_KIND_RE.exec(text)?.[1];
-  if (!kind) return null;
-  const lines = text.split(/\r?\n/);
-  const startIndex = lines.findIndex((line) =>
-    kind === "Agent completed"
-      ? line.startsWith("result:")
-      : line.startsWith("error:"),
-  );
-  let body = "";
-  if (startIndex !== -1) {
-    const first = lines[startIndex]!.replace(/^(?:result|error):\s?/, "");
-    const rest: string[] = [];
-    for (const line of lines.slice(startIndex + 1)) {
-      if (WAKE_TRAILER_RE.test(line)) break;
-      rest.push(line);
-    }
-    body = [first, ...rest].join("\n").trim();
-  }
-  return { kind: WAKE_OUTCOMES[kind] ?? "failed", body };
-};
-
 export type JournalMirroredWake = {
   record: JournalMessageRecord;
   threadId: string;
@@ -133,11 +71,14 @@ export const journalMirroredWake = (
     if (record.kind !== "message" || record.role !== "user" || !record.hidden) {
       continue;
     }
-    const text = messageText(record.payload);
-    const task = lifecycleWakeTask(text);
-    const outcome = task ? lifecycleWakeOutcome(text) : null;
-    if (!task || !outcome || carded.has(task.threadId)) continue;
-    wake = { record, ...task, outcome };
+    const prompt = wakePromptOf(record.payload, record.clientMsgId);
+    if (!prompt || carded.has(prompt.threadId)) continue;
+    wake = {
+      record,
+      threadId: prompt.threadId,
+      ...(prompt.description ? { description: prompt.description } : {}),
+      outcome: { kind: prompt.outcome, body: prompt.body },
+    };
   }
   return wake;
 };
@@ -238,7 +179,7 @@ export const resolveJournalReplyRefs = (args: {
     });
   }
   if (refs.length === 0 && args.turnUserRecord?.hidden) {
-    const wake = lifecycleWakeTask(messageText(args.turnUserRecord.payload));
+    const wake = wakePromptOf(args.turnUserRecord.payload, args.turnUserRecord.clientMsgId);
     if (wake)
       push({
         kind: "agent",

@@ -71,18 +71,9 @@ const keyLooksSensitive = (key: string): boolean => {
   ) {
     return true;
   }
-  // Fused keys are matched by EXACT equality on the normalized key only, never
-  // by prefix/suffix — otherwise benign keys that merely start or end with a
-  // fused name (passwordless, accessKeyboard, clientSecretary, turnkey) would be
-  // over-redacted.
-  //
-  // Documented residual: a fused sensitive name embedded in the MIDDLE of an
-  // unrecognized key (e.g. `openaiapikeyprod=`, `myauthtokenprod=`) is not
-  // matched here. This is an accepted heuristic limitation: a real secret value
-  // is long/high-entropy or an sk-/AWS/JWT/private-key form and is redacted by
-  // the value-based patterns regardless of key name; only a short,
-  // non-secret-looking value under such an unusual key slips, which is not a
-  // real secret. We deliberately do NOT chase it with more key-name patterns.
+  // Exact match only, so passwordless or accessKeyboard stay readable. These
+  // patterns are best-effort; secrets a user typed are redacted by
+  // fingerprint (secret-redaction.ts), not by guessing from key names.
   const normalized = key.toLowerCase().replace(/[^a-z0-9]+/g, "");
   return FUSED_SECRET_KEYS.includes(normalized);
 };

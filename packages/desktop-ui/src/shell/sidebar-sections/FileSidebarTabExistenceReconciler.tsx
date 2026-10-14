@@ -4,11 +4,10 @@ import {
   useSidebarOpenTabs,
 } from "@/features/workspace-display/sidebar-sections";
 import { useDisplayTabList } from "@/features/workspace-display/tab-store";
-import type { DisplayTab } from "@/features/workspace-display/types";
 
 export function FileSidebarTabExistenceReconciler() {
   const sidebarTabs = useSidebarOpenTabs();
-  const { tabs } = useDisplayTabList() as { tabs: DisplayTab[] };
+  const { tabs } = useDisplayTabList();
   const previousDisplayTabIds = useRef(
     new Set(tabs.map((tab) => tab.id)),
   );

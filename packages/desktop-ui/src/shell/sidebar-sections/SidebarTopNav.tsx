@@ -7,7 +7,6 @@ import {
   type SidebarTab,
 } from "@/features/workspace-display/sidebar-sections";
 import { useDisplayTabList } from "@/features/workspace-display/tab-store";
-import type { DisplayTab } from "@/features/workspace-display/types";
 import { DisplayTabIcon } from "@/features/workspace-display/icons";
 import { cloudAppTitles } from "@/features/cloud/cloud-app-title-store";
 import { cloudAppIdFromLocation } from "@/features/cloud/open-cloud-app-panel";
@@ -19,8 +18,7 @@ import "./sidebar-top-nav.css";
 export function SidebarTopNav() {
   const tabs = useSidebarOpenTabs();
   const activeTabId = useSidebarActiveTabId();
-  // `tab-store` is untyped JS (tabs infer as `never[]`); type the entries.
-  const { tabs: displayTabs } = useDisplayTabList() as { tabs: DisplayTab[] };
+  const { tabs: displayTabs } = useDisplayTabList();
   const cloudTitles = useSyncExternalStore(
     cloudAppTitles.subscribe,
     cloudAppTitles.getSnapshot,

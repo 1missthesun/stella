@@ -1,19 +1,28 @@
-// Expo's default Metro config, plus one resolver fallback: shared workspace
-// packages (e.g. @stella/contracts) use NodeNext-style `./x.js` specifiers for
-// TypeScript sources, which Metro does not map to `./x.ts` on its own.
+const fs = require("node:fs");
+const path = require("node:path");
 const { getDefaultConfig } = require("expo/metro-config");
 
 const config = getDefaultConfig(__dirname);
 
+const nodeNextSourceRoots = ["contracts", "theme"].map(
+  (name) => fs.realpathSync(path.join(__dirname, "..", name)) + path.sep,
+);
+
 config.resolver.resolveRequest = (context, moduleName, platform) => {
-  try {
-    return context.resolveRequest(context, moduleName, platform);
-  } catch (error) {
-    if (moduleName.startsWith(".") && moduleName.endsWith(".js")) {
-      return context.resolveRequest(context, moduleName.slice(0, -3), platform);
+  if (
+    moduleName.startsWith(".") &&
+    moduleName.endsWith(".js") &&
+    nodeNextSourceRoots.some((root) => context.originModulePath.startsWith(root))
+  ) {
+    const sourcePath = path.resolve(
+      path.dirname(context.originModulePath),
+      `${moduleName.slice(0, -3)}.ts`,
+    );
+    if (fs.existsSync(sourcePath)) {
+      return { type: "sourceFile", filePath: sourcePath };
     }
-    throw error;
   }
+  return context.resolveRequest(context, moduleName, platform);
 };
 
 module.exports = config;

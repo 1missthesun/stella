@@ -138,9 +138,7 @@ export const deviceDestination = (
   presence: DevicePresenceState | undefined,
   online: boolean,
 ): DeviceDestination => {
-  const remoteExecution =
-    device.remoteExecution ??
-    (device.remoteExecutionEnabled ? "enabled" : "unconfigured");
+  const remoteExecution = device.remoteExecution;
   return {
     deviceId: device.deviceId,
     ...(device.label ? { label: device.label } : {}),

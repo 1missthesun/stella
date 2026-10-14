@@ -290,29 +290,15 @@ const register = async (
   return {
     deviceId: args.deviceId,
     ownerGeneration: snapshot.ownerGeneration,
-    remoteExecutionEnabled: existing.remote_execution_enabled === 1,
+    remoteExecutionEnabled: remoteExecutionOf(existing) === "enabled",
     remoteExecution: remoteExecutionOf(existing),
     rotated: Boolean(existing.public_key && existing.public_key !== args.devicePublicKey),
   };
 };
 
-/**
- * The stored consent, tolerating a row written before the consent migration
- * (or by an older build) by falling back to the boolean it was derived from.
- */
-const remoteExecutionOf = (
-  row: Pick<DeviceRow, "remote_execution_enabled" | "remote_execution_state">,
-): DeviceRemoteExecution => {
-  const state = row.remote_execution_state?.trim();
-  if (
-    state === "unconfigured" ||
-    state === "asking" ||
-    state === "enabled" ||
-    state === "declined"
-  ) {
-    return state;
-  }
-  return row.remote_execution_enabled === 1 ? "enabled" : "unconfigured";
+const remoteExecutionOf = (row: Pick<DeviceRow, "remote_execution_state">): DeviceRemoteExecution => {
+  const state = row.remote_execution_state;
+  return state === "asking" || state === "enabled" || state === "declined" ? state : "unconfigured";
 };
 
 const writeRemoteExecution = (

@@ -49,7 +49,7 @@ export type OwnerSnapshot = {
     deviceId: string;
     publicKey: string;
     remoteExecutionEnabled: boolean;
-    remoteExecution?:
+    remoteExecution:
       | "unconfigured"
       | "asking"
       | "enabled"

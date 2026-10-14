@@ -259,10 +259,7 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
       (candidate) => candidate.deviceId === deviceId,
     );
     if (!device) return undefined;
-    return (
-      device.remoteExecution ??
-      (device.remoteExecutionEnabled ? "enabled" : "unconfigured")
-    );
+    return device.remoteExecution;
   }
 
   protected offerAgainTo(attachment: PresenceAttachment, now: number): void {

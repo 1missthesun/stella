@@ -1036,6 +1036,7 @@
       "claudeNote": "यहां खाता जोड़ने से Stella का क्लाउड Anthropic के अपने पेज पर Claude Code में साइन इन होता है। हर कंप्यूटर अपना Claude Code साइन-इन इस्तेमाल करता है।",
       "claudeSection": "Claude",
       "claudeSyncNote": "पूरे Claude Code सत्र, टूल आउटपुट सहित, Stella के क्लाउड में सिंक होते हैं।",
+      "claudeSyncNoteSelfHosted": "पूरे Claude Code सत्र, टूल आउटपुट सहित, आपके Stella सर्वर में सिंक होते हैं।",
       "connectChatgpt": "ChatGPT अकाउंट कनेक्ट करें",
       "connectClaude": "Claude खाता जोड़ें",
       "connecting": "कनेक्ट हो रहा है…",
@@ -2081,6 +2082,7 @@
         "whereDevice": "{place} पर Claude Code में साइन इन किया जा रहा है।"
       },
       "claudeSyncNote": "पूरे Claude Code सत्र, टूल आउटपुट सहित, Stella के क्लाउड में सिंक होते हैं।",
+      "claudeSyncNoteSelfHosted": "पूरे Claude Code सत्र, टूल आउटपुट सहित, आपके Stella सर्वर में सिंक होते हैं।",
       "claudeTitle": "Claude (Pro/Max)",
       "cliMissing": "यहाँ Claude इस्तेमाल करने के लिए इस कंप्यूटर पर Claude Code इंस्टॉल करें।",
       "connecting": "कनेक्ट हो रहा है…",

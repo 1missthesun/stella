@@ -10,10 +10,15 @@
  */
 
 import * as SecureStore from "./secure-store";
+import { isSelfHostedLaunch } from "./server-registry";
 
 // Version 4 names Meta Muse as the direct transcription recipient. Do not
 // silently treat consent naming xAI as consent to a different company.
-const CONSENT_KEY = "stella-mobile_ai-data-consent-v4";
+// A self-hosted server names different recipients (the owner's server and
+// the AI accounts connected to it), so it asks for its own consent.
+const CONSENT_KEY = isSelfHostedLaunch
+  ? "stella-mobile_ai-data-consent-selfhosted-v1"
+  : "stella-mobile_ai-data-consent-v4";
 
 let cached: boolean | null = null;
 

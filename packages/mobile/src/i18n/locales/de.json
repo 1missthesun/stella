@@ -1036,6 +1036,7 @@
       "claudeNote": "Wenn du hier ein Konto hinzufügst, meldet sich Stellas Cloud auf Anthropics eigener Seite bei Claude Code an. Jeder Computer nutzt seine eigene Claude-Code-Anmeldung.",
       "claudeSection": "Claude",
       "claudeSyncNote": "Vollständige Claude-Code-Sitzungen, einschließlich Tool-Ausgaben, werden mit Stellas Cloud synchronisiert.",
+      "claudeSyncNoteSelfHosted": "Vollständige Claude-Code-Sitzungen, einschließlich Tool-Ausgaben, werden mit deinem Stella-Server synchronisiert.",
       "connectChatgpt": "ChatGPT-Konto verbinden",
       "connectClaude": "Claude-Konto hinzufügen",
       "connecting": "Wird verbunden…",
@@ -2081,6 +2082,7 @@
         "whereDevice": "Anmeldung bei Claude Code auf {place}."
       },
       "claudeSyncNote": "Vollständige Claude-Code-Sitzungen, einschließlich Tool-Ausgaben, werden mit Stellas Cloud synchronisiert.",
+      "claudeSyncNoteSelfHosted": "Vollständige Claude-Code-Sitzungen, einschließlich Tool-Ausgaben, werden mit deinem Stella-Server synchronisiert.",
       "claudeTitle": "Claude (Pro/Max)",
       "cliMissing": "Installiere Claude Code auf diesem Computer, um Claude hier zu nutzen.",
       "connecting": "Wird verbunden…",

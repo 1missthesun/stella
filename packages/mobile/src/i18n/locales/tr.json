@@ -1036,6 +1036,7 @@
       "claudeNote": "Buradan hesap eklemek, Stella'nın bulutunun Anthropic'in kendi sayfasında Claude Code'a oturum açmasını sağlar. Her bilgisayar kendi Claude Code oturumunu kullanır.",
       "claudeSection": "Claude",
       "claudeSyncNote": "Araç çıktıları dahil tüm Claude Code oturumları Stella'nın bulutuna senkronize edilir.",
+      "claudeSyncNoteSelfHosted": "Araç çıktıları dahil tüm Claude Code oturumları kendi Stella sunucunuza senkronize edilir.",
       "connectChatgpt": "ChatGPT hesabını bağla",
       "connectClaude": "Claude hesabı ekle",
       "connecting": "Bağlanıyor…",
@@ -2081,6 +2082,7 @@
         "whereDevice": "{place} üzerinde Claude Code'da oturum açılıyor."
       },
       "claudeSyncNote": "Araç çıktıları dahil tüm Claude Code oturumları Stella'nın bulutuna senkronize edilir.",
+      "claudeSyncNoteSelfHosted": "Araç çıktıları dahil tüm Claude Code oturumları kendi Stella sunucunuza senkronize edilir.",
       "claudeTitle": "Claude (Pro/Max)",
       "cliMissing": "Claude'u burada kullanmak için bu bilgisayara Claude Code yükle.",
       "connecting": "Bağlanıyor…",

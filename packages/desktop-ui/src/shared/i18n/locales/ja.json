@@ -1028,6 +1028,7 @@
       "claudeNote": "ここでアカウントを追加すると、Stella のクラウドが Anthropic 自身のページで Claude Code にサインインします。各コンピュータは独自の Claude Code のサインインを使います。",
       "claudeSection": "Claude",
       "claudeSyncNote": "ツールの出力を含む Claude Code のセッション全体が Stella のクラウドに同期されます。",
+      "claudeSyncNoteSelfHosted": "ツールの出力を含む Claude Code のセッション全体が、あなたの Stella サーバーに同期されます。",
       "connectChatgpt": "ChatGPT アカウントを接続",
       "connectClaude": "Claude アカウントを追加",
       "connecting": "接続中…",
@@ -2073,6 +2074,7 @@
         "whereDevice": "{place} の Claude Code にサインインしています。"
       },
       "claudeSyncNote": "ツールの出力を含む Claude Code のセッション全体が Stella のクラウドに同期されます。",
+      "claudeSyncNoteSelfHosted": "ツールの出力を含む Claude Code のセッション全体が、あなたの Stella サーバーに同期されます。",
       "claudeTitle": "Claude (Pro/Max)",
       "cliMissing": "ここで Claude を使うには、このコンピュータに Claude Code をインストールしてください。",
       "connecting": "接続中…",

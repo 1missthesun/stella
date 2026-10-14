@@ -1044,6 +1044,7 @@
       "claudeNote": "Ajouter un compte ici connecte le cloud de Stella à Claude Code sur la page même d'Anthropic. Chaque ordinateur utilise sa propre connexion Claude Code.",
       "claudeSection": "Claude",
       "claudeSyncNote": "Les sessions Claude Code complètes, y compris les sorties des outils, sont synchronisées avec le cloud de Stella.",
+      "claudeSyncNoteSelfHosted": "Les sessions Claude Code complètes, y compris les sorties des outils, sont synchronisées avec votre serveur Stella.",
       "connectChatgpt": "Connecter le compte ChatGPT",
       "connectClaude": "Ajouter un compte Claude",
       "connecting": "Connexion…",
@@ -2089,6 +2090,7 @@
         "whereDevice": "Connexion à Claude Code sur {place}."
       },
       "claudeSyncNote": "Les sessions Claude Code complètes, y compris les sorties des outils, sont synchronisées avec le cloud de Stella.",
+      "claudeSyncNoteSelfHosted": "Les sessions Claude Code complètes, y compris les sorties des outils, sont synchronisées avec votre serveur Stella.",
       "claudeTitle": "Claude (Pro/Max)",
       "cliMissing": "Installez Claude Code sur cet ordinateur pour utiliser Claude ici.",
       "connecting": "Connexion…",

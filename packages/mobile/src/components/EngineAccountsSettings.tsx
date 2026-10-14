@@ -31,6 +31,7 @@ import { NativeMenu } from "./NativeMenu";
 import type { NativeMenuItem } from "./NativeMenu.types";
 import { makeSettingsStyles } from "./settings/settings-styles";
 import { getBackendClient, useBackendView } from "../lib/backend";
+import { isSelfHostedLaunch } from "../lib/server-registry";
 import { tapLight } from "../lib/haptics";
 import { type Colors } from "../theme/colors";
 import { fonts } from "../theme/fonts";
@@ -122,7 +123,11 @@ const announceClaudeSync = async (
   }
   Alert.alert(
     t("settings.engineAccounts.claudeTitle"),
-    t("mobile.engineAccounts.claudeSyncNote"),
+    t(
+      isSelfHostedLaunch
+        ? "mobile.engineAccounts.claudeSyncNoteSelfHosted"
+        : "mobile.engineAccounts.claudeSyncNote",
+    ),
     [
       {
         text: t("common.gotIt"),

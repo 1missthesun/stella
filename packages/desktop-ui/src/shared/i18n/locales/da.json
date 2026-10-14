@@ -1036,6 +1036,7 @@
       "claudeNote": "Når du tilføjer en konto her, logges Stellas sky ind i Claude Code på Anthropics egen side. Hver computer bruger sit eget Claude Code-login.",
       "claudeSection": "Claude",
       "claudeSyncNote": "Hele Claude Code-sessioner, inklusive værktøjsoutput, synkroniseres til Stellas sky.",
+      "claudeSyncNoteSelfHosted": "Hele Claude Code-sessioner, inklusive værktøjsoutput, synkroniseres til din Stella-server.",
       "connectChatgpt": "Forbind ChatGPT-konto",
       "connectClaude": "Tilføj Claude-konto",
       "connecting": "Forbinder…",
@@ -2081,6 +2082,7 @@
         "whereDevice": "Logger ind på Claude Code på {place}."
       },
       "claudeSyncNote": "Hele Claude Code-sessioner, inklusive værktøjsoutput, synkroniseres til Stellas sky.",
+      "claudeSyncNoteSelfHosted": "Hele Claude Code-sessioner, inklusive værktøjsoutput, synkroniseres til din Stella-server.",
       "claudeTitle": "Claude (Pro/Max)",
       "cliMissing": "Installer Claude Code på denne computer for at bruge Claude her.",
       "connecting": "Forbinder…",

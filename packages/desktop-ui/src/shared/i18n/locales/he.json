@@ -1044,6 +1044,7 @@
       "claudeNote": "הוספת חשבון כאן מחברת את הענן של Stella ל-Claude Code בדף של Anthropic עצמה. כל מחשב משתמש בחיבור Claude Code משלו.",
       "claudeSection": "Claude",
       "claudeSyncNote": "סשנים מלאים של Claude Code, כולל פלטי כלים, מסונכרנים לענן של Stella.",
+      "claudeSyncNoteSelfHosted": "סשנים מלאים של Claude Code, כולל פלטי כלים, מסונכרנים לשרת Stella שלך.",
       "connectChatgpt": "חיבור חשבון ChatGPT",
       "connectClaude": "הוספת חשבון Claude",
       "connecting": "מתחבר…",
@@ -2089,6 +2090,7 @@
         "whereDevice": "מתחברים ל-Claude Code ב-{place}."
       },
       "claudeSyncNote": "סשנים מלאים של Claude Code, כולל פלטי כלים, מסונכרנים לענן של Stella.",
+      "claudeSyncNoteSelfHosted": "סשנים מלאים של Claude Code, כולל פלטי כלים, מסונכרנים לשרת Stella שלך.",
       "claudeTitle": "Claude (Pro/Max)",
       "cliMissing": "התקינו את Claude Code במחשב הזה כדי להשתמש כאן ב-Claude.",
       "connecting": "מתחבר…",

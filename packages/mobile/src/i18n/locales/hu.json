@@ -1036,6 +1036,7 @@
       "claudeNote": "Ha itt adsz hozzá fiókot, a Stella felhője az Anthropic saját oldalán jelentkezik be a Claude Code-ba. Minden számítógép a saját Claude Code-bejelentkezését használja.",
       "claudeSection": "Claude",
       "claudeSyncNote": "A teljes Claude Code-munkamenetek, az eszközök kimeneteivel együtt, szinkronizálódnak a Stella felhőjébe.",
+      "claudeSyncNoteSelfHosted": "A teljes Claude Code-munkamenetek, az eszközök kimeneteivel együtt, szinkronizálódnak a saját Stella-szervereddel.",
       "connectChatgpt": "ChatGPT-fiók csatlakoztatása",
       "connectClaude": "Claude-fiók hozzáadása",
       "connecting": "Csatlakozás…",
@@ -2081,6 +2082,7 @@
         "whereDevice": "Bejelentkezés a Claude Code-ba itt: {place}."
       },
       "claudeSyncNote": "A teljes Claude Code-munkamenetek, az eszközök kimeneteivel együtt, szinkronizálódnak a Stella felhőjébe.",
+      "claudeSyncNoteSelfHosted": "A teljes Claude Code-munkamenetek, az eszközök kimeneteivel együtt, szinkronizálódnak a saját Stella-szervereddel.",
       "claudeTitle": "Claude (Pro/Max)",
       "cliMissing": "Telepítsd a Claude Code-ot erre a gépre, hogy itt használhasd a Claude-ot.",
       "connecting": "Csatlakozás…",

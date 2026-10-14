@@ -1028,6 +1028,7 @@
       "claudeNote": "การเพิ่มบัญชีที่นี่จะให้คลาวด์ของ Stella ลงชื่อเข้าใช้ Claude Code ผ่านหน้าของ Anthropic เอง คอมพิวเตอร์แต่ละเครื่องใช้การลงชื่อเข้าใช้ Claude Code ของตัวเอง",
       "claudeSection": "Claude",
       "claudeSyncNote": "เซสชัน Claude Code ทั้งหมด รวมถึงผลลัพธ์ของเครื่องมือ จะซิงค์ไปยังคลาวด์ของ Stella",
+      "claudeSyncNoteSelfHosted": "เซสชัน Claude Code ทั้งหมด รวมถึงผลลัพธ์ของเครื่องมือ จะซิงค์ไปยังเซิร์ฟเวอร์ Stella ของคุณ",
       "connectChatgpt": "เชื่อมต่อบัญชี ChatGPT",
       "connectClaude": "เพิ่มบัญชี Claude",
       "connecting": "กำลังเชื่อมต่อ…",
@@ -2073,6 +2074,7 @@
         "whereDevice": "กำลังลงชื่อเข้าใช้ Claude Code บน {place}"
       },
       "claudeSyncNote": "เซสชัน Claude Code ทั้งหมด รวมถึงผลลัพธ์ของเครื่องมือ จะซิงค์ไปยังคลาวด์ของ Stella",
+      "claudeSyncNoteSelfHosted": "เซสชัน Claude Code ทั้งหมด รวมถึงผลลัพธ์ของเครื่องมือ จะซิงค์ไปยังเซิร์ฟเวอร์ Stella ของคุณ",
       "claudeTitle": "Claude (Pro/Max)",
       "cliMissing": "ติดตั้ง Claude Code ในคอมพิวเตอร์เครื่องนี้เพื่อใช้ Claude ที่นี่",
       "connecting": "กำลังเชื่อมต่อ…",

@@ -1028,6 +1028,7 @@
       "claudeNote": "在此新增帳號會讓 Stella 的雲端在 Anthropic 自己的頁面上登入 Claude Code。每台電腦使用各自的 Claude Code 登入。",
       "claudeSection": "Claude",
       "claudeSyncNote": "完整的 Claude Code 工作階段（包括工具輸出）會同步到 Stella 的雲端。",
+      "claudeSyncNoteSelfHosted": "完整的 Claude Code 工作階段（包括工具輸出）會同步到你的 Stella 伺服器。",
       "connectChatgpt": "連線 ChatGPT 帳號",
       "connectClaude": "新增 Claude 帳號",
       "connecting": "正在連線…",
@@ -2073,6 +2074,7 @@
         "whereDevice": "正在{place}上登入 Claude Code。"
       },
       "claudeSyncNote": "完整的 Claude Code 工作階段（包括工具輸出）會同步到 Stella 的雲端。",
+      "claudeSyncNoteSelfHosted": "完整的 Claude Code 工作階段（包括工具輸出）會同步到你的 Stella 伺服器。",
       "claudeTitle": "Claude (Pro/Max)",
       "cliMissing": "在這台電腦上安裝 Claude Code，即可在此使用 Claude。",
       "connecting": "正在連線…",

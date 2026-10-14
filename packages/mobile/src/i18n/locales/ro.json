@@ -1044,6 +1044,7 @@
       "claudeNote": "Adăugarea unui cont aici conectează cloudul Stella la Claude Code pe pagina proprie a Anthropic. Fiecare computer își folosește propria conectare la Claude Code.",
       "claudeSection": "Claude",
       "claudeSyncNote": "Sesiunile Claude Code complete, inclusiv rezultatele instrumentelor, se sincronizează cu cloudul Stella.",
+      "claudeSyncNoteSelfHosted": "Sesiunile Claude Code complete, inclusiv rezultatele instrumentelor, se sincronizează cu serverul tău Stella.",
       "connectChatgpt": "Conectează contul ChatGPT",
       "connectClaude": "Adaugă cont Claude",
       "connecting": "Se conectează…",
@@ -2089,6 +2090,7 @@
         "whereDevice": "Conectare la Claude Code pe {place}."
       },
       "claudeSyncNote": "Sesiunile Claude Code complete, inclusiv rezultatele instrumentelor, se sincronizează cu cloudul Stella.",
+      "claudeSyncNoteSelfHosted": "Sesiunile Claude Code complete, inclusiv rezultatele instrumentelor, se sincronizează cu serverul tău Stella.",
       "claudeTitle": "Claude (Pro/Max)",
       "cliMissing": "Instalează Claude Code pe acest computer ca să folosești Claude aici.",
       "connecting": "Se conectează…",

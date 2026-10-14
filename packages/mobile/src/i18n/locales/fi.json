@@ -1036,6 +1036,7 @@
       "claudeNote": "Kun lisäät tilin täällä, Stellan pilvi kirjautuu Claude Codeen Anthropicin omalla sivulla. Jokainen tietokone käyttää omaa Claude Code -kirjautumistaan.",
       "claudeSection": "Claude",
       "claudeSyncNote": "Kokonaiset Claude Code -istunnot työkalujen tulosteineen synkronoidaan Stellan pilveen.",
+      "claudeSyncNoteSelfHosted": "Kokonaiset Claude Code -istunnot työkalujen tulosteineen synkronoidaan omalle Stella-palvelimellesi.",
       "connectChatgpt": "Yhdistä ChatGPT-tili",
       "connectClaude": "Lisää Claude-tili",
       "connecting": "Yhdistetään…",
@@ -2081,6 +2082,7 @@
         "whereDevice": "Kirjaudutaan Claude Codeen kohteessa {place}."
       },
       "claudeSyncNote": "Kokonaiset Claude Code -istunnot työkalujen tulosteineen synkronoidaan Stellan pilveen.",
+      "claudeSyncNoteSelfHosted": "Kokonaiset Claude Code -istunnot työkalujen tulosteineen synkronoidaan omalle Stella-palvelimellesi.",
       "claudeTitle": "Claude (Pro/Max)",
       "cliMissing": "Asenna Claude Code tälle tietokoneelle käyttääksesi Claudea täällä.",
       "connecting": "Yhdistetään…",

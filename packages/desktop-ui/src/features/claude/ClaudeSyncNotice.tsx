@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from "@/ui/dialog";
 import { useT } from "@/shared/i18n";
+import { isSelfHostedServer } from "@/platform/backend/server-discovery";
 
 const K = "settings.engineAccounts";
 const SEEN_KEY = "stella.claude-sync-notice-seen";
@@ -75,7 +76,9 @@ export function ClaudeSyncNoticeDialog({
         <DialogHeader>
           <DialogTitle>{t(`${K}.claudeTitle`)}</DialogTitle>
         </DialogHeader>
-        <DialogDescription>{t(`${K}.claudeSyncNote`)}</DialogDescription>
+        <DialogDescription>
+          {t(isSelfHostedServer() ? `${K}.claudeSyncNoteSelfHosted` : `${K}.claudeSyncNote`)}
+        </DialogDescription>
         <div className="sidebar-confirm-actions">
           <Button
             variant="primary"

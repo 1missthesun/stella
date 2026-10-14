@@ -1,4 +1,15 @@
 const ROOT_COMBINATOR_KEYS = ["oneOf", "anyOf", "allOf"] as const;
+/** Root keywords OpenAI's function schemas also refuse; they only narrow, so dropping them loosens. */
+const ROOT_DROPPED_KEYS = ["not", "enum", "const", "if", "then", "else"] as const;
+
+/** Whether a schema has root keywords some providers' tool schemas refuse. */
+export const needsProviderToolSchemaNormalization = (
+  schema: Record<string, unknown>,
+): boolean =>
+  schema.type !== "object" ||
+  [...ROOT_COMBINATOR_KEYS, ...ROOT_DROPPED_KEYS].some(
+    (key) => schema[key] !== undefined,
+  );
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -24,8 +35,9 @@ const intersectRequired = (branches: Record<string, unknown>[]): string[] => {
 /**
  * Return a provider-facing copy of a tool input schema.
  *
- * Anthropic custom tools reject root-level `oneOf`, `anyOf`, and `allOf`.
- * OpenAI-compatible routers can forward the same schema to Anthropic or to
+ * Anthropic custom tools reject root-level `oneOf`, `anyOf`, and `allOf`;
+ * OpenAI's function schemas also refuse root `not`, `enum` and `const`
+ * ("schema must have type 'object' and not have …"). OpenAI-compatible routers can forward the same schema to Anthropic or to
  * other providers with similarly narrow tool-schema support, so normalize at
  * every wire boundary instead of keying the behavior to the selected model.
  *
@@ -61,6 +73,7 @@ export const normalizeProviderToolInputSchema = (
     }
     delete normalized[key];
   }
+  for (const key of ROOT_DROPPED_KEYS) delete normalized[key];
 
   return {
     ...normalized,

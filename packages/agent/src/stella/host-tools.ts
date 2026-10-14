@@ -13,7 +13,12 @@
 import type { Context, JsonValue } from "@earendil-works/chord";
 import { withAbortSignal, withoutAbortSignal } from "@earendil-works/chord/context";
 import type { ImageContent, TextContent, TSchema } from "@earendil-works/pi-ai";
+import { validateToolArguments } from "@earendil-works/pi-ai/utils/validation";
 import { defineExtension, type Extension, type ToolRegistration } from "@earendil-works/pi-durable";
+import {
+  needsProviderToolSchemaNormalization,
+  normalizeProviderToolInputSchema,
+} from "@stella/runtime/kernel/tools/provider-tool-schema";
 import { StellaAgentDoc } from "./agent-doc.ts";
 
 export const STELLA_ORCHESTRATOR_TOOLS = "stella-tools-orchestrator";
@@ -90,10 +95,31 @@ const jsonDetails = (details: unknown): JsonValue | undefined => {
   }
 };
 
+/**
+ * The schema the model is sent, and the check a call's arguments still pass.
+ * Providers refuse different root keywords (OpenAI: a root `oneOf`, `not` or
+ * `enum`; Anthropic: root combinators), and one refused tool fails the whole
+ * request. A schema with any of them goes out loosened to one plain object,
+ * and the call is checked against the original before it runs.
+ */
+const providerSchema = (
+  spec: StellaToolSpec,
+): Pick<ToolRegistration, "parameters" | "prepareArguments"> => {
+  if (!needsProviderToolSchemaNormalization(spec.parameters)) {
+    return { parameters: spec.parameters as unknown as TSchema };
+  }
+  const original = { name: spec.name, description: spec.description, parameters: spec.parameters as unknown as TSchema };
+  return {
+    parameters: normalizeProviderToolInputSchema(spec.parameters) as unknown as TSchema,
+    prepareArguments: (args) =>
+      validateToolArguments(original, { type: "toolCall", id: "", name: spec.name, arguments: (args ?? {}) as Parameters<typeof validateToolArguments>[1]["arguments"] }),
+  };
+};
+
 const register = (role: StellaToolRole, spec: StellaToolSpec, host: StellaToolHost): ToolRegistration => ({
   name: spec.name,
   description: spec.description,
-  parameters: spec.parameters as unknown as TSchema,
+  ...providerSchema(spec),
   replay: spec.replay === "safe" || spec.replay === "keyed" ? "safe" : "unsafe",
   async execute(args, api, context) {
     const agent = role === "general" ? await api.snapshot(StellaAgentDoc, api.conversationId, context) : undefined;

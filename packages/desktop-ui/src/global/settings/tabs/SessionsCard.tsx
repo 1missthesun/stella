@@ -18,6 +18,8 @@ const deviceLabel = (session: AccountSessionSummary): string => {
   return ua ? ua.slice(0, 48) : "Unknown device";
 };
 
+const LOAD_TIMEOUT_MS = 15_000;
+
 /** Signed-in sessions on this account, each revocable on its own. */
 export function SessionsCard() {
   const t = useT();
@@ -28,10 +30,17 @@ export function SessionsCard() {
   const [revoking, setRevoking] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    setError(null);
     try {
-      setSessions(await listAccountSessions());
-      setError(null);
+      const timeout = new Promise<never>((_, reject) =>
+        window.setTimeout(() => reject(new Error("timeout")), LOAD_TIMEOUT_MS),
+      );
+      const next = await Promise.race([listAccountSessions(), timeout]);
+      // Signed in means at least this device's own session exists.
+      if (next.length === 0) throw new Error("empty");
+      setSessions(next);
     } catch {
+      setSessions((current) => current ?? []);
       setError(t("settings.sessions.loadError"));
     }
   }, [t]);
@@ -58,9 +67,18 @@ export function SessionsCard() {
         {t("settings.sessions.description")}
       </p>
       {error ? (
-        <p className="settings-card-desc settings-card-desc--error" role="alert">
-          {error}
-        </p>
+        <div className="settings-row">
+          <p className="settings-card-desc settings-card-desc--error" role="alert">
+            {error}
+          </p>
+          <div className="settings-row-control">
+            <Button type="button" variant="ghost" className="pill-btn" onClick={() => void load()}>
+              {t("common.tryAgain")}
+            </Button>
+          </div>
+        </div>
+      ) : sessions === null ? (
+        <p className="settings-card-desc">{t("common.loading")}</p>
       ) : null}
       {sessions?.map((session) => (
         <div className="settings-row" key={session.id}>

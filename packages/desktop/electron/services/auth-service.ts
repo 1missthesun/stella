@@ -923,7 +923,12 @@ export class AuthService {
     if (!list.ok) {
       throw new Error(`Session list failed with HTTP ${list.status}.`);
     }
-    const rows = (await list.json().catch(() => [])) as Array<{
+    // An unreadable answer is an error, never an empty list.
+    const parsed: unknown = await list.json().catch(() => null);
+    if (!Array.isArray(parsed)) {
+      throw new Error("Session list came back unreadable.");
+    }
+    const rows = parsed as Array<{
       id?: unknown;
       createdAt?: unknown;
       updatedAt?: unknown;

@@ -1386,7 +1386,13 @@ export function ArtifactViewerContent({
       </View>
       <TopSheetDragHandle>
         <View>
-          <FileViewerFooter name={title} actions={actions} onBack={onBack} />
+          <FileViewerFooter
+            name={title}
+            actions={actions}
+            onBack={onBack}
+            onClose={onClose}
+            closeLabel="Close"
+          />
         </View>
       </TopSheetDragHandle>
     </View>

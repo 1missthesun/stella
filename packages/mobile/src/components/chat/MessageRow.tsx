@@ -24,7 +24,7 @@ import {
 import { Image } from "expo-image";
 import { extractPlainText } from "react-native-nitro-markdown";
 import type { ReplyRef } from "@stella/contracts/reply-refs";
-import { driveLinkPath } from "@stella/contracts/cloud-world-paths";
+import { driveLinkPath, driveLinkTarget } from "@stella/contracts/cloud-world-paths";
 import { extractStellaAppLinkSlugs } from "@stella/contracts/workspace-apps";
 import {
   extractFileLinkTargets,
@@ -808,7 +808,13 @@ export const ChatMessageRow = memo(function ChatMessageRow({
             .map((preview) => ({ name: preview.name, path: preview.path }))
         : documentNames.map((name) => ({ name }));
     const fileNames = fileEntries.map((entry) => entry.name);
-    const imageGallery = imageUris.flatMap((image) => (image.path ? [image.path] : []));
+    const attachmentLink = (path: string) =>
+      driveLinkPath(path) || /^(?:[/~]|[A-Za-z]:[\\/]|[a-z]+:)/i.test(path)
+        ? path
+        : driveLinkTarget(path);
+    const imageGallery = imageUris.flatMap((image) =>
+      image.path ? [attachmentLink(image.path)] : [],
+    );
     const openPastedText = (text: string) =>
       onOpenArtifact?.({
         id: `${conversationId}:pasted-text:${item.id}:${text.length}`,
@@ -828,7 +834,7 @@ export const ChatMessageRow = memo(function ChatMessageRow({
             colors={colors}
             onPress={
               image.path && onOpenStellaFile
-                ? () => onOpenStellaFile(image.path!, imageGallery)
+                ? () => onOpenStellaFile(attachmentLink(image.path!), imageGallery)
                 : undefined
             }
           />
@@ -842,7 +848,7 @@ export const ChatMessageRow = memo(function ChatMessageRow({
             colors={colors}
             onPress={
               entry.path && onOpenStellaFile
-                ? () => onOpenStellaFile(entry.path!)
+                ? () => onOpenStellaFile(attachmentLink(entry.path!))
                 : undefined
             }
           />

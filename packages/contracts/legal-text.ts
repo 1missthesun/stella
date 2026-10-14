@@ -69,7 +69,7 @@ The price, billing interval, included features, usage limits, and any applicable
 
 Usage limits can operate over more than one time window. We may restrict managed or hosted features when an allowance or limit is reached. An allowance has no cash value and is not transferable. Where extra-use credit is offered, it is a separate one-time purchase at the price shown, not a subscription renewal or a guarantee that every capability becomes available. Buying a plan or credit does not cover charges your own model provider, connected services, or self-hosting infrastructure bills to you.
 
-You can cancel through the available billing-management controls. Cancellation generally stops the next renewal, and access to paid features continues until the end of the paid period. Uninstalling an app does not cancel a subscription. If you delete an account, check that any separately store-billed subscription is also canceled.
+You can cancel through the available billing-management controls. Cancellation generally stops the next renewal, and access to paid features continues until the end of the paid period. Uninstalling an app does not cancel a subscription. A recorded in-app account-deletion request turns off hosted Stripe subscription renewal, with failed billing updates retried hourly; the customer record and any remaining subscription are closed when final deletion runs after the recovery period. Signing in to cancel deletion does not automatically turn renewal back on. Check that any separately store-billed subscription is also canceled.
 
 Except where required by law, by the applicable store, or expressly offered by us, fees are nonrefundable and we do not provide refunds for a partly used billing period or unused allowance. This does not limit mandatory cooling-off, withdrawal, refund, or other consumer rights. Contact contact@fromyou.ai about a billing error or refund request.
 
@@ -115,7 +115,7 @@ When you run Stella on your own server, you operate it and control its data; FRO
 
 13. Account deletion and ending use
 
-You may stop using the Service at any time and request account deletion from the account-deletion control within the official apps. You may also contact contact@fromyou.ai for help or make a deletion request through our published account-deletion page. Export wanted data and manage subscriptions before deletion. The Privacy Policy explains deletion, legal retention, and copies outside our control. A self-hosted operator manages deletion and decommissioning of its own server.
+You may stop using the Service at any time and request deletion through Settings → Account → Delete account. Once the in-app request is recorded, your hosted account is disabled and signed out on all devices, subscription renewal is turned off, and we send a confirmation email. You have a seven-day recovery period: signing in during it cancels deletion and re-enables the account, but does not automatically resume subscription renewal. After seven days, a background process deletes eligible hosted account data and sends a completion email, usually within a day after the recovery period ends. The Privacy Policy and https://stella.sh/delete-account explain the process and limited retained records. You may also email contact@fromyou.ai for a manually handled deletion request or assistance. Export wanted data before requesting deletion; copies held by your devices, recipients, organizations, and third-party services are separate.
 
 We may suspend or terminate access for a material breach of these Terms, nonpayment, a security or abuse risk, a legal requirement, or discontinuation of the Service. Where reasonable and lawful, we will give notice and an opportunity to address the issue. We may act without advance notice when needed to protect users, security, or comply with law. Mandatory notice and refund rights still apply.
 
@@ -338,14 +338,14 @@ No system is completely secure. Public content, third-party destinations, modifi
 
 11. Retention and deletion
 
-Retention depends on the data, feature, purpose, available controls, legal requirements, and third-party policies. We do not promise a universal retention period or immediate deletion from every storage layer.
+Retention depends on the data, feature, purpose, available controls, legal requirements, and third-party policies. The hosted in-app account-deletion process has the specific recovery and processing timeline below; it does not promise immediate erasure from every storage layer or deletion of copies outside our control.
 
 • Conversations, memory, task history, Drive, and hosted workspaces: kept to provide history, synchronization, ongoing tasks, and recovery until removed through applicable controls or account deletion, subject to legitimate legal, security, and operational needs.
 • Engine session records and checkpoints: can persist separately from a running sandbox or visible cache to enable continuation. Stopping a task or destroying a sandbox is not necessarily deletion of the associated history or workspace.
 • Connected-account credentials: kept while needed for the active connection. Disconnect removes the relevant active credentials according to the connection's controls; historical tool results and connected-service copies are separate.
 • Media inputs, outputs, and job records: kept to submit, deliver, manage, and troubleshoot the feature. Completed jobs and generated files can persist until removed; there is no blanket promise of automatic short-term deletion after completion.
 • Public shares, apps, and previews: may be separate copies from source files or projects. Remove the publication separately where controls are available, or contact us for assistance.
-• Account and authentication records: kept while your account is active and removed through account deletion, except records we must or may lawfully keep for security, compliance, or disputes.
+• Account and authentication records: kept while your account is active and during the seven-day deletion recovery period. Sessions are revoked when the deletion request is recorded. Sign-in records are removed during final deletion, apart from the limited deletion, billing, and fraud-prevention records described below.
 • Billing, usage, and security records: kept as necessary for accounting, legal obligations, reconciliation, abuse prevention, and dispute resolution. A usage-limit reset is not deletion of historical billing records.
 • Temporary delivery and operational records: expire or are cleaned up according to the record type; some routing, deduplication, or recovery records persist longer than a stream or session.
 • Telemetry and support logs: metadata retained for their stated purposes. Turning telemetry off stops future optional reporting and removes queued device events; it is not a promise to erase all previously received telemetry or required operational records. The in-app support audit log shows a bounded recent history, not an unlimited archive.
@@ -353,11 +353,23 @@ Retention depends on the data, feature, purpose, available controls, legal requi
 • Device-local data: remains until removed by you, an applicable client control, or your operating system; deleting a hosted account does not automatically erase all files on your devices.
 • Organizational and third-party records: subject to the organization or provider's controls. Crew uninstall or individual account deletion is not a guarantee that all workspace messages, installations, preview records, or repository history are erased.
 
-Account deletion initiates removal of eligible hosted account content and credentials and cancellation of the hosted Stripe subscription where applicable. Some cleanup occurs asynchronously. Deletion cannot recall information already sent to third parties or copied by recipients, and store subscriptions, if offered, must be managed with the store. If a control does not remove a separately hosted publication or a record you expect to be deleted, contact us.
+Hosted in-app account-deletion timeline
+
+When you request deletion in Settings → Account → Delete account, the server records the request first. If it cannot record it, the app shows an error with Retry and you remain signed in. Once recorded, your account is disabled immediately, all devices are signed out, agents, schedules, and syncing are stopped, hosted Stripe subscription renewal is turned off, and we send a confirmation email. If the initial Stripe renewal update fails, it is retried hourly during the recovery period.
+
+You have seven days to recover the account. Signing in during that period cancels deletion, re-enables the account, and triggers a cancellation email. Subscription renewal stays off; you can manage or resume it in billing.
+
+After the seven-day period, an hourly background job processes deletion, survives service restarts, and retries failures. It removes eligible hosted account content, including conversations, memory, agents and tasks, schedules, Drive and R2 files, hosted workspaces, connector and provider credentials, devices and pairings, owner-store content, and sign-in records such as sessions, linked logins, and passkeys. It also deletes the Stripe customer record, which cancels any remaining subscription. Some storage cleanup finishes asynchronously and is retried.
+
+We send a completion email when that process is complete, usually within a day of the recovery period ending. This is the usual processing time, not a guarantee that every failure, third-party copy, or delivery issue is resolved within a day. If an expected email does not arrive or you need the status of a request, contact contact@fromyou.ai. Applicable statutory response and deletion requirements still apply.
+
+After completion, we retain a minimal deletion record containing the account identifier and request/processing/completion timestamps, a minimal billing-account record and accounting information retained as required, and hashed abuse or fraud-prevention signals. The deletion record's email address is cleared after completion-email processing; delivery failures are retried before attempts end. Stripe retains its required billing/accounting records under its own policies and applicable law. These limited records do not include retained conversation, memory, or Drive content.
+
+Email-only requests to contact@fromyou.ai are handled manually after any necessary identity verification. Deletion cannot recall information already sent to third parties or copied by recipients; local files, organizational records, and separately held third-party copies follow the applicable controls and policies. Store subscriptions, if offered, must also be managed with the store. Contact us if content you expect to be removed is still hosted by FROMYOU.
 
 12. Your controls and privacy rights
 
-• Delete your hosted account: use Settings → Account → Delete account in the official apps, or the account-deletion page at https://stella.sh/delete-account. You may also contact contact@fromyou.ai. You do not need to reinstall a removed app to request deletion.
+• Delete your hosted account: use Settings → Account → Delete account in the official apps to start the seven-day recovery and background-deletion process described above. Instructions and an email request link are at https://stella.sh/delete-account. Email requests are handled manually; you do not need to reinstall a removed app.
 • Export and manage data: Settings → Privacy provides a JSON export of supported account data such as conversations, memory, and preferences. This is not necessarily a complete archive of every hosted file or third-party record. Download wanted Drive files separately and contact us for additional access or export requests.
 • Manage sessions: account settings let you review active sessions and sign devices out. Security emails may notify you of new sign-ins.
 • Control connected accounts and engines: disconnect services in Stella and revoke their authorization at the provider; change engines or remove your keys where supported. Google-specific controls are in section 6.
@@ -393,30 +405,37 @@ contact@fromyou.ai`;
 export const ACCOUNT_DELETION = `Stella — FROMYOU, LLC
 Last updated: October 14, 2026
 
-1. Delete within Stella
+1. Request deletion within Stella
 
-For a FROMYOU-hosted Stella account, open Settings → Account → Delete account in the official app and confirm the request. Account deletion is different from signing out, uninstalling the app, clearing a local cache, or resetting conversation data.
+For a FROMYOU-hosted Stella account, open Settings → Account → Delete account in the official app and confirm the request. This is different from signing out, uninstalling the app, clearing a cache, or resetting conversation data. Export wanted conversations in Settings → Privacy and download wanted Drive files before requesting deletion.
 
-Before deleting, export wanted conversation data in Settings → Privacy and download wanted Drive files. Deletion removes your access and initiates removal of eligible hosted account data. Some cleanup runs asynchronously; it is not a promise that every copy is erased immediately.
+The server records your request first. If it cannot, the app shows an error with Retry and you stay signed in. Once the request is recorded, your account is disabled immediately, all devices are signed out, agents, schedules, and syncing stop, hosted Stripe subscription renewal is turned off, and we send a confirmation email. If the initial Stripe renewal update fails, it is retried hourly during the recovery period.
 
-2. Request deletion without the app
+2. Seven-day recovery period
 
-Email contact@fromyou.ai with the subject "Delete my Stella account" and identify the email address associated with your Stella account. If possible, send the request from that address. You do not need to reinstall Stella. Do not send a password, API key, or payment-card number.
+You have seven days to change your mind. Signing in during that period cancels deletion, re-enables your account, and triggers a cancellation email. Subscription renewal remains off; you can manage or resume it in billing. If you still want deletion, do not sign in during the recovery period.
 
-We may ask you to verify control of the account before deleting it. We will respond with information about the request and its completion as applicable. If you are requesting deletion on behalf of someone else, explain your authority. You can use the same email address for deletion assistance or a narrower privacy request.
+3. Background deletion and completion email
 
-3. What deletion covers and its limits
+After seven days, an hourly background job processes deletion. The job survives restarts and retries failures. It removes eligible hosted account information, conversations, memory, agents and tasks, schedules, Drive/R2 files, hosted workspaces, connector and provider credentials, devices and pairings, owner-store content, and sign-in records including sessions, linked logins, and passkeys. The Stripe customer is deleted, canceling any remaining subscription. Some storage cleanup completes asynchronously and is retried.
 
-Account deletion initiates removal of eligible Stella account information, conversations, memory, credentials, Drive and hosted workspace content associated with the account. Cleanup can remain pending and retry. We may retain limited information where needed for law, accounting, security, fraud prevention, or disputes, as explained in the Privacy Policy at https://stella.sh/privacy. We do not promise a single deletion deadline across all storage systems; contact us for your request's status.
+We send a completion email when the process is finished, usually within a day of the recovery period ending. Failures or delivery issues can take longer; contact contact@fromyou.ai if you need status or have not received an expected email. Applicable statutory requirements still apply.
 
-Local files and credentials on your computers, data held by connected AI or integration providers, messages and repository history in Slack or GitHub, organizational records, and copies others downloaded are separate. Deleting your account cannot recall those copies. Contact the relevant provider or organization about its records, and remove remaining local data separately. Contact us if a public publication still hosted by FROMYOU needs removal.
+After completion, we keep a minimal deletion record with the account identifier and request/processing/completion timestamps, a minimal billing-account record and required accounting information, and hashed abuse/fraud-prevention signals. The deletion record's email address is cleared after completion-email processing; delivery failures are retried before attempts end. Stripe retains required billing/accounting records under its policies and applicable law. These limited records do not include retained conversations, memory, or Drive files.
 
-4. Subscriptions
+4. Request deletion without the app
 
-Hosted account deletion closes the account's Stripe customer record as part of the backend process; this is different from ordinary end-of-period subscription cancellation. To cancel renewal without deleting your account, use the available billing-management controls first. Uninstalling Stella does not cancel a subscription. If store billing is offered, manage that subscription with Apple or Google as well. Mandatory refund and consumer rights still apply; contact us about billing questions.
+Email contact@fromyou.ai with the subject "Delete my Stella account" and identify the account's email address. If possible, send the request from that address. You do not need to reinstall Stella. Do not send a password, API key, or payment-card number.
 
+Email requests are handled manually. We may ask you to verify account control, and will provide information about your request and completion as applicable. If you are acting for someone else, explain your authority. The same email address can be used for deletion assistance or a narrower privacy request.
 
-5. Contact
+5. Copies outside this process and billing
+
+Local files and credentials on your computers, AI or integration-provider copies, messages and repository history in Slack or GitHub, organizational records, and copies others downloaded are separate. Deleting your account cannot recall them. Use the relevant provider's or organization's controls and remove remaining local data separately. Contact us if a publication still hosted by FROMYOU needs removal. Details are in the Privacy Policy at https://stella.sh/privacy.
+
+To cancel renewal without deleting your account, use billing management. Uninstalling Stella does not cancel a subscription. A recorded deletion request turns off hosted Stripe renewal; final deletion closes the Stripe customer and any remaining subscription after the recovery period. If store billing is offered, manage that subscription with Apple or Google as well. Mandatory refund and consumer rights still apply.
+
+6. Contact
 
 FROMYOU, LLC  
 131 Continental Drive, Suite 305  

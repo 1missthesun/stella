@@ -14,43 +14,6 @@ import { platform, arch } from "os";
 
 const __dirname = import.meta.dirname;
 
-function getBinaryName() {
-  const os = platform();
-  const cpuArch = arch();
-
-  let osKey;
-  switch (os) {
-    case "darwin":
-      osKey = "darwin";
-      break;
-    case "linux":
-      osKey = "linux";
-      break;
-    case "win32":
-      osKey = "win32";
-      break;
-    default:
-      return null;
-  }
-
-  let archKey;
-  switch (cpuArch) {
-    case "x64":
-    case "x86_64":
-      archKey = "x64";
-      break;
-    case "arm64":
-    case "aarch64":
-      archKey = "arm64";
-      break;
-    default:
-      return null;
-  }
-
-  const ext = os === "win32" ? ".exe" : "";
-  return `stella-browser-${osKey}-${archKey}${ext}`;
-}
-
 function getPlatformKey() {
   const os = platform();
   const cpuArch = arch();
@@ -90,7 +53,7 @@ function promoteStagedBinary(binaryPath) {
   }
 }
 
-function resolveBinaryPath(binaryName) {
+function resolveBinaryPath() {
   const forcedBinaryPath = process.env.STELLA_BROWSER_BINARY_PATH;
   if (forcedBinaryPath) {
     return forcedBinaryPath;
@@ -99,30 +62,19 @@ function resolveBinaryPath(binaryName) {
   const platformKey = getPlatformKey();
   const hydratedName =
     platform() === "win32" ? "stella-browser.exe" : "stella-browser";
-  const hydratedPath = platformKey
-    ? join(__dirname, "..", "out", platformKey, hydratedName)
-    : null;
-  if (hydratedPath) {
-    promoteStagedBinary(hydratedPath);
-    if (existsSync(hydratedPath)) return hydratedPath;
-  }
-
-  // Temporary migration fallback for installs made before browser artifacts
-  // moved out of the tracked bin/ directory.
-  const legacyPath = join(__dirname, binaryName);
-  promoteStagedBinary(legacyPath);
-  return legacyPath;
+  if (!platformKey) return null;
+  const hydratedPath = join(__dirname, "..", "out", platformKey, hydratedName);
+  promoteStagedBinary(hydratedPath);
+  return hydratedPath;
 }
 
 function main() {
-  const binaryName = getBinaryName();
+  const binaryPath = resolveBinaryPath();
 
-  if (!binaryName) {
+  if (!binaryPath) {
     console.error(`Error: Unsupported platform: ${platform()}-${arch()}`);
     process.exit(1);
   }
-
-  const binaryPath = resolveBinaryPath(binaryName);
 
   if (!existsSync(binaryPath)) {
     console.error(`Error: No binary found for ${platform()}-${arch()}`);

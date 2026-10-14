@@ -17,10 +17,6 @@ const stellaComputerStateRoot = () =>
   path.join(resolveStatePath(), "stella-computer");
 
 const sessionsDir = (root: string) => path.join(root, "sessions");
-// Pre-socket-relocation layout; swept so sockets left behind by older builds
-// don't linger. Current sockets live under ~/.stella/computer-sockets (see
-// runtime/kernel/computer-use/automation-socket-paths.ts).
-const legacySocketsDir = (root: string) => path.join(root, "daemon-sockets");
 
 const readPidFile = (filePath: string): number | null => {
   try {
@@ -160,18 +156,5 @@ export const stopAllDesktopAutomationDaemons = async (): Promise<void> => {
   }
   for (const name of sessionNames) {
     rmSync(resolveAutomationSocketPath(root, name), { force: true });
-  }
-  const legacySockets = legacySocketsDir(root);
-  if (existsSync(legacySockets)) {
-    let socketEntries: string[];
-    try {
-      socketEntries = readdirSync(legacySockets);
-    } catch {
-      return;
-    }
-    for (const entry of socketEntries) {
-      if (!entry.endsWith(".sock")) continue;
-      rmSync(path.join(legacySockets, entry), { force: true });
-    }
   }
 };

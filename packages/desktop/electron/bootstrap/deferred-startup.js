@@ -2,7 +2,7 @@ import path from "node:path";
 import { getMainLogger } from "../observability/main-logger.js";
 import { startupAppPainted } from "../observability/app-paint.js";
 import { sweepOrphanedHelpers } from "../services/orphaned-helpers.js";
-import { resolveLegacyStellaBrowserBinaryPath, resolveStellaBrowserBinaryPath, } from "../utils/stella-browser-paths.js";
+import { resolveStellaBrowserBinaryPath } from "../utils/stella-browser-paths.js";
 import { getTotalSystemMemoryMb, isLowMemoryWindowsDevice, } from "../resource-profile.js";
 import { getCompanionEnabled } from "@stella/runtime/kernel/preferences/local-preferences";
 const OVERLAY_STARTUP_WARM_DELAY_MS = 5_000;
@@ -59,10 +59,7 @@ const createDeferredStartupTasks = (context) => {
             label: "orphaned-helpers",
             afterAppPaint: true,
             run: () => {
-                const browserBinaryDirectories = [
-                    resolveStellaBrowserBinaryPath(),
-                    resolveLegacyStellaBrowserBinaryPath(),
-                ]
+                const browserBinaryDirectories = [resolveStellaBrowserBinaryPath()]
                     .filter((binaryPath) => Boolean(binaryPath))
                     .map((binaryPath) => path.dirname(binaryPath));
                 void sweepOrphanedHelpers({ browserBinaryDirectories }).catch((error) => {

@@ -46,7 +46,6 @@ import {
 } from "./process-identity.js";
 import {
   activateStagedStellaBrowserBinary,
-  resolveLegacyStellaBrowserBinaryPath,
   resolveStellaBrowserBinaryPath,
   resolveStellaBrowserRoot,
 } from "../utils/stella-browser-paths.js";
@@ -114,9 +113,7 @@ export const buildWindowsBundledBrowserProcessQuery = (
 };
 
 const findOrphanedBundledDaemonPids = async (): Promise<number[]> => {
-  const activeBinaryPath = resolveStellaBrowserBinaryPath();
-  const legacyBinaryPath = resolveLegacyStellaBrowserBinaryPath();
-  const binaryPaths = [activeBinaryPath, legacyBinaryPath].filter(
+  const binaryPaths = [resolveStellaBrowserBinaryPath()].filter(
     (value): value is string => Boolean(value),
   );
   if (process.platform === "win32") {
@@ -186,10 +183,7 @@ export const stopOrphanedStellaBrowserDaemons = async () => {
     );
     return;
   }
-  const binaryPaths = [
-    resolveStellaBrowserBinaryPath(),
-    resolveLegacyStellaBrowserBinaryPath(),
-  ].filter((value): value is string => Boolean(value));
+  const binaryPaths = [resolveStellaBrowserBinaryPath()].filter((value): value is string => Boolean(value));
   await Promise.all(
     pids.map((pid) =>
       terminateOwnedProcess(

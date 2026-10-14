@@ -36,11 +36,6 @@ export const currentStellaBrowserPlatformKey = (): string | null => {
   return null;
 };
 
-const legacyStellaBrowserBinaryName = (platformKey: string): string => {
-  if (platformKey === "win-x64") return "stella-browser-win32-x64.exe";
-  return `stella-browser-${platformKey}`;
-};
-
 const hydratedStellaBrowserBinaryName = (): string =>
   process.platform === "win32" ? "stella-browser.exe" : "stella-browser";
 
@@ -57,26 +52,11 @@ export const resolveHydratedStellaBrowserBinaryPath = (
   );
 };
 
-export const resolveLegacyStellaBrowserBinaryPath = (
-  stellaBrowserRoot = resolveStellaBrowserRoot(),
-): string | null => {
-  const platformKey = currentStellaBrowserPlatformKey();
-  if (!platformKey) return null;
-  return path.join(
-    stellaBrowserRoot,
-    "bin",
-    legacyStellaBrowserBinaryName(platformKey),
-  );
-};
-
-/** Prefer the hydrated artifact, with a temporary tracked-bin fallback. */
 export const resolveStellaBrowserBinaryPath = (
   stellaBrowserRoot = resolveStellaBrowserRoot(),
 ): string | null => {
   const hydrated = resolveHydratedStellaBrowserBinaryPath(stellaBrowserRoot);
-  if (hydrated && existsSync(hydrated)) return hydrated;
-  const legacy = resolveLegacyStellaBrowserBinaryPath(stellaBrowserRoot);
-  return legacy && existsSync(legacy) ? legacy : null;
+  return hydrated && existsSync(hydrated) ? hydrated : null;
 };
 
 const promoteStagedBinary = (binaryPath: string): boolean => {
@@ -108,11 +88,5 @@ export const activateStagedStellaBrowserBinary = (
   stellaBrowserRoot = resolveStellaBrowserRoot(),
 ): boolean => {
   const hydrated = resolveHydratedStellaBrowserBinaryPath(stellaBrowserRoot);
-  const legacy = resolveLegacyStellaBrowserBinaryPath(stellaBrowserRoot);
-  if (!hydrated || !legacy) return false;
-  // Browser binary hydration stages into ignored out/<platform>. Also finish
-  // any legacy bin/<platform>.update left during the binary-layout migration.
-  const hydratedActivated = promoteStagedBinary(hydrated);
-  const legacyActivated = promoteStagedBinary(legacy);
-  return hydratedActivated || legacyActivated;
+  return hydrated ? promoteStagedBinary(hydrated) : false;
 };

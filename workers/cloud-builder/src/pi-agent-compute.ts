@@ -269,7 +269,16 @@ export const openPiComputeLease = async (
       worldMaterializationCommand({ worldRoot: WORLD_ROOT, manifestId: head.manifestId, exportUrl: exportUrl.toString(), capability }),
       { origin: "internal", timeout: COMMAND_TIMEOUT_MS },
     );
-    if (!materialized.success) throw new Error("Stella could not bring this world into the agent's workspace.");
+    if (!materialized.success) {
+      host.log("pi_agent_world_materialize_failed", {
+        threadId,
+        turnId,
+        exitCode: materialized.exitCode,
+        stderr: materialized.stderr.trim().slice(-1500),
+        stdout: materialized.stdout.trim().slice(-500),
+      });
+      throw new Error("Stella could not bring this world into the agent's workspace.");
+    }
     // Materialization replaces the world root, including the drive directory the daemon expects.
     await normalizeToolWorkspaceRoot(session, WORLD_ROOT);
     const repoDir = await prepareSlackRepo(host.env, session, owner.conversationId, publicOrigin(host), host.log);

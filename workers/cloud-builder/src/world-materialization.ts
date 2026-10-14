@@ -34,7 +34,7 @@ export const worldMaterializationCommand = (args: {
       `curl --fail --silent --show-error --dump-header "$headers" -H ${shellQuote(`Authorization: Bearer ${args.capability}`)} ${shellQuote(args.exportUrl)} | tar -x -f - -C ${shellQuote(args.worldRoot)}`,
       `manifest=${shellQuote(args.manifestId)}`,
       'revision="$(awk \'BEGIN { IGNORECASE=1 } /^x-stella-world-revision:/ { gsub("\\r", "", $2); print $2 }\' "$headers" | tail -1)"',
-      'case "$revision" in ""|*[!0-9]*) exit 1;; esac',
+      'case "$revision" in ""|*[!0-9]*) { echo "The world export named no revision. Its response headers:"; cut -d: -f1 "$headers"; } >&2; exit 1;; esac',
       `mkdir -p ${shellQuote(`${args.worldRoot}/.stella`)}`,
       `printf '{"manifestId":"%s","revision":%s}\\n' "$manifest" "$revision" > "$marker"`,
       `chown -R 42424:42424 ${shellQuote(args.worldRoot)}`,

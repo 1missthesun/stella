@@ -89,7 +89,7 @@ at Stella's account:
 | 〃 | `kv_namespaces` ids (`APP_ROUTES`, `ASN_POLICY`) | from `wrangler kv namespace create` (1.3) |
 | 〃 | `artifacts[0].namespace` | any name; `stella-app-dev` is fine |
 | `workers/model-gateway/wrangler.jsonc` | `vars.CAPABILITY_JWKS` | your public key (1.4) |
-| 〃 | `kv_namespaces` ids (`CONFIG_SNAPSHOT`, `OWNER_ENFORCEMENT`, `ASN_POLICY`) | your ids; `ASN_POLICY` is the same namespace cloud-builder uses |
+| 〃 | `kv_namespaces` ids (`CONFIG_SNAPSHOT`, `ASN_POLICY`) | your ids; `ASN_POLICY` is the same namespace cloud-builder uses |
 | `workers/telemetry/wrangler.jsonc` | `pipelines[0].stream` | your stream id (1.3) |
 
 The URLs in the vars follow the worker names: `https://<worker name>.<sub>.workers.dev`.
@@ -180,7 +180,6 @@ bunx wrangler d1 create stella-v2-dev
 bunx wrangler kv namespace create stella-app-routes-dev        # APP_ROUTES
 bunx wrangler kv namespace create stella-asn-policy-dev        # ASN_POLICY (both workers)
 bunx wrangler kv namespace create stella-gateway-config-dev    # CONFIG_SNAPSHOT
-bunx wrangler kv namespace create stella-owner-enforcement-dev # OWNER_ENFORCEMENT
 
 # R2
 for b in stella-v2-app-builds-dev stella-v2-agent-home-dev stella-v2-conversation-archive-dev \

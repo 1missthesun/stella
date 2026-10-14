@@ -24,12 +24,12 @@ To see what is currently set: `bunx wrangler secret list` and `bunx wrangler sec
 
 The KV ids are already filled in both configs; this section only matters for a new environment.
 
-- `workers/model-gateway/wrangler.jsonc`: `OWNER_ENFORCEMENT` and `ASN_POLICY`.
+- `workers/model-gateway/wrangler.jsonc`: `ASN_POLICY`.
 - `workers/cloud-builder/wrangler.jsonc`: `ASN_POLICY` (default, `bn118`, `production`).
 
 Create a namespace with `bunx wrangler kv namespace create <BINDING> [--env <env>]` in the worker directory and paste the returned id.
 
-What they hold: `OWNER_ENFORCEMENT` mirrors the suspend/throttle status that each owner's `OwnerGate` pushes to the gateway (`ModelGatewayControl.applyOwnerEnforcement`); you never write it by hand. `ASN_POLICY` is an optional override map, key = decimal ASN number, value = one of `hosting | vpn | residential | mobile | edu | unknown`; leave it empty unless the built-in classifier misclassifies a network.
+What they hold: `ASN_POLICY` is an optional override map, key = decimal ASN number, value = one of `hosting | vpn | residential | mobile | edu | unknown`; leave it empty unless the built-in classifier misclassifies a network.
 
 ## 2. Model gateway settings
 

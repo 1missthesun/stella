@@ -228,7 +228,6 @@ const names = (prefix) => ({
     APP_ROUTES: `${prefix}-app-routes`,
     ASN_POLICY: `${prefix}-asn-policy`,
     CONFIG_SNAPSHOT: `${prefix}-gateway-config`,
-    OWNER_ENFORCEMENT: `${prefix}-owner-enforcement`,
   },
   r2: {
     appBuilds: `${prefix}-app-builds`,

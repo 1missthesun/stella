@@ -6,7 +6,6 @@ import {
 import { GatewayError } from "./errors.js";
 
 export const DEFAULT_ENFORCEMENT_TTL_SECONDS = 7 * 24 * 60 * 60;
-const KV_MINIMUM_TTL_SECONDS = 60;
 
 export type StoredOwnerEnforcement = {
   status: OwnerEnforcementStatus;
@@ -48,18 +47,6 @@ export const normalizeStoredOwnerEnforcement = (
     ...(typeof until === "number" ? { until } : {}),
     ...(typeof expiresAt === "number" ? { expiresAt } : {}),
   };
-};
-
-export const parseStoredOwnerEnforcement = (
-  value: string,
-): StoredOwnerEnforcement | null => {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(value);
-  } catch {
-    return null;
-  }
-  return normalizeStoredOwnerEnforcement(parsed);
 };
 
 export const enforcementAdmissionForRecord = (
@@ -127,17 +114,18 @@ const parseRequest = (
 };
 
 export const ownerEnforcementAdmission = async (
-  env: Pick<Env, "OWNER_ENFORCEMENT">,
+  env: Pick<Env, "OWNER_RELAY_GATE">,
   ownerId: string,
   now: number,
-): Promise<OwnerEnforcementAdmission> => {
-  const stored = await env.OWNER_ENFORCEMENT.get(ownerId, { cacheTtl: 60 });
-  if (!stored) return { suspended: false, throttled: false };
-  return enforcementAdmissionForRecord(
-    parseStoredOwnerEnforcement(stored),
-    now,
-  );
-};
+): Promise<OwnerEnforcementAdmission> =>
+  await env.OWNER_RELAY_GATE.get(
+    env.OWNER_RELAY_GATE.idFromName(ownerId),
+  ).admitOwnerEnforcement(ownerId, now);
+
+const admissionStatus = (
+  admission: OwnerEnforcementAdmission,
+): OwnerEnforcementStatus =>
+  admission.suspended ? "suspended" : admission.throttled ? "throttled" : "ok";
 
 export const applyOwnerEnforcementPush = async (
   env: Env,
@@ -152,32 +140,18 @@ export const applyOwnerEnforcementPush = async (
   const until = body.enforcement.until;
   const expiresAt =
     until ?? receivedAt + DEFAULT_ENFORCEMENT_TTL_SECONDS * 1_000;
-  const previous = await env.OWNER_ENFORCEMENT.get(body.ownerId);
-  const authoritative = await env.OWNER_RELAY_GATE.get(
+  const gate = env.OWNER_RELAY_GATE.get(
     env.OWNER_RELAY_GATE.idFromName(body.ownerId),
-  ).applyOwnerEnforcement({
+  );
+  const from = admissionStatus(
+    await gate.admitOwnerEnforcement(body.ownerId, receivedAt),
+  );
+  const authoritative = await gate.applyOwnerEnforcement({
     status: body.enforcement.status,
     ...(until !== undefined ? { until } : {}),
     updatedAt: body.updatedAt,
     expiresAt,
   });
-  // KV mirrors the owner object for session mints; the owner DO is the
-  // ordered authority for owner-relay-v2 requests.
-  const expirationTtl =
-    authoritative.until === undefined
-      ? DEFAULT_ENFORCEMENT_TTL_SECONDS
-      : Math.max(
-          KV_MINIMUM_TTL_SECONDS,
-          Math.ceil((authoritative.until - receivedAt) / 1_000),
-        );
-  await env.OWNER_ENFORCEMENT.put(
-    body.ownerId,
-    JSON.stringify(authoritative),
-    { expirationTtl },
-  );
-  const from =
-    (previous ? parseStoredOwnerEnforcement(previous)?.status : undefined) ??
-    "ok";
   if (from !== authoritative.status) {
     await postAlert(env, [
       "Owner enforcement status changed",

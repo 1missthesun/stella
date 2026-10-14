@@ -22,8 +22,8 @@ events flow to cloud-builder's `BillingControl` through `USAGE_QUEUE`.
 
 Cloud-builder's owner object pushes an owner's enforcement status over the
 `ModelGatewayControl.applyOwnerEnforcement` service-binding RPC; it lands in
-the owner's `OwnerRelayGate`, is mirrored to `OWNER_ENFORCEMENT` KV, and a
-status change posts `STELLA_ALERT_WEBHOOK_URL` when that is set. An owner
+the owner's `OwnerRelayGate`, which every admission (session mints and
+relays) reads, and a status change posts `STELLA_ALERT_WEBHOOK_URL` when that is set. An owner
 object with no enforcement yet seeds it from `BillingControl.ownerEnforcement`.
 
 ## Capability accounting

@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 enum Prepare {
@@ -65,8 +66,18 @@ enum ElectronIdentity {
     static let bundleId = "com.stella.app"
     static let appName = "Stella"
     static let microphoneUsage = "Stella uses your microphone for voice conversations."
-    /// Bump when the patch below changes, to rebuild existing bundles.
-    static let revision = 1
+    static let plistPatch: KeyValuePairs<String, String> = [
+        // Electron decides app.isPackaged from the executable name; launcher runs are source runs.
+        "CFBundleExecutable": "Electron",
+        "CFBundleName": appName,
+        "CFBundleDisplayName": appName,
+        "CFBundleIdentifier": bundleId,
+        "NSMicrophoneUsageDescription": microphoneUsage,
+    ]
+    static var plistPatchDigest: String {
+        let canonical = plistPatch.map { "\($0.key)=\($0.value)" }.joined(separator: "\n")
+        return SHA256.hash(data: Data(canonical.utf8)).map { String(format: "%02x", $0) }.joined()
+    }
     static let signedBase = "\(Deployment.releasesURL)/electron-identity"
     static let requirement =
         "anchor apple generic and identifier \"com.stella.app\" and certificate leaf[subject.OU] = \"\(Deployment.appleTeamID)\""
@@ -94,7 +105,7 @@ enum ElectronIdentity {
         let target = dir.appendingPathComponent("Stella.app")
         let marker = dir.appendingPathComponent("identity.json")
         let signedMarker = "{\"electron\":\"\(version)\",\"signed\":true}"
-        let expected = "{\"electron\":\"\(version)\",\"icon\":\"\(iconHash)\",\"revision\":\(revision)}"
+        let expected = "{\"electron\":\"\(version)\",\"icon\":\"\(iconHash)\",\"plist\":\"\(plistPatchDigest)\"}"
         let current = try? String(contentsOf: marker, encoding: .utf8)
         if FileManager.default.fileExists(atPath: target.path), current == signedMarker {
             return target
@@ -125,13 +136,9 @@ enum ElectronIdentity {
         guard var plist = try PropertyListSerialization.propertyList(
             from: plistData, options: [], format: &format) as? [String: Any]
         else { throw LauncherError("Electron's Info.plist is unreadable.") }
-        // The executable keeps its name: Electron decides app.isPackaged from
-        // it, and launcher runs are source runs.
-        plist["CFBundleExecutable"] = "Electron"
-        plist["CFBundleName"] = appName
-        plist["CFBundleDisplayName"] = appName
-        plist["CFBundleIdentifier"] = bundleId
-        plist["NSMicrophoneUsageDescription"] = microphoneUsage
+        for (key, value) in plistPatch {
+            plist[key] = value
+        }
         let patched = try PropertyListSerialization.data(fromPropertyList: plist, format: format, options: 0)
         try patched.write(to: plistURL)
 

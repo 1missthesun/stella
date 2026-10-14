@@ -4,7 +4,15 @@ import {
 } from "@legendapp/list/react-native";
 import { isCloudWorldAppPath } from "@stella/contracts/cloud-world-paths";
 import { generatedImageFileName } from "@stella/contracts/generated-image-name";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  type ComponentRef,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -512,6 +520,14 @@ export function FilesPage() {
     setTypeFilter(order[(order.indexOf(activeType) + 1) % order.length] ?? "all");
   }, [activeType, presentTypes]);
   const [typeLabelWidth, setTypeLabelWidth] = useState(0);
+  const typeMeasureRef = useRef<ComponentRef<typeof Text>>(null);
+  const currentTypeLabel = typeLabel(activeType);
+  useLayoutEffect(() => {
+    const node = typeMeasureRef.current;
+    node?.measureLayout(node, (_x, _y, width) => {
+      if (width > 0) setTypeLabelWidth(Math.ceil(width));
+    });
+  }, [currentTypeLabel, hasAnything, firstLoad]);
   const [stackHeight, setStackHeight] = useState(
     SEARCH_HEIGHT + CONTROL_HEIGHT + STACK_GAP,
   );
@@ -540,7 +556,6 @@ export function FilesPage() {
     );
   }
 
-  const currentTypeLabel = typeLabel(activeType);
   return (
     <View style={styles.root}>
       <LegendList<ListItem>
@@ -589,6 +604,7 @@ export function FilesPage() {
         >
           <View style={styles.controls} pointerEvents="box-none">
             <Text
+              ref={typeMeasureRef}
               style={[styles.typeLabel, styles.measure]}
               onLayout={(event) =>
                 setTypeLabelWidth(Math.ceil(event.nativeEvent.layout.width))

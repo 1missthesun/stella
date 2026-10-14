@@ -942,7 +942,7 @@ export type IpcInvokeContract = {
   >;
   [IPC_AUTH_GET_CHALLENGE_TOKEN]: Invoke<[], string | undefined>;
   [IPC_AUTH_SIGN_OUT]: Invoke<[], OkResult>;
-  [IPC_AUTH_DELETE_USER]: Invoke<[], OkResult>;
+  [IPC_AUTH_DELETE_USER]: Invoke<[], { ok: true; scheduled?: boolean }>;
   [IPC_AUTH_APPLY_SESSION_TOKEN]: Invoke<
     [payload: { sessionToken: string }],
     OkResult

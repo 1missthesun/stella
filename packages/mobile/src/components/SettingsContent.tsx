@@ -224,8 +224,12 @@ export function SettingsContent() {
     clearAiConsent();
     setIsDeletingAccount(false);
     Alert.alert(
-      t("mobile.settings.deletionScheduledTitle"),
-      t("settings.account.toasts.deletionScheduled"),
+      outcome.scheduled
+        ? t("mobile.settings.deletionScheduledTitle")
+        : t("mobile.settings.deleteConfirmTitle"),
+      outcome.scheduled
+        ? t("settings.account.toasts.deletionScheduled")
+        : t("settings.account.toasts.accountDeleted"),
     );
   };
 

@@ -1,9 +1,11 @@
 import { authClient } from "./auth-client";
 
-export type AccountDeletionOutcome = { ok: true } | { ok: false; message: string };
+export type AccountDeletionOutcome =
+  | { ok: true; scheduled: boolean }
+  | { ok: false; message: string };
 
 type DeleteUserResult = {
-  data?: { success?: unknown } | null;
+  data?: { success?: unknown; message?: unknown } | null;
   error?: { message?: unknown; status?: unknown } | null;
 };
 
@@ -17,7 +19,9 @@ export async function requestAccountDeletion(): Promise<AccountDeletionOutcome> 
     return { ok: false, message: "Account deletion is not available in this build." };
   }
   const result = await client.deleteUser({});
-  if (result?.data?.success === true && !result.error) return { ok: true };
+  if (result?.data?.success === true && !result.error) {
+    return { ok: true, scheduled: result.data.message !== "User deleted" };
+  }
   const message = result?.error?.message;
   return {
     ok: false,

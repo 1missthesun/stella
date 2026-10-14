@@ -940,7 +940,7 @@ export class AuthService {
       staleSession: null,
       signedOutReason: "explicit_sign_out",
     });
-    return { ok: true };
+    return { ok: true, scheduled: body.message !== "User deleted" };
   }
 
   async applySessionToken(sessionToken: string) {

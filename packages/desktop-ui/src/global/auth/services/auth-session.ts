@@ -459,7 +459,8 @@ export const signOutAuthSession = async () => {
   emit();
 };
 
-export const deleteAuthUser = async () => {
+export const deleteAuthUser = async (): Promise<{ scheduled: boolean }> => {
+  let scheduled = true;
   if (getStellaInteriorBridge()) {
     throw new Error(
       "Account deletion must be completed by the trusted Stella browser shell.",
@@ -473,6 +474,7 @@ export const deleteAuthUser = async () => {
           `Account deletion was not recorded (HTTP ${result.error?.status ?? "unknown"}).`,
       );
     }
+    scheduled = result.data.message !== "User deleted";
     clearBrowserSessionToken();
     writeBrowserIdentityIntent("anonymous");
     writeBrowserCachedSession(null);
@@ -480,7 +482,8 @@ export const deleteAuthUser = async () => {
     if (!window.electronAPI.system.deleteAuthUser) {
       throw new Error("Desktop account deletion is unavailable.");
     }
-    await window.electronAPI.system.deleteAuthUser();
+    const result = await window.electronAPI.system.deleteAuthUser();
+    scheduled = result.scheduled !== false;
   }
   refreshVersion += 1;
   setCurrentSession({
@@ -492,6 +495,7 @@ export const deleteAuthUser = async () => {
     isPending: false,
   });
   emit();
+  return { scheduled };
 };
 
 export function getAuthSessionSnapshot(): AuthSessionResult {

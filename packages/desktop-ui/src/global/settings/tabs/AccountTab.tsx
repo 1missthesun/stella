@@ -87,7 +87,7 @@ async function clearLocalAccountState() {
 }
 
 async function deleteCurrentBetterAuthUser() {
-  await deleteAuthUser();
+  return await deleteAuthUser();
 }
 
 interface AccountTabProps {
@@ -115,6 +115,7 @@ export function AccountTab({ onSignOut, onOpenLegal }: AccountTabProps) {
     if (!pendingDeleteAction || isDeleting) return;
     const action = pendingDeleteAction;
     setIsDeleting(true);
+    let scheduled = true;
 
     try {
       if (action === "data") {
@@ -125,14 +126,16 @@ export function AccountTab({ onSignOut, onOpenLegal }: AccountTabProps) {
         if (!hasConnectedAccount) {
           throw new Error(t("settings.account.toasts.signInBeforeDelete"));
         }
-        await deleteCurrentBetterAuthUser();
+        scheduled = (await deleteCurrentBetterAuthUser()).scheduled;
       }
 
       await clearLocalAccountState();
       showToast(
         action === "data"
           ? t("settings.account.toasts.dataDeleted")
-          : t("settings.account.toasts.deletionScheduled"),
+          : scheduled
+            ? t("settings.account.toasts.deletionScheduled")
+            : t("settings.account.toasts.accountDeleted"),
       );
       window.location.reload();
     } catch (error) {

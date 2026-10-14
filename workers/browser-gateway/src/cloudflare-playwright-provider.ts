@@ -1,6 +1,7 @@
 import {
   acquire,
   connect,
+  sessions,
   type Browser,
   type BrowserContext,
   type CDPSession,
@@ -28,6 +29,7 @@ import type {
   BrowserHandoff,
   HandoffState,
   NetworkEntry,
+  RemoteCloseOutcome,
   SafeElement,
   SafeObservation,
   SafeScreenshot,
@@ -915,14 +917,18 @@ export class CloudflarePlaywrightProvider implements BrowserBackend {
     }
   }
 
-  async closeRemote(sessionId?: string): Promise<void> {
+  async closeRemote(sessionId?: string): Promise<RemoteCloseOutcome> {
     await this.closeContext();
     if (!this.browser && sessionId) {
       try {
         this.browser = await connect(this.endpoint, sessionId);
         this.currentSessionId = sessionId;
       } catch {
-        // The remote session may already be closed or owned by a live request.
+        this.currentSessionId = undefined;
+        this.currentPolicyDigest = undefined;
+        return (await this.remoteSessionIsActive(sessionId))
+          ? "pending"
+          : "closed";
       }
     }
     if (this.browser) {
@@ -937,5 +943,15 @@ export class CloudflarePlaywrightProvider implements BrowserBackend {
     }
     this.currentSessionId = undefined;
     this.currentPolicyDigest = undefined;
+    return "closed";
+  }
+
+  private async remoteSessionIsActive(sessionId: string): Promise<boolean> {
+    try {
+      const active = await sessions(this.endpoint);
+      return active.some((session) => session.sessionId === sessionId);
+    } catch {
+      return true;
+    }
   }
 }

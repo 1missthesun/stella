@@ -70,6 +70,9 @@ export interface ProfileStore {
   putReceipt(receipt: CommandReceipt): void;
   deleteReceipts(): void;
   deleteInteractions(): void;
+  pendingRemoteCloses(): readonly string[];
+  putPendingRemoteClose(sessionId: string, recordedAt: number): void;
+  deletePendingRemoteClose(sessionId: string): void;
   destroy(): Promise<void>;
 }
 
@@ -119,6 +122,10 @@ const DDL = [
   ) STRICT`,
   `CREATE INDEX IF NOT EXISTS interactions_by_state
    ON interactions (state, updated_at)`,
+  `CREATE TABLE IF NOT EXISTS pending_remote_closes (
+    session_id TEXT PRIMARY KEY,
+    recorded_at INTEGER NOT NULL
+  ) STRICT`,
 ] as const;
 
 type StateRow = {
@@ -385,6 +392,31 @@ export class SqliteProfileStore implements ProfileStore {
 
   deleteInteractions(): void {
     this.storage.sql.exec("DELETE FROM interactions");
+  }
+
+  pendingRemoteCloses(): readonly string[] {
+    return this.storage.sql
+      .exec<{ session_id: string }>(
+        "SELECT session_id FROM pending_remote_closes ORDER BY recorded_at",
+      )
+      .toArray()
+      .map((row) => row.session_id);
+  }
+
+  putPendingRemoteClose(sessionId: string, recordedAt: number): void {
+    this.storage.sql.exec(
+      `INSERT INTO pending_remote_closes (session_id, recorded_at)
+       VALUES (?, ?) ON CONFLICT(session_id) DO NOTHING`,
+      sessionId,
+      recordedAt,
+    );
+  }
+
+  deletePendingRemoteClose(sessionId: string): void {
+    this.storage.sql.exec(
+      "DELETE FROM pending_remote_closes WHERE session_id = ?",
+      sessionId,
+    );
   }
 
   async destroy(): Promise<void> {

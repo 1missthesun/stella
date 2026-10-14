@@ -79,6 +79,9 @@ export type TrustedVerification = Readonly<{
 
 export type TrustedVerificationState = "authenticated" | "logged_out";
 
+/** `pending`: the remote session may still be running and must be closed later. */
+export type RemoteCloseOutcome = "closed" | "pending";
+
 export interface BrowserBackend {
   ensure(args: {
     sessionId?: string;
@@ -129,5 +132,5 @@ export interface BrowserBackend {
     expectedState: TrustedVerificationState,
   ): Promise<boolean>;
   closeContext(): Promise<void>;
-  closeRemote(sessionId?: string): Promise<void>;
+  closeRemote(sessionId?: string): Promise<RemoteCloseOutcome>;
 }

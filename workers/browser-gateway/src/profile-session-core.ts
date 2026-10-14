@@ -677,8 +677,18 @@ export class BrowserProfileSessionCore {
     );
   }
 
+  private async closeRemoteSession(sessionId: string | undefined): Promise<void> {
+    const outcome = await this.browser.closeRemote(sessionId);
+    if (!sessionId) return;
+    if (outcome === "pending") {
+      this.store.putPendingRemoteClose(sessionId, this.now());
+    } else {
+      this.store.deletePendingRemoteClose(sessionId);
+    }
+  }
+
   private async closeBrowser(state: ProfileState): Promise<ProfileState> {
-    await this.browser.closeRemote(state.browserSessionId);
+    await this.closeRemoteSession(state.browserSessionId);
     const updated: ProfileState = {
       ...state,
       browserSessionId: undefined,
@@ -1563,10 +1573,6 @@ export class BrowserProfileSessionCore {
     if (expired !== interaction) this.store.putInteraction(expired);
     let updated = state;
     if (ownsHumanControl) {
-      // Expiry is persisted before remote teardown. If teardown fails, the
-      // interaction is terminal while activeInteractionId remains set; alarm
-      // retries must keep attempting this branch rather than treating the
-      // terminal record as fully cleaned up.
       if (state.browserSessionId) updated = await this.closeBrowser(state);
       updated = {
         ...updated,
@@ -1590,14 +1596,23 @@ export class BrowserProfileSessionCore {
 
   async expireActive(): Promise<void> {
     const state = this.store.getState();
-    if (!state?.activeInteractionId) return;
-    const interaction = this.store.getInteraction(state.activeInteractionId);
-    if (!interaction) return;
-    await this.expireIfNeeded(state, interaction);
+    const interaction = state?.activeInteractionId
+      ? this.store.getInteraction(state.activeInteractionId)
+      : null;
+    if (state && interaction) await this.expireIfNeeded(state, interaction);
+    for (const sessionId of this.store.pendingRemoteCloses()) {
+      await this.closeRemoteSession(sessionId);
+    }
+    if (this.store.pendingRemoteCloses().length > 0) {
+      throw new GatewayError("browser_unavailable", 503);
+    }
   }
 
   hasActiveCleanupDebt(): boolean {
-    return this.store.getState()?.activeInteractionId !== undefined;
+    return (
+      this.store.getState()?.activeInteractionId !== undefined ||
+      this.store.pendingRemoteCloses().length > 0
+    );
   }
 
   async liveView(envelope: InteractionEnvelope): Promise<unknown> {
@@ -2002,7 +2017,7 @@ export class BrowserProfileSessionCore {
     this.store.deleteReceipts();
     this.store.deleteInteractions();
     if (state.browserSessionId) {
-      await this.browser.closeRemote(state.browserSessionId);
+      await this.closeRemoteSession(state.browserSessionId);
     }
     await this.deletePrefix(this.profilePrefix(state));
     const response = {
@@ -2038,8 +2053,19 @@ export class BrowserProfileSessionCore {
     if (state && state.ownerDigest !== owner) {
       throw new GatewayError("profile_conflict", 409);
     }
-    if (state?.browserSessionId) {
-      await this.browser.closeRemote(state.browserSessionId);
+    const unclosed = [
+      ...(state?.browserSessionId ? [state.browserSessionId] : []),
+      ...this.store.pendingRemoteCloses(),
+    ];
+    for (const sessionId of unclosed) {
+      if ((await this.browser.closeRemote(sessionId)) === "pending") {
+        console.warn(
+          JSON.stringify({
+            service: "browser-gateway",
+            event: "purge_left_remote_session_to_expire",
+          }),
+        );
+      }
     }
     await this.deletePrefix(`browser-profiles/${owner}/${profile}/`);
     await this.store.destroy();

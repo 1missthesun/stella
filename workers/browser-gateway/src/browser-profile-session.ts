@@ -98,6 +98,13 @@ export class BrowserProfileSession extends DurableObject<BrowserGatewayEnv> {
     });
   }
 
+  private async armCleanupAlarm(): Promise<void> {
+    if (!this.core.hasActiveCleanupDebt()) return;
+    if ((await this.durableState.storage.getAlarm()) === null) {
+      await this.durableState.storage.setAlarm(Date.now() + 30_000);
+    }
+  }
+
   private exclusive<T>(operation: () => Promise<T>): Promise<T> {
     const result = this.tail.then(operation, operation);
     this.tail = result.then(
@@ -137,6 +144,8 @@ export class BrowserProfileSession extends DurableObject<BrowserGatewayEnv> {
                 ? { outcomeUnknown: true }
                 : {}),
             });
+          } finally {
+            await this.armCleanupAlarm();
           }
         }
         if (path === "/internal/interactions/status") {
@@ -166,10 +175,7 @@ export class BrowserProfileSession extends DurableObject<BrowserGatewayEnv> {
             parseInteraction(body, { requireDecision: true }),
           );
           if (this.core.hasActiveCleanupDebt()) {
-            const alarm = await this.durableState.storage.getAlarm();
-            if (alarm === null) {
-              await this.durableState.storage.setAlarm(Date.now() + 30_000);
-            }
+            await this.armCleanupAlarm();
           } else {
             await this.durableState.storage.deleteAlarm();
           }
@@ -178,6 +184,7 @@ export class BrowserProfileSession extends DurableObject<BrowserGatewayEnv> {
         if (path === "/internal/owners/profile/reset") {
           const result = await this.core.reset(parseProfileReset(body));
           await this.durableState.storage.deleteAlarm();
+          await this.armCleanupAlarm();
           return jsonNoStore(result);
         }
         if (path === "/internal/owners/purge") {

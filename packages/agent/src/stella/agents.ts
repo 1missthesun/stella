@@ -312,7 +312,6 @@ export type AgentDirectoryHost = {
     agents: AgentDirectoryAgentRow[];
     sessions: AgentDirectorySessionRow[];
     unavailable?: string;
-    threadIdsRead?: true;
   }>;
   message(
     args: { key: string; to: string; text: string; from: AgentMessageSender; remoteStella?: true },
@@ -544,11 +543,9 @@ const statusResult = (view: Record<string, unknown>) => ({
 type DirectoryLedger = {
   agents: readonly AgentDirectoryAgentRow[];
   unavailable?: string;
-  threadIdsRead?: true;
 };
 
 const DIRECTORY_THREAD_IDS_MAX = 200;
-const DIRECTORY_SETTLE_MS = 2 * 60_000;
 
 const relationOf = (row: { threadId: string; parentThreadId?: string }, self: { threadId?: string }, parentThreadId?: string) =>
   (self.threadId ? row.parentThreadId === self.threadId : !row.parentThreadId)
@@ -1490,14 +1487,7 @@ export function stellaAgents(host: StellaAgentsHost) {
         };
       }
       const computer = await computerOf(record, context, seen);
-      const notLive =
-        ledger !== undefined &&
-        !ledger.unavailable &&
-        ledger.threadIdsRead !== true &&
-        record.placement?.kind === "device" &&
-        !record.engine &&
-        Date.now() - (record.startedAt ?? Date.now()) > DIRECTORY_SETTLE_MS;
-      const done = notLive || (record.answered?.length ?? 0) >= agent.given;
+      const done = (record.answered?.length ?? 0) >= agent.given;
       const status = done ? remoteOutcome(record) : "running";
       return {
         ...row,

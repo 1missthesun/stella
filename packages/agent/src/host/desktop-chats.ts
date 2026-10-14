@@ -882,16 +882,8 @@ export function desktopChats(options: DesktopChatsOptions) {
         if (!cloud) return { agents: [], sessions: local };
         try {
           const threadIds = listOptions?.threadIds?.length ? listOptions.threadIds : undefined;
-          // A backend from before `threadIds` refuses the field: it lists the live ones only.
-          let threadIdsRead = threadIds !== undefined;
           const remote = await within(
-            cloud.directory(conversationId, threadIds).catch(async (error: unknown) => {
-              if (!threadIds || !/threadIds is not allowed/.test(error instanceof Error ? error.message : String(error))) {
-                throw error;
-              }
-              threadIdsRead = false;
-              return await cloud.directory(conversationId);
-            }),
+            cloud.directory(conversationId, threadIds),
             DIRECTORY_TIMEOUT_MS,
             "Stella's cloud did not answer.",
           );
@@ -913,7 +905,6 @@ export function desktopChats(options: DesktopChatsOptions) {
           return {
             agents: remote.agents,
             sessions: [...sessions.values()],
-            ...(threadIdsRead ? { threadIdsRead: true as const } : {}),
           };
         } catch (error) {
           return {

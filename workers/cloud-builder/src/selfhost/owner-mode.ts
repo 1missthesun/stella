@@ -63,11 +63,12 @@ const positiveNumber = (raw: string, fallback: number): number => {
 };
 
 export const DEFAULT_OWNER_MODE_MONTHLY_AGENT_HOURS = 40;
-export const DEFAULT_OWNER_MODE_MAX_CONCURRENT_AGENTS = 2;
+export const DEFAULT_OWNER_MODE_MAX_CONCURRENT_AGENTS = 3;
 
 /**
- * Cloud agent spending cap: container-hours a month and containers at once.
- * On in owner mode with defaults; off on hosted Stella unless set. 0 = no cap.
+ * Cloud agent spending cap: container-hours a month and containers at once
+ * (the cloud orchestrator's Claude Code container counts as one). On in
+ * owner mode with defaults; off on hosted Stella unless set. 0 = no cap.
  */
 export const cloudAgentCaps = (env: unknown): { monthlyHours: number; maxConcurrent: number } => {
   const owner = ownerModeEnabled(env);

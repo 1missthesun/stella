@@ -17,6 +17,7 @@ import { executionUnavailableMessage, snapshotAllowsExecution } from "./owner-ga
 import { HEADER_GATE_ADMITTED } from "./turn-start-request.js";
 import { parseCloudExecutionSelection } from "./turn-start-request.js";
 import { sha256Hex } from "./hash.js";
+import { CloudAgentCapError, checkContainerCaps } from "./container-cap.js";
 
 export const CLOUD_AGENT_DEPTH_LIMIT_ERROR =
   `Task depth limit reached (${MAX_AGENT_DEPTH}). Complete work in the current task instead of creating another subtask.`;
@@ -460,6 +461,13 @@ export const dispatchCloudAgentTurn = async (args: {
       );
     }
     return await projectSpawnedAttempt(dependencies, caller, attempt, agentDepth);
+  }
+  try {
+    await checkContainerCaps(dependencies.env as never);
+  } catch (error) {
+    await release();
+    if (error instanceof CloudAgentCapError) throw new CloudAgentDispatchRefused(error.message);
+    throw error;
   }
   const publicOrigin = (dependencies.env.CLOUD_BUILDER_PUBLIC_URL ?? "")
     .trim()

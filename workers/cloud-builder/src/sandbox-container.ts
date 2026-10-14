@@ -7,6 +7,7 @@
  * Callers never hold a container handle. `src/sandbox-client.ts` wraps the
  * stub in the session/process shapes the turn code uses.
  */
+import { admitContainerStart, settleContainer, touchContainer } from "./container-cap.js";
 import {
   DirectoryBackup,
   Files,
@@ -740,12 +741,19 @@ export class Sandbox extends DurableObject<Env> {
       }
     }
     if (this.#container.running) {
+      await touchContainer(this.env, this.ctx.id.toString()).catch(() => undefined);
       await this.#extendIdleTimeout(boot);
       return;
     }
-    this.#booting = this.#start(this.#withWorld(boot)).finally(() => {
-      this.#booting = null;
-    });
+    await admitContainerStart(this.env, this.ctx.id.toString());
+    this.#booting = this.#start(this.#withWorld(boot))
+      .catch(async (error: unknown) => {
+        await settleContainer(this.env, this.ctx.id.toString()).catch(() => undefined);
+        throw error;
+      })
+      .finally(() => {
+        this.#booting = null;
+      });
     await this.#booting;
   }
 
@@ -815,6 +823,7 @@ export class Sandbox extends DurableObject<Env> {
     if (this.ctx.container?.running) {
       await this.#container.destroy();
     }
+    await settleContainer(this.env, this.ctx.id.toString()).catch(() => undefined);
   }
 
   /**
@@ -949,6 +958,7 @@ export class Sandbox extends DurableObject<Env> {
         this.#stopping = null;
       });
     await this.#stopping;
+    if (!failure) await settleContainer(this.env, this.ctx.id.toString()).catch(() => undefined);
     console.log(
       JSON.stringify({
         level: failure ? "error" : "info",

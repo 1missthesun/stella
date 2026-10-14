@@ -14,9 +14,9 @@
  * lens slides to whichever one is in use, and tapping another connected row
  * moves it.
  *
- * Stella models need a Stella account, so Continue waits for one of the
- * four. Continuing without a Stella account moves the engine onto the
- * connected provider so the first message never goes to a Stella model.
+ * All of it is optional here: onboarding runs without an account, and the
+ * app asks for a Stella account once onboarding ends, before the first chat.
+ * Continuing with only a provider connected moves the engine onto it.
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/ui/button";
@@ -562,7 +562,7 @@ export function SignInCard({ active, answered, onAnswer }: SignInCardProps) {
         <Button
           type="button"
           variant="primary"
-          disabled={!active || busyOption !== null || !anyConnected}
+          disabled={!active || busyOption !== null}
           onClick={() => void handleContinue()}
         >
           {t("common.continue")}

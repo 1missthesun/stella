@@ -11,16 +11,28 @@
  * Unlike the legacy flow this does not wait for a conversation id — the
  * greeting is parked (see `pending-handoff.ts`) and appended by the chat
  * surface once the root layout has selected a conversation.
+ *
+ * Onboarding runs before the user has a Stella account, and synthesis runs on
+ * Stella's model, which needs one. So the signals are collected on this
+ * computer right away, but nothing leaves it until the user has signed in:
+ * the job waits ("waiting_for_account") holding the collected text in memory
+ * only, synthesizes once an account exists, and then drops it.
  */
 import { useSyncExternalStore } from "react";
 import type { DiscoveryCategory } from "@stella/contracts/discovery";
 import type { OnboardingStarter } from "@stella/contracts/desktop/onboarding";
 import { synthesizeCoreMemory } from "@/global/onboarding/services/synthesis";
+import {
+  getAuthSessionSnapshot,
+  subscribeAuthSession,
+} from "@/global/auth/services/auth-session";
+import { isConnectedAccountSession } from "@/global/auth/hooks/use-auth-session-state";
 import { setPendingDiscoveryWelcome } from "./pending-handoff";
 
 export type DiscoveryJobStatus =
   | "idle"
   | "collecting"
+  | "waiting_for_account"
   | "synthesizing"
   | "saving"
   | "done"
@@ -81,6 +93,31 @@ const fail = (jobGeneration: number, error: string, details?: unknown) => {
   publish({ status: "failed", result: null, error });
 };
 
+const hasAccount = () =>
+  isConnectedAccountSession(getAuthSessionSnapshot().data);
+
+/** Resolves true once a Stella account is signed in, false if superseded. */
+const waitForAccount = (isCurrent: () => boolean): Promise<boolean> =>
+  new Promise((resolve) => {
+    if (hasAccount()) {
+      resolve(true);
+      return;
+    }
+    const unsubscribe = subscribeAuthSession(() => {
+      if (!isCurrent()) {
+        unsubscribe();
+        resolve(false);
+        return;
+      }
+      if (!hasAccount()) return;
+      unsubscribe();
+      resolve(true);
+    });
+  });
+
+/** Right after sign-in the runtime may still be picking up the new token. */
+const SYNTHESIS_RETRY_DELAY_MS = 3_000;
+
 /**
  * Starts (or restarts) the job. Safe to call again after a failure; a
  * second call while a run is in flight supersedes it.
@@ -123,8 +160,23 @@ export const startDiscoveryJob = (input: DiscoveryJobInput) => {
         return;
       }
 
+      const waited = !hasAccount();
+      if (waited) {
+        publish({ status: "waiting_for_account", result: null, error: null });
+        if (!(await waitForAccount(isCurrent))) return;
+      }
+
       publish({ status: "synthesizing", result: null, error: null });
-      const synthesis = await synthesizeCoreMemory(formattedSections);
+      const synthesis = await synthesizeCoreMemory(formattedSections).catch(
+        async (error: unknown) => {
+          if (!waited) throw error;
+          await new Promise((resolve) =>
+            setTimeout(resolve, SYNTHESIS_RETRY_DELAY_MS),
+          );
+          if (!isCurrent()) throw error;
+          return await synthesizeCoreMemory(formattedSections);
+        },
+      );
       if (!isCurrent()) return;
       if (!synthesis.coreMemory) {
         fail(

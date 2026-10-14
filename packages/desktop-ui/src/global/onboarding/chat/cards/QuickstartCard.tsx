@@ -108,7 +108,7 @@ const STAGES: { id: string; key: string; reached: DiscoveryJobStatus[] }[] = [
   {
     id: "read",
     key: "onboarding.chat.quickstart.stages.read",
-    reached: ["collecting", "synthesizing", "saving", "done"],
+    reached: ["collecting", "waiting_for_account", "synthesizing", "saving", "done"],
   },
   {
     id: "notice",
@@ -124,6 +124,8 @@ const STAGES: { id: string; key: string; reached: DiscoveryJobStatus[] }[] = [
 
 const STAGE_INDEX: Partial<Record<DiscoveryJobStatus, number>> = {
   collecting: 0,
+  // Read, and held on this computer until the user signs in after onboarding.
+  waiting_for_account: 1,
   synthesizing: 1,
   saving: 2,
   done: 3,

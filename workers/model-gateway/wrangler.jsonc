@@ -45,13 +45,11 @@
     // signs for the per-agent cloud-builder Previews (DEPLOY.md, "Previews").
     "CAPABILITY_JWKS": "{\"keys\":[{\"kid\":\"builder-1\",\"issuer\":\"stella-cloud-builder\",\"jwk\":{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"_zTj5c7FMbjcMng9baQbQRXtkHak6jk4-1boqSnt59A\",\"y\":\"tR-kttYxzHOPR__VorAqBes7AkaI9uvAiyuM7h7DMEk\",\"alg\":\"ES256\",\"use\":\"sig\"}},{\"kid\":\"builder-bn118-1\",\"issuer\":\"stella-cloud-builder\",\"jwk\":{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"3B2uhLMZ0nFNovFPfyHOqiVeXac4vJO0YhR1F7U1xQc\",\"y\":\"_vW3crzH0DnvV5yjUqvxa9qH5_lygAfXR7FWiI7MLAA\",\"alg\":\"ES256\",\"use\":\"sig\"}},{\"kid\":\"builder-preview-1\",\"issuer\":\"stella-cloud-builder\",\"jwk\":{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"fNbXqGJFsWaRGpdQmkq-4KmWvbqUVpWzbiPzbVoWyAk\",\"y\":\"gITvf5FUWXr6wCD8-rKlCTsE_FnZt-DXkC-cr5wZeTI\",\"alg\":\"ES256\",\"use\":\"sig\"}}]}",
   },
-  // The default models run on OpenRouter. Every other provider key
-  // (FIREWORKS_, DEEPSEEK_, XAI_, OPENAI_, ANTHROPIC_, GOOGLE_AI_,
-  // META_MODEL_API_KEY) and STELLA_RELAY_PROBE_SECRET are optional: a model
+  // The default models run on OpenRouter. Every provider key, OPENROUTER_API_KEY
+  // included (FIREWORKS_, DEEPSEEK_, XAI_, OPENAI_, ANTHROPIC_, GOOGLE_AI_,
+  // META_MODEL_API_KEY), and STELLA_RELAY_PROBE_SECRET are optional: a model
   // whose provider has no key answers "The model provider is not configured."
-  "secrets": {
-    "required": ["OPENROUTER_API_KEY"],
-  },
+  // A server without OpenRouter runs on its owner's Claude or ChatGPT account.
   "durable_objects": {
     "bindings": [
       {

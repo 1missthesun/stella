@@ -6,6 +6,16 @@ import { applyOwnerEnforcementPush } from "./owner-enforcement.js";
 import { isGatewayRequestId } from "./request-util.js";
 
 export class ModelGatewayControl extends WorkerEntrypoint<Env> {
+  /** What this gateway can serve, for the backend's `/.well-known/stella`. */
+  async capabilities(): Promise<{ managedModels: boolean; webSearch: boolean }> {
+    const env = this.env as unknown as Record<string, unknown>;
+    const configured = (name: string) => typeof env[name] === "string" && (env[name] as string).trim() !== "";
+    return {
+      managedModels: configured("OPENROUTER_API_KEY"),
+      webSearch: configured("OPENROUTER_API_KEY"),
+    };
+  }
+
   /**
    * Best-effort owner-scoped preparation for trusted Worker callers. This
    * entrypoint deliberately performs no capability validation, inference, or

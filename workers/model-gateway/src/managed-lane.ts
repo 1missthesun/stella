@@ -10,6 +10,7 @@ import {
   type OwnerRelayAccounting,
 } from "./ledger-client.js";
 import type { RelayTiming } from "./relay-timing.js";
+import { ownerModeEnabled } from "./owner-mode.js";
 import {
   GATEWAY_MAX_OUTPUT_TOKENS_BY_AUDIENCE,
   GATEWAY_NETWORK_POLICY,
@@ -259,6 +260,7 @@ export const shapeUpstreamRequest = (args: {
   route: ManagedRoute;
   requestJson: Record<string, unknown>;
   apiKey: string;
+  ownerMode?: boolean;
   audience: ManagedModelAudience;
 }): ShapedUpstreamRequest => {
   const shapingRequest = new Request(
@@ -296,6 +298,8 @@ export const shapeUpstreamRequest = (args: {
     shapingRequest,
     args.route.provider,
     args.apiKey,
+    undefined,
+    !args.ownerMode,
   );
   headers.set("accept", "text/event-stream");
   return { url, headers, body };
@@ -748,8 +752,10 @@ export const handleManagedRelay = async (args: {
       throw new GatewayError(
         503,
         "internal",
-        "The model provider is not configured.",
-        { retryable: true },
+        ownerModeEnabled(env)
+          ? "Stella's own models aren't set up on this server. Use your Claude or ChatGPT account, or add an OpenRouter key to the server."
+          : "The model provider is not configured.",
+        { retryable: false },
       );
     }
     const {
@@ -762,6 +768,7 @@ export const handleManagedRelay = async (args: {
       route,
       requestJson: cappedRequestJson,
       apiKey,
+      ownerMode: ownerModeEnabled(env),
       audience: claims.audience,
     });
 

@@ -67,6 +67,7 @@ export const cloneForwardHeaders = (
   extraHeaders:
     | Readonly<Record<string, string>>
     | undefined = getManagedGatewayConfig(provider).extraHeaders,
+  attribution = true,
 ): Headers => {
   const headers = new Headers();
   request.headers.forEach((value, key) => {
@@ -83,7 +84,7 @@ export const cloneForwardHeaders = (
     headers.set("authorization", `Bearer ${apiKey}`);
   }
 
-  if (provider === "openrouter") {
+  if (provider === "openrouter" && attribution) {
     headers.set("HTTP-Referer", "https://stella.sh");
     headers.set("X-OpenRouter-Title", "Stella");
   }

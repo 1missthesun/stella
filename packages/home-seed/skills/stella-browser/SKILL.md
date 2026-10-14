@@ -1,6 +1,6 @@
 ---
 name: stella-browser
-description: Control browser tabs through the persistent code runtime and its frozen browser API, in Stella's own browser or, for tasks that need the user's logins, in the user's own browser. Use for navigation, page interaction, semantic locators, state inspection, new-tab flows, and browser screenshots. The user's Browser panel never switches to your tab by itself: when the user asked to see a page, call `tab.show()` on it.
+description: Control browser tabs through the persistent code runtime and its frozen browser API, in the user's own browser (signed in as them; the default while the Stella Browser extension is connected) or in Stella's own browser. Use for navigation, page interaction, semantic locators, state inspection, new-tab flows, and browser screenshots. The user's Browser panel never switches to your tab by itself: when the user asked to see a page, call `tab.show()` on it.
 ---
 
 # Stella Browser
@@ -13,16 +13,18 @@ Use `var` for reusable REPL bindings. Browser actions are not exposed through `B
 
 Pick the browser at the start of the task:
 
-- **The user's own browser**, `browser.use("external")`: when the task needs the user's accounts. Their email, GitHub, bank, shopping, social or work tools, anything they are signed in to. Your tabs open in the background of their real browser (Chrome, Brave, Edge or Arc), in a tab group labeled "Stella", signed in exactly as the user is. Nothing is copied, so a session never goes stale. It needs the Stella Browser extension.
-- **Stella's browser**, `browser.use("in-app")`, the default: everything else. Public pages, research, docs, previews, sites that need no account. It has its own profile and is signed in only where someone signed in inside it (the user in Stella's Browser panel, or a sign-in the user completed in your tab). Those logins persist across restarts.
+- **The user's own browser**, `browser.use("external")`, the default while the Stella Browser extension is connected: their real browser (Chrome, Brave, Edge or Arc), signed in exactly as the user is, so their email, GitHub, bank, shopping, social and work tools just work. Your tabs open in the background, in a tab group labeled "Stella". Nothing is copied, so a session never goes stale.
+- **Stella's browser**, `browser.use("in-app")`: when the extension isn't connected, or for work that should stay out of the user's browser (throwaway or test sessions, anything that would disturb their tabs or sign them out). It has its own profile and is signed in only where someone signed in inside it (the user in Stella's Browser panel, or a sign-in the user completed in your tab).
+
+Without a `browser.use()` call, the first browser call picks the user's browser if the extension is connected, else Stella's; `browser.backend` tells you which.
 
 ```js
-await browser.use("external"); // this task needs the user's logins
+await browser.use("external"); // or leave it to the default
 var tab = await browser.tabs.new();
 await tab.goto("https://github.com/notifications");
 ```
 
-`browser.use()` sets the browser for handles you acquire afterwards. Every `Tab` and `Locator` keeps its fixed `.backend`, so an existing handle keeps routing to the browser that created it. Use both in one task when it helps, for example public research in Stella's browser and the signed-in step in the user's.
+`browser.use()` sets the browser for handles you acquire afterwards. Every `Tab` and `Locator` keeps its fixed `.backend`, so an existing handle keeps routing to the browser that created it. Use both in one task when it helps, for example a throwaway test session in Stella's browser beside the signed-in work in the user's.
 
 In the user's browser you are a guest in their window:
 
@@ -32,7 +34,7 @@ In the user's browser you are a guest in their window:
 
 When the extension is not connected, the first command in the user's browser fails with "Extension not connected" and Stella offers the user a card to connect it. If it stays unconnected, continue in Stella's browser. For a step that needs the user's account there, open its sign-in page in a Stella browser tab, `show()` it, and ask the user to sign in once in Stella's Browser panel; Stella keeps that login. Never ask for or type their password yourself. Continue once they confirm.
 
-If a site in Stella's browser turns out signed out (a sign-in page, "session expired", an auth wall) and the task needs the user's account, switch to the user's browser for that site instead of asking them to sign in.
+If a site in Stella's browser turns out signed out and the task needs the user's account, switch to the user's browser for that site instead of asking them to sign in.
 
 ## Production Workflow
 

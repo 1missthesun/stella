@@ -111,9 +111,6 @@ class ConversationStore {
       this.listeners.delete(listener);
       this.subscribers -= 1;
       if (this.subscribers > 0) return;
-      // Debounced: React remounts (StrictMode, a route change and back) would
-      // otherwise close the socket and reopen one with no cursor, which is the
-      // slow path and the only way to lose the resume point.
       if (this.teardownTimer) clearTimeout(this.teardownTimer);
       this.teardownTimer = setTimeout(() => {
         this.teardownTimer = null;

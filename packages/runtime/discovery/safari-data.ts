@@ -1,7 +1,6 @@
 import { promises as fs } from "fs";
 import path from "path";
 import os from "os";
-import { exec } from "child_process";
 import { Effect } from "effect";
 import {
   acquireCloseable,
@@ -9,275 +8,53 @@ import {
   tryDiscovery,
   tryDiscoverySync,
 } from "./effect-io.js";
-import type { SafariData, BookmarkEntry } from "./discovery-types.js";
 import { openSqliteSnapshot } from "./sqlite-snapshot.js";
+import type { BrowserVisit, BrowserVisitSource } from "./browsing-digest.js";
 
 const log = (...args: unknown[]) => console.error("[safari-data]", ...args);
 
-type SqliteDatabase = {
-  prepare(sql: string): { all(...params: unknown[]): unknown[] };
-  close(): void;
-};
+const CF_ABSOLUTE_EPOCH_S = 978307200;
 
-const openDatabase = (dbPath: string): Promise<SqliteDatabase> =>
-  openSqliteSnapshot(dbPath);
+const RECENT_VISITS_QUERY = `
+SELECT hi.url AS url, hv.title AS title, (hv.visit_time + ${CF_ABSOLUTE_EPOCH_S}) * 1000 AS time
+FROM history_visits hv
+JOIN history_items hi ON hv.history_item = hi.id
+WHERE hv.visit_time > ?
+ORDER BY hv.visit_time DESC
+LIMIT 60000
+`;
 
-const execAsync = (command: string): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    exec(command, { encoding: "utf-8", maxBuffer: 5 * 1024 * 1024, windowsHide: true }, (error, stdout) => {
-      if (error) reject(error);
-      else resolve(stdout.trim());
-    });
-  });
-};
-
-const collectSafariHistoryEffect: Effect.Effect<
-  { domain: string; visits: number }[]
-> = Effect.suspend(() => {
-  if (process.platform !== "darwin") {
-    return Effect.succeed<{ domain: string; visits: number }[]>([]);
-  }
-
-  const historyPath = path.join(os.homedir(), "Library", "Safari", "History.db");
-
-  return Effect.gen(function* () {
-    const exists = yield* tryDiscovery(() => fs.access(historyPath)).pipe(
-      Effect.match({
-        onSuccess: () => true,
-        onFailure: () => false,
-      }),
-    );
-    if (!exists) {
-      log("Safari History.db not found");
-      return [];
-    }
-
-    return yield* Effect.scoped(
-      Effect.gen(function* () {
-        const db = yield* acquireCloseable(() => openDatabase(historyPath));
-
-        // Query top domains by explicit visit rows in the last 7 days.
-        // Safari history_visits.visit_time is CFAbsoluteTime (seconds since 2001-01-01).
-        const query = `
-      SELECT
-        hi.domain AS domain,
-        COUNT(*) AS visits
-      FROM history_visits hv
-      JOIN history_items hi ON hv.history_item = hi.id
-      WHERE hi.domain IS NOT NULL
-        AND hi.domain != ''
-        AND hv.visit_time > ((strftime('%s', 'now') - 978307200) - 604800)
-      GROUP BY hi.domain
-      ORDER BY visits DESC
-      LIMIT 30
-    `;
-
-        const rows = yield* tryDiscoverySync(
-          () =>
-            db.prepare(query).all() as Array<{ domain: string; visits: number }>,
-        ).pipe(
-          Effect.catch((visitQueryError) =>
-            tryDiscoverySync(() => {
-              const fallbackQuery = `
-        SELECT domain, visit_count
-        FROM history_items
-        WHERE domain IS NOT NULL
-          AND domain != ''
-        ORDER BY visit_count DESC
-        LIMIT 30
-      `;
-              const fallbackRows = db.prepare(fallbackQuery).all() as Array<{
-                domain: string;
-                visit_count: number;
-              }>;
-              const mapped = fallbackRows.map((row) => ({
-                domain: row.domain,
-                visits: row.visit_count,
-              }));
-              log("Using Safari history fallback query:", visitQueryError);
-              return mapped;
-            }),
-          ),
+export const readSafariVisits = (sinceMs: number): Promise<BrowserVisitSource | null> =>
+  runDiscovery(
+    Effect.suspend(() => {
+      if (process.platform !== "darwin") return Effect.succeed(null);
+      const historyPath = path.join(os.homedir(), "Library", "Safari", "History.db");
+      return Effect.gen(function* () {
+        yield* tryDiscovery(() => fs.access(historyPath));
+        const visits = yield* Effect.scoped(
+          Effect.gen(function* () {
+            const db = yield* acquireCloseable(() => openSqliteSnapshot(historyPath));
+            return yield* tryDiscoverySync(
+              () =>
+                db
+                  .prepare(RECENT_VISITS_QUERY)
+                  .all(sinceMs / 1000 - CF_ABSOLUTE_EPOCH_S) as BrowserVisit[],
+            );
+          }),
         );
-
-        return rows.map((row) => ({
-          domain: row.domain,
-          visits: row.visits,
-        }));
-      }),
-    );
-  }).pipe(
-    Effect.catch((error) =>
-      Effect.sync(() => {
-        if ((error as NodeJS.ErrnoException).code === "EPERM") {
-          log("Safari History access denied - grant Full Disk Access");
-        } else {
-          log("Error reading Safari history:", error);
-        }
-        return [];
-      }),
-    ),
-  );
-});
-
-type BookmarkNode = {
-  Title?: string;
-  URLString?: string;
-  URIDictionary?: { title?: string };
-  Children?: BookmarkNode[];
-  WebBookmarkType?: string;
-};
-
-type BookmarksPlist = {
-  Children?: BookmarkNode[];
-};
-
-const walkBookmarks = (
-  node: BookmarkNode,
-  folder: string,
-  result: BookmarkEntry[]
-): void => {
-  if (node.WebBookmarkType === "WebBookmarkTypeProxy") {
-    return;
-  }
-
-  if (node.URLString) {
-    const title = node.URIDictionary?.title || node.Title || "Untitled";
-    result.push({
-      title,
-      url: node.URLString,
-      folder: folder || undefined,
-    });
-    return;
-  }
-
-  if (node.Children) {
-    const folderName = node.Title || folder;
-    for (const child of node.Children) {
-      walkBookmarks(child, folderName, result);
-    }
-  }
-};
-
-const collectSafariBookmarksEffect: Effect.Effect<BookmarkEntry[]> =
-  Effect.suspend(() => {
-    if (process.platform !== "darwin") {
-      return Effect.succeed<BookmarkEntry[]>([]);
-    }
-
-    const bookmarksPath = path.join(os.homedir(), "Library", "Safari", "Bookmarks.plist");
-
-    return tryDiscovery(() =>
-      execAsync(`plutil -convert json -o - "${bookmarksPath}"`),
-    ).pipe(
-      Effect.flatMap((jsonOutput) =>
-        tryDiscoverySync(() => {
-          const plist: BookmarksPlist = JSON.parse(jsonOutput);
-
-          const result: BookmarkEntry[] = [];
-
-          if (plist.Children) {
-            for (const child of plist.Children) {
-              walkBookmarks(child, "", result);
+        log(`Read ${visits.length} Safari visits`);
+        return { browser: "safari", visits, accounts: [], languages: null };
+      }).pipe(
+        Effect.catch((error) =>
+          Effect.sync(() => {
+            if ((error as NodeJS.ErrnoException).code === "EPERM") {
+              log("Safari History access denied - grant Full Disk Access");
+            } else {
+              log("Error reading Safari history:", error);
             }
-          }
-
-          return result.slice(0, 200);
-        }),
-      ),
-      Effect.catch((error) =>
-        Effect.sync(() => {
-          if ((error as NodeJS.ErrnoException).code === "EPERM") {
-            log("Safari Bookmarks access denied - grant Full Disk Access");
-          } else {
-            log("Error reading Safari bookmarks:", error);
-          }
-          return [];
-        }),
-      ),
-    );
-  });
-
-const collectSafariDataEffect: Effect.Effect<SafariData | null> =
-  Effect.suspend(() => {
-    if (process.platform !== "darwin") {
-      return Effect.succeed(null);
-    }
-
-    log("Collecting Safari data...");
-
-    return Effect.all(
-      [collectSafariHistoryEffect, collectSafariBookmarksEffect],
-      { concurrency: "unbounded" },
-    ).pipe(
-      Effect.map(([history, bookmarks]) => {
-        if (history.length === 0 && bookmarks.length === 0) {
-          log("No Safari data found");
-          return null;
-        }
-
-        log("Safari data collected:", {
-          history: history.length,
-          bookmarks: bookmarks.length,
-        });
-
-        return { history, bookmarks };
-      }),
-    );
-  });
-
-export const collectSafariData = async (): Promise<SafariData | null> =>
-  runDiscovery(collectSafariDataEffect);
-
-export const formatSafariDataForSynthesis = (data: SafariData | null): string => {
-  if (!data) return "";
-
-  const sections: string[] = ["## Safari Data"];
-
-  if (data.history.length > 0) {
-    sections.push("\n### Top Domains");
-    sections.push(
-      data.history
-        .slice(0, 20)
-        .map((d) => `${d.domain} (${d.visits})`)
-        .join("\n")
-    );
-  }
-
-  if (data.bookmarks.length > 0) {
-    sections.push("\n### Bookmarks");
-
-    const byFolder = new Map<string, BookmarkEntry[]>();
-    for (const bookmark of data.bookmarks) {
-      const folder = bookmark.folder || "Bookmarks";
-      if (!byFolder.has(folder)) {
-        byFolder.set(folder, []);
-      }
-      byFolder.get(folder)!.push(bookmark);
-    }
-
-    const folders = Array.from(byFolder.entries()).slice(0, 15);
-
-    for (const [folder, entries] of folders) {
-      sections.push(`\n**${folder}**`);
-
-      const limitedEntries = entries.slice(0, 8);
-
-      for (const entry of limitedEntries) {
-        const domain = extractDomain(entry.url);
-        sections.push(`- ${entry.title} (${domain})`);
-      }
-    }
-  }
-
-  return sections.join("\n");
-};
-
-const extractDomain = (url: string): string => {
-  try {
-    const urlObj = new URL(url);
-    return urlObj.hostname;
-  } catch {
-    return url;
-  }
-};
+            return null;
+          }),
+        ),
+      );
+    }),
+  );

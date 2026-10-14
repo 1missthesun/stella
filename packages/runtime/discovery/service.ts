@@ -1,26 +1,19 @@
 import path from "path";
 import { Cause, Context, Effect, Layer } from "effect";
 import {
-  collectBrowserData,
   detectPreferredBrowserProfile,
-  formatBrowserDataForSynthesis,
+  readChromiumVisits,
 } from "./browser-data.js";
+import {
+  BROWSING_WINDOW_DAYS,
+  buildBrowsingDigest,
+  type BrowserVisitSource,
+} from "./browsing-digest.js";
 import {
   collectDevProjects,
   formatDevProjectsForSynthesis,
 } from "./dev-projects.js";
-import {
-  collectBrowserBookmarks,
-  formatBrowserBookmarksForSynthesis,
-} from "./browser-bookmarks.js";
-import {
-  collectSafariData,
-  formatSafariDataForSynthesis,
-} from "./safari-data.js";
-import {
-  filterLowSignalDomains,
-  tierFormattedSignals,
-} from "./signal-processing.js";
+import { readSafariVisits } from "./safari-data.js";
 import {
   collectSystemSignals,
   formatSystemSignalsForSynthesis,
@@ -29,10 +22,7 @@ import {
   collectMessagesNotes,
   formatMessagesNotesForSynthesis,
 } from "./messages-notes.js";
-import {
-  collectFirefoxData,
-  formatFirefoxDataForSynthesis,
-} from "./firefox-data.js";
+import { readFirefoxVisits } from "./firefox-data.js";
 import {
   collectSteamLibrary,
   formatSteamLibraryForSynthesis,
@@ -50,13 +40,10 @@ import { tryDiscovery } from "./effect-io.js";
 import type { AllUserSignals, AllUserSignalsResult } from "./types.js";
 import type { DiscoveryCategory } from "@stella/contracts/discovery";
 import type {
-  BrowserBookmarks,
-  SafariData,
   DevEnvironmentSignals,
   SystemSignals,
   MessagesNotesSignals,
 } from "./discovery-types.js";
-import type { FirefoxSignals } from "./firefox-data.js";
 import type { SteamLibrarySignals } from "./steam-library.js";
 import type { MusicLibrarySignals } from "./music-library.js";
 import type { BrowserType } from "@stella/contracts";
@@ -102,9 +89,6 @@ const persistSelectedCategories = async (
 };
 
 export type ExtendedUserSignals = AllUserSignals & {
-  bookmarks?: BrowserBookmarks | null;
-  safari?: SafariData | null;
-  firefox?: FirefoxSignals | null;
   devEnvironment?: DevEnvironmentSignals;
   systemSignals?: SystemSignals;
   messagesNotes?: MessagesNotesSignals;
@@ -133,6 +117,7 @@ const collectAllUserSignalsEffect = (
     const tasks: Record<string, () => Promise<unknown>> = {};
 
     if (categories.includes("browsing_bookmarks")) {
+      const since = Date.now() - BROWSING_WINDOW_DAYS * 24 * 60 * 60 * 1000;
       const shouldCollectChromium =
         !selectedBrowser || CHROMIUM_BROWSERS.has(selectedBrowser);
       const preferredChromiumSelection =
@@ -146,36 +131,35 @@ const collectAllUserSignalsEffect = (
         ? selectedProfile
         : (preferredChromiumSelection?.profile ?? undefined);
 
+      const readers: (() => Promise<BrowserVisitSource | null>)[] = [];
       if (shouldCollectChromium && selectedChromiumBrowser) {
-        tasks.browser = () =>
-          collectBrowserData(StellaDataDir, {
-            selectedBrowser: selectedChromiumBrowser,
-            selectedProfile: selectedChromiumProfile,
-          });
-        tasks.bookmarks = () =>
-          collectBrowserBookmarks({
-            selectedBrowser: selectedChromiumBrowser,
-            selectedProfile: selectedChromiumProfile,
-          }).catch((e) => {
-            log("Bookmark collection failed:", e);
-            return null;
-          });
+        readers.push(() =>
+          readChromiumVisits(
+            {
+              selectedBrowser: selectedChromiumBrowser,
+              selectedProfile: selectedChromiumProfile,
+            },
+            since,
+          ),
+        );
       }
-
       if (!selectedBrowser || selectedBrowser === "firefox") {
-        tasks.firefox = () =>
-          collectFirefoxData().catch((e) => {
-            log("Firefox collection failed:", e);
-            return null;
-          });
+        readers.push(() => readFirefoxVisits(since));
       }
       if (!selectedBrowser || selectedBrowser === "safari") {
-        tasks.safari = () =>
-          collectSafariData().catch((e) => {
-            log("Safari collection failed:", e);
+        readers.push(() => readSafariVisits(since));
+      }
+      tasks.browsing = async () => {
+        const sources: BrowserVisitSource[] = [];
+        for (const read of readers) {
+          const source = await read().catch((e) => {
+            log("Browser history read failed:", e);
             return null;
           });
-      }
+          if (source) sources.push(source);
+        }
+        return buildBrowsingDigest(sources);
+      };
     }
 
     if (categories.includes("dev_environment")) {
@@ -236,22 +220,8 @@ const collectAllUserSignalsEffect = (
     log(`Collection complete in ${elapsed}ms`);
 
     return {
-      browser: (results.browser as AllUserSignals["browser"]) ?? {
-        browser: null,
-        clusterDomains: [],
-        recentDomains: [],
-        allTimeDomains: [],
-        domainDetails: {},
-      },
+      browsing: (results.browsing as AllUserSignals["browsing"]) ?? null,
       devProjects: (results.devProjects as AllUserSignals["devProjects"]) ?? [],
-      shell: {
-        topCommands: [],
-        projectPaths: [],
-        toolsUsed: [],
-      },
-      bookmarks: results.bookmarks as BrowserBookmarks | null | undefined,
-      safari: results.safari as SafariData | null | undefined,
-      firefox: results.firefox as FirefoxSignals | null | undefined,
       systemSignals: results.system as SystemSignals | undefined,
       messagesNotes: results.messagesNotes as MessagesNotesSignals | undefined,
       steamLibrary: results.steam as SteamLibrarySignals | null | undefined,
@@ -269,33 +239,8 @@ const formatSignalsForSynthesisWithSections = async (
   const formattedSections: FormattedCategorySections = {};
 
   if (categories.includes("browsing_bookmarks")) {
-    const categorySections: string[] = [];
-
-    const browserSection = formatBrowserDataForSynthesis(data.browser);
-    if (browserSection && browserSection !== "No browser data available.") {
-      categorySections.push(browserSection);
-    }
-
-    if (data.bookmarks) {
-      const bookmarksSection = formatBrowserBookmarksForSynthesis(
-        data.bookmarks,
-      );
-      if (bookmarksSection) categorySections.push(bookmarksSection);
-    }
-
-    if (data.safari) {
-      const safariSection = formatSafariDataForSynthesis(data.safari);
-      if (safariSection) categorySections.push(safariSection);
-    }
-
-    if (data.firefox) {
-      const firefoxSection = formatFirefoxDataForSynthesis(data.firefox);
-      if (firefoxSection) categorySections.push(firefoxSection);
-    }
-
-    const categoryFormatted = joinSections(categorySections);
-    if (categoryFormatted) {
-      formattedSections.browsing_bookmarks = categoryFormatted;
+    if (data.browsing?.text) {
+      formattedSections.browsing_bookmarks = data.browsing.text;
     }
   }
 
@@ -348,9 +293,7 @@ const formatSignalsForSynthesisWithSections = async (
       Boolean(section && section.trim().length > 0),
     );
 
-  let formatted = orderedSections.join("\n\n");
-  formatted = filterLowSignalDomains(formatted);
-  formatted = tierFormattedSignals(formatted);
+  const formatted = orderedSections.join("\n\n");
 
   return {
     formatted,

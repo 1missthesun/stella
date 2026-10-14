@@ -13,19 +13,18 @@ import {
 } from "./effect-io.js";
 import type {
   BrowserType,
-  DomainVisit,
-  DomainDetail,
-  BrowserData,
   PreferredBrowserProfile,
   BrowserProfile,
-  ClusterKeyword,
-  SearchQuery,
 } from "@stella/contracts";
 import { openSqliteSnapshot } from "./sqlite-snapshot.js";
+import type {
+  BrowserAccount,
+  BrowserVisit,
+  BrowserVisitSource,
+} from "./browsing-digest.js";
 
 export type {
   BrowserType,
-  BrowserData,
   PreferredBrowserProfile,
   BrowserProfile,
 }
@@ -485,152 +484,6 @@ const parseProfileFromHistoryPath = (historyPath: string): string | null => {
   return profile ?? null;
 };
 
-// Chrome stores timestamps as microseconds since January 1, 1601
-const CHROME_EPOCH_OFFSET = 11644473600000;
-
-const toChromeTime = (date: Date): number => {
-  return (date.getTime() + CHROME_EPOCH_OFFSET) * 1000;
-};
-
-const NOISE_TITLE_PATTERNS = [
-  /^just a moment\.{0,3}$/i,
-  /^loading\.{0,3}$/i,
-  /^please wait\.{0,3}$/i,
-  /^redirecting\.{0,3}$/i,
-  /^access denied/i,
-  /^403 forbidden/i,
-  /^404 not found/i,
-  /^500 /i,
-  /^error$/i,
-  /^untitled$/i,
-  /^new tab$/i,
-  /^https?:\/\//i,
-  /^\w+\.\w+\/[\w/-]+$/,
-];
-
-const AUTH_DOMAINS = [
-  "accounts.google.com",
-  "login.",
-  "auth.",
-  "oauth.",
-  "signin.",
-  "sso.",
-  "id.",
-];
-
-const normalizeDomain = (domain: string): string => {
-  let normalized = domain.toLowerCase().trim();
-  
-  const prefixes = ["www.", "mobile.", "m."];
-  for (const prefix of prefixes) {
-    if (normalized.startsWith(prefix)) {
-      normalized = normalized.slice(prefix.length);
-      break;
-    }
-  }
-  
-  return normalized;
-};
-
-const filterAndAggregateDomains = (
-  rows: Array<{ domain: string; visits: number }>
-): DomainVisit[] => {
-  const aggregated = new Map<string, number>();
-
-  for (const { domain, visits } of rows) {
-    if (!domain || domain.length === 0) continue;
-    const normalized = normalizeDomain(domain);
-    aggregated.set(normalized, (aggregated.get(normalized) || 0) + visits);
-  }
-
-  return Array.from(aggregated.entries())
-    .map(([domain, visits]) => ({ domain, visits }))
-    .sort((a, b) => b.visits - a.visits);
-};
-
-const CLUSTER_QUERY = `
-SELECT label, COUNT(*) as sessions 
-FROM clusters 
-WHERE label != '' 
-  AND label NOT LIKE '%localhost%' 
-  AND label NOT LIKE '%127.0.0.1%' 
-GROUP BY label 
-ORDER BY sessions DESC 
-LIMIT 40
-`;
-
-const RECENT_DOMAINS_QUERY = `
-SELECT 
-  SUBSTR(
-    SUBSTR(u.url, INSTR(u.url, '://') + 3), 
-    1, 
-    CASE 
-      WHEN INSTR(SUBSTR(u.url, INSTR(u.url, '://') + 3), '/') = 0 
-      THEN LENGTH(SUBSTR(u.url, INSTR(u.url, '://') + 3)) 
-      ELSE INSTR(SUBSTR(u.url, INSTR(u.url, '://') + 3), '/') - 1 
-    END
-  ) as domain, 
-  COUNT(*) as visits 
-FROM urls u 
-JOIN visits v ON u.id = v.url 
-WHERE v.visit_time > ?
-  AND u.url NOT LIKE '%localhost%'
-  AND u.url NOT LIKE '%127.0.0.1%'
-  AND u.url NOT LIKE '%file://%'
-  AND u.url NOT LIKE '%chrome://%'
-  AND u.url NOT LIKE '%edge://%'
-  AND u.url NOT LIKE '%brave://%'
-GROUP BY domain 
-ORDER BY visits DESC 
-LIMIT 30
-`;
-
-const DOMAIN_TITLES_QUERY = `
-SELECT title, url, visit_count 
-FROM urls 
-WHERE url LIKE ? 
-  AND title != '' 
-ORDER BY visit_count DESC 
-LIMIT 25
-`;
-
-const ALL_TIME_DOMAINS_QUERY = `
-SELECT 
-  SUBSTR(
-    SUBSTR(url, INSTR(url, '://') + 3), 
-    1, 
-    CASE 
-      WHEN INSTR(SUBSTR(url, INSTR(url, '://') + 3), '/') = 0 
-      THEN LENGTH(SUBSTR(url, INSTR(url, '://') + 3)) 
-      ELSE INSTR(SUBSTR(url, INSTR(url, '://') + 3), '/') - 1 
-    END
-  ) as domain, 
-  SUM(visit_count) as visits 
-FROM urls
-WHERE url NOT LIKE '%localhost%'
-  AND url NOT LIKE '%127.0.0.1%'
-  AND url NOT LIKE '%file://%'
-  AND url NOT LIKE '%chrome://%'
-  AND url NOT LIKE '%edge://%'
-  AND url NOT LIKE '%brave://%'
-GROUP BY domain 
-ORDER BY visits DESC 
-LIMIT 50
-`;
-
-const CLUSTER_KEYWORDS_QUERY = `
-SELECT ck.keyword, ck.score,
-       MAX(v.visit_time) as latest_visit
-FROM cluster_keywords ck
-JOIN clusters c ON c.cluster_id = ck.cluster_id
-JOIN clusters_and_visits cv ON cv.cluster_id = c.cluster_id
-JOIN visits v ON v.id = cv.visit_id
-WHERE v.visit_time > ?
-  AND LENGTH(ck.keyword) > 1
-GROUP BY ck.keyword
-ORDER BY latest_visit DESC
-LIMIT 40
-`;
 
 const findMostRecentlyModifiedBrowser = async (): Promise<{
   type: BrowserType;
@@ -843,321 +696,81 @@ const findBrowserWithOptions = async (
   return null;
 };
 
-const queryClusterDomains = (db: SqliteDatabase): string[] => {
-  try {
-    const rows = db.prepare(CLUSTER_QUERY).all() as Array<{
-      label: string;
-      sessions: number;
-    }>;
-    return rows.map((r) => r.label);
-  } catch {
-    log("Clusters table not available");
-    return [];
-  }
-};
+const CHROME_EPOCH_OFFSET_MS = 11644473600000;
+const MAX_VISIT_ROWS = 60_000;
 
-const FALLBACK_DOMAINS_QUERY = `
-SELECT 
-  SUBSTR(
-    SUBSTR(url, INSTR(url, '://') + 3), 
-    1, 
-    CASE 
-      WHEN INSTR(SUBSTR(url, INSTR(url, '://') + 3), '/') = 0 
-      THEN LENGTH(SUBSTR(url, INSTR(url, '://') + 3)) 
-      ELSE INSTR(SUBSTR(url, INSTR(url, '://') + 3), '/') - 1 
-    END
-  ) as domain, 
-  SUM(visit_count) as visits 
-FROM urls 
-WHERE url NOT LIKE '%localhost%'
-  AND url NOT LIKE '%127.0.0.1%'
-  AND url NOT LIKE '%file://%'
-  AND url NOT LIKE '%chrome://%'
-  AND url NOT LIKE '%edge://%'
-  AND url NOT LIKE '%brave://%'
-  AND visit_count > 0
-GROUP BY domain 
-ORDER BY visits DESC 
-LIMIT 30
+const RECENT_VISITS_QUERY = `
+SELECT u.url AS url, u.title AS title, (v.visit_time / 1000) - ${CHROME_EPOCH_OFFSET_MS} AS time
+FROM visits v
+JOIN urls u ON u.id = v.url
+WHERE v.visit_time > ?
+ORDER BY v.visit_time DESC
+LIMIT ${MAX_VISIT_ROWS}
 `;
 
-type DomainRow = { domain: string; visits: number };
-
-const SEARCH_QUERIES_LIMIT = 15;
-
-const SEARCH_QUERY_URL_FILTER = `
-SELECT url, visit_count
-FROM urls
-WHERE visit_count > 0
-  AND (
-    url LIKE '%/search?%q=%'
-    OR url LIKE '%/results?%search_query=%'
-    OR url LIKE '%duckduckgo.com/?%q=%'
-  )
-ORDER BY visit_count DESC
-LIMIT 800
-`;
-
-const SEARCH_HOST_PARAMS: { match: (host: string) => boolean; param: string }[] =
-  [
-    { match: (h) => h.includes("google."), param: "q" },
-    { match: (h) => h.endsWith("bing.com"), param: "q" },
-    { match: (h) => h.endsWith("duckduckgo.com"), param: "q" },
-    { match: (h) => h.endsWith("brave.com"), param: "q" },
-    { match: (h) => h.endsWith("youtube.com"), param: "search_query" },
-    { match: (h) => h.includes("search.yahoo."), param: "p" },
-    { match: (h) => h.endsWith("ecosia.org"), param: "q" },
-    { match: (h) => h.endsWith("startpage.com"), param: "query" },
-  ];
-
-const querySearchQueries = (db: SqliteDatabase): SearchQuery[] => {
-  let rows: { url: string; visit_count: number }[];
-  try {
-    rows = db.prepare(SEARCH_QUERY_URL_FILTER).all() as {
-      url: string;
-      visit_count: number;
-    }[];
-  } catch (error) {
-    log("Search query extraction failed:", error);
-    return [];
-  }
-
-  const counts = new Map<string, { display: string; count: number }>();
-  for (const row of rows) {
-    let parsed: URL;
-    try {
-      parsed = new URL(row.url);
-    } catch {
-      continue;
-    }
-    const host = parsed.hostname.toLowerCase();
-    const spec = SEARCH_HOST_PARAMS.find((s) => s.match(host));
-    if (!spec) continue;
-    const raw = parsed.searchParams.get(spec.param)?.trim();
-    if (!raw || raw.length < 2 || raw.length > 80) continue;
-    const key = raw.toLowerCase();
-    const existing = counts.get(key);
-    if (existing) existing.count += row.visit_count || 1;
-    else counts.set(key, { display: raw, count: row.visit_count || 1 });
-  }
-
-  return Array.from(counts.values())
-    .sort((a, b) => b.count - a.count)
-    .slice(0, SEARCH_QUERIES_LIMIT)
-    .map((entry) => ({ query: entry.display, count: entry.count }));
-};
-
-const queryRecentDomains = (
-  db: SqliteDatabase,
-  sinceMs = Date.now() - 7 * 24 * 60 * 60 * 1000,
-  options: { allowFallback?: boolean } = {},
-): DomainVisit[] => {
-  try {
-    const rows = db.prepare(RECENT_DOMAINS_QUERY).all(toChromeTime(new Date(sinceMs))) as DomainRow[];
-    return filterAndAggregateDomains(rows);
-  } catch (error) {
-    log("Recent domains query failed, trying fallback:", error);
-  }
-
-  if (options.allowFallback === false) {
-    return [];
-  }
-
-  try {
-    const rows = db.prepare(FALLBACK_DOMAINS_QUERY).all() as DomainRow[];
-    return filterAndAggregateDomains(rows);
-  } catch (fallbackError) {
-    log("Fallback domains query failed:", fallbackError);
-    return [];
-  }
-};
-
-const isNoiseTitle = (title: string): boolean => {
-  const trimmed = title.trim();
-  if (!trimmed) return true;
-  return NOISE_TITLE_PATTERNS.some((pattern) => pattern.test(trimmed));
-};
-
-const isAuthDomain = (domain: string): boolean => {
-  const lower = domain.toLowerCase();
-  return AUTH_DOMAINS.some((auth) => lower.includes(auth));
-};
-
-const getTopDomainsForDetails = (
-  domains: DomainVisit[],
-  limit: number = 15
-): string[] => {
-  return domains
-    .filter((d) => !isAuthDomain(d.domain))
-    .slice(0, limit)
-    .map((d) => d.domain);
-};
-
-const queryDomainDetails = (
-  db: SqliteDatabase,
-  topDomains: string[]
-): Record<string, DomainDetail[]> => {
-  const details: Record<string, DomainDetail[]> = {};
-
-  for (const domain of topDomains) {
-    try {
-      const rows = db.prepare(DOMAIN_TITLES_QUERY).all(`%${domain}%`) as Array<{
-        title: string;
-        url: string;
-        visit_count: number;
-      }>;
-
-      const titleMap = new Map<string, DomainDetail>();
-      for (const row of rows) {
-        if (isNoiseTitle(row.title)) continue;
-
-        const key = row.title.trim().toLowerCase();
-        const existing = titleMap.get(key);
-        if (existing) {
-          existing.visitCount += row.visit_count;
-        } else {
-          titleMap.set(key, {
-            title: row.title,
-            url: row.url,
-            visitCount: row.visit_count,
-          });
-        }
-      }
-
-      if (titleMap.size > 0) {
-        details[domain] = Array.from(titleMap.values())
-          .sort((a, b) => b.visitCount - a.visitCount)
-          .slice(0, 15);
-      }
-    } catch {
-      // Skip domains that fail
-    }
-  }
-
-  return details;
-};
-
-const queryAllTimeDomains = (db: SqliteDatabase): DomainVisit[] => {
-  try {
-    const rows = db.prepare(ALL_TIME_DOMAINS_QUERY).all() as DomainRow[];
-    return filterAndAggregateDomains(rows);
-  } catch (error) {
-    log("All-time domains query failed:", error);
-    return [];
-  }
-};
-
-const queryClusterKeywords = (db: SqliteDatabase, sinceChromeTime: number): ClusterKeyword[] => {
-  try {
-    const rows = db.prepare(CLUSTER_KEYWORDS_QUERY).all(sinceChromeTime) as Array<{
-      keyword: string;
-      score: number;
-      latest_visit: number | bigint;
-    }>;
-
-    // Chrome timestamps: microseconds since 1601-01-01
-    // Convert to ms since Unix epoch: (chromeTime / 1000) - 11644473600000
-    const CHROME_TO_UNIX_MS = 11644473600000n;
-    return rows.map((r) => ({
-      keyword: r.keyword,
-      score: r.score,
-      lastVisit: Number(BigInt(r.latest_visit) / 1000n - CHROME_TO_UNIX_MS),
-    }));
-  } catch {
-    log("Cluster keywords table not available");
-    return [];
-  }
-};
-
-const emptyBrowserData = (browser: BrowserType | null = null): BrowserData => ({
-  browser,
-  clusterDomains: [],
-  recentDomains: [],
-  allTimeDomains: [],
-  domainDetails: {},
-  clusterKeywords: [],
+const accountInfoSchema = z.array(
+  z.looseObject({ full_name: z.string().optional(), email: z.string().optional() }),
+);
+const chromiumPreferencesSchema = z.looseObject({
+  account_info: z.unknown().optional(),
+  intl: z.looseObject({ accept_languages: z.string().optional() }).optional(),
 });
 
-const buildFullBrowserData = (
-  db: SqliteDatabase,
-  browserType: BrowserType,
-): BrowserData => {
-  const clusterDomains = queryClusterDomains(db);
-  const recentDomains = queryRecentDomains(db);
-  const rawAllTimeDomains = queryAllTimeDomains(db);
-  const thirtyDaysAgo = toChromeTime(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
-  const clusterKeywords = queryClusterKeywords(db, thirtyDaysAgo);
-  const searchQueries = querySearchQueries(db);
-
-  const recentDomainSet = new Set(recentDomains.map((d) => d.domain.toLowerCase()));
-  const allTimeDomains = rawAllTimeDomains
-    .filter((d) => !recentDomainSet.has(d.domain.toLowerCase()))
-    .slice(0, 20);
-
-  const combinedDomains = [
-    ...new Set([
-      ...getTopDomainsForDetails(recentDomains, 15),
-      ...getTopDomainsForDetails(allTimeDomains, 10),
-    ]),
-  ];
-  const domainDetails = queryDomainDetails(db, combinedDomains);
-
-  log("Collection complete:", {
-    browser: browserType,
-    clusterDomains: clusterDomains.length,
-    recentDomains: recentDomains.length,
-    allTimeDomains: allTimeDomains.length,
-    domainDetails: Object.keys(domainDetails).length,
-    clusterKeywords: clusterKeywords.length,
-  });
-
-  return {
-    browser: browserType,
-    clusterDomains,
-    recentDomains,
-    allTimeDomains,
-    domainDetails,
-    clusterKeywords,
-    searchQueries,
-  };
+const readChromiumProfileHints = async (
+  historyPath: string,
+): Promise<{ accounts: BrowserAccount[]; languages: string | null }> => {
+  const raw = await fs
+    .readFile(path.join(path.dirname(historyPath), "Preferences"), "utf-8")
+    .catch(() => null);
+  if (!raw) return { accounts: [], languages: null };
+  try {
+    const prefs = chromiumPreferencesSchema.parse(JSON.parse(raw));
+    const accounts = accountInfoSchema.safeParse(prefs.account_info);
+    return {
+      accounts: accounts.success
+        ? accounts.data.map((account) => ({
+            name: account.full_name?.trim() || undefined,
+            email: account.email?.trim() || undefined,
+          }))
+        : [],
+      languages: prefs.intl?.accept_languages?.trim() || null,
+    };
+  } catch {
+    return { accounts: [], languages: null };
+  }
 };
 
-const collectBrowserDataEffect = (
-  StellaDataDir: string,
-  options: BrowserCollectionOptions = {},
-): Effect.Effect<BrowserData, unknown> =>
-  Effect.gen(function* () {
-    log("Starting browser data collection...");
-
-    const browser = yield* tryDiscovery(() => findBrowserWithOptions(options));
-    if (!browser) {
-      return emptyBrowserData(options.selectedBrowser ?? null);
-    }
-
-    return yield* Effect.scoped(
-      Effect.gen(function* () {
-        const db = yield* acquireCloseable(() =>
-          openDatabase(browser.historyPath),
-        );
-        return yield* tryDiscoverySync(() =>
-          buildFullBrowserData(db, browser.type),
-        );
-      }),
-    ).pipe(
-      Effect.catch((error) =>
-        Effect.sync(() => {
-          log("Error collecting browser data:", error);
-          return emptyBrowserData(browser.type);
+export const readChromiumVisits = (
+  options: BrowserCollectionOptions,
+  sinceMs: number,
+): Promise<BrowserVisitSource | null> =>
+  runDiscovery(
+    Effect.gen(function* () {
+      const browser = yield* tryDiscovery(() => findBrowserWithOptions(options));
+      if (!browser) return null;
+      const visits = yield* Effect.scoped(
+        Effect.gen(function* () {
+          const db = yield* acquireCloseable(() => openDatabase(browser.historyPath));
+          return yield* tryDiscoverySync(
+            () =>
+              db
+                .prepare(RECENT_VISITS_QUERY)
+                .all((sinceMs + CHROME_EPOCH_OFFSET_MS) * 1000) as BrowserVisit[],
+          );
         }),
-      ),
-    );
-  });
-
-export const collectBrowserData = async (
-  StellaDataDir: string,
-  options: BrowserCollectionOptions = {},
-): Promise<BrowserData> =>
-  runDiscovery(collectBrowserDataEffect(StellaDataDir, options));
+      ).pipe(
+        Effect.catch((error) =>
+          Effect.sync(() => {
+            log("Error reading browser history:", error);
+            return [] as BrowserVisit[];
+          }),
+        ),
+      );
+      const hints = yield* tryDiscovery(() => readChromiumProfileHints(browser.historyPath));
+      log(`Read ${visits.length} visits from ${browser.type}`);
+      return { browser: browser.type, visits, ...hints };
+    }),
+  );
 
 type LocationProvider = {
   url: string;
@@ -1328,7 +941,7 @@ export const writeCoreMemory = async (
         ? yield* fetchUserLocationLineEffect
         : null;
       const who = location
-        ? `${content.trim()}\n\nLocation: ${location}`
+        ? `${content.trim()}\n- Approximate location (from IP): ${location}`
         : content.trim();
       const existing = yield* tryDiscovery(() =>
         fs.readFile(filePath, "utf-8"),
@@ -1339,54 +952,6 @@ export const writeCoreMemory = async (
       log(`Wrote ~/.stella/memories/main.md${location ? " (with location)" : ""}`);
     }),
   );
-
-
-const formatDomainList = (domains: DomainVisit[]): string =>
-  domains.map((d) => `${d.domain} (${d.visits})`).join("\n");
-
-export const formatBrowserDataForSynthesis = (data: BrowserData): string => {
-  if (!data.browser) return "No browser data available.";
-
-  const sections: string[] = [`## Browser Data (${data.browser})`];
-
-  if (data.recentDomains.length > 0) {
-    sections.push("\n### Most Active (Last 7 Days)");
-    sections.push(formatDomainList(data.recentDomains));
-  }
-
-  if (data.allTimeDomains.length > 0) {
-    sections.push("\n### Long-term Interests (All-time, excluding recent)");
-    sections.push(formatDomainList(data.allTimeDomains));
-  }
-
-  if (Object.keys(data.domainDetails).length > 0) {
-    sections.push("\n### Content Details");
-    for (const [domain, titles] of Object.entries(data.domainDetails)) {
-      sections.push(`\n**${domain}**`);
-      sections.push(titles.map((t) => `- ${t.title} (${t.visitCount})`).join("\n"));
-    }
-  }
-
-  if (data.searchQueries && data.searchQueries.length > 0) {
-    sections.push("\n### Recent Searches");
-    sections.push(data.searchQueries.map((s) => `- ${s.query}`).join("\n"));
-  }
-
-  if (data.clusterKeywords?.length > 0) {
-    sections.push("\n### Research Topics (Last 30 Days)");
-    sections.push(
-      data.clusterKeywords
-        .map((k) => {
-          const daysAgo = Math.floor((Date.now() - k.lastVisit) / (24 * 60 * 60 * 1000));
-          const recency = daysAgo === 0 ? "today" : daysAgo === 1 ? "yesterday" : `${daysAgo}d ago`;
-          return `- ${k.keyword} (${recency})`;
-        })
-        .join("\n")
-    );
-  }
-
-  return sections.join("\n");
-};
 
 export const detectPreferredBrowserProfile = async (): Promise<PreferredBrowserProfile> =>
   runDiscovery(

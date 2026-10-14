@@ -1,20 +1,3 @@
-export type BookmarkEntry = {
-  title: string;
-  url: string;
-  folder?: string;
-};
-
-export type BrowserBookmarks = {
-  browser: string;
-  bookmarks: BookmarkEntry[];
-  folders: string[];
-};
-
-export type SafariData = {
-  history: { domain: string; visits: number }[];
-  bookmarks: BookmarkEntry[];
-};
-
 export type GitConfig = {
   name?: string;
   email?: string;

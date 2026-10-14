@@ -92,36 +92,10 @@ export type BrowserType =
   | "opera"
   | "vivaldi";
 
-export type DomainVisit = {
-  domain: string;
-  visits: number;
-};
-
-export type DomainDetail = {
-  title: string;
-  url: string;
+export type BrowsingSignals = {
+  browsers: string[];
   visitCount: number;
-};
-
-export type ClusterKeyword = {
-  keyword: string;
-  score: number;
-  lastVisit: number;
-};
-
-export type SearchQuery = {
-  query: string;
-  count: number;
-};
-
-export type BrowserData = {
-  browser: BrowserType | null;
-  clusterDomains: string[];
-  recentDomains: DomainVisit[];
-  allTimeDomains: DomainVisit[];
-  domainDetails: Record<string, DomainDetail[]>;
-  clusterKeywords: ClusterKeyword[];
-  searchQueries?: SearchQuery[];
+  text: string;
 };
 
 export type PreferredBrowserProfile = {
@@ -141,21 +115,9 @@ export type DevProject = {
   tech?: string[];
 };
 
-export type CommandFrequency = {
-  command: string;
-  count: number;
-};
-
-export type ShellAnalysis = {
-  topCommands: CommandFrequency[];
-  projectPaths: string[];
-  toolsUsed: string[];
-};
-
 export type AllUserSignals = {
-  browser: BrowserData;
+  browsing: BrowsingSignals | null;
   devProjects: DevProject[];
-  shell: ShellAnalysis;
 };
 
 export type AllUserSignalsResult = {

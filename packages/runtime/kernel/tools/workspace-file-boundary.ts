@@ -105,6 +105,25 @@ const mkdirUnlessExists = async (directory: string): Promise<boolean> => {
   }
 };
 
+const directorySteps = new Map<string, Promise<unknown>>();
+
+/**
+ * Directory creation is mkdir then chown, so another writer could otherwise
+ * see the directory still owned by this process and refuse it. Steps on the
+ * same directory path run one at a time; unrelated paths are not serialized.
+ */
+const withDirectoryStep = async <T>(directory: string, step: () => Promise<T>): Promise<T> => {
+  const previous = directorySteps.get(directory) ?? Promise.resolve();
+  const run = previous.then(step, step);
+  const settled = run.catch(() => undefined);
+  directorySteps.set(directory, settled);
+  try {
+    return await run;
+  } finally {
+    if (directorySteps.get(directory) === settled) directorySteps.delete(directory);
+  }
+};
+
 const openLinuxParent = async (args: {
   canonicalRoot: string;
   parentParts: string[];
@@ -119,33 +138,29 @@ const openLinuxParent = async (args: {
     );
     handles.push(current);
     await assertDirectory(current, args.owner);
+    let logical = args.canonicalRoot;
     for (const part of args.parentParts) {
       const nextPath = `${PROC_FD_ROOT}/${current.fd}/${part}`;
-      let next: FileHandle;
-      let created = false;
-      try {
-        next = await open(
-          nextPath,
-          fsConstants.O_RDONLY | DIRECTORY | NO_FOLLOW,
-        );
-      } catch (error) {
-        if (
-          !args.createParents ||
-          (error as NodeJS.ErrnoException).code !== "ENOENT"
-        ) {
-          throw error;
+      logical = path.join(logical, part);
+      const next = await withDirectoryStep(logical, async () => {
+        let opened: FileHandle;
+        let created = false;
+        try {
+          opened = await open(nextPath, fsConstants.O_RDONLY | DIRECTORY | NO_FOLLOW);
+        } catch (error) {
+          if (!args.createParents || (error as NodeJS.ErrnoException).code !== "ENOENT") {
+            throw error;
+          }
+          created = await mkdirUnlessExists(nextPath);
+          opened = await open(nextPath, fsConstants.O_RDONLY | DIRECTORY | NO_FOLLOW);
         }
-        created = await mkdirUnlessExists(nextPath);
-        next = await open(
-          nextPath,
-          fsConstants.O_RDONLY | DIRECTORY | NO_FOLLOW,
-        );
-      }
-      handles.push(next);
-      if (created && args.owner) {
-        await next.chown(args.owner.uid, args.owner.gid);
-      }
-      await assertDirectory(next, args.owner);
+        handles.push(opened);
+        if (created && args.owner) {
+          await opened.chown(args.owner.uid, args.owner.gid);
+        }
+        await assertDirectory(opened, args.owner);
+        return opened;
+      });
       current = next;
     }
     return {
@@ -179,32 +194,34 @@ const openPortableParent = async (args: {
         );
       }
     };
-    try {
-      await assertExistingParent();
-    } catch (error) {
-      if (
-        !args.createParents ||
-        (error as NodeJS.ErrnoException).code !== "ENOENT"
-      ) {
-        throw error;
-      }
-      if (!(await mkdirUnlessExists(current))) {
-        await assertExistingParent();
-        continue;
-      }
-      const created = await open(
-        current,
-        fsConstants.O_RDONLY | DIRECTORY | NO_FOLLOW,
-      );
+    await withDirectoryStep(current, async () => {
       try {
-        if (args.owner) {
-          await created.chown(args.owner.uid, args.owner.gid);
+        await assertExistingParent();
+      } catch (error) {
+        if (
+          !args.createParents ||
+          (error as NodeJS.ErrnoException).code !== "ENOENT"
+        ) {
+          throw error;
         }
-        await assertDirectory(created, args.owner);
-      } finally {
-        await created.close();
+        if (!(await mkdirUnlessExists(current))) {
+          await assertExistingParent();
+          return;
+        }
+        const created = await open(
+          current,
+          fsConstants.O_RDONLY | DIRECTORY | NO_FOLLOW,
+        );
+        try {
+          if (args.owner) {
+            await created.chown(args.owner.uid, args.owner.gid);
+          }
+          await assertDirectory(created, args.owner);
+        } finally {
+          await created.close();
+        }
       }
-    }
+    });
   }
   return { entryParent: current, handles: [] };
 };

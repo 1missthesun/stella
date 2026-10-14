@@ -27,6 +27,7 @@ type StoredLlmOAuthCredentialRecord = {
   valueProtected: string;
   createdAt: number;
   updatedAt: number;
+  refreshRequired?: true;
 };
 
 type StoredLlmOAuthCredentialFile = {
@@ -243,15 +244,27 @@ export const deleteLocalLlmOAuthCredential = (
 };
 
 export type GetLocalLlmOAuthApiKeyOptions = {
-  /**
-   * Mint a new access token from the stored refresh token even though the
-   * recorded expiry has not passed. When that refresh fails, the stored
-   * expiry is cleared so the next read (including the settings validator)
-   * retries the refresh and reports "needs reauth" instead of trusting a
-   * token the provider already rejected.
-   */
   forceRefresh?: boolean;
 };
+
+const updateRecordIfUnchanged = (
+  stellaAppDir: string,
+  provider: string,
+  expectedValueProtected: string,
+  next: (record: StoredLlmOAuthCredentialRecord) => StoredLlmOAuthCredentialRecord,
+): void => {
+  const file = readCredentialFile(stellaAppDir);
+  const current = file.credentials[provider];
+  if (!current || current.valueProtected !== expectedValueProtected) return;
+  const updated = next(current);
+  file.credentials[provider] = updated;
+  writeCredentialFile(stellaAppDir, file);
+  if (updated.valueProtected !== current.valueProtected) {
+    deleteProtectedValue(credentialScope(provider), current.valueProtected);
+  }
+};
+
+const inflightKeys = new Map<string, Promise<string>>();
 
 export const getLocalLlmOAuthApiKey = async (
   stellaAppDir: string,
@@ -276,27 +289,53 @@ export const getLocalLlmOAuthApiKey = async (
   if (!oauthProvider) {
     throw new Error(`Unknown OAuth provider: ${normalizedProvider}`);
   }
-  let result: Awaited<ReturnType<typeof getLlmOAuthApiKey>>;
-  try {
-    result = await getLlmOAuthApiKey(oauthProvider, credentials, {
-      forceRefresh: options.forceRefresh === true,
-    });
-  } catch (error) {
-    if (options.forceRefresh && credentials.expires > 0) {
-      saveLocalLlmOAuthCredential(stellaAppDir, {
-        provider: normalizedProvider,
-        label: record.label,
-        credentials: { ...credentials, expires: 0 },
+  const forceRefresh =
+    options.forceRefresh === true || record.refreshRequired === true;
+  const flightKey = `${normalizedProvider}\n${record.valueProtected}\n${forceRefresh}`;
+  const inflight = inflightKeys.get(flightKey);
+  if (inflight) return await inflight;
+
+  const run = (async () => {
+    let result: Awaited<ReturnType<typeof getLlmOAuthApiKey>>;
+    try {
+      result = await getLlmOAuthApiKey(oauthProvider, credentials, {
+        forceRefresh,
       });
+    } catch (error) {
+      if (forceRefresh && !record.refreshRequired) {
+        updateRecordIfUnchanged(
+          stellaAppDir,
+          normalizedProvider,
+          record.valueProtected,
+          (current) => ({ ...current, refreshRequired: true }),
+        );
+      }
+      throw error;
     }
-    throw error;
+    if (result.credentials !== credentials || record.refreshRequired) {
+      updateRecordIfUnchanged(
+        stellaAppDir,
+        normalizedProvider,
+        record.valueProtected,
+        ({ refreshRequired: _cleared, ...current }) => ({
+          ...current,
+          valueProtected:
+            result.credentials === credentials
+              ? current.valueProtected
+              : protectValue(
+                  credentialScope(normalizedProvider),
+                  JSON.stringify(result.credentials),
+                ),
+          updatedAt: Date.now(),
+        }),
+      );
+    }
+    return result.apiKey;
+  })();
+  inflightKeys.set(flightKey, run);
+  try {
+    return await run;
+  } finally {
+    inflightKeys.delete(flightKey);
   }
-  if (result.credentials !== credentials) {
-    saveLocalLlmOAuthCredential(stellaAppDir, {
-      provider: normalizedProvider,
-      label: record.label,
-      credentials: result.credentials,
-    });
-  }
-  return result.apiKey;
 };

@@ -53,7 +53,8 @@ bun scripts/selfhost.mjs setup --json --name "Alex's Stella"
 - It is **safe to run again** at any time: it finds what already exists, repairs what's missing, and never replaces a secret the server already has. If it stops, fix the cause and run the same command again.
 - Optional OpenRouter key: save it to a file (never paste it into a command line) and add \`--openrouter-key-file <path>\`, or set \`OPENROUTER_API_KEY\` in the environment. The script never prints it. You can add it later by running setup again with the flag.
 - If the Cloudflare login can use several accounts, the script stops and lists them; rerun with \`--account-id <id>\`.
-- \`--prefix <name>\` names everything it creates (default \`stella\`: \`stella-cloud-builder\`, \`stella-db\`, …). Use another prefix for a second server on the same account.
+- \`--prefix <name>\` names everything it creates (default \`stella\`: \`stella-cloud-builder\`, \`stella-db\`, …). The script only creates, changes and deletes things named with its prefix; nothing else on the account is touched, so an account that already runs other Workers (or another Stella) is fine. Use another prefix for a second server on the same account.
+- With \`--json\` it never waits for a device to scan: it exits right after the \`ready\` line. (Without \`--json\` it shows the QR in the terminal and waits until a device connects.)
 
 ### Reading the output
 
@@ -86,7 +87,7 @@ Everything else (the workers.dev subdomain, databases, storage buckets, queues, 
 The last line is \`"status":"ready"\`. The server is running and the line carries a **one-time pairing code**:
 
 - \`link\`: \`stella://pair?server=…&code=…\`
-- \`qrFile\`: the same link as a QR code (SVG)
+- \`qrFile\`: the same link as a QR code (SVG). Every code gets its own file, so making a second code doesn't overwrite the first.
 
 Each code works **once** and expires after **10 minutes**. Make a new one for every device with \`bun scripts/selfhost.mjs pair --json\` (its last line has the same fields). Once one computer is connected, the user can also make codes there: Stella → Settings → **Connect a device**.
 

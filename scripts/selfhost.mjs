@@ -10,6 +10,7 @@ import {
   readFileSync,
   readdirSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from "node:fs";
 import { createRequire } from "node:module";
@@ -598,6 +599,22 @@ const writeConfigs = (configs) => {
   return files;
 };
 
+const depsInstalled = () => {
+  if (!existsSync(path.join(ROOT, "node_modules"))) return false;
+  try {
+    return wranglerBin().startsWith(ROOT);
+  } catch {
+    return false;
+  }
+};
+
+const ensureDeps = async (step) => {
+  if (depsInstalled()) return;
+  emit(step, "start", "Installing the server's dependencies (bun run deps backend)…");
+  const result = await run("bun", ["run", "deps", "backend"], { timeoutMs: 20 * 60_000 });
+  if (result.status !== 0) fail(step, `bun run deps backend failed:\n${tail(result.stderr || result.stdout)}`);
+};
+
 const preflight = async () => {
   const step = "preflight";
   const nodeVersion = spawnSync("node", ["--version"], { encoding: "utf8" });
@@ -613,17 +630,7 @@ const preflight = async () => {
     fail(step, "Bun is needed: curl -fsSL https://bun.sh/install | bash", { needsHuman: true, url: "https://bun.sh" });
   }
   if (!which("git")) fail(step, "git is needed.", { needsHuman: true });
-  let hasWrangler = true;
-  try {
-    wranglerBin();
-  } catch {
-    hasWrangler = false;
-  }
-  if (!hasWrangler) {
-    emit(step, "start", "Installing the server's dependencies (bun run deps backend)…");
-    const result = await run("bun", ["run", "deps", "backend"], { timeoutMs: 20 * 60_000 });
-    if (result.status !== 0) fail(step, `bun run deps backend failed:\n${tail(result.stderr || result.stdout)}`);
-  }
+  await ensureDeps(step);
   emit(step, "ok", `node ${nodeVersion.stdout.trim()}, bun ${bunVersion.stdout.trim()}, wrangler ready`);
 };
 
@@ -1132,6 +1139,10 @@ const pairingStatus = async (state, pairingId) => {
   return res.ok ? res.json : null;
 };
 
+const isPairQrFile = (file) =>
+  file === `pair-${PREFIX}.svg` ||
+  (file.startsWith(`pair-${PREFIX}-`) && /^[A-Za-z0-9_-]{8}\.svg$/.test(file.slice(`pair-${PREFIX}-`.length)));
+
 const mintPairing = async (state, { wait }) => {
   const step = "pair";
   const res = await admin(state, "POST", "/api/auth/device-pairing/start", { label: "selfhost CLI" });
@@ -1142,7 +1153,12 @@ const mintPairing = async (state, { wait }) => {
     fail(step, `Couldn't start a pairing (${res.status}): ${res.text.slice(0, 300)}`);
   }
   const { pairingId, link, expiresAt } = res.json;
-  const qrFile = path.join(STATE_DIR, `pair-${PREFIX}.svg`);
+  for (const file of readdirSync(STATE_DIR)) {
+    if (!isPairQrFile(file)) continue;
+    const old = path.join(STATE_DIR, file);
+    if (Date.now() - statSync(old).mtimeMs > 60 * 60_000) rmSync(old, { force: true });
+  }
+  const qrFile = path.join(STATE_DIR, `pair-${PREFIX}-${pairingId.slice(0, 8)}.svg`);
   writeFileSync(qrFile, qrSvg(link), { mode: 0o600 });
   const minutes = Math.max(1, Math.round((expiresAt - Date.now()) / 60_000));
   if (!JSON_MODE) {
@@ -1592,7 +1608,9 @@ const destroy = async () => {
   }
   if (problems.length) fail(step, `Some things couldn't be deleted (state kept so you can run destroy again):\n  ${problems.join("\n  ")}`);
   if (state) rmSync(statePath(accountId), { force: true });
-  rmSync(path.join(STATE_DIR, `pair-${PREFIX}.svg`), { force: true });
+  if (existsSync(STATE_DIR)) {
+    for (const file of readdirSync(STATE_DIR)) if (isPairQrFile(file)) rmSync(path.join(STATE_DIR, file), { force: true });
+  }
   rmSync(path.join(STATE_DIR, `review-${PREFIX}.svg`), { force: true });
   rmSync(GEN_DIR, { recursive: true, force: true });
   emit(step, "ready", `Everything named ${PREFIX}-* is gone from ${account.name}.`);
@@ -1607,6 +1625,7 @@ const main = async () => {
   }
   validatePrefix(PREFIX);
   log(`selfhost ${command} ${argv.filter((arg) => !arg.includes("key")).join(" ")}`);
+  await ensureDeps(command);
   await COMMANDS[command]();
 };
 

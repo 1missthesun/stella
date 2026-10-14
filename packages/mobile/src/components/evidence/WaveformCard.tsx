@@ -10,6 +10,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { Icon } from "../Icon";
 import { createPlaybackSessionHold } from "../../lib/mobile-audio-session";
+import { disposeAudioPlayer } from "../../lib/audio-player-disposal";
 import { evidenceAudioFileUri } from "../../lib/chat-evidence-previews";
 import type { StoredPhoneAccess } from "../../lib/phone-access";
 import type { Colors } from "../../theme/colors";
@@ -97,14 +98,7 @@ export function WaveformCard({
       subscriptionRef.current = null;
       const player = playerRef.current;
       playerRef.current = null;
-      if (player) {
-        try {
-          player.pause();
-          player.remove();
-        } catch {
-          // Already torn down by the module's own cleanup.
-        }
-      }
+      if (player) disposeAudioPlayer(player);
       session.release();
     };
   }, [progress, session]);

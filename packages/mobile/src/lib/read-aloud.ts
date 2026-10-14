@@ -3,32 +3,17 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createAudioPlayer, type AudioPlayer } from "expo-audio";
 import { Alert } from "react-native";
 import { VOICE_TTS_STREAM_CANCEL_PATH } from "@stella/contracts/backend/voice";
+import type { BackendError } from "@stella/contracts/backend/protocol";
 import { getAuthToken } from "./auth-token";
 import { getBackendClient } from "./backend";
 import { backendOrigin } from "./http";
 import { createPlaybackSessionHold } from "./mobile-audio-session";
+import { disposeAudioPlayer } from "./audio-player-disposal";
 
 const READ_ALOUD_KEY = "stella-mobile.read-aloud-enabled";
-// The mobile player streams a live HLS playlist so audio starts while Gemini
-// is still generating. The signed ticket in the playlist path authorizes the
-// playlist and its segments: native players cannot send headers.
-// Voice and model for read-aloud are server-authoritative: the client omits
-// them so the backend applies its default (Kore / gemini-3.8-flash-lite-tts),
-// keeping mobile in lockstep with desktop. Only send an explicit value once
-// the user can pick a voice here. (Removed the pinned "Wendy" voice that had
-// drifted from the server default.)
-// Reload a stalled native player from the same session, never synthesize again.
 const STREAM_START_TIMEOUT_MS = 8000;
-// AVPlayer that opens the playlist before its first segment exists sits silent
-// until the start timeout replaces it, so playback waits for a real segment.
 const PLAYLIST_READY_TIMEOUT_MS = 20_000;
 const PLAYLIST_READY_POLL_MS = 250;
-// Progressive HLS playback is resilient to transient segment/playlist/network
-// failures. Native players (AVPlayer/ExoPlayer) give up on a segment fetch that
-// fails past their small built-in retry budget, stalling mid-message. When that
-// happens we recreate the player and seek back to the last played position —
-// reusing the server-cached segments (no re-synthesis, no duplicated audio) —
-// so playback continues instead of silently stopping partway.
 const HLS_MAX_RECOVER_ATTEMPTS = 4;
 const HLS_MAX_START_RETRIES = 3;
 const HLS_RECOVER_BACKOFF_MS = 700;
@@ -202,19 +187,7 @@ export function stopReadAloud() {
   if (ticket) cancelStreamSession(ticket);
   const player = currentPlayer;
   currentPlayer = null;
-  if (player) {
-    try {
-      player.pause();
-      player.remove();
-    } catch {
-      /* ignore */
-    }
-    try {
-      player.release();
-    } catch {
-      /* already released */
-    }
-  }
+  if (player) disposeAudioPlayer(player);
   playbackSession.release();
 }
 
@@ -367,21 +340,25 @@ async function tryStreamReply(
   return await playHlsResilient(uri, id, generation, 0, options.quiet === true);
 }
 
-// The playlist route holds each read until the first segment lands, or answers
-// "still generating". Poll it until it lists a segment, the stream fails for
-// good, or the wait runs out; the native player then opens a playable list.
 async function waitForPlaylistReady(uri: string, signal: AbortSignal) {
   const deadline = Date.now() + PLAYLIST_READY_TIMEOUT_MS;
   while (!signal.aborted && Date.now() < deadline) {
+    let delayMs = PLAYLIST_READY_POLL_MS;
     try {
       const response = await fetch(uri, { signal, headers: { "cache-control": "no-cache" } });
-      const body = await response.text();
       if (response.ok) return;
-      if (!/"retryable"\s*:\s*true|retryAfterMs|still being generated/i.test(body)) return;
+      const body = (await response.json().catch(() => null)) as {
+        error?: Partial<BackendError>;
+      } | null;
+      if (body?.error?.retryable !== true) return;
+      delayMs = Math.min(
+        Math.max(body.error.retryAfterMs ?? PLAYLIST_READY_POLL_MS, PLAYLIST_READY_POLL_MS),
+        Math.max(0, deadline - Date.now()),
+      );
     } catch {
       if (signal.aborted) return;
     }
-    await new Promise((resolve) => setTimeout(resolve, PLAYLIST_READY_POLL_MS));
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
   }
 }
 
@@ -413,24 +390,7 @@ async function playHlsResilient(
       const p = player;
       player = null;
       if (currentPlayer === p) currentPlayer = null;
-      if (!p) return;
-      try {
-        p.pause();
-      } catch {
-        /* already released */
-      }
-      try {
-        p.remove();
-      } catch {
-        /* already released */
-      }
-      // remove() unregisters the Expo player; release() tears down AVPlayer
-      // and its pending network/seek work immediately.
-      try {
-        p.release();
-      } catch {
-        /* already released */
-      }
+      if (p) disposeAudioPlayer(p);
     };
     const clearStartTimer = () => {
       if (startTimer !== null) clearTimeout(startTimer);

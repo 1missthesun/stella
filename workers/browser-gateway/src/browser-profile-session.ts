@@ -20,6 +20,7 @@ import {
 } from "./protocol.js";
 import { readJsonBody } from "./request-body.js";
 import { suspensionAlarmDeadline } from "./suspension-alarm.js";
+import { BrowserSessionMeter, type BrowserBilling } from "./browser-meter.js";
 
 type Dependencies = Readonly<{
   store?: ProfileStore;
@@ -43,6 +44,7 @@ const boundedConfigInteger = (
 
 export class BrowserProfileSession extends DurableObject<BrowserGatewayEnv> {
   private readonly core: BrowserProfileSessionCore;
+  private readonly meter: BrowserSessionMeter;
   private readonly durableState: DurableObjectState;
   private tail: Promise<void> = Promise.resolve();
 
@@ -54,12 +56,15 @@ export class BrowserProfileSession extends DurableObject<BrowserGatewayEnv> {
     super(ctx, env);
     this.durableState = ctx;
     const store = dependencies.store ?? new SqliteProfileStore(ctx.storage);
+    const keepAliveMs = boundedConfigInteger(env.BROWSER_KEEP_ALIVE_MS, 10_000, 600_000);
     const browser =
-      dependencies.browser ??
-      new CloudflarePlaywrightProvider(
-        env.BROWSER,
-        boundedConfigInteger(env.BROWSER_KEEP_ALIVE_MS, 10_000, 600_000),
-      );
+      dependencies.browser ?? new CloudflarePlaywrightProvider(env.BROWSER, keepAliveMs);
+    this.meter = new BrowserSessionMeter(
+      ctx.storage.sql,
+      env.COMPUTE_BILLING as unknown as BrowserBilling | undefined,
+      env.BROWSER,
+      keepAliveMs,
+    );
     if (
       (env.DEVICE_CODE_FIXTURE === undefined) !==
       (env.DEVICE_CODE_FIXTURE_ORIGIN === undefined)
@@ -91,6 +96,7 @@ export class BrowserProfileSession extends DurableObject<BrowserGatewayEnv> {
         30 * 60_000,
       ),
       ...(deviceCodeFixture ? { deviceCodeFixture } : {}),
+      meter: this.meter,
       ...(dependencies.now ? { now: dependencies.now } : {}),
       ...(dependencies.randomUuid
         ? { randomUuid: dependencies.randomUuid }
@@ -103,6 +109,13 @@ export class BrowserProfileSession extends DurableObject<BrowserGatewayEnv> {
     if ((await this.durableState.storage.getAlarm()) === null) {
       await this.durableState.storage.setAlarm(Date.now() + 30_000);
     }
+  }
+
+  private async armMeterAlarm(): Promise<void> {
+    const due = this.meter.nextDue();
+    if (due === null) return;
+    const alarm = await this.durableState.storage.getAlarm();
+    if (alarm === null || alarm > due) await this.durableState.storage.setAlarm(due);
   }
 
   private exclusive<T>(operation: () => Promise<T>): Promise<T> {
@@ -122,6 +135,7 @@ export class BrowserProfileSession extends DurableObject<BrowserGatewayEnv> {
         body = await readJsonBody(request);
         if (path === "/internal/turn/command") {
           const envelope = parseTurnCommand(body);
+          this.meter.forOwner(envelope.authority.ownerId);
           try {
             const result = await this.core.turn(envelope);
             const expiresAt = suspensionAlarmDeadline(result);
@@ -145,7 +159,9 @@ export class BrowserProfileSession extends DurableObject<BrowserGatewayEnv> {
                 : {}),
             });
           } finally {
+            this.meter.used(this.core.currentSessionId());
             await this.armCleanupAlarm();
+            await this.armMeterAlarm();
           }
         }
         if (path === "/internal/interactions/status") {
@@ -179,12 +195,14 @@ export class BrowserProfileSession extends DurableObject<BrowserGatewayEnv> {
           } else {
             await this.durableState.storage.deleteAlarm();
           }
+          await this.armMeterAlarm();
           return jsonNoStore(result);
         }
         if (path === "/internal/owners/profile/reset") {
           const result = await this.core.reset(parseProfileReset(body));
           await this.durableState.storage.deleteAlarm();
           await this.armCleanupAlarm();
+          await this.armMeterAlarm();
           return jsonNoStore(result);
         }
         if (path === "/internal/owners/purge") {
@@ -208,6 +226,18 @@ export class BrowserProfileSession extends DurableObject<BrowserGatewayEnv> {
   }
 
   async alarm(alarmInfo?: AlarmInvocationInfo): Promise<void> {
+    await this.exclusive(() => this.meter.tick((sessionId) => this.core.closeForBudget(sessionId))).catch(
+      (error: unknown) => {
+        console.error(
+          JSON.stringify({
+            service: "browser-gateway",
+            event: "browser_meter_tick_failed",
+            code: safeErrorCode(error),
+          }),
+        );
+      },
+    );
+    await this.armMeterAlarm();
     try {
       await this.exclusive(() => this.core.expireActive());
     } catch (error) {

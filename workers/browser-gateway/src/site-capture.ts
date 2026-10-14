@@ -1,6 +1,7 @@
-import { launch } from "@cloudflare/playwright";
+import type { launch } from "@cloudflare/playwright";
 import type { BrowserGatewayEnv } from "./profile-session-core.js";
 import { GatewayError } from "./errors.js";
+import { withTimedBrowser } from "./timed-browser.js";
 
 /**
  * Screenshots (and an optional short recording) of one Stella site, for Crew
@@ -263,10 +264,7 @@ const record = async (
 
 export async function captureSite(env: BrowserGatewayEnv, body: unknown): Promise<Response> {
   const request = parseRequest(body);
-  const browser = await launch(env.BROWSER, { keep_alive: 30_000 }).catch(() => {
-    throw new GatewayError("browser_unavailable", 503);
-  });
-  try {
+  return await withTimedBrowser(env, 30_000, async (browser) => {
     const shots: Array<{ name: string; contentType: string; data: string; width: number; title: string }> = [];
     for (const view of request.views) {
       const page = await open(browser, request, view);
@@ -290,7 +288,5 @@ export async function captureSite(env: BrowserGatewayEnv, body: unknown): Promis
       { shots, ...(recording ? { recording } : request.recording ? { recordingError: "The browser couldn't encode a video." } : {}) },
       { headers: { "cache-control": "no-store" } },
     );
-  } finally {
-    await browser.close().catch(() => undefined);
-  }
+  });
 }

@@ -2,6 +2,7 @@ import { ownerAccess } from "./cloud-home-routes.js";
 import { worldName } from "./workspace.js";
 import { readBoundedRequestText } from "./bounded-body.js";
 import { builderServiceSecret, builderServiceSecrets } from "./secret-rotation.js";
+import { meteredCapture } from "./browser-billing.js";
 const encoder = new TextEncoder();
 const base64 = (bytes: Uint8Array) =>
   btoa(String.fromCharCode(...bytes))
@@ -163,17 +164,19 @@ export async function serveWorkspaceAppPreview(
   if (!env.BROWSER_GATEWAY)
     return Response.json({ error: "Preview unavailable" }, { status: 503 });
   const { url } = await mintWorkspaceAppAccess(env, ownerId, app.slug);
+  const gateway = env.BROWSER_GATEWAY;
   let upstream: Response;
   try {
-    upstream = await env.BROWSER_GATEWAY.fetch(
-      "https://browser-gateway/internal/apps/preview",
-      {
+    const metered = await meteredCapture(env, ownerId, "browser-app-preview", () =>
+      gateway.fetch("https://browser-gateway/internal/apps/preview", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ url }),
         signal: AbortSignal.timeout(45_000),
-      },
+      }),
     );
+    if (!metered.ok) return Response.json({ error: metered.message }, { status: 402 });
+    upstream = metered.response;
   } catch {
     return Response.json({ error: "Preview unavailable" }, { status: 503 });
   }

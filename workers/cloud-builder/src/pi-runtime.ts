@@ -162,10 +162,12 @@ import {
   type TurnBrokerRecord,
 } from "./turn-credential-broker.js";
 import { ownerGateStub } from "./rpc-release.js";
+import { BROWSER_BUDGET_MESSAGE } from "./browser-billing.js";
 
 /** How long recovered work waits for its turn or agent run to bind a transport. */
 const BINDING_WAIT_MS = 120_000;
 const CAPABILITY_RENEW_MS = 60_000;
+const BROWSER_BUDGET_CHECK_MS = 60_000;
 const CONTAINER_SLOT_WAIT_MS = 10 * 60_000;
 const CONTAINER_SLOT_POLL_MS = 5_000;
 const ORIGIN_STOP_HOLD_MS = 5_000;
@@ -878,7 +880,13 @@ export class PiConversationRuntime {
     }
     if (active.browser) return active.browser;
     const transport = gatewayBrowserTransport(gateway, this.#browserAuthority(active));
+    let budgetCheckedAt = 0;
     active.browser = createCloudBrowserClient(async (command, signal) => {
+      if (command.action !== "browser.close" && Date.now() - budgetCheckedAt > BROWSER_BUDGET_CHECK_MS) {
+        const access = await ownerGateStub(this.#options.env.OWNER_GATES, active.authority.ownerId).billingAccess();
+        if (!access.allowed) throw new Error(access.usageLimit?.message || BROWSER_BUDGET_MESSAGE);
+        budgetCheckedAt = Date.now();
+      }
       const started = Date.now();
       const forwarded = await transport(command, signal);
       this.#options.log("pi_browser_command", {

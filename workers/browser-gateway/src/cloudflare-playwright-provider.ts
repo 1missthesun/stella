@@ -153,6 +153,7 @@ export class CloudflarePlaywrightProvider implements BrowserBackend {
     sessionId?: string;
     storageState?: BrowserStorageSnapshot;
     allowedOrigins: readonly string[];
+    beforeAcquire?: () => Promise<void>;
     onSessionAcquired: (sessionId: string, policyDigest: string) => void;
   }): Promise<void> {
     const allowedDomains = [...browserGuardrailDomains(args.allowedOrigins)];
@@ -181,6 +182,7 @@ export class CloudflarePlaywrightProvider implements BrowserBackend {
       }
     }
     if (!browser) {
+      await args.beforeAcquire?.();
       let acquired: { sessionId: string };
       try {
         acquired = await acquire(this.endpoint, {

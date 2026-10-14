@@ -45,6 +45,7 @@ import { slackTry } from "./api.js";
 import { SLACK_PATHS, slackPublicOrigin, slackSecret } from "./config.js";
 import { signToken, verifyToken, type TokenKind } from "./signed-token.js";
 import { loadInstallation } from "./store.js";
+import { meteredCapture } from "../browser-billing.js";
 import { resolveConversationRepo } from "./repos.js";
 import { isSlackConversationId } from "./workspace.js";
 import { conversationAllowsHost } from "./environment.js";
@@ -784,19 +785,26 @@ const capture = async (request: Request, env: Cloudflare.Env): Promise<Response>
   const views = Array.isArray(body?.views) && body.views.length ? body.views : DEFAULT_VIEWS;
   const fullPage = body?.fullPage === true;
   const recording = body?.recording && typeof body.recording === "object" ? body.recording : null;
+  const install = await loadInstallation(env, claims.team);
+  if (!install?.ownerId) return Response.json({ error: "This workspace no longer has Stella installed." }, { status: 403 });
+  const gateway = env.BROWSER_GATEWAY;
   let upstream: Response;
   try {
-    upstream = await env.BROWSER_GATEWAY.fetch("https://browser-gateway/internal/sites/capture", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        url: navigate,
-        views: (views as Array<Record<string, unknown>>).map((view) => ({ ...view, fullPage: view.fullPage ?? fullPage })),
-        ...(typeof body?.waitFor === "string" ? { waitFor: body.waitFor } : {}),
-        ...(recording ? { recording } : {}),
+    const metered = await meteredCapture(env, install.ownerId, "browser-site-capture", () =>
+      gateway.fetch("https://browser-gateway/internal/sites/capture", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          url: navigate,
+          views: (views as Array<Record<string, unknown>>).map((view) => ({ ...view, fullPage: view.fullPage ?? fullPage })),
+          ...(typeof body?.waitFor === "string" ? { waitFor: body.waitFor } : {}),
+          ...(recording ? { recording } : {}),
+        }),
+        signal: AbortSignal.timeout(170_000),
       }),
-      signal: AbortSignal.timeout(170_000),
-    });
+    );
+    if (!metered.ok) return Response.json({ error: metered.message }, { status: 402 });
+    upstream = metered.response;
   } catch {
     return Response.json({ error: "The cloud browser didn't answer. Try again." }, { status: 503 });
   }

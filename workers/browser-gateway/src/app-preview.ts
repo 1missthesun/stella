@@ -1,6 +1,6 @@
-import { launch } from "@cloudflare/playwright";
 import type { BrowserGatewayEnv } from "./profile-session-core.js";
 import { GatewayError } from "./errors.js";
+import { withTimedBrowser } from "./timed-browser.js";
 
 const VIEWPORT = { width: 1280, height: 800 };
 const NAVIGATION_TIMEOUT_MS = 20_000;
@@ -27,10 +27,7 @@ export async function captureAppPreview(
   body: unknown,
 ): Promise<Response> {
   const url = previewUrl(body);
-  const browser = await launch(env.BROWSER, { keep_alive: 10_000 }).catch(() => {
-    throw new GatewayError("browser_unavailable", 503);
-  });
-  try {
+  return await withTimedBrowser(env, 10_000, async (browser) => {
     const page = await browser.newPage({ viewport: VIEWPORT });
     await page
       .goto(url, { waitUntil: "load", timeout: NAVIGATION_TIMEOUT_MS })
@@ -43,7 +40,5 @@ export async function captureAppPreview(
         "cache-control": "no-store",
       },
     });
-  } finally {
-    await browser.close().catch(() => undefined);
-  }
+  });
 }

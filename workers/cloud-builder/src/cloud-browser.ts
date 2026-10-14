@@ -4,6 +4,7 @@ import {
   type CloudBrowserSuspension,
 } from "@stella/contracts/cloud-browser";
 import { readBoundedResponseBytes } from "./bounded-body.js";
+import { BROWSER_BUDGET_MESSAGE } from "./browser-billing.js";
 
 const GATEWAY_CANCEL_TIMEOUT_MS = 30_000;
 const GATEWAY_RESPONSE_MAX_BYTES = 16 * 1024 * 1024;
@@ -508,6 +509,7 @@ export const createCloudBrowserClient = (
     }
     const outcome = parseGatewayResponse(forwarded.body, command.requestId);
     if (outcome.outcome === "failed") {
+      if (outcome.code === "budget_exhausted") throw new Error(BROWSER_BUDGET_MESSAGE);
       throw new Error(
         `Cloud browser ${plan.action} failed: ${outcome.code}${outcome.detail ? ` — ${outcome.detail}` : ""}.`,
       );

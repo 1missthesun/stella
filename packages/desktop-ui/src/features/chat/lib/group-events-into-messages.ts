@@ -1,33 +1,8 @@
-/**
- * Renderer-side mirror of `SessionStore.assembleMessageWindow`. Walks a
- * flat `EventRecord[]` in chronological order, groups by turn (boundary
- * = `user_message`), and attaches each turn's tool/agent lifecycle
- * events to the assistant message that most-recently preceded them in
- * the same turn (falling back to the turn's user_message when no
- * assistant has fired yet).
- *
- * Per-assistant attachment — rather than dumping the whole turn's tools
- * onto the FIRST assistant message — is what lets the chat render
- * linearly when an orchestrator run produces multiple assistant
- * messages (e.g. preamble → tools → post-tool answer): the tools fall
- * under the preamble row, and the post-tool answer renders as its own
- * row below them.
- *
- * Used by:
- *  - `useFullShellChat` for the cloud-mode chat timeline (the backend
- *    has no `listMessages` IPC equivalent).
- *  - Scheduled-event and optimistic-event overlays merged onto the local
- *    messages stream so synthetic user/assistant messages and just-sent
- *    placeholders surface inline without waiting for SQLite to catch up.
- *
- * Keep this in lockstep with the storage-side grouping so cloud-mode
- * and local-mode produce identical shapes.
- */
 import type {
   EventRecord,
   MessageRecord,
 } from "@stella/contracts/local-chat";
-import { isUiHiddenChatMessagePayload } from "@stella/contracts/chat-event-visibility";
+import { groupChatTurns } from "@stella/contracts/chat-turn-grouping";
 
 const isTurnDecorationEvent = (event: EventRecord): boolean =>
   event.type === "tool_request" ||
@@ -52,56 +27,5 @@ const toMessageRecord = (event: EventRecord): MessageRecord => ({
 
 export const groupEventsIntoMessages = (
   events: readonly EventRecord[],
-): MessageRecord[] => {
-  const messages: MessageRecord[] = [];
-  let turnUserMessage: MessageRecord | null = null;
-  let currentAssistant: MessageRecord | null = null;
-  let pendingPreAssistantTools: EventRecord[] = [];
-
-  const finalizePreAssistantTools = () => {
-    if (pendingPreAssistantTools.length > 0 && turnUserMessage) {
-      turnUserMessage.toolEvents = [
-        ...turnUserMessage.toolEvents,
-        ...pendingPreAssistantTools,
-      ];
-    }
-    pendingPreAssistantTools = [];
-  };
-
-  for (const event of events) {
-    if (event.type === "user_message") {
-      finalizePreAssistantTools();
-      const message = toMessageRecord(event);
-      messages.push(message);
-      turnUserMessage = message;
-      currentAssistant = null;
-      continue;
-    }
-    if (event.type === "assistant_message") {
-      const message = toMessageRecord(event);
-      messages.push(message);
-      const hidden = isUiHiddenChatMessagePayload(event.payload ?? null);
-      if (!hidden && pendingPreAssistantTools.length > 0) {
-        message.toolEvents = [
-          ...message.toolEvents,
-          ...pendingPreAssistantTools,
-        ];
-        pendingPreAssistantTools = [];
-      }
-      if (!hidden) {
-        currentAssistant = message;
-      }
-      continue;
-    }
-    if (isTurnDecorationEvent(event)) {
-      if (currentAssistant) {
-        currentAssistant.toolEvents = [...currentAssistant.toolEvents, event];
-      } else {
-        pendingPreAssistantTools.push(event);
-      }
-    }
-  }
-
-  finalizePreAssistantTools();
-  return messages;
-};
+): MessageRecord[] =>
+  groupChatTurns(events, toMessageRecord, isTurnDecorationEvent).messages;

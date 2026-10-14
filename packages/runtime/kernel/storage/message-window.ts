@@ -1,4 +1,5 @@
 import { isUiHiddenChatMessagePayload } from "@stella/contracts/chat-event-visibility";
+import { groupChatTurns } from "@stella/contracts/chat-turn-grouping";
 import type { ConversationFocusRoot } from "@stella/contracts/reply-refs";
 import {
   CHAT_MESSAGE_TYPES,
@@ -65,60 +66,10 @@ export function assembleMessageWindow(rows: LocalChatEventRecord[]): {
   messages: ChatMessageRecord[];
   visibleMessageCount: number;
 } {
-  const messages: ChatMessageRecord[] = [];
-  let turnUserMessage: ChatMessageRecord | null = null;
-  let currentAssistant: ChatMessageRecord | null = null;
-  let pendingPreAssistantTools: LocalChatEventRecord[] = [];
-  let visibleMessageCount = 0;
-
-  const finalizePreAssistantTools = () => {
-    if (pendingPreAssistantTools.length > 0 && turnUserMessage) {
-      turnUserMessage.toolEvents = [
-        ...turnUserMessage.toolEvents,
-        ...pendingPreAssistantTools,
-      ];
-    }
-    pendingPreAssistantTools = [];
-  };
-  for (const row of rows) {
-    if (row.type === "user_message") {
-      finalizePreAssistantTools();
-      const message: ChatMessageRecord = { ...row, toolEvents: [] };
-      messages.push(message);
-      turnUserMessage = message;
-      currentAssistant = null;
-      if (!isUiHiddenChatMessagePayload((row.payload as never) ?? null)) {
-        visibleMessageCount += 1;
-      }
-      continue;
-    }
-    if (row.type === "assistant_message") {
-      const message: ChatMessageRecord = { ...row, toolEvents: [] };
-      messages.push(message);
-      const hidden = isUiHiddenChatMessagePayload(
-        (row.payload as never) ?? null,
-      );
-      if (!hidden && pendingPreAssistantTools.length > 0) {
-        message.toolEvents = [
-          ...message.toolEvents,
-          ...pendingPreAssistantTools,
-        ];
-        pendingPreAssistantTools = [];
-      }
-      if (!hidden) {
-        currentAssistant = message;
-        visibleMessageCount += 1;
-      }
-      continue;
-    }
-    if (currentAssistant) {
-      currentAssistant.toolEvents = [...currentAssistant.toolEvents, row];
-    } else {
-      pendingPreAssistantTools.push(row);
-    }
-  }
-  finalizePreAssistantTools();
-  return { messages, visibleMessageCount };
+  return groupChatTurns(rows, (row): ChatMessageRecord => ({
+    ...row,
+    toolEvents: [],
+  }));
 }
 
 function trimMessageWindow(

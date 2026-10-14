@@ -3,8 +3,15 @@ import { attachmentContentType } from "@stella/contracts/attachment-content-type
 import { driveLinkPath } from "@stella/contracts/cloud-world-paths";
 import { pickDeviceFileLocation } from "@stella/contracts/device-files";
 
+const isControlCharacter = (char: string): boolean => {
+  const code = char.charCodeAt(0);
+  return code < 0x20 || code === 0x7f;
+};
+
 const nameOf = (filePath: string): string =>
-  filePath.split(/[\\/]/).pop()?.replace(/[\u0000-\u001f\u007f]/g, "-") || "file";
+  Array.from(filePath.split(/[\\/]/).pop() ?? "", (char) =>
+    isControlCharacter(char) ? "-" : char,
+  ).join("") || "file";
 
 const sharedDrivePath = (name: string): string =>
   `shared/${new Date().toISOString().slice(0, 10)}/${crypto.randomUUID().slice(0, 8)}/${name}`;

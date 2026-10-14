@@ -20,7 +20,7 @@ export function ServerSettingsCard() {
   const [switching, setSwitching] = useState(false);
   if (!state || (!state.canSwitch && !state.selfHosted)) return null;
 
-  const useDefault = async () => {
+  const switchToHosted = async () => {
     setSwitching(true);
     const result = await window.electronAPI?.selfHost?.useDefault();
     if (!result?.ok) {
@@ -79,7 +79,7 @@ export function ServerSettingsCard() {
                 variant="ghost"
                 className="pill-btn"
                 disabled={switching}
-                onClick={() => void useDefault()}
+                onClick={() => void switchToHosted()}
               >
                 {switching ? t("selfHost.settings.switching") : t("selfHost.settings.useHosted")}
               </Button>

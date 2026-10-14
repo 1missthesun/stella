@@ -76,7 +76,6 @@ export type BackendClientOptions = {
   fetch?: FetchLike;
   WebSocket?: SocketConstructor;
   maxReconnectDelayMs?: number;
-  onConnectionChange?: (connected: boolean) => void;
 };
 
 type Listener = {
@@ -132,14 +131,12 @@ export class BackendClient {
   private readonly fetchImpl: FetchLike;
   private readonly SocketImpl: SocketConstructor | undefined;
   private readonly maxReconnectDelayMs: number;
-  private readonly onConnectionChange?: (connected: boolean) => void;
 
   private readonly subscriptions = new Map<string, Subscription>();
   private readonly subscriptionsById = new Map<string, Subscription>();
   private nextSubscriptionId = 1;
   private socket: SocketLike | null = null;
   private connecting = false;
-  private connected = false;
   private reconnectAttempt = 0;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private pingTimer: ReturnType<typeof setInterval> | null = null;
@@ -159,7 +156,6 @@ export class BackendClient {
         ? undefined
         : (WebSocket as unknown as SocketConstructor));
     this.maxReconnectDelayMs = options.maxReconnectDelayMs ?? 30_000;
-    this.onConnectionChange = options.onConnectionChange;
   }
 
   async call<K extends CallName>(
@@ -336,10 +332,6 @@ export class BackendClient {
     this.socket = socket;
     socket.onopen = () => {
       if (this.socket !== socket) return;
-      // The backoff resets on the server's first frame, not here: a refused
-      // token is accepted and then closed 4401, so an open proves nothing,
-      // and resetting on it reconnected four times a second.
-      this.setConnected(true);
       for (const subscription of this.subscriptions.values()) {
         this.sendFrame({
           t: "sub",
@@ -360,7 +352,6 @@ export class BackendClient {
       if (this.socket !== socket) return;
       this.socket = null;
       this.stopPing();
-      this.setConnected(false);
       if (this.disposed || this.subscriptions.size === 0) return;
       if (event.code === LIVE_CLOSE.unauthenticated) {
         this.forceTokenOnConnect = true;
@@ -524,12 +515,5 @@ export class BackendClient {
         // Already closed.
       }
     }
-    this.setConnected(false);
-  }
-
-  private setConnected(connected: boolean): void {
-    if (this.connected === connected) return;
-    this.connected = connected;
-    this.onConnectionChange?.(connected);
   }
 }

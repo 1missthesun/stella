@@ -3106,7 +3106,12 @@
       "paste": "Pegar un enlace de vinculación"
     },
     "onboarding": {
-      "link": "¿Tienes tu propio servidor de Stella? Conéctalo"
+      "link": "¿Tienes tu propio servidor de Stella? Conéctalo",
+      "prose": "Estás conectado a {name} como propietario. Ahora elige con qué pienso: tu plan de Claude o ChatGPT, o tu propia clave de API.",
+      "title": "Conectado a {name}",
+      "body": "Has iniciado sesión como propietario. Elige con qué piensa Stella. Con uno basta.",
+      "bodyOptional": "Has iniciado sesión como propietario. Este servidor tiene sus propios modelos, así que es opcional: también puedes usar tu plan de Claude o ChatGPT, o una clave de API.",
+      "settled": "Conectado a {name}"
     }
   }
 }

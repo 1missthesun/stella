@@ -3090,7 +3090,12 @@
       "paste": "Paste a pairing link"
     },
     "onboarding": {
-      "link": "Have your own Stella server? Connect it"
+      "link": "Have your own Stella server? Connect it",
+      "prose": "You're connected to {name}, signed in as its owner. Next, choose what I think with: the Claude or ChatGPT plan you already have, or your own API key.",
+      "title": "Connected to {name}",
+      "body": "You're signed in as its owner. Pick what Stella thinks with. Any one is enough.",
+      "bodyOptional": "You're signed in as its owner. This server has its own models, so this is optional: you can also use your Claude or ChatGPT plan, or an API key.",
+      "settled": "Connected to {name}"
     }
   }
 }

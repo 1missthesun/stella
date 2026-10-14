@@ -3090,7 +3090,12 @@
       "paste": "Indsæt et parringslink"
     },
     "onboarding": {
-      "link": "Har du din egen Stella-server? Forbind den"
+      "link": "Har du din egen Stella-server? Forbind den",
+      "prose": "Du er forbundet til {name} og logget ind som ejer. Vælg nu, hvad jeg tænker med: dit Claude- eller ChatGPT-abonnement eller din egen API-nøgle.",
+      "title": "Forbundet til {name}",
+      "body": "Du er logget ind som ejer. Vælg, hvad Stella tænker med. Én er nok.",
+      "bodyOptional": "Du er logget ind som ejer. Denne server har sine egne modeller, så dette er valgfrit: du kan også bruge dit Claude- eller ChatGPT-abonnement eller en API-nøgle.",
+      "settled": "Forbundet til {name}"
     }
   }
 }

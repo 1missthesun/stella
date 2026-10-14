@@ -3072,7 +3072,12 @@
       "paste": "Dán liên kết ghép nối"
     },
     "onboarding": {
-      "link": "Bạn có máy chủ Stella riêng? Kết nối ngay"
+      "link": "Bạn có máy chủ Stella riêng? Kết nối ngay",
+      "prose": "Bạn đã kết nối với {name} với tư cách chủ sở hữu. Giờ hãy chọn thứ tôi dùng để suy nghĩ: gói Claude hoặc ChatGPT bạn đang có, hoặc khóa API của riêng bạn.",
+      "title": "Đã kết nối với {name}",
+      "body": "Bạn đã đăng nhập với tư cách chủ sở hữu. Chọn thứ Stella dùng để suy nghĩ. Một là đủ.",
+      "bodyOptional": "Bạn đã đăng nhập với tư cách chủ sở hữu. Máy chủ này có mô hình riêng nên bước này là tùy chọn: bạn cũng có thể dùng gói Claude hoặc ChatGPT, hoặc một khóa API.",
+      "settled": "Đã kết nối với {name}"
     }
   }
 }

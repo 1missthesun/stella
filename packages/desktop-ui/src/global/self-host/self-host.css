@@ -192,3 +192,9 @@
   font-weight: var(--weight-semibold, 600);
   color: var(--text-strong);
 }
+
+.self-host-onboarding__title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}

@@ -3072,7 +3072,12 @@
       "paste": "Tempel tautan pemasangan"
     },
     "onboarding": {
-      "link": "Punya server Stella sendiri? Hubungkan"
+      "link": "Punya server Stella sendiri? Hubungkan",
+      "prose": "Anda terhubung ke {name} sebagai pemiliknya. Sekarang pilih apa yang saya gunakan untuk berpikir: paket Claude atau ChatGPT Anda, atau kunci API Anda sendiri.",
+      "title": "Terhubung ke {name}",
+      "body": "Anda masuk sebagai pemilik. Pilih apa yang dipakai Stella untuk berpikir. Satu saja cukup.",
+      "bodyOptional": "Anda masuk sebagai pemilik. Server ini punya model sendiri, jadi ini opsional: Anda juga bisa memakai paket Claude atau ChatGPT, atau kunci API.",
+      "settled": "Terhubung ke {name}"
     }
   }
 }

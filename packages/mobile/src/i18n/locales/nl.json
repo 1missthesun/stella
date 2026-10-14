@@ -3090,7 +3090,12 @@
       "paste": "Koppellink plakken"
     },
     "onboarding": {
-      "link": "Heb je je eigen Stella-server? Verbind hem"
+      "link": "Heb je je eigen Stella-server? Verbind hem",
+      "prose": "Je bent verbonden met {name} en aangemeld als eigenaar. Kies nu waarmee ik denk: je Claude- of ChatGPT-abonnement, of je eigen API-sleutel.",
+      "title": "Verbonden met {name}",
+      "body": "Je bent aangemeld als eigenaar. Kies waarmee Stella denkt. Eén is genoeg.",
+      "bodyOptional": "Je bent aangemeld als eigenaar. Deze server heeft eigen modellen, dus dit is optioneel: je kunt ook je Claude- of ChatGPT-abonnement of een API-sleutel gebruiken.",
+      "settled": "Verbonden met {name}"
     }
   }
 }

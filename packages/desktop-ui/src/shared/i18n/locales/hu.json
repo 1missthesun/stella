@@ -3090,7 +3090,12 @@
       "paste": "Párosítási link beillesztése"
     },
     "onboarding": {
-      "link": "Van saját Stella-szervered? Csatlakoztasd"
+      "link": "Van saját Stella-szervered? Csatlakoztasd",
+      "prose": "Tulajdonosként csatlakoztál ehhez: {name}. Most válaszd ki, mivel gondolkodjak: a Claude- vagy ChatGPT-előfizetésed, vagy a saját API-kulcsod.",
+      "title": "Csatlakozva: {name}",
+      "body": "Tulajdonosként vagy bejelentkezve. Válaszd ki, mivel gondolkodjon a Stella. Egy is elég.",
+      "bodyOptional": "Tulajdonosként vagy bejelentkezve. Ennek a szervernek saját modelljei vannak, így ez nem kötelező: használhatod a Claude- vagy ChatGPT-előfizetésedet, vagy egy API-kulcsot is.",
+      "settled": "Csatlakozva: {name}"
     }
   }
 }

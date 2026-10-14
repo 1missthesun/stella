@@ -3090,7 +3090,12 @@
       "paste": "Eşleştirme bağlantısı yapıştır"
     },
     "onboarding": {
-      "link": "Kendi Stella sunucun mu var? Bağla"
+      "link": "Kendi Stella sunucun mu var? Bağla",
+      "prose": "{name} sunucusuna sahibi olarak bağlısın. Şimdi neyle düşüneceğimi seç: Claude veya ChatGPT planın ya da kendi API anahtarın.",
+      "title": "{name} sunucusuna bağlandı",
+      "body": "Sahibi olarak oturum açtın. Stella'nın neyle düşüneceğini seç. Biri yeterli.",
+      "bodyOptional": "Sahibi olarak oturum açtın. Bu sunucunun kendi modelleri var, bu yüzden bu isteğe bağlı: Claude veya ChatGPT planını ya da bir API anahtarını da kullanabilirsin.",
+      "settled": "{name} sunucusuna bağlandı"
     }
   }
 }

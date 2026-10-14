@@ -3106,7 +3106,12 @@
       "paste": "Incolla un link di abbinamento"
     },
     "onboarding": {
-      "link": "Hai un tuo server Stella? Connettilo"
+      "link": "Hai un tuo server Stella? Connettilo",
+      "prose": "Sei connesso a {name} come proprietario. Ora scegli con cosa penso: il tuo piano Claude o ChatGPT, o la tua chiave API.",
+      "title": "Connesso a {name}",
+      "body": "Hai effettuato l'accesso come proprietario. Scegli con cosa pensa Stella. Ne basta uno.",
+      "bodyOptional": "Hai effettuato l'accesso come proprietario. Questo server ha modelli propri, quindi è facoltativo: puoi anche usare il tuo piano Claude o ChatGPT, o una chiave API.",
+      "settled": "Connesso a {name}"
     }
   }
 }

@@ -3106,7 +3106,12 @@
       "paste": "Lipește un link de asociere"
     },
     "onboarding": {
-      "link": "Ai propriul server Stella? Conectează-l"
+      "link": "Ai propriul server Stella? Conectează-l",
+      "prose": "Ești conectat la {name} ca proprietar. Acum alege cu ce gândesc: planul tău Claude sau ChatGPT ori propria cheie API.",
+      "title": "Conectat la {name}",
+      "body": "Ești autentificat ca proprietar. Alege cu ce gândește Stella. Una este suficientă.",
+      "bodyOptional": "Ești autentificat ca proprietar. Acest server are propriile modele, deci e opțional: poți folosi și planul Claude sau ChatGPT ori o cheie API.",
+      "settled": "Conectat la {name}"
     }
   }
 }

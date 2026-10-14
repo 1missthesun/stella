@@ -3072,7 +3072,12 @@
       "paste": "페어링 링크 붙여 넣기"
     },
     "onboarding": {
-      "link": "나만의 Stella 서버가 있나요? 연결하기"
+      "link": "나만의 Stella 서버가 있나요? 연결하기",
+      "prose": "{name}에 소유자로 연결되었습니다. 이제 제가 생각에 쓸 것을 고르세요: 사용 중인 Claude 또는 ChatGPT 요금제, 또는 직접 가진 API 키.",
+      "title": "{name}에 연결됨",
+      "body": "소유자로 로그인했습니다. Stella가 생각에 쓸 것을 고르세요. 하나면 충분합니다.",
+      "bodyOptional": "소유자로 로그인했습니다. 이 서버에는 자체 모델이 있으므로 선택 사항입니다. Claude 또는 ChatGPT 요금제나 API 키도 사용할 수 있습니다.",
+      "settled": "{name}에 연결됨"
     }
   }
 }

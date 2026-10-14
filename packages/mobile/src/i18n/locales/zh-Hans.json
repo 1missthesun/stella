@@ -3072,7 +3072,12 @@
       "paste": "粘贴配对链接"
     },
     "onboarding": {
-      "link": "有自己的 Stella 服务器？连接它"
+      "link": "有自己的 Stella 服务器？连接它",
+      "prose": "你已作为所有者连接到 {name}。接下来选择我用什么来思考：你已有的 Claude 或 ChatGPT 套餐，或你自己的 API 密钥。",
+      "title": "已连接到 {name}",
+      "body": "你已作为所有者登录。选择 Stella 用什么来思考，选一个就够了。",
+      "bodyOptional": "你已作为所有者登录。此服务器有自己的模型，所以这一步是可选的：你也可以使用 Claude 或 ChatGPT 套餐，或 API 密钥。",
+      "settled": "已连接到 {name}"
     }
   }
 }

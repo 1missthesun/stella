@@ -3122,7 +3122,12 @@
       "paste": "Wklej link parowania"
     },
     "onboarding": {
-      "link": "Masz własny serwer Stella? Połącz go"
+      "link": "Masz własny serwer Stella? Połącz go",
+      "prose": "Masz połączenie z {name} jako właściciel. Teraz wybierz, czym mam myśleć: Twój plan Claude lub ChatGPT albo Twój własny klucz API.",
+      "title": "Połączono z {name}",
+      "body": "Zalogowano jako właściciel. Wybierz, czym myśli Stella. Wystarczy jedno.",
+      "bodyOptional": "Zalogowano jako właściciel. Ten serwer ma własne modele, więc to opcjonalne: możesz też użyć planu Claude lub ChatGPT albo klucza API.",
+      "settled": "Połączono z {name}"
     }
   }
 }

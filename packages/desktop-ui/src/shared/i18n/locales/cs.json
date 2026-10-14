@@ -3122,7 +3122,12 @@
       "paste": "Vložit párovací odkaz"
     },
     "onboarding": {
-      "link": "Máte vlastní server Stella? Připojte ho"
+      "link": "Máte vlastní server Stella? Připojte ho",
+      "prose": "Jsi připojen k {name} jako vlastník. Teď vyber, čím budu myslet: tvůj plán Claude nebo ChatGPT, nebo vlastní klíč API.",
+      "title": "Připojeno k {name}",
+      "body": "Jsi přihlášen jako vlastník. Vyber, čím Stella myslí. Stačí jedno.",
+      "bodyOptional": "Jsi přihlášen jako vlastník. Tento server má vlastní modely, takže je to volitelné: můžeš použít i svůj plán Claude nebo ChatGPT, nebo klíč API.",
+      "settled": "Připojeno k {name}"
     }
   }
 }

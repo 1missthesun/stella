@@ -3090,7 +3090,12 @@
       "paste": "Liitä yhdistämislinkki"
     },
     "onboarding": {
-      "link": "Onko sinulla oma Stella-palvelin? Yhdistä se"
+      "link": "Onko sinulla oma Stella-palvelin? Yhdistä se",
+      "prose": "Olet yhteydessä palvelimeen {name} omistajana. Valitse seuraavaksi, millä ajattelen: Claude- tai ChatGPT-tilauksesi tai oma API-avaimesi.",
+      "title": "Yhdistetty: {name}",
+      "body": "Olet kirjautunut omistajana. Valitse, millä Stella ajattelee. Yksi riittää.",
+      "bodyOptional": "Olet kirjautunut omistajana. Tällä palvelimella on omat mallit, joten tämä on valinnaista: voit käyttää myös Claude- tai ChatGPT-tilaustasi tai API-avainta.",
+      "settled": "Yhdistetty: {name}"
     }
   }
 }

@@ -29,6 +29,8 @@ import { CapabilitiesCard } from "./cards/CapabilitiesCard";
 import { SelfModCard } from "./cards/SelfModCard";
 import { MemoryCard } from "./cards/MemoryCard";
 import { SignInCard } from "./cards/SignInCard";
+import { useDesktopServerState } from "@/global/self-host/self-host-store";
+import { useSelfHostedServer, useServerDiscovery } from "@/platform/backend/server-discovery";
 import { ThemeCard } from "./cards/ThemeCard";
 import { ExtrasCard } from "./cards/ExtrasCard";
 import { GmailCard } from "./cards/GmailCard";
@@ -276,7 +278,15 @@ export function OnboardingChat({ isAuthenticated, onComplete }: OnboardingChatPr
   }, [job.status]);
 
   /* ── Prose per step ─────────────────────────────────────────────── */
+  // A paired self-hosted server already signed its owner in.
+  const selfHosted = useSelfHostedServer();
+  const discovery = useServerDiscovery();
+  const serverState = useDesktopServerState();
+  const serverName = discovery?.name || serverState?.name || "";
   const proseFor = (step: OnboardingChatStep): string => {
+    if (step === "signin" && selfHosted) {
+      return t("selfHost.onboarding.prose", { name: serverName });
+    }
     if (step !== "quickstart") return t(`onboarding.chat.messages.${step}`);
     if (job.status === "done") return t("onboarding.chat.messages.quickstartDone");
     if (job.status === "failed") return t("onboarding.chat.messages.quickstartFailed");

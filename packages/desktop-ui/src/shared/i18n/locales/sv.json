@@ -3090,7 +3090,12 @@
       "paste": "Klistra in en kopplingslänk"
     },
     "onboarding": {
-      "link": "Har du en egen Stella-server? Anslut den"
+      "link": "Har du en egen Stella-server? Anslut den",
+      "prose": "Du är ansluten till {name} och inloggad som ägare. Välj nu vad jag tänker med: din Claude- eller ChatGPT-plan, eller din egen API-nyckel.",
+      "title": "Ansluten till {name}",
+      "body": "Du är inloggad som ägare. Välj vad Stella tänker med. Ett räcker.",
+      "bodyOptional": "Du är inloggad som ägare. Den här servern har egna modeller, så det här är valfritt: du kan också använda din Claude- eller ChatGPT-plan, eller en API-nyckel.",
+      "settled": "Ansluten till {name}"
     }
   }
 }

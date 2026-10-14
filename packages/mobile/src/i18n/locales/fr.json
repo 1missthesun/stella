@@ -3106,7 +3106,12 @@
       "paste": "Coller un lien d'association"
     },
     "onboarding": {
-      "link": "Vous avez votre propre serveur Stella ? Connectez-le"
+      "link": "Vous avez votre propre serveur Stella ? Connectez-le",
+      "prose": "Tu es connecté à {name} en tant que propriétaire. Choisis maintenant ce qui me fait réfléchir : ton abonnement Claude ou ChatGPT, ou ta propre clé API.",
+      "title": "Connecté à {name}",
+      "body": "Tu es connecté en tant que propriétaire. Choisis ce qui fait réfléchir Stella. Un seul suffit.",
+      "bodyOptional": "Tu es connecté en tant que propriétaire. Ce serveur a ses propres modèles, c'est donc facultatif : tu peux aussi utiliser ton abonnement Claude ou ChatGPT, ou une clé API.",
+      "settled": "Connecté à {name}"
     }
   }
 }

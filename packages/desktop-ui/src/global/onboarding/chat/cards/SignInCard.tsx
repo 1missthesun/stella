@@ -50,7 +50,11 @@ import {
 } from "@/global/settings/lib/engine-model-routing";
 import type { OnboardingChatAnswer } from "../onboarding-chat-flow";
 import { selfHostDialogs, useDesktopServerState } from "@/global/self-host/self-host-store";
-import { useServerFeature } from "@/platform/backend/server-discovery";
+import {
+  useSelfHostedServer,
+  useServerDiscovery,
+  useServerFeature,
+} from "@/platform/backend/server-discovery";
 import { switchEngine } from "@/global/settings/lib/switch-engine";
 import "@/global/self-host/self-host.css";
 
@@ -83,6 +87,14 @@ const ENGINE_TO_OPTION: Record<ModelPickerEngine, OptionId> = {
 };
 
 type ApiKeyProvider = (typeof API_KEY_PROVIDERS)[number];
+
+const hostOf = (origin: string): string => {
+  try {
+    return new URL(origin).host;
+  } catch {
+    return origin;
+  }
+};
 
 const isApiKeyModel = (model: string | undefined): boolean => {
   const provider = model?.split("/")[0];
@@ -139,12 +151,21 @@ export function SignInCard({ active, answered, onAnswer }: SignInCardProps) {
   // A self-hosted server without Stella's own models offers only the
   // user's Claude, ChatGPT or API key.
   const managedModels = useServerFeature("managedModels");
+  // On a paired self-hosted server the owner is already signed in: this step
+  // only picks the engine.
+  const selfHosted = useSelfHostedServer();
+  const discovery = useServerDiscovery();
   const options = useMemo(() => {
-    const base = managedModels ? BASE_OPTIONS : BASE_OPTIONS.filter((option) => option.id !== "stella");
+    const base =
+      managedModels && !selfHosted
+        ? BASE_OPTIONS
+        : BASE_OPTIONS.filter((option) => option.id !== "stella");
     return apiKeysAvailable ? [...base, API_KEY_OPTION] : base;
-  }, [apiKeysAvailable, managedModels]);
+  }, [apiKeysAvailable, managedModels, selfHosted]);
   const [authOpen, setAuthOpen] = useState(false);
   const serverState = useDesktopServerState();
+  const serverName =
+    discovery?.name || serverState?.name || (serverState?.backendUrl ? hostOf(serverState.backendUrl) : "");
   const [pending, setPending] = useState<OptionId | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [engine, setEngine] = useState<ModelPickerEngine | null>(null);
@@ -172,7 +193,7 @@ export function SignInCard({ active, answered, onAnswer }: SignInCardProps) {
   const connected = useMemo<Record<OptionId, boolean>>(() => {
     const connections = engines?.connections ?? [];
     return {
-      stella: managedModels && session.hasConnectedAccount,
+      stella: managedModels && !selfHosted && session.hasConnectedAccount,
       claude: claudeLocal.available
         ? claudeLocal.signedIn
         : connections.some((row) => row.provider === "anthropic" && isEngineConnectionUsable(row)),
@@ -190,10 +211,17 @@ export function SignInCard({ active, answered, onAnswer }: SignInCardProps) {
     connectedApiKeyProvider,
     engines?.connections,
     managedModels,
+    selfHosted,
     session.hasConnectedAccount,
   ]);
+  // A self-hosted server with its own models answers without an engine.
+  const serverModels = selfHosted && managedModels;
   const anyConnected =
-    connected.stella || connected.claude || connected.chatgpt || connected.apikey;
+    serverModels ||
+    connected.stella ||
+    connected.claude ||
+    connected.chatgpt ||
+    connected.apikey;
   const inUse: OptionId | null = engine
     ? engine === "default" && apiKeyModel
       ? "apikey"
@@ -352,7 +380,9 @@ export function SignInCard({ active, answered, onAnswer }: SignInCardProps) {
         ? t("onboarding.chat.signin.settledEngine", {
             name: t(`onboarding.chat.signin.options.${lensOn}.title`),
           })
-        : t("onboarding.chat.signin.settledStella");
+        : selfHosted
+          ? t("selfHost.onboarding.settled", { name: serverName })
+          : t("onboarding.chat.signin.settledStella");
     return (
       <div className="obc-card" data-settled>
         <span className="obc-card__settled-icon">
@@ -372,8 +402,22 @@ export function SignInCard({ active, answered, onAnswer }: SignInCardProps) {
     <div className="obc-card">
       <AuthDialog open={authOpen} onOpenChange={setAuthOpen} />
       <div className="obc-card__section">
-        <h3 className="obc-card__title">{t("onboarding.chat.signin.title")}</h3>
-        <p className="obc-card__body">{t("onboarding.chat.signin.body")}</p>
+        {selfHosted ? (
+          <>
+            <h3 className="obc-card__title self-host-onboarding__title">
+              <Check size={15} aria-hidden="true" />
+              {t("selfHost.onboarding.title", { name: serverName })}
+            </h3>
+            <p className="obc-card__body">
+              {t(serverModels ? "selfHost.onboarding.bodyOptional" : "selfHost.onboarding.body")}
+            </p>
+          </>
+        ) : (
+          <>
+            <h3 className="obc-card__title">{t("onboarding.chat.signin.title")}</h3>
+            <p className="obc-card__body">{t("onboarding.chat.signin.body")}</p>
+          </>
+        )}
       </div>
 
       <div className="obc-signin" ref={listRef}>
@@ -524,7 +568,9 @@ export function SignInCard({ active, answered, onAnswer }: SignInCardProps) {
           {t("common.continue")}
         </Button>
         <span className="obc-actions__spacer" />
-        <span className="obc-actions__hint">{t("onboarding.chat.signin.hint")}</span>
+        {selfHosted ? null : (
+          <span className="obc-actions__hint">{t("onboarding.chat.signin.hint")}</span>
+        )}
       </div>
       {serverState?.canSwitch && !serverState.selfHosted ? (
         <p className="obc-card__fine">

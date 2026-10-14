@@ -3090,7 +3090,12 @@
       "paste": "Kopplungslink einfügen"
     },
     "onboarding": {
-      "link": "Hast du deinen eigenen Stella-Server? Verbinde ihn"
+      "link": "Hast du deinen eigenen Stella-Server? Verbinde ihn",
+      "prose": "Du bist mit {name} verbunden und als Eigentümer angemeldet. Als Nächstes wähle, womit ich denke: dein Claude- oder ChatGPT-Abo oder dein eigener API-Schlüssel.",
+      "title": "Mit {name} verbunden",
+      "body": "Du bist als Eigentümer angemeldet. Wähle, womit Stella denkt. Eines reicht.",
+      "bodyOptional": "Du bist als Eigentümer angemeldet. Dieser Server hat eigene Modelle, das hier ist also optional: Du kannst auch dein Claude- oder ChatGPT-Abo oder einen API-Schlüssel nutzen.",
+      "settled": "Mit {name} verbunden"
     }
   }
 }

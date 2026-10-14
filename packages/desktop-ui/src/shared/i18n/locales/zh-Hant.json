@@ -3072,7 +3072,12 @@
       "paste": "貼上配對連結"
     },
     "onboarding": {
-      "link": "有自己的 Stella 伺服器？連線它"
+      "link": "有自己的 Stella 伺服器？連線它",
+      "prose": "你已作為擁有者連線到 {name}。接下來選擇我用什麼來思考：你已有的 Claude 或 ChatGPT 方案，或你自己的 API 金鑰。",
+      "title": "已連線到 {name}",
+      "body": "你已作為擁有者登入。選擇 Stella 用什麼來思考，選一個就夠了。",
+      "bodyOptional": "你已作為擁有者登入。此伺服器有自己的模型，所以這一步是選用的：你也可以使用 Claude 或 ChatGPT 方案，或 API 金鑰。",
+      "settled": "已連線到 {name}"
     }
   }
 }

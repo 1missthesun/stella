@@ -48,22 +48,12 @@ export const registerHomeHandlers = (options: HomeHandlersOptions) => {
   registerPrivilegedHandle(
     options,
     IPC_HOME_CAPTURE_APP_WINDOW,
-    async (
-      _event,
-      payload?: { appName?: string | null; pid?: number | null },
-    ) => {
-      const appName =
-        typeof payload?.appName === "string" ? payload.appName.trim() : "";
-      const rawPid = payload?.pid;
-      const pid =
-        typeof rawPid === "number" && Number.isFinite(rawPid) && rawPid > 0
-          ? rawPid
-          : null;
-      if (!appName && !pid) {
+    async (_event, payload?: { pid?: number }) => {
+      const pid = payload?.pid;
+      if (typeof pid !== "number" || !Number.isInteger(pid) || pid <= 0) {
         return { capture: null };
       }
-      const capture = await captureAppWindow({ appName, pid });
-      return { capture };
+      return { capture: await captureAppWindow(pid) };
     },
   );
 };

@@ -809,15 +809,8 @@ export const createElectronApi = (
         ipc.invoke(IPC_HOME_LIST_RECENT_APPS, { limit }),
       getActiveBrowserTab: (bundleId: string) =>
         ipc.invoke(IPC_HOME_GET_ACTIVE_BROWSER_TAB, { bundleId }),
-      captureAppWindow: (
-        target: string | { appName?: string | null; pid?: number | null },
-      ) =>
-        ipc.invoke(
-          IPC_HOME_CAPTURE_APP_WINDOW,
-          typeof target === "string"
-            ? { appName: target }
-            : { appName: target?.appName ?? null, pid: target?.pid ?? null },
-        ),
+      captureAppWindow: (target: { pid: number }) =>
+        ipc.invoke(IPC_HOME_CAPTURE_APP_WINDOW, { pid: target.pid }),
     },
 
     media: {

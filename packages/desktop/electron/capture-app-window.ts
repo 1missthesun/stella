@@ -1,4 +1,3 @@
-import { desktopCapturer } from "electron";
 import { captureWindowScreenshotByPid } from "./window-capture.js";
 
 export type AppWindowCapture = {
@@ -11,129 +10,20 @@ export type AppWindowCapture = {
   };
 };
 
-const MAX_THUMBNAIL_DIM = 1280;
-
-const normalizeName = (value: string): string =>
-  value.toLowerCase().replace(/\s+/g, "").trim();
-
-type CaptureOptions = {
-  pid?: number | null;
-  appName?: string | null;
-};
-
-/**
- * Captures the topmost on-screen window for the given app.
- *
- * When a `pid` is provided, uses the bundled native helpers
- * (`home_capture --pid=<pid>` on macOS via ScreenCaptureKit,
- * `window_info --shot --pid=<pid>` on Windows via PrintWindow) against the
- * process's topmost window. This is the reliable path — Electron's
- * `desktopCapturer.getSources({ types: ['window'] })` returns sources named
- * by window title (no app prefix) on modern macOS and Windows, so a
- * name-based match against window sources misses most apps.
- *
- * When no pid is provided (or the native helper fails) we fall back to
- * `desktopCapturer` and a name match — useful for cmd+rc → "Open chat"
- * which doesn't have a pid.
- */
 export const captureAppWindow = async (
-  options: CaptureOptions,
+  pid: number,
 ): Promise<AppWindowCapture | null> => {
-  const pid =
-    typeof options.pid === "number" && Number.isFinite(options.pid) && options.pid > 0
-      ? options.pid
-      : null;
-
-  if (
-    pid !== null &&
-    (process.platform === "darwin" || process.platform === "win32")
-  ) {
-    try {
-      const capture = await captureWindowScreenshotByPid(pid);
-      if (capture) {
-        return {
-          title: capture.windowInfo.title ?? "",
-          axTree: capture.axTree ?? capture.windowInfo.axTree ?? null,
-          screenshot: capture.screenshot,
-        };
-      }
-    } catch (error) {
-      console.warn("[home] captureWindowScreenshotByPid failed", error);
-    }
-  }
-
-  const appName = (options.appName ?? "").trim();
-  if (!appName) return null;
-  return await captureAppWindowByName(appName);
-};
-
-/**
- * Fallback path — match a window source by app name via `desktopCapturer`.
- * On modern macOS most window sources are named after the window title,
- * not "<App> - <Title>", so this only succeeds for a small set of apps.
- * Kept around for cmd+rc → "Open chat" which doesn't carry a pid, and
- * eventually for Windows/Linux capture.
- */
-const captureAppWindowByName = async (
-  appName: string,
-): Promise<AppWindowCapture | null> => {
-  const targetNormalized = normalizeName(appName);
-
-  let sources: Electron.DesktopCapturerSource[];
+  if (process.platform !== "darwin" && process.platform !== "win32") return null;
   try {
-    sources = await desktopCapturer.getSources({
-      types: ["window"],
-      thumbnailSize: { width: MAX_THUMBNAIL_DIM, height: MAX_THUMBNAIL_DIM },
-      fetchWindowIcons: false,
-    });
+    const capture = await captureWindowScreenshotByPid(pid);
+    if (!capture) return null;
+    return {
+      title: capture.windowInfo.title ?? "",
+      axTree: capture.axTree ?? capture.windowInfo.axTree ?? null,
+      screenshot: capture.screenshot,
+    };
   } catch (error) {
-    console.warn("[home] captureAppWindow getSources failed", error);
+    console.warn("[home] captureWindowScreenshotByPid failed", error);
     return null;
   }
-
-  const candidates = sources
-    .map((source) => {
-      const sourceName = source.name ?? "";
-      const trimmedName = sourceName.trim();
-      if (!trimmedName) return null;
-
-      const splitMatch = trimmedName.match(/^(.+?)\s+[\u2013\u2014-]\s+(.*)$/);
-      const appPortion = splitMatch ? splitMatch[1] : trimmedName;
-      const titlePortion = splitMatch ? splitMatch[2] : "";
-      const appPortionNormalized = normalizeName(appPortion);
-
-      let score = 0;
-      if (appPortionNormalized === targetNormalized) {
-        score = 3;
-      } else if (appPortionNormalized.startsWith(targetNormalized)) {
-        score = 2;
-      } else if (appPortionNormalized.includes(targetNormalized)) {
-        score = 1;
-      } else {
-        return null;
-      }
-
-      return { source, score, titlePortion };
-    })
-    .filter((candidate): candidate is NonNullable<typeof candidate> =>
-      candidate !== null,
-    )
-    .sort((a, b) => b.score - a.score);
-
-  if (candidates.length === 0) return null;
-
-  const best = candidates[0];
-  const thumbnail = best.source.thumbnail;
-  if (thumbnail.isEmpty()) return null;
-  const size = thumbnail.getSize();
-
-  return {
-    title: best.titlePortion,
-    axTree: null,
-    screenshot: {
-      dataUrl: thumbnail.toDataURL(),
-      width: size.width,
-      height: size.height,
-    },
-  };
 };

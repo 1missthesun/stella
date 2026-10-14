@@ -374,7 +374,6 @@ export class CaptureService {
             return;
         }
         const resolve = this.pendingRegionCaptureResolve;
-        const regionBounds = this.options.overlay.getOverlayBounds();
         let capture = null;
         try {
             capture = await this.withCaptureContext(async () => {
@@ -388,22 +387,9 @@ export class CaptureService {
         catch (error) {
             console.debug('[capture] window capture at point failed:', error.message);
         }
-        // Native window capture failed (missing/broken helper, PrintWindow
-        // refusal). Fall back to a desktopCapturer shot of the display under the
-        // click so the user still gets an attachment instead of a silent no-op.
-        let fallbackScreenshot = null;
-        if (!capture?.screenshot) {
-            const dipPoint = {
-                x: (regionBounds?.x ?? 0) + point.x,
-                y: (regionBounds?.y ?? 0) + point.y,
-            };
-            const display = screen.getDisplayNearestPoint(dipPoint);
-            fallbackScreenshot = await this.captureDisplayScreenshot(display);
-        }
-        resolve({
-            screenshot: capture?.screenshot ?? fallbackScreenshot,
-            window: toChatContextWindow(capture?.windowInfo),
-        });
+        resolve(capture?.screenshot
+            ? { screenshot: capture.screenshot, window: toChatContextWindow(capture.windowInfo) }
+            : { screenshot: null, window: null });
         this.resetRegionCapture();
     }
     async captureScreenshot(point) {

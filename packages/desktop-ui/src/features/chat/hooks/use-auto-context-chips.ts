@@ -15,6 +15,7 @@ export type RecentAppChip = {
 export type BrowserTabChip = {
   kind: "tab"
   browser: string
+  pid: number
   bundleId: string
   url: string
   title?: string
@@ -280,17 +281,17 @@ const fetchSnapshot = async (): Promise<FetchSnapshotResult> => {
           host = next.url
         }
         const tabBundleId = next.bundleId ?? activeBrowser.bundleId
-        const browserIcon = apps.find(
-          (app) => app.bundleId === tabBundleId,
-        )?.iconDataUrl
+        const browserApp =
+          apps.find((app) => app.bundleId === tabBundleId) ?? activeBrowser
         tab = {
           kind: "tab",
           browser: next.browser,
+          pid: browserApp.pid,
           bundleId: tabBundleId,
           url: next.url,
           title: next.title,
           host,
-          iconDataUrl: browserIcon,
+          iconDataUrl: browserApp.iconDataUrl,
         }
       }
     } catch {

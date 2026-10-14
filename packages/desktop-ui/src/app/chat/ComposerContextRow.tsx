@@ -101,16 +101,13 @@ export function useComposerContextSuggestions(
       if (slot.chip.kind === "tab") {
         setChatContext(tabChipToChatContext(slot.chip));
         captureAppWindowAsync(
-          { appName: slot.chip.browser, pid: null },
+          { appName: slot.chip.browser, pid: slot.chip.pid },
           setChatContext,
         );
       } else {
         setChatContext(appChipToChatContext(slot.chip));
         captureAppWindowAsync(
-          {
-            appName: slot.chip.name,
-            pid: slot.chip.pid > 0 ? slot.chip.pid : null,
-          },
+          { appName: slot.chip.name, pid: slot.chip.pid },
           setChatContext,
         );
       }
@@ -123,7 +120,7 @@ export function useComposerContextSuggestions(
 }
 
 const captureAppWindowAsync = (
-  target: { appName: string; pid: number | null },
+  target: { appName: string; pid: number },
   setChatContext: Dispatch<SetStateAction<ChatContext | null>>,
 ): void => {
   const api = getElectronApi();
@@ -139,7 +136,7 @@ const captureAppWindowAsync = (
 
   void (async () => {
     try {
-      const result = await captureFn({ appName, pid });
+      const result = await captureFn({ pid });
       const capture = result?.capture ?? null;
       setChatContext((prev) => {
         if (!prev?.window) return prev;

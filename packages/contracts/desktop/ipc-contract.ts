@@ -1296,7 +1296,7 @@ export type IpcInvokeContract = {
     GetActiveBrowserTabResult
   >;
   [IPC_HOME_CAPTURE_APP_WINDOW]: Invoke<
-    [payload: { appName?: string | null; pid?: number | null }],
+    [payload: { pid: number }],
     AppWindowCapture
   >;
 

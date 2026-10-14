@@ -406,8 +406,6 @@ function AppsHost({
           )}
         </MainDetailSurface>
       </View>
-      {/* No KeyboardAvoidingView: the WebView already scrolls a focused field
-          into view, and padding on top of that shifted the page twice. */}
       {frames.map((entry) => (
         <View
           key={entry.url}

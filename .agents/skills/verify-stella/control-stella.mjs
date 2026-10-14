@@ -470,6 +470,34 @@ const runHomeEnvironment = (run) => {
 };
 
 /**
+ * Agents in a test app sometimes write the real home's absolute path (a model
+ * expanding `~` from other paths it saw) even though HOME points at the run.
+ * On Linux the app runs in a mount namespace where the real `~/.stella` is the
+ * run's data folder, so such writes land in the run. STELLA_VERIFY_HOME_JAIL=0
+ * turns it off.
+ */
+const homeJail = (run, env) => {
+  if (process.platform !== "linux") return { prefix: [], status: "unavailable on this platform" };
+  if (process.env.STELLA_VERIFY_HOME_JAIL === "0") return { prefix: [], status: "off (STELLA_VERIFY_HOME_JAIL=0)" };
+  const realStella = path.join(realHome, ".stella");
+  if (!existsSync(realStella)) return { prefix: [], status: "not needed (no real ~/.stella)" };
+  const bwrap = ["/usr/bin/bwrap", "/bin/bwrap"].find((candidate) => existsSync(candidate))
+    ?? spawnSync("sh", ["-c", "command -v bwrap"], { encoding: "utf8" }).stdout.trim();
+  if (!bwrap) return { prefix: [], status: "missing bwrap (install bubblewrap)" };
+  const inside = (candidate) => {
+    const relative = path.relative(realStella, candidate);
+    return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+  };
+  const keep = [...new Set([repoRoot, run.runDir, run.userDataDir, env.TMPDIR].filter(Boolean).map((entry) => path.resolve(entry)))]
+    .filter((entry) => inside(entry) && existsSync(entry));
+  const args = ["--dev-bind", "/", "/", "--bind", run.dataDir, realStella];
+  for (const entry of keep) args.push("--bind", entry, entry);
+  const probe = spawnSync(bwrap, [...args, "true"], { encoding: "utf8", timeout: 10_000 });
+  if (probe.status !== 0) return { prefix: [], status: `bwrap failed: ${(probe.stderr || probe.error?.message || "").trim()}` };
+  return { prefix: [bwrap, ...args], status: "on" };
+};
+
+/**
  * A run that borrows Claude Code exists to drive real Claude Code turns,
  * which spend the user's own Claude quota: start it on the Claude Code
  * engine with Haiku, not the account's best model.
@@ -718,10 +746,14 @@ const startElectron = async (run, { minted, modelGateway, fakeMic, browserBridge
     electronArgs.push(`--inspect=127.0.0.1:${process.env.STELLA_VERIFY_INSPECT_MAIN}`);
   }
   electronArgs.push(repoRoot, "--dev");
-  const electron = spawnLogged(electronBin(), electronArgs, {
+  const baseEnv = isolatedElectronEnvironment();
+  const jail = homeJail(run, baseEnv);
+  run.homeJail = jail.status;
+  const [command, ...commandArgs] = [...jail.prefix, electronBin(), ...electronArgs];
+  const electron = spawnLogged(command, commandArgs, {
     cwd: repoRoot,
     env: {
-      ...isolatedElectronEnvironment(),
+      ...baseEnv,
       ...(modelGateway ? { STELLA_MODEL_GATEWAY_URL: modelGateway } : {}),
       ...(browserBridge ? { STELLA_BROWSER_BRIDGE: browserBridge } : {}),
       ...(run.display?.display ? { DISPLAY: run.display.display } : {}),
@@ -945,6 +977,9 @@ const cmdLaunch = async (options) => {
 
 const launchWarnings = (run) => {
   const warnings = [];
+  if (process.platform === "linux" && run.homeJail && run.homeJail !== "on") {
+    warnings.push(`Agents in the test app can still write the real ~/.stella by absolute path: home jail ${run.homeJail}`);
+  }
   if (process.platform === "linux" && run.display?.mode === "host") {
     warnings.push(`The window is on the real display ${run.display.display ?? ""}${run.display.reason ? `: ${run.display.reason}` : ""}`);
   }

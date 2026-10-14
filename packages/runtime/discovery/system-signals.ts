@@ -52,10 +52,11 @@ async function collectUserIdentity(signal: AbortSignal): Promise<UserIdentitySig
   try {
     const info = os.userInfo();
     if (info.username) identity.username = info.username;
-    if (info.homedir) identity.homeDirectory = info.homedir;
   } catch {
-    identity.homeDirectory = os.homedir();
+    // No passwd entry: the username stays unknown.
   }
+  // $HOME, not the passwd entry: a test instance or relocated home points it elsewhere.
+  identity.homeDirectory = os.homedir();
 
   try {
     if (os.platform() === "darwin") {

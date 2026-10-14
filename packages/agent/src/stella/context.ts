@@ -13,6 +13,7 @@ export type StellaMemory = {
 
 export type StellaContextSources = {
   readonly env: StellaPromptEnvironment;
+  readonly homeFolders?: { readonly home: string; readonly stellaHome: string };
   agentPrompt(id: StellaAgentPromptId, context: Context): Promise<string | undefined>;
   personality(context: Context): Promise<string | undefined>;
   memory(context: Context): Promise<StellaMemory>;

@@ -42,24 +42,34 @@ const promptIdFor = (agent: StellaAgentRole): StellaAgentPromptId =>
 
 const AGENTS_MD_MAX_CHARS = 32_000;
 
-const workingDirectory: PromptSection["render"] = async (input, context) => {
+const homeFoldersLine = (folders: { home: string; stellaHome: string }): string =>
+  `Your home folder \`~\` is ${folders.home} and \`~/.stella/\` is ${folders.stellaHome}; expand \`~\` from these when a path must be absolute, never from other paths you see.`;
+
+const workingDirectory = async (
+  input: PromptInput,
+  context: Context,
+  homeFolders: StellaContextSources["homeFolders"],
+): Promise<string | undefined> => {
+  const lines: string[] = [];
   const cwd = input.agent.cwd;
   const env = input.env;
-  if (!cwd || !env || (await role(input, context)).agentType === "orchestrator") return undefined;
-  const lines = [
-    `Your working directory is ${cwd}: shell commands and relative paths start there. You can still read and change files anywhere the work needs.`,
-  ];
-  const file = await env.joinPath([env.cwd, "AGENTS.md"], context);
-  const text = file.ok ? await env.readTextFile(file.value, context) : undefined;
-  if (file.ok && text?.ok && text.value.trim()) {
-    const body = text.value.trim();
-    const shown =
-      body.length > AGENTS_MD_MAX_CHARS
-        ? `${body.slice(0, AGENTS_MD_MAX_CHARS)}\n\n[Truncated: read ${file.value} for the rest.]`
-        : body;
-    lines.push(`The project's instructions for agents, from ${file.value}:`, startupDoc(file.value, shown)!);
+  if (cwd && env && (await role(input, context)).agentType !== "orchestrator") {
+    lines.push(
+      `Your working directory is ${cwd}: shell commands and relative paths start there. You can still read and change files anywhere the work needs.`,
+    );
+    const file = await env.joinPath([env.cwd, "AGENTS.md"], context);
+    const text = file.ok ? await env.readTextFile(file.value, context) : undefined;
+    if (file.ok && text?.ok && text.value.trim()) {
+      const body = text.value.trim();
+      const shown =
+        body.length > AGENTS_MD_MAX_CHARS
+          ? `${body.slice(0, AGENTS_MD_MAX_CHARS)}\n\n[Truncated: read ${file.value} for the rest.]`
+          : body;
+      lines.push(`The project's instructions for agents, from ${file.value}:`, startupDoc(file.value, shown)!);
+    }
   }
-  return lines.join("\n\n");
+  if (homeFolders) lines.splice(Math.min(lines.length, 1), 0, homeFoldersLine(homeFolders));
+  return lines.length > 0 ? lines.join("\n\n") : undefined;
 };
 
 const agentIdentity: PromptSection["render"] = async (input, context) => {
@@ -134,7 +144,9 @@ export function stellaPromptExtension(sources: StellaContextSources) {
       section(ENGINE_MODEL_SECTION, async (input) =>
         input.agent.model ? engineModelText(runsOn(input.agent.model.provider, input.agent.model.modelId, input.agent.thinkingLevel)) : undefined,
       ),
-      section("working-directory", async (input, context) => (sources.env === "cloud" ? undefined : workingDirectory(input, context))),
+      section("working-directory", async (input, context) =>
+        sources.env === "cloud" ? undefined : workingDirectory(input, context, sources.homeFolders),
+      ),
       section("agent-identity", agentIdentity),
       section("media-access", async (input, context) => {
         const snapshot = await sources.executionContext(input.conversationId, context);

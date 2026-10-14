@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -78,6 +79,7 @@ export function desktopContextSources(options: DesktopSourcesOptions): StellaCon
   const served = servedPrompts(options.backendUrl);
   return {
     env: "desktop",
+    homeFolders: { home: os.homedir(), stellaHome: path.resolve(options.stellaHome) },
     agentPrompt: async (id) => (await served(id)) ?? (await readOptional(bundledPath(id))),
     personality: async () => readOrSeedPersonality(options.stellaHome) || undefined,
     memory: async (): Promise<StellaMemory> => {

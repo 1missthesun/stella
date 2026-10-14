@@ -121,6 +121,7 @@ import {
   alignJournalContext,
   checkpointToPublish,
   importJournal,
+  adoptJournalCheckpoint,
   journalImportAfter,
   JournalSyncDoc,
   noteCheckpointPublished,
@@ -415,6 +416,18 @@ export type PiRuntimeOptions = {
    * the conversation's latest checkpoint, or the journal's context start.
    */
   journalStart(): Promise<JournalStart>;
+  /**
+   * Entries this object moved to R2 (`PiEntryArchive`): those of
+   * `piConversationId`, oldest first, all of them or the newest `limit` below
+   * `beforeId`. Absent where nothing is archived.
+   */
+  archivedEntries?: {
+    read(
+      piConversationId: number,
+      options?: { beforeId?: number; limit?: number },
+    ): Promise<{ entries: ReadonlyArray<{ id: number; record: unknown }>; hasOlder: boolean }>;
+    has(piConversationId: number, beforeId?: number): boolean;
+  };
   waitUntil(work: Promise<unknown>): void;
   report(error: unknown): void;
   log(event: string, fields: Record<string, unknown>): void;
@@ -1050,7 +1063,19 @@ export class PiConversationRuntime {
   #ownHistory(threadId: string): CloudHistoryClient {
     const query = async (args: Record<string, unknown>) => {
       const { harness, root } = await this.open();
-      return await ownHistoryQuery(harness, root.id, threadId, args, BACKGROUND_CONTEXT);
+      const archive = this.#options.archivedEntries;
+      return await ownHistoryQuery(
+        harness,
+        root.id,
+        threadId,
+        args,
+        BACKGROUND_CONTEXT,
+        undefined,
+        archive
+          ? async (conversationId) =>
+              (await archive.read(conversationId)).entries.map((entry) => entry.record as EntryRecord)
+          : undefined,
+      );
     };
     return {
       search: (text, options) => query({ op: "search", text, options }),
@@ -2407,8 +2432,28 @@ export class PiConversationRuntime {
       }
       const through: number = page.records.at(-1)?.seq ?? after;
       await importJournal(harness, root, messages, through, context, start.seed);
-      if (page.complete || through <= after) return through;
+      if (page.complete || through <= after) {
+        await this.#adoptCheckpoint(harness, root, context);
+        return through;
+      }
       after = through;
+    }
+  }
+
+  /**
+   * A newer conversation checkpoint (another host's compaction) becomes this
+   * transcript's context start, so what it covers leaves the context and the
+   * archive can move it out of the object. Never fails the turn.
+   */
+  async #adoptCheckpoint(harness: Harness, root: Conversation, context: Context): Promise<void> {
+    try {
+      const { checkpoint } = await this.#options.journalStart();
+      if (!checkpoint) return;
+      if (await adoptJournalCheckpoint(harness, root, checkpoint, context)) {
+        this.#options.log("pi_root_checkpoint_adopted", { throughSeq: checkpoint.throughSeq });
+      }
+    } catch (error) {
+      this.#options.report(error);
     }
   }
 
@@ -2512,7 +2557,10 @@ export class PiConversationRuntime {
       mergePiEntries(history, snapshot.entries),
       CLIENT_FRAME_BYTES,
     );
-    return { snapshot: { ...snapshot, entries }, hasOlder: page.next !== undefined || trimmed };
+    const oldest = page.items.at(-1)?.id;
+    const archived =
+      page.next === undefined && (this.#options.archivedEntries?.has(root.id, oldest) ?? false);
+    return { snapshot: { ...snapshot, entries }, hasOlder: page.next !== undefined || trimmed || archived };
   }
 
   /** Whether the clients' stream is attached in this isolate. */
@@ -2535,11 +2583,18 @@ export class PiConversationRuntime {
       undefined,
       context,
     );
-    const { entries, trimmed } = piEntriesForClients(
-      [...page.items].reverse() as unknown as PiEntry[],
-      CLIENT_FRAME_BYTES,
-    );
-    return { entries, hasOlder: page.next !== undefined || trimmed };
+    let items = [...page.items].reverse() as unknown as PiEntry[];
+    let hasOlder = page.next !== undefined;
+    // Below what the store holds: the entries moved to R2, newest first.
+    const archive = this.#options.archivedEntries;
+    if (!hasOlder && archive && items.length < CLIENT_HISTORY_PAGE) {
+      const below = Math.min(beforeEntryId, page.items.at(-1)?.id ?? beforeEntryId);
+      const older = await archive.read(root.id, { beforeId: below, limit: CLIENT_HISTORY_PAGE - items.length });
+      items = [...(older.entries.map((entry) => entry.record) as unknown as PiEntry[]), ...items];
+      hasOlder = older.hasOlder;
+    }
+    const { entries, trimmed } = piEntriesForClients(items, CLIENT_FRAME_BYTES);
+    return { entries, hasOlder: hasOlder || trimmed };
   }
 
   /** Closes pi's in-memory side. Its durable state is untouched. */

@@ -56,6 +56,8 @@ export type JournalSyncState = {
   seededFromSeq?: number;
   /** The newest compaction of this transcript published as the journal's checkpoint. */
   publishedCheckpoint?: number;
+  /** The newest journal checkpoint (its `throughSeq`) taken as this transcript's compaction after its seed. */
+  adoptedCheckpoint?: number;
   /** The newest transcript entry mirrored into the journal. */
   mirrored?: number;
   /** Messages typed here and sent on to where Stella runs (`relay`): the journal's copy is not imported. */
@@ -293,6 +295,76 @@ export async function alignJournalContext(
     doc.importedSeq = Math.max(doc.importedSeq, contextStartSeq - 1);
     return true;
   }, context);
+}
+
+/**
+ * Take a journal checkpoint newer than this transcript's context: a
+ * compaction whose summary stands in for everything through
+ * `checkpoint.throughSeq`, its context opening on the first prompt after the
+ * last entry it covers. That is what a transcript seeded now would hold
+ * (`journalImportAfter`). Without it a long-lived transcript that mirrors
+ * another host's turns keeps every entry since its own last compaction in
+ * context, and in its store, for good. Only ever moves the context forward;
+ * admitted as a write (placed when idle, else at the run's next boundary).
+ * Returns whether it was submitted.
+ */
+export async function adoptJournalCheckpoint(
+  harness: Harness,
+  root: Conversation,
+  checkpoint: JournalCheckpoint,
+  context: Context,
+): Promise<boolean> {
+  const plan = await harness.commit(async (tx) => {
+    const doc = await tx.doc(JournalSyncDoc, root.id);
+    if ((doc.adoptedCheckpoint ?? -1) >= checkpoint.throughSeq) return undefined;
+    if ((doc.importedSeq ?? -1) < checkpoint.throughSeq) return undefined;
+    const marker = await tx.latestHeadMarker(root.id);
+    if (marker && journalCheckpointOf(marker) !== undefined && journalCheckpointOf(marker)! >= checkpoint.throughSeq) {
+      return undefined;
+    }
+    // Newest first: the first prompt after the newest entry the checkpoint covers.
+    let head: EntryId | undefined;
+    let covered = false;
+    let cursor: Cursor | undefined;
+    do {
+      const page = await tx.scanEntries({ conversationId: root.id, order: "descending" }, ALIGN_SCAN_PAGE, cursor);
+      for (const entry of page.items) {
+        if (marker && entry.id < marker.head) break;
+        const seq = journalSeqOf(entry);
+        if (seq !== undefined && seq <= checkpoint.throughSeq) {
+          covered = true;
+          break;
+        }
+        if (entry.kind === ENTRY_KIND.user) head = entry.id;
+      }
+      if (covered || (marker && page.items.some((entry) => entry.id < marker.head))) break;
+      cursor = page.next;
+    } while (cursor !== undefined);
+    // Nothing since the current head is covered by it: the context is already newer.
+    if (!covered) return undefined;
+    if (marker && head !== undefined && head <= marker.head) return undefined;
+    return { head };
+  }, context);
+  if (!plan) return false;
+  await root.submit(
+    {
+      type: "write",
+      requestId: `journal-checkpoint:${checkpoint.throughSeq}`,
+      entry: {
+        kind: CompactionEntry.kind,
+        ...(plan.head === undefined ? { head: "self" as const } : { head: plan.head }),
+        model: [{ role: "user", content: checkpoint.summary, timestamp: Date.now() }],
+        data: { reason: "threshold", journalCheckpoint: checkpoint.throughSeq },
+      },
+    },
+    context,
+  );
+  await harness.commit(async (tx) => {
+    const doc = await tx.doc(JournalSyncDoc, root.id);
+    doc.adoptedCheckpoint = Math.max(doc.adoptedCheckpoint ?? -1, checkpoint.throughSeq);
+    return undefined;
+  }, context);
+  return true;
 }
 
 /** The journal seq of an entry written from the journal, which is never mirrored back. */

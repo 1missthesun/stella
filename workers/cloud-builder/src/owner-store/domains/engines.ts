@@ -1619,11 +1619,6 @@ const resolving = new Map<string, Promise<EngineAccessResult>>();
 
 const ACCESS_MIN_VALIDITY_MS = 10 * 60_000;
 const ACCESS_EXPIRY_MARGIN_MS = 60_000;
-/**
- * A forced refresh this soon after the account's last token write serves that
- * token: another caller already refreshed for the same rejection.
- */
-const FORCED_REFRESH_REUSE_MS = 30_000;
 
 const toAccess = (payload: StoredEnginePayload, engineAccountId: string): EngineAccessResponse => ({
   accessToken: payload.access,
@@ -1631,10 +1626,7 @@ const toAccess = (payload: StoredEnginePayload, engineAccountId: string): Engine
   expiresAt: payload.expires,
 });
 
-const resolveAccess = async (
-  ctx: OwnerContext,
-  forceRefresh = false,
-): Promise<EngineAccessResult> => {
+const resolveAccess = async (ctx: OwnerContext): Promise<EngineAccessResult> => {
   const provider = "chatgpt" as const;
   let row = activeAccountOf(accountsOf(ctx.db, provider), providerSettings(ctx.db, provider));
   if (!row) {
@@ -1659,12 +1651,11 @@ const resolveAccess = async (
     row = { ...row, payload: encrypted };
   }
   const now = Date.now();
-  const forced = forceRefresh && now - row.updated_at >= FORCED_REFRESH_REUSE_MS;
   const usable = payload.expires > now + ACCESS_EXPIRY_MARGIN_MS;
   const due =
     payload.expires <= now + ACCESS_MIN_VALIDITY_MS &&
     (payload.earliestRefreshAt === undefined || payload.earliestRefreshAt <= now || !usable);
-  if (!forced && !due && usable) return toAccess(payload, row.account_id);
+  if (!due && usable) return toAccess(payload, row.account_id);
   if (!payload.clientId || !payload.refresh || !payload.subject) {
     return { needsSignIn: true, engineAccountId: row.account_id };
   }
@@ -1722,14 +1713,11 @@ const resolveAccess = async (
   return toAccess(next, row.account_id);
 };
 
-const sharedAccess = async (
-  ctx: OwnerContext,
-  forceRefresh = false,
-): Promise<EngineAccessResult> => {
+const sharedAccess = async (ctx: OwnerContext): Promise<EngineAccessResult> => {
   const key = ctx.ownerId;
   const pending = resolving.get(key);
   if (pending) return await pending;
-  const run = resolveAccess(ctx, forceRefresh).finally(() => resolving.delete(key));
+  const run = resolveAccess(ctx).finally(() => resolving.delete(key));
   resolving.set(key, run);
   return await run;
 };

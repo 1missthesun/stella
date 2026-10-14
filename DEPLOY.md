@@ -709,9 +709,24 @@ release covers nothing on Play.
 
 ## Smoke check after a prod deploy
 
-- `curl -s https://auth.stella.sh/api/auth/jwks` → 200.
-- Anonymous sign-in, then one chat turn: `POST /api/auth/sign-in/anonymous`,
-  `GET /api/auth/token`, `POST /conversations/<uuid>/turns`
-  `{"protocol":1,"clientMsgId":"<uuid>","prompt":"Reply with exactly: ok","lane":"chat"}`,
-  then poll `GET /conversations/<uuid>/history` for the assistant reply.
-- Desktop against a given backend: `STELLA_BACKEND_URL=<backend> TMPDIR=/tmp node .agents/skills/verify-stella/control-stella.mjs session launch`.
+No human and no secret needed. Run all three:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' https://auth.stella.sh/api/auth/jwks   # 200
+curl -s https://auth.stella.sh/readyz                                          # "ok":true
+```
+
+Then one real cloud turn on Stella's own model, as the owner (Rahul's prod
+account), from any Stella agent or chat:
+
+```js
+spawn_agent({ description: "Prod smoke turn", destination: "cloud", model: "stella/default",
+  prompt: "Reply with exactly: ok. Do not run any tools." })
+```
+
+Its report must read `ok` (it arrives as `[Agent completed]`, typically within
+a minute). That covers the owner's session, cloud agent placement, an agent
+container and the model gateway. Scripted anonymous sign-in is no smoke check:
+prod expects a Turnstile or app-integrity proof for it.
+
+Desktop against a given backend: `STELLA_BACKEND_URL=<backend> TMPDIR=/tmp node .agents/skills/verify-stella/control-stella.mjs session launch`.

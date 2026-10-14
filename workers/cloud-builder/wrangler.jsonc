@@ -705,7 +705,7 @@
       },
       "secrets": {
         "required": [
-          "BUILDER_SERVICE_SECRET",
+          "BUILDER_SERVICE_SECRET_V2",
           "BETTER_AUTH_SECRET",
           "CAPABILITY_SIGNING_KEY",
           "R2_ACCESS_KEY_ID",

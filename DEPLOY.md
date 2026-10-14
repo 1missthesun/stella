@@ -476,7 +476,10 @@ Steps (production, from `workers/cloud-builder`):
    key; every `legacy` should be 0.
 4. Delete the old name only when nothing needs it:
    - `BUILDER_SERVICE_SECRET`: after 24 hours (the longest capability is 12
-     hours) and once every operator script uses the new bearer.
+     hours) and once every operator script uses the new bearer. Retired on
+     production 2026-10-14: wherever `_V2` is set it is the only key accepted
+     (`builderServiceSecrets`), and production requires `_V2`. Dev and bn118
+     never rotated and still use the old name.
    - `BETTER_AUTH_SECRET`: 8 days after step 2, with `status` showing no
      legacy rows. A session nobody used in that time has expired anyway.
    - `OWNER_SECRETS_KEK`: not yet. Rows and journals nobody has opened stay

@@ -28,16 +28,30 @@ type OnboardingHandlersOptions = {
   ) => boolean;
 };
 
-const CATEGORY_LABELS: Record<string, string> = {
-  browsing_bookmarks: "Browsing & Bookmarks",
-  dev_environment: "Development Environment",
-  apps_system: "Apps & System",
-  messages_notes: "Messages & Notes",
+const SECTION_LABELS: Record<string, string> = {
+  apps_system: "Apps & system",
+  messages_notes: "Messages & notes",
 };
 
 const DEFAULT_WELCOME_MESSAGE =
   "Hey! I'm Stella, your AI assistant. What can I help you with today?";
-const CATEGORY_ANALYSIS_MAX_OUTPUT_TOKENS = 30_000;
+const MAX_PROFILE_LINES = 20;
+const REPO_LINE = /^- (.+?) \((.+)\) \((?:today|yesterday|\d+d ago)\)$/;
+
+const parseRepos = (section: string | undefined): { name: string; path: string }[] =>
+  (section ?? "")
+    .split("\n")
+    .map((line) => REPO_LINE.exec(line.trim()))
+    .filter((match): match is RegExpExecArray => Boolean(match))
+    .map((match) => ({ name: match[1], path: match[2] }));
+
+const profileLines = (raw: string): string[] =>
+  raw
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => /^[-*•]\s+\S/.test(line))
+    .map((line) => `- ${line.replace(/^[-*•]\s+/, "").replace(/\*\*/g, "")}`)
+    .slice(0, MAX_PROFILE_LINES);
 const MAX_PROFILE_HIGHLIGHTS = 5;
 const MAX_STARTERS = 4;
 
@@ -98,16 +112,18 @@ const synthesize = async (
   payload: OnboardingSynthesisRequest,
 ): Promise<OnboardingSynthesisResponse> => {
   const config = payload.promptConfig;
-  const coreSystemPrompt = config?.coreMemorySystemPrompt?.trim();
-  const coreUserTemplate = config?.coreMemoryUserPromptTemplate?.trim();
+  const profileSystemPrompt = config?.profileSystemPrompt?.trim();
+  const profileUserTemplate = config?.profileUserPromptTemplate?.trim();
   const welcomeTemplate = config?.welcomeMessagePromptTemplate?.trim();
-  if (!coreSystemPrompt || !coreUserTemplate || !welcomeTemplate) {
+  if (!profileSystemPrompt || !profileUserTemplate || !welcomeTemplate) {
     throw new Error("Missing synthesis prompt payload.");
   }
-  const sections = Object.entries(payload.formattedSections ?? {}).filter(
-    ([, data]) => typeof data === "string" && data.trim().length > 0,
+  const sections = Object.fromEntries(
+    Object.entries(payload.formattedSections ?? {}).filter(
+      ([, data]) => typeof data === "string" && data.trim().length > 0,
+    ),
   );
-  if (sections.length === 0) {
+  if (Object.keys(sections).length === 0) {
     throw new Error("formattedSections is required.");
   }
 
@@ -127,31 +143,36 @@ const synthesize = async (
       })
     ).text.trim();
 
-  const analysisTemplate = config.categoryAnalysisUserPromptTemplate?.trim();
-  const analyses = await Promise.all(
-    sections.map(async ([category, data]) => {
-      const systemPrompt = config.categoryAnalysisSystemPrompts?.[category];
-      if (!systemPrompt || !analysisTemplate)
-        return { category, analysis: data };
-      const userText = analysisTemplate
-        .replace("{{categoryLabel}}", CATEGORY_LABELS[category] ?? category)
-        .replace("{{data}}", data);
-      return {
-        category,
-        analysis: await complete("synthesis", userText, {
-          systemPrompt,
-          maxOutputTokens: CATEGORY_ANALYSIS_MAX_OUTPUT_TOKENS,
-        }),
-      };
-    }),
-  );
-  const usable = analyses.filter((entry) => entry.analysis.length > 0);
-
-  const coreMemory = await complete(
-    "synthesis",
-    `${coreUserTemplate}\n\n${usable.map((entry) => entry.analysis).join("\n\n")}`,
-    { systemPrompt: coreSystemPrompt },
-  );
+  const repos = parseRepos(sections.dev_environment);
+  const signalSections = Object.entries(sections)
+    .filter(([category]) => category !== "dev_environment")
+    .map(([category, data]) =>
+      category === "browsing_bookmarks"
+        ? data.trim()
+        : `## ${SECTION_LABELS[category] ?? category}\n${data.trim()}`,
+    );
+  const learned =
+    signalSections.length > 0
+      ? profileLines(
+          await complete(
+            "synthesis",
+            profileUserTemplate.replace(
+              "{{signals}}",
+              [
+                ...signalSections,
+                ...(repos.length > 0
+                  ? [`## Recent repositories\n${repos.map((repo) => `- ${repo.name}`).join("\n")}`]
+                  : []),
+              ].join("\n\n"),
+            ),
+            { systemPrompt: profileSystemPrompt },
+          ),
+        )
+      : [];
+  const coreMemory = [
+    ...learned,
+    ...repos.map((repo) => `- Recent repo ${repo.name}: ${repo.path}`),
+  ].join("\n");
   if (!coreMemory) throw new Error("Failed to synthesize core memory.");
 
   const startersPrompt = readRuntimePrompt("synthesis");

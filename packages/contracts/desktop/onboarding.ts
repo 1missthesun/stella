@@ -1,8 +1,6 @@
 export type OnboardingSynthesisPromptConfig = {
-  categoryAnalysisSystemPrompts?: Record<string, string>;
-  categoryAnalysisUserPromptTemplate?: string;
-  coreMemorySystemPrompt: string;
-  coreMemoryUserPromptTemplate: string;
+  profileSystemPrompt: string;
+  profileUserPromptTemplate: string;
   welcomeMessagePromptTemplate: string;
 };
 

@@ -58,6 +58,16 @@ const parseOpenAIUsage = (usage: unknown): RelayUsage => {
   };
 };
 
+// OpenRouter reports what it billed for the request, in USD, as `usage.cost`.
+const openRouterCost = (
+  usage: Record<string, unknown> | null,
+): Pick<RelayUsage, "costMicroCents"> => {
+  const cost = usage?.cost;
+  return typeof cost === "number" && Number.isFinite(cost) && cost >= 0
+    ? { costMicroCents: Math.round(cost * 100_000_000) }
+    : {};
+};
+
 const parseResponsesUsage = (usage: unknown): RelayUsage => {
   const record = asRecord(usage);
   if (!record) return {};
@@ -304,6 +314,7 @@ export function createRelayUsageParser(
         ...(usage?.input_tokens !== undefined
           ? parseResponsesUsage(usage)
           : parseOpenAIUsage(usage)),
+        ...openRouterCost(usage),
       };
     });
   }

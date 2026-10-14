@@ -75,7 +75,7 @@ export function useConversationSummaries(
   }, [offer.lingerUntil]);
   const pending = catchUps.some((catchUp) => catchUp.state === "pending");
   /** Whether the pill shows: a busy stretch, one being written, or a fresh one to reread. */
-  const visible = offer.offer || pending || offer.lingerUntil > 0;
+  const visible = enabled && (offer.offer || pending || offer.lingerUntil > 0);
   return { catchUps, offer, pending, visible };
 }
 

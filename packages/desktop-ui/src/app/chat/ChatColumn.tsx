@@ -52,6 +52,7 @@ import {
   useComposerMessage,
   type ComposerMessageStore,
 } from "@/features/chat/hooks/use-composer-message-state";
+import { CATCH_UP_ENABLED } from "@stella/contracts/catch-up";
 import { useT } from "@/shared/i18n";
 import "./full-shell.chat.css";
 
@@ -340,7 +341,7 @@ export const ChatColumn = memo(function ChatColumn({
         onStop={composer.onStop}
         isDragOver={isDragOver}
         replyPeek={replyPeek}
-        catchUp={surface === "chat"}
+        catchUp={CATCH_UP_ENABLED && surface === "chat"}
         suggestionsActive={isActiveSurface}
       />
     );

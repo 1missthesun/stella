@@ -88,6 +88,13 @@ export const catchUpMessagesFromJournal = (
   return messages;
 };
 
+/**
+ * The off switch for catch-up summaries (the composer's Summary pill). While
+ * false no client shows the pill or reads summaries, and the cloud refuses
+ * requests and drops queued jobs, so no model runs. Off pending a redesign.
+ */
+export const CATCH_UP_ENABLED: boolean = false;
+
 /** Stella's messages in this window, after the last catch-up, make a busy stretch. */
 export const CATCH_UP_BUSY_MESSAGES = 6;
 export const CATCH_UP_BUSY_WINDOW_MS = 20 * 60_000;

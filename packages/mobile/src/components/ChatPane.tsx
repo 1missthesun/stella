@@ -115,7 +115,7 @@ import {
   useConversationSummaries,
 } from "./chat/ConversationSummary";
 import type { CatchUpLink } from "@stella/contracts/backend/catch-ups";
-import { CATCH_UP_MIN_NEW_MESSAGES } from "@stella/contracts/catch-up";
+import { CATCH_UP_ENABLED, CATCH_UP_MIN_NEW_MESSAGES } from "@stella/contracts/catch-up";
 import { isGuest } from "../lib/guest-mode";
 import {
   type AnchorRect,
@@ -1938,7 +1938,7 @@ export function ChatPane({
   const summaries = useConversationSummaries(
     conversationId,
     visibleMessages,
-    Boolean(conversationId) && !isGuest(),
+    CATCH_UP_ENABLED && Boolean(conversationId) && !isGuest(),
   );
   const [summaryOpen, setSummaryOpen] = useState<{ requestNew: boolean } | null>(null);
   const [summaryJump, setSummaryJump] = useState<{ link: CatchUpLink; pages: number } | null>(null);

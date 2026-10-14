@@ -20,9 +20,10 @@ import type {
   CatchUpLink,
   CatchUpState,
 } from "@stella/contracts/backend/catch-ups";
-import type {
-  CatchUpSource,
-  CatchUpSourceMessage,
+import {
+  CATCH_UP_ENABLED,
+  type CatchUpSource,
+  type CatchUpSourceMessage,
 } from "@stella/contracts/catch-up";
 import { gatewayRelayBaseUrl } from "@stella/contracts/gateway/api";
 import { stellaModel, stellaProvider } from "@stella/agent/provider/stella";
@@ -160,6 +161,9 @@ const request = async (
   ctx: OwnerContext,
   args: { conversationId: string },
 ): Promise<{ catchUpId: string }> => {
+  if (!CATCH_UP_ENABLED) {
+    throw new RpcError("UNAVAILABLE", "Summaries are switched off.");
+  }
   if (!liveConversation(ctx.db, ctx.ownerId, args.conversationId)) {
     throw new RpcError("NOT_FOUND", "Conversation not found.");
   }
@@ -535,6 +539,7 @@ const generate = async (ctx: OwnerContext, payload: unknown): Promise<void> => {
     payload && typeof payload === "object" && typeof (payload as { catchUpId?: unknown }).catchUpId === "string"
       ? (payload as { catchUpId: string }).catchUpId
       : "";
+  if (!CATCH_UP_ENABLED) return;
   const row = ctx.db.one<Row>(`SELECT * FROM catch_ups WHERE catch_up_id = ?`, catchUpId);
   if (!row || row.state !== "pending") return;
   const fail = (error: unknown) => {

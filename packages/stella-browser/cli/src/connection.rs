@@ -343,20 +343,56 @@ pub fn ensure_daemon(session: &str) -> Result<DaemonResult, String> {
     Err(format!("Daemon failed to start ({})", endpoint_info))
 }
 
-fn connect(session: &str) -> Result<Connection, String> {
+fn connect(session: &str) -> std::io::Result<Connection> {
     #[cfg(unix)]
     {
-        let socket_path = get_socket_path(session);
-        UnixStream::connect(&socket_path)
-            .map(Connection::Unix)
-            .map_err(|e| format!("Failed to connect: {}", e))
+        UnixStream::connect(get_socket_path(session)).map(Connection::Unix)
     }
     #[cfg(windows)]
     {
-        let port = get_port_for_session(session);
-        TcpStream::connect(format!("127.0.0.1:{}", port))
+        TcpStream::connect(format!("127.0.0.1:{}", get_port_for_session(session)))
             .map(Connection::Tcp)
-            .map_err(|e| format!("Failed to connect: {}", e))
+    }
+}
+
+enum SendError {
+    Connect(std::io::Error),
+    Encode(serde_json::Error),
+    Send(std::io::Error),
+    Read(std::io::Error),
+    Decode(serde_json::Error),
+}
+
+impl SendError {
+    fn is_transient(&self) -> bool {
+        use std::io::ErrorKind;
+        match self {
+            SendError::Connect(error) | SendError::Send(error) | SendError::Read(error) => {
+                matches!(
+                    error.kind(),
+                    ErrorKind::WouldBlock
+                        | ErrorKind::UnexpectedEof
+                        | ErrorKind::ConnectionReset
+                        | ErrorKind::ConnectionRefused
+                        | ErrorKind::BrokenPipe
+                        | ErrorKind::NotFound
+                )
+            }
+            SendError::Decode(error) => error.is_eof(),
+            SendError::Encode(_) => false,
+        }
+    }
+}
+
+impl std::fmt::Display for SendError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SendError::Connect(error) => write!(f, "Failed to connect: {}", error),
+            SendError::Encode(error) => write!(f, "{}", error),
+            SendError::Send(error) => write!(f, "Failed to send: {}", error),
+            SendError::Read(error) => write!(f, "Failed to read: {}", error),
+            SendError::Decode(error) => write!(f, "Invalid response: {}", error),
+        }
     }
 }
 
@@ -381,13 +417,10 @@ pub fn send_command_with_timeout(
 
         match send_command_once(&cmd, session, timeout) {
             Ok(response) => return Ok(response),
-            Err(e) => {
-                if is_transient_error(&e) {
-                    last_error = e;
-                    continue;
-                }
-                return Err(e);
+            Err(error) if error.is_transient() => {
+                last_error = error.to_string();
             }
+            Err(error) => return Err(error.to_string()),
         }
     }
 
@@ -397,47 +430,26 @@ pub fn send_command_with_timeout(
     ))
 }
 
-/// - EAGAIN/EWOULDBLOCK (os error 35 on macOS, 11 on Linux)
-/// - EOF errors (daemon closed connection before responding)
-/// - Connection reset/broken pipe (daemon crashed or restarting)
-fn is_transient_error(error: &str) -> bool {
-    error.contains("os error 35") // EAGAIN on macOS
-        || error.contains("os error 11") // EAGAIN on Linux
-        || error.contains("WouldBlock")
-        || error.contains("Resource temporarily unavailable")
-        || error.contains("EOF")
-        || error.contains("line 1 column 0") // Empty JSON response
-        || error.contains("Connection reset")
-        || error.contains("Broken pipe")
-        || error.contains("os error 54") // Connection reset by peer (macOS)
-        || error.contains("os error 104") // Connection reset by peer (Linux)
-        || error.contains("os error 2") // No such file or directory (socket gone)
-        || error.contains("os error 61") // Connection refused (macOS)
-        || error.contains("os error 111") // Connection refused (Linux)
-        || error.contains("os error 10061") // Connection refused (Windows)
-        || error.contains("os error 10054") // Connection reset by peer (Windows)
-}
-
-fn send_command_once(cmd: &Value, session: &str, timeout: Duration) -> Result<Response, String> {
-    let mut stream = connect(session)?;
+fn send_command_once(cmd: &Value, session: &str, timeout: Duration) -> Result<Response, SendError> {
+    let mut stream = connect(session).map_err(SendError::Connect)?;
 
     stream.set_read_timeout(Some(timeout)).ok();
     stream.set_write_timeout(Some(Duration::from_secs(5))).ok();
 
-    let mut json_str = serde_json::to_string(cmd).map_err(|e| e.to_string())?;
+    let mut json_str = serde_json::to_string(cmd).map_err(SendError::Encode)?;
     json_str.push('\n');
 
     stream
         .write_all(json_str.as_bytes())
-        .map_err(|e| format!("Failed to send: {}", e))?;
+        .map_err(SendError::Send)?;
 
     let mut reader = BufReader::new(stream);
     let mut response_line = String::new();
     reader
         .read_line(&mut response_line)
-        .map_err(|e| format!("Failed to read: {}", e))?;
+        .map_err(SendError::Read)?;
 
-    serde_json::from_str(&response_line).map_err(|e| format!("Invalid response: {}", e))
+    serde_json::from_str(&response_line).map_err(SendError::Decode)
 }
 
 #[cfg(test)]
@@ -538,111 +550,6 @@ mod tests {
         assert!(
             result.to_string_lossy().contains("home") || result.to_string_lossy().contains("Users")
         );
-    }
-
-    #[test]
-    fn test_is_transient_error_eagain_macos() {
-        assert!(is_transient_error(
-            "Failed to read: Resource temporarily unavailable (os error 35)"
-        ));
-    }
-
-    #[test]
-    fn test_is_transient_error_eagain_linux() {
-        assert!(is_transient_error(
-            "Failed to read: Resource temporarily unavailable (os error 11)"
-        ));
-    }
-
-    #[test]
-    fn test_is_transient_error_would_block() {
-        assert!(is_transient_error("operation WouldBlock"));
-    }
-
-    #[test]
-    fn test_is_transient_error_resource_unavailable() {
-        assert!(is_transient_error("Resource temporarily unavailable"));
-    }
-
-    #[test]
-    fn test_is_transient_error_eof() {
-        assert!(is_transient_error(
-            "Invalid response: EOF while parsing a value at line 1 column 0"
-        ));
-    }
-
-    #[test]
-    fn test_is_transient_error_empty_json() {
-        assert!(is_transient_error(
-            "Invalid response: expected value at line 1 column 0"
-        ));
-    }
-
-    #[test]
-    fn test_is_transient_error_connection_reset() {
-        assert!(is_transient_error("Connection reset by peer"));
-    }
-
-    #[test]
-    fn test_is_transient_error_broken_pipe() {
-        assert!(is_transient_error("Broken pipe"));
-    }
-
-    #[test]
-    fn test_is_transient_error_connection_reset_macos() {
-        assert!(is_transient_error(
-            "Failed to send: Connection reset by peer (os error 54)"
-        ));
-    }
-
-    #[test]
-    fn test_is_transient_error_connection_reset_linux() {
-        assert!(is_transient_error(
-            "Failed to send: Connection reset by peer (os error 104)"
-        ));
-    }
-
-    #[test]
-    fn test_is_transient_error_socket_not_found() {
-        assert!(is_transient_error(
-            "Failed to connect: No such file or directory (os error 2)"
-        ));
-    }
-
-    #[test]
-    fn test_is_transient_error_connection_refused_macos() {
-        assert!(is_transient_error(
-            "Failed to connect: Connection refused (os error 61)"
-        ));
-    }
-
-    #[test]
-    fn test_is_transient_error_connection_refused_linux() {
-        assert!(is_transient_error(
-            "Failed to connect: Connection refused (os error 111)"
-        ));
-    }
-
-    #[test]
-    fn test_is_transient_error_connection_refused_windows() {
-        assert!(is_transient_error(
-            "Failed to connect: No connection could be made because the target machine actively refused it. (os error 10061)"
-        ));
-    }
-
-    #[test]
-    fn test_is_transient_error_connection_reset_windows() {
-        assert!(is_transient_error(
-            "Failed to send: An existing connection was forcibly closed by the remote host. (os error 10054)"
-        ));
-    }
-
-    #[test]
-    fn test_is_transient_error_non_transient() {
-        assert!(!is_transient_error("Unknown command: foo"));
-        assert!(!is_transient_error("Invalid JSON syntax"));
-        assert!(!is_transient_error("Permission denied"));
-        assert!(!is_transient_error("Daemon not found"));
     }
 
     #[test]

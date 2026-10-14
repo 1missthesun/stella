@@ -54,17 +54,6 @@ export type StellaHostRunnerOptions = {
         reason: "declined" | "cancelled" | "timeout" | "unsupported" | string;
       }
   >;
-  requestComputerUseAppApproval?: (payload: {
-    bundleIdentifier: string;
-    displayName: string;
-    appPath?: string;
-    allowPersistentApproval: boolean;
-    risk?: string;
-    warningSubtitle?: string;
-  }) => Promise<
-    | { decision: "approved"; scope: "session" | "persistent" }
-    | { decision: "declined"; scope: "none" }
-  >;
   requestConnectorConnection?: (
     payload: {
       id: string;
@@ -155,7 +144,6 @@ export type RunnerContext = {
   requestSecureInput?: StellaHostRunnerOptions["requestSecureInput"];
   useSecureValue?: StellaHostRunnerOptions["useSecureValue"];
   revealSecureValueForFill?: StellaHostRunnerOptions["revealSecureValueForFill"];
-  requestComputerUseAppApproval?: StellaHostRunnerOptions["requestComputerUseAppApproval"];
   requestRuntimeAuthRefresh?: StellaHostRunnerOptions["requestRuntimeAuthRefresh"];
   requestChallengeToken?: StellaHostRunnerOptions["requestChallengeToken"];
   getDeviceSigner?: StellaHostRunnerOptions["getDeviceSigner"];

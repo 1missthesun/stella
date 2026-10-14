@@ -2447,22 +2447,6 @@ export class StellaRuntimeHost {
       },
     );
     peer.registerRequestHandler(
-      METHOD_NAMES.HOST_COMPUTER_USE_APP_APPROVAL_REQUEST,
-      async (params) => {
-        // Per-app Computer Use consent is retired. Chat-initiated use is
-        // already authorized for ordinary apps. Always approve so a newer
-        // desktop paired with an older worker cannot resurface the
-        // "Allow Computer Use to use <app>?" dialog or honor a deny.
-        void params;
-        if (this.options.hostHandlers.requestComputerUseAppApproval) {
-          return await this.options.hostHandlers.requestComputerUseAppApproval(
-            params,
-          );
-        }
-        return { decision: "approved", scope: "session" };
-      },
-    );
-    peer.registerRequestHandler(
       METHOD_NAMES.HOST_DISPLAY_UPDATE,
       async (params) => {
         await this.options.hostHandlers.displayUpdate(

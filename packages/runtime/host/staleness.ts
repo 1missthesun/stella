@@ -51,7 +51,6 @@ export const evaluateWorkerStaleness = (args: {
     }
     const workerStamp = yield* readWorkerReportedBuildStamp(args.paths);
     if (!workerStamp) {
-      // Pre-stamp worker (older build) — by definition running old code.
       return { stale: true, reason: "worker-stamp-missing" };
     }
     const onDiskStamp = computeRuntimeBuildStamp(args.workerEntryPath);

@@ -61,7 +61,6 @@ export const RUNTIME_HOST_HANDLERS = [
   "requestConnectorConnection",
   "cancelConnectorConnection",
   "requestBrowserExtensionConnect",
-  "requestComputerUseAppApproval",
   "displayUpdate",
   "showNotification",
   "requestDesktopPermission",

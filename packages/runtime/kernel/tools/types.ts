@@ -167,17 +167,6 @@ export type ToolHostOptions = {
   useSecureValue?: import("./user.js").UserToolsConfig["useSecureValue"];
   revealSecureValueForFill?: import("./user.js").UserToolsConfig["revealSecureValueForFill"];
   requestBrowserExtensionConnect?: import("./browser-extension-offer.js").BrowserExtensionConnectRequester;
-  requestComputerUseAppApproval?: (payload: {
-    bundleIdentifier: string;
-    displayName: string;
-    appPath?: string;
-    allowPersistentApproval: boolean;
-    risk?: string;
-    warningSubtitle?: string;
-  }) => Promise<
-    | { decision: "approved"; scope: "session" | "persistent" }
-    | { decision: "declined"; scope: "none" }
-  >;
   requestConnectorConnection?: import("./defs/connector-status.js").ConnectorConnectionRequester;
 };
 

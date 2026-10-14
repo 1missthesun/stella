@@ -74,7 +74,6 @@ export const METHOD_NAMES = {
   HOST_PI_BRAIN_NOTE: "host.piBrain.note",
   HOST_BROWSER_EXTENSION_CONNECT_REQUEST:
     "host.browserExtensionConnect.request",
-  HOST_COMPUTER_USE_APP_APPROVAL_REQUEST: "host.computerUseAppApproval.request",
   HOST_DISPLAY_UPDATE: "host.display.update",
   HOST_NOTIFICATION_SHOW: "host.notification.show",
   HOST_SYSTEM_REQUEST_PERMISSION: "host.system.requestPermission",

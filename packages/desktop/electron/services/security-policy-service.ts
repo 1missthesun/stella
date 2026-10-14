@@ -21,18 +21,6 @@ type PersistedSecurityPolicy = {
   approved?: unknown;
 };
 
-export type ComputerUseAppApprovalRequest = {
-  bundleIdentifier: string;
-  displayName: string;
-  risk?: string;
-  warningSubtitle?: string;
-  allowPersistentApproval: boolean;
-};
-
-export type ComputerUseAppApprovalResult =
-  | { decision: "approved"; scope: "session" | "persistent" }
-  | { decision: "declined"; scope: "none" };
-
 export class SecurityPolicyService {
   private securityPolicyPath: string | null = null;
   private readonly trustedPrivilegedActions = new Set<string>();
@@ -86,9 +74,6 @@ export class SecurityPolicyService {
           {
             version: SECURITY_POLICY_VERSION,
             approved: [...this.trustedPrivilegedActions].sort(),
-            // Per-app Computer Use consent is retired. Drop any remembered
-            // bundle approvals so stale state cannot prompt or deny later.
-            computerUseAppApprovals: {},
           },
           null,
           2,
@@ -147,15 +132,6 @@ export class SecurityPolicyService {
     }
 
     return true;
-  }
-
-  async ensureComputerUseAppApproval(
-    request: ComputerUseAppApprovalRequest,
-  ): Promise<ComputerUseAppApprovalResult> {
-    // Compatibility shim for older runtimes that still request per-app
-    // Computer Use consent. Chat-initiated use is already authorized.
-    void request;
-    return { decision: "approved", scope: "session" };
   }
 
   clearAll() {

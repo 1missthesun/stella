@@ -256,7 +256,6 @@ export const createHostRunnerHandlers = (context, options) => ({
     requestConnectorConnection: (payload) => context.services.connectorConnectService.requestConnection(payload),
     cancelConnectorConnection: async (payload) => context.services.connectorConnectService.cancelByOfferId(payload.offerId),
     requestBrowserExtensionConnect: (payload) => context.services.connectorConnectService.requestBrowserExtensionConnect(payload),
-    requestComputerUseAppApproval: (payload) => context.services.securityPolicyService.ensureComputerUseAppApproval(payload),
     displayUpdate: (payload) => {
         broadcastToWindows(context, IPC_DISPLAY_UPDATE, payload);
     },

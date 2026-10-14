@@ -177,15 +177,6 @@ import type {
   MobileTask,
 } from "../types";
 
-/**
- * Quiet window after the footer stops shrinking before we commit the smaller
- * height to the list inset. A collapse animation emits a burst of intermediate
- * `onLayout` heights; committing each one re-renders the list padding and
- * re-targets the scroll-follow math every frame. Slightly longer than a 350ms
- * spring's tail so we settle on the resting height, not a mid-animation one.
- */
-const FOOTER_SHRINK_SETTLE_MS = 140;
-
 const EDGE_FADE = 48;
 const LIST_TOP_GAP = 84;
 const TOP_TAPER_TAIL = 24;
@@ -523,46 +514,12 @@ export function ChatPane({
 
   const listTrailingSlackPx = listBottomInsetPx + CHAT_TAIL_GAP;
 
-  // The footer (working indicator + composer) re-measures on every frame of any
-  // layout animation it runs. Each measurement re-renders the list padding and
-  // nudges the scroll-follow target, so tracking every intermediate frame turns
-  // a composer collapse into churn at the bottom of the screen. Grow the inset
-  // immediately — too little reserved space lets the composer overlap the last
-  // message — but defer a shrink until the animation settles, since extra slack
-  // for a beat is invisible.
-  const footerShrinkTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null,
-  );
-  const [composerHeight, setComposerHeight] = useState(0);
   const onFooterLayout = useCallback((e: LayoutChangeEvent) => {
-    const h = Math.round(e.nativeEvent.layout.height);
-    setComposerHeight(h);
-    if (footerShrinkTimerRef.current) {
-      clearTimeout(footerShrinkTimerRef.current);
-      footerShrinkTimerRef.current = null;
-    }
-    setFooterHeight((prev) => {
-      if (h > prev) return h;
-      if (h < prev) {
-        footerShrinkTimerRef.current = setTimeout(() => {
-          footerShrinkTimerRef.current = null;
-          setFooterHeight(h);
-        }, FOOTER_SHRINK_SETTLE_MS);
-      }
-      return prev;
-    });
+    setFooterHeight(Math.round(e.nativeEvent.layout.height));
   }, []);
   useEffect(() => {
-    onFooterHeightChange?.(composerHeight);
-  }, [composerHeight, onFooterHeightChange]);
-  useEffect(
-    () => () => {
-      if (footerShrinkTimerRef.current) {
-        clearTimeout(footerShrinkTimerRef.current);
-      }
-    },
-    [],
-  );
+    onFooterHeightChange?.(footerHeight);
+  }, [footerHeight, onFooterHeightChange]);
 
   const assistantTextLenRef = useRef(0);
   const assistantIdRef = useRef<string | null>(null);
@@ -1839,7 +1796,7 @@ export function ChatPane({
           {replyFocus && (
             <ReplyViewer
               key={`${conversationId}:${replyFocus.kind === "agent" ? replyFocus.threadId : replyFocus.id}`}
-              bottomReserve={composerHeight}
+              bottomReserve={footerHeight}
               root={replyFocus}
               messages={visibleMessages}
               colors={colors}

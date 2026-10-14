@@ -29,7 +29,7 @@ export const SettingsDialogHost = memo(function SettingsDialogHost() {
   return (
     <Dialog open onOpenChange={(next) => settingsDialog.setOpen(next)}>
       <DialogContent
-        size="xl"
+        size="page"
         className="shell-settings-dialog"
         aria-describedby={undefined}
       >

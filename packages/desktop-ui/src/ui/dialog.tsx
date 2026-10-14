@@ -21,7 +21,7 @@ DialogOverlay.displayName = "DialogOverlay";
 
 interface DialogContentProps
   extends React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> {
-  size?: "md" | "lg" | "xl";
+  size?: "md" | "lg" | "xl" | "page";
   fit?: boolean;
 }
 

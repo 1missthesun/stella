@@ -1,6 +1,7 @@
 [data-component="popover-content"] {
   min-width: 200px;
-  max-width: 320px;
+  width: var(--popover-width, auto);
+  max-width: var(--popover-width, 320px);
   border-radius: var(--radius-lg, 10px);
   /* Light blur — popovers (theme picker, model picker) are transient
      overlays, so they keep glass alongside dropdown menus and tooltips.

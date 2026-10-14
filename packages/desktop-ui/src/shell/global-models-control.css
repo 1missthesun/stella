@@ -130,12 +130,7 @@
 }
 
 .models-popover {
-  /* `max-width` has to move with `width`: the shared popover surface caps
-     every popover at 320px, which silently clamped this one. The model
-     list carries provider names plus an action pill, so it needs the
-     extra room. */
-  width: min(380px, 92vw);
-  max-width: min(380px, 92vw);
+  --popover-width: min(380px, 92vw);
   height: min(560px, 72vh);
   display: flex;
   flex-direction: column;
@@ -160,26 +155,6 @@
      scrollbar here. A clipped box is not scrollable, so that reveal goes to
      the model list, which is the scroller that should move. */
   overflow: clip;
-}
-
-/* The picker's own root is `flex-grow: 0` (it sizes to content in the
-   settings page, where it sits beside other blocks). Inside the popover it
-   is the only child and should own the full width, or widening the popover
-   just adds dead space on the right. */
-.models-popover__panel > * {
-  flex: 1 1 auto;
-  min-width: 0;
-  min-height: 0;
-}
-
-/* The picker and its list shell carry fixed heights so every tab and engine
-   panel fills one stable height on the Settings page. In the popover the
-   popover owns the height, and those fixed heights are taller than the panel
-   that clips them — so they have to shrink to it instead of overflowing. */
-.models-popover .agent-model-picker,
-.models-popover .model-picker-shell {
-  height: 100%;
-  min-height: 0;
 }
 
 .models-popover__footer {

@@ -32,6 +32,15 @@
   --dialog-height: 640px;
 }
 
+[data-component="dialog"][data-size="page"] {
+  --dialog-width: 1120px;
+  --dialog-height: 820px;
+}
+
+[data-component="dialog"][data-size="page"] [data-slot="dialog-content"] {
+  height: 100%;
+}
+
 [data-component="dialog"] [data-slot="dialog-container"] {
   position: relative;
   z-index: 50;

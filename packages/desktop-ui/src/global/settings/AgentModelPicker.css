@@ -1,9 +1,10 @@
 .agent-model-picker {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: 10px;
   min-width: 0;
-  height: clamp(440px, 70vh, 580px);
+  min-height: 0;
 }
 
 .agent-model-picker-body {

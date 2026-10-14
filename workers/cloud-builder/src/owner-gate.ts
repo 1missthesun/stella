@@ -66,6 +66,12 @@ import {
   type UsageBatchResult,
 } from "./owner-store/domains/billing.js";
 import {
+  exportCostDaily,
+  ownerCostReport,
+  type OwnerCostQuery,
+  type OwnerCostReport,
+} from "./owner-store/domains/billing-costs.js";
+import {
   abuseState,
   admitSession,
   enforcementForSnapshot,
@@ -639,6 +645,14 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     complimentary?: boolean;
   }): Promise<void> {
     await this.billingWrite((ctx) => setAdminPlan(ctx, input));
+  }
+
+  async billingCosts(query: OwnerCostQuery): Promise<OwnerCostReport> {
+    return ownerCostReport(this.ownerStore().context(null), query);
+  }
+
+  async exportBillingCosts(): Promise<{ exported: number; remaining: boolean }> {
+    return await this.billingWrite((ctx) => exportCostDaily(ctx));
   }
 
   async closeBilling(): Promise<void> {

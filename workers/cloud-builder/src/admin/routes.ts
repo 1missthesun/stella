@@ -184,6 +184,38 @@ const billingPlan = async (request: Request, env: AdminEnv): Promise<Response> =
   return json(await owner.gate.billingAccess());
 };
 
+const ownerCosts = async (url: URL, env: AdminEnv): Promise<Response> => {
+  const ownerId = ownerIdOf(url.searchParams.get("ownerId"));
+  if (!ownerId) return fail(400, "Missing ownerId.");
+  const { dayRange } = await import("./costs.js");
+  const range = dayRange(url);
+  if (range instanceof Response) return range;
+  const rawLimit = url.searchParams.get("limit");
+  const limit = rawLimit === null ? undefined : Number(rawLimit);
+  if (limit !== undefined && (!Number.isInteger(limit) || limit < 1 || limit > 500)) {
+    return fail(400, "limit must be 1 to 500.");
+  }
+  const owner = await ownerGate(env, ownerId);
+  if (owner.response) return owner.response;
+  const cursor = url.searchParams.get("cursor")?.trim() || undefined;
+  const report = await owner.gate.billingCosts({
+    from: range.from,
+    to: range.to,
+    ...(limit !== undefined ? { limit } : {}),
+    ...(cursor ? { cursor } : {}),
+  });
+  return json({ ownerId, ...report });
+};
+
+const ownerCostsExport = async (request: Request, env: AdminEnv): Promise<Response> => {
+  const body = await readBody(request);
+  const ownerId = ownerIdOf(body?.ownerId);
+  if (!ownerId) return fail(400, "Missing ownerId.");
+  const owner = await ownerGate(env, ownerId);
+  if (owner.response) return owner.response;
+  return json({ ownerId, ...(await owner.gate.exportBillingCosts()) });
+};
+
 const remove = async (request: Request, env: AdminEnv): Promise<Response> => {
   const body = await readBody(request);
   const kind = typeof body?.kind === "string" ? body.kind.trim() : "";
@@ -394,6 +426,12 @@ const ROUTES: Record<string, { method: "GET" | "POST"; run: (request: Request, u
   "/api/admin/owners/lookup": { method: "GET", run: (_request, url, env) => lookup(url, env) },
   "/api/admin/owners/top": { method: "GET", run: (_request, url, env) => top(url, env) },
   "/api/admin/owners/storage": { method: "GET", run: (_request, url, env) => storage(url, env) },
+  "/api/admin/owners/costs": { method: "GET", run: (_request, url, env) => ownerCosts(url, env) },
+  "/api/admin/owners/costs/export": { method: "POST", run: (request, _url, env) => ownerCostsExport(request, env) },
+  "/api/admin/costs": {
+    method: "GET",
+    run: async (_request, url, env) => (await import("./costs.js")).costsReport(url, db(env)),
+  },
   "/api/admin/owners/enforcement": { method: "POST", run: (request, _url, env) => enforcement(request, env) },
   "/api/admin/billing/plan": { method: "POST", run: (request, _url, env) => billingPlan(request, env) },
   "/api/admin/delete": { method: "POST", run: (request, _url, env) => remove(request, env) },

@@ -16,7 +16,7 @@ const QUERY_FLAGS = ["role", "name", "selector", "within"];
 export const COMMANDS = [
   command("session", "launch", "launch", "Launch an isolated Stella instance", {
     aliases: ["launch"],
-    usage: "[--replace] [--account signed-in|signed-out|go|pro] [--first-run] [--display auto|xvfb|host] [--browser-extension] [--claude-login host|token] [--fake-mic <wav>] [--browser-bridge shared|isolated] [--model-gateway <origin>]   (STELLA_VERIFY_RUN=<name> keeps a separate run per name)",
+    usage: "[--replace] [--account signed-in|signed-out|plus|pro|max] [--first-run] [--display auto|xvfb|host] [--browser-extension] [--claude-login host|token] [--fake-mic <wav>] [--browser-bridge shared|isolated] [--model-gateway <origin>]   (STELLA_VERIFY_RUN=<name> keeps a separate run per name)",
     flags: ["account", "fake-mic", "browser-bridge", "model-gateway", "display", "claude-login"],
     switches: ["replace", "first-run", "browser-extension"],
   }),

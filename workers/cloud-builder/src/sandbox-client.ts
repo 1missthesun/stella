@@ -1,11 +1,9 @@
 /**
- * Caller-side view of one sandbox Durable Object (`src/sandbox-container.ts`).
- *
- * The turn code was written against the 0.12 SDK's sandbox, session, and
- * process objects. These wrappers keep those call shapes over plain RPC:
- * a session is a stored cwd/env/timeout that each call carries to the
- * object, and a process is an id the object resolves against its process
- * directory. Nothing here holds a live connection to the container.
+ * Caller-side view of one sandbox Durable Object (`src/sandbox-container.ts`)
+ * over plain RPC: a session is a stored cwd/env/timeout that each call
+ * carries to the object, and a process is an id the object resolves against
+ * its process directory. Nothing here holds a live connection to the
+ * container.
  */
 import type {
   Sandbox,
@@ -22,8 +20,6 @@ import type {
 export type ExecResult = SandboxExecResult;
 
 export type ExecOptions = {
-  /** Accepted for 0.12 call compatibility; every command is internal now. */
-  origin?: "internal" | "user";
   timeout?: number;
   cwd?: string;
   env?: Record<string, string | undefined>;
@@ -34,8 +30,6 @@ export type ProcessOptions = {
   timeout?: number;
   cwd?: string;
   env?: Record<string, string | undefined>;
-  /** Accepted for 0.12 call compatibility; process directories persist. */
-  autoCleanup?: boolean;
 };
 
 export type ReadFileResult =

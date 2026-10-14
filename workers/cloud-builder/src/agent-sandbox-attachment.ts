@@ -62,17 +62,6 @@ const EXECUTOR_ROOT = "/opt/stella";
 const READINESS_POLL_MS = 250;
 const READINESS_ATTEMPTS = 240;
 
-/**
- * The readiness probe runs in the session's persistent shell, which earlier
- * boundary scripts may have left with `errexit` on. A probe that exits
- * non-zero while the socket is still absent would therefore take the whole
- * shell down (the SDK reports it as "shell exited (exit code: 1)") and the
- * attach could never succeed. So the probe always exits zero and answers on
- * stdout instead.
- */
-const READINESS_READY_MARKER = "stella-attached-tool-host-ready";
-const readinessProbe = (socketPath: string): string =>
-  `if test -S ${quoted([socketPath])}; then echo ${READINESS_READY_MARKER}; fi`;
 
 const DAEMON_STDERR_EXCERPT_CHARS = 400;
 
@@ -83,17 +72,12 @@ const DAEMON_TERMINAL_STATUSES: ReadonlySet<string> = new Set([
   "error",
 ]);
 
-/**
- * An SDK process call that never settles must not wedge the attach: the
- * readiness loop and the failure report only need a best-effort answer.
- */
 const DAEMON_RPC_DEADLINE_MS = 5_000;
 const bounded = async <T>(
   work: Promise<T> | undefined,
   fallback: T,
 ): Promise<T> => {
   if (!work) return fallback;
-  // The SDK call keeps running after the deadline; only this wait is bounded.
   const settled = work.then(
     (value) => value,
     () => fallback,
@@ -170,16 +154,7 @@ export type AgentSandboxAttachmentDeps = Readonly<{
   prepareBrokerHandoff(args: {
     session: ExecutionSession;
   }): Promise<AttachedToolHostHandoff>;
-  /**
-   * Start the daemon as a sessionless background process, the way the eager
-   * container path starts its executor. A process started through an
-   * `ExecutionSession` belongs to that session's persistent shell and dies
-   * with it, and that shell also runs the readiness probe, the one-shot
-   * client and every boundary script. Starting the daemon outside any session
-   * means no shell exit can take the bridge down. Falls back to the session
-   * when absent so the phase machine stays testable with one fake.
-   */
-  startDaemon?: (
+  startDaemon: (
     command: string,
     options: Readonly<{ cwd: string; processId: string }>,
   ) => Promise<Process>;
@@ -195,12 +170,6 @@ export type AgentSandboxAttachmentDeps = Readonly<{
   }): Promise<void>;
   emitEvent?: (kind: string, payload: unknown) => void;
 }>;
-
-const SESSION_TERMINATED_MESSAGE = /shell exited|session .* ended/iu;
-export const isSessionTerminatedError = (error: unknown): boolean =>
-  error instanceof Error &&
-  (error.name === "SessionTerminatedError" ||
-    SESSION_TERMINATED_MESSAGE.test(error.message));
 
 const quoted = (argv: readonly string[]): string =>
   argv
@@ -254,7 +223,6 @@ export const createAgentSandboxAttachment = (
   let daemon: Process | undefined;
   let daemonDirectory: string | undefined;
   let daemonLossReported = false;
-  let sessionTerminationReported = false;
 
   const requireSession = (): ExecutionSession => {
     if (!attached) {
@@ -279,30 +247,6 @@ export const createAgentSandboxAttachment = (
     }
   };
 
-  /**
-   * A shell that exited under a bridge call is reported once, with the SDK's
-   * own exit reason, and surfaces as a tool error rather than being swallowed
-   * into a generic "could not run that call". This is the signal that a
-   * boundary script leaked `set -e` into the session, which is otherwise
-   * invisible: the daemon dies with an empty stderr and the next call simply
-   * finds nothing listening.
-   */
-  const sessionTerminated = (
-    error: unknown,
-  ): AttachedToolHostUnavailableError => {
-    const message = error instanceof Error ? error.message : String(error);
-    if (!sessionTerminationReported) {
-      sessionTerminationReported = true;
-      deps.emitEvent?.("attached_session_terminated", {
-        reason: "The workspace shell exited under a bridge call",
-        error: message.slice(0, 400),
-      });
-    }
-    return new AttachedToolHostUnavailableError(
-      `The workspace shell exited under that call: ${message.slice(0, 400)}`,
-    );
-  };
-
   const roundTrip = async (
     frame: AttachedToolRequest | AttachedToolControlRequest,
   ): Promise<unknown> => {
@@ -314,41 +258,34 @@ export const createAgentSandboxAttachment = (
     }
     const paths = attachedToolPathsForDirectory(daemonDirectory);
     deps.context.assertActive();
-    try {
-      await session.deleteFile(paths.result).catch((error) => {
-        if (isSessionTerminatedError(error)) throw error;
-      });
-      await writeProtected(
-        session,
+    await session.deleteFile(paths.result).catch(() => undefined);
+    await writeProtected(
+      session,
+      paths.request,
+      encodeAttachedToolFrame(frame),
+    );
+    deps.context.assertActive();
+    const call = await session.exec(
+      quoted([
+        ...CLIENT_ARGV,
+        "--socket",
+        paths.socket,
+        "--request",
         paths.request,
-        encodeAttachedToolFrame(frame),
+        "--result",
+        paths.result,
+      ]),
+      {
+        cwd: EXECUTOR_ROOT,
+      },
+    );
+    if (!call.success) {
+      throw new AttachedToolHostUnavailableError(
+        "The workspace could not run that call.",
       );
-      deps.context.assertActive();
-      const call = await session.exec(
-        quoted([
-          ...CLIENT_ARGV,
-          "--socket",
-          paths.socket,
-          "--request",
-          paths.request,
-          "--result",
-          paths.result,
-        ]),
-        {
-          cwd: EXECUTOR_ROOT,
-        },
-      );
-      if (!call.success) {
-        throw new AttachedToolHostUnavailableError(
-          "The workspace could not run that call.",
-        );
-      }
-      deps.context.assertActive();
-      return await readBoundedFrame(session, paths.result);
-    } catch (error) {
-      if (isSessionTerminatedError(error)) throw sessionTerminated(error);
-      throw error;
     }
+    deps.context.assertActive();
+    return await readBoundedFrame(session, paths.result);
   };
 
   const reportDaemonLoss = async (
@@ -430,13 +367,8 @@ export const createAgentSandboxAttachment = (
   ): Promise<void> => {
     for (let attempt = 0; attempt < READINESS_ATTEMPTS; attempt += 1) {
       deps.context.assertActive();
-      const listening = await session.exec(readinessProbe(socketPath));
-      if (
-        listening.success &&
-        listening.stdout.includes(READINESS_READY_MARKER)
-      ) {
-        return;
-      }
+      const listening = await session.exec(`test -S ${quoted([socketPath])}`);
+      if (listening.success) return;
       const status = await bounded(daemon?.getStatus?.(), "running");
       if (DAEMON_TERMINAL_STATUSES.has(status)) {
         throw await daemonFailure(
@@ -485,28 +417,17 @@ export const createAgentSandboxAttachment = (
       // The daemon is trusted root code: it holds the broker capability and
       // serves a root-only socket, so it must not be dropped to the tool
       // account the way a model-controlled command is.
-      // stderr also lands in a file: the SDK keeps nothing for a process
-      // that died abruptly, and that file is how a dead bridge explains itself.
-      // Started outside the session shell when the caller can: a session
-      // process is a child of that persistent shell, and the shell has just
-      // run the restore scripts and will run every bridged call next.
       const daemonCommand = `exec setsid --fork --wait ${quoted([
         ...DAEMON_ARGV,
         "--dir",
         paths.directory,
       ])} 2>>${quoted([paths.daemonStderr])}`;
       const processId = `attached-daemon-${args.sessionId}`.slice(0, 64);
-      daemon = deps.startDaemon
-        ? await deps.startDaemon(daemonCommand, {
-            cwd: EXECUTOR_ROOT,
-            processId,
-          })
-        : await world.session.startProcess(daemonCommand, {
-            cwd: EXECUTOR_ROOT,
-            processId,
-          });
+      daemon = await deps.startDaemon(daemonCommand, {
+        cwd: EXECUTOR_ROOT,
+        processId,
+      });
       daemonLossReported = false;
-      sessionTerminationReported = false;
       await waitForDaemon(world.session, daemon, paths.socket);
       return {
         coldStartMs: world.coldContainerStartMs,

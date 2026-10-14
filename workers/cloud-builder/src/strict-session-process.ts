@@ -153,9 +153,6 @@ export const strictSessionExec = (
   argv: readonly string[],
   options?: ExecOptions,
 ): Promise<ExecResult> =>
-  // ExecutionSession owns a persistent shell. `exec setpriv ...` would replace
-  // that shell, so a successful foreground command would terminate the whole
-  // session and make every subsequent operation fail.
   session.exec(strictSessionCommand(argv), options);
 
 const trustedProcessCommand = (argv: readonly string[]): string => {
@@ -167,17 +164,10 @@ const trustedProcessCommand = (argv: readonly string[]): string => {
 
 /**
  * Run the trusted Stella executor as a named, sessionless process and collect
- * its authoritative terminal result from Cloudflare's process registry. The
- * executor must remain root so it can validate the root-owned host/native
- * anchors and apply the per-tool setpriv boundary itself. Untrusted app/build
- * commands continue to use `strictSessionExec`.
- *
- * A foreground `ExecutionSession.exec()` RPC can remain pending after its
- * command exits, while an explicit-session background process can be tracked
- * as the persistent session shell rather than the one-shot command. The
- * Builder therefore passes the sessionless Sandbox facade here. A Process
- * start ACK, one terminal observer, and one final accumulated-log read avoid
- * capture-file polling or uncancellable RPC accumulation.
+ * its terminal result from the sandbox's process directory. The executor must
+ * remain root so it can validate the root-owned host/native anchors and apply
+ * the per-tool setpriv boundary itself. Untrusted app/build commands use
+ * `strictSessionExec`.
  *
  * The caller owns the destructive uncertainty boundary. A start whose ACK is
  * lost must destroy the exact sandbox. An acknowledged process that does not
@@ -248,7 +238,6 @@ export const capturedSessionExec = async (
       () =>
         session.startProcess(trustedProcessCommand(argv), {
           processId,
-          autoCleanup: false,
           timeout: commandTimeoutMs,
           ...(options.cwd ? { cwd: options.cwd } : {}),
           ...(options.env ? { env: options.env } : {}),

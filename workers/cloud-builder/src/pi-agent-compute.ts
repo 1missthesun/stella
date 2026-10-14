@@ -121,7 +121,7 @@ export const releasePiCompute = async (
   if (running) {
     const paths = attachedToolPathsForDirectory(record.daemonDirectory);
     const pid = await sandbox
-      .exec(`cat -- ${quoted(paths.daemonPid)}`, { origin: "internal" })
+      .exec(`cat -- ${quoted(paths.daemonPid)}`)
       .then((result) => {
         if (!result.success) return undefined;
         const value = JSON.parse(result.stdout) as { pid?: unknown; pgid?: unknown };
@@ -131,12 +131,12 @@ export const releasePiCompute = async (
       })
       .catch(() => undefined);
     if (pid !== undefined) {
-      await sandbox.exec(`kill -TERM -- -${pid}`, { origin: "internal" }).catch(() => undefined);
+      await sandbox.exec(`kill -TERM -- -${pid}`).catch(() => undefined);
       await scheduler.wait(500);
-      await sandbox.exec(`kill -KILL -- -${pid}`, { origin: "internal" }).catch(() => undefined);
+      await sandbox.exec(`kill -KILL -- -${pid}`).catch(() => undefined);
     }
     await sandbox.killProcess(`attached-daemon-${record.sessionId}`.slice(0, 64), "SIGKILL").catch(() => undefined);
-    await sandbox.exec(`rm -rf -- ${quoted(record.daemonDirectory)}`, { origin: "internal" }).catch(() => undefined);
+    await sandbox.exec(`rm -rf -- ${quoted(record.daemonDirectory)}`).catch(() => undefined);
     await sandbox.deleteSession(record.sessionId).catch(() => undefined);
     await sandbox.release({ warm: options.warm === true }).catch(() => undefined);
   }
@@ -220,7 +220,7 @@ export const openPiComputeLease = async (
     const exportUrl = new URL(`${publicOrigin(host)}/internal/worlds/${world}/export`);
     const materialized = await session.exec(
       worldMaterializationCommand({ worldRoot: WORLD_ROOT, exportUrl: exportUrl.toString(), capability }),
-      { origin: "internal", timeout: COMMAND_TIMEOUT_MS },
+      { timeout: COMMAND_TIMEOUT_MS },
     );
     if (!materialized.success) {
       host.log("pi_agent_world_materialize_failed", {

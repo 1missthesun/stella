@@ -9,7 +9,6 @@ import { HEADER_OWNER } from "../../conversation-types.js";
 import type { TurnEventEvent } from "@stella/contracts/turn-plane/owner-events";
 import { sha256Hex } from "../../hash.js";
 import { builderServiceSecret, builderServiceSecrets } from "../../secret-rotation.js";
-import { inSubshell } from "../../shell-subshell.js";
 import {
   isInstanceSize,
   largerSize,
@@ -385,10 +384,7 @@ export const normalizeToolWorkspaceRoot = async (
     'test "$(readlink -f /home/stella-host-state)" = /home/stella-host-state',
     "test \"$(stat -c '%u:%g:%a' /home/stella-host-state)\" = 0:0:700",
   ].join("; ");
-  // The session shell is persistent, so `set -eu` must stay inside a
-  // subshell: leaked into the session it turns the next non-zero exit (for
-  // one, the attached tool-host readiness probe) into a dead shell.
-  const result = await session.exec(inSubshell(command));
+  const result = await session.exec(command);
   if (!result.success) {
     log("error", "cloud_workspace_boundary_failed", {
       exitCode: result.exitCode,

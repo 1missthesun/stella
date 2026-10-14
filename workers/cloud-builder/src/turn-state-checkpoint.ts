@@ -14,13 +14,6 @@ type TurnStateArchiveSessionFactory<TSession> = {
   }) => Promise<TSession>;
 };
 
-/**
- * Replace only the deterministic checkpoint helper session.
- *
- * Sandbox processes are shared across sessions, so `killAllProcesses()` is
- * intentionally forbidden here: it would also terminate the sessionless
- * agent executor that is awaiting this checkpoint response.
- */
 export const replaceTurnStateArchiveSession = async <TSession>(args: {
   sandbox: TurnStateArchiveSessionFactory<TSession>;
   sessionId: string;

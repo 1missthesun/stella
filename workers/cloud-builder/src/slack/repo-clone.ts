@@ -147,7 +147,6 @@ export const prepareSlackRepo = async (
   const access = capability ? "github" : token ? "token" : "public";
   try {
     const result = await session.exec(command, {
-      origin: "internal",
       timeout: CLONE_TIMEOUT_MS,
     } as Parameters<ExecutionSession["exec"]>[1]);
     log(result.success ? "slack_repo_ready" : "slack_repo_failed", {

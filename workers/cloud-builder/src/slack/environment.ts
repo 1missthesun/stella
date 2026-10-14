@@ -749,7 +749,6 @@ cd ${shellQuote(cwd)} 2>/dev/null || cd ${shellQuote(WORLD_ROOT)}
   ].join("\n");
   const started = Date.now();
   const result = await session.exec(command, {
-    origin: "internal",
     timeout: (2 * SETUP_TIMEOUT_S + 90) * 1000,
   } as Parameters<ExecutionSession["exec"]>[1]);
   const ms = Date.now() - started;
@@ -789,7 +788,7 @@ cd ${shellQuote(cwd)} 2>/dev/null || cd ${shellQuote(WORLD_ROOT)}
       } The end of its log:\n${output.slice(-1500)}`,
     };
   }
-  const after = await session.exec(`cat ${savedEnv}`, { origin: "internal", timeout: 30_000 } as Parameters<
+  const after = await session.exec(`cat ${savedEnv}`, { timeout: 30_000 } as Parameters<
     ExecutionSession["exec"]
   >[1]);
   const exported = after.success ? decodeEnvDump(after.stdout) : {};

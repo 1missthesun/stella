@@ -281,9 +281,6 @@ export const quiesceCurrentAgentSession = async (
     turnSleepAfterMs(host.env, turn),
   );
   if (!(await host.sandboxContainerRunning(sandbox))) return;
-  // The container is this agent thread's own, but the SDK's
-  // `killAllProcesses` ignores its session argument, so only this attempt's
-  // own executor process is killed before its session is deleted.
   await sandbox
     .killProcess(
       sessionName(`agent-executor-${turn.turnId}-${turn.attemptGeneration}`),
@@ -464,7 +461,7 @@ const containerPressure = async (
 ): Promise<{ note: string; resizedTo?: InstanceSize } | undefined> => {
   if (!(await host.sandboxContainerRunning(sandbox))) return undefined;
   const probe = await withInfrastructureDeadline(
-    sandbox.exec(CONTAINER_PRESSURE_PROBE, { origin: "internal" }),
+    sandbox.exec(CONTAINER_PRESSURE_PROBE),
     10_000,
     "Container pressure probe did not settle.",
   );
@@ -566,14 +563,14 @@ export const runContainerAgentTurn = async (
         const warming = host.sandbox(sandboxId, size, "world", ownerWorld, idleTimeoutMs);
         const wasRunning = await host.sandboxContainerRunning(warming);
         await withInfrastructureDeadline(
-          warming.exec("true", { origin: "internal" }),
+          warming.exec("true"),
           120_000,
           "Agent container prewarm did not settle.",
         );
         prewarmMs = Math.round(performance.now() - started);
         if (!wasRunning) {
           await warming
-            .exec(SANDBOX_PAGE_CACHE_WARM_COMMAND, { origin: "internal" })
+            .exec(SANDBOX_PAGE_CACHE_WARM_COMMAND)
             .catch(() => undefined);
         }
       } catch (error) {
@@ -1276,7 +1273,7 @@ export const attachAgentWorld = async (
         exportUrl: exportUrl.toString(),
         capability,
       }),
-      { origin: "internal", timeout: args.commandTimeoutMs },
+      { timeout: args.commandTimeoutMs },
     );
     if (!materialized.success)
       throw new AgentTurnError(worldMaterializationFailure(materialized));
@@ -1303,7 +1300,6 @@ export const attachAgentWorld = async (
     const stateRoot = cloudNativeStateRoot(await nativeStateThreadHash(turn));
     const clear = async () => {
       const cleared = await session.exec(`rm -rf -- ${stateRoot}`, {
-        origin: "internal",
         timeout: args.commandTimeoutMs,
       });
       if (!cleared.success) {

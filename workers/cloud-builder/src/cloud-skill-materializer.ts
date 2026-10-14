@@ -50,7 +50,6 @@ export const mirrorCloudSkillsIntoHome = async (args: {
       CLOUD_SKILL_HOME_ROOT,
       ...pairs,
     ],
-    { origin: "internal" },
   );
   if (!result.success) {
     throw new Error(
@@ -63,10 +62,7 @@ const SAFE_SKILL_PATH =
   /^(?!\/)(?!.*(?:^|\/)\.{1,2}(?:\/|$))(?!.*\\)(?!.*(?:^|\/)\.)[^\u0000-\u001f\u007f]+$/u;
 
 type SandboxFileWriter = {
-  exec?(
-    command: string,
-    options?: { origin?: "internal" },
-  ): Promise<{ success: boolean; stdout: string }>;
+  exec?(command: string): Promise<{ success: boolean; stdout: string }>;
   mkdir(path: string, options?: { recursive?: boolean }): Promise<unknown>;
   writeFile(
     path: string,
@@ -123,7 +119,6 @@ const presentSkillFiles = async (
   const listed = await session
     .exec(
       `find ${CLOUD_SKILL_SANDBOX_ROOT} -xdev \\( -type d ! -user root -prune \\) -o \\( -type d -perm /022 -prune \\) -o \\( -type f -user root ! -perm /022 -links 1 -print0 \\) 2>/dev/null | xargs -0 -r sha256sum 2>/dev/null; true`,
-      { origin: "internal" },
     )
     .catch(() => null);
   if (!listed?.success) return present;

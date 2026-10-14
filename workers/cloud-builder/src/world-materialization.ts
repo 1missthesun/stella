@@ -1,5 +1,4 @@
 import { dependencyAdoptionLines } from "./sandbox-dependencies.js";
-import { inSubshell } from "./shell-subshell.js";
 import { WORLD_ROOT } from "./workspace.js";
 
 const shellQuote = (value: string): string => {
@@ -17,32 +16,30 @@ export const worldMaterializationCommand = (args: {
   }
   const marker = `${args.worldRoot}/.stella/world-manifest`;
   const index = `${args.worldRoot.slice(0, args.worldRoot.lastIndexOf("/"))}/.stella-world-index.json`;
-  return inSubshell(
-    [
-      "set -euo pipefail",
-      "umask 077",
-      "exec 9>/workspace/.world-materialize.lock",
-      "/usr/bin/flock --exclusive 9",
-      `root=${shellQuote(args.worldRoot)}`,
-      `marker=${shellQuote(marker)}`,
-      'if [ ! -f "$marker" ]; then',
-      "headers=/workspace/.world-export-headers",
-      "trap 'rm -f -- \"$headers\"' EXIT",
-      `find ${shellQuote(args.worldRoot)} -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +`,
-      `curl --fail --silent --show-error --dump-header "$headers" -H ${shellQuote(`Authorization: Bearer ${args.capability}`)} ${shellQuote(args.exportUrl)} | tar -x -f - -C ${shellQuote(args.worldRoot)}`,
-      `manifest="$(tr -d '\\r' <"$headers" | awk 'tolower($0) ~ /^x-stella-world-manifest:/ { sub(/^[^:]*: */, ""); print }' | tail -1)"`,
-      'case "$manifest" in ""|*[!A-Za-z0-9:_-]*) { echo "The world export named no manifest."; } >&2; exit 1;; esac',
-      `revision="$(tr -d '\\r' <"$headers" | awk -F': *' 'tolower($1) == "x-stella-world-revision" { print $2 }' | tail -1)"`,
-      'case "$revision" in ""|*[!0-9]*) { echo "The world export named no revision. Its response headers:"; cut -d: -f1 "$headers"; } >&2; exit 1;; esac',
-      `mkdir -p ${shellQuote(`${args.worldRoot}/.stella`)}`,
-      `printf '{"manifestId":"%s","revision":%s}\\n' "$manifest" "$revision" > "$marker"`,
-      `chown -R 42424:42424 ${shellQuote(args.worldRoot)}`,
-      'chown 0:0 "$marker"',
-      'chmod 0600 "$marker"',
-      ...(args.worldRoot === WORLD_ROOT ? dependencyAdoptionLines(index) : []),
-      "fi",
-    ].join("\n"),
-  );
+  return [
+    "set -euo pipefail",
+    "umask 077",
+    "exec 9>/workspace/.world-materialize.lock",
+    "/usr/bin/flock --exclusive 9",
+    `root=${shellQuote(args.worldRoot)}`,
+    `marker=${shellQuote(marker)}`,
+    'if [ ! -f "$marker" ]; then',
+    "headers=/workspace/.world-export-headers",
+    "trap 'rm -f -- \"$headers\"' EXIT",
+    `find ${shellQuote(args.worldRoot)} -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +`,
+    `curl --fail --silent --show-error --dump-header "$headers" -H ${shellQuote(`Authorization: Bearer ${args.capability}`)} ${shellQuote(args.exportUrl)} | tar -x -f - -C ${shellQuote(args.worldRoot)}`,
+    `manifest="$(tr -d '\\r' <"$headers" | awk 'tolower($0) ~ /^x-stella-world-manifest:/ { sub(/^[^:]*: */, ""); print }' | tail -1)"`,
+    'case "$manifest" in ""|*[!A-Za-z0-9:_-]*) { echo "The world export named no manifest."; } >&2; exit 1;; esac',
+    `revision="$(tr -d '\\r' <"$headers" | awk -F': *' 'tolower($1) == "x-stella-world-revision" { print $2 }' | tail -1)"`,
+    'case "$revision" in ""|*[!0-9]*) { echo "The world export named no revision. Its response headers:"; cut -d: -f1 "$headers"; } >&2; exit 1;; esac',
+    `mkdir -p ${shellQuote(`${args.worldRoot}/.stella`)}`,
+    `printf '{"manifestId":"%s","revision":%s}\\n' "$manifest" "$revision" > "$marker"`,
+    `chown -R 42424:42424 ${shellQuote(args.worldRoot)}`,
+    'chown 0:0 "$marker"',
+    'chmod 0600 "$marker"',
+    ...(args.worldRoot === WORLD_ROOT ? dependencyAdoptionLines(index) : []),
+    "fi",
+  ].join("\n");
 };
 
 export const worldMaterializationFailure = (result: { stderr: string; exitCode?: number }): string => {

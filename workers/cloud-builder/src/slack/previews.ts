@@ -326,7 +326,6 @@ export const prepareSlackPreviews = async (
       writeFile(SHOT_HELPER, shotScript, "0755", "root:root"),
     ].join("\n");
     const result = await session.exec(command, {
-      origin: "internal",
       timeout: 30_000,
     } as Parameters<ExecutionSession["exec"]>[1]);
     log(result.success ? "slack_preview_helper_ready" : "slack_preview_helper_failed", {

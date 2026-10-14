@@ -6,7 +6,6 @@ import { worker } from "./build-session/worker-router.js";
 import type { Env } from "./build-session/shared/env.js";
 import { OrchestratorSession } from "./orchestrator-session.js";
 import { OwnerGate } from "./owner-gate.js";
-import { inSubshell } from "./shell-subshell.js";
 export { OrchestratorSession };
 export { OwnerGate };
 export { BillingControl } from "./billing/control.js";
@@ -19,7 +18,6 @@ export { Sandbox, SandboxCode, SandboxEgress } from "./sandbox-container.js";
 
 export { DirectoryBackupGateway } from "@cloudflare/sandbox";
 
-export { inSubshell };
 export class BuildSession extends DurableObject<Env> {
   private implementation?: Promise<
     import("./build-session/object.js").BuildSessionObject

@@ -221,7 +221,7 @@ export const prewarmOrchestratorContainer = async (
   const started = performance.now();
   try {
     await withInfrastructureDeadline(
-      handle.exec("true", { origin: "internal" }),
+      handle.exec("true"),
       120_000,
       "Orchestrator container prewarm did not settle.",
     );
@@ -233,7 +233,7 @@ export const prewarmOrchestratorContainer = async (
   }
   const startMs = Math.round(performance.now() - started);
   await handle
-    .exec(SANDBOX_PAGE_CACHE_WARM_COMMAND, { origin: "internal" })
+    .exec(SANDBOX_PAGE_CACHE_WARM_COMMAND)
     .catch(() => undefined);
   log("info", "orchestrator_container_prewarmed", {
     instanceSize: size,
@@ -517,20 +517,7 @@ export const releaseAgentSessionResources = async (
   }
   if (!(await host.sandboxContainerRunning(sandbox))) return;
   const paths = attachedToolPathsForDirectory(target.daemonDirectory);
-  const session = await sandbox
-    .getSession(target.sessionId)
-    .catch(() => undefined);
-  const teardownExec = async (command: string) => {
-    if (session) {
-      try {
-        const result = await session.exec(command, { origin: "internal" });
-        if (result.success) return result;
-      } catch {
-        // The persistent session shell can already be gone after quiesce.
-      }
-    }
-    return await sandbox.exec(command, { origin: "internal" });
-  };
+  const teardownExec = (command: string) => sandbox.exec(command);
   const identity = await withInfrastructureDeadline(
     teardownExec(`cat -- '${paths.daemonPid.replace(/'/gu, `'"'"'`)}'`),
     5_000,
@@ -566,9 +553,6 @@ export const releaseAgentSessionResources = async (
       "Attached daemon group SIGKILL did not settle.",
     ).catch(() => undefined);
   }
-  // Never `killAllProcesses`: it ignores the session argument. The SDK id is
-  // only a fallback for the `setsid --wait` wrapper after this turn's private
-  // group was signalled.
   await withInfrastructureDeadline(
     sandbox.killProcess(
       `attached-daemon-${target.sessionId}`.slice(0, 64),

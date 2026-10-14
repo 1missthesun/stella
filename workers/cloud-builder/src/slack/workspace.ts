@@ -185,7 +185,7 @@ const repositoryBlock = (context: SlackWorkspaceContext): string => {
   const repos = context.repos ?? [];
   if (!repos.length) return "Repositories: none connected";
   const current = context.currentRepo
-    ? `This conversation works in ${context.currentRepo} (${SOURCE_LABEL[context.currentRepoSource ?? "chosen"]}): every agent you start has it cloned at ${repoCheckout(context.currentRepo)}, in its environment.`
+    ? `This conversation works in ${context.currentRepo} (${SOURCE_LABEL[context.currentRepoSource ?? "chosen"]}): every agent you start has it cloned at ${repoCheckout(context.currentRepo)}, in its environment. It's the only one they can reach: the workspace's other repositories aren't cloned and can't be fetched from this thread.`
     : context.noRepo
       ? "This conversation works in no repository (chosen earlier): agents start without one."
       : "This conversation hasn't picked a repository yet. Agents you start get none until you pick one with slack_repo.";

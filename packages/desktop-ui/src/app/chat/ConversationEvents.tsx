@@ -4,7 +4,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type CSSProperties,
   type RefObject,
 } from "react";
 import type { LegendListRef } from "@legendapp/list/react";
@@ -13,7 +12,7 @@ import { useEventRows } from "@/features/chat/hooks/use-event-rows";
 import { useThreadActivity } from "@/features/chat/hooks/use-thread-activity";
 import { useAgentParents } from "@/features/chat/hooks/use-agent-parents";
 import { useDriveAttachmentPreviews } from "@/features/cloud/drive-attachment-previews";
-import { ChatTimeline } from "./ChatTimeline";
+import { ChatTimeline, type LegendContentStyle } from "./ChatTimeline";
 import type { InlineWorkingIndicatorMountProps } from "./InlineWorkingIndicator";
 import type { QueuedUserMessage } from "@/features/chat/hooks/use-streaming-chat";
 import { hasQueuedMessageEntryPlayed } from "@/features/chat/lib/message-entry-animation-state";
@@ -45,7 +44,7 @@ type Props = {
   isLoadingHistory?: boolean;
   listRef?: RefObject<LegendListRef | null>;
   className?: string;
-  contentContainerStyle?: CSSProperties;
+  contentContainerStyle?: LegendContentStyle;
   estimatedItemSize?: number;
   extraTail?: React.ReactNode;
   alignItemsAtEnd?: boolean;

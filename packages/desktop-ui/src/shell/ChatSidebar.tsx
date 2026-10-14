@@ -65,16 +65,17 @@ import {
 import { useAssistantReplyPeek } from "@/features/chat/hooks/use-assistant-reply-peek";
 import { useCloudConversationSession } from "@/global/auth/hooks/use-cloud-conversation-session";
 import { useT } from "@/shared/i18n";
+import type { LegendContentStyle } from "@/app/chat/ChatTimeline";
 import "./chat-sidebar.css";
 
-const SIDEBAR_CONTENT_STYLE = {
+const SIDEBAR_CONTENT_STYLE: LegendContentStyle = {
   paddingLeft: 10,
   paddingRight: 10,
   paddingTop: 8,
   paddingBottom: 12,
-} as const;
+};
 
-const WIDE_PANEL_CONTENT_STYLE = {
+const WIDE_PANEL_CONTENT_STYLE: LegendContentStyle = {
   maxWidth: "min(50rem, 100%)",
   marginLeft: "auto",
   marginRight: "auto",
@@ -82,7 +83,7 @@ const WIDE_PANEL_CONTENT_STYLE = {
   paddingRight: 24,
   paddingTop: 16,
   paddingBottom: 16,
-} as const;
+};
 
 interface ChatSidebarOpenOptions {
   chatContext?: ChatContext | null;

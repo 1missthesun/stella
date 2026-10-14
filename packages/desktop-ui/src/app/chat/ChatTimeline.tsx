@@ -46,6 +46,25 @@ import {
   subscribeMessageJump,
 } from "@/features/catch-up/message-jump";
 
+type LegendSummedPadding =
+  | "padding"
+  | "paddingTop"
+  | "paddingRight"
+  | "paddingBottom"
+  | "paddingLeft";
+
+export type LegendContentStyle = Omit<
+  CSSProperties,
+  | LegendSummedPadding
+  | "paddingBlock"
+  | "paddingBlockStart"
+  | "paddingBlockEnd"
+  | "paddingInline"
+  | "paddingInlineStart"
+  | "paddingInlineEnd"
+> &
+  Partial<Record<LegendSummedPadding, number>>;
+
 type ChatTimelineProps = {
   rows: EventRowViewModel[];
   conversationId?: string | null;
@@ -62,7 +81,7 @@ type ChatTimelineProps = {
   alignItemsAtEnd?: boolean;
   estimatedItemSize?: number;
   className?: string;
-  contentContainerStyle?: CSSProperties;
+  contentContainerStyle?: LegendContentStyle;
   takesMessageJumps?: boolean;
   onLoadOlder?: () => boolean | void | Promise<boolean>;
 };

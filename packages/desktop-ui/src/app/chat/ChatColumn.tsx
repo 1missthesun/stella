@@ -15,6 +15,7 @@ import { CloudBrowserInterventionCard } from "@/features/cloud/CloudBrowserInter
 import { CloudConnectorConnectCard } from "@/features/cloud/CloudConnectorConnectCard";
 import { UserAskList } from "@/features/user-ask/UserAskList";
 import { ConversationEvents } from "./ConversationEvents";
+import type { LegendContentStyle } from "./ChatTimeline";
 import { MessageReplyContext } from "./message-reply-context";
 import { ConversationFocusOverlay } from "./ConversationFocusOverlay";
 import { useConversationFocus } from "@/features/chat/services/conversation-focus-store";
@@ -39,16 +40,7 @@ import { CATCH_UP_ENABLED } from "@stella/contracts/catch-up";
 import { useT } from "@/shared/i18n";
 import "./full-shell.chat.css";
 
-/**
- * Inline content-container style for Legend List.
- *
- * Important: Legend sums `paddingTop`/`paddingBottom` as numbers when
- * computing `contentLength`. Strings like `"112px"` get string-concat'd
- * (`"25656" + "112px" + "30px"`) and the resulting non-numeric
- * `contentLength` poisons every "is at end" / "scroll target" computation
- * and stops items from rendering. Always pass paddings as numbers (px).
- */
-const FULL_CHAT_CONTENT_STYLE = {
+const FULL_CHAT_CONTENT_STYLE: LegendContentStyle = {
   maxWidth: "min(50rem, 100%)",
   marginLeft: "auto",
   marginRight: "auto",
@@ -56,7 +48,7 @@ const FULL_CHAT_CONTENT_STYLE = {
   paddingRight: 24,
   paddingTop: 112,
   paddingBottom: 16,
-} as const;
+};
 
 type StoreBackedComposerProps = Omit<
   ComponentProps<typeof Composer>,

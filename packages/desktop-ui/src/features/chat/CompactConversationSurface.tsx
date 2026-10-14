@@ -4,6 +4,7 @@ import type { MessageRecord } from "@stella/contracts/local-chat";
 import type { QueuedUserMessage } from "@/features/chat/hooks/use-streaming-chat";
 import type { ChatColumnScroll } from "@/features/chat/chat-column-types";
 import { ConversationEvents } from "@/app/chat/ConversationEvents";
+import type { LegendContentStyle } from "@/app/chat/ChatTimeline";
 import type { InlineWorkingIndicatorMountProps } from "@/app/chat/InlineWorkingIndicator";
 import "@/app/chat/full-shell.chat.css";
 import "./compact-conversation.css";
@@ -12,7 +13,7 @@ type CompactConversationVariant = "orb" | "sidebar";
 
 type CompactConversationSurfaceProps = {
   className: string;
-  contentContainerStyle?: React.CSSProperties;
+  contentContainerStyle?: LegendContentStyle;
   variant: CompactConversationVariant;
   scroll: ChatColumnScroll;
   messages: MessageRecord[];

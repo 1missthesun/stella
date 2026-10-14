@@ -17,14 +17,15 @@ import {
 } from "@/features/chat/lib/message-turn-display";
 import { toReplyPreview } from "@stella/contracts/reply-refs";
 import { useAgentTitle } from "@/features/cloud/use-agent-title";
+import type { LegendContentStyle } from "./ChatTimeline";
 import "./conversation-focus-overlay.css";
 
-const FOCUS_CONTENT_STYLE = {
+const FOCUS_CONTENT_STYLE: LegendContentStyle = {
   paddingTop: 16,
   paddingBottom: 16,
   paddingLeft: 24,
   paddingRight: 24,
-} as const;
+};
 
 type ConversationFocusOverlayProps = {
   conversationId: string | null | undefined;

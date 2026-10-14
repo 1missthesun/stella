@@ -1529,14 +1529,8 @@ func axBatchedAttributes(
         let raw = CFArrayGetValueAtIndex(values, index)
         guard let raw else { continue }
         let value = unsafeBitCast(raw, to: AnyObject.self)
-        // CFArray entries that came back as AXError get represented as a
-        // CFNumber wrapping the AXError value; skip those.
-        if CFGetTypeID(value) == CFNumberGetTypeID() {
-            // Heuristic: CFNumberRef of AXError code; skip if matches.
-            // We can't disambiguate a real number-valued attribute from an
-            // error sentinel, so only skip when value == an AXError raw.
-            // In practice, attributes we batch (role/title/value/...) are not
-            // numeric, so this is safe for our usage.
+        if CFGetTypeID(value) == AXValueGetTypeID(),
+           AXValueGetType(value as! AXValue) == .axError {
             continue
         }
         dict[attributes[index]] = value

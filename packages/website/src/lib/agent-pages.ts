@@ -438,6 +438,7 @@ const SUMMARY = [
   "- Open source: Apache 2.0, [github.com/1missthesun/stella-v2](https://github.com/1missthesun/stella-v2). The desktop app runs from its own source and can redesign its own interface on request.",
   "- Models: Stella's own models by default, or Claude Code, a ChatGPT plan, your own API keys (Anthropic, OpenAI, Google, xAI, Moonshot, Z.AI, OpenRouter, GitHub Copilot) or local models.",
   "- Get it: https://stella.sh (desktop download), `curl -fsSL https://stella.sh/install.sh | sh` on Linux, iPhone and Android apps, or https://stella.sh/chat in a browser.",
+  "- Self-hosting: Stella's server can run on your own Cloudflare account ($5/month Workers Paid plus usage, your own Claude or ChatGPT subscription for models). Agents: follow https://stella.sh/self-host.md.",
 ];
 
 /** llms.txt index so agents can discover every markdown page in one fetch. */
@@ -446,6 +447,11 @@ export function renderLlmsTxt(): string {
   for (const page of AGENT_PAGES) {
     lines.push(`- [${page.label}](${abs(page.mdPath)}): ${page.description}`);
   }
+  lines.push(
+    "",
+    "## Run your own server",
+    `- [Self-host Stella](${abs("/self-host.md")}): For agents: set up a Stella server on the user's own Cloudflare account with one command, then connect the phone and desktop by QR code.`,
+  );
   lines.push("", "## Answers");
   for (const page of ANSWER_PAGES) {
     lines.push(`- [${page.headline.replace(/\.$/, "")}](${abs(`/ai/${page.slug}`)}): ${page.metaDescription}`);

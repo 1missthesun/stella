@@ -40,6 +40,13 @@ import {
   startTestBrowser,
   stopRunOwnedProcesses,
 } from "./cli/isolation.mjs";
+import {
+  reapRecordedProcesses,
+  recordProcesses,
+  registerRun,
+  sweepOrphanedRuns,
+  unregisterRun,
+} from "./cli/run-processes.mjs";
 
 const scriptPath = fileURLToPath(import.meta.url);
 const skillRoot = path.dirname(scriptPath);
@@ -234,19 +241,35 @@ const harnessTempRoot = () => {
   return SHORT_DARWIN_TMPDIR;
 };
 
-const removeTemporaryUserData = (run) => {
-  const tempRoot = path.join(
-    path.dirname(path.dirname(run.userDataDir ?? "")),
-    `stella-verify-${run.runId}`,
-  );
+const runTempRoot = (run) =>
+  path.join(path.dirname(path.dirname(run.userDataDir ?? "")), `stella-verify-${run.runId}`);
+
+const removeTempRoot = (tempRoot) => {
   if (![os.tmpdir(), SHORT_DARWIN_TMPDIR].includes(path.dirname(tempRoot))) return;
+  if (!/^stella-verify-[0-9a-f]{8}$/.test(path.basename(tempRoot))) return;
+  rmSync(tempRoot, { recursive: true, force: true });
+};
+
+const removeTemporaryUserData = (run) => {
+  const tempRoot = runTempRoot(run);
   if (
     path.resolve(run.userDataDir ?? "") !==
     path.join(tempRoot, "electron-user-data")
   )
     return;
-  rmSync(tempRoot, { recursive: true, force: true });
+  removeTempRoot(tempRoot);
 };
+
+/** Adds everything now running under the run's Electron and test browser. */
+const recordRunProcesses = (run) => {
+  let recorded = recordProcesses(run.ownedProcesses ?? [], run.electronPid, runOwnedProcesses(run.runId));
+  if (run.browserExtension?.chromiumPid) recorded = recordProcesses(recorded, run.browserExtension.chromiumPid);
+  run.ownedProcesses = recorded;
+  registerRun(run, POINTER_PATH, runTempRoot(run));
+};
+
+const sweepAbandonedRuns = () =>
+  sweepOrphanedRuns({ runOwnedProcesses, removeTempRoot }).catch(() => []);
 
 const bunBin = () => {
   const fromEnv = process.env.BUN_INSTALL
@@ -841,6 +864,7 @@ const startElectron = async (run, { minted, modelGateway, fakeMic, browserBridge
 };
 
 const cmdLaunch = async (options) => {
+  await sweepAbandonedRuns();
   const existing = currentRun();
   if (
     existing &&
@@ -943,6 +967,7 @@ const cmdLaunch = async (options) => {
   };
   writeJson(POINTER_PATH, run);
   writeJson(path.join(runDir, "run.json"), run);
+  registerRun(run, POINTER_PATH, runTempRoot(run));
 
   try {
     run.homeDir = ensureRunHome(run);
@@ -963,6 +988,7 @@ const cmdLaunch = async (options) => {
     await startElectron(run, { minted, modelGateway, fakeMic, browserBridge });
     if (run.browserExtension) await startRunTestBrowser(run);
     run.warnings = launchWarnings(run);
+    recordRunProcesses(run);
     writeJson(POINTER_PATH, run);
   } catch (error) {
     if (process.env.STELLA_VERIFY_KEEP_ON_FAILURE !== "1") {
@@ -1005,16 +1031,38 @@ const startRunTestBrowser = async (run) => {
   }
 };
 
+// Every step runs even when an earlier one fails, and nothing is deleted
+// until every process the run started (recorded or still marked) is gone.
 const teardownRun = async (run) => {
   const stopped = { electronPid: run.electronPid, chromiumPid: run.browserExtension?.chromiumPid ?? null, xvfbPid: run.display?.pid ?? null };
-  await killGroup(run.browserExtension?.chromiumPid);
-  await stopPid(run.electronPid);
-  const strays = await stopRunOwnedProcesses(run.runId);
-  if (run.display?.mode === "xvfb") await killGroup(run.display.pid);
-  const claudeLoginRemoved = removeBorrowedClaudeLogin(run.claudeLogin ? run.providerHomes?.CLAUDE_CONFIG_DIR : null);
-  removeTemporaryUserData(run);
+  const errors = [];
+  const step = async (name, action) => {
+    try {
+      return await action();
+    } catch (error) {
+      errors.push(`${name}: ${error instanceof Error ? error.message : String(error)}`);
+      return undefined;
+    }
+  };
+  await step("record", () => recordRunProcesses(run));
+  await step("browser", () => killGroup(run.browserExtension?.chromiumPid));
+  await step("electron", () => stopPid(run.electronPid));
+  const strays = (await step("marked", () => stopRunOwnedProcesses(run.runId))) ?? [];
+  const detached = (await step("recorded", () => reapRecordedProcesses(run.ownedProcesses ?? []))) ?? [];
+  if (run.display?.mode === "xvfb") await step("xvfb", () => killGroup(run.display.pid));
+  const claudeLoginRemoved = await step("claude-login", () =>
+    removeBorrowedClaudeLogin(run.claudeLogin ? run.providerHomes?.CLAUDE_CONFIG_DIR : null),
+  );
+  await step("temp", () => removeTemporaryUserData(run));
   rmSync(POINTER_PATH, { force: true });
-  return { ...stopped, runtimeAndHelpers: strays, claudeLoginRemoved };
+  unregisterRun(run.runId);
+  return {
+    ...stopped,
+    runtimeAndHelpers: strays,
+    detachedHelpers: detached,
+    claudeLoginRemoved,
+    ...(errors.length > 0 ? { teardownErrors: errors } : {}),
+  };
 };
 
 const cmdRelaunch = async () => {
@@ -1024,9 +1072,12 @@ const cmdRelaunch = async () => {
       errorCode: "NOT_RUNNING",
       recovery: "Run `session launch` first.",
     });
+  recordRunProcesses(run);
   await killGroup(run.browserExtension?.chromiumPid);
   await stopPid(run.electronPid);
   const stoppedRuntime = await stopRunOwnedProcesses(run.runId);
+  await reapRecordedProcesses(run.ownedProcesses ?? []);
+  run.ownedProcesses = [];
   let minted = null;
   if (run.account?.mode && run.account.mode !== "signed-out" && run.account.mode !== "anonymous") {
     minted = await mintTestAccount(run.runId, run.account.mode);
@@ -1045,10 +1096,13 @@ const cmdRelaunch = async () => {
     browserBridge: run.browserBridge === "shared" ? "shared" : null,
   });
   if (run.browserExtension) await startRunTestBrowser(run);
+  recordRunProcesses(run);
+  writeJson(POINTER_PATH, run);
   respond({ ...run, stoppedRuntime }, run);
 };
 
 const cmdStop = async ({ silent = false, "dry-run": dryRun = false } = {}) => {
+  if (!dryRun) await sweepAbandonedRuns();
   const run = currentRun();
   if (!run) {
     if (!silent) respond({ stopped: false, reason: "No verification instance is recorded." }, null);

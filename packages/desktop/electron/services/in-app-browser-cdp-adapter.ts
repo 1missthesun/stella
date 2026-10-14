@@ -108,7 +108,9 @@ class CdpCommandTimeoutError extends Error {
     readonly method: string,
     readonly timeoutMs: number,
   ) {
-    super(`CDP command ${method} timed out after ${timeoutMs}ms.`);
+    super(
+      `CDP command ${method} timed out after ${timeoutMs}ms. The tab did not respond: it may be frozen or blocked by a dialog. Navigate it again with tab.goto(), or close it and open a new tab with browser.tabs.new().`,
+    );
     this.name = "CdpCommandTimeoutError";
   }
 }

@@ -970,6 +970,9 @@ export class InAppBrowserService {
       this.syncState();
       this.attachActiveView();
     });
+    contents.on("will-prevent-unload", (event) => {
+      if (tab.ownerId !== MANUAL_OWNER_ID) event.preventDefault();
+    });
     contents.on("will-navigate", (event) => {
       const allowed = tab.preview
         ? isRendererUrl(event.url)

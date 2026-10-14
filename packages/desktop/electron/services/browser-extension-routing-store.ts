@@ -11,7 +11,9 @@ import type {
 export const BROWSER_EXTENSION_ROUTING_FILE = "browser-extension-routing.json";
 
 const MAX_KNOWN_CLIENTS = 32;
-const BUNDLE_KEY_PREFIX = "bundle:";
+const UNPROFILED_KEY_PREFIXES = ["browser:", "bundle:"];
+const isUnprofiledKey = (key: string) =>
+  UNPROFILED_KEY_PREFIXES.some((prefix) => key.startsWith(prefix));
 
 const nullableString = z.string().nullable().catch(null);
 
@@ -147,14 +149,14 @@ export const rememberBrowserExtensionClients = (
   }
   const profiledBrowsers = new Set(
     [...known.values()]
-      .filter((entry) => !entry.key.startsWith(BUNDLE_KEY_PREFIX))
+      .filter((entry) => !isUnprofiledKey(entry.key))
       .map((entry) => entry.browser),
   );
   const connectedKeys = new Set(clients.map((client) => client.key));
   const next = [...known.values()]
     .filter(
       (entry) =>
-        !entry.key.startsWith(BUNDLE_KEY_PREFIX) ||
+        !isUnprofiledKey(entry.key) ||
         connectedKeys.has(entry.key) ||
         isPinned(record, entry.key) ||
         !profiledBrowsers.has(entry.browser),

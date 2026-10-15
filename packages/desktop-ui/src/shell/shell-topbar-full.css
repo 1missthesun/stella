@@ -17,7 +17,7 @@
   user-select: none;
   pointer-events: auto;
   transition:
-    right 460ms cubic-bezier(0.32, 0.72, 0.16, 1),
+    right 140ms ease-out,
     opacity 120ms ease-out;
 }
 
@@ -118,8 +118,8 @@ body[data-display-expanding="true"] .shell-topbar-full,
   -webkit-app-region: drag;
   clip-path: inset(0);
   transition:
-    width 460ms cubic-bezier(0.32, 0.72, 0.16, 1),
-    clip-path 460ms cubic-bezier(0.32, 0.72, 0.16, 1);
+    width 140ms ease-out,
+    clip-path 140ms ease-out;
 }
 
 .display-panel-topbar[data-display-open="false"] {

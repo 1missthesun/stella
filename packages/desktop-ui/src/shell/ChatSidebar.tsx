@@ -10,6 +10,7 @@ import {
   type SetStateAction,
 } from "react";
 import { CompactConversationSurface } from "@/features/chat/CompactConversationSurface";
+import { UsageLimitChatCard } from "@/features/chat/UsageLimitChatCard";
 import type { ChatColumnScroll } from "@/features/chat/chat-column-types";
 import { useChatScrollManagement } from "@/shell/use-chat-scroll-management";
 import {
@@ -428,7 +429,12 @@ function AccountScopedChatPanelTab({
                 wideLayout ? WIDE_PANEL_CONTENT_STYLE : SIDEBAR_CONTENT_STYLE
               }
               estimatedItemSize={wideLayout ? 140 : undefined}
-              extraTail={extraTail}
+              extraTail={
+                <>
+                  {extraTail}
+                  <UsageLimitChatCard conversationId={conversationId} />
+                </>
+              }
             />
 
             <div className="chat-sidebar-composer">

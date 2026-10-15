@@ -176,6 +176,8 @@ Notifications.setNotificationHandler({
     if (!pushDeliveryEnabled()) return { ...SILENT };
     if (getNotificationsMuted()) return { ...SILENT };
     if (parseReminderPushData(notification.request.content.data)) {
+      // In the app the reminder's card in chat is the notice; a banner would show it twice.
+      if (isPhoneInForeground()) return { ...SILENT };
       return {
         shouldShowAlert: true,
         shouldShowBanner: true,

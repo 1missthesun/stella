@@ -26,7 +26,7 @@ const formatTime = (ms: number): string => {
       });
 };
 
-/** A reminder that went off: what to do on row 1; "Reminder · 9:00 AM" and Done / Snooze on row 2. */
+/** A reminder that went off: what to do on row 1; "Reminder · 9:00 AM" and "Reminder · 9:00 AM" on row 2; Done / Snooze in a row under it while open. */
 export const ReminderFireCard = memo(function ReminderFireCard({
   mark,
   text,
@@ -74,18 +74,9 @@ export const ReminderFireCard = memo(function ReminderFireCard({
   } else if (fire) {
     trailing = (
       <span className="schedule-card__actions" data-reminder-state="open">
-        <button
-          type="button"
-          className="schedule-card__button schedule-card__button--primary"
-          disabled={busy}
-          onClick={() => run(() => markReminderDone(fire.fireId))}
-        >
-          <Check size={13} strokeWidth={2} />
-          {t("reminders.done")}
-        </button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button type="button" className="schedule-card__button" disabled={busy}>
+            <button type="button" className="pill-btn schedule-card__button" disabled={busy}>
               {t("reminders.snooze")}
               <ChevronDown size={12} strokeWidth={1.75} />
             </button>
@@ -104,19 +95,29 @@ export const ReminderFireCard = memo(function ReminderFireCard({
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        <button
+          type="button"
+          className="pill-btn pill-btn--primary schedule-card__button"
+          disabled={busy}
+          onClick={() => run(() => markReminderDone(fire.fireId))}
+        >
+          {t("reminders.done")}
+        </button>
       </span>
     );
   }
 
   return (
     <div className="schedule-card" data-testid="reminder-fire-card" title={text}>
-      <span className="schedule-card__row">
-        <Clock className="schedule-card__icon" size={13} strokeWidth={1.9} aria-hidden="true" />
-        <span className="schedule-card__headline">{text}</span>
+      <span className="schedule-card__tile" aria-hidden="true">
+        <Clock size={16} strokeWidth={1.9} />
       </span>
-      <span className="schedule-card__meta">
-        <span className="schedule-card__status">{failed ? t("reminders.failed") : status}</span>
-        {trailing}
+      <span className="schedule-card__body">
+        <span className="schedule-card__headline">{text}</span>
+        <span className="schedule-card__meta">
+          <span className="schedule-card__status">{failed ? t("reminders.failed") : status}</span>
+          {trailing}
+        </span>
       </span>
     </div>
   );

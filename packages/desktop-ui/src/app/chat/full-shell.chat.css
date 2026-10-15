@@ -143,7 +143,18 @@
 .event-list-extra-tail {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 6px;
+}
+
+/* The last row keeps a full row gap (20px, ChatTimeline ROW_GAP) above the
+   working-indicator slot, which stays mounted but empty between turns. Cards
+   in the tail (a change ready to add, cloud status) then sat 20px under the
+   last message instead of the 6px between stacked assistant messages
+   (ASSISTANT_RUN_GAP), so pull them up by the difference while it's empty. */
+div:has(> div > .event-list-working-indicator > .inline-working-indicator--vacated)
+  + div
+  > .event-list-extra-tail {
+  margin-top: -14px;
 }
 
 .composer-queued-stack {

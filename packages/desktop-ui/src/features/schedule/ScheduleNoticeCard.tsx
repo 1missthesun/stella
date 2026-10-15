@@ -36,12 +36,14 @@ export const ScheduleNoticeCard = memo(function ScheduleNoticeCard({ card }: { c
       title={`${card.name}\n${status}`}
       onClick={() => openScheduleFocused(card.scheduleId)}
     >
-      <span className="schedule-card__row">
-        <Clock className="schedule-card__icon" size={13} strokeWidth={1.9} aria-hidden="true" />
-        <span className="schedule-card__headline">{card.name}</span>
+      <span className="schedule-card__tile" aria-hidden="true">
+        <Clock size={16} strokeWidth={1.9} />
       </span>
-      <span className="schedule-card__meta">
-        <span className="schedule-card__status">{status}</span>
+      <span className="schedule-card__body">
+        <span className="schedule-card__headline">{card.name}</span>
+        <span className="schedule-card__meta">
+          <span className="schedule-card__status">{status}</span>
+        </span>
       </span>
     </button>
   );

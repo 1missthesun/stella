@@ -1,8 +1,11 @@
+/* Chat cards (schedules, reminders, a change ready to add, usage limit): an
+   icon tile in a leading column, centred against the title and subtitle; any
+   actions sit at the right end of the subtitle row. */
 .schedule-card {
+  position: relative;
   display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 1px;
+  align-items: center;
+  gap: 10px;
   width: fit-content;
   max-width: 85%;
   min-width: 0;
@@ -29,21 +32,29 @@ button.schedule-card:focus-visible {
   outline-offset: 2px;
 }
 
-.schedule-card__row {
+.schedule-card__tile {
   display: flex;
+  flex: none;
   align-items: center;
-  gap: 6px;
-  min-width: 0;
-  white-space: nowrap;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: color-mix(in oklch, var(--foreground) 7%, transparent);
+  color: var(--text-weak);
 }
 
-.schedule-card__icon {
-  flex: none;
-  color: var(--text-weak);
+.schedule-card__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
 }
 
 .schedule-card__headline {
   min-width: 0;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   font-weight: var(--weight-medium, 500);
@@ -55,7 +66,6 @@ button.schedule-card:focus-visible {
   justify-content: space-between;
   gap: 12px;
   min-height: 18px;
-  padding-inline-start: 19px;
   white-space: nowrap;
   color: var(--text-weak);
   font-size: var(--font-size-base, 13px);
@@ -83,43 +93,80 @@ button.schedule-card:focus-visible {
   gap: 4px;
 }
 
-.schedule-card__button {
-  display: inline-flex;
+/* Actions overhang the 18px subtitle row so a card with buttons keeps the
+   same height as one without. */
+.schedule-card__actions:has(.schedule-card__button) {
+  margin-block: -5px;
+}
+
+/* Cards whose text can run long wrap instead of truncating. */
+.schedule-card--wrap .schedule-card__headline,
+.schedule-card--wrap .schedule-card__meta,
+.schedule-card--wrap .schedule-card__status {
+  white-space: normal;
+}
+
+/* A ✕ on the title row; the actions' right edge sits under the visible icon
+   (14px icon centred in the 24px button). */
+.schedule-card__dismiss {
+  position: absolute;
+  top: 5px;
+  right: 9px;
+  display: flex;
   align-items: center;
-  gap: 4px;
+  justify-content: center;
+  width: 24px;
   height: 24px;
-  padding: 0 10px;
-  border: 1px solid var(--panel-surface-border);
+  padding: 0;
+  border: 0;
   border-radius: 999px;
-  background: color-mix(in oklch, var(--foreground) 4%, transparent);
-  color: var(--text-base);
-  font: inherit;
-  font-size: var(--font-size-sm, 12px);
+  background: transparent;
+  color: var(--text-weak);
   cursor: pointer;
-  transition: background 120ms ease;
 }
 
-.schedule-card__button:hover:not(:disabled) {
+.schedule-card__dismiss:hover {
   background: color-mix(in oklch, var(--foreground) 8%, transparent);
+  color: var(--text-strong);
 }
 
-.schedule-card__button:disabled {
-  opacity: 0.6;
-  cursor: default;
+.schedule-card:has(.schedule-card__dismiss) .schedule-card__headline {
+  padding-inline-end: 24px;
 }
 
-.schedule-card__button--primary {
-  border-color: transparent;
-  background: var(--text-strong);
-  color: var(--background);
+/* Chat-card actions use the shared pill styles (`pill-btn`, `pill-btn--primary`)
+   at the chat-card height, as small-radius rounded rectangles. */
+.pill-btn.schedule-card__button {
+  border-radius: 8px;
 }
 
-.schedule-card__button--primary:hover:not(:disabled) {
-  background: color-mix(in oklch, var(--text-strong) 88%, transparent);
+.schedule-card__button {
+  gap: 4px;
+  height: 28px;
+  padding-block: 0;
 }
 
 .schedule-card[data-action="removed"] .schedule-card__headline {
   color: var(--text-weak);
   text-decoration: line-through;
   text-decoration-color: color-mix(in oklch, var(--text-weak) 60%, transparent);
+}
+
+.usage-limit-card__tile {
+  color: var(--warning, var(--text-weak));
+}
+
+/* With a ✕ on the title row the subtitle keeps its usual spacing; its
+   button hangs down from the subtitle row (not up toward the ✕) and the card
+   grows at the bottom to hold it. */
+.schedule-card:has(.schedule-card__dismiss) {
+  padding-bottom: 19px;
+}
+
+.schedule-card:has(.schedule-card__dismiss) .schedule-card__meta {
+  align-items: flex-start;
+}
+
+.schedule-card:has(.schedule-card__dismiss) .schedule-card__actions:has(.schedule-card__button) {
+  margin-block: 0 -10px;
 }

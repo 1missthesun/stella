@@ -86,7 +86,6 @@ import {
 } from "@/shared/lib/stella-orb-chat";
 import { useRestrictedStellaModelReset } from "@/global/settings/hooks/use-restricted-stella-model-reset";
 import { MobileActivityNotificationsBridge } from "@/global/mobile/MobileActivityNotificationsBridge";
-import { ReminderNoticeLayer } from "@/features/reminders/ReminderNoticeLayer";
 import { ScheduleZoneReporter } from "@/features/schedule/use-schedule-zone";
 import { useDictationToggleBridge } from "@/shell/root-chrome/use-dictation-toggle-bridge";
 import { CompanionBridge } from "@/shell/companion/use-companion-bridge";
@@ -782,7 +781,6 @@ function RootChrome({ conversationId }: { conversationId: string | null }) {
     <>
       {/* A leaf, so its timeline subscription never re-renders this chrome. */}
       <CompanionBridge conversationId={conversationId} />
-      <ReminderNoticeLayer />
       <ScheduleZoneReporter />
       {platformCapabilities.phoneAccess ? (
         <MobileActivityNotificationsBridge />

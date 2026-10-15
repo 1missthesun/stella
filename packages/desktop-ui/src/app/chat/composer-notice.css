@@ -155,28 +155,45 @@
   width: auto;
 }
 
-/* Resume's right edge lines up under the visible ✕ icon (14px icon centred in a 24px button 8px from the edge). */
-.composer-notice--limit .composer-notice__row {
-  margin-right: -27px;
+/* Usage-limit card: the ✕ sits top-right on the title row and Resume on the
+   last row, its right edge under the visible ✕ icon (14px icon centred in the
+   24px button), with a clear gap between them. */
+.composer-notice--limit .composer-notice__title {
+  line-height: 18px;
 }
 
-.composer-notice--limit.composer-notice--compact .composer-notice__row {
-  margin-right: -21px;
-}
-
-/* The ✕ sits close to the corner on this card. */
 .composer-notice--limit .composer-notice__dismiss {
+  top: 6px;
+  right: 6px;
+}
+
+.composer-notice--limit .composer-notice__row {
+  margin-top: 8px;
+  margin-right: -29px;
+}
+
+.composer-notice--limit.composer-notice--compact .composer-notice__title {
+  line-height: 17px;
+}
+
+.composer-notice--limit.composer-notice--compact .composer-notice__dismiss {
   top: 4px;
   right: 4px;
 }
 
-.composer-notice--limit.composer-notice--compact .composer-notice__dismiss {
-  top: 3px;
-  right: 3px;
+.composer-notice--limit.composer-notice--compact .composer-notice__row {
+  margin-top: 6px;
+  margin-right: -23px;
 }
 
 @media (max-width: 600px) {
   .composer-notice:not(.composer-notice--compact) {
     width: calc(100% - 16px);
   }
+}
+
+/* Same height as the other chat-card actions (28px). */
+.composer-notice__primary.pill-btn {
+  height: 28px;
+  padding-block: 0;
 }

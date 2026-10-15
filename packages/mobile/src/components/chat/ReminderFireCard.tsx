@@ -8,7 +8,7 @@ import { CONTENT_MAX_FONT_SCALE } from "../../lib/font-scale";
 import type { Colors } from "../../theme/colors";
 import { fonts } from "../../theme/fonts";
 import { useT } from "../../i18n";
-import { ScheduleCardShell } from "./ScheduleCardShell";
+import { ScheduleCardShell, makeChatCardButtonStyles } from "./ScheduleCardShell";
 
 const SNOOZES = [
   { label: "reminders.snooze10", minutes: () => 10 },
@@ -23,7 +23,7 @@ const formatTime = (ms: number): string => {
     : date.toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" });
 };
 
-/** A reminder that went off: what to do on row 1; "Reminder · 9:00 AM" and Done / Snooze on row 2. */
+/** A reminder that went off: what to do on row 1; "Reminder · 9:00 AM" on row 2 with Snooze / Done at its right end. */
 export const ReminderFireCard = memo(function ReminderFireCard({
   mark,
   text,
@@ -38,7 +38,7 @@ export const ReminderFireCard = memo(function ReminderFireCard({
   const t = useT();
   const fires = useReminderFires(true);
   const [busy, setBusy] = useState(false);
-  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const styles = useMemo(() => ({ ...makeChatCardButtonStyles(colors), ...makeStyles(colors) }), [colors]);
   const fire = fires?.get(mark.fireId);
   const atMs = mark.dueAt ?? firedAtMs;
   const status = [t("reminders.title"), atMs !== undefined ? formatTime(atMs) : null]
@@ -91,21 +91,21 @@ export const ReminderFireCard = memo(function ReminderFireCard({
         <Pressable
           accessibilityRole="button"
           disabled={busy}
-          onPress={() => run(() => markReminderDone(fire.fireId))}
-          style={({ pressed }) => [styles.button, styles.primary, (pressed || busy) && styles.dimmed]}
-        >
-          <Text style={[styles.label, styles.primaryLabel]} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
-            {t("reminders.done")}
-          </Text>
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          disabled={busy}
           onPress={chooseSnooze}
           style={({ pressed }) => [styles.button, (pressed || busy) && styles.dimmed]}
         >
           <Text style={styles.label} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
             {t("reminders.snooze")}
+          </Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          disabled={busy}
+          onPress={() => run(() => markReminderDone(fire.fireId))}
+          style={({ pressed }) => [styles.button, styles.primary, (pressed || busy) && styles.dimmed]}
+        >
+          <Text style={[styles.label, styles.primaryLabel]} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
+            {t("reminders.done")}
           </Text>
         </Pressable>
       </View>
@@ -126,18 +126,6 @@ export const ReminderFireCard = memo(function ReminderFireCard({
 
 const makeStyles = (colors: Colors) =>
   StyleSheet.create({
-    actions: { flexDirection: "row", flexShrink: 0, gap: 6 },
-    button: {
-      borderColor: colors.border,
-      borderRadius: 999,
-      borderWidth: StyleSheet.hairlineWidth,
-      paddingHorizontal: 11,
-      paddingVertical: 4,
-    },
-    primary: { backgroundColor: colors.textStrong, borderColor: colors.textStrong },
-    dimmed: { opacity: 0.6 },
-    label: { color: colors.text, fontFamily: fonts.sans.medium, fontSize: 14 },
-    primaryLabel: { color: colors.background },
     settled: {
       color: colors.textMuted,
       flexShrink: 0,

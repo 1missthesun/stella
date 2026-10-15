@@ -1,6 +1,8 @@
+/* Top-right under the window header, clear of the composer and the cards
+   docked above it (usage limit, notices). */
 [data-component="toast-region"] {
   position: fixed;
-  bottom: 16px;
+  top: 48px;
   right: 16px;
   z-index: var(--layer-toast);
   display: flex;
@@ -101,12 +103,24 @@
   margin: 0;
 }
 
+[data-component="toast"] [data-slot="toast-row"] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+[data-component="toast"] [data-slot="toast-row"] [data-slot="toast-description"] {
+  flex: 1;
+  min-width: 0;
+}
+
 [data-component="toast"] [data-slot="toast-actions"] {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 8px;
+  flex: none;
+  gap: 10px;
+  margin-left: auto;
 }
 
 [data-component="toast"] [data-slot="toast-action-button"] {
@@ -116,7 +130,7 @@
   justify-content: center;
   min-height: 28px;
   padding: 0 12px;
-  border-radius: var(--radius-full, 999px);
+  border-radius: 8px;
   border: 1px solid var(--interactive);
   background: var(--interactive);
   color: var(--interactive-foreground);
@@ -159,7 +173,18 @@
   text-underline-offset: 2px;
 }
 
+/* The ✕ is pinned top-right on the first text row so the actions row can run
+   the full width: the primary's right edge sits under the visible ✕ icon
+   (16px icon centred in the 22px button; content inset 16px). */
+[data-component="toast"] [data-slot="toast-title"],
+[data-component="toast"] [data-slot="toast-row"]:first-child [data-slot="toast-description"] {
+  padding-right: 22px;
+}
+
 [data-component="toast"] [data-slot="toast-close-button"] {
+  position: absolute;
+  top: 12px;
+  right: 13px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -187,7 +212,7 @@
 @keyframes toast-pop-in {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(-12px);
   }
   to {
     opacity: 1;

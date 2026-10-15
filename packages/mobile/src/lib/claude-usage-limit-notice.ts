@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import * as Crypto from "expo-crypto";
 import type { JournalRecord } from "@stella/contracts/conversation-protocol";
 import {
@@ -9,7 +9,6 @@ import {
   type ClaudeUsageLimitCard,
   type UsageLimitSummary,
 } from "@stella/contracts/claude-usage-limit";
-import { dismissComposerNotice, showComposerNotice } from "./composer-notice";
 import { getBackendClient } from "./backend";
 import type { JournalView } from "./journal-index";
 
@@ -29,30 +28,56 @@ export const USAGE_LIMIT_CARDS: JournalView = {
   test: (record) => record.kind === "card" && record.card.type === "usage-limit",
 };
 
-const showPaused = (conversationId: string, id: string, summary: UsageLimitSummary) => {
+/** What the chat's usage-limit card shows; it sits in the message list where the paused reply would be. */
+export type UsageLimitCardState = {
+  title: string;
+  description?: string;
+  resume?: () => void;
+};
+
+let cards = new Map<string, UsageLimitCardState>();
+const listeners = new Set<() => void>();
+
+const setCard = (conversationId: string, state: UsageLimitCardState | null) => {
+  const next = new Map(cards);
+  if (state) next.set(conversationId, state);
+  else if (!next.delete(conversationId)) return;
+  cards = next;
+  for (const listener of listeners) listener();
+};
+
+const subscribe = (listener: () => void) => {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+};
+
+export const dismissUsageLimitCard = (conversationId: string) => setCard(conversationId, null);
+
+export const useUsageLimitCard = (conversationId: string | null | undefined): UsageLimitCardState | null => {
+  const snapshot = useSyncExternalStore(subscribe, () => cards, () => cards);
+  return conversationId ? (snapshot.get(conversationId) ?? null) : null;
+};
+
+const showPaused = (conversationId: string, summary: UsageLimitSummary) => {
   const notice = usageLimitNotice(summary, resetTime);
   const press = () => {
-    showComposerNotice({ id, conversationId, kind: "limit", title: "Resuming…" });
+    setCard(conversationId, { title: "Resuming…" });
     void getBackendClient()
       .call("usageLimits.resume", { conversationId, requestId: Crypto.randomUUID() })
       .catch((error: unknown) => {
-        showComposerNotice({
-          id,
-          conversationId,
-          kind: "limit",
+        setCard(conversationId, {
           title: notice.title,
           description: `Resume didn't go through: ${error instanceof Error ? error.message : String(error)}`,
-          action: { label: "Resume", onPress: press },
+          resume: press,
         });
       });
   };
-  showComposerNotice({
-    id,
-    conversationId,
-    kind: "limit",
+  setCard(conversationId, {
     title: notice.title,
     ...(notice.description ? { description: notice.description } : {}),
-    action: { label: "Resume", onPress: press },
+    resume: press,
   });
 };
 
@@ -81,15 +106,14 @@ export function useClaudeUsageLimitNotice(
     const key = state.summary ? JSON.stringify(state.summary) : state.resumed ? `resumed:${state.latestAt}` : "none";
     if (shown.current === key) return;
     shown.current = key;
-    const id = `claude-usage-limit:${conversationId}`;
     if (state.summary) {
-      showPaused(conversationId, id, state.summary);
+      showPaused(conversationId, state.summary);
       return;
     }
-    dismissComposerNotice(id);
+    dismissUsageLimitCard(conversationId);
     if (!state.resumed || Date.now() - state.latestAt > USAGE_LIMIT_PAUSE_STALE_MS) return;
-    showComposerNotice({ id, conversationId, kind: "limit", title: usageLimitNotice("resumed", resetTime).title });
-    const timer = setTimeout(() => dismissComposerNotice(id), RESUMED_VISIBLE_MS);
+    setCard(conversationId, { title: usageLimitNotice("resumed", resetTime).title });
+    const timer = setTimeout(() => dismissUsageLimitCard(conversationId), RESUMED_VISIBLE_MS);
     return () => clearTimeout(timer);
   }, [conversationId, state]);
 }

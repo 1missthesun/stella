@@ -123,9 +123,8 @@
   margin-left: auto;
 }
 
-/* Actions are plain text links on the last text row, the same size as the
-   description: the primary in the accent colour, a secondary in the muted
-   colour just left of it. */
+/* Actions sit on the last text row at the description's size: a secondary as
+   muted text just left of the primary pill. */
 [data-component="toast"] [data-slot="toast-action-button"] {
   padding: 0;
   border: 0;
@@ -137,6 +136,21 @@
   letter-spacing: -0.01em;
   line-height: 1.55;
   cursor: default;
+}
+
+/* The primary: a tight accent pill no taller than the description's line
+   (16px line + 2px padding ≈ its 20px row). */
+[data-component="toast"] [data-slot="toast-action-button"]:not([data-variant]) {
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--interactive);
+  color: var(--interactive-foreground);
+  line-height: 16px;
+}
+
+[data-component="toast"] [data-slot="toast-action-button"]:not([data-variant]):hover {
+  text-decoration: none;
+  background: color-mix(in srgb, var(--foreground) 10%, var(--interactive));
 }
 
 [data-component="toast"] [data-slot="toast-action-button"][data-variant="secondary"] {

@@ -128,9 +128,9 @@ button.schedule-card:focus-visible {
   padding-inline-end: 24px;
 }
 
-/* Chat-card actions are plain text links on the subtitle row: same size as
-   the subtitle, medium weight, no box, so the card is only as tall as its
-   text. The primary is in the accent colour; secondaries in the subtitle's. */
+/* Chat-card actions sit on the subtitle row at the subtitle's size, medium
+   weight, so the card is only as tall as its text. Secondaries are grey text;
+   the primary is a tight accent pill (below). */
 .schedule-card__button {
   display: inline-flex;
   align-items: baseline;
@@ -145,8 +145,20 @@ button.schedule-card:focus-visible {
   cursor: pointer;
 }
 
+/* The primary is a tight filled pill no taller than the 18px text row
+   (14px line + 2px padding), so it sits on the row's baseline and adds no
+   height to the card. */
 .schedule-card__button--primary {
-  color: var(--interactive);
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--interactive);
+  color: var(--interactive-foreground);
+  line-height: 14px;
+}
+
+.schedule-card__button--primary:hover:not(:disabled) {
+  text-decoration: none;
+  background: color-mix(in srgb, var(--foreground) 10%, var(--interactive));
 }
 
 .schedule-card__button:hover:not(:disabled) {

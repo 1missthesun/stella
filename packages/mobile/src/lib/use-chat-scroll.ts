@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   LayoutChangeEvent,
+  LayoutRectangle,
   NativeScrollEvent,
   NativeSyntheticEvent,
 } from "react-native";
@@ -27,6 +28,7 @@ const FOLLOW_TOP_PEEK_PX = 56;
  * layout churn (e.g. a "Show more" tap) yank the scroll position around.
  */
 const POST_SEND_REANCHOR_WINDOW_MS = 1500;
+const ROW_SIZE_DRIFT_PX = 1;
 
 export function useChatScroll(
   listTrailingSlackPx: number,
@@ -200,7 +202,65 @@ export function useChatScroll(
     stopFollowLoop();
   }, [setFollowArmed, stopFollowLoop]);
 
+  // Legend sizes the scroll content from the row heights it recorded. A row
+  // that grew without Legend recording it (seen after a long reply landed)
+  // leaves the content short, so its last lines sit under the composer and
+  // the list cannot scroll to them. Each row reports its own layout here and
+  // any recorded size that drifted from it is corrected.
+  const rowLayoutsRef = useRef(
+    new Map<string, Pick<LayoutRectangle, "width" | "height">>(),
+  );
+  const syncRowSize = useCallback(
+    (
+      list: LegendListRef,
+      state: ReturnType<LegendListRef["getState"]>,
+      id: string,
+    ) => {
+      const layout = rowLayoutsRef.current.get(id);
+      if (!layout) return;
+      const index = state.indexByKey(id);
+      if (index === undefined) return;
+      const recorded = state.sizeAtIndex(index);
+      if (
+        recorded === undefined ||
+        Math.abs(recorded - layout.height) > ROW_SIZE_DRIFT_PX
+      ) {
+        list.setItemSize(id, layout);
+      }
+    },
+    [],
+  );
+  const onRowLayout = useCallback(
+    (id: string, layout: LayoutRectangle) => {
+      rowLayoutsRef.current.set(id, {
+        width: layout.width,
+        height: layout.height,
+      });
+      const list = listRef.current;
+      if (list) syncRowSize(list, list.getState(), id);
+    },
+    [syncRowSize],
+  );
+  const syncRenderedRowSizes = useCallback(() => {
+    const list = listRef.current;
+    if (!list) return;
+    const state = list.getState();
+    const layouts = rowLayoutsRef.current;
+    for (let index = state.startBuffered; index <= state.endBuffered; index += 1) {
+      const row = state.data[index] as { id?: unknown } | undefined;
+      if (typeof row?.id === "string") syncRowSize(list, state, row.id);
+    }
+    if (layouts.size > state.data.length * 2 + 200) {
+      const live = new Set<string>();
+      for (const row of state.data as { id?: unknown }[]) {
+        if (typeof row?.id === "string") live.add(row.id);
+      }
+      for (const id of layouts.keys()) if (!live.has(id)) layouts.delete(id);
+    }
+  }, [syncRowSize]);
+
   const onScrollSettle = useCallback(() => {
+    syncRenderedRowSizes();
     isDraggingRef.current = false;
     scheduleManualScrollSettle();
     const { offsetY, contentHeight, layoutHeight } = metricsRef.current;
@@ -209,7 +269,12 @@ export function useChatScroll(
       followRearmBlockedRef.current = false;
       setFollowArmed(true);
     }
-  }, [nearBottomLimit, scheduleManualScrollSettle, setFollowArmed]);
+  }, [
+    nearBottomLimit,
+    scheduleManualScrollSettle,
+    setFollowArmed,
+    syncRenderedRowSizes,
+  ]);
 
   const prepareAssistantLayoutFollow = useCallback(() => {
     assistantLayoutBaselineRef.current = contentHeightRef.current;
@@ -437,6 +502,7 @@ export function useChatScroll(
     onLatestUserLayout,
     onScrollBeginDrag,
     onScrollSettle,
+    onRowLayout,
     getShouldPlaceLatestTurn,
     releaseFollow,
     nudgeAfterSend,

@@ -1678,12 +1678,17 @@ export function ChatPane({
   const renderItem = useCallback(
     ({ item }: LegendListRenderItemProps<ChatMessage>) => {
       return (
-        <View style={styles.listRow}>
+        <View
+          style={styles.listRow}
+          onLayout={(event) =>
+            scroll.onRowLayout(item.id, event.nativeEvent.layout)
+          }
+        >
           <ChatListRow item={item} store={rowEnvStore} />
         </View>
       );
     },
-    [rowEnvStore, styles.listRow],
+    [rowEnvStore, styles.listRow, scroll.onRowLayout],
   );
   const getItemType = useCallback(
     (item: ChatMessage) =>

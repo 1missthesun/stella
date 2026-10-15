@@ -1,8 +1,11 @@
+/* Chat cards (schedules, reminders, a change ready to add, usage limit): an
+   icon tile in a leading column, centred against the title and subtitle; any
+   actions sit at the right end of the subtitle row. */
 .schedule-card {
+  position: relative;
   display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 1px;
+  align-items: center;
+  gap: 10px;
   width: fit-content;
   max-width: 85%;
   min-width: 0;
@@ -29,21 +32,29 @@ button.schedule-card:focus-visible {
   outline-offset: 2px;
 }
 
-.schedule-card__row {
+.schedule-card__tile {
   display: flex;
+  flex: none;
   align-items: center;
-  gap: 6px;
-  min-width: 0;
-  white-space: nowrap;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: color-mix(in oklch, var(--foreground) 7%, transparent);
+  color: var(--text-weak);
 }
 
-.schedule-card__icon {
-  flex: none;
-  color: var(--text-weak);
+.schedule-card__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
 }
 
 .schedule-card__headline {
   min-width: 0;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   font-weight: var(--weight-medium, 500);
@@ -55,7 +66,6 @@ button.schedule-card:focus-visible {
   justify-content: space-between;
   gap: 12px;
   min-height: 18px;
-  padding-inline-start: 19px;
   white-space: nowrap;
   color: var(--text-weak);
   font-size: var(--font-size-base, 13px);
@@ -83,10 +93,45 @@ button.schedule-card:focus-visible {
   gap: 4px;
 }
 
-/* An open reminder's Done / Snooze: a row under the text, at the meta indent. */
-.schedule-card__actions[data-reminder-state="open"] {
-  margin-top: 5px;
-  padding-inline-start: 19px;
+/* Actions overhang the 18px subtitle row so a card with buttons keeps the
+   same height as one without. */
+.schedule-card__actions:has(.schedule-card__button) {
+  margin-block: -5px;
+}
+
+/* Cards whose text can run long wrap instead of truncating. */
+.schedule-card--wrap .schedule-card__headline,
+.schedule-card--wrap .schedule-card__meta,
+.schedule-card--wrap .schedule-card__status {
+  white-space: normal;
+}
+
+/* A ✕ on the title row; the actions' right edge sits under the visible icon
+   (14px icon centred in the 24px button). */
+.schedule-card__dismiss {
+  position: absolute;
+  top: 7px;
+  right: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-weak);
+  cursor: pointer;
+}
+
+.schedule-card__dismiss:hover {
+  background: color-mix(in oklch, var(--foreground) 8%, transparent);
+  color: var(--text-strong);
+}
+
+.schedule-card:has(.schedule-card__dismiss) .schedule-card__headline {
+  padding-inline-end: 24px;
 }
 
 /* Chat-card actions use the shared pill (`pill-btn`, `pill-btn--primary`) at the chat-card height. */
@@ -100,4 +145,18 @@ button.schedule-card:focus-visible {
   color: var(--text-weak);
   text-decoration: line-through;
   text-decoration-color: color-mix(in oklch, var(--text-weak) 60%, transparent);
+}
+
+.usage-limit-card__tile {
+  color: var(--warning, var(--text-weak));
+}
+
+/* With a ✕ on the title row, the subtitle row drops a little so Resume
+   clears the ✕ (≈10px between them). */
+.schedule-card:has(.schedule-card__dismiss) .schedule-card__meta {
+  margin-top: 10px;
+}
+
+.schedule-card:has(.schedule-card__dismiss) .schedule-card__actions:has(.schedule-card__button) {
+  margin-bottom: 0;
 }

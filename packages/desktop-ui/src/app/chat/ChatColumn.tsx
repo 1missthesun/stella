@@ -10,6 +10,7 @@ import {
 import { ChevronDown } from "@/ui/icons";
 import { ConnectorConnectCard } from "./ConnectorConnectCard";
 import { AppSourceOffers } from "@/features/app-source/AppSourceCards";
+import { UsageLimitChatCard } from "@/features/chat/UsageLimitChatCard";
 import { ComposerNotice } from "./ComposerNotice";
 import { CloudBrowserInterventionCard } from "@/features/cloud/CloudBrowserInterventionCard";
 import { CloudConnectorConnectCard } from "@/features/cloud/CloudConnectorConnectCard";
@@ -284,9 +285,10 @@ export const ChatColumn = memo(function ChatColumn({
       <>
         {extraTail}
         <AppSourceOffers />
+        <UsageLimitChatCard conversationId={conversationId} />
       </>
     ),
-    [extraTail],
+    [conversationId, extraTail],
   );
 
   return (

@@ -1,11 +1,51 @@
+import { useSyncExternalStore } from "react";
 import {
   usageLimitNotice,
   type UsageLimitSummary,
 } from "@stella/contracts/claude-usage-limit";
-import { presentComposerNotice, showComposerNotice, dismissComposerNotice } from "./composer-notice-store";
+import { showToast } from "@/ui/toast";
 
 /** One usage-limit card per chat, the same on desktop and web. */
 export const usageLimitCardId = (conversationId: string) => `claude-usage-limit:${conversationId}`;
+
+/** What the chat's usage-limit card shows; it sits in the message list where the paused reply would be. */
+export type UsageLimitCardState = {
+  title: string;
+  description?: string;
+  resume?: () => void;
+};
+
+let cards = new Map<string, UsageLimitCardState>();
+const listeners = new Set<() => void>();
+let mountedSurfaces = 0;
+
+const set = (conversationId: string, state: UsageLimitCardState | null) => {
+  const next = new Map(cards);
+  if (state) next.set(conversationId, state);
+  else if (!next.delete(conversationId)) return;
+  cards = next;
+  for (const listener of listeners) listener();
+};
+
+const subscribe = (listener: () => void) => {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+};
+
+export const useUsageLimitCard = (conversationId: string | null | undefined): UsageLimitCardState | null => {
+  const snapshot = useSyncExternalStore(subscribe, () => cards, () => cards);
+  return conversationId ? (snapshot.get(conversationId) ?? null) : null;
+};
+
+/** A chat timeline that shows the card; without one the pause falls back to a toast. */
+export const registerUsageLimitCardSurface = (): (() => void) => {
+  mountedSurfaces += 1;
+  return () => {
+    mountedSurfaces = Math.max(0, mountedSurfaces - 1);
+  };
+};
 
 const resetTime = (until: number) => {
   const at = new Date(until);
@@ -24,43 +64,35 @@ export const presentUsageLimitPaused = (
   summary: UsageLimitSummary,
   resume: () => Promise<unknown>,
 ) => {
-  const id = usageLimitCardId(conversationId);
   const notice = usageLimitNotice(summary, resetTime);
   const press = () => {
-    showComposerNotice({ id, conversationId, kind: "limit", title: "Resuming…" });
+    set(conversationId, { title: "Resuming…" });
     void resume().catch((error: unknown) => {
-      showComposerNotice({
-        id,
-        conversationId,
-        kind: "limit",
+      set(conversationId, {
         title: notice.title,
         description: `Resume didn't go through: ${error instanceof Error ? error.message : String(error)}`,
-        action: { label: "Resume", onClick: press },
+        resume: press,
       });
     });
   };
-  presentComposerNotice(
-    {
-      id,
-      conversationId,
-      kind: "limit",
-      title: notice.title,
-      ...(notice.description ? { description: notice.description } : {}),
-      action: { label: "Resume", onClick: press },
-    },
-    {
+  set(conversationId, {
+    title: notice.title,
+    ...(notice.description ? { description: notice.description } : {}),
+    resume: press,
+  });
+  if (mountedSurfaces === 0) {
+    showToast({
       title: notice.title,
       ...(notice.description ? { description: notice.description } : {}),
       variant: "default",
       duration: 10000,
       action: { label: "Resume", onClick: press },
-    },
-  );
+    });
+  }
 };
 
 export const presentUsageLimitResumed = (conversationId: string) => {
-  const notice = usageLimitNotice("resumed", resetTime);
-  showComposerNotice({ id: usageLimitCardId(conversationId), conversationId, kind: "limit", title: notice.title });
+  set(conversationId, { title: usageLimitNotice("resumed", resetTime).title });
 };
 
-export const dismissUsageLimitCard = (conversationId: string) => dismissComposerNotice(usageLimitCardId(conversationId));
+export const dismissUsageLimitCard = (conversationId: string) => set(conversationId, null);

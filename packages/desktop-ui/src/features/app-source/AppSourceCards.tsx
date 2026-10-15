@@ -4,6 +4,7 @@ import type {
   AppSourceWaiting,
 } from "@stella/contracts/desktop/app-source";
 import { showToast } from "@/ui/toast";
+import { Download } from "@/ui/icons";
 import { useLocale, useT, useTPlural } from "@/shared/i18n";
 import {
   agentChange,
@@ -15,6 +16,7 @@ import {
 } from "./app-source-store";
 import { UpdateCard } from "./UpdateCard";
 import "./app-update-message.css";
+import "@/features/schedule/schedule-card.css";
 
 export const useNow = () => {
   const [now, setNow] = useState(() => Date.now());
@@ -158,9 +160,12 @@ export const AppSourceOffers = memo(function AppSourceOffers() {
         return (
           <div key={offer.key} className="event-row event-row--assistant">
             <div className="event-item assistant">
-              <div className="message-line message-line--assistant">
-                <div className="assistant-message-text chat-bubble-text app-update-message">
-                  <p className="app-update-message__title">
+              <div className="schedule-card schedule-card--wrap app-update-message">
+                <span className="schedule-card__tile" aria-hidden="true">
+                  <Download size={16} strokeWidth={1.9} />
+                </span>
+                <span className="schedule-card__body">
+                  <span className="schedule-card__headline">
                     {offer.kind === "other-computer"
                       ? offer.device
                         ? t("shell.appSource.updates.fromDevice", {
@@ -168,25 +173,25 @@ export const AppSourceOffers = memo(function AppSourceOffers() {
                           })
                         : t("shell.appSource.updates.fromOtherComputer")
                       : t("shell.appSource.updates.readyChange")}
-                  </p>
-                  <div className="app-update-message__row">
-                  <p className="app-update-message__summary">
-                    {subjectOf(offer.summary)}
-                  </p>
-                  <button
-                    type="button"
-                    className="pill-btn pill-btn--primary app-update-message__button"
-                    disabled={adding || blocked}
-                    onClick={() => void run(offer.key, () => addOffer(offer))}
-                  >
-                    {adding
-                      ? t("shell.appSource.updates.adding")
-                      : offer.kind === "other-computer"
-                        ? t("shell.appSource.updates.get")
-                        : t("shell.appSource.updates.add")}
-                  </button>
-                  </div>
-                </div>
+                  </span>
+                  <span className="schedule-card__meta">
+                    <span className="schedule-card__status">{subjectOf(offer.summary)}</span>
+                    <span className="schedule-card__actions">
+                      <button
+                        type="button"
+                        className="pill-btn pill-btn--primary schedule-card__button"
+                        disabled={adding || blocked}
+                        onClick={() => void run(offer.key, () => addOffer(offer))}
+                      >
+                        {adding
+                          ? t("shell.appSource.updates.adding")
+                          : offer.kind === "other-computer"
+                            ? t("shell.appSource.updates.get")
+                            : t("shell.appSource.updates.add")}
+                      </button>
+                    </span>
+                  </span>
+                </span>
               </div>
             </div>
           </div>

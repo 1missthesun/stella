@@ -1089,8 +1089,9 @@ export const runCloudClaude = async (options: {
     }
     const limit = error ? claudeCodeSubscriptionLimitOf(error) : null;
     if (limit) {
-      error =
-        limit.resetsAt !== undefined
+      error = limit.monthly
+        ? `Claude monthly spend limit reached for ${options.claudeAccount.email}.`
+        : limit.resetsAt !== undefined
           ? `Claude usage limit reached for ${options.claudeAccount.email}. It resets at ${new Date(limit.resetsAt).toISOString()}.`
           : `Claude usage limit reached for ${options.claudeAccount.email}.`;
     }

@@ -164,6 +164,7 @@ export const purgeConversationData: PurgeDef = async (ctx) => {
     "agent_report_outbox",
     "agent_events",
     "usage_limit_backoff",
+    "usage_limit_pauses",
     "conversation_main",
   ]) {
     ctx.db.run(`DELETE FROM ${table}`);

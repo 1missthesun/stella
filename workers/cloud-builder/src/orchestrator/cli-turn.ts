@@ -294,6 +294,7 @@ export abstract class OrchestratorCliTurn extends OrchestratorTools {
           conversationId: turn.conversationId,
           ownerGeneration: turn.ownerGeneration,
           ...(limit.resetsAt !== undefined ? { resetsAt: limit.resetsAt } : {}),
+          ...(limit.monthly ? { monthly: true } : {}),
         },
         ownerGeneration: turn.ownerGeneration,
       })) as RpcResponse;
@@ -310,6 +311,7 @@ export abstract class OrchestratorCliTurn extends OrchestratorTools {
       type: "usage-limit",
       state: "held",
       ...(limit.resetsAt !== undefined ? { until: limit.resetsAt } : {}),
+      ...(limit.monthly ? { monthly: true as const } : {}),
     };
     const appended = this.journal.appendCard({
       turnId: turn.turnId,

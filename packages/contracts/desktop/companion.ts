@@ -53,6 +53,10 @@ export type CompanionMessagePreview = {
   id: string;
   text: string;
   at: number;
+  /** User messages: the optimistic id the stored message was accepted from. */
+  originId?: string;
+  /** Assistant messages: the user message this replies to. */
+  replyTo?: string;
 };
 
 export type CompanionState = {

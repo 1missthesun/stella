@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { CompanionState } from "@stella/contracts/desktop/companion";
+import type {
+  CompanionMessagePreview,
+  CompanionState,
+} from "@stella/contracts/desktop/companion";
 
 export type CompanionBubble = {
   key: string;
+  sourceId: string;
   role: "user" | "assistant";
   text: string;
   streaming: boolean;
@@ -22,11 +26,30 @@ const dwellFor = (text: string) =>
     Math.max(MIN_DWELL_MS, 4_000 + text.length * DWELL_PER_CHAR_MS),
   );
 
+type Turn = { key: string; ids: Set<string>; text: string; at: number };
+
+// A turn's ids change under it (optimistic → accepted → stored user message,
+// streaming overlay → stored assistant message). Bubbles are keyed by turn, not
+// by message id, so those swaps update a bubble in place instead of remounting
+// it and replaying its pop-in.
+const SAME_USER_MESSAGE_MS = 2 * 60_000;
+
+const belongsToTurn = (
+  turn: Turn | null,
+  user: CompanionMessagePreview,
+): turn is Turn =>
+  turn !== null &&
+  (turn.ids.has(user.id) ||
+    (user.originId !== undefined && turn.ids.has(user.originId)) ||
+    (turn.text === user.text &&
+      Math.abs(turn.at - user.at) < SAME_USER_MESSAGE_MS));
+
 export function useCompanionBubbles(
   state: CompanionState,
   paused: boolean,
 ): { bubbles: CompanionBubble[]; visible: boolean } {
   const mountedAtRef = useRef(Date.now());
+  const turnRef = useRef<Turn | null>(null);
   const { latestUser, latestAssistant, isStreaming } = state;
 
   const bubbles = useMemo<CompanionBubble[]>(() => {
@@ -36,34 +59,51 @@ export function useCompanionBubbles(
       latestAssistant && latestAssistant.at >= freshFloor
         ? latestAssistant
         : null;
-    const out: CompanionBubble[] = [];
-    if (assistant && (!user || assistant.at >= user.at)) {
-      if (user && assistant.at - user.at < TURN_PAIRING_WINDOW_MS) {
-        out.push({
-          key: `u:${user.id}`,
-          role: "user",
-          text: user.text,
-          streaming: false,
-        });
+
+    let turn: Turn | null = null;
+    if (user) {
+      const current = turnRef.current;
+      if (belongsToTurn(current, user)) {
+        turn = current;
+      } else {
+        turn = { key: user.id, ids: new Set(), text: user.text, at: user.at };
+        turnRef.current = turn;
       }
+      turn.ids.add(user.id);
+      if (user.originId) turn.ids.add(user.originId);
+    }
+
+    const userBubble = (): CompanionBubble => ({
+      key: `u:${turn!.key}`,
+      sourceId: user!.id,
+      role: "user",
+      text: user!.text,
+      streaming: false,
+    });
+
+    const out: CompanionBubble[] = [];
+    const repliesToTurn =
+      assistant?.replyTo !== undefined && turn?.ids.has(assistant.replyTo);
+    if (assistant && (!user || repliesToTurn || assistant.at >= user.at)) {
+      const paired =
+        turn !== null &&
+        (repliesToTurn || assistant.at - user!.at < TURN_PAIRING_WINDOW_MS);
+      if (paired) out.push(userBubble());
       out.push({
-        key: `a:${assistant.id}`,
+        key: paired ? `a:${turn!.key}` : `a:${assistant.id}`,
+        sourceId: assistant.id,
         role: "assistant",
         text: assistant.text,
-        streaming: assistant.streaming,
+        streaming: assistant.streaming || (paired && isStreaming),
       });
       return out;
     }
     if (user) {
-      out.push({
-        key: `u:${user.id}`,
-        role: "user",
-        text: user.text,
-        streaming: false,
-      });
+      out.push(userBubble());
       if (isStreaming) {
         out.push({
-          key: `a:pending:${user.id}`,
+          key: `a:${turn!.key}`,
+          sourceId: "",
           role: "assistant",
           text: "",
           streaming: true,
@@ -74,7 +114,10 @@ export function useCompanionBubbles(
   }, [latestUser, latestAssistant, isStreaming]);
 
   const signature = bubbles
-    .map((b) => `${b.key}:${b.streaming ? "s" : "f"}`)
+    .map(
+      (b) =>
+        `${b.key}:${b.role === "assistant" ? b.sourceId : ""}:${b.streaming ? "s" : "f"}`,
+    )
     .join("|");
   const settled = bubbles.length > 0 && !bubbles.some((b) => b.streaming);
   const settledText = settled ? bubbles[bubbles.length - 1]!.text : "";

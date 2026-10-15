@@ -27,6 +27,8 @@ const ASSISTANT_PREVIEW_MAX_CHARS = 700;
 
 type MessagePayload = {
   text?: unknown;
+  originUserMessageId?: unknown;
+  userMessageId?: unknown;
   metadata?: {
     ui?: { visibility?: unknown };
     runtime?: { isStreaming?: unknown };
@@ -57,7 +59,16 @@ const latestUserPreview = (
     if (!text) continue;
     const plain = toPlainPreview(text, USER_PREVIEW_MAX_CHARS);
     if (!plain) continue;
-    return { id: message._id, text: plain, at: message.timestamp };
+    const originId =
+      typeof payload.originUserMessageId === "string"
+        ? payload.originUserMessageId
+        : undefined;
+    return {
+      id: message._id,
+      text: plain,
+      at: message.timestamp,
+      ...(originId ? { originId } : {}),
+    };
   }
   return null;
 };
@@ -72,11 +83,16 @@ const latestAssistantPreview = (
     const text = typeof payload.text === "string" ? payload.text.trim() : "";
     const streaming = payload.metadata?.runtime?.isStreaming === true;
     if (!text && !streaming) continue;
+    const replyTo =
+      typeof payload.userMessageId === "string"
+        ? payload.userMessageId
+        : undefined;
     return {
       id: message._id,
       text: text ? toPlainPreview(text, ASSISTANT_PREVIEW_MAX_CHARS) : "",
       at: message.timestamp,
       streaming,
+      ...(replyTo ? { replyTo } : {}),
     };
   }
   return null;

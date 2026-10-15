@@ -143,6 +143,8 @@ const makeStyles = (colors: Colors) =>
       flexDirection: "row",
       gap: 10,
       marginTop: 2,
+      // Resume's right edge lines up under the ✕ (card paddingRight 36, ✕ inset 8).
+      marginRight: -28,
     },
     inlineDescription: { flex: 1, marginTop: 0 },
     icon: {

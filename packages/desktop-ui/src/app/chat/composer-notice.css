@@ -155,6 +155,15 @@
   width: auto;
 }
 
+/* Resume's right edge lines up under the ✕ (the card's right padding makes room for it). */
+.composer-notice--limit .composer-notice__row {
+  margin-right: -32px;
+}
+
+.composer-notice--limit.composer-notice--compact .composer-notice__row {
+  margin-right: -26px;
+}
+
 @media (max-width: 600px) {
   .composer-notice:not(.composer-notice--compact) {
     width: calc(100% - 16px);

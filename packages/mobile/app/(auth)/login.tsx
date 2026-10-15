@@ -344,8 +344,16 @@ export default function LoginScreen() {
           keyboardDismissMode="interactive"
           showsVerticalScrollIndicator={false}
         >
-          <Pressable style={styles.hero} onPress={Keyboard.dismiss}>
-            <Text style={styles.title} maxFontSizeMultiplier={1.2}>
+          <Pressable
+            style={styles.hero}
+            onPress={Keyboard.dismiss}
+            accessible={false}
+          >
+            <Text
+              style={styles.title}
+              maxFontSizeMultiplier={1.2}
+              accessibilityRole="header"
+            >
               {t("mobile.login.heroTitle")}
             </Text>
             <Text style={styles.body}>{t("mobile.login.heroBody")}</Text>
@@ -363,7 +371,14 @@ export default function LoginScreen() {
                   submitState.type === "sending" ||
                   submitState.type === "verifying"
                 }
-                accessibilityLabel={t("mobile.login.continueWithApple")}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  submitState.type === "apple"
+                    ? t("mobile.login.openingApple")
+                    : t("mobile.login.continueWithApple")
+                }
+                accessibilityState={{ busy: submitState.type === "apple" }}
+                testID="login-apple"
                 style={({ pressed }) => [
                   styles.socialButton,
                   styles.appleButton,
@@ -392,7 +407,14 @@ export default function LoginScreen() {
                 submitState.type === "sending" ||
                 submitState.type === "verifying"
               }
-              accessibilityLabel={t("mobile.login.continueWithGoogle")}
+              accessibilityRole="button"
+              accessibilityLabel={
+                submitState.type === "google"
+                  ? t("mobile.login.openingGoogle")
+                  : t("mobile.login.continueWithGoogle")
+              }
+              accessibilityState={{ busy: submitState.type === "google" }}
+              testID="login-google"
               style={({ pressed }) => [
                 styles.socialButton,
                 pressed ? styles.socialButtonPressed : null,
@@ -419,6 +441,7 @@ export default function LoginScreen() {
 
             <TextInput
               accessibilityLabel={t("mobile.login.emailPlaceholder")}
+              testID="login-email"
               autoCapitalize="none"
               autoComplete="email"
               keyboardType="email-address"
@@ -433,6 +456,20 @@ export default function LoginScreen() {
               onPress={() => {
                 void sendMagicLink();
               }}
+              accessibilityRole="button"
+              accessibilityLabel={
+                submitState.type === "sending"
+                  ? t("mobile.login.sending")
+                  : submitState.type === "verifying"
+                    ? t("mobile.login.signingIn")
+                    : t("mobile.common.continue")
+              }
+              accessibilityState={{
+                busy:
+                  submitState.type === "sending" ||
+                  submitState.type === "verifying",
+              }}
+              testID="login-continue"
               disabled={
                 submitState.type === "sending" ||
                 submitState.type === "sent" ||
@@ -463,6 +500,7 @@ export default function LoginScreen() {
                 <View style={styles.sentActions}>
                   <Pressable
                     onPress={editEmail}
+                    accessibilityRole="button"
                     accessibilityLabel={t("mobile.login.useDifferentEmail")}
                     style={({ pressed }) => [
                       styles.inlineLink,
@@ -476,6 +514,7 @@ export default function LoginScreen() {
                   {canResend ? (
                     <Pressable
                       onPress={() => void sendMagicLink()}
+                      accessibilityRole="button"
                       accessibilityLabel={t("mobile.login.resendLabel")}
                       style={({ pressed }) => [
                         styles.inlineLink,
@@ -492,13 +531,16 @@ export default function LoginScreen() {
             ) : null}
 
             {submitState.type === "error" ? (
-              <Text style={styles.errorText}>{submitState.message}</Text>
+              <Text style={styles.errorText} accessibilityLiveRegion="polite">
+                {submitState.message}
+              </Text>
             ) : null}
 
             <Text style={styles.legalFooter}>
               {t("mobile.login.legalPrefix")}
               <Text
                 style={styles.legalLink}
+                accessibilityRole="link"
                 onPress={() => setActiveLegal("terms")}
               >
                 {t("mobile.login.legalTerms")}
@@ -506,6 +548,7 @@ export default function LoginScreen() {
               {t("mobile.login.legalConjunction")}
               <Text
                 style={styles.legalLink}
+                accessibilityRole="link"
                 onPress={() => setActiveLegal("privacy")}
               >
                 {t("mobile.login.legalPrivacy")}

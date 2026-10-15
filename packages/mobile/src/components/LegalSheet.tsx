@@ -32,10 +32,15 @@ export function LegalSheet({
     >
       <SafeAreaView style={styles.legalModal}>
         <View style={styles.legalModalHeader}>
-          <Text style={styles.legalModalTitle}>
+          <Text style={styles.legalModalTitle} accessibilityRole="header">
             {document ? LEGAL_TITLES[document] : ""}
           </Text>
-          <Pressable onPress={onClose} style={styles.legalModalClose}>
+          <Pressable
+            onPress={onClose}
+            accessibilityRole="button"
+            accessibilityLabel={t("mobile.common.done")}
+            style={styles.legalModalClose}
+          >
             <Text style={styles.legalModalCloseText}>{t("mobile.common.done")}</Text>
           </Pressable>
         </View>

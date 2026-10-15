@@ -184,6 +184,21 @@ const LIST_TOP_GAP = 84;
 const TOP_TAPER_TAIL = 24;
 const CATCH_UP_PILL_GAP = 10;
 const ASK_TOP_GAP = 12;
+/** Rows appended at once beyond which an arrival counts as a catch-up. */
+const CATCH_UP_APPENDED_ROWS = 3;
+
+/** True when at least CATCH_UP_APPENDED_ROWS rows follow the previous tail. */
+function isCatchUpAppend(
+  messages: readonly ChatMessage[],
+  previousTailId: string,
+): boolean {
+  const last = messages.length - 1;
+  for (let back = 0; back < CATCH_UP_APPENDED_ROWS; back += 1) {
+    if (messages[last - back]?.id === previousTailId) return false;
+  }
+  return true;
+}
+
 const LEGEND_TAIL_SCROLL_AT_END = {
   animated: false,
   on: { dataChange: true, itemLayout: false, layout: false },
@@ -866,6 +881,40 @@ export function ChatPane({
     settledReplyIdsRef.current = null;
   }
   const placedReplyIdRef = useRef<string | null>(null);
+  // A catch-up (reconnect, bulk history) appends many rows in one render. Its
+  // newest reply lands far below the rendered window, so placing that row
+  // would wait for a layout that never comes while Legend's tail pin is off,
+  // leaving the list where it was. Settle it here instead: the data change
+  // stays with Legend's tail pin, which keeps a reader at the bottom pinned.
+  const tailTrackRef = useRef<{
+    conversationId: typeof conversationId;
+    id: string | null;
+  }>({
+    conversationId,
+    id: null,
+  });
+  const previousTail = tailTrackRef.current;
+  const previousTailId =
+    previousTail.conversationId === conversationId ? previousTail.id : null;
+  tailTrackRef.current = { conversationId, id: lastMessage?.id ?? null };
+  if (
+    lastMessage &&
+    previousTailId !== null &&
+    previousTailId !== lastMessage.id &&
+    settledReplyIdsRef.current !== null &&
+    isCatchUpAppend(visibleMessages, previousTailId)
+  ) {
+    for (
+      let index = visibleMessages.length - 1;
+      index >= 0 && visibleMessages[index]!.id !== previousTailId;
+      index -= 1
+    ) {
+      const message = visibleMessages[index]!;
+      if (message.role === "assistant" && message.text.trim().length > 0) {
+        settledReplyIdsRef.current.add(message.id);
+      }
+    }
+  }
   const lastReplyHasText =
     lastMessage?.role === "assistant" && lastMessage.text.trim().length > 0;
   const landingReplyId =

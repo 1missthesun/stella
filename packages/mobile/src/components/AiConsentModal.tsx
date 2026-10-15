@@ -39,21 +39,21 @@ export function AiConsentModal({ visible, onAccept, onDecline }: Props) {
       onRequestClose={onDecline}
     >
       <SafeAreaProvider initialMetrics={initialWindowMetrics}>
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={styles.container} accessibilityViewIsModal>
           <ScrollView
             style={styles.scroll}
             contentContainerStyle={styles.content}
           >
-            <Text style={styles.title}>Before you start</Text>
+            <Text style={styles.title} accessibilityRole="header">Before you start</Text>
             <Text style={styles.subtitle}>{AI_DATA_SHARING.intro}</Text>
 
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>What data is sent</Text>
+              <Text style={styles.sectionTitle} accessibilityRole="header">What data is sent</Text>
               <Text style={styles.body}>{AI_DATA_SHARING.data}</Text>
             </View>
 
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Who receives it</Text>
+              <Text style={styles.sectionTitle} accessibilityRole="header">Who receives it</Text>
               <Text style={styles.body}>
                 {isSelfHostedLaunch
                   ? AI_DATA_SHARING.selfHostedRecipients
@@ -62,7 +62,7 @@ export function AiConsentModal({ visible, onAccept, onDecline }: Props) {
             </View>
 
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>How it's handled</Text>
+              <Text style={styles.sectionTitle} accessibilityRole="header">How it's handled</Text>
               <Text style={styles.body}>{AI_DATA_SHARING.handling}</Text>
             </View>
 
@@ -70,6 +70,7 @@ export function AiConsentModal({ visible, onAccept, onDecline }: Props) {
               Read our full{" "}
               <Text
                 style={styles.link}
+                accessibilityRole="link"
                 onPress={() => void Linking.openURL(`${env.siteUrl}/privacy`)}
               >
                 Privacy Policy
@@ -80,6 +81,10 @@ export function AiConsentModal({ visible, onAccept, onDecline }: Props) {
           <View style={styles.actions}>
             <Pressable
               onPress={onAccept}
+              accessibilityRole="button"
+              accessibilityLabel="I Understand & Agree"
+              accessibilityHint="Agrees to sharing data with the AI services described above"
+              testID="ai-consent-accept"
               style={({ pressed }) => [
                 styles.acceptButton,
                 pressed && styles.acceptButtonPressed,
@@ -87,7 +92,14 @@ export function AiConsentModal({ visible, onAccept, onDecline }: Props) {
             >
               <Text style={styles.acceptText}>I Understand & Agree</Text>
             </Pressable>
-            <Pressable onPress={onDecline} style={styles.declineButton}>
+            <Pressable
+              onPress={onDecline}
+              accessibilityRole="button"
+              accessibilityLabel="Don't Agree"
+              accessibilityHint="Closes this screen without agreeing"
+              testID="ai-consent-decline"
+              style={styles.declineButton}
+            >
               <Text style={styles.declineText}>Don't Agree</Text>
             </Pressable>
           </View>

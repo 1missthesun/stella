@@ -35,6 +35,7 @@ import {
   type BillingConfig,
 } from "../../billing/plans.js";
 import { stripeRequest, StripeError, type StripeEvent } from "../../billing/stripe.js";
+import { costExportJobs, purgeCostExport, scheduleCostExport } from "./billing-costs.js";
 import { empty, literal, number, object, optional, string } from "../args.js";
 import { RpcError } from "../errors.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
@@ -643,7 +644,7 @@ const rollUp = (
        failures = failures + excluded.failures,
        provider_cost = provider_cost + excluded.provider_cost,
        charged = charged + excluded.charged,
-       updated_at = excluded.updated_at`,
+       updated_at = MAX(excluded.updated_at, updated_at + 1)`,
     utcDay(ctx.now),
     entry.category,
     entry.provider,
@@ -732,6 +733,7 @@ export const recordCost = (ctx: OwnerContext, entry: CostEntry, chargedMicroCent
     charged,
   });
   allocateFixedInfra(ctx, currentPlan, level);
+  scheduleCostExport(ctx);
   if (Math.random() < 0.01) {
     ctx.db.run("DELETE FROM billing_cost_ledger WHERE at < ?", ctx.now - COST_LEDGER_RETENTION_MS);
   }
@@ -1367,4 +1369,6 @@ export const billingDomain = {
       read: (ctx) => status(ctx),
     },
   },
+  jobs: costExportJobs,
+  purge: purgeCostExport,
 } satisfies OwnerDomain;

@@ -68,18 +68,16 @@ Run in `workers/cloud-builder`: `bunx wrangler secret put NAME` (dev) and `bunx 
 
 | Variable | Purpose |
 | --- | --- |
-| `STELLA_FREE_ROLLING_LIMIT_USD`, `STELLA_FREE_ROLLING_WINDOW_HOURS`, `STELLA_FREE_WEEKLY_LIMIT_USD`, `STELLA_FREE_MONTHLY_LIMIT_USD` | Free plan windows |
+| `STRIPE_SECRET_KEY`, `STRIPE_PRICE_PLUS`, `STRIPE_PRICE_PRO`, `STRIPE_PRICE_MAX` | Billing on; all four or none |
 | `STELLA_ADMIN_API_SECRET` | Bearer for the `/api/admin/*` routes |
 
-The rest of the plan catalog (paid prices, Stripe ids) is listed in the header of `billing/plans.ts`. `BUILDER_SERVICE_SECRET`, `CAPABILITY_SIGNING_KEY` and `CAPABILITY_SIGNING_KID` are wiring the Worker already requires.
+Plan prices, budgets (Free's one-time allowance and its email-only share included) and per-plan limits, cloud containers among them, are the catalog in `packages/contracts/billing-plans.ts`. `BUILDER_SERVICE_SECRET`, `CAPABILITY_SIGNING_KEY` and `CAPABILITY_SIGNING_KID` are wiring the Worker already requires.
 
 ### 4.2 Optional with defaults
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `STELLA_TIER_CEILING_FREE_HOURLY_USD` / `STELLA_TIER_CEILING_FREE_DAILY_USD` | `100` / `1000` | Global Free spend breakers |
-| `STELLA_CLOUD_SANDBOX_PLANS` | `free,go,pro` | Plans (`free`, `go`, `pro`) that may start Cloudflare Container sandboxes: cloud agents, agent dispatches placed in the cloud, Claude Code cloud turns and sign-in, container prewarm. Prod/dev set `go,pro` to require an active subscription (go/pro with status active, trialing or past_due; a paid plan past its limits still counts; credits alone don't). Others get `subscription_required`. An unknown name fails billing config |
-| `STELLA_FREE_EMAIL_ALLOWANCE_SHARE` | `0.4` | Share of the Free allowance for email-only (magic link) accounts; Google/Apple accounts get 1.0 |
 | `STELLA_TEST_ACCOUNTS` | unset = disabled | `1` (a dev `var`) enables admin-minted `@test.stella.local` sessions; never set it on production |
 | `TURNSTILE_SECRET_KEY` | unset = OFF | See section 3. Set, browser-borne requests (an Origin header that is http(s), `stella-app:` or `null`: website, web chat, desktop) to magic-link sign-in must carry a valid token. With app integrity off, native requests (no Origin, or the mobile scheme) pass without one |
 | `STELLA_TURNSTILE_STEP_UP` | unset = OFF | `1` also turns on the model gateway's step-up challenges (`owner-store/domains/abuse.ts`); needs `TURNSTILE_SECRET_KEY` |

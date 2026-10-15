@@ -418,6 +418,55 @@ curl -s -H "CF-Access-Client-Id: $STELLA_CF_ACCESS_CLIENT_ID" -H "CF-Access-Clie
 
 Call prod admin only through `auth.stella.sh`, never the workers.dev host.
 
+### Reading costs
+
+Every paid attempt (model call, media job, container time, search, …) writes a
+row to its owner's cost ledger: what Stella paid (`provider_cost`) and what the
+owner's budget was charged (`charged`), which differ for subsidies, absorbed
+failures and fixed infrastructure. Money is micro-cents (1 USD = 100,000,000);
+the reports add `…Usd` fields. Days are UTC `YYYY-MM-DD`, inclusive; both
+default to the last 30 days. Prod needs the Access headers above.
+
+One owner, live from their Durable Object (raw rows newest first, paged with
+`cursor` = the previous `nextCursor`; rollups by category/provider/sku/basis/plan;
+plan, price, budget and credit purchased):
+
+```bash
+curl -s -H "Authorization: Bearer $STELLA_ADMIN_API_SECRET" \
+  "$BACKEND/api/admin/owners/costs?ownerId=<id>&from=2026-10-01&to=2026-10-31&limit=100"
+```
+
+Across owners, from D1 `owner_cost_daily` (migration 0023). Each owner DO
+copies its changed daily rollups there about an hour after its first new cost,
+so it lags by up to an hour; `POST /api/admin/owners/costs/export` with
+`{"ownerId":"<id>"}` copies one owner now. `groupBy` is `plan` (default),
+`category` or `owner`; `plan=` filters, `limit=` caps the owner list:
+
+```bash
+curl -s -H "Authorization: Bearer $STELLA_ADMIN_API_SECRET" \
+  "$BACKEND/api/admin/costs?from=2026-10-01&to=2026-10-31&groupBy=plan"
+```
+
+- `basis` is `actual` when the provider reported the cost itself (a model
+  response carrying its price) and `estimated` when Stella computed it from
+  token prices or a tariff (container, browser and hosting time, TTS
+  characters, the fixed infra line). `estimatedShare` is the estimated
+  fraction of variable cost.
+- `tariff_version` is `TARIFF_VERSION` in `packages/contracts/billing-tariffs.ts`
+  at the time of the attempt; rows priced under different rates stay apart, so
+  a rate change never rewrites history.
+- `infra_fixed` is one line per owner per active day (always-on Durable
+  Object, D1, logs), never charged. Reports keep it out of variable cost and
+  show it as `fixedInfraCostUsd`.
+- Revenue in `/api/admin/costs` is an estimate: each owner with cost rows in
+  the range pays their plan's monthly price prorated to the range, split by
+  active days per plan. Owners without any cost row aren't counted, and
+  Stripe fees, taxes, refunds and credit purchases aren't in it.
+  `marginAllInUsd` = revenue − variable cost − fixed infra;
+  `perOwnerAllInCost` gives p50/p95/max per owner.
+- The owner ledger keeps raw rows 120 days; daily rollups and D1 rows stay.
+  Deleting an account deletes its D1 rows.
+
 ### Rotating server secrets
 
 Policy: rotate yearly, and immediately on suspected compromise. Generate with

@@ -33,30 +33,7 @@ const reader = (env: Cloudflare.Env): EnvReader => {
   };
 };
 
-const cloudSandboxPlans = (read: EnvReader): ReadonlySet<BillingPlan> => {
-  const raw = read("STELLA_CLOUD_SANDBOX_PLANS");
-  if (raw === undefined) {
-    return new Set(BILLING_PLANS.filter((plan) => PLAN_CATALOG[plan].cloudContainers));
-  }
-  const plans = new Set<BillingPlan>();
-  for (const entry of raw.split(",")) {
-    const name = entry.trim().toLowerCase();
-    if (!name) continue;
-    if (!(BILLING_PLANS as readonly string[]).includes(name)) {
-      console.warn(
-        JSON.stringify({ event: "billing_config_unknown_cloud_sandbox_plan", plan: name, known: BILLING_PLANS }),
-      );
-      continue;
-    }
-    plans.add(name as BillingPlan);
-  }
-  return plans;
-};
-
-const planConfig = (
-  definition: PlanDefinition,
-  sandboxPlans: ReadonlySet<BillingPlan>,
-): BillingPlanConfig => ({
+const planConfig = (definition: PlanDefinition): BillingPlanConfig => ({
   label: definition.label,
   monthlyPriceCents: definition.monthlyPriceCents,
   rollingLimitUsd: definition.budget.rollingUsd,
@@ -64,7 +41,7 @@ const planConfig = (
   weeklyLimitUsd: definition.budget.weeklyUsd,
   monthlyLimitUsd: definition.budget.monthlyUsd,
   ...(definition.budget.oneTimeUsd !== undefined ? { lifetimeLimitUsd: definition.budget.oneTimeUsd } : {}),
-  cloudSandbox: { enabled: sandboxPlans.has(definition.id) } satisfies CloudSandboxAccess,
+  cloudSandbox: { enabled: definition.cloudContainers } satisfies CloudSandboxAccess,
   mediaGeneration: definition.mediaGeneration,
   includes: definition.includes,
 });
@@ -79,7 +56,7 @@ const BILLING_SWITCHES = ["STRIPE_SECRET_KEY", ...Object.values(STRIPE_PRICE_SEC
 
 const OPEN_LIMIT_USD = 1_000_000;
 const openPlan = (definition: PlanDefinition): BillingPlanConfig => ({
-  ...planConfig(definition, new Set(BILLING_PLANS)),
+  ...planConfig(definition),
   rollingLimitUsd: OPEN_LIMIT_USD,
   weeklyLimitUsd: OPEN_LIMIT_USD,
   monthlyLimitUsd: OPEN_LIMIT_USD,
@@ -112,9 +89,8 @@ const loadBillingConfig = (env: Cloudflare.Env): BillingConfig => {
   if (missing.length > 0) {
     throw new BillingConfigError(`Missing billing secret ${missing.join(", ")}.`);
   }
-  const sandboxPlans = cloudSandboxPlans(read);
   const plans = {} as PlanCatalog;
-  for (const plan of BILLING_PLANS) plans[plan] = planConfig(PLAN_CATALOG[plan], sandboxPlans);
+  for (const plan of BILLING_PLANS) plans[plan] = planConfig(PLAN_CATALOG[plan]);
   const stripePrices = {} as Record<PaidBillingPlan, string>;
   for (const plan of PAID_BILLING_PLANS) stripePrices[plan] = read(STRIPE_PRICE_SECRETS[plan])!;
   return {

@@ -1,4 +1,4 @@
-import { PLAN_CATALOG, type BillingPlan } from "@stella/contracts/billing-plans";
+import { PLAN_CATALOG, planLabel, type BillingPlan } from "@stella/contracts/billing-plans";
 import type {
   DeviceFileLocation,
   DriveFile,
@@ -476,7 +476,7 @@ const partitionWrite = (
   const { plan, unlimited } = billingPlan(ctx);
   const quota = unlimited ? UNLIMITED_QUOTA : planQuota(plan);
   const proxied = !ctx.env.R2_ACCESS_KEY_ID?.trim() || !ctx.env.R2_SECRET_ACCESS_KEY?.trim();
-  const planLabel = plan === "free" ? "Free" : plan;
+  const label = planLabel(plan);
   let { fileCount, totalBytes } = usage(ctx.db);
   const occurrences = new Map<string, number>();
   for (const file of files) occurrences.set(file.path, (occurrences.get(file.path) ?? 0) + 1);
@@ -510,14 +510,14 @@ const partitionWrite = (
     if (nextFileCount > quota.maxFiles) {
       skipped.push({
         path: file.path,
-        reason: `Your drive is limited to ${quota.maxFiles} files on the ${planLabel} plan.`,
+        reason: `Your drive is limited to ${quota.maxFiles} files on the ${label} plan.`,
       });
       continue;
     }
     if (nextTotalBytes > quota.totalBytes) {
       skipped.push({
         path: file.path,
-        reason: `Your drive is limited to ${formatMb(quota.totalBytes)} on the ${planLabel} plan.`,
+        reason: `Your drive is limited to ${formatMb(quota.totalBytes)} on the ${label} plan.`,
       });
       continue;
     }

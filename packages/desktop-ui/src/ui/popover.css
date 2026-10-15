@@ -24,40 +24,10 @@
   outline: none;
 }
 
-[data-component="popover-content"][data-state="open"] {
-  animation: popover-open 0.15s ease-out;
-}
-
-[data-component="popover-content"][data-state="closed"] {
-  animation: popover-close 0.15s ease-out;
-}
-
 [data-models-picker="true"][data-state="closed"] {
   display: none;
 }
 
 [data-component="popover-content"] [data-slot="popover-body"] {
   padding: 12px;
-}
-
-@keyframes popover-open {
-  from {
-    opacity: 0;
-    transform: scale(0.96);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-@keyframes popover-close {
-  from {
-    opacity: 1;
-    transform: scale(1);
-  }
-  to {
-    opacity: 0;
-    transform: scale(0.96);
-  }
 }

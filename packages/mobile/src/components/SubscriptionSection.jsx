@@ -532,10 +532,8 @@ const makeStyles = (colors) => ({
     paddingVertical: 14,
   },
   planRowCurrent: {
-    backgroundColor: colors.accentSoft,
-    borderRadius: 12,
-    borderTopColor: "transparent",
-    paddingHorizontal: 12,
+    borderTopColor: colors.accent,
+    borderTopWidth: 2,
   },
   planTop: {
     alignItems: "flex-start",

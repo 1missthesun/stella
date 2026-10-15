@@ -137,13 +137,15 @@ function Meter({
   );
 }
 
-function Section({ id, title, lede, children }: { id?: string; title: string; lede?: string; children: ReactNode }) {
+function Section({ id, title, lede, children }: { id?: string; title?: string; lede?: string; children: ReactNode }) {
   return (
     <section className="billing-section" id={id}>
-      <header className="billing-section-head">
-        <h2 className="billing-section-title">{title}</h2>
-        {lede ? <p className="billing-section-lede">{lede}</p> : null}
-      </header>
+      {title ? (
+        <header className="billing-section-head">
+          <h2 className="billing-section-title">{title}</h2>
+          {lede ? <p className="billing-section-lede">{lede}</p> : null}
+        </header>
+      ) : null}
       {children}
     </section>
   );
@@ -426,9 +428,9 @@ function PlanSection({
   };
 
   return (
-    <Section id="billing-plans" title={t("billing.v3.plan.title")}>
+    <Section id="billing-plans">
       <div className="billing-plans-head">
-        <h3 className="billing-plans-heading">{t("billing.v3.plan.heading")}</h3>
+        <h2 className="billing-plans-heading">{t("billing.v3.plan.heading")}</h2>
         <p className="billing-plans-lede">{t("billing.v3.plan.lede")}</p>
       </div>
       <div className="billing-plans" role="list">

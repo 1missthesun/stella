@@ -12,36 +12,9 @@
   opacity: 0.7;
 }
 
+/* Styled by the shared chat-card pill (`pill-btn pill-btn--primary`). */
 .app-update-message__button {
-  display: inline-flex;
-  align-items: center;
-  height: 28px;
-  margin: 8px 0 2px;
-  padding: 0 14px;
-  border: 0;
-  border-radius: 999px;
-  background: color-mix(in oklch, var(--foreground) 7%, transparent);
-  color: var(--primary);
-  font: inherit;
-  font-size: var(--font-size-base);
-  font-weight: var(--weight-semibold);
-  cursor: pointer;
-  transition:
-    background-color 150ms ease,
-    scale 150ms ease-out;
-}
-
-.app-update-message__button:hover:not(:disabled) {
-  background: color-mix(in oklch, var(--foreground) 11%, transparent);
-}
-
-.app-update-message__button:active:not(:disabled) {
-  scale: 0.95;
-}
-
-.app-update-message__button:disabled {
-  cursor: default;
-  opacity: 0.6;
+  margin-top: 8px;
 }
 
 .composer-wrap > .app-update-messages {

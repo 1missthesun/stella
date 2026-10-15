@@ -134,10 +134,10 @@ const makeStyles = (colors: Colors) =>
       paddingHorizontal: 11,
       paddingVertical: 4,
     },
-    primary: { backgroundColor: colors.textStrong, borderColor: colors.textStrong },
+    primary: { backgroundColor: colors.accent, borderColor: colors.accent },
     dimmed: { opacity: 0.6 },
     label: { color: colors.text, fontFamily: fonts.sans.medium, fontSize: 14 },
-    primaryLabel: { color: colors.background },
+    primaryLabel: { color: colors.accentForeground, fontFamily: fonts.sans.semiBold },
     settled: {
       color: colors.textMuted,
       flexShrink: 0,

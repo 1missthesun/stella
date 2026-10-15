@@ -174,7 +174,7 @@ export const AppSourceOffers = memo(function AppSourceOffers() {
                   </p>
                   <button
                     type="button"
-                    className="app-update-message__button"
+                    className="pill-btn pill-btn--primary app-update-message__button"
                     disabled={adding || blocked}
                     onClick={() => void run(offer.key, () => addOffer(offer))}
                   >

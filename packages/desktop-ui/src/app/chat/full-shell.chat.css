@@ -641,7 +641,7 @@ button.event-context-chip--overflow:focus-visible {
 
 .scroll-to-bottom {
   position: absolute;
-  bottom: 28px;
+  bottom: calc(28px + var(--chat-composer-overlap, 0px));
   left: 50%;
   transform: translateX(-50%);
   width: 32px;

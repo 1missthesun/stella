@@ -48,7 +48,7 @@ const FULL_CHAT_CONTENT_STYLE: LegendContentStyle = {
   paddingLeft: 24,
   paddingRight: 24,
   paddingTop: 112,
-  paddingBottom: 16,
+  paddingBottom: 28,
 };
 
 const HOME_LEAVE_MS = 280;

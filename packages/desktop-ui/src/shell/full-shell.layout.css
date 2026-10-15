@@ -471,6 +471,7 @@ body[data-display-expanding="true"] .shell-topbar-tablist {
 }
 
 .full-body-main {
+  --chat-composer-overlap: 0px;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -505,12 +506,17 @@ body[data-display-expanding="true"] .shell-topbar-tablist {
   pointer-events: none;
 }
 
+.full-body-main:has(> .chat-viewport-region + .composer-wrap) {
+  --chat-composer-overlap: 12px;
+}
+
 .chat-viewport-region {
   flex: 1;
   min-height: 0;
   position: relative;
   overflow: hidden;
   container-type: size;
+  margin-bottom: calc(-1 * var(--chat-composer-overlap, 0px));
 }
 
 .session-content {
@@ -521,14 +527,18 @@ body[data-display-expanding="true"] .shell-topbar-tablist {
     transparent 0%,
     black 24px,
     black calc(100% - var(--session-end-fade, 0px)),
-    transparent 100%
+    rgb(0 0 0 / 0.86) calc(100% - var(--session-end-fade, 0px) * 0.6),
+    rgb(0 0 0 / 0.62) calc(100% - var(--session-end-fade, 0px) * 0.28),
+    rgb(0 0 0 / 0.4) 100%
   );
   -webkit-mask-image: linear-gradient(
     to bottom,
     transparent 0%,
     black 24px,
     black calc(100% - var(--session-end-fade, 0px)),
-    transparent 100%
+    rgb(0 0 0 / 0.86) calc(100% - var(--session-end-fade, 0px) * 0.6),
+    rgb(0 0 0 / 0.62) calc(100% - var(--session-end-fade, 0px) * 0.28),
+    rgb(0 0 0 / 0.4) 100%
   );
   transition:
     mask-image 160ms ease,

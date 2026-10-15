@@ -63,7 +63,15 @@ export function ComposerNotice({
               router.push("/settings");
             },
           }
-        : null;
+        : notice.action
+          ? {
+              label: notice.action.label,
+              onPress: () => {
+                dismiss();
+                notice.action!.onPress();
+              },
+            }
+          : null;
 
   return (
     <View

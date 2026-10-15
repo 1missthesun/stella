@@ -1,10 +1,18 @@
 import { useEffect, useMemo, useRef } from "react";
+import * as Crypto from "expo-crypto";
 import type { JournalRecord } from "@stella/contracts/conversation-protocol";
-import { CLAUDE_USAGE_LIMIT_RESUMED_TEXT } from "@stella/contracts/claude-usage-limit";
+import {
+  foldUsageLimitPauses,
+  summarizeUsageLimitPauses,
+  usageLimitNotice,
+  USAGE_LIMIT_PAUSE_STALE_MS,
+  type ClaudeUsageLimitCard,
+  type UsageLimitSummary,
+} from "@stella/contracts/claude-usage-limit";
 import { dismissComposerNotice, showComposerNotice } from "./composer-notice";
+import { getBackendClient } from "./backend";
 import type { JournalView } from "./journal-index";
 
-const STALE_MS = 15 * 60_000;
 const RESUMED_VISIBLE_MS = 8_000;
 
 const resetTime = (until: number): string => {
@@ -21,43 +29,67 @@ export const USAGE_LIMIT_CARDS: JournalView = {
   test: (record) => record.kind === "card" && record.card.type === "usage-limit",
 };
 
+const showPaused = (conversationId: string, id: string, summary: UsageLimitSummary) => {
+  const notice = usageLimitNotice(summary, resetTime);
+  const press = () => {
+    showComposerNotice({ id, conversationId, kind: "limit", title: "Resuming…" });
+    void getBackendClient()
+      .call("usageLimits.resume", { conversationId, requestId: Crypto.randomUUID() })
+      .catch((error: unknown) => {
+        showComposerNotice({
+          id,
+          conversationId,
+          kind: "limit",
+          title: notice.title,
+          description: `Resume didn't go through: ${error instanceof Error ? error.message : String(error)}`,
+          action: { label: "Resume", onPress: press },
+        });
+      });
+  };
+  showComposerNotice({
+    id,
+    conversationId,
+    kind: "limit",
+    title: notice.title,
+    ...(notice.description ? { description: notice.description } : {}),
+    action: { label: "Resume", onPress: press },
+  });
+};
+
+/**
+ * The chat's usage-limit card: what a Claude usage limit paused (the reply
+ * and tasks, wherever they run), with Resume; "Resumed" once it continued.
+ */
 export function useClaudeUsageLimitNotice(
   conversationId: string | null | undefined,
   records: readonly JournalRecord[],
 ): void {
-  const shown = useRef<number | null>(null);
-  const latest = useMemo(() => {
-    for (let index = records.length - 1; index >= 0; index -= 1) {
-      const record = records[index]!;
-      if (record.kind === "card" && record.card.type === "usage-limit") return record;
+  const shown = useRef<string | null>(null);
+  const state = useMemo(() => {
+    const cards: Array<{ card: ClaudeUsageLimitCard; createdAtMs: number }> = [];
+    for (const record of records) {
+      if (record.kind === "card" && record.card.type === "usage-limit") {
+        cards.push({ card: record.card, createdAtMs: record.createdAtMs });
+      }
     }
-    return undefined;
+    if (cards.length === 0) return undefined;
+    const pauses = foldUsageLimitPauses(cards);
+    return { summary: summarizeUsageLimitPauses(pauses), resumed: pauses.resumed, latestAt: cards.at(-1)!.createdAtMs };
   }, [records]);
   useEffect(() => {
-    if (!conversationId || !latest || latest.card.type !== "usage-limit") return;
-    if (shown.current === latest.seq) return;
-    shown.current = latest.seq;
+    if (!conversationId || !state) return;
+    const key = state.summary ? JSON.stringify(state.summary) : state.resumed ? `resumed:${state.latestAt}` : "none";
+    if (shown.current === key) return;
+    shown.current = key;
     const id = `claude-usage-limit:${conversationId}`;
-    const card = latest.card;
-    const now = Date.now();
-    if (card.state === "held") {
-      if (card.until !== undefined && card.until < now - STALE_MS) return;
-      showComposerNotice({
-        id,
-        conversationId,
-        kind: "limit",
-        title: "Claude usage limit reached",
-        description:
-          card.until !== undefined
-            ? `It resets at ${resetTime(card.until)}. Stella is holding the work that hit it and continues it automatically then.`
-            : "Stella is holding the work that hit it and continues it automatically once the limit resets.",
-      });
+    if (state.summary) {
+      showPaused(conversationId, id, state.summary);
       return;
     }
     dismissComposerNotice(id);
-    if (now - latest.createdAtMs > STALE_MS) return;
-    showComposerNotice({ id, conversationId, kind: "limit", title: CLAUDE_USAGE_LIMIT_RESUMED_TEXT });
+    if (!state.resumed || Date.now() - state.latestAt > USAGE_LIMIT_PAUSE_STALE_MS) return;
+    showComposerNotice({ id, conversationId, kind: "limit", title: usageLimitNotice("resumed", resetTime).title });
     const timer = setTimeout(() => dismissComposerNotice(id), RESUMED_VISIBLE_MS);
     return () => clearTimeout(timer);
-  }, [conversationId, latest]);
+  }, [conversationId, state]);
 }

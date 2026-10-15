@@ -18,6 +18,8 @@ export type ComposerNotice = {
   kind: ComposerNoticeKind;
   title: string;
   description?: string;
+  /** A button on the card; pressing it dismisses the card first. */
+  action?: { label: string; onPress: () => void };
 };
 
 export type ComposerNoticeInput = Omit<ComposerNotice, "id"> & { id?: string };

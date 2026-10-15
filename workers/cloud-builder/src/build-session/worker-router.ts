@@ -37,6 +37,7 @@ import {
 } from "@stella/contracts/turn-plane/placement";
 import {
   CONVERSATION_ID_PATTERN,
+  isSlackConversationId,
   TURN_OWNER_GENERATION_HEADER,
   TURN_OWNER_ID_HEADER,
 } from "@stella/contracts/turn-plane/turn-start";
@@ -295,6 +296,10 @@ const forwardToConversation = async (
   doPath: string,
   caller: ConversationCaller,
 ): Promise<Response> => {
+  // Slack's conversations are standalone: none of the user's clients opens one.
+  if (isSlackConversationId(conversationId)) {
+    return Response.json({ error: "Conversation not found." }, { status: 404 });
+  }
   const source = new URL(request.url);
   const target = new URL(ORCHESTRATOR_INTERNAL_ORIGIN);
   target.pathname = doPath;
@@ -434,6 +439,13 @@ const handleTurnStartRoute = async (
   const parsed = parseCloudTurnStartRequest(body);
   if (!parsed.ok) {
     return turnStartErrorResponse("bad_request", parsed.message, false);
+  }
+  if (authKind === "user" && isSlackConversationId(conversationId)) {
+    return turnStartErrorResponse(
+      "forbidden",
+      "Conversation not found.",
+      false,
+    );
   }
   if (authKind === "user") {
     const restricted = serviceOnlyTurnFields(parsed.request);

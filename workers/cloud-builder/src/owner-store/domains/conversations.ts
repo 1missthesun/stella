@@ -28,6 +28,7 @@ import type {
   TurnStartedEvent,
 } from "@stella/contracts/turn-plane/owner-events";
 import { parseCloudExecutionSelection } from "../../turn-start-request.js";
+import { isSlackConversationId } from "@stella/contracts/turn-plane/turn-start";
 import { empty, number, object, optional, string } from "../args.js";
 import type { Parser } from "../args.js";
 import { RpcError } from "../errors.js";
@@ -128,6 +129,9 @@ const summary = (row: ConversationRow, ownerId: string): ConversationSummary => 
     : {}),
 });
 
+/** Slack's conversations are standalone: no list or pick of the user's own shows them. */
+export const NOT_SLACK_SQL = "conversation_id NOT LIKE 'slack-%'";
+
 export const readConversation = (db: OwnerDbReader, conversationId: string): ConversationRow | null =>
   db.one<ConversationRow>(
     "SELECT * FROM conversations WHERE conversation_id = ?",
@@ -140,6 +144,7 @@ export const liveConversation = (
   ownerId: string,
   conversationId: string,
 ): ConversationSummary | null => {
+  if (isSlackConversationId(conversationId)) return null;
   const row = readConversation(db, conversationId);
   return row && row.deleted_at === null ? summary(row, ownerId) : null;
 };
@@ -147,7 +152,7 @@ export const liveConversation = (
 const recentConversations = (db: OwnerDbReader, ownerId: string): ConversationSummary[] =>
   db
     .all<ConversationRow>(
-      `SELECT * FROM conversations WHERE deleted_at IS NULL
+      `SELECT * FROM conversations WHERE deleted_at IS NULL AND ${NOT_SLACK_SQL}
         ORDER BY updated_at DESC, conversation_id DESC LIMIT ?`,
       RECENT_CONVERSATIONS_LIMIT,
     )
@@ -187,7 +192,11 @@ const createConversation = async (
   if (!CLIENT_CREATE_ID_PATTERN.test(args.clientCreateId)) {
     throw new RpcError("BAD_REQUEST", "That conversation could not be created. Try again.");
   }
-  if (args.requestedConversationId && !CONVERSATION_ID_PATTERN.test(args.requestedConversationId)) {
+  if (
+    args.requestedConversationId &&
+    (!CONVERSATION_ID_PATTERN.test(args.requestedConversationId) ||
+      isSlackConversationId(args.requestedConversationId))
+  ) {
     throw new RpcError("BAD_REQUEST", "That conversation could not be created. Try again.");
   }
   const existing = ctx.db.one<ConversationRow>(
@@ -195,7 +204,7 @@ const createConversation = async (
     args.clientCreateId,
   );
   if (existing) {
-    if (existing.deleted_at !== null) throw new RpcError("NOT_FOUND", "Conversation not found.");
+    if (existing.deleted_at !== null || isSlackConversationId(existing.conversation_id)) throw new RpcError("NOT_FOUND", "Conversation not found.");
     return summary(existing, ctx.ownerId);
   }
   if (args.execution) await assertExecutionAvailable(ctx, args.execution);
@@ -231,6 +240,7 @@ const createConversation = async (
 };
 
 const isLiveConversation = (db: OwnerDbReader, conversationId: string): boolean => {
+  if (isSlackConversationId(conversationId)) return false;
   const row = readConversation(db, conversationId);
   return row !== null && row.deleted_at === null;
 };
@@ -246,7 +256,7 @@ const pinnedMainConversationId = (db: OwnerDbReader): string | null => {
 
 const newestConversationId = (db: OwnerDbReader): string | null =>
   db.one<{ conversation_id: string }>(
-    `SELECT conversation_id FROM conversations WHERE deleted_at IS NULL
+    `SELECT conversation_id FROM conversations WHERE deleted_at IS NULL AND ${NOT_SLACK_SQL}
       ORDER BY updated_at DESC, conversation_id DESC LIMIT 1`,
   )?.conversation_id ?? null;
 
@@ -301,7 +311,7 @@ const page = (
   const limit = Math.min(Math.max(args.limit ?? 25, 1), MAX_PAGE);
   const rows = args.before
     ? db.all<ConversationRow>(
-        `SELECT * FROM conversations WHERE deleted_at IS NULL
+        `SELECT * FROM conversations WHERE deleted_at IS NULL AND ${NOT_SLACK_SQL}
            AND (updated_at < ? OR (updated_at = ? AND conversation_id < ?))
          ORDER BY updated_at DESC, conversation_id DESC LIMIT ?`,
         args.before.updatedAt,
@@ -310,7 +320,7 @@ const page = (
         limit + 1,
       )
     : db.all<ConversationRow>(
-        `SELECT * FROM conversations WHERE deleted_at IS NULL
+        `SELECT * FROM conversations WHERE deleted_at IS NULL AND ${NOT_SLACK_SQL}
          ORDER BY updated_at DESC, conversation_id DESC LIMIT ?`,
         limit + 1,
       );

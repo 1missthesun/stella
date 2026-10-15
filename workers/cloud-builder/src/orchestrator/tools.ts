@@ -45,6 +45,7 @@ import {
   CONNECT_CARD_POLL_MS,
 } from "./constants.js";
 import { OrchestratorPi } from "./pi.js";
+import { standaloneOwnerInternal } from "../slack/standalone.js";
 
 /** The orchestrator's tool set and connector connection requests. */
 export abstract class OrchestratorTools extends OrchestratorPi {
@@ -67,22 +68,26 @@ export abstract class OrchestratorTools extends OrchestratorPi {
     agentHome: AgentHome,
     skillCatalog: CloudSkillCatalogSnapshot,
     memoryEnabled: boolean,
+    standalone = false,
   ): Promise<{
     /** Code and every other tool, demoted ones included. */
     catalog: readonly CloudCodeSourceAgentTool[];
   }> {
+    const ownerInternal = async (name: string, args: unknown) =>
+      unwrapRpc(
+        await this.ownerGate(turn.ownerId).ownerInternal({
+          name,
+          args,
+          ownerGeneration: turn.ownerGeneration,
+        }),
+      );
     const toolContext = {
       ownerId: turn.ownerId,
       ownerGeneration: turn.ownerGeneration,
       conversationId: turn.conversationId,
-      ownerInternal: async (name: string, args: unknown) =>
-        unwrapRpc(
-          await this.ownerGate(turn.ownerId).ownerInternal({
-            name,
-            args,
-            ownerGeneration: turn.ownerGeneration,
-          }),
-        ),
+      ownerInternal: standalone
+        ? standaloneOwnerInternal(ownerInternal)
+        : ownerInternal,
     };
     // Resolved on first use: a turn that never reads a world file never
     // touches the world Durable Object. `drive/` is not in the world: a Read
@@ -146,7 +151,7 @@ export abstract class OrchestratorTools extends OrchestratorPi {
       },
     });
 
-    const tools: CloudCodeSourceAgentTool[] = [
+    const shared: CloudCodeSourceAgentTool[] = [
       createCloudWebTool({ ownerInternal: toolContext.ownerInternal }),
       createCloudImageGenTool({
         ownerGeneration: turn.ownerGeneration,
@@ -166,6 +171,28 @@ export abstract class OrchestratorTools extends OrchestratorPi {
         apiKey: mapsServerKey(this.env),
         ownerInternal: toolContext.ownerInternal,
       }),
+    ];
+    // Slack's Stella is standalone: the skills Stella ships with, and none
+    // of the user's world, Drive, schedules, connectors or asks.
+    if (standalone) {
+      const tools = [
+        ...shared,
+        createCloudReadTool(
+          agentHome.available
+            ? { skills: { home: agentHome.cloudStore(), snapshot: skillCatalog } }
+            : {},
+        ),
+      ];
+      const codeTool = await createCloudCodeAgentTool({
+        loader: this.env.LOADER,
+        tools,
+        executionScope: `${turn.ownerGeneration}:${turn.conversationId}:${turn.turnId}`,
+        history: this.conversationHistory(),
+      });
+      return { catalog: [codeTool, ...tools] };
+    }
+    const tools: CloudCodeSourceAgentTool[] = [
+      ...shared,
       createCloudAskUserTool({
         conversationId: turn.conversationId,
         ownerInternal: toolContext.ownerInternal,
@@ -205,26 +232,27 @@ export abstract class OrchestratorTools extends OrchestratorPi {
       executionScope: `${turn.ownerGeneration}:${turn.conversationId}:${turn.turnId}`,
       connect: createCloudConnectClient(connectors),
       ...(memory ? { memory } : {}),
-      ...(memoryEnabled
-        ? {
-            history: {
-              search: async (text: string, options: unknown) => {
-                await this.archive.reindexArchivedSearch();
-                return searchHistory(this.ctx.storage, text, historySearchOptions(options));
-              },
-              sql: (query: string, params: readonly SqlStorageValue[]) =>
-                runHistoryQuery(this.ctx.storage, query, params),
-              read: (fromSeq: number, toSeq: number) =>
-                this.archive.readRange(
-                  Math.max(0, fromSeq),
-                  toSeq,
-                  BACKFILL_BATCH_RECORDS,
-                ),
-            },
-          }
-        : {}),
+      ...(memoryEnabled ? { history: this.conversationHistory() } : {}),
     });
     return { catalog: [codeTool, ...tools] };
+  }
+
+  /** This conversation's own history, which its code reads. */
+  private conversationHistory() {
+    return {
+      search: async (text: string, options: unknown) => {
+        await this.archive.reindexArchivedSearch();
+        return searchHistory(this.ctx.storage, text, historySearchOptions(options));
+      },
+      sql: (query: string, params: readonly SqlStorageValue[]) =>
+        runHistoryQuery(this.ctx.storage, query, params),
+      read: (fromSeq: number, toSeq: number) =>
+        this.archive.readRange(
+          Math.max(0, fromSeq),
+          toSeq,
+          BACKFILL_BATCH_RECORDS,
+        ),
+    };
   }
 
   /**

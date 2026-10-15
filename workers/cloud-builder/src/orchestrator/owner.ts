@@ -12,6 +12,7 @@ import {
 import { deliverOwnerEvents } from "../owner-events.js";
 import { AgentHome } from "../agent-home.js";
 import { ownerMemoryWorld } from "../world-memory.js";
+import { isSlackConversationId } from "@stella/contracts/turn-plane/turn-start";
 import { sha256Hex } from "../hash.js";
 import type { ConversationOwnerRecord } from "../conversation-types.js";
 import type {
@@ -771,10 +772,13 @@ export abstract class OrchestratorOwner extends OrchestratorSessionCore {
     timings.homeMetadataRevision = metadata.revision;
     if (this.purged()) throw new Error("Conversation was purged.");
     const memoryPreference = metadata.memory.preference;
+    // Slack's Stella is standalone: none of the user's memory, personality
+    // or own skills, only the skills Stella ships with.
+    const standalone = isSlackConversationId(turn.conversationId);
     // Memory is plain world files that change without a home revision, so
     // the resident documents and the personality are read fresh every turn.
     const [memoryDocuments, personalityOverride] =
-      memoryPreference.memoryEnabled
+      memoryPreference.memoryEnabled && !standalone
         ? await Promise.all([
             measure("memoryDocumentsMs", () =>
               requireCloudContext("agent_home_memory", home.readDocuments()),
@@ -791,7 +795,15 @@ export abstract class OrchestratorOwner extends OrchestratorSessionCore {
       memoryPreference,
       memoryDocuments,
       personalityOverride,
-      skillCatalog: metadata.skills,
+      skillCatalog: standalone
+        ? {
+            ...metadata.skills,
+            entries: metadata.skills.entries.filter(
+              (entry) => entry.source === "bundled",
+            ),
+          }
+        : metadata.skills,
+      standalone,
       timings,
     };
   }

@@ -62,7 +62,7 @@ import {
   CONVERSATION_AGENT_THREADS_MAX,
 } from "@stella/contracts/backend/agent-threads";
 import { CONVERSATION_TITLE_MAX } from "@stella/contracts/backend/conversations";
-import { readMainConversationId } from "./conversations.js";
+import { NOT_SLACK_SQL, readMainConversationId } from "./conversations.js";
 import { agentReportId, agentReportReceipt } from "@stella/contracts/backend/agent-reports";
 import { isPlacementThreadId, placementRemoteThreadAgentId } from "@stella/contracts/placement-thread-id";
 import { OWNER_GENERATION_STALE } from "@stella/contracts/backend/protocol";
@@ -74,7 +74,11 @@ import type {
   TurnEventEvent,
   TurnStartedEvent,
 } from "@stella/contracts/turn-plane/owner-events";
-import { TURN_ATTACHMENTS_MAX } from "@stella/contracts/turn-plane/turn-start";
+import {
+  TURN_ATTACHMENTS_MAX,
+  conversationRealm,
+  isSlackConversationId,
+} from "@stella/contracts/turn-plane/turn-start";
 import { parseCloudExecutionSelection } from "../../turn-start-request.js";
 import { normalizeDrivePath } from "./drive.js";
 import { endedKind, recordAgentChange, startedKind } from "./agent-events.js";
@@ -361,6 +365,30 @@ const readConversationThread = (
   if (!isPlacementThreadId(threadId)) return readThread(db, threadId);
   const resolved = placementAliasThreadId(db, threadId, conversationId);
   return resolved ? readThread(db, resolved) : null;
+};
+
+/** Which side of the Slack boundary a thread sits on: its conversation's. */
+const threadRealm = (row: ThreadRow): string =>
+  isSlackConversationId(row.conversation_id)
+    ? row.conversation_id
+    : row.origin_conversation_id !== null && isSlackConversationId(row.origin_conversation_id)
+      ? row.origin_conversation_id
+      : conversationRealm(row.conversation_id);
+
+/** A thread id's realm when it names a thread, else the id's as a conversation. */
+const idRealm = (db: OwnerDbReader, id: string): string => {
+  const row = readThread(db, id);
+  return row ? threadRealm(row) : conversationRealm(id);
+};
+
+/** Nothing crosses the Slack boundary: a thread out of reach reads as no thread. */
+const assertReachable = (senderRealm: string, targetRealm: string, threadId: string): void => {
+  if (senderRealm === targetRealm) return;
+  throw new RpcError(
+    "NOT_FOUND",
+    `No agent has the thread_id ${threadId}. agent_status without a thread_id lists who you can reach.`,
+    { reason: "target_not_found" },
+  );
 };
 
 const readTurn = (db: OwnerDbReader, turnId: string): TurnRow | null =>
@@ -1553,12 +1581,13 @@ const agentDirectory = async (
         : {}),
     };
   });
-  const sessions = ctx.db
-    .all<{ conversation_id: string; title: string; updated_at: number; activity: string | null }>(
-      `SELECT conversation_id, title, updated_at, activity FROM conversations
-        WHERE deleted_at IS NULL ORDER BY updated_at DESC, conversation_id DESC LIMIT ?`,
-      DIRECTORY_SESSIONS_RECENT + 1,
-    )
+  const sessions = (isSlackConversationId(args.conversationId)
+    ? []
+    : ctx.db.all<{ conversation_id: string; title: string; updated_at: number; activity: string | null }>(
+        `SELECT conversation_id, title, updated_at, activity FROM conversations
+          WHERE deleted_at IS NULL AND ${NOT_SLACK_SQL} ORDER BY updated_at DESC, conversation_id DESC LIMIT ?`,
+        DIRECTORY_SESSIONS_RECENT + 1,
+      ))
     .filter((row) => row.conversation_id !== args.conversationId)
     .slice(0, DIRECTORY_SESSIONS_RECENT)
     .map(
@@ -1696,9 +1725,11 @@ const deliverAgentMessage = async (
     from: AgentMessageSender;
     kind: "message" | "resume";
     source: string;
+    senderRealm?: string;
   },
 ): Promise<AgentControlResult> => {
   const to = isPlacementThreadId(args.to) ? (placementAliasThreadId(ctx.db, args.to) ?? args.to) : args.to;
+  assertReachable(args.senderRealm ?? idRealm(ctx.db, args.from.threadId), idRealm(ctx.db, to), args.to);
   const conversation = ctx.db.one<{ conversation_id: string }>(
     "SELECT conversation_id FROM conversations WHERE conversation_id = ? AND deleted_at IS NULL",
     to,
@@ -2445,6 +2476,7 @@ const controlRequest = async (ctx: OwnerContext, args: ControlArgs): Promise<Age
     from: command.from,
     kind: command.kind,
     source: `${ctx.caller ? "client" : "cloud"}:${args.conversationId}`,
+    senderRealm: conversationRealm(args.conversationId),
   });
 };
 
@@ -2587,7 +2619,11 @@ const pauseAgent = async (ctx: OwnerContext, args: PauseArgs): Promise<PauseResu
     "Too many pause requests. Wait a moment and try again.",
   );
   const thread = readConversationThread(ctx.db, args.conversationId, requested);
-  if (!thread || (thread.owner_generation !== null && thread.owner_generation !== args.ownerGeneration)) {
+  if (
+    !thread ||
+    (thread.owner_generation !== null && thread.owner_generation !== args.ownerGeneration) ||
+    threadRealm(thread) !== conversationRealm(args.conversationId)
+  ) {
     throw new RpcError(
       "NOT_FOUND",
       `No agent has the thread_id ${requested}. agent_status without a thread_id lists who you can reach.`,
@@ -3380,7 +3416,12 @@ export const applyAgentThreadEvent = (
 
 const recentThreads = (db: OwnerDbReader, ownerId: string, limit: number): AgentThreadSummary[] =>
   db
-    .all<ThreadRow>("SELECT * FROM agent_threads ORDER BY updated_at DESC, thread_id DESC LIMIT ?", limit)
+    .all<ThreadRow>(
+      `SELECT * FROM agent_threads
+        WHERE conversation_id NOT LIKE 'slack-%' AND COALESCE(origin_conversation_id, '') NOT LIKE 'slack-%'
+        ORDER BY updated_at DESC, thread_id DESC LIMIT ?`,
+      limit,
+    )
     .map((row) => summary(row, ownerId));
 
 /**

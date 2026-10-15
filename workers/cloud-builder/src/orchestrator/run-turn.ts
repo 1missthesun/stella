@@ -964,6 +964,7 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
             this.cloudAgentHome(turn),
             home.skillCatalog,
             home.memoryPreference.memoryEnabled,
+            home.standalone,
           )
         ).catalog,
       sources: {
@@ -971,7 +972,7 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
         personality:
           home.personalityOverride ?? canonicalPrompts.personalityBody,
         memory: pi.memoryFromDocuments(
-          home.memoryPreference.memoryEnabled,
+          home.memoryPreference.memoryEnabled && !home.standalone,
           home.memoryDocuments,
         ),
         skillsCatalog: buildCloudSkillsBlock(home.skillCatalog) || undefined,

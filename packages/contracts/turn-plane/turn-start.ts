@@ -43,6 +43,23 @@ export type CloudTurnSource =
 
 export const CLIENT_MSG_ID_PATTERN = /^[A-Za-z0-9._:-]{8,64}$/;
 export const CONVERSATION_ID_PATTERN = /^[A-Za-z0-9._-]{8,128}$/;
+
+/**
+ * Slack's conversations are standalone: they live under the account that
+ * linked Slack, but the user's own Stella neither lists nor reaches them,
+ * and they reach none of the user's personal context. The prefix is
+ * reserved; no client can mint a conversation id that carries it.
+ */
+export const SLACK_CONVERSATION_PREFIX = "slack-";
+export const isSlackConversationId = (conversationId: string): boolean =>
+  conversationId.startsWith(SLACK_CONVERSATION_PREFIX);
+
+/**
+ * Which side of the Slack boundary a conversation sits on: its own id for a
+ * Slack conversation, one shared realm for every other.
+ */
+export const conversationRealm = (conversationId: string): string =>
+  isSlackConversationId(conversationId) ? conversationId : "personal";
 export const TURN_PROMPT_MAX_CHARS = 8_000;
 export const TURN_ATTACHMENTS_MAX = 4;
 export const TURN_TITLE_MAX_CHARS = 120;

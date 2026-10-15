@@ -17,7 +17,9 @@ import {
   TURN_OWNER_GENERATION_HEADER,
   TURN_PLANE_PROTOCOL,
   TURN_PROMPT_MAX_CHARS,
+  isSlackConversationId,
 } from "@stella/contracts/turn-plane/turn-start";
+import { STELLA_DEFAULT_MODEL } from "@stella/model-catalog/aliases";
 import { CLOUD_SANDBOX_SUBSCRIPTION_REQUIRED_MESSAGE } from "@stella/contracts/backend/billing";
 import {
   type OwnerGateAdmission,
@@ -615,11 +617,23 @@ export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
               CONVERSATION_EXECUTION_KEY,
             )
           : undefined;
-      const execution =
+      const chosenExecution =
         start.execution ??
         (conversationExecution && allowed(conversationExecution)
           ? conversationExecution
           : snapshot.execution);
+      // Slack's Stella runs on no container of the user's: Claude Code's runs
+      // in the one that holds their world and their Claude login.
+      const execution: CloudExecutionSelection =
+        isSlackConversationId(conversationId) &&
+        chosenExecution.engine === "anthropic"
+          ? {
+              engine: "stella",
+              provider: "stella",
+              model: STELLA_DEFAULT_MODEL,
+              reasoningEffort: chosenExecution.reasoningEffort,
+            }
+          : chosenExecution;
       if (
         execution.engine === "anthropic" &&
         !snapshotAllowsCloudSandbox(snapshot)

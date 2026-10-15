@@ -77,6 +77,8 @@ import {
 } from "../cloud-code-tool.js";
 import type { CloudBrowserClient } from "../cloud-browser.js";
 import { createCloudWebTool } from "../cloud-web-tool.js";
+import { isSlackConversationId } from "@stella/contracts/turn-plane/turn-start";
+import { standaloneOwnerInternal } from "../slack/standalone.js";
 import { unwrapRpc } from "../owner-store/errors.js";
 import { sha256Hex } from "../hash.js";
 import {
@@ -269,6 +271,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
   protected async openPiRuntime(
     gatewayOrigin: string,
   ): Promise<import("../pi-runtime.js").PiConversationRuntime> {
+    const standalone = isSlackConversationId(this.conversationId());
     this.piRuntime ??= import("../pi-runtime.js").then(
       ({ PiConversationRuntime }) =>
         new PiConversationRuntime({
@@ -381,15 +384,31 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
           },
           agentTools: (authority, browser, history) =>
             this.createPiAgentTools(authority, browser, history),
-          browserHandoff: (handoff, signal) =>
-            this.awaitPiBrowserHandoff(handoff, signal),
+          ...(standalone
+            ? {}
+            : {
+                browserHandoff: (
+                  handoff: import("../pi-runtime.js").PiBrowserHandoff,
+                  signal: AbortSignal | undefined,
+                ) => this.awaitPiBrowserHandoff(handoff, signal),
+                deviceAgents: this.piDeviceAgents(),
+                threadAgents: this.piThreadAgents(),
+              }),
           agentGuard: (authority, turnId) =>
             this.piAgentGuard(authority, turnId),
-          deviceAgents: this.piDeviceAgents(),
           claudeCode: this.claudeCodeTransport(),
-          threadAgents: this.piThreadAgents(),
           // Her brief continues there once this turn ends (`runPiTurn`).
-          moveBrain: async (authority, host, brief) => {
+          ...(standalone
+            ? {}
+            : {
+                moveBrain: async (
+                  authority: import("../pi-runtime.js").PiAuthority,
+                  host: Extract<
+                    import("@stella/contracts/turn-plane/pi-brain").PiBrainHost,
+                    { host: "device" }
+                  >,
+                  brief: string,
+                ) => {
             const handoff: BrainHandoff = {
               turnId: this.activeTurnId ?? "",
               ownerId: authority.ownerId,
@@ -407,6 +426,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
             await this.setPiBrain(host);
             await this.placeOnPiBrain({ ...handoff, handoff: true });
           },
+              }),
           // What the agents reach beyond this conversation's harness: the
           // owner's agent threads and other sessions, as the loop's do.
           agentDirectory: {
@@ -2060,6 +2080,19 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
           ownerGeneration: authority.ownerGeneration,
         }),
       );
+    if (isSlackConversationId(authority.conversationId)) {
+      const web = createCloudWebTool({
+        ownerInternal: standaloneOwnerInternal(ownerInternal),
+      });
+      const code = await createCloudCodeAgentTool({
+        loader: this.env.LOADER,
+        tools: [web],
+        executionScope: `${authority.ownerGeneration}:${authority.conversationId}:pi-agents`,
+        ...(browser ? { browser } : {}),
+        ...(history ? { history } : {}),
+      });
+      return [code, web];
+    }
     const web = createCloudWebTool({ ownerInternal });
     const connectors = new CloudConnectorDirectory({
       source: {

@@ -26,6 +26,21 @@ import {
   type LiveServerFrame,
 } from "@stella/contracts/backend/protocol";
 import { RpcError, toBackendError } from "./errors.js";
+import { isSlackConversationId } from "@stella/contracts/turn-plane/turn-start";
+
+/**
+ * Slack's conversations are standalone: no client of the user's reads or
+ * acts on one, or on the agents it started.
+ */
+const assertClientReach = (args: unknown): void => {
+  if (!args || typeof args !== "object") return;
+  for (const key of ["conversationId", "originConversationId"]) {
+    const value = (args as Record<string, unknown>)[key];
+    if (typeof value === "string" && isSlackConversationId(value)) {
+      throw new RpcError("NOT_FOUND", "Conversation not found.");
+    }
+  }
+};
 import type {
   OwnerCaller,
   OwnerContext,
@@ -376,6 +391,7 @@ export class OwnerStore {
         throw new RpcError("FORBIDDEN", "Sign in with an account to use this.");
       }
       const parsed = def.parse(args ?? {});
+      if (caller) assertClientReach(parsed);
       const value = await def.handler(this.context(caller), parsed as never);
       return { ok: true, value: value ?? null };
     } catch (error) {
@@ -712,6 +728,7 @@ export class OwnerStore {
         throw new RpcError("FORBIDDEN", "Sign in with an account to see this.");
       }
       const args = def.parse(JSON.parse(row.args));
+      assertClientReach(args);
       const viewContext: OwnerViewContext = {
         ownerId: this.ownerIdOf(),
         caller: attachment.caller,

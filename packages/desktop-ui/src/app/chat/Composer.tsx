@@ -414,7 +414,7 @@ function ComposerImpl({
               {dictationBelow && (
                 <div className="composer-dictation-row">
                   <DictationRecordingBar
-                    levels={dictation.levels}
+                    readLevel={dictation.readLevel}
                     elapsedMs={dictation.elapsedMs}
                     onCancel={dictation.cancel}
                     onConfirm={dictation.toggle}

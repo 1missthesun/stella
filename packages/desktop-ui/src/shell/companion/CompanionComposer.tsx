@@ -148,7 +148,7 @@ export function CompanionComposer({
         >
           {recording ? (
             <DictationRecordingBar
-              levels={dictation.levels}
+              readLevel={dictation.readLevel}
               elapsedMs={dictation.elapsedMs}
               onCancel={dictation.cancel}
               onConfirm={dictation.toggle}

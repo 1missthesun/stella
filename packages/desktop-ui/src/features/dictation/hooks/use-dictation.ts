@@ -16,7 +16,6 @@ import {
   DICTATION_KEY_SAVED_EVENT,
   requestDictationKey,
 } from "@/features/dictation/components/DictationKeyDialog";
-import { appendRollingLevel } from "@/features/dictation/rolling-levels";
 import { showToast } from "@/ui/toast";
 import { SIGN_IN_TOAST_ACTION } from "@/shared/lib/auth-cta";
 import { presentComposerNotice } from "@/features/chat/composer-notice-store";
@@ -29,8 +28,6 @@ type DictationToggleEventDetail = {
   action?: "toggle" | "start" | "stop" | "cancel";
   source?: "companion";
 };
-
-const MAX_LEVEL_BARS = 256;
 
 type Setter<T> = (next: T | ((prev: T) => T)) => void;
 
@@ -53,7 +50,7 @@ interface UseDictationResult {
   toggle: () => void;
   cancel: () => void;
   commitAndSend: () => void;
-  levels: number[];
+  readLevel: () => number;
   elapsedMs: number;
   error: string | null;
 }
@@ -76,7 +73,6 @@ export const useDictation = ({
   const t = useT();
   const [state, setState] = useState<DictationSessionState>("idle");
   const [error, setError] = useState<string | null>(null);
-  const [levels, setLevels] = useState<number[]>([]);
   const [elapsedMs, setElapsedMs] = useState(0);
   const [showControls, setShowControls] = useState(false);
   const [showRecordingBar, setShowRecordingBar] = useState(false);
@@ -138,7 +134,6 @@ export const useDictation = ({
     sendAfterCommitRef.current = false;
     const session = sessionRef.current;
     if (!session) return;
-    setLevels([]);
     setShowControls(false);
     setShowRecordingBar(false);
     void session.cancel().catch((err: Error) => {
@@ -188,7 +183,6 @@ export const useDictation = ({
       const session = new DictationSession();
       sessionRef.current = session;
       setError(null);
-      setLevels([]);
       setElapsedMs(0);
       setShowControls(source === "button");
       setShowRecordingBar(true);
@@ -230,7 +224,6 @@ export const useDictation = ({
             }
             if (next === "idle" || next === "error") {
               sessionRef.current = null;
-              setLevels([]);
               setShowControls(false);
               setShowRecordingBar(false);
               fireCommitIfPending();
@@ -242,11 +235,6 @@ export const useDictation = ({
             );
             onTranscriptCommittedRef.current?.();
           },
-          onLevel: (level) => {
-            setLevels((prev) =>
-              appendRollingLevel(prev, level, MAX_LEVEL_BARS),
-            );
-          },
         }, { streaming: route === "streaming" });
       } catch (err) {
         const errMessage = (err as Error).message;
@@ -254,7 +242,6 @@ export const useDictation = ({
         onErrorRef.current?.(errMessage);
         window.electronAPI?.dictation?.activeChanged({ active: false });
         sessionRef.current = null;
-        setLevels([]);
         setShowControls(false);
         setShowRecordingBar(false);
       }
@@ -356,6 +343,11 @@ export const useDictation = ({
     };
   }, []);
 
+  const readLevel = useCallback(
+    () => sessionRef.current?.readLevel() ?? 0,
+    [],
+  );
+
   const prewarm = useCallback(() => {
     const route = cachedDictationRoute();
     if (route === "streaming") prewarmDictationSocket();
@@ -375,7 +367,7 @@ export const useDictation = ({
     prewarm,
     cancel,
     commitAndSend,
-    levels,
+    readLevel,
     elapsedMs,
     error,
   };

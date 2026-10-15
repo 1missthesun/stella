@@ -1,4 +1,5 @@
 import { DictationIngressQueue } from "@stella/contracts/dictation-ingress";
+import { createDictationLevelMeter } from "@stella/contracts/dictation-waveform";
 import { uiState } from "@/platform/ui-state";
 import {
   acquireSharedMicrophone,
@@ -17,9 +18,6 @@ const PCM_WORKLET_FILE = "dictation-pcm-worklet.js";
 const DICTATION_SUPER_FAST_KEY = "stella-dictation-super-fast";
 const MAX_DICTATION_DURATION_MS = 15 * 60 * 1000;
 
-const LEVEL_EMIT_INTERVAL_MS = 80;
-
-const LEVEL_GAIN = 6;
 const PRE_ROLL_MS = 300;
 const WARM_CONTEXT_IDLE_MS = 60_000;
 
@@ -35,7 +33,6 @@ export type DictationSessionState =
 type DictationCallbacks = {
   onFinalTranscript?: (text: string) => void;
   onStateChange?: (state: DictationSessionState, error?: string) => void;
-  onLevel?: (level: number) => void;
 };
 
 export function isDictationSuperFastEnabled(): boolean {
@@ -285,8 +282,7 @@ export class DictationSession {
   private ingress: DictationIngressQueue | null = null;
   private durationLimitTimer: ReturnType<typeof setTimeout> | null = null;
   private cancelled = false;
-  private peakSinceLastEmit = 0;
-  private levelEmitTimer: ReturnType<typeof setInterval> | null = null;
+  private readonly meter = createDictationLevelMeter();
   private pressedAt = 0;
   private marks: Record<string, number> = {};
 
@@ -305,6 +301,7 @@ export class DictationSession {
     this.cancelled = false;
     this.streaming = options.streaming === true;
     this.recording = new PcmRecording();
+    this.meter.reset();
     this.resetStream();
     if (this.streaming) this.openStream();
 
@@ -337,7 +334,6 @@ export class DictationSession {
         console.warn("[dictation] hit max segment duration, auto-stopping");
         void this.stop();
       }, MAX_DICTATION_DURATION_MS);
-      this.startLevelEmitter();
       this.setState("listening");
     } catch (err) {
       console.error("[dictation] failed to start dictation:", err);
@@ -355,7 +351,7 @@ export class DictationSession {
       clearTimeout(this.durationLimitTimer);
       this.durationLimitTimer = null;
     }
-    this.stopLevelEmitter();
+    this.meter.reset();
     this.releaseCapture();
 
     const recording = this.recording;
@@ -421,7 +417,7 @@ export class DictationSession {
         );
       }, 1500);
     }
-    if (frame.rms > this.peakSinceLastEmit) this.peakSinceLastEmit = frame.rms;
+    this.meter.pushRms(frame.rms, (frame.pcm.length * 1000) / TARGET_SAMPLE_RATE);
     this.capture(frame.pcm);
     if (this.recording.full && this.state === "listening") {
       console.warn("[dictation] hit max recording length, auto-stopping");
@@ -512,26 +508,12 @@ export class DictationSession {
       clearTimeout(this.durationLimitTimer);
       this.durationLimitTimer = null;
     }
-    this.stopLevelEmitter();
+    this.meter.reset();
     this.recording = new PcmRecording();
   }
 
-  private startLevelEmitter(): void {
-    this.stopLevelEmitter();
-    this.peakSinceLastEmit = 0;
-    this.levelEmitTimer = setInterval(() => {
-      const level = Math.min(1, this.peakSinceLastEmit * LEVEL_GAIN);
-      this.peakSinceLastEmit = 0;
-      this.callbacks.onLevel?.(level);
-    }, LEVEL_EMIT_INTERVAL_MS);
-  }
-
-  private stopLevelEmitter(): void {
-    if (this.levelEmitTimer) {
-      clearInterval(this.levelEmitTimer);
-      this.levelEmitTimer = null;
-    }
-    this.peakSinceLastEmit = 0;
+  readLevel(): number {
+    return this.meter.takeLevel();
   }
 
   private setState(state: DictationSessionState, error?: string): void {

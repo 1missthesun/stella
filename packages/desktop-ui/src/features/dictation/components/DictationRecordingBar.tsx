@@ -2,11 +2,20 @@ import { useEffect, useRef } from "react";
 import { cn } from "@/shared/lib/utils";
 import { ArrowUp, Check, X } from "@/ui/icons";
 import { useT } from "@/shared/i18n";
+import {
+  DICTATION_WAVEFORM_BAR_WIDTH,
+  createDictationWaveformState,
+  dictationWaveformBarCount,
+  dictationWaveformBarLook,
+  dictationWaveformLevel,
+  dictationWaveformOffset,
+  stepDictationWaveform,
+} from "@stella/contracts/dictation-waveform";
 import "./dictation-recording-bar.css";
 
 type DictationRecordingBarProps = {
   className?: string;
-  levels: number[];
+  readLevel: () => number;
   elapsedMs: number;
   onCancel?: () => void;
   onConfirm?: () => void;
@@ -16,7 +25,7 @@ type DictationRecordingBarProps = {
 
 export function DictationRecordingBar({
   className,
-  levels,
+  readLevel,
   elapsedMs,
   onCancel,
   onConfirm,
@@ -27,7 +36,7 @@ export function DictationRecordingBar({
   return (
     <div className={cn("composer-dictation-recording-bar", className)}>
       <div className="composer-dictation-recording-row">
-        <DictationWaveform levels={levels} />
+        <DictationWaveform readLevel={readLevel} />
         <span className="composer-dictation-timer" aria-live="polite">
           {formatElapsed(elapsedMs)}
         </span>
@@ -91,67 +100,78 @@ export function DictationCancelButton({
   );
 }
 
-const BAR_WIDTH_CSS = 2;
-const BAR_GAP_CSS = 1;
-const MIN_BAR_HEIGHT_CSS = 1;
+const WAVEFORM_FILL = 0.94;
 
-function DictationWaveform({ levels }: { levels: number[] }) {
+function DictationWaveform({ readLevel }: { readLevel: () => number }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const barColorRef = useRef<string | null>(null);
+  const readLevelRef = useRef(readLevel);
+  readLevelRef.current = readLevel;
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx) return;
 
-    const dpr = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0) return;
+    const wave = createDictationWaveformState();
+    let width = 0;
+    let height = 0;
+    let color = "#9aa1a8";
+    let frame = 0;
 
-    const targetW = Math.round(rect.width * dpr);
-    const targetH = Math.round(rect.height * dpr);
-    if (canvas.width !== targetW || canvas.height !== targetH) {
-      canvas.width = targetW;
-      canvas.height = targetH;
-    }
+    const measure = () => {
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      width = rect.width;
+      height = rect.height;
+      const targetW = Math.round(width * dpr);
+      const targetH = Math.round(height * dpr);
+      if (canvas.width !== targetW || canvas.height !== targetH) {
+        canvas.width = targetW;
+        canvas.height = targetH;
+      }
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      color = getComputedStyle(canvas).color || color;
+    };
 
-    if (!barColorRef.current) {
-      const cs = getComputedStyle(canvas);
-      const resolved =
-        cs.getPropertyValue("color").trim() ||
-        cs.getPropertyValue("--text-weak").trim() ||
-        "#9aa1a8";
-      barColorRef.current = resolved;
-    }
+    const draw = (now: number) => {
+      frame = requestAnimationFrame(draw);
+      stepDictationWaveform(wave, now, readLevelRef.current());
+      ctx.clearRect(0, 0, width, height);
+      if (width === 0 || height === 0) return;
+      ctx.fillStyle = color;
+      const midY = height / 2;
+      const maxHeight = height * WAVEFORM_FILL;
+      const radius = DICTATION_WAVEFORM_BAR_WIDTH / 2;
+      const count = dictationWaveformBarCount(width);
+      for (let age = 0; age < count; age += 1) {
+        const offset = dictationWaveformOffset(wave, age);
+        const x = width - offset - DICTATION_WAVEFORM_BAR_WIDTH;
+        if (x + DICTATION_WAVEFORM_BAR_WIDTH <= 0) break;
+        const level = dictationWaveformLevel(wave, age) ?? 0;
+        const look = dictationWaveformBarLook(level, offset, width, maxHeight);
+        ctx.globalAlpha = look.opacity;
+        ctx.beginPath();
+        ctx.roundRect(
+          x,
+          midY - look.height / 2,
+          DICTATION_WAVEFORM_BAR_WIDTH,
+          look.height,
+          radius,
+        );
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    };
 
-    ctx.clearRect(0, 0, targetW, targetH);
-
-    const barCount = levels.length;
-    if (barCount === 0) return;
-
-    const barW = BAR_WIDTH_CSS * dpr;
-    const gap = BAR_GAP_CSS * dpr;
-    const stride = barW + gap;
-    const maxVisible = Math.max(1, Math.floor(targetW / stride));
-    const visibleCount = Math.min(barCount, maxVisible);
-    const startIndex = barCount - visibleCount;
-
-    const midY = targetH / 2;
-    const minBarH = MIN_BAR_HEIGHT_CSS * dpr;
-    const maxBarH = targetH;
-
-    ctx.fillStyle = barColorRef.current;
-    const startX = targetW - visibleCount * stride + gap / 2;
-
-    for (let i = 0; i < visibleCount; i += 1) {
-      const level = levels[startIndex + i]!;
-      const barH = Math.max(minBarH, Math.min(maxBarH, level * maxBarH));
-      const x = startX + i * stride;
-      const y = midY - barH / 2;
-      ctx.fillRect(x, y, barW, barH);
-    }
-  }, [levels]);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(canvas);
+    frame = requestAnimationFrame(draw);
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
+  }, []);
 
   return (
     <canvas

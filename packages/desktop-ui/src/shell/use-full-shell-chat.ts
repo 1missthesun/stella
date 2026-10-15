@@ -332,11 +332,7 @@ export function useFullShellChat({
     : localOptimisticEvents;
   const runtimeStatusText = piChat.runtimeStatusText;
   const isCompacting = piChat.isCompacting;
-  const activeToolCallId = piChat.activeToolCallId;
-  const activeToolName = piChat.activeToolName;
   const latestCompletedTool = piChat.latestCompletedTool;
-  const hasToolActivity = piChat.hasToolActivity;
-  const isToolActive = piChat.isToolActive;
   const runningElsewhere = useMemo(
     () =>
       remoteTurnRunning({
@@ -356,6 +352,14 @@ export function useFullShellChat({
     ],
   );
   const turnRunning = piChat.isRunningHere || runningElsewhere;
+  const remoteToolName =
+    runningElsewhere && !piChat.isRunningHere ? cloudChat.activeToolName : null;
+  const activeToolCallId = remoteToolName
+    ? cloudChat.activeToolCallId
+    : piChat.activeToolCallId;
+  const activeToolName = remoteToolName ?? piChat.activeToolName;
+  const hasToolActivity = piChat.hasToolActivity || Boolean(remoteToolName);
+  const isToolActive = piChat.isToolActive || Boolean(remoteToolName);
   const awaitingTurnHandoff = useTurnHandoff({
     conversationId: activeConversationId,
     optimisticEvents: localOptimisticEvents,

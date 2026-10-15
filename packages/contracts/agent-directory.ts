@@ -87,7 +87,7 @@ const offlineText = (row: AgentDirectoryAgentRow, now: number): string | undefin
     : undefined;
 
 const awaitingConsentText = (row: AgentDirectoryAgentRow): string | undefined =>
-  row.awaitingConsent && !row.offline
+  row.awaitingConsent && !row.offline && row.pausedBy === undefined
     ? `not started yet: ${row.where} is waiting for the user to allow work from other devices on its screen, and the agent starts once they do (up to an hour after it was sent)`
     : undefined;
 
@@ -107,7 +107,7 @@ const rosterLine = (
     `- ${row.threadId}`,
     row.offline
       ? `${row.status}, computer offline`
-      : row.awaitingConsent
+      : row.awaitingConsent && row.pausedBy === undefined
         ? "waiting for consent on that computer"
         : statusText(row),
     ...placeOf(row.where),

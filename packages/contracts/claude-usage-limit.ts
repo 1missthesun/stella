@@ -164,6 +164,9 @@ export const USAGE_LIMIT_PAUSE_STALE_MS = 15 * 60_000;
 /** A pause with no reset time (a monthly cap, or an unnamed reset) stays live this long. */
 export const USAGE_LIMIT_PAUSE_UNTIMED_MS = 24 * 60 * 60_000;
 
+/** A pause this soon after a Resume press means Resume ran into the limit again. */
+export const USAGE_LIMIT_STILL_LIMITED_MS = 90_000;
+
 /** The pause key of a card: the task's thread id, or "" for the reply. */
 export const usageLimitPauseKey = (card: Pick<ClaudeUsageLimitCard, "threadId">): string => card.threadId ?? "";
 
@@ -251,7 +254,12 @@ export const summarizeUsageLimitPauses = (pauses: UsageLimitPauses): UsageLimitS
   const values = [...pauses.held.values()];
   const reply = pauses.held.has("");
   const times = values.flatMap((pause) => (pause.until !== undefined ? [pause.until] : []));
-  const stillLimited = pauses.resumedAt !== undefined && values.every((pause) => pause.at >= pauses.resumedAt!);
+  // Paused again right after Resume: the limit still holds. A pause long after
+  // a Resume that went through is a new limit, not a failed Resume.
+  const resumedAt = pauses.resumedAt;
+  const stillLimited =
+    resumedAt !== undefined &&
+    values.every((pause) => pause.at >= resumedAt && pause.at - resumedAt <= USAGE_LIMIT_STILL_LIMITED_MS);
   return {
     reply,
     tasks: pauses.held.size - (reply ? 1 : 0),

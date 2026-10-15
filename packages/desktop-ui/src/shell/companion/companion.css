@@ -11,9 +11,11 @@
   --companion-stack-width: 340px;
 }
 
-.companion-root[data-hovered],
-.companion-root[data-expanded] {
-  --companion-stack-lift: 150px;
+/* The arc sits beside and below the mark, so only the voice button (in the
+   upper valley, ~110px above the mark's bottom) needs extra lift. */
+.companion-root[data-voice][data-hovered],
+.companion-root[data-voice][data-expanded] {
+  --companion-stack-lift: 120px;
 }
 
 .companion-mark-root {

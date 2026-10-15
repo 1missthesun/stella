@@ -34,13 +34,15 @@ import { useCompanionWindow } from "./use-companion-window";
 import { useMarkPress } from "./use-mark-press";
 import "./companion.css";
 
-const ARC_RADIUS = 72;
+// Seats the buttons in the star's valleys with an even ~10px gap to its
+// outline (measured from the rendered mark).
+const ARC_RADIUS = 58;
 const ARC_ANGLES_BY_EDGE: Record<
   CompanionEdgeH,
   readonly [number, number, number]
 > = {
-  right: [172, 131, 90],
-  left: [8, 49, 90],
+  right: [240, 180, 120],
+  left: [300, 0, 60],
 };
 
 const arcButtonStyle = (
@@ -255,6 +257,7 @@ export function CompanionPanelRoot() {
       data-dragging={dragging || undefined}
       data-edge-h={edgeH}
       data-edge-v={edgeV}
+      data-voice={showVoice || undefined}
       style={anchorVars(edgeH, edgeV, layout)}
     >
       <div className="companion-stack">

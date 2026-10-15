@@ -71,6 +71,9 @@ export type CompanionWindowOptions = {
 const READY_TIMEOUT_MS = 4_000;
 const EDGE_MARGIN = 6;
 const HOVER_GRACE_MS = 340;
+// The arc's lowest button reaches this far past the mark's bottom edge (top
+// edge when the arc flips), so the panel and the screen clamp leave room.
+const ARC_OVERHANG = 28;
 const HYPRLAND_ATTACH_TIMEOUT_MS = 3_000;
 const HYPRLAND_DRAG_INTERVAL_MS = 16;
 // Where the panel waits on Hyprland while it has nothing to show: Wayland
@@ -558,8 +561,11 @@ export class CompanionWindowController {
       ),
       y: Math.round(
         Math.min(
-          Math.max(anchor.y, area.y + COMPANION_MARK_SIZE + EDGE_MARGIN),
-          area.y + area.height - EDGE_MARGIN,
+          Math.max(
+            anchor.y,
+            area.y + COMPANION_MARK_SIZE + EDGE_MARGIN + ARC_OVERHANG,
+          ),
+          area.y + area.height - EDGE_MARGIN - ARC_OVERHANG,
         ),
       ),
     };
@@ -584,6 +590,9 @@ export class CompanionWindowController {
       edgeH === "right" ? compactX + compact.width - size.width : compactX;
     let y =
       edgeV === "bottom" ? compactY + compact.height - size.height : compactY;
+    if (kind === "panel" && edgeV === "bottom") {
+      y = anchor.y + ARC_OVERHANG - size.height;
+    }
     x = Math.min(Math.max(x, area.x), area.x + area.width - size.width);
     y = Math.min(Math.max(y, area.y), area.y + area.height - size.height);
     return {

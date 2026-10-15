@@ -69,7 +69,10 @@ import {
 import { createActivityHubArtifacts } from "./activity-hub-model";
 import { useTurnHandoff } from "./use-turn-handoff";
 import { createTurnStatusWake } from "./turn-status-wake";
-import { canonicalWorkingState } from "./canonical-working-state";
+import {
+  canonicalWorkingState,
+  localSendTurn,
+} from "./canonical-working-state";
 import {
   applyAgentLedger,
   collectJournalTasks,
@@ -320,6 +323,7 @@ const useSustainedCloudOffline = (status: CloudSocketStatus): boolean => {
 };
 
 const STOP_CONFIRM_MS = 15_000;
+const SETTLED_SEND_RELEASE_MS = 10_000;
 const STOP_UNREACHABLE_MESSAGE =
   "Couldn’t stop this reply. Stella isn’t connected right now.";
 const STOP_UNCONFIRMED_MESSAGE =
@@ -877,6 +881,33 @@ export const useCloudCanonicalChatThread = (
       local.workingIndicator, local.messages, state.activity, state.live,
       journalWindow],
   );
+  const localActiveSendId = local.sending ? local.activeSendMessageId ?? null : null;
+  const localSendSettled = useMemo(
+    () =>
+      localActiveSendId !== null &&
+      localSendTurn(
+        journalWindow,
+        dispatchBindings.get(localActiveSendId) ?? null,
+        localActiveSendId,
+      ).terminal,
+    [dispatchBindings, journalWindow, localActiveSendId],
+  );
+  const releaseSettledSend = local.releaseSettledSend;
+  useEffect(() => {
+    if (
+      !localActiveSendId ||
+      !localSendSettled ||
+      state.activity === "running" ||
+      !releaseSettledSend
+    ) {
+      return;
+    }
+    const timer = setTimeout(
+      () => releaseSettledSend(localActiveSendId),
+      SETTLED_SEND_RELEASE_MS,
+    );
+    return () => clearTimeout(timer);
+  }, [localActiveSendId, localSendSettled, releaseSettledSend, state.activity]);
   const [activityHubArtifacts] = useState(createActivityHubArtifacts);
   const conversationArtifacts = useMemo(
     () => activityHubArtifacts(messages),

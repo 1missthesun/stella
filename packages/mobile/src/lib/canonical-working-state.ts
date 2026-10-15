@@ -7,6 +7,24 @@ import type { JournalIndex } from "./journal-index";
 import type { LiveTurn } from "./cloud-conversation-store";
 import { activeCloudTurnId, cloudTurnActivity } from "./cloud-journal-projection";
 
+export function localSendTurn(
+  index: JournalIndex,
+  activeDispatchId: string | null,
+  activeSendMessageId: string | null | undefined,
+): { turnId: string | null; terminal: boolean } {
+  const turnId = activeDispatchId || activeSendMessageId
+    ? index.records.find((record) =>
+        record.kind === "message" && record.role === "user" &&
+        ((Boolean(activeDispatchId) && record.clientMsgId === activeDispatchId) ||
+          (Boolean(activeSendMessageId) &&
+            (record.clientMsgId === activeSendMessageId ||
+              record.payload.originUserMessageId === activeSendMessageId))))?.turnId ?? null
+    : null;
+  const terminal = Boolean(turnId && index.turn(turnId)?.records.some((record) =>
+    record.kind === "turn" && record.phase !== "started"));
+  return { turnId, terminal };
+}
+
 export function canonicalWorkingState(args: {
   index: JournalIndex;
   live: LiveTurn | null;
@@ -26,16 +44,11 @@ export function canonicalWorkingState(args: {
       : null;
   const authoritativeRunning =
     !trustRecords && args.authoritativeActivity === "running";
-  const localTurnId = args.activeDispatchId || args.activeSendMessageId
-    ? args.index.records.find((record) =>
-        record.kind === "message" && record.role === "user" &&
-        ((Boolean(args.activeDispatchId) && record.clientMsgId === args.activeDispatchId) ||
-          (Boolean(args.activeSendMessageId) &&
-            (record.clientMsgId === args.activeSendMessageId ||
-              record.payload.originUserMessageId === args.activeSendMessageId))))?.turnId ?? null
-    : null;
-  const localTerminal = Boolean(localTurnId && args.index.turn(localTurnId)?.records.some((record) =>
-    record.kind === "turn" && record.phase !== "started"));
+  const { turnId: localTurnId, terminal: localTerminal } = localSendTurn(
+    args.index,
+    args.activeDispatchId,
+    args.activeSendMessageId,
+  );
   const localPending = args.localSending && !localTerminal;
   const sending =
     localPending ||

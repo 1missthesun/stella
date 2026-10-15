@@ -42,6 +42,7 @@ import {
 } from "./phone-access";
 import {
   AUTOMATIC_EXECUTION_TARGET,
+  AutomaticExecutionRequestError,
   AutomaticExecutionWaitAbortedError,
   automaticExecutionCancellationCommand,
   automaticExecutionResultText,
@@ -73,8 +74,10 @@ import { userFacingError } from "./user-facing-error";
 import { createChatDraftStore, type ChatDraftStore } from "./chat-draft-store";
 import {
   clearComposerNotices,
+  showComposerNotice,
   showComposerNoticeForError,
 } from "./composer-notice";
+import { HttpRequestError } from "./http";
 import type {
   ChatArtifact,
   ChatMessage,
@@ -83,6 +86,14 @@ import type {
 } from "../types";
 
 const AUTOMATIC_RETRY_MS = 1_500;
+const ADMISSION_GIVE_UP_MS = 120_000;
+
+class SendNotDeliveredError extends Error {
+  constructor() {
+    super("Stella couldn't send this message. Check your connection and try again.");
+    this.name = "SendNotDeliveredError";
+  }
+}
 const waitForAutomaticRetry = (signal?: AbortSignal) =>
   new Promise<void>((resolve, reject) => {
     if (signal?.aborted) {
@@ -101,6 +112,14 @@ const waitForAutomaticRetry = (signal?: AbortSignal) =>
   });
 
 const isPermanentAutomaticAdmissionError = (error: unknown) => {
+  if (
+    error instanceof AutomaticExecutionRequestError ||
+    error instanceof SendNotDeliveredError ||
+    (error instanceof HttpRequestError &&
+      (error.status === 400 || error.status === 413 || error.status === 422))
+  ) {
+    return true;
+  }
   const code =
     error && typeof error === "object" ? Reflect.get(error, "code") : null;
   if (
@@ -206,6 +225,7 @@ export type ChatComposerThread = {
   send: () => { userMessageId: string } | null;
   sendPrompt?: (prompt: string) => { userMessageId: string } | null;
   stop: () => void;
+  releaseSettledSend?: (userMessageId: string) => void;
 };
 
 export type ChatThread = ChatComposerThread & {
@@ -389,6 +409,9 @@ export function useChatThread(opts: {
     latestResponseUserMessageId: string;
   } | null>(null);
   const dispatchGenerationRef = useRef(0);
+  const retryFailedSendRef = useRef<
+    ((item: QueuedSend, replyId: string) => void) | null
+  >(null);
   const pendingEnqueueRef = useRef<Set<string>>(new Set());
   const drainQueueRef = useRef<(() => void) | null>(null);
   // The dispatch fn closes over `transport`; keep the latest in a ref so the
@@ -446,17 +469,32 @@ export function useChatThread(opts: {
     void loadDesktopChatOutbox(threadId, canonicalOutboxAuthority).then(
       (storedOutbox) => {
         if (!active || generation !== historyPageGenerationRef.current) return;
-        const restored = restoreOutboxMessages([], storedOutbox);
+        const unsendable = storedOutbox.filter(
+          (record) =>
+            !record.text.trim() && record.attachments.length === 0,
+        );
+        if (unsendable.length > 0) {
+          void acknowledgeDesktopChatOutbox(
+            threadId,
+            new Set(unsendable.map((record) => record.sendId)),
+            canonicalOutboxAuthority,
+          ).catch(() => {});
+        }
+        const sendable = storedOutbox.filter(
+          (record) => !unsendable.includes(record),
+        );
+        const restored = restoreOutboxMessages([], sendable);
         updateMessages(restored);
         setStorageLoaded(true);
         const outboxByUserMessageId = new Map(
-          storedOutbox.map((record) => [record.userMessageId, record]),
+          sendable.map((record) => [record.userMessageId, record]),
         );
         const pendingSends = restored.filter(
           (m) =>
             m.role === "user" &&
             (outboxByUserMessageId.has(m.id) || m.queued === true) &&
-            m.text.trim().length > 0,
+            (m.text.trim().length > 0 ||
+              (outboxByUserMessageId.get(m.id)?.attachments.length ?? 0) > 0),
         );
         for (const row of pendingSends) {
           const stored = outboxByUserMessageId.get(row.id);
@@ -571,7 +609,8 @@ export function useChatThread(opts: {
     [canonicalOutboxAuthority, threadId],
   );
 
-  const finishDispatch = useCallback(() => {
+  const finishDispatch = useCallback((replyId: string) => {
+    if (activeDispatchRef.current?.replyId !== replyId) return;
     activeDispatchRef.current = null;
     markSending(false);
     setWorkingActivity(IDLE_WORKING_ACTIVITY);
@@ -608,13 +647,21 @@ export function useChatThread(opts: {
         kind: entry.kind,
       }));
 
+      let admittedDispatchId: string | null = null;
       try {
         assertAuthorityLease();
         let admitted: AutomaticExecutionDispatch | null = null;
         let placementConversationId = canonicalConversationId ?? "";
         let ignoreStoredAccess = false;
+        const admissionStartedAt = Date.now();
         while (!admitted) {
           assertAuthorityLease();
+          if (stoppedDispatchIdsRef.current.has(item.dispatchId)) {
+            throw new AutomaticExecutionWaitAbortedError();
+          }
+          if (Date.now() - admissionStartedAt > ADMISSION_GIVE_UP_MS) {
+            throw new SendNotDeliveredError();
+          }
           try {
             if (!placementConversationId) {
               placementConversationId = await readMainConversationId();
@@ -676,6 +723,7 @@ export function useChatThread(opts: {
           }
         }
 
+        admittedDispatchId = admitted.dispatchId;
         assertAuthorityLease();
         const active = activeDispatchRef.current;
         transport.onAdmission?.({
@@ -774,7 +822,7 @@ export function useChatThread(opts: {
           );
         }
         acknowledgeDesktopSendIds([item.dispatchId, item.userMessageId]);
-        finishDispatch();
+        finishDispatch(replyId);
       } catch (error) {
         if (
           error instanceof AutomaticExecutionWaitAbortedError ||
@@ -782,12 +830,30 @@ export function useChatThread(opts: {
         ) {
           return;
         }
-        renderReply(userFacingError(error));
-        showComposerNoticeForError(error, canonicalConversationId);
-        if (isPermanentAutomaticAdmissionError(error)) {
+        const message = userFacingError(error);
+        renderReply(message);
+        const permanent = isPermanentAutomaticAdmissionError(error);
+        if (permanent) {
           acknowledgeDesktopSendIds([item.dispatchId, item.userMessageId]);
         }
-        finishDispatch();
+        if (
+          !showComposerNoticeForError(error, canonicalConversationId) &&
+          permanent &&
+          !admittedDispatchId &&
+          isCurrent()
+        ) {
+          showComposerNotice({
+            kind: "send-failed",
+            conversationId: canonicalConversationId ?? null,
+            title: "Message not sent",
+            description: message,
+            action: {
+              label: "Retry",
+              onPress: () => retryFailedSendRef.current?.(item, replyId),
+            },
+          });
+        }
+        finishDispatch(replyId);
       }
     },
     [
@@ -825,6 +891,71 @@ export function useChatThread(opts: {
     },
     [updateMessages],
   );
+
+  const retryFailedSend = useCallback(
+    (item: QueuedSend, replyId: string) => {
+      if (!canonicalAuthorityLeaseCurrent(item.canonicalAuthorityLease)) {
+        return;
+      }
+      const row = messagesRef.current.find(
+        (message) => message.id === item.userMessageId,
+      );
+      stoppedDispatchIdsRef.current.delete(item.dispatchId);
+      acceptedDesktopSendIdsRef.current.delete(item.dispatchId);
+      acceptedDesktopSendIdsRef.current.delete(item.userMessageId);
+      const retryItem: QueuedSend = { ...item };
+      delete retryItem.cancelRequestId;
+      updateMessages((current) =>
+        current
+          .filter((message) => message.id !== replyId)
+          .map((message) =>
+            message.id === item.userMessageId
+              ? { ...message, queued: true, stopped: false }
+              : message,
+          ),
+      );
+      void enqueueDesktopChatOutbox(threadId, {
+        ...(item.structuredAttachments ? { structuredAttachments: true } : {}),
+        sendId: item.dispatchId,
+        userMessageId: item.userMessageId,
+        ...(item.userMessageEventId
+          ? { userMessageEventId: item.userMessageEventId }
+          : {}),
+        text: item.text,
+        displayText: row?.text ?? item.text,
+        createdAt: row?.createdAt ?? Date.now(),
+        attachments: item.attachments,
+        ...(item.executionTarget
+          ? { executionTarget: item.executionTarget }
+          : {}),
+        ...(item.execution ? { execution: item.execution } : {}),
+        authority: canonicalOutboxAuthority,
+      }).then(
+        (stored) => {
+          if (!canonicalAuthorityLeaseCurrent(item.canonicalAuthorityLease)) {
+            return;
+          }
+          retryItem.queueSequence = stored.sequence;
+          parkQueuedSend(retryItem);
+          if (!sendingRef.current && admissionEnabledRef.current) {
+            drainQueueRef.current?.();
+          }
+        },
+        () => undefined,
+      );
+    },
+    [
+      canonicalAuthorityLeaseCurrent,
+      canonicalOutboxAuthority,
+      parkQueuedSend,
+      threadId,
+      updateMessages,
+    ],
+  );
+
+  useEffect(() => {
+    retryFailedSendRef.current = retryFailedSend;
+  }, [retryFailedSend]);
 
   const dispatch = useCallback(
     async (item: QueuedSend) => {
@@ -1098,10 +1229,20 @@ export function useChatThread(opts: {
   const sendPrompt = useCallback((prompt: string) => submit(prompt), [submit]);
 
   const stop = useCallback(() => {
+    const activeUserMessageId = activeDispatchRef.current?.userMessageId;
     const cancelledIds = [
       ...new Set([
         ...queueRef.current.map((q) => q.userMessageId),
         ...pendingEnqueueRef.current,
+        ...messagesRef.current
+          .filter(
+            (message) =>
+              message.role === "user" &&
+              message.queued === true &&
+              message.stopped !== true &&
+              message.id !== activeUserMessageId,
+          )
+          .map((message) => message.id),
       ]),
     ];
     for (const id of cancelledIds) stoppedDispatchIdsRef.current.add(id);
@@ -1120,6 +1261,21 @@ export function useChatThread(opts: {
       );
     }
     const active = activeDispatchRef.current;
+    if (active && !active.automaticControl?.serverDispatchId) {
+      stoppedDispatchIdsRef.current.add(active.dispatchId);
+      activeDispatchRef.current = null;
+      acknowledgeDesktopSendIds([active.dispatchId, active.userMessageId]);
+      updateMessages((m) =>
+        m.map((msg) =>
+          msg.id === active.replyId
+            ? { ...msg, text: msg.text || "Stopped.", stopped: true }
+            : msg,
+        ),
+      );
+      markSending(false);
+      setWorkingActivity(IDLE_WORKING_ACTIVITY);
+      return;
+    }
     if (active) {
       stoppedDispatchIdsRef.current.add(active.dispatchId);
       const control = requestAutomaticExecutionCancellation(
@@ -1174,6 +1330,29 @@ export function useChatThread(opts: {
     updateMessages,
   ]);
 
+  const releaseSettledSend = useCallback(
+    (userMessageId: string) => {
+      const active = activeDispatchRef.current;
+      if (
+        !active ||
+        active.userMessageId !== userMessageId ||
+        !active.automaticControl?.serverDispatchId
+      ) {
+        return;
+      }
+      activeDispatchRef.current = null;
+      active.abort.abort();
+      acknowledgeDesktopSendIds([active.dispatchId, active.userMessageId]);
+      updateMessages((m) =>
+        m.filter((msg) => msg.id !== active.replyId || msg.text.length > 0),
+      );
+      markSending(false);
+      setWorkingActivity(IDLE_WORKING_ACTIVITY);
+      if (queueRef.current.length > 0) drainQueueRef.current?.();
+    },
+    [acknowledgeDesktopSendIds, markSending, updateMessages],
+  );
+
   const workingIndicator = useMemo(
     () => buildWorkingIndicatorState({ sending, activity: workingActivity }),
     [sending, workingActivity],
@@ -1215,5 +1394,6 @@ export function useChatThread(opts: {
     send,
     sendPrompt,
     stop,
+    releaseSettledSend,
   };
 }

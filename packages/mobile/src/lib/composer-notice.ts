@@ -10,7 +10,8 @@ export type ComposerNoticeKind =
   | "upgrade"
   | "limit"
   | "provider"
-  | "server";
+  | "server"
+  | "send-failed";
 
 export type ComposerNotice = {
   id: string;

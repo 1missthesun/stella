@@ -21,6 +21,7 @@ const KIND_ICON: Record<ComposerNoticeKind, IconName> = {
   limit: "alert-circle",
   provider: "alert-circle",
   server: "refresh-cw",
+  "send-failed": "alert-circle",
 };
 
 export function ComposerNotice({

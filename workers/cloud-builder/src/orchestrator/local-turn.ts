@@ -285,7 +285,13 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
     }
   }
 
-  protected usageLimitHolds(): Array<{ threadId?: string; until?: number; createdAtMs: number }> {
+  protected usageLimitHolds(): Array<{
+    threadId?: string;
+    until?: number;
+    deviceId?: string;
+    monthly?: true;
+    createdAtMs: number;
+  }> {
     const rows = this.ctx.storage.sql
       .exec<{ seq: number; created_at: number; payload_json: string }>(
         `SELECT seq, created_at, payload_json FROM journal
@@ -303,6 +309,8 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
         card = null;
       }
       if (!card) continue;
+      // A Resume press ended every pause before it.
+      if (card.resume) break;
       const key = card.threadId ?? "";
       if (!latest.has(key)) latest.set(key, { card, createdAtMs: row.created_at });
     }
@@ -311,6 +319,8 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
       .map(({ card, createdAtMs }) => ({
         ...(card.threadId ? { threadId: card.threadId } : {}),
         ...(card.until !== undefined ? { until: card.until } : {}),
+        ...(card.deviceId ? { deviceId: card.deviceId } : {}),
+        ...(card.monthly ? { monthly: true as const } : {}),
         createdAtMs,
       }));
   }

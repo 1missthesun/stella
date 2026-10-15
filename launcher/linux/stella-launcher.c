@@ -1,5 +1,6 @@
 #define _GNU_SOURCE
 #include <ctype.h>
+#include <dirent.h>
 #include <dlfcn.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -3061,6 +3062,92 @@ static void on_signal(int sig) {
     _exit(128 + sig);
 }
 
+/* A self-update execs the new launcher in this same process, so the old
+ * image's WebKit helpers stay our children while the new image knows nothing
+ * of them: they exit when their IPC sockets close and stayed zombies. At
+ * startup nothing has been spawned yet, so every child is such a leftover;
+ * each is asked to stop and reaped by its own pid. */
+typedef struct {
+    pid_t pids[64];
+    size_t count;
+} Inherited;
+
+static void inherited_children(Inherited *out) {
+    char path[300], buf[512];
+    pid_t self = getpid();
+    DIR *proc = opendir("/proc");
+    struct dirent *entry;
+    out->count = 0;
+    if (!proc) return;
+    while ((entry = readdir(proc)) && out->count < sizeof(out->pids) / sizeof(out->pids[0])) {
+        char *close_paren;
+        long ppid;
+        FILE *f;
+        size_t n;
+        if (!isdigit((unsigned char)entry->d_name[0])) continue;
+        snprintf(path, sizeof(path), "/proc/%s/stat", entry->d_name);
+        f = fopen(path, "re");
+        if (!f) continue;
+        n = fread(buf, 1, sizeof(buf) - 1, f);
+        fclose(f);
+        buf[n] = 0;
+        close_paren = strrchr(buf, ')');
+        if (!close_paren || sscanf(close_paren + 1, " %*c %ld", &ppid) != 1) continue;
+        if ((pid_t)ppid == self) out->pids[out->count++] = (pid_t)atol(entry->d_name);
+    }
+    closedir(proc);
+}
+
+static void inherited_child_exited(GPid pid, gint status, gpointer data) {
+    (void)data;
+    LOG("launcher: reaped inherited child %d (status %d)", (int)pid, status);
+    g_spawn_close_pid(pid);
+}
+
+static gpointer inherited_reaper(gpointer data) {
+    Inherited *inherited = data;
+    size_t i;
+    for (i = 0; i < inherited->count; i++) {
+        int status;
+        while (waitpid(inherited->pids[i], &status, 0) < 0 && errno == EINTR) {}
+        LOG("launcher: reaped inherited child %d", (int)inherited->pids[i]);
+    }
+    free(inherited);
+    return NULL;
+}
+
+static Inherited *g_inherited;
+
+/* Runs before this image spawns anything (updater included). */
+static void stop_inherited_children(void) {
+    Inherited *inherited = calloc(1, sizeof(*inherited));
+    size_t i;
+    if (!inherited) return;
+    inherited_children(inherited);
+    if (inherited->count == 0) {
+        free(inherited);
+        return;
+    }
+    for (i = 0; i < inherited->count; i++) {
+        LOG("launcher: stopping child %d left by the previous launcher image", (int)inherited->pids[i]);
+        kill(inherited->pids[i], SIGTERM);
+    }
+    g_inherited = inherited;
+}
+
+static void reap_inherited_children(int with_main_loop) {
+    Inherited *inherited = g_inherited;
+    size_t i;
+    g_inherited = NULL;
+    if (!inherited) return;
+    if (!with_main_loop) {
+        g_thread_new("reaper", inherited_reaper, inherited);
+        return;
+    }
+    for (i = 0; i < inherited->count; i++) g_child_watch_add(inherited->pids[i], inherited_child_exited, NULL);
+    free(inherited);
+}
+
 static gpointer worker(gpointer data) {
     int code;
     (void)data;
@@ -3091,6 +3178,7 @@ int main(int argc, char **argv) {
         ask_running_launcher_to_show();
         return 0;
     }
+    stop_inherited_children();
     state_load();
     follow_server_file();
     updater_start();
@@ -3107,6 +3195,7 @@ int main(int argc, char **argv) {
      * setups (protocol error 71); this page doesn't need it. */
     setenv("WEBKIT_DISABLE_DMABUF_RENDERER", "1", 0);
     g_ui = gtk_init_check(&argc, &argv);
+    reap_inherited_children(g_ui);
     if (!g_ui) {
         LOG("launcher: no display; running without windows");
         worker(NULL);

@@ -8,6 +8,7 @@ import { CONTENT_MAX_FONT_SCALE } from "../../lib/font-scale";
 import type { Colors } from "../../theme/colors";
 import { fonts } from "../../theme/fonts";
 import { useT } from "../../i18n";
+import { ScheduleCardShell } from "./ScheduleCardShell";
 
 const SNOOZES = [
   { label: "reminders.snooze10", minutes: () => 10 },
@@ -22,11 +23,16 @@ const formatTime = (ms: number): string => {
     : date.toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" });
 };
 
-export const ReminderActions = memo(function ReminderActions({
+/** A reminder that went off: what to do on row 1; "Reminder · 9:00 AM" and Done / Snooze on row 2. */
+export const ReminderFireCard = memo(function ReminderFireCard({
   mark,
+  text,
+  firedAtMs,
   colors,
 }: {
   mark: ReminderMark;
+  text: string;
+  firedAtMs: number | undefined;
   colors: Colors;
 }) {
   const t = useT();
@@ -34,12 +40,10 @@ export const ReminderActions = memo(function ReminderActions({
   const [busy, setBusy] = useState(false);
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const fire = fires?.get(mark.fireId);
-  if (!fire) return null;
-  const due = mark.dueAt ? (
-    <Text style={styles.settled} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
-      {t("reminders.due", { time: formatTime(mark.dueAt) })}
-    </Text>
-  ) : null;
+  const atMs = mark.dueAt ?? firedAtMs;
+  const status = [t("reminders.title"), atMs !== undefined ? formatTime(atMs) : null]
+    .filter(Boolean)
+    .join(" · ");
 
   const run = (action: () => Promise<unknown>) => {
     tapMedium();
@@ -50,6 +54,7 @@ export const ReminderActions = memo(function ReminderActions({
   };
 
   const chooseSnooze = () => {
+    if (!fire) return;
     const pick = (index: number) => {
       const choice = SNOOZES[index];
       if (choice) run(() => snoozeReminder(fire.fireId, choice.minutes()));
@@ -67,26 +72,22 @@ export const ReminderActions = memo(function ReminderActions({
     ]);
   };
 
-  if (fire.state !== "open") {
+  let trailing = null;
+  if (fire && fire.state !== "open") {
     const label =
       fire.state === "done"
-        ? t("reminders.doneState")
+        ? `✓ ${t("reminders.doneState")}`
         : fire.snoozedUntil && fire.snoozedUntil > Date.now()
           ? t("reminders.snoozedUntil", { time: formatTime(fire.snoozedUntil) })
           : t("reminders.snoozed");
-    return (
-      <View>
-        {due}
-        <Text style={styles.settled} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
-          {label}
-        </Text>
-      </View>
+    trailing = (
+      <Text style={styles.settled} numberOfLines={1} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
+        {label}
+      </Text>
     );
-  }
-  return (
-    <View>
-      {due}
-      <View style={styles.row}>
+  } else if (fire) {
+    trailing = (
+      <View style={styles.actions}>
         <Pressable
           accessibilityRole="button"
           disabled={busy}
@@ -108,19 +109,30 @@ export const ReminderActions = memo(function ReminderActions({
           </Text>
         </Pressable>
       </View>
-    </View>
+    );
+  }
+
+  return (
+    <ScheduleCardShell
+      colors={colors}
+      headline={text}
+      status={status}
+      trailing={trailing}
+      testID="reminder-fire-card"
+      accessibilityLabel={`${text}, ${status}`}
+    />
   );
 });
 
 const makeStyles = (colors: Colors) =>
   StyleSheet.create({
-    row: { flexDirection: "row", gap: 8, marginTop: 8 },
+    actions: { flexDirection: "row", flexShrink: 0, gap: 6 },
     button: {
+      borderColor: colors.border,
       borderRadius: 999,
       borderWidth: StyleSheet.hairlineWidth,
-      borderColor: colors.border,
-      paddingHorizontal: 14,
-      paddingVertical: 7,
+      paddingHorizontal: 11,
+      paddingVertical: 4,
     },
     primary: { backgroundColor: colors.textStrong, borderColor: colors.textStrong },
     dimmed: { opacity: 0.6 },
@@ -128,8 +140,8 @@ const makeStyles = (colors: Colors) =>
     primaryLabel: { color: colors.background },
     settled: {
       color: colors.textMuted,
+      flexShrink: 0,
       fontFamily: fonts.sans.medium,
-      fontSize: 13,
-      marginTop: 6,
+      fontSize: 14,
     },
   });

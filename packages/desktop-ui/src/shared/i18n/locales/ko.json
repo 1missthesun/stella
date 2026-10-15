@@ -3082,6 +3082,56 @@
         "pickDays": "하루 이상 선택하세요.",
         "pickCron": "cron 표현식을 입력하세요."
       }
+    },
+    "notice": {
+      "open": "일정에서 열기",
+      "title": {
+        "created": {
+          "reminder": "리마인더 설정됨",
+          "task": "작업 예약됨",
+          "watch": "감시 설정됨"
+        },
+        "updated": {
+          "reminder": "리마인더 변경됨",
+          "task": "작업 변경됨",
+          "watch": "감시 변경됨"
+        },
+        "paused": {
+          "reminder": "리마인더 일시 중지됨",
+          "task": "작업 일시 중지됨",
+          "watch": "감시 일시 중지됨"
+        },
+        "resumed": {
+          "reminder": "리마인더 재개됨",
+          "task": "작업 재개됨",
+          "watch": "감시 재개됨"
+        },
+        "removed": {
+          "reminder": "리마인더 삭제됨",
+          "task": "작업 삭제됨",
+          "watch": "감시 삭제됨"
+        }
+      },
+      "when": {
+        "today": "오늘 {time}",
+        "tomorrow": "내일 {time}",
+        "onDay": "{day} {time}",
+        "onDate": "{date} {time}",
+        "daily": "매일 {time}",
+        "weekdays": "평일마다 {time}",
+        "weekends": "주말 {time}",
+        "weekly": "매주 {day} {time}",
+        "onDays": "{days} {time}",
+        "everyMinutes": {
+          "other": "{count}분마다"
+        },
+        "everyHours": {
+          "other": "{count}시간마다"
+        },
+        "everyDays": {
+          "other": "{count}일마다"
+        }
+      }
     }
   },
   "selfHost": {

@@ -3082,6 +3082,56 @@
         "pickDays": "Chọn ít nhất một ngày.",
         "pickCron": "Nhập biểu thức cron."
       }
+    },
+    "notice": {
+      "open": "Mở trong Lịch",
+      "title": {
+        "created": {
+          "reminder": "Đã đặt lời nhắc",
+          "task": "Đã lên lịch tác vụ",
+          "watch": "Đã thiết lập theo dõi"
+        },
+        "updated": {
+          "reminder": "Đã thay đổi lời nhắc",
+          "task": "Đã thay đổi tác vụ",
+          "watch": "Đã thay đổi theo dõi"
+        },
+        "paused": {
+          "reminder": "Đã tạm dừng lời nhắc",
+          "task": "Đã tạm dừng tác vụ",
+          "watch": "Đã tạm dừng theo dõi"
+        },
+        "resumed": {
+          "reminder": "Đã tiếp tục lời nhắc",
+          "task": "Đã tiếp tục tác vụ",
+          "watch": "Đã tiếp tục theo dõi"
+        },
+        "removed": {
+          "reminder": "Đã xóa lời nhắc",
+          "task": "Đã xóa tác vụ",
+          "watch": "Đã xóa theo dõi"
+        }
+      },
+      "when": {
+        "today": "Hôm nay lúc {time}",
+        "tomorrow": "Ngày mai lúc {time}",
+        "onDay": "{day} lúc {time}",
+        "onDate": "{date} lúc {time}",
+        "daily": "Hằng ngày lúc {time}",
+        "weekdays": "Mỗi ngày trong tuần lúc {time}",
+        "weekends": "Cuối tuần lúc {time}",
+        "weekly": "Mỗi {day} lúc {time}",
+        "onDays": "{days} lúc {time}",
+        "everyMinutes": {
+          "other": "Mỗi {count} phút"
+        },
+        "everyHours": {
+          "other": "Mỗi {count} giờ"
+        },
+        "everyDays": {
+          "other": "Mỗi {count} ngày"
+        }
+      }
     }
   },
   "selfHost": {

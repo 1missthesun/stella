@@ -63,11 +63,34 @@ export function ComposerNotice({
               router.push("/settings");
             },
           }
-        : null;
+        : notice.action
+          ? {
+              label: notice.action.label,
+              onPress: () => {
+                dismiss();
+                notice.action!.onPress();
+              },
+            }
+          : null;
+
+  const inline = notice.kind === "limit";
+  const button = (action: { label: string; onPress: () => void }, compact: boolean) => (
+    <Pressable
+      accessibilityRole="button"
+      onPress={action.onPress}
+      style={({ pressed }) => [
+        styles.primaryButton,
+        compact && styles.primaryButtonCompact,
+        pressed && styles.primaryButtonPressed,
+      ]}
+    >
+      <Text style={styles.primaryText}>{action.label}</Text>
+    </Pressable>
+  );
 
   return (
     <View
-      style={styles.card}
+      style={[styles.card, inline && styles.cardInline]}
       accessibilityRole="summary"
       testID="composer-notice"
     >
@@ -76,7 +99,13 @@ export function ComposerNotice({
       </View>
       <View style={styles.body}>
         <Text style={styles.title}>{title}</Text>
-        {description ? (
+        {inline ? (
+          // Usage-limit card: reset text on the left, the button on the same row.
+          <View style={styles.inlineRow}>
+            <Text style={[styles.description, styles.inlineDescription]}>{description ?? ""}</Text>
+            {primary ? button(primary, true) : null}
+          </View>
+        ) : description ? (
           <Text style={styles.description}>{description}</Text>
         ) : null}
       </View>
@@ -89,20 +118,7 @@ export function ComposerNotice({
       >
         <Icon name="x" size={14} color={colors.textMuted} />
       </Pressable>
-      {primary ? (
-        <View style={styles.actions}>
-          <Pressable
-            accessibilityRole="button"
-            onPress={primary.onPress}
-            style={({ pressed }) => [
-              styles.primaryButton,
-              pressed && styles.primaryButtonPressed,
-            ]}
-          >
-            <Text style={styles.primaryText}>{primary.label}</Text>
-          </Pressable>
-        </View>
-      ) : null}
+      {primary && !inline ? <View style={styles.actions}>{button(primary, false)}</View> : null}
     </View>
   );
 }
@@ -121,6 +137,16 @@ const makeStyles = (colors: Colors) =>
       padding: 11,
       paddingRight: 36,
     },
+    cardInline: { paddingVertical: 8 },
+    inlineRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 10,
+      marginTop: 2,
+      // Resume's right edge lines up under the visible ✕ icon (card paddingRight 36, icon edge ~15pt in).
+      marginRight: -21,
+    },
+    inlineDescription: { flex: 1, marginTop: 0 },
     icon: {
       alignItems: "center",
       backgroundColor: colors.muted,
@@ -164,6 +190,7 @@ const makeStyles = (colors: Colors) =>
       paddingHorizontal: 16,
       paddingVertical: 8,
     },
+    primaryButtonCompact: { paddingHorizontal: 14, paddingVertical: 5 },
     primaryButtonPressed: {
       backgroundColor: colors.accentHover,
     },

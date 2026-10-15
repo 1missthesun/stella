@@ -29,6 +29,7 @@ export const assistantRowHasOwnContent = (
   (row.mapArtifacts?.length ?? 0) > 0 ||
   (row.askRecords?.length ?? 0) > 0 ||
   (row.sourceDiffPayloads?.length ?? 0) > 0 ||
-  Boolean(row.voiceSession);
+  Boolean(row.voiceSession) ||
+  Boolean(row.scheduleNotice);
 export const eventRowRendersContent = (row: EventRowViewModel): boolean =>
   row.kind === "user" ? !row.hidden : assistantRowHasVisibleContent(row);

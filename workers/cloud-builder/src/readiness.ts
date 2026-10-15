@@ -17,7 +17,6 @@ export const CLOUD_BUILDER_REQUIRED_FIELDS = [
   "TURN_TIMEOUT_MS",
   "SANDBOX_IDLE_TIMEOUT_MS",
   "APPS_HOST_BASE_URL",
-  "TRUSTED_APPS_HOST_BASE_URL",
   "MODEL_GATEWAY_URL",
   "CLOUD_BUILDER_PUBLIC_URL",
   "CAPABILITY_SIGNING_KEY",
@@ -128,7 +127,6 @@ const validators: Readonly<
   TURN_TIMEOUT_MS: isPositiveIntegerString,
   SANDBOX_IDLE_TIMEOUT_MS: isPositiveIntegerString,
   APPS_HOST_BASE_URL: isHttpsOrigin,
-  TRUSTED_APPS_HOST_BASE_URL: isHttpsOrigin,
   MODEL_GATEWAY_URL: isHttpsOrigin,
   CLOUD_BUILDER_PUBLIC_URL: isHttpsOrigin,
   CAPABILITY_SIGNING_KEY: (value) =>
@@ -167,23 +165,6 @@ export const evaluateCloudBuilderReadiness = (
     input.STELLA_PLAINTEXT_STORAGE !== "1"
   ) {
     missing.push("OWNER_SECRETS_KEK");
-  }
-
-  const appsHost = normalizedHttpsOrigin(input.APPS_HOST_BASE_URL);
-  const trustedAppsHost = normalizedHttpsOrigin(
-    input.TRUSTED_APPS_HOST_BASE_URL,
-  );
-  if (
-    appsHost !== null &&
-    trustedAppsHost !== null &&
-    appsHost === trustedAppsHost
-  ) {
-    if (!invalid.includes("APPS_HOST_BASE_URL")) {
-      invalid.push("APPS_HOST_BASE_URL");
-    }
-    if (!invalid.includes("TRUSTED_APPS_HOST_BASE_URL")) {
-      invalid.push("TRUSTED_APPS_HOST_BASE_URL");
-    }
   }
 
   return {

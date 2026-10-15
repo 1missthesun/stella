@@ -6,6 +6,7 @@ import type {
 } from "@stella/contracts/local-chat";
 import { isPiAgentText } from "@stella/contracts/pi-chat";
 import { parseReminderCard, reminderMarkOf } from "@stella/contracts/reminders";
+import { parseScheduleNoticeCard } from "@stella/contracts/schedule-notice";
 import { journalAgentTitles } from "@stella/contracts/agent-titles";
 import {
   agentToolResultThreadId,
@@ -437,6 +438,16 @@ export const journalRecordsToMessageRecords = (
             text: reminder.text,
             metadata: { reminder: reminderMarkOf(reminder) },
           },
+        });
+        continue;
+      }
+      const scheduleNotice = record.kind === "card" ? parseScheduleNoticeCard(record.card) : null;
+      if (scheduleNotice) {
+        events.push({
+          _id: `cloud:${turnId}:schedule-notice:${record.seq}`,
+          timestamp: record.createdAtMs,
+          type: "assistant_message",
+          payload: { text: "", metadata: { scheduleNotice } },
         });
         continue;
       }

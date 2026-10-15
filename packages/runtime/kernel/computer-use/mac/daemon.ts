@@ -217,6 +217,34 @@ export const stopAutomationDaemon = (sessionPaths: SessionPaths) => {
   return pid !== null;
 };
 
+/**
+ * SIGTERM first so the helper restores app focus state on the way out, then
+ * SIGKILL its process group if it is still alive after the grace period.
+ */
+export const stopAutomationDaemonGracefully = async (
+  sessionPaths: SessionPaths,
+  graceMs = 2_000,
+) => {
+  const pid = readPidFile(automationPidPath(sessionPaths));
+  if (!pid || !pidIsRunning(pid)) {
+    resetAutomationDaemonFiles(sessionPaths);
+    return false;
+  }
+  try {
+    process.kill(pid, "SIGTERM");
+  } catch {
+    // Already gone.
+  }
+  for (let waited = 0; waited < graceMs && pidIsRunning(pid); waited += 50) {
+    await delayMs(50);
+  }
+  if (pidIsRunning(pid)) killProcessGroup(pid);
+  if (readPidFile(automationPidPath(sessionPaths)) === pid) {
+    resetAutomationDaemonFiles(sessionPaths);
+  }
+  return true;
+};
+
 const writeAutomationHostPid = (sessionPaths: SessionPaths, pid: number) => {
   try {
     fs.writeFileSync(automationHostPidPath(sessionPaths), String(pid), "utf8");

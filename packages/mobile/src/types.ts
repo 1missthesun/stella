@@ -166,6 +166,7 @@ export type ComposerQuote = {
 export type ChatMessage = {
   askRecords?: readonly UserAskRecord[];
   reminder?: { fireId: string; scheduleId: string; dueAt?: number };
+  scheduleNotice?: import("@stella/contracts/schedule-notice").ScheduleNoticeCard;
   replyRefs?: ReplyRef[];
   reaction?: string;
   reactionAt?: number;

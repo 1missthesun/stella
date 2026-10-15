@@ -41,6 +41,7 @@ Commands:
   launch [bundle-id] [--metro-port <port>]
   logs
   shutdown
+  teardown            stop Metro/DevTools, remove the staged source, shut down the simulator
 EOF
 }
 
@@ -207,6 +208,7 @@ REMOTE
   stage)
     local_root="$(require_repo_root)"
     mkdir -p "$run_dir"
+    node "$skill_dir/scripts/reap-staged-processes.mjs" --orphans >/dev/null || true
     if [[ -f "$source_state" ]]; then
       printf 'A staged source already exists. Run clean-source first.\n' >&2
       exit 2
@@ -251,6 +253,9 @@ REMOTE
     fi
     remote_source="$(read_state_value "$source_state" PATH)"
     validate_scratch_path "$remote_source"
+    # Metro and the React Native DevTools it opens outlive the build command;
+    # stop them before their folder goes away.
+    node "$skill_dir/scripts/reap-staged-processes.mjs" "$remote_source" || true
     run_zsh "$remote_source" <<'REMOTE'
 set -eu
 path="$1"
@@ -658,6 +663,15 @@ REMOTE
       printf 'Left pre-existing simulator %s running.\n' "$boot_udid"
     fi
     rm -f -- "$sim_state"
+    ;;
+  teardown)
+    # Always runs every step: processes of this and of deleted staging
+    # folders, the staged source, then the simulator this helper booted.
+    status=0
+    "${BASH_SOURCE[0]}" clean-source || status=1
+    node "$skill_dir/scripts/reap-staged-processes.mjs" --orphans || status=1
+    "${BASH_SOURCE[0]}" shutdown || status=1
+    exit "$status"
     ;;
   *)
     usage >&2

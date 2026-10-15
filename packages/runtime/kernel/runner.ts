@@ -465,6 +465,15 @@ export const createStellaHostRunner = (
         });
       },
     },
+    usageLimits: {
+      note: async (args) =>
+        await context.backend.require().call("usageLimits.note", {
+          ...args,
+          ownerGeneration: await context.cloudOwnerGeneration(),
+          originDeviceId: context.deviceId,
+        }),
+      resume: async (args) => await context.backend.require().call("usageLimits.resume", args),
+    },
     agentThreads: {
       directory: async (conversationId, threadIds) =>
         await withinAgentControlTimeout(

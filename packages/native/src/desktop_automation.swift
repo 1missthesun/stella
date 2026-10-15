@@ -3850,6 +3850,10 @@ final class PersistentOverlayController {
         setTarget(cursorPoint, viewportFrame: viewportFrame)
     }
 
+    var needsTicks: Bool {
+        window != nil || pendingShow != nil
+    }
+
     func tickPendingShow() {
         guard let pending = pendingShow else { return }
         if isBusy(at: CACurrentMediaTime()) { return }
@@ -4122,10 +4126,20 @@ final class UnifiedAutomationOverlayService {
         try? FileManager.default.removeItem(atPath: busyUntilPath)
     }
 
-    func start() {
-        timer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
+    // The 60 Hz tick only runs while an overlay is showing or waiting to
+    // show; an idle daemon has no timer, so it costs no CPU between actions.
+    private func startTicking() {
+        guard timer == nil else { return }
+        let next = Timer(timeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
             self?.tick()
         }
+        RunLoop.main.add(next, forMode: .default)
+        timer = next
+    }
+
+    private func stopTicking() {
+        timer?.invalidate()
+        timer = nil
     }
 
     func perform<T>(
@@ -4137,6 +4151,7 @@ final class UnifiedAutomationOverlayService {
             return body()
         }
 
+        startTicking()
         waitUntilIdle()
         lastActivity = Date()
         hasVisibleOverlay = true
@@ -4162,6 +4177,7 @@ final class UnifiedAutomationOverlayService {
     func hide() {
         controller.hide()
         hasVisibleOverlay = false
+        if !controller.needsTicks { stopTicking() }
     }
 
     private func tick() {
@@ -4169,6 +4185,8 @@ final class UnifiedAutomationOverlayService {
         controller.tickPendingShow()
         if hasVisibleOverlay, Date().timeIntervalSince(lastActivity) > overlayIdleTimeout {
             hide()
+        } else if !hasVisibleOverlay, !controller.needsTicks {
+            stopTicking()
         }
     }
 
@@ -10654,6 +10672,11 @@ final class LockedUseCoordinator {
         return status(message: "Locked computer use lease closed.")
     }
 
+    var holdsActiveLease: Bool {
+        guard let lease = Self.readLease(at: Self.leasePath(in: stateDir)) else { return false }
+        return lease.expiresAtUnixMs >= nowUnixMs() && lease.consumedAtUnixMs == nil
+    }
+
     func status(message: String = "Locked computer use daemon status.") -> LockedUsePayload {
         let lease = Self.readLease(at: Self.leasePath(in: stateDir))
         let now = nowUnixMs()
@@ -11710,6 +11733,10 @@ final class AutomationDaemon {
     private let serverQueue = DispatchQueue(label: "desktop_automation.daemon.server")
     private var listeningFD: Int32 = -1
     private var terminationSignalSources: [DispatchSourceSignal] = []
+    private let activityLock = NSLock()
+    private var requestsInFlight = 0
+    private var lastRequestAt = Date()
+    private var idleExitTimer: DispatchSourceTimer?
 
     init(options: AutomationDaemonOptions) {
         self.options = options
@@ -11743,7 +11770,6 @@ final class AutomationDaemon {
             .appendingPathComponent("overlay-busy-until.json")
             .path
         let overlayService = UnifiedAutomationOverlayService(busyUntilPath: overlayBusyUntilPath)
-        overlayService.start()
         currentAutomationOverlayService = overlayService
         let lockedUseStateDir = ProcessInfo.processInfo.environment["STELLA_COMPUTER_STATE_DIR"]
             ?? URL(fileURLWithPath: options.pidFile)
@@ -11762,6 +11788,10 @@ final class AutomationDaemon {
         serverQueue.async { [weak self] in
             self?.acceptLoop()
         }
+        installIdleExit()
+        // Keeps the main run loop blocking when no overlay timer is
+        // scheduled; a run loop with no sources returns at once and spins.
+        RunLoop.current.add(Port(), forMode: .default)
         while true {
             RunLoop.current.run(mode: .default, before: Date(timeIntervalSinceNow: 0.25))
         }
@@ -11789,6 +11819,44 @@ final class AutomationDaemon {
         }
     }
 
+    // The app stops a task's daemon when the task ends; this is the
+    // backstop for a daemon nobody stopped (crashed host, CLI session).
+    // The next request respawns it.
+    private static let idleExitSeconds: TimeInterval = {
+        let raw = ProcessInfo.processInfo.environment["STELLA_COMPUTER_DAEMON_IDLE_EXIT_SECONDS"]
+        if let raw, let parsed = TimeInterval(raw), parsed > 0 { return parsed }
+        return 15 * 60
+    }()
+
+    private func installIdleExit() {
+        let interval = min(60, max(1, Self.idleExitSeconds / 4))
+        let timer = DispatchSource.makeTimerSource(queue: .main)
+        timer.schedule(deadline: .now() + interval, repeating: interval, leeway: .seconds(5))
+        timer.setEventHandler { [weak self] in
+            self?.exitIfIdle()
+        }
+        timer.resume()
+        idleExitTimer = timer
+    }
+
+    private func exitIfIdle() {
+        activityLock.lock()
+        let idle = requestsInFlight == 0
+            && Date().timeIntervalSince(lastRequestAt) >= Self.idleExitSeconds
+        activityLock.unlock()
+        guard idle else { return }
+        if currentLockedUseCoordinator?.holdsActiveLease == true { return }
+        trace("daemon:idle-exit after \(Int(Self.idleExitSeconds))s without requests")
+        SyntheticAppFocusEnforcer.shared.deactivate()
+        let pid = String(ProcessInfo.processInfo.processIdentifier)
+        if let recorded = try? String(contentsOfFile: options.pidFile, encoding: .utf8),
+           recorded.trimmingCharacters(in: .whitespacesAndNewlines) == pid {
+            try? FileManager.default.removeItem(atPath: options.socketPath)
+            try? FileManager.default.removeItem(atPath: options.pidFile)
+        }
+        exit(0)
+    }
+
     private func acceptLoop() {
         while true {
             let clientFD = accept(listeningFD, nil, nil)
@@ -11799,7 +11867,15 @@ final class AutomationDaemon {
                 fputs("desktop_automation daemon accept failed: \(String(cString: strerror(errno)))\n", stderr)
                 continue
             }
+            activityLock.lock()
+            requestsInFlight += 1
+            lastRequestAt = Date()
+            activityLock.unlock()
             handleClient(clientFD)
+            activityLock.lock()
+            requestsInFlight -= 1
+            lastRequestAt = Date()
+            activityLock.unlock()
         }
     }
 

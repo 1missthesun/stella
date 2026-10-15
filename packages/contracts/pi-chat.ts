@@ -130,7 +130,14 @@ export type PiChatEvent =
   | { type: "compaction_start"; reason: string; blocking: boolean }
   | { type: "compaction_end"; reason: string }
   | { type: "engine_status"; state: "running" | "compacting" | "model-fallback"; text: string }
-  | { type: "engine_status"; state: "usage-limit"; text: string; until?: number }
+  | {
+      type: "engine_status";
+      state: "usage-limit";
+      text: string;
+      until?: number;
+      /** What the limit paused in this chat; the card's text and Resume come from it. */
+      paused?: import("./claude-usage-limit.js").UsageLimitSummary;
+    }
   | { type: "engine_status"; state: "usage-limit-end"; text: string; resumed: boolean }
   | { type: "remote_turns"; turns: PiRemoteTurn[] }
   | { type: "brain"; brain: PiChatBrainResult }
@@ -186,6 +193,8 @@ export type PiChatRequest =
   | { op: "welcome"; conversationId: string; message: string }
   | { op: "files"; conversationId: string }
   | { op: "journal"; conversationId: string }
+  /** Resume on the usage-limit card: continue everything the limit paused in this chat. */
+  | { op: "resumeUsageLimit"; conversationId: string }
   | {
       op: "brain";
       conversationId: string;

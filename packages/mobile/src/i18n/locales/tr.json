@@ -3100,6 +3100,59 @@
         "pickDays": "En az bir gün seçin.",
         "pickCron": "Bir cron ifadesi girin."
       }
+    },
+    "notice": {
+      "open": "Takvimde aç",
+      "title": {
+        "created": {
+          "reminder": "Hatırlatıcı kuruldu",
+          "task": "Görev planlandı",
+          "watch": "Takip kuruldu"
+        },
+        "updated": {
+          "reminder": "Hatırlatıcı değiştirildi",
+          "task": "Görev değiştirildi",
+          "watch": "Takip değiştirildi"
+        },
+        "paused": {
+          "reminder": "Hatırlatıcı duraklatıldı",
+          "task": "Görev duraklatıldı",
+          "watch": "Takip duraklatıldı"
+        },
+        "resumed": {
+          "reminder": "Hatırlatıcı sürdürüldü",
+          "task": "Görev sürdürüldü",
+          "watch": "Takip sürdürüldü"
+        },
+        "removed": {
+          "reminder": "Hatırlatıcı kaldırıldı",
+          "task": "Görev kaldırıldı",
+          "watch": "Takip kaldırıldı"
+        }
+      },
+      "when": {
+        "today": "Bugün {time}",
+        "tomorrow": "Yarın {time}",
+        "onDay": "{day} {time}",
+        "onDate": "{date} {time}",
+        "daily": "Her gün {time}",
+        "weekdays": "Her hafta içi {time}",
+        "weekends": "Hafta sonları {time}",
+        "weekly": "Her {day} {time}",
+        "onDays": "{days} {time}",
+        "everyMinutes": {
+          "one": "Her dakika",
+          "other": "{count} dakikada bir"
+        },
+        "everyHours": {
+          "one": "Her saat",
+          "other": "{count} saatte bir"
+        },
+        "everyDays": {
+          "one": "Her gün",
+          "other": "{count} günde bir"
+        }
+      }
     }
   },
   "selfHost": {

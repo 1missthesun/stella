@@ -383,8 +383,7 @@ headers verbatim, and `Sec-WebSocket-Protocol` carries socket tickets (and, from
 clients that predate tickets, the JWT). Console logs, errors and traces still
 arrive. Every Stella Worker sets `redact_query_string: true`; it is a
 script-level setting, so `PATCH .../workers/scripts/<name>/script-settings`
-changes it without a new version (the `stella-v2-apps-auth-*` Workers have no
-config in this repo and were set that way).
+changes it without a new version.
 
 cloud-builder and canvas-share set `observability.redact_query_string`, so
 stored logs and traces keep paths but never query strings (magic-link
@@ -525,7 +524,10 @@ Steps (production, from `workers/cloud-builder`):
    key; every `legacy` should be 0.
 4. Delete the old name only when nothing needs it:
    - `BUILDER_SERVICE_SECRET`: after 24 hours (the longest capability is 12
-     hours) and once every operator script uses the new bearer.
+     hours) and once every operator script uses the new bearer. Retired on
+     production 2026-10-14: wherever `_V2` is set it is the only key accepted
+     (`builderServiceSecrets`), and production requires `_V2`. Dev and bn118
+     never rotated and still use the old name.
    - `BETTER_AUTH_SECRET`: 8 days after step 2, with `status` showing no
      legacy rows. A session nobody used in that time has expired anyway.
    - `OWNER_SECRETS_KEK`: not yet. Rows and journals nobody has opened stay

@@ -3116,6 +3116,62 @@
         "pickDays": "Elige al menos un día.",
         "pickCron": "Introduce una expresión cron."
       }
+    },
+    "notice": {
+      "open": "Abrir en Agenda",
+      "title": {
+        "created": {
+          "reminder": "Recordatorio creado",
+          "task": "Tarea programada",
+          "watch": "Vigilancia configurada"
+        },
+        "updated": {
+          "reminder": "Recordatorio cambiado",
+          "task": "Tarea cambiada",
+          "watch": "Vigilancia cambiada"
+        },
+        "paused": {
+          "reminder": "Recordatorio en pausa",
+          "task": "Tarea en pausa",
+          "watch": "Vigilancia en pausa"
+        },
+        "resumed": {
+          "reminder": "Recordatorio reanudado",
+          "task": "Tarea reanudada",
+          "watch": "Vigilancia reanudada"
+        },
+        "removed": {
+          "reminder": "Recordatorio eliminado",
+          "task": "Tarea eliminada",
+          "watch": "Vigilancia eliminada"
+        }
+      },
+      "when": {
+        "today": "Hoy a las {time}",
+        "tomorrow": "Mañana a las {time}",
+        "onDay": "El {day} a las {time}",
+        "onDate": "El {date} a las {time}",
+        "daily": "Todos los días a las {time}",
+        "weekdays": "Cada día laborable a las {time}",
+        "weekends": "Los fines de semana a las {time}",
+        "weekly": "Cada {day} a las {time}",
+        "onDays": "{days} a las {time}",
+        "everyMinutes": {
+          "one": "Cada minuto",
+          "many": "Cada {count} minutos",
+          "other": "Cada {count} minutos"
+        },
+        "everyHours": {
+          "one": "Cada hora",
+          "many": "Cada {count} horas",
+          "other": "Cada {count} horas"
+        },
+        "everyDays": {
+          "one": "Cada día",
+          "many": "Cada {count} días",
+          "other": "Cada {count} días"
+        }
+      }
     }
   },
   "selfHost": {

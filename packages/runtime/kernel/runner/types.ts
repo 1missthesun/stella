@@ -190,6 +190,7 @@ export type RunnerContext = {
       runId: string,
       behavior: import("../browser-use/client.js").BrowserTurnEndBehavior,
     ) => Promise<void>;
+    releaseAgentComputerSessions: (agentId: string) => Promise<number>;
     registerExtensionTools: (tools: ToolDefinition[]) => void;
     unregisterExtensionTools: () => void;
     listRunningShellSessionsOwnedBy: (
@@ -352,6 +353,14 @@ export type RunnerPublicApi = {
     handoff: (
       args: Omit<AgentThreadCalls["agentThreads.handoff"]["args"], "ownerGeneration" | "fromDeviceId">,
     ) => Promise<AgentThreadCalls["agentThreads.handoff"]["result"]>;
+  };
+  usageLimits: {
+    note: (
+      args: Omit<AgentThreadCalls["usageLimits.note"]["args"], "ownerGeneration" | "originDeviceId">,
+    ) => Promise<AgentThreadCalls["usageLimits.note"]["result"]>;
+    resume: (
+      args: AgentThreadCalls["usageLimits.resume"]["args"],
+    ) => Promise<AgentThreadCalls["usageLimits.resume"]["result"]>;
   };
   agentLogs: {
     append: (

@@ -1520,6 +1520,7 @@ const agentDirectory = async (
   const devices = [...rows.values()].some((row) => threadDeviceId(row) !== null)
     ? await devicePresence(ctx)
     : new Map<string, DeviceDestination>();
+  const pausedOnComputers = computerPausedThreads(ctx.db, [...rows.keys()]);
   const agents = [...rows.values()].map((row): AgentDirectoryAgentRow => {
     const deviceId = threadDeviceId(row);
     const device = deviceId ? devices.get(resolveCurrentDeviceId(ctx.db, deviceId)) : undefined;
@@ -1537,6 +1538,7 @@ const agentDirectory = async (
         ? { offline: device?.lastSeenAt !== undefined ? { lastSeenAt: device.lastSeenAt } : {} }
         : {}),
       ...(live && device?.online && device.remoteExecution !== "enabled" ? { awaitingConsent: true as const } : {}),
+      ...(live && (heldByUsageLimit(row) || pausedOnComputers.has(row.thread_id)) ? { pausedBy: "usage-limit" as const } : {}),
     };
   });
   const sessions = (isSlackConversationId(args.conversationId)
@@ -3156,7 +3158,9 @@ const usageLimitResumeAt = (
 };
 
 const usageLimitHoldMessage = (limit: ClaudeUsageLimit): string =>
-  limit.resetsAt !== undefined
+  limit.monthly
+    ? `${USAGE_LIMIT_HOLD_PREFIX}: Claude's monthly spend limit is reached; it continues when Resume is pressed on the chat's card.`
+    : limit.resetsAt !== undefined
     ? `${USAGE_LIMIT_HOLD_PREFIX} at ${new Date(limit.resetsAt).toISOString()}; it continues automatically then.`
     : `${USAGE_LIMIT_HOLD_PREFIX}; it continues automatically once it does.`;
 
@@ -3168,12 +3172,16 @@ const holdAgentForUsageLimit = (
   limit: ClaudeUsageLimit,
   now: number,
 ): void => {
-  jobs.schedule(
-    USAGE_LIMIT_AGENT_JOB,
-    usageLimitResumeAt(db, `agent:${thread.thread_id}`, limit, now),
-    { threadId: thread.thread_id, attemptGeneration: thread.attempt_generation },
-    { id: `usage-limit:agent:${thread.thread_id}` },
-  );
+  if (limit.monthly) {
+    jobs.cancel(`usage-limit:agent:${thread.thread_id}`);
+  } else {
+    jobs.schedule(
+      USAGE_LIMIT_AGENT_JOB,
+      usageLimitResumeAt(db, `agent:${thread.thread_id}`, limit, now),
+      { threadId: thread.thread_id, attemptGeneration: thread.attempt_generation },
+      { id: `usage-limit:agent:${thread.thread_id}` },
+    );
+  }
   const conversationId = thread.parent_thread_id === null ? journalConversationOf(db, thread) : null;
   if (!conversationId || !thread.owner_generation) return;
   effects.cards.push({
@@ -3185,6 +3193,7 @@ const holdAgentForUsageLimit = (
       state: "held",
       threadId: thread.thread_id,
       ...(limit.resetsAt !== undefined ? { until: limit.resetsAt } : {}),
+      ...(limit.monthly ? { monthly: true as const } : {}),
     } satisfies ClaudeUsageLimitCard,
   });
 };
@@ -3240,8 +3249,27 @@ const resumeAgentAfterUsageLimit = async (ctx: OwnerContext, raw: unknown): Prom
   }
 };
 
-const holdConversationForUsageLimit = (ctx: OwnerContext, raw: unknown): { resumeAt: number } => {
-  const args = object({ conversationId: string(), ownerGeneration: string(), resetsAt: optional(number()) })(raw);
+const holdConversationForUsageLimit = (ctx: OwnerContext, raw: unknown): { resumeAt: number | null } => {
+  const args = object({
+    conversationId: string(),
+    ownerGeneration: string(),
+    resetsAt: optional(number()),
+    monthly: optional(boolean()),
+  })(raw);
+  notePause(ctx.db, {
+    conversationId: args.conversationId,
+    key: "",
+    threadId: null,
+    deviceId: null,
+    ownerGeneration: args.ownerGeneration,
+    until: args.resetsAt ?? null,
+    monthly: args.monthly === true,
+    now: ctx.now,
+  });
+  if (args.monthly) {
+    ctx.jobs.cancel(`usage-limit:conversation:${args.conversationId}`);
+    return { resumeAt: null };
+  }
   const resumeAt = usageLimitResumeAt(
     ctx.db,
     `conversation:${args.conversationId}`,
@@ -3264,6 +3292,10 @@ const resumeConversationAfterUsageLimit = async (ctx: OwnerContext, raw: unknown
     "SELECT conversation_id FROM conversations WHERE conversation_id = ? AND deleted_at IS NULL",
     payload.conversationId,
   );
+  ctx.db.run(
+    "DELETE FROM usage_limit_pauses WHERE conversation_id = ? AND hold_key = '' AND device_id IS NULL",
+    payload.conversationId,
+  );
   if (!exists) return;
   const key = `${typeof payload.resumeAt === "number" ? payload.resumeAt : ctx.now}`;
   await ctx.host.startAgentMessageTurn({
@@ -3277,6 +3309,152 @@ const resumeConversationAfterUsageLimit = async (ctx: OwnerContext, raw: unknown
     ownerGeneration: payload.ownerGeneration,
     key,
   });
+};
+
+const notePause = (
+  db: OwnerDb,
+  pause: {
+    conversationId: string;
+    key: string;
+    threadId: string | null;
+    deviceId: string | null;
+    ownerGeneration: string;
+    until: number | null;
+    monthly: boolean;
+    now: number;
+  },
+): void => {
+  db.run(
+    `INSERT INTO usage_limit_pauses
+       (conversation_id, hold_key, thread_id, device_id, owner_generation, until, monthly, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT (conversation_id, hold_key) DO UPDATE SET
+       thread_id = excluded.thread_id, device_id = excluded.device_id,
+       owner_generation = excluded.owner_generation, until = excluded.until,
+       monthly = excluded.monthly, created_at = excluded.created_at`,
+    pause.conversationId,
+    pause.key,
+    pause.threadId,
+    pause.deviceId,
+    pause.ownerGeneration,
+    pause.until,
+    pause.monthly ? 1 : 0,
+    pause.now,
+  );
+};
+
+/** Threads a usage limit holds on a computer right now (their computer said so). */
+const computerPausedThreads = (db: OwnerDbReader, threadIds: readonly string[]): Set<string> => {
+  const paused = new Set<string>();
+  for (let at = 0; at < threadIds.length; at += DIRECTORY_THREAD_IDS_PER_QUERY) {
+    const chunk = threadIds.slice(at, at + DIRECTORY_THREAD_IDS_PER_QUERY);
+    for (const row of db.all<{ thread_id: string }>(
+      `SELECT thread_id FROM usage_limit_pauses
+        WHERE device_id IS NOT NULL AND thread_id IN (${chunk.map(() => "?").join(", ")})`,
+      ...chunk,
+    )) {
+      paused.add(row.thread_id);
+    }
+  }
+  return paused;
+};
+
+const heldByUsageLimit = (row: Pick<ThreadRow, "status" | "error_message">): boolean =>
+  row.status === "waiting_for_user" && (row.error_message?.startsWith(USAGE_LIMIT_HOLD_PREFIX) ?? false);
+
+const noteUsageLimit = async (
+  ctx: OwnerContext,
+  args: AgentThreadCalls["usageLimits.note"]["args"],
+): Promise<AgentThreadCalls["usageLimits.note"]["result"]> => {
+  await assertGeneration(ctx, args.ownerGeneration);
+  const key = args.threadId ?? "";
+  if (args.state === "held") {
+    notePause(ctx.db, {
+      conversationId: args.conversationId,
+      key,
+      threadId: args.threadId ?? null,
+      deviceId: args.originDeviceId,
+      ownerGeneration: args.ownerGeneration,
+      until: args.until ?? null,
+      monthly: args.monthly === true,
+      now: ctx.now,
+    });
+  } else {
+    ctx.db.run(
+      "DELETE FROM usage_limit_pauses WHERE conversation_id = ? AND hold_key = ? AND device_id = ?",
+      args.conversationId,
+      key,
+      args.originDeviceId,
+    );
+  }
+  const posted = await ctx.host.postConversationCard({
+    conversationId: args.conversationId,
+    ownerGeneration: args.ownerGeneration,
+    sourceTurnId: `usage-limit:${args.originDeviceId}:${args.holdId}:${args.state}`,
+    card: {
+      type: "usage-limit",
+      state: args.state,
+      deviceId: args.originDeviceId,
+      ...(args.threadId ? { threadId: args.threadId } : {}),
+      ...(args.state === "held" && args.until !== undefined ? { until: args.until } : {}),
+      ...(args.state === "held" && args.monthly ? { monthly: true as const } : {}),
+    } satisfies ClaudeUsageLimitCard,
+  });
+  return { posted };
+};
+
+/**
+ * Resume pressed on a chat's usage-limit card. Cloud work the limit holds
+ * for the chat (its reply and its tasks) continues now instead of at the
+ * reset; the Resume card it posts tells every computer to wake what it
+ * holds. Each piece of work re-runs on the account and engine selected now,
+ * and one that is still limited pauses again with a fresh card.
+ */
+const resumeUsageLimit = async (
+  ctx: OwnerContext,
+  args: AgentThreadCalls["usageLimits.resume"]["args"],
+): Promise<AgentThreadCalls["usageLimits.resume"]["result"]> => {
+  const snapshot = await ctx.host.snapshot();
+  if (!snapshot.writable) throw new RpcError("CONFLICT", "Account data is currently being reset or deleted.");
+  const ownerGeneration = snapshot.ownerGeneration;
+  let cloud = 0;
+  const held = ctx.db.all<ThreadRow>(
+    `SELECT * FROM agent_threads
+      WHERE (conversation_id = ? OR origin_conversation_id = ?) AND status = 'waiting_for_user'`,
+    args.conversationId,
+    args.conversationId,
+  );
+  for (const thread of held) {
+    if (!heldByUsageLimit(thread)) continue;
+    ctx.jobs.cancel(`usage-limit:agent:${thread.thread_id}`);
+    await resumeAgentAfterUsageLimit(ctx, {
+      threadId: thread.thread_id,
+      attemptGeneration: thread.attempt_generation,
+    });
+    cloud += 1;
+  }
+  const reply = ctx.db.one<{ owner_generation: string }>(
+    `SELECT owner_generation FROM usage_limit_pauses
+      WHERE conversation_id = ? AND hold_key = '' AND device_id IS NULL`,
+    args.conversationId,
+  );
+  if (reply) {
+    ctx.jobs.cancel(`usage-limit:conversation:${args.conversationId}`);
+    await resumeConversationAfterUsageLimit(ctx, {
+      conversationId: args.conversationId,
+      ownerGeneration: reply.owner_generation,
+      resumeAt: ctx.now,
+    });
+    cloud += 1;
+  }
+  ctx.db.run("DELETE FROM usage_limit_pauses WHERE conversation_id = ? AND device_id IS NOT NULL", args.conversationId);
+  await ctx.host.postConversationCard({
+    conversationId: args.conversationId,
+    ownerGeneration,
+    sourceTurnId: `usage-limit-resume:${args.requestId}`,
+    card: { type: "usage-limit", state: "resumed", resume: true, requestId: args.requestId } satisfies ClaudeUsageLimitCard,
+  });
+  return { cloud };
 };
 
 export type AgentThreadEffects = {
@@ -3749,6 +3927,23 @@ export const agentThreadsDomain = {
         "ALTER TABLE agent_dispatch_prompts ADD COLUMN workspace TEXT",
       ],
     },
+    {
+      id: "agent-threads.14-usage-limit-pauses",
+      statements: [
+        `CREATE TABLE usage_limit_pauses (
+           conversation_id TEXT NOT NULL,
+           hold_key TEXT NOT NULL,
+           thread_id TEXT,
+           device_id TEXT,
+           owner_generation TEXT NOT NULL,
+           until INTEGER,
+           monthly INTEGER NOT NULL DEFAULT 0,
+           created_at INTEGER NOT NULL,
+           PRIMARY KEY (conversation_id, hold_key)
+         )`,
+        "CREATE INDEX usage_limit_pauses_thread ON usage_limit_pauses (thread_id) WHERE thread_id IS NOT NULL",
+      ],
+    },
   ],
   calls: {
     "agentThreads.directory": {
@@ -3881,6 +4076,25 @@ export const agentThreadsDomain = {
         const row = readComputerThread(ctx.db, args);
         return row ? computerRecord(row) : null;
       },
+    },
+    "usageLimits.note": {
+      scope: "owner",
+      parse: object({
+        conversationId: id(256),
+        ownerGeneration: generation,
+        originDeviceId: id(256),
+        holdId: id(),
+        state: literal("held", "resumed"),
+        threadId: optional(id()),
+        until: optional(number({ int: true, min: 0 })),
+        monthly: optional(boolean()),
+      }),
+      handler: noteUsageLimit,
+    },
+    "usageLimits.resume": {
+      scope: "owner",
+      parse: object({ conversationId: id(256), requestId: id() }),
+      handler: resumeUsageLimit,
     },
     "computerThreads.running": {
       scope: "owner",

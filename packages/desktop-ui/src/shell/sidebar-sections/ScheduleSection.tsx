@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   getCronTriggerKind,
   type LocalCronJobRecord,
@@ -10,6 +10,7 @@ import { cronJobOfScheduleRow, scheduleUpdateArgsOf } from "@stella/contracts/sc
 import { backendClient } from "@/platform/backend/backend-client";
 import { useBackendView } from "@/platform/backend/use-backend-view";
 import { useI18n, useT } from "@/shared/i18n";
+import { useScheduleFocus } from "@/features/schedule/schedule-focus";
 import { useAuthSessionState } from "@/global/auth/hooks/use-auth-session-state";
 import { EmptyState } from "@/ui/empty-state/EmptyState";
 import { Clock, Eye, Pause, Pencil, Play, Trash2, Wand2 } from "@/ui/icons";
@@ -294,16 +295,23 @@ function ScheduleItem({
   job,
   nowMs,
   editing,
+  focusedAt,
   onEdit,
   onEditDone,
 }: {
   job: LocalCronJobRecord;
   nowMs: number;
   editing: boolean;
+  focusedAt: number | null;
   onEdit: () => void;
   onEditDone: () => void;
 }) {
   const t = useT();
+  const itemRef = useRef<HTMLLIElement>(null);
+  useEffect(() => {
+    if (focusedAt === null) return;
+    itemRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [focusedAt]);
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -354,7 +362,13 @@ function ScheduleItem({
   const api = useContext(ScheduleApiContext);
 
   return (
-    <li className="schedule-section__item" data-paused={job.enabled ? undefined : "true"} data-busy={busy || undefined}>
+    <li
+      ref={itemRef}
+      className="schedule-section__item"
+      data-paused={job.enabled ? undefined : "true"}
+      data-busy={busy || undefined}
+      data-focused={focusedAt !== null || undefined}
+    >
       <div className="schedule-section__row">
         <span className="schedule-section__glyph" aria-hidden="true">
           <Icon size={15} strokeWidth={1.75} />
@@ -421,6 +435,7 @@ export function ScheduleSection({ active }: { active: boolean }) {
   const { hasConnectedAccount } = useAuthSessionState();
   const { jobs, api } = useAllSchedules(hasConnectedAccount);
   const [editing, setEditing] = useState<string | null>(null);
+  const focus = useScheduleFocus();
   const [nowMs, setNowMs] = useState(() => Date.now());
   useEffect(() => {
     if (!active) return;
@@ -452,6 +467,7 @@ export function ScheduleSection({ active }: { active: boolean }) {
           job={job}
           nowMs={nowMs}
           editing={editing === job.id}
+          focusedAt={focus?.scheduleId === job.id && active ? focus.at : null}
           onEdit={() => setEditing(job.id)}
           onEditDone={closeEditor}
         />

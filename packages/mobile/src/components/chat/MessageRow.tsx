@@ -87,7 +87,8 @@ import { fadeHex } from "../../theme/oklch";
 import { fonts } from "../../theme/fonts";
 import type { ChatArtifact, ChatMessage } from "../../types";
 import { UserAskRecordView } from "../UserAskCard";
-import { ReminderActions } from "./ReminderActions";
+import { ReminderFireCard } from "./ReminderFireCard";
+import { ScheduleNoticeCard } from "./ScheduleNoticeCard";
 
 export type MessageRowStyles = ReturnType<typeof makeMessageRowStyles>;
 
@@ -772,7 +773,7 @@ export const ChatMessageRow = memo(function ChatMessageRow({
       ? unlinkLocalFileLinks(text, evidencePaths)
       : text;
   }, [item.role, item.text, evidencePaths]);
-  const hasText = bodyText.trim().length > 0;
+  const hasText = !item.reminder && bodyText.trim().length > 0;
   const linkedAppSlugs = useMemo(
     () =>
       item.role === "assistant" ? extractStellaAppLinkSlugs(item.text) : [],
@@ -1098,6 +1099,7 @@ export const ChatMessageRow = memo(function ChatMessageRow({
           <UserAskRecordView record={record} />
         </View>
       ))}
+      {item.scheduleNotice ? <ScheduleNoticeCard card={item.scheduleNotice} colors={colors} /> : null}
       {hasText && isSelecting ? (
         <View style={[styles.assistantBubble, styles.assistantSelectBubble]}>
           <AssistantTextSelection
@@ -1132,7 +1134,9 @@ export const ChatMessageRow = memo(function ChatMessageRow({
           </Animated.View>
         </View>
       ) : null}
-      {item.reminder ? <ReminderActions mark={item.reminder} colors={colors} /> : null}
+      {item.reminder ? (
+        <ReminderFireCard mark={item.reminder} text={item.text} firedAtMs={item.createdAt} colors={colors} />
+      ) : null}
       {hasText && (showGeneratedImages || showEvidence) ? (
         <View>
           {showGeneratedImages ? (

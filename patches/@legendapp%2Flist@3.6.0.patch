@@ -1,5 +1,5 @@
 diff --git a/react-native.js b/react-native.js
-index 0b730ec..ae384cb 100644
+index 0b730ec..d31a8fa 100644
 --- a/react-native.js
 +++ b/react-native.js
 @@ -246,8 +246,24 @@ function set$(ctx, signalName, value) {
@@ -27,7 +27,45 @@ index 0b730ec..ae384cb 100644
        for (const listener of setListeners) {
          listener(value);
        }
-@@ -6060,6 +6076,7 @@ function ContainerSlotBase({
+@@ -5301,7 +5317,7 @@ function measureContainersInLayoutEffect(ctx, targetContainerIds = null) {
+           revealMeasuredGeneration(ctx, containerId, itemKey, generation);
+         }
+       } else if (view == null ? void 0 : view.measure) {
+-        view.measure((_x, _y, width, height) => {
++        measureUntransformed$(view, (_x, _y, width, height) => {
+           var _a4;
+           const isCurrentGeneration = ((_a4 = ctx.state.containerItemGenerations[containerId]) != null ? _a4 : 0) === generation;
+           if (isCurrentGeneration) {
+@@ -5758,6 +5774,19 @@ function Separator({ ItemSeparatorComponent, leadingItem }) {
+   const isLastItem = useIsLastItem();
+   return isLastItem ? null : /* @__PURE__ */ React2__namespace.createElement(ItemSeparatorComponent, { leadingItem });
+ }
++function measureUntransformed$(view, callback) {
++  view.measure((x, y, width, height) => {
++    let w = width;
++    let h = height;
++    if (IsNewArchitecture && view.measureLayout) {
++      view.measureLayout(view, (_lx, _ly, layoutWidth, layoutHeight) => {
++        w = layoutWidth;
++        h = layoutHeight;
++      });
++    }
++    callback(x, y, w, h);
++  });
++}
+ function useOnLayoutSync({
+   ref,
+   measureInLayoutEffect = true,
+@@ -5775,7 +5804,7 @@ function useOnLayoutSync({
+   if (IsNewArchitecture) {
+     React2.useLayoutEffect(() => {
+       if (measureInLayoutEffect && ref.current) {
+-        ref.current.measure((x, y, width, height) => {
++        measureUntransformed$(ref.current, (x, y, width, height) => {
+           onLayoutChange({ height, width, x, y }, true);
+         });
+       }
+@@ -6060,6 +6089,7 @@ function ContainerSlotBase({
    id,
    horizontal,
    recycleItems,
@@ -35,7 +73,7 @@ index 0b730ec..ae384cb 100644
    ItemSeparatorComponent,
    getRenderedItem: getRenderedItem2,
    stickyHeaderConfig,
-@@ -6135,6 +6152,7 @@ var ContainersLayer = typedMemo(function ContainersLayer2({
+@@ -6135,6 +6165,7 @@ var ContainersLayer = typedMemo(function ContainersLayer2({
  });
  var Containers = typedMemo(function Containers2({
    freshDataTransitionEpoch,
@@ -43,7 +81,7 @@ index 0b730ec..ae384cb 100644
    horizontal,
    recycleItems,
    ItemSeparatorComponent,
-@@ -6154,6 +6172,7 @@ var Containers = typedMemo(function Containers2({
+@@ -6154,6 +6185,7 @@ var Containers = typedMemo(function Containers2({
            id: i,
            key: i,
            recycleItems,
@@ -51,7 +89,7 @@ index 0b730ec..ae384cb 100644
            stickyHeaderConfig
          }
        )
-@@ -6297,6 +6316,7 @@ var AlignItemsAtEndSpacer = typedMemo(function AlignItemsAtEndSpacer2({ horizont
+@@ -6297,6 +6329,7 @@ var AlignItemsAtEndSpacer = typedMemo(function AlignItemsAtEndSpacer2({ horizont
  var ListComponent = typedMemo(function ListComponent2({
    canRender,
    freshDataTransitionEpoch,
@@ -59,7 +97,7 @@ index 0b730ec..ae384cb 100644
    style,
    contentContainerStyle,
    horizontal,
-@@ -6413,6 +6433,7 @@ var ListComponent = typedMemo(function ListComponent2({
+@@ -6413,6 +6446,7 @@ var ListComponent = typedMemo(function ListComponent2({
        Containers,
        {
          freshDataTransitionEpoch,
@@ -67,7 +105,7 @@ index 0b730ec..ae384cb 100644
          getRenderedItem: getRenderedItem2,
          horizontal,
          ItemSeparatorComponent,
-@@ -6505,7 +6526,7 @@ function useDevChecksNoop(_props) {
+@@ -6505,7 +6539,7 @@ function useDevChecksNoop(_props) {
  var useDevChecks = IS_DEV ? useDevChecksImpl : useDevChecksNoop;
  
  // src/core/checkResetContainers.ts
@@ -76,7 +114,7 @@ index 0b730ec..ae384cb 100644
    const state = ctx.state;
    const { previousData } = state;
    const { maintainScrollAtEnd } = state.props;
-@@ -6519,7 +6540,9 @@ function checkResetContainers(ctx, dataProp, { didColumnsChange = false } = {})
+@@ -6519,7 +6553,9 @@ function checkResetContainers(ctx, dataProp, { didColumnsChange = false } = {})
      state.positionRecalculationStartIndex = 0;
      state.scrollForNextCalculateItemsInView = void 0;
    }
@@ -87,7 +125,7 @@ index 0b730ec..ae384cb 100644
    const shouldMaintainScrollAtEnd = !didColumnsChange && (maintainScrollAtEnd == null ? void 0 : maintainScrollAtEnd.onDataChange);
    const didMaintainScrollAtEnd = shouldMaintainScrollAtEnd && doMaintainScrollAtEnd(ctx);
    if (!didMaintainScrollAtEnd && previousData && dataProp.length > previousData.length) {
-@@ -7880,6 +7903,25 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
+@@ -7880,6 +7916,25 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
        set$(ctx, "totalSize", 0);
      }
    }
@@ -113,7 +151,7 @@ index 0b730ec..ae384cb 100644
    if (IS_DEV) {
      useDevChecks(props);
    }
-@@ -8002,7 +8044,10 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
+@@ -8002,7 +8057,10 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
      } = state;
      const didAllocateContainers = data.length > 0 && doInitialAllocateContainers(ctx);
      if (!didAllocateContainers && !isFirst && (didDataChange || didColumnsChange)) {
@@ -125,7 +163,7 @@ index 0b730ec..ae384cb 100644
      }
      if (didDataChange) {
        state.pendingDataComparison = void 0;
-@@ -8114,6 +8159,7 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
+@@ -8114,6 +8172,7 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
        contentContainerStyle,
        contentInset,
        freshDataTransitionEpoch: state.freshDataTransitionEpoch,
@@ -134,7 +172,7 @@ index 0b730ec..ae384cb 100644
        horizontal,
        initialContentOffset,
 diff --git a/react-native.mjs b/react-native.mjs
-index a3d8d9a..7ae0276 100644
+index a3d8d9a..4a61757 100644
 --- a/react-native.mjs
 +++ b/react-native.mjs
 @@ -225,8 +225,24 @@ function set$(ctx, signalName, value) {
@@ -162,7 +200,45 @@ index a3d8d9a..7ae0276 100644
        for (const listener of setListeners) {
          listener(value);
        }
-@@ -6039,6 +6055,7 @@ function ContainerSlotBase({
+@@ -5280,7 +5296,7 @@ function measureContainersInLayoutEffect(ctx, targetContainerIds = null) {
+           revealMeasuredGeneration(ctx, containerId, itemKey, generation);
+         }
+       } else if (view == null ? void 0 : view.measure) {
+-        view.measure((_x, _y, width, height) => {
++        measureUntransformed$(view, (_x, _y, width, height) => {
+           var _a4;
+           const isCurrentGeneration = ((_a4 = ctx.state.containerItemGenerations[containerId]) != null ? _a4 : 0) === generation;
+           if (isCurrentGeneration) {
+@@ -5737,6 +5753,19 @@ function Separator({ ItemSeparatorComponent, leadingItem }) {
+   const isLastItem = useIsLastItem();
+   return isLastItem ? null : /* @__PURE__ */ React2.createElement(ItemSeparatorComponent, { leadingItem });
+ }
++function measureUntransformed$(view, callback) {
++  view.measure((x, y, width, height) => {
++    let w = width;
++    let h = height;
++    if (IsNewArchitecture && view.measureLayout) {
++      view.measureLayout(view, (_lx, _ly, layoutWidth, layoutHeight) => {
++        w = layoutWidth;
++        h = layoutHeight;
++      });
++    }
++    callback(x, y, w, h);
++  });
++}
+ function useOnLayoutSync({
+   ref,
+   measureInLayoutEffect = true,
+@@ -5754,7 +5783,7 @@ function useOnLayoutSync({
+   if (IsNewArchitecture) {
+     useLayoutEffect(() => {
+       if (measureInLayoutEffect && ref.current) {
+-        ref.current.measure((x, y, width, height) => {
++        measureUntransformed$(ref.current, (x, y, width, height) => {
+           onLayoutChange({ height, width, x, y }, true);
+         });
+       }
+@@ -6039,6 +6068,7 @@ function ContainerSlotBase({
    id,
    horizontal,
    recycleItems,
@@ -170,7 +246,7 @@ index a3d8d9a..7ae0276 100644
    ItemSeparatorComponent,
    getRenderedItem: getRenderedItem2,
    stickyHeaderConfig,
-@@ -6114,6 +6131,7 @@ var ContainersLayer = typedMemo(function ContainersLayer2({
+@@ -6114,6 +6144,7 @@ var ContainersLayer = typedMemo(function ContainersLayer2({
  });
  var Containers = typedMemo(function Containers2({
    freshDataTransitionEpoch,
@@ -178,7 +254,7 @@ index a3d8d9a..7ae0276 100644
    horizontal,
    recycleItems,
    ItemSeparatorComponent,
-@@ -6133,6 +6151,7 @@ var Containers = typedMemo(function Containers2({
+@@ -6133,6 +6164,7 @@ var Containers = typedMemo(function Containers2({
            id: i,
            key: i,
            recycleItems,
@@ -186,7 +262,7 @@ index a3d8d9a..7ae0276 100644
            stickyHeaderConfig
          }
        )
-@@ -6276,6 +6295,7 @@ var AlignItemsAtEndSpacer = typedMemo(function AlignItemsAtEndSpacer2({ horizont
+@@ -6276,6 +6308,7 @@ var AlignItemsAtEndSpacer = typedMemo(function AlignItemsAtEndSpacer2({ horizont
  var ListComponent = typedMemo(function ListComponent2({
    canRender,
    freshDataTransitionEpoch,
@@ -194,7 +270,7 @@ index a3d8d9a..7ae0276 100644
    style,
    contentContainerStyle,
    horizontal,
-@@ -6392,6 +6412,7 @@ var ListComponent = typedMemo(function ListComponent2({
+@@ -6392,6 +6425,7 @@ var ListComponent = typedMemo(function ListComponent2({
        Containers,
        {
          freshDataTransitionEpoch,
@@ -202,7 +278,7 @@ index a3d8d9a..7ae0276 100644
          getRenderedItem: getRenderedItem2,
          horizontal,
          ItemSeparatorComponent,
-@@ -6484,7 +6505,7 @@ function useDevChecksNoop(_props) {
+@@ -6484,7 +6518,7 @@ function useDevChecksNoop(_props) {
  var useDevChecks = IS_DEV ? useDevChecksImpl : useDevChecksNoop;
  
  // src/core/checkResetContainers.ts
@@ -211,7 +287,7 @@ index a3d8d9a..7ae0276 100644
    const state = ctx.state;
    const { previousData } = state;
    const { maintainScrollAtEnd } = state.props;
-@@ -6498,7 +6519,9 @@ function checkResetContainers(ctx, dataProp, { didColumnsChange = false } = {})
+@@ -6498,7 +6532,9 @@ function checkResetContainers(ctx, dataProp, { didColumnsChange = false } = {})
      state.positionRecalculationStartIndex = 0;
      state.scrollForNextCalculateItemsInView = void 0;
    }
@@ -222,7 +298,7 @@ index a3d8d9a..7ae0276 100644
    const shouldMaintainScrollAtEnd = !didColumnsChange && (maintainScrollAtEnd == null ? void 0 : maintainScrollAtEnd.onDataChange);
    const didMaintainScrollAtEnd = shouldMaintainScrollAtEnd && doMaintainScrollAtEnd(ctx);
    if (!didMaintainScrollAtEnd && previousData && dataProp.length > previousData.length) {
-@@ -7859,6 +7882,25 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
+@@ -7859,6 +7895,25 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
        set$(ctx, "totalSize", 0);
      }
    }
@@ -248,7 +324,7 @@ index a3d8d9a..7ae0276 100644
    if (IS_DEV) {
      useDevChecks(props);
    }
-@@ -7981,7 +8023,10 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
+@@ -7981,7 +8036,10 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
      } = state;
      const didAllocateContainers = data.length > 0 && doInitialAllocateContainers(ctx);
      if (!didAllocateContainers && !isFirst && (didDataChange || didColumnsChange)) {
@@ -260,7 +336,7 @@ index a3d8d9a..7ae0276 100644
      }
      if (didDataChange) {
        state.pendingDataComparison = void 0;
-@@ -8093,6 +8138,7 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
+@@ -8093,6 +8151,7 @@ var LegendListInner = typedForwardRef(function LegendListInner2(props, forwarded
        contentContainerStyle,
        contentInset,
        freshDataTransitionEpoch: state.freshDataTransitionEpoch,

@@ -272,6 +272,34 @@ export type AgentThreadCalls = {
     args: { originDeviceId: string; ownerGeneration: string };
     result: Array<{ threadId: string; conversationId: string; attemptGeneration: number }>;
   };
+  /**
+   * A computer records that a usage limit paused (`held`) or released
+   * (`resumed`) its reply (no threadId) or one of its tasks in a chat. The
+   * chat's journal gets the card every device shows; `holdId` makes repeats
+   * of one event land once.
+   */
+  "usageLimits.note": {
+    args: {
+      conversationId: string;
+      ownerGeneration: string;
+      originDeviceId: string;
+      holdId: string;
+      state: "held" | "resumed";
+      threadId?: string;
+      until?: number;
+      monthly?: boolean;
+    };
+    result: { posted: boolean };
+  };
+  /**
+   * Resume pressed on a chat's usage-limit card: work the cloud holds for it
+   * continues now, and a Resume card tells every computer to continue what it
+   * holds. Runs on whatever account and engine are selected now.
+   */
+  "usageLimits.resume": {
+    args: { conversationId: string; requestId: string };
+    result: { cloud: number };
+  };
 };
 
 export type ComputerThreadRecord = {

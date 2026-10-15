@@ -3116,6 +3116,62 @@
         "pickDays": "Choisissez au moins un jour.",
         "pickCron": "Saisissez une expression cron."
       }
+    },
+    "notice": {
+      "open": "Ouvrir dans le planning",
+      "title": {
+        "created": {
+          "reminder": "Rappel créé",
+          "task": "Tâche planifiée",
+          "watch": "Veille configurée"
+        },
+        "updated": {
+          "reminder": "Rappel modifié",
+          "task": "Tâche modifiée",
+          "watch": "Veille modifiée"
+        },
+        "paused": {
+          "reminder": "Rappel en pause",
+          "task": "Tâche en pause",
+          "watch": "Veille en pause"
+        },
+        "resumed": {
+          "reminder": "Rappel repris",
+          "task": "Tâche reprise",
+          "watch": "Veille reprise"
+        },
+        "removed": {
+          "reminder": "Rappel supprimé",
+          "task": "Tâche supprimée",
+          "watch": "Veille supprimée"
+        }
+      },
+      "when": {
+        "today": "Aujourd’hui à {time}",
+        "tomorrow": "Demain à {time}",
+        "onDay": "{day} à {time}",
+        "onDate": "Le {date} à {time}",
+        "daily": "Tous les jours à {time}",
+        "weekdays": "Chaque jour de semaine à {time}",
+        "weekends": "Le week-end à {time}",
+        "weekly": "Chaque {day} à {time}",
+        "onDays": "{days} à {time}",
+        "everyMinutes": {
+          "one": "Toutes les minutes",
+          "many": "Toutes les {count} minutes",
+          "other": "Toutes les {count} minutes"
+        },
+        "everyHours": {
+          "one": "Toutes les heures",
+          "many": "Toutes les {count} heures",
+          "other": "Toutes les {count} heures"
+        },
+        "everyDays": {
+          "one": "Tous les jours",
+          "many": "Tous les {count} jours",
+          "other": "Tous les {count} jours"
+        }
+      }
     }
   },
   "selfHost": {

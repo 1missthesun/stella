@@ -20,6 +20,7 @@ export function ScheduleRow({
   schedule,
   trailing,
   busy,
+  highlighted,
   styles,
   colors,
   onPress,
@@ -27,6 +28,7 @@ export function ScheduleRow({
   schedule: MobileSchedule;
   trailing: string | null;
   busy: boolean;
+  highlighted?: boolean;
   styles: ScheduleRowStyles;
   colors: Colors;
   onPress: () => void;
@@ -41,7 +43,7 @@ export function ScheduleRow({
       onPress={onPress}
       style={({ pressed }) => [
         styles.row,
-        pressed && styles.rowPressed,
+        (pressed || highlighted) && styles.rowPressed,
         busy && styles.rowBusy,
       ]}
     >

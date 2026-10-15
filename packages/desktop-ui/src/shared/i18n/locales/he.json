@@ -3116,6 +3116,62 @@
         "pickDays": "בחרו לפחות יום אחד.",
         "pickCron": "הזינו ביטוי cron."
       }
+    },
+    "notice": {
+      "open": "פתיחה בלוח הזמנים",
+      "title": {
+        "created": {
+          "reminder": "התזכורת נקבעה",
+          "task": "המשימה תוזמנה",
+          "watch": "המעקב הוגדר"
+        },
+        "updated": {
+          "reminder": "התזכורת שונתה",
+          "task": "המשימה שונתה",
+          "watch": "המעקב שונה"
+        },
+        "paused": {
+          "reminder": "התזכורת הושהתה",
+          "task": "המשימה הושהתה",
+          "watch": "המעקב הושהה"
+        },
+        "resumed": {
+          "reminder": "התזכורת חודשה",
+          "task": "המשימה חודשה",
+          "watch": "המעקב חודש"
+        },
+        "removed": {
+          "reminder": "התזכורת הוסרה",
+          "task": "המשימה הוסרה",
+          "watch": "המעקב הוסר"
+        }
+      },
+      "when": {
+        "today": "היום ב-{time}",
+        "tomorrow": "מחר ב-{time}",
+        "onDay": "{day} ב-{time}",
+        "onDate": "{date} ב-{time}",
+        "daily": "כל יום ב-{time}",
+        "weekdays": "כל יום חול ב-{time}",
+        "weekends": "בסופי שבוע ב-{time}",
+        "weekly": "כל {day} ב-{time}",
+        "onDays": "{days} ב-{time}",
+        "everyMinutes": {
+          "one": "כל דקה",
+          "two": "כל שתי דקות",
+          "other": "כל {count} דקות"
+        },
+        "everyHours": {
+          "one": "כל שעה",
+          "two": "כל שעתיים",
+          "other": "כל {count} שעות"
+        },
+        "everyDays": {
+          "one": "כל יום",
+          "two": "כל יומיים",
+          "other": "כל {count} ימים"
+        }
+      }
     }
   },
   "selfHost": {

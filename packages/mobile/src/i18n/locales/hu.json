@@ -3100,6 +3100,59 @@
         "pickDays": "Válassz legalább egy napot.",
         "pickCron": "Adj meg egy cron-kifejezést."
       }
+    },
+    "notice": {
+      "open": "Megnyitás az Ütemezésben",
+      "title": {
+        "created": {
+          "reminder": "Emlékeztető beállítva",
+          "task": "Feladat ütemezve",
+          "watch": "Figyelés beállítva"
+        },
+        "updated": {
+          "reminder": "Emlékeztető módosítva",
+          "task": "Feladat módosítva",
+          "watch": "Figyelés módosítva"
+        },
+        "paused": {
+          "reminder": "Emlékeztető szüneteltetve",
+          "task": "Feladat szüneteltetve",
+          "watch": "Figyelés szüneteltetve"
+        },
+        "resumed": {
+          "reminder": "Emlékeztető folytatva",
+          "task": "Feladat folytatva",
+          "watch": "Figyelés folytatva"
+        },
+        "removed": {
+          "reminder": "Emlékeztető törölve",
+          "task": "Feladat törölve",
+          "watch": "Figyelés törölve"
+        }
+      },
+      "when": {
+        "today": "Ma {time}-kor",
+        "tomorrow": "Holnap {time}-kor",
+        "onDay": "{day} {time}-kor",
+        "onDate": "{date} {time}-kor",
+        "daily": "Minden nap {time}-kor",
+        "weekdays": "Minden hétköznap {time}-kor",
+        "weekends": "Hétvégén {time}-kor",
+        "weekly": "Minden {day} {time}-kor",
+        "onDays": "{days} {time}-kor",
+        "everyMinutes": {
+          "one": "Percenként",
+          "other": "{count} percenként"
+        },
+        "everyHours": {
+          "one": "Óránként",
+          "other": "{count} óránként"
+        },
+        "everyDays": {
+          "one": "Naponta",
+          "other": "{count} naponta"
+        }
+      }
     }
   },
   "selfHost": {

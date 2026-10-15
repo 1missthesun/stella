@@ -50,7 +50,8 @@ import {
 import { AppPreviewCard } from "@/features/cloud/AppPreviewCard";
 import { extractStellaAppLinkSlugs } from "@stella/contracts/workspace-apps";
 import { VoiceSessionCard } from "@/app/chat/VoiceSessionCard";
-import { ReminderActions } from "@/features/reminders/ReminderActions";
+import { ReminderFireCard } from "@/features/reminders/ReminderFireCard";
+import { ScheduleNoticeCard } from "@/features/schedule/ScheduleNoticeCard";
 import { ReplyPreview } from "@/app/chat/ReplyPreview";
 import type { ReplyRef } from "@stella/contracts/reply-refs";
 import { ReplyReportLinks } from "@/app/chat/ReplyReportLinks";
@@ -703,7 +704,7 @@ export const AssistantMessageRow = memo(
           );
         })
       : text;
-    const hasBody = bodyText.trim().length > 0;
+    const hasBody = !row.reminder && bodyText.trim().length > 0;
     const inlineImages = (row.inlineImagePayloads ?? []).filter(
       (payload): payload is Extract<DisplayPayload, { kind: "media" }> =>
         payload.kind === "media" &&
@@ -745,6 +746,9 @@ export const AssistantMessageRow = memo(
           {row.askRecords?.map((record) => (
             <UserAskRecordCard key={record.id} record={record} />
           ))}
+          {row.scheduleNotice ? (
+            <ScheduleNoticeCard card={row.scheduleNotice} />
+          ) : null}
           {hasBody && (
             <div className="message-line message-line--assistant">
               <div className="assistant-message-text chat-bubble-text">
@@ -778,7 +782,9 @@ export const AssistantMessageRow = memo(
               )}
             </div>
           )}
-          {row.reminder ? <ReminderActions mark={row.reminder} /> : null}
+          {row.reminder ? (
+            <ReminderFireCard mark={row.reminder} text={text} firedAtMs={row.timestampMs} />
+          ) : null}
           {hasBody && (inlineImageStrip || hasMedia) ? (
             <div className="assistant-media">
               {inlineImageStrip}

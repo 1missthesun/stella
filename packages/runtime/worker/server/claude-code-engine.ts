@@ -18,6 +18,7 @@ import {
   checkClaudeCodeAuth,
   claudeCodeResumableSessionId,
   closeClaudeCodeSessionWhenIdle,
+  wakeClaudeCodeUsageLimitHolds,
   CLAUDE_CODE_AGENT_AUTO_COMPACT_WINDOW,
   runClaudeCodeTurn,
 } from "../../kernel/integrations/claude-code-session-runtime.js";
@@ -112,6 +113,7 @@ const sessionStore = (dataDir: string): ClaudeCodeSessionStore => {
           seen: Array.isArray(parsed.seen) ? parsed.seen.filter((entry): entry is string => typeof entry === "string") : [],
           ...(undelivered.length > 0 ? { undelivered } : {}),
           ...(typeof parsed.context === "string" ? { context: parsed.context } : {}),
+          ...(typeof parsed.boundary === "string" ? { boundary: parsed.boundary } : {}),
         };
       } catch {
         return undefined;
@@ -334,6 +336,7 @@ const desktopTransport = (session: OpenSession): ClaudeCodeTransport => {
       return sessionId;
     },
     close: (ref) => closeClaudeCodeSessionWhenIdle(ref.sessionKey),
+    wakeUsageLimitHolds: (sessionKeys) => wakeClaudeCodeUsageLimitHolds((sessionKey) => sessionKeys.has(sessionKey)),
   };
 };
 

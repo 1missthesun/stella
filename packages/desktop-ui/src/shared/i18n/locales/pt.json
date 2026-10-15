@@ -3116,6 +3116,62 @@
         "pickDays": "Escolha pelo menos um dia.",
         "pickCron": "Digite uma expressão cron."
       }
+    },
+    "notice": {
+      "open": "Abrir na Agenda",
+      "title": {
+        "created": {
+          "reminder": "Lembrete criado",
+          "task": "Tarefa agendada",
+          "watch": "Monitoramento configurado"
+        },
+        "updated": {
+          "reminder": "Lembrete alterado",
+          "task": "Tarefa alterada",
+          "watch": "Monitoramento alterado"
+        },
+        "paused": {
+          "reminder": "Lembrete pausado",
+          "task": "Tarefa pausada",
+          "watch": "Monitoramento pausado"
+        },
+        "resumed": {
+          "reminder": "Lembrete retomado",
+          "task": "Tarefa retomada",
+          "watch": "Monitoramento retomado"
+        },
+        "removed": {
+          "reminder": "Lembrete removido",
+          "task": "Tarefa removida",
+          "watch": "Monitoramento removido"
+        }
+      },
+      "when": {
+        "today": "Hoje às {time}",
+        "tomorrow": "Amanhã às {time}",
+        "onDay": "{day} às {time}",
+        "onDate": "{date} às {time}",
+        "daily": "Todos os dias às {time}",
+        "weekdays": "Todo dia útil às {time}",
+        "weekends": "Nos fins de semana às {time}",
+        "weekly": "Toda {day} às {time}",
+        "onDays": "{days} às {time}",
+        "everyMinutes": {
+          "one": "A cada minuto",
+          "many": "A cada {count} minutos",
+          "other": "A cada {count} minutos"
+        },
+        "everyHours": {
+          "one": "A cada hora",
+          "many": "A cada {count} horas",
+          "other": "A cada {count} horas"
+        },
+        "everyDays": {
+          "one": "Todos os dias",
+          "many": "A cada {count} dias",
+          "other": "A cada {count} dias"
+        }
+      }
     }
   },
   "selfHost": {

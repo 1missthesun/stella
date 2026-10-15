@@ -53,7 +53,7 @@ import {
 } from "../computer-use/kernel.js";
 import {
   createMacComputerUseSession,
-  shutdownMacStellaComputerSession,
+  releaseMacStellaComputerSession,
 } from "../computer-use/stella-computer-executor.js";
 import { createWindowsComputerUseSession } from "../computer-use/windows-session.js";
 import { createComputerUseSession } from "../computer-use/session.js";
@@ -321,7 +321,7 @@ export const createToolHost = ({
       if (process.platform === "win32") {
         await cleanupWindowsStellaComputerSessionDaemon(sessionId);
       } else if (process.platform === "darwin") {
-        shutdownMacStellaComputerSession(sessionId);
+        await releaseMacStellaComputerSession(sessionId);
       }
     },
     executeTool: executeNestedToolCall,
@@ -680,6 +680,8 @@ export const createToolHost = ({
       runId: string,
       behavior: import("../browser-use/client.js").BrowserTurnEndBehavior,
     ) => nodeReplRegistry.endBrowserTurn(runId, behavior),
+    releaseAgentComputerSessions: (agentId: string) =>
+      nodeReplRegistry.releaseAgentNativeSessions(agentId),
     killAllShells,
     killShell,
     shutdown,

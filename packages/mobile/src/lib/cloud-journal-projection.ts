@@ -1,4 +1,5 @@
 import { reminderMarkOf } from "@stella/contracts/reminders";
+import { SCHEDULE_NOTICE_CARD_TYPE } from "@stella/contracts/schedule-notice";
 import { parseAskUserToolResult, type UserAskRecord } from "@stella/contracts/user-ask-deck";
 import { projectMobileLifecycle, type ProjectedTurn } from "./mobile-reply-context";
 import {
@@ -325,6 +326,19 @@ const projectTurn = (
     });
     return out;
   }
+  for (const record of turn) {
+    if (record.kind !== "card" || record.card.type !== SCHEDULE_NOTICE_CARD_TYPE) continue;
+    out.push({
+      id: `cloud:${turnId}:schedule-notice:${record.seq}`,
+      role: "assistant",
+      text: "",
+      createdAt: record.createdAtMs,
+      canonicalCreatedAt: record.createdAtMs,
+      sequence: record.seq,
+      scheduleNotice: record.card,
+    });
+  }
+  if (out.length > 0) return out;
   let userMessageId = `cloud:${turnId}:user`;
   let turnUserRecord: JournalMessageRecord | undefined;
   let terminal: Extract<JournalRecord, { kind: "turn" }> | undefined;
@@ -615,7 +629,8 @@ const leadingTurnLacksPrompt = (turn: JournalTurn): boolean =>
   !turn.records.some(
     (record) =>
       (record.kind === "message" && record.role === "user") ||
-      (record.kind === "card" && record.card.type === "reminder"),
+      (record.kind === "card" &&
+        (record.card.type === "reminder" || record.card.type === SCHEDULE_NOTICE_CARD_TYPE)),
   );
 
 /** The turns a window shows: all but a leading turn cut off from its prompt. */

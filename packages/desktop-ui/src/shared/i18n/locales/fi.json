@@ -3100,6 +3100,59 @@
         "pickDays": "Valitse vähintään yksi päivä.",
         "pickCron": "Anna cron-lauseke."
       }
+    },
+    "notice": {
+      "open": "Avaa aikataulussa",
+      "title": {
+        "created": {
+          "reminder": "Muistutus asetettu",
+          "task": "Tehtävä ajastettu",
+          "watch": "Seuranta asetettu"
+        },
+        "updated": {
+          "reminder": "Muistutus muutettu",
+          "task": "Tehtävä muutettu",
+          "watch": "Seuranta muutettu"
+        },
+        "paused": {
+          "reminder": "Muistutus keskeytetty",
+          "task": "Tehtävä keskeytetty",
+          "watch": "Seuranta keskeytetty"
+        },
+        "resumed": {
+          "reminder": "Muistutus jatkuu",
+          "task": "Tehtävä jatkuu",
+          "watch": "Seuranta jatkuu"
+        },
+        "removed": {
+          "reminder": "Muistutus poistettu",
+          "task": "Tehtävä poistettu",
+          "watch": "Seuranta poistettu"
+        }
+      },
+      "when": {
+        "today": "Tänään klo {time}",
+        "tomorrow": "Huomenna klo {time}",
+        "onDay": "{day} klo {time}",
+        "onDate": "{date} klo {time}",
+        "daily": "Joka päivä klo {time}",
+        "weekdays": "Joka arkipäivä klo {time}",
+        "weekends": "Viikonloppuisin klo {time}",
+        "weekly": "Joka {day} klo {time}",
+        "onDays": "{days} klo {time}",
+        "everyMinutes": {
+          "one": "Joka minuutti",
+          "other": "{count} minuutin välein"
+        },
+        "everyHours": {
+          "one": "Joka tunti",
+          "other": "{count} tunnin välein"
+        },
+        "everyDays": {
+          "one": "Joka päivä",
+          "other": "{count} päivän välein"
+        }
+      }
     }
   },
   "selfHost": {

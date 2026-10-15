@@ -1,4 +1,5 @@
 import { agentStatusOf, isLiveAgentStatus, type AgentStatus } from "./agent-status.js";
+import { USAGE_LIMIT_PAUSED_STATUS } from "./claude-usage-limit.js";
 
 export const STELLA_MESSAGE_TARGET = "stella";
 
@@ -23,6 +24,8 @@ export type AgentDirectoryAgentRow = {
   updatedAt: number;
   offline?: { lastSeenAt?: number };
   awaitingConsent?: true;
+  /** A usage limit paused it mid-run; Resume on the chat's card continues it. */
+  pausedBy?: "usage-limit";
 };
 
 export type AgentDirectorySessionRow = {
@@ -84,9 +87,12 @@ const offlineText = (row: AgentDirectoryAgentRow, now: number): string | undefin
     : undefined;
 
 const awaitingConsentText = (row: AgentDirectoryAgentRow): string | undefined =>
-  row.awaitingConsent && !row.offline
+  row.awaitingConsent && !row.offline && row.pausedBy === undefined
     ? `not started yet: ${row.where} is waiting for the user to allow work from other devices on its screen, and the agent starts once they do (up to an hour after it was sent)`
     : undefined;
+
+const statusText = (row: AgentDirectoryAgentRow): string =>
+  row.pausedBy === "usage-limit" && isLiveAgentStatus(row.status) ? USAGE_LIMIT_PAUSED_STATUS : row.status;
 
 const placeOf = (where: string): string[] => (where === "this computer" ? [] : [where]);
 
@@ -101,9 +107,9 @@ const rosterLine = (
     `- ${row.threadId}`,
     row.offline
       ? `${row.status}, computer offline`
-      : row.awaitingConsent
+      : row.awaitingConsent && row.pausedBy === undefined
         ? "waiting for consent on that computer"
-        : row.status,
+        : statusText(row),
     ...placeOf(row.where),
     `last active ${formatAge(row.updatedAt, now)}`,
     ...(options?.startedYou
@@ -151,7 +157,7 @@ export const agentDirectoryEntry = (row: AgentDirectoryAgentRow, now = Date.now(
   return {
     thread_id: row.threadId,
     description: row.description,
-    status: row.status,
+    status: statusText(row),
     where: row.where,
     last_active: formatAge(row.updatedAt, now),
     started_by: row.parentThreadId ?? STELLA_MESSAGE_TARGET,

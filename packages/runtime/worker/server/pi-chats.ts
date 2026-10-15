@@ -371,6 +371,18 @@ export const piChatsFor = (
           await runner.agentThreads.note(args);
         },
       },
+      usageLimits: {
+        note: async (args) => {
+          const runner = session.runnerCell.get();
+          if (!runner?.getStellaSiteAuth()) return;
+          await runner.usageLimits.note(args);
+        },
+        resume: async (args) => {
+          const runner = session.runnerCell.get();
+          if (!runner?.getStellaSiteAuth()) throw new Error("Sign in to Stella to resume work paused in the cloud or on your other devices.");
+          return await runner.usageLimits.resume(args);
+        },
+      },
       agentLogs: {
         append: async (args) => {
           const runner = session.runnerCell.get();
@@ -407,6 +419,9 @@ export const piChatsFor = (
         void runner.piTools
           .endAgentBrowserTurn(threadId)
           .catch((error) => console.warn("[pi-chat] closing the agent's browser tabs failed", error));
+        void runner.piTools
+          .releaseAgentComputerUse(threadId)
+          .catch((error) => console.warn("[pi-chat] stopping the agent's computer-use helper failed", error));
         const owner = { conversationId, agentId: threadId };
         const runningSessionIds = runner.backgroundExits.runningSessions(owner);
         if (runningSessionIds.length === 0) return;

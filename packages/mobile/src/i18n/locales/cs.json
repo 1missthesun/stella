@@ -3132,6 +3132,65 @@
         "pickDays": "Vyberte alespoň jeden den.",
         "pickCron": "Zadejte výraz cron."
       }
+    },
+    "notice": {
+      "open": "Otevřít v Plánu",
+      "title": {
+        "created": {
+          "reminder": "Připomínka nastavena",
+          "task": "Úkol naplánován",
+          "watch": "Hlídání nastaveno"
+        },
+        "updated": {
+          "reminder": "Připomínka změněna",
+          "task": "Úkol změněn",
+          "watch": "Hlídání změněno"
+        },
+        "paused": {
+          "reminder": "Připomínka pozastavena",
+          "task": "Úkol pozastaven",
+          "watch": "Hlídání pozastaveno"
+        },
+        "resumed": {
+          "reminder": "Připomínka obnovena",
+          "task": "Úkol obnoven",
+          "watch": "Hlídání obnoveno"
+        },
+        "removed": {
+          "reminder": "Připomínka odstraněna",
+          "task": "Úkol odstraněn",
+          "watch": "Hlídání odstraněno"
+        }
+      },
+      "when": {
+        "today": "Dnes v {time}",
+        "tomorrow": "Zítra v {time}",
+        "onDay": "{day} v {time}",
+        "onDate": "{date} v {time}",
+        "daily": "Každý den v {time}",
+        "weekdays": "Každý pracovní den v {time}",
+        "weekends": "O víkendech v {time}",
+        "weekly": "Každý {day} v {time}",
+        "onDays": "{days} v {time}",
+        "everyMinutes": {
+          "one": "Každou minutu",
+          "few": "Každé {count} minuty",
+          "many": "Každých {count} minuty",
+          "other": "Každých {count} minut"
+        },
+        "everyHours": {
+          "one": "Každou hodinu",
+          "few": "Každé {count} hodiny",
+          "many": "Každých {count} hodiny",
+          "other": "Každých {count} hodin"
+        },
+        "everyDays": {
+          "one": "Každý den",
+          "few": "Každé {count} dny",
+          "many": "Každých {count} dne",
+          "other": "Každých {count} dní"
+        }
+      }
     }
   },
   "selfHost": {

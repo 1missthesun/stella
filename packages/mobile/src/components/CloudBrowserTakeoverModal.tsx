@@ -38,6 +38,32 @@ type LoginDetail = Extract<
   { kind: "login_takeover" }
 >;
 
+// Live View forwards keys from its own text field; iOS zooms into that field on
+// focus (cropping the remote page) and capitalizes the first letter typed.
+const LIVE_VIEW_PAGE_SCRIPT = `(() => {
+  const apply = () => {
+    const head = document.head || document.documentElement;
+    if (!head) return;
+    let meta = document.querySelector('meta[name="viewport"]');
+    if (!meta) {
+      meta = document.createElement("meta");
+      meta.name = "viewport";
+      head.prepend(meta);
+    }
+    meta.content = "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no";
+  };
+  apply();
+  document.addEventListener("DOMContentLoaded", apply, { once: true });
+  document.addEventListener("focusin", (event) => {
+    const field = event.target;
+    if (!(field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement || (field instanceof HTMLElement && field.isContentEditable))) return;
+    field.setAttribute("autocapitalize", "off");
+    field.setAttribute("autocorrect", "off");
+    field.setAttribute("spellcheck", "false");
+  }, true);
+})();
+true;`;
+
 export function CloudBrowserTakeoverModal({
   visible,
   detail,
@@ -283,6 +309,8 @@ export function CloudBrowserTakeoverModal({
               sharedCookiesEnabled={false}
               thirdPartyCookiesEnabled={false}
               originWhitelist={["https://live.browser.run"]}
+              injectedJavaScriptBeforeContentLoaded={LIVE_VIEW_PAGE_SCRIPT}
+              injectedJavaScript={LIVE_VIEW_PAGE_SCRIPT}
               onShouldStartLoadWithRequest={(request) =>
                 isCloudBrowserLiveViewNavigationAllowed(request.url)
               }

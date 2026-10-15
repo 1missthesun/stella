@@ -60,7 +60,6 @@ function planIncludes(plan, t) {
   const def = PLAN_CATALOG[plan];
   if (!def.interval) return [t("billing.v3.includes.local"), t("billing.v3.includes.voice")];
   return [
-    t("billing.v3.includes.cloud", { count: def.limits.cloudAgentsAtOnce }),
     ...(def.mediaGeneration ? [t("billing.v3.includes.media")] : []),
   ];
 }

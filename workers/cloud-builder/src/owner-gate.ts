@@ -1226,7 +1226,7 @@ export class OwnerGate extends OwnerGateCloudDispatch {
   async acquireAgentContainer(input: {
     sandboxId: string;
     now?: number;
-  }): Promise<{ ok: boolean; running: number; limit: number }> {
+  }): Promise<{ ok: boolean; running: number }> {
     this.ensureSchema();
     const now = input.now ?? Date.now();
     const sandboxId = input.sandboxId?.trim() ?? "";
@@ -1244,10 +1244,12 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     const running = sql
       .exec<{ count: number }>(`SELECT COUNT(*) AS count FROM agent_containers`)
       .one().count;
-    const limit =
-      PLAN_CATALOG[billingPlan(this.ownerStore().context(null, now)).plan].limits.cloudAgentsAtOnce;
-    if (!held && running >= limit) {
-      return { ok: false, running, limit };
+    // Plans never cap how many cloud agents run at once; the budget is the
+    // only limit. Free has no cloud containers at all.
+    const cloud =
+      PLAN_CATALOG[billingPlan(this.ownerStore().context(null, now)).plan].cloudContainers;
+    if (!held && !cloud) {
+      return { ok: false, running };
     }
     sql.exec(
       `INSERT INTO agent_containers (sandbox_id, acquired_at) VALUES (?, ?)
@@ -1258,7 +1260,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     return {
       ok: true,
       running: held ? running : running + 1,
-      limit,
     };
   }
 

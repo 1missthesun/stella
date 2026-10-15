@@ -246,9 +246,6 @@ export const prewarmOrchestratorContainer = async (
   return json({ prewarmed: true, alreadyRunning: false, startMs });
 };
 
-const AGENT_CONTAINER_WAIT_MS = 3 * 60_000;
-const AGENT_CONTAINER_POLL_MS = 5_000;
-
 export const acquireAgentContainerSlot = async (
   host: Pick<SessionSandboxHost, "env">,
   turn: TurnRequest,
@@ -256,42 +253,15 @@ export const acquireAgentContainerSlot = async (
   execution: TurnExecutionContext,
 ): Promise<void> => {
   if (turn.agentRole === "orchestrator") return;
+  execution.assertActive();
   const gate = ownerGateStub(host.env.OWNER_GATES, turn.ownerId);
-  const deadline = Date.now() + AGENT_CONTAINER_WAIT_MS;
-  const queuedAt = Date.now();
-  let queued = false;
-  for (;;) {
-    execution.assertActive();
-    const slot = await gate.acquireAgentContainer({ sandboxId });
-    if (slot.ok) {
-      log("info", "agent_container_acquired", {
-        threadId: turn.threadId,
-        sandbox: sandboxId.slice(0, 16),
-        running: slot.running,
-        limit: slot.limit,
-        waitedMs: Date.now() - queuedAt,
-      });
-      return;
-    }
-    if (slot.limit === 0) {
-      throw new AgentTurnError(CLOUD_SANDBOX_SUBSCRIPTION_REQUIRED_MESSAGE);
-    }
-    if (!queued) {
-      queued = true;
-      log("info", "agent_container_queued", {
-        threadId: turn.threadId,
-        sandbox: sandboxId.slice(0, 16),
-        running: slot.running,
-        limit: slot.limit,
-      });
-    }
-    if (Date.now() >= deadline) {
-      throw new AgentTurnError(
-        `Your plan runs ${slot.limit} cloud agents at once, and that many are busy. This agent waited ${AGENT_CONTAINER_WAIT_MS / 60_000} minutes for one of them to finish. Try again once one is done, or upgrade to run more at once.`,
-      );
-    }
-    await execution.cancellation.sleep(AGENT_CONTAINER_POLL_MS);
-  }
+  const slot = await gate.acquireAgentContainer({ sandboxId });
+  if (!slot.ok) throw new AgentTurnError(CLOUD_SANDBOX_SUBSCRIPTION_REQUIRED_MESSAGE);
+  log("info", "agent_container_acquired", {
+    threadId: turn.threadId,
+    sandbox: sandboxId.slice(0, 16),
+    running: slot.running,
+  });
 };
 
 export const sandbox = (

@@ -84,7 +84,6 @@ export const planIncludesLines = (plan: BillingPlan, t: Translate): string[] => 
   const def = PLAN_CATALOG[plan];
   if (!def.interval) return [t("billing.v3.includes.local"), t("billing.v3.includes.voice")];
   return [
-    t("billing.v3.includes.cloud", { count: def.limits.cloudAgentsAtOnce }),
     ...(def.mediaGeneration ? [t("billing.v3.includes.media")] : []),
     t("billing.v3.includes.drive", { size: `${Math.round(def.limits.driveBytes / 1024 ** 3)} GB` }),
   ];

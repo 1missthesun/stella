@@ -169,8 +169,6 @@ import { containerBudgetMessage } from "./container-meter.js";
 const BINDING_WAIT_MS = 120_000;
 const CAPABILITY_RENEW_MS = 60_000;
 const BROWSER_BUDGET_CHECK_MS = 60_000;
-const CONTAINER_SLOT_WAIT_MS = 10 * 60_000;
-const CONTAINER_SLOT_POLL_MS = 5_000;
 const ORIGIN_STOP_HOLD_MS = 5_000;
 const PI_AGENT_STATE_KEY = "piAgentState";
 const CLIENT_HISTORY_PAGE = 200;
@@ -1280,19 +1278,9 @@ export class PiConversationRuntime {
     };
   }
 
-  async #takeSlot(owner: PiComputeOwner, sandboxId: string, signal: AbortSignal): Promise<void> {
-    const deadline = Date.now() + CONTAINER_SLOT_WAIT_MS;
-    for (;;) {
-      const slot = await ownerGateStub(this.#options.env.OWNER_GATES, owner.ownerId).acquireAgentContainer({ sandboxId });
-      if (slot.ok) return;
-      if (slot.limit === 0) throw new Error(CLOUD_SANDBOX_SUBSCRIPTION_REQUIRED_MESSAGE);
-      if (Date.now() >= deadline) {
-        throw new Error(
-          `Your plan runs ${slot.limit} cloud agents at once, and that many are busy. This agent waited ${CONTAINER_SLOT_WAIT_MS / 60_000} minutes for one of them to finish.`,
-        );
-      }
-      await waitFor(CONTAINER_SLOT_POLL_MS, signal);
-    }
+  async #takeSlot(owner: PiComputeOwner, sandboxId: string, _signal: AbortSignal): Promise<void> {
+    const slot = await ownerGateStub(this.#options.env.OWNER_GATES, owner.ownerId).acquireAgentContainer({ sandboxId });
+    if (!slot.ok) throw new Error(CLOUD_SANDBOX_SUBSCRIPTION_REQUIRED_MESSAGE);
   }
 
   async #attachedTool(call: PiAttachedToolCall, context: Context): Promise<SerializedAgentToolResult> {

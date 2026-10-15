@@ -46,7 +46,6 @@ export type PlanDefinition = {
   cloudContainers: boolean;
   mediaGeneration: boolean;
   limits: {
-    cloudAgentsAtOnce: number;
     modelRequestsAtOnce: number;
     modelRequestsPerMinute: number;
     modelBudgetChunkUsd: number;
@@ -63,6 +62,10 @@ export type PlanDefinition = {
   // Plain-terms lines for plan displays, most important first.
   includes: readonly string[];
 };
+
+// Abuse ceiling only, the same on every plan: plans never limit how much runs
+// at once. The budget is the only plan limit.
+const MODEL_REQUESTS_AT_ONCE = 64;
 
 const MB = 1024 * 1024;
 const GB = 1024 * MB;
@@ -92,8 +95,7 @@ export const PLAN_CATALOG: Readonly<Record<BillingPlan, PlanDefinition>> = {
     cloudContainers: false,
     mediaGeneration: false,
     limits: {
-      cloudAgentsAtOnce: 0,
-      modelRequestsAtOnce: 2,
+      modelRequestsAtOnce: MODEL_REQUESTS_AT_ONCE,
       modelRequestsPerMinute: 40,
       modelBudgetChunkUsd: 0.25,
       driveBytes: 256 * MB,
@@ -120,8 +122,7 @@ export const PLAN_CATALOG: Readonly<Record<BillingPlan, PlanDefinition>> = {
     cloudContainers: true,
     mediaGeneration: true,
     limits: {
-      cloudAgentsAtOnce: 3,
-      modelRequestsAtOnce: 4,
+      modelRequestsAtOnce: MODEL_REQUESTS_AT_ONCE,
       modelRequestsPerMinute: 80,
       modelBudgetChunkUsd: 1,
       driveBytes: 10 * GB,
@@ -148,8 +149,7 @@ export const PLAN_CATALOG: Readonly<Record<BillingPlan, PlanDefinition>> = {
     cloudContainers: true,
     mediaGeneration: true,
     limits: {
-      cloudAgentsAtOnce: 6,
-      modelRequestsAtOnce: 8,
+      modelRequestsAtOnce: MODEL_REQUESTS_AT_ONCE,
       modelRequestsPerMinute: 120,
       modelBudgetChunkUsd: 2,
       driveBytes: 50 * GB,
@@ -176,8 +176,7 @@ export const PLAN_CATALOG: Readonly<Record<BillingPlan, PlanDefinition>> = {
     cloudContainers: true,
     mediaGeneration: true,
     limits: {
-      cloudAgentsAtOnce: 10,
-      modelRequestsAtOnce: 12,
+      modelRequestsAtOnce: MODEL_REQUESTS_AT_ONCE,
       modelRequestsPerMinute: 180,
       modelBudgetChunkUsd: 4,
       driveBytes: 100 * GB,

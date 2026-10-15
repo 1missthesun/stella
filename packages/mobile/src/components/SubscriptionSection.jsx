@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Pressable, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import { Text } from "./Text";
 import { useBackendView } from "../lib/backend";
 import {
@@ -9,16 +9,57 @@ import {
 import { useMobileCheckout } from "../lib/use-mobile-checkout";
 import { useColors } from "../theme/theme-context";
 import { fonts } from "../theme/fonts";
-import { useT } from "../i18n";
+import { useLocale, useT } from "../i18n";
+import {
+  PLAN_CATALOG,
+  PLAN_ORDER,
+  isPaidBillingPlan,
+  normalizeBillingPlan,
+  planLabel as catalogPlanLabel,
+} from "@stella/contracts/billing-plans";
 import { PrimaryButton } from "./PrimaryButton";
 import { tapLight } from "../lib/haptics";
 
-const PAID_PLANS = ["go", "pro"];
+function formatAmount(dollars) {
+  if (typeof dollars !== "number" || !Number.isFinite(dollars)) return "";
+  const value = Math.max(0, dollars);
+  return Number.isInteger(value) ? `$${value}` : `$${value.toFixed(2)}`;
+}
 
-function formatPrice(cents) {
-  if (typeof cents !== "number" || !Number.isFinite(cents)) return "";
-  const dollars = Math.max(0, cents) / 100;
-  return Number.isInteger(dollars) ? `$${dollars}` : `$${dollars.toFixed(2)}`;
+function formatUsd(dollars) {
+  return `$${Math.max(0, dollars || 0).toFixed(2)}`;
+}
+
+// Whole percent for display: never 0% once anything is used, never 100% until it's all used.
+function usedPercent(used, limit) {
+  if (!(limit > 0) || !(used > 0)) return 0;
+  if (used >= limit) return 100;
+  return Math.min(99, Math.max(1, Math.floor((used / limit) * 100)));
+}
+
+const RECOMMENDED_PLAN = "pro";
+
+function formatReset(ms, locale) {
+  if (typeof ms !== "number" || ms <= 0) return "";
+  const delta = ms - Date.now();
+  try {
+    return new Date(ms).toLocaleString(
+      locale,
+      delta < 24 * 60 * 60 * 1000
+        ? { hour: "numeric", minute: "2-digit" }
+        : delta < 7 * 24 * 60 * 60 * 1000
+          ? { weekday: "long", hour: "numeric", minute: "2-digit" }
+          : { month: "short", day: "numeric" },
+    );
+  } catch {
+    return "";
+  }
+}
+
+function planIncludes(plan, t) {
+  const def = PLAN_CATALOG[plan];
+  if (!def.interval) return [t("billing.v3.includes.voice"), t("billing.v3.includes.byok")];
+  return def.mediaGeneration ? [t("billing.v3.includes.media")] : [];
 }
 
 function formatDate(ms) {
@@ -37,6 +78,7 @@ function formatDate(ms) {
 export function SubscriptionSection() {
   const colors = useColors();
   const t = useT();
+  const locale = useLocale();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const status = useBackendView("billing.status", {}).value;
@@ -44,22 +86,20 @@ export function SubscriptionSection() {
   const checkout = useMobileCheckout();
 
   const [justSubscribedPlan, setJustSubscribedPlan] = useState(null);
-  const [plansOpen, setPlansOpen] = useState(false);
   const startedPlanRef = useRef(null);
   const debugTapRef = useRef(0);
 
-  const plan = status ? status.plan : "free";
+  const plan = normalizeBillingPlan(status ? status.plan : "free");
   const signedIn = Boolean(status && status.authenticated && !status.isAnonymous);
-  const isPaid = PAID_PLANS.includes(plan);
+  const isPaid = isPaidBillingPlan(plan);
   const eligible = storefront.status === "eligible";
-  const plans = status ? status.plans : null;
 
   const checkoutPhase = checkout.phase;
-  const currentPlan = status ? status.plan : null;
+  const currentPlan = status ? normalizeBillingPlan(status.plan) : null;
   useEffect(() => {
     if (
       checkoutPhase === "pending" &&
-      PAID_PLANS.includes(currentPlan) &&
+      isPaidBillingPlan(currentPlan) &&
       currentPlan !== startedPlanRef.current
     ) {
       setJustSubscribedPlan(currentPlan);
@@ -101,58 +141,104 @@ export function SubscriptionSection() {
 
   if (!signedIn) return null;
 
-  const canExpand = !isPaid && eligible;
-  const showPlans =
-    canExpand &&
-    (plansOpen ||
-      checkoutPhase !== "idle" ||
-      justSubscribedPlan !== null);
   return (
     <View style={styles.section}>
       {header}
       <View style={styles.card}>
         {/* Current plan */}
-        <Pressable
-          disabled={!canExpand}
-          accessibilityRole={canExpand ? "button" : undefined}
-          accessibilityState={canExpand ? { expanded: showPlans } : undefined}
-          onPress={() => {
-            tapLight();
-            setPlansOpen((open) => !open);
-          }}
-          style={({ pressed }) => [
-            styles.currentPlanRow,
-            pressed && styles.rowPressed,
-          ]}
-        >
+        <View style={styles.currentPlanRow}>
           <Text style={styles.currentPlanLabel}>
             {t("billing.mobile.currentPlanLabel")}
           </Text>
           <Text style={styles.currentPlanValue}>
             {t("billing.mobile.planValue", { plan: planLabel(plan) })}
           </Text>
-          {canExpand ? (
-            <Text style={[styles.chevron, showPlans && styles.chevronOpen]}>
-              ›
-            </Text>
-          ) : null}
-        </Pressable>
+        </View>
         {isPaid ? renderRenewal() : null}
+        {renderUsage()}
 
         {justSubscribedPlan ? renderSuccess() : null}
 
-        {isPaid
-          ? renderManage()
-          : showPlans
-            ? renderPurchase()
-            : null }
+        {renderPurchase()}
+        {isPaid ? renderManage() : null}
       </View>
     </View>
   );
 
   function planLabel(key) {
-    if (plans && plans[key] && plans[key].label) return plans[key].label;
-    return key.charAt(0).toUpperCase() + key.slice(1);
+    return catalogPlanLabel(key);
+  }
+
+  function renderUsage() {
+    const usage = status ? status.usage : null;
+    if (!usage || !status || status.usagePolicy.kind !== "managed_cost") return null;
+    const oneTime = plan === "free" && usage.lifetimeLimitUsd !== null;
+    const limit = oneTime ? usage.lifetimeLimitUsd : usage.monthlyLimitUsd;
+    const used = Math.min(limit, oneTime ? usage.lifetimeUsedUsd : usage.monthlyUsedUsd);
+    const percent = limit > 0 ? Math.min(100, Math.max(0, (used / limit) * 100)) : 0;
+    const reserved = Number.isFinite(usage.reservedUsd) ? usage.reservedUsd : 0;
+    const heldPercent = limit > 0 ? Math.min(100 - percent, (reserved / limit) * 100) : 0;
+    const credit = status.credits ? status.credits.balanceUsd : 0;
+    const blocked = typeof usage.availableUsd === "number" && usage.availableUsd <= 0.0001;
+    const exceeded = oneTime
+      ? []
+      : [
+          [usage.rollingUsedUsd, usage.rollingLimitUsd, usage.rollingResetsAt],
+          [usage.weeklyUsedUsd, usage.weeklyLimitUsd, usage.weeklyResetsAt],
+          [usage.monthlyUsedUsd, usage.monthlyLimitUsd, usage.monthlyResetsAt],
+        ].filter(([u, l, at]) => l > 0 && u >= l && typeof at === "number");
+    const resumesAt = exceeded.length ? Math.max(...exceeded.map((w) => w[2])) : null;
+    return (
+      <View style={styles.usage}>
+        <View style={styles.usageHead}>
+          <Text style={styles.currentPlanLabel}>
+            {oneTime ? t("billing.v3.mobile.usageOneTime") : t("billing.v3.mobile.usageRow")}
+          </Text>
+          <Text style={styles.usageValue}>
+            {t("billing.v3.usage.percentUsed", { percent: `${usedPercent(used, limit)}%` })}
+          </Text>
+        </View>
+        <View
+          style={styles.track}
+          accessibilityRole="progressbar"
+          accessibilityValue={{ min: 0, max: 100, now: Math.round(percent) }}
+        >
+          <View style={[styles.fill, percent >= 100 && styles.fillFull, { width: `${percent}%` }]} />
+          {heldPercent > 0 ? <View style={[styles.held, { width: `${heldPercent}%` }]} /> : null}
+        </View>
+        <Text style={styles.usageMuted}>
+          {oneTime
+            ? t("billing.v3.usage.oneTimeNote")
+            : t("billing.v3.usage.resets", { date: formatReset(usage.monthlyResetsAt, locale) })}
+        </Text>
+        {credit > 0 ? (
+          <Text style={styles.usageMuted}>
+            {t("billing.v3.usage.credit")}: {formatUsd(credit)}
+          </Text>
+        ) : null}
+        {blocked ? (
+          <View style={[styles.banner, styles.bannerError]}>
+            <Text style={styles.bannerTitle}>
+              {oneTime ? t("billing.v3.usage.freeOutTitle") : t("billing.v3.usage.outTitle")}
+            </Text>
+            <Text style={styles.bannerBody}>
+              {oneTime
+                ? t("billing.v3.usage.freeOutBody")
+                : resumesAt
+                  ? t("billing.v3.usage.outBody", { date: formatReset(resumesAt, locale) })
+                  : t("billing.v3.usage.outBodyNoDate")}
+            </Text>
+          </View>
+        ) : resumesAt && credit > 0 ? (
+          <View style={[styles.banner, styles.bannerPending]}>
+            <Text style={styles.bannerTitle}>{t("billing.v3.usage.creditTitle")}</Text>
+            <Text style={styles.bannerBody}>
+              {t("billing.v3.usage.creditBody", { date: formatReset(resumesAt, locale) })}
+            </Text>
+          </View>
+        ) : null}
+      </View>
+    );
   }
 
   function renderRenewal() {
@@ -232,8 +318,10 @@ export function SubscriptionSection() {
     }
     return (
       <>
-        <Text style={styles.cardTitle}>{t("billing.mobile.chooseHeading")}</Text>
-        <Text style={styles.cardSubtitle}>{t("billing.subtitle")}</Text>
+        <View style={styles.plansHead}>
+          <Text style={styles.plansHeading}>{t("billing.v3.plan.heading")}</Text>
+          <Text style={styles.plansLede}>{t("billing.v3.plan.lede")}</Text>
+        </View>
         {checkoutPhase === "error" && checkout.error ? (
           <View style={[styles.banner, styles.bannerError]}>
             <Text style={styles.bannerTitle}>
@@ -253,42 +341,73 @@ export function SubscriptionSection() {
             </Pressable>
           </View>
         ) : null}
-        {PAID_PLANS.map((key) => renderPlanRow(key, { subscribe: true }))}
-        <Text style={styles.footnote}>{t("billing.mobile.footnote")}</Text>
+        {PLAN_ORDER.map((key) => renderPlanRow(key))}
+        {!isPaid && eligible ? <Text style={styles.footnote}>{t("billing.mobile.footnote")}</Text> : null}
       </>
     );
   }
 
-  function renderPlanRow(key, opts) {
-    const config = plans ? plans[key] : null;
-    const priceText = config ? formatPrice(config.monthlyPriceCents) : "";
-    const intro =
-      config && typeof config.introFirstMonthPriceCents === "number"
-        ? formatPrice(config.introFirstMonthPriceCents)
-        : null;
+  function renderPlanRow(key) {
+    const def = PLAN_CATALOG[key];
     const starting = checkoutPhase === "starting";
+    const isCurrent = key === plan;
+    const recommended = key === RECOMMENDED_PLAN;
+    const rank = (id) => PLAN_ORDER.indexOf(id);
+    const suggested =
+      rank(plan) < rank(RECOMMENDED_PLAN) ? RECOMMENDED_PLAN : PLAN_ORDER[rank(plan) + 1] ?? null;
+    const subscribe = eligible && !isPaid && !isCurrent && isPaidBillingPlan(key);
+    const change = eligible && isPaid && !isCurrent;
+    const primary = (subscribe || change) && key === suggested;
+    const actionLabel = subscribe
+      ? starting
+        ? t("billing.mobile.startingCheckout")
+        : t("billing.v3.plan.get", { plan: planLabel(key) })
+      : rank(key) > rank(plan)
+        ? t("billing.v3.usage.upgradeTo", { plan: planLabel(key) })
+        : t("billing.v3.plan.switchTo", { plan: planLabel(key) });
+    const onAction = () => {
+      if (subscribe) {
+        handleSubscribe(key);
+        return;
+      }
+      tapLight();
+      void checkout.openManage();
+    };
     return (
-      <View key={key} style={styles.planRow}>
-        <View style={styles.planInfo}>
-          <Text style={styles.planName}>{planLabel(key)}</Text>
-          <Text style={styles.planTagline}>{t(`billing.plans.${key}.tagline`)}</Text>
-          <Text style={styles.planPrice}>
-            {intro
-              ? t("billing.mobile.introLine", { introPrice: intro, price: priceText })
-              : t("billing.mobile.perMonth", { price: priceText })}
-          </Text>
+      <View key={key} style={[styles.planRow, isCurrent && styles.planRowCurrent]}>
+        <View style={styles.planTop}>
+          <View style={styles.planInfo}>
+            {isCurrent || recommended ? (
+              <Text style={styles.planFlag}>
+                {isCurrent ? t("billing.v3.plan.currentPlan") : t("billing.v3.plan.recommended")}
+              </Text>
+            ) : null}
+            <Text style={styles.planName}>{planLabel(key)}</Text>
+            <Text style={styles.planTagline}>{t(`billing.v3.tagline.${key}`)}</Text>
+          </View>
+          <View style={styles.planPriceBox}>
+            <Text style={[styles.planAmount, recommended && styles.planAmountAccent]}>
+              {formatAmount(def.monthlyPriceCents / 100)}
+            </Text>
+            <Text style={styles.planPer}>
+              {def.interval ? t("billing.v3.plan.month") : t("billing.v3.plan.noCard")}
+            </Text>
+          </View>
         </View>
-        {opts.subscribe ? (
-          <PrimaryButton
-            label={
-              starting
-                ? t("billing.mobile.startingCheckout")
-                : t("billing.mobile.subscribe")
-            }
-            disabled={starting}
-            onPress={() => handleSubscribe(key)}
-            style={styles.planCta}
-          />
+        <Text style={styles.planFeatures}>{planIncludes(key, t).join(" · ")}</Text>
+        {subscribe || change ? (
+          primary ? (
+            <PrimaryButton label={actionLabel} disabled={starting} onPress={onAction} style={styles.planCta} />
+          ) : (
+            <Pressable
+              accessibilityRole="button"
+              disabled={starting}
+              onPress={onAction}
+              style={({ pressed }) => [styles.planGhost, pressed && styles.rowPressed]}
+            >
+              <Text style={styles.planGhostText}>{actionLabel}</Text>
+            </Pressable>
+          )
         ) : null}
       </View>
     );
@@ -300,20 +419,17 @@ const makeStyles = (colors) => ({
     marginTop: 4,
   },
   sectionLabel: {
-    color: colors.textMuted,
-    fontFamily: fonts.sans.medium,
-    fontSize: 13,
-    letterSpacing: 0.3,
-    marginBottom: 10,
-
+    color: colors.text,
+    fontFamily: fonts.sans.semiBold,
+    fontSize: 20,
+    letterSpacing: -0.4,
+    marginBottom: 8,
   },
   card: {
-    backgroundColor: colors.surface ?? colors.card ?? "transparent",
-    borderColor: colors.border,
-    borderRadius: 16,
-    borderWidth: 1,
+    borderTopColor: colors.border,
+    borderTopWidth: StyleSheet.hairlineWidth,
     gap: 12,
-    padding: 16,
+    paddingTop: 12,
   },
   cardTitle: {
     color: colors.text,
@@ -351,39 +467,141 @@ const makeStyles = (colors) => ({
     fontSize: 13,
     marginTop: -4,
   },
-  planRow: {
+  usage: {
+    gap: 6,
+  },
+  usageHead: {
+    alignItems: "baseline",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  usageValue: {
+    color: colors.text,
+    fontFamily: fonts.sans.semiBold,
+    fontSize: 18,
+    fontVariant: ["tabular-nums"],
+  },
+  usageMuted: {
+    color: colors.textMuted,
+    fontFamily: fonts.sans.regular,
+    fontSize: 13,
+  },
+  track: {
+    backgroundColor: colors.border,
+    borderRadius: 4,
+    flexDirection: "row",
+    height: 8,
+    overflow: "hidden",
+  },
+  fill: {
+    backgroundColor: colors.text,
+    height: "100%",
+  },
+  fillFull: {
+    backgroundColor: colors.danger ?? colors.text,
+  },
+  held: {
+    backgroundColor: colors.textMuted,
+    height: "100%",
+    opacity: 0.5,
+  },
+  plansHead: {
     alignItems: "center",
-    borderColor: colors.border,
-    borderRadius: 12,
-    borderWidth: 1,
+    gap: 4,
+    paddingTop: 12,
+  },
+  plansHeading: {
+    color: colors.text,
+    fontFamily: fonts.sans.semiBold,
+    fontSize: 24,
+    letterSpacing: -0.5,
+    textAlign: "center",
+  },
+  plansLede: {
+    color: colors.textMuted,
+    fontFamily: fonts.sans.regular,
+    fontSize: 14,
+    lineHeight: 19,
+    textAlign: "center",
+  },
+  planRow: {
+    borderTopColor: colors.border,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    gap: 10,
+    paddingHorizontal: 4,
+    paddingVertical: 14,
+  },
+  planRowCurrent: {
+    borderTopColor: colors.accent,
+    borderTopWidth: 2,
+  },
+  planTop: {
+    alignItems: "flex-start",
     flexDirection: "row",
     gap: 12,
-    justifyContent: "space-between",
-    padding: 12,
   },
   planInfo: {
     flex: 1,
     gap: 2,
   },
+  planFlag: {
+    color: colors.accent,
+    fontFamily: fonts.sans.semiBold,
+    fontSize: 11,
+    letterSpacing: 0.6,
+    textTransform: "uppercase",
+  },
   planName: {
     color: colors.text,
     fontFamily: fonts.sans.semiBold,
-    fontSize: 16,
-    letterSpacing: -0.2,
+    fontSize: 20,
+    letterSpacing: -0.4,
   },
   planTagline: {
     color: colors.textMuted,
     fontFamily: fonts.sans.regular,
-    fontSize: 13,
-  },
-  planPrice: {
-    color: colors.text,
-    fontFamily: fonts.sans.medium,
     fontSize: 14,
-    marginTop: 2,
+  },
+  planPriceBox: {
+    alignItems: "flex-end",
+  },
+  planAmount: {
+    color: colors.text,
+    fontFamily: fonts.sans.semiBold,
+    fontSize: 30,
+    fontVariant: ["tabular-nums"],
+    letterSpacing: -1,
+  },
+  planAmountAccent: {
+    color: colors.accent,
+  },
+  planPer: {
+    color: colors.textMuted,
+    fontFamily: fonts.sans.regular,
+    fontSize: 12,
+  },
+  planFeatures: {
+    color: colors.textMuted,
+    fontFamily: fonts.sans.regular,
+    fontSize: 13,
+    lineHeight: 18,
   },
   planCta: {
-    minWidth: 108,
+    alignSelf: "stretch",
+  },
+  planGhost: {
+    alignItems: "center",
+    borderColor: colors.border,
+    borderRadius: 22,
+    borderWidth: 1,
+    justifyContent: "center",
+    minHeight: 44,
+  },
+  planGhostText: {
+    color: colors.text,
+    fontFamily: fonts.sans.semiBold,
+    fontSize: 15,
+    letterSpacing: -0.3,
   },
   cta: {
     marginTop: 4,
@@ -410,25 +628,14 @@ const makeStyles = (colors) => ({
     transform: [{ rotate: "90deg" }],
   },
   banner: {
-    borderRadius: 12,
-    gap: 6,
-    padding: 12,
+    borderTopColor: colors.border,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    gap: 4,
+    paddingTop: 12,
   },
-  bannerSuccess: {
-    backgroundColor: colors.successSoft ?? colors.surfaceMuted ?? "transparent",
-    borderColor: colors.border,
-    borderWidth: 1,
-  },
-  bannerPending: {
-    backgroundColor: colors.surfaceMuted ?? "transparent",
-    borderColor: colors.border,
-    borderWidth: 1,
-  },
-  bannerError: {
-    backgroundColor: colors.dangerSoft ?? colors.surfaceMuted ?? "transparent",
-    borderColor: colors.border,
-    borderWidth: 1,
-  },
+  bannerSuccess: {},
+  bannerPending: {},
+  bannerError: {},
   pendingHeader: {
     alignItems: "center",
     flexDirection: "row",

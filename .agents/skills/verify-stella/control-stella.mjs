@@ -556,7 +556,7 @@ const seedDataDir = (dataDir, { claudeCode = false, firstRun = false } = {}) => 
   });
 };
 
-const ACCOUNT_MODES = ["signed-in", "signed-out", "go", "pro"];
+const ACCOUNT_MODES = ["signed-in", "signed-out", "plus", "pro", "max"];
 const TEST_ACCOUNT_EMAIL_DOMAIN = "test.stella.local";
 
 const DEV_BACKEND_URL = "https://stella-v2-cloud-builder-dev.fromyou.workers.dev";
@@ -589,10 +589,11 @@ const mintTestAccount = async (runId, mode) => {
     });
   }
   const body = { email: reuseEmail || `agent-${runId}@${TEST_ACCOUNT_EMAIL_DOMAIN}` };
-  if (mode === "go" || mode === "pro") {
+  if (mode === "plus" || mode === "pro" || mode === "max") {
     body.plan = mode;
-    body.usageMode = "unlimited";
+    body.usageMode = process.env.STELLA_VERIFY_METERED === "1" ? "default" : "unlimited";
   }
+  if (process.env.STELLA_VERIFY_ALLOWANCE === "spent") body.allowance = "spent";
   let response;
   try {
     response = await fetch(`${siteUrl}/api/admin/test-accounts/session`, {

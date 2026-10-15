@@ -624,8 +624,9 @@ export class BuildSessionObject extends DurableObject<Env> {
     workload: SandboxWorkload = "app-build",
     world?: string,
     idleTimeoutMs?: number,
+    owner?: string,
   ) {
-    return sandbox(this.self, id, size, workload, world, idleTimeoutMs);
+    return sandbox(this.self, id, size, workload, world, idleTimeoutMs, owner);
   }
 
   private sandboxContainerRunning(

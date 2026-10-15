@@ -924,7 +924,7 @@ app.all(`/internal/worlds/:world{${WORLD_KEY}}/blob/:sha256{[0-9a-f]{64}}`, (c) 
   }),
 );
 
-app.all("/workspace-apps/:rest{.*}", (c) => serveWorkspaceApp(c.req.raw, c.env));
+app.all("/workspace-apps/:rest{.*}", (c) => serveWorkspaceApp(c.req.raw, c.env, c.executionCtx));
 
 // ── User-authenticated ────────────────────────────────────────────────────
 // A signed-in user presents a user JWT, not the shared secret. Each route

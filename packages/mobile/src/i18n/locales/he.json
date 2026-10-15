@@ -481,7 +481,7 @@
       "video_generation": "יצירת וידאו"
     },
     "capabilityRestriction": {
-      "genericDescription": "התכונה הזו כלולה ב-Stella Pro. שדרג כדי לפתוח אותה.",
+      "genericDescription": "התכונה הזו כלולה בכל תוכנית בתשלום של Stella. שדרג כדי לפתוח אותה.",
       "genericTitle": "לא כלול בתוכנית שלך",
       "lockedBadge": "{plan}",
       "lockedBadgeGeneric": "לא זמין",
@@ -490,22 +490,6 @@
       "unavailable": "התכונה {capability} לא זמינה באף תוכנית כרגע.",
       "upgrade": "התכונה {capability} כלולה ב-Stella {plan}. שדרג כדי לפתוח אותה."
     },
-    "features": {
-      "assistant": "עוזר אישי",
-      "codingAgent": "סוכן קוד",
-      "dictationReadAloud": "הכתבה והקראה",
-      "multipleAgents": "סוכנים מרובים",
-      "research": "מחקר ועבודת ידע"
-    },
-    "freeAllowance": {
-      "caption": "חינם להתנסות.",
-      "exhaustedCta": "שדרוג ל-Go",
-      "exhaustedDescription": "שדרגו ל-Go לשימוש גבוה פי 10.",
-      "exhaustedTitle": "הגעתם למגבלת תוכנית Free",
-      "label": "שימוש בתוכנית Free",
-      "remaining": "חינם להתנסות."
-    },
-    "heading": "בחרו את התוכנית שלכם",
     "mobile": {
       "accessEnds": "הגישה מסתיימת ב-{date}",
       "alreadySubscribedTitle": "כבר יש לך מנוי",
@@ -513,7 +497,6 @@
       "currentPlanLabel": "התוכנית הנוכחית",
       "errorRetry": "נסו שוב",
       "footnote": "החיוב מתבצע על ידי Stella דרך Stripe. מתחדש מדי חודש עד לביטול; ניתן לבטל בכל עת.",
-      "introLine": "{introPrice} בחודש הראשון, אחר כך {price}/חודש",
       "manage": "ניהול המנוי",
       "manageWebNote": "אפשר לנהל או לבטל את המנוי הזה ב‑Stella באתר, בכתובת stella.sh.",
       "pendingBody": "השלימו את התשלום בדפדפן. התוכנית שלכם תתעדכן כאן אוטומטית ברגע שהתשלום יאושר — אין צורך להפעיל מחדש.",
@@ -529,30 +512,98 @@
       "successBody": "המנוי שלך פעיל. תיהנו מהמגבלות הגבוהות יותר.",
       "successTitle": "יש לך Stella {plan}"
     },
-    "plans": {
-      "free": {
-        "tagline": "חינם להתנסות."
-      },
-      "go": {
-        "tagline": "שימוש גבוה פי 10"
-      },
-      "pro": {
-        "tagline": "מגבלות השימוש הגבוהות ביותר ליצירת מדיה ולסוכנים מרובים"
-      }
-    },
-    "renewal": {
-      "accessEnds": "הגישה מסתיימת ב-{date}",
-      "lapseDescription": "תוכנית {plan} שלך פעילה עד {date}. אחרי כן Stella תפסיק לפעול — המכסה של תוכנית Free ניתנת פעם אחת, ואת שלך כבר ניצלת.",
-      "lapseTitle": "Stella תפסיק לפעול כשהתוכנית שלך תסתיים",
-      "nextLabel": "החידוש הבא",
-      "pendingLabel": "ביטול ממתין",
-      "renews": "מתחדש ב-{date}"
-    },
-    "subtitle": "התחילו בחינם. שדרגו כשתצטרכו יותר.",
     "upgradeDialog": {
       "cta": "בוא נתחיל",
       "description": "תודה על השדרוג. עדיפות גבוהה יותר ושימוש מוגדל פעילים כעת — אפשר להמשיך.",
       "title": "אתה בתוכנית Stella {plan}."
+    },
+    "v3": {
+      "opening": "פותח…",
+      "signIn": {
+        "title": "התחבר כדי לראות את התוכנית שלך",
+        "body": "התוכנית, השימוש והקרדיט הנוסף שלך שייכים לחשבון ה-Stella שלך."
+      },
+      "notice": {
+        "checkoutOpened": "התשלום נפתח בדפדפן. כאן יתעדכן ברגע שהתשלום יושלם.",
+        "portalOpened": "החיוב נפתח בדפדפן. שינויים יופיעו כאן אוטומטית.",
+        "checkoutFailed": "לא ניתן להתחיל תשלום כרגע.",
+        "portalFailed": "לא ניתן לפתוח את החיוב כרגע."
+      },
+      "usage": {
+        "title": "שימוש",
+        "lede": "תקציב אחד משלם על כל מה ש-Stella מריצה בשבילך.",
+        "oneTimeNote": "חד-פעמי, לא מתאפס",
+        "used": "נוצל",
+        "held": "שמור לעבודה פעילה",
+        "rolling": "{hours} השעות הבאות",
+        "weekly": "השבוע",
+        "resets": "מתאפס {date}",
+        "startsNext": "מתחיל בשימוש הבא שלך",
+        "credit": "קרדיט נוסף",
+        "creditHint": "בשימוש כשתקציב התוכנית שלך נגמר.",
+        "outTitle": "השימוש שלך נגמר לעת עתה",
+        "outBody": "התקציב שלך מתאפס {date}. הוסף קרדיט או שדרג כדי להמשיך עכשיו.",
+        "outBodyNoDate": "הוסף קרדיט או שדרג כדי להמשיך עכשיו.",
+        "freeOutTitle": "ניצלת את השימוש החינמי שלך",
+        "freeOutBody": "בחר תוכנית או הוסף קרדיט כדי להמשיך.",
+        "creditTitle": "פועל על קרדיט נוסף",
+        "creditBody": "מגבלת התוכנית שלך מוצתה עד {date}. הקרדיט מכסה את מה ש-Stella עושה עד אז.",
+        "upgradeTo": "שדרוג ל-{plan}",
+        "percentUsed": "{percent} בשימוש",
+        "usedMonth": "נוצל החודש",
+        "usedOneTime": "מהשימוש החינמי שלך נוצל",
+        "rollingNote": "מפזר את השימוש כך שתקופה עמוסה אחת לא תנצל את כל השבוע.",
+        "weeklyNote": "מפזר את השימוש כך ששבוע אחד לא ינצל את כל החודש."
+      },
+      "plan": {
+        "title": "תוכנית",
+        "lede": "אותה Stella בכל תוכנית. תוכניות גדולות יותר נותנות יותר שימוש.",
+        "perMonth": "{price}/חודש",
+        "checkoutHint": "התשלום נפתח בדפדפן. התקציב שלך מתחיל מיד.",
+        "changeHint": "תאשר את השינוי בדפדפן.",
+        "renews": "מתחדשת",
+        "renewsHint": "{price}, בחיוב חודשי דרך Stripe.",
+        "ends": "מסתיימת",
+        "endsHint": "{plan} פעילה עד אז. אפשר לחדש אותה מניהול החיוב.",
+        "manage": "תשלום וחשבוניות",
+        "manageHint": "כרטיס, חשבוניות וביטול.",
+        "manageButton": "ניהול החיוב",
+        "heading": "בחרו תוכנית",
+        "recommended": "מומלץ",
+        "currentPlan": "התוכנית הנוכחית",
+        "get": "קבלו את {plan}",
+        "switchTo": "מעבר ל-{plan}",
+        "month": "לחודש",
+        "noCard": "לא נדרש כרטיס"
+      },
+      "includes": {
+        "media": "תמונות, וידאו, מוזיקה ותלת-ממד",
+        "voice": "הכתבה והקראה",
+        "drive": "{size} אחסון ב-Drive",
+        "byok": "השתמשו במודלים ובמפתחות שלכם"
+      },
+      "credit": {
+        "title": "קרדיט נוסף",
+        "lede": "שומר על Stella פעילה כשתקציב התוכנית נגמר.",
+        "balance": "יתרה",
+        "add": "הוספת קרדיט",
+        "addHint": "תשלום חד-פעמי דרך Stripe. ללא מינוי.",
+        "addAmount": "הוספת {amount}",
+        "other": "סכום אחר",
+        "invalid": "הזן סכום בדולרים.",
+        "min": "המינימום הוא {amount}.",
+        "max": "המקסימום הוא {amount}."
+      },
+      "mobile": {
+        "usageRow": "החודש",
+        "usageOneTime": "שימוש חינמי"
+      },
+      "tagline": {
+        "free": "נסו את Stella",
+        "plus": "יותר שימוש",
+        "pro": "שימוש גבוה יותר",
+        "max": "השימוש הגבוה ביותר"
+      }
     }
   },
   "chat": {

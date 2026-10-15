@@ -1,3 +1,4 @@
+import { PLAN_CATALOG, planLabel } from "@stella/contracts/billing-plans";
 import { Cron } from "croner";
 import type { LocalCronSchedule } from "@stella/contracts/scheduling";
 import {
@@ -63,7 +64,7 @@ const RECEIPT_TTL_MS = 7 * DAY_MS;
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9._:-]{8,128}$/u;
 const ID_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/u;
 
-const DAILY_FIRES = { free: 24, go: 60, pro: 120 } as const;
+
 const UNLIMITED_DAILY_FIRES = 800;
 
 export const SCHEDULES_MIGRATION = {
@@ -1084,11 +1085,11 @@ const dailyFires = (ctx: OwnerContext): { plan: string; count: number } => {
   const access = billingAccess(ctx);
   return {
     plan: access.plan,
-    count: access.unlimited ? UNLIMITED_DAILY_FIRES : DAILY_FIRES[access.plan],
+    count: access.unlimited ? UNLIMITED_DAILY_FIRES : PLAN_CATALOG[access.plan].limits.scheduleFiresPerDay,
   };
 };
 
-const planLabel = (plan: string): string => (plan === "free" ? "Free" : plan === "go" ? "Go" : "Pro");
+
 
 const finishFire = (
   ctx: OwnerContext,

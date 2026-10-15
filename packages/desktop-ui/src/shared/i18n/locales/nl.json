@@ -476,7 +476,7 @@
       "video_generation": "Video genereren"
     },
     "capabilityRestriction": {
-      "genericDescription": "Deze functie hoort bij Stella Pro. Upgrade om hem te ontgrendelen.",
+      "genericDescription": "Deze functie zit in elk betaald Stella-abonnement. Upgrade om hem te ontgrendelen.",
       "genericTitle": "Zit niet in je abonnement",
       "lockedBadge": "{plan}",
       "lockedBadgeGeneric": "Niet beschikbaar",
@@ -485,22 +485,6 @@
       "unavailable": "{capability} is momenteel in geen enkel abonnement beschikbaar.",
       "upgrade": "{capability} hoort bij Stella {plan}. Upgrade om deze functie te ontgrendelen."
     },
-    "features": {
-      "assistant": "Persoonlijke assistent",
-      "codingAgent": "Code-agent",
-      "dictationReadAloud": "Dicteren en voorlezen",
-      "multipleAgents": "Meerdere agents",
-      "research": "Onderzoek en kenniswerk"
-    },
-    "freeAllowance": {
-      "caption": "Gratis te proberen.",
-      "exhaustedCta": "Upgraden naar Go",
-      "exhaustedDescription": "Upgrade naar Go voor 10× hoger gebruik.",
-      "exhaustedTitle": "Je hebt de limiet van het Free-abonnement bereikt",
-      "label": "Gebruik van het Free-abonnement",
-      "remaining": "Gratis te proberen."
-    },
-    "heading": "Kies je abonnement",
     "mobile": {
       "accessEnds": "Toegang eindigt op {date}",
       "alreadySubscribedTitle": "Je hebt al een abonnement",
@@ -508,7 +492,6 @@
       "currentPlanLabel": "Huidig abonnement",
       "errorRetry": "Opnieuw proberen",
       "footnote": "Gefactureerd door Stella via Stripe. Verlengt maandelijks tot je opzegt; je kunt altijd opzeggen.",
-      "introLine": "{introPrice} de eerste maand, daarna {price}/mnd",
       "manage": "Abonnement beheren",
       "manageWebNote": "Beheer of annuleer dit abonnement via Stella op het web op stella.sh.",
       "pendingBody": "Rond de betaling af in de browser. Je abonnement wordt hier automatisch bijgewerkt zodra de betaling is bevestigd — opnieuw opstarten is niet nodig.",
@@ -524,30 +507,98 @@
       "successBody": "Je abonnement is actief. Geniet van de hogere limieten.",
       "successTitle": "Je hebt nu Stella {plan}"
     },
-    "plans": {
-      "free": {
-        "tagline": "Gratis te proberen."
-      },
-      "go": {
-        "tagline": "10× hoger gebruik"
-      },
-      "pro": {
-        "tagline": "De hoogste gebruikslimieten voor mediageneratie en meerdere agents"
-      }
-    },
-    "renewal": {
-      "accessEnds": "Toegang stopt op {date}",
-      "lapseDescription": "Je {plan}-abonnement loopt tot {date}. Daarna stopt Stella — het tegoed van het Free-abonnement krijg je maar één keer en dat van jou is al op.",
-      "lapseTitle": "Stella stopt zodra je abonnement afloopt",
-      "nextLabel": "Volgende verlenging",
-      "pendingLabel": "Opzegging in behandeling",
-      "renews": "Verlengt op {date}"
-    },
-    "subtitle": "Begin gratis. Upgrade wanneer je meer nodig hebt.",
     "upgradeDialog": {
       "cta": "Aan de slag",
       "description": "Bedankt voor de upgrade. Hogere prioriteit en meer gebruik zijn nu actief — ga vooral door.",
       "title": "Je gebruikt Stella {plan}."
+    },
+    "v3": {
+      "opening": "Openen…",
+      "signIn": {
+        "title": "Log in om je abonnement te zien",
+        "body": "Je abonnement, gebruik en extra tegoed horen bij je Stella-account."
+      },
+      "notice": {
+        "checkoutOpened": "De betaling is geopend in je browser. Dit wordt bijgewerkt zodra de betaling is voltooid.",
+        "portalOpened": "Facturering is geopend in je browser. Wijzigingen verschijnen hier automatisch.",
+        "checkoutFailed": "Kan de betaling nu niet starten.",
+        "portalFailed": "Kan facturering nu niet openen."
+      },
+      "usage": {
+        "title": "Gebruik",
+        "lede": "Eén budget betaalt alles wat Stella voor je uitvoert.",
+        "oneTimeNote": "Eenmalig, wordt niet gereset",
+        "used": "Gebruikt",
+        "held": "Gereserveerd door lopend werk",
+        "rolling": "Komende {hours} uur",
+        "weekly": "Deze week",
+        "resets": "Reset: {date}",
+        "startsNext": "Begint bij je volgende gebruik",
+        "credit": "Extra tegoed",
+        "creditHint": "Gebruikt zodra het budget van je abonnement op is.",
+        "outTitle": "Je gebruik is voorlopig op",
+        "outBody": "Je budget wordt gereset: {date}. Voeg tegoed toe of upgrade om nu door te gaan.",
+        "outBodyNoDate": "Voeg tegoed toe of upgrade om nu door te gaan.",
+        "freeOutTitle": "Je hebt je gratis gebruik opgebruikt",
+        "freeOutBody": "Kies een abonnement of voeg tegoed toe om door te gaan.",
+        "creditTitle": "Draait op extra tegoed",
+        "creditBody": "De limiet van je abonnement is op tot {date}. Je tegoed dekt wat Stella tot dan doet.",
+        "upgradeTo": "Upgrade naar {plan}",
+        "percentUsed": "{percent} gebruikt",
+        "usedMonth": "gebruikt deze maand",
+        "usedOneTime": "van je gratis gebruik gebruikt",
+        "rollingNote": "Spreidt je gebruik zodat één drukke periode niet de hele week opmaakt.",
+        "weeklyNote": "Spreidt je gebruik zodat één week niet de hele maand opmaakt."
+      },
+      "plan": {
+        "title": "Abonnement",
+        "lede": "Dezelfde Stella in elk abonnement. Grotere abonnementen geven meer gebruik.",
+        "perMonth": "{price}/mnd",
+        "checkoutHint": "De betaling opent in je browser. Je budget gaat meteen in.",
+        "changeHint": "Je bevestigt de wijziging in je browser.",
+        "renews": "Verlengt",
+        "renewsHint": "{price}, maandelijks gefactureerd door Stripe.",
+        "ends": "Eindigt",
+        "endsHint": "{plan} blijft tot dan actief. Hervat het via Facturering beheren.",
+        "manage": "Betaling en facturen",
+        "manageHint": "Kaart, facturen en opzeggen.",
+        "manageButton": "Facturering beheren",
+        "heading": "Kies je abonnement",
+        "recommended": "Aanbevolen",
+        "currentPlan": "Huidig abonnement",
+        "get": "{plan} nemen",
+        "switchTo": "Overstappen naar {plan}",
+        "month": "per maand",
+        "noCard": "Geen kaart nodig"
+      },
+      "includes": {
+        "media": "Afbeelding, video, muziek en 3D",
+        "voice": "Dicteren en voorlezen",
+        "drive": "{size} Drive-opslag",
+        "byok": "Gebruik je eigen modellen en sleutels"
+      },
+      "credit": {
+        "title": "Extra tegoed",
+        "lede": "Houdt Stella draaiende als het budget van je abonnement op is.",
+        "balance": "Saldo",
+        "add": "Tegoed toevoegen",
+        "addHint": "Eenmalig betalen met Stripe. Geen abonnement.",
+        "addAmount": "{amount} toevoegen",
+        "other": "Ander bedrag",
+        "invalid": "Voer een bedrag in dollars in.",
+        "min": "Het minimum is {amount}.",
+        "max": "Het maximum is {amount}."
+      },
+      "mobile": {
+        "usageRow": "Deze maand",
+        "usageOneTime": "Gratis gebruik"
+      },
+      "tagline": {
+        "free": "Probeer Stella",
+        "plus": "Meer gebruik",
+        "pro": "Hoger gebruik",
+        "max": "Hoogste gebruik"
+      }
     }
   },
   "chat": {

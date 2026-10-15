@@ -1,3 +1,4 @@
+import { isBillingPlan, type BillingPlan } from "@stella/contracts/billing-plans";
 import { OWNER_ENFORCEMENT_STATUSES, type OwnerEnforcementStatus } from "@stella/contracts/gateway/usage";
 import { rpcErrorStatus, type RpcResponse } from "@stella/contracts/backend/protocol";
 import { bearerCredential } from "../../../shared/bearer.js";
@@ -158,7 +159,10 @@ const billingPlan = async (request: Request, env: AdminEnv): Promise<Response> =
   const ownerId = ownerIdOf(body?.ownerId);
   if (!ownerId) return fail(400, "Missing ownerId.");
   const plan = typeof body?.plan === "string" ? body.plan.trim().toLowerCase() : "";
-  if (plan && plan !== "free" && plan !== "go" && plan !== "pro") return fail(400, `Unsupported plan: ${plan}`);
+  if (plan && !isBillingPlan(plan)) return fail(400, `Unsupported plan: ${plan}`);
+  if (body?.complimentary !== undefined && typeof body.complimentary !== "boolean") {
+    return fail(400, "complimentary must be a boolean.");
+  }
   const rawUsageMode = typeof body?.usageMode === "string" ? body.usageMode.trim().toLowerCase() : "";
   const usageMode =
     typeof body?.unlimited === "boolean" ? (body.unlimited ? "unlimited" : "default") : rawUsageMode;
@@ -171,12 +175,45 @@ const billingPlan = async (request: Request, env: AdminEnv): Promise<Response> =
   const owner = await ownerGate(env, ownerId);
   if (owner.response) return owner.response;
   await owner.gate.setBillingPlan({
-    ...(plan ? { plan: plan as "free" | "go" | "pro" } : {}),
+    ...(plan ? { plan: plan as BillingPlan } : {}),
     ...(usageMode ? { usageMode: usageMode as "default" | "unlimited" } : {}),
     ...(typeof body?.resetUsage === "boolean" ? { resetUsage: body.resetUsage } : {}),
+    ...(body?.complimentary === true ? { complimentary: true } : {}),
   });
   console.log(JSON.stringify({ event: "admin_billing_plan", ownerId, plan: plan || null, usageMode: usageMode || null }));
   return json(await owner.gate.billingAccess());
+};
+
+const ownerCosts = async (url: URL, env: AdminEnv): Promise<Response> => {
+  const ownerId = ownerIdOf(url.searchParams.get("ownerId"));
+  if (!ownerId) return fail(400, "Missing ownerId.");
+  const { dayRange } = await import("./costs.js");
+  const range = dayRange(url);
+  if (range instanceof Response) return range;
+  const rawLimit = url.searchParams.get("limit");
+  const limit = rawLimit === null ? undefined : Number(rawLimit);
+  if (limit !== undefined && (!Number.isInteger(limit) || limit < 1 || limit > 500)) {
+    return fail(400, "limit must be 1 to 500.");
+  }
+  const owner = await ownerGate(env, ownerId);
+  if (owner.response) return owner.response;
+  const cursor = url.searchParams.get("cursor")?.trim() || undefined;
+  const report = await owner.gate.billingCosts({
+    from: range.from,
+    to: range.to,
+    ...(limit !== undefined ? { limit } : {}),
+    ...(cursor ? { cursor } : {}),
+  });
+  return json({ ownerId, ...report });
+};
+
+const ownerCostsExport = async (request: Request, env: AdminEnv): Promise<Response> => {
+  const body = await readBody(request);
+  const ownerId = ownerIdOf(body?.ownerId);
+  if (!ownerId) return fail(400, "Missing ownerId.");
+  const owner = await ownerGate(env, ownerId);
+  if (owner.response) return owner.response;
+  return json({ ownerId, ...(await owner.gate.exportBillingCosts()) });
 };
 
 const remove = async (request: Request, env: AdminEnv): Promise<Response> => {
@@ -215,8 +252,8 @@ const testAccountSession = async (request: Request, env: AdminEnv): Promise<Resp
       : `agent-${crypto.randomUUID().replaceAll("-", "").slice(0, 12)}${TEST_ACCOUNT_SUFFIX}`;
   if (!email.endsWith(TEST_ACCOUNT_SUFFIX)) return fail(400, `email must end with ${TEST_ACCOUNT_SUFFIX}.`);
   const plan = typeof body.plan === "string" ? body.plan.trim().toLowerCase() : "";
-  if (body.plan !== undefined && plan !== "free" && plan !== "go" && plan !== "pro") {
-    return fail(400, "plan must be free, go, or pro.");
+  if (body.plan !== undefined && !isBillingPlan(plan)) {
+    return fail(400, "plan must be free, plus, pro, or max.");
   }
   const usageMode = typeof body.usageMode === "string" ? body.usageMode.trim().toLowerCase() : "";
   if (body.usageMode !== undefined && usageMode !== "default" && usageMode !== "unlimited") {
@@ -256,7 +293,7 @@ const testAccountSession = async (request: Request, env: AdminEnv): Promise<Resp
   const spendAllowance = body.allowance === "spent";
   if (plan || spendAllowance) {
     await ownerGateStub(env.OWNER_GATES, ownerId).setBillingPlan({
-      ...(plan ? { plan: plan as "free" | "go" | "pro" } : {}),
+      ...(plan ? { plan: plan as BillingPlan } : {}),
       ...(usageMode ? { usageMode: usageMode as "default" | "unlimited" } : {}),
       ...(spendAllowance ? { spendAllowance: true } : {}),
     });
@@ -389,6 +426,12 @@ const ROUTES: Record<string, { method: "GET" | "POST"; run: (request: Request, u
   "/api/admin/owners/lookup": { method: "GET", run: (_request, url, env) => lookup(url, env) },
   "/api/admin/owners/top": { method: "GET", run: (_request, url, env) => top(url, env) },
   "/api/admin/owners/storage": { method: "GET", run: (_request, url, env) => storage(url, env) },
+  "/api/admin/owners/costs": { method: "GET", run: (_request, url, env) => ownerCosts(url, env) },
+  "/api/admin/owners/costs/export": { method: "POST", run: (request, _url, env) => ownerCostsExport(request, env) },
+  "/api/admin/costs": {
+    method: "GET",
+    run: async (_request, url, env) => (await import("./costs.js")).costsReport(url, db(env)),
+  },
   "/api/admin/owners/enforcement": { method: "POST", run: (request, _url, env) => enforcement(request, env) },
   "/api/admin/billing/plan": { method: "POST", run: (request, _url, env) => billingPlan(request, env) },
   "/api/admin/delete": { method: "POST", run: (request, _url, env) => remove(request, env) },

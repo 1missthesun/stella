@@ -476,7 +476,7 @@
       "video_generation": "Videogenerering"
     },
     "capabilityRestriction": {
-      "genericDescription": "Den här funktionen ingår i Stella Pro. Uppgradera för att låsa upp den.",
+      "genericDescription": "Den här funktionen ingår i alla betalda Stella-planer. Uppgradera för att låsa upp den.",
       "genericTitle": "Ingår inte i din plan",
       "lockedBadge": "{plan}",
       "lockedBadgeGeneric": "Otillgänglig",
@@ -485,22 +485,6 @@
       "unavailable": "{capability} är inte tillgänglig i någon plan just nu.",
       "upgrade": "{capability} ingår i Stella {plan}. Uppgradera för att låsa upp funktionen."
     },
-    "features": {
-      "assistant": "Personlig assistent",
-      "codingAgent": "Kodagent",
-      "dictationReadAloud": "Diktering och uppläsning",
-      "multipleAgents": "Flera agenter",
-      "research": "Research och kunskapsarbete"
-    },
-    "freeAllowance": {
-      "caption": "Gratis att prova.",
-      "exhaustedCta": "Uppgradera till Go",
-      "exhaustedDescription": "Uppgradera till Go för 10× högre användning.",
-      "exhaustedTitle": "Du har nått gränsen för Free-planen",
-      "label": "Användning på Free-planen",
-      "remaining": "Gratis att prova."
-    },
-    "heading": "Välj din plan",
     "mobile": {
       "accessEnds": "Åtkomsten upphör {date}",
       "alreadySubscribedTitle": "Du har redan en prenumeration",
@@ -508,7 +492,6 @@
       "currentPlanLabel": "Nuvarande plan",
       "errorRetry": "Försök igen",
       "footnote": "Debiteras av Stella via Stripe. Förnyas varje månad tills du säger upp; avsluta när du vill.",
-      "introLine": "{introPrice} första månaden, sedan {price}/mån",
       "manage": "Hantera prenumeration",
       "manageWebNote": "Hantera eller avsluta den här prenumerationen i Stella på webben på stella.sh.",
       "pendingBody": "Slutför betalningen i webbläsaren. Din plan uppdateras här automatiskt så snart betalningen har bekräftats – du behöver inte starta om.",
@@ -524,30 +507,98 @@
       "successBody": "Din prenumeration är aktiv. Njut av de högre gränserna.",
       "successTitle": "Du har Stella {plan}"
     },
-    "plans": {
-      "free": {
-        "tagline": "Gratis att prova."
-      },
-      "go": {
-        "tagline": "10× högre användning"
-      },
-      "pro": {
-        "tagline": "De högsta användningsgränserna för mediegenerering och flera agenter"
-      }
-    },
-    "renewal": {
-      "accessEnds": "Åtkomsten slutar {date}",
-      "lapseDescription": "Din {plan}-plan gäller till {date}. Efter det stannar Stella — Free-planens saldo ges bara en gång och ditt är redan förbrukat.",
-      "lapseTitle": "Stella stannar när din plan tar slut",
-      "nextLabel": "Nästa förnyelse",
-      "pendingLabel": "Uppsägning väntar",
-      "renews": "Förnyas {date}"
-    },
-    "subtitle": "Börja gratis. Uppgradera när du behöver mer.",
     "upgradeDialog": {
       "cta": "Kom igång",
       "description": "Tack för uppgraderingen. Högre prioritet och ökad användning är aktiva nu — kör vidare.",
       "title": "Du har Stella {plan}."
+    },
+    "v3": {
+      "opening": "Öppnar…",
+      "signIn": {
+        "title": "Logga in för att se din plan",
+        "body": "Din plan, din användning och ditt extra saldo hör till ditt Stella-konto."
+      },
+      "notice": {
+        "checkoutOpened": "Kassan öppnades i din webbläsare. Det här uppdateras när betalningen är klar.",
+        "portalOpened": "Faktureringen öppnades i din webbläsare. Ändringar visas här automatiskt.",
+        "checkoutFailed": "Det gick inte att starta kassan just nu.",
+        "portalFailed": "Det gick inte att öppna faktureringen just nu."
+      },
+      "usage": {
+        "title": "Användning",
+        "lede": "En budget betalar allt som Stella kör åt dig.",
+        "oneTimeNote": "Engångs, återställs inte",
+        "used": "Använt",
+        "held": "Reserverat av pågående arbete",
+        "rolling": "Kommande {hours} timmar",
+        "weekly": "Den här veckan",
+        "resets": "Återställs {date}",
+        "startsNext": "Börjar vid din nästa användning",
+        "credit": "Extra saldo",
+        "creditHint": "Används när din plans budget är slut.",
+        "outTitle": "Din användning är slut för tillfället",
+        "outBody": "Din budget återställs {date}. Fyll på saldo eller uppgradera för att fortsätta nu.",
+        "outBodyNoDate": "Fyll på saldo eller uppgradera för att fortsätta nu.",
+        "freeOutTitle": "Du har använt din gratisanvändning",
+        "freeOutBody": "Välj en plan eller fyll på saldo för att fortsätta.",
+        "creditTitle": "Kör på extra saldo",
+        "creditBody": "Din plans gräns är förbrukad till {date}. Saldot täcker det Stella gör fram till dess.",
+        "upgradeTo": "Uppgradera till {plan}",
+        "percentUsed": "{percent} använt",
+        "usedMonth": "använt denna månad",
+        "usedOneTime": "av din gratisanvändning använt",
+        "rollingNote": "Fördelar din användning så att en intensiv period inte förbrukar hela veckan.",
+        "weeklyNote": "Fördelar din användning så att en vecka inte förbrukar hela månaden."
+      },
+      "plan": {
+        "title": "Plan",
+        "lede": "Samma Stella i alla abonnemang. Större abonnemang ger mer användning.",
+        "perMonth": "{price}/mån",
+        "checkoutHint": "Kassan öppnas i din webbläsare. Din budget börjar direkt.",
+        "changeHint": "Du bekräftar ändringen i din webbläsare.",
+        "renews": "Förnyas",
+        "renewsHint": "{price}, debiteras månadsvis via Stripe.",
+        "ends": "Upphör",
+        "endsHint": "{plan} gäller fram till dess. Återuppta den under Hantera fakturering.",
+        "manage": "Betalning och fakturor",
+        "manageHint": "Kort, fakturor och uppsägning.",
+        "manageButton": "Hantera fakturering",
+        "heading": "Välj abonnemang",
+        "recommended": "Rekommenderas",
+        "currentPlan": "Nuvarande abonnemang",
+        "get": "Skaffa {plan}",
+        "switchTo": "Byt till {plan}",
+        "month": "per månad",
+        "noCard": "Inget kort behövs"
+      },
+      "includes": {
+        "media": "Bild, video, musik och 3D",
+        "voice": "Diktering och uppläsning",
+        "drive": "{size} Drive-lagring",
+        "byok": "Använd egna modeller och nycklar"
+      },
+      "credit": {
+        "title": "Extra saldo",
+        "lede": "Håller Stella igång när din plans budget är slut.",
+        "balance": "Saldo",
+        "add": "Fyll på saldo",
+        "addHint": "Betala en gång med Stripe. Ingen prenumeration.",
+        "addAmount": "Fyll på {amount}",
+        "other": "Annat",
+        "invalid": "Ange ett belopp i dollar.",
+        "min": "Minsta belopp är {amount}.",
+        "max": "Högsta belopp är {amount}."
+      },
+      "mobile": {
+        "usageRow": "Den här månaden",
+        "usageOneTime": "Gratisanvändning"
+      },
+      "tagline": {
+        "free": "Prova Stella",
+        "plus": "Mer användning",
+        "pro": "Högre användning",
+        "max": "Högsta användning"
+      }
     }
   },
   "chat": {

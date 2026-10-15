@@ -16,7 +16,7 @@ const option = (name) => {
 };
 
 const plan = (option("--plan") ?? "pro").toLowerCase();
-if (!["free", "go", "pro"].includes(plan)) fail("--plan must be free, go, or pro.");
+if (!["free", "plus", "pro", "max"].includes(plan)) fail("--plan must be free, plus, pro, or max.");
 const email = (option("--email") ?? process.env.STELLA_VERIFY_ACCOUNT_EMAIL ?? "").trim().toLowerCase();
 if (email && !email.endsWith(TEST_ACCOUNT_SUFFIX)) fail(`--email must end with ${TEST_ACCOUNT_SUFFIX}.`);
 

@@ -49,6 +49,13 @@ export type GatewayUsageEvent = {
   billable: boolean;
   networkClass?: NetworkClass;
   deviceKeyHash?: string;
+  // What the provider billed Stella for this attempt, when it differs from
+  // the charge (e.g. a failed attempt Stella absorbs).
+  providerCostMicroCents?: number;
+  costBasis?: "actual" | "estimated";
+  // 1 for the first physical attempt of a request, 2+ for retries.
+  attempt?: number;
+  tariffVersion?: string;
 };
 
 export type GatewayUsageBatch = {

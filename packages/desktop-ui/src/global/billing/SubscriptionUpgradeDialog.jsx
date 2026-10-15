@@ -6,17 +6,8 @@ import { Dialog, DialogBody, DialogContent, DialogDescription, DialogHeader, Dia
 import { Button } from "@/ui/button";
 import { uiState } from "@/platform/ui-state";
 import { useT } from "@/shared/i18n";
+import { isPaidBillingPlan, normalizeBillingPlan, planLabel, planRank, } from "@stella/contracts/billing-plans";
 import "./SubscriptionUpgradeDialog.css";
-const PAID_PLANS = new Set([
-    "go",
-    "pro",
-]);
-const DEFAULT_PLAN_LABEL = {
-    free: "Free",
-    go: "Go",
-    pro: "Pro",
-};
-const planLabelOf = (plan, status) => status?.plans?.[plan]?.label ?? DEFAULT_PLAN_LABEL[plan];
 const storageKeyFor = (accountKey) => `stella-billing-last-seen-plan:${accountKey}`;
 export const SUBSCRIPTION_UPGRADED_EVENT = "stella:subscription-upgraded";
 export function SubscriptionUpgradeDialog() {
@@ -36,9 +27,9 @@ export function SubscriptionUpgradeDialog() {
             return;
         if (billingStatus && billingStatus.authenticated === false)
             return;
-        const plan = billingStatus?.plan;
-        if (!plan)
+        if (!billingStatus?.plan)
             return;
+        const plan = normalizeBillingPlan(billingStatus.plan);
         const fingerprint = `${accountKey}|${plan}`;
         if (lastProcessedRef.current === fingerprint)
             return;
@@ -46,15 +37,15 @@ export function SubscriptionUpgradeDialog() {
         const storageKey = storageKeyFor(accountKey);
         let stored = null;
         const raw = uiState.getItem(storageKey);
-        if (raw && raw in DEFAULT_PLAN_LABEL) {
-            stored = raw;
+        if (raw) {
+            stored = normalizeBillingPlan(raw);
         }
         if (stored === plan)
             return;
         uiState.setItem(storageKey, plan);
         if (stored === null)
             return;
-        if (!PAID_PLANS.has(plan))
+        if (!isPaidBillingPlan(plan) || planRank(plan) <= planRank(stored))
             return;
         setShownPlan(plan);
         window.dispatchEvent(new CustomEvent(SUBSCRIPTION_UPGRADED_EVENT));
@@ -63,12 +54,12 @@ export function SubscriptionUpgradeDialog() {
     const message = useMemo(() => {
         if (!shownPlan)
             return null;
-        const label = planLabelOf(shownPlan, billingStatus);
+        const label = planLabel(shownPlan);
         return {
             title: t("billing.upgradeDialog.title", { plan: label }),
             description: t("billing.upgradeDialog.description"),
         };
-    }, [billingStatus, shownPlan, t]);
+    }, [shownPlan, t]);
     if (!message)
         return null;
     return (<Dialog open onOpenChange={(open) => (open ? null : onClose())}>

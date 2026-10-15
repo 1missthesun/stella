@@ -141,6 +141,7 @@ export interface BrowserBackend {
     sessionId?: string;
     storageState?: BrowserStorageSnapshot;
     allowedOrigins: readonly string[];
+    beforeAcquire?: () => Promise<void>;
     onSessionAcquired: (sessionId: string, policyDigest: string) => void;
   }): Promise<void>;
   sessionId(): string | undefined;

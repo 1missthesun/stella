@@ -100,7 +100,7 @@ export function ServerSection({
                 disabled={busy || active}
                 onPress={() => confirmSwitch(entry)}
                 style={({ pressed }) => [
-                  { flex: 1, flexDirection: "row", alignItems: "center" },
+                  { flex: 1, flexDirection: "row", alignItems: "center", gap: 12 },
                   pressed && { opacity: 0.6 },
                 ]}
               >

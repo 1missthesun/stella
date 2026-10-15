@@ -118,6 +118,8 @@ export type HlsSynthesisResult = {
   status: "done" | "error" | "canceled";
   segments: number;
   usage: TtsUsage | null;
+  sentChars: number;
+  pcmBytes: number;
 };
 
 export const synthesizeHls = async (input: {
@@ -135,12 +137,13 @@ export const synthesizeHls = async (input: {
     });
   const encoder = createPcmMp3Encoder();
   let provider: TtsProvider | null = null;
-  const usage = () => (provider ? estimateTtsUsage(provider, input.text.length, encoder.pcmBytes) : null);
+  let sentChars = () => 0;
+  const usage = () => (provider ? estimateTtsUsage(provider, sentChars(), encoder.pcmBytes) : null);
   const finish = async (status: HlsSynthesisResult["status"]): Promise<HlsSynthesisResult> => {
     manifest.done = true;
     manifest.error = status === "error" && manifest.segments.length === 0;
     await writeManifest().catch(() => undefined);
-    return { status, segments: manifest.segments.length, usage: usage() };
+    return { status, segments: manifest.segments.length, usage: usage(), sentChars: sentChars(), pcmBytes: encoder.pcmBytes };
   };
 
   const signal = AbortSignal.timeout(SYNTHESIS_TIMEOUT_MS);
@@ -149,6 +152,7 @@ export const synthesizeHls = async (input: {
     const opened = await openTtsPcm(input.env, { text: input.text, voice: input.voice, signal });
     provider = opened.provider;
     source = opened.pcm;
+    sentChars = opened.sentChars;
   } catch (error) {
     console.error(JSON.stringify({
       event: "tts_hls_provider_failed",

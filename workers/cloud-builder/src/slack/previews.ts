@@ -1,3 +1,4 @@
+import { PLAN_CATALOG, normalizeBillingPlan } from "@stella/contracts/billing-plans";
 /**
  * Stella previews for Slack: static sites a workspace's agents build and
  * Stella hosts, for when the repository publishes no preview of its own.
@@ -44,6 +45,8 @@ import { slackTry } from "./api.js";
 import { SLACK_PATHS, slackPublicOrigin, slackSecret } from "./config.js";
 import { signToken, verifyToken, type TokenKind } from "./signed-token.js";
 import { loadInstallation } from "./store.js";
+import { meteredCapture } from "../browser-billing.js";
+import { hostingPause, pausedHostingPage, recordHosting, type HostingSku } from "../hosting-meter.js";
 import { resolveConversationRepo } from "./repos.js";
 import { isSlackConversationId } from "./workspace.js";
 import { conversationAllowsHost } from "./environment.js";
@@ -72,13 +75,8 @@ const MAX_CODE_BYTES = 48 * MB;
 const MAX_UPLOAD_BYTES = 95 * MB;
 const MAX_FILES = 20_000;
 const MAX_LIVE_PREVIEWS = 500;
-const QUOTA_BYTES: Record<ManagedModelAudience, number> = {
-  free: 250 * MB,
-  go: 1024 * MB,
-  pro: 5 * 1024 * MB,
-  go_fallback: 1024 * MB,
-  pro_fallback: 5 * 1024 * MB,
-};
+const quotaBytes = (audience: ManagedModelAudience): number =>
+  PLAN_CATALOG[normalizeBillingPlan(audience)].limits.crewPreviewBytes;
 
 const PUBLISH: TokenKind = { prefix: "sp1", domain: "stella.slack-preview-publish.v1" };
 const SIGNIN_STATE: TokenKind = { prefix: "ss1", domain: "stella.slack-preview-signin.v1" };
@@ -187,7 +185,7 @@ const usage = async (env: Cloudflare.Env, teamId: string): Promise<{ bytes: numb
 const quotaFor = async (env: Cloudflare.Env, ownerId: string | null): Promise<number> => {
   if (!ownerId) return 0;
   const access = await ownerGateStub(env.OWNER_GATES, ownerId).billingAccess();
-  return QUOTA_BYTES[access.audience as ManagedModelAudience] ?? 0;
+  return quotaBytes(access.audience as ManagedModelAudience);
 };
 
 export const describePreviews = async (
@@ -788,19 +786,26 @@ const capture = async (request: Request, env: Cloudflare.Env): Promise<Response>
   const views = Array.isArray(body?.views) && body.views.length ? body.views : DEFAULT_VIEWS;
   const fullPage = body?.fullPage === true;
   const recording = body?.recording && typeof body.recording === "object" ? body.recording : null;
+  const install = await loadInstallation(env, claims.team);
+  if (!install?.ownerId) return Response.json({ error: "This workspace no longer has Stella installed." }, { status: 403 });
+  const gateway = env.BROWSER_GATEWAY;
   let upstream: Response;
   try {
-    upstream = await env.BROWSER_GATEWAY.fetch("https://browser-gateway/internal/sites/capture", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        url: navigate,
-        views: (views as Array<Record<string, unknown>>).map((view) => ({ ...view, fullPage: view.fullPage ?? fullPage })),
-        ...(typeof body?.waitFor === "string" ? { waitFor: body.waitFor } : {}),
-        ...(recording ? { recording } : {}),
+    const metered = await meteredCapture(env, install.ownerId, "browser-site-capture", () =>
+      gateway.fetch("https://browser-gateway/internal/sites/capture", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          url: navigate,
+          views: (views as Array<Record<string, unknown>>).map((view) => ({ ...view, fullPage: view.fullPage ?? fullPage })),
+          ...(typeof body?.waitFor === "string" ? { waitFor: body.waitFor } : {}),
+          ...(recording ? { recording } : {}),
+        }),
+        signal: AbortSignal.timeout(170_000),
       }),
-      signal: AbortSignal.timeout(170_000),
-    });
+    );
+    if (!metered.ok) return Response.json({ error: metered.message }, { status: 402 });
+    upstream = metered.response;
   } catch {
     return Response.json({ error: "The cloud browser didn't answer. Try again." }, { status: 503 });
   }
@@ -1133,7 +1138,12 @@ const hasView = async (request: Request, env: Cloudflare.Env, teamId: string): P
   return false;
 };
 
-export const servePreview = async (request: Request, env: Cloudflare.Env, exports?: unknown): Promise<Response> => {
+export const servePreview = async (
+  request: Request,
+  env: Cloudflare.Env,
+  exports?: unknown,
+  waiter?: { waitUntil(promise: Promise<unknown>): void },
+): Promise<Response> => {
   const url = new URL(request.url);
   const readOnly = request.method === "GET" || request.method === "HEAD";
   const shared = !sitesHost(env);
@@ -1197,14 +1207,22 @@ export const servePreview = async (request: Request, env: Cloudflare.Env, export
       `<p>This preview is for members of the ${escapeHtml(install.teamName)} Slack workspace.</p><a class="button" href="${escapeHtml(target.toString())}">Sign in</a>`,
     );
   }
+  const paused = install.ownerId ? await hostingPause(env, install.ownerId) : null;
+  if (paused) return pausedHostingPage(`This preview is paused. ${paused}`);
+  const startedAt = Date.now();
+  const meter = (sku: HostingSku) => {
+    if (install.ownerId && waiter) recordHosting(env, waiter, install.ownerId, sku, sku === "static-site" ? 0 : Date.now() - startedAt);
+  };
   if (isWorker) {
     if (shared) return page(503, "This preview can't run here", "<p>Live previews of apps need their own sites domain on this Stella server.</p>");
     const response = await serveWorkerPreview(request, env, exports, preview.id, isPublic);
+    meter("dynamic-worker");
     response.headers.delete("service-worker-allowed");
     return response;
   }
   const pathname = shared ? url.pathname.slice(preview.id.length + 1) || "/" : url.pathname;
   const response = await serveFile(request, env, preview, pathname, isPublic);
+  meter("static-site");
   response.headers.delete("service-worker-allowed");
   return response;
 };
@@ -1212,7 +1230,7 @@ export const servePreview = async (request: Request, env: Cloudflare.Env, export
 export class SitesHost extends WorkerEntrypoint<Cloudflare.Env> {
   override async fetch(request: Request): Promise<Response> {
     try {
-      return await servePreview(request, this.env, this.ctx.exports);
+      return await servePreview(request, this.env, this.ctx.exports, this.ctx);
     } catch (error) {
       console.error(
         JSON.stringify({

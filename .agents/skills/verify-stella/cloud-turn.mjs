@@ -32,6 +32,8 @@
 //
 // `--plan free [--allowance spent]` runs as a free owner (with its allowance
 // used up), for checking what a free account can still run, like its own keys.
+// `--plan plus|max` runs metered on that plan's budget; the default `pro` is
+// unlimited.
 //
 // A follow-up into an existing conversation must arrive as the same owner, so
 // pass the `--email` the first run printed together with its `--conversation`.

@@ -12,7 +12,12 @@ export const HEADER_DEVICE_REQUEST_ID = "x-stella-device-request-id";
 export const HEADER_DEVICE_REQUEST_METHOD = "x-stella-device-request-method";
 
 export const OWNER_GATE_RUNNING_GRACE_MS = 60_000;
-export const OWNER_AGENT_CONTAINER_LIMIT = 6;
+export const HOSTING_DAY_KEY = "hostingDay";
+export const HOSTING_DAILY_REQUEST_CAP = 1_000_000;
+export const HOSTING_BUDGET_MESSAGE =
+  "Its owner's Stella budget for this period is used up. It will be back when the budget resets or the owner adds credit.";
+export const HOSTING_CAP_MESSAGE =
+  "It served more requests today than Stella allows for one account. It will be back tomorrow.";
 export const DISPATCH_CLOUD_RETRY_DELAY_MS = 1_000;
 export const DISPATCH_CLOUD_MAX_ATTEMPTS = 2;
 export const DEFAULT_TURN_TIMEOUT_MS = 900_000;

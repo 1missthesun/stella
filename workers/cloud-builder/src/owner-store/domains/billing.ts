@@ -18,13 +18,24 @@ import {
   STELLA_USAGE_LIMIT_MESSAGES,
   type StellaUsageLimit,
 } from "@stella/contracts/stella-usage-limit";
+import { normalizeBillingPlan, PLAN_CATALOG } from "@stella/contracts/billing-plans";
+import {
+  FIXED_INFRA_TARIFF,
+  TARIFF_VERSION,
+  usdToMicroCents,
+  type CostEntry,
+} from "@stella/contracts/billing-tariffs";
 import {
   BillingConfigError,
   billingConfig,
   planForStripePrice,
+  priceMismatch,
+  StripePriceMismatchError,
+  verifyStripePrice,
   type BillingConfig,
 } from "../../billing/plans.js";
 import { stripeRequest, StripeError, type StripeEvent } from "../../billing/stripe.js";
+import { costExportJobs, purgeCostExport, scheduleCostExport } from "./billing-costs.js";
 import { empty, literal, number, object, optional, string } from "../args.js";
 import { RpcError } from "../errors.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
@@ -34,12 +45,17 @@ const MICRO_CENTS_PER_USD = 100_000_000;
 const LIFETIME_RETRY_AFTER_MS = 24 * 60 * 60 * 1000;
 const GRANT_SETTLEMENT_GRACE_MS = 10 * 60 * 1000;
 const RECEIPT_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
-const ACTIVE_SUBSCRIPTION_STATUSES = new Set(["active", "trialing", "past_due"]);
+const ACTIVE_SUBSCRIPTION_STATUSES = new Set(["active", "trialing", "past_due", "complimentary"]);
 const CREDIT_CURRENCY = "usd";
 const CREDIT_MIN_CENTS = 100;
 const CREDIT_MAX_CENTS = 50_000;
+// Managed Payments refuses products without a tax code: software as a service, personal use.
+const CREDIT_TAX_CODE = "txcd_10103000";
 const CREDIT_PRESET_CENTS = [500, 1_000, 2_500, 5_000];
 const STRIPE_RATE_LIMIT = { count: 10, windowMs: 60_000 };
+const COST_LEDGER_RETENTION_MS = 120 * 24 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const MIN_MODEL_HOLD_MICRO_CENTS = 2_000_000;
 
 export const BILLING_MIGRATION = {
   id: "billing.1-ledger",
@@ -94,6 +110,50 @@ export const BILLING_MIGRATION = {
        amount INTEGER NOT NULL,
        created_at INTEGER NOT NULL
      )`,
+  ],
+};
+
+// Pricing v3: Go is now Plus. The per-attempt cost ledger records what Stella
+// paid for each paid attempt, separate from what the budget was charged.
+export const BILLING_COST_LEDGER_MIGRATION = {
+  id: "billing.2-cost-ledger",
+  statements: [
+    "UPDATE billing_account SET plan = 'plus' WHERE plan = 'go'",
+    `CREATE TABLE billing_cost_ledger (
+       id TEXT PRIMARY KEY,
+       at INTEGER NOT NULL,
+       category TEXT NOT NULL,
+       provider TEXT NOT NULL,
+       sku TEXT,
+       quantity_json TEXT,
+       provider_cost INTEGER NOT NULL,
+       basis TEXT NOT NULL,
+       outcome TEXT NOT NULL,
+       attempt INTEGER NOT NULL,
+       request_id TEXT,
+       charged INTEGER NOT NULL,
+       tariff_version TEXT NOT NULL,
+       plan TEXT NOT NULL,
+       identity_level INTEGER NOT NULL
+     )`,
+    "CREATE INDEX billing_cost_ledger_at ON billing_cost_ledger (at)",
+    `CREATE TABLE billing_cost_daily (
+       day TEXT NOT NULL,
+       category TEXT NOT NULL,
+       provider TEXT NOT NULL,
+       sku TEXT NOT NULL,
+       basis TEXT NOT NULL,
+       plan TEXT NOT NULL,
+       tariff_version TEXT NOT NULL,
+       attempts INTEGER NOT NULL,
+       failures INTEGER NOT NULL,
+       provider_cost INTEGER NOT NULL,
+       charged INTEGER NOT NULL,
+       updated_at INTEGER NOT NULL,
+       exported_at INTEGER NOT NULL DEFAULT 0,
+       PRIMARY KEY (day, category, provider, sku, basis, plan, tariff_version)
+     )`,
+    "ALTER TABLE billing_grants ADD COLUMN category TEXT",
   ],
 };
 
@@ -216,8 +276,7 @@ const updateAccount = (db: OwnerDb, fields: Partial<AccountRow>): void => {
   );
 };
 
-const plan = (row: AccountRow): BillingPlan =>
-  row.plan === "go" || row.plan === "pro" ? row.plan : "free";
+const plan = (row: AccountRow): BillingPlan => normalizeBillingPlan(row.plan);
 
 const isPaying = (row: AccountRow): boolean =>
   (plan(row) !== "free" && ACTIVE_SUBSCRIPTION_STATUSES.has(row.subscription_status)) ||
@@ -304,14 +363,21 @@ export type BillingAccess = {
   retryAfterMs: number;
   message: string;
   remainingMicroCents: number | null;
+  // Remaining minus what running work has reserved; null when unlimited.
+  availableMicroCents: number | null;
+  reservedMicroCents: number;
   usageLimit?: StellaUsageLimit;
 };
 
-const audienceFor = (current: BillingPlan, downgraded: boolean): ManagedModelAudience =>
-  current === "free" ? "free" : downgraded ? `${current}_fallback` : current;
+const audienceFor = (current: BillingPlan): ManagedModelAudience => current;
 
-const accessFor = (config: BillingConfig, row: AccountRow, now: number): BillingAccess => {
-  const current = config.enabled ? plan(row) : "pro";
+const accessFor = (
+  config: BillingConfig,
+  row: AccountRow,
+  now: number,
+  reserved: number,
+): BillingAccess => {
+  const current = config.enabled ? plan(row) : "max";
   const unlimited = row.usage_mode === "unlimited" || !config.enabled;
   const snapshot = usageSnapshot(config, row, now);
   const credit = Math.max(0, row.credit_balance);
@@ -321,6 +387,8 @@ const accessFor = (config: BillingConfig, row: AccountRow, now: number): Billing
     identityLevel: identityLevel(row),
     unlimited,
     remainingMicroCents: unlimited ? null : remaining,
+    availableMicroCents: unlimited ? null : Math.max(0, remaining - reserved),
+    reservedMicroCents: reserved,
   };
   const blocks = (window: Window) => Math.max(0, window.limit - window.used) + credit <= 0;
   const blocking = unlimited
@@ -335,44 +403,28 @@ const accessFor = (config: BillingConfig, row: AccountRow, now: number): Billing
       ...base,
       allowed: true,
       downgraded: false,
-      audience: audienceFor(current, false),
+      audience: audienceFor(current),
       retryAfterMs: 0,
       message: "",
     };
   }
   const retryAfterMs = Math.max(1_000, blocking.window.resetAt - now);
-  if (current === "free") {
-    const message = blocking.lifetime
+  const label = config.plans[current].label;
+  const message = current === "free"
+    ? blocking.lifetime
       ? STELLA_USAGE_LIMIT_MESSAGES.free_allowance
-      : "Free plan usage limit reached. Upgrade to keep going, or wait until it resets.";
-    return {
-      ...base,
-      allowed: false,
-      downgraded: false,
-      audience: audienceFor(current, false),
-      retryAfterMs,
-      message,
-      usageLimit: blocking.lifetime
-        ? { reason: "free_allowance", message }
-        : { reason: "plan_limit", message, retryAfterMs },
-    };
-  }
+      : "Free plan usage limit reached. Upgrade to keep going, or wait until it resets."
+    : `You've used this period's ${label} budget. Add credit or upgrade to keep going, or wait until it resets.`;
   return {
     ...base,
-    allowed: true,
-    downgraded: true,
-    audience: audienceFor(current, true),
+    allowed: false,
+    downgraded: false,
+    audience: audienceFor(current),
     retryAfterMs,
-    message: `${config.plans[current].label} plan managed-model limits reached. Falling back until usage resets.`,
-    ...(remaining <= 0
-      ? {
-          usageLimit: {
-            reason: "plan_limit" as const,
-            message: `${config.plans[current].label} plan usage limit reached. Upgrade or add credit to keep going, or wait until it resets.`,
-            retryAfterMs,
-          },
-        }
-      : {}),
+    message,
+    usageLimit: blocking.lifetime
+      ? { reason: "free_allowance", message }
+      : { reason: "plan_limit", message, retryAfterMs },
   };
 };
 
@@ -386,7 +438,11 @@ const reservedGrants = (db: OwnerDbReader, now: number): number =>
 const capabilityBudget = (access: BillingAccess, reserved: number): number => {
   if (access.remainingMicroCents === null) return GATEWAY_BUDGET_UNLIMITED;
   const chunk = GATEWAY_SESSION_BUDGET_CHUNK_MICRO_CENTS[limitsAudienceFor(access.audience)];
-  return Math.min(Math.max(0, Math.floor(access.remainingMicroCents - reserved)), chunk);
+  const available = Math.max(0, Math.floor(access.remainingMicroCents - reserved));
+  // One model session or turn holds at most a quarter of what's free, so a
+  // few concurrent turns still leave room for containers, media and search.
+  const share = Math.max(Math.floor(available / 4), Math.min(available, MIN_MODEL_HOLD_MICRO_CENTS));
+  return Math.min(available, share, chunk);
 };
 
 export const recordBillingIdentity = (
@@ -415,13 +471,13 @@ export const billingPlan = (ctx: {
   env: Cloudflare.Env;
   now: number;
 }): { plan: BillingPlan; unlimited: boolean } => {
-  if (billingOff(ctx.env)) return { plan: "pro", unlimited: true };
+  if (billingOff(ctx.env)) return { plan: "max", unlimited: true };
   const row = readAccount(ctx.db, ctx.now);
   return { plan: plan(row), unlimited: row.usage_mode === "unlimited" };
 };
 
 export const billingAccess = (ctx: { db: OwnerDbReader; env: Cloudflare.Env; now: number }): BillingAccess =>
-  accessFor(billingConfig(ctx.env), readAccount(ctx.db, ctx.now), ctx.now);
+  accessFor(billingConfig(ctx.env), readAccount(ctx.db, ctx.now), ctx.now, reservedGrants(ctx.db, ctx.now));
 
 const subscribedPlan = (row: AccountRow): BillingPlan =>
   plan(row) !== "free" && ACTIVE_SUBSCRIPTION_STATUSES.has(row.subscription_status) ? plan(row) : "free";
@@ -438,7 +494,7 @@ export const cloudSandboxAccess = (ctx: {
     if (error instanceof BillingConfigError) return { enabled: false };
     throw error;
   }
-  if (!config.enabled) return config.plans.pro.cloudSandbox;
+  if (!config.enabled) return config.plans.max.cloudSandbox;
   const row = readAccount(ctx.db, ctx.now);
   return config.plans[subscribedPlan(row)].cloudSandbox;
 };
@@ -478,30 +534,72 @@ export const reserveSessionGrant = (
   return { ...access, budgetMicroCents };
 };
 
-export const reserveUsage = (
-  ctx: OwnerContext,
-  input: { id: string; budgetMicroCents: number; expiresAt: number },
-): BillingAccess & { reserved: boolean } => {
+export type SpendReservation = BillingAccess & {
+  reserved: boolean;
+  reservedMicroCents: number;
+};
+
+const pruneGrants = (ctx: OwnerContext): void => {
   ctx.db.run("DELETE FROM billing_grants WHERE expires_at + ? < ?", GRANT_SETTLEMENT_GRACE_MS, ctx.now);
+};
+
+// Atomically hold `microCents` of the owner's budget for work about to run.
+// Every paid operation reserves first so concurrent jobs cannot spend the same
+// headroom twice: available = tightest window + credit - reserved.
+// With `minimumMicroCents`, a smaller hold (down to that floor) is accepted.
+export const reserveSpend = (
+  ctx: OwnerContext,
+  input: {
+    id: string;
+    microCents: number;
+    expiresAt: number;
+    category?: string;
+    minimumMicroCents?: number;
+  },
+): SpendReservation => {
+  pruneGrants(ctx);
   const access = billingAccess(ctx);
-  if (!access.allowed) return { ...access, reserved: false };
-  const budget = Math.max(0, Math.ceil(input.budgetMicroCents));
-  if (access.remainingMicroCents === null) return { ...access, reserved: true };
-  if (access.remainingMicroCents - reservedGrants(ctx.db, ctx.now) < budget) return { ...access, reserved: false };
-  ctx.db.run(
-    "INSERT OR REPLACE INTO billing_grants (jti, budget, settled, expires_at) VALUES (?, ?, 0, ?)",
+  const wanted = Math.max(0, Math.ceil(input.microCents));
+  if (!access.allowed) return { ...access, reserved: false, reservedMicroCents: 0 };
+  if (access.availableMicroCents === null) return { ...access, reserved: true, reservedMicroCents: wanted };
+  const existing = ctx.db.one<{ budget: number; settled: number }>(
+    "SELECT budget, settled FROM billing_grants WHERE jti = ?",
     input.id,
-    budget,
-    input.expiresAt,
   );
-  return { ...access, reserved: true };
+  const held = existing ? Math.max(0, existing.budget - existing.settled) : 0;
+  const available = access.availableMicroCents + held;
+  const floor = Math.max(0, Math.ceil(input.minimumMicroCents ?? wanted));
+  const amount = Math.min(wanted, available);
+  if (amount < floor || (wanted > 0 && amount <= 0)) {
+    return { ...access, reserved: false, reservedMicroCents: 0 };
+  }
+  ctx.db.run(
+    `INSERT INTO billing_grants (jti, budget, settled, expires_at, category) VALUES (?, ?, 0, ?, ?)
+     ON CONFLICT(jti) DO UPDATE SET budget = billing_grants.settled + excluded.budget,
+       expires_at = excluded.expires_at, category = excluded.category`,
+    input.id,
+    amount,
+    input.expiresAt,
+    input.category ?? null,
+  );
+  return {
+    ...access,
+    availableMicroCents: Math.max(0, available - amount),
+    reservedMicroCents: amount,
+    reserved: true,
+  };
 };
 
-export const settleReservation = (ctx: OwnerContext, id: string, costMicroCents: number): void => {
-  ctx.db.run("UPDATE billing_grants SET settled = settled + ? WHERE jti = ?", Math.max(0, Math.floor(costMicroCents)), id);
+// What is still held for a reservation (0 once released or never made).
+export const reservationHeld = (ctx: { db: OwnerDbReader }, id: string): number => {
+  const row = ctx.db.one<{ budget: number; settled: number }>(
+    "SELECT budget, settled FROM billing_grants WHERE jti = ?",
+    id,
+  );
+  return row ? Math.max(0, row.budget - row.settled) : 0;
 };
 
-export const releaseReservation = (ctx: OwnerContext, id: string): void => {
+export const releaseSpend = (ctx: OwnerContext, id: string): void => {
   ctx.db.run("DELETE FROM billing_grants WHERE jti = ?", id);
 };
 
@@ -525,6 +623,167 @@ const charge = (ctx: OwnerContext, costMicroCents: number): void => {
     updated_at: ctx.now,
   });
 };
+
+const utcDay = (at: number): string => new Date(at).toISOString().slice(0, 10);
+
+const rollUp = (
+  ctx: OwnerContext,
+  entry: {
+    category: string;
+    provider: string;
+    sku: string;
+    basis: string;
+    plan: string;
+    tariffVersion: string;
+    failed: boolean;
+    providerCost: number;
+    charged: number;
+  },
+): void => {
+  ctx.db.run(
+    `INSERT INTO billing_cost_daily
+       (day, category, provider, sku, basis, plan, tariff_version, attempts, failures, provider_cost, charged, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
+     ON CONFLICT(day, category, provider, sku, basis, plan, tariff_version) DO UPDATE SET
+       attempts = attempts + 1,
+       failures = failures + excluded.failures,
+       provider_cost = provider_cost + excluded.provider_cost,
+       charged = charged + excluded.charged,
+       updated_at = MAX(excluded.updated_at, updated_at + 1)`,
+    utcDay(ctx.now),
+    entry.category,
+    entry.provider,
+    entry.sku,
+    entry.basis,
+    entry.plan,
+    entry.tariffVersion,
+    entry.failed ? 1 : 0,
+    entry.providerCost,
+    entry.charged,
+    ctx.now,
+  );
+};
+
+// Fixed always-on infrastructure, allocated once per active account-day as a
+// cost line. It is never charged to the customer's budget.
+const allocateFixedInfra = (ctx: OwnerContext, currentPlan: string, level: number): void => {
+  const day = utcDay(ctx.now);
+  const id = `infra:${day}`;
+  if (ctx.db.one("SELECT 1 AS seen FROM billing_cost_ledger WHERE id = ?", id)) return;
+  const cost = usdToMicroCents(FIXED_INFRA_TARIFF.usdPerActiveDay);
+  ctx.db.run(
+    `INSERT INTO billing_cost_ledger
+       (id, at, category, provider, sku, quantity_json, provider_cost, basis, outcome, attempt, request_id,
+        charged, tariff_version, plan, identity_level)
+     VALUES (?, ?, 'infra_fixed', 'cloudflare', 'active_day', NULL, ?, 'estimated', 'succeeded', 1, NULL, 0, ?, ?, ?)`,
+    id,
+    ctx.now,
+    cost,
+    TARIFF_VERSION,
+    currentPlan,
+    level,
+  );
+  rollUp(ctx, {
+    category: "infra_fixed",
+    provider: "cloudflare",
+    sku: "active_day",
+    basis: "estimated",
+    plan: currentPlan,
+    tariffVersion: TARIFF_VERSION,
+    failed: false,
+    providerCost: cost,
+    charged: 0,
+  });
+};
+
+// Record one paid attempt in the cost ledger. Idempotent on entry.id.
+export const recordCost = (ctx: OwnerContext, entry: CostEntry, chargedMicroCents: number): boolean => {
+  const row = ensureAccount(ctx.db, ctx.now);
+  const currentPlan = plan(row);
+  const level = identityLevel(row);
+  const providerCost = Math.max(0, Math.round(entry.providerCostMicroCents));
+  const charged = Math.max(0, Math.floor(chargedMicroCents));
+  const tariffVersion = entry.tariffVersion ?? TARIFF_VERSION;
+  if (ctx.db.one("SELECT 1 AS seen FROM billing_cost_ledger WHERE id = ?", entry.id)) return false;
+  ctx.db.run(
+    `INSERT INTO billing_cost_ledger
+       (id, at, category, provider, sku, quantity_json, provider_cost, basis, outcome, attempt, request_id,
+        charged, tariff_version, plan, identity_level)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    entry.id,
+    ctx.now,
+    entry.category,
+    entry.provider,
+    entry.sku ?? null,
+    entry.quantity ? JSON.stringify(entry.quantity) : null,
+    providerCost,
+    entry.basis,
+    entry.outcome,
+    entry.attempt ?? 1,
+    entry.requestId ?? null,
+    charged,
+    tariffVersion,
+    currentPlan,
+    level,
+  );
+  rollUp(ctx, {
+    category: entry.category,
+    provider: entry.provider,
+    sku: entry.sku ?? "",
+    basis: entry.basis,
+    plan: currentPlan,
+    tariffVersion,
+    failed: entry.outcome !== "succeeded",
+    providerCost,
+    charged,
+  });
+  allocateFixedInfra(ctx, currentPlan, level);
+  scheduleCostExport(ctx);
+  if (Math.random() < 0.01) {
+    ctx.db.run("DELETE FROM billing_cost_ledger WHERE at < ?", ctx.now - COST_LEDGER_RETENTION_MS);
+  }
+  return true;
+};
+
+// Charge the budget for finished (or partly finished) work and record what it
+// cost us, in one transaction. `reservationId` lowers that hold by the charge;
+// `release` drops whatever is left of it. Idempotent on `receiptId`.
+export const settleSpend = (
+  ctx: OwnerContext,
+  input: {
+    receiptId: string;
+    chargeMicroCents: number;
+    cost?: CostEntry;
+    reservationId?: string;
+    release?: boolean;
+  },
+): { charged: boolean } => {
+  pruneReceipts(ctx);
+  const amount = Math.max(0, Math.floor(input.chargeMicroCents));
+  const fresh = claimReceipt(ctx, input.receiptId, amount);
+  if (fresh) {
+    if (amount > 0) charge(ctx, amount);
+    if (input.reservationId && amount > 0) {
+      ctx.db.run("UPDATE billing_grants SET settled = settled + ? WHERE jti = ?", amount, input.reservationId);
+    }
+    if (input.cost) recordCost(ctx, input.cost, amount);
+  }
+  if (input.reservationId && input.release) releaseSpend(ctx, input.reservationId);
+  return { charged: fresh };
+};
+
+// Old names, kept for callers not yet moved to reserveSpend/settleSpend.
+export const reserveUsage = (
+  ctx: OwnerContext,
+  input: { id: string; budgetMicroCents: number; expiresAt: number },
+): SpendReservation =>
+  reserveSpend(ctx, { id: input.id, microCents: input.budgetMicroCents, expiresAt: input.expiresAt });
+
+export const settleReservation = (ctx: OwnerContext, id: string, costMicroCents: number): void => {
+  ctx.db.run("UPDATE billing_grants SET settled = settled + ? WHERE jti = ?", Math.max(0, Math.floor(costMicroCents)), id);
+};
+
+export const releaseReservation = releaseSpend;
 
 const claimReceipt = (ctx: OwnerContext, id: string, charged: number): boolean => {
   if (ctx.db.one("SELECT 1 AS seen FROM billing_receipts WHERE id = ?", id)) return false;
@@ -555,13 +814,51 @@ export const applyGatewayUsage = (ctx: OwnerContext, events: GatewayUsageEvent[]
       result.rejected.push({ requestId: event.requestId, reason: "owner_mismatch" });
       continue;
     }
-    const charged = Math.max(0, Math.floor(event.chargedMicroCents));
-    if (!claimReceipt(ctx, `gw:${event.requestId}`, charged)) {
+    const charged = event.billable ? Math.max(0, Math.floor(event.chargedMicroCents)) : 0;
+    // Receipts carry the same scope as the gateway's replay key (capability +
+    // request); request ids alone can repeat across capabilities. A retry is
+    // a new physical attempt of the same request and is paid separately.
+    const attempt = Math.max(1, Math.floor(event.attempt ?? 1));
+    const scope = `${event.capabilityId}:${event.requestId}${attempt > 1 ? `:${attempt}` : ""}`;
+    const legacyReceipt =
+      attempt === 1 && ctx.db.one("SELECT 1 AS seen FROM billing_receipts WHERE id = ?", `gw:${event.requestId}`);
+    if (legacyReceipt || !claimReceipt(ctx, `gw:${scope}`, charged)) {
       result.duplicate.push(event.requestId);
       continue;
     }
     ctx.db.run("UPDATE billing_grants SET settled = settled + ? WHERE jti = ?", charged, event.capabilityId);
-    if (event.billable && event.outcome !== "failed") charge(ctx, charged);
+    if (event.kind === "turn" && event.turnId) {
+      ctx.db.run("UPDATE billing_grants SET settled = settled + ? WHERE jti = ?", charged, `turn:${event.turnId}`);
+    }
+    // Failed and aborted attempts are charged at what the provider billed us.
+    if (charged > 0) charge(ctx, charged);
+    const providerCost = event.providerCostMicroCents ?? event.usage.costMicroCents ?? event.chargedMicroCents;
+    if (event.billable || providerCost > 0) {
+      recordCost(
+        ctx,
+        {
+          id: `model:${scope}`,
+          category: "model",
+          provider: event.provider,
+          sku: event.resolvedModel || event.requestedModel,
+          quantity: {
+            inputTokens: event.usage.inputTokens,
+            outputTokens: event.usage.outputTokens,
+            cachedInputTokens: event.usage.cachedInputTokens ?? 0,
+            cacheWriteTokens: event.usage.cacheWriteTokens ?? 0,
+            reasoningTokens: event.usage.reasoningTokens ?? 0,
+            durationMs: Math.max(0, event.finishedAt - event.startedAt),
+          },
+          providerCostMicroCents: event.billable ? providerCost : 0,
+          basis: event.costBasis ?? (event.usage.reported && event.usage.costMicroCents !== undefined ? "actual" : "estimated"),
+          outcome: event.outcome === "succeeded" ? "succeeded" : event.outcome === "aborted" ? "aborted" : "failed",
+          attempt,
+          requestId: event.requestId,
+          ...(event.tariffVersion ? { tariffVersion: event.tariffVersion } : {}),
+        },
+        charged,
+      );
+    }
     result.accepted.push(event.requestId);
   }
   return result;
@@ -569,13 +866,14 @@ export const applyGatewayUsage = (ctx: OwnerContext, events: GatewayUsageEvent[]
 
 export const recordUsage = (
   ctx: OwnerContext,
-  records: Array<{ id: string; costMicroCents: number }>,
+  records: Array<{ id: string; costMicroCents: number; cost?: CostEntry }>,
 ): { recorded: number; duplicate: number } => {
   let recorded = 0;
   pruneReceipts(ctx);
   for (const record of records) {
     if (!claimReceipt(ctx, `use:${record.id}`, record.costMicroCents)) continue;
     charge(ctx, record.costMicroCents);
+    if (record.cost) recordCost(ctx, record.cost, record.costMicroCents);
     recorded += 1;
   }
   return { recorded, duplicate: records.length - recorded };
@@ -588,6 +886,9 @@ export const setAdminPlan = (
     usageMode?: "default" | "unlimited";
     resetUsage?: boolean;
     spendAllowance?: boolean;
+    // A plan granted outside Stripe (Rahul's own account): detach any Stripe
+    // subscription so its later events can't move the plan.
+    complimentary?: boolean;
   },
 ): void => {
   const row = ensureAccount(ctx.db, ctx.now);
@@ -605,7 +906,19 @@ export const setAdminPlan = (
     ...(input.resetUsage ?? (planChanged || usageMode !== row.usage_mode)
       ? resetWindows(ctx.now, anchor)
       : {}),
-    ...(input.spendAllowance ? { total_used: SPENT_ALLOWANCE_MICRO_CENTS, credit_balance: 0 } : {}),
+    ...(input.spendAllowance
+      ? {
+          ...resetWindows(ctx.now, anchor),
+          rolling_used: SPENT_ALLOWANCE_MICRO_CENTS,
+          weekly_used: SPENT_ALLOWANCE_MICRO_CENTS,
+          monthly_used: SPENT_ALLOWANCE_MICRO_CENTS,
+          total_used: SPENT_ALLOWANCE_MICRO_CENTS,
+          credit_balance: 0,
+        }
+      : {}),
+    ...(input.complimentary
+      ? { stripe_subscription_id: null, stripe_price_id: null, subscription_status: nextPlan === "free" ? "none" : "complimentary" }
+      : {}),
     updated_at: ctx.now,
   });
 };
@@ -621,6 +934,14 @@ const resetWindows = (now: number, anchor: number): Partial<AccountRow> => ({
   monthly_started_at: monthBounds(now, anchor).start,
 });
 
+type StripeItemPrice = {
+  active: boolean;
+  currency: string;
+  unit_amount: number | null;
+  type: string;
+  recurring?: { interval?: string; interval_count?: number; usage_type?: string } | null;
+};
+
 type StripeSubscription = {
   id: string;
   status: string;
@@ -631,7 +952,7 @@ type StripeSubscription = {
   metadata?: Record<string, string>;
   items?: {
     data?: Array<{
-      price?: { id?: string };
+      price?: { id?: string } & Partial<StripeItemPrice>;
       current_period_start?: number;
       current_period_end?: number;
     }>;
@@ -710,14 +1031,14 @@ const checkout = async (
   try {
     const customer = await ensureCustomer(ctx);
     const metadata = { ownerId: ctx.ownerId, plan: args.plan, source };
-    const coupon = args.plan === "go" ? config.goFirstMonthCoupon : undefined;
+    const priceId = await verifyStripePrice(ctx.env, config, args.plan);
     const session = await stripeRequest<{ id: string; url: string | null }>(ctx.env, "POST", "/checkout/sessions", {
       mode: "subscription",
       ui_mode: "hosted_page",
       customer,
       client_reference_id: ctx.ownerId,
-      line_items: [{ price: config.stripePrices[args.plan], quantity: 1 }],
-      ...(coupon ? { discounts: [{ coupon }] } : { allow_promotion_codes: true }),
+      line_items: [{ price: priceId, quantity: 1 }],
+      allow_promotion_codes: true,
       success_url: withCheckoutStatus(returnUrl, "success"),
       cancel_url: withCheckoutStatus(returnUrl, "cancel"),
       managed_payments: { enabled: true },
@@ -730,6 +1051,9 @@ const checkout = async (
     return { url: session.url, sessionId: session.id };
   } catch (error) {
     if (error instanceof RpcError) throw error;
+    if (error instanceof StripePriceMismatchError) {
+      throw new RpcError("UNAVAILABLE", "This plan can't be bought right now. Try again later.", { retryable: false });
+    }
     throw stripeUnavailable(error);
   }
 };
@@ -767,7 +1091,7 @@ const creditCheckout = async (
           price_data: {
             currency: CREDIT_CURRENCY,
             unit_amount: amountCents,
-            product_data: { name: "Stella extra usage credit" },
+            product_data: { name: "Stella extra usage credit", tax_code: CREDIT_TAX_CODE },
           },
           quantity: 1,
         },
@@ -817,8 +1141,19 @@ const syncSubscription = (ctx: OwnerContext, subscription: StripeSubscription): 
   if (row.stripe_customer_id && subscription.customer !== row.stripe_customer_id) return;
   const item = subscription.items?.data?.[0];
   const priceId = item?.price?.id ?? null;
-  const paid = planForStripePrice(billingConfig(ctx.env), priceId);
-  const nextPlan: BillingPlan = ACTIVE_SUBSCRIPTION_STATUSES.has(subscription.status) && paid ? paid : "free";
+  const mapped = planForStripePrice(billingConfig(ctx.env), priceId);
+  const mismatch = mapped && item?.price?.unit_amount !== undefined
+    ? priceMismatch(mapped, { ...(item.price as StripeItemPrice), active: true, id: priceId ?? "" })
+    : null;
+  if (mismatch) {
+    console.error(JSON.stringify({ event: "billing_subscription_price_mismatch", plan: mapped, priceId, mismatch }));
+  }
+  const paid = mismatch ? null : mapped;
+  const nextPlan: BillingPlan =
+    subscription.status !== "complimentary" && ACTIVE_SUBSCRIPTION_STATUSES.has(subscription.status) && paid
+      ? paid
+      : "free";
+  if (row.subscription_status === "complimentary" && nextPlan === "free") return;
   if (
     row.stripe_subscription_id &&
     row.stripe_subscription_id !== subscription.id &&
@@ -970,11 +1305,12 @@ const status = (ctx: {
   const config = billingConfig(ctx.env);
   const row = readAccount(ctx.db, ctx.now);
   const snapshot = usageSnapshot(config, row, ctx.now);
+  const access = accessFor(config, row, ctx.now, reservedGrants(ctx.db, ctx.now));
   return {
     authenticated: true,
     isAnonymous: false,
     identityLevel: identityLevel(row),
-    plan: config.enabled ? plan(row) : "pro",
+    plan: config.enabled ? plan(row) : "max",
     subscriptionStatus: row.subscription_status,
     cancelAtPeriodEnd: row.cancel_at_period_end === 1,
     currentPeriodEnd: row.current_period_end > 0 ? row.current_period_end : null,
@@ -987,6 +1323,11 @@ const status = (ctx: {
       monthlyLimitUsd: usd(snapshot.monthly.limit),
       lifetimeUsedUsd: usd(row.total_used),
       lifetimeLimitUsd: snapshot.lifetime ? usd(snapshot.lifetime.limit) : null,
+      rollingResetsAt: snapshot.rolling.resetAt,
+      weeklyResetsAt: snapshot.weekly.resetAt,
+      monthlyResetsAt: snapshot.monthly.resetAt,
+      reservedUsd: usd(access.reservedMicroCents),
+      availableUsd: access.availableMicroCents === null ? null : usd(access.availableMicroCents),
     },
     usagePolicy: { kind: "managed_cost" },
     plans: config.plans,
@@ -1009,12 +1350,12 @@ const returnUrlArg = string({ min: 1, max: 2_048 });
 
 export const billingDomain = {
   name: "billing",
-  migrations: [BILLING_MIGRATION],
+  migrations: [BILLING_MIGRATION, BILLING_COST_LEDGER_MIGRATION],
   calls: {
     "billing.checkout": {
       scope: "owner",
       parse: object({
-        plan: literal("go", "pro"),
+        plan: literal("plus", "pro", "max"),
         returnUrl: returnUrlArg,
         source: optional(string({ max: 32 })),
         appStoreCountry: optional(string({ max: 8 })),
@@ -1042,4 +1383,6 @@ export const billingDomain = {
       read: (ctx) => status(ctx),
     },
   },
+  jobs: costExportJobs,
+  purge: purgeCostExport,
 } satisfies OwnerDomain;

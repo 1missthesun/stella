@@ -123,7 +123,7 @@ export const getCapabilityRestrictionDescription = (
     : t("billing.capabilityRestriction.upgrade", { capability, plan });
 };
 
-const openBilling = () => planUsageDialog.open();
+const openBilling = () => planUsageDialog.openPlans();
 
 const openSignInDialog = () => {
   void import("@/router").then(({ router }) => {

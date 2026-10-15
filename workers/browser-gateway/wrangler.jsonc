@@ -26,6 +26,13 @@
     "BROWSER_HANDOFF_TIMEOUT_MS": "600000",
   },
   "browser": { "binding": "BROWSER" },
+  "services": [
+    {
+      "binding": "COMPUTE_BILLING",
+      "service": "stella-v2-cloud-builder-dev",
+      "entrypoint": "ComputeBilling",
+    },
+  ],
   "r2_buckets": [
     {
       "binding": "BROWSER_PROFILES",
@@ -69,6 +76,11 @@
       },
       "browser": { "binding": "BROWSER" },
       "services": [
+        {
+          "binding": "COMPUTE_BILLING",
+          "service": "stella-v2-cloud-builder-basic-nightingale-118",
+          "entrypoint": "ComputeBilling",
+        },
         {
           "binding": "DEVICE_CODE_FIXTURE",
           "service": "stella-v2-device-code-fixture-basic-nightingale-118",
@@ -116,6 +128,13 @@
         "BROWSER_HANDOFF_TIMEOUT_MS": "600000",
       },
       "browser": { "binding": "BROWSER" },
+      "services": [
+        {
+          "binding": "COMPUTE_BILLING",
+          "service": "stella-v2-cloud-builder-prod",
+          "entrypoint": "ComputeBilling",
+        },
+      ],
       "r2_buckets": [
         {
           "binding": "BROWSER_PROFILES",

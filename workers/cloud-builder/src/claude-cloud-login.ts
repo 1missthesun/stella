@@ -235,7 +235,7 @@ export const claudeLoginContainer = async (env: Cloudflare.Env, ownerId: string)
     (env as unknown as { Sandbox: DurableObjectNamespace<import("./sandbox-container.js").Sandbox> })
       .Sandbox,
     await worldSandboxId(ownerId),
-    { size: "small", workload: "world" },
+    { size: "small", workload: "world", owner: ownerId },
   );
 
 const runScript = async (

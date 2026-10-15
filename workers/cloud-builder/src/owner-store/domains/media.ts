@@ -7,6 +7,7 @@ import type {
   MediaJobStatus,
 } from "@stella/contracts/backend/media";
 import { buildCapabilityDenial, hasCapability, toCapabilityAudience } from "@stella/contracts/capabilities";
+import { TARIFF_VERSION, type CostOutcome } from "@stella/contracts/billing-tariffs";
 import { MEDIA_MODELS, mediaModel, type MediaModel } from "@stella/contracts/media-models";
 import { sha256Hex } from "../../hash.js";
 import {
@@ -24,19 +25,30 @@ import { json, literal, number, object, optional, string, type Parser } from "..
 import { RpcError } from "../errors.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
 import type { OwnerContext, OwnerDbReader, OwnerDomain } from "../registry.js";
-import { billingAccess, recordUsage } from "./billing.js";
+import { billingAccess, reserveSpend, settleSpend } from "./billing.js";
 
 export const MEDIA_DOCS_URL = "https://stella.sh/docs/media";
 export const MEDIA_POLL_JOB = "media.poll";
 export const MEDIA_EXPIRE_JOB = "media.expire";
+export const MEDIA_SETTLE_JOB = "media.settle";
 const pollJobId = (jobId: string) => `media.poll:${jobId}`;
 const expireJobId = (jobId: string) => `media.expire:${jobId}`;
+const settleJobId = (jobId: string) => `media.settle:${jobId}`;
+const spendId = (jobId: string) => `media:${jobId}`;
 
 const FIRST_POLL_MS = 2 * 60_000;
 const MAX_POLL_MS = 10 * 60_000;
 const EXPIRE_MS = 30 * 60_000;
 const RATE_LIMIT = { count: 20, windowMs: 5 * 60_000 };
-const ADMISSION_BUFFER_USD = 0.8;
+// Static tariffs can undershoot what fal bills; hold a margin above the estimate.
+const RESERVE_MARGIN = 1.25;
+// Models priced from their output (transcription) reserve this up front.
+const UNPRICED_RESERVE_USD = 0.5;
+// After a cancel or timeout the job may still finish on fal and be billed:
+// keep checking for this long before settling at the estimate.
+const SETTLE_POLL_MS = 5 * 60_000;
+const SETTLE_MAX_CHECKS = 12;
+const RESERVATION_MS = 3 * 60 * 60_000;
 const MICRO_CENTS_PER_USD = 100_000_000;
 const MAX_OBJECT_BYTES = 2 * 1024 * 1024 * 1024;
 const MAX_OUTPUT_FILES = 16;
@@ -94,6 +106,15 @@ export const MEDIA_WEBHOOK_TOKEN_MIGRATION = {
   statements: ["ALTER TABLE media_jobs ADD COLUMN webhook_token TEXT"],
 };
 
+export const MEDIA_SETTLEMENT_MIGRATION = {
+  id: "media.5-settlement",
+  statements: [
+    "ALTER TABLE media_jobs ADD COLUMN reserved_micro_cents INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE media_jobs ADD COLUMN settled_at INTEGER",
+    "UPDATE media_jobs SET settled_at = updated_at WHERE status IN ('succeeded', 'failed', 'canceled')",
+  ],
+};
+
 type JobRow = {
   job_id: string;
   client_request_key: string | null;
@@ -106,6 +127,8 @@ type JobRow = {
   cost_micro_cents: number | null;
   billed: number;
   webhook_token: string | null;
+  reserved_micro_cents: number;
+  settled_at: number | null;
   conversation_id: string | null;
   turn_id: string | null;
   created_at: number;
@@ -387,20 +410,87 @@ const jobCost = (row: JobRow, payload: unknown): number | null => {
   return usd === null ? null : microCents(usd);
 };
 
+const estimatedCost = (row: JobRow): number =>
+  jobCost(row, undefined) ?? Math.round(row.reserved_micro_cents / RESERVE_MARGIN);
+
+const lateOutcome = (row: JobRow): CostOutcome =>
+  row.status === "canceled"
+    ? "cancelled"
+    : parseJson<MediaJobError>(row.error_json)?.code === "timeout"
+      ? "expired"
+      : "failed";
+
+// Charge what fal billed for this job (best estimate from the tariff), write
+// its cost ledger row and drop the hold. Runs once per job.
+const settleJob = (
+  ctx: OwnerContext,
+  jobId: string,
+  input: { chargeMicroCents: number; outcome: CostOutcome; reachedProvider: boolean },
+): void => {
+  const row = getRow(ctx.db, jobId);
+  if (!row || row.settled_at !== null) return;
+  const charge = Math.max(0, Math.round(input.chargeMicroCents));
+  const now = Date.now();
+  settleSpend(
+    { ...ctx, now },
+    {
+      receiptId: spendId(jobId),
+      chargeMicroCents: charge,
+      reservationId: spendId(jobId),
+      release: true,
+      ...(input.reachedProvider
+        ? {
+            cost: {
+              id: spendId(jobId),
+              category: "media",
+              provider: "fal",
+              sku: row.model,
+              quantity: { jobs: 1 },
+              providerCostMicroCents: charge,
+              basis: "estimated",
+              outcome: input.outcome,
+              attempt: 1,
+              requestId: row.provider_request_id ?? jobId,
+              tariffVersion: TARIFF_VERSION,
+            },
+          }
+        : {}),
+    },
+  );
+  ctx.db.run(
+    "UPDATE media_jobs SET settled_at = ?, cost_micro_cents = ?, billed = ? WHERE job_id = ?",
+    now,
+    charge,
+    charge > 0 ? 1 : 0,
+    jobId,
+  );
+  ctx.jobs.cancel(settleJobId(jobId));
+  log("media_job_settled", { jobId, model: row.model, outcome: input.outcome, chargedMicroCents: charge });
+};
+
+// A canceled, timed-out or lost job may still run to completion on fal; find
+// out what happened before settling.
+const settleLater = (ctx: OwnerContext, jobId: string, delayMs = 30_000): void => {
+  ctx.jobs.schedule(MEDIA_SETTLE_JOB, Date.now() + delayMs, { jobId, check: 0 }, { id: settleJobId(jobId) });
+};
+
 const completeJob = async (ctx: OwnerContext, row: JobRow, payload: unknown): Promise<unknown> => {
+  const before = getRow(ctx.db, row.job_id);
+  if (!before) return undefined;
+  const cost = jobCost(before, payload);
+  if (cost === null) log("media_job_unpriced", { jobId: row.job_id, model: row.model });
+  if (TERMINAL.has(before.status)) {
+    settleJob(ctx, row.job_id, { chargeMicroCents: cost ?? 0, outcome: lateOutcome(before), reachedProvider: true });
+    return undefined;
+  }
+  settleJob(ctx, row.job_id, { chargeMicroCents: cost ?? 0, outcome: "succeeded", reachedProvider: true });
   const prefix = `${await mediaOwnerPrefix(ctx.ownerId)}${row.job_id}/`;
   const output = await storeOutputs(ctx, prefix, payload);
   const current = getRow(ctx.db, row.job_id);
   if (!current || TERMINAL.has(current.status)) return output;
-  const cost = jobCost(row, payload);
-  if (cost === null) log("media_job_unpriced", { jobId: row.job_id, model: row.model });
-  if (cost !== null && cost > 0) recordUsage(ctx, [{ id: `media:${row.job_id}`, costMicroCents: cost }]);
   ctx.db.run(
-    `UPDATE media_jobs SET status = 'succeeded', outputs_json = ?, cost_micro_cents = ?, billed = ?, error_json = NULL,
-       updated_at = ? WHERE job_id = ?`,
+    `UPDATE media_jobs SET status = 'succeeded', outputs_json = ?, error_json = NULL, updated_at = ? WHERE job_id = ?`,
     JSON.stringify(output),
-    cost,
-    cost !== null && cost > 0 ? 1 : 0,
     Date.now(),
     row.job_id,
   );
@@ -409,7 +499,7 @@ const completeJob = async (ctx: OwnerContext, row: JobRow, payload: unknown): Pr
   return output;
 };
 
-const admit = (ctx: OwnerContext, model: MediaModel, input: Record<string, unknown>): void => {
+const admit = (ctx: OwnerContext, model: MediaModel, input: Record<string, unknown>, jobId: string): number => {
   const access = billingAccess(ctx);
   if (model.plan) {
     const audience = toCapabilityAudience(access.audience) ?? "free";
@@ -419,14 +509,26 @@ const admit = (ctx: OwnerContext, model: MediaModel, input: Record<string, unkno
       });
     }
   }
-  const needed = microCents(Math.max(ADMISSION_BUFFER_USD, model.price(input) ?? 0));
-  if (!access.allowed || (access.remainingMicroCents !== null && access.remainingMicroCents < needed)) {
-    throw new RpcError("RATE_LIMITED", access.message || "Your Stella usage limit is reached.", {
-      retryAfterMs: access.retryAfterMs,
+  enforceOwnerRateLimit(ctx.db, ctx.now, "media.generate", RATE_LIMIT, "Too many media requests. Try again in a few minutes.");
+  const needed = microCents((model.price(input) ?? UNPRICED_RESERVE_USD) * RESERVE_MARGIN);
+  const hold = reserveSpend(ctx, {
+    id: spendId(jobId),
+    microCents: needed,
+    expiresAt: Date.now() + RESERVATION_MS,
+    category: "media",
+  });
+  if (!hold.reserved) {
+    const message = !hold.allowed
+      ? hold.message || "Your Stella usage limit is reached."
+      : access.reservedMicroCents > 0
+        ? "This needs more of your budget than is free right now. Running work is holding some of it; try again when it finishes, or add credit."
+        : "This needs more of your budget than is free right now. Add credit or upgrade to keep going, or wait until it resets.";
+    throw new RpcError("RATE_LIMITED", message, {
+      retryAfterMs: hold.retryAfterMs,
       reason: "usage_limit",
     });
   }
-  enforceOwnerRateLimit(ctx.db, ctx.now, "media.generate", RATE_LIMIT, "Too many media requests. Try again in a few minutes.");
+  return hold.reservedMicroCents;
 };
 
 const startJob = async (
@@ -452,23 +554,24 @@ const startJob = async (
       return accepted(existing, true);
     }
   }
-  admit(ctx, model, request.input);
   const apiKey = secret(ctx.env, "FAL_KEY");
   const baseUrl = ctx.env.CLOUD_BUILDER_PUBLIC_URL;
   if (!apiKey || !baseUrl) throw unavailable();
   const jobId = crypto.randomUUID();
+  const reserved = admit(ctx, model, request.input, jobId);
   const webhookToken = mintWebhookToken();
   const now = Date.now();
   const summary = (input: unknown): string => JSON.stringify({ input, hash } as StoredRequest);
   ctx.db.run(
     `INSERT INTO media_jobs (job_id, client_request_key, model, status, request_json, billed,
-       webhook_token, conversation_id, turn_id, created_at, updated_at)
-     VALUES (?, ?, ?, 'submitting', ?, 0, ?, ?, ?, ?, ?)`,
+       webhook_token, reserved_micro_cents, conversation_id, turn_id, created_at, updated_at)
+     VALUES (?, ?, ?, 'submitting', ?, 0, ?, ?, ?, ?, ?, ?)`,
     jobId,
     clientRequestKey,
     model.id,
     summary(withoutInlineSources(request.input)),
     webhookToken,
+    reserved,
     origin.conversationId ?? null,
     origin.turnId ?? null,
     now,
@@ -486,10 +589,14 @@ const startJob = async (
       staged = await stageSources(ctx, prefix, request.input);
     } catch (error) {
       failJob(ctx, jobId, errorOf(error, "Media sources could not be stored."));
+      settleJob(ctx, jobId, { chargeMicroCents: 0, outcome: "failed", reachedProvider: false });
       throw error instanceof RpcError ? error : unavailable("Media sources could not be stored. Try again.");
     }
     ctx.db.run("UPDATE media_jobs SET request_json = ? WHERE job_id = ?", summary(staged), jobId);
-    if (getRow(ctx.db, jobId)?.status === "canceled") throw new RpcError("CONFLICT", "This media request was canceled.");
+    if (getRow(ctx.db, jobId)?.status === "canceled") {
+      settleJob(ctx, jobId, { chargeMicroCents: 0, outcome: "cancelled", reachedProvider: false });
+      throw new RpcError("CONFLICT", "This media request was canceled.");
+    }
     try {
       const submitted = await submitFal({
         apiKey,
@@ -512,6 +619,7 @@ const startJob = async (
     } catch (error) {
       if (error instanceof FalError && error.definitive) {
         failJob(ctx, jobId, errorOf(error, "Media generation failed upstream."));
+        settleJob(ctx, jobId, { chargeMicroCents: 0, outcome: "failed", reachedProvider: false });
         throw new RpcError("BAD_REQUEST", `${model.id} refused the request: ${error.message} (see ${model.docsUrl})`);
       }
       ctx.db.run(
@@ -551,6 +659,7 @@ const cancelJob = async (
   if (TERMINAL.has(row.status)) return { state: "terminal", jobId: row.job_id };
   ctx.db.run("UPDATE media_jobs SET status = 'canceled', updated_at = ? WHERE job_id = ?", Date.now(), row.job_id);
   clearJobs(ctx, row.job_id);
+  settleLater(ctx, row.job_id);
   await cancelOnFal(ctx, row);
   return { state: "canceled", jobId: row.job_id };
 };
@@ -585,6 +694,7 @@ const runPoll = async (ctx: OwnerContext, raw: unknown): Promise<void> => {
         code: "submission_lost",
         message: "Stella lost this request while submitting it and did not resubmit it.",
       });
+      settleLater(ctx, row.job_id);
     }
     return;
   }
@@ -595,6 +705,7 @@ const runPoll = async (ctx: OwnerContext, raw: unknown): Promise<void> => {
     await completeJob(ctx, row, outcome.payload);
   } else if (outcome.state === "failed") {
     failJob(ctx, row.job_id, { message: outcome.message, ...(outcome.code ? { code: outcome.code } : {}) });
+    settleJob(ctx, row.job_id, { chargeMicroCents: 0, outcome: "failed", reachedProvider: true });
   } else {
     if (outcome.running && row.status === "queued") {
       ctx.db.run("UPDATE media_jobs SET status = 'running', updated_at = ? WHERE job_id = ?", Date.now(), row.job_id);
@@ -608,7 +719,59 @@ const runExpire = async (ctx: OwnerContext, raw: unknown): Promise<void> => {
   const row = getRow(ctx.db, jobId);
   if (!row || TERMINAL.has(row.status)) return;
   failJob(ctx, jobId, { code: "timeout", message: "Media generation took too long." });
+  settleLater(ctx, jobId);
   await cancelOnFal(ctx, row);
+};
+
+const settlePayload = object({
+  jobId: string({ max: 100 }),
+  check: optional(number({ int: true, min: 0 })),
+  result: optional(json({ maxBytes: MAX_WEBHOOK_RESULT_CHARS })),
+  failed: optional(literal(true)),
+});
+
+const runSettle = async (ctx: OwnerContext, raw: unknown): Promise<void> => {
+  const payload = settlePayload(raw);
+  const row = getRow(ctx.db, payload.jobId);
+  if (!row || row.settled_at !== null) return;
+  const outcome = lateOutcome(row);
+  if (payload.result !== undefined) {
+    settleJob(ctx, row.job_id, { chargeMicroCents: jobCost(row, payload.result) ?? estimatedCost(row), outcome, reachedProvider: true });
+    return;
+  }
+  if (payload.failed) {
+    settleJob(ctx, row.job_id, { chargeMicroCents: 0, outcome, reachedProvider: true });
+    return;
+  }
+  const check = payload.check ?? 0;
+  const later = () =>
+    ctx.jobs.schedule(MEDIA_SETTLE_JOB, Date.now() + SETTLE_POLL_MS, { jobId: row.job_id, check: check + 1 }, {
+      id: settleJobId(row.job_id),
+    });
+  if (!row.provider_request_id) {
+    if (inFlight.has(row.job_id) || check < 1) {
+      later();
+      return;
+    }
+    settleJob(ctx, row.job_id, { chargeMicroCents: 0, outcome, reachedProvider: false });
+    return;
+  }
+  const apiKey = secret(ctx.env, "FAL_KEY");
+  const polled = apiKey ? await pollFal(apiKey, row.model, row.provider_request_id).catch(() => null) : null;
+  if (polled?.state === "succeeded") {
+    settleJob(ctx, row.job_id, {
+      chargeMicroCents: jobCost(row, polled.payload) ?? estimatedCost(row),
+      outcome,
+      reachedProvider: true,
+    });
+  } else if (polled?.state === "failed") {
+    settleJob(ctx, row.job_id, { chargeMicroCents: 0, outcome, reachedProvider: true });
+  } else if (check + 1 >= SETTLE_MAX_CHECKS) {
+    settleJob(ctx, row.job_id, { chargeMicroCents: estimatedCost(row), outcome, reachedProvider: true });
+  } else {
+    if (polled && !polled.running) await cancelOnFal(ctx, row);
+    later();
+  }
 };
 
 const generateArgs: Parser<MediaGenerateRequest> = (value, path = "") => {
@@ -642,16 +805,27 @@ const falWebhook = (ctx: OwnerContext, raw: unknown): { received: true; discarde
   if (!row.webhook_token || !constantTimeEqual(row.webhook_token, token)) {
     return { received: true, discarded: "bad_token" };
   }
-  if (TERMINAL.has(row.status)) return { received: true, discarded: "terminal" };
   const event = isRecord(body) ? body : {};
   const requestId = typeof event.request_id === "string" ? event.request_id : null;
   if (requestId && row.provider_request_id && requestId !== row.provider_request_id) {
     return { received: true, discarded: "request_mismatch" };
   }
+  if (TERMINAL.has(row.status) && row.settled_at !== null) return { received: true, discarded: "terminal" };
   if (requestId && !row.provider_request_id) {
     ctx.db.run("UPDATE media_jobs SET provider_request_id = ?, updated_at = ? WHERE job_id = ?", requestId, Date.now(), jobId);
   }
   const status = typeof event.status === "string" ? event.status.toUpperCase() : "ERROR";
+  if (TERMINAL.has(row.status)) {
+    const result = event.payload;
+    const usable = isRecord(result) && JSON.stringify(result).length <= MAX_WEBHOOK_RESULT_CHARS;
+    ctx.jobs.schedule(
+      MEDIA_SETTLE_JOB,
+      Date.now(),
+      status !== "OK" ? { jobId, failed: true } : usable ? { jobId, result } : { jobId, check: 1 },
+      { id: settleJobId(jobId) },
+    );
+    return { received: true, discarded: "terminal" };
+  }
   if (status === "OK") {
     const result = event.payload;
     const usable = isRecord(result) && JSON.stringify(result).length <= MAX_WEBHOOK_RESULT_CHARS;
@@ -682,6 +856,7 @@ const falWebhook = (ctx: OwnerContext, raw: unknown): { received: true; discarde
     ...(typeof event.error_type === "string" ? { code: event.error_type } : {}),
     ...(detail !== undefined ? { details: { detail } } : {}),
   });
+  settleJob(ctx, jobId, { chargeMicroCents: 0, outcome: "failed", reachedProvider: true });
   return { received: true };
 };
 
@@ -713,6 +888,11 @@ const deleteJob = async (
   if (!row) return { deleted: false, kind: "media_job", id: jobId };
   await cancelJob(ctx, { jobId });
   clearJobs(ctx, jobId);
+  settleJob(ctx, jobId, {
+    chargeMicroCents: row.status === "running" ? estimatedCost(row) : 0,
+    outcome: "cancelled",
+    reachedProvider: row.provider_request_id !== null,
+  });
   ctx.db.run("DELETE FROM media_jobs WHERE job_id = ?", jobId);
   await deleteJobObjects(ctx, jobId);
   return { deleted: true, kind: "media_job", id: jobId };
@@ -737,7 +917,13 @@ const statusArg = literal("queued", "running", "succeeded", "failed", "canceled"
 
 export const mediaDomain = {
   name: "media",
-  migrations: [MEDIA_MIGRATION, MEDIA_CHARGE_MIGRATION, MEDIA_MODEL_MIGRATION, MEDIA_WEBHOOK_TOKEN_MIGRATION],
+  migrations: [
+    MEDIA_MIGRATION,
+    MEDIA_CHARGE_MIGRATION,
+    MEDIA_MODEL_MIGRATION,
+    MEDIA_WEBHOOK_TOKEN_MIGRATION,
+    MEDIA_SETTLEMENT_MIGRATION,
+  ],
   calls: {
     "media.generate": {
       scope: "owner",
@@ -794,6 +980,7 @@ export const mediaDomain = {
   jobs: {
     [MEDIA_POLL_JOB]: { run: runPoll },
     [MEDIA_EXPIRE_JOB]: { run: runExpire },
+    [MEDIA_SETTLE_JOB]: { run: runSettle },
   },
   purge: (ctx: OwnerContext) => purgeMedia(ctx),
 } satisfies OwnerDomain;

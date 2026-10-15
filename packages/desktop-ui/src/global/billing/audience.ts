@@ -1,37 +1,22 @@
+import {
+  normalizeBillingPlan,
+  planLabel,
+  type BillingPlan,
+} from "@stella/contracts/billing-plans";
+
 export { toCapabilityAudience } from "@stella/contracts/capabilities";
 
-export type SubscriptionPlan = "free" | "go" | "pro";
+export type SubscriptionPlan = BillingPlan;
 
-export type ManagedModelAudience =
-  | "free"
-  | "go"
-  | "pro"
-  | "go_fallback"
-  | "pro_fallback";
-
-const RESTRICTED_MODEL_OVERRIDE_AUDIENCES = new Set<ManagedModelAudience>([
-  "free",
-  "go",
-  "go_fallback",
-]);
+export type ManagedModelAudience = BillingPlan;
 
 export const isRestrictedModelOverrideAudience = (
   audience: ManagedModelAudience | null | undefined,
 ): boolean =>
-  audience !== null &&
-  audience !== undefined &&
-  RESTRICTED_MODEL_OVERRIDE_AUDIENCES.has(audience);
-
-const PLAN_LABELS: Record<ManagedModelAudience, string> = {
-  free: "Free",
-  go: "Go",
-  pro: "Pro",
-  go_fallback: "Go",
-  pro_fallback: "Pro",
-};
+  audience === "free";
 
 export const getPlanLabel = (audience: ManagedModelAudience): string =>
-  PLAN_LABELS[audience];
+  planLabel(audience);
 
 export const getRestrictionActionKind = (
   _audience: ManagedModelAudience,
@@ -67,16 +52,10 @@ type BillingUsage = {
 };
 
 type ResolvableBillingStatus = {
-  plan: SubscriptionPlan;
+  plan: string;
   usage: BillingUsage | null;
   authenticated?: boolean;
 };
-
-const isUsageExceeded = (usage: BillingUsage | null): boolean =>
-  usage !== null &&
-  (usage.rollingUsedUsd >= usage.rollingLimitUsd ||
-  usage.weeklyUsedUsd >= usage.weeklyLimitUsd ||
-  usage.monthlyUsedUsd >= usage.monthlyLimitUsd);
 
 export const resolveBillingAudience = (args: {
   hasConnectedAccount: boolean;
@@ -91,13 +70,7 @@ export const resolveBillingAudience = (args: {
   if (args.billingStatus.authenticated === false) {
     return null;
   }
-  const { plan, usage } = args.billingStatus;
-  if (plan === "free") {
-    return "free";
-  }
-  return isUsageExceeded(usage)
-    ? (`${plan}_fallback` as ManagedModelAudience)
-    : plan;
+  return normalizeBillingPlan(args.billingStatus.plan);
 };
 
 export type FreeAllowance = {

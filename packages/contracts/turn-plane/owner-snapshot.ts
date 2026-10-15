@@ -1,3 +1,4 @@
+import type { BillingPlan } from "../billing-plans.js";
 import type { CloudExecutionSelection } from "../agent-engine.js";
 import type { ManagedModelAudience } from "../gateway/capability.js";
 import type { OwnerEnforcement } from "../gateway/usage.js";
@@ -9,7 +10,7 @@ import type { PairingHmacKey } from "./pairing-proof.js";
 
 export const OWNER_SNAPSHOT_VERSION = 1 as const;
 
-export type CloudPlanId = "free" | "go" | "pro";
+export type CloudPlanId = BillingPlan;
 
 export type OwnerSnapshot = {
   v: typeof OWNER_SNAPSHOT_VERSION;

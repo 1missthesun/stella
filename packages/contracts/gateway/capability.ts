@@ -16,13 +16,7 @@ export const GATEWAY_CAPABILITY_ALGORITHM = "ES256" as const;
 
 export type GatewayCapabilityKind = "session" | "turn";
 
-export const MANAGED_MODEL_AUDIENCES = [
-  "free",
-  "go",
-  "pro",
-  "go_fallback",
-  "pro_fallback",
-] as const;
+export const MANAGED_MODEL_AUDIENCES = ["free", "plus", "pro", "max"] as const;
 
 export type ManagedModelAudience = (typeof MANAGED_MODEL_AUDIENCES)[number];
 

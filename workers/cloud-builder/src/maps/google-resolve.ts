@@ -31,9 +31,17 @@ export type MapResolveResult =
   | { status: 200; body: { map: MapRouteArtifact; unresolved: string[] } }
   | { status: 400 | 403 | 422 | 429 | 502 | 503; body: { error: string } };
 
+export type MapsUsage = { placeCalls: number; routeCalls: number; outcome: "succeeded" | "failed" | "aborted" };
+
 export type MapsAdmission = (lookups: { places: number; route: boolean }) => Promise<
-  { ok: true } | { ok: false; status: 403 | 429; error: string }
+  { ok: true; settle: (usage: MapsUsage) => Promise<void> } | { ok: false; status: 403 | 429; error: string }
 >;
+
+// Google calls that Google bills for, counted as they happen.
+type Meter = { placeCalls: number; routeCalls: number };
+
+// Directions answers HTTP 200 for everything; these statuses are not billed.
+const UNBILLED_DIRECTIONS = new Set(["REQUEST_DENIED", "INVALID_REQUEST", "OVER_QUERY_LIMIT", "OVER_DAILY_LIMIT", "UNKNOWN_ERROR"]);
 
 const asTrimmedString = (value: unknown): string => (typeof value === "string" ? value.trim() : "");
 
@@ -73,8 +81,9 @@ const resolvePlace = async (
   apiKey: string,
   fetchImpl: typeof fetch,
   signal: AbortSignal | undefined,
+  meter: Meter,
 ): Promise<ResolvedPlace | null> => {
-  const response = await fetchGoogle(fetchImpl, "https://places.googleapis.com/v1/places:searchText", signal, {
+  const sent = fetchGoogle(fetchImpl, "https://places.googleapis.com/v1/places:searchText", signal, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -84,7 +93,12 @@ const resolvePlace = async (
     },
     body: JSON.stringify({ textQuery: query, pageSize: 1 }),
   });
+  const response = await sent.catch((error: unknown) => {
+    meter.placeCalls += 1;
+    throw error;
+  });
   if (!response.ok) throw new Error(`Places search failed (${response.status}).`);
+  meter.placeCalls += 1;
   const data = (await response.json()) as {
     places?: Array<{
       id?: string;
@@ -132,13 +146,17 @@ const resolveRoute = async (
   apiKey: string,
   fetchImpl: typeof fetch,
   signal: AbortSignal | undefined,
+  meter: Meter,
 ): Promise<ResolvedRoute | string> => {
   const url = new URL("https://maps.googleapis.com/maps/api/directions/json");
   url.searchParams.set("origin", originQuery);
   url.searchParams.set("destination", destinationQuery);
   url.searchParams.set("mode", DIRECTIONS_MODE[mode]);
   url.searchParams.set("key", apiKey);
-  const response = await fetchGoogle(fetchImpl, url.toString(), signal);
+  const response = await fetchGoogle(fetchImpl, url.toString(), signal).catch((error: unknown) => {
+    meter.routeCalls += 1;
+    throw error;
+  });
   if (!response.ok) return `Directions lookup failed (${response.status}).`;
   const data = (await response.json()) as {
     status?: string;
@@ -157,6 +175,7 @@ const resolveRoute = async (
       }>;
     }>;
   };
+  if (!UNBILLED_DIRECTIONS.has(data.status ?? "")) meter.routeCalls += 1;
   if (data.status === "ZERO_RESULTS") {
     return `No ${mode} route found between "${originQuery}" and "${destinationQuery}".`;
   }
@@ -230,19 +249,42 @@ export const resolveMapRequest = async (
   if (typeof parsed === "string") return { status: 400, body: { error: parsed } };
   const admitted = await options.admit({ places: parsed.places.length, route: Boolean(parsed.origin) });
   if (!admitted.ok) return { status: admitted.status, body: { error: admitted.error } };
+  const meter: Meter = { placeCalls: 0, routeCalls: 0 };
+  const result = await resolveAdmitted(parsed, apiKey, options, meter);
+  await admitted.settle({
+    ...meter,
+    outcome: result.status === 200 ? "succeeded" : options.signal?.aborted ? "aborted" : "failed",
+  });
+  return result;
+};
+
+const resolveAdmitted = async (
+  parsed: ResolveRequest,
+  apiKey: string,
+  options: { fetchImpl?: typeof fetch; signal?: AbortSignal },
+  meter: Meter,
+): Promise<MapResolveResult> => {
   const fetchImpl = options.fetchImpl ?? fetch;
   try {
     const markers: MapArtifactMarker[] = [];
     let route: MapArtifactRoute | undefined;
     const unresolved: string[] = [];
     if (parsed.origin && parsed.destination) {
-      const resolved = await resolveRoute(parsed.origin, parsed.destination, parsed.mode, apiKey, fetchImpl, options.signal);
+      const resolved = await resolveRoute(
+        parsed.origin,
+        parsed.destination,
+        parsed.mode,
+        apiKey,
+        fetchImpl,
+        options.signal,
+        meter,
+      );
       if (typeof resolved === "string") return { status: 422, body: { error: resolved } };
       markers.push(resolved.origin, resolved.destination);
       route = resolved.route;
     }
     for (const [index, query] of parsed.places.entries()) {
-      const place = await resolvePlace(query, apiKey, fetchImpl, options.signal);
+      const place = await resolvePlace(query, apiKey, fetchImpl, options.signal, meter);
       if (!place) {
         unresolved.push(query);
         continue;

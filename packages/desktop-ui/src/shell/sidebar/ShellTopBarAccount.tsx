@@ -10,6 +10,7 @@ import {
 } from "react";
 import { CreditCard, LogOut, Settings } from "@/ui/icons";
 import { useT } from "@/shared/i18n";
+import { planLabel } from "@stella/contracts/billing-plans";
 import {
   preloadAuthDialog,
   preloadBillingScreen,
@@ -39,29 +40,8 @@ import { useSettingsMenu } from "@/shell/topbar/use-settings-menu";
 import "./topbar-nav.css";
 import "./account-dialogs.css";
 
-
-type BillingPlanId = "free" | "go" | "pro" | "plus" | "ultra";
-
 type BillingStatusLite = {
-  plan?: BillingPlanId;
-  plans?: Partial<Record<BillingPlanId, { label?: string }>>;
-};
-
-const planLabel = (
-  plan: BillingPlanId | undefined,
-  status: BillingStatusLite | undefined,
-): string | undefined => {
-  if (!plan) return "Free";
-  const live = status?.plans?.[plan]?.label;
-  if (live) return live;
-  switch (plan) {
-    case "free":
-      return "Free";
-    case "go":
-      return "Go";
-    case "pro":
-      return "Pro";
-  }
+  plan?: string;
 };
 
 interface ShellTopBarAccountProps {
@@ -167,7 +147,7 @@ export const ShellTopBarAccount = ({ onSignIn }: ShellTopBarAccountProps) => {
     t("sidebar.account");
   const displayLabel = nickname.trim() || accountName;
   const sidebarPlanLabel = billingQueryReady && !selfHosted
-    ? planLabel(billingStatus?.plan, billingStatus)
+    ? planLabel(billingStatus?.plan)
     : null;
 
   return (

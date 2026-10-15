@@ -1,159 +1,63 @@
 "use client";
 
-import {
-  getBackendClient,
-  isBackendConfigured,
-  useBackendValue,
-} from "@/lib/backend";
-import {
-  useCallback,
-  useEffect,
-  useState,
-  useSyncExternalStore,
-  type CSSProperties,
-} from "react";
+import type { BillingStatus } from "@stella/contracts/backend/billing";
+import { getBackendClient, isBackendConfigured, useBackendValue } from "@/lib/backend";
+import { useCallback, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import Link from "next/link";
 import { openSignInDialog } from "@/components/auth/sign-in-dialog";
 import { authClient } from "@/lib/auth-client";
 import { signOut } from "@/lib/sign-out";
 import { useDesktopBridgeAuthUser } from "@/lib/desktop-bridge-auth";
-import { PLAN_ORDER, PLANS, type BillingPlan } from "@/lib/plans";
+import {
+  PLAN_CATALOG,
+  PLAN_ORDER,
+  formatUsd,
+  isPaidBillingPlan,
+  normalizeBillingPlan,
+  planPriceLabel,
+  planRank,
+  type BillingPlan,
+  type PaidBillingPlan,
+} from "@/lib/plans";
+import { billingMockStatus, readBillingMockMode, type BillingMockMode } from "./billing-mock";
 
-type PaidBillingPlan = Exclude<BillingPlan, "free">;
+const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2 });
+const dateFormat = new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric" });
+const timeFormat = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" });
+const weekdayFormat = new Intl.DateTimeFormat("en-US", { weekday: "long", hour: "numeric", minute: "2-digit" });
 
-type BillingPlanConfig = {
-  label: string;
-  monthlyPriceCents: number;
-  introFirstMonthPriceCents?: number;
-  rollingLimitUsd: number;
-  rollingWindowHours: number;
-  weeklyLimitUsd: number;
-  monthlyLimitUsd: number;
-  tokensPerMinute: number;
+const whenLabel = (at: number, now: number): string => {
+  const ms = at - now;
+  if (ms <= 0) return "now";
+  if (ms < 24 * 60 * 60 * 1000) return `at ${timeFormat.format(at)}`;
+  if (ms < 7 * 24 * 60 * 60 * 1000) return `on ${weekdayFormat.format(at).replace(" at", ",")}`;
+  return `on ${dateFormat.format(at)}`;
 };
 
-type BillingUsage = {
-  rollingUsedUsd: number;
-  rollingLimitUsd: number;
-  weeklyUsedUsd: number;
-  weeklyLimitUsd: number;
-  monthlyUsedUsd: number;
-  monthlyLimitUsd: number;
+const resetLabel = (at: number | undefined, now: number): string =>
+  typeof at === "number" && at > 0 ? `Resets ${whenLabel(at, now)}` : "";
+
+// Whole percent for display: never 0% once anything is used, never 100% until it's all used.
+const usedPercent = (used: number, limit: number): string => {
+  if (!Number.isFinite(limit) || limit <= 0 || !(used > 0)) return "0%";
+  if (used >= limit) return "100%";
+  return `${Math.min(99, Math.max(1, Math.floor((used / limit) * 100)))}%`;
 };
 
-type BillingUsagePolicy =
-  | {
-      kind: "anonymous_requests";
-      requestLimit: number;
-      perIpRequestLimit: number;
-      resetAfterInactivityDays: number;
-    }
-  | { kind: "managed_cost" };
+const RECOMMENDED_PLAN: PaidBillingPlan = "pro";
 
-type BillingStatus = {
-  authenticated: boolean;
-  isAnonymous: boolean;
-  plan: BillingPlan;
-  subscriptionStatus: string;
-  cancelAtPeriodEnd: boolean;
-  currentPeriodEnd: number | null;
-  usage: BillingUsage | null;
-  usagePolicy: BillingUsagePolicy;
-  plans: Record<BillingPlan, BillingPlanConfig>;
-};
+const planFeatures = (plan: BillingPlan): readonly string[] => PLAN_CATALOG[plan].includes;
 
-type CheckoutSessionPayload = {
-  url: string;
-  sessionId: string;
-};
+const pct = (used: number, limit: number) =>
+  !Number.isFinite(limit) || limit <= 0 ? 0 : Math.min(100, Math.max(0, (used / limit) * 100));
 
-type BillingPortalSessionPayload = {
-  url: string;
-};
-
-type UsageCreditPurchaseOptions = {
-  currency: string;
-  minAmountCents: number;
-  maxAmountCents: number;
-  presetAmountCents: number[];
-};
-
-type UsageCreditStatus = {
-  authenticated: boolean;
-  currency: string;
-  balanceUsd: number;
-  totalPurchasedUsd: number;
-  totalConsumedUsd: number;
-};
-
-const RECOMMENDED_PLAN: BillingPlan = "pro";
-
-const VERIFIED_BADGE_FEATURE = "Verified creator badge on the Store";
-
-const PAID_PLANS = new Set<BillingPlan>(["go", "pro"]);
-
-const getPlanFeatures = (plan: BillingPlan): readonly string[] => {
-  const features: string[] = [...PLANS[plan].features];
-  if (PAID_PLANS.has(plan)) features.push(VERIFIED_BADGE_FEATURE);
-  return features;
-};
-
-const currencyFormatter = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  maximumFractionDigits: 0,
-});
-
-const usdFormatter = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
-
-const dateFormatter = new Intl.DateTimeFormat("en-US", {
-  month: "long",
-  day: "numeric",
-  year: "numeric",
-});
-
-const toUsagePercent = (usedUsd: number, limitUsd: number) => {
-  if (!Number.isFinite(limitUsd) || limitUsd <= 0) return 0;
-  if (!Number.isFinite(usedUsd) || usedUsd <= 0) return 0;
-  return Math.min(100, Math.max(0, (usedUsd / limitUsd) * 100));
-};
-
-const formatUsagePercent = (pct: number) => {
-  if (pct > 0 && pct < 1) return "<1%";
-  return `${Math.round(pct)}%`;
-};
-
-type UsageMeter = {
-  percent: number;
-};
-
-const getBillingReturnUrl = () => {
-  const url = new URL("/billing", window.location.origin);
-  return url.toString();
-};
-
-const getErrorMessage = (error: unknown, fallback: string) =>
+const errorText = (error: unknown, fallback: string) =>
   error instanceof Error && error.message ? error.message : fallback;
 
-// Stripe hosted checkout lives on `checkout.stripe.com`. On the website we
-// open it in a new tab; inside Stella's desktop WebContentsView the same
-// click is intercepted by `setWindowOpenHandler` and routed to
-// `shell.openExternal`, which opens it in the user's system browser.
-// Either way the user lands back on `/billing?checkout=success` when
-// Stripe finishes redirecting.
-//
-// Uses a synthesized anchor click rather than `window.open` because
-// `window.open(url, '_blank', 'noopener,noreferrer')` returns `null` per
-// the HTML spec when `noopener` is set — even on success — which made the
-// previous null-check fallback navigate the current tab as well, opening
-// Stripe in two tabs. The anchor-click pattern is treated as a normal
-// user-initiated link, so it's never popup-blocked and only opens once.
-const openStripeCheckoutUrl = (url: string) => {
+// A synthesized anchor opens Stripe once: window.open with noopener returns
+// null even on success, which used to open it twice. In the desktop web view
+// the click is routed to the system browser.
+const openExternal = (url: string) => {
   const anchor = document.createElement("a");
   anchor.href = url;
   anchor.target = "_blank";
@@ -163,674 +67,620 @@ const openStripeCheckoutUrl = (url: string) => {
   anchor.remove();
 };
 
-const subscribeNoop = () => () => {};
+const returnUrl = () => new URL("/billing", window.location.origin).toString();
 
-const readCheckoutStatus = (): string | null =>
-  new URLSearchParams(window.location.search).get("checkout");
+type Boot = { mock: BillingMockMode | null; checkout: string | null; plan: BillingPlan | null };
+let bootSnapshot: Boot | null = null;
+const readBoot = (): Boot => {
+  if (!bootSnapshot) {
+    const params = new URL(window.location.href).searchParams;
+    const plan = params.get("plan");
+    bootSnapshot = {
+      mock: readBillingMockMode(),
+      checkout: params.get("checkout"),
+      plan: plan ? normalizeBillingPlan(plan) : null,
+    };
+  }
+  return bootSnapshot;
+};
+const subscribeNever = () => () => {};
 
 export function BillingClient() {
-  if (!isBackendConfigured()) {
-    return (
-      <main className="billing-root">
-        <div className="billing-shell">
-          <header className="billing-hero">
-            <p className="billing-eyebrow">Account</p>
-            <h1 className="billing-title">
-              Choose how much <em>Stella</em>.
-            </h1>
-            <p className="billing-lead">
-              Billing is available inside Stella once the backend connection is
-              configured.
-            </p>
-          </header>
-        </div>
-      </main>
-    );
-  }
-
-  return <BillingInteractive />;
-}
-
-function BillingInteractive() {
-  const [billingNowMs, setBillingNowMs] = useState(() => Date.now());
-  const [startingPlan, setStartingPlan] = useState<PaidBillingPlan | null>(null);
-  const [openingPortal, setOpeningPortal] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [creditCustomAmount, setCreditCustomAmount] = useState("");
-  const [creditSelectedPresetCents, setCreditSelectedPresetCents] = useState<
-    number | null
-  >(null);
-  const [startingCredit, setStartingCredit] = useState(false);
+  const boot = useSyncExternalStore(subscribeNever, readBoot, () => null);
 
   useEffect(() => {
-    const id = window.setInterval(() => setBillingNowMs(Date.now()), 60_000);
-    return () => window.clearInterval(id);
-  }, []);
-
-  const checkoutStatus = useSyncExternalStore(
-    subscribeNoop,
-    readCheckoutStatus,
-    () => null,
-  );
-  const [seenCheckoutStatus, setSeenCheckoutStatus] = useState<string | null>(
-    null,
-  );
-  if (checkoutStatus && checkoutStatus !== seenCheckoutStatus) {
-    setSeenCheckoutStatus(checkoutStatus);
-    if (checkoutStatus === "success") {
-      setNotice("Payment received. Your updated plan will appear in a moment.");
-    } else if (checkoutStatus === "cancel") {
-      setNotice("Checkout cancelled. You can pick a plan whenever you're ready.");
-    }
-  }
-  useEffect(() => {
-    if (!checkoutStatus) return;
     const url = new URL(window.location.href);
+    if (!url.searchParams.has("checkout")) return;
     url.searchParams.delete("checkout");
     window.history.replaceState(null, "", url.toString());
-  }, [checkoutStatus]);
-
-  void billingNowMs;
-  const ledger = useBackendValue("billing.status", {});
-  const billingStatus = ledger as BillingStatus | undefined;
-  const creditOptions: UsageCreditPurchaseOptions | undefined = ledger?.creditPurchase;
-  const creditStatus: UsageCreditStatus | undefined = ledger
-    ? { authenticated: !ledger.isAnonymous, ...ledger.credits }
-    : undefined;
-  const startCheckout = useCallback(
-    (args: { plan: PaidBillingPlan; returnUrl: string }): Promise<CheckoutSessionPayload> =>
-      getBackendClient().call("billing.checkout", args),
-    [],
-  );
-  const openPortal = useCallback(
-    (args: { returnUrl: string }): Promise<BillingPortalSessionPayload> =>
-      getBackendClient().call("billing.portal", args),
-    [],
-  );
-  const startCreditCheckout = useCallback(
-    (args: { amountCents: number; returnUrl: string }): Promise<CheckoutSessionPayload> =>
-      getBackendClient().call("billing.creditCheckout", args),
-    [],
-  );
-
-  const planCatalog = billingStatus?.plans;
-  const currentPlan = billingStatus?.plan ?? "free";
-  const usage = billingStatus?.usage;
-  const usagePolicy = billingStatus?.usagePolicy;
-  const hasAccount = Boolean(
-    billingStatus?.authenticated && !billingStatus.isAnonymous,
-  );
-  const isLoadingStatus = billingStatus === undefined;
-  const account = useAccountUser();
-  const showAccountBody = account.signedIn || hasAccount || !isLoadingStatus;
-  const isActivePaidSubscriber = hasAccount && currentPlan !== "free";
-  const currentPlanRank = PLAN_ORDER.indexOf(currentPlan);
-
-  const getPlanDisplay = useCallback(
-    (plan: BillingPlan) => {
-      const live = planCatalog?.[plan];
-      const fallback = PLANS[plan];
-      return {
-        label: live?.label ?? fallback.label,
-        monthlyPriceCents: live?.monthlyPriceCents ?? fallback.monthlyPriceCents,
-        ...(typeof live?.introFirstMonthPriceCents === "number"
-          ? { introFirstMonthPriceCents: live.introFirstMonthPriceCents }
-          : {}),
-      };
-    },
-    [planCatalog],
-  );
-
-  const handleStartCheckout = useCallback(
-    async (plan: PaidBillingPlan) => {
-      if (!hasAccount) {
-        openSignInDialog();
-        return;
-      }
-      setError(null);
-      setNotice(null);
-      setStartingPlan(plan);
-      try {
-        const session = await startCheckout({
-          plan,
-          returnUrl: getBillingReturnUrl(),
-        });
-        openStripeCheckoutUrl(session.url);
-      } catch (err) {
-        setError(getErrorMessage(err, "Unable to start checkout right now."));
-      } finally {
-        setStartingPlan(null);
-      }
-    },
-    [hasAccount, startCheckout],
-  );
-
-  const parseCustomAmountCents = useCallback(
-    (raw: string): { amountCents: number; error: string | null } => {
-      if (!creditOptions) {
-        return { amountCents: 0, error: "Credit options are still loading." };
-      }
-      const trimmed = raw.trim();
-      if (!trimmed) {
-        return { amountCents: 0, error: "Enter an amount." };
-      }
-      const parsed = Number(trimmed);
-      if (!Number.isFinite(parsed) || parsed <= 0) {
-        return { amountCents: 0, error: "Enter a valid amount in dollars." };
-      }
-      const amountCents = Math.round(parsed * 100);
-      if (amountCents < creditOptions.minAmountCents) {
-        return {
-          amountCents,
-          error: `Minimum is ${usdFormatter.format(
-            creditOptions.minAmountCents / 100,
-          )}.`,
-        };
-      }
-      if (amountCents > creditOptions.maxAmountCents) {
-        return {
-          amountCents,
-          error: `Maximum is ${usdFormatter.format(
-            creditOptions.maxAmountCents / 100,
-          )}.`,
-        };
-      }
-      return { amountCents, error: null };
-    },
-    [creditOptions],
-  );
-
-  const handleSelectCreditPreset = useCallback((amountCents: number) => {
-    setCreditSelectedPresetCents(amountCents);
-    setCreditCustomAmount((amountCents / 100).toFixed(2).replace(/\.00$/, ""));
   }, []);
 
-  const handleStartCreditCheckout = useCallback(async () => {
-    if (!hasAccount) {
-      openSignInDialog();
-      return;
-    }
-    setError(null);
-    setNotice(null);
-    const { amountCents, error: amountError } =
-      parseCustomAmountCents(creditCustomAmount);
-    if (amountError) {
-      setError(amountError);
-      return;
-    }
-    setStartingCredit(true);
-    try {
-      const session = await startCreditCheckout({
-        amountCents,
-        returnUrl: getBillingReturnUrl(),
-      });
-      openStripeCheckoutUrl(session.url);
-    } catch (err) {
-      setError(getErrorMessage(err, "Unable to start checkout right now."));
-    } finally {
-      setStartingCredit(false);
-    }
-  }, [
-    creditCustomAmount,
-    hasAccount,
-    parseCustomAmountCents,
-    startCreditCheckout,
-  ]);
-
-  const handleOpenPortal = useCallback(async () => {
-    if (!hasAccount) {
-      openSignInDialog();
-      return;
-    }
-    setError(null);
-    setNotice(null);
-    setOpeningPortal(true);
-    try {
-      const session = await openPortal({ returnUrl: getBillingReturnUrl() });
-      openStripeCheckoutUrl(session.url);
-    } catch (err) {
-      setError(getErrorMessage(err, "Unable to open billing right now."));
-    } finally {
-      setOpeningPortal(false);
-    }
-  }, [hasAccount, openPortal]);
-
-  const usageMeter: UsageMeter | null =
-    usage && planCatalog && usagePolicy?.kind === "managed_cost"
-      ? {
-          percent: Math.max(
-            toUsagePercent(usage.rollingUsedUsd, usage.rollingLimitUsd),
-            toUsagePercent(usage.weeklyUsedUsd, usage.weeklyLimitUsd),
-            toUsagePercent(usage.monthlyUsedUsd, usage.monthlyLimitUsd),
-          ),
-        }
-      : null;
-  const anonymousUsagePolicy =
-    usagePolicy?.kind === "anonymous_requests" ? usagePolicy : null;
-
-  const renewalLabel = billingStatus?.cancelAtPeriodEnd
-    ? "Cancellation pending"
-    : "Next renewal";
-  const renewalDetail =
-    billingStatus?.currentPeriodEnd
-      ? billingStatus.cancelAtPeriodEnd
-        ? `Access ends ${dateFormatter.format(
-            new Date(billingStatus.currentPeriodEnd),
-          )}`
-        : `Renews ${dateFormatter.format(
-            new Date(billingStatus.currentPeriodEnd),
-          )}`
-      : "Managed by Stripe";
-
-  return (
-    <main className="billing-root">
-      <div className="billing-shell">
-        <header className="billing-hero">
-          <p className="billing-eyebrow">Account</p>
-          <h1 className="billing-title">
-            Choose how much <em>Stella</em>.
-          </h1>
-          <p className="billing-lead">Monthly plans. Change or cancel anytime. Prices in USD.</p>
-        </header>
-
-        {error ? (
-          <p className="billing-notice billing-notice--error" role="alert">
-            {error}
-          </p>
-        ) : null}
-        {notice ? <p className="billing-notice">{notice}</p> : null}
-
-        <section className="billing-account" aria-label="Your account">
-          <AccountIdentity account={account} hasAccount={hasAccount} />
-
-          {showAccountBody ? (
-            <div className="billing-account-body">
-              <div className="billing-account-plan">
-                <span className="billing-status-label">Current plan</span>
-                <span className="billing-status-value">
-                  {isLoadingStatus ? (
-                    <span
-                      className="loading-text"
-                      style={{ "--w": "5ch" } as CSSProperties}
-                      aria-label="Loading current plan"
-                    />
-                  ) : (
-                    getPlanDisplay(currentPlan).label
-                  )}
-                </span>
-                {isActivePaidSubscriber ? (
-                  <span className="billing-account-renewal">
-                    {renewalLabel} · {renewalDetail}
-                  </span>
-                ) : null}
-              </div>
-
-              {anonymousUsagePolicy ? (
-                <div className="billing-anonymous-policy">
-                  <div className="billing-status-meter-label">
-                    <span>Anonymous preview</span>
-                  </div>
-                  <p>Sign in to continue with the Free plan.</p>
-                </div>
-              ) : usageMeter ? (
-                <div className="billing-status-meter">
-                  <div className="billing-status-meter-label">
-                    <span>Plan usage</span>
-                    <span>{formatUsagePercent(usageMeter.percent)}</span>
-                  </div>
-                  <div className="billing-meter-track">
-                    <div
-                      className="billing-meter-fill"
-                      style={{ width: `${usageMeter.percent}%` }}
-                    />
-                  </div>
-                </div>
-              ) : null}
-
-              {isActivePaidSubscriber ? (
-                <div className="billing-account-actions">
-                  <button
-                    type="button"
-                    className="billing-button billing-button--primary"
-                    onClick={() => void handleOpenPortal()}
-                    disabled={openingPortal}
-                  >
-                    {openingPortal ? "Opening..." : "Manage subscription"}
-                  </button>
-                  {billingStatus && !billingStatus.cancelAtPeriodEnd ? (
-                    <button
-                      type="button"
-                      className="billing-link-button billing-link-button--danger"
-                      onClick={() => void handleOpenPortal()}
-                      disabled={openingPortal}
-                    >
-                      Cancel plan
-                    </button>
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-        </section>
-
-        <section className="billing-plans-section" aria-label="Plans">
-          <div className="billing-section-head billing-section-head--center">
-            <h2 className="billing-section-title">Plans</h2>
-          </div>
-          <div className="billing-plans-grid">
-            {PLAN_ORDER.map((plan) => {
-              const display = getPlanDisplay(plan);
-              const isCurrentPlan = plan === currentPlan;
-              const introCents =
-                plan === "go" &&
-                typeof display.introFirstMonthPriceCents === "number" &&
-                display.introFirstMonthPriceCents > 0 &&
-                display.monthlyPriceCents >
-                  display.introFirstMonthPriceCents &&
-                !(isCurrentPlan && currentPlan === "go")
-                  ? display.introFirstMonthPriceCents
-                  : null;
-              const isPaidPlan = plan !== "free";
-              const isStartingThisPlan = startingPlan === plan;
-              const isRecommended =
-                plan === RECOMMENDED_PLAN && currentPlan !== RECOMMENDED_PLAN;
-              const targetRank = PLAN_ORDER.indexOf(plan);
-              const changeVerb =
-                isActivePaidSubscriber && isPaidPlan && !isCurrentPlan
-                  ? targetRank > currentPlanRank
-                    ? "Upgrade to"
-                    : "Downgrade to"
-                  : "Choose";
-              const ctaLabel = isCurrentPlan
-                ? "Current plan"
-                : isStartingThisPlan
-                  ? "Opening..."
-                  : isActivePaidSubscriber && !isPaidPlan
-                    ? "Cancel to switch"
-                    : isActivePaidSubscriber && isPaidPlan
-                      ? openingPortal
-                        ? "Opening..."
-                        : `${changeVerb} ${display.label}`
-                      : !hasAccount && isPaidPlan
-                        ? `Sign in for ${display.label}`
-                        : isPaidPlan
-                          ? `Choose ${display.label}`
-                          : "Included";
-
-              const handlePlanClick = () => {
-                if (isCurrentPlan) return;
-                if (isActivePaidSubscriber) {
-                  void handleOpenPortal();
-                  return;
-                }
-                if (isPaidPlan) {
-                  void handleStartCheckout(plan as PaidBillingPlan);
-                }
-              };
-
-              const isDisabled =
-                isCurrentPlan ||
-                startingPlan !== null ||
-                (isActivePaidSubscriber ? openingPortal : !isPaidPlan);
-
-              return (
-                <article
-                  key={plan}
-                  className="billing-plan"
-                  data-active={isCurrentPlan || undefined}
-                  data-recommended={isRecommended || undefined}
-                >
-                  <div className="billing-plan-name">{display.label}</div>
-                  <div className="billing-plan-price-block">
-                    {introCents !== null ? (
-                      <>
-                        <div className="billing-plan-price billing-plan-price--intro-offer">
-                          <span className="billing-plan-price-value">
-                            {currencyFormatter.format(introCents / 100)}
-                          </span>
-                          <span className="billing-plan-price-period intro">
-                            first month
-                          </span>
-                        </div>
-                        <p className="billing-plan-price-then">
-                          Then{" "}
-                          <strong>
-                            {currencyFormatter.format(
-                              display.monthlyPriceCents / 100,
-                            )}
-                          </strong>
-                          <span aria-hidden="true">/mo</span> after that
-                        </p>
-                      </>
-                    ) : (
-                      <div className="billing-plan-price">
-                        <span className="billing-plan-price-value">
-                          {display.monthlyPriceCents <= 0
-                            ? "Free"
-                            : currencyFormatter.format(
-                                display.monthlyPriceCents / 100,
-                              )}
-                        </span>
-                        {display.monthlyPriceCents > 0 ? (
-                          <span className="billing-plan-price-period">/mo</span>
-                        ) : null}
-                      </div>
-                    )}
-                  </div>
-                  <p className="billing-plan-allotment">
-                    {PLANS[plan].tagline}
-                  </p>
-                  <ul className="billing-plan-features">
-                    {getPlanFeatures(plan).map((feature) => (
-                      <li key={feature}>{feature}</li>
-                    ))}
-                  </ul>
-                  <hr className="billing-plan-rule" />
-                  <button
-                    type="button"
-                    className={
-                      "billing-button billing-plan-cta" +
-                      (isRecommended && !isCurrentPlan ? " billing-button--primary" : "") +
-                      (isCurrentPlan ? " billing-plan-cta--current" : "")
-                    }
-                    onClick={handlePlanClick}
-                    disabled={isDisabled}
-                  >
-                    {ctaLabel}
-                  </button>
-                </article>
-              );
-            })}
-          </div>
-
-        </section>
-
-        <section className="billing-credit" aria-label="Top up usage">
-          <div className="billing-credit-head">
-            <div className="billing-section-head">
-              <h2 className="billing-section-title">Extra usage credit</h2>
-              <p className="billing-section-sub">
-                Add credit for usage beyond your plan&apos;s limits.
-              </p>
-            </div>
-            {creditStatus?.authenticated ? (
-              <div className="billing-credit-balance">
-                <span className="billing-status-label">Available credit</span>
-                <span className="billing-credit-balance-value">
-                  {usdFormatter.format(creditStatus.balanceUsd)}
-                </span>
-              </div>
-            ) : null}
-          </div>
-
-          <div className="billing-credit-controls">
-            {creditOptions ? (
-              <div
-                className="billing-credit-presets"
-                role="radiogroup"
-                aria-label="Preset amounts"
-              >
-                {creditOptions.presetAmountCents.map((amountCents) => {
-                  const isSelected = creditSelectedPresetCents === amountCents;
-                  return (
-                    <button
-                      key={amountCents}
-                      type="button"
-                      role="radio"
-                      aria-checked={isSelected}
-                      className="billing-credit-preset"
-                      data-active={isSelected || undefined}
-                      onClick={() => handleSelectCreditPreset(amountCents)}
-                      disabled={startingCredit}
-                    >
-                      {currencyFormatter.format(amountCents / 100)}
-                    </button>
-                  );
-                })}
-              </div>
-            ) : null}
-
-            <div className="billing-credit-form">
-              <label className="billing-credit-input-wrap">
-                <span className="billing-credit-input-prefix">$</span>
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  className="billing-credit-input"
-                  placeholder={
-                    creditOptions
-                      ? `${creditOptions.minAmountCents / 100}–${
-                          creditOptions.maxAmountCents / 100
-                        }`
-                      : "Custom amount"
-                  }
-                  value={creditCustomAmount}
-                  onChange={(event) => {
-                    setCreditCustomAmount(event.target.value);
-                    setCreditSelectedPresetCents(null);
-                  }}
-                  disabled={!creditOptions || startingCredit}
-                  aria-label="Custom credit amount in dollars"
-                />
-              </label>
-              <button
-                type="button"
-                className="billing-button billing-button--primary billing-credit-cta"
-                onClick={() => void handleStartCreditCheckout()}
-                disabled={
-                  !creditOptions ||
-                  startingCredit ||
-                  !creditCustomAmount.trim()
-                }
-              >
-                {startingCredit
-                  ? "Opening..."
-                  : !hasAccount
-                    ? "Sign in to top up"
-                    : "Add credit"}
-              </button>
-            </div>
-          </div>
-        </section>
-      </div>
-    </main>
-  );
+  if (boot === null) return <Shell />;
+  if (boot.mock) return <MockAccount boot={boot} mode={boot.mock} />;
+  if (!isBackendConfigured()) {
+    return (
+      <Shell>
+        <Notice title="Not available here">This build of the site isn&apos;t connected to Stella.</Notice>
+      </Shell>
+    );
+  }
+  return <LiveAccount boot={boot} />;
 }
 
-type AccountUser = {
-  email?: string;
-  name?: string;
-  isAnonymous?: boolean | null;
-};
+type AccountUser = { email?: string; name?: string; isAnonymous?: boolean | null };
 
-function useAccountUser() {
+function MockAccount({ boot, mode }: { boot: Boot; mode: BillingMockMode }) {
+  const status = billingMockStatus(mode);
+  if (!status) return <SignedOut />;
+  return <Account boot={boot} status={status} user={{ email: "you@example.com", name: "Alex Rivera" }} />;
+}
+
+function LiveAccount({ boot }: { boot: Boot }) {
   const session = authClient.useSession();
   const desktopUser = useDesktopBridgeAuthUser();
   const user: AccountUser | null =
     (session.data as { user?: AccountUser } | null | undefined)?.user ?? desktopUser;
   const signedIn = Boolean(user) && user?.isAnonymous !== true;
-  return { user, signedIn, pending: session.isPending };
+  const status = useBackendValue("billing.status", signedIn ? {} : "skip");
+  if (session.isPending && !desktopUser) return <Shell />;
+  if (!signedIn || !user) return <SignedOut />;
+  if (!status) return <Shell user={user} />;
+  if (!status.authenticated || status.isAnonymous) return <SignedOut />;
+  return <Account boot={boot} status={status} user={user} />;
 }
 
-function AccountIdentity({
-  account,
-  hasAccount,
-}: {
-  account: ReturnType<typeof useAccountUser>;
-  hasAccount: boolean;
-}) {
-  const { user, signedIn } = account;
+function Shell({ user, children }: { user?: AccountUser; children?: ReactNode }) {
   const [signingOut, setSigningOut] = useState(false);
-
-  const handleSignOut = useCallback(async () => {
-    setSigningOut(true);
-    await signOut().catch(() => undefined);
-    window.location.reload();
-  }, []);
-
-  if (!signedIn || !user) {
-    if (account.pending || hasAccount) {
-      return (
-        <div className="billing-identity">
-          <span className="billing-avatar" aria-hidden="true" />
-          <div className="billing-identity-text">
-            <span
-              className="loading-text"
-              style={{ "--w": "16ch" } as CSSProperties}
-              aria-label="Loading account"
-            />
+  const email = user?.email?.trim();
+  return (
+    <main className="billing-main">
+      <div className="billing-shell">
+        <header className="billing-head">
+          <div>
+            <h1 className="billing-title">Plan &amp; usage</h1>
+            <p className="billing-lede">{email ? `Signed in as ${email}` : " "}</p>
           </div>
-        </div>
-      );
-    }
-    return (
-      <div className="billing-identity">
-        <div className="billing-identity-text">
-          <p className="billing-identity-name">You&apos;re not signed in</p>
-          <p className="billing-identity-email">
-            Sign in to choose a plan, manage billing and add credit.
-          </p>
-        </div>
-        <div className="billing-identity-actions">
-          <button
-            type="button"
-            className="billing-button billing-button--primary"
-            onClick={() => openSignInDialog()}
-          >
+          {user ? (
+            <div className="billing-head-actions">
+              <Link className="billing-btn billing-btn--ghost" href="/crew">
+                Crew
+              </Link>
+              <button
+                type="button"
+                className="billing-btn billing-btn--ghost"
+                disabled={signingOut}
+                onClick={() => {
+                  setSigningOut(true);
+                  void signOut()
+                    .catch(() => undefined)
+                    .then(() => window.location.reload());
+                }}
+              >
+                {signingOut ? "Signing out…" : "Sign out"}
+              </button>
+            </div>
+          ) : null}
+        </header>
+        {children ?? (
+          <div className="billing-loading" aria-live="polite">
+            <span className="billing-spinner" aria-hidden="true" />
+            Loading
+          </div>
+        )}
+      </div>
+    </main>
+  );
+}
+
+function Notice({ title, children, action }: { title: string; children: ReactNode; action?: ReactNode }) {
+  return (
+    <div className="billing-notice">
+      <h2 className="billing-notice-title">{title}</h2>
+      <p className="billing-notice-text">{children}</p>
+      {action ? <div className="billing-notice-actions">{action}</div> : null}
+    </div>
+  );
+}
+
+function SignedOut() {
+  return (
+    <Shell>
+      <Notice
+        title="Sign in to see your plan"
+        action={
+          <button type="button" className="billing-btn billing-btn--primary" onClick={() => openSignInDialog()}>
             Sign in
           </button>
+        }
+      >
+        Your plan, usage and extra credit belong to your Stella account.
+      </Notice>
+    </Shell>
+  );
+}
+
+function Section({ id, title, lede, children }: { id: string; title: string; lede?: ReactNode; children: ReactNode }) {
+  return (
+    <section className="billing-section" id={id} aria-labelledby={`${id}-title`}>
+      <header className="billing-section-head">
+        <h2 className="billing-section-title" id={`${id}-title`}>
+          {title}
+        </h2>
+        {lede ? <p className="billing-section-lede">{lede}</p> : null}
+      </header>
+      {children}
+    </section>
+  );
+}
+
+function Row({ label, hint, children }: { label: string; hint?: ReactNode; children: ReactNode }) {
+  return (
+    <div className="billing-row">
+      <div className="billing-row-text">
+        <span className="billing-row-label">{label}</span>
+        {hint ? <p className="billing-row-hint">{hint}</p> : null}
+      </div>
+      <div className="billing-row-control">{children}</div>
+    </div>
+  );
+}
+
+function Meter({
+  used,
+  limit,
+  reserved = 0,
+  caption,
+  large = false,
+}: {
+  used: number;
+  limit: number;
+  reserved?: number;
+  caption: ReactNode;
+  large?: boolean;
+}) {
+  const usedPct = pct(used, limit);
+  const heldPct = Math.min(100 - usedPct, pct(reserved, limit));
+  const full = used >= limit && limit > 0;
+  return (
+    <div className="billing-meter" data-large={large ? "" : undefined}>
+      <div
+        className="billing-meter-track"
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(usedPct)}
+        aria-valuetext={`${usedPercent(used, limit)} used`}
+      >
+        <span className="billing-meter-used" data-full={full ? "" : undefined} style={{ width: `${usedPct}%` }} />
+        {heldPct > 0 ? <span className="billing-meter-held" style={{ width: `${heldPct}%` }} /> : null}
+      </div>
+      <div className="billing-meter-caption">{caption}</div>
+    </div>
+  );
+}
+
+const SECTIONS = [
+  { id: "usage", label: "Usage" },
+  { id: "plan", label: "Plan" },
+  { id: "credit", label: "Extra credit" },
+] as const;
+
+function Account({ boot, status, user }: { boot: Boot; status: BillingStatus; user: AccountUser }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 60_000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const plan = normalizeBillingPlan(status.plan);
+  const isPaid = isPaidBillingPlan(plan);
+  const [notice, setNotice] = useState<string | null>(() =>
+    boot.checkout === "success"
+      ? "Payment received. Your plan updates here in a moment."
+      : boot.checkout === "cancel"
+        ? "Checkout cancelled. Nothing changed."
+        : null,
+  );
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState<"checkout" | "portal" | "credit" | null>(null);
+
+  const run = useCallback(async (kind: "checkout" | "portal" | "credit", action: () => Promise<{ url: string }>) => {
+    setError(null);
+    setNotice(null);
+    setBusy(kind);
+    try {
+      const session = await action();
+      openExternal(session.url);
+      setNotice(
+        kind === "portal"
+          ? "Billing opened in a new tab. Changes show up here automatically."
+          : "Checkout opened in a new tab. This page updates once payment completes.",
+      );
+    } catch (err) {
+      setError(errorText(err, kind === "portal" ? "Couldn't open billing right now." : "Couldn't start checkout right now."));
+    } finally {
+      setBusy(null);
+    }
+  }, []);
+
+  const mock = boot.mock !== null;
+  const checkout = (target: PaidBillingPlan) =>
+    mock
+      ? setNotice(`Mock: would open checkout for ${PLAN_CATALOG[target].label}.`)
+      : void run("checkout", () => getBackendClient().call("billing.checkout", { plan: target, returnUrl: returnUrl() }));
+  const portal = () =>
+    mock
+      ? setNotice("Mock: would open Stripe billing.")
+      : void run("portal", () => getBackendClient().call("billing.portal", { returnUrl: returnUrl() }));
+  const buyCredit = (amountCents: number) =>
+    mock
+      ? setNotice(`Mock: would open checkout for ${usd.format(amountCents / 100)} of credit.`)
+      : void run("credit", () => getBackendClient().call("billing.creditCheckout", { amountCents, returnUrl: returnUrl() }));
+
+  return (
+    <Shell user={user}>
+      {error ? (
+        <p className="billing-banner billing-banner--error" role="alert">
+          {error}
+        </p>
+      ) : null}
+      {notice ? (
+        <p className="billing-banner" role="status">
+          {notice}
+        </p>
+      ) : null}
+      <div className="billing-layout">
+        <nav className="billing-nav" aria-label="Sections">
+          <ul>
+            {SECTIONS.map((s) => (
+              <li key={s.id}>
+                <a href={`#${s.id}`}>{s.label}</a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+        <div className="billing-sections">
+          <UsageSection status={status} plan={plan} now={now} onUpgrade={checkout} onPortal={portal} busy={busy} />
+          <PlanSection
+            status={status}
+            plan={plan}
+            isPaid={isPaid}
+            initial={boot.plan}
+            busy={busy}
+            onCheckout={checkout}
+            onPortal={portal}
+          />
+          <CreditSection status={status} busy={busy} onBuy={buyCredit} />
         </div>
       </div>
+    </Shell>
+  );
+}
+
+function UsageSection({
+  status,
+  plan,
+  now,
+  busy,
+  onUpgrade,
+  onPortal,
+}: {
+  status: BillingStatus;
+  plan: BillingPlan;
+  now: number;
+  busy: string | null;
+  onUpgrade: (plan: PaidBillingPlan) => void;
+  onPortal: () => void;
+}) {
+  const usage = status.usage;
+  const def = PLAN_CATALOG[plan];
+  const lede = "One budget pays for everything Stella runs for you.";
+  if (!usage || status.usagePolicy.kind !== "managed_cost") {
+    return (
+      <Section id="usage" title="Usage" lede={lede}>
+        <p className="billing-muted">Usage isn&apos;t metered on this server.</p>
+      </Section>
     );
   }
 
-  const name = user.name?.trim() ?? "";
-  const email = user.email?.trim() ?? "";
-  const initial = (name || email || "S").charAt(0).toUpperCase();
+  const oneTime = plan === "free" && usage.lifetimeLimitUsd !== null;
+  const mainLimit = oneTime ? (usage.lifetimeLimitUsd ?? 0) : usage.monthlyLimitUsd;
+  const mainUsed = Math.min(mainLimit, oneTime ? usage.lifetimeUsedUsd : usage.monthlyUsedUsd);
+  const credit = status.credits.balanceUsd;
+  const reserved = Number.isFinite(usage.reservedUsd) ? usage.reservedUsd : 0;
+  // Backends before pricing v3 send no reservation or availability.
+  const available: number | null | undefined = usage.availableUsd;
+  const blocked = typeof available === "number" && available <= 0.0001;
+  const blockingReset = (() => {
+    if (oneTime) return null;
+    const windows = [
+      { used: usage.rollingUsedUsd, limit: usage.rollingLimitUsd, at: usage.rollingResetsAt },
+      { used: usage.weeklyUsedUsd, limit: usage.weeklyLimitUsd, at: usage.weeklyResetsAt },
+      { used: usage.monthlyUsedUsd, limit: usage.monthlyLimitUsd, at: usage.monthlyResetsAt },
+    ].filter((w) => w.used >= w.limit && w.limit > 0 && typeof w.at === "number");
+    return windows.length ? Math.max(...windows.map((w) => w.at)) : null;
+  })();
+  const next = plan === "free" ? "plus" : plan === "plus" ? "pro" : plan === "pro" ? "max" : null;
+  const windowCaption = (used: number, limit: number, at: number) => (
+    <>
+      <span>{usedPercent(used, limit)} used</span>
+      <span className="billing-muted">{used > 0 ? resetLabel(at, now) : "Starts with your next use"}</span>
+    </>
+  );
 
   return (
-    <div className="billing-identity">
-      <span className="billing-avatar" aria-hidden="true">
-        {initial}
-      </span>
-      <div className="billing-identity-text">
-        <p className="billing-identity-name">{name || email}</p>
-        {name && email ? <p className="billing-identity-email">{email}</p> : null}
+    <Section id="usage" title="Usage" lede={lede}>
+      <div className="billing-total">
+        <div className="billing-total-head">
+          <span className="billing-total-amount">{usedPercent(mainUsed, mainLimit)}</span>
+          <span className="billing-muted">{oneTime ? "of your free usage used" : "used this month"}</span>
+        </div>
+        <Meter
+          large
+          used={mainUsed}
+          limit={mainLimit}
+          reserved={reserved}
+          caption={
+            <>
+              <span className="billing-legend">
+                <i className="billing-legend-used" aria-hidden="true" />
+                Used
+                {reserved > 0 ? (
+                  <>
+                    <i className="billing-legend-held" aria-hidden="true" />
+                    Held by running work
+                  </>
+                ) : null}
+              </span>
+              <span className="billing-muted">{oneTime ? "One-time, doesn't reset" : resetLabel(usage.monthlyResetsAt, now)}</span>
+            </>
+          }
+        />
       </div>
-      <div className="billing-identity-actions">
-        <Link className="billing-button billing-button--ghost" href="/crew">
-          Stella Crew
-        </Link>
-        <button
-          type="button"
-          className="billing-button billing-button--ghost"
-          onClick={() => void handleSignOut()}
-          disabled={signingOut}
-        >
-          {signingOut ? "Signing out…" : "Sign out"}
-        </button>
+
+      {blocked ? (
+        <div className="billing-callout" role="status">
+          <div>
+            <strong>{oneTime ? "You've used your free usage" : "You're out of usage for now"}</strong>
+            <span>
+              {oneTime
+                ? "Choose a plan or add credit to keep going."
+                : blockingReset
+                  ? `Stella picks up again ${whenLabel(blockingReset, now)}. Add credit or upgrade to keep going now.`
+                  : "Add credit or upgrade to keep going now."}
+            </span>
+          </div>
+          {next ? (
+            <button
+              type="button"
+              className="billing-btn billing-btn--primary"
+              disabled={busy !== null}
+              onClick={() => (plan === "free" ? onUpgrade(next) : onPortal())}
+            >
+              Upgrade to {PLAN_CATALOG[next].label}
+            </button>
+          ) : null}
+        </div>
+      ) : blockingReset !== null && credit > 0 ? (
+        <div className="billing-callout billing-callout--info" role="status">
+          <div>
+            <strong>Running on extra credit</strong>
+            <span>Your plan&apos;s limit is used up until {whenLabel(blockingReset, now)}. Credit covers what Stella does until then.</span>
+          </div>
+        </div>
+      ) : null}
+
+      {oneTime ? null : (
+        <div className="billing-rows">
+          <Row
+            label={`Next ${def.budget.rollingWindowHours} hours`}
+            hint="Spreads your usage so one busy stretch can't use up the week."
+          >
+            <Meter
+              used={usage.rollingUsedUsd}
+              limit={usage.rollingLimitUsd}
+              caption={windowCaption(usage.rollingUsedUsd, usage.rollingLimitUsd, usage.rollingResetsAt)}
+            />
+          </Row>
+          <Row label="This week" hint="Spreads your usage so one week can't use up the month.">
+            <Meter
+              used={usage.weeklyUsedUsd}
+              limit={usage.weeklyLimitUsd}
+              caption={windowCaption(usage.weeklyUsedUsd, usage.weeklyLimitUsd, usage.weeklyResetsAt)}
+            />
+          </Row>
+        </div>
+      )}
+    </Section>
+  );
+}
+
+function PlanSection({
+  status,
+  plan,
+  isPaid,
+  initial,
+  busy,
+  onCheckout,
+  onPortal,
+}: {
+  status: BillingStatus;
+  plan: BillingPlan;
+  isPaid: boolean;
+  initial: BillingPlan | null;
+  busy: string | null;
+  onCheckout: (plan: PaidBillingPlan) => void;
+  onPortal: () => void;
+}) {
+  const periodEnd = status.currentPeriodEnd ? dateFormat.format(status.currentPeriodEnd) : null;
+  const suggested: BillingPlan | null =
+    initial && initial !== plan && isPaidBillingPlan(initial)
+      ? initial
+      : planRank(plan) < planRank(RECOMMENDED_PLAN)
+        ? RECOMMENDED_PLAN
+        : (PLAN_ORDER[planRank(plan) + 1] ?? null);
+
+  const actionFor = (id: BillingPlan) => {
+    if (id === plan) return null;
+    const label = PLAN_CATALOG[id].label;
+    if (!isPaid && isPaidBillingPlan(id)) return { label: `Get ${label}`, primary: id === suggested, onClick: () => onCheckout(id) };
+    if (planRank(id) > planRank(plan)) return { label: `Upgrade to ${label}`, primary: id === suggested, onClick: onPortal };
+    return { label: `Switch to ${label}`, primary: false, onClick: onPortal };
+  };
+
+  return (
+    <Section id="plan" title="Choose your plan" lede="Same Stella on every plan. Bigger plans give you more usage.">
+      <div className="billing-plans" role="list">
+        {PLAN_ORDER.map((id) => {
+          const def = PLAN_CATALOG[id];
+          const current = id === plan;
+          const recommended = id === RECOMMENDED_PLAN;
+          const action = actionFor(id);
+          return (
+            <div
+              key={id}
+              role="listitem"
+              className="billing-plan"
+              data-current={current ? "" : undefined}
+              data-recommended={recommended ? "" : undefined}
+            >
+              <span className="billing-plan-flag">{current ? "Current plan" : recommended ? "Recommended" : ""}</span>
+              <span className="billing-plan-name">{def.label}</span>
+              <span className="billing-plan-tagline">{def.tagline}</span>
+              <span className="billing-plan-price">
+                <span className="billing-plan-amount">{planPriceLabel(id).replace("/mo", "")}</span>
+                <span className="billing-plan-per">{def.interval ? "per month" : "No card needed"}</span>
+              </span>
+              {action ? (
+                <button
+                  type="button"
+                  className={`billing-btn billing-plan-btn ${action.primary ? "billing-btn--primary" : "billing-btn--secondary"}`}
+                  disabled={busy !== null}
+                  onClick={action.onClick}
+                >
+                  {action.label}
+                </button>
+              ) : (
+                <span className="billing-btn billing-plan-btn billing-plan-btn--current" aria-disabled="true">
+                  Current plan
+                </span>
+              )}
+              <ul className="billing-plan-features">
+                {planFeatures(id).map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            </div>
+          );
+        })}
       </div>
-    </div>
+      <p className="billing-plans-note">
+        {busy === "checkout" || busy === "portal"
+          ? "Opening…"
+          : isPaid
+            ? "You'll confirm any change in Stripe."
+            : "Payment opens in a new tab. Your usage starts right away."}
+      </p>
+
+      {isPaid ? (
+        <div className="billing-rows">
+          <Row
+            label={status.cancelAtPeriodEnd ? "Ends" : "Renews"}
+            hint={
+              status.cancelAtPeriodEnd
+                ? `${PLAN_CATALOG[plan].label} stays on until then. Resume it from Manage billing.`
+                : `${planPriceLabel(plan)}, billed monthly by Stripe.`
+            }
+          >
+            <span className="billing-value">{periodEnd ?? "—"}</span>
+          </Row>
+          <Row label="Payment and invoices" hint="Card, invoices, and cancelling.">
+            <button type="button" className="billing-btn billing-btn--secondary" disabled={busy !== null} onClick={onPortal}>
+              Manage billing
+            </button>
+          </Row>
+        </div>
+      ) : null}
+    </Section>
+  );
+}
+
+function CreditSection({
+  status,
+  busy,
+  onBuy,
+}: {
+  status: BillingStatus;
+  busy: string | null;
+  onBuy: (amountCents: number) => void;
+}) {
+  const options = status.creditPurchase;
+  const [preset, setPreset] = useState<number | null>(options.presetAmountCents[1] ?? options.presetAmountCents[0] ?? null);
+  const [custom, setCustom] = useState("");
+  const [inputError, setInputError] = useState<string | null>(null);
+
+  const amountCents = (() => {
+    if (!custom.trim()) return preset;
+    const parsed = Number(custom.trim());
+    return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed * 100) : null;
+  })();
+
+  const submit = () => {
+    if (amountCents === null) return setInputError("Enter an amount in dollars.");
+    if (amountCents < options.minAmountCents) return setInputError(`The minimum is ${usd.format(options.minAmountCents / 100)}.`);
+    if (amountCents > options.maxAmountCents) return setInputError(`The maximum is ${usd.format(options.maxAmountCents / 100)}.`);
+    setInputError(null);
+    onBuy(amountCents);
+  };
+
+  return (
+    <Section id="credit" title="Extra credit" lede="Keeps Stella going when your plan's budget runs out.">
+      <div className="billing-balance">
+        <span className="billing-balance-amount">{usd.format(status.credits.balanceUsd)}</span>
+        <span className="billing-muted">Balance</span>
+      </div>
+      <div className="billing-topup">
+        <div className="billing-credit">
+          <div className="billing-segmented" role="radiogroup" aria-label="Amount">
+            {options.presetAmountCents.map((cents) => (
+              <button
+                key={cents}
+                type="button"
+                role="radio"
+                aria-checked={!custom.trim() && preset === cents}
+                data-on={!custom.trim() && preset === cents ? "" : undefined}
+                onClick={() => {
+                  setPreset(cents);
+                  setCustom("");
+                  setInputError(null);
+                }}
+              >
+                {formatUsd(cents / 100)}
+              </button>
+            ))}
+          </div>
+          <label className="billing-input-wrap">
+            <span aria-hidden="true">$</span>
+            <input
+              className="billing-input"
+              inputMode="decimal"
+              placeholder="Other"
+              value={custom}
+              aria-label="Other amount in dollars"
+              aria-invalid={inputError ? true : undefined}
+              onChange={(event) => {
+                setCustom(event.target.value);
+                setInputError(null);
+              }}
+            />
+          </label>
+          <button type="button" className="billing-btn billing-btn--primary" disabled={busy !== null || amountCents === null} onClick={submit}>
+            {busy === "credit" ? "Opening…" : amountCents ? `Add ${usd.format(amountCents / 100)}` : "Add credit"}
+          </button>
+        </div>
+        {inputError ? <p className="billing-field-error">{inputError}</p> : null}
+        <p className="billing-centered-hint">Pay once with Stripe. No subscription.</p>
+      </div>
+    </Section>
   );
 }

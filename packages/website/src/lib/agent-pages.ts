@@ -5,7 +5,7 @@ import {
   PRIVACY_POLICY,
   TERMS_OF_SERVICE,
 } from "@/lib/legal-text";
-import { INCLUDED_IN_EVERY_PLAN, PLAN_ORDER, PLANS } from "@/lib/plans";
+import { BUDGET_COVERS, INCLUDED_IN_EVERY_PLAN, PLAN_CATALOG, PLAN_ORDER, planPriceLabel, planSummary } from "@/lib/plans";
 import { getSiteUrl } from "@/lib/site-url";
 
 const MARKDOWN_HEADERS: HeadersInit = {
@@ -98,15 +98,14 @@ Out of the box, Stella runs on her own models. No keys, no accounts, no setup �
 just open the app and go. Prefer something else? Plug in Claude Code, Codex,
 your own key or a local model and Stella runs on that instead.
 
-## Pictures, voice, and more — on Pro
+## Pictures, voice, and more — on every paid plan
 Ask Stella to make an image, a video, a song, or a spoken reading, and she just
 does it. It runs on the house models with nothing extra to wire up, and it
-comes with the Pro plan.
+comes with every paid plan.
 
 ## Ask once. Keep talking
 One ongoing chat, with the work happening behind it — on Stella's models or
-yours. Running several jobs at once in the background comes with Pro; other
-plans work through one at a time. See ${abs("/pricing.md")}.
+yours. See ${abs("/pricing.md")} for plans.
 `;
 
 const VOICE_MD = `${header(
@@ -133,30 +132,30 @@ and steps back the moment you say "bye."
 Talk back and forth like a phone call. Stella hears you in real time, answers
 out loud, and can even take a look at your screen when you ask her to.
 
-Live conversation and having Stella read her replies aloud come with the Pro
-plan. Dictation and "Hey Stella" are on every tier — turning
-your speech into text is never gated. See ${abs("/pricing.md")}.
+Live conversation comes with every paid plan. Dictation, read-aloud and
+"Hey Stella" are on every plan — turning your speech into text is never gated. See ${abs("/pricing.md")}.
 `;
 
 const PRICING_MD = `${header(
-  "Pricing — choose your plan",
+  "Pricing — one budget for everything",
   "/pricing",
-  "Pick the usage and capabilities you need.",
+  "Same Stella on every plan. Bigger plans give you more usage.",
 )}
 ## Plans
-${PLAN_ORDER.map((id) => {
-  const plan = PLANS[id];
-  const price = plan.monthlyPriceCents / 100;
-  return `- **${plan.label}** — $${price}${price > 0 ? "/mo" : ""}. ${plan.tagline.replace(/\.?$/, ".")} Includes: ${plan.features.join("; ")}.`;
-}).join("\n")}
+${PLAN_ORDER.map((id) => `- **${PLAN_CATALOG[id].label}** — ${planPriceLabel(id)}, ${PLAN_CATALOG[id].tagline.toLowerCase()}. Includes: ${PLAN_CATALOG[id].includes.join("; ")}.`).join("\n")}
+
+## What the usage budget pays for
+One budget pays for everything Stella runs for you:
+
+${BUDGET_COVERS.map((item) => `- ${item}`).join("\n")}
+
+Shorter limits spread usage across the month so one busy day can't use it all up. When it runs out, Stella pauses until it resets; extra credit keeps it going. Runs on your own Claude or ChatGPT subscription, API keys or local models don't use the budget.
 
 ## Every plan includes
-Every tier includes browser, desktop, and mobile access, with different usage limits.
-
 ${INCLUDED_IN_EVERY_PLAN.map((item) => `- ${item}`).join("\n")}
 
 ## Choose Stella and get started
-Free. No credit card, no trial. Download Stella and try it today.
+Free to start, no credit card. Download Stella and try it today.
 `;
 
 const LEARN_MORE_MD = `${header(
@@ -188,8 +187,8 @@ conversation instead of becoming the project manager for your assistant.
 - **Use your computer** — Inspect the screen, click, type, open apps, navigate windows, and work with what is actually in front of you.
 - **Use the web** — Browse, search, read pages, fill forms, and use browser context when it helps.
 - **Work with files** — Read, write, organize, summarize, and transform documents, spreadsheets, PDFs, presentations, images, and generated outputs.
-- **Create media** — Help make images, video, audio, 3D assets, small apps, games, mockups, and visual artifacts. Image, video, 3D, and voice generation come with the Pro plan.
-- **Listen and speak** — Use in-app dictation, OS-wide dictation, read-aloud, and realtime voice. Wake-word activation is optional. Dictation and wake word are on every tier; read-aloud and realtime voice come with the Pro plan.
+- **Create media** — Help make images, video, audio, 3D assets, small apps, games, mockups, and visual artifacts. Image, video, music, and 3D generation come with every paid plan.
+- **Listen and speak** — Use in-app dictation, OS-wide dictation, read-aloud, and realtime voice. Wake-word activation is optional. Dictation, read-aloud and wake word are on every plan; realtime voice comes with every paid plan.
 - **Run routines** — Create reminders, recurring check-ins, scheduled work, and automations from plain English.
 - **Connect apps** — Use supported services, including the Stella mobile app, Google Workspace, and Store-backed integrations.
 - **Choose your model** — Use Stella's managed provider, bring your own keys, use local models, pick OpenRouter-style options where supported, or select Claude Code as the engine.
@@ -377,7 +376,7 @@ const SUMMARY = [
   "> Windows, Linux (including Arch and Omarchy), iPhone, Android and the web.",
   "",
   "Key facts:",
-  "- Price: Free plan $0, no credit card, no trial. Go $5/month (10x usage). Pro $15/month (highest limits, image/video/3D/voice generation, multiple agents in parallel).",
+  `- Price: ${PLAN_ORDER.map(planSummary).join("; ")}. One usage budget pays for models, tasks, media, voice, search and hosting. Paid plans add image/video/music/3D generation.`,
   "- Computer use: on macOS and Windows Stella sees the screen, clicks and types in your apps. On Linux it works with files, terminal and browser.",
   "- Open source: MIT, [github.com/1missthesun/stella](https://github.com/1missthesun/stella). The desktop app runs from its own source and can redesign its own interface on request.",
   "- Models: Stella's own models by default, or Claude Code, a ChatGPT plan, your own API keys (Anthropic, OpenAI, Google, xAI, Moonshot, Z.AI, OpenRouter, GitHub Copilot) or local models.",

@@ -17,6 +17,7 @@ const CREW_HOME = /^Slack\/[^\u0000-\u001f/][^\u0000-\u001f]{0,200}$/u;
 export const CREW_OWNER_CALLS: ReadonlySet<string> = new Set([
   "search.web",
   "maps.admit",
+  "maps.settle",
   "media.generateForTurn",
   "media.lookup",
   "media.cancelForTurn",

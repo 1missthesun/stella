@@ -45,7 +45,7 @@ const claudeLoginEmailOf = (message: string): string | undefined =>
     message,
   )?.[1]
 
-const openBilling = () => planUsageDialog.open()
+const openBilling = () => planUsageDialog.openPlans()
 const openSignInDialog = () => {
   void import('@/router').then(({ router }) => {
     void router.navigate({

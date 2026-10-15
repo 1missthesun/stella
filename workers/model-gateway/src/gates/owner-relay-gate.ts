@@ -35,6 +35,7 @@ import {
   type LedgerSettleArgs,
   type LedgerSettleResult,
 } from "../ledger-store.js";
+import { flushUsageOutbox } from "../usage-outbox.js";
 import {
   managedCancellationKey,
   type ManagedCancellationIdentity,
@@ -61,7 +62,7 @@ export type GateAdmission =
 export type OwnerReservation =
   | Exclude<LedgerReserveResult, { kind: "reserved" }>
   | ({ kind: "refused" } & OwnerAdmissionRefusal)
-  | { kind: "reserved"; attempt: string; remainingMicroCents: number | null };
+  | Extract<LedgerReserveResult, { kind: "reserved" }>;
 
 type RelayAdmissionCheck =
   | { kind: "free" }
@@ -566,7 +567,7 @@ export class OwnerRelayGate extends DurableObject<Env> {
   async settleCapability(
     args: LedgerSettleArgs & { generation: string; jti: string },
   ): Promise<LedgerSettleResult> {
-    return this.ctx.storage.transactionSync(() => {
+    const settled = this.ctx.storage.transactionSync(() => {
       const settled = this.ledger.settleSync({
         ...args,
         jti: ownerLedgerJti(args.generation, args.jti),
@@ -578,6 +579,8 @@ export class OwnerRelayGate extends DurableObject<Env> {
       );
       return settled;
     });
+    if (args.usage) await this.ledger.armAlarm();
+    return settled;
   }
 
   private async armCancellationAlarm(): Promise<void> {
@@ -593,7 +596,12 @@ export class OwnerRelayGate extends DurableObject<Env> {
   }
 
   async alarm(): Promise<void> {
-    await this.ledger.alarm();
+    this.ledger.expireSync();
+    try {
+      await flushUsageOutbox(this.ledger, billingControl(this.env));
+    } finally {
+      await this.ledger.rearmAfterAlarm();
+    }
     this.ctx.storage.sql.exec(
       "DELETE FROM managed_cancellations WHERE expires_at <= ?",
       Date.now(),

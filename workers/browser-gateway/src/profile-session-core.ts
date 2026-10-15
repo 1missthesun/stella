@@ -14,6 +14,7 @@ import type {
   DeviceCodeFixtureClient,
   DeviceCodeGrant,
 } from "./device-code-fixture-client.js";
+import type { BrowserSessionMeter } from "./browser-meter.js";
 import { GatewayError } from "./errors.js";
 import { parseAgentSelector } from "./selectors.js";
 import {
@@ -72,6 +73,7 @@ export type ProfileCoreDependencies = Readonly<{
   liveViewTtlMs?: number;
   handoffTimeoutMs?: number;
   deviceCodeFixture?: DeviceCodeFixtureClient;
+  meter?: BrowserSessionMeter;
 }>;
 
 type InteractionDetail = Readonly<{
@@ -364,6 +366,7 @@ export class BrowserProfileSessionCore {
   private readonly liveViewTtlMs: number;
   private readonly handoffTimeoutMs: number;
   private readonly deviceCodeFixture: DeviceCodeFixtureClient | undefined;
+  private readonly meter: BrowserSessionMeter | undefined;
   private purgedOwnerDigest: string | undefined;
 
   constructor(dependencies: ProfileCoreDependencies) {
@@ -376,7 +379,18 @@ export class BrowserProfileSessionCore {
     this.liveViewTtlMs = dependencies.liveViewTtlMs ?? 300_000;
     this.handoffTimeoutMs = dependencies.handoffTimeoutMs ?? 600_000;
     this.deviceCodeFixture = dependencies.deviceCodeFixture;
+    this.meter = dependencies.meter;
     this.store.bootstrap();
+  }
+
+  currentSessionId(): string | undefined {
+    return this.store.getState()?.browserSessionId;
+  }
+
+  async closeForBudget(sessionId: string): Promise<void> {
+    const state = this.store.getState();
+    if (state?.browserSessionId === sessionId) await this.closeBrowser(state);
+    else await this.closeRemoteSession(sessionId);
   }
 
   private async identity(authority: {
@@ -571,20 +585,27 @@ export class BrowserProfileSessionCore {
       throw new GatewayError("bad_request", 400);
     }
     let current = state;
-    await this.browser.ensure({
-      sessionId: state.browserSessionId,
-      storageState,
-      allowedOrigins: state.allowedOrigins,
-      onSessionAcquired: (sessionId, policyDigest) => {
-        current = {
-          ...current,
-          browserSessionId: sessionId,
-          browserPolicyDigest: policyDigest,
-          updatedAt: this.now(),
-        };
-        this.store.putState(current);
-      },
-    });
+    const meter = this.meter;
+    try {
+      await this.browser.ensure({
+        sessionId: state.browserSessionId,
+        storageState,
+        allowedOrigins: state.allowedOrigins,
+        ...(meter ? { beforeAcquire: () => meter.admit() } : {}),
+        onSessionAcquired: (sessionId, policyDigest) => {
+          meter?.acquired(sessionId);
+          current = {
+            ...current,
+            browserSessionId: sessionId,
+            browserPolicyDigest: policyDigest,
+            updatedAt: this.now(),
+          };
+          this.store.putState(current);
+        },
+      });
+    } finally {
+      await meter?.releasePending();
+    }
     const sessionId = this.browser.sessionId();
     const policyDigest = this.browser.policyDigest();
     if (
@@ -664,6 +685,7 @@ export class BrowserProfileSessionCore {
   private async closeRemoteSession(sessionId: string | undefined): Promise<void> {
     const outcome = await this.browser.closeRemote(sessionId);
     if (!sessionId) return;
+    if (outcome !== "pending") this.meter?.closed(sessionId);
     if (outcome === "pending") {
       this.store.putPendingRemoteClose(sessionId, this.now());
     } else {

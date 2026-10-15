@@ -1,3 +1,4 @@
+import { PAID_BILLING_PLANS, PLAN_CATALOG, formatPlanPrice, planSummary } from "@/lib/plans";
 export type Answer = { q: string; a: string };
 
 export const FAQ: Answer[] = [
@@ -7,7 +8,7 @@ export const FAQ: Answer[] = [
   },
   {
     q: "Is Stella free?",
-    a: "Yes. The Free plan is $0, with no credit card and no trial. Go is $5 a month for 10× more usage. Pro is $15 a month for the highest limits, image, video, 3D and voice generation, and multiple agents working at once.",
+    a: `Yes. ${planSummary("free")}, no credit card needed. Paid plans add monthly usage and image, video, music and 3D: ${PAID_BILLING_PLANS.map((id) => `${PLAN_CATALOG[id].label} is ${formatPlanPrice(PLAN_CATALOG[id].monthlyPriceCents)} a month for ${PLAN_CATALOG[id].tagline.toLowerCase()}`).join(", ")}.`,
   },
   {
     q: "Is there an AI that can use my computer for me?",
@@ -35,11 +36,11 @@ export const FAQ: Answer[] = [
   },
   {
     q: "Can Stella run several AI agents at once?",
-    a: "Yes, on Pro. Hand Stella ten things and it splits them across agents that work in parallel in the background while you keep chatting. Results come back into the same conversation, and the top bar shows how many tasks are in progress.",
+    a: "Yes. Hand Stella ten things and it splits them across agents that work in parallel in the background while you keep chatting. Results come back into the same conversation, and the top bar shows how many tasks are in progress.",
   },
   {
     q: "Can Stella make images, video, music and 3D models?",
-    a: "Yes, on Pro. Ask in the chat and Stella makes images, video clips, music and 3D models, with no extra accounts or setup.",
+    a: "Yes, on any paid plan. Ask in the chat and Stella makes images, video clips, music and 3D models, with no extra accounts or setup.",
   },
   {
     q: "Can Stella browse the web and fill in forms?",
@@ -51,7 +52,7 @@ export const FAQ: Answer[] = [
   },
   {
     q: "Can I talk to Stella?",
-    a: "Yes. Dictation and the “Hey Stella” wake word are on every plan, and on Mac and Windows you can dictate into any app. Live back-and-forth voice conversation and read-aloud are on Pro.",
+    a: "Yes. Dictation and the “Hey Stella” wake word are on every plan, and on Mac and Windows you can dictate into any app. Read-aloud is on every plan too, and live back-and-forth voice conversation is on every paid plan.",
   },
   {
     q: "Can Stella change its own design?",
@@ -136,7 +137,7 @@ export const ANSWER_PAGES: AnswerPage[] = [
       "Stella is an AI assistant for macOS that can use your Mac for you. It sees the screen, clicks, types and works across your apps, dictates into any app, and answers to “Hey Stella”. Ask in plain English and keep working while it finishes the task. Free.",
     points: [
       { title: "Uses any app", body: "Mail, Calendar, Finder, Safari, Excel or the app you built last week. Stella works with what is on your screen." },
-      { title: "Talk to it", body: "Dictate into any app or say “Hey Stella”. Live voice conversation is on Pro." },
+      { title: "Talk to it", body: "Dictate into any app or say “Hey Stella”. Live voice conversation is on paid plans." },
       { title: "One chat on every device", body: "Start on the Mac, follow along on your iPhone, pick it back up in the browser." },
     ],
     questions: [
@@ -238,11 +239,11 @@ export const ANSWER_PAGES: AnswerPage[] = [
     ],
     metaTitle: "Run many AI agents from one chat",
     metaDescription:
-      "Stella Pro runs multiple AI agents in parallel from one ongoing chat: hand off ten tasks, keep talking, and get each result back in the same conversation.",
-    eyebrow: "Stella Pro",
+      "Stella runs multiple AI agents in parallel from one ongoing chat: hand off ten tasks, keep talking, and get each result back in the same conversation.",
+    eyebrow: "Agents",
     headline: "Ten things at once, from one chat.",
     answer:
-      "Stella Pro runs multiple AI agents at once from a single ongoing chat. Hand Stella several tasks and it splits them across agents that work in parallel in the background, while you keep talking. Each result comes back into the same conversation.",
+      "Stella runs multiple AI agents at once from a single ongoing chat. Hand Stella several tasks and it splits them across agents that work in parallel in the background, while you keep talking. Each result comes back into the same conversation.",
     points: [
       { title: "No threads to manage", body: "One conversation. Stella decides which agent, app or tool takes each job." },
       { title: "Always responsive", body: "Agents run in the background, so Stella can answer you while they work." },

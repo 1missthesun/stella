@@ -476,7 +476,7 @@
       "video_generation": "Videoiden luonti"
     },
     "capabilityRestriction": {
-      "genericDescription": "Tämä ominaisuus sisältyy Stella Pro -tilaukseen. Päivitä tilaus, niin saat sen käyttöön.",
+      "genericDescription": "Tämä ominaisuus sisältyy kaikkiin Stellan maksullisiin tilauksiin. Päivitä tilaus avataksesi sen.",
       "genericTitle": "Ei sisälly tilaukseesi",
       "lockedBadge": "{plan}",
       "lockedBadgeGeneric": "Ei käytettävissä",
@@ -485,22 +485,6 @@
       "unavailable": "{capability} ei ole tällä hetkellä saatavilla missään tilauksessa.",
       "upgrade": "{capability} sisältyy Stella {plan} -tilaukseen. Päivitä tilaus, niin saat ominaisuuden käyttöön."
     },
-    "features": {
-      "assistant": "Henkilökohtainen avustaja",
-      "codingAgent": "Koodausagentti",
-      "dictationReadAloud": "Sanelu ja ääneenluku",
-      "multipleAgents": "Useita agentteja",
-      "research": "Tutkimus ja tietotyö"
-    },
-    "freeAllowance": {
-      "caption": "Ilmainen kokeilla.",
-      "exhaustedCta": "Päivitä Go-tilaukseen",
-      "exhaustedDescription": "Päivitä Go-tilaukseen saadaksesi 10× enemmän käyttöä.",
-      "exhaustedTitle": "Olet saavuttanut Free-tilauksen rajan",
-      "label": "Free-tilauksen käyttö",
-      "remaining": "Ilmainen kokeilla."
-    },
-    "heading": "Valitse tilauksesi",
     "mobile": {
       "accessEnds": "Käyttöoikeus päättyy {date}",
       "alreadySubscribedTitle": "Sinulla on jo tilaus",
@@ -508,7 +492,6 @@
       "currentPlanLabel": "Nykyinen tilaus",
       "errorRetry": "Yritä uudelleen",
       "footnote": "Laskuttaa Stella Stripen kautta. Uusiutuu kuukausittain, kunnes peruutat; voit peruuttaa milloin tahansa.",
-      "introLine": "{introPrice} ensimmäinen kuukausi, sitten {price}/kk",
       "manage": "Hallitse tilausta",
       "manageWebNote": "Hallitse tai peruuta tämä tilaus Stellan verkkosivustolla osoitteessa stella.sh.",
       "pendingBody": "Maksa loppuun selaimessa. Tilauksesi päivittyy tähän automaattisesti heti, kun maksu on vahvistettu – uudelleenkäynnistystä ei tarvita.",
@@ -524,30 +507,98 @@
       "successBody": "Tilauksesi on aktiivinen. Nauti suuremmista rajoista.",
       "successTitle": "Sinulla on Stella {plan}"
     },
-    "plans": {
-      "free": {
-        "tagline": "Ilmainen kokeilla."
-      },
-      "go": {
-        "tagline": "10× enemmän käyttöä"
-      },
-      "pro": {
-        "tagline": "Suurimmat käyttörajat median luontiin ja useille agenteille"
-      }
-    },
-    "renewal": {
-      "accessEnds": "Käyttöoikeus päättyy {date}",
-      "lapseDescription": "{plan}-tilauksesi on voimassa {date} asti. Sen jälkeen Stella pysähtyy — Free-tilauksen krediitti annetaan vain kerran, ja olet jo käyttänyt omasi.",
-      "lapseTitle": "Stella pysähtyy, kun tilauksesi päättyy",
-      "nextLabel": "Seuraava uusiminen",
-      "pendingLabel": "Peruutus odottaa",
-      "renews": "Uusitaan {date}"
-    },
-    "subtitle": "Aloita ilmaiseksi. Päivitä, kun tarvitset enemmän.",
     "upgradeDialog": {
       "cta": "Aloita",
       "description": "Kiitos päivityksestä. Korkeampi prioriteetti ja suurempi käyttömäärä ovat nyt aktiivisia — jatka vain.",
       "title": "Käytössäsi on Stella {plan}."
+    },
+    "v3": {
+      "opening": "Avataan…",
+      "signIn": {
+        "title": "Kirjaudu sisään nähdäksesi tilauksesi",
+        "body": "Tilauksesi, käyttösi ja lisäsaldosi kuuluvat Stella-tiliisi."
+      },
+      "notice": {
+        "checkoutOpened": "Maksu avautui selaimeesi. Tämä päivittyy, kun maksu on valmis.",
+        "portalOpened": "Laskutus avautui selaimeesi. Muutokset näkyvät täällä automaattisesti.",
+        "checkoutFailed": "Maksua ei voitu aloittaa juuri nyt.",
+        "portalFailed": "Laskutusta ei voitu avata juuri nyt."
+      },
+      "usage": {
+        "title": "Käyttö",
+        "lede": "Yksi budjetti maksaa kaiken, mitä Stella tekee puolestasi.",
+        "oneTimeNote": "Kertaluonteinen, ei nollaudu",
+        "used": "Käytetty",
+        "held": "Käynnissä olevan työn varaama",
+        "rolling": "Seuraavat {hours} tuntia",
+        "weekly": "Tämä viikko",
+        "resets": "Nollautuu {date}",
+        "startsNext": "Alkaa seuraavasta käytöstä",
+        "credit": "Lisäsaldo",
+        "creditHint": "Käytetään, kun tilauksesi budjetti loppuu.",
+        "outTitle": "Käyttösi on toistaiseksi lopussa",
+        "outBody": "Budjettisi nollautuu {date}. Lisää saldoa tai päivitä tilaus jatkaaksesi heti.",
+        "outBodyNoDate": "Lisää saldoa tai päivitä tilaus jatkaaksesi heti.",
+        "freeOutTitle": "Olet käyttänyt ilmaisen käyttösi",
+        "freeOutBody": "Valitse tilaus tai lisää saldoa jatkaaksesi.",
+        "creditTitle": "Käytössä lisäsaldo",
+        "creditBody": "Tilauksesi raja on käytetty {date} asti. Saldo kattaa Stellan työn siihen asti.",
+        "upgradeTo": "Päivitä tilaukseen {plan}",
+        "percentUsed": "{percent} käytetty",
+        "usedMonth": "käytetty tässä kuussa",
+        "usedOneTime": "ilmaisesta käytöstäsi käytetty",
+        "rollingNote": "Jakaa käyttösi, jotta yksi kiireinen jakso ei kuluta koko viikkoa.",
+        "weeklyNote": "Jakaa käyttösi, jotta yksi viikko ei kuluta koko kuukautta."
+      },
+      "plan": {
+        "title": "Tilaus",
+        "lede": "Sama Stella jokaisessa tilauksessa. Isommat tilaukset antavat enemmän käyttöä.",
+        "perMonth": "{price}/kk",
+        "checkoutHint": "Maksu avautuu selaimeesi. Budjettisi alkaa heti.",
+        "changeHint": "Vahvistat muutoksen selaimessa.",
+        "renews": "Uusiutuu",
+        "renewsHint": "{price}, laskutetaan kuukausittain Stripen kautta.",
+        "ends": "Päättyy",
+        "endsHint": "{plan} on voimassa siihen asti. Jatka sitä kohdasta Hallitse laskutusta.",
+        "manage": "Maksut ja laskut",
+        "manageHint": "Kortti, laskut ja peruutus.",
+        "manageButton": "Hallitse laskutusta",
+        "heading": "Valitse tilauksesi",
+        "recommended": "Suositeltu",
+        "currentPlan": "Nykyinen tilaus",
+        "get": "Hanki {plan}",
+        "switchTo": "Vaihda tilaukseen {plan}",
+        "month": "kuukaudessa",
+        "noCard": "Korttia ei tarvita"
+      },
+      "includes": {
+        "media": "Kuvat, video, musiikki ja 3D",
+        "voice": "Sanelu ja ääneen luku",
+        "drive": "{size} Drive-tallennustilaa",
+        "byok": "Omat mallit ja avaimet"
+      },
+      "credit": {
+        "title": "Lisäsaldo",
+        "lede": "Pitää Stellan käynnissä, kun tilauksesi budjetti loppuu.",
+        "balance": "Saldo",
+        "add": "Lisää saldoa",
+        "addHint": "Maksa kerran Stripellä. Ei tilausta.",
+        "addAmount": "Lisää {amount}",
+        "other": "Muu",
+        "invalid": "Anna summa dollareina.",
+        "min": "Vähimmäissumma on {amount}.",
+        "max": "Enimmäissumma on {amount}."
+      },
+      "mobile": {
+        "usageRow": "Tämä kuu",
+        "usageOneTime": "Ilmainen käyttö"
+      },
+      "tagline": {
+        "free": "Kokeile Stellaa",
+        "plus": "Enemmän käyttöä",
+        "pro": "Suurempi käyttö",
+        "max": "Suurin käyttö"
+      }
     }
   },
   "chat": {

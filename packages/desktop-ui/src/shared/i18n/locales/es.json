@@ -481,7 +481,7 @@
       "video_generation": "Generación de vídeo"
     },
     "capabilityRestriction": {
-      "genericDescription": "Esta función se incluye con Stella Pro. Mejora tu plan para desbloquearla.",
+      "genericDescription": "Esta función está incluida en todos los planes de pago de Stella. Mejora tu plan para desbloquearla.",
       "genericTitle": "No se incluye en tu plan",
       "lockedBadge": "{plan}",
       "lockedBadgeGeneric": "No disponible",
@@ -490,22 +490,6 @@
       "unavailable": "{capability} no está disponible en ningún plan por ahora.",
       "upgrade": "{capability} se incluye con Stella {plan}. Mejora tu plan para desbloquear esta función."
     },
-    "features": {
-      "assistant": "Asistente personal",
-      "codingAgent": "Agente de programación",
-      "dictationReadAloud": "Dictado y lectura en voz alta",
-      "multipleAgents": "Varios agentes",
-      "research": "Investigación y trabajo con información"
-    },
-    "freeAllowance": {
-      "caption": "Gratis para probar.",
-      "exhaustedCta": "Mejorar a Go",
-      "exhaustedDescription": "Mejora al plan Go para obtener 10× más uso.",
-      "exhaustedTitle": "Has alcanzado el límite del plan Free",
-      "label": "Uso del plan Free",
-      "remaining": "Gratis para probar."
-    },
-    "heading": "Elige tu plan",
     "mobile": {
       "accessEnds": "El acceso termina el {date}",
       "alreadySubscribedTitle": "Ya tienes una suscripción",
@@ -513,7 +497,6 @@
       "currentPlanLabel": "Plan actual",
       "errorRetry": "Reintentar",
       "footnote": "Facturado por Stella a través de Stripe. Se renueva mensualmente hasta que la canceles; cancela cuando quieras.",
-      "introLine": "{introPrice} el primer mes y luego {price}/mes",
       "manage": "Gestionar suscripción",
       "manageWebNote": "Gestiona o cancela esta suscripción desde Stella en la web, en stella.sh.",
       "pendingBody": "Termina el pago en el navegador. Tu plan se actualizará aquí automáticamente en cuanto se confirme el pago; no hace falta reiniciar.",
@@ -529,30 +512,98 @@
       "successBody": "Tu suscripción está activa. Disfruta de los límites más altos.",
       "successTitle": "Ya tienes Stella {plan}"
     },
-    "plans": {
-      "free": {
-        "tagline": "Gratis para probar."
-      },
-      "go": {
-        "tagline": "10× más uso"
-      },
-      "pro": {
-        "tagline": "Los límites de uso más altos para generar contenido multimedia y usar varios agentes"
-      }
-    },
-    "renewal": {
-      "accessEnds": "El acceso termina el {date}",
-      "lapseDescription": "Tu plan {plan} sigue activo hasta el {date}. Después, Stella se detiene: el saldo del plan Free es único y el tuyo ya está agotado.",
-      "lapseTitle": "Stella se detendrá cuando acabe tu plan",
-      "nextLabel": "Próxima renovación",
-      "pendingLabel": "Cancelación pendiente",
-      "renews": "Se renueva el {date}"
-    },
-    "subtitle": "Empieza gratis. Mejora tu plan cuando necesites más.",
     "upgradeDialog": {
       "cta": "Empezar",
       "description": "Gracias por mejorar el plan. Ya tienes más prioridad y más uso: sigue adelante.",
       "title": "Tienes Stella {plan}."
+    },
+    "v3": {
+      "opening": "Abriendo…",
+      "signIn": {
+        "title": "Inicia sesión para ver tu plan",
+        "body": "Tu plan, tu uso y tu crédito extra pertenecen a tu cuenta de Stella."
+      },
+      "notice": {
+        "checkoutOpened": "El pago se abrió en tu navegador. Esto se actualiza cuando se complete el pago.",
+        "portalOpened": "La facturación se abrió en tu navegador. Los cambios aparecen aquí automáticamente.",
+        "checkoutFailed": "No se pudo iniciar el pago ahora mismo.",
+        "portalFailed": "No se pudo abrir la facturación ahora mismo."
+      },
+      "usage": {
+        "title": "Uso",
+        "lede": "Un solo presupuesto paga todo lo que Stella ejecuta por ti.",
+        "oneTimeNote": "Único, no se renueva",
+        "used": "Usado",
+        "held": "Reservado por trabajo en curso",
+        "rolling": "Próximas {hours} horas",
+        "weekly": "Esta semana",
+        "resets": "Se renueva: {date}",
+        "startsNext": "Empieza con tu próximo uso",
+        "credit": "Crédito extra",
+        "creditHint": "Se usa cuando se agota el presupuesto de tu plan.",
+        "outTitle": "Te quedaste sin uso por ahora",
+        "outBody": "Tu presupuesto se renueva: {date}. Añade crédito o mejora tu plan para seguir ahora.",
+        "outBodyNoDate": "Añade crédito o mejora tu plan para seguir ahora.",
+        "freeOutTitle": "Has usado tu uso gratuito",
+        "freeOutBody": "Elige un plan o añade crédito para continuar.",
+        "creditTitle": "Funcionando con crédito extra",
+        "creditBody": "El límite de tu plan está agotado hasta {date}. El crédito cubre lo que haga Stella hasta entonces.",
+        "upgradeTo": "Mejorar a {plan}",
+        "percentUsed": "{percent} usado",
+        "usedMonth": "usado este mes",
+        "usedOneTime": "de tu uso gratuito usado",
+        "rollingNote": "Reparte tu uso para que un rato intenso no agote la semana.",
+        "weeklyNote": "Reparte tu uso para que una semana no agote el mes."
+      },
+      "plan": {
+        "title": "Plan",
+        "lede": "El mismo Stella en todos los planes. Los planes mayores te dan más uso.",
+        "perMonth": "{price}/mes",
+        "checkoutHint": "El pago se abre en tu navegador. Tu presupuesto empieza de inmediato.",
+        "changeHint": "Confirmarás el cambio en tu navegador.",
+        "renews": "Se renueva",
+        "renewsHint": "{price}, facturado mensualmente por Stripe.",
+        "ends": "Termina",
+        "endsHint": "{plan} sigue activo hasta entonces. Puedes reanudarlo desde Gestionar facturación.",
+        "manage": "Pagos y facturas",
+        "manageHint": "Tarjeta, facturas y cancelación.",
+        "manageButton": "Gestionar facturación",
+        "heading": "Elige tu plan",
+        "recommended": "Recomendado",
+        "currentPlan": "Plan actual",
+        "get": "Obtener {plan}",
+        "switchTo": "Cambiar a {plan}",
+        "month": "al mes",
+        "noCard": "Sin tarjeta"
+      },
+      "includes": {
+        "media": "Imagen, vídeo, música y 3D",
+        "voice": "Dictado y lectura en voz alta",
+        "drive": "{size} de almacenamiento en Drive",
+        "byok": "Usa tus propios modelos y claves"
+      },
+      "credit": {
+        "title": "Crédito extra",
+        "lede": "Mantiene a Stella funcionando cuando se agota el presupuesto de tu plan.",
+        "balance": "Saldo",
+        "add": "Añadir crédito",
+        "addHint": "Pago único con Stripe. Sin suscripción.",
+        "addAmount": "Añadir {amount}",
+        "other": "Otro",
+        "invalid": "Introduce un importe en dólares.",
+        "min": "El mínimo es {amount}.",
+        "max": "El máximo es {amount}."
+      },
+      "mobile": {
+        "usageRow": "Este mes",
+        "usageOneTime": "Uso gratuito"
+      },
+      "tagline": {
+        "free": "Prueba Stella",
+        "plus": "Más uso",
+        "pro": "Uso superior",
+        "max": "Máximo uso"
+      }
     }
   },
   "chat": {

@@ -37,7 +37,7 @@ export class NetworkGate extends DurableObject<Env> {
     capShare: number;
   }): Promise<NetworkAdmission> {
     const audience = limitsAudienceFor(args.audience);
-    if (audience === "go" || audience === "pro") return { ok: true };
+    if (audience !== "free") return { ok: true };
 
     const now = Date.now();
     this.ctx.storage.sql.exec(

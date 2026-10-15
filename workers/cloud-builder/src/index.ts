@@ -9,6 +9,7 @@ import { OwnerGate } from "./owner-gate.js";
 export { OrchestratorSession };
 export { OwnerGate };
 export { BillingControl } from "./billing/control.js";
+export { ComputeBilling } from "./billing/compute-billing.js";
 export { WorldStore } from "./world-store.js";
 export { AppReleaseChannel } from "./app-source-releases.js";
 export { SitesHost } from "./slack/previews.js";

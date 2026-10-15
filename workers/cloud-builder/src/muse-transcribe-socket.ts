@@ -11,6 +11,10 @@ const MUSE_SOCKET_URL = "https://api.meta.ai/v1/asr/realtime";
 const PCM_BYTES_PER_SECOND = 16_000 * 2;
 const MAX_AUDIO_BYTES = 60 * 60 * PCM_BYTES_PER_SECOND;
 const MAX_FRAME_BYTES = PCM_BYTES_PER_SECOND;
+// Ask the owner for more budget this far before the current hold runs out;
+// audio that arrives at the limit while it answers waits, up to a few seconds.
+const EXTEND_LEAD_BYTES = 60 * PCM_BYTES_PER_SECOND;
+const MAX_WAITING_BYTES = 10 * PCM_BYTES_PER_SECOND;
 
 type MuseRelayEnv = Pick<Cloudflare.Env, "META_MODEL_API_KEY">;
 
@@ -24,6 +28,8 @@ export class DictationUsageError extends Error {}
 
 export type MuseControl = {
   prepare(sessionId: string): Promise<PreparedSession>;
+  /** Grows the session's budget hold; resolves to the new audio byte limit. */
+  extend(usage: { sessionId: string; audioBytes: number }): Promise<number>;
   settle(usage: {
     sessionId: string;
     audioBytes: number;
@@ -232,7 +238,7 @@ const startProvider = async (
         });
         return;
       } catch {
-        // If all attempts fail, the session goes unbilled.
+        // The owner charges the session's remaining hold when it expires.
       }
     }
   };
@@ -307,10 +313,65 @@ const bridge = (
     Math.max(0, prepared.providerDeadlineAt - Date.now()),
     endInput,
   );
-  const maxAudioBytes = Math.min(
+  let maxAudioBytes = Math.min(
     MAX_AUDIO_BYTES,
     prepared.maxAudioBytes ?? MAX_AUDIO_BYTES,
   );
+  let extending = false;
+  let extendRefused = false;
+  const waiting: ArrayBuffer[] = [];
+  let waitingBytes = 0;
+  let endAfterWaiting = false;
+
+  const extend = (): void => {
+    if (extending || extendRefused || maxAudioBytes >= MAX_AUDIO_BYTES) return;
+    extending = true;
+    args.waitUntil(
+      args.control
+        .extend({ sessionId: prepared.sessionId, audioBytes })
+        .then(
+          (next) => {
+            if (next > maxAudioBytes) maxAudioBytes = Math.min(MAX_AUDIO_BYTES, next);
+            else extendRefused = true;
+          },
+          () => {
+            extendRefused = true;
+          },
+        )
+        .finally(() => {
+          extending = false;
+          const queued = waiting.splice(0);
+          waitingBytes = 0;
+          for (const frame of queued) sendAudio(frame);
+          if (endAfterWaiting || audioBytes >= maxAudioBytes) endInput();
+        }),
+    );
+  };
+
+  const sendAudio = (data: ArrayBuffer): void => {
+    if (settled || closing || inputEnded) return;
+    const room = Math.max(0, maxAudioBytes - audioBytes);
+    const frame = data.byteLength > room ? data.slice(0, room) : data;
+    if (frame.byteLength > 0) {
+      audioBytes += frame.byteLength;
+      if (!trySend(upstream, frame)) {
+        closeBoth(1011, "Muse transcription failed");
+        return;
+      }
+    }
+    if (maxAudioBytes - audioBytes <= EXTEND_LEAD_BYTES) extend();
+    if (data.byteLength > room) {
+      const rest = data.slice(room);
+      if (extending && waitingBytes + rest.byteLength <= MAX_WAITING_BYTES) {
+        waiting.push(rest);
+        waitingBytes += rest.byteLength;
+        return;
+      }
+      endInput();
+      return;
+    }
+    if (audioBytes >= maxAudioBytes && !extending) endInput();
+  };
 
   const onClientFrame = (data: ArrayBuffer | string) => {
     if (settled || closing || inputEnded) return;
@@ -323,17 +384,21 @@ const bridge = (
         closeBoth(1008, "Invalid audio frame");
         return;
       }
-      const frame = data.slice(0, maxAudioBytes - audioBytes);
-      audioBytes += frame.byteLength;
-      if (!trySend(upstream, frame)) {
-        closeBoth(1011, "Muse transcription failed");
+      if (waiting.length > 0) {
+        if (waitingBytes + data.byteLength > MAX_WAITING_BYTES) {
+          endInput();
+          return;
+        }
+        waiting.push(data);
+        waitingBytes += data.byteLength;
         return;
       }
-      if (audioBytes === maxAudioBytes) endInput();
+      sendAudio(data);
       return;
     }
     if (isMuseEndStreamFrame(data)) {
-      endInput();
+      if (waiting.length > 0) endAfterWaiting = true;
+      else endInput();
       return;
     }
     closeBoth(1008, "Invalid transcription frame");

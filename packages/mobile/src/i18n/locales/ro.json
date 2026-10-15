@@ -481,7 +481,7 @@
       "video_generation": "Generare de videoclipuri"
     },
     "capabilityRestriction": {
-      "genericDescription": "Această funcție face parte din Stella Pro. Fă upgrade pentru a o debloca.",
+      "genericDescription": "Această funcție este inclusă în toate planurile Stella cu plată. Treci la un plan superior ca s-o deblochezi.",
       "genericTitle": "Nu este inclus în planul tău",
       "lockedBadge": "{plan}",
       "lockedBadgeGeneric": "Indisponibil",
@@ -490,22 +490,6 @@
       "unavailable": "Momentan, {capability} nu se găsește în niciun plan.",
       "upgrade": "{capability} face parte din Stella {plan}. Fă upgrade pentru a debloca funcția."
     },
-    "features": {
-      "assistant": "Asistent personal",
-      "codingAgent": "Agent de programare",
-      "dictationReadAloud": "Dictare și citire cu voce tare",
-      "multipleAgents": "Mai mulți agenți",
-      "research": "Cercetare și lucru cu informații"
-    },
-    "freeAllowance": {
-      "caption": "Gratuit pentru încercare.",
-      "exhaustedCta": "Upgrade la Go",
-      "exhaustedDescription": "Fă upgrade la Go pentru o utilizare de 10× mai mare.",
-      "exhaustedTitle": "Ai atins limita planului Free",
-      "label": "Utilizarea planului Free",
-      "remaining": "Gratuit pentru încercare."
-    },
-    "heading": "Alege-ți planul",
     "mobile": {
       "accessEnds": "Accesul se încheie pe {date}",
       "alreadySubscribedTitle": "Ai deja un abonament",
@@ -513,7 +497,6 @@
       "currentPlanLabel": "Planul actual",
       "errorRetry": "Încearcă din nou",
       "footnote": "Facturat de Stella prin Stripe. Se reînnoiește lunar până la anulare; anulează oricând.",
-      "introLine": "{introPrice} în prima lună, apoi {price}/lună",
       "manage": "Gestionează abonamentul",
       "manageWebNote": "Gestionează sau anulează acest abonament din Stella pe web, la stella.sh.",
       "pendingBody": "Finalizează plata în browser. Planul tău se actualizează aici automat imediat ce plata este confirmată — nu e nevoie să repornești.",
@@ -529,30 +512,98 @@
       "successBody": "Abonamentul tău este activ. Bucură-te de limitele mai mari.",
       "successTitle": "Ai Stella {plan}"
     },
-    "plans": {
-      "free": {
-        "tagline": "Gratuit pentru încercare."
-      },
-      "go": {
-        "tagline": "Utilizare de 10× mai mare"
-      },
-      "pro": {
-        "tagline": "Cele mai mari limite de utilizare pentru generare media și mai mulți agenți"
-      }
-    },
-    "renewal": {
-      "accessEnds": "Accesul se încheie pe {date}",
-      "lapseDescription": "Planul tău {plan} este activ până pe {date}. După aceea Stella se oprește — creditul planului Free se acordă o singură dată, iar al tău a fost deja folosit.",
-      "lapseTitle": "Stella se oprește când se termină planul tău",
-      "nextLabel": "Următoarea reînnoire",
-      "pendingLabel": "Anulare în curs",
-      "renews": "Se reînnoiește pe {date}"
-    },
-    "subtitle": "Începe gratuit. Fă upgrade când ai nevoie de mai mult.",
     "upgradeDialog": {
       "cta": "Începe",
       "description": "Mulțumim pentru upgrade. Prioritatea mai mare și utilizarea crescută sunt active acum — continuă.",
       "title": "Ești pe Stella {plan}."
+    },
+    "v3": {
+      "opening": "Se deschide…",
+      "signIn": {
+        "title": "Conectează-te ca să îți vezi planul",
+        "body": "Planul, utilizarea și creditul suplimentar aparțin contului tău Stella."
+      },
+      "notice": {
+        "checkoutOpened": "Plata s-a deschis în browser. Pagina se actualizează după finalizarea plății.",
+        "portalOpened": "Facturarea s-a deschis în browser. Modificările apar aici automat.",
+        "checkoutFailed": "Nu am putut porni plata acum.",
+        "portalFailed": "Nu am putut deschide facturarea acum."
+      },
+      "usage": {
+        "title": "Utilizare",
+        "lede": "Un singur buget plătește tot ce rulează Stella pentru tine.",
+        "oneTimeNote": "O singură dată, nu se resetează",
+        "used": "Folosit",
+        "held": "Rezervat de lucrul în desfășurare",
+        "rolling": "Următoarele {hours} ore",
+        "weekly": "Săptămâna aceasta",
+        "resets": "Se resetează {date}",
+        "startsNext": "Începe la următoarea utilizare",
+        "credit": "Credit suplimentar",
+        "creditHint": "Folosit când bugetul planului tău se termină.",
+        "outTitle": "Ai epuizat utilizarea deocamdată",
+        "outBody": "Bugetul tău se resetează {date}. Adaugă credit sau treci la un plan superior ca să continui acum.",
+        "outBodyNoDate": "Adaugă credit sau treci la un plan superior ca să continui acum.",
+        "freeOutTitle": "Ai folosit utilizarea gratuită",
+        "freeOutBody": "Alege un plan sau adaugă credit ca să continui.",
+        "creditTitle": "Funcționează pe credit suplimentar",
+        "creditBody": "Limita planului tău este atinsă până la {date}. Creditul acoperă ce face Stella până atunci.",
+        "upgradeTo": "Treci la {plan}",
+        "percentUsed": "{percent} folosit",
+        "usedMonth": "folosit luna aceasta",
+        "usedOneTime": "din utilizarea gratuită folosit",
+        "rollingNote": "Îți împarte utilizarea ca o perioadă aglomerată să nu consume toată săptămâna.",
+        "weeklyNote": "Îți împarte utilizarea ca o săptămână să nu consume toată luna."
+      },
+      "plan": {
+        "title": "Plan",
+        "lede": "Aceeași Stella în fiecare plan. Planurile mai mari oferă mai multă utilizare.",
+        "perMonth": "{price}/lună",
+        "checkoutHint": "Plata se deschide în browser. Bugetul începe imediat.",
+        "changeHint": "Vei confirma schimbarea în browser.",
+        "renews": "Se reînnoiește",
+        "renewsHint": "{price}, facturat lunar prin Stripe.",
+        "ends": "Se încheie",
+        "endsHint": "{plan} rămâne activ până atunci. Îl poți relua din Gestionează facturarea.",
+        "manage": "Plată și facturi",
+        "manageHint": "Card, facturi și anulare.",
+        "manageButton": "Gestionează facturarea",
+        "heading": "Alege-ți planul",
+        "recommended": "Recomandat",
+        "currentPlan": "Planul actual",
+        "get": "Obține {plan}",
+        "switchTo": "Treci la {plan}",
+        "month": "pe lună",
+        "noCard": "Fără card"
+      },
+      "includes": {
+        "media": "Imagine, video, muzică și 3D",
+        "voice": "Dictare și citire cu voce tare",
+        "drive": "{size} spațiu Drive",
+        "byok": "Folosește propriile modele și chei"
+      },
+      "credit": {
+        "title": "Credit suplimentar",
+        "lede": "Ține Stella în funcțiune când bugetul planului se termină.",
+        "balance": "Sold",
+        "add": "Adaugă credit",
+        "addHint": "Plătești o dată cu Stripe. Fără abonament.",
+        "addAmount": "Adaugă {amount}",
+        "other": "Altă sumă",
+        "invalid": "Introdu o sumă în dolari.",
+        "min": "Minimul este {amount}.",
+        "max": "Maximul este {amount}."
+      },
+      "mobile": {
+        "usageRow": "Luna aceasta",
+        "usageOneTime": "Utilizare gratuită"
+      },
+      "tagline": {
+        "free": "Încearcă Stella",
+        "plus": "Mai multă utilizare",
+        "pro": "Utilizare mai mare",
+        "max": "Cea mai mare utilizare"
+      }
     }
   },
   "chat": {

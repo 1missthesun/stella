@@ -2,6 +2,7 @@ import { useSyncExternalStore } from "react";
 import { isSelfHostedServer } from "@/platform/backend/server-discovery";
 
 let open = false;
+let focusPlans = false;
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach((listener) => listener());
 
@@ -10,6 +11,15 @@ export const planUsageDialog = {
     if (open || isSelfHostedServer()) return;
     open = true;
     emit();
+  },
+  openPlans() {
+    focusPlans = true;
+    this.open();
+  },
+  consumeFocusPlans() {
+    const value = focusPlans;
+    focusPlans = false;
+    return value;
   },
   close() {
     if (!open) return;

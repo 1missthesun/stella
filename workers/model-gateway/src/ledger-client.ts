@@ -19,6 +19,8 @@ export type RelaySettlement = Omit<LedgerSettleArgs, "requestId" | "attempt">;
 
 export type HeldReservation = {
   remainingMicroCents: number | null;
+  heldMicroCents: number;
+  attemptNumber: number;
   settle: (args: RelaySettlement) => Promise<LedgerSettleResult>;
 };
 
@@ -60,6 +62,8 @@ export const relayAccounting = (
           kind: "reserved",
           held: {
             remainingMicroCents: result.remainingMicroCents,
+            heldMicroCents: result.heldMicroCents,
+            attemptNumber: result.attemptNumber,
             settle: async (settlement) =>
               await ownerGate.settleCapability({
                 ...settlement,
@@ -85,6 +89,8 @@ export const relayAccounting = (
         kind: "reserved",
         held: {
           remainingMicroCents: result.remainingMicroCents,
+          heldMicroCents: result.heldMicroCents,
+          attemptNumber: result.attemptNumber,
           settle: async (settlement) =>
             await ledger.settle({
               ...settlement,

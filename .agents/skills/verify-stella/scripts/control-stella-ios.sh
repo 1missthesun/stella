@@ -26,7 +26,7 @@ Commands:
   clean-source
   boot [udid]
   build [--no-bundler] [--metro-only] [--port <port>]
-  sign-in [--plan pro|go|free] [--email <name>@test.stella.local]
+  sign-in [--plan pro|plus|max|free] [--email <name>@test.stella.local]
   info
   app-status [bundle-id]
   uninstall [bundle-id]

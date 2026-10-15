@@ -84,7 +84,7 @@ export function useTierRestrictedModelToast() {
       action: {
         label: getModelRestrictionActionLabel(audience),
         onClick: () => {
-          planUsageDialog.open();
+          planUsageDialog.openPlans();
         },
       },
       secondaryAction: BYOK_TOAST_ACTION,

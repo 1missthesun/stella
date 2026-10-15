@@ -80,7 +80,13 @@ const hex = async (value: string): Promise<string> =>
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
 
-const sandboxFor = (host: PiComputeHost, sandboxId: string, size: InstanceSize, world: string): SandboxHandle => {
+const sandboxFor = (
+  host: PiComputeHost,
+  sandboxId: string,
+  size: InstanceSize,
+  world: string,
+  owner: string,
+): SandboxHandle => {
   const namespace = host.env.Sandbox;
   if (!namespace) throw new Error("Cloud containers are not configured.");
   const idle = Number(host.env.SANDBOX_IDLE_TIMEOUT_MS);
@@ -89,6 +95,7 @@ const sandboxFor = (host: PiComputeHost, sandboxId: string, size: InstanceSize, 
     workload: "world",
     ...(Number.isSafeInteger(idle) && idle > 0 ? { idleTimeoutMs: idle } : {}),
     world,
+    owner,
   });
 };
 
@@ -118,7 +125,7 @@ export const releasePiCompute = async (
   options: { warm?: boolean } = {},
 ) => {
   await host.releaseSlot(record.owner, record.sandboxId).catch(() => undefined);
-  const sandbox = sandboxFor(host, record.sandboxId, INSTANCE_SIZE, await piWorldName(host, record.owner));
+  const sandbox = sandboxFor(host, record.sandboxId, INSTANCE_SIZE, await piWorldName(host, record.owner), record.owner.ownerId);
   const running = await sandbox
     .getState()
     .then((state) => state.status === "running")
@@ -197,7 +204,7 @@ export const openPiComputeLease = async (
   const attachWorld = async (target: { sandboxId: string; sessionId: string }) => {
     const started = Date.now();
     await host.takeSlot(owner, target.sandboxId, execution.signal);
-    sandbox = sandboxFor(host, target.sandboxId, INSTANCE_SIZE, world);
+    sandbox = sandboxFor(host, target.sandboxId, INSTANCE_SIZE, world, owner.ownerId);
     if (isSlackConversationId(owner.conversationId) && slackEnvironmentsEnabled(host.env)) {
       const egress = await egressForConversation(host.env as Cloudflare.Env, owner.conversationId);
       const { restarted } = await sandbox.setEgress(egress);
@@ -324,7 +331,7 @@ export const openPiComputeLease = async (
     release: async () => await releasePiCompute(host, record, { warm: releaseWarm }),
     destroy: async (target) => {
       await host.releaseSlot(owner, target.sandboxId).catch(() => undefined);
-      await sandboxFor(host, target.sandboxId, INSTANCE_SIZE, world)
+      await sandboxFor(host, target.sandboxId, INSTANCE_SIZE, world, owner.ownerId)
         .destroy()
         .catch(() => undefined);
     },

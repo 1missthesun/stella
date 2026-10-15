@@ -1,3 +1,10 @@
+import {
+  PLAN_CATALOG,
+  PLAN_ORDER,
+  normalizeBillingPlan,
+  type BillingPlan,
+} from "./billing-plans.js";
+
 export const CAPABILITIES = [
   "image_generation",
   "video_generation",
@@ -7,38 +14,25 @@ export const CAPABILITIES = [
 
 export type Capability = (typeof CAPABILITIES)[number];
 
-export type CapabilityAudience = "free" | "go" | "pro";
+export type CapabilityAudience = BillingPlan;
 
-export const CAPABILITY_AUDIENCE_ORDER: readonly CapabilityAudience[] = [
-  "free",
-  "go",
-  "pro",
-];
+export const CAPABILITY_AUDIENCE_ORDER: readonly CapabilityAudience[] = PLAN_ORDER;
+
+const mediaPlans = (): Record<CapabilityAudience, boolean> => ({
+  free: PLAN_CATALOG.free.mediaGeneration,
+  plus: PLAN_CATALOG.plus.mediaGeneration,
+  pro: PLAN_CATALOG.pro.mediaGeneration,
+  max: PLAN_CATALOG.max.mediaGeneration,
+});
 
 export const CAPABILITY_MATRIX: Record<
   Capability,
   Record<CapabilityAudience, boolean>
 > = {
-  image_generation: {
-    free: false,
-    go: false,
-    pro: true,
-  },
-  video_generation: {
-    free: false,
-    go: false,
-    pro: true,
-  },
-  audio_generation: {
-    free: false,
-    go: false,
-    pro: true,
-  },
-  three_d_generation: {
-    free: false,
-    go: false,
-    pro: true,
-  },
+  image_generation: mediaPlans(),
+  video_generation: mediaPlans(),
+  audio_generation: mediaPlans(),
+  three_d_generation: mediaPlans(),
 };
 
 export const hasCapability = (
@@ -53,27 +47,12 @@ export const minimumPlanForCapability = (
     hasCapability(audience, capability),
   ) ?? null;
 
-export type ManagedCapabilityAudience =
-  | CapabilityAudience
-  | "go_fallback"
-  | "pro_fallback";
+export type ManagedCapabilityAudience = CapabilityAudience | string;
 
 export const toCapabilityAudience = (
   audience: ManagedCapabilityAudience | null | undefined,
-): CapabilityAudience | null => {
-  switch (audience) {
-    case "free":
-    case "go":
-    case "pro":
-      return audience;
-    case "go_fallback":
-      return "go";
-    case "pro_fallback":
-      return "pro";
-    default:
-      return null;
-  }
-};
+): CapabilityAudience | null =>
+  audience === null || audience === undefined ? null : normalizeBillingPlan(audience);
 
 export const CAPABILITY_LABELS: Record<Capability, string> = {
   image_generation: "Image generation",
@@ -83,9 +62,10 @@ export const CAPABILITY_LABELS: Record<Capability, string> = {
 };
 
 export const CAPABILITY_PLAN_LABELS: Record<CapabilityAudience, string> = {
-  free: "Free",
-  go: "Go",
-  pro: "Pro",
+  free: PLAN_CATALOG.free.label,
+  plus: PLAN_CATALOG.plus.label,
+  pro: PLAN_CATALOG.pro.label,
+  max: PLAN_CATALOG.max.label,
 };
 
 export const CAPABILITY_DENIED_CODE = "CAPABILITY_REQUIRED" as const;

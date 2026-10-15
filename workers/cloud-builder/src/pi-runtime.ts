@@ -3,6 +3,7 @@ import type { Context } from "@earendil-works/chord";
 import type { Api, Model, ModelThinkingLevel } from "@earendil-works/pi-ai";
 import { createModels } from "@earendil-works/pi-ai/models";
 import { normalizeReasoningEffortLevel } from "@stella/contracts/reasoning-effort";
+import { CLOUD_SANDBOX_SUBSCRIPTION_REQUIRED_MESSAGE } from "@stella/contracts/backend/billing";
 import { parseReminderCard, reminderAssistantMessage } from "@stella/contracts/reminders";
 import {
   AssistantEntry,
@@ -161,12 +162,13 @@ import {
   type TurnBrokerRecord,
 } from "./turn-credential-broker.js";
 import { ownerGateStub } from "./rpc-release.js";
+import { BROWSER_BUDGET_MESSAGE } from "./browser-billing.js";
+import { containerBudgetMessage } from "./container-meter.js";
 
 /** How long recovered work waits for its turn or agent run to bind a transport. */
 const BINDING_WAIT_MS = 120_000;
 const CAPABILITY_RENEW_MS = 60_000;
-const CONTAINER_SLOT_WAIT_MS = 10 * 60_000;
-const CONTAINER_SLOT_POLL_MS = 5_000;
+const BROWSER_BUDGET_CHECK_MS = 60_000;
 const ORIGIN_STOP_HOLD_MS = 5_000;
 const PI_AGENT_STATE_KEY = "piAgentState";
 const CLIENT_HISTORY_PAGE = 200;
@@ -877,7 +879,13 @@ export class PiConversationRuntime {
     }
     if (active.browser) return active.browser;
     const transport = gatewayBrowserTransport(gateway, this.#browserAuthority(active));
+    let budgetCheckedAt = 0;
     active.browser = createCloudBrowserClient(async (command, signal) => {
+      if (command.action !== "browser.close" && Date.now() - budgetCheckedAt > BROWSER_BUDGET_CHECK_MS) {
+        const access = await ownerGateStub(this.#options.env.OWNER_GATES, active.authority.ownerId).billingAccess();
+        if (!access.allowed) throw new Error(access.usageLimit?.message || BROWSER_BUDGET_MESSAGE);
+        budgetCheckedAt = Date.now();
+      }
       const started = Date.now();
       const forwarded = await transport(command, signal);
       this.#options.log("pi_browser_command", {
@@ -1270,18 +1278,9 @@ export class PiConversationRuntime {
     };
   }
 
-  async #takeSlot(owner: PiComputeOwner, sandboxId: string, signal: AbortSignal): Promise<void> {
-    const deadline = Date.now() + CONTAINER_SLOT_WAIT_MS;
-    for (;;) {
-      const slot = await ownerGateStub(this.#options.env.OWNER_GATES, owner.ownerId).acquireAgentContainer({ sandboxId });
-      if (slot.ok) return;
-      if (Date.now() >= deadline) {
-        throw new Error(
-          `Your cloud is already running ${slot.limit} agents' workspaces, its limit. This agent waited ${CONTAINER_SLOT_WAIT_MS / 60_000} minutes for one of them to finish.`,
-        );
-      }
-      await waitFor(CONTAINER_SLOT_POLL_MS, signal);
-    }
+  async #takeSlot(owner: PiComputeOwner, sandboxId: string, _signal: AbortSignal): Promise<void> {
+    const slot = await ownerGateStub(this.#options.env.OWNER_GATES, owner.ownerId).acquireAgentContainer({ sandboxId });
+    if (!slot.ok) throw new Error(CLOUD_SANDBOX_SUBSCRIPTION_REQUIRED_MESSAGE);
   }
 
   async #attachedTool(call: PiAttachedToolCall, context: Context): Promise<SerializedAgentToolResult> {
@@ -1289,7 +1288,10 @@ export class PiConversationRuntime {
     const agentConversationId = call.conversationId as ConversationId;
     const sessionId = await this.#providerSession(harness, agentConversationId, context);
     const active = await this.#agentRun(sessionId, context.abortSignal);
-    const held = await this.#lease(agentConversationId, active, context);
+    const held = await this.#lease(agentConversationId, active, context).catch((error: unknown) => {
+      const budget = containerBudgetMessage(error);
+      throw budget ? new Error(budget) : error;
+    });
     held.inFlight += 1;
     const signal = context.abortSignal;
     const stop = () => {
@@ -1302,7 +1304,8 @@ export class PiConversationRuntime {
       return await held.lease.call({ toolCallId: call.callId, toolName: call.toolName, params: call.params });
     } catch (error) {
       void this.#dropLease(agentConversationId, held).catch((dropError: unknown) => this.#options.report(dropError));
-      throw error;
+      const budget = containerBudgetMessage(error);
+      throw budget ? new Error(budget) : error;
     } finally {
       signal?.removeEventListener("abort", stop);
       held.inFlight -= 1;

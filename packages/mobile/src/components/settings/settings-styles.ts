@@ -9,18 +9,17 @@ export const makeSettingsStyles = (colors: Colors) =>
       marginTop: 28,
     },
     sectionLabel: {
-      color: colors.textMuted,
-      fontFamily: fonts.sans.medium,
-      fontSize: 13,
-      letterSpacing: 0,
-      marginBottom: 10,
+      color: colors.text,
+      fontFamily: fonts.sans.semiBold,
+      fontSize: 20,
+      letterSpacing: -0.4,
+      marginBottom: 8,
     },
     group: {
-      backgroundColor: colors.surface,
-      borderColor: colors.border,
-      borderRadius: 16,
-      borderWidth: StyleSheet.hairlineWidth,
-      overflow: "hidden",
+      borderBottomColor: colors.border,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.border,
+      borderTopWidth: StyleSheet.hairlineWidth,
     },
     groupGap: {
       marginTop: 12,
@@ -30,7 +29,6 @@ export const makeSettingsStyles = (colors: Colors) =>
       flexDirection: "row",
       gap: 12,
       minHeight: 52,
-      paddingHorizontal: 16,
       paddingVertical: 12,
     },
     rowDivider: {
@@ -38,7 +36,7 @@ export const makeSettingsStyles = (colors: Colors) =>
       borderTopWidth: StyleSheet.hairlineWidth,
     },
     rowPressed: {
-      backgroundColor: fadeHex(colors.text, 0.05),
+      opacity: 0.6,
     },
     rowDisabled: {
       opacity: 0.55,
@@ -86,7 +84,6 @@ export const makeSettingsStyles = (colors: Colors) =>
       fontFamily: fonts.sans.regular,
       fontSize: 14,
       lineHeight: 20,
-      paddingHorizontal: 16,
       paddingVertical: 14,
     },
   });

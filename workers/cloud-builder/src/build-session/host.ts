@@ -222,6 +222,7 @@ export interface BuildSessionInternals {
     workload?: SandboxWorkload,
     world?: string,
     idleTimeoutMs?: number,
+    owner?: string,
   ): SandboxHandle;
   sandboxContainerRunning(
     sandbox: ReturnType<BuildSessionInternals["sandbox"]>,

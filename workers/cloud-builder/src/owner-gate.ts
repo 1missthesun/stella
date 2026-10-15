@@ -22,7 +22,9 @@ import { applyOwnerEventsToStore } from "./owner-store/owner-events.js";
 import type { RpcResponse } from "@stella/contracts/backend/protocol";
 import {
   GATEWAY_CAPABILITY_ISSUERS,
+  GATEWAY_BUDGET_UNLIMITED,
   GATEWAY_SESSION_CAPABILITY_TTL_MS,
+  GATEWAY_TURN_CAPABILITY_TTL_MS,
 } from "@stella/contracts/gateway/capability";
 import { signCapability } from "@stella/contracts/gateway/jwt";
 import type {
@@ -50,21 +52,35 @@ import {
   type BillingPlan,
   CLOUD_SANDBOX_SUBSCRIPTION_REQUIRED_MESSAGE,
 } from "@stella/contracts/backend/billing";
+import { PLAN_CATALOG } from "@stella/contracts/billing-plans";
+import { TARIFF_VERSION, hostingCostMicroCents } from "@stella/contracts/billing-tariffs";
 import {
   applyGatewayUsage,
   applyStripeEvent,
   billingAccess,
   type BillingAccess,
   billingPaying,
+  billingPlan,
   closeStripeCustomer,
   stopStripeRenewal,
   cloudSandboxAccess,
   recordBillingIdentity,
+  releaseSpend,
   reserveSessionGrant,
+  reserveSpend,
+  reservationHeld,
   setAdminPlan,
+  settleSpend,
+  type SpendReservation,
   turnAllowance,
   type UsageBatchResult,
 } from "./owner-store/domains/billing.js";
+import {
+  exportCostDaily,
+  ownerCostReport,
+  type OwnerCostQuery,
+  type OwnerCostReport,
+} from "./owner-store/domains/billing-costs.js";
 import {
   abuseState,
   admitSession,
@@ -148,8 +164,11 @@ import type {
 } from "./owner-gate/types.js";
 import {
   HEADER_PRESENCE_DEVICE_ID,
+  HOSTING_BUDGET_MESSAGE,
+  HOSTING_CAP_MESSAGE,
+  HOSTING_DAILY_REQUEST_CAP,
+  HOSTING_DAY_KEY,
   OWNER_GATE_RUNNING_GRACE_MS,
-  OWNER_AGENT_CONTAINER_LIMIT,
   SNAPSHOT_TTL_MS,
   STEER_ACK_TIMEOUT_MS,
   LOCAL_AGENT_MESSAGE_ACK_TIMEOUT_MS,
@@ -197,6 +216,8 @@ export {
   snapshotAllowsExecution,
   snapshotAllowsCloudSandbox,
 } from "./owner-gate/support.js";
+
+const turnGrantId = (turnId: string): string => `turn:${turnId}`;
 
 export class OwnerGate extends OwnerGateCloudDispatch {
   private testClaudeChecked = false;
@@ -631,13 +652,100 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     return billingAccess(this.ownerStore().context(null));
   }
 
+  async reserveSpend(
+    input: Parameters<typeof reserveSpend>[1] & { requireCloudSandbox?: boolean },
+  ): Promise<SpendReservation & { cloudSandbox: boolean }> {
+    const { requireCloudSandbox, ...reservation } = input;
+    return await this.billingWrite((ctx) => {
+      const cloudSandbox = cloudSandboxAccess(ctx).enabled;
+      if (requireCloudSandbox && !cloudSandbox) {
+        return {
+          ...billingAccess(ctx),
+          reserved: false,
+          reservedMicroCents: 0,
+          cloudSandbox,
+          message: CLOUD_SANDBOX_SUBSCRIPTION_REQUIRED_MESSAGE,
+        };
+      }
+      return { ...reserveSpend(ctx, reservation), cloudSandbox };
+    });
+  }
+
+  async settleSpend(input: Parameters<typeof settleSpend>[1]): Promise<{ charged: boolean }> {
+    return await this.billingWrite((ctx) => settleSpend(ctx, input));
+  }
+
+  async releaseSpend(id: string): Promise<void> {
+    await this.billingWrite((ctx) => releaseSpend(ctx, id));
+  }
+
+  // Requests and CPU the owner's hosted apps and Crew previews served,
+  // charged in batches. Serving stops while the budget is out, and past a
+  // daily request cap that backstops a traffic spike.
+  async settleHosting(input: {
+    receiptId: string;
+    sku: "dynamic-worker" | "static-site";
+    requests: number;
+    cpuMs: number;
+  }): Promise<{ serving: boolean; message: string }> {
+    const requests = Math.max(0, Math.floor(input.requests));
+    const cpuMs = Math.max(0, Math.round(input.cpuMs));
+    const day = new Date().toISOString().slice(0, 10);
+    const counted = this.ctx.storage.kv.get<{ day: string; requests: number }>(HOSTING_DAY_KEY);
+    const today = (counted?.day === day ? counted.requests : 0) + requests;
+    this.ctx.storage.kv.put(HOSTING_DAY_KEY, { day, requests: today });
+    const microCents = hostingCostMicroCents({ requests, cpuMs });
+    const access = await this.billingWrite((ctx) => {
+      settleSpend(ctx, {
+        receiptId: input.receiptId,
+        chargeMicroCents: microCents,
+        cost: {
+          id: input.receiptId,
+          category: "hosting",
+          provider: "cloudflare",
+          sku: input.sku,
+          quantity: { requests, cpuMs },
+          providerCostMicroCents: microCents,
+          basis: "estimated",
+          outcome: "succeeded",
+          tariffVersion: TARIFF_VERSION,
+        },
+      });
+      return billingAccess(ctx);
+    });
+    return this.hostingVerdict(access.allowed, today);
+  }
+
+  async hostingStatus(): Promise<{ serving: boolean; message: string }> {
+    const day = new Date().toISOString().slice(0, 10);
+    const counted = this.ctx.storage.kv.get<{ day: string; requests: number }>(HOSTING_DAY_KEY);
+    return this.hostingVerdict(
+      billingAccess(this.ownerStore().context(null)).allowed,
+      counted?.day === day ? counted.requests : 0,
+    );
+  }
+
+  private hostingVerdict(allowed: boolean, requestsToday: number): { serving: boolean; message: string } {
+    if (requestsToday > HOSTING_DAILY_REQUEST_CAP) return { serving: false, message: HOSTING_CAP_MESSAGE };
+    return allowed ? { serving: true, message: "" } : { serving: false, message: HOSTING_BUDGET_MESSAGE };
+  }
+
   async setBillingPlan(input: {
     plan?: BillingPlan;
     usageMode?: "default" | "unlimited";
     resetUsage?: boolean;
     spendAllowance?: boolean;
+    complimentary?: boolean;
   }): Promise<void> {
     await this.billingWrite((ctx) => setAdminPlan(ctx, input));
+  }
+
+  async billingCosts(query: OwnerCostQuery): Promise<OwnerCostReport> {
+    return ownerCostReport(this.ownerStore().context(null), query);
+  }
+
+  async exportBillingCosts(): Promise<{ exported: number; remaining: boolean }> {
+    return await this.billingWrite((ctx) => exportCostDaily(ctx));
   }
 
   async closeBilling(): Promise<void> {
@@ -1071,7 +1179,8 @@ export class OwnerGate extends OwnerGateCloudDispatch {
       }>(`SELECT lane FROM running WHERE turn_id = ?`, turnId)
       .toArray();
     if (existing.length > 0) {
-      return { ok: true, snapshot, replayed: true };
+      const held = this.ownerStore().context(null, now);
+      return { ok: true, snapshot: this.withTurnBudget(snapshot, reservationHeld(held, turnGrantId(turnId))), replayed: true };
     }
     this.ctx.storage.sql.exec(
       `INSERT INTO running (turn_id, lane, conversation_id, started_at)
@@ -1081,7 +1190,29 @@ export class OwnerGate extends OwnerGateCloudDispatch {
       input.conversationId ?? "",
       now,
     );
-    return { ok: true, snapshot, replayed: false };
+    return { ok: true, snapshot: await this.reserveTurnBudget(snapshot, turnId, now), replayed: false };
+  }
+
+  // Each admitted turn holds its own slice of the budget, so concurrent turns
+  // can't each spend the same headroom through their turn capabilities.
+  private async reserveTurnBudget(snapshot: OwnerSnapshot, turnId: string, now: number): Promise<OwnerSnapshot> {
+    const wanted = snapshot.allowance.budgetMicroCents;
+    if (wanted === GATEWAY_BUDGET_UNLIMITED || wanted <= 0) return snapshot;
+    const reservation = await this.billingWrite((ctx) =>
+      reserveSpend(ctx, {
+        id: turnGrantId(turnId),
+        microCents: wanted,
+        expiresAt: now + GATEWAY_TURN_CAPABILITY_TTL_MS,
+        category: "model",
+        minimumMicroCents: 1,
+      }),
+    );
+    return this.withTurnBudget(snapshot, reservation.reserved ? reservation.reservedMicroCents : 0);
+  }
+
+  private withTurnBudget(snapshot: OwnerSnapshot, budgetMicroCents: number): OwnerSnapshot {
+    if (snapshot.allowance.budgetMicroCents === GATEWAY_BUDGET_UNLIMITED) return snapshot;
+    return { ...snapshot, allowance: { ...snapshot.allowance, budgetMicroCents } };
   }
 
   async release(input: { turnId: string }): Promise<void> {
@@ -1089,12 +1220,13 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     const turnId = input.turnId?.trim() ?? "";
     if (!turnId) return;
     this.ctx.storage.sql.exec(`DELETE FROM running WHERE turn_id = ?`, turnId);
+    await this.billingWrite((ctx) => releaseSpend(ctx, turnGrantId(turnId)));
   }
 
   async acquireAgentContainer(input: {
     sandboxId: string;
     now?: number;
-  }): Promise<{ ok: boolean; running: number; limit: number }> {
+  }): Promise<{ ok: boolean; running: number }> {
     this.ensureSchema();
     const now = input.now ?? Date.now();
     const sandboxId = input.sandboxId?.trim() ?? "";
@@ -1112,8 +1244,12 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     const running = sql
       .exec<{ count: number }>(`SELECT COUNT(*) AS count FROM agent_containers`)
       .one().count;
-    if (!held && running >= OWNER_AGENT_CONTAINER_LIMIT) {
-      return { ok: false, running, limit: OWNER_AGENT_CONTAINER_LIMIT };
+    // Plans never cap how many cloud agents run at once; the budget is the
+    // only limit. Free has no cloud containers at all.
+    const cloud =
+      PLAN_CATALOG[billingPlan(this.ownerStore().context(null, now)).plan].cloudContainers;
+    if (!held && !cloud) {
+      return { ok: false, running };
     }
     sql.exec(
       `INSERT INTO agent_containers (sandbox_id, acquired_at) VALUES (?, ?)
@@ -1124,7 +1260,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     return {
       ok: true,
       running: held ? running : running + 1,
-      limit: OWNER_AGENT_CONTAINER_LIMIT,
     };
   }
 

@@ -4,6 +4,7 @@ import {
   GATEWAY_UPSTREAM_MAX_DURATION_MS,
 } from "@stella/contracts/gateway/api";
 import { GATEWAY_BUDGET_UNLIMITED } from "@stella/contracts/gateway/capability";
+import type { GatewayUsageEvent } from "@stella/contracts/gateway/usage";
 
 export const RESERVATION_LEASE_MS = GATEWAY_UPSTREAM_MAX_DURATION_MS + 60_000;
 
@@ -14,11 +15,21 @@ export type LedgerReserveArgs = {
   /** Capability expiry, ms since epoch. */
   expiresAt: number;
   requestId: string;
+  /** The most this attempt can cost; held in full when the budget allows. */
   estimatedMicroCents: number;
+  /** Hold less than the estimate, down to this floor, when that is all that is left. */
+  minimumMicroCents?: number;
 };
 
 export type LedgerReserveResult =
-  | { kind: "reserved"; attempt: string; remainingMicroCents: number | null }
+  | {
+      kind: "reserved";
+      attempt: string;
+      /** 1 for the first physical attempt of this request id, 2+ for retries. */
+      attemptNumber: number;
+      heldMicroCents: number;
+      remainingMicroCents: number | null;
+    }
   | { kind: "replay"; status: number; body: string }
   | { kind: "in_flight" }
   | { kind: "budget_exhausted"; remainingMicroCents: number }
@@ -32,6 +43,8 @@ export type LedgerSettleArgs = {
   refundRequest: boolean;
   /** Present for a completed result that should be replayable. */
   result?: { status: number; body: string };
+  /** Kept in the outbox, in the same transaction, until billing acknowledges it. */
+  usage?: GatewayUsageEvent;
 };
 
 export type LedgerSettleResult = {
@@ -63,6 +76,7 @@ type LedgerRow = {
 type ResultRow = {
   request_id: string;
   attempt: string | null;
+  attempts: number;
   status: number;
   body: string | null;
   bytes: number;
@@ -92,7 +106,25 @@ const SCHEMA = [
     created_at INTEGER NOT NULL,
     PRIMARY KEY (jti, request_id)
   )`,
+  `CREATE TABLE IF NOT EXISTS usage_outbox (
+    id TEXT PRIMARY KEY,
+    event TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    next_at INTEGER NOT NULL,
+    tries INTEGER NOT NULL DEFAULT 0
+  )`,
+  `CREATE INDEX IF NOT EXISTS usage_outbox_due ON usage_outbox(next_at)`,
 ];
+
+// Result rows: status > 0 holds a replayable result, 0 an attempt in flight,
+// and SETTLED_UNREPLAYABLE a finished attempt whose result was not kept, so
+// the next attempt for that request id is counted as a retry.
+const SETTLED_UNREPLAYABLE = -1;
+
+export type OutboxEntry = { id: string; event: GatewayUsageEvent; tries: number; createdAt: number };
+
+export const usageOutboxId = (event: GatewayUsageEvent): string =>
+  JSON.stringify([event.capabilityId, event.requestId, event.attempt ?? 1]);
 
 const clampMicroCents = (value: number): number =>
   Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
@@ -105,8 +137,6 @@ const clampMicroCents = (value: number): number =>
  * next reserve for the same request id replaces it with a new attempt.
  */
 export class LedgerStore {
-  private alarmAt: number | null = null;
-
   constructor(private readonly storage: DurableObjectStorage) {
     for (const statement of SCHEMA) this.storage.sql.exec(statement);
     const columns = new Set(
@@ -120,6 +150,9 @@ export class LedgerStore {
     }
     if (!columns.has("jti")) {
       this.storage.sql.exec("ALTER TABLE results ADD COLUMN jti TEXT");
+    }
+    if (!columns.has("attempts")) {
+      this.storage.sql.exec("ALTER TABLE results ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0");
     }
   }
 
@@ -161,6 +194,7 @@ export class LedgerStore {
   reserveSync(args: LedgerReserveArgs): LedgerReserveResult {
     const now = Date.now();
     const estimate = clampMicroCents(args.estimatedMicroCents);
+    const floor = Math.min(estimate, clampMicroCents(args.minimumMicroCents ?? estimate));
     let row = this.ledgerRow(args.jti);
     if (!row) {
       this.storage.sql.exec(
@@ -186,21 +220,18 @@ export class LedgerStore {
       if (existing.status > 0 && existing.body !== null) {
         return { kind: "replay", status: existing.status, body: existing.body };
       }
-      if (now - existing.created_at <= RESERVATION_LEASE_MS) {
-        return { kind: "in_flight" };
+      if (existing.status === 0) {
+        if (now - existing.created_at <= RESERVATION_LEASE_MS) {
+          return { kind: "in_flight" };
+        }
+        this.storage.sql.exec(
+          "UPDATE ledger SET reserved = MAX(0, reserved - ?) WHERE jti = ?",
+          existing.reserved,
+          args.jti,
+        );
+        row = this.ledgerRow(args.jti) ?? row;
+        replacingLapsed = true;
       }
-      this.storage.sql.exec(
-        "UPDATE ledger SET reserved = MAX(0, reserved - ?) WHERE jti = ?",
-        existing.reserved,
-        args.jti,
-      );
-      this.storage.sql.exec(
-        "DELETE FROM results WHERE jti = ? AND request_id = ?",
-        args.jti,
-        args.requestId,
-      );
-      row = this.ledgerRow(args.jti) ?? row;
-      replacingLapsed = true;
     }
 
     if (
@@ -211,41 +242,45 @@ export class LedgerStore {
       return { kind: "request_limit", maxRequests: row.max_requests };
     }
     const unlimited = row.budget === GATEWAY_BUDGET_UNLIMITED || row.budget < 0;
-    const remaining = unlimited ? null : row.budget - row.spent - row.reserved;
-    if (
-      remaining !== null &&
-      row.spent + row.reserved + estimate > row.budget
-    ) {
-      return {
-        kind: "budget_exhausted",
-        remainingMicroCents: Math.max(0, remaining),
-      };
+    const remaining = unlimited
+      ? null
+      : Math.max(0, row.budget - row.spent - row.reserved);
+    const held = remaining === null ? estimate : Math.min(estimate, remaining);
+    if (remaining !== null && (held < floor || (estimate > 0 && held <= 0))) {
+      return { kind: "budget_exhausted", remainingMicroCents: remaining };
     }
 
     const attempt = crypto.randomUUID();
+    const attemptNumber = Math.max(0, existing?.attempts ?? 0) + 1;
     this.storage.sql.exec(
-      "INSERT INTO results (jti, request_id, attempt, status, body, bytes, reserved, created_at) VALUES (?, ?, ?, 0, NULL, 0, ?, ?)",
+      `INSERT INTO results (jti, request_id, attempt, attempts, status, body, bytes, reserved, created_at)
+       VALUES (?, ?, ?, ?, 0, NULL, 0, ?, ?)
+       ON CONFLICT(jti, request_id) DO UPDATE SET attempt = excluded.attempt, attempts = excluded.attempts,
+         status = 0, body = NULL, bytes = 0, reserved = excluded.reserved, created_at = excluded.created_at`,
       args.jti,
       args.requestId,
       attempt,
-      estimate,
+      attemptNumber,
+      held,
       now,
     );
     this.storage.sql.exec(
       "UPDATE ledger SET reserved = reserved + ?, requests = requests + ? WHERE jti = ?",
-      estimate,
+      held,
       replacingLapsed ? 0 : 1,
       args.jti,
     );
     return {
       kind: "reserved",
       attempt,
-      remainingMicroCents:
-        remaining === null ? null : Math.max(0, remaining - estimate),
+      attemptNumber,
+      heldMicroCents: held,
+      remainingMicroCents: remaining === null ? null : Math.max(0, remaining - held),
     };
   }
 
   settleSync(args: LedgerSettleArgs & { jti: string }): LedgerSettleResult {
+    if (args.usage) this.enqueueUsageSync(args.usage);
     const row = this.ledgerRow(args.jti);
     const pending = this.storage.sql
       .exec<ResultRow>(
@@ -289,7 +324,8 @@ export class LedgerStore {
     }
     if (!cached) {
       this.storage.sql.exec(
-        "DELETE FROM results WHERE jti = ? AND request_id = ?",
+        "UPDATE results SET status = ?, body = NULL, bytes = 0, reserved = 0 WHERE jti = ? AND request_id = ?",
+        SETTLED_UNREPLAYABLE,
         args.jti,
         args.requestId,
       );
@@ -303,30 +339,87 @@ export class LedgerStore {
     };
   }
 
-  async armAlarm(): Promise<void> {
-    const next = this.storage.sql
-      .exec<{
-        at: number | null;
-      }>(
+  enqueueUsageSync(event: GatewayUsageEvent): void {
+    const now = Date.now();
+    this.storage.sql.exec(
+      "INSERT OR IGNORE INTO usage_outbox (id, event, created_at, next_at, tries) VALUES (?, ?, ?, ?, 0)",
+      usageOutboxId(event),
+      JSON.stringify(event),
+      now,
+      now,
+    );
+  }
+
+  dueUsage(now: number, limit: number): OutboxEntry[] {
+    return this.storage.sql
+      .exec<{ id: string; event: string; tries: number; created_at: number }>(
+        "SELECT id, event, tries, created_at FROM usage_outbox WHERE next_at <= ? ORDER BY next_at LIMIT ?",
+        now,
+        limit,
+      )
+      .toArray()
+      .map((row) => ({
+        id: row.id,
+        event: JSON.parse(row.event) as GatewayUsageEvent,
+        tries: row.tries,
+        createdAt: row.created_at,
+      }));
+  }
+
+  hasPendingUsage(): boolean {
+    return this.storage.sql
+      .exec<{ count: number }>("SELECT COUNT(*) AS count FROM usage_outbox")
+      .one().count > 0;
+  }
+
+  deliveredUsage(ids: readonly string[]): void {
+    for (const id of ids) this.storage.sql.exec("DELETE FROM usage_outbox WHERE id = ?", id);
+  }
+
+  deferUsage(id: string, tries: number, nextAt: number): void {
+    this.storage.sql.exec(
+      "UPDATE usage_outbox SET tries = ?, next_at = ? WHERE id = ?",
+      tries,
+      nextAt,
+      id,
+    );
+  }
+
+  private nextAlarmAt(): number | null {
+    const ledger = this.storage.sql
+      .exec<{ at: number | null }>(
         "SELECT MIN(expires_at) + ? AS at FROM ledger",
         GATEWAY_RESULT_CACHE_TTL_MS,
       )
       .one().at;
-    if (next !== null && (this.alarmAt === null || next < this.alarmAt)) {
-      const at = Math.max(Date.now() + 1_000, next);
-      await this.storage.setAlarm(at);
-      this.alarmAt = at;
-    }
+    const outbox = this.storage.sql
+      .exec<{ at: number | null }>("SELECT MIN(next_at) AS at FROM usage_outbox")
+      .one().at;
+    const candidates = [ledger, outbox].filter((at): at is number => at !== null);
+    return candidates.length > 0 ? Math.min(...candidates) : null;
   }
 
-  async alarm(): Promise<void> {
+  /** Arms the alarm for the next ledger expiry or usage delivery, unless an earlier one is set. */
+  async armAlarm(): Promise<void> {
+    const next = this.nextAlarmAt();
+    if (next === null) return;
+    const at = Math.max(Date.now() + 250, next);
+    const current = await this.storage.getAlarm();
+    if (current === null || at < current) await this.storage.setAlarm(at);
+  }
+
+  /** Inside alarm(): the fired alarm is gone, so set the next one unconditionally. */
+  async rearmAfterAlarm(): Promise<void> {
+    const next = this.nextAlarmAt();
+    if (next !== null) await this.storage.setAlarm(Math.max(Date.now() + 250, next));
+  }
+
+  expireSync(): void {
     const cutoff = Date.now() - GATEWAY_RESULT_CACHE_TTL_MS;
     this.storage.sql.exec(
       "DELETE FROM results WHERE jti IN (SELECT jti FROM ledger WHERE expires_at <= ?)",
       cutoff,
     );
     this.storage.sql.exec("DELETE FROM ledger WHERE expires_at <= ?", cutoff);
-    this.alarmAt = null;
-    await this.armAlarm();
   }
 }

@@ -113,6 +113,16 @@ const numberAt = (
   return undefined;
 };
 
+// Tool definitions are billed input; their JSON schemas count as written.
+const toolDefinitionsLength = (tools: unknown): number => {
+  if (!Array.isArray(tools) || tools.length === 0) return 0;
+  try {
+    return JSON.stringify(tools).length;
+  } catch {
+    return 0;
+  }
+};
+
 export function estimateRequestTokens(
   requestBody: StellaRequestBody,
 ): TokenEstimate {
@@ -124,7 +134,8 @@ export function estimateRequestTokens(
     requestBody.instructions,
     requestBody.systemInstruction,
     requestBody.system_instruction,
-  ].reduce<number>((total, value) => total + textLengthOf(value), 0);
+  ].reduce<number>((total, value) => total + textLengthOf(value), 0) +
+    toolDefinitionsLength(requestBody.tools);
 
   const maxCompletionTokens =
     numberAt(

@@ -471,7 +471,7 @@
       "video_generation": "Pembuatan video"
     },
     "capabilityRestriction": {
-      "genericDescription": "Fitur ini termasuk dalam Stella Pro. Tingkatkan paket untuk membukanya.",
+      "genericDescription": "Fitur ini ada di setiap paket berbayar Stella. Upgrade untuk membukanya.",
       "genericTitle": "Tidak termasuk dalam paket Anda",
       "lockedBadge": "{plan}",
       "lockedBadgeGeneric": "Tidak tersedia",
@@ -480,22 +480,6 @@
       "unavailable": "{capability} belum tersedia di paket mana pun saat ini.",
       "upgrade": "{capability} termasuk dalam Stella {plan}. Tingkatkan paket untuk membuka fitur ini."
     },
-    "features": {
-      "assistant": "Asisten pribadi",
-      "codingAgent": "Agen pemrograman",
-      "dictationReadAloud": "Dikte dan baca nyaring",
-      "multipleAgents": "Beberapa agen",
-      "research": "Riset dan kerja pengetahuan"
-    },
-    "freeAllowance": {
-      "caption": "Gratis untuk dicoba.",
-      "exhaustedCta": "Tingkatkan ke Go",
-      "exhaustedDescription": "Tingkatkan ke Go untuk penggunaan 10× lebih tinggi.",
-      "exhaustedTitle": "Anda telah mencapai batas paket Free",
-      "label": "Penggunaan paket Free",
-      "remaining": "Gratis untuk dicoba."
-    },
-    "heading": "Pilih paket Anda",
     "mobile": {
       "accessEnds": "Akses berakhir {date}",
       "alreadySubscribedTitle": "Kamu sudah memiliki langganan",
@@ -503,7 +487,6 @@
       "currentPlanLabel": "Paket saat ini",
       "errorRetry": "Coba lagi",
       "footnote": "Ditagih oleh Stella melalui Stripe. Diperpanjang setiap bulan hingga dibatalkan; batalkan kapan saja.",
-      "introLine": "{introPrice} bulan pertama, lalu {price}/bln",
       "manage": "Kelola langganan",
       "manageWebNote": "Kelola atau batalkan langganan ini dari Stella di web di stella.sh.",
       "pendingBody": "Selesaikan pembayaran di browser. Paketmu diperbarui di sini secara otomatis setelah pembayaran dikonfirmasi — tidak perlu memulai ulang.",
@@ -519,30 +502,98 @@
       "successBody": "Langgananmu aktif. Nikmati batas yang lebih tinggi.",
       "successTitle": "Kamu menggunakan Stella {plan}"
     },
-    "plans": {
-      "free": {
-        "tagline": "Gratis untuk dicoba."
-      },
-      "go": {
-        "tagline": "Penggunaan 10× lebih tinggi"
-      },
-      "pro": {
-        "tagline": "Batas penggunaan tertinggi untuk pembuatan media dan beberapa agen"
-      }
-    },
-    "renewal": {
-      "accessEnds": "Akses berakhir {date}",
-      "lapseDescription": "Paket {plan} Anda berlaku sampai {date}. Setelah itu Stella berhenti — kuota paket Free hanya diberikan sekali dan milik Anda sudah terpakai.",
-      "lapseTitle": "Stella berhenti saat paket Anda berakhir",
-      "nextLabel": "Perpanjangan berikutnya",
-      "pendingLabel": "Menunggu pembatalan",
-      "renews": "Diperpanjang {date}"
-    },
-    "subtitle": "Mulai gratis. Tingkatkan saat Anda membutuhkan lebih banyak.",
     "upgradeDialog": {
       "cta": "Mulai",
       "description": "Terima kasih sudah meningkatkan paket. Prioritas lebih tinggi dan kuota penggunaan lebih besar sudah aktif — lanjutkan.",
       "title": "Anda menggunakan Stella {plan}."
+    },
+    "v3": {
+      "opening": "Membuka…",
+      "signIn": {
+        "title": "Masuk untuk melihat paketmu",
+        "body": "Paket, penggunaan, dan kredit tambahanmu terhubung ke akun Stella-mu."
+      },
+      "notice": {
+        "checkoutOpened": "Pembayaran terbuka di browser. Halaman ini diperbarui setelah pembayaran selesai.",
+        "portalOpened": "Penagihan terbuka di browser. Perubahan muncul di sini secara otomatis.",
+        "checkoutFailed": "Tidak dapat memulai pembayaran saat ini.",
+        "portalFailed": "Tidak dapat membuka penagihan saat ini."
+      },
+      "usage": {
+        "title": "Penggunaan",
+        "lede": "Satu anggaran membayar semua yang dijalankan Stella untukmu.",
+        "oneTimeNote": "Sekali saja, tidak direset",
+        "used": "Terpakai",
+        "held": "Ditahan oleh pekerjaan berjalan",
+        "rolling": "{hours} jam ke depan",
+        "weekly": "Minggu ini",
+        "resets": "Direset {date}",
+        "startsNext": "Dimulai saat kamu menggunakan lagi",
+        "credit": "Kredit tambahan",
+        "creditHint": "Dipakai saat anggaran paketmu habis.",
+        "outTitle": "Penggunaanmu habis untuk sementara",
+        "outBody": "Anggaranmu direset {date}. Tambahkan kredit atau upgrade untuk lanjut sekarang.",
+        "outBodyNoDate": "Tambahkan kredit atau upgrade untuk lanjut sekarang.",
+        "freeOutTitle": "Penggunaan gratismu sudah habis",
+        "freeOutBody": "Pilih paket atau tambahkan kredit untuk melanjutkan.",
+        "creditTitle": "Berjalan dengan kredit tambahan",
+        "creditBody": "Batas paketmu habis sampai {date}. Kredit menanggung pekerjaan Stella sampai saat itu.",
+        "upgradeTo": "Upgrade ke {plan}",
+        "percentUsed": "{percent} terpakai",
+        "usedMonth": "terpakai bulan ini",
+        "usedOneTime": "dari penggunaan gratis Anda terpakai",
+        "rollingNote": "Membagi penggunaan Anda agar satu periode sibuk tidak menghabiskan seminggu.",
+        "weeklyNote": "Membagi penggunaan Anda agar satu minggu tidak menghabiskan sebulan."
+      },
+      "plan": {
+        "title": "Paket",
+        "lede": "Stella yang sama di setiap paket. Paket lebih besar memberi lebih banyak penggunaan.",
+        "perMonth": "{price}/bln",
+        "checkoutHint": "Pembayaran terbuka di browser. Anggaranmu langsung berlaku.",
+        "changeHint": "Kamu akan mengonfirmasi perubahan di browser.",
+        "renews": "Diperpanjang",
+        "renewsHint": "{price}, ditagih bulanan oleh Stripe.",
+        "ends": "Berakhir",
+        "endsHint": "{plan} tetap aktif sampai saat itu. Lanjutkan dari Kelola penagihan.",
+        "manage": "Pembayaran dan faktur",
+        "manageHint": "Kartu, faktur, dan pembatalan.",
+        "manageButton": "Kelola penagihan",
+        "heading": "Pilih paket Anda",
+        "recommended": "Direkomendasikan",
+        "currentPlan": "Paket saat ini",
+        "get": "Dapatkan {plan}",
+        "switchTo": "Beralih ke {plan}",
+        "month": "per bulan",
+        "noCard": "Tanpa kartu"
+      },
+      "includes": {
+        "media": "Gambar, video, musik, dan 3D",
+        "voice": "Dikte dan bacakan",
+        "drive": "Penyimpanan Drive {size}",
+        "byok": "Gunakan model dan kunci Anda sendiri"
+      },
+      "credit": {
+        "title": "Kredit tambahan",
+        "lede": "Menjaga Stella tetap berjalan saat anggaran paketmu habis.",
+        "balance": "Saldo",
+        "add": "Tambah kredit",
+        "addHint": "Bayar sekali dengan Stripe. Tanpa langganan.",
+        "addAmount": "Tambah {amount}",
+        "other": "Lainnya",
+        "invalid": "Masukkan jumlah dalam dolar.",
+        "min": "Minimumnya {amount}.",
+        "max": "Maksimumnya {amount}."
+      },
+      "mobile": {
+        "usageRow": "Bulan ini",
+        "usageOneTime": "Penggunaan gratis"
+      },
+      "tagline": {
+        "free": "Coba Stella",
+        "plus": "Penggunaan lebih banyak",
+        "pro": "Penggunaan lebih tinggi",
+        "max": "Penggunaan tertinggi"
+      }
     }
   },
   "chat": {

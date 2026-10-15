@@ -226,10 +226,9 @@ const AUDIENCE_MODE_OVERRIDES: Record<
   Partial<Record<ModelMode, Partial<ModeConfig>>>
 > = {
   free: {},
-  go: {},
+  plus: {},
   pro: {},
-  go_fallback: {},
-  pro_fallback: {},
+  max: {},
 };
 
 const DEFAULT_AGENT_OVERRIDES: Partial<Record<string, TaskModelSelection>> = {
@@ -241,15 +240,14 @@ const AUDIENCE_AGENT_MODE_OVERRIDES: Partial<
   Record<ManagedModelAudience, Partial<Record<string, TaskModelSelection>>>
 > = {
   free: DEFAULT_AGENT_OVERRIDES,
-  go: DEFAULT_AGENT_OVERRIDES,
+  plus: DEFAULT_AGENT_OVERRIDES,
   pro: DEFAULT_AGENT_OVERRIDES,
-  go_fallback: DEFAULT_AGENT_OVERRIDES,
-  pro_fallback: DEFAULT_AGENT_OVERRIDES,
+  max: DEFAULT_AGENT_OVERRIDES,
 };
 
 export const canOverrideStellaModel = (
   audience: ManagedModelAudience,
-): boolean => audience === "pro";
+): boolean => audience !== "free";
 
 const UNPAID_MODEL_AUDIENCES = new Set<ManagedModelAudience>(["free"]);
 
@@ -397,10 +395,9 @@ const AUDIENCE_MODE_CONFIGS: Record<
   Record<ModelMode, ModelConfig>
 > = {
   free: buildAudienceModeCatalog("free"),
-  go: buildAudienceModeCatalog("go"),
+  plus: buildAudienceModeCatalog("plus"),
   pro: buildAudienceModeCatalog("pro"),
-  go_fallback: buildAudienceModeCatalog("go_fallback"),
-  pro_fallback: buildAudienceModeCatalog("pro_fallback"),
+  max: buildAudienceModeCatalog("max"),
 };
 
 export const AUDIENCE_AGENT_MODELS: Record<
@@ -408,16 +405,9 @@ export const AUDIENCE_AGENT_MODELS: Record<
   Record<string, ModelConfig>
 > = {
   free: buildAudienceAgentCatalog("free", AUDIENCE_MODE_CONFIGS.free),
-  go: buildAudienceAgentCatalog("go", AUDIENCE_MODE_CONFIGS.go),
+  plus: buildAudienceAgentCatalog("plus", AUDIENCE_MODE_CONFIGS.plus),
   pro: buildAudienceAgentCatalog("pro", AUDIENCE_MODE_CONFIGS.pro),
-  go_fallback: buildAudienceAgentCatalog(
-    "go_fallback",
-    AUDIENCE_MODE_CONFIGS.go_fallback,
-  ),
-  pro_fallback: buildAudienceAgentCatalog(
-    "pro_fallback",
-    AUDIENCE_MODE_CONFIGS.pro_fallback,
-  ),
+  max: buildAudienceAgentCatalog("max", AUDIENCE_MODE_CONFIGS.max),
 };
 
 export const AGENT_MODELS = AUDIENCE_AGENT_MODELS.free;

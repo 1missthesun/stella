@@ -354,6 +354,14 @@ export type RunnerPublicApi = {
       args: Omit<AgentThreadCalls["agentThreads.handoff"]["args"], "ownerGeneration" | "fromDeviceId">,
     ) => Promise<AgentThreadCalls["agentThreads.handoff"]["result"]>;
   };
+  usageLimits: {
+    note: (
+      args: Omit<AgentThreadCalls["usageLimits.note"]["args"], "ownerGeneration" | "originDeviceId">,
+    ) => Promise<AgentThreadCalls["usageLimits.note"]["result"]>;
+    resume: (
+      args: AgentThreadCalls["usageLimits.resume"]["args"],
+    ) => Promise<AgentThreadCalls["usageLimits.resume"]["result"]>;
+  };
   agentLogs: {
     append: (
       args: import("@stella/contracts/backend/agent-logs").AgentLogCalls["agentLogs.append"]["args"],

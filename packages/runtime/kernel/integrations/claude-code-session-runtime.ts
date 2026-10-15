@@ -2,6 +2,7 @@ import { spawn } from "child_process";
 import {
   claudeUsageLimitOf,
   formatClaudeUsageLimitReset,
+  USAGE_LIMIT_BACKGROUND_NOTE,
   type ClaudeUsageLimit,
 } from "@stella/contracts/claude-usage-limit";
 import type { ChildProcess, ChildProcessByStdio } from "child_process";
@@ -68,7 +69,7 @@ type ClaudeToolUseTruncation = {
 };
 type ClaudeCodeStatusChange =
   | { state: "running" | "compacting" | "model-fallback"; text: string }
-  | { state: "usage-limit"; text: string; until?: number }
+  | { state: "usage-limit"; text: string; until?: number; monthly?: true }
   | { state: "usage-limit-end"; text: string; resumed: boolean };
 type ClaudeCodeImage = { mimeType: string; data: string };
 type ClaudeCodeUsage = {
@@ -283,6 +284,8 @@ type ClaudeCodeSession = {
   onBackgroundWake?: (wake: ClaudeCodeBackgroundWake) => void;
   mcpTurnWaiters?: Set<(turn: ClaudeCodeToolMcpActiveTurn) => void>;
   modelFallbackNotified?: boolean;
+  /** The current CLI process started a background shell (Bash run_in_background). */
+  backgroundShellStarted?: boolean;
   claudeLoginEmail?: string;
   thinkingStripped?: boolean;
 };
@@ -593,7 +596,9 @@ const withStepRecoveryExhausted = (error: unknown) =>
     `${normalizeErrorMessage(error)} Stella retried ${MAX_STEP_RECOVERIES_PER_TURN} time(s) but Claude Code kept ending the step without a usable result. Try the request again; if it keeps failing, check that \`claude --version\` runs on this computer.`,
   );
 const describeClaudeUsageLimit = (limit: ClaudeUsageLimit) =>
-  typeof limit.resetsAt === "number" && Number.isFinite(limit.resetsAt)
+  limit.monthly
+    ? "Claude's monthly spend limit is reached for this account."
+    : typeof limit.resetsAt === "number" && Number.isFinite(limit.resetsAt)
     ? `Claude usage limit reached. It resets at ${formatClaudeUsageLimitReset(limit.resetsAt)}.`
     : "Claude usage limit reached for this account.";
 const withClaudeSubscriptionLimitReported = (limit: ClaudeUsageLimit) => {
@@ -605,29 +610,54 @@ const USAGE_LIMIT_UNKNOWN_RESET_HOLD_MS = 30 * 60 * 1000;
 const USAGE_LIMIT_RESET_MARGIN_MS = 30 * 1000;
 const USAGE_LIMIT_MIN_HOLD_MS = 5 * 60 * 1000;
 const USAGE_LIMIT_MAX_MIN_HOLD_MS = 60 * 60 * 1000;
-const waitUntil = (until: number, signal: AbortSignal | undefined) =>
-  new Promise<void>((resolve, reject) => {
+/**
+ * Waits until `until` (forever when undefined), or until `wake` settles: a
+ * Resume press continues held work early. Resolves "woken" or "reset".
+ */
+const waitUntil = (until: number | undefined, signal: AbortSignal | undefined, wake: Promise<void>) =>
+  new Promise<"woken" | "reset">((resolve, reject) => {
     if (signal?.aborted) {
       reject(signal.reason ?? new Error("Stopped."));
       return;
     }
     let cancelTick: (() => void) | undefined;
+    let settled = false;
+    const finish = (outcome: "woken" | "reset") => {
+      if (settled) return;
+      settled = true;
+      cancelTick?.();
+      signal?.removeEventListener("abort", onAbort);
+      resolve(outcome);
+    };
     const onAbort = () => {
+      if (settled) return;
+      settled = true;
       cancelTick?.();
       reject(signal?.reason ?? new Error("Stopped."));
     };
     const tick = () => {
-      const remaining = until - Date.now();
-      if (remaining <= 0) {
-        signal?.removeEventListener("abort", onAbort);
-        resolve();
+      const remaining = until === undefined ? 60_000 : until - Date.now();
+      if (until !== undefined && remaining <= 0) {
+        finish("reset");
         return;
       }
       cancelTick = forkCancelableTimeout(Math.min(remaining, 60_000), tick);
     };
     signal?.addEventListener("abort", onAbort, { once: true });
+    void wake.then(() => finish("woken"));
     tick();
   });
+/** A Bash call the CLI runs in the background: it dies with the process. */
+const startsBackgroundShell = (line: unknown): boolean => {
+  const event = asObject(line);
+  if (event?.type !== "assistant") return false;
+  const content = asObject(event.message)?.content;
+  if (!Array.isArray(content)) return false;
+  return content.some((raw) => {
+    const block = asObject(raw);
+    return block?.type === "tool_use" && asObject(block.input)?.run_in_background === true;
+  });
+};
 const buildClaudeCodeHookSettingsObject = () => {
   const command = `"${process.execPath}" -e ""`;
   return {
@@ -1729,6 +1759,19 @@ class ClaudeCodeSessionRuntime {
   activeProcesses = new Map<string, ChildProcess>();
   closeWhenIdle = new Set<string>();
   idleCloseTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  /** Steps a usage limit holds, by session key; calling one continues it now. */
+  usageLimitWakers = new Map<string, () => void>();
+  /** Continue held steps now (Resume). Returns how many were woken. */
+  wakeUsageLimitHolds(select: (sessionKey: string) => boolean = () => true): number {
+    let woken = 0;
+    for (const [sessionKey, wake] of [...this.usageLimitWakers]) {
+      if (!select(sessionKey)) continue;
+      this.usageLimitWakers.delete(sessionKey);
+      wake();
+      woken += 1;
+    }
+    return woken;
+  }
   async runTurn(request: ClaudeCodeTurnRequest): Promise<ClaudeCodeTurnResult> {
     this.clearIdleCloseTimer(request.sessionKey);
     const session = ensureSessionState(
@@ -2056,6 +2099,7 @@ class ClaudeCodeSessionRuntime {
           if (!request.holdOnUsageLimit) {
             throw withClaudeSubscriptionLimitReported(limit);
           }
+          const backgroundStopped = session.backgroundShellStarted === true;
           this.resetStreamingProcess(request.sessionKey, session);
           usageLimitHolds += 1;
           await this.holdForUsageLimit(request, limit, usageLimitHolds);
@@ -2064,6 +2108,7 @@ class ClaudeCodeSessionRuntime {
             currentPrompt = buildSideEffectReconciliationPrompt(failedAttemptMcpCalls);
             currentPromptImages = [];
           }
+          if (backgroundStopped) currentPrompt = `${USAGE_LIMIT_BACKGROUND_NOTE}\n\n${currentPrompt}`;
           continue;
         }
         if (claudeCodeAuthFailureOf(error)) {
@@ -2116,29 +2161,43 @@ class ClaudeCodeSessionRuntime {
       USAGE_LIMIT_MAX_MIN_HOLD_MS,
       USAGE_LIMIT_MIN_HOLD_MS * 2 ** Math.max(0, holds - 1),
     );
-    const until = Math.max(
-      now + minHold,
-      named !== undefined
-        ? Math.max(now, named) + USAGE_LIMIT_RESET_MARGIN_MS
-        : now + USAGE_LIMIT_UNKNOWN_RESET_HOLD_MS,
-    );
+    // A monthly spend cap doesn't lift on a timer: it waits for Resume
+    // (after switching accounts). Other limits also retry by themselves at
+    // the reset.
+    const until = limit.monthly
+      ? undefined
+      : Math.max(
+          now + minHold,
+          named !== undefined
+            ? Math.max(now, named) + USAGE_LIMIT_RESET_MARGIN_MS
+            : now + USAGE_LIMIT_UNKNOWN_RESET_HOLD_MS,
+        );
     request.onStatusChange?.({
       state: "usage-limit",
-      text:
-        named !== undefined
-          ? `${describeClaudeUsageLimit(limit)} Waiting until then to continue.`
-          : `${describeClaudeUsageLimit(limit)} Waiting for it to reset to continue.`,
-      ...(named !== undefined ? { until: named } : {}),
+      text: limit.monthly
+        ? "Claude's monthly spend limit is reached for this account. Paused until Resume."
+        : named !== undefined
+          ? `${describeClaudeUsageLimit(limit)} Paused until then or until Resume.`
+          : `${describeClaudeUsageLimit(limit)} Paused until it resets or until Resume.`,
+      ...(named !== undefined && !limit.monthly ? { until: named } : {}),
+      ...(limit.monthly ? { monthly: true as const } : {}),
     });
-    let resumed = false;
+    let wake!: () => void;
+    const woken = new Promise<void>((resolve) => {
+      wake = resolve;
+    });
+    this.usageLimitWakers.set(request.sessionKey, wake);
+    let outcome: "woken" | "reset" | undefined;
     try {
-      await waitUntil(until, request.abortSignal);
-      resumed = true;
+      outcome = await waitUntil(until, request.abortSignal, woken);
     } finally {
+      if (this.usageLimitWakers.get(request.sessionKey) === wake) {
+        this.usageLimitWakers.delete(request.sessionKey);
+      }
       request.onStatusChange?.({
         state: "usage-limit-end",
-        text: resumed ? "Claude usage limit reset. Continuing." : "",
-        resumed,
+        text: outcome === "woken" ? "Resumed." : outcome === "reset" ? "Claude usage limit reset. Continuing." : "",
+        resumed: outcome !== undefined,
       });
     }
   }
@@ -2698,6 +2757,9 @@ class ClaudeCodeSessionRuntime {
         // every inbound call (integrity gate, 750ms fail-open settle) and
         // for image_gen's durable identity (5s claim), so an unfed
         // correlator taxes every call and refuses every image_gen.
+        if (!session.backgroundShellStarted && startsBackgroundShell(parsedLine)) {
+          session.backgroundShellStarted = true;
+        }
         const correlator = session.activeNativeToolUseCorrelator;
         if (correlator) {
           observeFinalizedClaudeToolUses(parsedLine, correlator.observe);
@@ -3428,6 +3490,7 @@ class ClaudeCodeSessionRuntime {
     );
     killProcess(child);
     session.process = undefined;
+    session.backgroundShellStarted = false;
     if (this.activeProcesses.get(sessionKey) === child) {
       this.activeProcesses.delete(sessionKey);
     }
@@ -3442,6 +3505,9 @@ export const claudeCodeResumableSessionId = (
   sessionKey: string,
   cwd: string | undefined,
 ) => runtime.resumableSessionId(sessionKey, cwd);
+/** Resume: continue every step a usage limit holds (optionally only some sessions). */
+export const wakeClaudeCodeUsageLimitHolds = (select?: (sessionKey: string) => boolean): number =>
+  runtime.wakeUsageLimitHolds(select);
 export const closeClaudeCodeSessionWhenIdle = (sessionKey: string) => {
   runtime.closeSessionWhenIdle(sessionKey);
 };

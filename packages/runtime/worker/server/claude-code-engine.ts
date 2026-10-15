@@ -18,6 +18,7 @@ import {
   checkClaudeCodeAuth,
   claudeCodeResumableSessionId,
   closeClaudeCodeSessionWhenIdle,
+  wakeClaudeCodeUsageLimitHolds,
   CLAUDE_CODE_AGENT_AUTO_COMPACT_WINDOW,
   runClaudeCodeTurn,
 } from "../../kernel/integrations/claude-code-session-runtime.js";
@@ -334,6 +335,7 @@ const desktopTransport = (session: OpenSession): ClaudeCodeTransport => {
       return sessionId;
     },
     close: (ref) => closeClaudeCodeSessionWhenIdle(ref.sessionKey),
+    wakeUsageLimitHolds: (sessionKeys) => wakeClaudeCodeUsageLimitHolds((sessionKey) => sessionKeys.has(sessionKey)),
   };
 };
 

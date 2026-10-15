@@ -1,4 +1,13 @@
-import { CLAUDE_USAGE_LIMIT_RESUMED_TEXT, type ClaudeUsageLimitCard } from "@stella/contracts/claude-usage-limit";
+import {
+  applyUsageLimitCard,
+  dropStaleUsageLimitPauses,
+  emptyUsageLimitPauses,
+  summarizeUsageLimitPauses,
+  USAGE_LIMIT_PAUSE_STALE_MS,
+  USAGE_LIMIT_RESUMED_TITLE,
+  type ClaudeUsageLimitCard,
+  type UsageLimitPauses,
+} from "@stella/contracts/claude-usage-limit";
 import { execFile } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
@@ -218,6 +227,18 @@ export type DesktopChatsOptions = {
   agentReportRelayed?(agent: { conversationId: string; description: string }): void;
   agentStopped?(agent: { conversationId: string; threadId: string; description: string; attempt: number }): void;
   localLog?(conversationId: string): DesktopLocalLog | undefined;
+  /** Records this computer's usage-limit pauses in the cloud and resumes a chat's paused work. */
+  usageLimits?: {
+    note(args: {
+      conversationId: string;
+      holdId: string;
+      state: "held" | "resumed";
+      threadId?: string;
+      until?: number;
+      monthly?: boolean;
+    }): Promise<void>;
+    resume(args: { conversationId: string; requestId: string }): Promise<{ cloud: number }>;
+  };
   emit(payload: PiChatEventsPayload): void;
   report(error: unknown): void;
 };
@@ -501,64 +522,149 @@ export function desktopChats(options: DesktopChatsOptions) {
       : {},
   );
   const byok = byokModels(models, options.resolveDirectModel);
-  const usageLimitHolds = new Map<string, Map<string, number | undefined>>();
+  // What a usage limit has paused in each chat: this computer's own held
+  // Claude Code steps plus the pauses the chat's journal records elsewhere
+  // (the cloud, other computers). One card per chat shows them; Resume
+  // continues all of them.
+  const usageLimitPauses = new Map<string, UsageLimitPauses>();
+  const pausesOf = (conversationId: string) => {
+    let pauses = usageLimitPauses.get(conversationId);
+    if (!pauses) usageLimitPauses.set(conversationId, (pauses = emptyUsageLimitPauses()));
+    return pauses;
+  };
   const usageLimitEvent = (conversationId: string): PiChatEvent | undefined => {
-    const holds = usageLimitHolds.get(conversationId);
-    if (!holds || holds.size === 0) return undefined;
-    const known = [...holds.values()].filter((until): until is number => until !== undefined);
-    const until = known.length > 0 ? Math.max(...known) : undefined;
+    const pauses = usageLimitPauses.get(conversationId);
+    if (!pauses) return undefined;
+    dropStaleUsageLimitPauses(pauses);
+    const paused = summarizeUsageLimitPauses(pauses);
+    if (!paused) return undefined;
     return {
       type: "engine_status",
       state: "usage-limit",
-      text: "Claude usage limit reached. Held work continues when it resets.",
-      ...(until !== undefined ? { until } : {}),
+      text: "Paused by the Claude usage limit.",
+      ...(paused.until !== undefined ? { until: paused.until } : {}),
+      paused,
     };
   };
-  const noteUsageLimit = (
-    conversationId: string,
-    sessionKey: string,
-    status: Extract<ClaudeCodeStatus, { state: "usage-limit" | "usage-limit-end" }>,
-  ) => {
-    const holds = usageLimitHolds.get(conversationId) ?? new Map<string, number | undefined>();
-    let event: PiChatEvent | undefined;
-    if (status.state === "usage-limit") {
-      holds.set(sessionKey, status.until);
-      usageLimitHolds.set(conversationId, holds);
-      event = usageLimitEvent(conversationId);
-    } else {
-      if (!holds.delete(sessionKey)) return;
-      if (holds.size > 0) return;
-      usageLimitHolds.delete(conversationId);
-      event = { type: "engine_status", state: "usage-limit-end", text: status.text, resumed: status.resumed };
-    }
+  const emitUsageLimit = (conversationId: string, ended?: { text: string; resumed: boolean }) => {
+    const event: PiChatEvent | undefined =
+      usageLimitEvent(conversationId) ??
+      (ended ? { type: "engine_status", state: "usage-limit-end", text: ended.text, resumed: ended.resumed } : undefined);
     if (event) options.emit({ conversationId, events: [event] });
   };
-  const CLOUD_USAGE_LIMIT_STALE_MS = 15 * 60_000;
-  const noteCloudUsageLimit = (conversationId: string, card: ClaudeUsageLimitCard, at: number) => {
-    const key = `cloud:${card.threadId ?? "stella"}`;
-    const now = Date.now();
-    if (card.state === "held") {
-      if (card.until !== undefined && card.until < now - CLOUD_USAGE_LIMIT_STALE_MS) return;
-      noteUsageLimit(conversationId, key, {
-        state: "usage-limit",
-        text: "",
-        ...(card.until !== undefined ? { until: card.until } : {}),
+  const holdSerial = new Map<string, number>();
+  const startedAt = Date.now();
+  const ownResumes = new Set<string>();
+  const recordUsageLimit = (
+    conversationId: string,
+    note: { key: string; state: "held" | "resumed"; until?: number; monthly?: true },
+  ) => {
+    if (conversationId.startsWith("local_") || !options.usageLimits) return;
+    const serialKey = `${conversationId}\0${note.key}`;
+    const serial = note.state === "held" ? (holdSerial.get(serialKey) ?? 0) + 1 : (holdSerial.get(serialKey) ?? 0);
+    holdSerial.set(serialKey, serial);
+    const holdId = createHash("sha256")
+      .update(`${conversationId}\0${note.key}\0${serial}\0${process.pid}\0${startedAt}`)
+      .digest("hex")
+      .slice(0, 40);
+    void options.usageLimits
+      .note({
+        conversationId,
+        holdId,
+        state: note.state,
+        ...(note.key ? { threadId: note.key } : {}),
+        ...(note.until !== undefined ? { until: note.until } : {}),
+        ...(note.monthly ? { monthly: true } : {}),
+      })
+      .catch((error: unknown) => options.report(error));
+  };
+  // Subagents pause and resume with the rest, but the card counts only the
+  // reply and Stella's own tasks.
+  const subagentThreads = new Set<string>();
+  const heldThreads = new Set<string>();
+  const noteUsageLimit = (
+    conversationId: string,
+    threadId: string | undefined,
+    status: Extract<ClaudeCodeStatus, { state: "usage-limit" | "usage-limit-end" }>,
+  ) => {
+    if (threadId) {
+      if (status.state === "usage-limit") heldThreads.add(threadId);
+      else heldThreads.delete(threadId);
+      if (subagentThreads.has(threadId)) return;
+    }
+    const pauses = pausesOf(conversationId);
+    const key = threadId ?? "";
+    if (status.state === "usage-limit") {
+      applyUsageLimitCard(
+        pauses,
+        {
+          type: "usage-limit",
+          state: "held",
+          ...(threadId ? { threadId } : {}),
+          ...(status.until !== undefined ? { until: status.until } : {}),
+          ...(status.monthly ? { monthly: true as const } : {}),
+          ...(options.deviceId ? { deviceId: options.deviceId } : {}),
+        },
+        Date.now(),
+      );
+      recordUsageLimit(conversationId, {
+        key,
+        state: "held",
+        ...(status.until !== undefined ? { until: status.until } : {}),
+        ...(status.monthly ? { monthly: true as const } : {}),
       });
+      emitUsageLimit(conversationId);
       return;
     }
-    noteUsageLimit(conversationId, key, {
-      state: "usage-limit-end",
-      text: CLAUDE_USAGE_LIMIT_RESUMED_TEXT,
-      resumed: now - at < CLOUD_USAGE_LIMIT_STALE_MS,
-    });
+    if (!pauses.held.has(key)) return;
+    applyUsageLimitCard(pauses, { type: "usage-limit", state: "resumed", ...(threadId ? { threadId } : {}) }, Date.now());
+    recordUsageLimit(conversationId, { key, state: "resumed" });
+    if (pauses.held.size > 0) {
+      emitUsageLimit(conversationId);
+      return;
+    }
+    emitUsageLimit(conversationId, { text: status.text, resumed: status.resumed });
   };
+  const noteCloudUsageLimit = (conversationId: string, card: ClaudeUsageLimitCard, at: number) => {
+    // This computer's own pauses come back through the journal too; its
+    // engine is the truth for them.
+    if (!card.resume && card.deviceId && card.deviceId === options.deviceId) return;
+    const pauses = pausesOf(conversationId);
+    const before = pauses.held.size;
+    if (card.resume) {
+      // Resume pressed on another device: wake what this computer holds.
+      if (card.requestId && ownResumes.has(card.requestId)) return;
+      if (Date.now() - at < USAGE_LIMIT_PAUSE_STALE_MS) claudeCodeEngine?.wakeUsageLimitHolds(conversationId);
+    }
+    applyUsageLimitCard(pauses, card, at);
+    if (pauses.held.size > 0 || before > 0 || card.resume) {
+      emitUsageLimit(conversationId, { text: USAGE_LIMIT_RESUMED_TITLE, resumed: Date.now() - at < USAGE_LIMIT_PAUSE_STALE_MS });
+    }
+  };
+  /** Resume pressed here: continue everything the limit paused in this chat, wherever it runs. */
+  const resumeUsageLimit = async (conversationId: string): Promise<{ woken: number; cloud: number }> => {
+    const woken = claudeCodeEngine?.wakeUsageLimitHolds(conversationId) ?? 0;
+    const pauses = pausesOf(conversationId);
+    const now = Date.now();
+    applyUsageLimitCard(pauses, { type: "usage-limit", state: "resumed", resume: true }, now);
+    emitUsageLimit(conversationId, { text: USAGE_LIMIT_RESUMED_TITLE, resumed: true });
+    let cloud = 0;
+    if (!conversationId.startsWith("local_") && options.usageLimits) {
+      const requestId = randomUUID();
+      ownResumes.add(requestId);
+      cloud = (await options.usageLimits.resume({ conversationId, requestId })).cloud;
+    }
+    return { woken, cloud };
+  };
+  const usageLimitPaused = (conversationId: string, threadId: string): boolean =>
+    heldThreads.has(threadId) || (usageLimitPauses.get(conversationId)?.held.has(threadId) ?? false);
   const claudeCodeEngine = options.claudeCodeEngine;
   if (claudeCodeEngine) {
     models.setProvider(claudeCodeEngine.provider());
     claudeCodeEngine.onProviderChange((provider) => models.setProvider(provider));
     claudeCodeEngine.onStatus((session, status) => {
       if (status.state === "usage-limit" || status.state === "usage-limit-end") {
-        noteUsageLimit(session.conversationId, session.sessionKey, status);
+        noteUsageLimit(session.conversationId, session.threadId, status);
         return;
       }
       if (session.threadId) return;
@@ -876,6 +982,7 @@ export function desktopChats(options: DesktopChatsOptions) {
       }));
     return {
       conversationId: async () => conversationId,
+      usageLimitPaused: (threadId) => usageLimitPaused(conversationId, threadId),
       list: async (_context, listOptions) => {
         const local = localSessions();
         if (!cloud) return { agents: [], sessions: local };
@@ -1121,6 +1228,7 @@ export function desktopChats(options: DesktopChatsOptions) {
                 ensureModel: (model) => ensureModel(model),
                 beginAgentRun: async (run) => {
                   if (!opened) return;
+                  if (run.parentThreadId) subagentThreads.add(run.threadId);
                   if (run.parentConversationId !== opened.root.id) {
                     if (!run.parentThreadId) return;
                     await noteAgentThread(run.threadId, conversationId);
@@ -1906,6 +2014,7 @@ export function desktopChats(options: DesktopChatsOptions) {
   return {
     submit,
     automation,
+    resumeUsageLimit,
     startAgent,
     messageAgent,
     runPlacedAgent,
@@ -2031,6 +2140,8 @@ export function desktopChats(options: DesktopChatsOptions) {
             events: [{ type: "send_moved", requestId: request.requestId, userMessageId: request.userMessageId }],
           });
           return { ok: true };
+        case "resumeUsageLimit":
+          return await resumeUsageLimit(request.conversationId);
         case "journaled": {
           const chat = await open(request.conversationId);
           await caughtUp(chat);

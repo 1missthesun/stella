@@ -212,7 +212,7 @@ export const cloudJournalFor = (
         },
       );
       const body = (await response.json().catch(() => null)) as {
-        holds?: Array<{ threadId?: string; until?: number; createdAtMs: number }>;
+        holds?: Array<{ threadId?: string; until?: number; deviceId?: string; monthly?: true; createdAtMs: number }>;
         error?: string;
       } | null;
       if (!response.ok || !body) {

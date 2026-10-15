@@ -97,7 +97,7 @@ export type ClaudeCodeToolSpec = { name: string; description: string; parameters
 export type ClaudeCodeToolOutcome = { content: (TextContent | ImageContent)[]; isError?: boolean };
 export type ClaudeCodeStatus =
   | { state: "running" | "compacting" | "model-fallback"; text: string }
-  | { state: "usage-limit"; text: string; until?: number }
+  | { state: "usage-limit"; text: string; until?: number; monthly?: true }
   | { state: "usage-limit-end"; text: string; resumed: boolean };
 
 export type ClaudeCodeBackgroundWake = {
@@ -140,6 +140,8 @@ export type ClaudeCodeTransport = {
   resume?(session: ClaudeCodeSessionRef, args: { held?: string; lastReply?: string }): Promise<{ sessionId?: string; restored?: boolean }>;
   hydrate?(session: ClaudeCodeSessionRef, transcript: (meta: ClaudeCodeTranscriptMeta) => string): Promise<string>;
   close?(session: ClaudeCodeSessionRef): void;
+  /** Resume: continue the steps a usage limit holds in these sessions now. Returns how many. */
+  wakeUsageLimitHolds?(sessionKeys: ReadonlySet<string>): number;
 };
 
 export type ClaudeCodeSessionRecord = { cliSessionId?: string; seen: string[]; undelivered?: string[]; context?: string };
@@ -1592,6 +1594,15 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
         if (scope.threadId !== undefined ? ref.threadId !== scope.threadId : ref.threadId !== undefined && !scope.agents) continue;
         abortTurn(session.turn, "Stopped.");
       }
+    },
+    /** Resume: steps a usage limit holds in this chat (its reply and its agents) continue now. */
+    wakeUsageLimitHolds(conversationId: string): number {
+      const keys = new Set<string>();
+      for (const session of sessions.values()) {
+        const ref = session.binding.session;
+        if (ref.conversationId === conversationId) keys.add(ref.sessionKey);
+      }
+      return keys.size > 0 ? (options.transport.wakeUsageLimitHolds?.(keys) ?? 0) : 0;
     },
     running(conversationId: string): boolean {
       for (const session of sessions.values()) {

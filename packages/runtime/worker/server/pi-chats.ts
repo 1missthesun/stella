@@ -371,6 +371,18 @@ export const piChatsFor = (
           await runner.agentThreads.note(args);
         },
       },
+      usageLimits: {
+        note: async (args) => {
+          const runner = session.runnerCell.get();
+          if (!runner?.getStellaSiteAuth()) return;
+          await runner.usageLimits.note(args);
+        },
+        resume: async (args) => {
+          const runner = session.runnerCell.get();
+          if (!runner?.getStellaSiteAuth()) throw new Error("Sign in to Stella to resume work paused in the cloud or on your other devices.");
+          return await runner.usageLimits.resume(args);
+        },
+      },
       agentLogs: {
         append: async (args) => {
           const runner = session.runnerCell.get();

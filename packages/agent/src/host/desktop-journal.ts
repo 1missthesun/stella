@@ -65,7 +65,9 @@ export type DesktopJournal = {
   start(): Promise<JournalStart>;
   publishCheckpoint(checkpoint: { summary: string; firstKept: JournalCheckpointFirstKept }): Promise<void>;
   read(afterSeq: number): Promise<{ records: JournalReadRecord[]; complete: boolean }>;
-  usageLimitHolds?(): Promise<Array<{ threadId?: string; until?: number; createdAtMs: number }>>;
+  usageLimitHolds?(): Promise<
+    Array<{ threadId?: string; until?: number; deviceId?: string; monthly?: true; createdAtMs: number }>
+  >;
   ownTurn(turnId: string): boolean;
   begin(turn: {
     localTurnId: string;
@@ -314,6 +316,8 @@ export async function journalMirror(args: {
             state: "held",
             ...(hold.threadId ? { threadId: hold.threadId } : {}),
             ...(hold.until !== undefined ? { until: hold.until } : {}),
+            ...(hold.deviceId ? { deviceId: hold.deviceId } : {}),
+            ...(hold.monthly ? { monthly: true as const } : {}),
           },
           hold.createdAtMs,
         );

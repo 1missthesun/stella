@@ -305,6 +305,8 @@ export type StellaAgentsHost = {
 
 export type AgentDirectoryHost = {
   conversationId(context: Context): Promise<string>;
+  /** A usage limit holds this agent's run on this computer right now. */
+  usageLimitPaused?(threadId: string): boolean;
   list(
     context: Context,
     options?: { threadIds?: string[] },
@@ -1528,6 +1530,7 @@ export function stellaAgents(host: StellaAgentsHost) {
           updatedAt: there.updatedAt,
           ...(there.offline ? { offline: there.offline } : {}),
           ...(there.awaitingConsent ? { awaitingConsent: true as const } : {}),
+          ...(there.pausedBy ? { pausedBy: there.pausedBy } : {}),
         };
       }
       const computer = await computerOf(record, context, seen);
@@ -1565,6 +1568,9 @@ export function stellaAgents(host: StellaAgentsHost) {
               ? "failed"
               : "completed",
       updatedAt: at ?? latest?.timestamp ?? Date.now(),
+      ...(live?.run !== undefined && host.directory?.usageLimitPaused?.(agent.threadId)
+        ? { pausedBy: "usage-limit" as const }
+        : {}),
     };
   };
 

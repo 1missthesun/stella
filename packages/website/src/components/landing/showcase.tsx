@@ -20,7 +20,7 @@ const CHAPTERS: Chapter[] = [
 ];
 
 const ASK_MS = 520;
-const SWAP_MS = 1150;
+const SWAP_MS = 640;
 
 type Phase = "idle" | "ask" | "swap" | "done";
 
@@ -168,13 +168,10 @@ function ChapterView({ index }: { index: number }) {
       ([entry]) => {
         if (!entry?.isIntersecting) return;
         io.disconnect();
-        if (prefersReducedMotion()) {
-          setPhase("done");
-          return;
-        }
-        setPhase("ask");
-        timers.push(window.setTimeout(() => setPhase("swap"), ASK_MS));
-        timers.push(window.setTimeout(() => setPhase("done"), ASK_MS + SWAP_MS));
+        const askMs = prefersReducedMotion() ? 0 : ASK_MS;
+        setPhase(askMs ? "ask" : "swap");
+        if (askMs) timers.push(window.setTimeout(() => setPhase("swap"), askMs));
+        timers.push(window.setTimeout(() => setPhase("done"), askMs + SWAP_MS));
       },
       { threshold: 0.5 },
     );
@@ -202,7 +199,6 @@ function ChapterView({ index }: { index: number }) {
             {mounted ? <From /> : null}
           </div>
         ) : null}
-        <i className={w.beam} />
       </div>
     </article>
   );

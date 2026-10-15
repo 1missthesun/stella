@@ -161,47 +161,20 @@
   container-type: size;
 }
 
+/* The desktop's hot-reload focus pull (update-transition.ts focusPull): the old
+   window blurs to 12px, dissolves at peak blur while the new one, held at 12px
+   underneath, pulls back into focus. Slowed to 640ms; blur in is ease-in cubic,
+   blur out ease-out cubic, so the whole pass reads as one ease-in-out. */
 .chapter[data-phase="swap"] .skinBox {
-  animation: settle 1150ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation: focus-in 640ms linear both;
 }
 
 .from {
   z-index: 2;
-  clip-path: inset(0 0 0 0);
 }
 
 .chapter[data-phase="swap"] .from {
-  animation: wipe 1150ms cubic-bezier(0.7, 0, 0.2, 1) both;
-}
-
-.beam {
-  position: absolute;
-  left: -2%;
-  right: -2%;
-  top: 0;
-  z-index: 3;
-  height: 2px;
-  opacity: 0;
-  pointer-events: none;
-  background: linear-gradient(90deg, transparent, #00eeff 12%, #fff 30%, #b89cff 55%, #ff4ac0 82%, transparent);
-  box-shadow:
-    0 0 18px 2px rgba(150, 120, 255, 0.85),
-    0 0 60px 8px rgba(112, 60, 255, 0.45);
-}
-
-.beam::after {
-  content: "";
-  position: absolute;
-  left: 2%;
-  right: 2%;
-  bottom: 1px;
-  height: clamp(60px, 12svh, 140px);
-  background: linear-gradient(to top, rgba(160, 130, 255, 0.22), transparent);
-  mix-blend-mode: screen;
-}
-
-.chapter[data-phase="swap"] .beam {
-  animation: beam 1150ms cubic-bezier(0.7, 0, 0.2, 1) both;
+  animation: focus-out 640ms linear both;
 }
 
 .coda {
@@ -226,36 +199,32 @@
   background-clip: text;
 }
 
-@keyframes wipe {
-  from {
-    clip-path: inset(0 0 0 0);
+@keyframes focus-out {
+  0% {
+    opacity: 1;
+    filter: blur(0px);
+    animation-timing-function: cubic-bezier(0.32, 0, 0.67, 0);
   }
-  to {
-    clip-path: inset(100% 0 0 0);
+  46% {
+    opacity: 1;
+    filter: blur(12px);
+    animation-timing-function: cubic-bezier(0.45, 0, 0.55, 1);
+  }
+  62%,
+  100% {
+    opacity: 0;
+    filter: blur(14px);
   }
 }
 
-@keyframes beam {
-  0% {
-    top: 0;
-    opacity: 0;
-  }
-  8% {
-    opacity: 1;
-  }
-  92% {
-    opacity: 1;
+@keyframes focus-in {
+  0%,
+  46% {
+    filter: blur(12px);
+    animation-timing-function: cubic-bezier(0.33, 1, 0.68, 1);
   }
   100% {
-    top: 100%;
-    opacity: 0;
-  }
-}
-
-@keyframes settle {
-  from {
-    transform: scale(1.012);
-    filter: brightness(1.25) saturate(1.1);
+    filter: blur(0px);
   }
 }
 
@@ -297,5 +266,19 @@
     opacity: 1;
     filter: none;
     transform: none;
+  }
+
+  .chapter[data-phase="swap"] .skinBox {
+    animation: none;
+  }
+
+  .chapter[data-phase="swap"] .from {
+    animation: crossfade 640ms cubic-bezier(0.45, 0, 0.55, 1) both;
+  }
+}
+
+@keyframes crossfade {
+  to {
+    opacity: 0;
   }
 }

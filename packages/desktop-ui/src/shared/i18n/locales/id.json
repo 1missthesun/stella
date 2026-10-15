@@ -547,7 +547,7 @@
       },
       "plan": {
         "title": "Paket",
-        "lede": "Stella yang sama di setiap paket. Paket lebih besar memberi lebih banyak penggunaan dan lebih banyak sekaligus.",
+        "lede": "Stella yang sama di setiap paket. Paket lebih besar memberi lebih banyak penggunaan.",
         "perMonth": "{price}/bln",
         "checkoutHint": "Pembayaran terbuka di browser. Anggaranmu langsung berlaku.",
         "changeHint": "Kamu akan mengonfirmasi perubahan di browser.",
@@ -567,11 +567,10 @@
         "noCard": "Tanpa kartu"
       },
       "includes": {
-        "local": "Agen di komputermu",
-        "cloud": "Agen cloud, {count} sekaligus",
         "media": "Gambar, video, musik, dan 3D",
         "voice": "Dikte dan bacakan",
-        "drive": "Penyimpanan Drive {size}"
+        "drive": "Penyimpanan Drive {size}",
+        "byok": "Gunakan model dan kunci Anda sendiri"
       },
       "credit": {
         "title": "Kredit tambahan",

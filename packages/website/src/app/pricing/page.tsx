@@ -44,7 +44,7 @@ const INCLUDED_ICONS: Record<(typeof INCLUDED_IN_EVERY_PLAN)[number], LucideIcon
 const QUESTIONS = [
   {
     q: "What does the usage budget pay for?",
-    a: "Everything Stella runs for you on its own servers: its models, cloud agents and the computers they use, image, video, music and 3D, voice, web search, maps, the cloud browser, and hosted apps. It all draws from one budget, so you spend it on whatever you use most.",
+    a: "Everything Stella runs for you on its own servers: its models, the tasks it works on, image, video, music and 3D, voice, web search, maps, the cloud browser, and hosted apps. It all draws from one budget, so you spend it on whatever you use most.",
   },
   {
     q: "What happens when I run out?",

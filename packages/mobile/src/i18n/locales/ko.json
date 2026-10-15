@@ -547,7 +547,7 @@
       },
       "plan": {
         "title": "요금제",
-        "lede": "모든 요금제에서 같은 Stella. 상위 요금제일수록 사용량이 많고 동시에 더 많이 실행합니다.",
+        "lede": "모든 요금제에서 같은 Stella. 상위 요금제일수록 사용량이 많습니다.",
         "perMonth": "{price}/월",
         "checkoutHint": "결제는 브라우저에서 열려요. 예산은 바로 시작돼요.",
         "changeHint": "변경은 브라우저에서 확인하게 돼요.",
@@ -567,11 +567,10 @@
         "noCard": "카드 필요 없음"
       },
       "includes": {
-        "local": "내 컴퓨터의 에이전트",
-        "cloud": "클라우드 에이전트, 동시에 {count}개",
         "media": "이미지, 동영상, 음악, 3D",
         "voice": "받아쓰기 및 소리 내어 읽기",
-        "drive": "Drive 저장공간 {size}"
+        "drive": "Drive 저장공간 {size}",
+        "byok": "내 모델과 키 사용"
       },
       "credit": {
         "title": "추가 크레딧",

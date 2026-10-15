@@ -529,11 +529,7 @@ function PlanSection({
   };
 
   return (
-    <Section id="plan" title="Plan">
-      <div className="billing-plans-head">
-        <h3 className="billing-plans-heading">Choose your plan</h3>
-        <p className="billing-plans-lede">Same Stella on every plan. Bigger plans give you more usage and more at once.</p>
-      </div>
+    <Section id="plan" title="Choose your plan" lede="Same Stella on every plan. Bigger plans give you more usage.">
       <div className="billing-plans" role="list">
         {PLAN_ORDER.map((id) => {
           const def = PLAN_CATALOG[id];
@@ -639,51 +635,51 @@ function CreditSection({
 
   return (
     <Section id="credit" title="Extra credit" lede="Keeps Stella going when your plan's budget runs out.">
-      <div className="billing-rows">
-        <Row label="Balance">
-          <span className="billing-value billing-value--strong">{usd.format(status.credits.balanceUsd)}</span>
-        </Row>
-        <Row label="Add credit" hint="Pay once with Stripe. No subscription.">
-          <div className="billing-credit">
-            <div className="billing-segmented" role="radiogroup" aria-label="Amount">
-              {options.presetAmountCents.map((cents) => (
-                <button
-                  key={cents}
-                  type="button"
-                  role="radio"
-                  aria-checked={!custom.trim() && preset === cents}
-                  data-on={!custom.trim() && preset === cents ? "" : undefined}
-                  onClick={() => {
-                    setPreset(cents);
-                    setCustom("");
-                    setInputError(null);
-                  }}
-                >
-                  {formatUsd(cents / 100)}
-                </button>
-              ))}
-            </div>
-            <label className="billing-input-wrap">
-              <span aria-hidden="true">$</span>
-              <input
-                className="billing-input"
-                inputMode="decimal"
-                placeholder="Other"
-                value={custom}
-                aria-label="Other amount in dollars"
-                aria-invalid={inputError ? true : undefined}
-                onChange={(event) => {
-                  setCustom(event.target.value);
+      <div className="billing-balance">
+        <span className="billing-balance-amount">{usd.format(status.credits.balanceUsd)}</span>
+        <span className="billing-muted">Balance</span>
+      </div>
+      <div className="billing-topup">
+        <div className="billing-credit">
+          <div className="billing-segmented" role="radiogroup" aria-label="Amount">
+            {options.presetAmountCents.map((cents) => (
+              <button
+                key={cents}
+                type="button"
+                role="radio"
+                aria-checked={!custom.trim() && preset === cents}
+                data-on={!custom.trim() && preset === cents ? "" : undefined}
+                onClick={() => {
+                  setPreset(cents);
+                  setCustom("");
                   setInputError(null);
                 }}
-              />
-            </label>
-            <button type="button" className="billing-btn billing-btn--primary" disabled={busy !== null || amountCents === null} onClick={submit}>
-              {busy === "credit" ? "Opening…" : amountCents ? `Add ${usd.format(amountCents / 100)}` : "Add credit"}
-            </button>
+              >
+                {formatUsd(cents / 100)}
+              </button>
+            ))}
           </div>
-          {inputError ? <p className="billing-field-error">{inputError}</p> : null}
-        </Row>
+          <label className="billing-input-wrap">
+            <span aria-hidden="true">$</span>
+            <input
+              className="billing-input"
+              inputMode="decimal"
+              placeholder="Other"
+              value={custom}
+              aria-label="Other amount in dollars"
+              aria-invalid={inputError ? true : undefined}
+              onChange={(event) => {
+                setCustom(event.target.value);
+                setInputError(null);
+              }}
+            />
+          </label>
+          <button type="button" className="billing-btn billing-btn--primary" disabled={busy !== null || amountCents === null} onClick={submit}>
+            {busy === "credit" ? "Opening…" : amountCents ? `Add ${usd.format(amountCents / 100)}` : "Add credit"}
+          </button>
+        </div>
+        {inputError ? <p className="billing-field-error">{inputError}</p> : null}
+        <p className="billing-centered-hint">Pay once with Stripe. No subscription.</p>
       </div>
     </Section>
   );

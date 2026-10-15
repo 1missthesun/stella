@@ -8,7 +8,7 @@ export const FAQ: Answer[] = [
   },
   {
     q: "Is Stella free?",
-    a: `Yes. ${planSummary("free")}, no credit card needed. Paid plans add monthly usage, cloud agents and image, video, music and 3D: ${PAID_BILLING_PLANS.map((id) => `${PLAN_CATALOG[id].label} is ${formatPlanPrice(PLAN_CATALOG[id].monthlyPriceCents)} a month for ${PLAN_CATALOG[id].tagline.toLowerCase()}`).join(", ")}.`,
+    a: `Yes. ${planSummary("free")}, no credit card needed. Paid plans add monthly usage and image, video, music and 3D: ${PAID_BILLING_PLANS.map((id) => `${PLAN_CATALOG[id].label} is ${formatPlanPrice(PLAN_CATALOG[id].monthlyPriceCents)} a month for ${PLAN_CATALOG[id].tagline.toLowerCase()}`).join(", ")}.`,
   },
   {
     q: "Is there an AI that can use my computer for me?",
@@ -36,7 +36,7 @@ export const FAQ: Answer[] = [
   },
   {
     q: "Can Stella run several AI agents at once?",
-    a: "Yes. Hand Stella ten things and it splits them across agents that work in parallel in the background while you keep chatting. On any plan they run on your computer; paid plans also run them in the cloud, several at once. Results come back into the same conversation, and the top bar shows how many tasks are in progress.",
+    a: "Yes. Hand Stella ten things and it splits them across agents that work in parallel in the background while you keep chatting. Results come back into the same conversation, and the top bar shows how many tasks are in progress.",
   },
   {
     q: "Can Stella make images, video, music and 3D models?",

@@ -557,7 +557,7 @@
       },
       "plan": {
         "title": "Plan",
-        "lede": "El mismo Stella en todos los planes. Los planes mayores te dan más uso y más a la vez.",
+        "lede": "El mismo Stella en todos los planes. Los planes mayores te dan más uso.",
         "perMonth": "{price}/mes",
         "checkoutHint": "El pago se abre en tu navegador. Tu presupuesto empieza de inmediato.",
         "changeHint": "Confirmarás el cambio en tu navegador.",
@@ -577,11 +577,10 @@
         "noCard": "Sin tarjeta"
       },
       "includes": {
-        "local": "Agentes en tu ordenador",
-        "cloud": "Agentes en la nube, {count} a la vez",
         "media": "Imagen, vídeo, música y 3D",
         "voice": "Dictado y lectura en voz alta",
-        "drive": "{size} de almacenamiento en Drive"
+        "drive": "{size} de almacenamiento en Drive",
+        "byok": "Usa tus propios modelos y claves"
       },
       "credit": {
         "title": "Crédito extra",

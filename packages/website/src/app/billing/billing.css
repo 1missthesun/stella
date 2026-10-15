@@ -243,22 +243,29 @@
   border-top: 0;
 }
 
-.billing-section-head {
-  margin-bottom: 20px;
+.billing-section-head,
+.billing-plans-head {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  margin: 4px 0 28px;
+  text-align: center;
 }
 
-.billing-main .billing-section-title {
+.billing-main .billing-section-title,
+.billing-main .billing-plans-heading {
   margin: 0;
-  font-size: 19px;
-  font-weight: 620;
-  line-height: 1.3;
-  letter-spacing: -0.02em;
+  font-size: clamp(28px, 3vw, 36px);
+  font-weight: 680;
+  line-height: 1.1;
+  letter-spacing: -0.035em;
   color: var(--b-ink);
 }
 
-.billing-main .billing-section-lede {
-  margin: 4px 0 0;
-  max-width: 62ch;
+.billing-main .billing-section-lede,
+.billing-plans-lede {
+  margin: 0;
+  max-width: 52ch;
   color: var(--b-muted);
 }
 
@@ -273,14 +280,13 @@
 }
 
 .billing-total-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 4px 10px;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
 }
 
 .billing-total-amount {
-  font-size: 34px;
+  font-size: 44px;
   font-weight: 680;
   line-height: 1;
   letter-spacing: -0.04em;
@@ -363,14 +369,14 @@
 }
 
 .billing-callout {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px 20px;
-  margin-top: 16px;
-  padding: 14px 0;
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  margin-top: 20px;
+  padding: 20px 0;
   border-top: 1px solid var(--b-line);
+  border-bottom: 1px solid var(--b-line);
+  text-align: center;
 }
 
 .billing-callout:not(.billing-callout--info) strong {
@@ -385,7 +391,8 @@
 }
 
 .billing-callout strong {
-  font-weight: 620;
+  font-size: 17px;
+  font-weight: 640;
   color: var(--b-ink);
 }
 
@@ -395,7 +402,7 @@
 }
 
 .billing-rows {
-  margin-top: 8px;
+  margin-top: 16px;
 }
 
 .billing-row {
@@ -452,28 +459,8 @@
   color: var(--b-ink);
 }
 
-.billing-plans-head {
-  display: grid;
-  justify-items: center;
-  gap: 8px;
-  margin: 4px 0 28px;
-  text-align: center;
-}
 
-.billing-main .billing-plans-heading {
-  margin: 0;
-  font-size: clamp(28px, 3vw, 36px);
-  font-weight: 680;
-  line-height: 1.1;
-  letter-spacing: -0.035em;
-  color: var(--b-ink);
-}
 
-.billing-plans-lede {
-  margin: 0;
-  max-width: 46ch;
-  color: var(--b-muted);
-}
 
 .billing-plans {
   display: grid;
@@ -728,4 +715,39 @@ html[data-embedded="true"] .billing-main {
 
 .billing-sections {
   container: billing / inline-size;
+}
+
+.billing-balance {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+}
+
+.billing-balance-amount {
+  font-size: 44px;
+  font-weight: 680;
+  line-height: 1;
+  letter-spacing: -0.045em;
+  color: var(--b-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.billing-topup {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid var(--b-line);
+}
+
+.billing-topup .billing-credit {
+  justify-content: center;
+}
+
+.billing-centered-hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--b-faint);
+  text-align: center;
 }

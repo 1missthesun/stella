@@ -552,7 +552,7 @@
       },
       "plan": {
         "title": "Plan",
-        "lede": "Her planda aynı Stella. Büyük planlar daha fazla kullanım ve aynı anda daha fazlasını sunar.",
+        "lede": "Her planda aynı Stella. Büyük planlar daha fazla kullanım sunar.",
         "perMonth": "{price}/ay",
         "checkoutHint": "Ödeme tarayıcında açılır. Bütçen hemen başlar.",
         "changeHint": "Değişikliği tarayıcında onaylayacaksın.",
@@ -572,11 +572,10 @@
         "noCard": "Kart gerekmez"
       },
       "includes": {
-        "local": "Bilgisayarındaki ajanlar",
-        "cloud": "Bulut ajanları, aynı anda {count}",
         "media": "Görsel, video, müzik ve 3D",
         "voice": "Dikte ve sesli okuma",
-        "drive": "{size} Drive depolama"
+        "drive": "{size} Drive depolama",
+        "byok": "Kendi modellerinizi ve anahtarlarınızı kullanın"
       },
       "credit": {
         "title": "Ek kredi",

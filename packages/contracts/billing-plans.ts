@@ -107,7 +107,6 @@ export const PLAN_CATALOG: Readonly<Record<BillingPlan, PlanDefinition>> = {
     },
     tagline: "Try Stella",
     includes: [
-      "Chat, research and agents on your computer",
       "Dictation and read-aloud",
       "Bring your own models and keys",
     ],
@@ -134,7 +133,6 @@ export const PLAN_CATALOG: Readonly<Record<BillingPlan, PlanDefinition>> = {
     },
     tagline: "More usage",
     includes: [
-      "Agents that run in the cloud, 3 at once",
       "Image, video, music and 3D generation",
       "10 GB of Drive storage",
     ],
@@ -161,7 +159,6 @@ export const PLAN_CATALOG: Readonly<Record<BillingPlan, PlanDefinition>> = {
     },
     tagline: "Higher usage",
     includes: [
-      "Agents that run in the cloud, 6 at once",
       "Image, video, music and 3D generation",
       "50 GB of Drive storage",
     ],
@@ -188,7 +185,6 @@ export const PLAN_CATALOG: Readonly<Record<BillingPlan, PlanDefinition>> = {
     },
     tagline: "Highest usage",
     includes: [
-      "Agents that run in the cloud, 10 at once",
       "Image, video, music and 3D generation",
       "100 GB of Drive storage",
     ],
@@ -212,7 +208,7 @@ export const formatPlanPrice = (cents: number): string =>
 // Every plan, in words: what the usage budget pays for.
 export const BUDGET_COVERS = [
   "Stella's models",
-  "Cloud agents and their computers",
+  "Tasks Stella works on for you",
   "Image, video, music and 3D",
   "Voice, read-aloud and dictation",
   "Web search, maps and the cloud browser",

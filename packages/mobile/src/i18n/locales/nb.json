@@ -552,7 +552,7 @@
       },
       "plan": {
         "title": "Abonnement",
-        "lede": "Samme Stella i alle abonnementer. Større abonnementer gir mer bruk og mer samtidig.",
+        "lede": "Samme Stella i alle abonnementer. Større abonnementer gir mer bruk.",
         "perMonth": "{price}/md.",
         "checkoutHint": "Betalingen åpnes i nettleseren. Budsjettet ditt starter med en gang.",
         "changeHint": "Du bekrefter endringen i nettleseren.",
@@ -572,11 +572,10 @@
         "noCard": "Ingen kort nødvendig"
       },
       "includes": {
-        "local": "Agenter på datamaskinen din",
-        "cloud": "Skyagenter, {count} samtidig",
         "media": "Bilde, video, musikk og 3D",
         "voice": "Diktering og opplesing",
-        "drive": "{size} Drive-lagring"
+        "drive": "{size} Drive-lagring",
+        "byok": "Bruk egne modeller og nøkler"
       },
       "credit": {
         "title": "Ekstra kreditt",

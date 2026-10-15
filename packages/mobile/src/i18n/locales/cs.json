@@ -562,7 +562,7 @@
       },
       "plan": {
         "title": "Plán",
-        "lede": "Stejná Stella v každém tarifu. Větší tarify dávají více využití a více najednou.",
+        "lede": "Stejná Stella v každém tarifu. Větší tarify dávají více využití.",
         "perMonth": "{price}/měs.",
         "checkoutHint": "Platba se otevře v prohlížeči. Rozpočet začne platit hned.",
         "changeHint": "Změnu potvrdíš v prohlížeči.",
@@ -582,11 +582,10 @@
         "noCard": "Bez platební karty"
       },
       "includes": {
-        "local": "Agenti na tvém počítači",
-        "cloud": "Agenti v cloudu, {count} najednou",
         "media": "Obrázky, video, hudba a 3D",
         "voice": "Diktování a předčítání",
-        "drive": "{size} úložiště Drive"
+        "drive": "{size} úložiště Drive",
+        "byok": "Vlastní modely a klíče"
       },
       "credit": {
         "title": "Kredit navíc",

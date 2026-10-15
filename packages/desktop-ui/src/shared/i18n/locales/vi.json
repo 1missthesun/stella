@@ -547,7 +547,7 @@
       },
       "plan": {
         "title": "Gói",
-        "lede": "Cùng một Stella trong mọi gói. Gói lớn hơn cho bạn dùng nhiều hơn và làm nhiều việc cùng lúc hơn.",
+        "lede": "Cùng một Stella trong mọi gói. Gói lớn hơn cho bạn dùng nhiều hơn.",
         "perMonth": "{price}/tháng",
         "checkoutHint": "Trang thanh toán mở trong trình duyệt. Ngân sách bắt đầu ngay.",
         "changeHint": "Bạn sẽ xác nhận thay đổi trong trình duyệt.",
@@ -567,11 +567,10 @@
         "noCard": "Không cần thẻ"
       },
       "includes": {
-        "local": "Tác tử trên máy tính của bạn",
-        "cloud": "Tác tử đám mây, {count} cùng lúc",
         "media": "Hình ảnh, video, nhạc và 3D",
         "voice": "Đọc chính tả và đọc to",
-        "drive": "{size} dung lượng Drive"
+        "drive": "{size} dung lượng Drive",
+        "byok": "Dùng mô hình và khóa của riêng bạn"
       },
       "credit": {
         "title": "Tín dụng bổ sung",

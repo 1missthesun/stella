@@ -82,7 +82,7 @@ export const planTagline = (plan: BillingPlan, t: Translate): string => t(`billi
 
 export const planIncludesLines = (plan: BillingPlan, t: Translate): string[] => {
   const def = PLAN_CATALOG[plan];
-  if (!def.interval) return [t("billing.v3.includes.local"), t("billing.v3.includes.voice")];
+  if (!def.interval) return [t("billing.v3.includes.voice"), t("billing.v3.includes.byok")];
   return [
     ...(def.mediaGeneration ? [t("billing.v3.includes.media")] : []),
     t("billing.v3.includes.drive", { size: `${Math.round(def.limits.driveBytes / 1024 ** 3)} GB` }),
@@ -544,63 +544,63 @@ function CreditSection({
 
   return (
     <Section title={t("billing.v3.credit.title")} lede={t("billing.v3.credit.lede")}>
-      <div className="billing-rows">
-        <Row label={t("billing.v3.credit.balance")}>
-          <span className="billing-value billing-value--strong">{f.usd(status.credits.balanceUsd)}</span>
-        </Row>
-        <Row label={t("billing.v3.credit.add")} hint={t("billing.v3.credit.addHint")}>
-          <div className="billing-credit">
-            <div className="billing-segmented" role="radiogroup" aria-label={t("billing.v3.credit.add")}>
-              {options.presetAmountCents.map((cents) => {
-                const on = !custom.trim() && preset === cents;
-                return (
-                  <button
-                    key={cents}
-                    type="button"
-                    role="radio"
-                    aria-checked={on}
-                    data-on={on || undefined}
-                    onClick={() => {
-                      setPreset(cents);
-                      setCustom("");
-                      setInputError(null);
-                    }}
-                  >
-                    {f.amount(cents / 100)}
-                  </button>
-                );
-              })}
-            </div>
-            <label className="billing-input-wrap">
-              <span aria-hidden="true">$</span>
-              <input
-                className="billing-input"
-                inputMode="decimal"
-                placeholder={t("billing.v3.credit.other")}
-                aria-label={t("billing.v3.credit.other")}
-                aria-invalid={inputError ? true : undefined}
-                value={custom}
-                onChange={(event) => {
-                  setCustom(event.target.value);
-                  setInputError(null);
-                }}
-              />
-            </label>
-            <button
-              type="button"
-              className="billing-btn billing-btn--primary"
-              disabled={busy !== null || amountCents === null}
-              onClick={submit}
-            >
-              {busy === "credit"
-                ? t("billing.v3.opening")
-                : amountCents
-                  ? t("billing.v3.credit.addAmount", { amount: f.usd(amountCents / 100) })
-                  : t("billing.v3.credit.add")}
-            </button>
+      <div className="billing-balance">
+        <span className="billing-balance-amount">{f.usd(status.credits.balanceUsd)}</span>
+        <span className="billing-muted">{t("billing.v3.credit.balance")}</span>
+      </div>
+      <div className="billing-topup">
+        <div className="billing-credit">
+          <div className="billing-segmented" role="radiogroup" aria-label={t("billing.v3.credit.add")}>
+            {options.presetAmountCents.map((cents) => {
+              const on = !custom.trim() && preset === cents;
+              return (
+                <button
+                  key={cents}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  data-on={on || undefined}
+                  onClick={() => {
+                    setPreset(cents);
+                    setCustom("");
+                    setInputError(null);
+                  }}
+                >
+                  {f.amount(cents / 100)}
+                </button>
+              );
+            })}
           </div>
-          {inputError ? <span className="billing-field-error">{inputError}</span> : null}
-        </Row>
+          <label className="billing-input-wrap">
+            <span aria-hidden="true">$</span>
+            <input
+              className="billing-input"
+              inputMode="decimal"
+              placeholder={t("billing.v3.credit.other")}
+              aria-label={t("billing.v3.credit.other")}
+              aria-invalid={inputError ? true : undefined}
+              value={custom}
+              onChange={(event) => {
+                setCustom(event.target.value);
+                setInputError(null);
+              }}
+            />
+          </label>
+          <button
+            type="button"
+            className="billing-btn billing-btn--primary"
+            disabled={busy !== null || amountCents === null}
+            onClick={submit}
+          >
+            {busy === "credit"
+              ? t("billing.v3.opening")
+              : amountCents
+                ? t("billing.v3.credit.addAmount", { amount: f.usd(amountCents / 100) })
+                : t("billing.v3.credit.add")}
+          </button>
+        </div>
+        {inputError ? <span className="billing-field-error">{inputError}</span> : null}
+        <p className="billing-centered-hint">{t("billing.v3.credit.addHint")}</p>
       </div>
     </Section>
   );

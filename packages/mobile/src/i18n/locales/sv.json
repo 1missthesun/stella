@@ -552,7 +552,7 @@
       },
       "plan": {
         "title": "Plan",
-        "lede": "Samma Stella i alla abonnemang. Större abonnemang ger mer användning och mer samtidigt.",
+        "lede": "Samma Stella i alla abonnemang. Större abonnemang ger mer användning.",
         "perMonth": "{price}/mån",
         "checkoutHint": "Kassan öppnas i din webbläsare. Din budget börjar direkt.",
         "changeHint": "Du bekräftar ändringen i din webbläsare.",
@@ -572,11 +572,10 @@
         "noCard": "Inget kort behövs"
       },
       "includes": {
-        "local": "Agenter på din dator",
-        "cloud": "Molnagenter, {count} samtidigt",
         "media": "Bild, video, musik och 3D",
         "voice": "Diktering och uppläsning",
-        "drive": "{size} Drive-lagring"
+        "drive": "{size} Drive-lagring",
+        "byok": "Använd egna modeller och nycklar"
       },
       "credit": {
         "title": "Extra saldo",

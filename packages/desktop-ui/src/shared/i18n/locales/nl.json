@@ -552,7 +552,7 @@
       },
       "plan": {
         "title": "Abonnement",
-        "lede": "Dezelfde Stella in elk abonnement. Grotere abonnementen geven meer gebruik en meer tegelijk.",
+        "lede": "Dezelfde Stella in elk abonnement. Grotere abonnementen geven meer gebruik.",
         "perMonth": "{price}/mnd",
         "checkoutHint": "De betaling opent in je browser. Je budget gaat meteen in.",
         "changeHint": "Je bevestigt de wijziging in je browser.",
@@ -572,11 +572,10 @@
         "noCard": "Geen kaart nodig"
       },
       "includes": {
-        "local": "Agents op je computer",
-        "cloud": "Cloud-agents, {count} tegelijk",
         "media": "Afbeelding, video, muziek en 3D",
         "voice": "Dicteren en voorlezen",
-        "drive": "{size} Drive-opslag"
+        "drive": "{size} Drive-opslag",
+        "byok": "Gebruik je eigen modellen en sleutels"
       },
       "credit": {
         "title": "Extra tegoed",

@@ -557,7 +557,7 @@
       },
       "plan": {
         "title": "Piano",
-        "lede": "Lo stesso Stella in ogni piano. I piani più grandi danno più utilizzo e più attività insieme.",
+        "lede": "Lo stesso Stella in ogni piano. I piani più grandi danno più utilizzo.",
         "perMonth": "{price}/mese",
         "checkoutHint": "Il pagamento si apre nel browser. Il tuo budget parte subito.",
         "changeHint": "Confermerai la modifica nel browser.",
@@ -577,11 +577,10 @@
         "noCard": "Nessuna carta richiesta"
       },
       "includes": {
-        "local": "Agenti sul tuo computer",
-        "cloud": "Agenti nel cloud, {count} alla volta",
         "media": "Immagini, video, musica e 3D",
         "voice": "Dettatura e lettura ad alta voce",
-        "drive": "{size} di spazio su Drive"
+        "drive": "{size} di spazio su Drive",
+        "byok": "Usa i tuoi modelli e le tue chiavi"
       },
       "credit": {
         "title": "Credito extra",

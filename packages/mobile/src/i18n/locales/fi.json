@@ -552,7 +552,7 @@
       },
       "plan": {
         "title": "Tilaus",
-        "lede": "Sama Stella jokaisessa tilauksessa. Isommat tilaukset antavat enemmän käyttöä ja enemmän kerralla.",
+        "lede": "Sama Stella jokaisessa tilauksessa. Isommat tilaukset antavat enemmän käyttöä.",
         "perMonth": "{price}/kk",
         "checkoutHint": "Maksu avautuu selaimeesi. Budjettisi alkaa heti.",
         "changeHint": "Vahvistat muutoksen selaimessa.",
@@ -572,11 +572,10 @@
         "noCard": "Korttia ei tarvita"
       },
       "includes": {
-        "local": "Agentit tietokoneellasi",
-        "cloud": "Pilviagentit, {count} kerrallaan",
         "media": "Kuvat, video, musiikki ja 3D",
         "voice": "Sanelu ja ääneen luku",
-        "drive": "{size} Drive-tallennustilaa"
+        "drive": "{size} Drive-tallennustilaa",
+        "byok": "Omat mallit ja avaimet"
       },
       "credit": {
         "title": "Lisäsaldo",

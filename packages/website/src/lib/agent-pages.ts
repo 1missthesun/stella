@@ -105,8 +105,7 @@ comes with every paid plan.
 
 ## Ask once. Keep talking
 One ongoing chat, with the work happening behind it — on Stella's models or
-yours. Agents run on your computer on every plan; paid plans also run them in
-the cloud, several at once. See ${abs("/pricing.md")}.
+yours. See ${abs("/pricing.md")} for plans.
 `;
 
 const VOICE_MD = `${header(
@@ -140,7 +139,7 @@ Live conversation comes with every paid plan. Dictation, read-aloud and
 const PRICING_MD = `${header(
   "Pricing — one budget for everything",
   "/pricing",
-  "Same Stella on every plan. Bigger plans give you more usage and more at once.",
+  "Same Stella on every plan. Bigger plans give you more usage.",
 )}
 ## Plans
 ${PLAN_ORDER.map((id) => `- **${PLAN_CATALOG[id].label}** — ${planPriceLabel(id)}, ${PLAN_CATALOG[id].tagline.toLowerCase()}. Includes: ${PLAN_CATALOG[id].includes.join("; ")}.`).join("\n")}
@@ -377,7 +376,7 @@ const SUMMARY = [
   "> Windows, Linux (including Arch and Omarchy), iPhone, Android and the web.",
   "",
   "Key facts:",
-  `- Price: ${PLAN_ORDER.map(planSummary).join("; ")}. One usage budget pays for models, cloud agents, media, voice, search and hosting. Paid plans add cloud agents and image/video/music/3D generation.`,
+  `- Price: ${PLAN_ORDER.map(planSummary).join("; ")}. One usage budget pays for models, tasks, media, voice, search and hosting. Paid plans add image/video/music/3D generation.`,
   "- Computer use: on macOS and Windows Stella sees the screen, clicks and types in your apps. On Linux it works with files, terminal and browser.",
   "- Open source: MIT, [github.com/1missthesun/stella](https://github.com/1missthesun/stella). The desktop app runs from its own source and can redesign its own interface on request.",
   "- Models: Stella's own models by default, or Claude Code, a ChatGPT plan, your own API keys (Anthropic, OpenAI, Google, xAI, Moonshot, Z.AI, OpenRouter, GitHub Copilot) or local models.",

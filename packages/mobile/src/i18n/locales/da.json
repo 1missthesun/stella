@@ -552,7 +552,7 @@
       },
       "plan": {
         "title": "Abonnement",
-        "lede": "Den samme Stella på alle abonnementer. Større abonnementer giver mere forbrug og mere på én gang.",
+        "lede": "Den samme Stella på alle abonnementer. Større abonnementer giver mere forbrug.",
         "perMonth": "{price}/md.",
         "checkoutHint": "Betalingen åbner i din browser. Dit budget starter med det samme.",
         "changeHint": "Du bekræfter ændringen i din browser.",
@@ -572,11 +572,10 @@
         "noCard": "Intet kort nødvendigt"
       },
       "includes": {
-        "local": "Agenter på din computer",
-        "cloud": "Cloud-agenter, {count} ad gangen",
         "media": "Billede, video, musik og 3D",
         "voice": "Diktering og oplæsning",
-        "drive": "{size} Drive-lagerplads"
+        "drive": "{size} Drive-lagerplads",
+        "byok": "Brug dine egne modeller og nøgler"
       },
       "credit": {
         "title": "Ekstra kredit",

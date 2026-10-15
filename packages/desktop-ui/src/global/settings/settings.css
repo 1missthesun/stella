@@ -375,6 +375,17 @@
   border-top: none;
 }
 
+/* Account matches the Plan & usage panel: larger section titles, more air. */
+.settings-tab-content--account {
+  gap: 32px;
+}
+
+.settings-tab-content--account .settings-card-title {
+  font-size: 22px;
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.02em;
+}
+
 .settings-card > .settings-row:first-of-type {
   padding-top: 4px;
 }

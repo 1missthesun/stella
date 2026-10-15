@@ -562,7 +562,7 @@
       },
       "plan": {
         "title": "Plan",
-        "lede": "Ta sama Stella w każdym planie. Większe plany dają więcej użycia i więcej naraz.",
+        "lede": "Ta sama Stella w każdym planie. Większe plany dają więcej użycia.",
         "perMonth": "{price}/mies.",
         "checkoutHint": "Płatność otworzy się w przeglądarce. Budżet zaczyna działać od razu.",
         "changeHint": "Potwierdzisz zmianę w przeglądarce.",
@@ -582,11 +582,10 @@
         "noCard": "Bez karty"
       },
       "includes": {
-        "local": "Agenci na Twoim komputerze",
-        "cloud": "Agenci w chmurze, {count} naraz",
         "media": "Obrazy, wideo, muzyka i 3D",
         "voice": "Dyktowanie i czytanie na głos",
-        "drive": "{size} miejsca na Drive"
+        "drive": "{size} miejsca na Drive",
+        "byok": "Własne modele i klucze"
       },
       "credit": {
         "title": "Dodatkowe środki",

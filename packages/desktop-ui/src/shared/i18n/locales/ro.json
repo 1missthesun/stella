@@ -557,7 +557,7 @@
       },
       "plan": {
         "title": "Plan",
-        "lede": "Aceeași Stella în fiecare plan. Planurile mai mari oferă mai multă utilizare și mai mult simultan.",
+        "lede": "Aceeași Stella în fiecare plan. Planurile mai mari oferă mai multă utilizare.",
         "perMonth": "{price}/lună",
         "checkoutHint": "Plata se deschide în browser. Bugetul începe imediat.",
         "changeHint": "Vei confirma schimbarea în browser.",
@@ -577,11 +577,10 @@
         "noCard": "Fără card"
       },
       "includes": {
-        "local": "Agenți pe computerul tău",
-        "cloud": "Agenți în cloud, {count} simultan",
         "media": "Imagine, video, muzică și 3D",
         "voice": "Dictare și citire cu voce tare",
-        "drive": "{size} spațiu Drive"
+        "drive": "{size} spațiu Drive",
+        "byok": "Folosește propriile modele și chei"
       },
       "credit": {
         "title": "Credit suplimentar",

@@ -547,7 +547,7 @@
       },
       "plan": {
         "title": "方案",
-        "lede": "每個方案都是同一個 Stella。更高的方案提供更多用量，可同時做更多事。",
+        "lede": "每個方案都是同一個 Stella。更高的方案提供更多用量。",
         "perMonth": "{price}/月",
         "checkoutHint": "結帳頁面會在瀏覽器中開啟。預算立即生效。",
         "changeHint": "你會在瀏覽器中確認變更。",
@@ -567,11 +567,10 @@
         "noCard": "無需信用卡"
       },
       "includes": {
-        "local": "在你電腦上執行的代理",
-        "cloud": "雲端代理,同時 {count} 個",
         "media": "圖片、影片、音樂與 3D",
         "voice": "聽寫和朗讀",
-        "drive": "{size} Drive 儲存空間"
+        "drive": "{size} Drive 儲存空間",
+        "byok": "使用你自己的模型和金鑰"
       },
       "credit": {
         "title": "額外額度",

@@ -552,7 +552,7 @@
       },
       "plan": {
         "title": "Csomag",
-        "lede": "Ugyanaz a Stella minden csomagban. A nagyobb csomagok több használatot és több egyidejű munkát adnak.",
+        "lede": "Ugyanaz a Stella minden csomagban. A nagyobb csomagok több használatot adnak.",
         "perMonth": "{price}/hó",
         "checkoutHint": "A fizetés a böngésződben nyílik meg. A kereted azonnal indul.",
         "changeHint": "A változtatást a böngészőben erősíted meg.",
@@ -572,11 +572,10 @@
         "noCard": "Nem kell kártya"
       },
       "includes": {
-        "local": "Ügynökök a számítógépeden",
-        "cloud": "Felhőügynökök, egyszerre {count}",
         "media": "Kép, videó, zene és 3D",
         "voice": "Diktálás és felolvasás",
-        "drive": "{size} Drive-tárhely"
+        "drive": "{size} Drive-tárhely",
+        "byok": "Saját modellek és kulcsok"
       },
       "credit": {
         "title": "Extra kredit",

@@ -58,10 +58,8 @@ function formatReset(ms, locale) {
 
 function planIncludes(plan, t) {
   const def = PLAN_CATALOG[plan];
-  if (!def.interval) return [t("billing.v3.includes.local"), t("billing.v3.includes.voice")];
-  return [
-    ...(def.mediaGeneration ? [t("billing.v3.includes.media")] : []),
-  ];
+  if (!def.interval) return [t("billing.v3.includes.voice"), t("billing.v3.includes.byok")];
+  return def.mediaGeneration ? [t("billing.v3.includes.media")] : [];
 }
 
 function formatDate(ms) {
@@ -421,12 +419,11 @@ const makeStyles = (colors) => ({
     marginTop: 4,
   },
   sectionLabel: {
-    color: colors.textMuted,
-    fontFamily: fonts.sans.medium,
-    fontSize: 13,
-    letterSpacing: 0.3,
-    marginBottom: 10,
-
+    color: colors.text,
+    fontFamily: fonts.sans.semiBold,
+    fontSize: 20,
+    letterSpacing: -0.4,
+    marginBottom: 8,
   },
   card: {
     borderTopColor: colors.border,

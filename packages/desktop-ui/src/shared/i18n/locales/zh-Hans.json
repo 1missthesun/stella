@@ -547,7 +547,7 @@
       },
       "plan": {
         "title": "套餐",
-        "lede": "每个套餐都是同一个 Stella。更高的套餐提供更多用量，可同时做更多事。",
+        "lede": "每个套餐都是同一个 Stella。更高的套餐提供更多用量。",
         "perMonth": "{price}/月",
         "checkoutHint": "结账页面会在浏览器中打开。预算立即生效。",
         "changeHint": "你将在浏览器中确认更改。",
@@ -567,11 +567,10 @@
         "noCard": "无需银行卡"
       },
       "includes": {
-        "local": "在你电脑上运行的代理",
-        "cloud": "云端代理,同时 {count} 个",
         "media": "图片、视频、音乐和 3D",
         "voice": "听写和朗读",
-        "drive": "{size} Drive 存储空间"
+        "drive": "{size} Drive 存储空间",
+        "byok": "使用你自己的模型和密钥"
       },
       "credit": {
         "title": "额外额度",

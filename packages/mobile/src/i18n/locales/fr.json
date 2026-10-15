@@ -557,7 +557,7 @@
       },
       "plan": {
         "title": "Forfait",
-        "lede": "Le même Stella dans chaque forfait. Les forfaits supérieurs offrent plus d'utilisation et plus de tâches à la fois.",
+        "lede": "Le même Stella dans chaque forfait. Les forfaits supérieurs offrent plus d'utilisation.",
         "perMonth": "{price}/mois",
         "checkoutHint": "Le paiement s'ouvre dans ton navigateur. Ton budget commence tout de suite.",
         "changeHint": "Tu confirmeras le changement dans ton navigateur.",
@@ -577,11 +577,10 @@
         "noCard": "Sans carte bancaire"
       },
       "includes": {
-        "local": "Agents sur ton ordinateur",
-        "cloud": "Agents dans le cloud, {count} à la fois",
         "media": "Image, vidéo, musique et 3D",
         "voice": "Dictée et lecture à voix haute",
-        "drive": "{size} de stockage Drive"
+        "drive": "{size} de stockage Drive",
+        "byok": "Vos propres modèles et clés"
       },
       "credit": {
         "title": "Crédit supplémentaire",

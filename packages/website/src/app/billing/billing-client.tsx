@@ -373,8 +373,8 @@ function UsageSection({
   }
 
   const oneTime = plan === "free" && usage.lifetimeLimitUsd !== null;
-  const mainUsed = oneTime ? usage.lifetimeUsedUsd : usage.monthlyUsedUsd;
   const mainLimit = oneTime ? (usage.lifetimeLimitUsd ?? 0) : usage.monthlyLimitUsd;
+  const mainUsed = Math.min(mainLimit, oneTime ? usage.lifetimeUsedUsd : usage.monthlyUsedUsd);
   const credit = status.credits.balanceUsd;
   const reserved = Number.isFinite(usage.reservedUsd) ? usage.reservedUsd : 0;
   // Backends before pricing v3 send no reservation or availability.
@@ -390,7 +390,9 @@ function UsageSection({
     return windows.length ? Math.max(...windows.map((w) => w.at)) : null;
   })();
   const next = plan === "free" ? "plus" : plan === "plus" ? "pro" : plan === "pro" ? "max" : null;
-  const windowCaption = (used: number, limit: number, at: number) => (
+  const windowCaption = (rawUsed: number, limit: number, at: number) => {
+    const used = Math.min(limit, rawUsed);
+    return (
     <>
       <span>
         {usd.format(used)} <span className="billing-muted">of {formatUsd(limit)}</span>
@@ -398,6 +400,7 @@ function UsageSection({
       <span className="billing-muted">{used > 0 ? resetLabel(at, now) : "Starts with your next use"}</span>
     </>
   );
+  };
 
   return (
     <Section id="usage" title="Usage" lede={lede}>

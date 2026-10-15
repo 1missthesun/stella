@@ -49,7 +49,7 @@ const FALLBACK_MESSAGES: Record<CloudTurnStartErrorCode, string> = {
   internal: "That didn't send. Try again.",
 };
 
-const openBilling = () => planUsageDialog.open();
+const openBilling = () => planUsageDialog.openPlans();
 
 export const notifyCloudSubscriptionRequired = (message?: string): void => {
   void import("@/ui/toast").then(({ showToast }) => {

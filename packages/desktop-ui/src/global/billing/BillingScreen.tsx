@@ -15,6 +15,7 @@ import { useBackendValue } from "@/platform/backend/use-backend-view";
 import { useLocale, useT } from "@/shared/i18n";
 import { useAuthSessionState } from "@/global/auth/hooks/use-auth-session-state";
 import { openExternalUrl } from "@/platform/electron/open-external";
+import { planUsageDialog } from "./plan-usage-dialog-store";
 import "./BillingScreen.css";
 
 type Translate = ReturnType<typeof useT>;
@@ -128,9 +129,9 @@ function Meter({
   );
 }
 
-function Section({ title, lede, children }: { title: string; lede?: string; children: ReactNode }) {
+function Section({ id, title, lede, children }: { id?: string; title: string; lede?: string; children: ReactNode }) {
   return (
-    <section className="billing-section">
+    <section className="billing-section" id={id}>
       <header className="billing-section-head">
         <h2 className="billing-section-title">{title}</h2>
         {lede ? <p className="billing-section-lede">{lede}</p> : null}
@@ -156,6 +157,12 @@ export function BillingPanel() {
   }, []);
 
   const hasAccount = Boolean(hasConnectedAccount && status?.authenticated && !status.isAnonymous);
+
+  const loaded = status !== undefined;
+  useEffect(() => {
+    if (!loaded || !planUsageDialog.consumeFocusPlans()) return;
+    document.getElementById("billing-plans")?.scrollIntoView({ block: "start" });
+  }, [loaded]);
 
   const run = useCallback(
     async (kind: Exclude<Busy, null>, action: (returnUrl: string) => Promise<{ url: string }>) => {
@@ -256,8 +263,8 @@ function UsageSection({
 
   const def = PLAN_CATALOG[plan];
   const oneTime = plan === "free" && usage.lifetimeLimitUsd !== null;
-  const mainUsed = oneTime ? usage.lifetimeUsedUsd : usage.monthlyUsedUsd;
   const mainLimit = oneTime ? (usage.lifetimeLimitUsd ?? 0) : usage.monthlyLimitUsd;
+  const mainUsed = Math.min(mainLimit, oneTime ? usage.lifetimeUsedUsd : usage.monthlyUsedUsd);
   const credit = status.credits.balanceUsd;
   const reserved = Number.isFinite(usage.reservedUsd) ? usage.reservedUsd : 0;
   // Backends before pricing v3 send no reservation or availability.
@@ -274,7 +281,9 @@ function UsageSection({
   const next = nextPlanUp(plan);
   const resets = (at: number | undefined) =>
     typeof at === "number" && at > 0 ? t("billing.v3.usage.resets", { date: f.when(at, now) }) : "";
-  const windowCaption = (used: number, limit: number, at: number) => (
+  const windowCaption = (rawUsed: number, limit: number, at: number) => {
+    const used = Math.min(limit, rawUsed);
+    return (
     <>
       <span>
         {f.usd(used)} <span className="billing-muted">{t("billing.v3.usage.of", { amount: f.amount(limit) })}</span>
@@ -282,6 +291,7 @@ function UsageSection({
       <span className="billing-muted">{used > 0 ? resets(at) : t("billing.v3.usage.startsNext")}</span>
     </>
   );
+  };
 
   return (
     <Section title={t("billing.v3.usage.title")} lede={t("billing.v3.usage.lede")}>
@@ -447,7 +457,7 @@ function PlanSection({
   })();
 
   return (
-    <Section title={t("billing.v3.plan.title")} lede={t("billing.v3.plan.lede")}>
+    <Section id="billing-plans" title={t("billing.v3.plan.title")} lede={t("billing.v3.plan.lede")}>
       <div className="billing-radio-list" role="radiogroup" aria-label={t("billing.v3.plan.title")}>
         {PLAN_ORDER.map((id) => {
           const def = PLAN_CATALOG[id];

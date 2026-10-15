@@ -1641,6 +1641,7 @@ export class BrowserProfileSessionCore {
     const url = await this.browser.renewLiveView(
       this.liveViewTtlMs,
       interaction.targetId,
+      envelope.viewport,
     );
     let parsed: URL;
     try {

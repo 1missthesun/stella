@@ -28,8 +28,13 @@ const publicVerificationUrl = (value: string): string | null => {
   }
 };
 
-const displayName = (interaction: CloudBrowserInteractionSummary): string =>
-  interaction.displayOrigin;
+const displayName = (interaction: CloudBrowserInteractionSummary): string => {
+  try {
+    return new URL(interaction.displayOrigin).host;
+  } catch {
+    return interaction.displayOrigin;
+  }
+};
 
 const deviceCodeDetail = (
   detail: CloudBrowserInteractionDetail | null | undefined,

@@ -4,6 +4,7 @@ import type {
   CloudBrowserInteractionDetail,
   CloudBrowserInteractionSummary,
   CloudBrowserLiveViewCapability,
+  CloudBrowserLiveViewViewport,
   CloudBrowserSessionTransferCapability,
 } from "../cloud-browser.js";
 
@@ -13,7 +14,11 @@ export type BrowserCalls = {
     result: CloudBrowserInteractionDetail | null;
   };
   "browser.liveView": {
-    args: { interactionId: string; expectedRevision: number };
+    args: {
+      interactionId: string;
+      expectedRevision: number;
+      viewport?: CloudBrowserLiveViewViewport;
+    };
     result: CloudBrowserLiveViewCapability;
   };
   "browser.sessionTransferKey": {

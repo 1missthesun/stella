@@ -144,7 +144,11 @@ export function useCurrentConversationBrowserInteraction(
 
 export function useCloudBrowserActions() {
   const mintLiveView = useCallback(
-    (args: { interactionId: string; expectedRevision: number }) =>
+    (args: {
+      interactionId: string;
+      expectedRevision: number;
+      viewport?: { width: number; height: number };
+    }) =>
       getBackendClient().call("browser.liveView", args),
     [],
   );

@@ -16,6 +16,13 @@
   background: white;
 }
 
+.cloud-browser-takeover__frame-host {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+
 .cloud-browser-takeover__frame {
   display: block;
   width: 100%;
@@ -84,7 +91,7 @@
   gap: 12px;
   min-height: 48px;
   padding: 7px 10px;
-  border-top: 1px solid var(--border-weak);
+  border-bottom: 1px solid var(--border-weak);
   background: var(--background);
 }
 

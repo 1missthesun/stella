@@ -64,6 +64,15 @@ export type TurnCommandEnvelope = Readonly<{
   command: CloudBrowserCommand;
 }>;
 
+export type LiveViewViewport = Readonly<{ width: number; height: number }>;
+
+export const LIVE_VIEW_VIEWPORT_LIMITS = Object.freeze({
+  minWidth: 320,
+  maxWidth: 1920,
+  minHeight: 320,
+  maxHeight: 1600,
+});
+
 export type InteractionEnvelope = Readonly<{
   schemaVersion: 1;
   authority: TurnAuthority;
@@ -72,6 +81,7 @@ export type InteractionEnvelope = Readonly<{
   interactionId: string;
   interactionRevision: number;
   decision?: "done" | "cancel";
+  viewport?: LiveViewViewport;
   sessionTransfer?: Readonly<{
     schemaVersion: 1;
     algorithm: "x25519-hkdf-sha256-aes-256-gcm-v1";
@@ -226,6 +236,7 @@ export const parseInteraction = (
     requireDecision?: boolean;
     allowSessionTransfer?: boolean;
     requireSessionTransfer?: boolean;
+    allowViewport?: boolean;
   }> = {},
 ): InteractionEnvelope => {
   const envelope = record(value);
@@ -246,6 +257,7 @@ export const parseInteraction = (
       ...(options.allowSessionTransfer && !options.requireSessionTransfer
         ? ["sessionTransfer"]
         : []),
+      ...(options.allowViewport ? ["viewport"] : []),
     ],
   );
   if (
@@ -257,6 +269,23 @@ export const parseInteraction = (
       envelope.decision !== "cancel")
   ) {
     throw new GatewayError("bad_request", 400);
+  }
+  let viewport: LiveViewViewport | undefined;
+  if (envelope.viewport !== undefined) {
+    const value = record(envelope.viewport);
+    exactKeys(value, ["width", "height"]);
+    const limits = LIVE_VIEW_VIEWPORT_LIMITS;
+    if (
+      !safeInteger(value.width) ||
+      !safeInteger(value.height) ||
+      value.width < limits.minWidth ||
+      value.width > limits.maxWidth ||
+      value.height < limits.minHeight ||
+      value.height > limits.maxHeight
+    ) {
+      throw new GatewayError("bad_request", 400);
+    }
+    viewport = { width: value.width, height: value.height };
   }
   let sessionTransfer: InteractionEnvelope["sessionTransfer"];
   if (envelope.sessionTransfer !== undefined) {
@@ -302,6 +331,7 @@ export const parseInteraction = (
       ? { decision: envelope.decision as "done" | "cancel" }
       : {}),
     ...(sessionTransfer ? { sessionTransfer } : {}),
+    ...(viewport ? { viewport } : {}),
   };
 };
 

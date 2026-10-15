@@ -29,6 +29,8 @@ const publicVerificationUrl = (
   }
 };
 
+const hostOf = (origin: string): string => origin.replace(/^https:\/\//u, "");
+
 export function CloudBrowserInterventionCard({
   conversationId,
 }: {
@@ -76,7 +78,7 @@ export function CloudBrowserInterventionCard({
   );
 
   if (!summary) return null;
-  const origin = summary.displayOrigin;
+  const origin = hostOf(summary.displayOrigin);
   const resuming = summary.state === "resuming";
   const loginDetail = detail?.kind === "login_takeover" ? detail : null;
   const device = detail?.kind === "device_code" ? detail : null;

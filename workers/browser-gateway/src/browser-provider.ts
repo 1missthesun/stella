@@ -1,3 +1,5 @@
+import type { LiveViewViewport } from "./protocol.js";
+
 export type SafeElement = Readonly<{
   ref: string;
   role: string;
@@ -179,7 +181,11 @@ export interface BrowserBackend {
     handoffTimeoutMs: number;
     expectedOrigin: string;
   }): Promise<BrowserHandoff>;
-  renewLiveView(liveViewTtlMs: number, targetId?: string): Promise<string>;
+  renewLiveView(
+    liveViewTtlMs: number,
+    targetId?: string,
+    viewport?: LiveViewViewport,
+  ): Promise<string>;
   handoffState(): Promise<HandoffState>;
   completeHandoff(success: boolean): Promise<void>;
   trustedVerify(

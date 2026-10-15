@@ -9,6 +9,10 @@ import {
 } from "react-native";
 import { Text } from "./Text";
 import { WebView } from "react-native-webview";
+import {
+  cloudBrowserLiveViewViewport,
+  type CloudBrowserLiveViewViewport,
+} from "@stella/contracts/cloud-browser";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type {
   CloudBrowserInteractionDetail,
@@ -61,6 +65,22 @@ export function CloudBrowserTakeoverModal({
     canCaptureCloudBrowserSession() ? "local" : "remote",
   );
   const [localBusy, setLocalBusy] = useState(false);
+  const [viewport, setViewport] =
+    useState<CloudBrowserLiveViewViewport | null>(null);
+  const measureViewport = useCallback(
+    (width: number, height: number) => {
+      const next = cloudBrowserLiveViewViewport(width, height);
+      if (!next) return;
+      setViewport((current) =>
+        current &&
+        current.width === next.width &&
+        current.height === next.height
+          ? current
+          : next,
+      );
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!visible) {
@@ -71,13 +91,14 @@ export function CloudBrowserTakeoverModal({
       setMode(canCaptureCloudBrowserSession() ? "local" : "remote");
       return;
     }
-    if (mode !== "remote") return;
+    if (mode !== "remote" || !viewport) return;
     let disposed = false;
     setCapability(null);
     setIssue(null);
     void mintLiveView({
       interactionId: detail.interactionId,
       expectedRevision: detail.revision,
+      viewport,
     })
       .then((next) => {
         if (disposed) return;
@@ -100,7 +121,15 @@ export function CloudBrowserTakeoverModal({
       disposed = true;
       setCapability(null);
     };
-  }, [detail.interactionId, detail.revision, mintLiveView, mode, t, visible]);
+  }, [
+    detail.interactionId,
+    detail.revision,
+    mintLiveView,
+    mode,
+    t,
+    viewport,
+    visible,
+  ]);
 
   useEffect(() => {
     if (!visible) return;
@@ -112,7 +141,7 @@ export function CloudBrowserTakeoverModal({
     return () => subscription.remove();
   }, [onDismiss, visible]);
 
-  const title = detail.displayOrigin;
+  const title = detail.displayOrigin.replace(/^https:\/\//u, "");
   const localNavigationAllowed = useCallback(
     (value: string): boolean => {
       if (value === "about:blank") return true;
@@ -214,7 +243,15 @@ export function CloudBrowserTakeoverModal({
           </Text>
         </View>
 
-        <View style={styles.viewport}>
+        <View
+          style={styles.viewport}
+          onLayout={(event) =>
+            measureViewport(
+              event.nativeEvent.layout.width,
+              event.nativeEvent.layout.height,
+            )
+          }
+        >
           {issue ? (
             <View style={styles.status}>
               <Icon name="alert-circle" size={26} color={colors.danger} />

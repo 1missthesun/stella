@@ -170,7 +170,11 @@ export class BrowserProfileSession extends DurableObject<BrowserGatewayEnv> {
           );
         }
         if (path === "/internal/interactions/live-view") {
-          return jsonNoStore(await this.core.liveView(parseInteraction(body)));
+          return jsonNoStore(
+            await this.core.liveView(
+              parseInteraction(body, { allowViewport: true }),
+            ),
+          );
         }
         if (path === "/internal/interactions/session-transfer-capability") {
           return jsonNoStore(

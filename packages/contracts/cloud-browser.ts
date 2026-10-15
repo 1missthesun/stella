@@ -54,6 +54,35 @@ export type CloudBrowserDeviceCodeDetail = CloudBrowserInteractionSummary &
 export type CloudBrowserInteractionDetail =
   CloudBrowserLoginTakeoverDetail | CloudBrowserDeviceCodeDetail;
 
+export type CloudBrowserLiveViewViewport = Readonly<{
+  width: number;
+  height: number;
+}>;
+
+const LIVE_VIEW_TOOLBAR_HEIGHT = 50;
+const LIVE_VIEW_WIDTH = { min: 320, max: 1920 } as const;
+const LIVE_VIEW_HEIGHT = { min: 320, max: 1600 } as const;
+
+/**
+ * The remote tab size that fills a Live View frame of this size. Live View
+ * draws the tab 1:1 under its own toolbar and crops anything larger.
+ */
+export const cloudBrowserLiveViewViewport = (
+  frameWidth: number,
+  frameHeight: number,
+): CloudBrowserLiveViewViewport | undefined => {
+  if (!Number.isFinite(frameWidth) || !Number.isFinite(frameHeight)) {
+    return undefined;
+  }
+  const clamp = (value: number, range: { min: number; max: number }) =>
+    Math.min(range.max, Math.max(range.min, Math.floor(value)));
+  if (frameWidth <= 0 || frameHeight <= LIVE_VIEW_TOOLBAR_HEIGHT) return undefined;
+  return {
+    width: clamp(frameWidth, LIVE_VIEW_WIDTH),
+    height: clamp(frameHeight - LIVE_VIEW_TOOLBAR_HEIGHT, LIVE_VIEW_HEIGHT),
+  };
+};
+
 export type CloudBrowserLiveViewCapability = Readonly<{
   schemaVersion: 1;
   interactionId: string;

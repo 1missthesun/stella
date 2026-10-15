@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
-import type {
-  CloudBrowserDeviceCodeDetail,
-  CloudBrowserInteractionDetail,
-  CloudBrowserLiveViewCapability,
+import {
+  cloudBrowserLiveViewViewport,
+  type CloudBrowserDeviceCodeDetail,
+  type CloudBrowserInteractionDetail,
+  type CloudBrowserLiveViewCapability,
+  type CloudBrowserLiveViewViewport,
 } from "@stella/contracts/cloud-browser";
 import { AlertCircle, Check, Copy, ExternalLink, Lock } from "@/ui/icons";
 import { Button } from "@/ui/button";
@@ -42,6 +44,46 @@ const publicVerificationUrl = (detail: CloudBrowserDeviceCodeDetail) => {
   }
 };
 
+const LIVE_VIEW_RESIZE_SETTLE_MS = 400;
+
+const useSettledViewport = (
+  element: HTMLElement | null,
+): CloudBrowserLiveViewViewport | null => {
+  const [viewport, setViewport] = useState<CloudBrowserLiveViewViewport | null>(
+    null,
+  );
+  useEffect(() => {
+    if (!element) return;
+    let timer: number | undefined;
+    const measure = (immediate: boolean) => {
+      const next = cloudBrowserLiveViewViewport(
+        element.clientWidth,
+        element.clientHeight,
+      );
+      if (!next) return;
+      window.clearTimeout(timer);
+      const apply = () =>
+        setViewport((current) =>
+          current &&
+          current.width === next.width &&
+          current.height === next.height
+            ? current
+            : next,
+        );
+      if (immediate) apply();
+      else timer = window.setTimeout(apply, LIVE_VIEW_RESIZE_SETTLE_MS);
+    };
+    measure(true);
+    const observer = new ResizeObserver(() => measure(false));
+    observer.observe(element);
+    return () => {
+      observer.disconnect();
+      window.clearTimeout(timer);
+    };
+  }, [element]);
+  return viewport;
+};
+
 function CloudBrowserLiveView({
   detail,
 }: {
@@ -49,17 +91,20 @@ function CloudBrowserLiveView({
 }) {
   const t = useT();
   const { mintLiveView } = useCloudBrowserActions();
+  const [frameHost, setFrameHost] = useState<HTMLDivElement | null>(null);
+  const viewport = useSettledViewport(frameHost);
   const [capability, setCapability] =
     useState<CloudBrowserLiveViewCapability | null>(null);
   const [issue, setIssue] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!viewport) return;
     let disposed = false;
-    setCapability(null);
     setIssue(null);
     void mintLiveView({
       interactionId: detail.interactionId,
       expectedRevision: detail.revision,
+      viewport,
     })
       .then((next) => {
         if (disposed) return;
@@ -81,37 +126,34 @@ function CloudBrowserLiveView({
 
     return () => {
       disposed = true;
-      setCapability(null);
     };
-  }, [detail.interactionId, detail.revision, mintLiveView, t]);
-
-  if (issue) {
-    return (
-      <div className="cloud-browser-takeover__status" role="alert">
-        <AlertCircle size={22} />
-        <strong>{issue}</strong>
-      </div>
-    );
-  }
-  if (!capability) {
-    return (
-      <div className="cloud-browser-takeover__status" role="status">
-        <span className="stella-loader-circle" aria-hidden="true" />
-        <strong>{t("cloudBrowser.takeover.preparing")}</strong>
-      </div>
-    );
-  }
+  }, [detail.interactionId, detail.revision, mintLiveView, t, viewport]);
 
   return (
-    <iframe
-      className="cloud-browser-takeover__frame"
-      src={capability.url}
-      title={t("cloudBrowser.takeover.frameTitle", {
-        origin: detail.displayOrigin,
-      })}
-      referrerPolicy="no-referrer"
-      sandbox="allow-forms allow-same-origin allow-scripts"
-    />
+    <div ref={setFrameHost} className="cloud-browser-takeover__frame-host">
+      {issue ? (
+        <div className="cloud-browser-takeover__status" role="alert">
+          <AlertCircle size={22} />
+          <strong>{issue}</strong>
+        </div>
+      ) : !capability ? (
+        <div className="cloud-browser-takeover__status" role="status">
+          <span className="stella-loader-circle" aria-hidden="true" />
+          <strong>{t("cloudBrowser.takeover.preparing")}</strong>
+        </div>
+      ) : (
+        <iframe
+          key={capability.url}
+          className="cloud-browser-takeover__frame"
+          src={capability.url}
+          title={t("cloudBrowser.takeover.frameTitle", {
+            origin: detail.displayOrigin,
+          })}
+          referrerPolicy="no-referrer"
+          sandbox="allow-forms allow-same-origin allow-scripts"
+        />
+      )}
+    </div>
   );
 }
 
@@ -218,23 +260,6 @@ export function CloudBrowserTakeoverSection({
           : t("common.signIn")
       }
     >
-      <div className="cloud-browser-takeover__viewport">
-        {!location || detail === null ? (
-          <div className="cloud-browser-takeover__status" role="alert">
-            <AlertCircle size={22} />
-            <strong>{t("cloudBrowser.errors.expired")}</strong>
-          </div>
-        ) : detail === undefined ? (
-          <div className="cloud-browser-takeover__status" role="status">
-            <span className="stella-loader-circle" aria-hidden="true" />
-            <strong>{t("common.loading")}</strong>
-          </div>
-        ) : detail.kind === "device_code" ? (
-          <DeviceCodeSurface detail={detail} />
-        ) : active && panelOpen && !busyDecision ? (
-          <CloudBrowserLiveView detail={detail} />
-        ) : null}
-      </div>
       {detail ? (
         <div className="cloud-browser-takeover__controls">
           <span className="cloud-browser-takeover__origin">
@@ -268,6 +293,23 @@ export function CloudBrowserTakeoverSection({
           </div>
         </div>
       ) : null}
+      <div className="cloud-browser-takeover__viewport">
+        {!location || detail === null ? (
+          <div className="cloud-browser-takeover__status" role="alert">
+            <AlertCircle size={22} />
+            <strong>{t("cloudBrowser.errors.expired")}</strong>
+          </div>
+        ) : detail === undefined ? (
+          <div className="cloud-browser-takeover__status" role="status">
+            <span className="stella-loader-circle" aria-hidden="true" />
+            <strong>{t("common.loading")}</strong>
+          </div>
+        ) : detail.kind === "device_code" ? (
+          <DeviceCodeSurface detail={detail} />
+        ) : active && panelOpen && !busyDecision ? (
+          <CloudBrowserLiveView detail={detail} />
+        ) : null}
+      </div>
     </section>
   );
 }

@@ -9,8 +9,9 @@ import {
   type CloudBrowserResumeReceipt,
   type CloudBrowserSessionTransferCapability,
 } from "@stella/contracts/cloud-browser";
-import { empty, literal, number, object, string } from "../args.js";
+import { empty, literal, number, object, optional, string } from "../args.js";
 import { RpcError } from "../errors.js";
+import { livePushTokens, sendPushMessages } from "./devices.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
 import type { OwnerContext, OwnerDbReader, OwnerDomain } from "../registry.js";
 
@@ -309,7 +310,7 @@ const detail = async (
 
 const liveView = async (
   ctx: OwnerContext,
-  args: { interactionId: string; expectedRevision: number },
+  args: BrowserCalls["browser.liveView"]["args"],
 ): Promise<CloudBrowserLiveViewCapability> => {
   enforceOwnerRateLimit(
     ctx.db,
@@ -319,7 +320,10 @@ const liveView = async (
     "Too many Live View requests. Wait a moment and try again.",
   );
   const row = openRow(ctx, args.interactionId, args.expectedRevision);
-  const payload = await gateway(ctx.env, "/internal/interactions/live-view", interactionBody(ctx.ownerId, row));
+  const payload = await gateway(ctx.env, "/internal/interactions/live-view", {
+    ...interactionBody(ctx.ownerId, row),
+    ...(args.viewport ? { viewport: args.viewport } : {}),
+  });
   if (!isRecord(payload) || payload.schemaVersion !== 1) {
     throw invalid("The secure browser returned an invalid Live View.");
   }
@@ -635,7 +639,47 @@ const handoffOpen = async (ctx: OwnerContext, args: unknown): Promise<CloudBrows
     { id: expireJobId(suspension.interactionId) },
   );
   log("browser_handoff_opened", { interactionId: suspension.interactionId, kind: suspension.interactionKind });
-  return summary(readRow(ctx.db, suspension.interactionId)!);
+  const row = readRow(ctx.db, suspension.interactionId)!;
+  await pushHandoff(ctx, row).catch(() => undefined);
+  return summary(row);
+};
+
+const hostOf = (origin: string): string => {
+  try {
+    return new URL(origin).host;
+  } catch {
+    return origin;
+  }
+};
+
+const pushHandoff = async (ctx: OwnerContext, row: InteractionRow): Promise<void> => {
+  const tokens = livePushTokens(ctx);
+  if (tokens.length === 0) return;
+  const site = row.display_title?.trim() || hostOf(row.display_origin);
+  const collapseId = `cloud_browser:${row.interaction_id}`.slice(0, 64);
+  const sent = await sendPushMessages(
+    ctx,
+    tokens,
+    tokens.map(({ token }) => ({
+      to: token,
+      title: "Stella needs you to sign in",
+      body:
+        row.kind === "device_code"
+          ? `Approve ${site} so the task can continue.`
+          : `Sign in to ${site} so the task can continue. Stella can't see what you type.`,
+      sound: "default",
+      priority: "high",
+      data: {
+        kind: "cloud_browser_handoff",
+        conversationId: row.conversation_id,
+        interactionId: row.interaction_id,
+      },
+      threadId: "cloud_browser",
+      collapseId,
+      tag: collapseId,
+    })),
+  );
+  if (!sent) log("browser_handoff_push_failed", { interactionId: row.interaction_id });
 };
 
 const handoffArgs = object({ interactionId });
@@ -677,7 +721,16 @@ export const browserDomain = {
     },
     "browser.liveView": {
       scope: "owner",
-      parse: object({ interactionId, expectedRevision }),
+      parse: object({
+        interactionId,
+        expectedRevision,
+        viewport: optional(
+          object({
+            width: number({ int: true, min: 320, max: 1920 }),
+            height: number({ int: true, min: 320, max: 1600 }),
+          }),
+        ),
+      }),
       handler: liveView,
     },
     "browser.sessionTransferKey": {

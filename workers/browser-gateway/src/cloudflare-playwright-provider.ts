@@ -12,7 +12,7 @@ import { collectElements, type RawElement } from "./collect-elements.page.js";
 import { GatewayError } from "./errors.js";
 import { handoffNetworkRequestAllowed } from "./handoff-navigation-policy.js";
 import { browserGuardrailDomains } from "./network-policy.js";
-import { sha256Hex, stableJson } from "./protocol.js";
+import { sha256Hex, stableJson, type LiveViewViewport } from "./protocol.js";
 import {
   SENSITIVE_OBSERVATION_SELECTOR,
   redactVisibleText,
@@ -721,11 +721,15 @@ export class CloudflarePlaywrightProvider implements BrowserBackend {
   async renewLiveView(
     liveViewTtlMs: number,
     targetId?: string,
+    viewport?: LiveViewViewport,
   ): Promise<string> {
     try {
       if (this.handoffOriginViolation) {
         throw new GatewayError("verification_failed", 409);
       }
+      // Live View draws the tab 1:1 and crops what doesn't fit, so the tab
+      // takes the viewer's size before the link is minted.
+      if (viewport) await this.requiredPage().setViewportSize(viewport);
       const liveView = await (
         await this.handoffCdp()
       ).send("Cloudflare.getLiveView", {

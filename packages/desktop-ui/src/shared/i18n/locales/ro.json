@@ -3067,6 +3067,62 @@
         "pickDays": "Alege cel puțin o zi.",
         "pickCron": "Introdu o expresie cron."
       }
+    },
+    "notice": {
+      "open": "Deschide în Program",
+      "title": {
+        "created": {
+          "reminder": "Memento setat",
+          "task": "Sarcină programată",
+          "watch": "Urmărire configurată"
+        },
+        "updated": {
+          "reminder": "Memento modificat",
+          "task": "Sarcină modificată",
+          "watch": "Urmărire modificată"
+        },
+        "paused": {
+          "reminder": "Memento întrerupt",
+          "task": "Sarcină întreruptă",
+          "watch": "Urmărire întreruptă"
+        },
+        "resumed": {
+          "reminder": "Memento reluat",
+          "task": "Sarcină reluată",
+          "watch": "Urmărire reluată"
+        },
+        "removed": {
+          "reminder": "Memento eliminat",
+          "task": "Sarcină eliminată",
+          "watch": "Urmărire eliminată"
+        }
+      },
+      "when": {
+        "today": "Astăzi la {time}",
+        "tomorrow": "Mâine la {time}",
+        "onDay": "{day} la {time}",
+        "onDate": "{date} la {time}",
+        "daily": "În fiecare zi la {time}",
+        "weekdays": "În fiecare zi lucrătoare la {time}",
+        "weekends": "În weekend la {time}",
+        "weekly": "În fiecare {day} la {time}",
+        "onDays": "{days} la {time}",
+        "everyMinutes": {
+          "one": "În fiecare minut",
+          "few": "La fiecare {count} minute",
+          "other": "La fiecare {count} de minute"
+        },
+        "everyHours": {
+          "one": "În fiecare oră",
+          "few": "La fiecare {count} ore",
+          "other": "La fiecare {count} de ore"
+        },
+        "everyDays": {
+          "one": "În fiecare zi",
+          "few": "La fiecare {count} zile",
+          "other": "La fiecare {count} de zile"
+        }
+      }
     }
   },
   "selfHost": {

@@ -3051,6 +3051,59 @@
         "pickDays": "Pick at least one day.",
         "pickCron": "Enter a cron expression."
       }
+    },
+    "notice": {
+      "open": "Open in Schedule",
+      "title": {
+        "created": {
+          "reminder": "Reminder set",
+          "task": "Task scheduled",
+          "watch": "Watch set up"
+        },
+        "updated": {
+          "reminder": "Reminder changed",
+          "task": "Task changed",
+          "watch": "Watch changed"
+        },
+        "paused": {
+          "reminder": "Reminder paused",
+          "task": "Task paused",
+          "watch": "Watch paused"
+        },
+        "resumed": {
+          "reminder": "Reminder resumed",
+          "task": "Task resumed",
+          "watch": "Watch resumed"
+        },
+        "removed": {
+          "reminder": "Reminder removed",
+          "task": "Task removed",
+          "watch": "Watch removed"
+        }
+      },
+      "when": {
+        "today": "Today at {time}",
+        "tomorrow": "Tomorrow at {time}",
+        "onDay": "{day} at {time}",
+        "onDate": "{date} at {time}",
+        "daily": "Every day at {time}",
+        "weekdays": "Every weekday at {time}",
+        "weekends": "Weekends at {time}",
+        "weekly": "Every {day} at {time}",
+        "onDays": "{days} at {time}",
+        "everyMinutes": {
+          "one": "Every minute",
+          "other": "Every {count} minutes"
+        },
+        "everyHours": {
+          "one": "Every hour",
+          "other": "Every {count} hours"
+        },
+        "everyDays": {
+          "one": "Every day",
+          "other": "Every {count} days"
+        }
+      }
     }
   },
   "selfHost": {

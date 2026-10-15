@@ -3051,6 +3051,59 @@
         "pickDays": "Wähle mindestens einen Tag.",
         "pickCron": "Gib einen Cron-Ausdruck ein."
       }
+    },
+    "notice": {
+      "open": "Im Zeitplan öffnen",
+      "title": {
+        "created": {
+          "reminder": "Erinnerung eingerichtet",
+          "task": "Aufgabe geplant",
+          "watch": "Beobachtung eingerichtet"
+        },
+        "updated": {
+          "reminder": "Erinnerung geändert",
+          "task": "Aufgabe geändert",
+          "watch": "Beobachtung geändert"
+        },
+        "paused": {
+          "reminder": "Erinnerung pausiert",
+          "task": "Aufgabe pausiert",
+          "watch": "Beobachtung pausiert"
+        },
+        "resumed": {
+          "reminder": "Erinnerung fortgesetzt",
+          "task": "Aufgabe fortgesetzt",
+          "watch": "Beobachtung fortgesetzt"
+        },
+        "removed": {
+          "reminder": "Erinnerung entfernt",
+          "task": "Aufgabe entfernt",
+          "watch": "Beobachtung entfernt"
+        }
+      },
+      "when": {
+        "today": "Heute um {time}",
+        "tomorrow": "Morgen um {time}",
+        "onDay": "{day} um {time}",
+        "onDate": "{date} um {time}",
+        "daily": "Jeden Tag um {time}",
+        "weekdays": "Jeden Werktag um {time}",
+        "weekends": "Am Wochenende um {time}",
+        "weekly": "Jeden {day} um {time}",
+        "onDays": "{days} um {time}",
+        "everyMinutes": {
+          "one": "Jede Minute",
+          "other": "Alle {count} Minuten"
+        },
+        "everyHours": {
+          "one": "Jede Stunde",
+          "other": "Alle {count} Stunden"
+        },
+        "everyDays": {
+          "one": "Jeden Tag",
+          "other": "Alle {count} Tage"
+        }
+      }
     }
   },
   "selfHost": {

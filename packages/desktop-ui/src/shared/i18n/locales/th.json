@@ -3033,6 +3033,56 @@
         "pickDays": "เลือกอย่างน้อยหนึ่งวัน",
         "pickCron": "ป้อนนิพจน์ cron"
       }
+    },
+    "notice": {
+      "open": "เปิดในกำหนดการ",
+      "title": {
+        "created": {
+          "reminder": "ตั้งการเตือนแล้ว",
+          "task": "กำหนดเวลางานแล้ว",
+          "watch": "ตั้งการติดตามแล้ว"
+        },
+        "updated": {
+          "reminder": "เปลี่ยนการเตือนแล้ว",
+          "task": "เปลี่ยนงานแล้ว",
+          "watch": "เปลี่ยนการติดตามแล้ว"
+        },
+        "paused": {
+          "reminder": "หยุดการเตือนชั่วคราวแล้ว",
+          "task": "หยุดงานชั่วคราวแล้ว",
+          "watch": "หยุดการติดตามชั่วคราวแล้ว"
+        },
+        "resumed": {
+          "reminder": "เริ่มการเตือนต่อแล้ว",
+          "task": "เริ่มงานต่อแล้ว",
+          "watch": "เริ่มการติดตามต่อแล้ว"
+        },
+        "removed": {
+          "reminder": "ลบการเตือนแล้ว",
+          "task": "ลบงานแล้ว",
+          "watch": "ลบการติดตามแล้ว"
+        }
+      },
+      "when": {
+        "today": "วันนี้ เวลา {time}",
+        "tomorrow": "พรุ่งนี้ เวลา {time}",
+        "onDay": "{day} เวลา {time}",
+        "onDate": "{date} เวลา {time}",
+        "daily": "ทุกวัน เวลา {time}",
+        "weekdays": "ทุกวันทำงาน เวลา {time}",
+        "weekends": "วันหยุดสุดสัปดาห์ เวลา {time}",
+        "weekly": "ทุก{day} เวลา {time}",
+        "onDays": "{days} เวลา {time}",
+        "everyMinutes": {
+          "other": "ทุก {count} นาที"
+        },
+        "everyHours": {
+          "other": "ทุก {count} ชั่วโมง"
+        },
+        "everyDays": {
+          "other": "ทุก {count} วัน"
+        }
+      }
     }
   },
   "selfHost": {

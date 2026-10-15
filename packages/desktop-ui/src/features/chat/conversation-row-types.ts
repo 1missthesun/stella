@@ -12,6 +12,7 @@ import type { AgentCompletionSection } from "@/features/chat/lib/agent-completio
 import type { OfficePreviewRef } from "@stella/contracts/office-preview";
 import type { VoiceSessionSummaryMetadata } from "@stella/contracts/local-chat";
 import type { ReminderMark } from "@stella/contracts/reminders";
+import type { ScheduleNoticeCard } from "@stella/contracts/schedule-notice";
 import type { ReplyRef } from "@stella/contracts/reply-refs";
 import type { UserAskRecord } from "@stella/contracts/user-ask-deck";
 
@@ -71,6 +72,7 @@ export type AssistantRowViewModel = {
   sourceDiffPayloads?: DisplayPayload[];
   voiceSession?: VoiceSessionSummaryMetadata;
   reminder?: ReminderMark;
+  scheduleNotice?: ScheduleNoticeCard;
   toolActivity?: ToolActivityGroup;
   backgroundWork?: {
     threadIds: string[];

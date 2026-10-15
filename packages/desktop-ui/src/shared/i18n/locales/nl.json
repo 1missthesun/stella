@@ -3051,6 +3051,59 @@
         "pickDays": "Kies minstens één dag.",
         "pickCron": "Voer een cron-expressie in."
       }
+    },
+    "notice": {
+      "open": "Openen in Planning",
+      "title": {
+        "created": {
+          "reminder": "Herinnering ingesteld",
+          "task": "Taak gepland",
+          "watch": "Bewaking ingesteld"
+        },
+        "updated": {
+          "reminder": "Herinnering gewijzigd",
+          "task": "Taak gewijzigd",
+          "watch": "Bewaking gewijzigd"
+        },
+        "paused": {
+          "reminder": "Herinnering gepauzeerd",
+          "task": "Taak gepauzeerd",
+          "watch": "Bewaking gepauzeerd"
+        },
+        "resumed": {
+          "reminder": "Herinnering hervat",
+          "task": "Taak hervat",
+          "watch": "Bewaking hervat"
+        },
+        "removed": {
+          "reminder": "Herinnering verwijderd",
+          "task": "Taak verwijderd",
+          "watch": "Bewaking verwijderd"
+        }
+      },
+      "when": {
+        "today": "Vandaag om {time}",
+        "tomorrow": "Morgen om {time}",
+        "onDay": "{day} om {time}",
+        "onDate": "{date} om {time}",
+        "daily": "Elke dag om {time}",
+        "weekdays": "Elke werkdag om {time}",
+        "weekends": "In het weekend om {time}",
+        "weekly": "Elke {day} om {time}",
+        "onDays": "{days} om {time}",
+        "everyMinutes": {
+          "one": "Elke minuut",
+          "other": "Elke {count} minuten"
+        },
+        "everyHours": {
+          "one": "Elk uur",
+          "other": "Elke {count} uur"
+        },
+        "everyDays": {
+          "one": "Elke dag",
+          "other": "Elke {count} dagen"
+        }
+      }
     }
   },
   "selfHost": {

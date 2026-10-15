@@ -3083,6 +3083,65 @@
         "pickDays": "Wybierz co najmniej jeden dzień.",
         "pickCron": "Wpisz wyrażenie cron."
       }
+    },
+    "notice": {
+      "open": "Otwórz w Harmonogramie",
+      "title": {
+        "created": {
+          "reminder": "Przypomnienie ustawione",
+          "task": "Zadanie zaplanowane",
+          "watch": "Obserwacja ustawiona"
+        },
+        "updated": {
+          "reminder": "Przypomnienie zmienione",
+          "task": "Zadanie zmienione",
+          "watch": "Obserwacja zmieniona"
+        },
+        "paused": {
+          "reminder": "Przypomnienie wstrzymane",
+          "task": "Zadanie wstrzymane",
+          "watch": "Obserwacja wstrzymana"
+        },
+        "resumed": {
+          "reminder": "Przypomnienie wznowione",
+          "task": "Zadanie wznowione",
+          "watch": "Obserwacja wznowiona"
+        },
+        "removed": {
+          "reminder": "Przypomnienie usunięte",
+          "task": "Zadanie usunięte",
+          "watch": "Obserwacja usunięta"
+        }
+      },
+      "when": {
+        "today": "Dziś o {time}",
+        "tomorrow": "Jutro o {time}",
+        "onDay": "{day} o {time}",
+        "onDate": "{date} o {time}",
+        "daily": "Codziennie o {time}",
+        "weekdays": "W każdy dzień roboczy o {time}",
+        "weekends": "W weekendy o {time}",
+        "weekly": "W każdy {day} o {time}",
+        "onDays": "{days} o {time}",
+        "everyMinutes": {
+          "one": "Co minutę",
+          "few": "Co {count} minuty",
+          "many": "Co {count} minut",
+          "other": "Co {count} minuty"
+        },
+        "everyHours": {
+          "one": "Co godzinę",
+          "few": "Co {count} godziny",
+          "many": "Co {count} godzin",
+          "other": "Co {count} godziny"
+        },
+        "everyDays": {
+          "one": "Codziennie",
+          "few": "Co {count} dni",
+          "many": "Co {count} dni",
+          "other": "Co {count} dnia"
+        }
+      }
     }
   },
   "selfHost": {

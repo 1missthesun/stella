@@ -3051,6 +3051,59 @@
         "pickDays": "Vælg mindst én dag.",
         "pickCron": "Indtast et cron-udtryk."
       }
+    },
+    "notice": {
+      "open": "Åbn i Tidsplan",
+      "title": {
+        "created": {
+          "reminder": "Påmindelse oprettet",
+          "task": "Opgave planlagt",
+          "watch": "Overvågning oprettet"
+        },
+        "updated": {
+          "reminder": "Påmindelse ændret",
+          "task": "Opgave ændret",
+          "watch": "Overvågning ændret"
+        },
+        "paused": {
+          "reminder": "Påmindelse sat på pause",
+          "task": "Opgave sat på pause",
+          "watch": "Overvågning sat på pause"
+        },
+        "resumed": {
+          "reminder": "Påmindelse genoptaget",
+          "task": "Opgave genoptaget",
+          "watch": "Overvågning genoptaget"
+        },
+        "removed": {
+          "reminder": "Påmindelse fjernet",
+          "task": "Opgave fjernet",
+          "watch": "Overvågning fjernet"
+        }
+      },
+      "when": {
+        "today": "I dag kl. {time}",
+        "tomorrow": "I morgen kl. {time}",
+        "onDay": "{day} kl. {time}",
+        "onDate": "{date} kl. {time}",
+        "daily": "Hver dag kl. {time}",
+        "weekdays": "Hver hverdag kl. {time}",
+        "weekends": "I weekenden kl. {time}",
+        "weekly": "Hver {day} kl. {time}",
+        "onDays": "{days} kl. {time}",
+        "everyMinutes": {
+          "one": "Hvert minut",
+          "other": "Hvert {count}. minut"
+        },
+        "everyHours": {
+          "one": "Hver time",
+          "other": "Hver {count}. time"
+        },
+        "everyDays": {
+          "one": "Hver dag",
+          "other": "Hver {count}. dag"
+        }
+      }
     }
   },
   "selfHost": {

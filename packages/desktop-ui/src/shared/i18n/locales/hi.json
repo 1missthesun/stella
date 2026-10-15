@@ -3051,6 +3051,59 @@
         "pickDays": "कम से कम एक दिन चुनें।",
         "pickCron": "Cron एक्सप्रेशन दर्ज करें।"
       }
+    },
+    "notice": {
+      "open": "शेड्यूल में खोलें",
+      "title": {
+        "created": {
+          "reminder": "रिमाइंडर सेट हुआ",
+          "task": "कार्य शेड्यूल हुआ",
+          "watch": "निगरानी सेट हुई"
+        },
+        "updated": {
+          "reminder": "रिमाइंडर बदला गया",
+          "task": "कार्य बदला गया",
+          "watch": "निगरानी बदली गई"
+        },
+        "paused": {
+          "reminder": "रिमाइंडर रोका गया",
+          "task": "कार्य रोका गया",
+          "watch": "निगरानी रोकी गई"
+        },
+        "resumed": {
+          "reminder": "रिमाइंडर फिर शुरू हुआ",
+          "task": "कार्य फिर शुरू हुआ",
+          "watch": "निगरानी फिर शुरू हुई"
+        },
+        "removed": {
+          "reminder": "रिमाइंडर हटाया गया",
+          "task": "कार्य हटाया गया",
+          "watch": "निगरानी हटाई गई"
+        }
+      },
+      "when": {
+        "today": "आज {time} बजे",
+        "tomorrow": "कल {time} बजे",
+        "onDay": "{day} को {time} बजे",
+        "onDate": "{date} को {time} बजे",
+        "daily": "हर दिन {time} बजे",
+        "weekdays": "हर कार्यदिवस {time} बजे",
+        "weekends": "सप्ताहांत पर {time} बजे",
+        "weekly": "हर {day} {time} बजे",
+        "onDays": "{days} को {time} बजे",
+        "everyMinutes": {
+          "one": "हर मिनट",
+          "other": "हर {count} मिनट"
+        },
+        "everyHours": {
+          "one": "हर घंटे",
+          "other": "हर {count} घंटे"
+        },
+        "everyDays": {
+          "one": "हर दिन",
+          "other": "हर {count} दिन"
+        }
+      }
     }
   },
   "selfHost": {

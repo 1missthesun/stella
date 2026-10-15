@@ -20,6 +20,7 @@ import type { MessageRecord } from "@stella/contracts/local-chat";
 import { isOrchestratorReservedBuiltinAgentId } from "@stella/contracts/agent-runtime";
 import { isOfficePreviewRef } from "@stella/contracts/office-preview";
 import { parseReminderMark } from "@stella/contracts/reminders";
+import { parseScheduleNoticeCard } from "@stella/contracts/schedule-notice";
 import {
   collectTurnSourceDiffPayloads,
   deriveTurnInlineImagePayloads,
@@ -759,6 +760,7 @@ export function useEventRows(opts: UseEventRowsOptions): UseEventRowsResult {
         const officePreviewRef = getOfficePreviewRef(ownToolEvents);
         const voiceSession = payload?.metadata?.voiceSession;
         const reminder = parseReminderMark(payload?.metadata?.reminder);
+        const scheduleNotice = parseScheduleNoticeCard(payload?.metadata?.scheduleNotice);
         const backgroundWorks = buildBackgroundWorks(toolEvents);
         const backgroundWork = backgroundWorks[0];
         const spawnedThreadIds = getSpawnedThreadIds(toolEvents);
@@ -795,6 +797,7 @@ export function useEventRows(opts: UseEventRowsOptions): UseEventRowsResult {
           ...(sourceDiffPayloads.length > 0 ? { sourceDiffPayloads } : {}),
           ...(voiceSession ? { voiceSession } : {}),
           ...(reminder ? { reminder } : {}),
+          ...(scheduleNotice ? { scheduleNotice } : {}),
           ...(backgroundWork ? { backgroundWork } : {}),
           ...(spawnedThreadIds.length > 0 ? { spawnedThreadIds } : {}),
           ...(spawnedDescriptions.length > 0 ? { spawnedDescriptions } : {}),

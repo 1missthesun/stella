@@ -3033,6 +3033,56 @@
         "pickDays": "請至少選擇一天。",
         "pickCron": "請輸入 Cron 運算式。"
       }
+    },
+    "notice": {
+      "open": "在排程中開啟",
+      "title": {
+        "created": {
+          "reminder": "已設定提醒",
+          "task": "已排定任務",
+          "watch": "已設定監看"
+        },
+        "updated": {
+          "reminder": "已變更提醒",
+          "task": "已變更任務",
+          "watch": "已變更監看"
+        },
+        "paused": {
+          "reminder": "已暫停提醒",
+          "task": "已暫停任務",
+          "watch": "已暫停監看"
+        },
+        "resumed": {
+          "reminder": "已恢復提醒",
+          "task": "已恢復任務",
+          "watch": "已恢復監看"
+        },
+        "removed": {
+          "reminder": "已移除提醒",
+          "task": "已移除任務",
+          "watch": "已移除監看"
+        }
+      },
+      "when": {
+        "today": "今天 {time}",
+        "tomorrow": "明天 {time}",
+        "onDay": "{day} {time}",
+        "onDate": "{date} {time}",
+        "daily": "每天 {time}",
+        "weekdays": "每個工作日 {time}",
+        "weekends": "週末 {time}",
+        "weekly": "每{day} {time}",
+        "onDays": "{days} {time}",
+        "everyMinutes": {
+          "other": "每 {count} 分鐘"
+        },
+        "everyHours": {
+          "other": "每 {count} 小時"
+        },
+        "everyDays": {
+          "other": "每 {count} 天"
+        }
+      }
     }
   },
   "selfHost": {

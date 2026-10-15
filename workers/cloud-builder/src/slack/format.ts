@@ -145,19 +145,25 @@ export const composePrompt = (args: {
 };
 
 export const toolLabel = (name: string): string => {
-  const key = name.toLowerCase();
-  if (key === "spawn_agent") return "Starting a background agent";
-  if (key === "send_message") return "Messaging an agent";
-  if (key === "agent_status") return "Checking on agents";
-  if (key === "stop_agent") return "Stopping an agent";
+  const key = name.replace(/^mcp__.+?__/u, "").toLowerCase();
+  if (key === "spawn_agent") return "Starting a background task";
+  if (key === "send_message") return "Updating a task";
+  if (key === "agent_status") return "Checking on tasks";
+  if (key === "stop_agent") return "Stopping a task";
+  if (key === "web_fetch") return "Reading a page";
   if (key.includes("web")) return "Searching the web";
-  if (key === "code" || key === "bash") return "Running code";
+  if (key === "code" || key === "bash" || key === "exec_command") return "Running code";
   if (key.startsWith("drive")) return "Working with files";
   if (key.includes("image")) return "Making an image";
+  if (key.includes("video")) return "Making a video";
   if (key.includes("html")) return "Making a page";
+  if (key === "map") return "Making a map";
   if (key.includes("schedule")) return "Setting up a schedule";
-  if (key.includes("memory")) return "Checking notes";
+  if (key.includes("memory") || key === "history") return "Checking notes";
   if (key.endsWith("slack_repo")) return "Choosing the repository";
   if (key === "read") return "Reading a file";
-  return `Using ${name}`;
+  if (key === "write" || key === "edit" || key === "apply_patch") return "Editing files";
+  if (key === "grep" || key === "glob") return "Searching files";
+  if (key === "ask_user") return "Asking you";
+  return "Working on it";
 };

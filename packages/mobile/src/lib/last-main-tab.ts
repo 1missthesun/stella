@@ -55,14 +55,16 @@ export async function loadLastMainTabHref(): Promise<string> {
   return MAIN_TAB_HREFS[tab ?? "chat"];
 }
 
-type MainShellRouter = { replace: (href: MainTabHref) => void };
+type MainShellRouter = { dismissTo: (href: MainTabHref) => void };
 
 let pendingMainTab: MainTabId | null = null;
 
 export function enterMainShell(router: MainShellRouter, href: string): void {
   const tab = readMainTabFromPath(href);
   pendingMainTab = tab && tab !== "chat" ? tab : null;
-  router.replace(MAIN_TAB_HREFS.chat);
+  // The (main) stack anchors chat beneath every route, so replacing the
+  // index with /chat stacked a second chat screen on the anchor's.
+  router.dismissTo(MAIN_TAB_HREFS.chat);
 }
 
 export function queueMainTab(tab: MainTabId): void {

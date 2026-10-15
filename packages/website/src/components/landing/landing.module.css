@@ -7,6 +7,7 @@
   position: relative;
   min-height: 100vh;
   overflow-x: clip;
+  overflow-anchor: none;
   background: #ffffff;
   color: var(--l-ink);
   font-family: var(--l-sans), system-ui, sans-serif;

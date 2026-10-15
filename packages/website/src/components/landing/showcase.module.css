@@ -1,7 +1,37 @@
 .show {
+  --peek: 24svh;
   position: relative;
-  padding: clamp(110px, 16svh, 200px) 0 clamp(120px, 18svh, 220px);
+  margin-top: calc(-1 * var(--peek));
+  padding: 0 0 clamp(120px, 18svh, 220px);
   color: #fff;
+}
+
+.journey {
+  display: flex;
+  justify-content: center;
+  padding-bottom: clamp(110px, 17svh, 200px);
+}
+
+.journeyFrame {
+  --journey: 0;
+  position: relative;
+  width: min(1180px, 90vw);
+  height: min(760px, 71svh);
+  transform: scale(calc(0.94 + 0.06 * var(--journey)));
+  transform-origin: 50% 0;
+}
+
+.journeyGlow {
+  position: absolute;
+  inset: 8% -4% -10%;
+  border-radius: 50%;
+  background:
+    radial-gradient(50% 50% at 30% 60%, rgba(0, 200, 255, 0.22), transparent 70%),
+    radial-gradient(50% 50% at 70% 60%, rgba(255, 74, 192, 0.2), transparent 70%),
+    radial-gradient(60% 60% at 50% 70%, rgba(112, 60, 255, 0.3), transparent 70%);
+  filter: blur(40px);
+  opacity: calc(0.75 * var(--journey));
+  pointer-events: none;
 }
 
 .title {
@@ -230,6 +260,15 @@
 }
 
 @media (max-width: 700px) {
+  .show {
+    --peek: 0px;
+  }
+
+  .journeyFrame {
+    width: 92vw;
+    height: min(600px, 68svh);
+  }
+
   .chapter {
     --frame-w: 92vw;
     --frame-h: min(600px, 68svh);

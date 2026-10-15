@@ -19,6 +19,8 @@
 
 .aurora {
   animation: fadeIn 1600ms ease both;
+  -webkit-mask-image: linear-gradient(to bottom, #000 50%, transparent 97%);
+  mask-image: linear-gradient(to bottom, #000 50%, transparent 97%);
 }
 
 .darkAurora {

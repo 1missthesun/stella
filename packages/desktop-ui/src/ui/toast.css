@@ -130,7 +130,7 @@
   justify-content: center;
   min-height: 28px;
   padding: 0 12px;
-  border-radius: var(--radius-full, 999px);
+  border-radius: 8px;
   border: 1px solid var(--interactive);
   background: var(--interactive);
   color: var(--interactive-foreground);

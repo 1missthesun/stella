@@ -110,7 +110,7 @@ button.schedule-card:focus-visible {
    (14px icon centred in the 24px button). */
 .schedule-card__dismiss {
   position: absolute;
-  top: 7px;
+  top: 5px;
   right: 9px;
   display: flex;
   align-items: center;
@@ -134,7 +134,12 @@ button.schedule-card:focus-visible {
   padding-inline-end: 24px;
 }
 
-/* Chat-card actions use the shared pill (`pill-btn`, `pill-btn--primary`) at the chat-card height. */
+/* Chat-card actions use the shared pill styles (`pill-btn`, `pill-btn--primary`)
+   at the chat-card height, as small-radius rounded rectangles. */
+.pill-btn.schedule-card__button {
+  border-radius: 8px;
+}
+
 .schedule-card__button {
   gap: 4px;
   height: 28px;
@@ -151,12 +156,17 @@ button.schedule-card:focus-visible {
   color: var(--warning, var(--text-weak));
 }
 
-/* With a ✕ on the title row, the subtitle row drops a little so Resume
-   clears the ✕ (≈10px between them). */
+/* With a ✕ on the title row the subtitle keeps its usual spacing; its
+   button hangs down from the subtitle row (not up toward the ✕) and the card
+   grows at the bottom to hold it. */
+.schedule-card:has(.schedule-card__dismiss) {
+  padding-bottom: 19px;
+}
+
 .schedule-card:has(.schedule-card__dismiss) .schedule-card__meta {
-  margin-top: 10px;
+  align-items: flex-start;
 }
 
 .schedule-card:has(.schedule-card__dismiss) .schedule-card__actions:has(.schedule-card__button) {
-  margin-bottom: 0;
+  margin-block: 0 -10px;
 }

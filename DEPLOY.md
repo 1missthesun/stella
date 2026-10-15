@@ -182,6 +182,15 @@ from PATH for the command until that Stella updates.
 cloud-builder builds its container image, so Docker must respond (`docker info`;
 if it hangs, force-quit and reopen Docker Desktop).
 
+Install before deploying with `bun run deps backend` or a full
+`bun install --frozen-lockfile`. Bun skips `patchedDependencies` under
+`--omit peer`, which the backend kind uses, so `deps` applies the skipped
+patches itself, and every cloud-builder deploy script runs
+`scripts/check-patched-deps.mjs` first: it refuses when an installed copy lacks
+its patch or when workspaces link different copies of one patched package (two
+copies of `@earendil-works/pi-durable` in one bundle fail every cloud chat turn
+with "Not a Harness").
+
 Order: **D1 migrations → cloud-builder → model-gateway → the rest.** The gateway
 refuses any model it has no price for, and it prices models from
 cloud-builder's catalog. When a release adds or changes a model, deploy
@@ -805,5 +814,11 @@ spawn_agent({ description: "Prod smoke turn", destination: "cloud", model: "stel
 Its report must read `ok` (it arrives as `[Agent completed]`, typically within
 a minute). That covers the owner's session, cloud agent placement, an agent
 container and the model gateway.
+
+**After every cloud-builder deploy** (prod, and dev when you ship master),
+also run the same turn with `model: "claude-code"`; both must read `ok`.
+The two engines take different paths through the deployed bundle, so one
+passing doesn't prove the other. If either fails, redeploy the previous
+release's tag (or fix forward) before shipping desktop or mobile.
 
 Desktop against a given backend: `STELLA_BACKEND_URL=<backend> TMPDIR=/tmp node .agents/skills/verify-stella/control-stella.mjs session launch`.

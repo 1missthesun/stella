@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { spawnSync } from "node:child_process";
 import path from "node:path";
+import { ensurePatchedDeps } from "./check-patched-deps.mjs";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
 
@@ -50,5 +51,12 @@ if (result.status !== 0) {
   console.error(
     "[deps] Install failed. If your branch changed a package.json, refresh the lock first: `bun install --lockfile-only`, then rerun.",
   );
+  process.exit(result.status ?? 1);
 }
-process.exit(result.status ?? 1);
+
+// bun skips patchedDependencies under `--omit peer`; apply what it skipped.
+const problems = ensurePatchedDeps({ fix: true });
+if (problems.length > 0) {
+  for (const problem of problems) console.error(`[deps] ${problem}`);
+  process.exit(1);
+}

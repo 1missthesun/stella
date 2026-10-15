@@ -55,6 +55,7 @@ const CREDIT_PRESET_CENTS = [500, 1_000, 2_500, 5_000];
 const STRIPE_RATE_LIMIT = { count: 10, windowMs: 60_000 };
 const COST_LEDGER_RETENTION_MS = 120 * 24 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
+const MIN_MODEL_HOLD_MICRO_CENTS = 2_000_000;
 
 export const BILLING_MIGRATION = {
   id: "billing.1-ledger",
@@ -437,7 +438,11 @@ const reservedGrants = (db: OwnerDbReader, now: number): number =>
 const capabilityBudget = (access: BillingAccess, reserved: number): number => {
   if (access.remainingMicroCents === null) return GATEWAY_BUDGET_UNLIMITED;
   const chunk = GATEWAY_SESSION_BUDGET_CHUNK_MICRO_CENTS[limitsAudienceFor(access.audience)];
-  return Math.min(Math.max(0, Math.floor(access.remainingMicroCents - reserved)), chunk);
+  const available = Math.max(0, Math.floor(access.remainingMicroCents - reserved));
+  // One model session or turn holds at most a quarter of what's free, so a
+  // few concurrent turns still leave room for containers, media and search.
+  const share = Math.max(Math.floor(available / 4), Math.min(available, MIN_MODEL_HOLD_MICRO_CENTS));
+  return Math.min(available, share, chunk);
 };
 
 export const recordBillingIdentity = (

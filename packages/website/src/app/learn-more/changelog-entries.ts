@@ -61,9 +61,12 @@ export const changelogEntries: ChangelogEntry[] = [
     "highlights": [
       "Connect Claude Code accounts from Settings, see where they are in use, and sign in on another computer from the same place.",
       "Custom MCP connections now belong to your account and work when Stella runs in the cloud.",
+      "Add a passkey, manage signed-in sessions, and receive an alert when a new device signs in.",
       "Linked files open from the computer or Drive where they live, with previews for plain-text and log files."
     ],
     "more": [
+      "Export your data from Settings and choose whether to share optional diagnostics.",
+      "Reminders offer Done and Snooze, and schedules handle time zones more reliably.",
       "Images linked from Markdown files appear in file previews.",
       "Scheduled check-ins and watch results appear once instead of repeating.",
       "Long conversations and task reports are easier to scroll through without losing your place.",

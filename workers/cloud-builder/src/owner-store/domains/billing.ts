@@ -901,7 +901,16 @@ export const setAdminPlan = (
     ...(input.resetUsage ?? (planChanged || usageMode !== row.usage_mode)
       ? resetWindows(ctx.now, anchor)
       : {}),
-    ...(input.spendAllowance ? { total_used: SPENT_ALLOWANCE_MICRO_CENTS, credit_balance: 0 } : {}),
+    ...(input.spendAllowance
+      ? {
+          ...resetWindows(ctx.now, anchor),
+          rolling_used: SPENT_ALLOWANCE_MICRO_CENTS,
+          weekly_used: SPENT_ALLOWANCE_MICRO_CENTS,
+          monthly_used: SPENT_ALLOWANCE_MICRO_CENTS,
+          total_used: SPENT_ALLOWANCE_MICRO_CENTS,
+          credit_balance: 0,
+        }
+      : {}),
     ...(input.complimentary
       ? { stripe_subscription_id: null, stripe_price_id: null, subscription_status: nextPlan === "free" ? "none" : "complimentary" }
       : {}),

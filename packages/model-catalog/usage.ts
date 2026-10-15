@@ -58,14 +58,20 @@ const parseOpenAIUsage = (usage: unknown): RelayUsage => {
   };
 };
 
-// OpenRouter reports what it billed for the request, in USD, as `usage.cost`.
+// OpenRouter reports what it billed as `usage.cost`. With our own provider
+// keys (BYOK) that is only OpenRouter's fee; the provider's charge is
+// `cost_details.upstream_inference_cost`.
 const openRouterCost = (
   usage: Record<string, unknown> | null,
 ): Pick<RelayUsage, "costMicroCents"> => {
-  const cost = usage?.cost;
-  return typeof cost === "number" && Number.isFinite(cost) && cost >= 0
-    ? { costMicroCents: Math.round(cost * 100_000_000) }
-    : {};
+  const amount = (value: unknown): number | null =>
+    typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
+  const cost = amount(usage?.cost);
+  const details = usage?.cost_details;
+  const upstream =
+    details && typeof details === "object" ? amount((details as Record<string, unknown>).upstream_inference_cost) : null;
+  if (cost === null && upstream === null) return {};
+  return { costMicroCents: Math.round(((cost ?? 0) + (upstream ?? 0)) * 100_000_000) };
 };
 
 const parseResponsesUsage = (usage: unknown): RelayUsage => {

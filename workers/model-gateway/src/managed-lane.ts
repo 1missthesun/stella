@@ -379,30 +379,30 @@ export const attemptCost = (args: {
 }): AttemptCost => {
   const seen = { inputTokens: args.inputTokens, outputTokens: Math.max(0, args.streamedOutputTokens) };
   const tokens = usageTokens(args.usage, seen, args.complete);
-  if (args.usage?.costMicroCents !== undefined && hasReportedTokens(args.usage)) {
-    return {
-      chargedMicroCents: Math.max(0, Math.round(args.usage.costMicroCents)),
-      tokens,
-      basis: "actual",
-    };
+  const reported =
+    args.usage?.costMicroCents !== undefined && hasReportedTokens(args.usage)
+      ? Math.max(0, Math.round(args.usage.costMicroCents))
+      : null;
+  // A reported $0 for tokens we used is not a real price (free promos, BYOK
+  // fee-only reports); fall back to the tariff so usage is never free.
+  if (reported !== null && reported > 0) {
+    return { chargedMicroCents: reported, tokens, basis: "actual" };
   }
   const usage = args.usage;
-  return {
-    chargedMicroCents: computeUsageCostMicroCents({
-      model: args.model,
-      tokens: billableTokens({
-        inputTokens: tokens.inputTokens,
-        outputTokens: tokens.outputTokens,
-        cachedInputTokens: usage?.cachedInputTokens,
-        cacheWriteInputTokens: usage?.cacheWriteInputTokens,
-        cacheWrite1hInputTokens: usage?.cacheWrite1hInputTokens,
-        reasoningTokens: usage?.reasoningTokens,
-      }),
-      price: args.price,
+  const estimated = computeUsageCostMicroCents({
+    model: args.model,
+    tokens: billableTokens({
+      inputTokens: tokens.inputTokens,
+      outputTokens: tokens.outputTokens,
+      cachedInputTokens: usage?.cachedInputTokens,
+      cacheWriteInputTokens: usage?.cacheWriteInputTokens,
+      cacheWrite1hInputTokens: usage?.cacheWrite1hInputTokens,
+      reasoningTokens: usage?.reasoningTokens,
     }),
-    tokens,
-    basis: "estimated",
-  };
+    price: args.price,
+  });
+  if (reported === 0 && estimated === 0) return { chargedMicroCents: 0, tokens, basis: "actual" };
+  return { chargedMicroCents: estimated, tokens, basis: "estimated" };
 };
 
 const recordOf = (value: unknown): Record<string, unknown> | null =>

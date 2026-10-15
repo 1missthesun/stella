@@ -3,7 +3,7 @@
     "owner": "stella-ai",
     "name": "Stella",
     "slug": "stella-mobile",
-    "version": "1.0.47",
+    "version": "1.0.46",
     "runtimeVersion": {
       "policy": "fingerprint"
     },
@@ -11,7 +11,7 @@
       "url": "https://u.expo.dev/892d4162-8a4f-40e8-a0d5-b24516cb7537"
     },
     "orientation": "portrait",
-    "scheme": ["stella-mobile", "stella"],
+    "scheme": "stella-mobile",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "splash": {
@@ -43,11 +43,6 @@
             "NSPrivacyAccessedAPITypeReasons": ["CA92.1"]
           }
         ]
-      },
-      "icon": {
-        "light": "./assets/icon.png",
-        "dark": "./assets/icon-dark.png",
-        "tinted": "./assets/icon-tinted.png"
       }
     },
     "android": {
@@ -55,6 +50,7 @@
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false
@@ -102,13 +98,7 @@
       ],
       "expo-font",
       "expo-image",
-      [
-        "expo-notifications",
-        {
-          "icon": "./assets/notification-icon.png",
-          "color": "#6B5BD6"
-        }
-      ],
+      "expo-notifications",
       [
         "expo-widgets",
         {
@@ -145,7 +135,6 @@
     ],
     "extra": {
       "router": {},
-      "nativeCapabilities": ["self-host-servers"],
       "eas": {
         "projectId": "892d4162-8a4f-40e8-a0d5-b24516cb7537"
       }

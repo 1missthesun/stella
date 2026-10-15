@@ -3,6 +3,10 @@ import { font, foregroundStyle, padding } from "@expo/ui/swift-ui/modifiers";
 import { createWidget } from "expo-widgets";
 import type { WidgetEnvironment } from "expo-widgets/build/Widgets.types";
 
+/**
+ * Snapshot the app pushes to the home-screen widget: whether a desktop is
+ * paired and the last known bridge availability.
+ */
 export type StellaWidgetProps = {
   paired: boolean;
   online: boolean;
@@ -45,14 +49,14 @@ const StellaWidget = (
           </Text>
         </VStack>
         <Spacer />
-        <Image systemName="bubble.left.fill" color={accent} size={28} />
+        <Image systemName="sparkles" color={accent} size={28} />
       </HStack>
     );
   }
 
   return (
     <VStack alignment="leading" modifiers={[padding({ all: 14 })]}>
-      <Image systemName="bubble.left.fill" color={accent} size={22} />
+      <Image systemName="sparkles" color={accent} size={22} />
       <Spacer />
       <Text modifiers={[font({ weight: "semibold", size: 15 })]}>
         Ask Stella

@@ -1,5 +1,7 @@
 import UIKit
 
+// Compile with StellaSelectionTextView.swift for an iOS Simulator executable.
+// Exercises the real UIKit menu/actions without needing a chat/network fixture.
 @MainActor func runSelectionChecks() {
   let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 402, height: 874))
   let view = StellaSelectionTextView(frame: CGRect(x: 0, y: 100, width: 360, height: 100))
@@ -45,6 +47,7 @@ import UIKit
   second.removeFromSuperview()
   assert(second.selectedRange.length == 0)
   assert(!(window.gestureRecognizers ?? []).contains(secondObserver))
+  // An outside tap is delayed so the original control action can run first.
   window.addSubview(view)
   view.selectedRange = boldRange
   view.selectionDidChange()
@@ -53,6 +56,7 @@ import UIKit
   RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.02))
   assert(view.selectedRange.length == 0)
 
+  // A newer selection must survive a previously queued outside dismissal.
   view.selectedRange = boldRange
   view.selectionDidChange()
   view.scheduleOutsideDismissal()
@@ -61,6 +65,7 @@ import UIKit
   RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.02))
   assert(view.selectedRange == NSRange(location: 0, length: 5))
 
+  // UIKit can defer its menu action until the dismissal animation finishes.
   view.selectedRange = boldRange
   view.selectionDidChange()
   let deferredMenu = view.selectionMenu(for: [boldRange])

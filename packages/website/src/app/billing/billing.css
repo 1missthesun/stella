@@ -181,17 +181,13 @@
 
 .billing-main .billing-banner {
   margin: 0 0 20px;
-  padding: 10px 14px;
-  border: 1px solid var(--b-line-strong);
-  border-radius: 8px;
-  background: var(--b-surface);
+  padding: 0 0 12px;
+  border-bottom: 1px solid var(--b-line);
   color: var(--b-text);
   font-size: 14px;
 }
 
 .billing-main .billing-banner--error {
-  border-color: rgba(198, 42, 47, 0.35);
-  background: rgba(198, 42, 47, 0.05);
   color: var(--b-danger);
 }
 
@@ -372,10 +368,12 @@
   justify-content: space-between;
   gap: 12px 20px;
   margin-top: 16px;
-  padding: 14px 16px;
-  border: 1px solid rgba(198, 42, 47, 0.28);
-  border-radius: 10px;
-  background: rgba(198, 42, 47, 0.04);
+  padding: 14px 0;
+  border-top: 1px solid var(--b-line);
+}
+
+.billing-callout:not(.billing-callout--info) strong {
+  color: var(--b-danger);
 }
 
 .billing-callout > div {
@@ -456,10 +454,8 @@
 .billing-radio-list {
   margin-bottom: 16px;
   display: grid;
-  border: 1px solid var(--b-line-strong);
-  border-radius: 10px;
-  background: var(--b-bg);
-  overflow: hidden;
+  border-top: 1px solid var(--b-line);
+  border-bottom: 1px solid var(--b-line);
 }
 
 .billing-radio {
@@ -467,21 +463,16 @@
   display: grid;
   grid-template-columns: 16px minmax(0, 1fr) auto;
   gap: 12px 14px;
-  padding: 14px 16px;
+  padding: 16px 0;
   cursor: pointer;
-  transition: background-color 120ms ease;
 }
 
 .billing-radio + .billing-radio {
   border-top: 1px solid var(--b-line);
 }
 
-.billing-radio:hover {
-  background: var(--b-surface);
-}
-
-.billing-radio[data-checked] {
-  background: rgba(112, 60, 255, 0.04);
+.billing-radio:hover .billing-radio-label {
+  color: var(--b-accent);
 }
 
 .billing-radio input {
@@ -665,7 +656,4 @@ html[data-embedded="true"] .billing-main {
   padding-top: clamp(32px, 6svh, 64px);
 }
 
-.billing-callout--info {
-  border-color: var(--b-line-strong);
-  background: var(--b-surface);
-}
+

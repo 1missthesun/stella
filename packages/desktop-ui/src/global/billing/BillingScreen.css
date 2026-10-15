@@ -26,19 +26,15 @@
 
 .billing-banner {
   margin: 4px 0 12px;
-  padding: 9px 12px;
-  border: 1px solid var(--billing-line-strong);
-  border-radius: 8px;
-  background: var(--surface-inset);
+  padding: 0 0 10px;
+  border-bottom: 1px solid var(--billing-line);
   color: var(--text-base);
   font-size: var(--font-size-sm);
   line-height: 1.5;
 }
 
 .billing-banner--error {
-  border-color: color-mix(in srgb, var(--destructive) 40%, transparent);
-  background: color-mix(in srgb, var(--destructive) 7%, transparent);
-  color: var(--text-strong);
+  color: var(--destructive);
 }
 
 .billing-empty {
@@ -195,15 +191,12 @@
   justify-content: space-between;
   gap: 10px 16px;
   margin-top: 14px;
-  padding: 11px 14px;
-  border: 1px solid var(--billing-line-strong);
-  border-radius: 8px;
-  background: var(--surface-inset);
+  padding: 12px 0;
+  border-top: 1px solid var(--billing-line);
 }
 
-.billing-callout[data-tone="warning"] {
-  border-color: color-mix(in srgb, var(--destructive) 32%, transparent);
-  background: color-mix(in srgb, var(--destructive) 5%, transparent);
+.billing-callout[data-tone="warning"] strong {
+  color: var(--destructive);
 }
 
 .billing-callout > div {
@@ -328,9 +321,8 @@
 
 .billing-radio-list {
   display: grid;
-  border: 1px solid var(--billing-line-strong);
-  border-radius: 8px;
-  overflow: hidden;
+  border-top: 1px solid var(--billing-line);
+  border-bottom: 1px solid var(--billing-line);
 }
 
 .billing-radio {
@@ -338,20 +330,16 @@
   display: grid;
   grid-template-columns: 14px minmax(0, 1fr) auto;
   gap: 10px 12px;
-  padding: 11px 14px;
-  transition: background 0.12s ease;
+  padding: 12px 0;
+  transition: opacity 0.12s ease;
 }
 
 .billing-radio + .billing-radio {
   border-top: 1px solid var(--billing-line);
 }
 
-.billing-radio:hover {
-  background: var(--surface-inset);
-}
-
-.billing-radio[data-checked] {
-  background: color-mix(in oklch, var(--interactive) 7%, transparent);
+.billing-radio:hover .billing-radio-label {
+  color: var(--interactive);
 }
 
 .billing-radio input {

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Pressable, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import { Text } from "./Text";
 import { useBackendView } from "../lib/backend";
 import {
@@ -418,12 +418,10 @@ const makeStyles = (colors) => ({
 
   },
   card: {
-    backgroundColor: colors.surface ?? colors.card ?? "transparent",
-    borderColor: colors.border,
-    borderRadius: 16,
-    borderWidth: 1,
+    borderTopColor: colors.border,
+    borderTopWidth: StyleSheet.hairlineWidth,
     gap: 12,
-    padding: 16,
+    paddingTop: 12,
   },
   cardTitle: {
     color: colors.text,
@@ -501,13 +499,12 @@ const makeStyles = (colors) => ({
   },
   planRow: {
     alignItems: "center",
-    borderColor: colors.border,
-    borderRadius: 12,
-    borderWidth: 1,
+    borderTopColor: colors.border,
+    borderTopWidth: StyleSheet.hairlineWidth,
     flexDirection: "row",
     gap: 12,
     justifyContent: "space-between",
-    padding: 12,
+    paddingTop: 12,
   },
   planInfo: {
     flex: 1,
@@ -558,25 +555,14 @@ const makeStyles = (colors) => ({
     transform: [{ rotate: "90deg" }],
   },
   banner: {
-    borderRadius: 12,
-    gap: 6,
-    padding: 12,
+    borderTopColor: colors.border,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    gap: 4,
+    paddingTop: 12,
   },
-  bannerSuccess: {
-    backgroundColor: colors.successSoft ?? colors.surfaceMuted ?? "transparent",
-    borderColor: colors.border,
-    borderWidth: 1,
-  },
-  bannerPending: {
-    backgroundColor: colors.surfaceMuted ?? "transparent",
-    borderColor: colors.border,
-    borderWidth: 1,
-  },
-  bannerError: {
-    backgroundColor: colors.dangerSoft ?? colors.surfaceMuted ?? "transparent",
-    borderColor: colors.border,
-    borderWidth: 1,
-  },
+  bannerSuccess: {},
+  bannerPending: {},
+  bannerError: {},
   pendingHeader: {
     alignItems: "center",
     flexDirection: "row",

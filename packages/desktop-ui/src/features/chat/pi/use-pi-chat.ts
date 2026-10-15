@@ -31,7 +31,7 @@ export const usePiChat = (conversationId: string | null) => {
   const runningTool = useMemo(() => {
     const running = Object.entries(state.tools).filter(([, tool]) => tool.status === "running");
     const last = running[running.length - 1];
-    return last ? { callId: last[0], name: last[1].name } : null;
+    return last ? { callId: last[0], name: last[1].activity ?? last[1].name } : null;
   }, [state.tools]);
   const latestCompletedTool = useMemo(() => {
     const done = Object.entries(state.tools).filter(([, tool]) => tool.status === "done");

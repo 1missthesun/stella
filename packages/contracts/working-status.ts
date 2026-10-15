@@ -22,6 +22,15 @@ const SHELL_COMMAND_VARIATIONS: readonly string[] = [
   "Just a sec",
 ];
 
+const CODE_VARIATIONS: readonly string[] = [
+  "Working on it",
+  "Getting it done",
+  "On it",
+  "Handling it",
+  "Making it happen",
+  "Just a sec",
+];
+
 const TOOL_STATUS_BY_NAME: Record<string, readonly string[]> = {
   image_gen: [
     "Sketching",
@@ -102,26 +111,8 @@ const TOOL_STATUS_BY_NAME: Record<string, readonly string[]> = {
 
   bash: SHELL_COMMAND_VARIATIONS,
   exec_command: SHELL_COMMAND_VARIATIONS,
-  code: [
-    "Running code",
-    "Working on it",
-    "Writing some code",
-    "Getting it done",
-    "On it",
-    "Handling it",
-    "Making it happen",
-    "Just a sec",
-  ],
-  node_repl: [
-    "Running code",
-    "Working on it",
-    "Writing some code",
-    "Getting it done",
-    "On it",
-    "Handling it",
-    "Making it happen",
-    "Just a sec",
-  ],
+  code: CODE_VARIATIONS,
+  node_repl: CODE_VARIATIONS,
   read: [
     "Reading",
     "Looking it over",
@@ -370,19 +361,133 @@ const TOOL_STATUS_BY_NAME: Record<string, readonly string[]> = {
     "Logging it",
     "Recording it",
   ],
+
+  powershell: SHELL_COMMAND_VARIATIONS,
+  shell: SHELL_COMMAND_VARIATIONS,
+  local_shell: SHELL_COMMAND_VARIATIONS,
+  heartbeat: ["Checking in", "Taking a pulse", "Checking status"],
+  bash_output: ["Checking the output", "Seeing how it went", "Checking on it"],
+  kill_shell: ["Stopping it", "Halting", "Wrapping it up"],
+  kill_bash: ["Stopping it", "Halting", "Wrapping it up"],
+  web_search: [
+    "Searching the web",
+    "Looking it up",
+    "Checking online",
+    "Searching",
+    "Asking the internet",
+  ],
+  web_fetch: [
+    "Reading a page",
+    "Pulling up the page",
+    "Checking the page",
+    "Reading it online",
+  ],
+  multi_edit: [
+    "Editing",
+    "Making changes",
+    "Tweaking it",
+    "Updating it",
+  ],
+  notebook_edit: ["Editing the notebook", "Making changes", "Updating it"],
+  ls: ["Looking for files", "Checking the folder", "Browsing files"],
+  find: ["Looking for files", "Finding files", "Searching files"],
+  todo_write: ["Planning it out", "Making a plan", "Lining up the steps"],
+  agent: AGENT_WORK_VARIATIONS,
+  no_response: ["Wrapping up", "Finishing up", "Almost done"],
+  switch_destination: [
+    "Moving over",
+    "Switching places",
+    "Picking it up elsewhere",
+    "Heading over",
+  ],
+  drive: ["Checking your Drive", "Working with files", "Pulling up files"],
+  drive_upload: [
+    "Saving to your Drive",
+    "Uploading it",
+    "Putting it in your Drive",
+  ],
+  drive_download: [
+    "Getting it from your Drive",
+    "Downloading it",
+    "Pulling it from your Drive",
+  ],
+  map: ["Making a map", "Mapping it out", "Finding it on the map", "Plotting it"],
+  connector_status: [
+    "Checking your connections",
+    "Checking your accounts",
+    "Seeing what's connected",
+  ],
+  video_gen: [
+    "Making a video",
+    "Filming it",
+    "Rolling the camera",
+    "Starting the render",
+  ],
+  history: [
+    "Looking back",
+    "Checking our past chats",
+    "Finding the thread",
+    "Catching up",
+  ],
+  memory: [
+    "Checking my notes",
+    "Looking back",
+    "Pulling up my notes",
+  ],
+  slack_memory: ["Checking my notes", "Looking back", "Catching up"],
+  slack_repo: ["Choosing the repository", "Picking the project"],
 };
+
 
 const RAW_TOOL_STATUS_PATTERN =
   /^(?:running|executing|calling|invoking)\s+(.+)$/i;
 
+const MCP_TOOL_PREFIX = /^mcp__.+?__/;
+
 const toToolStatusKey = (value: string): string =>
   value
     .trim()
+    .replace(MCP_TOOL_PREFIX, "")
     .replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2")
     .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
     .replace(/[_\s-]+/g, "_")
     .replace(/:+$/g, "")
     .toLowerCase();
+
+const CODE_TOOL_KEYS = new Set(["code", "node_repl"]);
+
+const CODE_ACTIVITY_PATTERNS: ReadonlyArray<readonly [RegExp, string]> = [
+  [/\bmemory\s*\.\s*(?:write|edit|append|update|remove|delete)\s*\(/, "remember"],
+  [/\bmemory\s*\.\s*(?:read|list|search)\s*\(/, "memory"],
+  [/\bhistory\s*\.\s*(?:search|read|sql)\s*\(/, "history"],
+  [/\btools\s*(?:\.\s*|\[\s*\\?["'])image_gen\b/, "image_gen"],
+  [/\btools\s*(?:\.\s*|\[\s*\\?["'])video_gen\b/, "video_gen"],
+  [/\btools\s*(?:\.\s*|\[\s*\\?["'])web\b/, "web"],
+  [/\btools\s*(?:\.\s*|\[\s*\\?["'])schedule_/, "schedule"],
+  [/\btools\s*(?:\.\s*|\[\s*\\?["'])drive_upload\b/, "drive_upload"],
+  [/\btools\s*(?:\.\s*|\[\s*\\?["'])drive_download\b/, "drive_download"],
+  [/\bsky\s*\./, "computer_use"],
+  [/\bbrowser\s*\./, "browser"],
+];
+
+export function workingToolName(name: string, args?: unknown): string {
+  if (!CODE_TOOL_KEYS.has(toToolStatusKey(name)) || args === undefined) {
+    return name;
+  }
+  let source: string;
+  if (typeof args === "string") source = args;
+  else {
+    try {
+      source = JSON.stringify(args) ?? "";
+    } catch {
+      return name;
+    }
+  }
+  for (const [pattern, activity] of CODE_ACTIVITY_PATTERNS) {
+    if (pattern.test(source)) return activity;
+  }
+  return name;
+}
 
 const looksLikeJsonBlob = (value: string): boolean => {
   const trimmed = value.trim();
@@ -520,8 +625,8 @@ const STILL_STATUS_BY_NAME: Record<string, string> = {
   image_gen: "Still drawing",
   bash: "Still running it",
   exec_command: "Still running it",
-  code: "Still running code",
-  node_repl: "Still running code",
+  code: "Still working on it",
+  node_repl: "Still working on it",
   read: "Still reading",
   write: "Still writing",
   edit: "Still making changes",
@@ -541,6 +646,17 @@ const STILL_STATUS_BY_NAME: Record<string, string> = {
   spawn_agent: "Still on it",
   send_message: "Still on it",
   task: "Still on it",
+  powershell: "Still running it",
+  web_search: "Still searching",
+  web_fetch: "Still reading",
+  multi_edit: "Still making changes",
+  video_gen: "Still filming",
+  map: "Still mapping it out",
+  history: "Still looking back",
+  memory: "Still checking my notes",
+  drive_upload: "Still uploading",
+  drive_download: "Still downloading",
+  switch_destination: "Still moving over",
 };
 
 export function computeStillStatus(toolName: string): string {

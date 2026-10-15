@@ -574,8 +574,15 @@ export function useCloudChatBridge({
     () => journalWorkingActivity(completeRecords, conversation.state.live?.turnId ?? null),
     [completeRecords, conversation.state.live?.turnId],
   );
+  const live = conversation.state.live;
+  const liveToolAhead = Boolean(live?.toolName) && live?.toolCallId !== activity.toolCallId;
   const activeToolName = activity.answerLanded ? null
-    : conversation.state.live?.toolName ?? activity.toolName ?? null;
+    : liveToolAhead
+      ? (live?.toolName ?? null)
+      : activity.toolName ?? live?.toolName ?? null;
+  const activeToolCallId = liveToolAhead
+    ? (live?.toolCallId ?? null)
+    : activity.toolCallId ?? null;
 
   return {
     conversation,
@@ -597,7 +604,7 @@ export function useCloudChatBridge({
         ? "Thinking…"
         : null,
     activeToolName,
-    activeToolCallId: activity.toolCallId ?? null,
+    activeToolCallId,
     answerLanded: activity.answerLanded,
     pendingUserMessageId,
     isInitialLoading: isAwaitingFirstHistory,

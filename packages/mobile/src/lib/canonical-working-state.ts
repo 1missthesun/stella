@@ -61,7 +61,10 @@ export function canonicalWorkingState(args: {
         ...journal,
         answerLanded: journal.answerLanded && !args.hasQueuedSend,
         ...((!journal.answerLanded || args.hasQueuedSend) && live?.toolName
-          ? { toolName: live.toolName, toolCallId: live.toolCallId ?? undefined }
+          ? {
+              toolName: live.toolCallId === journal.toolCallId && journal.toolName ? journal.toolName : live.toolName,
+              toolCallId: live.toolCallId ?? undefined,
+            }
           : {}),
         ...((!journal.answerLanded || args.hasQueuedSend) && live?.toolLabel ? { statusText: live.toolLabel } : {}),
         ...(deviceTool ? { toolName: deviceTool,

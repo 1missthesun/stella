@@ -1,3 +1,5 @@
+import { workingToolName } from "./working-status.js";
+
 type ActivityRecord = {
   kind: string;
   turnId: string;
@@ -29,7 +31,9 @@ export function journalWorkingActivity(records: readonly ActivityRecord[], turnI
       if (block.type !== "toolCall") continue;
       hasCalls = true;
       hasToolActivity = true;
-      if (typeof block.id === "string" && typeof block.name === "string") tools.set(block.id, block.name);
+      if (typeof block.id === "string" && typeof block.name === "string") {
+        tools.set(block.id, workingToolName(block.name, block.arguments));
+      }
     }
     answerLanded = hasText && !hasCalls && payload.followedByToolCall !== true;
     if (answerLanded) tools.clear();

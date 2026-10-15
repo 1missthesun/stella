@@ -3,6 +3,7 @@ import type { ChatContext } from "./index.js";
 import { parseAgentReportEnvelope, type AgentReportEnvelope } from "./agent-wake-prompt.js";
 import { drivePathFromSignedDriveUrl } from "./attachment-content-type.js";
 import { stellaUsageLimitText } from "./stella-usage-limit.js";
+import { workingToolName } from "./working-status.js";
 
 export type PiPartMarks = {
   hidden?: true;
@@ -245,7 +246,7 @@ export type PiChatState = {
   hasOlder: boolean;
   running: boolean;
   streaming?: PiAssistantMessage;
-  tools: Record<string, { name: string; status: PiToolSlot["status"]; output?: string }>;
+  tools: Record<string, { name: string; status: PiToolSlot["status"]; output?: string; activity?: string }>;
   requestIds: Record<number, string>;
   queued: string[];
   retry?: { at: number; error: string };
@@ -356,8 +357,20 @@ const reduceOne = (state: PiChatState, event: PiChatEvent): PiChatState => {
       };
     case "entry_appended":
       return { ...state, entries: appendEntry(state.entries, event.entry) };
-    case "tool_execution_start":
-      return { ...state, tools: { ...state.tools, [event.toolCallId]: { name: event.toolName, status: "running" } } };
+    case "tool_execution_start": {
+      const activity = workingToolName(event.toolName, event.args);
+      return {
+        ...state,
+        tools: {
+          ...state.tools,
+          [event.toolCallId]: {
+            name: event.toolName,
+            status: "running",
+            ...(activity !== event.toolName ? { activity } : {}),
+          },
+        },
+      };
+    }
     case "tool_execution_update": {
       const slot = state.tools[event.toolCallId];
       const output = toolOutput(slot?.output, event.output);
@@ -365,7 +378,12 @@ const reduceOne = (state: PiChatState, event: PiChatEvent): PiChatState => {
         ...state,
         tools: {
           ...state.tools,
-          [event.toolCallId]: { name: event.toolName, status: slot?.status ?? "running", ...(output ? { output } : {}) },
+          [event.toolCallId]: {
+            name: event.toolName,
+            status: slot?.status ?? "running",
+            ...(slot?.activity ? { activity: slot.activity } : {}),
+            ...(output ? { output } : {}),
+          },
         },
       };
     }

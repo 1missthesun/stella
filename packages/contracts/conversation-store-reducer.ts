@@ -5,6 +5,7 @@ import {
   type LiveTurnSnapshot,
 } from "./conversation-protocol.js";
 import type { SocketStatus } from "./conversation-socket.js";
+import { workingToolName } from "./working-status.js";
 
 export type LiveTurn = {
   turnId: string;
@@ -85,6 +86,7 @@ export const liveTurnWithTool = (
     name: string;
     label?: string;
     phase: "start" | "end";
+    argsPreview?: string;
   },
 ): LiveTurn => {
   const current =
@@ -96,7 +98,7 @@ export const liveTurnWithTool = (
   }
   return {
     ...current,
-    toolName: tool.phase === "start" ? tool.name : null,
+    toolName: tool.phase === "start" ? workingToolName(tool.name, tool.argsPreview) : null,
     toolCallId: tool.phase === "start" ? tool.toolCallId : null,
     toolLabel: tool.phase === "start" ? (tool.label ?? null) : null,
   };

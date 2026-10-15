@@ -7,7 +7,7 @@
   margin-left: auto;
   order: 999;
   position: relative;
-  transition: width 200ms ease-out;
+  transition: width 250ms ease-out;
   contain: layout;
 }
 
@@ -77,8 +77,8 @@
   transform: translate3d(12px, 0, 0);
   opacity: 0;
   transition:
-    transform 200ms ease-out,
-    opacity 170ms ease-out;
+    transform 250ms ease-out,
+    opacity 210ms ease-out;
   will-change: transform, opacity;
   contain: layout paint;
   overflow: hidden;
@@ -95,8 +95,8 @@
   transform: translate3d(0, 0, 0);
   opacity: 1;
   transition:
-    transform 200ms ease-out,
-    opacity 200ms ease-out;
+    transform 250ms ease-out,
+    opacity 250ms ease-out;
 }
 
 .right-sidebar--expanded .right-sidebar-inner {

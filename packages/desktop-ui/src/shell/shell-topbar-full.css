@@ -17,7 +17,7 @@
   user-select: none;
   pointer-events: auto;
   transition:
-    right 200ms ease-out,
+    right 250ms ease-out,
     opacity 120ms ease-out;
 }
 
@@ -118,8 +118,8 @@ body[data-display-expanding="true"] .shell-topbar-full,
   -webkit-app-region: drag;
   clip-path: inset(0);
   transition:
-    width 200ms ease-out,
-    clip-path 200ms ease-out;
+    width 250ms ease-out,
+    clip-path 250ms ease-out;
 }
 
 .display-panel-topbar[data-display-open="false"] {

@@ -205,8 +205,8 @@
   justify-content: flex-end;
   -webkit-app-region: no-drag;
   transition:
-    max-width 200ms ease-out,
-    flex-basis 200ms ease-out;
+    max-width 250ms ease-out,
+    flex-basis 250ms ease-out;
 }
 
 .shell-topbar[data-display-open="true"] .shell-topbar-tabs {
@@ -257,10 +257,10 @@
     transparent 100%
   );
   transition:
-    max-width 200ms ease-out,
-    flex-basis 200ms ease-out,
-    padding 200ms ease-out,
-    opacity 200ms ease-out;
+    max-width 250ms ease-out,
+    flex-basis 250ms ease-out,
+    padding 250ms ease-out,
+    opacity 250ms ease-out;
   will-change: max-width, flex-basis;
 }
 

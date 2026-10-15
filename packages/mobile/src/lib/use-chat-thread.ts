@@ -959,10 +959,9 @@ export function useChatThread(opts: {
       const userMessageId = createId();
       const images = picked.filter((entry) => entry.kind === "image");
       const documents = picked.filter((entry) => entry.kind === "file");
-      const displayText =
-        promptText ||
-        (images.length ? t("chat.attachments.photoLabel") : "") ||
-        documents.map((entry) => entry.name).join(", ");
+      // Same text the confirmed row shows (the prompt only); attachments
+      // render as thumbnails/chips, so image-only sends carry no label.
+      const displayText = promptText;
       const quotedPreview = rawQuotes
         ? rawQuotes.slice(0, QUOTED_TEXT_PREVIEW_MAX_CHARS)
         : undefined;

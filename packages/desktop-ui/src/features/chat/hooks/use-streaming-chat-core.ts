@@ -84,6 +84,11 @@ export const buildContextMessageMetadata = (
   };
 };
 
+// Mirrors the runtime's persisted user_message text (the trimmed prompt only;
+// quoted text travels in metadata), so the pending bubble matches the
+// confirmed one, including image-only sends with no text.
+const visibleUserMessageText = (userPrompt: string): string => userPrompt.trim();
+
 const buildOptimisticUserEvent = (args: {
   id: string;
   text: string;
@@ -268,10 +273,7 @@ export function useStreamingChatCore({
         ? combined.optimisticEvent
         : buildOptimisticUserEvent({
             id: combined.id,
-            text:
-              combined.userPrompt ||
-              combined.selectedText?.trim() ||
-              "Attached context",
+            text: visibleUserMessageText(combined.userPrompt),
             timestamp: dequeuedAtMs,
             platform: combined.platform,
             timezone: combined.timezone,
@@ -441,8 +443,7 @@ export function useStreamingChatCore({
       const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
       const requestLocale = locale;
       const optimisticUserMessageId = createLocalMessageId();
-      const optimisticText =
-        cleanedText || options.selectedText?.trim() || "Attached context";
+      const optimisticText = visibleUserMessageText(cleanedText);
 
       const messageTimestamp = Date.now();
       const optimisticEvent = buildOptimisticUserEvent({

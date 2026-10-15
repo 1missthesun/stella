@@ -191,3 +191,9 @@
     width: calc(100% - 16px);
   }
 }
+
+/* Same height as the other chat-card actions (28px). */
+.composer-notice__primary.pill-btn {
+  height: 28px;
+  padding-block: 0;
+}

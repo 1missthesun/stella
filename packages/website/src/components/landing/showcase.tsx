@@ -20,7 +20,7 @@ const CHAPTERS: Chapter[] = [
 ];
 
 const ASK_MS = 520;
-const SWAP_MS = 640;
+const SWAP_MS = 1100;
 
 type Phase = "idle" | "ask" | "swap" | "done";
 

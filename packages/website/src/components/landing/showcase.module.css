@@ -163,10 +163,11 @@
 
 /* The desktop's hot-reload focus pull (update-transition.ts focusPull): the old
    window blurs to 12px, dissolves at peak blur while the new one, held at 12px
-   underneath, pulls back into focus. Slowed to 640ms; blur in is ease-in cubic,
+   underneath, pulls back into focus. Slowed to 1100ms with a short hold at
+   peak blur; blur in is ease-in cubic,
    blur out ease-out cubic, so the whole pass reads as one ease-in-out. */
 .chapter[data-phase="swap"] .skinBox {
-  animation: focus-in 640ms linear both;
+  animation: focus-in 1100ms linear both;
 }
 
 .from {
@@ -174,7 +175,7 @@
 }
 
 .chapter[data-phase="swap"] .from {
-  animation: focus-out 640ms linear both;
+  animation: focus-out 1100ms linear both;
 }
 
 .coda {
@@ -205,12 +206,12 @@
     filter: blur(0px);
     animation-timing-function: cubic-bezier(0.32, 0, 0.67, 0);
   }
-  46% {
+  40% {
     opacity: 1;
     filter: blur(12px);
     animation-timing-function: cubic-bezier(0.45, 0, 0.55, 1);
   }
-  62%,
+  60%,
   100% {
     opacity: 0;
     filter: blur(14px);
@@ -219,7 +220,7 @@
 
 @keyframes focus-in {
   0%,
-  46% {
+  58% {
     filter: blur(12px);
     animation-timing-function: cubic-bezier(0.33, 1, 0.68, 1);
   }
@@ -273,7 +274,7 @@
   }
 
   .chapter[data-phase="swap"] .from {
-    animation: crossfade 640ms cubic-bezier(0.45, 0, 0.55, 1) both;
+    animation: crossfade 1100ms cubic-bezier(0.45, 0, 0.55, 1) both;
   }
 }
 

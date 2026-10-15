@@ -1,63 +1,42 @@
 import { useSyncExternalStore } from "react";
 
-const LEVEL_TICK_MS = 80;
-
 type DictationMeterSnapshot = {
   active: boolean;
   startedAt: number;
-  level: number;
-  revision: number;
 };
 
-let snapshot: DictationMeterSnapshot = {
-  active: false,
-  startedAt: 0,
-  level: 0,
-  revision: 0,
-};
-const MAX_QUEUED_LEVELS = 16;
-
-let queuedLevels: number[] = [];
-let tickTimer: ReturnType<typeof setInterval> | null = null;
+let snapshot: DictationMeterSnapshot = { active: false, startedAt: 0 };
 const listeners = new Set<() => void>();
+const levelListeners = new Set<(level: number) => void>();
 
-const publish = (next: Omit<DictationMeterSnapshot, "revision">): void => {
-  snapshot = { ...next, revision: snapshot.revision + 1 };
+const publish = (next: DictationMeterSnapshot): void => {
+  snapshot = next;
   for (const listener of listeners) listener();
 };
 
-const clearTick = (): void => {
-  if (tickTimer !== null) clearInterval(tickTimer);
-  tickTimer = null;
-  queuedLevels = [];
-};
-
 export const startDictationMeter = (startedAt: number): void => {
-  clearTick();
-  publish({ active: true, startedAt, level: 0 });
-  tickTimer = setInterval(() => {
-    const level = queuedLevels.shift();
-    if (level === undefined) return;
-    publish({ ...snapshot, level });
-  }, LEVEL_TICK_MS);
+  publish({ active: true, startedAt });
 };
 
-export const pushDictationLevels = (levels: readonly number[]): void => {
-  for (const level of levels) {
-    queuedLevels.push(Math.max(0, Math.min(1, level)));
-  }
-  if (queuedLevels.length > MAX_QUEUED_LEVELS) {
-    queuedLevels = queuedLevels.slice(queuedLevels.length - MAX_QUEUED_LEVELS);
-  }
+export const pushDictationLevel = (level: number): void => {
+  if (!snapshot.active) return;
+  const clamped = Math.max(0, Math.min(1, level));
+  for (const listener of levelListeners) listener(clamped);
 };
 
 export const stopDictationMeter = (): void => {
-  clearTick();
   if (!snapshot.active) return;
-  publish({ active: false, startedAt: 0, level: 0 });
+  publish({ active: false, startedAt: 0 });
 };
 
-export const getDictationMeterSnapshot = (): DictationMeterSnapshot => snapshot;
+export const subscribeDictationLevel = (
+  listener: (level: number) => void,
+): (() => void) => {
+  levelListeners.add(listener);
+  return () => {
+    levelListeners.delete(listener);
+  };
+};
 
 const subscribe = (listener: () => void) => {
   listeners.add(listener);
@@ -66,16 +45,7 @@ const subscribe = (listener: () => void) => {
   };
 };
 
-export const useDictationMeterTick = (): number =>
-  useSyncExternalStore(
-    subscribe,
-    () => snapshot.revision,
-    () => snapshot.revision,
-  );
+const startedAtSnapshot = () => (snapshot.active ? snapshot.startedAt : 0);
 
 export const useDictationMeterStartedAt = (): number =>
-  useSyncExternalStore(
-    subscribe,
-    () => (snapshot.active ? snapshot.startedAt : 0),
-    () => (snapshot.active ? snapshot.startedAt : 0),
-  );
+  useSyncExternalStore(subscribe, startedAtSnapshot, startedAtSnapshot);

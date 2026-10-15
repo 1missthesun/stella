@@ -1,29 +1,42 @@
-import { memo, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import {
   Pressable,
   StyleSheet,
   View,
+  type LayoutChangeEvent,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
+import Animated, {
+  useAnimatedStyle,
+  useFrameCallback,
+  useSharedValue,
+  type SharedValue,
+} from "react-native-reanimated";
+import {
+  DICTATION_WAVEFORM_BAR_WIDTH,
+  createDictationWaveformState,
+  dictationWaveformBarCount,
+  dictationWaveformBarLook,
+  dictationWaveformLevel,
+  dictationWaveformOffset,
+  stepDictationWaveform,
+  type DictationWaveformState,
+} from "@stella/contracts/dictation-waveform";
 import { Text } from "./Text";
 import { Icon } from "./Icon";
 import { useColors } from "../theme/theme-context";
 import { fonts } from "../theme/fonts";
 import { fadeHex } from "../theme/oklch";
 import {
-  getDictationMeterSnapshot,
+  subscribeDictationLevel,
   useDictationMeterStartedAt,
-  useDictationMeterTick,
 } from "../lib/dictation-meter";
 
-const BAR_WIDTH = 2;
-const BAR_GAP = 2;
 const WAVEFORM_HEIGHT = 32;
+const WAVEFORM_FILL = 0.94;
 const CONTROL_SIZE = 38;
 const CONTROL_HIT_SLOP = (44 - CONTROL_SIZE) / 2;
-const MIN_BAR_HEIGHT = 1;
-const LEVEL_BUFFER_LENGTH = 64;
 const TIMER_TICK_MS = 250;
 
 type Props = {
@@ -118,42 +131,89 @@ const DictationWaveform = memo(function DictationWaveform({
 }: {
   color: string;
 }) {
-  const tick = useDictationMeterTick();
-  const [levels, setLevels] = useState<number[]>([]);
+  const target = useSharedValue(0);
+  const width = useSharedValue(0);
+  const wave = useSharedValue<DictationWaveformState>(
+    createDictationWaveformState(),
+  );
+  const [barCount, setBarCount] = useState(0);
 
-  useEffect(() => {
-    const { active, level } = getDictationMeterSnapshot();
-    if (!active) return;
-    setLevels((previous) =>
-      previous.length < LEVEL_BUFFER_LENGTH
-        ? [...previous, level]
-        : [...previous.slice(previous.length - LEVEL_BUFFER_LENGTH + 1), level],
-    );
-  }, [tick]);
+  useEffect(
+    () =>
+      subscribeDictationLevel((level) => {
+        target.value = level;
+      }),
+    [target],
+  );
+
+  useFrameCallback((frame) => {
+    "worklet";
+    wave.modify((state) => {
+      "worklet";
+      stepDictationWaveform(state, frame.timestamp, target.value);
+      return state;
+    });
+  });
+
+  const onLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      const next = event.nativeEvent.layout.width;
+      width.value = next;
+      setBarCount(dictationWaveformBarCount(next));
+    },
+    [width],
+  );
+
+  const ages = useMemo(
+    () => Array.from({ length: barCount }, (_, age) => age),
+    [barCount],
+  );
 
   return (
-    <View style={waveStyles.container}>
-      <View style={waveStyles.row}>
-        {levels.map((level, idx) => {
-          const h = Math.max(
-            MIN_BAR_HEIGHT,
-            Math.min(WAVEFORM_HEIGHT, level * WAVEFORM_HEIGHT),
-          );
-          return (
-            <View
-              key={idx}
-              style={{
-                width: BAR_WIDTH,
-                marginRight: BAR_GAP,
-                height: h,
-                borderRadius: 1,
-                backgroundColor: color,
-              }}
-            />
-          );
-        })}
-      </View>
+    <View style={waveStyles.container} onLayout={onLayout}>
+      {ages.map((age) => (
+        <WaveformBar
+          key={age}
+          age={age}
+          wave={wave}
+          width={width}
+          color={color}
+        />
+      ))}
     </View>
+  );
+});
+
+const WaveformBar = memo(function WaveformBar({
+  age,
+  wave,
+  width,
+  color,
+}: {
+  age: number;
+  wave: SharedValue<DictationWaveformState>;
+  width: SharedValue<number>;
+  color: string;
+}) {
+  const animatedStyle = useAnimatedStyle(() => {
+    const state = wave.value;
+    const offset = dictationWaveformOffset(state, age);
+    const look = dictationWaveformBarLook(
+      dictationWaveformLevel(state, age) ?? 0,
+      offset,
+      width.value,
+      WAVEFORM_HEIGHT * WAVEFORM_FILL,
+    );
+    return {
+      height: look.height,
+      opacity: offset > width.value ? 0 : look.opacity,
+      transform: [{ translateX: -offset }],
+    };
+  });
+  return (
+    <Animated.View
+      style={[waveStyles.bar, { backgroundColor: color }, animatedStyle]}
+    />
   );
 });
 
@@ -162,14 +222,16 @@ const waveStyles = StyleSheet.create({
     flex: 1,
     height: WAVEFORM_HEIGHT,
     minWidth: 0,
+    alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
   },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "flex-end",
-    height: WAVEFORM_HEIGHT,
+  bar: {
+    position: "absolute",
+    right: 0,
+    width: DICTATION_WAVEFORM_BAR_WIDTH,
+    borderRadius: DICTATION_WAVEFORM_BAR_WIDTH / 2,
+    borderCurve: "continuous",
   },
 });
 

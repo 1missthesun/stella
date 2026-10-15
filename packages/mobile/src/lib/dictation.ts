@@ -4,6 +4,7 @@ import { AudioStudioModule } from "@siteed/audio-studio";
 import { LegacyEventEmitter, type EventSubscription } from "expo-modules-core";
 import { File } from "expo-file-system";
 import { Alert, AppState, Linking } from "react-native";
+import { createDictationLevelMeter } from "@stella/contracts/dictation-waveform";
 import { hasAiConsent, requestAiConsent } from "./ai-consent";
 import {
   acquireRecordingAudioSession,
@@ -38,7 +39,7 @@ import { tapLight, tapMedium } from "./haptics";
 import {
   startDictationMeter,
   stopDictationMeter,
-  pushDictationLevels,
+  pushDictationLevel,
 } from "./dictation-meter";
 
 const MIN_RECORDING_MS = 300;
@@ -307,7 +308,7 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
 
       current.marks.session = Date.now() - pressedAt;
       phase = "recorder";
-      const sliceLevels = createLevelSlicer();
+      const meterLevels = createLevelMeter();
       const emitter = new LegacyEventEmitter(AudioStudioModule);
       audioSubscriptionRef.current = emitter.addListener<{
         encoded?: string;
@@ -328,7 +329,7 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
             }, 1500);
           }
         }
-        pushDictationLevels(sliceLevels(bytes));
+        pushDictationLevel(meterLevels(bytes));
         if (current.full) return;
         if (current.live) {
           current.bytes += bytes.byteLength;
@@ -610,37 +611,21 @@ const audioEventToPcm16 = (
 };
 
 const LEVEL_FRAME_SAMPLES = 128;
-const LEVEL_SLICE_SAMPLES = (DICTATION_SAMPLE_RATE * 80) / 1000;
-const LEVEL_GAIN = 6;
 
-const createLevelSlicer = () => {
-  let carry = new Int16Array(0);
-  return (bytes: ArrayBuffer): number[] => {
-    const incoming = new Int16Array(bytes);
-    const samples = new Int16Array(carry.length + incoming.length);
-    samples.set(carry, 0);
-    samples.set(incoming, carry.length);
-    const levels: number[] = [];
-    let start = 0;
-    for (; start + LEVEL_SLICE_SAMPLES <= samples.length; start += LEVEL_SLICE_SAMPLES) {
-      levels.push(peakLevel(samples, start, start + LEVEL_SLICE_SAMPLES));
+const createLevelMeter = () => {
+  const meter = createDictationLevelMeter();
+  return (bytes: ArrayBuffer): number => {
+    const samples = new Int16Array(bytes);
+    for (let start = 0; start < samples.length; start += LEVEL_FRAME_SAMPLES) {
+      const end = Math.min(samples.length, start + LEVEL_FRAME_SAMPLES);
+      let sum = 0;
+      for (let i = start; i < end; i += 1) {
+        const sample = samples[i]! / 0x8000;
+        sum += sample * sample;
+      }
+      const count = end - start;
+      meter.pushRms(Math.sqrt(sum / count), (count * 1000) / DICTATION_SAMPLE_RATE);
     }
-    carry = samples.slice(start);
-    return levels;
+    return meter.takeLevel();
   };
-};
-
-const peakLevel = (samples: Int16Array, from: number, to: number): number => {
-  let peak = 0;
-  for (let start = from; start < to; start += LEVEL_FRAME_SAMPLES) {
-    const end = Math.min(to, start + LEVEL_FRAME_SAMPLES);
-    let sum = 0;
-    for (let i = start; i < end; i += 1) {
-      const sample = samples[i]! / 0x8000;
-      sum += sample * sample;
-    }
-    const rms = Math.sqrt(sum / Math.max(1, end - start));
-    if (rms > peak) peak = rms;
-  }
-  return Math.min(1, peak * LEVEL_GAIN);
 };

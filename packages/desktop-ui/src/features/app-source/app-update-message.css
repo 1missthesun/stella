@@ -12,9 +12,19 @@
   opacity: 0.7;
 }
 
+/* The action sits at the right end of the card's last text row. */
+.app-update-message__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
 /* Styled by the shared chat-card pill (`pill-btn pill-btn--primary`). */
 .app-update-message__button {
-  margin-top: 8px;
+  flex: none;
+  height: 28px;
+  padding-block: 0;
 }
 
 .composer-wrap > .app-update-messages {

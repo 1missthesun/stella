@@ -169,6 +169,7 @@ export const AppSourceOffers = memo(function AppSourceOffers() {
                         : t("shell.appSource.updates.fromOtherComputer")
                       : t("shell.appSource.updates.readyChange")}
                   </p>
+                  <div className="app-update-message__row">
                   <p className="app-update-message__summary">
                     {subjectOf(offer.summary)}
                   </p>
@@ -184,6 +185,7 @@ export const AppSourceOffers = memo(function AppSourceOffers() {
                         ? t("shell.appSource.updates.get")
                         : t("shell.appSource.updates.add")}
                   </button>
+                  </div>
                 </div>
               </div>
             </div>

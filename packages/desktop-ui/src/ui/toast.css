@@ -101,12 +101,24 @@
   margin: 0;
 }
 
+[data-component="toast"] [data-slot="toast-row"] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+[data-component="toast"] [data-slot="toast-row"] [data-slot="toast-description"] {
+  flex: 1;
+  min-width: 0;
+}
+
 [data-component="toast"] [data-slot="toast-actions"] {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 8px;
+  flex: none;
+  gap: 10px;
+  margin-left: auto;
 }
 
 [data-component="toast"] [data-slot="toast-action-button"] {

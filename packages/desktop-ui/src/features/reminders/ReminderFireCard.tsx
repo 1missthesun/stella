@@ -26,7 +26,7 @@ const formatTime = (ms: number): string => {
       });
 };
 
-/** A reminder that went off: what to do on row 1; "Reminder · 9:00 AM" and Done / Snooze on row 2. */
+/** A reminder that went off: what to do on row 1; "Reminder · 9:00 AM" and "Reminder · 9:00 AM" on row 2; Done / Snooze in a row under it while open. */
 export const ReminderFireCard = memo(function ReminderFireCard({
   mark,
   text,
@@ -55,6 +55,7 @@ export const ReminderFireCard = memo(function ReminderFireCard({
   };
 
   let trailing: ReactNode = null;
+  let actions: ReactNode = null;
   if (fire?.state === "done") {
     trailing = (
       <span className="schedule-card__settled" data-reminder-state="done">
@@ -72,7 +73,7 @@ export const ReminderFireCard = memo(function ReminderFireCard({
       </span>
     );
   } else if (fire) {
-    trailing = (
+    actions = (
       <span className="schedule-card__actions" data-reminder-state="open">
         <button
           type="button"
@@ -80,7 +81,6 @@ export const ReminderFireCard = memo(function ReminderFireCard({
           disabled={busy}
           onClick={() => run(() => markReminderDone(fire.fireId))}
         >
-          <Check size={13} strokeWidth={2} />
           {t("reminders.done")}
         </button>
         <DropdownMenu>
@@ -118,6 +118,7 @@ export const ReminderFireCard = memo(function ReminderFireCard({
         <span className="schedule-card__status">{failed ? t("reminders.failed") : status}</span>
         {trailing}
       </span>
+      {actions}
     </div>
   );
 });

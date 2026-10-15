@@ -7,12 +7,13 @@ import { CONTENT_MAX_FONT_SCALE } from "../../lib/font-scale";
 import type { Colors } from "../../theme/colors";
 import { fonts } from "../../theme/fonts";
 
-/** Two rows in an assistant bubble: a clock and the headline, then a quiet status line with optional trailing controls. */
+/** Two rows in an assistant bubble: a clock and the headline, then a quiet status line with optional trailing controls; an optional footer (action row) sits under them at the status indent. */
 export function ScheduleCardShell({
   colors,
   headline,
   status,
   trailing,
+  footer,
   struck,
   onPress,
   accessibilityLabel,
@@ -23,6 +24,7 @@ export function ScheduleCardShell({
   headline: string;
   status: string;
   trailing?: ReactNode;
+  footer?: ReactNode;
   struck?: boolean;
   onPress?: () => void;
   accessibilityLabel?: string;
@@ -53,6 +55,7 @@ export function ScheduleCardShell({
         </Text>
         {trailing}
       </View>
+      {footer ? <View style={styles.footer}>{footer}</View> : null}
     </>
   );
   if (!onPress) {
@@ -108,6 +111,7 @@ const makeStyles = (colors: Colors) =>
       minHeight: 22,
       paddingLeft: 21,
     },
+    footer: { marginTop: 6, paddingLeft: 21 },
     status: {
       color: colors.textMuted,
       flexShrink: 1,

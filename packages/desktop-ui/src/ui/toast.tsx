@@ -170,27 +170,32 @@ function ToastItem({ toast, onClose }: ToastItemProps) {
     <li data-component="toast" data-variant={toast.variant}>
       <div data-slot="toast-content">
         {toast.title && <div data-slot="toast-title">{toast.title}</div>}
-        {toast.description && <div data-slot="toast-description">{toast.description}</div>}
-        {(toast.action || toast.secondaryAction) && (
-          <div data-slot="toast-actions">
-            {toast.action && (
-              <button
-                data-slot="toast-action-button"
-                onClick={handleActionClick}
-                type="button"
-              >
-                {toast.action.label}
-              </button>
-            )}
-            {toast.secondaryAction && (
-              <button
-                data-slot="toast-action-button"
-                data-variant="secondary"
-                onClick={handleSecondaryActionClick}
-                type="button"
-              >
-                {toast.secondaryAction.label}
-              </button>
+        {(toast.description || toast.action || toast.secondaryAction) && (
+          // The actions sit at the right end of the last text row.
+          <div data-slot="toast-row">
+            {toast.description && <div data-slot="toast-description">{toast.description}</div>}
+            {(toast.action || toast.secondaryAction) && (
+              <div data-slot="toast-actions">
+                {toast.secondaryAction && (
+                  <button
+                    data-slot="toast-action-button"
+                    data-variant="secondary"
+                    onClick={handleSecondaryActionClick}
+                    type="button"
+                  >
+                    {toast.secondaryAction.label}
+                  </button>
+                )}
+                {toast.action && (
+                  <button
+                    data-slot="toast-action-button"
+                    onClick={handleActionClick}
+                    type="button"
+                  >
+                    {toast.action.label}
+                  </button>
+                )}
+              </div>
             )}
           </div>
         )}

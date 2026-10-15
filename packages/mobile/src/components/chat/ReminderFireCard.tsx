@@ -23,7 +23,7 @@ const formatTime = (ms: number): string => {
     : date.toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" });
 };
 
-/** A reminder that went off: what to do on row 1; "Reminder · 9:00 AM" and Done / Snooze on row 2. */
+/** A reminder that went off: what to do on row 1; "Reminder · 9:00 AM" on row 2; Done / Snooze in a row under it while open. */
 export const ReminderFireCard = memo(function ReminderFireCard({
   mark,
   text,
@@ -73,6 +73,7 @@ export const ReminderFireCard = memo(function ReminderFireCard({
   };
 
   let trailing = null;
+  let actions = null;
   if (fire && fire.state !== "open") {
     const label =
       fire.state === "done"
@@ -86,7 +87,7 @@ export const ReminderFireCard = memo(function ReminderFireCard({
       </Text>
     );
   } else if (fire) {
-    trailing = (
+    actions = (
       <View style={styles.actions}>
         <Pressable
           accessibilityRole="button"
@@ -118,6 +119,7 @@ export const ReminderFireCard = memo(function ReminderFireCard({
       headline={text}
       status={status}
       trailing={trailing}
+      footer={actions}
       testID="reminder-fire-card"
       accessibilityLabel={`${text}, ${status}`}
     />

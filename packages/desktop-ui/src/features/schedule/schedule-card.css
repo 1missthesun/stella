@@ -83,9 +83,17 @@ button.schedule-card:focus-visible {
   gap: 4px;
 }
 
-/* Chat-card actions use the shared pill (`pill-btn`, `pill-btn--primary`); this only spaces the icon. */
+/* An open reminder's Done / Snooze: a row under the text, at the meta indent. */
+.schedule-card__actions[data-reminder-state="open"] {
+  margin-top: 5px;
+  padding-inline-start: 19px;
+}
+
+/* Chat-card actions use the shared pill (`pill-btn`, `pill-btn--primary`) at the chat-card height. */
 .schedule-card__button {
   gap: 4px;
+  height: 28px;
+  padding-block: 0;
 }
 
 .schedule-card[data-action="removed"] .schedule-card__headline {

@@ -222,3 +222,56 @@ export type CloudBrowserResumeReceipt = Readonly<{
   result: "approved" | "canceled" | "expired" | "failed";
   safeMessage: string;
 }>;
+
+export const CLOUD_BROWSER_METHODS = [
+  "open",
+  "navigate",
+  "observe",
+  "click",
+  "fill",
+  "press",
+  "select",
+  "wait",
+  "tabs",
+  "focusTab",
+  "back",
+  "forward",
+  "reload",
+  "hover",
+  "scroll",
+  "check",
+  "uncheck",
+  "text",
+  "screenshot",
+  "evaluate",
+  "cookies",
+  "setCookies",
+  "clearCookies",
+  "requests",
+  "responseBody",
+  "close",
+  "requestLoginTakeover",
+  "requestDeviceCodeFixture",
+] as const;
+
+export type CloudBrowserMethod = (typeof CLOUD_BROWSER_METHODS)[number];
+
+/** Methods that hand the browser to the user and wait until they finish. */
+export const CLOUD_BROWSER_HANDOFF_METHODS: ReadonlySet<string> = new Set<CloudBrowserMethod>([
+  "requestLoginTakeover",
+  "requestDeviceCodeFixture",
+]);
+
+/** How a sign-in handed to the user ended. */
+export type CloudBrowserHandoffResult = "approved" | "canceled" | "expired" | "failed";
+
+/**
+ * The `browser` global of a cloud agent's `code`, for its tool description.
+ * `screenshots` says where a screenshot goes; `handoffEnd` what the agent
+ * sees once the user finishes a sign-in.
+ */
+export const cloudBrowserCodeSentence = (options: {
+  screenshots: string;
+  handoffEnd: string;
+}): string =>
+  `browser drives Stella's private cloud browser (one persistent signed-in profile, kept between turns; it is not the user's own browser). Each method is one awaited command. browser.open(url, { allowedOrigins? }) starts at an https URL and limits navigation to its origin plus allowedOrigins. browser.open, navigate(url), observe(), back(), forward(), and reload() return { url, title, text, elements }: text is the page's visible text, and elements lists the visible controls as { ref, role, name, selector?, href?, checked?, disabled?, sensitive? } (sensitive marks password, email, code, and card fields). Selectors are Playwright selectors (CSS, text=, role=, xpath=, chains) or ref=eN from the latest observation; refs change after navigation, so observe again. Actions: click(selector), fill(selector, value), press(selector, key), select(selector, value), check(selector), uncheck(selector), hover(selector), text(selector), wait(selector, timeoutMs?), and scroll({ direction?, amount?, selector? }). browser.evaluate(script, arg?) runs a JavaScript expression, or a function source string called with arg, in the page and returns its JSON result (use it for DOM reads, localStorage, or same-origin fetch with the page's session). browser.cookies(urls?), setCookies(cookies), and clearCookies() manage the profile's cookies. browser.requests({ limit? }) lists recent network requests and responseBody(url) returns one response's body. browser.screenshot({ fullPage? }) ${options.screenshots}. Also tabs(), focusTab(tabId), and close(). For signing in, hand the login to the user: call browser.requestLoginTakeover({ allowedOrigins: [origin], displayOrigin: origin, startUrl?, displayTitle?, verification: { expectedOrigin: origin, authenticatedSelector, loggedOutSelector, resumeUrl } }) with one exact https origin everywhere. loggedOutSelector names something visible now only when signed out; authenticatedSelector names something that appears only once signed in (such as text=Sign out); they must differ and cannot be refs. It shows the login screen to the user on their phone or desktop and waits until they finish. ${options.handoffEnd} Type a password or card number yourself only when the user gave it to you in this conversation.`;

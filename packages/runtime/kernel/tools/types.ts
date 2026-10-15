@@ -128,11 +128,23 @@ export type AgentToolSnapshot = {
   }>;
 };
 
+/**
+ * Stella's cloud browser as the `browser` global of a sandbox's `code`.
+ * A method in `awaitsUser` waits on the user (a sign-in handoff), so its
+ * cell stays open with its clock stopped until they finish.
+ */
+export type CloudBrowserBridge = {
+  methods: readonly string[];
+  call(method: string, args: readonly unknown[], signal: AbortSignal): Promise<unknown>;
+  awaitsUser(method: string): boolean;
+};
+
 export type ToolHostOptions = {
   stellaAppDir: string;
   recoverStaleSecrets?: boolean;
   enableShellShims?: boolean;
   allowCloudCode?: boolean;
+  cloudBrowser?: CloudBrowserBridge;
   browserSessionFactory?: import("../browser-use/client.js").BrowserSessionFactory;
   stellaBrowserBinPath?: string;
   stellaOfficeBinPath?: string;

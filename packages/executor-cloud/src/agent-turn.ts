@@ -46,6 +46,7 @@ import {
 } from "./general-agent-prompt.js";
 import { cloudGeneralToolNames } from "./cloud-general-tools.js";
 import { createBrokerConnectClient } from "./cloud-code-services.js";
+import { createBrokerCloudBrowser } from "./cloud-browser-client.js";
 import { CODE_TOOL_CLOUD_AGENT_DESCRIPTION } from "@stella/runtime/kernel/tools/defs/code-def.js";
 import { CLOUD_AGENT_MOVE_TOOL, cloudAgentMoveTool, runCloudAgentMove } from "./cloud-agent-move.js";
 import {
@@ -491,6 +492,10 @@ export const runAgentTurn = (
         ...(input.skills ? { skills: input.skills } : {}),
         drive: driveSync,
       });
+      const cloudBrowser = createBrokerCloudBrowser({
+        post: postJson,
+        turnId: input.turnId,
+      });
       const toolHost = yield* Effect.acquireRelease(
         Effect.sync(() =>
           createToolHost({
@@ -499,6 +504,7 @@ export const runAgentTurn = (
             recoverStaleSecrets: false,
             enableShellShims: false,
             allowCloudCode: true,
+            cloudBrowser,
             codeConnectClient: createBrokerConnectClient({
               post: postJson,
               turnId: input.turnId,
@@ -861,6 +867,7 @@ export const runAgentTurn = (
       }));
 
       const shutdownFailures = yield* Effect.promise(async () => {
+        await cloudBrowser.checkpoint().catch(() => undefined);
         const results = await Promise.allSettled([
           toolHost.shutdown(),
           claudeToolMcpHost?.close() ?? Promise.resolve(),

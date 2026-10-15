@@ -1,3 +1,5 @@
+import { cloudBrowserCodeSentence } from "@stella/contracts/cloud-browser";
+
 export const CODE_TOOL_HISTORY_SENTENCE =
   "history: await history.search(text, { kinds, limit, order }) finds messages and agent reports in this conversation's whole history, await history.sql(query, params) runs one read-only SELECT over it, and await history.read(fromSeq, toSeq) returns { records: [{ seq, role, at, text }] } for a seq range.";
 
@@ -9,8 +11,14 @@ export const CODE_TOOL_ORCHESTRATOR_DESCRIPTION =
   "Run JavaScript with top-level await in a persistent runtime on the computer you run on (use var for bindings you reuse). Globals: tools, connect, history, memory (when on), codeRuntime. node:fs works on absolute paths; codeRuntime.emitImage(path) shows you an image; no processes, computer use or browser. End with an expression to return it; console.log prints. A long cell returns a cell_id to call again with. tools.$search({ query }) finds a tool and tools.$describe(name) gives its full schema. Every action of a connected service is a deferred tool here, named <service>_<action> (tools.gmail_send_email); connect manages the connections (connect.documentation()). Cards from tools called here (map, connector_status) render in the chat as usual.";
 
 export const CODE_TOOL_CLOUD_AGENT_DESCRIPTION =
-  "Run JavaScript with top-level await in Stella's persistent code runtime in your cloud sandbox; bindings persist within one generation (use var for reusable names). Globals: codeRuntime, connect, history, and tools; there is no sky or browser in the cloud. node:fs reads and writes your workspace and fetch reaches the network, as Bash does. End with an expression to return its value; codeRuntime.write(...) and console.log also print. A long cell yields a cell_id: call code again with it to read new output or terminate it. A failed cell returns the output it printed before the error. tools exposes your other tools (tools.Bash, tools.Read, tools.web, ...): tools.$list() for exact names, tools.$search({ query: \"<capability>\" }) for ranked signatures, and tools.$describe(name) for a complete schema. Use Promise.all for independent calls. Nested calls keep permissions and cancellation; tools requiring explicit approval must be called directly. Every action of a connected service is a deferred tool here too, named <service>_<action> (tools.gmail_send_email) and found with tools.$search; connect manages the connections (connect.documentation()). " +
-  CODE_TOOL_HISTORY_SENTENCE;
+  "Run JavaScript with top-level await in Stella's persistent code runtime in your cloud sandbox; bindings persist within one generation (use var for reusable names). Globals: codeRuntime, browser, connect, history, and tools; there is no sky in the cloud. node:fs reads and writes your workspace and fetch reaches the network, as Bash does. End with an expression to return its value; codeRuntime.write(...) and console.log also print. A long cell yields a cell_id: call code again with it to read new output or terminate it. A failed cell returns the output it printed before the error. tools exposes your other tools (tools.Bash, tools.Read, tools.web, ...): tools.$list() for exact names, tools.$search({ query: \"<capability>\" }) for ranked signatures, and tools.$describe(name) for a complete schema. Use Promise.all for independent calls. Nested calls keep permissions and cancellation; tools requiring explicit approval must be called directly. Every action of a connected service is a deferred tool here too, named <service>_<action> (tools.gmail_send_email) and found with tools.$search; connect manages the connections (connect.documentation()). " +
+  CODE_TOOL_HISTORY_SENTENCE +
+  " " +
+  cloudBrowserCodeSentence({
+    screenshots: "attaches the picture to this code call's result",
+    handoffEnd:
+      "The call keeps the code cell open until then (it can take minutes) and returns { result, message }: result is approved, canceled, expired, or failed; on approved, browser.open the site again and carry on signed in.",
+  });
 
 export const CODE_TOOL_PROMPT_SNIPPET =
   "Run persistent JavaScript, orchestrate allowed Stella tools and connected services' actions, and control apps through the sky/browser globals";

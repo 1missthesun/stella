@@ -177,6 +177,7 @@ export const createToolHost = ({
   getStellaSiteAuth,
   getCloudBackendAuth,
   codeConnectClient,
+  cloudBrowser,
   codeHistoryQuery,
   agentHistoryQuery,
   deviceId,
@@ -411,6 +412,7 @@ export const createToolHost = ({
       };
     },
     connectClient,
+    ...(cloudBrowser ? { cloudBrowser } : {}),
   });
 
   if (recoverStaleSecrets) {

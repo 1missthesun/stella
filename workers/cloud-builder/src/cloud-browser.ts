@@ -1,6 +1,8 @@
 import {
+  CLOUD_BROWSER_METHODS,
   isCloudBrowserSuspension,
   type CloudBrowserCommandRequest,
+  type CloudBrowserMethod,
   type CloudBrowserSuspension,
 } from "@stella/contracts/cloud-browser";
 import { readBoundedResponseBytes } from "./bounded-body.js";
@@ -80,67 +82,9 @@ export const cancelGatewayHandoff = async (
   await response.body?.cancel().catch(() => undefined);
 };
 
-export type CloudBrowserMethod =
-  | "open"
-  | "navigate"
-  | "observe"
-  | "click"
-  | "fill"
-  | "press"
-  | "select"
-  | "wait"
-  | "tabs"
-  | "focusTab"
-  | "back"
-  | "forward"
-  | "reload"
-  | "hover"
-  | "scroll"
-  | "check"
-  | "uncheck"
-  | "text"
-  | "screenshot"
-  | "evaluate"
-  | "cookies"
-  | "setCookies"
-  | "clearCookies"
-  | "requests"
-  | "responseBody"
-  | "close"
-  | "requestLoginTakeover"
-  | "requestDeviceCodeFixture";
-
-export const CLOUD_BROWSER_METHODS: ReadonlySet<string> =
-  new Set<CloudBrowserMethod>([
-    "open",
-    "navigate",
-    "observe",
-    "click",
-    "fill",
-    "press",
-    "select",
-    "wait",
-    "tabs",
-    "focusTab",
-    "back",
-    "forward",
-    "reload",
-    "hover",
-    "scroll",
-    "check",
-    "uncheck",
-    "text",
-    "screenshot",
-    "evaluate",
-    "cookies",
-    "setCookies",
-    "clearCookies",
-    "requests",
-    "responseBody",
-    "close",
-    "requestLoginTakeover",
-    "requestDeviceCodeFixture",
-  ]);
+export const CLOUD_BROWSER_METHOD_SET: ReadonlySet<string> = new Set(
+  CLOUD_BROWSER_METHODS,
+);
 
 export class CloudBrowserSuspendedError extends Error {
   constructor() {
@@ -169,7 +113,7 @@ export type CloudBrowserClient = Readonly<{
   suspension(): CloudBrowserSuspension | undefined;
   resumed(): void;
   used(): boolean;
-  checkpoint(signal: AbortSignal): Promise<void>;
+  checkpoint(signal: AbortSignal, options?: { force?: boolean }): Promise<void>;
 }>;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -523,7 +467,7 @@ export const createCloudBrowserClient = (
 
   return {
     call: async (method, args, signal) => {
-      if (!CLOUD_BROWSER_METHODS.has(method)) {
+      if (!CLOUD_BROWSER_METHOD_SET.has(method)) {
         throw new Error(`browser.${method || "?"} is not a browser method.`);
       }
       if (suspension) throw new CloudBrowserSuspendedError();
@@ -587,8 +531,8 @@ export const createCloudBrowserClient = (
       suspension = undefined;
     },
     used: () => used,
-    checkpoint: async (signal) => {
-      if (!used || suspension) return;
+    checkpoint: async (signal, options) => {
+      if ((!used && !options?.force) || suspension) return;
       await send({ action: "browser.checkpoint", params: {} }, signal);
     },
   };

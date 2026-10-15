@@ -96,6 +96,8 @@ export type NodeReplWorkerData = {
   toolNames: string[];
   memory: boolean;
   deviceControl: boolean;
+  /** Methods of the cloud browser `browser` global; absent when it has none. */
+  cloudBrowserMethods?: string[];
 };
 
 export type ParentToNodeReplWorkerMessage =
@@ -137,6 +139,18 @@ export type ParentToNodeReplWorkerMessage =
     }
   | {
       type: "tool-result";
+      callId: number;
+      ok: false;
+      error: SerializedError;
+    }
+  | {
+      type: "cloud-browser-result";
+      callId: number;
+      ok: true;
+      value: unknown;
+    }
+  | {
+      type: "cloud-browser-result";
       callId: number;
       ok: false;
       error: SerializedError;
@@ -204,5 +218,12 @@ export type WorkerToNodeReplParentMessage =
       evaluationId: number;
       callId: number;
       method: ConnectMethod;
+      args: unknown[];
+    }
+  | {
+      type: "cloud-browser-call";
+      evaluationId: number;
+      callId: number;
+      method: string;
       args: unknown[];
     };

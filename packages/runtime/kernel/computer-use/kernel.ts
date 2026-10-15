@@ -17,6 +17,7 @@ import {
   type MapRouteArtifact,
 } from "@stella/contracts/map-artifact";
 import type {
+  CloudBrowserBridge,
   ToolContext,
   ToolProcessIdentity,
   ToolResult,
@@ -160,6 +161,7 @@ export type NodeReplKernelManagerOptions = {
   ) => Promise<ToolResult>;
   toolAwaitsUser?: (toolName: string) => boolean;
   connectClient?: ReplConnectClient;
+  cloudBrowser?: CloudBrowserBridge;
   searchTools?: (
     query: string,
     context: ToolContext,
@@ -704,6 +706,7 @@ class NodeReplKernel {
   private readonly memory?: NodeReplMemoryHost;
   private readonly deviceControl: boolean;
   private readonly connectClient?: ReplConnectClient;
+  private readonly cloudBrowser?: CloudBrowserBridge;
   private readonly onTerminated: (kernel: NodeReplKernel) => void;
   private tail: Promise<void> = Promise.resolve();
   private cancelIdleTimer: (() => void) | null = null;
@@ -746,6 +749,7 @@ class NodeReplKernel {
       memory?: NodeReplMemoryHost;
       deviceControl: boolean;
       connectClient?: ReplConnectClient;
+      cloudBrowser?: CloudBrowserBridge;
       processIdentity?: ToolProcessIdentity;
       toolStateRoot?: string;
       toolNames: string[];
@@ -767,6 +771,7 @@ class NodeReplKernel {
     this.memory = options.memory;
     this.deviceControl = options.deviceControl;
     this.connectClient = options.connectClient;
+    this.cloudBrowser = options.deviceControl ? undefined : options.cloudBrowser;
     this.browserSessionId = options.browserSessionId;
     const getSignal = () => this.active?.controller.signal;
     const session = options.sessionFactory({
@@ -805,6 +810,9 @@ class NodeReplKernel {
       toolNames: options.toolNames,
       memory: options.memory !== undefined,
       deviceControl: options.deviceControl,
+      ...(this.cloudBrowser
+        ? { cloudBrowserMethods: [...this.cloudBrowser.methods] }
+        : {}),
     };
     this.worker = createNodeReplTransport(
       createNodeReplWorkerSource(),
@@ -1163,6 +1171,10 @@ class NodeReplKernel {
       );
       return;
     }
+    if (typed.type === "cloud-browser-call") {
+      void this.handleCloudBrowserCall(typed);
+      return;
+    }
     if (typed.type === "connect-call") {
       const run = () => this.handleConnectCall(typed);
       const task = this.connectTail.then(run, run);
@@ -1381,6 +1393,78 @@ class NodeReplKernel {
       if (!this.closed && this.active === active) {
         this.postToolError(message.callId, error);
       }
+    }
+  }
+
+  private async handleCloudBrowserCall(
+    message: Extract<
+      WorkerToNodeReplParentMessage,
+      { type: "cloud-browser-call" }
+    >,
+  ) {
+    const active = this.active;
+    const bridge = this.cloudBrowser;
+    const fail = (error: unknown) => {
+      if (this.closed || this.active !== active) return;
+      this.post({
+        type: "cloud-browser-result",
+        callId: message.callId,
+        ok: false,
+        error: serializeError(error),
+      });
+    };
+    if (
+      !bridge ||
+      !active ||
+      message.evaluationId !== active.id ||
+      !bridge.methods.includes(message.method) ||
+      !Array.isArray(message.args) ||
+      serializedSize(message.args) > MAX_NODE_REPL_PROTOCOL_MESSAGE_BYTES
+    ) {
+      fail(new Error("Invalid browser protocol request."));
+      return;
+    }
+    try {
+      const run = () =>
+        bridge.call(message.method, message.args, active.controller.signal);
+      let value = bridge.awaitsUser(message.method)
+        ? await this.whileAwaitingUser(active, run)
+        : await run();
+      const image = this.recordValue(this.recordValue(value)?.image);
+      if (
+        image &&
+        typeof image.data === "string" &&
+        (image.mimeType === "image/jpeg" || image.mimeType === "image/png")
+      ) {
+        const format = image.mimeType === "image/png" ? "png" : "jpeg";
+        const data: Record<string, unknown> = { base64: image.data };
+        await this.materializeBrowserScreenshot(active, data, {
+          base64Key: "base64",
+          pathKey: "path",
+          format,
+        });
+        value = {
+          attached: true,
+          path: data.path,
+          format,
+          mimeType: image.mimeType,
+          width: image.width,
+          height: image.height,
+        };
+      }
+      if (serializedSize(value) > MAX_NODE_REPL_PROTOCOL_MESSAGE_BYTES) {
+        throw new Error("browser result exceeds the protocol limit.");
+      }
+      if (!this.closed && this.active === active) {
+        this.post({
+          type: "cloud-browser-result",
+          callId: message.callId,
+          ok: true,
+          value,
+        });
+      }
+    } catch (error) {
+      fail(error);
     }
   }
 
@@ -2780,6 +2864,9 @@ export class NodeReplKernelRegistry {
           context.agentType !== AGENT_IDS.ORCHESTRATOR &&
           context.executionHost !== "sandbox",
         connectClient: this.options.connectClient,
+        ...(context.executionHost === "sandbox" && this.options.cloudBrowser
+          ? { cloudBrowser: this.options.cloudBrowser }
+          : {}),
         toolNames: replToolNamesForContext(context),
         browserSessionId,
         ownerLeaseId: randomUUID(),

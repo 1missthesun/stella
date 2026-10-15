@@ -217,6 +217,7 @@ const nodeReplWorkerMain = async (
   let nextBrowserCallId = 1;
   let nextToolCallId = 1;
   let nextConnectCallId = 1;
+  let nextCloudBrowserCallId = 1;
   const pendingSkyCalls = new Map<
     number,
     { resolve: (value: unknown) => void; reject: (error: Error) => void }
@@ -226,6 +227,10 @@ const nodeReplWorkerMain = async (
     { resolve: (value: unknown) => void; reject: (error: Error) => void }
   >();
   const pendingConnectCalls = new Map<
+    number,
+    { resolve: (value: unknown) => void; reject: (error: Error) => void }
+  >();
+  const pendingCloudBrowserCalls = new Map<
     number,
     { resolve: (value: unknown) => void; reject: (error: Error) => void }
   >();
@@ -358,6 +363,51 @@ const nodeReplWorkerMain = async (
     });
   };
   const connect = installConnectApi(callConnect);
+
+  const callCloudBrowser = (
+    method: string,
+    args: readonly unknown[],
+  ): Promise<unknown> => {
+    if (activeEvaluationId === null) {
+      return Promise.reject(
+        new Error("browser methods may only be called during code evaluation."),
+      );
+    }
+    if (pendingCloudBrowserCalls.size >= workerData.maxPendingBrowserCalls) {
+      return Promise.reject(new Error("Too many pending browser calls."));
+    }
+    if (serializedSize(args) > workerData.maxProtocolMessageBytes) {
+      return Promise.reject(
+        new Error("browser call arguments exceed the protocol limit."),
+      );
+    }
+    const callId = nextCloudBrowserCallId++;
+    return new Promise((resolve, reject) => {
+      pendingCloudBrowserCalls.set(callId, { resolve, reject });
+      try {
+        post({
+          type: "cloud-browser-call",
+          evaluationId: activeEvaluationId!,
+          callId,
+          method,
+          args: [...args],
+        });
+      } catch (error) {
+        pendingCloudBrowserCalls.delete(callId);
+        reject(error instanceof Error ? error : new Error(String(error)));
+      }
+    });
+  };
+  const cloudBrowser = workerData.cloudBrowserMethods
+    ? Object.freeze(
+        Object.fromEntries(
+          workerData.cloudBrowserMethods.map((method) => [
+            method,
+            (...args: unknown[]) => callCloudBrowser(method, args),
+          ]),
+        ),
+      )
+    : undefined;
 
   const callTool = (
     toolName: string,
@@ -937,7 +987,16 @@ const nodeReplWorkerMain = async (
             configurable: false,
           },
         }
-      : {}),
+      : cloudBrowser
+        ? {
+            browser: {
+              value: cloudBrowser,
+              enumerable: true,
+              writable: false,
+              configurable: false,
+            },
+          }
+        : {}),
     connect: {
       value: connect,
       enumerable: true,
@@ -998,6 +1057,7 @@ const nodeReplWorkerMain = async (
     pendingSkyCalls.clear();
     pendingBrowserCalls.clear();
     pendingConnectCalls.clear();
+    pendingCloudBrowserCalls.clear();
     pendingToolCalls.clear();
     pendingToolSettlements.clear();
     content = null;
@@ -1171,6 +1231,19 @@ const nodeReplWorkerMain = async (
       const pending = pendingBrowserCalls.get(message.callId);
       if (!pending) return;
       pendingBrowserCalls.delete(message.callId);
+      if (message.ok) pending.resolve(message.value);
+      else {
+        const error = new Error(message.error.message);
+        error.name = message.error.name;
+        if (message.error.stack) error.stack = message.error.stack;
+        pending.reject(error);
+      }
+      return;
+    }
+    if (message.type === "cloud-browser-result") {
+      const pending = pendingCloudBrowserCalls.get(message.callId);
+      if (!pending) return;
+      pendingCloudBrowserCalls.delete(message.callId);
       if (message.ok) pending.resolve(message.value);
       else {
         const error = new Error(message.error.message);

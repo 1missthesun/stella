@@ -113,6 +113,7 @@ const sessionStore = (dataDir: string): ClaudeCodeSessionStore => {
           seen: Array.isArray(parsed.seen) ? parsed.seen.filter((entry): entry is string => typeof entry === "string") : [],
           ...(undelivered.length > 0 ? { undelivered } : {}),
           ...(typeof parsed.context === "string" ? { context: parsed.context } : {}),
+          ...(typeof parsed.boundary === "string" ? { boundary: parsed.boundary } : {}),
         };
       } catch {
         return undefined;

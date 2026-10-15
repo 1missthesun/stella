@@ -52,7 +52,7 @@ export default function WhatsNew() {
           Every release, <em>in plain English.</em>
         </h1>
         <p className={pg.lede}>
-          Stella ships in small, frequent releases. Each entry below headlines the version that shipped, with the
+          Stella ships in small, frequent releases. Each dated entry below covers what changed, with the
           highlights up top and the rest tucked just behind &ldquo;More in this release.&rdquo;
         </p>
       </section>

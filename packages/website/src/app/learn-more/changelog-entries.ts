@@ -47,7 +47,7 @@ export const changelogEntries: ChangelogEntry[] = [
       "Dictation gets ready sooner so the first word is less likely to be missed.",
       "Desktop updates arrive without a manual check, and a failed update is caught before replacing the working app.",
       {
-        "text": "Improved chat catch-up, file browsing, and access to account controls.",
+        "text": "Find files with search and type filters, with easier access to account controls.",
         "product": "Mobile"
       }
     ]

@@ -435,23 +435,23 @@ div:has(> div > .event-list-working-indicator > .inline-working-indicator--vacat
   font-weight: var(--chat-text-strong-weight);
 }
 
-:is(.event-item.assistant, .reply-preview-report__body) .markdown :is(h1, h2, h3, h4, h5, h6) {
+.event-item.assistant .markdown :is(h1, h2, h3, h4, h5, h6) {
   font-weight: var(--weight-semibold);
   line-height: 1.3;
   margin-top: 1rem;
   margin-bottom: 0.4rem;
 }
 
-:is(.event-item.assistant, .reply-preview-report__body) .markdown :is(h1, h2, h3, h4, h5, h6):first-child {
+.event-item.assistant .markdown :is(h1, h2, h3, h4, h5, h6):first-child {
   margin-top: 0;
 }
 
-:is(.event-item.assistant, .reply-preview-report__body) .markdown h1 { font-size: 26px; }
-:is(.event-item.assistant, .reply-preview-report__body) .markdown h2 { font-size: 21px; }
-:is(.event-item.assistant, .reply-preview-report__body) .markdown h3 { font-size: 18px; }
-:is(.event-item.assistant, .reply-preview-report__body) .markdown h4 { font-size: 16px; }
-:is(.event-item.assistant, .reply-preview-report__body) .markdown h5,
-:is(.event-item.assistant, .reply-preview-report__body) .markdown h6 { font-size: var(--font-size-lg); }
+.event-item.assistant .markdown h1 { font-size: 26px; }
+.event-item.assistant .markdown h2 { font-size: 21px; }
+.event-item.assistant .markdown h3 { font-size: 18px; }
+.event-item.assistant .markdown h4 { font-size: 16px; }
+.event-item.assistant .markdown h5,
+.event-item.assistant .markdown h6 { font-size: var(--font-size-lg); }
 
 .event-context-chips {
   position: relative;

@@ -1,4 +1,3 @@
-import type { LocalChatAgentReport } from "@stella/contracts/local-chat";
 import type { DesktopThreadActivityRecord } from "@/features/chat/thread-activity-types";
 import { presentStellaProviderError } from "@/features/chat/streaming/stella-provider-error-toast";
 import { showToast } from "@/ui/toast";
@@ -230,24 +229,6 @@ export const piChatAgents = async (conversationId: string): Promise<DesktopThrea
       assistantMessagesUpdatedAt: agent.updatedAt,
     };
   });
-};
-
-export const piAgentReport = async (
-  conversationId: string,
-  threadId: string,
-): Promise<LocalChatAgentReport | null> => {
-  const agent = (await piChatAgents(conversationId)).find((record) => record.threadId === threadId);
-  if (!agent) return null;
-  return {
-    threadId,
-    description: agent.description,
-    agentType: agent.agentType,
-    status: agent.status,
-    ...(agent.result ? { result: agent.result } : {}),
-    ...(agent.error ? { error: agent.error } : {}),
-    startedAt: agent.startedAt,
-    ...(agent.completedAt ? { completedAt: agent.completedAt } : {}),
-  };
 };
 
 export const onPiChatEvents = (listener: (payload: PiChatEventsPayload) => void): (() => void) =>

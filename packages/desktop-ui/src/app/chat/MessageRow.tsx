@@ -54,7 +54,6 @@ import { ReminderFireCard } from "@/features/reminders/ReminderFireCard";
 import { ScheduleNoticeCard } from "@/features/schedule/ScheduleNoticeCard";
 import { ReplyPreview } from "@/app/chat/ReplyPreview";
 import type { ReplyRef } from "@stella/contracts/reply-refs";
-import { ReplyReportLinks } from "@/app/chat/ReplyReportLinks";
 import { AgentUpdateCard } from "@/features/app-source/AppSourceCards";
 import { sanitizeAttachmentImageUrl } from "@/shared/lib/url-safety";
 import { UserMessageBody } from "@/app/chat/UserMessageBody";
@@ -624,9 +623,6 @@ export const AssistantMessageRow = memo(
           }),
         ),
     ];
-    const hasAgentCompletion = Boolean(
-      row.agentCompletion && row.agentCompletion.sections.length > 0,
-    );
     const linkedFiles = row.linkedFiles ?? [];
     const linkTargets = hasText ? extractFileLinkTargets(text) : [];
     const evidencePaths = linkTargets.filter((target) => !driveLinkPath(target));
@@ -755,14 +751,6 @@ export const AssistantMessageRow = memo(
                 <Markdown text={bodyText} cacheKey={row.cacheKey} hideHorizontalRules
                   hiddenFilePaths={hiddenFileKeys}
                 />
-                {conversationId &&
-                ((row.replyRefs && row.replyRefs.length > 0) || hasAgentCompletion) ? (
-                  <ReplyReportLinks
-                    refs={row.replyRefs ?? []}
-                    completions={row.agentCompletion?.sections}
-                    conversationId={conversationId}
-                  />
-                ) : null}
                 {evidencePaths.length > 0 ? (
                   <MessageAttachments filePaths={evidencePaths} part="documents" />
                 ) : null}

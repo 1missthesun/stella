@@ -30,7 +30,7 @@ export function UsageLimitChatCard({ conversationId }: { conversationId: string 
                   <span className="schedule-card__actions">
                     <button
                       type="button"
-                      className="pill-btn pill-btn--primary schedule-card__button"
+                      className="schedule-card__button schedule-card__button--primary"
                       onClick={card.resume}
                     >
                       Resume

@@ -117,60 +117,45 @@
 
 [data-component="toast"] [data-slot="toast-actions"] {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   flex: none;
-  gap: 10px;
+  gap: 12px;
   margin-left: auto;
 }
 
+/* Actions are plain text links on the last text row, the same size as the
+   description: the primary in the accent colour, a secondary in the muted
+   colour just left of it. */
 [data-component="toast"] [data-slot="toast-action-button"] {
-  align-self: flex-start;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 28px;
-  padding: 0 12px;
-  border-radius: 8px;
-  border: 1px solid var(--interactive);
-  background: var(--interactive);
-  color: var(--interactive-foreground);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--interactive);
   font-family: var(--font-family-sans, "Manrope", sans-serif);
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-base);
   font-weight: var(--weight-medium);
-  line-height: 1;
+  letter-spacing: -0.01em;
+  line-height: 1.55;
   cursor: default;
-  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+[data-component="toast"] [data-slot="toast-action-button"][data-variant="secondary"] {
+  color: var(--text-weak);
 }
 
 [data-component="toast"] [data-slot="toast-action-button"]:hover {
-  background: color-mix(in srgb, var(--foreground) 10%, var(--interactive));
-  border-color: color-mix(in srgb, var(--foreground) 10%, var(--interactive));
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 [data-component="toast"] [data-slot="toast-action-button"]:focus-visible {
   outline: none;
+  border-radius: 4px;
   box-shadow: var(--focus-ring);
 }
 
-[data-component="toast"] [data-slot="toast-action-button"][data-variant="secondary"] {
-  margin: 0;
-  min-height: 28px;
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: var(--text-muted);
-  font-size: var(--font-size-xs);
-  font-weight: var(--weight-medium);
-  letter-spacing: -0.01em;
-}
-
-[data-component="toast"] [data-slot="toast-action-button"][data-variant="secondary"]:hover {
-  background: transparent;
-  border-color: transparent;
-  color: var(--foreground);
-  transform: none;
-  text-decoration: underline;
-  text-underline-offset: 2px;
+[data-component="toast"] [data-slot="toast-row"] {
+  align-items: baseline;
 }
 
 /* The ✕ is pinned top-right on the first text row so the actions row can run

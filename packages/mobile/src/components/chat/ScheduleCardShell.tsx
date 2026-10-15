@@ -64,11 +64,11 @@ export function ScheduleCardShell({
           {headline}
         </Text>
         {status || trailing ? (
-          <View style={[styles.meta, onDismiss && styles.metaDismiss]}>
+          <View style={styles.meta}>
             <Text style={styles.status} numberOfLines={wrap ? undefined : 1} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
               {status}
             </Text>
-            {trailing ? <View style={[styles.trailing, onDismiss && styles.trailingDismiss]}>{trailing}</View> : null}
+            {trailing ? <View style={styles.trailing}>{trailing}</View> : null}
           </View>
         ) : null}
       </View>
@@ -87,7 +87,7 @@ export function ScheduleCardShell({
   );
   if (!onPress) {
     return (
-      <View style={[styles.card, onDismiss && styles.cardDismiss]} testID={testID} accessibilityLabel={accessibilityLabel}>
+      <View style={styles.card} testID={testID} accessibilityLabel={accessibilityLabel}>
         {body}
       </View>
     );
@@ -99,7 +99,7 @@ export function ScheduleCardShell({
       accessibilityHint={accessibilityHint}
       testID={testID}
       onPress={onPress}
-      style={({ pressed }) => [styles.card, onDismiss && styles.cardDismiss, pressed && styles.pressed]}
+      style={({ pressed }) => [styles.card, pressed && styles.pressed]}
     >
       {body}
     </Pressable>
@@ -132,13 +132,7 @@ const makeStyles = (colors: Colors) =>
     },
     body: { flexShrink: 1, gap: 1 },
     headlineDismiss: { paddingRight: 24 },
-    // Trailing buttons overhang the status line so the card keeps its height.
-    trailing: { flexShrink: 0, marginVertical: -5 },
-    // With a ✕: the status keeps its usual spacing; its button hangs down from
-    // the status line (away from the ✕) and the card grows at the bottom.
-    cardDismiss: { paddingBottom: 17 },
-    metaDismiss: { alignItems: "flex-start" },
-    trailingDismiss: { marginBottom: -8, marginTop: 0 },
+    trailing: { flexShrink: 0 },
     // On the headline row; its visible 14pt icon's right edge = the card's
     // content edge (paddingRight 14), so trailing buttons line up under it.
     dismiss: {
@@ -160,7 +154,7 @@ const makeStyles = (colors: Colors) =>
     },
     struck: { color: colors.textMuted, textDecorationLine: "line-through" },
     meta: {
-      alignItems: "center",
+      alignItems: "baseline",
       flexDirection: "row",
       gap: 10,
       justifyContent: "space-between",
@@ -177,19 +171,19 @@ const makeStyles = (colors: Colors) =>
     },
   });
 
-/** The chat-card action button: filled accent for the primary, outlined otherwise; small-radius rounded rectangle. */
+/** Chat-card actions: plain text links on the status line, its size, medium weight; the primary in the accent colour, others muted. */
 export const makeChatCardButtonStyles = (colors: Colors) =>
   StyleSheet.create({
-    actions: { flexDirection: "row", flexShrink: 0, gap: 6 },
-    button: {
-      borderColor: colors.border,
-      borderRadius: 8,
-      borderWidth: StyleSheet.hairlineWidth,
-      paddingHorizontal: 11,
-      paddingVertical: 4,
+    actions: { alignItems: "baseline", flexDirection: "row", flexShrink: 0, gap: 14 },
+    button: {},
+    primary: {},
+    dimmed: { opacity: 0.5 },
+    label: {
+      color: colors.textMuted,
+      fontFamily: fonts.sans.medium,
+      fontSize: 15,
+      letterSpacing: -0.2,
+      lineHeight: 20,
     },
-    primary: { backgroundColor: colors.accent, borderColor: colors.accent },
-    dimmed: { opacity: 0.6 },
-    label: { color: colors.text, fontFamily: fonts.sans.medium, fontSize: 14 },
-    primaryLabel: { color: colors.accentForeground, fontFamily: fonts.sans.semiBold },
+    primaryLabel: { color: colors.accent },
   });

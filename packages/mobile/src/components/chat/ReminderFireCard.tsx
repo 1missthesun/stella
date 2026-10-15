@@ -90,6 +90,7 @@ export const ReminderFireCard = memo(function ReminderFireCard({
       <View style={styles.actions}>
         <Pressable
           accessibilityRole="button"
+          hitSlop={10}
           disabled={busy}
           onPress={chooseSnooze}
           style={({ pressed }) => [styles.button, (pressed || busy) && styles.dimmed]}
@@ -100,6 +101,7 @@ export const ReminderFireCard = memo(function ReminderFireCard({
         </Pressable>
         <Pressable
           accessibilityRole="button"
+          hitSlop={10}
           disabled={busy}
           onPress={() => run(() => markReminderDone(fire.fireId))}
           style={({ pressed }) => [styles.button, styles.primary, (pressed || busy) && styles.dimmed]}

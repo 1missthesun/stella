@@ -179,7 +179,7 @@ export const AppSourceOffers = memo(function AppSourceOffers() {
                     <span className="schedule-card__actions">
                       <button
                         type="button"
-                        className="pill-btn pill-btn--primary schedule-card__button"
+                        className="schedule-card__button schedule-card__button--primary"
                         disabled={adding || blocked}
                         onClick={() => void run(offer.key, () => addOffer(offer))}
                       >

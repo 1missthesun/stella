@@ -32,6 +32,7 @@ export function UsageLimitChatCard({
         resume ? (
           <Pressable
             accessibilityRole="button"
+            hitSlop={10}
             onPress={resume}
             style={({ pressed }) => [styles.button, styles.primary, pressed && styles.dimmed]}
           >

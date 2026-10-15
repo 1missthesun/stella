@@ -62,7 +62,7 @@ button.schedule-card:focus-visible {
 
 .schedule-card__meta {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
   gap: 12px;
   min-height: 18px;
@@ -82,8 +82,8 @@ button.schedule-card:focus-visible {
 .schedule-card__actions {
   display: flex;
   flex: none;
-  align-items: center;
-  gap: 6px;
+  align-items: baseline;
+  gap: 12px;
 }
 
 .schedule-card__settled {
@@ -91,12 +91,6 @@ button.schedule-card:focus-visible {
   flex: none;
   align-items: center;
   gap: 4px;
-}
-
-/* Actions overhang the 18px subtitle row so a card with buttons keeps the
-   same height as one without. */
-.schedule-card__actions:has(.schedule-card__button) {
-  margin-block: -5px;
 }
 
 /* Cards whose text can run long wrap instead of truncating. */
@@ -134,16 +128,45 @@ button.schedule-card:focus-visible {
   padding-inline-end: 24px;
 }
 
-/* Chat-card actions use the shared pill styles (`pill-btn`, `pill-btn--primary`)
-   at the chat-card height, as small-radius rounded rectangles. */
-.pill-btn.schedule-card__button {
-  border-radius: 8px;
+/* Chat-card actions are plain text links on the subtitle row: same size as
+   the subtitle, medium weight, no box, so the card is only as tall as its
+   text. The primary is in the accent colour; secondaries in the subtitle's. */
+.schedule-card__button {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-weak);
+  font: inherit;
+  font-weight: var(--weight-medium, 500);
+  line-height: inherit;
+  cursor: pointer;
 }
 
-.schedule-card__button {
-  gap: 4px;
-  height: 28px;
-  padding-block: 0;
+.schedule-card__button--primary {
+  color: var(--interactive);
+}
+
+.schedule-card__button:hover:not(:disabled) {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.schedule-card__button:focus-visible {
+  outline: none;
+  border-radius: 4px;
+  box-shadow: var(--focus-ring);
+}
+
+.schedule-card__button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.schedule-card__button svg {
+  align-self: center;
 }
 
 .schedule-card[data-action="removed"] .schedule-card__headline {
@@ -154,19 +177,4 @@ button.schedule-card:focus-visible {
 
 .usage-limit-card__tile {
   color: var(--warning, var(--text-weak));
-}
-
-/* With a ✕ on the title row the subtitle keeps its usual spacing; its
-   button hangs down from the subtitle row (not up toward the ✕) and the card
-   grows at the bottom to hold it. */
-.schedule-card:has(.schedule-card__dismiss) {
-  padding-bottom: 19px;
-}
-
-.schedule-card:has(.schedule-card__dismiss) .schedule-card__meta {
-  align-items: flex-start;
-}
-
-.schedule-card:has(.schedule-card__dismiss) .schedule-card__actions:has(.schedule-card__button) {
-  margin-block: 0 -10px;
 }

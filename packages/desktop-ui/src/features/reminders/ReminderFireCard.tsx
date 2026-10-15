@@ -76,7 +76,7 @@ export const ReminderFireCard = memo(function ReminderFireCard({
       <span className="schedule-card__actions" data-reminder-state="open">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button type="button" className="pill-btn schedule-card__button" disabled={busy}>
+            <button type="button" className="schedule-card__button" disabled={busy}>
               {t("reminders.snooze")}
               <ChevronDown size={12} strokeWidth={1.75} />
             </button>
@@ -97,7 +97,7 @@ export const ReminderFireCard = memo(function ReminderFireCard({
         </DropdownMenu>
         <button
           type="button"
-          className="pill-btn pill-btn--primary schedule-card__button"
+          className="schedule-card__button schedule-card__button--primary"
           disabled={busy}
           onClick={() => run(() => markReminderDone(fire.fireId))}
         >

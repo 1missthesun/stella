@@ -1,6 +1,8 @@
+/* Top-right under the window header, clear of the composer and the cards
+   docked above it (usage limit, notices). */
 [data-component="toast-region"] {
   position: fixed;
-  bottom: 16px;
+  top: 48px;
   right: 16px;
   z-index: var(--layer-toast);
   display: flex;
@@ -210,7 +212,7 @@
 @keyframes toast-pop-in {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(-12px);
   }
   to {
     opacity: 1;

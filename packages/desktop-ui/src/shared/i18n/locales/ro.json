@@ -3157,16 +3157,20 @@
     "settings": {
       "title": "Server",
       "hostedName": "Stella",
-      "hostedDesc": "Serviciul Stella de pe stella.sh",
-      "selfHostedDesc": "Propriul tău server la {host}",
       "connectDevice": "Conectează un dispozitiv",
-      "ownServerLabel": "Propriul tău server",
-      "otherServerLabel": "Alt server",
-      "ownServerDesc": "Rulează Stella în propriul cont Cloudflare și conectează acest computer cu un link de asociere.",
-      "connect": "Conectează…",
       "useHosted": "Revino la stella.sh",
       "switching": "Se schimbă…",
-      "switchFailed": "Serverul nu a putut fi schimbat"
+      "switchFailed": "Serverul nu a putut fi schimbat",
+      "hostedSub": "stella.sh, administrat de Stella",
+      "selfHostedSub": "{host}, administrat de proprietar",
+      "addServer": "Conectează un server",
+      "switchTitle": "Treci la {name}?",
+      "switchBody": "Stella repornește pe acel server.",
+      "switchButton": "Schimbă",
+      "removeTitle": "Elimini {name}?",
+      "removeBody": "Computerul uită serverul și autentificarea. Îl poți asocia din nou mai târziu.",
+      "removeButton": "Elimină",
+      "removeA11y": "Elimină {name}"
     },
     "screen": {
       "title": "Conectează acest computer la {name}",

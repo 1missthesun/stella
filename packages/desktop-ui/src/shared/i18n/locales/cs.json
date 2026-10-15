@@ -3176,16 +3176,20 @@
     "settings": {
       "title": "Server",
       "hostedName": "Stella",
-      "hostedDesc": "Vlastní služba Stelly na stella.sh",
-      "selfHostedDesc": "Váš vlastní server na {host}",
       "connectDevice": "Připojit zařízení",
-      "ownServerLabel": "Váš vlastní server",
-      "otherServerLabel": "Jiný server",
-      "ownServerDesc": "Provozujte Stellu na vlastním účtu Cloudflare a připojte tento počítač párovacím odkazem.",
-      "connect": "Připojit…",
       "useHosted": "Přepnout zpět na stella.sh",
       "switching": "Přepínání…",
-      "switchFailed": "Server se nepodařilo přepnout"
+      "switchFailed": "Server se nepodařilo přepnout",
+      "hostedSub": "stella.sh, provozuje Stella",
+      "selfHostedSub": "{host}, provozuje vlastník",
+      "addServer": "Připojit server",
+      "switchTitle": "Přepnout na {name}?",
+      "switchBody": "Stella se na tomto serveru restartuje.",
+      "switchButton": "Přepnout",
+      "removeTitle": "Odebrat {name}?",
+      "removeBody": "Počítač zapomene server i přihlášení. Později ho můžete znovu spárovat.",
+      "removeButton": "Odebrat",
+      "removeA11y": "Odebrat {name}"
     },
     "screen": {
       "title": "Připojte tento počítač k {name}",

@@ -3117,16 +3117,20 @@
     "settings": {
       "title": "เซิร์ฟเวอร์",
       "hostedName": "Stella",
-      "hostedDesc": "บริการของ Stella เองที่ stella.sh",
-      "selfHostedDesc": "เซิร์ฟเวอร์ของคุณเองที่ {host}",
       "connectDevice": "เชื่อมต่ออุปกรณ์",
-      "ownServerLabel": "เซิร์ฟเวอร์ของคุณเอง",
-      "otherServerLabel": "เซิร์ฟเวอร์อื่น",
-      "ownServerDesc": "เรียกใช้ Stella ในบัญชี Cloudflare ของคุณเอง แล้วเชื่อมต่อคอมพิวเตอร์เครื่องนี้ด้วยลิงก์จับคู่",
-      "connect": "เชื่อมต่อ…",
       "useHosted": "กลับไปที่ stella.sh",
       "switching": "กำลังสลับ…",
-      "switchFailed": "สลับเซิร์ฟเวอร์ไม่สำเร็จ"
+      "switchFailed": "สลับเซิร์ฟเวอร์ไม่สำเร็จ",
+      "hostedSub": "stella.sh ดำเนินการโดย Stella",
+      "selfHostedSub": "{host} ดำเนินการโดยเจ้าของ",
+      "addServer": "เชื่อมต่อเซิร์ฟเวอร์",
+      "switchTitle": "สลับไปที่ {name} ไหม",
+      "switchBody": "Stella จะเริ่มใหม่บนเซิร์ฟเวอร์นั้น",
+      "switchButton": "สลับ",
+      "removeTitle": "ลบ {name} ไหม",
+      "removeBody": "คอมพิวเตอร์เครื่องนี้จะลืมเซิร์ฟเวอร์และการลงชื่อเข้าใช้ คุณจับคู่ใหม่ได้ภายหลัง",
+      "removeButton": "ลบ",
+      "removeA11y": "ลบ {name}"
     },
     "screen": {
       "title": "เชื่อมต่อคอมพิวเตอร์เครื่องนี้กับ {name}",

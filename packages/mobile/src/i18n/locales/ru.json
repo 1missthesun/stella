@@ -3176,16 +3176,20 @@
     "settings": {
       "title": "Сервер",
       "hostedName": "Stella",
-      "hostedDesc": "Собственный сервис Stella на stella.sh",
-      "selfHostedDesc": "Ваш собственный сервер {host}",
       "connectDevice": "Подключить устройство",
-      "ownServerLabel": "Ваш собственный сервер",
-      "otherServerLabel": "Другой сервер",
-      "ownServerDesc": "Запустите Stella в своём аккаунте Cloudflare и подключите этот компьютер по ссылке для привязки.",
-      "connect": "Подключить…",
       "useHosted": "Вернуться на stella.sh",
       "switching": "Переключение…",
-      "switchFailed": "Не удалось сменить сервер"
+      "switchFailed": "Не удалось сменить сервер",
+      "hostedSub": "stella.sh, управляет Stella",
+      "selfHostedSub": "{host}, управляет владелец",
+      "addServer": "Подключить сервер",
+      "switchTitle": "Переключиться на {name}?",
+      "switchBody": "Stella перезапустится на этом сервере.",
+      "switchButton": "Переключить",
+      "removeTitle": "Удалить {name}?",
+      "removeBody": "Компьютер забудет сервер и вход на нём. Позже его можно связать снова.",
+      "removeButton": "Удалить",
+      "removeA11y": "Удалить {name}"
     },
     "screen": {
       "title": "Подключите этот компьютер к {name}",

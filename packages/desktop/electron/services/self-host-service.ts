@@ -10,14 +10,26 @@ import {
   type PairingLink,
   type ServerDiscovery,
 } from "@stella/contracts/self-host";
+import {
+  DESKTOP_HOSTED_SERVER_ID,
+  type DesktopServerEntry,
+  type DesktopServerState,
+  type SelfHostConnectResult,
+  type SelfHostSwitchResult,
+} from "@stella/contracts/desktop/self-host";
 import type {
-  DesktopServerState,
-  SelfHostConnectResult,
   SelfHostInspectResult,
   SelfHostPairingStartResult,
   SelfHostPairingStatusResult,
 } from "@stella/contracts/desktop/self-host";
-import { launcherServerId, writeServerSession } from "./auth-service.js";
+import {
+  checkServerSession,
+  forgetServerData,
+  hasServerSession,
+  launcherServerId,
+  serverDataDir,
+  writeServerSession,
+} from "./auth-service.js";
 
 export const SERVER_FILE_NAME = "server.json";
 const REQUEST_TIMEOUT_MS = 15_000;
@@ -43,11 +55,11 @@ const serverFilePath = (): string | null => {
   return dir ? path.join(dir, SERVER_FILE_NAME) : null;
 };
 
-export const readServerFile = (): ServerFile | null => {
-  const file = serverFilePath();
-  if (!file) return null;
+type ServerRecord = ServerFile & { addedAt: number };
+
+const parseServerFile = (file: string): ServerRecord | null => {
   try {
-    const parsed = JSON.parse(fs.readFileSync(file, "utf8")) as Partial<ServerFile>;
+    const parsed = JSON.parse(fs.readFileSync(file, "utf8")) as Partial<ServerRecord>;
     const origin = normalizeServerOrigin(parsed.origin ?? "");
     if (!origin || typeof parsed.serverId !== "string" || !SERVER_ID_PATTERN.test(parsed.serverId)) {
       return null;
@@ -57,9 +69,62 @@ export const readServerFile = (): ServerFile | null => {
       serverId: parsed.serverId,
       name: typeof parsed.name === "string" && parsed.name.trim() ? parsed.name.trim() : "Stella",
       urls: parsed.urls && typeof parsed.urls === "object" ? parsed.urls : undefined,
+      addedAt: typeof parsed.addedAt === "number" ? parsed.addedAt : 0,
     };
   } catch {
     return null;
+  }
+};
+
+export const readServerFile = (): ServerFile | null => {
+  const file = serverFilePath();
+  if (!file) return null;
+  const record = parseServerFile(file);
+  if (!record) return null;
+  const { addedAt: _addedAt, ...value } = record;
+  return value;
+};
+
+const writeJsonAtomic = (file: string, value: unknown) => {
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const staging = `${file}.${process.pid}.tmp`;
+  fs.writeFileSync(staging, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600 });
+  fs.renameSync(staging, file);
+};
+
+const savedServerFile = (serverId: string): string | null => {
+  const dir = serverDataDir(serverId);
+  return dir ? path.join(dir, SERVER_FILE_NAME) : null;
+};
+
+const readSavedServer = (serverId: string): ServerRecord | null => {
+  const file = savedServerFile(serverId);
+  const record = file ? parseServerFile(file) : null;
+  return record?.serverId === serverId ? record : null;
+};
+
+const rememberServer = (value: ServerFile) => {
+  const file = savedServerFile(value.serverId);
+  if (!file) return;
+  const addedAt = readSavedServer(value.serverId)?.addedAt || Date.now();
+  writeJsonAtomic(file, { ...value, addedAt });
+};
+
+const savedServerIds = (): string[] => {
+  const probe = serverDataDir(DESKTOP_HOSTED_SERVER_ID);
+  if (!probe) return [];
+  try {
+    return fs
+      .readdirSync(path.dirname(probe), { withFileTypes: true })
+      .filter(
+        (entry) =>
+          entry.isDirectory() &&
+          entry.name !== DESKTOP_HOSTED_SERVER_ID &&
+          SERVER_ID_PATTERN.test(entry.name),
+      )
+      .map((entry) => entry.name);
+  } catch {
+    return [];
   }
 };
 
@@ -124,6 +189,18 @@ const fetchDiscovery = async (origin: string): Promise<ServerDiscovery> => {
   }
   return discovery;
 };
+
+const serverFileFor = (origin: string, discovery: ServerDiscovery): ServerFile => ({
+  origin,
+  serverId: discovery.serverId,
+  name: discovery.name,
+  urls: {
+    canvasShare: discovery.urls.canvasShare,
+    sites: discovery.urls.sites,
+    appsHost: discovery.urls.appsHost,
+    appsAuthHost: discovery.urls.appsAuthHost,
+  },
+});
 
 const devicePlatform = (): PairingClaimRequest["platform"] =>
   process.platform === "darwin" ? "macos" : process.platform === "win32" ? "windows" : "linux";
@@ -230,21 +307,18 @@ export class SelfHostService {
 
     if (launcherServerId() === discovery.serverId) {
       await this.options.applySessionToken(sessionToken);
+      try {
+        rememberServer(serverFileFor(link.server, discovery));
+      } catch {
+        // The session is live; the list entry is backfilled on the next listing.
+      }
       return { ok: true, relaunching: false };
     }
+    const server = serverFileFor(link.server, discovery);
     try {
       writeServerSession(discovery.serverId, link.server, sessionToken);
-      this.writeServerFile({
-        origin: link.server,
-        serverId: discovery.serverId,
-        name: discovery.name,
-        urls: {
-          canvasShare: discovery.urls.canvasShare,
-          sites: discovery.urls.sites,
-          appsHost: discovery.urls.appsHost,
-          appsAuthHost: discovery.urls.appsAuthHost,
-        },
-      });
+      rememberServer(server);
+      this.writeServerFile(server);
     } catch (error) {
       return { ok: false, error: `Couldn't save the connection: ${(error as Error).message}` };
     }
@@ -266,13 +340,104 @@ export class SelfHostService {
     return { ok: true, relaunching: true };
   }
 
+  listServers(): DesktopServerEntry[] {
+    const activeId = launcherServerId();
+    if (activeId && !readSavedServer(activeId)) {
+      const current = readServerFile();
+      if (current?.serverId === activeId) {
+        try {
+          rememberServer(current);
+        } catch {
+          // Listed from server.json below either way.
+        }
+      }
+    }
+    const records = savedServerIds()
+      .map((id) => readSavedServer(id))
+      .filter((record): record is ServerRecord => record !== null)
+      .sort((a, b) => a.addedAt - b.addedAt);
+    return [
+      {
+        id: DESKTOP_HOSTED_SERVER_ID,
+        kind: "hosted",
+        name: "Stella",
+        origin: null,
+        active: !activeId,
+        signedIn: true,
+      },
+      ...records.map((record): DesktopServerEntry => ({
+        id: record.serverId,
+        kind: "self-hosted",
+        name: record.name,
+        origin: record.origin,
+        active: record.serverId === activeId,
+        signedIn: record.serverId === activeId || hasServerSession(record.serverId),
+      })),
+    ];
+  }
+
+  async switchServer(serverId: string): Promise<SelfHostSwitchResult> {
+    if (!this.getState().canSwitch) {
+      return { ok: false, reason: "error", error: "This version of the Stella app can't switch servers yet." };
+    }
+    if (serverId === DESKTOP_HOSTED_SERVER_ID) {
+      const result = this.useDefault();
+      return result.ok ? result : { ok: false, reason: "error", error: result.error };
+    }
+    if (serverId === launcherServerId()) return { ok: true, relaunching: false };
+    const record = readSavedServer(serverId);
+    if (!record) return { ok: false, reason: "error", error: "This server isn't saved on this computer." };
+    let server: ServerFile = record;
+    try {
+      const discovery = await fetchDiscovery(record.origin);
+      if (discovery.serverId !== serverId) {
+        return { ok: false, reason: "error", error: "That address now runs a different server. Remove it and connect again." };
+      }
+      server = serverFileFor(record.origin, discovery);
+    } catch (error) {
+      return { ok: false, reason: "error", error: (error as Error).message };
+    }
+    const session = await checkServerSession(serverId, record.origin);
+    if (session === "unreachable") {
+      return { ok: false, reason: "error", error: "Couldn't reach the server. Check your connection and try again." };
+    }
+    if (session === "expired") {
+      return {
+        ok: false,
+        reason: "needs_pairing",
+        error: `Your sign-in to ${server.name} has expired. Paste a new pairing link from the server to connect again.`,
+      };
+    }
+    try {
+      rememberServer(server);
+      this.writeServerFile(server);
+    } catch (error) {
+      return { ok: false, reason: "error", error: `Couldn't switch: ${(error as Error).message}` };
+    }
+    setTimeout(() => this.options.relaunch(), 400);
+    return { ok: true, relaunching: true };
+  }
+
+  removeServer(serverId: string): { ok: boolean } {
+    if (
+      serverId === DESKTOP_HOSTED_SERVER_ID ||
+      !SERVER_ID_PATTERN.test(serverId) ||
+      serverId === launcherServerId()
+    ) {
+      return { ok: false };
+    }
+    try {
+      forgetServerData(serverId);
+      return { ok: true };
+    } catch {
+      return { ok: false };
+    }
+  }
+
   private writeServerFile(value: ServerFile) {
     const file = serverFilePath();
     if (!file) throw new Error("The launcher's data folder is unknown.");
-    fs.mkdirSync(path.dirname(file), { recursive: true });
-    const staging = `${file}.${process.pid}.tmp`;
-    fs.writeFileSync(staging, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600 });
-    fs.renameSync(staging, file);
+    writeJsonAtomic(file, value);
   }
 
   private async ownerRequest(pathname: string, init: RequestInit = {}): Promise<Response> {

@@ -3138,16 +3138,20 @@
     "settings": {
       "title": "Διακομιστής",
       "hostedName": "Stella",
-      "hostedDesc": "Η υπηρεσία της Stella στο stella.sh",
-      "selfHostedDesc": "Ο δικός σου διακομιστής στο {host}",
       "connectDevice": "Σύνδεση συσκευής",
-      "ownServerLabel": "Ο δικός σου διακομιστής",
-      "otherServerLabel": "Άλλος διακομιστής",
-      "ownServerDesc": "Τρέξε τη Stella στον δικό σου λογαριασμό Cloudflare και σύνδεσε αυτόν τον υπολογιστή με σύνδεσμο σύζευξης.",
-      "connect": "Σύνδεση…",
       "useHosted": "Επιστροφή στο stella.sh",
       "switching": "Αλλαγή…",
-      "switchFailed": "Η αλλαγή διακομιστή απέτυχε"
+      "switchFailed": "Η αλλαγή διακομιστή απέτυχε",
+      "hostedSub": "stella.sh, από τη Stella",
+      "selfHostedSub": "{host}, από τον ιδιοκτήτη του",
+      "addServer": "Σύνδεση διακομιστή",
+      "switchTitle": "Μετάβαση σε {name};",
+      "switchBody": "Η Stella επανεκκινείται σε εκείνον τον διακομιστή.",
+      "switchButton": "Μετάβαση",
+      "removeTitle": "Αφαίρεση {name};",
+      "removeBody": "Ο υπολογιστής ξεχνά τον διακομιστή και τη σύνδεσή του. Μπορείς να κάνεις ξανά σύζευξη αργότερα.",
+      "removeButton": "Αφαίρεση",
+      "removeA11y": "Αφαίρεση {name}"
     },
     "screen": {
       "title": "Σύνδεσε αυτόν τον υπολογιστή με το {name}",

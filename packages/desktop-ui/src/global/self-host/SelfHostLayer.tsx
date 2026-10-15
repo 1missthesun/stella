@@ -40,6 +40,7 @@ export function SelfHostLayer() {
         <ConnectServerDialog
           key={dialog.link ?? "manual"}
           initialLink={dialog.link}
+          notice={dialog.notice}
           onClose={() => selfHostDialogs.close()}
         />
       </>

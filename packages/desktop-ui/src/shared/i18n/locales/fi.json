@@ -3138,16 +3138,20 @@
     "settings": {
       "title": "Palvelin",
       "hostedName": "Stella",
-      "hostedDesc": "Stellan oma palvelu osoitteessa stella.sh",
-      "selfHostedDesc": "Oma palvelimesi osoitteessa {host}",
       "connectDevice": "Yhdistä laite",
-      "ownServerLabel": "Oma palvelimesi",
-      "otherServerLabel": "Toinen palvelin",
-      "ownServerDesc": "Aja Stellaa omalla Cloudflare-tililläsi ja yhdistä tämä tietokone yhdistämislinkillä.",
-      "connect": "Yhdistä…",
       "useHosted": "Vaihda takaisin stella.sh:hon",
       "switching": "Vaihdetaan…",
-      "switchFailed": "Palvelimen vaihto epäonnistui"
+      "switchFailed": "Palvelimen vaihto epäonnistui",
+      "hostedSub": "stella.sh, ylläpitäjä Stella",
+      "selfHostedSub": "{host}, ylläpitäjä sen omistaja",
+      "addServer": "Yhdistä palvelin",
+      "switchTitle": "Vaihdetaanko palvelimeen {name}?",
+      "switchBody": "Stella käynnistyy uudelleen sillä palvelimella.",
+      "switchButton": "Vaihda",
+      "removeTitle": "Poistetaanko {name}?",
+      "removeBody": "Tietokone unohtaa palvelimen ja sen kirjautumisen. Voit yhdistää sen myöhemmin uudelleen.",
+      "removeButton": "Poista",
+      "removeA11y": "Poista {name}"
     },
     "screen": {
       "title": "Yhdistä tämä tietokone: {name}",

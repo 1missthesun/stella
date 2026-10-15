@@ -3138,16 +3138,20 @@
     "settings": {
       "title": "Server",
       "hostedName": "Stella",
-      "hostedDesc": "Stellas egen tjänst på stella.sh",
-      "selfHostedDesc": "Din egen server på {host}",
       "connectDevice": "Anslut en enhet",
-      "ownServerLabel": "Din egen server",
-      "otherServerLabel": "En annan server",
-      "ownServerDesc": "Kör Stella på ditt eget Cloudflare-konto och anslut den här datorn med en kopplingslänk.",
-      "connect": "Anslut…",
       "useHosted": "Byt tillbaka till stella.sh",
       "switching": "Byter…",
-      "switchFailed": "Det gick inte att byta server"
+      "switchFailed": "Det gick inte att byta server",
+      "hostedSub": "stella.sh, drivs av Stella",
+      "selfHostedSub": "{host}, drivs av sin ägare",
+      "addServer": "Anslut en server",
+      "switchTitle": "Byta till {name}?",
+      "switchBody": "Stella startar om på den servern.",
+      "switchButton": "Byt",
+      "removeTitle": "Ta bort {name}?",
+      "removeBody": "Datorn glömmer servern och inloggningen. Du kan parkoppla igen senare.",
+      "removeButton": "Ta bort",
+      "removeA11y": "Ta bort {name}"
     },
     "screen": {
       "title": "Anslut den här datorn till {name}",

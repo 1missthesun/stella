@@ -3157,16 +3157,20 @@
     "settings": {
       "title": "שרת",
       "hostedName": "Stella",
-      "hostedDesc": "השירות של Stella ב-stella.sh",
-      "selfHostedDesc": "השרת שלך ב-{host}",
       "connectDevice": "חיבור מכשיר",
-      "ownServerLabel": "שרת משלך",
-      "otherServerLabel": "שרת אחר",
-      "ownServerDesc": "הפעל את Stella בחשבון Cloudflare שלך וחבר את המחשב הזה באמצעות קישור צימוד.",
-      "connect": "התחברות…",
       "useHosted": "חזרה ל-stella.sh",
       "switching": "מחליף…",
-      "switchFailed": "לא ניתן להחליף שרת"
+      "switchFailed": "לא ניתן להחליף שרת",
+      "hostedSub": "stella.sh, מופעל בידי Stella",
+      "selfHostedSub": "{host}, מופעל בידי הבעלים",
+      "addServer": "חיבור שרת",
+      "switchTitle": "לעבור אל {name}?",
+      "switchBody": "Stella תופעל מחדש בשרת הזה.",
+      "switchButton": "מעבר",
+      "removeTitle": "להסיר את {name}?",
+      "removeBody": "המחשב ישכח את השרת ואת ההתחברות אליו. אפשר לצמד שוב מאוחר יותר.",
+      "removeButton": "הסרה",
+      "removeA11y": "הסרת {name}"
     },
     "screen": {
       "title": "חבר את המחשב הזה ל-{name}",

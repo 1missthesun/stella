@@ -3138,16 +3138,20 @@
     "settings": {
       "title": "Szerver",
       "hostedName": "Stella",
-      "hostedDesc": "A Stella saját szolgáltatása a stella.sh-n",
-      "selfHostedDesc": "Saját szervered: {host}",
       "connectDevice": "Eszköz csatlakoztatása",
-      "ownServerLabel": "Saját szerver",
-      "otherServerLabel": "Másik szerver",
-      "ownServerDesc": "Futtasd a Stellát a saját Cloudflare-fiókodban, és csatlakoztasd ezt a számítógépet egy párosítási linkkel.",
-      "connect": "Csatlakozás…",
       "useHosted": "Vissza a stella.sh-ra",
       "switching": "Váltás…",
-      "switchFailed": "Nem sikerült szervert váltani"
+      "switchFailed": "Nem sikerült szervert váltani",
+      "hostedSub": "stella.sh, a Stella üzemelteti",
+      "selfHostedSub": "{host}, a tulajdonosa üzemelteti",
+      "addServer": "Szerver csatlakoztatása",
+      "switchTitle": "Váltasz erre: {name}?",
+      "switchBody": "A Stella újraindul azon a szerveren.",
+      "switchButton": "Váltás",
+      "removeTitle": "Eltávolítod: {name}?",
+      "removeBody": "A számítógép elfelejti a szervert és a bejelentkezést. Később újra párosíthatod.",
+      "removeButton": "Eltávolítás",
+      "removeA11y": "{name} eltávolítása"
     },
     "screen": {
       "title": "Csatlakoztasd ezt a számítógépet: {name}",

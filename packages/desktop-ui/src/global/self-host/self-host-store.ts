@@ -2,7 +2,7 @@ import { useSyncExternalStore } from "react";
 import type { DesktopServerState } from "@stella/contracts/desktop/self-host";
 
 export type SelfHostDialog =
-  | { kind: "connect"; link: string | null }
+  | { kind: "connect"; link: string | null; notice?: string }
   | { kind: "device" }
   | null;
 
@@ -17,8 +17,8 @@ const subscribe = (listener: () => void) => {
 };
 
 export const selfHostDialogs = {
-  openConnect(link: string | null = null) {
-    dialog = { kind: "connect", link };
+  openConnect(link: string | null = null, notice?: string) {
+    dialog = { kind: "connect", link, notice };
     emit();
   },
   openDevice() {

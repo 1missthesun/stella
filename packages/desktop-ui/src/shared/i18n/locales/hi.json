@@ -3138,16 +3138,20 @@
     "settings": {
       "title": "सर्वर",
       "hostedName": "Stella",
-      "hostedDesc": "stella.sh पर Stella की अपनी सेवा",
-      "selfHostedDesc": "{host} पर आपका अपना सर्वर",
       "connectDevice": "डिवाइस कनेक्ट करें",
-      "ownServerLabel": "आपका अपना सर्वर",
-      "otherServerLabel": "दूसरा सर्वर",
-      "ownServerDesc": "Stella को अपने Cloudflare खाते में चलाएँ और इस कंप्यूटर को पेयरिंग लिंक से कनेक्ट करें।",
-      "connect": "कनेक्ट करें…",
       "useHosted": "stella.sh पर वापस जाएँ",
       "switching": "बदला जा रहा है…",
-      "switchFailed": "सर्वर नहीं बदला जा सका"
+      "switchFailed": "सर्वर नहीं बदला जा सका",
+      "hostedSub": "stella.sh, Stella द्वारा संचालित",
+      "selfHostedSub": "{host}, उसके मालिक द्वारा संचालित",
+      "addServer": "सर्वर कनेक्ट करें",
+      "switchTitle": "{name} पर स्विच करें?",
+      "switchBody": "Stella उस सर्वर पर फिर से शुरू होगी।",
+      "switchButton": "स्विच करें",
+      "removeTitle": "{name} हटाएँ?",
+      "removeBody": "यह कंप्यूटर सर्वर और उसका साइन-इन भूल जाएगा। आप बाद में फिर से पेयर कर सकते हैं।",
+      "removeButton": "हटाएँ",
+      "removeA11y": "{name} हटाएँ"
     },
     "screen": {
       "title": "इस कंप्यूटर को {name} से कनेक्ट करें",

@@ -3117,16 +3117,20 @@
     "settings": {
       "title": "サーバー",
       "hostedName": "Stella",
-      "hostedDesc": "stella.sh の Stella 公式サービス",
-      "selfHostedDesc": "{host} の自分のサーバー",
       "connectDevice": "デバイスを接続",
-      "ownServerLabel": "自分のサーバー",
-      "otherServerLabel": "別のサーバー",
-      "ownServerDesc": "自分の Cloudflare アカウントで Stella を動かし、ペアリングリンクでこのコンピューターを接続します。",
-      "connect": "接続…",
       "useHosted": "stella.sh に戻す",
       "switching": "切り替え中…",
-      "switchFailed": "サーバーを切り替えられませんでした"
+      "switchFailed": "サーバーを切り替えられませんでした",
+      "hostedSub": "stella.sh、Stellaが運営",
+      "selfHostedSub": "{host}、所有者が運営",
+      "addServer": "サーバーに接続",
+      "switchTitle": "{name} に切り替えますか？",
+      "switchBody": "Stellaはそのサーバーで再起動します。",
+      "switchButton": "切り替え",
+      "removeTitle": "{name} を削除しますか？",
+      "removeBody": "このコンピューターはサーバーとそのサインインを削除します。あとで再度ペアリングできます。",
+      "removeButton": "削除",
+      "removeA11y": "{name} を削除"
     },
     "screen": {
       "title": "このコンピューターを {name} に接続",

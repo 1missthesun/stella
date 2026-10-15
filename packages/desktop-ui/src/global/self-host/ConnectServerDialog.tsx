@@ -36,9 +36,11 @@ const releasedOn = (value: string | null) => {
 
 export function ConnectServerDialog({
   initialLink,
+  notice,
   onClose,
 }: {
   initialLink: string | null;
+  notice?: string;
   onClose: () => void;
 }) {
   const t = useT();
@@ -118,6 +120,7 @@ export function ConnectServerDialog({
             <DialogDescription className="self-host-dialog__text">
               {t("selfHost.connect.intro")}
             </DialogDescription>
+            {notice ? <p className="self-host-dialog__notice">{notice}</p> : null}
             <textarea
               className="self-host-dialog__input"
               value={text}

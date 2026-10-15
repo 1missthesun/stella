@@ -198,3 +198,120 @@
   align-items: center;
   gap: 6px;
 }
+
+.server-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.server-list__row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.server-list__row + .server-list__row {
+  border-top: 1px solid color-mix(in oklch, var(--foreground) 7%, transparent);
+}
+
+.server-list__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 11px 8px 11px 2px;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  border-radius: 8px;
+}
+
+.server-list__main:disabled {
+  cursor: default;
+}
+
+.server-list__main:not(:disabled):hover .server-list__name {
+  color: var(--interactive);
+}
+
+.server-list__main:focus-visible,
+.server-list__remove:focus-visible {
+  outline: 2px solid var(--interactive);
+  outline-offset: 1px;
+}
+
+.server-list__icon {
+  flex-shrink: 0;
+  color: color-mix(in oklch, var(--text-base) 70%, var(--text-weak));
+}
+
+.server-list__copy {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.server-list__name,
+.server-list__host {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.server-list__name {
+  font-size: var(--font-size-base);
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.005em;
+  line-height: 1.25;
+  color: var(--text-strong);
+  transition: color 120ms ease;
+}
+
+.server-list__host {
+  font-size: var(--font-size-sm);
+  line-height: 1.45;
+  color: color-mix(in oklch, var(--text-base) 70%, var(--text-weak));
+}
+
+.server-list__check {
+  flex-shrink: 0;
+  color: var(--interactive);
+}
+
+.server-list__main--add .server-list__icon,
+.server-list__main--add .server-list__name {
+  color: var(--interactive);
+}
+
+.server-list__main--add {
+  flex: 1;
+}
+
+.server-list__remove {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: color-mix(in oklch, var(--text-base) 70%, var(--text-weak));
+  cursor: pointer;
+  transition: color 120ms ease, background-color 120ms ease;
+}
+
+.server-list__remove:not(:disabled):hover {
+  color: var(--destructive);
+  background: color-mix(in oklch, var(--destructive) 10%, transparent);
+}

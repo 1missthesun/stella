@@ -3117,16 +3117,20 @@
     "settings": {
       "title": "Máy chủ",
       "hostedName": "Stella",
-      "hostedDesc": "Dịch vụ của Stella tại stella.sh",
-      "selfHostedDesc": "Máy chủ của bạn tại {host}",
       "connectDevice": "Kết nối thiết bị",
-      "ownServerLabel": "Máy chủ của bạn",
-      "otherServerLabel": "Máy chủ khác",
-      "ownServerDesc": "Chạy Stella trong tài khoản Cloudflare của bạn và kết nối máy tính này bằng liên kết ghép nối.",
-      "connect": "Kết nối…",
       "useHosted": "Quay lại stella.sh",
       "switching": "Đang chuyển…",
-      "switchFailed": "Không thể chuyển máy chủ"
+      "switchFailed": "Không thể chuyển máy chủ",
+      "hostedSub": "stella.sh, do Stella vận hành",
+      "selfHostedSub": "{host}, do chủ sở hữu vận hành",
+      "addServer": "Kết nối máy chủ",
+      "switchTitle": "Chuyển sang {name}?",
+      "switchBody": "Stella sẽ khởi động lại trên máy chủ đó.",
+      "switchButton": "Chuyển",
+      "removeTitle": "Xóa {name}?",
+      "removeBody": "Máy tính này sẽ quên máy chủ và thông tin đăng nhập. Bạn có thể ghép nối lại sau.",
+      "removeButton": "Xóa",
+      "removeA11y": "Xóa {name}"
     },
     "screen": {
       "title": "Kết nối máy tính này với {name}",

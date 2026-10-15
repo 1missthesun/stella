@@ -22,6 +22,8 @@ import type { StellaBrowserBridgeStatus } from "../browser-bridge-status.js";
 import type {
   DesktopServerState,
   SelfHostConnectResult,
+  SelfHostSwitchResult,
+  DesktopServerEntry,
   SelfHostInspectResult,
   SelfHostPairingStartResult,
   SelfHostPairingStatusResult,
@@ -401,6 +403,9 @@ import {
   IPC_SELF_HOST_INSPECT_LINK,
   IPC_SELF_HOST_CONNECT,
   IPC_SELF_HOST_USE_DEFAULT,
+  IPC_SELF_HOST_LIST_SERVERS,
+  IPC_SELF_HOST_SWITCH_SERVER,
+  IPC_SELF_HOST_REMOVE_SERVER,
   IPC_SELF_HOST_START_PAIRING,
   IPC_SELF_HOST_PAIRING_STATUS,
   IPC_SELF_HOST_CANCEL_PAIRING,
@@ -770,6 +775,9 @@ export type IpcInvokeContract = {
   [IPC_SELF_HOST_INSPECT_LINK]: Invoke<[text: string], SelfHostInspectResult>;
   [IPC_SELF_HOST_CONNECT]: Invoke<[text: string], SelfHostConnectResult>;
   [IPC_SELF_HOST_USE_DEFAULT]: Invoke<[], SelfHostConnectResult>;
+  [IPC_SELF_HOST_LIST_SERVERS]: Invoke<[], DesktopServerEntry[]>;
+  [IPC_SELF_HOST_SWITCH_SERVER]: Invoke<[serverId: string], SelfHostSwitchResult>;
+  [IPC_SELF_HOST_REMOVE_SERVER]: Invoke<[serverId: string], OkResult>;
   [IPC_SELF_HOST_START_PAIRING]: Invoke<[], SelfHostPairingStartResult>;
   [IPC_SELF_HOST_PAIRING_STATUS]: Invoke<[pairingId: string], SelfHostPairingStatusResult>;
   [IPC_SELF_HOST_CANCEL_PAIRING]: Invoke<[pairingId: string], OkResult>;

@@ -3117,16 +3117,20 @@
     "settings": {
       "title": "伺服器",
       "hostedName": "Stella",
-      "hostedDesc": "Stella 在 stella.sh 上的官方服務",
-      "selfHostedDesc": "你在 {host} 的伺服器",
       "connectDevice": "連線裝置",
-      "ownServerLabel": "你自己的伺服器",
-      "otherServerLabel": "其他伺服器",
-      "ownServerDesc": "在你自己的 Cloudflare 帳號中執行 Stella，並用配對連結連線這台電腦。",
-      "connect": "連線…",
       "useHosted": "切換回 stella.sh",
       "switching": "正在切換…",
-      "switchFailed": "無法切換伺服器"
+      "switchFailed": "無法切換伺服器",
+      "hostedSub": "stella.sh，由 Stella 營運",
+      "selfHostedSub": "{host}，由其擁有者營運",
+      "addServer": "連接伺服器",
+      "switchTitle": "切換到 {name}？",
+      "switchBody": "Stella 將在該伺服器上重新啟動。",
+      "switchButton": "切換",
+      "removeTitle": "移除 {name}？",
+      "removeBody": "這台電腦將忘記該伺服器及其登入資訊。你之後可以重新配對。",
+      "removeButton": "移除",
+      "removeA11y": "移除 {name}"
     },
     "screen": {
       "title": "將這台電腦連線到 {name}",

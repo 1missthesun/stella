@@ -3138,16 +3138,20 @@
     "settings": {
       "title": "Server",
       "hostedName": "Stella",
-      "hostedDesc": "Stellas egen tjeneste på stella.sh",
-      "selfHostedDesc": "Din egen server på {host}",
       "connectDevice": "Forbind en enhed",
-      "ownServerLabel": "Din egen server",
-      "otherServerLabel": "En anden server",
-      "ownServerDesc": "Kør Stella på din egen Cloudflare-konto, og forbind denne computer med et parringslink.",
-      "connect": "Forbind…",
       "useHosted": "Skift tilbage til stella.sh",
       "switching": "Skifter…",
-      "switchFailed": "Kunne ikke skifte server"
+      "switchFailed": "Kunne ikke skifte server",
+      "hostedSub": "stella.sh, drevet af Stella",
+      "selfHostedSub": "{host}, drevet af ejeren",
+      "addServer": "Forbind en server",
+      "switchTitle": "Skift til {name}?",
+      "switchBody": "Stella genstarter på den server.",
+      "switchButton": "Skift",
+      "removeTitle": "Fjern {name}?",
+      "removeBody": "Computeren glemmer serveren og login. Du kan parre igen senere.",
+      "removeButton": "Fjern",
+      "removeA11y": "Fjern {name}"
     },
     "screen": {
       "title": "Forbind denne computer til {name}",

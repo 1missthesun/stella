@@ -3138,16 +3138,20 @@
     "settings": {
       "title": "Server",
       "hostedName": "Stella",
-      "hostedDesc": "Stella's own service at stella.sh",
-      "selfHostedDesc": "Your own server at {host}",
       "connectDevice": "Connect a device",
-      "ownServerLabel": "Your own server",
-      "otherServerLabel": "Another server",
-      "ownServerDesc": "Run Stella on your own Cloudflare account and connect this computer with a pairing link.",
-      "connect": "Connect…",
       "useHosted": "Switch back to stella.sh",
       "switching": "Switching…",
-      "switchFailed": "Couldn't switch servers"
+      "switchFailed": "Couldn't switch servers",
+      "hostedSub": "stella.sh, run by Stella",
+      "selfHostedSub": "{host}, run by its owner",
+      "addServer": "Connect a server",
+      "switchTitle": "Switch to {name}?",
+      "switchBody": "Stella restarts on that server.",
+      "switchButton": "Switch",
+      "removeTitle": "Remove {name}?",
+      "removeBody": "This computer forgets the server and its sign-in. You can pair it again later.",
+      "removeButton": "Remove",
+      "removeA11y": "Remove {name}"
     },
     "screen": {
       "title": "Connect this computer to {name}",

@@ -8,6 +8,9 @@ import {
   IPC_SELF_HOST_START_PAIRING,
   IPC_SELF_HOST_TAKE_PENDING_LINK,
   IPC_SELF_HOST_USE_DEFAULT,
+  IPC_SELF_HOST_LIST_SERVERS,
+  IPC_SELF_HOST_SWITCH_SERVER,
+  IPC_SELF_HOST_REMOVE_SERVER,
 } from "@stella/contracts/desktop/ipc-channels";
 import type { SelfHostService } from "../services/self-host-service.js";
 import {
@@ -39,6 +42,17 @@ export const registerSelfHostHandlers = (
   );
   registerPrivilegedHandle(options, IPC_SELF_HOST_USE_DEFAULT, (event) =>
     fromApp(event) ? service.useDefault() : refused,
+  );
+  registerPrivilegedHandle(options, IPC_SELF_HOST_LIST_SERVERS, (event) =>
+    fromApp(event) ? service.listServers() : [],
+  );
+  registerPrivilegedHandle(options, IPC_SELF_HOST_SWITCH_SERVER, (event, serverId) =>
+    fromApp(event)
+      ? service.switchServer(String(serverId ?? ""))
+      : { ok: false as const, reason: "error" as const, error: refused.error },
+  );
+  registerPrivilegedHandle(options, IPC_SELF_HOST_REMOVE_SERVER, (event, serverId) =>
+    fromApp(event) ? service.removeServer(String(serverId ?? "")) : { ok: false },
   );
   registerPrivilegedHandle(options, IPC_SELF_HOST_START_PAIRING, (event) =>
     fromApp(event) ? service.startPairing() : refused,

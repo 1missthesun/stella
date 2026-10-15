@@ -8,6 +8,21 @@ export type DesktopServerState = {
   backendUrl: string | null;
 };
 
+export const DESKTOP_HOSTED_SERVER_ID = "hosted";
+
+export type DesktopServerEntry = {
+  id: string;
+  kind: "hosted" | "self-hosted";
+  name: string;
+  origin: string | null;
+  active: boolean;
+  signedIn: boolean;
+};
+
+export type SelfHostSwitchResult =
+  | { ok: true; relaunching: boolean }
+  | { ok: false; reason: "needs_pairing" | "error"; error: string };
+
 export type SelfHostInspectResult =
   | { ok: true; server: string; discovery: ServerDiscovery }
   | { ok: false; error: string };

@@ -3138,16 +3138,20 @@
     "settings": {
       "title": "Sunucu",
       "hostedName": "Stella",
-      "hostedDesc": "Stella'nın stella.sh'deki kendi hizmeti",
-      "selfHostedDesc": "{host} adresindeki kendi sunucun",
       "connectDevice": "Cihaz bağla",
-      "ownServerLabel": "Kendi sunucun",
-      "otherServerLabel": "Başka bir sunucu",
-      "ownServerDesc": "Stella'yı kendi Cloudflare hesabında çalıştır ve bu bilgisayarı bir eşleştirme bağlantısıyla bağla.",
-      "connect": "Bağlan…",
       "useHosted": "stella.sh'ye geri dön",
       "switching": "Değiştiriliyor…",
-      "switchFailed": "Sunucu değiştirilemedi"
+      "switchFailed": "Sunucu değiştirilemedi",
+      "hostedSub": "stella.sh, Stella tarafından işletilir",
+      "selfHostedSub": "{host}, sahibi tarafından işletilir",
+      "addServer": "Sunucu bağla",
+      "switchTitle": "{name} sunucusuna geçilsin mi?",
+      "switchBody": "Stella o sunucuda yeniden başlar.",
+      "switchButton": "Geç",
+      "removeTitle": "{name} kaldırılsın mı?",
+      "removeBody": "Bu bilgisayar sunucuyu ve oturumunu unutur. Daha sonra yeniden eşleştirebilirsin.",
+      "removeButton": "Kaldır",
+      "removeA11y": "{name} öğesini kaldır"
     },
     "screen": {
       "title": "Bu bilgisayarı {name} sunucusuna bağla",

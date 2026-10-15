@@ -3117,16 +3117,20 @@
     "settings": {
       "title": "서버",
       "hostedName": "Stella",
-      "hostedDesc": "stella.sh의 Stella 공식 서비스",
-      "selfHostedDesc": "{host}의 내 서버",
       "connectDevice": "기기 연결",
-      "ownServerLabel": "내 서버",
-      "otherServerLabel": "다른 서버",
-      "ownServerDesc": "내 Cloudflare 계정에서 Stella를 실행하고 페어링 링크로 이 컴퓨터를 연결하세요.",
-      "connect": "연결…",
       "useHosted": "stella.sh로 돌아가기",
       "switching": "전환 중…",
-      "switchFailed": "서버를 전환하지 못했습니다"
+      "switchFailed": "서버를 전환하지 못했습니다",
+      "hostedSub": "stella.sh, Stella 운영",
+      "selfHostedSub": "{host}, 소유자 운영",
+      "addServer": "서버 연결",
+      "switchTitle": "{name}(으)로 전환할까요?",
+      "switchBody": "Stella가 해당 서버에서 다시 시작됩니다.",
+      "switchButton": "전환",
+      "removeTitle": "{name}을(를) 제거할까요?",
+      "removeBody": "이 컴퓨터에서 서버와 로그인 정보가 삭제됩니다. 나중에 다시 페어링할 수 있습니다.",
+      "removeButton": "제거",
+      "removeA11y": "{name} 제거"
     },
     "screen": {
       "title": "이 컴퓨터를 {name}에 연결",

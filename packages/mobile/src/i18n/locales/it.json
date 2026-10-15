@@ -3157,16 +3157,20 @@
     "settings": {
       "title": "Server",
       "hostedName": "Stella",
-      "hostedDesc": "Il servizio di Stella su stella.sh",
-      "selfHostedDesc": "Il tuo server su {host}",
       "connectDevice": "Connetti un dispositivo",
-      "ownServerLabel": "Il tuo server",
-      "otherServerLabel": "Un altro server",
-      "ownServerDesc": "Esegui Stella sul tuo account Cloudflare e connetti questo computer con un link di abbinamento.",
-      "connect": "Connetti…",
       "useHosted": "Torna a stella.sh",
       "switching": "Cambio in corso…",
-      "switchFailed": "Impossibile cambiare server"
+      "switchFailed": "Impossibile cambiare server",
+      "hostedSub": "stella.sh, gestito da Stella",
+      "selfHostedSub": "{host}, gestito dal suo proprietario",
+      "addServer": "Collega un server",
+      "switchTitle": "Passare a {name}?",
+      "switchBody": "Stella si riavvia su quel server.",
+      "switchButton": "Passa",
+      "removeTitle": "Rimuovere {name}?",
+      "removeBody": "Questo computer dimentica il server e il relativo accesso. Potrai abbinarlo di nuovo in seguito.",
+      "removeButton": "Rimuovi",
+      "removeA11y": "Rimuovi {name}"
     },
     "screen": {
       "title": "Connetti questo computer a {name}",

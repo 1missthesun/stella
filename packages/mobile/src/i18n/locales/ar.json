@@ -3214,16 +3214,20 @@
     "settings": {
       "title": "الخادم",
       "hostedName": "Stella",
-      "hostedDesc": "خدمة Stella الخاصة على stella.sh",
-      "selfHostedDesc": "خادمك الخاص على {host}",
       "connectDevice": "توصيل جهاز",
-      "ownServerLabel": "خادمك الخاص",
-      "otherServerLabel": "خادم آخر",
-      "ownServerDesc": "شغّل Stella في حساب Cloudflare الخاص بك ووصّل هذا الكمبيوتر برابط إقران.",
-      "connect": "اتصال…",
       "useHosted": "العودة إلى stella.sh",
       "switching": "جارٍ التبديل…",
-      "switchFailed": "تعذّر تبديل الخادم"
+      "switchFailed": "تعذّر تبديل الخادم",
+      "hostedSub": "stella.sh، تديره Stella",
+      "selfHostedSub": "{host}، يديره مالكه",
+      "addServer": "ربط خادم",
+      "switchTitle": "التبديل إلى {name}؟",
+      "switchBody": "ستُعاد تشغيل Stella على ذلك الخادم.",
+      "switchButton": "تبديل",
+      "removeTitle": "إزالة {name}؟",
+      "removeBody": "سينسى هذا الكمبيوتر الخادم وتسجيل الدخول إليه. يمكنك إقرانه مرة أخرى لاحقًا.",
+      "removeButton": "إزالة",
+      "removeA11y": "إزالة {name}"
     },
     "screen": {
       "title": "وصّل هذا الكمبيوتر بـ {name}",

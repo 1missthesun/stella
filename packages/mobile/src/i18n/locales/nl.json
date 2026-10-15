@@ -3138,16 +3138,20 @@
     "settings": {
       "title": "Server",
       "hostedName": "Stella",
-      "hostedDesc": "Stella's eigen dienst op stella.sh",
-      "selfHostedDesc": "Je eigen server op {host}",
       "connectDevice": "Apparaat verbinden",
-      "ownServerLabel": "Je eigen server",
-      "otherServerLabel": "Een andere server",
-      "ownServerDesc": "Draai Stella op je eigen Cloudflare-account en verbind deze computer met een koppellink.",
-      "connect": "Verbinden…",
       "useHosted": "Terug naar stella.sh",
       "switching": "Wisselen…",
-      "switchFailed": "Kan niet van server wisselen"
+      "switchFailed": "Kan niet van server wisselen",
+      "hostedSub": "stella.sh, beheerd door Stella",
+      "selfHostedSub": "{host}, beheerd door de eigenaar",
+      "addServer": "Een server verbinden",
+      "switchTitle": "Overschakelen naar {name}?",
+      "switchBody": "Stella start opnieuw op die server.",
+      "switchButton": "Overschakelen",
+      "removeTitle": "{name} verwijderen?",
+      "removeBody": "Deze computer vergeet de server en de aanmelding. Je kunt later opnieuw koppelen.",
+      "removeButton": "Verwijderen",
+      "removeA11y": "{name} verwijderen"
     },
     "screen": {
       "title": "Verbind deze computer met {name}",

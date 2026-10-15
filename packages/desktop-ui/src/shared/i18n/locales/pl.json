@@ -3176,16 +3176,20 @@
     "settings": {
       "title": "Serwer",
       "hostedName": "Stella",
-      "hostedDesc": "Własna usługa Stelli na stella.sh",
-      "selfHostedDesc": "Twój własny serwer pod adresem {host}",
       "connectDevice": "Połącz urządzenie",
-      "ownServerLabel": "Twój własny serwer",
-      "otherServerLabel": "Inny serwer",
-      "ownServerDesc": "Uruchom Stellę na własnym koncie Cloudflare i połącz ten komputer linkiem parowania.",
-      "connect": "Połącz…",
       "useHosted": "Wróć do stella.sh",
       "switching": "Przełączanie…",
-      "switchFailed": "Nie udało się zmienić serwera"
+      "switchFailed": "Nie udało się zmienić serwera",
+      "hostedSub": "stella.sh, prowadzony przez Stellę",
+      "selfHostedSub": "{host}, prowadzony przez właściciela",
+      "addServer": "Połącz serwer",
+      "switchTitle": "Przełączyć na {name}?",
+      "switchBody": "Stella uruchomi się ponownie na tym serwerze.",
+      "switchButton": "Przełącz",
+      "removeTitle": "Usunąć {name}?",
+      "removeBody": "Komputer zapomni serwer i logowanie. Możesz sparować go ponownie później.",
+      "removeButton": "Usuń",
+      "removeA11y": "Usuń {name}"
     },
     "screen": {
       "title": "Połącz ten komputer z {name}",

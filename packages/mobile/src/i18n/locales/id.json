@@ -3117,16 +3117,20 @@
     "settings": {
       "title": "Server",
       "hostedName": "Stella",
-      "hostedDesc": "Layanan Stella sendiri di stella.sh",
-      "selfHostedDesc": "Server Anda sendiri di {host}",
       "connectDevice": "Hubungkan perangkat",
-      "ownServerLabel": "Server Anda sendiri",
-      "otherServerLabel": "Server lain",
-      "ownServerDesc": "Jalankan Stella di akun Cloudflare Anda sendiri dan hubungkan komputer ini dengan tautan pemasangan.",
-      "connect": "Hubungkan…",
       "useHosted": "Kembali ke stella.sh",
       "switching": "Beralih…",
-      "switchFailed": "Tidak dapat beralih server"
+      "switchFailed": "Tidak dapat beralih server",
+      "hostedSub": "stella.sh, dijalankan oleh Stella",
+      "selfHostedSub": "{host}, dijalankan oleh pemiliknya",
+      "addServer": "Hubungkan server",
+      "switchTitle": "Beralih ke {name}?",
+      "switchBody": "Stella akan dimulai ulang di server tersebut.",
+      "switchButton": "Beralih",
+      "removeTitle": "Hapus {name}?",
+      "removeBody": "Komputer ini akan melupakan server dan info masuknya. Kamu bisa memasangkannya lagi nanti.",
+      "removeButton": "Hapus",
+      "removeA11y": "Hapus {name}"
     },
     "screen": {
       "title": "Hubungkan komputer ini ke {name}",

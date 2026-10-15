@@ -78,6 +78,90 @@ export const authStoragePathForServer = (serverId: string | null): string => {
     : path.join(userData, AUTH_STORAGE_FILE);
 };
 
+export const serverDataDir = (serverId: string): string | null =>
+  SERVER_ID_PATTERN.test(serverId)
+    ? path.join(app.getPath("userData"), "servers", serverId)
+    : null;
+
+const readServerAuthFile = (serverId: string): Record<string, string> => {
+  try {
+    const parsed = JSON.parse(
+      fs.readFileSync(authStoragePathForServer(serverId), "utf8"),
+    ) as Record<string, unknown>;
+    return Object.fromEntries(
+      Object.entries(parsed).filter(
+        (entry): entry is [string, string] => typeof entry[1] === "string",
+      ),
+    );
+  } catch {
+    return {};
+  }
+};
+
+export const hasServerSession = (serverId: string): boolean => {
+  const encoded = readServerAuthFile(serverId)[BETTER_AUTH_TOKEN_STORAGE_KEY];
+  return Boolean(encoded && unprotectValue(AUTH_STORAGE_SCOPE, encoded)?.trim());
+};
+
+export type ServerSessionCheck = "valid" | "expired" | "unreachable";
+
+/** Checks a saved (not active) server's sign-in without touching the live session. */
+export const checkServerSession = async (
+  serverId: string,
+  backendUrl: string,
+): Promise<ServerSessionCheck> => {
+  const stored = readServerAuthFile(serverId);
+  const encoded = stored[BETTER_AUTH_TOKEN_STORAGE_KEY];
+  const token = encoded ? unprotectValue(AUTH_STORAGE_SCOPE, encoded)?.trim() : "";
+  if (!token) return "expired";
+  let response: Response;
+  try {
+    response = await fetch(`${backendUrl}${AUTH_BASE_PATH}/get-session`, {
+      headers: {
+        accept: "application/json",
+        origin: DESKTOP_AUTH_ORIGIN,
+        authorization: `Bearer ${token}`,
+      },
+      signal: AbortSignal.timeout(AUTH_REQUEST_TIMEOUT_MS),
+    });
+  } catch {
+    return "unreachable";
+  }
+  if (response.status === 401) return "expired";
+  if (!response.ok) return "unreachable";
+  const data = (await response.json().catch(() => undefined)) as unknown;
+  if (data === undefined) return "unreachable";
+  if (!data || typeof data !== "object") return "expired";
+  const rotated = response.headers.get("set-auth-token")?.trim();
+  if (rotated && rotated !== token) {
+    const file = authStoragePathForServer(serverId);
+    const staging = `${file}.${process.pid}.tmp`;
+    fs.writeFileSync(
+      staging,
+      JSON.stringify(
+        {
+          ...stored,
+          [BETTER_AUTH_TOKEN_STORAGE_KEY]: protectValue(AUTH_STORAGE_SCOPE, rotated),
+        },
+        null,
+        2,
+      ),
+      { mode: 0o600 },
+    );
+    fs.renameSync(staging, file);
+  }
+  return "valid";
+};
+
+export const forgetServerData = (serverId: string) => {
+  const dir = serverDataDir(serverId);
+  if (!dir) throw new Error("Invalid server id.");
+  for (const value of Object.values(readServerAuthFile(serverId))) {
+    deleteProtectedValue(AUTH_STORAGE_SCOPE, value);
+  }
+  fs.rmSync(dir, { recursive: true, force: true });
+};
+
 export const writeServerSession = (
   serverId: string,
   backendUrl: string,

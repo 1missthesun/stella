@@ -791,6 +791,20 @@ const startElectron = async (run, { minted, modelGateway, fakeMic, browserBridge
       ...(modelGateway ? { STELLA_MODEL_GATEWAY_URL: modelGateway } : {}),
       ...(browserBridge ? { STELLA_BROWSER_BRIDGE: browserBridge } : {}),
       ...(run.display?.display ? { DISPLAY: run.display.display } : {}),
+      // On the host display a Wayland session runs Electron natively (as the
+      // installed app does); Xvfb runs must not see WAYLAND_DISPLAY or
+      // Electron would open on the real screen.
+      ...(process.platform === "linux" &&
+      run.display?.mode === "host" &&
+      process.env.WAYLAND_DISPLAY
+        ? {
+            WAYLAND_DISPLAY: process.env.WAYLAND_DISPLAY,
+            XDG_SESSION_TYPE: "wayland",
+            ...(process.env.HYPRLAND_INSTANCE_SIGNATURE
+              ? { HYPRLAND_INSTANCE_SIGNATURE: process.env.HYPRLAND_INSTANCE_SIGNATURE }
+              : {}),
+          }
+        : {}),
       ...(run.browserExtension
         ? {
             STELLA_BROWSER_SOCKET_DIR: run.browserExtension.socketDir,

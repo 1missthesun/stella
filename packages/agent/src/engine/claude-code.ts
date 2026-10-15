@@ -114,6 +114,7 @@ export type ClaudeCodeTurnSpec = {
   prompt: string;
   images: ImageContent[];
   resumeFallbackPrompt: string;
+  reseed?(): Promise<{ sessionId: string; prompt: string } | undefined>;
   tools: ClaudeCodeToolSpec[];
   nativeTools: readonly string[];
   signal: AbortSignal;
@@ -823,32 +824,33 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       return message.role === "user" && key !== undefined && undelivered.has(key) && !givenKeys.has(key);
     });
     const promptAt = trailingUsers(conversation).start;
-    const hydrated =
-      !steering && !delta && promptAt > 0 && options.transport.hydrate
-        ? await options.transport
-            .hydrate(binding.session, (meta) =>
-              claudeCodeTranscript(
-                conversation.slice(0, promptAt),
-                meta,
-                cliToolName(binding),
-                thinkingOn(conversation, request.model.id, options.resolveModel?.(request.model.id)),
-              ),
-            )
-            .catch((error: unknown) => {
-              report(error);
-              return undefined;
-            })
-        : undefined;
-    if (hydrated) {
+    const hydrate = async (): Promise<string | undefined> => {
+      if (promptAt === 0 || !options.transport.hydrate) return undefined;
+      const sessionId = await options.transport
+        .hydrate(binding.session, (meta) =>
+          claudeCodeTranscript(
+            conversation.slice(0, promptAt),
+            meta,
+            cliToolName(binding),
+            thinkingOn(conversation, request.model.id, options.resolveModel?.(request.model.id)),
+          ),
+        )
+        .catch((error: unknown) => {
+          report(error);
+          return undefined;
+        });
+      if (!sessionId) return undefined;
       record.seen = [];
       delete record.boundary;
       delete record.undelivered;
       noteSeen(session, conversation.slice(0, promptAt));
       if (baseline !== undefined) record.context = baseline;
-      record.cliSessionId = hydrated;
-      session.cliSessionId = hydrated;
+      record.cliSessionId = sessionId;
+      session.cliSessionId = sessionId;
       await saveRecord(session);
-    }
+      return sessionId;
+    };
+    const hydrated = !steering && !delta ? await hydrate() : undefined;
     const asked = steering
       ? request.prompt!
       : delta
@@ -908,6 +910,16 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
         prompt: prompt.text,
         images: prompt.images,
         resumeFallbackPrompt: rebuild.text,
+        ...(options.transport.hydrate
+          ? {
+              reseed: async () => {
+                const sessionId = await hydrate();
+                if (!sessionId) return undefined;
+                const users = conversation.slice(promptAt);
+                return { sessionId, prompt: commandSafe(hydratedPrompt(users).text, users) };
+              },
+            }
+          : {}),
         tools: fitted.tools,
         nativeTools: request.nativeTools,
         signal: abort.signal,

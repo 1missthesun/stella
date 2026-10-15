@@ -106,6 +106,7 @@ export type ClaudeCodeTurnRequest = {
   effortLevel?: string;
   prompt: string;
   resumeFallbackPrompt?: string;
+  reseed?: () => Promise<{ sessionId: string; prompt: string } | undefined>;
   systemPrompt?: string;
   cwd?: string;
   settingSources?: readonly ("user" | "project" | "local")[];
@@ -257,6 +258,7 @@ const backgroundTaskOf = (
 };
 type ClaudeCodeSession = {
   sessionId: string;
+  reseededSessionId?: string;
   cwd: string | undefined;
   lastUsedAt: number;
   turnCount: number;
@@ -2285,10 +2287,10 @@ class ClaudeCodeSessionRuntime {
     promptImages: ClaudeCodeImage[] = [],
     observedMcpCalls: McpCallRecord[] = [],
   ): Promise<ClaudeCodeStepResult> {
-    const buildReseedPrompt = (mcpCalls: McpCallRecord[]) => {
+    const buildReseedPrompt = (mcpCalls: McpCallRecord[], base?: string) => {
       const reseedBase = withConsumedSteering(
         session,
-        request.resumeFallbackPrompt ?? prompt,
+        base ?? request.resumeFallbackPrompt ?? prompt,
       );
       return mcpCalls.length > 0
         ? buildSideEffectReconciliationPrompt(mcpCalls, reseedBase)
@@ -2355,6 +2357,26 @@ class ClaudeCodeSessionRuntime {
       }
       if (useResume && isMissingResumeSessionError(message)) {
         this.resetStreamingProcess(request.sessionKey, session);
+        const reseeded =
+          session.reseededSessionId === session.sessionId
+            ? undefined
+            : await request.reseed?.().catch(() => undefined);
+        if (reseeded) {
+          session.sessionId = reseeded.sessionId;
+          session.reseededSessionId = reseeded.sessionId;
+          session.turnCount = 1;
+          session.resumeReady = true;
+          return await this.executeStepWithMode(
+            session,
+            request,
+            effectiveSystemPrompt,
+            buildReseedPrompt(observedMcpCalls, reseeded.prompt),
+            true,
+            allowCompactionLoopRestart,
+            promptImages,
+            observedMcpCalls,
+          );
+        }
         session.sessionId = crypto.randomUUID();
         session.turnCount = 0;
         session.resumeReady = false;

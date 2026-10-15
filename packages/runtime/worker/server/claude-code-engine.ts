@@ -252,6 +252,7 @@ const desktopTransport = (session: OpenSession): ClaudeCodeTransport => {
         ...(effortLevel ? { effortLevel } : {}),
         prompt: spec.prompt,
         resumeFallbackPrompt: spec.resumeFallbackPrompt,
+        ...(spec.reseed ? { reseed: spec.reseed } : {}),
         systemPrompt: spec.systemPrompt,
         ...(cwd ? { cwd } : {}),
         ...(ref.role === "orchestrator" ? { settingSources: [] } : {}),

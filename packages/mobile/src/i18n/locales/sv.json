@@ -3051,6 +3051,59 @@
         "pickDays": "Välj minst en dag.",
         "pickCron": "Ange ett cron-uttryck."
       }
+    },
+    "notice": {
+      "open": "Öppna i Schema",
+      "title": {
+        "created": {
+          "reminder": "Påminnelse skapad",
+          "task": "Uppgift schemalagd",
+          "watch": "Bevakning skapad"
+        },
+        "updated": {
+          "reminder": "Påminnelse ändrad",
+          "task": "Uppgift ändrad",
+          "watch": "Bevakning ändrad"
+        },
+        "paused": {
+          "reminder": "Påminnelse pausad",
+          "task": "Uppgift pausad",
+          "watch": "Bevakning pausad"
+        },
+        "resumed": {
+          "reminder": "Påminnelse återupptagen",
+          "task": "Uppgift återupptagen",
+          "watch": "Bevakning återupptagen"
+        },
+        "removed": {
+          "reminder": "Påminnelse borttagen",
+          "task": "Uppgift borttagen",
+          "watch": "Bevakning borttagen"
+        }
+      },
+      "when": {
+        "today": "I dag kl. {time}",
+        "tomorrow": "I morgon kl. {time}",
+        "onDay": "{day} kl. {time}",
+        "onDate": "{date} kl. {time}",
+        "daily": "Varje dag kl. {time}",
+        "weekdays": "Varje vardag kl. {time}",
+        "weekends": "På helger kl. {time}",
+        "weekly": "Varje {day} kl. {time}",
+        "onDays": "{days} kl. {time}",
+        "everyMinutes": {
+          "one": "Varje minut",
+          "other": "Var {count}:e minut"
+        },
+        "everyHours": {
+          "one": "Varje timme",
+          "other": "Var {count}:e timme"
+        },
+        "everyDays": {
+          "one": "Varje dag",
+          "other": "Var {count}:e dag"
+        }
+      }
     }
   },
   "selfHost": {

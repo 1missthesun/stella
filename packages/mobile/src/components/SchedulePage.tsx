@@ -1,8 +1,9 @@
 import {
   LegendList,
+  type LegendListRef,
   type LegendListRenderItemProps,
 } from "@legendapp/list/react-native";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActionSheetIOS,
   ActivityIndicator,
@@ -12,7 +13,7 @@ import {
   View,
 } from "react-native";
 import { Text } from "./Text";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useT } from "../i18n";
 import {
   scheduleCadence,
@@ -37,6 +38,10 @@ export function SchedulePage() {
   const t = useT();
   const styles = useMemo(() => makeStyles(), []);
   const router = useRouter();
+  const { focus } = useLocalSearchParams<{ focus?: string }>();
+  const listRef = useRef<LegendListRef>(null);
+  const [highlightKey, setHighlightKey] = useState<string | null>(null);
+  const focusedRef = useRef<string | null>(null);
   const rowStyles = useMemo(() => makeScheduleRowStyles(colors), [colors]);
   const bottomInset = useSafeAreaInsets().bottom;
   const session = authClient.useSession();
@@ -140,6 +145,26 @@ export function SchedulePage() {
     }
     return out;
   }, [nowMs, schedules, t]);
+
+  useEffect(() => {
+    if (!focus || focusedRef.current === focus) return;
+    const index = items.findIndex(
+      (item) => item.kind === "schedule" && item.schedule.id === focus,
+    );
+    if (index < 0) return;
+    focusedRef.current = focus;
+    const key = items[index]!.key;
+    setHighlightKey(key);
+    setTimeout(() => {
+      void listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.4 });
+    }, 50);
+  }, [focus, items]);
+
+  useEffect(() => {
+    if (!highlightKey) return;
+    const clear = setTimeout(() => setHighlightKey(null), 2_400);
+    return () => clearTimeout(clear);
+  }, [highlightKey]);
 
   const editSchedule = useCallback(
     (schedule: MobileSchedule) =>
@@ -248,6 +273,7 @@ export function SchedulePage() {
     }
     return (
       <LegendList<ListItem>
+        ref={listRef}
         style={styles.list}
         contentContainerStyle={{ paddingBottom: bottomInset + 24 }}
         data={items}
@@ -268,13 +294,14 @@ export function SchedulePage() {
               schedule={item.schedule}
               trailing={item.trailing}
               busy={busyKey === item.key}
+              highlighted={highlightKey === item.key}
               styles={rowStyles}
               colors={colors}
               onPress={() => openActions(item.schedule)}
             />
           )
         }
-        extraData={busyKey}
+        extraData={`${busyKey ?? ""}|${highlightKey ?? ""}`}
         showsVerticalScrollIndicator={false}
         estimatedItemSize={48}
         recycleItems

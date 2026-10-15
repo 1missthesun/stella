@@ -3033,6 +3033,56 @@
         "pickDays": "1日以上選んでください。",
         "pickCron": "cron式を入力してください。"
       }
+    },
+    "notice": {
+      "open": "スケジュールで開く",
+      "title": {
+        "created": {
+          "reminder": "リマインダーを設定しました",
+          "task": "タスクを予定しました",
+          "watch": "ウォッチを設定しました"
+        },
+        "updated": {
+          "reminder": "リマインダーを変更しました",
+          "task": "タスクを変更しました",
+          "watch": "ウォッチを変更しました"
+        },
+        "paused": {
+          "reminder": "リマインダーを一時停止しました",
+          "task": "タスクを一時停止しました",
+          "watch": "ウォッチを一時停止しました"
+        },
+        "resumed": {
+          "reminder": "リマインダーを再開しました",
+          "task": "タスクを再開しました",
+          "watch": "ウォッチを再開しました"
+        },
+        "removed": {
+          "reminder": "リマインダーを削除しました",
+          "task": "タスクを削除しました",
+          "watch": "ウォッチを削除しました"
+        }
+      },
+      "when": {
+        "today": "今日 {time}",
+        "tomorrow": "明日 {time}",
+        "onDay": "{day} {time}",
+        "onDate": "{date} {time}",
+        "daily": "毎日 {time}",
+        "weekdays": "平日毎日 {time}",
+        "weekends": "週末 {time}",
+        "weekly": "毎週{day} {time}",
+        "onDays": "{days} {time}",
+        "everyMinutes": {
+          "other": "{count}分ごと"
+        },
+        "everyHours": {
+          "other": "{count}時間ごと"
+        },
+        "everyDays": {
+          "other": "{count}日ごと"
+        }
+      }
     }
   },
   "selfHost": {

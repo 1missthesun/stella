@@ -3033,6 +3033,56 @@
         "pickDays": "Pilih setidaknya satu hari.",
         "pickCron": "Masukkan ekspresi cron."
       }
+    },
+    "notice": {
+      "open": "Buka di Jadwal",
+      "title": {
+        "created": {
+          "reminder": "Pengingat dibuat",
+          "task": "Tugas dijadwalkan",
+          "watch": "Pantauan disiapkan"
+        },
+        "updated": {
+          "reminder": "Pengingat diubah",
+          "task": "Tugas diubah",
+          "watch": "Pantauan diubah"
+        },
+        "paused": {
+          "reminder": "Pengingat dijeda",
+          "task": "Tugas dijeda",
+          "watch": "Pantauan dijeda"
+        },
+        "resumed": {
+          "reminder": "Pengingat dilanjutkan",
+          "task": "Tugas dilanjutkan",
+          "watch": "Pantauan dilanjutkan"
+        },
+        "removed": {
+          "reminder": "Pengingat dihapus",
+          "task": "Tugas dihapus",
+          "watch": "Pantauan dihapus"
+        }
+      },
+      "when": {
+        "today": "Hari ini pukul {time}",
+        "tomorrow": "Besok pukul {time}",
+        "onDay": "{day} pukul {time}",
+        "onDate": "{date} pukul {time}",
+        "daily": "Setiap hari pukul {time}",
+        "weekdays": "Setiap hari kerja pukul {time}",
+        "weekends": "Akhir pekan pukul {time}",
+        "weekly": "Setiap {day} pukul {time}",
+        "onDays": "{days} pukul {time}",
+        "everyMinutes": {
+          "other": "Setiap {count} menit"
+        },
+        "everyHours": {
+          "other": "Setiap {count} jam"
+        },
+        "everyDays": {
+          "other": "Setiap {count} hari"
+        }
+      }
     }
   },
   "selfHost": {

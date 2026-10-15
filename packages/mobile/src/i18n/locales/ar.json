@@ -3115,6 +3115,71 @@
         "pickDays": "اختر يومًا واحدًا على الأقل.",
         "pickCron": "أدخل تعبير cron."
       }
+    },
+    "notice": {
+      "open": "فتح في الجدول",
+      "title": {
+        "created": {
+          "reminder": "تم ضبط التذكير",
+          "task": "تمت جدولة المهمة",
+          "watch": "تم إعداد المراقبة"
+        },
+        "updated": {
+          "reminder": "تم تغيير التذكير",
+          "task": "تم تغيير المهمة",
+          "watch": "تم تغيير المراقبة"
+        },
+        "paused": {
+          "reminder": "تم إيقاف التذكير مؤقتًا",
+          "task": "تم إيقاف المهمة مؤقتًا",
+          "watch": "تم إيقاف المراقبة مؤقتًا"
+        },
+        "resumed": {
+          "reminder": "تم استئناف التذكير",
+          "task": "تم استئناف المهمة",
+          "watch": "تم استئناف المراقبة"
+        },
+        "removed": {
+          "reminder": "تمت إزالة التذكير",
+          "task": "تمت إزالة المهمة",
+          "watch": "تمت إزالة المراقبة"
+        }
+      },
+      "when": {
+        "today": "اليوم الساعة {time}",
+        "tomorrow": "غدًا الساعة {time}",
+        "onDay": "{day} الساعة {time}",
+        "onDate": "{date} الساعة {time}",
+        "daily": "كل يوم الساعة {time}",
+        "weekdays": "كل يوم عمل الساعة {time}",
+        "weekends": "في عطلات نهاية الأسبوع الساعة {time}",
+        "weekly": "كل {day} الساعة {time}",
+        "onDays": "{days} الساعة {time}",
+        "everyMinutes": {
+          "zero": "كل {count} دقيقة",
+          "one": "كل دقيقة",
+          "two": "كل دقيقتين",
+          "few": "كل {count} دقائق",
+          "many": "كل {count} دقيقة",
+          "other": "كل {count} دقيقة"
+        },
+        "everyHours": {
+          "zero": "كل {count} ساعة",
+          "one": "كل ساعة",
+          "two": "كل ساعتين",
+          "few": "كل {count} ساعات",
+          "many": "كل {count} ساعة",
+          "other": "كل {count} ساعة"
+        },
+        "everyDays": {
+          "zero": "كل {count} يوم",
+          "one": "كل يوم",
+          "two": "كل يومين",
+          "few": "كل {count} أيام",
+          "many": "كل {count} يومًا",
+          "other": "كل {count} يوم"
+        }
+      }
     }
   },
   "selfHost": {

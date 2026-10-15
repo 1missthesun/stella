@@ -3067,6 +3067,62 @@
         "pickDays": "Scegli almeno un giorno.",
         "pickCron": "Inserisci un'espressione cron."
       }
+    },
+    "notice": {
+      "open": "Apri in Programmazione",
+      "title": {
+        "created": {
+          "reminder": "Promemoria impostato",
+          "task": "Attività programmata",
+          "watch": "Monitoraggio impostato"
+        },
+        "updated": {
+          "reminder": "Promemoria modificato",
+          "task": "Attività modificata",
+          "watch": "Monitoraggio modificato"
+        },
+        "paused": {
+          "reminder": "Promemoria in pausa",
+          "task": "Attività in pausa",
+          "watch": "Monitoraggio in pausa"
+        },
+        "resumed": {
+          "reminder": "Promemoria ripreso",
+          "task": "Attività ripresa",
+          "watch": "Monitoraggio ripreso"
+        },
+        "removed": {
+          "reminder": "Promemoria rimosso",
+          "task": "Attività rimossa",
+          "watch": "Monitoraggio rimosso"
+        }
+      },
+      "when": {
+        "today": "Oggi alle {time}",
+        "tomorrow": "Domani alle {time}",
+        "onDay": "{day} alle {time}",
+        "onDate": "Il {date} alle {time}",
+        "daily": "Ogni giorno alle {time}",
+        "weekdays": "Ogni giorno feriale alle {time}",
+        "weekends": "Nel fine settimana alle {time}",
+        "weekly": "Ogni {day} alle {time}",
+        "onDays": "{days} alle {time}",
+        "everyMinutes": {
+          "one": "Ogni minuto",
+          "many": "Ogni {count} minuti",
+          "other": "Ogni {count} minuti"
+        },
+        "everyHours": {
+          "one": "Ogni ora",
+          "many": "Ogni {count} ore",
+          "other": "Ogni {count} ore"
+        },
+        "everyDays": {
+          "one": "Ogni giorno",
+          "many": "Ogni {count} giorni",
+          "other": "Ogni {count} giorni"
+        }
+      }
     }
   },
   "selfHost": {

@@ -157,11 +157,22 @@
 
 /* Resume's right edge lines up under the visible ✕ icon (14px icon centred in a 24px button 8px from the edge). */
 .composer-notice--limit .composer-notice__row {
-  margin-right: -27px;
+  margin-right: -31px;
 }
 
 .composer-notice--limit.composer-notice--compact .composer-notice__row {
-  margin-right: -21px;
+  margin-right: -24px;
+}
+
+/* The ✕ sits close to the corner on this card. */
+.composer-notice--limit .composer-notice__dismiss {
+  top: 4px;
+  right: 4px;
+}
+
+.composer-notice--limit.composer-notice--compact .composer-notice__dismiss {
+  top: 3px;
+  right: 3px;
 }
 
 @media (max-width: 600px) {

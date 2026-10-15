@@ -171,7 +171,18 @@
   text-underline-offset: 2px;
 }
 
+/* The ✕ is pinned top-right on the first text row so the actions row can run
+   the full width: the primary's right edge sits under the visible ✕ icon
+   (16px icon centred in the 22px button; content inset 16px). */
+[data-component="toast"] [data-slot="toast-title"],
+[data-component="toast"] [data-slot="toast-row"]:first-child [data-slot="toast-description"] {
+  padding-right: 22px;
+}
+
 [data-component="toast"] [data-slot="toast-close-button"] {
+  position: absolute;
+  top: 12px;
+  right: 13px;
   flex-shrink: 0;
   display: flex;
   align-items: center;

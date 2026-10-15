@@ -246,7 +246,7 @@ const ACTIVITY_OF: Partial<Record<StellaCharacterState, Activity>> = {
   searching: "orbit",
   reading: "orbit",
   listening: "radar",
-  speaking: "radar",
+  speaking: "squeeze",
   loading: "squeeze",
   generating: "squeeze",
   uploading: "progress",

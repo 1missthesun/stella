@@ -1,5 +1,7 @@
 # Stella
 
+https://github.com/user-attachments/assets/15f8981d-3a6d-4248-a0aa-d359e83483a3
+
 A personal AI assistant you talk to in one chat, working on your computers, in the cloud and on your phone.
 
 [Download and get started](https://stella.sh).

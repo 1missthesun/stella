@@ -17,6 +17,7 @@ export const openDraftPreview = async (options: {
   name: string;
   stellaAppDir: string;
   preloadPath: string;
+  offscreen?: { deviceScaleFactor: number };
 }): Promise<DraftPreview> => {
   if (!isDraftName(options.name)) {
     throw new Error(`"${options.name}" is not a valid draft name.`);
@@ -47,11 +48,14 @@ export const openDraftPreview = async (options: {
       }),
   });
   const view = new WebContentsView({
-    webPreferences: createSharedWebPreferences({
-      preloadPath: options.preloadPath,
-      sessionPartition: partition,
-      backgroundThrottling: false,
-    }),
+    webPreferences: {
+      ...createSharedWebPreferences({
+        preloadPath: options.preloadPath,
+        sessionPartition: partition,
+        backgroundThrottling: false,
+      }),
+      ...(options.offscreen ? { offscreen: options.offscreen } : {}),
+    },
   });
   return {
     view,

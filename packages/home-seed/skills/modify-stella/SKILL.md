@@ -41,7 +41,7 @@ var tab = await browser.tabs.new("stella-preview://<name>");
 await tab.screenshot();
 ```
 
-Click through the UI to reach what you changed, and `await tab.reload()` after further edits. If `tab.screenshot()` times out (the preview's hidden host may not paint on Linux or while the screen is locked), read what changed with `tab.evaluate()` instead and say in your report that you could not see it. Save screenshots you will show the user under `~/.stella/outputs/<name>/`, not in the draft: removing the worktree deletes them. The preview runs against the user's real account and runtime (with its own browser storage), so only look and navigate: never send messages, buy anything, change settings, or press Update in it. `await tab.close()` when done. The user can watch it by opening your tab in the browser panel.
+Click through the UI to reach what you changed, and `await tab.reload()` after further edits. If `tab.screenshot()` times out (a preview's hidden host may not paint while the screen is locked), read what changed with `tab.evaluate()` instead and say in your report that you could not see it. Save screenshots you will show the user under `~/.stella/outputs/<name>/`, not in the draft: removing the worktree deletes them. The preview runs against the user's real account and runtime (with its own browser storage), so only look and navigate: never send messages, buy anything, change settings, or press Update in it. `await tab.close()` when done. The user can watch it by opening your tab in the browser panel.
 
 **Runtime changes:** typecheck, then run the draft's code under Bun: a quick script in `~/.stella/tmp/` that imports the changed module and exercises it with real input. Don't write, update or run unit tests.
 

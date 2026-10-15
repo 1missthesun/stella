@@ -42,6 +42,7 @@ import {
   resolveOwnerId,
   type ManagedTab,
 } from "./in-app-browser/tab-registry.js";
+import { OffscreenTabs } from "./in-app-browser/offscreen-tabs.js";
 
 export type InAppBrowserPreview = {
   view: WebContentsView;
@@ -82,7 +83,16 @@ type InAppBrowserServiceOptions = {
   wait?: (delayMs: number) => Promise<void>;
   debuggerRecoveryTimeoutMs?: number;
   runtimeUserAgent?: string;
-  openPreview?: (name: string) => Promise<InAppBrowserPreview>;
+  openPreview?: (
+    name: string,
+    options: { offscreen?: { deviceScaleFactor: number } },
+  ) => Promise<InAppBrowserPreview>;
+  /**
+   * Preload of the panel mirror for offscreen agent tabs. Agent tabs render
+   * offscreen on Linux when it is set (see in-app-browser/offscreen-tabs.ts).
+   */
+  offscreenMirrorPreloadPath?: string;
+  offscreenAgentTabs?: boolean;
 };
 
 const PREVIEW_URL_PREFIX = "stella-preview://";
@@ -171,6 +181,7 @@ export class InAppBrowserService {
   private readonly options: InAppBrowserServiceOptions;
   private readonly tabs = new BrowserTabRegistry();
   private readonly debuggerProxy: DebuggerTargetProxy;
+  private readonly offscreenTabs: OffscreenTabs | null;
   private readonly errorsByOwner = new Map<string, string>();
   private readonly profilePath: string;
 
@@ -217,6 +228,20 @@ export class InAppBrowserService {
       wait: options.wait,
       debuggerRecoveryTimeoutMs: options.debuggerRecoveryTimeoutMs,
     });
+    const mirrorPreloadPath = options.offscreenMirrorPreloadPath;
+    this.offscreenTabs =
+      mirrorPreloadPath &&
+      (options.offscreenAgentTabs ?? process.platform === "linux")
+        ? new OffscreenTabs({
+            mirrorPreloadPath,
+            getPageBounds: () => this.layout?.pageBounds,
+          })
+        : null;
+  }
+
+  /** Agent tabs render offscreen where a hidden tab can't get frames. */
+  private rendersOffscreen(ownerId: string) {
+    return this.offscreenTabs !== null && ownerId !== MANUAL_OWNER_ID;
   }
 
   async getState(ownerId?: string): Promise<BrowserViewState> {
@@ -454,10 +479,15 @@ export class InAppBrowserService {
     if (!browserSession) throw new Error("Browser session is unavailable.");
     const ownerId = resolveOwnerId(options.ownerId);
     const id = (this.options.createId ?? randomUUID)();
+    const offscreen =
+      this.rendersOffscreen(ownerId) && !this.options.createView
+        ? this.offscreenTabs?.webPreferences()
+        : undefined;
     const view =
       this.options.createView?.(browserSession) ??
       new WebContentsView({
         webPreferences: {
+          ...offscreen,
           session: browserSession,
           nodeIntegration: false,
           nodeIntegrationInSubFrames: false,
@@ -474,7 +504,13 @@ export class InAppBrowserService {
     } catch {
       // Injected/mock views in tests may not implement setUserAgent.
     }
-    const tab = this.addTab({ id, view, ownerId, activate: options.activate });
+    const tab = this.addTab({
+      id,
+      view,
+      ownerId,
+      activate: options.activate,
+      offscreen: offscreen !== undefined,
+    });
     try {
       const url = normalizeWebUrl(options.url);
       await view.webContents.loadURL(url);
@@ -493,6 +529,7 @@ export class InAppBrowserService {
     ownerId: string;
     activate?: boolean;
     preview?: ManagedTab["preview"];
+    offscreen?: boolean;
   }): ManagedTab {
     const { id, view, ownerId } = options;
     const tab: ManagedTab = {
@@ -503,7 +540,9 @@ export class InAppBrowserService {
       faviconLoadId: 0,
       loading: false,
       ...(options.preview ? { preview: options.preview } : {}),
+      ...(options.offscreen ? { offscreen: true } : {}),
     };
+    if (tab.offscreen) this.offscreenTabs?.adopt(tab);
     this.tabs.add(tab, options.activate);
     this.bindTab(tab);
     this.syncState();
@@ -523,7 +562,10 @@ export class InAppBrowserService {
       existing.preview.dispose();
       this.closeTabInternal(existing.id, existing.ownerId);
     }
-    const preview = await openPreview(name);
+    const offscreen = this.rendersOffscreen(ownerId)
+      ? this.offscreenTabs?.webPreferences().offscreen
+      : undefined;
+    const preview = await openPreview(name, { offscreen });
     let disposed = false;
     const dispose = () => {
       if (disposed) return;
@@ -537,6 +579,7 @@ export class InAppBrowserService {
       view: preview.view,
       ownerId,
       preview: { name, dispose },
+      offscreen: offscreen !== undefined,
     });
     try {
       await contents.loadURL(preview.url);
@@ -735,13 +778,20 @@ export class InAppBrowserService {
     debuggerSessionId?: string,
   ): Promise<unknown> {
     this.markAgentActivity(tabId);
-    return this.debuggerProxy.sendCommand(
+    const tab = this.tabs.get(tabId);
+    const resumePainting =
+      tab?.offscreen && method === "Page.captureScreenshot"
+        ? this.offscreenTabs?.pausePainting(tab)
+        : undefined;
+    const command = this.debuggerProxy.sendCommand(
       tabId,
       method,
       params,
       ownerId,
       debuggerSessionId,
     );
+    if (!resumePainting) return command;
+    return command.finally(resumePainting);
   }
 
   private markAgentActivity(tabId: string) {
@@ -813,6 +863,7 @@ export class InAppBrowserService {
       this.closeTabInternal(tab.id, tab.ownerId);
     }
     this.debuggerProxy.dispose();
+    this.offscreenTabs?.dispose();
     this.tabs.clearOwners();
   }
 
@@ -964,6 +1015,7 @@ export class InAppBrowserService {
     contents.on("destroyed", () => {
       if (this.tabs.get(tab.id) !== tab) return;
       this.debuggerProxy.forgetTab(tab.id);
+      this.offscreenTabs?.release(tab);
       if (this.tabs.remove(tab, "last")) {
         this.errorsByOwner.delete(tab.ownerId);
       }
@@ -1017,8 +1069,14 @@ export class InAppBrowserService {
   private closeTabInternal(tabId: string, ownerId: string) {
     const tab = this.tabs.require(tabId, ownerId);
     clearTimeout(tab.agentIdleTimer);
-    if (this.attachedView === tab.view) this.detachAttachedView();
+    if (
+      this.attachedView === tab.view ||
+      this.offscreenTabs?.isMirroring(tab)
+    ) {
+      this.detachAttachedView();
+    }
     this.debuggerProxy.releaseTab(tab);
+    this.offscreenTabs?.release(tab);
     if (this.tabs.remove(tab, "neighbor")) this.errorsByOwner.delete(ownerId);
     const tabDebugger = tab.view.webContents.debugger;
     if (tabDebugger.isAttached()) tabDebugger.detach();
@@ -1166,6 +1224,7 @@ export class InAppBrowserService {
       );
     }
     this.debuggerProxy.resizeHiddenMounts();
+    this.offscreenTabs?.resize();
   }
 
   private attachActiveView() {
@@ -1191,15 +1250,20 @@ export class InAppBrowserService {
       // blank in the panel for good.
       this.debuggerProxy.takeBackForPanel(tab);
     }
+    if (!tab.offscreen) this.offscreenTabs?.unbindMirror();
+    const view =
+      tab.offscreen && this.offscreenTabs
+        ? this.offscreenTabs.mirrorFor(tab)
+        : tab.view;
     let attached = false;
-    if (this.attachedView !== tab.view || this.attachedWindow !== window) {
-      this.detachAttachedView();
-      window.contentView.addChildView(tab.view);
-      this.attachedView = tab.view;
+    if (this.attachedView !== view || this.attachedWindow !== window) {
+      this.detachAttachedView({ keepMirror: view !== tab.view });
+      window.contentView.addChildView(view);
+      this.attachedView = view;
       this.attachedWindow = window;
       attached = true;
     }
-    tab.view.setBounds(clampBoundsToWindow(this.layout.pageBounds, window));
+    view.setBounds(clampBoundsToWindow(this.layout.pageBounds, window));
     if (attached) this.refreshAttachedVisibility(window);
   }
 
@@ -1220,7 +1284,8 @@ export class InAppBrowserService {
     }
   }
 
-  private detachAttachedView() {
+  private detachAttachedView(options: { keepMirror?: boolean } = {}) {
+    if (!options.keepMirror) this.offscreenTabs?.unbindMirror();
     const view = this.attachedView;
     const window = this.attachedWindow;
     this.attachedView = null;

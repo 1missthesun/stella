@@ -28,6 +28,8 @@ const electronMainEntryPoints = {
 };
 const preloadEntryPoints = {
   "electron/preload": "packages/desktop/electron/preload.ts",
+  "electron/offscreen-tab-mirror-preload":
+    "packages/desktop/electron/offscreen-tab-mirror-preload.ts",
 };
 const desktopUiDir = path.join(repoRootDir, "packages", "desktop-ui");
 const desktopEnvFiles = (mode) => [".env", ".env.local", `.env.${mode}`, `.env.${mode}.local`];
@@ -450,7 +452,12 @@ const writeBundleFingerprint = (fingerprint, inputs) => {
 
 export const requiredOutputsExist = () => {
   const outBase = path.join(desktopDir, outdir);
-  return ["launch.js", "main.js", "preload.js"].every((name) =>
+  return [
+    "launch.js",
+    "main.js",
+    "preload.js",
+    "offscreen-tab-mirror-preload.js",
+  ].every((name) =>
     existsSync(path.join(outBase, "electron", name)),
   );
 };

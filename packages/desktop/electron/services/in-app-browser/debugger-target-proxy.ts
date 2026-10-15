@@ -89,6 +89,10 @@ export class DebuggerTargetProxy {
     }
     const tabDebugger = tab.view.webContents.debugger;
     if (!tabDebugger.isAttached()) tabDebugger.attach();
+    // An offscreen tab always has its viewport and its own frames.
+    if (tab.offscreen) {
+      return await tabDebugger.sendCommand(method, params, debuggerSessionId);
+    }
     // Electron gives an unattached WebContentsView a 0x0 layout viewport. CDP
     // Runtime queries and Input commands need the same drawable mount as
     // screenshots; otherwise discovery succeeds but actionability/scrolling
@@ -182,6 +186,7 @@ export class DebuggerTargetProxy {
     ownerId?: string,
   ): InAppBrowserDrawableLease {
     const tab = this.options.tabs.require(tabId, resolveOwnerId(ownerId));
+    if (tab.offscreen) return { release: () => {} };
     const attachedView = this.options.getAttachedView();
     let lease = this.drawableLeases.get(tabId);
     if (lease) {
@@ -320,6 +325,9 @@ export class DebuggerTargetProxy {
     // forces frames while a command is pending. The cost is ~16-30 ms of
     // latency on those commands and a page that reads
     // `visibilityState: "hidden"` during agent commands instead of "visible".
+    // Even pumped, surface screenshots (all of stella-browser's) still stall,
+    // so agent tabs on Linux render offscreen instead and never come here
+    // (offscreen-tabs.ts); this path is left for tabs that aren't offscreen.
     if (!this.options.hideDrawableHost) host.showInactive();
     this.drawableHost = host;
     return host;

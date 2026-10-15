@@ -17,5 +17,9 @@
   "include": [
     "electron/**/*"
   ],
-  "exclude": ["electron/preload.ts", "electron/**/*.page.ts"],
+  "exclude": [
+    "electron/preload.ts",
+    "electron/offscreen-tab-mirror-preload.ts",
+    "electron/**/*.page.ts"
+  ],
 }

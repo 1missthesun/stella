@@ -18,6 +18,8 @@ export type ManagedTab = {
   agentActive?: boolean;
   agentIdleTimer?: ReturnType<typeof setTimeout>;
   preview?: { name: string; dispose: () => void };
+  /** Renders offscreen; the panel shows it through a mirror (offscreen-tabs.ts). */
+  offscreen?: boolean;
 };
 
 type OwnerTabRegistry = {

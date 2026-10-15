@@ -11,5 +11,5 @@
     "types": ["node"],
     "emitDeclarationOnly": false
   },
-  "include": ["electron/preload.ts"]
+  "include": ["electron/preload.ts", "electron/offscreen-tab-mirror-preload.ts"]
 }

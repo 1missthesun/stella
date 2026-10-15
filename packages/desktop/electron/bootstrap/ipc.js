@@ -110,11 +110,13 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
                     resource.start();
                 }
             },
-            openPreview: (name) => openDraftPreview({
+            openPreview: (name, { offscreen }) => openDraftPreview({
                 name,
                 stellaAppDir: state.stellaAppDir ?? config.stellaAppDir,
                 preloadPath: path.join(config.electronDir, "preload.js"),
+                offscreen,
             }),
+            offscreenMirrorPreloadPath: path.join(config.electronDir, "offscreen-tab-mirror-preload.js"),
             connectionTimeoutMs: 4 * 60 * 1000,
             connectionPollMs: 1000,
             automaticConnectionTimeoutMs: 15 * 1000,

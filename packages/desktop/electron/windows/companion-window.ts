@@ -2,6 +2,7 @@ import {
   BrowserWindow,
   Menu,
   screen,
+  type Display,
   type IpcMainEvent,
   type Rectangle,
   type WebContents,
@@ -47,6 +48,12 @@ import { t } from "../services/i18n-service.js";
 import { STELLA_CAPTURE_EXCLUDED_TITLE_PREFIXES } from "../window-capture.js";
 import { createSharedWebPreferences } from "./shared-window-preferences.js";
 import { loadWindow } from "./window-load.js";
+import {
+  HyprlandIpc,
+  isNativeWayland,
+  type HyprlandDispatch,
+  type HyprlandMonitor,
+} from "./hyprland-ipc.js";
 import { onIpc, offIpc } from "../ipc/typed-ipc.js";
 
 export type CompanionWindowOptions = {
@@ -64,6 +71,12 @@ export type CompanionWindowOptions = {
 const READY_TIMEOUT_MS = 4_000;
 const EDGE_MARGIN = 6;
 const HOVER_GRACE_MS = 340;
+const HYPRLAND_ATTACH_TIMEOUT_MS = 3_000;
+const HYPRLAND_DRAG_INTERVAL_MS = 16;
+// Where the panel waits on Hyprland while it has nothing to show: Wayland
+// windows can't pass clicks through, so an idle panel on screen would block
+// whatever is under it.
+const HYPRLAND_PARK_OFFSET = 20_000;
 
 const IDLE_ACTIVITY: CompanionActivity = {
   hovered: false,
@@ -126,6 +139,17 @@ export class CompanionWindowController {
   private boundsRepairTimer: ReturnType<typeof setTimeout> | null = null;
   private boundsRepairs: number[] = [];
   private helloWaiters = new Map<CompanionWindowKind, Array<() => void>>();
+
+  // Native Wayland ignores client positions and input shaping; on Hyprland
+  // the windows are placed, stacked and dragged through its IPC instead.
+  private readonly wayland = isNativeWayland();
+  private readonly hypr = HyprlandIpc.connectIfAvailable();
+  private hyprAddress: Partial<Record<CompanionWindowKind, string>> = {};
+  private hyprAttachRun = 0;
+  private hyprMonitors: HyprlandMonitor[] = [];
+  private hyprDragTimer: ReturnType<typeof setTimeout> | null = null;
+  private hyprDragGeneration = 0;
+  private hyprPlacement: Promise<void> = Promise.resolve();
 
   private markHovered = false;
   private panelHovered = false;
@@ -198,7 +222,8 @@ export class CompanionWindowController {
     if (!mark.isVisible()) mark.showInactive();
     mark.moveTop();
     this.applyPanelInteractivity();
-    if (options.focus) panel.focus();
+    if (this.hypr) await this.attachHyprland();
+    if (options.focus) this.focusPanel();
     if (persist) {
       const dir = this.options.getStellaDataDir();
       if (dir) setCompanionEnabled(dir, true);
@@ -212,6 +237,9 @@ export class CompanionWindowController {
     const persist = options.persist ?? true;
     this.visible = false;
     this.drag = null;
+    this.stopHyprlandDrag();
+    this.hyprAddress = {};
+    this.hyprAttachRun += 1;
     this.resetInteraction();
     if (persist) {
       const dir = this.options.getStellaDataDir();
@@ -253,6 +281,7 @@ export class CompanionWindowController {
     offIpc(IPC_COMPANION_OPEN_MAIN, this.handleOpenMain);
     offIpc(IPC_COMPANION_SHOW_CONTEXT_MENU, this.handleShowContextMenu);
     this.resetInteraction();
+    this.stopHyprlandDrag();
     this.detachDisplayListeners();
     if (this.boundsRepairTimer) {
       clearTimeout(this.boundsRepairTimer);
@@ -374,6 +403,7 @@ export class CompanionWindowController {
       this.hide();
     });
     win.on("closed", () => {
+      delete this.hyprAddress[slot.kind];
       slot.window = null;
       slot.ready = false;
       slot.hello = false;
@@ -461,6 +491,12 @@ export class CompanionWindowController {
     this.displayHandler = () => {
       this.anchor = this.clampAnchor(this.resolveAnchor());
       this.applyBounds();
+      if (this.hypr) {
+        void this.refreshHyprlandMonitors().then(() => {
+          this.anchor = this.clampAnchor(this.resolveAnchor());
+          this.applyBounds();
+        });
+      }
     };
     screen.on("display-added", this.displayHandler);
     screen.on("display-removed", this.displayHandler);
@@ -483,7 +519,7 @@ export class CompanionWindowController {
       this.anchor = this.clampAnchor(saved);
       return this.anchor;
     }
-    const area = screen.getPrimaryDisplay().workArea;
+    const area = this.workAreaFor(screen.getPrimaryDisplay());
     this.anchor = {
       x: area.x + area.width - 32 - COMPANION_MARK_SIZE / 2,
       y: area.y + area.height - 28,
@@ -491,8 +527,28 @@ export class CompanionWindowController {
     return this.anchor;
   }
 
+  /**
+   * Wayland doesn't tell clients about panels and bars, so Electron's work
+   * area there is the whole output; Hyprland reports what is reserved.
+   */
+  private workAreaFor(display: Display): Rectangle {
+    if (!this.hypr) return display.workArea;
+    const { bounds } = display;
+    const monitor = this.hyprMonitors.find(
+      (m) => Math.round(m.x) === bounds.x && Math.round(m.y) === bounds.y,
+    );
+    if (!monitor) return display.workArea;
+    const [left, top, right, bottom] = monitor.reserved;
+    return {
+      x: bounds.x + left,
+      y: bounds.y + top,
+      width: Math.max(1, bounds.width - left - right),
+      height: Math.max(1, bounds.height - top - bottom),
+    };
+  }
+
   private clampAnchor(anchor: CompanionAnchor): CompanionAnchor {
-    const area = screen.getDisplayNearestPoint(anchor).workArea;
+    const area = this.workAreaFor(screen.getDisplayNearestPoint(anchor));
     const half = COMPANION_MARK_SIZE / 2;
     return {
       x: Math.round(
@@ -514,7 +570,7 @@ export class CompanionWindowController {
     kind: CompanionWindowKind,
     anchor: CompanionAnchor,
   ): { bounds: Rectangle; layout: CompanionLayout } {
-    const area = screen.getDisplayNearestPoint(anchor).workArea;
+    const area = this.workAreaFor(screen.getDisplayNearestPoint(anchor));
     const compact = COMPANION_COMPACT_SIZE;
     const compactX = Math.round(anchor.x - compact.width / 2);
     const compactY = Math.round(
@@ -556,6 +612,190 @@ export class CompanionWindowController {
       }
     }
     if (edges) this.lastEdges = edges;
+    this.placeOnHyprland();
+  }
+
+  /** Mirrors the bounds just applied onto the real Hyprland windows. */
+  private placeOnHyprland(): void {
+    const hypr = this.hypr;
+    if (!hypr) return;
+    const calls: HyprlandDispatch[] = [];
+    for (const kind of ["panel", "mark"] as const) {
+      const address = this.hyprAddress[kind];
+      const bounds = this.expectedBounds[kind];
+      if (!address || !bounds) continue;
+      const parked = kind === "panel" && !this.activity.panelActive;
+      calls.push(
+        HyprlandIpc.move(
+          address,
+          parked ? bounds.x - HYPRLAND_PARK_OFFSET : bounds.x,
+          parked ? bounds.y - HYPRLAND_PARK_OFFSET : bounds.y,
+        ),
+      );
+    }
+    if (calls.length === 0) return;
+    this.hyprPlacement = this.hyprPlacement
+      .then(() => hypr.dispatch(calls))
+      .catch((error: unknown) => {
+        console.warn("[companion] hyprland placement failed:", error);
+      });
+  }
+
+  private async refreshHyprlandMonitors(): Promise<void> {
+    if (!this.hypr) return;
+    try {
+      this.hyprMonitors = await this.hypr.monitors();
+    } catch (error) {
+      console.warn("[companion] hyprland monitors failed:", error);
+    }
+  }
+
+  /**
+   * Finds both companion windows in Hyprland once they are mapped, keeps them
+   * floating on every workspace, and moves them where they belong. Hyprland
+   * first maps them wherever it likes, so this runs after every show.
+   */
+  private async attachHyprland(): Promise<void> {
+    const hypr = this.hypr;
+    if (!hypr) return;
+    const run = ++this.hyprAttachRun;
+    this.hyprAddress = {};
+    await this.refreshHyprlandMonitors();
+    this.anchor = this.clampAnchor(this.resolveAnchor());
+    this.applyBounds();
+    const title = STELLA_CAPTURE_EXCLUDED_TITLE_PREFIXES[0];
+    const wanted: Record<CompanionWindowKind, { width: number; height: number }> =
+      { mark: COMPANION_COMPACT_SIZE, panel: COMPANION_FULL_SIZE };
+    const deadline = Date.now() + HYPRLAND_ATTACH_TIMEOUT_MS;
+    while (run === this.hyprAttachRun && Date.now() < deadline) {
+      let clients;
+      try {
+        clients = await hypr.clients();
+      } catch (error) {
+        console.warn("[companion] hyprland clients failed:", error);
+        return;
+      }
+      if (run !== this.hyprAttachRun) return;
+      const calls: HyprlandDispatch[] = [];
+      for (const kind of ["mark", "panel"] as const) {
+        if (this.hyprAddress[kind]) continue;
+        const size = wanted[kind];
+        const client = clients.find(
+          (c) =>
+            c.pid === process.pid &&
+            c.title === title &&
+            c.mapped !== false &&
+            c.size[0] === size.width &&
+            c.size[1] === size.height &&
+            !Object.values(this.hyprAddress).includes(c.address),
+        );
+        if (!client) continue;
+        this.hyprAddress[kind] = client.address;
+        if (!client.floating) {
+          calls.push({
+            lua: `hl.dsp.window.float({ action = 'enable', window = 'address:${client.address}' })`,
+            legacy: `setfloating address:${client.address}`,
+          });
+        }
+        if (!client.pinned) calls.push(HyprlandIpc.pin(client.address));
+      }
+      if (this.hyprAddress.mark || this.hyprAddress.panel) {
+        this.applyBounds();
+        if (calls.length > 0) {
+          try {
+            await hypr.dispatch(calls);
+          } catch (error) {
+            console.warn("[companion] hyprland setup failed:", error);
+          }
+        }
+        this.applyStacking();
+      }
+      if (this.hyprAddress.mark && this.hyprAddress.panel) return;
+      await new Promise((resolve) => setTimeout(resolve, 40));
+    }
+  }
+
+  private focusPanel(): void {
+    const panel = this.live(this.panel);
+    if (!panel) return;
+    if (!panel.isFocused()) panel.focus();
+    const address = this.hyprAddress.panel;
+    if (this.hypr && address) {
+      void this.hypr
+        .dispatch([HyprlandIpc.focus(address)])
+        .catch(() => undefined);
+    }
+  }
+
+  /**
+   * While the panel is active it takes the pointer for the mark too (its hull
+   * holds the arc buttons and a hit target over the mark), so the mark's own
+   * window must not sit on top of the arc and swallow its clicks.
+   */
+  private applyStacking(): void {
+    const panel = this.live(this.panel);
+    const mark = this.live(this.mark);
+    if (!panel || !mark) return;
+    const active = this.activity.panelActive;
+    if (process.platform === "darwin" || process.platform === "win32") {
+      // The mark stays on top so it keeps drawing over the panel, but lets
+      // clicks through to the panel; forwarded moves keep its hover and eyes.
+      if (active) mark.setIgnoreMouseEvents(true, { forward: true });
+      else mark.setIgnoreMouseEvents(false);
+      mark.moveTop();
+      return;
+    }
+    // Linux can't forward mouse moves through an ignoring window, so the
+    // transparent panel goes above the mark while active instead.
+    const hypr = this.hypr;
+    if (hypr) {
+      const top = this.hyprAddress[active ? "panel" : "mark"];
+      if (!top) return;
+      this.hyprPlacement = this.hyprPlacement
+        .then(() => hypr.dispatch([HyprlandIpc.raise(top)]))
+        .catch(() => undefined);
+      return;
+    }
+    if (active) panel.moveTop();
+    else mark.moveTop();
+  }
+
+  private startHyprlandDrag(): void {
+    const hypr = this.hypr;
+    if (!hypr) return;
+    this.stopHyprlandDrag();
+    const generation = ++this.hyprDragGeneration;
+    const anchorAtStart = this.resolveAnchor();
+    let offset: { x: number; y: number } | null = null;
+    const tick = async () => {
+      if (generation !== this.hyprDragGeneration || !this.drag) return;
+      try {
+        const cursor = await hypr.cursorPos();
+        if (generation !== this.hyprDragGeneration || !this.drag) return;
+        offset ??= {
+          x: cursor.x - anchorAtStart.x,
+          y: cursor.y - anchorAtStart.y,
+        };
+        this.anchor = this.clampAnchor({
+          x: cursor.x - offset.x,
+          y: cursor.y - offset.y,
+        });
+        this.applyBounds();
+      } catch (error) {
+        console.warn("[companion] hyprland cursor failed:", error);
+      }
+      if (generation !== this.hyprDragGeneration || !this.drag) return;
+      this.hyprDragTimer = setTimeout(() => void tick(), HYPRLAND_DRAG_INTERVAL_MS);
+    };
+    void tick();
+  }
+
+  private stopHyprlandDrag(): void {
+    this.hyprDragGeneration += 1;
+    if (this.hyprDragTimer) {
+      clearTimeout(this.hyprDragTimer);
+      this.hyprDragTimer = null;
+    }
   }
 
   private sendLayout(kind: CompanionWindowKind): void {
@@ -570,7 +810,7 @@ export class CompanionWindowController {
    * only a few times per second so a WM that refuses never starts a loop.
    */
   private scheduleBoundsRepair(): void {
-    if (this.boundsRepairTimer || this.drag) return;
+    if (this.wayland || this.boundsRepairTimer || this.drag) return;
     this.boundsRepairTimer = setTimeout(() => {
       this.boundsRepairTimer = null;
       if (this.drag) return;
@@ -648,12 +888,9 @@ export class CompanionWindowController {
   private applyPanelInteractivity(): void {
     const panel = this.live(this.panel);
     if (!panel) return;
-    if (this.activity.panelActive) {
-      panel.setIgnoreMouseEvents(false);
-      this.live(this.mark)?.moveTop();
-    } else {
-      panel.setIgnoreMouseEvents(true);
-    }
+    panel.setIgnoreMouseEvents(!this.activity.panelActive);
+    this.applyStacking();
+    this.placeOnHyprland();
   }
 
   private handleHello = (event: IpcMainEvent) => {
@@ -714,11 +951,14 @@ export class CompanionWindowController {
       offsetX: cursor.screenX - anchor.x,
       offsetY: cursor.screenY - anchor.y,
     };
+    // Wayland pointer events carry no global position, so on Hyprland the
+    // drag follows its cursor instead of the renderer's coordinates.
+    this.startHyprlandDrag();
     this.sendToPanel(IPC_COMPANION_SET_EXPANDED, { expanded: false });
   };
 
   private handleDragMove = (event: IpcMainEvent, cursor: CompanionDragMove) => {
-    if (!this.isSender(event.sender) || !this.drag) return;
+    if (!this.isSender(event.sender) || !this.drag || this.hypr) return;
     if (
       !cursor ||
       typeof cursor.screenX !== "number" ||
@@ -735,6 +975,7 @@ export class CompanionWindowController {
   private handleDragEnd = (event: IpcMainEvent) => {
     if (!this.isSender(event.sender)) return;
     this.drag = null;
+    this.stopHyprlandDrag();
     const dir = this.options.getStellaDataDir();
     if (dir && this.anchor) setCompanionAnchor(dir, this.anchor);
     this.applyBounds();
@@ -742,8 +983,7 @@ export class CompanionWindowController {
 
   private handleFocus = (event: IpcMainEvent) => {
     if (this.kindOf(event.sender) !== "panel") return;
-    const panel = this.live(this.panel);
-    if (panel && !panel.isFocused()) panel.focus();
+    this.focusPanel();
   };
 
   private handleOpenMain = (event: IpcMainEvent) => {

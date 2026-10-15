@@ -41,6 +41,7 @@ const profileOwnerFromBody = (
       requireDecision: path === "/internal/interactions/decision",
       requireSessionTransfer:
         path === "/internal/interactions/session-transfer",
+      allowViewport: path === "/internal/interactions/live-view",
     });
     return { ownerId: parsed.authority.ownerId, parsed };
   }

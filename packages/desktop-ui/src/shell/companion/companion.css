@@ -26,8 +26,8 @@
 }
 
 .companion-mark-root .companion-mark {
-  left: 50%;
-  top: calc(100% - 14px);
+  left: var(--companion-anchor-x, 50%);
+  top: var(--companion-anchor-y, calc(100% - 14px));
   transform: translate(-50%, -100%);
 }
 

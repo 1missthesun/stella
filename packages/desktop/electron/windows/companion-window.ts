@@ -133,8 +133,7 @@ export class CompanionWindowController {
   private drag: { offsetX: number; offsetY: number } | null = null;
   private state: CompanionState = EMPTY_COMPANION_STATE;
   private displayHandler: (() => void) | null = null;
-  private lastEdges: { edgeH: CompanionEdgeH; edgeV: CompanionEdgeV } | null =
-    null;
+  private lastLayout: Partial<Record<CompanionWindowKind, string>> = {};
   private expectedBounds: Partial<Record<CompanionWindowKind, Rectangle>> = {};
   private boundsRepairTimer: ReturnType<typeof setTimeout> | null = null;
   private boundsRepairs: number[] = [];
@@ -589,29 +588,32 @@ export class CompanionWindowController {
     y = Math.min(Math.max(y, area.y), area.y + area.height - size.height);
     return {
       bounds: { x, y, width: size.width, height: size.height },
-      layout: { kind, width: size.width, height: size.height, edgeH, edgeV },
+      layout: {
+        kind,
+        width: size.width,
+        height: size.height,
+        edgeH,
+        edgeV,
+        anchorX: Math.round(anchor.x - x),
+        anchorY: Math.round(anchor.y - y),
+      },
     };
   }
 
   private applyBounds(): void {
     const anchor = this.resolveAnchor();
-    let edges: { edgeH: CompanionEdgeH; edgeV: CompanionEdgeV } | null = null;
     for (const slot of [this.panel, this.mark]) {
       const win = this.live(slot);
       if (!win) continue;
       const { bounds, layout } = this.computeBounds(slot.kind, anchor);
       this.expectedBounds[slot.kind] = bounds;
       win.setBounds(bounds, false);
-      edges = { edgeH: layout.edgeH, edgeV: layout.edgeV };
-      if (
-        !this.lastEdges ||
-        this.lastEdges.edgeH !== layout.edgeH ||
-        this.lastEdges.edgeV !== layout.edgeV
-      ) {
+      const serialized = JSON.stringify(layout);
+      if (this.lastLayout[slot.kind] !== serialized) {
+        this.lastLayout[slot.kind] = serialized;
         win.webContents.send(IPC_COMPANION_LAYOUT, layout);
       }
     }
-    if (edges) this.lastEdges = edges;
     this.placeOnHyprland();
   }
 

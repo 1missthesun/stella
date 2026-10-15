@@ -1,4 +1,4 @@
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, type CSSProperties } from "react";
 import { COMPANION_MARK_SIZE } from "@stella/contracts/desktop/companion";
 import { useUiState } from "@/context/ui-state";
 import { useT } from "@/shared/i18n";
@@ -23,7 +23,7 @@ export function CompanionMarkRoot() {
   const t = useT();
   const api = window.electronAPI?.companion;
   const state = useCompanionState();
-  const { activity } = useCompanionWindow();
+  const { layout, activity } = useCompanionWindow();
   const { state: uiState } = useUiState();
   const voiceActive = Boolean(uiState.isVoiceRtcActive);
   const voice = useVoiceSpeakingState(voiceActive);
@@ -65,6 +65,14 @@ export function CompanionMarkRoot() {
   return (
     <div
       className="companion-mark-root"
+      style={
+        layout
+          ? ({
+              "--companion-anchor-x": `${layout.anchorX}px`,
+              "--companion-anchor-y": `${layout.anchorY}px`,
+            } as CSSProperties)
+          : undefined
+      }
       data-hovered={activity.hovered || undefined}
       data-expanded={expanded || undefined}
       data-dragging={dragging || undefined}

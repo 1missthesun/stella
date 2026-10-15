@@ -12,6 +12,7 @@ import {
   COMPANION_MARK_TOP_INSET,
   type CompanionEdgeH,
   type CompanionEdgeV,
+  type CompanionLayout,
 } from "@stella/contracts/desktop/companion";
 import { useUiState } from "@/context/ui-state";
 import type { ChatContext } from "@/shared/types/electron";
@@ -59,16 +60,19 @@ const arcButtonStyle = (
 const anchorVars = (
   edgeH: CompanionEdgeH,
   edgeV: CompanionEdgeV,
+  layout: CompanionLayout | null,
 ): CSSProperties => {
   const half = COMPANION_MARK_SIZE / 2;
   const centerFromSide = COMPANION_MARK_SIDE_INSET + half;
   return {
-    "--companion-anchor-x":
-      edgeH === "right"
+    "--companion-anchor-x": layout
+      ? `${layout.anchorX}px`
+      : edgeH === "right"
         ? `calc(100% - ${centerFromSide}px)`
         : `${centerFromSide}px`,
-    "--companion-anchor-y":
-      edgeV === "bottom"
+    "--companion-anchor-y": layout
+      ? `${layout.anchorY}px`
+      : edgeV === "bottom"
         ? `calc(100% - ${COMPANION_MARK_BOTTOM_INSET}px)`
         : `${COMPANION_MARK_TOP_INSET + COMPANION_MARK_SIZE}px`,
     "--companion-mark-size": `${COMPANION_MARK_SIZE}px`,
@@ -251,7 +255,7 @@ export function CompanionPanelRoot() {
       data-dragging={dragging || undefined}
       data-edge-h={edgeH}
       data-edge-v={edgeV}
-      style={anchorVars(edgeH, edgeV)}
+      style={anchorVars(edgeH, edgeV, layout)}
     >
       <div className="companion-stack">
         {bubbles.length > 0 ? (

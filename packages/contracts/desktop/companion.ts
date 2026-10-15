@@ -27,6 +27,13 @@ export type CompanionLayout = {
   height: number;
   edgeH: CompanionEdgeH;
   edgeV: CompanionEdgeV;
+  /**
+   * Where the anchor (the mark's bottom centre) falls inside this window.
+   * Usually a corner of the layout, but the window is clamped to the work
+   * area, so near a screen edge the mark sits elsewhere.
+   */
+  anchorX: number;
+  anchorY: number;
 };
 
 export type CompanionPanelStatus = {

@@ -23,6 +23,7 @@ import {
 } from "./execution-placement-core";
 export {
   AUTOMATIC_EXECUTION_TARGET,
+  AutomaticExecutionRequestError,
   AutomaticExecutionWaitAbortedError,
   automaticExecutionCancellationCommand,
   automaticExecutionResultText,

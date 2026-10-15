@@ -398,27 +398,36 @@ const validAttachmentPath = (path: string): boolean =>
       (segment) => segment.length > 0 && segment !== "." && segment !== "..",
     );
 
+export class AutomaticExecutionRequestError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AutomaticExecutionRequestError";
+  }
+}
+
 export const buildAutomaticExecutionAdmission = (
   input: AutomaticExecutionAdmissionInput,
 ) => {
   const prompt = input.prompt.trim();
-  if (!prompt) throw new Error("A prompt is required.");
   const idempotencyKey = input.idempotencyKey.trim();
   const conversationId = input.conversationId.trim();
   const subject = input.subject ?? "portable";
   const target = input.target ?? AUTOMATIC_EXECUTION_TARGET;
   const targetDeviceId = target.mode === "device" ? target.deviceId.trim() : "";
   if (target.mode === "device" && !targetDeviceId) {
-    throw new Error("A selected computer needs a device id.");
+    throw new AutomaticExecutionRequestError("A selected computer needs a device id.");
   }
   const attachments = [...new Set(input.attachments ?? [])];
   if (attachments.length > AUTOMATIC_EXECUTION_MAX_ATTACHMENTS) {
-    throw new Error(
+    throw new AutomaticExecutionRequestError(
       `A turn may carry at most ${AUTOMATIC_EXECUTION_MAX_ATTACHMENTS} attachments.`,
     );
   }
   if (!attachments.every(validAttachmentPath)) {
-    throw new Error("An attachment does not name a drive file.");
+    throw new AutomaticExecutionRequestError("An attachment does not name a drive file.");
+  }
+  if (!prompt && !(input.kind === "chat" && attachments.length > 0)) {
+    throw new AutomaticExecutionRequestError("A prompt is required.");
   }
   const payload: DispatchPayload = {
     schemaVersion: 1,

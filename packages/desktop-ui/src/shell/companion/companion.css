@@ -238,8 +238,11 @@
   }
 }
 
+/* Above the hull: its 208px hover circle reaches the composer and dictation
+   pill now that they sit close to the mark, and would eat their clicks. */
 .companion-stack {
   position: absolute;
+  z-index: 3;
   width: var(--companion-stack-width);
   display: flex;
   flex-direction: column;

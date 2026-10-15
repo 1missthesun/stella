@@ -73,7 +73,7 @@ const EDGE_MARGIN = 6;
 const HOVER_GRACE_MS = 340;
 // The arc's lowest button reaches this far past the mark's bottom edge (top
 // edge when the arc flips), so the panel and the screen clamp leave room.
-const ARC_OVERHANG = 28;
+const ARC_OVERHANG = 34;
 const HYPRLAND_ATTACH_TIMEOUT_MS = 3_000;
 const HYPRLAND_DRAG_INTERVAL_MS = 16;
 // Where the panel waits on Hyprland while it has nothing to show: Wayland
@@ -524,7 +524,7 @@ export class CompanionWindowController {
     const area = this.workAreaFor(screen.getPrimaryDisplay());
     this.anchor = {
       x: area.x + area.width - 32 - COMPANION_MARK_SIZE / 2,
-      y: area.y + area.height - 28,
+      y: area.y + area.height - EDGE_MARGIN - ARC_OVERHANG,
     };
     return this.anchor;
   }

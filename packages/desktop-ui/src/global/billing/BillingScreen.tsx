@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { BillingStatus } from "@stella/contracts/backend/billing";
 import {
   PLAN_CATALOG,
@@ -30,7 +30,9 @@ const useFormatters = (locale: string) =>
     const time = new Intl.DateTimeFormat(locale, { hour: "numeric", minute: "2-digit" });
     const weekday = new Intl.DateTimeFormat(locale, { weekday: "long", hour: "numeric", minute: "2-digit" });
     const day = new Intl.DateTimeFormat(locale, { month: "long", day: "numeric" });
+    const percent = new Intl.NumberFormat(locale, { style: "percent", maximumFractionDigits: 0 });
     return {
+      percent: (used: number, limit: number) => percent.format(usedShare(used, limit) / 100),
       usd: (value: number) => usd.format(value),
       amount: (value: number) => (Number.isInteger(value) ? whole.format(value) : usd.format(value)),
       day: (ms: number) => day.format(ms),
@@ -43,6 +45,13 @@ type Formatters = ReturnType<typeof useFormatters>;
 
 const pct = (used: number, limit: number) =>
   !Number.isFinite(limit) || limit <= 0 ? 0 : Math.min(100, Math.max(0, (used / limit) * 100));
+
+// Whole percent for display: never 0% once anything is used, never 100% until it's all used.
+export const usedShare = (used: number, limit: number): number => {
+  if (!Number.isFinite(limit) || limit <= 0 || !(used > 0)) return 0;
+  if (used >= limit) return 100;
+  return Math.min(99, Math.max(1, Math.floor((used / limit) * 100)));
+};
 
 const errorText = (error: unknown, fallback: string) =>
   error instanceof Error && error.message ? error.message : fallback;
@@ -67,18 +76,17 @@ const openSignInDialog = () => {
   });
 };
 
-export const planIncludesLines = (plan: BillingPlan, t: Translate, f: Pick<Formatters, "amount">): string[] => {
+export const RECOMMENDED_PLAN: PaidBillingPlan = "pro";
+
+export const planTagline = (plan: BillingPlan, t: Translate): string => t(`billing.v3.tagline.${plan}`);
+
+export const planIncludesLines = (plan: BillingPlan, t: Translate): string[] => {
   const def = PLAN_CATALOG[plan];
-  if (!def.interval) {
-    return [
-      t("billing.v3.includes.oneTime", { amount: f.amount(def.budget.oneTimeUsd ?? def.budget.monthlyUsd) }),
-      t("billing.v3.includes.local"),
-    ];
-  }
+  if (!def.interval) return [t("billing.v3.includes.local"), t("billing.v3.includes.voice")];
   return [
-    t("billing.v3.includes.monthly", { amount: f.amount(def.budget.monthlyUsd) }),
     t("billing.v3.includes.cloud", { count: def.limits.cloudAgentsAtOnce }),
     ...(def.mediaGeneration ? [t("billing.v3.includes.media")] : []),
+    t("billing.v3.includes.drive", { size: `${Math.round(def.limits.driveBytes / 1024 ** 3)} GB` }),
   ];
 };
 
@@ -281,27 +289,20 @@ function UsageSection({
   const next = nextPlanUp(plan);
   const resets = (at: number | undefined) =>
     typeof at === "number" && at > 0 ? t("billing.v3.usage.resets", { date: f.when(at, now) }) : "";
-  const windowCaption = (rawUsed: number, limit: number, at: number) => {
-    const used = Math.min(limit, rawUsed);
-    return (
+  const windowCaption = (used: number, limit: number, at: number) => (
     <>
-      <span>
-        {f.usd(used)} <span className="billing-muted">{t("billing.v3.usage.of", { amount: f.amount(limit) })}</span>
-      </span>
+      <span>{t("billing.v3.usage.percentUsed", { percent: f.percent(used, limit) })}</span>
       <span className="billing-muted">{used > 0 ? resets(at) : t("billing.v3.usage.startsNext")}</span>
     </>
   );
-  };
 
   return (
     <Section title={t("billing.v3.usage.title")} lede={t("billing.v3.usage.lede")}>
       <div className="billing-total">
         <div className="billing-total-head">
-          <span className="billing-total-amount">{f.usd(mainUsed)}</span>
+          <span className="billing-total-amount">{f.percent(mainUsed, mainLimit)}</span>
           <span className="billing-muted">
-            {oneTime
-              ? t("billing.v3.usage.ofOneTime", { amount: f.amount(mainLimit) })
-              : t("billing.v3.usage.ofMonth", { amount: f.amount(mainLimit) })}
+            {oneTime ? t("billing.v3.usage.usedOneTime") : t("billing.v3.usage.usedMonth")}
           </span>
         </div>
         <Meter
@@ -360,50 +361,34 @@ function UsageSection({
         </div>
       ) : null}
 
-      <div className="billing-rows">
-        {oneTime ? null : (
-          <>
-            <Row
+      {oneTime ? null : (
+        <div className="billing-rows">
+          <Row
+            label={t("billing.v3.usage.rolling", { hours: def.budget.rollingWindowHours })}
+            hint={t("billing.v3.usage.rollingNote", { hours: def.budget.rollingWindowHours })}
+          >
+            <Meter
               label={t("billing.v3.usage.rolling", { hours: def.budget.rollingWindowHours })}
-              hint={t("billing.v3.usage.rollingHint", {
-                amount: f.amount(usage.rollingLimitUsd),
-                hours: def.budget.rollingWindowHours,
-              })}
-            >
-              <Meter
-                label={t("billing.v3.usage.rolling", { hours: def.budget.rollingWindowHours })}
-                used={usage.rollingUsedUsd}
-                limit={usage.rollingLimitUsd}
-                caption={windowCaption(usage.rollingUsedUsd, usage.rollingLimitUsd, usage.rollingResetsAt)}
-              />
-            </Row>
-            <Row label={t("billing.v3.usage.weekly")} hint={t("billing.v3.usage.weeklyHint", { amount: f.amount(usage.weeklyLimitUsd) })}>
-              <Meter
-                label={t("billing.v3.usage.weekly")}
-                used={usage.weeklyUsedUsd}
-                limit={usage.weeklyLimitUsd}
-                caption={windowCaption(usage.weeklyUsedUsd, usage.weeklyLimitUsd, usage.weeklyResetsAt)}
-              />
-            </Row>
-          </>
-        )}
-        <Row label={t("billing.v3.usage.held")} hint={t("billing.v3.usage.heldHint")}>
-          <span className="billing-value">{f.usd(reserved)}</span>
-        </Row>
-        <Row label={t("billing.v3.usage.credit")} hint={t("billing.v3.usage.creditHint")}>
-          <span className="billing-value">{f.usd(credit)}</span>
-        </Row>
-        {available === undefined ? null : (
-          <Row label={t("billing.v3.usage.available")} hint={t("billing.v3.usage.availableHint")}>
-            <span className="billing-value billing-value--strong">
-              {available === null ? t("billing.v3.usage.unlimited") : f.usd(available)}
-            </span>
+              used={usage.rollingUsedUsd}
+              limit={usage.rollingLimitUsd}
+              caption={windowCaption(usage.rollingUsedUsd, usage.rollingLimitUsd, usage.rollingResetsAt)}
+            />
           </Row>
-        )}
-      </div>
+          <Row label={t("billing.v3.usage.weekly")} hint={t("billing.v3.usage.weeklyNote")}>
+            <Meter
+              label={t("billing.v3.usage.weekly")}
+              used={usage.weeklyUsedUsd}
+              limit={usage.weeklyLimitUsd}
+              caption={windowCaption(usage.weeklyUsedUsd, usage.weeklyLimitUsd, usage.weeklyResetsAt)}
+            />
+          </Row>
+        </div>
+      )}
     </Section>
   );
 }
+
+type PlanAction = { label: string; primary: boolean; onClick: () => void };
 
 function PlanSection({
   status,
@@ -422,75 +407,83 @@ function PlanSection({
   onCheckout: (plan: PaidBillingPlan) => void;
   onPortal: () => void;
 }) {
-  const name = useId();
-  const [selected, setSelected] = useState<BillingPlan>(plan);
-  useEffect(() => setSelected(plan), [plan]);
   const isPaid = isPaidBillingPlan(plan);
   const periodEnd = status.currentPeriodEnd ? f.day(status.currentPeriodEnd) : null;
   const priceOf = (id: BillingPlan) => t("billing.v3.plan.perMonth", { price: f.amount(PLAN_CATALOG[id].monthlyPriceCents / 100) });
+  const suggested =
+    planRank(plan) < planRank(RECOMMENDED_PLAN) ? RECOMMENDED_PLAN : nextPlanUp(plan);
 
-  const action = (() => {
-    if (selected === plan) return null;
-    if (!isPaid && isPaidBillingPlan(selected)) {
-      return {
-        label: t("billing.v3.plan.checkout", { price: priceOf(selected) }),
-        hint: t("billing.v3.plan.checkoutHint"),
-        danger: false,
-        onClick: () => onCheckout(selected),
-      };
+  const actionFor = (id: BillingPlan): PlanAction | null => {
+    if (id === plan) return null;
+    const label = PLAN_CATALOG[id].label;
+    if (!isPaid && isPaidBillingPlan(id)) {
+      return { label: t("billing.v3.plan.get", { plan: label }), primary: id === suggested, onClick: () => onCheckout(id) };
     }
-    if (selected === "free") {
-      return {
-        label: t("billing.v3.plan.cancel"),
-        hint: t("billing.v3.plan.cancelHint", { plan: PLAN_CATALOG[plan].label, date: periodEnd ?? "—" }),
-        danger: true,
-        onClick: onPortal,
-      };
+    if (planRank(id) > planRank(plan)) {
+      return { label: t("billing.v3.usage.upgradeTo", { plan: label }), primary: id === suggested, onClick: onPortal };
     }
-    const params = { plan: PLAN_CATALOG[selected].label, price: priceOf(selected) };
-    return {
-      label: planRank(selected) > planRank(plan) ? t("billing.v3.plan.upgrade", params) : t("billing.v3.plan.downgrade", params),
-      hint: t("billing.v3.plan.changeHint"),
-      danger: false,
-      onClick: onPortal,
-    };
-  })();
+    return { label: t("billing.v3.plan.switchTo", { plan: label }), primary: false, onClick: onPortal };
+  };
 
   return (
-    <Section id="billing-plans" title={t("billing.v3.plan.title")} lede={t("billing.v3.plan.lede")}>
-      <div className="billing-radio-list" role="radiogroup" aria-label={t("billing.v3.plan.title")}>
+    <Section id="billing-plans" title={t("billing.v3.plan.title")}>
+      <div className="billing-plans-head">
+        <h3 className="billing-plans-heading">{t("billing.v3.plan.heading")}</h3>
+        <p className="billing-plans-lede">{t("billing.v3.plan.lede")}</p>
+      </div>
+      <div className="billing-plans" role="list">
         {PLAN_ORDER.map((id) => {
           const def = PLAN_CATALOG[id];
-          const checked = selected === id;
+          const current = id === plan;
+          const recommended = id === RECOMMENDED_PLAN;
+          const action = actionFor(id);
           return (
-            <label key={id} className="billing-radio" data-checked={checked || undefined}>
-              <input type="radio" name={name} value={id} checked={checked} onChange={() => setSelected(id)} />
-              <span className="billing-radio-dot" aria-hidden="true" />
-              <span className="billing-radio-text">
-                <span className="billing-radio-label">
-                  {def.label}
-                  {id === plan ? <span className="billing-tag">{t("billing.v3.plan.current")}</span> : null}
-                </span>
-                <span className="billing-radio-detail">{planIncludesLines(id, t, f).join(" · ")}</span>
+            <div
+              key={id}
+              role="listitem"
+              className="billing-plan"
+              data-current={current || undefined}
+              data-recommended={recommended || undefined}
+            >
+              <span className="billing-plan-flag">
+                {current ? t("billing.v3.plan.currentPlan") : recommended ? t("billing.v3.plan.recommended") : ""}
               </span>
-              <span className="billing-radio-price">{def.interval ? priceOf(id) : f.amount(0)}</span>
-            </label>
+              <span className="billing-plan-name">{def.label}</span>
+              <span className="billing-plan-tagline">{planTagline(id, t)}</span>
+              <span className="billing-plan-price">
+                <span className="billing-plan-amount">{f.amount(def.monthlyPriceCents / 100)}</span>
+                <span className="billing-plan-per">{def.interval ? t("billing.v3.plan.month") : t("billing.v3.plan.noCard")}</span>
+              </span>
+              {action ? (
+                <button
+                  type="button"
+                  className={`billing-btn billing-plan-btn${action.primary ? " billing-btn--primary" : ""}`}
+                  disabled={busy !== null}
+                  onClick={action.onClick}
+                >
+                  {action.label}
+                </button>
+              ) : (
+                <span className="billing-btn billing-plan-btn billing-plan-btn--current" aria-disabled="true">
+                  {t("billing.v3.plan.currentPlan")}
+                </span>
+              )}
+              <ul className="billing-plan-features">
+                {planIncludesLines(id, t).map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            </div>
           );
         })}
       </div>
-      {action ? (
-        <div className="billing-plan-action">
-          <button
-            type="button"
-            className={`billing-btn ${action.danger ? "billing-btn--danger" : "billing-btn--primary"}`}
-            disabled={busy !== null}
-            onClick={action.onClick}
-          >
-            {busy === "checkout" || busy === "portal" ? t("billing.v3.opening") : action.label}
-          </button>
-          <span className="billing-row-hint">{action.hint}</span>
-        </div>
-      ) : null}
+      <p className="billing-plans-note">
+        {busy === "checkout" || busy === "portal"
+          ? t("billing.v3.opening")
+          : isPaid
+            ? t("billing.v3.plan.changeHint")
+            : t("billing.v3.plan.checkoutHint")}
+      </p>
       {isPaid ? (
         <div className="billing-rows">
           <Row

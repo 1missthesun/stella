@@ -499,8 +499,6 @@ const completeJob = async (ctx: OwnerContext, row: JobRow, payload: unknown): Pr
   return output;
 };
 
-const usdText = (value: number): string => `$${(value / MICRO_CENTS_PER_USD).toFixed(2)}`;
-
 const admit = (ctx: OwnerContext, model: MediaModel, input: Record<string, unknown>, jobId: string): number => {
   const access = billingAccess(ctx);
   if (model.plan) {
@@ -522,9 +520,9 @@ const admit = (ctx: OwnerContext, model: MediaModel, input: Record<string, unkno
   if (!hold.reserved) {
     const message = !hold.allowed
       ? hold.message || "Your Stella usage limit is reached."
-      : `This would cost up to ${usdText(needed)}, and ${usdText(hold.availableMicroCents ?? 0)} of your budget is free right now${
-          access.reservedMicroCents > 0 ? " (running work is holding the rest)" : ""
-        }.`;
+      : access.reservedMicroCents > 0
+        ? "This needs more of your budget than is free right now. Running work is holding some of it; try again when it finishes, or add credit."
+        : "This needs more of your budget than is free right now. Add credit or upgrade to keep going, or wait until it resets.";
     throw new RpcError("RATE_LIMITED", message, {
       retryAfterMs: hold.retryAfterMs,
       reason: "usage_limit",

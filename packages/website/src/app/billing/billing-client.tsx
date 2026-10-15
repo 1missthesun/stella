@@ -2,7 +2,7 @@
 
 import type { BillingStatus } from "@stella/contracts/backend/billing";
 import { getBackendClient, isBackendConfigured, useBackendValue } from "@/lib/backend";
-import { useCallback, useEffect, useId, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import Link from "next/link";
 import { openSignInDialog } from "@/components/auth/sign-in-dialog";
 import { authClient } from "@/lib/auth-client";
@@ -36,6 +36,17 @@ const whenLabel = (at: number, now: number): string => {
 
 const resetLabel = (at: number | undefined, now: number): string =>
   typeof at === "number" && at > 0 ? `Resets ${whenLabel(at, now)}` : "";
+
+// Whole percent for display: never 0% once anything is used, never 100% until it's all used.
+const usedPercent = (used: number, limit: number): string => {
+  if (!Number.isFinite(limit) || limit <= 0 || !(used > 0)) return "0%";
+  if (used >= limit) return "100%";
+  return `${Math.min(99, Math.max(1, Math.floor((used / limit) * 100)))}%`;
+};
+
+const RECOMMENDED_PLAN: PaidBillingPlan = "pro";
+
+const planFeatures = (plan: BillingPlan): readonly string[] => PLAN_CATALOG[plan].includes;
 
 const pct = (used: number, limit: number) =>
   !Number.isFinite(limit) || limit <= 0 ? 0 : Math.min(100, Math.max(0, (used / limit) * 100));
@@ -238,7 +249,7 @@ function Meter({
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={Math.round(usedPct)}
-        aria-valuetext={`${usd.format(used)} of ${usd.format(limit)} used`}
+        aria-valuetext={`${usedPercent(used, limit)} used`}
       >
         <span className="billing-meter-used" data-full={full ? "" : undefined} style={{ width: `${usedPct}%` }} />
         {heldPct > 0 ? <span className="billing-meter-held" style={{ width: `${heldPct}%` }} /> : null}
@@ -390,26 +401,19 @@ function UsageSection({
     return windows.length ? Math.max(...windows.map((w) => w.at)) : null;
   })();
   const next = plan === "free" ? "plus" : plan === "plus" ? "pro" : plan === "pro" ? "max" : null;
-  const windowCaption = (rawUsed: number, limit: number, at: number) => {
-    const used = Math.min(limit, rawUsed);
-    return (
+  const windowCaption = (used: number, limit: number, at: number) => (
     <>
-      <span>
-        {usd.format(used)} <span className="billing-muted">of {formatUsd(limit)}</span>
-      </span>
+      <span>{usedPercent(used, limit)} used</span>
       <span className="billing-muted">{used > 0 ? resetLabel(at, now) : "Starts with your next use"}</span>
     </>
   );
-  };
 
   return (
     <Section id="usage" title="Usage" lede={lede}>
       <div className="billing-total">
         <div className="billing-total-head">
-          <span className="billing-total-amount">{usd.format(mainUsed)}</span>
-          <span className="billing-muted">
-            of {formatUsd(mainLimit)} {oneTime ? "to try Stella" : "this month"}
-          </span>
+          <span className="billing-total-amount">{usedPercent(mainUsed, mainLimit)}</span>
+          <span className="billing-muted">{oneTime ? "of your free usage used" : "used this month"}</span>
         </div>
         <Meter
           large
@@ -466,40 +470,27 @@ function UsageSection({
         </div>
       ) : null}
 
-      <div className="billing-rows">
-        {oneTime ? null : (
-          <>
-            <Row
-              label={`Next ${def.budget.rollingWindowHours} hours`}
-              hint={`Up to ${formatUsd(usage.rollingLimitUsd)} in any ${def.budget.rollingWindowHours} hours.`}
-            >
-              <Meter
-                used={usage.rollingUsedUsd}
-                limit={usage.rollingLimitUsd}
-                caption={windowCaption(usage.rollingUsedUsd, usage.rollingLimitUsd, usage.rollingResetsAt)}
-              />
-            </Row>
-            <Row label="This week" hint={`Up to ${formatUsd(usage.weeklyLimitUsd)} a week.`}>
-              <Meter
-                used={usage.weeklyUsedUsd}
-                limit={usage.weeklyLimitUsd}
-                caption={windowCaption(usage.weeklyUsedUsd, usage.weeklyLimitUsd, usage.weeklyResetsAt)}
-              />
-            </Row>
-          </>
-        )}
-        <Row label="Held by running work" hint="Set aside while agents and media jobs finish. What they don't use comes back.">
-          <span className="billing-value">{usd.format(reserved)}</span>
-        </Row>
-        <Row label="Extra credit" hint="Used once your plan's budget runs out.">
-          <span className="billing-value">{usd.format(credit)}</span>
-        </Row>
-        {available === undefined ? null : (
-          <Row label="Available now" hint="What Stella can spend right now, credit included.">
-            <span className="billing-value billing-value--strong">{available === null ? "Unlimited" : usd.format(available)}</span>
+      {oneTime ? null : (
+        <div className="billing-rows">
+          <Row
+            label={`Next ${def.budget.rollingWindowHours} hours`}
+            hint="Spreads your usage so one busy stretch can't use up the week."
+          >
+            <Meter
+              used={usage.rollingUsedUsd}
+              limit={usage.rollingLimitUsd}
+              caption={windowCaption(usage.rollingUsedUsd, usage.rollingLimitUsd, usage.rollingResetsAt)}
+            />
           </Row>
-        )}
-      </div>
+          <Row label="This week" hint="Spreads your usage so one week can't use up the month.">
+            <Meter
+              used={usage.weeklyUsedUsd}
+              limit={usage.weeklyLimitUsd}
+              caption={windowCaption(usage.weeklyUsedUsd, usage.weeklyLimitUsd, usage.weeklyResetsAt)}
+            />
+          </Row>
+        </div>
+      )}
     </Section>
   );
 }
@@ -521,79 +512,79 @@ function PlanSection({
   onCheckout: (plan: PaidBillingPlan) => void;
   onPortal: () => void;
 }) {
-  const name = useId();
-  const [selected, setSelected] = useState<BillingPlan>(initial ?? plan);
-  const target = PLAN_CATALOG[selected];
   const periodEnd = status.currentPeriodEnd ? dateFormat.format(status.currentPeriodEnd) : null;
+  const suggested: BillingPlan | null =
+    initial && initial !== plan && isPaidBillingPlan(initial)
+      ? initial
+      : planRank(plan) < planRank(RECOMMENDED_PLAN)
+        ? RECOMMENDED_PLAN
+        : (PLAN_ORDER[planRank(plan) + 1] ?? null);
 
-  const action = (() => {
-    if (selected === plan) return null;
-    if (!isPaid && isPaidBillingPlan(selected)) {
-      return { label: `Continue to checkout · ${planPriceLabel(selected)}`, disabled: busy !== null, onClick: () => onCheckout(selected), danger: false };
-    }
-    if (selected === "free") return { label: "Cancel plan", disabled: busy !== null, onClick: onPortal, danger: true };
-    const up = planRank(selected) > planRank(plan);
-    return {
-      label: `${up ? "Upgrade" : "Downgrade"} to ${target.label} · ${planPriceLabel(selected)}`,
-      disabled: busy !== null,
-      onClick: onPortal,
-      danger: false,
-    };
-  })();
-
-  const actionHint =
-    selected === plan
-      ? null
-      : selected === "free"
-        ? `You keep ${PLAN_CATALOG[plan].label} until ${periodEnd ?? "the end of this period"}, then move to Free.`
-        : !isPaid
-          ? "Payment opens in a new tab. Your budget starts right away."
-          : "You'll confirm the change in Stripe.";
+  const actionFor = (id: BillingPlan) => {
+    if (id === plan) return null;
+    const label = PLAN_CATALOG[id].label;
+    if (!isPaid && isPaidBillingPlan(id)) return { label: `Get ${label}`, primary: id === suggested, onClick: () => onCheckout(id) };
+    if (planRank(id) > planRank(plan)) return { label: `Upgrade to ${label}`, primary: id === suggested, onClick: onPortal };
+    return { label: `Switch to ${label}`, primary: false, onClick: onPortal };
+  };
 
   return (
-    <Section id="plan" title="Plan" lede="Every plan runs the same Stella. Bigger plans give it a bigger budget and more at once.">
-      <div className="billing-radio-list" role="radiogroup" aria-label="Plans">
+    <Section id="plan" title="Plan">
+      <div className="billing-plans-head">
+        <h3 className="billing-plans-heading">Choose your plan</h3>
+        <p className="billing-plans-lede">Same Stella on every plan. Bigger plans give you more usage and more at once.</p>
+      </div>
+      <div className="billing-plans" role="list">
         {PLAN_ORDER.map((id) => {
           const def = PLAN_CATALOG[id];
-          const checked = selected === id;
+          const current = id === plan;
+          const recommended = id === RECOMMENDED_PLAN;
+          const action = actionFor(id);
           return (
-            <label key={id} className="billing-radio" data-checked={checked ? "" : undefined}>
-              <input type="radio" name={name} value={id} checked={checked} onChange={() => setSelected(id)} />
-              <span className="billing-radio-dot" aria-hidden="true" />
-              <span className="billing-radio-text">
-                <span className="billing-radio-label">
-                  {def.label}
-                  {id === plan ? <span className="billing-tag">Current</span> : null}
+            <div
+              key={id}
+              role="listitem"
+              className="billing-plan"
+              data-current={current ? "" : undefined}
+              data-recommended={recommended ? "" : undefined}
+            >
+              <span className="billing-plan-flag">{current ? "Current plan" : recommended ? "Recommended" : ""}</span>
+              <span className="billing-plan-name">{def.label}</span>
+              <span className="billing-plan-tagline">{def.tagline}</span>
+              <span className="billing-plan-price">
+                <span className="billing-plan-amount">{planPriceLabel(id).replace("/mo", "")}</span>
+                <span className="billing-plan-per">{def.interval ? "per month" : "No card needed"}</span>
+              </span>
+              {action ? (
+                <button
+                  type="button"
+                  className={`billing-btn billing-plan-btn ${action.primary ? "billing-btn--primary" : "billing-btn--secondary"}`}
+                  disabled={busy !== null}
+                  onClick={action.onClick}
+                >
+                  {action.label}
+                </button>
+              ) : (
+                <span className="billing-btn billing-plan-btn billing-plan-btn--current" aria-disabled="true">
+                  Current plan
                 </span>
-                <span className="billing-radio-detail">{def.includes.join(" · ")}</span>
-              </span>
-              <span className="billing-radio-price">
-                {def.interval ? (
-                  <>
-                    {planPriceLabel(id).replace("/mo", "")}
-                    <span className="billing-muted">/mo</span>
-                  </>
-                ) : (
-                  "$0"
-                )}
-              </span>
-            </label>
+              )}
+              <ul className="billing-plan-features">
+                {planFeatures(id).map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            </div>
           );
         })}
       </div>
-      {action ? (
-      <div className="billing-plan-action">
-        <button
-          type="button"
-          className={`billing-btn ${action.danger ? "billing-btn--danger" : "billing-btn--primary"}`}
-          disabled={action.disabled}
-          onClick={action.onClick}
-        >
-          {busy === "checkout" || busy === "portal" ? "Opening…" : action.label}
-        </button>
-        {actionHint ? <p className="billing-row-hint">{actionHint}</p> : null}
-      </div>
-      ) : null}
+      <p className="billing-plans-note">
+        {busy === "checkout" || busy === "portal"
+          ? "Opening…"
+          : isPaid
+            ? "You'll confirm any change in Stripe."
+            : "Payment opens in a new tab. Your usage starts right away."}
+      </p>
 
       {isPaid ? (
         <div className="billing-rows">

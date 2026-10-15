@@ -522,24 +522,15 @@
       "usage": {
         "title": "用量",
         "lede": "一份预算支付 Stella 为你运行的一切。",
-        "ofMonth": "/ 本月 {amount}",
-        "ofOneTime": "/ 试用 {amount}",
         "oneTimeNote": "一次性,不会重置",
-        "of": "/ {amount}",
         "used": "已用",
         "held": "运行中的任务已预留",
-        "heldHint": "在代理和媒体任务完成前预留。没用到的会退回。",
         "rolling": "接下来 {hours} 小时",
-        "rollingHint": "任意 {hours} 小时内最多 {amount}。",
         "weekly": "本周",
-        "weeklyHint": "每周最多 {amount}。",
         "resets": "{date} 重置",
         "startsNext": "下次使用时开始",
         "credit": "额外额度",
         "creditHint": "套餐预算用完后使用。",
-        "available": "当前可用",
-        "availableHint": "Stella 现在可花费的金额(含额外额度)。",
-        "unlimited": "不限",
         "outTitle": "你暂时没有可用额度了",
         "outBody": "你的预算将在 {date} 重置。添加额度或升级即可立即继续。",
         "outBodyNoDate": "添加额度或升级即可立即继续。",
@@ -547,34 +538,40 @@
         "freeOutBody": "选择一个套餐或添加额度以继续。",
         "creditTitle": "正在使用额外额度",
         "creditBody": "你的套餐限额在 {date} 前已用完。在此之前,Stella 的工作由额外额度支付。",
-        "upgradeTo": "升级到 {plan}"
+        "upgradeTo": "升级到 {plan}",
+        "percentUsed": "已用 {percent}",
+        "usedMonth": "本月已用",
+        "usedOneTime": "免费用量已用",
+        "rollingNote": "分散你的用量，避免某段忙碌时间用完整周额度。",
+        "weeklyNote": "分散你的用量，避免某一周用完整月额度。"
       },
       "plan": {
         "title": "套餐",
-        "lede": "所有套餐运行的是同一个 Stella。更大的套餐提供更多预算,并能同时做更多事。",
-        "current": "当前",
+        "lede": "每个套餐都是同一个 Stella。更高的套餐提供更多用量，可同时做更多事。",
         "perMonth": "{price}/月",
-        "checkout": "继续结账 · {price}",
         "checkoutHint": "结账页面会在浏览器中打开。预算立即生效。",
-        "upgrade": "升级到 {plan} · {price}",
-        "downgrade": "降级到 {plan} · {price}",
         "changeHint": "你将在浏览器中确认更改。",
-        "cancel": "取消套餐",
-        "cancelHint": "{plan} 将保留到 {date},之后转为 Free。",
         "renews": "续订日期",
         "renewsHint": "{price},由 Stripe 每月收费。",
         "ends": "结束日期",
         "endsHint": "{plan} 在此之前保持有效。可在“管理账单”中恢复。",
         "manage": "付款和发票",
         "manageHint": "银行卡、发票和取消。",
-        "manageButton": "管理账单"
+        "manageButton": "管理账单",
+        "heading": "选择你的套餐",
+        "recommended": "推荐",
+        "currentPlan": "当前套餐",
+        "get": "获取 {plan}",
+        "switchTo": "切换到 {plan}",
+        "month": "每月",
+        "noCard": "无需银行卡"
       },
       "includes": {
-        "oneTime": "试用 {amount},仅一次",
-        "monthly": "每月 {amount} 用量",
         "local": "在你电脑上运行的代理",
         "cloud": "云端代理,同时 {count} 个",
-        "media": "图片、视频、音乐和 3D"
+        "media": "图片、视频、音乐和 3D",
+        "voice": "听写和朗读",
+        "drive": "{size} Drive 存储空间"
       },
       "credit": {
         "title": "额外额度",
@@ -591,6 +588,12 @@
       "mobile": {
         "usageRow": "本月",
         "usageOneTime": "免费额度"
+      },
+      "tagline": {
+        "free": "试用 Stella",
+        "plus": "更多用量",
+        "pro": "更高用量",
+        "max": "最高用量"
       }
     }
   },

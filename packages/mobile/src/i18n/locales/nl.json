@@ -527,24 +527,15 @@
       "usage": {
         "title": "Gebruik",
         "lede": "Eén budget betaalt alles wat Stella voor je uitvoert.",
-        "ofMonth": "van {amount} deze maand",
-        "ofOneTime": "van {amount} om Stella te proberen",
         "oneTimeNote": "Eenmalig, wordt niet gereset",
-        "of": "van {amount}",
         "used": "Gebruikt",
         "held": "Gereserveerd door lopend werk",
-        "heldHint": "Apart gezet terwijl agents en mediataken afronden. Wat ze niet gebruiken, komt terug.",
         "rolling": "Komende {hours} uur",
-        "rollingHint": "Tot {amount} in elke {hours} uur.",
         "weekly": "Deze week",
-        "weeklyHint": "Tot {amount} per week.",
         "resets": "Reset: {date}",
         "startsNext": "Begint bij je volgende gebruik",
         "credit": "Extra tegoed",
         "creditHint": "Gebruikt zodra het budget van je abonnement op is.",
-        "available": "Nu beschikbaar",
-        "availableHint": "Wat Stella nu kan uitgeven, tegoed inbegrepen.",
-        "unlimited": "Onbeperkt",
         "outTitle": "Je gebruik is voorlopig op",
         "outBody": "Je budget wordt gereset: {date}. Voeg tegoed toe of upgrade om nu door te gaan.",
         "outBodyNoDate": "Voeg tegoed toe of upgrade om nu door te gaan.",
@@ -552,34 +543,40 @@
         "freeOutBody": "Kies een abonnement of voeg tegoed toe om door te gaan.",
         "creditTitle": "Draait op extra tegoed",
         "creditBody": "De limiet van je abonnement is op tot {date}. Je tegoed dekt wat Stella tot dan doet.",
-        "upgradeTo": "Upgrade naar {plan}"
+        "upgradeTo": "Upgrade naar {plan}",
+        "percentUsed": "{percent} gebruikt",
+        "usedMonth": "gebruikt deze maand",
+        "usedOneTime": "van je gratis gebruik gebruikt",
+        "rollingNote": "Spreidt je gebruik zodat één drukke periode niet de hele week opmaakt.",
+        "weeklyNote": "Spreidt je gebruik zodat één week niet de hele maand opmaakt."
       },
       "plan": {
         "title": "Abonnement",
-        "lede": "Elk abonnement draait dezelfde Stella. Grotere abonnementen geven haar een groter budget en meer tegelijk.",
-        "current": "Huidig",
+        "lede": "Dezelfde Stella in elk abonnement. Grotere abonnementen geven meer gebruik en meer tegelijk.",
         "perMonth": "{price}/mnd",
-        "checkout": "Verder naar betalen · {price}",
         "checkoutHint": "De betaling opent in je browser. Je budget gaat meteen in.",
-        "upgrade": "Upgrade naar {plan} · {price}",
-        "downgrade": "Downgrade naar {plan} · {price}",
         "changeHint": "Je bevestigt de wijziging in je browser.",
-        "cancel": "Abonnement opzeggen",
-        "cancelHint": "Je houdt {plan} tot {date} en gaat daarna naar Free.",
         "renews": "Verlengt",
         "renewsHint": "{price}, maandelijks gefactureerd door Stripe.",
         "ends": "Eindigt",
         "endsHint": "{plan} blijft tot dan actief. Hervat het via Facturering beheren.",
         "manage": "Betaling en facturen",
         "manageHint": "Kaart, facturen en opzeggen.",
-        "manageButton": "Facturering beheren"
+        "manageButton": "Facturering beheren",
+        "heading": "Kies je abonnement",
+        "recommended": "Aanbevolen",
+        "currentPlan": "Huidig abonnement",
+        "get": "{plan} nemen",
+        "switchTo": "Overstappen naar {plan}",
+        "month": "per maand",
+        "noCard": "Geen kaart nodig"
       },
       "includes": {
-        "oneTime": "{amount} om Stella te proberen, eenmalig",
-        "monthly": "{amount} gebruik per maand",
         "local": "Agents op je computer",
         "cloud": "Cloud-agents, {count} tegelijk",
-        "media": "Afbeelding, video, muziek en 3D"
+        "media": "Afbeelding, video, muziek en 3D",
+        "voice": "Dicteren en voorlezen",
+        "drive": "{size} Drive-opslag"
       },
       "credit": {
         "title": "Extra tegoed",
@@ -596,6 +593,12 @@
       "mobile": {
         "usageRow": "Deze maand",
         "usageOneTime": "Gratis gebruik"
+      },
+      "tagline": {
+        "free": "Probeer Stella",
+        "plus": "Meer gebruik",
+        "pro": "Hoger gebruik",
+        "max": "Hoogste gebruik"
       }
     }
   },

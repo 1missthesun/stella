@@ -43,13 +43,10 @@ export const planPriceLabel = (plan: BillingPlan): string => {
   return def.interval ? `${formatPlanPrice(def.monthlyPriceCents)}/mo` : formatPlanPrice(0);
 };
 
-// One line for summaries: "Plus — $20/mo with $15 of usage every month".
+// One line for summaries: "Plus — $20/mo, more usage".
 export const planSummary = (plan: BillingPlan): string => {
   const def = PLAN_CATALOG[plan];
-  if (!def.interval) {
-    return `${def.label} — $0, with ${formatUsd(def.budget.oneTimeUsd ?? def.budget.monthlyUsd)} of usage to try Stella`;
-  }
-  return `${def.label} — ${planPriceLabel(plan)} with ${formatUsd(def.budget.monthlyUsd)} of usage every month`;
+  return `${def.label} — ${def.interval ? planPriceLabel(plan) : "$0"}, ${def.tagline.toLowerCase()}`;
 };
 
 export const cheapestMediaPlan = (): PaidBillingPlan =>

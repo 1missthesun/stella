@@ -527,24 +527,15 @@
       "usage": {
         "title": "Forbrug",
         "lede": "Ét budget betaler for alt, hvad Stella kører for dig.",
-        "ofMonth": "af {amount} denne måned",
-        "ofOneTime": "af {amount} til at prøve Stella",
         "oneTimeNote": "Engangs, nulstilles ikke",
-        "of": "af {amount}",
         "used": "Brugt",
         "held": "Reserveret af igangværende arbejde",
-        "heldHint": "Sat til side, mens agenter og mediejob bliver færdige. Det, de ikke bruger, kommer tilbage.",
         "rolling": "Næste {hours} timer",
-        "rollingHint": "Op til {amount} i vilkårlige {hours} timer.",
         "weekly": "Denne uge",
-        "weeklyHint": "Op til {amount} om ugen.",
         "resets": "Nulstilles {date}",
         "startsNext": "Starter ved din næste brug",
         "credit": "Ekstra kredit",
         "creditHint": "Bruges, når dit abonnements budget er opbrugt.",
-        "available": "Tilgængeligt nu",
-        "availableHint": "Hvad Stella kan bruge lige nu, inklusive kredit.",
-        "unlimited": "Ubegrænset",
         "outTitle": "Dit forbrug er opbrugt for nu",
         "outBody": "Dit budget nulstilles {date}. Tilføj kredit eller opgrader for at fortsætte nu.",
         "outBodyNoDate": "Tilføj kredit eller opgrader for at fortsætte nu.",
@@ -552,34 +543,40 @@
         "freeOutBody": "Vælg et abonnement eller tilføj kredit for at fortsætte.",
         "creditTitle": "Kører på ekstra kredit",
         "creditBody": "Dit abonnements grænse er opbrugt indtil {date}. Kreditten dækker, hvad Stella laver indtil da.",
-        "upgradeTo": "Opgrader til {plan}"
+        "upgradeTo": "Opgrader til {plan}",
+        "percentUsed": "{percent} brugt",
+        "usedMonth": "brugt denne måned",
+        "usedOneTime": "af dit gratis forbrug brugt",
+        "rollingNote": "Fordeler dit forbrug, så én travl periode ikke bruger hele ugen.",
+        "weeklyNote": "Fordeler dit forbrug, så én uge ikke bruger hele måneden."
       },
       "plan": {
         "title": "Abonnement",
-        "lede": "Alle abonnementer kører den samme Stella. Større abonnementer giver den et større budget og mere på én gang.",
-        "current": "Nuværende",
+        "lede": "Den samme Stella på alle abonnementer. Større abonnementer giver mere forbrug og mere på én gang.",
         "perMonth": "{price}/md.",
-        "checkout": "Fortsæt til betaling · {price}",
         "checkoutHint": "Betalingen åbner i din browser. Dit budget starter med det samme.",
-        "upgrade": "Opgrader til {plan} · {price}",
-        "downgrade": "Nedgrader til {plan} · {price}",
         "changeHint": "Du bekræfter ændringen i din browser.",
-        "cancel": "Opsig abonnement",
-        "cancelHint": "Du beholder {plan} indtil {date} og skifter derefter til Free.",
         "renews": "Fornyes",
         "renewsHint": "{price}, faktureres månedligt af Stripe.",
         "ends": "Udløber",
         "endsHint": "{plan} fortsætter indtil da. Genoptag det under Administrer fakturering.",
         "manage": "Betaling og fakturaer",
         "manageHint": "Kort, fakturaer og opsigelse.",
-        "manageButton": "Administrer fakturering"
+        "manageButton": "Administrer fakturering",
+        "heading": "Vælg dit abonnement",
+        "recommended": "Anbefalet",
+        "currentPlan": "Nuværende abonnement",
+        "get": "Få {plan}",
+        "switchTo": "Skift til {plan}",
+        "month": "pr. måned",
+        "noCard": "Intet kort nødvendigt"
       },
       "includes": {
-        "oneTime": "{amount} til at prøve Stella, én gang",
-        "monthly": "{amount} forbrug hver måned",
         "local": "Agenter på din computer",
         "cloud": "Cloud-agenter, {count} ad gangen",
-        "media": "Billede, video, musik og 3D"
+        "media": "Billede, video, musik og 3D",
+        "voice": "Diktering og oplæsning",
+        "drive": "{size} Drive-lagerplads"
       },
       "credit": {
         "title": "Ekstra kredit",
@@ -596,6 +593,12 @@
       "mobile": {
         "usageRow": "Denne måned",
         "usageOneTime": "Gratis forbrug"
+      },
+      "tagline": {
+        "free": "Prøv Stella",
+        "plus": "Mere forbrug",
+        "pro": "Højere forbrug",
+        "max": "Højeste forbrug"
       }
     }
   },

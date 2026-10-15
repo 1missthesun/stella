@@ -522,24 +522,15 @@
       "usage": {
         "title": "利用状況",
         "lede": "ひとつの予算で、Stella があなたのために実行するすべてをまかないます。",
-        "ofMonth": "/ 今月 {amount}",
-        "ofOneTime": "/ お試し {amount}",
         "oneTimeNote": "1回限り・リセットされません",
-        "of": "/ {amount}",
         "used": "使用済み",
         "held": "実行中の作業で確保中",
-        "heldHint": "エージェントやメディア生成が終わるまで確保されます。使われなかった分は戻ります。",
         "rolling": "次の {hours} 時間",
-        "rollingHint": "任意の {hours} 時間で最大 {amount}。",
         "weekly": "今週",
-        "weeklyHint": "1週間で最大 {amount}。",
         "resets": "{date} にリセット",
         "startsNext": "次に使ったときから始まります",
         "credit": "追加クレジット",
         "creditHint": "プランの予算を使い切ると使われます。",
-        "available": "今使える額",
-        "availableHint": "Stella が今使える額(クレジットを含む)。",
-        "unlimited": "無制限",
         "outTitle": "利用枠を使い切りました",
         "outBody": "予算は {date} にリセットされます。今すぐ続けるにはクレジットを追加するかアップグレードしてください。",
         "outBodyNoDate": "今すぐ続けるにはクレジットを追加するかアップグレードしてください。",
@@ -547,34 +538,40 @@
         "freeOutBody": "続けるにはプランを選ぶかクレジットを追加してください。",
         "creditTitle": "追加クレジットで稼働中",
         "creditBody": "プランの上限は {date} まで使い切っています。それまでの Stella の作業はクレジットでまかないます。",
-        "upgradeTo": "{plan} にアップグレード"
+        "upgradeTo": "{plan} にアップグレード",
+        "percentUsed": "{percent} 使用済み",
+        "usedMonth": "今月の使用量",
+        "usedOneTime": "無料利用分の使用量",
+        "rollingNote": "忙しい時間帯だけで1週間分を使い切らないよう利用を分散します。",
+        "weeklyNote": "1週間だけで1か月分を使い切らないよう利用を分散します。"
       },
       "plan": {
         "title": "プラン",
-        "lede": "どのプランでも同じ Stella が動きます。上位プランほど予算が大きく、同時にこなせる作業も増えます。",
-        "current": "現在",
+        "lede": "どのプランでも同じ Stella。上位プランほど利用量と同時実行数が増えます。",
         "perMonth": "{price}/月",
-        "checkout": "決済に進む · {price}",
         "checkoutHint": "決済はブラウザで開きます。予算はすぐに使えます。",
-        "upgrade": "{plan} にアップグレード · {price}",
-        "downgrade": "{plan} にダウングレード · {price}",
         "changeHint": "変更はブラウザで確認します。",
-        "cancel": "プランを解約",
-        "cancelHint": "{date} まで {plan} を使え、その後 Free に移ります。",
         "renews": "更新日",
         "renewsHint": "{price}、Stripe で毎月請求。",
         "ends": "終了日",
         "endsHint": "{plan} はそれまで有効です。「請求を管理」から再開できます。",
         "manage": "支払いと請求書",
         "manageHint": "カード、請求書、解約。",
-        "manageButton": "請求を管理"
+        "manageButton": "請求を管理",
+        "heading": "プランを選択",
+        "recommended": "おすすめ",
+        "currentPlan": "現在のプラン",
+        "get": "{plan} にする",
+        "switchTo": "{plan} に変更",
+        "month": "月額",
+        "noCard": "カード不要"
       },
       "includes": {
-        "oneTime": "お試し {amount}(1回限り)",
-        "monthly": "毎月 {amount} の利用枠",
         "local": "あなたのコンピューターで動くエージェント",
         "cloud": "クラウドエージェント、同時に {count} 個",
-        "media": "画像・動画・音楽・3D"
+        "media": "画像・動画・音楽・3D",
+        "voice": "音声入力と読み上げ",
+        "drive": "{size} の Drive ストレージ"
       },
       "credit": {
         "title": "追加クレジット",
@@ -591,6 +588,12 @@
       "mobile": {
         "usageRow": "今月",
         "usageOneTime": "無料の利用枠"
+      },
+      "tagline": {
+        "free": "Stella を試す",
+        "plus": "より多くの利用",
+        "pro": "さらに多くの利用",
+        "max": "最大の利用"
       }
     }
   },

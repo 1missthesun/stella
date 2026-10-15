@@ -537,24 +537,15 @@
       "usage": {
         "title": "Využití",
         "lede": "Jeden rozpočet platí vše, co pro tebe Stella spouští.",
-        "ofMonth": "z {amount} tento měsíc",
-        "ofOneTime": "z {amount} na vyzkoušení Stelly",
         "oneTimeNote": "Jednorázové, neobnovuje se",
-        "of": "z {amount}",
         "used": "Využito",
         "held": "Rezervováno probíhající prací",
-        "heldHint": "Odloženo, dokud agenti a mediální úlohy neskončí. Co nevyužijí, se vrátí.",
         "rolling": "Příštích {hours} hodin",
-        "rollingHint": "Až {amount} za libovolných {hours} hodin.",
         "weekly": "Tento týden",
-        "weeklyHint": "Až {amount} týdně.",
         "resets": "Obnoví se {date}",
         "startsNext": "Začne při dalším použití",
         "credit": "Kredit navíc",
         "creditHint": "Použije se, až dojde rozpočet tvého plánu.",
-        "available": "Dostupné teď",
-        "availableHint": "Kolik může Stella utratit právě teď, včetně kreditu.",
-        "unlimited": "Neomezeno",
         "outTitle": "Využití ti zatím došlo",
         "outBody": "Rozpočet se obnoví {date}. Přidej kredit nebo přejdi na vyšší plán a pokračuj hned.",
         "outBodyNoDate": "Přidej kredit nebo přejdi na vyšší plán a pokračuj hned.",
@@ -562,34 +553,40 @@
         "freeOutBody": "Vyber plán nebo přidej kredit a pokračuj.",
         "creditTitle": "Běží na kreditu navíc",
         "creditBody": "Limit tvého plánu je vyčerpán do {date}. Kredit do té doby pokryje práci Stelly.",
-        "upgradeTo": "Přejít na {plan}"
+        "upgradeTo": "Přejít na {plan}",
+        "percentUsed": "Využito {percent}",
+        "usedMonth": "využito tento měsíc",
+        "usedOneTime": "bezplatného využití využito",
+        "rollingNote": "Rozkládá využití, aby jedno rušné období nevyčerpalo celý týden.",
+        "weeklyNote": "Rozkládá využití, aby jeden týden nevyčerpal celý měsíc."
       },
       "plan": {
         "title": "Plán",
-        "lede": "Každý plán spouští stejnou Stellu. Větší plány jí dají větší rozpočet a víc úloh najednou.",
-        "current": "Aktuální",
+        "lede": "Stejná Stella v každém tarifu. Větší tarify dávají více využití a více najednou.",
         "perMonth": "{price}/měs.",
-        "checkout": "Pokračovat k platbě · {price}",
         "checkoutHint": "Platba se otevře v prohlížeči. Rozpočet začne platit hned.",
-        "upgrade": "Přejít na {plan} · {price}",
-        "downgrade": "Přejít na nižší {plan} · {price}",
         "changeHint": "Změnu potvrdíš v prohlížeči.",
-        "cancel": "Zrušit plán",
-        "cancelHint": "{plan} ti zůstane do {date}, pak přejdeš na Free.",
         "renews": "Obnovuje se",
         "renewsHint": "{price}, účtováno měsíčně přes Stripe.",
         "ends": "Končí",
         "endsHint": "{plan} platí do té doby. Obnovit ho můžeš ve Správě fakturace.",
         "manage": "Platby a faktury",
         "manageHint": "Karta, faktury a zrušení.",
-        "manageButton": "Spravovat fakturaci"
+        "manageButton": "Spravovat fakturaci",
+        "heading": "Vyberte si tarif",
+        "recommended": "Doporučeno",
+        "currentPlan": "Aktuální tarif",
+        "get": "Získat {plan}",
+        "switchTo": "Přejít na {plan}",
+        "month": "měsíčně",
+        "noCard": "Bez platební karty"
       },
       "includes": {
-        "oneTime": "{amount} na vyzkoušení Stelly, jednorázově",
-        "monthly": "{amount} využití každý měsíc",
         "local": "Agenti na tvém počítači",
         "cloud": "Agenti v cloudu, {count} najednou",
-        "media": "Obrázky, video, hudba a 3D"
+        "media": "Obrázky, video, hudba a 3D",
+        "voice": "Diktování a předčítání",
+        "drive": "{size} úložiště Drive"
       },
       "credit": {
         "title": "Kredit navíc",
@@ -606,6 +603,12 @@
       "mobile": {
         "usageRow": "Tento měsíc",
         "usageOneTime": "Bezplatné využití"
+      },
+      "tagline": {
+        "free": "Vyzkoušejte Stellu",
+        "plus": "Více využití",
+        "pro": "Vyšší využití",
+        "max": "Nejvyšší využití"
       }
     }
   },

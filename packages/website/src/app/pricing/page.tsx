@@ -21,7 +21,6 @@ import {
   PLAN_CATALOG,
   PLAN_ORDER,
   formatPlanPrice,
-  formatUsd,
   planSummary,
 } from "@/lib/plans";
 import { BudgetVisual, PaceVisual } from "./budget-visuals";
@@ -29,7 +28,7 @@ import pr from "./pricing.module.css";
 
 export const metadata: Metadata = {
   title: "Pricing",
-  description: `Stella plans: ${PLAN_ORDER.map(planSummary).join("; ")}. One usage budget pays for everything Stella runs for you.`,
+  description: `Stella plans: ${PLAN_ORDER.map(planSummary).join("; ")}. One budget pays for everything Stella runs for you.`,
   alternates: { canonical: "/pricing" },
 };
 
@@ -42,8 +41,6 @@ const INCLUDED_ICONS: Record<(typeof INCLUDED_IN_EVERY_PLAN)[number], LucideIcon
   "Top up with extra credit anytime": Plus,
 };
 
-const plus = PLAN_CATALOG.plus.budget;
-
 const QUESTIONS = [
   {
     q: "What does the usage budget pay for?",
@@ -51,7 +48,7 @@ const QUESTIONS = [
   },
   {
     q: "What happens when I run out?",
-    a: `Stella pauses until your budget resets. Add extra credit to keep going right away, or move to a bigger plan. To make a month last, any ${plus.rollingWindowHours} hours can use up to 20% of it and any week up to 50%.`,
+    a: "Stella pauses until your usage resets. Add extra credit to keep going right away, or move to a bigger plan. Shorter limits spread your usage across the month, so one busy day can't use it all up.",
   },
   {
     q: "Do my own models count against it?",
@@ -78,24 +75,12 @@ export default function Pricing() {
             const featured = id === FEATURED_PLAN;
             return (
               <article key={id} className={pr.col} data-featured={featured ? "1" : "0"} style={{ ["--i" as string]: i }}>
-                <header className={pr.colHead}>
-                  <h2 className={pr.name}>{plan.label}</h2>
-                  {featured ? <span className={pr.badge}>Most popular</span> : null}
-                </header>
+                <p className={pr.flag}>{featured ? "Recommended" : "\u00a0"}</p>
+                <h2 className={pr.name}>{plan.label}</h2>
+                <p className={pr.tagline}>{plan.tagline}</p>
                 <p className={pr.price}>
                   <span className={pr.amount}>{formatPlanPrice(plan.monthlyPriceCents)}</span>
-                  <span className={pr.period}>{plan.interval ? "/ month" : "forever"}</span>
-                </p>
-                <p className={pr.budget}>
-                  {plan.interval ? (
-                    <>
-                      <b>{formatUsd(plan.budget.monthlyUsd)}</b> of usage every month
-                    </>
-                  ) : (
-                    <>
-                      <b>{formatUsd(plan.budget.oneTimeUsd ?? plan.budget.monthlyUsd)}</b> of usage to try it
-                    </>
-                  )}
+                  <span className={pr.period}>{plan.interval ? "per month" : "No card needed"}</span>
                 </p>
                 {plan.interval ? (
                   <Link className={featured ? pr.ctaPrimary : pr.cta} href={`/billing?plan=${id}`}>
@@ -107,7 +92,7 @@ export default function Pricing() {
                   </Link>
                 )}
                 <ul className={pr.features}>
-                  {plan.includes.slice(1).map((line) => (
+                  {plan.includes.map((line) => (
                     <li key={line}>
                       <Check size={15} strokeWidth={2.4} aria-hidden="true" />
                       {line}

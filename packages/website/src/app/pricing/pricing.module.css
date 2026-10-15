@@ -26,6 +26,8 @@
   position: relative;
   display: flex;
   flex-direction: column;
+  align-items: center;
+  text-align: center;
   padding: clamp(24px, 2.4vw, 36px) clamp(18px, 2vw, 32px) clamp(28px, 3vw, 44px);
   color: #0a0a0d;
   opacity: 0;
@@ -44,42 +46,48 @@
   transform: none;
 }
 
+.col[data-featured="1"] {
+  background: color-mix(in srgb, var(--l-accent, #5243ff) 4%, transparent);
+}
+
 .col[data-featured="1"]::before {
   content: "";
   position: absolute;
   inset: -1px 0 auto;
   height: 3px;
-  background: linear-gradient(90deg, #00b8ff, #5243ff 50%, #ff4ac0);
+  background: var(--l-accent, #5243ff);
 }
 
-.colHead {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  min-height: 28px;
+.flag {
+  margin: 0 0 14px;
+  font-family: var(--l-mono);
+  font-size: 11px;
+  line-height: 16px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--l-accent, #5243ff);
 }
 
 .plans .name {
   margin: 0;
-  font-size: clamp(20px, 1.6vw, 24px);
+  font-size: clamp(22px, 1.8vw, 28px);
   font-weight: 700;
   letter-spacing: -0.03em;
 }
 
-.badge {
-  font-family: var(--l-mono);
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #5243ff;
+.tagline {
+  margin: 6px 0 0;
+  font-size: 16px;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+  color: #4a4a55;
 }
 
 .price {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  margin: clamp(28px, 4svh, 44px) 0 0;
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  margin: clamp(28px, 4svh, 40px) 0 0;
 }
 
 .amount {
@@ -89,23 +97,14 @@
   letter-spacing: -0.06em;
 }
 
+.col[data-featured="1"] .amount {
+  color: var(--l-accent, #5243ff);
+}
+
 .period {
   font-family: var(--l-mono);
   font-size: 13px;
   color: rgba(10, 10, 13, 0.5);
-}
-
-.budget {
-  margin: 16px 0 0;
-  font-size: 16px;
-  line-height: 1.35;
-  letter-spacing: -0.01em;
-  color: #4a4a55;
-}
-
-.budget b {
-  font-weight: 680;
-  color: #0a0a0d;
 }
 
 .cta,
@@ -113,8 +112,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 42px;
-  margin-top: 24px;
+  align-self: stretch;
+  height: 44px;
+  margin-top: 28px;
   border-radius: 8px;
   font-size: 15px;
   font-weight: 600;
@@ -135,19 +135,20 @@
 }
 
 .ctaPrimary {
-  border: 1px solid #0a0a0d;
-  background: #0a0a0d;
-  color: #fff;
+  border: 1px solid var(--l-accent, #5243ff);
+  background: var(--l-accent, #5243ff);
+  color: var(--l-accent-ink, #fff);
 }
 
 .ctaPrimary:hover {
-  background: #2a2a31;
+  background: color-mix(in srgb, var(--l-accent, #5243ff) 86%, #000);
 }
 
 .features {
   display: grid;
   gap: 11px;
   margin: 28px 0 0;
+  text-align: left;
   padding: 0;
   list-style: none;
   font-size: 15px;
@@ -165,7 +166,7 @@
 .features svg {
   flex: none;
   margin-top: 2px;
-  color: #5243ff;
+  color: var(--l-accent, #5243ff);
 }
 
 /* Product visuals: a recreation of Stella's Plan & usage panel. */

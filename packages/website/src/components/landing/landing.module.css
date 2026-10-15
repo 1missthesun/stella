@@ -1,6 +1,8 @@
 .root {
   --l-margin: clamp(20px, 4.4vw, 72px);
   --l-ink: #0a0a0d;
+  --l-accent: #5243ff;
+  --l-accent-ink: #fff;
   --l-aurora: linear-gradient(90deg, #00eeff, #0e8aff 30%, #703cff 60%, #ff4ac0);
   position: relative;
   min-height: 100vh;

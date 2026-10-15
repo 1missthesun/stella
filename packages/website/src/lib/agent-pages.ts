@@ -140,17 +140,17 @@ Live conversation comes with every paid plan. Dictation, read-aloud and
 const PRICING_MD = `${header(
   "Pricing — one budget for everything",
   "/pricing",
-  "Every plan runs the same Stella. Bigger plans give it a bigger usage budget.",
+  "Same Stella on every plan. Bigger plans give you more usage and more at once.",
 )}
 ## Plans
-${PLAN_ORDER.map((id) => `- **${PLAN_CATALOG[id].label}** — ${planPriceLabel(id)}. Includes: ${PLAN_CATALOG[id].includes.join("; ")}.`).join("\n")}
+${PLAN_ORDER.map((id) => `- **${PLAN_CATALOG[id].label}** — ${planPriceLabel(id)}, ${PLAN_CATALOG[id].tagline.toLowerCase()}. Includes: ${PLAN_CATALOG[id].includes.join("; ")}.`).join("\n")}
 
 ## What the usage budget pays for
 One budget pays for everything Stella runs for you:
 
 ${BUDGET_COVERS.map((item) => `- ${item}`).join("\n")}
 
-Any ${PLAN_CATALOG.plus.budget.rollingWindowHours} hours can use up to 20% of the monthly budget and any week up to 50%. When it runs out, Stella pauses until it resets; extra credit keeps it going. Runs on your own Claude or ChatGPT subscription, API keys or local models don't use the budget.
+Shorter limits spread usage across the month so one busy day can't use it all up. When it runs out, Stella pauses until it resets; extra credit keeps it going. Runs on your own Claude or ChatGPT subscription, API keys or local models don't use the budget.
 
 ## Every plan includes
 ${INCLUDED_IN_EVERY_PLAN.map((item) => `- ${item}`).join("\n")}

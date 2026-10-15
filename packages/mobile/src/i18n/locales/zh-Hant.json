@@ -522,24 +522,15 @@
       "usage": {
         "title": "用量",
         "lede": "一份預算支付 Stella 為你執行的一切。",
-        "ofMonth": "/ 本月 {amount}",
-        "ofOneTime": "/ 試用 {amount}",
         "oneTimeNote": "一次性,不會重設",
-        "of": "/ {amount}",
         "used": "已用",
         "held": "執行中的工作已預留",
-        "heldHint": "在代理和媒體工作完成前預留。沒用到的會退回。",
         "rolling": "接下來 {hours} 小時",
-        "rollingHint": "任意 {hours} 小時內最多 {amount}。",
         "weekly": "本週",
-        "weeklyHint": "每週最多 {amount}。",
         "resets": "{date} 重設",
         "startsNext": "下次使用時開始",
         "credit": "額外額度",
         "creditHint": "方案預算用完後使用。",
-        "available": "目前可用",
-        "availableHint": "Stella 現在可花費的金額(含額外額度)。",
-        "unlimited": "不限",
         "outTitle": "你暫時沒有可用額度了",
         "outBody": "你的預算將於 {date} 重設。新增額度或升級即可立即繼續。",
         "outBodyNoDate": "新增額度或升級即可立即繼續。",
@@ -547,34 +538,40 @@
         "freeOutBody": "選擇一個方案或新增額度以繼續。",
         "creditTitle": "正在使用額外額度",
         "creditBody": "你的方案上限在 {date} 前已用完。在此之前,Stella 的工作由額外額度支付。",
-        "upgradeTo": "升級到 {plan}"
+        "upgradeTo": "升級到 {plan}",
+        "percentUsed": "已用 {percent}",
+        "usedMonth": "本月已用",
+        "usedOneTime": "免費用量已用",
+        "rollingNote": "分散你的用量，避免某段忙碌時間用完整週額度。",
+        "weeklyNote": "分散你的用量，避免某一週用完整月額度。"
       },
       "plan": {
         "title": "方案",
-        "lede": "所有方案執行的都是同一個 Stella。更大的方案提供更多預算,並能同時做更多事。",
-        "current": "目前",
+        "lede": "每個方案都是同一個 Stella。更高的方案提供更多用量，可同時做更多事。",
         "perMonth": "{price}/月",
-        "checkout": "繼續結帳 · {price}",
         "checkoutHint": "結帳頁面會在瀏覽器中開啟。預算立即生效。",
-        "upgrade": "升級到 {plan} · {price}",
-        "downgrade": "降級到 {plan} · {price}",
         "changeHint": "你會在瀏覽器中確認變更。",
-        "cancel": "取消方案",
-        "cancelHint": "{plan} 會保留到 {date},之後改為 Free。",
         "renews": "續訂日期",
         "renewsHint": "{price},由 Stripe 每月收費。",
         "ends": "結束日期",
         "endsHint": "{plan} 在此之前維持有效。可在「管理帳單」中恢復。",
         "manage": "付款與發票",
         "manageHint": "信用卡、發票與取消。",
-        "manageButton": "管理帳單"
+        "manageButton": "管理帳單",
+        "heading": "選擇你的方案",
+        "recommended": "推薦",
+        "currentPlan": "目前方案",
+        "get": "取得 {plan}",
+        "switchTo": "切換到 {plan}",
+        "month": "每月",
+        "noCard": "無需信用卡"
       },
       "includes": {
-        "oneTime": "試用 {amount},僅一次",
-        "monthly": "每月 {amount} 用量",
         "local": "在你電腦上執行的代理",
         "cloud": "雲端代理,同時 {count} 個",
-        "media": "圖片、影片、音樂與 3D"
+        "media": "圖片、影片、音樂與 3D",
+        "voice": "聽寫和朗讀",
+        "drive": "{size} Drive 儲存空間"
       },
       "credit": {
         "title": "額外額度",
@@ -591,6 +588,12 @@
       "mobile": {
         "usageRow": "本月",
         "usageOneTime": "免費額度"
+      },
+      "tagline": {
+        "free": "試用 Stella",
+        "plus": "更多用量",
+        "pro": "更高用量",
+        "max": "最高用量"
       }
     }
   },

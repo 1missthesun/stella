@@ -527,24 +527,15 @@
       "usage": {
         "title": "Käyttö",
         "lede": "Yksi budjetti maksaa kaiken, mitä Stella tekee puolestasi.",
-        "ofMonth": "/ {amount} tässä kuussa",
-        "ofOneTime": "/ {amount} Stellan kokeiluun",
         "oneTimeNote": "Kertaluonteinen, ei nollaudu",
-        "of": "/ {amount}",
         "used": "Käytetty",
         "held": "Käynnissä olevan työn varaama",
-        "heldHint": "Varattu, kunnes agentit ja mediatyöt valmistuvat. Käyttämättä jäävä palautuu.",
         "rolling": "Seuraavat {hours} tuntia",
-        "rollingHint": "Enintään {amount} minkä tahansa {hours} tunnin aikana.",
         "weekly": "Tämä viikko",
-        "weeklyHint": "Enintään {amount} viikossa.",
         "resets": "Nollautuu {date}",
         "startsNext": "Alkaa seuraavasta käytöstä",
         "credit": "Lisäsaldo",
         "creditHint": "Käytetään, kun tilauksesi budjetti loppuu.",
-        "available": "Käytettävissä nyt",
-        "availableHint": "Mitä Stella voi käyttää juuri nyt, saldo mukaan lukien.",
-        "unlimited": "Rajoittamaton",
         "outTitle": "Käyttösi on toistaiseksi lopussa",
         "outBody": "Budjettisi nollautuu {date}. Lisää saldoa tai päivitä tilaus jatkaaksesi heti.",
         "outBodyNoDate": "Lisää saldoa tai päivitä tilaus jatkaaksesi heti.",
@@ -552,34 +543,40 @@
         "freeOutBody": "Valitse tilaus tai lisää saldoa jatkaaksesi.",
         "creditTitle": "Käytössä lisäsaldo",
         "creditBody": "Tilauksesi raja on käytetty {date} asti. Saldo kattaa Stellan työn siihen asti.",
-        "upgradeTo": "Päivitä tilaukseen {plan}"
+        "upgradeTo": "Päivitä tilaukseen {plan}",
+        "percentUsed": "{percent} käytetty",
+        "usedMonth": "käytetty tässä kuussa",
+        "usedOneTime": "ilmaisesta käytöstäsi käytetty",
+        "rollingNote": "Jakaa käyttösi, jotta yksi kiireinen jakso ei kuluta koko viikkoa.",
+        "weeklyNote": "Jakaa käyttösi, jotta yksi viikko ei kuluta koko kuukautta."
       },
       "plan": {
         "title": "Tilaus",
-        "lede": "Jokainen tilaus käyttää samaa Stellaa. Isommat tilaukset antavat sille suuremman budjetin ja enemmän samanaikaisesti.",
-        "current": "Nykyinen",
+        "lede": "Sama Stella jokaisessa tilauksessa. Isommat tilaukset antavat enemmän käyttöä ja enemmän kerralla.",
         "perMonth": "{price}/kk",
-        "checkout": "Jatka maksuun · {price}",
         "checkoutHint": "Maksu avautuu selaimeesi. Budjettisi alkaa heti.",
-        "upgrade": "Päivitä tilaukseen {plan} · {price}",
-        "downgrade": "Vaihda tilaukseen {plan} · {price}",
         "changeHint": "Vahvistat muutoksen selaimessa.",
-        "cancel": "Peru tilaus",
-        "cancelHint": "{plan} pysyy voimassa {date} asti, minkä jälkeen siirryt Free-tilaukseen.",
         "renews": "Uusiutuu",
         "renewsHint": "{price}, laskutetaan kuukausittain Stripen kautta.",
         "ends": "Päättyy",
         "endsHint": "{plan} on voimassa siihen asti. Jatka sitä kohdasta Hallitse laskutusta.",
         "manage": "Maksut ja laskut",
         "manageHint": "Kortti, laskut ja peruutus.",
-        "manageButton": "Hallitse laskutusta"
+        "manageButton": "Hallitse laskutusta",
+        "heading": "Valitse tilauksesi",
+        "recommended": "Suositeltu",
+        "currentPlan": "Nykyinen tilaus",
+        "get": "Hanki {plan}",
+        "switchTo": "Vaihda tilaukseen {plan}",
+        "month": "kuukaudessa",
+        "noCard": "Korttia ei tarvita"
       },
       "includes": {
-        "oneTime": "{amount} Stellan kokeiluun, kerran",
-        "monthly": "{amount} käyttöä joka kuukausi",
         "local": "Agentit tietokoneellasi",
         "cloud": "Pilviagentit, {count} kerrallaan",
-        "media": "Kuvat, video, musiikki ja 3D"
+        "media": "Kuvat, video, musiikki ja 3D",
+        "voice": "Sanelu ja ääneen luku",
+        "drive": "{size} Drive-tallennustilaa"
       },
       "credit": {
         "title": "Lisäsaldo",
@@ -596,6 +593,12 @@
       "mobile": {
         "usageRow": "Tämä kuu",
         "usageOneTime": "Ilmainen käyttö"
+      },
+      "tagline": {
+        "free": "Kokeile Stellaa",
+        "plus": "Enemmän käyttöä",
+        "pro": "Suurempi käyttö",
+        "max": "Suurin käyttö"
       }
     }
   },

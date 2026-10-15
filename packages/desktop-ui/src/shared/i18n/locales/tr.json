@@ -527,24 +527,15 @@
       "usage": {
         "title": "Kullanım",
         "lede": "Tek bir bütçe, Stella'nın senin için çalıştırdığı her şeyi öder.",
-        "ofMonth": "/ {amount} bu ay",
-        "ofOneTime": "/ {amount} Stella'yı denemek için",
         "oneTimeNote": "Tek seferlik, sıfırlanmaz",
-        "of": "/ {amount}",
         "used": "Kullanılan",
         "held": "Süren işler için ayrıldı",
-        "heldHint": "Ajanlar ve medya işleri bitene kadar ayrılır. Kullanılmayan kısım geri gelir.",
         "rolling": "Sonraki {hours} saat",
-        "rollingHint": "Herhangi bir {hours} saatte en fazla {amount}.",
         "weekly": "Bu hafta",
-        "weeklyHint": "Haftada en fazla {amount}.",
         "resets": "Sıfırlanma: {date}",
         "startsNext": "Bir sonraki kullanımınla başlar",
         "credit": "Ek kredi",
         "creditHint": "Planının bütçesi bittiğinde kullanılır.",
-        "available": "Şu an kullanılabilir",
-        "availableHint": "Stella'nın şu anda harcayabileceği, kredi dahil.",
-        "unlimited": "Sınırsız",
         "outTitle": "Şimdilik kullanımın bitti",
         "outBody": "Bütçen sıfırlanma tarihi: {date}. Hemen devam etmek için kredi ekle veya yükselt.",
         "outBodyNoDate": "Hemen devam etmek için kredi ekle veya yükselt.",
@@ -552,34 +543,40 @@
         "freeOutBody": "Devam etmek için bir plan seç veya kredi ekle.",
         "creditTitle": "Ek krediyle çalışıyor",
         "creditBody": "Planının sınırı {date} tarihine kadar doldu. O zamana kadar Stella'nın yaptıklarını kredi karşılar.",
-        "upgradeTo": "{plan} planına yükselt"
+        "upgradeTo": "{plan} planına yükselt",
+        "percentUsed": "{percent} kullanıldı",
+        "usedMonth": "bu ay kullanıldı",
+        "usedOneTime": "ücretsiz kullanımınızdan kullanıldı",
+        "rollingNote": "Kullanımınızı yayar; yoğun bir dönem tüm haftayı tüketmez.",
+        "weeklyNote": "Kullanımınızı yayar; bir hafta tüm ayı tüketmez."
       },
       "plan": {
         "title": "Plan",
-        "lede": "Her plan aynı Stella'yı çalıştırır. Büyük planlar daha büyük bütçe ve aynı anda daha fazla iş sağlar.",
-        "current": "Mevcut",
+        "lede": "Her planda aynı Stella. Büyük planlar daha fazla kullanım ve aynı anda daha fazlasını sunar.",
         "perMonth": "{price}/ay",
-        "checkout": "Ödemeye devam et · {price}",
         "checkoutHint": "Ödeme tarayıcında açılır. Bütçen hemen başlar.",
-        "upgrade": "{plan} planına yükselt · {price}",
-        "downgrade": "{plan} planına düşür · {price}",
         "changeHint": "Değişikliği tarayıcında onaylayacaksın.",
-        "cancel": "Planı iptal et",
-        "cancelHint": "{plan} planın {date} tarihine kadar sürer, sonra Free'ye geçersin.",
         "renews": "Yenilenme",
         "renewsHint": "{price}, Stripe tarafından aylık faturalandırılır.",
         "ends": "Bitiş",
         "endsHint": "{plan} o zamana kadar açık kalır. Faturalandırmayı yönet bölümünden devam ettirebilirsin.",
         "manage": "Ödeme ve faturalar",
         "manageHint": "Kart, faturalar ve iptal.",
-        "manageButton": "Faturalandırmayı yönet"
+        "manageButton": "Faturalandırmayı yönet",
+        "heading": "Planınızı seçin",
+        "recommended": "Önerilen",
+        "currentPlan": "Mevcut plan",
+        "get": "{plan} al",
+        "switchTo": "{plan} planına geç",
+        "month": "aylık",
+        "noCard": "Kart gerekmez"
       },
       "includes": {
-        "oneTime": "Stella'yı denemek için {amount}, bir kez",
-        "monthly": "Her ay {amount} kullanım",
         "local": "Bilgisayarındaki ajanlar",
         "cloud": "Bulut ajanları, aynı anda {count}",
-        "media": "Görsel, video, müzik ve 3D"
+        "media": "Görsel, video, müzik ve 3D",
+        "voice": "Dikte ve sesli okuma",
+        "drive": "{size} Drive depolama"
       },
       "credit": {
         "title": "Ek kredi",
@@ -596,6 +593,12 @@
       "mobile": {
         "usageRow": "Bu ay",
         "usageOneTime": "Ücretsiz kullanım"
+      },
+      "tagline": {
+        "free": "Stella'yı deneyin",
+        "plus": "Daha fazla kullanım",
+        "pro": "Daha yüksek kullanım",
+        "max": "En yüksek kullanım"
       }
     }
   },

@@ -2,10 +2,10 @@
 
 import { useRef, useState } from "react";
 import { ease, seg, usePlayOnce } from "@/components/landing/motion";
-import { BUDGET_COVERS, PLAN_CATALOG, formatUsd, planPriceLabel } from "@/lib/plans";
+import { BUDGET_COVERS, PLAN_CATALOG, planPriceLabel } from "@/lib/plans";
 import pr from "./pricing.module.css";
 
-const usd = (value: number) => `$${value.toFixed(2)}`;
+const percent = (used: number, limit: number) => `${Math.round(Math.min(1, used / limit) * 100)}%`;
 
 const SPEND_COLORS = ["#703cff", "#00a3ff", "#ff4ac0", "#ff9d2e", "#13b37a", "#8b8b95"];
 // What a month of Pro might look like, in the order of BUDGET_COVERS.
@@ -43,8 +43,8 @@ export function BudgetVisual() {
           <span className={pr.panelMuted}>{planPriceLabel("pro")} · Renews Nov 3</span>
         </div>
         <div className={pr.panelBig}>
-          <span className={pr.panelAmount}>{usd(used)}</span>
-          <span className={pr.panelMuted}>of {formatUsd(limit)} this month</span>
+          <span className={pr.panelAmount}>{percent(used, limit)}</span>
+          <span className={pr.panelMuted}>used this month</span>
         </div>
         <div className={pr.stack} aria-hidden="true">
           {segments.map((s) => (
@@ -56,7 +56,7 @@ export function BudgetVisual() {
             <li key={s.label} style={{ opacity: 0.35 + 0.65 * seg(t, i * 0.09, 0.3 + i * 0.09) }}>
               <i style={{ background: s.color }} aria-hidden="true" />
               <span>{s.label}</span>
-              <span className={pr.legendAmount}>{usd(s.amount)}</span>
+              <span className={pr.legendAmount}>{percent(s.amount, limit)}</span>
             </li>
           ))}
         </ul>
@@ -99,9 +99,7 @@ export function PaceVisual() {
             <div key={w.label} className={pr.meter}>
               <div className={pr.meterHead}>
                 <span>{w.label}</span>
-                <span className={pr.panelMuted}>
-                  {usd(w.used)} of {formatUsd(w.limit)}
-                </span>
+                <span className={pr.panelMuted}>{percent(w.used, w.limit)} used</span>
               </div>
               <div className={pr.meterTrack}>
                 <span data-full={full ? "" : undefined} style={{ width: `${(w.used / w.limit) * 100}%` }} />

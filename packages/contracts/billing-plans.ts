@@ -57,6 +57,9 @@ export type PlanDefinition = {
     scheduleFiresPerDay: number;
     readAloudCharsPerDay: number;
   };
+  // How much usage the plan gives, relative to the others. Plan displays
+  // never show the dollar budget.
+  tagline: string;
   // Plain-terms lines for plan displays, most important first.
   includes: readonly string[];
 };
@@ -100,8 +103,8 @@ export const PLAN_CATALOG: Readonly<Record<BillingPlan, PlanDefinition>> = {
       scheduleFiresPerDay: 24,
       readAloudCharsPerDay: 60_000,
     },
+    tagline: "Try Stella",
     includes: [
-      "$0.50 of usage to try Stella, once",
       "Chat, research and agents on your computer",
       "Dictation and read-aloud",
       "Bring your own models and keys",
@@ -128,8 +131,8 @@ export const PLAN_CATALOG: Readonly<Record<BillingPlan, PlanDefinition>> = {
       scheduleFiresPerDay: 60,
       readAloudCharsPerDay: 300_000,
     },
+    tagline: "More usage",
     includes: [
-      "$15 of usage every month",
       "Agents that run in the cloud, 3 at once",
       "Image, video, music and 3D generation",
       "10 GB of Drive storage",
@@ -156,8 +159,8 @@ export const PLAN_CATALOG: Readonly<Record<BillingPlan, PlanDefinition>> = {
       scheduleFiresPerDay: 120,
       readAloudCharsPerDay: 1_000_000,
     },
+    tagline: "Higher usage",
     includes: [
-      "$40 of usage every month",
       "Agents that run in the cloud, 6 at once",
       "Image, video, music and 3D generation",
       "50 GB of Drive storage",
@@ -184,8 +187,8 @@ export const PLAN_CATALOG: Readonly<Record<BillingPlan, PlanDefinition>> = {
       scheduleFiresPerDay: 240,
       readAloudCharsPerDay: 2_000_000,
     },
+    tagline: "Highest usage",
     includes: [
-      "$85 of usage every month",
       "Agents that run in the cloud, 10 at once",
       "Image, video, music and 3D generation",
       "100 GB of Drive storage",

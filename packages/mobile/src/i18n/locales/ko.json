@@ -522,24 +522,15 @@
       "usage": {
         "title": "사용량",
         "lede": "하나의 예산으로 Stella가 실행하는 모든 작업을 결제해요.",
-        "ofMonth": "/ 이번 달 {amount}",
-        "ofOneTime": "/ 체험용 {amount}",
         "oneTimeNote": "1회성, 초기화되지 않음",
-        "of": "/ {amount}",
         "used": "사용함",
         "held": "실행 중인 작업에 예약됨",
-        "heldHint": "에이전트와 미디어 작업이 끝날 때까지 따로 잡아 둬요. 쓰지 않은 금액은 돌아와요.",
         "rolling": "다음 {hours}시간",
-        "rollingHint": "어느 {hours}시간 동안이든 최대 {amount}.",
         "weekly": "이번 주",
-        "weeklyHint": "주당 최대 {amount}.",
         "resets": "{date}에 초기화",
         "startsNext": "다음에 사용할 때부터 시작",
         "credit": "추가 크레딧",
         "creditHint": "요금제 예산을 다 쓰면 사용돼요.",
-        "available": "지금 사용 가능",
-        "availableHint": "Stella가 지금 쓸 수 있는 금액(크레딧 포함).",
-        "unlimited": "무제한",
         "outTitle": "지금은 사용량을 모두 썼어요",
         "outBody": "예산은 {date}에 초기화돼요. 지금 계속하려면 크레딧을 추가하거나 업그레이드하세요.",
         "outBodyNoDate": "지금 계속하려면 크레딧을 추가하거나 업그레이드하세요.",
@@ -547,34 +538,40 @@
         "freeOutBody": "계속하려면 요금제를 고르거나 크레딧을 추가하세요.",
         "creditTitle": "추가 크레딧으로 실행 중",
         "creditBody": "{date}까지 요금제 한도를 모두 썼어요. 그때까지 Stella의 작업은 크레딧으로 충당돼요.",
-        "upgradeTo": "{plan}(으)로 업그레이드"
+        "upgradeTo": "{plan}(으)로 업그레이드",
+        "percentUsed": "{percent} 사용함",
+        "usedMonth": "이번 달 사용량",
+        "usedOneTime": "무료 사용량 중 사용함",
+        "rollingNote": "바쁜 한때가 한 주 사용량을 다 쓰지 않도록 사용량을 나눕니다.",
+        "weeklyNote": "한 주가 한 달 사용량을 다 쓰지 않도록 사용량을 나눕니다."
       },
       "plan": {
         "title": "요금제",
-        "lede": "모든 요금제에서 같은 Stella가 실행돼요. 상위 요금제일수록 예산이 크고 동시에 더 많은 일을 해요.",
-        "current": "현재",
+        "lede": "모든 요금제에서 같은 Stella. 상위 요금제일수록 사용량이 많고 동시에 더 많이 실행합니다.",
         "perMonth": "{price}/월",
-        "checkout": "결제 계속하기 · {price}",
         "checkoutHint": "결제는 브라우저에서 열려요. 예산은 바로 시작돼요.",
-        "upgrade": "{plan}(으)로 업그레이드 · {price}",
-        "downgrade": "{plan}(으)로 다운그레이드 · {price}",
         "changeHint": "변경은 브라우저에서 확인하게 돼요.",
-        "cancel": "요금제 해지",
-        "cancelHint": "{date}까지 {plan}을(를) 쓰고 그 뒤 Free로 바뀌어요.",
         "renews": "갱신일",
         "renewsHint": "{price}, Stripe에서 매월 청구.",
         "ends": "종료일",
         "endsHint": "{plan}은(는) 그때까지 유지돼요. 결제 관리에서 다시 이어갈 수 있어요.",
         "manage": "결제 및 청구서",
         "manageHint": "카드, 청구서, 해지.",
-        "manageButton": "결제 관리"
+        "manageButton": "결제 관리",
+        "heading": "요금제 선택",
+        "recommended": "추천",
+        "currentPlan": "현재 요금제",
+        "get": "{plan} 시작하기",
+        "switchTo": "{plan}(으)로 변경",
+        "month": "월",
+        "noCard": "카드 필요 없음"
       },
       "includes": {
-        "oneTime": "체험용 {amount}, 1회",
-        "monthly": "매월 {amount} 사용량",
         "local": "내 컴퓨터의 에이전트",
         "cloud": "클라우드 에이전트, 동시에 {count}개",
-        "media": "이미지, 동영상, 음악, 3D"
+        "media": "이미지, 동영상, 음악, 3D",
+        "voice": "받아쓰기 및 소리 내어 읽기",
+        "drive": "Drive 저장공간 {size}"
       },
       "credit": {
         "title": "추가 크레딧",
@@ -591,6 +588,12 @@
       "mobile": {
         "usageRow": "이번 달",
         "usageOneTime": "무료 사용량"
+      },
+      "tagline": {
+        "free": "Stella 체험",
+        "plus": "더 많은 사용량",
+        "pro": "더 높은 사용량",
+        "max": "최대 사용량"
       }
     }
   },

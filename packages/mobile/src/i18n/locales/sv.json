@@ -527,24 +527,15 @@
       "usage": {
         "title": "Användning",
         "lede": "En budget betalar allt som Stella kör åt dig.",
-        "ofMonth": "av {amount} den här månaden",
-        "ofOneTime": "av {amount} för att testa Stella",
         "oneTimeNote": "Engångs, återställs inte",
-        "of": "av {amount}",
         "used": "Använt",
         "held": "Reserverat av pågående arbete",
-        "heldHint": "Avsatt medan agenter och mediejobb blir klara. Det de inte använder kommer tillbaka.",
         "rolling": "Kommande {hours} timmar",
-        "rollingHint": "Upp till {amount} under valfria {hours} timmar.",
         "weekly": "Den här veckan",
-        "weeklyHint": "Upp till {amount} per vecka.",
         "resets": "Återställs {date}",
         "startsNext": "Börjar vid din nästa användning",
         "credit": "Extra saldo",
         "creditHint": "Används när din plans budget är slut.",
-        "available": "Tillgängligt nu",
-        "availableHint": "Vad Stella kan spendera just nu, saldo inräknat.",
-        "unlimited": "Obegränsat",
         "outTitle": "Din användning är slut för tillfället",
         "outBody": "Din budget återställs {date}. Fyll på saldo eller uppgradera för att fortsätta nu.",
         "outBodyNoDate": "Fyll på saldo eller uppgradera för att fortsätta nu.",
@@ -552,34 +543,40 @@
         "freeOutBody": "Välj en plan eller fyll på saldo för att fortsätta.",
         "creditTitle": "Kör på extra saldo",
         "creditBody": "Din plans gräns är förbrukad till {date}. Saldot täcker det Stella gör fram till dess.",
-        "upgradeTo": "Uppgradera till {plan}"
+        "upgradeTo": "Uppgradera till {plan}",
+        "percentUsed": "{percent} använt",
+        "usedMonth": "använt denna månad",
+        "usedOneTime": "av din gratisanvändning använt",
+        "rollingNote": "Fördelar din användning så att en intensiv period inte förbrukar hela veckan.",
+        "weeklyNote": "Fördelar din användning så att en vecka inte förbrukar hela månaden."
       },
       "plan": {
         "title": "Plan",
-        "lede": "Varje plan kör samma Stella. Större planer ger den en större budget och mer samtidigt.",
-        "current": "Nuvarande",
+        "lede": "Samma Stella i alla abonnemang. Större abonnemang ger mer användning och mer samtidigt.",
         "perMonth": "{price}/mån",
-        "checkout": "Fortsätt till kassan · {price}",
         "checkoutHint": "Kassan öppnas i din webbläsare. Din budget börjar direkt.",
-        "upgrade": "Uppgradera till {plan} · {price}",
-        "downgrade": "Nedgradera till {plan} · {price}",
         "changeHint": "Du bekräftar ändringen i din webbläsare.",
-        "cancel": "Avsluta plan",
-        "cancelHint": "Du behåller {plan} till {date} och går sedan över till Free.",
         "renews": "Förnyas",
         "renewsHint": "{price}, debiteras månadsvis via Stripe.",
         "ends": "Upphör",
         "endsHint": "{plan} gäller fram till dess. Återuppta den under Hantera fakturering.",
         "manage": "Betalning och fakturor",
         "manageHint": "Kort, fakturor och uppsägning.",
-        "manageButton": "Hantera fakturering"
+        "manageButton": "Hantera fakturering",
+        "heading": "Välj abonnemang",
+        "recommended": "Rekommenderas",
+        "currentPlan": "Nuvarande abonnemang",
+        "get": "Skaffa {plan}",
+        "switchTo": "Byt till {plan}",
+        "month": "per månad",
+        "noCard": "Inget kort behövs"
       },
       "includes": {
-        "oneTime": "{amount} för att testa Stella, en gång",
-        "monthly": "{amount} i användning varje månad",
         "local": "Agenter på din dator",
         "cloud": "Molnagenter, {count} samtidigt",
-        "media": "Bild, video, musik och 3D"
+        "media": "Bild, video, musik och 3D",
+        "voice": "Diktering och uppläsning",
+        "drive": "{size} Drive-lagring"
       },
       "credit": {
         "title": "Extra saldo",
@@ -596,6 +593,12 @@
       "mobile": {
         "usageRow": "Den här månaden",
         "usageOneTime": "Gratisanvändning"
+      },
+      "tagline": {
+        "free": "Prova Stella",
+        "plus": "Mer användning",
+        "pro": "Högre användning",
+        "max": "Högsta användning"
       }
     }
   },

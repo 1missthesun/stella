@@ -522,24 +522,15 @@
       "usage": {
         "title": "Penggunaan",
         "lede": "Satu anggaran membayar semua yang dijalankan Stella untukmu.",
-        "ofMonth": "dari {amount} bulan ini",
-        "ofOneTime": "dari {amount} untuk mencoba Stella",
         "oneTimeNote": "Sekali saja, tidak direset",
-        "of": "dari {amount}",
         "used": "Terpakai",
         "held": "Ditahan oleh pekerjaan berjalan",
-        "heldHint": "Disisihkan sampai agen dan tugas media selesai. Sisa yang tidak terpakai kembali.",
         "rolling": "{hours} jam ke depan",
-        "rollingHint": "Hingga {amount} dalam {hours} jam mana pun.",
         "weekly": "Minggu ini",
-        "weeklyHint": "Hingga {amount} per minggu.",
         "resets": "Direset {date}",
         "startsNext": "Dimulai saat kamu menggunakan lagi",
         "credit": "Kredit tambahan",
         "creditHint": "Dipakai saat anggaran paketmu habis.",
-        "available": "Tersedia sekarang",
-        "availableHint": "Yang bisa dibelanjakan Stella sekarang, termasuk kredit.",
-        "unlimited": "Tanpa batas",
         "outTitle": "Penggunaanmu habis untuk sementara",
         "outBody": "Anggaranmu direset {date}. Tambahkan kredit atau upgrade untuk lanjut sekarang.",
         "outBodyNoDate": "Tambahkan kredit atau upgrade untuk lanjut sekarang.",
@@ -547,34 +538,40 @@
         "freeOutBody": "Pilih paket atau tambahkan kredit untuk melanjutkan.",
         "creditTitle": "Berjalan dengan kredit tambahan",
         "creditBody": "Batas paketmu habis sampai {date}. Kredit menanggung pekerjaan Stella sampai saat itu.",
-        "upgradeTo": "Upgrade ke {plan}"
+        "upgradeTo": "Upgrade ke {plan}",
+        "percentUsed": "{percent} terpakai",
+        "usedMonth": "terpakai bulan ini",
+        "usedOneTime": "dari penggunaan gratis Anda terpakai",
+        "rollingNote": "Membagi penggunaan Anda agar satu periode sibuk tidak menghabiskan seminggu.",
+        "weeklyNote": "Membagi penggunaan Anda agar satu minggu tidak menghabiskan sebulan."
       },
       "plan": {
         "title": "Paket",
-        "lede": "Semua paket menjalankan Stella yang sama. Paket lebih besar memberinya anggaran lebih besar dan lebih banyak tugas sekaligus.",
-        "current": "Saat ini",
+        "lede": "Stella yang sama di setiap paket. Paket lebih besar memberi lebih banyak penggunaan dan lebih banyak sekaligus.",
         "perMonth": "{price}/bln",
-        "checkout": "Lanjut ke pembayaran · {price}",
         "checkoutHint": "Pembayaran terbuka di browser. Anggaranmu langsung berlaku.",
-        "upgrade": "Upgrade ke {plan} · {price}",
-        "downgrade": "Turunkan ke {plan} · {price}",
         "changeHint": "Kamu akan mengonfirmasi perubahan di browser.",
-        "cancel": "Batalkan paket",
-        "cancelHint": "Kamu tetap memakai {plan} sampai {date}, lalu pindah ke Free.",
         "renews": "Diperpanjang",
         "renewsHint": "{price}, ditagih bulanan oleh Stripe.",
         "ends": "Berakhir",
         "endsHint": "{plan} tetap aktif sampai saat itu. Lanjutkan dari Kelola penagihan.",
         "manage": "Pembayaran dan faktur",
         "manageHint": "Kartu, faktur, dan pembatalan.",
-        "manageButton": "Kelola penagihan"
+        "manageButton": "Kelola penagihan",
+        "heading": "Pilih paket Anda",
+        "recommended": "Direkomendasikan",
+        "currentPlan": "Paket saat ini",
+        "get": "Dapatkan {plan}",
+        "switchTo": "Beralih ke {plan}",
+        "month": "per bulan",
+        "noCard": "Tanpa kartu"
       },
       "includes": {
-        "oneTime": "{amount} untuk mencoba Stella, sekali",
-        "monthly": "{amount} penggunaan setiap bulan",
         "local": "Agen di komputermu",
         "cloud": "Agen cloud, {count} sekaligus",
-        "media": "Gambar, video, musik, dan 3D"
+        "media": "Gambar, video, musik, dan 3D",
+        "voice": "Dikte dan bacakan",
+        "drive": "Penyimpanan Drive {size}"
       },
       "credit": {
         "title": "Kredit tambahan",
@@ -591,6 +588,12 @@
       "mobile": {
         "usageRow": "Bulan ini",
         "usageOneTime": "Penggunaan gratis"
+      },
+      "tagline": {
+        "free": "Coba Stella",
+        "plus": "Penggunaan lebih banyak",
+        "pro": "Penggunaan lebih tinggi",
+        "max": "Penggunaan tertinggi"
       }
     }
   },

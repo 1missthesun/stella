@@ -532,24 +532,15 @@
       "usage": {
         "title": "Utilisation",
         "lede": "Un seul budget paie tout ce que Stella exécute pour toi.",
-        "ofMonth": "sur {amount} ce mois-ci",
-        "ofOneTime": "sur {amount} pour essayer Stella",
         "oneTimeNote": "Unique, ne se renouvelle pas",
-        "of": "sur {amount}",
         "used": "Utilisé",
         "held": "Réservé par le travail en cours",
-        "heldHint": "Mis de côté pendant que les agents et les tâches multimédias se terminent. Ce qu'ils n'utilisent pas te revient.",
         "rolling": "{hours} prochaines heures",
-        "rollingHint": "Jusqu'à {amount} sur n'importe quelles {hours} heures.",
         "weekly": "Cette semaine",
-        "weeklyHint": "Jusqu'à {amount} par semaine.",
         "resets": "Réinitialisation : {date}",
         "startsNext": "Commence à ta prochaine utilisation",
         "credit": "Crédit supplémentaire",
         "creditHint": "Utilisé une fois le budget de ton forfait épuisé.",
-        "available": "Disponible maintenant",
-        "availableHint": "Ce que Stella peut dépenser maintenant, crédit inclus.",
-        "unlimited": "Illimité",
         "outTitle": "Tu n'as plus d'utilisation pour l'instant",
         "outBody": "Ton budget se réinitialise : {date}. Ajoute du crédit ou passe à un forfait supérieur pour continuer maintenant.",
         "outBodyNoDate": "Ajoute du crédit ou passe à un forfait supérieur pour continuer maintenant.",
@@ -557,34 +548,40 @@
         "freeOutBody": "Choisis un forfait ou ajoute du crédit pour continuer.",
         "creditTitle": "Fonctionne sur le crédit supplémentaire",
         "creditBody": "La limite de ton forfait est atteinte jusqu'à {date}. Ton crédit couvre ce que fait Stella d'ici là.",
-        "upgradeTo": "Passer à {plan}"
+        "upgradeTo": "Passer à {plan}",
+        "percentUsed": "{percent} utilisé",
+        "usedMonth": "utilisé ce mois-ci",
+        "usedOneTime": "de votre utilisation gratuite utilisé",
+        "rollingNote": "Répartit votre utilisation pour qu'une période chargée n'épuise pas la semaine.",
+        "weeklyNote": "Répartit votre utilisation pour qu'une semaine n'épuise pas le mois."
       },
       "plan": {
         "title": "Forfait",
-        "lede": "Tous les forfaits font tourner le même Stella. Les plus grands lui donnent un budget plus élevé et plus de tâches en parallèle.",
-        "current": "Actuel",
+        "lede": "Le même Stella dans chaque forfait. Les forfaits supérieurs offrent plus d'utilisation et plus de tâches à la fois.",
         "perMonth": "{price}/mois",
-        "checkout": "Continuer vers le paiement · {price}",
         "checkoutHint": "Le paiement s'ouvre dans ton navigateur. Ton budget commence tout de suite.",
-        "upgrade": "Passer à {plan} · {price}",
-        "downgrade": "Rétrograder vers {plan} · {price}",
         "changeHint": "Tu confirmeras le changement dans ton navigateur.",
-        "cancel": "Résilier le forfait",
-        "cancelHint": "Tu gardes {plan} jusqu'au {date}, puis tu passes à Free.",
         "renews": "Renouvellement",
         "renewsHint": "{price}, facturé chaque mois par Stripe.",
         "ends": "Fin",
         "endsHint": "{plan} reste actif jusque-là. Tu peux le réactiver depuis Gérer la facturation.",
         "manage": "Paiement et factures",
         "manageHint": "Carte, factures et résiliation.",
-        "manageButton": "Gérer la facturation"
+        "manageButton": "Gérer la facturation",
+        "heading": "Choisissez votre forfait",
+        "recommended": "Recommandé",
+        "currentPlan": "Forfait actuel",
+        "get": "Choisir {plan}",
+        "switchTo": "Passer à {plan}",
+        "month": "par mois",
+        "noCard": "Sans carte bancaire"
       },
       "includes": {
-        "oneTime": "{amount} pour essayer Stella, une fois",
-        "monthly": "{amount} d'utilisation chaque mois",
         "local": "Agents sur ton ordinateur",
         "cloud": "Agents dans le cloud, {count} à la fois",
-        "media": "Image, vidéo, musique et 3D"
+        "media": "Image, vidéo, musique et 3D",
+        "voice": "Dictée et lecture à voix haute",
+        "drive": "{size} de stockage Drive"
       },
       "credit": {
         "title": "Crédit supplémentaire",
@@ -601,6 +598,12 @@
       "mobile": {
         "usageRow": "Ce mois-ci",
         "usageOneTime": "Utilisation gratuite"
+      },
+      "tagline": {
+        "free": "Essayez Stella",
+        "plus": "Plus d'utilisation",
+        "pro": "Utilisation supérieure",
+        "max": "Utilisation maximale"
       }
     }
   },

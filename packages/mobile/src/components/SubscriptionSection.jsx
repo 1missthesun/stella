@@ -30,6 +30,15 @@ function formatUsd(dollars) {
   return `$${Math.max(0, dollars || 0).toFixed(2)}`;
 }
 
+// Whole percent for display: never 0% once anything is used, never 100% until it's all used.
+function usedPercent(used, limit) {
+  if (!(limit > 0) || !(used > 0)) return 0;
+  if (used >= limit) return 100;
+  return Math.min(99, Math.max(1, Math.floor((used / limit) * 100)));
+}
+
+const RECOMMENDED_PLAN = "pro";
+
 function formatReset(ms, locale) {
   if (typeof ms !== "number" || ms <= 0) return "";
   const delta = ms - Date.now();
@@ -49,14 +58,8 @@ function formatReset(ms, locale) {
 
 function planIncludes(plan, t) {
   const def = PLAN_CATALOG[plan];
-  if (!def.interval) {
-    return [
-      t("billing.v3.includes.oneTime", { amount: formatAmount(def.budget.oneTimeUsd ?? def.budget.monthlyUsd) }),
-      t("billing.v3.includes.local"),
-    ];
-  }
+  if (!def.interval) return [t("billing.v3.includes.local"), t("billing.v3.includes.voice")];
   return [
-    t("billing.v3.includes.monthly", { amount: formatAmount(def.budget.monthlyUsd) }),
     t("billing.v3.includes.cloud", { count: def.limits.cloudAgentsAtOnce }),
     ...(def.mediaGeneration ? [t("billing.v3.includes.media")] : []),
   ];
@@ -195,8 +198,7 @@ export function SubscriptionSection() {
             {oneTime ? t("billing.v3.mobile.usageOneTime") : t("billing.v3.mobile.usageRow")}
           </Text>
           <Text style={styles.usageValue}>
-            {formatUsd(used)}{" "}
-            <Text style={styles.usageMuted}>{t("billing.v3.usage.of", { amount: formatAmount(limit) })}</Text>
+            {t("billing.v3.usage.percentUsed", { percent: `${usedPercent(used, limit)}%` })}
           </Text>
         </View>
         <View
@@ -212,11 +214,6 @@ export function SubscriptionSection() {
             ? t("billing.v3.usage.oneTimeNote")
             : t("billing.v3.usage.resets", { date: formatReset(usage.monthlyResetsAt, locale) })}
         </Text>
-        {reserved > 0 ? (
-          <Text style={styles.usageMuted}>
-            {t("billing.v3.usage.held")}: {formatUsd(reserved)}
-          </Text>
-        ) : null}
         {credit > 0 ? (
           <Text style={styles.usageMuted}>
             {t("billing.v3.usage.credit")}: {formatUsd(credit)}
@@ -324,7 +321,10 @@ export function SubscriptionSection() {
     }
     return (
       <>
-        <Text style={styles.cardTitle}>{t("billing.v3.plan.title")}</Text>
+        <View style={styles.plansHead}>
+          <Text style={styles.plansHeading}>{t("billing.v3.plan.heading")}</Text>
+          <Text style={styles.plansLede}>{t("billing.v3.plan.lede")}</Text>
+        </View>
         {checkoutPhase === "error" && checkout.error ? (
           <View style={[styles.banner, styles.bannerError]}>
             <Text style={styles.bannerTitle}>
@@ -352,53 +352,65 @@ export function SubscriptionSection() {
 
   function renderPlanRow(key) {
     const def = PLAN_CATALOG[key];
-    const priceText = def.interval
-      ? t("billing.mobile.perMonth", { price: formatAmount(def.monthlyPriceCents / 100) })
-      : formatAmount(0);
     const starting = checkoutPhase === "starting";
     const isCurrent = key === plan;
+    const recommended = key === RECOMMENDED_PLAN;
+    const rank = (id) => PLAN_ORDER.indexOf(id);
+    const suggested =
+      rank(plan) < rank(RECOMMENDED_PLAN) ? RECOMMENDED_PLAN : PLAN_ORDER[rank(plan) + 1] ?? null;
     const subscribe = eligible && !isPaid && !isCurrent && isPaidBillingPlan(key);
     const change = eligible && isPaid && !isCurrent;
-    const info = (
-      <View style={styles.planInfo}>
-        <View style={styles.planNameRow}>
-          <Text style={styles.planName}>{planLabel(key)}</Text>
-          {isCurrent ? <Text style={styles.planCurrent}>{t("billing.v3.plan.current")}</Text> : null}
-        </View>
-        <Text style={styles.planTagline}>{planIncludes(key, t).join(" · ")}</Text>
-        <Text style={styles.planPrice}>{priceText}</Text>
-      </View>
-    );
-    if (change) {
-      return (
-        <Pressable
-          key={key}
-          accessibilityRole="button"
-          onPress={() => {
-            tapLight();
-            void checkout.openManage();
-          }}
-          style={({ pressed }) => [styles.planRow, pressed && styles.rowPressed]}
-        >
-          {info}
-          <Text style={styles.chevron}>›</Text>
-        </Pressable>
-      );
-    }
+    const primary = (subscribe || change) && key === suggested;
+    const actionLabel = subscribe
+      ? starting
+        ? t("billing.mobile.startingCheckout")
+        : t("billing.v3.plan.get", { plan: planLabel(key) })
+      : rank(key) > rank(plan)
+        ? t("billing.v3.usage.upgradeTo", { plan: planLabel(key) })
+        : t("billing.v3.plan.switchTo", { plan: planLabel(key) });
+    const onAction = () => {
+      if (subscribe) {
+        handleSubscribe(key);
+        return;
+      }
+      tapLight();
+      void checkout.openManage();
+    };
     return (
-      <View key={key} style={styles.planRow}>
-        {info}
-        {subscribe ? (
-          <PrimaryButton
-            label={
-              starting
-                ? t("billing.mobile.startingCheckout")
-                : t("billing.mobile.subscribe")
-            }
-            disabled={starting}
-            onPress={() => handleSubscribe(key)}
-            style={styles.planCta}
-          />
+      <View key={key} style={[styles.planRow, isCurrent && styles.planRowCurrent]}>
+        <View style={styles.planTop}>
+          <View style={styles.planInfo}>
+            {isCurrent || recommended ? (
+              <Text style={styles.planFlag}>
+                {isCurrent ? t("billing.v3.plan.currentPlan") : t("billing.v3.plan.recommended")}
+              </Text>
+            ) : null}
+            <Text style={styles.planName}>{planLabel(key)}</Text>
+            <Text style={styles.planTagline}>{t(`billing.v3.tagline.${key}`)}</Text>
+          </View>
+          <View style={styles.planPriceBox}>
+            <Text style={[styles.planAmount, recommended && styles.planAmountAccent]}>
+              {formatAmount(def.monthlyPriceCents / 100)}
+            </Text>
+            <Text style={styles.planPer}>
+              {def.interval ? t("billing.v3.plan.month") : t("billing.v3.plan.noCard")}
+            </Text>
+          </View>
+        </View>
+        <Text style={styles.planFeatures}>{planIncludes(key, t).join(" · ")}</Text>
+        {subscribe || change ? (
+          primary ? (
+            <PrimaryButton label={actionLabel} disabled={starting} onPress={onAction} style={styles.planCta} />
+          ) : (
+            <Pressable
+              accessibilityRole="button"
+              disabled={starting}
+              onPress={onAction}
+              style={({ pressed }) => [styles.planGhost, pressed && styles.rowPressed]}
+            >
+              <Text style={styles.planGhostText}>{actionLabel}</Text>
+            </Pressable>
+          )
         ) : null}
       </View>
     );
@@ -470,7 +482,7 @@ const makeStyles = (colors) => ({
   usageValue: {
     color: colors.text,
     fontFamily: fonts.sans.semiBold,
-    fontSize: 16,
+    fontSize: 18,
     fontVariant: ["tabular-nums"],
   },
   usageMuted: {
@@ -497,48 +509,105 @@ const makeStyles = (colors) => ({
     height: "100%",
     opacity: 0.5,
   },
-  planRow: {
+  plansHead: {
     alignItems: "center",
+    gap: 4,
+    paddingTop: 12,
+  },
+  plansHeading: {
+    color: colors.text,
+    fontFamily: fonts.sans.semiBold,
+    fontSize: 24,
+    letterSpacing: -0.5,
+    textAlign: "center",
+  },
+  plansLede: {
+    color: colors.textMuted,
+    fontFamily: fonts.sans.regular,
+    fontSize: 14,
+    lineHeight: 19,
+    textAlign: "center",
+  },
+  planRow: {
     borderTopColor: colors.border,
     borderTopWidth: StyleSheet.hairlineWidth,
+    gap: 10,
+    paddingHorizontal: 4,
+    paddingVertical: 14,
+  },
+  planRowCurrent: {
+    backgroundColor: colors.accentSoft,
+    borderRadius: 12,
+    borderTopColor: "transparent",
+    paddingHorizontal: 12,
+  },
+  planTop: {
+    alignItems: "flex-start",
     flexDirection: "row",
     gap: 12,
-    justifyContent: "space-between",
-    paddingTop: 12,
   },
   planInfo: {
     flex: 1,
     gap: 2,
   },
-  planNameRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 8,
-  },
-  planCurrent: {
-    color: colors.textMuted,
-    fontFamily: fonts.sans.medium,
-    fontSize: 12,
+  planFlag: {
+    color: colors.accent,
+    fontFamily: fonts.sans.semiBold,
+    fontSize: 11,
+    letterSpacing: 0.6,
+    textTransform: "uppercase",
   },
   planName: {
     color: colors.text,
     fontFamily: fonts.sans.semiBold,
-    fontSize: 16,
-    letterSpacing: -0.2,
+    fontSize: 20,
+    letterSpacing: -0.4,
   },
   planTagline: {
     color: colors.textMuted,
     fontFamily: fonts.sans.regular,
-    fontSize: 13,
-  },
-  planPrice: {
-    color: colors.text,
-    fontFamily: fonts.sans.medium,
     fontSize: 14,
-    marginTop: 2,
+  },
+  planPriceBox: {
+    alignItems: "flex-end",
+  },
+  planAmount: {
+    color: colors.text,
+    fontFamily: fonts.sans.semiBold,
+    fontSize: 30,
+    fontVariant: ["tabular-nums"],
+    letterSpacing: -1,
+  },
+  planAmountAccent: {
+    color: colors.accent,
+  },
+  planPer: {
+    color: colors.textMuted,
+    fontFamily: fonts.sans.regular,
+    fontSize: 12,
+  },
+  planFeatures: {
+    color: colors.textMuted,
+    fontFamily: fonts.sans.regular,
+    fontSize: 13,
+    lineHeight: 18,
   },
   planCta: {
-    minWidth: 108,
+    alignSelf: "stretch",
+  },
+  planGhost: {
+    alignItems: "center",
+    borderColor: colors.border,
+    borderRadius: 22,
+    borderWidth: 1,
+    justifyContent: "center",
+    minHeight: 44,
+  },
+  planGhostText: {
+    color: colors.text,
+    fontFamily: fonts.sans.semiBold,
+    fontSize: 15,
+    letterSpacing: -0.3,
   },
   cta: {
     marginTop: 4,

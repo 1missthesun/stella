@@ -1,4 +1,4 @@
-import { PAID_BILLING_PLANS, PLAN_CATALOG, formatPlanPrice, formatUsd, planSummary } from "@/lib/plans";
+import { PAID_BILLING_PLANS, PLAN_CATALOG, formatPlanPrice, planSummary } from "@/lib/plans";
 export type Answer = { q: string; a: string };
 
 export const FAQ: Answer[] = [
@@ -8,7 +8,7 @@ export const FAQ: Answer[] = [
   },
   {
     q: "Is Stella free?",
-    a: `Yes. ${planSummary("free")}, no credit card needed. Paid plans add a monthly usage budget, cloud agents and image, video, music and 3D: ${PAID_BILLING_PLANS.map((id) => `${PLAN_CATALOG[id].label} is ${formatPlanPrice(PLAN_CATALOG[id].monthlyPriceCents)} a month with ${formatUsd(PLAN_CATALOG[id].budget.monthlyUsd)} of usage`).join(", ")}.`,
+    a: `Yes. ${planSummary("free")}, no credit card needed. Paid plans add monthly usage, cloud agents and image, video, music and 3D: ${PAID_BILLING_PLANS.map((id) => `${PLAN_CATALOG[id].label} is ${formatPlanPrice(PLAN_CATALOG[id].monthlyPriceCents)} a month for ${PLAN_CATALOG[id].tagline.toLowerCase()}`).join(", ")}.`,
   },
   {
     q: "Is there an AI that can use my computer for me?",

@@ -527,24 +527,15 @@
       "usage": {
         "title": "Használat",
         "lede": "Egy keret fizet mindenért, amit a Stella neked futtat.",
-        "ofMonth": "/ {amount} ebben a hónapban",
-        "ofOneTime": "/ {amount} a Stella kipróbálására",
         "oneTimeNote": "Egyszeri, nem újul meg",
-        "of": "/ {amount}",
         "used": "Felhasznált",
         "held": "Futó munkára lefoglalva",
-        "heldHint": "Félretéve, amíg az ügynökök és a médiafeladatok befejeződnek. Amit nem használnak fel, visszajár.",
         "rolling": "Következő {hours} óra",
-        "rollingHint": "Legfeljebb {amount} bármely {hours} órában.",
         "weekly": "Ezen a héten",
-        "weeklyHint": "Legfeljebb {amount} hetente.",
         "resets": "Megújul: {date}",
         "startsNext": "A következő használattal indul",
         "credit": "Extra kredit",
         "creditHint": "Akkor használódik, amikor a csomagod kerete elfogy.",
-        "available": "Most elérhető",
-        "availableHint": "Amennyit a Stella most elkölthet, a kredittel együtt.",
-        "unlimited": "Korlátlan",
         "outTitle": "Egyelőre elfogyott a kereted",
         "outBody": "A kereted megújul: {date}. Adj hozzá kreditet vagy válts nagyobb csomagra, hogy most folytathasd.",
         "outBodyNoDate": "Adj hozzá kreditet vagy válts nagyobb csomagra, hogy most folytathasd.",
@@ -552,34 +543,40 @@
         "freeOutBody": "Válassz csomagot vagy adj hozzá kreditet a folytatáshoz.",
         "creditTitle": "Extra kreditből fut",
         "creditBody": "A csomagod korlátja {date}-ig elfogyott. Addig a kredit fedezi, amit a Stella csinál.",
-        "upgradeTo": "Váltás erre: {plan}"
+        "upgradeTo": "Váltás erre: {plan}",
+        "percentUsed": "{percent} felhasználva",
+        "usedMonth": "felhasználva ebben a hónapban",
+        "usedOneTime": "az ingyenes keretedből felhasználva",
+        "rollingNote": "Elosztja a használatot, hogy egy sűrű időszak ne merítse ki az egész hetet.",
+        "weeklyNote": "Elosztja a használatot, hogy egy hét ne merítse ki az egész hónapot."
       },
       "plan": {
         "title": "Csomag",
-        "lede": "Minden csomag ugyanazt a Stellát futtatja. A nagyobb csomagok nagyobb keretet és több párhuzamos munkát adnak.",
-        "current": "Jelenlegi",
+        "lede": "Ugyanaz a Stella minden csomagban. A nagyobb csomagok több használatot és több egyidejű munkát adnak.",
         "perMonth": "{price}/hó",
-        "checkout": "Tovább a fizetéshez · {price}",
         "checkoutHint": "A fizetés a böngésződben nyílik meg. A kereted azonnal indul.",
-        "upgrade": "Váltás erre: {plan} · {price}",
-        "downgrade": "Visszaváltás erre: {plan} · {price}",
         "changeHint": "A változtatást a böngészőben erősíted meg.",
-        "cancel": "Csomag lemondása",
-        "cancelHint": "A(z) {plan} csomag {date}-ig marad, utána Free-re váltasz.",
         "renews": "Megújul",
         "renewsHint": "{price}, havonta számlázza a Stripe.",
         "ends": "Lejár",
         "endsHint": "A(z) {plan} addig aktív marad. A Számlázás kezelése résznél folytathatod.",
         "manage": "Fizetés és számlák",
         "manageHint": "Kártya, számlák és lemondás.",
-        "manageButton": "Számlázás kezelése"
+        "manageButton": "Számlázás kezelése",
+        "heading": "Válassz csomagot",
+        "recommended": "Ajánlott",
+        "currentPlan": "Jelenlegi csomag",
+        "get": "{plan} választása",
+        "switchTo": "Váltás erre: {plan}",
+        "month": "havonta",
+        "noCard": "Nem kell kártya"
       },
       "includes": {
-        "oneTime": "{amount} a Stella kipróbálására, egyszer",
-        "monthly": "{amount} használat havonta",
         "local": "Ügynökök a számítógépeden",
         "cloud": "Felhőügynökök, egyszerre {count}",
-        "media": "Kép, videó, zene és 3D"
+        "media": "Kép, videó, zene és 3D",
+        "voice": "Diktálás és felolvasás",
+        "drive": "{size} Drive-tárhely"
       },
       "credit": {
         "title": "Extra kredit",
@@ -596,6 +593,12 @@
       "mobile": {
         "usageRow": "Ebben a hónapban",
         "usageOneTime": "Ingyenes használat"
+      },
+      "tagline": {
+        "free": "Próbáld ki a Stellát",
+        "plus": "Több használat",
+        "pro": "Magasabb használat",
+        "max": "Legmagasabb használat"
       }
     }
   },

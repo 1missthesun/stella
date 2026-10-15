@@ -532,24 +532,15 @@
       "usage": {
         "title": "Uso",
         "lede": "Um único orçamento paga tudo o que a Stella executa para você.",
-        "ofMonth": "de {amount} este mês",
-        "ofOneTime": "de {amount} para experimentar a Stella",
         "oneTimeNote": "Único, não é renovado",
-        "of": "de {amount}",
         "used": "Usado",
         "held": "Reservado por trabalho em andamento",
-        "heldHint": "Separado enquanto agentes e tarefas de mídia terminam. O que não for usado volta para você.",
         "rolling": "Próximas {hours} horas",
-        "rollingHint": "Até {amount} em quaisquer {hours} horas.",
         "weekly": "Esta semana",
-        "weeklyHint": "Até {amount} por semana.",
         "resets": "Renova: {date}",
         "startsNext": "Começa no seu próximo uso",
         "credit": "Crédito extra",
         "creditHint": "Usado quando o orçamento do seu plano acaba.",
-        "available": "Disponível agora",
-        "availableHint": "O que a Stella pode gastar agora, com crédito incluído.",
-        "unlimited": "Ilimitado",
         "outTitle": "Seu uso acabou por enquanto",
         "outBody": "Seu orçamento renova: {date}. Adicione crédito ou faça upgrade para continuar agora.",
         "outBodyNoDate": "Adicione crédito ou faça upgrade para continuar agora.",
@@ -557,34 +548,40 @@
         "freeOutBody": "Escolha um plano ou adicione crédito para continuar.",
         "creditTitle": "Usando crédito extra",
         "creditBody": "O limite do seu plano está esgotado até {date}. O crédito cobre o que a Stella fizer até lá.",
-        "upgradeTo": "Fazer upgrade para {plan}"
+        "upgradeTo": "Fazer upgrade para {plan}",
+        "percentUsed": "{percent} usado",
+        "usedMonth": "usado este mês",
+        "usedOneTime": "do seu uso gratuito usado",
+        "rollingNote": "Distribui seu uso para que um período intenso não esgote a semana.",
+        "weeklyNote": "Distribui seu uso para que uma semana não esgote o mês."
       },
       "plan": {
         "title": "Plano",
-        "lede": "Todo plano roda a mesma Stella. Planos maiores dão a ela um orçamento maior e mais tarefas ao mesmo tempo.",
-        "current": "Atual",
+        "lede": "O mesmo Stella em todos os planos. Planos maiores dão mais uso e mais ao mesmo tempo.",
         "perMonth": "{price}/mês",
-        "checkout": "Continuar para o pagamento · {price}",
         "checkoutHint": "O pagamento abre no seu navegador. Seu orçamento começa na hora.",
-        "upgrade": "Fazer upgrade para {plan} · {price}",
-        "downgrade": "Fazer downgrade para {plan} · {price}",
         "changeHint": "Você vai confirmar a mudança no navegador.",
-        "cancel": "Cancelar plano",
-        "cancelHint": "Você mantém o {plan} até {date} e depois passa para o Free.",
         "renews": "Renova",
         "renewsHint": "{price}, cobrado mensalmente pela Stripe.",
         "ends": "Termina",
         "endsHint": "O {plan} continua ativo até lá. Retome em Gerenciar faturamento.",
         "manage": "Pagamento e faturas",
         "manageHint": "Cartão, faturas e cancelamento.",
-        "manageButton": "Gerenciar faturamento"
+        "manageButton": "Gerenciar faturamento",
+        "heading": "Escolha seu plano",
+        "recommended": "Recomendado",
+        "currentPlan": "Plano atual",
+        "get": "Assinar {plan}",
+        "switchTo": "Mudar para {plan}",
+        "month": "por mês",
+        "noCard": "Sem cartão"
       },
       "includes": {
-        "oneTime": "{amount} para experimentar a Stella, uma vez",
-        "monthly": "{amount} de uso todo mês",
         "local": "Agentes no seu computador",
         "cloud": "Agentes na nuvem, {count} ao mesmo tempo",
-        "media": "Imagem, vídeo, música e 3D"
+        "media": "Imagem, vídeo, música e 3D",
+        "voice": "Ditado e leitura em voz alta",
+        "drive": "{size} de armazenamento no Drive"
       },
       "credit": {
         "title": "Crédito extra",
@@ -601,6 +598,12 @@
       "mobile": {
         "usageRow": "Este mês",
         "usageOneTime": "Uso gratuito"
+      },
+      "tagline": {
+        "free": "Experimente o Stella",
+        "plus": "Mais uso",
+        "pro": "Uso maior",
+        "max": "Uso máximo"
       }
     }
   },

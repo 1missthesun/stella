@@ -527,24 +527,15 @@
       "usage": {
         "title": "Nutzung",
         "lede": "Ein Budget bezahlt alles, was Stella für dich ausführt.",
-        "ofMonth": "von {amount} diesen Monat",
-        "ofOneTime": "von {amount} zum Ausprobieren",
         "oneTimeNote": "Einmalig, wird nicht zurückgesetzt",
-        "of": "von {amount}",
         "used": "Verbraucht",
         "held": "Für laufende Arbeit reserviert",
-        "heldHint": "Wird zurückgelegt, bis Agenten und Medienaufträge fertig sind. Was sie nicht brauchen, kommt zurück.",
         "rolling": "Nächste {hours} Stunden",
-        "rollingHint": "Bis zu {amount} in beliebigen {hours} Stunden.",
         "weekly": "Diese Woche",
-        "weeklyHint": "Bis zu {amount} pro Woche.",
         "resets": "Wird zurückgesetzt: {date}",
         "startsNext": "Beginnt mit deiner nächsten Nutzung",
         "credit": "Zusatzguthaben",
         "creditHint": "Wird genutzt, wenn das Budget deines Plans aufgebraucht ist.",
-        "available": "Jetzt verfügbar",
-        "availableHint": "Was Stella jetzt ausgeben kann, Guthaben inklusive.",
-        "unlimited": "Unbegrenzt",
         "outTitle": "Dein Nutzungsbudget ist vorerst aufgebraucht",
         "outBody": "Dein Budget wird zurückgesetzt: {date}. Lade Guthaben auf oder upgrade, um sofort weiterzumachen.",
         "outBodyNoDate": "Lade Guthaben auf oder upgrade, um sofort weiterzumachen.",
@@ -552,34 +543,40 @@
         "freeOutBody": "Wähle einen Plan oder lade Guthaben auf, um weiterzumachen.",
         "creditTitle": "Läuft mit Zusatzguthaben",
         "creditBody": "Das Limit deines Plans ist bis {date} aufgebraucht. Bis dahin deckt dein Guthaben, was Stella tut.",
-        "upgradeTo": "Upgrade auf {plan}"
+        "upgradeTo": "Upgrade auf {plan}",
+        "percentUsed": "{percent} verbraucht",
+        "usedMonth": "diesen Monat verbraucht",
+        "usedOneTime": "deiner Gratis-Nutzung verbraucht",
+        "rollingNote": "Verteilt deine Nutzung, damit eine intensive Phase nicht die ganze Woche aufbraucht.",
+        "weeklyNote": "Verteilt deine Nutzung, damit eine Woche nicht den ganzen Monat aufbraucht."
       },
       "plan": {
         "title": "Plan",
-        "lede": "Jeder Plan nutzt dasselbe Stella. Größere Pläne geben ihm ein größeres Budget und mehr gleichzeitig.",
-        "current": "Aktuell",
+        "lede": "Dieselbe Stella in jedem Plan. Größere Pläne geben dir mehr Nutzung und mehr gleichzeitig.",
         "perMonth": "{price}/Monat",
-        "checkout": "Weiter zum Checkout · {price}",
         "checkoutHint": "Der Checkout öffnet sich in deinem Browser. Dein Budget gilt sofort.",
-        "upgrade": "Upgrade auf {plan} · {price}",
-        "downgrade": "Downgrade auf {plan} · {price}",
         "changeHint": "Du bestätigst die Änderung in deinem Browser.",
-        "cancel": "Plan kündigen",
-        "cancelHint": "Du behältst {plan} bis {date} und wechselst dann zu Free.",
         "renews": "Verlängert sich",
         "renewsHint": "{price}, monatlich über Stripe abgerechnet.",
         "ends": "Endet",
         "endsHint": "{plan} bleibt bis dahin aktiv. Du kannst ihn unter „Abrechnung verwalten“ fortsetzen.",
         "manage": "Zahlung und Rechnungen",
         "manageHint": "Karte, Rechnungen und Kündigung.",
-        "manageButton": "Abrechnung verwalten"
+        "manageButton": "Abrechnung verwalten",
+        "heading": "Wähle deinen Plan",
+        "recommended": "Empfohlen",
+        "currentPlan": "Aktueller Plan",
+        "get": "{plan} holen",
+        "switchTo": "Zu {plan} wechseln",
+        "month": "pro Monat",
+        "noCard": "Keine Karte nötig"
       },
       "includes": {
-        "oneTime": "{amount} zum Ausprobieren, einmalig",
-        "monthly": "{amount} Nutzung jeden Monat",
         "local": "Agenten auf deinem Computer",
         "cloud": "Cloud-Agenten, {count} gleichzeitig",
-        "media": "Bild, Video, Musik und 3D"
+        "media": "Bild, Video, Musik und 3D",
+        "voice": "Diktieren und Vorlesen",
+        "drive": "{size} Drive-Speicher"
       },
       "credit": {
         "title": "Zusatzguthaben",
@@ -596,6 +593,12 @@
       "mobile": {
         "usageRow": "Diesen Monat",
         "usageOneTime": "Kostenlose Nutzung"
+      },
+      "tagline": {
+        "free": "Stella ausprobieren",
+        "plus": "Mehr Nutzung",
+        "pro": "Höhere Nutzung",
+        "max": "Höchste Nutzung"
       }
     }
   },

@@ -532,24 +532,15 @@
       "usage": {
         "title": "Utilizare",
         "lede": "Un singur buget plătește tot ce rulează Stella pentru tine.",
-        "ofMonth": "din {amount} luna aceasta",
-        "ofOneTime": "din {amount} pentru a încerca Stella",
         "oneTimeNote": "O singură dată, nu se resetează",
-        "of": "din {amount}",
         "used": "Folosit",
         "held": "Rezervat de lucrul în desfășurare",
-        "heldHint": "Pus deoparte până termină agenții și sarcinile media. Ce nu folosesc se întoarce.",
         "rolling": "Următoarele {hours} ore",
-        "rollingHint": "Până la {amount} în oricare {hours} ore.",
         "weekly": "Săptămâna aceasta",
-        "weeklyHint": "Până la {amount} pe săptămână.",
         "resets": "Se resetează {date}",
         "startsNext": "Începe la următoarea utilizare",
         "credit": "Credit suplimentar",
         "creditHint": "Folosit când bugetul planului tău se termină.",
-        "available": "Disponibil acum",
-        "availableHint": "Cât poate cheltui Stella acum, inclusiv creditul.",
-        "unlimited": "Nelimitat",
         "outTitle": "Ai epuizat utilizarea deocamdată",
         "outBody": "Bugetul tău se resetează {date}. Adaugă credit sau treci la un plan superior ca să continui acum.",
         "outBodyNoDate": "Adaugă credit sau treci la un plan superior ca să continui acum.",
@@ -557,34 +548,40 @@
         "freeOutBody": "Alege un plan sau adaugă credit ca să continui.",
         "creditTitle": "Funcționează pe credit suplimentar",
         "creditBody": "Limita planului tău este atinsă până la {date}. Creditul acoperă ce face Stella până atunci.",
-        "upgradeTo": "Treci la {plan}"
+        "upgradeTo": "Treci la {plan}",
+        "percentUsed": "{percent} folosit",
+        "usedMonth": "folosit luna aceasta",
+        "usedOneTime": "din utilizarea gratuită folosit",
+        "rollingNote": "Îți împarte utilizarea ca o perioadă aglomerată să nu consume toată săptămâna.",
+        "weeklyNote": "Îți împarte utilizarea ca o săptămână să nu consume toată luna."
       },
       "plan": {
         "title": "Plan",
-        "lede": "Fiecare plan rulează aceeași Stella. Planurile mai mari îi dau un buget mai mare și mai multe sarcini simultan.",
-        "current": "Actual",
+        "lede": "Aceeași Stella în fiecare plan. Planurile mai mari oferă mai multă utilizare și mai mult simultan.",
         "perMonth": "{price}/lună",
-        "checkout": "Continuă la plată · {price}",
         "checkoutHint": "Plata se deschide în browser. Bugetul începe imediat.",
-        "upgrade": "Treci la {plan} · {price}",
-        "downgrade": "Coboară la {plan} · {price}",
         "changeHint": "Vei confirma schimbarea în browser.",
-        "cancel": "Anulează planul",
-        "cancelHint": "Păstrezi {plan} până pe {date}, apoi treci la Free.",
         "renews": "Se reînnoiește",
         "renewsHint": "{price}, facturat lunar prin Stripe.",
         "ends": "Se încheie",
         "endsHint": "{plan} rămâne activ până atunci. Îl poți relua din Gestionează facturarea.",
         "manage": "Plată și facturi",
         "manageHint": "Card, facturi și anulare.",
-        "manageButton": "Gestionează facturarea"
+        "manageButton": "Gestionează facturarea",
+        "heading": "Alege-ți planul",
+        "recommended": "Recomandat",
+        "currentPlan": "Planul actual",
+        "get": "Obține {plan}",
+        "switchTo": "Treci la {plan}",
+        "month": "pe lună",
+        "noCard": "Fără card"
       },
       "includes": {
-        "oneTime": "{amount} pentru a încerca Stella, o singură dată",
-        "monthly": "{amount} de utilizare în fiecare lună",
         "local": "Agenți pe computerul tău",
         "cloud": "Agenți în cloud, {count} simultan",
-        "media": "Imagine, video, muzică și 3D"
+        "media": "Imagine, video, muzică și 3D",
+        "voice": "Dictare și citire cu voce tare",
+        "drive": "{size} spațiu Drive"
       },
       "credit": {
         "title": "Credit suplimentar",
@@ -601,6 +598,12 @@
       "mobile": {
         "usageRow": "Luna aceasta",
         "usageOneTime": "Utilizare gratuită"
+      },
+      "tagline": {
+        "free": "Încearcă Stella",
+        "plus": "Mai multă utilizare",
+        "pro": "Utilizare mai mare",
+        "max": "Cea mai mare utilizare"
       }
     }
   },

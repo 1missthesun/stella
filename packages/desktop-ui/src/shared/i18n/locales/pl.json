@@ -537,24 +537,15 @@
       "usage": {
         "title": "Wykorzystanie",
         "lede": "Jeden budżet płaci za wszystko, co Stella robi dla Ciebie.",
-        "ofMonth": "z {amount} w tym miesiącu",
-        "ofOneTime": "z {amount} na wypróbowanie Stelli",
         "oneTimeNote": "Jednorazowo, nie odnawia się",
-        "of": "z {amount}",
         "used": "Wykorzystano",
         "held": "Zarezerwowane przez trwającą pracę",
-        "heldHint": "Odłożone, dopóki agenci i zadania multimedialne się nie zakończą. To, czego nie użyją, wraca.",
         "rolling": "Najbliższe {hours} godz.",
-        "rollingHint": "Do {amount} w dowolnych {hours} godzinach.",
         "weekly": "Ten tydzień",
-        "weeklyHint": "Do {amount} tygodniowo.",
         "resets": "Odnowienie: {date}",
         "startsNext": "Zaczyna się przy następnym użyciu",
         "credit": "Dodatkowe środki",
         "creditHint": "Używane, gdy budżet Twojego planu się wyczerpie.",
-        "available": "Dostępne teraz",
-        "availableHint": "Ile Stella może teraz wydać, łącznie ze środkami.",
-        "unlimited": "Bez limitu",
         "outTitle": "Na razie wykorzystano cały limit",
         "outBody": "Twój budżet odnowi się: {date}. Dodaj środki lub zmień plan na wyższy, aby kontynuować teraz.",
         "outBodyNoDate": "Dodaj środki lub zmień plan na wyższy, aby kontynuować teraz.",
@@ -562,34 +553,40 @@
         "freeOutBody": "Wybierz plan lub dodaj środki, aby kontynuować.",
         "creditTitle": "Korzystasz z dodatkowych środków",
         "creditBody": "Limit Twojego planu jest wyczerpany do {date}. Do tego czasu środki pokrywają pracę Stelli.",
-        "upgradeTo": "Przejdź na {plan}"
+        "upgradeTo": "Przejdź na {plan}",
+        "percentUsed": "Wykorzystano {percent}",
+        "usedMonth": "wykorzystano w tym miesiącu",
+        "usedOneTime": "darmowego użycia wykorzystano",
+        "rollingNote": "Rozkłada użycie, by jeden intensywny okres nie wyczerpał całego tygodnia.",
+        "weeklyNote": "Rozkłada użycie, by jeden tydzień nie wyczerpał całego miesiąca."
       },
       "plan": {
         "title": "Plan",
-        "lede": "Każdy plan uruchamia tę samą Stellę. Większe plany dają jej większy budżet i więcej zadań naraz.",
-        "current": "Obecny",
+        "lede": "Ta sama Stella w każdym planie. Większe plany dają więcej użycia i więcej naraz.",
         "perMonth": "{price}/mies.",
-        "checkout": "Przejdź do płatności · {price}",
         "checkoutHint": "Płatność otworzy się w przeglądarce. Budżet zaczyna działać od razu.",
-        "upgrade": "Przejdź na {plan} · {price}",
-        "downgrade": "Zmień na niższy: {plan} · {price}",
         "changeHint": "Potwierdzisz zmianę w przeglądarce.",
-        "cancel": "Anuluj plan",
-        "cancelHint": "Zachowasz {plan} do {date}, a potem przejdziesz na Free.",
         "renews": "Odnawia się",
         "renewsHint": "{price}, rozliczane co miesiąc przez Stripe.",
         "ends": "Kończy się",
         "endsHint": "{plan} działa do tego czasu. Wznów go w Zarządzaj rozliczeniami.",
         "manage": "Płatności i faktury",
         "manageHint": "Karta, faktury i anulowanie.",
-        "manageButton": "Zarządzaj rozliczeniami"
+        "manageButton": "Zarządzaj rozliczeniami",
+        "heading": "Wybierz plan",
+        "recommended": "Polecany",
+        "currentPlan": "Obecny plan",
+        "get": "Wybierz {plan}",
+        "switchTo": "Przejdź na {plan}",
+        "month": "miesięcznie",
+        "noCard": "Bez karty"
       },
       "includes": {
-        "oneTime": "{amount} na wypróbowanie Stelli, jednorazowo",
-        "monthly": "{amount} wykorzystania co miesiąc",
         "local": "Agenci na Twoim komputerze",
         "cloud": "Agenci w chmurze, {count} naraz",
-        "media": "Obrazy, wideo, muzyka i 3D"
+        "media": "Obrazy, wideo, muzyka i 3D",
+        "voice": "Dyktowanie i czytanie na głos",
+        "drive": "{size} miejsca na Drive"
       },
       "credit": {
         "title": "Dodatkowe środki",
@@ -606,6 +603,12 @@
       "mobile": {
         "usageRow": "Ten miesiąc",
         "usageOneTime": "Darmowy limit"
+      },
+      "tagline": {
+        "free": "Wypróbuj Stellę",
+        "plus": "Więcej użycia",
+        "pro": "Wyższe użycie",
+        "max": "Najwyższe użycie"
       }
     }
   },

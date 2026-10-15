@@ -527,24 +527,15 @@
       "usage": {
         "title": "Usage",
         "lede": "One budget pays for everything Stella runs for you.",
-        "ofMonth": "of {amount} this month",
-        "ofOneTime": "of {amount} to try Stella",
         "oneTimeNote": "One-time, doesn't reset",
-        "of": "of {amount}",
         "used": "Used",
         "held": "Held by running work",
-        "heldHint": "Set aside while agents and media jobs finish. What they don't use comes back.",
         "rolling": "Next {hours} hours",
-        "rollingHint": "Up to {amount} in any {hours} hours.",
         "weekly": "This week",
-        "weeklyHint": "Up to {amount} a week.",
         "resets": "Resets {date}",
         "startsNext": "Starts with your next use",
         "credit": "Extra credit",
         "creditHint": "Used once your plan's budget runs out.",
-        "available": "Available now",
-        "availableHint": "What Stella can spend right now, credit included.",
-        "unlimited": "Unlimited",
         "outTitle": "You're out of usage for now",
         "outBody": "Your budget resets {date}. Add credit or upgrade to keep going now.",
         "outBodyNoDate": "Add credit or upgrade to keep going now.",
@@ -552,34 +543,40 @@
         "freeOutBody": "Choose a plan or add credit to keep going.",
         "creditTitle": "Running on extra credit",
         "creditBody": "Your plan's limit is used up until {date}. Credit covers what Stella does until then.",
-        "upgradeTo": "Upgrade to {plan}"
+        "upgradeTo": "Upgrade to {plan}",
+        "percentUsed": "{percent} used",
+        "usedMonth": "used this month",
+        "usedOneTime": "of your free usage used",
+        "rollingNote": "Spreads your usage so one busy stretch can't use up the week.",
+        "weeklyNote": "Spreads your usage so one week can't use up the month."
       },
       "plan": {
         "title": "Plan",
-        "lede": "Every plan runs the same Stella. Bigger plans give it a bigger budget and more at once.",
-        "current": "Current",
+        "lede": "Same Stella on every plan. Bigger plans give you more usage and more at once.",
         "perMonth": "{price}/mo",
-        "checkout": "Continue to checkout · {price}",
         "checkoutHint": "Checkout opens in your browser. Your budget starts right away.",
-        "upgrade": "Upgrade to {plan} · {price}",
-        "downgrade": "Downgrade to {plan} · {price}",
         "changeHint": "You'll confirm the change in your browser.",
-        "cancel": "Cancel plan",
-        "cancelHint": "You keep {plan} until {date}, then move to Free.",
         "renews": "Renews",
         "renewsHint": "{price}, billed monthly by Stripe.",
         "ends": "Ends",
         "endsHint": "{plan} stays on until then. Resume it from Manage billing.",
         "manage": "Payment and invoices",
         "manageHint": "Card, invoices and cancelling.",
-        "manageButton": "Manage billing"
+        "manageButton": "Manage billing",
+        "heading": "Choose your plan",
+        "recommended": "Recommended",
+        "currentPlan": "Current plan",
+        "get": "Get {plan}",
+        "switchTo": "Switch to {plan}",
+        "month": "per month",
+        "noCard": "No card needed"
       },
       "includes": {
-        "oneTime": "{amount} to try Stella, once",
-        "monthly": "{amount} of usage every month",
         "local": "Agents on your computer",
         "cloud": "Cloud agents, {count} at once",
-        "media": "Image, video, music and 3D"
+        "media": "Image, video, music and 3D",
+        "voice": "Dictation and read-aloud",
+        "drive": "{size} of Drive storage"
       },
       "credit": {
         "title": "Extra credit",
@@ -596,6 +593,12 @@
       "mobile": {
         "usageRow": "This month",
         "usageOneTime": "Free usage"
+      },
+      "tagline": {
+        "free": "Try Stella",
+        "plus": "More usage",
+        "pro": "Higher usage",
+        "max": "Highest usage"
       }
     }
   },

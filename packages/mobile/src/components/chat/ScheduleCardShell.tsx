@@ -171,7 +171,7 @@ const makeStyles = (colors: Colors) =>
     },
   });
 
-/** Chat-card actions on the status line at its size: secondaries as muted text; the primary a tight accent pill no taller than the 20pt line. */
+/** Chat-card actions on the status line at its size: secondaries as muted text; the primary an accent pill overhanging the 20pt line by 2pt each side. */
 export const makeChatCardButtonStyles = (colors: Colors) =>
   StyleSheet.create({
     actions: { alignItems: "baseline", flexDirection: "row", flexShrink: 0, gap: 14 },
@@ -179,8 +179,9 @@ export const makeChatCardButtonStyles = (colors: Colors) =>
     primary: {
       backgroundColor: colors.accent,
       borderRadius: 999,
-      paddingHorizontal: 9,
-      paddingVertical: 2,
+      marginVertical: -2,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
     },
     dimmed: { opacity: 0.5 },
     label: {

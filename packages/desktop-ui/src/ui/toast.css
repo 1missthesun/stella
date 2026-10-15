@@ -138,10 +138,11 @@
   cursor: default;
 }
 
-/* The primary: a tight accent pill no taller than the description's line
-   (16px line + 2px padding ≈ its 20px row). */
+/* The primary: an accent pill on the description's baseline (16px line +
+   4px padding), overhanging its 20px row by 2px each side. */
 [data-component="toast"] [data-slot="toast-action-button"]:not([data-variant]) {
-  padding: 2px 9px;
+  margin-block: -2px;
+  padding: 4px 10px;
   border-radius: 999px;
   background: var(--interactive);
   color: var(--interactive-foreground);

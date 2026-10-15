@@ -145,11 +145,12 @@ button.schedule-card:focus-visible {
   cursor: pointer;
 }
 
-/* The primary is a tight filled pill no taller than the 18px text row
-   (14px line + 2px padding), so it sits on the row's baseline and adds no
-   height to the card. */
+/* The primary is a filled pill on the row's baseline: 14px line + 4px
+   padding (22px), overhanging the 18px text row by 2px each side so the
+   card doesn't grow. */
 .schedule-card__button--primary {
-  padding: 2px 9px;
+  margin-block: -2px;
+  padding: 4px 10px;
   border-radius: 999px;
   background: var(--interactive);
   color: var(--interactive-foreground);

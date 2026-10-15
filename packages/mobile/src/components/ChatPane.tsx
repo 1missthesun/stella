@@ -4,9 +4,7 @@ import {
   isPlacementThreadId,
   placementAliases,
 } from "@stella/contracts/placement-thread-id";
-import { ReplyViewer, type AgentReplyRef } from "./ReplyViewer";
-import { AgentReportPopover } from "./AgentReportPopover";
-import type { ReportAnchor } from "./AgentReport";
+import { ReplyViewer } from "./ReplyViewer";
 import { type ReplyAgentStatus } from "./ReplyPreview";
 import {
   createMobileReplyContexts,
@@ -754,28 +752,9 @@ export function ChatPane({
     initialScrollAtEndRef.current = visibleMessages.length > 0;
   }
   const [replyFocus, setReplyFocus] = useState<ReplyRef | null>(null);
-  const [openReport, setOpenReport] = useState<{
-    refs: readonly AgentReplyRef[];
-    anchor: ReportAnchor | null;
-  } | null>(null);
-  const showReport = useCallback(
-    (refs: readonly AgentReplyRef[], anchor?: ReportAnchor) =>
-      setOpenReport({ refs, anchor: anchor ?? null }),
-    [],
-  );
   const closeReplyFocus = useCallback(() => setReplyFocus(null), []);
-  const closeReport = useCallback(() => setOpenReport(null), []);
-  const openReportJournal = openReport
-    ? Object.fromEntries(
-        openReport.refs.map((ref) => {
-          const task = activityTasks?.find((candidate) => candidate.id === ref.threadId);
-          return [ref.threadId, task?.resultText ?? task?.errorMessage];
-        }),
-      )
-    : undefined;
   useEffect(() => {
     setReplyFocus(null);
-    setOpenReport(null);
   }, [conversationId]);
   const contextStatusFor = useCallback(
     (
@@ -1623,7 +1602,6 @@ export function ChatPane({
       onAskStella: quoteMessage,
       onOpenAgentActivity: onOpenActivity,
       onOpenReply: setReplyFocus,
-      onOpenReport: showReport,
     }),
     [
       onOpenArtifact,
@@ -1631,7 +1609,6 @@ export function ChatPane({
       stopSelectingMessage,
       quoteMessage,
       onOpenActivity,
-      showReport,
     ],
   );
   const menuCloneRowActions = useMemo<MessageRowActions>(
@@ -2007,18 +1984,6 @@ export function ChatPane({
               )}
             />
           )}
-          {openReport && conversationId ? (
-            <AgentReportPopover
-              key={openReport.refs.map((ref) => ref.threadId).join(" ")}
-              references={openReport.refs}
-              anchor={openReport.anchor}
-              conversationId={conversationId}
-              journalReports={openReportJournal}
-              colors={colors}
-              onClose={closeReport}
-              topInset={topInset}
-            />
-          ) : null}
           <View
             pointerEvents={replyFocus ? "none" : "box-none"}
             style={[

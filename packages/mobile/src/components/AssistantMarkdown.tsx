@@ -1,6 +1,5 @@
 import { memo, useCallback, useMemo, type ReactNode } from "react";
-import { Alert, Linking, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
-import { Text } from "./Text";
+import { Alert, Linking, Platform, ScrollView, StyleSheet, View } from "react-native";
 import {
   Markdown,
   List,
@@ -23,7 +22,6 @@ import type { Colors } from "../theme/colors";
 import { SelectableMarkdownText, nativeMarkdownSelectionAvailable } from "./SelectableMarkdownText";
 import { AssistantMarkdownTable } from "./AssistantMarkdownTable";
 import { useT } from "../i18n";
-import { CONTENT_MAX_FONT_SCALE } from "../lib/font-scale";
 
 const BASE_FONT_SIZE = 17;
 
@@ -149,22 +147,6 @@ function buildNodeStyles(colors: Colors): NodeStyleOverrides {
   };
 }
 
-const moreLinkStyles = StyleSheet.create({
-  row: {
-    alignSelf: "flex-end",
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: -4,
-    marginBottom: 10,
-  },
-  label: {
-    fontFamily: fonts.sans.medium,
-    fontSize: 13,
-    letterSpacing: -0.1,
-    lineHeight: 16,
-  },
-});
-
 const containsImage = (node: MarkdownNode): boolean => node.type === "image" || Boolean(node.children?.some(containsImage));
 
 const PARSER_OPTIONS = { gfm: true, math: false, html: false } as const;
@@ -185,7 +167,6 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
   embeddedImages = false,
   onStellaFileLink,
   onAskStella,
-  showMore,
 }: {
   text: string;
   colors: Colors;
@@ -194,15 +175,10 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
   embeddedImages?: boolean;
   onStellaFileLink?: (path: string) => void;
   onAskStella?: (text: string) => void;
-  showMore?: {
-    label: string;
-    onPress: (anchor?: { x: number; y: number }) => void;
-  };
 }) {
   const theme = useMemo(() => buildTheme(colors), [colors]);
   const nodeStyles = useMemo(() => buildNodeStyles(colors), [colors]);
   const t = useT();
-  const showMoreLabel = t("app.chat.userMessage.showMore");
 
   const onLinkPress = useCallback(
     (url: string): boolean => {
@@ -311,30 +287,6 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
   return (
     <View style={fill ? containerStyle.wrapper : containerStyle.hug}>
       {content}
-      {showMore ? (
-        <View style={moreLinkStyles.row}>
-          <Pressable
-            onPress={(event) =>
-              showMore.onPress({ x: event.nativeEvent.pageX, y: event.nativeEvent.pageY })
-            }
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel={showMore.label}
-          >
-            {({ pressed }) => (
-              <Text
-                style={[
-                  moreLinkStyles.label,
-                  { color: pressed ? colors.text : fadeHex(colors.text, 0.68) },
-                ]}
-                maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
-              >
-                {showMoreLabel}
-              </Text>
-            )}
-          </Pressable>
-        </View>
-      ) : null}
     </View>
   );
 });

@@ -32,10 +32,8 @@ import {
 } from "@stella/contracts/local-file-links";
 import { AssistantBubble, SENT_BUBBLE_POP, useBubblePop } from "../BubblePop";
 import { type AgentReplyRef } from "../ReplyViewer";
-import type { ReportAnchor } from "../AgentReport";
 import {
   ReplyPreview,
-  replyTitle,
   type ReplyAgentStatus,
 } from "../ReplyPreview";
 import { Icon } from "../Icon";
@@ -103,7 +101,6 @@ export type MessageRowActions = {
   onAskStella: (text: string) => void;
   onOpenAgentActivity?: () => void;
   onOpenReply?: (ref: ReplyRef) => void;
-  onOpenReport?: (refs: readonly AgentReplyRef[], anchor?: ReportAnchor) => void;
 };
 
 const MESSAGE_HOLD_MS = 180;
@@ -640,7 +637,6 @@ export const ChatMessageRow = memo(function ChatMessageRow({
     onEndSelecting,
     onAskStella,
     onOpenReply,
-    onOpenReport,
   },
   contextRef,
   contextStatus,
@@ -1024,25 +1020,6 @@ export const ChatMessageRow = memo(function ChatMessageRow({
         style={styles.bubbleEvidence}
       />
     ) : null;
-  const reportRefs: AgentReplyRef[] = [
-    ...new Map(
-      [
-        ...relayedQuotes.map((quote) => quote.ref),
-        ...(contextRef?.kind === "agent" &&
-        !quotedThreadIds.has(contextRef.threadId) &&
-        contextStatus !== "running"
-          ? [contextRef]
-          : []),
-      ].map((ref) => [ref.threadId, ref] as const),
-    ).values(),
-  ];
-  const showMore =
-    onOpenReport && reportRefs.length > 0
-      ? {
-          label: `Full report: ${reportRefs.map(replyTitle).join(", ")}`,
-          onPress: (anchor?: ReportAnchor) => onOpenReport(reportRefs, anchor),
-        }
-      : undefined;
   const fillAssistantBubble = boundedAssistantBubble;
   const assistantBubble = (
     <AssistantBubble
@@ -1057,7 +1034,6 @@ export const ChatMessageRow = memo(function ChatMessageRow({
         colors={colors}
         fill={boundedAssistantBubble}
         onStellaFileLink={onOpenStellaFile}
-        showMore={showMore}
       />
       {evidenceDocuments}
     </AssistantBubble>

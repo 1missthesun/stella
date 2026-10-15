@@ -233,17 +233,12 @@
         "jumpToLatest": "Zur neuesten Antwort springen"
       },
       "replyPreview": {
-        "closeReport": "Close report",
         "emptyMessage": "(empty message)",
         "more": "+{count} more",
         "openMessage": "Show this message and its replies",
         "openTask": "Show this task and its updates",
         "replyingToStella": "Replying to Stella",
         "replyingToYou": "Replying to you",
-        "reportEmpty": "No report yet.",
-        "reportLoading": "Loading report…",
-        "reportUnavailable": "The report is no longer available.",
-        "showReport": "Report",
         "statusDone": "Done",
         "statusFailed": "Failed",
         "statusStopped": "Stopped",

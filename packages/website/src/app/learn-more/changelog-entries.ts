@@ -13,6 +13,178 @@ export type ChangelogEntry = {
 
 export const changelogEntries: ChangelogEntry[] = [
   {
+    "release": "server-2026.10.15 – server-2026.10.15.3",
+    "date": "October 15, 2026",
+    "tags": [
+      "New",
+      "Billing"
+    ],
+    "highlights": [
+      "New Free, Plus, Pro, and Max plans: start free, then choose more usage as you need it.",
+      "See your usage as percentages, compare plans, and upgrade from the plan picker.",
+      "Scheduled tasks now leave a card in chat when you create or change them. Open the card to see the schedule."
+    ],
+    "more": [
+      "When Claude Code reaches a usage limit, a chat card shows what paused and offers a Resume button.",
+      "Sending a message and following a long reply scroll more smoothly on desktop.",
+      "Saved servers are easier to find in Settings → Account → Server."
+    ]
+  },
+  {
+    "release": "server-2026.10.14 – server-2026.10.14.7",
+    "date": "October 14, 2026",
+    "tags": [
+      "New",
+      "Fixes"
+    ],
+    "highlights": [
+      "Sign in with Google, or use an email link, to bring your account across devices.",
+      "Account deletion now has a seven-day grace period. Sign back in during that time to cancel it.",
+      "Finished background tasks bring their results back more reliably, including when work runs on another computer."
+    ],
+    "more": [
+      "Stella now asks you to sign in before you start chatting.",
+      "Dictation gets ready sooner so the first word is less likely to be missed.",
+      "Desktop updates arrive without a manual check, and a failed update is caught before replacing the working app.",
+      {
+        "text": "Improved chat catch-up, file browsing, and access to account controls.",
+        "product": "Mobile"
+      }
+    ]
+  },
+  {
+    "date": "October 12–13, 2026",
+    "tags": [
+      "New",
+      "Fixes"
+    ],
+    "highlights": [
+      "Connect Claude Code accounts from Settings, see where they are in use, and sign in on another computer from the same place.",
+      "Custom MCP connections now belong to your account and work when Stella runs in the cloud.",
+      "Linked files open from the computer or Drive where they live, with previews for plain-text and log files."
+    ],
+    "more": [
+      "Images linked from Markdown files appear in file previews.",
+      "Scheduled check-ins and watch results appear once instead of repeating.",
+      "Long conversations and task reports are easier to scroll through without losing your place.",
+      "Claude Code conversations keep more of their context when work moves between the cloud and a computer."
+    ]
+  },
+  {
+    "date": "October 10–11, 2026",
+    "tags": [
+      "New",
+      "Fixes"
+    ],
+    "highlights": [
+      "Stella Drive links open across your devices, with images, audio, and video available in the file viewer.",
+      "Canvas links are private by default. Use Share when you want to make a file public.",
+      "Connect your own AI provider keys to your account and use them for work in the cloud."
+    ],
+    "more": [
+      "Stella Browser remembers website sign-ins between sessions.",
+      "Claude Code sessions recover more reliably after interrupted work.",
+      "Scheduled tasks keep their setup instructions out of chat and show Stella’s answer instead.",
+      {
+        "text": "Files, Schedule, and Apps have clearer navigation and more consistent empty states.",
+        "product": "Mobile"
+      }
+    ]
+  },
+  {
+    "release": "Mobile v1.0.43 updates",
+    "date": "October 8, 2026",
+    "tags": [
+      "New",
+      "Polish"
+    ],
+    "highlights": [
+      {
+        "text": "Replies bring images and other attachments together in a preview strip, with file links underneath.",
+        "product": "Mobile"
+      },
+      {
+        "text": "Answer Stella’s questions and secure-input requests from your phone, even when the work is happening elsewhere.",
+        "product": "Mobile"
+      },
+      {
+        "text": "Interactive canvases open with their own titles and can load the images, fonts, and libraries they need.",
+        "product": "Mobile"
+      }
+    ],
+    "more": [
+      {
+        "text": "Task activity shows clearer status icons and no longer brings finished tasks back as running.",
+        "product": "Mobile"
+      },
+      {
+        "text": "Clearer voice-call errors and more reliable push-notification registration after changing accounts.",
+        "product": "Mobile"
+      }
+    ]
+  },
+  {
+    "date": "October 5, 2026",
+    "tags": [
+      "New",
+      "Polish"
+    ],
+    "highlights": [
+      "Ask Stella to change the desktop app, then apply or undo the changes. Bring a change to another computer when you want it there too.",
+      "Connect multiple Claude Code and ChatGPT accounts and switch between them.",
+      "A rebuilt first-run walkthrough makes it easier to set up Stella and choose how you want to work."
+    ]
+  },
+  {
+    "release": "v0.1.104 – v0.1.105",
+    "date": "September 26–27, 2026",
+    "tags": [
+      "New",
+      "Polish"
+    ],
+    "highlights": [
+      "See background tasks in the chat top bar and adjust your conversation from Chat settings.",
+      "The composer’s plus button opens a dedicated attachment sheet.",
+      "Stella starts faster, and typing no longer makes the rest of the window work as hard."
+    ],
+    "more": [
+      "Queued messages look like sent messages, making the conversation easier to follow.",
+      "Dictation starts listening while the connection gets ready.",
+      "Model choices stay in sync with your account."
+    ]
+  },
+  {
+    "release": "v0.1.103",
+    "date": "September 12, 2026",
+    "tags": [
+      "Polish"
+    ],
+    "highlights": [
+      {
+        "text": "Workspace apps open edge to edge, with one back control to return to Stella.",
+        "product": "Mobile"
+      }
+    ],
+    "more": [
+      {
+        "text": "The app library loads faster and keeps recently opened apps ready.",
+        "product": "Mobile"
+      },
+      "Install Stella on Linux with a single command.",
+      "Improved keyboard access in dialogs and filled in missing translations."
+    ]
+  },
+  {
+    "release": "v0.1.102",
+    "date": "September 11, 2026",
+    "tags": [
+      "New"
+    ],
+    "highlights": [
+      "Apps Stella builds in the cloud are available across desktop, browser, and phone."
+    ]
+  },
+  {
     "release": "v0.1.101",
     "date": "September 10, 2026",
     "tags": [

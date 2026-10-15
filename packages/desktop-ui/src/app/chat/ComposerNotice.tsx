@@ -51,6 +51,33 @@ export const ComposerNotice = ({
     action.onClick();
   };
 
+  const inline = notice.kind === "limit";
+  const actions =
+    notice.action || notice.secondaryAction ? (
+      <div className="composer-notice__actions">
+        {notice.secondaryAction ? (
+          <Button
+            type="button"
+            variant="ghost"
+            className="pill-btn composer-notice__secondary"
+            onClick={() => run(notice.secondaryAction!)}
+          >
+            {notice.secondaryAction.label}
+          </Button>
+        ) : null}
+        {notice.action ? (
+          <Button
+            type="button"
+            variant="primary"
+            className="pill-btn pill-btn--primary composer-notice__primary"
+            onClick={() => run(notice.action!)}
+          >
+            {notice.action.label}
+          </Button>
+        ) : null}
+      </div>
+    ) : null;
+
   return (
     <div
       className={`composer-notice composer-notice--${notice.kind}${compact ? " composer-notice--compact" : ""}`}
@@ -62,34 +89,17 @@ export const ComposerNotice = ({
       </div>
       <div className="composer-notice__body">
         <p className="composer-notice__title">{notice.title}</p>
-        {notice.description ? (
+        {inline ? (
+          // Usage-limit card: reset text on the left, Resume on the same row.
+          <div className="composer-notice__row">
+            <p className="composer-notice__sub">{notice.description ?? ""}</p>
+            {actions}
+          </div>
+        ) : notice.description ? (
           <p className="composer-notice__sub">{notice.description}</p>
         ) : null}
       </div>
-      {notice.action || notice.secondaryAction ? (
-        <div className="composer-notice__actions">
-          {notice.secondaryAction ? (
-            <Button
-              type="button"
-              variant="ghost"
-              className="pill-btn composer-notice__secondary"
-              onClick={() => run(notice.secondaryAction!)}
-            >
-              {notice.secondaryAction.label}
-            </Button>
-          ) : null}
-          {notice.action ? (
-            <Button
-              type="button"
-              variant="primary"
-              className="pill-btn pill-btn--primary composer-notice__primary"
-              onClick={() => run(notice.action!)}
-            >
-              {notice.action.label}
-            </Button>
-          ) : null}
-        </div>
-      ) : null}
+      {inline ? null : actions}
       <button
         type="button"
         className="composer-notice__dismiss"

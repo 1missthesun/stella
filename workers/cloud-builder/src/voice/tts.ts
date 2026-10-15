@@ -1,5 +1,6 @@
 import { Mp3Encoder } from "@breezystack/lamejs";
 import { ownerModeEnabled } from "../selfhost/owner-mode.js";
+import { TTS_TARIFF } from "@stella/contracts/billing-tariffs";
 import { STELLA_MEDIA_MODELS } from "@stella/contracts/media-models";
 import { DEFAULT_GEMINI_TTS_VOICE, isGeminiTtsVoice } from "@stella/contracts/realtime-voice-catalog";
 import { Effect, Fiber } from "effect";
@@ -53,8 +54,10 @@ export const estimateTtsUsage = (provider: TtsProvider, requestChars: number, pc
   const audioOutputTokens = Math.ceil((pcmBytes / PCM_BYTES_PER_SECOND) * AUDIO_TOKENS_PER_SECOND_ESTIMATE);
   const estimatedUsd =
     provider === "fal"
-      ? (requestChars / 1_000) * 0.03
-      : (textInputTokens * 0.5 + audioOutputTokens * 6) / 1_000_000;
+      ? (requestChars / 1_000) * TTS_TARIFF.falGeminiUsdPerThousandChars
+      : (textInputTokens * TTS_TARIFF.openRouterGeminiInputUsdPerMillionTokens +
+          audioOutputTokens * TTS_TARIFF.openRouterGeminiAudioUsdPerMillionTokens) /
+        1_000_000;
   return { provider, textInputTokens, audioOutputTokens, estimatedUsd: Number(estimatedUsd.toFixed(6)) };
 };
 

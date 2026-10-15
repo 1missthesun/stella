@@ -64,10 +64,10 @@ export const hostingCostMicroCents = (input: { requests: number; cpuMs: number }
 // Read-aloud. fal Gemini TTS is priced per input character; OpenAI mini TTS
 // by its token tariff, approximated per character.
 export const TTS_TARIFF = {
-  falGeminiUsdPerThousandChars: 0.03,
+  falGeminiUsdPerThousandChars: 0.045,
   openAiMiniUsdPerThousandChars: 0.015,
   openRouterGeminiInputUsdPerMillionTokens: 0.5,
-  openRouterGeminiAudioUsdPerMillionTokens: 6,
+  openRouterGeminiAudioUsdPerMillionTokens: 9,
 } as const;
 
 // Google Maps Platform list prices for the SKUs the resolver calls.

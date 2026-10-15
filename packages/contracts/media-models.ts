@@ -1,4 +1,5 @@
 import type { Capability } from "./capabilities.js";
+import { TTS_TARIFF } from "./billing-tariffs.js";
 
 export type MediaModelKind = "image" | "video" | "music" | "speech" | "transcription" | "3d";
 
@@ -148,13 +149,13 @@ export const MEDIA_MODELS: readonly MediaModel[] = [
     price: () => 0.1,
   },
   {
-    id: "google/gemini-3.8-flash-lite-tts",
-    name: "Gemini 3.8 Flash Lite TTS",
+    id: "google/gemini-3.8-flash-tts",
+    name: "Gemini 3.8 Flash TTS",
     kind: "speech",
     does: "Turn text into speech, one voice or a two-speaker dialogue.",
-    docsUrl: falDocs("google/gemini-3.8-flash-lite-tts"),
+    docsUrl: falDocs("google/gemini-3.8-flash-tts"),
     plan: "audio_generation",
-    price: (input) => (ttsText(input).length / 1_000) * 0.03,
+    price: (input) => (ttsText(input).length / 1_000) * TTS_TARIFF.falGeminiUsdPerThousandChars,
   },
   {
     id: "fal-ai/elevenlabs/speech-to-text/scribe-v2",
@@ -198,7 +199,7 @@ export const STELLA_MEDIA_MODELS = {
   imageEdit: "openai/gpt-image-2.5/flare/edit",
   video: "bytedance/seedance-2.5/text-to-video",
   imageToVideo: "bytedance/seedance-2.5/image-to-video",
-  speech: "google/gemini-3.8-flash-lite-tts",
+  speech: "google/gemini-3.8-flash-tts",
   dictation: "elevenlabs/scribe-v2",
 } as const;
 

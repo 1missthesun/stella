@@ -13,7 +13,7 @@ export type ChangelogEntry = {
 
 export const changelogEntries: ChangelogEntry[] = [
   {
-    "release": "server-2026.10.15 – server-2026.10.15.3",
+    "release": "New plans and clearer task updates",
     "date": "October 15, 2026",
     "tags": [
       "New",
@@ -22,7 +22,7 @@ export const changelogEntries: ChangelogEntry[] = [
     "highlights": [
       "New Free, Plus, Pro, and Max plans: start free, then choose more usage as you need it.",
       "See your usage as percentages, compare plans, and upgrade from the plan picker.",
-      "Scheduled tasks now leave a card in chat when you create or change them. Open the card to see the schedule."
+      "On desktop, scheduled tasks leave a card in chat when you create or change them. Click the card to open Schedule with that task highlighted."
     ],
     "more": [
       "When Claude Code reaches a usage limit, a chat card shows what paused and offers a Resume button.",
@@ -31,7 +31,7 @@ export const changelogEntries: ChangelogEntry[] = [
     ]
   },
   {
-    "release": "server-2026.10.14 – server-2026.10.14.7",
+    "release": "Sign-in and everyday reliability",
     "date": "October 14, 2026",
     "tags": [
       "New",
@@ -44,15 +44,16 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
     "more": [
       "Stella now asks you to sign in before you start chatting.",
-      "Dictation gets ready sooner so the first word is less likely to be missed.",
+      "Desktop dictation gets ready sooner so the first word is less likely to be missed.",
       "Desktop updates arrive without a manual check, and a failed update is caught before replacing the working app.",
       {
-        "text": "Find files with search and type filters, with easier access to account controls.",
+        "text": "Find files with search and type filters.",
         "product": "Mobile"
       }
     ]
   },
   {
+    "release": "More control over your account and files",
     "date": "October 12–13, 2026",
     "tags": [
       "New",
@@ -74,6 +75,7 @@ export const changelogEntries: ChangelogEntry[] = [
     ]
   },
   {
+    "release": "Your files across devices",
     "date": "October 10–11, 2026",
     "tags": [
       "New",
@@ -95,7 +97,7 @@ export const changelogEntries: ChangelogEntry[] = [
     ]
   },
   {
-    "release": "Mobile v1.0.43 updates",
+    "release": "Richer replies on your phone",
     "date": "October 8, 2026",
     "tags": [
       "New",
@@ -127,6 +129,7 @@ export const changelogEntries: ChangelogEntry[] = [
     ]
   },
   {
+    "release": "Make Stella your own",
     "date": "October 5, 2026",
     "tags": [
       "New",

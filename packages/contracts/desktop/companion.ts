@@ -1,3 +1,5 @@
+import type { ChatContext } from "../index.js";
+
 export const COMPANION_MARK_SIZE = 84;
 
 export const COMPANION_COMPACT_SIZE = { width: 128, height: 128 } as const;
@@ -79,7 +81,16 @@ export const EMPTY_COMPANION_STATE: CompanionState = {
   readAloudPlaying: false,
 };
 
-export type CompanionSendRequest = { text: string };
+/** What the pet's + menu and paste can attach to a message. */
+export type CompanionAttachments = Pick<
+  ChatContext,
+  "files" | "regionScreenshots" | "pastedTexts"
+>;
+
+export type CompanionSendRequest = {
+  text: string;
+  attachments?: CompanionAttachments;
+};
 
 export type CompanionDragMove = {
   screenX: number;

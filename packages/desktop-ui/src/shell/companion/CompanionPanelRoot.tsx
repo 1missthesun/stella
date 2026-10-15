@@ -14,6 +14,7 @@ import {
   type CompanionEdgeV,
 } from "@stella/contracts/desktop/companion";
 import { useUiState } from "@/context/ui-state";
+import type { ChatContext } from "@/shared/types/electron";
 import { WorkingDots } from "@/ui/working-dots";
 import {
   useComposerMessage,
@@ -93,12 +94,33 @@ export function CompanionPanelRoot() {
   const { store: messageStore, setMessage } = useComposerMessageStore();
   const message = useComposerMessage(messageStore);
   const collapseAfterSendRef = useRef(false);
+  const [attachments, setAttachments] = useState<ChatContext | null>(null);
+  const attachmentsRef = useRef(attachments);
+  attachmentsRef.current = attachments;
+  const holdOpenRef = useRef(false);
+  // The + menu's file picker takes focus from the panel; that one blur must
+  // not collapse the composer.
+  const holdOpen = useCallback((hold: boolean) => {
+    holdOpenRef.current = hold;
+  }, []);
 
   const sendCurrent = useCallback(() => {
     const text = messageStore.getSnapshot().trim();
-    if (!text) return;
-    api?.send({ text });
+    const context = attachmentsRef.current;
+    const files = context?.files ?? [];
+    const regionScreenshots = context?.regionScreenshots ?? [];
+    const pastedTexts = context?.pastedTexts ?? [];
+    const attached =
+      files.length + regionScreenshots.length + pastedTexts.length > 0;
+    if (!text && !attached) return;
+    api?.send({
+      text,
+      ...(attached
+        ? { attachments: { files, regionScreenshots, pastedTexts } }
+        : {}),
+    });
     setMessage("");
+    setAttachments(null);
     if (collapseAfterSendRef.current) {
       collapseAfterSendRef.current = false;
       setExpanded(false);
@@ -164,9 +186,14 @@ export function CompanionPanelRoot() {
   useEffect(() => {
     const onFocus = () => {
       focusedSinceExpandRef.current = true;
+      holdOpenRef.current = false;
     };
     const onBlur = () => {
       if (!focusedSinceExpandRef.current) return;
+      if (holdOpenRef.current) {
+        holdOpenRef.current = false;
+        return;
+      }
       if (!dictationActiveRef.current) {
         collapseAfterSendRef.current = false;
         setExpanded(false);
@@ -188,7 +215,15 @@ export function CompanionPanelRoot() {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") collapse();
+      if (event.key !== "Escape") return;
+      // Escape first closes the composer's + menu, not the whole composer.
+      if (
+        event.target instanceof Element &&
+        event.target.closest("[role='menu']")
+      ) {
+        return;
+      }
+      collapse();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
@@ -253,12 +288,15 @@ export function CompanionPanelRoot() {
           <CompanionComposer
             message={message}
             setMessage={setMessage}
+            attachments={attachments}
+            setAttachments={setAttachments}
             dictation={dictation}
             isStreaming={state.isStreaming}
             focusRequestId={focusRequestId}
             onSend={sendCurrent}
             onStop={() => api?.stop()}
             onEscape={collapse}
+            onHoldOpen={holdOpen}
           />
         ) : null}
       </div>

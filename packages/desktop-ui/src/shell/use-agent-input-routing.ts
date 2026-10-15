@@ -23,6 +23,7 @@ type UseAgentInputRoutingResult = {
     chatCtx?: ChatContext | null,
     selectedTextCtx?: string | null,
     onOptimisticStart?: () => void,
+    metadata?: MessageMetadata,
   ) => Promise<boolean>
 }
 
@@ -89,6 +90,7 @@ export function useAgentInputRouting({
       chatCtx?: ChatContext | null,
       selectedTextCtx?: string | null,
       onOptimisticStart?: () => void,
+      metadata?: MessageMetadata,
     ) => {
       const accepted = await sendMessageRef.current({
         text,
@@ -96,6 +98,7 @@ export function useAgentInputRouting({
         chatContext: chatCtx ?? null,
         onClear: NO_OP,
         onOptimisticStart,
+        metadata,
       })
       if (accepted) enterChatSurfaceForInteraction()
       return accepted

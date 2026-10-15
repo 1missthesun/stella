@@ -26,6 +26,8 @@ type ComposerAddMenuProps = {
   title?: string;
   contextSuggestions?: ComposerContextSuggestion[];
   onSelectContextSuggestion?: (suggestion: ComposerContextSuggestion) => void;
+  /** Region capture lands in the main window's composer, so surfaces with their own attachments turn it off. */
+  allowCapture?: boolean;
 };
 
 const FILE_NAME_MAX_DISPLAY = 28;
@@ -65,6 +67,7 @@ export const ComposerAddMenu = memo(function ComposerAddMenu({
   title,
   contextSuggestions = [],
   onSelectContextSuggestion,
+  allowCapture = true,
 }: ComposerAddMenuProps) {
   const t = useT();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -175,12 +178,14 @@ export const ComposerAddMenu = memo(function ComposerAddMenu({
               })}
             </>
           ) : null}
-          <DropdownMenuItem onSelect={handleCapture}>
-            <span data-slot="dropdown-menu-item-icon">
-              <Camera size={16} strokeWidth={1.75} />
-            </span>
-            {t("app.chat.addMenu.capture")}
-          </DropdownMenuItem>
+          {allowCapture ? (
+            <DropdownMenuItem onSelect={handleCapture}>
+              <span data-slot="dropdown-menu-item-icon">
+                <Camera size={16} strokeWidth={1.75} />
+              </span>
+              {t("app.chat.addMenu.capture")}
+            </DropdownMenuItem>
+          ) : null}
           <DropdownMenuItem onSelect={handleAttachFiles}>
             <span data-slot="dropdown-menu-item-icon">
               <Paperclip size={16} strokeWidth={1.75} />

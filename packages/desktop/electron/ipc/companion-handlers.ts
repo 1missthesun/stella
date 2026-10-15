@@ -15,6 +15,7 @@ import {
   IPC_COMPANION_VISIBLE_CHANGED,
 } from "@stella/contracts/desktop/ipc-channels";
 import type {
+  CompanionAttachments,
   CompanionSendRequest,
   CompanionState,
 } from "@stella/contracts/desktop/companion";
@@ -43,6 +44,34 @@ type PendingRequest =
   | { channel: typeof IPC_COMPANION_STOP_REQUESTED; payload: undefined };
 
 const MAX_PENDING_REQUESTS = 8;
+
+const nonEmptyArray = <T>(value: unknown): T[] | undefined =>
+  Array.isArray(value) && value.length > 0 ? (value as T[]) : undefined;
+
+const sanitizeAttachments = (
+  value: CompanionAttachments | undefined,
+): CompanionAttachments | undefined => {
+  if (!value || typeof value !== "object") return undefined;
+  const files = nonEmptyArray<NonNullable<CompanionAttachments["files"]>[number]>(
+    value.files,
+  )?.filter(
+    (file) => typeof file?.dataUrl === "string" && typeof file.name === "string",
+  );
+  const regionScreenshots = nonEmptyArray<
+    NonNullable<CompanionAttachments["regionScreenshots"]>[number]
+  >(value.regionScreenshots)?.filter(
+    (shot) => typeof shot?.dataUrl === "string",
+  );
+  const pastedTexts = nonEmptyArray<string>(value.pastedTexts)?.filter(
+    (text) => typeof text === "string" && text.length > 0,
+  );
+  const attachments: CompanionAttachments = {
+    ...(files?.length ? { files } : {}),
+    ...(regionScreenshots?.length ? { regionScreenshots } : {}),
+    ...(pastedTexts?.length ? { pastedTexts } : {}),
+  };
+  return Object.keys(attachments).length > 0 ? attachments : undefined;
+};
 const PENDING_REQUEST_TTL_MS = 20_000;
 
 export const broadcastCompanionVisibility = (visible: boolean): void => {
@@ -115,10 +144,11 @@ export const registerCompanionHandlers = (
     const controller = options.getCompanionController();
     if (!controller?.isSender(event.sender)) return;
     const text = typeof payload?.text === "string" ? payload.text.trim() : "";
-    if (!text) return;
+    const attachments = sanitizeAttachments(payload?.attachments);
+    if (!text && !attachments) return;
     dispatchToBrain({
       channel: IPC_COMPANION_SEND_REQUESTED,
-      payload: { text },
+      payload: { text, ...(attachments ? { attachments } : {}) },
     });
   });
 

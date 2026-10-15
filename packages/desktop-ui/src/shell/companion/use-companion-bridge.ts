@@ -106,6 +106,7 @@ export function useCompanionBridge(conversationId: string | null): void {
     tasks,
     isStreaming,
     sendContextlessMessage,
+    sendMessageWithContext,
     cancelCurrentStream,
   } = conversation;
   const activeToolName = conversation.streaming.activeToolName ?? null;
@@ -193,12 +194,23 @@ export function useCompanionBridge(conversationId: string | null): void {
 
   useEffect(() => {
     if (!api) return;
-    return api.onSendRequested(({ text }) => {
+    return api.onSendRequested(({ text, attachments }) => {
       const trimmed = typeof text === "string" ? text.trim() : "";
+      const metadata = { trigger: { source: "companion" } } as const;
+      if (attachments) {
+        void sendMessageWithContext(
+          trimmed,
+          { window: null, ...attachments },
+          null,
+          undefined,
+          metadata,
+        );
+        return;
+      }
       if (!trimmed) return;
-      sendContextlessMessage(trimmed, { trigger: { source: "companion" } });
+      sendContextlessMessage(trimmed, metadata);
     });
-  }, [api, sendContextlessMessage]);
+  }, [api, sendContextlessMessage, sendMessageWithContext]);
 
   useEffect(() => {
     if (!api) return;

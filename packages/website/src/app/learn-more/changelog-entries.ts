@@ -39,7 +39,7 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
     "highlights": [
       "Sign in with Google, or use an email link, to bring your account across devices.",
-      "Account deletion now has a seven-day grace period. Sign back in during that time to cancel it.",
+      "Request account deletion from Settings → Account → Delete account.",
       "Finished background tasks bring their results back more reliably, including when work runs on another computer."
     ],
     "more": [

@@ -191,3 +191,9 @@ button.schedule-card:focus-visible {
 .usage-limit-card__tile {
   color: var(--warning, var(--text-weak));
 }
+
+/* With a ✕ on the title row, the subtitle row drops 5px so its primary pill
+   clears the ✕ by about 10px. */
+.schedule-card:has(.schedule-card__dismiss) .schedule-card__meta {
+  margin-top: 5px;
+}

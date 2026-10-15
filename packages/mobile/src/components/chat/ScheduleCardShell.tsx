@@ -64,7 +64,7 @@ export function ScheduleCardShell({
           {headline}
         </Text>
         {status || trailing ? (
-          <View style={styles.meta}>
+          <View style={[styles.meta, onDismiss && styles.metaDismiss]}>
             <Text style={styles.status} numberOfLines={wrap ? undefined : 1} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
               {status}
             </Text>
@@ -132,6 +132,8 @@ const makeStyles = (colors: Colors) =>
     },
     body: { flexShrink: 1, gap: 1 },
     headlineDismiss: { paddingRight: 24 },
+    // With a ✕: the status line drops so its primary pill clears the ✕ by ~10pt.
+    metaDismiss: { marginTop: 4 },
     trailing: { flexShrink: 0 },
     // On the headline row; its visible 14pt icon's right edge = the card's
     // content edge (paddingRight 14), so trailing buttons line up under it.

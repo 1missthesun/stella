@@ -135,7 +135,9 @@ export function SubscriptionSection() {
     </Pressable>
   );
 
-  if (status === undefined || storefront.status === "loading") {
+  // Only the billing status gates the section. Until the storefront is
+  // known the plans show without purchase buttons, never a missing section.
+  if (status === undefined) {
     return null;
   }
 
@@ -272,6 +274,7 @@ export function SubscriptionSection() {
   }
 
   function renderManage() {
+    if (storefront.status === "loading") return null;
     if (eligible) {
       return (
         <>

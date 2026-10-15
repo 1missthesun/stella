@@ -29,11 +29,24 @@ export function setDebugStorefrontOverride(codeOrNull) {
     codeOrNull == null ? codeOrNull : String(codeOrNull).trim().toUpperCase();
 }
 
+// StoreKit can leave the storefront lookup unanswered (no App Store account,
+// mid sign-in). Fail closed instead of waiting: a later foreground or
+// storefront-change event re-reads it.
+const STOREFRONT_TIMEOUT_MS = 5000;
+
 async function resolveStorefrontCountryCode() {
   if (__DEV__ && debugStorefrontOverride !== undefined) {
     return debugStorefrontOverride;
   }
-  return getStorefrontCountryCode();
+  let timer;
+  const timeout = new Promise((resolve) => {
+    timer = setTimeout(() => resolve(null), STOREFRONT_TIMEOUT_MS);
+  });
+  try {
+    return await Promise.race([getStorefrontCountryCode(), timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /**

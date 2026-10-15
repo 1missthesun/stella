@@ -1,4 +1,5 @@
 import type { LocalCronSchedule } from "./scheduling.js";
+import type { ScheduleTiming } from "./schedule-notice.js";
 
 const MINUTE_MS = 60_000;
 const HOUR_MS = 60 * MINUTE_MS;
@@ -277,4 +278,59 @@ export const summarizeSchedule = (
     return `Once at ${SHORT_MONTHS[date.getMonth()]} ${date.getDate()}, ${formatClock(date.getHours(), date.getMinutes())}`;
   }
   return summarizeCron(schedule.expr, schedule.tz || zone, nextRunAtMs);
+};
+
+const startOfLocalDay = (ms: number): number => {
+  const date = new Date(ms);
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+};
+
+const timingOfOnce = (atMs: number, nowMs: number): ScheduleTiming => {
+  const at = new Date(atMs);
+  const time = formatClock(at.getHours(), at.getMinutes());
+  const days = Math.round((startOfLocalDay(atMs) - startOfLocalDay(nowMs)) / DAY_MS);
+  if (days === 0) return { kind: "today", time };
+  if (days === 1) return { kind: "tomorrow", time };
+  if (days > 1 && days < 7) return { kind: "weekday", day: at.getDay(), time };
+  return { kind: "date", atMs, time };
+};
+
+const timingOfInterval = (everyMs: number): ScheduleTiming => {
+  if (everyMs >= DAY_MS && everyMs % DAY_MS === 0) {
+    return { kind: "interval", unit: "days", count: everyMs / DAY_MS };
+  }
+  if (everyMs >= HOUR_MS && everyMs % HOUR_MS === 0) {
+    return { kind: "interval", unit: "hours", count: everyMs / HOUR_MS };
+  }
+  return { kind: "interval", unit: "minutes", count: Math.max(1, Math.round(everyMs / MINUTE_MS)) };
+};
+
+const timingOfCron = (expr: string, tz: string | undefined, nextRunAtMs: number | undefined): ScheduleTiming => {
+  const parts = expr.trim().split(/\s+/);
+  const fields = parts.length === 6 ? parts.slice(1) : parts;
+  const raw: ScheduleTiming = { kind: "raw", text: summarizeCron(expr, tz, nextRunAtMs) };
+  if (fields.length !== 5) return raw;
+  const [minute, hour, dom, mon, dow] = fields;
+  const clock = parseClockTimeFromCron(minute, hour);
+  if (!clock || !isAllOrStar(dom) || !isAllOrStar(mon)) return raw;
+  const parsed = parseWeekdays(dow);
+  if (!parsed) return raw;
+  const local = toLocalClock(clock, tz, nextRunAtMs);
+  const days = shiftWeekdays(parsed, local.dayDelta);
+  const time = formatClock(local.h, local.m);
+  if (days.size === 7) return { kind: "daily", time };
+  if (days.size === 5 && [1, 2, 3, 4, 5].every((day) => days.has(day))) return { kind: "weekdays", time };
+  if (days.size === 2 && days.has(0) && days.has(6)) return { kind: "weekends", time };
+  if (days.size === 1) return { kind: "weekly", day: [...days][0]!, time };
+  return { kind: "days", days: ALL_DAYS.filter((day) => days.has(day)), time };
+};
+
+/** When a schedule runs, in this device's time zone, as parts a client words in its own language. */
+export const describeScheduleTiming = (
+  schedule: LocalCronSchedule,
+  options: { nextRunAtMs?: number; zone?: string; nowMs: number },
+): ScheduleTiming => {
+  if (schedule.kind === "at") return timingOfOnce(schedule.atMs, options.nowMs);
+  if (schedule.kind === "every") return timingOfInterval(schedule.everyMs);
+  return timingOfCron(schedule.expr, schedule.tz || options.zone, options.nextRunAtMs);
 };

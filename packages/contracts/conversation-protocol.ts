@@ -12,6 +12,11 @@ import {
   type ReminderCard,
 } from "./reminders.js";
 import {
+  parseScheduleNoticeCard,
+  SCHEDULE_NOTICE_CARD_TYPE,
+  type ScheduleNoticeCard,
+} from "./schedule-notice.js";
+import {
   parseAgentActivityEntry,
   type AgentActivityEntry,
 } from "./conversation-agent-activity.js";
@@ -92,7 +97,8 @@ export type JournalCard =
     }
   | { type: "files"; files: JournalFile[] }
   | ClaudeUsageLimitCard
-  | ReminderCard;
+  | ReminderCard
+  | ScheduleNoticeCard;
 
 type JournalRecordBase = {
   seq: number;
@@ -306,6 +312,7 @@ const decodeCard = (value: unknown): JournalCard | null => {
   if (type === "agent-lifecycle") return parseCloudAgentLifecycleCard(raw);
   if (type === "usage-limit") return parseClaudeUsageLimitCard(raw);
   if (type === REMINDER_CARD_TYPE) return parseReminderCard(raw);
+  if (type === SCHEDULE_NOTICE_CARD_TYPE) return parseScheduleNoticeCard(raw);
   if (type === "build") {
     const buildId = str(raw.buildId);
     if (!buildId) return null;

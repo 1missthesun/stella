@@ -22,7 +22,14 @@ import {
   type ReminderFireState,
   type ReminderPushData,
 } from "@stella/contracts/reminders";
-import { boolean, empty, literal, number, object, optional, string, type Parser } from "../args.js";
+import {
+  parseScheduleNoticeCard,
+  SCHEDULE_NOTICE_CARD_TYPE,
+  SCHEDULE_NOTICE_MESSAGE_MAX_CHARS,
+  type ScheduleNoticeAction,
+  type ScheduleNoticeCard,
+} from "@stella/contracts/schedule-notice";
+import { boolean, empty, json, literal, number, object, optional, string, type Parser } from "../args.js";
 import { RpcError } from "../errors.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
 import type { OwnerContext, OwnerDb, OwnerDbReader, OwnerDomain } from "../registry.js";
@@ -41,6 +48,8 @@ export const SCHEDULE_FIRE_JOB = "schedules.fire";
 export const scheduleJobId = (scheduleId: string): string => `schedule:${scheduleId}`;
 export const REMINDER_RETURN_JOB = "schedules.reminderReturn";
 const reminderReturnJobId = (fireId: string): string => `reminder:${fireId}`;
+
+export const SCHEDULE_NOTICE_JOB = "schedules.notice";
 
 const MAX_SCHEDULES = 25;
 const MIN_INTERVAL_MS = 15 * 60_000;
@@ -229,6 +238,79 @@ const zoneField = (scheduleJson: string, ownerZone?: string): { zone?: string } 
 
 const readRow = (db: OwnerDbReader, scheduleId: string): Row | null =>
   db.one<Row>("SELECT * FROM schedules WHERE schedule_id = ?", scheduleId);
+
+const noticeCardOf = (row: Row, action: ScheduleNoticeAction, zone?: string): ScheduleNoticeCard => {
+  const kind = toScheduleKind(row.kind);
+  let schedule: LocalCronSchedule | undefined;
+  try {
+    schedule = JSON.parse(row.schedule_json) as LocalCronSchedule;
+  } catch {
+    schedule = undefined;
+  }
+  const message = kind === "reminder" && row.prompt.trim() !== row.description.trim() ? row.prompt.trim() : "";
+  const { zone: scheduleZone } = zoneField(row.schedule_json, zone);
+  return {
+    type: SCHEDULE_NOTICE_CARD_TYPE,
+    action,
+    scheduleId: row.schedule_id,
+    kind,
+    name: row.description,
+    ...(schedule ? { schedule } : {}),
+    ...(scheduleZone ? { zone: scheduleZone } : {}),
+    ...(action !== "removed" && row.status === "active" ? { nextRunAt: row.next_run_at } : {}),
+    ...(message
+      ? {
+          message:
+            message.length > SCHEDULE_NOTICE_MESSAGE_MAX_CHARS
+              ? `${message.slice(0, SCHEDULE_NOTICE_MESSAGE_MAX_CHARS - 1)}…`
+              : message,
+        }
+      : {}),
+  };
+};
+
+/** Show the change in the schedule's conversation, posted after this write commits. */
+const queueNotice = (ctx: OwnerContext, row: Row, action: ScheduleNoticeAction): void => {
+  const conversationId = row.conversation_id;
+  if (!conversationId || conversationId.startsWith("local_")) return;
+  const stamp = ctx.now.toString(36);
+  ctx.jobs.schedule(
+    SCHEDULE_NOTICE_JOB,
+    ctx.now,
+    {
+      conversationId,
+      sourceTurnId: `schedule:${row.schedule_id}:${action}:${stamp}`,
+      card: noticeCardOf(row, action, ownerZone(ctx.db)),
+    },
+    { id: `schedule-notice:${row.schedule_id}:${action}:${stamp}` },
+  );
+};
+
+const noticePayload = object({
+  conversationId: string({ max: 128 }),
+  sourceTurnId: string({ max: 256 }),
+  card: json({ maxBytes: 16 * 1024 }),
+});
+
+const postNotice = async (ctx: OwnerContext, payload: unknown): Promise<void> => {
+  const { conversationId, sourceTurnId, card: raw } = noticePayload(payload);
+  const card = parseScheduleNoticeCard(raw);
+  if (!card) return;
+  const live = ctx.db.one<{ conversation_id: string }>(
+    "SELECT conversation_id FROM conversations WHERE conversation_id = ? AND deleted_at IS NULL",
+    conversationId,
+  );
+  if (!live) return;
+  const snapshot = await ctx.host.snapshot();
+  if (!snapshot.writable) return;
+  const posted = await ctx.host.postConversationCard({
+    conversationId,
+    ownerGeneration: snapshot.ownerGeneration,
+    sourceTurnId,
+    card,
+  });
+  if (!posted) throw new Error("The schedule notice could not be posted yet.");
+};
 
 const listRows = (db: OwnerDbReader): ScheduleRow[] => {
   const { zone } = readZone(db);
@@ -577,6 +659,7 @@ const createSchedule = async (
         ...columns.map((column) => row[column]),
       );
       arm(ctx, row);
+      queueNotice(ctx, row, "created");
       return { ...toScheduleRow(row, ownerZone(ctx.db)), ...(first ? { check: first.check } : {}) };
     },
   );
@@ -691,6 +774,15 @@ const updateSchedule = async (
         next.schedule_id,
       );
       if (next.status !== row.status || next.next_run_at !== row.next_run_at) arm(ctx, next);
+      const edited =
+        next.prompt !== row.prompt ||
+        next.schedule_json !== row.schedule_json ||
+        next.description !== row.description ||
+        next.route !== row.route ||
+        next.once !== row.once ||
+        next.script !== row.script;
+      if (edited) queueNotice(ctx, next, "updated");
+      else if (next.status !== row.status) queueNotice(ctx, next, next.status === "active" ? "resumed" : "paused");
       return { ...toScheduleRow(next, ownerZone(ctx.db)), ...(first ? { check: first.check } : {}) };
     },
   );
@@ -708,6 +800,7 @@ const removeSchedule = (ctx: OwnerContext, input: { requestId: string; scheduleI
       ctx.jobs.cancel(scheduleJobId(input.scheduleId));
       if (!row) return { removed: false };
       ctx.db.run("DELETE FROM schedules WHERE schedule_id = ?", input.scheduleId);
+      queueNotice(ctx, row, "removed");
       return { removed: true };
     },
   );
@@ -1423,6 +1516,10 @@ export const schedulesDomain = {
     [REMINDER_RETURN_JOB]: {
       run: reminderReturn,
       maxAttempts: 6,
+    },
+    [SCHEDULE_NOTICE_JOB]: {
+      run: postNotice,
+      maxAttempts: 5,
     },
   },
   purge: (ctx) => {

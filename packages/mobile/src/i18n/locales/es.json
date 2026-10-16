@@ -910,6 +910,18 @@
         "title": "Condiciones del servicio"
       }
     },
+    "localMode": {
+      "authNote": "Al iniciar sesión obtienes los modelos de Stella, la app del móvil, Drive, tareas en la nube y sincronización entre dispositivos. Tus chats se quedan en este ordenador hasta que decidas.",
+      "banner": "Tus chats se quedan en este ordenador. Inicia sesión para usar los modelos de Stella, la app del móvil, Drive, tareas en la nube y sincronización.",
+      "choiceBody": "Chateaste antes de iniciar sesión, así que ese chat solo está en este ordenador. Sincronízalo con tu cuenta para verlo en el móvil y en otros dispositivos, o déjalo aquí.",
+      "choiceFailed": "No se pudo guardar tu elección. Inténtalo de nuevo.",
+      "choiceTitle": "¿Sincronizar tu chat?",
+      "keep": "Dejar en este ordenador",
+      "needsAccount": "Esto funciona en la nube de Stella, así que necesita una cuenta de Stella.",
+      "sync": "Sincronizar con mi cuenta",
+      "syncFailed": "No se pudo sincronizar tu chat. Sigue en este ordenador.",
+      "synced": "Tu chat está sincronizado con tu cuenta."
+    },
     "remoteExecutionConsent": {
       "allow": "Allow",
       "body": "Another of your devices asked to run work on this computer. Allowing lets work sent from your devices run here.",
@@ -1687,7 +1699,7 @@
         "quickstartDone": "Listo. Esto es lo que he aprendido y algunas cosas con las que podríamos empezar.",
         "quickstartFailed": "Esta vez no pude terminar de leer tu navegador. Podemos empezar igualmente, y aprenderé sobre la marcha.",
         "selfmod": "Y como vivo en tu ordenador, puedo cambiarme a mí misma.",
-        "signin": "Ahora vamos a iniciar tu sesión. Usa una cuenta de Stella, o el plan de Claude o ChatGPT que ya tienes.",
+        "signin": "Ahora elige cómo pienso. Usa el plan de Claude o ChatGPT que ya tienes, tu propia clave o una cuenta de Stella.",
         "theme": "Now, how should I look?"
       },
       "progress": "Progreso de configuración",
@@ -1801,7 +1813,7 @@
         "settledEngine": "Usando {name}",
         "settledStella": "Sesión iniciada en Stella",
         "signIn": "Iniciar sesión",
-        "title": "Iniciar sesión",
+        "title": "Elige tu IA",
         "use": "Usar",
         "waiting": "Termina de iniciar sesión en tu navegador y vuelve aquí."
       },

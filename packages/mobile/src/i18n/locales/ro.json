@@ -910,6 +910,18 @@
         "title": "Termeni și condiții"
       }
     },
+    "localMode": {
+      "authNote": "Conectarea îți aduce modelele Stella, aplicația de telefon, Drive, sarcini în cloud și sincronizare între dispozitive. Conversațiile tale rămân pe acest computer până alegi tu.",
+      "banner": "Conversațiile tale rămân pe acest computer. Conectează-te pentru modelele Stella, aplicația de telefon, Drive, sarcini în cloud și sincronizare.",
+      "choiceBody": "Ai conversat înainte să te conectezi, așa că acea conversație este doar pe acest computer. Sincronizeaz-o cu contul tău ca să o vezi pe telefon și pe alte dispozitive sau păstreaz-o aici.",
+      "choiceFailed": "Alegerea nu a putut fi salvată. Încearcă din nou.",
+      "choiceTitle": "Sincronizezi conversația?",
+      "keep": "Păstrează pe acest computer",
+      "needsAccount": "Funcționează în cloudul Stella, deci are nevoie de un cont Stella.",
+      "sync": "Sincronizează cu contul meu",
+      "syncFailed": "Conversația nu a putut fi sincronizată. Este încă pe acest computer.",
+      "synced": "Conversația ta este sincronizată cu contul."
+    },
     "remoteExecutionConsent": {
       "allow": "Allow",
       "body": "Another of your devices asked to run work on this computer. Allowing lets work sent from your devices run here.",
@@ -1687,7 +1699,7 @@
         "quickstartDone": "Gata. Iată ce am aflat și câteva lucruri cu care putem începe.",
         "quickstartFailed": "De data asta nu am reușit să-ți citesc tot browserul. Putem începe oricum, iar eu învăț pe parcurs.",
         "selfmod": "Și, fiindcă locuiesc pe computerul tău, mă pot schimba singură.",
-        "signin": "Acum să te conectăm. Folosește un cont Stella sau abonamentul Claude ori ChatGPT pe care îl ai deja.",
+        "signin": "Acum alege cum gândesc. Folosește abonamentul Claude sau ChatGPT pe care îl ai, propria cheie sau un cont Stella.",
         "theme": "Now, how should I look?"
       },
       "progress": "Progresul configurării",
@@ -1801,7 +1813,7 @@
         "settledEngine": "Folosești {name}",
         "settledStella": "Conectat la Stella",
         "signIn": "Conectează-te",
-        "title": "Conectează-te",
+        "title": "Alege-ți IA",
         "use": "Folosește",
         "waiting": "Termină autentificarea în browser, apoi revino aici."
       },

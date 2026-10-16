@@ -1,4 +1,7 @@
-import { useChatStorageMode } from "@/features/chat/services/chat-storage-preference";
+import {
+  enterSignedOutLocalMode,
+  useChatStorageMode,
+} from "@/features/chat/services/chat-storage-preference";
 import type { ReactNode } from "react";
 import {
   createContext,
@@ -114,8 +117,10 @@ function DesktopAuthRuntimeEffects({
         return;
       }
 
+      const selfHosted = isSelfHostedServer();
+      if (!selfHosted) enterSignedOutLocalMode();
       setAuthBootstrapState({
-        status: isSelfHostedServer() ? "needs_pairing" : "signed_out",
+        status: selfHosted ? "needs_pairing" : "signed_out",
         error: null,
       });
     });

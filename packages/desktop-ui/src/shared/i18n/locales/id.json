@@ -896,6 +896,18 @@
         "title": "Ketentuan Layanan"
       }
     },
+    "localMode": {
+      "authNote": "Dengan masuk, kamu mendapat model Stella, aplikasi ponsel, Drive, tugas cloud, dan sinkronisasi antarperangkat. Obrolanmu tetap di komputer ini sampai kamu memilih.",
+      "banner": "Obrolanmu tetap di komputer ini. Masuk untuk model Stella, aplikasi ponsel, Drive, tugas cloud, dan sinkronisasi.",
+      "choiceBody": "Kamu mengobrol sebelum masuk, jadi obrolan itu hanya ada di komputer ini. Sinkronkan ke akunmu agar terlihat di ponsel dan perangkat lain, atau simpan di sini.",
+      "choiceFailed": "Pilihan itu tidak bisa disimpan. Coba lagi.",
+      "choiceTitle": "Sinkronkan obrolanmu?",
+      "keep": "Simpan di komputer ini",
+      "needsAccount": "Ini berjalan di cloud Stella, jadi perlu akun Stella.",
+      "sync": "Sinkronkan ke akunku",
+      "syncFailed": "Obrolanmu tidak bisa disinkronkan. Masih ada di komputer ini.",
+      "synced": "Obrolanmu sudah disinkronkan ke akunmu."
+    },
     "remoteExecutionConsent": {
       "allow": "Allow",
       "body": "Another of your devices asked to run work on this computer. Allowing lets work sent from your devices run here.",
@@ -1671,7 +1683,7 @@
         "quickstartDone": "Selesai. Ini yang saya pelajari, dan beberapa hal yang bisa kita mulai.",
         "quickstartFailed": "Kali ini saya tidak bisa selesai membaca browser Anda. Kita tetap bisa mulai, dan saya akan belajar seiring berjalan.",
         "selfmod": "Dan karena saya berada di komputer Anda, saya bisa mengubah diri saya sendiri.",
-        "signin": "Selanjutnya, mari masuk ke akun. Gunakan akun Stella, atau paket Claude atau ChatGPT yang sudah Anda miliki.",
+        "signin": "Sekarang pilih cara aku berpikir. Pakai paket Claude atau ChatGPT yang sudah kamu punya, kunci milikmu sendiri, atau akun Stella.",
         "theme": "Now, how should I look?"
       },
       "progress": "Kemajuan penyiapan",
@@ -1785,7 +1797,7 @@
         "settledEngine": "Menggunakan {name}",
         "settledStella": "Sudah masuk ke Stella",
         "signIn": "Masuk",
-        "title": "Masuk",
+        "title": "Pilih AI kamu",
         "use": "Gunakan",
         "waiting": "Selesaikan proses masuk di browser Anda, lalu kembali ke sini."
       },

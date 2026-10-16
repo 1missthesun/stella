@@ -910,6 +910,18 @@
         "title": "Termini di servizio"
       }
     },
+    "localMode": {
+      "authNote": "Accedendo ottieni i modelli di Stella, l'app per telefono, Drive, le attività nel cloud e la sincronizzazione tra dispositivi. Le tue chat restano su questo computer finché non scegli.",
+      "banner": "Le tue chat restano su questo computer. Accedi per i modelli di Stella, l'app per telefono, Drive, le attività nel cloud e la sincronizzazione.",
+      "choiceBody": "Hai chattato prima di accedere, quindi quella chat è solo su questo computer. Sincronizzala con il tuo account per vederla sul telefono e sugli altri dispositivi, oppure tienila qui.",
+      "choiceFailed": "Impossibile salvare la scelta. Riprova.",
+      "choiceTitle": "Sincronizzare la chat?",
+      "keep": "Tieni su questo computer",
+      "needsAccount": "Funziona nel cloud di Stella, quindi serve un account Stella.",
+      "sync": "Sincronizza con il mio account",
+      "syncFailed": "Impossibile sincronizzare la chat. È ancora su questo computer.",
+      "synced": "La tua chat è sincronizzata con il tuo account."
+    },
     "remoteExecutionConsent": {
       "allow": "Allow",
       "body": "Another of your devices asked to run work on this computer. Allowing lets work sent from your devices run here.",
@@ -1687,7 +1699,7 @@
         "quickstartDone": "Fatto. Ecco cosa ho capito di te, e alcune cose da cui potremmo iniziare.",
         "quickstartFailed": "Questa volta non sono riuscita a finire di leggere il tuo browser. Possiamo iniziare lo stesso, e imparerò strada facendo.",
         "selfmod": "E siccome vivo sul tuo computer, posso cambiare me stessa.",
-        "signin": "Ora accediamo. Usa un account Stella, oppure l'abbonamento Claude o ChatGPT che hai già.",
+        "signin": "Ora scegli come penso. Usa il piano Claude o ChatGPT che hai già, la tua chiave o un account Stella.",
         "theme": "Now, how should I look?"
       },
       "progress": "Avanzamento della configurazione",
@@ -1801,7 +1813,7 @@
         "settledEngine": "Uso di {name}",
         "settledStella": "Accesso a Stella effettuato",
         "signIn": "Accedi",
-        "title": "Accedi",
+        "title": "Scegli la tua IA",
         "use": "Usa",
         "waiting": "Completa l'accesso nel browser, poi torna qui."
       },

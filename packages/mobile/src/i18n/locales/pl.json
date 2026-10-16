@@ -917,6 +917,18 @@
         "title": "Warunki korzystania"
       }
     },
+    "localMode": {
+      "authNote": "Logowanie daje modele Stelli, aplikację na telefon, Drive, zadania w chmurze i synchronizację między urządzeniami. Twoje czaty zostają na tym komputerze, dopóki nie zdecydujesz.",
+      "banner": "Twoje czaty zostają na tym komputerze. Zaloguj się, aby korzystać z modeli Stelli, aplikacji na telefon, Drive, zadań w chmurze i synchronizacji.",
+      "choiceBody": "Czatowałeś przed zalogowaniem, więc ten czat jest tylko na tym komputerze. Zsynchronizuj go z kontem, aby widzieć go na telefonie i innych urządzeniach, albo zostaw go tutaj.",
+      "choiceFailed": "Nie udało się zapisać wyboru. Spróbuj ponownie.",
+      "choiceTitle": "Zsynchronizować czat?",
+      "keep": "Zostaw na tym komputerze",
+      "needsAccount": "To działa w chmurze Stelli, więc wymaga konta Stella.",
+      "sync": "Synchronizuj z moim kontem",
+      "syncFailed": "Nie udało się zsynchronizować czatu. Nadal jest na tym komputerze.",
+      "synced": "Twój czat jest zsynchronizowany z kontem."
+    },
     "remoteExecutionConsent": {
       "allow": "Allow",
       "body": "Another of your devices asked to run work on this computer. Allowing lets work sent from your devices run here.",
@@ -1695,7 +1707,7 @@
         "quickstartDone": "Gotowe. Oto, czego się dowiedziałam, i kilka rzeczy, od których możemy zacząć.",
         "quickstartFailed": "Tym razem nie udało mi się dokończyć czytania Twojej przeglądarki. Możemy zacząć mimo to, a ja będę uczyć się po drodze.",
         "selfmod": "A ponieważ mieszkam na Twoim komputerze, mogę zmieniać samą siebie.",
-        "signin": "Teraz się zalogujmy. Użyj konta Stella albo planu Claude lub ChatGPT, który już masz.",
+        "signin": "Teraz wybierz, jak myślę. Użyj planu Claude lub ChatGPT, który już masz, własnego klucza albo konta Stella.",
         "theme": "Now, how should I look?"
       },
       "progress": "Postęp konfiguracji",
@@ -1809,7 +1821,7 @@
         "settledEngine": "Używasz: {name}",
         "settledStella": "Zalogowano w Stelli",
         "signIn": "Zaloguj się",
-        "title": "Zaloguj się",
+        "title": "Wybierz swoją AI",
         "use": "Użyj",
         "waiting": "Dokończ logowanie w przeglądarce, a potem wróć tutaj."
       },

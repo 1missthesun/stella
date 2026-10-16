@@ -903,6 +903,18 @@
         "title": "Servicevoorwaarden"
       }
     },
+    "localMode": {
+      "authNote": "Inloggen geeft je Stella's modellen, de telefoonapp, Drive, cloudtaken en synchronisatie tussen apparaten. Je chats blijven op deze computer tot je zelf kiest.",
+      "banner": "Je chats blijven op deze computer. Log in voor Stella's modellen, de telefoonapp, Drive, cloudtaken en synchronisatie.",
+      "choiceBody": "Je chatte voordat je inlogde, dus die chat staat alleen op deze computer. Synchroniseer hem met je account om hem op je telefoon en andere apparaten te zien, of houd hem hier.",
+      "choiceFailed": "Die keuze kon niet worden opgeslagen. Probeer het opnieuw.",
+      "choiceTitle": "Je chat synchroniseren?",
+      "keep": "Op deze computer houden",
+      "needsAccount": "Dit draait in Stella's cloud en heeft dus een Stella-account nodig.",
+      "sync": "Synchroniseren met mijn account",
+      "syncFailed": "Je chat kon niet worden gesynchroniseerd. Hij staat nog op deze computer.",
+      "synced": "Je chat is gesynchroniseerd met je account."
+    },
     "remoteExecutionConsent": {
       "allow": "Allow",
       "body": "Another of your devices asked to run work on this computer. Allowing lets work sent from your devices run here.",
@@ -1679,7 +1691,7 @@
         "quickstartDone": "Klaar. Dit heb ik opgepikt, plus een paar dingen waarmee we kunnen beginnen.",
         "quickstartFailed": "Ik kon je browser deze keer niet helemaal uitlezen. We kunnen toch beginnen, dan leer ik gaandeweg.",
         "selfmod": "En omdat ik op jouw computer woon, kan ik mezelf aanpassen.",
-        "signin": "Laten we je nu inloggen. Gebruik een Stella-account, of het Claude- of ChatGPT-abonnement dat je al hebt.",
+        "signin": "Kies nu hoe ik denk. Gebruik je Claude- of ChatGPT-abonnement, je eigen sleutel of een Stella-account.",
         "theme": "Now, how should I look?"
       },
       "progress": "Voortgang van de installatie",
@@ -1793,7 +1805,7 @@
         "settledEngine": "{name} in gebruik",
         "settledStella": "Ingelogd bij Stella",
         "signIn": "Inloggen",
-        "title": "Inloggen",
+        "title": "Kies je AI",
         "use": "Gebruiken",
         "waiting": "Rond het inloggen af in je browser en kom dan hier terug."
       },

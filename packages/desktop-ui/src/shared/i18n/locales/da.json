@@ -903,6 +903,18 @@
         "title": "Servicevilkår"
       }
     },
+    "localMode": {
+      "authNote": "Når du logger ind, får du Stellas modeller, mobilappen, Drive, cloudopgaver og synkronisering mellem enheder. Dine chats bliver på denne computer, indtil du vælger.",
+      "banner": "Dine chats bliver på denne computer. Log ind for Stellas modeller, mobilappen, Drive, cloudopgaver og synkronisering.",
+      "choiceBody": "Du chattede, før du loggede ind, så den chat findes kun på denne computer. Synkroniser den til din konto for at se den på din telefon og andre enheder, eller behold den her.",
+      "choiceFailed": "Valget kunne ikke gemmes. Prøv igen.",
+      "choiceTitle": "Synkroniser din chat?",
+      "keep": "Behold på denne computer",
+      "needsAccount": "Det kører i Stellas cloud og kræver derfor en Stella-konto.",
+      "sync": "Synkroniser til min konto",
+      "syncFailed": "Din chat kunne ikke synkroniseres. Den er stadig på denne computer.",
+      "synced": "Din chat er synkroniseret til din konto."
+    },
     "remoteExecutionConsent": {
       "allow": "Allow",
       "body": "Another of your devices asked to run work on this computer. Allowing lets work sent from your devices run here.",
@@ -1679,7 +1691,7 @@
         "quickstartDone": "Færdig. Her er, hvad jeg har lært, og et par ting, vi kunne begynde med.",
         "quickstartFailed": "Jeg kunne ikke nå at læse din browser færdig denne gang. Vi kan starte alligevel, og jeg lærer undervejs.",
         "selfmod": "Og fordi jeg lever på din computer, kan jeg ændre mig selv.",
-        "signin": "Lad os nu logge dig ind. Brug en Stella-konto eller det Claude- eller ChatGPT-abonnement, du allerede har.",
+        "signin": "Vælg nu, hvordan jeg tænker. Brug dit Claude- eller ChatGPT-abonnement, din egen nøgle eller en Stella-konto.",
         "theme": "Now, how should I look?"
       },
       "progress": "Opsætningsforløb",
@@ -1793,7 +1805,7 @@
         "settledEngine": "Bruger {name}",
         "settledStella": "Logget ind på Stella",
         "signIn": "Log ind",
-        "title": "Log ind",
+        "title": "Vælg din AI",
         "use": "Brug",
         "waiting": "Gør indlogningen færdig i din browser, og kom så tilbage hertil."
       },

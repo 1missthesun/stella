@@ -80,6 +80,7 @@ import { FeedbackDialogHost } from "@/shell/FeedbackDialogHost";
 import { PlanUsageDialogHost } from "@/shell/PlanUsageDialogHost";
 import { SelfHostPairScreen } from "@/global/self-host/SelfHostPairScreen";
 import { SignInScreen } from "@/global/auth/SignInScreen";
+import { SignedOutLocalChoice } from "@/global/local-mode/SignedOutLocalChoice";
 import {
   STELLA_COMPOSE_TEXT_EVENT,
   type StellaComposeTextDetail,
@@ -413,7 +414,7 @@ function RootLayout() {
     return <SelfHostPairScreen />;
   }
 
-  if (authBootstrapStatus === "signed_out") {
+  if (authBootstrapStatus === "signed_out" && !isPrivate) {
     return <SignInScreen />;
   }
 
@@ -474,6 +475,11 @@ function RootLayout() {
           to reconnect your account.
         </div>
       ) : null}
+      <SignedOutLocalChoice
+        signedIn={authBootstrapStatus === "ready"}
+        isPrivate={isPrivate}
+        conversationId={conversationId}
+      />
       <ChatRuntimeProvider
         activeConversationId={conversationId}
         isOnChatRoute={isOnChatRoute}

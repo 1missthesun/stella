@@ -39,6 +39,7 @@ import {
 } from "@/features/chat/hooks/use-composer-message-state";
 import { CATCH_UP_ENABLED } from "@stella/contracts/catch-up";
 import { useT } from "@/shared/i18n";
+import { SignedOutBanner } from "@/global/local-mode/SignedOutBanner";
 import "./full-shell.chat.css";
 
 const FULL_CHAT_CONTENT_STYLE: LegendContentStyle = {
@@ -311,6 +312,7 @@ export const ChatColumn = memo(function ChatColumn({
         inert={homeObscuresChat || undefined}
       >
         <div className="full-body-main" {...dropHandlers}>
+          <SignedOutBanner />
           {/* Viewport region: list + overlay scroll-to-bottom.
             The custom scrollbar deliberately hangs off the layer (sibling
             below) rather than the viewport region so it pins to the

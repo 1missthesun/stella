@@ -9,7 +9,9 @@ import {
 import { openExternalUrl } from "@/platform/electron/open-external";
 import { useLocale, useT } from "@/shared/i18n";
 import { EmptyState } from "@/ui/empty-state/EmptyState";
-import { Check, LoaderCircle, Mail, RefreshCw } from "@/ui/icons";
+import { Check, LoaderCircle, LogIn, Mail, RefreshCw } from "@/ui/icons";
+import { useAuthSessionState } from "@/global/auth/hooks/use-auth-session-state";
+import { SIGN_IN_TOAST_ACTION } from "@/shared/lib/auth-cta";
 import "./email-digest-section.css";
 
 const GMAIL_ID = "gmail";
@@ -93,7 +95,8 @@ export function EmailDigestSection({ active }: { active: boolean }) {
   const [connecting, setConnecting] = useState(false);
   const [connectFailed, setConnectFailed] = useState(false);
   const [checking, setChecking] = useState(false);
-  const feed = useBackendView("emailDigest.feed", seen ? {} : "skip");
+  const { hasConnectedAccount } = useAuthSessionState();
+  const feed = useBackendView("emailDigest.feed", seen && hasConnectedAccount ? {} : "skip");
 
   useEffect(() => {
     if (active) setSeen(true);
@@ -112,8 +115,8 @@ export function EmailDigestSection({ active }: { active: boolean }) {
   const liveCheckedAt = feed.value?.status.lastCheckedAt;
 
   useEffect(() => {
-    if (active) void refresh();
-  }, [active, epoch, refresh, liveEnabled, liveCheckedAt]);
+    if (active && hasConnectedAccount) void refresh();
+  }, [active, epoch, hasConnectedAccount, refresh, liveEnabled, liveCheckedAt]);
 
   const connect = useCallback(async () => {
     setConnecting(true);
@@ -137,6 +140,22 @@ export function EmailDigestSection({ active }: { active: boolean }) {
   const value = feed.value;
   const status = value?.status;
   const digests = value?.digests ?? [];
+
+  if (!hasConnectedAccount) {
+    return (
+      <EmptyState
+        motif="mail"
+        title={t("shell.emailDigest.connectTitle")}
+        body={t("shell.emailDigest.connectBody")}
+        detail={t("global.localMode.needsAccount")}
+        action={{
+          label: t("common.signIn"),
+          icon: LogIn,
+          onClick: SIGN_IN_TOAST_ACTION.onClick,
+        }}
+      />
+    );
+  }
 
   if (connection === "checking" && !value) {
     return <div className="email-digest" aria-busy="true" />;

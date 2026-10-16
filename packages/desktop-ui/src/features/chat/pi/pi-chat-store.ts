@@ -197,6 +197,15 @@ export const submitPiWelcome = async (conversationId: string, message: string): 
   await chat.request({ op: "welcome", conversationId, message });
 };
 
+export const importLocalPiChat = async (conversationId: string, fromConversationId: string): Promise<number> => {
+  const chat = api();
+  if (!chat) throw new Error("Stella's runtime is not available.");
+  const result = (await chat.request({ op: "importLocal", conversationId, fromConversationId })) as
+    | { imported?: number }
+    | undefined;
+  return result?.imported ?? 0;
+};
+
 export const abortPiChat = (conversationId: string): void => {
   const dispatchIds = (watched.get(conversationId)?.state.remote ?? []).flatMap((turn) =>
     turn.clientMsgId ? [turn.clientMsgId] : [],

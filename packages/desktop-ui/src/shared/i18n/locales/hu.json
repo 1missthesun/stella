@@ -903,6 +903,18 @@
         "title": "Felhasználási feltételek"
       }
     },
+    "localMode": {
+      "authNote": "A bejelentkezéssel megkapod Stella modelljeit, a telefonos appot, a Drive-ot, a felhős feladatokat és az eszközök közötti szinkronizálást. A csevegéseid ezen a számítógépen maradnak, amíg nem döntesz.",
+      "banner": "A csevegéseid ezen a számítógépen maradnak. Jelentkezz be Stella modelljeihez, a telefonos apphoz, a Drive-hoz, a felhős feladatokhoz és a szinkronizáláshoz.",
+      "choiceBody": "Bejelentkezés előtt csevegtél, ezért ez a csevegés csak ezen a számítógépen van. Szinkronizáld a fiókodba, hogy a telefonodon és más eszközökön is lásd, vagy tartsd meg itt.",
+      "choiceFailed": "Nem sikerült menteni a választást. Próbáld újra.",
+      "choiceTitle": "Szinkronizálod a csevegést?",
+      "keep": "Megtartás ezen a számítógépen",
+      "needsAccount": "Ez Stella felhőjében fut, ezért Stella-fiók kell hozzá.",
+      "sync": "Szinkronizálás a fiókomba",
+      "syncFailed": "Nem sikerült szinkronizálni a csevegést. Továbbra is ezen a számítógépen van.",
+      "synced": "A csevegésed szinkronizálva van a fiókodba."
+    },
     "remoteExecutionConsent": {
       "allow": "Allow",
       "body": "Another of your devices asked to run work on this computer. Allowing lets work sent from your devices run here.",
@@ -1679,7 +1691,7 @@
         "quickstartDone": "Kész. Ezt tanultam meg rólad, és néhány dolog, amivel kezdhetjük.",
         "quickstartFailed": "Ezúttal nem tudtam végigolvasni a böngésződet. Kezdhetjük így is, és menet közben tanulok.",
         "selfmod": "És mivel a te számítógépeden élek, magamat is át tudom alakítani.",
-        "signin": "Most jelentkezzünk be. Használhatsz Stella-fiókot, vagy a már meglévő Claude vagy ChatGPT előfizetésedet.",
+        "signin": "Most válaszd ki, hogyan gondolkodjak. Használd a meglévő Claude- vagy ChatGPT-előfizetésed, a saját kulcsod vagy egy Stella-fiókot.",
         "theme": "Now, how should I look?"
       },
       "progress": "Beállítás állapota",
@@ -1793,7 +1805,7 @@
         "settledEngine": "{name} használatban",
         "settledStella": "Bejelentkezve a Stellába",
         "signIn": "Bejelentkezés",
-        "title": "Bejelentkezés",
+        "title": "Válaszd ki az MI-t",
         "use": "Használat",
         "waiting": "Fejezd be a bejelentkezést a böngészőben, aztán gyere vissza ide."
       },

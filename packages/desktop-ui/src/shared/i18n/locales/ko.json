@@ -896,6 +896,18 @@
         "title": "서비스 약관"
       }
     },
+    "localMode": {
+      "authNote": "로그인하면 Stella 모델, 휴대폰 앱, Drive, 클라우드 작업, 기기 간 동기화를 쓸 수 있어요. 직접 선택하기 전까지 채팅은 이 컴퓨터에 남아 있어요.",
+      "banner": "채팅은 이 컴퓨터에 남아 있어요. 로그인하면 Stella 모델, 휴대폰 앱, Drive, 클라우드 작업, 동기화를 쓸 수 있어요.",
+      "choiceBody": "로그인 전에 채팅해서 그 채팅은 이 컴퓨터에만 있어요. 계정에 동기화해 휴대폰과 다른 기기에서 보거나, 여기에 그대로 두세요.",
+      "choiceFailed": "선택을 저장하지 못했어요. 다시 시도해 주세요.",
+      "choiceTitle": "채팅을 동기화할까요?",
+      "keep": "이 컴퓨터에 두기",
+      "needsAccount": "이 기능은 Stella 클라우드에서 실행되므로 Stella 계정이 필요해요.",
+      "sync": "내 계정에 동기화",
+      "syncFailed": "채팅을 동기화하지 못했어요. 아직 이 컴퓨터에 있어요.",
+      "synced": "채팅이 계정에 동기화되었어요."
+    },
     "remoteExecutionConsent": {
       "allow": "Allow",
       "body": "Another of your devices asked to run work on this computer. Allowing lets work sent from your devices run here.",
@@ -1671,7 +1683,7 @@
         "quickstartDone": "완료했어요. 제가 파악한 내용과 함께 시작해 볼 만한 일 몇 가지를 정리했어요.",
         "quickstartFailed": "이번에는 브라우저를 끝까지 읽지 못했어요. 그래도 먼저 시작해요. 하면서 배울게요.",
         "selfmod": "그리고 저는 이 컴퓨터 안에 있기 때문에 스스로를 바꿀 수 있어요.",
-        "signin": "이제 로그인해 볼게요. Stella 계정이나 이미 쓰고 계신 Claude 또는 ChatGPT 요금제를 사용하세요.",
+        "signin": "이제 제가 생각하는 방식을 고르세요. 이미 있는 Claude 또는 ChatGPT 요금제, 내 키, 또는 Stella 계정을 사용할 수 있어요.",
         "theme": "Now, how should I look?"
       },
       "progress": "설정 진행 상황",
@@ -1785,7 +1797,7 @@
         "settledEngine": "{name} 사용 중",
         "settledStella": "Stella에 로그인됨",
         "signIn": "로그인",
-        "title": "로그인",
+        "title": "AI 선택",
         "use": "사용",
         "waiting": "브라우저에서 로그인을 마친 뒤 여기로 돌아오세요."
       },

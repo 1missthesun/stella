@@ -903,6 +903,18 @@
         "title": "Hizmet Şartları"
       }
     },
+    "localMode": {
+      "authNote": "Giriş yapmak Stella'nın modellerini, telefon uygulamasını, Drive'ı, bulut görevlerini ve cihazlar arası eşitlemeyi ekler. Sen karar verene kadar sohbetlerin bu bilgisayarda kalır.",
+      "banner": "Sohbetlerin bu bilgisayarda kalır. Stella'nın modelleri, telefon uygulaması, Drive, bulut görevleri ve eşitleme için giriş yap.",
+      "choiceBody": "Giriş yapmadan önce sohbet ettin, bu yüzden o sohbet yalnızca bu bilgisayarda. Telefonunda ve diğer cihazlarında görmek için hesabına eşitle ya da burada tut.",
+      "choiceFailed": "Seçim kaydedilemedi. Tekrar dene.",
+      "choiceTitle": "Sohbetin eşitlensin mi?",
+      "keep": "Bu bilgisayarda tut",
+      "needsAccount": "Bu Stella'nın bulutunda çalışır, bu yüzden bir Stella hesabı gerekir.",
+      "sync": "Hesabıma eşitle",
+      "syncFailed": "Sohbetin eşitlenemedi. Hâlâ bu bilgisayarda.",
+      "synced": "Sohbetin hesabına eşitlendi."
+    },
     "remoteExecutionConsent": {
       "allow": "Allow",
       "body": "Another of your devices asked to run work on this computer. Allowing lets work sent from your devices run here.",
@@ -1679,7 +1691,7 @@
         "quickstartDone": "Tamam. İşte öğrendiklerim ve birlikte başlayabileceğimiz birkaç şey.",
         "quickstartFailed": "Bu sefer tarayıcını okumayı bitiremedim. Yine de başlayabiliriz, ben yol boyunca öğrenirim.",
         "selfmod": "Senin bilgisayarında yaşadığım için kendimi değiştirebilirim.",
-        "signin": "Şimdi oturum açalım. Bir Stella hesabı ya da zaten sahip olduğun Claude veya ChatGPT planını kullanabilirsin.",
+        "signin": "Şimdi nasıl düşüneceğimi seç. Mevcut Claude veya ChatGPT planını, kendi anahtarını ya da bir Stella hesabını kullan.",
         "theme": "Now, how should I look?"
       },
       "progress": "Kurulum ilerlemesi",
@@ -1793,7 +1805,7 @@
         "settledEngine": "{name} kullanılıyor",
         "settledStella": "Stella'da oturum açıldı",
         "signIn": "Oturum aç",
-        "title": "Oturum aç",
+        "title": "Yapay zekânı seç",
         "use": "Kullan",
         "waiting": "Oturum açmayı tarayıcında tamamla, sonra buraya dön."
       },

@@ -917,6 +917,18 @@
         "title": "Podmínky služby"
       }
     },
+    "localMode": {
+      "authNote": "Přihlášením získáte modely Stelly, mobilní aplikaci, Drive, úlohy v cloudu a synchronizaci mezi zařízeními. Vaše chaty zůstanou v tomto počítači, dokud se nerozhodnete.",
+      "banner": "Vaše chaty zůstávají v tomto počítači. Přihlaste se pro modely Stelly, mobilní aplikaci, Drive, úlohy v cloudu a synchronizaci.",
+      "choiceBody": "Chatovali jste před přihlášením, takže ten chat je jen v tomto počítači. Synchronizujte ho s účtem, abyste ho viděli v telefonu a dalších zařízeních, nebo ho nechte tady.",
+      "choiceFailed": "Volbu se nepodařilo uložit. Zkuste to znovu.",
+      "choiceTitle": "Synchronizovat chat?",
+      "keep": "Ponechat v tomto počítači",
+      "needsAccount": "Běží to v cloudu Stelly, takže je potřeba účet Stella.",
+      "sync": "Synchronizovat s mým účtem",
+      "syncFailed": "Chat se nepodařilo synchronizovat. Je stále v tomto počítači.",
+      "synced": "Váš chat je synchronizovaný s účtem."
+    },
     "remoteExecutionConsent": {
       "allow": "Allow",
       "body": "Another of your devices asked to run work on this computer. Allowing lets work sent from your devices run here.",
@@ -1695,7 +1707,7 @@
         "quickstartDone": "Hotovo. Tohle jsem se dozvěděla a tady je pár věcí, kterými bychom mohli začít.",
         "quickstartFailed": "Tentokrát jsem nestihla dočíst tvůj prohlížeč. Můžeme začít i tak a já se budu učit za pochodu.",
         "selfmod": "A protože žiju na tvém počítači, můžu měnit sama sebe.",
-        "signin": "Teď tě přihlásíme. Použij účet Stella, nebo předplatné Claude či ChatGPT, které už máš.",
+        "signin": "Teď vyberte, jak budu přemýšlet. Použijte předplatné Claude nebo ChatGPT, vlastní klíč nebo účet Stella.",
         "theme": "Now, how should I look?"
       },
       "progress": "Průběh nastavení",
@@ -1809,7 +1821,7 @@
         "settledEngine": "Používá se {name}",
         "settledStella": "Přihlášeno ke Stelle",
         "signIn": "Přihlásit se",
-        "title": "Přihlásit se",
+        "title": "Vyberte si AI",
         "use": "Použít",
         "waiting": "Dokonči přihlášení v prohlížeči a pak se vrať sem."
       },

@@ -903,6 +903,18 @@
         "title": "Terms of Service"
       }
     },
+    "localMode": {
+      "authNote": "Signing in adds Stella's models, the phone app, Drive, cloud tasks and sync across devices. Your chats stay on this computer until you choose.",
+      "banner": "Your chats stay on this computer. Sign in for Stella's models, the phone app, Drive, cloud tasks and sync.",
+      "choiceBody": "You chatted before signing in, so that chat is only on this computer. Sync it to your account to see it on your phone and other devices, or keep it here.",
+      "choiceFailed": "Couldn't save that choice. Try again.",
+      "choiceTitle": "Sync your chat?",
+      "keep": "Keep on this computer",
+      "needsAccount": "This runs in Stella's cloud, so it needs a Stella account.",
+      "sync": "Sync to my account",
+      "syncFailed": "Couldn't sync your chat. It's still on this computer.",
+      "synced": "Your chat is synced to your account."
+    },
     "remoteExecutionConsent": {
       "allow": "Allow",
       "body": "Another of your devices asked to run work on this computer. Allowing lets work sent from your devices run here.",
@@ -1679,7 +1691,7 @@
         "quickstartDone": "Done. Here's what I picked up, and a few things we could start with.",
         "quickstartFailed": "I couldn't finish reading your browser this time. We can start anyway, and I'll learn as we go.",
         "selfmod": "And because I live on your computer, I can change myself.",
-        "signin": "Next, let's sign you in. Use a Stella account, or the Claude or ChatGPT plan you already have.",
+        "signin": "Next, choose how I think. Use the Claude or ChatGPT plan you already have, your own key, or a Stella account.",
         "theme": "Now, how should I look?"
       },
       "progress": "Setup progress",
@@ -1793,7 +1805,7 @@
         "settledEngine": "Using {name}",
         "settledStella": "Signed in to Stella",
         "signIn": "Sign in",
-        "title": "Sign in",
+        "title": "Choose your AI",
         "use": "Use",
         "waiting": "Finish signing in, then come back here."
       },

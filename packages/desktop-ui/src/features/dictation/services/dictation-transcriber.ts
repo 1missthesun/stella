@@ -58,10 +58,8 @@ export const cachedDictationRoute = (): DictationRoute | null => lastRoute;
 
 export const resolveDictationRoute = async (): Promise<DictationRoute> => {
   const generation = routeGeneration;
-  const [managed, token] = await Promise.all([
-    loadManagedAvailability(),
-    getAuthToken().catch(() => null),
-  ]);
+  const token = await getAuthToken().catch(() => null);
+  const managed = token ? await loadManagedAvailability() : null;
   const route: DictationRoute =
     token && managed?.streaming
       ? "streaming"

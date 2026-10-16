@@ -903,6 +903,18 @@
         "title": "Nutzungsbedingungen"
       }
     },
+    "localMode": {
+      "authNote": "Mit der Anmeldung bekommst du Stellas Modelle, die Handy-App, Drive, Cloud-Aufgaben und Synchronisierung zwischen Geräten. Deine Chats bleiben auf diesem Computer, bis du dich entscheidest.",
+      "banner": "Deine Chats bleiben auf diesem Computer. Melde dich an für Stellas Modelle, die Handy-App, Drive, Cloud-Aufgaben und Synchronisierung.",
+      "choiceBody": "Du hast vor der Anmeldung gechattet, daher ist dieser Chat nur auf diesem Computer. Synchronisiere ihn mit deinem Konto, um ihn auf deinem Handy und anderen Geräten zu sehen, oder behalte ihn hier.",
+      "choiceFailed": "Die Auswahl konnte nicht gespeichert werden. Versuch es noch einmal.",
+      "choiceTitle": "Chat synchronisieren?",
+      "keep": "Auf diesem Computer behalten",
+      "needsAccount": "Das läuft in Stellas Cloud und braucht daher ein Stella-Konto.",
+      "sync": "Mit meinem Konto synchronisieren",
+      "syncFailed": "Der Chat konnte nicht synchronisiert werden. Er ist noch auf diesem Computer.",
+      "synced": "Dein Chat ist mit deinem Konto synchronisiert."
+    },
     "remoteExecutionConsent": {
       "allow": "Allow",
       "body": "Another of your devices asked to run work on this computer. Allowing lets work sent from your devices run here.",
@@ -1679,7 +1691,7 @@
         "quickstartDone": "Fertig. Das habe ich gelernt, und hier sind ein paar Dinge, mit denen wir anfangen könnten.",
         "quickstartFailed": "Ich konnte deinen Browser diesmal nicht fertig lesen. Wir können trotzdem loslegen, und ich lerne unterwegs.",
         "selfmod": "Und weil ich auf deinem Computer lebe, kann ich mich selbst verändern.",
-        "signin": "Als Nächstes melden wir dich an. Nutze ein Stella-Konto oder das Claude- oder ChatGPT-Abo, das du schon hast.",
+        "signin": "Als Nächstes: Wähle, wie ich denke. Nutze dein Claude- oder ChatGPT-Abo, deinen eigenen Schlüssel oder ein Stella-Konto.",
         "theme": "Now, how should I look?"
       },
       "progress": "Einrichtung",
@@ -1793,7 +1805,7 @@
         "settledEngine": "{name} wird verwendet",
         "settledStella": "Bei Stella angemeldet",
         "signIn": "Anmelden",
-        "title": "Anmelden",
+        "title": "Wähle deine KI",
         "use": "Nutzen",
         "waiting": "Schließe die Anmeldung in deinem Browser ab und komm dann hierher zurück."
       },

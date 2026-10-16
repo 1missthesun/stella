@@ -896,6 +896,18 @@
         "title": "Điều khoản dịch vụ"
       }
     },
+    "localMode": {
+      "authNote": "Đăng nhập sẽ thêm các mô hình của Stella, ứng dụng điện thoại, Drive, tác vụ đám mây và đồng bộ giữa các thiết bị. Các cuộc trò chuyện của bạn ở lại trên máy tính này cho đến khi bạn quyết định.",
+      "banner": "Các cuộc trò chuyện của bạn ở lại trên máy tính này. Đăng nhập để dùng các mô hình của Stella, ứng dụng điện thoại, Drive, tác vụ đám mây và đồng bộ.",
+      "choiceBody": "Bạn đã trò chuyện trước khi đăng nhập nên cuộc trò chuyện đó chỉ có trên máy tính này. Đồng bộ vào tài khoản để xem trên điện thoại và thiết bị khác, hoặc giữ lại ở đây.",
+      "choiceFailed": "Không thể lưu lựa chọn đó. Hãy thử lại.",
+      "choiceTitle": "Đồng bộ cuộc trò chuyện?",
+      "keep": "Giữ trên máy tính này",
+      "needsAccount": "Tính năng này chạy trên đám mây của Stella nên cần tài khoản Stella.",
+      "sync": "Đồng bộ vào tài khoản của tôi",
+      "syncFailed": "Không thể đồng bộ cuộc trò chuyện. Nó vẫn ở trên máy tính này.",
+      "synced": "Cuộc trò chuyện của bạn đã được đồng bộ vào tài khoản."
+    },
     "remoteExecutionConsent": {
       "allow": "Allow",
       "body": "Another of your devices asked to run work on this computer. Allowing lets work sent from your devices run here.",
@@ -1671,7 +1683,7 @@
         "quickstartDone": "Xong rồi. Đây là những gì tôi đã nắm được, và vài việc chúng ta có thể bắt đầu.",
         "quickstartFailed": "Lần này tôi không đọc xong trình duyệt của bạn. Chúng ta vẫn có thể bắt đầu, và tôi sẽ học dần.",
         "selfmod": "Và vì tôi sống trên máy tính của bạn, tôi có thể tự thay đổi chính mình.",
-        "signin": "Tiếp theo, hãy đăng nhập. Dùng tài khoản Stella, hoặc gói Claude hay ChatGPT mà bạn đã có.",
+        "signin": "Giờ hãy chọn cách tôi suy nghĩ. Dùng gói Claude hoặc ChatGPT bạn đang có, khóa riêng của bạn hoặc tài khoản Stella.",
         "theme": "Now, how should I look?"
       },
       "progress": "Tiến trình thiết lập",
@@ -1785,7 +1797,7 @@
         "settledEngine": "Đang dùng {name}",
         "settledStella": "Đã đăng nhập vào Stella",
         "signIn": "Đăng nhập",
-        "title": "Đăng nhập",
+        "title": "Chọn AI của bạn",
         "use": "Dùng",
         "waiting": "Hãy đăng nhập xong trong trình duyệt, rồi quay lại đây."
       },

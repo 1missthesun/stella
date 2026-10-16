@@ -896,6 +896,18 @@
         "title": "服务条款"
       }
     },
+    "localMode": {
+      "authNote": "登录后可使用 Stella 的模型、手机应用、Drive、云端任务和跨设备同步。在你做出选择之前，聊天会保留在这台电脑上。",
+      "banner": "你的聊天保留在这台电脑上。登录即可使用 Stella 的模型、手机应用、Drive、云端任务和同步。",
+      "choiceBody": "你在登录前进行了聊天，因此该聊天只在这台电脑上。同步到你的账户即可在手机和其他设备上查看，或者保留在这里。",
+      "choiceFailed": "无法保存该选择。请重试。",
+      "choiceTitle": "同步你的聊天？",
+      "keep": "保留在这台电脑上",
+      "needsAccount": "此功能在 Stella 云端运行，因此需要 Stella 账户。",
+      "sync": "同步到我的账户",
+      "syncFailed": "无法同步你的聊天。它仍在这台电脑上。",
+      "synced": "你的聊天已同步到账户。"
+    },
     "remoteExecutionConsent": {
       "allow": "Allow",
       "body": "Another of your devices asked to run work on this computer. Allowing lets work sent from your devices run here.",
@@ -1671,7 +1683,7 @@
         "quickstartDone": "好了。这是我了解到的内容，还有几件我们可以先做的事。",
         "quickstartFailed": "这次我没能读完你的浏览器。我们可以直接开始，我会边用边了解。",
         "selfmod": "因为我就住在你的电脑上，所以我可以改变自己。",
-        "signin": "接下来登录。可以用 Stella 账号，也可以用你已有的 Claude 或 ChatGPT 套餐。",
+        "signin": "接下来，选择我的思考方式。使用你已有的 Claude 或 ChatGPT 套餐、你自己的密钥，或 Stella 账户。",
         "theme": "Now, how should I look?"
       },
       "progress": "设置进度",
@@ -1785,7 +1797,7 @@
         "settledEngine": "正在使用 {name}",
         "settledStella": "已登录 Stella",
         "signIn": "登录",
-        "title": "登录",
+        "title": "选择你的 AI",
         "use": "使用",
         "waiting": "请在浏览器中完成登录，然后回到这里。"
       },

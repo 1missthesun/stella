@@ -903,6 +903,18 @@
         "title": "Käyttöehdot"
       }
     },
+    "localMode": {
+      "authNote": "Kirjautuminen tuo Stellan mallit, puhelinsovelluksen, Driven, pilvitehtävät ja synkronoinnin laitteiden välillä. Keskustelusi pysyvät tällä tietokoneella, kunnes päätät toisin.",
+      "banner": "Keskustelusi pysyvät tällä tietokoneella. Kirjaudu sisään saadaksesi Stellan mallit, puhelinsovelluksen, Driven, pilvitehtävät ja synkronoinnin.",
+      "choiceBody": "Keskustelit ennen kirjautumista, joten keskustelu on vain tällä tietokoneella. Synkronoi se tiliisi nähdäksesi sen puhelimessa ja muilla laitteilla, tai pidä se täällä.",
+      "choiceFailed": "Valintaa ei voitu tallentaa. Yritä uudelleen.",
+      "choiceTitle": "Synkronoidaanko keskustelu?",
+      "keep": "Pidä tällä tietokoneella",
+      "needsAccount": "Tämä toimii Stellan pilvessä, joten se vaatii Stella-tilin.",
+      "sync": "Synkronoi tiliini",
+      "syncFailed": "Keskustelua ei voitu synkronoida. Se on yhä tällä tietokoneella.",
+      "synced": "Keskustelusi on synkronoitu tiliisi."
+    },
     "remoteExecutionConsent": {
       "allow": "Allow",
       "body": "Another of your devices asked to run work on this computer. Allowing lets work sent from your devices run here.",
@@ -1679,7 +1691,7 @@
         "quickstartDone": "Valmis. Tämän opin, ja tässä muutamia asioita, joista voisimme aloittaa.",
         "quickstartFailed": "En saanut selaintasi luettua loppuun tällä kertaa. Voimme aloittaa silti, ja opin matkan varrella.",
         "selfmod": "Ja koska asun tietokoneellasi, voin muuttaa itseäni.",
-        "signin": "Seuraavaksi kirjaudutaan sisään. Käytä Stella-tiliä tai Claude- tai ChatGPT-tilausta, joka sinulla jo on.",
+        "signin": "Valitse seuraavaksi, miten ajattelen. Käytä Claude- tai ChatGPT-tilaustasi, omaa avaintasi tai Stella-tiliä.",
         "theme": "Now, how should I look?"
       },
       "progress": "Käyttöönoton eteneminen",
@@ -1793,7 +1805,7 @@
         "settledEngine": "Käytössä {name}",
         "settledStella": "Kirjauduttu Stellaan",
         "signIn": "Kirjaudu",
-        "title": "Kirjaudu sisään",
+        "title": "Valitse tekoälysi",
         "use": "Käytä",
         "waiting": "Viimeistele kirjautuminen selaimessasi ja palaa sitten tänne."
       },

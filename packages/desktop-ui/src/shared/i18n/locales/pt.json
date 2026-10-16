@@ -910,6 +910,18 @@
         "title": "Termos de Serviço"
       }
     },
+    "localMode": {
+      "authNote": "Ao entrar, você ganha os modelos da Stella, o app do celular, o Drive, tarefas na nuvem e sincronização entre dispositivos. Suas conversas ficam neste computador até você decidir.",
+      "banner": "Suas conversas ficam neste computador. Entre para usar os modelos da Stella, o app do celular, o Drive, tarefas na nuvem e sincronização.",
+      "choiceBody": "Você conversou antes de entrar, então essa conversa está só neste computador. Sincronize com sua conta para vê-la no celular e em outros dispositivos, ou mantenha aqui.",
+      "choiceFailed": "Não foi possível salvar essa escolha. Tente de novo.",
+      "choiceTitle": "Sincronizar sua conversa?",
+      "keep": "Manter neste computador",
+      "needsAccount": "Isso roda na nuvem da Stella, então precisa de uma conta Stella.",
+      "sync": "Sincronizar com minha conta",
+      "syncFailed": "Não foi possível sincronizar sua conversa. Ela continua neste computador.",
+      "synced": "Sua conversa foi sincronizada com sua conta."
+    },
     "remoteExecutionConsent": {
       "allow": "Allow",
       "body": "Another of your devices asked to run work on this computer. Allowing lets work sent from your devices run here.",
@@ -1687,7 +1699,7 @@
         "quickstartDone": "Pronto. Veja o que aprendi e algumas coisas com que podemos começar.",
         "quickstartFailed": "Desta vez não consegui terminar de ler o seu navegador. Podemos começar mesmo assim, e eu aprendo pelo caminho.",
         "selfmod": "E, como eu vivo no seu computador, posso mudar a mim mesma.",
-        "signin": "Agora, vamos entrar na sua conta. Use uma conta Stella ou o plano do Claude ou do ChatGPT que você já tem.",
+        "signin": "Agora escolha como eu penso. Use o plano do Claude ou do ChatGPT que você já tem, sua própria chave ou uma conta Stella.",
         "theme": "Now, how should I look?"
       },
       "progress": "Progresso da configuração",
@@ -1801,7 +1813,7 @@
         "settledEngine": "Usando {name}",
         "settledStella": "Conectado à Stella",
         "signIn": "Entrar",
-        "title": "Entrar",
+        "title": "Escolha sua IA",
         "use": "Usar",
         "waiting": "Conclua o login no navegador e depois volte aqui."
       },

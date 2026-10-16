@@ -903,6 +903,18 @@
         "title": "Användarvillkor"
       }
     },
+    "localMode": {
+      "authNote": "Inloggning ger dig Stellas modeller, mobilappen, Drive, molnuppgifter och synkning mellan enheter. Dina chattar stannar på den här datorn tills du väljer.",
+      "banner": "Dina chattar stannar på den här datorn. Logga in för Stellas modeller, mobilappen, Drive, molnuppgifter och synkning.",
+      "choiceBody": "Du chattade innan du loggade in, så den chatten finns bara på den här datorn. Synka den till ditt konto för att se den i mobilen och på andra enheter, eller behåll den här.",
+      "choiceFailed": "Valet kunde inte sparas. Försök igen.",
+      "choiceTitle": "Synka din chatt?",
+      "keep": "Behåll på den här datorn",
+      "needsAccount": "Det här körs i Stellas moln och kräver därför ett Stella-konto.",
+      "sync": "Synka till mitt konto",
+      "syncFailed": "Chatten kunde inte synkas. Den finns kvar på den här datorn.",
+      "synced": "Din chatt är synkad till ditt konto."
+    },
     "remoteExecutionConsent": {
       "allow": "Allow",
       "body": "Another of your devices asked to run work on this computer. Allowing lets work sent from your devices run here.",
@@ -1679,7 +1691,7 @@
         "quickstartDone": "Klart. Här är vad jag har lärt mig, och några saker vi kan börja med.",
         "quickstartFailed": "Jag kunde inte läsa klart din webbläsare den här gången. Vi kan börja ändå, så lär jag mig under tiden.",
         "selfmod": "Och eftersom jag lever på din dator kan jag ändra mig själv.",
-        "signin": "Nästa steg är att logga in. Använd ett Stella-konto, eller det Claude- eller ChatGPT-abonnemang du redan har.",
+        "signin": "Välj nu hur jag tänker. Använd ditt Claude- eller ChatGPT-abonnemang, din egen nyckel eller ett Stella-konto.",
         "theme": "Now, how should I look?"
       },
       "progress": "Installationsförlopp",
@@ -1793,7 +1805,7 @@
         "settledEngine": "Använder {name}",
         "settledStella": "Inloggad på Stella",
         "signIn": "Logga in",
-        "title": "Logga in",
+        "title": "Välj din AI",
         "use": "Använd",
         "waiting": "Slutför inloggningen i webbläsaren och kom sedan tillbaka hit."
       },

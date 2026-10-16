@@ -896,6 +896,18 @@
         "title": "利用規約"
       }
     },
+    "localMode": {
+      "authNote": "サインインすると、Stellaのモデル、スマホアプリ、Drive、クラウドタスク、デバイス間の同期が使えるようになります。選ぶまで、チャットはこのコンピュータに残ります。",
+      "banner": "チャットはこのコンピュータに保存されます。サインインすると、Stellaのモデル、スマホアプリ、Drive、クラウドタスク、同期が使えます。",
+      "choiceBody": "サインイン前にチャットしたため、そのチャットはこのコンピュータにしかありません。アカウントに同期してスマホや他のデバイスで見るか、ここに残してください。",
+      "choiceFailed": "選択を保存できませんでした。もう一度お試しください。",
+      "choiceTitle": "チャットを同期しますか？",
+      "keep": "このコンピュータに残す",
+      "needsAccount": "これはStellaのクラウドで動くため、Stellaアカウントが必要です。",
+      "sync": "アカウントに同期",
+      "syncFailed": "チャットを同期できませんでした。このコンピュータに残っています。",
+      "synced": "チャットをアカウントに同期しました。"
+    },
     "remoteExecutionConsent": {
       "allow": "Allow",
       "body": "Another of your devices asked to run work on this computer. Allowing lets work sent from your devices run here.",
@@ -1671,7 +1683,7 @@
         "quickstartDone": "完了しました。私が把握したことと、最初に取りかかれそうなことをいくつかご紹介します。",
         "quickstartFailed": "今回はブラウザーを最後まで読み取れませんでした。このまま始めても大丈夫です。進めながら覚えていきます。",
         "selfmod": "そして、あなたのコンピューターの中にいるので、私は自分自身を変えることもできます。",
-        "signin": "次はサインインです。Stella アカウント、またはお持ちの Claude か ChatGPT のプランを使えます。",
+        "signin": "次に、私の考え方を選んでください。お持ちのClaudeやChatGPTのプラン、ご自身のキー、またはStellaアカウントを使えます。",
         "theme": "Now, how should I look?"
       },
       "progress": "セットアップの進行状況",
@@ -1785,7 +1797,7 @@
         "settledEngine": "{name} を使用中",
         "settledStella": "Stella にサインイン済み",
         "signIn": "サインイン",
-        "title": "サインイン",
+        "title": "AIを選ぶ",
         "use": "使う",
         "waiting": "ブラウザーでサインインを完了して、こちらに戻ってください。"
       },

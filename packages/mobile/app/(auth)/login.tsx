@@ -22,7 +22,9 @@ import {
   generateClaimSecret,
   hashClaimSecret,
 } from "../../src/lib/claim-secret";
+import { REQUEST_BUDGET_MS } from "@stella/contracts/request-deadline";
 import { env } from "../../src/config/env";
+import { fetchWithinDeadline } from "../../src/lib/cloud-request";
 import { userFacingError } from "../../src/lib/user-facing-error";
 import { type Colors } from "../../src/theme/colors";
 import { useColors, useTheme } from "../../src/theme/theme-context";
@@ -125,13 +127,14 @@ export default function LoginScreen() {
         await requestWithAppIntegrity<MagicLinkSendResult>({
           purpose: "magic-link",
           request: async (proof) => {
-            const response = await fetch(
+            const response = await fetchWithinDeadline(
               `${env.backendUrl}/api/auth/link/send`,
               {
                 method: "POST",
                 headers: buildMagicLinkHeaders(proof),
                 body: JSON.stringify({ email: trimmed, claimHash }),
               },
+              { label: "Sending your sign-in link", timeoutMs: REQUEST_BUDGET_MS.call },
             );
             return {
               response,
@@ -282,8 +285,10 @@ export default function LoginScreen() {
         if (cancelled) return;
 
         try {
-          const res = await fetch(
+          const res = await fetchWithinDeadline(
             `${env.backendUrl}/api/auth/link/status?requestId=${encodeURIComponent(requestId)}`,
+            undefined,
+            { label: "Checking your sign-in link", timeoutMs: REQUEST_BUDGET_MS.lookup },
           );
           if (!res.ok) continue;
           const data = (await res.json()) as { status: string };

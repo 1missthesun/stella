@@ -1,3 +1,4 @@
+import { REQUEST_BUDGET_MS, withDeadline } from "@stella/contracts/request-deadline";
 import { authClient } from "./auth-client";
 import { assert } from "./assert";
 import {
@@ -42,7 +43,10 @@ export async function getAuthToken(
     return inflightTokenPromise;
   }
 
-  const request = loadAuthToken();
+  const request = withDeadline(
+    { label: "Refreshing your sign-in", timeoutMs: REQUEST_BUDGET_MS.call },
+    loadAuthToken,
+  );
   const tracked = request.finally(() => {
     if (inflightTokenPromise === tracked) inflightTokenPromise = null;
   });

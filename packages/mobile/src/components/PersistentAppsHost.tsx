@@ -3,6 +3,7 @@ import {
   type WorkspaceApp,
 } from "@stella/contracts/workspace-apps";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { REQUEST_BUDGET_MS, withDeadline } from "@stella/contracts/request-deadline";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -41,6 +42,7 @@ import {
 } from "../lib/app-cache";
 
 const APPS_REFRESH_MS = 60_000;
+const OPEN_APP_TIMEOUT_MS = 60_000;
 
 const NATIVE_FEEL_SCRIPT = `(() => {
   const viewport = "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no";
@@ -173,17 +175,24 @@ function AppsHost({
     preloaded.current = true;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
-    let controller: AbortController;
+    const controller = new AbortController();
     const load = async () => {
-      controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 60_000);
       try {
-        const token = await getAuthTokenForSubject(owner);
+        const response = await withDeadline(
+          {
+            label: "Loading your apps",
+            timeoutMs: REQUEST_BUDGET_MS.call,
+            signal: controller.signal,
+          },
+          async (signal) =>
+            await fetch(`${origin}/owners/me/apps`, {
+              headers: {
+                Authorization: `Bearer ${await getAuthTokenForSubject(owner)}`,
+              },
+              signal,
+            }),
+        );
         if (cancelled) return;
-        const response = await fetch(`${origin}/owners/me/apps`, {
-          headers: { Authorization: `Bearer ${token}` },
-          signal: controller.signal,
-        });
         if (!response.ok) throw new Error("Apps could not be refreshed.");
         const data = parseWorkspaceApps((await response.json()).apps);
         if (cancelled) return;
@@ -212,7 +221,6 @@ function AppsHost({
             e instanceof Error ? e.message : "Apps could not be refreshed.",
           );
       } finally {
-        clearTimeout(timeout);
         if (!cancelled && visible)
           timer = setTimeout(() => void load(), APPS_REFRESH_MS);
       }
@@ -220,7 +228,7 @@ function AppsHost({
     void load();
     return () => {
       cancelled = true;
-      controller?.abort();
+      controller.abort();
       clearTimeout(timer);
     };
   }, [owner, origin, cacheKey, visible, active]);
@@ -239,17 +247,23 @@ function AppsHost({
     setOpening(app.slug);
     setError(null);
     try {
-      const token = await getAuthTokenForSubject(owner);
-      if (!mounted.current || id !== request.current) return;
-      const response = await fetch(
-        `${origin}/owners/me/apps/${encodeURIComponent(app.slug)}/session`,
-        {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
-          signal: AbortSignal.timeout(60_000),
+      const { response, data } = await withDeadline(
+        { label: "Opening this app", timeoutMs: OPEN_APP_TIMEOUT_MS },
+        async (signal) => {
+          const response = await fetch(
+            `${origin}/owners/me/apps/${encodeURIComponent(app.slug)}/session`,
+            {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${await getAuthTokenForSubject(owner)}`,
+              },
+              signal,
+            },
+          );
+          return { response, data: await response.json() };
         },
       );
-      const data = await response.json();
+      if (!mounted.current || id !== request.current) return;
       if (
         !response.ok ||
         typeof data.url !== "string" ||

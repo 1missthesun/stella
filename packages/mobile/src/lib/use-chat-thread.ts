@@ -32,7 +32,6 @@ import {
 } from "./chat-attachments";
 import { getBackendClient } from "./backend";
 import { File } from "expo-file-system";
-import { fetch as expoFetch } from "expo/fetch";
 import { useT } from "../i18n/I18nProvider";
 import { hasAiConsent, requestAiConsent } from "./ai-consent";
 import {
@@ -305,7 +304,6 @@ export function useChatThread(opts: {
       void uploadChatAttachment(picked, taken, {
         client: getBackendClient(),
         readFile: async (uri) => await new File(uri).bytes(),
-        fetch: expoFetch,
       })
         .then((drivePath) => {
           setAttachments((current) =>

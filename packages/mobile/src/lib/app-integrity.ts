@@ -12,7 +12,9 @@ import { sha256 } from "@noble/hashes/sha2.js";
 import { utf8ToBytes } from "@noble/hashes/utils.js";
 import * as SecureStore from "./secure-store";
 import { Platform } from "react-native";
+import { REQUEST_BUDGET_MS, withDeadline } from "@stella/contracts/request-deadline";
 import { env } from "../config/env";
+import { fetchWithinDeadline } from "./cloud-request";
 
 const APP_ATTEST_KEY_ID_STORAGE_KEY = "stella-app-attest.key-id";
 const APP_ATTEST_ATTESTED_STORAGE_KEY = "stella-app-attest.attested";
@@ -54,13 +56,14 @@ const requestChallenge = async (
   purpose: AppIntegrityPurpose,
 ): Promise<AppIntegrityChallengeResponse> => {
   const body = { purpose } satisfies AppIntegrityChallengeRequest;
-  const response = await fetch(
+  const response = await fetchWithinDeadline(
     `${env.backendUrl}${APP_INTEGRITY_CHALLENGE_PATH}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     },
+    { label: "Starting app verification", timeoutMs: REQUEST_BUDGET_MS.call },
   );
   const value: unknown = await response.json().catch(() => null);
   if (!response.ok) {
@@ -79,20 +82,23 @@ const loadOrCreateAppAttestKeyId = async (): Promise<string> => {
   if (cachedAppAttestKeyId) return cachedAppAttestKeyId;
   if (appAttestKeyPromise) return await appAttestKeyPromise;
 
-  appAttestKeyPromise = (async () => {
-    const stored = (
-      await SecureStore.getItemAsync(APP_ATTEST_KEY_ID_STORAGE_KEY)
-    )?.trim();
-    if (stored) return stored;
+  appAttestKeyPromise = withDeadline(
+    { label: "Creating the App Attest key", timeoutMs: REQUEST_BUDGET_MS.call },
+    async () => {
+      const stored = (
+        await SecureStore.getItemAsync(APP_ATTEST_KEY_ID_STORAGE_KEY)
+      )?.trim();
+      if (stored) return stored;
 
-    const generated = (await AppIntegrity.generateKeyAsync()).trim();
-    if (!generated) {
-      throw new Error("App verification could not create an App Attest key.");
-    }
-    await SecureStore.setItemAsync(APP_ATTEST_KEY_ID_STORAGE_KEY, generated);
-    await SecureStore.deleteItemAsync(APP_ATTEST_ATTESTED_STORAGE_KEY);
-    return generated;
-  })();
+      const generated = (await AppIntegrity.generateKeyAsync()).trim();
+      if (!generated) {
+        throw new Error("App verification could not create an App Attest key.");
+      }
+      await SecureStore.setItemAsync(APP_ATTEST_KEY_ID_STORAGE_KEY, generated);
+      await SecureStore.deleteItemAsync(APP_ATTEST_ATTESTED_STORAGE_KEY);
+      return generated;
+    },
+  );
 
   try {
     cachedAppAttestKeyId = await appAttestKeyPromise;
@@ -127,8 +133,9 @@ const createIosProof = async (
 
 const preparePlayIntegrityProvider = async (): Promise<void> => {
   if (!playIntegrityProviderPromise) {
-    playIntegrityProviderPromise = AppIntegrity.prepareIntegrityTokenProviderAsync(
-      env.playIntegrityProjectNumber,
+    playIntegrityProviderPromise = withDeadline(
+      { label: "Preparing Play Integrity", timeoutMs: REQUEST_BUDGET_MS.call },
+      () => AppIntegrity.prepareIntegrityTokenProviderAsync(env.playIntegrityProjectNumber),
     ).catch((error: unknown) => {
       playIntegrityProviderPromise = null;
       throw error;
@@ -172,6 +179,9 @@ const createAndroidProof = async (
   return { platform: "android", purpose, nonce, token };
 };
 
+const withProofDeadline = (create: () => Promise<AppIntegrityProof>) =>
+  withDeadline({ label: "App verification", timeoutMs: REQUEST_BUDGET_MS.slow }, create);
+
 export const getAppIntegrityProof = async (
   purpose: AppIntegrityPurpose,
 ): Promise<string | undefined> => {
@@ -181,7 +191,7 @@ export const getAppIntegrityProof = async (
     if (!AppIntegrity.isSupported) return undefined;
     const challenge = await requestChallenge(purpose);
     return encodeAppIntegrityProof(
-      await createIosProof(purpose, challenge.nonce),
+      await withProofDeadline(() => createIosProof(purpose, challenge.nonce)),
     );
   }
 
@@ -189,7 +199,7 @@ export const getAppIntegrityProof = async (
     if (!env.playIntegrityProjectNumber) return undefined;
     const challenge = await requestChallenge(purpose);
     return encodeAppIntegrityProof(
-      await createAndroidProof(purpose, challenge.nonce),
+      await withProofDeadline(() => createAndroidProof(purpose, challenge.nonce)),
     );
   }
 

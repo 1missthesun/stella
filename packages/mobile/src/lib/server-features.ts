@@ -8,6 +8,7 @@ import {
   type ServerDiscovery,
   type ServerFeatures,
 } from "@stella/contracts/self-host";
+import { fetchWithinDeadline } from "./cloud-request";
 import { showComposerNotice } from "./composer-notice";
 import {
   isSelfHostedLaunch,
@@ -86,22 +87,17 @@ export const fetchServerDiscovery = async (
   origin: string,
   timeoutMs = 10_000,
 ): Promise<ServerDiscovery> => {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const response = await fetch(`${origin}${SELF_HOST_DISCOVERY_PATH}`, {
-      headers: { accept: "application/json" },
-      signal: controller.signal,
-    });
-    if (!response.ok) {
-      throw new Error(`no_discovery_${response.status}`);
-    }
-    const parsed = parseServerDiscovery(await response.json());
-    if (!parsed) throw new Error("not_a_stella_server");
-    return parsed;
-  } finally {
-    clearTimeout(timer);
+  const response = await fetchWithinDeadline(
+    `${origin}${SELF_HOST_DISCOVERY_PATH}`,
+    { headers: { accept: "application/json" } },
+    { label: "Checking your server", timeoutMs },
+  );
+  if (!response.ok) {
+    throw new Error(`no_discovery_${response.status}`);
   }
+  const parsed = parseServerDiscovery(await response.json());
+  if (!parsed) throw new Error("not_a_stella_server");
+  return parsed;
 };
 
 const appReleasedAt = (): string | null => {

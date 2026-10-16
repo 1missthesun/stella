@@ -70,6 +70,8 @@ import type {
 } from "@stella/contracts/device-file-reads";
 import { DeviceFolderView, formatFileSize } from "./DeviceFolderView";
 import { stellaFileChatArtifact } from "../lib/stella-file-links";
+import { fetchWithinDeadline } from "../lib/cloud-request";
+import { transferBudgetMs } from "@stella/contracts/request-deadline";
 import {
   embedRelativeHtmlAssets,
   rewriteRelativeMarkdownImages,
@@ -877,7 +879,11 @@ export function ArtifactViewerContent({
       }
       if (payload.kind === "canvas-html" && payload.driveBacked) {
         const uri = await resolveCloudDriveFileUri(payload.filePath);
-        const response = await fetch(uri, { signal: controller.signal });
+        const response = await fetchWithinDeadline(uri, undefined, {
+          label: "Loading this file from your Drive",
+          timeoutMs: transferBudgetMs(null),
+          signal: controller.signal,
+        });
         if (!response.ok) throw new Error("This file is no longer available.");
         return {
           kind: "canvas-html" as const,
@@ -891,7 +897,11 @@ export function ArtifactViewerContent({
         }
         const uri = await resolveCloudDriveFileUri(drivePath);
         const fetchText = async () => {
-          const response = await fetch(uri, { signal: controller.signal });
+          const response = await fetchWithinDeadline(uri, undefined, {
+          label: "Loading this file from your Drive",
+          timeoutMs: transferBudgetMs(null),
+          signal: controller.signal,
+        });
           if (!response.ok) throw new Error("This file is no longer available.");
           return response.text();
         };
@@ -915,7 +925,11 @@ export function ArtifactViewerContent({
           if (payload.asset.kind === "video") {
             return { kind: "video" as const, uri, posterUri: null };
           }
-          const response = await fetch(uri, { signal: controller.signal });
+          const response = await fetchWithinDeadline(uri, undefined, {
+          label: "Loading this file from your Drive",
+          timeoutMs: transferBudgetMs(null),
+          signal: controller.signal,
+        });
           if (!response.ok) throw new Error("This file is no longer available.");
           const contentType = response.headers.get("content-type") ?? "";
           if (/^(?:text\/|application\/(?:json|xml|javascript))/i.test(contentType)) {

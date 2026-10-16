@@ -1,8 +1,8 @@
 import { Platform, Share } from "react-native";
 import * as Sharing from "expo-sharing";
 import { Directory, File, Paths } from "expo-file-system";
-import { fetch as expoFetch } from "expo/fetch";
 import { getBackendClient } from "./backend";
+import { downloadFileWithinIdle } from "./cloud-request";
 import { locateDeviceFile } from "./linked-device-files";
 import { uploadChatAttachment } from "./chat-attachments";
 
@@ -17,7 +17,9 @@ export const namedLocalCopy = async (uri: string, name: string): Promise<string>
   directory.create({ intermediates: true, idempotent: true });
   const target = new File(directory, safeName(name || nameFromUri(uri)));
   if (/^https?:/i.test(uri)) {
-    const downloaded = await File.downloadFileAsync(uri, target, { idempotent: true });
+    const downloaded = await downloadFileWithinIdle(uri, target, {
+      label: "Downloading this file",
+    });
     return downloaded.uri;
   }
   const inline = /^data:[^,]*;base64,(.*)$/s.exec(uri);
@@ -74,7 +76,6 @@ const uploadToDrive = async (
     {
       client: getBackendClient(),
       readFile: async (path) => await new File(path).bytes(),
-      fetch: expoFetch,
     },
   );
 };

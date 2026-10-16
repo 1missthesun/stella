@@ -4,8 +4,10 @@ import { createAudioPlayer, type AudioPlayer } from "expo-audio";
 import { Alert } from "react-native";
 import { VOICE_TTS_STREAM_CANCEL_PATH } from "@stella/contracts/backend/voice";
 import type { BackendError } from "@stella/contracts/backend/protocol";
+import { REQUEST_BUDGET_MS, withDeadline } from "@stella/contracts/request-deadline";
 import { getAuthToken } from "./auth-token";
 import { getBackendClient } from "./backend";
+import { fetchWithinDeadline } from "./cloud-request";
 import { backendOrigin } from "./http";
 import { createPlaybackSessionHold } from "./mobile-audio-session";
 import { disposeAudioPlayer } from "./audio-player-disposal";
@@ -160,15 +162,19 @@ async function prepareReadAloudStream(
 function cancelStreamSession(ticket: string) {
   void (async () => {
     try {
-      const token = await getAuthToken();
-      await fetch(`${backendOrigin()}${VOICE_TTS_STREAM_CANCEL_PATH}`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ ticket }),
-      });
+      await withDeadline(
+        { label: "Stopping read-aloud", timeoutMs: REQUEST_BUDGET_MS.call },
+        async (signal) =>
+          await fetch(`${backendOrigin()}${VOICE_TTS_STREAM_CANCEL_PATH}`, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${await getAuthToken()}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ ticket }),
+            signal,
+          }),
+      );
     } catch {
       /* ignore */
     }
@@ -345,7 +351,15 @@ async function waitForPlaylistReady(uri: string, signal: AbortSignal) {
   while (!signal.aborted && Date.now() < deadline) {
     let delayMs = PLAYLIST_READY_POLL_MS;
     try {
-      const response = await fetch(uri, { signal, headers: { "cache-control": "no-cache" } });
+      const response = await fetchWithinDeadline(
+        uri,
+        { headers: { "cache-control": "no-cache" } },
+        {
+          label: "Preparing read-aloud",
+          timeoutMs: Math.min(REQUEST_BUDGET_MS.lookup, Math.max(0, deadline - Date.now())),
+          signal,
+        },
+      );
       if (response.ok) return;
       const body = (await response.json().catch(() => null)) as {
         error?: Partial<BackendError>;

@@ -748,13 +748,41 @@ impl ExtensionBridge {
         } else {
             DEFAULT_COMMAND_TIMEOUT_MS
         };
-        let mut response = send_to_generation(
+        let mut response = match send_to_generation_outcome(
             &self.inner,
             generation,
             forwarded.clone(),
             Duration::from_millis(timeout_ms),
         )
-        .await?;
+        .await
+        {
+            Ok(response) => response,
+            // The connection closed between choosing it and sending, so the
+            // command never reached the browser: send it once on whichever
+            // connection serves this browser now instead of failing on the
+            // dead one.
+            Err(SendFailure::NotSent(first)) => {
+                if let (Some(owner), None) = (owner, target) {
+                    self.wait_for_owner_browser(owner).await?;
+                }
+                let next = self
+                    .select_generation(owner, target, true)
+                    .await
+                    .map_err(|_| first.clone())?;
+                if next == generation {
+                    return Err(first);
+                }
+                generation = next;
+                send_to_generation(
+                    &self.inner,
+                    generation,
+                    forwarded.clone(),
+                    Duration::from_millis(timeout_ms),
+                )
+                .await?
+            }
+            Err(failure) => return Err(failure.into_message()),
+        };
         if guard_dialogs {
             if let Some(Value::Array(dialogs)) = self
                 .run_page_script(generation, &forwarded, "dialogs", DIALOG_GUARD, 1500)
@@ -892,12 +920,39 @@ fn not_connected_error(guard: &BridgeInner) -> String {
     })
 }
 
+/// Why a command did not get an answer: `NotSent` means it never reached the
+/// extension (its connection was already gone), so sending it again elsewhere
+/// is safe; `Unknown` means it may have run.
+enum SendFailure {
+    NotSent(String),
+    Unknown(String),
+}
+
+impl SendFailure {
+    fn into_message(self) -> String {
+        match self {
+            SendFailure::NotSent(message) | SendFailure::Unknown(message) => message,
+        }
+    }
+}
+
 async fn send_to_generation(
     inner: &Arc<Mutex<BridgeInner>>,
     generation: u64,
     command: Value,
     timeout: Duration,
 ) -> Result<Value, String> {
+    send_to_generation_outcome(inner, generation, command, timeout)
+        .await
+        .map_err(SendFailure::into_message)
+}
+
+async fn send_to_generation_outcome(
+    inner: &Arc<Mutex<BridgeInner>>,
+    generation: u64,
+    command: Value,
+    timeout: Duration,
+) -> Result<Value, SendFailure> {
     let id = command
         .get("id")
         .and_then(Value::as_str)
@@ -918,16 +973,16 @@ async fn send_to_generation(
         }
     }
     let line = serde_json::to_string(&Value::Object(message))
-        .map_err(|e| format!("Failed to serialize command: {}", e))?;
+        .map_err(|e| SendFailure::NotSent(format!("Failed to serialize command: {}", e)))?;
 
     let (tx, rx) = oneshot::channel();
     let label = {
         let mut guard = inner.lock().await;
         let Some(connection) = guard.connections.get(&generation) else {
-            return Err(
+            return Err(SendFailure::NotSent(
                 "Extension disconnected before the command was sent. Nothing was sent; retry."
                     .to_string(),
-            );
+            ));
         };
         let cmd_tx = connection.cmd_tx.clone();
         let label = connection.info.label();
@@ -936,10 +991,10 @@ async fn send_to_generation(
             .insert(id.clone(), PendingCommand { tx, generation });
         if cmd_tx.send(line).await.is_err() {
             remove_pending_for_generation(&mut guard, &id, generation);
-            return Err(
+            return Err(SendFailure::NotSent(
                 "Extension connection closed before the command was sent. Nothing was sent; retry."
                     .to_string(),
-            );
+            ));
         }
         label
     };
@@ -956,19 +1011,19 @@ async fn send_to_generation(
         Ok(Err(_)) => {
             let mut guard = inner.lock().await;
             remove_pending_for_generation(&mut guard, &id, generation);
-            Err(format!(
+            Err(SendFailure::Unknown(format!(
                 "Extension disconnected while waiting for the response from {}",
                 label
-            ))
+            )))
         }
         Err(_) => {
             let mut guard = inner.lock().await;
             remove_pending_for_generation(&mut guard, &id, generation);
-            Err(format!(
+            Err(SendFailure::Unknown(format!(
                 "{} did not answer within {}ms. The page may be blocked by a dialog (\"Leave site?\", alert or confirm) or busy. The outcome is unknown: check the tab before retrying a mutating action.",
                 label,
                 timeout.as_millis()
-            ))
+            )))
         }
     }
 }

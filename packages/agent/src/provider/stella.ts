@@ -2,20 +2,27 @@ import { anthropicMessagesApi } from "@earendil-works/pi-ai/api/anthropic-messag
 import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
 import { openAIResponsesApi } from "@earendil-works/pi-ai/api/openai-responses.lazy";
 import { createProvider, type Provider } from "@earendil-works/pi-ai/models";
-import type { Api, Model, ProviderStreams } from "@earendil-works/pi-ai";
+import {
+  createAssistantMessageEventStream,
+  type Api,
+  type AssistantMessage,
+  type AssistantMessageEventStream,
+  type Model,
+  type ProviderStreams,
+  type SimpleStreamOptions,
+} from "@earendil-works/pi-ai";
 import {
   GATEWAY_AGENT_TYPE_HEADER,
   GATEWAY_REQUEST_ID_HEADER,
   type GatewayProtocol,
 } from "@stella/contracts/gateway/api";
-import { REASONING_EFFORT_PASSTHROUGH } from "@stella/contracts/reasoning-effort";
+import { parseReasoningEffortLevel, REASONING_EFFORT_PASSTHROUGH } from "@stella/contracts/reasoning-effort";
 import { anthropicMessageToSse, chatCompletionToSse, responseToSse } from "./relay-sse.ts";
 
 export const STELLA_PROVIDER_ID = "stella";
 
 export const STELLA_FALLBACK_CONTEXT_WINDOW = 80_000;
 const STELLA_FALLBACK_MAX_TOKENS = 16_384;
-const STELLA_MAX_OUTPUT_TOKENS = 32_768;
 
 export type StellaAgentType = "orchestrator" | "general" | (string & {});
 
@@ -68,7 +75,7 @@ export function stellaModel(spec: StellaModelSpec, relayBaseUrl: string): Model<
     input: spec.supportsImages === false ? ["text"] : ["text", "image"],
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     contextWindow: spec.contextWindow ?? STELLA_FALLBACK_CONTEXT_WINDOW,
-    maxTokens: Math.min(spec.maxOutputTokens ?? STELLA_FALLBACK_MAX_TOKENS, STELLA_MAX_OUTPUT_TOKENS),
+    maxTokens: spec.maxOutputTokens ?? STELLA_FALLBACK_MAX_TOKENS,
     headers: { [GATEWAY_AGENT_TYPE_HEADER]: spec.agentType },
   } as Model<Api>;
 }
@@ -145,11 +152,64 @@ const routed = (relay: RelayFetch, sessionId: string | undefined): typeof fetch 
  */
 const unwindowed = <T extends { contextWindow: number }>(model: T): T => ({ ...model, contextWindow: 0 });
 
+const ranOutWhileThinking = (message: AssistantMessage): boolean =>
+  message.stopReason === "length" &&
+  !message.content.some((part) => part.type === "text" && part.text.trim() !== "");
+
+const RAN_OUT_WHILE_THINKING =
+  "The model ran out of room while thinking and wrote no answer. Try again, or pick a lower thinking level.";
+
+/**
+ * Reasoning shares the output ceiling with the answer, and effort-only APIs
+ * take no thinking cap, so a hard problem can end on `length` with nothing
+ * written. That response is asked again once at low effort; if that also
+ * ends empty, the turn fails with a message instead of ending silently.
+ */
+const answerAfterRunningOut = (
+  attempt: (options: SimpleStreamOptions | undefined) => AssistantMessageEventStream,
+  options: SimpleStreamOptions | undefined,
+): AssistantMessageEventStream => {
+  const requested = parseReasoningEffortLevel(options?.reasoning);
+  const retryWith: SimpleStreamOptions | undefined =
+    requested !== undefined && requested !== "low" ? { ...options, reasoning: "low" } : undefined;
+  const first = attempt(options);
+  const out = createAssistantMessageEventStream();
+  const ranOut = (message: AssistantMessage, errorMessage = RAN_OUT_WHILE_THINKING) =>
+    out.push({ type: "error", reason: "error", error: { ...message, stopReason: "error", errorMessage } });
+  const forward = async (events: AssistantMessageEventStream, retry: boolean) => {
+    for await (const event of events) {
+      if (retry && event.type === "start") continue;
+      if (event.type === "done" && ranOutWhileThinking(event.message)) return event.message;
+      out.push(event);
+    }
+    return undefined;
+  };
+  void (async () => {
+    const emptied = await forward(first, false);
+    if (emptied === undefined) return;
+    if (retryWith === undefined) return ranOut(emptied);
+    try {
+      const again = await forward(attempt(retryWith), true);
+      if (again !== undefined) ranOut(again);
+    } catch (error) {
+      ranOut(emptied, error instanceof Error ? error.message : String(error));
+    }
+  })().finally(() => out.end());
+  return out;
+};
+
 const withFetch = (streams: ProviderStreams, relay: RelayFetch): ProviderStreams => ({
   stream: (model, context, options) =>
     streams.stream(unwindowed(model), context, { ...options, fetch: routed(relay, options?.sessionId) }),
   streamSimple: (model, context, options) =>
-    streams.streamSimple(unwindowed(model), context, { ...options, fetch: routed(relay, options?.sessionId) }),
+    answerAfterRunningOut(
+      (attemptOptions) =>
+        streams.streamSimple(unwindowed(model), context, {
+          ...attemptOptions,
+          fetch: routed(relay, attemptOptions?.sessionId),
+        }),
+      options,
+    ),
 });
 
 export type StellaProviderOptions = {

@@ -92,6 +92,10 @@ export type DesktopJournal = {
   }): Promise<void>;
   tools?(update: { localTurnId: string; leaseToken: string; tools: JournalTool[] }): void;
   appendVoice(append: { appendId: string; role: "user" | "assistant"; payloadJson: string; hidden: boolean }): Promise<void>;
+  appendHistory?(append: {
+    appendId: string;
+    records: Array<{ role: "user" | "assistant"; payloadJson: string }>;
+  }): Promise<void>;
   relay?(message: RelayedMessage): Promise<void>;
 };
 

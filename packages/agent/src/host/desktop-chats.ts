@@ -52,11 +52,13 @@ import {
   piEntriesForClients,
   piMessageText,
   piEventsForClients,
+  piJournalUserMessage,
   piUserView,
   type PiChatEvent,
   type PiChatEventsPayload,
   type PiChatAgentsResult,
   type PiChatBrainResult,
+  type PiChatImportLocalResult,
   type PiChatMoveTarget,
   type PiChatOlderResult,
   type PiChatRequest,
@@ -151,6 +153,10 @@ const DIRECTORY_TIMEOUT_MS = 5_000;
 const AGENT_MESSAGE_TIMEOUT_MS = 15_000;
 const AGENT_REPORT_REQUEST_PREFIX = "agent-report:";
 const PROMPT_SCAN_PAGE = 200;
+// The cloud journal takes at most 256 rows and 4 MB per append.
+const IMPORT_BATCH_ROWS = 200;
+const IMPORT_BATCH_BYTES = 3 * 1024 * 1024;
+const IMPORT_RECORD_MAX_BYTES = 1024 * 1024;
 
 export type DesktopChatsOptions = {
   dataDir: string;
@@ -711,7 +717,11 @@ export function desktopChats(options: DesktopChatsOptions) {
   const ensureGateway = () =>
     (gateway ??= (async () => {
       const site = options.siteAuth();
-      if (!site) throw new Error("Sign in to Stella to chat.");
+      if (!site) {
+        throw new Error(
+          "Stella models need a Stella account. Sign in to use them, or choose Claude Code, ChatGPT, an API key or a local model.",
+        );
+      }
       const baseUrl = site.baseUrl.replace(/\/+$/, "");
       const catalog = (await (
         await fetchWithDeadline(fetch, `${baseUrl}/api/stella/models`, {}, {
@@ -968,7 +978,8 @@ export function desktopChats(options: DesktopChatsOptions) {
       try {
         return await ensureProvider(alias);
       } catch (error) {
-        if (attempt === 0) options.report(error);
+        // Signed out, Stella's models wait quietly for an account; the user can chat on their own engine meanwhile.
+        if (attempt === 0 && options.siteAuth()) options.report(error);
         await new Promise((resolve) => setTimeout(resolve, PROVIDER_RETRY_MS));
       }
     }
@@ -1545,6 +1556,66 @@ export function desktopChats(options: DesktopChatsOptions) {
       },
       context,
     );
+  };
+
+  /**
+   * Copies what was said in a chat kept on this computer into an account
+   * conversation: the user's messages and Stella's written replies, without
+   * tool steps. Batches are idempotent, so a retry never duplicates.
+   */
+  const importLocal = async (conversationId: string, fromConversationId: string): Promise<PiChatImportLocalResult> => {
+    if (!fromConversationId.startsWith("local_") || conversationId.startsWith("local_")) {
+      throw new Error("Only a chat kept on this computer can be copied to your account.");
+    }
+    const journal = options.journal?.(conversationId);
+    if (!journal?.appendHistory) throw new Error("Sign in to sync this chat.");
+    const source = await open(fromConversationId);
+    const records: Array<{ role: "user" | "assistant"; payloadJson: string }> = [];
+    await source.harness.commit(async (tx) => {
+      let cursor: Parameters<typeof tx.scanEntries>[2];
+      do {
+        const page = await tx.scanEntries({ conversationId: source.root.id, order: "ascending" }, HISTORY_PAGE, cursor);
+        for (const entry of page.items) {
+          const message = entry.model?.[0];
+          if (!message || (entry.data as { localOnly?: unknown } | undefined)?.localOnly === true) continue;
+          if (entry.kind === "pi.user" && message.role === "user") {
+            const journaled = piJournalUserMessage(message as PiUserMessage);
+            if (journaled.hidden) continue;
+            let payloadJson = JSON.stringify(journaled.message);
+            if (payloadJson.length > IMPORT_RECORD_MAX_BYTES) {
+              const text = piUserView(message as PiUserMessage).text;
+              if (!text.trim()) continue;
+              payloadJson = JSON.stringify({ role: "user", content: text, timestamp: message.timestamp });
+            }
+            records.push({ role: "user", payloadJson });
+          } else if (entry.kind === "pi.assistant" && message.role === "assistant") {
+            const content = message.content.filter((part) => part.type === "text" && part.text.trim());
+            if (content.length === 0) continue;
+            const payloadJson = JSON.stringify({ ...message, content });
+            if (payloadJson.length > IMPORT_RECORD_MAX_BYTES) continue;
+            records.push({ role: "assistant", payloadJson });
+          }
+        }
+        cursor = page.next;
+      } while (cursor !== undefined);
+    }, context);
+    let batch: typeof records = [];
+    let bytes = 0;
+    let index = 0;
+    const flush = async () => {
+      if (batch.length === 0) return;
+      await journal.appendHistory!({ appendId: `import:${fromConversationId}:${index}`, records: batch });
+      index += 1;
+      batch = [];
+      bytes = 0;
+    };
+    for (const record of records) {
+      if (batch.length >= IMPORT_BATCH_ROWS || bytes + record.payloadJson.length > IMPORT_BATCH_BYTES) await flush();
+      batch.push(record);
+      bytes += record.payloadJson.length;
+    }
+    await flush();
+    return { imported: records.length };
   };
 
   const linkedFiles = async (conversationId: string): Promise<{ paths: string[] }> => {
@@ -2180,6 +2251,8 @@ export function desktopChats(options: DesktopChatsOptions) {
           return brainPlacement(request.conversationId);
         case "move":
           return moveBrain(request.conversationId, request.target);
+        case "importLocal":
+          return importLocal(request.conversationId, request.fromConversationId);
       }
     },
     async terminateCommands(): Promise<void> {

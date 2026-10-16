@@ -201,7 +201,11 @@ export type PiChatRequest =
       conversationId: string;
       fresh?: boolean;
     }
-  | { op: "move"; conversationId: string; target: PiChatMoveTarget };
+  | { op: "move"; conversationId: string; target: PiChatMoveTarget }
+  /** Copy a chat kept on this computer into an account conversation, once the user chose to sync it. */
+  | { op: "importLocal"; conversationId: string; fromConversationId: string };
+
+export type PiChatImportLocalResult = { imported: number };
 
 export type PiChatMoveTarget = { mode: "automatic" } | { mode: "cloud" } | { mode: "device"; deviceId: string };
 

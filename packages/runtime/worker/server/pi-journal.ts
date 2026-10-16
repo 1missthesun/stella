@@ -311,6 +311,13 @@ export const cloudJournalFor = (
         })
         .catch(() => undefined);
     },
+    appendHistory: async ({ appendId, records }) => {
+      await runner().cloudJournal.append({
+        conversationId,
+        appendId,
+        records: records.map((record) => ({ kind: "message", ...record })),
+      });
+    },
     appendVoice: async (said) => {
       await runner().cloudJournal.append({
         conversationId,

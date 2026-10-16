@@ -59,6 +59,7 @@ import {
 import { pruneAgentHistory } from "./prune-history.js";
 import { createNativeTranscript } from "./native-transcript.js";
 import { claudeCodeTranscript } from "@stella/runtime/kernel/integrations/claude-code-transcript.js";
+import { CLAUDE_CODE_MCP_TOOL_IDLE_TIMEOUT_MS } from "@stella/runtime/kernel/integrations/claude-code-mcp-timeouts.js";
 import {
   assertFreshNativeState,
   assertNativeState,
@@ -464,15 +465,15 @@ export const CLOUD_ORCHESTRATOR_CLI_CWD = path.join(
 );
 
 /**
- * An orchestrator tool call is one held broker request (BuildSession -> DO)
- * that sends no MCP progress while the DO runs the tool, which may wait on a
- * user approval. Claude Code aborts a silent HTTP MCP call after 5
- * minutes (`CLAUDE_CODE_MCP_TOOL_IDLE_TIMEOUT` default 300000) and has a
- * ~28 h hard cap (`MCP_TOOL_TIMEOUT` default 1e8). Both are set to 30
- * minutes: the turn's broker capability (TURN_BROKER_MAX_TTL_MS) and gateway
- * capability expire by then anyway, so the CLI never gives up on a tool the
- * DO is still running and journaling, and the turn's own bounds (DO watchdog,
- * BuildSession cancel ladder) stay the ones that end a wedged call.
+ * Claude Code aborts an HTTP MCP call silent for
+ * `CLAUDE_CODE_MCP_TOOL_IDLE_TIMEOUT` (default 5 minutes) and has a ~28 h hard
+ * cap (`MCP_TOOL_TIMEOUT`). Every role gets Stella's shared idle budget
+ * (`CLAUDE_CODE_MCP_TOOL_IDLE_TIMEOUT_MS`, as on the desktop) and the MCP
+ * host's progress heartbeats. An orchestrator call is a held broker request
+ * (BuildSession -> DO) whose broker and gateway capabilities expire by 30
+ * minutes (TURN_BROKER_MAX_TTL_MS), so its hard cap is 30 minutes and the
+ * turn's own bounds (DO watchdog, BuildSession cancel ladder) end a wedged
+ * call.
  */
 export const CLOUD_ORCHESTRATOR_MCP_TOOL_TIMEOUT_MS = 30 * 60_000;
 
@@ -560,12 +561,11 @@ export const buildClaudeChildEnv = (options: {
     childEnv.CLAUDE_CODE_EFFORT_LEVEL = "unset";
   }
   delete childEnv.MCP_TOOL_TIMEOUT;
-  delete childEnv.CLAUDE_CODE_MCP_TOOL_IDLE_TIMEOUT;
+  childEnv.CLAUDE_CODE_MCP_TOOL_IDLE_TIMEOUT = String(
+    CLAUDE_CODE_MCP_TOOL_IDLE_TIMEOUT_MS,
+  );
   if (options.mcpToolTimeoutMs !== undefined) {
     childEnv.MCP_TOOL_TIMEOUT = String(options.mcpToolTimeoutMs);
-    childEnv.CLAUDE_CODE_MCP_TOOL_IDLE_TIMEOUT = String(
-      options.mcpToolTimeoutMs,
-    );
   }
   delete childEnv.CLAUDE_CODE_AUTO_COMPACT_WINDOW;
   delete childEnv.CLAUDE_AUTOCOMPACT_PCT_OVERRIDE;

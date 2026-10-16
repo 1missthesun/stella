@@ -5,12 +5,16 @@ import type { Socket } from "node:net";
 
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import type { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js";
 import {
   CallToolRequestSchema,
   ErrorCode,
   ListToolsRequestSchema,
   McpError,
+  type CallToolRequest,
   type CallToolResult,
+  type ServerNotification,
+  type ServerRequest,
 } from "@modelcontextprotocol/sdk/types.js";
 
 import type {
@@ -30,13 +34,70 @@ import {
   sanitizeToolResult,
   sanitizeToolVisibleText,
 } from "../tools/safety.js";
-import { forkCancelableTimeout } from "./effect-runtime.js";
+import {
+  forkCancelableInterval,
+  forkCancelableTimeout,
+} from "./effect-runtime.js";
 import { claudeCodePostToolUseHookResponse } from "./claude-code-output-redaction.js";
+import { CLAUDE_CODE_MCP_PROGRESS_HEARTBEAT_MS } from "./claude-code-mcp-timeouts.js";
 
 const HOST = "127.0.0.1";
+
+type CallToolExtra = RequestHandlerExtra<ServerRequest, ServerNotification>;
 const MAX_TOOL_RESULT_CHARS = 80_000;
 const MAX_SETTLED_CALL_LEDGER_ENTRIES = 512;
 const MAX_HOOK_BODY_BYTES = 32 * 1024 * 1024;
+
+const formatElapsed = (ms: number): string => {
+  const seconds = Math.max(0, Math.round(ms / 1000));
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  const rest = seconds % 60;
+  return rest ? `${minutes}m ${rest}s` : `${minutes}m`;
+};
+
+type ProgressNotification = {
+  method: "notifications/progress";
+  params: {
+    progressToken: string | number;
+    progress: number;
+    message: string;
+  };
+};
+
+/**
+ * Progress for one tool call: tool updates as they come, and a heartbeat when
+ * nothing else was sent for half the interval. Without a progress token the
+ * client asked for no progress, so nothing is sent.
+ */
+const startCallProgress = (
+  progressToken: string | number | undefined,
+  send: (notification: ProgressNotification) => Promise<void>,
+  heartbeatMs: number,
+): { update: (message: string) => void; stop: () => void } => {
+  if (progressToken === undefined) {
+    return { update: () => undefined, stop: () => undefined };
+  }
+  const startedAt = Date.now();
+  let lastSentAt = startedAt;
+  let progress = 0;
+  const update = (message: string) => {
+    progress += 1;
+    lastSentAt = Date.now();
+    void send({
+      method: "notifications/progress",
+      params: { progressToken, progress, message },
+    }).catch(() => undefined);
+  };
+  const stop =
+    heartbeatMs > 0
+      ? forkCancelableInterval(heartbeatMs, () => {
+          if (Date.now() - lastSentAt < heartbeatMs / 2) return;
+          update(`Still running (${formatElapsed(Date.now() - startedAt)})`);
+        })
+      : () => undefined;
+  return { update, stop };
+};
 
 export type ClaudeCodeToolMcpActiveTurn = {
   identityScope?: string;
@@ -97,6 +158,8 @@ export type CreateClaudeCodeToolMcpHostOptions = {
   tools: readonly ToolMetadata[];
   identityScope?: string;
   allowLegacyImagePathReopen?: boolean;
+  /** Defaults to `CLAUDE_CODE_MCP_PROGRESS_HEARTBEAT_MS`; <= 0 sends none. */
+  progressHeartbeatMs?: number;
   getActiveTurn: () =>
     | ClaudeCodeToolMcpActiveTurn
     | undefined
@@ -284,6 +347,8 @@ export const createClaudeCodeToolMcpHost = async (
 ): Promise<ClaudeCodeToolMcpHost> => {
   const allowLegacyImagePathReopen =
     options.allowLegacyImagePathReopen !== false;
+  const progressHeartbeatMs =
+    options.progressHeartbeatMs ?? CLAUDE_CODE_MCP_PROGRESS_HEARTBEAT_MS;
   const tools = options.tools.map((tool) => ({
     name: tool.name,
     description: tool.description,
@@ -349,194 +414,194 @@ export const createClaudeCodeToolMcpHost = async (
     mcpServer.setRequestHandler(
       CallToolRequestSchema,
       async (request, extra) => {
-        if (!names.has(request.params.name)) {
-          throw new McpError(
-            ErrorCode.InvalidParams,
-            `Tool is not available in this Stella session: ${request.params.name}`,
-          );
-        }
-        const turn = await awaitWithAbort(
-          Promise.resolve(options.getActiveTurn()),
-          extra.signal,
+        const progress = startCallProgress(
+          request.params._meta?.progressToken,
+          (notification) => extra.sendNotification(notification),
+          progressHeartbeatMs,
         );
-        const integrityCheck = turn?.checkToolUseIntegrity?.(
-          request.params.name,
-          request.params.arguments ?? {},
-          extra.signal,
-        );
-        const truncation = integrityCheck
-          ? await awaitWithAbort(integrityCheck, extra.signal)
-          : undefined;
-        if (truncation) {
-          throw new McpError(
-            ErrorCode.InvalidParams,
-            `Refusing ${request.params.name}: your stream ended with ` +
-              `stop_reason "${truncation.stopReason}" while these arguments ` +
-              `were still being written, so they are cut off mid-value and ` +
-              `were NOT executed. Reissue the call with complete arguments` +
-              `${truncation.explanation ? ` (${truncation.explanation})` : ""}.`,
-          );
+        try {
+          return await callTool(request, extra, progress.update);
+        } finally {
+          progress.stop();
         }
-        const clientSessionId = extra.sessionId ?? "stateless";
-        const durableScope = crypto
-          .createHash("sha256")
-          .update(turn?.identityScope ?? options.identityScope ?? "unscoped")
-          .digest("hex")
-          .slice(0, 24);
-        const canonicalRequestHash = crypto
-          .createHash("sha256")
-          .update(request.params.name)
-          .update("\0")
-          .update(stableJson(request.params.arguments ?? {}))
-          .digest("hex");
-        const claimNativeId =
-          turn?.nativeToolCallIds === true && turn.claimNativeToolUseId
-            ? turn.claimNativeToolUseId
-            : undefined;
-        const durableImageGen =
-          request.params.name === "image_gen" && !claimNativeId;
-        const nativeToolUseId =
-          durableImageGen && turn?.claimNativeToolUseId
-            ? await awaitWithAbort(
-                turn.claimNativeToolUseId(
-                  request.params.name,
-                  request.params.arguments ?? {},
-                  extra.signal,
-                ),
-                extra.signal,
-              )
-            : undefined;
-        if (durableImageGen && !nativeToolUseId) {
-          throw new McpError(
-            ErrorCode.InternalError,
-            "Claude did not expose a durable tool_use identity for image_gen; refusing an unsafe submission.",
-          );
-        }
-        let toolCallId = nativeToolUseId
-          ? `claude:${durableScope}:${nativeToolUseId}:${canonicalRequestHash.slice(0, 24)}`
-          : `mcp:${clientSessionId}:${String(extra.requestId)}`;
-        const ledgerKey = durableImageGen
-          ? `${durableScope}:${nativeToolUseId}:${request.params.name}:${canonicalRequestHash}`
-          : `${clientSessionId}:${String(extra.requestId)}:${request.params.name}`;
-        const registerDeliveryAcknowledgement = () => {
-          if (request.params.name !== "image_gen") return;
-          const acknowledgement = turn?.onToolResponseWritten;
-          const delivery = responseDelivery.getStore();
-          if (!acknowledgement || !delivery) return;
-          delivery.acknowledgements.add(() =>
-            acknowledgement({
-              toolCallId,
-              toolName: request.params.name,
-            }),
-          );
-        };
-        const previous = callLedger.get(ledgerKey);
-        if (previous) {
-          const result = await awaitWithAbort(previous, extra.signal);
-          registerDeliveryAcknowledgement();
-          return result;
-        }
-
-        const execution = (async (): Promise<CallToolResult> => {
-          if (!turn) {
-            return {
-              content: [
-                {
-                  type: "text",
-                  text: "No Stella turn is active for this tool call.",
-                },
-              ],
-              isError: true,
-            };
-          }
-
-          const callSignal = AbortSignal.any([
-            extra.signal,
-            callGeneration.signal,
-          ]);
-
-          let progress = 0;
-          const progressToken = request.params._meta?.progressToken;
-          const onUpdate: ToolUpdateCallback = (update) => {
-            turn.onToolUpdate?.({
-              toolCallId,
-              toolName: request.params.name,
-              update,
-            });
-            if (progressToken !== undefined) {
-              progress += 1;
-              void extra
-                .sendNotification({
-                  method: "notifications/progress",
-                  params: {
-                    progressToken,
-                    progress,
-                    message: summarizeUpdate(update),
-                  },
-                })
-                .catch(() => undefined);
-            }
-          };
-
-          try {
-            if (claimNativeId) {
-              toolCallId = await awaitWithAbort(
-                claimNativeId(
-                  request.params.name,
-                  request.params.arguments ?? {},
-                  callSignal,
-                ),
-                callSignal,
-              );
-            }
-            const result = await awaitWithAbort(
-              turn.executeTool(
-                toolCallId,
-                request.params.name,
-                request.params.arguments ?? {},
-                callSignal,
-                onUpdate,
-              ),
-              callSignal,
-            );
-            turn.onToolResult?.({
-              toolCallId,
-              toolName: request.params.name,
-              result,
-            });
-            return await awaitWithAbort(
-              toolResultToMcp(result, { allowLegacyImagePathReopen }),
-              callSignal,
-            );
-          } catch (error) {
-            if (callSignal.aborted) throw error;
-            return {
-              content: [
-                {
-                  type: "text",
-                  text: toolErrorText(error),
-                },
-              ],
-              isError: true,
-            };
-          }
-        })();
-        callLedger.set(ledgerKey, execution);
-        void execution.then(
-          () => {
-            settledCallLedgerKeys.add(ledgerKey);
-            trimCallLedger();
-          },
-          () => {
-            settledCallLedgerKeys.add(ledgerKey);
-            trimCallLedger();
-          },
-        );
-        const result = await execution;
-        registerDeliveryAcknowledgement();
-        return result;
       },
     );
+  };
+
+  const callTool = async (
+    request: CallToolRequest,
+    extra: CallToolExtra,
+    reportProgress: (message: string) => void,
+  ): Promise<CallToolResult> => {
+    if (!names.has(request.params.name)) {
+      throw new McpError(
+        ErrorCode.InvalidParams,
+        `Tool is not available in this Stella session: ${request.params.name}`,
+      );
+    }
+    const turn = await awaitWithAbort(
+      Promise.resolve(options.getActiveTurn()),
+      extra.signal,
+    );
+    const integrityCheck = turn?.checkToolUseIntegrity?.(
+      request.params.name,
+      request.params.arguments ?? {},
+      extra.signal,
+    );
+    const truncation = integrityCheck
+      ? await awaitWithAbort(integrityCheck, extra.signal)
+      : undefined;
+    if (truncation) {
+      throw new McpError(
+        ErrorCode.InvalidParams,
+        `Refusing ${request.params.name}: your stream ended with ` +
+          `stop_reason "${truncation.stopReason}" while these arguments ` +
+          `were still being written, so they are cut off mid-value and ` +
+          `were NOT executed. Reissue the call with complete arguments` +
+          `${truncation.explanation ? ` (${truncation.explanation})` : ""}.`,
+      );
+    }
+    const clientSessionId = extra.sessionId ?? "stateless";
+    const durableScope = crypto
+      .createHash("sha256")
+      .update(turn?.identityScope ?? options.identityScope ?? "unscoped")
+      .digest("hex")
+      .slice(0, 24);
+    const canonicalRequestHash = crypto
+      .createHash("sha256")
+      .update(request.params.name)
+      .update("\0")
+      .update(stableJson(request.params.arguments ?? {}))
+      .digest("hex");
+    const claimNativeId =
+      turn?.nativeToolCallIds === true && turn.claimNativeToolUseId
+        ? turn.claimNativeToolUseId
+        : undefined;
+    const durableImageGen =
+      request.params.name === "image_gen" && !claimNativeId;
+    const nativeToolUseId =
+      durableImageGen && turn?.claimNativeToolUseId
+        ? await awaitWithAbort(
+            turn.claimNativeToolUseId(
+              request.params.name,
+              request.params.arguments ?? {},
+              extra.signal,
+            ),
+            extra.signal,
+          )
+        : undefined;
+    if (durableImageGen && !nativeToolUseId) {
+      throw new McpError(
+        ErrorCode.InternalError,
+        "Claude did not expose a durable tool_use identity for image_gen; refusing an unsafe submission.",
+      );
+    }
+    let toolCallId = nativeToolUseId
+      ? `claude:${durableScope}:${nativeToolUseId}:${canonicalRequestHash.slice(0, 24)}`
+      : `mcp:${clientSessionId}:${String(extra.requestId)}`;
+    const ledgerKey = durableImageGen
+      ? `${durableScope}:${nativeToolUseId}:${request.params.name}:${canonicalRequestHash}`
+      : `${clientSessionId}:${String(extra.requestId)}:${request.params.name}`;
+    const registerDeliveryAcknowledgement = () => {
+      if (request.params.name !== "image_gen") return;
+      const acknowledgement = turn?.onToolResponseWritten;
+      const delivery = responseDelivery.getStore();
+      if (!acknowledgement || !delivery) return;
+      delivery.acknowledgements.add(() =>
+        acknowledgement({
+          toolCallId,
+          toolName: request.params.name,
+        }),
+      );
+    };
+    const previous = callLedger.get(ledgerKey);
+    if (previous) {
+      const result = await awaitWithAbort(previous, extra.signal);
+      registerDeliveryAcknowledgement();
+      return result;
+    }
+
+    const execution = (async (): Promise<CallToolResult> => {
+      if (!turn) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: "No Stella turn is active for this tool call.",
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      const callSignal = AbortSignal.any([extra.signal, callGeneration.signal]);
+
+      const onUpdate: ToolUpdateCallback = (update) => {
+        turn.onToolUpdate?.({
+          toolCallId,
+          toolName: request.params.name,
+          update,
+        });
+        reportProgress(summarizeUpdate(update));
+      };
+
+      try {
+        if (claimNativeId) {
+          toolCallId = await awaitWithAbort(
+            claimNativeId(
+              request.params.name,
+              request.params.arguments ?? {},
+              callSignal,
+            ),
+            callSignal,
+          );
+        }
+        const result = await awaitWithAbort(
+          turn.executeTool(
+            toolCallId,
+            request.params.name,
+            request.params.arguments ?? {},
+            callSignal,
+            onUpdate,
+          ),
+          callSignal,
+        );
+        turn.onToolResult?.({
+          toolCallId,
+          toolName: request.params.name,
+          result,
+        });
+        return await awaitWithAbort(
+          toolResultToMcp(result, { allowLegacyImagePathReopen }),
+          callSignal,
+        );
+      } catch (error) {
+        if (callSignal.aborted) throw error;
+        return {
+          content: [
+            {
+              type: "text",
+              text: toolErrorText(error),
+            },
+          ],
+          isError: true,
+        };
+      }
+    })();
+    callLedger.set(ledgerKey, execution);
+    void execution.then(
+      () => {
+        settledCallLedgerKeys.add(ledgerKey);
+        trimCallLedger();
+      },
+      () => {
+        settledCallLedgerKeys.add(ledgerKey);
+        trimCallLedger();
+      },
+    );
+    const result = await execution;
+    registerDeliveryAcknowledgement();
+    return result;
   };
 
   type McpClientSession = {

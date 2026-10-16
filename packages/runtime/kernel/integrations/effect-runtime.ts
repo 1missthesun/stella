@@ -26,3 +26,25 @@ export const forkCancelableTimeout = (
   };
 };
 
+export const forkCancelableInterval = (
+  intervalMs: number,
+  onTick: () => void,
+): (() => void) => {
+  let stopped = false;
+  let cancelNext: (() => void) | undefined;
+  const arm = () => {
+    cancelNext = forkCancelableTimeout(intervalMs, () => {
+      if (stopped) return;
+      try {
+        onTick();
+      } finally {
+        if (!stopped) arm();
+      }
+    });
+  };
+  arm();
+  return () => {
+    stopped = true;
+    cancelNext?.();
+  };
+};

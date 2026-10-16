@@ -200,7 +200,7 @@ export class BackendClient {
         }
       },
       {
-        attempts: idempotent ? 3 : 1,
+        attempts: idempotent ? 2 : 1,
         signal: options.signal,
         shouldRetry: (error) =>
           error instanceof BackendRequestError &&

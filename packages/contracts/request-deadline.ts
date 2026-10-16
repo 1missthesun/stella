@@ -12,7 +12,7 @@ export const REQUEST_BUDGET_MS = {
 const MIN_TRANSFER_BYTES_PER_SECOND = 128 * 1024;
 
 export const transferBudgetMs = (bytes: number | null | undefined): number =>
-  REQUEST_BUDGET_MS.transferIdle +
+  REQUEST_BUDGET_MS.call +
   Math.ceil((Math.max(0, bytes ?? 0) / MIN_TRANSFER_BYTES_PER_SECOND) * 1000);
 
 export class RequestTimeoutError extends Error {
@@ -379,7 +379,7 @@ export const putSignedUpload = async (args: {
       }
       return response;
     },
-    { attempts: 3, signal: args.signal },
+    { attempts: 2, signal: args.signal },
   ).catch((error: unknown) => {
     const response = (error as { response?: unknown })?.response;
     if (response instanceof Response) return response;

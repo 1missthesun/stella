@@ -14,14 +14,25 @@ const fail = (message) => {
   process.exit(2);
 };
 
+const runAccount = () => {
+  const runName = process.env.STELLA_VERIFY_RUN?.trim();
+  const pointer = path.join(skillRoot, ".run", runName ? `current-${runName}.json` : "current.json");
+  return existsSync(pointer) ? (JSON.parse(readFileSync(pointer, "utf8"))?.account ?? {}) : {};
+};
+
 const accountEmail = () => {
   const explicit = process.env.STELLA_VERIFY_ACCOUNT_EMAIL?.trim();
   if (explicit) return explicit;
-  const runName = process.env.STELLA_VERIFY_RUN?.trim();
-  const pointer = path.join(skillRoot, ".run", runName ? `current-${runName}.json` : "current.json");
-  const email = existsSync(pointer) ? JSON.parse(readFileSync(pointer, "utf8"))?.account?.email : "";
+  const email = runAccount().email;
   if (!email) fail("No account: set STELLA_VERIFY_ACCOUNT_EMAIL or launch a desktop run with --account.");
   return email;
+};
+
+// Re-minting the session sets the account's plan, so keep the run's own plan
+// (a Free run stays Free); STELLA_VERIFY_PLAN overrides, default pro.
+const accountPlan = () => {
+  const plan = process.env.STELLA_VERIFY_PLAN?.trim() || (process.env.STELLA_VERIFY_ACCOUNT_EMAIL ? "" : runAccount().plan) || "pro";
+  return plan === "free" ? { plan } : { plan, usageMode: "unlimited" };
 };
 
 const mintJwt = async () => {
@@ -30,7 +41,7 @@ const mintJwt = async () => {
   const response = await fetch(`${backend}/api/admin/test-accounts/session`, {
     method: "POST",
     headers: { authorization: `Bearer ${secret}`, "content-type": "application/json" },
-    body: JSON.stringify({ email: accountEmail(), plan: "pro", usageMode: "unlimited" }),
+    body: JSON.stringify({ email: accountEmail(), ...accountPlan() }),
   });
   const payload = await response.json().catch(() => null);
   if (!response.ok || !payload?.token) fail(`Test account mint returned HTTP ${response.status}: ${payload?.error ?? ""}`);

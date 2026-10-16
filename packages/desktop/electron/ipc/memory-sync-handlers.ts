@@ -2,6 +2,7 @@ import {
   IPC_MEMORY_SYNC_ERASE_LOCAL,
   IPC_MEMORY_SYNC_GET_STATUS,
   IPC_MEMORY_SYNC_NOW,
+  IPC_MEMORY_SYNC_SET_HELD,
 } from "@stella/contracts/desktop/ipc-channels";
 import type { MemorySyncService } from "../services/memory-sync/memory-sync-service.js";
 import {
@@ -20,5 +21,8 @@ export const registerMemorySyncHandlers = (
   );
   registerPrivilegedHandle(options, IPC_MEMORY_SYNC_ERASE_LOCAL, () =>
     options.service.eraseLocal(),
+  );
+  registerPrivilegedHandle(options, IPC_MEMORY_SYNC_SET_HELD, (_event, payload) =>
+    options.service.setHeld(payload?.held !== false),
   );
 };

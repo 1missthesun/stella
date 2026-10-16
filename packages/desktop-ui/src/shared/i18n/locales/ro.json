@@ -913,9 +913,9 @@
     "localMode": {
       "authNote": "Conectarea îți aduce modelele Stella, aplicația de telefon, Drive, sarcini în cloud și sincronizare între dispozitive. Conversațiile tale rămân pe acest computer până alegi tu.",
       "banner": "Conversațiile tale rămân pe acest computer. Conectează-te pentru modelele Stella, aplicația de telefon, Drive, sarcini în cloud și sincronizare.",
-      "choiceBody": "Ai conversat înainte să te conectezi, așa că acea conversație este doar pe acest computer. Sincronizeaz-o cu contul tău ca să o vezi pe telefon și pe alte dispozitive sau păstreaz-o aici.",
+      "choiceBody": "Ai folosit Stella înainte să te conectezi, așa că acea conversație și ce își amintește Stella sunt doar pe acest computer. Sincronizează-le cu contul tău ca să le vezi pe telefon și pe alte dispozitive sau păstrează-le aici.",
       "choiceFailed": "Alegerea nu a putut fi salvată. Încearcă din nou.",
-      "choiceTitle": "Sincronizezi conversația?",
+      "choiceTitle": "Sincronizezi conversația și memoria?",
       "keep": "Păstrează pe acest computer",
       "needsAccount": "Funcționează în cloudul Stella, deci are nevoie de un cont Stella.",
       "sync": "Sincronizează cu contul meu",
@@ -1859,6 +1859,7 @@
         "memory": {
           "error": "Sincronizarea nu a reușit acum. Stella va încerca din nou.",
           "failedFiles": "Nesincronizat: {files}",
+          "heldLocal": "Păstrată pe acest computer. Activează istoricul conversațiilor în cloud ca s-o sincronizezi.",
           "heldOtherAccount": "Memoria acestui computer se sincronizează cu alt cont Stella, așa că rămâne în afara acestuia.",
           "heldWiped": "Întrerupt. Memoria din cloud a fost ștearsă, iar acest computer are încă memorie de dinainte. Alege mai jos ce se întâmplă cu ea.",
           "lastSynced": "Ultima sincronizare: {time}.",

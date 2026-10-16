@@ -913,9 +913,9 @@
     "localMode": {
       "authNote": "Ao entrar, você ganha os modelos da Stella, o app do celular, o Drive, tarefas na nuvem e sincronização entre dispositivos. Suas conversas ficam neste computador até você decidir.",
       "banner": "Suas conversas ficam neste computador. Entre para usar os modelos da Stella, o app do celular, o Drive, tarefas na nuvem e sincronização.",
-      "choiceBody": "Você conversou antes de entrar, então essa conversa está só neste computador. Sincronize com sua conta para vê-la no celular e em outros dispositivos, ou mantenha aqui.",
+      "choiceBody": "Você usou a Stella antes de entrar, então essa conversa e o que a Stella lembra estão só neste computador. Sincronize-os com sua conta para vê-los no celular e em outros dispositivos, ou mantenha-os aqui.",
       "choiceFailed": "Não foi possível salvar essa escolha. Tente de novo.",
-      "choiceTitle": "Sincronizar sua conversa?",
+      "choiceTitle": "Sincronizar sua conversa e memória?",
       "keep": "Manter neste computador",
       "needsAccount": "Isso roda na nuvem da Stella, então precisa de uma conta Stella.",
       "sync": "Sincronizar com minha conta",
@@ -1859,6 +1859,7 @@
         "memory": {
           "error": "Não foi possível sincronizar agora. A Stella tentará novamente.",
           "failedFiles": "Não sincronizado: {files}",
+          "heldLocal": "Guardada neste computador. Ative o histórico de conversas na nuvem para sincronizá-la.",
           "heldOtherAccount": "A memória deste computador é sincronizada com outra conta da Stella, então fica fora desta.",
           "heldWiped": "Pausada. A memória na nuvem foi apagada, e este computador ainda tem memória de antes. Escolha abaixo o que fazer com ela.",
           "lastSynced": "Última sincronização: {time}.",

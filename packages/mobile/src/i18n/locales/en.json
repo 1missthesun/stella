@@ -906,9 +906,9 @@
     "localMode": {
       "authNote": "Signing in adds Stella's models, the phone app, Drive, cloud tasks and sync across devices. Your chats stay on this computer until you choose.",
       "banner": "Your chats stay on this computer. Sign in for Stella's models, the phone app, Drive, cloud tasks and sync.",
-      "choiceBody": "You chatted before signing in, so that chat is only on this computer. Sync it to your account to see it on your phone and other devices, or keep it here.",
+      "choiceBody": "You used Stella before signing in, so that chat and what Stella remembers are only on this computer. Sync them to your account to see them on your phone and other devices, or keep them here.",
       "choiceFailed": "Couldn't save that choice. Try again.",
-      "choiceTitle": "Sync your chat?",
+      "choiceTitle": "Sync your chat and Memory?",
       "keep": "Keep on this computer",
       "needsAccount": "This runs in Stella's cloud, so it needs a Stella account.",
       "sync": "Sync to my account",
@@ -1851,6 +1851,7 @@
         "memory": {
           "error": "Couldn't sync. Retrying soon.",
           "failedFiles": "Not synced: {files}",
+          "heldLocal": "Kept on this computer. Turn on cloud chat history to sync it.",
           "heldOtherAccount": "Synced with a different Stella account.",
           "heldWiped": "Paused after cloud Memory was erased. Choose below.",
           "lastSynced": "Synced {time}",

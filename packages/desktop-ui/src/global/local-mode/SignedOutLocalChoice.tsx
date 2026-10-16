@@ -19,12 +19,13 @@ import {
   useSignedOutLocalMode,
 } from "@/features/chat/services/chat-storage-preference";
 import { importLocalPiChat } from "@/features/chat/pi/pi-chat-store";
+import { useMemorySyncStatus } from "@/features/cloud/use-memory-sync-status";
 import "./local-mode.css";
 
 /**
- * After signing in, chats made without an account stay on this computer
- * until the user says otherwise: keep them here, or copy them into the
- * account's chat. Nothing is uploaded before that choice.
+ * After signing in, chats and memory made without an account stay on this
+ * computer until the user says otherwise: keep them here, or copy them into
+ * the account. Nothing is uploaded before that choice.
  */
 export function SignedOutLocalChoice({
   signedIn,
@@ -40,6 +41,14 @@ export function SignedOutLocalChoice({
   const [localId, setLocalId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const memorySync = useMemorySyncStatus();
+  const hasMemorySync = Boolean(window.electronAPI?.memorySync);
+  // Memory files the account doesn't have yet; unknown until the sync service has looked.
+  const waitingMemory = !hasMemorySync
+    ? 0
+    : memorySync?.phase === "held" && memorySync.heldReason === "local_choice"
+      ? (memorySync.waitingFiles ?? 0)
+      : null;
 
   useEffect(() => {
     if (!signedIn || !signedOutLocal) {
@@ -47,23 +56,24 @@ export function SignedOutLocalChoice({
       return;
     }
     const localChat = window.electronAPI?.localChat;
-    if (!localChat) return;
+    if (!localChat || waitingMemory === null) return;
     let canceled = false;
     void (async () => {
       const id = await localChat.getOrCreateDefaultConversationId();
       const window_ = await localChat.listMessages({ conversationId: id, maxVisibleMessages: 1 });
       if (canceled) return;
-      if (window_.visibleMessageCount === 0 && window_.messages.length === 0) {
+      const chatEmpty = window_.visibleMessageCount === 0 && window_.messages.length === 0;
+      if (chatEmpty && waitingMemory === 0) {
         await settleSignedOutLocalMode("cloud");
         return;
       }
-      setLocalId(id);
+      setLocalId(chatEmpty ? null : id);
       setOpen(true);
     })().catch((error: unknown) => console.warn("[local-mode] Couldn't read the local chat.", error));
     return () => {
       canceled = true;
     };
-  }, [signedIn, signedOutLocal]);
+  }, [signedIn, signedOutLocal, waitingMemory]);
 
   const choose = useCallback(
     async (mode: "cloud" | "local") => {

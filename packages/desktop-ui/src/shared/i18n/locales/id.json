@@ -899,9 +899,9 @@
     "localMode": {
       "authNote": "Dengan masuk, kamu mendapat model Stella, aplikasi ponsel, Drive, tugas cloud, dan sinkronisasi antarperangkat. Obrolanmu tetap di komputer ini sampai kamu memilih.",
       "banner": "Obrolanmu tetap di komputer ini. Masuk untuk model Stella, aplikasi ponsel, Drive, tugas cloud, dan sinkronisasi.",
-      "choiceBody": "Kamu mengobrol sebelum masuk, jadi obrolan itu hanya ada di komputer ini. Sinkronkan ke akunmu agar terlihat di ponsel dan perangkat lain, atau simpan di sini.",
+      "choiceBody": "Kamu memakai Stella sebelum masuk, jadi obrolan itu dan hal yang diingat Stella hanya ada di komputer ini. Sinkronkan ke akunmu untuk melihatnya di ponsel dan perangkat lain, atau simpan di sini.",
       "choiceFailed": "Pilihan itu tidak bisa disimpan. Coba lagi.",
-      "choiceTitle": "Sinkronkan obrolanmu?",
+      "choiceTitle": "Sinkronkan obrolan dan memorimu?",
       "keep": "Simpan di komputer ini",
       "needsAccount": "Ini berjalan di cloud Stella, jadi perlu akun Stella.",
       "sync": "Sinkronkan ke akunku",
@@ -1843,6 +1843,7 @@
         "memory": {
           "error": "Tidak dapat menyinkronkan saat ini. Stella akan mencoba lagi.",
           "failedFiles": "Belum tersinkron: {files}",
+          "heldLocal": "Disimpan di komputer ini. Aktifkan riwayat obrolan di cloud untuk menyinkronkannya.",
           "heldOtherAccount": "Memori komputer ini disinkronkan dengan akun Stella lain, jadi tidak masuk ke akun ini.",
           "heldWiped": "Dijeda. Memori cloud telah dihapus, dan komputer ini masih memiliki memori dari sebelumnya. Pilih di bawah apa yang terjadi padanya.",
           "lastSynced": "Terakhir disinkronkan {time}.",

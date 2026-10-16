@@ -31,7 +31,9 @@ const memorySyncSummary = (
     case "held":
       return status.heldReason === "other_account"
         ? t(`${key}.heldOtherAccount`)
-        : t(`${key}.heldWiped`);
+        : status.heldReason === "local_choice"
+          ? t(`${key}.heldLocal`)
+          : t(`${key}.heldWiped`);
     case "error":
       return t(`${key}.error`);
     default:

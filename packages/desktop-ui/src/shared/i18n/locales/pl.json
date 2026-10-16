@@ -920,9 +920,9 @@
     "localMode": {
       "authNote": "Logowanie daje modele Stelli, aplikację na telefon, Drive, zadania w chmurze i synchronizację między urządzeniami. Twoje czaty zostają na tym komputerze, dopóki nie zdecydujesz.",
       "banner": "Twoje czaty zostają na tym komputerze. Zaloguj się, aby korzystać z modeli Stelli, aplikacji na telefon, Drive, zadań w chmurze i synchronizacji.",
-      "choiceBody": "Czatowałeś przed zalogowaniem, więc ten czat jest tylko na tym komputerze. Zsynchronizuj go z kontem, aby widzieć go na telefonie i innych urządzeniach, albo zostaw go tutaj.",
+      "choiceBody": "Używałeś Stelli przed zalogowaniem, więc ten czat i to, co pamięta Stella, są tylko na tym komputerze. Zsynchronizuj je z kontem, aby widzieć je na telefonie i innych urządzeniach, albo zostaw je tutaj.",
       "choiceFailed": "Nie udało się zapisać wyboru. Spróbuj ponownie.",
-      "choiceTitle": "Zsynchronizować czat?",
+      "choiceTitle": "Zsynchronizować czat i pamięć?",
       "keep": "Zostaw na tym komputerze",
       "needsAccount": "To działa w chmurze Stelli, więc wymaga konta Stella.",
       "sync": "Synchronizuj z moim kontem",
@@ -1867,6 +1867,7 @@
         "memory": {
           "error": "Nie udało się teraz zsynchronizować. Stella spróbuje ponownie.",
           "failedFiles": "Niezsynchronizowane: {files}",
+          "heldLocal": "Zapisana tylko na tym komputerze. Włącz historię czatów w chmurze, aby ją zsynchronizować.",
           "heldOtherAccount": "Pamięć tego komputera jest synchronizowana z innym kontem Stella, więc pozostaje poza tym kontem.",
           "heldWiped": "Wstrzymano. Pamięć w chmurze została wymazana, a ten komputer nadal ma pamięć sprzed tego. Wybierz poniżej, co z nią zrobić.",
           "lastSynced": "Ostatnia synchronizacja: {time}.",

@@ -906,9 +906,9 @@
     "localMode": {
       "authNote": "Giriş yapmak Stella'nın modellerini, telefon uygulamasını, Drive'ı, bulut görevlerini ve cihazlar arası eşitlemeyi ekler. Sen karar verene kadar sohbetlerin bu bilgisayarda kalır.",
       "banner": "Sohbetlerin bu bilgisayarda kalır. Stella'nın modelleri, telefon uygulaması, Drive, bulut görevleri ve eşitleme için giriş yap.",
-      "choiceBody": "Giriş yapmadan önce sohbet ettin, bu yüzden o sohbet yalnızca bu bilgisayarda. Telefonunda ve diğer cihazlarında görmek için hesabına eşitle ya da burada tut.",
+      "choiceBody": "Stella'yı oturum açmadan önce kullandın, bu yüzden o sohbet ve Stella'nın hatırladıkları yalnızca bu bilgisayarda. Telefonunda ve diğer cihazlarında görmek için hesabınla eşitle ya da burada tut.",
       "choiceFailed": "Seçim kaydedilemedi. Tekrar dene.",
-      "choiceTitle": "Sohbetin eşitlensin mi?",
+      "choiceTitle": "Sohbetin ve belleğin eşitlensin mi?",
       "keep": "Bu bilgisayarda tut",
       "needsAccount": "Bu Stella'nın bulutunda çalışır, bu yüzden bir Stella hesabı gerekir.",
       "sync": "Hesabıma eşitle",
@@ -1851,6 +1851,7 @@
         "memory": {
           "error": "Şu anda senkronize edilemedi. Stella yeniden deneyecek.",
           "failedFiles": "Senkronize edilmedi: {files}",
+          "heldLocal": "Bu bilgisayarda tutuluyor. Eşitlemek için buluttaki sohbet geçmişini aç.",
           "heldOtherAccount": "Bu bilgisayarın belleği başka bir Stella hesabıyla senkronize ediliyor, bu yüzden bu hesabın dışında kalıyor.",
           "heldWiped": "Duraklatıldı. Buluttaki bellek silindi ve bu bilgisayarda hâlâ öncesinden kalan bellek var. Buna ne olacağını aşağıdan seçin.",
           "lastSynced": "Son senkronizasyon: {time}.",

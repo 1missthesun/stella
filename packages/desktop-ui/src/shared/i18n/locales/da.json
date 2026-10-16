@@ -906,9 +906,9 @@
     "localMode": {
       "authNote": "Når du logger ind, får du Stellas modeller, mobilappen, Drive, cloudopgaver og synkronisering mellem enheder. Dine chats bliver på denne computer, indtil du vælger.",
       "banner": "Dine chats bliver på denne computer. Log ind for Stellas modeller, mobilappen, Drive, cloudopgaver og synkronisering.",
-      "choiceBody": "Du chattede, før du loggede ind, så den chat findes kun på denne computer. Synkroniser den til din konto for at se den på din telefon og andre enheder, eller behold den her.",
+      "choiceBody": "Du brugte Stella, før du loggede ind, så den chat og det, Stella husker, findes kun på denne computer. Synkroniser dem til din konto for at se dem på din telefon og andre enheder, eller behold dem her.",
       "choiceFailed": "Valget kunne ikke gemmes. Prøv igen.",
-      "choiceTitle": "Synkroniser din chat?",
+      "choiceTitle": "Synkroniser din chat og hukommelse?",
       "keep": "Behold på denne computer",
       "needsAccount": "Det kører i Stellas cloud og kræver derfor en Stella-konto.",
       "sync": "Synkroniser til min konto",
@@ -1851,6 +1851,7 @@
         "memory": {
           "error": "Kunne ikke synkronisere lige nu. Stella prøver igen.",
           "failedFiles": "Ikke synkroniseret: {files}",
+          "heldLocal": "Gemt på denne computer. Slå chathistorik i skyen til for at synkronisere den.",
           "heldOtherAccount": "Denne computers hukommelse synkroniseres med en anden Stella-konto, så den holdes uden for denne.",
           "heldWiped": "Sat på pause. Hukommelsen i skyen blev slettet, og denne computer har stadig hukommelse fra før. Vælg nedenfor, hvad der skal ske med den.",
           "lastSynced": "Sidst synkroniseret {time}.",

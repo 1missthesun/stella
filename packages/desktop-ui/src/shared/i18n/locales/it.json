@@ -913,9 +913,9 @@
     "localMode": {
       "authNote": "Accedendo ottieni i modelli di Stella, l'app per telefono, Drive, le attività nel cloud e la sincronizzazione tra dispositivi. Le tue chat restano su questo computer finché non scegli.",
       "banner": "Le tue chat restano su questo computer. Accedi per i modelli di Stella, l'app per telefono, Drive, le attività nel cloud e la sincronizzazione.",
-      "choiceBody": "Hai chattato prima di accedere, quindi quella chat è solo su questo computer. Sincronizzala con il tuo account per vederla sul telefono e sugli altri dispositivi, oppure tienila qui.",
+      "choiceBody": "Hai usato Stella prima di accedere, quindi quella chat e ciò che Stella ricorda sono solo su questo computer. Sincronizzali con il tuo account per vederli sul telefono e sugli altri dispositivi, oppure tienili qui.",
       "choiceFailed": "Impossibile salvare la scelta. Riprova.",
-      "choiceTitle": "Sincronizzare la chat?",
+      "choiceTitle": "Sincronizzare chat e memoria?",
       "keep": "Tieni su questo computer",
       "needsAccount": "Funziona nel cloud di Stella, quindi serve un account Stella.",
       "sync": "Sincronizza con il mio account",
@@ -1859,6 +1859,7 @@
         "memory": {
           "error": "Impossibile sincronizzare in questo momento. Stella riproverà.",
           "failedFiles": "Non sincronizzato: {files}",
+          "heldLocal": "Conservata su questo computer. Attiva la cronologia chat nel cloud per sincronizzarla.",
           "heldOtherAccount": "La memoria di questo computer è sincronizzata con un altro account Stella, quindi resta fuori da questo.",
           "heldWiped": "In pausa. La memoria nel cloud è stata cancellata e questo computer ha ancora la memoria di prima. Scegli qui sotto cosa farne.",
           "lastSynced": "Ultima sincronizzazione: {time}.",

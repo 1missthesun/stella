@@ -906,9 +906,9 @@
     "localMode": {
       "authNote": "A bejelentkezéssel megkapod Stella modelljeit, a telefonos appot, a Drive-ot, a felhős feladatokat és az eszközök közötti szinkronizálást. A csevegéseid ezen a számítógépen maradnak, amíg nem döntesz.",
       "banner": "A csevegéseid ezen a számítógépen maradnak. Jelentkezz be Stella modelljeihez, a telefonos apphoz, a Drive-hoz, a felhős feladatokhoz és a szinkronizáláshoz.",
-      "choiceBody": "Bejelentkezés előtt csevegtél, ezért ez a csevegés csak ezen a számítógépen van. Szinkronizáld a fiókodba, hogy a telefonodon és más eszközökön is lásd, vagy tartsd meg itt.",
+      "choiceBody": "Bejelentkezés előtt használtad a Stellát, ezért az a csevegés és amire a Stella emlékszik, csak ezen a számítógépen van. Szinkronizáld őket a fiókodba, hogy a telefonodon és más eszközeiden is lásd, vagy tartsd meg itt.",
       "choiceFailed": "Nem sikerült menteni a választást. Próbáld újra.",
-      "choiceTitle": "Szinkronizálod a csevegést?",
+      "choiceTitle": "Szinkronizálod a csevegést és a memóriát?",
       "keep": "Megtartás ezen a számítógépen",
       "needsAccount": "Ez Stella felhőjében fut, ezért Stella-fiók kell hozzá.",
       "sync": "Szinkronizálás a fiókomba",
@@ -1851,6 +1851,7 @@
         "memory": {
           "error": "A szinkronizálás most nem sikerült. A Stella újra megpróbálja.",
           "failedFiles": "Nincs szinkronizálva: {files}",
+          "heldLocal": "Csak ezen a számítógépen. A szinkronizáláshoz kapcsold be a felhőbeli csevegési előzményeket.",
           "heldOtherAccount": "Ennek a számítógépnek a memóriája egy másik Stella-fiókkal szinkronizálódik, ezért kimarad ebből a fiókból.",
           "heldWiped": "Szüneteltetve. A felhőbeli memória törölve lett, és ezen a számítógépen még van korábbi memória. Lent válaszd ki, mi történjen vele.",
           "lastSynced": "Utolsó szinkronizálás: {time}.",

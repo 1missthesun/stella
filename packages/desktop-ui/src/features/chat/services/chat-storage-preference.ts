@@ -5,6 +5,8 @@ const KEY = "stella:chat-storage-mode";
 const EVENT = "stella:chat-storage-changed";
 // Set while chats are local only because there is no account yet; signing in asks what to do with them.
 const SIGNED_OUT_KEY = "stella:chat-storage-signed-out";
+// Set when the user kept signed-out work on this computer; memory stays local until chats sync again.
+const MEMORY_KEPT_LOCAL_KEY = "stella:memory-kept-local";
 export const isPrivateConversationId = (id: string | null | undefined) =>
   Boolean(id?.startsWith("local_"));
 export const getChatStorageMode = (): "cloud" | "local" =>
@@ -28,6 +30,7 @@ export const setChatStorageMode = async (mode: "cloud" | "local") => {
     enabled: mode === "cloud",
   });
   uiState.setItem(KEY, mode);
+  if (mode === "cloud") uiState.removeItem(MEMORY_KEPT_LOCAL_KEY);
   window.dispatchEvent(new Event(EVENT));
 };
 export const createPrivateConversation = async () => {
@@ -72,8 +75,16 @@ export const useSignedOutLocalMode = () =>
 /** After sign-in: keep chats on this computer for good, or go back to synced chats. */
 export const settleSignedOutLocalMode = async (mode: "cloud" | "local") => {
   uiState.removeItem(SIGNED_OUT_KEY);
+  if (mode === "local") uiState.setItem(MEMORY_KEPT_LOCAL_KEY, "1");
   await setChatStorageMode(mode);
 };
+
+/** Memory files stay on this computer until the signed-out keep-or-sync choice says sync. */
+export const isMemorySyncHeld = () =>
+  isSignedOutLocalMode() || uiState.getItem(MEMORY_KEPT_LOCAL_KEY) === "1";
+
+export const useMemorySyncHeld = () =>
+  useSyncExternalStore(subscribe, isMemorySyncHeld, () => false);
 
 // The local chat the user chose to sync at sign-in, copied once the account's chat is open.
 const SYNC_PENDING_KEY = "stella:chat-storage-sync-pending";

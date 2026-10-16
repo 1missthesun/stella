@@ -913,9 +913,9 @@
     "localMode": {
       "authNote": "La connexion ajoute les modèles de Stella, l'app mobile, Drive, les tâches dans le cloud et la synchronisation entre appareils. Vos conversations restent sur cet ordinateur jusqu'à ce que vous choisissiez.",
       "banner": "Vos conversations restent sur cet ordinateur. Connectez-vous pour les modèles de Stella, l'app mobile, Drive, les tâches dans le cloud et la synchronisation.",
-      "choiceBody": "Vous avez discuté avant de vous connecter : cette conversation n'est que sur cet ordinateur. Synchronisez-la avec votre compte pour la voir sur votre téléphone et vos autres appareils, ou gardez-la ici.",
+      "choiceBody": "Vous avez utilisé Stella avant de vous connecter : cette conversation et ce dont Stella se souvient ne sont que sur cet ordinateur. Synchronisez-les avec votre compte pour les retrouver sur votre téléphone et vos autres appareils, ou gardez-les ici.",
       "choiceFailed": "Impossible d'enregistrer ce choix. Réessayez.",
-      "choiceTitle": "Synchroniser votre conversation ?",
+      "choiceTitle": "Synchroniser votre conversation et votre mémoire ?",
       "keep": "Garder sur cet ordinateur",
       "needsAccount": "Cela fonctionne dans le cloud de Stella et nécessite donc un compte Stella.",
       "sync": "Synchroniser avec mon compte",
@@ -1859,6 +1859,7 @@
         "memory": {
           "error": "Synchronisation impossible pour le moment. Stella réessaiera.",
           "failedFiles": "Non synchronisé : {files}",
+          "heldLocal": "Conservée sur cet ordinateur. Activez l'historique des conversations dans le cloud pour la synchroniser.",
           "heldOtherAccount": "La mémoire de cet ordinateur est synchronisée avec un autre compte Stella, elle reste donc en dehors de celui-ci.",
           "heldWiped": "En pause. La mémoire du cloud a été effacée et cet ordinateur a encore de la mémoire d'avant. Choisissez ci-dessous ce qu'elle devient.",
           "lastSynced": "Dernière synchronisation : {time}.",

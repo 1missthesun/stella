@@ -920,9 +920,9 @@
     "localMode": {
       "authNote": "Přihlášením získáte modely Stelly, mobilní aplikaci, Drive, úlohy v cloudu a synchronizaci mezi zařízeními. Vaše chaty zůstanou v tomto počítači, dokud se nerozhodnete.",
       "banner": "Vaše chaty zůstávají v tomto počítači. Přihlaste se pro modely Stelly, mobilní aplikaci, Drive, úlohy v cloudu a synchronizaci.",
-      "choiceBody": "Chatovali jste před přihlášením, takže ten chat je jen v tomto počítači. Synchronizujte ho s účtem, abyste ho viděli v telefonu a dalších zařízeních, nebo ho nechte tady.",
+      "choiceBody": "Stellu jste používali před přihlášením, takže ten chat a to, co si Stella pamatuje, jsou jen v tomto počítači. Synchronizujte je do svého účtu, abyste je viděli v telefonu a na dalších zařízeních, nebo si je nechte tady.",
       "choiceFailed": "Volbu se nepodařilo uložit. Zkuste to znovu.",
-      "choiceTitle": "Synchronizovat chat?",
+      "choiceTitle": "Synchronizovat chat a paměť?",
       "keep": "Ponechat v tomto počítači",
       "needsAccount": "Běží to v cloudu Stelly, takže je potřeba účet Stella.",
       "sync": "Synchronizovat s mým účtem",
@@ -1867,6 +1867,7 @@
         "memory": {
           "error": "Synchronizace se teď nezdařila. Stella to zkusí znovu.",
           "failedFiles": "Nesynchronizováno: {files}",
+          "heldLocal": "Uloženo jen v tomto počítači. Pro synchronizaci zapněte historii chatů v cloudu.",
           "heldOtherAccount": "Paměť tohoto počítače se synchronizuje s jiným účtem Stella, a proto zůstává mimo tento účet.",
           "heldWiped": "Pozastaveno. Paměť v cloudu byla vymazána a tento počítač má stále paměť z doby předtím. Níže zvolte, co se s ní stane.",
           "lastSynced": "Naposledy synchronizováno {time}.",

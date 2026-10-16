@@ -189,6 +189,7 @@ import {
   IPC_MEMORY_SYNC_ERASE_LOCAL,
   IPC_MEMORY_SYNC_GET_STATUS,
   IPC_MEMORY_SYNC_NOW,
+  IPC_MEMORY_SYNC_SET_HELD,
   IPC_MEMORY_SYNC_STATUS,
   IPC_NATIVE_INTEGRATIONS_DISABLE,
   IPC_NATIVE_INTEGRATIONS_ENABLE,
@@ -363,6 +364,7 @@ export const createElectronApi = (
       onStatus: on(IPC_MEMORY_SYNC_STATUS),
       syncNow: invoker(IPC_MEMORY_SYNC_NOW),
       eraseLocal: invoker(IPC_MEMORY_SYNC_ERASE_LOCAL),
+      setHeld: invoker(IPC_MEMORY_SYNC_SET_HELD),
     },
 
     cloudConversationCache: {

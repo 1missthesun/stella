@@ -906,9 +906,9 @@
     "localMode": {
       "authNote": "Inloggning ger dig Stellas modeller, mobilappen, Drive, molnuppgifter och synkning mellan enheter. Dina chattar stannar på den här datorn tills du väljer.",
       "banner": "Dina chattar stannar på den här datorn. Logga in för Stellas modeller, mobilappen, Drive, molnuppgifter och synkning.",
-      "choiceBody": "Du chattade innan du loggade in, så den chatten finns bara på den här datorn. Synka den till ditt konto för att se den i mobilen och på andra enheter, eller behåll den här.",
+      "choiceBody": "Du använde Stella innan du loggade in, så den chatten och det Stella minns finns bara på den här datorn. Synka dem till ditt konto för att se dem i telefonen och på andra enheter, eller behåll dem här.",
       "choiceFailed": "Valet kunde inte sparas. Försök igen.",
-      "choiceTitle": "Synka din chatt?",
+      "choiceTitle": "Synka din chatt och ditt minne?",
       "keep": "Behåll på den här datorn",
       "needsAccount": "Det här körs i Stellas moln och kräver därför ett Stella-konto.",
       "sync": "Synka till mitt konto",
@@ -1851,6 +1851,7 @@
         "memory": {
           "error": "Det gick inte att synkronisera just nu. Stella försöker igen.",
           "failedFiles": "Inte synkroniserad: {files}",
+          "heldLocal": "Sparat på den här datorn. Slå på chatthistorik i molnet för att synka det.",
           "heldOtherAccount": "Den här datorns minne synkroniseras med ett annat Stella-konto och hålls därför utanför det här.",
           "heldWiped": "Pausat. Minnet i molnet raderades, och den här datorn har fortfarande minne från tidigare. Välj nedan vad som ska hända med det.",
           "lastSynced": "Senast synkroniserat {time}.",

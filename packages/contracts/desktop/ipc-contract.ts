@@ -293,6 +293,7 @@ import {
   IPC_MEMORY_SYNC_ERASE_LOCAL,
   IPC_MEMORY_SYNC_GET_STATUS,
   IPC_MEMORY_SYNC_NOW,
+  IPC_MEMORY_SYNC_SET_HELD,
   IPC_MEMORY_SYNC_STATUS,
   IPC_NATIVE_INTEGRATIONS_DISABLE,
   IPC_NATIVE_INTEGRATIONS_ENABLE,
@@ -743,6 +744,7 @@ export type IpcInvokeContract = {
   [IPC_MEMORY_SYNC_GET_STATUS]: Invoke<[], MemorySyncStatus>;
   [IPC_MEMORY_SYNC_NOW]: Invoke<[], MemorySyncStatus>;
   [IPC_MEMORY_SYNC_ERASE_LOCAL]: Invoke<[], MemorySyncEraseResult>;
+  [IPC_MEMORY_SYNC_SET_HELD]: Invoke<[payload: { held: boolean }], MemorySyncStatus>;
   [IPC_CLOUD_CONVERSATION_CACHE_RETAIN_ACCOUNT]: Invoke<
     [payload: { accountScope: string }],
     CloudConversationCachePurgeResult

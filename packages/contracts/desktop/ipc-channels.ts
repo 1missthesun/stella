@@ -305,6 +305,7 @@ export const IPC_MEMORY_SYNC_GET_STATUS = "memorySync:getStatus" as const;
 export const IPC_MEMORY_SYNC_STATUS = "memorySync:status" as const;
 export const IPC_MEMORY_SYNC_NOW = "memorySync:syncNow" as const;
 export const IPC_MEMORY_SYNC_ERASE_LOCAL = "memorySync:eraseLocal" as const;
+export const IPC_MEMORY_SYNC_SET_HELD = "memorySync:setHeld" as const;
 
 export const IPC_DISCOVERY_DETECT_PREFERRED_BROWSER =
   "discovery:detectPreferredBrowser" as const;

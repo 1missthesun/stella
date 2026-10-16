@@ -208,6 +208,9 @@ export class MemorySyncService {
   private disposed = false;
   private passSubject: string | null = null;
   private preserved: PendingMerge[] = [];
+  // Memory written without an account stays on this computer until the user
+  // picks keep-or-sync after signing in. Held until the app says otherwise.
+  private heldForChoice = true;
 
   constructor(private readonly options: MemorySyncServiceOptions) {
     this.local = new LocalMemoryFiles(
@@ -236,8 +239,45 @@ export class MemorySyncService {
       this.publish({ phase: "signed_out", merging: 0, refused: [] });
       return;
     }
+    if (this.heldForChoice) {
+      void this.publishHeldForChoice();
+      return;
+    }
     this.start();
     this.request("full", SIGN_IN_DELAY_MS);
+  }
+
+  async setHeld(held: boolean): Promise<MemorySyncStatus> {
+    if (this.disposed || held === this.heldForChoice) return this.status;
+    this.heldForChoice = held;
+    if (held) {
+      this.stop();
+      await this.publishHeldForChoice();
+    } else if (this.subject) {
+      this.start();
+      this.request("full", 0);
+    }
+    return this.status;
+  }
+
+  private async publishHeldForChoice(): Promise<void> {
+    const subject = this.subject;
+    if (!subject) return;
+    await this.running?.catch(() => undefined);
+    let waitingFiles = 0;
+    try {
+      const [state, local] = await Promise.all([this.loadState(), this.local.scan()]);
+      const synced = state.owner === subject ? state.files : {};
+      for (const [file, sha] of local) {
+        if (synced[file]?.local !== sha) waitingFiles += 1;
+      }
+    } catch (error) {
+      this.log("memory_sync.held_scan_failed", {
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+    if (!this.heldForChoice || this.subject !== subject) return;
+    this.publish({ phase: "held", heldReason: "local_choice", waitingFiles });
   }
 
   noteWindowFocus(): void {
@@ -285,7 +325,7 @@ export class MemorySyncService {
   }
 
   async flush(timeoutMs: number): Promise<void> {
-    if (!this.subject || !(await this.hasUnsyncedEdits())) return;
+    if (!this.subject || this.heldForChoice || !(await this.hasUnsyncedEdits())) return;
     this.pendingMode ??= "local";
     this.kick();
     const running = this.running;
@@ -376,7 +416,7 @@ export class MemorySyncService {
   }
 
   private request(mode: "full" | "local", delayMs: number): void {
-    if (this.disposed || !this.subject) return;
+    if (this.disposed || !this.subject || this.heldForChoice) return;
     if (mode === "full") {
       delayMs = Math.max(delayMs, this.retryNotBefore - Date.now());
     }
@@ -443,6 +483,7 @@ export class MemorySyncService {
   }
 
   private async pass(mode: "full" | "local"): Promise<void> {
+    if (this.heldForChoice) return;
     const subject = this.subject;
     const backend = this.backend();
     if (!subject || !backend || !this.options.hasConnectedAccount()) {
@@ -828,6 +869,7 @@ export class MemorySyncService {
   private publish(patch: Partial<MemorySyncStatus>): void {
     const next: MemorySyncStatus = { ...this.status, ...patch };
     if (next.phase !== "held") delete next.heldReason;
+    if (next.heldReason !== "local_choice") delete next.waitingFiles;
     if (next.phase !== "error") delete next.failure;
     if (JSON.stringify(next) === JSON.stringify(this.status)) return;
     this.status = next;

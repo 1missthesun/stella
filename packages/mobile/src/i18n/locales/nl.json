@@ -906,9 +906,9 @@
     "localMode": {
       "authNote": "Inloggen geeft je Stella's modellen, de telefoonapp, Drive, cloudtaken en synchronisatie tussen apparaten. Je chats blijven op deze computer tot je zelf kiest.",
       "banner": "Je chats blijven op deze computer. Log in voor Stella's modellen, de telefoonapp, Drive, cloudtaken en synchronisatie.",
-      "choiceBody": "Je chatte voordat je inlogde, dus die chat staat alleen op deze computer. Synchroniseer hem met je account om hem op je telefoon en andere apparaten te zien, of houd hem hier.",
+      "choiceBody": "Je gebruikte Stella voordat je inlogde, dus die chat en wat Stella onthoudt staan alleen op deze computer. Synchroniseer ze met je account om ze op je telefoon en andere apparaten te zien, of houd ze hier.",
       "choiceFailed": "Die keuze kon niet worden opgeslagen. Probeer het opnieuw.",
-      "choiceTitle": "Je chat synchroniseren?",
+      "choiceTitle": "Je chat en geheugen synchroniseren?",
       "keep": "Op deze computer houden",
       "needsAccount": "Dit draait in Stella's cloud en heeft dus een Stella-account nodig.",
       "sync": "Synchroniseren met mijn account",
@@ -1851,6 +1851,7 @@
         "memory": {
           "error": "Synchroniseren lukte nu niet. Stella probeert het opnieuw.",
           "failedFiles": "Niet gesynchroniseerd: {files}",
+          "heldLocal": "Bewaard op deze computer. Zet chatgeschiedenis in de cloud aan om het te synchroniseren.",
           "heldOtherAccount": "Het geheugen van deze computer wordt gesynchroniseerd met een ander Stella-account en blijft daarom buiten dit account.",
           "heldWiped": "Gepauzeerd. Het cloudgeheugen is gewist en deze computer heeft nog geheugen van daarvoor. Kies hieronder wat ermee gebeurt.",
           "lastSynced": "Laatst gesynchroniseerd: {time}.",

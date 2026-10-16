@@ -1,6 +1,7 @@
 import {
   enterSignedOutLocalMode,
   useChatStorageMode,
+  useMemorySyncHeld,
 } from "@/features/chat/services/chat-storage-preference";
 import type { ReactNode } from "react";
 import {
@@ -145,6 +146,13 @@ function DesktopAuthRuntimeEffects({
 
     void systemApi.setCloudSyncEnabled({ enabled: chatStorageMode === "cloud" });
   }, [chatStorageMode]);
+
+  const memorySyncHeld = useMemorySyncHeld();
+  useEffect(() => {
+    void window.electronAPI?.memorySync
+      ?.setHeld({ held: memorySyncHeld })
+      .catch(() => undefined);
+  }, [memorySyncHeld]);
 
   useEffect(() => {
     const systemApi = window.electronAPI?.system;

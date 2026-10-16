@@ -906,9 +906,9 @@
     "localMode": {
       "authNote": "Mit der Anmeldung bekommst du Stellas Modelle, die Handy-App, Drive, Cloud-Aufgaben und Synchronisierung zwischen Geräten. Deine Chats bleiben auf diesem Computer, bis du dich entscheidest.",
       "banner": "Deine Chats bleiben auf diesem Computer. Melde dich an für Stellas Modelle, die Handy-App, Drive, Cloud-Aufgaben und Synchronisierung.",
-      "choiceBody": "Du hast vor der Anmeldung gechattet, daher ist dieser Chat nur auf diesem Computer. Synchronisiere ihn mit deinem Konto, um ihn auf deinem Handy und anderen Geräten zu sehen, oder behalte ihn hier.",
+      "choiceBody": "Du hast Stella vor der Anmeldung benutzt, deshalb sind dieser Chat und das, was Stella sich merkt, nur auf diesem Computer. Synchronisiere sie mit deinem Konto, um sie auf deinem Handy und anderen Geräten zu sehen, oder behalte sie hier.",
       "choiceFailed": "Die Auswahl konnte nicht gespeichert werden. Versuch es noch einmal.",
-      "choiceTitle": "Chat synchronisieren?",
+      "choiceTitle": "Chat und Erinnerungen synchronisieren?",
       "keep": "Auf diesem Computer behalten",
       "needsAccount": "Das läuft in Stellas Cloud und braucht daher ein Stella-Konto.",
       "sync": "Mit meinem Konto synchronisieren",
@@ -1851,6 +1851,7 @@
         "memory": {
           "error": "Synchronisierung gerade nicht möglich. Stella versucht es erneut.",
           "failedFiles": "Nicht synchronisiert: {files}",
+          "heldLocal": "Nur auf diesem Computer. Aktiviere den Chatverlauf in der Cloud, um sie zu synchronisieren.",
           "heldOtherAccount": "Die Erinnerungen dieses Computers werden mit einem anderen Stella-Konto synchronisiert und bleiben daher außerhalb dieses Kontos.",
           "heldWiped": "Pausiert. Die Erinnerungen in der Cloud wurden gelöscht, und dieser Computer hat noch Erinnerungen von vorher. Wähle unten, was damit geschehen soll.",
           "lastSynced": "Zuletzt synchronisiert: {time}.",

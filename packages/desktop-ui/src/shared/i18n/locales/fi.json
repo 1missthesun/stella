@@ -906,9 +906,9 @@
     "localMode": {
       "authNote": "Kirjautuminen tuo Stellan mallit, puhelinsovelluksen, Driven, pilvitehtävät ja synkronoinnin laitteiden välillä. Keskustelusi pysyvät tällä tietokoneella, kunnes päätät toisin.",
       "banner": "Keskustelusi pysyvät tällä tietokoneella. Kirjaudu sisään saadaksesi Stellan mallit, puhelinsovelluksen, Driven, pilvitehtävät ja synkronoinnin.",
-      "choiceBody": "Keskustelit ennen kirjautumista, joten keskustelu on vain tällä tietokoneella. Synkronoi se tiliisi nähdäksesi sen puhelimessa ja muilla laitteilla, tai pidä se täällä.",
+      "choiceBody": "Käytit Stellaa ennen kirjautumista, joten se keskustelu ja se, mitä Stella muistaa, ovat vain tällä tietokoneella. Synkronoi ne tiliisi, niin näet ne puhelimessa ja muilla laitteilla, tai pidä ne täällä.",
       "choiceFailed": "Valintaa ei voitu tallentaa. Yritä uudelleen.",
-      "choiceTitle": "Synkronoidaanko keskustelu?",
+      "choiceTitle": "Synkronoidaanko keskustelu ja muisti?",
       "keep": "Pidä tällä tietokoneella",
       "needsAccount": "Tämä toimii Stellan pilvessä, joten se vaatii Stella-tilin.",
       "sync": "Synkronoi tiliini",
@@ -1851,6 +1851,7 @@
         "memory": {
           "error": "Synkronointi ei onnistunut juuri nyt. Stella yrittää uudelleen.",
           "failedFiles": "Ei synkronoitu: {files}",
+          "heldLocal": "Vain tällä tietokoneella. Ota keskusteluhistoria pilvessä käyttöön synkronoidaksesi sen.",
           "heldOtherAccount": "Tämän tietokoneen muisti synkronoidaan toisen Stella-tilin kanssa, joten se pysyy tämän tilin ulkopuolella.",
           "heldWiped": "Keskeytetty. Pilven muisti poistettiin, ja tällä tietokoneella on yhä aiempaa muistia. Valitse alta, mitä sille tehdään.",
           "lastSynced": "Synkronoitu viimeksi {time}.",

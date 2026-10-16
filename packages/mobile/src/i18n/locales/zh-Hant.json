@@ -899,9 +899,9 @@
     "localMode": {
       "authNote": "登入後可使用 Stella 的模型、手機 App、Drive、雲端任務和跨裝置同步。在你做出選擇之前，聊天會保留在這台電腦上。",
       "banner": "你的聊天保留在這台電腦上。登入即可使用 Stella 的模型、手機 App、Drive、雲端任務和同步。",
-      "choiceBody": "你在登入前進行了聊天，因此該聊天只在這台電腦上。同步到你的帳戶即可在手機和其他裝置上查看，或者保留在這裡。",
+      "choiceBody": "你在登入前使用了 Stella，所以那段聊天和 Stella 記住的內容只在這台電腦上。同步到你的帳號即可在手機和其他裝置上查看，或者保留在這裡。",
       "choiceFailed": "無法儲存該選擇。請再試一次。",
-      "choiceTitle": "同步你的聊天？",
+      "choiceTitle": "同步你的聊天和記憶？",
       "keep": "保留在這台電腦上",
       "needsAccount": "此功能在 Stella 雲端執行，因此需要 Stella 帳戶。",
       "sync": "同步到我的帳戶",
@@ -1843,6 +1843,7 @@
         "memory": {
           "error": "暫時無法同步。Stella 會再試一次。",
           "failedFiles": "未同步：{files}",
+          "heldLocal": "僅儲存在這台電腦上。開啟雲端聊天記錄即可同步。",
           "heldOtherAccount": "這台電腦的記憶與另一個 Stella 帳號同步，因此不會進入此帳號。",
           "heldWiped": "已暫停。雲端記憶已被清除，而這台電腦上仍有之前的記憶。請在下方選擇如何處理。",
           "lastSynced": "上次同步：{time}。",

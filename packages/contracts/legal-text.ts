@@ -1,11 +1,11 @@
 export type LegalDocument = "terms" | "privacy";
 
 export const LEGAL_TITLES: Record<LegalDocument, string> = { terms: "Terms of Service", privacy: "Privacy Policy" };
-export const LEGAL_LAST_UPDATED = "October 14, 2026";
+export const LEGAL_LAST_UPDATED = "October 16, 2026";
 export const PRIVACY_LAST_UPDATED = LEGAL_LAST_UPDATED;
 
 export const TERMS_OF_SERVICE = `Stella — FROMYOU, LLC
-Last updated: October 14, 2026
+Last updated: October 16, 2026
 
 1. Who we are and what these Terms cover
 
@@ -21,13 +21,13 @@ Our Privacy Policy explains our handling of personal information. It is not perm
 
 You must be at least 13 and old enough under applicable law to use the Service. If you are under the age of legal majority where you live, a parent or legal guardian must review and agree to these Terms and supervise your use. We do not knowingly offer the Service to children under 13.
 
-A Stella account is required to use our hosted assistant service. You can authenticate using the available email or social sign-in methods. Visiting public pages or opening a public share link does not require an assistant account. You are responsible for keeping your account, devices, sign-in links, API keys, and connected accounts secure, and for activity you authorize through them. Let us know promptly if you suspect unauthorized access. You are not responsible for unauthorized activity to the extent applicable law provides otherwise.
+You can use the Stella desktop app without an account. Signed out, it runs on your computer with AI you bring: your own Claude Code or ChatGPT sign-in, your own API keys, or local models. An account is required for our hosted features, including Stella-managed models, the mobile app, Drive, cloud tasks and schedules, and sync across devices. You can sign in using the available email or social sign-in methods. Visiting public pages or opening a public share link does not require an account. You are responsible for keeping your account, devices, sign-in links, API keys, and connected accounts secure, and for activity you authorize through them. Let us know promptly if you suspect unauthorized access. You are not responsible for unauthorized activity to the extent applicable law provides otherwise.
 
 3. What Stella does
 
 Stella coordinates AI agents that can work on your computers, in your browser and applications, with connected accounts, and in hosted sandboxes. Capabilities include reading and changing files, executing commands, using websites, sending communications, working with repositories, generating media, scheduling work, creating apps and previews, and synchronizing conversations and files across devices.
 
-You can use Stella-managed AI, supported provider API keys such as OpenRouter, or supported engine accounts such as Claude or ChatGPT. Availability depends on the client, execution location, connected accounts, plan, provider restrictions, and server configuration. Not every feature is available on every route or plan. Your own engine login or key does not make all hosted features free or prevent conversation and task records from being stored by Stella.
+You can use Stella-managed AI, supported provider API keys such as OpenRouter, supported engine accounts such as Claude or ChatGPT, or supported local models. Availability depends on the client, execution location, connected accounts, plan, provider restrictions, and server configuration. Not every feature is available on every route or plan. When you are signed in, your own engine login or key does not make all hosted features free or prevent conversation and task records from being stored by Stella.
 
 Stella is a research preview. Features may be incomplete, unreliable, changed, or discontinued. We do not guarantee uninterrupted availability or that any particular model, provider, integration, or feature will remain available. We will honor applicable notice, refund, and other consumer obligations when we change or discontinue paid services.
 
@@ -51,7 +51,7 @@ You retain your rights in your inputs, files, conversations, and other content. 
 
 You authorize us and the service providers needed for features you choose to host, process, transmit, reproduce, and display your content only as necessary to provide, secure, maintain, and deliver the Service and comply with law. This includes submitting relevant context to the selected AI provider, synchronizing devices, executing tasks, and displaying content to recipients or collaborators you choose. It is not permission to sell your personal information, use private conversations for advertising, or train generalized AI models on your conversation content.
 
-Ordinary conversations and task records are stored in our hosted infrastructure, including when agents run locally or use your own engine. Files and credentials may also remain on a device or be stored for hosted work. The Privacy Policy describes those distinctions. Deleting an application or a local cache does not delete hosted content.
+When you use the desktop app without an account, your conversations stay on that computer and are not sent to FROMYOU. When you are signed in, ordinary conversations and task records are stored in our hosted infrastructure, including when agents run locally or use your own engine, unless you choose to keep chats only on that computer. Files and credentials may also remain on a device or be stored for hosted work. The Privacy Policy describes those distinctions. Deleting an application or a local cache does not delete hosted content.
 
 6. AI engines and connected services
 
@@ -161,13 +161,19 @@ Newark, DE 19713, United States
 contact@fromyou.ai`;
 
 export const PRIVACY_POLICY = `Stella — FROMYOU, LLC
-Last updated: October 14, 2026
+Last updated: October 16, 2026
 
 1. Scope and our privacy approach
 
 FROMYOU, LLC, a Delaware limited liability company ("FROMYOU," "we," "us," or "our"), provides Stella's hosted services and official desktop, browser, and mobile applications. This Privacy Policy explains the personal information we process through those services, including agents, Drive, sharing, hosted apps and previews, and Stella Crew for Slack.
 
-Stella is privacy-first, but it is not a local-only or entirely offline assistant. Our hosted service requires an account. It stores authoritative conversation and task records, including when work runs on your computer or uses your own model account or API key. Content relevant to a task can be sent to AI providers, connected services, or recipients you choose. We do not sell your personal information, use your conversations to serve advertising, or use your conversation content to train AI models. Our Google API commitments are stated in section 6.
+Stella is privacy-first. The desktop app can run locally without an account, as described below. Our hosted service requires an account. Once you sign in, it stores authoritative conversation and task records, including when work runs on your computer or uses your own model account or API key, unless you choose to keep chats only on that computer. Content relevant to a task can be sent to AI providers, connected services, or recipients you choose. We do not sell your personal information, use your conversations to serve advertising, or use your conversation content to train AI models. Our Google API commitments are stated in section 6.
+
+Using Stella without an account
+
+You can use the desktop app without an account. While you are signed out, Stella runs on your computer and keeps your conversations, memory, and files only on that computer. The AI runs through what you bring: your own Claude Code or ChatGPT sign-in on that computer, your own API keys (requests go directly to that provider), or local models. Those providers receive the content needed for your requests under their own terms. Nothing about your conversations is sent to FROMYOU while you are signed out; the app only downloads public app configuration, prompts, and update information from our servers. Telemetry is not sent while you are signed out (see section 9).
+
+Signing in is optional on the desktop and required for the mobile app. It adds Stella-managed models, the mobile app, Drive, cloud tasks and schedules, and sync across devices. Once you sign in, information goes to our hosted service for those features as described in this policy. When you sign in, Stella asks whether to keep your existing local chat on that computer or sync it to your account; it is not uploaded without your choice.
 
 Self-hosting
 
@@ -183,7 +189,7 @@ Authentication and security records can include session identifiers, provider ac
 
 Conversations, memory, and agent work
 
-We store messages, replies, conversation and event history, saved memory, attachments and references, tool calls and results, agent status and activity, and settings needed to synchronize clients and continue work. Relevant content may include file excerpts, screenshots, web pages, email or calendar content, shell commands and output, generated code or media, voice transcripts, and other information you supply or direct agents to use. Engine session and continuation records, including Claude Code session transcripts and tool outputs, can also sync to Stella's hosted services so work can resume across execution locations.
+When you are signed in, we store messages, replies, conversation and event history, saved memory, attachments and references, tool calls and results, agent status and activity, and settings needed to synchronize clients and continue work. Relevant content may include file excerpts, screenshots, web pages, email or calendar content, shell commands and output, generated code or media, voice transcripts, and other information you supply or direct agents to use. Engine session and continuation records, including Claude Code session transcripts and tool outputs, can also sync to Stella's hosted services so work can resume across execution locations.
 
 Agents can read and change files, use applications and your signed-in browser, and act on connected accounts. We do not upload every file or browsing record simply because it exists on your computer. However, content an agent reads for a task may enter its model context, tool results, conversation, memory, or hosted workspace. Local execution is not a promise that the resulting information remains local. Public web requests also disclose information to the sites contacted.
 
@@ -219,11 +225,12 @@ Files, messages, and connected accounts may contain other people's personal info
 
 Using an AI feature sends the content needed for that feature to the selected AI service. Depending on the route and feature, recipients can include Anthropic, OpenAI, Google, xAI, DeepSeek, and Meta, and the AI gateways OpenRouter and Fireworks. User-configured routes can also include GitHub Copilot, Moonshot AI/Kimi, and Z.AI, when selected. A gateway may forward the request to its selected upstream model provider. Not every recipient receives every request.
 
-The content can include your prompt, attachments and images, relevant conversation and memory, instructions, tool descriptions, file or screen content, tool results, audio, and model output. Stella's infrastructure can process these inputs and outputs to route work, synchronize clients, record history, and deliver the feature.
+The content can include your prompt, attachments and images, relevant conversation and memory, instructions, tool descriptions, file or screen content, tool results, audio, and model output. When you use hosted features, Stella's infrastructure can process these inputs and outputs to route work, synchronize clients, record history, and deliver the feature.
 
 • Stella-managed models: requests go through our hosted infrastructure and the gateway or model provider used for that request.
-• Your API keys: supported direct-device routes send requests to the chosen provider without our managed inference relay. Account-configured keys and cloud routes can instead be stored in Stella's credential infrastructure and used through our backend or model gateway. BYOK does not always mean local storage or a direct-device request.
-• Claude and ChatGPT logins: the appropriate engine provider processes the session context and results. Credential availability depends on execution location. Conversation and engine-session records can still sync to Stella's hosted service.
+• Your API keys: supported direct-device routes send requests to the chosen provider without our managed inference relay. Account-configured keys and cloud routes can instead be stored in Stella's credential infrastructure and used through our backend or model gateway. BYOK does not always mean local storage or a direct-device request. Without an account, the desktop app uses only direct routes.
+• Claude and ChatGPT logins: the appropriate engine provider processes the session context and results. Credential availability depends on execution location. When you are signed in, conversation and engine-session records can still sync to Stella's hosted service.
+• Local models: requests go to the model runtime you run or configure, not to FROMYOU.
 • Voice and dictation: audio and related text can be sent to Meta's transcription service, OpenAI's realtime voice service, or another provider you configure for the supported route.
 • Media generation and transcription: prompts, source files, audio, generated media, and job information can be sent to fal.ai and the selected media or transcription provider.
 
@@ -320,7 +327,7 @@ Some information is needed to provide the Service; declining required account in
 
 9. Telemetry, browser storage, and advertising measurement
 
-Optional telemetry records metadata such as event types, timing, tokens and cost, model or agent type, and error codes, with account or installation identifiers pseudonymized by hashing. Its defined event fields do not include chat messages, prompts, file content, tool arguments, or tool outputs. Hashing is pseudonymization, not a guarantee of anonymity. Settings → Privacy lets you turn off telemetry, remove queued device telemetry, and stop applicable future device and account-level cloud telemetry reporting. In-flight events may still arrive. Necessary billing, usage, security, and operational records still continue as described above.
+Optional telemetry records metadata such as event types, timing, tokens and cost, model or agent type, and error codes, with account or installation identifiers pseudonymized by hashing. Its defined event fields do not include chat messages, prompts, file content, tool arguments, or tool outputs. Hashing is pseudonymization, not a guarantee of anonymity. The desktop app does not send telemetry while you are signed out. If telemetry is on (the default), app start-up and crash metadata recorded while signed out waits on your computer and is sent only after you sign in; turning telemetry off removes it. Crash dumps and debug logs stay on your computer unless you choose to send them to us. Settings → Privacy lets you turn off telemetry, remove queued device telemetry, and stop applicable future device and account-level cloud telemetry reporting. In-flight events may still arrive. Necessary billing, usage, security, and operational records still continue as described above.
 
 Our apps and websites use cookies or local storage for sign-in, sessions, preferences, and necessary operation. Google Ads measurement is separate from assistant content and Google connected-account data.
 
@@ -352,7 +359,7 @@ Retention depends on the data, feature, purpose, available controls, legal requi
 • Temporary delivery and operational records: expire or are cleaned up according to the record type; some routing, deduplication, or recovery records persist longer than a stream or session.
 • Telemetry and support logs: metadata retained for their stated purposes. Turning telemetry off stops future optional reporting and removes queued device events; it is not a promise to erase all previously received telemetry or required operational records. The in-app support audit log shows a bounded recent history, not an unlimited archive.
 • Google Ads signup-deduplication flag: remains in browser local storage until cleared; Google-held data follows Google's policies.
-• Device-local data: remains until removed by you, an applicable client control, or your operating system; deleting a hosted account does not automatically erase all files on your devices.
+• Device-local data, including chats kept only on your computer: remains until removed by you, an applicable client control, or your operating system; deleting a hosted account does not automatically erase all files on your devices.
 • Organizational and third-party records: subject to the organization or provider's controls. Crew uninstall or individual account deletion is not a guarantee that all workspace messages, installations, preview records, or repository history are erased.
 
 Hosted in-app account-deletion timeline

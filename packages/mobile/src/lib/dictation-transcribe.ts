@@ -1,4 +1,6 @@
+import { isRequestTimeout, withDeadline } from "@stella/contracts/request-deadline";
 import { getAuthToken } from "./auth-token";
+import { fetchWithinDeadline } from "./cloud-request";
 import { backendOrigin } from "./http";
 
 export const DICTATION_SAMPLE_RATE = 16_000;
@@ -84,20 +86,15 @@ export const loadDictationStreamingAvailable = (): Promise<boolean> => {
   ) {
     return streamingAvailability.value;
   }
-  const controller = new AbortController();
-  const timer = setTimeout(
-    () => controller.abort(),
-    STREAMING_AVAILABILITY_TIMEOUT_MS,
-  );
   const entry = {
-    value: fetch(`${backendOrigin()}/api/dictation/transcribe`, {
-      signal: controller.signal,
+    value: fetchWithinDeadline(`${backendOrigin()}/api/dictation/transcribe`, undefined, {
+      label: "Checking dictation",
+      timeoutMs: STREAMING_AVAILABILITY_TIMEOUT_MS,
     })
       .then((response) => (response.ok ? response.json() : null))
       .then(
         (body: { streaming?: unknown } | null) => body?.streaming === true,
-      )
-      .finally(() => clearTimeout(timer)),
+      ),
     at: Date.now(),
   };
   streamingAvailability = entry;
@@ -114,28 +111,26 @@ export const transcribeDictationWav = async (
     1,
     (wav.byteLength - WAV_HEADER_BYTES) / PCM_BYTES_PER_SECOND,
   );
-  const controller = new AbortController();
-  let timedOut = false;
-  const timer = setTimeout(
-    () => {
-      timedOut = true;
-      controller.abort();
-    },
-    BASE_TIMEOUT_MS + seconds * TIMEOUT_MS_PER_SECOND,
-  );
   let response: Response;
   try {
-    response = await fetch(`${backendOrigin()}/api/dictation/transcribe`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${await getAuthToken()}`,
-        "Content-Type": "audio/wav",
+    response = await withDeadline(
+      {
+        label: "Transcribing",
+        timeoutMs: BASE_TIMEOUT_MS + seconds * TIMEOUT_MS_PER_SECOND,
       },
-      body: wav.buffer as BodyInit,
-      signal: controller.signal,
-    });
+      async (signal) =>
+        await fetch(`${backendOrigin()}/api/dictation/transcribe`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${await getAuthToken()}`,
+            "Content-Type": "audio/wav",
+          },
+          body: wav.buffer as BodyInit,
+          signal,
+        }),
+    );
   } catch (error) {
-    if (timedOut) {
+    if (isRequestTimeout(error)) {
       throw new DictationTranscribeError(
         "Transcribing that recording took too long. Try again.",
         null,
@@ -147,8 +142,6 @@ export const transcribeDictationWav = async (
         : "Stella couldn't reach dictation. Try again.",
       null,
     );
-  } finally {
-    clearTimeout(timer);
   }
 
   const body = await response.text();

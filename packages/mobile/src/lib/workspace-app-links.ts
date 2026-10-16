@@ -5,6 +5,7 @@ import {
 import { router } from "expo-router";
 import { useEffect, useSyncExternalStore } from "react";
 import { AppState } from "react-native";
+import { REQUEST_BUDGET_MS, withDeadline } from "@stella/contracts/request-deadline";
 import { env } from "../config/env";
 import { getAuthToken } from "./auth-token";
 
@@ -46,11 +47,14 @@ function refreshWorkspaceApps(): Promise<void> {
   setLoading(true);
   inflight = (async () => {
     try {
-      const token = await getAuthToken();
-      const response = await fetch(`${env.backendUrl}/owners/me/apps`, {
-        headers: { Authorization: `Bearer ${token}` },
-        signal: AbortSignal.timeout(30_000),
-      });
+      const response = await withDeadline(
+        { label: "Loading your apps", timeoutMs: REQUEST_BUDGET_MS.lookup },
+        async (signal) =>
+          await fetch(`${env.backendUrl}/owners/me/apps`, {
+            headers: { Authorization: `Bearer ${await getAuthToken()}` },
+            signal,
+          }),
+      );
       if (!response.ok) return;
       shareWorkspaceApps(parseWorkspaceApps((await response.json()).apps));
     } catch {

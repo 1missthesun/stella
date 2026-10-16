@@ -58,24 +58,6 @@ const USER_SPEECH_IDLE_MS = 900;
 const ASSISTANT_SPEECH_IDLE_MS = 1_200;
 const MAX_DELEGATION_RESULT_CHARS = 6_000;
 
-const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T> =>
-  new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(
-      () => reject(new Error("Request timed out. Try again.")),
-      ms,
-    );
-    promise.then(
-      (value) => {
-        clearTimeout(timer);
-        resolve(value);
-      },
-      (error: unknown) => {
-        clearTimeout(timer);
-        reject(error);
-      },
-    );
-  });
-
 export type RealtimeVoiceSnapshot = {
   phase: RealtimeVoicePhase;
   isConnected: boolean;
@@ -316,12 +298,13 @@ export class MobileRealtimeVoiceSession {
       const instructions = buildVoiceSessionInstructions(
         this.options.execution,
       );
-      const session = await withTimeout(
-        getBackendClient().call("voice.session", {
+      const session = await getBackendClient().call(
+        "voice.session",
+        {
           instructions,
           ...(history.length ? { history } : {}),
-        }),
-        SESSION_REQUEST_TIMEOUT_MS,
+        },
+        { timeoutMs: SESSION_REQUEST_TIMEOUT_MS },
       );
       this.token = {
         model: session.model,
@@ -836,9 +819,10 @@ export class MobileRealtimeVoiceSession {
     if (!token) return;
     const { leaseId } = token;
     try {
-      const response = await withTimeout(
-        getBackendClient().call("voice.lease", { leaseId, event }),
-        LEASE_REQUEST_TIMEOUT_MS,
+      const response = await getBackendClient().call(
+        "voice.lease",
+        { leaseId, event },
+        { timeoutMs: LEASE_REQUEST_TIMEOUT_MS },
       );
       if (
         event !== "heartbeat" ||

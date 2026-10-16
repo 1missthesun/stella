@@ -1,17 +1,16 @@
+import {
+  REQUEST_BUDGET_MS,
+  isTransientRequestError,
+  retryIdempotent,
+  withDeadline,
+} from "@stella/contracts/request-deadline";
 import { env } from "../config/env";
 import { assert } from "./assert";
 import { getAuthToken } from "./auth-token";
 
 type JsonRequest =
-  | {
-      method: "GET";
-      headers?: Record<string, string>;
-    }
-  | {
-      method: "POST" | "PUT";
-      body: string;
-      headers?: Record<string, string>;
-    };
+  | { method: "GET" }
+  | { method: "POST" | "PUT"; body: string };
 
 export class StreamAbortError extends Error {
   constructor() {
@@ -65,69 +64,76 @@ const readErrorDetail = async (
   return { message: GENERIC_REQUEST_FAILURE, code: null };
 };
 
-const REQUEST_TIMEOUT_MS = 15_000;
+type RequestOptions = {
+  headers?: Record<string, string>;
+  timeoutMs?: number;
+  signal?: AbortSignal;
+  origin?: string;
+  label?: string;
+};
 
-async function requestJson(
+const isRetryableLookupFailure = (error: unknown): boolean =>
+  error instanceof HttpRequestError
+    ? error.status === 502 || error.status === 503 || error.status === 504
+    : isTransientRequestError(error);
+
+async function sendRequest<T>(
   path: string,
   request: JsonRequest,
-  options?: {
-    timeoutMs?: number;
-    signal?: AbortSignal;
-    origin?: string;
-  },
-) {
+  contentType: string | null,
+  options: RequestOptions | undefined,
+  read: (response: Response) => Promise<T>,
+): Promise<T> {
   const origin = options?.origin?.replace(/\/+$/, "") || backendOrigin();
-  const authHeader = `Bearer ${await getAuthToken()}`;
-  const controller = new AbortController();
-  let timedOut = false;
-  const timer = setTimeout(
-    () => {
-      timedOut = true;
-      controller.abort();
-    },
-    options?.timeoutMs ?? REQUEST_TIMEOUT_MS,
-  );
-  const onAbort = () => controller.abort();
-  if (options?.signal?.aborted) controller.abort();
-  else options?.signal?.addEventListener("abort", onAbort, { once: true });
-  let response: Response;
-  try {
-    response = await fetch(`${origin}${path}`, {
-      ...request,
-      headers: {
-        Authorization: authHeader,
-        ...(request.method === "GET"
-          ? {}
-          : { "Content-Type": "application/json" }),
-        ...request.headers,
+  const lookup = request.method === "GET";
+  const attempt = () =>
+    withDeadline(
+      {
+        label: options?.label ?? (lookup ? "loading" : "sending"),
+        timeoutMs:
+          options?.timeoutMs ??
+          (lookup ? REQUEST_BUDGET_MS.lookup : REQUEST_BUDGET_MS.call),
+        signal: options?.signal,
       },
-      signal: controller.signal,
-    });
+      async (signal) => {
+        const response = await fetch(`${origin}${path}`, {
+          ...request,
+          headers: {
+            Authorization: `Bearer ${await getAuthToken()}`,
+            ...(contentType ? { "Content-Type": contentType } : {}),
+            ...options?.headers,
+          },
+          signal,
+        });
+        if (!response.ok) {
+          const detail = await readErrorDetail(response);
+          throw new HttpRequestError(detail.message, response.status, detail.code);
+        }
+        return await read(response);
+      },
+    );
+  try {
+    return lookup
+      ? await retryIdempotent(attempt, {
+          attempts: 2,
+          signal: options?.signal,
+          shouldRetry: isRetryableLookupFailure,
+        })
+      : await attempt();
   } catch (error) {
-    if (options?.signal?.aborted) {
-      throw new StreamAbortError();
-    }
-    if (timedOut) {
-      throw new Error("Request timed out. Try again.");
-    }
+    if (options?.signal?.aborted) throw new StreamAbortError();
     throw error;
-  } finally {
-    clearTimeout(timer);
-    options?.signal?.removeEventListener("abort", onAbort);
   }
+}
 
-  if (!response.ok) {
-    const detail = await readErrorDetail(response);
-    throw new HttpRequestError(detail.message, response.status, detail.code);
-  }
-
+const readJson = async (response: Response): Promise<unknown> => {
   const text = await response.text();
   try {
     return JSON.parse(text) as unknown;
   } catch {
-    throw new Error("Could not complete that request. Try again.");
+    throw new Error(GENERIC_REQUEST_FAILURE);
   }
-}
+};
 
 export const backendOrigin = (): string => {
   const origin = env.backendUrl?.trim();
@@ -135,114 +141,36 @@ export const backendOrigin = (): string => {
   return origin;
 };
 
-export const getJson = (
-  path: string,
-  options?: {
-    headers?: Record<string, string>;
-    timeoutMs?: number;
-    signal?: AbortSignal;
-    origin?: string;
-  },
-) =>
-  requestJson(
+export const getJson = (path: string, options?: RequestOptions) =>
+  sendRequest(path, { method: "GET" }, null, options, readJson);
+
+export const postJson = (path: string, body: unknown, options?: RequestOptions) =>
+  sendRequest(
     path,
-    { method: "GET", headers: options?.headers },
-    {
-      timeoutMs: options?.timeoutMs,
-      signal: options?.signal,
-      ...(options?.origin ? { origin: options.origin } : {}),
-    },
+    { method: "POST", body: JSON.stringify(body) },
+    "application/json",
+    options,
+    readJson,
   );
 
-export const postJson = (
-  path: string,
-  body: unknown,
-  options?: {
-    headers?: Record<string, string>;
-    timeoutMs?: number;
-    signal?: AbortSignal;
-    origin?: string;
-  },
-) =>
-  requestJson(
+export const putJson = (path: string, body: unknown, options?: RequestOptions) =>
+  sendRequest(
     path,
-    {
-      method: "POST",
-      body: JSON.stringify(body),
-      headers: options?.headers,
-    },
-    {
-      timeoutMs: options?.timeoutMs,
-      signal: options?.signal,
-      ...(options?.origin ? { origin: options.origin } : {}),
-    },
+    { method: "PUT", body: JSON.stringify(body) },
+    "application/json",
+    options,
+    readJson,
   );
 
-export const putJson = (
-  path: string,
-  body: unknown,
-  options?: {
-    headers?: Record<string, string>;
-    timeoutMs?: number;
-    signal?: AbortSignal;
-    origin?: string;
-  },
-) =>
-  requestJson(
-    path,
-    {
-      method: "PUT",
-      body: JSON.stringify(body),
-      headers: options?.headers,
-    },
-    {
-      timeoutMs: options?.timeoutMs,
-      signal: options?.signal,
-      ...(options?.origin ? { origin: options.origin } : {}),
-    },
-  );
-
-export const postText = async (
+export const postText = (
   path: string,
   body: string,
-  options?: {
-    headers?: Record<string, string>;
-    timeoutMs?: number;
-    signal?: AbortSignal;
-  },
-): Promise<string> => {
-  const origin = backendOrigin();
-  const controller = new AbortController();
-  let timedOut = false;
-  const timer = setTimeout(() => {
-    timedOut = true;
-    controller.abort();
-  }, options?.timeoutMs ?? REQUEST_TIMEOUT_MS);
-  const onAbort = () => controller.abort();
-  if (options?.signal?.aborted) controller.abort();
-  else options?.signal?.addEventListener("abort", onAbort, { once: true });
-  try {
-    const response = await fetch(`${origin}${path}`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${await getAuthToken()}`,
-        "Content-Type": "text/plain",
-        ...options?.headers,
-      },
-      body,
-      signal: controller.signal,
-    });
-    if (!response.ok) {
-      const detail = await readErrorDetail(response);
-      throw new HttpRequestError(detail.message, response.status, detail.code);
-    }
-    return await response.text();
-  } catch (error) {
-    if (options?.signal?.aborted) throw new StreamAbortError();
-    if (timedOut) throw new Error("Request timed out. Try again.");
-    throw error;
-  } finally {
-    clearTimeout(timer);
-    options?.signal?.removeEventListener("abort", onAbort);
-  }
-};
+  options?: Omit<RequestOptions, "origin">,
+): Promise<string> =>
+  sendRequest(
+    path,
+    { method: "POST", body },
+    "text/plain",
+    options,
+    async (response) => await response.text(),
+  );

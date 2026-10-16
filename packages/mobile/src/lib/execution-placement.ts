@@ -203,6 +203,7 @@ export const listExecutionDevices = async (options?: {
       origin,
       signal: options?.signal,
       timeoutMs: 10_000,
+      label: "listing your computers",
     }),
   );
   const devices =
@@ -237,6 +238,7 @@ export const getAutomaticExecutionStatus = async (
         origin,
         signal: options?.signal,
         timeoutMs: options?.timeoutMs ?? 10_000,
+        label: "checking your message",
       }),
     );
   } catch (error) {
@@ -267,7 +269,7 @@ export const cancelAutomaticExecution = async (args: {
         cancelRequestId: args.cancelRequestId.trim(),
         ...(args.reason?.trim() ? { reason: args.reason.trim() } : {}),
       },
-      { origin, signal: args.signal, timeoutMs: 10_000 },
+      { origin, signal: args.signal, timeoutMs: 10_000, label: "stopping" },
     ),
   );
   return readDispatchEnvelope(value, { dispatchId });
@@ -328,6 +330,7 @@ export const submitAutomaticExecution = async (
       },
       {
         origin,
+        label: "sending your message",
         ...(pairHeaders ? { headers: pairHeaders } : {}),
       },
     ),

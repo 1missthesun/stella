@@ -1,4 +1,5 @@
 import { fetch as expoFetch } from "expo/fetch";
+import { isRequestTimeout, withDeadline } from "@stella/contracts/request-deadline";
 import {
   buildDeviceRequestChallenge,
   deviceRequestPath,
@@ -100,57 +101,56 @@ export const requestDevice = async (
     paramsHash: sha256HexUtf8(paramsJson),
     ...(target !== access.desktopDeviceId ? { targetDeviceId: target } : {}),
   });
-  const origin = await resolveExecutionBuilderOrigin();
-  const token = await getAuthToken();
-
-  const controller = new AbortController();
-  let timedOut = false;
-  const timer = setTimeout(() => {
-    timedOut = true;
-    controller.abort();
-  }, options?.timeoutMs ?? DEFAULT_TIMEOUT_MS);
-  const onAbort = () => controller.abort();
-  if (options?.signal?.aborted) controller.abort();
-  else options?.signal?.addEventListener("abort", onAbort, { once: true });
-
+  const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   try {
-    let response: Awaited<ReturnType<typeof expoFetch>>;
-    try {
-      response = await expoFetch(`${origin}${deviceRequestPath(target)}`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-          ...phonePairingProofHeaders(access, challenge),
-        },
-        body: JSON.stringify({ requestId, method, params }),
-        signal: controller.signal,
-      });
-    } catch {
-      if (options?.signal?.aborted) {
-        const aborted = new Error("Request cancelled.");
-        aborted.name = "AbortError";
-        throw aborted;
-      }
+    return await withDeadline(
+      { label: "Your computer", timeoutMs, signal: options?.signal },
+      async (signal) => {
+        const origin = await resolveExecutionBuilderOrigin();
+        const token = await getAuthToken();
+        let response: Awaited<ReturnType<typeof expoFetch>>;
+        try {
+          response = await expoFetch(`${origin}${deviceRequestPath(target)}`, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+              ...phonePairingProofHeaders(access, challenge),
+            },
+            body: JSON.stringify({ requestId, method, params }),
+            signal,
+          });
+        } catch {
+          throw new DeviceRequestError(
+            "Couldn't reach Stella's cloud. Check your connection and try again.",
+            "network",
+            0,
+          );
+        }
+        if (!response.ok) throw await readError(response);
+        const bytes = new Uint8Array(await response.arrayBuffer());
+        return {
+          bytes,
+          contentType:
+            response.headers.get("content-type")?.split(";")[0]?.trim() ||
+            "application/octet-stream",
+        };
+      },
+    );
+  } catch (error) {
+    if (options?.signal?.aborted) {
+      const aborted = new Error("Request cancelled.");
+      aborted.name = "AbortError";
+      throw aborted;
+    }
+    if (isRequestTimeout(error)) {
       throw new DeviceRequestError(
-        timedOut
-          ? "Your computer took too long to answer. Try again."
-          : "Couldn't reach Stella's cloud. Check your connection and try again.",
-        timedOut ? "timeout" : "network",
+        "Your computer took too long to answer. Try again.",
+        "timeout",
         0,
       );
     }
-    if (!response.ok) throw await readError(response);
-    const bytes = new Uint8Array(await response.arrayBuffer());
-    return {
-      bytes,
-      contentType:
-        response.headers.get("content-type")?.split(";")[0]?.trim() ||
-        "application/octet-stream",
-    };
-  } finally {
-    clearTimeout(timer);
-    options?.signal?.removeEventListener("abort", onAbort);
+    throw error;
   }
 };
 

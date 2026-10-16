@@ -9,6 +9,7 @@ import {
   stableStringify,
   type BackendRequestError,
 } from "@stella/contracts/backend/client";
+import { REQUEST_BUDGET_MS } from "@stella/contracts/request-deadline";
 import { env } from "../config/env";
 import { getAuthToken } from "./auth-token";
 import { isSelfHostedLaunch } from "./server-registry";
@@ -28,9 +29,9 @@ export function getBackendClient(): BackendClient {
   });
   if (isSelfHostedLaunch) {
     const call = client.call.bind(client);
-    client.call = (async (name, args) => {
+    client.call = (async (name, args, options) => {
       try {
-        return await call(name, args);
+        return await call(name, args, options);
       } catch (error) {
         noteBackendError(error);
         throw error;
@@ -55,23 +56,7 @@ export function readBackendView<K extends ViewName>(
   view: K,
   args: ViewArgs<K>,
 ): Promise<ViewResult<K>> {
-  return new Promise((resolve, reject) => {
-    let done = false;
-    let unsubscribe: (() => void) | null = null;
-    const settle = (finish: () => void) => {
-      if (done) return;
-      done = true;
-      unsubscribe?.();
-      finish();
-    };
-    unsubscribe = getBackendClient().watch(
-      view,
-      args,
-      (value) => settle(() => resolve(value)),
-      (error) => settle(() => reject(error)),
-    );
-    if (done) unsubscribe();
-  });
+  return getBackendClient().read(view, args, { timeoutMs: REQUEST_BUDGET_MS.call });
 }
 
 export function useBackendView<K extends ViewName>(

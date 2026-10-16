@@ -12,6 +12,7 @@ import {
 } from "@stella/contracts/user-ask-notification";
 import { USER_ASK_PUSH_KIND } from "@stella/contracts/user-ask";
 import { i18nFallback } from "../i18n";
+import { fetchWithinDeadline } from "./cloud-request";
 import {
   claimNotificationAction,
   releaseNotificationAction,
@@ -177,20 +178,21 @@ export const sendAskReply = async (args: {
 }): Promise<AskReplyOutcome> => {
   const { data } = args;
   if (!data.replyUrl || !data.replyToken) return { ok: false };
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), REPLY_TIMEOUT_MS);
   try {
-    const response = await fetch(data.replyUrl, {
-      method: "POST",
-      headers: { "content-type": "application/json", accept: "application/json" },
-      body: JSON.stringify({
-        token: data.replyToken,
-        action: args.action,
-        ...(args.text ? { text: args.text } : {}),
-        ...(args.deviceId ? { deviceId: args.deviceId } : {}),
-      }),
-      signal: controller.signal,
-    });
+    const response = await fetchWithinDeadline(
+      data.replyUrl,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json", accept: "application/json" },
+        body: JSON.stringify({
+          token: data.replyToken,
+          action: args.action,
+          ...(args.text ? { text: args.text } : {}),
+          ...(args.deviceId ? { deviceId: args.deviceId } : {}),
+        }),
+      },
+      { label: "Sending your answer", timeoutMs: REPLY_TIMEOUT_MS },
+    );
     if (!response.ok) return response.status === 409 ? { ok: false, closed: true } : { ok: false };
     const body = record(await response.json().catch(() => null));
     return {
@@ -200,8 +202,6 @@ export const sendAskReply = async (args: {
     };
   } catch {
     return { ok: false };
-  } finally {
-    clearTimeout(timer);
   }
 };
 

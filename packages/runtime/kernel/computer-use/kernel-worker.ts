@@ -870,7 +870,7 @@ const nodeReplWorkerMain = async (
       bindings:
         "Bindings persist within one kernel generation. Use var for names you may redeclare. let and const cannot be redeclared in a later cell.",
       images: workerData.deviceControl
-        ? "Browser screenshots attach automatically and return a receipt. Call codeRuntime.emitImage(path, { mimeType, detail }) only for an absolute local path or file:// URL you created yourself; emitAudio(path, { mimeType }) records typed audio output."
+        ? "Browser screenshots attach automatically and return a receipt whose path stays on disk for later tool calls (kept 7 days under the Stella data folder's media/screenshots; tab.screenshot({ path }) saves to a path you choose). Call codeRuntime.emitImage(path, { mimeType, detail }) only for an absolute local path or file:// URL you created yourself; emitAudio(path, { mimeType }) records typed audio output."
         : "Call codeRuntime.emitImage(path, { mimeType, detail }) with an absolute local path or file:// URL to see an image; emitAudio(path, { mimeType }) records typed audio output.",
       reset:
         "codeRuntime.reset() ends the current generation after this cell and discards all bindings. codeRuntime.status() reports the current generation.",

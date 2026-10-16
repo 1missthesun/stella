@@ -52,7 +52,6 @@ export type NodeReplContentItem =
       mimeType?: "image/jpeg" | "image/png" | "image/gif" | "image/webp";
       detail?: NodeReplImageDetail;
       alreadyAttached?: boolean;
-      deleteAfterAttach?: boolean;
     }
   | {
       type: "audio";

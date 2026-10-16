@@ -15,7 +15,8 @@ export const CODE_TOOL_CLOUD_AGENT_DESCRIPTION =
   CODE_TOOL_HISTORY_SENTENCE +
   " " +
   cloudBrowserCodeSentence({
-    screenshots: "attaches the picture to this code call's result",
+    screenshots:
+      "attaches the picture to this code call's result and returns { path } of a saved copy that later tool calls can read (pass path to choose where it goes)",
     handoffEnd:
       "The call keeps the code cell open until then (it can take minutes) and returns { result, message }: result is approved, canceled, expired, or failed; on approved, browser.open the site again and carry on signed in.",
   });

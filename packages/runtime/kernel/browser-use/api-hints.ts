@@ -3,7 +3,7 @@ const STRING_METHODS =
 
 const METHOD_HINTS: Readonly<Record<string, string>> = {
   screenshot:
-    "Screenshots live on the Tab: await tab.screenshot({ fullPage, selector }). The image attaches to the result automatically.",
+    "Screenshots live on the Tab: await tab.screenshot({ fullPage, selector, path }). The image attaches to the result automatically and the returned .path stays on disk.",
   title: "title() and url() are async methods on the Tab: await tab.title(), await tab.url().",
   url: "title() and url() are async methods on the Tab: await tab.title(), await tab.url().",
   goto: "Navigate with the Tab: await tab.goto(url). tab.back(), tab.forward() and tab.reload() are there too.",
@@ -66,9 +66,6 @@ export const browserApiHint = (message: string): string | undefined => {
     new RegExp(`\\.(?:url|title)\\s*\\|\\|\\s*""\\)\\.(?:${STRING_METHODS})\\b`).test(message)
   ) {
     return "tab.url and tab.title are async methods, not strings: use (await tab.url()).includes(...). browser.tabs.list() returns Tab handles; read each with await t.url().";
-  }
-  if (/screenshot options contains unsupported option 'path'/.test(message)) {
-    return "tab.screenshot() saves the image itself and attaches it to the result; its return value has a .path you can copy to where you need it.";
   }
   if (/does not support RegExp/.test(message)) {
     return "Locator text and URL patterns must be strings; use { exact: false } for a substring match and glob patterns like \"**/path\" for waitForURL.";

@@ -13,7 +13,8 @@ export type ScheduleTiming =
 export const SCHEDULE_NOTICE_CARD_TYPE = "schedule-notice";
 export const SCHEDULE_NOTICE_MESSAGE_MAX_CHARS = 600;
 
-export type ScheduleNoticeAction = "created" | "updated" | "paused" | "resumed" | "removed";
+/** `waiting`: a run came due while the computer it runs on was away; it runs once that computer is back. */
+export type ScheduleNoticeAction = "created" | "updated" | "paused" | "resumed" | "removed" | "waiting";
 export type ScheduleNoticeKind = "reminder" | "task" | "watch";
 
 /** A schedule was set up, changed or removed; shown in its conversation. */
@@ -30,7 +31,7 @@ export type ScheduleNoticeCard = {
   message?: string;
 };
 
-const ACTIONS: readonly ScheduleNoticeAction[] = ["created", "updated", "paused", "resumed", "removed"];
+const ACTIONS: readonly ScheduleNoticeAction[] = ["created", "updated", "paused", "resumed", "removed", "waiting"];
 const KINDS: readonly ScheduleNoticeKind[] = ["reminder", "task", "watch"];
 
 const nonEmpty = (value: unknown): string | null =>

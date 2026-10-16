@@ -141,6 +141,12 @@ export type ScheduledTurnStart = {
   prompt: string;
   title: string;
   targetDeviceId?: string;
+  /**
+   * Run only on `targetDeviceId`, never in the cloud: the plan has no cloud
+   * runs. With `ownDevice`, the schedule was set up on that computer, so it is
+   * the computer's own work and needs no "work from other devices" consent.
+   */
+  computerOnly?: { ownDevice: boolean };
   agent?: { description: string };
 };
 

@@ -14,11 +14,17 @@ import type { ScheduledTurnStart } from "./registry.js";
 export class ScheduledTurnError extends Error {
   readonly retryable: boolean;
   readonly conversationGone: boolean;
-  constructor(message: string, options: { retryable: boolean; conversationGone?: boolean }) {
+  /** A computer-only run found its computer unavailable; nothing ran anywhere. */
+  readonly computerAway: boolean;
+  constructor(
+    message: string,
+    options: { retryable: boolean; conversationGone?: boolean; computerAway?: boolean },
+  ) {
     super(message);
     this.name = "ScheduledTurnError";
     this.retryable = options.retryable;
     this.conversationGone = options.conversationGone ?? false;
+    this.computerAway = options.computerAway ?? false;
   }
 }
 
@@ -32,9 +38,12 @@ const startOnDesktop = async (
       idempotencyKey: input.clientMsgId,
       kind: "chat",
       ingress: "schedule",
-      subject: "cloud",
+      // A "computer" subject is never handed to the cloud when the computer
+      // can't take it: the dispatch is blocked instead.
+      subject: input.computerOnly ? "computer" : "cloud",
       targetMode: "device",
       targetDeviceId: input.targetDeviceId,
+      ...(input.computerOnly?.ownDevice ? { requestingDeviceId: input.targetDeviceId } : {}),
       conversationId: input.conversationId,
       requiredCapabilities: ["chat"],
       payload: {
@@ -54,6 +63,7 @@ const startOnDesktop = async (
   if (dispatch.state === "blocked" || dispatch.state === "failed") {
     throw new ScheduledTurnError(dispatch.errorMessage ?? "The scheduled run could not be placed.", {
       retryable: true,
+      computerAway: Boolean(input.computerOnly) && dispatch.state === "blocked",
     });
   }
 };
@@ -128,6 +138,9 @@ export const startScheduledTurn = async (
   if (targetDeviceId) {
     await startOnDesktop(deps, { ...input, targetDeviceId });
     return;
+  }
+  if (input.computerOnly) {
+    throw new ScheduledTurnError("There is no computer to run this on.", { retryable: false, computerAway: true });
   }
   await startInCloud(deps, input);
 };

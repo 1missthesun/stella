@@ -95,6 +95,10 @@ export type LocalCronJobRecord = {
     summary: string
     atMs: number
   }
+  /** Its runs happen only on a computer: a local schedule, or a plan without cloud runs. */
+  runsOn?: 'computer'
+  /** A run came due while its computer was away and runs once the computer is back. */
+  waitingSinceMs?: number
   createdAt: number
   updatedAt: number
 }

@@ -276,7 +276,10 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
         presenceSessionId: attachment.presenceSessionId,
         serverTimeMs: now,
       });
-      if (attachment.availability?.ready) this.offerAgainTo(attachment, now);
+      if (attachment.availability?.ready) {
+        this.offerAgainTo(attachment, now);
+        await this.wakeWaitingSchedules(attachment.deviceId);
+      }
       if (device!.remoteExecution === "asking") {
         this.send(socket, {
           type: "consent.request",
@@ -322,7 +325,10 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
       attachment.availability = availability;
       socket.serializeAttachment(attachment);
       this.writePresence(attachment, now, true);
-      if (becameReady) this.offerAgainTo(attachment, now);
+      if (becameReady) {
+        this.offerAgainTo(attachment, now);
+        await this.wakeWaitingSchedules(attachment.deviceId);
+      }
       return;
     }
     if (frame.type === "consent") {
@@ -346,6 +352,8 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
           message: written.error.message,
           retryable: true,
         });
+      } else if (frame.allow) {
+        await this.wakeWaitingSchedules(attachment.deviceId);
       }
       return;
     }
@@ -507,6 +515,19 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
     this.deviceRequestRelay().onDeviceGone(attachment.deviceId, socket);
     this.closeSocket(socket, code, reason);
     await this.scheduleAlarm(now);
+  }
+
+  /** Scheduled runs that waited for this computer (Free plan) go now. */
+  protected async wakeWaitingSchedules(deviceId: string): Promise<void> {
+    const woke = await this.ownerStore().internalCall("schedules.computerBack", {
+      deviceId,
+    });
+    if (!woke.ok) {
+      log("error", "schedules_computer_back_failed", {
+        deviceId,
+        message: woke.error.message,
+      });
+    }
   }
 
   protected writePresence(

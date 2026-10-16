@@ -86,6 +86,18 @@ export const decideDispatchPlacement = (args: {
   };
 };
 
+/**
+ * A schedule's run on the computer that set the schedule up is that
+ * computer's own work, not work sent from another device.
+ */
+export const isOwnScheduledWork = (
+  row: { ingress: string; requesting_device_id: string | null },
+  deviceId: string | null | undefined,
+): boolean =>
+  row.ingress === "schedule" &&
+  Boolean(deviceId) &&
+  row.requesting_device_id === deviceId;
+
 export const ingressMayClaimComputerSubject = (
   ingress: ExecutionIngress,
 ): boolean => ingress === "desktop" || ingress === "mobile";
@@ -119,9 +131,12 @@ export const isEligibleDevice = (args: {
   requiredCapabilities: readonly ExecutionCapability[];
   now: number;
   staleAfterMs: number;
+  /** The computer's own work (a schedule it set up), which needs no remote-work consent. */
+  ownWork?: boolean;
 }): boolean => {
   const { presence, device } = args;
-  if (!presence || !device || !device.remoteExecutionEnabled) return false;
+  if (!presence || !device) return false;
+  if (!device.remoteExecutionEnabled && !args.ownWork) return false;
   if (!presence.connected || !presence.ready) return false;
   if (presence.protocolVersion !== DEVICE_PRESENCE_PROTOCOL_VERSION) {
     return false;

@@ -34,6 +34,10 @@ export type ScheduleRow = {
   description: string;
   lastError?: string;
   lastErrorAt?: number;
+  /** The account's plan runs scheduled work only on a computer, never in the cloud. */
+  computerOnly?: true;
+  /** A run came due while its computer was away; it runs once the computer is back. */
+  waitingSince?: number;
   createdAt: number;
   updatedAt: number;
 };

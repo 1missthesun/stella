@@ -1,6 +1,7 @@
 import { PLAN_CATALOG, planLabel } from "@stella/contracts/billing-plans";
 import { Cron } from "croner";
 import type { LocalCronSchedule } from "@stella/contracts/scheduling";
+import type { DeviceDestination } from "@stella/contracts/turn-plane/placement";
 import {
   WATCH_MIN_INTERVAL_MS,
   WATCH_SCRIPT_MAX_CHARS,
@@ -35,7 +36,7 @@ import { RpcError } from "../errors.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
 import type { OwnerContext, OwnerDb, OwnerDbReader, OwnerDomain } from "../registry.js";
 import { ScheduledTurnError } from "../scheduled-turn.js";
-import { billingAccess } from "./billing.js";
+import { billingAccess, cloudSandboxAccess } from "./billing.js";
 import { livePushTokens, sendPushMessages } from "./devices.js";
 import { runWatchCheck } from "../watch-runner.js";
 import {
@@ -171,6 +172,11 @@ export const SCHEDULES_WATCH_REPAIR_MIGRATION = {
   statements: [`ALTER TABLE schedules ADD COLUMN repair_sent_at INTEGER`],
 };
 
+export const SCHEDULES_WAITING_MIGRATION = {
+  id: "schedules.8-waiting",
+  statements: [`ALTER TABLE schedules ADD COLUMN waiting_since INTEGER`],
+};
+
 type Row = {
   schedule_id: string;
   kind: string;
@@ -183,6 +189,7 @@ type Row = {
   last_finding: string | null;
   failing_since: number | null;
   repair_sent_at: number | null;
+  waiting_since: number | null;
   conversation_id: string | null;
   target_device_id: string | null;
   prompt: string;
@@ -204,7 +211,7 @@ const toScheduleKind = (value: string): ScheduleKind =>
 
 const toRoute = (value: string): ScheduleRoute => (value === "agent" ? "agent" : "orchestrator");
 
-const toScheduleRow = (row: Row, ownerZone?: string): ScheduleRow => ({
+const toScheduleRow = (row: Row, ownerZone?: string, computerOnly = false): ScheduleRow => ({
   scheduleId: row.schedule_id,
   kind: toScheduleKind(row.kind),
   route: toRoute(row.route),
@@ -222,6 +229,8 @@ const toScheduleRow = (row: Row, ownerZone?: string): ScheduleRow => ({
   description: row.description,
   ...(row.last_error ? { lastError: row.last_error } : {}),
   ...(row.last_error_at !== null ? { lastErrorAt: row.last_error_at } : {}),
+  ...(computerOnly ? { computerOnly: true as const } : {}),
+  ...(row.waiting_since !== null ? { waitingSince: row.waiting_since } : {}),
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });
@@ -258,7 +267,7 @@ const noticeCardOf = (row: Row, action: ScheduleNoticeAction, zone?: string): Sc
     name: row.description,
     ...(schedule ? { schedule } : {}),
     ...(scheduleZone ? { zone: scheduleZone } : {}),
-    ...(action !== "removed" && row.status === "active" ? { nextRunAt: row.next_run_at } : {}),
+    ...(action !== "removed" && action !== "waiting" && row.status === "active" ? { nextRunAt: row.next_run_at } : {}),
     ...(message
       ? {
           message:
@@ -313,8 +322,19 @@ const postNotice = async (ctx: OwnerContext, payload: unknown): Promise<void> =>
   if (!posted) throw new Error("The schedule notice could not be posted yet.");
 };
 
-const listRows = (db: OwnerDbReader): ScheduleRow[] => {
+/**
+ * Plans without cloud containers (Free) run scheduled work only on the
+ * user's computer: a scheduled run never starts in the cloud, where it would
+ * need a container (Claude Code) or spend the small one-time budget.
+ * Reminders carry no AI and are still delivered from the cloud.
+ */
+const computerOnly = (ctx: { db: OwnerDbReader; env: Cloudflare.Env; now: number }): boolean =>
+  !cloudSandboxAccess(ctx).enabled;
+
+const listRows = (ctx: { db: OwnerDbReader; env: Cloudflare.Env; now: number }): ScheduleRow[] => {
+  const { db } = ctx;
   const { zone } = readZone(db);
+  const onComputer = computerOnly(ctx);
   return db
     .all<Row>(
       `SELECT * FROM schedules WHERE status IN ('active', 'paused')
@@ -322,7 +342,7 @@ const listRows = (db: OwnerDbReader): ScheduleRow[] => {
         LIMIT ?`,
       MAX_SCHEDULES * 2,
     )
-    .map((row) => toScheduleRow(row, zone));
+    .map((row) => toScheduleRow(row, zone, onComputer));
 };
 
 const bad = (message: string): never => {
@@ -607,6 +627,14 @@ const createSchedule = async (
     "SELECT request_id FROM schedule_receipts WHERE request_id = ?",
     requestId,
   );
+  if (kind !== "reminder" && !targetDeviceId && !replay && computerOnly(ctx)) {
+    const computers = await ctx.host.deviceDestinations();
+    if (computers.length === 0) {
+      bad(
+        "On the Free plan, scheduled tasks and watches run on the user's computer, never in the cloud, and no computer has Stella set up yet. Once Stella is installed on a computer, set it up from there; a paid plan runs them in the cloud. Reminders work without a computer.",
+      );
+    }
+  }
   let first: { check: WatchCheckResult; stateJson: string | null } | null = null;
   if (script && !replay) {
     assertAllowed(schedule, ctx.now, kind);
@@ -639,6 +667,7 @@ const createSchedule = async (
         last_finding: first?.check.ok && first.check.found ? first.check.found : null,
         failing_since: null,
         repair_sent_at: null,
+        waiting_since: null,
         conversation_id: conversationId,
         target_device_id: targetDeviceId,
         prompt,
@@ -661,7 +690,10 @@ const createSchedule = async (
       );
       arm(ctx, row);
       queueNotice(ctx, row, "created");
-      return { ...toScheduleRow(row, ownerZone(ctx.db)), ...(first ? { check: first.check } : {}) };
+      return {
+        ...toScheduleRow(row, ownerZone(ctx.db), computerOnly(ctx)),
+        ...(first ? { check: first.check } : {}),
+      };
     },
   );
 };
@@ -735,6 +767,7 @@ const updateSchedule = async (
           input.description === undefined ? row.description : cleanDescription(input.description, nextPrompt),
         route: kind === "reminder" ? row.route : (input.route ?? row.route),
         once: kind === "watch" && input.once !== undefined ? (input.once ? 1 : 0) : row.once,
+        waiting_since: schedule || input.status === "paused" ? null : row.waiting_since,
         ...(first
           ? {
               script: script ?? row.script,
@@ -754,7 +787,7 @@ const updateSchedule = async (
         `UPDATE schedules SET prompt = ?, schedule_json = ?, next_run_at = ?, status = ?,
                 description = ?, route = ?, once = ?, script = ?, state_json = ?, pending_finding = ?,
                 last_check_at = ?, last_finding = ?, failing_since = ?, repair_sent_at = ?, last_error = ?,
-                last_error_at = ?, updated_at = ? WHERE schedule_id = ?`,
+                last_error_at = ?, waiting_since = ?, updated_at = ? WHERE schedule_id = ?`,
         next.prompt,
         next.schedule_json,
         next.next_run_at,
@@ -771,6 +804,7 @@ const updateSchedule = async (
         next.repair_sent_at,
         next.last_error,
         next.last_error_at,
+        next.waiting_since,
         next.updated_at,
         next.schedule_id,
       );
@@ -784,7 +818,10 @@ const updateSchedule = async (
         next.script !== row.script;
       if (edited) queueNotice(ctx, next, "updated");
       else if (next.status !== row.status) queueNotice(ctx, next, next.status === "active" ? "resumed" : "paused");
-      return { ...toScheduleRow(next, ownerZone(ctx.db)), ...(first ? { check: first.check } : {}) };
+      return {
+        ...toScheduleRow(next, ownerZone(ctx.db), computerOnly(ctx)),
+        ...(first ? { check: first.check } : {}),
+      };
     },
   );
 };
@@ -838,7 +875,7 @@ const toolParser = object({
 
 const scheduleTool = async (ctx: OwnerContext, raw: unknown): Promise<ScheduleToolResult> => {
   const args = toolParser(raw);
-  const list = (): ScheduleRow[] => listRows(ctx.db);
+  const list = (): ScheduleRow[] => listRows(ctx);
   if (args.action === "list") return { ok: true, replayed: false, schedules: list() };
   if (!args.requestId) bad("requestId is required for schedule changes.");
   const requestId = args.requestId!;
@@ -1102,7 +1139,7 @@ const finishFire = (
   if (!outcome.error) {
     ctx.db.run(
       `UPDATE schedules SET active_fire_id = NULL, last_error = NULL, last_error_at = NULL,
-              failure_count = 0, updated_at = ? WHERE schedule_id = ?`,
+              failure_count = 0, waiting_since = NULL, updated_at = ? WHERE schedule_id = ?`,
       ctx.now,
       scheduleId,
     );
@@ -1201,12 +1238,125 @@ const fire = async (ctx: OwnerContext, payload: unknown): Promise<void> => {
     await fireWatch(ctx, row, fireId, retrying, snapshot.ownerGeneration);
     return;
   }
+  const placement = await placementOf(ctx, row);
+  if (placement.away) {
+    await waitForComputer(ctx, row, fireId, oneShot, placement.device);
+    return;
+  }
   if (!retrying && !spendRun(ctx, scheduleId, fireId, oneShot)) return;
-  const started = await startRun(ctx, row, fireId, snapshot.ownerGeneration, {
-    prompt: `${row.prompt}${retrying ? "" : lateNote(row.next_run_at, ctx.now)}`,
-    ...(toRoute(row.route) === "agent" ? { agent: { description: row.description } } : {}),
-  });
+  const started = await startRun(
+    ctx,
+    row,
+    fireId,
+    snapshot.ownerGeneration,
+    {
+      prompt: `${row.prompt}${retrying ? "" : lateNote(row.waiting_since ?? row.next_run_at, ctx.now)}`,
+      ...(toRoute(row.route) === "agent" ? { agent: { description: row.description } } : {}),
+    },
+    placement,
+  );
+  if (!started.ok && started.computerAway) {
+    await waitForComputer(ctx, row, fireId, oneShot, placement.device);
+    return;
+  }
   finishFire(ctx, scheduleId, fireId, started.ok ? {} : { ...started.outcome, oneShot });
+};
+
+/** Where a scheduled run goes: anywhere (today's routing), or only to a computer. */
+type Placement =
+  | { computerOnly: false; away: false; device?: undefined }
+  | { computerOnly: true; away: boolean; device?: DeviceDestination; ownDevice: boolean };
+
+const WAIT_RECHECK_MS = 30 * 60_000;
+
+/**
+ * A computer-only run goes to the computer that set the schedule up, else
+ * the user's main computer (or the one seen last). `away` when none is
+ * online: the run then waits instead of starting anywhere.
+ */
+const placementOf = async (ctx: OwnerContext, row: Row): Promise<Placement> => {
+  if (!computerOnly(ctx)) return { computerOnly: false, away: false };
+  const computers = await ctx.host.deviceDestinations();
+  const own = row.target_device_id
+    ? computers.find((device) => device.deviceId === row.target_device_id)
+    : undefined;
+  const device =
+    own ??
+    [...computers].sort(
+      (a, b) =>
+        Number(Boolean(b.brainHome)) - Number(Boolean(a.brainHome)) ||
+        Number(b.online) - Number(a.online) ||
+        (b.lastSeenAt ?? 0) - (a.lastSeenAt ?? 0),
+    )[0];
+  return { computerOnly: true, away: !device?.online, ownDevice: Boolean(own), ...(device ? { device } : {}) };
+};
+
+/**
+ * The run came due while its computer was away. Nothing runs in the cloud:
+ * the schedule keeps the run waiting, says so once in its conversation and on
+ * the phone, and runs it when the computer is back (`schedules.computerBack`),
+ * with a slow recheck in case that signal is missed.
+ */
+const waitForComputer = async (
+  ctx: OwnerContext,
+  row: Row,
+  fireId: string,
+  oneShot: boolean,
+  device: DeviceDestination | undefined,
+): Promise<void> => {
+  const current = readRow(ctx.db, row.schedule_id);
+  if (!current || current.active_fire_id !== fireId) return;
+  const dueAt = row.waiting_since ?? row.next_run_at;
+  const recheckAt = ctx.now + WAIT_RECHECK_MS;
+  const nextRunAt = oneShot ? recheckAt : Math.min(current.next_run_at, recheckAt);
+  ctx.db.run(
+    `UPDATE schedules SET active_fire_id = NULL, waiting_since = ?, status = 'active', next_run_at = ?,
+            last_error = NULL, last_error_at = NULL, failure_count = 0, updated_at = ? WHERE schedule_id = ?`,
+    dueAt,
+    nextRunAt,
+    ctx.now,
+    row.schedule_id,
+  );
+  arm(ctx, { schedule_id: row.schedule_id, status: "active", next_run_at: nextRunAt });
+  if (row.waiting_since !== null) return;
+  const waiting: Row = { ...current, status: "active", next_run_at: nextRunAt, waiting_since: dueAt };
+  queueNotice(ctx, waiting, "waiting");
+  const tokens = livePushTokens(ctx);
+  const computer = device?.label?.trim() || "your computer";
+  const body = `"${row.description}" is due, but ${computer} is off or asleep. It runs as soon as ${computer} is back.`;
+  await sendPushMessages(
+    ctx,
+    tokens,
+    tokens.map((token) => ({
+      to: token.token,
+      title: "Waiting for your computer",
+      body,
+      data: {
+        kind: SCHEDULE_WAITING_PUSH_KIND,
+        scheduleId: row.schedule_id,
+        ...(row.conversation_id ? { conversationId: row.conversation_id } : {}),
+      },
+      sound: "default",
+    })),
+  ).catch(() => false);
+};
+
+const SCHEDULE_WAITING_PUSH_KIND = "schedule-waiting";
+
+/** A computer came back: runs waiting for it go now. */
+const computerBack = (ctx: OwnerContext, raw: unknown): { woke: number } => {
+  const { deviceId } = object({ deviceId: string({ max: 256 }) })(raw);
+  const rows = ctx.db.all<Row>(
+    `SELECT * FROM schedules WHERE status = 'active' AND waiting_since IS NOT NULL
+        AND active_fire_id IS NULL AND (target_device_id = ? OR target_device_id IS NULL)`,
+    deviceId,
+  );
+  for (const row of rows) {
+    if (row.next_run_at <= ctx.now) continue;
+    ctx.db.run("UPDATE schedules SET next_run_at = ?, updated_at = ? WHERE schedule_id = ?", ctx.now, ctx.now, row.schedule_id);
+    arm(ctx, { ...row, next_run_at: ctx.now });
+  }
+  return { woke: rows.length };
 };
 
 const lateNote = (dueAt: number, now: number): string =>
@@ -1237,7 +1387,7 @@ const spendRun = (ctx: OwnerContext, scheduleId: string, fireId: string, oneShot
 
 type StartOutcome =
   | { ok: true }
-  | { ok: false; outcome: { error: string; retry?: { sameFire: boolean } } };
+  | { ok: false; computerAway: boolean; outcome: { error: string; retry?: { sameFire: boolean } } };
 
 const startRun = async (
   ctx: OwnerContext,
@@ -1245,12 +1395,14 @@ const startRun = async (
   fireId: string,
   ownerGeneration: string,
   run: { prompt: string; agent?: { description: string } },
+  placement: Placement,
 ): Promise<StartOutcome> => {
   const scheduleId = row.schedule_id;
   let conversationId = row.conversation_id ?? crypto.randomUUID();
   if (!row.conversation_id) {
     ctx.db.run("UPDATE schedules SET conversation_id = ? WHERE schedule_id = ?", conversationId, scheduleId);
   }
+  const targetDeviceId = placement.computerOnly ? placement.device?.deviceId : row.target_device_id;
   const start = async (id: string) =>
     await ctx.host.startScheduledTurn({
       ownerGeneration,
@@ -1258,7 +1410,8 @@ const startRun = async (
       clientMsgId: `schedule:${fireId}`,
       prompt: run.prompt,
       title: row.description,
-      ...(row.target_device_id ? { targetDeviceId: row.target_device_id } : {}),
+      ...(targetDeviceId ? { targetDeviceId } : {}),
+      ...(placement.computerOnly ? { computerOnly: { ownDevice: placement.ownDevice } } : {}),
       ...(run.agent ? { agent: run.agent } : {}),
     });
   try {
@@ -1278,6 +1431,7 @@ const startRun = async (
     const definite = error instanceof ScheduledTurnError;
     return {
       ok: false,
+      computerAway: definite && error.computerAway,
       outcome: {
         error: message,
         ...(!definite || error.retryable ? { retry: { sameFire: !definite } } : {}),
@@ -1373,6 +1527,11 @@ const fireWatch = async (
       failure = run.error;
     }
   }
+  const placement = await placementOf(ctx, row);
+  if (placement.away) {
+    await waitForComputer(ctx, row, fireId, false, placement.device);
+    return;
+  }
   if (!retrying && !spendRun(ctx, scheduleId, fireId, false)) return;
   const toAgent = Boolean(found) && toRoute(row.route) === "agent";
   const started = await startRun(
@@ -1386,7 +1545,12 @@ const fireWatch = async (
           ...(toAgent ? { agent: { description: row.description } } : {}),
         }
       : { prompt: watchFailedPrompt(row, failure) },
+    placement,
   );
+  if (!started.ok && started.computerAway) {
+    await waitForComputer(ctx, row, fireId, false, placement.device);
+    return;
+  }
   if (!started.ok) {
     finishFire(ctx, scheduleId, fireId, started.outcome);
     return;
@@ -1447,11 +1611,12 @@ export const schedulesDomain = {
     SCHEDULES_ZONE_MIGRATION,
     SCHEDULES_ZONE_SOURCE_MIGRATION,
     SCHEDULES_WATCH_REPAIR_MIGRATION,
+    SCHEDULES_WAITING_MIGRATION,
   ],
   views: {
     "schedules.list": {
       parse: empty(),
-      read: (ctx) => listRows(ctx.db),
+      read: (ctx) => listRows(ctx),
     },
     "schedules.reminders": {
       parse: empty(),
@@ -1508,6 +1673,7 @@ export const schedulesDomain = {
   },
   internal: {
     "schedules.tool": (ctx: OwnerContext, args: unknown) => scheduleTool(ctx, args),
+    "schedules.computerBack": (ctx: OwnerContext, args: unknown) => computerBack(ctx, args),
   },
   jobs: {
     [SCHEDULE_FIRE_JOB]: {

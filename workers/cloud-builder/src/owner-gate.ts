@@ -138,6 +138,7 @@ import type { OwnerEvent } from "@stella/contracts/turn-plane/owner-events";
 import {
   decideDispatchPlacement,
   type DevicePresenceState,
+  isOwnScheduledWork,
   isTerminalDispatchState,
   MAX_DEVICE_ID_CHARS,
   MAX_DISPATCH_PAYLOAD_BYTES,
@@ -1696,6 +1697,13 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     });
     let candidates: DevicePresenceState[] = [];
     let awaitsReconnect = false;
+    const ownWork = isOwnScheduledWork(
+      {
+        ingress: request.ingress,
+        requesting_device_id: requestingDeviceId ?? null,
+      },
+      request.targetDeviceId,
+    );
     if (decision.kind === "offer") {
       if (
         request.ingress === "mobile" &&
@@ -1731,6 +1739,7 @@ export class OwnerGate extends OwnerGateCloudDispatch {
         kind: request.kind,
         requiredCapabilities,
         now,
+        ...(ownWork ? { ownWorkOf: request.targetDeviceId } : {}),
       });
       if (
         candidates.length === 0 &&
@@ -1743,6 +1752,7 @@ export class OwnerGate extends OwnerGateCloudDispatch {
           kind: request.kind,
           requiredCapabilities,
           now,
+          ownWork,
         });
         if (reconnecting) {
           candidates = [reconnecting];
@@ -1751,7 +1761,7 @@ export class OwnerGate extends OwnerGateCloudDispatch {
       }
     }
     const targetConsent =
-      targetMode === "device" && request.targetDeviceId
+      targetMode === "device" && request.targetDeviceId && !ownWork
         ? await this.deviceRemoteExecution(request.targetDeviceId, now)
         : undefined;
     if (

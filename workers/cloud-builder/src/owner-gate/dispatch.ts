@@ -24,6 +24,7 @@ import {
   type DevicePresenceState,
   type DeviceRegistration,
   isEligibleDevice,
+  isOwnScheduledWork,
   isTerminalDispatchState,
   MAX_OFFERS_PER_DISPATCH,
 } from "../dispatch-policy.js";
@@ -160,6 +161,7 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
     kind: ExecutionKind;
     requiredCapabilities: readonly ExecutionCapability[];
     now: number;
+    ownWorkOf?: string;
   }): DevicePresenceState[] {
     const registrations = new Map<string, DeviceRegistration>();
     for (const device of args.snapshot.devices ?? []) {
@@ -176,6 +178,7 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
           requiredCapabilities: args.requiredCapabilities,
           now: args.now,
           staleAfterMs: DEVICE_PRESENCE_STALE_AFTER_MS,
+          ownWork: args.ownWorkOf === deviceId,
         })
       ) {
         eligible.push(presence!);
@@ -302,6 +305,7 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
     kind: ExecutionKind;
     requiredCapabilities: readonly ExecutionCapability[];
     now: number;
+    ownWork?: boolean;
   }): DevicePresenceState | null {
     const presence = this.presenceRow(args.deviceId);
     if (!presence || presence.connected) return null;
@@ -324,6 +328,7 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
       requiredCapabilities: args.requiredCapabilities,
       now: args.now,
       staleAfterMs: DEVICE_PRESENCE_STALE_AFTER_MS,
+      ...(args.ownWork ? { ownWork: true } : {}),
     });
     return eligible ? presence : null;
   }
@@ -434,14 +439,17 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
       return await this.runCloudBranch(committed, now);
     }
     const explicitDevice = row.requested_target_mode === "device";
+    const ownWork = isOwnScheduledWork(row, row.requested_executor_device_id);
     const refusal = explicitDevice
       ? this.selectedDeviceRefusal({
           deviceId: row.requested_executor_device_id,
           now,
-          ...(await this.deviceRemoteExecution(
-            row.requested_executor_device_id,
-            now,
-          ).then((state) => (state ? { remoteExecution: state } : {}))),
+          ...(ownWork
+            ? {}
+            : await this.deviceRemoteExecution(
+                row.requested_executor_device_id,
+                now,
+              ).then((state) => (state ? { remoteExecution: state } : {}))),
         })
       : null;
     const blocked = await this.patchDispatch(
@@ -856,6 +864,9 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
       kind: row.kind as ExecutionKind,
       requiredCapabilities: required,
       now,
+      ...(isOwnScheduledWork(row, attachment.deviceId)
+        ? { ownWorkOf: attachment.deviceId }
+        : {}),
     });
     if (eligible.length === 0) {
       this.send(socket, {

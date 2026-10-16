@@ -42,6 +42,8 @@ type ScheduleRow = {
   description: string;
   lastError?: string;
   lastErrorAt?: number;
+  computerOnly?: boolean;
+  waitingSince?: number;
 };
 
 const asTrimmedString = (value: unknown): string =>
@@ -94,6 +96,8 @@ const listRow = (row: ScheduleRow): ScheduleListRow => {
     ...(watch && row.once ? { once: true as const } : {}),
     ...(watch && row.lastFinding ? { lastFinding: row.lastFinding } : {}),
     ...(row.lastError ? { lastError: row.lastError } : {}),
+    ...(row.computerOnly && row.kind !== "reminder" ? { runsOn: "computer" as const } : {}),
+    ...(iso(row.waitingSince) ? { waitingForComputerSince: iso(row.waitingSince) } : {}),
   };
 };
 
@@ -123,8 +127,16 @@ const summarizeRow = (row: ScheduleRow): Record<string, unknown> => {
     ...(message !== null ? { message } : { prompt: row.prompt }),
     ...(row.lastError ? { lastStatus: "failed", lastError: row.lastError } : {}),
     ...(iso(row.lastRunAt) ? { lastRunAt: iso(row.lastRunAt) } : {}),
+    ...(row.computerOnly && row.kind !== "reminder" ? { runsOn: "computer" } : {}),
+    ...(iso(row.waitingSince) ? { waitingForComputerSince: iso(row.waitingSince) } : {}),
   };
 };
+
+/** Free has no cloud runs: say where the work happens instead of letting it fail later. */
+export const computerOnlyNote = (row: { kind?: string; computerOnly?: boolean } | undefined): string =>
+  row?.computerOnly && row.kind !== "reminder"
+    ? " The user's plan runs scheduled work only on their computer, never in the cloud: it runs there, and if that computer is off or asleep when it's due, the user is told and it runs once the computer is back. Say so if they expected it to run with the computer off."
+    : "";
 
 const scheduleFromArgs = (value: unknown, triggerKind = "task"): Record<string, unknown> => {
   const watch = triggerKind === "watch";
@@ -311,7 +323,7 @@ export const createCloudScheduleTools = (
             ? (receiptRow as unknown as ScheduleRow)
             : undefined);
         return result(
-          `Added ${kind} "${name}" (${jobId}), ${describeSchedule(schedule)}; next fire ${iso(record?.nextRunAt) ?? "pending"}.${firstCheckNote(payload)}`,
+          `Added ${kind} "${name}" (${jobId}), ${describeSchedule(schedule)}; next fire ${iso(record?.nextRunAt) ?? "pending"}.${firstCheckNote(payload)}${computerOnlyNote(record)}`,
           {
             action: "added",
             jobId,

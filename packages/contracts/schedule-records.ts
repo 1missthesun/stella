@@ -57,6 +57,8 @@ export const cronJobOfScheduleRow = (row: ScheduleRow): LocalCronJobRecord => ({
   ...(row.lastRunAt !== undefined ? { lastRunAtMs: row.lastRunAt } : {}),
   ...(row.lastFinding ? { lastOutputPreview: row.lastFinding } : {}),
   ...(row.lastError ? { lastStatus: "error", lastError: row.lastError } : {}),
+  ...(row.computerOnly && row.kind !== "reminder" ? { runsOn: "computer" as const } : {}),
+  ...(row.waitingSince !== undefined ? { waitingSinceMs: row.waitingSince } : {}),
   createdAt: row.createdAt,
   updatedAt: row.updatedAt,
 });

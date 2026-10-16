@@ -106,6 +106,8 @@ export type CloudJournalAppendRequest = {
   ownerGeneration?: string;
   appendId: string;
   records: CloudJournalAppendRecord[];
+  /** What the history is: a voice transcript (default) or local history imported once. */
+  source?: "voice" | "import";
 };
 
 export type CloudTranscriptWriterOptions = {
@@ -203,7 +205,7 @@ type JournalAppendPayload = {
   deviceId: string;
   expectedOwnerGeneration: string;
   localTurnId: string;
-  source: "voice";
+  source: "voice" | "import";
   records: CloudJournalAppendRecord[];
 };
 
@@ -1579,7 +1581,7 @@ export const createCloudTranscriptWriter = (
         deviceId: options.deviceId,
         expectedOwnerGeneration: ownerGeneration,
         localTurnId: appendId,
-        source: "voice",
+        source: request.source ?? "voice",
         records: request.records,
       };
       const { replayed } = options.store.putCloudJournalOutbox({

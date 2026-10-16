@@ -316,6 +316,7 @@ export const cloudJournalFor = (
         conversationId,
         appendId,
         records: records.map((record) => ({ kind: "message", ...record })),
+        source: "import",
       });
     },
     appendVoice: async (said) => {

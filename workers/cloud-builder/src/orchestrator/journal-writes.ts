@@ -64,7 +64,7 @@ export abstract class OrchestratorJournalWrites extends OrchestratorRunTurn {
       !expectedOwnerGeneration ||
       !localTurnId ||
       !LOCAL_TURN_ID_PATTERN.test(localTurnId) ||
-      body.source !== "voice" ||
+      (body.source !== "voice" && body.source !== "import") ||
       !Array.isArray(records) ||
       records.length === 0
     ) {
@@ -116,7 +116,9 @@ export abstract class OrchestratorJournalWrites extends OrchestratorRunTurn {
         413,
       );
     }
-    const source = "voice" as const;
+    // "voice": a desktop voice transcript; "import": chat history made on
+    // the computer before it synced (signed out), copied in once.
+    const source: "voice" | "import" = body.source;
     const receiptKey = `${source}:${deviceId}:${localTurnId}`;
     const turnId = `${source}:${deviceId}:${localTurnId}`;
     const appendLease: OwnerFencedTurn = {

@@ -320,7 +320,6 @@ codeRuntime.reset()`;
             type?: string;
             path?: string;
             mimeType?: string;
-            deleteAfterAttach?: boolean;
           }>;
         };
       }
@@ -333,10 +332,6 @@ codeRuntime.reset()`;
     typedDetail.path === image.sourcePath,
     "Model image source and code image receipt disagree",
   );
-  assert(
-    typedDetail.deleteAfterAttach === true,
-    "Kernel-owned screenshot did not transfer cleanup ownership",
-  );
   let screenshotStillExists = true;
   try {
     await access(image.sourcePath);
@@ -344,8 +339,8 @@ codeRuntime.reset()`;
     screenshotStillExists = false;
   }
   assert(
-    screenshotStillExists === false,
-    "Adapter did not acknowledge and clean up the transferred screenshot",
+    screenshotStillExists,
+    "Screenshot file was removed after it was attached",
   );
   const afterScreenshotReset = await modelTool.execute(
     `live-browser-after-screenshot-reset-${randomUUID()}`,

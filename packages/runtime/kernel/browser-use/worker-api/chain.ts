@@ -56,6 +56,7 @@ export const SAFE_ACTION_KEYS: Readonly<Record<string, readonly string[]>> =
       "format",
       "quality",
       "annotate",
+      "path",
     ],
     evaluate: ["tabId", "script"],
     click: ["tabId", "selector"],

@@ -1,8 +1,6 @@
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
-import { mkdir, rm, writeFile } from "node:fs/promises";
-import os from "node:os";
 import { Worker } from "node:worker_threads";
 import { Deferred, Effect } from "effect";
 
@@ -53,6 +51,9 @@ import {
   type SkyClient,
 } from "./client.js";
 import { createNodeReplWorkerSource } from "./kernel-worker.js";
+import { saveBrowserScreenshot } from "./browser-screenshot-store.js";
+import { resolveStatePath } from "../cli/shared.js";
+import { expandHomePath, toolContextHome } from "../tools/utils.js";
 import type { ComputerUseSession } from "./session.js";
 import {
   DEFAULT_NODE_REPL_TOOL_DRAIN_TIMEOUT_MS,
@@ -357,7 +358,6 @@ type ActiveEvaluation = {
 type BrowserScreenshotAttachment = Readonly<{
   path: string;
   mimeType: "image/jpeg" | "image/png";
-  deleteAfterAttach: boolean;
 }>;
 
 type BrowserPresentationTab = Readonly<{
@@ -370,6 +370,11 @@ type BrowserPresentationTabs = Readonly<{
   tabs: BrowserPresentationTab[];
   activeTabId?: number;
 }>;
+
+type ScreenshotSavePaths = {
+  command?: string;
+  steps: Map<number, string>;
+};
 
 const BROWSER_METHODS = new Set(["command", "chain", "use"]);
 const READ_ONLY_BROWSER_ACTIONS = new Set([
@@ -425,7 +430,6 @@ const BROWSER_PRESENTATION_ACTIONS = new Set([
   "wheel",
 ]);
 const BROWSER_PRESENTATION_TIMEOUT_MS = 10_000;
-const MAX_BROWSER_SCREENSHOT_FILES_PER_KERNEL = 100;
 export const NODE_REPL_EXCLUDED_TOOL_NAMES: ReadonlySet<string> = new Set([
   CODE_TOOL_NAME,
   LEGACY_NODE_REPL_TOOL_NAME,
@@ -718,7 +722,7 @@ class NodeReplKernel {
   private active: ActiveEvaluation | null = null;
   private closed = false;
   private closePromise?: Promise<void>;
-  private readonly browserScreenshotPaths = new Set<string>();
+  private readonly workingDirectory: string;
   readonly generationStartedAt = Date.now();
 
   constructor(
@@ -773,6 +777,7 @@ class NodeReplKernel {
     this.connectClient = options.connectClient;
     this.cloudBrowser = options.deviceControl ? undefined : options.cloudBrowser;
     this.browserSessionId = options.browserSessionId;
+    this.workingDirectory = cwd;
     const getSignal = () => this.active?.controller.signal;
     const session = options.sessionFactory({
       sessionId: id,
@@ -863,7 +868,6 @@ class NodeReplKernel {
     this.closePromise = Promise.allSettled([
       this.worker.terminate(),
       this.browser.dispose(),
-      this.cleanupBrowserScreenshots(),
     ]).then(() => undefined);
     return this.closePromise;
   }
@@ -1425,8 +1429,17 @@ class NodeReplKernel {
       return;
     }
     try {
+      let args: unknown[] = message.args;
+      let savePath: string | undefined;
+      if (message.method === "screenshot") {
+        const split = this.splitScreenshotParams(active, args[0]);
+        if (split.savePath) {
+          savePath = split.savePath;
+          args = [split.params, ...args.slice(1)];
+        }
+      }
       const run = () =>
-        bridge.call(message.method, message.args, active.controller.signal);
+        bridge.call(message.method, args, active.controller.signal);
       let value = bridge.awaitsUser(message.method)
         ? await this.whileAwaitingUser(active, run)
         : await run();
@@ -1442,6 +1455,7 @@ class NodeReplKernel {
           base64Key: "base64",
           pathKey: "path",
           format,
+          ...(savePath ? { savePath } : {}),
         });
         value = {
           attached: true,
@@ -1591,9 +1605,13 @@ class NodeReplKernel {
         active.context.rootRunId ??
         active.context.requestId;
       this.browser.beginTurn?.(turnId);
+      const { message: forwarded, savePaths } = this.takeScreenshotSavePaths(
+        active,
+        message,
+      );
       let value: unknown;
       try {
-        value = await this.executeBrowserMessage(active, message);
+        value = await this.executeBrowserMessage(active, forwarded);
       } catch (error) {
         const outcome = await this.whileAwaitingUser(active, () =>
           maybeRequestBrowserExtensionConnect({
@@ -1606,13 +1624,18 @@ class NodeReplKernel {
           }),
         );
         if (!outcome?.ok) throw error;
-        value = await this.executeBrowserMessage(active, message);
+        value = await this.executeBrowserMessage(active, forwarded);
       }
-      value = await this.prepareBrowserScreenshotResult(active, message, value);
+      value = await this.prepareBrowserScreenshotResult(
+        active,
+        forwarded,
+        value,
+        savePaths,
+      );
       if (serializedSize(value) > MAX_NODE_REPL_PROTOCOL_MESSAGE_BYTES) {
         throw new Error("browser result exceeds the protocol limit.");
       }
-      this.recordBrowserActivity(active, message, value);
+      this.recordBrowserActivity(active, forwarded, value);
       if (!this.closed && this.active === active) {
         this.post({
           type: "browser-result",
@@ -1632,6 +1655,7 @@ class NodeReplKernel {
     active: ActiveEvaluation,
     message: Extract<WorkerToNodeReplParentMessage, { type: "browser-call" }>,
     value: unknown,
+    savePaths: ScreenshotSavePaths,
   ): Promise<unknown> {
     const receipt = this.recordValue(value);
     const result = this.recordValue(receipt?.result);
@@ -1644,6 +1668,7 @@ class NodeReplKernel {
         base64Key: "base64",
         pathKey: "path",
         format: data.format ?? params?.format,
+        ...(savePaths.command ? { savePath: savePaths.command } : {}),
       });
       return value;
     }
@@ -1658,10 +1683,12 @@ class NodeReplKernel {
       const stepData = this.recordValue(stepResult?.data);
       if (!stepData) continue;
       const stepParams = this.recordValue(step.params);
+      const savePath = savePaths.steps.get(index);
       await this.materializeBrowserScreenshot(active, stepData, {
         base64Key: "base64",
         pathKey: "path",
         format: stepData.format ?? stepParams?.format,
+        ...(savePath ? { savePath } : {}),
       });
     }
 
@@ -1689,13 +1716,15 @@ class NodeReplKernel {
       base64Key: string;
       pathKey: string;
       format: unknown;
+      savePath?: string;
     },
   ): Promise<void> {
     const encoded = data[options.base64Key];
     const existingPath = data[options.pathKey];
     const format = this.browserScreenshotFormat(
       options.format,
-      typeof existingPath === "string" ? existingPath : undefined,
+      options.savePath ??
+        (typeof existingPath === "string" ? existingPath : undefined),
     );
     let screenshotPath =
       typeof existingPath === "string" && path.isAbsolute(existingPath)
@@ -1705,7 +1734,15 @@ class NodeReplKernel {
     if (typeof encoded === "string") {
       delete data[options.base64Key];
       if (encoded) {
-        screenshotPath = await this.writeBrowserScreenshot(encoded, format);
+        screenshotPath = await saveBrowserScreenshot({
+          stellaDataDir: active.context.stellaDataDir?.trim()
+            ? path.resolve(active.context.stellaDataDir)
+            : resolveStatePath(),
+          scope: active.context.agentId ?? active.context.conversationId,
+          bytes: Buffer.from(encoded, "base64"),
+          format,
+          ...(options.savePath ? { explicitPath: options.savePath } : {}),
+        });
         data[options.pathKey] = screenshotPath;
       }
     }
@@ -1714,7 +1751,6 @@ class NodeReplKernel {
     const attachment = {
       path: screenshotPath,
       mimeType: format === "png" ? "image/png" : "image/jpeg",
-      deleteAfterAttach: this.browserScreenshotPaths.has(screenshotPath),
     } as const;
     if (
       !active.browserActivity.screenshotAttachments.some(
@@ -1734,27 +1770,78 @@ class NodeReplKernel {
     return screenshotPath?.toLowerCase().endsWith(".png") ? "png" : "jpeg";
   }
 
-  private async writeBrowserScreenshot(
-    encoded: string,
-    format: "jpeg" | "png",
-  ): Promise<string> {
-    const directory = path.join(os.tmpdir(), "stella-browser-repl");
-    await mkdir(directory, { recursive: true });
-    const screenshotPath = path.join(
-      directory,
-      `${randomUUID()}.${format === "png" ? "png" : "jpeg"}`,
-    );
-    await writeFile(screenshotPath, Buffer.from(encoded, "base64"));
-    this.browserScreenshotPaths.add(screenshotPath);
-    while (
-      this.browserScreenshotPaths.size > MAX_BROWSER_SCREENSHOT_FILES_PER_KERNEL
-    ) {
-      const oldest = this.browserScreenshotPaths.values().next().value;
-      if (typeof oldest !== "string") break;
-      this.browserScreenshotPaths.delete(oldest);
-      await rm(oldest, { force: true }).catch(() => undefined);
+  private resolveScreenshotSavePath(
+    active: ActiveEvaluation,
+    value: unknown,
+  ): string {
+    if (typeof value !== "string" || !value.trim()) {
+      throw new TypeError("screenshot path must be a non-empty string.");
     }
-    return screenshotPath;
+    return path.resolve(
+      this.workingDirectory,
+      expandHomePath(value.trim(), toolContextHome(active.context)),
+    );
+  }
+
+  // `path` is saved here, after the capture, so it works the same on every
+  // backend (the extension and the cloud browser can't write local files).
+  private splitScreenshotParams(
+    active: ActiveEvaluation,
+    value: unknown,
+  ): { params: unknown; savePath?: string } {
+    const record = this.recordValue(value);
+    if (!record || record.path === undefined) return { params: value };
+    const { path: rawPath, ...params } = record;
+    const savePath = this.resolveScreenshotSavePath(active, rawPath);
+    if (params.format === undefined) {
+      const extension = path.extname(savePath).toLowerCase();
+      if (extension === ".png") params.format = "png";
+      else if (extension === ".jpg" || extension === ".jpeg") {
+        params.format = "jpeg";
+      }
+    }
+    return { params, savePath };
+  }
+
+  private takeScreenshotSavePaths(
+    active: ActiveEvaluation,
+    message: Extract<WorkerToNodeReplParentMessage, { type: "browser-call" }>,
+  ): {
+    message: Extract<WorkerToNodeReplParentMessage, { type: "browser-call" }>;
+    savePaths: ScreenshotSavePaths;
+  } {
+    const savePaths: ScreenshotSavePaths = { steps: new Map() };
+    if (message.method === "command" && message.args[0] === "screenshot") {
+      const { params, savePath } = this.splitScreenshotParams(
+        active,
+        message.args[1],
+      );
+      if (!savePath) return { message, savePaths };
+      savePaths.command = savePath;
+      return {
+        message: { ...message, args: [message.args[0], params] },
+        savePaths,
+      };
+    }
+    if (message.method !== "chain" || !Array.isArray(message.args[0])) {
+      return { message, savePaths };
+    }
+    const steps = (message.args[0] as unknown[]).map((rawStep, index) => {
+      const step = this.recordValue(rawStep);
+      if (step?.action !== "screenshot") return rawStep;
+      const { params, savePath } = this.splitScreenshotParams(
+        active,
+        step.params,
+      );
+      if (!savePath) return rawStep;
+      savePaths.steps.set(index, savePath);
+      return { ...step, params };
+    });
+    if (savePaths.steps.size === 0) return { message, savePaths };
+    return {
+      message: { ...message, args: [steps, ...message.args.slice(1)] },
+      savePaths,
+    };
   }
 
   private async executeBrowserMessage(
@@ -2380,14 +2467,10 @@ class NodeReplKernel {
     const content: NodeReplContentItem[] = [...(workerContent ?? [])];
     if (!error) {
       for (const attachment of activity.screenshotAttachments) {
-        if (attachment.deleteAfterAttach) {
-          this.browserScreenshotPaths.delete(attachment.path);
-        }
         content.push({
           type: "image",
           path: attachment.path,
           mimeType: attachment.mimeType,
-          ...(attachment.deleteAfterAttach ? { deleteAfterAttach: true } : {}),
         });
       }
     }
@@ -2474,14 +2557,6 @@ class NodeReplKernel {
       void this.close();
       this.onTerminated(this);
     }
-  }
-
-  private async cleanupBrowserScreenshots(): Promise<void> {
-    const paths = [...this.browserScreenshotPaths];
-    this.browserScreenshotPaths.clear();
-    await Promise.allSettled(
-      paths.map((filePath) => rm(filePath, { force: true })),
-    );
   }
 
   private terminateActive(error: KernelTerminatedError) {

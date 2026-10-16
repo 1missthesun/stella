@@ -1,4 +1,3 @@
-import { promises as fs } from "node:fs";
 
 import type {
   AgentToolResult,
@@ -394,7 +393,6 @@ type NodeReplImageRequest = {
   path: string;
   detail?: unknown;
   alreadyAttached?: unknown;
-  deleteAfterAttach?: unknown;
 };
 
 const base64Length = (binaryBytes: number) => Math.ceil(binaryBytes / 3) * 4;
@@ -741,14 +739,6 @@ export const extractCodeImageBlocks = async (
     } catch {
       // A vanished or invalid typed image is omitted without degrading
       // sibling items; its path remains available in tool details.
-    } finally {
-      // Browser screenshots created by the Node kernel transfer ownership
-      // here before a reset closes that kernel. Reading the bytes is the
-      // acknowledgement boundary; only kernel-marked temporary files are
-      // removed, never user-provided nodeRepl.emitImage paths.
-      if (item.deleteAfterAttach === true) {
-        await fs.rm(item.path, { force: true }).catch(() => undefined);
-      }
     }
   }
   return images;

@@ -115,10 +115,13 @@ export const screenshotParams = (
   const value = requireOptions(rawOptions, "screenshot options");
   assertKnownKeys(
     value,
-    ["fullPage", "selector", "format", "quality", "annotate"],
+    ["fullPage", "selector", "format", "quality", "annotate", "path"],
     "screenshot options",
   );
   const params: Record<string, unknown> = { tabId };
+  if (value.path !== undefined) {
+    params.path = requireString(value.path, "path");
+  }
   if (value.fullPage !== undefined) {
     if (typeof value.fullPage !== "boolean") {
       throw new TypeError("fullPage must be a boolean.");

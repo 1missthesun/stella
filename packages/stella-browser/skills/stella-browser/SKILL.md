@@ -117,6 +117,8 @@ Use the least expensive observation that answers the question:
 - Unknown structure at a branch or recovery point: `tab.axSnapshot()` (incremental; see below). It is not available in cloud browser sessions; there, and whenever the full DOM snapshot format is wanted, use `tab.snapshot()` or `page.domSnapshot()`.
 - Visual appearance, coordinates, or rendering: `tab.screenshot()`. The image is attached to the tool result automatically; the JavaScript return value is only a compact `{ attached, path, format, mimeType }` receipt. Do not pass that receipt to `codeRuntime.emitImage()`.
 
+Screenshot files stay on disk after the `code` call returns, so later `Bash`, `Read` or `drive_upload` calls can use the returned `path`. By default they go to `~/.stella/media/screenshots/<agent or conversation>/` and are deleted after 7 days (or sooner, oldest first, once that folder passes 1 GB). To keep one or put it somewhere specific, pass `path`: `await tab.screenshot({ path: "~/.stella/outputs/report/home.png" })` writes there (a relative path is relative to your working directory, `~` is your home, `.png`/`.jpg` picks the format) and that file is never cleaned up.
+
 Do not take a snapshot after every action. Snapshot only when page structure is needed to choose the next step. Use a screenshot only when pixels matter.
 
 Semantic snapshots are bounded to 200 emitted entries and 20,000 characters. When a page exceeds that budget, metadata reports truncation and unavailable frames; narrow with `selector`, `interactive`, `compact`, or `maxDepth` instead of requesting repeated full-page snapshots. Selector-scoped captures omit descendant frames.
@@ -249,7 +251,7 @@ For a new task, call `tabs.new()` once and then navigate that handle with `tab.g
 | `scroll(options?)`                                                    | Scroll page or element.                  |
 | `expectNewTab(action, { timeoutMs? })`                                | Capture exactly one new owned tab.       |
 
-Snapshot options are `interactive`, `cursor`, `maxDepth` (or `depth`), `compact`, and `selector`. Screenshot options are `fullPage`, `selector`, `format` (`"png"` or `"jpeg"`), `quality` (0-100), and `annotate`. Scroll options are pixel deltas `x`/`y` (negative scrolls up/left) or `selector` + `direction` + `amount`; prefer `locator.scrollIntoViewIfNeeded()` before acting on an element.
+Snapshot options are `interactive`, `cursor`, `maxDepth` (or `depth`), `compact`, and `selector`. Screenshot options are `fullPage`, `selector`, `format` (`"png"` or `"jpeg"`), `quality` (0-100), `annotate`, and `path` (where to save the file). Scroll options are pixel deltas `x`/`y` (negative scrolls up/left) or `selector` + `direction` + `amount`; prefer `locator.scrollIntoViewIfNeeded()` before acting on an element.
 
 ### Page Facade
 

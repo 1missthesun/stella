@@ -6,7 +6,7 @@ export const REQUEST_BUDGET_MS = {
   slow: 120_000,
   connect: 15_000,
   transferIdle: 60_000,
-  streamIdle: 180_000,
+  streamIdle: 300_000,
 } as const;
 
 const MIN_TRANSFER_BYTES_PER_SECOND = 128 * 1024;
@@ -169,6 +169,97 @@ export const withIdleBody = (
   });
 };
 
+const rejectOnAbort = (signal: AbortSignal): Promise<never> =>
+  new Promise((_, reject) => {
+    if (signal.aborted) reject(abortReason(signal));
+    else signal.addEventListener("abort", () => reject(abortReason(signal)), { once: true });
+  });
+
+/**
+ * For streams and big downloads: fails only when the server goes silent for
+ * `idleMs` (waiting for headers, or for the next chunk the reader asked for),
+ * never for total time. The caller's signal keeps reaching the body.
+ * Needs ReadableStream bodies (not mobile).
+ */
+export const fetchWithInactivity = async (
+  fetchImpl: (input: string, init: RequestInit) => Promise<Response>,
+  url: string,
+  init: RequestInit,
+  options: { label: string; idleMs: number; signal?: AbortSignal | null | undefined },
+): Promise<Response> => {
+  const caller = options.signal ?? null;
+  if (caller?.aborted) throw abortReason(caller);
+  const controller = new AbortController();
+  const aborted = rejectOnAbort(controller.signal);
+  aborted.catch(() => undefined);
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const disarm = () => {
+    if (timer) clearTimeout(timer);
+    timer = null;
+  };
+  const release = () => {
+    disarm();
+    caller?.removeEventListener("abort", onCallerAbort);
+  };
+  const onCallerAbort = () => {
+    release();
+    controller.abort(abortReason(caller!));
+  };
+  const arm = () => {
+    disarm();
+    timer = setTimeout(() => {
+      release();
+      controller.abort(new RequestTimeoutError(options.label, options.idleMs, "inactivity"));
+    }, options.idleMs);
+  };
+  const failure = (error: unknown): unknown =>
+    controller.signal.aborted ? controller.signal.reason ?? error : error;
+  caller?.addEventListener("abort", onCallerAbort, { once: true });
+  arm();
+  let response: Response;
+  try {
+    response = await Promise.race([fetchImpl(url, { ...init, signal: controller.signal }), aborted]);
+  } catch (error) {
+    release();
+    throw failure(error);
+  }
+  disarm();
+  const source = response.body;
+  if (!source) {
+    release();
+    return response;
+  }
+  const reader = source.getReader();
+  const body = new ReadableStream<Uint8Array>({
+    pull: async (stream) => {
+      arm();
+      try {
+        const chunk = await Promise.race([reader.read(), aborted]);
+        disarm();
+        if (chunk.done) {
+          release();
+          stream.close();
+        } else {
+          stream.enqueue(chunk.value);
+        }
+      } catch (error) {
+        release();
+        void reader.cancel(failure(error)).catch(() => undefined);
+        stream.error(failure(error));
+      }
+    },
+    cancel: async (reason) => {
+      release();
+      await reader.cancel(reason);
+    },
+  });
+  return new Response(body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  });
+};
+
 /** Aborts once `touch()` has not been called for `idleMs`. */
 export const inactivitySignal = (options: {
   label: string;
@@ -253,4 +344,42 @@ export const retryIdempotent = async <T>(
       await sleep(delay, options.signal);
     }
   }
+};
+
+type UploadBody = ArrayBuffer | Uint8Array | Blob;
+
+const uploadSize = (body: UploadBody): number =>
+  body instanceof Blob ? body.size : body.byteLength;
+
+/** PUT to a presigned URL: deadline scaled by size, retried (same bytes, same object) on transient failures. */
+export const putSignedUpload = async (args: {
+  url: string;
+  body: UploadBody;
+  contentType: string;
+  label?: string;
+  signal?: AbortSignal | null | undefined;
+  fetchImpl?: (input: string, init: RequestInit) => Promise<Response>;
+}): Promise<Response> => {
+  const fetchImpl = args.fetchImpl ?? ((input: string, init: RequestInit) => fetch(input, init));
+  const label = args.label ?? "Uploading to Stella's Drive";
+  const timeoutMs = transferBudgetMs(uploadSize(args.body));
+  return await retryIdempotent(
+    async () => {
+      const response = await fetchWithDeadline(
+        fetchImpl,
+        args.url,
+        { method: "PUT", headers: { "Content-Type": args.contentType }, body: args.body as NonNullable<RequestInit["body"]> },
+        { label, timeoutMs, signal: args.signal },
+      );
+      if (response.status >= 500) {
+        throw Object.assign(new Error(`${label} failed (${response.status}).`), { retryable: true, response });
+      }
+      return response;
+    },
+    { attempts: 3, signal: args.signal },
+  ).catch((error: unknown) => {
+    const response = (error as { response?: unknown })?.response;
+    if (response instanceof Response) return response;
+    throw error;
+  });
 };

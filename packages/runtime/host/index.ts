@@ -969,6 +969,7 @@ export class StellaRuntimeHost {
             ensureWorker: true,
             recordActivity: true,
             retryOnceOnDisconnect: false,
+            rpc: AGENT_RUN_RPC_OPTIONS,
           },
         );
         if (result.status === "ok") {
@@ -1842,6 +1843,7 @@ export class StellaRuntimeHost {
       {
         ensureWorker: true,
         recordActivity: true,
+        rpc: AGENT_RUN_RPC_OPTIONS,
       },
     );
   }
@@ -2102,6 +2104,7 @@ export class StellaRuntimeHost {
               {
                 ensureWorker: true,
                 recordActivity: true,
+                rpc: AGENT_RUN_RPC_OPTIONS,
               },
             ),
           startAgent: async ({ conversationId, key, description, prompt }) =>

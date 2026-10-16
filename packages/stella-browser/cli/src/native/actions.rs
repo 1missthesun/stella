@@ -1721,6 +1721,25 @@ async fn execute_authorized(cmd: &Value, state: &mut DaemonState, confirmed: &[S
             | "extension_reconnect"
     );
     if !skip_launch && !matches!(state.backend_type, BackendType::Extension) {
+        let mut reconnected = false;
+        if let Some(ref mut mgr) = state.browser {
+            if mgr.needs_fresh_connection() {
+                match mgr.reconnect().await {
+                    Ok(()) => reconnected = true,
+                    Err(error) => {
+                        let _ = writeln!(
+                            std::io::stderr(),
+                            "[stella-browser] reconnecting to the browser failed: {}",
+                            error
+                        );
+                    }
+                }
+            }
+        }
+        if reconnected {
+            state.ref_map.clear();
+            state.update_stream_client().await;
+        }
         let needs_launch = if let Some(ref mgr) = state.browser {
             !mgr.is_connection_alive().await
         } else {

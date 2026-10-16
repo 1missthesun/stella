@@ -881,11 +881,42 @@ impl BrowserManager {
         Ok(())
     }
 
+    /// The CDP connection closed or stopped answering for fresh targets while
+    /// the browser itself may still run: `reconnect` replaces it.
+    pub fn needs_fresh_connection(&self) -> bool {
+        !self.client.is_usable()
+            && !matches!(self.browser_process, Some(BrowserProcess::Lightpanda(_)))
+    }
+
+    /// A new CDP connection to the same browser, with every tab attached on it
+    /// afresh. Tab ids stay the same; the old connection's sessions are dropped.
+    pub async fn reconnect(&mut self) -> Result<(), String> {
+        let client = Arc::new(CdpClient::connect(&self.ws_url).await?);
+        spawn_dialog_auto_handler(&client);
+        let active_target = self
+            .pages
+            .get(self.active_page_index)
+            .map(|page| page.target_id.clone());
+        self.client = client;
+        self.pages.clear();
+        self.active_page_index = 0;
+        self.discover_and_attach_targets().await?;
+        if let Some(target) = active_target {
+            if let Some(index) = self.pages.iter().position(|page| page.target_id == target) {
+                self.active_page_index = index;
+            }
+        }
+        Ok(())
+    }
+
     pub fn has_pages(&self) -> bool {
         !self.pages.is_empty()
     }
 
     pub async fn is_connection_alive(&self) -> bool {
+        if !self.client.is_usable() {
+            return false;
+        }
         let timeout = tokio::time::Duration::from_secs(3);
         let result = tokio::time::timeout(
             timeout,
@@ -1172,19 +1203,45 @@ impl BrowserManager {
             )
             .await?;
 
-        let attach: AttachToTargetResult = self
-            .client
-            .send_command_typed(
-                "Target.attachToTarget",
-                &AttachToTargetParams {
-                    target_id: result.target_id.clone(),
-                    flatten: true,
-                },
-                None,
-            )
-            .await?;
-
-        self.enable_domains(&attach.session_id).await?;
+        let attached = async {
+            let attach: AttachToTargetResult = self
+                .client
+                .send_command_typed(
+                    "Target.attachToTarget",
+                    &AttachToTargetParams {
+                        target_id: result.target_id.clone(),
+                        flatten: true,
+                    },
+                    None,
+                )
+                .await?;
+            self.enable_domains(&attach.session_id).await?;
+            Ok::<_, String>(attach)
+        }
+        .await;
+        let attach = match attached {
+            Ok(attach) => attach,
+            Err(error) => {
+                let _ = self
+                    .client
+                    .send_command_typed::<_, Value>(
+                        "Target.closeTarget",
+                        &CloseTargetParams {
+                            target_id: result.target_id.clone(),
+                        },
+                        None,
+                    )
+                    .await;
+                if error.starts_with("CDP command timed out") {
+                    self.client.mark_stuck();
+                    return Err(format!(
+                        "The browser did not answer for a new tab ({}). Stella reconnects to it on the next command; retry once.",
+                        error
+                    ));
+                }
+                return Err(error);
+            }
+        };
 
         let index = self.pages.len();
         let tab_id = self.tab_id_for_target(&result.target_id);

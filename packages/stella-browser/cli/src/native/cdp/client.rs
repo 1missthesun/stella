@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 
 use futures_util::{SinkExt, StreamExt};
@@ -36,6 +36,8 @@ pub struct CdpClient {
     raw_tx: broadcast::Sender<RawCdpMessage>,
     _reader_handle: tokio::task::JoinHandle<()>,
     frame_sessions: Arc<Mutex<HashMap<(String, String), String>>>,
+    closed: Arc<AtomicBool>,
+    stuck: AtomicBool,
 }
 
 impl CdpClient {
@@ -68,6 +70,8 @@ impl CdpClient {
         let event_tx_clone = event_tx.clone();
         let raw_tx_clone = raw_tx.clone();
         let frame_sessions_clone = frame_sessions.clone();
+        let closed = Arc::new(AtomicBool::new(false));
+        let closed_clone = closed.clone();
 
         let reader_handle = tokio::spawn(async move {
             while let Some(msg) = ws_rx.next().await {
@@ -131,6 +135,7 @@ impl CdpClient {
                 }
             }
 
+            closed_clone.store(true, Ordering::SeqCst);
             pending_clone.lock().await.clear();
         });
 
@@ -142,7 +147,19 @@ impl CdpClient {
             raw_tx,
             _reader_handle: reader_handle,
             frame_sessions,
+            closed,
+            stuck: AtomicBool::new(false),
         })
+    }
+
+    /// False once the WebSocket closed, or once a caller saw a fresh target
+    /// not answer on it: the connection must be replaced, not retried.
+    pub fn is_usable(&self) -> bool {
+        !self.closed.load(Ordering::SeqCst) && !self.stuck.load(Ordering::SeqCst)
+    }
+
+    pub fn mark_stuck(&self) {
+        self.stuck.store(true, Ordering::SeqCst);
     }
 
     pub async fn send_command(
@@ -151,6 +168,12 @@ impl CdpClient {
         params: Option<Value>,
         session_id: Option<&str>,
     ) -> Result<Value, String> {
+        if self.closed.load(Ordering::SeqCst) {
+            return Err(format!(
+                "CDP connection closed before {} was sent. Nothing was sent; Stella reconnects to the browser on the next command.",
+                method
+            ));
+        }
         let id = self.next_id.fetch_add(1, Ordering::SeqCst);
 
         let cmd = CdpCommand {

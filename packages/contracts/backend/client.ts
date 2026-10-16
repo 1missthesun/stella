@@ -1,4 +1,11 @@
+import {
+  isRequestTimeout,
+  REQUEST_BUDGET_MS,
+  retryIdempotent,
+  withDeadline,
+} from "../request-deadline.js";
 import { socketCredentialProtocol } from "../socket-ticket.js";
+import { backendCallBudget } from "./call-budgets.js";
 import type {
   CallArgs,
   CallName,
@@ -70,6 +77,15 @@ type SocketConstructor = new (url: string, protocols: string[]) => SocketLike;
 
 type FetchLike = (input: string, init: RequestInit) => Promise<Response>;
 
+export type BackendCallOptions = {
+  /** The caller's cancellation or own deadline. */
+  signal?: AbortSignal;
+  /** Overrides the call's default budget (`backendCallBudget`). */
+  timeoutMs?: number;
+  /** Safe to repeat after a timeout or network failure. Defaults per call name. */
+  idempotent?: boolean;
+};
+
 export type BackendClientOptions = {
   baseUrl: string;
   getToken: TokenProvider;
@@ -123,7 +139,11 @@ const toError = (error: unknown): BackendRequestError =>
         message:
           error instanceof Error ? error.message : "The request failed.",
         retryable: true,
+        ...(isRequestTimeout(error) ? { reason: "timeout" } : {}),
       });
+
+const isCallerAbort = (error: unknown, signal: AbortSignal | undefined): boolean =>
+  signal?.aborted === true && !isRequestTimeout(error);
 
 export class BackendClient {
   private readonly baseUrl: string;
@@ -139,6 +159,7 @@ export class BackendClient {
   private connecting = false;
   private reconnectAttempt = 0;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private connectTimer: ReturnType<typeof setTimeout> | null = null;
   private pingTimer: ReturnType<typeof setInterval> | null = null;
   private socketHeardAt = 0;
   private idleTimer: ReturnType<typeof setTimeout> | null = null;
@@ -161,15 +182,51 @@ export class BackendClient {
   async call<K extends CallName>(
     name: K,
     args: CallArgs<K>,
+    options: BackendCallOptions = {},
   ): Promise<CallResult<K>> {
-    let response = await this.postCall(name, args, false);
+    const budget = backendCallBudget(name);
+    const timeoutMs = options.timeoutMs ?? budget.timeoutMs;
+    const idempotent = options.idempotent ?? budget.idempotent;
+    return await retryIdempotent(
+      async () => {
+        try {
+          return await withDeadline(
+            { label: name, timeoutMs, signal: options.signal },
+            async (signal) => await this.callOnce(name, args, signal),
+          );
+        } catch (error) {
+          if (isCallerAbort(error, options.signal)) throw error;
+          throw toError(error);
+        }
+      },
+      {
+        attempts: idempotent ? 3 : 1,
+        signal: options.signal,
+        shouldRetry: (error) =>
+          error instanceof BackendRequestError &&
+          error.retryable &&
+          (error.code === "UNAVAILABLE" || error.reason === "timeout"),
+        retryAfterMs: (error) =>
+          error instanceof BackendRequestError ? error.retryAfterMs : undefined,
+      },
+    );
+  }
+
+  private async callOnce<K extends CallName>(
+    name: K,
+    args: CallArgs<K>,
+    signal: AbortSignal,
+  ): Promise<CallResult<K>> {
+    let response = await this.postCall(name, args, false, signal);
     if (response.status === 401) {
-      response = await this.postCall(name, args, true);
+      await response.body?.cancel().catch(() => undefined);
+      response = await this.postCall(name, args, true, signal);
     }
     let body: RpcResponse<CallResult<K>>;
     try {
       body = (await response.json()) as RpcResponse<CallResult<K>>;
-    } catch {
+    } catch (error) {
+      if (signal.aborted) throw signal.reason ?? error;
       throw new BackendRequestError({
         code: response.status >= 500 ? "UNAVAILABLE" : "INTERNAL",
         message: `The backend returned an unreadable response (${response.status}).`,
@@ -298,6 +355,7 @@ export class BackendClient {
     name: string,
     args: unknown,
     force: boolean,
+    signal: AbortSignal,
   ): Promise<Response> {
     const token = force
       ? await this.getToken({ force: true }).catch(
@@ -313,8 +371,10 @@ export class BackendClient {
         method: "POST",
         headers,
         body: JSON.stringify({ args: args ?? {} }),
+        signal,
       });
     } catch (error) {
+      if (signal.aborted) throw signal.reason ?? error;
       throw toError(error);
     }
   }
@@ -333,14 +393,26 @@ export class BackendClient {
     this.connecting = true;
     const force = this.forceTokenOnConnect;
     this.forceTokenOnConnect = false;
-    void this.getToken(force ? { force: true } : undefined)
-      .then((token) => {
-        if (this.disposed || this.subscriptions.size === 0) {
-          this.connecting = false;
-          return;
+    void withDeadline(
+      { label: "Connecting to Stella's cloud", timeoutMs: REQUEST_BUDGET_MS.connect },
+      async () => {
+        const token = await this.getToken(force ? { force: true } : undefined);
+        if (!token || this.disposed || this.subscriptions.size === 0) {
+          return { token, credential: null };
         }
+        const credential = await socketCredentialProtocol({
+          socketUrl: this.liveSocketUrl(),
+          token,
+          purpose: "live",
+          fetchImpl: this.fetchImpl,
+        });
+        return { token, credential };
+      },
+    )
+      .then(({ token, credential }) => {
+        this.connecting = false;
+        if (this.disposed || this.subscriptions.size === 0) return;
         if (!token) {
-          this.connecting = false;
           this.failAll({
             code: "UNAUTHENTICATED",
             message: "Sign in to load this.",
@@ -348,19 +420,11 @@ export class BackendClient {
           });
           return;
         }
-        return socketCredentialProtocol({
-          socketUrl: this.liveSocketUrl(),
-          token,
-          purpose: "live",
-          fetchImpl: this.fetchImpl,
-        }).then((credential) => {
-          this.connecting = false;
-          if (this.disposed || this.subscriptions.size === 0) return;
-          this.openSocket(token, credential);
-        });
+        if (credential) this.openSocket(token, credential);
       })
       .catch(() => {
         this.connecting = false;
+        if (force) this.forceTokenOnConnect = true;
         this.scheduleReconnect();
       });
   }
@@ -380,8 +444,16 @@ export class BackendClient {
       return;
     }
     this.socket = socket;
+    this.clearConnectTimer();
+    this.connectTimer = setTimeout(() => {
+      this.connectTimer = null;
+      if (this.socket !== socket || socket.readyState === SOCKET_OPEN) return;
+      this.closeSocket(4002, "connect_timeout");
+      if (this.subscriptions.size > 0) this.scheduleReconnect();
+    }, REQUEST_BUDGET_MS.connect);
     socket.onopen = () => {
       if (this.socket !== socket) return;
+      this.clearConnectTimer();
       for (const subscription of this.subscriptions.values()) {
         this.sendFrame({
           t: "sub",
@@ -541,7 +613,15 @@ export class BackendClient {
     }
   }
 
+  private clearConnectTimer(): void {
+    if (this.connectTimer) {
+      clearTimeout(this.connectTimer);
+      this.connectTimer = null;
+    }
+  }
+
   private clearTimers(): void {
+    this.clearConnectTimer();
     this.stopPing();
     this.cancelIdleClose();
     if (this.reconnectTimer) {
@@ -553,6 +633,7 @@ export class BackendClient {
   private closeSocket(code: number, reason: string): void {
     const socket = this.socket;
     this.socket = null;
+    this.clearConnectTimer();
     this.stopPing();
     if (socket) {
       socket.onopen = null;

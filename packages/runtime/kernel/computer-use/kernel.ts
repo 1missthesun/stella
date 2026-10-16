@@ -1777,14 +1777,20 @@ class NodeReplKernel {
     if (typeof value !== "string" || !value.trim()) {
       throw new TypeError("screenshot path must be a non-empty string.");
     }
+    const base = resolveToolFallbackCwd(
+      active.context.toolWorkspaceRoot ??
+        active.context.agentWorkingDirectory ??
+        this.workingDirectory,
+    );
     return path.resolve(
-      this.workingDirectory,
+      base,
       expandHomePath(value.trim(), toolContextHome(active.context)),
     );
   }
 
   // `path` is saved here, after the capture, so it works the same on every
   // backend (the extension and the cloud browser can't write local files).
+  // A relative path resolves where the agent's Bash runs.
   private splitScreenshotParams(
     active: ActiveEvaluation,
     value: unknown,

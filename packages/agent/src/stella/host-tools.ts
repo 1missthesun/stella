@@ -7,6 +7,7 @@ import {
   needsProviderToolSchemaNormalization,
   normalizeProviderToolInputSchema,
 } from "@stella/runtime/kernel/tools/provider-tool-schema";
+import { watchToolCallAbandonment } from "../engine/abandoned-calls.ts";
 import { StellaAgentDoc } from "./agent-doc.ts";
 
 export const STELLA_ORCHESTRATOR_TOOLS = "stella-tools-orchestrator";
@@ -105,12 +106,17 @@ const register = (role: StellaToolRole, spec: StellaToolSpec, host: StellaToolHo
     const stopped = new Promise<never>((_, reject) => {
       stop = reject;
     });
-    const forward = () => {
-      controller.abort(parent?.reason);
-      stop?.(parent?.reason ?? new Error(`Tool ${spec.name} was aborted`));
+    const forward = (reason: unknown = parent?.reason) => {
+      controller.abort(reason);
+      stop?.(reason ?? new Error(`Tool ${spec.name} was aborted`));
     };
+    const fromParent = () => forward();
+    const abandonment = watchToolCallAbandonment(api.callId);
+    const fromAbandonment = () => forward(abandonment.signal.reason);
     if (parent?.aborted) forward();
-    else parent?.addEventListener("abort", forward, { once: true });
+    else parent?.addEventListener("abort", fromParent, { once: true });
+    if (abandonment.signal.aborted) fromAbandonment();
+    else abandonment.signal.addEventListener("abort", fromAbandonment, { once: true });
     let outcome: StellaToolOutcome;
     try {
       const running = host.run(
@@ -127,7 +133,9 @@ const register = (role: StellaToolRole, spec: StellaToolSpec, host: StellaToolHo
       stopped.catch(() => undefined);
       outcome = await Promise.race([running, stopped]);
     } finally {
-      parent?.removeEventListener("abort", forward);
+      parent?.removeEventListener("abort", fromParent);
+      abandonment.signal.removeEventListener("abort", fromAbandonment);
+      abandonment.release();
     }
     const details = jsonDetails(outcome.details);
     return {

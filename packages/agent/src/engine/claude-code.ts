@@ -49,6 +49,7 @@ import { residentContextAsOf, residentContextKind, withResidentContext } from ".
 import { claudeCodeTranscript, type ClaudeCodeTranscriptMeta } from "@stella/runtime/kernel/integrations/claude-code-transcript";
 import { isPiCompactionBoundary } from "../stella/handover.ts";
 import { CLAUDE_CODE_ENGINE_EXTENSION, CLAUDE_CODE_PROVIDER_ID } from "./selection.ts";
+import { abandonToolCall } from "./abandoned-calls.ts";
 
 export { CLAUDE_CODE_ENGINE_EXTENSION, CLAUDE_CODE_PROVIDER_ID, engineExtensionChange } from "./selection.ts";
 export const CLAUDE_CODE_API = "claude-code-cli";
@@ -713,6 +714,31 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
     if (changed) reconsiderGates(turn);
   };
 
+  // Claude Code can give up on a Stella call without telling Stella's server
+  // (its MCP idle watchdog sends no cancel and leaves the request open), and
+  // writes its own error result instead. A result for a call Stella is still
+  // running means exactly that: stop the call, so its work (a code cell, a wait)
+  // ends and the calls queued behind it run.
+  const abandonWaiting = (turn: Turn, toolUseId: string, reason: string) => {
+    const waiting = turn.waiting.get(toolUseId);
+    if (!waiting) return;
+    turn.waiting.delete(toolUseId);
+    abandonToolCall(toolUseId, new Error(reason));
+    waiting({ content: [{ type: "text", text: "The call was canceled." }], isError: true });
+  };
+
+  const noteAbandoned = (turn: Turn, event: Record<string, unknown>) => {
+    const content = asRecord(event.message)?.content;
+    if (!Array.isArray(content)) return;
+    for (const raw of content) {
+      const block = asRecord(raw);
+      if (block?.type !== "tool_result" || typeof block.tool_use_id !== "string") continue;
+      if (!turn.waiting.has(block.tool_use_id)) continue;
+      const said = cliResultText(block.content).trim().slice(0, 300);
+      abandonWaiting(turn, block.tool_use_id, `Claude Code stopped waiting for this call${said ? ` (${said})` : ""}, so Stella stopped it.`);
+    }
+  };
+
   const cliRuns = (turn: Turn, toolUseId: string, name: string, context: Context): Promise<string | undefined> =>
     new Promise((resolve) => {
       const signal = context.abortSignal;
@@ -949,20 +975,19 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
             }
             turn.waiting.set(toolUseId, resolve);
             reconsiderGates(turn);
-            signal?.addEventListener(
-              "abort",
-              () => {
-                if (turn.waiting.get(toolUseId) !== resolve) return;
-                turn.waiting.delete(toolUseId);
-                resolve({ content: [{ type: "text", text: "The call was canceled." }], isError: true });
-              },
-              { once: true },
-            );
+            const abandon = () => {
+              if (turn.waiting.get(toolUseId) === resolve) abandonWaiting(turn, toolUseId, "Claude Code canceled this call, so Stella stopped it.");
+            };
+            if (signal?.aborted) abandon();
+            else signal?.addEventListener("abort", abandon, { once: true });
           }),
         onEvent: (event) => {
           if (turn.done) return;
           if (event.type === "stream_event") answered();
-          if (event.type === "user") noteRefusals(turn, event as Record<string, unknown>);
+          if (event.type === "user") {
+            noteRefusals(turn, event as Record<string, unknown>);
+            noteAbandoned(turn, event as Record<string, unknown>);
+          }
           push(turn, { kind: "event", event: event as Record<string, any> });
         },
         onNativeToolEnd: ({ toolUseId, result, isError }) => {

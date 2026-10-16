@@ -28,6 +28,15 @@ export class RpcTimeoutError extends RpcError {
   }
 }
 
+export class RpcPeerUnresponsiveError extends RpcError {
+  constructor(method: string, misses: number, probe: string) {
+    super(
+      RPC_ERROR_CODES.INTERNAL_ERROR,
+      `RPC peer stopped responding during ${method}: ${misses} ${probe} checks in a row went unanswered.`,
+    );
+  }
+}
+
 export const createRuntimeUnavailableError = (
   message = "Runtime is not available.",
   data?: unknown,
@@ -193,12 +202,7 @@ export class JsonRpcPeer {
             }
             misses += 1;
             if (misses >= allowedMisses && !stopped) {
-              fail(
-                new RpcError(
-                  RPC_ERROR_CODES.INTERNAL_ERROR,
-                  `RPC peer stopped responding during ${method}: ${misses} ${liveness.method} checks in a row went unanswered.`,
-                ),
-              );
+              fail(new RpcPeerUnresponsiveError(method, misses, liveness.method));
             }
           },
         )

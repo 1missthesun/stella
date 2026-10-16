@@ -37,7 +37,11 @@ import {
   isDispatchEnded,
   type SubmittingPlacement,
 } from "./placed-dispatch.js";
-import { AGENT_RUN_RPC_OPTIONS } from "./agent-run-request.js";
+import {
+  AGENT_RUN_RPC_OPTIONS,
+  PLACED_CHAT_TURN_DEADLINE_MS,
+  PLACED_CHAT_TURN_RPC_OPTIONS,
+} from "./agent-run-request.js";
 import {
   placementAttachmentPaths,
   resolvePlacementAttachments,
@@ -55,7 +59,11 @@ import {
   DEVICE_REQUEST_CLOUD_ASKER,
   isDeviceClaudeLoginRequestMethod,
 } from "@stella/contracts/turn-plane/device-requests";
-import { createRuntimeUnavailableError } from "@stella/contracts/protocol/rpc-peer";
+import {
+  createRuntimeUnavailableError,
+  RpcPeerUnresponsiveError,
+  RpcTimeoutError,
+} from "@stella/contracts/protocol/rpc-peer";
 import { RuntimeWorkerLifecycleController } from "./worker-lifecycle.js";
 import { buildStdioConnectionFactory } from "./stdio-connection.js";
 import { buildInprocConnectionFactory } from "./inproc-connection.js";
@@ -946,31 +954,55 @@ export class StellaRuntimeHost {
           return { status: "ok", finalText: "" };
         }
         const userAuthored = !handoff && !scheduled;
-        const result = await this.requestWorker<RuntimeAutomationTurnResult>(
-          METHOD_NAMES.INTERNAL_WORKER_RUN_AUTOMATION,
-          {
+        const placementRunId = placementLocalChatRunId(dispatch.dispatchId);
+        let result: RuntimeAutomationTurnResult;
+        try {
+          result = await this.requestWorker<RuntimeAutomationTurnResult>(
+            METHOD_NAMES.INTERNAL_WORKER_RUN_AUTOMATION,
+            {
+              conversationId: dispatch.conversationId,
+              userPrompt: prompt,
+              userMessageEventId,
+              userAuthoredPrompt: userAuthored,
+              ...(scheduled ? { scheduled: true } : {}),
+              ...(handoff ? { handoff: true } : {}),
+              rejectIfBusy: false,
+              executionPlacementRunId: placementRunId,
+              ownerGeneration,
+              ...(attachments.length > 0 ? { attachments } : {}),
+              ...(userAuthored && payload.context !== undefined
+                ? { context: payload.context }
+                : {}),
+            },
+            {
+              ensureWorker: true,
+              recordActivity: true,
+              retryOnceOnDisconnect: false,
+              rpc: PLACED_CHAT_TURN_RPC_OPTIONS,
+            },
+          );
+        } catch (error) {
+          const timedOut = error instanceof RpcTimeoutError;
+          if (!timedOut && !(error instanceof RpcPeerUnresponsiveError)) {
+            throw error;
+          }
+          const reason = timedOut
+            ? `Stella's turn on this computer ran for ${PLACED_CHAT_TURN_DEADLINE_MS / 60_000} minutes without finishing, so it was stopped.`
+            : "Stella's runtime on this computer stopped responding during the turn, so it was stopped.";
+          getFileLogger()?.process("placement.chat-turn-abandoned", {
+            dispatchId: dispatch.dispatchId,
             conversationId: dispatch.conversationId,
-            userPrompt: prompt,
-            userMessageEventId,
-            userAuthoredPrompt: userAuthored,
-            ...(scheduled ? { scheduled: true } : {}),
-            ...(handoff ? { handoff: true } : {}),
-            rejectIfBusy: false,
-            executionPlacementRunId: placementLocalChatRunId(
-              dispatch.dispatchId,
-            ),
-            ownerGeneration,
-            ...(attachments.length > 0 ? { attachments } : {}),
-            ...(userAuthored && payload.context !== undefined
-              ? { context: payload.context }
-              : {}),
-          },
-          {
-            ensureWorker: true,
-            recordActivity: true,
-            retryOnceOnDisconnect: false,
-          },
-        );
+            reason: timedOut ? "deadline" : "unresponsive",
+          });
+          void this.cancelPlacementAutomation(placementRunId, reason).catch(
+            (cancelError) =>
+              console.warn(
+                `[placement] Could not stop the abandoned turn ${dispatch.dispatchId}.`,
+                cancelError,
+              ),
+          );
+          return { status: "error", error: reason };
+        }
         if (result.status === "ok") {
           return { status: "ok", finalText: result.finalText };
         }

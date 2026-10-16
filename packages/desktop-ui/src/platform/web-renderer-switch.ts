@@ -3,6 +3,10 @@ import {
   readBackendAccountEpoch,
   subscribeBackendAccount,
 } from "@/platform/backend/backend-client";
+import {
+  fetchWithDeadline,
+  REQUEST_BUDGET_MS,
+} from "@stella/contracts/request-deadline";
 
 const STORAGE_KEY = "stella:web-renderer";
 const SHARED_BASE = "/chat-app/";
@@ -31,7 +35,12 @@ const check = async () => {
     return;
   }
   const index = `${target}index.html`;
-  const available = await fetch(index, { method: "HEAD", cache: "no-store" })
+  const available = await fetchWithDeadline(
+    fetch,
+    index,
+    { method: "HEAD", cache: "no-store" },
+    { label: "web app version", timeoutMs: REQUEST_BUDGET_MS.lookup },
+  )
     .then((response) => response.ok)
     .catch(() => false);
   if (!available) return;

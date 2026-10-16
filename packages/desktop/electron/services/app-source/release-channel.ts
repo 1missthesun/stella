@@ -6,6 +6,7 @@ import {
   SOCKET_KEEPALIVE_PING,
   SOCKET_KEEPALIVE_PONG,
 } from "@stella/contracts/backend/protocol";
+import { REQUEST_BUDGET_MS } from "@stella/contracts/request-deadline";
 
 const PING_INTERVAL_MS = 30_000;
 const SILENCE_LIMIT_MS = 2 * PING_INTERVAL_MS + 5_000;
@@ -23,6 +24,7 @@ export class ReleaseChannel {
   private socket: WebSocket | null = null;
   private reconnectTimer: NodeJS.Timeout | null = null;
   private pingTimer: NodeJS.Timeout | null = null;
+  private connectTimer: NodeJS.Timeout | null = null;
   private heardAt = 0;
   private attempt = 0;
 
@@ -59,7 +61,23 @@ export class ReleaseChannel {
       return;
     }
     this.socket = socket;
+    this.connectTimer = setTimeout(() => {
+      this.connectTimer = null;
+      if (this.socket !== socket || socket.readyState !== WebSocket.CONNECTING) return;
+      this.socket = null;
+      this.options.log("app-source.release-channel-failed", {
+        message: "connect timed out",
+      });
+      try {
+        socket.close();
+      } catch {
+        // Already gone.
+      }
+      this.scheduleReconnect();
+    }, REQUEST_BUDGET_MS.connect);
+    this.connectTimer.unref?.();
     socket.onopen = () => {
+      this.clearConnectTimer();
       this.heardAt = Date.now();
       this.startPing(socket);
     };
@@ -83,6 +101,7 @@ export class ReleaseChannel {
     socket.onclose = (event) => {
       if (this.socket !== socket) return;
       this.socket = null;
+      this.clearConnectTimer();
       this.stopPing();
       this.options.log("app-source.release-channel-closed", {
         code: event.code,
@@ -117,6 +136,11 @@ export class ReleaseChannel {
     this.pingTimer.unref?.();
   }
 
+  private clearConnectTimer() {
+    if (this.connectTimer) clearTimeout(this.connectTimer);
+    this.connectTimer = null;
+  }
+
   private stopPing() {
     if (this.pingTimer) clearInterval(this.pingTimer);
     this.pingTimer = null;
@@ -137,6 +161,7 @@ export class ReleaseChannel {
   private close() {
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     this.reconnectTimer = null;
+    this.clearConnectTimer();
     this.stopPing();
     const socket = this.socket;
     this.socket = null;

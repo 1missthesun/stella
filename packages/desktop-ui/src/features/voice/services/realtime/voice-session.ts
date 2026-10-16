@@ -105,24 +105,6 @@ type VoiceEchoMetrics = {
 
 type VoiceLeaseRequest = { leaseId: string; event: VoiceLeaseEvent };
 
-const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T> =>
-  new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(
-      () => reject(new Error("The voice backend took too long to answer.")),
-      ms,
-    );
-    promise.then(
-      (value) => {
-        clearTimeout(timer);
-        resolve(value);
-      },
-      (error: unknown) => {
-        clearTimeout(timer);
-        reject(error);
-      },
-    );
-  });
-
 const GOODBYE_PHRASES = [
   /^(?:hey\s+|ok(?:ay)?\s+|alright\s+)?(?:bye|goodbye|good\s*bye)(?:\s+stella)?[\s.!?,]*$/i,
   /^(?:bye|goodbye)\s+(?:now|then|for\s+now)[\s.!?,]*$/i,
@@ -613,10 +595,9 @@ export class RealtimeVoiceSession {
   private async postLeaseRequest(
     request: VoiceLeaseRequest,
   ): Promise<VoiceLease> {
-    return await withTimeout(
-      backendClient.call("voice.lease", request),
-      STELLA_VOICE_LEASE_REQUEST_TIMEOUT_MS,
-    );
+    return await backendClient.call("voice.lease", request, {
+      timeoutMs: STELLA_VOICE_LEASE_REQUEST_TIMEOUT_MS,
+    });
   }
 
   private updateLocalAuthorityExpiry(leaseExpiresAt: number) {

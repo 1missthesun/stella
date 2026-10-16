@@ -11,6 +11,10 @@ import { isWebsiteHost } from "@/platform/capabilities";
 import { backendClient, backendUrl } from "@/platform/backend/backend-client";
 import { getAuthHeaders } from "@/global/auth/services/auth-token";
 import { sealUserAskValueOnWeb } from "./web-user-ask-seal";
+import {
+  fetchWithDeadline,
+  REQUEST_BUDGET_MS,
+} from "@stella/contracts/request-deadline";
 
 const EMPTY_ASKS: readonly UserAsk[] = [];
 const EMPTY_RECORDS: readonly UserAskRecord[] = [];
@@ -98,11 +102,20 @@ const webAsksRequest = async (
 ): Promise<Response | null> => {
   if (!backendUrl) return null;
   try {
-    return await fetch(`${backendUrl.replace(/\/$/u, "")}/api/user-asks${path}`, {
-      method: init?.method ?? "GET",
-      headers: await getAuthHeaders({ "Content-Type": "application/json" }),
-      ...(init?.body === undefined ? {} : { body: JSON.stringify(init.body) }),
-    });
+    const method = init?.method ?? "GET";
+    return await fetchWithDeadline(
+      fetch,
+      `${backendUrl.replace(/\/$/u, "")}/api/user-asks${path}`,
+      {
+        method,
+        headers: await getAuthHeaders({ "Content-Type": "application/json" }),
+        ...(init?.body === undefined ? {} : { body: JSON.stringify(init.body) }),
+      },
+      {
+        label: "user asks",
+        timeoutMs: method === "GET" ? REQUEST_BUDGET_MS.lookup : REQUEST_BUDGET_MS.call,
+      },
+    );
   } catch {
     return null;
   }

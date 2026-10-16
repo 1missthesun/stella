@@ -1,5 +1,9 @@
 import { getAuthToken } from "@/global/auth/services/auth-token";
 import { backendUrl } from "@/platform/backend/backend-client";
+import {
+  fetchWithInactivity,
+  REQUEST_BUDGET_MS,
+} from "@stella/contracts/request-deadline";
 
 export const voiceBackendFetch = async (
   path: string,
@@ -8,16 +12,20 @@ export const voiceBackendFetch = async (
   if (!backendUrl) throw new Error("VITE_STELLA_BACKEND_URL is not set.");
   const token = await getAuthToken();
   if (!token) throw new Error("Sign in to Stella to use voice.");
-  const response = await fetch(`${backendUrl}${path}`, {
-    method: "POST",
-    headers: {
-      ...init.headers,
-      Authorization: `Bearer ${token}`,
-      "Content-Type": init.contentType,
+  const response = await fetchWithInactivity(
+    fetch,
+    `${backendUrl}${path}`,
+    {
+      method: "POST",
+      headers: {
+        ...init.headers,
+        Authorization: `Bearer ${token}`,
+        "Content-Type": init.contentType,
+      },
+      body: init.body,
     },
-    body: init.body,
-    signal: init.signal,
-  });
+    { label: "voice", idleMs: REQUEST_BUDGET_MS.transferIdle, signal: init.signal },
+  );
   if (!response.ok) {
     const detail = await response.text().catch(() => "");
     let message = detail.trim();

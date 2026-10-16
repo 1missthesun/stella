@@ -61,3 +61,31 @@ export const REASONING_EFFORT_PASSTHROUGH: Readonly<
   xhigh: "xhigh",
   max: "max",
 };
+
+/**
+ * Smallest output ceiling that still leaves room for an answer after thinking
+ * at each effort. Reasoning and the answer share one ceiling, and effort-only
+ * APIs (OpenAI, Grok, DeepSeek, Gemini 3, Claude adaptive) take no thinking cap,
+ * so a ceiling below these can be spent entirely on thinking.
+ */
+export const REASONING_EFFORT_MIN_OUTPUT_TOKENS: Readonly<
+  Record<ReasoningEffortLevel, number>
+> = {
+  low: 0,
+  medium: 8_192,
+  high: 24_576,
+  xhigh: 49_152,
+  max: 65_536,
+};
+
+/** The requested effort, lowered until its thinking fits under `outputCeiling`. */
+export const reasoningEffortForOutputCeiling = (
+  requested: ReasoningEffortLevel,
+  outputCeiling: number,
+): ReasoningEffortLevel => {
+  for (let index = REASONING_EFFORT_LEVELS.indexOf(requested); index > 0; index -= 1) {
+    const level = REASONING_EFFORT_LEVELS[index]!;
+    if (outputCeiling >= REASONING_EFFORT_MIN_OUTPUT_TOKENS[level]) return level;
+  }
+  return "low";
+};

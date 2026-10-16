@@ -10,6 +10,7 @@ import {
   LOCKED_AGENT_TYPES,
   MANAGED_MODEL_API_OVERRIDES,
   MANAGED_MODEL_GATEWAY_OVERRIDES,
+  MANAGED_MODEL_MAX_OUTPUT_TOKENS,
   resolveManagedModelRouteAlias,
   type ManagedModelAudience,
   type ModelConfig,
@@ -193,6 +194,7 @@ export const resolveStellaModelConfigForSelection = (
         // agent default's transport. `api: undefined` here intentionally
         // clears a base-config value when the pinned model has no override.
         api: MANAGED_MODEL_API_OVERRIDES[model],
+        maxOutputTokens: MANAGED_MODEL_MAX_OUTPUT_TOKENS[model],
       },
       applied: true,
     };

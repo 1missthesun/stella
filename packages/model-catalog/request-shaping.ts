@@ -9,6 +9,7 @@ import {
   REASONING_EFFORT_LEVELS,
   nearestReasoningEffortLevel,
   parseReasoningEffortLevel,
+  reasoningEffortForOutputCeiling,
   type ReasoningEffortLevel,
 } from "@stella/contracts/reasoning-effort";
 import { downgradeUnsupportedRequestImages } from "./request-estimate";
@@ -22,6 +23,8 @@ export type RelayRequestShape = NativeRelayRequest & {
   resolvedModel: string;
   serviceTier?: string;
   managedReasoningEffort?: string;
+  /** The output ceiling the upstream is sent; thinking effort is fitted under it. */
+  maxOutputTokens?: number;
 };
 
 const providerModelPrefix: Partial<Record<ManagedGatewayProvider, string>> = {
@@ -479,11 +482,16 @@ const applyManagedReasoningEffort = (
   provider: ManagedGatewayProvider,
   model: string,
   catalogEffort: string | undefined,
+  maxOutputTokens: number | undefined,
 ): void => {
-  const requested =
+  const asked =
     requestedReasoningEffort(body) ?? parseReasoningEffortLevel(catalogEffort);
   stripManagedReasoningControls(body);
-  if (!requested) return;
+  if (!asked) return;
+  const requested =
+    maxOutputTokens === undefined
+      ? asked
+      : reasoningEffortForOutputCeiling(asked, maxOutputTokens);
   if (provider === "deepseek") {
     body.reasoning_effort = requested;
     body.reasoning = { effort: requested };
@@ -661,6 +669,7 @@ export const bodyForUpstream = (
     provider,
     authorized.resolvedModel,
     authorized.managedReasoningEffort,
+    authorized.maxOutputTokens,
   );
   if (isResponsesRequest(provider, request)) {
     normalizeResponsesBody(body);

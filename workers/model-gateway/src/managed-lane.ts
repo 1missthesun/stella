@@ -177,6 +177,8 @@ export type ShapedUpstreamRequest = {
   url: string;
   headers: Headers;
   body: string;
+  /** The output ceiling the upstream is sent, reasoning included. */
+  maxOutputTokens: number | null;
 };
 
 const outputTokenCap = (args: {
@@ -287,21 +289,21 @@ export const shapeUpstreamRequest = (args: {
       headers: args.request.headers,
     },
   );
+  const clamped = clampOutputTokens({
+    requestJson: args.requestJson,
+    protocol: args.protocol,
+    audience: args.audience,
+    modelCeiling: args.outputCeiling ?? args.route.config.maxOutputTokens,
+  });
+  const maxOutputTokens = declaredMaxOutputTokens(clamped);
   const body = bodyForUpstream(
     {
-      requestJson: streamingRequestJson(
-        clampOutputTokens({
-          requestJson: args.requestJson,
-          protocol: args.protocol,
-          audience: args.audience,
-          modelCeiling: args.outputCeiling ?? args.route.config.maxOutputTokens,
-        }),
-        args.protocol,
-      ),
+      requestJson: streamingRequestJson(clamped, args.protocol),
       resolvedModel: args.route.resolvedModel,
       upstreamModel: args.route.upstreamModel,
       serviceTier: args.route.config.serviceTier,
       managedReasoningEffort: getManagedReasoningEffort(args.route.config),
+      ...(maxOutputTokens !== null ? { maxOutputTokens } : {}),
     },
     args.route.provider,
     shapingRequest,
@@ -319,7 +321,7 @@ export const shapeUpstreamRequest = (args: {
     !args.ownerMode,
   );
   headers.set("accept", "text/event-stream");
-  return { url, headers, body };
+  return { url, headers, body, maxOutputTokens };
 };
 
 const usageTokens = (
@@ -905,6 +907,7 @@ export const handleManagedRelay = async (args: {
       url: target,
       headers,
       body: upstreamBody,
+      maxOutputTokens: upstreamMaxOutputTokens,
     } = shapeUpstreamRequest({
       request,
       protocol,
@@ -1355,7 +1358,7 @@ export const handleManagedRelay = async (args: {
       },
     );
     console.log(
-      `[model-gateway] trace=${traceId} agent=${agentType} requested=${route.requestedModel} resolved=${route.resolvedModel} provider=${route.provider} protocol=${protocol} status=${upstream.status} charged=${cost.chargedMicroCents} basis=${cost.basis} attempt=${attemptNumber} reported=${usage ? 1 : 0} ledger_settled=${settlement ? (settlement.ok ? 1 : 0) : "-"} ledger_spent=${settlement?.spentMicroCents ?? "-"} ledger_reserved=${settlement?.reservedMicroCents ?? "-"} ms=${deps.now() - startedAt}`,
+      `[model-gateway] trace=${traceId} agent=${agentType} requested=${route.requestedModel} resolved=${route.resolvedModel} provider=${route.provider} protocol=${protocol} status=${upstream.status} charged=${cost.chargedMicroCents} basis=${cost.basis} attempt=${attemptNumber} max_output=${upstreamMaxOutputTokens ?? "-"} held=${heldMicroCents} reported=${usage ? 1 : 0} ledger_settled=${settlement ? (settlement.ok ? 1 : 0) : "-"} ledger_spent=${settlement?.spentMicroCents ?? "-"} ledger_reserved=${settlement?.reservedMicroCents ?? "-"} ms=${deps.now() - startedAt}`,
     );
     return new Response(bodyText, {
       status: upstream.status,

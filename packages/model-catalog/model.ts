@@ -173,7 +173,7 @@ export const GEMINI_3_8_FLASH_OFFLINE_RESPONDER_MODEL =
 const GEMINI_3_8_FLASH_OFFLINE_RESPONDER_CONFIG: ModelConfig = {
   model: GEMINI_3_8_FLASH_OFFLINE_RESPONDER_MODEL,
   managedGatewayProvider: "openrouter",
-  maxOutputTokens: 65536,
+  maxOutputTokens: 65_536,
   providerOptions: {
     openai: {
       reasoningEffort: "low",
@@ -201,6 +201,17 @@ export const MANAGED_MODEL_CONTEXT_WINDOWS: Readonly<Record<string, number>> = {
   [DEEPSEEK_V4_1_FLASH_MODEL]: 1_040_000,
   [GEMINI_3_8_FLASH_OFFLINE_RESPONDER_MODEL]: 1_048_576,
   [GEMINI_3_1_FLASH_LITE_MODEL]: 1_048_576,
+};
+
+/**
+ * Most output tokens each managed upstream may return per request, reasoning
+ * included (it shares the ceiling). A pinned `stella/<model>` takes its own
+ * limit here, not the agent default's.
+ */
+export const MANAGED_MODEL_MAX_OUTPUT_TOKENS: Readonly<Record<string, number>> = {
+  [GPT_6_LUNA_MODEL]: GPT_6_LUNA_MAX_OUTPUT_TOKENS,
+  [DEEPSEEK_V4_1_FLASH_MODEL]: DEEPSEEK_V4_1_FLASH_MAX_OUTPUT_TOKENS,
+  [GEMINI_3_8_FLASH_OFFLINE_RESPONDER_MODEL]: 65_536,
 };
 
 const INTERNAL_MODEL_CONFIGS = {

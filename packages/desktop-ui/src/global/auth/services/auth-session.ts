@@ -10,6 +10,10 @@ import { configurePiRuntime } from "@/platform/electron/device";
 import { getStellaInteriorBridge } from "@/platform/interior/interior-bridge";
 import { authClient } from "@/global/auth/lib/auth-client";
 import {
+  REQUEST_BUDGET_MS,
+  withDeadline,
+} from "@stella/contracts/request-deadline";
+import {
   clearBrowserSessionToken,
   readBrowserCachedSession,
   readBrowserIdentityIntent,
@@ -223,8 +227,9 @@ export const refreshAuthSession = async (options: RefreshOptions = {}) => {
   }
   const interiorBridge = getStellaInteriorBridge();
   if (interiorBridge) {
-    inFlightRefresh = Promise.resolve()
-      .then(async () => {
+    inFlightRefresh = withDeadline(
+      { label: "sign-in check", timeoutMs: REQUEST_BUDGET_MS.call },
+      async () => {
         let session = await interiorBridge.getSession();
         if (session.expiresAt <= Date.now() + 5_000) {
           await interiorBridge.getToken({ forceRefresh: true });
@@ -240,7 +245,8 @@ export const refreshAuthSession = async (options: RefreshOptions = {}) => {
           staleSession: getAuthSnapshotSession(currentSession.snapshot),
         });
         setCurrentSession({ snapshot, isPending: false });
-      })
+      },
+    )
       .catch((error) => {
         if (version !== refreshVersion) return;
         setCurrentSession({
@@ -312,8 +318,10 @@ export const refreshAuthSession = async (options: RefreshOptions = {}) => {
     await inFlightRefresh;
     return;
   }
-  inFlightRefresh = configurePiRuntime()
-    .then(async () => {
+  inFlightRefresh = withDeadline(
+    { label: "sign-in check", timeoutMs: REQUEST_BUDGET_MS.slow },
+    async () => {
+      await configurePiRuntime();
       const first = await systemApi.getAuthSession({ allowCached });
       if (version !== refreshVersion) {
         return;
@@ -330,7 +338,8 @@ export const refreshAuthSession = async (options: RefreshOptions = {}) => {
       ipcRetryAttempt = 0;
       if (ipcRetryTimer) clearTimeout(ipcRetryTimer);
       ipcRetryTimer = null;
-    })
+    },
+  )
     .catch((error) => {
       if (version !== refreshVersion) {
         return;

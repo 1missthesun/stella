@@ -2,6 +2,10 @@ import { configurePiRuntime } from "@/platform/electron/device";
 import { getStellaInteriorBridge } from "@/platform/interior/interior-bridge";
 import { getJwtExpMs, parseJwtPayload } from "@/shared/lib/jwt";
 import { authClient } from "@/global/auth/lib/auth-client";
+import {
+  REQUEST_BUDGET_MS,
+  withDeadline,
+} from "@stella/contracts/request-deadline";
 
 let cachedToken: string | null = null;
 let tokenExpiresAt = 0;
@@ -41,58 +45,63 @@ export async function getAuthToken(
   const requestVersion = tokenRequestVersion;
   inflightTokenPromise = (async () => {
     try {
-      if (typeof window === "undefined") return null;
-      const interiorBridge = getStellaInteriorBridge();
-      const systemApi = window.electronAPI?.system;
-      let token: string | null | undefined;
-      let scopedTokenExpiresAt: number | null = null;
-      if (interiorBridge) {
-        const scoped = await interiorBridge.getToken({ forceRefresh });
-        token = scoped.token;
-        scopedTokenExpiresAt = scoped.expiresAt;
-      } else if (systemApi?.getAuthToken) {
-        await configurePiRuntime();
-        token = await systemApi.getAuthToken();
-      } else {
-        const result = await authClient.token();
-        token = result.data?.token ?? null;
-      }
-      if (!token) {
-        if (requestVersion === tokenRequestVersion) {
-          cachedToken = null;
-          tokenExpiresAt = 0;
-        }
-        return null;
-      }
+      return await withDeadline(
+        { label: "sign-in token", timeoutMs: REQUEST_BUDGET_MS.call },
+        async () => {
+          if (typeof window === "undefined") return null;
+          const interiorBridge = getStellaInteriorBridge();
+          const systemApi = window.electronAPI?.system;
+          let token: string | null | undefined;
+          let scopedTokenExpiresAt: number | null = null;
+          if (interiorBridge) {
+            const scoped = await interiorBridge.getToken({ forceRefresh });
+            token = scoped.token;
+            scopedTokenExpiresAt = scoped.expiresAt;
+          } else if (systemApi?.getAuthToken) {
+            await configurePiRuntime();
+            token = await systemApi.getAuthToken();
+          } else {
+            const result = await authClient.token();
+            token = result.data?.token ?? null;
+          }
+          if (!token) {
+            if (requestVersion === tokenRequestVersion) {
+              cachedToken = null;
+              tokenExpiresAt = 0;
+            }
+            return null;
+          }
 
-      if (requestVersion !== tokenRequestVersion) {
-        return token;
-      }
+          if (requestVersion !== tokenRequestVersion) {
+            return token;
+          }
 
-      cachedToken = token;
-      if (scopedTokenExpiresAt !== null) {
-        if (scopedTokenExpiresAt <= Date.now()) {
-          cachedToken = null;
-          tokenExpiresAt = 0;
-          return null;
-        }
-        tokenExpiresAt = Math.max(
-          Date.now(),
-          scopedTokenExpiresAt - REFRESH_MARGIN_MS,
-        );
-      } else {
-        try {
-          tokenExpiresAt = getJwtExpMs(token) - REFRESH_MARGIN_MS;
-        } catch (err) {
-          console.debug(
-            "[auth-token] JWT parse failed, using 4-minute cache:",
-            (err as Error).message,
-          );
-          tokenExpiresAt = Date.now() + 4 * 60 * 1000;
-        }
-      }
+          cachedToken = token;
+          if (scopedTokenExpiresAt !== null) {
+            if (scopedTokenExpiresAt <= Date.now()) {
+              cachedToken = null;
+              tokenExpiresAt = 0;
+              return null;
+            }
+            tokenExpiresAt = Math.max(
+              Date.now(),
+              scopedTokenExpiresAt - REFRESH_MARGIN_MS,
+            );
+          } else {
+            try {
+              tokenExpiresAt = getJwtExpMs(token) - REFRESH_MARGIN_MS;
+            } catch (err) {
+              console.debug(
+                "[auth-token] JWT parse failed, using 4-minute cache:",
+                (err as Error).message,
+              );
+              tokenExpiresAt = Date.now() + 4 * 60 * 1000;
+            }
+          }
 
-      return token;
+          return token;
+        },
+      );
     } catch (err) {
       console.debug("[auth-token] token fetch failed:", (err as Error).message);
       if (requestVersion === tokenRequestVersion) {

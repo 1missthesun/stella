@@ -7,6 +7,10 @@ import { writeBrowserSessionToken } from "@/global/auth/services/auth-storage";
 import { backendUrl } from "@/platform/backend/backend-url";
 import { platformCapabilities } from "@/platform/capabilities";
 import { captchaHeaders } from "@/platform/auth/challenge-token";
+import {
+  fetchWithDeadline,
+  REQUEST_BUDGET_MS,
+} from "@stella/contracts/request-deadline";
 
 type BrowserCallbackLocation = Pick<Location, "origin" | "pathname">;
 
@@ -57,13 +61,18 @@ export const startBrowserGoogleSignIn = async () => {
   if (!siteUrl) {
     throw new Error("Stella's sign-in service is not configured.");
   }
-  const response = await fetch(`${siteUrl}/api/auth/browser-social/start`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      returnTo: getBrowserSocialCallbackUrl(window.location),
-    }),
-  });
+  const response = await fetchWithDeadline(
+    fetch,
+    `${siteUrl}/api/auth/browser-social/start`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        returnTo: getBrowserSocialCallbackUrl(window.location),
+      }),
+    },
+    { label: "sign-in", timeoutMs: REQUEST_BUDGET_MS.call },
+  );
   const data = (await response.json().catch(() => null)) as {
     callbackURL?: unknown;
   } | null;

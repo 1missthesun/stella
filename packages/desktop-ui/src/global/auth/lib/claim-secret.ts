@@ -1,3 +1,8 @@
+import {
+  fetchWithDeadline,
+  REQUEST_BUDGET_MS,
+} from "@stella/contracts/request-deadline";
+
 const toBase64Url = (bytes: Uint8Array): string => {
   let binary = "";
   for (const byte of bytes) {
@@ -22,11 +27,16 @@ export const claimSessionToken = async (
   requestId: string,
   claimSecret: string,
 ): Promise<string | null> => {
-  const response = await fetch(`${backendUrl}/api/auth/link/claim`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ requestId, claimSecret }),
-  });
+  const response = await fetchWithDeadline(
+    fetch,
+    `${backendUrl}/api/auth/link/claim`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ requestId, claimSecret }),
+    },
+    { label: "sign-in", timeoutMs: REQUEST_BUDGET_MS.call },
+  );
   if (!response.ok) {
     return null;
   }

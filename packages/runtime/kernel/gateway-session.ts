@@ -1,3 +1,4 @@
+import { REQUEST_BUDGET_MS, withDeadline } from "@stella/contracts/request-deadline";
 import {
   GATEWAY_SESSION_CAPABILITY_PATH,
   type GatewayErrorBody,
@@ -356,7 +357,13 @@ export const createGatewaySessionClient = (
             args.refreshAuthToken
           ) {
             refreshedAuth = true;
-            const refreshed = (await args.refreshAuthToken())?.trim();
+            const refresh = args.refreshAuthToken;
+            const refreshed = (
+              await withDeadline(
+                { label: "Refreshing your Stella sign-in", timeoutMs: REQUEST_BUDGET_MS.lookup },
+                async () => await refresh(),
+              )
+            )?.trim();
             if (refreshed && refreshed !== currentAuthToken) {
               currentAuthToken = refreshed;
               continue;

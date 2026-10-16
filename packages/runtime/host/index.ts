@@ -1,3 +1,4 @@
+import { putSignedUpload } from "@stella/contracts/request-deadline";
 import { EventEmitter } from "node:events";
 import { promises as fs } from "node:fs";
 import { createHash } from "node:crypto";
@@ -1276,10 +1277,11 @@ export class StellaRuntimeHost {
         sizeBytes: attachment.bytes.byteLength,
         contentType: attachment.contentType,
       });
-      const response = await fetch(prepared.uploadUrl, {
-        method: "PUT",
-        headers: { "Content-Type": prepared.contentType },
+      const response = await putSignedUpload({
+        url: prepared.uploadUrl,
+        contentType: prepared.contentType,
         body: attachment.bytes,
+        label: "Uploading an attachment for your other device",
       });
       if (!response.ok) {
         throw new Error(

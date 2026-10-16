@@ -1,3 +1,4 @@
+import { fetchWithDeadline, isRequestTimeout, REQUEST_BUDGET_MS } from "@stella/contracts/request-deadline";
 import {
   isMapRouteArtifact,
   MAPS_RESOLVE_PATH,
@@ -153,7 +154,7 @@ export const resolveMapArtifact = async (
   const fetchImpl = options.fetchImpl ?? fetch;
   const base = options.backend.baseUrl.replace(/\/+$/, "");
   try {
-    const response = await fetchImpl(`${base}${MAPS_RESOLVE_PATH}`, {
+    const response = await fetchWithDeadline(fetchImpl, `${base}${MAPS_RESOLVE_PATH}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -167,8 +168,7 @@ export const resolveMapArtifact = async (
         ...(request.mode ? { mode: request.mode } : {}),
         ...(request.title ? { title: request.title } : {}),
       }),
-      ...(options.signal ? { signal: options.signal } : {}),
-    });
+    }, { label: "Map lookup", timeoutMs: REQUEST_BUDGET_MS.slow, signal: options.signal });
     let payload: unknown = null;
     try {
       payload = await response.json();
@@ -178,7 +178,7 @@ export const resolveMapArtifact = async (
     return mapOutcomeFromResolver(response.status, payload);
   } catch (error) {
     const message =
-      (error as Error).name === "AbortError"
+      (error as Error).name === "AbortError" || isRequestTimeout(error)
         ? "timed out"
         : (error as Error).message;
     return { ok: false, error: `Map lookup failed: ${message}` };

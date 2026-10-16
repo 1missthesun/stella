@@ -1,3 +1,4 @@
+import { REQUEST_BUDGET_MS } from "@stella/contracts/request-deadline";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { Context, Effect, Layer } from "effect";
@@ -148,6 +149,7 @@ export const layer = Layer.effect(
       requestRuntimeAuthRefresh: async (payload) =>
         await hostBus.request(METHOD_NAMES.HOST_RUNTIME_AUTH_REFRESH, payload, {
           retryOnDisconnect: true,
+          timeoutMs: REQUEST_BUDGET_MS.call,
         }),
       requestChallengeToken: async () => {
         const token = await hostBus.request(

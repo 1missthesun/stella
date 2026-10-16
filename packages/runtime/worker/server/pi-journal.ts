@@ -1,3 +1,4 @@
+import { putSignedUpload } from "@stella/contracts/request-deadline";
 import { promises as fs } from "node:fs";
 import { fileURLToPath } from "node:url";
 import type { DesktopJournal, JournalReadRecord, RelayedMessage } from "@stella/agent/host/desktop-journal";
@@ -18,7 +19,6 @@ import {
 const READ_TIMEOUT_MS = 30_000;
 const TOOL_FRAME_TIMEOUT_MS = 10_000;
 const RELAY_ATTACHMENT_MAX_BYTES = 20 * 1024 * 1024;
-const RELAY_UPLOAD_TIMEOUT_MS = 5 * 60_000;
 
 type RelayUpload = { path: string; contentType: string };
 type SiteAuth = { baseUrl: string; authToken: string };
@@ -85,11 +85,11 @@ const uploadRelayed = async (auth: () => SiteAuth | null, message: RelayedMessag
         sizeBytes: item.bytes.byteLength,
         contentType: item.contentType,
       });
-      const response = await fetch(prepared.uploadUrl, {
-        method: "PUT",
-        headers: { "Content-Type": prepared.contentType },
+      const response = await putSignedUpload({
+        url: prepared.uploadUrl,
+        contentType: prepared.contentType,
         body: item.bytes,
-        signal: AbortSignal.timeout(RELAY_UPLOAD_TIMEOUT_MS),
+        label: `Uploading ${item.name}`,
       });
       if (!response.ok) throw new Error(`Uploading ${item.name} failed (${response.status}).`);
       const record = await client.call("drive.finalizeUpload", {

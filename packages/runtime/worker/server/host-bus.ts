@@ -10,7 +10,7 @@ export interface Interface {
   readonly request: <TResult = unknown>(
     method: string,
     params?: unknown,
-    options?: { retryOnDisconnect?: boolean },
+    options?: { retryOnDisconnect?: boolean; timeoutMs?: number },
   ) => Promise<TResult>;
   readonly activeRequestHandlerCount: () => number;
   readonly attachedClientCount: () => number;

@@ -1,3 +1,4 @@
+import { putSignedUpload } from "@stella/contracts/request-deadline";
 import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
@@ -235,10 +236,12 @@ export const createLinkedFilePublisher = (deps: {
       sizeBytes: bytes.byteLength,
       contentType,
     });
-    const response = await (deps.fetchImpl ?? fetch)(prepared.uploadUrl, {
-      method: "PUT",
-      headers: { "Content-Type": prepared.contentType },
+    const response = await putSignedUpload({
+      url: prepared.uploadUrl,
+      contentType: prepared.contentType,
       body: bytes,
+      label: `Publishing ${drivePath}`,
+      ...(deps.fetchImpl ? { fetchImpl: deps.fetchImpl } : {}),
     });
     if (!response.ok) {
       throw new Error(`Drive upload failed (${response.status}).`);

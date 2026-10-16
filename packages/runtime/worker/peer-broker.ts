@@ -15,7 +15,7 @@ export type WorkerPeerLike = {
   request: <TResult = unknown>(
     method: string,
     params?: unknown,
-    options?: { retryOnDisconnect?: boolean },
+    options?: { retryOnDisconnect?: boolean; timeoutMs?: number },
   ) => Promise<TResult>;
   registerRequestHandler: (method: string, handler: RequestHandler) => void;
   registerNotificationHandler: (
@@ -158,14 +158,18 @@ export class WorkerPeerBroker {
   async request<TResult = unknown>(
     method: string,
     params?: unknown,
-    options?: { retryOnDisconnect?: boolean },
+    options?: { retryOnDisconnect?: boolean; timeoutMs?: number },
   ): Promise<TResult> {
     const deadline = Date.now() + NO_HOST_TIMEOUT_MS;
     while (true) {
       const remainingMs = Math.max(1, deadline - Date.now());
       const peer = this.pickPeer() ?? (await this.waitForPeer(remainingMs));
       try {
-        return await peer.request<TResult>(method, params);
+        return await peer.request<TResult>(
+          method,
+          params,
+          options?.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs },
+        );
       } catch (error) {
         const detached = !this.attachedPeers.has(peer);
         const disposed =

@@ -1,3 +1,4 @@
+import { REQUEST_BUDGET_MS } from "@stella/contracts/request-deadline";
 import { AGENT_REPORT_MAX_CHARS } from "@stella/contracts/backend/agent-reports";
 import { AGENT_STOPPED_REASON, isAgentStopReason } from "@stella/contracts/agent-status";
 import { existsSync, readFileSync } from "node:fs";
@@ -308,7 +309,7 @@ export const piChatsFor = (
         const result = (await hostBus.request(
           METHOD_NAMES.HOST_RUNTIME_AUTH_REFRESH,
           { source: "stella_provider" },
-          { retryOnDisconnect: true },
+          { retryOnDisconnect: true, timeoutMs: REQUEST_BUDGET_MS.call },
         )) as { authenticated?: boolean; token?: string } | null;
         return result?.authenticated ? (result.token ?? null) : null;
       },

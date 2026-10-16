@@ -1,3 +1,4 @@
+import { REQUEST_BUDGET_MS } from "@stella/contracts/request-deadline";
 import { Context, Effect, Layer } from "effect";
 import {
   METHOD_NAMES,
@@ -89,7 +90,7 @@ export const layer = Layer.effect(
               return (await hostBus.request(
                 METHOD_NAMES.HOST_RUNTIME_AUTH_REFRESH,
                 { source: "stella_provider" },
-                { retryOnDisconnect: true },
+                { retryOnDisconnect: true, timeoutMs: REQUEST_BUDGET_MS.call },
               )) as {
                 authenticated: boolean;
                 token: string | null;

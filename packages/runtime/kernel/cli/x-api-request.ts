@@ -1,3 +1,4 @@
+import { fetchWithDeadline, REQUEST_BUDGET_MS } from "@stella/contracts/request-deadline";
 export type XApiOperation =
   | { op: "connectUrl" }
   | { op: "connections" }
@@ -59,9 +60,10 @@ export const sendXApiRequest = async (
       : operation.op === "connectUrl"
         ? "/api/x/connect-url"
         : "/api/x/connections";
-  const response = await fetch(stellaUrl(auth.baseUrl, pathname), {
-    ...init,
-    ...(signal ? { signal } : {}),
+  const response = await fetchWithDeadline(fetch, stellaUrl(auth.baseUrl, pathname).toString(), init, {
+    label: "X request",
+    timeoutMs: operation.op === "request" ? REQUEST_BUDGET_MS.slow : REQUEST_BUDGET_MS.lookup,
+    signal,
   });
   return { status: response.status, body: await readBody(response) };
 };

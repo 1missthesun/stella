@@ -1,3 +1,8 @@
+import {
+  fetchWithInactivity,
+  putSignedUpload,
+  REQUEST_BUDGET_MS,
+} from "@stella/contracts/request-deadline";
 import { createHash, randomUUID } from "node:crypto";
 import { createWriteStream, promises as fs } from "node:fs";
 import { homedir } from "node:os";
@@ -152,11 +157,11 @@ export const createDriveTransferTools = (
           sizeBytes: bytes.byteLength,
           contentType,
         });
-        const response = await fetch(prepared.uploadUrl, {
-          method: "PUT",
-          headers: { "Content-Type": prepared.contentType },
+        const response = await putSignedUpload({
+          url: prepared.uploadUrl,
+          contentType: prepared.contentType,
           body: bytes,
-          signal: AbortSignal.timeout(10 * 60_000),
+          label: `Uploading ${drivePath}`,
         });
         if (!response.ok) {
           return failure(`Uploading ${drivePath} failed (${response.status}).`);
@@ -260,9 +265,12 @@ export const createDriveTransferTools = (
           );
         }
         await fs.mkdir(path.dirname(destination), { recursive: true });
-        const response = await fetch(file.url, {
-          signal: AbortSignal.timeout(10 * 60_000),
-        });
+        const response = await fetchWithInactivity(
+          fetch,
+          file.url,
+          {},
+          { label: `Downloading ${file.path}`, idleMs: REQUEST_BUDGET_MS.transferIdle },
+        );
         if (!response.ok || !response.body) {
           return failure(
             `Downloading ${file.path} from the drive failed (${response.status}).`,

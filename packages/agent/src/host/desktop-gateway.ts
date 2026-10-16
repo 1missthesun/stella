@@ -10,6 +10,7 @@ import {
   dpopHeadersForSessionCapability,
 } from "@stella/runtime/kernel/gateway-session";
 import type { DeviceSigner } from "@stella/runtime/kernel/home/device";
+import { fetchWithDeadline, fetchWithInactivity, REQUEST_BUDGET_MS } from "@stella/contracts/request-deadline";
 import type { StellaAgentType, StellaGatewayAccess, StellaModelSpec } from "../provider/stella.ts";
 
 export type DesktopGatewayOptions = {
@@ -62,7 +63,12 @@ export function desktopGatewayAccess(options: DesktopGatewayOptions): StellaGate
       now: Date.now(),
     });
     for (const [name, value] of Object.entries(proof)) headers.set(name, value);
-    const response = await fetch(request.url, { method: request.method, headers, body, signal: request.signal });
+    const response = await fetchWithInactivity(
+      fetch,
+      request.url,
+      { method: request.method, headers, body },
+      { label: "Stella model gateway", idleMs: REQUEST_BUDGET_MS.streamIdle, signal: request.signal },
+    );
     if (await dpopInvalid(response)) throw new Error(STELLA_GATEWAY_DEVICE_VERIFICATION_MESSAGE);
     return response;
   };
@@ -99,11 +105,16 @@ export async function resolveStellaModels(
 ): Promise<StellaModelSpec[]> {
   return Promise.all(
     agentTypes.map(async (agentType) => {
-      const response = await access.fetch(`${gatewayOrigin.replace(/\/+$/, "")}${GATEWAY_RESOLVE_PATH}`, {
-        method: "POST",
-        headers: { "content-type": "application/json", accept: "application/json" },
-        body: JSON.stringify({ model: alias, agentType }),
-      });
+      const response = await fetchWithDeadline(
+        (url, init) => access.fetch(url, init),
+        `${gatewayOrigin.replace(/\/+$/, "")}${GATEWAY_RESOLVE_PATH}`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json", accept: "application/json" },
+          body: JSON.stringify({ model: alias, agentType }),
+        },
+        { label: `Resolving ${alias}`, timeoutMs: REQUEST_BUDGET_MS.lookup },
+      );
       if (!response.ok) {
         throw new Error(`Stella gateway could not resolve ${alias} for ${agentType}: ${response.status} ${await response.text()}`);
       }

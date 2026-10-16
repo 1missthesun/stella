@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { fetchWithInactivity, REQUEST_BUDGET_MS } from "@stella/contracts/request-deadline";
 import { randomUUID } from "node:crypto";
 import { createWriteStream } from "node:fs";
 import { mkdir, readFile } from "node:fs/promises";
@@ -336,7 +337,10 @@ const saveOutputs = async (job: MediaJob): Promise<OutputFile[]> => {
 
   const files: OutputFile[] = [];
   for (const [index, item] of urls.entries()) {
-    const response = await fetch(item.url);
+    const response = await fetchWithInactivity(fetch, item.url, {}, {
+      label: "Downloading media output",
+      idleMs: REQUEST_BUDGET_MS.transferIdle,
+    });
     if (!response.ok || !response.body) {
       throw new Error(`Failed to download media output (${response.status}).`);
     }

@@ -132,6 +132,7 @@ import type { AgentThreadCalls } from "@stella/contracts/backend/agent-threads";
 import { agentLogSync, importAgentLog, type AgentLogTransport } from "../stella/agent-log-sync.ts";
 import { agentMoveModel } from "../stella/agent-move-model.ts";
 import { movedAgentBrief, type AgentMove } from "../stella/execution.ts";
+import { fetchWithDeadline, REQUEST_BUDGET_MS, withDeadline } from "@stella/contracts/request-deadline";
 
 const HISTORY_PAGE = 200;
 const CLIENT_PAGE_BYTES = 2 * 1024 * 1024;
@@ -347,7 +348,13 @@ export function desktopChats(options: DesktopChatsOptions) {
   const sharedExecutionContext = async (): Promise<ExecutionContextSnapshot | undefined> => {
     const loadOnce = () =>
       (executionContextRead.pending ??= (async () => {
-        const snapshot = await options.executionContext?.().catch(() => undefined);
+        const read = options.executionContext;
+        const snapshot = read
+          ? await withDeadline(
+              { label: "Reading your devices", timeoutMs: REQUEST_BUDGET_MS.lookup },
+              async () => await read(),
+            ).catch(() => undefined)
+          : undefined;
         executionContextRead = {
           snapshot: snapshot?.devicesKnown || !executionContextRead.snapshot ? snapshot : executionContextRead.snapshot,
           at: Date.now(),
@@ -706,7 +713,12 @@ export function desktopChats(options: DesktopChatsOptions) {
       const site = options.siteAuth();
       if (!site) throw new Error("Sign in to Stella to chat.");
       const baseUrl = site.baseUrl.replace(/\/+$/, "");
-      const catalog = (await (await fetch(`${baseUrl}/api/stella/models`)).json()) as { gateway?: { origin?: string } };
+      const catalog = (await (
+        await fetchWithDeadline(fetch, `${baseUrl}/api/stella/models`, {}, {
+          label: "Loading Stella's model catalog",
+          timeoutMs: REQUEST_BUDGET_MS.lookup,
+        })
+      ).json()) as { gateway?: { origin?: string } };
       const gatewayOrigin = catalog.gateway?.origin;
       if (!gatewayOrigin) throw new Error("Stella's model catalog names no gateway.");
       const access = desktopGatewayAccess({

@@ -1,3 +1,4 @@
+import { fetchWithDeadline, REQUEST_BUDGET_MS } from "@stella/contracts/request-deadline";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -104,6 +105,10 @@ export const sendMediaRequest = async (
       break;
     }
   }
-  const response = await fetch(url, { ...init, ...(signal ? { signal } : {}) });
+  const response = await fetchWithDeadline(fetch, url.toString(), init, {
+    label: `Stella media ${operation.op}`,
+    timeoutMs: operation.op === "generate" ? REQUEST_BUDGET_MS.slow : REQUEST_BUDGET_MS.lookup,
+    signal,
+  });
   return { status: response.status, body: await readBody(response) };
 };

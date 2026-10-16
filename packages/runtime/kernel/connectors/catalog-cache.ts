@@ -1,3 +1,4 @@
+import { fetchWithDeadline, REQUEST_BUDGET_MS } from "@stella/contracts/request-deadline";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
@@ -255,7 +256,8 @@ export const fetchServerNativeCatalog = async (options: {
   fetchImpl?: typeof fetch;
 }): Promise<NativeConnectorCatalogEntry[] | null> => {
   const fetchImpl = options.fetchImpl ?? fetch;
-  const response = await fetchImpl(
+  const response = await fetchWithDeadline(
+    fetchImpl,
     `${options.baseUrl.replace(/\/+$/u, "")}/api/native-integrations/catalog`,
     {
       headers: {
@@ -263,6 +265,7 @@ export const fetchServerNativeCatalog = async (options: {
         authorization: `Bearer ${options.authToken}`,
       },
     },
+    { label: "Loading the connector catalog", timeoutMs: REQUEST_BUDGET_MS.lookup },
   ).catch(() => null);
   if (!response?.ok) return null;
   const payload = (await response.json().catch(() => null)) as {

@@ -1,3 +1,4 @@
+import { fetchWithInactivity, REQUEST_BUDGET_MS } from "@stella/contracts/request-deadline";
 import { promises as fsPromises } from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
@@ -166,7 +167,10 @@ export const materializeImageAttachments = async (
     }
 
     try {
-      const response = await fetch(url);
+      const response = await fetchWithInactivity(fetch, url, {}, {
+        label: "Downloading an attachment",
+        idleMs: REQUEST_BUDGET_MS.transferIdle,
+      });
       if (!response.ok) {
         logger.warn("startChat.attachment-materialize-failed", {
           url,

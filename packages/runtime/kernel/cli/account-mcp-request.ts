@@ -1,3 +1,4 @@
+import { fetchWithDeadline, REQUEST_BUDGET_MS } from "@stella/contracts/request-deadline";
 import { RPC_PATH_PREFIX } from "@stella/contracts/backend/protocol";
 
 export const ACCOUNT_MCP_OPS = ["list", "put", "remove", "call"] as const;
@@ -21,15 +22,23 @@ export const sendAccountMcpRequest = async (
     `${RPC_PATH_PREFIX}mcpServers.${operation.op}`,
     auth.baseUrl.endsWith("/") ? auth.baseUrl : `${auth.baseUrl}/`,
   );
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${auth.authToken}`,
-      "content-type": "application/json",
+  const response = await fetchWithDeadline(
+    fetch,
+    url.toString(),
+    {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${auth.authToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ args: operation.args }),
     },
-    body: JSON.stringify({ args: operation.args }),
-    signal: signal ?? AbortSignal.timeout(150_000),
-  });
+    {
+      label: `MCP ${operation.op}`,
+      timeoutMs: operation.op === "call" ? REQUEST_BUDGET_MS.slow : REQUEST_BUDGET_MS.call,
+      signal,
+    },
+  );
   const text = await response.text().catch(() => "");
   if (text.length > MAX_RESPONSE_BYTES) {
     return { status: 502, body: { ok: false, error: { message: "The MCP registry response was too large." } } };

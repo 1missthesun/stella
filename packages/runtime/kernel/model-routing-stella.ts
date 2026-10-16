@@ -1,3 +1,4 @@
+import { fetchWithInactivity, REQUEST_BUDGET_MS } from "@stella/contracts/request-deadline";
 import {
   STELLA_DEEPSEEK_V4_FLASH_UPSTREAM_MODEL,
   STELLA_DEFAULT_UPSTREAM_MODEL,
@@ -432,7 +433,14 @@ const sessionCapabilityFetch = (
     if (!firstCapability) {
       throw new Error("Stella relay request is missing its session capability.");
     }
-    const response = await fetch(input, {
+    const callerSignal = init?.signal ?? requestInput?.signal ?? null;
+    const send = (target: string | URL | Request, sendInit: RequestInit) =>
+      fetchWithInactivity((_url, timed) => fetch(target, timed), requestUrl, sendInit, {
+        label: "Stella model gateway",
+        idleMs: REQUEST_BUDGET_MS.streamIdle,
+        signal: callerSignal,
+      });
+    const response = await send(input, {
       ...init,
       headers: await proofHeaders(firstCapability),
     });
@@ -448,7 +456,7 @@ const sessionCapabilityFetch = (
       retryRequest && method !== "GET" && method !== "HEAD"
         ? await retryRequest.arrayBuffer()
         : undefined;
-    const retried = await fetch(retryRequest?.url ?? requestUrl, {
+    const retried = await send(retryRequest?.url ?? requestUrl, {
       ...init,
       ...(retryRequest ? { method: retryRequest.method } : {}),
       ...(init?.body === undefined && retryBody !== undefined

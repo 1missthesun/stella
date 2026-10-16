@@ -1,3 +1,4 @@
+import { fetchWithDeadline, REQUEST_BUDGET_MS } from "@stella/contracts/request-deadline";
 import { ConnectorAuthError } from "./connector-bridge.js";
 import { loadConnectorAccessToken } from "./oauth.js";
 import type { ApiConnectorConfig } from "./types.js";
@@ -81,17 +82,22 @@ export const callApiConnector = async (
   let credentials = authHeaders;
   let response: Response;
   for (let hop = 0; ; hop += 1) {
-    response = await fetch(target, {
-      method: currentMethod,
-      redirect: "manual",
-      headers: {
-        accept: "application/json",
-        ...(body === undefined ? {} : { "content-type": "application/json" }),
-        ...(args.headers ?? {}),
-        ...credentials,
+    response = await fetchWithDeadline(
+      fetch,
+      target.toString(),
+      {
+        method: currentMethod,
+        redirect: "manual",
+        headers: {
+          accept: "application/json",
+          ...(body === undefined ? {} : { "content-type": "application/json" }),
+          ...(args.headers ?? {}),
+          ...credentials,
+        },
+        body,
       },
-      body,
-    });
+      { label: `${api.displayName} API`, timeoutMs: REQUEST_BUDGET_MS.slow },
+    );
     const location = response.headers.get("location");
     if (response.status < 300 || response.status >= 400 || !location) break;
     if (hop >= MAX_REDIRECTS) {

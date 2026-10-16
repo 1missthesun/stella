@@ -3,6 +3,9 @@ import {
   backendTokenExpiryMs,
 } from "@stella/contracts/backend/client";
 import type { OwnerIdentity } from "@stella/contracts/backend/conversations";
+import { raceWithTimeoutError } from "./cloud-effect-runtime.js";
+
+const OWNER_IDENTITY_TIMEOUT_MS = 15_000;
 
 type BackendSessionState = {
   backendUrl: string | null;
@@ -108,7 +111,13 @@ export const createBackendSession = (
     },
     async ownerIdentity(): Promise<OwnerIdentity> {
       if (identity && identity.subject === subject) return await identity.value;
-      const value = this.require().call("owner.identity", {});
+      // Cached, so a request that never answers must fail rather than hold
+      // every later spawn, message and stop that needs the owner generation.
+      const value = raceWithTimeoutError(
+        this.require().call("owner.identity", {}),
+        OWNER_IDENTITY_TIMEOUT_MS,
+        () => new Error("Stella's cloud did not confirm your account in time. Try again in a moment."),
+      );
       identity = { subject, value };
       try {
         return await value;

@@ -220,15 +220,14 @@ export const createRunnerContext = ({
         "Sign in to Stella to stop agents running in the cloud or on your other devices.",
       );
     }
-    const ownerGeneration = await getCloudOwnerGeneration();
     const sanitized = `stop:${requestId}`.replace(/[^A-Za-z0-9._:-]/g, "_");
     return await raceWithTimeoutError(
-      backend.require().call("agentThreads.stop", {
-        ownerGeneration,
+      (async () => backend.require().call("agentThreads.stop", {
+        ownerGeneration: await getCloudOwnerGeneration(),
         conversationId,
         threadId,
         controlRequestId: sanitized.slice(0, 128),
-      }),
+      }))(),
       AGENT_MESSAGE_TIMEOUT_MS,
       () =>
         new Error(
@@ -264,10 +263,9 @@ export const createRunnerContext = ({
       if (!backend.client() || !isCloudSignedIn()) {
         throw new Error("Sign in to Stella to run agents in the cloud.");
       }
-      const ownerGeneration = await getCloudOwnerGeneration();
       const started = await raceWithTimeoutError(
-        backend.require().call("agentThreads.spawnFromDesktop", {
-          ownerGeneration,
+        (async () => backend.require().call("agentThreads.spawnFromDesktop", {
+          ownerGeneration: await getCloudOwnerGeneration(),
           clientMsgId: requestId,
           description,
           prompt,
@@ -276,7 +274,7 @@ export const createRunnerContext = ({
           execution,
           ...(parentThreadId ? { parentThreadId } : {}),
           ...(workspace ? { workspace } : {}),
-        }),
+        }))(),
         AGENT_SPAWN_TIMEOUT_MS,
         () =>
           new Error(
@@ -289,10 +287,9 @@ export const createRunnerContext = ({
       if (!backend.client() || !isCloudSignedIn()) {
         throw new Error("Sign in to Stella to run agents on your other computers.");
       }
-      const ownerGeneration = await getCloudOwnerGeneration();
       const started = await raceWithTimeoutError(
-        backend.require().call("agentThreads.spawnFromDesktop", {
-          ownerGeneration,
+        (async () => backend.require().call("agentThreads.spawnFromDesktop", {
+          ownerGeneration: await getCloudOwnerGeneration(),
           clientMsgId: requestId,
           conversationId,
           description,
@@ -302,7 +299,7 @@ export const createRunnerContext = ({
           targetDeviceId,
           ...(model ? { model } : {}),
           ...(parentThreadId ? { parentThreadId } : {}),
-        }),
+        }))(),
         AGENT_SPAWN_TIMEOUT_MS,
         () =>
           new Error(
@@ -315,16 +312,15 @@ export const createRunnerContext = ({
       if (!backend.client() || !isCloudSignedIn()) {
         throw new Error("Sign in to Stella to message agents running in the cloud.");
       }
-      const ownerGeneration = await getCloudOwnerGeneration();
       const delivery = await raceWithTimeoutError(
-        backend.require().call("agentThreads.message", {
-          ownerGeneration,
+        (async () => backend.require().call("agentThreads.message", {
+          ownerGeneration: await getCloudOwnerGeneration(),
           messageId: requestId,
           to: threadId,
           text: message,
           from: { threadId: conversationId, label: "Stella" },
           ...(framed ? { framed } : {}),
-        }),
+        }))(),
         AGENT_MESSAGE_TIMEOUT_MS,
         () => new Error("Stella's cloud did not answer, so the message may not have been delivered."),
       );

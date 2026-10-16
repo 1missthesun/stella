@@ -69,27 +69,66 @@ const workspaceDirs = () => {
   return dirs;
 };
 
-// Two copies of one patched package in a bundle break identity checks
-// (`instanceof`, brands), so every workspace must link the same copy.
-const splitLinks = ({ spec, name }) => {
-  const byTarget = new Map();
-  for (const workspace of workspaceDirs()) {
-    const link = path.join(workspace, "node_modules", name);
-    if (!existsSync(link)) continue;
-    const target = realpathSync(link);
-    byTarget.set(target, [...(byTarget.get(target) ?? []), path.relative(root, workspace) || "."]);
-  }
-  if (byTarget.size <= 1) return [];
-  return [
-    `${spec} is linked from more than one copy: ` +
-      [...byTarget].map(([target, users]) => `${users.join(", ")} -> ${path.relative(root, target)}`).join("; "),
-  ];
+const manifestOf = (dir) => {
+  const file = path.join(dir, "package.json");
+  return existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : null;
 };
 
-export const ensurePatchedDeps = ({ fix }) => {
+// A bundle is a workspace plus the workspaces it depends on, transitively.
+const bundleWorkspaces = (entry) => {
+  const byName = new Map();
+  for (const dir of workspaceDirs()) {
+    const name = manifestOf(dir)?.name;
+    if (name) byName.set(name, dir);
+  }
+  const seen = new Set();
+  const visit = (dir) => {
+    if (seen.has(dir)) return;
+    seen.add(dir);
+    const manifest = manifestOf(dir) ?? {};
+    for (const deps of [manifest.dependencies, manifest.devDependencies, manifest.peerDependencies]) {
+      for (const [name, range] of Object.entries(deps ?? {})) {
+        if (String(range).startsWith("workspace:") && byName.has(name)) visit(byName.get(name));
+      }
+    }
+  };
+  visit(entry);
+  return [...seen];
+};
+
+const defaultBundles = () => {
+  const cwd = path.resolve(process.cwd());
+  if (cwd !== root && workspaceDirs().includes(cwd)) return [cwd];
+  const workers = path.join(root, "workers");
+  return workspaceDirs().filter((dir) => path.dirname(dir) === workers);
+};
+
+// Two copies of one patched package in a bundle break identity checks
+// (`instanceof`, brands), so every workspace in a bundle must link the same
+// copy. Copies used only by other apps (mobile's peer variant) don't matter.
+const splitLinks = ({ spec, name }, bundles) => {
+  const problems = [];
+  for (const entry of bundles) {
+    const byTarget = new Map();
+    for (const workspace of bundleWorkspaces(entry)) {
+      const link = path.join(workspace, "node_modules", name);
+      if (!existsSync(link)) continue;
+      const target = realpathSync(link);
+      byTarget.set(target, [...(byTarget.get(target) ?? []), path.relative(root, workspace) || "."]);
+    }
+    if (byTarget.size <= 1) continue;
+    problems.push(
+      `${spec} is linked from more than one copy in ${path.relative(root, entry) || "."}'s bundle: ` +
+        [...byTarget].map(([target, users]) => `${users.join(", ")} -> ${path.relative(root, target)}`).join("; "),
+    );
+  }
+  return problems;
+};
+
+export const ensurePatchedDeps = ({ fix, bundles = defaultBundles() }) => {
   const problems = [];
   for (const dep of patchedSpecs()) {
-    problems.push(...splitLinks(dep));
+    problems.push(...splitLinks(dep, bundles));
     for (const dir of installedCopies(dep)) {
       if (isPatched(dir, dep.patchFile)) continue;
       if (fix) {

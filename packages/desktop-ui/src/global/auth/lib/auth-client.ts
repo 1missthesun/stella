@@ -5,6 +5,10 @@ import {
   oneTimeTokenClient,
 } from "better-auth/client/plugins";
 import { passkeyClient } from "@better-auth/passkey/client";
+import {
+  fetchWithDeadline,
+  REQUEST_BUDGET_MS,
+} from "@stella/contracts/request-deadline";
 import { backendUrl } from "@/platform/backend/backend-url";
 import { getStellaInteriorBridge } from "@/platform/interior/interior-bridge";
 import {
@@ -45,6 +49,21 @@ export const authClient = new Proxy({} as AuthClient, {
         plugins: createPlugins(),
         fetchOptions: {
           credentials: usesTrustedCookieAuth ? "include" : "omit",
+          customFetchImpl: (input, init) =>
+            fetchWithDeadline(
+              fetch,
+              typeof input === "string"
+                ? input
+                : input instanceof URL
+                  ? input.href
+                  : input.url,
+              init ?? {},
+              {
+                label: "sign-in",
+                timeoutMs: REQUEST_BUDGET_MS.call,
+                signal: init?.signal,
+              },
+            ),
           onRequest(context) {
             if (usesTrustedCookieAuth) return context;
             const token = readBrowserSessionToken();

@@ -10,6 +10,10 @@ import {
   resolveDeviceFileSource,
   type DeviceFileSourceDeps,
 } from "../services/device-file-source.js";
+import {
+  fetchWithInactivity,
+  REQUEST_BUDGET_MS,
+} from "@stella/contracts/request-deadline";
 
 export const MEDIA_SCHEME = "stella-media";
 export const MEDIA_ORIGIN = `${MEDIA_SCHEME}://local`;
@@ -185,10 +189,15 @@ const streamDriveCopy = async (
 ): Promise<Response> => {
   for (const fresh of [false, true]) {
     const file = await locator.copyUrl(drivePath, { fresh });
-    const upstream = await net.fetch(file.url, {
-      method: request.method === "HEAD" ? "HEAD" : "GET",
-      headers: rangeHeaders(request),
-    });
+    const upstream = await fetchWithInactivity(
+      (url, init) => net.fetch(url, init),
+      file.url,
+      {
+        method: request.method === "HEAD" ? "HEAD" : "GET",
+        headers: rangeHeaders(request),
+      },
+      { label: "Drive media", idleMs: REQUEST_BUDGET_MS.transferIdle },
+    );
     if ((upstream.status === 401 || upstream.status === 403) && !fresh) {
       await upstream.body?.cancel().catch(() => undefined);
       continue;

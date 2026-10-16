@@ -9,6 +9,10 @@ import {
   readBackendAccountEpoch,
   subscribeBackendAccount,
 } from "@/platform/backend/backend-client";
+import {
+  fetchWithInactivity,
+  REQUEST_BUDGET_MS,
+} from "@stella/contracts/request-deadline";
 
 const DRIVE_ATTACHMENT_ID_PREFIX = "drive:";
 const MAX_RESOLVED = 48;
@@ -69,7 +73,10 @@ const remember = (path: string, entry: Resolved) => {
 
 const fetchPreview = async (path: string): Promise<Resolved> => {
   const file = await backendClient.call("drive.fileUrl", { path });
-  const response = await fetch(file.url);
+  const response = await fetchWithInactivity(fetch, file.url, {}, {
+    label: "Drive preview",
+    idleMs: REQUEST_BUDGET_MS.transferIdle,
+  });
   if (!response.ok) throw new Error(`drive file ${response.status}`);
   const blob = await response.blob();
   const mimeType = attachmentContentType({

@@ -22,6 +22,10 @@ import {
 import { requireBackendUrl } from "@/platform/backend/backend-url";
 import { useT, useTPlural } from "@/shared/i18n";
 import { getPlatformChallengeToken } from "@/platform/auth/challenge-token";
+import {
+  fetchWithDeadline,
+  REQUEST_BUDGET_MS,
+} from "@stella/contracts/request-deadline";
 
 type Status = "idle" | "sending" | "sent" | "verifying" | "error";
 
@@ -91,14 +95,19 @@ function useMagicLinkAuthState(): MagicLinkAuthState {
       const sendRequest = buildMagicLinkSendRequest(targetEmail, turnstileToken);
       const claimSecret = generateClaimSecret();
       claimSecretRef.current = claimSecret;
-      const response = await fetch(`${backendUrl}/api/auth/link/send`, {
-        method: "POST",
-        headers: sendRequest.headers,
-        body: JSON.stringify({
-          ...sendRequest.body,
-          claimHash: await hashClaimSecret(claimSecret),
-        }),
-      });
+      const response = await fetchWithDeadline(
+        fetch,
+        `${backendUrl}/api/auth/link/send`,
+        {
+          method: "POST",
+          headers: sendRequest.headers,
+          body: JSON.stringify({
+            ...sendRequest.body,
+            claimHash: await hashClaimSecret(claimSecret),
+          }),
+        },
+        { label: "sign-in link", timeoutMs: REQUEST_BUDGET_MS.call },
+      );
 
       if (response.status === 429) {
         const retryAfterHeader = response.headers.get("Retry-After");
@@ -179,8 +188,11 @@ function useMagicLinkAuthState(): MagicLinkAuthState {
         if (cancelled) return;
 
         try {
-          const res = await fetch(
+          const res = await fetchWithDeadline(
+            fetch,
             `${backendUrl}/api/auth/link/status?requestId=${encodeURIComponent(requestId)}`,
+            {},
+            { label: "sign-in status", timeoutMs: REQUEST_BUDGET_MS.lookup },
           );
           if (!res.ok) continue;
           const data = (await res.json()) as { status: string };

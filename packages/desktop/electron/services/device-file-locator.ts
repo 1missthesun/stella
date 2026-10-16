@@ -5,9 +5,12 @@ import {
   pickDeviceFileLocation,
 } from "@stella/contracts/device-files";
 import { resolveJwtOwnerScope } from "@stella/runtime/kernel/runner/computer-agent-cloud-records";
+import {
+  fetchWithInactivity,
+  REQUEST_BUDGET_MS,
+} from "@stella/contracts/request-deadline";
 
 const REQUEST_TIMEOUT_MS = 15_000;
-const DOWNLOAD_TIMEOUT_MS = 120_000;
 const LOCATION_CACHE_TTL_MS = 30_000;
 const COPY_URL_EXPIRY_MARGIN_MS = 60_000;
 const SIGNED_OUT_MESSAGE = "Sign in to open files from your other devices.";
@@ -146,8 +149,9 @@ export const createDeviceFileLocator = (deps: Deps): DeviceFileLocator => {
 
   const readCopy = async (drivePath: string, maxBytes: number) => {
     const file = await copyUrl(drivePath);
-    const response = await fetchImpl(file.url, {
-      signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS),
+    const response = await fetchWithInactivity(fetchImpl, file.url, {}, {
+      label: "Drive copy",
+      idleMs: REQUEST_BUDGET_MS.transferIdle,
     });
     if (!response.ok || !response.body) {
       throw new Error(`Couldn't download the copy in your Drive (${response.status}).`);

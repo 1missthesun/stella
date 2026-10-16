@@ -2,6 +2,10 @@ import { getAuthHeaders } from "@/global/auth/services/auth-token";
 import type { CatalogApiResponse } from "@/global/settings/lib/model-catalog";
 import { STELLA_MODELS_PATH } from "@/shared/stella-api";
 import { backendUrl } from "./backend-client";
+import {
+  fetchWithDeadline,
+  REQUEST_BUDGET_MS,
+} from "@stella/contracts/request-deadline";
 
 let last: { etag: string; body: CatalogApiResponse } | null = null;
 
@@ -10,9 +14,12 @@ export const fetchStellaModels = async (): Promise<CatalogApiResponse> => {
   const headers = await getAuthHeaders(
     last ? { "If-None-Match": last.etag } : {},
   );
-  const response = await fetch(`${backendUrl}${STELLA_MODELS_PATH}`, {
-    headers,
-  });
+  const response = await fetchWithDeadline(
+    fetch,
+    `${backendUrl}${STELLA_MODELS_PATH}`,
+    { headers },
+    { label: "model list", timeoutMs: REQUEST_BUDGET_MS.lookup },
+  );
   if (response.status === 304 && last) return last.body;
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   const body = (await response.json()) as CatalogApiResponse;

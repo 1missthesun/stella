@@ -1,5 +1,9 @@
 import { useEffect, useState } from "react";
 import { backendClient } from "@/platform/backend/backend-client";
+import {
+  fetchWithInactivity,
+  REQUEST_BUDGET_MS,
+} from "@stella/contracts/request-deadline";
 
 type State = {
   key: string | null;
@@ -30,7 +34,16 @@ export const useCloudDriveHtml = (
         const { url } = await backendClient.call("drive.fileUrl", {
           path: drivePath,
         });
-        const response = await fetch(url, { signal: controller.signal });
+        const response = await fetchWithInactivity(
+          fetch,
+          url,
+          {},
+          {
+            label: "Drive file",
+            idleMs: REQUEST_BUDGET_MS.transferIdle,
+            signal: controller.signal,
+          },
+        );
         if (!response.ok) {
           throw new Error(`Drive file fetch failed (${response.status}).`);
         }

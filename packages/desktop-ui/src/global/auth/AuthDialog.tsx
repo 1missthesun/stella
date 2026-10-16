@@ -24,6 +24,11 @@ import {
 import { openExternalUrl } from "@/platform/electron/open-external";
 import { requireBackendUrl } from "@/platform/backend/backend-url";
 import { useT } from "@/shared/i18n";
+import {
+  fetchWithDeadline,
+  isTransientRequestError,
+  REQUEST_BUDGET_MS,
+} from "@stella/contracts/request-deadline";
 import "./AuthDialog.css";
 
 interface AuthDialogProps {
@@ -54,7 +59,8 @@ type Translate = ReturnType<typeof useT>;
 const startDesktopSocialAuth = async (t: Translate) => {
   const backendUrl = requireBackendUrl();
   const claimSecret = generateClaimSecret();
-  const response = await fetch(
+  const response = await fetchWithDeadline(
+    fetch,
     `${backendUrl}/api/auth/desktop-social/start`,
     {
       method: "POST",
@@ -64,6 +70,7 @@ const startDesktopSocialAuth = async (t: Translate) => {
         claimHash: await hashClaimSecret(claimSecret),
       }),
     },
+    { label: "sign-in", timeoutMs: REQUEST_BUDGET_MS.call },
   );
   const data = (await response.json().catch(() => null)) as {
     requestId?: string;
@@ -90,10 +97,16 @@ const pollDesktopSocialAuth = async (
   const deadline = Date.now() + SOCIAL_AUTH_TIMEOUT_MS;
   while (Date.now() < deadline) {
     await wait(SOCIAL_AUTH_POLL_INTERVAL_MS);
-    const response = await fetch(
+    const response = await fetchWithDeadline(
+      fetch,
       `${backendUrl}/api/auth/link/status?requestId=${encodeURIComponent(requestId)}`,
-    );
-    if (!response.ok) {
+      {},
+      { label: "sign-in status", timeoutMs: REQUEST_BUDGET_MS.lookup },
+    ).catch((error: unknown) => {
+      if (isTransientRequestError(error)) return null;
+      throw error;
+    });
+    if (!response?.ok) {
       continue;
     }
     const data = (await response.json().catch(() => null)) as {

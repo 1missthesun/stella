@@ -31,6 +31,11 @@ import {
   AUTH_CHALLENGE_TOKEN_PARAM,
 } from "@stella/contracts/auth-challenge";
 import { resolveDevHarnessSessionToken } from "../bootstrap/dev-harness-options.js";
+import {
+  fetchWithDeadline,
+  REQUEST_BUDGET_MS,
+  withDeadline,
+} from "@stella/contracts/request-deadline";
 /**
  * Mint a replacement backend JWT this long before the cached one expires. It
  * must exceed the backend's reauthentication lead (two minutes), or a token
@@ -51,7 +56,8 @@ const HOST_AUTH_TOKEN_RETRY_JITTER = 0.2;
 const SESSION_REFRESH_RETRY_BASE_MS = 2_000;
 const SESSION_REFRESH_RETRY_MAX_MS = 60_000;
 const SESSION_REFRESH_RETRY_JITTER = 0.2;
-const AUTH_REQUEST_TIMEOUT_MS = 12_000;
+/** The runtime gives up on `host.runtimeAuth.refresh` at `REQUEST_BUDGET_MS.call`; answer before it does. */
+const RUNTIME_AUTH_REFRESH_BUDGET_MS = REQUEST_BUDGET_MS.call - 5_000;
 const AUTH_STORAGE_SCOPE = "desktop-better-auth-storage";
 const AUTH_STORAGE_FILE = "better-auth-storage.json";
 const BETTER_AUTH_SESSION_DATA_STORAGE_KEY = "better-auth_session_data";
@@ -116,14 +122,18 @@ export const checkServerSession = async (
   if (!token) return "expired";
   let response: Response;
   try {
-    response = await fetch(`${backendUrl}${AUTH_BASE_PATH}/get-session`, {
-      headers: {
-        accept: "application/json",
-        origin: DESKTOP_AUTH_ORIGIN,
-        authorization: `Bearer ${token}`,
+    response = await fetchWithDeadline(
+      fetch,
+      `${backendUrl}${AUTH_BASE_PATH}/get-session`,
+      {
+        headers: {
+          accept: "application/json",
+          origin: DESKTOP_AUTH_ORIGIN,
+          authorization: `Bearer ${token}`,
+        },
       },
-      signal: AbortSignal.timeout(AUTH_REQUEST_TIMEOUT_MS),
-    });
+      { label: "sign-in check", timeoutMs: REQUEST_BUDGET_MS.lookup },
+    );
   } catch {
     return "unreachable";
   }
@@ -485,11 +495,16 @@ export class AuthService {
     if (token) {
       headers.set("authorization", `Bearer ${token}`);
     }
-    const response = await fetch(`${backendUrl}${AUTH_BASE_PATH}${pathname}`, {
-      ...init,
-      headers,
-      signal: init.signal ?? AbortSignal.timeout(AUTH_REQUEST_TIMEOUT_MS),
-    });
+    const response = await fetchWithDeadline(
+      fetch,
+      `${backendUrl}${AUTH_BASE_PATH}${pathname}`,
+      { ...init, headers },
+      {
+        label: "sign-in",
+        timeoutMs: REQUEST_BUDGET_MS.lookup,
+        signal: init.signal,
+      },
+    );
     this.applyAuthResponseToken(response);
     return response;
   }
@@ -1341,24 +1356,13 @@ export class AuthService {
 
   async refreshRuntimeAuth(): Promise<HostRuntimeAuthRefreshResult> {
     try {
-      await this.awaitPendingResync();
-      const epoch = this.credentialEpoch;
-      if (this.getBackendUrl() && this.getBearerToken()) {
-        // The runtime branches on `hasConnectedAccount`: an anonymous identity
-        // still owns cloud conversations, a connected one also gets the
-        // account-bound surfaces. Minting alone never reads the session, so
-        // without this a boot-time refresh would report a connected user as
-        // anonymous until some later path happened to derive it.
-        if (!this.sessionStateDerived) {
-          await this.getBetterAuthSession().catch(() => null);
-        }
-        if (this.getBearerToken()) {
-          await this.mintHostAuthToken();
-        }
-      }
-      if (this.credentialEpoch !== epoch) {
-        await this.awaitPendingResync();
-      }
+      await withDeadline(
+        {
+          label: "runtime sign-in refresh",
+          timeoutMs: RUNTIME_AUTH_REFRESH_BUDGET_MS,
+        },
+        () => this.refreshRuntimeAuthState(),
+      );
     } catch (error) {
       console.warn(
         "[auth] Runtime auth refresh failed:",
@@ -1366,6 +1370,27 @@ export class AuthService {
       );
     }
     return this.getRuntimeAuthState();
+  }
+
+  private async refreshRuntimeAuthState(): Promise<void> {
+    await this.awaitPendingResync();
+    const epoch = this.credentialEpoch;
+    if (this.getBackendUrl() && this.getBearerToken()) {
+      // The runtime branches on `hasConnectedAccount`: an anonymous identity
+      // still owns cloud conversations, a connected one also gets the
+      // account-bound surfaces. Minting alone never reads the session, so
+      // without this a boot-time refresh would report a connected user as
+      // anonymous until some later path happened to derive it.
+      if (!this.sessionStateDerived) {
+        await this.getBetterAuthSession().catch(() => null);
+      }
+      if (this.getBearerToken()) {
+        await this.mintHostAuthToken();
+      }
+    }
+    if (this.credentialEpoch !== epoch) {
+      await this.awaitPendingResync();
+    }
   }
 
   private notifySessionInvalidated() {

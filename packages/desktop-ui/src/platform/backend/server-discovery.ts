@@ -6,6 +6,10 @@ import {
   type ServerFeatures,
 } from "@stella/contracts/self-host";
 import { backendUrl } from "./backend-url";
+import {
+  fetchWithDeadline,
+  REQUEST_BUDGET_MS,
+} from "@stella/contracts/request-deadline";
 
 const launchedSelfHosted =
   (import.meta.env.VITE_STELLA_SELF_HOSTED as string | undefined) === "1";
@@ -26,14 +30,17 @@ export const loadServerDiscovery = (): Promise<void> => {
   loading = (async () => {
     if (!backendUrl) return;
     try {
-      const response = await fetch(`${backendUrl}${SELF_HOST_DISCOVERY_PATH}`, {
-        headers: { Accept: "application/json" },
-      });
+      const response = await fetchWithDeadline(
+        fetch,
+        `${backendUrl}${SELF_HOST_DISCOVERY_PATH}`,
+        { headers: { Accept: "application/json" } },
+        { label: "server discovery", timeoutMs: REQUEST_BUDGET_MS.lookup },
+      );
       if (!response.ok) return;
       discovery = parseServerDiscovery(await response.json());
       listeners.forEach((listener) => listener());
     } catch {
-      // No discovery: treated as the hosted service.
+      loading = null;
     }
   })();
   return loading;

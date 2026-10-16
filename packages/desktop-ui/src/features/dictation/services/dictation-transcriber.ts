@@ -1,5 +1,9 @@
 import { getAuthToken } from "@/global/auth/services/auth-token";
 import { backendUrl } from "@/platform/backend/backend-url";
+import {
+  fetchWithDeadline,
+  transferBudgetMs,
+} from "@stella/contracts/request-deadline";
 
 export type DictationRoute = "streaming" | "managed" | "openrouter" | "needs-key";
 
@@ -82,12 +86,16 @@ export const invalidateDictationRoute = (): void => {
 const transcribeManaged = async (wav: ArrayBuffer, signal?: AbortSignal): Promise<string> => {
   const token = await getAuthToken();
   if (!token) throw new DictationRequestError("Sign in to Stella to use dictation.", 401);
-  const response = await fetch(`${backendUrl}${TRANSCRIBE_PATH}`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "audio/wav" },
-    body: wav,
-    signal,
-  });
+  const response = await fetchWithDeadline(
+    fetch,
+    `${backendUrl}${TRANSCRIBE_PATH}`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "audio/wav" },
+      body: wav,
+    },
+    { label: "dictation", timeoutMs: transferBudgetMs(wav.byteLength), signal },
+  );
   const body = (await response.json().catch(() => ({}))) as {
     text?: unknown;
     error?: unknown;

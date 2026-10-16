@@ -2,6 +2,11 @@ import { useSyncExternalStore } from "react";
 import { attachmentContentType } from "@stella/contracts/attachment-content-type";
 import { backendClient } from "@/platform/backend/backend-client";
 import { cloudAttachmentsStore } from "./cloud-composer-store";
+import {
+  RequestTimeoutError,
+  retryIdempotent,
+  transferBudgetMs,
+} from "@stella/contracts/request-deadline";
 
 export const BROWSER_ATTACHMENT_MAX_BYTES = 20 * 1024 * 1024;
 export const BROWSER_ATTACHMENT_MAX_FILES = 10;
@@ -97,15 +102,29 @@ export const browserAttachmentDrivePath = (
 ): string =>
   `Chat Attachments/${now.toISOString().slice(0, 10)}/${id.slice(-8)}-${safeName(file.name)}`;
 
-const putWithProgress = (
+const UPLOAD_LABEL = "Uploading to Stella's Drive";
+
+const uploadFailure = (message: string, retryable: boolean): Error =>
+  Object.assign(new Error(message), { retryable });
+
+const uploadCanceled = (): Error =>
+  Object.assign(new Error("Upload canceled."), { name: "AbortError" });
+
+const putOnceWithProgress = (
   upload: BrowserAttachmentUpload,
   url: string,
   contentType: string,
 ): Promise<void> =>
   new Promise((resolve, reject) => {
+    if (!uploads.some((entry) => entry.id === upload.id)) {
+      reject(uploadCanceled());
+      return;
+    }
     const request = new XMLHttpRequest();
+    const timeoutMs = transferBudgetMs(upload.file.size);
     activeRequests.set(upload.id, request);
     request.open("PUT", url);
+    request.timeout = timeoutMs;
     request.setRequestHeader("content-type", contentType);
     request.upload.onprogress = (event) => {
       if (event.lengthComputable) {
@@ -114,14 +133,32 @@ const putWithProgress = (
         });
       }
     };
-    request.onerror = () => reject(new Error("The upload connection failed."));
-    request.onabort = () => reject(new Error("Upload canceled."));
+    request.onerror = () =>
+      reject(uploadFailure("The upload connection failed.", true));
+    request.ontimeout = () =>
+      reject(new RequestTimeoutError(UPLOAD_LABEL, timeoutMs));
+    request.onabort = () => reject(uploadCanceled());
     request.onload = () => {
       if (request.status >= 200 && request.status < 300) resolve();
-      else reject(new Error(`Upload failed (${request.status}).`));
+      else
+        reject(
+          uploadFailure(
+            `Upload failed (${request.status}).`,
+            request.status >= 500,
+          ),
+        );
     };
     request.onloadend = () => activeRequests.delete(upload.id);
     request.send(upload.file);
+  });
+
+const putWithProgress = (
+  upload: BrowserAttachmentUpload,
+  url: string,
+  contentType: string,
+): Promise<void> =>
+  retryIdempotent(() => putOnceWithProgress(upload, url, contentType), {
+    attempts: 3,
   });
 
 const canvasBlob = (

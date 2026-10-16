@@ -3,6 +3,10 @@ import {
   deviceFileElsewhereMessage,
   pickDeviceFileLocation,
 } from "@stella/contracts/device-files";
+import {
+  fetchWithInactivity,
+  REQUEST_BUDGET_MS,
+} from "@stella/contracts/request-deadline";
 
 const DEFAULT_MAX_BYTES = 32 * 1024 * 1024;
 
@@ -28,7 +32,15 @@ export const readDeviceFileCopy = async (
   const { url, contentType } = await backendClient.call("drive.fileUrl", {
     path: location.drivePath,
   });
-  const response = await fetch(url);
+  const response = await fetchWithInactivity(
+    fetch,
+    url,
+    {},
+    {
+      label: "Drive file",
+      idleMs: REQUEST_BUDGET_MS.transferIdle,
+    },
+  );
   if (!response.ok || !response.body) {
     throw new Error("Couldn't load the copy of this file in your Drive.");
   }

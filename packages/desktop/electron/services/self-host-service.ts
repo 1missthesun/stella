@@ -30,9 +30,13 @@ import {
   serverDataDir,
   writeServerSession,
 } from "./auth-service.js";
+import {
+  fetchWithDeadline,
+  isRequestTimeout,
+  REQUEST_BUDGET_MS,
+} from "@stella/contracts/request-deadline";
 
 export const SERVER_FILE_NAME = "server.json";
-const REQUEST_TIMEOUT_MS = 15_000;
 const SERVER_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 
 export type ServerFile = {
@@ -146,18 +150,14 @@ export const applySelfHostedServerEnv = () => {
   }
 };
 
-const withTimeout = async (url: string, init: RequestInit = {}): Promise<Response> => {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-  try {
-    return await fetch(url, { ...init, signal: controller.signal });
-  } finally {
-    clearTimeout(timer);
-  }
-};
+const withTimeout = async (url: string, init: RequestInit = {}): Promise<Response> =>
+  await fetchWithDeadline(fetch, url, init, {
+    label: "Stella server",
+    timeoutMs: REQUEST_BUDGET_MS.lookup,
+  });
 
 const describeNetworkError = (error: unknown): string =>
-  (error as Error)?.name === "AbortError"
+  isRequestTimeout(error)
     ? "The server took too long to answer."
     : "Couldn't reach the server. Check the address and your connection.";
 

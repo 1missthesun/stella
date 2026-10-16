@@ -95,7 +95,10 @@ export const withDeadline = <T>(
   });
 };
 
-/** The deadline covers the response headers and the whole body read. */
+/**
+ * For text/JSON responses: the deadline covers the headers and the whole body
+ * read. Rebuilt from text since React Native's fetch decodes ArrayBuffer bodies as Latin-1.
+ */
 export const fetchWithDeadline = async (
   fetchImpl: (input: string, init: RequestInit) => Promise<Response>,
   url: string,
@@ -104,8 +107,8 @@ export const fetchWithDeadline = async (
 ): Promise<Response> =>
   await withDeadline(options, async (signal) => {
     const response = await fetchImpl(url, { ...init, signal });
-    const body = await response.arrayBuffer();
-    return new Response(body.byteLength === 0 && nullBodyStatus(response.status) ? null : body, {
+    const body = await response.text();
+    return new Response(nullBodyStatus(response.status) ? null : body, {
       status: response.status,
       statusText: response.statusText,
       headers: response.headers,

@@ -63,6 +63,7 @@ const LOOKUP_SUFFIXES = [
 
 const IDEMPOTENT_CALLS = new Set<string>([
   "conversations.bootstrap",
+  "agentThreads.handoff",
   "devices.register",
   "devices.identity",
   "agentReports.acknowledge",

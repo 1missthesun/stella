@@ -1,3 +1,4 @@
+import { REQUEST_BUDGET_MS, withDeadline } from "./request-deadline.js";
 import { socketCredentialProtocol } from "./socket-ticket.js";
 import {
   BACKFILL_BATCH_RECORDS,
@@ -432,7 +433,11 @@ export class ConversationSocket {
     const tokenStartedAt = performanceNow();
     let token: string | null = null;
     try {
-      token = await this.options.getToken({ forceRefresh: this.attempt > 0 });
+      const forceRefresh = this.attempt > 0;
+      token = await withDeadline(
+        { label: "Refreshing your Stella sign-in", timeoutMs: REQUEST_BUDGET_MS.lookup },
+        async () => await this.options.getToken({ forceRefresh }),
+      );
     } catch {
       token = null;
     }
@@ -730,7 +735,10 @@ export class ConversationSocket {
     if (this.reauthInFlight) return;
     this.reauthInFlight = true;
     try {
-      const token = await this.options.getToken({ forceRefresh: true });
+      const token = await withDeadline(
+        { label: "Refreshing your Stella sign-in", timeoutMs: REQUEST_BUDGET_MS.lookup },
+        async () => await this.options.getToken({ forceRefresh: true }),
+      );
       if (token && isSubprotocolSafe(token)) this.send({ type: "auth", token });
     } catch {
       // Same reasoning.

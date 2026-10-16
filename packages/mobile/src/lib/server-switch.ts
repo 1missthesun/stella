@@ -8,7 +8,9 @@ import type {
   ServerDiscovery,
 } from "@stella/contracts/self-host";
 import { parseServerDiscovery } from "@stella/contracts/self-host";
+import { REQUEST_BUDGET_MS } from "@stella/contracts/request-deadline";
 import { env } from "../config/env";
+import { fetchWithinDeadline } from "./cloud-request";
 import { MOBILE_SESSION_TOKEN_KEY } from "./native-auth-client";
 import { setItemForServerAsync } from "./secure-store";
 import {
@@ -107,15 +109,19 @@ export const claimPairingAndSwitch = async (
   };
   let response: Response;
   try {
-    response = await fetch(`${link.server}/api/auth/device-pairing/claim`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        accept: "application/json",
-        "expo-origin": Linking.createURL("", { scheme: env.mobileScheme }),
+    response = await fetchWithinDeadline(
+      `${link.server}/api/auth/device-pairing/claim`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          accept: "application/json",
+          "expo-origin": Linking.createURL("", { scheme: env.mobileScheme }),
+        },
+        body: JSON.stringify(request),
       },
-      body: JSON.stringify(request),
-    });
+      { label: "Pairing with your server", timeoutMs: REQUEST_BUDGET_MS.call },
+    );
   } catch {
     throw new PairingError("unreachable");
   }

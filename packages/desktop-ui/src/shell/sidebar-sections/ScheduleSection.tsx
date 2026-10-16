@@ -454,7 +454,18 @@ export function ScheduleSection({ active }: { active: boolean }) {
     return () => window.clearInterval(timer);
   }, [active, jobs]);
   const { running, paused } = useMemo(() => {
-    const list = jobs ?? [];
+    // This computer's scheduler keeps a one-time schedule after it ran (turned
+    // off); like a finished cloud one, it is done, not paused.
+    const list = (jobs ?? []).filter(
+      (job) =>
+        !(
+          job.schedule.kind === "at" &&
+          !job.enabled &&
+          job.lastRunAtMs !== undefined &&
+          job.lastRunAtMs >= job.schedule.atMs &&
+          job.lastStatus !== "error"
+        ),
+    );
     return {
       running: list.filter((job) => job.enabled).sort((a, b) => a.nextRunAtMs - b.nextRunAtMs),
       paused: list.filter((job) => !job.enabled).sort((a, b) => b.updatedAt - a.updatedAt),
@@ -466,7 +477,7 @@ export function ScheduleSection({ active }: { active: boolean }) {
     return <EmptyState motif="blank" title={t("schedule.signedOutTitle")} body={t("schedule.signedOutBody")} />;
   }
   if (jobs === undefined) return null;
-  if (jobs.length === 0) {
+  if (running.length === 0 && paused.length === 0) {
     return <EmptyState motif="blank" title={t("schedule.emptyTitle")} body={t("schedule.emptyBody")} />;
   }
   const renderList = (list: LocalCronJobRecord[], testId: string) => (

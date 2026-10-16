@@ -2,6 +2,7 @@ import { backendClient } from "@/platform/backend/backend-client";
 import { attachmentContentType } from "@stella/contracts/attachment-content-type";
 import { driveLinkPath } from "@stella/contracts/cloud-world-paths";
 import { pickDeviceFileLocation } from "@stella/contracts/device-files";
+import { putSignedUpload } from "@stella/contracts/request-deadline";
 
 const isControlCharacter = (char: string): boolean => {
   const code = char.charCodeAt(0);
@@ -32,10 +33,10 @@ const drivePathFor = async (filePath: string, blob: Blob | null): Promise<string
     sizeBytes: blob.size,
     contentType,
   });
-  const put = await fetch(prepared.uploadUrl, {
-    method: "PUT",
-    headers: { "content-type": prepared.contentType },
+  const put = await putSignedUpload({
+    url: prepared.uploadUrl,
     body: blob,
+    contentType: prepared.contentType,
   });
   if (!put.ok) throw new Error(`Upload failed (${put.status}).`);
   const finalized = await backendClient.call("drive.finalizeUpload", {

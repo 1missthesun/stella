@@ -45,6 +45,10 @@ import {
   driveLinkPath,
   driveLinkTarget,
 } from "@stella/contracts/cloud-world-paths";
+import {
+  fetchWithInactivity,
+  REQUEST_BUDGET_MS,
+} from "@stella/contracts/request-deadline";
 
 const CACHE_DIRNAME = "chat-evidence";
 const CACHE_SCHEMA = "v1";
@@ -53,7 +57,6 @@ const SAMPLE_BYTES = 1024 * 1024;
 const STACK_FRAME_CAP = 8;
 const DRIVE_IMAGE_MAX_BYTES = 40 * 1024 * 1024;
 const DRIVE_VIDEO_DOWNLOAD_MAX_BYTES = 64 * 1024 * 1024;
-const DRIVE_FETCH_TIMEOUT_MS = 30_000;
 const GENERATION_CONCURRENCY = 3;
 
 type SourceEntry = {
@@ -375,7 +378,10 @@ const mapWithLimit = async <Input, Output>(
 };
 
 const fetchDriveBytes = async (url: string, maxBytes: number): Promise<Buffer | null> => {
-  const response = await fetch(url, { signal: AbortSignal.timeout(DRIVE_FETCH_TIMEOUT_MS) });
+  const response = await fetchWithInactivity(fetch, url, {}, {
+    label: "Drive evidence",
+    idleMs: REQUEST_BUDGET_MS.transferIdle,
+  });
   if (!response.ok) return null;
   const declared = Number(response.headers.get("content-length") ?? "0");
   if (declared > maxBytes) {

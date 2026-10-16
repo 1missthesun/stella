@@ -2,6 +2,10 @@ import { useId, useMemo, type ReactNode } from "react";
 import { isDocumentFolderAsset } from "@stella/contracts/html-relative-assets";
 import { DisplayFileSourceContext } from "@/shared/hooks/display-file-source";
 import { backendClient } from "@/platform/backend/backend-client";
+import {
+  fetchWithInactivity,
+  REQUEST_BUDGET_MS,
+} from "@stella/contracts/request-deadline";
 
 const drivePathFor = (documentPath: string, filePath: string): string => {
   const document = `/${documentPath}`;
@@ -24,7 +28,12 @@ export function CloudFileSource({ path, children }: { path: string; children: Re
       const { url } = await backendClient.call("drive.fileUrl", {
         path: drivePathFor(path, filePath),
       });
-      const response = await fetch(url, { headers: { Range: `bytes=0-${maxBytes}` } });
+      const response = await fetchWithInactivity(
+        fetch,
+        url,
+        { headers: { Range: `bytes=0-${maxBytes}` } },
+        { label: "Drive file", idleMs: REQUEST_BUDGET_MS.transferIdle },
+      );
       if (!response.ok) throw new Error("Couldn’t load this Drive file.");
       const reader = response.body?.getReader();
       if (!reader) throw new Error("This Drive file has no readable content.");

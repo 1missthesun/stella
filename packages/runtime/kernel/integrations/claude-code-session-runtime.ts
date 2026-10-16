@@ -212,6 +212,8 @@ type PendingStep = {
   detachTurnControl?: () => void;
   intermediateResult?: ClaudeCodeStepResult;
   answeredMcpCallCount?: number;
+  /** Stella tools this step's MCP host is running; each reports progress. */
+  stellaToolsRunning?: number;
 };
 type ClaudeCodeChild = ChildProcessByStdio<Writable, Readable, Readable>;
 type ClaudeCodeProcessState = {
@@ -361,6 +363,14 @@ const DEFAULT_STEP_IDLE_TIMEOUT_MS = 5 * 60 * 1000;
 // Claude Code offers no way to cancel one native tool, so a silent native
 // tool is bounded only by restarting the CLI process after this long.
 const DEFAULT_STEP_TOOL_IDLE_TIMEOUT_MS = 20 * 60 * 1000;
+/**
+ * The MCP host sends progress every 15 s while a Stella tool runs, so this
+ * idle bound (Claude's default is 300 s) only ends a call whose host stopped
+ * answering. Same value as the cloud orchestrator's. Claude's total
+ * per-call cap (`MCP_TOOL_TIMEOUT`) stays at its default: a secure card can
+ * wait on the user for an hour.
+ */
+const CLAUDE_CODE_MCP_TOOL_IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 const DEFAULT_TOOL_CATALOG_TIMEOUT_MS = 40 * 1000;
 const MAX_ADRIFT_LINES = 50_000;
 const ADRIFT_TOOL_TURN_WAIT_MS = 2 * 60 * 1000;
@@ -1943,32 +1953,55 @@ class ClaudeCodeSessionRuntime {
             argsSummary: summarizeMcpLedgerValue(toolArgs, 4_000),
           };
           pending?.mcpCalls.push(callRecord);
+          const processState = session.process;
+          const refreshStepIdle = () => {
+            if (pending && processState?.pending.includes(pending)) {
+              this.refreshPendingIdleTimer(processState, pending);
+            }
+          };
+          if (pending) {
+            pending.stellaToolsRunning = (pending.stellaToolsRunning ?? 0) + 1;
+          }
+          refreshStepIdle();
           const signal =
             request.abortSignal && toolSignal
               ? AbortSignal.any([request.abortSignal, toolSignal])
               : (request.abortSignal ?? toolSignal);
-          const toolResult = await executeToolWithInactivityBound({
-            toolName,
-            signal,
-            ...(request.boundToolInactivity === false ? { timeoutMs: 0 } : {}),
-            run: (boundedSignal, onActivity) =>
-              request.executeTool(
-                toolCallId,
-                toolName,
-                toolArgs,
-                boundedSignal,
-                (update) => {
-                  onActivity();
-                  onUpdate?.(update);
-                  request.onToolUpdate?.({
-                    toolCallId,
-                    toolName,
-                    update,
-                  });
-                },
-              ),
-          });
-          callRecord.status = "completed";
+          let toolResult: ToolResult;
+          try {
+            toolResult = await executeToolWithInactivityBound({
+              toolName,
+              signal,
+              ...(request.boundToolInactivity === false
+                ? { timeoutMs: 0 }
+                : {}),
+              run: (boundedSignal, onActivity) =>
+                request.executeTool(
+                  toolCallId,
+                  toolName,
+                  toolArgs,
+                  boundedSignal,
+                  (update) => {
+                    onActivity();
+                    onUpdate?.(update);
+                    request.onToolUpdate?.({
+                      toolCallId,
+                      toolName,
+                      update,
+                    });
+                  },
+                ),
+            });
+          } finally {
+            callRecord.status = "completed";
+            if (pending) {
+              pending.stellaToolsRunning = Math.max(
+                0,
+                (pending.stellaToolsRunning ?? 1) - 1,
+              );
+            }
+            refreshStepIdle();
+          }
           callRecord.outcomeSummary = summarizeMcpLedgerValue(
             {
               result: toolResult.result,
@@ -2617,6 +2650,10 @@ class ClaudeCodeSessionRuntime {
       childEnv.CLAUDE_CODE_EFFORT_LEVEL = effortLevel;
     }
     session.claudeLoginEmail = claudeConfig.email;
+    delete childEnv.MCP_TOOL_TIMEOUT;
+    childEnv.CLAUDE_CODE_MCP_TOOL_IDLE_TIMEOUT = String(
+      CLAUDE_CODE_MCP_TOOL_IDLE_TIMEOUT_MS,
+    );
     delete childEnv.CLAUDE_CODE_AUTO_COMPACT_WINDOW;
     delete childEnv.CLAUDE_AUTOCOMPACT_PCT_OVERRIDE;
     if (
@@ -3395,6 +3432,7 @@ class ClaudeCodeSessionRuntime {
       clearTimeout(pending.idleTimer);
     }
     pending.idleTimer = undefined;
+    if ((pending.stellaToolsRunning ?? 0) > 0) return;
     // Claude Code emits nothing while a native tool runs.
     const toolsInFlight = pending.activeNativeToolUseIds.size > 0;
     const timeoutMs = toolsInFlight

@@ -26,3 +26,28 @@ export const forkCancelableTimeout = (
   };
 };
 
+export const forkCancelableInterval = (
+  everyMs: number,
+  onTick: () => void,
+): (() => void) => {
+  let canceled = false;
+  const cancelLatch = Deferred.makeUnsafe<void>();
+  integrationsRuntime.runFork(
+    Effect.raceFirst(
+      Effect.forever(
+        Effect.sleep(everyMs).pipe(
+          Effect.flatMap(() =>
+            Effect.sync(() => {
+              if (!canceled) onTick();
+            }),
+          ),
+        ),
+      ),
+      Deferred.await(cancelLatch),
+    ),
+  );
+  return () => {
+    canceled = true;
+    Deferred.doneUnsafe(cancelLatch, Effect.void);
+  };
+};

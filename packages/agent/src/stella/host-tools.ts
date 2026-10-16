@@ -89,12 +89,37 @@ const providerSchema = (
   };
 };
 
+const runningCalls = new Map<string, (reason: Error) => void>();
+const abandonedBeforeStart = new Set<string>();
+const MAX_ABANDONED_BEFORE_START = 256;
+
+/**
+ * An engine whose model stopped waiting for a call (Claude Code answered it
+ * itself after its MCP idle or total timeout) ends that call's work, so the
+ * tool round it holds can settle and the model's next calls run.
+ */
+export const abandonToolCall = (callId: string, reason: Error): void => {
+  const end = runningCalls.get(callId);
+  if (end) {
+    end(reason);
+    return;
+  }
+  abandonedBeforeStart.add(callId);
+  if (abandonedBeforeStart.size > MAX_ABANDONED_BEFORE_START) {
+    const oldest = abandonedBeforeStart.values().next().value;
+    if (oldest !== undefined) abandonedBeforeStart.delete(oldest);
+  }
+};
+
 const register = (role: StellaToolRole, spec: StellaToolSpec, host: StellaToolHost): ToolRegistration => ({
   name: spec.name,
   description: spec.description,
   ...providerSchema(spec),
   replay: spec.replay === "safe" || spec.replay === "keyed" ? "safe" : "unsafe",
   async execute(args, api, context) {
+    if (abandonedBeforeStart.delete(api.callId)) {
+      return { content: [{ type: "text", text: `The model stopped waiting for ${spec.name} before it started, so it did not run.` }], isError: true };
+    }
     const agent = role === "general" ? await api.snapshot(StellaAgentDoc, api.conversationId, context) : undefined;
     // pi-durable cancels a call's context when the call ends. Work a tool
     // leaves running (a code cell that yielded) must outlive the call, so the
@@ -111,6 +136,12 @@ const register = (role: StellaToolRole, spec: StellaToolSpec, host: StellaToolHo
     };
     if (parent?.aborted) forward();
     else parent?.addEventListener("abort", forward, { once: true });
+    const abandon = (reason: Error) => {
+      controller.abort(reason);
+      stop?.(reason);
+    };
+    runningCalls.set(api.callId, abandon);
+    if (abandonedBeforeStart.delete(api.callId)) abandon(new Error(`The model stopped waiting for ${spec.name}.`));
     let outcome: StellaToolOutcome;
     try {
       const running = host.run(
@@ -128,6 +159,7 @@ const register = (role: StellaToolRole, spec: StellaToolSpec, host: StellaToolHo
       outcome = await Promise.race([running, stopped]);
     } finally {
       parent?.removeEventListener("abort", forward);
+      runningCalls.delete(api.callId);
     }
     const details = jsonDetails(outcome.details);
     return {

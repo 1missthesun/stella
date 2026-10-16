@@ -45,6 +45,7 @@ import { resolveClaudeCodeToolSet } from "@stella/runtime/kernel/integrations/cl
 import type { ClaudeCodeCompaction } from "@stella/runtime/kernel/integrations/claude-code-compaction";
 import { fitCodeDescriptionForClaudeCode } from "@stella/runtime/kernel/tools/code-catalog";
 import { StellaAgentDoc } from "../stella/agent-doc.ts";
+import { abandonToolCall } from "../stella/host-tools.ts";
 import { residentContextAsOf, residentContextKind, withResidentContext } from "../stella/resident-context.ts";
 import { claudeCodeTranscript, type ClaudeCodeTranscriptMeta } from "@stella/runtime/kernel/integrations/claude-code-transcript";
 import { isPiCompactionBoundary } from "../stella/handover.ts";
@@ -688,13 +689,6 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
     }
   };
 
-  const builtinWaits = (turn: Turn, toolUseId: string): boolean => {
-    for (const [id, record] of calls) {
-      if (id !== toolUseId && record.turn === turn && record.native && !nativeResults.has(id)) return true;
-    }
-    return false;
-  };
-
   const reconsiderGates = (turn: Turn) => {
     for (const gate of [...turn.gates]) gate();
   };
@@ -711,6 +705,22 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       changed = true;
     }
     if (changed) reconsiderGates(turn);
+  };
+
+  const noteAbandoned = (turn: Turn, event: Record<string, unknown>) => {
+    const content = asRecord(event.message)?.content;
+    if (!Array.isArray(content)) return;
+    for (const raw of content) {
+      const block = asRecord(raw);
+      if (block?.type !== "tool_result" || typeof block.tool_use_id !== "string") continue;
+      const waiting = turn.waiting.get(block.tool_use_id);
+      if (!waiting) continue;
+      turn.waiting.delete(block.tool_use_id);
+      calls.delete(block.tool_use_id);
+      const answer = cliResultText(block.content) || "Claude Code stopped waiting for this call.";
+      abandonToolCall(block.tool_use_id, new Error(`Claude Code stopped waiting for this call, so Stella ended it: ${answer}`));
+      waiting({ content: [{ type: "text", text: answer }], isError: true });
+    }
   };
 
   const cliRuns = (turn: Turn, toolUseId: string, name: string, context: Context): Promise<string | undefined> =>
@@ -962,7 +972,10 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
         onEvent: (event) => {
           if (turn.done) return;
           if (event.type === "stream_event") answered();
-          if (event.type === "user") noteRefusals(turn, event as Record<string, unknown>);
+          if (event.type === "user") {
+            noteRefusals(turn, event as Record<string, unknown>);
+            noteAbandoned(turn, event as Record<string, unknown>);
+          }
           push(turn, { kind: "event", event: event as Record<string, any> });
         },
         onNativeToolEnd: ({ toolUseId, result, isError }) => {
@@ -1579,7 +1592,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
             afterTool: (call, result) => {
               const record = calls.get(call.id);
               if (!record || record.native || record.truncated || record.turn.done) return undefined;
-              if (result.control || result.content === undefined || !builtinWaits(record.turn, call.id)) return undefined;
+              if (result.control || result.content === undefined) return undefined;
               calls.delete(call.id);
               const content = result.content.filter((part): part is TextContent | ImageContent => part.type === "text" || part.type === "image");
               const diagnostics = result.diagnostics ?? [];

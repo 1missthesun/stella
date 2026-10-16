@@ -1,4 +1,5 @@
 import { handleRequest } from "./router.js";
+import { withRelayKeepalive } from "./relay-keepalive.js";
 import { handleUsageBatch } from "./usage-queue.js";
 import { billingGatewayConfig } from "./billing-control.js";
 import { publishSharedGatewayConfig } from "./shared-config.js";
@@ -10,7 +11,8 @@ export { handleRequest } from "./router.js";
 export { handleUsageBatch } from "./usage-queue.js";
 
 export default {
-  fetch: (request, env, ctx) => handleRequest(request, env, ctx),
+  fetch: (request, env, ctx) =>
+    withRelayKeepalive(request, ctx, (forwarded) => handleRequest(forwarded, env, ctx)),
   queue: (batch, env) => handleUsageBatch(batch, env),
   scheduled: (_controller, env, ctx) => {
     ctx.waitUntil(

@@ -9,6 +9,11 @@ import {
   createGatewaySessionClient,
   dpopHeadersForSessionCapability,
 } from "@stella/runtime/kernel/gateway-session";
+import {
+  GATEWAY_RELAY_KEEPALIVE_HEADER,
+  isKeepaliveRelayPath,
+  unwrapRelayKeepalive,
+} from "@stella/contracts/gateway/relay-keepalive";
 import type { DeviceSigner } from "@stella/runtime/kernel/home/device";
 import { fetchWithDeadline, fetchWithInactivity, REQUEST_BUDGET_MS } from "@stella/contracts/request-deadline";
 import type { StellaAgentType, StellaGatewayAccess, StellaModelSpec } from "../provider/stella.ts";
@@ -41,6 +46,16 @@ const capabilityExhausted = async (response: Response): Promise<boolean> => {
 const dpopInvalid = async (response: Response): Promise<boolean> =>
   (response.status === 400 || response.status === 401) && (await errorCode(response)) === "dpop_invalid";
 
+const wantsKeepalive = (request: Request, body: ArrayBuffer | undefined): boolean => {
+  if (!body || request.method !== "POST" || !isKeepaliveRelayPath(new URL(request.url).pathname)) return false;
+  try {
+    const parsed = JSON.parse(new TextDecoder().decode(body)) as { stream?: unknown } | null;
+    return parsed?.stream !== true;
+  } catch {
+    return false;
+  }
+};
+
 export function desktopGatewayAccess(options: DesktopGatewayOptions): StellaGatewayAccess {
   const session = createGatewaySessionClient({
     gatewayOrigin: () => options.gatewayOrigin,
@@ -63,14 +78,16 @@ export function desktopGatewayAccess(options: DesktopGatewayOptions): StellaGate
       now: Date.now(),
     });
     for (const [name, value] of Object.entries(proof)) headers.set(name, value);
+    if (wantsKeepalive(request, body)) headers.set(GATEWAY_RELAY_KEEPALIVE_HEADER, "1");
     const response = await fetchWithInactivity(
       fetch,
       request.url,
       { method: request.method, headers, body },
       { label: "Stella model gateway", idleMs: REQUEST_BUDGET_MS.streamIdle, signal: request.signal },
     );
-    if (await dpopInvalid(response)) throw new Error(STELLA_GATEWAY_DEVICE_VERIFICATION_MESSAGE);
-    return response;
+    const unwrapped = await unwrapRelayKeepalive(response);
+    if (await dpopInvalid(unwrapped)) throw new Error(STELLA_GATEWAY_DEVICE_VERIFICATION_MESSAGE);
+    return unwrapped;
   };
 
   const relayFetch = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {

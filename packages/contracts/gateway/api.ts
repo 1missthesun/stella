@@ -242,7 +242,7 @@ export const limitsAudienceFor = (audience: string): ManagedModelAudienceForLimi
 export const GATEWAY_MAX_REQUEST_BODY_BYTES = 24 * 1024 * 1024;
 export const GATEWAY_MAX_RESULT_CACHE_BYTES = 8 * 1024 * 1024;
 export const GATEWAY_RESULT_CACHE_TTL_MS = 10 * 60 * 1000;
-export const GATEWAY_UPSTREAM_IDLE_TIMEOUT_MS = 5 * 60 * 1000;
+export const GATEWAY_UPSTREAM_IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 export const GATEWAY_UPSTREAM_MAX_DURATION_MS = 45 * 60 * 1000;
 
 export const gatewayRelayBaseUrl = (gatewayOrigin: string): string =>

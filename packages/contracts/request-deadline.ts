@@ -6,7 +6,7 @@ export const REQUEST_BUDGET_MS = {
   slow: 120_000,
   connect: 15_000,
   transferIdle: 60_000,
-  streamIdle: 300_000,
+  streamIdle: 30 * 60_000,
 } as const;
 
 const MIN_TRANSFER_BYTES_PER_SECOND = 128 * 1024;

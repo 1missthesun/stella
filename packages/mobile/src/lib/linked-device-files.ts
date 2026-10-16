@@ -16,7 +16,9 @@ import {
   pickDeviceFileLocation,
 } from "@stella/contracts/device-files";
 import { EVIDENCE_THUMBNAIL_VARIANT } from "@stella/contracts/chat-evidence-thumbnails";
+import { transferBudgetMs } from "@stella/contracts/request-deadline";
 import { getBackendClient } from "./backend";
+import { downloadFileWithinIdle, fetchWithinDeadline } from "./cloud-request";
 import {
   DeviceRequestError,
   decodeUtf8,
@@ -377,8 +379,13 @@ const readOnce = async (
 
 const driveCopyUrl = async (
   drivePath: string,
+  signal: AbortSignal | undefined,
 ): Promise<{ url: string; contentType: string }> => {
-  const file = await getBackendClient().call("drive.fileUrl", { path: drivePath });
+  const file = await getBackendClient().call(
+    "drive.fileUrl",
+    { path: drivePath },
+    signal ? { signal } : {},
+  );
   return { url: file.url, contentType: file.contentType };
 };
 
@@ -394,8 +401,12 @@ export const readLinkedFileBytes = async (
   const { signal, maxBytes } = options;
   if (source.kind === "drive") {
     if (source.sizeBytes > maxBytes) throw tooLarge();
-    const file = await driveCopyUrl(source.drivePath);
-    const response = await fetch(file.url, { signal });
+    const file = await driveCopyUrl(source.drivePath, signal);
+    const response = await fetchWithinDeadline(file.url, undefined, {
+      label: "Loading this file from your Drive",
+      timeoutMs: transferBudgetMs(source.sizeBytes),
+      signal,
+    });
     if (!response.ok) {
       throw new Error("Couldn't load the copy of this file in your Drive.");
     }
@@ -472,9 +483,12 @@ export const downloadLinkedFile = async (
   let mimeType = "application/octet-stream";
   try {
     if (source.kind === "drive") {
-      const file = await driveCopyUrl(source.drivePath);
+      const file = await driveCopyUrl(source.drivePath, signal);
       mimeType = file.contentType || source.contentType;
-      await File.downloadFileAsync(file.url, part, { idempotent: true });
+      await downloadFileWithinIdle(file.url, part, {
+        label: "Downloading this file from your Drive",
+        ...(signal ? { signal } : {}),
+      });
     } else if (!source.stat || source.stat.sizeBytes <= DEVICE_FILE_READ_LIMITS.rangeBytes) {
       const { bytes, contentType } = await readOnce(
         source.target,
@@ -539,8 +553,12 @@ export const listLinkedFolder = async (
       value = null;
     }
   } else {
-    const file = await driveCopyUrl(source.drivePath);
-    const response = await fetch(file.url, { signal });
+    const file = await driveCopyUrl(source.drivePath, signal);
+    const response = await fetchWithinDeadline(file.url, undefined, {
+      label: "Loading this folder from your Drive",
+      timeoutMs: transferBudgetMs(source.sizeBytes),
+      signal,
+    });
     if (!response.ok) {
       throw new Error("Couldn't load this folder's listing from your Drive.");
     }

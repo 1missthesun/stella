@@ -12,6 +12,7 @@ import {
 } from "@stella/contracts/chat-evidence-thumbnails";
 import type { EvidenceSourceKind } from "@stella/contracts/chat-evidence-naming";
 import { resolveCloudDriveFile } from "./use-cloud-drive-file-uri";
+import { downloadFileWithinIdle } from "./cloud-request";
 import { assertReadableOnPairedComputer } from "./desktop-artifact-data";
 import {
   downloadLinkedFile,
@@ -145,7 +146,9 @@ const localSourceFor = async (
     `${stableKey(request.filePath)}${extensionOf(request.filePath)}`,
   );
   if (remote) {
-    await File.downloadFileAsync(remote.url, target, { idempotent: true });
+    await downloadFileWithinIdle(remote.url, target, {
+      label: "Downloading a preview from your Drive",
+    });
   } else {
     assertReadableOnPairedComputer(request.filePath);
     const source = await resolveLinkedFile(
@@ -195,7 +198,9 @@ const driveThumbnailFor = async (
   const cached = readManifest(identity);
   if (cached?.kind === "image") return cached;
   const target = new File(directoryFor("thumbnail"), `${stableKey(identity)}.jpg`);
-  await File.downloadFileAsync(entry.url, target, { idempotent: true });
+  await downloadFileWithinIdle(entry.url, target, {
+    label: "Downloading a thumbnail from your Drive",
+  });
   const preview: EvidencePreview = { kind: "image", uri: target.uri };
   writeManifest(identity, preview);
   return preview;

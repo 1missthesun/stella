@@ -1,4 +1,6 @@
 import type { BackendClient } from "@stella/contracts/backend/client";
+import { fetch as expoFetch, type FetchRequestInit } from "expo/fetch";
+import { putSignedUpload } from "@stella/contracts/request-deadline";
 import { attachmentContentType } from "./image-attachments";
 
 export const CHAT_ATTACHMENT_MAX_COUNT = 4;
@@ -105,9 +107,11 @@ export const withAttachmentPreamble = (
 export type AttachmentUploadDeps = {
   client: Pick<BackendClient, "call">;
   readFile: (uri: string) => Promise<Uint8Array<ArrayBuffer>>;
-  fetch?: (url: string, init: RequestInit) => Promise<Pick<Response, "ok" | "status">>;
   now?: () => Date;
 };
+
+const uploadFetch = async (url: string, init: RequestInit): Promise<Response> =>
+  (await expoFetch(url, init as FetchRequestInit)) as unknown as Response;
 
 export const uploadChatAttachment = async (
   attachment: PickedAttachment,
@@ -127,10 +131,12 @@ export const uploadChatAttachment = async (
     sizeBytes: bytes.byteLength,
     contentType,
   });
-  const put = await (deps.fetch ?? fetch)(prepared.uploadUrl, {
-    method: "PUT",
-    headers: { "content-type": prepared.contentType },
+  const put = await putSignedUpload({
+    url: prepared.uploadUrl,
     body: bytes,
+    contentType: prepared.contentType,
+    label: `Uploading ${attachment.name || "your attachment"}`,
+    fetchImpl: uploadFetch,
   });
   if (!put.ok) {
     throw new Error(`Upload failed (${put.status}).`);

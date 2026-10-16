@@ -47,6 +47,8 @@ export type StellaToolCall = {
   callId: string;
   args: Record<string, unknown>;
   threadId?: string;
+  /** Where the caller's Bash runs; relative paths in tool arguments resolve here. */
+  cwd?: string;
 };
 
 export type StellaToolOutcome = {
@@ -126,6 +128,7 @@ const register = (role: StellaToolRole, spec: StellaToolSpec, host: StellaToolHo
           callId: api.callId,
           args: (args ?? {}) as Record<string, unknown>,
           ...(agent?.threadId ? { threadId: agent.threadId } : {}),
+          ...(api.env?.cwd ? { cwd: api.env.cwd } : {}),
         },
         withAbortSignal(controller.signal, withoutAbortSignal(context)),
       );

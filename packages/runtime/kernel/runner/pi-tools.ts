@@ -46,6 +46,7 @@ export type PiToolCall = {
   args: Record<string, unknown>;
   conversationId: string;
   agentId?: string;
+  cwd?: string;
   signal?: AbortSignal;
 };
 
@@ -145,6 +146,7 @@ export const createRunnerPiTools = (context: RunnerContext): RunnerPiTools => ({
         storageMode: "local",
         agentType,
         ...(call.agentId ? { agentId: call.agentId } : {}),
+        ...(call.cwd ? { agentWorkingDirectory: call.cwd } : {}),
         deviceId: context.deviceId,
         stellaAppDir: context.stellaAppDir,
         stellaDataDir: context.stellaDataDir,

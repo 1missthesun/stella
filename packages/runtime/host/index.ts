@@ -1979,7 +1979,16 @@ export class StellaRuntimeHost {
   }
   async addCronJob(input: LocalCronJobCreateInput) {
     if (isCloudSchedulePayload(input.payload)) {
-      return await this.getCloudSchedules().add(input);
+      if (this.configCache.hasConnectedAccount) {
+        return await this.getCloudSchedules().add(input);
+      }
+      // Signed out there is no cloud: reminders and tasks run from this
+      // computer's own scheduler. A watch's check must be a local script.
+      if (input.payload.kind === "watch") {
+        throw new Error(
+          "Stella is signed out, so schedules live only on this computer: write the check with ScriptDraft and add the watch with runsOn \"computer\".",
+        );
+      }
     }
     return this.ensureScheduler().addCronJob(input);
   }

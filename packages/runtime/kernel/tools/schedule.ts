@@ -149,6 +149,10 @@ const summarizeJob = (record: LocalCronJobRecord): ScheduleListRow => {
       ? { lastFinding: record.lastOutputPreview }
       : {}),
     ...(record.lastError ? { lastError: record.lastError } : {}),
+    ...(record.runsOn === "computer" ? { runsOn: "computer" as const } : {}),
+    ...(record.waitingSinceMs !== undefined
+      ? { waitingForComputerSince: new Date(record.waitingSinceMs).toISOString() }
+      : {}),
   };
 };
 
@@ -270,9 +274,20 @@ export const handleScheduleAdd = async (
       : {}),
   });
   return {
-    result: `Added ${getCronTriggerKind(record.payload)} "${record.name}" (${record.id}), ${describeSchedule(record.schedule)}; next fire ${new Date(record.nextRunAtMs).toISOString()}.${watchCheckNote(record)}`,
+    result: `Added ${getCronTriggerKind(record.payload)} "${record.name}" (${record.id}), ${describeSchedule(record.schedule)}; next fire ${new Date(record.nextRunAtMs).toISOString()}.${watchCheckNote(record)}${whereNote(record)}`,
     details: cronDetails("added", record),
   };
+};
+
+/** Where its runs happen, when that is only this computer. */
+const whereNote = (record: LocalCronJobRecord): string => {
+  if (record.id.startsWith("cron:")) {
+    return " It lives only on this computer and runs while Stella is open here; a run missed while Stella was closed happens once when it's back.";
+  }
+  if (record.runsOn === "computer") {
+    return " The user's plan runs scheduled work only on their computer, never in the cloud: it runs here, and if this computer is off or asleep when it's due, the user is told and it runs once the computer is back. Say so if they expected it to run with the computer off.";
+  }
+  return "";
 };
 
 const watchCheckNote = (record: LocalCronJobRecord): string => {

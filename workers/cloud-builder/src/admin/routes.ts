@@ -184,6 +184,25 @@ const billingPlan = async (request: Request, env: AdminEnv): Promise<Response> =
   return json(await owner.gate.billingAccess());
 };
 
+const billingCredit = async (request: Request, env: AdminEnv): Promise<Response> => {
+  const body = await readBody(request);
+  const ownerId = ownerIdOf(body?.ownerId);
+  if (!ownerId) return fail(400, "Missing ownerId.");
+  const grantId = typeof body?.grantId === "string" ? body.grantId.trim() : "";
+  if (!/^[A-Za-z0-9._-]{1,80}$/.test(grantId)) return fail(400, "grantId must be 1-80 of [A-Za-z0-9._-].");
+  const amountCents = body?.amountCents;
+  if (typeof amountCents !== "number" || !Number.isSafeInteger(amountCents) || amountCents < 1 || amountCents > 10_000) {
+    return fail(400, "amountCents must be an integer from 1 to 10000.");
+  }
+  const note = typeof body?.note === "string" ? body.note.trim().slice(0, 500) : "";
+  if (!note) return fail(400, "Missing note.");
+  const owner = await ownerGate(env, ownerId);
+  if (owner.response) return owner.response;
+  const { granted } = await owner.gate.grantBillingCredit({ grantId, amountCents, note });
+  console.log(JSON.stringify({ event: "admin_billing_credit", ownerId, grantId, amountCents, granted, note }));
+  return json({ granted, access: await owner.gate.billingAccess() });
+};
+
 const ownerCosts = async (url: URL, env: AdminEnv): Promise<Response> => {
   const ownerId = ownerIdOf(url.searchParams.get("ownerId"));
   if (!ownerId) return fail(400, "Missing ownerId.");
@@ -434,6 +453,7 @@ const ROUTES: Record<string, { method: "GET" | "POST"; run: (request: Request, u
   },
   "/api/admin/owners/enforcement": { method: "POST", run: (request, _url, env) => enforcement(request, env) },
   "/api/admin/billing/plan": { method: "POST", run: (request, _url, env) => billingPlan(request, env) },
+  "/api/admin/billing/credit": { method: "POST", run: (request, _url, env) => billingCredit(request, env) },
   "/api/admin/delete": { method: "POST", run: (request, _url, env) => remove(request, env) },
   "/api/admin/test-accounts/session": { method: "POST", run: (request, _url, env) => testAccountSession(request, env) },
   "/api/admin/selfhost/owner": {

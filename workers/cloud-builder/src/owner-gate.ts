@@ -70,6 +70,7 @@ import {
   reserveSpend,
   reservationHeld,
   setAdminPlan,
+  grantAdminCredit,
   settleSpend,
   type SpendReservation,
   turnAllowance,
@@ -738,6 +739,10 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     complimentary?: boolean;
   }): Promise<void> {
     await this.billingWrite((ctx) => setAdminPlan(ctx, input));
+  }
+
+  async grantBillingCredit(input: { grantId: string; amountCents: number; note: string }): Promise<{ granted: boolean }> {
+    return await this.billingWrite((ctx) => grantAdminCredit(ctx, input));
   }
 
   async billingCosts(query: OwnerCostQuery): Promise<OwnerCostReport> {

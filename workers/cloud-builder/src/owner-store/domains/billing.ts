@@ -157,6 +157,13 @@ export const BILLING_COST_LEDGER_MIGRATION = {
   ],
 };
 
+// Admin credit grants share billing_credit_purchases (keyed `admin:<grantId>`);
+// the note is their audit trail.
+export const BILLING_CREDIT_NOTE_MIGRATION = {
+  id: "billing.3-credit-note",
+  statements: ["ALTER TABLE billing_credit_purchases ADD COLUMN note TEXT"],
+};
+
 type AccountRow = {
   plan: string;
   usage_mode: string;
@@ -923,6 +930,31 @@ export const setAdminPlan = (
   });
 };
 
+export const grantAdminCredit = (
+  ctx: OwnerContext,
+  input: { grantId: string; amountCents: number; note: string },
+): { granted: boolean } => {
+  const id = `admin:${input.grantId}`;
+  if (ctx.db.one("SELECT 1 AS seen FROM billing_credit_purchases WHERE checkout_session_id = ?", id)) {
+    return { granted: false };
+  }
+  const amount = input.amountCents * 1_000_000;
+  ctx.db.run(
+    "INSERT INTO billing_credit_purchases (checkout_session_id, amount, created_at, note) VALUES (?, ?, ?, ?)",
+    id,
+    amount,
+    ctx.now,
+    input.note,
+  );
+  const row = ensureAccount(ctx.db, ctx.now);
+  updateAccount(ctx.db, {
+    credit_balance: row.credit_balance + amount,
+    credit_purchased: row.credit_purchased + amount,
+    updated_at: ctx.now,
+  });
+  return { granted: true };
+};
+
 const SPENT_ALLOWANCE_MICRO_CENTS = 10_000_000_000_000;
 
 const resetWindows = (now: number, anchor: number): Partial<AccountRow> => ({
@@ -1350,7 +1382,7 @@ const returnUrlArg = string({ min: 1, max: 2_048 });
 
 export const billingDomain = {
   name: "billing",
-  migrations: [BILLING_MIGRATION, BILLING_COST_LEDGER_MIGRATION],
+  migrations: [BILLING_MIGRATION, BILLING_COST_LEDGER_MIGRATION, BILLING_CREDIT_NOTE_MIGRATION],
   calls: {
     "billing.checkout": {
       scope: "owner",

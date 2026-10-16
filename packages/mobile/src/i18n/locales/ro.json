@@ -3076,6 +3076,8 @@
     "paused": "Pe pauză",
     "runsInCloud": "Rulează în cloud",
     "runsOnComputer": "Rulează pe acest computer",
+    "runsOnYourComputer": "Rulează pe computerul tău",
+    "waiting": "Așteaptă computerul tău",
     "toAgent": "Merge la un agent",
     "toStella": "Merge la Stella",
     "once": "Se oprește când găsește",
@@ -3116,6 +3118,7 @@
     },
     "notice": {
       "open": "Deschide în Program",
+      "whenBack": "Rulează când revine",
       "title": {
         "created": {
           "reminder": "Memento setat",
@@ -3141,6 +3144,11 @@
           "reminder": "Memento eliminat",
           "task": "Sarcină eliminată",
           "watch": "Urmărire eliminată"
+        },
+        "waiting": {
+          "reminder": "Așteaptă computerul tău",
+          "task": "Așteaptă computerul tău",
+          "watch": "Așteaptă computerul tău"
         }
       },
       "when": {

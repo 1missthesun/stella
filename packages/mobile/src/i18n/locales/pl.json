@@ -3092,6 +3092,8 @@
     "paused": "Wstrzymane",
     "runsInCloud": "Działa w chmurze",
     "runsOnComputer": "Działa na tym komputerze",
+    "runsOnYourComputer": "Działa na Twoim komputerze",
+    "waiting": "Czeka na Twój komputer",
     "toAgent": "Trafia do agenta",
     "toStella": "Trafia do Stelli",
     "once": "Kończy się po znalezieniu",
@@ -3132,6 +3134,7 @@
     },
     "notice": {
       "open": "Otwórz w Harmonogramie",
+      "whenBack": "Uruchomi się, gdy komputer wróci",
       "title": {
         "created": {
           "reminder": "Przypomnienie ustawione",
@@ -3157,6 +3160,11 @@
           "reminder": "Przypomnienie usunięte",
           "task": "Zadanie usunięte",
           "watch": "Obserwacja usunięta"
+        },
+        "waiting": {
+          "reminder": "Czeka na Twój komputer",
+          "task": "Czeka na Twój komputer",
+          "watch": "Czeka na Twój komputer"
         }
       },
       "when": {

@@ -3076,6 +3076,8 @@
     "paused": "In pausa",
     "runsInCloud": "Eseguito nel cloud",
     "runsOnComputer": "Eseguito su questo computer",
+    "runsOnYourComputer": "Viene eseguito sul tuo computer",
+    "waiting": "In attesa del tuo computer",
     "toAgent": "Va a un agente",
     "toStella": "Va a Stella",
     "once": "Si ferma quando trova",
@@ -3116,6 +3118,7 @@
     },
     "notice": {
       "open": "Apri in Programmazione",
+      "whenBack": "Verrà eseguito quando torna disponibile",
       "title": {
         "created": {
           "reminder": "Promemoria impostato",
@@ -3141,6 +3144,11 @@
           "reminder": "Promemoria rimosso",
           "task": "Attività rimossa",
           "watch": "Monitoraggio rimosso"
+        },
+        "waiting": {
+          "reminder": "In attesa del tuo computer",
+          "task": "In attesa del tuo computer",
+          "watch": "In attesa del tuo computer"
         }
       },
       "when": {

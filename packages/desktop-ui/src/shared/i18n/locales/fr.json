@@ -3076,6 +3076,8 @@
     "paused": "En pause",
     "runsInCloud": "S'exécute dans le cloud",
     "runsOnComputer": "S'exécute sur cet ordinateur",
+    "runsOnYourComputer": "S’exécute sur votre ordinateur",
+    "waiting": "En attente de votre ordinateur",
     "toAgent": "Envoyé à un agent",
     "toStella": "Envoyé à Stella",
     "once": "S'arrête dès que trouvé",
@@ -3116,6 +3118,7 @@
     },
     "notice": {
       "open": "Ouvrir dans le planning",
+      "whenBack": "S’exécutera à son retour",
       "title": {
         "created": {
           "reminder": "Rappel créé",
@@ -3141,6 +3144,11 @@
           "reminder": "Rappel supprimé",
           "task": "Tâche supprimée",
           "watch": "Veille supprimée"
+        },
+        "waiting": {
+          "reminder": "En attente de votre ordinateur",
+          "task": "En attente de votre ordinateur",
+          "watch": "En attente de votre ordinateur"
         }
       },
       "when": {

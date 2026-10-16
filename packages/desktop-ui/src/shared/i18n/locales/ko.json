@@ -3042,6 +3042,8 @@
     "paused": "일시 중지됨",
     "runsInCloud": "클라우드에서 실행",
     "runsOnComputer": "이 컴퓨터에서 실행",
+    "runsOnYourComputer": "내 컴퓨터에서 실행",
+    "waiting": "컴퓨터를 기다리는 중",
     "toAgent": "에이전트에게 전달",
     "toStella": "Stella에게 전달",
     "once": "찾으면 중지",
@@ -3082,6 +3084,7 @@
     },
     "notice": {
       "open": "일정에서 열기",
+      "whenBack": "컴퓨터가 돌아오면 실행됩니다",
       "title": {
         "created": {
           "reminder": "리마인더 설정됨",
@@ -3107,6 +3110,11 @@
           "reminder": "리마인더 삭제됨",
           "task": "작업 삭제됨",
           "watch": "감시 삭제됨"
+        },
+        "waiting": {
+          "reminder": "컴퓨터를 기다리는 중",
+          "task": "컴퓨터를 기다리는 중",
+          "watch": "컴퓨터를 기다리는 중"
         }
       },
       "when": {

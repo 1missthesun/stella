@@ -3060,6 +3060,8 @@
     "paused": "Pausad",
     "runsInCloud": "Körs i molnet",
     "runsOnComputer": "Körs på den här datorn",
+    "runsOnYourComputer": "Körs på din dator",
+    "waiting": "Väntar på din dator",
     "toAgent": "Går till en agent",
     "toStella": "Går till Stella",
     "once": "Slutar när det hittas",
@@ -3100,6 +3102,7 @@
     },
     "notice": {
       "open": "Öppna i Schema",
+      "whenBack": "Körs när den är tillbaka",
       "title": {
         "created": {
           "reminder": "Påminnelse skapad",
@@ -3125,6 +3128,11 @@
           "reminder": "Påminnelse borttagen",
           "task": "Uppgift borttagen",
           "watch": "Bevakning borttagen"
+        },
+        "waiting": {
+          "reminder": "Väntar på din dator",
+          "task": "Väntar på din dator",
+          "watch": "Väntar på din dator"
         }
       },
       "when": {

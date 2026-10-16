@@ -125,7 +125,10 @@ export function SchedulePage() {
         kind: "schedule",
         key: `${schedule.kind}:${schedule.id}`,
         schedule,
-        trailing: timeOfDay(schedule.nextRunAtMs),
+        trailing:
+          schedule.waitingSinceMs !== undefined
+            ? t("schedule.waiting")
+            : timeOfDay(schedule.nextRunAtMs),
       });
     }
     if (paused.length > 0) {
@@ -187,7 +190,9 @@ export function SchedulePage() {
           cadence,
           badge.kind === "paused"
             ? t("mobile.activityHub.schedule.paused")
-            : t("mobile.activityHub.schedule.next", { when: badge.label }),
+            : schedule.waitingSinceMs !== undefined
+              ? t("schedule.waiting")
+              : t("mobile.activityHub.schedule.next", { when: badge.label }),
         ].join(" · "),
         schedule.enabled && schedule.lastError
           ? t("mobile.activityHub.schedule.lastRunFailed", {

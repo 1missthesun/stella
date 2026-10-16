@@ -3060,6 +3060,8 @@
     "paused": "Pausiert",
     "runsInCloud": "Läuft in der Cloud",
     "runsOnComputer": "Läuft auf diesem Computer",
+    "runsOnYourComputer": "Läuft auf deinem Computer",
+    "waiting": "Wartet auf deinen Computer",
     "toAgent": "Geht an einen Agenten",
     "toStella": "Geht an Stella",
     "once": "Stoppt, sobald gefunden",
@@ -3100,6 +3102,7 @@
     },
     "notice": {
       "open": "Im Zeitplan öffnen",
+      "whenBack": "Läuft, sobald er wieder da ist",
       "title": {
         "created": {
           "reminder": "Erinnerung eingerichtet",
@@ -3125,6 +3128,11 @@
           "reminder": "Erinnerung entfernt",
           "task": "Aufgabe entfernt",
           "watch": "Beobachtung entfernt"
+        },
+        "waiting": {
+          "reminder": "Wartet auf deinen Computer",
+          "task": "Wartet auf deinen Computer",
+          "watch": "Wartet auf deinen Computer"
         }
       },
       "when": {

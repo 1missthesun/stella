@@ -3092,6 +3092,8 @@
     "paused": "Pozastaveno",
     "runsInCloud": "Běží v cloudu",
     "runsOnComputer": "Běží na tomto počítači",
+    "runsOnYourComputer": "Běží na vašem počítači",
+    "waiting": "Čeká na váš počítač",
     "toAgent": "Jde agentovi",
     "toStella": "Jde Stelle",
     "once": "Skončí po nalezení",
@@ -3132,6 +3134,7 @@
     },
     "notice": {
       "open": "Otevřít v Plánu",
+      "whenBack": "Spustí se, až bude zpět",
       "title": {
         "created": {
           "reminder": "Připomínka nastavena",
@@ -3157,6 +3160,11 @@
           "reminder": "Připomínka odstraněna",
           "task": "Úkol odstraněn",
           "watch": "Hlídání odstraněno"
+        },
+        "waiting": {
+          "reminder": "Čeká na váš počítač",
+          "task": "Čeká na váš počítač",
+          "watch": "Čeká na váš počítač"
         }
       },
       "when": {

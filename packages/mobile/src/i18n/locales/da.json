@@ -3060,6 +3060,8 @@
     "paused": "Sat på pause",
     "runsInCloud": "Kører i skyen",
     "runsOnComputer": "Kører på denne computer",
+    "runsOnYourComputer": "Kører på din computer",
+    "waiting": "Venter på din computer",
     "toAgent": "Går til en agent",
     "toStella": "Går til Stella",
     "once": "Stopper, når det er fundet",
@@ -3100,6 +3102,7 @@
     },
     "notice": {
       "open": "Åbn i Tidsplan",
+      "whenBack": "Kører, når den er tilbage",
       "title": {
         "created": {
           "reminder": "Påmindelse oprettet",
@@ -3125,6 +3128,11 @@
           "reminder": "Påmindelse fjernet",
           "task": "Opgave fjernet",
           "watch": "Overvågning fjernet"
+        },
+        "waiting": {
+          "reminder": "Venter på din computer",
+          "task": "Venter på din computer",
+          "watch": "Venter på din computer"
         }
       },
       "when": {

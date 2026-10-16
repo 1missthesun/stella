@@ -24,6 +24,7 @@ export const ScheduleNoticeCard = memo(function ScheduleNoticeCard({
   const router = useRouter();
   const removed = card.action === "removed";
   const when = useMemo(() => {
+    if (card.action === "waiting") return t("schedule.notice.whenBack");
     if (removed || !card.schedule) return null;
     const timing = describeScheduleTiming(card.schedule, {
       nowMs: Date.now(),

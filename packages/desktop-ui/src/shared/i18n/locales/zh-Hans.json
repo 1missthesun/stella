@@ -3042,6 +3042,8 @@
     "paused": "已暂停",
     "runsInCloud": "在云端运行",
     "runsOnComputer": "在这台电脑上运行",
+    "runsOnYourComputer": "在你的电脑上运行",
+    "waiting": "正在等待你的电脑",
     "toAgent": "交给智能体",
     "toStella": "交给 Stella",
     "once": "找到后停止",
@@ -3082,6 +3084,7 @@
     },
     "notice": {
       "open": "在日程中打开",
+      "whenBack": "电脑恢复后运行",
       "title": {
         "created": {
           "reminder": "已设置提醒",
@@ -3107,6 +3110,11 @@
           "reminder": "已删除提醒",
           "task": "已删除任务",
           "watch": "已删除监视"
+        },
+        "waiting": {
+          "reminder": "正在等待你的电脑",
+          "task": "正在等待你的电脑",
+          "watch": "正在等待你的电脑"
         }
       },
       "when": {

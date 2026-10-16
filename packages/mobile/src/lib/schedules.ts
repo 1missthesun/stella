@@ -21,6 +21,8 @@ export type MobileSchedule = {
   targetDeviceId?: string;
   lastStatus?: string;
   lastError?: string;
+  /** Due while its computer was away; runs once the computer is back. */
+  waitingSinceMs?: number;
   running: boolean;
 };
 
@@ -36,6 +38,7 @@ export type CloudScheduleRow = Pick<
   | "status"
   | "description"
   | "lastError"
+  | "waitingSince"
 > &
   Partial<Pick<ScheduleRow, "kind">>;
 
@@ -53,6 +56,7 @@ export const toMobileSchedule = (row: CloudScheduleRow): MobileSchedule => ({
   ...(row.zone ? { zone: row.zone } : {}),
   ...(row.targetDeviceId ? { targetDeviceId: row.targetDeviceId } : {}),
   ...(row.lastError ? { lastError: row.lastError } : {}),
+  ...(row.waitingSince !== undefined ? { waitingSinceMs: row.waitingSince } : {}),
   running: false,
 });
 

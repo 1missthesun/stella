@@ -3076,6 +3076,8 @@
     "paused": "Pausado",
     "runsInCloud": "Executado na nuvem",
     "runsOnComputer": "Executado neste computador",
+    "runsOnYourComputer": "É executado no seu computador",
+    "waiting": "Aguardando seu computador",
     "toAgent": "Vai para um agente",
     "toStella": "Vai para a Stella",
     "once": "Para quando encontrar",
@@ -3116,6 +3118,7 @@
     },
     "notice": {
       "open": "Abrir na Agenda",
+      "whenBack": "Será executado quando ele voltar",
       "title": {
         "created": {
           "reminder": "Lembrete criado",
@@ -3141,6 +3144,11 @@
           "reminder": "Lembrete removido",
           "task": "Tarefa removida",
           "watch": "Monitoramento removido"
+        },
+        "waiting": {
+          "reminder": "Aguardando seu computador",
+          "task": "Aguardando seu computador",
+          "watch": "Aguardando seu computador"
         }
       },
       "when": {

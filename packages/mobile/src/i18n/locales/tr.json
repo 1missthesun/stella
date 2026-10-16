@@ -3060,6 +3060,8 @@
     "paused": "Duraklatıldı",
     "runsInCloud": "Bulutta çalışır",
     "runsOnComputer": "Bu bilgisayarda çalışır",
+    "runsOnYourComputer": "Bilgisayarında çalışır",
+    "waiting": "Bilgisayarın bekleniyor",
     "toAgent": "Bir ajana gider",
     "toStella": "Stella'ya gider",
     "once": "Bulunca durur",
@@ -3100,6 +3102,7 @@
     },
     "notice": {
       "open": "Takvimde aç",
+      "whenBack": "Geri geldiğinde çalışır",
       "title": {
         "created": {
           "reminder": "Hatırlatıcı kuruldu",
@@ -3125,6 +3128,11 @@
           "reminder": "Hatırlatıcı kaldırıldı",
           "task": "Görev kaldırıldı",
           "watch": "Takip kaldırıldı"
+        },
+        "waiting": {
+          "reminder": "Bilgisayarın bekleniyor",
+          "task": "Bilgisayarın bekleniyor",
+          "watch": "Bilgisayarın bekleniyor"
         }
       },
       "when": {

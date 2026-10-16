@@ -3060,6 +3060,8 @@
     "paused": "Gepauzeerd",
     "runsInCloud": "Draait in de cloud",
     "runsOnComputer": "Draait op deze computer",
+    "runsOnYourComputer": "Draait op je computer",
+    "waiting": "Wacht op je computer",
     "toAgent": "Gaat naar een agent",
     "toStella": "Gaat naar Stella",
     "once": "Stopt zodra gevonden",
@@ -3100,6 +3102,7 @@
     },
     "notice": {
       "open": "Openen in Planning",
+      "whenBack": "Draait zodra hij terug is",
       "title": {
         "created": {
           "reminder": "Herinnering ingesteld",
@@ -3125,6 +3128,11 @@
           "reminder": "Herinnering verwijderd",
           "task": "Taak verwijderd",
           "watch": "Bewaking verwijderd"
+        },
+        "waiting": {
+          "reminder": "Wacht op je computer",
+          "task": "Wacht op je computer",
+          "watch": "Wacht op je computer"
         }
       },
       "when": {

@@ -318,12 +318,16 @@ function ScheduleItem({
   const kind = getCronTriggerKind(job.payload);
   const Icon = KIND_ICON[kind] ?? Clock;
   const cadence = summarizeSchedule(job.schedule, undefined, job.nextRunAtMs, job.zone);
+  const local = job.id.startsWith("cron:");
   const where =
-    job.payload.kind === "watch"
-      ? job.payload.scriptPath
-        ? t("schedule.runsOnComputer")
-        : t("schedule.runsInCloud")
-      : null;
+    local || (job.payload.kind === "watch" && job.payload.scriptPath)
+      ? t("schedule.runsOnComputer")
+      : job.runsOn === "computer"
+        ? t("schedule.runsOnYourComputer")
+        : job.payload.kind === "watch"
+          ? t("schedule.runsInCloud")
+          : null;
+  const waiting = job.enabled && job.waitingSinceMs !== undefined;
   const route =
     job.payload.kind === "watch" || job.payload.kind === "task"
       ? job.payload.route === "agent"
@@ -334,7 +338,11 @@ function ScheduleItem({
   const detail = [
     kindLabel(job, t),
     cadence,
-    job.enabled ? t("schedule.next", { when: formatNextRun(job.nextRunAtMs, nowMs) }) : t("schedule.paused"),
+    waiting
+      ? t("schedule.waiting")
+      : job.enabled
+        ? t("schedule.next", { when: formatNextRun(job.nextRunAtMs, nowMs) })
+        : t("schedule.paused"),
     where,
     route,
     once,
@@ -433,7 +441,9 @@ function ScheduleItem({
 export function ScheduleSection({ active }: { active: boolean }) {
   const t = useT();
   const { hasConnectedAccount } = useAuthSessionState();
-  const { jobs, api } = useAllSchedules(hasConnectedAccount);
+  // Signed out, the desktop still has this computer's own schedules.
+  const desktop = Boolean(window.electronAPI?.schedule);
+  const { jobs, api } = useAllSchedules(hasConnectedAccount || desktop);
   const [editing, setEditing] = useState<string | null>(null);
   const focus = useScheduleFocus();
   const [nowMs, setNowMs] = useState(() => Date.now());
@@ -452,7 +462,7 @@ export function ScheduleSection({ active }: { active: boolean }) {
   }, [jobs]);
   const closeEditor = useCallback(() => setEditing(null), []);
 
-  if (!hasConnectedAccount) {
+  if (!hasConnectedAccount && !desktop) {
     return <EmptyState motif="blank" title={t("schedule.signedOutTitle")} body={t("schedule.signedOutBody")} />;
   }
   if (jobs === undefined) return null;

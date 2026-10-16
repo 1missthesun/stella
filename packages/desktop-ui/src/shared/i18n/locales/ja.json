@@ -3042,6 +3042,8 @@
     "paused": "一時停止中",
     "runsInCloud": "クラウドで実行",
     "runsOnComputer": "このコンピューターで実行",
+    "runsOnYourComputer": "お使いのコンピューターで実行",
+    "waiting": "コンピューターを待っています",
     "toAgent": "エージェントに送信",
     "toStella": "Stellaに送信",
     "once": "見つかったら停止",
@@ -3082,6 +3084,7 @@
     },
     "notice": {
       "open": "スケジュールで開く",
+      "whenBack": "戻りしだい実行します",
       "title": {
         "created": {
           "reminder": "リマインダーを設定しました",
@@ -3107,6 +3110,11 @@
           "reminder": "リマインダーを削除しました",
           "task": "タスクを削除しました",
           "watch": "ウォッチを削除しました"
+        },
+        "waiting": {
+          "reminder": "コンピューターを待っています",
+          "task": "コンピューターを待っています",
+          "watch": "コンピューターを待っています"
         }
       },
       "when": {

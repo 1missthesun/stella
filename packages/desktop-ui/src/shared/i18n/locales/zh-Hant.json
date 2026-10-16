@@ -3042,6 +3042,8 @@
     "paused": "已暫停",
     "runsInCloud": "在雲端執行",
     "runsOnComputer": "在這台電腦上執行",
+    "runsOnYourComputer": "在你的電腦上執行",
+    "waiting": "正在等待你的電腦",
     "toAgent": "交給代理程式",
     "toStella": "交給 Stella",
     "once": "找到後停止",
@@ -3082,6 +3084,7 @@
     },
     "notice": {
       "open": "在排程中開啟",
+      "whenBack": "電腦恢復後執行",
       "title": {
         "created": {
           "reminder": "已設定提醒",
@@ -3107,6 +3110,11 @@
           "reminder": "已移除提醒",
           "task": "已移除任務",
           "watch": "已移除監看"
+        },
+        "waiting": {
+          "reminder": "正在等待你的電腦",
+          "task": "正在等待你的電腦",
+          "watch": "正在等待你的電腦"
         }
       },
       "when": {

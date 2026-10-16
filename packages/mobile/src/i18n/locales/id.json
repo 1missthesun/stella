@@ -3042,6 +3042,8 @@
     "paused": "Dijeda",
     "runsInCloud": "Berjalan di cloud",
     "runsOnComputer": "Berjalan di komputer ini",
+    "runsOnYourComputer": "Berjalan di komputer Anda",
+    "waiting": "Menunggu komputer Anda",
     "toAgent": "Dikirim ke agen",
     "toStella": "Dikirim ke Stella",
     "once": "Berhenti setelah ditemukan",
@@ -3082,6 +3084,7 @@
     },
     "notice": {
       "open": "Buka di Jadwal",
+      "whenBack": "Berjalan saat komputer kembali",
       "title": {
         "created": {
           "reminder": "Pengingat dibuat",
@@ -3107,6 +3110,11 @@
           "reminder": "Pengingat dihapus",
           "task": "Tugas dihapus",
           "watch": "Pantauan dihapus"
+        },
+        "waiting": {
+          "reminder": "Menunggu komputer Anda",
+          "task": "Menunggu komputer Anda",
+          "watch": "Menunggu komputer Anda"
         }
       },
       "when": {

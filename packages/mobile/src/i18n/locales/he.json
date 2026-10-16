@@ -3076,6 +3076,8 @@
     "paused": "מושהה",
     "runsInCloud": "פועל בענן",
     "runsOnComputer": "פועל במחשב הזה",
+    "runsOnYourComputer": "פועל במחשב שלך",
+    "waiting": "ממתין למחשב שלך",
     "toAgent": "עובר לסוכן",
     "toStella": "עובר ל-Stella",
     "once": "נעצר כשנמצא",
@@ -3116,6 +3118,7 @@
     },
     "notice": {
       "open": "פתיחה בלוח הזמנים",
+      "whenBack": "יפעל כשהוא יחזור",
       "title": {
         "created": {
           "reminder": "התזכורת נקבעה",
@@ -3141,6 +3144,11 @@
           "reminder": "התזכורת הוסרה",
           "task": "המשימה הוסרה",
           "watch": "המעקב הוסר"
+        },
+        "waiting": {
+          "reminder": "ממתין למחשב שלך",
+          "task": "ממתין למחשב שלך",
+          "watch": "ממתין למחשב שלך"
         }
       },
       "when": {

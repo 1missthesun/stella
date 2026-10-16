@@ -3076,6 +3076,8 @@
     "paused": "En pausa",
     "runsInCloud": "Se ejecuta en la nube",
     "runsOnComputer": "Se ejecuta en este ordenador",
+    "runsOnYourComputer": "Se ejecuta en tu ordenador",
+    "waiting": "Esperando a tu ordenador",
     "toAgent": "Va a un agente",
     "toStella": "Va a Stella",
     "once": "Se detiene al encontrarlo",
@@ -3116,6 +3118,7 @@
     },
     "notice": {
       "open": "Abrir en Agenda",
+      "whenBack": "Se ejecutará cuando vuelva",
       "title": {
         "created": {
           "reminder": "Recordatorio creado",
@@ -3141,6 +3144,11 @@
           "reminder": "Recordatorio eliminado",
           "task": "Tarea eliminada",
           "watch": "Vigilancia eliminada"
+        },
+        "waiting": {
+          "reminder": "Esperando a tu ordenador",
+          "task": "Esperando a tu ordenador",
+          "watch": "Esperando a tu ordenador"
         }
       },
       "when": {

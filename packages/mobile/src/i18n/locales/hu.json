@@ -3060,6 +3060,8 @@
     "paused": "Szüneteltetve",
     "runsInCloud": "A felhőben fut",
     "runsOnComputer": "Ezen a számítógépen fut",
+    "runsOnYourComputer": "A számítógépeden fut",
+    "waiting": "Várakozás a számítógépedre",
     "toAgent": "Egy ügynökhöz kerül",
     "toStella": "Stellához kerül",
     "once": "Leáll, ha megtalálja",
@@ -3100,6 +3102,7 @@
     },
     "notice": {
       "open": "Megnyitás az Ütemezésben",
+      "whenBack": "Akkor fut, amikor újra elérhető",
       "title": {
         "created": {
           "reminder": "Emlékeztető beállítva",
@@ -3125,6 +3128,11 @@
           "reminder": "Emlékeztető törölve",
           "task": "Feladat törölve",
           "watch": "Figyelés törölve"
+        },
+        "waiting": {
+          "reminder": "Várakozás a számítógépedre",
+          "task": "Várakozás a számítógépedre",
+          "watch": "Várakozás a számítógépedre"
         }
       },
       "when": {

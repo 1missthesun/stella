@@ -3060,6 +3060,8 @@
     "paused": "Keskeytetty",
     "runsInCloud": "Toimii pilvessä",
     "runsOnComputer": "Toimii tällä tietokoneella",
+    "runsOnYourComputer": "Suoritetaan tietokoneellasi",
+    "waiting": "Odottaa tietokonettasi",
     "toAgent": "Menee agentille",
     "toStella": "Menee Stellalle",
     "once": "Pysähtyy, kun löytyy",
@@ -3100,6 +3102,7 @@
     },
     "notice": {
       "open": "Avaa aikataulussa",
+      "whenBack": "Suoritetaan, kun se on taas päällä",
       "title": {
         "created": {
           "reminder": "Muistutus asetettu",
@@ -3125,6 +3128,11 @@
           "reminder": "Muistutus poistettu",
           "task": "Tehtävä poistettu",
           "watch": "Seuranta poistettu"
+        },
+        "waiting": {
+          "reminder": "Odottaa tietokonettasi",
+          "task": "Odottaa tietokonettasi",
+          "watch": "Odottaa tietokonettasi"
         }
       },
       "when": {

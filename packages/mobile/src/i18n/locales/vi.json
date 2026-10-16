@@ -3042,6 +3042,8 @@
     "paused": "Đã tạm dừng",
     "runsInCloud": "Chạy trên đám mây",
     "runsOnComputer": "Chạy trên máy tính này",
+    "runsOnYourComputer": "Chạy trên máy tính của bạn",
+    "waiting": "Đang chờ máy tính của bạn",
     "toAgent": "Gửi đến một tác nhân",
     "toStella": "Gửi đến Stella",
     "once": "Dừng khi tìm thấy",
@@ -3082,6 +3084,7 @@
     },
     "notice": {
       "open": "Mở trong Lịch",
+      "whenBack": "Sẽ chạy khi máy tính quay lại",
       "title": {
         "created": {
           "reminder": "Đã đặt lời nhắc",
@@ -3107,6 +3110,11 @@
           "reminder": "Đã xóa lời nhắc",
           "task": "Đã xóa tác vụ",
           "watch": "Đã xóa theo dõi"
+        },
+        "waiting": {
+          "reminder": "Đang chờ máy tính của bạn",
+          "task": "Đang chờ máy tính của bạn",
+          "watch": "Đang chờ máy tính của bạn"
         }
       },
       "when": {

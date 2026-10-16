@@ -3060,6 +3060,8 @@
     "paused": "Paused",
     "runsInCloud": "Runs in the cloud",
     "runsOnComputer": "Runs on this computer",
+    "runsOnYourComputer": "Runs on your computer",
+    "waiting": "Waiting for your computer",
     "toAgent": "Goes to an agent",
     "toStella": "Goes to Stella",
     "once": "Stops once found",
@@ -3100,6 +3102,7 @@
     },
     "notice": {
       "open": "Open in Schedule",
+      "whenBack": "Runs when it's back",
       "title": {
         "created": {
           "reminder": "Reminder set",
@@ -3125,6 +3128,11 @@
           "reminder": "Reminder removed",
           "task": "Task removed",
           "watch": "Watch removed"
+        },
+        "waiting": {
+          "reminder": "Waiting for your computer",
+          "task": "Waiting for your computer",
+          "watch": "Waiting for your computer"
         }
       },
       "when": {

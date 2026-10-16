@@ -17,6 +17,7 @@ import {
 } from "./in-app-browser-auth-policy.js";
 import type {
   InAppBrowserDebuggerEvent,
+  InAppBrowserTabLifecycleEvent,
   InAppBrowserDebuggerRecovery,
   InAppBrowserDebuggerTarget,
 } from "./in-app-browser-cdp-adapter.js";
@@ -846,6 +847,12 @@ export class InAppBrowserService {
     listener: (event: InAppBrowserDebuggerEvent) => void,
   ): () => void {
     return this.debuggerProxy.subscribe(listener);
+  }
+
+  subscribeTabLifecycle(
+    listener: (event: InAppBrowserTabLifecycleEvent) => void,
+  ): () => void {
+    return this.debuggerProxy.subscribeTabLifecycle(listener);
   }
 
   getDebuggerUserAgent(): string {

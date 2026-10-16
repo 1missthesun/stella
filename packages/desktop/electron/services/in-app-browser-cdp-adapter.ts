@@ -23,6 +23,12 @@ export type InAppBrowserDebuggerEvent = {
 
 export type InAppBrowserDebuggerRecovery = "terminated" | "reloaded";
 
+export type InAppBrowserTabLifecycleEvent = {
+  tabId: string;
+  ownerId: string;
+  kind: "navigating" | "debugger-detached" | "gone";
+};
+
 export type InAppBrowserDebuggerController = {
   getDebuggerUserAgent?: () => string;
   listDebuggerTargets: (
@@ -55,6 +61,9 @@ export type InAppBrowserDebuggerController = {
   subscribeDebuggerEvents: (
     listener: (event: InAppBrowserDebuggerEvent) => void,
   ) => () => void;
+  subscribeTabLifecycle?: (
+    listener: (event: InAppBrowserTabLifecycleEvent) => void,
+  ) => () => void;
 };
 
 type InAppBrowserCdpAdapterOptions = Readonly<{
@@ -69,6 +78,11 @@ type CdpRequest = {
   params?: Record<string, unknown>;
   sessionId?: string;
 };
+
+type ChildSessionDrop = Readonly<{
+  notify?: boolean;
+  nativeGone?: (sessionId: string) => boolean;
+}>;
 
 type ClientState = {
   socket: WebSocket;
@@ -161,6 +175,23 @@ const isSafeTargetUrl = (value: string) => {
   }
 };
 
+function isFrameTarget(value: unknown, targetId: string): boolean {
+  if (!value || typeof value !== "object" || !("targetInfos" in value))
+    return false;
+  return (
+    Array.isArray(value.targetInfos) &&
+    value.targetInfos.some(
+      (info: unknown) =>
+        !!info &&
+        typeof info === "object" &&
+        "targetId" in info &&
+        info.targetId === targetId &&
+        "type" in info &&
+        info.type === "iframe",
+    )
+  );
+}
+
 function isDescendantFrame(value: unknown, frameId: string): boolean {
   if (!value || typeof value !== "object" || !("frameTree" in value))
     return false;
@@ -228,6 +259,7 @@ export class InAppBrowserCdpAdapter {
   private webSocketServer: WebSocketServer | null = null;
   private webSocketUrl: string | null = null;
   private unsubscribeDebuggerEvents: (() => void) | null = null;
+  private unsubscribeTabLifecycle: (() => void) | null = null;
 
   constructor(
     controller: InAppBrowserDebuggerController,
@@ -315,6 +347,10 @@ export class InAppBrowserCdpAdapter {
     this.unsubscribeDebuggerEvents = this.controller.subscribeDebuggerEvents(
       (event) => this.broadcastDebuggerEvent(event),
     );
+    this.unsubscribeTabLifecycle =
+      this.controller.subscribeTabLifecycle?.((event) =>
+        this.handleTabLifecycle(event),
+      ) ?? null;
     return this.webSocketUrl;
   }
 
@@ -342,6 +378,8 @@ export class InAppBrowserCdpAdapter {
   async stop(): Promise<void> {
     this.unsubscribeDebuggerEvents?.();
     this.unsubscribeDebuggerEvents = null;
+    this.unsubscribeTabLifecycle?.();
+    this.unsubscribeTabLifecycle = null;
     await Promise.all(
       [...this.clients].map(async (client) => {
         await this.hideClientAgentCursors(client);
@@ -538,13 +576,6 @@ export class InAppBrowserCdpAdapter {
           if (binding.tabId === targetId)
             client.childSessions.delete(sessionId);
         }
-        if (success) {
-          this.broadcastTargetEvent(
-            "Target.targetDestroyed",
-            { targetId },
-            client.ownerId,
-          );
-        }
         return { success };
       }
       default:
@@ -667,15 +698,34 @@ export class InAppBrowserCdpAdapter {
   private broadcastDebuggerEvent(event: InAppBrowserDebuggerEvent) {
     for (const client of this.clients) {
       if (event.method === "Target.detachedFromTarget") {
+        // Chromium already detached this session; only its descendants may
+        // still need a native detach.
+        const nativeSessionId = event.params?.sessionId;
         for (const [sessionId, binding] of client.childSessions) {
           if (
             binding.tabId === event.tabId &&
-            binding.nativeSessionId === event.params?.sessionId
+            binding.nativeSessionId === nativeSessionId
           ) {
-            void this.detachChildSessions(client, binding.tabId, sessionId);
-            sendJson(client.socket, {
-              method: "Target.detachedFromTarget",
-              params: { sessionId },
+            void this.detachChildSessions(client, binding.tabId, sessionId, {
+              notify: true,
+              nativeGone: (candidate) => candidate === sessionId,
+            });
+          }
+        }
+      }
+      if (
+        event.method === "Page.frameSubtreeWillBeDetached" ||
+        (event.method === "Page.frameDetached" &&
+          event.params?.reason !== "swap")
+      ) {
+        // Detach before Chromium force-detaches the removed frame's session.
+        for (const [sessionId, binding] of client.childSessions) {
+          if (
+            binding.tabId === event.tabId &&
+            binding.frameId === event.params?.frameId
+          ) {
+            void this.detachChildSessions(client, binding.tabId, sessionId, {
+              notify: true,
             });
           }
         }
@@ -703,6 +753,39 @@ export class InAppBrowserCdpAdapter {
           sessionId,
         });
       }
+    }
+  }
+
+  private handleTabLifecycle(event: InAppBrowserTabLifecycleEvent) {
+    for (const client of this.clients) {
+      if (event.kind === "navigating") {
+        // A cross-document navigation discards every frame of the old page.
+        void this.detachChildSessions(client, event.tabId, undefined, {
+          notify: true,
+        });
+        continue;
+      }
+      void this.detachChildSessions(client, event.tabId, undefined, {
+        notify: true,
+        nativeGone: () => true,
+      });
+      if (event.kind !== "gone") continue;
+      for (const [sessionId, tabId] of client.sessions) {
+        if (tabId !== event.tabId) continue;
+        client.sessions.delete(sessionId);
+        client.cursorTabs.delete(tabId);
+        sendJson(client.socket, {
+          method: "Target.detachedFromTarget",
+          params: { sessionId, targetId: tabId },
+        });
+      }
+    }
+    if (event.kind === "gone") {
+      this.broadcastTargetEvent(
+        "Target.targetDestroyed",
+        { targetId: event.tabId },
+        event.ownerId,
+      );
     }
   }
 
@@ -797,7 +880,14 @@ export class InAppBrowserCdpAdapter {
     // Electron's native Target agent only accepts target IDs it has reported.
     // Register currently live targets internally; never expose this unfiltered
     // browser-wide result through the owner-scoped adapter.
-    await this.sendPageCommand(tabId, "Target.getTargets", {}, client.ownerId);
+    const known = await this.sendPageCommand(
+      tabId,
+      "Target.getTargets",
+      {},
+      client.ownerId,
+    );
+    if (!isFrameTarget(known, targetId))
+      throw new Error("Browser frame target was not found.");
     const attached = await this.sendPageCommand(
       tabId,
       "Target.attachToTarget",
@@ -930,6 +1020,7 @@ export class InAppBrowserCdpAdapter {
     client: ClientState,
     tabId?: string,
     rootSessionId?: string,
+    drop: ChildSessionDrop = {},
   ) {
     const selected = new Set(rootSessionId ? [rootSessionId] : []);
     for (let round = 0; round <= client.childSessions.size; round += 1) {
@@ -952,6 +1043,13 @@ export class InAppBrowserCdpAdapter {
     for (const [sessionId, binding] of client.childSessions) {
       if (!selected.has(sessionId)) continue;
       client.childSessions.delete(sessionId);
+      if (drop.notify) {
+        sendJson(client.socket, {
+          method: "Target.detachedFromTarget",
+          params: { sessionId, targetId: binding.frameId },
+        });
+      }
+      if (drop.nativeGone?.(sessionId)) continue;
       pending.push(
         this.cleanupPageCommand(
           binding.tabId,

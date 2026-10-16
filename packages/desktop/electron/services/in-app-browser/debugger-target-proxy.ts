@@ -3,6 +3,7 @@ import type {
   InAppBrowserDebuggerEvent,
   InAppBrowserDebuggerRecovery,
   InAppBrowserDebuggerTarget,
+  InAppBrowserTabLifecycleEvent,
 } from "../in-app-browser-cdp-adapter.js";
 import type { InAppBrowserDrawableLease } from "../in-app-browser-service.js";
 import { RENDERER_ORIGIN } from "../../source/origin.js";
@@ -45,11 +46,23 @@ const DEFAULT_DEBUGGER_RECOVERY_TIMEOUT_MS = 1_000;
 // settles would otherwise keep the tab there, and out of the panel, for good.
 const HIDDEN_MOUNT_LIMIT_MS = 30_000;
 
+// Chromium hands debugger events and replies to JS from inside its own call
+// stacks, and Node drains microtasks before returning to them. A debugger call
+// made from there re-enters Chromium mid-operation: answering a frame's
+// Target.detachedFromTarget with Target.detachFromTarget freed the session
+// Chromium was still detaching (SIGSEGV in TargetHandler::Session::Detach).
+// Every native debugger call therefore starts from a fresh event-loop turn.
+const leaveNativeStack = () =>
+  new Promise<void>((resolve) => setImmediate(resolve));
+
 export class DebuggerTargetProxy {
   private readonly options: DebuggerTargetProxyOptions;
   private readonly drawableLeases = new Map<string, DrawableLease>();
   private readonly debuggerListeners = new Set<
     (event: InAppBrowserDebuggerEvent) => void
+  >();
+  private readonly lifecycleListeners = new Set<
+    (event: InAppBrowserTabLifecycleEvent) => void
   >();
   private drawableHost: BrowserWindow | null = null;
   private readonly screenshotsInFlight = new Map<string, number>();
@@ -77,6 +90,7 @@ export class DebuggerTargetProxy {
     debuggerSessionId?: string,
   ): Promise<unknown> {
     const resolvedOwnerId = resolveOwnerId(ownerId);
+    await leaveNativeStack();
     const tab = this.options.tabs.require(tabId, resolvedOwnerId);
     if (
       tab.preview &&
@@ -140,7 +154,9 @@ export class DebuggerTargetProxy {
     ownerId?: string,
     debuggerSessionId?: string,
   ): Promise<InAppBrowserDebuggerRecovery> {
-    const tab = this.options.tabs.require(tabId, resolveOwnerId(ownerId));
+    const resolvedOwnerId = resolveOwnerId(ownerId);
+    await leaveNativeStack();
+    const tab = this.options.tabs.require(tabId, resolvedOwnerId);
     const contents = tab.view.webContents;
     const tabDebugger = contents.debugger;
     const timeoutMs =
@@ -219,8 +235,26 @@ export class DebuggerTargetProxy {
     return () => this.debuggerListeners.delete(listener);
   }
 
+  subscribeTabLifecycle(
+    listener: (event: InAppBrowserTabLifecycleEvent) => void,
+  ): () => void {
+    this.lifecycleListeners.add(listener);
+    return () => this.lifecycleListeners.delete(listener);
+  }
+
   forwardEvents(tab: ManagedTab) {
-    tab.view.webContents.debugger.on(
+    const contents = tab.view.webContents;
+    const emit = (kind: InAppBrowserTabLifecycleEvent["kind"]) => {
+      for (const listener of this.lifecycleListeners) {
+        listener({ tabId: tab.id, ownerId: tab.ownerId, kind });
+      }
+    };
+    contents.debugger.on("detach", () => emit("debugger-detached"));
+    contents.on("did-start-navigation", (details) => {
+      if (details.isMainFrame && !details.isSameDocument) emit("navigating");
+    });
+    contents.once("destroyed", () => emit("gone"));
+    contents.debugger.on(
       "message",
       (_event, method, params, sessionId) => {
         const debuggerEvent: InAppBrowserDebuggerEvent = {
@@ -278,6 +312,7 @@ export class DebuggerTargetProxy {
     this.drawableHost = null;
     if (drawableHost && !drawableHost.isDestroyed()) drawableHost.destroy();
     this.debuggerListeners.clear();
+    this.lifecycleListeners.clear();
   }
 
   private ensureDrawableHost() {

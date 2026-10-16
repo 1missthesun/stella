@@ -36,6 +36,7 @@ import {
   useServerFeature,
 } from "@/platform/backend/server-discovery";
 import { switchEngine } from "@/global/settings/lib/switch-engine";
+import { uiState } from "@/platform/ui-state";
 import "@/global/self-host/self-host.css";
 
 type SignInCardProps = {
@@ -67,6 +68,9 @@ const ENGINE_TO_OPTION: Record<ModelPickerEngine, OptionId> = {
 };
 
 type ApiKeyProvider = (typeof API_KEY_PROVIDERS)[number];
+
+// Set once the card has offered its default, so a later pick of Stella survives a remount.
+const ENGINE_DEFAULT_DECIDED_KEY = "stella-onboarding-engine-default-decided";
 
 const hostOf = (origin: string): string => {
   try {
@@ -250,6 +254,14 @@ export function SignInCard({ active, answered, onAnswer }: SignInCardProps) {
     }
     onAnswer("done");
   }, [applyEngine, connected, lensOn, onAnswer, options]);
+
+  const claudeReady = claudeLocal.loaded && claudeLocal.cliInstalled && claudeLocal.signedIn;
+  useEffect(() => {
+    if (!active || answered !== undefined || engine === null || !claudeLocal.loaded) return;
+    if (uiState.getItem(ENGINE_DEFAULT_DECIDED_KEY)) return;
+    uiState.setItem(ENGINE_DEFAULT_DECIDED_KEY, "1");
+    if (engine === "default" && !apiKeyModel && claudeReady) void applyEngine(BASE_OPTIONS[1]!);
+  }, [active, answered, apiKeyModel, applyEngine, claudeLocal.loaded, claudeReady, engine]);
 
   const { reload: reloadClaudeLocal } = claudeLocal;
   const claudeLogin = useClaudeLogin({

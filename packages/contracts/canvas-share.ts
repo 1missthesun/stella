@@ -52,7 +52,7 @@ export const parseCanvasShareSlug = (
   const rootPath = trimTrailingSlashes(root.pathname);
   const expectedPrefix = `${rootPath}${CANVAS_SHARE_PATH_PREFIX}`;
   if (!target.pathname.startsWith(expectedPrefix)) return null;
-  const slug = target.pathname.slice(expectedPrefix.length);
+  const slug = target.pathname.slice(expectedPrefix.length).replace(/\/$/u, "");
   if (!slug || slug.includes("/")) return null;
   return isCanvasShareSlug(slug) ? slug : null;
 };

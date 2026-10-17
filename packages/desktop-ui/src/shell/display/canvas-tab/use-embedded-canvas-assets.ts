@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
 import { embedRelativeHtmlAssets } from "@stella/contracts/html-relative-assets";
 import { readDeviceFileCopy } from "@/features/cloud/device-file-copy";
+import { backendClient } from "@/platform/backend/backend-client";
+import {
+  fetchWithInactivity,
+  REQUEST_BUDGET_MS,
+} from "@stella/contracts/request-deadline";
 
 const MAX_ASSET_BYTES = 16 * 1024 * 1024;
 const decoder = new TextDecoder("utf-8");
@@ -64,11 +69,43 @@ const embedFromDeviceCopies = (
     signal,
   );
 
+/**
+ * A Drive document's images and videos point at their signed Drive URLs, so
+ * video streams with range requests instead of being inlined; its styles and
+ * scripts are inlined.
+ */
+const embedFromDrive = (
+  html: string,
+  documentPath: string,
+  signal: AbortSignal,
+) =>
+  embedRelativeHtmlAssets(
+    html,
+    documentPath,
+    async ({ path, kind }) => {
+      const { url, sizeBytes } = await backendClient.call("drive.fileUrl", {
+        path: path.replace(/^\/+/u, ""),
+      });
+      if (kind !== "text") return url;
+      if (sizeBytes > MAX_ASSET_BYTES) return null;
+      const response = await fetchWithInactivity(fetch, url, {}, {
+        label: "Drive file",
+        idleMs: REQUEST_BUDGET_MS.transferIdle,
+        signal,
+      });
+      return response.ok ? await response.text() : null;
+    },
+    signal,
+  );
+
+export type EmbeddedCanvasAssetSource = "device" | "drive";
+
 export const useEmbeddedCanvasAssets = (
   html: string,
   documentPath: string,
-  enabled: boolean,
+  source: EmbeddedCanvasAssetSource | null,
 ): { html: string; loading: boolean } => {
+  const enabled = source !== null;
   const [embedded, setEmbedded] = useState<{
     source: string;
     html: string;
@@ -79,12 +116,13 @@ export const useEmbeddedCanvasAssets = (
     const settle = (result: string) => {
       if (!controller.signal.aborted) setEmbedded({ source: html, html: result });
     };
-    void embedFromDeviceCopies(html, documentPath, controller.signal).then(
+    const embed = source === "drive" ? embedFromDrive : embedFromDeviceCopies;
+    void embed(html, documentPath, controller.signal).then(
       settle,
       () => settle(html),
     );
     return () => controller.abort();
-  }, [html, documentPath, enabled]);
+  }, [html, documentPath, enabled, source]);
   if (!enabled || !html) return { html, loading: false };
   return embedded?.source === html
     ? { html: embedded.html, loading: false }

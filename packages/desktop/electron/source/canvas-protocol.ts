@@ -38,9 +38,9 @@ export const CANVAS_SCHEME_PRIVILEGES = {
   privileges: { standard: true, secure: true },
 } as const;
 
-export const MAX_CANVAS_HTML_BYTES = 16 * 1024 * 1024;
+export const MAX_CANVAS_HTML_BYTES = 48 * 1024 * 1024;
 const MAX_REGISTERED_CANVASES = 32;
-const MAX_REGISTERED_BYTES = 64 * 1024 * 1024;
+const MAX_REGISTERED_BYTES = 128 * 1024 * 1024;
 const MAX_DOCUMENT_DIRECTORIES = 256;
 const MAX_CANVAS_ASSET_BYTES = 256 * 1024 * 1024;
 const MAX_REMOTE_ASSET_BYTES = 32 * 1024 * 1024;

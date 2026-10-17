@@ -236,6 +236,7 @@ import {
   IPC_DISCOVERY_DETECT_PREFERRED_BROWSER,
   IPC_DISCOVERY_LIST_BROWSER_PROFILES,
   IPC_DISCOVERY_WRITE_CORE_MEMORY,
+  IPC_DISPLAY_CANVAS_DRIVE_URL,
   IPC_DISPLAY_CANVAS_FILE_URL,
   IPC_DISPLAY_CANVAS_HTML_CHANGED,
   IPC_DISPLAY_CANVAS_HTML_URL,
@@ -817,6 +818,10 @@ export type IpcInvokeContract = {
   >;
   [IPC_DISPLAY_CANVAS_HTML_URL]: Invoke<
     [payload: { html: string; drivePath?: string }],
+    { url: string }
+  >;
+  [IPC_DISPLAY_CANVAS_DRIVE_URL]: Invoke<
+    [payload: { drivePath: string }],
     { url: string }
   >;
   [IPC_DISPLAY_TRASH_LIST]: Invoke<

@@ -1,4 +1,6 @@
 export const SHARE_MAX_HTML_BYTES = 5 * 1024 * 1024;
+export const SHARE_MAX_DRIVE_HTML_BYTES = 48 * 1024 * 1024;
+export const SHARE_MAX_DRIVE_ASSET_BYTES = 500 * 1024 * 1024;
 export const SHARE_MAX_TITLE_CHARS = 300;
 export const SHARE_CANVAS_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/;
 
@@ -28,6 +30,11 @@ export type ShareLink = {
   file?: string | null;
 };
 
+export type SavedDriveDocumentShare = SavedCanvasShare & {
+  assets: number;
+  missingAssets: string[];
+};
+
 export type SharedFileLink = {
   url: string;
   slug: string;
@@ -47,6 +54,15 @@ export type ShareCalls = {
       visibility?: ShareVisibility;
     };
     result: SavedCanvasShare;
+  };
+  "shares.saveDriveDocument": {
+    args: {
+      canvas: string;
+      path: string;
+      title?: string;
+      visibility?: ShareVisibility;
+    };
+    result: SavedDriveDocumentShare;
   };
   "shares.setVisibility": {
     args: { slug: string; visibility: ShareVisibility };

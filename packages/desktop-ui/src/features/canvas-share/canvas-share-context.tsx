@@ -3,6 +3,7 @@ import {
   SHARE_CANVAS_PATTERN,
   type PublishedShare,
   type SavedCanvasShare,
+  type SavedDriveDocumentShare,
   type ShareLink,
   type ShareVisibility,
 } from "@stella/contracts/backend/shares";
@@ -27,6 +28,12 @@ export type CanvasShareContextValue = {
     title?: string;
     visibility?: ShareVisibility;
   }) => Promise<SavedCanvasShare>;
+  saveDriveDocument: (args: {
+    canvas: string;
+    path: string;
+    title?: string;
+    visibility?: ShareVisibility;
+  }) => Promise<SavedDriveDocumentShare>;
   setVisibility: (args: {
     slug: string;
     visibility: ShareVisibility;
@@ -46,6 +53,9 @@ const revoke = async ({ slug }: { slug: string }) => {
 const save: CanvasShareContextValue["save"] = (args) =>
   backendClient.call("shares.save", args);
 
+const saveDriveDocument: CanvasShareContextValue["saveDriveDocument"] = (args) =>
+  backendClient.call("shares.saveDriveDocument", args);
+
 const setVisibility: CanvasShareContextValue["setVisibility"] = (args) =>
   backendClient.call("shares.setVisibility", args);
 
@@ -59,6 +69,7 @@ export function CanvasShareProvider({ children }: { children: ReactNode }) {
       publish,
       revoke,
       save,
+      saveDriveDocument,
       setVisibility,
       viewLink,
     }),

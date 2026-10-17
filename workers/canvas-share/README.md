@@ -30,6 +30,14 @@ layer.
     - `Referrer-Policy: no-referrer`
     - `Cache-Control: public, max-age=60`
     - `Content-Security-Policy: sandbox allow-scripts allow-popups allow-forms allow-downloads;`
+- Pages published from Drive with files beside them (`shares.saveDriveDocument`)
+  carry `assets: 1` metadata; their files are copied to `shares/<slug>/<path>`.
+  - `GET /c/<slug>` → `308` to `/c/<slug>/`, so the page's relative URLs resolve.
+  - `GET /c/<slug>/<path>` → that file, with range requests (video seeking),
+    under the page's expiry and visibility. Public: `Access-Control-Allow-Origin: *`.
+    Private: the page sets a second view cookie (`stella_canvas_asset`,
+    `SameSite=None`, `Path=/c/<slug>/`), because a sandboxed page's own
+    subresource requests are cross-site and never carry the Lax view cookie.
 - `SHARES_DISABLED` var truthy (`1`/`true`/`yes`) → `503` for every share (kill-switch).
 
 ### CSP note (important)

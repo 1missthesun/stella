@@ -22,6 +22,7 @@ import {
 import type { CanvasHtmlItem } from "./canvas-items";
 import { useT } from "@/shared/i18n";
 import { deviceFileMissingMessage } from "@stella/contracts/device-files";
+import { SHARE_MAX_HTML_BYTES } from "@stella/contracts/backend/shares";
 import {
   DisplayFileSourceContext,
   type DisplayFileSource,
@@ -44,6 +45,47 @@ const readCanvasHtml = async (
     throw new Error(deviceFileMissingMessage(result.reason, filePath));
   }
   return decoder.decode(result.bytes);
+};
+
+class CanvasTooLargeError extends Error {}
+
+const megabytes = (bytes: number): string => {
+  const value = bytes / (1024 * 1024);
+  return `${value >= 10 ? Math.round(value) : Math.round(value * 10) / 10} MB`;
+};
+
+const readShareableHtml = async (
+  filePath: string,
+  source: DisplayFileSource | null,
+): Promise<string> => {
+  const html = await readCanvasHtml(filePath, source);
+  const bytes = new TextEncoder().encode(html).byteLength;
+  if (bytes > SHARE_MAX_HTML_BYTES) {
+    throw new CanvasTooLargeError(
+      `This canvas is ${megabytes(bytes)}; a public link can hold up to ${megabytes(SHARE_MAX_HTML_BYTES)}.`,
+    );
+  }
+  return html;
+};
+
+/** The reason to show when it is something the user can act on (a size limit, a missing file). */
+const publishFailureReason = (error: unknown): string | null => {
+  if (error instanceof CanvasTooLargeError) return error.message;
+  const code =
+    error && typeof error === "object" && "code" in error ? error.code : null;
+  return (code === "BAD_REQUEST" || code === "NOT_FOUND") && error instanceof Error
+    ? error.message
+    : null;
+};
+
+const drivePathOf = (
+  item: CanvasHtmlItem,
+  source: DisplayFileSource | null,
+): string | null => {
+  const path =
+    source?.drivePath ??
+    (item.driveBacked ? item.filePath.replace(/^\/+/u, "") : null);
+  return path && /\.html?$/iu.test(path) ? path : null;
 };
 
 const copyToClipboard = async (value: string): Promise<void> => {
@@ -111,28 +153,36 @@ const CanvasLinkPanel = ({ item }: { item: CanvasHtmlItem }) => {
   const [published, setPublished] = useState<SharedCanvasLink | null>(null);
   const link = canvas ? linkView.value : published;
   const [pending, setPending] = useState<Pending>(null);
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<{ reason: string | null } | null>(null);
+  const drivePath = drivePathOf(item, fileSource);
   const { copied, copy } = useCopyLink();
 
   const setVisibility = useCallback(
     async (visibility: CanvasLinkVisibility) => {
       if (!share) return;
       setPending(visibility);
-      setFailed(false);
+      setFailed(null);
       try {
         if (link) {
           const saved = await share.setVisibility({ slug: link.slug, visibility });
           if (!canvas) setPublished({ ...link, visibility: saved.visibility });
+        } else if (canvas && drivePath) {
+          await share.saveDriveDocument({
+            canvas,
+            path: drivePath,
+            title: item.title,
+            visibility,
+          });
         } else if (canvas) {
           await share.save({
             canvas,
-            html: await readCanvasHtml(item.filePath, fileSource),
+            html: await readShareableHtml(item.filePath, fileSource),
             title: item.title,
             visibility,
           });
         } else {
           const result = await share.publish({
-            html: await readCanvasHtml(item.filePath, fileSource),
+            html: await readShareableHtml(item.filePath, fileSource),
             title: item.title,
           });
           setPublished({
@@ -150,14 +200,14 @@ const CanvasLinkPanel = ({ item }: { item: CanvasHtmlItem }) => {
               : "shell.display.canvasShare.toasts.madePrivate",
           ),
         );
-      } catch {
-        setFailed(true);
+      } catch (error) {
+        setFailed({ reason: publishFailureReason(error) });
         showToast(t("shell.display.canvasShare.toasts.visibilityFailed"));
       } finally {
         setPending(null);
       }
     },
-    [share, link, canvas, fileSource, item.filePath, item.title, t],
+    [share, link, canvas, drivePath, fileSource, item.filePath, item.title, t],
   );
 
   const onOpen = useCallback(async () => {
@@ -189,7 +239,7 @@ const CanvasLinkPanel = ({ item }: { item: CanvasHtmlItem }) => {
         </div>
         {failed ? (
           <div className="canvas-share__state canvas-share__state--error">
-            {t("shell.display.canvasShare.publishFailed")}
+            {failed.reason ?? t("shell.display.canvasShare.publishFailed")}
           </div>
         ) : null}
         <div className="canvas-share__actions">

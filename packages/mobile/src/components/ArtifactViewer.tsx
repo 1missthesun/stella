@@ -35,7 +35,11 @@ import {
   storeViewerEntry,
 } from "../lib/artifact-viewer-cache";
 import type { PopoverAction } from "./FloatingPopoverParts";
-import { canvasSlugFor, useCanvasShareToggle } from "../lib/use-canvas-share-toggle";
+import {
+  canvasShareFailureReason,
+  canvasSlugFor,
+  useCanvasShareToggle,
+} from "../lib/use-canvas-share-toggle";
 import type { ChatArtifact } from "../types";
 import type { StoredPhoneAccess } from "../lib/phone-access";
 import {
@@ -660,6 +664,7 @@ export function ArtifactViewerContent({
     canvas ? canvasSlugFor(canvas.slug, canvas.filePath) : null,
     loaded?.kind === "canvas-html" ? loaded.html : null,
     canvas?.title,
+    canvas?.driveBacked ? canvas.filePath.replace(/^\/+/u, "") : null,
   );
 
   const fileTarget = useMemo(() => {
@@ -760,9 +765,9 @@ export function ArtifactViewerContent({
               if (isPublic) notifySuccess();
               else tapLight();
               return isPublic;
-            } catch {
+            } catch (error) {
               notifyError();
-              Alert.alert("Couldn't change the canvas link");
+              Alert.alert("Couldn't change the canvas link", canvasShareFailureReason(error));
               return false;
             }
           },
@@ -885,9 +890,24 @@ export function ArtifactViewerContent({
           signal: controller.signal,
         });
         if (!response.ok) throw new Error("This file is no longer available.");
+        const html = await embedRelativeHtmlAssets(
+          await response.text(),
+          `/${payload.filePath.replace(/^\/+/u, "")}`,
+          async ({ path, kind }) => {
+            const assetUri = await resolveCloudDriveFileUri(path.replace(/^\/+/u, ""));
+            if (kind !== "text") return assetUri;
+            const asset = await fetchWithinDeadline(assetUri, undefined, {
+              label: "Loading this file from your Drive",
+              timeoutMs: transferBudgetMs(null),
+              signal: controller.signal,
+            });
+            return asset.ok ? await asset.text() : null;
+          },
+          controller.signal,
+        );
         return {
           kind: "canvas-html" as const,
-          html: prepareDocumentHtml(await response.text()),
+          html: prepareDocumentHtml(html),
         };
       }
       if ("driveBacked" in payload && payload.driveBacked === true) {

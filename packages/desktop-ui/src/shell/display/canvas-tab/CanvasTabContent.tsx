@@ -16,6 +16,7 @@ import type { ReactNode } from "react";
 
 const decoder = new TextDecoder("utf-8");
 const CANVAS_HTML_MAX_BYTES = 4 * 1024 * 1024;
+const DRIVE_CANVAS_HTML_MAX_BYTES = 48 * 1024 * 1024;
 
 type CanvasFrame = { src: string } | { srcDoc: string };
 
@@ -25,6 +26,10 @@ const canvasUrlApi = () => {
         typeof display.canvasHtmlUrl === "function"
         ? display
         : null;
+};
+const canvasDriveUrlApi = () => {
+    const display = typeof window === "undefined" ? undefined : window.electronAPI?.display;
+    return typeof display?.canvasDriveUrl === "function" ? display.canvasDriveUrl : null;
 };
 const errorMessage = (caught: unknown) => (caught instanceof Error ? caught.message : String(caught)).replace(/^Error invoking remote method '[^']*': (?:\w*Error: )?/u, "");
 const CanvasLoadingDots = () => (<span className="canvas-tab__loading-dots" aria-hidden>
@@ -70,6 +75,32 @@ const LocalFileCanvasHeroFrameContent = ({ item }: { item: CanvasHtmlItem }) => 
     const settled = resolved?.key === key ? resolved : null;
     return <CanvasHeroFrameDocument item={item} frame={settled?.src ? { src: settled.src } : null} error={settled?.error ?? null} loading={!settled}/>;
 };
+const DriveCanvasHeroFrameContent = ({ item, drivePath }: { item: CanvasHtmlItem; drivePath: string }) => {
+    const key = `${drivePath}\0${item.createdAt}`;
+    const [resolved, setResolved] = useState<{
+        key: string;
+        src: string | null;
+        error: string | null;
+    } | null>(null);
+    useEffect(() => {
+        const canvasDriveUrl = canvasDriveUrlApi();
+        if (!canvasDriveUrl)
+            return;
+        let cancelled = false;
+        void canvasDriveUrl(drivePath).then(({ url }) => {
+            if (!cancelled)
+                setResolved({ key, src: url, error: null });
+        }, (caught: unknown) => {
+            if (!cancelled)
+                setResolved({ key, src: null, error: errorMessage(caught) });
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [drivePath, key]);
+    const settled = resolved?.key === key ? resolved : null;
+    return <CanvasHeroFrameDocument item={item} frame={settled?.src ? { src: settled.src } : null} error={settled?.error ?? null} loading={!settled}/>;
+};
 const HtmlCanvasHeroFrameContent = ({ item, html, error, loading, limited = false, drivePath, }: {
   item: CanvasHtmlItem;
   html: string;
@@ -108,17 +139,23 @@ const HtmlCanvasHeroFrameContent = ({ item, html, error, loading, limited = fals
 };
 const BytesCanvasHeroFrameContent = ({ item }: { item: CanvasHtmlItem }) => {
     const fileSource = useContext(DisplayFileSourceContext);
-    const { bytes, error, loading, truncated } = useDisplayFileBytes(item.filePath, "Canvas preview requires the Stella desktop app.", undefined, item.createdAt, CANVAS_HTML_MAX_BYTES);
+    const fromDrive = Boolean(fileSource?.drivePath);
+    const { bytes, error, loading, truncated } = useDisplayFileBytes(item.filePath, "Canvas preview requires the Stella desktop app.", undefined, item.createdAt, fromDrive ? DRIVE_CANVAS_HTML_MAX_BYTES : CANVAS_HTML_MAX_BYTES);
     const html = useMemo(() => (bytes ? decoder.decode(bytes) : ""), [bytes]);
-    const embedded = useEmbeddedCanvasAssets(html, item.filePath, !fileSource && !canvasUrlApi());
+    const embedded = useEmbeddedCanvasAssets(html, item.filePath, canvasUrlApi() ? null : fromDrive ? "drive" : fileSource ? null : "device");
     return <HtmlCanvasHeroFrameContent item={item} html={embedded.html} error={error} loading={loading || embedded.loading} limited={truncated} {...(fileSource?.drivePath ? { drivePath: fileSource.drivePath } : {})}/>;
 };
 const CloudCanvasHeroFrameContent = ({ item }: { item: CanvasHtmlItem }) => {
     const { html, error, loading } = useCloudDriveHtml(item.filePath, item.createdAt);
-    return <HtmlCanvasHeroFrameContent item={item} html={html ?? ""} error={error} loading={loading} drivePath={item.filePath}/>;
+    const documentPath = item.filePath.startsWith("/") ? item.filePath : `/${item.filePath}`;
+    const embedded = useEmbeddedCanvasAssets(html ?? "", documentPath, canvasUrlApi() ? null : "drive");
+    return <HtmlCanvasHeroFrameContent item={item} html={embedded.html} error={error} loading={loading || embedded.loading} drivePath={item.filePath}/>;
 };
 const CanvasHeroFrameContent = ({ item }: { item: CanvasHtmlItem }) => {
     const fileSource = useContext(DisplayFileSourceContext);
+    const drivePath = item.driveBacked ? item.filePath.replace(/^\/+/u, "") : fileSource?.drivePath;
+    if (drivePath && /\.html?$/iu.test(drivePath) && canvasDriveUrlApi())
+        return <DriveCanvasHeroFrameContent item={item} drivePath={drivePath}/>;
     if (item.driveBacked)
         return <CloudCanvasHeroFrameContent item={item}/>;
     if (fileSource || !canvasUrlApi())

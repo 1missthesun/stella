@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import * as Clipboard from "expo-clipboard";
 import {
   SHARE_CANVAS_PATTERN,
+  SHARE_MAX_HTML_BYTES,
   type ShareLink,
 } from "@stella/contracts/backend/shares";
 import { getBackendClient } from "./backend";
@@ -15,16 +16,44 @@ export const canvasSlugFor = (
   return SHARE_CANVAS_PATTERN.test(base) ? base : null;
 };
 
+class CanvasTooLargeError extends Error {}
+
+const megabytes = (bytes: number): string => {
+  const value = bytes / (1024 * 1024);
+  return `${value >= 10 ? Math.round(value) : Math.round(value * 10) / 10} MB`;
+};
+
+/** The reason to show when it is something the user can act on (a size limit, a missing file). */
+export const canvasShareFailureReason = (error: unknown): string | undefined => {
+  if (error instanceof CanvasTooLargeError) return error.message;
+  const code =
+    error && typeof error === "object" && "code" in error ? error.code : null;
+  return (code === "BAD_REQUEST" || code === "NOT_FOUND") && error instanceof Error
+    ? error.message
+    : undefined;
+};
+
 export type CanvasShareToggle = {
   isPublic: boolean;
   busy: boolean;
   toggle: () => Promise<boolean>;
 };
 
+const checkedShareHtml = (html: string): string => {
+  const bytes = new TextEncoder().encode(html).byteLength;
+  if (bytes > SHARE_MAX_HTML_BYTES) {
+    throw new CanvasTooLargeError(
+      `This canvas is ${megabytes(bytes)}; a public link can hold up to ${megabytes(SHARE_MAX_HTML_BYTES)}.`,
+    );
+  }
+  return html;
+};
+
 export function useCanvasShareToggle(
   canvas: string | null,
   html: string | null,
   title: string | undefined,
+  drivePath: string | null = null,
 ): CanvasShareToggle | null {
   const [link, setLink] = useState<ShareLink | null>(null);
   const [busy, setBusy] = useState(false);
@@ -61,14 +90,21 @@ export function useCanvasShareToggle(
             slug: link.slug,
             visibility: "public",
           })
-        : html
-          ? await client.call("shares.save", {
+        : drivePath && /\.html?$/iu.test(drivePath)
+          ? await client.call("shares.saveDriveDocument", {
               canvas,
-              html,
+              path: drivePath,
               ...(title ? { title: title.slice(0, 300) } : {}),
               visibility: "public",
             })
-          : null;
+          : html
+            ? await client.call("shares.save", {
+                canvas,
+                html: checkedShareHtml(html),
+                ...(title ? { title: title.slice(0, 300) } : {}),
+                visibility: "public",
+              })
+            : null;
       if (!saved) return false;
       setLink({
         slug: saved.slug,
@@ -84,7 +120,7 @@ export function useCanvasShareToggle(
     } finally {
       setBusy(false);
     }
-  }, [canvas, html, isPublic, link, title]);
+  }, [canvas, drivePath, html, isPublic, link, title]);
   return useMemo(
     () => (canvas ? { isPublic, busy, toggle } : null),
     [busy, canvas, isPublic, toggle],

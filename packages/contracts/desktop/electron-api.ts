@@ -132,6 +132,7 @@ import {
   IPC_DISCOVERY_DETECT_PREFERRED_BROWSER,
   IPC_DISCOVERY_LIST_BROWSER_PROFILES,
   IPC_DISCOVERY_WRITE_CORE_MEMORY,
+  IPC_DISPLAY_CANVAS_DRIVE_URL,
   IPC_DISPLAY_CANVAS_FILE_URL,
   IPC_DISPLAY_CANVAS_HTML_CHANGED,
   IPC_DISPLAY_CANVAS_HTML_URL,
@@ -426,6 +427,8 @@ export const createElectronApi = (
           html,
           ...(options?.drivePath ? { drivePath: options.drivePath } : {}),
         }),
+      canvasDriveUrl: (drivePath: string) =>
+        ipc.invoke(IPC_DISPLAY_CANVAS_DRIVE_URL, { drivePath }),
       listTrash: invoker(IPC_DISPLAY_TRASH_LIST),
       forceDeleteTrash: invoker(IPC_DISPLAY_TRASH_FORCE_DELETE),
     },

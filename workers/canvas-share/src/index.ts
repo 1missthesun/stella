@@ -25,6 +25,12 @@
  * `CANVAS_SHARE_VIEW_SECRET` no private canvas opens here at all. Objects
  * written before visibility existed carry none and stay public.
  *
+ * Page assets: a page published from Drive with files beside it (videos,
+ * images, styles, scripts) is served at `/c/:slug/` (the bare `/c/:slug`
+ * redirects there, so relative URLs resolve) and its files at
+ * `/c/:slug/<path>` from `shares/<slug>/<path>`, under the page's own expiry
+ * and visibility, with range requests for video.
+ *
  * Shared drive files: `GET /f/:slug/:name` serves `files/<slug>` with the
  * content type the backend stored on it, under a scriptless sandbox. Only
  * images (never SVG), video, audio and PDFs open inline; everything else is
@@ -42,6 +48,10 @@ import {
 import { buildCanvasOwnerOpenUrl } from "../../../packages/contracts/canvas-share.js";
 
 const KEY_PREFIX = "shares";
+// A sandboxed page has an opaque origin, so its own subresource requests are
+// cross-site and never carry the Lax view cookie. Its owner gets this one,
+// scoped to the page's folder and accepted only for the page's assets.
+const CANVAS_ASSET_COOKIE = "stella_canvas_asset";
 const SLUG_PATTERN = /^[A-Za-z0-9_-]{16,64}$/;
 
 const SHARE_CSP =
@@ -164,19 +174,116 @@ const privatePage = (method: string, ownerOpenUrl: string | null): Response =>
     },
   });
 
-const parseSlug = (pathname: string): string | null => {
-  const match = /^\/c\/([^/]+)\/?$/.exec(pathname);
+type CanvasPath = { slug: string; slash: boolean; asset: string | null };
+
+const parseCanvasPath = (pathname: string): CanvasPath | null => {
+  const match = /^\/c\/([^/]+)(\/.*)?$/.exec(pathname);
   if (!match) return null;
   let slug: string;
+  let segments: string[];
   try {
     slug = decodeURIComponent(match[1]);
+    segments = (match[2] ?? "").split("/").slice(1).map(decodeURIComponent);
   } catch {
     return null;
   }
-  return SLUG_PATTERN.test(slug) ? slug : null;
+  if (!SLUG_PATTERN.test(slug)) return null;
+  if (segments.length === 0) return { slug, slash: false, asset: null };
+  if (segments.length === 1 && segments[0] === "") return { slug, slash: true, asset: null };
+  if (segments.some((segment) => !segment || segment.startsWith(".") || /[\\\0]/.test(segment))) {
+    return null;
+  }
+  return { slug, slash: true, asset: segments.join("/") };
 };
 
 const FILE_CSP = "sandbox; default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'";
+
+const rangedObjectResponse = async (
+  request: Request,
+  bucket: R2Bucket,
+  key: string,
+  size: number,
+  headers: Headers,
+): Promise<Response> => {
+  if (request.method === "HEAD") {
+    headers.set("content-length", String(size));
+    return new Response(null, { status: 200, headers });
+  }
+  const object = await bucket.get(key, {
+    range: request.headers,
+    onlyIf: request.headers,
+  });
+  if (!object) return notFound();
+  if (!("body" in object)) {
+    return new Response(null, { status: 304, headers });
+  }
+  const range = object.range as { offset?: number; length?: number; suffix?: number } | undefined;
+  if (range && request.headers.has("range")) {
+    const offset =
+      range.suffix !== undefined ? Math.max(0, object.size - range.suffix) : (range.offset ?? 0);
+    const length =
+      range.suffix !== undefined
+        ? Math.min(range.suffix, object.size)
+        : (range.length ?? object.size - offset);
+    headers.set("content-range", `bytes ${offset}-${offset + length - 1}/${object.size}`);
+    headers.set("content-length", String(length));
+    return new Response(object.body, { status: 206, headers });
+  }
+  headers.set("content-length", String(object.size));
+  return new Response(object.body, { status: 200, headers });
+};
+
+const hasOwnerViewCookie = async (
+  request: Request,
+  secret: string,
+  owner: string,
+  name: string = CANVAS_VIEW_COOKIE,
+): Promise<boolean> => {
+  const cookie = readCookie(request, name);
+  const claims = cookie ? await verifyCanvasViewToken(secret, cookie, Date.now()) : null;
+  return claims?.k === "view" && claims.o === owner;
+};
+
+const serveCanvasAsset = async (
+  request: Request,
+  env: Env,
+  page: R2Object,
+  slug: string,
+  asset: string,
+): Promise<Response> => {
+  if (page.customMetadata?.assets !== "1") return notFound();
+  const isPrivate = page.customMetadata?.visibility === "private";
+  if (isPrivate) {
+    const owner = page.customMetadata?.owner;
+    const secret = viewSecretOf(env);
+    if (
+      !owner ||
+      !secret ||
+      !(
+        (await hasOwnerViewCookie(request, secret, owner, CANVAS_ASSET_COOKIE)) ||
+        (await hasOwnerViewCookie(request, secret, owner))
+      )
+    ) {
+      return notFound();
+    }
+  }
+  const key = `${KEY_PREFIX}/${slug}/${asset}`;
+  const head = await env.SHARES_BUCKET.head(key);
+  if (!head) return notFound();
+  const headers = new Headers();
+  head.writeHttpMetadata(headers);
+  headers.set("content-type", head.httpMetadata?.contentType || "application/octet-stream");
+  headers.delete("content-disposition");
+  headers.set("x-content-type-options", "nosniff");
+  headers.set("x-robots-tag", "noindex, nofollow");
+  headers.set("referrer-policy", "no-referrer");
+  headers.set("content-security-policy", FILE_CSP);
+  headers.set("accept-ranges", "bytes");
+  headers.set("cache-control", isPrivate ? "private, no-store" : "public, max-age=60");
+  if (!isPrivate) headers.set("access-control-allow-origin", "*");
+  headers.set("etag", head.httpEtag);
+  return rangedObjectResponse(request, env.SHARES_BUCKET, key, head.size, headers);
+};
 
 const INLINE_FILE_TYPE = /^(?:image\/(?!svg)[a-z0-9.+-]+|video\/[a-z0-9.+-]+|audio\/[a-z0-9.+-]+|application\/pdf)$/;
 
@@ -228,33 +335,7 @@ const serveFile = async (
     }
   }
   headers.set("etag", head.httpEtag);
-
-  if (request.method === "HEAD") {
-    headers.set("content-length", String(head.size));
-    return new Response(null, { status: 200, headers });
-  }
-  const object = await env.SHARES_BUCKET.get(key, {
-    range: request.headers,
-    onlyIf: request.headers,
-  });
-  if (!object) return notFound();
-  if (!("body" in object)) {
-    return new Response(null, { status: 304, headers });
-  }
-  const range = object.range as { offset?: number; length?: number; suffix?: number } | undefined;
-  if (range && request.headers.has("range")) {
-    const offset =
-      range.suffix !== undefined ? Math.max(0, object.size - range.suffix) : (range.offset ?? 0);
-    const length =
-      range.suffix !== undefined
-        ? Math.min(range.suffix, object.size)
-        : (range.length ?? object.size - offset);
-    headers.set("content-range", `bytes ${offset}-${offset + length - 1}/${object.size}`);
-    headers.set("content-length", String(length));
-    return new Response(object.body, { status: 206, headers });
-  }
-  headers.set("content-length", String(object.size));
-  return new Response(object.body, { status: 200, headers });
+  return rangedObjectResponse(request, env.SHARES_BUCKET, key, head.size, headers);
 };
 
 export default {
@@ -276,10 +357,18 @@ export default {
     const fileSlug = parseFileSlug(url.pathname);
     if (fileSlug) return serveFile(request, env, ctx, fileSlug);
 
-    const slug = parseSlug(url.pathname);
-    if (!slug) return notFound();
+    const canvasPath = parseCanvasPath(url.pathname);
+    if (!canvasPath) return notFound();
+    const { slug } = canvasPath;
 
     const key = `${KEY_PREFIX}/${slug}.html`;
+    if (canvasPath.asset) {
+      const page = await env.SHARES_BUCKET.head(key);
+      if (!page) return notFound();
+      const expiresAt = Number(page.customMetadata?.["expires-at"]);
+      if (Number.isFinite(expiresAt) && expiresAt <= Date.now()) return notFound();
+      return serveCanvasAsset(request, env, page, slug, canvasPath.asset);
+    }
     const object = await env.SHARES_BUCKET.get(key);
     if (!object) return notFound();
 
@@ -292,6 +381,7 @@ export default {
       }
     }
 
+    const pagePath = `/c/${slug}${object.customMetadata?.assets === "1" ? "/" : ""}`;
     const isPrivate = object.customMetadata?.visibility === "private";
     if (isPrivate) {
       const owner = object.customMetadata?.owner;
@@ -315,7 +405,7 @@ export default {
           return new Response(null, {
             status: 302,
             headers: {
-              location: `/c/${slug}`,
+              location: pagePath,
               "set-cookie": `${CANVAS_VIEW_COOKIE}=${view}; Path=/c/; Max-Age=${Math.floor(CANVAS_VIEW_COOKIE_TTL_MS / 1000)}; HttpOnly; Secure; SameSite=Lax`,
               "cache-control": "no-store",
               "referrer-policy": "no-referrer",
@@ -324,12 +414,22 @@ export default {
         }
         return privatePage(request.method, ownerOpenUrl);
       }
-      const cookie = readCookie(request, CANVAS_VIEW_COOKIE);
-      const claims = cookie ? await verifyCanvasViewToken(secret, cookie, now) : null;
-      if (claims?.k !== "view" || claims.o !== owner) {
+      if (!(await hasOwnerViewCookie(request, secret, owner))) {
         object.body.cancel().catch(() => {});
         return privatePage(request.method, ownerOpenUrl);
       }
+    }
+
+    if (!canvasPath.slash && pagePath.endsWith("/")) {
+      object.body.cancel().catch(() => {});
+      return new Response(null, {
+        status: 308,
+        headers: {
+          location: `${pagePath}${url.search}`,
+          "cache-control": isPrivate ? "no-store" : "public, max-age=60",
+          "referrer-policy": "no-referrer",
+        },
+      });
     }
 
     const headers = new Headers({
@@ -341,6 +441,19 @@ export default {
       "content-security-policy": SHARE_CSP,
     });
     if (object.httpEtag) headers.set("etag", object.httpEtag);
+    const owner = object.customMetadata?.owner;
+    const secret = viewSecretOf(env);
+    if (isPrivate && pagePath.endsWith("/") && owner && secret) {
+      const assetView = await signCanvasViewToken(secret, {
+        k: "view",
+        o: owner,
+        e: Date.now() + CANVAS_VIEW_COOKIE_TTL_MS,
+      });
+      headers.append(
+        "set-cookie",
+        `${CANVAS_ASSET_COOKIE}=${assetView}; Path=${pagePath}; Max-Age=${Math.floor(CANVAS_VIEW_COOKIE_TTL_MS / 1000)}; HttpOnly; Secure; SameSite=None`,
+      );
+    }
 
     if (request.method === "HEAD") {
       return new Response(null, { status: 200, headers });

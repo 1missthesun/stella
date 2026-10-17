@@ -8,6 +8,7 @@ import {
   type IpcMainInvokeEvent,
 } from "electron";
 import {
+  IPC_DISPLAY_CANVAS_DRIVE_URL,
   IPC_DISPLAY_CANVAS_FILE_URL,
   IPC_DISPLAY_CANVAS_HTML_CHANGED,
   IPC_DISPLAY_CANVAS_HTML_URL,
@@ -1072,6 +1073,39 @@ export const registerDisplayHandlers = (options: DisplayHandlersOptions) => {
         return { url: registerCanvasHtml(html, `/${drivePath}`, "drive") };
       }
       return { url: registerCanvasHtml(html) };
+    },
+  );
+
+  handleIpc(
+    IPC_DISPLAY_CANVAS_DRIVE_URL,
+    async (event, payload?: { drivePath?: unknown }) => {
+      if (!options.assertPrivilegedSender(event, IPC_DISPLAY_CANVAS_DRIVE_URL)) {
+        throw new Error(
+          `Blocked untrusted ${IPC_DISPLAY_CANVAS_DRIVE_URL} request.`,
+        );
+      }
+      const drivePath =
+        typeof payload?.drivePath === "string"
+          ? payload.drivePath.trim().replace(/^\/+/u, "")
+          : "";
+      if (!drivePath || !/\.html?$/iu.test(drivePath)) {
+        throw new Error(`${IPC_DISPLAY_CANVAS_DRIVE_URL} requires an HTML drivePath.`);
+      }
+      const locator = options.deviceFileLocator;
+      if (!locator) throw new Error("Your Drive isn't available right now.");
+      const file = await locator.copyUrl(drivePath);
+      if (file.sizeBytes > MAX_CANVAS_HTML_BYTES) {
+        throw new Error(
+          `This page is too large to show here (${Math.round(file.sizeBytes / (1024 * 1024))} MB, limit ${MAX_CANVAS_HTML_BYTES / (1024 * 1024)} MB).`,
+        );
+      }
+      const copy = await locator.readCopy(drivePath, MAX_CANVAS_HTML_BYTES);
+      const html = Buffer.from(
+        copy.bytes.buffer,
+        copy.bytes.byteOffset,
+        copy.bytes.byteLength,
+      ).toString("utf8");
+      return { url: registerCanvasHtml(html, `/${drivePath}`, "drive") };
     },
   );
 

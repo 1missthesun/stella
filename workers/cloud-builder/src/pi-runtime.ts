@@ -100,6 +100,7 @@ import {
   type JournalStart,
 } from "@stella/agent/stella/journal-sync";
 import { fitForHandover } from "@stella/agent/stella/handover";
+import { inlineImageBytes } from "@stella/agent/stella/image-budget";
 import type { JournalCheckpointFirstKept } from "@stella/contracts/journal-checkpoint";
 export { journalSeqOf } from "@stella/agent/stella/journal-sync";
 import type { AgentModelReasoningEffort, CloudExecutionSelection } from "@stella/contracts/agent-engine";
@@ -173,6 +174,18 @@ const ORIGIN_STOP_HOLD_MS = 5_000;
 const PI_AGENT_STATE_KEY = "piAgentState";
 const CLIENT_HISTORY_PAGE = 200;
 const CLIENT_FRAME_BYTES = 512 * 1024;
+/**
+ * Inline images in this Durable Object's 128MB: one request carries at most
+ * `PI_REQUEST_IMAGE_BYTES` of base64 (the newest images), and once the context
+ * itself holds more than `PI_CONTEXT_IMAGE_HIGH_WATER_BYTES` it is compacted,
+ * since token-based compaction never trims images (each costs a model ~1k
+ * tokens but ~1.5MB of memory per copy).
+ */
+const PI_REQUEST_IMAGE_BYTES = 12 * 1024 * 1024;
+const PI_CONTEXT_IMAGE_HIGH_WATER_BYTES = 24 * 1024 * 1024;
+const PI_IMAGE_COMPACTION_SPACING_MS = 10 * 60_000;
+const PI_IMAGE_COMPACTION_INSTRUCTIONS =
+  "The conversation holds too many images to keep sending them. Images before the kept recent part will no longer be visible: describe in the summary what each one showed that the work still needs (text, numbers, layout, what was wrong or right).";
 
 export type PiExecution = CloudExecutionSelection;
 
@@ -761,6 +774,7 @@ export class PiConversationRuntime {
     const turn = async (): Promise<PiTurnSources> => (await this.#turn()).sources;
     return {
       env: "cloud",
+      requestImageBytes: PI_REQUEST_IMAGE_BYTES,
       agentPrompt: async (id) =>
         id === "agents/orchestrator.md"
           ? (await turn()).orchestratorPrompt
@@ -2090,6 +2104,24 @@ export class PiConversationRuntime {
     if (!pending) return;
     await store(pending.summary, pending.firstKept);
     await noteCheckpointPublished(harness, root, pending.markerId, context);
+  }
+
+  #imageCompactionAt = 0;
+
+  /**
+   * Compacts the root conversation when the images its context holds pass the
+   * high-water mark. Admits the compaction and returns; the harness runs it.
+   */
+  async boundContextImages(context: Context): Promise<void> {
+    if (Date.now() - this.#imageCompactionAt < PI_IMAGE_COMPACTION_SPACING_MS) return;
+    const { root } = await this.open();
+    const { bytes, images } = inlineImageBytes((await root.context(context)).messages);
+    if (bytes <= PI_CONTEXT_IMAGE_HIGH_WATER_BYTES) return;
+    const running = await root.commit(async (tx) => (await tx.doc(LiveDoc, root.id)).compactions, context);
+    if (running?.length) return;
+    this.#imageCompactionAt = Date.now();
+    await root.compact(PI_IMAGE_COMPACTION_INSTRUCTIONS, context);
+    this.#options.log("pi_image_compaction", { bytes, images });
   }
 
   async follow(

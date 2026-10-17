@@ -2,6 +2,11 @@ import type { ImageContent } from "@earendil-works/pi-ai";
 import type { AgentMessage } from "@stella/runtime/kernel/agent-core/types.js";
 import { assistantMessageHasUsableOutput } from "@stella/runtime/kernel/agent-runtime/run-shared.js";
 import type { TurnEventEvent } from "@stella/contracts/turn-plane/owner-events";
+import {
+  base64EncodedLength,
+  DURABLE_OBJECT_READ_IMAGE_CAPS,
+} from "@stella/runtime/kernel/shared/image-caps.js";
+import { fitImageWithImagesBinding } from "../cloud-image-fit.js";
 import { deliverOwnerEvents } from "../owner-events.js";
 import { crewScopeForConversation } from "../slack/scope.js";
 import { unwrapRpc } from "../owner-store/errors.js";
@@ -220,10 +225,21 @@ export abstract class OrchestratorTurnLifecycle extends OrchestratorOwner {
           if (!bytes.ok) continue;
           const content = new Uint8Array(await bytes.arrayBuffer());
           signal?.throwIfAborted();
+          // Fit like Read does: the image is stored as one pi entry (a 2MB
+          // SQLite row) and re-sent with every later request, so an unfitted
+          // 3MB photo (4MB of base64) neither fits the row nor the isolate.
+          const caps = DURABLE_OBJECT_READ_IMAGE_CAPS;
+          const fitted = this.env.IMAGES
+            ? await fitImageWithImagesBinding(this.env.IMAGES, content, entry.contentType, caps)
+            : base64EncodedLength(content.byteLength) < caps.maxBytes
+              ? { bytes: content, mimeType: entry.contentType }
+              : null;
+          signal?.throwIfAborted();
+          if (!fitted) continue;
           images.push({
             type: "image",
-            data: base64FromBytes(content),
-            mimeType: entry.contentType,
+            data: base64FromBytes(fitted.bytes),
+            mimeType: fitted.mimeType,
           });
         } catch {
           signal?.throwIfAborted();

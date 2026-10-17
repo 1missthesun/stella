@@ -21,4 +21,6 @@ export type StellaContextSources = {
   executionContext(conversationId: ConversationId, context: Context): Promise<ExecutionContextSnapshot | undefined>;
   locale?(context: Context): Promise<string | undefined>;
   codeHistory?(agentType: StellaAgentRole["agentType"], context: Context): Promise<boolean>;
+  /** Most inline image base64 one model request carries; older images go out as a note. Unset: no bound. */
+  readonly requestImageBytes?: number;
 };

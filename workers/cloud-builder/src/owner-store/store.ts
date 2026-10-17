@@ -890,7 +890,7 @@ export class OwnerStore {
           JOB_BATCH + ran.size,
         )
         .toArray()
-        .filter((job) => !ran.has(job.id))
+        .filter((job) => !ran.has(job.id) && !this.runningJobs.has(job.id))
         .slice(0, JOB_BATCH);
       if (due.length === 0) break;
       for (const job of due) ran.add(job.id);
@@ -900,39 +900,58 @@ export class OwnerStore {
     return ran.size;
   }
 
+  /**
+   * Jobs running in this isolate. An alarm and a request (`closeOwner`, any
+   * call that drains jobs) can both reach `runDueJobs` while the other awaits,
+   * and both would pick the same due row: two account purges sent the same
+   * conversation two `/purge` calls, the second dying on tables the first had
+   * just dropped. A job already running is left to that run.
+   */
+  private readonly runningJobs = new Set<string>();
+
   private async runJobs(due: JobRow[], now: number): Promise<void> {
     for (const job of due) {
-      const def = this.registry.jobs.get(job.kind);
-      if (!def) {
-        this.log("error", "owner_job_unknown", { id: job.id, kind: job.kind });
-        this.sql.exec("DELETE FROM owner_jobs WHERE id = ?", job.id);
-        continue;
-      }
+      if (this.runningJobs.has(job.id)) continue;
+      this.runningJobs.add(job.id);
       try {
-        await def.run(this.context(null, now), JSON.parse(job.payload));
+        await this.runJob(job, now);
+      } finally {
+        this.runningJobs.delete(job.id);
+      }
+    }
+  }
+
+  private async runJob(job: JobRow, now: number): Promise<void> {
+    const def = this.registry.jobs.get(job.kind);
+    if (!def) {
+      this.log("error", "owner_job_unknown", { id: job.id, kind: job.kind });
+      this.sql.exec("DELETE FROM owner_jobs WHERE id = ?", job.id);
+      return;
+    }
+    try {
+      await def.run(this.context(null, now), JSON.parse(job.payload));
+      this.sql.exec(
+        "DELETE FROM owner_jobs WHERE id = ? AND run_at = ? AND attempts = ?",
+        job.id,
+        job.run_at,
+        job.attempts,
+      );
+    } catch (error) {
+      const attempts = job.attempts + 1;
+      const message = error instanceof Error ? error.message : String(error);
+      if (attempts >= (def.maxAttempts ?? JOB_DEFAULT_MAX_ATTEMPTS)) {
+        this.log("error", "owner_job_dropped", { id: job.id, kind: job.kind, attempts, message });
+        this.sql.exec("DELETE FROM owner_jobs WHERE id = ?", job.id);
+      } else {
+        const backoff = Math.min(JOB_MAX_BACKOFF_MS, JOB_RETRY_BASE_MS * 2 ** (attempts - 1));
+        this.log("error", "owner_job_failed", { id: job.id, kind: job.kind, attempts, message });
         this.sql.exec(
-          "DELETE FROM owner_jobs WHERE id = ? AND run_at = ? AND attempts = ?",
+          "UPDATE owner_jobs SET attempts = ?, run_at = ? WHERE id = ? AND run_at = ?",
+          attempts,
+          now + backoff,
           job.id,
           job.run_at,
-          job.attempts,
         );
-      } catch (error) {
-        const attempts = job.attempts + 1;
-        const message = error instanceof Error ? error.message : String(error);
-        if (attempts >= (def.maxAttempts ?? JOB_DEFAULT_MAX_ATTEMPTS)) {
-          this.log("error", "owner_job_dropped", { id: job.id, kind: job.kind, attempts, message });
-          this.sql.exec("DELETE FROM owner_jobs WHERE id = ?", job.id);
-        } else {
-          const backoff = Math.min(JOB_MAX_BACKOFF_MS, JOB_RETRY_BASE_MS * 2 ** (attempts - 1));
-          this.log("error", "owner_job_failed", { id: job.id, kind: job.kind, attempts, message });
-          this.sql.exec(
-            "UPDATE owner_jobs SET attempts = ?, run_at = ? WHERE id = ? AND run_at = ?",
-            attempts,
-            now + backoff,
-            job.id,
-            job.run_at,
-          );
-        }
       }
     }
   }

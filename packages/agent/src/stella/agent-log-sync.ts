@@ -97,6 +97,8 @@ export function agentLogSync(options: {
   transport: () => AgentLogTransport | undefined;
   report: (error: unknown) => void;
   onAppend?: (stat: AgentLogAppendStat) => void;
+  /** Readies a message for the log, such as bringing stored images back inline; runs one entry at a time. */
+  prepare?: (message: Message) => Promise<Message>;
   context: Context;
 }) {
   const { context } = options;
@@ -127,8 +129,6 @@ export function agentLogSync(options: {
         context,
       );
       if (page.length === 0) break;
-      const drafts: Array<{ entry: EntryRecord; draft?: AgentLogRecordDraft }> = [];
-      for (const entry of page) drafts.push({ entry, draft: await draftOf(harness, entry, syncId, context) });
       let batch: AgentLogRecordDraft[] = [];
       let bytes = 0;
       let through = mirrored;
@@ -144,7 +144,9 @@ export function agentLogSync(options: {
         bytes = 0;
         await save();
       };
-      for (const { entry, draft } of drafts) {
+      // Drafted one entry at a time so a page of image-heavy entries never sits inline in memory at once.
+      for (const entry of page) {
+        const draft = await draftOf(harness, entry, syncId, context, options.prepare);
         if (draft) {
           const size = draft.payloadJson.length + draft.key.length;
           if (batch.length > 0 && bytes + size > APPEND_BATCH_BYTES) await send();
@@ -235,11 +237,15 @@ const draftOf = async (
   entry: EntryRecord,
   syncId: string,
   context: Context,
+  prepare?: (message: Message) => Promise<Message>,
 ): Promise<AgentLogRecordDraft | undefined> => {
   if (journalSeqOf(entry) !== undefined) return undefined;
   const message = entry.model?.[0] as Message | undefined;
   const role = ROLE_OF_KIND[entry.kind];
-  if (role && message) return { key: recordKey(syncId, entry.id), role, payloadJson: boundedMessageJson(message) };
+  if (role && message) {
+    const ready = prepare ? await prepare(message) : message;
+    return { key: recordKey(syncId, entry.id), role, payloadJson: boundedMessageJson(ready) };
+  }
   if (entry.kind !== CompactionEntry.kind || !message || message.role !== "user") return undefined;
   if ((entry.data as { journalCheckpoint?: unknown } | undefined)?.journalCheckpoint !== undefined) return undefined;
   const summary = typeof message.content === "string" ? message.content : message.content.map((part) => (part.type === "text" ? part.text : "")).join("\n");

@@ -49,6 +49,8 @@ export type CloudClaudeCodeHost = {
   models: { read(): Promise<CloudClaudeCodeModels | undefined>; write(models: CloudClaudeCodeModels): Promise<void> };
   sleep(ms: number, signal: AbortSignal): Promise<void>;
   log(event: string, fields: Record<string, unknown>): void;
+  /** Stored images back inline: Claude Code's tool results carry bytes, never a URL. */
+  inlineImages?<T extends { type: string }>(content: readonly T[]): Promise<readonly T[]>;
 };
 
 export type CloudClaudeCodeModels = { resolved: Record<string, string>; windows: Record<string, number> };
@@ -378,6 +380,9 @@ export const createCloudClaudeCodeTransport = (host: CloudClaudeCodeHost): Cloud
         outcome = await call.outcome;
       } catch (error) {
         outcome = { content: [{ type: "text", text: errorText(error) }], isError: true };
+      }
+      if (host.inlineImages) {
+        outcome = { ...outcome, content: [...(await host.inlineImages(outcome.content))] };
       }
       if (attempt.finished) return refuse("turn_inactive", "This chat turn is no longer running.");
       return {

@@ -29,7 +29,6 @@ import {
   json,
   errorMessage,
   log,
-  base64FromBytes,
   truncateMessage,
   terminalNotice,
 } from "./support.js";
@@ -236,11 +235,9 @@ export abstract class OrchestratorTurnLifecycle extends OrchestratorOwner {
               : null;
           signal?.throwIfAborted();
           if (!fitted) continue;
-          images.push({
-            type: "image",
-            data: base64FromBytes(fitted.bytes),
-            mimeType: fitted.mimeType,
-          });
+          // Stored in R2 so the conversation holds a reference and each
+          // request sends a signed URL instead of the bytes.
+          images.push(await this.images.storeFitted(fitted.bytes, fitted.mimeType));
         } catch {
           signal?.throwIfAborted();
         }

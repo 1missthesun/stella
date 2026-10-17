@@ -25,6 +25,7 @@ import {
 } from "../conversation-types.js";
 import { Journal } from "../journal.js";
 import { ConversationArchive } from "../archive.js";
+import { ConversationImages } from "../conversation-images.js";
 import { ConversationIndex } from "../index-flush.js";
 import { ExactTurnCancellationLedger } from "../execution-placement-turn-cancellation.js";
 import type {
@@ -74,6 +75,8 @@ export abstract class OrchestratorSessionCore extends DurableObject<Env> {
 
   protected readonly journal: Journal;
   protected readonly archive: ConversationArchive;
+  /** Images this conversation's pi entries hold by reference (`conversation-images.ts`). */
+  protected readonly images: ConversationImages;
   protected readonly index: ConversationIndex;
   protected readonly hub: ConversationHub;
   protected readonly exactTurnCancellations: ExactTurnCancellationLedger;
@@ -133,6 +136,16 @@ export abstract class OrchestratorSessionCore extends DurableObject<Env> {
       log,
       storageKeks(env),
     );
+    this.images = new ConversationImages({
+      env,
+      scope: () => {
+        const meta = this.journal.meta();
+        return meta.owner_id && meta.conversation_id
+          ? { ownerId: meta.owner_id, conversationId: meta.conversation_id }
+          : null;
+      },
+      log: (event, fields) => log("info", event, fields),
+    });
     this.archive = new ConversationArchive(
       env.CONVERSATION_ARCHIVE,
       this.journal,

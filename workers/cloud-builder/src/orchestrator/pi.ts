@@ -265,6 +265,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
           storage: this.ctx.storage,
           env: this.env,
           gatewayOrigin,
+          images: this.images,
           journalStart: () => this.journalStart(),
           archivedEntries: {
             read: (piConversationId, options) =>

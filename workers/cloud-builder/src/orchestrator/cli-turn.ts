@@ -43,6 +43,7 @@ export abstract class OrchestratorCliTurn extends OrchestratorTools {
   protected claudeCodeTransport(): CloudClaudeCodeTransport {
     this.#claudeCode ??= createCloudClaudeCodeTransport({
       env: this.env,
+      inlineImages: (content) => this.images.inlineContent(content),
       turn: async (signal) => {
         const runtime = this.piRuntime;
         if (!runtime) throw new Error("No Stella turn is running to carry this Claude Code turn.");

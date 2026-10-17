@@ -22,6 +22,7 @@
  * untouched, so the working user-attached path does not regress.
  */
 
+import { isImageRef } from "./image-ref.js";
 import type { ImageContent, Message, TextContent } from "@earendil-works/pi-ai";
 import { ANTHROPIC_DIRECT_MAX_IMAGE_BASE64_BYTES } from "./image-caps.js";
 
@@ -230,6 +231,8 @@ const processable = (
   block: TextContent | ImageContent,
 ): TextContent | ImageContent => {
   if (block.type !== "image") return block;
+  // A stored image was checked when it was stored; its bytes are not here.
+  if (isImageRef(block.data)) return block;
   const sanitized = sanitizeInlineImagePayload(block.data, block.mimeType);
   if (!sanitized) return { type: "text", text: UNPROCESSABLE_IMAGE_NOTE };
   return sanitized.data === block.data && sanitized.mediaType === block.mimeType

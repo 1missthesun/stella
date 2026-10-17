@@ -1,12 +1,15 @@
 import { BACKGROUND_CONTEXT, withAbortSignal } from "@earendil-works/chord/context";
 import type { Context } from "@earendil-works/chord";
-import type { Api, Model, ModelThinkingLevel } from "@earendil-works/pi-ai";
+import type { Api, Message, Model, ModelThinkingLevel } from "@earendil-works/pi-ai";
 import { createModels } from "@earendil-works/pi-ai/models";
 import { normalizeReasoningEffortLevel } from "@stella/contracts/reasoning-effort";
 import { CLOUD_SANDBOX_SUBSCRIPTION_REQUIRED_MESSAGE } from "@stella/contracts/backend/billing";
 import { parseReminderCard, reminderAssistantMessage } from "@stella/contracts/reminders";
 import {
   AssistantEntry,
+  defineExtension,
+  hook,
+  ToolTask,
   type EntryId,
   LiveDoc,
   ProviderDoc,
@@ -150,6 +153,7 @@ import {
   type PiComputeRecord,
 } from "./pi-agent-compute.js";
 import { piAttachedCoding, type PiAttachedToolCall } from "./pi-attached-tools.js";
+import type { ConversationImages } from "./conversation-images.js";
 import { WORLD_ROOT } from "./workspace.js";
 import {
   claimTurnBrokerRequest,
@@ -366,6 +370,8 @@ export type PiRuntimeOptions = {
     resolvedModel?(alias: string): string | undefined;
     contextWindow?(model: string): number | undefined;
   };
+  /** Holds conversation images in R2: entries keep references and requests carry signed URLs. */
+  images?: ConversationImages;
 };
 
 export type PiToolActivity = {
@@ -538,6 +544,7 @@ export class PiConversationRuntime {
     transport: () => this.#agentLogTransport(),
     report: (error) => this.#options.report(error),
     onAppend: (stat) => this.#options.log("pi_agent_log_append", stat),
+    prepare: async (message) => await this.#inlineMessage(message),
     context: BACKGROUND_CONTEXT,
   });
 
@@ -678,12 +685,22 @@ export class PiConversationRuntime {
     });
   }
 
+  /** A message with its stored images back inline, for a reader that only takes bytes (an agent log a device imports). */
+  async #inlineMessage(message: Message): Promise<Message> {
+    const images = this.#options.images;
+    if (!images || typeof message.content === "string") return message;
+    const parts = message.content as ReadonlyArray<{ type: string }>;
+    const content = await images.inlineContent(parts);
+    return content === parts ? message : ({ ...message, content: [...content] } as Message);
+  }
+
   #access(): StellaGatewayAccess {
     return {
       relayBaseUrl: gatewayRelayBaseUrl(this.#options.gatewayOrigin),
       capability: async () => "stella-routed",
       fetch: async (input: string | URL | Request, init?: RequestInit, route?: StellaRequestRoute) => {
-        const request = input instanceof Request ? new Request(input, init) : new Request(String(input), init);
+        const built = input instanceof Request ? new Request(input, init) : new Request(String(input), init);
+        const request = this.#options.images ? await this.#options.images.rewriteRequest(built) : built;
         const { rootSession } = await this.open();
         if (!route?.sessionId || route.sessionId === rootSession) {
           const turn = await this.#turn(request.signal);
@@ -1680,6 +1697,7 @@ export class PiConversationRuntime {
             piAttachedCoding((call, context) => this.#attachedTool(call, context)),
             ...(this.#claudeCode ? [this.#claudeCode.extension(CLAUDE_CODE_SCOPE)] : []),
             this.#agentLog.extension(),
+            ...(this.#options.images ? [conversationImagesExtension(this.#options.images)] : []),
           ],
           onReport: this.#options.report,
         },
@@ -2225,3 +2243,22 @@ export class PiConversationRuntime {
     return runs.length;
   }
 }
+
+/**
+ * Tool results store their images in R2 before the result entry is written,
+ * so the conversation keeps a reference and each request sends a signed URL.
+ * Listed last so it sees the result every other extension settled on.
+ */
+const conversationImagesExtension = (images: ConversationImages) =>
+  defineExtension({
+    name: "stella-conversation-images",
+    hooks: [
+      hook(ToolTask, {
+        afterTool: async (_call, result) => {
+          if (!result.content) return undefined;
+          const content = await images.storeContent(result.content);
+          return content === result.content ? undefined : { ...result, content: [...content] };
+        },
+      }),
+    ],
+  });

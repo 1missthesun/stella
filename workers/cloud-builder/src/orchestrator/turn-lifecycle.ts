@@ -2,11 +2,8 @@ import type { ImageContent } from "@earendil-works/pi-ai";
 import type { AgentMessage } from "@stella/runtime/kernel/agent-core/types.js";
 import { assistantMessageHasUsableOutput } from "@stella/runtime/kernel/agent-runtime/run-shared.js";
 import type { TurnEventEvent } from "@stella/contracts/turn-plane/owner-events";
-import {
-  base64EncodedLength,
-  DURABLE_OBJECT_READ_IMAGE_CAPS,
-} from "@stella/runtime/kernel/shared/image-caps.js";
-import { fitImageWithImagesBinding } from "../cloud-image-fit.js";
+import { attachmentImageKey, prepareAttachmentImage } from "../attachment-images.js";
+import { sha256Hex } from "../hash.js";
 import { deliverOwnerEvents } from "../owner-events.js";
 import { crewScopeForConversation } from "../slack/scope.js";
 import { unwrapRpc } from "../owner-store/errors.js";
@@ -191,12 +188,20 @@ export abstract class OrchestratorTurnLifecycle extends OrchestratorOwner {
     return json({ ok: true, text: finalText });
   }
 
+  /**
+   * The turn's attached images as conversation references. Each was uploaded
+   * to the Drive when attached and its model-ready copy prepared in the
+   * background as its upload finalized, so this only copies them into the
+   * conversation, all at once; an image sent before its copy was ready is
+   * prepared here, the oversized ones fitted at most two at a time.
+   */
   protected async loadChatAttachmentImages(
     turn: ChatTurnRequest,
     signal?: AbortSignal,
   ): Promise<ImageContent[]> {
     const paths = (turn.attachments ?? []).slice(0, 4);
     if (paths.length === 0) return [];
+    const started = performance.now();
     try {
       signal?.throwIfAborted();
       const crew = await crewScopeForConversation(this.env, turn.conversationId);
@@ -208,40 +213,56 @@ export abstract class OrchestratorTurnLifecycle extends OrchestratorOwner {
           ...(crew ? { crew } : {}),
         }),
       ) as {
-        attachments?: Array<{ path: string; contentType: string; url: string }>;
+        attachments?: Array<{ path: string; contentType: string; sizeBytes: number; key?: string }>;
       };
       signal?.throwIfAborted();
-      const images: ImageContent[] = [];
-      for (const entry of payload.attachments ?? []) {
-        try {
-          signal?.throwIfAborted();
-          const bytes = await fetch(entry.url, {
-            signal: signal
-              ? AbortSignal.any([signal, AbortSignal.timeout(20_000)])
-              : AbortSignal.timeout(20_000),
-          });
-          signal?.throwIfAborted();
-          if (!bytes.ok) continue;
-          const content = new Uint8Array(await bytes.arrayBuffer());
-          signal?.throwIfAborted();
-          // Fit like Read does: the image is stored as one pi entry (a 2MB
-          // SQLite row) and re-sent with every later request, so an unfitted
-          // 3MB photo (4MB of base64) neither fits the row nor the isolate.
-          const caps = DURABLE_OBJECT_READ_IMAGE_CAPS;
-          const fitted = this.env.IMAGES
-            ? await fitImageWithImagesBinding(this.env.IMAGES, content, entry.contentType, caps)
-            : base64EncodedLength(content.byteLength) < caps.maxBytes
-              ? { bytes: content, mimeType: entry.contentType }
-              : null;
-          signal?.throwIfAborted();
-          if (!fitted) continue;
-          // Stored in R2 so the conversation holds a reference and each
-          // request sends a signed URL instead of the bytes.
-          images.push(await this.images.storeFitted(fitted.bytes, fitted.mimeType));
-        } catch {
-          signal?.throwIfAborted();
-        }
-      }
+      const rpcMs = Math.round(performance.now() - started);
+      const via: Record<string, number> = {};
+      const results = await Promise.all(
+        (payload.attachments ?? []).map(async (entry) => {
+          if (!entry.key) return null;
+          const driveKey = entry.key;
+          const name = await sha256Hex(driveKey);
+          try {
+            // Usually prepared in the background when it was attached.
+            const ready = await this.images.adopt(await attachmentImageKey(turn.ownerId, driveKey), name);
+            signal?.throwIfAborted();
+            if (ready !== "missing") {
+              via[ready ? "ready" : "unusable"] = (via[ready ? "ready" : "unusable"] ?? 0) + 1;
+              return ready;
+            }
+            const prepared = await prepareAttachmentImage(this.env, {
+              ownerId: turn.ownerId,
+              driveKey,
+              contentType: entry.contentType,
+              sizeBytes: entry.sizeBytes,
+            });
+            signal?.throwIfAborted();
+            const adopted = prepared ? await this.images.adopt(prepared.key, name) : null;
+            const outcome = adopted && adopted !== "missing" ? (prepared?.via ?? "ready") : "unusable";
+            via[outcome] = (via[outcome] ?? 0) + 1;
+            return adopted && adopted !== "missing" ? adopted : null;
+          } catch (error) {
+            signal?.throwIfAborted();
+            via.failed = (via.failed ?? 0) + 1;
+            log("error", "chat_attachment_prepare_failed", {
+              turnId: turn.turnId,
+              message: errorMessage(error),
+            });
+            return null;
+          }
+        }),
+      );
+      const images = results.filter((image): image is ImageContent => image !== null);
+      log("info", "chat_attachments_loaded", {
+        turnId: turn.turnId,
+        conversationId: turn.conversationId,
+        requested: paths.length,
+        images: images.length,
+        totalMs: Math.round(performance.now() - started),
+        rpcMs,
+        ...via,
+      });
       return images;
     } catch (error) {
       signal?.throwIfAborted();

@@ -14,6 +14,7 @@ import {
 import { copyR2Object, presignR2Url, r2Signer, type R2Signer } from "../../r2-presign.js";
 import { R2_PROXY_MAX_PUT_BYTES } from "../../r2-proxy.js";
 import { sha256Hex } from "../../hash.js";
+import { attachmentImageKey, prepareAttachmentImage } from "../../attachment-images.js";
 import { array, number, object, optional, string } from "../args.js";
 import { RpcError } from "../errors.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
@@ -78,13 +79,15 @@ const TOMBSTONE_TTL_MS = 30 * 24 * 60 * 60_000;
 const TOMBSTONE_PRUNE_EVERY_MS = 24 * 60 * 60_000;
 
 const ATTACHMENT_MAX_COUNT = 4;
-const ATTACHMENT_MAX_BYTES = 3 * MB;
+/** Larger chat images are fitted to the model's limits when prepared (the Images binding's input bound). */
+const ATTACHMENT_MAX_BYTES = 20 * MB;
 const ATTACHMENT_URL_EXPIRES_SECONDS = 120;
 const REFERENCE_MAX_COUNT = 4;
 const REFERENCE_URL_EXPIRES_SECONDS = 2 * 60 * 60;
 
 export const DRIVE_CLEANUP_JOB = "drive.cleanup";
 export const DRIVE_PRUNE_JOB = "drive.pruneTombstones";
+const CHAT_UPLOAD_SOURCES = new Set(["web-chat", "mobile-chat"]);
 
 export const DRIVE_MIGRATION = {
   id: "drive.1-init",
@@ -684,6 +687,11 @@ const finalizeUpload = async (
   ctx.db.run("DELETE FROM drive_uploads WHERE upload_id = ?", debtId);
   // The staging key stays cleanup work until its unrevocable PUT has aged out.
   retirePendingUpload(ctx, current, now);
+  if (contentType.toLowerCase().startsWith("image/") && CHAT_UPLOAD_SOURCES.has(args.source ?? "")) {
+    // Started here rather than as a job so the images of one message are
+    // prepared side by side, not one alarm after another.
+    void prepareChatImage(ctx, { r2Key: finalKey, contentType, sizeBytes: stagedBytes });
+  }
   return { path, name, sizeBytes: stagedBytes, contentType, updatedAt: now };
 };
 
@@ -1609,7 +1617,7 @@ export const adoptCrewSpace = (
 
 const turnAttachments = async (ctx: OwnerContext, raw: unknown) => {
   const paths = stringList(record(raw).paths).slice(0, ATTACHMENT_MAX_COUNT);
-  const attachments: Array<{ path: string; contentType: string; sizeBytes: number; url: string }> = [];
+  const attachments: Array<{ path: string; contentType: string; sizeBytes: number; key: string; url: string }> = [];
   const skipped: DriveSkip[] = [];
   const now = Date.now();
   for (const path of paths) {
@@ -1630,6 +1638,7 @@ const turnAttachments = async (ctx: OwnerContext, raw: unknown) => {
       path,
       contentType: row.content_type,
       sizeBytes: row.size_bytes,
+      key: row.r2_key,
       url: await signGet(signerOf(ctx), row.r2_key, ATTACHMENT_URL_EXPIRES_SECONDS, row.name, now),
     });
   }
@@ -1663,6 +1672,41 @@ const signImages = async (ctx: OwnerContext, raw: unknown): Promise<{ urls: stri
 };
 
 /**
+ * The background half of a chat image upload: its model-ready copy, made while
+ * the user is still typing so sending only copies it into the conversation.
+ * Best effort and never awaited: a send that finds no copy prepares one itself.
+ */
+const prepareChatImage = async (
+  ctx: Pick<OwnerContext, "env" | "ownerId">,
+  input: { r2Key: string; contentType: string; sizeBytes: number },
+): Promise<void> => {
+  const started = Date.now();
+  try {
+    const prepared = await prepareAttachmentImage(ctx.env, {
+      ownerId: ctx.ownerId,
+      driveKey: input.r2Key,
+      contentType: input.contentType,
+      sizeBytes: input.sizeBytes,
+    });
+    console.info(
+      JSON.stringify({
+        event: "drive_chat_image_prepared",
+        via: prepared?.via ?? "unusable",
+        sizeBytes: input.sizeBytes,
+        ms: Date.now() - started,
+      }),
+    );
+  } catch (error) {
+    console.warn(
+      JSON.stringify({
+        event: "drive_chat_image_prepare_failed",
+        message: error instanceof Error ? error.message : String(error),
+      }),
+    );
+  }
+};
+
+/**
  * Deletes every retired object that is due, one R2 batch delete per
  * `CLEANUP_BATCH` keys, in this one run.
  */
@@ -1689,8 +1733,11 @@ const runCleanup = async (ctx: OwnerContext): Promise<void> => {
     }
     const doomed = due.filter((row) => !isKeyReferenced(ctx.db, row.r2_key));
     if (doomed.length > 0) {
+      const keys = [...new Set(doomed.map((row) => row.r2_key))];
+      // A retired file's prepared chat-image copy goes with it.
+      const prepared = await Promise.all(keys.map((key) => attachmentImageKey(ctx.ownerId, key)));
       try {
-        await bucketOf(ctx).delete([...new Set(doomed.map((row) => row.r2_key))]);
+        await bucketOf(ctx).delete([...keys, ...prepared]);
       } catch {
         // The lease holds these rows back until it lapses, then they retry.
         break;

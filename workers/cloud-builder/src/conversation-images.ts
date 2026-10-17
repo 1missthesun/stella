@@ -216,6 +216,39 @@ export class ConversationImages {
     return out;
   }
 
+  /**
+   * An image prepared elsewhere under this owner (an attachment's model-ready
+   * copy) copied into this conversation, so the conversation keeps it
+   * after the original goes and its purge takes it. `name` names the copy, so
+   * attaching the same file again reuses it. Null when it can't be copied.
+   */
+  async adopt(sourceKey: string, name: string): Promise<ImageContent | "missing" | null> {
+    const bucket = this.#env.DRIVE;
+    const prefix = await this.#prefix();
+    if (!bucket || !prefix || !sourceKey.startsWith(prefix.owner)) return null;
+    try {
+      // Streamed bucket to bucket through the binding: no S3 round trip, and
+      // the bytes never sit whole in the isolate. The read is also the check
+      // that the source is there.
+      const object = await withTimeout(bucket.get(sourceKey), "Image read");
+      if (!object) return "missing";
+      const mimeType = object.httpMetadata?.contentType ?? "";
+      const extension = EXTENSIONS[mimeType];
+      if (!extension) {
+        await object.body.cancel();
+        return null;
+      }
+      const key = `${prefix.conversation}${name}.${extension}`;
+      await withTimeout(bucket.put(key, object.body, { httpMetadata: { contentType: mimeType } }), "Image write");
+      return { type: "image", mimeType, data: imageRef(key) };
+    } catch (error) {
+      this.#log("conversation_image_adopt_failed", {
+        message: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }
+  }
+
   /** Deletes every image this conversation stored; `done` is false while more remain. */
   async purge(): Promise<{ deleted: number; done: boolean }> {
     const bucket = this.#env.DRIVE;

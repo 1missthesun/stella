@@ -1,3 +1,4 @@
+import { releasingStub } from "../rpc-release.js";
 import { OwnerHomeContextCache } from "../owner-home-context.js";
 import type { ModelGatewayControl } from "../managed-request-cancellation.js";
 import { OwnerStore } from "../owner-store/store.js";
@@ -151,7 +152,7 @@ export abstract class OwnerGateBase extends DurableObject<OwnerGateEnv> {
     if (existing) return existing.then(() => undefined);
     const preparation = withTimeout(
       (
-        sessions.getByName(conversationId) as unknown as {
+        releasingStub(sessions.getByName(conversationId)) as unknown as {
           prepareCloudChatReader(): Promise<unknown>;
         }
       ).prepareCloudChatReader(),
@@ -193,9 +194,9 @@ export abstract class OwnerGateBase extends DurableObject<OwnerGateEnv> {
         if (!sessions)
           throw new Error("Conversation execution is not configured.");
         await withTimeout(
-          sessions
-            .getByName(request.conversationId)
-            .freezeOwnerModelGrants(request),
+          releasingStub(
+            sessions.getByName(request.conversationId),
+          ).freezeOwnerModelGrants(request),
           OWNER_MODEL_GRANT_FREEZE_TIMEOUT_MS,
           "Owner model grant freeze timed out.",
         );

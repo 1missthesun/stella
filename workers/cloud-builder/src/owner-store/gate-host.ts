@@ -1,3 +1,4 @@
+import { releasingStub } from "../rpc-release.js";
 import { AGENT_STOP_WIRE_REASON } from "@stella/contracts/agent-status";
 import type { OwnerSnapshot } from "@stella/contracts/turn-plane/owner-snapshot";
 import { PLACEMENT_PROTOCOL, type DeviceDestination } from "@stella/contracts/turn-plane/placement";
@@ -176,8 +177,8 @@ export const createGateHost = (deps: GateHostDependencies): OwnerHost => ({
 
   async controlHarnessAgent(input) {
     return {
-      outcome: await deps.env.ORCHESTRATOR_SESSIONS.getByName(
-        input.conversationId,
+      outcome: await releasingStub(
+        deps.env.ORCHESTRATOR_SESSIONS.getByName(input.conversationId),
       ).controlPiHarnessAgent({
         ownerId: deps.ownerId(),
         ownerGeneration: input.ownerGeneration,

@@ -1,3 +1,4 @@
+import { ownerGateStub } from "../rpc-release.js";
 import type { RpcResponse } from "@stella/contracts/backend/protocol";
 import {
   CLOUD_CODE_CONNECT_METHODS,
@@ -48,7 +49,7 @@ const agentConnectClient = (
   if (cached) return cached;
   const ownerInternal = async (name: string, args: unknown) =>
     unwrapRpc(
-      (await env.OWNER_GATES.getByName(turn.ownerId).ownerInternal({
+      (await ownerGateStub(env.OWNER_GATES, turn.ownerId).ownerInternal({
         name,
         args,
         ownerGeneration: turn.ownerGeneration,

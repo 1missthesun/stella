@@ -55,7 +55,7 @@ import {
   R2_SWEEP_MAX_PAGES,
   sweepR2Prefix,
 } from "./shared/keys.js";
-import { ownerGateStub, released } from "../rpc-release.js";
+import { ownerGateStub, released, releasingStub } from "../rpc-release.js";
 
 const ownerFenceStub = (env: Env, ownerId: string) =>
   ownerGateStub(env.OWNER_GATES, ownerId);
@@ -385,10 +385,10 @@ export const purgeOwnerStorage = async (
     try {
       const agents = await ownerGateStub(env.OWNER_GATES, ownerId).agentContainers();
       for (const sandboxId of [...agents, await worldSandboxId(ownerId)]) {
-        await env.Sandbox.getByName(sandboxId.toLowerCase()).destroy();
+        await releasingStub(env.Sandbox.getByName(sandboxId.toLowerCase())).destroy();
       }
       const world = await worldName(ownerId);
-      await env.WORLDS.getByName(world).forgetContainerState();
+      await releasingStub(env.WORLDS.getByName(world)).forgetContainerState();
       const swept = await sweepR2Prefix(
         env.BACKUP_BUCKET,
         dependencyBackupPrefix(world),

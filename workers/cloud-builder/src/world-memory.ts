@@ -35,6 +35,7 @@ import {
   MEMORIES_DIR,
   PERSONALITY_FILE,
 } from "@stella/runtime/kernel/memory/memory-layout.js";
+import { releasingStub } from "./rpc-release.js";
 import { worldName } from "./workspace.js";
 import type { WorldEntry, WorldListingEntry } from "./world/types.js";
 
@@ -66,7 +67,10 @@ export const ownerMemoryWorld = async (
   worlds: Cloudflare.Env["WORLDS"],
   ownerId: string,
 ): Promise<MemoryWorld> => {
-  const stub = worlds.getByName(await worldName(ownerId));
+  // Every result is plain data, so each is released as it arrives. An
+  // unreleased RPC result holds its call open until GC, and the owner object's
+  // `memory.files.list` polls (about one a minute per desktop) kept it awake.
+  const stub = releasingStub(worlds.getByName(await worldName(ownerId)));
   return {
     head: () => stub.head(),
     stat: (path) => stub.stat(path),

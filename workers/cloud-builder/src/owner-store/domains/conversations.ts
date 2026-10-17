@@ -1,3 +1,4 @@
+import { releasingStub } from "../../rpc-release.js";
 import type {
   ConversationCalls,
   ConversationExport,
@@ -159,7 +160,7 @@ const exportData = async (ctx: OwnerContext): Promise<DataExport> => {
     let conversationTruncated = false;
     let fromSeq = 0;
     try {
-      const stub = ctx.env.ORCHESTRATOR_SESSIONS.getByName(row.conversation_id);
+      const stub = releasingStub(ctx.env.ORCHESTRATOR_SESSIONS.getByName(row.conversation_id));
       for (;;) {
         const range = (await stub.queryHistory(ctx.ownerId, {
           op: "read",

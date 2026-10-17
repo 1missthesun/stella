@@ -1,3 +1,4 @@
+import { releasingStub } from "../rpc-release.js";
 import {
   type AdmittedCloudChat,
   chatTurnFingerprintSource,
@@ -524,7 +525,7 @@ export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
   ): Promise<DispatchRow> {
     const sessions = this.env.ORCHESTRATOR_SESSIONS;
     if (!sessions) throw new Error("Orchestrator sessions unavailable.");
-    await sessions.getByName(row.conversation_id).startPiThread({
+    await releasingStub(sessions.getByName(row.conversation_id)).startPiThread({
       ownerId: request.ownerId,
       ownerGeneration: request.ownerGeneration,
       conversationId: row.conversation_id,

@@ -1,3 +1,4 @@
+import { releasingStub } from "../../rpc-release.js";
 import type { Tool, ToolCall } from "@earendil-works/pi-ai";
 import { createModels } from "@earendil-works/pi-ai/models";
 import type { TSchema } from "@sinclair/typebox";
@@ -528,7 +529,7 @@ const generate = async (ctx: OwnerContext, payload: unknown): Promise<void> => {
   };
   try {
     const previous = latestReady(ctx.db, row.conversation_id);
-    const source = await ctx.env.ORCHESTRATOR_SESSIONS.getByName(row.conversation_id).catchUpSource(ctx.ownerId);
+    const source = await releasingStub(ctx.env.ORCHESTRATOR_SESSIONS.getByName(row.conversation_id)).catchUpSource(ctx.ownerId);
     const { fresh, context } = selectMessages(
       source.messages,
       previous?.through_seq !== null && previous?.through_seq !== undefined

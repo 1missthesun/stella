@@ -44,6 +44,11 @@ import {
   type TokenPriceConfig,
 } from "@stella/model-catalog/pricing";
 import {
+  inlineStoredImages,
+  mayCarryStoredImages,
+  providerFetchesImageUrls,
+} from "./stored-images.js";
+import {
   estimateRequestTokens,
   requestedModelFromGooglePath,
   type TokenEstimate,
@@ -903,6 +908,24 @@ export const handleManagedRelay = async (args: {
             ),
           )
         : null;
+    // Stored conversation images arrive as signed URLs; a provider that
+    // can't fetch them gets the bytes inline instead.
+    let upstreamRequestJson = cappedRequestJson;
+    if (
+      !providerFetchesImageUrls(route.provider) &&
+      mayCarryStoredImages(JSON.stringify(cappedRequestJson))
+    ) {
+      const images = await inlineStoredImages(cappedRequestJson, {
+        fetch: deps.fetch,
+        backendOrigin: env.STELLA_BACKEND_URL,
+      });
+      upstreamRequestJson = images.json;
+      if (images.inlined > 0 || images.failed > 0) {
+        console.log(
+          `[model-gateway] trace=${traceId} provider=${route.provider} stored_images_inlined=${images.inlined} failed=${images.failed}`,
+        );
+      }
+    }
     const {
       url: target,
       headers,
@@ -912,7 +935,7 @@ export const handleManagedRelay = async (args: {
       request,
       protocol,
       route,
-      requestJson: cappedRequestJson,
+      requestJson: upstreamRequestJson,
       apiKey,
       ownerMode: ownerModeEnabled(env),
       audience: claims.audience,

@@ -30,6 +30,7 @@ import {
 } from "./capability.js";
 import { billingControl } from "./billing-control.js";
 import { GatewayError } from "./errors.js";
+import { inlineStoredImages, mayCarryStoredImages } from "./stored-images.js";
 import {
   agentTypeFrom,
   createUpstreamController,
@@ -259,8 +260,18 @@ export const handleNativeRelay = async (args: {
       { retryable: true },
     );
   }
+  // Stored conversation images arrive as signed URLs; the ChatGPT backend's
+  // handling of image URLs is unverified, so they go to it inline.
+  const images = mayCarryStoredImages(JSON.stringify(requestJson))
+    ? await inlineStoredImages(requestJson, { fetch: deps.fetch, backendOrigin: env.STELLA_BACKEND_URL })
+    : undefined;
+  if (images && (images.inlined > 0 || images.failed > 0)) {
+    console.log(
+      `[model-gateway] trace=${traceId} native=${credential} stored_images_inlined=${images.inlined} failed=${images.failed}`,
+    );
+  }
   const body = nativeCredentialBody({
-    requestJson,
+    requestJson: images?.json ?? requestJson,
     upstreamModel: binding.nativeModel,
     userCredential,
   });

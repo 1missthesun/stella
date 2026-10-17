@@ -15,6 +15,7 @@ import {
   verifySessionDpop,
 } from "./capability.js";
 import { GatewayError } from "./errors.js";
+import { hostFetchesImageUrls, inlineStoredImages, mayCarryStoredImages } from "./stored-images.js";
 import {
   createUpstreamController,
   ownedResponseBody,
@@ -268,6 +269,21 @@ export const handleByokRelay = async (args: {
   const access = await accessFor(env, claims, provider, deps.now());
   const target = upstreamTarget(request.headers.get(GATEWAY_BYOK_UPSTREAM_HEADER), access);
   const headers = forwardHeaders(request, access);
+  // Stored conversation images arrive as signed URLs; an upstream that can't
+  // fetch them gets the bytes inline instead.
+  let upstreamBody = bodyText;
+  if (!hostFetchesImageUrls(target.host) && mayCarryStoredImages(bodyText)) {
+    const images = await inlineStoredImages(JSON.parse(bodyText) as unknown, {
+      fetch: deps.fetch,
+      backendOrigin: env.STELLA_BACKEND_URL,
+    });
+    if (images.inlined > 0 || images.failed > 0) {
+      upstreamBody = JSON.stringify(images.json);
+      console.log(
+        `[model-gateway] trace=${traceId} byok=${provider} host=${target.host} stored_images_inlined=${images.inlined} failed=${images.failed}`,
+      );
+    }
+  }
 
   const controller = createUpstreamController({
     clientSignal: request.signal,
@@ -279,7 +295,7 @@ export const handleByokRelay = async (args: {
     upstream = await deps.fetch(target.toString(), {
       method: "POST",
       headers,
-      body: bodyText,
+      body: upstreamBody,
       signal: controller.signal,
     });
   } catch (error) {

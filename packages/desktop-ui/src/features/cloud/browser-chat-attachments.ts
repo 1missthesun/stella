@@ -1,5 +1,10 @@
 import { useSyncExternalStore } from "react";
 import { attachmentContentType } from "@stella/contracts/attachment-content-type";
+import {
+  CHAT_IMAGE_MAX_BYTES,
+  CHAT_IMAGE_MAX_EDGE,
+  CHAT_IMAGE_PASSTHROUGH_TYPES,
+} from "@stella/contracts/chat-image-limits";
 import { backendClient } from "@/platform/backend/backend-client";
 import { cloudAttachmentsStore } from "./cloud-composer-store";
 import {
@@ -11,8 +16,6 @@ import {
 export const BROWSER_ATTACHMENT_MAX_BYTES = 20 * 1024 * 1024;
 export const BROWSER_ATTACHMENT_MAX_FILES = 10;
 const BROWSER_IMAGE_SOURCE_MAX_BYTES = 100 * 1024 * 1024;
-const BROWSER_IMAGE_MAX_EDGE = 4096;
-const BROWSER_IMAGE_TARGET_BYTES = 18 * 1024 * 1024;
 
 export type BrowserAttachmentUpload = {
   id: string;
@@ -175,47 +178,79 @@ const canvasBlob = (
     );
   });
 
-export const resizeOversizedBrowserImage = async (
-  file: File,
-): Promise<File> => {
-  if (file.size <= BROWSER_ATTACHMENT_MAX_BYTES) return file;
-  if (!file.type.toLowerCase().startsWith("image/")) {
-    throw new Error("This file is larger than 20 MB.");
+const imageFile = (blob: Blob, source: File): File => {
+  const extension = blob.type === "image/webp" ? "webp" : "jpg";
+  const stem = source.name.replace(/\.[^.]+$/, "") || "image";
+  return new File([blob], `${stem}.${extension}`, {
+    type: blob.type,
+    lastModified: source.lastModified,
+  });
+};
+
+/**
+ * An attached image fitted to what the model takes (the long edge and byte
+ * budget in `chat-image-limits`) as soon as it is attached, so the upload is
+ * small and the cloud sends it as it is. One already within the limits, in a
+ * type every provider takes, uploads untouched (a screenshot stays lossless,
+ * a GIF animated). An image the browser can't decode (HEIC outside Safari)
+ * uploads as it is and the cloud fits it instead.
+ */
+export const fitBrowserChatImage = async (file: File): Promise<File> => {
+  const type = attachmentContentType({ declared: file.type, name: file.name });
+  if (!type.startsWith("image/") || type === "image/svg+xml") {
+    if (file.size > BROWSER_ATTACHMENT_MAX_BYTES) {
+      throw new Error("This file is larger than 20 MB.");
+    }
+    return file;
   }
   if (file.size > BROWSER_IMAGE_SOURCE_MAX_BYTES) {
     throw new Error("This image is too large to resize safely in the browser.");
   }
-
-  const bitmap = await createImageBitmap(file);
+  let bitmap: ImageBitmap;
   try {
-    const edgeScale = Math.min(
-      1,
-      BROWSER_IMAGE_MAX_EDGE / Math.max(bitmap.width, bitmap.height),
-    );
-    let scale = Math.min(
-      edgeScale,
-      Math.sqrt(BROWSER_IMAGE_TARGET_BYTES / file.size),
-    );
+    bitmap = await createImageBitmap(file);
+  } catch {
+    if (file.size > BROWSER_ATTACHMENT_MAX_BYTES) {
+      throw new Error("This image is larger than 20 MB.");
+    }
+    return file;
+  }
+  try {
+    const longEdge = Math.max(bitmap.width, bitmap.height, 1);
+    if (
+      CHAT_IMAGE_PASSTHROUGH_TYPES.has(type) &&
+      file.size <= CHAT_IMAGE_MAX_BYTES &&
+      longEdge <= CHAT_IMAGE_MAX_EDGE
+    ) {
+      return file;
+    }
+    // A photo stays JPEG; anything that may carry transparency goes to WebP.
+    let output = type === "image/jpeg" ? "image/jpeg" : "image/webp";
+    let scale = Math.min(1, CHAT_IMAGE_MAX_EDGE / longEdge);
     let quality = 0.86;
-    for (let attempt = 0; attempt < 4; attempt += 1) {
+    for (let attempt = 0; attempt < 8; attempt += 1) {
       const canvas = document.createElement("canvas");
       canvas.width = Math.max(1, Math.round(bitmap.width * scale));
       canvas.height = Math.max(1, Math.round(bitmap.height * scale));
       const context = canvas.getContext("2d");
       if (!context) throw new Error("Image resizing isn’t available.");
-      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-      const blob = await canvasBlob(canvas, "image/webp", quality);
-      if (blob.size <= BROWSER_ATTACHMENT_MAX_BYTES) {
-        const stem = file.name.replace(/\.[^.]+$/, "") || "image";
-        return new File([blob], `${stem}.webp`, {
-          type: "image/webp",
-          lastModified: file.lastModified,
-        });
+      if (output === "image/jpeg") {
+        context.fillStyle = "#fff";
+        context.fillRect(0, 0, canvas.width, canvas.height);
       }
-      scale *= 0.78;
-      quality = Math.max(0.62, quality - 0.08);
+      context.imageSmoothingQuality = "high";
+      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      const blob = await canvasBlob(canvas, output, quality);
+      if (blob.type !== output) {
+        // This browser can't encode WebP; JPEG on white instead.
+        output = "image/jpeg";
+        continue;
+      }
+      if (blob.size <= CHAT_IMAGE_MAX_BYTES) return imageFile(blob, file);
+      quality = Math.max(0.6, quality - 0.08);
+      if (attempt >= 2) scale *= 0.85;
     }
-    throw new Error("This image couldn’t be reduced below 20 MB.");
+    throw new Error("This image couldn’t be made small enough to send.");
   } finally {
     bitmap.close();
   }
@@ -223,7 +258,7 @@ export const resizeOversizedBrowserImage = async (
 
 const uploadOne = async (upload: BrowserAttachmentUpload): Promise<void> => {
   try {
-    const file = await resizeOversizedBrowserImage(upload.file);
+    const file = await fitBrowserChatImage(upload.file);
     const path = browserAttachmentDrivePath(file, upload.id);
     const contentType = attachmentContentType({
       declared: file.type,

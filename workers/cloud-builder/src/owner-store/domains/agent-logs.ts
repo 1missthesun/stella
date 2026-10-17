@@ -13,6 +13,7 @@ import { RpcError } from "../errors.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
 import type { OwnerContext, OwnerDb, OwnerDbReader, OwnerDomain, OwnerJobs } from "../registry.js";
 import { sha256Hex } from "../../hash.js";
+import { log } from "../../build-session/shared/keys.js";
 
 export const AGENT_LOGS_MIGRATION = {
   id: "agent-logs.1-init",
@@ -58,7 +59,23 @@ export const AGENT_LOGS_LEAN_INDEX_MIGRATION = {
 
 export const AGENT_LOG_ARCHIVE_JOB = "agentLogs.archive";
 export const AGENT_LOG_SEGMENT_DELETE_JOB = "agentLogs.deleteSegments";
+export const AGENT_LOG_ORPHAN_SWEEP_JOB = "agentLogs.sweepOrphanSegments";
 const AGENT_LOG_ARCHIVE_JOB_ID = "agent-logs:archive";
+const AGENT_LOG_ORPHAN_SWEEP_JOB_ID = "agent-logs:sweep-orphans";
+
+/**
+ * One sweep per owner for segments a failed archive pass uploaded and never
+ * recorded: before the archive UPDATE was bounded, every pass that reached a
+ * thread with 99+ cold records uploaded its segment and then failed on the
+ * bound-parameter cap, leaving the object in R2 with no row naming it.
+ */
+export const AGENT_LOGS_ORPHAN_SWEEP_MIGRATION = {
+  id: "agent-logs.4-sweep-orphan-segments",
+  statements: [
+    `INSERT OR IGNORE INTO owner_jobs (id, kind, run_at, payload, attempts)
+       VALUES ('${AGENT_LOG_ORPHAN_SWEEP_JOB_ID}', '${AGENT_LOG_ORPHAN_SWEEP_JOB}', 0, '{}', 0)`,
+  ],
+};
 const AGENT_LOG_INLINE_MS = 3 * 24 * 60 * 60_000;
 const AGENT_LOG_ARCHIVE_EVERY_MS = 6 * 60 * 60_000;
 const AGENT_LOG_ARCHIVE_CONTINUE_MS = 30_000;
@@ -125,18 +142,95 @@ const archiveColdRecords = async (ctx: OwnerContext): Promise<void> => {
       key,
       await gzip(JSON.stringify({ threadId: oldest.thread_id, records } satisfies SegmentBody)),
     );
-    const placeholders = records.map(() => "?").join(", ");
-    ctx.db.run(
-      `UPDATE agent_log_records SET payload_json = '', segment = ?
-        WHERE thread_id = ? AND segment IS NULL AND seq IN (${placeholders})`,
-      key,
-      oldest.thread_id,
-      ...records.map(([seq]) => seq),
-    );
+    // A seq range under the same filters names exactly the rows read above
+    // (they are a seq-ordered prefix, and nothing older than the cutoff is
+    // appended meanwhile), in five bound parameters: an IN list of up to 200
+    // seqs exceeded the Durable Object SQLite cap of 100.
+    let archived: number;
+    try {
+      ctx.db.run(
+        `UPDATE agent_log_records SET payload_json = '', segment = ?
+          WHERE thread_id = ? AND segment IS NULL AND role <> 'checkpoint' AND created_at < ?
+            AND seq >= ? AND seq <= ?`,
+        key,
+        oldest.thread_id,
+        cutoff,
+        first,
+        last,
+      );
+      archived =
+        ctx.db.one<{ count: number }>(
+          `SELECT COUNT(*) AS count FROM agent_log_records
+            WHERE thread_id = ? AND seq >= ? AND seq <= ? AND segment = ?`,
+          oldest.thread_id,
+          first,
+          last,
+          key,
+        )?.count ?? 0;
+    } catch (error) {
+      // The rows still hold their payloads; don't leave a copy nothing names.
+      await bucket.delete(key).catch(() => undefined);
+      throw error;
+    }
+    if (archived === 0) await bucket.delete(key);
   }
   ctx.jobs.schedule(AGENT_LOG_ARCHIVE_JOB, ctx.now + AGENT_LOG_ARCHIVE_CONTINUE_MS, {}, {
     id: AGENT_LOG_ARCHIVE_JOB_ID,
   });
+};
+
+const ORPHAN_SWEEP_PAGE = 1_000;
+const ORPHAN_MIN_AGE_MS = 60 * 60_000;
+
+/**
+ * Deletes this owner's agent-log segments that no record names, one listing
+ * page per run. A key is `<sha256(thread)>/<first>-<last>-<nonce>.json.gz`, so
+ * a live segment is found by its thread's first seq; one younger than an hour
+ * is left alone in case its archive pass is still between upload and UPDATE.
+ */
+const sweepOrphanSegments = async (ctx: OwnerContext, payload: unknown): Promise<void> => {
+  const bucket = ctx.env.CONVERSATION_ARCHIVE;
+  if (!bucket) return;
+  const cursor = (payload as { cursor?: unknown } | null)?.cursor;
+  const prefix = await agentLogsPrefix(ctx.ownerId);
+  const listed = await bucket.list({
+    prefix,
+    limit: ORPHAN_SWEEP_PAGE,
+    ...(typeof cursor === "string" && cursor ? { cursor } : {}),
+  });
+  const threads = new Map<string, string>();
+  for (const { thread_id } of ctx.db.all<{ thread_id: string }>(
+    "SELECT DISTINCT thread_id FROM agent_log_records WHERE segment IS NOT NULL",
+  )) {
+    threads.set(await sha256Hex(thread_id), thread_id);
+  }
+  const orphans: string[] = [];
+  for (const object of listed.objects) {
+    if (ctx.now - object.uploaded.getTime() < ORPHAN_MIN_AGE_MS) continue;
+    const match = /^([0-9a-f]{64})\/(\d+)-\d+-[^/]+\.json\.gz$/.exec(object.key.slice(prefix.length));
+    if (!match) continue;
+    const threadId = threads.get(match[1]!);
+    const named =
+      threadId !== undefined &&
+      ctx.db.one(
+        "SELECT 1 AS named FROM agent_log_records WHERE thread_id = ? AND seq = ? AND segment = ?",
+        threadId,
+        Number(match[2]),
+        object.key,
+      ) !== null;
+    if (!named) orphans.push(object.key);
+  }
+  if (orphans.length > 0) await bucket.delete(orphans);
+  log("info", "agent_logs_orphans_swept", {
+    listed: listed.objects.length,
+    deleted: orphans.length,
+    more: listed.truncated,
+  });
+  if (listed.truncated) {
+    ctx.jobs.schedule(AGENT_LOG_ORPHAN_SWEEP_JOB, ctx.now, { cursor: listed.cursor }, {
+      id: AGENT_LOG_ORPHAN_SWEEP_JOB_ID,
+    });
+  }
 };
 
 const archivedPayloads = async (
@@ -388,9 +482,15 @@ const cloudAppend = (ctx: OwnerContext, raw: unknown) => {
 
 export const agentLogsDomain = {
   name: "agent-logs",
-  migrations: [AGENT_LOGS_MIGRATION, AGENT_LOGS_COLD_MIGRATION, AGENT_LOGS_LEAN_INDEX_MIGRATION],
+  migrations: [
+    AGENT_LOGS_MIGRATION,
+    AGENT_LOGS_COLD_MIGRATION,
+    AGENT_LOGS_LEAN_INDEX_MIGRATION,
+    AGENT_LOGS_ORPHAN_SWEEP_MIGRATION,
+  ],
   jobs: {
     [AGENT_LOG_ARCHIVE_JOB]: { run: (ctx) => archiveColdRecords(ctx), maxAttempts: 10 },
+    [AGENT_LOG_ORPHAN_SWEEP_JOB]: { run: (ctx, payload) => sweepOrphanSegments(ctx, payload) },
     [AGENT_LOG_SEGMENT_DELETE_JOB]: {
       run: async (ctx, payload) => {
         const keys = (payload as { keys?: unknown } | null)?.keys;

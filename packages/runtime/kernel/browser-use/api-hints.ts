@@ -40,6 +40,10 @@ const METHOD_HINTS: Readonly<Record<string, string>> = {
   getByAltText: "Supported finders: getByRole, getByText, getByLabel, getByPlaceholder, getByTestId, locator(css).",
   getByTitle: "Supported finders: getByRole, getByText, getByLabel, getByPlaceholder, getByTestId, locator(css).",
   setInputFiles: "setInputFiles(absolutePaths) is a Locator method: page.locator('input[type=file]').setInputFiles([path]).",
+  waitForEvent:
+    "Page events aren't exposed. For a download in Stella's browser: var file = await tab.waitForDownload(() => locator.click()); file.path is where it was saved.",
+  waitForDownload:
+    "waitForDownload is on the Tab: var file = await tab.waitForDownload(() => locator.click()). It works in Stella's browser (browser.use(\"in-app\")).",
 };
 
 const API_NOTE =

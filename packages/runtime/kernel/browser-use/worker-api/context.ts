@@ -3,6 +3,7 @@ import type {
   BrowserWorkerCall,
   BrowserWorkerChainOptions,
   BrowserWorkerChainStep,
+  BrowserWorkerDownload,
 } from "../worker-api.js";
 import {
   WORKER_BOUND_BACKEND_PARAM,
@@ -239,6 +240,34 @@ export const createBrowserWorkerContext = (callBrowser: BrowserWorkerCall) => {
         },
       ]),
     );
+  const downloads = async (): Promise<readonly BrowserWorkerDownload[]> => {
+    const value = await callBrowser("downloads", []);
+    const records = Array.isArray(value) ? value.filter(isPlainObject) : [];
+    return Object.freeze(
+      records.map((download) => {
+        const text = (key: string) =>
+          typeof download[key] === "string" ? (download[key] as string) : "";
+        const count = (key: string) =>
+          typeof download[key] === "number" ? (download[key] as number) : 0;
+        const state = text("state");
+        return Object.freeze({
+          id: text("id"),
+          path: text("path"),
+          filename: text("filename"),
+          url: text("url"),
+          mimeType: text("mimeType"),
+          state:
+            state === "completed" || state === "cancelled"
+              ? state
+              : "interrupted",
+          receivedBytes: count("receivedBytes"),
+          totalBytes: count("totalBytes"),
+          startedAt: count("startedAt"),
+          finishedAt: count("finishedAt"),
+        });
+      }),
+    );
+  };
   const normalizeTabGeneration = (
     value: unknown,
     tabId: number,
@@ -278,5 +307,6 @@ export const createBrowserWorkerContext = (callBrowser: BrowserWorkerCall) => {
     rememberTabGeneration,
     command,
     sendChain,
+    downloads,
   };
 };

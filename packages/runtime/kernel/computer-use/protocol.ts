@@ -33,7 +33,7 @@ export const NODE_REPL_TOOL_HISTORY_NAME = "$history";
 export const NODE_REPL_TOOL_MEMORY_NAME = "$memory";
 
 export type SkyMethod = keyof SkyClient;
-export type BrowserMethod = "command" | "chain" | "use";
+export type BrowserMethod = "command" | "chain" | "use" | "downloads";
 export type ConnectMethod = "discover" | "connectors" | "addMcp" | "remove";
 
 export type SerializedError = {

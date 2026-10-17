@@ -2,6 +2,7 @@ import type {
   BrowserWorkerAxObservation,
   BrowserWorkerAxSnapshotOptions,
   BrowserWorkerBackend,
+  BrowserWorkerDownload,
   BrowserWorkerKeyboard,
   BrowserWorkerNetwork,
   BrowserWorkerPlaywright,
@@ -42,6 +43,9 @@ import {
 } from "./validation.js";
 
 const DEFAULT_EXPECT_NEW_TAB_TIMEOUT_MS = 10_000;
+const DEFAULT_DOWNLOAD_TIMEOUT_MS = 60_000;
+const MAX_DOWNLOAD_TIMEOUT_MS = 600_000;
+const DOWNLOAD_POLL_MS = 250;
 
 type TabState = {
   backend: BrowserWorkerBackend;
@@ -150,6 +154,7 @@ const TAB_PUBLIC_API = publicApiNames<BrowserWorkerTab>({
   screenshot: true,
   scroll: true,
   expectNewTab: true,
+  waitForDownload: true,
 });
 
 type NormalizedTabList = {
@@ -596,6 +601,50 @@ export const createTabs = (
 
     async show(): Promise<unknown> {
       return await this.run("bringtofront", { tabId: this.id });
+    }
+
+    async waitForDownload(
+      action: () => unknown | Promise<unknown>,
+      rawOptions: Readonly<{ timeoutMs?: number }> = {},
+    ): Promise<BrowserWorkerDownload> {
+      if (this.state().backend !== "in-app") {
+        throw new Error(
+          "tab.waitForDownload() works in Stella's browser (browser.use(\"in-app\")). In the user's browser, files download to their own Downloads folder.",
+        );
+      }
+      if (typeof action !== "function") {
+        throw new TypeError("waitForDownload action must be a function.");
+      }
+      const value = requireOptions(rawOptions, "waitForDownload options");
+      assertKnownKeys(value, ["timeoutMs"], "waitForDownload options");
+      const timeoutMs = timeoutParam(
+        value.timeoutMs ?? DEFAULT_DOWNLOAD_TIMEOUT_MS,
+        "timeoutMs",
+        MAX_DOWNLOAD_TIMEOUT_MS,
+      );
+      const earlier = new Set(
+        (await context.downloads()).map((download) => download.id),
+      );
+      await action();
+      const startedAt = Date.now();
+      for (;;) {
+        const fresh = (await context.downloads()).filter(
+          (download) => !earlier.has(download.id),
+        );
+        const first = fresh[fresh.length - 1];
+        if (first) {
+          if (first.state !== "completed") {
+            throw new Error(`The download of ${first.filename} was ${first.state}.`);
+          }
+          return first;
+        }
+        if (Date.now() - startedAt >= timeoutMs) {
+          throw new Error(
+            `No download finished within ${timeoutMs}ms of the action. Check that the action starts a download, or pass a longer { timeoutMs } for a large file.`,
+          );
+        }
+        await delay(DOWNLOAD_POLL_MS);
+      }
     }
 
     async markHandoff(): Promise<unknown> {

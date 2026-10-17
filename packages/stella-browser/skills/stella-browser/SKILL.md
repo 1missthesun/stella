@@ -154,6 +154,17 @@ Page dialogs never block you:
 
 If a tab stops answering (a command times out with a message saying the page may be blocked), don't retry the same command on it. `await tab.goto(url)` usually recovers it; if not, `await tab.close()` and continue in `await browser.tabs.new()`. After a timeout on a mutating action, check the page state before repeating it.
 
+## Downloads and File Pickers
+
+In Stella's browser nothing opens a native dialog. A download saves straight to `~/.stella/media/downloads/<agent or conversation>/`; wrap the action that starts it to get the file:
+
+```js
+var file = await tab.waitForDownload(async () => await page.getByRole("button", { name: "Export MP4" }).click());
+file.path; // absolute path of the saved file, e.g. for Bash, Read or drive_upload
+```
+
+`waitForDownload()` resolves once a download started after the action finishes (default timeout 60 s, `{ timeoutMs }` up to 600 s) and throws if it was cancelled. `await browser.downloads()` lists this session's recent downloads, newest first. Clicking a file input opens no picker: use `locator.setInputFiles([absolutePath])`. `window.print()` does nothing; take `tab.screenshot({ fullPage: true })` instead. In the user's own browser, downloads go to their browser's Downloads folder as usual.
+
 ## Synchronize on Browser State
 
 Wait for the state caused by the action:
@@ -224,7 +235,7 @@ The public object graph is frozen. Do not mutate it or attach properties. This i
 
 | Object         | Supported API                                                        |
 | -------------- | -------------------------------------------------------------------- |
-| `browser`      | `capabilities`, `use(backend?, { browser? })`, `browsers()`, `chain(steps, options)`, `tabs` |
+| `browser`      | `capabilities`, `use(backend?, { browser? })`, `browsers()`, `downloads()`, `chain(steps, options)`, `tabs` |
 | `browser.tabs` | `list()`, `new(url?)`, `selected()`, `get(id)`, `finalize(entries?)` |
 
 For a new task, call `tabs.new()` once and then navigate that handle with `tab.goto(url)`. If navigation fails, reuse the same handle or inspect `tabs.list()`; do not loop on `tabs.new()` because a delayed response can otherwise create a pileup of blank tabs. Use `tabs.selected()` only when the user's currently selected owned tab is the target, and `tabs.list()` when tab choice is itself a decision.
@@ -250,6 +261,7 @@ For a new task, call `tabs.new()` once and then navigate that handle with `tab.g
 | `keyboard.type(text)`, `keyboard.press(key)`                          | Raw text insertion / key press.          |
 | `scroll(options?)`                                                    | Scroll page or element.                  |
 | `expectNewTab(action, { timeoutMs? })`                                | Capture exactly one new owned tab.       |
+| `waitForDownload(action, { timeoutMs? })`                             | The file a download saved (Stella's browser). |
 
 Snapshot options are `interactive`, `cursor`, `maxDepth` (or `depth`), `compact`, and `selector`. Screenshot options are `fullPage`, `selector`, `format` (`"png"` or `"jpeg"`), `quality` (0-100), `annotate`, and `path` (where to save the file). Scroll options are pixel deltas `x`/`y` (negative scrolls up/left) or `selector` + `direction` + `amount`; prefer `locator.scrollIntoViewIfNeeded()` before acting on an element.
 

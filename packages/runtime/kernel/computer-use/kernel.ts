@@ -1,4 +1,5 @@
 import path from "node:path";
+import { readFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { Worker } from "node:worker_threads";
@@ -10,6 +11,11 @@ import {
 } from "./effect-runtime.js";
 
 import type { BrowserUseResponseMeta } from "@stella/contracts/local-chat";
+import {
+  IN_APP_BROWSER_DOWNLOADS_INDEX,
+  inAppBrowserDownloadsSegments,
+  parseInAppBrowserDownloadRecord,
+} from "@stella/contracts/in-app-browser-downloads";
 import {
   isMapRouteArtifact,
   type MapRouteArtifact,
@@ -376,7 +382,8 @@ type ScreenshotSavePaths = {
   steps: Map<number, string>;
 };
 
-const BROWSER_METHODS = new Set(["command", "chain", "use"]);
+const BROWSER_METHODS = new Set(["command", "chain", "use", "downloads"]);
+const MAX_LISTED_BROWSER_DOWNLOADS = 50;
 const READ_ONLY_BROWSER_ACTIONS = new Set([
   "healthcheck",
   "url",
@@ -1599,6 +1606,25 @@ class NodeReplKernel {
       return;
     }
 
+    if (message.method === "downloads") {
+      try {
+        const value = await this.readInAppBrowserDownloads(active);
+        if (!this.closed && this.active === active) {
+          this.post({
+            type: "browser-result",
+            callId: message.callId,
+            ok: true,
+            value,
+          });
+        }
+      } catch (error) {
+        if (!this.closed && this.active === active) {
+          this.postBrowserError(message.callId, error);
+        }
+      }
+      return;
+    }
+
     try {
       const turnId =
         active.context.runId ??
@@ -1649,6 +1675,33 @@ class NodeReplKernel {
         this.postBrowserError(message.callId, error);
       }
     }
+  }
+
+  /** Desktop main records this session's in-app browser downloads here. */
+  private async readInAppBrowserDownloads(active: ActiveEvaluation) {
+    const stellaDataDir = active.context.stellaDataDir?.trim()
+      ? path.resolve(active.context.stellaDataDir)
+      : resolveStatePath();
+    const indexPath = path.join(
+      stellaDataDir,
+      ...inAppBrowserDownloadsSegments(this.browserSessionId),
+      IN_APP_BROWSER_DOWNLOADS_INDEX,
+    );
+    let text: string;
+    try {
+      text = await readFile(indexPath, "utf8");
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
+      throw error;
+    }
+    return text
+      .split("\n")
+      .flatMap((line) => {
+        const record = line.trim() && parseInAppBrowserDownloadRecord(line);
+        return record ? [record] : [];
+      })
+      .slice(-MAX_LISTED_BROWSER_DOWNLOADS)
+      .reverse();
   }
 
   private async prepareBrowserScreenshotResult(

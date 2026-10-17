@@ -6,7 +6,7 @@ import { createTabs } from "./worker-api/tabs.js";
 import { isPlainObject } from "./worker-api/validation.js";
 
 export type BrowserWorkerCall = (
-  method: "command" | "chain" | "use",
+  method: "command" | "chain" | "use" | "downloads",
   args: readonly unknown[],
 ) => Promise<unknown>;
 
@@ -61,6 +61,20 @@ export type BrowserWorkerChainOptions = Readonly<{
 
 export type BrowserWorkerApiOptions = Readonly<{
   maxExpectNewTabTimeoutMs?: number;
+}>;
+
+/** A file a page downloaded in Stella's browser, saved without a dialog. */
+export type BrowserWorkerDownload = Readonly<{
+  id: string;
+  path: string;
+  filename: string;
+  url: string;
+  mimeType: string;
+  state: "completed" | "cancelled" | "interrupted";
+  receivedBytes: number;
+  totalBytes: number;
+  startedAt: number;
+  finishedAt: number;
 }>;
 
 export type BrowserWorkerScreenshotReceipt = Readonly<{
@@ -237,6 +251,10 @@ export interface BrowserWorkerTab {
     action: () => unknown | Promise<unknown>,
     options?: Readonly<{ timeoutMs?: number }>,
   ): Promise<BrowserWorkerTab>;
+  waitForDownload(
+    action: () => unknown | Promise<unknown>,
+    options?: Readonly<{ timeoutMs?: number }>,
+  ): Promise<BrowserWorkerDownload>;
 }
 
 export interface BrowserWorkerTabs {
@@ -265,6 +283,7 @@ export interface BrowserWorkerApi {
     options?: Readonly<{ browser?: string }>,
   ): Promise<Readonly<{ backend: BrowserWorkerBackend }>>;
   browsers(): Promise<readonly BrowserWorkerConnectedBrowser[]>;
+  downloads(): Promise<readonly BrowserWorkerDownload[]>;
   readonly capabilities: Readonly<{
     observations: readonly string[];
     actions: readonly string[];
@@ -356,6 +375,7 @@ export function installBrowserWorkerApi(
         backend: BrowserWorkerBackend;
       }>;
     },
+    downloads: () => context.downloads(),
     browsers: async () => {
       let data: unknown;
       try {
@@ -397,12 +417,14 @@ export function installBrowserWorkerApi(
         "locator actions",
         "low-level chain",
         "network observation",
+        "downloads saved without a dialog (in-app)",
       ]),
       notes: Object.freeze([
         "Prefer state reads before snapshots.",
         "On desktop, use tab.axSnapshot() for repeated structural observations; mode:'full' restores context after compaction.",
         "Screenshots attach automatically.",
         "Reuse one task-owned tab.",
+        "In Stella's browser a download never opens a save dialog: var file = await tab.waitForDownload(() => locator.click()) gives file.path; browser.downloads() lists recent ones.",
       ]),
     }),
     chain: async (

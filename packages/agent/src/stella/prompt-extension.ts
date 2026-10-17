@@ -15,7 +15,6 @@ import { shapeResidentMemoryDoc } from "@stella/runtime/kernel/memory/resident-d
 import { responseLanguageSection } from "@stella/runtime/kernel/runner/locale-prompt";
 import { StellaAgentDoc, type StellaAgentRole } from "./agent-doc.ts";
 import { messageIdsHook } from "./message-ids.ts";
-import { imageBudgetHook } from "./image-budget.ts";
 import { processableImagesHook } from "./processable-images.ts";
 import { ENGINE_MODEL_SECTION, engineModelText, residentContextHook, runsOn } from "./resident-context.ts";
 import type { StellaAgentPromptId, StellaContextSources } from "./context.ts";
@@ -97,12 +96,7 @@ export function stellaPromptExtension(sources: StellaContextSources) {
   const memory = (context: Context) => sources.memory(context);
   return defineExtension({
     name: STELLA_PROMPT_EXTENSION,
-    hooks: [
-      ...(sources.requestImageBytes ? [imageBudgetHook(sources.requestImageBytes)] : []),
-      processableImagesHook,
-      residentContextHook,
-      messageIdsHook,
-    ],
+    hooks: [processableImagesHook, residentContextHook, messageIdsHook],
     sections: [
       section(
         "preamble",

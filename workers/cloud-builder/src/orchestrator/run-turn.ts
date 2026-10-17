@@ -1150,7 +1150,6 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
         conversationId: turn.conversationId,
         submissionId: submission.id,
         resumed: args.resumeTurn,
-        ...(images.length ? { images: images.length, imageBytes: images.reduce((sum, image) => sum + image.data.length, 0) } : {}),
         preparationMs: Math.round(performance.now() - args.started),
         ...args.preparationTimings,
       });
@@ -1240,11 +1239,6 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
             message: errorMessage(error),
           }),
         );
-      await runtime.boundContextImages(pi.contextFor()).catch((error: unknown) =>
-        log("error", "pi_image_compaction_failed", {
-          message: errorMessage(error),
-        }),
-      );
       await this.placeBrainHandoff(
         turn.turnId,
         turnCancellation.aborted || executionSignal.aborted,

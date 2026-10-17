@@ -2,6 +2,7 @@ import type { IdentityLevel } from "@stella/contracts/gateway/api";
 import { empty } from "../args.js";
 import { RpcError } from "../errors.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
+import { log } from "../../build-session/shared/keys.js";
 import type { OwnerCaller, OwnerContext, OwnerDb, OwnerDomain, OwnerPurgeMode } from "../registry.js";
 import { REMINDER_RETURN_JOB, SCHEDULE_FIRE_JOB } from "./schedules.js";
 
@@ -165,11 +166,37 @@ const resetAccount = (ctx: OwnerContext): null => {
   return null;
 };
 
-const runAccountPurge = async (ctx: OwnerContext): Promise<void> => {
+const PURGE_WAIT_BASE_MS = 5_000;
+const PURGE_WAIT_MAX_MS = 30 * 60_000;
+const PURGE_WAIT_LOUD_AFTER = 12;
+
+/**
+ * Runs passes until every store reports done. A pass that is still waiting on
+ * a store (a conversation draining R2, a peer service down) is normal, not a
+ * failure: it comes back with a capped backoff, and keeps coming back for as
+ * long as it takes, so a purge is never dropped half done. It turns loud once
+ * it has waited long enough that something is stuck.
+ */
+const runAccountPurge = async (ctx: OwnerContext, payload: unknown): Promise<void> => {
   const { purge } = readOwnerState(ctx.db);
   if (!purge) return;
   const { pending } = await ctx.host.purgeOwner(purge.mode, purge.requestId);
-  if (pending.length > 0) throw new Error(`Owner ${purge.mode} is waiting on ${pending.join(", ")}.`);
+  if (pending.length > 0) {
+    const previous = (payload as { waits?: unknown } | null)?.waits;
+    const waits = (typeof previous === "number" && Number.isSafeInteger(previous) ? previous : 0) + 1;
+    log(waits >= PURGE_WAIT_LOUD_AFTER ? "error" : "info", "owner_purge_waiting", {
+      mode: purge.mode,
+      pending,
+      waits,
+    });
+    ctx.jobs.schedule(
+      ACCOUNT_PURGE_JOB,
+      ctx.now + Math.min(PURGE_WAIT_MAX_MS, PURGE_WAIT_BASE_MS * 2 ** (waits - 1)),
+      { waits },
+      { id: ACCOUNT_PURGE_JOB_ID },
+    );
+    return;
+  }
   ctx.db.run(
     `UPDATE owner_state SET purge_request_id = NULL, purge_mode = NULL, writable = ? WHERE id = 1 AND purge_request_id = ?`,
     purge.mode === "reset" ? 1 : 0,
@@ -217,6 +244,6 @@ export const accountDomain: OwnerDomain = {
     },
   },
   jobs: {
-    [ACCOUNT_PURGE_JOB]: { run: runAccountPurge, maxAttempts: 100 },
+    [ACCOUNT_PURGE_JOB]: { run: runAccountPurge, maxAttempts: Number.POSITIVE_INFINITY },
   },
 };

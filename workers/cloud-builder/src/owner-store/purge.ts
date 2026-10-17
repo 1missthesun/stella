@@ -5,7 +5,8 @@ import { AGENT_REPORT_JOB, deleteConversationAgentReports } from "./domains/agen
 import type { JobDef, OwnerContext, OwnerDb, OwnerJobs, PurgeDef } from "./registry.js";
 
 const PURGE_BATCH = 25;
-const PURGE_JOB_MAX_ATTEMPTS = 30;
+/** A deleted conversation's storage is purged however long it takes; never dropped. */
+const PURGE_JOB_MAX_ATTEMPTS = Number.POSITIVE_INFINITY;
 
 export const CONVERSATION_PURGE_JOB = "conversations.purge";
 

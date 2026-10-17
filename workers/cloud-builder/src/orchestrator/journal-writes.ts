@@ -547,7 +547,24 @@ export abstract class OrchestratorJournalWrites extends OrchestratorRunTurn {
    * this body's `purged`, never the status class, precisely because
    * `response.ok` is true for it.
    */
+  private purgeInFlight?: Promise<{ body: Record<string, unknown>; status: number }>;
+
+  /**
+   * One purge at a time per object: a second `/purge` (a retried owner job, a
+   * reset racing an account deletion) joins the one running. Two used to
+   * interleave, and the later one read the segment manifest after the earlier
+   * one's `deleteAll()`, failing on `no such table: segments` and reporting the
+   * conversation as not purged.
+   */
   protected async handlePurge(): Promise<Response> {
+    this.purgeInFlight ??= this.purgeOnce().finally(() => {
+      this.purgeInFlight = undefined;
+    });
+    const { body, status } = await this.purgeInFlight;
+    return json(body, status);
+  }
+
+  private async purgeOnce(): Promise<{ body: Record<string, unknown>; status: number }> {
     const now = Date.now();
     const identity = this.indexIdentity();
     this.journal.markDeleted(now);
@@ -567,6 +584,10 @@ export abstract class OrchestratorJournalWrites extends OrchestratorRunTurn {
       );
     }
     await this.archive.quiesce();
+    // A conversation object that never served a turn, or one on an older
+    // journal schema, gets the current tables (all `IF NOT EXISTS`) before the
+    // manifest is read, so an empty or old object purges instead of failing.
+    await this.journal.bootstrap();
     // `segments` and `spills` outlive the drain — only the queue rows are
     // removed — so what has already been offered has to be remembered here, or
     // the re-check below would re-delete every key on every purge.
@@ -594,7 +615,7 @@ export abstract class OrchestratorJournalWrites extends OrchestratorRunTurn {
         conversationId: this.conversationId(),
         pending,
       });
-      return json({ purged: false, pending }, 202);
+      return { body: { purged: false, pending }, status: 202 };
     }
     const purgedId = this.conversationId();
     await this.ctx.storage.deleteAll();
@@ -650,6 +671,6 @@ export abstract class OrchestratorJournalWrites extends OrchestratorRunTurn {
       ]).catch(() => undefined);
     }
     log("info", "conversation_purged", { conversationId: purgedId });
-    return json({ purged: true });
+    return { body: { purged: true }, status: 200 };
   }
 }

@@ -1,4 +1,5 @@
 import { builderServiceSecrets } from "../secret-rotation.js";
+import { CONVERSATION_IMAGES_ROOT } from "../conversation-images.js";
 import type { LegacyDirectoryBackup as DirectoryBackup } from "../sandbox-client.js";
 import { sha256Hex } from "../hash.js";
 import {
@@ -318,6 +319,11 @@ export const purgeOwnerStorage = async (
       store: "app-builds",
       bucket: env.APP_BUILDS,
       prefix: `${ownerAppBuildRoot(ownerHash)}/`,
+    },
+    {
+      store: "conversation-images",
+      bucket: env.DRIVE,
+      prefix: `${CONVERSATION_IMAGES_ROOT}${ownerHash}/`,
     },
   ];
   for (const target of prefixTargets) {

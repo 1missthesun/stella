@@ -604,6 +604,13 @@ export abstract class OrchestratorJournalWrites extends OrchestratorRunTurn {
     };
     enqueueNewKeys();
     let { pending } = await this.archive.drainPurge();
+    // The images its turns stored in R2 go with it; the turn runtime was
+    // discarded above, so nothing stores another behind the sweep.
+    const images = await this.images.purge().catch((error: unknown) => {
+      log("error", "conversation_images_purge_failed", { message: errorMessage(error) });
+      return { deleted: 0, done: false };
+    });
+    if (!images.done) pending += 1;
     // The drain itself awaits, and a tombstone is a fence rather than a lock.
     // Re-reading the manifest costs two queries and is what turns "nothing can
     // have been added behind us" from an argument into a check.

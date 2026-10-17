@@ -7,7 +7,9 @@ import type {
 } from "../in-app-browser-cdp-adapter.js";
 import type { InAppBrowserDrawableLease } from "../in-app-browser-service.js";
 import { RENDERER_ORIGIN } from "../../source/origin.js";
+import agentPageGuard from "browser-script:./agent-page-guard.page.ts";
 import {
+  MANUAL_OWNER_ID,
   readTabUrl,
   resolveOwnerId,
   type BrowserTabRegistry,
@@ -21,6 +23,12 @@ type DrawableLease = {
   expiryTimer?: ReturnType<typeof setTimeout>;
 };
 
+export type FileChooserOpened = {
+  tab: ManagedTab;
+  sessionId?: string;
+  params: Record<string, unknown>;
+};
+
 type DebuggerTargetProxyOptions = {
   tabs: BrowserTabRegistry;
   getAttachedView: () => WebContentsView | null;
@@ -30,6 +38,7 @@ type DebuggerTargetProxyOptions = {
   hideDrawableHost: boolean;
   wait?: (delayMs: number) => Promise<void>;
   debuggerRecoveryTimeoutMs?: number;
+  onFileChooserOpened?: (request: FileChooserOpened) => void;
 };
 
 export const isRendererUrl = (value: string) =>
@@ -55,6 +64,13 @@ const HIDDEN_MOUNT_LIMIT_MS = 30_000;
 const leaveNativeStack = () =>
   new Promise<void>((resolve) => setImmediate(resolve));
 
+const isAgentTab = (tab: ManagedTab) => tab.ownerId !== MANUAL_OWNER_ID;
+
+const record = (value: unknown): Record<string, unknown> | undefined =>
+  value && typeof value === "object"
+    ? (value as Record<string, unknown>)
+    : undefined;
+
 export class DebuggerTargetProxy {
   private readonly options: DebuggerTargetProxyOptions;
   private readonly drawableLeases = new Map<string, DrawableLease>();
@@ -67,6 +83,9 @@ export class DebuggerTargetProxy {
   private drawableHost: BrowserWindow | null = null;
   private readonly screenshotsInFlight = new Map<string, number>();
   private readonly pumpCaptures = new Map<string, Promise<unknown>>();
+  private readonly pageGuards = new Map<string, Promise<void>>();
+  private readonly guardSessions = new Map<string, Map<string, string>>();
+  private readonly explicitAttaches = new Map<string, number>();
 
   constructor(options: DebuggerTargetProxyOptions) {
     this.options = options;
@@ -101,8 +120,50 @@ export class DebuggerTargetProxy {
         "A Stella preview tab only shows Stella. Open web pages in a new tab.",
       );
     }
+    this.attachDebugger(tab);
+    await this.guardAgentPage(tab);
+    if (isAgentTab(tab) && !debuggerSessionId) {
+      // The file chooser guard needs the Page domain enabled on the tab.
+      if (method === "Page.disable") return {};
+      if (method === "Page.setInterceptFileChooserDialog") {
+        params = { ...params, enabled: true };
+      }
+    }
+    if (method !== "Target.attachToTarget") {
+      return await this.sendAttachedCommand(
+        tab,
+        method,
+        params,
+        debuggerSessionId,
+      );
+    }
+    const attachKey = `${tab.id}:${String(params?.targetId ?? "")}`;
+    this.explicitAttaches.set(
+      attachKey,
+      (this.explicitAttaches.get(attachKey) ?? 0) + 1,
+    );
+    try {
+      return await this.sendAttachedCommand(
+        tab,
+        method,
+        params,
+        debuggerSessionId,
+      );
+    } finally {
+      const remaining = (this.explicitAttaches.get(attachKey) ?? 1) - 1;
+      if (remaining > 0) this.explicitAttaches.set(attachKey, remaining);
+      else this.explicitAttaches.delete(attachKey);
+    }
+  }
+
+  private async sendAttachedCommand(
+    tab: ManagedTab,
+    method: string,
+    params: Record<string, unknown> | undefined,
+    debuggerSessionId: string | undefined,
+  ): Promise<unknown> {
+    const tabId = tab.id;
     const tabDebugger = tab.view.webContents.debugger;
-    if (!tabDebugger.isAttached()) tabDebugger.attach();
     // An offscreen tab always has its viewport and its own frames.
     if (tab.offscreen) {
       return await tabDebugger.sendCommand(method, params, debuggerSessionId);
@@ -113,7 +174,7 @@ export class DebuggerTargetProxy {
     // fails against viewport=0x0. The hidden host never replaces the visible
     // manual view, and the scoped lease restores the prior mount after every
     // command (including failures).
-    const lease = this.acquireDrawableHost(tabId, resolvedOwnerId);
+    const lease = this.acquireDrawableHost(tabId, tab.ownerId);
     // A screenshot renders its own frame, and one overlapping a frame-pump
     // capture (full-page ones above all) can leave the page drawing only a
     // band of itself after it returns to the panel.
@@ -166,7 +227,8 @@ export class DebuggerTargetProxy {
     let terminated = false;
 
     try {
-      if (!tabDebugger.isAttached()) tabDebugger.attach();
+      this.attachDebugger(tab);
+      void this.guardAgentPage(tab);
       terminated = await Promise.race([
         Promise.resolve(
           tabDebugger.sendCommand(
@@ -249,7 +311,10 @@ export class DebuggerTargetProxy {
         listener({ tabId: tab.id, ownerId: tab.ownerId, kind });
       }
     };
-    contents.debugger.on("detach", () => emit("debugger-detached"));
+    contents.debugger.on("detach", () => {
+      this.forgetPageGuard(tab.id);
+      emit("debugger-detached");
+    });
     contents.on("did-start-navigation", (details) => {
       if (details.isMainFrame && !details.isSameDocument) emit("navigating");
     });
@@ -257,6 +322,11 @@ export class DebuggerTargetProxy {
     contents.debugger.on(
       "message",
       (_event, method, params, sessionId) => {
+        if (
+          this.consumeGuardEvent(tab, method, record(params), sessionId || undefined)
+        ) {
+          return;
+        }
         const debuggerEvent: InAppBrowserDebuggerEvent = {
           tabId: tab.id,
           method,
@@ -268,6 +338,166 @@ export class DebuggerTargetProxy {
         for (const listener of this.debuggerListeners) listener(debuggerEvent);
       },
     );
+  }
+
+  /**
+   * Sends an agent tab's guard before its first navigation. Page commands to a
+   * tab that has no renderer yet are answered only once it loads, so this
+   * resolves when they are sent, not answered.
+   */
+  async prepareTab(tab: ManagedTab) {
+    await leaveNativeStack();
+    if (tab.view.webContents.isDestroyed()) return;
+    this.attachDebugger(tab);
+    void this.guardAgentPage(tab);
+  }
+
+  emitEvent(event: InAppBrowserDebuggerEvent) {
+    for (const listener of this.debuggerListeners) listener(event);
+  }
+
+  private attachDebugger(tab: ManagedTab) {
+    const tabDebugger = tab.view.webContents.debugger;
+    if (tabDebugger.isAttached()) return;
+    tabDebugger.attach();
+    this.forgetPageGuard(tab.id);
+  }
+
+  private forgetPageGuard(tabId: string) {
+    this.pageGuards.delete(tabId);
+    this.guardSessions.delete(tabId);
+  }
+
+  /**
+   * Native dialogs from an agent tab would be parented to a window that is
+   * never shown (fatal on Wayland, invisible elsewhere). File choosers are
+   * intercepted and cancelled, and every frame, including cross-origin
+   * iframes, gets the page guard. Frames attached for this are internal and
+   * never reach agent clients.
+   */
+  private async guardAgentPage(tab: ManagedTab) {
+    if (!isAgentTab(tab)) return;
+    let guard = this.pageGuards.get(tab.id);
+    if (!guard) {
+      const created: Promise<void> = this.guardSession(tab).catch(() => {
+        if (this.pageGuards.get(tab.id) === created) {
+          this.pageGuards.delete(tab.id);
+        }
+      });
+      guard = created;
+      this.pageGuards.set(tab.id, guard);
+    }
+    await guard;
+  }
+
+  private async guardSession(tab: ManagedTab, sessionId?: string) {
+    const tabDebugger = tab.view.webContents.debugger;
+    await Promise.all([
+      tabDebugger.sendCommand("Page.enable", {}, sessionId),
+      tabDebugger.sendCommand(
+        "Page.setInterceptFileChooserDialog",
+        { enabled: true, cancel: true },
+        sessionId,
+      ),
+      tabDebugger.sendCommand(
+        "Page.addScriptToEvaluateOnNewDocument",
+        { source: agentPageGuard, runImmediately: true },
+        sessionId,
+      ),
+      tabDebugger.sendCommand(
+        "Target.setAutoAttach",
+        {
+          autoAttach: true,
+          waitForDebuggerOnStart: true,
+          flatten: true,
+          filter: [{ type: "iframe" }],
+        },
+        sessionId,
+      ),
+    ]);
+  }
+
+  private async guardFrameSession(
+    tab: ManagedTab,
+    sessionId: string,
+    waitingForDebugger: boolean,
+  ) {
+    await leaveNativeStack();
+    const contents = tab.view.webContents;
+    if (contents.isDestroyed() || !contents.debugger.isAttached()) return;
+    try {
+      await this.guardSession(tab, sessionId);
+    } catch {
+      // A frame that went away while being guarded has nothing left to open.
+    } finally {
+      if (waitingForDebugger && !contents.isDestroyed()) {
+        try {
+          await contents.debugger.sendCommand(
+            "Runtime.runIfWaitingForDebugger",
+            {},
+            sessionId,
+          );
+        } catch {
+          // Detached frames don't wait.
+        }
+      }
+    }
+  }
+
+  private consumeGuardEvent(
+    tab: ManagedTab,
+    method: string,
+    params: Record<string, unknown> | undefined,
+    sessionId: string | undefined,
+  ): boolean {
+    if (!isAgentTab(tab)) return false;
+    let sessions = this.guardSessions.get(tab.id);
+    const onGuardedSession =
+      sessionId === undefined || sessions?.has(sessionId) === true;
+    if (method === "Target.attachedToTarget" && onGuardedSession) {
+      const childSessionId = params?.sessionId;
+      const targetInfo = record(params?.targetInfo);
+      const explicit = this.explicitAttaches.has(
+        `${tab.id}:${String(targetInfo?.targetId ?? "")}`,
+      );
+      if (
+        !explicit &&
+        typeof childSessionId === "string" &&
+        targetInfo?.type === "iframe"
+      ) {
+        if (!sessions) {
+          sessions = new Map();
+          this.guardSessions.set(tab.id, sessions);
+        }
+        sessions.set(childSessionId, String(targetInfo.targetId ?? ""));
+        void this.guardFrameSession(
+          tab,
+          childSessionId,
+          params?.waitingForDebugger === true,
+        );
+        return true;
+      }
+    }
+    if (method === "Target.detachedFromTarget") {
+      const detached = params?.sessionId;
+      if (typeof detached === "string" && sessions?.delete(detached)) {
+        return true;
+      }
+    }
+    if (method === "Target.targetInfoChanged" && sessions) {
+      const targetId = record(params?.targetInfo)?.targetId;
+      for (const guarded of sessions.values()) {
+        if (guarded === targetId) return true;
+      }
+    }
+    if (method === "Page.fileChooserOpened" && onGuardedSession && params) {
+      this.options.onFileChooserOpened?.({
+        tab,
+        ...(sessionId ? { sessionId } : {}),
+        params,
+      });
+    }
+    return sessionId !== undefined && sessions?.has(sessionId) === true;
   }
 
   isMountedInHiddenHost(tabId: string) {
@@ -298,6 +528,7 @@ export class DebuggerTargetProxy {
   }
 
   forgetTab(tabId: string) {
+    this.forgetPageGuard(tabId);
     const lease = this.drawableLeases.get(tabId);
     if (lease) clearTimeout(lease.expiryTimer);
     this.drawableLeases.delete(tabId);

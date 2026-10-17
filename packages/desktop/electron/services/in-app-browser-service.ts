@@ -1,7 +1,10 @@
 import { randomUUID } from "node:crypto";
+import os from "node:os";
 import path from "node:path";
 import {
+  app,
   BrowserWindow,
+  dialog,
   session,
   View,
   WebContentsView,
@@ -35,7 +38,9 @@ import { keepSessionCookies } from "./in-app-browser/session-cookie-keeper.js";
 import {
   DebuggerTargetProxy,
   isRendererUrl,
+  type FileChooserOpened,
 } from "./in-app-browser/debugger-target-proxy.js";
+import { InAppBrowserDownloads } from "./in-app-browser/downloads.js";
 import {
   BrowserTabRegistry,
   DEFAULT_URL,
@@ -183,6 +188,7 @@ export class InAppBrowserService {
   private readonly tabs = new BrowserTabRegistry();
   private readonly debuggerProxy: DebuggerTargetProxy;
   private readonly offscreenTabs: OffscreenTabs | null;
+  private readonly downloads: InAppBrowserDownloads;
   private readonly errorsByOwner = new Map<string, string>();
   private readonly profilePath: string;
 
@@ -228,6 +234,20 @@ export class InAppBrowserService {
         options.hideDrawableHost ?? process.platform === "linux",
       wait: options.wait,
       debuggerRecoveryTimeoutMs: options.debuggerRecoveryTimeoutMs,
+      onFileChooserOpened: (request) => this.openFileChooserForUser(request),
+    });
+    this.downloads = new InAppBrowserDownloads({
+      stellaDataDir: options.stellaDataDir,
+      getUserDownloadsDir: () => {
+        try {
+          return app.getPath("downloads");
+        } catch {
+          return path.join(os.homedir(), "Downloads");
+        }
+      },
+      findTab: (contents) =>
+        this.tabs.all().find((tab) => tab.view.webContents === contents),
+      emit: (event) => this.debuggerProxy.emitEvent(event),
     });
     const mirrorPreloadPath = options.offscreenMirrorPreloadPath;
     this.offscreenTabs =
@@ -479,6 +499,7 @@ export class InAppBrowserService {
     const browserSession = this.browserSession;
     if (!browserSession) throw new Error("Browser session is unavailable.");
     const ownerId = resolveOwnerId(options.ownerId);
+    const agentOwned = ownerId !== MANUAL_OWNER_ID;
     const id = (this.options.createId ?? randomUUID)();
     const offscreen =
       this.rendersOffscreen(ownerId) && !this.options.createView
@@ -498,6 +519,9 @@ export class InAppBrowserService {
           webSecurity: true,
           allowRunningInsecureContent: false,
           webviewTag: false,
+          // alert/confirm would open a message box parented to the tab's
+          // never-shown host; agents get them dismissed, as over CDP.
+          ...(agentOwned ? { disableDialogs: true } : {}),
         },
       });
     try {
@@ -512,6 +536,7 @@ export class InAppBrowserService {
       activate: options.activate,
       offscreen: offscreen !== undefined,
     });
+    if (agentOwned) await this.debuggerProxy.prepareTab(tab).catch(() => {});
     try {
       const url = normalizeWebUrl(options.url);
       await view.webContents.loadURL(url);
@@ -575,6 +600,7 @@ export class InAppBrowserService {
     };
     const contents = preview.view.webContents;
     contents.once("destroyed", dispose);
+    this.downloads.watch(contents.session);
     const tab = this.addTab({
       id: (this.options.createId ?? randomUUID)(),
       view: preview.view,
@@ -582,6 +608,7 @@ export class InAppBrowserService {
       preview: { name, dispose },
       offscreen: offscreen !== undefined,
     });
+    await this.debuggerProxy.prepareTab(tab).catch(() => {});
     try {
       await contents.loadURL(preview.url);
     } catch (error) {
@@ -795,6 +822,50 @@ export class InAppBrowserService {
     return command.finally(resumePainting);
   }
 
+  /**
+   * File choosers in agent tabs are intercepted (see debugger-target-proxy).
+   * When the user, not the agent, opens one in the tab the panel shows, a
+   * picker parented to the visible Stella window fills it in.
+   */
+  private openFileChooserForUser({ tab, sessionId, params }: FileChooserOpened) {
+    const window = this.attachedWindow;
+    const backendNodeId = params.backendNodeId;
+    const shownInPanel =
+      this.attachedView === tab.view ||
+      this.offscreenTabs?.isMirroring(tab) === true;
+    if (
+      !shownInPanel ||
+      tab.agentActive ||
+      typeof backendNodeId !== "number" ||
+      !window ||
+      window.isDestroyed() ||
+      !window.isVisible() ||
+      !window.isFocused()
+    ) {
+      return;
+    }
+    void dialog
+      .showOpenDialog(window, {
+        properties:
+          params.mode === "selectMultiple"
+            ? ["openFile", "multiSelections"]
+            : ["openFile"],
+      })
+      .then(async ({ canceled, filePaths }) => {
+        if (canceled || filePaths.length === 0 || !this.tabs.has(tab.id)) {
+          return;
+        }
+        await this.debuggerProxy.sendCommand(
+          tab.id,
+          "DOM.setFileInputFiles",
+          { files: filePaths, backendNodeId },
+          tab.ownerId,
+          sessionId,
+        );
+      })
+      .catch(() => {});
+  }
+
   private markAgentActivity(tabId: string) {
     const tab = this.tabs.get(tabId);
     if (!tab) return;
@@ -905,6 +976,7 @@ export class InAppBrowserService {
       this.browserSession.setDevicePermissionHandler((details) =>
         shouldAllowAuthDevice(details),
       );
+      this.downloads.watch(this.browserSession);
       this.releaseSessionCookies = keepSessionCookies(this.browserSession);
       void trimInAppBrowserStorage(this.profilePath, this.browserSession);
     })().finally(() => {

@@ -5,6 +5,7 @@ import { existsSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { getMainLogger } from "../observability/main-logger.js";
+import { visibleDialogParent } from "../windows/dialog-parent.js";
 import { noteAppPainted } from "../observability/app-paint.js";
 import { exportDesktopDebugLogs, getDesktopDebugPaths } from "../observability/desktop-debug-logging.js";
 import { resolveLogPaths } from "@stella/runtime/observability/log-paths";
@@ -654,7 +655,7 @@ export const registerSystemHandlers = (options) => {
             const defaultName = typeof payload.defaultName === "string" && payload.defaultName.trim()
                 ? path.basename(payload.defaultName.trim())
                 : path.basename(sourcePath);
-            const owner = BrowserWindow.fromWebContents(event.sender);
+            const owner = visibleDialogParent(event.sender);
             const saveOptions = {
                 defaultPath: defaultName,
             };

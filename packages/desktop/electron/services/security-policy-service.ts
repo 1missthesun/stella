@@ -1,6 +1,6 @@
 import { promises as fs } from "fs";
 import {
-  BrowserWindow,
+  type BrowserWindow,
   dialog,
   type IpcMainEvent,
   type IpcMainInvokeEvent,
@@ -13,6 +13,7 @@ import {
 } from "@stella/runtime/kernel/home/private-fs";
 import type { WindowManagerTarget } from "@stella/runtime/kernel/lifecycle-targets";
 import { t } from "./i18n-service.js";
+import { visibleDialogParent } from "../windows/dialog-parent.js";
 
 const SECURITY_POLICY_VERSION = 2;
 const SECURITY_APPROVAL_PREFIX = "v1:";
@@ -99,11 +100,10 @@ export class SecurityPolicyService {
     }
 
     const windowManager = this.options.windowManagerTarget.getWindowManager();
-    const ownerWindow =
-      (event ? BrowserWindow.fromWebContents(event.sender) : null) ??
-      BrowserWindow.getFocusedWindow() ??
-      windowManager?.getFullWindow() ??
-      undefined;
+    const ownerWindow = visibleDialogParent(
+      event?.sender,
+      windowManager?.getFullWindow(),
+    );
 
     const dialogOptions: MessageBoxOptions = {
       type: "warning",

@@ -7,11 +7,37 @@ on the user's Stella account. Inside Stella, use the \`stella-media\` CLI
 (\`stella-media models\`, \`stella-media generate --wait --request '<json>'\`);
 the HTTP API below is what it calls.
 
+## One catalog, not separate operation pages
+
+This is the canonical overview at https://stella.sh/docs/media. The old
+category pages under /docs/media/ (images, video, audio, music, 3d) are retired.
+The model list below is generated from packages/contracts/media-models.ts,
+the same catalog used by Stella's media API and CLI; do not maintain a separate
+list of operation aliases. Follow each model's linked schema for current fields.
+
 ## Models
 
 ${MEDIA_MODELS.map((model) => `- \`${model.id}\` (${model.kind}): ${model.does}\n  Input and output: ${model.docsUrl}`).join("\n")}
 
 The current list is also served at \`GET <stella-api>/api/media/v1/models\`.
+
+## Video references, editing and extension
+
+Choose a video model from the catalog above: text-to-video for a prompt,
+image-to-video to animate an image, or reference-to-video for multimodal guidance.
+The reference model accepts image_urls, video_urls and audio_urls; its task field
+selects reference, editing or extension. Read its linked schema for limits and
+how each task affects duration and aspect ratio. These are model inputs, not
+separate Stella operations named image_to_video, video_extend or video_to_video.
+
+On a computer, the stella-media CLI can call any listed model with its native
+input. In Stella's cloud, the video_gen convenience tool only exposes text and
+image-to-video, not reference generation, editing or extension. Use a computer
+with the CLI when those inputs are needed.
+
+Video requires the video_generation plan capability and available usage budget.
+Set an explicit duration and the requested resolution: video is priced per
+second, and disabling generated audio does not reduce the catalog price.
 
 ## Start a job
 

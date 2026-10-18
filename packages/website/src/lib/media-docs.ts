@@ -21,23 +21,27 @@ ${MEDIA_MODELS.map((model) => `- \`${model.id}\` (${model.kind}): ${model.does}\
 
 The current list is also served at \`GET <stella-api>/api/media/v1/models\`.
 
-## Video references, editing and extension
+## Video references and extension
 
 Choose a video model from the catalog above: text-to-video for a prompt,
-image-to-video to animate an image, or reference-to-video for multimodal guidance.
-The reference model accepts image_urls, video_urls and audio_urls; its task field
-selects reference, editing or extension. Read its linked schema for limits and
-how each task affects duration and aspect ratio. These are model inputs, not
-separate Stella operations named image_to_video, video_extend or video_to_video.
+image-to-video to animate an image (optionally to an end frame),
+reference-to-video for guidance from reference images, videos and audio
+(reference_image_urls, reference_video_urls, reference_audio_urls, or an
+ordered reference_conditions list), and extend-video to continue an existing
+video. There is no general prompt-driven video editing model in the catalog.
+Read each model's linked schema for limits. These are models, not separate
+Stella operations named image_to_video, video_extend or video_to_video.
 
 On a computer, the stella-media CLI can call any listed model with its native
 input. In Stella's cloud, the video_gen convenience tool only exposes text and
-image-to-video, not reference generation, editing or extension. Use a computer
-with the CLI when those inputs are needed.
+image-to-video, not references or extension. Use a computer with the CLI when
+those inputs are needed.
 
 Video requires the video_generation plan capability and available usage budget.
-Set an explicit duration and the requested resolution: video is priced per
-second, and disabling generated audio does not reduce the catalog price.
+Every clip has generated sound at no extra cost. Video is priced per second of
+the requested duration and by resolution (480P, 768P or 1080P; 768P is the
+default), so set an explicit duration. Reference inputs above the model's
+included allowance add to the price.
 
 ## Start a job
 

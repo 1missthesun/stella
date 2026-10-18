@@ -23,13 +23,14 @@ use that live list rather than a copied model or operation table. The HTTP list 
 
 Each line is a model id, what it does, and its docs page. Read the docs page (`web` fetch it) before the first call to a model: it is the model's own input and output schema, and Stella passes your input to the model untouched.
 
-For video, pick the model for text, image animation or multimodal references
-from that list. Reference-to-video supports reference generation, editing and
-extension through its own `task` input (`reference`, `editing`, `extension`);
-read its linked schema for `image_urls`, `video_urls`, `audio_urls` and limits.
-These are not separate Stella operations named `video_extend` or `video_to_video`.
+For video, pick the model for text, image animation, references or extension
+from that list. Reference-to-video takes `reference_image_urls`,
+`reference_video_urls` and `reference_audio_urls` (or an ordered
+`reference_conditions` list); extend-video continues a `video_url`. There is
+no general prompt-driven video editing model. These are separate models, not
+Stella operations named `video_extend` or `video_to_video`.
 The cloud `video_gen` convenience tool only supports text-to-video and
-image-to-video; it does not expose multimodal references, editing or extension.
+image-to-video; it does not expose references or extension.
 Use a computer with `stella-media` for those requests; do not substitute
 `video_gen` or a direct provider call.
 

@@ -69,15 +69,59 @@ const gptImagePrice = (input: Record<string, unknown>): number => {
   return images * perImage + prompt + references;
 };
 
-const SEEDANCE_PER_SECOND: Record<string, number> = { "480p": 0.2205, "720p": 0.473, "1080p": 1.164 };
-const SEEDANCE_AUTO_SECONDS = 15;
+// fal's H3 Max list rates per second of output. Text and image-to-video run
+// 35% off until fal's promotion ends on October 31; from that day (UTC) the
+// list rate applies. Audio is always generated and costs nothing extra.
+const H3_MAX_PER_SECOND: Record<string, number> = { "480p": 0.05, "768p": 0.08, "1080p": 0.16, "2k": 0.32 };
+const H3_MAX_PROMO_ENDS_AT = Date.UTC(2026, 9, 31);
+const H3_MAX_PROMO_FACTOR = 0.65;
+const H3_MAX_DEFAULT_SECONDS = 5;
+const H3_MAX_MAX_SECONDS = 15;
+// Reference inputs above a 4,096-token allowance per request cost $0.02 per
+// 1,000 tokens. The files aren't inspected, so this assumes the largest counts:
+// 2,560 tokens per image (its most elongated shape), reference videos and
+// audio filling the output length up to their combined 15 s, and about 6,900
+// video tokens per second (2,700 at 480p) and 80 audio tokens per second.
+const H3_MAX_FREE_REFERENCE_TOKENS = 4_096;
+const H3_MAX_USD_PER_REFERENCE_TOKEN = 0.02 / 1_000;
+const H3_MAX_IMAGE_TOKENS = 2_560;
+const H3_MAX_AUDIO_TOKENS_PER_SECOND = 80;
 
-const seedancePrice = (input: Record<string, unknown>): number => {
-  const resolution = input.draft === true ? "480p" : String(input.resolution ?? "720p").toLowerCase();
-  const perSecond = SEEDANCE_PER_SECOND[resolution] ?? SEEDANCE_PER_SECOND["1080p"]!;
-  const seconds = num(input.duration) ?? SEEDANCE_AUTO_SECONDS;
-  const videos = list(input.video_urls).length;
-  return videos > 0 ? perSecond * 0.6 * (seconds + Math.min(30.2, videos * 10)) : perSecond * seconds;
+const h3MaxResolution = (input: Record<string, unknown>, highest: string): string => {
+  const resolution = String(input.resolution ?? "768p").toLowerCase();
+  return H3_MAX_PER_SECOND[resolution] === undefined ? highest : resolution;
+};
+
+const h3MaxSeconds = (input: Record<string, unknown>): number =>
+  Math.min(H3_MAX_MAX_SECONDS, Math.max(0, num(input.duration) ?? H3_MAX_DEFAULT_SECONDS));
+
+const h3MaxReferenceUsd = (input: Record<string, unknown>, resolution: string, seconds: number): number => {
+  const conditions = list(input.reference_conditions).filter(isRecord);
+  const count = (field: string, type: string) =>
+    list(input[field]).length + conditions.filter((condition) => condition.type === type).length;
+  const filled = (clips: number) => Math.min(H3_MAX_MAX_SECONDS, clips * seconds);
+  const tokens =
+    count("reference_image_urls", "image") * H3_MAX_IMAGE_TOKENS +
+    filled(count("reference_video_urls", "video")) * (resolution === "480p" ? 2_700 : 6_900) +
+    filled(count("reference_audio_urls", "audio")) * H3_MAX_AUDIO_TOKENS_PER_SECOND;
+  return Math.max(0, tokens - H3_MAX_FREE_REFERENCE_TOKENS) * H3_MAX_USD_PER_REFERENCE_TOKEN;
+};
+
+const h3MaxPrice = (input: Record<string, unknown>): number => {
+  const promo = Date.now() < H3_MAX_PROMO_ENDS_AT ? H3_MAX_PROMO_FACTOR : 1;
+  return H3_MAX_PER_SECOND[h3MaxResolution(input, "1080p")]! * promo * h3MaxSeconds(input);
+};
+
+const h3MaxReferencePrice = (input: Record<string, unknown>): number => {
+  const resolution = h3MaxResolution(input, "1080p");
+  const seconds = h3MaxSeconds(input);
+  return H3_MAX_PER_SECOND[resolution]! * seconds + h3MaxReferenceUsd(input, resolution, seconds);
+};
+
+const h3MaxExtendPrice = (input: Record<string, unknown>): number => {
+  const resolution = h3MaxResolution(input, "2k");
+  const seconds = h3MaxSeconds(input);
+  return H3_MAX_PER_SECOND[resolution]! * seconds + h3MaxReferenceUsd(input, resolution, seconds);
 };
 
 const tripoPrice = (input: Record<string, unknown>): number => {
@@ -113,31 +157,40 @@ export const MEDIA_MODELS: readonly MediaModel[] = [
     price: gptImagePrice,
   },
   {
-    id: "bytedance/seedance-2.5/text-to-video",
-    name: "Seedance 2.5",
+    id: "minimax/h3-max/text-to-video",
+    name: "MiniMax H3 Max",
     kind: "video",
     does: "Generate a video with sound from a text prompt.",
-    docsUrl: falDocs("bytedance/seedance-2.5/text-to-video"),
+    docsUrl: falDocs("minimax/h3-max/text-to-video"),
     plan: "video_generation",
-    price: seedancePrice,
+    price: h3MaxPrice,
   },
   {
-    id: "bytedance/seedance-2.5/image-to-video",
-    name: "Seedance 2.5 Image to Video",
+    id: "minimax/h3-max/image-to-video",
+    name: "MiniMax H3 Max Image to Video",
     kind: "video",
-    does: "Animate an image (image_url, optional end_image_url) into a video.",
-    docsUrl: falDocs("bytedance/seedance-2.5/image-to-video"),
+    does: "Animate an image (image_url, optional end_image_url) into a video with sound.",
+    docsUrl: falDocs("minimax/h3-max/image-to-video"),
     plan: "video_generation",
-    price: seedancePrice,
+    price: h3MaxPrice,
   },
   {
-    id: "bytedance/seedance-2.5/reference-to-video",
-    name: "Seedance 2.5 Reference to Video",
+    id: "minimax/h3-max/reference-to-video",
+    name: "MiniMax H3 Max Reference to Video",
     kind: "video",
-    does: "Generate, edit or extend a video guided by reference images, videos and audio.",
-    docsUrl: falDocs("bytedance/seedance-2.5/reference-to-video"),
+    does: "Generate a video guided by reference images, videos and audio, optionally between start, middle and end frames.",
+    docsUrl: falDocs("minimax/h3-max/reference-to-video"),
     plan: "video_generation",
-    price: seedancePrice,
+    price: h3MaxReferencePrice,
+  },
+  {
+    id: "minimax/h3-max/extend-video",
+    name: "MiniMax H3 Max Extend Video",
+    kind: "video",
+    does: "Continue a video (video_url) with new footage described by a prompt.",
+    docsUrl: falDocs("minimax/h3-max/extend-video"),
+    plan: "video_generation",
+    price: h3MaxExtendPrice,
   },
   {
     id: "google/lyria-3.5",
@@ -197,8 +250,8 @@ export const mediaModel = (id: string): MediaModel | null =>
 export const STELLA_MEDIA_MODELS = {
   image: "openai/gpt-image-2.5/flare/text-to-image",
   imageEdit: "openai/gpt-image-2.5/flare/edit",
-  video: "bytedance/seedance-2.5/text-to-video",
-  imageToVideo: "bytedance/seedance-2.5/image-to-video",
+  video: "minimax/h3-max/text-to-video",
+  imageToVideo: "minimax/h3-max/image-to-video",
   speech: "google/gemini-3.8-flash-tts",
   dictation: "elevenlabs/scribe-v2",
 } as const;
@@ -249,7 +302,6 @@ export const stellaVideoRequest = (args: {
   durationSeconds: number;
   resolution?: string | null;
   aspectRatio?: string | null;
-  generateAudio?: boolean | null;
   imageUrl?: string | null;
   endImageUrl?: string | null;
 }): { model: string; input: Record<string, unknown> } => {
@@ -258,10 +310,9 @@ export const stellaVideoRequest = (args: {
     model: fromImage ? STELLA_MEDIA_MODELS.imageToVideo : STELLA_MEDIA_MODELS.video,
     input: {
       prompt: args.prompt,
-      duration: String(args.durationSeconds),
-      resolution: args.resolution || "720p",
-      generate_audio: args.generateAudio ?? true,
-      codec: "H264",
+      duration: args.durationSeconds,
+      resolution: (args.resolution || "768p").toUpperCase(),
+      prompt_expansion_mode: "balanced",
       ...(fromImage
         ? {
             image_url: args.imageUrl,

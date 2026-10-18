@@ -30,7 +30,7 @@ const MAX_SECONDS = 15;
 const NOUN = "Video";
 const HTTP_URL_RE = /^https?:\/\//i;
 const ASPECT_RATIOS = ["16:9", "9:16", "1:1", "4:3", "3:4", "21:9"] as const;
-const RESOLUTIONS = ["480p", "720p", "1080p"] as const;
+const RESOLUTIONS = ["480p", "768p", "1080p"] as const;
 
 export type CloudVideoGenDetails =
   | {
@@ -75,11 +75,7 @@ const PARAMETERS = {
     resolution: {
       type: "string",
       enum: [...RESOLUTIONS],
-      description: "Defaults to 720p. 1080p costs over twice as much; use it only when asked.",
-    },
-    generateAudio: {
-      type: "boolean",
-      description: "Whether the clip has generated sound. Defaults to true; same price either way.",
+      description: "Defaults to 768p. 1080p costs twice as much; use it only when asked.",
     },
     startImageDrivePath: {
       type: "string",
@@ -110,7 +106,6 @@ type Args = {
   aspectRatio?: unknown;
   aspect_ratio?: unknown;
   resolution?: unknown;
-  generateAudio?: unknown;
   startImageDrivePath?: unknown;
   startImageUrl?: unknown;
   endImageDrivePath?: unknown;
@@ -182,8 +177,7 @@ export const createCloudVideoGenTool = (context: CloudMediaToolContext): Replaya
       ASPECT_RATIOS,
       "aspectRatio",
     );
-    const resolution = oneOf(asNonEmptyString(args.resolution), RESOLUTIONS, "resolution") ?? "720p";
-    const generateAudio = typeof args.generateAudio === "boolean" ? args.generateAudio : true;
+    const resolution = oneOf(asNonEmptyString(args.resolution)?.toLowerCase() ?? null, RESOLUTIONS, "resolution") ?? "768p";
     const startUrl = asNonEmptyString(args.startImageUrl);
     if (startUrl && !HTTP_URL_RE.test(startUrl)) {
       throw new Error("startImageUrl must be an http(s) URL; use startImageDrivePath for the user's own files.");
@@ -211,7 +205,6 @@ export const createCloudVideoGenTool = (context: CloudMediaToolContext): Replaya
       durationSeconds,
       resolution,
       aspectRatio,
-      generateAudio,
       imageUrl,
       endImageUrl,
     });

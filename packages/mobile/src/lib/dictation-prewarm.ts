@@ -30,6 +30,18 @@ export const PREWARMED_RECORDING_OPTIONS = {
   },
 };
 
+/**
+ * audio-studio records with the settings it was prepared with, and on iOS
+ * `keepAwake: false` pauses the engine when the app backgrounds, which ended
+ * dictation for anyone who switched apps mid-sentence. Preparing an already
+ * prepared recorder only swaps its settings (the session stays as it is, so
+ * nothing ducks), so the tap re-prepares with these before it starts.
+ */
+export const PREWARMED_START_OPTIONS = {
+  ...PREWARMED_RECORDING_OPTIONS,
+  keepAwake: true,
+};
+
 type KeepAwakeModule = {
   activate(tag: string): Promise<boolean>;
   deactivate(tag: string): Promise<boolean>;

@@ -14,7 +14,7 @@ import {
 } from "./mobile-audio-session";
 import {
   DICTATION_RECORDING_OPTIONS,
-  PREWARMED_RECORDING_OPTIONS,
+  PREWARMED_START_OPTIONS,
   claimPreparedDictationRecorder,
   keepScreenAwakeForDictation,
   releaseClaimedDictationRecorder,
@@ -342,8 +342,11 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
         current.full = true;
         if (statusRef.current === "recording") void stopRecordingRef.current?.();
       });
+      if (prewarmed) {
+        await AudioStudioModule.prepareRecording(PREWARMED_START_OPTIONS);
+      }
       await AudioStudioModule.startRecording(
-        prewarmed ? PREWARMED_RECORDING_OPTIONS : DICTATION_RECORDING_OPTIONS,
+        prewarmed ? PREWARMED_START_OPTIONS : DICTATION_RECORDING_OPTIONS,
       );
       if (prewarmed) keepScreenAwakeForDictation(true);
       current.marks.recorder = Date.now() - pressedAt;

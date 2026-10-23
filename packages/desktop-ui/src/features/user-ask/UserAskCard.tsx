@@ -7,6 +7,7 @@ import type {
 } from "@stella/contracts/user-ask";
 import {
   USER_ASK_MAX_NOTE,
+  userAskFieldInputKind,
   userAskOffersRemember,
 } from "@stella/contracts/user-ask";
 import { userAskSecureRecord } from "@stella/contracts/user-ask-deck";
@@ -24,8 +25,36 @@ import {
 import { formatRemaining } from "./format-remaining";
 import "./user-ask-card.css";
 
-const inputTypeForField = (field: UserAskField): string =>
-  field.type === "secret" ? "password" : "text";
+type FieldInputProps = {
+  type: string;
+  inputMode?: "numeric" | "email" | "text";
+  autoComplete?: string;
+  maxLength?: number;
+};
+
+const inputPropsForField = (field: UserAskField): FieldInputProps => {
+  const masked = field.type === "secret" ? "password" : "text";
+  switch (userAskFieldInputKind(field)) {
+    case "one_time_code":
+      return { type: "text", inputMode: "numeric", autoComplete: "one-time-code", maxLength: 12 };
+    case "card_number":
+      return { type: masked, inputMode: "numeric", autoComplete: "cc-number", maxLength: 23 };
+    case "card_expiry":
+      return { type: "text", inputMode: "numeric", autoComplete: "cc-exp", maxLength: 7 };
+    case "card_cvc":
+      return { type: masked, inputMode: "numeric", autoComplete: "cc-csc", maxLength: 4 };
+    case "postal_code":
+      return { type: masked, autoComplete: "postal-code", maxLength: 12 };
+    case "email":
+      return { type: masked, inputMode: "email", autoComplete: "email" };
+    case "username":
+      return { type: masked, autoComplete: "username" };
+    case "password":
+      return { type: masked, autoComplete: "off" };
+    default:
+      return { type: masked, ...(field.type === "secret" ? { autoComplete: "off" } : {}) };
+  }
+};
 
 function UserAskHeader({
   ask,
@@ -98,7 +127,7 @@ function UserAskFieldRow({
   );
 
   return (
-    <div className="user-ask__field" data-field-type={field.type}>
+    <div className="user-ask__field" data-field-type={field.type} data-field-id={field.id}>
       <div className="user-ask__field-head">
         <span className="user-ask__field-label">{label}</span>
         <span
@@ -138,11 +167,8 @@ function UserAskFieldRow({
           hideLabel
           aria-label={label}
           description={field.hint}
-          type={inputTypeForField(field)}
-          inputMode={field.type === "code" ? "numeric" : undefined}
-          autoComplete={field.type === "secret" ? "off" : undefined}
+          {...inputPropsForField(field)}
           spellCheck={false}
-          maxLength={field.type === "code" ? 12 : undefined}
           className={field.type === "code" ? "user-ask__field-code" : undefined}
           placeholder={field.placeholder}
           value={value}

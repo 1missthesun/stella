@@ -481,13 +481,18 @@
 
 .user-ask__field-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
-  gap: 8px;
+  gap: 2px 8px;
   min-width: 0;
 }
 
+/* The label keeps its full width; the privacy badge wraps under it when a
+   narrow column can't fit both, instead of cutting the label to "Card nu…". */
 .user-ask__field-label {
+  flex: 0 0 auto;
+  max-width: 100%;
   overflow: hidden;
   color: var(--text-base);
   font-size: var(--font-size-sm);

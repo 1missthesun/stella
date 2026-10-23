@@ -226,26 +226,56 @@ const newHandle = () => `${USER_ASK_SECRET_HANDLE_PREFIX}${randomUUID()}`;
 const fieldKey = (value: string) =>
   value.toLowerCase().replace(/[^a-z0-9]+/g, "");
 
-export const matchSavedField = (
+type MatchableField = Pick<UserAskField, "id" | "label" | "type" | "sensitive">;
+
+const sameKind = (saved: SavedField, field: MatchableField) =>
+  saved.sensitive === field.sensitive &&
+  (saved.type === "secret") === (field.type === "secret");
+
+/**
+ * Pairs requested fields with saved ones, one to one: by id, then by label,
+ * then (so a renamed field still finds its value) the only unclaimed saved field
+ * of the same kind when exactly one requested field of that kind is left over.
+ * No saved field is ever paired with two requested fields, so every field keeps
+ * its own value and its own handle.
+ */
+export const matchSavedFields = (
   saved: readonly SavedField[],
-  field: Pick<UserAskField, "id" | "label" | "type" | "sensitive">,
-): SavedField | null => {
-  const byId = saved.find((candidate) => candidate.id === field.id);
-  if (byId) return byId;
-  const label = fieldKey(field.label);
-  const byLabel = saved.find((candidate) => fieldKey(candidate.label) === label);
-  if (byLabel) return byLabel;
-  const sameKind = saved.filter(
-    (candidate) =>
-      candidate.sensitive === field.sensitive &&
-      (candidate.type === "secret") === (field.type === "secret"),
-  );
-  return sameKind.length === 1 ? sameKind[0]! : null;
+  fields: readonly MatchableField[],
+): Map<string, SavedField> => {
+  const matched = new Map<string, SavedField>();
+  const claimed = new Set<SavedField>();
+  const pair = (field: MatchableField, candidate: SavedField | undefined) => {
+    if (!candidate || claimed.has(candidate) || matched.has(field.id)) return;
+    matched.set(field.id, candidate);
+    claimed.add(candidate);
+  };
+  for (const field of fields) {
+    pair(field, saved.find((candidate) => candidate.id === field.id));
+  }
+  for (const field of fields) {
+    if (matched.has(field.id)) continue;
+    const label = fieldKey(field.label);
+    pair(
+      field,
+      saved.find((candidate) => !claimed.has(candidate) && fieldKey(candidate.label) === label),
+    );
+  }
+  for (const field of fields) {
+    if (matched.has(field.id)) continue;
+    const open = saved.filter((candidate) => !claimed.has(candidate) && sameKind(candidate, field));
+    const rivals = fields.filter(
+      (other) => !matched.has(other.id) && open.some((candidate) => sameKind(candidate, other)),
+    );
+    if (open.length === 1 && rivals.length === 1) pair(field, open[0]);
+  }
+  return matched;
 };
 
 export class SavedSecureValues {
   private readonly getDir: () => string | null;
   private readonly singleUse = new Map<string, SingleUse>();
+  private readonly spent = new Set<string>();
   private ready: Promise<void> | null = null;
   private readyDir: string | null = null;
 
@@ -476,8 +506,13 @@ export class SavedSecureValues {
     for (const field of fields) {
       if (field.id in previousValues) values[field.id] = previousValues[field.id]!;
     }
+    const previous = matchSavedFields(
+      fields,
+      input.fields.map(({ field }) => field),
+    );
+    const placed = new Map<string, SavedField>();
     for (const { field, value } of input.fields) {
-      const current = matchSavedField(fields, field);
+      const current = previous.get(field.id) ?? null;
       const stored: SavedField = {
         id: current?.id ?? field.id,
         label: field.label,
@@ -488,8 +523,12 @@ export class SavedSecureValues {
       if (current) {
         fields[fields.indexOf(current)] = stored;
       } else {
+        while (fields.some((other) => other.id === stored.id)) {
+          stored.id = `${stored.id}_${fields.length + 1}`;
+        }
         fields.push(stored);
       }
+      placed.set(field.id, stored);
       values[stored.id] = value;
     }
     const entry = await this.writeEntry(dir, {
@@ -502,7 +541,7 @@ export class SavedSecureValues {
     });
     const handles: Record<string, string> = {};
     for (const { field } of input.fields) {
-      const stored = matchSavedField(entry.fields, field);
+      const stored = placed.get(field.id);
       if (field.sensitive && stored?.handle) handles[field.id] = stored.handle;
     }
     return { entry, handles };
@@ -534,6 +573,7 @@ export class SavedSecureValues {
     const single = this.singleUse.get(handle);
     if (single) {
       this.singleUse.delete(handle);
+      this.spent.add(handle);
       return Date.now() - single.createdAt > SINGLE_USE_TTL_MS
         ? null
         : { value: single.value, singleUse: true };
@@ -545,6 +585,12 @@ export class SavedSecureValues {
     if (typeof value !== "string") return null;
     this.touch(found.dir, found.entry.id);
     return { value, singleUse: false };
+  }
+
+  /** Whether Stella ever issued this handle (so a miss means used up or removed, not mistyped). */
+  async issued(handle: string): Promise<boolean> {
+    if (this.singleUse.has(handle) || this.spent.has(handle)) return true;
+    return (await this.locate(handle)) !== null;
   }
 
   async markUsed(id: string) {

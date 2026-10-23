@@ -1,8 +1,10 @@
 import {
   USER_ASK_MAX_FIELDS,
   USER_ASK_FIELD_TYPES,
+  USER_ASK_PRESETS,
   clampUrgency,
   normalizeUserAskOptions,
+  userAskPresetFields,
   type SecureValueTarget,
   type SecureValueUseReceipt,
   type UserAskField,
@@ -238,6 +240,21 @@ const normalizeFields = (input: unknown): readonly UserAskField[] => {
   return fields;
 };
 
+/** A preset's fields first, in order; an explicit field with a preset field's id refines that one, any other is added after. */
+const mergePresetFields = (
+  presetFields: readonly UserAskField[],
+  explicit: unknown,
+): unknown[] => {
+  const rows: Record<string, unknown>[] = presetFields.map((field) => ({ ...field }));
+  for (const row of Array.isArray(explicit) ? explicit : []) {
+    const source = (row ?? {}) as Record<string, unknown>;
+    const at = rows.findIndex((field) => field.id === source.id);
+    if (at >= 0 && presetFields.length > 0) rows[at] = { ...rows[at], ...source };
+    else rows.push(source);
+  }
+  return rows;
+};
+
 export const handleRequestSecureInput = async (
   config: UserToolsConfig,
   args: Record<string, unknown>,
@@ -249,11 +266,16 @@ export const handleRequestSecureInput = async (
   }
   const purpose = text(args.purpose, 300);
   if (!purpose) return { error: "purpose is required." };
-  const fields = normalizeFields(args.fields);
+  const preset = text(args.preset, 32).toLowerCase();
+  const presetFields = userAskPresetFields(preset);
+  if (preset && presetFields.length === 0) {
+    return { error: `preset must be one of: ${USER_ASK_PRESETS.join(", ")}.` };
+  }
+  const fields = normalizeFields(mergePresetFields(presetFields, args.fields));
   if (fields.length === 0) {
     return {
       error:
-        "fields is required: describe each value you need with a label, a type (text, secret, code, choice), and whether it is sensitive.",
+        'fields is required: describe each value you need with a label, a type (text, secret, code, choice), and whether it is sensitive, or pass preset "login" or "card".',
     };
   }
   const detail = text(args.detail, 1000);

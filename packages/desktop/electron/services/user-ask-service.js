@@ -14,6 +14,7 @@ import {
   SECRET_REDACTION_MARK,
   createSecretFingerprintParams,
   fingerprintSecrets,
+  mergeSecretFingerprints,
   redactSecretFingerprints,
 } from "@stella/contracts/secret-redaction";
 import { PI_LATE_ANSWER_PREFIX } from "@stella/contracts/pi-chat";
@@ -54,7 +55,7 @@ import {
 } from "@stella/runtime/kernel/preferences/local-preferences";
 import { showStellaNotification } from "./notification-service.js";
 import { PendingRequestStore } from "./pending-request-store.js";
-import { SavedSecureValues, matchSavedField } from "./saved-secure-values.js";
+import { SavedSecureValues, matchSavedFields } from "./saved-secure-values.js";
 import { UserAskEscalationEngine, localTimeZone, minuteOfDayAt } from "./user-ask-escalation.js";
 import {
   createUserAskRecipientKey,
@@ -64,6 +65,18 @@ import {
 const KEYCHAIN_FALLBACK_FILE = "user-ask-keychain.json";
 const KEYCHAIN_SCOPE_PREFIX = "user-ask-keychain";
 const COMMAND_PLACEHOLDER = "{{secret}}";
+const sharedHandles = (handles) => {
+    const seen = new Set();
+    const shared = new Set();
+    for (const handle of Object.values(handles)) {
+        if (seen.has(handle)) {
+            shared.add(handle);
+        }
+        seen.add(handle);
+    }
+    return shared;
+};
+const handlesAreDistinct = (handles) => sharedHandles(handles).size === 0;
 const COMMAND_SECRET_ENV_VAR = "STELLA_SECRET";
 const COMMAND_TIMEOUT_MS = 2 * 60_000;
 const COMMAND_OUTPUT_LIMIT = 4000;
@@ -76,24 +89,7 @@ const CLOUD_REQUEST_TIMEOUT_MS = 10_000;
 const REMOTE_ANSWER_POLL_MS = 15_000;
 const POLICY_CACHE_MAX_AGE_MS = 30_000;
 const ACCOUNT_FIELD_PATTERN = /^(user(name)?|e-?mail|login|account|handle|user ?id)$/i;
-const mergeFingerprints = (left, right) => {
-    if (right.windows.length === 0) {
-        return left;
-    }
-    const byLength = new Map();
-    for (const window of [...left.windows, ...right.windows]) {
-        const hashes = byLength.get(window.length) ?? new Set();
-        for (const hash of window.hashes) {
-            hashes.add(hash);
-        }
-        byLength.set(window.length, hashes);
-    }
-    return {
-        baseA: left.baseA,
-        baseB: left.baseB,
-        windows: [...byLength].map(([length, hashes]) => ({ length, hashes: [...hashes] })),
-    };
-};
+const mergeFingerprints = mergeSecretFingerprints;
 const normalizeSaveRequest = (input) => {
     if (!input || typeof input !== "object") {
         return null;
@@ -617,8 +613,9 @@ export class UserAskService {
         }
         const values = {};
         const handles = {};
+        const matched = matchSavedFields(entry.fields, fields);
         for (const field of fields) {
-            const savedField = matchSavedField(entry.fields, field);
+            const savedField = matched.get(field.id) ?? null;
             const value = savedField ? stored[savedField.id] : undefined;
             if (!savedField || typeof value !== "string" || savedField.sensitive !== field.sensitive) {
                 if (field.optional === true) {
@@ -635,6 +632,9 @@ export class UserAskService {
             else {
                 values[field.id] = value;
             }
+        }
+        if (!handlesAreDistinct(handles)) {
+            return null;
         }
         await this.saved.markUsed(entry.id);
         return {
@@ -907,10 +907,13 @@ export class UserAskService {
         else if (save?.replaceId && !remember) {
             await this.saved.remove({ id: save.replaceId });
         }
+        const shared = sharedHandles(handles);
         for (const { field, value } of collected) {
-            if (!field.sensitive || handles[field.id]) {
+            if (!field.sensitive || (handles[field.id] && !shared.has(handles[field.id]))) {
                 continue;
             }
+            // Every sensitive field gets a handle of its own; a saved handle that
+            // more than one field would share is replaced with a single-use one.
             handles[field.id] = this.saved.rememberSingleUse(value, field.label);
         }
         if (!savedNote &&
@@ -988,6 +991,12 @@ export class UserAskService {
         this.fingerprintCache = { key, fingerprints };
         return fingerprints;
     }
+    async missingHandleMessage(handle) {
+        if (await this.saved.issued(handle)) {
+            return "That secure value is no longer on this computer: a value the user chose not to remember works once and for an hour. Ask for it again with request_secure_input.";
+        }
+        return "Stella never issued that handle, so it was probably copied wrong. Pass the exact handle for this field from the `handles` of your request_secure_input result (handles.<field id>); calling request_secure_input again with the same service returns remembered values without asking the user.";
+    }
     async resolveHandle(handle) {
         const resolved = await this.saved.resolve(handle);
         if (!resolved) {
@@ -1006,7 +1015,7 @@ export class UserAskService {
         }
         const value = await this.resolveHandle(handle);
         if (value === null) {
-            return { ok: false, error: "That secure value is no longer on this computer. Ask for it again with request_secure_input." };
+            return { ok: false, error: await this.missingHandleMessage(handle) };
         }
         return { ok: true, value };
     }
@@ -1047,7 +1056,7 @@ export class UserAskService {
                 handle,
                 target: target?.kind ?? "command",
                 usedAt,
-                detail: "That secure value is no longer on this computer. Ask for it again with request_secure_input.",
+                detail: await this.missingHandleMessage(handle),
                 ok: false,
             };
         }

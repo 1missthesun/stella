@@ -24,6 +24,7 @@ const workspaceDirs = (root: string): string[] => {
       continue;
     }
     const parent = pattern.slice(0, -2);
+    if (!fs.existsSync(path.join(root, parent))) continue;
     for (const entry of fs.readdirSync(path.join(root, parent), { withFileTypes: true, encoding: "utf8" })) {
       if (entry.isDirectory()) dirs.push(`${parent}/${entry.name}`);
     }

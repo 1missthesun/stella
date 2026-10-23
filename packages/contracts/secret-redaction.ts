@@ -1,5 +1,7 @@
 export const SECRET_FRAGMENT_WINDOW = 12;
 export const SECRET_MIN_MATCH_LENGTH = 8;
+/** Shorter secrets (a CVC, a ZIP, a card expiry) are only redacted as whole tokens, never inside longer text. */
+export const SECRET_MIN_EXACT_LENGTH = 3;
 export const SECRET_REDACTION_MARK = "[REDACTED]";
 
 const MODULUS_A = 67_108_859;
@@ -9,7 +11,14 @@ const KEY_SPLIT = 67_108_864;
 export type SecretFingerprintParams = { baseA: number; baseB: number };
 
 export type SecretFingerprints = SecretFingerprintParams & {
-  windows: readonly { length: number; hashes: readonly number[] }[];
+  windows: readonly SecretFingerprintWindow[];
+};
+
+/** `exact` windows hold whole short secrets and match only a complete token of that length. */
+export type SecretFingerprintWindow = {
+  length: number;
+  hashes: readonly number[];
+  exact?: boolean;
 };
 
 export const EMPTY_SECRET_FINGERPRINTS: SecretFingerprints = {
@@ -127,7 +136,24 @@ export const fingerprintSecrets = (
   params: SecretFingerprintParams,
 ): SecretFingerprints => {
   const byLength = new Map<number, Set<number>>();
+  const exactByLength = new Map<number, Set<number>>();
   for (const secret of secrets) {
+    const short = normalize(secret).text;
+    if (
+      short.length >= SECRET_MIN_EXACT_LENGTH &&
+      short.length < SECRET_MIN_MATCH_LENGTH &&
+      short === secret.trim()
+    ) {
+      let hashes = exactByLength.get(short.length);
+      if (!hashes) {
+        hashes = new Set();
+        exactByLength.set(short.length, hashes);
+      }
+      const target = hashes;
+      forEachWindowHash(short, short.length, params, (_start, key) => {
+        target.add(key);
+      });
+    }
     for (const variant of secretEncodedVariants(secret)) {
       const { text } = normalize(variant);
       if (text.length < SECRET_MIN_MATCH_LENGTH) continue;
@@ -145,25 +171,88 @@ export const fingerprintSecrets = (
   }
   return {
     ...params,
-    windows: [...byLength].map(([length, hashes]) => ({
+    windows: [
+      ...[...byLength].map(([length, hashes]) => ({
+        length,
+        hashes: [...hashes],
+      })),
+      ...[...exactByLength].map(([length, hashes]) => ({
+        length,
+        hashes: [...hashes],
+        exact: true,
+      })),
+    ],
+  };
+};
+
+/** Combines two fingerprint sets made with the same params. */
+export const mergeSecretFingerprints = (
+  left: SecretFingerprints,
+  right: SecretFingerprints,
+): SecretFingerprints => {
+  if (right.windows.length === 0) return left;
+  if (left.windows.length === 0) return right;
+  const byKey = new Map<string, { length: number; exact: boolean; hashes: Set<number> }>();
+  for (const window of [...left.windows, ...right.windows]) {
+    const exact = window.exact === true;
+    const key = `${window.length}:${exact}`;
+    const entry = byKey.get(key) ?? { length: window.length, exact, hashes: new Set<number>() };
+    for (const hash of window.hashes) entry.hashes.add(hash);
+    byKey.set(key, entry);
+  }
+  return {
+    baseA: left.baseA,
+    baseB: left.baseB,
+    windows: [...byKey.values()].map(({ length, exact, hashes }) => ({
       length,
       hashes: [...hashes],
+      ...(exact ? { exact: true } : {}),
     })),
   };
 };
 
+// A token is letters and digits, optionally joined by / - . (so "11/31" and
+// "94107-1234" are one token, and a sentence's trailing period is not part of it).
+const SHORT_TOKEN_RE = /[\p{L}\p{N}]+(?:[/.-][\p{L}\p{N}]+)*/gu;
+
+const redactExactTokens = (
+  input: string,
+  lookups: readonly { length: number; hashes: Set<number> }[],
+  params: SecretFingerprintParams,
+  mark: string,
+): string => {
+  if (lookups.length === 0) return input;
+  const lengths = new Set(lookups.map((lookup) => lookup.length));
+  return input.replace(SHORT_TOKEN_RE, (token) => {
+    if (!lengths.has(token.length)) return token;
+    let found = false;
+    forEachWindowHash(token, token.length, params, (_start, key) => {
+      if (lookups.some((lookup) => lookup.length === token.length && lookup.hashes.has(key))) {
+        found = true;
+      }
+    });
+    return found ? mark : token;
+  });
+};
+
+type Lookup = { length: number; hashes: Set<number> };
+
 const lookupCache = new WeakMap<
   SecretFingerprints,
-  { length: number; hashes: Set<number> }[]
+  { windows: Lookup[]; exact: Lookup[] }
 >();
 
 const lookupsOf = (fingerprints: SecretFingerprints) => {
   let lookups = lookupCache.get(fingerprints);
   if (!lookups) {
-    lookups = fingerprints.windows.map((window) => ({
+    const toLookup = (window: SecretFingerprintWindow): Lookup => ({
       length: window.length,
       hashes: new Set(window.hashes),
-    }));
+    });
+    lookups = {
+      windows: fingerprints.windows.filter((window) => !window.exact).map(toLookup),
+      exact: fingerprints.windows.filter((window) => window.exact).map(toLookup),
+    };
     lookupCache.set(fingerprints, lookups);
   }
   return lookups;
@@ -175,7 +264,11 @@ export const redactSecretFingerprints = (
   mark: string = SECRET_REDACTION_MARK,
 ): string => {
   if (!input || fingerprints.windows.length === 0) return input;
-  const lookups = lookupsOf(fingerprints);
+  const { windows: lookups, exact } = lookupsOf(fingerprints);
+  if (exact.length > 0) {
+    input = redactExactTokens(input, exact, fingerprints, mark);
+  }
+  if (lookups.length === 0) return input;
   const shortest = Math.min(...lookups.map((lookup) => lookup.length));
   if (input.length < shortest) return input;
   const normalized = normalize(input);

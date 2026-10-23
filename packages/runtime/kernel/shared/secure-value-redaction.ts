@@ -29,7 +29,7 @@ const parseFingerprints = (value: unknown): SecretFingerprints | null => {
   ) {
     return null;
   }
-  const windows: { length: number; hashes: number[] }[] = [];
+  const windows: { length: number; hashes: number[]; exact?: boolean }[] = [];
   for (const window of candidate.windows) {
     if (!isFiniteInteger(window?.length) || !Array.isArray(window.hashes)) {
       return null;
@@ -39,6 +39,7 @@ const parseFingerprints = (value: unknown): SecretFingerprints | null => {
       hashes: (window.hashes as unknown[]).filter((hash): hash is number =>
         Number.isSafeInteger(hash),
       ),
+      ...(window.exact === true ? { exact: true } : {}),
     });
   }
   return { baseA: candidate.baseA, baseB: candidate.baseB, windows };

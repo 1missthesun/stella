@@ -810,13 +810,23 @@ const startElectron = async (run, { minted, modelGateway, fakeMic, browserBridge
             STELLA_BROWSER_SOCKET_DIR: run.browserExtension.socketDir,
             STELLA_BROWSER_ISOLATED_EXT_PORT: String(run.browserExtension.extPort),
           }
-        : {}),
+        : process.platform === "darwin"
+          ? {
+              // The run's home is deep enough that the browser daemon's
+              // `<home>/.stella-browser/i-<hash>/agent-<id>.sock` passes the
+              // 104-byte sun_path limit and the test browser never starts.
+              STELLA_BROWSER_SOCKET_DIR: path.join(path.dirname(userDataDir), "b"),
+            }
+          : {}),
       ...providerHomes,
       ...runHomeEnvironment(run),
       ...(process.env.STELLA_BACKEND_URL?.trim()
         ? { VITE_STELLA_BACKEND_URL: resolveSiteUrl() }
         : {}),
       STELLA_SKIP_BROWSER_HYDRATE: "1",
+      // Saved secure values go to the run's protected file, never the user's
+      // login keychain or Secret Service.
+      STELLA_SAVED_VALUES_STORE: "protected_file",
       STELLA_DATA_DIR: dataDir,
       STELLA_V2_DEV_DATA_DIR: dataDir,
       STELLA_DEV_HARNESS: "1",

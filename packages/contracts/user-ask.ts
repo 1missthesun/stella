@@ -171,6 +171,74 @@ export type UserAskField = Readonly<{
   choices?: readonly UserAskOption[];
 }>;
 
+/**
+ * Ready-made field sets for the common secure prompts. A preset expands into
+ * fields with these well-known ids, so the agent reads each field's handle back
+ * under the same id (`handles.card_number`, `handles.password`, …) and the
+ * desktop and phone cards pick the right keyboard and autofill for each one.
+ */
+export const USER_ASK_PRESETS = ["login", "card"] as const;
+
+export type UserAskPreset = (typeof USER_ASK_PRESETS)[number];
+
+const USER_ASK_PRESET_FIELDS: Record<UserAskPreset, readonly UserAskField[]> = {
+  login: [
+    { id: "username", label: "Username or email", type: "text", sensitive: false },
+    { id: "password", label: "Password", type: "secret", sensitive: true },
+  ],
+  card: [
+    { id: "card_number", label: "Card number", type: "secret", sensitive: true },
+    {
+      id: "card_expiry",
+      label: "Expiry",
+      type: "text",
+      sensitive: true,
+      placeholder: "MM/YY",
+    },
+    { id: "card_cvc", label: "Security code (CVC)", type: "secret", sensitive: true },
+    { id: "postal_code", label: "Billing ZIP / postal code", type: "text", sensitive: true },
+  ],
+};
+
+export const userAskPresetFields = (preset: unknown): readonly UserAskField[] =>
+  typeof preset === "string" && (USER_ASK_PRESETS as readonly string[]).includes(preset)
+    ? USER_ASK_PRESET_FIELDS[preset as UserAskPreset]
+    : [];
+
+/** What kind of value a text field holds, for keyboards, autofill and masking. */
+export type UserAskFieldInputKind =
+  | "username"
+  | "email"
+  | "password"
+  | "card_number"
+  | "card_expiry"
+  | "card_cvc"
+  | "postal_code"
+  | "one_time_code"
+  | "plain";
+
+const INPUT_KIND_PATTERNS: readonly (readonly [UserAskFieldInputKind, RegExp])[] = [
+  ["card_number", /^(card_?(number|no|num)|cc_?(number|num)|pan)$/],
+  ["card_expiry", /^(card_?)?(expiry|expiration|exp)(_?date)?$|^cc_?exp$/],
+  ["card_cvc", /^(card_?)?(cvc|cvv|cvc2|cvv2|csc|security_?code)$/],
+  ["postal_code", /^(billing_?)?(postal_?code|post_?code|zip(_?code)?)$/],
+  ["email", /^e_?mail$/],
+  ["username", /^(user(name)?|login|user_?id)$/],
+  ["password", /^(pass(word)?|pwd)$/],
+];
+
+export const userAskFieldInputKind = (
+  field: Pick<UserAskField, "id" | "type">,
+): UserAskFieldInputKind => {
+  if (field.type === "code") return "one_time_code";
+  if (field.type === "choice") return "plain";
+  const id = field.id.toLowerCase();
+  for (const [kind, pattern] of INPUT_KIND_PATTERNS) {
+    if (pattern.test(id)) return kind;
+  }
+  return field.type === "secret" ? "password" : "plain";
+};
+
 export type UserAskQuestion = Readonly<{
   id: string;
   question: string;

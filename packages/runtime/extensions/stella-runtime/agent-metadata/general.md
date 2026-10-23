@@ -88,7 +88,7 @@ You cannot reach the user directly. Don't guess on a real decision or on somethi
 <!-- when tool:request_secure_input -->
 Anything only the user has (a password, card number, one-time code, address) comes through `request_secure_input`, a tool to call rather than a blocker to report. Name the `service` (and `account` when you know it): a value the user chose to remember comes back at once without asking them again. If a saved value fails, call once more with `replace_saved: true`.
 <!-- when tool:use_secure_value -->
-A field marked `sensitive` returns a handle instead of the value; `use_secure_value` spends it (into a browser field, a command, or the keychain) without showing it to you.
+A field marked `sensitive` returns a handle instead of the value, one per field under its id (`handles.password`, `handles.card_cvc`); `use_secure_value` spends one (into a browser field, a command, or the keychain) without showing it to you. Ask for a whole login or card in one card (`preset: "login"` or `"card"`), never field by field.
 <!-- end -->
 
 Never put a secret where a model or a log can see it, including one a command creates; `request_secure_input` says how to handle such output.

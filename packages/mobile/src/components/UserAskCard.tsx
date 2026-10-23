@@ -21,10 +21,12 @@ import { Text } from "./Text";
 import type {
   UserAsk,
   UserAskAnswerFieldValue,
+  UserAskField,
   UserAskSecureInputDetail,
 } from "@stella/contracts/user-ask";
 import {
   USER_ASK_MAX_NOTE,
+  userAskFieldInputKind,
   userAskOffersRemember,
 } from "@stella/contracts/user-ask";
 import {
@@ -968,13 +970,7 @@ function SecureInputBody({
                   autoCapitalize="none"
                   autoCorrect={false}
                   colors={colors}
-                  {...(field.type === "code"
-                    ? {
-                        keyboardType: "number-pad" as const,
-                        maxLength: 12,
-                        textContentType: "oneTimeCode" as const,
-                      }
-                    : {})}
+                  {...nativeInputPropsForField(field)}
                   accessibilityLabel={field.label}
                   onChangeText={(next) =>
                     setValues((prev) => ({ ...prev, [field.id]: next }))
@@ -984,7 +980,8 @@ function SecureInputBody({
                   spellCheck={false}
                   style={[
                     styles.input,
-                    field.type === "code" && styles.inputCode,
+                    userAskFieldInputKind(field) === "one_time_code" &&
+                      styles.inputCode,
                   ]}
                   value={value}
                 />
@@ -1066,6 +1063,46 @@ function SecureInputBody({
     </View>
   );
 }
+
+/** Keyboard, autofill and length for a field, from its well-known id or type (card number, expiry, CVC, ZIP, login, code). */
+const nativeInputPropsForField = (field: UserAskField): Partial<TextInputProps> => {
+  const kind = userAskFieldInputKind(field);
+  const props = nativeInputPropsForKind(kind);
+  // iOS reads a card with several masked fields as a sign-up form and offers
+  // "Use Strong Password?" (and can fill one) on any masked field it doesn't
+  // recognise as the password, e.g. a masked ZIP or expiry. Only the password
+  // keeps the password hint; other masked fields are marked as one-time codes,
+  // which keeps their keyboard and turns that offer off.
+  if (field.type === "secret" && kind !== "password") {
+    return { ...props, textContentType: "oneTimeCode", autoComplete: "off" };
+  }
+  return props;
+};
+
+const nativeInputPropsForKind = (
+  kind: ReturnType<typeof userAskFieldInputKind>,
+): Partial<TextInputProps> => {
+  switch (kind) {
+    case "one_time_code":
+      return { keyboardType: "number-pad", maxLength: 12, textContentType: "oneTimeCode", autoComplete: "one-time-code" };
+    case "card_number":
+      return { keyboardType: "number-pad", maxLength: 23, textContentType: "creditCardNumber", autoComplete: "cc-number" };
+    case "card_expiry":
+      return { keyboardType: "numbers-and-punctuation", maxLength: 7, textContentType: "creditCardExpiration", autoComplete: "cc-exp" };
+    case "card_cvc":
+      return { keyboardType: "number-pad", maxLength: 4, textContentType: "creditCardSecurityCode", autoComplete: "cc-csc" };
+    case "postal_code":
+      return { keyboardType: "numbers-and-punctuation", maxLength: 12, textContentType: "postalCode", autoComplete: "postal-code" };
+    case "email":
+      return { keyboardType: "email-address", textContentType: "emailAddress", autoComplete: "email" };
+    case "username":
+      return { textContentType: "username", autoComplete: "username" };
+    case "password":
+      return { textContentType: "password", autoComplete: "current-password" };
+    default:
+      return {};
+  }
+};
 
 function AskTextInput({
   colors,

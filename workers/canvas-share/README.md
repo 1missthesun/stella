@@ -38,6 +38,18 @@ layer.
     Private: the page sets a second view cookie (`stella_canvas_asset`,
     `SameSite=None`, `Path=/c/<slug>/`), because a sandboxed page's own
     subresource requests are cross-site and never carry the Lax view cookie.
+- `GET /f/<slug>/<name>` → a shared Drive file from `files/<slug>`, with range
+  requests (206) so media streams and seeks.
+  - Video/audio opened by a person (`Sec-Fetch-Dest: document`, or no Sec-Fetch
+    headers and an `Accept` with `text/html`) → a small script-free player
+    page (`<video controls playsinline preload="metadata">`, full width, first
+    frame as poster, file name, Download). The player loads the bytes from
+    `?raw=1`; `?download=1` forces an attachment. Both carry
+    `Vary: Sec-Fetch-Dest, Accept`.
+  - Video/audio bytes are served without the CSP `sandbox` flag: WebKit's
+    built-in player needs its own scripts, and a sandbox without
+    `allow-scripts` collapsed shared videos on iPhone to a tiny box with a
+    spinner. Every other type keeps `sandbox`.
 - `SHARES_DISABLED` var truthy (`1`/`true`/`yes`) → `503` for every share (kill-switch).
 
 ### CSP note (important)

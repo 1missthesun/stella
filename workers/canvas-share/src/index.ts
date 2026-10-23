@@ -197,6 +197,19 @@ const parseCanvasPath = (pathname: string): CanvasPath | null => {
 };
 
 const FILE_CSP = "sandbox; default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'";
+// WebKit lays out its built-in player (the page Safari shows for a bare video
+// URL, and every <video controls>) with its own scripts, which a `sandbox`
+// without allow-scripts blocks: the video collapses to a sliver and the
+// controls never show a duration. A video/audio body served with nosniff can
+// never run as a document, so media goes without the sandbox.
+const MEDIA_FILE_CSP = "default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'";
+const MEDIA_TYPE = /^(?:video|audio)\/[a-z0-9.+-]+$/;
+
+const fileCspFor = (contentType: string): string =>
+  MEDIA_TYPE.test(contentType) ? MEDIA_FILE_CSP : FILE_CSP;
+
+const bareContentType = (value: string | undefined): string =>
+  (value ?? "").split(";")[0]!.trim().toLowerCase();
 
 const rangedObjectResponse = async (
   request: Request,
@@ -277,7 +290,7 @@ const serveCanvasAsset = async (
   headers.set("x-content-type-options", "nosniff");
   headers.set("x-robots-tag", "noindex, nofollow");
   headers.set("referrer-policy", "no-referrer");
-  headers.set("content-security-policy", FILE_CSP);
+  headers.set("content-security-policy", fileCspFor(bareContentType(head.httpMetadata?.contentType)));
   headers.set("accept-ranges", "bytes");
   headers.set("cache-control", isPrivate ? "private, no-store" : "public, max-age=60");
   if (!isPrivate) headers.set("access-control-allow-origin", "*");
@@ -299,11 +312,108 @@ const parseFileSlug = (pathname: string): string | null => {
   return SLUG_PATTERN.test(slug) ? slug : null;
 };
 
+const fileNameOf = (head: R2Object): string | null => {
+  const encoded = head.httpMetadata?.contentDisposition?.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+  if (!encoded) return null;
+  try {
+    return decodeURIComponent(encoded);
+  } catch {
+    return null;
+  }
+};
+
+const formatBytes = (bytes: number): string => {
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  const mb = bytes / (1024 * 1024);
+  return mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${mb >= 10 ? Math.round(mb) : mb.toFixed(1)} MB`;
+};
+
+// A person opening a shared video or audio link gets a small player page
+// rather than the browser's bare media page; the player loads the bytes from
+// the same link with `?raw=1`. Everything else (the <video> element itself,
+// curl, download managers, `?raw=1`, `?download=1`) gets the file.
+const wantsPlayerPage = (request: Request, url: URL): boolean => {
+  if (url.searchParams.has("raw") || url.searchParams.has("download")) return false;
+  if (request.headers.has("range")) return false;
+  const dest = request.headers.get("sec-fetch-dest");
+  if (dest) return dest === "document";
+  return (request.headers.get("accept") ?? "").includes("text/html");
+};
+
+const PLAYER_CSP =
+  "default-src 'none'; media-src 'self'; img-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
+
+const playerPageHtml = (
+  kind: "video" | "audio",
+  name: string,
+  size: number,
+  rawPath: string,
+  rawUrl: string,
+  contentType: string,
+): string => {
+  const title = escapeHtml(name);
+  const src = escapeHtml(rawPath);
+  const media =
+    kind === "video"
+      ? `<video controls playsinline preload="metadata" src="${src}#t=0.001"></video>`
+      : `<audio controls preload="metadata" src="${src}"></audio>`;
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="robots" content="noindex, nofollow">
+<title>${title}</title>
+<meta property="og:title" content="${title}">
+<meta property="og:type" content="${kind === "video" ? "video.other" : "music.song"}">
+<meta property="og:${kind}" content="${escapeHtml(rawUrl)}">
+<meta property="og:${kind}:type" content="${escapeHtml(contentType)}">
+<style>
+  html, body { margin: 0; }
+  body { background: #0e0e0d; color: #ecebe8; display: flex; align-items: center; justify-content: center;
+    min-height: 100vh; min-height: 100svh;
+    font: 15px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-text-size-adjust: 100%; }
+  figure { margin: 0; width: 100%; padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
+    box-sizing: border-box; }
+  video { display: block; width: 100%; height: auto; aspect-ratio: auto 16 / 9;
+    max-height: calc(100vh - 72px); max-height: calc(100svh - 72px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    background: #000; object-fit: contain; }
+  audio { display: block; width: min(640px, calc(100% - 32px)); margin: 0 auto; }
+  figcaption { display: flex; align-items: center; gap: 12px; box-sizing: border-box; min-height: 72px;
+    padding: 12px 16px max(12px, env(safe-area-inset-bottom)); }
+  .meta { flex: 1; min-width: 0; }
+  .name { display: block; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .size { display: block; font-size: 13px; color: #a3a29e; }
+  a.download { flex: none; padding: 8px 14px; border-radius: 999px; background: #ecebe8;
+    color: #161615; text-decoration: none; font-weight: 500; font-size: 14px; }
+  @media (min-width: 900px) {
+    figure { width: fit-content; max-width: calc(100% - 48px); padding: 24px 0 0; }
+    figure.audio { width: 640px; }
+    video { width: auto; max-width: 100%; min-width: min(100%, 720px);
+      max-height: calc(100vh - 120px); max-height: calc(100svh - 120px); border-radius: 10px; }
+    figcaption { padding: 12px 2px 16px; }
+  }
+</style>
+</head>
+<body>
+<figure class="${kind}">${media}
+<figcaption>
+  <div class="meta"><span class="name">${title}</span><span class="size">${formatBytes(size)}</span></div>
+  <a class="download" href="${escapeHtml(rawPath.replace(/\?raw=1$/, "?download=1"))}" download="${title}">Download</a>
+</figcaption>
+</figure>
+</body>
+</html>`;
+};
+
 const serveFile = async (
   request: Request,
   env: Env,
   ctx: ExecutionContext,
   slug: string,
+  url: URL,
 ): Promise<Response> => {
   const key = `files/${slug}`;
   const head = await env.SHARES_BUCKET.head(key);
@@ -315,21 +425,49 @@ const serveFile = async (
   }
   if (head.customMetadata?.visibility === "private") return notFound();
 
+  const contentType = bareContentType(head.httpMetadata?.contentType);
+  const isMedia = MEDIA_TYPE.test(contentType);
+  const name = fileNameOf(head) ?? "file";
+
+  if (isMedia && wantsPlayerPage(request, url)) {
+    const rawPath = `${url.pathname}?raw=1`;
+    const html = playerPageHtml(
+      contentType.startsWith("audio/") ? "audio" : "video",
+      name,
+      head.size,
+      rawPath,
+      `${url.origin}${rawPath}`,
+      contentType,
+    );
+    return new Response(request.method === "HEAD" ? null : html, {
+      status: 200,
+      headers: {
+        "content-type": "text/html; charset=utf-8",
+        "x-content-type-options": "nosniff",
+        "x-robots-tag": "noindex, nofollow",
+        "referrer-policy": "no-referrer",
+        "cache-control": "public, max-age=60",
+        "content-security-policy": PLAYER_CSP,
+        vary: "Sec-Fetch-Dest, Accept",
+      },
+    });
+  }
+
   const headers = new Headers({
     "x-content-type-options": "nosniff",
     "x-robots-tag": "noindex, nofollow",
     "referrer-policy": "no-referrer",
     "cache-control": "public, max-age=60",
-    "content-security-policy": FILE_CSP,
+    "content-security-policy": fileCspFor(contentType),
     "accept-ranges": "bytes",
   });
   head.writeHttpMetadata(headers);
   headers.set("cache-control", "public, max-age=60");
   headers.set("x-content-type-options", "nosniff");
-  const contentType = (head.httpMetadata?.contentType ?? "").split(";")[0]!.trim().toLowerCase();
-  if (!INLINE_FILE_TYPE.test(contentType)) {
-    const name = head.httpMetadata?.contentDisposition?.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
-    headers.set("content-disposition", `attachment${name ? `; filename*=UTF-8''${name}` : ""}`);
+  if (isMedia) headers.set("vary", "Sec-Fetch-Dest, Accept");
+  if (!INLINE_FILE_TYPE.test(contentType) || url.searchParams.has("download")) {
+    const encoded = head.httpMetadata?.contentDisposition?.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+    headers.set("content-disposition", `attachment${encoded ? `; filename*=UTF-8''${encoded}` : ""}`);
     if (!contentType || /html|svg|xml|javascript/.test(contentType)) {
       headers.set("content-type", "application/octet-stream");
     }
@@ -355,7 +493,7 @@ export default {
     }
 
     const fileSlug = parseFileSlug(url.pathname);
-    if (fileSlug) return serveFile(request, env, ctx, fileSlug);
+    if (fileSlug) return serveFile(request, env, ctx, fileSlug, url);
 
     const canvasPath = parseCanvasPath(url.pathname);
     if (!canvasPath) return notFound();

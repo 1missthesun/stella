@@ -195,9 +195,15 @@
 }
 
 .coda .word {
+  padding: 0.1em 0.12em 0.24em;
+  margin: -0.1em calc(0.22em - 0.12em) -0.24em -0.12em;
   background: inherit;
   -webkit-background-clip: text;
   background-clip: text;
+}
+
+.coda .word:last-child {
+  margin-right: -0.12em;
 }
 
 @keyframes focus-out {

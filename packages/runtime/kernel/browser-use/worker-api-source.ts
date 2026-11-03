@@ -20,7 +20,8 @@ const bundleWithBun = async (bun: typeof Bun): Promise<string> => {
         setup(build) {
           build.onResolve(
             { filter: /^[^./]/ },
-            ({ path: specifier, importer }) => {
+            ({ path: specifier, importer, kind }) => {
+              if (kind === "entry-point-build") return undefined;
               packageImports.push(`${importer} imports ${specifier}`);
               return { path: specifier, external: true };
             },

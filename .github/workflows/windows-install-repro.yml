@@ -1,0 +1,134 @@
+name: Windows install repro
+
+# Installs Stella on a fresh Windows runner the way a user does (Stella.exe
+# from launcher/stable, or a launcher built from this ref), presses Start,
+# watches for a while and uploads screenshots, the launcher, Electron and
+# runtime logs and crash dumps. Not a gate: run it by hand to see what a
+# Windows user sees.
+
+on:
+  workflow_dispatch:
+    inputs:
+      launcher:
+        description: "published (launcher/stable/Stella.exe) or built (this ref's launcher/windows)"
+        default: published
+        type: choice
+        options: [published, built]
+      minutes:
+        description: Minutes to watch after start
+        default: "10"
+      backend:
+        description: Backend URL for STELLA_LAUNCHER_BACKEND_URL (empty = the launcher's default, prod)
+        default: ""
+
+jobs:
+  build:
+    if: inputs.launcher == 'built'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - run: sudo apt-get update -q && sudo apt-get install -y -q g++-mingw-w64-x86-64-posix binutils-mingw-w64-x86-64
+      - name: Build Stella.exe like the release build
+        env:
+          STELLA_LAUNCHER_VERSION: "999999"
+        run: launcher/windows/build.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: built-launcher
+          path: launcher/windows/build/Stella.exe
+
+  repro:
+    needs: [build]
+    if: always() && (needs.build.result == 'success' || needs.build.result == 'skipped')
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          sparse-checkout: .github
+      - uses: actions/download-artifact@v4
+        if: needs.build.result == 'success'
+        with:
+          name: built-launcher
+          path: ${{ runner.temp }}\built
+      - name: Get Stella.exe
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $dir = "$env:USERPROFILE\Downloads"
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          if (Test-Path "$env:RUNNER_TEMP\built\Stella.exe") {
+            Copy-Item "$env:RUNNER_TEMP\built\Stella.exe" "$dir\Stella.exe"
+            Write-Host "Using the launcher built from this ref"
+          } else {
+            $base = "https://pub-a319aaada8144dc9be5a83625033769c.r2.dev/launcher/stable"
+            Invoke-WebRequest "$base/Stella.exe" -OutFile "$dir\Stella.exe"
+            $sums = (Invoke-WebRequest "$base/SHA256SUMS").Content
+            Write-Host "VERSION: $((Invoke-WebRequest "$base/VERSION").Content)"
+            Write-Host $sums
+          }
+          Get-FileHash "$dir\Stella.exe" -Algorithm SHA256 | Format-List
+          Get-AuthenticodeSignature "$dir\Stella.exe" | Format-List
+          [System.Environment]::OSVersion | Format-List
+          Get-ItemProperty 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}' -ErrorAction SilentlyContinue | Format-List
+      - name: Run Stella.exe and watch
+        shell: pwsh
+        env:
+          WATCH_MINUTES: ${{ inputs.minutes }}
+          STELLA_LAUNCHER_BACKEND_URL: ${{ inputs.backend }}
+          ELECTRON_ENABLE_LOGGING: "1"
+        run: |
+          $out = "$env:RUNNER_TEMP\evidence"
+          New-Item -ItemType Directory -Force $out | Out-Null
+          & "$env:GITHUB_WORKSPACE\.github\scripts\windows-watch.ps1" -Exe "$env:USERPROFILE\Downloads\Stella.exe" -Out $out -Minutes ([double]$env:WATCH_MINUTES)
+      - name: Collect logs
+        if: always()
+        shell: pwsh
+        run: |
+          $out = "$env:RUNNER_TEMP\evidence"
+          New-Item -ItemType Directory -Force "$out\files" | Out-Null
+          $roots = @("$env:LOCALAPPDATA\Stella", "$env:APPDATA\Stella", "$env:USERPROFILE\.stella", "$env:LOCALAPPDATA\CrashDumps", "$env:LOCALAPPDATA\Temp")
+          foreach ($r in $roots) {
+            if (-not (Test-Path $r)) { continue }
+            Get-ChildItem $r -Recurse -File -Force -ErrorAction SilentlyContinue |
+              Where-Object { $_.FullName -notmatch '\\node_modules\\|\\\.git\\|\\runtimes\\|\\Cache\\|\\Code Cache\\|\\GPUCache\\' } |
+              Where-Object { $_.Extension -in '.log','.txt','.json','.dmp','.netlog','.jsonl' -or $_.Name -match 'log' } |
+              Where-Object { $_.Length -lt 20MB } |
+              ForEach-Object {
+                $rel = $_.FullName.Replace(':', '').TrimStart('\')
+                $dest = Join-Path "$out\files" $rel
+                New-Item -ItemType Directory -Force (Split-Path $dest) | Out-Null
+                Copy-Item $_.FullName $dest -ErrorAction SilentlyContinue
+              }
+          }
+          if (Test-Path "$env:USERPROFILE\.stella") {
+            Get-ChildItem "$env:USERPROFILE\.stella" -Recurse -Force -ErrorAction SilentlyContinue |
+              Where-Object { $_.FullName -notmatch '\\node_modules\\|\\\.git\\' } |
+              Select-Object FullName, Length, LastWriteTime | Format-Table -AutoSize | Out-String -Width 400 | Set-Content "$out\stella-home-tree.txt"
+            foreach ($sub in 'logs', 'runtime', 'state') {
+              if (Test-Path "$env:USERPROFILE\.stella\$sub") {
+                Get-ChildItem "$env:USERPROFILE\.stella\$sub" -Recurse -File -Force -ErrorAction SilentlyContinue |
+                  Where-Object { $_.Length -lt 20MB -and $_.Extension -ne '.netlog' } | ForEach-Object {
+                    $dest = Join-Path "$out\stella-home" $_.FullName.Substring("$env:USERPROFILE\.stella".Length)
+                    New-Item -ItemType Directory -Force (Split-Path $dest) | Out-Null
+                    Copy-Item $_.FullName $dest -ErrorAction SilentlyContinue
+                  }
+              }
+            }
+          }
+          Get-ChildItem "$env:LOCALAPPDATA\Stella" -Recurse -Depth 3 -Force -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -notmatch '\\node_modules\\|\\\.git\\' } |
+            Select-Object FullName, Length, LastWriteTime | Format-Table -AutoSize | Out-String -Width 400 | Set-Content "$out\localappdata-tree.txt"
+          if (Test-Path "$env:LOCALAPPDATA\Stella\logs\launcher.log") { Get-Content "$env:LOCALAPPDATA\Stella\logs\launcher.log" -Tail 200 }
+          if (Test-Path "$env:LOCALAPPDATA\Stella\logs\electron.log") { Get-Content "$env:LOCALAPPDATA\Stella\logs\electron.log" -Tail 200 }
+          Get-WinEvent -FilterHashtable @{LogName='Application'; StartTime=(Get-Date).AddHours(-1)} -ErrorAction SilentlyContinue |
+            Where-Object { $_.LevelDisplayName -in 'Error','Critical' } | Format-List TimeCreated, ProviderName, Message | Out-String -Width 400 | Set-Content "$out\app-events.txt"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-install-evidence
+          path: ${{ runner.temp }}\evidence

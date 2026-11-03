@@ -175,11 +175,16 @@ jobs:
           $env:STELLA_LAUNCHER_ROOT = "$env:RUNNER_TEMP\stella-root"
           $env:STELLA_LAUNCHER_KEY_FILE = "$env:RUNNER_TEMP\test-key\signing.pem"
           $env:STELLA_LAUNCHER_BACKEND_URL = $env:STELLA_DEV_BACKEND_URL
+          $check = Start-Process pwsh -NoNewWindow -PassThru -ArgumentList @('-NoProfile', '-File',
+            "`"$env:GITHUB_WORKSPACE\.github\scripts\launcher-window-check.ps1`"", '-Out', "`"$env:RUNNER_TEMP\capture`"")
+          $null = $check.Handle
           # Stella.exe is a GUI-subsystem program: wait on it explicitly.
           $p = Start-Process -FilePath "$env:GITHUB_WORKSPACE\launcher\windows\build\Stella.exe" -Wait -PassThru -ArgumentList @(
             '--self-test', '--source', "`"$env:GITHUB_WORKSPACE`"", '--capture-dir', "`"$env:RUNNER_TEMP\capture`"")
           Get-Content "$env:STELLA_LAUNCHER_ROOT\logs\launcher.log"
           Write-Host "self-test exit code: $($p.ExitCode)"
+          $check.WaitForExit()
+          if ($check.ExitCode -ne 0) { exit 1 }
           exit $p.ExitCode
 
       # Authenticode through DigiCert KeyLocker, the same certificate pinning

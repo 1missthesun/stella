@@ -1817,6 +1817,7 @@ private:
                 RECT rc;
                 GetClientRect(hwnd, &rc);
                 controller_->put_Bounds(rc);
+                if (IsWindowVisible(hwnd)) controller_->put_IsVisible(wParam != SIZE_MINIMIZED);
             }
             return 0;
         case WM_DPICHANGED: {
@@ -1935,6 +1936,10 @@ private:
         RECT rc;
         GetClientRect(hwnd_, &rc);
         controller_->put_Bounds(rc);
+        // A controller created under a hidden window starts invisible and never
+        // follows the window (seen with WebView2 156): applyVisibility and
+        // WM_SIZE drive IsVisible, or the shown window stays blank.
+        controller_->put_IsVisible(IsWindowVisible(hwnd_));
 
         EventRegistrationToken token;
         auto *onMessage = new Callback<ICoreWebView2WebMessageReceivedEventHandler>(
@@ -2088,8 +2093,10 @@ private:
         if (want && loaded) {
             ShowWindow(hwnd_, IsIconic(hwnd_) ? SW_RESTORE : SW_SHOW);
             SetForegroundWindow(hwnd_);
+            controller_->put_IsVisible(TRUE);
             controller_->MoveFocus(COREWEBVIEW2_MOVE_FOCUS_REASON_PROGRAMMATIC);
         } else if (!want && IsWindowVisible(hwnd_)) {
+            controller_->put_IsVisible(FALSE);
             ShowWindow(hwnd_, SW_HIDE);
         }
     }

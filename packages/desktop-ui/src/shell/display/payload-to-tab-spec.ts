@@ -222,7 +222,10 @@ export const removeGeneratedMediaItem = (
 };
 
 const rememberInFiles = (spec: DisplayTabSpec): DisplayTabSpec => {
-  if (!displayTabs.getLayoutSnapshot().panelOpen) {
+  if (
+    !displayTabs.getLayoutSnapshot().panelOpen &&
+    !sidebarSections.hasLocation("files", spec.id)
+  ) {
     sidebarSections.setLocation("files", spec.id);
   }
   return spec;

@@ -345,6 +345,12 @@ export const sidebarSections = {
     return snapshot;
   },
 
+  hasLocation(section: SidebarSection, location: string): boolean {
+    return snapshot.tabs.some(
+      (tab) => tab.kind === section && tab.location === location,
+    );
+  },
+
   getActiveTab(): SidebarTab | null {
     return activeTabOf(snapshot);
   },

@@ -1,4 +1,4 @@
-import { useRef, useSyncExternalStore } from "react";
+import { useLayoutEffect, useRef, useSyncExternalStore } from "react";
 import {
   fileNameFromDisplayTabId,
   sidebarSections,
@@ -32,6 +32,13 @@ export function SidebarTopNav() {
     tabSelector: ".sidebar-top-nav__tab",
     tabIds: tabs.map((tab) => tab.id),
   });
+
+  useLayoutEffect(() => {
+    if (!activeTabId) return;
+    stripRef.current
+      ?.querySelector<HTMLElement>(`[data-tab-id="${CSS.escape(activeTabId)}"]`)
+      ?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [activeTabId]);
 
   const titleFor = (tab: SidebarTab): string => {
     switch (tab.kind) {

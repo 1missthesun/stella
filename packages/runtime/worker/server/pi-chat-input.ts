@@ -4,6 +4,7 @@ import type {
 } from "@stella/contracts/protocol";
 import type { PiUserDisplay, PiUserPart } from "@stella/contracts/pi-chat";
 import type { PreparedChatInput } from "./chat-input.js";
+import { contentTypeFromName } from "@stella/contracts/attachment-content-type";
 
 const DATA_URL = /^data:([^;,]+);base64,(.+)$/s;
 
@@ -41,9 +42,15 @@ const displayOf = (
   const savedFiles = [...prepared.modelFileAttachments];
   const attachments = (payload.attachments ?? []).flatMap(
     (attachment, index): NonNullable<PiUserDisplay["attachments"]> => {
+      const typeFromLocation =
+        attachment.kind === "file" ? undefined : contentTypeFromName(attachment.path ?? attachment.url);
+      // Screenshots and dropped images can arrive as a bare path plus a data-URL preview, with no kind or type.
       const image =
         attachment.kind === "image" ||
-        (attachment.mimeType ?? "").startsWith("image/");
+        (attachment.mimeType ?? "").startsWith("image/") ||
+        (attachment.kind !== "file" &&
+          (/^data:image\//i.test(attachment.previewUrl ?? attachment.url ?? "") ||
+            Boolean(typeFromLocation?.startsWith("image/"))));
       const drivePath = attachment.drivePath?.trim() || undefined;
       const preview = attachment.previewUrl ?? (image && !drivePath ? attachment.url : undefined);
       const savedIndex = image || attachment.path
@@ -52,7 +59,10 @@ const displayOf = (
       const saved = savedIndex >= 0 ? savedFiles.splice(savedIndex, 1)[0] : undefined;
       const spilled = image ? prepared.spilledImagePaths.get(index) : undefined;
       const localPath = spilled?.filePath ?? attachment.path ?? saved?.sourcePath;
-      const mimeType = spilled?.mimeType || attachment.mimeType;
+      const mimeType =
+        spilled?.mimeType ||
+        attachment.mimeType ||
+        (image && typeFromLocation?.startsWith("image/") ? typeFromLocation : undefined);
       return [
         {
           kind: image ? "image" : "file",

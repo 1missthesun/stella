@@ -93,7 +93,8 @@ const make = (kind) => {
     webPreferences: { nodeIntegration: true, contextIsolation: false, backgroundThrottling: false },
   });
   w.setAlwaysOnTop(true, "floating");
-  w.setContentProtection(true);
+  // Content protection hides the windows from screenshots; "visible" variants skip it.
+  if (!VARIANT.includes("visible")) w.setContentProtection(true);
   w.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   if (kind !== "mark") w.setIgnoreMouseEvents(true);
   w.on("page-title-updated", (e) => e.preventDefault());

@@ -1,6 +1,7 @@
 import { memo, useEffect, useState } from "react";
 import type {
   AppSourceActionResult,
+  AppSourceDraft,
   AppSourceWaiting,
 } from "@stella/contracts/desktop/app-source";
 import { showToast } from "@/ui/toast";
@@ -12,6 +13,8 @@ import {
   runAppSourceAction,
   updateProgress,
   useAppSourceState,
+  useClaimDraft,
+  useClaimedDrafts,
   usePendingAppSourceAction,
 } from "./app-source-store";
 import { UpdateCard } from "./UpdateCard";
@@ -59,19 +62,56 @@ export const useAppSourceAction = () => {
   return { pending, run };
 };
 
+const DraftUpdateCard = ({
+  draft,
+  stale,
+  busy,
+  disabled,
+  placement,
+  onUpdate,
+}: {
+  draft: AppSourceDraft;
+  stale: boolean;
+  busy: boolean;
+  disabled: boolean;
+  placement?: "message" | "composer";
+  onUpdate: () => void;
+}) => {
+  const t = useT();
+  const tPlural = useTPlural();
+  const shape = draft.restart
+    ? t("shell.appSource.restarts")
+    : tPlural("shell.appSource.files", draft.files);
+  return (
+    <UpdateCard
+      tone="update"
+      title={draft.subject || draft.name}
+      detail={stale ? t("shell.appSource.outdated") : `${t("shell.appSource.title")} · ${shape}`}
+      busy={busy}
+      disabled={disabled}
+      placement={placement}
+      action={{
+        label: t("shell.appSource.update"),
+        primary: true,
+        onClick: onUpdate,
+      }}
+    />
+  );
+};
+
 export const AgentUpdateCard = memo(function AgentUpdateCard({
   agentId,
 }: {
   agentId: string;
 }) {
   const t = useT();
-  const tPlural = useTPlural();
   const locale = useLocale();
   const now = useNow();
   const state = useAppSourceState();
   const { pending: running, run } = useAppSourceAction();
   const api = appSourceApi();
   const change = state ? agentChange(state, agentId) : null;
+  useClaimDraft(api && change && change.kind !== "applied" ? change.draft.name : null);
   if (!state || !api || !change) return null;
   const pending = running === agentId;
   const blocked =
@@ -80,22 +120,13 @@ export const AgentUpdateCard = memo(function AgentUpdateCard({
 
   if (change.kind === "ready" || change.kind === "stale") {
     const { draft } = change;
-    const stale = change.kind === "stale";
-    const shape = draft.restart
-      ? t("shell.appSource.restarts")
-      : tPlural("shell.appSource.files", draft.files);
     return (
-      <UpdateCard
-        tone="update"
-        title={draft.subject || draft.name}
-        detail={stale ? t("shell.appSource.outdated") : `${t("shell.appSource.title")} · ${shape}`}
+      <DraftUpdateCard
+        draft={draft}
+        stale={change.kind === "stale"}
         busy={pending}
         disabled={blocked}
-        action={{
-          label: t("shell.appSource.update"),
-          primary: true,
-          onClick: () => void run(agentId, () => api.apply(draft.name)),
-        }}
+        onUpdate={() => void run(agentId, () => api.apply(draft.name))}
       />
     );
   }
@@ -141,22 +172,60 @@ export const addOffer = (offer: AppSourceWaiting) => {
   return api.apply(offer.name);
 };
 
-export const AppSourceOffers = memo(function AppSourceOffers() {
+export const AppSourceOffers = memo(function AppSourceOffers({
+  placement = "message",
+}: {
+  placement?: "message" | "composer";
+}) {
   const t = useT();
   const state = useAppSourceState();
+  const claimed = useClaimedDrafts();
   const { pending, run } = useAppSourceAction();
   if (!state || !appSourceApi()) return null;
   const merging = updateProgress(state)?.state === "merging";
   const offers = state.waiting.filter(
     (offer): offer is Exclude<AppSourceWaiting, { kind: "version" }> =>
-      offer.kind !== "version" && (!merging || offer.adding),
+      offer.kind !== "version" &&
+      (!merging || offer.adding) &&
+      !(offer.kind === "draft" && claimed.has(offer.name)),
   );
   if (offers.length === 0) return null;
   const blocked = state.busy || pending !== null || merging;
+  const draftNamed = (name: string) =>
+    state.ready.find((draft) => draft.name === name) ??
+    state.stale.find((draft) => draft.name === name) ??
+    null;
   return (
     <div className="app-update-messages" data-testid="app-source-offers">
       {offers.map((offer) => {
         const adding = offer.adding || pending === offer.key;
+        if (offer.kind === "draft") {
+          const draft: AppSourceDraft = draftNamed(offer.name) ?? {
+            name: offer.name,
+            subject: offer.summary,
+            sha: "",
+            files: 0,
+            restart: false,
+          };
+          const card = (
+            <DraftUpdateCard
+              key={offer.key}
+              draft={draft}
+              stale={state.stale.some((entry) => entry.name === offer.name)}
+              busy={adding}
+              disabled={blocked && !adding}
+              placement={placement}
+              onUpdate={() => void run(offer.key, () => addOffer(offer))}
+            />
+          );
+          return placement === "composer" ? (
+            card
+          ) : (
+            <div key={offer.key} className="event-row event-row--assistant">
+              <div className="event-item assistant">{card}</div>
+            </div>
+          );
+        }
         return (
           <div key={offer.key} className="event-row event-row--assistant">
             <div className="event-item assistant">
@@ -166,13 +235,11 @@ export const AppSourceOffers = memo(function AppSourceOffers() {
                 </span>
                 <span className="schedule-card__body">
                   <span className="schedule-card__headline">
-                    {offer.kind === "other-computer"
-                      ? offer.device
-                        ? t("shell.appSource.updates.fromDevice", {
-                            device: deviceLabel(offer.device),
-                          })
-                        : t("shell.appSource.updates.fromOtherComputer")
-                      : t("shell.appSource.updates.readyChange")}
+                    {offer.device
+                      ? t("shell.appSource.updates.fromDevice", {
+                          device: deviceLabel(offer.device),
+                        })
+                      : t("shell.appSource.updates.fromOtherComputer")}
                   </span>
                   <span className="schedule-card__meta">
                     <span className="schedule-card__status">{subjectOf(offer.summary)}</span>
@@ -185,9 +252,7 @@ export const AppSourceOffers = memo(function AppSourceOffers() {
                       >
                         {adding
                           ? t("shell.appSource.updates.adding")
-                          : offer.kind === "other-computer"
-                            ? t("shell.appSource.updates.get")
-                            : t("shell.appSource.updates.add")}
+                          : t("shell.appSource.updates.get")}
                       </button>
                     </span>
                   </span>

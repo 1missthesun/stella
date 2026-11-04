@@ -26,6 +26,7 @@ import {
 import { STELLA_CODING_EXTENSION, StellaCoding } from "./stella/coding.ts";
 import type { StellaContextSources } from "./stella/context.ts";
 import { STELLA_AGENT_TOOLS, stellaToolExtensions, type StellaToolHost } from "./stella/host-tools.ts";
+import { createImageBudget } from "./stella/image-budget.ts";
 import { stellaPromptExtension } from "./stella/prompt-extension.ts";
 
 const MODEL_REQUEST_TIMEOUT_MS = 30 * 60 * 1000;
@@ -111,7 +112,8 @@ export type OpenStellaHarness = {
 
 export async function openStellaHarness(options: StellaHarnessOptions, context: Context): Promise<OpenStellaHarness> {
   const registry = createRegistry();
-  registry.install(stellaPromptExtension(options.sources));
+  const imageBudget = createImageBudget();
+  registry.install(stellaPromptExtension(options.sources, imageBudget.hook));
   const agents = stellaAgents(options.agents);
   registry.install(agents.extension);
   registry.install(StellaCoding);
@@ -132,7 +134,7 @@ export async function openStellaHarness(options: StellaHarnessOptions, context: 
   const harness = await Harness.open(
     options.storage,
     {
-      models: options.models,
+      models: imageBudget.models(options.models),
       registry,
       settings,
       ...(options.env ? { env: options.env } : {}),
@@ -140,6 +142,7 @@ export async function openStellaHarness(options: StellaHarnessOptions, context: 
     },
     context,
   );
+  imageBudget.bind(harness);
   return {
     harness,
     registry,

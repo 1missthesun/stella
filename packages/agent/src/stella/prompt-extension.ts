@@ -1,5 +1,5 @@
 import type { Context } from "@earendil-works/chord";
-import { defineExtension, section, type PromptInput, type PromptSection } from "@earendil-works/pi-durable";
+import { defineExtension, section, type HookRegistration, type PromptInput, type PromptSection } from "@earendil-works/pi-durable";
 import {
   renderExecutionDestination,
   renderExecutionDevices,
@@ -92,11 +92,11 @@ const orchestratorOnly = (
 ): PromptSection["render"] =>
   async (input, context) => ((await role(input, context)).agentType === "orchestrator" ? render(input, context) : undefined);
 
-export function stellaPromptExtension(sources: StellaContextSources) {
+export function stellaPromptExtension(sources: StellaContextSources, imageBudgetHook?: HookRegistration) {
   const memory = (context: Context) => sources.memory(context);
   return defineExtension({
     name: STELLA_PROMPT_EXTENSION,
-    hooks: [processableImagesHook, residentContextHook, messageIdsHook],
+    hooks: [processableImagesHook, ...(imageBudgetHook ? [imageBudgetHook] : []), residentContextHook, messageIdsHook],
     sections: [
       section(
         "preamble",

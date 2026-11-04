@@ -15,7 +15,10 @@ jobs:
       - name: Install Electron
         shell: pwsh
         working-directory: .github/scripts/companion-repro
-        run: bun install
+        run: |
+          bun install
+          node node_modules/electron/install.js
+          Get-ChildItem node_modules/electron/dist | Select-Object -First 5
       - name: Drive the pet
         shell: pwsh
         run: |

@@ -33,7 +33,7 @@ const buildLocalFileAttachments = (
   chatContext: ChatContext | null | undefined,
 ): LocalAttachment[] =>
   (chatContext?.files ?? []).map((file) => ({
-    url: file.dataUrl,
+    url: file.path || file.dataUrl,
     mimeType: file.mimeType,
     name: file.name,
     size: file.size,

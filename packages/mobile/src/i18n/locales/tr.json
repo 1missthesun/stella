@@ -271,6 +271,10 @@
         "empty": "Kayda değer yeni bir şey yok.",
         "close": "Kapat",
         "notLoaded": "Bu mesaj artık sohbette değil."
+      },
+      "attach": {
+        "failedTitle": "Dosya eklenemedi",
+        "failedDescription": "{names} eklenemedi. Bu bilgisayardaki bir klasöre kaydedip tekrar deneyin."
       }
     },
     "media": {

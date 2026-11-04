@@ -271,6 +271,10 @@
         "empty": "Intet nyt værd at nævne.",
         "close": "Luk",
         "notLoaded": "Den besked er ikke længere i chatten."
+      },
+      "attach": {
+        "failedTitle": "Kunne ikke vedhæfte en fil",
+        "failedDescription": "{names} kunne ikke vedhæftes. Gem den i en mappe på denne computer, og prøv igen."
       }
     },
     "media": {

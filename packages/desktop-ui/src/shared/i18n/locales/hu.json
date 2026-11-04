@@ -271,6 +271,10 @@
         "empty": "Semmi új, amit érdemes megemlíteni.",
         "close": "Bezárás",
         "notLoaded": "Ez az üzenet már nincs a csevegésben."
+      },
+      "attach": {
+        "failedTitle": "Nem sikerült csatolni a fájlt",
+        "failedDescription": "A(z) {names} csatolása nem sikerült. Mentsd egy mappába ezen a számítógépen, és próbáld újra."
       }
     },
     "media": {

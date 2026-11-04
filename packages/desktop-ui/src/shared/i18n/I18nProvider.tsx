@@ -17,6 +17,7 @@ import {
   type TranslateParams,
 } from "./catalogs";
 import { uiState } from "@/platform/ui-state";
+import { setActiveTranslator } from "./active-translator";
 import {
   DEFAULT_LOCALE,
   isRtlLocale,
@@ -148,6 +149,7 @@ export function I18nProviderBase({
     (key: string, params?: TranslateParams) => translate(catalog, key, params),
     [catalog],
   );
+  useEffect(() => setActiveTranslator(t), [t]);
 
   const tArray = useCallback(
     (key: string, params?: TranslateParams) =>

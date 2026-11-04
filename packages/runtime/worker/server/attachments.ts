@@ -239,7 +239,6 @@ export const materializeFileAttachments = async (args: {
         const stat = await fsPromises.stat(sourcePath);
         if (!stat.isFile()) throw new Error("Attachment is not a regular file");
         size = stat.size;
-        if (size > MAX_FILE_ATTACHMENT_BYTES) throw new Error("Attachment exceeds 50 MiB");
       } else {
         let data: Buffer;
         const match = DATA_URL_RE.exec(url);

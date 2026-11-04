@@ -266,6 +266,10 @@
         "empty": "Không có gì mới đáng chú ý.",
         "close": "Đóng",
         "notLoaded": "Tin nhắn đó không còn trong cuộc trò chuyện."
+      },
+      "attach": {
+        "failedTitle": "Không thể đính kèm tệp",
+        "failedDescription": "Không thể đính kèm {names}. Hãy lưu vào một thư mục trên máy tính này rồi thử lại."
       }
     },
     "media": {

@@ -276,6 +276,10 @@
         "empty": "Nada nuevo que destacar.",
         "close": "Cerrar",
         "notLoaded": "Ese mensaje ya no está en el chat."
+      },
+      "attach": {
+        "failedTitle": "No se pudo adjuntar un archivo",
+        "failedDescription": "No se pudo adjuntar {names}. Guárdalo en una carpeta de este ordenador e inténtalo de nuevo."
       }
     },
     "media": {

@@ -271,6 +271,10 @@
         "empty": "Ei mitään uutta mainittavaa.",
         "close": "Sulje",
         "notLoaded": "Viesti ei ole enää keskustelussa."
+      },
+      "attach": {
+        "failedTitle": "Tiedostoa ei voitu liittää",
+        "failedDescription": "Tiedostoa {names} ei voitu liittää. Tallenna se tämän tietokoneen kansioon ja yritä uudelleen."
       }
     },
     "media": {

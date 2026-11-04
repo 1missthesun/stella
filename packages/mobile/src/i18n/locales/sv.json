@@ -271,6 +271,10 @@
         "empty": "Inget nytt värt att nämna.",
         "close": "Stäng",
         "notLoaded": "Meddelandet finns inte längre i chatten."
+      },
+      "attach": {
+        "failedTitle": "Det gick inte att bifoga en fil",
+        "failedDescription": "{names} kunde inte bifogas. Spara den i en mapp på den här datorn och försök igen."
       }
     },
     "media": {

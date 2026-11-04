@@ -266,6 +266,10 @@
         "empty": "Tidak ada hal baru yang penting.",
         "close": "Tutup",
         "notLoaded": "Pesan itu sudah tidak ada di chat."
+      },
+      "attach": {
+        "failedTitle": "Tidak dapat melampirkan file",
+        "failedDescription": "{names} tidak dapat dilampirkan. Simpan ke folder di komputer ini lalu coba lagi."
       }
     },
     "media": {

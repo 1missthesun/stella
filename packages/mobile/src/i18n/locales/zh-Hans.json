@@ -266,6 +266,10 @@
         "empty": "没有值得一提的新内容。",
         "close": "关闭",
         "notLoaded": "该消息已不在对话中。"
+      },
+      "attach": {
+        "failedTitle": "无法附加文件",
+        "failedDescription": "无法附加 {names}。请将其保存到这台电脑上的文件夹后重试。"
       }
     },
     "media": {

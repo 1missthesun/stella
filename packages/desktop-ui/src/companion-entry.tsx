@@ -12,6 +12,8 @@ import { CompanionPanelRoot } from "./shell/companion/CompanionPanelRoot";
 
 applyLowPowerDocumentFlag();
 document.documentElement.dataset.stellaWindow = "companion";
+document.documentElement.dataset.stellaPlatform =
+  window.electronAPI?.platform ?? "";
 
 const kind =
   new URLSearchParams(window.location.search).get("window") ===

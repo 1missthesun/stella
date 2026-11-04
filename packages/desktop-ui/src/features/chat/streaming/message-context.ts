@@ -1,3 +1,4 @@
+import { contentTypeFromName } from "@stella/contracts/attachment-content-type";
 import type { ChatContext } from "@/shared/types/electron";
 
 export type LocalAttachment = {
@@ -15,9 +16,13 @@ const buildLocalScreenshotAttachments = (
 ): LocalAttachment[] =>
   (chatContext?.regionScreenshots ?? []).map((screenshot) => {
     if (screenshot.filePath) {
+      const name = screenshot.filePath.split(/[\\/]/).pop() || undefined;
+      const mimeType = contentTypeFromName(name);
       return {
         url: screenshot.filePath,
         previewUrl: screenshot.previewUrl ?? screenshot.dataUrl,
+        ...(name ? { name } : {}),
+        ...(mimeType?.startsWith("image/") ? { mimeType } : {}),
       };
     }
     const match = screenshot.dataUrl.match(

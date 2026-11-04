@@ -8,10 +8,12 @@ html,body{margin:0;background:transparent;overflow:hidden;user-select:none}
 .hull[data-active] .arc{display:block}
 .composer{position:absolute;left:30px;right:30px;top:40px;height:120px;border-radius:16px;background:#fff;border:2px solid #24c;display:none;font:16px sans-serif;padding:12px;pointer-events:auto}
 .root[data-expanded] .composer{display:block}
+html[data-fix] .hit, html[data-fix] .hull[data-active], html[data-fix] .mark { background: rgba(255,255,255,0.004); }
 </style></head><body><div class="root" id="root">
 <div class="composer">EXPANDED (clicked)</div>
 <div class="hull" id="hull"><button class="arc" style="left:150px;top:150px"></button><button class="hit" id="hit"></button></div></div>
 <script>
+if (new URLSearchParams(location.search).get("fix") === "1") document.documentElement.dataset.fix = "1";
 const { attachPress, ipcRenderer } = require("./press.js");
 const root = document.getElementById("root"), hull = document.getElementById("hull"), hit = document.getElementById("hit");
 ipcRenderer.on("layout", (_e, l) => { hull.style.left = (l.anchorX - 104) + "px"; hull.style.top = (l.anchorY - 42 - 104) + "px"; });

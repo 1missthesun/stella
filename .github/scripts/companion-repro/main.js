@@ -6,6 +6,8 @@ const fs = require("fs");
 const path = require("path");
 const OUT = process.env.OUT || __dirname;
 const VARIANT = process.env.VARIANT || "current";
+// "ddc" = Stella's Windows switch from packages/desktop/electron/windows-composition.js.
+if (VARIANT.includes("ddc")) app.commandLine.appendSwitch("disable-direct-composition");
 const logFile = path.join(OUT, `harness-${VARIANT}.log`);
 const log = (...a) =>
   fs.appendFileSync(logFile, `${Date.now()} ${a.map((x) => (typeof x === "string" ? x : JSON.stringify(x))).join(" ")}\n`);
@@ -95,7 +97,7 @@ const make = (kind) => {
   w.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   if (kind !== "mark") w.setIgnoreMouseEvents(true);
   w.on("page-title-updated", (e) => e.preventDefault());
-  w.loadFile(path.join(__dirname, `${kind}.html`));
+  w.loadFile(path.join(__dirname, `${kind}.html`), { query: { fix: VARIANT.includes("fix") ? "1" : "0" } });
   return w;
 };
 app.whenReady().then(async () => {

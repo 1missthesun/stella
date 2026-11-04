@@ -4,8 +4,10 @@ html,body{margin:0;background:transparent;overflow:hidden;user-select:none}
 .mark{position:absolute;width:84px;height:84px;transform:translate(-50%,-100%);padding:0;margin:0;border:0;background:transparent;border-radius:50%;cursor:grab}
 .mark span{display:block;position:absolute;inset:12px;border-radius:50%;background:radial-gradient(circle,#ffd54a,#ff7a00);pointer-events:none}
 .root[data-hovered] .mark span{background:radial-gradient(circle,#7af,#24c)}
+html[data-fix] .hit, html[data-fix] .hull[data-active], html[data-fix] .mark { background: rgba(255,255,255,0.004); }
 </style></head><body><div class="root" id="root"><button class="mark" id="mark"><span></span></button></div>
 <script>
+if (new URLSearchParams(location.search).get("fix") === "1") document.documentElement.dataset.fix = "1";
 const { attachPress, ipcRenderer } = require("./press.js");
 const root = document.getElementById("root"), mark = document.getElementById("mark");
 ipcRenderer.on("layout", (_e, l) => { mark.style.left = l.anchorX + "px"; mark.style.top = l.anchorY + "px"; });

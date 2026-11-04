@@ -1120,6 +1120,10 @@ export const registerSystemHandlers = (options) => {
         if (payload?.memoryEnabled !== undefined) {
             patch.memoryEnabled = payload.memoryEnabled === true;
         }
+        if (payload?.memoryChoice !== undefined) {
+            patch.memoryChoice =
+                typeof payload.memoryChoice === "boolean" ? payload.memoryChoice : null;
+        }
         const saved = updateLocalModelPreferences(stellaAppDir, patch);
         if (previousRealtimeVoice &&
             hasRealtimeVoiceSessionRouteChanged(previousRealtimeVoice, saved.realtimeVoice)) {

@@ -276,6 +276,10 @@
         "empty": "Niente di nuovo da segnalare.",
         "close": "Chiudi",
         "notLoaded": "Quel messaggio non è più nella chat."
+      },
+      "attach": {
+        "failedTitle": "Impossibile allegare un file",
+        "failedDescription": "Impossibile allegare {names}. Salvalo in una cartella di questo computer e riprova."
       }
     },
     "media": {

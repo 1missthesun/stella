@@ -271,6 +271,10 @@
         "empty": "Niets nieuws om te melden.",
         "close": "Sluiten",
         "notLoaded": "Dat bericht staat niet meer in de chat."
+      },
+      "attach": {
+        "failedTitle": "Kan bestand niet bijvoegen",
+        "failedDescription": "{names} kan niet worden bijgevoegd. Sla het op in een map op deze computer en probeer het opnieuw."
       }
     },
     "media": {

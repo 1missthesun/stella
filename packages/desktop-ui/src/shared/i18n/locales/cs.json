@@ -281,6 +281,10 @@
         "empty": "Nic nového k zmínění.",
         "close": "Zavřít",
         "notLoaded": "Tato zpráva už v chatu není."
+      },
+      "attach": {
+        "failedTitle": "Soubor se nepodařilo připojit",
+        "failedDescription": "{names} se nepodařilo připojit. Uložte ho do složky v tomto počítači a zkuste to znovu."
       }
     },
     "media": {

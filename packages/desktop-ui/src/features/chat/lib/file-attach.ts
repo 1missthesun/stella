@@ -3,6 +3,8 @@ import type { ChatContext, ChatContextFile } from "@/shared/types/electron";
 import { platformCapabilities } from "@/platform/capabilities";
 import { browserAttachmentUploads } from "@/features/cloud/browser-chat-attachments";
 import { attachmentContentType } from "@stella/contracts/attachment-content-type";
+import { showToast } from "@/ui/toast";
+import { translateNow } from "@/shared/i18n";
 
 type AttachedScreenshot = {
   dataUrl: string;
@@ -28,9 +30,17 @@ const ATTACHMENT_IMAGE_MIME_TYPES: ReadonlySet<string> = new Set([
   "image/svg+xml",
 ]);
 
-const ATTACHMENT_MAX_FILE_SIZE = 20 * 1024 * 1024;
+/**
+ * Files with a path on this computer attach by reference at any size. Only
+ * files without one (pasted or dragged from another app) are read into memory,
+ * and the runtime accepts at most this much inline.
+ */
+const IN_MEMORY_ATTACHMENT_MAX_BYTES = 50 * 1024 * 1024;
 
 type SetChatContext = Dispatch<SetStateAction<ChatContext | null>>;
+
+const pathForFile = (file: File): string | undefined =>
+  window.electronAPI?.files?.getPathForFile?.(file) || undefined;
 
 function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -91,7 +101,7 @@ async function decodeImageAttachment(
 async function processPathBackedImage(
   file: File,
 ): Promise<AttachedScreenshot | null> {
-  const filePath = window.electronAPI?.files?.getPathForFile?.(file);
+  const filePath = pathForFile(file);
   if (!filePath) return null;
   try {
     const bitmap = await createImageBitmap(file);
@@ -123,10 +133,12 @@ function isAttachableImage(mimeType: string): boolean {
 async function processInputFiles(
   files: readonly File[],
 ): Promise<ProcessedAttachments> {
-  const accepted = files.filter((f) => f.size <= ATTACHMENT_MAX_FILE_SIZE);
-  if (accepted.length === 0) {
-    return { screenshots: [], files: [] };
-  }
+  const rejected: File[] = [];
+  const accepted = files.filter((file) => {
+    if (pathForFile(file) || file.size <= IN_MEMORY_ATTACHMENT_MAX_BYTES) return true;
+    rejected.push(file);
+    return false;
+  });
 
   const imageFiles = accepted.filter((f) =>
     isAttachableImage(effectiveFileType(f)),
@@ -135,44 +147,59 @@ async function processInputFiles(
     (f) => !isAttachableImage(effectiveFileType(f)),
   );
 
+  const asFile = async (file: File): Promise<AttachedFile> => {
+    const path = pathForFile(file);
+    return {
+      name: file.name,
+      size: file.size,
+      mimeType: effectiveFileType(file),
+      dataUrl: path ? "" : await readFileAsDataUrl(file),
+      ...(path ? { path } : {}),
+    };
+  };
+
   const imageResults = await Promise.allSettled(
-    imageFiles.map(async (file): Promise<AttachedScreenshot> => {
+    imageFiles.map(async (file): Promise<AttachedScreenshot | AttachedFile> => {
       const pathBacked = await processPathBackedImage(file);
       if (pathBacked) return pathBacked;
+      if (pathForFile(file)) return await asFile(file);
       const typed = withEffectiveType(file);
       const dataUrl = await readFileAsDataUrl(typed);
       return { dataUrl, ...(await decodeImageAttachment(typed, dataUrl)) };
     }),
   );
 
-  const fileResults = await Promise.allSettled(
-    otherFiles.map(async (file): Promise<AttachedFile> => {
-      const dataUrl = await readFileAsDataUrl(file);
-      const path =
-        window.electronAPI?.files?.getPathForFile?.(file) || undefined;
-      return {
-        name: file.name,
-        size: file.size,
-        mimeType: effectiveFileType(file),
-        dataUrl,
-        ...(path ? { path } : {}),
-      };
-    }),
-  );
+  const fileResults = await Promise.allSettled(otherFiles.map(asFile));
 
+  const failed = [
+    ...rejected.map((file) => file.name),
+    ...[...imageResults, ...fileResults].flatMap((result, index) =>
+      result.status === "rejected"
+        ? [[...imageFiles, ...otherFiles][index]?.name ?? ""]
+        : [],
+    ),
+  ].filter(Boolean);
+  if (failed.length > 0) {
+    showToast({
+      title: translateNow("app.chat.attach.failedTitle"),
+      description: translateNow("app.chat.attach.failedDescription", {
+        names: failed.join(", "),
+      }),
+      variant: "error",
+    });
+  }
+
+  const images = imageResults.flatMap((r) =>
+    r.status === "fulfilled" ? [r.value] : [],
+  );
   return {
-    screenshots: imageResults
-      .filter(
-        (r): r is PromiseFulfilledResult<AttachedScreenshot> =>
-          r.status === "fulfilled",
-      )
-      .map((r) => r.value),
-    files: fileResults
-      .filter(
-        (r): r is PromiseFulfilledResult<AttachedFile> =>
-          r.status === "fulfilled",
-      )
-      .map((r) => r.value),
+    screenshots: images.filter(
+      (value): value is AttachedScreenshot => "width" in value,
+    ),
+    files: [
+      ...images.filter((value): value is AttachedFile => !("width" in value)),
+      ...fileResults.flatMap((r) => (r.status === "fulfilled" ? [r.value] : [])),
+    ],
   };
 }
 

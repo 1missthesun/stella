@@ -271,6 +271,10 @@
         "empty": "Nothing new worth noting.",
         "close": "Close",
         "notLoaded": "That message is no longer in the chat."
+      },
+      "attach": {
+        "failedTitle": "Couldn't attach a file",
+        "failedDescription": "{names} couldn't be attached. Save it to a folder on this computer and try again."
       }
     },
     "media": {

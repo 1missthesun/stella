@@ -281,6 +281,10 @@
         "empty": "Nic nowego wartego uwagi.",
         "close": "Zamknij",
         "notLoaded": "Tej wiadomości nie ma już w czacie."
+      },
+      "attach": {
+        "failedTitle": "Nie udało się dołączyć pliku",
+        "failedDescription": "Nie udało się dołączyć {names}. Zapisz go w folderze na tym komputerze i spróbuj ponownie."
       }
     },
     "media": {

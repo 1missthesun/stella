@@ -271,6 +271,10 @@
         "empty": "Ikke noe nytt verdt å nevne.",
         "close": "Lukk",
         "notLoaded": "Den meldingen er ikke lenger i chatten."
+      },
+      "attach": {
+        "failedTitle": "Kunne ikke legge ved en fil",
+        "failedDescription": "{names} kunne ikke legges ved. Lagre den i en mappe på denne datamaskinen og prøv igjen."
       }
     },
     "media": {

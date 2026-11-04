@@ -276,6 +276,10 @@
         "empty": "Rien de nouveau à signaler.",
         "close": "Fermer",
         "notLoaded": "Ce message n’est plus dans la conversation."
+      },
+      "attach": {
+        "failedTitle": "Impossible de joindre un fichier",
+        "failedDescription": "Impossible de joindre {names}. Enregistrez-le dans un dossier de cet ordinateur et réessayez."
       }
     },
     "media": {

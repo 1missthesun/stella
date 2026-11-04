@@ -1,0 +1,26 @@
+name: Companion Windows repro
+on:
+  push:
+    branches: [ci/companion-windows-repro]
+  workflow_dispatch:
+jobs:
+  repro:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 1, sparse-checkout: .github }
+      - uses: oven-sh/setup-bun@v2
+        with: { bun-version: 1.4.2 }
+      - name: Install Electron
+        shell: pwsh
+        working-directory: .github/scripts/companion-repro
+        run: bun install
+      - name: Drive the pet
+        shell: pwsh
+        run: |
+          $out = "$env:RUNNER_TEMP\evidence"; New-Item -ItemType Directory -Force $out | Out-Null
+          & "$env:GITHUB_WORKSPACE\.github\scripts\companion-repro\drive.ps1" -Out $out -Variants @("current","panel-on-top")
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: companion-evidence, path: "${{ runner.temp }}\\evidence" }

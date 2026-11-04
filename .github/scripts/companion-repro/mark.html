@@ -1,0 +1,16 @@
+<!doctype html><html><head><style>
+html,body{margin:0;background:transparent;overflow:hidden;user-select:none}
+.root{position:fixed;inset:0}
+.mark{position:absolute;width:84px;height:84px;transform:translate(-50%,-100%);padding:0;margin:0;border:0;background:transparent;border-radius:50%;cursor:grab}
+.mark span{display:block;position:absolute;inset:12px;border-radius:50%;background:radial-gradient(circle,#ffd54a,#ff7a00);pointer-events:none}
+.root[data-hovered] .mark span{background:radial-gradient(circle,#7af,#24c)}
+</style></head><body><div class="root" id="root"><button class="mark" id="mark"><span></span></button></div>
+<script>
+const { attachPress, ipcRenderer } = require("./press.js");
+const root = document.getElementById("root"), mark = document.getElementById("mark");
+ipcRenderer.on("layout", (_e, l) => { mark.style.left = l.anchorX + "px"; mark.style.top = l.anchorY + "px"; });
+ipcRenderer.on("activity", (_e, a) => { if (a.hovered) root.dataset.hovered = "1"; else delete root.dataset.hovered; });
+root.addEventListener("mouseenter", () => ipcRenderer.send("hover", true));
+root.addEventListener("mouseleave", () => ipcRenderer.send("hover", false));
+attachPress(mark, "mark");
+</script></body></html>

@@ -75,6 +75,8 @@ export type LocalPreferences = {
   imageGeneration: ImageGenerationPreferences;
   realtimeVoice: RealtimeVoicePreferences;
   memoryEnabled: boolean;
+  /** The user's last explicit Memory choice, here or on their account; null until they make one. */
+  memoryChoice: boolean | null;
   dictationShortcut: string;
   voiceRtcShortcut: string;
   preventComputerSleep: boolean;
@@ -115,6 +117,7 @@ export type LocalModelPreferencesSnapshot = Pick<
   | "imageGeneration"
   | "realtimeVoice"
   | "memoryEnabled"
+  | "memoryChoice"
 >;
 
 const DEFAULT_MAX_AGENT_CONCURRENCY = 24;
@@ -139,6 +142,7 @@ const DEFAULT_PREFERENCES: LocalPreferences = {
   imageGeneration: { provider: "stella" },
   realtimeVoice: { provider: "stella" },
   memoryEnabled: true,
+  memoryChoice: null,
   dictationShortcut: "Alt",
   voiceRtcShortcut: "CommandOrControl+Shift+D",
   preventComputerSleep: false,
@@ -228,6 +232,8 @@ const normalizeStoredPreferences = (
   imageGeneration: normalizeImageGenerationPreferences(parsed.imageGeneration),
   realtimeVoice: normalizeRealtimeVoicePreferences(parsed.realtimeVoice),
   memoryEnabled: parsed.memoryEnabled !== false,
+  memoryChoice:
+    typeof parsed.memoryChoice === "boolean" ? parsed.memoryChoice : null,
   dictationShortcut:
     typeof parsed.dictationShortcut === "string"
       ? parsed.dictationShortcut
@@ -512,6 +518,7 @@ export const getLocalModelPreferences = (
     imageGeneration: { ...prefs.imageGeneration },
     realtimeVoice: { ...prefs.realtimeVoice },
     memoryEnabled: prefs.memoryEnabled,
+    memoryChoice: prefs.memoryChoice,
   };
 };
 
@@ -594,6 +601,12 @@ export const updateLocalModelPreferences = (
       patch.memoryEnabled === undefined
         ? prefs.memoryEnabled
         : patch.memoryEnabled !== false,
+    memoryChoice:
+      patch.memoryChoice === undefined
+        ? prefs.memoryChoice
+        : typeof patch.memoryChoice === "boolean"
+          ? patch.memoryChoice
+          : null,
   };
   saveLocalPreferences(stellaDataDir, next);
   return getLocalModelPreferences(stellaDataDir);

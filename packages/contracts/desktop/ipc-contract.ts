@@ -623,6 +623,7 @@ export type LocalModelPreferences = {
   };
   realtimeVoice: RealtimeVoicePreferences;
   memoryEnabled: boolean;
+  memoryChoice: boolean | null;
 };
 
 export type LocalLlmOAuthProviderSummary = {

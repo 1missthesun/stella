@@ -414,7 +414,7 @@ export const ChatColumn = memo(function ChatColumn({
             >
               {showHomeContent ? (
                 <>
-                  <AppSourceOffers />
+                  <AppSourceOffers placement="composer" />
                   <ComposerNotice conversationId={conversationId} />
                 </>
               ) : null}

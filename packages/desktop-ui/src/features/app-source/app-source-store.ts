@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from "react";
+import { useLayoutEffect, useSyncExternalStore } from "react";
 import type {
   AppSourceActionResult,
   AppSourceCommit,
@@ -99,3 +99,35 @@ export const versionOffer = (state: AppSourceState) =>
   ) ?? null;
 
 export const updateProgress = (state: AppSourceState) => state.update ?? null;
+
+const claimedDraftCounts = new Map<string, number>();
+let claimedDrafts: ReadonlySet<string> = new Set();
+const claimListeners = new Set<() => void>();
+const publishClaims = () => {
+  claimedDrafts = new Set(claimedDraftCounts.keys());
+  for (const listener of claimListeners) listener();
+};
+const subscribeClaims = (listener: () => void) => {
+  claimListeners.add(listener);
+  return () => {
+    claimListeners.delete(listener);
+  };
+};
+
+/** Drafts already offered on the message that relays their agent's completion. */
+export const useClaimedDrafts = () =>
+  useSyncExternalStore(subscribeClaims, () => claimedDrafts);
+
+export const useClaimDraft = (name: string | null) => {
+  useLayoutEffect(() => {
+    if (!name) return;
+    claimedDraftCounts.set(name, (claimedDraftCounts.get(name) ?? 0) + 1);
+    publishClaims();
+    return () => {
+      const count = (claimedDraftCounts.get(name) ?? 1) - 1;
+      if (count > 0) claimedDraftCounts.set(name, count);
+      else claimedDraftCounts.delete(name);
+      publishClaims();
+    };
+  }, [name]);
+};

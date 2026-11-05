@@ -327,6 +327,7 @@ export const piChatsFor = (
       },
       tools: (conversationId) => ({
         specs: (role) => session.runnerCell.get()?.piTools.specs(role) ?? [],
+        readsImages: true,
         run: async (call, context) => {
           const runner = session.runnerCell.get();
           if (!runner) throw new Error("Stella's runtime is restarting; try again.");

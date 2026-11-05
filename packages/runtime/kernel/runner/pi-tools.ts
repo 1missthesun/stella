@@ -59,9 +59,14 @@ export type RunnerPiTools = {
   cliBridgeSocketPath?: string;
 };
 
+/**
+ * A general agent's `Read` is pi's text reader; the runtime's `Read` is not
+ * offered to it but runs the images that one hands over (`runnable`).
+ */
 const offeredTools = (
   context: RunnerContext,
   agentType: PiToolAgentType,
+  runnable = false,
 ): ToolMetadata[] => {
   const allowed = new Set(resolveAgent(context, agentType)?.toolsAllowlist ?? []);
   const catalog = context.toolHost.getToolCatalog(agentType);
@@ -71,7 +76,7 @@ const offeredTools = (
   return catalog.filter(
     (tool) =>
       !HARNESS_TOOL_NAMES.has(tool.name) &&
-      !(agentType === "general" && tool.name === "Read") &&
+      !(agentType === "general" && tool.name === "Read" && !runnable) &&
       (demoted.has(tool.name) || (!tool.demoted && allowed.has(tool.name))),
   );
 };
@@ -125,7 +130,7 @@ export const createRunnerPiTools = (context: RunnerContext): RunnerPiTools => ({
     }));
   },
   run: async (call) => {
-    const offered = offeredTools(context, call.agentType);
+    const offered = offeredTools(context, call.agentType, true);
     if (!offered.some((tool) => tool.name === call.name)) {
       return {
         content: [{ type: "text", text: `${call.name} is not available here.` }],

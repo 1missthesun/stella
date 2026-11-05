@@ -2,7 +2,8 @@ import type { Context, JsonValue } from "@earendil-works/chord";
 import { withAbortSignal, withoutAbortSignal } from "@earendil-works/chord/context";
 import type { ImageContent, TextContent, TSchema } from "@earendil-works/pi-ai";
 import { validateToolArguments } from "@earendil-works/pi-ai/utils/validation";
-import { defineExtension, type Extension, type ToolRegistration } from "@earendil-works/pi-durable";
+import path from "node:path";
+import { defineExtension, type Extension, type ToolRegistration, type Wrap } from "@earendil-works/pi-durable";
 import {
   needsProviderToolSchemaNormalization,
   normalizeProviderToolInputSchema,
@@ -59,6 +60,12 @@ export type StellaToolOutcome = {
 
 export interface StellaToolHost {
   specs(role: StellaToolRole): readonly StellaToolSpec[];
+  /**
+   * Whether `run` takes a general agent's `Read` of an image, which the
+   * coding Read refuses. Then an agent can see an image it saved, or one a
+   * placeholder points it back to.
+   */
+  readsImages?: boolean;
   run(call: StellaToolCall, context: Context): Promise<StellaToolOutcome>;
 }
 
@@ -151,6 +158,35 @@ const register = (role: StellaToolRole, spec: StellaToolSpec, host: StellaToolHo
 
 export const STELLA_CODE_TOOL_NAME = "code";
 
+const READ_TOOL = "Read";
+
+/**
+ * The coding `Read` (pi's, text only) with images handed to the host's
+ * `Read`, which fits them to the model and returns them as images. Text keeps
+ * pi's reading: relative paths, line ranges and truncation as before.
+ */
+const imageRead = (host: StellaToolHost): Wrap => ({
+  tool: READ_TOOL,
+  wrap: (tool: ToolRegistration): ToolRegistration => {
+    const viewer = register("general", { name: READ_TOOL, description: "", parameters: {}, replay: "safe" }, host);
+    const wrapped: ToolRegistration = {
+      ...tool,
+      description: `${tool.description} PNG, JPG, GIF and WEBP images are shown to you as images.`,
+      async execute(args, api, context) {
+        const result = await tool.execute(args, api, context);
+        const raw = (args as { path?: unknown } | undefined)?.path;
+        if (typeof raw !== "string" || !result?.diagnostics?.some((note) => note.code === "unsupported_image")) {
+          return result;
+        }
+        const cwd = api.env?.cwd;
+        const file_path = raw.startsWith("~") || path.isAbsolute(raw) || !cwd ? raw : path.resolve(cwd, raw);
+        return await viewer.execute({ file_path }, api, context);
+      },
+    };
+    return wrapped;
+  },
+});
+
 export function stellaToolExtensions(host: StellaToolHost | undefined): Extension[] {
   const build = (role: StellaToolRole, name: string) => {
     const specs = host?.specs(role) ?? [];
@@ -158,6 +194,7 @@ export function stellaToolExtensions(host: StellaToolHost | undefined): Extensio
     return defineExtension({
       name,
       tools: host ? specs.filter((spec) => !(code && spec.codeOnly)).map((spec) => register(role, spec, host)) : [],
+      ...(host?.readsImages && role === "general" ? { wraps: [imageRead(host)] } : {}),
     });
   };
   return [build("orchestrator", STELLA_ORCHESTRATOR_TOOLS), build("general", STELLA_AGENT_TOOLS)];

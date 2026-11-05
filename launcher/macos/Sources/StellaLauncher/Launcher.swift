@@ -50,6 +50,7 @@ final class Launcher {
     private var recoveryCount = 0
     private var identityRetry: String?
     private var crashTimes: [Date] = []
+    private var outsideChanges: OutsideChanges?
     private(set) var current: ElectronProcess?
 
     init(options: Options, paths: LauncherPaths) {
@@ -95,12 +96,19 @@ final class Launcher {
                 if !options.startNow || recoveryCount > 0 { updateBeforeStart() }
             case .returnToKnownGood:
                 do { try returnToKnownGood() } catch { log("recovery: return failed: \(error)") }
+            case .acceptOutsideChanges:
+                do { try acceptOutsideChanges() } catch { log("outside: accepting failed: \(error)") }
             case .reinstall:
                 do { try reinstall() } catch { log("recovery: reinstall failed: \(error)") }
             }
             guard let failure = launch() else {
                 log("launcher: Stella quit; exiting")
                 return 0
+            }
+            if failure.kind == .outsideChanges, let changes = outsideChanges {
+                closeCode = options.selfTest ? 1 : 0
+                showOutsideChanges(changes)
+                continue
             }
             closeCode = 1
             recover(reason: failure.reason, output: failure.output, kind: failure.kind)
@@ -153,6 +161,11 @@ final class Launcher {
     enum FailureKind {
         case start
         case download
+        case outsideChanges
+    }
+
+    private struct OutsideChangesFound: Error {
+        let changes: OutsideChanges
     }
 
     private func launch() -> (reason: String, output: [String], kind: FailureKind)? {
@@ -193,6 +206,9 @@ final class Launcher {
                 case let .failed(reason, output):
                     return (reason, output, .start)
                 }
+            } catch let found as OutsideChangesFound {
+                outsideChanges = found.changes
+                return ("", [], .outsideChanges)
             } catch let failure as ElectronIdentity.DownloadFailure {
                 return ("Stella needs its signed app to keep your Mac's permissions. Check your connection and try again.",
                         ["\(failure)"], .download)
@@ -268,10 +284,9 @@ final class Launcher {
             state.save(paths)
         }
 
-        let verdict = try signer.verifyHead(git: git, app: paths.app)
-        guard case .signed = verdict else {
-            log("verify: refused: \(verdict)")
-            throw LauncherError(refusalMessage(verdict))
+        if let changes = try signer.outsideChanges(git: git, app: paths.app) {
+            log("verify: \(changes.files.count) file(s) changed outside Stella since the last signed version (HEAD \(changes.head.prefix(12)), tree \(changes.tree.prefix(12)))")
+            throw OutsideChangesFound(changes: changes)
         }
         log("verify: HEAD signed and clean")
 
@@ -309,19 +324,6 @@ final class Launcher {
     private var source: Install.Source {
         if let source = options.source { return .explicit(source, ref: options.sourceRef) }
         return .upstream(backend: backend)
-    }
-
-    private func refusalMessage(_ verdict: TreeSigner.Verdict) -> String {
-        switch verdict {
-        case let .dirty(files):
-            return "Stella's files were changed outside of Stella's updates, so it won't run them (\(files.count) changed: \(files.prefix(3).map { $0.trimmingCharacters(in: .whitespaces) }.joined(separator: ", ")))."
-        case .unsigned:
-            return "This version of Stella wasn't installed through Stella's updates (it has no signature), so it won't run."
-        case .badSignature:
-            return "This version of Stella has an invalid signature, so it won't run."
-        case .signed:
-            return ""
-        }
     }
 
     private func baseEnvironment() -> [String: String] {
@@ -550,6 +552,30 @@ final class Launcher {
     private func hasKnownGood() -> Bool {
         guard let git else { return false }
         return (try? git.raw(["rev-parse", "--verify", "--quiet", "\(Launcher.knownGoodRef)^{commit}"], cwd: paths.app).code) == 0
+    }
+
+    private func showOutsideChanges(_ changes: OutsideChanges) {
+        hold.hide(after: 0)
+        let facts = installFacts()
+        ui.update(show: .front) {
+            $0.phase = .changed
+            $0.changes = changes.files
+            $0.changesRoot = self.paths.app
+            $0.hasKnownGood = facts.hasKnownGood
+            $0.version = facts.version
+        }
+        ui.capture("changes.png", after: 0.6)
+        if options.selfTest {
+            log("launcher: self-test found files changed outside Stella")
+            ui.perform("close", after: 1.5)
+        }
+    }
+
+    private func acceptOutsideChanges() throws {
+        guard let seen = outsideChanges else { return }
+        outsideChanges = nil
+        let (git, signer) = try tools()
+        _ = try signer.acceptOutsideChanges(seen, git: git, app: paths.app)
     }
 
     private func recover(reason: String, output: [String], kind: FailureKind = .start) {

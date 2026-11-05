@@ -10,7 +10,7 @@
   Native -> page: window.stellaLauncher.render(state), where state is
     {
       platform: "linux" | "macos" | "windows",
-      phase: "idle" | "starting" | "running" | "stopping" | "failed",
+      phase: "idle" | "starting" | "running" | "stopping" | "failed" | "changed",
       status: string,        // starting: what is happening now, in plain words
       progress: number,      // starting: 0..1, the part of setup that is done
       progressTo: number,    // starting: 0..1, where the current step ends; the
@@ -20,7 +20,10 @@
       reason: string,        // failed: one sentence
       output: string[],      // failed: Electron's last lines (Settings > Last error)
       hasKnownGood: boolean, // "Return to last working version" is possible
-      version: string        // short HEAD, "" before install
+      version: string,       // short HEAD, "" before install
+      changes: {path, kind}[],// changed: files changed outside Stella, relative
+                             //   to the checkout; kind "changed" | "added" | "removed"
+      moreChanges: number    // changed: how many more files are not listed
     }
   Any field may be omitted; it keeps its previous value.
   window.stellaLauncher.showSettings(open) opens or closes Settings
@@ -33,6 +36,8 @@
     {"action": "return"}      return to the last working version, then start
     {"action": "reinstall"}   reinstall, then start
     {"action": "openLogs"}    open the logs folder
+    {"action": "accept"}      changed: trust these changes, then start
+    {"action": "reveal", "index": n}  changed: show changes[n] in the file manager
     {"action": "close"}       Linux only (undecorated): the close button
     {"action": "drag"}        Linux only: a press on the background; move the window
   through window.webkit.messageHandlers.stella (WebKitGTK, WKWebView) or
@@ -472,6 +477,118 @@
         cursor: text;
       }
 
+      #changes {
+        padding: 30px 26px 22px;
+      }
+      html[data-platform="macos"] #changes {
+        padding-top: 40px;
+      }
+      #changes[hidden] {
+        transform: translateY(6px);
+      }
+      .changes-mark {
+        width: 30px;
+        height: 30px;
+        margin-bottom: 14px;
+        flex: none;
+      }
+      .changes-title {
+        font-size: 15.5px;
+        font-weight: 650;
+        line-height: 21px;
+        letter-spacing: -0.012em;
+      }
+      .changes-text {
+        margin-top: 7px;
+        color: var(--muted);
+        font-size: 12.5px;
+        line-height: 18.5px;
+      }
+      .files {
+        margin: 16px -8px 0;
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+      }
+      .file {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+        min-height: 40px;
+        padding: 5px 8px;
+        border-radius: 9px;
+        text-align: left;
+        transition: background 140ms ease;
+      }
+      button.file:hover {
+        background: var(--ghost);
+      }
+      .file-icon {
+        width: 16px;
+        height: 16px;
+        flex: none;
+        color: var(--faint);
+      }
+      .file-text {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        flex: 1;
+      }
+      .file-name,
+      .file-dir {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .file-name {
+        font-size: 12.5px;
+        font-weight: 600;
+      }
+      .file-dir {
+        color: var(--faint);
+        font-size: 11px;
+        direction: rtl;
+        text-align: left;
+      }
+      .file-dir > bdi {
+        direction: ltr;
+      }
+      .file-tag {
+        flex: none;
+        color: var(--faint);
+        font-size: 11px;
+        font-weight: 500;
+      }
+      button.file .file-tag {
+        opacity: 0;
+        transition: opacity 140ms ease;
+      }
+      button.file:hover .file-tag,
+      button.file:focus-visible .file-tag {
+        opacity: 1;
+      }
+      .files-more {
+        padding: 6px 8px 2px;
+        color: var(--faint);
+        font-size: 11.5px;
+      }
+      .changes-actions {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+        padding-top: 16px;
+        flex: none;
+      }
+      .changes-actions .pill {
+        width: 220px;
+      }
+
       @media (prefers-reduced-motion: reduce) {
         *,
         *::before,
@@ -525,6 +642,23 @@
         </svg>
       </button>
     </main>
+
+    <section class="view" id="changes" hidden>
+      <svg class="changes-mark" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+        <path d="M14 3v5h5" />
+        <path d="M9 13.5l2 2 4-4" />
+      </svg>
+      <div class="changes-title">Some of Stella’s files were changed outside Stella</div>
+      <div class="changes-text" id="changes-text">
+        This happens when you or another app edits Stella’s files. If you expected it, start Stella as usual.
+      </div>
+      <div class="files" id="files"></div>
+      <div class="changes-actions">
+        <button class="pill primary" id="accept" data-default>Start Stella anyway</button>
+        <button class="link" id="changes-safe">Quit</button>
+      </div>
+    </section>
 
     <section class="view" id="settings" hidden>
       <div class="settings-head">
@@ -589,6 +723,8 @@
           output: [],
           hasKnownGood: false,
           version: "",
+          changes: [],
+          moreChanges: 0,
         };
         let confirmingReinstall = false;
 
@@ -626,6 +762,62 @@
           $("reinstall").classList.toggle("danger", on);
         };
 
+        const revealLabel = () =>
+          state.platform === "macos" ? "Show in Finder" : state.platform === "windows" ? "Show in Explorer" : "Show in folder";
+        const fileIcon =
+          '<svg class="file-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>';
+        let shownChanges = "";
+        const renderChanges = () => {
+          const changed = state.phase === "changed";
+          $("changes").hidden = !changed;
+          $("home").hidden = changed || settingsOpen();
+          if (changed && settingsOpen()) showSettings(false);
+          $("changes-safe").textContent = state.hasKnownGood ? "Restore last working version" : "Quit";
+          const files = state.changes || [];
+          const key = JSON.stringify([files, state.moreChanges, state.platform]);
+          if (key === shownChanges) return;
+          shownChanges = key;
+          const list = $("files");
+          list.textContent = "";
+          files.forEach((file, index) => {
+            const slash = file.path.lastIndexOf("/");
+            const removed = file.kind === "removed";
+            const row = document.createElement(removed ? "div" : "button");
+            row.className = "file";
+            row.innerHTML = fileIcon;
+            const text = document.createElement("span");
+            text.className = "file-text";
+            const name = document.createElement("span");
+            name.className = "file-name";
+            name.textContent = file.path.slice(slash + 1);
+            text.appendChild(name);
+            if (slash > 0) {
+              const dir = document.createElement("span");
+              dir.className = "file-dir";
+              const inner = document.createElement("bdi");
+              inner.textContent = file.path.slice(0, slash);
+              dir.appendChild(inner);
+              text.appendChild(dir);
+            }
+            row.appendChild(text);
+            const tag = document.createElement("span");
+            tag.className = "file-tag";
+            tag.textContent = removed ? "Removed" : file.kind === "added" ? "New · " + revealLabel() : revealLabel();
+            row.appendChild(tag);
+            if (!removed) {
+              row.title = file.path;
+              row.onclick = () => post({ action: "reveal", index });
+            }
+            list.appendChild(row);
+          });
+          if (state.moreChanges > 0) {
+            const more = document.createElement("div");
+            more.className = "files-more";
+            more.textContent = `and ${state.moreChanges} more`;
+            list.appendChild(more);
+          }
+        };
+
         const render = (next) => {
           Object.assign(state, next || {});
           if (state.platform) document.documentElement.dataset.platform = state.platform;
@@ -660,6 +852,8 @@
           $("reinstall-hint").textContent = busy ? "Shut Stella down first." : "Download Stella again. Your data stays.";
           if (busy) setConfirming(false);
 
+          renderChanges();
+
           const lines = state.output || [];
           const log = [state.reason, lines.join("\n")].filter(Boolean).join("\n\n");
           $("log").hidden = !log;
@@ -685,11 +879,16 @@
           act("reinstall");
         };
         $("close").onclick = () => act("close");
+        $("accept").onclick = () => act("accept");
+        $("changes-safe").onclick = () => act(state.hasKnownGood ? "return" : "close");
 
         document.addEventListener("keydown", (event) => {
           if (event.key === "Escape" && settingsOpen()) showSettings(false);
           if (event.key === "Enter" && !settingsOpen() && !(event.target instanceof HTMLButtonElement)) {
-            const panel = document.querySelector(`.panel[data-for~="${state.phase}"] [data-default]`);
+            const panel =
+              state.phase === "changed"
+                ? $("accept")
+                : document.querySelector(`.panel[data-for~="${state.phase}"] [data-default]`);
             if (panel) panel.click();
           }
         });

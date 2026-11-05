@@ -275,6 +275,11 @@
       "attach": {
         "failedTitle": "Kan bestand niet bijvoegen",
         "failedDescription": "{names} kan niet worden bijgevoegd. Sla het op in een map op deze computer en probeer het opnieuw."
+      },
+      "attachmentStrip": {
+        "showMore": "Nog {count} tonen",
+        "showLess": "Minder tonen",
+        "showAll": "Alle {count} tonen"
       }
     },
     "media": {

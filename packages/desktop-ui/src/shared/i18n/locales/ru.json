@@ -285,6 +285,11 @@
       "attach": {
         "failedTitle": "Не удалось прикрепить файл",
         "failedDescription": "Не удалось прикрепить {names}. Сохраните его в папку на этом компьютере и попробуйте снова."
+      },
+      "attachmentStrip": {
+        "showMore": "Показать ещё {count}",
+        "showLess": "Свернуть",
+        "showAll": "Показать все ({count})"
       }
     },
     "media": {

@@ -35,6 +35,8 @@ import { timestampHeaders } from "@/features/chat/lib/message-time-labels";
 import type { EventRowViewModel } from "@/features/chat/conversation-row-types";
 import { shownAgentLabelIds } from "@/features/chat/lib/assistant-row-content";
 import { LoaderCircle } from "@/ui/icons";
+import { extractFileLinkTargets } from "@stella/contracts/local-file-links";
+import { replyAttachmentPlacement } from "@stella/contracts/reply-attachments";
 import { UserAskRecordCard } from "@/features/user-ask/UserAskRecordCard";
 import { useConversationUserAskRecords } from "@/features/user-ask/user-ask-store";
 import { useT } from "@/shared/i18n";
@@ -181,9 +183,16 @@ const ItemSeparator = ({ leadingItem }: { leadingItem: TimelineListItem }) => (
   <div style={{ height: leadingItem.gapAfter }} aria-hidden="true" />
 );
 
+const hasMediaLinks = (text: string): boolean =>
+  text.trim().length > 0 &&
+  extractFileLinkTargets(text).some(
+    (target) => replyAttachmentPlacement(target) === "media",
+  );
+
 const renderRow = (
   row: EventRowViewModel,
   conversationId?: string | null,
+  latestMedia = false,
 ) => {
   if (row.kind === "user") {
     return <UserMessageRow key={row.id} row={row} />;
@@ -193,6 +202,7 @@ const renderRow = (
       key={row.id}
       row={row}
       conversationId={conversationId}
+      latestMedia={latestMedia}
     />
   );
 };
@@ -283,6 +293,14 @@ export const ChatTimeline = memo(function ChatTimeline({
       };
     });
   }, [askRecords, indicator, queuedUserMessages, rows]);
+  // The newest reply with media opens its previews expanded; older ones show one row.
+  const latestMediaRowId = useMemo(() => {
+    for (let index = rows.length - 1; index >= 0; index -= 1) {
+      const row = rows[index];
+      if (row?.kind === "assistant" && hasMediaLinks(row.text)) return row.id;
+    }
+    return null;
+  }, [rows]);
   const tailUserRowId = useMemo(() => {
     for (let index = rows.length - 1; index >= 0; index -= 1) {
       const row = rows[index];
@@ -381,6 +399,7 @@ export const ChatTimeline = memo(function ChatTimeline({
           renderRow(
             item.row,
             conversationId,
+            item.row.id === latestMediaRowId,
           )
         );
       return (
@@ -395,7 +414,7 @@ export const ChatTimeline = memo(function ChatTimeline({
         </>
       );
     },
-    [conversationId, flashItemId, indicator, onCancelQueued],
+    [conversationId, flashItemId, indicator, latestMediaRowId, onCancelQueued],
   );
 
   const keyExtractor = useCallback((item: TimelineListItem) => item.id, []);

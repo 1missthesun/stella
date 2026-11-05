@@ -285,6 +285,11 @@
       "attach": {
         "failedTitle": "Soubor se nepodařilo připojit",
         "failedDescription": "{names} se nepodařilo připojit. Uložte ho do složky v tomto počítači a zkuste to znovu."
+      },
+      "attachmentStrip": {
+        "showMore": "Zobrazit další ({count})",
+        "showLess": "Zobrazit méně",
+        "showAll": "Zobrazit vše ({count})"
       }
     },
     "media": {

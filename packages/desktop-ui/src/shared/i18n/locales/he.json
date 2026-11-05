@@ -280,6 +280,11 @@
       "attach": {
         "failedTitle": "לא ניתן היה לצרף קובץ",
         "failedDescription": "לא ניתן היה לצרף את {names}. שמרו אותו בתיקייה במחשב הזה ונסו שוב."
+      },
+      "attachmentStrip": {
+        "showMore": "הצג עוד {count}",
+        "showLess": "הצג פחות",
+        "showAll": "הצג את כל {count}"
       }
     },
     "media": {

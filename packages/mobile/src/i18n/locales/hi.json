@@ -275,6 +275,11 @@
       "attach": {
         "failedTitle": "फ़ाइल अटैच नहीं हो सकी",
         "failedDescription": "{names} अटैच नहीं हो सकी। इसे इस कंप्यूटर के किसी फ़ोल्डर में सेव करें और फिर से कोशिश करें।"
+      },
+      "attachmentStrip": {
+        "showMore": "{count} और दिखाएँ",
+        "showLess": "कम दिखाएँ",
+        "showAll": "सभी {count} दिखाएँ"
       }
     },
     "media": {

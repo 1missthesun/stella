@@ -275,6 +275,11 @@
       "attach": {
         "failedTitle": "Tiedostoa ei voitu liittää",
         "failedDescription": "Tiedostoa {names} ei voitu liittää. Tallenna se tämän tietokoneen kansioon ja yritä uudelleen."
+      },
+      "attachmentStrip": {
+        "showMore": "Näytä {count} lisää",
+        "showLess": "Näytä vähemmän",
+        "showAll": "Näytä kaikki {count}"
       }
     },
     "media": {

@@ -270,6 +270,11 @@
       "attach": {
         "failedTitle": "파일을 첨부할 수 없습니다",
         "failedDescription": "{names}을(를) 첨부할 수 없습니다. 이 컴퓨터의 폴더에 저장한 후 다시 시도하세요."
+      },
+      "attachmentStrip": {
+        "showMore": "{count}개 더 보기",
+        "showLess": "간단히 보기",
+        "showAll": "{count}개 모두 보기"
       }
     },
     "media": {

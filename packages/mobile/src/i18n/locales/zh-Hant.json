@@ -270,6 +270,11 @@
       "attach": {
         "failedTitle": "無法附加檔案",
         "failedDescription": "無法附加 {names}。請將其儲存到這台電腦上的資料夾後再試一次。"
+      },
+      "attachmentStrip": {
+        "showMore": "再顯示 {count} 個",
+        "showLess": "收合",
+        "showAll": "顯示全部 {count} 個"
       }
     },
     "media": {

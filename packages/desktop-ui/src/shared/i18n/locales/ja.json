@@ -270,6 +270,11 @@
       "attach": {
         "failedTitle": "ファイルを添付できませんでした",
         "failedDescription": "{names} を添付できませんでした。このコンピュータのフォルダに保存してから、もう一度お試しください。"
+      },
+      "attachmentStrip": {
+        "showMore": "さらに{count}件を表示",
+        "showLess": "表示を減らす",
+        "showAll": "{count}件すべてを表示"
       }
     },
     "media": {

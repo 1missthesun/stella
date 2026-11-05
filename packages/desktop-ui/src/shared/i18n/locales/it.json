@@ -280,6 +280,11 @@
       "attach": {
         "failedTitle": "Impossibile allegare un file",
         "failedDescription": "Impossibile allegare {names}. Salvalo in una cartella di questo computer e riprova."
+      },
+      "attachmentStrip": {
+        "showMore": "Mostra altri {count}",
+        "showLess": "Mostra meno",
+        "showAll": "Mostra tutti ({count})"
       }
     },
     "media": {

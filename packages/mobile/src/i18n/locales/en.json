@@ -275,6 +275,11 @@
       "attach": {
         "failedTitle": "Couldn't attach a file",
         "failedDescription": "{names} couldn't be attached. Save it to a folder on this computer and try again."
+      },
+      "attachmentStrip": {
+        "showMore": "Show {count} more",
+        "showLess": "Show less",
+        "showAll": "Show all {count}"
       }
     },
     "media": {

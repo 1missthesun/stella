@@ -270,6 +270,11 @@
       "attach": {
         "failedTitle": "Không thể đính kèm tệp",
         "failedDescription": "Không thể đính kèm {names}. Hãy lưu vào một thư mục trên máy tính này rồi thử lại."
+      },
+      "attachmentStrip": {
+        "showMore": "Hiện thêm {count}",
+        "showLess": "Ẩn bớt",
+        "showAll": "Hiện tất cả {count}"
       }
     },
     "media": {

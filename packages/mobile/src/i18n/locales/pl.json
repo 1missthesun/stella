@@ -285,6 +285,11 @@
       "attach": {
         "failedTitle": "Nie udało się dołączyć pliku",
         "failedDescription": "Nie udało się dołączyć {names}. Zapisz go w folderze na tym komputerze i spróbuj ponownie."
+      },
+      "attachmentStrip": {
+        "showMore": "Pokaż jeszcze {count}",
+        "showLess": "Pokaż mniej",
+        "showAll": "Pokaż wszystkie ({count})"
       }
     },
     "media": {

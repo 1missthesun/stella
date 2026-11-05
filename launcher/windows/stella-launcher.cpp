@@ -431,13 +431,14 @@ struct State {
 
 static State S;
 
-enum class Choice { None, Return, Reinstall, Retry, Quit };
+enum class Choice { None, Return, Reinstall, Retry, Accept, Quit };
 
 static const char *choiceName(Choice c) {
     switch (c) {
     case Choice::Return: return "return";
     case Choice::Reinstall: return "reinstall";
     case Choice::Retry: return "retry";
+    case Choice::Accept: return "accept";
     case Choice::Quit: return "quit";
     default: return "none";
     }
@@ -1222,6 +1223,16 @@ struct Recovery {
     wstring capturePath;
 };
 
+// Files changed outside Stella's updates: the working tree as git would commit
+// it, compared with the newest commit this launcher signed.
+struct OutsideChanges {
+    struct File {
+        string kind, path;
+    };
+    string head, tree;
+    vector<File> files;
+};
+
 class Ui {
 public:
     virtual ~Ui() {}
@@ -1229,6 +1240,7 @@ public:
     virtual void starting(const string &status, double from, double to, bool show) = 0;
     virtual void running() = 0;
     virtual Choice failed(const Recovery &recovery) = 0;
+    virtual Choice changed(const OutsideChanges &changes, bool hasKnownGood) = 0;
     virtual void installInfo(const string &version, bool hasKnownGood) {}
 };
 
@@ -1404,6 +1416,39 @@ public:
         gProgress.hide();
         RecoveryDialog dialog{recovery};
         return dialog.present();
+    }
+    Choice changed(const OutsideChanges &changes, bool hasKnownGood) override {
+        gProgress.hide();
+        enum { kAccept = 101, kSafe = 102 };
+        string names;
+        for (size_t i = 0; i < changes.files.size() && i < 8; i++) names += (i ? "\n" : "") + changes.files[i].path;
+        if (changes.files.size() > 8) names += format("\n…and %zu more", changes.files.size() - 8);
+        wstring content = wide("If you or an app you trust made these changes, start Stella as usual.");
+        wstring details = wide(names.empty() ? string("(No file list.)") : names);
+        TASKDIALOG_BUTTON buttons[] = {
+            {kAccept, L"Start Stella anyway"},
+            {kSafe, hasKnownGood ? L"Restore last working version" : L"Quit"},
+        };
+        TASKDIALOGCONFIG config;
+        ZeroMemory(&config, sizeof(config));
+        config.cbSize = sizeof(config);
+        config.hInstance = GetModuleHandleW(nullptr);
+        config.dwFlags = TDF_EXPANDED_BY_DEFAULT | TDF_ALLOW_DIALOG_CANCELLATION;
+        config.pszWindowTitle = L"Stella";
+        config.pszMainInstruction = L"Some of Stella\u2019s files were changed outside Stella";
+        config.pszContent = content.c_str();
+        config.pszExpandedInformation = details.c_str();
+        config.pszExpandedControlText = L"Hide files";
+        config.pszCollapsedControlText = L"Show files";
+        config.pButtons = buttons;
+        config.cButtons = 2;
+        config.nDefaultButton = kAccept;
+        config.cxWidth = 320;
+        int pressed = IDCANCEL;
+        if (O.selfTest || FAILED(TaskDialogIndirect(&config, &pressed, nullptr, nullptr))) pressed = IDCANCEL;
+        if (pressed == kAccept) return Choice::Accept;
+        if (pressed == kSafe && hasKnownGood) return Choice::Return;
+        return Choice::Quit;
     }
 };
 
@@ -1720,6 +1765,23 @@ public:
         return choice;
     }
 
+    Choice changed(const OutsideChanges &changes, bool hasKnownGood) override {
+        update([&]() {
+            phase_ = "changed";
+            reason_.clear();
+            changes_ = changes.files;
+            hasKnownGood_ = hasKnownGood;
+            command_ = Choice::None;
+        });
+        setVisible(true);
+        if (!O.selfTest) return waitCommand();
+        waitLoaded();
+        pause(0.7);
+        if (!O.captureDir.empty()) capture(O.captureDir + L"\\changes.png");
+        LOG("launcher: self-test found files changed outside Stella");
+        return Choice::Quit;
+    }
+
     void installInfo(const string &version, bool hasKnownGood) override {
         update([&]() {
             version_ = version;
@@ -1743,6 +1805,7 @@ private:
     string phase_ = "idle", status_, reason_, version_;
     double progress_ = 0, progressTo_ = 0;
     vector<string> output_;
+    vector<OutsideChanges::File> changes_;
     bool hasKnownGood_ = false, loaded_ = false, wantVisible_ = false;
     bool startingCaptured_ = false, toured_ = false;
     Choice command_ = Choice::None;
@@ -1998,6 +2061,8 @@ private:
         mj_value *json = mj_parse(text.data(), text.size());
         const char *raw = mj_get_string(json, "action");
         string action = raw ? raw : "";
+        double index = -1;
+        mj_get_number(json, "index", &index);
         mj_free(json);
         if (action == "loaded") {
             pageLoaded();
@@ -2005,6 +2070,15 @@ private:
             command(Choice::Retry, action);
         } else if (action == "return") {
             command(Choice::Return, action);
+        } else if (action == "accept") {
+            bool changed;
+            {
+                std::lock_guard<std::mutex> lock(mutex_);
+                changed = phase_ == "changed";
+            }
+            if (changed) command(Choice::Accept, action);
+        } else if (action == "reveal") {
+            reveal(index);
         } else if (action == "reinstall") {
             command(Choice::Reinstall, action);
         } else if (action == "shutdown") {
@@ -2030,9 +2104,35 @@ private:
         }
     }
 
+    void reveal(double index) {
+        string path;
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            if (phase_ != "changed" || index < 0 || (size_t)index >= changes_.size()) return;
+            path = changes_[(size_t)index].path;
+        }
+        if (path.find("..") != string::npos) return;
+        wstring full = P.app() + L"\\" + wide(path);
+        for (auto &c : full)
+            if (c == L'/') c = L'\\';
+        LOG("ui: show %s in Explorer", path.c_str());
+        if (exists(full)) {
+            wstring args = L"/select,\"" + full + L"\"";
+            ShellExecuteW(hwnd_, L"open", L"explorer.exe", args.c_str(), nullptr, SW_SHOWNORMAL);
+            return;
+        }
+        wstring folder = full;
+        while (!exists(folder) && folder.size() > P.app().size()) {
+            size_t slash = folder.find_last_of(L'\\');
+            if (slash == wstring::npos) break;
+            folder.resize(slash);
+        }
+        ShellExecuteW(hwnd_, L"open", folder.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+    }
+
     void command(Choice choice, const string &action) {
         std::lock_guard<std::mutex> lock(mutex_);
-        if ((phase_ != "idle" && phase_ != "failed") || command_ != Choice::None) return;
+        if ((phase_ != "idle" && phase_ != "failed" && phase_ != "changed") || command_ != Choice::None) return;
         LOG("ui: %s", action.c_str());
         command_ = choice;
         cond_.notify_all();
@@ -2041,7 +2141,7 @@ private:
     void closeRequested() {
         {
             std::lock_guard<std::mutex> lock(mutex_);
-            if (phase_ == "idle" || phase_ == "failed") {
+            if (phase_ == "idle" || phase_ == "failed" || phase_ == "changed") {
                 LOG("ui: closed; quitting");
                 command_ = Choice::Quit;
                 cond_.notify_all();
@@ -2078,7 +2178,13 @@ private:
                                                                    starting ? progress_ : 0, starting ? progressTo_ : 0) +
                    ",\"output\":[";
             for (size_t i = 0; i < output_.size(); i++) json += (i ? "," : "") + jsonString(output_[i]);
-            json += string("],\"hasKnownGood\":") + (hasKnownGood_ ? "true" : "false") + ",\"version\":" + jsonString(version_) + "}";
+            json += string("],\"hasKnownGood\":") + (hasKnownGood_ ? "true" : "false") + ",\"version\":" + jsonString(version_) +
+                    ",\"changes\":[";
+            const size_t shown = 200;
+            for (size_t i = 0; i < changes_.size() && i < shown; i++)
+                json += string(i ? "," : "") + "{\"path\":" + jsonString(changes_[i].path) + ",\"kind\":" +
+                        jsonString(changes_[i].kind) + "}";
+            json += format("],\"moreChanges\":%zu}", changes_.size() > shown ? changes_.size() - shown : (size_t)0);
         }
         webview_->ExecuteScript(wide("window.stellaLauncher.render(" + json + ")").c_str(), nullptr);
     }
@@ -2669,8 +2775,6 @@ static void removeOldLauncher() {
     if (exists(old) && DeleteFileW(old.c_str())) LOG("update: removed %s", utf8(old).c_str());
 }
 
-enum class Verdict { Signed, Unsigned, BadSignature, Dirty };
-
 static vector<string> changedFiles() {
     vector<string> out;
     for (auto &line : splitLines(gGit->run({"status", "--porcelain=v1", "--untracked-files=all"}, P.app())))
@@ -2678,14 +2782,92 @@ static vector<string> changedFiles() {
     return out;
 }
 
-static Verdict verifyHead(vector<string> &dirty) {
-    dirty = changedFiles();
-    if (!dirty.empty()) return Verdict::Dirty;
+static bool commitSigned(const string &commit, const string &tree) {
+    CmdResult note = gGit->raw({"notes", "--ref", kNotesRef, "show", commit}, P.app());
+    return note.code == 0 && gSigner->verify(tree, note.out);
+}
+
+static string newestSignedAncestor(const string &head) {
+    string listed = gGit->run({"notes", "--ref", kNotesRef, "list"}, P.app());
+    if (listed.empty()) return string();
+    for (auto &commit : splitLines(gGit->run({"rev-list", "--max-count=500", head}, P.app()))) {
+        if (commit.empty() || listed.find(commit) == string::npos) continue;
+        if (commitSigned(commit, gGit->run({"rev-parse", commit + "^{tree}"}, P.app()))) return commit;
+    }
+    return string();
+}
+
+// The tree `git add -A` would produce, built in a scratch copy of the index so
+// the checkout's own index is untouched.
+static string workingTree() {
+    wstring index = wide(gGit->run({"rev-parse", "--git-path", "index"}, P.app()));
+    for (auto &c : index)
+        if (c == L'/') c = L'\\';
+    if (index.size() < 2 || index[1] != L':') index = P.app() + L"\\" + index;
+    wstring scratch = index.substr(0, index.find_last_of(L'\\')) + L"\\stella-outside-" +
+                      std::to_wstring(GetCurrentProcessId()) + L".index";
+    DeleteFileW(scratch.c_str());
+    if (exists(index) && !CopyFileW(index.c_str(), scratch.c_str(), FALSE))
+        fail(format("could not copy the git index (error %lu)", GetLastError()));
+    vector<std::pair<wstring, wstring>> env = {{L"GIT_INDEX_FILE", scratch}};
+    string tree;
+    try {
+        gGit->run({"add", "-A"}, P.app(), env);
+        tree = gGit->run({"write-tree"}, P.app(), env);
+    } catch (...) {
+        DeleteFileW(scratch.c_str());
+        throw;
+    }
+    DeleteFileW(scratch.c_str());
+    return tree;
+}
+
+static bool outsideChanges(OutsideChanges &out) {
+    out = OutsideChanges();
     string head = gGit->run({"rev-parse", "HEAD"}, P.app());
-    string tree = gGit->run({"rev-parse", "HEAD^{tree}"}, P.app());
-    CmdResult note = gGit->raw({"notes", "--ref", kNotesRef, "show", head}, P.app());
-    if (note.code != 0) return Verdict::Unsigned;
-    return gSigner->verify(tree, note.out) ? Verdict::Signed : Verdict::BadSignature;
+    string headTree = gGit->run({"rev-parse", "HEAD^{tree}"}, P.app());
+    bool clean = changedFiles().empty();
+    bool headSigned = commitSigned(head, headTree);
+    if (clean && headSigned) return false;
+    out.head = head;
+    out.tree = clean ? headTree : workingTree();
+    string base = headSigned ? head : newestSignedAncestor(head);
+    if (base.empty()) return true;
+    for (auto &line : splitLines(gGit->run({"-c", "core.quotepath=off", "diff-tree", "-r", "--no-renames", "--name-status",
+                                            base, out.tree},
+                                           P.app()))) {
+        size_t tab = line.find('\t');
+        if (tab == string::npos) continue;
+        string path = line.substr(tab + 1);
+        if (path.size() >= 2 && path.front() == '"' && path.back() == '"') path = path.substr(1, path.size() - 2);
+        char status = line[0];
+        out.files.push_back({status == 'A' ? "added" : status == 'D' ? "removed" : "changed", path});
+    }
+    return true;
+}
+
+static string signHead(const string &expected);
+
+// Makes exactly `seen` the trusted state: commits the working tree as it was
+// shown, then signs it. Changes nothing when the checkout no longer matches
+// what the user saw; the next check shows it again.
+static void acceptOutsideChanges(const OutsideChanges &seen) {
+    OutsideChanges now;
+    if (!outsideChanges(now)) return;
+    if (now.head != seen.head || now.tree != seen.tree) {
+        LOG("outside: the checkout changed while the notice was up; asking again");
+        return;
+    }
+    string head = seen.head;
+    if (gGit->run({"rev-parse", "HEAD^{tree}"}, P.app()) != seen.tree) {
+        string commit =
+            gGit->run({"commit-tree", seen.tree, "-p", head, "-m", "Changes made outside Stella"}, P.app(), kIdentityEnv);
+        gGit->run({"update-ref", "-m", "stella: accept changes made outside Stella", "HEAD", commit, head}, P.app());
+        gGit->run({"reset", "-q"}, P.app());
+        head = commit;
+    }
+    signHead(head);
+    LOG("outside: accepted %zu file(s) as %s", seen.files.size(), short12(head).c_str());
 }
 
 static string signHead(const string &expected) {
@@ -3330,25 +3512,14 @@ static Choice recover(const string &reason, const vector<string> &output) {
     return choice;
 }
 
-static string refusalMessage(Verdict verdict, const vector<string> &dirty) {
-    switch (verdict) {
-    case Verdict::Dirty:
-        return format("Stella's files were changed outside of Stella's updates, so it won't run them (%zu changed: %s%s).",
-                      dirty.size(), dirty.empty() ? "" : trim(dirty[0]).c_str(), dirty.size() > 1 ? ", ..." : "");
-    case Verdict::Unsigned:
-        return "This version of Stella wasn't installed through Stella's updates (it has no signature), so it won't run.";
-    case Verdict::BadSignature:
-        return "This version of Stella has an invalid signature, so it won't run.";
-    default:
-        return string();
-    }
-}
-
 static void ensureTools() {
     for (auto &dir : {P.root, P.logs(), P.runtimes()}) mkdirs(dir);
     if (!gGit) ensureGit();
     if (!gSigner) gSigner.reset(new TreeSigner());
 }
+
+struct OutsideChangesFound {};
+static OutsideChanges gOutside;
 
 static wstring prepareForLaunch() {
     ensureTools();
@@ -3358,11 +3529,10 @@ static wstring prepareForLaunch() {
         signHead("");
         resetInstallState();
     }
-    vector<string> dirty;
-    Verdict verdict = verifyHead(dirty);
-    if (verdict != Verdict::Signed) {
-        LOG("verify: refused (%d)", (int)verdict);
-        fail(refusalMessage(verdict, dirty));
+    if (outsideChanges(gOutside)) {
+        LOG("verify: %zu file(s) changed outside Stella since the last signed version (HEAD %s, tree %s)",
+            gOutside.files.size(), short12(gOutside.head).c_str(), short12(gOutside.tree).c_str());
+        throw OutsideChangesFound();
     }
     LOG("verify: HEAD signed and clean");
     refreshInstallInfo();
@@ -3385,7 +3555,15 @@ static int run() {
         string reason;
         vector<string> output;
         try {
-            if (next == Choice::Return || next == Choice::Reinstall) {
+            if (next == Choice::Accept) {
+                gUi->starting("Starting Stella…", 0, 0.05, false);
+                ensureTools();
+                try {
+                    acceptOutsideChanges(gOutside);
+                } catch (const LauncherError &e) {
+                    LOG("outside: accepting failed: %s", e.message.c_str());
+                }
+            } else if (next == Choice::Return || next == Choice::Reinstall) {
                 gUi->starting(next == Choice::Return ? "Restoring the last working version…" : "Reinstalling Stella…", 0,
                               next == Choice::Return ? 0.3 : 0.1, false);
                 ensureTools();
@@ -3443,6 +3621,13 @@ static int run() {
                 output = outcome.output;
                 break;
             }
+        } catch (const OutsideChangesFound &) {
+            refreshInstallInfo();
+            next = gUi->changed(gOutside, hasKnownGood());
+            LOG("outside: chose %s", choiceName(next));
+            if (next == Choice::Quit || next == Choice::None) return O.selfTest ? 1 : 0;
+            checkUpdate = false;
+            continue;
         } catch (const LauncherError &e) {
             failed = true;
             vector<string> lines = splitLines(e.message);

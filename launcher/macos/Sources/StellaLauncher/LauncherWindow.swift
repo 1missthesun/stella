@@ -3,7 +3,7 @@ import WebKit
 
 struct LauncherViewState {
     enum Phase: String {
-        case idle, starting, running, stopping, failed
+        case idle, starting, running, stopping, failed, changed
     }
 
     var phase = Phase.idle
@@ -16,11 +16,17 @@ struct LauncherViewState {
     var output: [String] = []
     var hasKnownGood = false
     var version = ""
+    var changes: [OutsideChanges.File] = []
+    var changesRoot: URL?
+
+    static let shownChanges = 200
 
     var json: [String: Any] {
         ["platform": "macos", "phase": phase.rawValue, "status": status, "title": title, "offerRecovery": offerRecovery, "reason": reason,
          "progress": phase == .starting ? progress : 0, "progressTo": phase == .starting ? progressTo : 0,
-         "output": output, "hasKnownGood": hasKnownGood, "version": version]
+         "output": output, "hasKnownGood": hasKnownGood, "version": version,
+         "changes": changes.prefix(Self.shownChanges).map { ["path": $0.path, "kind": $0.kind] },
+         "moreChanges": max(0, changes.count - Self.shownChanges)]
     }
 }
 
@@ -28,6 +34,7 @@ enum LauncherCommand {
     case start
     case returnToKnownGood
     case reinstall
+    case acceptOutsideChanges
     case close
 }
 
@@ -238,16 +245,20 @@ final class LauncherWindow: NSObject, WKScriptMessageHandler, NSWindowDelegate {
             log("ui: ignored page message \(message.body)")
             return
         }
-        handle(action)
+        handle(action, index: (object["index"] as? NSNumber)?.intValue)
     }
 
-    private func handle(_ action: String) {
-        let waiting = state.phase == .idle || state.phase == .failed
+    private func handle(_ action: String, index: Int? = nil) {
+        let waiting = state.phase == .idle || state.phase == .failed || state.phase == .changed
         switch action {
         case "loaded":
             log("ui: page loaded")
             pageLoaded()
-        case "start" where waiting:
+        case "accept" where state.phase == .changed:
+            choose(.acceptOutsideChanges, "Starting Stella…", to: 0.05)
+        case "reveal" where state.phase == .changed:
+            reveal(index)
+        case "start" where state.phase == .idle || state.phase == .failed:
             choose(.start, "Starting Stella…", to: 0.05)
         case "return" where waiting:
             choose(.returnToKnownGood, "Restoring the last working version…", to: 0.3)
@@ -268,6 +279,24 @@ final class LauncherWindow: NSObject, WKScriptMessageHandler, NSWindowDelegate {
         }
     }
 
+    private func reveal(_ index: Int?) {
+        guard let index, state.changes.indices.contains(index), let root = state.changesRoot else { return }
+        let file = state.changes[index]
+        let url = root.appendingPathComponent(file.path).standardizedFileURL
+        guard url.path.hasPrefix(root.standardizedFileURL.path + "/") else { return }
+        if FileManager.default.fileExists(atPath: url.path) {
+            log("ui: show \(file.path) in Finder")
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+        } else {
+            var folder = url.deletingLastPathComponent()
+            while !FileManager.default.fileExists(atPath: folder.path), folder.path.count > root.path.count {
+                folder = folder.deletingLastPathComponent()
+            }
+            log("ui: \(file.path) was removed; opening \(folder.path)")
+            NSWorkspace.shared.open(folder)
+        }
+    }
+
     private func choose(_ command: LauncherCommand, _ status: String, to: Double) {
         log("ui: \(command)")
         state.phase = .starting
@@ -280,7 +309,7 @@ final class LauncherWindow: NSObject, WKScriptMessageHandler, NSWindowDelegate {
 
     private func close() {
         hideWindow()
-        if state.phase == .idle || state.phase == .failed {
+        if state.phase == .idle || state.phase == .failed || state.phase == .changed {
             log("ui: closed")
             onCommand?(.close)
         }
@@ -312,6 +341,21 @@ final class LauncherWindow: NSObject, WKScriptMessageHandler, NSWindowDelegate {
                 let retry = alert.runModal() == .alertFirstButtonReturn
                 state.phase = retry ? .starting : .idle
                 onCommand?(retry ? .start : .close)
+            }
+        case .changed:
+            DispatchQueue.main.async { [self] in
+                guard state.phase == .changed else { return }
+                let alert = NSAlert()
+                alert.messageText = "Some of Stella’s files were changed outside Stella"
+                let names = state.changes.prefix(8).map(\.path).joined(separator: "\n")
+                let more = state.changes.count > 8 ? "\n…and \(state.changes.count - 8) more" : ""
+                alert.informativeText = "If you or an app you trust made these changes, start Stella as usual.\n\n\(names)\(more)"
+                alert.addButton(withTitle: "Start Stella anyway")
+                alert.addButton(withTitle: state.hasKnownGood ? "Restore last working version" : "Quit")
+                NSApp.activate(ignoringOtherApps: true)
+                let accept = alert.runModal() == .alertFirstButtonReturn
+                state.phase = accept || state.hasKnownGood ? .starting : .idle
+                onCommand?(accept ? .acceptOutsideChanges : state.hasKnownGood ? .returnToKnownGood : .close)
             }
         default:
             break

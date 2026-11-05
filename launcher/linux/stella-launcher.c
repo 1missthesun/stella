@@ -1136,29 +1136,6 @@ static int changed_files(StrList *out) {
     return 0;
 }
 
-typedef enum { V_SIGNED, V_UNSIGNED, V_BAD_SIGNATURE, V_DIRTY, V_ERROR } Verdict;
-
-static Verdict verify_head(StrList *dirty) {
-    char *head, *tree;
-    CmdResult note;
-    Verdict v;
-    if (changed_files(dirty) != 0) return V_ERROR;
-    if (dirty->count) return V_DIRTY;
-    head = GIT("rev-parse", "HEAD");
-    tree = GIT("rev-parse", "HEAD^{tree}");
-    if (!head || !tree) { free(head); free(tree); return V_ERROR; }
-    if (git_raw((const char *const[]){"notes", "--ref", NOTES_REF, "show", head, NULL}, P.app, NULL, &note) != 0) {
-        free(head); free(tree);
-        return V_ERROR;
-    }
-    if (note.code != 0) v = V_UNSIGNED;
-    else v = signer_verify(g_signer, tree, note.out) ? V_SIGNED : V_BAD_SIGNATURE;
-    cmd_free(&note);
-    free(head);
-    free(tree);
-    return v;
-}
-
 static char *sign_head(const char *expected) {
     char *head = GIT("rev-parse", "HEAD"), *tree, *note, *added;
     StrList dirty = {0};
@@ -1188,6 +1165,158 @@ static char *sign_head(const char *expected) {
     return head;
 }
 
+/* Files changed outside Stella's updates: the working tree as git would commit
+ * it, compared with the newest commit this launcher signed. */
+typedef struct {
+    char *head, *tree;
+    StrList kinds, paths;
+} OutsideChanges;
+
+static void outside_free(OutsideChanges *c) {
+    free(c->head);
+    free(c->tree);
+    sl_free(&c->kinds);
+    sl_free(&c->paths);
+    memset(c, 0, sizeof(*c));
+}
+
+static int commit_signed(const char *commit, const char *tree) {
+    CmdResult note;
+    int ok;
+    if (git_raw((const char *const[]){"notes", "--ref", NOTES_REF, "show", commit, NULL}, P.app, NULL, &note) != 0)
+        return 0;
+    ok = note.code == 0 && signer_verify(g_signer, tree, note.out);
+    cmd_free(&note);
+    return ok;
+}
+
+static char *newest_signed_ancestor(const char *head) {
+    char *listed = GIT("notes", "--ref", NOTES_REF, "list"), *history, *line, *save = NULL, *found = NULL;
+    if (!listed) return NULL;
+    if (!*listed) { free(listed); return NULL; }
+    history = GIT("rev-list", "--max-count=500", head);
+    for (line = history ? strtok_r(history, "\n", &save) : NULL; line && !found; line = strtok_r(NULL, "\n", &save)) {
+        char *tree, *spec;
+        if (!*line || !strstr(listed, line)) continue;
+        spec = xasprintf("%s^{tree}", line);
+        tree = GIT("rev-parse", spec);
+        free(spec);
+        if (tree && commit_signed(line, tree)) found = xstrdup(line);
+        free(tree);
+    }
+    free(history);
+    free(listed);
+    return found;
+}
+
+/* The tree `git add -A` would produce, built in a scratch copy of the index so
+ * the checkout's own index is untouched. */
+static char *working_tree(void) {
+    char *index = GIT("rev-parse", "--git-path", "index"), *absolute, *scratch, *slash, *env, *added, *tree = NULL;
+    if (!index) return NULL;
+    absolute = index[0] == '/' ? xstrdup(index) : xasprintf("%s/%s", P.app, index);
+    free(index);
+    scratch = xstrdup(absolute);
+    slash = strrchr(scratch, '/');
+    *slash = 0;
+    {
+        char *dir = scratch;
+        scratch = xasprintf("%s/stella-outside-%d.index", dir, (int)getpid());
+        free(dir);
+    }
+    unlink(scratch);
+    if (!file_exists(absolute) || copy_file(absolute, scratch, 0644) == 0) {
+        env = xasprintf("GIT_INDEX_FILE=%s", scratch);
+        added = git_run((const char *const[]){"add", "-A", NULL}, P.app, (const char *const[]){env, NULL});
+        if (added) tree = git_run((const char *const[]){"write-tree", NULL}, P.app, (const char *const[]){env, NULL});
+        free(added);
+        free(env);
+    } else {
+        set_error("could not copy the git index");
+    }
+    unlink(scratch);
+    free(scratch);
+    free(absolute);
+    return tree;
+}
+
+/* 1 and fills `out` when something changed, 0 when HEAD is signed and clean, -1
+ * on error. */
+static int outside_changes(OutsideChanges *out) {
+    StrList dirty = {0};
+    char *head = GIT("rev-parse", "HEAD"), *head_tree = GIT("rev-parse", "HEAD^{tree}"), *base = NULL, *diff = NULL;
+    char *line, *save = NULL;
+    int head_signed, clean;
+    memset(out, 0, sizeof(*out));
+    if (!head || !head_tree || changed_files(&dirty) != 0) { free(head); free(head_tree); sl_free(&dirty); return -1; }
+    clean = dirty.count == 0;
+    sl_free(&dirty);
+    head_signed = commit_signed(head, head_tree);
+    if (clean && head_signed) { free(head); free(head_tree); return 0; }
+    out->head = head;
+    out->tree = clean ? xstrdup(head_tree) : working_tree();
+    free(head_tree);
+    if (!out->tree) { outside_free(out); return -1; }
+    base = head_signed ? xstrdup(head) : newest_signed_ancestor(head);
+    if (base) {
+        diff = GIT("-c", "core.quotepath=off", "diff-tree", "-r", "--no-renames", "--name-status", base, out->tree);
+        if (!diff) { free(base); outside_free(out); return -1; }
+    }
+    for (line = diff ? strtok_r(diff, "\n", &save) : NULL; line; line = strtok_r(NULL, "\n", &save)) {
+        char *tab = strchr(line, '\t'), *path;
+        size_t n;
+        if (!tab) continue;
+        *tab = 0;
+        path = tab + 1;
+        n = strlen(path);
+        if (n >= 2 && path[0] == '"' && path[n - 1] == '"') { path[n - 1] = 0; path++; }
+        sl_push(&out->kinds, line[0] == 'A' ? "added" : line[0] == 'D' ? "removed" : "changed");
+        sl_push(&out->paths, path);
+    }
+    free(diff);
+    free(base);
+    return 1;
+}
+
+/* Makes exactly `seen` the trusted state: commits the working tree as it was
+ * shown, then signs it. Changes nothing when the checkout no longer matches
+ * what the user saw; the next check shows it again. */
+static int accept_outside_changes(const OutsideChanges *seen) {
+    OutsideChanges now;
+    char *head, *head_tree, *signed_head;
+    int found = outside_changes(&now);
+    if (found <= 0) return found;
+    if (strcmp(now.head, seen->head) != 0 || strcmp(now.tree, seen->tree) != 0) {
+        LOG("outside: the checkout changed while the notice was up; asking again");
+        outside_free(&now);
+        return 0;
+    }
+    outside_free(&now);
+    head = xstrdup(seen->head);
+    head_tree = GIT("rev-parse", "HEAD^{tree}");
+    if (!head_tree) { free(head); return -1; }
+    if (strcmp(head_tree, seen->tree) != 0) {
+        char *commit = git_run((const char *const[]){"commit-tree", seen->tree, "-p", head, "-m",
+                                                     "Changes made outside Stella", NULL},
+                               P.app, IDENTITY_ENV);
+        char *moved = commit ? GIT("update-ref", "-m", "stella: accept changes made outside Stella", "HEAD", commit, head)
+                             : NULL;
+        char *reset = moved ? GIT("reset", "-q") : NULL;
+        free(moved);
+        if (!reset) { free(commit); free(head_tree); free(head); return -1; }
+        free(reset);
+        free(head);
+        head = commit;
+    }
+    free(head_tree);
+    signed_head = sign_head(head);
+    if (!signed_head) { free(head); return -1; }
+    LOG("outside: accepted %zu file(s) as %.12s", seen->paths.count, signed_head);
+    free(signed_head);
+    free(head);
+    return 0;
+}
+
 __asm__(".section .rodata\n"
         ".global launcher_html\n"
         "launcher_html:\n"
@@ -1196,10 +1325,12 @@ __asm__(".section .rodata\n"
         ".previous\n");
 extern const char launcher_html[];
 
-typedef enum { PHASE_IDLE, PHASE_STARTING, PHASE_RUNNING, PHASE_STOPPING, PHASE_FAILED } Phase;
-static const char *const PHASE_NAMES[] = {"idle", "starting", "running", "stopping", "failed"};
+typedef enum { PHASE_IDLE, PHASE_STARTING, PHASE_RUNNING, PHASE_STOPPING, PHASE_FAILED, PHASE_CHANGED } Phase;
+static const char *const PHASE_NAMES[] = {"idle", "starting", "running", "stopping", "failed", "changed"};
 
-typedef enum { CMD_NONE, CMD_START, CMD_RETURN, CMD_REINSTALL, CMD_QUIT } Command;
+typedef enum { CMD_NONE, CMD_START, CMD_RETURN, CMD_REINSTALL, CMD_ACCEPT, CMD_QUIT } Command;
+
+#define SHOWN_CHANGES 200
 
 static int g_ui;
 static volatile sig_atomic_t g_shutdown;
@@ -1212,6 +1343,7 @@ typedef struct {
     double progress, progress_to;
     StrList output;
     int has_known_good;
+    OutsideChanges changes;
     Command command;
     int loaded;
     int captures;
@@ -1224,7 +1356,7 @@ static Ui U;
 
 static int has_known_good(void);
 
-static int idle_or_failed(Phase p) { return p == PHASE_IDLE || p == PHASE_FAILED; }
+static int idle_or_failed(Phase p) { return p == PHASE_IDLE || p == PHASE_FAILED || p == PHASE_CHANGED; }
 
 static char *ui_state_json(void) {
     GString *s = g_string_new(NULL);
@@ -1240,7 +1372,15 @@ static char *ui_state_json(void) {
         g_string_append_printf(s, "%s%s", i ? "," : "", q);
         free(q);
     }
-    g_string_append(s, "]}");
+    g_string_append(s, "],\"changes\":[");
+    for (i = 0; i < U.changes.paths.count && i < SHOWN_CHANGES; i++) {
+        char *path = mj_quote(U.changes.paths.items[i]), *kind = mj_quote(U.changes.kinds.items[i]);
+        g_string_append_printf(s, "%s{\"path\":%s,\"kind\":%s}", i ? "," : "", path, kind);
+        free(path);
+        free(kind);
+    }
+    g_string_append_printf(s, "],\"moreChanges\":%zu}",
+                           U.changes.paths.count > SHOWN_CHANGES ? U.changes.paths.count - SHOWN_CHANGES : 0);
     free(status);
     free(reason);
     free(version);
@@ -1349,6 +1489,49 @@ static void ui_close_main(void) {
     else ui_hide_main();
 }
 
+static void ui_reveal_main(double index) {
+    char *path = NULL, *folder;
+    int shown = 0;
+    g_mutex_lock(&U.lock);
+    if (U.phase == PHASE_CHANGED && index >= 0 && (size_t)index < U.changes.paths.count &&
+        strstr(U.changes.paths.items[(size_t)index], "..") == NULL)
+        path = xasprintf("%s/%s", P.app, U.changes.paths.items[(size_t)index]);
+    g_mutex_unlock(&U.lock);
+    if (!path) return;
+    LOG("ui: show %s in the file manager", path);
+    if (file_exists(path)) {
+        GDBusConnection *bus = g_bus_get_sync(G_BUS_TYPE_SESSION, NULL, NULL);
+        char *uri = g_filename_to_uri(path, NULL, NULL);
+        if (bus && uri) {
+            const char *uris[] = {uri, NULL};
+            GVariant *reply = g_dbus_connection_call_sync(
+                bus, "org.freedesktop.FileManager1", "/org/freedesktop/FileManager1", "org.freedesktop.FileManager1",
+                "ShowItems", g_variant_new("(^ass)", uris, ""), NULL, G_DBUS_CALL_FLAGS_NONE, 3000, NULL, NULL);
+            if (reply) {
+                shown = 1;
+                g_variant_unref(reply);
+            }
+        }
+        g_free(uri);
+        if (bus) g_object_unref(bus);
+    }
+    if (!shown) {
+        folder = xstrdup(path);
+        do {
+            char *slash = strrchr(folder, '/');
+            if (!slash || strlen(folder) <= strlen(P.app)) break;
+            *slash = 0;
+        } while (!file_exists(folder));
+        {
+            char *uri = g_filename_to_uri(folder, NULL, NULL);
+            if (!uri || !g_app_info_launch_default_for_uri(uri, NULL, NULL)) LOG("ui: could not open %s", folder);
+            g_free(uri);
+        }
+        free(folder);
+    }
+    free(path);
+}
+
 static void ui_message(WebKitUserContentManager *manager, WebKitJavascriptResult *result, gpointer data) {
     char *text = jsc_value_to_string(webkit_javascript_result_get_js_value(result));
     mj_value *msg = text ? mj_parse(text, strlen(text)) : NULL;
@@ -1368,6 +1551,16 @@ static void ui_message(WebKitUserContentManager *manager, WebKitJavascriptResult
         ui_command_main(CMD_START);
     } else if (!strcmp(action, "return")) {
         ui_command_main(CMD_RETURN);
+    } else if (!strcmp(action, "accept")) {
+        int changed;
+        g_mutex_lock(&U.lock);
+        changed = U.phase == PHASE_CHANGED;
+        g_mutex_unlock(&U.lock);
+        if (changed) ui_command_main(CMD_ACCEPT);
+    } else if (!strcmp(action, "reveal")) {
+        double index = -1;
+        mj_get_number(msg, "index", &index);
+        ui_reveal_main(index);
     } else if (!strcmp(action, "reinstall")) {
         ui_command_main(CMD_REINSTALL);
     } else if (!strcmp(action, "shutdown")) {
@@ -1590,6 +1783,28 @@ static void ui_fail(const char *reason, const StrList *output) {
     U.reason = xstrdup(reason);
     sl_free(&U.output);
     for (i = 0; i < output->count; i++) sl_push(&U.output, output->items[i]);
+    U.has_known_good = known_good;
+    g_mutex_unlock(&U.lock);
+    if (g_ui) {
+        g_idle_add(ui_render_cb, NULL);
+        g_idle_add(ui_present_cb, NULL);
+    }
+}
+
+static void ui_changes(const OutsideChanges *changes) {
+    int known_good = has_known_good();
+    size_t i;
+    g_mutex_lock(&U.lock);
+    U.phase = PHASE_CHANGED;
+    free(U.status);
+    U.status = xstrdup("");
+    free(U.reason);
+    U.reason = NULL;
+    outside_free(&U.changes);
+    for (i = 0; i < changes->paths.count; i++) {
+        sl_push(&U.changes.paths, changes->paths.items[i]);
+        sl_push(&U.changes.kinds, changes->kinds.items[i]);
+    }
     U.has_known_good = known_good;
     g_mutex_unlock(&U.lock);
     if (g_ui) {
@@ -2877,25 +3092,11 @@ static Command recover(const char *reason, const StrList *output) {
     return g_ui ? CMD_NONE : CMD_QUIT;
 }
 
-static char *refusal_message(Verdict v, const StrList *dirty) {
-    switch (v) {
-    case V_DIRTY:
-        return xasprintf("Stella's files were changed outside of Stella's updates, so it won't run them "
-                         "(%zu changed: %s%s).",
-                         dirty->count, dirty->count ? trim(dirty->items[0]) : "", dirty->count > 1 ? ", ..." : "");
-    case V_UNSIGNED:
-        return xstrdup("This version of Stella wasn't installed through Stella's updates (it has no signature), so it won't run.");
-    case V_BAD_SIGNATURE:
-        return xstrdup("This version of Stella has an invalid signature, so it won't run.");
-    default:
-        return xasprintf("Stella's files could not be checked: %s", last_error());
-    }
-}
+static OutsideChanges g_outside;
 
 static char *prepare_for_launch(void) {
     char *git_dir;
-    StrList dirty = {0};
-    Verdict v;
+    int found;
     mkdirs(P.root, 0755);
     mkdirs(P.logs, 0755);
     mkdirs(P.runtimes, 0755);
@@ -2916,13 +3117,18 @@ static char *prepare_for_launch(void) {
     }
     if (!P.isolated && !O.self_test) install_desktop_entry();
 
-    v = verify_head(&dirty);
-    if (v != V_SIGNED) {
-        char *msg = refusal_message(v, &dirty);
-        LOG("verify: refused (%d)", (int)v);
+    outside_free(&g_outside);
+    found = outside_changes(&g_outside);
+    if (found < 0) {
+        char *msg = xasprintf("Stella's files could not be checked: %s", last_error());
         set_error("%s", msg);
         free(msg);
-        sl_free(&dirty);
+        return NULL;
+    }
+    if (found > 0) {
+        LOG("verify: %zu file(s) changed outside Stella since the last signed version (HEAD %.12s, tree %.12s)",
+            g_outside.paths.count, g_outside.head, g_outside.tree);
+        set_error("Some of Stella's files were changed outside Stella.");
         return NULL;
     }
     LOG("verify: HEAD signed and clean");
@@ -2951,7 +3157,7 @@ static int launcher_run(void) {
     for (;;) {
         char *electron;
         if (command == CMD_NONE) {
-            if (!reason) {
+            if (!reason && !g_outside.head) {
                 ui_set(PHASE_IDLE, NULL);
                 ui_show();
             }
@@ -2959,7 +3165,7 @@ static int launcher_run(void) {
             check_update = 1;
             LOG("launcher: the window asks for %s",
                 command == CMD_START ? "start" : command == CMD_RETURN ? "return" :
-                command == CMD_REINSTALL ? "reinstall" : "quit");
+                command == CMD_REINSTALL ? "reinstall" : command == CMD_ACCEPT ? "accept" : "quit");
         }
         if (command == CMD_QUIT) {
             int code = reason ? 1 : 0;
@@ -2970,7 +3176,11 @@ static int launcher_run(void) {
         free(reason);
         reason = NULL;
         sl_free(&output);
-        if (command == CMD_RETURN) {
+        if (command == CMD_ACCEPT) {
+            progress_show("Starting Stella…", 0, 0.05);
+            if (g_outside.head && accept_outside_changes(&g_outside) != 0)
+                LOG("outside: accepting failed: %s", last_error());
+        } else if (command == CMD_RETURN) {
             progress_show("Restoring the last working version…", 0, 0.30);
             if (return_to_known_good() != 0) LOG("recovery: return failed: %s", last_error());
         } else if (command == CMD_REINSTALL) {
@@ -2984,6 +3194,20 @@ static int launcher_run(void) {
         command = CMD_NONE;
 
         electron = prepare_for_launch();
+        if (!electron && g_outside.head) {
+            ui_changes(&g_outside);
+            if (O.self_test || !g_ui) {
+                LOG("launcher: %zu file(s) changed outside Stella and there is no one to ask; quitting",
+                    g_outside.paths.count);
+                reason = xstrdup("Some of Stella's files were changed outside Stella.");
+                if (g_ui) {
+                    ui_wait_loaded();
+                    ui_capture("changes.png", 1200);
+                }
+                command = CMD_QUIT;
+            }
+            continue;
+        }
         if (electron) {
             Outcome outcome;
             ui_refresh_version();

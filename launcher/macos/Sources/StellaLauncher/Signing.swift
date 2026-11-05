@@ -47,32 +47,6 @@ final class TreeSigner {
         return key.publicKey.isValidSignature(signature, for: TreeSigner.message(tree: tree))
     }
 
-    enum Verdict: CustomStringConvertible {
-        case signed
-        case unsigned(head: String)
-        case badSignature(head: String)
-        case dirty([String])
-
-        var description: String {
-            switch self {
-            case .signed: return "signed"
-            case let .unsigned(head): return "HEAD \(head.prefix(12)) has no signature"
-            case let .badSignature(head): return "HEAD \(head.prefix(12)) has an invalid signature"
-            case let .dirty(files): return "\(files.count) uncommitted file(s): \(files.prefix(5).joined(separator: ", "))"
-            }
-        }
-    }
-
-    func verifyHead(git: GitTool, app: URL) throws -> Verdict {
-        let dirty = try changedFiles(git: git, app: app)
-        if !dirty.isEmpty { return .dirty(dirty) }
-        let head = try git.run(["rev-parse", "HEAD"], cwd: app)
-        let tree = try git.run(["rev-parse", "HEAD^{tree}"], cwd: app)
-        let note = try git.raw(["notes", "--ref", TreeSigner.notesRef, "show", head], cwd: app)
-        guard note.code == 0 else { return .unsigned(head: head) }
-        return verify(tree: tree, note: note.stdout) ? .signed : .badSignature(head: head)
-    }
-
     @discardableResult
     func signHead(git: GitTool, app: URL, expected: String?) throws -> String {
         let head = try git.run(["rev-parse", "HEAD"], cwd: app)
@@ -89,6 +63,88 @@ final class TreeSigner {
                     cwd: app, extraEnv: GitTool.identityEnv)
         log("signing: signed \(head.prefix(12)) tree \(tree.prefix(12))")
         return head
+    }
+
+    /// What changed outside Stella's updates: the working tree as git would
+    /// commit it, compared with the newest commit this launcher signed.
+    func outsideChanges(git: GitTool, app: URL) throws -> OutsideChanges? {
+        let head = try git.run(["rev-parse", "HEAD"], cwd: app)
+        let headTree = try git.run(["rev-parse", "HEAD^{tree}"], cwd: app)
+        let clean = try changedFiles(git: git, app: app).isEmpty
+        let headSigned = isSigned(git: git, app: app, commit: head, tree: headTree)
+        if clean && headSigned { return nil }
+        let tree = clean ? headTree : try workingTree(git: git, app: app)
+        let base = headSigned ? head : try newestSignedAncestor(git: git, app: app, head: head)
+        var files: [OutsideChanges.File] = []
+        if let base {
+            let diff = try git.raw(["diff-tree", "-r", "--no-renames", "--name-status", "-z", base, tree], cwd: app)
+            guard diff.code == 0 else { throw LauncherError("git diff-tree failed: \(diff.stderr)") }
+            let fields = diff.stdout.split(separator: "\0", omittingEmptySubsequences: true).map(String.init)
+            var index = 0
+            while index + 1 < fields.count {
+                files.append(OutsideChanges.File(status: fields[index], path: fields[index + 1]))
+                index += 2
+            }
+        }
+        return OutsideChanges(head: head, tree: tree, files: files)
+    }
+
+    /// Makes exactly `seen` the trusted state: commits the working tree as it
+    /// was shown, then signs it. Returns false, changing nothing, when the
+    /// checkout no longer matches what the user saw.
+    func acceptOutsideChanges(_ seen: OutsideChanges, git: GitTool, app: URL) throws -> Bool {
+        guard let now = try outsideChanges(git: git, app: app) else { return true }
+        guard now.head == seen.head, now.tree == seen.tree else {
+            log("outside: the checkout changed while the notice was up; asking again")
+            return false
+        }
+        var head = seen.head
+        let headTree = try git.run(["rev-parse", "HEAD^{tree}"], cwd: app)
+        if seen.tree != headTree {
+            let commit = try git.run(
+                ["commit-tree", seen.tree, "-p", head, "-m", "Changes made outside Stella"],
+                cwd: app, extraEnv: GitTool.identityEnv)
+            try git.run(["update-ref", "-m", "stella: accept changes made outside Stella", "HEAD", commit, head], cwd: app)
+            try git.run(["reset", "-q"], cwd: app)
+            head = commit
+        }
+        try signHead(git: git, app: app, expected: head)
+        log("outside: accepted \(seen.files.count) file(s) as \(head.prefix(12))")
+        return true
+    }
+
+    private func isSigned(git: GitTool, app: URL, commit: String, tree: String) -> Bool {
+        guard let note = try? git.raw(["notes", "--ref", TreeSigner.notesRef, "show", commit], cwd: app),
+              note.code == 0
+        else { return false }
+        return verify(tree: tree, note: note.stdout)
+    }
+
+    private func newestSignedAncestor(git: GitTool, app: URL, head: String) throws -> String? {
+        let listed = try git.raw(["notes", "--ref", TreeSigner.notesRef, "list"], cwd: app)
+        let annotated = Set(listed.stdout.split(separator: "\n").compactMap { $0.split(separator: " ").last.map(String.init) })
+        guard !annotated.isEmpty else { return nil }
+        let history = try git.run(["rev-list", "--max-count=500", head], cwd: app).split(separator: "\n").map(String.init)
+        for commit in history where annotated.contains(commit) {
+            let tree = try git.run(["rev-parse", "\(commit)^{tree}"], cwd: app)
+            if isSigned(git: git, app: app, commit: commit, tree: tree) { return commit }
+        }
+        return nil
+    }
+
+    /// The tree `git add -A` would produce, built in a scratch copy of the
+    /// index so the checkout's own index is untouched.
+    private func workingTree(git: GitTool, app: URL) throws -> String {
+        let fm = FileManager.default
+        let index = URL(fileURLWithPath: try git.run(["rev-parse", "--git-path", "index"], cwd: app), relativeTo: app)
+            .standardizedFileURL
+        let scratch = index.deletingLastPathComponent().appendingPathComponent("stella-outside-\(getpid()).index")
+        try? fm.removeItem(at: scratch)
+        defer { try? fm.removeItem(at: scratch) }
+        if fm.fileExists(atPath: index.path) { try fm.copyItem(at: index, to: scratch) }
+        let env = ["GIT_INDEX_FILE": scratch.path]
+        try git.run(["add", "-A"], cwd: app, extraEnv: env)
+        return try git.run(["write-tree"], cwd: app, extraEnv: env)
     }
 
     func changedFiles(git: GitTool, app: URL) throws -> [String] {
@@ -146,4 +202,23 @@ final class TreeSigner {
         log("signing: generated a keychain key")
         return key
     }
+}
+
+struct OutsideChanges: Equatable {
+    struct File: Equatable {
+        let status: String
+        let path: String
+
+        var kind: String {
+            switch status.prefix(1) {
+            case "A": return "added"
+            case "D": return "removed"
+            default: return "changed"
+            }
+        }
+    }
+
+    let head: String
+    let tree: String
+    let files: [File]
 }

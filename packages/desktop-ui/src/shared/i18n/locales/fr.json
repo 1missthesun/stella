@@ -280,6 +280,11 @@
       "attach": {
         "failedTitle": "Impossible de joindre un fichier",
         "failedDescription": "Impossible de joindre {names}. Enregistrez-le dans un dossier de cet ordinateur et réessayez."
+      },
+      "attachmentStrip": {
+        "showMore": "Afficher {count} de plus",
+        "showLess": "Afficher moins",
+        "showAll": "Tout afficher ({count})"
       }
     },
     "media": {

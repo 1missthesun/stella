@@ -275,6 +275,11 @@
       "attach": {
         "failedTitle": "Kunne ikke legge ved en fil",
         "failedDescription": "{names} kunne ikke legges ved. Lagre den i en mappe på denne datamaskinen og prøv igjen."
+      },
+      "attachmentStrip": {
+        "showMore": "Vis {count} til",
+        "showLess": "Vis mindre",
+        "showAll": "Vis alle {count}"
       }
     },
     "media": {

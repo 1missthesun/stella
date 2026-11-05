@@ -275,6 +275,11 @@
       "attach": {
         "failedTitle": "Dosya eklenemedi",
         "failedDescription": "{names} eklenemedi. Bu bilgisayardaki bir klasöre kaydedip tekrar deneyin."
+      },
+      "attachmentStrip": {
+        "showMore": "{count} tane daha göster",
+        "showLess": "Daha az göster",
+        "showAll": "Tümünü göster ({count})"
       }
     },
     "media": {

@@ -275,6 +275,11 @@
       "attach": {
         "failedTitle": "Det gick inte att bifoga en fil",
         "failedDescription": "{names} kunde inte bifogas. Spara den i en mapp på den här datorn och försök igen."
+      },
+      "attachmentStrip": {
+        "showMore": "Visa {count} till",
+        "showLess": "Visa mindre",
+        "showAll": "Visa alla {count}"
       }
     },
     "media": {

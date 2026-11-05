@@ -578,12 +578,15 @@ export const UserMessageRow = memo(
 type AssistantRowProps = {
   row: AssistantRowViewModel;
   conversationId?: string | null;
+  /** This is the newest reply with media, so its previews start expanded. */
+  latestMedia?: boolean;
 };
 
 export const AssistantMessageRow = memo(
   function AssistantMessageRow({
     row,
     conversationId,
+    latestMedia = false,
   }: AssistantRowProps) {
     const reply = useMessageReply();
     const rowRef = useRef<HTMLDivElement>(null);
@@ -781,6 +784,8 @@ export const AssistantMessageRow = memo(
                   filePaths={evidencePaths}
                   part="media"
                   driveCards={driveCards}
+                  expansionKey={row.id}
+                  expandedByDefault={latestMedia}
                 />
               ) : null}
             </div>
@@ -791,6 +796,8 @@ export const AssistantMessageRow = memo(
                 filePaths={evidencePaths}
                 part="media"
                 driveCards={driveCards}
+                expansionKey={row.id}
+                expandedByDefault={latestMedia}
               />
               <MessageAttachments filePaths={evidencePaths} part="documents" />
             </div>
@@ -825,5 +832,6 @@ export const AssistantMessageRow = memo(
   },
   (prev, next) =>
     prev.conversationId === next.conversationId &&
+    prev.latestMedia === next.latestMedia &&
     eventRowEqual(prev.row, next.row),
 );

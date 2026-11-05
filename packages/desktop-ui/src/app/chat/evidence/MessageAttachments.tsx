@@ -1,27 +1,19 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { fileDisplayName } from "@stella/contracts/file-display-name";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
   EVIDENCE_TILE_WIDTH,
   isEvidenceMediaKind,
   type EvidenceCard,
 } from "@stella/contracts/chat-evidence";
 import { useEvidenceCards } from "@/features/chat/hooks/use-evidence-cards";
-import { openLocalPathOrExplain } from "@/features/chat/lib/open-local-path";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/ui/dropdown-menu";
-import { AudioLines, Film, Image as ImageIcon } from "@/ui/icons";
-import { MediaTile, openEvidenceSource } from "./MediaTile";
-import { driveLinkPath } from "@stella/contracts/cloud-world-paths";
+import { useT } from "@/shared/i18n";
+import { MediaTile } from "./MediaTile";
 import { AttachmentPill } from "./AttachmentPill";
 import "./attachment-strip.css";
 
 const useOnscreenTiles = (
   rowRef: React.RefObject<HTMLDivElement | null>,
   count: number,
+  wrapped: boolean,
 ): Set<string> => {
   const [visible, setVisible] = useState<Set<string>>(new Set());
   useEffect(() => {
@@ -46,13 +38,14 @@ const useOnscreenTiles = (
           return changed ? next : previous;
         });
       },
-      { root: row, rootMargin: "200px" },
+      // A wrapped grid scrolls with the chat, so it watches the viewport instead of the row.
+      { root: wrapped ? null : row, rootMargin: "200px" },
     );
     for (const tile of row.querySelectorAll<HTMLElement>("[data-evidence-tile]")) {
       observer.observe(tile);
     }
     return () => observer.disconnect();
-  }, [rowRef, count]);
+  }, [rowRef, count, wrapped]);
   return visible;
 };
 
@@ -105,58 +98,52 @@ const useRowWidth = (
   return width;
 };
 
-const fileNameOf = (card: EvidenceCard): string =>
-  card.sourcePaths[0] ? fileDisplayName(card.sourcePaths[0]) : card.title;
+// Expanded grids stay bounded; past this many tiles a "Show all" step reveals the rest.
+const EXPANDED_TILE_CAP = 48;
 
-const MenuGlyph = ({ card }: { card: EvidenceCard }) =>
-  card.kind === "video" ? (
-    <Film size={14} aria-hidden="true" />
-  ) : card.kind === "audio" ? (
-    <AudioLines size={14} aria-hidden="true" />
-  ) : (
-    <ImageIcon size={14} aria-hidden="true" />
-  );
+// A user's own expand/collapse choice per message, kept for the session so it
+// survives the row scrolling out of the virtualized list and back.
+const chosenExpansion = new Map<string, boolean>();
+const expansionListeners = new Set<() => void>();
+let expansionVersion = 0;
+const subscribeExpansion = (listener: () => void) => {
+  expansionListeners.add(listener);
+  return () => {
+    expansionListeners.delete(listener);
+  };
+};
+const chooseExpansion = (key: string, expanded: boolean) => {
+  chosenExpansion.set(key, expanded);
+  expansionVersion += 1;
+  for (const listener of expansionListeners) listener();
+};
+const useExpanded = (key: string | undefined, fallback: boolean): boolean => {
+  useSyncExternalStore(subscribeExpansion, () => expansionVersion);
+  return (key ? chosenExpansion.get(key) : undefined) ?? fallback;
+};
 
-const MoreTile = ({ cards }: { cards: readonly EvidenceCard[] }) => (
-  <DropdownMenu>
-    <DropdownMenuTrigger asChild>
-      <button
-        type="button"
-        className="attachment-strip__more-tile"
-        aria-label={`${cards.length} more files`}
-      >
-        +{cards.length}
-      </button>
-    </DropdownMenuTrigger>
-    <DropdownMenuContent
-      side="top"
-      align="start"
-      sideOffset={6}
-      collisionPadding={12}
-      className="attachment-strip__more-menu"
-    >
-      {cards.map((card) => (
-        <DropdownMenuItem
-          key={card.id}
-          onSelect={() => {
-            const target = card.sourcePaths[0];
-            if (!target) return;
-            if (driveLinkPath(target)) openEvidenceSource(target);
-            else openLocalPathOrExplain(target);
-          }}
-        >
-          <span className="attachment-strip__more-item">
-            <span className="attachment-strip__more-glyph">
-              <MenuGlyph card={card} />
-            </span>
-            <span className="attachment-strip__more-name">
-              {fileNameOf(card)}
-            </span>
-          </span>
-        </DropdownMenuItem>
-      ))}
-    </DropdownMenuContent>
-  </DropdownMenu>
+const ToggleTile = ({
+  label,
+  text,
+  expanded,
+  onClick,
+}: {
+  label: string;
+  text: string;
+  expanded: boolean;
+  onClick: () => void;
+}) => (
+  <button
+    type="button"
+    className="attachment-strip__more-tile"
+    data-kind={expanded ? "less" : "more"}
+    aria-label={label}
+    aria-expanded={expanded}
+    title={label}
+    onClick={onClick}
+  >
+    {text}
+  </button>
 );
 
 const NO_DRIVE_CARDS: readonly EvidenceCard[] = [];
@@ -165,12 +152,21 @@ export const MessageAttachments = ({
   filePaths,
   part,
   driveCards = NO_DRIVE_CARDS,
+  expansionKey,
+  expandedByDefault = false,
 }: {
   filePaths: string[];
   part: "media" | "documents";
   driveCards?: readonly EvidenceCard[];
+  /** Identifies the message, so a manual expand/collapse sticks to it. */
+  expansionKey?: string;
+  /** The latest message with media opens expanded; older ones start as one row. */
+  expandedByDefault?: boolean;
 }) => {
+  const t = useT();
   const rowRef = useRef<HTMLDivElement | null>(null);
+  const expanded = useExpanded(expansionKey, expandedByDefault);
+  const [showEverything, setShowEverything] = useState(false);
   const { cards, overflowCount } = useEvidenceCards(filePaths);
 
   const { media, documents } = useMemo(() => {
@@ -186,16 +182,29 @@ export const MessageAttachments = ({
   }, [cards, driveCards]);
 
   const rowWidth = useRowWidth(rowRef, part === "media" && media.length > 0);
-  const shownCount = fittingCount(media, rowWidth);
+  const rowCount = fittingCount(media, rowWidth);
+  const collapsible = rowCount < media.length;
+  const wrapped = expanded && collapsible;
+  const cappedCount =
+    showEverything || media.length <= EXPANDED_TILE_CAP ? media.length : EXPANDED_TILE_CAP;
+  const shownCount = wrapped ? cappedCount : rowCount;
   const shown = media.slice(0, shownCount);
-  const hidden = media.slice(shownCount);
-  const visible = useOnscreenTiles(rowRef, part === "media" ? shown.length : 0);
+  const hiddenCount = media.length - shownCount;
+  const visible = useOnscreenTiles(rowRef, part === "media" ? shown.length : 0, wrapped);
+  const setExpanded = (next: boolean) => {
+    if (expansionKey) chooseExpansion(expansionKey, next);
+    if (!next) setShowEverything(false);
+  };
 
   if (part === "media") {
     if (media.length === 0) return null;
     return (
       <div className="attachment-strip attachment-strip--media">
-        <div className="attachment-strip__media" ref={rowRef}>
+        <div
+          className="attachment-strip__media"
+          data-expanded={wrapped ? "" : undefined}
+          ref={rowRef}
+        >
           {shown.map((card) => (
             <div
               key={card.id}
@@ -205,7 +214,30 @@ export const MessageAttachments = ({
               <MediaTile card={card} visible={visible.has(card.id)} />
             </div>
           ))}
-          {hidden.length > 0 ? <MoreTile cards={hidden} /> : null}
+          {!wrapped && hiddenCount > 0 ? (
+            <ToggleTile
+              expanded={false}
+              text={`+${hiddenCount}`}
+              label={t("app.chat.attachmentStrip.showMore", { count: hiddenCount })}
+              onClick={() => setExpanded(true)}
+            />
+          ) : null}
+          {wrapped && hiddenCount > 0 ? (
+            <ToggleTile
+              expanded={false}
+              text={`+${hiddenCount}`}
+              label={t("app.chat.attachmentStrip.showAll", { count: media.length })}
+              onClick={() => setShowEverything(true)}
+            />
+          ) : null}
+          {wrapped ? (
+            <ToggleTile
+              expanded
+              text={t("app.chat.attachmentStrip.showLess")}
+              label={t("app.chat.attachmentStrip.showLess")}
+              onClick={() => setExpanded(false)}
+            />
+          ) : null}
         </div>
       </div>
     );

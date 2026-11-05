@@ -270,6 +270,11 @@
       "attach": {
         "failedTitle": "Tidak dapat melampirkan file",
         "failedDescription": "{names} tidak dapat dilampirkan. Simpan ke folder di komputer ini lalu coba lagi."
+      },
+      "attachmentStrip": {
+        "showMore": "Tampilkan {count} lagi",
+        "showLess": "Tampilkan lebih sedikit",
+        "showAll": "Tampilkan semua {count}"
       }
     },
     "media": {

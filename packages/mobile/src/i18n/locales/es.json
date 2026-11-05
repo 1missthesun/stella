@@ -280,6 +280,11 @@
       "attach": {
         "failedTitle": "No se pudo adjuntar un archivo",
         "failedDescription": "No se pudo adjuntar {names}. Guárdalo en una carpeta de este ordenador e inténtalo de nuevo."
+      },
+      "attachmentStrip": {
+        "showMore": "Mostrar {count} más",
+        "showLess": "Mostrar menos",
+        "showAll": "Mostrar los {count}"
       }
     },
     "media": {

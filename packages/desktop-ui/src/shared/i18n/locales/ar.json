@@ -295,6 +295,11 @@
       "attach": {
         "failedTitle": "تعذّر إرفاق ملف",
         "failedDescription": "تعذّر إرفاق {names}. احفظه في مجلد على هذا الكمبيوتر وحاول مرة أخرى."
+      },
+      "attachmentStrip": {
+        "showMore": "عرض {count} أخرى",
+        "showLess": "عرض أقل",
+        "showAll": "عرض الكل ({count})"
       }
     },
     "media": {

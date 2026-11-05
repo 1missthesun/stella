@@ -280,6 +280,11 @@
       "attach": {
         "failedTitle": "Fișierul nu a putut fi atașat",
         "failedDescription": "{names} nu a putut fi atașat. Salvează-l într-un folder de pe acest computer și încearcă din nou."
+      },
+      "attachmentStrip": {
+        "showMore": "Afișează încă {count}",
+        "showLess": "Afișează mai puțin",
+        "showAll": "Afișează toate ({count})"
       }
     },
     "media": {

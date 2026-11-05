@@ -275,6 +275,11 @@
       "attach": {
         "failedTitle": "Kunne ikke vedhæfte en fil",
         "failedDescription": "{names} kunne ikke vedhæftes. Gem den i en mappe på denne computer, og prøv igen."
+      },
+      "attachmentStrip": {
+        "showMore": "Vis {count} mere",
+        "showLess": "Vis mindre",
+        "showAll": "Vis alle {count}"
       }
     },
     "media": {

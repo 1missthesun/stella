@@ -280,6 +280,11 @@
       "attach": {
         "failedTitle": "Não foi possível anexar um arquivo",
         "failedDescription": "Não foi possível anexar {names}. Salve-o em uma pasta neste computador e tente novamente."
+      },
+      "attachmentStrip": {
+        "showMore": "Mostrar mais {count}",
+        "showLess": "Mostrar menos",
+        "showAll": "Mostrar todos ({count})"
       }
     },
     "media": {

@@ -275,6 +275,11 @@
       "attach": {
         "failedTitle": "Nem sikerült csatolni a fájlt",
         "failedDescription": "A(z) {names} csatolása nem sikerült. Mentsd egy mappába ezen a számítógépen, és próbáld újra."
+      },
+      "attachmentStrip": {
+        "showMore": "További {count} megjelenítése",
+        "showLess": "Kevesebb megjelenítése",
+        "showAll": "Mind a(z) {count} megjelenítése"
       }
     },
     "media": {

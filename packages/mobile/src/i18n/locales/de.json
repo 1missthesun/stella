@@ -275,6 +275,11 @@
       "attach": {
         "failedTitle": "Datei konnte nicht angehängt werden",
         "failedDescription": "{names} konnte nicht angehängt werden. Speichere sie in einem Ordner auf diesem Computer und versuche es erneut."
+      },
+      "attachmentStrip": {
+        "showMore": "{count} weitere anzeigen",
+        "showLess": "Weniger anzeigen",
+        "showAll": "Alle {count} anzeigen"
       }
     },
     "media": {

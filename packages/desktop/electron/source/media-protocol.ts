@@ -1,5 +1,6 @@
-import { pathToFileURL } from "node:url";
+import { createReadStream, promises as fsPromises } from "node:fs";
 import path from "node:path";
+import { Readable } from "node:stream";
 import { net, session } from "electron";
 import type { DeviceFileSource } from "@stella/contracts/device-files";
 import type { DeviceFileLocator } from "../services/device-file-locator.js";
@@ -10,6 +11,7 @@ import {
   resolveDeviceFileSource,
   type DeviceFileSourceDeps,
 } from "../services/device-file-source.js";
+import { contentTypeFromName } from "@stella/contracts/attachment-content-type";
 import {
   fetchWithInactivity,
   REQUEST_BUDGET_MS,
@@ -114,6 +116,7 @@ const parseRange = (
   if (!rawStart && !rawEnd) return null;
   if (!rawStart) {
     const suffix = Number(rawEnd);
+    if (suffix <= 0 || sizeBytes === 0) return null;
     return { start: Math.max(0, sizeBytes - suffix), end: sizeBytes - 1 };
   }
   const start = Number(rawStart);
@@ -159,6 +162,41 @@ const streamFromPeer = async (
     `bytes ${start}-${start + read.bytes.byteLength - 1}/${sizeBytes}`,
   );
   return new Response(read.bytes, { status: 206, headers });
+};
+
+// Media elements seek with Range requests; a 200 with the whole file instead
+// of a 206 leaves the element unseekable, so scrubbing snaps back to the start.
+const serveLocalFile = async (filePath: string, request: Request): Promise<Response> => {
+  const stat = await fsPromises.stat(filePath);
+  if (!stat.isFile()) return new Response("Not found", { status: 404 });
+  const sizeBytes = stat.size;
+  const headers = new Headers({
+    "access-control-allow-origin": "*",
+    "accept-ranges": "bytes",
+  });
+  // Unknown extensions go without a type so Chromium sniffs them, as it did for file:// loads.
+  const contentType = contentTypeFromName(filePath);
+  if (contentType) headers.set("content-type", contentType);
+  if (request.method === "HEAD") {
+    headers.set("content-length", String(sizeBytes));
+    return new Response(null, { status: 200, headers });
+  }
+  const rangeHeader = request.headers.get("range");
+  const asked = parseRange(rangeHeader, sizeBytes);
+  if (rangeHeader && !asked) {
+    headers.set("content-range", `bytes */${sizeBytes}`);
+    return new Response(null, { status: 416, headers });
+  }
+  if (sizeBytes === 0) {
+    headers.set("content-length", "0");
+    return new Response(null, { status: 200, headers });
+  }
+  const start = asked?.start ?? 0;
+  const end = asked?.end ?? sizeBytes - 1;
+  headers.set("content-length", String(end - start + 1));
+  if (asked) headers.set("content-range", `bytes ${start}-${end}/${sizeBytes}`);
+  const body = Readable.toWeb(createReadStream(filePath, { start, end })) as ReadableStream<Uint8Array>;
+  return new Response(body, { status: asked ? 206 : 200, headers });
 };
 
 const withMediaHeaders = (upstream: Response, contentType?: string): Response => {
@@ -221,12 +259,7 @@ export const serveMediaProtocol = (
     try {
       const source = await resolveDeviceFileSource(requested, devices);
       if (source.kind === "local") {
-        return withMediaHeaders(
-          await net.fetch(pathToFileURL(source.filePath).toString(), {
-            headers: rangeHeaders(request),
-            bypassCustomProtocolHandlers: true,
-          }),
-        );
+        return await serveLocalFile(source.filePath, request);
       }
       const holder = useDevices ? await findPeerHolder(requested, source) : null;
       if (holder && peerFiles) {

@@ -132,7 +132,7 @@ export const prepareAttachmentImage = async (
   const header = await bucket.get(args.driveKey, { range: { offset: 0, length: HEADER_BYTES } });
   if (!header) return null;
   const info = imageHeaderInfo(await bytesOf(header));
-  if (info && MODEL_IMAGE_TYPES.has(info.mimeType) && imageFitsCaps(caps, info.width, info.height, args.sizeBytes)) {
+  if (info && MODEL_IMAGE_TYPES.has(info.mimeType) && imageFitsCaps(caps, info.width, info.height, args.sizeBytes, info.mimeType)) {
     const signer = r2Signer(env, env.R2_DRIVE_BUCKET);
     if (signer) {
       await copyR2Object(signer, { from: args.driveKey, to: key });

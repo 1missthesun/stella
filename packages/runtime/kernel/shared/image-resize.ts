@@ -1,23 +1,17 @@
 import {
   DEFAULT_JPEG_QUALITY,
-  fitImageDimensions,
   formatImageResizeNote,
-  IMAGE_SHRINK_FACTOR,
+  type ImageCaps,
+  imageFitPasses,
   imageFitsCaps,
-  jpegQualitySteps,
   SAFE_FALLBACK_MAX_BYTES,
   SAFE_FALLBACK_MAX_EDGE,
-  triesLosslessFirst,
 } from "./image-caps.js";
 import { applyExifOrientation } from "./exif-orientation.js";
 import { loadPhoton } from "./photon.js";
+import { encodePng } from "./png-encode.js";
 
-export interface ImageResizeOptions {
-  maxWidth?: number;
-  maxHeight?: number;
-  maxBytes?: number;
-  jpegQuality?: number;
-}
+export type ImageResizeOptions = Partial<ImageCaps>;
 
 export interface ResizedImage {
   data: string;
@@ -29,7 +23,7 @@ export interface ResizedImage {
   wasResized: boolean;
 }
 
-const DEFAULT_OPTIONS: Required<ImageResizeOptions> = {
+const DEFAULT_OPTIONS: ImageCaps = {
   maxWidth: SAFE_FALLBACK_MAX_EDGE,
   maxHeight: SAFE_FALLBACK_MAX_EDGE,
   maxBytes: SAFE_FALLBACK_MAX_BYTES,
@@ -59,7 +53,7 @@ export const resizeImage = async (
   mimeType: string,
   options?: ImageResizeOptions,
 ): Promise<ResizedImage | null> => {
-  const opts = { ...DEFAULT_OPTIONS, ...options };
+  const opts: ImageCaps = { ...DEFAULT_OPTIONS, ...options };
 
   const photon = await loadPhoton();
   if (!photon) {
@@ -79,7 +73,7 @@ export const resizeImage = async (
     const format = mimeType.split("/")[1] ?? "png";
 
     if (
-      imageFitsCaps(opts, originalWidth, originalHeight, inputBytes.byteLength)
+      imageFitsCaps(opts, originalWidth, originalHeight, inputBytes.byteLength, mimeType)
     ) {
       return {
         data: Buffer.from(inputBytes).toString("base64"),
@@ -92,73 +86,28 @@ export const resizeImage = async (
       };
     }
 
-    const target = fitImageDimensions(opts, originalWidth, originalHeight);
-    const losslessFirst = triesLosslessFirst(mimeType);
-    const qualitySteps = jpegQualitySteps(opts.jpegQuality);
-
-    const firstFitting = (
-      width: number,
-      height: number,
-    ): EncodedCandidate | undefined => {
-      const resized = photon.resize(
-        image!,
-        width,
-        height,
-        photon.SamplingFilter.Lanczos3,
-      );
+    for (const pass of imageFitPasses(opts, originalWidth, originalHeight, mimeType)) {
+      const resized = photon.resize(image, pass.width, pass.height, photon.SamplingFilter.Lanczos3);
       try {
-        if (losslessFirst) {
-          const png = encodeCandidate(resized.get_bytes(), "image/png");
-          if (png.encodedSize < opts.maxBytes) return png;
+        for (const encoding of pass.encodings) {
+          const candidate =
+            encoding.format === "image/png"
+              ? encodeCandidate(encodePng(resized.get_raw_pixels(), resized.get_width(), resized.get_height()), "image/png")
+              : encodeCandidate(resized.get_bytes_jpeg(encoding.quality), "image/jpeg");
+          if (candidate.encodedSize >= pass.maxBytes) continue;
+          return {
+            data: candidate.data,
+            mimeType: candidate.mimeType,
+            originalWidth,
+            originalHeight,
+            width: pass.width,
+            height: pass.height,
+            wasResized: true,
+          };
         }
-        for (const quality of qualitySteps) {
-          const jpeg = encodeCandidate(
-            resized.get_bytes_jpeg(quality),
-            "image/jpeg",
-          );
-          if (jpeg.encodedSize < opts.maxBytes) return jpeg;
-        }
-        return undefined;
       } finally {
         resized.free();
       }
-    };
-
-    let currentWidth = target.width;
-    let currentHeight = target.height;
-
-    while (true) {
-      const candidate = firstFitting(currentWidth, currentHeight);
-      if (candidate) {
-        return {
-          data: candidate.data,
-          mimeType: candidate.mimeType,
-          originalWidth,
-          originalHeight,
-          width: currentWidth,
-          height: currentHeight,
-          wasResized: true,
-        };
-      }
-
-      if (currentWidth === 1 && currentHeight === 1) {
-        break;
-      }
-
-      const nextWidth =
-        currentWidth === 1
-          ? 1
-          : Math.max(1, Math.floor(currentWidth * IMAGE_SHRINK_FACTOR));
-      const nextHeight =
-        currentHeight === 1
-          ? 1
-          : Math.max(1, Math.floor(currentHeight * IMAGE_SHRINK_FACTOR));
-      if (nextWidth === currentWidth && nextHeight === currentHeight) {
-        break;
-      }
-
-      currentWidth = nextWidth;
-      currentHeight = nextHeight;
     }
 
     return null;

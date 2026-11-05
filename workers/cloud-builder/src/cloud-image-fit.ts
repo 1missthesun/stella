@@ -7,21 +7,19 @@
  * is ~48MB of RGBA, a 24MP one ~96MB) would not fit beside a Durable Object
  * in 128MB anyway. The Images binding decodes and resizes outside the isolate.
  * Everything that decides the outcome — the caps, when an image passes
- * untouched, the aspect-preserving target, PNG-first only for graphics, the
- * JPEG quality ladder, the shrink factor, and the note the model reads — comes
- * from the shared `image-caps` module, so a Read behaves the same here as on a
- * computer or in an agent's container.
+ * untouched, the sizes and encodings it tries in turn, and the note the model
+ * reads — comes from the shared `image-caps` module, so a Read behaves the
+ * same here as on a computer or in an agent's container. (The binding's PNG is
+ * less compact than the runtime's, so a dense screenshot that stays PNG there
+ * may go as JPEG at quality 90 here.)
  */
 
 import {
   base64EncodedLength,
-  fitImageDimensions,
   formatImageResizeNote,
-  IMAGE_SHRINK_FACTOR,
   type ImageCaps,
+  imageFitPasses,
   imageFitsCaps,
-  jpegQualitySteps,
-  triesLosslessFirst,
 } from "@stella/runtime/kernel/shared/image-caps.js";
 import { detectImageMediaType } from "@stella/runtime/kernel/shared/image-payload.js";
 
@@ -32,8 +30,6 @@ export type FittedImage = {
   originalHeight: number;
   note?: string;
 };
-
-const MAX_SHRINK_PASSES = 8;
 
 const streamOf = (bytes: Uint8Array): ReadableStream<Uint8Array> =>
   new Response(bytes).body as ReadableStream<Uint8Array>;
@@ -58,7 +54,7 @@ export const fitImageWithImagesBinding = async (
   try {
     const original = await dimensionsOf(images, bytes);
     if (!original) return null;
-    if (imageFitsCaps(caps, original.width, original.height, bytes.byteLength)) {
+    if (imageFitsCaps(caps, original.width, original.height, bytes.byteLength, mimeType)) {
       return {
         bytes,
         mimeType,
@@ -66,33 +62,17 @@ export const fitImageWithImagesBinding = async (
         originalHeight: original.height,
       };
     }
-    const outputs: ImageOutputOptions[] = [
-      ...(triesLosslessFirst(mimeType)
-        ? [{ format: "image/png" } as const]
-        : []),
-      ...jpegQualitySteps(caps.jpegQuality).map((quality) => ({
-        format: "image/jpeg" as const,
-        quality,
-      })),
-    ];
-    let { width, height } = fitImageDimensions(
-      caps,
-      original.width,
-      original.height,
-    );
-    for (let pass = 0; pass <= MAX_SHRINK_PASSES; pass += 1) {
-      for (const output of outputs) {
+    for (const pass of imageFitPasses(caps, original.width, original.height, mimeType)) {
+      for (const encoding of pass.encodings) {
         const result = await images
           .input(streamOf(bytes))
-          .transform({ width, height, fit: "scale-down" })
-          .output(output);
-        const encoded = new Uint8Array(
-          await result.response().arrayBuffer(),
-        );
-        if (base64EncodedLength(encoded.byteLength) >= caps.maxBytes) continue;
+          .transform({ width: pass.width, height: pass.height, fit: "scale-down" })
+          .output(encoding.format === "image/png" ? { format: "image/png" } : { format: "image/jpeg", quality: encoding.quality });
+        const encoded = new Uint8Array(await result.response().arrayBuffer());
+        if (base64EncodedLength(encoded.byteLength) >= pass.maxBytes) continue;
         const outputMimeType = detectImageMediaType(encoded);
         if (!outputMimeType) return null;
-        const shown = (await dimensionsOf(images, encoded)) ?? { width, height };
+        const shown = (await dimensionsOf(images, encoded)) ?? { width: pass.width, height: pass.height };
         return {
           bytes: encoded,
           mimeType: outputMimeType,
@@ -110,8 +90,6 @@ export const fitImageWithImagesBinding = async (
           }),
         };
       }
-      width = Math.max(1, Math.floor(width * IMAGE_SHRINK_FACTOR));
-      height = Math.max(1, Math.floor(height * IMAGE_SHRINK_FACTOR));
     }
     return null;
   } catch {

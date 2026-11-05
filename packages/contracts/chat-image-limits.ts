@@ -1,8 +1,8 @@
 /**
  * What a chat client fits an attached image to before uploading it, so the
  * cloud sends it to the model as it is: the long edge and byte budget of the
- * cloud's own fit (`DURABLE_OBJECT_READ_IMAGE_CAPS`: 2576px, 1.5MB of base64),
- * with a little room under the byte budget.
+ * cloud's own fit (`DURABLE_OBJECT_READ_IMAGE_CAPS`: 2576px, ~1 MB), with a
+ * little room under the byte budget.
  */
 export const CHAT_IMAGE_MAX_EDGE = 2576;
 export const CHAT_IMAGE_MAX_BYTES = 1_100_000;

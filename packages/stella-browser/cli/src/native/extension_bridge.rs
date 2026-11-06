@@ -26,8 +26,6 @@ const DEFAULT_WAIT_TIMEOUT_MS: u64 = 60_000;
 
 const HEALTH_CHECK_TTL_MS: u64 = 5_000;
 
-const DISCONNECT_SHUTDOWN_MS: u64 = 30_000;
-
 const RECONNECT_WAIT_MS: u64 = 10_000;
 
 const DEAD_AFTER_MISSED_HEALTH_CHECKS: u32 = 2;
@@ -197,7 +195,7 @@ impl ExtensionBridge {
         self.events_tx.subscribe()
     }
 
-    pub async fn start(&mut self, session: &str) -> Result<mpsc::Receiver<()>, String> {
+    pub async fn start(&mut self, session: &str) -> Result<(), String> {
         let socket_dir = get_socket_dir();
         if !socket_dir.exists() {
             let _ = fs::create_dir_all(&socket_dir);
@@ -242,7 +240,6 @@ impl ExtensionBridge {
         };
 
         let (shutdown_tx, mut shutdown_rx) = mpsc::channel::<()>(1);
-        let (disconnect_shutdown_tx, disconnect_shutdown_rx) = mpsc::channel::<()>(1);
         self.shutdown_tx = Some(shutdown_tx);
 
         let inner = self.inner.clone();
@@ -266,7 +263,6 @@ impl ExtensionBridge {
                                 let notify = connected_notify.clone();
                                 let token = token.clone();
                                 let session = session_str.clone();
-                                let disconnect_tx = disconnect_shutdown_tx.clone();
                                 let events = events_tx.clone();
 
                                 tokio::spawn(async move {
@@ -276,7 +272,6 @@ impl ExtensionBridge {
                                         notify,
                                         token,
                                         session,
-                                        disconnect_tx,
                                         events,
                                     ).await;
                                 });
@@ -296,7 +291,7 @@ impl ExtensionBridge {
             let _ = fs::remove_file(&port_file);
         });
 
-        Ok(disconnect_shutdown_rx)
+        Ok(())
     }
 
     pub async fn wait_for_connection(&self) -> bool {
@@ -323,25 +318,6 @@ impl ExtensionBridge {
 
     pub async fn is_connected(&self) -> bool {
         self.inner.lock().await.has_enabled_connection()
-    }
-
-    pub async fn verified_connection_generation(&self) -> Option<u64> {
-        for _ in 0..4 {
-            let generation = self.select_generation(None, None, false).await.ok()?;
-            if self.check_health(generation).await {
-                return Some(generation);
-            }
-            if self
-                .inner
-                .lock()
-                .await
-                .connections
-                .contains_key(&generation)
-            {
-                return Some(generation);
-            }
-        }
-        None
     }
 
     pub async fn force_reconnect(&self) -> bool {
@@ -1112,11 +1088,6 @@ async fn deactivate_connection(inner: &Arc<Mutex<BridgeInner>>, generation: u64)
     true
 }
 
-async fn should_shutdown_for_disconnect(inner: &Arc<Mutex<BridgeInner>>, generation: u64) -> bool {
-    let guard = inner.lock().await;
-    guard.connections.is_empty() && guard.next_generation == generation
-}
-
 async fn identify_connection(inner: Arc<Mutex<BridgeInner>>, generation: u64) {
     let info = match inner.lock().await.connections.get(&generation) {
         Some(connection) => connection.info.clone(),
@@ -1205,7 +1176,6 @@ async fn handle_extension_connection(
     connected_notify: Arc<Notify>,
     expected_token: String,
     session: String,
-    disconnect_shutdown_tx: mpsc::Sender<()>,
     events_tx: broadcast::Sender<String>,
 ) {
     let mut probe_buf = [0u8; 8];
@@ -1390,16 +1360,7 @@ async fn handle_extension_connection(
 
     if authenticated {
         if let Some(generation) = connection_generation {
-            if deactivate_connection(&inner, generation).await {
-                let inner_clone = inner.clone();
-                let disconnect_tx = disconnect_shutdown_tx.clone();
-                tokio::spawn(async move {
-                    tokio::time::sleep(Duration::from_millis(DISCONNECT_SHUTDOWN_MS)).await;
-                    if should_shutdown_for_disconnect(&inner_clone, generation).await {
-                        let _ = disconnect_tx.send(()).await;
-                    }
-                });
-            }
+            deactivate_connection(&inner, generation).await;
         }
     }
 

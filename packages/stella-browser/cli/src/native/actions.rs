@@ -2687,14 +2687,7 @@ async fn handle_chain(cmd: &Value, state: &mut DaemonState, id: &str) -> Value {
 async fn handle_extension_status(state: &DaemonState, cmd: &Value) -> Value {
     let owner = cmd.get("ownerId").and_then(Value::as_str);
     let mut status = match state.extension_bridge.as_ref() {
-        Some(bridge) => {
-            let generation = bridge.verified_connection_generation().await;
-            let mut status = bridge.status_for(owner).await;
-            status["connected"] = json!(generation.is_some());
-            status["authorized"] = json!(generation.is_some());
-            status["connectionGeneration"] = json!(generation);
-            status
-        }
+        Some(bridge) => bridge.status_for(owner).await,
         None => json!({
             "connected": false,
             "authorized": false,
@@ -3257,7 +3250,7 @@ async fn handle_launch(cmd: &Value, state: &mut DaemonState) -> Result<Value, St
                 let mut bridge = ExtensionBridge::new(ext_port, ext_token);
                 let session =
                     env::var("STELLA_BROWSER_SESSION").unwrap_or_else(|_| "default".to_string());
-                let _disconnect_rx = bridge.start(&session).await?;
+                bridge.start(&session).await?;
                 state.extension_bridge = Some(bridge);
                 state.backend_type = BackendType::Extension;
 

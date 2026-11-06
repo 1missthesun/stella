@@ -90,6 +90,13 @@ export const browserExecutionCancelArgs = (dispatchId: string) => ({
   reason: "Canceled by the user.",
 });
 
+export class BrowserExecutionStillStartingError extends Error {
+  constructor() {
+    super("Stella accepted that turn but is still starting it. Retry to check again.");
+    this.name = "BrowserExecutionStillStartingError";
+  }
+}
+
 const TERMINAL_STATES = new Set(["completed", "failed", "canceled", "blocked"]);
 
 export type BrowserExecutionWaitResult =
@@ -128,7 +135,5 @@ export const waitForBrowserExecutionTurn = async (args: {
     }
     if (attempt + 1 < attempts) await delay(250);
   }
-  throw new Error(
-    "Stella accepted that turn but is still starting it. Retry to check again.",
-  );
+  throw new BrowserExecutionStillStartingError();
 };

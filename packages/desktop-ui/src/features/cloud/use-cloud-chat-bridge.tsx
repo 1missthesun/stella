@@ -1,3 +1,4 @@
+import { sendStateInFlight } from "@stella/contracts/send-state";
 import { useChatStorageMode } from "@/features/chat/services/chat-storage-preference";
 import {
   cloudOfflineNoticeDueAt,
@@ -109,7 +110,7 @@ export const cloudPendingPromptsToEvents = (
         ...(entry.submission.context?.display
           ? { metadata: { context: entry.submission.context.display } }
           : {}),
-        ...(entry.error ? { sendFailed: entry.error } : {}),
+        ...(entry.send.kind === "not_sent" ? { sendFailed: entry.send.message } : {}),
       },
     };
   });
@@ -117,7 +118,7 @@ export const cloudPendingPromptsToEvents = (
 export const latestInFlightCloudUserMessageId = (
   pending: readonly PendingPrompt[],
 ): string | null =>
-  pending.findLast((entry) => !entry.error)?.clientMsgId ?? null;
+  pending.findLast((entry) => sendStateInFlight(entry.send))?.clientMsgId ?? null;
 
 const escapeXmlText = (value: string): string =>
   value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -514,7 +515,7 @@ export function useCloudChatBridge({
     });
   }, [dismissSend, enabled, retrySend, webShell]);
   const awaitingAdmission =
-    enabled && webShell && conversation.pending.some((entry) => !entry.error);
+    enabled && webShell && conversation.pending.some((entry) => sendStateInFlight(entry.send));
 
   const sendMessage = useCallback(
     async (args: SendMessageArgs): Promise<boolean> => {
@@ -539,7 +540,9 @@ export function useCloudChatBridge({
 
   const cancelCurrentStream = useCallback(() => {
     if (!enabled) return;
-    const pendingEntry = conversation.pending.findLast((entry) => !entry.error);
+    const pendingEntry = conversation.pending.findLast((entry) =>
+      sendStateInFlight(entry.send),
+    );
     const turnId =
       conversation.state.live?.turnId ??
       (pendingEntry?.turnId !== null ? pendingEntry?.turnId : null) ??

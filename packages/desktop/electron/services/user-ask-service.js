@@ -271,9 +271,22 @@ const storeInMacosKeychain = async ({ service, account, value }) => await new Pr
     child.on("close", (code) => resolve(code === 0 ? { ok: true, failure: "" } : { ok: false, failure }));
     child.stdin?.end(`${value}\n${value}\n`);
 });
+const CLOUD_OUTBOX_FILE = "user-ask-cloud-outbox.json";
+const CLOUD_OUTBOX_RETRY_MS = 15_000;
+const CLOUD_OUTBOX_MAX_AGE_MS = 2 * 60 * 60_000;
+const cloudPublishSettled = (response) => Boolean(response &&
+    (response.ok ||
+        (response.status >= 400 &&
+            response.status < 500 &&
+            response.status !== 401 &&
+            response.status !== 408 &&
+            response.status !== 429)));
 export class UserAskService {
     options;
     asks = new Map();
+    cloudOutbox = null;
+    cloudOutboxTimer = null;
+    cloudOutboxFlushing = null;
     pending = new PendingRequestStore();
     escalation;
     backend = null;
@@ -325,6 +338,7 @@ export class UserAskService {
     }
     startMirror() {
         this.mirrorStarted = true;
+        this.loadCloudOutbox();
         this.startRemoteAnswerSync();
         void this.refreshMirror();
     }
@@ -340,6 +354,9 @@ export class UserAskService {
         }
         this.startRemoteAnswerSync();
         void this.refreshMirror();
+        if (this.loadCloudOutbox().size > 0) {
+            this.scheduleCloudOutboxFlush(0);
+        }
     }
     async refreshMirror() {
         if (this.mirrorRefreshing) {
@@ -371,6 +388,7 @@ export class UserAskService {
                 continue;
             }
             if (deviceId && ask.originDeviceId === deviceId) {
+                this.closeOrphanedOwnAsk(ask.askId);
                 continue;
             }
             seen.add(ask.askId);
@@ -1277,8 +1295,126 @@ export class UserAskService {
         if (!ask.conversationId || !ask.originDeviceId) {
             return;
         }
+        this.queueCloudPublish(ask.askId, { op: "open", ask });
+    }
+    async publishAskResolved(askId, state, reason) {
+        this.queueCloudPublish(askId, { op: "close", state, ...(reason ? { reason } : {}) });
+    }
+    closeOrphanedOwnAsk(askId) {
+        if (this.loadCloudOutbox().has(askId)) {
+            return;
+        }
+        this.queueCloudPublish(askId, { op: "close", state: "canceled", reason: "origin_restarted" });
+    }
+    cloudOutboxPath() {
+        const dir = this.options.getStellaAppDir();
+        return dir ? path.join(dir, CLOUD_OUTBOX_FILE) : null;
+    }
+    loadCloudOutbox() {
+        if (this.cloudOutbox) {
+            return this.cloudOutbox;
+        }
+        this.cloudOutbox = new Map();
+        const filePath = this.cloudOutboxPath();
+        try {
+            const parsed = filePath ? JSON.parse(fs.readFileSync(filePath, "utf-8")) : null;
+            for (const [askId, entry] of Object.entries(parsed?.entries ?? {})) {
+                if (entry?.op === "close" && !entry.ask) {
+                    this.cloudOutbox.set(askId, entry);
+                }
+            }
+        }
+        catch { }
+        if (this.cloudOutbox.size > 0) {
+            this.scheduleCloudOutboxFlush(0);
+        }
+        return this.cloudOutbox;
+    }
+    saveCloudOutbox() {
+        const filePath = this.cloudOutboxPath();
+        if (!filePath) {
+            return;
+        }
+        try {
+            if (this.cloudOutbox.size === 0) {
+                fs.rmSync(filePath, { force: true });
+                return;
+            }
+            const tmpPath = `${filePath}.${process.pid}.tmp`;
+            writePrivateFileSync(tmpPath, JSON.stringify({ entries: Object.fromEntries(this.cloudOutbox) }));
+            fs.renameSync(tmpPath, filePath);
+        }
+        catch (error) {
+            console.warn("[user-asks] Failed to save the cloud outbox:", error.message);
+        }
+    }
+    queueCloudPublish(askId, entry) {
+        const outbox = this.loadCloudOutbox();
+        if (entry.op === "close" && outbox.get(askId)?.op === "open") {
+            entry = { ...entry, ask: outbox.get(askId).ask };
+        }
+        outbox.set(askId, { ...entry, queuedAt: Date.now() });
+        this.saveCloudOutbox();
+        this.scheduleCloudOutboxFlush(0);
+    }
+    scheduleCloudOutboxFlush(delayMs) {
+        if (this.cloudOutboxTimer) {
+            if (delayMs > 0) {
+                return;
+            }
+            clearTimeout(this.cloudOutboxTimer);
+        }
+        this.cloudOutboxTimer = setTimeout(() => {
+            this.cloudOutboxTimer = null;
+            void this.flushCloudOutbox();
+        }, delayMs);
+        this.cloudOutboxTimer.unref?.();
+    }
+    async flushCloudOutbox() {
+        if (this.cloudOutboxFlushing) {
+            await this.cloudOutboxFlushing;
+            if (this.loadCloudOutbox().size > 0) {
+                this.scheduleCloudOutboxFlush(0);
+            }
+            return;
+        }
+        this.cloudOutboxFlushing = (async () => {
+            const outbox = this.loadCloudOutbox();
+            for (const [askId, entry] of [...outbox]) {
+                const stale = !(entry.queuedAt > Date.now() - CLOUD_OUTBOX_MAX_AGE_MS);
+                const delivered = stale || (await this.sendCloudPublish(askId, entry));
+                if (delivered && outbox.get(askId) === entry) {
+                    outbox.delete(askId);
+                    this.saveCloudOutbox();
+                }
+            }
+        })().finally(() => {
+            this.cloudOutboxFlushing = null;
+        });
+        await this.cloudOutboxFlushing;
+        if (this.loadCloudOutbox().size > 0) {
+            this.scheduleCloudOutboxFlush(CLOUD_OUTBOX_RETRY_MS);
+        }
+    }
+    async sendCloudPublish(askId, entry) {
+        if (entry.op === "open" || entry.ask) {
+            const opened = await this.sendAskOpen(entry.ask);
+            if (!opened) {
+                return false;
+            }
+            if (entry.op === "open") {
+                return true;
+            }
+        }
+        const response = await this.cloudRequest(`${CLOUD_ASKS_PATH}/${encodeURIComponent(askId)}/cancel`, {
+            method: "POST",
+            body: JSON.stringify({ state: entry.state, ...(entry.reason ? { reason: entry.reason } : {}) }),
+        });
+        return cloudPublishSettled(response);
+    }
+    async sendAskOpen(ask) {
         const now = new Date();
-        await this.cloudRequest(CLOUD_ASKS_PATH, {
+        const response = await this.cloudRequest(CLOUD_ASKS_PATH, {
             method: "POST",
             body: JSON.stringify({
                 askId: ask.askId,
@@ -1298,12 +1434,7 @@ export class UserAskService {
                 ...(ask.recipientKey ? { recipientKey: ask.recipientKey } : {}),
             }),
         });
-    }
-    async publishAskResolved(askId, state, reason) {
-        await this.cloudRequest(`${CLOUD_ASKS_PATH}/${encodeURIComponent(askId)}/cancel`, {
-            method: "POST",
-            body: JSON.stringify({ state, ...(reason ? { reason } : {}) }),
-        });
+        return cloudPublishSettled(response);
     }
     ensureBackendClient() {
         const baseUrl = this.options.getBackendUrl?.();

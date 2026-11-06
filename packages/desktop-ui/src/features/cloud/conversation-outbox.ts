@@ -1,5 +1,8 @@
 import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
-import type { CloudTurnContext } from "@stella/contracts/turn-plane/turn-start";
+import {
+  parseCloudTurnContext,
+  type CloudTurnContext,
+} from "@stella/contracts/turn-plane/turn-start";
 import { isAccountProviderId } from "@stella/contracts/backend/providers";
 import { REASONING_EFFORT_LEVELS } from "@stella/contracts/reasoning-effort";
 import type { JournalRecord } from "@stella/contracts/conversation-protocol";
@@ -137,13 +140,15 @@ const isSubmission = (value: unknown): value is PendingCloudTurnSubmission => {
       candidate.requestedConversationId,
       MAX_CONVERSATION_ID_CHARS,
     ) &&
-    isBoundedString(candidate.prompt, MAX_PROMPT_CHARS) &&
+    isBoundedString(candidate.prompt, MAX_PROMPT_CHARS, true) &&
     Array.isArray(candidate.imagePaths) &&
     candidate.imagePaths.length <= 4 &&
     candidate.imagePaths.every((path) => isBoundedString(path, 512)) &&
     Array.isArray(candidate.attachments) &&
     candidate.attachments.length <= 32 &&
     candidate.attachments.every(isAttachment) &&
+    (candidate.context === undefined ||
+      parseCloudTurnContext(candidate.context) !== null) &&
     (candidate.uploadIds === undefined ||
       (Array.isArray(candidate.uploadIds) &&
         candidate.uploadIds.length <= 32 &&
@@ -172,7 +177,7 @@ const parseEnvelope = (raw: string): PendingPrompt | null => {
     !isBoundedString(candidate.ownerGeneration, MAX_GENERATION_CHARS) ||
     !isBoundedString(candidate.clientMsgId, MAX_CLIENT_MSG_ID_CHARS) ||
     !CLIENT_MSG_ID_PATTERN.test(candidate.clientMsgId) ||
-    !isBoundedString(candidate.text, MAX_PROMPT_CHARS) ||
+    !isBoundedString(candidate.text, MAX_PROMPT_CHARS, true) ||
     typeof candidate.createdAtMs !== "number" ||
     !Number.isSafeInteger(candidate.createdAtMs) ||
     candidate.createdAtMs < 0 ||
@@ -481,6 +486,10 @@ const frozenSubmission = (
     execution: submission.execution
       ? Object.freeze({ ...submission.execution })
       : null,
+    ...(submission.context ? { context: submission.context } : {}),
+    ...(submission.executionTarget
+      ? { executionTarget: Object.freeze({ ...submission.executionTarget }) }
+      : {}),
   });
 
 const emitPending = (next: readonly PendingPrompt[]): void => {

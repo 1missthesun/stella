@@ -61,6 +61,7 @@ import {
 import "./cloud-chat-status.css";
 import {
   browserAttachmentUploads,
+  hasUnsentBrowserAttachments,
   useBrowserAttachmentUploads,
 } from "./browser-chat-attachments";
 import { provideCloudSendRecovery } from "./cloud-send-recovery";
@@ -107,6 +108,9 @@ export const cloudPendingPromptsToEvents = (
       payload: {
         text: entry.text,
         ...(attachments.length ? { attachments } : {}),
+        ...(entry.submission.context?.display
+          ? { metadata: { context: entry.submission.context.display } }
+          : {}),
         ...(entry.error ? { sendFailed: entry.error } : {}),
       },
     };
@@ -520,7 +524,7 @@ export function useCloudChatBridge({
     async (args: SendMessageArgs): Promise<boolean> => {
       if (!enabled || !webShell || !conversationId) return false;
       const { prompt, context } = cloudSendFromSendArgs(args);
-      if (!prompt) return false;
+      if (!prompt && !hasUnsentBrowserAttachments()) return false;
       if (context?.text && context.text.length > TURN_CONTEXT_TEXT_MAX_CHARS) {
         showToast({
           title: "That paste is too long to send",

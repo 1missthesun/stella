@@ -19,6 +19,7 @@ const MAX_RESOLVED = 48;
 const MAX_SENT = 32;
 const MAX_CONCURRENT = 4;
 const RETRY_MS = 30_000;
+const MAX_FILE_PREVIEW_BYTES = 8 * 1024 * 1024;
 
 type Resolved =
   | { status: "pending" }
@@ -45,7 +46,9 @@ const notify = () => {
 };
 
 const forget = (entry: Resolved | undefined) => {
-  if (entry?.status === "ready") URL.revokeObjectURL(entry.url);
+  if (entry?.status === "ready" && entry.url) {
+    URL.revokeObjectURL(entry.url);
+  }
 };
 
 const clearAll = () => {
@@ -73,6 +76,22 @@ const remember = (path: string, entry: Resolved) => {
 
 const fetchPreview = async (path: string): Promise<Resolved> => {
   const file = await backendClient.call("drive.fileUrl", { path });
+  const declared = attachmentContentType({
+    declared: file.contentType,
+    name: file.name || path,
+  });
+  if (
+    !declared.toLowerCase().startsWith("image/") &&
+    file.sizeBytes > MAX_FILE_PREVIEW_BYTES
+  ) {
+    return {
+      status: "ready",
+      url: "",
+      mimeType: declared,
+      name: file.name,
+      size: file.sizeBytes,
+    };
+  }
   const response = await fetchWithInactivity(fetch, file.url, {}, {
     label: "Drive preview",
     idleMs: REQUEST_BUDGET_MS.transferIdle,
@@ -184,7 +203,7 @@ const presentDrive = (state: Snapshot, attachment: Attachment): Attachment | nul
   if (entry?.status === "ready") {
     return {
       id: attachment.id,
-      url: entry.url,
+      ...(entry.url ? { url: entry.url } : {}),
       mimeType: entry.mimeType,
       name: entry.name,
       size: entry.size,

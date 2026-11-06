@@ -376,7 +376,7 @@ const isRetryableUploadError = (error: unknown): boolean => {
   return !(error instanceof Error && /too large|larger than|empty|couldn’t be made small/i.test(error.message));
 };
 
-const untilOnline = (): Promise<void> =>
+export const untilOnline = (): Promise<void> =>
   typeof navigator === "undefined" || navigator.onLine
     ? Promise.resolve()
     : new Promise((resolve) =>
@@ -487,6 +487,16 @@ export const browserAttachmentUploads = {
 };
 
 const PREVIEW_RELEASE_DELAY_MS = 60_000;
+
+export const hasUnsentBrowserAttachments = (): boolean =>
+  uploads.some((entry) => entry.sentWith === null);
+
+export const useHasUnsentBrowserAttachments = (): boolean =>
+  useSyncExternalStore(
+    browserAttachmentUploads.subscribe,
+    hasUnsentBrowserAttachments,
+    () => false,
+  );
 
 const EMPTY: readonly BrowserAttachmentUpload[] = [];
 export const useBrowserAttachmentUploads = () =>

@@ -27,7 +27,7 @@ import {
   type JournalRecord,
 } from "@stella/contracts/conversation-protocol";
 import type { LiveTurn } from "./cloud-conversation-store";
-import { withAttachmentPreamble } from "./chat-attachments";
+import { splitAttachmentPreamble } from "./chat-attachments";
 import type { SentMessageAnchors } from "@stella/contracts/sent-message-anchors";
 import { replaceEqualDeep } from "./structural-sharing";
 
@@ -81,15 +81,19 @@ const userDisplayContext = (payload: Record<string, unknown>) => {
 
 const userAttachmentPresentation = (payload: Record<string, unknown>) => {
   const raw = asRecord(payload.providerContext)?.attachments;
-  const attachmentPaths = Array.isArray(raw)
-    ? [...new Set(raw.filter((path): path is string => typeof path === "string" && path.length > 0 && path.length <= 400))]
-    : [];
-  const text = messageText(payload);
-  const suffix = attachmentPaths.length ? withAttachmentPreamble("", attachmentPaths) : "";
+  const prompt = splitAttachmentPreamble(messageText(payload));
+  const attachmentPaths = [
+    ...new Set([
+      ...(Array.isArray(raw)
+        ? raw.filter((path): path is string => typeof path === "string" && path.length > 0 && path.length <= 400)
+        : []),
+      ...prompt.paths,
+    ]),
+  ];
   const thumbnailUris = attachmentPaths.length ? [] : inlineImageUris(payload);
   const documentNames = attachmentPaths.length ? [] : declaredFileNames(payload);
   return {
-    text: !suffix ? text : text === suffix.trimStart() ? "" : text.endsWith(suffix) ? text.slice(0, -suffix.length) : text,
+    text: prompt.text,
     ...(attachmentPaths.length ? {
       attachmentPaths,
       attachmentPreviews: attachmentPaths.map(path => ({ path, name: path.split("/").at(-1) ?? path })),

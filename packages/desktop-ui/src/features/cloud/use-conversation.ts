@@ -61,6 +61,8 @@ import { presentCloudUsageLimit } from "./usage-limit-notice";
 import { getExecutionTargetSnapshot } from "../execution-placement/execution-target-store";
 import {
   browserAttachmentUploads,
+  hasUnsentBrowserAttachments,
+  untilOnline,
   waitForAttachmentUploads,
 } from "./browser-chat-attachments";
 
@@ -432,6 +434,7 @@ export const useConversation = (
             attachments,
           };
         }
+        await untilOnline();
         await turnOrder.previous;
         if (!isCurrentAuthority()) return;
         if (
@@ -668,9 +671,15 @@ export const useConversation = (
   const send = useCallback(
     async (prompt: string, context?: CloudTurnContext): Promise<void> => {
       const text = prompt.trim();
-      if (!text) return;
-      const clientMsgId = newClientMsgId();
       const attachments = cloudAttachmentsStore.getSnapshot();
+      if (
+        !text &&
+        !attachments.length &&
+        !(webShell && hasUnsentBrowserAttachments())
+      ) {
+        return;
+      }
+      const clientMsgId = newClientMsgId();
       const selectedExecution =
         getCloudExecutionSelectionSnapshot() ?? cloudSelection ?? null;
       if (!authority) return;

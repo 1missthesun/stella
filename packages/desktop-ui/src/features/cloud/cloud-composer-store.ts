@@ -64,3 +64,19 @@ export const withAttachmentPreamble = (
   const lines = files.map((file) => `- ${file.path}`).join("\n");
   return `${prompt}\n\nAttached in my drive:\n${lines}`;
 };
+
+const ATTACHMENT_PREAMBLE = /(?:^|\n\n)Attached in my drive:\n((?:- [^\n]+(?:\n|$))+)$/;
+
+/** Splits the Drive file list that `withAttachmentPreamble` appended off a prompt. */
+export const splitAttachmentPreamble = (
+  text: string,
+): { text: string; paths: string[] } => {
+  const match = ATTACHMENT_PREAMBLE.exec(text);
+  if (!match) return { text, paths: [] };
+  const paths = match[1]!
+    .split("\n")
+    .filter((line) => line.startsWith("- "))
+    .map((line) => line.slice(2).trim())
+    .filter((path) => path.length > 0 && path.length <= 400);
+  return { text: text.slice(0, match.index), paths };
+};

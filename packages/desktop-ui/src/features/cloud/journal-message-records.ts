@@ -13,7 +13,7 @@ import {
   bareToolName,
 } from "@stella/contracts/conversation-agent-activity";
 import { groupEventsIntoMessages } from "@/features/chat/lib/group-events-into-messages";
-import { withAttachmentPreamble } from "./cloud-composer-store";
+import { splitAttachmentPreamble } from "./cloud-composer-store";
 import { driveAttachmentRef } from "./drive-attachment-previews";
 import {
   messageText,
@@ -177,6 +177,7 @@ const contentBlocks = (
 
 const userAttachments = (
   payload: AgentMessagePayload,
+  listedPaths: readonly string[],
 ): Attachment[] => {
   const images = contentBlocks(payload).flatMap((block): Attachment[] =>
     block.type === "image" &&
@@ -217,7 +218,9 @@ const userAttachments = (
   return [
     ...images,
     ...files,
-    ...providerAttachmentPaths(payload).map(driveAttachmentRef),
+    ...[...new Set([...providerAttachmentPaths(payload), ...listedPaths])].map(
+      driveAttachmentRef,
+    ),
   ];
 };
 
@@ -233,20 +236,6 @@ const providerAttachmentPaths = (payload: AgentMessagePayload): string[] => {
         ),
       ]
     : [];
-};
-
-const withoutDrivePreamble = (
-  text: string,
-  payload: AgentMessagePayload,
-): string => {
-  const paths = providerAttachmentPaths(payload);
-  if (paths.length === 0) return text;
-  const suffix = withAttachmentPreamble(
-    "",
-    paths.map((path) => ({ path, name: path, sizeBytes: 0 })),
-  );
-  if (text === suffix.trimStart()) return "";
-  return text.endsWith(suffix) ? text.slice(0, -suffix.length) : text;
 };
 
 const nonEmptyStrings = (value: unknown): string[] =>
@@ -457,10 +446,9 @@ export const journalRecordsToMessageRecords = (
         turnUserRecord = record;
         userMessageId =
           record.clientMsgId ?? `cloud:${turnId}:message:${record.seq}`;
-        const userText =
-          userDisplayText(record.payload) ??
-          withoutDrivePreamble(messageText(record.payload), record.payload);
-        const attachments = userAttachments(record.payload);
+        const prompt = splitAttachmentPreamble(messageText(record.payload));
+        const userText = userDisplayText(record.payload) ?? prompt.text;
+        const attachments = userAttachments(record.payload, prompt.paths);
         // A prompt with nothing to show (older desktop turns mirrored their
         // lifecycle wake as an empty, unflagged user record) renders like a
         // hidden one: no bubble, no slot. So does one an agent sent (a note

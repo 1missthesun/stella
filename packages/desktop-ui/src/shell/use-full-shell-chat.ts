@@ -29,6 +29,7 @@ import { useAgentInputRouting } from "./use-agent-input-routing";
 import { useStellaSendMessageBridge } from "./use-stella-send-message-bridge";
 import { useChatStore } from "@/context/chat-store-context";
 import { useCloudChatBridge } from "@/features/cloud/use-cloud-chat-bridge";
+import { useHasUnsentBrowserAttachments } from "@/features/cloud/browser-chat-attachments";
 import { usePiChat } from "@/features/chat/pi/use-pi-chat";
 import { remoteTurnRunning } from "@/features/chat/pi/remote-turn-running";
 import {
@@ -592,8 +593,9 @@ export function useFullShellChat({
     showHome,
     showHomeContent,
   ]);
+  const hasUnsentAttachments = useHasUnsentBrowserAttachments();
   const { canSubmit } = deriveComposerState({
-    hasMessage: hasComposerText,
+    hasMessage: hasComposerText || hasUnsentAttachments,
     chatContext,
     selectedText,
     conversationId: activeConversationId,

@@ -14,7 +14,7 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::signal;
 use tokio::sync::{broadcast, mpsc, oneshot, RwLock};
 
-use super::actions::{execute_command, teardown_daemon_state, DaemonState};
+use super::actions::{prepare_command, teardown_daemon_state, DaemonState, PreparedCommand};
 use super::cdp::client::CdpClient;
 use super::state;
 use super::stream::StreamServer;
@@ -1103,8 +1103,14 @@ async fn execute_command_with_deadline(
         .and_then(Value::as_str)
         .unwrap_or("unknown");
     match tokio::time::timeout(Duration::from_millis(timeout_ms), async {
-        let mut guard = state.lock().await;
-        execute_command(command, &mut guard).await
+        let prepared = {
+            let mut guard = state.lock().await;
+            prepare_command(command, &mut guard).await
+        };
+        match prepared {
+            PreparedCommand::Ready(response) => response,
+            PreparedCommand::Extension(forward) => forward.run().await,
+        }
     })
     .await
     {

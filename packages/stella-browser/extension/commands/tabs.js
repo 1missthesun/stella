@@ -1,4 +1,4 @@
-import { clearCdpEvents } from "../lib/debugger.js";
+import { clearCdpEvents, ensureDebugger } from "../lib/debugger.js";
 import { clearOwnerRefMaps, clearTabRefMap } from "../lib/selector.js";
 
 let agentWindowId = null;
@@ -703,6 +703,35 @@ export async function getOwnerTabIds(command) {
 }
 
 export async function getActiveTab(command) {
+  return await wakeTab(await resolveActiveTab(command));
+}
+
+/**
+ * Memory Saver discards background tabs and energy saving freezes them; a
+ * discarded tab has no page until it reloads, and a frozen one runs no script.
+ */
+async function wakeTab(tab) {
+  if (tab.discarded) {
+    await chrome.tabs.reload(tab.id);
+    const deadline = Date.now() + 15_000;
+    for (;;) {
+      const current = await chrome.tabs.get(tab.id);
+      if (current.status === "complete" || Date.now() > deadline) return current;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+  }
+  if (tab.frozen) {
+    try {
+      await ensureDebugger(tab.id);
+      await chrome.debugger.sendCommand({ tabId: tab.id }, "Page.setWebLifecycleState", {
+        state: "active",
+      });
+    } catch {}
+  }
+  return tab;
+}
+
+async function resolveActiveTab(command) {
   const ownerId = getCommandOwnerId(command);
   const tabs = await getOwnerTabs(ownerId, { ensureWindow: true });
   const state = getOwnerState(ownerId);
@@ -1206,6 +1235,32 @@ chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
     if (changed) {
       await saveState();
     }
+  })().catch(() => {});
+});
+
+chrome.tabs.onReplaced.addListener((addedTabId, removedTabId) => {
+  void (async () => {
+    await loadState();
+    let changed = false;
+    for (const [ownerId, state] of Object.entries(ownerTabState)) {
+      if (!state.tabIds.includes(removedTabId)) continue;
+      state.tabIds = state.tabIds.map((tabId) =>
+        tabId === removedTabId ? addedTabId : tabId,
+      );
+      if (state.activeTabId === removedTabId) state.activeTabId = addedTabId;
+      const touched = state.lastTouchedAtByTabId?.[String(removedTabId)];
+      delete state.lastTouchedAtByTabId?.[String(removedTabId)];
+      state.lastTouchedAtByTabId[String(addedTabId)] = touched ?? Date.now();
+      const marks = ownerLeaseState[ownerId]?.markedTabs;
+      if (marks?.[String(removedTabId)]) {
+        marks[String(addedTabId)] = marks[String(removedTabId)];
+        delete marks[String(removedTabId)];
+      }
+      clearTabRefMap(ownerId, removedTabId);
+      clearCdpEvents(removedTabId);
+      changed = true;
+    }
+    if (changed) await saveState();
   })().catch(() => {});
 });
 

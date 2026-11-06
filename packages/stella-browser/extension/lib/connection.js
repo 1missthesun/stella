@@ -3,6 +3,7 @@ import { STELLA_NATIVE_HOST_NAME } from "./native-host-name.js";
 /** Must match the daemon's bridge port (STELLA_BROWSER_BRIDGE_PORT / DEFAULT_EXT_PORT). */
 const BRIDGE_HEALTH_URL = "http://127.0.0.1:39040/healthz";
 const PROBE_INTERVAL = 4000;
+const MAX_PROBE_INTERVAL = 30000;
 const PROBE_TIMEOUT = 1500;
 const EXTENSION_PROTOCOL_VERSION = "2.1";
 
@@ -13,6 +14,7 @@ let commandHandler = null;
 let statusCallback = null;
 let shouldConnect = false;
 let connectionGeneration = 0;
+let failedAttaches = 0;
 
 /**
  * Set the handler for incoming commands from the daemon.
@@ -80,11 +82,13 @@ export function send(message) {
 }
 
 /**
- * Check whether the Stella daemon is listening on the bridge port. It answers
- * the health probe with 204; anything else, including a timeout, is not up.
- * @returns {Promise<boolean>}
+ * Check whether the Stella daemon is listening on the bridge port. A 204 means
+ * up and a refused connection means down. Chrome's Local Network Access check
+ * can hold a service worker's loopback fetch with no prompt to answer, so a
+ * probe that times out is unknown, not down: the native host then finds out.
+ * @returns {Promise<"up" | "down" | "unknown">}
  */
-async function isDaemonUp() {
+async function probeDaemon() {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT);
   try {
@@ -92,9 +96,9 @@ async function isDaemonUp() {
       signal: controller.signal,
       cache: "no-store",
     });
-    return response.status === 204;
-  } catch {
-    return false;
+    return response.status === 204 ? "up" : "down";
+  } catch (error) {
+    return error?.name === "AbortError" ? "unknown" : "down";
   } finally {
     clearTimeout(timer);
   }
@@ -113,16 +117,16 @@ async function probeThenConnect(generation = connectionGeneration) {
   probeTimer = null;
 
   probesInFlight.add(generation);
-  let up = false;
+  let state = "down";
   try {
-    up = await isDaemonUp();
+    state = await probeDaemon();
   } finally {
     probesInFlight.delete(generation);
   }
 
   if (!shouldConnect || generation !== connectionGeneration || isConnected())
     return;
-  if (up) {
+  if (state !== "down") {
     doConnect(generation);
     return;
   }
@@ -132,10 +136,11 @@ async function probeThenConnect(generation = connectionGeneration) {
 function scheduleProbe(generation = connectionGeneration) {
   if (!shouldConnect || generation !== connectionGeneration) return;
   clearTimeout(probeTimer);
+  const delay = Math.min(PROBE_INTERVAL * 2 ** failedAttaches, MAX_PROBE_INTERVAL);
   probeTimer = setTimeout(() => {
     probeTimer = null;
     probeThenConnect(generation);
-  }, PROBE_INTERVAL);
+  }, delay);
 }
 
 function doConnect(generation) {
@@ -160,12 +165,15 @@ function doConnect(generation) {
     return;
   }
   nativePort = port;
+  let welcomed = false;
 
   port.onMessage.addListener(async (msg) => {
     if (generation !== connectionGeneration || nativePort !== port) return;
 
     if (msg.type === "welcome") {
       console.log("[connection] Authenticated, session:", msg.session);
+      welcomed = true;
+      failedAttaches = 0;
       setStatus(true);
       return;
     }
@@ -210,7 +218,14 @@ function doConnect(generation) {
 
     nativePort = null;
     setStatus(false);
-    probeThenConnect(generation);
+    if (welcomed) {
+      // A working link dropped (daemon restart, host crash): reattach at
+      // once; the host itself waits briefly for the daemon to come back.
+      doConnect(generation);
+      return;
+    }
+    failedAttaches = Math.min(failedAttaches + 1, 4);
+    scheduleProbe(generation);
   });
 
   const extensionVersion = chrome.runtime.getManifest().version;
@@ -231,7 +246,7 @@ function setStatus(connected) {
   }
 }
 
-chrome.alarms.create("keepalive", { periodInMinutes: 24 / 60 });
+chrome.alarms.create("keepalive", { periodInMinutes: 0.5 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === "keepalive") {

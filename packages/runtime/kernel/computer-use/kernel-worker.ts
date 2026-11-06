@@ -918,10 +918,11 @@ const nodeReplWorkerMain = async (
           Math.min(workerData.maxEvalOutputBytes, 65_536),
         );
         if (/(?:^|\n)Uncaught\b/.test(outputBuffer)) {
-          // Normal REPL errors are also rendered as `Uncaught ...`, then
-          // delivered through server.eval's callback. Give that callback a
-          // short grace period. Only an async/domain throw that abandons the
-          // callback is fatal to this worker.
+          // The REPL reports a cell's thrown or rejected error through its
+          // domain, prints it as `Uncaught ...`, and never calls server.eval's
+          // callback, so this is how every failing cell ends. Only a throw
+          // that abandons a cell still waiting on host calls leaves work
+          // running in this worker; that alone makes it unsafe to reuse.
           // Effect-ratchet pin: this function is serialized with
           // `toString()` into the eval-worker source, which has no Effect
           // runtime — the raw timer is the only scheduling primitive there.
@@ -930,15 +931,23 @@ const nodeReplWorkerMain = async (
             outputErrorTimer = undefined;
             if (!reject) return;
             outputErrorReject = undefined;
-            // The literal must stay inline: this function is serialized with
-            // `toString()` into the worker source.
             const renderedError = outputBuffer.trim();
             const uncaught = new Error(renderedError);
+            const cellAbandonedHostCalls =
+              pendingSkyCalls.size +
+                pendingBrowserCalls.size +
+                pendingConnectCalls.size +
+                pendingCloudBrowserCalls.size +
+                pendingToolCalls.size >
+              0;
             if (
-              !/^Uncaught\s+(?:(?:Error\s+\[)?(?:SyntaxError|ReferenceError|TypeError|RangeError|BrowserSessionCommandError|BrowserSessionDisposedError)\]?):/.test(
+              cellAbandonedHostCalls &&
+              !/^Uncaught\s+(?:(?:Error\s+\[)?(?:BrowserSessionCommandError|BrowserSessionDisposedError)\]?):/.test(
                 renderedError,
               )
             ) {
+              // The literal must stay inline: this function is serialized
+              // with `toString()` into the worker source.
               uncaught.name = "NodeReplUncaughtError";
             }
             reject(uncaught);

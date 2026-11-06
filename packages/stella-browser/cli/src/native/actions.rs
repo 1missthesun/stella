@@ -879,6 +879,34 @@ struct ExtensionProxy {
     delegate_token: String,
 }
 
+/// Where an extension-targeted command goes once the daemon state lock is
+/// released. The extension answers on its own schedule (a slow page load can
+/// take tens of seconds), so the round trip must not hold the lock that every
+/// other owner's commands wait on.
+enum ExtensionRoute {
+    Bridge(ExtensionBridge),
+    Proxy(ExtensionProxy),
+}
+
+pub struct ExtensionForward {
+    cmd: Value,
+    route: ExtensionRoute,
+}
+
+impl ExtensionForward {
+    pub async fn run(self) -> Value {
+        match self.route {
+            ExtensionRoute::Bridge(bridge) => forward_extension_command(&self.cmd, &bridge).await,
+            ExtensionRoute::Proxy(proxy) => forward_extension_proxy_command(&self.cmd, proxy).await,
+        }
+    }
+}
+
+pub enum PreparedCommand {
+    Ready(Value),
+    Extension(ExtensionForward),
+}
+
 pub struct DaemonState {
     pub browser: Option<BrowserManager>,
     pub extension_bridge: Option<ExtensionBridge>,
@@ -921,6 +949,7 @@ pub struct DaemonState {
     pub stream_server: Option<Arc<StreamServer>>,
     pub daemon_shutdown_tx: Option<mpsc::UnboundedSender<()>>,
     owner_leases: OwnerLeaseRegistry,
+    deferred_extension_forward: Option<ExtensionForward>,
 }
 
 impl DaemonState {
@@ -982,6 +1011,7 @@ impl DaemonState {
             owner_leases: OwnerLeaseRegistry::default(),
             stream_server: None,
             daemon_shutdown_tx: None,
+            deferred_extension_forward: None,
         }
     }
 
@@ -1481,7 +1511,21 @@ impl DaemonState {
 }
 
 pub async fn execute_command(cmd: &Value, state: &mut DaemonState) -> Value {
-    execute_authorized(cmd, state, &[]).await
+    match prepare_command(cmd, state).await {
+        PreparedCommand::Ready(response) => response,
+        PreparedCommand::Extension(forward) => forward.run().await,
+    }
+}
+
+/// Runs everything that needs the daemon state and returns the extension
+/// round trip, if any, for the caller to await after releasing the state lock.
+pub async fn prepare_command(cmd: &Value, state: &mut DaemonState) -> PreparedCommand {
+    state.deferred_extension_forward = None;
+    let response = execute_authorized(cmd, state, &[]).await;
+    match state.deferred_extension_forward.take() {
+        Some(forward) => PreparedCommand::Extension(forward),
+        None => PreparedCommand::Ready(response),
+    }
 }
 
 /// `confirmed` lists the actions of this exact command the owner already
@@ -1505,7 +1549,7 @@ async fn execute_authorized(cmd: &Value, state: &mut DaemonState, confirmed: &[S
         if let Err(error) = state.owner_leases.release(cmd) {
             return error_response(&id, &error);
         }
-        return forward_targeted_extension_command(cmd, state).await;
+        return defer_targeted_extension_command(cmd, state).await;
     }
 
     if action == "release_owner_lease" {
@@ -1689,7 +1733,7 @@ async fn execute_authorized(cmd: &Value, state: &mut DaemonState, confirmed: &[S
         if let Err(error) = validate_extension_domain_gates(cmd, state) {
             return error_response(&id, &error);
         }
-        return forward_targeted_extension_command(cmd, state).await;
+        return defer_targeted_extension_command(cmd, state).await;
     }
 
     let skip_launch = matches!(
@@ -2795,7 +2839,17 @@ async fn export_extension_cookies_for_urls(cmd: &Value, bridge: &ExtensionBridge
     )
 }
 
-async fn forward_targeted_extension_command(cmd: &Value, state: &DaemonState) -> Value {
+async fn defer_targeted_extension_command(cmd: &Value, state: &mut DaemonState) -> Value {
+    match prepare_targeted_extension_command(cmd, state).await {
+        PreparedCommand::Ready(response) => response,
+        PreparedCommand::Extension(forward) => {
+            state.deferred_extension_forward = Some(forward);
+            Value::Null
+        }
+    }
+}
+
+async fn prepare_targeted_extension_command(cmd: &Value, state: &DaemonState) -> PreparedCommand {
     let id = cmd
         .get("id")
         .and_then(Value::as_str)
@@ -2818,20 +2872,35 @@ async fn forward_targeted_extension_command(cmd: &Value, state: &DaemonState) ->
             .as_ref()
             .is_some_and(|filter| !filter.allowed_domains.is_empty())
     {
-        return error_response(&id, "External frame snapshots are unavailable with a configured domain allowlist. Use the in-app browser, which validates each frame's domain before capture.");
+        return PreparedCommand::Ready(error_response(&id, "External frame snapshots are unavailable with a configured domain allowlist. Use the in-app browser, which validates each frame's domain before capture."));
     }
     if let Some(ref bridge) = state.extension_bridge {
         if cmd.get("action").and_then(Value::as_str) == Some("extension_status") {
-            return success_response(&id, handle_extension_status(state, cmd).await);
+            return PreparedCommand::Ready(success_response(&id, handle_extension_status(state, cmd).await));
         }
-        return forward_extension_command(cmd, bridge).await;
+        return PreparedCommand::Extension(ExtensionForward {
+            cmd: cmd.clone(),
+            route: ExtensionRoute::Bridge(bridge.clone()),
+        });
     }
     let Some(proxy) = state.extension_proxy.clone() else {
-        return error_response(
+        return PreparedCommand::Ready(error_response(
             &id,
             "Extension not connected. The external backend drives your real browser and needs the Stella Browser Bridge extension; the in-app browser works without it (browser.use(\"in-app\")).",
-        );
+        ));
     };
+    PreparedCommand::Extension(ExtensionForward {
+        cmd: cmd.clone(),
+        route: ExtensionRoute::Proxy(proxy),
+    })
+}
+
+async fn forward_extension_proxy_command(cmd: &Value, proxy: ExtensionProxy) -> Value {
+    let id = cmd
+        .get("id")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_string();
     let mut proxied = cmd.clone();
     if let Some(object) = proxied.as_object_mut() {
         object.insert(
@@ -8515,6 +8584,10 @@ async fn handle_confirm(cmd: &Value, state: &mut DaemonState) -> Result<Value, S
     let mut confirmed = pending.confirmed;
     confirmed.push(pending.action.clone());
     let result = Box::pin(execute_authorized(&pending.cmd, state, &confirmed)).await;
+    let result = match state.deferred_extension_forward.take() {
+        Some(forward) => forward.run().await,
+        None => result,
+    };
     Ok(json!({ "confirmed": true, "action": pending.action, "result": result }))
 }
 

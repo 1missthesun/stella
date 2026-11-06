@@ -53,10 +53,39 @@ async function detachIdleDebuggers() {
  */
 export async function ensureDebugger(tabId) {
   if (!debuggerAttachments.has(tabId)) {
-    await chrome.debugger.attach({ tabId }, '1.3');
+    try {
+      await chrome.debugger.attach({ tabId }, '1.3');
+    } catch (error) {
+      // A service worker restart forgets attachments Chrome still holds.
+      if (!/already attached/i.test(String(error?.message || error))) throw error;
+      await chrome.debugger.sendCommand({ tabId }, 'Runtime.evaluate', {
+        expression: '1',
+        returnByValue: true,
+      });
+    }
     debuggerAttachments.set(tabId, true);
+    await keepPageRunning(tabId);
   }
   scheduleIdleDetach();
+}
+
+/**
+ * Chrome throttles timers and stops requestAnimationFrame in background tabs,
+ * and freezes or discards them under memory or energy saving, so a page the
+ * agent drives without showing it stops reacting. Focus emulation makes
+ * Chrome treat the tab as visible and focused for as long as the debugger is
+ * attached; the lifecycle call unfreezes a frozen page.
+ */
+async function keepPageRunning(tabId) {
+  await Promise.all([
+    chrome.debugger
+      .sendCommand({ tabId }, 'Emulation.setFocusEmulationEnabled', { enabled: true })
+      .catch(() => undefined),
+    chrome.debugger
+      .sendCommand({ tabId }, 'Page.setWebLifecycleState', { state: 'active' })
+      .catch(() => undefined),
+    chrome.tabs.update(tabId, { autoDiscardable: false }).catch(() => undefined),
+  ]);
 }
 
 /**
@@ -79,11 +108,23 @@ export async function evaluateRuntime(tabId, expression, options = {}) {
     timeout: timeoutMs,
   };
   if (options.userGesture === true) params.userGesture = true;
-  const result = await chrome.debugger.sendCommand(
-    { tabId },
-    'Runtime.evaluate',
-    params,
-  );
+  // Runtime.evaluate's own timeout stops running script only; it never ends
+  // the wait for a promise the page does not settle.
+  let timer;
+  const result = await Promise.race([
+    chrome.debugger.sendCommand({ tabId }, 'Runtime.evaluate', params),
+    new Promise((_, reject) => {
+      timer = setTimeout(
+        () =>
+          reject(
+            new Error(
+              `The page did not finish evaluating within ${timeoutMs}ms; it may be frozen, blocked by a dialog, or waiting on something that never settles.`,
+            ),
+          ),
+        timeoutMs + 1_000,
+      );
+    }),
+  ]).finally(() => clearTimeout(timer));
 
   if (result.exceptionDetails) {
     const message =

@@ -307,6 +307,8 @@ const BROWSER_OWNER_LIFECYCLE_ACTIONS = new Set<string>([
 // preflight. It is one local round trip to Stella, so it must be short
 // enough that paying it is never worse than the hang it prevents.
 const EXTERNAL_ATTACH_PREFLIGHT_TIMEOUT_MS = 2_000;
+const OWNER_DAEMON_PROBE_TIMEOUT_MS = 2_000;
+const NAVIGATION_ACTIONS = new Set(["navigate", "back", "forward", "reload"]);
 // How long a positive answer is trusted, so a burst of commands in one turn
 // does not pay for the probe every time.
 const EXTERNAL_ATTACH_PREFLIGHT_CACHE_MS = 5_000;
@@ -638,6 +640,57 @@ export const readStellaBrowserExtensionStatus = async ({
     socket.once("close", () => finish(undefined));
   });
 };
+
+const probeBrowserDaemon = async ({
+  endpoint,
+  request,
+  timeoutMs,
+}: Readonly<{
+  endpoint: ResolvedExecutionConfig["endpoint"];
+  request: Readonly<Record<string, unknown>>;
+  timeoutMs: number;
+}>): Promise<boolean> =>
+  await new Promise<boolean>((resolve) => {
+    let settled = false;
+    let buffer = "";
+    const socket =
+      "path" in endpoint
+        ? createConnection({ path: endpoint.path })
+        : createConnection({ host: endpoint.host, port: endpoint.port });
+    const finish = (value: boolean) => {
+      if (settled) return;
+      settled = true;
+      cancelTimeout();
+      socket.removeAllListeners();
+      if (!socket.destroyed) socket.destroy();
+      resolve(value);
+    };
+    const cancelTimeout = forkCancelableTimeout(Math.max(1, timeoutMs), () =>
+      finish(false),
+    );
+    socket.setEncoding("utf8");
+    socket.once("connect", () => {
+      socket.write(`${JSON.stringify(request)}\n`);
+    });
+    socket.on("data", (chunk: string) => {
+      buffer += chunk;
+      const newline = buffer.indexOf("\n");
+      if (newline < 0) {
+        if (buffer.length > 16 * 1024) finish(false);
+        return;
+      }
+      try {
+        const response = JSON.parse(buffer.slice(0, newline)) as {
+          success?: unknown;
+        };
+        finish(response.success === true);
+      } catch {
+        finish(false);
+      }
+    });
+    socket.once("error", () => finish(false));
+    socket.once("close", () => finish(false));
+  });
 
 const validateJson = (
   value: unknown,
@@ -994,6 +1047,25 @@ const getChainTimeoutMs = (
 const leaseFingerprint = (leaseId: string): string =>
   createHash("sha256").update(leaseId).digest("hex").slice(0, 12);
 
+/**
+ * A page load can outlast the command budget. The backend gets a deadline
+ * inside the budget so it answers with what happened (committed, still
+ * loading) before this client gives up with an unknown outcome.
+ */
+const withBackendNavigationTimeout = (
+  action: string,
+  params: BrowserCommandParams,
+  commandTimeoutMs: number,
+): BrowserCommandParams =>
+  NAVIGATION_ACTIONS.has(action) &&
+  params.timeout === undefined &&
+  commandTimeoutMs > BROWSER_COMMAND_TIMEOUT_GRACE_MS * 2
+    ? Object.freeze({
+        ...params,
+        timeout: commandTimeoutMs - BROWSER_COMMAND_TIMEOUT_GRACE_MS,
+      })
+    : params;
+
 const getCommandDeadline = (
   commandTimeoutMs: number,
   params: BrowserCommandParams,
@@ -1064,6 +1136,7 @@ export class BrowserSession implements BrowserSessionClient {
     };
     config: ResolvedExecutionConfig;
   }>;
+  private suspectOwnerRoute?: BrowserSession["ownerRoute"];
   private recoverInAppBrowserCapability = false;
   private externalAttachCheckedUntil = 0;
   private queue: Promise<void> = Promise.resolve();
@@ -1185,7 +1258,11 @@ export class BrowserSession implements BrowserSessionClient {
     options?: BrowserCommandOptions,
   ): Promise<BrowserCommandReceipt<TData>> {
     const validatedAction = validateAction(action);
-    const validatedParams = validateParams(params);
+    const validatedParams = withBackendNavigationTimeout(
+      validatedAction,
+      validateParams(params),
+      this.commandTimeoutMs,
+    );
     const validatedOptions = validateCommandOptions(options);
     this.assertOpen();
     const deadline = getCommandDeadline(this.commandTimeoutMs, validatedParams);
@@ -1593,6 +1670,7 @@ export class BrowserSession implements BrowserSessionClient {
 
   private resetOwnerBinding(): void {
     this.ownerRoute = undefined;
+    this.suspectOwnerRoute = undefined;
     this.executionConfig = undefined;
   }
 
@@ -1922,6 +2000,12 @@ export class BrowserSession implements BrowserSessionClient {
     ) {
       return this.ownerRoute!.config;
     }
+    if (
+      this.recoverInAppBrowserCapability &&
+      (await this.restoreResponsiveOwnerRoute(turn, deadline))
+    ) {
+      return this.ownerRoute!.config;
+    }
     const remainingMs = this.remainingTime(deadline);
     if (remainingMs <= 0) {
       throw new Error(
@@ -1969,6 +2053,49 @@ export class BrowserSession implements BrowserSessionClient {
     return config;
   }
 
+  private async restoreResponsiveOwnerRoute(
+    turn: Readonly<{
+      turnId: string;
+      ownerLeaseId: string;
+      ownerLeaseIssuedAt: number;
+    }>,
+    deadline: number,
+  ): Promise<boolean> {
+    const route = this.suspectOwnerRoute;
+    if (
+      !route ||
+      route.capability.turnId !== turn.turnId ||
+      route.capability.ownerLeaseId !== turn.ownerLeaseId ||
+      route.capability.capabilityExpiresAt <= Date.now()
+    ) {
+      return false;
+    }
+    const timeoutMs = Math.min(
+      OWNER_DAEMON_PROBE_TIMEOUT_MS,
+      this.remainingTime(deadline) / 2,
+    );
+    if (timeoutMs <= 0) return false;
+    const responsive = await probeBrowserDaemon({
+      endpoint: route.config.endpoint,
+      request: {
+        id: randomUUID(),
+        action: "healthcheck",
+        ownerId: this.sessionId,
+        sessionId: this.sessionId,
+        turnId: turn.turnId,
+        ownerLeaseId: turn.ownerLeaseId,
+        ownerLeaseIssuedAt: turn.ownerLeaseIssuedAt,
+      },
+      timeoutMs,
+    });
+    if (!responsive || this.suspectOwnerRoute !== route) return false;
+    this.ownerRoute = route;
+    this.executionConfig = route.config;
+    this.suspectOwnerRoute = undefined;
+    this.recoverInAppBrowserCapability = false;
+    return true;
+  }
+
   private markManagedCapabilityForRecovery(cause: unknown): void {
     if (
       !(cause instanceof BrowserTransportError) ||
@@ -1977,10 +2104,11 @@ export class BrowserSession implements BrowserSessionClient {
     ) {
       return;
     }
-    // A timed-out command may leave the single-threaded per-owner daemon
-    // alive but wedged in page evaluation. Dropping only the socket causes
-    // every follow-up to reconnect to that same process. Poison the cached
-    // capability so bootstrap replaces the backend on the next attempt/call.
+    // A timed-out command may leave the per-owner daemon wedged in page
+    // evaluation, and every follow-up would queue behind it on that process.
+    // The next command asks the daemon first and replaces it only when it does
+    // not answer: replacing it drops the in-app tabs it owns.
+    this.suspectOwnerRoute = this.ownerRoute ?? this.suspectOwnerRoute;
     this.ownerRoute = undefined;
     this.recoverInAppBrowserCapability = true;
   }
@@ -2365,7 +2493,10 @@ export class BrowserSession implements BrowserSessionClient {
   ): void {
     if (socket !== this.socket) return;
     this.socket = undefined;
-    if (!preserveCapability) this.ownerRoute = undefined;
+    if (!preserveCapability) {
+      this.suspectOwnerRoute = this.ownerRoute ?? this.suspectOwnerRoute;
+      this.ownerRoute = undefined;
+    }
     this.readBuffer = EMPTY_BUFFER;
     const pending = this.takePending();
     socket.removeAllListeners();

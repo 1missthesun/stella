@@ -183,6 +183,47 @@ export async function handleClick(command) {
   return { id: command.id, success: true, data: { clicked: true } };
 }
 
+const FILL_SETTLE_POLLS = 8;
+const FILL_SETTLE_INTERVAL_MS = 40;
+
+/**
+ * Page-side check of the filled value. Controlled inputs (React, Fluent and
+ * similar) can commit the value a task later or move focus to a replacement
+ * input, so the element that now has focus counts as the target too.
+ */
+function fillCheckSource(nextValueJs) {
+  return `
+    const nextValue = ${nextValueJs};
+    const valueOf = (node) => node && (node.isContentEditable ? (node.textContent || '') : String(node.value ?? ''));
+    const editableNode = (node) => node && (node.isContentEditable || 'value' in node) ? node : null;
+    const current = () => {
+      const focused = editableNode(document.activeElement);
+      if (el.isConnected && valueOf(el) === nextValue) return el;
+      if (focused && valueOf(focused) === nextValue) return focused;
+      return el.isConnected ? el : (focused || el);
+    };
+    const settle = async () => {
+      for (let attempt = 0; attempt < ${FILL_SETTLE_POLLS}; attempt += 1) {
+        const target = current();
+        if (valueOf(target) === nextValue) return target;
+        await new Promise((resolve) => setTimeout(resolve, ${FILL_SETTLE_INTERVAL_MS}));
+      }
+      return current();
+    };
+    const report = (target, extra) => {
+      const actual = valueOf(target);
+      const tag = (target.tagName || '').toLowerCase();
+      return Object.assign({
+        ok: actual === nextValue,
+        reason: actual === nextValue ? null : 'value-mismatch',
+        tag,
+        inputType: tag === 'input' ? String(target.type || 'text').toLowerCase() : null,
+        actualLength: [...actual].length,
+      }, extra || {});
+    };
+  `;
+}
+
 export async function handleFill(command) {
   throwIfCommandAborted(command);
   const tab = await getActiveTab(command);
@@ -191,13 +232,14 @@ export async function handleFill(command) {
   if (!selector) throw new Error("Selector is required for fill");
 
   const resolved = resolveSelector(selector, command.ownerId, tab.id);
+  const nextValueJs = JSON.stringify(String(value));
   markCommandMutationDispatched(command);
   const outcome = await injectScript(
     tab.id,
     resolved,
     `
     el.focus();
-    const nextValue = ${JSON.stringify(String(value))};
+    ${fillCheckSource(nextValueJs)}
     const tag = (el.tagName || '').toLowerCase();
     const inputType = tag === 'input' ? String(el.type || 'text').toLowerCase() : null;
     const editable = el.isContentEditable;
@@ -231,28 +273,87 @@ export async function handleFill(command) {
       inputType: 'insertReplacementText',
     });
     el.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
-    return Promise.resolve().then(() => {
-      const actual = String(editable ? (el.textContent || '') : (el.value ?? ''));
-      return {
-        ok: actual === nextValue,
-        reason: actual === nextValue ? null : 'value-mismatch',
-        tag,
-        inputType,
-        actualLength: [...actual].length,
-      };
-    });
+    return settle().then((target) => report(target));
   `,
   );
 
-  if (!outcome?.ok) {
-    throw new Error(
-      `Fill did not replace the element value (reason=${outcome?.reason || "unknown"}, ` +
-        `tag=${outcome?.tag || "unknown"}, input_type=${outcome?.inputType || "n/a"}, ` +
-        `expected_chars=${[...String(value)].length}, actual_chars=${outcome?.actualLength ?? "unknown"}): ${selector}`,
-    );
+  if (outcome?.ok) {
+    return { id: command.id, success: true, data: { filled: true } };
+  }
+  if (outcome?.reason === "not-editable") {
+    throw new Error(fillFailureMessage(outcome, value, selector));
   }
 
-  return { id: command.id, success: true, data: { filled: true } };
+  const typed = await fillByTyping(command, tab.id, resolved, value, nextValueJs);
+  if (!typed?.ok) {
+    throw new Error(fillFailureMessage(typed || outcome, value, selector));
+  }
+  return {
+    id: command.id,
+    success: true,
+    data: { filled: true, method: "typed" },
+  };
+}
+
+/**
+ * Replace the value through Chrome's own text input, the path real typing
+ * takes, for inputs that reject or revert a programmatic value.
+ */
+async function fillByTyping(command, tabId, resolved, value, nextValueJs) {
+  throwIfCommandAborted(command);
+  await injectScript(
+    tabId,
+    resolved,
+    `
+    el.focus();
+    const target = document.activeElement && (document.activeElement.isContentEditable || 'value' in document.activeElement)
+      ? document.activeElement
+      : el;
+    if (typeof target.select === 'function') {
+      target.select();
+    } else {
+      const range = document.createRange();
+      range.selectNodeContents(target);
+      const selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+    return true;
+  `,
+  );
+  await ensureDebugger(tabId);
+  if (String(value).length > 0) {
+    await chrome.debugger.sendCommand({ tabId }, "Input.insertText", {
+      text: String(value),
+    });
+  } else {
+    for (const type of ["rawKeyDown", "keyUp"]) {
+      await chrome.debugger.sendCommand({ tabId }, "Input.dispatchKeyEvent", {
+        type,
+        key: "Backspace",
+        code: "Backspace",
+        windowsVirtualKeyCode: 8,
+      });
+    }
+  }
+  return await injectScript(
+    tabId,
+    resolved,
+    `
+    ${fillCheckSource(nextValueJs)}
+    return settle().then((target) => report(target, { method: 'typed' }));
+  `,
+  ).catch(() => null);
+}
+
+function fillFailureMessage(outcome, value, selector) {
+  return (
+    `Fill did not replace the element value (reason=${outcome?.reason || "unknown"}, ` +
+    `tag=${outcome?.tag || "unknown"}, input_type=${outcome?.inputType || "n/a"}, ` +
+    `expected_chars=${[...String(value)].length}, actual_chars=${outcome?.actualLength ?? "unknown"}): ${selector}. ` +
+    "Both a direct value set and typed input were tried; the page may rewrite this field, or focus moved to another element. " +
+    "Click the field and use locator.type() or tab.keyboard.type(), then read inputValue()."
+  );
 }
 
 export async function handleType(command) {

@@ -30,6 +30,7 @@ import {
 } from "../dispatch-policy.js";
 import type { DispatchRow } from "./types.js";
 import {
+  DISPATCH_RECONCILE_MAX_MS,
   DISPATCH_RENEW_WRITE_BELOW_MS,
   ALARM_BACKOFF_KEY,
   ALARM_HOT_STREAK_KEY,
@@ -708,7 +709,7 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
       await this.patchDispatch(
         row,
         {
-          state: "computer_running",
+          state: row.cancel_request_id ? "cancel_pending" : "computer_running",
           started_at: row.started_at ?? now,
           lease_expires_at: now + DISPATCH_ACCEPTED_LEASE_MS,
         },
@@ -728,9 +729,11 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
       }
       const state =
         row.state === "reconciliation_required"
-          ? row.started_at
-            ? "computer_running"
-            : "computer_accepted"
+          ? row.cancel_request_id
+            ? "cancel_pending"
+            : row.started_at
+              ? "computer_running"
+              : "computer_accepted"
           : row.state;
       if (
         state === row.state &&
@@ -982,6 +985,8 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
               WHERE state = 'cloud_committed' AND lease_expires_at IS NOT NULL) AS committed,
            (SELECT MIN(lease_expires_at) FROM dispatches
               WHERE state = 'cancel_pending' AND lease_expires_at IS NOT NULL) AS canceling,
+           (SELECT MIN(lease_expires_at) FROM dispatches
+              WHERE state = 'reconciliation_required' AND lease_expires_at IS NOT NULL) AS reconciling,
            (SELECT MIN(cloud_retry_at) FROM dispatches
               WHERE state = 'cloud_committed' AND cloud_retry_at IS NOT NULL) AS retry,
            (SELECT MIN(payload_expires_at) FROM dispatches
@@ -1060,7 +1065,7 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
                  AND cloud_retry_at <= ?)
              OR (state IN ('computer_claimed', 'computer_accepted',
                            'computer_running', 'cloud_committed',
-                           'cancel_pending')
+                           'cancel_pending', 'reconciliation_required')
                  AND lease_expires_at IS NOT NULL AND lease_expires_at <= ?)
              OR (payload_json IS NOT NULL AND payload_expires_at IS NOT NULL
                  AND payload_expires_at <= ?)
@@ -1123,12 +1128,36 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
           row,
           {
             state: "reconciliation_required",
-            lease_expires_at: null,
+            lease_expires_at: now + DISPATCH_RECONCILE_MAX_MS,
             fallback_reason: `${row.state}-lease-expired`,
           },
           now,
           { notifyExecutor: false },
         );
+        continue;
+      }
+      if (leaseLapsed && row.state === "reconciliation_required") {
+        const ended = await this.patchDispatch(
+          row,
+          row.cancel_request_id
+            ? {
+                state: "canceled",
+                payload_json: null,
+                payload_expires_at: null,
+                lease_expires_at: null,
+              }
+            : {
+                state: "failed",
+                payload_json: null,
+                payload_expires_at: null,
+                lease_expires_at: null,
+                error_code: "RECONCILIATION_EXPIRED",
+                error_message:
+                  "The device running this never reported how it ended.",
+              },
+          now,
+        );
+        await this.releaseGate(ended);
         continue;
       }
       if (row.payload_json !== null) {

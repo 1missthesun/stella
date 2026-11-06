@@ -2188,9 +2188,17 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     const next = await this.patchDispatch(
       row,
       {
-        state: unaccepted || cloudNeverStarted ? "canceled" : "cancel_pending",
+        state:
+          unaccepted || cloudNeverStarted
+            ? "canceled"
+            : row.state === "reconciliation_required"
+              ? row.state
+              : "cancel_pending",
         cancel_request_id: cancelRequestId,
         ...(reason ? { cancel_reason: reason } : {}),
+        ...(row.state !== "reconciliation_required" && !row.lease_expires_at
+          ? { lease_expires_at: now + DISPATCH_ACCEPTED_LEASE_MS }
+          : {}),
         ...(unaccepted || cloudNeverStarted
           ? {
               payload_json: null,

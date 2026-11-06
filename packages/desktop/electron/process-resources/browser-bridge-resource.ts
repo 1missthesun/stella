@@ -1,6 +1,7 @@
 import { ProcessRuntime } from "../process-runtime.js";
 import {
   StellaBrowserBridgeService,
+  type BrowserExtensionLink,
   type StellaBrowserAgentBackend,
   type StellaBrowserAgentCapability,
 } from "../services/stella-browser-bridge-service.js";
@@ -45,6 +46,7 @@ export const createStellaBrowserBridgeResource = (options: {
   stellaDataDir: string;
   processRuntime: ProcessRuntime;
   onStatus: (status: StellaBrowserBridgeStatus) => void;
+  onExtensionLinkChanged?: (link: BrowserExtensionLink) => void;
 }): StellaBrowserBridgeResource => {
   let currentStatus: StellaBrowserBridgeStatus = {
     state: "idle",
@@ -103,6 +105,7 @@ export const createStellaBrowserBridgeResource = (options: {
           stellaAppDir: options.stellaAppDir,
           stellaDataDir: options.stellaDataDir,
           onUnexpectedExit,
+          onExtensionLinkChanged: options.onExtensionLinkChanged,
         }),
       start: (s) => s.start(),
       stop: (s) => s.stop(),

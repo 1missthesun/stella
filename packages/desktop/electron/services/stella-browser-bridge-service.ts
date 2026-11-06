@@ -221,10 +221,16 @@ export const stopOrphanedStellaBrowserDaemons = async () => {
   );
 };
 
+export type BrowserExtensionLink = Readonly<{
+  connected: boolean;
+  clients: BrowserExtensionClientsState;
+}>;
+
 type StellaBrowserBridgeServiceOptions = {
   stellaAppDir: string;
   stellaDataDir: string;
   onUnexpectedExit?: (error: string) => void;
+  onExtensionLinkChanged?: (link: BrowserExtensionLink) => void;
 };
 
 export type StellaBrowserAgentCapability = Readonly<{
@@ -278,6 +284,10 @@ export class StellaBrowserBridgeService {
   private readonly stellaAppDir: string;
   private readonly stellaDataDir: string;
   private readonly onUnexpectedExit?: (error: string) => void;
+  private readonly onExtensionLinkChanged?: (link: BrowserExtensionLink) => void;
+  private extensionEvents: net.Socket | null = null;
+  private extensionLinkRead: Promise<void> | null = null;
+  private extensionLinkStale = false;
 
   private daemonProcess: ChildProcess | null = null;
   private launchPromise: Promise<void> | null = null;
@@ -317,22 +327,18 @@ export class StellaBrowserBridgeService {
     this.stellaAppDir = options.stellaAppDir;
     this.stellaDataDir = options.stellaDataDir;
     this.onUnexpectedExit = options.onUnexpectedExit;
+    this.onExtensionLinkChanged = options.onExtensionLinkChanged;
   }
 
   async getExtensionStatus(): Promise<boolean> {
-    const response = await this.sendCommand({
-      id: randomUUID(),
-      action: "extension_status",
-    });
-    return (
-      typeof response.data === "object" &&
-      response.data !== null &&
-      "connected" in response.data &&
-      response.data.connected === true
-    );
+    return (await this.readExtensionLink()).connected;
   }
 
   async getExtensionClients(): Promise<BrowserExtensionClientsState> {
+    return (await this.readExtensionLink()).clients;
+  }
+
+  private async readExtensionLink(): Promise<BrowserExtensionLink> {
     const response = await this.sendCommand({
       id: randomUUID(),
       action: "extension_status",
@@ -342,7 +348,83 @@ export class StellaBrowserBridgeService {
       this.stellaDataDir,
       connected,
     );
-    return buildBrowserExtensionClientsState(record, connected);
+    return {
+      connected:
+        typeof response.data === "object" &&
+        response.data !== null &&
+        "connected" in response.data &&
+        response.data.connected === true,
+      clients: buildBrowserExtensionClientsState(record, connected),
+    };
+  }
+
+  private publishExtensionLink() {
+    if (!this.onExtensionLinkChanged) return;
+    if (this.extensionLinkRead) {
+      this.extensionLinkStale = true;
+      return;
+    }
+    const read = (async () => {
+      do {
+        this.extensionLinkStale = false;
+        try {
+          const link = await this.readExtensionLink();
+          if (!this.stopped) this.onExtensionLinkChanged?.(link);
+        } catch {
+          return;
+        }
+      } while (this.extensionLinkStale && !this.stopped);
+    })().finally(() => {
+      if (this.extensionLinkRead === read) this.extensionLinkRead = null;
+    });
+    this.extensionLinkRead = read;
+  }
+
+  private async watchExtensionLink(daemon: ChildProcess) {
+    if (!this.onExtensionLinkChanged) return;
+    const socket = await this.openConnection();
+    if (this.stopped || this.daemonProcess !== daemon) {
+      socket.destroy();
+      return;
+    }
+    this.extensionEvents?.destroy();
+    this.extensionEvents = socket;
+    socket.setEncoding("utf8");
+    let buffer = "";
+    socket.on("data", (chunk: string) => {
+      buffer += chunk;
+      let newline = buffer.indexOf("\n");
+      while (newline >= 0) {
+        const line = buffer.slice(0, newline);
+        buffer = buffer.slice(newline + 1);
+        if (
+          line.includes('"extension_clients_changed"') ||
+          line.includes('"events_lagged"')
+        ) {
+          this.publishExtensionLink();
+        }
+        newline = buffer.indexOf("\n");
+      }
+    });
+    socket.on("error", () => undefined);
+    socket.once("close", () => {
+      if (this.extensionEvents !== socket) return;
+      this.extensionEvents = null;
+      if (this.stopped || this.daemonProcess !== daemon) return;
+      setTimeout(() => {
+        if (this.stopped || this.daemonProcess !== daemon) return;
+        void this.applyExtensionRouting();
+        void this.watchExtensionLink(daemon).catch(() => undefined);
+      }, 1_000);
+    });
+    socket.write(
+      `${JSON.stringify({
+        id: randomUUID(),
+        action: "subscribe_events",
+        controlToken: this.controlToken,
+      })}\n`,
+    );
+    this.publishExtensionLink();
   }
 
   async setExtensionRouting(
@@ -584,6 +666,8 @@ export class StellaBrowserBridgeService {
     this.agentBackendLaunches.clear();
     this.agentOwnerLeaseHighWater.clear();
 
+    this.extensionEvents?.destroy();
+    this.extensionEvents = null;
     const daemon = this.daemonProcess;
     if (daemon) {
       const closePromise = this.sendCommand({
@@ -638,6 +722,15 @@ export class StellaBrowserBridgeService {
         provider: "extension",
       });
       await this.applyExtensionRouting();
+      const daemon = this.daemonProcess;
+      if (daemon) {
+        await this.watchExtensionLink(daemon).catch((error: unknown) => {
+          console.warn(
+            "[stella-browser-bridge] Could not watch the extension link:",
+            error instanceof Error ? error.message : error,
+          );
+        });
+      }
       await Promise.all(
         Array.from(this.agentBackends.values(), (backend) =>
           this.registerAgentExtensionDelegate(backend).catch(() =>

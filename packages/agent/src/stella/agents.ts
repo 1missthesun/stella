@@ -38,6 +38,7 @@ import { agentStopText, type AgentMessageDelivery, type AgentStopResult } from "
 import type { AgentWorkspaceSize } from "@stella/contracts/turn-plane/turn-start";
 import {
   AGENT_STOPPED_REASON,
+  isAgentAttemptOutcome,
   isLiveAgentStatus,
   reportStatusOf,
   type AgentAttemptOutcome,
@@ -67,12 +68,9 @@ type AgentRecord = {
   description: string;
   placement: { kind: "local" | "cloud" | "device"; deviceId?: string };
   reported: number[];
-  remote?: true;
+  remote?: RemoteRun;
   engine?: string;
   startedAt?: number;
-  answered?: string[];
-  outcome?: AgentAttemptOutcome;
-  failed?: true;
   origin?: AgentOrigin;
   held?: string[];
   stopped?: true;
@@ -87,6 +85,46 @@ type AgentRecord = {
 
 export type AgentOrigin = { agentThread: true };
 
+/**
+ * An agent that runs elsewhere (another computer, the cloud, an engine): its
+ * last known state there. `seen` holds the report and stop ids already applied.
+ */
+type RemoteRun =
+  | { phase: "running"; seen: string[] }
+  | { phase: "settled"; outcome: AgentAttemptOutcome; seen: string[] };
+
+type RemoteEvent =
+  | { kind: "started" }
+  | { kind: "messaged" }
+  | { kind: "reported"; requestId: string; outcome: AgentAttemptOutcome }
+  | { kind: "stopped" };
+
+const REMOTE_SEEN_MAX = 64;
+
+const advanceRemote = (run: RemoteRun | undefined, event: RemoteEvent): RemoteRun => {
+  const seen = run?.seen ?? [];
+  switch (event.kind) {
+    case "started":
+    case "messaged":
+      return { phase: "running", seen };
+    case "reported":
+      if (seen.includes(event.requestId)) return run ?? { phase: "running", seen };
+      return { phase: "settled", outcome: event.outcome, seen: [...seen, event.requestId].slice(-REMOTE_SEEN_MAX) };
+    case "stopped":
+      return run?.phase === "settled" ? run : { phase: "settled", outcome: "canceled", seen };
+  }
+};
+
+const legacyRemoteRun = (
+  agent: { answered?: unknown; outcome?: unknown; failed?: unknown },
+  given: number,
+): RemoteRun => {
+  const seen = Array.isArray(agent.answered) ? agent.answered.filter((id): id is string => typeof id === "string") : [];
+  if (seen.length < given) return { phase: "running", seen };
+  const outcome = isAgentAttemptOutcome(agent.outcome) ? agent.outcome : agent.failed ? "failed" : "completed";
+  return { phase: "settled", outcome, seen };
+};
+
 export type StellaAgentRecord = {
   threadId: string;
   description: string;
@@ -100,16 +138,32 @@ export type StellaAgentRecord = {
   agentStatus: AgentStatus;
 };
 
-export const StellaAgentsDoc = defineDoc<{
+type StellaAgents = {
   agents: Record<string, AgentRecord>;
   calls: Record<string, { threadId: string; reporter: number }>;
-}>({
+};
+
+export const StellaAgentsDoc = defineDoc<StellaAgents>({
   kind: "stella.agents",
-  version: 1,
+  version: 2,
   scope: "conversation",
   history: "latest",
   fork: "initial",
   initial: () => ({ agents: {}, calls: {} }),
+  migrate: (stored) => {
+    const value = structuredClone(stored);
+    const calls = Object.values((value.calls ?? {}) as Record<string, { threadId?: unknown }>);
+    const agents = (value.agents ?? {}) as Record<string, Record<string, unknown>>;
+    for (const [threadId, agent] of Object.entries(agents)) {
+      if (agent.remote === true) {
+        agent.remote = legacyRemoteRun(agent, calls.filter((call) => call.threadId === threadId).length);
+      }
+      delete agent.answered;
+      delete agent.outcome;
+      delete agent.failed;
+    }
+    return value as unknown as StellaAgents;
+  },
 });
 
 const PLACED_CALL_PREFIX = "placed:";
@@ -190,14 +244,11 @@ export const noteRemoteReport = async (
 ): Promise<boolean> => {
   const agent = (await tx.doc(StellaAgentsDoc, conversationId)).agents[report.threadId];
   if (!agent?.remote) return false;
-  if (agent.answered?.includes(report.requestId)) return true;
-  agent.answered = [...(agent.answered ?? []), report.requestId];
   if (report.text === undefined) {
-    if (report.status === "canceled") agent.outcome = "canceled";
+    if (report.status === "canceled") agent.remote = advanceRemote(agent.remote, { kind: "stopped" });
     return true;
   }
-  agent.outcome = reportStatusOf(report);
-  delete agent.failed;
+  agent.remote = advanceRemote(agent.remote, { kind: "reported", requestId: report.requestId, outcome: reportStatusOf(report) });
   return true;
 };
 
@@ -221,7 +272,6 @@ export const remoteAgentHome = async (
   return await visit(root, 1);
 };
 
-const remoteOutcome = (agent: AgentRecord): AgentAttemptOutcome => agent.outcome ?? (agent.failed ? "failed" : "completed");
 
 export const PLACED_AGENT_STOPPED = "placed-agent-stopped";
 
@@ -700,13 +750,11 @@ export function stellaAgents(host: StellaAgentsHost) {
               const agent = state.agents[threadId];
               if (agent && !agent.reported.includes(answered)) agent.reported.push(answered);
               if (agent && "moved" in move) {
-                const given = Object.entries(state.calls).filter(([, call]) => call.threadId === threadId).map(([key]) => `moved:${key}`);
-                agent.remote = true;
+                agent.remote = advanceRemote(undefined, { kind: "started" });
                 agent.moved = true;
                 agent.away = true;
                 agent.placement = move.deviceId === AGENT_MOVE_CLOUD ? { kind: "cloud" } : { kind: "device", deviceId: move.deviceId };
                 agent.startedAt ??= Date.now();
-                agent.answered = [...new Set([...(agent.answered ?? []), ...given.slice(0, -1)])];
               }
               if ("failed" in move) {
                 await tx.createTask(
@@ -1127,7 +1175,7 @@ export function stellaAgents(host: StellaAgentsHost) {
             description,
             placement: { kind: placement.kind, ...(placement.kind === "device" ? { deviceId: placement.deviceId } : {}) },
             reported: [],
-            remote: true,
+            remote: advanceRemote(undefined, { kind: "started" }),
             ...(engine ? { engine } : {}),
             startedAt: Date.now(),
           };
@@ -1415,7 +1463,10 @@ export function stellaAgents(host: StellaAgentsHost) {
   ) =>
     on.commit(async (tx) => {
       const state = await tx.doc(StellaAgentsDoc, conversationId);
-      state.calls[callKey] ??= { threadId, reporter: -1 };
+      if (state.calls[callKey]) return;
+      state.calls[callKey] = { threadId, reporter: -1 };
+      const agent = state.agents[threadId];
+      if (agent?.remote) agent.remote = advanceRemote(agent.remote, { kind: "messaged" });
     }, context);
 
   const remoteHostOf = (agent: AgentRecord): RemoteAgentHost | undefined => {
@@ -1534,8 +1585,7 @@ export function stellaAgents(host: StellaAgentsHost) {
         };
       }
       const computer = await computerOf(record, context, seen);
-      const done = (record.answered?.length ?? 0) >= agent.given;
-      const status = done ? remoteOutcome(record) : "running";
+      const status = record.remote.phase === "settled" ? record.remote.outcome : "running";
       return {
         ...row,
         status,
@@ -1579,7 +1629,8 @@ export function stellaAgents(host: StellaAgentsHost) {
     const conversationId = (await host.directory?.conversationId(context).catch(() => undefined)) ?? STELLA_MESSAGE_TARGET;
     const tree = root === undefined ? [] : await agentTree(api, root, context);
     const threadIds = tree
-      .filter((agent) => agent.record.remote && (agent.record.answered?.length ?? 0) < agent.given)
+      .filter((agent) => agent.record.remote)
+      .sort((a, b) => Number(a.record.remote!.phase === "settled") - Number(b.record.remote!.phase === "settled"))
       .map((agent) => agent.threadId)
       .slice(0, DIRECTORY_THREAD_IDS_MAX);
     const elsewhere = await host.directory
@@ -1901,10 +1952,9 @@ export function stellaAgents(host: StellaAgentsHost) {
     if (!found) return undefined;
     const attempt = Math.max(1, found.given);
     if (found.record.remote) {
-      const done = (found.record.answered?.length ?? 0) >= found.given;
-      const outcome = remoteOutcome(found.record);
-      return done
-        ? { status: outcome === "failed" ? "error" : "completed", agentStatus: outcome, attempt }
+      const run = found.record.remote;
+      return run.phase === "settled"
+        ? { status: run.outcome === "failed" ? "error" : "completed", agentStatus: run.outcome, attempt }
         : { status: "running", agentStatus: "running", attempt };
     }
     const conversationId = found.record.conversationId as ConversationId;
@@ -1944,7 +1994,7 @@ export function stellaAgents(host: StellaAgentsHost) {
             .map((entry) => ({ entry, text: messageText(entry.model?.[0]) }))
             .filter(({ text }) => /^\[(Agent completed|Task failed|Task canceled)\]/.test(text.trimStart()));
     for (const [threadId, agent] of remoteAgents) {
-      const given = Object.values(state?.calls ?? {}).filter((call) => call.threadId === threadId).length;
+      const run = agent.remote!;
       const back = reports.filter(({ text }) => text.includes(`\nthread_id: ${threadId}\n`));
       const at = (back[0]?.entry.model?.[0] as { timestamp?: number } | undefined)?.timestamp;
       const said = back
@@ -1956,15 +2006,12 @@ export function stellaAgents(host: StellaAgentsHost) {
         threadId,
         description: agent.description,
         placement: agent.placement,
-        ...((agent.answered?.length ?? 0) >= given
-          ? (() => {
-              const outcome = remoteOutcome(agent);
-              return outcome === "completed"
-                ? { status: "completed" as const, agentStatus: outcome }
-                : outcome === "failed"
-                  ? { status: "error" as const, agentStatus: outcome }
-                  : { status: "completed" as const, stopped: true as const, agentStatus: outcome };
-            })()
+        ...(run.phase === "settled"
+          ? run.outcome === "completed"
+            ? { status: "completed" as const, agentStatus: run.outcome }
+            : run.outcome === "failed"
+              ? { status: "error" as const, agentStatus: run.outcome }
+              : { status: "completed" as const, stopped: true as const, agentStatus: run.outcome }
           : { status: "running" as const, agentStatus: "running" as const }),
         startedAt: agent.startedAt ?? at ?? Date.now(),
         updatedAt: at ?? agent.startedAt ?? Date.now(),

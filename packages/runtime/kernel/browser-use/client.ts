@@ -207,6 +207,33 @@ export type BrowserSessionCommandErrorCode =
 
 export type BrowserCommandTimeoutSource = "caller" | "runtime-default";
 
+type OwnerRoute = Readonly<{
+  capability: InAppBrowserCapability & {
+    turnId: string;
+    ownerLeaseId: string;
+  };
+  config: ResolvedExecutionConfig;
+}>;
+
+/**
+ * The per-owner daemon this session's in-app commands go to. `detached`: the
+ * socket dropped, so the next command re-initializes with the same lease.
+ * `suspect`: a command failed in a way that may have wedged the daemon, so the
+ * next command probes `route` and keeps it if it answers, else asks desktop to
+ * replace the daemon (which drops the in-app tabs it owns).
+ */
+type OwnerRouteState =
+  | Readonly<{ kind: "unbound" }>
+  | Readonly<{ kind: "bound"; route: OwnerRoute }>
+  | Readonly<{ kind: "detached"; route: OwnerRoute }>
+  | Readonly<{ kind: "suspect"; route: OwnerRoute | undefined }>;
+
+type OwnerRouteEvent =
+  | Readonly<{ type: "bind"; route: OwnerRoute }>
+  | Readonly<{ type: "reset" }>
+  | Readonly<{ type: "socket-lost" }>
+  | Readonly<{ type: "command-failed" }>;
+
 export class BrowserSessionCommandError extends Error {
   readonly code: BrowserSessionCommandErrorCode;
   readonly requestId: string;
@@ -1129,15 +1156,7 @@ export class BrowserSession implements BrowserSessionClient {
   private readBuffer = EMPTY_BUFFER;
   private pending?: PendingResponse;
   private fallbackAttempted = false;
-  private ownerRoute?: Readonly<{
-    capability: InAppBrowserCapability & {
-      turnId: string;
-      ownerLeaseId: string;
-    };
-    config: ResolvedExecutionConfig;
-  }>;
-  private suspectOwnerRoute?: BrowserSession["ownerRoute"];
-  private recoverInAppBrowserCapability = false;
+  private route: OwnerRouteState = { kind: "unbound" };
   private externalAttachCheckedUntil = 0;
   private queue: Promise<void> = Promise.resolve();
   private disposed = false;
@@ -1220,7 +1239,6 @@ export class BrowserSession implements BrowserSessionClient {
     }
     this.activeTurnBackends.clear();
     this.activeTurn = this.createTurnLease(validatedTurnId);
-    this.recoverInAppBrowserCapability = false;
     this.resetOwnerBinding();
   }
 
@@ -1237,7 +1255,6 @@ export class BrowserSession implements BrowserSessionClient {
       } finally {
         if (this.activeTurn === turn) this.activeTurn = undefined;
         this.activeTurnBackends.clear();
-        this.recoverInAppBrowserCapability = false;
         this.resetOwnerBinding();
         if (this.socket) {
           this.invalidateSocket(
@@ -1660,18 +1677,48 @@ export class BrowserSession implements BrowserSessionClient {
         true,
       );
     }
-    this.ownerRoute = Object.freeze({
-      capability: Object.freeze({ ...capability }),
-      config,
+    this.transitionRoute({
+      type: "bind",
+      route: Object.freeze({
+        capability: Object.freeze({ ...capability }),
+        config,
+      }),
     });
-    this.executionConfig = config;
     return config;
   }
 
   private resetOwnerBinding(): void {
-    this.ownerRoute = undefined;
-    this.suspectOwnerRoute = undefined;
-    this.executionConfig = undefined;
+    this.transitionRoute({ type: "reset" });
+  }
+
+  private transitionRoute(event: OwnerRouteEvent): void {
+    const current = this.route;
+    switch (event.type) {
+      case "bind":
+        this.route = { kind: "bound", route: event.route };
+        this.executionConfig = event.route.config;
+        return;
+      case "reset":
+        this.route = { kind: "unbound" };
+        this.executionConfig = undefined;
+        return;
+      case "socket-lost":
+        if (current.kind === "bound") {
+          this.route = { kind: "detached", route: current.route };
+        }
+        return;
+      case "command-failed":
+        this.route = {
+          kind: "suspect",
+          route:
+            current.kind === "bound" || current.kind === "detached"
+              ? current.route
+              : current.kind === "suspect"
+                ? current.route
+                : undefined,
+        };
+        return;
+    }
   }
 
   private async execute<TData>(
@@ -1704,7 +1751,10 @@ export class BrowserSession implements BrowserSessionClient {
               ([key]) => key !== WORKER_BOUND_BACKEND_PARAM,
             ),
           );
-    let config = this.ownerRoute?.config ?? this.resolveExecutionConfig();
+    let config =
+      this.route.kind === "bound"
+        ? this.route.route.config
+        : this.resolveExecutionConfig();
     const requestId = randomUUID();
     const request = {
       id: requestId,
@@ -1992,20 +2042,17 @@ export class BrowserSession implements BrowserSessionClient {
     signal: AbortSignal | undefined,
     deadline: number,
   ): Promise<ResolvedExecutionConfig> {
-    const capability = this.ownerRoute?.capability;
+    const bound = this.route.kind === "bound" ? this.route.route : undefined;
     if (
-      capability?.turnId === turn.turnId &&
-      capability.ownerLeaseId === turn.ownerLeaseId &&
-      capability.capabilityExpiresAt > Date.now()
+      bound?.capability.turnId === turn.turnId &&
+      bound.capability.ownerLeaseId === turn.ownerLeaseId &&
+      bound.capability.capabilityExpiresAt > Date.now()
     ) {
-      return this.ownerRoute!.config;
+      return bound.config;
     }
-    if (
-      this.recoverInAppBrowserCapability &&
-      (await this.restoreResponsiveOwnerRoute(turn, deadline))
-    ) {
-      return this.ownerRoute!.config;
-    }
+    const restored = await this.restoreResponsiveOwnerRoute(turn, deadline);
+    if (restored) return restored.config;
+    const recover = this.route.kind === "suspect";
     const remainingMs = this.remainingTime(deadline);
     if (remainingMs <= 0) {
       throw new Error(
@@ -2013,7 +2060,7 @@ export class BrowserSession implements BrowserSessionClient {
       );
     }
     const initConfig =
-      this.recoverInAppBrowserCapability && this.executionConfig
+      recover && this.executionConfig
         ? this.executionConfig
         : this.bootstrapExecutionConfig();
     const initialized = await this.initializeInAppBrowser({
@@ -2024,10 +2071,9 @@ export class BrowserSession implements BrowserSessionClient {
       turnId: turn.turnId,
       ownerLeaseId: turn.ownerLeaseId,
       ownerLeaseIssuedAt: turn.ownerLeaseIssuedAt,
-      ...(this.recoverInAppBrowserCapability ? { recover: true } : {}),
+      ...(recover ? { recover: true } : {}),
     });
     if (initialized === true) {
-      this.recoverInAppBrowserCapability = false;
       return this.bindOwnerRoute({
         bridgeSessionId: initConfig.bridgeSessionId,
         capabilityExpiresAt: Number.MAX_SAFE_INTEGER,
@@ -2036,7 +2082,6 @@ export class BrowserSession implements BrowserSessionClient {
       });
     }
     if (initialized && typeof initialized === "object") {
-      this.recoverInAppBrowserCapability = false;
       return this.bindOwnerRoute({
         ...initialized,
         turnId: turn.turnId,
@@ -2060,21 +2105,23 @@ export class BrowserSession implements BrowserSessionClient {
       ownerLeaseIssuedAt: number;
     }>,
     deadline: number,
-  ): Promise<boolean> {
-    const route = this.suspectOwnerRoute;
+  ): Promise<OwnerRoute | undefined> {
+    const state = this.route;
+    if (state.kind !== "suspect") return undefined;
+    const { route } = state;
     if (
       !route ||
       route.capability.turnId !== turn.turnId ||
       route.capability.ownerLeaseId !== turn.ownerLeaseId ||
       route.capability.capabilityExpiresAt <= Date.now()
     ) {
-      return false;
+      return undefined;
     }
     const timeoutMs = Math.min(
       OWNER_DAEMON_PROBE_TIMEOUT_MS,
       this.remainingTime(deadline) / 2,
     );
-    if (timeoutMs <= 0) return false;
+    if (timeoutMs <= 0) return undefined;
     const responsive = await probeBrowserDaemon({
       endpoint: route.config.endpoint,
       request: {
@@ -2088,12 +2135,9 @@ export class BrowserSession implements BrowserSessionClient {
       },
       timeoutMs,
     });
-    if (!responsive || this.suspectOwnerRoute !== route) return false;
-    this.ownerRoute = route;
-    this.executionConfig = route.config;
-    this.suspectOwnerRoute = undefined;
-    this.recoverInAppBrowserCapability = false;
-    return true;
+    if (!responsive || this.route !== state) return undefined;
+    this.transitionRoute({ type: "bind", route });
+    return route;
   }
 
   private markManagedCapabilityForRecovery(cause: unknown): void {
@@ -2108,9 +2152,7 @@ export class BrowserSession implements BrowserSessionClient {
     // evaluation, and every follow-up would queue behind it on that process.
     // The next command asks the daemon first and replaces it only when it does
     // not answer: replacing it drops the in-app tabs it owns.
-    this.suspectOwnerRoute = this.ownerRoute ?? this.suspectOwnerRoute;
-    this.ownerRoute = undefined;
-    this.recoverInAppBrowserCapability = true;
+    this.transitionRoute({ type: "command-failed" });
   }
 
   private async ensureConnected(
@@ -2493,10 +2535,7 @@ export class BrowserSession implements BrowserSessionClient {
   ): void {
     if (socket !== this.socket) return;
     this.socket = undefined;
-    if (!preserveCapability) {
-      this.suspectOwnerRoute = this.ownerRoute ?? this.suspectOwnerRoute;
-      this.ownerRoute = undefined;
-    }
+    if (!preserveCapability) this.transitionRoute({ type: "socket-lost" });
     this.readBuffer = EMPTY_BUFFER;
     const pending = this.takePending();
     socket.removeAllListeners();

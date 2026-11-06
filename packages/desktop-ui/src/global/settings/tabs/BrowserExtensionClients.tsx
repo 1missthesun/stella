@@ -9,7 +9,6 @@ import { Select } from "@/ui/select";
 import { Switch } from "@/ui/switch";
 import { useT } from "@/shared/i18n";
 
-const POLL_MS = 3_000;
 const AUTOMATIC = "__automatic__";
 
 const STATUS_KEYS: Record<BrowserExtensionClientStatus, string> = {
@@ -52,8 +51,9 @@ export function BrowserExtensionClients() {
 
   useEffect(() => {
     void refresh();
-    const timer = window.setInterval(() => void refresh(), POLL_MS);
-    return () => window.clearInterval(timer);
+    return window.electronAPI?.browserView?.onExtensionClients?.((next) => {
+      if (!savingRef.current) setState(next);
+    });
   }, [refresh]);
 
   const apply = useCallback(

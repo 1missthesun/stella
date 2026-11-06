@@ -1,7 +1,7 @@
 import { memo, useEffect, useState } from "react";
 import type {
   AppSourceActionResult,
-  AppSourceDraft,
+  AppSourceDraftOffer,
   AppSourceWaiting,
 } from "@stella/contracts/desktop/app-source";
 import { showToast } from "@/ui/toast";
@@ -11,11 +11,9 @@ import {
   agentChange,
   appSourceApi,
   runAppSourceAction,
-  updateProgress,
   useAppSourceState,
-  useClaimDraft,
-  useClaimedDrafts,
   usePendingAppSourceAction,
+  useRelayedAgents,
 } from "./app-source-store";
 import { UpdateCard } from "./UpdateCard";
 import "./app-update-message.css";
@@ -64,14 +62,12 @@ export const useAppSourceAction = () => {
 
 const DraftUpdateCard = ({
   draft,
-  stale,
   busy,
   disabled,
   placement,
   onUpdate,
 }: {
-  draft: AppSourceDraft;
-  stale: boolean;
+  draft: AppSourceDraftOffer;
   busy: boolean;
   disabled: boolean;
   placement?: "message" | "composer";
@@ -85,8 +81,8 @@ const DraftUpdateCard = ({
   return (
     <UpdateCard
       tone="update"
-      title={draft.subject || draft.name}
-      detail={stale ? t("shell.appSource.outdated") : `${t("shell.appSource.title")} · ${shape}`}
+      title={draft.summary}
+      detail={draft.stale ? t("shell.appSource.outdated") : `${t("shell.appSource.title")} · ${shape}`}
       busy={busy}
       disabled={disabled}
       placement={placement}
@@ -111,22 +107,19 @@ export const AgentUpdateCard = memo(function AgentUpdateCard({
   const { pending: running, run } = useAppSourceAction();
   const api = appSourceApi();
   const change = state ? agentChange(state, agentId) : null;
-  useClaimDraft(api && change && change.kind !== "applied" ? change.draft.name : null);
   if (!state || !api || !change) return null;
   const pending = running === agentId;
   const blocked =
-    updateProgress(state)?.state === "merging" ||
-    ((state.busy || running !== null) && !pending);
+    state.merging !== undefined || ((state.busy || running !== null) && !pending);
 
-  if (change.kind === "ready" || change.kind === "stale") {
-    const { draft } = change;
+  if (change.kind === "draft") {
+    const { offer } = change;
     return (
       <DraftUpdateCard
-        draft={draft}
-        stale={change.kind === "stale"}
-        busy={pending}
-        disabled={blocked}
-        onUpdate={() => void run(agentId, () => api.apply(draft.name))}
+        draft={offer}
+        busy={pending || offer.adding}
+        disabled={blocked && !offer.adding}
+        onUpdate={() => void run(agentId, () => api.apply(offer.name))}
       />
     );
   }
@@ -175,45 +168,35 @@ export const addOffer = (offer: AppSourceWaiting) => {
 };
 
 export const AppSourceOffers = memo(function AppSourceOffers({
+  conversationId,
   placement = "message",
 }: {
+  conversationId: string | null;
   placement?: "message" | "composer";
 }) {
   const t = useT();
   const state = useAppSourceState();
-  const claimed = useClaimedDrafts();
+  const relayed = useRelayedAgents(conversationId);
   const { pending, run } = useAppSourceAction();
   if (!state || !appSourceApi()) return null;
-  const merging = updateProgress(state)?.state === "merging";
+  const merging = state.merging !== undefined;
   const offers = state.waiting.filter(
     (offer): offer is Exclude<AppSourceWaiting, { kind: "version" }> =>
       offer.kind !== "version" &&
       (!merging || offer.adding) &&
-      !(offer.kind === "draft" && claimed.has(offer.name)),
+      !(offer.kind === "draft" && offer.agentId && relayed.has(offer.agentId)),
   );
   if (offers.length === 0) return null;
   const blocked = state.busy || pending !== null || merging;
-  const draftNamed = (name: string) =>
-    state.ready.find((draft) => draft.name === name) ??
-    state.stale.find((draft) => draft.name === name) ??
-    null;
   return (
     <div className="app-update-messages" data-testid="app-source-offers">
       {offers.map((offer) => {
         const adding = offer.adding || pending === offer.key;
         if (offer.kind === "draft") {
-          const draft: AppSourceDraft = draftNamed(offer.name) ?? {
-            name: offer.name,
-            subject: offer.summary,
-            sha: "",
-            files: 0,
-            restart: false,
-          };
           const card = (
             <DraftUpdateCard
-              key={offer.key}
-              draft={draft}
-              stale={state.stale.some((entry) => entry.name === offer.name)}
+              key={offer.name}
+              draft={offer}
               busy={adding}
               disabled={blocked && !adding}
               placement={placement}
@@ -223,7 +206,7 @@ export const AppSourceOffers = memo(function AppSourceOffers({
           return placement === "composer" ? (
             card
           ) : (
-            <div key={offer.key} className="event-row event-row--assistant">
+            <div key={offer.name} className="event-row event-row--assistant">
               <div className="event-item assistant">{card}</div>
             </div>
           );

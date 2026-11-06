@@ -1,14 +1,5 @@
 export const APP_RELAUNCHING_EVENT = "stella:relaunching";
 
-export type AppSourceDraft = {
-  name: string;
-  subject: string;
-  sha: string;
-  agentId?: string;
-  files: number;
-  restart: boolean;
-};
-
 export type AppSourceCommit = {
   sha: string;
   subject: string;
@@ -28,7 +19,20 @@ export type AppSourceWaiting =
       summary: string;
       draft?: string;
     }
-  | { kind: "draft"; key: string; adding: boolean; name: string; summary: string };
+  | {
+      kind: "draft";
+      key: string;
+      adding: boolean;
+      name: string;
+      summary: string;
+      sha: string;
+      agentId?: string;
+      stale: boolean;
+      files: number;
+      restart: boolean;
+    };
+
+export type AppSourceDraftOffer = Extract<AppSourceWaiting, { kind: "draft" }>;
 
 export const isUpdateDraft = (name: string) => /^update-[0-9a-f]{12}$/.test(name);
 
@@ -38,15 +42,14 @@ export const isStellaDraft = (name: string) =>
   isUpdateDraft(name) || isRemoteMergeDraft(name);
 
 export type AppSourceState = {
-  ready: AppSourceDraft[];
-  stale: AppSourceDraft[];
   remote: { status: "none" | "ahead" | "diverged"; count: number };
   upstream: {
     status: "none" | "ahead" | "diverged";
     count: number;
     subject: string;
   };
-  update?: { state: "merging" | "done" };
+  /** An agent Stella sent is drafting this merge; nothing else may start until it settles. */
+  merging?: { from: "upstream" | "remote" | "draft"; draft: string };
   recent: AppSourceCommit[];
   waiting: AppSourceWaiting[];
   skipped: AppSourceWaiting[];

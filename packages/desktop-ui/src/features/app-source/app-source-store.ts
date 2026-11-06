@@ -1,8 +1,8 @@
-import { useLayoutEffect, useSyncExternalStore } from "react";
+import { useSyncExternalStore } from "react";
 import type {
   AppSourceActionResult,
   AppSourceCommit,
-  AppSourceDraft,
+  AppSourceDraftOffer,
   AppSourceState,
   AppSourceWaiting,
 } from "@stella/contracts/desktop/app-source";
@@ -74,20 +74,21 @@ export const runAppSourceAction = async (
 };
 
 export type AgentChange =
-  | { kind: "ready"; draft: AppSourceDraft }
-  | { kind: "stale"; draft: AppSourceDraft }
+  | { kind: "draft"; offer: AppSourceDraftOffer }
   | { kind: "applied"; commit: AppSourceCommit };
+
+const draftOffers = (state: AppSourceState) =>
+  [...state.waiting, ...state.skipped].filter(
+    (offer): offer is AppSourceDraftOffer =>
+      offer.kind === "draft" && !isStellaDraft(offer.name),
+  );
 
 export const agentChange = (
   state: AppSourceState,
   agentId: string,
 ): AgentChange | null => {
-  const mine = (draft: AppSourceDraft) =>
-    draft.agentId === agentId && !isStellaDraft(draft.name);
-  const ready = state.ready.find(mine);
-  if (ready) return { kind: "ready", draft: ready };
-  const stale = state.stale.find(mine);
-  if (stale) return { kind: "stale", draft: stale };
+  const offer = draftOffers(state).find((entry) => entry.agentId === agentId);
+  if (offer) return { kind: "draft", offer };
   const commit = state.recent.find((entry) => entry.agentId === agentId);
   return commit ? { kind: "applied", commit } : null;
 };
@@ -98,36 +99,25 @@ export const versionOffer = (state: AppSourceState) =>
       offer.kind === "version",
   ) ?? null;
 
-export const updateProgress = (state: AppSourceState) => state.update ?? null;
-
-const claimedDraftCounts = new Map<string, number>();
-let claimedDrafts: ReadonlySet<string> = new Set();
-const claimListeners = new Set<() => void>();
-const publishClaims = () => {
-  claimedDrafts = new Set(claimedDraftCounts.keys());
-  for (const listener of claimListeners) listener();
-};
-const subscribeClaims = (listener: () => void) => {
-  claimListeners.add(listener);
+const EMPTY_AGENTS: ReadonlySet<string> = new Set();
+const relayedAgents = new Map<string, ReadonlySet<string>>();
+const relayedListeners = new Set<() => void>();
+const subscribeRelayed = (listener: () => void) => {
+  relayedListeners.add(listener);
   return () => {
-    claimListeners.delete(listener);
+    relayedListeners.delete(listener);
   };
 };
 
-/** Drafts already offered on the message that relays their agent's completion. */
-export const useClaimedDrafts = () =>
-  useSyncExternalStore(subscribeClaims, () => claimedDrafts);
-
-export const useClaimDraft = (name: string | null) => {
-  useLayoutEffect(() => {
-    if (!name) return;
-    claimedDraftCounts.set(name, (claimedDraftCounts.get(name) ?? 0) + 1);
-    publishClaims();
-    return () => {
-      const count = (claimedDraftCounts.get(name) ?? 1) - 1;
-      if (count > 0) claimedDraftCounts.set(name, count);
-      else claimedDraftCounts.delete(name);
-      publishClaims();
-    };
-  }, [name]);
+/** Agents whose completion is a row in the conversation's loaded messages: their change shows on that row. */
+export const publishRelayedAgents = (conversationId: string, agentIds: string[]) => {
+  const known = relayedAgents.get(conversationId) ?? EMPTY_AGENTS;
+  if (known.size === agentIds.length && agentIds.every((id) => known.has(id))) return;
+  relayedAgents.set(conversationId, new Set(agentIds));
+  for (const listener of relayedListeners) listener();
 };
+
+export const useRelayedAgents = (conversationId: string | null) =>
+  useSyncExternalStore(subscribeRelayed, () =>
+    conversationId ? (relayedAgents.get(conversationId) ?? EMPTY_AGENTS) : EMPTY_AGENTS,
+  );

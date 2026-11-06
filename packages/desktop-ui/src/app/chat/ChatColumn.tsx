@@ -285,7 +285,7 @@ export const ChatColumn = memo(function ChatColumn({
     () => (
       <>
         {extraTail}
-        <AppSourceOffers />
+        <AppSourceOffers conversationId={conversationId} />
         <UsageLimitChatCard conversationId={conversationId} />
       </>
     ),
@@ -414,7 +414,7 @@ export const ChatColumn = memo(function ChatColumn({
             >
               {showHomeContent ? (
                 <>
-                  <AppSourceOffers placement="composer" />
+                  <AppSourceOffers conversationId={conversationId} placement="composer" />
                   <ComposerNotice conversationId={conversationId} />
                 </>
               ) : null}

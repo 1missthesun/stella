@@ -1,11 +1,12 @@
 import type { ChatListBinding } from "@/shell/use-chat-scroll-management";
-import { memo, useLayoutEffect, useMemo, useReducer, useRef } from "react";
+import { memo, useEffect, useLayoutEffect, useMemo, useReducer, useRef } from "react";
 import type { MessageRecord } from "@stella/contracts/local-chat";
 import { useEventRows } from "@/features/chat/hooks/use-event-rows";
 import { useThreadActivity } from "@/features/chat/hooks/use-thread-activity";
 import { useAgentParents } from "@/features/chat/hooks/use-agent-parents";
 import { useDriveAttachmentPreviews } from "@/features/cloud/drive-attachment-previews";
 import { ChatTimeline, type LegendContentStyle } from "./ChatTimeline";
+import { publishRelayedAgents } from "@/features/app-source/app-source-store";
 import type { InlineWorkingIndicatorMountProps } from "./InlineWorkingIndicator";
 import type { QueuedUserMessage } from "@/features/chat/hooks/use-streaming-chat";
 import {
@@ -114,6 +115,23 @@ export const ConversationEvents = memo(function ConversationEvents({
     agentTitles,
     agentParents,
   });
+
+  const relayedKey = useMemo(
+    () =>
+      projectedRows
+        .flatMap((row) =>
+          row.kind === "assistant"
+            ? (row.agentCompletion?.sections.map((section) => section.agentId) ?? [])
+            : [],
+        )
+        .join("\n"),
+    [projectedRows],
+  );
+  useEffect(() => {
+    if (conversationId) {
+      publishRelayedAgents(conversationId, relayedKey ? relayedKey.split("\n") : []);
+    }
+  }, [conversationId, relayedKey]);
 
   const arrivalVersion = useMessageArrivals(
     projectedRows,

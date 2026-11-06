@@ -424,7 +424,7 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
         const appSourceService = new AppSourceService({
             stellaAppDir: state.stellaAppDir ?? config.stellaAppDir,
             broadcast: (next) => {
-                if (next.ready.length > 0 ||
+                if (next.waiting.some((offer) => offer.kind === "draft" && !offer.stale) ||
                     next.remote.status === "ahead" ||
                     next.upstream.status === "ahead") {
                     updateTransition.prewarm();

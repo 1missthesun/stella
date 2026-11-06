@@ -37,12 +37,17 @@ import {
   TURN_OWNER_GENERATION_HEADER,
   TURN_PLANE_PROTOCOL,
 } from "@stella/contracts/turn-plane/turn-start";
-import { cloudUnsupportedCapabilities } from "../dispatch-policy.js";
+import {
+  cloudUnsupportedCapabilities,
+  isTerminalDispatchState,
+} from "../dispatch-policy.js";
 import type {
   OwnerGateAdmitInput,
   OwnerGateAdmissionWithLease,
   OwnerGateFenceLeaseRequest,
+  DispatchPatch,
   DispatchRow,
+  DispatchTransition,
 } from "./types.js";
 import {
   DISPATCH_CLOUD_RETRY_DELAY_MS,
@@ -64,15 +69,34 @@ export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
     }
   }
 
-  /** A started cloud run may still become this dispatch's execution. */
-  protected cloudStartStillWanted(dispatchId: string): DispatchRow | null {
-    const current = this.dispatchRow(dispatchId);
-    return current &&
-      (current.state === "cloud_committed" ||
-        (current.state === "reconciliation_required" &&
-          !current.cancel_request_id))
-      ? current
-      : null;
+  /** A cloud run just started: it becomes this dispatch's execution unless the dispatch ended meanwhile. */
+  protected async markCloudRunning(
+    row: DispatchRow,
+    patch: DispatchPatch,
+    now: number,
+  ): Promise<DispatchTransition> {
+    const current = this.dispatchRow(row.dispatch_id) ?? row;
+    const wanted =
+      current.state === "cloud_committed" ||
+      (current.state === "reconciliation_required" &&
+        !current.cancel_request_id);
+    if (!wanted) return { applied: false, row: current };
+    return await this.transitionDispatch(
+      current,
+      "cloud_running",
+      {
+        placement: "cloud",
+        cloud_retry_at: null,
+        error_code: null,
+        error_message: null,
+        payload_json: null,
+        payload_expires_at: null,
+        lease_expires_at: null,
+        started_at: now,
+        ...patch,
+      },
+      now,
+    );
   }
 
   protected async stopUnwantedCloudAgent(
@@ -109,10 +133,10 @@ export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
     ) as ExecutionCapability[];
     const unsupported = cloudUnsupportedCapabilities(required);
     if (unsupported.length > 0) {
-      const failed = await this.patchDispatch(
+      const failed = await this.transitionDispatch(
         row,
+        "failed",
         {
-          state: "failed",
           payload_json: null,
           payload_expires_at: null,
           lease_expires_at: null,
@@ -121,31 +145,33 @@ export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
         },
         now,
       );
-      await this.releaseGate(failed);
-      return failed;
+      if (failed.applied) await this.releaseGate(failed.row);
+      return failed.row;
     }
     const payload = this.cloudPayload(row);
     if (!payload) {
-      const failed = await this.patchDispatch(
+      const failed = await this.transitionDispatch(
         row,
+        "failed",
         {
-          state: "failed",
           lease_expires_at: null,
           error_code: "CLOUD_PAYLOAD_UNAVAILABLE",
           error_message: "The dispatch payload is no longer available.",
         },
         now,
       );
-      await this.releaseGate(failed);
-      return failed;
+      if (failed.applied) await this.releaseGate(failed.row);
+      return failed.row;
     }
-    this.ctx.storage.sql.exec(
-      `UPDATE dispatches SET cloud_attempts = cloud_attempts + 1,
-                             cloud_retry_at = NULL
-        WHERE dispatch_id = ?`,
-      row.dispatch_id,
+    const attempt = await this.transitionDispatch(
+      row,
+      "cloud_committed",
+      { cloud_attempts: row.cloud_attempts + 1, cloud_retry_at: null },
+      now,
+      { notifyExecutor: false },
     );
-    const attempting = this.dispatchRow(row.dispatch_id) ?? row;
+    if (!attempt.applied) return attempt.row;
+    const attempting = attempt.row;
     try {
       return row.kind === "chat"
         ? await this.startCloudChat(attempting, payload, now)
@@ -178,8 +204,9 @@ export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
       response.status === 503 &&
       row.cloud_attempts < DISPATCH_CLOUD_MAX_ATTEMPTS
     ) {
-      const retrying = await this.patchDispatch(
+      const retrying = await this.transitionDispatch(
         row,
+        "cloud_committed",
         {
           cloud_retry_at: now + DISPATCH_CLOUD_RETRY_DELAY_MS,
           lease_expires_at: now + DISPATCH_ACCEPTED_LEASE_MS,
@@ -189,13 +216,16 @@ export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
         now,
         { notifyExecutor: false },
       );
-      await this.scheduleAlarm(now);
-      return retrying;
+      if (retrying.applied) await this.scheduleAlarm(now);
+      else if (isTerminalDispatchState(retrying.row.state)) {
+        await this.releaseGate(retrying.row);
+      }
+      return retrying.row;
     }
-    const failed = await this.patchDispatch(
+    const failed = await this.transitionDispatch(
       row,
+      "failed",
       {
-        state: "failed",
         payload_json: null,
         payload_expires_at: null,
         lease_expires_at: null,
@@ -204,8 +234,10 @@ export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
       },
       now,
     );
-    await this.releaseGate(failed);
-    return failed;
+    if (isTerminalDispatchState(failed.row.state)) {
+      await this.releaseGate(failed.row);
+    }
+    return failed.row;
   }
 
   protected async startCloudChat(
@@ -306,10 +338,7 @@ export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
           ),
           now,
         );
-      this.ctx.storage.sql.exec(
-        "UPDATE dispatches SET gate_held = 1 WHERE dispatch_id = ?",
-        row.dispatch_id,
-      );
+      this.setGateHeld(row.dispatch_id, true);
       row.gate_held = 1;
       if (result.lease.status !== "registered")
         return this.cloudRefusal(
@@ -388,16 +417,22 @@ export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
     }
     if (handoff?.phase === "registered") {
       const current = this.dispatchRow(row.dispatch_id);
-      if (!current || current.state !== "cloud_committed") {
+      const named =
+        current?.state === "cloud_committed"
+          ? await this.transitionDispatch(
+              current,
+              "cloud_committed",
+              { cloud_turn_id: handoff.authority.turnId },
+              now,
+              { notifyExecutor: false },
+            )
+          : null;
+      if (!named?.applied) {
         await this.retireCloudChatHandoff(handoff.authority);
-        await this.releaseGate(this.dispatchRow(row.dispatch_id) ?? row);
+        await this.releaseGate(row);
         return this.dispatchRow(row.dispatch_id) ?? row;
       }
-      this.ctx.storage.sql.exec(
-        "UPDATE dispatches SET cloud_turn_id = ? WHERE dispatch_id = ?",
-        handoff.authority.turnId,
-        row.dispatch_id,
-      );
+      row = named.row;
     }
     const response =
       handoff?.phase === "registered"
@@ -433,24 +468,12 @@ export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
       started.turnId !== handoff.authority.turnId
     )
       throw new Error("Cloud admission response identity changed.");
-    const current = this.cloudStartStillWanted(row.dispatch_id);
-    if (!current) return this.dispatchRow(row.dispatch_id) ?? row;
-    return await this.patchDispatch(
-      current,
-      {
-        state: "cloud_running",
-        placement: "cloud",
-        cloud_turn_id: started.turnId,
-        cloud_retry_at: null,
-        error_code: null,
-        error_message: null,
-        payload_json: null,
-        payload_expires_at: null,
-        lease_expires_at: null,
-        started_at: now,
-      },
+    const running = await this.markCloudRunning(
+      row,
+      { cloud_turn_id: started.turnId },
       now,
     );
+    return running.row;
   }
 
   protected async retireCloudChatHandoff(a: AdmittedCloudChat): Promise<void> {
@@ -532,38 +555,28 @@ export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
       });
     if (!response.ok) return await this.cloudRefusal(row, response, now);
     const started = (await response.json()) as CloudAgentTurnStartResponse;
-    const current = this.cloudStartStillWanted(row.dispatch_id);
-    if (!current) {
-      const ended = this.dispatchRow(row.dispatch_id) ?? row;
-      await this.stopUnwantedCloudAgent(
-        ended,
-        started.threadId ?? threadId,
-        started.turnId ?? row.dispatch_id,
-      );
-      return ended;
-    }
-    await this.recordPlacedAgent(
-      current,
-      { ...request, threadId: started.threadId ?? threadId },
-      now,
-    );
-    return await this.patchDispatch(
-      current,
+    const running = await this.markCloudRunning(
+      row,
       {
-        state: "cloud_running",
-        placement: "cloud",
         cloud_turn_id: started.turnId ?? row.dispatch_id,
-        cloud_retry_at: null,
-        error_code: null,
-        error_message: null,
         cloud_thread_id: started.threadId ?? threadId,
-        payload_json: null,
-        payload_expires_at: null,
-        lease_expires_at: null,
-        started_at: now,
       },
       now,
     );
+    if (!running.applied) {
+      await this.stopUnwantedCloudAgent(
+        running.row,
+        started.threadId ?? threadId,
+        started.turnId ?? row.dispatch_id,
+      );
+      return running.row;
+    }
+    await this.recordPlacedAgent(
+      running.row,
+      { ...request, threadId: started.threadId ?? threadId },
+      now,
+    );
+    return running.row;
   }
 
   protected async startPiPlacedAgent(
@@ -589,31 +602,20 @@ export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
         lineage: { depth: 1 },
       },
     });
-    const current = this.cloudStartStillWanted(row.dispatch_id);
-    if (!current) {
-      const ended = this.dispatchRow(row.dispatch_id) ?? row;
-      await this.stopUnwantedCloudAgent(ended, request.threadId, row.dispatch_id);
-      await this.releaseGate(ended);
-      return ended;
-    }
-    await this.releaseGate(current);
-    return await this.patchDispatch(
-      current,
-      {
-        state: "cloud_running",
-        placement: "cloud",
-        cloud_turn_id: row.dispatch_id,
-        cloud_retry_at: null,
-        error_code: null,
-        error_message: null,
-        cloud_thread_id: request.threadId,
-        payload_json: null,
-        payload_expires_at: null,
-        lease_expires_at: null,
-        started_at: now,
-      },
+    const running = await this.markCloudRunning(
+      row,
+      { cloud_turn_id: row.dispatch_id, cloud_thread_id: request.threadId },
       now,
     );
+    if (!running.applied) {
+      await this.stopUnwantedCloudAgent(
+        running.row,
+        request.threadId,
+        row.dispatch_id,
+      );
+    }
+    await this.releaseGate(running.row);
+    return running.row;
   }
 
   /**

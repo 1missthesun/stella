@@ -1369,10 +1369,7 @@ export class OwnerGate extends OwnerGateCloudDispatch {
             leaseId: identity.leaseId,
           } satisfies CloudChatHandoff);
           await this.release({ turnId: identity.turnId });
-          this.ctx.storage.sql.exec(
-            "UPDATE dispatches SET gate_held = 0 WHERE dispatch_id = ?",
-            dispatchId,
-          );
+          this.setGateHeld(dispatchId, false);
         }
       }
       return response;
@@ -2009,11 +2006,11 @@ export class OwnerGate extends OwnerGateCloudDispatch {
             )
             .toArray()[0]
         : undefined;
-    if (receipt && !isTerminalDispatchState(row.state as DispatchState)) {
-      row = await this.patchDispatch(
+    if (receipt && !isTerminalDispatchState(row.state)) {
+      const ended = await this.transitionDispatch(
         row,
+        receipt.outcome,
         {
-          state: receipt.outcome,
           error_message: receipt.error_message,
           payload_json: null,
           payload_expires_at: null,
@@ -2021,7 +2018,8 @@ export class OwnerGate extends OwnerGateCloudDispatch {
         },
         Date.now(),
       );
-      await this.releaseGate(row);
+      row = ended.row;
+      if (ended.applied) await this.releaseGate(row);
       await this.scheduleAlarm(Date.now());
     }
     return {
@@ -2170,7 +2168,7 @@ export class OwnerGate extends OwnerGateCloudDispatch {
         false,
       );
     }
-    if (isTerminalDispatchState(row.state as DispatchState)) {
+    if (isTerminalDispatchState(row.state)) {
       return {
         ok: true,
         response: {
@@ -2185,15 +2183,14 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     const cloudNeverStarted =
       row.state === "cloud_committed" && !row.cloud_turn_id;
     this.withdrawOffers(row.dispatch_id, null, "canceled", now);
-    const next = await this.patchDispatch(
+    const transition = await this.transitionDispatch(
       row,
+      unaccepted || cloudNeverStarted
+        ? "canceled"
+        : row.state === "reconciliation_required"
+          ? row.state
+          : "cancel_pending",
       {
-        state:
-          unaccepted || cloudNeverStarted
-            ? "canceled"
-            : row.state === "reconciliation_required"
-              ? row.state
-              : "cancel_pending",
         cancel_request_id: cancelRequestId,
         ...(reason ? { cancel_reason: reason } : {}),
         ...(row.state !== "reconciliation_required" && !row.lease_expires_at
@@ -2213,8 +2210,14 @@ export class OwnerGate extends OwnerGateCloudDispatch {
       now,
       { notifyExecutor: false },
     );
-    if (unaccepted || cloudNeverStarted) {
+    const next = transition.row;
+    if (transition.applied && (unaccepted || cloudNeverStarted)) {
       await this.releaseGate(next);
+    } else if (!transition.applied) {
+      return {
+        ok: true,
+        response: { protocol: PLACEMENT_PROTOCOL, dispatch: dispatchSummary(next) },
+      };
     } else if (next.placement === "computer" && next.executor_device_id) {
       const socket = this.connectedSocket(next.executor_device_id);
       if (socket) {

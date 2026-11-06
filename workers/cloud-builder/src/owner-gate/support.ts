@@ -10,7 +10,6 @@ import {
 import type { OwnerSnapshot } from "@stella/contracts/turn-plane/owner-snapshot";
 import type {
   DispatchError,
-  DispatchState,
   DispatchSummary,
   ExecutionIngress,
   ExecutionKind,
@@ -131,7 +130,7 @@ export const dispatchSummary = (row: DispatchRow): DispatchSummary => ({
   conversationId: row.conversation_id,
   ...optional(row.parent_turn_id, "parentTurnId"),
   ...optional(row.thread_id, "threadId"),
-  state: row.state as DispatchState,
+  state: row.state,
   ...(optional(row.placement, "placement") as {
     placement?: "computer" | "cloud";
   }),

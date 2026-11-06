@@ -277,7 +277,7 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
         serverTimeMs: now,
       });
       if (attachment.availability?.ready) {
-        this.offerAgainTo(attachment, now);
+        await this.offerAgainTo(attachment, now);
         await this.wakeWaitingSchedules(attachment.deviceId);
       }
       if (device!.remoteExecution === "asking") {
@@ -326,7 +326,7 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
       socket.serializeAttachment(attachment);
       this.writePresence(attachment, now, true);
       if (becameReady) {
-        this.offerAgainTo(attachment, now);
+        await this.offerAgainTo(attachment, now);
         await this.wakeWaitingSchedules(attachment.deviceId);
       }
       return;
@@ -732,7 +732,7 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
   protected abstract offerAgainTo(
     attachment: PresenceAttachment,
     now: number,
-  ): void;
+  ): Promise<void>;
   protected abstract handleExecutorFrame(
     socket: WebSocket,
     attachment: PresenceAttachment,

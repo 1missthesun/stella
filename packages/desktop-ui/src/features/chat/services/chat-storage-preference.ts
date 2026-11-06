@@ -74,9 +74,10 @@ export const useSignedOutLocalMode = () =>
 
 /** After sign-in: keep chats on this computer for good, or go back to synced chats. */
 export const settleSignedOutLocalMode = async (mode: "cloud" | "local") => {
-  uiState.removeItem(SIGNED_OUT_KEY);
-  if (mode === "local") uiState.setItem(MEMORY_KEPT_LOCAL_KEY, "1");
   await setChatStorageMode(mode);
+  if (mode === "local") uiState.setItem(MEMORY_KEPT_LOCAL_KEY, "1");
+  uiState.removeItem(SIGNED_OUT_KEY);
+  window.dispatchEvent(new Event(EVENT));
 };
 
 /** Memory files stay on this computer until the signed-out keep-or-sync choice says sync. */

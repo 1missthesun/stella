@@ -10,6 +10,7 @@ import { CloudModelSelectionBridge } from "./features/cloud/CloudModelSelectionB
 import { TelemetryPreferenceBridge } from "./features/cloud/TelemetryPreferenceBridge";
 import { platformCapabilities } from "./platform/capabilities";
 import { SelfHostLayer } from "./global/self-host/SelfHostLayer";
+import { readParkedDiscovery } from "./global/onboarding/chat/discovery-parked";
 
 const AUTO_REPAIR_SIGNATURE_KEY = "stella:auto-repair:last-signature";
 
@@ -31,6 +32,13 @@ function App() {
       window.sessionStorage.removeItem(AUTO_REPAIR_SIGNATURE_KEY);
     }, 20_000);
     return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!platformCapabilities.nativeBridges || !readParkedDiscovery()) return;
+    void import("./global/onboarding/chat/discovery-job").then((job) =>
+      job.resumeParkedDiscoveryJob(),
+    );
   }, []);
 
   return (

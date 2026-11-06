@@ -6,6 +6,7 @@ import {
   useAccountProviders,
   useCloudEngines,
 } from "./cloud-engines-api";
+import { uiState } from "@/platform/ui-state";
 import { publishCloudExecutionSelection } from "./cloud-execution-store";
 import {
   cloudExecutionFromLocal,
@@ -24,12 +25,27 @@ type ServerSelection = {
   selectedAt: number | null | undefined;
 };
 
-const createSelectionController = () => {
+const PENDING_PICK_RETRY_MS = 30_000;
+
+type PendingPick = { execution: CloudExecutionSelection; pickedAt: number };
+
+const createSelectionController = (accountId: string) => {
+  const pendingKey = `stella:model-pick-pending:${accountId}`;
   let reconciled: CloudExecutionSelection | null = null;
   let accountProviders: ReadonlySet<string> = new Set();
   let lastServer: ServerSelection | null = null;
   let queue: Promise<void> = Promise.resolve();
   let disposed = false;
+  let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const readPending = (): PendingPick | null => {
+    try {
+      const raw = uiState.getItem(pendingKey);
+      return raw ? (JSON.parse(raw) as PendingPick) : null;
+    } catch {
+      return null;
+    }
+  };
 
   const enqueue = (step: () => Promise<void>) => {
     queue = queue
@@ -40,19 +56,55 @@ const createSelectionController = () => {
   const derive = (local: MirroredModelPreferences) =>
     cloudExecutionFromLocal(local, accountProviders);
 
+  const scheduleRetry = () => {
+    if (retryTimer !== null || disposed) return;
+    retryTimer = globalThis.setTimeout(() => {
+      retryTimer = null;
+      enqueue(async () => {
+        const local = await readLocal();
+        if (local && readPending()) await pushLocal(local);
+      });
+    }, PENDING_PICK_RETRY_MS);
+  };
+
   const pushLocal = async (local: MirroredModelPreferences) => {
     const derived = derive(local);
     if (!derived || disposed) return;
-    if (reconciled && sameCloudExecution(derived, reconciled)) return;
-    reconciled = derived;
+    const pending = readPending();
+    if (
+      !pending &&
+      reconciled &&
+      sameCloudExecution(derived, reconciled)
+    ) {
+      return;
+    }
+    if (!pending || !sameCloudExecution(pending.execution, derived)) {
+      uiState.setItem(
+        pendingKey,
+        JSON.stringify({ execution: derived, pickedAt: Date.now() }),
+      );
+    }
     publishCloudExecutionSelection(derived);
-    await cloudEnginesApi.setExecution(derived);
+    try {
+      await cloudEnginesApi.setExecution(derived);
+    } catch (error) {
+      scheduleRetry();
+      throw error;
+    }
+    reconciled = derived;
+    const latest = readPending();
+    if (latest && sameCloudExecution(latest.execution, derived)) {
+      uiState.removeItem(pendingKey);
+    }
   };
 
   const applyServer = async ({ execution, selectedAt }: ServerSelection) => {
     const local = await readLocal();
     if (!local || disposed) return;
-    if (selectedAt === null) {
+    const pending = readPending();
+    if (pending && typeof selectedAt === "number" && selectedAt > pending.pickedAt) {
+      uiState.removeItem(pendingKey);
+    } else if (selectedAt === null || pending) {
       await pushLocal(local);
       return;
     }
@@ -92,6 +144,7 @@ const createSelectionController = () => {
     },
     dispose() {
       disposed = true;
+      if (retryTimer !== null) globalThis.clearTimeout(retryTimer);
     },
   };
 };
@@ -109,7 +162,7 @@ export function CloudModelSelectionBridge() {
   const providers = useAccountProviders(enabled);
 
   const controller = useMemo(
-    () => (accountId ? createSelectionController() : null),
+    () => (accountId ? createSelectionController(accountId) : null),
     [accountId],
   );
   useEffect(() => () => controller?.dispose(), [controller]);

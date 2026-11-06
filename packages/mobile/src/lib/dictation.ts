@@ -61,6 +61,7 @@ export type UseDictationResult = {
   cancel: () => Promise<string | null>;
   toggle: () => Promise<void>;
   prewarm: () => void;
+  isStarting: () => boolean;
 };
 
 type DictationCapture = {
@@ -573,6 +574,8 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
     };
   }, [prewarm, prewarmEnabled]);
 
+  const isStarting = useCallback(() => startingRef.current !== null, []);
+
   const toggle = useCallback(async () => {
     if (startingRef.current || statusRef.current === "recording") {
       await stop();
@@ -616,6 +619,7 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
     cancel,
     toggle,
     prewarm,
+    isStarting,
   };
 }
 

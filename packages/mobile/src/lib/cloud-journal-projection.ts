@@ -28,6 +28,7 @@ import {
 } from "@stella/contracts/conversation-protocol";
 import type { LiveTurn } from "./cloud-conversation-store";
 import { splitAttachmentPreamble } from "./chat-attachments";
+import { chatAttachmentDisplayName } from "@stella/contracts/chat-attachment-name";
 import type { SentMessageAnchors } from "@stella/contracts/sent-message-anchors";
 import { replaceEqualDeep } from "./structural-sharing";
 
@@ -96,7 +97,7 @@ const userAttachmentPresentation = (payload: Record<string, unknown>) => {
     text: prompt.text,
     ...(attachmentPaths.length ? {
       attachmentPaths,
-      attachmentPreviews: attachmentPaths.map(path => ({ path, name: path.split("/").at(-1) ?? path })),
+      attachmentPreviews: attachmentPaths.map(path => ({ path, name: chatAttachmentDisplayName(path) })),
     } : {}),
     ...(thumbnailUris.length ? { thumbnailUris, hasImage: true } : {}),
     ...(documentNames.length ? { documentNames } : {}),
@@ -883,7 +884,7 @@ export const mergeCanonicalCloudMessages = (args: {
         attachmentPreviews: message.attachmentPaths.map(path =>
           local.attachmentPreviews?.find(preview => preview.path === path)
           ?? message.attachmentPreviews?.find(preview => preview.path === path)
-          ?? { path, name: path.split("/").at(-1) ?? path }),
+          ?? { path, name: chatAttachmentDisplayName(path) }),
       } : {}),
       ...(!message.thumbnailUris?.length && local.thumbnailUris?.length
         ? { thumbnailUris: local.thumbnailUris, hasImage: true } : {}),

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AppState } from "react-native";
 import type { DriveFileUrl as DrivePreview } from "@stella/contracts/backend/drive";
 import { attachmentContentType } from "@stella/contracts/attachment-content-type";
+import { chatAttachmentDisplayName } from "@stella/contracts/chat-attachment-name";
 import type { ChatMessage } from "../types";
 import { getBackendClient } from "./backend";
 
@@ -115,11 +116,11 @@ export function useChatAttachmentPreviews(
         const preview = entries.get(path);
         const existing = existingPreviews.get(path);
         if (!preview || preview.expiresAt <= Date.now()) {
-          return existing ?? { path, name: path.split("/").pop() || path };
+          return existing ?? { path, name: chatAttachmentDisplayName(path) };
         }
         return {
           path,
-          name: preview.name,
+          name: chatAttachmentDisplayName(path, preview.name),
           ...(preview.contentType.toLowerCase().startsWith("image/")
             ? { imageUri: preview.url }
             : existing?.imageUri ? { imageUri: existing.imageUri } : {}),
@@ -138,7 +139,7 @@ export function useChatAttachmentPreviews(
         ...(images.length ? { hasImage: true } : {}),
         ...(thumbnailUris.length ? { thumbnailUris } : {}),
         ...(documents.length ? {
-          documentNames: [...new Set([...(message.documentNames ?? []), ...documents.map((preview) => preview.name)])],
+          documentNames: [...new Set([...(message.documentNames ?? []), ...documents.map((preview) => chatAttachmentDisplayName(preview.path, preview.name))])],
         } : {}),
       };
     };

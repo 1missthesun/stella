@@ -4,6 +4,7 @@ import {
   attachmentContentType,
   isGenericContentType,
 } from "@stella/contracts/attachment-content-type";
+import { chatAttachmentDisplayName } from "@stella/contracts/chat-attachment-name";
 import {
   backendClient,
   readBackendAccountEpoch,
@@ -205,12 +206,14 @@ const presentDrive = (state: Snapshot, attachment: Attachment): Attachment | nul
       id: attachment.id,
       ...(entry.url ? { url: entry.url } : {}),
       mimeType: entry.mimeType,
-      name: entry.name,
+      name: chatAttachmentDisplayName(path, entry.name),
       size: entry.size,
       ...(entry.mimeType.toLowerCase().startsWith("image/") ? {} : { kind: "file" }),
     };
   }
-  if (entry?.status === "failed") return { id: attachment.id, kind: "file" };
+  if (entry?.status === "failed") {
+    return { id: attachment.id, kind: "file", name: chatAttachmentDisplayName(path) };
+  }
   return null;
 };
 

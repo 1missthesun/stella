@@ -41,7 +41,7 @@ export class ReplyArrivalHaptics {
     for (const message of messages) {
       if (message.role !== "user" || !this.pending.has(message.id)) continue;
       const record = recordOf(message);
-      if (message.stopped || (record && unsuccessful(record.turnId))) {
+      if (message.send === "stopped" || (record && unsuccessful(record.turnId))) {
         this.pending.delete(message.id);
       }
     }

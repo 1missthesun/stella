@@ -108,8 +108,7 @@ function CarPlayVoiceLoop({
     threadId: "carplay",
   });
   const { setDraft, send, messages, sending, storageLoaded } = thread;
-  const ready =
-    storageLoaded && thread.catchingUp !== true && thread.authorityReady !== false;
+  const ready = thread.composerGate.kind === "ready";
   const draft = useChatDraft(thread.draftStore);
   const readAloud = useReadAloudState();
 

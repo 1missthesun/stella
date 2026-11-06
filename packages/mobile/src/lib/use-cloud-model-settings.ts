@@ -13,7 +13,7 @@ import type {
   ProviderModel,
 } from "@stella/contracts/backend/providers";
 import { useT } from "../i18n";
-import { getBackendClient, readBackendView } from "./backend";
+import { getBackendClient, readBackendView, useBackendView } from "./backend";
 import { authClient } from "./auth-client";
 import { getAuthTokenForSubject } from "./auth-token";
 import { observeCloudConversationIdentity } from "./cloud-conversation-auth";
@@ -189,6 +189,24 @@ export function useCloudModelSettings(active: boolean) {
     }
   }, [owner, scope, active, t]);
   useEffect(() => { void refresh(); }, [refresh]);
+  const { value: liveEngines } = useBackendView(
+    "engines.get",
+    active && scope ? {} : "skip",
+  );
+  useEffect(() => {
+    if (!liveEngines || writePending.current) return;
+    const liveExecution = liveEngines.selection ?? liveEngines.execution;
+    const liveConnected = liveEngines.connections
+      .filter(isEngineConnectionUsable)
+      .map((row) => row.provider);
+    setState((current) =>
+      current?.scope !== scope ||
+      (JSON.stringify(current.execution) === JSON.stringify(liveExecution) &&
+        JSON.stringify(current.connectedProviders) === JSON.stringify(liveConnected))
+        ? current
+        : { ...current, execution: liveExecution, connectedProviders: liveConnected },
+    );
+  }, [liveEngines, scope]);
 
   const apply = useCallback((next: CloudExecutionSelection) => {
     if (!active || !owner || !scope || !loaded) return;

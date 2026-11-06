@@ -1044,14 +1044,14 @@ export const ChatMessageRow = memo(function ChatMessageRow({
                 {receiptLabel}
               </Text>
             ) : null}
-            {item.sendFailed && failedSend ? (
+            {item.send === "not_sent" && failedSend ? (
               <SendFailedMark
                 actions={failedSend}
                 colors={colors}
                 styles={styles}
               />
             ) : null}
-            {item.stopped ? (
+            {item.send === "stopped" ? (
               <Text
                 style={styles.stoppedTag}
                 maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}

@@ -480,10 +480,7 @@ function ChatSurface(props: {
     composerModelPinned,
   ]);
 
-  const sendReady =
-    !offline &&
-    thread.storageLoaded &&
-    thread.authorityReady !== false;
+  const sendReady = thread.composerGate.kind === "ready";
   const handoffSentRef = useRef(false);
   useEffect(() => {
     if (!handoffDraft?.send || handoffSentRef.current || !sendReady) return;
@@ -548,9 +545,14 @@ function ChatSurface(props: {
   const chatIssue = useMemo(
     () =>
       issue
-        ? { message: issue.message, retryable: issue.retryable, retry: issue.retry }
+        ? {
+            message: issue.message,
+            retryable: issue.retryable,
+            blocksSending: issue.blocksSending,
+            retry: issue.retry,
+          }
         : null,
-    [issue?.message, issue?.retryable, issue?.retry],
+    [issue?.message, issue?.retryable, issue?.blocksSending, issue?.retry],
   );
   const composerIntervention = useMemo(
     () => (

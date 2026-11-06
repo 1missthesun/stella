@@ -22,6 +22,17 @@ import {
 } from "./server-registry";
 import { markOnboardingSeen } from "./onboarding";
 import { clearAccountChatData } from "./chat-account-cleanup";
+import { tearDownPushNotifications } from "./notifications";
+
+const PUSH_TEARDOWN_BUDGET_MS = 4_000;
+
+const leaveActiveServer = async (): Promise<void> => {
+  await Promise.race([
+    tearDownPushNotifications().catch(() => undefined),
+    new Promise((resolve) => setTimeout(resolve, PUSH_TEARDOWN_BUDGET_MS)),
+  ]);
+  await clearAccountChatData().catch(() => undefined);
+};
 
 export const reloadApp = async (): Promise<void> => {
   // Release builds restart through expo-updates. In development builds it is
@@ -42,7 +53,7 @@ export const reloadApp = async (): Promise<void> => {
 
 export const switchToServer = async (serverId: string): Promise<void> => {
   if (serverId === launchServer.id) return;
-  await clearAccountChatData().catch(() => undefined);
+  await leaveActiveServer();
   setActiveServerId(serverId);
   await reloadApp();
 };
@@ -51,7 +62,7 @@ export const removeServer = async (serverId: string): Promise<void> => {
   const wasActive = serverId === launchServer.id;
   await removeSelfHostedServer(serverId);
   if (wasActive) {
-    await clearAccountChatData().catch(() => undefined);
+    await leaveActiveServer();
     setActiveServerId(HOSTED_SERVER_ID);
     await reloadApp();
   }
@@ -137,7 +148,7 @@ export const claimPairingAndSwitch = async (
   const entry = upsertSelfHostedServer(confirmed, link.server);
   await setItemForServerAsync(entry.id, MOBILE_SESSION_TOKEN_KEY, sessionToken);
   await markOnboardingSeen().catch(() => undefined);
-  await clearAccountChatData().catch(() => undefined);
+  await leaveActiveServer();
   setActiveServerId(entry.id);
   await reloadApp();
 };

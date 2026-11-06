@@ -290,6 +290,7 @@ async function readGrantedPushToken(): Promise<string | null> {
 
 let registeredSubject: string | null = null;
 let registering: { subject: string; done: Promise<void> } | null = null;
+let registrationGeneration = 0;
 let deliveryBlocked = false;
 
 export function setPushDeliveryOwner(subject: string | null): void {
@@ -312,6 +313,7 @@ export function registerForPushNotifications(subject: string): Promise<void> {
 }
 
 async function registerOnce(subject: string): Promise<void> {
+  const generation = registrationGeneration;
   try {
     const token = await getExpoPushToken();
     if (!token) return;
@@ -324,16 +326,19 @@ async function registerOnce(subject: string): Promise<void> {
       mobileDeviceId,
       capabilities,
     }, { origin: backendOrigin() });
-    registeredSubject = subject;
+    if (generation === registrationGeneration) registeredSubject = subject;
   } catch {
     // Best-effort — don't block the app if registration fails.
   }
 }
 
 export async function tearDownPushNotifications(): Promise<void> {
+  registrationGeneration += 1;
   registeredSubject = null;
+  const inFlight = registering?.done;
   registering = null;
   deliveryBlocked = true;
+  await inFlight?.catch(() => undefined);
   for (const askId of [...repeatTimers.keys()]) stopUserAskRepeats(askId);
   await Promise.all([
     Notifications.dismissAllNotificationsAsync().catch(() => undefined),

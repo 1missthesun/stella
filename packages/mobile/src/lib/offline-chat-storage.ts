@@ -530,7 +530,6 @@ function parseRow(row: unknown): ChatMessage | null {
         }
       : {}),
     ...(o.cloudFallback === true ? { cloudFallback: true } : {}),
-    ...(o.queued === true ? { queued: true } : {}),
     ...(o.stopped === true ? { stopped: true } : {}),
   };
 }

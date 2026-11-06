@@ -15,6 +15,7 @@ import { i18nFallback } from "../i18n";
 import { fetchWithinDeadline } from "./cloud-request";
 import {
   claimNotificationAction,
+  completeNotificationAction,
   releaseNotificationAction,
 } from "./notification-action-claims";
 import { handleReminderActionResponse } from "./reminder-notification-actions";
@@ -259,6 +260,7 @@ export const handleAskReplyResponse = async (
     deviceId,
   });
   if (!outcome.ok && !outcome.closed) releaseNotificationAction(claimKey);
+  else completeNotificationAction(claimKey);
   await Notifications.dismissNotificationAsync(request.identifier).catch(() => undefined);
   if (!outcome.ok) await presentReplyFailure(data, outcome.closed === true);
   else if (!outcome.accepted) await presentReplyFailure(data, true);

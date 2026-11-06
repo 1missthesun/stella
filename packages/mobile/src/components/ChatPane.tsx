@@ -1090,8 +1090,9 @@ export function ChatPane({
     LayoutAnimation.configureNext(LAYOUT_SPRING);
   }
 
+  const dictationStarting = dictation.isStarting;
   const toggleVoice = useCallback(async () => {
-    if (dictationStatus === "idle") {
+    if (dictationStatus === "idle" && !dictationStarting()) {
       // No tap here: `useDictation` fires on the real transition, once the
       // mic is actually live. Buzzing on the press as well double-tapped the
       // start and lied whenever consent or the mic permission refused.
@@ -1101,7 +1102,7 @@ export function ChatPane({
       return;
     }
     await toggleDictation();
-  }, [dictationStatus, startDictation, toggleDictation]);
+  }, [dictationStarting, dictationStatus, startDictation, toggleDictation]);
   const cancelDictationInput = useCallback(
     () => void cancelDictation(),
     [cancelDictation],

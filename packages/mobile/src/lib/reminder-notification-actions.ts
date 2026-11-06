@@ -7,6 +7,7 @@ import {
 import { markReminderDone, snoozeReminder } from "./reminders";
 import {
   claimNotificationAction,
+  completeNotificationAction,
   releaseNotificationAction,
 } from "./notification-action-claims";
 
@@ -30,6 +31,7 @@ export const handleReminderActionResponse = async (
     releaseNotificationAction(key);
     return true;
   }
+  completeNotificationAction(key);
   await Notifications.dismissNotificationAsync(request.identifier).catch(() => undefined);
   return true;
 };

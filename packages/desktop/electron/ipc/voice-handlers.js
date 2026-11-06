@@ -1,5 +1,5 @@
 import { applyShortcutRegistration } from "./shortcut-registration.js";
-import { getRealtimeVoicePreferences, loadLocalPreferences, resolveRealtimeVoiceId, saveLocalPreferences, } from "@stella/runtime/kernel/preferences/local-preferences";
+import { getRealtimeVoicePreferences, loadLocalPreferences, resolveRealtimeVoiceId, updateLocalPreferences, } from "@stella/runtime/kernel/preferences/local-preferences";
 import { DEFAULT_OPENAI_REALTIME_VOICE, DEFAULT_XAI_REALTIME_VOICE, buildXaiRealtimeClientSecretRequest, } from "@stella/contracts/realtime-voice-catalog";
 import { getLocalLlmCredential } from "@stella/runtime/kernel/storage/llm-credentials";
 import { getLocalLlmOAuthApiKey } from "@stella/runtime/kernel/storage/llm-oauth-credentials";
@@ -155,9 +155,7 @@ export const registerVoiceHandlers = (options) => {
         return loadLocalPreferences(options.stellaAppDir).voiceRtcShortcut;
     };
     const saveConfiguredShortcut = (shortcut) => {
-        const prefs = loadLocalPreferences(options.stellaAppDir);
-        prefs.voiceRtcShortcut = shortcut;
-        saveLocalPreferences(options.stellaAppDir, prefs);
+        updateLocalPreferences(options.stellaAppDir, { voiceRtcShortcut: shortcut });
     };
     const initialVoiceRtcShortcut = applyShortcutRegistration({
         label: "Voice realtime",

@@ -111,7 +111,14 @@ import type {
   PiChatSend,
 } from "@stella/contracts/pi-chat";
 import type { InprocWorkerAttach } from "./inproc-connection.js";
-import type { PendingWorkerRestartRecord } from "./staleness.js";
+import {
+  restartReason,
+  staleRecordOf,
+  transitionWorkerPhase,
+  WORKER_CURRENT,
+  type WorkerPhase,
+  type WorkerPhaseEvent,
+} from "./worker-phase.js";
 import type {
   WorkerConnection,
   WorkerHealthSnapshot,
@@ -229,12 +236,8 @@ export class StellaRuntimeHost {
   schedulerSubscription: (() => void) | null = null;
   cloudScheduleUnsubscribe: (() => void) | null = null;
   cloudSchedules: CloudSchedules | null = null;
-  deferredRuntimeReload = false;
-  restartInProgress = false;
-  restartRequestedDuringRestart = false;
-  pendingStaleWorkerRestart: PendingWorkerRestartRecord | null = null;
+  workerPhase: WorkerPhase = WORKER_CURRENT;
   staleWorkerQuiescencePollFiber: Fiber.Fiber<void, never> | null = null;
-  workerRestartCheckInFlight = false;
   reloadQueue: Promise<void> = Promise.resolve();
   configCache: RuntimeConfigureParams = {};
   deviceIdentity:
@@ -358,8 +361,14 @@ export class StellaRuntimeHost {
       },
     });
   }
+  transitionWorker(event: WorkerPhaseEvent): boolean {
+    const next = transitionWorkerPhase(this.workerPhase, event);
+    if (next === this.workerPhase) return false;
+    this.workerPhase = next;
+    return true;
+  }
   async requestRuntimeRestart() {
-    this.deferredRuntimeReload = true;
+    this.transitionWorker({ type: "requested" });
     void this.flushWorkerRestart();
     return { ok: true };
   }
@@ -367,10 +376,9 @@ export class StellaRuntimeHost {
     return resolveRuntimePaths(this.options.initializeParams.stellaAppDir);
   }
   async markPendingWorkerRestart(reason: string) {
-    if (!this.pendingStaleWorkerRestart) {
-      this.pendingStaleWorkerRestart = { reason, detectedAtMs: Date.now() };
-    }
-    const record = this.pendingStaleWorkerRestart;
+    const detected = { reason, detectedAtMs: Date.now() };
+    this.transitionWorker({ type: "stale", record: detected });
+    const record = staleRecordOf(this.workerPhase) ?? detected;
     getFileLogger()?.process("host.worker-restart-pending", { reason });
     console.warn(
       `[runtime-host] Runtime update pending (${reason}); the worker restarts when current work finishes.`,
@@ -399,7 +407,7 @@ export class StellaRuntimeHost {
   }
   async clearPendingWorkerRestart() {
     this.stopStaleWorkerQuiescencePoll();
-    this.pendingStaleWorkerRestart = null;
+    this.transitionWorker({ type: "stale_cleared" });
     await hostRuntime.runPromise(
       clearPendingWorkerRestartFlag(this.getRuntimeControlPaths()),
     );
@@ -438,7 +446,7 @@ export class StellaRuntimeHost {
     if (
       !verdict.stale ||
       (verdict.reason === "pending-restart-flag" &&
-        this.pendingStaleWorkerRestart)
+        this.workerPhase.kind !== "current")
     ) {
       return;
     }
@@ -451,72 +459,55 @@ export class StellaRuntimeHost {
     return !isWorkerBusyForRestart(health);
   }
   hasPendingWorkerRestartIntent() {
-    return this.deferredRuntimeReload || this.pendingStaleWorkerRestart != null;
+    return this.workerPhase.kind !== "current";
   }
   async flushWorkerRestart() {
-    if (!this.started || !this.hasPendingWorkerRestartIntent()) return;
-    if (this.workerRestartCheckInFlight) return;
-    this.workerRestartCheckInFlight = true;
+    if (!this.started) return;
+    if (!this.transitionWorker({ type: "check_started" })) return;
+    let idle = false;
     try {
       const health = await this.getWorkerHealth({ ensureWorker: false }).catch(
         () => null,
       );
-      if (!this.canRestartWorkerNow(health)) {
-        // pi work ends without a RUN_FINISHED notification, so keep a
-        // re-check armed for any deferred restart, not only stale ones.
-        this.startStaleWorkerQuiescencePoll();
-        return;
-      }
-      this.executeWorkerRestart();
+      idle = this.canRestartWorkerNow(health);
     } finally {
-      this.workerRestartCheckInFlight = false;
+      this.transitionWorker({ type: "check_finished" });
     }
-  }
-  executeWorkerRestart() {
-    if (this.restartInProgress) {
-      this.restartRequestedDuringRestart = true;
+    if (!idle) {
+      // pi work ends without a RUN_FINISHED notification, so keep a
+      // re-check armed for any deferred restart, not only stale ones.
+      this.startStaleWorkerQuiescencePoll();
       return;
     }
-    this.restartInProgress = true;
+    this.executeWorkerRestart();
+  }
+  executeWorkerRestart() {
+    if (!this.transitionWorker({ type: "restart_started" })) return;
+    const phase = this.workerPhase;
+    if (phase.kind !== "restarting") return;
+    const reason = restartReason(phase.intent);
     this.reloadQueue = this.reloadQueue
       .catch(() => undefined)
       .then(async () => {
+        let restarted = false;
         try {
-          if (!this.started || !this.hasPendingWorkerRestartIntent()) return;
-          const health = await this.getWorkerHealth({
-            ensureWorker: false,
-          }).catch(() => null);
-          if (!this.canRestartWorkerNow(health)) return;
-          const reason =
-            this.pendingStaleWorkerRestart?.reason ?? "runtime-reload";
-          // Consume the requested intent before the replacement worker starts.
-          // Worker initialization resets reload pauses and flushes pending
-          // restart intent; leaving this bit set there re-arms the restart
-          // forever, producing a spawn/ready/kill loop until Electron exits.
-          const consumedDeferredRuntimeReload = this.deferredRuntimeReload;
-          this.deferredRuntimeReload = false;
+          if (!this.started) return;
           getFileLogger()?.process("host.worker-restart", { reason });
           console.warn(`[runtime-host] Restarting runtime worker (${reason}).`);
-          try {
-            await this.restartWorker(reason);
-          } catch (error) {
-            if (consumedDeferredRuntimeReload) {
-              this.deferredRuntimeReload = true;
-            }
-            throw error;
-          }
+          restarted = (await this.restartWorker(reason)).ok;
         } finally {
-          this.restartInProgress = false;
-          if (this.restartRequestedDuringRestart) {
-            this.restartRequestedDuringRestart = false;
-            forkDelayed(0, () => {
-              void this.flushWorkerRestart();
-            });
+          this.transitionWorker({
+            type: restarted ? "restart_finished" : "restart_deferred",
+          });
+          if (this.workerPhase.kind === "wanted") {
+            if (restarted) {
+              forkDelayed(0, () => {
+                void this.flushWorkerRestart();
+              });
+            } else {
+              this.startStaleWorkerQuiescencePoll();
+            }
           }
-          // `restartWorker()` emits readiness while restartInProgress is still
-          // true, so that snapshot intentionally remains send-blocked. Publish
-          // the authoritative post-transition state after clearing the flag so
-          // waitUntilReady callers are released without polling or retrying.
           if (this.started) {
             void this.health().then((snapshot) => {
               this.events.emit("runtime-ready", snapshot);
@@ -1154,10 +1145,7 @@ export class StellaRuntimeHost {
     this.hostReady = false;
     this.workerHealthCache = null;
     this.workerGeneration = 0;
-    this.deferredRuntimeReload = false;
-    this.restartInProgress = false;
-    this.restartRequestedDuringRestart = false;
-    this.pendingStaleWorkerRestart = null;
+    this.transitionWorker({ type: "host_stopped" });
     this.stopStaleWorkerQuiescencePoll();
     await this.workerController.stop(
       options?.killWorker ? "restart" : "stopped",
@@ -1183,15 +1171,25 @@ export class StellaRuntimeHost {
   async health() {
     return await this.buildHealthSnapshot();
   }
-  async restartWorker(reason = "runtime-reload") {
+  async restartWorker(
+    reason = "runtime-reload",
+  ): Promise<{ ok: boolean }> {
     const startedAt = Date.now();
+    const inproc = this.workerMode === "inproc";
+    const stopped = await this.workerController.stop("restart", {
+      retire: inproc,
+      stillIdle: async () =>
+        this.canRestartWorkerNow(
+          await this.getWorkerHealth({ ensureWorker: false }),
+        ),
+    });
+    if (!stopped) return { ok: false };
     this.events.emit("runtime-reloading", { reason: "worker-restart" });
-    if (this.workerMode === "inproc") {
+    if (inproc) {
       getFileLogger()?.process("host.runtime-restart", { reason });
       this.options.inprocWorker!.restartProcess(reason);
       return { ok: true };
     }
-    await this.workerController.stop("restart");
     const stoppedAt = Date.now();
     await this.workerController.ensureStarted();
     const readyAt = Date.now();
@@ -2251,7 +2249,7 @@ export class StellaRuntimeHost {
         this.workerController.getState() === "starting",
       workerGeneration: this.workerGeneration,
       deviceId: workerHealth?.deviceId ?? this.deviceIdentity?.deviceId ?? null,
-      ...(this.hasPendingWorkerRestartIntent() || this.restartInProgress
+      ...(this.hasPendingWorkerRestartIntent()
         ? { pendingWorkerRestart: true }
         : {}),
       busy: workerHealth?.piBusy === true,

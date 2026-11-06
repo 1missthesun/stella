@@ -1249,7 +1249,18 @@ const readAnswerForOriginDevice = (
   };
 };
 
-const cancelAsk = (ctx: OwnerContext, askId: string, reason: string) => {
+const ORIGIN_CLOSE_STATES: ReadonlySet<UserAskState> = new Set([
+  "answered",
+  "answered_late",
+  "expired",
+]);
+
+const cancelAsk = (
+  ctx: OwnerContext,
+  askId: string,
+  reason: string,
+  origin?: { state: unknown; deviceId: string },
+) => {
   enforceOwnerRateLimit(
     ctx.db,
     ctx.now,
@@ -1262,7 +1273,13 @@ const cancelAsk = (ctx: OwnerContext, askId: string, reason: string) => {
   if (!userAskIsOpen(row.state as UserAskState)) {
     return { ask: summaryOf(row), canceled: false };
   }
-  return { ask: summaryOf(closeAsk(ctx, row, "canceled", reason)), canceled: true };
+  const state =
+    origin &&
+    origin.deviceId === row.origin_device_id &&
+    ORIGIN_CLOSE_STATES.has(origin.state as UserAskState)
+      ? (origin.state as UserAskState)
+      : "canceled";
+  return { ask: summaryOf(closeAsk(ctx, row, state, reason)), canceled: true };
 };
 
 const turnRegisterParser = object({
@@ -1838,7 +1855,10 @@ const route = async (
     case "POST cancel":
       return {
         status: 200,
-        body: cancelAsk(ctx, input.askId, normalizeUserAskDeclineReason(input.body.reason)),
+        body: cancelAsk(ctx, input.askId, normalizeUserAskDeclineReason(input.body.reason), {
+          state: input.body.state,
+          deviceId: (input.deviceIdHeader ?? "").trim(),
+        }),
       };
     case "POST escalate":
       return {

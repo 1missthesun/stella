@@ -72,8 +72,11 @@ const waitForWorkerProcessExitEffect = (
           }
         }),
       ),
+      Effect.andThen(disconnectWorkerEffect(child, SIGKILL_EXIT_WAIT_MS)),
     ),
   );
+
+const SIGKILL_EXIT_WAIT_MS = 1_000;
 
 const disconnectWorkerEffect = (
   child: WorkerProcess,
@@ -122,30 +125,16 @@ export type RuntimeWorkerLifecycleControllerOptions = {
 };
 
 /**
- * The host-side worker lifecycle state machine, rewritten on structured
- * Effect primitives (M5 completion, phase 5):
- *
- * - Single-flight startup is a forked fiber on the host runtime; joiners
- *   share its `Fiber.join` promise, so every concurrent `ensureStarted`
- *   observes the same success or the same original failure.
- * - The in-flight request drain race is a `Deferred` latch resolved by the
- *   last decrement, raced against the old 1.5s cap.
- * - `stop()` runs the kill/disconnect branch as one Effect whose
- *   `Effect.ensuring` cleanup performs the old `.finally` bookkeeping
- *   (connection/stoppingPid/state reset) on success, failure, and
- *   interruption alike.
- *
- * The outward surface is unchanged: plain Promise methods, the same
- * `WorkerLifecycleState` transitions, and byte-identical error strings —
- * Electron main never sees an Effect type. Startup is deliberately never
- * interrupted (parity: a concurrent `stop()` sees no connection until the
- * factory settles, exactly as before).
+ * The host-side worker lifecycle. Exit and close events act only when they
+ * come from the current connection, so a stopped worker that exits late can't
+ * reset or replace its successor.
  */
 export class RuntimeWorkerLifecycleController {
   private connection: WorkerConnection | null = null;
   private startupPromise: Promise<void> | null = null;
-  private stopPromise: Promise<void> | null = null;
-  private stoppingPid: number | null = null;
+  private stopPromise: Promise<boolean> | null = null;
+  private readonly intentionalStops = new WeakSet<WorkerConnection>();
+  private retired = false;
   private state: WorkerLifecycleState = "idle";
   private inFlightWorkerRequests = 0;
   private inFlightDrainLatch: Deferred.Deferred<void> | null = null;
@@ -212,7 +201,6 @@ export class RuntimeWorkerLifecycleController {
         catch: (error) => error,
       });
       self.connection = connection;
-      self.stoppingPid = null;
 
       connection.peer.on("closed", () => {
         if (self.connection?.peer !== connection.peer) {
@@ -225,14 +213,10 @@ export class RuntimeWorkerLifecycleController {
       });
 
       connection.process.once("exit", () => {
-        const wasIntentional = self.stoppingPid === connection.pid;
-        if (self.connection?.process === connection.process) {
-          self.connection = null;
-        }
-        if (!wasIntentional) {
-          self.setState("idle");
-        }
-        if (self.stopPromise && wasIntentional) return;
+        if (self.connection !== connection) return;
+        self.connection = null;
+        if (self.intentionalStops.has(connection)) return;
+        self.setState("idle");
         if (self.options.isHostStarted()) {
           void self.options.onUnexpectedExit();
         }
@@ -251,7 +235,7 @@ export class RuntimeWorkerLifecycleController {
         Effect.andThen(Effect.sync(() => self.setState("running"))),
         Effect.catch((error) =>
           Effect.sync(() => {
-            if (self.connection?.pid === connection.pid) {
+            if (self.connection === connection) {
               self.connection = null;
             }
             self.setState("idle");
@@ -274,9 +258,13 @@ export class RuntimeWorkerLifecycleController {
         "Stella runtime host is not started.",
       );
     }
+    if (this.retired) {
+      throw createRuntimeUnavailableError("Stella runtime is restarting.");
+    }
     if (this.state === "running" && this.getLivePeer()) return;
     if (this.state === "stopping" && this.stopPromise) {
       await this.stopPromise;
+      if (this.getState() === "running" && this.getLivePeer()) return;
     }
     if (this.startupPromise) {
       await this.startupPromise;
@@ -297,18 +285,54 @@ export class RuntimeWorkerLifecycleController {
     }
   }
 
-  async stop(reason: "idle" | "restart" | "stopped") {
-    if (this.stopPromise) {
+  /**
+   * Stops the current worker. `stillIdle` is asked after new requests are held
+   * (state `stopping`) and in-flight ones have drained, right before the kill;
+   * returning false keeps the worker running and resolves `false`. `retire`
+   * refuses every later start (the process itself is about to restart).
+   */
+  async stop(
+    reason: "idle" | "restart" | "stopped",
+    options: { stillIdle?: () => Promise<boolean>; retire?: boolean } = {},
+  ): Promise<boolean> {
+    while (this.stopPromise) {
       await this.stopPromise;
-      return;
     }
     const connection = this.connection;
-    if (!connection) return;
+    if (!connection) return true;
+    const resumeState = this.state;
+    this.setState("stopping");
+    this.stopPromise = this.stopConnection(connection, reason, resumeState, options)
+      .finally(() => {
+        this.stopPromise = null;
+      });
+    const stopped = await this.stopPromise;
+    if (stopped && this.options.isHostStarted()) {
+      await this.options.onAfterStop(reason);
+    }
+    return stopped;
+  }
+
+  private async stopConnection(
+    connection: WorkerConnection,
+    reason: "idle" | "restart" | "stopped",
+    resumeState: WorkerLifecycleState,
+    options: { stillIdle?: () => Promise<boolean>; retire?: boolean },
+  ): Promise<boolean> {
     if (reason !== "idle") {
       await this.waitForInFlightWorkerRequestsToDrain();
     }
-    this.setState("stopping");
-    this.stoppingPid = connection.pid;
+    if (
+      options.stillIdle &&
+      this.connection === connection &&
+      !(await options.stillIdle().catch(() => false)) &&
+      this.connection === connection
+    ) {
+      this.setState(resumeState);
+      return false;
+    }
+    this.intentionalStops.add(connection);
+    if (options.retire) this.retired = true;
     const shouldKill = this.options.killWorkerOnStop?.(reason) ?? true;
     const killWorker = this.options.killWorker;
     const stopCore: Effect.Effect<void, unknown> = shouldKill
@@ -319,24 +343,19 @@ export class RuntimeWorkerLifecycleController {
           }).pipe(Effect.andThen(disconnectWorkerEffect(connection.process, 100)))
         : waitForWorkerProcessExitEffect(connection.process, 1_500)
       : disconnectWorkerEffect(connection.process, 1_500);
-    this.stopPromise = runHostEffect(
+    await runHostEffect(
       stopCore.pipe(
         Effect.ensuring(
           Effect.sync(() => {
-            if (this.connection?.pid === connection.pid) {
+            if (this.connection === connection) {
               this.connection = null;
             }
-            this.stoppingPid = null;
-            this.stopPromise = null;
             this.setState("idle");
           }),
         ),
       ),
     );
-    await this.stopPromise;
-    if (this.options.isHostStarted()) {
-      await this.options.onAfterStop(reason);
-    }
+    return true;
   }
 
   async request<TResult>(
@@ -348,7 +367,9 @@ export class RuntimeWorkerLifecycleController {
     },
   ): Promise<TResult> {
     if (options.ensureWorker) {
-      await this.ensureStarted();
+      do {
+        await this.ensureStarted();
+      } while (this.getState() === "stopping");
     }
     const peer = this.getLivePeer();
     if (!peer) {

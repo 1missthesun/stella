@@ -498,7 +498,13 @@ export class StellaRuntimeHost {
           getFileLogger()?.process("host.worker-restart", { reason });
           console.warn(`[runtime-host] Restarting runtime worker (${reason}).`);
           try {
-            await this.restartWorker(reason);
+            const result = await this.restartWorker(reason);
+            if ("deferred" in result) {
+              if (consumedDeferredRuntimeReload) {
+                this.deferredRuntimeReload = true;
+              }
+              this.startStaleWorkerQuiescencePoll();
+            }
           } catch (error) {
             if (consumedDeferredRuntimeReload) {
               this.deferredRuntimeReload = true;
@@ -1191,7 +1197,13 @@ export class StellaRuntimeHost {
       this.options.inprocWorker!.restartProcess(reason);
       return { ok: true };
     }
-    await this.workerController.stop("restart");
+    const stopped = await this.workerController.stop("restart", {
+      stillIdle: async () =>
+        this.canRestartWorkerNow(
+          await this.getWorkerHealth({ ensureWorker: false }),
+        ),
+    });
+    if (!stopped) return { ok: false, deferred: true };
     const stoppedAt = Date.now();
     await this.workerController.ensureStarted();
     const readyAt = Date.now();

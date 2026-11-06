@@ -510,7 +510,7 @@ export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
                 admission: admissionInput,
                 lease,
                 includeHomeContext:
-                  !this.activeTurnId && this.turnExecutions.size === 0,
+                  !this.current && this.turnExecutions.size === 0,
               });
               observed.result = result;
               if (result.admission.ok && "homeContext" in result)
@@ -745,7 +745,7 @@ export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
       }
 
       if (
-        !this.activeTurnId &&
+        !this.current &&
         this.turnExecutions.size === 0 &&
         this.ctx.storage.kv &&
         !this.ctx.storage.kv.get(LOCAL_TURN_LEASE_KEY) &&

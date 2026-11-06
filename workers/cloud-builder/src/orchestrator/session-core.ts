@@ -34,14 +34,25 @@ import type {
   OwnerFencedTurn,
   LocalTurnLease,
   AgentsView,
+  CloudTurnPhase,
+  OwedTerminal,
 } from "./types.js";
+import type { TurnPhase } from "../conversation-types.js";
 import {
   AGENT_RUNTIME_KEY,
   AGENTS_VIEW_KEY,
+  CHAT_TURN_PHASE_KEY,
+  CHAT_WATCHDOG_MS,
+  LEGACY_CHAT_TURN_PHASE_KEYS,
   LOCAL_TURN_LEASE_KEY,
   JOURNAL_CHECKPOINT_KEY,
 } from "./constants.js";
-import { listedAgents, errorMessage, log } from "./support.js";
+import {
+  listedAgents,
+  errorMessage,
+  log,
+  terminalNotice,
+} from "./support.js";
 import type { OrchestratorOwner } from "./owner.js";
 import { SlackRelay } from "../slack/relay.js";
 import { ownerGateStub } from "../rpc-release.js";
@@ -85,7 +96,10 @@ export abstract class OrchestratorSessionCore extends DurableObject<Env> {
 
   protected live: LiveTurnSnapshot | null = null;
 
-  protected activeTurnId: string | null = null;
+  protected current: {
+    turnId: string;
+    execution: TurnExecution<Response> | undefined;
+  } | null = null;
   protected finalizedTurnId: string | null = null;
 
   /**
@@ -222,6 +236,7 @@ export abstract class OrchestratorSessionCore extends DurableObject<Env> {
         ((await this.ctx.storage.get<string>(AGENT_RUNTIME_KEY)) === "pi"
           ? { pi: [], owner: [] }
           : null);
+      await this.migrateLegacyTurnPhase();
       const localLease =
         await this.ctx.storage.get<LocalTurnLease>(LOCAL_TURN_LEASE_KEY);
       if (localLease) {
@@ -271,6 +286,67 @@ export abstract class OrchestratorSessionCore extends DurableObject<Env> {
     return this.ctx.storage.kv
       ? this.ctx.storage.kv.get<T>(key)
       : await this.ctx.storage.get<T>(key);
+  }
+
+  protected async turnPhase(): Promise<CloudTurnPhase | null> {
+    return (
+      (await this.getTurnState<CloudTurnPhase | null>(CHAT_TURN_PHASE_KEY)) ??
+      null
+    );
+  }
+
+  private async migrateLegacyTurnPhase(): Promise<void> {
+    const legacy = await this.ctx.storage.get<unknown>([
+      "turn",
+      ...LEGACY_CHAT_TURN_PHASE_KEYS,
+    ]);
+    if (LEGACY_CHAT_TURN_PHASE_KEYS.every((key) => !legacy.has(key))) return;
+    const turn = legacy.get("turn") as ChatTurnRequest | undefined;
+    const existing = await this.turnPhase();
+    let phase: CloudTurnPhase | null = existing;
+    if (!existing && turn) {
+      const now = Date.now();
+      if (legacy.get("terminal") === true) {
+        const recorded = this.journal.turnState(turn.turnId);
+        const kind =
+          recorded?.state === "terminal" && recorded.terminal_kind
+            ? recorded.terminal_kind
+            : "failed";
+        phase = {
+          s: "terminal",
+          turnId: turn.turnId,
+          owed:
+            (legacy.get("terminalOwed") as OwedTerminal | null | undefined) ??
+            { kind: kind as TurnPhase, message: terminalNotice(kind) },
+          delivered: legacy.get("terminalDelivered") === true,
+          attempts: (legacy.get("alarmAttempts") as number | undefined) ?? 0,
+        };
+      } else {
+        const watchdogAt =
+          (legacy.get("turnWatchdogAt") as number | undefined) ?? now;
+        const resume = legacy.get("turnResume") as
+          | { turnId: string; count: number }
+          | null
+          | undefined;
+        phase = {
+          s: "running",
+          turnId: turn.turnId,
+          watchdogAt,
+          startedAt:
+            (legacy.get("turnStartedAt") as number | undefined) ??
+            watchdogAt - Math.max(1_000, turn.watchdogMs ?? CHAT_WATCHDOG_MS),
+          resumes: resume?.turnId === turn.turnId ? resume.count : 0,
+        };
+      }
+    }
+    await this.putTurnState(
+      phase ? { [CHAT_TURN_PHASE_KEY]: phase } : {},
+      LEGACY_CHAT_TURN_PHASE_KEYS,
+    );
+    log("info", "chat_turn_phase_migrated", {
+      turnId: turn?.turnId ?? null,
+      phase: phase?.s ?? null,
+    });
   }
 
   protected async putTurnState(

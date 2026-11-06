@@ -49,6 +49,7 @@ import type {
   LocalTurnLease,
   PersistedChatTurnModelCapability,
   OwedTerminal,
+  CloudTurnPhase,
 } from "./types.js";
 import {
   CHAT_WATCHDOG_MS,
@@ -56,8 +57,7 @@ import {
   PI_MIRRORED_KEY,
   CHECKPOINT_TURN_SCAN,
   CHAT_TURN_HEARTBEAT_MS,
-  CHAT_TURN_RESUME_KEY,
-  CHAT_TURN_STARTED_AT_KEY,
+  CHAT_TURN_PHASE_KEY,
   CHAT_TURN_MODEL_CAPABILITY_KEY,
   LOCAL_TURN_LEASE_KEY,
   TERMINAL_NOTICE,
@@ -220,14 +220,19 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
         message: TERMINAL_NOTICE.canceled,
         eventSeq: await this.nextTurnEventSeq(turn.turnId),
       };
-      await this.ctx.storage.put({
-        turn,
-        terminal: true,
-        terminalDelivered: false,
-        terminalOwed: owed,
-        alarmAttempts: 0,
-      });
-      await this.ctx.storage.delete(`queued:${turn.turnId}`);
+      await this.putTurnState(
+        {
+          turn,
+          [CHAT_TURN_PHASE_KEY]: {
+            s: "terminal",
+            turnId: turn.turnId,
+            owed,
+            delivered: false,
+            attempts: 0,
+          } satisfies CloudTurnPhase,
+        },
+        [`queued:${turn.turnId}`],
+      );
       this.ownerGeneration = turn.ownerGeneration;
       this.journal.upsertTurn({
         turnId: turn.turnId,
@@ -241,21 +246,7 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
       });
       await this.journalStoppedPrompt(turn);
       this.recordTerminal(turn, "canceled", TERMINAL_NOTICE.canceled);
-      try {
-        await this.emitTurnEvent(
-          turn,
-          "canceled",
-          { message: TERMINAL_NOTICE.canceled },
-          {
-            terminal: true,
-            eventSeq: owed.eventSeq,
-            errorMessage: TERMINAL_NOTICE.canceled,
-          },
-        );
-        await this.ctx.storage.put("terminalDelivered", true);
-      } catch {
-        await this.armAlarmNoLaterThan(Date.now() + 30_000);
-      }
+      await this.deliverTerminal(turn, owed);
       await this.afterTerminal(turn);
       if (!(await this.acknowledgeExactTurnCancellation(cancellation))) {
         throw new Error("Pre-admission cancellation acknowledgement was lost.");
@@ -370,45 +361,41 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
       return json({ ok: false, duplicate: true });
     }
     const stale = await this.getTurnState<ChatTurnRequest>("turn");
+    const stalePhase = await this.turnPhase();
     if (
       stale &&
       stale.turnId !== turn.turnId &&
-      !(await this.getTurnState<boolean>("terminalDelivered"))
+      !(stalePhase?.s === "terminal" && stalePhase.delivered)
     ) {
       const interrupted: OwedTerminal = {
         kind: "failed",
         message: TERMINAL_NOTICE.interrupted,
+        eventSeq: await this.nextTurnEventSeq(stale.turnId),
       };
-      const owed = await this.decideTerminal(stale.turnId, interrupted);
+      const owed = await this.claimTerminal(stale.turnId, interrupted);
       if (owed === interrupted) {
         this.recordTerminal(stale, "failed", TERMINAL_NOTICE.interrupted);
       }
-      await this.emitTurnEvent(
-        stale,
-        owed.kind,
-        owed.payload ?? { message: owed.message },
-        {
-          terminal: true,
-          eventSeq: await this.terminalEventSeq(stale, owed),
-          ...(owed.kind !== "completed" ? { errorMessage: owed.message } : {}),
-        },
-      ).catch(() => undefined);
+      await this.deliverTerminal(stale, owed);
       await this.releaseOwnerGate(stale);
     }
-    const reclaimed = stale?.turnId === turn.turnId;
-    const [storedWatchdogAt, storedStartedAt] = reclaimed
-      ? await Promise.all([
-          this.getTurnState<number>("turnWatchdogAt"),
-          this.getTurnState<number>(CHAT_TURN_STARTED_AT_KEY),
-        ])
-      : [undefined, undefined];
+    const reclaimed =
+      stale?.turnId === turn.turnId && stalePhase?.turnId === turn.turnId
+        ? stalePhase
+        : null;
     const watchdogAt =
-      reclaimed && typeof storedWatchdogAt === "number"
-        ? storedWatchdogAt
+      reclaimed?.s === "running"
+        ? reclaimed.watchdogAt
         : Date.now() + Math.max(1_000, turn.watchdogMs ?? CHAT_WATCHDOG_MS);
     let preCanceled: ExactTurnCancellation | null = null;
+    let alreadyDecided = false;
     const claimAt = performance.now();
     await this.ctx.blockConcurrencyWhile(async () => {
+      const phase = await this.turnPhase();
+      if (phase?.turnId === turn.turnId && phase.s === "terminal") {
+        alreadyDecided = true;
+        return;
+      }
       preCanceled = await this.exactTurnCancellations.matching({
         turnId: turn.turnId,
         ownerId: turn.ownerId,
@@ -418,25 +405,32 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
       await this.armAlarmNoLaterThan(
         Math.min(watchdogAt, Date.now() + CHAT_TURN_HEARTBEAT_MS),
       );
-      await this.putTurnState({
-        turn,
-        turnWatchdogAt: watchdogAt,
-        [CHAT_TURN_STARTED_AT_KEY]:
-          reclaimed && typeof storedStartedAt === "number"
-            ? storedStartedAt
-            : Date.now(),
-        ...(reclaimed
-          ? {}
+      const running: CloudTurnPhase =
+        phase?.turnId === turn.turnId && phase.s === "running"
+          ? phase
           : {
-              [CHAT_TURN_RESUME_KEY]: null,
-              [CHAT_TURN_MODEL_CAPABILITY_KEY]: null,
-            }),
-        terminal: false,
-        terminalDelivered: false,
-        terminalOwed: null,
-        alarmAttempts: 0,
-      }, [`queued:${turn.turnId}`]);
+              s: "running",
+              turnId: turn.turnId,
+              watchdogAt,
+              startedAt: Date.now(),
+              resumes: 0,
+            };
+      await this.putTurnState(
+        {
+          turn,
+          [CHAT_TURN_PHASE_KEY]: running,
+          ...(reclaimed ? {} : { [CHAT_TURN_MODEL_CAPABILITY_KEY]: null }),
+        },
+        [`queued:${turn.turnId}`],
+      );
     });
+    if (alreadyDecided) {
+      log("info", "chat_turn_duplicate_ignored", { turnId: turn.turnId });
+      await this.ctx.storage.delete(`queued:${turn.turnId}`);
+      await this.unregisterOwnerTurn(turn);
+      await this.releaseOwnerGate(turn);
+      return json({ ok: false, duplicate: true });
+    }
     if (preCanceled) {
       return await this.finishPreCanceledTurn(turn, preCanceled);
     }
@@ -468,13 +462,14 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
     this.firstChatInIsolate = false;
     const assertExactTurnActive = async (): Promise<void> => {
       assertTurnExecutionActive(turnCancellation, executionSignal);
-      const [stored, terminal] = await Promise.all([
+      const [stored, phase] = await Promise.all([
         this.getTurnState<ChatTurnRequest>("turn"),
-        this.getTurnState<boolean>("terminal"),
+        this.turnPhase(),
       ]);
       assertTurnExecutionActive(turnCancellation, executionSignal);
       if (
-        terminal ||
+        phase?.s !== "running" ||
+        phase.turnId !== turn.turnId ||
         stored?.turnId !== turn.turnId ||
         stored.ownerId !== turn.ownerId ||
         stored.ownerGeneration !== turn.ownerGeneration
@@ -490,7 +485,10 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
     let gatewayRefusal: GatewayPlanRefusal | undefined;
     try {
       await assertExactTurnActive();
-      this.activeTurnId = turn.turnId;
+      this.current = {
+        turnId: turn.turnId,
+        execution: this.turnExecutions.get(turn.turnId),
+      };
       const harnessExecution =
         turn.execution.engine === "anthropic" ? undefined : turn.execution;
       this.bindConversation(turn);
@@ -873,18 +871,9 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
         payload: terminalPayload,
         eventSeq: await this.nextTurnEventSeq(turn.turnId),
       };
-      if ((await this.decideTerminal(turn.turnId, failedOwed)) === failedOwed) {
+      if ((await this.claimTerminal(turn.turnId, failedOwed)) === failedOwed) {
         this.recordTerminal(turn, "failed", terminalNotice);
-        try {
-          await this.emitTurnEvent(turn, "failed", terminalPayload, {
-            terminal: true,
-            eventSeq: failedOwed.eventSeq,
-            errorMessage: terminalNotice,
-          });
-          await this.ctx.storage.put("terminalDelivered", true);
-        } catch {
-          await this.armAlarmNoLaterThan(Date.now() + 30_000);
-        }
+        await this.deliverTerminal(turn, failedOwed);
       }
       await this.afterTerminal(turn);
       return json(
@@ -900,7 +889,7 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
     } finally {
       this.live = null;
       this.hub.endTurn(turn.turnId);
-      if (this.activeTurnId === turn.turnId) this.activeTurnId = null;
+      if (this.current?.turnId === turn.turnId) this.current = null;
       if (this.currentTurnCancellation === turnCancellation) {
         this.currentTurnCancellation = undefined;
       }
@@ -1180,7 +1169,7 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
         if (
           turnCancellation.aborted ||
           executionSignal.aborted ||
-          (await this.getTurnState<boolean>("terminal"))
+          (await this.turnDecided(turn.turnId))
         ) {
           this.currentPiRun?.abort();
           await this.afterTerminal(turn);
@@ -1194,7 +1183,7 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
       if (persistError !== undefined) {
         throw new Error(`Persisting the reply failed: ${persistError}`);
       }
-      if (await this.getTurnState<boolean>("terminal")) {
+      if (await this.turnDecided(turn.turnId)) {
         await this.afterTerminal(turn);
         return json({ ok: false, canceled: true });
       }

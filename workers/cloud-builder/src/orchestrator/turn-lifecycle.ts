@@ -16,9 +16,16 @@ import {
   utf8Length,
 } from "../conversation-types.js";
 import { Journal } from "../journal.js";
-import type { ChatTurnRequest, LocalTurnLease, OwedTerminal } from "./types.js";
+import type {
+  ChatTurnRequest,
+  CloudTurnPhase,
+  LocalTurnLease,
+  OwedTerminal,
+} from "./types.js";
 import {
+  CHAT_TURN_PHASE_KEY,
   LOCAL_TURN_LEASE_KEY,
+  TERMINAL_DELIVERY_ATTEMPTS,
   turnEventSeqKey,
   TERMINAL_STATUS,
 } from "./constants.js";
@@ -27,7 +34,6 @@ import {
   errorMessage,
   log,
   truncateMessage,
-  terminalNotice,
 } from "./support.js";
 import { OrchestratorOwner } from "./owner.js";
 
@@ -98,49 +104,111 @@ export abstract class OrchestratorTurnLifecycle extends OrchestratorOwner {
     if (owed.eventSeq !== undefined) return owed.eventSeq;
     const eventSeq = await this.nextTurnEventSeq(turn.turnId);
     owed.eventSeq = eventSeq;
-    await this.ctx.storage.put("terminalOwed", owed);
+    await this.ctx.blockConcurrencyWhile(async () => {
+      const phase = await this.turnPhase();
+      if (phase?.s === "terminal" && phase.turnId === turn.turnId) {
+        await this.putTurnState({
+          [CHAT_TURN_PHASE_KEY]: { ...phase, owed: { ...phase.owed, eventSeq } },
+        });
+      }
+    });
     return eventSeq;
   }
 
-  /**
-   * What this turn still owes the owner, for a caller that did not terminate it
-   * itself. `terminalOwed` is the authority — it is written in the same durable
-   * put as `terminal` by every path that terminates a turn. The journal's
-   * recorded kind is the fallback, and covers exactly one case: a turn that
-   * went terminal under a build that predates the key.
-   */
   protected async owedTerminal(
     turn: ChatTurnRequest,
   ): Promise<OwedTerminal | null> {
-    const owed = await this.ctx.storage.get<OwedTerminal | null>(
-      "terminalOwed",
-    );
-    if (owed) return owed;
-    if (!(await this.ctx.storage.get<boolean>("terminal"))) return null;
-    const recorded = this.journal.turnState(turn.turnId);
-    const kind =
-      recorded?.state === "terminal" && recorded.terminal_kind
-        ? recorded.terminal_kind
-        : "failed";
-    return { kind: kind as TurnPhase, message: terminalNotice(kind) };
+    const phase = await this.turnPhase();
+    return phase?.s === "terminal" && phase.turnId === turn.turnId
+      ? phase.owed
+      : null;
   }
 
-  protected async decideTerminal(
+  protected async turnDecided(turnId: string): Promise<boolean> {
+    const phase = await this.turnPhase();
+    return phase?.turnId === turnId && phase.s === "terminal";
+  }
+
+  /**
+   * The only way a cloud turn ends. The first claim wins and every later
+   * claimant gets the winner back, so a caller proceeds to journal and
+   * deliver its outcome only when the returned value is the one it passed.
+   */
+  protected async claimTerminal(
     turnId: string,
     owed: OwedTerminal,
   ): Promise<OwedTerminal> {
     return await this.ctx.blockConcurrencyWhile(async () => {
-      const stored = await this.getTurnState<ChatTurnRequest>("turn");
-      if (
-        stored?.turnId === turnId &&
-        (await this.getTurnState<boolean>("terminal"))
-      ) {
-        const decided = await this.owedTerminal(stored);
-        if (decided) return decided;
-      }
-      await this.putTurnState({ terminal: true, terminalOwed: owed });
+      const phase = await this.turnPhase();
+      if (phase?.turnId !== turnId) return owed;
+      if (phase.s === "terminal") return phase.owed;
+      await this.putTurnState({
+        [CHAT_TURN_PHASE_KEY]: {
+          s: "terminal",
+          turnId,
+          owed,
+          delivered: false,
+          attempts: 0,
+        } satisfies CloudTurnPhase,
+      });
       return owed;
     });
+  }
+
+  protected async markTerminalDelivered(turnId: string): Promise<void> {
+    await this.ctx.blockConcurrencyWhile(async () => {
+      const phase = await this.turnPhase();
+      if (phase?.s !== "terminal" || phase.turnId !== turnId) return;
+      await this.putTurnState({
+        [CHAT_TURN_PHASE_KEY]: { ...phase, delivered: true },
+      });
+    });
+  }
+
+  /**
+   * Sends the owner the outcome this turn owes. A failed send leaves the
+   * phase undelivered and the alarm retries it; past the retry budget the
+   * outcome is abandoned so the conversation can move on.
+   */
+  protected async deliverTerminal(
+    turn: ChatTurnRequest,
+    owed: OwedTerminal,
+    options: { retry?: boolean } = {},
+  ): Promise<boolean> {
+    try {
+      await this.emitTurnEvent(
+        turn,
+        owed.kind,
+        owed.payload ?? { message: owed.message },
+        {
+          terminal: true,
+          eventSeq: await this.terminalEventSeq(turn, owed),
+          ...(owed.kind !== "completed" ? { errorMessage: owed.message } : {}),
+          ...(owed.resultJson ? { resultJson: owed.resultJson } : {}),
+        },
+      );
+      await this.markTerminalDelivered(turn.turnId);
+      return true;
+    } catch (error) {
+      const abandoned = await this.ctx.blockConcurrencyWhile(async () => {
+        const phase = await this.turnPhase();
+        if (phase?.s !== "terminal" || phase.turnId !== turn.turnId) return false;
+        const attempts = phase.attempts + (options.retry ? 1 : 0);
+        const give = attempts > TERMINAL_DELIVERY_ATTEMPTS;
+        await this.putTurnState({
+          [CHAT_TURN_PHASE_KEY]: { ...phase, attempts, delivered: give },
+        });
+        if (!give) await this.armAlarmNoLaterThan(Date.now() + 30_000);
+        return give;
+      });
+      if (abandoned) {
+        log("error", "terminal_delivery_abandoned", {
+          turnId: turn.turnId,
+          message: errorMessage(error),
+        });
+      }
+      return false;
+    }
   }
 
   protected async completeChatTurn(
@@ -153,28 +221,15 @@ export abstract class OrchestratorTurnLifecycle extends OrchestratorOwner {
       kind: "completed",
       message: "",
       payload: { text: finalText, wallClockMs },
+      resultJson: JSON.stringify({ finalText }),
       eventSeq: await this.nextTurnEventSeq(turn.turnId),
     };
-    if ((await this.decideTerminal(turn.turnId, completedOwed)) !== completedOwed) {
+    if ((await this.claimTerminal(turn.turnId, completedOwed)) !== completedOwed) {
       await this.afterTerminal(turn);
       return json({ ok: false, canceled: true });
     }
     this.recordTerminal(turn, "completed", undefined, wallClockMs);
-    try {
-      await this.emitTurnEvent(
-        turn,
-        "completed",
-        { text: finalText, wallClockMs },
-        {
-          terminal: true,
-          eventSeq: completedOwed.eventSeq,
-          resultJson: JSON.stringify({ finalText }),
-        },
-      );
-      await this.ctx.storage.put("terminalDelivered", true);
-    } catch {
-      await this.armAlarmNoLaterThan(Date.now() + 30_000);
-    }
+    await this.deliverTerminal(turn, completedOwed);
     await this.afterTerminal(turn);
     // Keep the alarm alive while queued turns remain: it is the wake
     // guarantee that lets a restarted DO drain the durable queue. The read
@@ -187,8 +242,9 @@ export abstract class OrchestratorTurnLifecycle extends OrchestratorOwner {
         limit: 1,
       });
       if (queued.size === 0) {
+        const phase = await this.turnPhase();
         if (
-          !(await this.getTurnState<boolean>("terminalDelivered")) ||
+          (phase?.s === "terminal" && !phase.delivered) ||
           (await this.hasMaintenanceDebt())
         ) {
           const retryAt = Date.now() + 30_000;
@@ -478,7 +534,7 @@ export abstract class OrchestratorTurnLifecycle extends OrchestratorOwner {
 
   protected async finalizeTerminalTurn(turn: ChatTurnRequest): Promise<void> {
     if (this.finalizedTurnId === turn.turnId) return;
-    if (this.activeTurnId === turn.turnId) return;
+    if (this.current?.turnId === turn.turnId) return;
     await this.afterTerminal(turn);
   }
 
@@ -495,7 +551,8 @@ export abstract class OrchestratorTurnLifecycle extends OrchestratorOwner {
     ]);
     if (queued.size > 0) return true;
     if (!turn) return false;
-    return !(await this.ctx.storage.get<boolean>("terminal"));
+    const phase = await this.turnPhase();
+    return phase?.turnId === turn.turnId && phase.s === "running";
   }
 
   protected drainInbox(): void {

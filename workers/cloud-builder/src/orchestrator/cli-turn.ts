@@ -161,7 +161,7 @@ export abstract class OrchestratorCliTurn extends OrchestratorTools {
   protected prewarmForComposer(): void {
     const now = Date.now();
     if (now - this.composerPrewarmAt < 60_000) return;
-    if (this.activeTurnId || this.turnExecutions.size > 0) return;
+    if (this.current || this.turnExecutions.size > 0) return;
     const kv = this.ctx.storage.kv;
     if (!kv || kv.get(LOCAL_TURN_LEASE_KEY)) return;
     if (Array.from(kv.list({ prefix: "queued:", limit: 1 })).length > 0) return;
@@ -308,7 +308,7 @@ export abstract class OrchestratorCliTurn extends OrchestratorTools {
       });
       return false;
     }
-    if (await this.getTurnState<boolean>("terminal")) return true;
+    if (await this.turnDecided(turn.turnId)) return true;
     const card: ClaudeUsageLimitCard = {
       type: "usage-limit",
       state: "held",

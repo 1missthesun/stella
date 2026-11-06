@@ -207,7 +207,21 @@ export type HarnessExecution = Exclude<
   { engine: "anthropic" }
 >;
 
-export type ChatTurnResumeRecord = { turnId: string; count: number };
+export type CloudTurnPhase =
+  | {
+      s: "running";
+      turnId: string;
+      watchdogAt: number;
+      startedAt: number;
+      resumes: number;
+    }
+  | {
+      s: "terminal";
+      turnId: string;
+      owed: OwedTerminal;
+      delivered: boolean;
+      attempts: number;
+    };
 export type PersistedChatTurnModelCapability = {
   turnId: string;
   capability: MintedTurnCapability;
@@ -224,5 +238,6 @@ export type OwedTerminal = {
   kind: TurnPhase;
   message: string;
   payload?: Record<string, unknown>;
+  resultJson?: string;
   eventSeq?: number;
 };

@@ -344,14 +344,14 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
             this.piAgentGuard(authority, turnId),
           moveBrain: slack ? undefined : async (authority, host, brief) => {
             const handoff: BrainHandoff = {
-              turnId: this.activeTurnId ?? "",
+              turnId: this.current?.turnId ?? "",
               ownerId: authority.ownerId,
               ownerGeneration: authority.ownerGeneration,
               deviceId: host.deviceId,
               clientMsgId: `handoff-${crypto.randomUUID()}`,
               prompt: piBrainHandoffPrompt("the cloud", brief),
             };
-            if (this.activeTurnId) {
+            if (this.current) {
               await this.putTurnState({ [BRAIN_HANDOFF_KEY]: handoff });
               await this.setPiBrain(host);
               return;
@@ -1474,7 +1474,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     if (record && samePiBrainHost(record, home)) return record;
     const busy =
       record?.host === "cloud"
-        ? this.activeTurnId !== null
+        ? this.current !== null
         : record?.host === "device" &&
           (await this.piBrainHolderBusy(record.deviceId));
     if (busy) return record;

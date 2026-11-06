@@ -1048,8 +1048,7 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
         local,
         concurrentClientReceipt,
         cloudTurn,
-        terminal,
-        terminalDelivered,
+        cloudPhase,
         queued,
       ] = await Promise.all([
         this.ctx.storage.get<LocalTurnLease>(LOCAL_TURN_LEASE_KEY),
@@ -1059,17 +1058,18 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
             )
           : Promise.resolve(undefined),
         this.ctx.storage.get<ChatTurnRequest>("turn"),
-        this.ctx.storage.get<boolean>("terminal"),
-        this.ctx.storage.get<boolean>("terminalDelivered"),
+        this.turnPhase(),
         this.ctx.storage.list<ChatTurnRequest>({
           prefix: "queued:",
           limit: 1,
         }),
       ]);
       const cloudBusy =
-        Boolean(cloudTurn && terminal !== true) ||
-        Boolean(cloudTurn && terminalDelivered !== true) ||
-        queued.size > 0;
+        Boolean(
+          cloudTurn &&
+            cloudPhase?.turnId === cloudTurn.turnId &&
+            !(cloudPhase.s === "terminal" && cloudPhase.delivered),
+        ) || queued.size > 0;
       if (local || cloudBusy || this.purged()) return;
       if (clientMsgId) {
         const replay = classifyLocalClientMessageReplay(

@@ -30,6 +30,7 @@ import {
 } from "./git.js";
 import { DRAFT_AGENTS_DIR, installCheckoutGuard } from "./checkout-guard.js";
 import { ReleaseChannel } from "./release-channel.js";
+import { tokenSubject } from "../engine-account-access.js";
 import type { CoveredWindow, RelaunchHold } from "./update-transition.js";
 import {
   classifyUpdate,
@@ -108,7 +109,11 @@ type ForkAccess = {
   expiresAt: number;
 };
 
-type SourceAccess = { fork: ForkAccess | null; upstream: AppSourceRemote };
+type SourceAccess = {
+  owner: string | null;
+  fork: ForkAccess | null;
+  upstream: AppSourceRemote;
+};
 
 const STATE_POLL_MS = 10_000;
 const UPDATE_MERGE_WAIT_MS = 60 * 60_000;
@@ -215,7 +220,6 @@ export class AppSourceService {
   private forkBranch: string | null = null;
   private forkUnrelated = false;
   private upstreamTracked = false;
-  private upstreamUnrelated = false;
   private updateState: {
     state: "merging";
     name: string;
@@ -255,6 +259,7 @@ export class AppSourceService {
     const poll = setInterval(() => {
       if (this.options.isAnyWindowVisible()) void this.refresh();
       this.followBackend();
+      void this.followOwner();
       if (this.syncWanted && Date.now() >= this.syncNotBefore) void this.syncFork();
     }, STATE_POLL_MS);
     poll.unref?.();
@@ -1476,10 +1481,36 @@ export class AppSourceService {
     this.forkWatch = { baseUrl: watchFork, stop };
   }
 
+  private async currentOwner() {
+    if (!this.options.hasConnectedAccount()) return null;
+    return tokenSubject(await this.options.getAuthToken()) ?? "";
+  }
+
+  private async followOwner() {
+    if (!this.access || this.disposed) return;
+    const owner = await this.currentOwner().catch(() => this.access?.owner ?? null);
+    if (this.access && owner !== this.access.owner) {
+      this.forgetAccount();
+      this.wantSync("account");
+    }
+  }
+
+  private forgetAccount() {
+    this.options.log("app-source.account-changed", {});
+    this.access = null;
+    this.forkBranch = null;
+    this.forkUnrelated = false;
+    this.forkPushSeen = null;
+    this.ownForkPushes.clear();
+    this.forkPushHeld = null;
+    this.forkWatch?.stop();
+    this.forkWatch = null;
+    this.followBackend();
+  }
+
   private onPublished(version: string | null) {
     this.published = version;
     if (!version || version === this.syncedFor) return;
-    if (this.forkUnrelated || this.upstreamUnrelated) return;
     void gitRaw(this.options.stellaAppDir, ["rev-parse", "--verify", "--quiet", UPSTREAM_REF])
       .then((result) => {
         if (result.code === 0 && result.stdout.trim() === version) {
@@ -1543,21 +1574,20 @@ export class AppSourceService {
       }
       this.syncWanted = false;
       this.options.log("app-source.sync", { reason: this.syncReason });
+      this.forkUnrelated = false;
       const access = await this.sourceAccess();
       if (!access) {
         outcome = "done";
         return;
       }
-      if (access.fork && !this.forkUnrelated) {
+      if (access.fork) {
         await this.syncWithFork(cwd, access.fork).catch((error) => {
           this.options.log("app-source.fork-sync-failed", {
             message: errorMessage(error),
           });
         });
       }
-      if (!this.forkUnrelated && !this.upstreamUnrelated) {
-        await this.fetchUpstream(cwd, access.upstream);
-      }
+      await this.fetchUpstream(cwd, access.upstream);
       outcome = "done";
     } catch (error) {
       this.options.log("app-source.sync-failed", {
@@ -1597,6 +1627,7 @@ export class AppSourceService {
     );
     if ((await gitRaw(cwd, ["merge-base", "HEAD", ref])).code !== 0) {
       this.forkUnrelated = true;
+      this.forkBranch = null;
       this.options.log("app-source.fork-unrelated", {});
       return;
     }
@@ -1618,7 +1649,6 @@ export class AppSourceService {
       { env: fetchEnv(upstream.token), timeoutMs: 5 * 60_000 },
     );
     if ((await gitRaw(cwd, ["merge-base", "HEAD", UPSTREAM_REF])).code !== 0) {
-      this.upstreamUnrelated = true;
       this.upstreamTracked = false;
       this.options.log("app-source.upstream-unrelated", {});
       return;
@@ -1728,21 +1758,27 @@ export class AppSourceService {
   private async sourceAccess(): Promise<SourceAccess | null> {
     const baseUrl = this.options.getBackendUrl();
     if (!baseUrl) return null;
-    const signedIn = this.options.hasConnectedAccount();
+    const owner = await this.currentOwner();
     const cached = this.access;
+    if (cached && cached.owner !== owner) this.forgetAccount();
     if (
       cached &&
-      (cached.fork !== null) === signedIn &&
+      cached.owner === owner &&
       Math.min(cached.upstream.expiresAt, cached.fork?.expiresAt ?? Infinity) -
         60_000 >
         Date.now()
     ) {
       return cached;
     }
-    this.access = signedIn
-      ? await this.accountAccess(baseUrl)
-      : { fork: null, upstream: await this.bootstrapAccess(baseUrl) };
-    return this.access;
+    const access: SourceAccess =
+      owner !== null
+        ? { owner, ...(await this.accountAccess(baseUrl)) }
+        : { owner, fork: null, upstream: await this.bootstrapAccess(baseUrl) };
+    if (owner !== (await this.currentOwner())) {
+      throw new Error("The account changed while checking for updates.");
+    }
+    this.access = access;
+    return access;
   }
 
   private async bootstrapAccess(baseUrl: string): Promise<AppSourceRemote> {
@@ -1780,7 +1816,9 @@ export class AppSourceService {
     return this.backend.client;
   }
 
-  private async accountAccess(baseUrl: string): Promise<SourceAccess> {
+  private async accountAccess(
+    baseUrl: string,
+  ): Promise<Omit<SourceAccess, "owner">> {
     const client = this.backendClient(baseUrl);
     for (let attempt = 1; ; attempt += 1) {
       try {

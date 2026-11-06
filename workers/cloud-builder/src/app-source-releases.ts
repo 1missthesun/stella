@@ -20,7 +20,7 @@ const frame = (version: string | null) =>
   JSON.stringify({ t: "published", version } satisfies AppSourceReleaseFrame);
 
 export class AppReleaseChannel extends DurableObject<Env> {
-  private checking: Promise<PublishedRecord> | null = null;
+  private checking: { promise: Promise<PublishedRecord>; read: { at: number | null } } | null = null;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -34,7 +34,7 @@ export class AppReleaseChannel extends DurableObject<Env> {
       return this.acceptDesktop();
     }
     if (request.method === "POST") {
-      const record = await this.check();
+      const record = await this.check(Date.now());
       return Response.json({ version: record.version }, { headers: { "cache-control": "no-store" } });
     }
     return Response.json({ error: "Method not allowed" }, { status: 405, headers: { allow: "GET, POST" } });
@@ -57,12 +57,22 @@ export class AppReleaseChannel extends DurableObject<Env> {
     return this.ctx.storage.kv.get<PublishedRecord>(RECORD_KEY) ?? null;
   }
 
-  private check(): Promise<PublishedRecord> {
-    if (this.checking) return this.checking;
-    const checking = (async () => {
+  /** `notBefore`: the answer must come from a read of upstream that started no earlier. */
+  private check(notBefore?: number): Promise<PublishedRecord> {
+    const running = this.checking;
+    if (running) {
+      const { at } = running.read;
+      const fresh = notBefore === undefined || at === null || at > notBefore;
+      return fresh
+        ? running.promise
+        : running.promise.catch(() => null).then(() => this.check(notBefore));
+    }
+    const read: { at: number | null } = { at: null };
+    const promise = (async () => {
       const previous = this.record();
       const wait = previous ? previous.checkedAt + MIN_CHECK_INTERVAL_MS - Date.now() : 0;
       if (wait > 0) await Effect.runPromise(Effect.sleep(wait));
+      read.at = Date.now();
       let version: string | null;
       try {
         version = await this.readUpstream();
@@ -92,10 +102,10 @@ export class AppReleaseChannel extends DurableObject<Env> {
       }
       return next;
     })().finally(() => {
-      this.checking = null;
+      if (this.checking?.promise === promise) this.checking = null;
     });
-    this.checking = checking;
-    return checking;
+    this.checking = { promise, read };
+    return promise;
   }
 
   private async readUpstream(): Promise<string | null> {

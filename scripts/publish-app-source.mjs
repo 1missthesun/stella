@@ -37,7 +37,7 @@ const NAMESPACE_BACKENDS = {
 const backend = option("backend", NAMESPACE_BACKENDS[namespace]);
 
 /** Tell the backend's connected desktops; never fails the publish. */
-const announce = async () => {
+const announce = async (expected) => {
   if (!backend) {
     console.log(`No backend follows ${namespace}; pass --backend <url> to tell its desktops.`);
     return;
@@ -50,10 +50,14 @@ const announce = async () => {
       });
       if (response.ok) {
         const { version } = await response.json();
-        console.log(`Told ${backend}'s desktops about ${String(version).slice(0, 12)}.`);
-        return;
+        if (version === expected) {
+          console.log(`Told ${backend}'s desktops about ${String(version).slice(0, 12)}.`);
+          return;
+        }
+        console.warn(`${backend} still reports ${String(version).slice(0, 12)}, not ${expected.slice(0, 12)}.`);
+      } else {
+        console.warn(`Release notice to ${backend} failed (${response.status}).`);
       }
-      console.warn(`Release notice to ${backend} failed (${response.status}).`);
     } catch (error) {
       console.warn(`Release notice to ${backend} failed: ${error instanceof Error ? error.message : error}`);
     }
@@ -76,6 +80,7 @@ const wrangler = (commandArgs) => {
 
 const sourceSha = run("git", ["rev-parse", ref], { cwd: repoRoot });
 const workDir = mkdtempSync(path.join(tmpdir(), "stella-app-source-"));
+let publishedTip;
 
 try {
   const archive = spawnSync("git", ["archive", sourceSha], { cwd: repoRoot, maxBuffer: 1 << 30 });
@@ -118,14 +123,16 @@ try {
   git(["add", "-A"]);
   if (fetched && spawnSync("git", ["diff", "--cached", "--quiet", "FETCH_HEAD"], { cwd: workDir }).status === 0) {
     console.log(`Upstream already matches ${sourceSha.slice(0, 12)}; nothing to publish.`);
+    publishedTip = git(["rev-parse", "HEAD"]);
   } else {
     git(["commit", "-q", "-m", `Stella ${sourceSha.slice(0, 12)}`, "-m", `Stella-Source: ${sourceSha}`]);
     git(["push", "-q", remote, "HEAD:refs/heads/main"]);
-    console.log(`Published ${sourceSha.slice(0, 12)} to ${namespace}/${UPSTREAM_REPO} as ${git(["rev-parse", "HEAD"])}.`);
+    publishedTip = git(["rev-parse", "HEAD"]);
+    console.log(`Published ${sourceSha.slice(0, 12)} to ${namespace}/${UPSTREAM_REPO} as ${publishedTip}.`);
   }
 } finally {
   rmSync(workDir, { recursive: true, force: true });
 }
 
 // Also after "nothing to publish": a notice lost last time is sent again.
-await announce();
+await announce(publishedTip);

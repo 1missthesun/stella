@@ -6,69 +6,65 @@ import {
 } from "./cloud-memory-local-mirror";
 import { useCloudMemoryPreference } from "./use-cloud-memory-preference";
 
-function AccountMemoryPreferenceBridge() {
-  const preference = useCloudMemoryPreference();
-  const desired =
-    preference.status === "synced" && preference.preference
-      ? preference.preference.memoryEnabled
-      : false;
-  const settled = preference.status === "synced" && preference.preference !== null;
+type MemorySource =
+  | { kind: "signed_out" }
+  | { kind: "account_unknown" }
+  | { kind: "account"; memoryEnabled: boolean };
 
+const writeLocalMemory = (source: MemorySource): Promise<boolean> => {
+  switch (source.kind) {
+    case "signed_out":
+      return restoreLocalMemoryChoice();
+    case "account_unknown":
+      return restoreLocalMemoryChoice({ whenUnknown: "keep" });
+    case "account":
+      return mirrorCloudMemoryPreferenceLocally(source.memoryEnabled, {
+        settled: true,
+      });
+  }
+};
+
+function useLocalMemoryMirror(
+  kind: MemorySource["kind"],
+  memoryEnabled: boolean | null,
+) {
   useLayoutEffect(() => {
+    const source: MemorySource =
+      kind === "account" && memoryEnabled !== null
+        ? { kind, memoryEnabled }
+        : kind === "signed_out"
+          ? { kind }
+          : { kind: "account_unknown" };
     let cancelled = false;
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
-
-    const scheduleRetry = () => {
-      if (cancelled || retryTimer !== null) return;
+    const apply = async () => {
+      const done = await writeLocalMemory(source).catch(() => false);
+      if (cancelled || done) return;
       retryTimer = globalThis.setTimeout(() => {
         retryTimer = null;
         void apply();
       }, 1_000);
     };
-    const apply = async () => {
-      const failClosed = await mirrorCloudMemoryPreferenceLocally(false, {
-        settled: settled && !desired,
-      }).catch(() => false);
-      if (cancelled) return;
-      if (!failClosed) {
-        scheduleRetry();
-        return;
-      }
-      if (!desired) return;
-      const mirrored = await mirrorCloudMemoryPreferenceLocally(true, {
-        settled,
-      }).catch(() => false);
-      if (!cancelled && !mirrored) scheduleRetry();
-    };
-
     void apply();
     return () => {
       cancelled = true;
       if (retryTimer !== null) globalThis.clearTimeout(retryTimer);
     };
-  }, [desired, settled]);
+  }, [kind, memoryEnabled]);
+}
 
+function AccountMemoryPreferenceBridge() {
+  const preference = useCloudMemoryPreference();
+  const known = preference.status === "synced" && preference.preference;
+  useLocalMemoryMirror(
+    known ? "account" : "account_unknown",
+    known ? known.memoryEnabled : null,
+  );
   return null;
 }
 
 function SignedOutMemoryPreferenceBridge() {
-  useLayoutEffect(() => {
-    let cancelled = false;
-    let retryTimer: ReturnType<typeof setTimeout> | null = null;
-    const apply = async () => {
-      const restored = await restoreLocalMemoryChoice().catch(() => false);
-      if (cancelled || restored) return;
-      retryTimer = globalThis.setTimeout(() => {
-        retryTimer = null;
-        void apply();
-      }, 1_000);
-    };
-    void apply();
-    return () => {
-      cancelled = true;
-      if (retryTimer !== null) globalThis.clearTimeout(retryTimer);
-    };
-  }, []);
+  useLocalMemoryMirror("signed_out", null);
   return null;
 }
 

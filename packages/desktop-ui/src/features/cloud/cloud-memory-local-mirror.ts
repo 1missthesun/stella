@@ -29,13 +29,22 @@ export const mirrorCloudMemoryPreferenceLocally = (
     ),
   );
 
-/** Signed out, Memory follows the user's last choice and is on until they make one. */
-export const restoreLocalMemoryChoice = (): Promise<boolean> =>
+/**
+ * Memory follows the user's last settled choice while the account value is
+ * unknown (signed out, offline, or still loading). With no choice yet it is on
+ * when signed out, and left as it is when signed in.
+ */
+export const restoreLocalMemoryChoice = (
+  options: { whenUnknown?: "on" | "keep" } = {},
+): Promise<boolean> =>
   enqueue(async () => {
     const system = window.electronAPI?.system;
     if (!system?.getLocalModelPreferences) return true;
     const preferences = await system.getLocalModelPreferences();
     if (!preferences) return false;
+    if (preferences.memoryChoice == null && options.whenUnknown === "keep") {
+      return true;
+    }
     const memoryEnabled = preferences.memoryChoice ?? true;
     if (preferences.memoryEnabled === memoryEnabled) return true;
     return await writeLocal({ memoryEnabled });

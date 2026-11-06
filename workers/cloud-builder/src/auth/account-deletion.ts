@@ -164,12 +164,24 @@ export const cancelAccountDeletion = async (env: Cloudflare.Env, userId: string)
     .bind(userId)
     .first<DeletionRow>();
   if (!row) return false;
-  await ownerGateStub(env.OWNER_GATES, userId).setDeletionHold(false);
   const removed = await d1(env)
     .prepare("DELETE FROM account_deletions WHERE user_id = ? AND status = 'pending'")
     .bind(userId)
     .run();
   if ((removed.meta.changes ?? 0) === 0) return false;
+  try {
+    await ownerGateStub(env.OWNER_GATES, userId).setDeletionHold(false);
+  } catch (error) {
+    await d1(env)
+      .prepare(
+        `INSERT INTO account_deletions (user_id, email, status, requested_at, due_at, confirmation_sent_at, attempts)
+         VALUES (?, ?, 'pending', ?, ?, ?, ?) ON CONFLICT (user_id) DO NOTHING`,
+      )
+      .bind(row.user_id, row.email, row.requested_at, row.due_at, row.confirmation_sent_at, row.attempts)
+      .run()
+      .catch(() => undefined);
+    throw error;
+  }
   log("info", "account_deletion_canceled", {});
   if (row.email) {
     await sendDeletionEmail(env, row.email, "canceled", row.due_at).catch((error: unknown) =>

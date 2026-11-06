@@ -1,6 +1,7 @@
 import { app, BrowserWindow } from "electron";
 import { randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
+import { readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { getDictationSoundEffectsEnabled, loadLocalPreferences, saveLocalPreferences, } from "@stella/runtime/kernel/preferences/local-preferences";
 import { runNativeHelper } from "../native-helper.js";
@@ -33,6 +34,7 @@ const DICTATION_SOUND_VOLUME_BY_SOUND = {
 };
 const DICTATION_START_SOUND_MUTE_DELAY_MS = 220;
 const DICTATION_BRIDGE_TIMEOUT_MS = 2_000;
+const OUTPUT_MUTE_FILE = "dictation-output-mute.json";
 const dictationBridgeIsSupported = () => process.platform === "darwin" || process.platform === "win32";
 const isUsableWindow = (window) => Boolean(window && !window.isDestroyed());
 const soundPath = (stellaAppDir, sound) => path.join(stellaAppDir, "packages", "desktop", "resources", "audio", `${sound}.mp3`);
@@ -55,6 +57,65 @@ export const registerDictationHandlers = (options) => {
     let outputMuteDelayTimer = null;
     const activeDictationSources = new Set();
     let dictationActive = false;
+    const outputMuteFile = () => {
+        const stellaDataDir = options.getStellaDataDir();
+        return stellaDataDir ? path.join(stellaDataDir, OUTPUT_MUTE_FILE) : null;
+    };
+    const saveOutputMute = (previousVolume, previousMuted) => {
+        const file = outputMuteFile();
+        if (!file)
+            return;
+        try {
+            writeFileSync(`${file}.tmp`, JSON.stringify({ previousVolume, previousMuted }), "utf8");
+            renameSync(`${file}.tmp`, file);
+        }
+        catch (error) {
+            console.debug("[dictation] saving the output mute failed:", error.message);
+        }
+    };
+    const clearOutputMute = () => {
+        const file = outputMuteFile();
+        if (file)
+            rmSync(file, { force: true });
+    };
+    const runOutputRestore = (previousVolume, previousMuted) => {
+        const args = ["restore-output", String(previousVolume)];
+        if (typeof previousMuted === "boolean") {
+            args.push(previousMuted ? "true" : "false");
+        }
+        return runNativeHelper("dictation_bridge", args, {
+            timeout: DICTATION_BRIDGE_TIMEOUT_MS,
+            maxBuffer: 64 * 1024,
+            onError: (error) => {
+                console.debug("[dictation] output restore failed:", error.message);
+            },
+        });
+    };
+    const restoreOutputLeftMuted = () => {
+        const file = outputMuteFile();
+        if (!file || !dictationBridgeIsSupported())
+            return;
+        let saved;
+        try {
+            saved = JSON.parse(readFileSync(file, "utf8"));
+        }
+        catch {
+            return;
+        }
+        if (typeof saved?.previousVolume !== "number") {
+            clearOutputMute();
+            return;
+        }
+        console.warn("[dictation] restoring the output volume a previous session left muted");
+        void runOutputRestore(saved.previousVolume, saved.previousMuted)
+            .then((raw) => {
+            if (raw !== null && raw !== undefined)
+                clearOutputMute();
+        })
+            .catch((error) => {
+            console.debug("[dictation] output restore failed:", error);
+        });
+    };
     const areDictationSoundsEnabled = () => {
         const stellaDataDir = options.getStellaDataDir();
         return stellaDataDir ? getDictationSoundEffectsEnabled(stellaDataDir) : true;
@@ -95,6 +156,7 @@ export const registerDictationHandlers = (options) => {
                     typeof result.previousMuted === "boolean"
                         ? result.previousMuted
                         : null;
+                saveOutputMute(mutedOutputVolume, mutedOutputPreviousMuted);
                 if (!outputMuteActive) {
                     restoreOutputAfterDictation();
                 }
@@ -137,17 +199,12 @@ export const registerDictationHandlers = (options) => {
         mutedOutputPreviousMuted = null;
         if (typeof previousVolume !== "number")
             return;
-        const args = ["restore-output", String(previousVolume)];
-        if (typeof previousMuted === "boolean") {
-            args.push(previousMuted ? "true" : "false");
-        }
-        runNativeHelper("dictation_bridge", args, {
-            timeout: DICTATION_BRIDGE_TIMEOUT_MS,
-            maxBuffer: 64 * 1024,
-            onError: (error) => {
-                console.debug("[dictation] output restore failed:", error.message);
-            },
-        }).catch((error) => {
+        runOutputRestore(previousVolume, previousMuted)
+            .then((raw) => {
+            if (raw !== null && raw !== undefined)
+                clearOutputMute();
+        })
+            .catch((error) => {
             console.debug("[dictation] output restore failed:", error);
         });
     };
@@ -260,6 +317,7 @@ export const registerDictationHandlers = (options) => {
         prefs.dictationShortcut = shortcut;
         saveLocalPreferences(stellaDataDir, prefs);
     };
+    restoreOutputLeftMuted();
     const initial = applyDictationShortcutRegistration(loadConfiguredShortcut());
     if (!initial.ok) {
         console.warn("[dictation]", initial.error);

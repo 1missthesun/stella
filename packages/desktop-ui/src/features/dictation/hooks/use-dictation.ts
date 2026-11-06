@@ -23,12 +23,6 @@ import { useT } from "@/shared/i18n";
 
 export const DICTATION_TOGGLE_EVENT = "stella:dictation-toggle";
 
-type DictationToggleEventDetail = {
-  startId?: string;
-  action?: "toggle" | "start" | "stop" | "cancel";
-  source?: "companion";
-};
-
 type Setter<T> = (next: T | ((prev: T) => T)) => void;
 
 interface UseDictationOptions {
@@ -89,6 +83,7 @@ export const useDictation = ({
   const sendAfterCommitRef = useRef(false);
   const warmedRef = useRef(false);
   const awaitingKeyRef = useRef(false);
+  const pendingStartRef = useRef<{ stopRequested: boolean } | null>(null);
 
   setMessageRef.current = setMessage;
   onErrorRef.current = onError;
@@ -121,6 +116,7 @@ export const useDictation = ({
   }, [state]);
 
   const stop = useCallback(async () => {
+    if (pendingStartRef.current) pendingStartRef.current.stopRequested = true;
     const session = sessionRef.current;
     if (!session) return;
     try {
@@ -132,6 +128,7 @@ export const useDictation = ({
 
   const cancel = useCallback(() => {
     sendAfterCommitRef.current = false;
+    if (pendingStartRef.current) pendingStartRef.current.stopRequested = true;
     const session = sessionRef.current;
     if (!session) return;
     setShowControls(false);
@@ -155,13 +152,24 @@ export const useDictation = ({
 
   const start = useCallback(
     async (source: "button" | "shortcut") => {
-      if (sessionRef.current) return;
+      if (sessionRef.current || pendingStartRef.current) return;
       if (disabled) return;
+      const pending = { stopRequested: false };
+      pendingStartRef.current = pending;
+      setState("starting");
+      window.electronAPI?.dictation?.activeChanged({ active: true });
       const cached = cachedDictationRoute();
       const route =
         cached === "streaming" || cached === "managed" || cached === "openrouter"
           ? cached
           : await resolveDictationRoute().catch(() => "needs-key" as const);
+      pendingStartRef.current = null;
+      if (pending.stopRequested || route === "needs-key") {
+        setState("idle");
+        window.electronAPI?.dictation?.activeChanged({ active: false });
+        fireCommitIfPending();
+      }
+      if (pending.stopRequested) return;
       if (route === "needs-key") {
         if (requestDictationKey()) {
           awaitingKeyRef.current = true;
@@ -173,7 +181,6 @@ export const useDictation = ({
         }
         return;
       }
-      if (sessionRef.current) return;
       if (!warmedRef.current) {
         warmedRef.current = true;
         if (isDictationSuperFastEnabled()) {
@@ -192,7 +199,7 @@ export const useDictation = ({
           onStateChange: (next, errMessage) => {
             setState(next);
             window.electronAPI?.dictation?.activeChanged({
-              active: next === "listening" || next === "transcribing",
+              active: next !== "idle" && next !== "error",
             });
             if (next === "error" && errMessage) {
               console.warn(
@@ -262,7 +269,7 @@ export const useDictation = ({
 
   const toggle = useCallback(() => {
     const current = stateRef.current;
-    if (current === "listening") {
+    if (current === "listening" || current === "starting") {
       sendAfterCommitRef.current = false;
       window.electronAPI?.dictation?.playSound({ sound: "stopRecording" });
       void stop();
@@ -277,7 +284,7 @@ export const useDictation = ({
 
   const commitAndSend = useCallback(() => {
     const current = stateRef.current;
-    if (current === "listening") {
+    if (current === "listening" || current === "starting") {
       sendAfterCommitRef.current = true;
       void stop();
       return;
@@ -290,35 +297,11 @@ export const useDictation = ({
   }, [stop]);
 
   useEffect(() => {
-    const handler = (event: Event) => {
-      const detail = (event as CustomEvent<DictationToggleEventDetail>).detail;
-      const startId = detail?.startId;
-      const action = detail?.action ?? "toggle";
+    const handler = () => {
       const current = stateRef.current;
-      const canHandle =
-        !disabled || current === "listening" || current === "transcribing";
-      if (!canHandle) return;
-      void startId;
-      if (action === "start") {
-        if (current !== "listening" && current !== "transcribing") {
-          void start("shortcut");
-        }
-        return;
-      }
-      if (action === "stop") {
-        if (current === "listening") {
-          sendAfterCommitRef.current = commitOnShortcutStopRef.current;
-          void stop();
-        }
-        return;
-      }
-      if (action === "cancel") {
-        if (current === "listening" || current === "transcribing") {
-          cancel();
-        }
-        return;
-      }
-      if (current === "listening") {
+      const recording = current === "starting" || current === "listening";
+      if (disabled && !recording && current !== "transcribing") return;
+      if (recording) {
         sendAfterCommitRef.current = commitOnShortcutStopRef.current;
         void stop();
       } else if (current === "transcribing") {
@@ -334,6 +317,7 @@ export const useDictation = ({
 
   useEffect(() => {
     return () => {
+      if (pendingStartRef.current) pendingStartRef.current.stopRequested = true;
       const session = sessionRef.current;
       if (session) {
         window.electronAPI?.dictation?.activeChanged({ active: false });

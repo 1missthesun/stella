@@ -13,6 +13,21 @@ export type AccountMcpHttpResult = { status: number; body: unknown };
 
 const MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
 
+const accountOwner = (auth: AccountMcpAuth): string | null => {
+  const payload = auth.authToken.split(".")[1];
+  if (!payload) return null;
+  try {
+    const { sub } = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as {
+      sub?: unknown;
+    };
+    return typeof sub === "string" && sub
+      ? `${new URL(auth.baseUrl).origin}|${sub}`
+      : null;
+  } catch {
+    return null;
+  }
+};
+
 export const sendAccountMcpRequest = async (
   auth: AccountMcpAuth,
   operation: AccountMcpOperation,
@@ -48,6 +63,10 @@ export const sendAccountMcpRequest = async (
     body = text.trim() ? (JSON.parse(text) as unknown) : null;
   } catch {
     body = { ok: false, error: { message: text.slice(0, 500) } };
+  }
+  const listed = (body as { ok?: unknown; value?: unknown } | null)?.value;
+  if (operation.op === "list" && listed && typeof listed === "object") {
+    (listed as { owner?: string | null }).owner = accountOwner(auth);
   }
   return { status: response.status, body };
 };

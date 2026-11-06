@@ -79,8 +79,8 @@ class LineDelimitedHelperDaemon {
     child.stdout.setEncoding('utf8')
     child.stdout.on('data', (chunk: string) => this.onStdout(chunk))
     child.stdin.on('error', () => {})
-    child.on('exit', () => this.onChildGone())
-    child.on('error', () => this.onChildGone())
+    child.on('exit', () => this.onChildGone(child))
+    child.on('error', () => this.onChildGone(child))
 
     this.child = child
     this.childSpawnedAt = Date.now()
@@ -92,7 +92,8 @@ class LineDelimitedHelperDaemon {
     return child
   }
 
-  private onChildGone() {
+  private onChildGone(gone: DaemonChild) {
+    if (this.child !== gone) return
     const spawnedAt = this.childSpawnedAt
     const answered = this.childAnswered
     this.child = null
@@ -157,15 +158,13 @@ class LineDelimitedHelperDaemon {
 
   private kill() {
     const child = this.child
-    this.child = null
-    if (child) {
-      try {
-        child.kill()
-      } catch {
-        // Already gone; nothing to do.
-      }
+    if (!child) return
+    this.onChildGone(child)
+    try {
+      child.kill()
+    } catch {
+      // Already gone; nothing to do.
     }
-    this.onChildGone()
   }
 
   request(tokens: string[]): Promise<string | undefined> {

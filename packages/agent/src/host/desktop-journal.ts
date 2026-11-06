@@ -346,9 +346,9 @@ export async function journalMirror(args: {
   ): Promise<void> => {
     const { before, after } = await harness.commit(async (tx) => {
       const state = await tx.doc(JournalSyncDoc, root.id);
-      const prior = mirrorTurnsOf(state);
+      const prior = JSON.parse(JSON.stringify(mirrorTurnsOf(state))) as MirrorTurn[];
       const next = applyMirrorEvents(prior, events);
-      state.turns = next;
+      state.turns = JSON.parse(JSON.stringify(next)) as MirrorTurn[];
       delete state.open;
       patch?.(state);
       return { before: new Map(prior.map((turn) => [turn.localTurnId, turn.s])), after: next };

@@ -31,7 +31,12 @@ export type CloudOrchestratorCliTurnSpec = {
   startFresh?: true;
   compact?: true;
   quiet?: boolean;
+  /** Claude Code's own WebSearch and WebFetch, in place of Stella's `web`. */
+  webTools?: true;
 };
+
+export const CLOUD_CLI_WEB_TOOLS: readonly string[] = ["WebSearch", "WebFetch"];
+export const CLOUD_CLI_NATIVE_RESULT_MAX_CHARS = 200_000;
 
 const ADOPTED_SESSION_ID = /^[A-Za-z0-9][A-Za-z0-9-]{0,127}$/;
 
@@ -125,6 +130,7 @@ export const parseCloudOrchestratorCliTurnSpec = (
     ...(value.startFresh === true ? { startFresh: true } : {}),
     ...(compact ? { compact: true } : {}),
     ...(value.quiet === true ? { quiet: true } : {}),
+    ...(value.webTools === true ? { webTools: true } : {}),
   };
 };
 
@@ -220,6 +226,7 @@ export type CloudOrchestratorEvent =
   | { type: "compaction"; id: string; summary: string; preservedMessages?: number }
   | { type: "assistant_message"; message: CloudCliAssistantMessage }
   | { type: "models"; alias?: string; resolved?: string; windows?: Record<string, number> }
+  | { type: "native_tool_result"; toolUseId: string; text: string; isError?: true }
   | {
       type: "usage";
       inputTokens: number;

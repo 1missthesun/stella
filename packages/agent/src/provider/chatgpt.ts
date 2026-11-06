@@ -35,6 +35,40 @@ export const chatGptModel = (modelId: string): Model<"openai-responses"> | undef
   };
 };
 
+type PayloadHook = (payload: unknown, model: Model<Api>) => unknown | undefined | Promise<unknown | undefined>;
+
+/**
+ * The plan's own `web_search` tool stands in for Stella's `web`: OpenAI runs
+ * the search and page reads on the user's ChatGPT plan, so the turn never
+ * reaches Stella's paid search.
+ */
+const isStellaWeb = (tool: unknown): boolean =>
+  Boolean(tool) &&
+  typeof tool === "object" &&
+  (tool as { type?: unknown }).type === "function" &&
+  (tool as { name?: unknown }).name === "web";
+
+const withPlanWebSearch = (payload: unknown): unknown => {
+  if (!payload || typeof payload !== "object") return payload;
+  const body = payload as { tools?: unknown; input?: unknown };
+  let offered = false;
+  const withoutWeb = (tools: unknown): unknown => {
+    if (!Array.isArray(tools) || !tools.some(isStellaWeb)) return tools;
+    offered = true;
+    return tools.filter((tool) => !isStellaWeb(tool));
+  };
+  const tools = withoutWeb(body.tools);
+  const input = Array.isArray(body.input)
+    ? body.input.map((item: unknown) =>
+        item && typeof item === "object" && Array.isArray((item as { tools?: unknown }).tools)
+          ? { ...(item as object), tools: withoutWeb((item as { tools: unknown }).tools) }
+          : item,
+      )
+    : body.input;
+  if (!offered) return payload;
+  return { ...body, input, tools: [...(Array.isArray(tools) ? tools : []), { type: "web_search" }] };
+};
+
 export function chatGptProvider(options: {
   models: readonly Model<"openai-responses">[];
   transport?: ChatGptTransport;
@@ -50,9 +84,16 @@ export function chatGptProvider(options: {
           return transport.fetch(new Request(url, request), sessionId ? { sessionId } : {});
         }) as typeof fetch)
       : undefined;
-  const sent = <O extends { sessionId?: string; fetch?: typeof fetch }>(options: O | undefined): O | undefined => {
+  const sent = <O extends { sessionId?: string; fetch?: typeof fetch; onPayload?: PayloadHook }>(
+    options: O | undefined,
+  ): O => {
     const fetch = routed(options?.sessionId);
-    return fetch ? ({ ...options, fetch } as O) : options;
+    const given = options?.onPayload;
+    const onPayload: PayloadHook = async (payload, model) => {
+      const next = given ? ((await given(payload, model)) ?? payload) : payload;
+      return withPlanWebSearch(next);
+    };
+    return { ...options, ...(fetch ? { fetch } : {}), onPayload } as O;
   };
   return createProvider({
     id: CHATGPT_PROVIDER_ID,

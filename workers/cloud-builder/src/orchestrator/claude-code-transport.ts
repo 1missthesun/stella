@@ -9,6 +9,7 @@ import {
 import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
 import {
   CLOUD_CLI_SESSION_LOST_MARK,
+  CLOUD_CLI_WEB_TOOLS,
   orchestratorCliCompactThreadId,
   orchestratorCliThreadId,
   type CloudCliAssistantMessage,
@@ -122,7 +123,12 @@ const streamEventsOf = (message: CloudCliAssistantMessage): Record<string, unkno
         event({
           type: "content_block_start",
           index,
-          content_block: { type: "tool_use", id: part.id, name: `${MCP_PREFIX}${part.name}`, input: {} },
+          content_block: {
+            type: "tool_use",
+            id: part.id,
+            name: CLOUD_CLI_WEB_TOOLS.includes(part.name) ? part.name : `${MCP_PREFIX}${part.name}`,
+            input: {},
+          },
         }),
         event({
           type: "content_block_delta",
@@ -273,6 +279,9 @@ export const createCloudClaudeCodeTransport = (host: CloudClaudeCodeHost): Cloud
               ...(startFresh ? { startFresh: true as const } : {}),
               ...(spec.compact ? { compact: true as const } : {}),
               ...(spec.quiet ? { quiet: true } : {}),
+              ...(!spec.compact && spec.nativeTools.some((name) => CLOUD_CLI_WEB_TOOLS.includes(name))
+                ? { webTools: true as const }
+                : {}),
             },
             signal: spec.signal,
           });
@@ -409,6 +418,8 @@ export const createCloudClaudeCodeTransport = (host: CloudClaudeCodeHost): Cloud
           for (const line of streamEventsOf(event.message)) attempt.spec.onEvent(line);
         } else if (event.type === "status") {
           attempt.spec.onStatus({ state: event.state, text: event.text });
+        } else if (event.type === "native_tool_result") {
+          attempt.spec.onNativeToolEnd({ toolUseId: event.toolUseId, result: event.text, isError: event.isError === true });
         } else if (event.type === "models") {
           noteModels(event);
         } else if (event.type === "compaction") {

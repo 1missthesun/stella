@@ -1,7 +1,9 @@
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import {
+  CLOUD_CLI_NATIVE_RESULT_MAX_CHARS,
   CLOUD_CLI_SESSION_LOST_MARK,
+  CLOUD_CLI_WEB_TOOLS,
   CLOUD_ORCHESTRATOR_BROKER_PATHS,
   parseCloudOrchestratorCliTurnSpec,
   type CloudCliAssistantMessage,
@@ -248,9 +250,22 @@ const stopReasonOf = (
   }
 };
 
+const nativeResultText = (content: unknown): string =>
+  typeof content === "string"
+    ? content
+    : (Array.isArray(content) ? content : [])
+        .map((raw) => {
+          const part = asRecord(raw);
+          if (part?.type === "text" && typeof part.text === "string") return part.text;
+          return part?.type === "image" ? "[image]" : "";
+        })
+        .filter(Boolean)
+        .join("\n");
+
 export class CliAssistantAssembler {
   #open: OpenAssistantMessage | undefined;
   #journaled = new Set<string>();
+  #nativeCalls = new Set<string>();
   #waiters = new Map<string, Array<() => void>>();
   #closed = false;
   #inputTokens = 0;
@@ -356,6 +371,7 @@ export class CliAssistantAssembler {
           typeof block.name === "string"
         ) {
           open.toolUseIds.push(block.id);
+          if (!block.name.startsWith(MCP_TOOL_PREFIX)) this.#nativeCalls.add(block.id);
           open.content.push({
             type: "toolCall",
             id: block.id,
@@ -365,6 +381,22 @@ export class CliAssistantAssembler {
             arguments: asRecord(block.input) ?? {},
           });
         }
+      }
+      return;
+    }
+    if (event.type === "user" && event.parent_tool_use_id == null) {
+      const content = asRecord(event.message)?.content;
+      for (const raw of Array.isArray(content) ? content : []) {
+        const block = asRecord(raw);
+        if (block?.type !== "tool_result" || typeof block.tool_use_id !== "string") continue;
+        if (!this.#nativeCalls.delete(block.tool_use_id)) continue;
+        this.#finalize();
+        this.emit({
+          type: "native_tool_result",
+          toolUseId: block.tool_use_id,
+          text: nativeResultText(block.content).slice(0, CLOUD_CLI_NATIVE_RESULT_MAX_CHARS),
+          ...(block.is_error === true ? { isError: true as const } : {}),
+        });
       }
       return;
     }
@@ -567,6 +599,7 @@ export const runOrchestratorTurn = async (args: {
     quiet: input.quiet,
     startFresh: input.startFresh,
     compact: input.compact,
+    webTools: input.webTools,
   });
   if (!spec) {
     return failed(
@@ -614,6 +647,7 @@ export const runOrchestratorTurn = async (args: {
     execution.model,
   );
   const correlator = createClaudeNativeToolUseCorrelator();
+  const nativeTools = spec.webTools && !spec.compact ? CLOUD_CLI_WEB_TOOLS : [];
   const identityScope = `${input.threadId}:${input.turnId}`;
 
   const executeTool = async (
@@ -696,11 +730,12 @@ export const runOrchestratorTurn = async (args: {
           role: "orchestrator",
           threadId: input.threadId,
           conversationId: input.conversationId,
+          nativeTools,
         }),
         prompt: input.prompt,
         systemPrompt: spec.compact
           ? ""
-          : buildClaudeCodeNativeToolRuntimePrompt(spec.systemPrompt),
+          : buildClaudeCodeNativeToolRuntimePrompt(spec.systemPrompt, nativeTools),
         execution,
         claudeAccount,
         threadId: input.threadId,

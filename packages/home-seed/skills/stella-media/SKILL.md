@@ -21,7 +21,7 @@ and `stella-media models` are generated from `packages/contracts/media-models.ts
 use that live list rather than a copied model or operation table. The HTTP list is
 `GET <stella-api>/api/media/v1/models` on the user's signed-in Stella backend.
 
-Each line is a model id, what it does, and its docs page. Read the docs page (`web` fetch it) before the first call to a model: it is the model's own input and output schema, and Stella passes your input to the model untouched.
+Each line is a model id, what it does, and its docs page. Read the docs page (fetch it) before the first call to a model: it is the model's own input and output schema, and Stella passes your input to the model untouched.
 
 For video, pick the model for text, image animation, references or extension
 from that list. Reference-to-video takes `reference_image_urls`,

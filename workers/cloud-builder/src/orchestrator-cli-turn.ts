@@ -1,4 +1,5 @@
 import {
+  CLOUD_CLI_NATIVE_RESULT_MAX_CHARS,
   isOrchestratorCliThreadId,
   orchestratorCliThreadId,
   type CloudCliAssistantMessage,
@@ -148,6 +149,19 @@ const parseCliEvent = (value: unknown): CloudOrchestratorEvent | null => {
         ...(windows && Object.keys(windows).length > 0 ? { windows: windows as Record<string, number> } : {}),
       };
     }
+    case "native_tool_result":
+      return typeof value.toolUseId === "string" &&
+        value.toolUseId.length > 0 &&
+        value.toolUseId.length <= 200 &&
+        typeof value.text === "string" &&
+        value.text.length <= CLOUD_CLI_NATIVE_RESULT_MAX_CHARS
+        ? {
+            type: "native_tool_result",
+            toolUseId: value.toolUseId,
+            text: value.text,
+            ...(value.isError === true ? { isError: true as const } : {}),
+          }
+        : null;
     case "usage":
       return nonNegativeInteger(value.inputTokens) &&
         nonNegativeInteger(value.outputTokens) &&

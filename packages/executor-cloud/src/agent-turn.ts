@@ -17,6 +17,7 @@ import {
 } from "@stella/contracts/local-file-links";
 import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
 import {
+  CLOUD_CLI_WEB_TOOLS,
   parseCloudAgentSystemPrompt,
   type CloudCliTurnRoleInput,
 } from "@stella/contracts/cloud-orchestrator-cli";
@@ -565,6 +566,7 @@ export const runAgentTurn = (
       const byName = new Map(catalog.map((tool) => [tool.name, tool]));
       const cloudToolMetadata = [
         ...cloudGeneralToolNames()
+          .filter((name) => name !== "web")
           .map((name) => byName.get(name))
           .filter((tool): tool is ToolMetadata => Boolean(tool))
           .map((tool) =>
@@ -658,10 +660,13 @@ export const runAgentTurn = (
                 role: "agent",
                 threadId: input.threadId,
                 conversationId: input.conversationId,
+                nativeTools: CLOUD_CLI_WEB_TOOLS,
               }),
               prompt: input.prompt,
-              systemPrompt:
-                buildClaudeCodeNativeToolRuntimePrompt(cloudSystemPrompt),
+              systemPrompt: buildClaudeCodeNativeToolRuntimePrompt(
+                cloudSystemPrompt,
+                CLOUD_CLI_WEB_TOOLS,
+              ),
               execution: nativeExecution,
               claudeAccount,
               threadId: input.threadId,

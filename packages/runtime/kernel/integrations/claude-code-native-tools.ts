@@ -1,7 +1,13 @@
 export type ClaudeCodeNativeToolRole = "orchestrator" | "worker";
 
+export const CLAUDE_CODE_WEB_NATIVE_TOOLS: readonly string[] = [
+  "WebSearch",
+  "WebFetch",
+];
+
 export const CLAUDE_CODE_ORCHESTRATOR_NATIVE_TOOLS: readonly string[] = [
   "Read",
+  ...CLAUDE_CODE_WEB_NATIVE_TOOLS,
 ];
 
 export const CLAUDE_CODE_WORKER_NATIVE_TOOLS: readonly string[] = [
@@ -11,6 +17,7 @@ export const CLAUDE_CODE_WORKER_NATIVE_TOOLS: readonly string[] = [
   "Bash",
   "Grep",
   "Glob",
+  ...CLAUDE_CODE_WEB_NATIVE_TOOLS,
 ];
 
 const STELLA_TOOLS_REPLACED_BY_NATIVE: Readonly<
@@ -22,6 +29,8 @@ const STELLA_TOOLS_REPLACED_BY_NATIVE: Readonly<
   Bash: ["Bash", "exec_command", "write_stdin"],
   Grep: ["Grep"],
   Glob: ["Glob"],
+  WebSearch: ["web"],
+  WebFetch: ["web"],
 };
 
 export const CLAUDE_CODE_ORCHESTRATOR_WITHHELD_TOOLS: readonly string[] = [
@@ -44,6 +53,8 @@ const STELLA_TOOLS_GRANTING_NATIVE: Readonly<
   Bash: ["Bash", "exec_command", "write_stdin"],
   Grep: ["Grep"],
   Glob: ["Glob", "Grep", "Read"],
+  WebSearch: ["web"],
+  WebFetch: ["web"],
 };
 
 export const resolveClaudeCodeNativeTools = (
@@ -92,9 +103,13 @@ export const resolveClaudeCodeToolSet = <
   catalog: readonly T[];
   builtinsOff: boolean;
 }): { nativeTools: readonly string[]; tools: T[] } => {
-  const nativeTools = args.builtinsOff
-    ? []
-    : resolveClaudeCodeNativeTools(args.role, args.toolsAllowlist);
+  const offersWeb = args.catalog.some((tool) => tool.name === "web");
+  const nativeTools = resolveClaudeCodeNativeTools(
+    args.role,
+    args.toolsAllowlist,
+  ).filter((name) =>
+    CLAUDE_CODE_WEB_NATIVE_TOOLS.includes(name) ? offersWeb : !args.builtinsOff,
+  );
   return {
     nativeTools,
     tools: withoutToolsReplacedByNative(args.catalog, nativeTools, args.role),

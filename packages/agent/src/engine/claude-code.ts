@@ -55,8 +55,9 @@ export { CLAUDE_CODE_ENGINE_EXTENSION, CLAUDE_CODE_PROVIDER_ID, engineExtensionC
 export const CLAUDE_CODE_API = "claude-code-cli";
 const CLOUD_CLAUDE_CODE_API = "claude-code";
 
-export const CLAUDE_CODE_BUILTIN_TOOLS = ["Read", "Edit", "Write", "Bash", "Grep", "Glob"] as const;
-const ENGINE_ONLY_TOOLS = ["Grep", "Glob"] as const;
+export const CLAUDE_CODE_BUILTIN_TOOLS = ["Read", "Edit", "Write", "Bash", "Grep", "Glob", "WebSearch", "WebFetch"] as const;
+const CLI_WEB_TOOLS: readonly string[] = ["WebSearch", "WebFetch"];
+const ENGINE_ONLY_TOOLS = ["Grep", "Glob", "WebSearch", "WebFetch"] as const;
 const WRAPPED_TOOLS = ["Read", "Edit", "Write", "Bash"] as const;
 const MCP_PREFIX = "mcp__stella__";
 
@@ -442,7 +443,9 @@ const sessionLost = (error: unknown): boolean => (error as { code?: unknown } | 
 const cliToolName =
   (binding: Binding) =>
   (name: string): string =>
-    !binding.builtinsOff && (CLAUDE_CODE_BUILTIN_TOOLS as readonly string[]).includes(name) ? name : `${MCP_PREFIX}${name}`;
+    CLI_WEB_TOOLS.includes(name) || (!binding.builtinsOff && (CLAUDE_CODE_BUILTIN_TOOLS as readonly string[]).includes(name))
+      ? name
+      : `${MCP_PREFIX}${name}`;
 
 const deltaPrompt = (delta: readonly Message[], context?: string): { text: string; images: ImageContent[] } => {
   const { start, users } = trailingUsers(delta);
@@ -763,6 +766,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
   const toolSetFor = (binding: Binding, tools: readonly { name: string; description: string; parameters: unknown }[]) => {
     const offered = new Set(tools.map((tool) => tool.name));
     const catalog = tools.filter((tool) => !(ENGINE_ONLY_TOOLS as readonly string[]).includes(tool.name)).map(toolSpec);
+    if (!offered.has("web")) for (const name of CLI_WEB_TOOLS) offered.delete(name);
     const set = resolveClaudeCodeToolSet({
       role: binding.session.role,
       catalog,

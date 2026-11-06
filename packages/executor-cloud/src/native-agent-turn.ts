@@ -455,6 +455,8 @@ export type CloudClaudeRoleProfile = {
    */
   cwd: string;
   includePartialMessages: boolean;
+  /** Claude Code built-ins the CLI runs itself (its WebSearch and WebFetch). */
+  nativeTools: readonly string[];
   mcpToolTimeoutMs?: number;
   autoCompactWindowTokens?: number;
 };
@@ -481,6 +483,7 @@ export const cloudClaudeRoleProfile = (args: {
   role: CloudCliTurnRole;
   threadId: string;
   conversationId: string;
+  nativeTools?: readonly string[];
 }): CloudClaudeRoleProfile =>
   args.role === "orchestrator"
     ? {
@@ -489,6 +492,7 @@ export const cloudClaudeRoleProfile = (args: {
         agentType: "orchestrator",
         cwd: CLOUD_ORCHESTRATOR_CLI_CWD,
         includePartialMessages: true,
+        nativeTools: args.nativeTools ?? [],
         mcpToolTimeoutMs: CLOUD_ORCHESTRATOR_MCP_TOOL_TIMEOUT_MS,
       }
     : {
@@ -497,6 +501,7 @@ export const cloudClaudeRoleProfile = (args: {
         agentType: "general",
         cwd: WORLD_ROOT,
         includePartialMessages: false,
+        nativeTools: args.nativeTools ?? [],
         autoCompactWindowTokens: CLAUDE_CODE_AGENT_AUTO_COMPACT_WINDOW,
       };
 
@@ -587,6 +592,7 @@ export const buildCloudClaudeTakeoverArgs = (options: {
   inputPrompt?: string;
   includePartialMessages?: boolean;
   streamInput?: boolean;
+  nativeTools?: readonly string[];
 }): string[] => [
   "-p",
   "--verbose",
@@ -603,9 +609,9 @@ export const buildCloudClaudeTakeoverArgs = (options: {
   "--mcp-config",
   options.mcpConfigPath,
   "--tools",
-  "",
+  (options.nativeTools ?? []).join(","),
   "--allowedTools",
-  `mcp__${CLOUD_CLAUDE_MCP_SERVER_NAME}`,
+  [...(options.nativeTools ?? []), `mcp__${CLOUD_CLAUDE_MCP_SERVER_NAME}`].join(","),
   "--setting-sources",
   "",
   "--settings",
@@ -749,6 +755,7 @@ export const runCloudClaude = async (options: {
       sessionId,
       includePartialMessages: profile.includePartialMessages,
       streamInput: Boolean(inbox),
+      nativeTools: profile.nativeTools,
     });
   const childEnv = buildClaudeChildEnv({
     initialEnv: process.env,

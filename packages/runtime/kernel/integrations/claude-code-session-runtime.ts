@@ -1245,6 +1245,18 @@ const normalizeNativeTools = (nativeTools: unknown): string[] =>
         ),
       ]
     : [];
+const nativeToolUses = (enabled: readonly string[]): string => {
+  const uses = [
+    enabled.some((name) => ["Read", "Edit", "Write", "Grep", "Glob"].includes(name)) ? "files" : "",
+    enabled.includes("Bash") ? "shell commands" : "",
+    enabled.includes("WebSearch") || enabled.includes("WebFetch")
+      ? "the web (WebSearch to search, WebFetch to read a page)"
+      : "",
+  ].filter(Boolean);
+  return uses.length > 1
+    ? `${uses.slice(0, -1).join(", ")} and ${uses.at(-1)}`
+    : (uses[0] ?? "what they do");
+};
 export const buildClaudeCodeNativeToolRuntimePrompt = (
   systemPrompt: string | undefined,
   nativeTools: readonly string[] = [],
@@ -1253,7 +1265,7 @@ export const buildClaudeCodeNativeToolRuntimePrompt = (
   return [
     systemPrompt?.trim() ?? "",
     enabled.length > 0
-      ? `Your Claude Code built-in tools for this session are ${enabled.join(", ")}; use them for files and ${enabled.includes("Bash") ? "shell commands" : "searches"}. Other built-ins are disabled. Use the available Stella tools for everything else and answer the user normally when finished.`
+      ? `Your Claude Code built-in tools for this session are ${enabled.join(", ")}; use them for ${nativeToolUses(enabled)}. Other built-ins are disabled. Use the available Stella tools for everything else and answer the user normally when finished.`
       : "Claude Code built-in tools are disabled for this session. Use the available Stella tools when needed and answer the user normally when finished.",
     "Never mention MCP, missing Claude tools, or the raw tool protocol to the user.",
   ]

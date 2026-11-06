@@ -219,10 +219,6 @@
         "loadFailed": "โหลด PDF ไม่สำเร็จ",
         "loading": "กำลังโหลด PDF…"
       },
-      "queuedMessages": {
-        "cancel": "ยกเลิกข้อความที่เข้าคิว",
-        "cancelAndEdit": "ยกเลิกและแก้ไข"
-      },
       "replyPeek": {
         "dismiss": "ปิดตัวอย่าง",
         "jumpToLatest": "ไปที่คำตอบล่าสุด"

@@ -224,10 +224,6 @@
         "loadFailed": "Kunne ikke indlæse PDF'en.",
         "loading": "Indlæser PDF…"
       },
-      "queuedMessages": {
-        "cancel": "Annuller besked i kø",
-        "cancelAndEdit": "Annuller og rediger"
-      },
       "replyPeek": {
         "dismiss": "Afvis forhåndsvisning",
         "jumpToLatest": "Gå til seneste svar"

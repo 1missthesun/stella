@@ -234,10 +234,6 @@
         "loadFailed": "Nie udało się wczytać PDF.",
         "loading": "Ładowanie PDF…"
       },
-      "queuedMessages": {
-        "cancel": "Anuluj wiadomość z kolejki",
-        "cancelAndEdit": "Anuluj i edytuj"
-      },
       "replyPeek": {
         "dismiss": "Zamknij podgląd",
         "jumpToLatest": "Przejdź do najnowszej odpowiedzi"

@@ -234,10 +234,6 @@
         "loadFailed": "Не удалось загрузить PDF.",
         "loading": "Загрузка PDF…"
       },
-      "queuedMessages": {
-        "cancel": "Отменить сообщение из очереди",
-        "cancelAndEdit": "Отменить и изменить"
-      },
       "replyPeek": {
         "dismiss": "Скрыть предпросмотр",
         "jumpToLatest": "Перейти к последнему ответу"

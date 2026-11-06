@@ -229,10 +229,6 @@
         "loadFailed": "Falha ao carregar o PDF.",
         "loading": "Carregando PDF…"
       },
-      "queuedMessages": {
-        "cancel": "Cancelar a mensagem na fila",
-        "cancelAndEdit": "Cancelar e editar"
-      },
       "replyPeek": {
         "dismiss": "Dispensar a prévia",
         "jumpToLatest": "Ir para a resposta mais recente"

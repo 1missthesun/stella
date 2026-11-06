@@ -224,10 +224,6 @@
         "loadFailed": "PDF:n lataus epäonnistui.",
         "loading": "Ladataan PDF:ää…"
       },
-      "queuedMessages": {
-        "cancel": "Peruuta jonossa oleva viesti",
-        "cancelAndEdit": "Peruuta ja muokkaa"
-      },
       "replyPeek": {
         "dismiss": "Hylkää esikatselu",
         "jumpToLatest": "Siirry uusimpaan vastaukseen"

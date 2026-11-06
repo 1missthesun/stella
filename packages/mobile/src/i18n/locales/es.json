@@ -229,10 +229,6 @@
         "loadFailed": "No se pudo cargar el PDF.",
         "loading": "Cargando PDF…"
       },
-      "queuedMessages": {
-        "cancel": "Cancelar el mensaje en cola",
-        "cancelAndEdit": "Cancelar y editar"
-      },
       "replyPeek": {
         "dismiss": "Descartar la vista previa",
         "jumpToLatest": "Ir a la última respuesta"

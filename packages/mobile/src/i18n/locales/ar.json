@@ -244,10 +244,6 @@
         "loadFailed": "تعذّر تحميل ملف PDF.",
         "loading": "جارٍ تحميل PDF…"
       },
-      "queuedMessages": {
-        "cancel": "ألغِ الرسالة المنتظرة",
-        "cancelAndEdit": "إلغاء وتعديل"
-      },
       "replyPeek": {
         "dismiss": "أغلق المعاينة",
         "jumpToLatest": "انتقل إلى أحدث رد"

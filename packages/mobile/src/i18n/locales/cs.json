@@ -234,10 +234,6 @@
         "loadFailed": "Nepodařilo se načíst PDF.",
         "loading": "Načítání PDF…"
       },
-      "queuedMessages": {
-        "cancel": "Zrušit zprávu ve frontě",
-        "cancelAndEdit": "Zrušit a upravit"
-      },
       "replyPeek": {
         "dismiss": "Zavřít náhled",
         "jumpToLatest": "Přejít na nejnovější odpověď"

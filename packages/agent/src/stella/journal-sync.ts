@@ -21,11 +21,103 @@ export type JournalMessage = {
   clientMsgId?: string;
 };
 
-export type JournalOpenTurn = {
+type JournalOpenTurn = {
   localTurnId: string;
   leaseToken: string;
   ownerGeneration: string;
   entries: number[];
+};
+
+/**
+ * One of this computer's turns as the cloud journal sees it. `held` names
+ * the mirror instance (`holder`) that holds its lease, so a held turn left by
+ * an earlier run of the app is one this run still has to adopt.
+ */
+export type MirrorTurn =
+  | { s: "beginning"; localTurnId: string }
+  | {
+      s: "held";
+      localTurnId: string;
+      leaseToken: string;
+      ownerGeneration: string;
+      entries: number[];
+      holder: string;
+    }
+  | { s: "ending"; localTurnId: string }
+  | { s: "lost"; localTurnId: string; reason: string }
+  | { s: "finished"; localTurnId: string };
+
+export type MirrorEvent =
+  | { e: "begin" }
+  | { e: "begun"; leaseToken: string; ownerGeneration: string; holder: string }
+  | { e: "refused"; reason: string }
+  | { e: "entry"; entryId: number }
+  | { e: "lease_lost"; reason: string }
+  | { e: "ending" }
+  | { e: "finished" }
+  | { e: "finish_failed"; reason: string };
+
+export const mirrorTransition = (
+  turn: MirrorTurn | undefined,
+  localTurnId: string,
+  event: MirrorEvent,
+): MirrorTurn | undefined => {
+  const s = turn?.s;
+  switch (event.e) {
+    case "begin":
+      return turn ?? { s: "beginning", localTurnId };
+    case "begun":
+      return s === undefined || s === "beginning" || s === "held"
+        ? {
+            s: "held",
+            localTurnId,
+            leaseToken: event.leaseToken,
+            ownerGeneration: event.ownerGeneration,
+            entries: turn?.s === "held" ? turn.entries : [],
+            holder: event.holder,
+          }
+        : turn;
+    case "refused":
+    case "lease_lost":
+      return s === undefined || s === "beginning" || s === "held"
+        ? { s: "lost", localTurnId, reason: event.reason }
+        : turn;
+    case "entry":
+      return turn?.s === "held" && !turn.entries.includes(event.entryId)
+        ? { ...turn, entries: [...turn.entries, event.entryId] }
+        : turn;
+    case "ending":
+      return s === "held" ? { s: "ending", localTurnId } : turn;
+    case "finished":
+      return s === "ending" ? { s: "finished", localTurnId } : turn;
+    case "finish_failed":
+      return s === "held" || s === "ending"
+        ? { s: "lost", localTurnId, reason: event.reason }
+        : turn;
+  }
+};
+
+const SETTLED_TURNS_KEPT = 16;
+
+export const mirrorTurnsOf = (state: Readonly<JournalSyncState>): MirrorTurn[] =>
+  state.turns ?? (state.open ? [{ s: "held", ...state.open, holder: "" }] : []);
+
+export const applyMirrorEvents = (
+  turns: readonly MirrorTurn[],
+  events: ReadonlyArray<readonly [string, MirrorEvent]>,
+): MirrorTurn[] => {
+  const byId = new Map(turns.map((turn) => [turn.localTurnId, turn]));
+  for (const [localTurnId, event] of events) {
+    const next = mirrorTransition(byId.get(localTurnId), localTurnId, event);
+    if (next) {
+      byId.delete(localTurnId);
+      byId.set(localTurnId, next);
+    }
+  }
+  const all = [...byId.values()];
+  const settled = all.filter((turn) => turn.s === "lost" || turn.s === "finished");
+  const drop = new Set<MirrorTurn>(settled.slice(0, Math.max(0, settled.length - SETTLED_TURNS_KEPT)));
+  return all.filter((turn) => !drop.has(turn));
 };
 
 export type JournalSyncState = {
@@ -36,6 +128,8 @@ export type JournalSyncState = {
   adoptedCheckpoint?: number;
   mirrored?: number;
   relayed?: string[];
+  turns?: MirrorTurn[];
+  /** Before `turns`; read once by `mirrorTurnsOf` and dropped on the next save. */
   open?: JournalOpenTurn;
   epoch?: number;
 };

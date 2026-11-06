@@ -37,9 +37,12 @@ import {
   noteCheckpointPublished,
   journalSeqOf,
   JournalSyncDoc,
+  applyMirrorEvents,
+  mirrorTurnsOf,
   type JournalMessage,
-  type JournalOpenTurn,
   type JournalStart,
+  type MirrorEvent,
+  type MirrorTurn,
   type JournalSyncState,
 } from "../stella/journal-sync.ts";
 import { NO_MESSAGE_ID, recordMessageId } from "../stella/message-ids.ts";
@@ -89,7 +92,9 @@ export type DesktopJournal = {
     records: Array<{ ordinal: number; role: "assistant" | "toolResult"; payloadJson: string }>;
     phase: "completed" | "failed" | "canceled";
     notice?: string;
+    onDeliveryFailure?: () => void;
   }): Promise<void>;
+  finishOutcome?(localTurnId: string): { s: "pending" } | { s: "delivered" } | { s: "dead"; reason: string };
   tools?(update: { localTurnId: string; leaseToken: string; tools: JournalTool[] }): void;
   appendVoice(append: { appendId: string; role: "user" | "assistant"; payloadJson: string; hidden: boolean }): Promise<void>;
   appendHistory?(append: {
@@ -185,6 +190,7 @@ const PAGE = 100;
 const REMOTE_TURN_STALE_MS = 30 * 60_000;
 const MIRRORED_EVENTS = new Set(["entry_appended", "message_end", "tool_execution_end", "run_end"]);
 const LEASE_SILENCE = "lease_renewal_silence";
+const FINISH_FAILED = "finish:";
 const CONFIRM_RETRY_MS = 10_000;
 
 const REFUSED_STOP_WAIT_MS = 30_000;
@@ -252,10 +258,9 @@ export async function journalMirror(args: {
       return [{ turnId, ...(clientMsgId ? { clientMsgId } : {}) }];
     });
   let remoteSeen = "[]";
-  const held = new Set<string>();
-  const ending = new Set<string>();
-  const lost = new Set<string>();
-  const adoptions = new Map<string, Promise<string | undefined>>();
+  const holder = randomUUID();
+  let known = new Map<string, MirrorTurn>();
+  let adopting: Promise<"held" | "refused" | "transient"> | undefined;
   let running = false;
   let again = false;
   let stopped = false;
@@ -308,6 +313,59 @@ export async function journalMirror(args: {
       return undefined;
     }, context);
 
+  const remember = (turns: readonly MirrorTurn[]) => {
+    known = new Map(turns.map((turn) => [turn.localTurnId, turn]));
+  };
+
+  const unsyncedNotice = async (): Promise<void> => {
+    const { model } = await root.agent(context);
+    const notice: AssistantMessage = {
+      role: "assistant",
+      content: [
+        {
+          type: "text",
+          text: "Stella's reply above couldn't be saved to your cloud chat, so your other devices won't show it.",
+        },
+      ],
+      api: "stella-notice",
+      provider: model?.provider ?? "stella",
+      model: model?.modelId ?? "notice",
+      usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+      stopReason: "stop",
+      timestamp: Date.now(),
+    };
+    await harness.commit(async (tx) => {
+      await tx.appendEntry(root.id, { kind: AssistantEntry.kind, model: [notice], data: { localOnly: true } });
+      return undefined;
+    }, context);
+  };
+
+  const apply = async (
+    events: ReadonlyArray<readonly [string, MirrorEvent]>,
+    patch?: (state: JournalSyncState) => void,
+  ): Promise<void> => {
+    const { before, after } = await harness.commit(async (tx) => {
+      const state = await tx.doc(JournalSyncDoc, root.id);
+      const prior = mirrorTurnsOf(state);
+      const next = applyMirrorEvents(prior, events);
+      state.turns = next;
+      delete state.open;
+      patch?.(state);
+      return { before: new Map(prior.map((turn) => [turn.localTurnId, turn.s])), after: next };
+    }, context);
+    remember(after);
+    const unsynced = after.some(
+      (turn) =>
+        turn.s === "lost" &&
+        turn.reason.startsWith(FINISH_FAILED) &&
+        (before.get(turn.localTurnId) === "held" || before.get(turn.localTurnId) === "ending"),
+    );
+    if (unsynced) await unsyncedNotice().catch(report);
+  };
+
+  const heldTurn = (): Extract<MirrorTurn, { s: "held" }> | undefined =>
+    [...known.values()].reverse().find((turn): turn is Extract<MirrorTurn, { s: "held" }> => turn.s === "held");
+
   let holdsRebuilt = false;
   const rebuildHolds = async () => {
     if (holdsRebuilt || !journal.usageLimitHolds || !args.onUsageLimit) return;
@@ -335,6 +393,7 @@ export async function journalMirror(args: {
   const importNow = async () => {
     await rebuildHolds();
     const synced = await doc();
+    remember(mirrorTurnsOf(synced));
     for (const id of synced.relayed ?? []) relayed.add(id);
     const start = await journalImportAfter(synced, journal.start);
     let after: number = start.after;
@@ -364,13 +423,12 @@ export async function journalMirror(args: {
           if (record.kind === "message" && record.role === "user" && record.clientMsgId && !record.hidden) {
             await recordMessageId(harness, root.id, record.clientMsgId, record.seq, context);
           }
-          const open = [...held].some(
-            (localTurnId) => !ending.has(localTurnId) && record.turnId.endsWith(`:${localTurnId}`),
+          const open = [...known.values()].find(
+            (turn) => turn.s === "held" && record.turnId.endsWith(`:${turn.localTurnId}`),
           );
           if (open && record.kind === "turn" && record.phase === "canceled") stoppedElsewhere = true;
           else if (open && record.kind === "turn" && record.phase && record.phase !== "started") {
-            const localTurnId = [...held].find((id) => !ending.has(id) && record.turnId.endsWith(`:${id}`));
-            if (localTurnId) loseTurn(localTurnId);
+            loseTurn(open.localTurnId, `ended_elsewhere:${record.phase}`);
           }
           continue;
         }
@@ -409,94 +467,131 @@ export async function journalMirror(args: {
     }
   };
 
-  const finishTurn = (open: Readonly<JournalOpenTurn>) =>
-    finishWith(open).catch((error: unknown) => {
-      held.delete(open.localTurnId);
-      ending.delete(open.localTurnId);
+  const finishTurn = async (localTurnId: string) => {
+    const open = known.get(localTurnId);
+    if (open?.s !== "held" || open.holder !== holder) return;
+    try {
+      const entries: EntryRecord[] = [];
+      for (const id of open.entries) {
+        const entry = await harness.commit(async (tx) => tx.entry(id as EntryId), context);
+        if (entry?.model?.[0]) entries.push(entry);
+      }
+      if (known.get(localTurnId)?.s !== "held") return;
+      const messages = entries.map((entry) => entry.model![0]!);
+      const last = [...messages].reverse().find((message) => message.role === "assistant");
+      await journal.finish({
+        localTurnId: open.localTurnId,
+        leaseToken: open.leaseToken,
+        ownerGeneration: open.ownerGeneration,
+        records: messages.map((message, ordinal) => ({
+          ordinal,
+          role: message.role === "assistant" ? "assistant" : "toolResult",
+          payloadJson: JSON.stringify(message),
+        })),
+        ...((last?.role === "assistant" ? piTerminalNotice(last) : undefined) ?? { phase: "completed" as const }),
+        onDeliveryFailure: () => sync(),
+      });
+      await apply([[open.localTurnId, { e: "ending" }]]);
+    } catch (error) {
       report(error);
-    });
-
-  const finishWith = async (open: Readonly<JournalOpenTurn>) => {
-    if (lost.has(open.localTurnId)) return;
-    const entries: EntryRecord[] = [];
-    for (const id of open.entries) {
-      const entry = await harness.commit(async (tx) => tx.entry(id as EntryId), context);
-      if (entry?.model?.[0]) entries.push(entry);
+      await apply([[open.localTurnId, { e: "finish_failed", reason: `${FINISH_FAILED}rejected` }]]).catch(report);
     }
-    const messages = entries.map((entry) => entry.model![0]!);
-    const last = [...messages].reverse().find((message) => message.role === "assistant");
-    ending.add(open.localTurnId);
-    await journal.finish({
-      localTurnId: open.localTurnId,
-      leaseToken: open.leaseToken,
-      ownerGeneration: open.ownerGeneration,
-      records: messages.map((message, ordinal) => ({
-        ordinal,
-        role: message.role === "assistant" ? "assistant" : "toolResult",
-        payloadJson: JSON.stringify(message),
-      })),
-      ...((last?.role === "assistant" ? piTerminalNotice(last) : undefined) ?? { phase: "completed" as const }),
-    });
-    held.delete(open.localTurnId);
-    ending.delete(open.localTurnId);
   };
 
-  const loseTurn = (localTurnId: string | undefined) => {
-    if (localTurnId) {
-      if (lost.has(localTurnId)) return;
-      lost.add(localTurnId);
-      held.delete(localTurnId);
+  const settleEnding = async () => {
+    const outcome = journal.finishOutcome;
+    if (!outcome) return;
+    const events: Array<[string, MirrorEvent]> = [];
+    for (const turn of known.values()) {
+      if (turn.s !== "ending") continue;
+      let settled: ReturnType<typeof outcome>;
+      try {
+        settled = outcome(turn.localTurnId);
+      } catch (error) {
+        report(error);
+        return;
+      }
+      if (settled.s === "delivered") events.push([turn.localTurnId, { e: "finished" }]);
+      else if (settled.s === "dead") {
+        events.push([turn.localTurnId, { e: "finish_failed", reason: `${FINISH_FAILED}${settled.reason}` }]);
+      }
     }
-    void stopStella(harness, root, context).catch(report);
+    if (events.length > 0) await apply(events);
+  };
+
+  const loseTurn = (localTurnId: string | undefined, reason: string) => {
+    void (async () => {
+      if (localTurnId) await apply([[localTurnId, { e: "lease_lost", reason }]]);
+      await stopStella(harness, root, context);
+    })().catch(report);
   };
 
   const brainHere = (record: PiBrainRecord | null) =>
     !record || (record.host === "device" && record.deviceId === journal.deviceId);
 
   const leaseLost = (localTurnId: string) => (reason: string) => {
-    if (stopped || ending.has(localTurnId)) return;
+    const turn = known.get(localTurnId);
+    if (stopped || (turn?.s !== "held" && turn?.s !== "beginning")) return;
     if (reason !== LEASE_SILENCE) {
-      loseTurn(localTurnId);
+      loseTurn(localTurnId, reason);
       return;
     }
     void (async () => {
       const record = await args.readBrain?.();
       if (record !== undefined && !brainHere(record)) {
-        loseTurn(localTurnId);
+        loseTurn(localTurnId, "brain_elsewhere");
         return;
       }
       await importNow();
     })().catch(report);
   };
 
-  const adopt = (turn: Readonly<JournalOpenTurn>): Promise<string | undefined> => {
-    const known = adoptions.get(turn.localTurnId);
-    if (known) return known;
-    const adoption = (async () => {
-      const userEntry = await harness.commit(async (tx) => tx.entry(Number(turn.localTurnId.split(":").at(-1)) as EntryId), context);
-      const user = userEntry?.model?.[0];
-      if (user?.role !== "user") return undefined;
-      const journaled = piJournalUserMessage(user as PiUserMessage);
-      const ack = await journal
-        .begin({
-          localTurnId: turn.localTurnId,
-          clientMsgId: turn.localTurnId,
-          userMessageJson: JSON.stringify(journaled.message),
-          hidden: journaled.hidden,
-          adopt: true,
-          ownerGeneration: turn.ownerGeneration,
-          onLeaseLost: leaseLost(turn.localTurnId),
-        })
-        .catch((error: unknown) => {
-          report(error);
-          return undefined;
-        });
-      if (!ack) return undefined;
-      held.add(turn.localTurnId);
-      return ack.leaseToken;
-    })();
-    adoptions.set(turn.localTurnId, adoption);
-    return adoption;
+  const adoptOnce = async (
+    turn: Readonly<Extract<MirrorTurn, { s: "held" }>>,
+  ): Promise<"held" | "refused" | "transient"> => {
+    const userEntry = await harness.commit(async (tx) => tx.entry(Number(turn.localTurnId.split(":").at(-1)) as EntryId), context);
+    const user = userEntry?.model?.[0];
+    if (user?.role !== "user") {
+      await apply([[turn.localTurnId, { e: "refused", reason: "prompt_missing" }]]);
+      return "refused";
+    }
+    const journaled = piJournalUserMessage(user as PiUserMessage);
+    try {
+      const ack = await journal.begin({
+        localTurnId: turn.localTurnId,
+        clientMsgId: turn.localTurnId,
+        userMessageJson: JSON.stringify(journaled.message),
+        hidden: journaled.hidden,
+        adopt: true,
+        ownerGeneration: turn.ownerGeneration,
+        onLeaseLost: leaseLost(turn.localTurnId),
+      });
+      await apply([[turn.localTurnId, { e: "begun", leaseToken: ack.leaseToken, ownerGeneration: turn.ownerGeneration, holder }]]);
+      return known.get(turn.localTurnId)?.s === "held" ? "held" : "refused";
+    } catch (error) {
+      report(error);
+      if ((error as { refused?: unknown } | null)?.refused !== true) return "transient";
+      const reason = (error as { reason?: unknown }).reason;
+      await apply([[turn.localTurnId, { e: "refused", reason: typeof reason === "string" ? reason : "refused" }]]);
+      return "refused";
+    }
+  };
+
+  const promptAfter = async (localTurnId: string): Promise<boolean> => {
+    const entryId = Number(localTurnId.split(":").at(-1));
+    if (!Number.isFinite(entryId)) return true;
+    const later = await harness.commit(
+      async (tx) => (await tx.scanEntries({ conversationId: root.id, minEntryId: (entryId + 1) as EntryId, order: "ascending" }, PAGE)).items,
+      context,
+    );
+    return later.length === PAGE || later.some((entry) => entry.kind === "pi.user");
+  };
+
+  const adoptHeld = (turn: Readonly<Extract<MirrorTurn, { s: "held" }>>) => {
+    adopting ??= adoptOnce(turn).finally(() => {
+      adopting = undefined;
+    });
+    return adopting;
   };
 
   const confirmResumed = async (): Promise<boolean> => {
@@ -513,26 +608,47 @@ export async function journalMirror(args: {
         }
       }
     }
-    const open = (await doc()).open;
+    remember(mirrorTurnsOf(await doc()));
+    const open = heldTurn();
     if (!brainHere(record)) {
-      loseTurn(open?.localTurnId);
+      loseTurn(open?.localTurnId, "brain_elsewhere");
       return false;
     }
-    if (open && !(await adopt(open))) {
-      loseTurn(open.localTurnId);
+    if (!open) {
+      const latest = [...known.values()].at(-1);
+      if (latest?.s !== "lost" || (await promptAfter(latest.localTurnId))) return true;
+      loseTurn(undefined, latest.reason);
       return false;
     }
-    return !(open && lost.has(open.localTurnId));
+    for (;;) {
+      if (stopped) return false;
+      const current = heldTurn();
+      if (!current) return false;
+      if (current.holder === holder) return true;
+      const adopted = await adoptHeld(current);
+      if (adopted === "held") return true;
+      if (adopted === "refused") {
+        loseTurn(undefined, "adopt_refused");
+        return false;
+      }
+      await new Promise((resolve) => setTimeout(resolve, CONFIRM_RETRY_MS));
+    }
   };
 
   const mirror = async () => {
     const state = await doc();
+    remember(mirrorTurnsOf(state));
+    await settleEnding();
     const syncId = state.syncId ?? randomUUID();
     let mirrored = state.mirrored ?? 0;
-    let open: JournalOpenTurn | undefined = state.open && { ...state.open, entries: [...state.open.entries] };
-    if (open && (lost.has(open.localTurnId) || adoptions.has(open.localTurnId) || !held.has(open.localTurnId))) {
-      const leaseToken = lost.has(open.localTurnId) ? undefined : await adopt(open);
-      open = leaseToken && !lost.has(open.localTurnId) ? { ...open, leaseToken } : undefined;
+    let open = heldTurn();
+    if (open && open.holder !== holder) {
+      const adopted = await adoptHeld(open);
+      open = adopted === "held" ? heldTurn() : undefined;
+      if (adopted === "transient") {
+        setTimeout(sync, CONFIRM_RETRY_MS);
+        return;
+      }
     }
     // A turn ends when the orchestrator goes idle. Idleness is read before
     // the scan that follows it, so every entry of a run that had ended by
@@ -548,6 +664,7 @@ export async function journalMirror(args: {
           async (tx) => (await tx.scanEntries({ conversationId: root.id, minEntryId: (mirrored + 1) as EntryId, order: "ascending" }, PAGE)).items,
           context,
         );
+        const events: Array<[string, MirrorEvent]> = [];
         for (const entry of page) {
           const message = entry.model?.[0];
           const localOnly = (entry.data as { localOnly?: unknown } | undefined)?.localOnly === true;
@@ -562,13 +679,17 @@ export async function journalMirror(args: {
                 hidden: journaled?.hidden ?? said.stella?.hidden === true,
               });
             } else if (entry.kind === "pi.user" && message.role === "user") {
-              if (open) await finishTurn(open);
+              if (open) {
+                await apply(events.splice(0));
+                await finishTurn(open.localTurnId);
+              }
               const journaled = piJournalUserMessage(message as PiUserMessage);
               const localTurnId = `pi:${syncId}:${entry.id}`;
               const relayId = journaled.clientMsgId && CLIENT_MSG_ID_PATTERN.test(journaled.clientMsgId)
                 ? journaled.clientMsgId
                 : localTurnId;
               const typed = journaled.hidden ? undefined : relayedMessage(relayId, message as PiUserMessage);
+              await apply([[localTurnId, { e: "begin" }]]);
               const ack = await journal
                 .begin({
                   localTurnId,
@@ -594,41 +715,41 @@ export async function journalMirror(args: {
                       await stopStella(harness, root, context).catch(report);
                     }
                   }
+                  const reason = (error as { reason?: unknown } | null)?.reason;
+                  events.push([localTurnId, { e: "refused", reason: typeof reason === "string" ? reason : "begin_failed" }]);
                   return undefined;
                 });
-              if (ack) held.add(localTurnId);
+              if (ack) {
+                events.push([localTurnId, { e: "begun", leaseToken: ack.leaseToken, ownerGeneration: ack.ownerGeneration, holder }]);
+              }
               if (journaled.clientMsgId && !journaled.hidden) {
                 await recordMessageId(harness, root.id, journaled.clientMsgId, ack?.promptSeq ?? NO_MESSAGE_ID, context);
               }
               open = ack
-                ? { localTurnId, leaseToken: ack.leaseToken, ownerGeneration: ack.ownerGeneration, entries: [] }
+                ? { s: "held", localTurnId, leaseToken: ack.leaseToken, ownerGeneration: ack.ownerGeneration, entries: [], holder }
                 : undefined;
             } else if (open && (entry.kind === "pi.assistant" || entry.kind === "pi.tool-result")) {
               open = { ...open, entries: [...open.entries, entry.id] };
+              events.push([open.localTurnId, { e: "entry", entryId: entry.id }]);
               const tools = toolsOf(message);
-              if (tools.length > 0 && !lost.has(open.localTurnId) && !ending.has(open.localTurnId)) {
+              if (tools.length > 0 && known.get(open.localTurnId)?.s === "held") {
                 journal.tools?.({ localTurnId: open.localTurnId, leaseToken: open.leaseToken, tools });
               }
             }
           }
           mirrored = entry.id;
         }
-        const turn = open;
-        await save((current) => {
+        await apply(events, (current) => {
           current.syncId = syncId;
           current.mirrored = mirrored;
-          if (turn) current.open = turn;
-          else delete current.open;
         });
+        if (open && known.get(open.localTurnId)?.s !== "held") open = undefined;
         if (page.length < PAGE) break;
       }
       if (!open || !idle) break;
       if (open.localTurnId === openedBefore) {
-        await finishTurn(open);
+        await finishTurn(open.localTurnId);
         open = undefined;
-        await save((current) => {
-          delete current.open;
-        });
         break;
       }
       idle = await idleNow();
@@ -667,7 +788,7 @@ export async function journalMirror(args: {
   const standing = args.resumed
     ? confirmResumed().catch((error: unknown) => {
         report(error);
-        loseTurn(undefined);
+        loseTurn(undefined, "confirm_failed");
         return false;
       })
     : Promise.resolve(true);
@@ -681,7 +802,7 @@ export async function journalMirror(args: {
   return {
     importNow,
     remoteTurns,
-    turnOpen: () => held.size > 0,
+    turnOpen: () => [...known.values()].some((turn) => turn.s === "held" || turn.s === "beginning"),
     standing,
     sync,
     async stop() {

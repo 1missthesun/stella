@@ -253,6 +253,10 @@ export class SessionStore {
       );
   }
 
+  getCloudTranscriptOutbox(id: string): CloudTranscriptOutboxRecord | undefined {
+    return this.transcriptOutbox.get(id);
+  }
+
   listCloudTranscriptOutbox(limit = 256): CloudTranscriptOutboxRecord[] {
     return this.transcriptOutbox.list(limit);
   }

@@ -319,6 +319,7 @@ export type RunnerPublicApi = {
     begin: import("./cloud-transcript-write.js").CloudTranscriptWriter["begin"];
     promptSeq: import("./cloud-transcript-write.js").CloudTranscriptWriter["promptSeq"];
     finish: import("./cloud-transcript-write.js").CloudTranscriptWriter["finish"];
+    finishOutcome: import("./cloud-transcript-write.js").CloudTranscriptWriter["finishOutcome"];
     append: import("./cloud-transcript-write.js").CloudTranscriptWriter["append"];
     history: import("./cloud-transcript-write.js").CloudTranscriptWriter["history"];
     priorTurnPromptSeq: import("./cloud-transcript-write.js").CloudTranscriptWriter["priorTurnPromptSeq"];

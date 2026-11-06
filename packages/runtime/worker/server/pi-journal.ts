@@ -250,11 +250,13 @@ export const cloudJournalFor = (
         records: turn.records,
         phase: turn.phase,
         ...(turn.notice ? { notice: turn.notice } : {}),
+        ...(turn.onDeliveryFailure ? { onDeliveryFailure: turn.onDeliveryFailure } : {}),
       });
       if (!status.queued) {
         throw new Error(`A turn was too large for the cloud journal (${status.reason}).`);
       }
     },
+    finishOutcome: (localTurnId) => runner().cloudJournal.finishOutcome(conversationId, localTurnId),
     relay: async (message) => {
       const { clientMsgId } = message;
       const auth = runner().getStellaSiteAuth();

@@ -432,6 +432,8 @@ export const createStellaHostRunner = (
       promptSeq: (conversationId, ack) =>
         context.cloudTranscript.promptSeq(conversationId, ack),
       finish: (request) => context.cloudTranscript.finish(request),
+      finishOutcome: (conversationId, localTurnId) =>
+        context.cloudTranscript.finishOutcome(conversationId, localTurnId),
       append: (request) => context.cloudTranscript.append(request),
       history: (conversationId) => context.cloudTranscript.history(conversationId),
       priorTurnPromptSeq: (conversationId, throughSeq) =>

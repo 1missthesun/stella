@@ -760,16 +760,17 @@ const resolveAccess = async (ctx: OwnerContext, provider: string): Promise<Provi
       if (credential.expires <= Date.now()) return null;
     }
     if (credential !== stored) {
-      const current = rowOf(ctx.db, provider);
-      if (current?.payload !== row.payload) return null;
       const { type: _type, ...fields } = credential as OAuthCredential & { type?: string };
+      const payload = await encrypt(ctx, provider, { ...fields, type: "oauth" } as StoredCredential);
       ctx.db.run(
-        "UPDATE provider_credentials SET payload = ?, checked_at = ?, updated_at = ? WHERE provider = ?",
-        await encrypt(ctx, provider, { ...fields, type: "oauth" } as StoredCredential),
+        "UPDATE provider_credentials SET payload = ?, checked_at = ?, updated_at = ? WHERE provider = ? AND payload = ?",
+        payload,
         Date.now(),
         Date.now(),
         provider,
+        row.payload,
       );
+      if (rowOf(ctx.db, provider)?.payload !== payload) return await resolveAccess(ctx, provider);
     }
   }
   const auth = await oauth.toAuth(credential);

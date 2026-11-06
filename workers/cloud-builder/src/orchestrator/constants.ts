@@ -104,6 +104,7 @@ export const TERMINAL_NOTICE = {
   timeout: "This took longer than expected, so Stella stopped. Try again.",
   canceled: "Stopped.",
   failed: "Stella hit a problem answering this. Try again.",
+  interrupted: "Stella was interrupted answering this. Try again.",
 } as const;
 
 export const CLOUD_CONTEXT_NOTICE =

@@ -22,6 +22,7 @@ import type {
   OwnerFenceLeaseReceipt,
   LocalTurnLease,
   LocalTurnFinishReceipt,
+  OwedTerminal,
 } from "./orchestrator/types.js";
 import {
   AGENT_RUNTIME_KEY,
@@ -157,24 +158,28 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
         );
         return;
       }
-      await this.ctx.storage.put("terminal", true);
-      this.currentTurnCancellation?.abort();
-      this.currentPiRun?.abort();
-      if (!this.currentPiRun) {
-        await this.abortPiConversation().catch((error: unknown) => {
-          log("error", "pi_conversation_abort_failed", {
-            turnId: turn.turnId,
-            message: errorMessage(error),
+      const live = this.turnExecutions.has(turn.turnId);
+      const expired: OwedTerminal = live
+        ? { kind: "timeout", message: TERMINAL_NOTICE.timeout }
+        : { kind: "failed", message: TERMINAL_NOTICE.interrupted };
+      owed = await this.decideTerminal(turn.turnId, expired);
+      if (owed === expired) {
+        this.currentTurnCancellation?.abort();
+        this.currentPiRun?.abort();
+        if (!this.currentPiRun) {
+          await this.abortPiConversation().catch((error: unknown) => {
+            log("error", "pi_conversation_abort_failed", {
+              turnId: turn.turnId,
+              message: errorMessage(error),
+            });
           });
+        }
+        log("error", live ? "chat_turn_timed_out" : "chat_turn_interrupted", {
+          turnId: turn.turnId,
+          conversationId: turn.conversationId,
         });
+        this.recordTerminal(turn, expired.kind, expired.message);
       }
-      log("error", "chat_turn_timed_out", {
-        turnId: turn.turnId,
-        conversationId: turn.conversationId,
-      });
-      this.recordTerminal(turn, "timeout", TERMINAL_NOTICE.timeout);
-      owed = { kind: "timeout", message: TERMINAL_NOTICE.timeout };
-      await this.ctx.storage.put("terminalOwed", owed);
     }
     try {
       await this.emitTurnEvent(
@@ -193,7 +198,7 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
         ((await this.ctx.storage.get<number>("alarmAttempts")) ?? 0) + 1;
       if (attempts <= 5) {
         await this.ctx.storage.put("alarmAttempts", attempts);
-        await this.ctx.storage.setAlarm(Date.now() + 30_000);
+        await this.armAlarmNoLaterThan(Date.now() + 30_000);
       } else {
         await this.ctx.storage.put("terminalDelivered", true);
         log("error", "terminal_delivery_abandoned", {

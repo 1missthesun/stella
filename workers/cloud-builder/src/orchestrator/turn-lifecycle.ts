@@ -125,6 +125,24 @@ export abstract class OrchestratorTurnLifecycle extends OrchestratorOwner {
     return { kind: kind as TurnPhase, message: terminalNotice(kind) };
   }
 
+  protected async decideTerminal(
+    turnId: string,
+    owed: OwedTerminal,
+  ): Promise<OwedTerminal> {
+    return await this.ctx.blockConcurrencyWhile(async () => {
+      const stored = await this.getTurnState<ChatTurnRequest>("turn");
+      if (
+        stored?.turnId === turnId &&
+        (await this.getTurnState<boolean>("terminal"))
+      ) {
+        const decided = await this.owedTerminal(stored);
+        if (decided) return decided;
+      }
+      await this.putTurnState({ terminal: true, terminalOwed: owed });
+      return owed;
+    });
+  }
+
   protected async completeChatTurn(
     turn: ChatTurnRequest,
     finalText: string,
@@ -137,10 +155,10 @@ export abstract class OrchestratorTurnLifecycle extends OrchestratorOwner {
       payload: { text: finalText, wallClockMs },
       eventSeq: await this.nextTurnEventSeq(turn.turnId),
     };
-    await this.ctx.storage.put({
-      terminal: true,
-      terminalOwed: completedOwed,
-    });
+    if ((await this.decideTerminal(turn.turnId, completedOwed)) !== completedOwed) {
+      await this.afterTerminal(turn);
+      return json({ ok: false, canceled: true });
+    }
     this.recordTerminal(turn, "completed", undefined, wallClockMs);
     try {
       await this.emitTurnEvent(
@@ -155,7 +173,7 @@ export abstract class OrchestratorTurnLifecycle extends OrchestratorOwner {
       );
       await this.ctx.storage.put("terminalDelivered", true);
     } catch {
-      await this.ctx.storage.setAlarm(Date.now() + 30_000);
+      await this.armAlarmNoLaterThan(Date.now() + 30_000);
     }
     await this.afterTerminal(turn);
     // Keep the alarm alive while queued turns remain: it is the wake

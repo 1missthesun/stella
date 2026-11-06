@@ -308,6 +308,7 @@ export abstract class OrchestratorCliTurn extends OrchestratorTools {
       });
       return false;
     }
+    if (await this.getTurnState<boolean>("terminal")) return true;
     const card: ClaudeUsageLimitCard = {
       type: "usage-limit",
       state: "held",

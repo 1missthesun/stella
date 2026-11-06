@@ -60,6 +60,12 @@ export abstract class OrchestratorTurnQueue extends OrchestratorTurnLifecycle {
       ownerId: target.ownerId,
       ownerGeneration: target.ownerGeneration,
     });
+    if (response.status === 409) {
+      const refusal = (await response.json().catch(() => null)) as {
+        reason?: string;
+      } | null;
+      if (refusal?.reason === "terminal_already_decided") return;
+    }
     if (!response.ok) {
       throw new Error(
         `Exact turn cancellation failed with ${response.status}.`,
@@ -315,7 +321,27 @@ export abstract class OrchestratorTurnQueue extends OrchestratorTurnLifecycle {
         message: TERMINAL_NOTICE.canceled,
         eventSeq: await this.nextTurnEventSeq(exactTurn.turnId),
       };
-      await this.ctx.storage.put({ terminal: true, terminalOwed: owed });
+      const decided = await this.decideTerminal(exactTurn.turnId, owed);
+      if (decided !== owed) {
+        if (decided.kind !== "canceled") {
+          return json(
+            {
+              canceled: false,
+              reason: "terminal_already_decided",
+              turnId: request.turnId,
+            },
+            409,
+          );
+        }
+        if (execution) await execution.join();
+        await this.acknowledgeExactTurnCancellation(request);
+        return json({
+          canceled: true,
+          turnId: request.turnId,
+          replayed: true,
+          joined: true,
+        });
+      }
       await execution?.interrupt(new Error("The chat turn was stopped."));
       await this.journalStoppedPrompt(exactTurn);
       this.recordTerminal(exactTurn, "canceled", TERMINAL_NOTICE.canceled);
@@ -332,7 +358,7 @@ export abstract class OrchestratorTurnQueue extends OrchestratorTurnLifecycle {
         );
         await this.ctx.storage.put("terminalDelivered", true);
       } catch {
-        await this.ctx.storage.setAlarm(Date.now() + 30_000);
+        await this.armAlarmNoLaterThan(Date.now() + 30_000);
       }
       await this.finalizeTerminalTurn(exactTurn);
       if (execution) await execution.join();
@@ -404,6 +430,8 @@ export abstract class OrchestratorTurnQueue extends OrchestratorTurnLifecycle {
         resumeCount,
         ageMs: Number.isFinite(ageMs) ? ageMs : null,
       });
+      await this.putTurnState({ turnWatchdogAt: now });
+      await this.ctx.storage.setAlarm(now);
       return null;
     }
     const count = resumeCount + 1;

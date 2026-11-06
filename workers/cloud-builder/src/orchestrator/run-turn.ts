@@ -254,7 +254,7 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
         );
         await this.ctx.storage.put("terminalDelivered", true);
       } catch {
-        await this.ctx.storage.setAlarm(Date.now() + 30_000);
+        await this.armAlarmNoLaterThan(Date.now() + 30_000);
       }
       await this.afterTerminal(turn);
       if (!(await this.acknowledgeExactTurnCancellation(cancellation))) {
@@ -375,15 +375,25 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
       stale.turnId !== turn.turnId &&
       !(await this.getTurnState<boolean>("terminalDelivered"))
     ) {
-      const interrupted = "Stella was interrupted answering this. Try again.";
+      const interrupted: OwedTerminal = {
+        kind: "failed",
+        message: TERMINAL_NOTICE.interrupted,
+      };
+      const owed = await this.decideTerminal(stale.turnId, interrupted);
+      if (owed === interrupted) {
+        this.recordTerminal(stale, "failed", TERMINAL_NOTICE.interrupted);
+      }
       await this.emitTurnEvent(
         stale,
-        "failed",
-        { message: interrupted },
-        { terminal: true, errorMessage: interrupted },
+        owed.kind,
+        owed.payload ?? { message: owed.message },
+        {
+          terminal: true,
+          eventSeq: await this.terminalEventSeq(stale, owed),
+          ...(owed.kind !== "completed" ? { errorMessage: owed.message } : {}),
+        },
       ).catch(() => undefined);
       await this.releaseOwnerGate(stale);
-      this.recordTerminal(stale, "failed", interrupted);
     }
     const reclaimed = stale?.turnId === turn.turnId;
     const [storedWatchdogAt, storedStartedAt] = reclaimed
@@ -857,17 +867,13 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
             : {}),
         });
       }
-      if (!(await this.getTurnState<boolean>("terminal"))) {
-        const failedOwed: OwedTerminal = {
-          kind: "failed",
-          message: terminalNotice,
-          payload: terminalPayload,
-          eventSeq: await this.nextTurnEventSeq(turn.turnId),
-        };
-        await this.ctx.storage.put({
-          terminal: true,
-          terminalOwed: failedOwed,
-        });
+      const failedOwed: OwedTerminal = {
+        kind: "failed",
+        message: terminalNotice,
+        payload: terminalPayload,
+        eventSeq: await this.nextTurnEventSeq(turn.turnId),
+      };
+      if ((await this.decideTerminal(turn.turnId, failedOwed)) === failedOwed) {
         this.recordTerminal(turn, "failed", terminalNotice);
         try {
           await this.emitTurnEvent(turn, "failed", terminalPayload, {
@@ -877,7 +883,7 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
           });
           await this.ctx.storage.put("terminalDelivered", true);
         } catch {
-          await this.ctx.storage.setAlarm(Date.now() + 30_000);
+          await this.armAlarmNoLaterThan(Date.now() + 30_000);
         }
       }
       await this.afterTerminal(turn);

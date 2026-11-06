@@ -53,7 +53,6 @@ export function useShellConversationSource({
   const routeIsListedOrPendingCloudConversation = isOwnedCloudConversation(
     scopedCloudConversations,
     routeConversationId,
-    accountScope,
     ownerSubject,
   );
   const routeLookupId =

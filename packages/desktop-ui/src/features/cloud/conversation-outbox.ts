@@ -8,6 +8,7 @@ import { REASONING_EFFORT_LEVELS } from "@stella/contracts/reasoning-effort";
 import type { JournalRecord } from "@stella/contracts/conversation-protocol";
 import type { CloudAttachment } from "./cloud-composer-store";
 import type { DesktopExecutionTarget } from "../execution-placement/execution-target-store";
+import { isWebShell } from "./cloud-composer-store";
 
 export type CloudConversationOutboxAuthority = {
   accountScope: string;
@@ -53,7 +54,8 @@ export type CloudConversationOutboxStorage = Pick<
 >;
 
 const STORAGE_PREFIX = "stella:cloud-conversation-outbox:v1:";
-const MAX_OUTBOX_ENTRIES = 32;
+const MAX_CONVERSATION_ENTRIES = 32;
+const FAILED_ENTRY_TTL_MS = 24 * 60 * 60 * 1000;
 const MAX_ENTRY_BYTES = 256_000;
 const MAX_SCOPE_CHARS = 512;
 const MAX_GENERATION_CHARS = 512;
@@ -303,8 +305,13 @@ const storageKeys = (storage: CloudConversationOutboxStorage): string[] => {
   return keys;
 };
 
+const sameConversation = (a: PendingPrompt, b: PendingPrompt): boolean =>
+  authorityMatches(a, b) &&
+  a.submission.requestedConversationId === b.submission.requestedConversationId;
+
 export const createCloudConversationOutbox = (
   getStorage: () => CloudConversationOutboxStorage | null,
+  now: () => number = Date.now,
 ) => {
   const requireStorage = (): CloudConversationOutboxStorage => {
     const storage = getStorage();
@@ -336,8 +343,11 @@ export const createCloudConversationOutbox = (
       const storage = requireStorage();
       const current: PendingPrompt[] = [];
       const byClientMsgId = new Map<string, PendingPrompt>();
+      const expiredBefore = now() - FAILED_ENTRY_TTL_MS;
       for (const entry of readAll()) {
-        if (authorityMatches(entry, authority)) {
+        if (entry.error !== null && entry.createdAtMs < expiredBefore) {
+          storage.removeItem(cloudConversationOutboxStorageKey(entry));
+        } else if (authorityMatches(entry, authority)) {
           if (byClientMsgId.has(entry.clientMsgId)) {
             throw new Error(
               "Reliable message storage contains conflicting prior deliveries.",
@@ -352,6 +362,11 @@ export const createCloudConversationOutbox = (
       return current.sort((a, b) => a.createdAtMs - b.createdAtMs);
     },
 
+    clear(): void {
+      const storage = requireStorage();
+      for (const key of storageKeys(storage)) storage.removeItem(key);
+    },
+
     purgeOtherAccounts(accountScope: string): void {
       const storage = requireStorage();
       for (const entry of readAll()) {
@@ -361,7 +376,7 @@ export const createCloudConversationOutbox = (
       }
     },
 
-    enqueue(entry: PendingPrompt): PendingPrompt {
+    enqueue(entry: PendingPrompt): { entry: PendingPrompt; pruned: PendingPrompt[] } {
       const storage = requireStorage();
       const all = readAll();
       const collision = all.find(
@@ -375,23 +390,30 @@ export const createCloudConversationOutbox = (
             "That reliable message id is already bound to a different request.",
           );
         }
-        return collision;
+        return { entry: collision, pruned: [] };
       }
-      if (all.length >= MAX_OUTBOX_ENTRIES) {
+      const conversation = all
+        .filter((candidate) => sameConversation(candidate, entry))
+        .sort((a, b) => a.createdAtMs - b.createdAtMs);
+      const failed = conversation.filter((candidate) => candidate.error !== null);
+      const overflow = conversation.length + 1 - MAX_CONVERSATION_ENTRIES;
+      if (overflow > failed.length) {
         throw new Error(
           "Too many messages are waiting for reliable delivery. Retry after they finish.",
         );
       }
+      const pruned = overflow > 0 ? failed.slice(0, overflow) : [];
       const durable = {
         ...entry,
         durable: true,
         deliveryAcknowledged: false,
       };
-      storage.setItem(
-        cloudConversationOutboxStorageKey(durable),
-        serialize(durable),
-      );
-      return durable;
+      const raw = serialize(durable);
+      for (const stale of pruned) {
+        storage.removeItem(cloudConversationOutboxStorageKey(stale));
+      }
+      storage.setItem(cloudConversationOutboxStorageKey(durable), raw);
+      return { entry: durable, pruned };
     },
 
     update(entry: PendingPrompt): PendingPrompt | null {
@@ -492,6 +514,20 @@ const frozenSubmission = (
       : {}),
   });
 
+const withoutEntries = (
+  entries: readonly PendingPrompt[],
+  removed: readonly PendingPrompt[],
+): readonly PendingPrompt[] =>
+  removed.length === 0
+    ? entries
+    : entries.filter(
+        (entry) =>
+          !removed.some(
+            (gone) =>
+              authorityMatches(entry, gone) && entry.clientMsgId === gone.clientMsgId,
+          ),
+      );
+
 const emitPending = (next: readonly PendingPrompt[]): void => {
   pending = next;
   for (const listener of pendingListeners) listener();
@@ -535,12 +571,15 @@ export const pendingPrompts = {
       submission: frozenSubmission(submission),
     };
     let entry = base;
+    let current = pending;
     if (
       activePendingAuthorityReady &&
       activePendingAuthorityKey === authorityKey(authority)
     ) {
       try {
-        entry = cloudConversationOutbox.enqueue(base);
+        const queued = cloudConversationOutbox.enqueue(base);
+        entry = queued.entry;
+        current = withoutEntries(current, queued.pruned);
       } catch (error) {
         entry = { ...base, error: reliableStorageError(error) };
       }
@@ -551,7 +590,7 @@ export const pendingPrompts = {
           "Stella is still verifying reliable delivery for this account. This message was not sent.",
       };
     }
-    emitPending([...pending, entry]);
+    emitPending([...current, entry]);
     return entry;
   },
   bindDispatch(
@@ -635,12 +674,18 @@ export const pendingPrompts = {
       retryOnNextActivation: false,
     };
     try {
-      const durable = found.durable
-        ? cloudConversationOutbox.update(candidate)
-        : cloudConversationOutbox.enqueue(candidate);
+      let current = pending;
+      let durable: PendingPrompt | null;
+      if (found.durable) {
+        durable = cloudConversationOutbox.update(candidate);
+      } else {
+        const queued = cloudConversationOutbox.enqueue(candidate);
+        durable = queued.entry;
+        current = withoutEntries(current, queued.pruned);
+      }
       if (!durable) return null;
       emitPending(
-        pending.map((entry) =>
+        current.map((entry) =>
           ownsPending(entry, authority) && entry.clientMsgId === clientMsgId
             ? durable
             : entry,
@@ -786,6 +831,16 @@ export const pendingPrompts = {
     activePendingAuthorityKey = nextAuthorityKey;
     activePendingAuthorityReady = false;
     inFlightPending.clear();
+    if (!isWebShell()) {
+      try {
+        cloudConversationOutbox.clear();
+      } catch {
+        // The desktop never sends through this outbox; leftover rows stay inert.
+      }
+      activePendingAuthorityReady = true;
+      emitPending(EMPTY_PENDING);
+      return true;
+    }
     try {
       const hydrated = cloudConversationOutbox
         .activate(authority)
@@ -799,7 +854,16 @@ export const pendingPrompts = {
           return cloudConversationOutbox.update(rearmed) ?? entry;
         });
       activePendingAuthorityReady = true;
-      emitPending(hydrated);
+      const stored = new Set(hydrated.map((entry) => entry.clientMsgId));
+      const inMemoryOnly = pending.filter(
+        (entry) =>
+          !entry.durable &&
+          ownsPending(entry, authority) &&
+          !stored.has(entry.clientMsgId),
+      );
+      emitPending(
+        [...hydrated, ...inMemoryOnly].sort((a, b) => a.createdAtMs - b.createdAtMs),
+      );
       return true;
     } catch {
       emitPending(EMPTY_PENDING);

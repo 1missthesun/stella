@@ -12,13 +12,10 @@ import { useCloudConversationSession } from "@/global/auth/hooks/use-cloud-conve
 import { getAuthToken } from "@/global/auth/services/auth-token";
 import { backendSocketUrl, backendUrl } from "@/platform/backend/backend-client";
 import { useCloudEngines } from "./cloud-engines-api";
-import { markCloudConversationCreated } from "./cloud-conversation-selection";
 import {
   CloudTurnStartClientError,
   CloudTurnStartTransportError,
-  cloudTurnStartRequest,
   newCloudConversationId,
-  startCloudTurn,
 } from "./turn-start-client";
 import {
   getCloudExecutionSelectionSnapshot,
@@ -444,46 +441,6 @@ export const useConversation = (
           pendingPrompts.drop(sendAuthority, clientMsgId);
           return;
         }
-        if (!webShell) {
-          const targetConversationId = submission.requestedConversationId;
-          if (!targetConversationId) {
-            throw new Error("Open a cloud conversation before sending.");
-          }
-          const httpOrigin = config.httpOrigin;
-          if (!httpOrigin) {
-            throw new Error(
-              "Stella's cloud isn't reachable yet. Try again in a moment.",
-            );
-          }
-          const result = await startCloudTurn({
-            httpOrigin,
-            conversationId: targetConversationId,
-            request: cloudTurnStartRequest(clientMsgId, submission, entry.text),
-            getToken: (options) => getAuthToken(options ?? {}),
-          });
-          if (!isCurrentAuthority()) return;
-          if (result.createdConversation) {
-            markCloudConversationCreated(
-              result.conversationId,
-              entry.accountScope,
-            );
-          }
-          pendingPrompts.bind(
-            sendAuthority,
-            clientMsgId,
-            result.conversationId,
-            result.turnId,
-          );
-          pendingPrompts.acknowledgeAdmission(
-            sendAuthority,
-            clientMsgId,
-            result.conversationId,
-            result.turnId,
-          );
-          turnOrder.release();
-          onSent(submission.attachments);
-          return;
-        }
         const requestedConversationId = submission.requestedConversationId;
         if (!requestedConversationId) {
           throw new Error("Open a cloud conversation before sending.");
@@ -641,7 +598,7 @@ export const useConversation = (
         pendingPrompts.releaseDispatch(sendAuthority, clientMsgId);
       }
     },
-    [config.httpOrigin, decoratePrompt, onSent, webShell],
+    [config.httpOrigin, decoratePrompt, onSent],
   );
 
   useEffect(() => {

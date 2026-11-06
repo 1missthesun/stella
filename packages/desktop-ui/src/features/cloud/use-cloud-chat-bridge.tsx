@@ -65,8 +65,6 @@ import {
   useBrowserAttachmentUploads,
 } from "./browser-chat-attachments";
 import { provideCloudSendRecovery } from "./cloud-send-recovery";
-import { isPendingCloudConversation } from "./cloud-conversation-selection";
-import { useCloudConversationSession } from "@/global/auth/hooks/use-cloud-conversation-session";
 
 const EMPTY_EVENTS: EventRecord[] = [];
 const EMPTY_MESSAGES: MessageRecord[] = [];
@@ -363,14 +361,12 @@ export function useCloudChatBridge({
   const cloudActivity = useCloudConversationActivity(
     enabled ? conversationId : null,
   );
-  const { accountScope } = useCloudConversationSession();
   const isAwaitingFirstHistory = Boolean(
     enabled &&
       conversationId &&
       (conversation.state.recordsSource ?? "none") === "none" &&
       conversation.state.epoch === null &&
-      conversation.state.status !== "blocked" &&
-      !isPendingCloudConversation(conversationId, accountScope),
+      conversation.state.status !== "blocked",
   );
   const webShell = isWebShell();
   const completeRecords = useMemo(

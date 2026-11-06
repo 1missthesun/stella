@@ -31,7 +31,6 @@ import { useCloudConversationSession } from "@/global/auth/hooks/use-cloud-conve
 import { useShellConversationSource } from "@/global/auth/hooks/use-shell-conversation-source";
 import { SIGN_IN_TOAST_ACTION } from "@/shared/lib/auth-cta";
 import {
-  acknowledgeCloudConversation,
   cloudConversationBelongsToOwnerSubject,
   resolveCloudConversationForShell,
   resolveCloudConversationRoute,
@@ -281,7 +280,6 @@ function RootLayout() {
           conversations: ownedCloudConversationCandidates,
           routeConversationId: routerConversationId,
           mainConversationId: mainCloudConversationId,
-          accountScope,
           ownerSubject,
         })
       : null;
@@ -325,16 +323,12 @@ function RootLayout() {
   useEffect(() => {
     if (isAuthLoading || !isOnChatRoute || !isCloudConversationReady) return;
     if (cloudConversations === undefined || routeOwnershipIsLoading) return;
-    for (const item of scopedCloudConversations) {
-      acknowledgeCloudConversation(item.conversationId);
-    }
     if (routeIsOwnedCloudConversation && routerConversationId) return;
     if (mainOwnershipIsLoading || !mainCloudConversationId) return;
     const fallbackConversationId = resolveCloudConversationRoute({
       conversations: ownedCloudConversationCandidates,
       routeConversationId: routerConversationId,
       mainConversationId: mainCloudConversationId,
-      accountScope,
       ownerSubject,
     });
     if (fallbackConversationId) {

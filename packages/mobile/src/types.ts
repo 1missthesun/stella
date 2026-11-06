@@ -245,9 +245,8 @@ export type ChatMessage = {
   documentNames?: string[];
   quotedText?: string;
   pastedTexts?: { lines: number; chars: number; text?: string }[];
-  queued?: boolean;
-  /** A local send that did not go through; the row offers retry or remove. */
-  sendFailed?: true;
+  /** A local user send still on this phone: waiting, not sent (retry or remove), or stopped. */
+  send?: "queued" | "not_sent" | "stopped";
   sentWhileBusy?: boolean;
   stopped?: boolean;
   /**

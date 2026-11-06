@@ -6,6 +6,7 @@ const CHECK_INTERVAL_MS = 30 * 1000
 type UseIdleHomeVisibilityOptions = {
   hasMessages: boolean
   isStreaming: boolean
+  onIdle?: () => void
 }
 
 type HomeVisibilityArgs = {
@@ -27,10 +28,13 @@ export function computeShowHomeContent({
 export function useIdleHomeVisibility({
   hasMessages,
   isStreaming,
+  onIdle,
 }: UseIdleHomeVisibilityOptions) {
   const [isIdle, setIsIdle] = useState(false)
   const [isForcedHome, setIsForcedHome] = useState(false)
   const lastActivityRef = useRef(Date.now())
+  const onIdleRef = useRef(onIdle)
+  onIdleRef.current = onIdle
 
   const resetIdleTimer = useCallback(() => {
     lastActivityRef.current = Date.now()
@@ -49,6 +53,7 @@ export function useIdleHomeVisibility({
     const interval = setInterval(() => {
       if (Date.now() - lastActivityRef.current >= IDLE_THRESHOLD_MS) {
         setIsIdle(true)
+        onIdleRef.current?.()
       }
     }, CHECK_INTERVAL_MS)
 

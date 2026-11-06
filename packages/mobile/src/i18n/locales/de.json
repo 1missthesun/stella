@@ -224,10 +224,6 @@
         "loadFailed": "PDF konnte nicht geladen werden.",
         "loading": "PDF wird geladen…"
       },
-      "queuedMessages": {
-        "cancel": "Wartende Nachricht abbrechen",
-        "cancelAndEdit": "Abbrechen und bearbeiten"
-      },
       "replyPeek": {
         "dismiss": "Vorschau schließen",
         "jumpToLatest": "Zur neuesten Antwort springen"

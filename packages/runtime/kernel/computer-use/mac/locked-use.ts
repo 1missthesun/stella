@@ -8,7 +8,7 @@ import {
 } from "../../cli/native-helper.js";
 import {
   loadLocalPreferences,
-  saveLocalPreferences,
+  updateLocalPreferences,
 } from "../../preferences/local-preferences.js";
 import { forkCancelableTimeout } from "../effect-runtime.js";
 import {
@@ -225,10 +225,7 @@ const readLockedUseEnabled = () => {
 };
 
 const writeLockedUseEnabled = (enabled: boolean) => {
-  const stellaDataDir = resolveStellaDataDir();
-  const prefs = loadLocalPreferences(stellaDataDir);
-  saveLocalPreferences(stellaDataDir, {
-    ...prefs,
+  updateLocalPreferences(resolveStellaDataDir(), {
     lockedComputerUseEnabled: enabled,
   });
 };

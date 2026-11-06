@@ -66,6 +66,7 @@ export type AutomaticExecutionDispatch = {
 export type SubmitAutomaticExecutionInput = AutomaticExecutionAdmissionInput & {
   access?: StoredPhoneAccess;
   builderOrigin?: string | null;
+  signal?: AbortSignal;
 };
 
 
@@ -303,7 +304,7 @@ export const waitForAutomaticExecution = async (args: {
 export const submitAutomaticExecution = async (
   input: SubmitAutomaticExecutionInput,
 ): Promise<AutomaticExecutionDispatch> => {
-  const { access, builderOrigin, ...admissionInput } = input;
+  const { access, builderOrigin, signal, ...admissionInput } = input;
   const admission = buildAutomaticExecutionAdmission(admissionInput);
   const target = admissionInput.target ?? AUTOMATIC_EXECUTION_TARGET;
   const deviceAccess =
@@ -330,6 +331,7 @@ export const submitAutomaticExecution = async (
       },
       {
         origin,
+        signal,
         label: "sending your message",
         ...(pairHeaders ? { headers: pairHeaders } : {}),
       },

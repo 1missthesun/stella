@@ -885,8 +885,10 @@ const ACCOUNT_MCP_LIST_TIMEOUT_MS = 8_000;
 
 type AccountMcpState = {
   version: 1;
+  owner: string | null;
   synced: string[];
   pendingRemovals: string[];
+  otherAccountLocal: string[];
 };
 
 type AccountMcpDevice = {
@@ -897,12 +899,21 @@ type AccountMcpDevice = {
 };
 
 type AccountMcpListing = {
+  owner: string | null;
   servers: McpServerRecord[];
   devices: AccountMcpDevice[];
 };
 
 const accountMcpStatePath = (stellaAppDir: string) =>
   path.join(getConnectorStateRoot(stellaAppDir), ACCOUNT_MCP_STATE_FILE);
+
+const emptyAccountMcpState = (owner: string | null): AccountMcpState => ({
+  version: 1,
+  owner,
+  synced: [],
+  pendingRemovals: [],
+  otherAccountLocal: [],
+});
 
 const readAccountMcpState = async (
   stellaAppDir: string,
@@ -914,14 +925,18 @@ const readAccountMcpState = async (
     if (parsed?.version === 1) {
       return {
         version: 1,
+        owner: typeof parsed.owner === "string" ? parsed.owner : null,
         synced: isStringArray(parsed.synced) ? parsed.synced : [],
         pendingRemovals: isStringArray(parsed.pendingRemovals)
           ? parsed.pendingRemovals
           : [],
+        otherAccountLocal: isStringArray(parsed.otherAccountLocal)
+          ? parsed.otherAccountLocal
+          : [],
       };
     }
   } catch {}
-  return { version: 1, synced: [], pendingRemovals: [] };
+  return emptyAccountMcpState(null);
 };
 
 const writeAccountMcpState = async (
@@ -935,8 +950,10 @@ const writeAccountMcpState = async (
     `${JSON.stringify(
       {
         version: 1,
+        owner: state.owner,
         synced: [...new Set(state.synced)].sort(),
         pendingRemovals: [...new Set(state.pendingRemovals)].sort(),
+        otherAccountLocal: [...new Set(state.otherAccountLocal)].sort(),
       },
       null,
       2,
@@ -972,6 +989,7 @@ const accountMcpCall = async (
 const readAccountListing = (value: unknown): AccountMcpListing | null => {
   if (!isPlainRecord(value) || !Array.isArray(value.servers)) return null;
   return {
+    owner: typeof value.owner === "string" ? value.owner : null,
     servers: value.servers.filter(
       (entry): entry is McpServerRecord =>
         isPlainRecord(entry) &&
@@ -1083,6 +1101,7 @@ const putOnAccount = async (
     await updateAccountMcpState(options.stellaAppDir, (state) => {
       state.synced.push(command.id);
       state.pendingRemovals = state.pendingRemovals.filter((id) => id !== command.id);
+      state.otherAccountLocal = state.otherAccountLocal.filter((id) => id !== command.id);
     });
     forgetAccountListing(options.stellaAppDir);
     return true;
@@ -1176,9 +1195,20 @@ export const reconcileAccountMcp = (
     const listing = await accountMcpListing(options);
     if (!listing) return [];
     const { stellaAppDir } = options;
-    const state = await readAccountMcpState(stellaAppDir);
+    let state = await readAccountMcpState(stellaAppDir);
     let servers = listing.servers;
     let changed = false;
+    if (listing.owner && state.owner !== listing.owner) {
+      const adopting = state.owner === null;
+      const local = adopting ? [] : await listConfiguredConnectorCommands(stellaAppDir);
+      state = {
+        ...(adopting ? state : emptyAccountMcpState(null)),
+        owner: listing.owner,
+        otherAccountLocal: local.map((command) => command.id),
+      };
+      changed = true;
+    }
+    const otherAccountLocal = new Set(state.otherAccountLocal);
 
     for (const id of [...state.pendingRemovals]) {
       try {
@@ -1208,6 +1238,7 @@ export const reconcileAccountMcp = (
         }
         continue;
       }
+      if (otherAccountLocal.has(command.id)) continue;
       if (synced.has(command.id)) {
         await removeLocalMcp(stellaAppDir, command.id);
         localIds.delete(command.id);
@@ -1288,6 +1319,7 @@ export const reconcileAccountMcp = (
     }
     if (changed) {
       state.synced = [...synced];
+      state.otherAccountLocal = state.otherAccountLocal.filter((id) => localIds.has(id));
       await writeAccountMcpState(stellaAppDir, state).catch(() => undefined);
     }
     return elsewhere;

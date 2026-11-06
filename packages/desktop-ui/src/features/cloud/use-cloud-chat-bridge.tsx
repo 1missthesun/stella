@@ -1,3 +1,4 @@
+import { sendStateInFlight } from "@stella/contracts/send-state";
 import { useChatStorageMode } from "@/features/chat/services/chat-storage-preference";
 import {
   cloudOfflineNoticeDueAt,
@@ -65,8 +66,6 @@ import {
   useBrowserAttachmentUploads,
 } from "./browser-chat-attachments";
 import { provideCloudSendRecovery } from "./cloud-send-recovery";
-import { isPendingCloudConversation } from "./cloud-conversation-selection";
-import { useCloudConversationSession } from "@/global/auth/hooks/use-cloud-conversation-session";
 
 const EMPTY_EVENTS: EventRecord[] = [];
 const EMPTY_MESSAGES: MessageRecord[] = [];
@@ -111,7 +110,7 @@ export const cloudPendingPromptsToEvents = (
         ...(entry.submission.context?.display
           ? { metadata: { context: entry.submission.context.display } }
           : {}),
-        ...(entry.error ? { sendFailed: entry.error } : {}),
+        ...(entry.send.kind === "not_sent" ? { sendFailed: entry.send.message } : {}),
       },
     };
   });
@@ -119,7 +118,7 @@ export const cloudPendingPromptsToEvents = (
 export const latestInFlightCloudUserMessageId = (
   pending: readonly PendingPrompt[],
 ): string | null =>
-  pending.findLast((entry) => !entry.error)?.clientMsgId ?? null;
+  pending.findLast((entry) => sendStateInFlight(entry.send))?.clientMsgId ?? null;
 
 const escapeXmlText = (value: string): string =>
   value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -314,8 +313,7 @@ export type CloudChatBridge = {
   loadOlderActivity: () => void;
   optimisticEvents: EventRecord[];
   isWebShell: boolean;
-  isStreaming: boolean;
-  runtimeStatusText: string | null;
+  awaitingAdmission: boolean;
   activeToolName: string | null;
   activeToolCallId: string | null;
   answerLanded: boolean;
@@ -364,14 +362,12 @@ export function useCloudChatBridge({
   const cloudActivity = useCloudConversationActivity(
     enabled ? conversationId : null,
   );
-  const { accountScope } = useCloudConversationSession();
   const isAwaitingFirstHistory = Boolean(
     enabled &&
       conversationId &&
       (conversation.state.recordsSource ?? "none") === "none" &&
       conversation.state.epoch === null &&
-      conversation.state.status !== "blocked" &&
-      !isPendingCloudConversation(conversationId, accountScope),
+      conversation.state.status !== "blocked",
   );
   const webShell = isWebShell();
   const completeRecords = useMemo(
@@ -518,10 +514,8 @@ export function useCloudChatBridge({
       dismiss: dismissSend,
     });
   }, [dismissSend, enabled, retrySend, webShell]);
-  const pendingInFlight = conversation.pending.filter((entry) => !entry.error);
-  const isStreaming = Boolean(
-    enabled && (conversation.state.live || (webShell && pendingInFlight.length)),
-  );
+  const awaitingAdmission =
+    enabled && webShell && conversation.pending.some((entry) => sendStateInFlight(entry.send));
 
   const sendMessage = useCallback(
     async (args: SendMessageArgs): Promise<boolean> => {
@@ -546,7 +540,9 @@ export function useCloudChatBridge({
 
   const cancelCurrentStream = useCallback(() => {
     if (!enabled) return;
-    const pendingEntry = conversation.pending.findLast((entry) => !entry.error);
+    const pendingEntry = conversation.pending.findLast((entry) =>
+      sendStateInFlight(entry.send),
+    );
     const turnId =
       conversation.state.live?.turnId ??
       (pendingEntry?.turnId !== null ? pendingEntry?.turnId : null) ??
@@ -625,12 +621,7 @@ export function useCloudChatBridge({
     loadOlderActivity: cloudActivity.loadOlder,
     optimisticEvents,
     isWebShell: webShell,
-    isStreaming,
-    runtimeStatusText: activeToolName
-      ? (conversation.state.live?.toolLabel ?? `Running ${activeToolName}…`)
-      : isStreaming
-        ? "Thinking…"
-        : null,
+    awaitingAdmission,
     activeToolName,
     activeToolCallId,
     answerLanded: activity.answerLanded,

@@ -70,7 +70,11 @@ export function useChatHomeSurface({
     showHomeContent: idleBasedHome,
     resetIdleTimer,
     forceShowHome,
-  } = useIdleHomeVisibility({ hasMessages, isStreaming });
+  } = useIdleHomeVisibility({
+    hasMessages,
+    isStreaming,
+    onIdle: () => setIsHomeDismissed(false),
+  });
 
   const firstStintOnChat = !leftChatOnce && isOnChatRoute;
   // A conversation subscription re-keys before its SQLite window resolves.

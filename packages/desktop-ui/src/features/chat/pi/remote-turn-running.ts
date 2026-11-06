@@ -13,12 +13,14 @@ export const remoteTurnRunning = ({
   records,
   polled,
   ownDeviceId,
+  deviceless = false,
 }: {
   socketLive: boolean;
   live: LiveTurn | null;
   records: readonly JournalRecord[];
   polled: readonly PiRemoteTurn[];
   ownDeviceId: string | null;
+  deviceless?: boolean;
 }): boolean => {
   if (!socketLive) return polled.length > 0;
   const ended = new Set<string>();
@@ -30,6 +32,7 @@ export const remoteTurnRunning = ({
     }
   }
   if (polled.some((turn) => !ended.has(turn.turnId))) return true;
-  if (!live || !ownDeviceId) return false;
-  return !ownTurn(live.turnId, ownDeviceId) && !agentOperations.has(live.turnId) && !ended.has(live.turnId);
+  if (!live || (!ownDeviceId && !deviceless)) return false;
+  if (ownDeviceId && ownTurn(live.turnId, ownDeviceId)) return false;
+  return !agentOperations.has(live.turnId) && !ended.has(live.turnId);
 };

@@ -9,7 +9,7 @@ import { visibleDialogParent } from "../windows/dialog-parent.js";
 import { noteAppPainted } from "../observability/app-paint.js";
 import { exportDesktopDebugLogs, getDesktopDebugPaths } from "../observability/desktop-debug-logging.js";
 import { resolveLogPaths } from "@stella/runtime/observability/log-paths";
-import { getLocalModelPreferences, getOnboardingCompleted, getPreventComputerSleep, getReadAloudEnabled, setReadAloudEnabled, getSoundNotificationsEnabled, getTelemetryState, setTelemetryEnabled, loadLocalPreferences, normalizeImageGenerationPreferences, normalizeCodexServiceTier, normalizeRealtimeVoicePreferences, saveLocalPreferences, setOnboardingCompleted, updateLocalModelPreferences, } from "@stella/runtime/kernel/preferences/local-preferences";
+import { getLocalModelPreferences, getOnboardingCompleted, getPreventComputerSleep, getReadAloudEnabled, setReadAloudEnabled, getSoundNotificationsEnabled, getTelemetryState, setTelemetryEnabled, loadLocalPreferences, normalizeImageGenerationPreferences, normalizeCodexServiceTier, normalizeRealtimeVoicePreferences, setOnboardingCompleted, updateLocalModelPreferences, updateLocalPreferences, } from "@stella/runtime/kernel/preferences/local-preferences";
 import { coerceAgentRuntimeEngine } from "@stella/contracts/agent-engine";
 import { normalizeReasoningEffortLevel } from "@stella/contracts/reasoning-effort";
 import { listChatGptModels } from "@stella/contracts/chatgpt-siwc-flows";
@@ -235,10 +235,7 @@ const readLockedComputerUseEnabled = (stellaAppDir) => {
     }
 };
 const writeLockedComputerUseEnabled = (stellaAppDir, enabled) => {
-    const stellaDataDir = resolveLockedComputerUseHome(stellaAppDir);
-    const prefs = loadLocalPreferences(stellaDataDir);
-    saveLocalPreferences(stellaDataDir, {
-        ...prefs,
+    updateLocalPreferences(resolveLockedComputerUseHome(stellaAppDir), {
         lockedComputerUseEnabled: enabled,
     });
 };
@@ -691,9 +688,7 @@ export const registerSystemHandlers = (options) => {
         const nextEnabled = enabled === true;
         const stellaAppDir = options.getStellaAppDir();
         if (stellaAppDir) {
-            const prefs = loadLocalPreferences(stellaAppDir);
-            prefs.preventComputerSleep = nextEnabled;
-            saveLocalPreferences(stellaAppDir, prefs);
+            updateLocalPreferences(stellaAppDir, { preventComputerSleep: nextEnabled });
         }
         setPreventComputerSleep(nextEnabled);
         return { enabled: nextEnabled };
@@ -768,9 +763,7 @@ export const registerSystemHandlers = (options) => {
         const nextEnabled = enabled === true;
         const stellaAppDir = options.getStellaAppDir();
         if (stellaAppDir) {
-            const prefs = loadLocalPreferences(stellaAppDir);
-            prefs.soundNotificationsEnabled = nextEnabled;
-            saveLocalPreferences(stellaAppDir, prefs);
+            updateLocalPreferences(stellaAppDir, { soundNotificationsEnabled: nextEnabled });
         }
         return { enabled: nextEnabled };
     });

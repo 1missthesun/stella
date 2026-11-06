@@ -198,9 +198,12 @@ const runAccountPurge = async (ctx: OwnerContext, payload: unknown): Promise<voi
     return;
   }
   ctx.db.run(
-    `UPDATE owner_state SET purge_request_id = NULL, purge_mode = NULL, writable = ? WHERE id = 1 AND purge_request_id = ?`,
+    `UPDATE owner_state SET purge_request_id = NULL, purge_mode = NULL, writable = ?
+     WHERE id = 1 AND purge_request_id = ? AND purge_mode = ? AND closed = ?`,
     purge.mode === "reset" ? 1 : 0,
     purge.requestId,
+    purge.mode,
+    purge.mode === "reset" ? 0 : 1,
   );
 };
 

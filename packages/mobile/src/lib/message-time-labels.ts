@@ -55,7 +55,7 @@ export function timestampHeaders(
 
 const readAt = (message: ChatMessage): number | null => {
   if (!message.sentWhileBusy) return null;
-  if (message.queued) return null;
+  if (message.send === "queued") return null;
   if (message.sequence === undefined && !message.canonicalId) return null;
   return message.canonicalCreatedAt ?? message.createdAt ?? null;
 };

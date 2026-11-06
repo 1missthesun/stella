@@ -224,10 +224,6 @@
         "loadFailed": "PDF yüklenemedi.",
         "loading": "PDF yükleniyor…"
       },
-      "queuedMessages": {
-        "cancel": "Sıradaki mesajı iptal et",
-        "cancelAndEdit": "İptal et ve düzenle"
-      },
       "replyPeek": {
         "dismiss": "Önizlemeyi kapat",
         "jumpToLatest": "En son yanıta git"

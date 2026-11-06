@@ -229,10 +229,6 @@
         "loadFailed": "טעינת ה-PDF נכשלה.",
         "loading": "טוען PDF…"
       },
-      "queuedMessages": {
-        "cancel": "בטל הודעה בתור",
-        "cancelAndEdit": "בטל וערוך"
-      },
       "replyPeek": {
         "dismiss": "סגור תצוגה מקדימה",
         "jumpToLatest": "עבור לתשובה האחרונה"

@@ -16,7 +16,7 @@ import { registerOnboardingHandlers } from "../ipc/onboarding-handlers.js";
 import { app, BrowserWindow, shell } from "electron";
 import { toggleRealtimeVoice, } from "../services/realtime-voice-control.js";
 import { WakewordService } from "../services/wakeword-service.js";
-import { loadLocalPreferences, saveLocalPreferences, } from "@stella/runtime/kernel/preferences/local-preferences";
+import { loadLocalPreferences, updateLocalPreferences, } from "@stella/runtime/kernel/preferences/local-preferences";
 import { IPC_APP_SOURCE_STATE, IPC_BROWSER_VIEW_STATE, IPC_PREFERENCES_GET_WAKE_WORD, IPC_PREFERENCES_SET_WAKE_WORD, IPC_PREFERENCES_WAKE_WORD_CHANGED, } from "@stella/contracts/desktop/ipc-channels";
 import { registerOfficePreviewHandlers } from "../ipc/office-preview-handlers.js";
 import { registerChatEvidenceHandlers } from "../ipc/chat-evidence-handlers.js";
@@ -424,7 +424,7 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
         const appSourceService = new AppSourceService({
             stellaAppDir: state.stellaAppDir ?? config.stellaAppDir,
             broadcast: (next) => {
-                if (next.ready.length > 0 ||
+                if (next.waiting.some((offer) => offer.kind === "draft" && !offer.stale) ||
                     next.remote.status === "ahead" ||
                     next.upstream.status === "ahead") {
                     updateTransition.prewarm();
@@ -453,12 +453,20 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
                 if (!runner || !conversationId) {
                     throw new Error("Stella isn't ready to install this update yet.");
                 }
-                await runner.createBackgroundAgent({
+                const { threadId } = await runner.createBackgroundAgent({
                     conversationId,
                     description: brief.description,
                     prompt: brief.prompt,
                     agentType: "general",
                 });
+                return { conversationId, threadId };
+            },
+            agentRunning: async ({ conversationId, threadId }) => {
+                const runner = lifecycle.getRunner();
+                if (!runner) return null;
+                const { agents } = await runner.piChat({ op: "agents", conversationId });
+                const agent = agents.find((entry) => entry.threadId === threadId);
+                return agent ? agent.status === "running" : null;
             },
             hasConnectedAccount: () => services.authService.getHostHasConnectedAccount(),
             getBackendUrl: () => services.authService.getBackendUrl(),
@@ -568,9 +576,7 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
         const next = enabled === true;
         const root = lifecycle.getStellaDataDir();
         if (root) {
-            const prefs = loadLocalPreferences(root);
-            prefs.wakeWordEnabled = next;
-            saveLocalPreferences(root, prefs);
+            updateLocalPreferences(root, { wakeWordEnabled: next });
         }
         wakeword?.setEnabled(next);
         for (const window of BrowserWindow.getAllWindows()) {

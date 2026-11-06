@@ -58,9 +58,13 @@ export const keepScreenAwakeForDictation = (awake: boolean): void => {
   ).catch(() => undefined);
 };
 
-type PrewarmState = "idle" | "preparing" | "prepared" | "claimed";
+type RecorderState =
+  | { kind: "idle" }
+  | { kind: "preparing" }
+  | { kind: "prepared" }
+  | { kind: "recording"; owner: symbol };
 
-let state: PrewarmState = "idle";
+let state: RecorderState = { kind: "idle" };
 let pending: Promise<void> = Promise.resolve();
 let generation = 0;
 
@@ -71,55 +75,81 @@ const prepareNow = async (token: number): Promise<void> => {
     () => null,
   );
   if (token !== generation || !permission?.granted) {
-    if (token === generation) state = "idle";
+    if (token === generation) state = { kind: "idle" };
     return;
   }
   try {
     await AudioStudioModule.prepareRecording(PREWARMED_RECORDING_OPTIONS);
   } catch {
-    if (token === generation) state = "idle";
+    if (token === generation) state = { kind: "idle" };
     return;
   }
-  if (token === generation && state === "preparing") {
-    state = "prepared";
+  if (token === generation && state.kind === "preparing") {
+    state = { kind: "prepared" };
     return;
   }
-  if (state !== "claimed") {
+  if (state.kind !== "recording") {
     await AudioStudioModule.stopRecording().catch(() => undefined);
   }
 };
 
 export const prewarmDictationRecorder = (): void => {
-  if (!dictationPrewarmSupported || state !== "idle") return;
-  state = "preparing";
+  if (!dictationPrewarmSupported || state.kind !== "idle") return;
+  state = { kind: "preparing" };
   const token = ++generation;
   pending = pending.then(() => prepareNow(token));
 };
 
 export const releaseDictationRecorderPrewarm = (): Promise<void> => {
   if (!dictationPrewarmSupported) return Promise.resolve();
-  if (state === "claimed") return pending;
-  const wasPrepared = state === "prepared";
-  const wasPreparing = state === "preparing";
+  if (state.kind === "recording" || state.kind === "idle") return pending;
+  const wasPrepared = state.kind === "prepared";
   generation += 1;
-  state = "idle";
-  if (!wasPrepared && !wasPreparing) return pending;
-  pending = pending.then(async () => {
-    if (wasPrepared) {
-      await AudioStudioModule.stopRecording().catch(() => undefined);
-    }
-  });
+  state = { kind: "idle" };
+  if (wasPrepared) {
+    pending = pending.then(() =>
+      AudioStudioModule.stopRecording().then(
+        () => undefined,
+        () => undefined,
+      ),
+    );
+  }
   return pending;
 };
 
-export const claimPreparedDictationRecorder = async (): Promise<boolean> => {
-  if (!dictationPrewarmSupported) return false;
-  if (state === "preparing") await pending;
-  if (state !== "prepared") return false;
-  state = "claimed";
-  return true;
+/**
+ * Takes the one native recorder for `owner`. "prewarmed" hands over the
+ * recorder prepared with PREWARMED_RECORDING_OPTIONS; "fresh" means nothing is
+ * prepared and the caller starts with its own options; null means another
+ * owner is recording.
+ */
+export const acquireDictationRecorder = async (
+  owner: symbol,
+  options: { usePrewarm: boolean },
+): Promise<"prewarmed" | "fresh" | null> => {
+  if (state.kind === "preparing") await pending;
+  if (state.kind === "recording") return null;
+  if (state.kind === "prepared" && options.usePrewarm) {
+    state = { kind: "recording", owner };
+    return "prewarmed";
+  }
+  const wasPrepared = state.kind === "prepared";
+  generation += 1;
+  state = { kind: "recording", owner };
+  if (wasPrepared) {
+    pending = pending.then(() =>
+      AudioStudioModule.stopRecording().then(
+        () => undefined,
+        () => undefined,
+      ),
+    );
+    await pending;
+  }
+  return "fresh";
 };
 
-export const releaseClaimedDictationRecorder = (): void => {
-  if (state === "claimed") state = "idle";
+export const releaseDictationRecorder = (owner: symbol): void => {
+  if (state.kind === "recording" && state.owner === owner) {
+    state = { kind: "idle" };
+  }
 };

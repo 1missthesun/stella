@@ -11,7 +11,7 @@ import type { AppSourceRemote } from "@stella/contracts/backend/app-source";
 import type {
   AppSourceActionResult,
   AppSourceCommit,
-  AppSourceDraft,
+  AppSourceDraftOffer,
   AppSourceState,
   AppSourceWaiting,
 } from "@stella/contracts/desktop/app-source";
@@ -30,6 +30,16 @@ import {
 } from "./git.js";
 import { DRAFT_AGENTS_DIR, installCheckoutGuard } from "./checkout-guard.js";
 import { ReleaseChannel } from "./release-channel.js";
+import {
+  classifyMerge,
+  isMerging,
+  readMergeRecord,
+  writeMergeRecord,
+  type DispatchedAgent,
+  type MergeRecord,
+  type MergeStatus,
+} from "./merge-record.js";
+import { tokenSubject } from "../engine-account-access.js";
 import type { CoveredWindow, RelaunchHold } from "./update-transition.js";
 import {
   classifyUpdate,
@@ -53,6 +63,7 @@ import {
 import {
   mergeDraftName,
   remoteMergeBrief,
+  remoteMergeDraftName,
   staleDraftBrief,
   undoBrief,
   upstreamMergeBrief,
@@ -78,7 +89,9 @@ type AppSourceServiceOptions = {
   launcherPreparesOnRelaunch?: boolean;
   reportPrepared?: (prepared: { lockHash?: string; head?: string }) => void;
   updateScratchDir: string;
-  dispatchAgentBrief?: (brief: AgentBrief) => Promise<void>;
+  dispatchAgentBrief?: (brief: AgentBrief) => Promise<DispatchedAgent>;
+  /** null: the runtime can't be asked right now. */
+  agentRunning?: (agent: DispatchedAgent) => Promise<boolean | null>;
 };
 
 type TakeSource = {
@@ -104,10 +117,13 @@ type ForkAccess = {
   expiresAt: number;
 };
 
-type SourceAccess = { fork: ForkAccess | null; upstream: AppSourceRemote };
+type SourceAccess = {
+  owner: string | null;
+  fork: ForkAccess | null;
+  upstream: AppSourceRemote;
+};
 
 const STATE_POLL_MS = 10_000;
-const UPDATE_MERGE_WAIT_MS = 60 * 60_000;
 const LAUNCH_SYNC_DELAY_MS = 5_000;
 const SYNC_RETRY_MS = 30_000;
 const SYNC_RETRY_MAX_MS = 10 * 60_000;
@@ -135,8 +151,6 @@ const NO_UPSTREAM: AppSourceState["upstream"] = {
 };
 
 const EMPTY_STATE: AppSourceState = {
-  ready: [],
-  stale: [],
   remote: { status: "none", count: 0 },
   upstream: NO_UPSTREAM,
   recent: [],
@@ -146,6 +160,12 @@ const EMPTY_STATE: AppSourceState = {
 };
 
 type Offer = { tip: string; real: boolean; catchUp: boolean };
+
+type ApplyPhase = "planned" | "signed" | "holding" | "installed" | "relaunching";
+
+type FoundDraft = Omit<AppSourceDraftOffer, "kind" | "key" | "adding" | "summary"> & {
+  subject: string;
+};
 
 const deviceName = () =>
   hostname()
@@ -210,10 +230,7 @@ export class AppSourceService {
   private forkBranch: string | null = null;
   private forkUnrelated = false;
   private upstreamTracked = false;
-  private upstreamUnrelated = false;
-  private updateState:
-    | { state: "merging"; name: string; since: number; from: TakeSource["kind"] }
-    | null = null;
+  private merge: MergeRecord | null | undefined;
   private offers = new Map<string, Offer>();
   private catchingUp = false;
   private caughtUp = new Set<string>();
@@ -246,6 +263,7 @@ export class AppSourceService {
     const poll = setInterval(() => {
       if (this.options.isAnyWindowVisible()) void this.refresh();
       this.followBackend();
+      void this.followOwner();
       if (this.syncWanted && Date.now() >= this.syncNotBefore) void this.syncFork();
     }, STATE_POLL_MS);
     poll.unref?.();
@@ -449,7 +467,7 @@ export class AppSourceService {
         trustIdenticalTree: false,
         brief: (plan, head, gateOutput) =>
           remoteMergeBrief(plan, head, ref, gateOutput),
-        pendingDraft: mergeDraftName(tip),
+        pendingDraft: remoteMergeDraftName(tip),
         pendingDraftExists: false,
       });
     });
@@ -561,36 +579,108 @@ export class AppSourceService {
       throw new Error("Stella isn't ready to make that change yet.");
     }
     const name = source.pendingDraft;
-    if (!(await this.draftUnderWay(cwd, name, !source.pendingDraftExists))) {
-      await dispatch(brief);
+    let draft = await this.draftOf(cwd, name);
+    const current = await this.mergeRecord(cwd);
+    if (draft.state === "worktree") {
+      const running =
+        current?.draft === name && current.agent
+          ? await this.agentRunning(current.agent)
+          : false;
+      if (running !== false) return { background: true };
+      await git(cwd, ["worktree", "remove", "--force", draft.path]);
+      this.options.log("app-source.orphaned-draft-dropped", { draft: name });
+      draft = await this.draftOf(cwd, name);
+    }
+    if (draft.state === "stale" && !source.pendingDraftExists) {
+      await git(cwd, ["branch", "-D", `draft/${name}`]);
+      this.options.log("app-source.leftover-draft-dropped", { draft: name });
+      draft = { state: "none" };
+    }
+    let agent: DispatchedAgent | null = null;
+    if (source.pendingDraftExists || draft.state === "none") {
+      agent = await dispatch(brief);
       this.options.log("app-source.brief-dispatched", {
         from: source.kind,
         draft: name,
       });
     }
-    this.updateState = {
-      state: "merging",
-      name,
-      since: Date.now(),
+    await this.setMerge(cwd, {
+      draft: name,
       from: source.kind,
-    };
+      tip: "tip" in draft ? draft.tip : "",
+      since: Date.now(),
+      agent,
+    });
     return { background: true };
   }
 
-  private async draftUnderWay(
+  private async draftOf(
     cwd: string,
     name: string,
-    branchCounts: boolean,
-  ) {
+  ): Promise<
+    | { state: "worktree"; path: string }
+    | { state: "ready" | "stale"; tip: string }
+    | { state: "none" }
+  > {
     const ref = `${DRAFT_REF_PREFIX}${name}`;
-    if ((await listWorktrees(cwd)).some((tree) => tree.branch === ref)) {
-      return true;
-    }
-    if (!branchCounts) return false;
-    return (
-      (await gitRaw(cwd, ["rev-parse", "--verify", "--quiet", `${ref}^{commit}`]))
-        .code === 0
+    const tree = (await listWorktrees(cwd)).find((entry) => entry.branch === ref);
+    if (tree) return { state: "worktree", path: tree.path };
+    const tip = (
+      await gitRaw(cwd, ["rev-parse", "--verify", "--quiet", `${ref}^{commit}`])
+    ).stdout.trim();
+    if (!tip) return { state: "none" };
+    return { state: (await isAncestor(cwd, "HEAD", tip)) ? "ready" : "stale", tip };
+  }
+
+  private async agentRunning(agent: DispatchedAgent) {
+    return (await this.options.agentRunning?.(agent).catch(() => null)) ?? null;
+  }
+
+  private async mergeRecord(cwd: string) {
+    if (this.merge === undefined) this.merge = await readMergeRecord(await this.commonDir(cwd));
+    return this.merge;
+  }
+
+  private async setMerge(cwd: string, record: MergeRecord | null) {
+    this.merge = record;
+    await writeMergeRecord(await this.commonDir(cwd), record).catch((error: unknown) =>
+      this.options.log("app-source.merge-record-failed", { message: errorMessage(error) }),
     );
+  }
+
+  /** Where the recorded merge stands; a settled one is cleared. */
+  private async mergeStatus(
+    cwd: string,
+    head: string,
+    worktreeBranches: Set<string | null>,
+    offered: (name: string) => boolean,
+  ): Promise<{ record: MergeRecord; status: MergeStatus } | null> {
+    const record = await this.mergeRecord(cwd);
+    if (!record) return null;
+    const ref = `${DRAFT_REF_PREFIX}${record.draft}`;
+    const tip =
+      (await gitRaw(cwd, ["rev-parse", "--verify", "--quiet", `${ref}^{commit}`])).stdout.trim() ||
+      null;
+    const worktree = worktreeBranches.has(ref);
+    const descendsFromHead = tip !== null && (await isAncestor(cwd, head, tip));
+    const settledByGit = !worktree && tip !== null && (descendsFromHead || record.from !== "draft" || tip !== record.tip);
+    const status = classifyMerge(record, {
+      worktree,
+      tip,
+      descendsFromHead,
+      offered: offered(record.draft),
+      agentRunning: record.agent && !settledByGit ? await this.agentRunning(record.agent) : null,
+      now: Date.now(),
+    });
+    if (!isMerging(status) && this.merge === record) {
+      this.options.log("app-source.merge-settled", {
+        draft: record.draft,
+        status,
+        ms: Date.now() - record.since,
+      });
+      await this.setMerge(cwd, null);
+    }
+    return { record, status };
   }
 
   private async dispatchUndo(
@@ -618,17 +708,6 @@ export class AppSourceService {
     return { background: true };
   }
 
-
-  private settleFinishedMerge(state: Omit<AppSourceState, "busy">) {
-    const pending = this.updateState;
-    if (pending?.state !== "merging") return;
-    if (
-      Date.now() - pending.since > UPDATE_MERGE_WAIT_MS ||
-      state.ready.some((draft) => draft.name === pending.name)
-    ) {
-      this.updateState = null;
-    }
-  }
 
   private exclusive(
     task: (cwd: string) => Promise<void | { background: true }>,
@@ -718,71 +797,92 @@ export class AppSourceService {
           !file.startsWith("packages/desktop/"),
       );
     const covering = visible ? this.options.coverRenderer?.() ?? null : null;
+    let phase: ApplyPhase = "planned";
+    let holding: Promise<RelaunchHold | null> | null = null;
     try {
-      await git(cwd, ["merge", "--ff-only", to]);
-      this.mark("merge");
-      await this.options.afterApply?.(cwd);
-    } catch (error) {
-      await (await covering)?.cancel();
-      throw error;
-    }
-    this.mark("sign");
-    const settling = settle?.() ?? Promise.resolve();
-    settling.catch(() => undefined);
-    this.options.log("app-source.applied", { files: paths.length });
-    if (restart) {
-      const holding = this.options.beforeRelaunch?.() ?? Promise.resolve(null);
-      try {
+      await this.moveHead(cwd, from, to);
+      phase = "signed";
+      this.mark("sign");
+      const settling = (settle?.() ?? Promise.resolve()).catch((error: unknown) =>
+        this.options.log("app-source.settle-failed", { message: errorMessage(error) }),
+      );
+      this.options.log("app-source.applied", { files: paths.length });
+      if (restart) {
+        holding = this.options.beforeRelaunch?.() ?? Promise.resolve(null);
+        phase = "holding";
         if (install) {
           await this.install(cwd);
           this.mark("install");
         }
-      } catch (error) {
-        await (await holding)?.release();
-        throw error;
+        phase = "installed";
+        const [, setUp] = await Promise.all([
+          prebuildElectronBundles(
+            cwd,
+            `${this.options.updateScratchDir}-prebuild.mjs`,
+            this.options.log,
+            bundles,
+          ),
+          this.options.launcherPreparesOnRelaunch
+            ? prepareInstallAhead(cwd, this.options.log)
+            : false,
+        ]);
+        this.mark("prebuild");
+        if (this.options.launcherPreparesOnRelaunch) {
+          this.options.reportPrepared?.({
+            ...(install
+              ? {
+                  lockHash: createHash("sha256")
+                    .update(await fs.readFile(path.join(cwd, "bun.lock")))
+                    .digest("hex"),
+                }
+              : {}),
+            ...(setUp ? { head: to } : {}),
+          });
+        }
+        await settling;
+        await (await holding)?.commit();
+        this.mark("hold");
+        phase = "relaunching";
+        this.logTimeline("relaunch");
+        this.options.relaunch({ keepRuntime: !install && !restartsRuntime(paths) });
+        return;
       }
-      const [, setUp] = await Promise.all([
-        prebuildElectronBundles(
-          cwd,
-          `${this.options.updateScratchDir}-prebuild.mjs`,
-          this.options.log,
-          bundles,
-        ),
-        this.options.launcherPreparesOnRelaunch
-          ? prepareInstallAhead(cwd, this.options.log)
-          : false,
-      ]);
-      this.mark("prebuild");
-      if (this.options.launcherPreparesOnRelaunch) {
-        this.options.reportPrepared?.({
-          ...(install
-            ? {
-                lockHash: createHash("sha256")
-                  .update(await fs.readFile(path.join(cwd, "bun.lock")))
-                  .digest("hex"),
-              }
-            : {}),
-          ...(setUp ? { head: to } : {}),
-        });
+      if (restartsRuntime(paths)) {
+        this.options.requestRuntimeRestart();
       }
+      const covered = await covering;
+      this.mark("cover");
+      const swap = async () => {
+        await this.options.applyRendererChanges(paths);
+      };
+      await (covered ? covered.reveal(swap) : swap());
+      this.mark("reveal");
       await settling;
-      await (await holding)?.commit();
-      this.mark("hold");
-      this.logTimeline("relaunch");
-      this.options.relaunch({ keepRuntime: !install && !restartsRuntime(paths) });
-      return;
+    } catch (error) {
+      this.options.log("app-source.apply-stopped", { phase, message: errorMessage(error) });
+      if (phase !== "relaunching") {
+        await (await holding)?.release();
+        await (await covering)?.cancel();
+      }
+      throw error;
     }
-    if (restartsRuntime(paths)) {
-      this.options.requestRuntimeRestart();
+  }
+
+  /** A HEAD the launcher refuses to sign is moved back, so Stella never runs on an unsigned version. */
+  private async moveHead(cwd: string, from: string, to: string) {
+    await git(cwd, ["merge", "--ff-only", to]);
+    this.mark("merge");
+    try {
+      await this.options.afterApply?.(cwd);
+    } catch (error) {
+      const restored = await gitRaw(cwd, ["reset", "--keep", from]);
+      this.options.log("app-source.apply-rolled-back", {
+        to: to.slice(0, 12),
+        restored: restored.code === 0,
+        ...(restored.code === 0 ? {} : { message: restored.stderr.trim() }),
+      });
+      throw error;
     }
-    const covered = await covering;
-    this.mark("cover");
-    const swap = async () => {
-      await this.options.applyRendererChanges(paths);
-    };
-    await (covered ? covered.reveal(swap) : swap());
-    this.mark("reveal");
-    await settling;
   }
 
   private async install(cwd: string) {
@@ -840,7 +940,6 @@ export class AppSourceService {
         try {
           const next = await this.readState();
           this.publish({ ...next, busy: this.busy });
-          this.settleFinishedMerge(next);
         } catch (error) {
           this.options.log("app-source.refresh-failed", {
             message: errorMessage(error),
@@ -867,24 +966,20 @@ export class AppSourceService {
       this.recentLog(cwd),
     ]);
     const inProgress = new Set(worktrees.map((tree) => tree.branch));
-    const ready: AppSourceDraft[] = [];
-    const stale: AppSourceDraft[] = [];
+    const drafts: FoundDraft[] = [];
     for (const line of refs.split("\n").filter(Boolean)) {
       const [refname = "", sha = "", subject = ""] = line.split("\0");
       const name = refname.slice(DRAFT_REF_PREFIX.length);
       if (!isDraftName(name) || inProgress.has(refname) || sha === head)
         continue;
-      const list = (await isAncestor(cwd, head, sha))
-        ? ready
-        : (await isAncestor(cwd, sha, head))
-          ? null
-          : stale;
-      if (!list) continue;
+      const ahead = await isAncestor(cwd, head, sha);
+      if (!ahead && (await isAncestor(cwd, sha, head))) continue;
       const agentId = await this.agentOf(cwd, DRAFT_AGENTS_DIR, name);
-      list.push({
+      drafts.push({
         name,
         subject,
         sha,
+        stale: !ahead,
         ...(agentId ? { agentId } : {}),
         ...(await this.draftShape(cwd, head, sha)),
       });
@@ -923,24 +1018,20 @@ export class AppSourceService {
       jobs.push({ ...job, head, identityEnv });
       return await this.preparer.isReady(head, job.tip);
     };
-    const shownDrafts = async (drafts: AppSourceDraft[]) => {
-      const shown: AppSourceDraft[] = [];
-      for (const draft of drafts) {
-        const ready = await preparedFor(
-          {
-            tip: draft.sha,
-            ref: `${DRAFT_REF_PREFIX}${draft.name}`,
-            subject: draft.subject,
-            trustIdenticalTree: false,
-          },
-          [`draft:${draft.sha}`, `version:${draft.sha}`],
-        );
-        if (ready) shown.push(draft);
-      }
-      return shown;
-    };
-    const readyShown = await shownDrafts(ready);
-    const staleShown = await shownDrafts(stale);
+    const shown: FoundDraft[] = [];
+    for (const draft of drafts) {
+      const prepared = await preparedFor(
+        {
+          tip: draft.sha,
+          ref: `${DRAFT_REF_PREFIX}${draft.name}`,
+          subject: draft.subject,
+          trustIdenticalTree: false,
+        },
+        [`draft:${draft.sha}`, `version:${draft.sha}`],
+      );
+      if (prepared) shown.push(draft);
+    }
+    const readyShown = shown.filter((draft) => !draft.stale);
     let upstreamShown = false;
     if (upstreamOffer?.real) {
       const ref = (await this.mergedElsewhere(cwd, upstreamOffer.tip)) ?? UPSTREAM_REF;
@@ -974,14 +1065,25 @@ export class AppSourceService {
       forkRef && forkShown ? this.compareRef(cwd, head, forkRef) : null,
       upstreamShown ? this.compareRef(cwd, head, UPSTREAM_REF) : null,
     ]);
-    const merging =
-      this.updateState?.state === "merging" ? this.updateState.from : null;
+    const merge = await this.mergeStatus(
+      cwd,
+      head,
+      inProgress,
+      (name) => readyShown.some((draft) => draft.name === name),
+    );
+    const pending = merge && isMerging(merge.status) ? merge.record : null;
+    const merging = pending?.from ?? null;
     const offered: AppSourceWaiting[] = [];
-    const updateDraft = readyShown.find((draft) => isUpdateDraft(draft.name));
-    if ((upstreamOffer?.real && upstreamShown) || updateDraft) {
+    const versionTip = upstreamOffer?.real && upstreamShown ? upstreamOffer.tip : null;
+    const updateDraft = readyShown.find((draft) =>
+      versionTip
+        ? draft.name === mergeDraftName(versionTip)
+        : isUpdateDraft(draft.name),
+    );
+    if (versionTip || updateDraft) {
       offered.push({
         kind: "version",
-        key: `version:${upstreamOffer?.real && upstreamShown ? upstreamOffer.tip : updateDraft!.sha}`,
+        key: `version:${versionTip ?? updateDraft!.sha}`,
         adding: merging === "upstream",
         ...(updateDraft ? { draft: updateDraft.name } : {}),
       });
@@ -991,48 +1093,53 @@ export class AppSourceService {
         this.forkSummary(cwd, head, forkOffer.tip),
         this.forkDevice(cwd),
       ]);
+      const forkDraft = readyShown.find(
+        (draft) => draft.name === remoteMergeDraftName(forkOffer.tip),
+      );
       offered.push({
         kind: "other-computer",
         key: `other:${forkOffer.tip}`,
         adding: merging === "remote",
         device,
         summary,
+        ...(forkDraft ? { draft: forkDraft.name } : {}),
       });
     }
-    for (const draft of [...readyShown, ...staleShown]) {
+    for (const draft of shown) {
       if (isStellaDraft(draft.name)) continue;
+      const { subject, ...rest } = draft;
       offered.push({
         kind: "draft",
         key: `draft:${draft.sha}`,
-        adding:
-          this.updateState?.state === "merging" &&
-          this.updateState.from === "draft" &&
-          this.updateState.name === draft.name,
-        name: draft.name,
-        summary: draft.subject || draft.name,
+        adding: merging === "draft" && pending?.draft === draft.name,
+        summary: subject || draft.name,
+        ...rest,
       });
     }
-    const pending = this.updateState?.state === "merging" ? this.updateState : null;
     if (
       pending?.from === "draft" &&
-      !offered.some((offer) => offer.kind === "draft" && offer.name === pending.name)
+      !offered.some((offer) => offer.kind === "draft" && offer.name === pending.draft)
     ) {
       const subject = (
-        await gitRaw(cwd, ["log", "-1", "--format=%s", `${DRAFT_REF_PREFIX}${pending.name}`])
+        await gitRaw(cwd, ["log", "-1", "--format=%s", `${DRAFT_REF_PREFIX}${pending.draft}`])
       ).stdout.trim();
+      const agentId = await this.agentOf(cwd, DRAFT_AGENTS_DIR, pending.draft);
       offered.push({
         kind: "draft",
-        key: `adding:${pending.name}`,
+        key: `draft:${pending.tip}`,
         adding: true,
-        name: pending.name,
-        summary: subject || pending.name,
+        name: pending.draft,
+        summary: subject || pending.draft,
+        sha: pending.tip,
+        stale: true,
+        files: 0,
+        restart: false,
+        ...(agentId ? { agentId } : {}),
       });
     }
     this.offeredKeys = offered.map((offer) => offer.key);
     const skipped = skippedNow;
     return {
-      ready: readyShown,
-      stale: staleShown,
       remote: remote
         ? { status: remote.status, count: remote.count }
         : { status: "none", count: 0 },
@@ -1040,9 +1147,7 @@ export class AppSourceService {
       recent,
       waiting: offered.filter((offer) => offer.adding || !skipped.has(offer.key)),
       skipped: offered.filter((offer) => !offer.adding && skipped.has(offer.key)),
-      ...(this.updateState
-        ? { update: { state: this.updateState.state } }
-        : {}),
+      ...(pending ? { merging: { from: pending.from, draft: pending.draft } } : {}),
     };
   }
 
@@ -1311,7 +1416,7 @@ export class AppSourceService {
 
   private catchUpLater(ref: string, tip: string, head: string) {
     if (this.catchingUp || this.busy || this.disposed) return;
-    if (this.updateState?.state === "merging") return;
+    if (this.state.merging) return;
     const attempt = `${head}:${tip}`;
     if (this.caughtUp.has(attempt)) return;
     if (this.caughtUp.size > 64) this.caughtUp.clear();
@@ -1346,8 +1451,7 @@ export class AppSourceService {
           ["commit-tree", tree, "-p", head, "-p", tip, "-m", CATCH_UP_SUBJECT],
           { env: await this.identityEnv(cwd) },
         );
-    await git(cwd, ["merge", "--ff-only", to]);
-    await this.options.afterApply?.(cwd);
+    await this.moveHead(cwd, head, to);
     this.options.log("app-source.caught-up", {
       from: ref === UPSTREAM_REF ? "upstream" : "remote",
     });
@@ -1434,10 +1538,36 @@ export class AppSourceService {
     this.forkWatch = { baseUrl: watchFork, stop };
   }
 
+  private async currentOwner() {
+    if (!this.options.hasConnectedAccount()) return null;
+    return tokenSubject(await this.options.getAuthToken()) ?? "";
+  }
+
+  private async followOwner() {
+    if (!this.access || this.disposed) return;
+    const owner = await this.currentOwner().catch(() => this.access?.owner ?? null);
+    if (this.access && owner !== this.access.owner) {
+      this.forgetAccount();
+      this.wantSync("account");
+    }
+  }
+
+  private forgetAccount() {
+    this.options.log("app-source.account-changed", {});
+    this.access = null;
+    this.forkBranch = null;
+    this.forkUnrelated = false;
+    this.forkPushSeen = null;
+    this.ownForkPushes.clear();
+    this.forkPushHeld = null;
+    this.forkWatch?.stop();
+    this.forkWatch = null;
+    this.followBackend();
+  }
+
   private onPublished(version: string | null) {
     this.published = version;
     if (!version || version === this.syncedFor) return;
-    if (this.forkUnrelated || this.upstreamUnrelated) return;
     void gitRaw(this.options.stellaAppDir, ["rev-parse", "--verify", "--quiet", UPSTREAM_REF])
       .then((result) => {
         if (result.code === 0 && result.stdout.trim() === version) {
@@ -1501,21 +1631,20 @@ export class AppSourceService {
       }
       this.syncWanted = false;
       this.options.log("app-source.sync", { reason: this.syncReason });
+      this.forkUnrelated = false;
       const access = await this.sourceAccess();
       if (!access) {
         outcome = "done";
         return;
       }
-      if (access.fork && !this.forkUnrelated) {
+      if (access.fork) {
         await this.syncWithFork(cwd, access.fork).catch((error) => {
           this.options.log("app-source.fork-sync-failed", {
             message: errorMessage(error),
           });
         });
       }
-      if (!this.forkUnrelated && !this.upstreamUnrelated) {
-        await this.fetchUpstream(cwd, access.upstream);
-      }
+      await this.fetchUpstream(cwd, access.upstream);
       outcome = "done";
     } catch (error) {
       this.options.log("app-source.sync-failed", {
@@ -1555,6 +1684,7 @@ export class AppSourceService {
     );
     if ((await gitRaw(cwd, ["merge-base", "HEAD", ref])).code !== 0) {
       this.forkUnrelated = true;
+      this.forkBranch = null;
       this.options.log("app-source.fork-unrelated", {});
       return;
     }
@@ -1576,7 +1706,6 @@ export class AppSourceService {
       { env: fetchEnv(upstream.token), timeoutMs: 5 * 60_000 },
     );
     if ((await gitRaw(cwd, ["merge-base", "HEAD", UPSTREAM_REF])).code !== 0) {
-      this.upstreamUnrelated = true;
       this.upstreamTracked = false;
       this.options.log("app-source.upstream-unrelated", {});
       return;
@@ -1686,21 +1815,27 @@ export class AppSourceService {
   private async sourceAccess(): Promise<SourceAccess | null> {
     const baseUrl = this.options.getBackendUrl();
     if (!baseUrl) return null;
-    const signedIn = this.options.hasConnectedAccount();
+    const owner = await this.currentOwner();
     const cached = this.access;
+    if (cached && cached.owner !== owner) this.forgetAccount();
     if (
       cached &&
-      (cached.fork !== null) === signedIn &&
+      cached.owner === owner &&
       Math.min(cached.upstream.expiresAt, cached.fork?.expiresAt ?? Infinity) -
         60_000 >
         Date.now()
     ) {
       return cached;
     }
-    this.access = signedIn
-      ? await this.accountAccess(baseUrl)
-      : { fork: null, upstream: await this.bootstrapAccess(baseUrl) };
-    return this.access;
+    const access: SourceAccess =
+      owner !== null
+        ? { owner, ...(await this.accountAccess(baseUrl)) }
+        : { owner, fork: null, upstream: await this.bootstrapAccess(baseUrl) };
+    if (owner !== (await this.currentOwner())) {
+      throw new Error("The account changed while checking for updates.");
+    }
+    this.access = access;
+    return access;
   }
 
   private async bootstrapAccess(baseUrl: string): Promise<AppSourceRemote> {
@@ -1738,7 +1873,9 @@ export class AppSourceService {
     return this.backend.client;
   }
 
-  private async accountAccess(baseUrl: string): Promise<SourceAccess> {
+  private async accountAccess(
+    baseUrl: string,
+  ): Promise<Omit<SourceAccess, "owner">> {
     const client = this.backendClient(baseUrl);
     for (let attempt = 1; ; attempt += 1) {
       try {

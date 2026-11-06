@@ -664,34 +664,59 @@ const xConnections = (db: OwnerDbReader): { connections: XConnection[] } => {
   };
 };
 
-const xAccessToken = async (ctx: OwnerContext): Promise<string> => {
+const X_EXPIRED = "X connection expired. Reconnect X in Stella.";
+const xRefreshing = new Map<string, Promise<string>>();
+
+const readXTokens = (ctx: OwnerContext): XTokenRow => {
   const row = ctx.db.one<XTokenRow>("SELECT * FROM x_tokens WHERE id = 1");
   if (!row) throw new RpcError("FORBIDDEN", "X is not connected. Run `stella-x-api connect` first.");
-  if (row.access_token_expires_at === null || row.access_token_expires_at > Date.now() + X_REFRESH_SKEW_MS) {
-    return row.access_token;
+  return row;
+};
+
+const freshXAccess = (row: XTokenRow): string | null =>
+  row.access_token_expires_at === null || row.access_token_expires_at > Date.now() + X_REFRESH_SKEW_MS
+    ? row.access_token
+    : null;
+
+const xAccessToken = async (ctx: OwnerContext): Promise<string> => {
+  const row = readXTokens(ctx);
+  const fresh = freshXAccess(row);
+  if (fresh) return fresh;
+  let run = xRefreshing.get(ctx.ownerId);
+  if (!run) {
+    run = refreshXAccess(ctx, row).finally(() => xRefreshing.delete(ctx.ownerId));
+    xRefreshing.set(ctx.ownerId, run);
   }
+  return await run;
+};
+
+const refreshXAccess = async (ctx: OwnerContext, row: XTokenRow): Promise<string> => {
   const client = xClient(ctx.env);
-  if (!row.refresh_token || !client) {
-    throw new RpcError("FORBIDDEN", "X connection expired. Reconnect X in Stella.");
-  }
+  if (!row.refresh_token || !client) throw new RpcError("FORBIDDEN", X_EXPIRED);
   const token = await requestXToken(client, { grant_type: "refresh_token", refresh_token: row.refresh_token });
   const accessToken = readTokenString(token.body.access_token);
   if (!token.ok || !accessToken) {
+    const current = readXTokens(ctx);
+    const replaced = current.refresh_token !== row.refresh_token ? freshXAccess(current) : null;
+    if (replaced) return replaced;
     console.error(JSON.stringify({ event: "x_token_refresh_failed", status: token.status }));
-    throw new RpcError("FORBIDDEN", "X connection expired. Reconnect X in Stella.");
+    throw new RpcError("FORBIDDEN", X_EXPIRED);
   }
   const now = Date.now();
   const scopes = parseXScope(token.body.scope);
   ctx.db.run(
     `UPDATE x_tokens SET access_token = ?, refresh_token = COALESCE(?, refresh_token),
-       scopes = COALESCE(?, scopes), access_token_expires_at = ?, updated_at = ? WHERE id = 1`,
+       scopes = COALESCE(?, scopes), access_token_expires_at = ?, updated_at = ?
+     WHERE id = 1 AND refresh_token = ?`,
     accessToken,
     readTokenString(token.body.refresh_token),
     scopes.length > 0 ? JSON.stringify(scopes) : null,
     expiresAtOf(token.body, now),
     now,
+    row.refresh_token,
   );
-  return accessToken;
+  const current = readXTokens(ctx);
+  return current.access_token === accessToken ? accessToken : (freshXAccess(current) ?? accessToken);
 };
 
 const X_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;

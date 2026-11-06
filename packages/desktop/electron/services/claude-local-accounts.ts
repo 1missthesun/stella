@@ -458,9 +458,14 @@ export class ClaudeLocalAccounts {
           { configId: DEFAULT_CONFIG_ID, dir: null as string | null, createdAt: 0 },
           ...this.extraConfigDirs(),
         ];
-        this.configs = await Promise.all(
+        const previous = new Map((this.configs ?? []).map((config) => [config.configId, config]));
+        const statuses = await Promise.all(
           entries.map((entry) => this.readStatus(executable, entry.configId, entry.dir, entry.createdAt)),
         );
+        this.configs = statuses.map((status) => {
+          const last = previous.get(status.configId);
+          return status.known || !last?.known ? status : last;
+        });
       }
       this.lastRefreshAt = Date.now();
       this.broadcastIfChanged();
@@ -620,6 +625,7 @@ export class ClaudeLocalAccounts {
     }
     const settings = this.options.engineAccounts.settings();
     if (!this.options.engineAccounts.isSignedIn() || !settings) return;
+    if (this.configs.some((config) => !config.known)) return;
     const logins = new Map<string, ClaudeLocalLogin>();
     for (const config of this.configs) {
       const email = lower(config.email);

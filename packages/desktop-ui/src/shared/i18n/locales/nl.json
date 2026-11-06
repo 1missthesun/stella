@@ -224,10 +224,6 @@
         "loadFailed": "PDF laden mislukt.",
         "loading": "PDF laden…"
       },
-      "queuedMessages": {
-        "cancel": "Bericht in wachtrij annuleren",
-        "cancelAndEdit": "Annuleren en bewerken"
-      },
       "replyPeek": {
         "dismiss": "Voorbeeld sluiten",
         "jumpToLatest": "Naar nieuwste antwoord"

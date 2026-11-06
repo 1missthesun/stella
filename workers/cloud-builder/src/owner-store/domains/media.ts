@@ -656,7 +656,7 @@ const cancelJob = async (
 ): Promise<MediaCalls["media.cancel"]["result"]> => {
   const row = findRow(ctx, args);
   if (!row) return { state: "not_found" };
-  if (TERMINAL.has(row.status)) return { state: "terminal", jobId: row.job_id };
+  if (TERMINAL.has(row.status) || row.settled_at !== null) return { state: "terminal", jobId: row.job_id };
   ctx.db.run("UPDATE media_jobs SET status = 'canceled', updated_at = ? WHERE job_id = ?", Date.now(), row.job_id);
   clearJobs(ctx, row.job_id);
   settleLater(ctx, row.job_id);

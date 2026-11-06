@@ -1,5 +1,6 @@
 import { createStellaBrowserBridgeResource } from "../process-resources/browser-bridge-resource.js";
-import { broadcastStellaBrowserBridgeStatus, } from "./context.js";
+import { broadcastStellaBrowserBridgeStatus, broadcastToWindows, } from "./context.js";
+import { IPC_BROWSER_EXTENSION_CLIENTS_CHANGED } from "@stella/contracts/desktop/ipc-channels";
 export const startStellaBrowserBridge = (context) => {
     if (context.state.stellaBrowserBridgeService) {
         context.state.stellaBrowserBridgeService.start();
@@ -11,6 +12,10 @@ export const startStellaBrowserBridge = (context) => {
         processRuntime: context.state.processRuntime,
         onStatus: (status) => {
             broadcastStellaBrowserBridgeStatus(context, status);
+        },
+        onExtensionLinkChanged: (link) => {
+            context.state.inAppBrowserService?.noteExtensionLink(link.connected);
+            broadcastToWindows(context, IPC_BROWSER_EXTENSION_CLIENTS_CHANGED, link.clients);
         },
     });
     context.state.stellaBrowserBridgeService = service;

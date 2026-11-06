@@ -224,10 +224,6 @@
         "loadFailed": "Kunne ikke laste inn PDF.",
         "loading": "Laster inn PDF…"
       },
-      "queuedMessages": {
-        "cancel": "Avbryt melding i kø",
-        "cancelAndEdit": "Avbryt og rediger"
-      },
       "replyPeek": {
         "dismiss": "Lukk forhåndsvisning",
         "jumpToLatest": "Gå til siste svar"

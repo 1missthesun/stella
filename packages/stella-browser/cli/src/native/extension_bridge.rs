@@ -26,13 +26,16 @@ const DEFAULT_WAIT_TIMEOUT_MS: u64 = 60_000;
 
 const HEALTH_CHECK_TTL_MS: u64 = 5_000;
 
-const DISCONNECT_SHUTDOWN_MS: u64 = 30_000;
-
 const RECONNECT_WAIT_MS: u64 = 10_000;
 
 const DEAD_AFTER_MISSED_HEALTH_CHECKS: u32 = 2;
 
 const RETIRED_CONNECTION_POLL_MS: u64 = 500;
+
+const IDENTIFY_RETRY_DELAYS_MS: [u64; 5] = [500, 2_000, 5_000, 15_000, 60_000];
+const IDENTIFY_SCAN_ATTEMPTS: u32 = 4;
+const IDENTIFY_SCAN_GAP_MS: u64 = 400;
+const IDENTIFY_WAIT_MS: u64 = 10_000;
 const EXTENSION_PROTOCOL_VERSION: &str = "2.1";
 const MIN_EXTENSION_VERSION: (u64, u64, u64) = (1, 2, 12);
 
@@ -81,12 +84,49 @@ struct PendingCommand {
     generation: u64,
 }
 
+/// Which browser profile a connection is. Only `Identified` connections carry
+/// a profile-directory key; `Identifying` ones take no commands, and
+/// `Unidentifiable` ones keep retrying while routable under their
+/// `browser:<Name>` key when no turned-off profile could be theirs.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Identity {
+    Identifying,
+    Identified,
+    Unidentifiable { retry_at_ms: u64 },
+}
+
+impl Identity {
+    fn name(self) -> &'static str {
+        match self {
+            Identity::Identifying => "identifying",
+            Identity::Identified => "identified",
+            Identity::Unidentifiable { .. } => "unidentifiable",
+        }
+    }
+}
+
+enum IdentifyOutcome {
+    Found {
+        profile_dir: PathBuf,
+        profile: Option<String>,
+        email: Option<String>,
+    },
+    Failed,
+}
+
 struct Connection {
     cmd_tx: mpsc::Sender<String>,
     info: ClientInfo,
+    identity: Identity,
     connected_at_ms: u64,
     last_health_check: Instant,
     missed_health_checks: u32,
+}
+
+#[derive(Clone)]
+struct OwnerRoute {
+    generation: u64,
+    key: String,
 }
 
 struct BridgeInner {
@@ -94,27 +134,85 @@ struct BridgeInner {
     last_connection_error: Option<String>,
     next_generation: u64,
     pending: HashMap<String, PendingCommand>,
-    owner_routes: HashMap<String, String>,
+    owner_routes: HashMap<String, OwnerRoute>,
     known_labels: HashMap<String, String>,
+    known_browsers: HashMap<String, String>,
     preferred_key: Option<String>,
     disabled_keys: HashSet<String>,
+    events_tx: broadcast::Sender<String>,
 }
 
 impl BridgeInner {
-    fn enabled(&self, connection: &Connection) -> bool {
-        !self.disabled_keys.contains(&connection.info.key())
+    fn turned_off(&self, connection: &Connection) -> bool {
+        self.disabled_keys.contains(&connection.info.key())
     }
 
-    fn has_enabled_connection(&self) -> bool {
-        self.connections.values().any(|c| self.enabled(c))
+    fn may_be_turned_off_profile(&self, connection: &Connection) -> bool {
+        self.disabled_keys.iter().any(|key| {
+            if key.starts_with("browser:") {
+                return false;
+            }
+            if let Some(browser) = self.known_browsers.get(key) {
+                return *browser == connection.info.browser;
+            }
+            match &connection.info.user_data_dir {
+                Some(root) => std::path::Path::new(key).starts_with(root),
+                None => true,
+            }
+        })
+    }
+
+    fn routable(&self, connection: &Connection) -> bool {
+        match connection.identity {
+            Identity::Identifying => false,
+            Identity::Identified => !self.turned_off(connection),
+            Identity::Unidentifiable { .. } => {
+                !self.turned_off(connection) && !self.may_be_turned_off_profile(connection)
+            }
+        }
+    }
+
+    fn has_routable_connection(&self) -> bool {
+        self.connections.values().any(|c| self.routable(c))
+    }
+
+    fn has_identifying_connection(&self) -> bool {
+        self.connections
+            .values()
+            .any(|c| c.identity == Identity::Identifying)
     }
 
     fn newest_with_key(&self, key: &str) -> Option<u64> {
+        if let Some(browser) = key.strip_prefix("browser:") {
+            let mut same_browser = self
+                .connections
+                .iter()
+                .filter(|(_, c)| c.info.browser == browser && self.routable(c));
+            let only = same_browser.next();
+            return match (only, same_browser.next()) {
+                (Some((generation, _)), None) => Some(*generation),
+                _ => None,
+            };
+        }
         self.connections
             .iter()
             .rev()
-            .find(|(_, c)| c.info.key() == key && self.enabled(c))
+            .find(|(_, c)| {
+                c.identity == Identity::Identified && c.info.key() == key && self.routable(c)
+            })
             .map(|(generation, _)| *generation)
+    }
+
+    /// The connection an owner's commands go to: the very connection it was
+    /// routed to while that is up, else the newest connection of the same
+    /// profile (a reconnect).
+    fn owner_generation(&self, owner: &str) -> Option<u64> {
+        let route = self.owner_routes.get(owner)?;
+        match self.connections.get(&route.generation) {
+            Some(connection) if self.routable(connection) => Some(route.generation),
+            Some(_) => None,
+            None => self.newest_with_key(&route.key),
+        }
     }
 
     fn labels(&self) -> String {
@@ -122,11 +220,25 @@ impl BridgeInner {
             .connections
             .iter()
             .map(|(generation, c)| {
-                let off = if self.enabled(c) { "" } else { ", turned off" };
-                format!("\"{}\" (id {}{})", c.info.label(), generation, off)
+                let note = if self.turned_off(c) {
+                    ", turned off"
+                } else if c.identity == Identity::Identifying {
+                    ", still being identified"
+                } else if !self.routable(c) {
+                    ", unidentified"
+                } else {
+                    ""
+                };
+                format!("\"{}\" (id {}{})", c.info.label(), generation, note)
             })
             .collect();
         labels.join(", ")
+    }
+
+    fn emit_clients_changed(&self) {
+        let _ = self
+            .events_tx
+            .send(r#"{"type":"event","event":"extension_clients_changed"}"#.to_string());
     }
 }
 
@@ -174,6 +286,7 @@ impl ExtensionBridge {
                 .unwrap_or_else(|| Uuid::new_v4().to_string()),
         };
 
+        let events_tx = broadcast::channel(EVENT_BROADCAST_CAPACITY).0;
         Self {
             port,
             token,
@@ -184,12 +297,14 @@ impl ExtensionBridge {
                 pending: HashMap::new(),
                 owner_routes: HashMap::new(),
                 known_labels: HashMap::new(),
+                known_browsers: HashMap::new(),
                 preferred_key: None,
                 disabled_keys: HashSet::new(),
+                events_tx: events_tx.clone(),
             })),
             connected_notify: Arc::new(Notify::new()),
             shutdown_tx: None,
-            events_tx: broadcast::channel(EVENT_BROADCAST_CAPACITY).0,
+            events_tx,
         }
     }
 
@@ -197,7 +312,7 @@ impl ExtensionBridge {
         self.events_tx.subscribe()
     }
 
-    pub async fn start(&mut self, session: &str) -> Result<mpsc::Receiver<()>, String> {
+    pub async fn start(&mut self, session: &str) -> Result<(), String> {
         let socket_dir = get_socket_dir();
         if !socket_dir.exists() {
             let _ = fs::create_dir_all(&socket_dir);
@@ -242,7 +357,6 @@ impl ExtensionBridge {
         };
 
         let (shutdown_tx, mut shutdown_rx) = mpsc::channel::<()>(1);
-        let (disconnect_shutdown_tx, disconnect_shutdown_rx) = mpsc::channel::<()>(1);
         self.shutdown_tx = Some(shutdown_tx);
 
         let inner = self.inner.clone();
@@ -266,7 +380,6 @@ impl ExtensionBridge {
                                 let notify = connected_notify.clone();
                                 let token = token.clone();
                                 let session = session_str.clone();
-                                let disconnect_tx = disconnect_shutdown_tx.clone();
                                 let events = events_tx.clone();
 
                                 tokio::spawn(async move {
@@ -276,7 +389,6 @@ impl ExtensionBridge {
                                         notify,
                                         token,
                                         session,
-                                        disconnect_tx,
                                         events,
                                     ).await;
                                 });
@@ -296,7 +408,7 @@ impl ExtensionBridge {
             let _ = fs::remove_file(&port_file);
         });
 
-        Ok(disconnect_shutdown_rx)
+        Ok(())
     }
 
     pub async fn wait_for_connection(&self) -> bool {
@@ -305,43 +417,38 @@ impl ExtensionBridge {
             let notified = self.connected_notify.notified();
             {
                 let guard = self.inner.lock().await;
-                if guard.has_enabled_connection() {
+                if guard.has_routable_connection() {
                     return true;
                 }
-                if !guard.connections.is_empty() {
+                if !guard.connections.is_empty() && !guard.has_identifying_connection() {
                     return false;
                 }
             }
             tokio::select! {
                 _ = notified => {},
                 _ = tokio::time::sleep_until(deadline) => {
-                    return self.inner.lock().await.has_enabled_connection();
+                    return self.inner.lock().await.has_routable_connection();
                 }
             }
         }
     }
 
-    pub async fn is_connected(&self) -> bool {
-        self.inner.lock().await.has_enabled_connection()
-    }
-
-    pub async fn verified_connection_generation(&self) -> Option<u64> {
-        for _ in 0..4 {
-            let generation = self.select_generation(None, None, false).await.ok()?;
-            if self.check_health(generation).await {
-                return Some(generation);
+    async fn wait_for_identification(&self) {
+        let deadline = tokio::time::Instant::now() + Duration::from_millis(IDENTIFY_WAIT_MS);
+        loop {
+            let notified = self.connected_notify.notified();
+            if !self.inner.lock().await.has_identifying_connection() {
+                return;
             }
-            if self
-                .inner
-                .lock()
-                .await
-                .connections
-                .contains_key(&generation)
-            {
-                return Some(generation);
+            tokio::select! {
+                _ = notified => {},
+                _ = tokio::time::sleep_until(deadline) => return,
             }
         }
-        None
+    }
+
+    pub async fn is_connected(&self) -> bool {
+        self.inner.lock().await.has_routable_connection()
     }
 
     pub async fn force_reconnect(&self) -> bool {
@@ -365,7 +472,10 @@ impl ExtensionBridge {
         guard.preferred_key = preferred_key.filter(|key| !key.trim().is_empty());
         guard.disabled_keys = disabled_keys.into_iter().collect();
         let disabled = guard.disabled_keys.clone();
-        guard.owner_routes.retain(|_, key| !disabled.contains(key));
+        guard
+            .owner_routes
+            .retain(|_, route| !disabled.contains(&route.key));
+        guard.emit_clients_changed();
         drop(guard);
         self.connected_notify.notify_waiters();
     }
@@ -377,12 +487,11 @@ impl ExtensionBridge {
     pub async fn status_for(&self, owner: Option<&str>) -> Value {
         let in_use = self.select_generation(None, None, false).await.ok();
         let guard = self.inner.lock().await;
-        let owner_key = owner
-            .and_then(|owner| guard.owner_routes.get(owner))
-            .cloned();
+        let owner_generation = owner.and_then(|owner| guard.owner_generation(owner));
         let clients: Vec<Value> = guard
             .connections
             .iter()
+            .filter(|(_, connection)| connection.identity != Identity::Identifying)
             .map(|(generation, connection)| {
                 let mut client = connection.info.to_json();
                 if let Some(object) = client.as_object_mut() {
@@ -391,12 +500,17 @@ impl ExtensionBridge {
                         "connectedAtMs".to_string(),
                         json!(connection.connected_at_ms),
                     );
-                    object.insert("enabled".to_string(), json!(guard.enabled(connection)));
+                    object.insert("enabled".to_string(), json!(!guard.turned_off(connection)));
+                    object.insert("routable".to_string(), json!(guard.routable(connection)));
+                    object.insert("identity".to_string(), json!(connection.identity.name()));
+                    if let Identity::Unidentifiable { retry_at_ms } = connection.identity {
+                        object.insert("identifyRetryAtMs".to_string(), json!(retry_at_ms));
+                    }
                     object.insert("inUse".to_string(), json!(in_use == Some(*generation)));
                     if owner.is_some() {
                         object.insert(
                             "current".to_string(),
-                            json!(owner_key.as_deref() == Some(connection.info.key().as_str())),
+                            json!(owner_generation == Some(*generation)),
                         );
                     }
                 }
@@ -409,6 +523,7 @@ impl ExtensionBridge {
             "connected": in_use.is_some(),
             "authorized": in_use.is_some(),
             "connectionGeneration": in_use,
+            "identifying": guard.has_identifying_connection(),
             "preferredKey": guard.preferred_key,
             "disabledKeys": disabled,
             "clients": clients,
@@ -422,7 +537,7 @@ impl ExtensionBridge {
         remember: bool,
     ) -> Result<u64, String> {
         let (candidates, preferred) = {
-            let guard = self.inner.lock().await;
+            let mut guard = self.inner.lock().await;
             if let Some(target) = target.map(str::trim).filter(|t| !t.is_empty()) {
                 let needle = target.to_lowercase();
                 let found = guard
@@ -440,7 +555,11 @@ impl ExtensionBridge {
                             .find(|(_, c)| c.info.label().to_lowercase().contains(&needle))
                     });
                 return match found {
-                    Some((_, c)) if !guard.enabled(c) => Err(format!(
+                    Some((_, c)) if c.identity == Identity::Identifying => Err(format!(
+                        "The browser \"{}\" just connected and Stella is still identifying its profile. Retry in a few seconds.",
+                        c.info.label()
+                    )),
+                    Some((_, c)) if !guard.routable(c) => Err(format!(
                         "The browser \"{}\" is turned off in Stella's Settings (Browser extension). Use another browser or ask the user to turn it back on.",
                         c.info.label()
                     )),
@@ -460,8 +579,13 @@ impl ExtensionBridge {
                     )),
                 };
             }
-            if let Some(key) = owner.and_then(|owner| guard.owner_routes.get(owner)) {
-                if let Some(generation) = guard.newest_with_key(key) {
+            if let Some(owner) = owner {
+                if let Some(generation) = guard.owner_generation(owner) {
+                    if remember {
+                        if let Some(route) = guard.owner_routes.get_mut(owner) {
+                            route.generation = generation;
+                        }
+                    }
                     return Ok(generation);
                 }
             }
@@ -477,12 +601,17 @@ impl ExtensionBridge {
             let candidates: Vec<(u64, ClientInfo, u64)> = guard
                 .connections
                 .iter()
-                .filter(|(_, c)| guard.enabled(c))
+                .filter(|(_, c)| guard.routable(c))
                 .map(|(generation, c)| (*generation, c.info.clone(), c.connected_at_ms))
                 .collect();
             if candidates.is_empty() {
                 return Err(if guard.connections.is_empty() {
                     not_connected_error(&guard)
+                } else if guard.has_identifying_connection() {
+                    format!(
+                        "The Stella Browser extension just connected and Stella is still identifying the browser profile: {}. Retry in a few seconds.",
+                        guard.labels()
+                    )
                 } else {
                     format!(
                         "The Stella Browser extension is connected only in browsers turned off in Stella's Settings (Browser extension): {}. Ask the user to turn one on, or use Stella's own browser with browser.use(\"in-app\").",
@@ -526,7 +655,9 @@ impl ExtensionBridge {
             let missing = {
                 let guard = self.inner.lock().await;
                 match guard.owner_routes.get(owner) {
-                    Some(key) if guard.newest_with_key(key).is_none() => Some(key.clone()),
+                    Some(route) if guard.owner_generation(owner).is_none() => {
+                        Some(route.key.clone())
+                    }
                     _ => None,
                 }
             };
@@ -567,7 +698,9 @@ impl ExtensionBridge {
             let key = connection.info.key();
             let label = connection.info.label();
             guard.known_labels.insert(key.clone(), label);
-            guard.owner_routes.insert(owner.to_string(), key);
+            guard
+                .owner_routes
+                .insert(owner.to_string(), OwnerRoute { generation, key });
         }
     }
 
@@ -611,10 +744,9 @@ impl ExtensionBridge {
     }
 
     pub async fn execute_command(&self, command: &Value) -> Result<Value, String> {
-        {
-            let has_any = !self.inner.lock().await.connections.is_empty();
-            if !has_any && !self.wait_for_connection().await {
-                let guard = self.inner.lock().await;
+        if !self.wait_for_connection().await {
+            let guard = self.inner.lock().await;
+            if guard.connections.is_empty() {
                 return Err(guard
                     .last_connection_error
                     .clone()
@@ -626,6 +758,14 @@ impl ExtensionBridge {
         let owner = command.get("ownerId").and_then(Value::as_str);
         let target = command.get("browserTarget").and_then(Value::as_str);
 
+        let routed_now = match owner {
+            Some(owner) => self.inner.lock().await.owner_generation(owner).is_some(),
+            None => false,
+        };
+        if !routed_now {
+            self.wait_for_identification().await;
+        }
+
         let mut forwarded = command.clone();
         if let Some(object) = forwarded.as_object_mut() {
             object.remove("browserTarget");
@@ -634,13 +774,7 @@ impl ExtensionBridge {
 
         if LIFECYCLE_ACTIONS.contains(&action) && target.is_none() {
             let routed = match owner {
-                Some(owner) => {
-                    let guard = self.inner.lock().await;
-                    guard
-                        .owner_routes
-                        .get(owner)
-                        .and_then(|key| guard.newest_with_key(key))
-                }
+                Some(owner) => self.inner.lock().await.owner_generation(owner),
                 None => None,
             };
             if routed.is_none() {
@@ -1088,11 +1222,13 @@ async fn activate_connection(
         Connection {
             cmd_tx,
             info,
+            identity: Identity::Identifying,
             connected_at_ms: now_ms(),
             last_health_check: Instant::now(),
             missed_health_checks: 0,
         },
     );
+    guard.emit_clients_changed();
     generation
 }
 
@@ -1102,6 +1238,7 @@ async fn deactivate_connection(inner: &Arc<Mutex<BridgeInner>>, generation: u64)
         let Some(connection) = guard.connections.remove(&generation) else {
             return false;
         };
+        guard.emit_clients_changed();
         (
             take_pending_for_generation(&mut guard, generation),
             connection.info.label(),
@@ -1112,20 +1249,100 @@ async fn deactivate_connection(inner: &Arc<Mutex<BridgeInner>>, generation: u64)
     true
 }
 
-async fn should_shutdown_for_disconnect(inner: &Arc<Mutex<BridgeInner>>, generation: u64) -> bool {
-    let guard = inner.lock().await;
-    guard.connections.is_empty() && guard.next_generation == generation
+async fn identify_connection(
+    inner: Arc<Mutex<BridgeInner>>,
+    connected_notify: Arc<Notify>,
+    generation: u64,
+) {
+    for attempt in 0u32.. {
+        let Some(info) = inner
+            .lock()
+            .await
+            .connections
+            .get(&generation)
+            .map(|connection| connection.info.clone())
+        else {
+            return;
+        };
+        let outcome = probe_profile(&inner, generation, info).await;
+        let found = matches!(outcome, IdentifyOutcome::Found { .. });
+        let delay = IDENTIFY_RETRY_DELAYS_MS
+            [(attempt as usize).min(IDENTIFY_RETRY_DELAYS_MS.len() - 1)];
+        let duplicates = apply_identity(&inner, generation, outcome, now_ms() + delay).await;
+        connected_notify.notify_waiters();
+        let Some(duplicates) = duplicates else {
+            return;
+        };
+        for duplicate in duplicates {
+            deactivate_connection(&inner, duplicate).await;
+        }
+        if found {
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(delay)).await;
+    }
 }
 
-async fn identify_connection(inner: Arc<Mutex<BridgeInner>>, generation: u64) {
-    let info = match inner.lock().await.connections.get(&generation) {
-        Some(connection) => connection.info.clone(),
-        None => return,
+/// The one place a connection's `Identity` changes. Returns `None` when the
+/// connection is gone, else the older connections of the same profile that
+/// this one replaces.
+async fn apply_identity(
+    inner: &Arc<Mutex<BridgeInner>>,
+    generation: u64,
+    outcome: IdentifyOutcome,
+    retry_at_ms: u64,
+) -> Option<Vec<u64>> {
+    let mut guard = inner.lock().await;
+    let connection = guard.connections.get_mut(&generation)?;
+    let IdentifyOutcome::Found {
+        profile_dir,
+        profile,
+        email,
+    } = outcome
+    else {
+        let first_failure = connection.identity == Identity::Identifying;
+        connection.identity = Identity::Unidentifiable { retry_at_ms };
+        if first_failure {
+            guard.emit_clients_changed();
+        }
+        return Some(Vec::new());
     };
+    connection.info.profile_dir = Some(profile_dir);
+    connection.info.profile = profile;
+    connection.info.email = email;
+    connection.identity = Identity::Identified;
+    let key = connection.info.key();
+    let label = connection.info.label();
+    let browser = connection.info.browser.clone();
+    guard.known_labels.insert(key.clone(), label);
+    guard.known_browsers.insert(key.clone(), browser);
+    for route in guard.owner_routes.values_mut() {
+        if route.generation == generation {
+            route.key = key.clone();
+        }
+    }
+    guard.emit_clients_changed();
+    Some(
+        guard
+            .connections
+            .iter()
+            .filter(|(other, c)| {
+                **other < generation && c.identity == Identity::Identified && c.info.key() == key
+            })
+            .map(|(other, _)| *other)
+            .collect(),
+    )
+}
+
+async fn probe_profile(
+    inner: &Arc<Mutex<BridgeInner>>,
+    generation: u64,
+    info: ClientInfo,
+) -> IdentifyOutcome {
     let marker = probe_marker();
     let pattern = format!("{}.invalid", marker);
     let set = send_to_generation(
-        &inner,
+        inner,
         generation,
         json!({
             "action": "site_mod_set",
@@ -1137,19 +1354,27 @@ async fn identify_connection(inner: Arc<Mutex<BridgeInner>>, generation: u64) {
         Duration::from_secs(5),
     )
     .await;
-    let profile_dir = if set.is_ok_and(|r| r.get("success").and_then(Value::as_bool) == Some(true))
-    {
-        let lookup_info = info.clone();
-        let lookup_marker = marker.clone();
-        tokio::task::spawn_blocking(move || find_profile_with_marker(&lookup_info, &lookup_marker))
+    let mut profile_dir = None;
+    if set.is_ok_and(|r| r.get("success").and_then(Value::as_bool) == Some(true)) {
+        for scan in 0..IDENTIFY_SCAN_ATTEMPTS {
+            if scan > 0 {
+                tokio::time::sleep(Duration::from_millis(IDENTIFY_SCAN_GAP_MS)).await;
+            }
+            let lookup_info = info.clone();
+            let lookup_marker = marker.clone();
+            profile_dir = tokio::task::spawn_blocking(move || {
+                find_profile_with_marker(&lookup_info, &lookup_marker)
+            })
             .await
             .ok()
-            .flatten()
-    } else {
-        None
-    };
+            .flatten();
+            if profile_dir.is_some() {
+                break;
+            }
+        }
+    }
     let _ = send_to_generation(
-        &inner,
+        inner,
         generation,
         json!({
             "action": "site_mod_remove",
@@ -1160,42 +1385,16 @@ async fn identify_connection(inner: Arc<Mutex<BridgeInner>>, generation: u64) {
     )
     .await;
     let Some(profile_dir) = profile_dir else {
-        return;
+        return IdentifyOutcome::Failed;
     };
     let identity_dir = profile_dir.clone();
-    let (profile, email) =
-        tokio::task::spawn_blocking(move || read_profile_identity(&identity_dir))
-            .await
-            .unwrap_or((None, None));
-    let duplicates: Vec<u64> = {
-        let mut guard = inner.lock().await;
-        let old_key = match guard.connections.get_mut(&generation) {
-            Some(connection) => {
-                let old_key = connection.info.key();
-                connection.info.profile_dir = Some(profile_dir);
-                connection.info.profile = profile;
-                connection.info.email = email;
-                old_key
-            }
-            None => return,
-        };
-        let key = guard.connections[&generation].info.key();
-        let label = guard.connections[&generation].info.label();
-        guard.known_labels.insert(key.clone(), label);
-        for route in guard.owner_routes.values_mut() {
-            if *route == old_key {
-                *route = key.clone();
-            }
-        }
-        guard
-            .connections
-            .iter()
-            .filter(|(other, c)| **other < generation && c.info.key() == key)
-            .map(|(other, _)| *other)
-            .collect()
-    };
-    for duplicate in duplicates {
-        deactivate_connection(&inner, duplicate).await;
+    let (profile, email) = tokio::task::spawn_blocking(move || read_profile_identity(&identity_dir))
+        .await
+        .unwrap_or((None, None));
+    IdentifyOutcome::Found {
+        profile_dir,
+        profile,
+        email,
     }
 }
 
@@ -1205,7 +1404,6 @@ async fn handle_extension_connection(
     connected_notify: Arc<Notify>,
     expected_token: String,
     session: String,
-    disconnect_shutdown_tx: mpsc::Sender<()>,
     events_tx: broadcast::Sender<String>,
 ) {
     let mut probe_buf = [0u8; 8];
@@ -1337,7 +1535,11 @@ async fn handle_extension_connection(
                         "protocolVersion": EXTENSION_PROTOCOL_VERSION,
                     });
                     let _ = cmd_tx.send(serde_json::to_string(&welcome).unwrap()).await;
-                    tokio::spawn(identify_connection(inner.clone(), generation));
+                    tokio::spawn(identify_connection(
+                        inner.clone(),
+                        connected_notify.clone(),
+                        generation,
+                    ));
                 } else {
                     let err = json!({
                         "type": "auth_error",
@@ -1390,16 +1592,8 @@ async fn handle_extension_connection(
 
     if authenticated {
         if let Some(generation) = connection_generation {
-            if deactivate_connection(&inner, generation).await {
-                let inner_clone = inner.clone();
-                let disconnect_tx = disconnect_shutdown_tx.clone();
-                tokio::spawn(async move {
-                    tokio::time::sleep(Duration::from_millis(DISCONNECT_SHUTDOWN_MS)).await;
-                    if should_shutdown_for_disconnect(&inner_clone, generation).await {
-                        let _ = disconnect_tx.send(()).await;
-                    }
-                });
-            }
+            deactivate_connection(&inner, generation).await;
+            connected_notify.notify_waiters();
         }
     }
 

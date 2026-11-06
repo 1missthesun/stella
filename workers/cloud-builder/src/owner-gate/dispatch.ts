@@ -23,13 +23,19 @@ import {
 import {
   type DevicePresenceState,
   type DeviceRegistration,
+  isDispatchTransition,
   isEligibleDevice,
   isOwnScheduledWork,
   isTerminalDispatchState,
   MAX_OFFERS_PER_DISPATCH,
 } from "../dispatch-policy.js";
-import type { DispatchRow } from "./types.js";
+import type {
+  DispatchPatch,
+  DispatchRow,
+  DispatchTransition,
+} from "./types.js";
 import {
+  DISPATCH_RECONCILE_MAX_MS,
   DISPATCH_RENEW_WRITE_BELOW_MS,
   ALARM_BACKOFF_KEY,
   ALARM_HOT_STREAK_KEY,
@@ -66,33 +72,72 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
     this.send(socket, { type: "dispatch", dispatch: dispatchSummary(row) });
   }
 
-  protected async patchDispatch(
+  /**
+   * The one write of a dispatch row. It applies only while the row is still
+   * in the state the caller read (`row.state`), and `to` must be a legal edge
+   * from it. When the row moved on meanwhile nothing is written and the
+   * current row comes back with `applied: false`.
+   */
+  protected async transitionDispatch(
     row: DispatchRow,
-    patch: Record<string, string | number | null>,
+    to: DispatchState,
+    patch: DispatchPatch,
     now: number,
     options: { notifyExecutor?: boolean } = {},
-  ): Promise<DispatchRow> {
-    const columns = Object.keys(patch);
-    const assignments = [
-      ...columns.map((column) => `${column} = ?`),
-      "revision = revision + 1",
-      "updated_at = ?",
-    ];
-    this.ctx.storage.sql.exec(
-      `UPDATE dispatches SET ${assignments.join(", ")} WHERE dispatch_id = ?`,
-      ...columns.map((column) => patch[column] ?? null),
-      now,
-      row.dispatch_id,
-    );
-    const next = this.dispatchRow(row.dispatch_id)!;
+  ): Promise<DispatchTransition> {
+    const from = row.state;
+    if (!isDispatchTransition(from, to)) {
+      log("error", "dispatch_transition_illegal", {
+        dispatchId: row.dispatch_id,
+        from,
+        to,
+      });
+      return { applied: false, row: this.dispatchRow(row.dispatch_id) ?? row };
+    }
+    const columns = Object.keys(patch) as Array<keyof DispatchPatch>;
+    const next = this.ctx.storage.sql
+      .exec<DispatchRow>(
+        `UPDATE dispatches SET ${[
+          "state = ?",
+          ...columns.map((column) => `${column} = ?`),
+          "revision = revision + 1",
+          "updated_at = ?",
+        ].join(", ")}
+          WHERE dispatch_id = ? AND state = ?
+          RETURNING *`,
+        to,
+        ...columns.map((column) => patch[column] ?? null),
+        now,
+        row.dispatch_id,
+        from,
+      )
+      .toArray()[0];
+    if (!next) {
+      const current = this.dispatchRow(row.dispatch_id) ?? row;
+      log("info", "dispatch_transition_lost", {
+        dispatchId: row.dispatch_id,
+        from,
+        to,
+        current: current.state,
+      });
+      return { applied: false, row: current };
+    }
     if (options.notifyExecutor !== false) this.notifyExecutor(next);
-    if (
-      !isTerminalDispatchState(row.state as DispatchState) &&
-      isTerminalDispatchState(next.state as DispatchState)
-    ) {
+    if (!isTerminalDispatchState(from) && isTerminalDispatchState(to)) {
       await this.reportDeviceAgentSettled(next);
     }
-    return next;
+    return { applied: true, row: next };
+  }
+
+  /** Whether this dispatch holds an owner-gate slot, whatever its state. */
+  protected setGateHeld(dispatchId: string, held: boolean): void {
+    this.ctx.storage.sql.exec(
+      `UPDATE dispatches SET gate_held = ?, revision = revision + 1,
+         updated_at = ? WHERE dispatch_id = ?`,
+      held ? 1 : 0,
+      Date.now(),
+      dispatchId,
+    );
   }
 
   protected async reportDeviceAgentSettled(row: DispatchRow): Promise<void> {
@@ -265,7 +310,10 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
     return device.remoteExecution;
   }
 
-  protected offerAgainTo(attachment: PresenceAttachment, now: number): void {
+  protected async offerAgainTo(
+    attachment: PresenceAttachment,
+    now: number,
+  ): Promise<void> {
     const presence = this.presenceRow(attachment.deviceId);
     if (!presence?.connected || !presence.ready) return;
     const rows = this.ctx.storage.sql
@@ -277,18 +325,21 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
         attachment.deviceId,
       )
       .toArray();
-    for (const row of rows) {
+    for (let row of rows) {
       const deadline = Math.max(
         row.offer_deadline_at ?? 0,
         now + DISPATCH_OFFER_WINDOW_MS,
       );
       if (deadline !== row.offer_deadline_at) {
-        this.ctx.storage.sql.exec(
-          `UPDATE dispatches SET offer_deadline_at = ? WHERE dispatch_id = ?`,
-          deadline,
-          row.dispatch_id,
+        const moved = await this.transitionDispatch(
+          row,
+          "offering",
+          { offer_deadline_at: deadline },
+          now,
+          { notifyExecutor: false },
         );
-        row.offer_deadline_at = deadline;
+        if (!moved.applied) continue;
+        row = moved.row;
       }
       this.openOffer(row.dispatch_id, presence, deadline, now);
       this.pushOffer(row, attachment.deviceId, deadline);
@@ -368,7 +419,7 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
   }
 
   protected async releaseGate(row: DispatchRow): Promise<void> {
-    if (row.gate_held !== 1) return;
+    if (this.dispatchRow(row.dispatch_id)?.gate_held !== 1) return;
     const handoff = await this.ctx.storage.get<CloudChatHandoff>(
       cloudChatHandoffKey(row.dispatch_id),
     );
@@ -378,10 +429,7 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
           ? handoff.authority.turnId
           : (handoff?.turnId ?? row.dispatch_id),
     });
-    this.ctx.storage.sql.exec(
-      `UPDATE dispatches SET gate_held = 0 WHERE dispatch_id = ?`,
-      row.dispatch_id,
-    );
+    this.setGateHeld(row.dispatch_id, false);
     row.gate_held = 0;
   }
 
@@ -402,10 +450,10 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
     if (row.on_no_eligible_computer === "cloud" && row.kind === "agent") {
       const snapshot = await this.snapshot({ now }).catch(() => null);
       if (snapshot && !snapshotAllowsCloudSandbox(snapshot)) {
-        const refused = await this.patchDispatch(
+        const refused = await this.transitionDispatch(
           row,
+          "blocked",
           {
-            state: "blocked",
             executor_device_id: null,
             executor_presence_session_id: null,
             offer_deadline_at: null,
@@ -418,15 +466,15 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
           },
           now,
         );
-        await this.releaseGate(refused);
-        return refused;
+        if (refused.applied) await this.releaseGate(refused.row);
+        return refused.row;
       }
     }
     if (row.on_no_eligible_computer === "cloud") {
-      const committed = await this.patchDispatch(
+      const committed = await this.transitionDispatch(
         row,
+        "cloud_committed",
         {
-          state: "cloud_committed",
           placement: "cloud",
           executor_device_id: null,
           executor_presence_session_id: null,
@@ -436,7 +484,9 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
         },
         now,
       );
-      return await this.runCloudBranch(committed, now);
+      return committed.applied
+        ? await this.runCloudBranch(committed.row, now)
+        : committed.row;
     }
     const explicitDevice = row.requested_target_mode === "device";
     const ownWork = isOwnScheduledWork(row, row.requested_executor_device_id);
@@ -452,10 +502,10 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
               ).then((state) => (state ? { remoteExecution: state } : {}))),
         })
       : null;
-    const blocked = await this.patchDispatch(
+    const blocked = await this.transitionDispatch(
       row,
+      "blocked",
       {
-        state: "blocked",
         executor_device_id: null,
         executor_presence_session_id: null,
         offer_deadline_at: null,
@@ -480,8 +530,8 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
       },
       now,
     );
-    await this.releaseGate(blocked);
-    return blocked;
+    if (blocked.applied) await this.releaseGate(blocked.row);
+    return blocked.row;
   }
 
   protected async submitSnapshot(
@@ -642,10 +692,10 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
         );
         return;
       }
-      const released = await this.patchDispatch(
+      const released = await this.transitionDispatch(
         row,
+        "offering",
         {
-          state: "offering",
           executor_device_id: null,
           executor_presence_session_id: null,
           lease_expires_at: null,
@@ -653,15 +703,16 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
         now,
         { notifyExecutor: false },
       );
+      if (!released.applied) return;
       this.ctx.storage.sql.exec(
         `UPDATE dispatch_offers SET status = 'withdrawn', updated_at = ?
           WHERE dispatch_id = ? AND device_id = ?`,
         now,
-        released.dispatch_id,
+        released.row.dispatch_id,
         attachment.deviceId,
       );
       await this.resolveUnaccepted(
-        released,
+        released.row,
         now,
         `computer-claim-released:${(frame.reason ?? "").slice(0, 160)}`,
       );
@@ -683,10 +734,10 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
         deny("conflict", "Claim expired before durable local acceptance.");
         return;
       }
-      await this.patchDispatch(
+      await this.transitionDispatch(
         row,
+        "computer_accepted",
         {
-          state: "computer_accepted",
           placement: "computer",
           payload_json: null,
           payload_expires_at: null,
@@ -705,10 +756,10 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
         deny("conflict", "Only an accepted computer execution can start.");
         return;
       }
-      await this.patchDispatch(
+      await this.transitionDispatch(
         row,
+        row.cancel_request_id ? "cancel_pending" : "computer_running",
         {
-          state: "computer_running",
           started_at: row.started_at ?? now,
           lease_expires_at: now + DISPATCH_ACCEPTED_LEASE_MS,
         },
@@ -726,11 +777,13 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
         deny("conflict", "Execution is not renewable.");
         return;
       }
-      const state =
+      const state: DispatchState =
         row.state === "reconciliation_required"
-          ? row.started_at
-            ? "computer_running"
-            : "computer_accepted"
+          ? row.cancel_request_id
+            ? "cancel_pending"
+            : row.started_at
+              ? "computer_running"
+              : "computer_accepted"
           : row.state;
       if (
         state === row.state &&
@@ -740,9 +793,10 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
         this.notifyExecutor(row);
         return;
       }
-      await this.patchDispatch(
+      await this.transitionDispatch(
         row,
-        { state, lease_expires_at: now + DISPATCH_ACCEPTED_LEASE_MS },
+        state,
+        { lease_expires_at: now + DISPATCH_ACCEPTED_LEASE_MS },
         now,
       );
       return;
@@ -757,7 +811,7 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
         deny("bad_request", "A completion needs a terminal outcome.");
         return;
       }
-      if (isTerminalDispatchState(row.state as DispatchState)) {
+      if (isTerminalDispatchState(row.state)) {
         this.notifyExecutor(row);
         return;
       }
@@ -773,10 +827,10 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
         );
         return;
       }
-      const terminal = await this.patchDispatch(
+      const terminal = await this.transitionDispatch(
         row,
+        outcome,
         {
-          state: outcome,
           result_json:
             typeof frame.resultJson === "string" ? frame.resultJson : null,
           payload_json: null,
@@ -791,7 +845,7 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
         },
         now,
       );
-      await this.releaseGate(terminal);
+      if (terminal.applied) await this.releaseGate(terminal.row);
       await this.scheduleAlarm(now);
       return;
     }
@@ -877,6 +931,27 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
       });
       return;
     }
+    const claimExpiresAt = now + DISPATCH_CLAIM_LEASE_MS;
+    const claimed = await this.transitionDispatch(
+      row,
+      "computer_claimed",
+      {
+        executor_device_id: attachment.deviceId,
+        executor_presence_session_id: attachment.presenceSessionId ?? "",
+        lease_expires_at: claimExpiresAt,
+      },
+      now,
+      { notifyExecutor: false },
+    );
+    if (!claimed.applied) {
+      this.send(socket, {
+        type: "error",
+        code: "conflict",
+        message: "Execution offer is no longer claimable.",
+        retryable: false,
+      });
+      return;
+    }
     this.ctx.storage.sql.exec(
       `UPDATE dispatch_offers SET status = 'claimed', updated_at = ?
         WHERE dispatch_id = ? AND device_id = ?`,
@@ -885,18 +960,6 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
       attachment.deviceId,
     );
     this.withdrawOffers(row.dispatch_id, attachment.deviceId, "claimed", now);
-    const claimExpiresAt = now + DISPATCH_CLAIM_LEASE_MS;
-    await this.patchDispatch(
-      row,
-      {
-        state: "computer_claimed",
-        executor_device_id: attachment.deviceId,
-        executor_presence_session_id: attachment.presenceSessionId ?? "",
-        lease_expires_at: claimExpiresAt,
-      },
-      now,
-      { notifyExecutor: false },
-    );
     this.send(socket, {
       type: "claimed",
       dispatchId: row.dispatch_id,
@@ -982,6 +1045,8 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
               WHERE state = 'cloud_committed' AND lease_expires_at IS NOT NULL) AS committed,
            (SELECT MIN(lease_expires_at) FROM dispatches
               WHERE state = 'cancel_pending' AND lease_expires_at IS NOT NULL) AS canceling,
+           (SELECT MIN(lease_expires_at) FROM dispatches
+              WHERE state = 'reconciliation_required' AND lease_expires_at IS NOT NULL) AS reconciling,
            (SELECT MIN(cloud_retry_at) FROM dispatches
               WHERE state = 'cloud_committed' AND cloud_retry_at IS NOT NULL) AS retry,
            (SELECT MIN(payload_expires_at) FROM dispatches
@@ -1060,7 +1125,7 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
                  AND cloud_retry_at <= ?)
              OR (state IN ('computer_claimed', 'computer_accepted',
                            'computer_running', 'cloud_committed',
-                           'cancel_pending')
+                           'cancel_pending', 'reconciliation_required')
                  AND lease_expires_at IS NOT NULL AND lease_expires_at <= ?)
              OR (payload_json IS NOT NULL AND payload_expires_at IS NOT NULL
                  AND payload_expires_at <= ?)
@@ -1082,10 +1147,12 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
       if (offerLapsed) {
         const waitUntil = this.reconnectDeadline(row, now);
         if (waitUntil !== null) {
-          this.ctx.storage.sql.exec(
-            `UPDATE dispatches SET offer_deadline_at = ? WHERE dispatch_id = ?`,
-            waitUntil,
-            row.dispatch_id,
+          await this.transitionDispatch(
+            row,
+            "offering",
+            { offer_deadline_at: waitUntil },
+            now,
+            { notifyExecutor: false },
           );
           log("info", "dispatch_offer_awaits_reconnect", {
             dispatchId: row.dispatch_id,
@@ -1119,11 +1186,11 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
           row.state === "cloud_committed" ||
           row.state === "cancel_pending")
       ) {
-        await this.patchDispatch(
+        await this.transitionDispatch(
           row,
+          "reconciliation_required",
           {
-            state: "reconciliation_required",
-            lease_expires_at: null,
+            lease_expires_at: now + DISPATCH_RECONCILE_MAX_MS,
             fallback_reason: `${row.state}-lease-expired`,
           },
           now,
@@ -1131,11 +1198,36 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
         );
         continue;
       }
+      if (leaseLapsed && row.state === "reconciliation_required") {
+        const ended = await this.transitionDispatch(
+          row,
+          row.cancel_request_id ? "canceled" : "failed",
+          row.cancel_request_id
+            ? {
+                payload_json: null,
+                payload_expires_at: null,
+                lease_expires_at: null,
+              }
+            : {
+                payload_json: null,
+                payload_expires_at: null,
+                lease_expires_at: null,
+                error_code: "RECONCILIATION_EXPIRED",
+                error_message:
+                  "The device running this never reported how it ended.",
+              },
+          now,
+        );
+        if (ended.applied) await this.releaseGate(ended.row);
+        continue;
+      }
       if (row.payload_json !== null) {
-        this.ctx.storage.sql.exec(
-          `UPDATE dispatches SET payload_json = NULL, payload_expires_at = NULL
-            WHERE dispatch_id = ?`,
-          row.dispatch_id,
+        await this.transitionDispatch(
+          row,
+          row.state,
+          { payload_json: null, payload_expires_at: null },
+          now,
+          { notifyExecutor: false },
         );
       }
     }

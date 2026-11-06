@@ -224,10 +224,6 @@
         "loadFailed": "Det gick inte att läsa in PDF-filen.",
         "loading": "Laddar PDF…"
       },
-      "queuedMessages": {
-        "cancel": "Avbryt meddelande i kö",
-        "cancelAndEdit": "Avbryt och redigera"
-      },
       "replyPeek": {
         "dismiss": "Stäng förhandsvisning",
         "jumpToLatest": "Hoppa till senaste svaret"

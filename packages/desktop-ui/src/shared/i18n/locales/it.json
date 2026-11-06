@@ -229,10 +229,6 @@
         "loadFailed": "Caricamento del PDF non riuscito.",
         "loading": "Caricamento del PDF…"
       },
-      "queuedMessages": {
-        "cancel": "Annulla il messaggio in coda",
-        "cancelAndEdit": "Annulla e modifica"
-      },
       "replyPeek": {
         "dismiss": "Chiudi l'anteprima",
         "jumpToLatest": "Vai all'ultima risposta"

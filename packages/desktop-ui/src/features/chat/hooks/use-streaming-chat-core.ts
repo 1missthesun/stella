@@ -15,20 +15,9 @@ import { toPastedTextDescriptor } from "../lib/paste-context";
 import { rememberSentAttachmentPreviews } from "@/features/cloud/drive-attachment-previews";
 import { getComposerAppSelections } from "../composer-context";
 import { useLocalAgentStream } from "../streaming/use-local-agent-stream";
-import {
-  combineQueuedSendPayloads,
-  orderQueuedMessages,
-  removeQueuedUserMessageById,
-  restoreQueuedMessagesAfterFailedDrain,
-  timestampQueuedOptimisticEventForDrain,
-  type QueuedUserMessage,
-} from "./queued-user-messages";
-import { useQueuedDequeueClock } from "./use-queued-dequeue-clock";
 import { acceptedUserMessageIds } from "../lib/accepted-user-message-ids";
 import { onPiChatEvents } from "@/features/chat/pi/pi-chat-store";
 import { showToast } from "@/ui/toast";
-
-export type { QueuedUserMessage } from "./queued-user-messages";
 
 type UseStreamingChatOptions = {
   conversationId: string | null;
@@ -114,22 +103,6 @@ const buildOptimisticUserEvent = (args: {
   },
 });
 
-type QueuedStreamPayload = {
-  id: string;
-  queueOrder: number;
-  conversationId: string;
-  userPrompt: string;
-  selectedText: SendMessageArgs["selectedText"];
-  chatContext: SendMessageArgs["chatContext"];
-  deviceId: string;
-  platform?: string;
-  timezone?: string;
-  locale?: string;
-  messageMetadata?: SendMessageArgs["metadata"];
-  attachments: ReturnType<typeof buildAllLocalAttachments>;
-  optimisticEvent: EventRecord;
-};
-
 export function useStreamingChatCore({
   conversationId,
   locale,
@@ -138,24 +111,11 @@ export function useStreamingChatCore({
 }: UseStreamingChatOptions) {
   const activeConversationId = conversationId;
   const [optimisticEvents, setOptimisticEvents] = useState<EventRecord[]>([]);
-  const [queuedUserMessages, setQueuedUserMessages] = useState<
-    QueuedUserMessage[]
-  >([]);
-  const queuedStreamPayloadsRef = useRef<QueuedStreamPayload[]>([]);
-  const drainingQueuedPayloadsRef = useRef<QueuedStreamPayload[]>([]);
-  const drainingQueuedMessageIdRef = useRef<string | null>(null);
-  const queuedMessageOrderRef = useRef(0);
-  const queueDrainPausedRef = useRef(false);
   const pendingSendRef = useRef<symbol | null>(null);
   const [isSending, setIsSending] = useState(false);
   const activeConversationIdRef = useRef(activeConversationId);
   activeConversationIdRef.current = activeConversationId;
   const { isLocalStorage, storageMode } = useChatStore();
-  const issueDequeueTimestamp = useQueuedDequeueClock({
-    conversationId: activeConversationId,
-    persistedMessages,
-    optimisticEvents,
-  });
 
   const reconcileAcceptedUserMessage = useCallback(
     (optimisticId: string, acceptedId: string) => {
@@ -169,20 +129,6 @@ export function useStreamingChatCore({
     [],
   );
 
-  const removeQueuedUserMessage = useCallback((messageId: string) => {
-    queuedStreamPayloadsRef.current = queuedStreamPayloadsRef.current.filter(
-      (message) => message.id !== messageId,
-    );
-    if (drainingQueuedMessageIdRef.current === messageId) {
-      drainingQueuedMessageIdRef.current = null;
-      drainingQueuedPayloadsRef.current = [];
-    }
-    queueDrainPausedRef.current = false;
-    setQueuedUserMessages((current) =>
-      removeQueuedUserMessageById(current, messageId),
-    );
-  }, []);
-
   const {
     pendingUserMessageId,
     setPendingUserMessageId,
@@ -194,15 +140,9 @@ export function useStreamingChatCore({
   });
 
   useEffect(() => {
-    queuedStreamPayloadsRef.current = [];
-    drainingQueuedPayloadsRef.current = [];
-    drainingQueuedMessageIdRef.current = null;
-    queuedMessageOrderRef.current = 0;
-    queueDrainPausedRef.current = false;
     pendingSendRef.current = null;
     setIsSending(false);
     setOptimisticEvents([]);
-    setQueuedUserMessages([]);
     setPendingUserMessageId(null);
   }, [activeConversationId, setPendingUserMessageId]);
 
@@ -246,116 +186,6 @@ export function useStreamingChatCore({
     setPendingUserMessageId,
   ]);
 
-  const drainQueuedMessagesIfIdle = useCallback(() => {
-    if (!activeConversationId) return;
-    if (drainingQueuedMessageIdRef.current) return;
-    if (queueDrainPausedRef.current) return;
-    const drainable = orderQueuedMessages(
-      queuedStreamPayloadsRef.current.filter(
-        (message) => message.conversationId === activeConversationId,
-      ),
-    );
-    const combined = combineQueuedSendPayloads(drainable);
-    if (!combined) return;
-
-    const drainedIds = new Set(drainable.map((message) => message.id));
-    drainingQueuedMessageIdRef.current = combined.id;
-    drainingQueuedPayloadsRef.current = drainable;
-    queuedStreamPayloadsRef.current = queuedStreamPayloadsRef.current.filter(
-      (message) => !drainedIds.has(message.id),
-    );
-    setQueuedUserMessages((current) =>
-      current.filter((message) => !drainedIds.has(message.id)),
-    );
-    const dequeuedAtMs = issueDequeueTimestamp();
-    const optimisticEventTemplate =
-      drainable.length === 1
-        ? combined.optimisticEvent
-        : buildOptimisticUserEvent({
-            id: combined.id,
-            text: visibleUserMessageText(combined.userPrompt),
-            timestamp: dequeuedAtMs,
-            platform: combined.platform,
-            timezone: combined.timezone,
-            locale: combined.locale,
-            ...(combined.messageMetadata
-              ? { metadata: combined.messageMetadata }
-              : {}),
-            attachments: toDisplayAttachments(combined.attachments),
-          });
-    const optimisticEvent = timestampQueuedOptimisticEventForDrain(
-      optimisticEventTemplate,
-      dequeuedAtMs,
-    );
-    rememberSentAttachmentPreviews(
-      combined.id,
-      toDisplayAttachments(combined.attachments),
-    );
-    setOptimisticEvents((current) =>
-      current.some((event) => event._id === combined.id)
-        ? current
-        : [...current, optimisticEvent],
-    );
-    setPendingUserMessageId(combined.id);
-
-    startStream({
-      userPrompt: combined.userPrompt,
-      selectedText: combined.selectedText,
-      chatContext: combined.chatContext,
-      deviceId: combined.deviceId,
-      platform: combined.platform,
-      timezone: combined.timezone,
-      locale: combined.locale,
-      ...(combined.messageMetadata
-        ? { messageMetadata: combined.messageMetadata }
-        : {}),
-      attachments: combined.attachments,
-      userMessageEventId: combined.id,
-      onUserMessageAccepted: (acceptedId: string) =>
-        reconcileAcceptedUserMessage(combined.id, acceptedId),
-      userMessageTimestamp: optimisticEvent.timestamp,
-      onStartFailed: () => {
-        if (drainingQueuedMessageIdRef.current === combined.id) {
-          drainingQueuedMessageIdRef.current = null;
-        }
-        const failedDrain = drainingQueuedPayloadsRef.current;
-        drainingQueuedPayloadsRef.current = [];
-        queueDrainPausedRef.current = true;
-        queuedStreamPayloadsRef.current = restoreQueuedMessagesAfterFailedDrain(
-          queuedStreamPayloadsRef.current,
-          failedDrain,
-        );
-        clearOptimisticMessage(combined.id);
-        setQueuedUserMessages((current) =>
-          restoreQueuedMessagesAfterFailedDrain(
-            current,
-            failedDrain.map((message) => {
-              const payload = message.optimisticEvent.payload as
-                | { text?: unknown }
-                | undefined;
-              return {
-                id: message.id,
-                text:
-                  (typeof payload?.text === "string" ? payload.text : "") ||
-                  message.userPrompt ||
-                  "Attached context",
-                timestamp: message.optimisticEvent.timestamp,
-                queueOrder: message.queueOrder,
-              };
-            }),
-          ),
-        );
-      },
-    });
-  }, [
-    activeConversationId,
-    clearOptimisticMessage,
-    issueDequeueTimestamp,
-    setPendingUserMessageId,
-    startStream,
-    reconcileAcceptedUserMessage,
-  ]);
-
   useEffect(() => {
     if (!pendingUserMessageId) return;
 
@@ -381,26 +211,6 @@ export function useStreamingChatCore({
   useEffect(() => {
     if (optimisticEvents.length > 0) acknowledgeMessages(persistedMessages);
   }, [acknowledgeMessages, optimisticEvents, persistedMessages]);
-
-  useEffect(() => {
-    const persistedIds = acceptedUserMessageIds(persistedMessages);
-    const queuedPayloads = queuedStreamPayloadsRef.current.filter(
-      (message) => !persistedIds.has(message.id),
-    );
-    if (queuedPayloads.length !== queuedStreamPayloadsRef.current.length) {
-      queuedStreamPayloadsRef.current = queuedPayloads;
-    }
-    if (queuedUserMessages.length > 0) {
-      setQueuedUserMessages((current) => {
-        const next = current.filter((message) => !persistedIds.has(message.id));
-        return next.length === current.length ? current : next;
-      });
-    }
-  }, [persistedMessages, queuedUserMessages.length]);
-
-  useEffect(() => {
-    drainQueuedMessagesIfIdle();
-  }, [drainQueuedMessagesIfIdle, queuedUserMessages.length]);
 
   const sendMessage = useCallback(
     async (options: SendMessageArgs) => {
@@ -525,10 +335,8 @@ export function useStreamingChatCore({
   return {
     optimisticEvents,
     acknowledgeMessages,
-    queuedUserMessages,
     isSending,
     pendingUserMessageId,
-    removeQueuedUserMessage,
     sendMessage,
     cancelCurrentStream,
   };

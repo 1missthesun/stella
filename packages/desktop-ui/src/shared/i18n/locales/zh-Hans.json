@@ -219,10 +219,6 @@
         "loadFailed": "加载 PDF 失败。",
         "loading": "正在加载 PDF…"
       },
-      "queuedMessages": {
-        "cancel": "取消排队的消息",
-        "cancelAndEdit": "取消并编辑"
-      },
       "replyPeek": {
         "dismiss": "关闭预览",
         "jumpToLatest": "跳到最新回复"

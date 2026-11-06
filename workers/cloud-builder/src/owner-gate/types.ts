@@ -1,6 +1,7 @@
 import type { OwnerHomeContext } from "../owner-home-context.js";
 import type { OwnerSnapshot } from "@stella/contracts/turn-plane/owner-snapshot";
 import type {
+  DispatchState,
   DevicesResponse,
   DispatchError,
   DispatchStatusResponse,
@@ -117,7 +118,7 @@ export type DispatchRow = {
   pair_grant_device_id: string | null;
   required_capabilities: string;
   routing_fingerprint: string;
-  state: string;
+  state: DispatchState;
   placement: string | null;
   executor_device_id: string | null;
   executor_presence_session_id: string | null;
@@ -143,6 +144,24 @@ export type DispatchRow = {
   created_at: number;
   updated_at: number;
 };
+
+/** Columns a transition may write besides `state`; `gate_held` has its own writer. */
+export type DispatchPatch = Partial<
+  Pick<
+    DispatchRow,
+    Exclude<
+      keyof DispatchRow,
+      | "dispatch_id"
+      | "state"
+      | "revision"
+      | "updated_at"
+      | "created_at"
+      | "gate_held"
+    >
+  >
+>;
+
+export type DispatchTransition = { applied: boolean; row: DispatchRow };
 
 export type OwnerGateSubmitInput = {
   request: DispatchSubmitRequest;

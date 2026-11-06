@@ -64,6 +64,7 @@ import {
   AUTOMATIC_EXECUTION_TARGET,
   cancelAutomaticExecution,
   getAutomaticExecutionStatus,
+  readMainConversationId,
   type AutomaticExecutionTarget,
 } from "./execution-placement";
 import { createActivityHubArtifacts } from "./activity-hub-model";
@@ -95,10 +96,12 @@ import type { ChatMessage } from "../types";
 import { SentMessageAnchors } from "@stella/contracts/sent-message-anchors";
 import type { ChatThreadId } from "./offline-chat-storage";
 import type { StoredPhoneAccess } from "./phone-access";
+import { useIsOffline } from "./use-network-status";
 import {
   useChatThread,
   type ChatThread,
   type ChatTransport,
+  type ComposerGate,
 } from "./use-chat-thread";
 
 
@@ -324,6 +327,7 @@ const useSustainedCloudOffline = (status: CloudSocketStatus): boolean => {
 
 const STOP_CONFIRM_MS = 15_000;
 const SETTLED_SEND_RELEASE_MS = 10_000;
+const PLACEMENT_RECHECK_MS = 10_000;
 const STOP_UNREACHABLE_MESSAGE =
   "Couldn’t stop this reply. Stella isn’t connected right now.";
 const STOP_UNCONFIRMED_MESSAGE =
@@ -377,6 +381,29 @@ export const useCloudCanonicalChatThread = (
     },
     [authority.conversationId],
   );
+  useEffect(() => {
+    if (!placementIssue) return;
+    let active = true;
+    const check = () => {
+      void readMainConversationId().then(
+        (mainConversationId) => {
+          if (!active) return;
+          if (mainConversationId === authority.conversationId) {
+            setPlacementIssue(null);
+          } else {
+            reloadAuthority?.();
+          }
+        },
+        () => undefined,
+      );
+    };
+    const timer = setInterval(check, PLACEMENT_RECHECK_MS);
+    check();
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [authority.conversationId, placementIssue, reloadAuthority]);
   const store = useMemo(
     () =>
       conversationStore(
@@ -465,6 +492,7 @@ export const useCloudCanonicalChatThread = (
   const caughtUp =
     state.epoch !== null && (state.headSeq < 0 || lastSeq >= state.headSeq);
   const authorityReady = !placementIssue && state.status === "live" && caughtUp;
+  const networkOffline = useIsOffline();
   const pauseStatusInBackground = threadId !== "carplay";
   const [statusWake] = useState(() => createTurnStatusWake());
   useEffect(() => {
@@ -497,7 +525,7 @@ export const useCloudCanonicalChatThread = (
       accountScope: authority.accountScope,
       ownerGeneration: authority.ownerGeneration,
       conversationId: authority.conversationId,
-      authorityReady,
+      admissionOpen: authorityReady,
       access,
       executionTarget,
       ...(execution ? { execution } : {}),
@@ -529,18 +557,9 @@ export const useCloudCanonicalChatThread = (
     ).catch(() => undefined);
   }, [composing, authority.conversationId]);
 
+  const pendingSendIds = local.pendingSendIds;
   useEffect(() => {
-    const activeIds = local.messages.flatMap((message) =>
-      message.role === "user" &&
-      (message.queued === true ||
-        (local.sending &&
-          local.messages
-            .slice()
-            .reverse()
-            .find((candidate) => candidate.role === "user")?.id === message.id))
-        ? [message.id]
-        : [],
-    );
+    const activeIds = pendingSendIds ?? [];
     if (!activeIds.some((id) => !dispatchBindings.has(id))) return;
     setDispatchBindings((current) => {
       let changed = false;
@@ -552,7 +571,7 @@ export const useCloudCanonicalChatThread = (
       }
       return changed ? next : current;
     });
-  }, [dispatchBindings, local.messages, local.sending]);
+  }, [dispatchBindings, pendingSendIds]);
 
   const destinationSwitch = useMemo(
     () => latestJournalDestinationSwitch(journalWindow),
@@ -792,35 +811,56 @@ export const useCloudCanonicalChatThread = (
     state.statusRetryable,
     sustainedOffline,
   ]);
-  const issue =
-    placementIssue ??
-    (stopIssue && stopIssue.turnId === activeTurnId
-      ? { message: stopIssue.message, retryable: true, retry: retryStop }
-      : null) ??
-    (local.authorityIssue
-      ? {
-          message: local.authorityIssue.message,
-          retryable: local.authorityIssue.retryable,
-        }
-      : null) ??
-    socketIssue;
   const retryAuthority = useCallback(() => {
     setPlacementIssue(null);
     local.authorityIssue?.retry();
     store.retry();
     reloadAuthority?.();
   }, [local.authorityIssue, reloadAuthority, store]);
-  const authorityIssue: ChatThread["authorityIssue"] = issue
-    ? {
-        ...issue,
-        retry: "retry" in issue ? issue.retry : retryAuthority,
-      }
-    : null;
+  const blockingIssue = placementIssue ?? local.authorityIssue ?? socketIssue;
+  const composerGate = useMemo<ComposerGate>(() => {
+    if (blockingIssue) {
+      return {
+        kind: "blocked",
+        issue: {
+          message: blockingIssue.message,
+          retryable: blockingIssue.retryable,
+          retry: retryAuthority,
+        },
+      };
+    }
+    if (networkOffline) return { kind: "offline" };
+    if (state.status !== "live" || !display.shown || !local.storageLoaded) {
+      return { kind: "connecting" };
+    }
+    if (!caughtUp) return { kind: "catching_up" };
+    return { kind: "ready" };
+  }, [
+    blockingIssue,
+    caughtUp,
+    display.shown,
+    local.storageLoaded,
+    networkOffline,
+    retryAuthority,
+    state.status,
+  ]);
+  const authorityIssue: ChatThread["authorityIssue"] =
+    composerGate.kind === "blocked"
+      ? { ...composerGate.issue, blocksSending: true }
+      : stopIssue && stopIssue.turnId === activeTurnId
+        ? {
+            message: stopIssue.message,
+            retryable: true,
+            blocksSending: false,
+            retry: retryStop,
+          }
+        : null;
   const storageLoaded = display.shown && !local.authorityIssue;
+  const sendOpen = composerGate.kind === "ready";
 
   const trackSend = useCallback(
     (send: () => { userMessageId: string } | null) => {
-      if (!clientAuthorityReady) return null;
+      if (!sendOpen) return null;
       const result = send();
       if (!result) return null;
       if (threadId === "cloud") replyHaptics.arm(result.userMessageId);
@@ -832,7 +872,7 @@ export const useCloudCanonicalChatThread = (
       });
       return result;
     },
-    [clientAuthorityReady, replyHaptics, threadId],
+    [replyHaptics, sendOpen, threadId],
   );
   const localSend = local.send;
   const localSendPrompt = local.sendPrompt;
@@ -870,15 +910,14 @@ export const useCloudCanonicalChatThread = (
       localIndicator: local.workingIndicator,
       caughtUp,
       authoritativeActivity: state.activity,
-      hasQueuedSend: local.messages.some((message) =>
-        message.role === "user" && message.queued && !message.stopped),
+      hasQueuedSend: local.hasQueuedSend === true,
       activeSendMessageId: sendMessageId,
       activeDispatchId: sendMessageId
         ? dispatchBindings.get(sendMessageId) ?? null
         : null,
     }),
     [caughtUp, dispatchBindings, handoffMessageId, local.sending, sendMessageId,
-      local.workingIndicator, local.messages, state.activity, state.live,
+      local.workingIndicator, local.hasQueuedSend, state.activity, state.live,
       journalWindow],
   );
   const localActiveSendId = local.sending ? local.activeSendMessageId ?? null : null;
@@ -897,7 +936,7 @@ export const useCloudCanonicalChatThread = (
     if (
       !localActiveSendId ||
       !localSendSettled ||
-      state.activity === "running" ||
+      turnRunning ||
       !releaseSettledSend
     ) {
       return;
@@ -907,7 +946,7 @@ export const useCloudCanonicalChatThread = (
       SETTLED_SEND_RELEASE_MS,
     );
     return () => clearTimeout(timer);
-  }, [localActiveSendId, localSendSettled, releaseSettledSend, state.activity]);
+  }, [localActiveSendId, localSendSettled, releaseSettledSend, turnRunning]);
   const [activityHubArtifacts] = useState(createActivityHubArtifacts);
   const conversationArtifacts = useMemo(
     () => activityHubArtifacts(messages),
@@ -1062,7 +1101,7 @@ export const useCloudCanonicalChatThread = (
     sending,
     workingIndicator,
     storageLoaded,
-    authorityReady: clientAuthorityReady,
+    composerGate,
     authorityIssue,
     hasOlderMessages: state.hasOlder,
     hasNewerMessages: false,

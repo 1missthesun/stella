@@ -285,6 +285,9 @@ const updateAccount = (db: OwnerDb, fields: Partial<AccountRow>): void => {
 
 const plan = (row: AccountRow): BillingPlan => normalizeBillingPlan(row.plan);
 
+const hasLiveSubscription = (row: AccountRow): boolean =>
+  plan(row) !== "free" && ACTIVE_SUBSCRIPTION_STATUSES.has(row.subscription_status);
+
 const isPaying = (row: AccountRow): boolean =>
   (plan(row) !== "free" && ACTIVE_SUBSCRIPTION_STATUSES.has(row.subscription_status)) ||
   row.credit_balance > 0;
@@ -1042,6 +1045,30 @@ const ensureCustomer = async (ctx: OwnerContext): Promise<string> => {
   return customer.id;
 };
 
+const ALREADY_SUBSCRIBED = "You already have a subscription. Use Manage billing to change it.";
+
+const refuseSecondSubscription = (row: AccountRow): void => {
+  if (hasLiveSubscription(row)) throw new RpcError("CONFLICT", ALREADY_SUBSCRIBED);
+};
+
+const liveStripeSubscription = async (
+  ctx: OwnerContext,
+  customer: string,
+): Promise<StripeSubscription | null> => {
+  const list = await stripeRequest<{ data?: StripeSubscription[] }>(ctx.env, "GET", "/subscriptions", {
+    customer,
+    status: "all",
+    limit: 10,
+    expand: ["data.default_payment_method"],
+  });
+  return (
+    list.data?.find(
+      (subscription) =>
+        subscription.status !== "complimentary" && ACTIVE_SUBSCRIPTION_STATUSES.has(subscription.status),
+    ) ?? null
+  );
+};
+
 const checkout = async (
   ctx: OwnerContext,
   args: BillingCalls["billing.checkout"]["args"],
@@ -1060,8 +1087,15 @@ const checkout = async (
   );
   const config = billingConfig(ctx.env);
   const returnUrl = normalizeReturnUrl(args.returnUrl);
+  refuseSecondSubscription(ensureAccount(ctx.db, ctx.now));
   try {
     const customer = await ensureCustomer(ctx);
+    const live = await liveStripeSubscription(ctx, customer);
+    if (live) {
+      syncSubscription(ctx, live);
+      refuseSecondSubscription(ensureAccount(ctx.db, ctx.now));
+      throw new RpcError("CONFLICT", ALREADY_SUBSCRIBED);
+    }
     const metadata = { ownerId: ctx.ownerId, plan: args.plan, source };
     const priceId = await verifyStripePrice(ctx.env, config, args.plan);
     const session = await stripeRequest<{ id: string; url: string | null }>(ctx.env, "POST", "/checkout/sessions", {
@@ -1185,7 +1219,7 @@ const syncSubscription = (ctx: OwnerContext, subscription: StripeSubscription): 
     subscription.status !== "complimentary" && ACTIVE_SUBSCRIPTION_STATUSES.has(subscription.status) && paid
       ? paid
       : "free";
-  if (row.subscription_status === "complimentary" && nextPlan === "free") return;
+  if (row.subscription_status === "complimentary" && subscription.id !== row.stripe_subscription_id) return;
   if (
     row.stripe_subscription_id &&
     row.stripe_subscription_id !== subscription.id &&
@@ -1230,7 +1264,25 @@ const subscriptionIdOf = (object: Record<string, unknown>): string | null => {
   return typeof nested === "string" ? nested : null;
 };
 
-export const applyStripeEvent = async (ctx: OwnerContext, event: StripeEvent): Promise<void> => {
+const stripeEventChains = new Map<string, Promise<void>>();
+
+/**
+ * One event at a time per owner: each sync reads the subscription from Stripe
+ * after the previous one wrote, so a slower, older read can't land last.
+ */
+export const applyStripeEvent = (ctx: OwnerContext, event: StripeEvent): Promise<void> => {
+  const previous = stripeEventChains.get(ctx.ownerId) ?? Promise.resolve();
+  const run = previous.catch(() => undefined).then(() => applyStripeEventInOrder(ctx, event));
+  stripeEventChains.set(ctx.ownerId, run);
+  void run
+    .catch(() => undefined)
+    .finally(() => {
+      if (stripeEventChains.get(ctx.ownerId) === run) stripeEventChains.delete(ctx.ownerId);
+    });
+  return run;
+};
+
+const applyStripeEventInOrder = async (ctx: OwnerContext, event: StripeEvent): Promise<void> => {
   if (ctx.db.one("SELECT 1 AS seen FROM billing_stripe_events WHERE id = ?", event.id)) return;
   const object = event.data.object;
   switch (event.type) {

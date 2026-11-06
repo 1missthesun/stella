@@ -12,14 +12,8 @@ import { useCloudConversationSession } from "@/global/auth/hooks/use-cloud-conve
 import { getAuthToken } from "@/global/auth/services/auth-token";
 import { backendSocketUrl, backendUrl } from "@/platform/backend/backend-client";
 import { useCloudEngines } from "./cloud-engines-api";
-import { markCloudConversationCreated } from "./cloud-conversation-selection";
-import {
-  CloudTurnStartClientError,
-  CloudTurnStartTransportError,
-  cloudTurnStartRequest,
-  newCloudConversationId,
-  startCloudTurn,
-} from "./turn-start-client";
+import type { NotSentReason } from "@stella/contracts/send-state";
+import { newCloudConversationId } from "./turn-start-client";
 import {
   getCloudExecutionSelectionSnapshot,
   reconcileCloudExecutionSelection,
@@ -34,6 +28,7 @@ import {
 import {
   browserExecutionCancelArgs,
   browserExecutionSubmitArgs,
+  BrowserExecutionStillStartingError,
   sha256Hex,
   waitForBrowserExecutionTurn,
 } from "./browser-execution-placement";
@@ -41,6 +36,7 @@ import {
   cancelDispatch,
   getDispatchStatus,
   PlacementClientError,
+  PlacementTransportError,
   submitDispatch,
 } from "./placement-client";
 import type { ConversationState } from "./conversation-store";
@@ -60,6 +56,7 @@ import { reportCloudReadiness } from "./cloud-readiness-timing";
 import { presentCloudUsageLimit } from "./usage-limit-notice";
 import { getExecutionTargetSnapshot } from "../execution-placement/execution-target-store";
 import {
+  AttachmentUploadFailedError,
   browserAttachmentUploads,
   hasUnsentBrowserAttachments,
   untilOnline,
@@ -437,60 +434,22 @@ export const useConversation = (
         await untilOnline();
         await turnOrder.previous;
         if (!isCurrentAuthority()) return;
-        if (
-          !entry.dispatchId &&
-          pendingPrompts.find(sendAuthority, clientMsgId)?.cancelRequested
-        ) {
+        const claimed = pendingPrompts.find(sendAuthority, clientMsgId)?.send;
+        if (claimed?.kind === "admitting" && claimed.cancelRequested) {
           pendingPrompts.drop(sendAuthority, clientMsgId);
-          return;
-        }
-        if (!webShell) {
-          const targetConversationId = submission.requestedConversationId;
-          if (!targetConversationId) {
-            throw new Error("Open a cloud conversation before sending.");
-          }
-          const httpOrigin = config.httpOrigin;
-          if (!httpOrigin) {
-            throw new Error(
-              "Stella's cloud isn't reachable yet. Try again in a moment.",
-            );
-          }
-          const result = await startCloudTurn({
-            httpOrigin,
-            conversationId: targetConversationId,
-            request: cloudTurnStartRequest(clientMsgId, submission, entry.text),
-            getToken: (options) => getAuthToken(options ?? {}),
-          });
-          if (!isCurrentAuthority()) return;
-          if (result.createdConversation) {
-            markCloudConversationCreated(
-              result.conversationId,
-              entry.accountScope,
-            );
-          }
-          pendingPrompts.bind(
-            sendAuthority,
-            clientMsgId,
-            result.conversationId,
-            result.turnId,
-          );
-          pendingPrompts.acknowledgeAdmission(
-            sendAuthority,
-            clientMsgId,
-            result.conversationId,
-            result.turnId,
-          );
-          turnOrder.release();
-          onSent(submission.attachments);
           return;
         }
         const requestedConversationId = submission.requestedConversationId;
         if (!requestedConversationId) {
-          throw new Error("Open a cloud conversation before sending.");
+          throw new SendFailure(
+            "rejected",
+            "Open a cloud conversation before sending.",
+          );
         }
         const placementOrigin = config.httpOrigin;
         if (!placementOrigin) {
-          throw new Error(
+          throw new SendFailure(
+            "network",
             "Stella's cloud isn't reachable yet. Try again in a moment.",
           );
         }
@@ -548,16 +507,17 @@ export const useConversation = (
         if (!mutationOutcome.accepted) throw mutationOutcome.error;
         const result = mutationOutcome.result;
         if (!isCurrentAuthority()) return;
-        pendingPrompts.bindDispatch(
+        pendingPrompts.transition(
           sendAuthority,
           clientMsgId,
-          result.dispatchId,
+          { type: "dispatched" },
+          { dispatchId: result.dispatchId },
         );
         turnOrder.release();
         onSent(submission.attachments);
 
-        const current = pendingPrompts.find(sendAuthority, clientMsgId);
-        if (current?.cancelRequested) {
+        const current = pendingPrompts.find(sendAuthority, clientMsgId)?.send;
+        if (current?.kind === "dispatched" && current.cancelRequested) {
           const canceled = await cancelDispatch({
             httpOrigin: placementOrigin,
             getToken: (options) => getAuthToken(options ?? {}),
@@ -565,11 +525,6 @@ export const useConversation = (
           });
           if (!isCurrentAuthority()) return;
           if (canceled.state === "canceled") {
-            pendingPrompts.acknowledgeTerminal(
-              sendAuthority,
-              clientMsgId,
-              result.dispatchId,
-            );
             pendingPrompts.drop(sendAuthority, clientMsgId);
             return;
           }
@@ -591,33 +546,28 @@ export const useConversation = (
             settled.dispatch.cloudTurnId,
             result.dispatchId,
           );
-          pendingPrompts.bind(
-            sendAuthority,
-            clientMsgId,
-            settled.dispatch.conversationId,
-            settled.dispatch.cloudTurnId,
-          );
-          pendingPrompts.acknowledgeAdmission(
-            sendAuthority,
-            clientMsgId,
-            settled.dispatch.conversationId,
-            settled.dispatch.cloudTurnId,
-          );
+          if (settled.dispatch.conversationId === requestedConversationId) {
+            pendingPrompts.transition(
+              sendAuthority,
+              clientMsgId,
+              { type: "settled" },
+              {
+                conversationId: settled.dispatch.conversationId,
+                turnId: settled.dispatch.cloudTurnId,
+              },
+            );
+          }
         }
         if (settled.status === "terminal") {
-          pendingPrompts.acknowledgeTerminal(
-            sendAuthority,
-            clientMsgId,
-            result.dispatchId,
-          );
+          pendingPrompts.transition(sendAuthority, clientMsgId, { type: "settled" });
           if (settled.dispatch.state === "canceled") {
             pendingPrompts.drop(sendAuthority, clientMsgId);
           } else if (settled.dispatch.state === "failed") {
-            pendingPrompts.fail(
-              sendAuthority,
-              clientMsgId,
-              settled.dispatch.errorMessage || "That cloud turn failed.",
-            );
+            pendingPrompts.transition(sendAuthority, clientMsgId, {
+              type: "failed",
+              reason: "turn_failed",
+              message: settled.dispatch.errorMessage || "That cloud turn failed.",
+            });
             presentCloudUsageLimit(
               settled.dispatch.errorMessage,
               settled.dispatch.conversationId || null,
@@ -626,14 +576,13 @@ export const useConversation = (
         }
       } catch (error) {
         if (!isCurrentAuthority()) return;
-        pendingPrompts.fail(
-          sendAuthority,
-          clientMsgId,
-          friendlySendError(error),
-          isAmbiguousTransportFailure(error),
-        );
+        const failure = classifySendFailure(error);
+        pendingPrompts.transition(sendAuthority, clientMsgId, {
+          type: "failed",
+          ...failure,
+        });
         presentCloudUsageLimit(
-          friendlySendError(error),
+          failure.message,
           entry.conversationId ?? submission.requestedConversationId ?? null,
         );
       } finally {
@@ -641,7 +590,7 @@ export const useConversation = (
         pendingPrompts.releaseDispatch(sendAuthority, clientMsgId);
       }
     },
-    [config.httpOrigin, decoratePrompt, onSent, webShell],
+    [config.httpOrigin, decoratePrompt, onSent],
   );
 
   useEffect(() => {
@@ -651,7 +600,7 @@ export const useConversation = (
       if (
         entry.accountScope !== authority.accountScope ||
         entry.ownerGeneration !== authority.ownerGeneration ||
-        entry.error !== null ||
+        (entry.send.kind !== "queued" && entry.send.kind !== "dispatched") ||
         (entry.conversationId !== null &&
           entry.conversationId !== conversationId)
       ) {
@@ -706,7 +655,7 @@ export const useConversation = (
         conversationId,
         submission,
       );
-      if (entry.durable && entry.error === null) await dispatch(entry);
+      if (entry.durable && entry.send.kind === "queued") await dispatch(entry);
     },
     [
       authority,
@@ -742,8 +691,14 @@ export const useConversation = (
       if (!authority) return false;
       const entry = pendingPrompts.find(authority, clientMsgId);
       if (!entry) return false;
+      if (entry.send.kind === "queued") {
+        pendingPrompts.drop(authority, clientMsgId);
+        return true;
+      }
       if (!entry.dispatchId) {
-        pendingPrompts.requestCancel(authority, clientMsgId);
+        pendingPrompts.transition(authority, clientMsgId, {
+          type: "cancel_requested",
+        });
         return true;
       }
       const placementOrigin = config.httpOrigin;
@@ -755,11 +710,6 @@ export const useConversation = (
           ...browserExecutionCancelArgs(entry.dispatchId),
         });
         if (canceled.state === "canceled") {
-          pendingPrompts.acknowledgeTerminal(
-            authority,
-            clientMsgId,
-            entry.dispatchId,
-          );
           pendingPrompts.drop(authority, clientMsgId);
         }
         return true;
@@ -818,18 +768,33 @@ export const useConversation = (
   };
 };
 
-const friendlySendError = (error: unknown): string => {
-  if (error instanceof Error && error.message) return error.message;
-  return "That didn't send. Try again.";
-};
+class SendFailure extends Error {
+  constructor(
+    readonly reason: NotSentReason,
+    message: string,
+  ) {
+    super(message);
+    this.name = "SendFailure";
+  }
+}
 
-const isAmbiguousTransportFailure = (error: unknown): boolean => {
-  if (error instanceof CloudTurnStartClientError) return false;
-  if (error instanceof CloudTurnStartTransportError) return true;
-  if (error instanceof TypeError) return true;
-  if ((error as { data?: unknown })?.data !== undefined) return false;
-  const message = error instanceof Error ? error.message : String(error ?? "");
-  return /network|fetch|connection|socket|timed out|timeout|still starting|failed to reach|load failed/i.test(
-    message,
-  );
+const classifySendFailure = (
+  error: unknown,
+): { reason: NotSentReason; message: string } => {
+  const message =
+    error instanceof Error && error.message
+      ? error.message
+      : "That didn't send. Try again.";
+  if (error instanceof SendFailure) return { reason: error.reason, message };
+  if (
+    error instanceof PlacementTransportError ||
+    error instanceof BrowserExecutionStillStartingError ||
+    error instanceof TypeError
+  ) {
+    return { reason: "network", message };
+  }
+  if (error instanceof AttachmentUploadFailedError) {
+    return { reason: "attachment", message };
+  }
+  return { reason: "rejected", message };
 };

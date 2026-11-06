@@ -290,6 +290,19 @@ export class InAppBrowserService {
     return this.snapshot(resolvedOwnerId);
   }
 
+  noteExtensionLink(connected: boolean) {
+    if (this.disposed || this.readSetupRequirement()) return;
+    if (connected) {
+      if (this.state.connection !== "connected") this.updateConnection("connected");
+      return;
+    }
+    if (this.state.connection === "connected") {
+      this.updateUnavailableConnection(
+        this.readConnectionFailure("extension_disconnected"),
+      );
+    }
+  }
+
   async requestExtensionConnect(): Promise<BrowserViewState> {
     if (this.disposed) throw new Error("The in-app browser has been closed.");
     const setupRequirement = this.readSetupRequirement({ extension: false });

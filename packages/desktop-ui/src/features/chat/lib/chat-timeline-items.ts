@@ -1,5 +1,4 @@
 import type { EventRowViewModel } from "@/features/chat/conversation-row-types";
-import type { QueuedUserMessage } from "@/features/chat/hooks/queued-user-messages";
 import { eventRowRendersContent } from "@/features/chat/lib/assistant-row-content";
 import type { UserAskRecord } from "@stella/contracts/user-ask-deck";
 
@@ -18,18 +17,13 @@ export type ChatTimelineItem =
       type: "ask-record";
       record: UserAskRecord;
     }
-  | {
-      id: string;
-      type: "queued-users";
-      messages: QueuedUserMessage[];
-    };
+;
 
 const askRecordSignature = (record: UserAskRecord): string =>
   record.answers.map((answer) => answer.question).join("\u0000");
 
 export const buildChatTimelineItems = (args: {
   rows: EventRowViewModel[];
-  queuedUserMessages: readonly QueuedUserMessage[];
   includeWorkingIndicator: boolean;
   askRecords?: readonly UserAskRecord[];
 }): ChatTimelineItem[] => {
@@ -75,25 +69,6 @@ export const buildChatTimelineItems = (args: {
     items.push({
       id: "chat-timeline:working-indicator",
       type: "working-indicator",
-    });
-  }
-
-  const queued = args.queuedUserMessages
-    .map((message, insertionIndex) => ({ message, insertionIndex }))
-    .sort(
-      (left, right) =>
-        left.message.queueOrder - right.message.queueOrder ||
-        left.insertionIndex - right.insertionIndex,
-    );
-  const visibleQueued: QueuedUserMessage[] = [];
-  for (const { message } of queued) {
-    if (!messageIds.has(message.id)) visibleQueued.push(message);
-  }
-  if (visibleQueued.length > 0) {
-    items.push({
-      id: visibleQueued[0]!.id,
-      type: "queued-users",
-      messages: visibleQueued,
     });
   }
 

@@ -219,10 +219,6 @@
         "loadFailed": "載入 PDF 失敗。",
         "loading": "正在載入 PDF…"
       },
-      "queuedMessages": {
-        "cancel": "取消排入佇列的訊息",
-        "cancelAndEdit": "取消並編輯"
-      },
       "replyPeek": {
         "dismiss": "關閉預覽",
         "jumpToLatest": "跳到最新回覆"

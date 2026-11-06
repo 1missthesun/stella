@@ -87,31 +87,6 @@ export type ThreadActivityRecord = {
   updatedAt: number;
 };
 
-export type ThreadActivityAssistantUpdate = {
-  threadId: string;
-  assistantMessages: string[];
-  reasoningSummaries: string[];
-  latestMessage: string;
-  atMs: number;
-  atSequence?: number;
-  attemptGeneration: number;
-  rootRunId?: string;
-};
-
-export type ThreadTranscriptUpdate = {
-  source?: "stella" | "claude-native";
-  threadId: string;
-  entryId: string;
-  atMs: number;
-};
-
-export type ThreadActivityUpdatedPayload = {
-  conversationId: string;
-  record?: ThreadActivityRecord;
-  assistantUpdate?: ThreadActivityAssistantUpdate;
-  transcriptUpdate?: ThreadTranscriptUpdate;
-};
-
 export type WebSearchResultHit = {
   title: string;
   url: string;

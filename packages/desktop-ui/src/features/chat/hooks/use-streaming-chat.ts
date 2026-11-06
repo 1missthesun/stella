@@ -4,9 +4,6 @@ import { useTierRestrictedModelToast } from './use-tier-restricted-model-toast'
 import {
   useStreamingChatCore,
 } from './use-streaming-chat-core'
-import type { QueuedUserMessage } from './queued-user-messages'
-
-export type { QueuedUserMessage }
 
 type UseStreamingChatOptions = {
   conversationId: string | null

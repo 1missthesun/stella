@@ -23,15 +23,16 @@ const writeHandled = (keys: string[]): void => {
 };
 
 export const claimNotificationAction = (key: string): boolean => {
-  if (claimedInMemory.has(key)) return false;
-  const handled = readHandled();
-  if (handled.includes(key)) return false;
+  if (claimedInMemory.has(key) || readHandled().includes(key)) return false;
   claimedInMemory.add(key);
-  writeHandled([...handled, key]);
   return true;
+};
+
+export const completeNotificationAction = (key: string): void => {
+  const handled = readHandled();
+  if (!handled.includes(key)) writeHandled([...handled, key]);
 };
 
 export const releaseNotificationAction = (key: string): void => {
   claimedInMemory.delete(key);
-  writeHandled(readHandled().filter((item) => item !== key));
 };

@@ -224,10 +224,6 @@
         "loadFailed": "Αποτυχία φόρτωσης του PDF.",
         "loading": "Φόρτωση PDF…"
       },
-      "queuedMessages": {
-        "cancel": "Ακύρωση μηνύματος σε αναμονή",
-        "cancelAndEdit": "Ακύρωση και επεξεργασία"
-      },
       "replyPeek": {
         "dismiss": "Απόρριψη προεπισκόπησης",
         "jumpToLatest": "Μετάβαση στην τελευταία απάντηση"

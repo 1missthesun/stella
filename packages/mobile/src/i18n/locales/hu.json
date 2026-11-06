@@ -224,10 +224,6 @@
         "loadFailed": "A PDF betöltése sikertelen.",
         "loading": "PDF betöltése…"
       },
-      "queuedMessages": {
-        "cancel": "Sorba állított üzenet visszavonása",
-        "cancelAndEdit": "Visszavonás és szerkesztés"
-      },
       "replyPeek": {
         "dismiss": "Előnézet elvetése",
         "jumpToLatest": "Ugrás a legutóbbi válaszra"

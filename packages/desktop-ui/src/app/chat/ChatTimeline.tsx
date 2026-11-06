@@ -17,7 +17,6 @@ import {
 } from "@legendapp/list/react";
 import { AssistantMessageRow, UserMessageRow } from "@/app/chat/MessageRow";
 import { ChatTimeDivider } from "@/app/chat/ChatTimeDivider";
-import { ComposerQueuedMessages } from "./ComposerQueuedMessages";
 import {
   InlineWorkingIndicator,
   type InlineWorkingIndicatorMountProps,
@@ -26,7 +25,6 @@ import {
   createReplyHandoffController,
   ReplyHandoffContext,
 } from "./reply-handoff";
-import type { QueuedUserMessage } from "@/features/chat/hooks/queued-user-messages";
 import {
   buildChatTimelineItems,
   type ChatTimelineItem,
@@ -74,8 +72,6 @@ type ChatTimelineProps = {
   isLoadingHistory?: boolean;
   emptyState?: React.ReactNode;
   extraTail?: React.ReactNode;
-  queuedUserMessages?: QueuedUserMessage[];
-  onCancelQueued?: (message: QueuedUserMessage) => void;
   indicator?: InlineWorkingIndicatorMountProps;
   list?: ChatListBinding;
   recycleItems?: boolean;
@@ -175,8 +171,7 @@ const KEEP_VISIBLE_POSITION: MaintainVisibleContentPositionConfig<TimelineListIt
   {
     data: true,
     size: true,
-    shouldRestorePosition: (item) =>
-      item.type !== "working-indicator" && item.type !== "queued-users",
+    shouldRestorePosition: (item) => item.type !== "working-indicator",
   };
 
 const ItemSeparator = ({ leadingItem }: { leadingItem: TimelineListItem }) => (
@@ -207,26 +202,6 @@ const renderRow = (
   );
 };
 
-const TimelineUserItem = ({
-  item,
-  onCancelQueued,
-}: {
-  item: Extract<ChatTimelineItem, { type: "message" | "queued-users" }>;
-  onCancelQueued?: (message: QueuedUserMessage) => void;
-}) => {
-  if (item.type === "queued-users") {
-    return (
-      <ComposerQueuedMessages
-        messages={item.messages}
-        onCancel={onCancelQueued}
-      />
-    );
-  }
-  return item.row.kind === "user" ? (
-    <UserMessageRow row={item.row} />
-  ) : null;
-};
-
 export const ChatTimeline = memo(function ChatTimeline({
   rows,
   conversationId,
@@ -235,8 +210,6 @@ export const ChatTimeline = memo(function ChatTimeline({
   isLoadingHistory,
   emptyState,
   extraTail,
-  queuedUserMessages,
-  onCancelQueued,
   indicator,
   list,
   recycleItems = true,
@@ -253,7 +226,6 @@ export const ChatTimeline = memo(function ChatTimeline({
   const listItems = useMemo<TimelineListItem[]>(() => {
     const items = buildChatTimelineItems({
       rows,
-      queuedUserMessages: queuedUserMessages ?? [],
       includeWorkingIndicator: Boolean(indicator),
       askRecords,
     });
@@ -284,15 +256,10 @@ export const ChatTimeline = memo(function ChatTimeline({
           timeHeaderMs,
         };
       }
-      if (item.type === "working-indicator") {
-        return { ...item, gapAfter: next?.type === "queued-users" ? 20 : 0 };
-      }
-      return {
-        ...item,
-        gapAfter: next?.type === "queued-users" ? 6 : ROW_GAP,
-      };
+      if (item.type === "working-indicator") return { ...item, gapAfter: 0 };
+      return { ...item, gapAfter: ROW_GAP };
     });
-  }, [askRecords, indicator, queuedUserMessages, rows]);
+  }, [askRecords, indicator, rows]);
   // The newest reply with media opens its previews expanded; older ones show one row.
   const latestMediaRowId = useMemo(() => {
     for (let index = rows.length - 1; index >= 0; index -= 1) {
@@ -393,8 +360,8 @@ export const ChatTimeline = memo(function ChatTimeline({
         ) : null;
       }
       const row =
-        item.type === "queued-users" || item.row.kind === "user" ? (
-          <TimelineUserItem item={item} onCancelQueued={onCancelQueued} />
+        item.row.kind === "user" ? (
+          <UserMessageRow row={item.row} />
         ) : (
           renderRow(
             item.row,
@@ -414,7 +381,7 @@ export const ChatTimeline = memo(function ChatTimeline({
         </>
       );
     },
-    [conversationId, flashItemId, indicator, latestMediaRowId, onCancelQueued],
+    [conversationId, flashItemId, indicator, latestMediaRowId],
   );
 
   const keyExtractor = useCallback((item: TimelineListItem) => item.id, []);

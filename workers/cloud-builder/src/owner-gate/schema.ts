@@ -1,3 +1,69 @@
+import { DISPATCH_STATES } from "../dispatch-policy.js";
+
+const DISPATCH_STATE_LIST = DISPATCH_STATES.map((state) => `'${state}'`).join(
+  ", ",
+);
+
+export const DISPATCH_STATE_CHECK = `CHECK (state IN (${DISPATCH_STATE_LIST}))`;
+
+export const dispatchesTableDdl = (name: string): string =>
+  `CREATE TABLE IF NOT EXISTS ${name} (
+     dispatch_id                  TEXT    PRIMARY KEY,
+     idempotency_key              TEXT    NOT NULL,
+     owner_generation             TEXT    NOT NULL,
+     kind                         TEXT    NOT NULL,
+     ingress                      TEXT    NOT NULL,
+     subject                      TEXT    NOT NULL,
+     requested_target_mode        TEXT,
+     requested_executor_device_id TEXT,
+     conversation_id              TEXT    NOT NULL,
+     parent_turn_id               TEXT,
+     thread_id                    TEXT,
+     requesting_device_id         TEXT,
+     pair_grant_device_id         TEXT,
+     required_capabilities        TEXT    NOT NULL,
+     routing_fingerprint          TEXT    NOT NULL,
+     state                        TEXT    NOT NULL ${DISPATCH_STATE_CHECK},
+     placement                    TEXT,
+     executor_device_id           TEXT,
+     executor_presence_session_id TEXT,
+     on_no_eligible_computer      TEXT    NOT NULL,
+     revision                     INTEGER NOT NULL,
+     fallback_reason              TEXT,
+     cancel_request_id            TEXT,
+     cancel_reason                TEXT,
+     error_code                   TEXT,
+     error_message                TEXT,
+     result_json                  TEXT,
+     cloud_turn_id                TEXT,
+     cloud_thread_id              TEXT,
+     payload_json                 TEXT,
+     payload_hash                 TEXT    NOT NULL,
+     payload_expires_at           INTEGER,
+     offer_deadline_at            INTEGER,
+     lease_expires_at             INTEGER,
+     started_at                   INTEGER,
+     cloud_attempts               INTEGER NOT NULL DEFAULT 0,
+     cloud_retry_at               INTEGER,
+     gate_held                    INTEGER NOT NULL,
+     created_at                   INTEGER NOT NULL,
+     updated_at                   INTEGER NOT NULL
+   )`;
+
+/** Copies rows into a rebuilt `dispatches` table; a state outside the CHECK ends as failed. */
+export const dispatchesCopySql = (
+  from: string,
+  to: string,
+  columns: readonly string[],
+): string =>
+  `INSERT INTO ${to} (${columns.join(", ")}) SELECT ${columns
+    .map((column) =>
+      column === "state"
+        ? `CASE WHEN state IN (${DISPATCH_STATE_LIST}) THEN state ELSE 'failed' END`
+        : column,
+    )
+    .join(", ")} FROM ${from}`;
+
 export const DDL = [
   `CREATE TABLE IF NOT EXISTS running (
      turn_id         TEXT    PRIMARY KEY,
@@ -23,48 +89,7 @@ export const DDL = [
      last_seen_at        INTEGER NOT NULL,
      updated_at          INTEGER NOT NULL
    )`,
-  `CREATE TABLE IF NOT EXISTS dispatches (
-     dispatch_id                  TEXT    PRIMARY KEY,
-     idempotency_key              TEXT    NOT NULL,
-     owner_generation             TEXT    NOT NULL,
-     kind                         TEXT    NOT NULL,
-     ingress                      TEXT    NOT NULL,
-     subject                      TEXT    NOT NULL,
-     requested_target_mode        TEXT,
-     requested_executor_device_id TEXT,
-     conversation_id              TEXT    NOT NULL,
-     parent_turn_id               TEXT,
-     thread_id                    TEXT,
-     requesting_device_id         TEXT,
-     pair_grant_device_id         TEXT,
-     required_capabilities        TEXT    NOT NULL,
-     routing_fingerprint          TEXT    NOT NULL,
-     state                        TEXT    NOT NULL,
-     placement                    TEXT,
-     executor_device_id           TEXT,
-     executor_presence_session_id TEXT,
-     on_no_eligible_computer      TEXT    NOT NULL,
-     revision                     INTEGER NOT NULL,
-     fallback_reason              TEXT,
-     cancel_request_id            TEXT,
-     cancel_reason                TEXT,
-     error_code                   TEXT,
-     error_message                TEXT,
-     result_json                  TEXT,
-     cloud_turn_id                TEXT,
-     cloud_thread_id              TEXT,
-     payload_json                 TEXT,
-     payload_hash                 TEXT    NOT NULL,
-     payload_expires_at           INTEGER,
-     offer_deadline_at            INTEGER,
-     lease_expires_at             INTEGER,
-     started_at                   INTEGER,
-     cloud_attempts               INTEGER NOT NULL DEFAULT 0,
-     cloud_retry_at               INTEGER,
-     gate_held                    INTEGER NOT NULL,
-     created_at                   INTEGER NOT NULL,
-     updated_at                   INTEGER NOT NULL
-   )`,
+  dispatchesTableDdl("dispatches"),
   `CREATE TABLE IF NOT EXISTS cloud_dispatch_terminals (
      turn_id TEXT NOT NULL, owner_generation TEXT NOT NULL,
      outcome TEXT NOT NULL, result_json TEXT, error_message TEXT,

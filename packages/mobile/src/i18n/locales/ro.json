@@ -229,10 +229,6 @@
         "loadFailed": "Încărcarea PDF-ului a eșuat.",
         "loading": "Se încarcă PDF-ul…"
       },
-      "queuedMessages": {
-        "cancel": "Anulează mesajul din coadă",
-        "cancelAndEdit": "Anulează și editează"
-      },
       "replyPeek": {
         "dismiss": "Închide previzualizarea",
         "jumpToLatest": "Sari la cel mai recent răspuns"

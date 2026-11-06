@@ -4,10 +4,11 @@ import { accountChatMetadataReadsBlocked } from "./chat-account-metadata-queue";
 import {
   acknowledgeDesktopChatOutboxRecords,
   appendDesktopChatOutboxRecord,
-  markDesktopChatOutboxRecordCanceled,
   parseDesktopChatOutbox,
   partitionDesktopChatOutboxForAuthority,
+  setDesktopChatOutboxRecordPhase,
   type DesktopChatOutboxAuthority,
+  type DesktopChatOutboxPhase,
   type DesktopChatOutboxRecord,
 } from "./desktop-chat-outbox-state";
 
@@ -112,21 +113,14 @@ export const acknowledgeDesktopChatOutbox = (
     value: undefined,
   }));
 
-export const markDesktopChatOutboxCancellation = (
+export const setDesktopChatOutboxPhase = (
   thread: ChatThreadId,
   sendId: string,
-  cancelRequestId: string,
-  cancelRequestedAt = Date.now(),
+  phase: DesktopChatOutboxPhase,
   authority?: DesktopChatOutboxAuthority,
 ): Promise<void> =>
   mutate(thread, (current) => ({
-    records: markDesktopChatOutboxRecordCanceled(
-      current,
-      sendId,
-      cancelRequestId,
-      cancelRequestedAt,
-      authority,
-    ),
+    records: setDesktopChatOutboxRecordPhase(current, sendId, phase, authority),
     value: undefined,
   }));
 

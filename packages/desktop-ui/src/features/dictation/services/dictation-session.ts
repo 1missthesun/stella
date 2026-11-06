@@ -26,6 +26,7 @@ export const resolveDictationPcmWorkletUrl = (rendererHref: string): string =>
 
 export type DictationSessionState =
   | "idle"
+  | "starting"
   | "listening"
   | "transcribing"
   | "error";
@@ -282,12 +283,17 @@ export class DictationSession {
   private ingress: DictationIngressQueue | null = null;
   private durationLimitTimer: ReturnType<typeof setTimeout> | null = null;
   private cancelled = false;
+  private stopRequested = false;
   private readonly meter = createDictationLevelMeter();
   private pressedAt = 0;
   private marks: Record<string, number> = {};
 
   isActive(): boolean {
-    return this.state === "listening" || this.state === "transcribing";
+    return (
+      this.state === "starting" ||
+      this.state === "listening" ||
+      this.state === "transcribing"
+    );
   }
 
   async start(
@@ -299,6 +305,8 @@ export class DictationSession {
     this.marks = {};
     this.callbacks = callbacks;
     this.cancelled = false;
+    this.stopRequested = false;
+    this.setState("starting");
     this.streaming = options.streaming === true;
     this.recording = new PcmRecording();
     this.meter.reset();
@@ -341,11 +349,15 @@ export class DictationSession {
       await this.cleanup();
       throw err;
     }
+    if (this.stopRequested) await this.stop();
   }
 
   async stop(): Promise<void> {
-    if (this.state === "idle") return;
-    if (this.state === "transcribing") return;
+    if (this.state === "starting") {
+      this.stopRequested = true;
+      return;
+    }
+    if (this.state !== "listening") return;
 
     if (this.durationLimitTimer) {
       clearTimeout(this.durationLimitTimer);
@@ -400,6 +412,7 @@ export class DictationSession {
       this.callbacks = {};
       return;
     }
+    if (this.state === "starting") return;
     if (this.state === "idle") {
       this.releaseCapture();
       return;

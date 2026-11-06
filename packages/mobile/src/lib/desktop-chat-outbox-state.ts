@@ -2,6 +2,7 @@ import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
 import { parseCloudModelSelection } from "./cloud-model-selection";
 import type { ChatMessage } from "../types";
 import type { AutomaticExecutionTarget } from "./execution-placement";
+import type { NotSentReason } from "./chat-send-state";
 import { withAttachmentPreamble } from "@stella/contracts/chat-attachments";
 
 export type DesktopChatOutboxAttachment = {
@@ -37,6 +38,11 @@ export type DesktopChatOutboxAuthority = {
   conversationId: string;
 };
 
+export type DesktopChatOutboxPhase =
+  | { kind: "pending" }
+  | { kind: "cancelling"; cancelRequestId: string; requestedAt: number }
+  | { kind: "not_sent"; reason: NotSentReason };
+
 export type DesktopChatOutboxRecord = {
   sendId: string;
   userMessageId: string;
@@ -50,8 +56,51 @@ export type DesktopChatOutboxRecord = {
   executionTarget?: AutomaticExecutionTarget;
   execution?: CloudExecutionSelection;
   authority?: DesktopChatOutboxAuthority;
-  cancelRequestId?: string;
-  cancelRequestedAt?: number;
+  phase: DesktopChatOutboxPhase;
+};
+
+const NOT_SENT_REASONS: ReadonlySet<string> = new Set<NotSentReason>([
+  "storage",
+  "attachment",
+  "rejected",
+  "network",
+]);
+
+const parsePhase = (record: Record<string, unknown>): DesktopChatOutboxPhase => {
+  const phase =
+    record.phase && typeof record.phase === "object"
+      ? (record.phase as Record<string, unknown>)
+      : null;
+  if (
+    phase?.kind === "cancelling" &&
+    typeof phase.cancelRequestId === "string" &&
+    phase.cancelRequestId.trim()
+  ) {
+    return {
+      kind: "cancelling",
+      cancelRequestId: phase.cancelRequestId.trim(),
+      requestedAt: finiteNumber(phase.requestedAt) ?? 0,
+    };
+  }
+  if (
+    phase?.kind === "not_sent" &&
+    typeof phase.reason === "string" &&
+    NOT_SENT_REASONS.has(phase.reason)
+  ) {
+    return { kind: "not_sent", reason: phase.reason as NotSentReason };
+  }
+  if (
+    !phase &&
+    typeof record.cancelRequestId === "string" &&
+    record.cancelRequestId.trim()
+  ) {
+    return {
+      kind: "cancelling",
+      cancelRequestId: record.cancelRequestId.trim(),
+      requestedAt: finiteNumber(record.cancelRequestedAt) ?? 0,
+    };
+  }
+  return { kind: "pending" };
 };
 
 export const desktopChatOutboxPrompt = (
@@ -224,13 +273,7 @@ export const parseDesktopChatOutbox = (
       ...(executionTarget ? { executionTarget } : {}),
       ...(execution ? { execution } : {}),
       ...(authority ? { authority } : {}),
-      ...(typeof record.cancelRequestId === "string" &&
-      record.cancelRequestId.trim()
-        ? { cancelRequestId: record.cancelRequestId.trim() }
-        : {}),
-      ...(finiteNumber(record.cancelRequestedAt) !== null
-        ? { cancelRequestedAt: record.cancelRequestedAt as number }
-        : {}),
+      phase: parsePhase(record),
     };
     bySendId.set(recordScopeKey(parsed), parsed);
   }
@@ -238,6 +281,9 @@ export const parseDesktopChatOutbox = (
     (a, b) => a.sequence - b.sequence || a.sendId.localeCompare(b.sendId),
   );
 };
+
+const withoutPhase = ({ phase: _phase, ...rest }: DesktopChatOutboxRecord) =>
+  rest;
 
 export const appendDesktopChatOutboxRecord = (
   current: DesktopChatOutboxRecord[],
@@ -254,11 +300,17 @@ export const appendDesktopChatOutboxRecord = (
     ])[0];
     if (
       !normalizedInput ||
-      JSON.stringify(existing) !== JSON.stringify(normalizedInput)
+      JSON.stringify(withoutPhase(existing)) !==
+        JSON.stringify(withoutPhase(normalizedInput))
     ) {
       throw new Error("Conflicting durable chat outbox identity");
     }
-    return { records: normalized, record: existing };
+    return {
+      records: normalized.map((record) =>
+        record === existing ? normalizedInput : record,
+      ),
+      record: normalizedInput,
+    };
   }
   const sequence =
     normalized.reduce(
@@ -285,21 +337,16 @@ export const acknowledgeDesktopChatOutboxRecords = (
         !acceptedIds.has(record.userMessageId)),
   );
 
-export const markDesktopChatOutboxRecordCanceled = (
+export const setDesktopChatOutboxRecordPhase = (
   current: DesktopChatOutboxRecord[],
   sendId: string,
-  cancelRequestId: string,
-  cancelRequestedAt: number,
+  phase: DesktopChatOutboxPhase,
   authority?: DesktopChatOutboxAuthority,
 ): DesktopChatOutboxRecord[] =>
   parseDesktopChatOutbox(current).map((record) =>
     (record.sendId === sendId || record.userMessageId === sendId) &&
     (!authority || desktopChatOutboxAuthorityMatches(record, authority))
-      ? {
-          ...record,
-          cancelRequestId,
-          cancelRequestedAt,
-        }
+      ? { ...record, phase }
       : record,
   );
 
@@ -331,7 +378,6 @@ export const restoreOutboxMessages = (
       role: "user",
       text: record.displayText,
       createdAt: record.createdAt,
-      queued: true,
       ...(record.attachments.length ? {
         attachmentPaths: record.attachments.map(entry => entry.path),
         attachmentPreviews: record.attachments.map(entry => ({

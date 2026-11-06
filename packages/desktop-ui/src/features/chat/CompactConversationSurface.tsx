@@ -1,7 +1,6 @@
 import { cn } from "@/shared/lib/utils";
 import { useDeferredChatMessages } from "@/features/chat/hooks/use-deferred-chat-messages";
 import type { MessageRecord } from "@stella/contracts/local-chat";
-import type { QueuedUserMessage } from "@/features/chat/hooks/use-streaming-chat";
 import type { ChatColumnScroll } from "@/features/chat/chat-column-types";
 import { ConversationEvents } from "@/app/chat/ConversationEvents";
 import type { LegendContentStyle } from "@/app/chat/ChatTimeline";
@@ -22,8 +21,6 @@ type CompactConversationSurfaceProps = {
   isStreaming: boolean;
   runtimeStatusText?: string | null;
   pendingUserMessageId: string | null;
-  queuedUserMessages?: QueuedUserMessage[];
-  onCancelQueued?: (message: QueuedUserMessage) => void;
   indicator?: InlineWorkingIndicatorMountProps;
   hasOlderMessages?: boolean;
   isLoadingOlder?: boolean;
@@ -42,8 +39,6 @@ export function CompactConversationSurface({
   conversationId,
   maxItems,
   pendingUserMessageId,
-  queuedUserMessages,
-  onCancelQueued,
   indicator,
   hasOlderMessages,
   isLoadingOlder,
@@ -77,8 +72,6 @@ export function CompactConversationSurface({
             conversationId={conversationId}
             maxItems={maxItems}
             pendingUserMessageId={pendingUserMessageId}
-            queuedUserMessages={queuedUserMessages}
-            onCancelQueued={onCancelQueued}
             indicator={indicator}
             hasOlderMessages={hasOlderMessages}
             isLoadingOlder={isLoadingOlder}

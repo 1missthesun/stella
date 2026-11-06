@@ -7,7 +7,6 @@ import { useAgentParents } from "@/features/chat/hooks/use-agent-parents";
 import { useDriveAttachmentPreviews } from "@/features/cloud/drive-attachment-previews";
 import { ChatTimeline, type LegendContentStyle } from "./ChatTimeline";
 import type { InlineWorkingIndicatorMountProps } from "./InlineWorkingIndicator";
-import type { QueuedUserMessage } from "@/features/chat/hooks/use-streaming-chat";
 import {
   messageArrivedAt,
   recordMessageArrival,
@@ -20,8 +19,6 @@ type Props = {
   conversationId?: string | null;
   maxItems?: number;
   pendingUserMessageId?: string | null;
-  queuedUserMessages?: QueuedUserMessage[];
-  onCancelQueued?: (message: QueuedUserMessage) => void;
   indicator?: InlineWorkingIndicatorMountProps;
   hasOlderMessages?: boolean;
   isLoadingOlder?: boolean;
@@ -78,8 +75,6 @@ export const ConversationEvents = memo(function ConversationEvents({
   conversationId,
   maxItems,
   pendingUserMessageId,
-  queuedUserMessages,
-  onCancelQueued,
   indicator,
   hasOlderMessages,
   isLoadingOlder,
@@ -138,8 +133,6 @@ export const ConversationEvents = memo(function ConversationEvents({
       hasOlderEvents={hasOlderMessages}
       isLoadingOlder={isLoadingOlder}
       isLoadingHistory={isLoadingHistory}
-      queuedUserMessages={queuedUserMessages}
-      onCancelQueued={onCancelQueued}
       indicator={indicator}
       list={list}
       className={className}

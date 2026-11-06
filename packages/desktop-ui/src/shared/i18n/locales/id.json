@@ -219,10 +219,6 @@
         "loadFailed": "Gagal memuat PDF.",
         "loading": "Memuat PDF…"
       },
-      "queuedMessages": {
-        "cancel": "Batalkan pesan dalam antrean",
-        "cancelAndEdit": "Batalkan dan edit"
-      },
       "replyPeek": {
         "dismiss": "Tutup pratinjau",
         "jumpToLatest": "Lompat ke balasan terbaru"

@@ -219,10 +219,6 @@
         "loadFailed": "PDF を読み込めませんでした。",
         "loading": "PDF を読み込み中…"
       },
-      "queuedMessages": {
-        "cancel": "キューのメッセージをキャンセル",
-        "cancelAndEdit": "キャンセルして編集"
-      },
       "replyPeek": {
         "dismiss": "プレビューを閉じる",
         "jumpToLatest": "最新の返信へ移動"

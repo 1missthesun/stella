@@ -10,7 +10,6 @@ html[data-low-power] * {
   -webkit-backdrop-filter: none !important;
 }
 
-html[data-low-power] .composer-queued-message,
 html[data-low-power] .inline-working-indicator,
 html[data-low-power] .inline-working-indicator--leaving,
 html[data-low-power] .inline-generated-image-cards--strip-pending::before,

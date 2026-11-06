@@ -1,6 +1,5 @@
 import type { ChatListBinding } from "@/shell/use-chat-scroll-management";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
-import type { QueuedUserMessage } from "@/features/chat/hooks/use-streaming-chat";
 import type {
   EventRecord,
   TaskItem,
@@ -41,8 +40,6 @@ export type ChatColumnConversation = {
     answerLanded?: boolean;
     isCompacting?: boolean;
     pendingUserMessageId: string | null;
-    queuedUserMessages: QueuedUserMessage[];
-    removeQueuedUserMessage: (messageId: string) => void;
   };
   history: {
     hasOlderMessages: boolean;

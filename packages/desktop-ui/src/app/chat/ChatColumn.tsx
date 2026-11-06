@@ -30,10 +30,6 @@ import type { ChatColumnProps } from "@/features/chat/chat-column-types";
 import { useAssistantReplyPeek } from "@/features/chat/hooks/use-assistant-reply-peek";
 import { useDeferredChatMessages } from "@/features/chat/hooks/use-deferred-chat-messages";
 import {
-  restoreQueuedTextToComposer,
-  type QueuedUserMessage,
-} from "@/features/chat/hooks/queued-user-messages";
-import {
   useComposerMessage,
   type ComposerMessageStore,
 } from "@/features/chat/hooks/use-composer-message-state";
@@ -211,9 +207,6 @@ export const ChatColumn = memo(function ChatColumn({
     setChatContext: composer.setChatContext,
   });
 
-  const { removeQueuedUserMessage } = conversation.streaming;
-  const { setMessage: setComposerMessage, requestFocus: requestComposerFocus } =
-    composer;
   const replyComposerRef = useRef(composer);
   replyComposerRef.current = composer;
   const handleReplyToMessage = useCallback((text: string) => {
@@ -223,17 +216,6 @@ export const ChatColumn = memo(function ChatColumn({
     current.setSelectedText(quoted);
     current.requestFocus?.();
   }, []);
-
-  const handleCancelQueued = useCallback(
-    (message: QueuedUserMessage) => {
-      removeQueuedUserMessage(message.id);
-      setComposerMessage((current) =>
-        restoreQueuedTextToComposer(current, message.text),
-      );
-      requestComposerFocus?.();
-    },
-    [removeQueuedUserMessage, setComposerMessage, requestComposerFocus],
-  );
 
   const renderComposer = (
     surface: "chat" | "home",
@@ -334,8 +316,6 @@ export const ChatColumn = memo(function ChatColumn({
                   pendingUserMessageId={
                     conversation.streaming.pendingUserMessageId
                   }
-                  queuedUserMessages={conversation.streaming.queuedUserMessages}
-                  onCancelQueued={handleCancelQueued}
                   indicator={indicatorProps}
                   hasOlderMessages={conversation.history.hasOlderMessages}
                   isLoadingOlder={conversation.history.isLoadingOlder}

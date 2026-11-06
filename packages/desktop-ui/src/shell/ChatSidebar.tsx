@@ -56,8 +56,6 @@ import {
 } from "@/app/chat/ScreenshotPreview";
 import type { ChatContext } from "@/shared/types/electron";
 import type { MessageRecord } from "@stella/contracts/local-chat";
-import type { QueuedUserMessage } from "@/features/chat/hooks/use-streaming-chat";
-import { restoreQueuedTextToComposer } from "@/features/chat/hooks/queued-user-messages";
 import { useCapturedChatContext } from "./use-captured-chat-context";
 import {
   updateComposerTextareaExpansion,
@@ -107,8 +105,6 @@ interface ChatPanelTabProps {
   activeToolName?: string | null;
   isToolActive?: boolean;
   pendingUserMessageId: string | null;
-  queuedUserMessages?: QueuedUserMessage[];
-  removeQueuedUserMessage?: (messageId: string) => void;
   hasOlderMessages: boolean;
   hasNewerMessages: boolean;
   isLoadingOlder: boolean;
@@ -165,8 +161,6 @@ function AccountScopedChatPanelTab({
   activeToolName,
   isToolActive,
   pendingUserMessageId,
-  queuedUserMessages,
-  removeQueuedUserMessage,
   hasOlderMessages,
   hasNewerMessages,
   isLoadingOlder,
@@ -310,17 +304,6 @@ function AccountScopedChatPanelTab({
     setChatContext,
   });
 
-  const handleCancelQueued = useCallback(
-    (message: QueuedUserMessage) => {
-      removeQueuedUserMessage?.(message.id);
-      setInputText((current) =>
-        restoreQueuedTextToComposer(current, message.text),
-      );
-      requestAnimationFrame(() => inputRef.current?.focus());
-    },
-    [removeQueuedUserMessage, setInputText],
-  );
-
   useEffect(() => {
     if (!openRequest) return;
     if (openRequest.chatContext !== undefined) {
@@ -417,10 +400,6 @@ function AccountScopedChatPanelTab({
               isStreaming={isStreaming}
               runtimeStatusText={runtimeStatusText}
               pendingUserMessageId={pendingUserMessageId}
-              queuedUserMessages={queuedUserMessages}
-              onCancelQueued={
-                removeQueuedUserMessage ? handleCancelQueued : undefined
-              }
               indicator={indicatorProps}
               hasOlderMessages={hasOlderMessages}
               isLoadingOlder={isLoadingOlder}

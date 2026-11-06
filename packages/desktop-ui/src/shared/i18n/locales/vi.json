@@ -219,10 +219,6 @@
         "loadFailed": "Không tải được PDF.",
         "loading": "Đang tải PDF…"
       },
-      "queuedMessages": {
-        "cancel": "Hủy tin nhắn trong hàng đợi",
-        "cancelAndEdit": "Hủy và chỉnh sửa"
-      },
       "replyPeek": {
         "dismiss": "Đóng bản xem trước",
         "jumpToLatest": "Nhảy tới câu trả lời mới nhất"

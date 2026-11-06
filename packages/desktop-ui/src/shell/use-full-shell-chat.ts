@@ -214,8 +214,6 @@ export function useFullShellChat({
   const {
     optimisticEvents: localOptimisticEvents,
     acknowledgeMessages: acknowledgeLocalMessages,
-    queuedUserMessages: localQueuedUserMessages,
-    removeQueuedUserMessage: localRemoveQueuedUserMessage,
     sendMessage: localSendMessage,
     pendingUserMessageId: localPendingUserMessageId,
   } = useStreamingChat({
@@ -399,12 +397,6 @@ export function useFullShellChat({
   const pendingUserMessageId = cloudChat.isWebShell
     ? cloudChat.pendingUserMessageId
     : localPendingUserMessageId;
-  const queuedUserMessages = cloudChat.isWebShell
-    ? []
-    : localQueuedUserMessages;
-  const removeQueuedUserMessage = cloudChat.isWebShell
-    ? () => {}
-    : localRemoveQueuedUserMessage;
   const sendMessage = cloudChat.isWebShell
     ? cloudChat.sendMessage
     : localSendMessage;
@@ -676,8 +668,6 @@ export function useFullShellChat({
         hasToolActivity,
         isToolActive,
         pendingUserMessageId,
-        queuedUserMessages,
-        removeQueuedUserMessage,
       },
       history: {
         hasOlderMessages,
@@ -712,8 +702,6 @@ export function useFullShellChat({
       loadOlderMessages,
       pendingUserMessageId,
       persistedFiles,
-      queuedUserMessages,
-      removeQueuedUserMessage,
       runtimeStatusText,
       isCompacting,
       isStreaming,
@@ -789,7 +777,6 @@ export function useFullShellChat({
       loadLatestMessages,
       isStreaming,
       pendingUserMessageId,
-      queuedUserMessages,
       sendMessage,
       sendContextlessMessage,
       sendMessageWithContext,
@@ -807,7 +794,6 @@ export function useFullShellChat({
       loadLatestMessages,
       isStreaming,
       pendingUserMessageId,
-      queuedUserMessages,
       sendMessage,
       sendContextlessMessage,
       sendMessageWithContext,

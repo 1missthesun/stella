@@ -224,10 +224,6 @@
         "loadFailed": "Failed to load PDF.",
         "loading": "Loading PDF…"
       },
-      "queuedMessages": {
-        "cancel": "Cancel queued message",
-        "cancelAndEdit": "Cancel and edit"
-      },
       "replyPeek": {
         "dismiss": "Dismiss preview",
         "jumpToLatest": "Jump to latest reply"

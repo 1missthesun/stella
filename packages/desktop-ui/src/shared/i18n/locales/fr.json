@@ -229,10 +229,6 @@
         "loadFailed": "Échec du chargement du PDF.",
         "loading": "Chargement du PDF…"
       },
-      "queuedMessages": {
-        "cancel": "Annuler le message en file d’attente",
-        "cancelAndEdit": "Annuler et modifier"
-      },
       "replyPeek": {
         "dismiss": "Masquer l’aperçu",
         "jumpToLatest": "Aller à la dernière réponse"

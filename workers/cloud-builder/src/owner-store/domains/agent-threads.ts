@@ -2466,7 +2466,15 @@ const stopCloudAttempt = async (
   source: string,
 ): Promise<void> => {
   const turn = runningTurn(ctx.db, thread);
-  if (!turn) throw threadChanged(thread.thread_id);
+  if (!turn) {
+    await settleCloudAttempt(ctx, thread, {
+      status: "canceled",
+      errorMessage: AGENT_STOPPED_REASON,
+      source,
+      detail: { cancelRequestId, stopped: true, executorGone: true },
+    });
+    return;
+  }
   const outcome = await ctx.host.cancelAgentTurn({
     threadId: thread.thread_id,
     conversationId: thread.conversation_id,
@@ -2505,6 +2513,67 @@ const stopCloudAttempt = async (
     },
   );
   ctx.jobs.cancel(`dispatch:${turn.turn_id}`);
+};
+
+/**
+ * Ends a cloud attempt whose executor no longer has it (its finish was lost),
+ * so nothing will report it: the owner row is the only place it can end.
+ */
+const settleCloudAttempt = async (
+  ctx: OwnerContext,
+  thread: ThreadRow,
+  input: { status: "canceled" | "failed"; errorMessage: string; source: string; detail: Record<string, unknown> },
+): Promise<boolean> => {
+  let settled = false;
+  recordAgentChange(
+    ctx.db,
+    {
+      threadId: thread.thread_id,
+      kind: endedKind,
+      outcome: input.status,
+      source: input.source,
+      detail: input.detail,
+      now: ctx.now,
+    },
+    () => {
+      const current = readThread(ctx.db, thread.thread_id);
+      if (
+        !current ||
+        current.attempt_generation !== thread.attempt_generation ||
+        !ACTIVE_STATUSES.has(current.status)
+      ) {
+        return;
+      }
+      ctx.db.run(
+        `UPDATE agent_threads SET status = ?, error_message = ?, updated_at = MAX(updated_at + 1, ?)
+          WHERE thread_id = ?`,
+        input.status,
+        input.errorMessage,
+        ctx.now,
+        thread.thread_id,
+      );
+      ctx.db.run(
+        `UPDATE agent_turns SET status = ?, updated_at = ?
+          WHERE thread_id = ? AND attempt_generation = ? AND status IN ('running', 'resuming', 'waiting_for_user')`,
+        input.status,
+        ctx.now,
+        thread.thread_id,
+        thread.attempt_generation,
+      );
+      settled = true;
+    },
+  );
+  if (!settled) return false;
+  for (const turn of ctx.db.all<{ turn_id: string }>(
+    "SELECT turn_id FROM agent_turns WHERE thread_id = ? AND attempt_generation = ?",
+    thread.thread_id,
+    thread.attempt_generation,
+  )) {
+    ctx.jobs.cancel(`dispatch:${turn.turn_id}`);
+  }
+  const ended = readThread(ctx.db, thread.thread_id);
+  if (ended) await postAgentLifecycleCard(ctx, ended, { kind: input.status, text: input.errorMessage });
+  return true;
 };
 
 const markLocalThreadStopped = async (
@@ -2556,6 +2625,7 @@ const markWaitingThreadStopped = async (
       now: ctx.now,
     },
     () => {
+      ctx.jobs.cancel(`usage-limit:agent:${thread.thread_id}`);
       ctx.db.run(
         `UPDATE agent_turns SET status = 'canceled', updated_at = ?
           WHERE thread_id = ? AND attempt_generation = ? AND status = 'waiting_for_user'`,
@@ -2607,7 +2677,7 @@ const runningDescendants = (db: OwnerDbReader, threadId: string): ThreadRow[] =>
      )
      SELECT t.* FROM agent_threads t
        JOIN (SELECT thread_id, MAX(depth) AS depth FROM tree GROUP BY thread_id) below ON below.thread_id = t.thread_id
-      WHERE t.status IN ('running', 'resuming')
+      WHERE t.status IN ('running', 'resuming', 'waiting_for_user')
       ORDER BY below.depth DESC`,
     threadId,
     threadId,
@@ -2776,9 +2846,6 @@ const cancelThread = async (ctx: OwnerContext, args: CancelArgs): Promise<Cancel
     thread.attempt_generation !== args.expectedAttemptGeneration ||
     thread.updated_at !== args.expectedThreadUpdatedAt
   ) {
-    throw threadChanged(thread.thread_id);
-  }
-  if (threadExecutor(thread).kind === "cloud" && !runningTurn(ctx.db, thread)) {
     throw threadChanged(thread.thread_id);
   }
   await stopTree(ctx, {

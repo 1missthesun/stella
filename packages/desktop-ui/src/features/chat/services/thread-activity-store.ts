@@ -1,8 +1,4 @@
-import type {
-  DesktopThreadActivityRecord as ThreadActivityRecord,
-  DesktopThreadActivityUpdatedPayload as ThreadActivityUpdatedPayload,
-  ThreadActivityAssistantUpdate,
-} from "@/features/chat/thread-activity-types";
+import type { DesktopThreadActivityRecord as ThreadActivityRecord } from "@/features/chat/thread-activity-types";
 import {
   onPiChatEvents,
   piChatAgents,
@@ -35,7 +31,7 @@ export const listThreadActivity = async (
 };
 
 const subscribeToThreadActivityUpdates = (
-  listener: (payload: ThreadActivityUpdatedPayload) => void,
+  listener: (conversationId: string) => void,
 ): (() => void) => {
   if (!piChatAvailable()) return () => {};
   return onPiChatEvents(({ conversationId, events }) => {
@@ -47,7 +43,7 @@ const subscribeToThreadActivityUpdates = (
           event.type === "tool_execution_end",
       )
     ) {
-      listener({ conversationId });
+      listener(conversationId);
     }
   });
 };
@@ -75,9 +71,6 @@ type ThreadActivityEntry = {
   retryAttempt: number;
   requestGeneration: number;
   disposed: boolean;
-  assistantUpdates: Map<string, ThreadActivityAssistantUpdate>;
-  recordWatermarks: Map<string, ThreadActivityRecord>;
-  equalVersionConflicts: Map<string, string>;
 };
 
 const EMPTY_SNAPSHOT: ThreadActivitySnapshot = {
@@ -141,49 +134,6 @@ const setSnapshot = (
   }
 };
 
-const patchRecord = (
-  entry: ThreadActivityEntry,
-  incoming: ThreadActivityRecord,
-) => {
-  const previous = entry.recordsByThreadId.get(incoming.threadId);
-  const sameAttempt =
-    previous?.attemptGeneration === incoming.attemptGeneration &&
-    (!previous?.rootRunId ||
-      !incoming.rootRunId ||
-      previous.rootRunId === incoming.rootRunId);
-  // Group metadata belongs to the durable thread, not an individual agent
-  // attempt. Lifecycle pushes are projected directly from runtime_agents and
-  // therefore omit the joined runtime_threads fields; retain them across both
-  // same-attempt patches and retry generations.
-  const stableThreadFields = previous
-    ? {
-        ...(previous.groupKey ? { groupKey: previous.groupKey } : {}),
-        ...(previous.groupLabel ? { groupLabel: previous.groupLabel } : {}),
-      }
-    : {};
-  const record = sameAttempt
-    ? { ...previous, ...incoming }
-    : { ...stableThreadFields, ...incoming };
-  entry.recordsByThreadId.set(record.threadId, record);
-
-  const listeners = entry.recordListeners.get(record.threadId);
-  if (listeners) {
-    for (const listener of listeners) listener(record, true);
-  }
-
-  if (entry.listeners.size > 0) {
-    const records = Array.from(entry.recordsByThreadId.values()).sort(
-      (a, b) =>
-        a.startedAt - b.startedAt || a.threadId.localeCompare(b.threadId),
-    );
-    entry.snapshot = { records, hasLoaded: true, error: null };
-    retainRecords(entry.conversationId, records);
-    for (const listener of entry.listeners) listener(entry.snapshot);
-  } else {
-    entry.snapshot = { ...entry.snapshot, hasLoaded: true, error: null };
-  }
-};
-
 const materializeAggregateSnapshot = (entry: ThreadActivityEntry) => {
   const records = Array.from(entry.recordsByThreadId.values()).sort(
     (a, b) =>
@@ -191,127 +141,6 @@ const materializeAggregateSnapshot = (entry: ThreadActivityEntry) => {
   );
   entry.snapshot = { ...entry.snapshot, records };
   return entry.snapshot;
-};
-
-/** Overlay persisted live-message watermarks onto list results. A list request
- * started before an incremental write may return an older projection; its
- * lifecycle fields remain useful, but it cannot roll assistant text back. */
-const applyAssistantUpdateWatermarks = (
-  entry: ThreadActivityEntry,
-  records: ThreadActivityRecord[],
-): ThreadActivityRecord[] =>
-  records.map((record) => {
-    const update = entry.assistantUpdates.get(record.threadId);
-    if (!update) return record;
-    const recordAttempt = record.attemptGeneration;
-    const updateIsOlderAttempt =
-      recordAttempt !== undefined && update.attemptGeneration < recordAttempt;
-    const sameAttempt =
-      recordAttempt === undefined || recordAttempt === update.attemptGeneration;
-    const conflictingRootOnSameAttempt =
-      sameAttempt &&
-      Boolean(record.rootRunId) &&
-      Boolean(update.rootRunId) &&
-      record.rootRunId !== update.rootRunId;
-    if (updateIsOlderAttempt || conflictingRootOnSameAttempt) {
-      entry.assistantUpdates.delete(record.threadId);
-      return record;
-    }
-    const recordSequence = record.assistantMessagesUpdatedSequence;
-    const updateSequence = update.atSequence;
-    const recordHasCaughtUp =
-      recordSequence !== undefined && updateSequence !== undefined
-        ? recordSequence >= updateSequence
-        : (record.assistantMessagesUpdatedAt ?? 0) >= update.atMs;
-    if (recordHasCaughtUp) {
-      entry.assistantUpdates.delete(record.threadId);
-      return record;
-    }
-    return {
-      ...record,
-      assistantMessages: update.assistantMessages,
-      assistantMessagesUpdatedAt: update.atMs,
-      ...(update.atSequence === undefined
-        ? {}
-        : { assistantMessagesUpdatedSequence: update.atSequence }),
-    };
-  });
-
-const compareRecordVersions = (
-  left: ThreadActivityRecord,
-  right: ThreadActivityRecord,
-): number =>
-  (left.recordRevision ?? 0) - (right.recordRevision ?? 0) ||
-  (left.attemptGeneration ?? 0) - (right.attemptGeneration ?? 0) ||
-  left.updatedAt - right.updatedAt ||
-  (left.status === "running" ? 0 : 1) -
-    (right.status === "running" ? 0 : 1);
-
-const recordVersionPayloadSignature = (record: ThreadActivityRecord): string =>
-  JSON.stringify({
-    source: record.source,
-    threadId: record.threadId,
-    conversationId: record.conversationId,
-    agentType: record.agentType,
-    description: record.description,
-    status: record.status,
-    attemptGeneration: record.attemptGeneration ?? 0,
-    recordRevision: record.recordRevision ?? 0,
-    rootRunId: record.rootRunId ?? null,
-    modelConfigSnapshot: record.modelConfigSnapshot ?? null,
-    parentAgentId: record.parentAgentId ?? null,
-    groupKey: record.groupKey ?? null,
-    groupLabel: record.groupLabel ?? null,
-    startedAt: record.startedAt,
-    completedAt: record.completedAt ?? null,
-    result: record.result ?? null,
-    error: record.error ?? null,
-    updatedAt: record.updatedAt,
-  });
-
-/** A keyed push can race an older hydration request. Keep the pushed durable
- * row until a later list result demonstrably catches up to its version. */
-const applyRecordWatermarks = (
-  entry: ThreadActivityEntry,
-  records: ThreadActivityRecord[],
-): ThreadActivityRecord[] => {
-  if (entry.recordWatermarks.size === 0) return records;
-  const protectedRecords = new Map(
-    records.map((record) => [record.threadId, record]),
-  );
-  for (const [threadId, watermark] of entry.recordWatermarks) {
-    const fetched = protectedRecords.get(threadId);
-    if (fetched) {
-      const comparison = compareRecordVersions(fetched, watermark);
-      if (comparison > 0) {
-        entry.recordWatermarks.delete(threadId);
-        entry.equalVersionConflicts.delete(threadId);
-        continue;
-      }
-      if (comparison === 0) {
-        const fetchedSignature = recordVersionPayloadSignature(fetched);
-        const watermarkSignature = recordVersionPayloadSignature(watermark);
-        if (fetchedSignature === watermarkSignature) {
-          entry.recordWatermarks.delete(threadId);
-          entry.equalVersionConflicts.delete(threadId);
-          continue;
-        }
-        // Equal timestamps/status ranks are not proof that an older hydration
-        // caught a push. Keep the pushed row and force one deterministic
-        // follow-up read; persisted Stella records use recordRevision so the
-        // next result can establish a strict order.
-        const conflictSignature = `${fetchedSignature}\n${watermarkSignature}`;
-        if (entry.equalVersionConflicts.get(threadId) !== conflictSignature) {
-          entry.equalVersionConflicts.set(threadId, conflictSignature);
-          entry.pendingRefetch = true;
-        }
-      }
-    }
-    protectedRecords.set(threadId, watermark);
-  }
-  return Array.from(protectedRecords.values()).sort(
-    (a, b) => a.startedAt - b.startedAt || a.threadId.localeCompare(b.threadId),
-  );
 };
 
 const refreshEntry = (entry: ThreadActivityEntry): Promise<void> => {
@@ -330,10 +159,6 @@ const refreshEntry = (entry: ThreadActivityEntry): Promise<void> => {
       if (entry.disposed || requestGeneration !== entry.requestGeneration) {
         return;
       }
-      const protectedRecords = applyAssistantUpdateWatermarks(
-        entry,
-        applyRecordWatermarks(entry, records),
-      );
       entry.hasHydrated = true;
       entry.retryAttempt = 0;
       if (
@@ -350,13 +175,13 @@ const refreshEntry = (entry: ThreadActivityEntry): Promise<void> => {
       if (
         entry.snapshot.hasLoaded &&
         !entry.snapshot.error &&
-        recordsSignature(protectedRecords) ===
+        recordsSignature(records) ===
           recordsSignature(entry.snapshot.records)
       ) {
         return;
       }
       setSnapshot(entry, {
-        records: protectedRecords,
+        records: records,
         hasLoaded: true,
         error: null,
       });
@@ -403,52 +228,9 @@ const refreshEntry = (entry: ThreadActivityEntry): Promise<void> => {
   return entry.loading;
 };
 
-const handleThreadActivityUpdated = (payload: ThreadActivityUpdatedPayload) => {
-  if (payload.transcriptUpdate && !payload.assistantUpdate) return;
-  const entry = entries.get(payload.conversationId);
-  if (!entry) return;
-  if (payload.record) {
-    const previousWatermark = entry.recordWatermarks.get(
-      payload.record.threadId,
-    );
-    if (
-      !previousWatermark ||
-      compareRecordVersions(payload.record, previousWatermark) >= 0
-    ) {
-      entry.recordWatermarks.set(payload.record.threadId, payload.record);
-      const current = entry.recordsByThreadId.get(payload.record.threadId);
-      if (!current || compareRecordVersions(payload.record, current) >= 0) {
-        patchRecord(entry, payload.record);
-      }
-    }
-  }
-  const update = payload.assistantUpdate;
-  if (update) {
-    const previous = entry.assistantUpdates.get(update.threadId);
-    if (
-      !previous ||
-      update.attemptGeneration > previous.attemptGeneration ||
-      (update.attemptGeneration === previous.attemptGeneration &&
-        (update.atSequence !== undefined && previous.atSequence !== undefined
-          ? update.atSequence >= previous.atSequence
-          : update.atMs >= previous.atMs))
-    ) {
-      entry.assistantUpdates.set(update.threadId, update);
-      const record = entry.recordsByThreadId.get(update.threadId);
-      if (record) {
-        patchRecord(entry, {
-          ...record,
-          assistantMessages: update.assistantMessages,
-          assistantMessagesUpdatedAt: update.atMs,
-          ...(update.atSequence === undefined
-            ? {}
-            : { assistantMessagesUpdatedSequence: update.atSequence }),
-        });
-      }
-    }
-  }
-  if (payload.record || update) return;
-  if (entry.refreshTimer !== null) return;
+const handleThreadActivityUpdated = (conversationId: string) => {
+  const entry = entries.get(conversationId);
+  if (!entry || entry.refreshTimer !== null) return;
   entry.refreshTimer = window.setTimeout(() => {
     entry.refreshTimer = null;
     if (entry.listeners.size > 0 || entry.recordListeners.size > 0) {
@@ -514,9 +296,6 @@ export const subscribeToThreadActivity = (
       retryAttempt: 0,
       requestGeneration: 0,
       disposed: false,
-      assistantUpdates: new Map(),
-      recordWatermarks: new Map(),
-      equalVersionConflicts: new Map(),
     };
     entries.set(conversationId, entry);
   }
@@ -571,9 +350,6 @@ export const subscribeToThreadActivityRecord = (
       retryAttempt: 0,
       requestGeneration: 0,
       disposed: false,
-      assistantUpdates: new Map(),
-      recordWatermarks: new Map(),
-      equalVersionConflicts: new Map(),
     };
     entries.set(conversationId, entry);
   }

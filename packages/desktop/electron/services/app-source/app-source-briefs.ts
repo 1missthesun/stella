@@ -4,6 +4,8 @@ export type AgentBrief = { description: string; prompt: string };
 
 export const mergeDraftName = (tip: string) => `update-${tip.slice(0, 12)}`;
 
+export const remoteMergeDraftName = (tip: string) => `merge-${tip.slice(0, 12)}`;
+
 const listing = (paths: string[], limit = 40) => {
   const shown = paths.slice(0, limit).map((path) => `- ${path}`);
   if (paths.length > limit) shown.push(`- …and ${paths.length - limit} more`);
@@ -71,7 +73,7 @@ export const remoteMergeBrief = (
   description: `Merge changes from another computer ${plan.tip.slice(0, 7)}`,
   prompt: `The user changed Stella on another of their computers, and that change has to be merged with this computer's own changes. They already pressed the button to add it here, so nobody is waiting on a question — finish the draft. It then waits in Updates until they add it, so Stella never relaunches under them.
 
-Follow the "Rebase, merge, or undo for the user" section of the modify-stella skill, the "changes from another computer diverged" case. Name the draft \`${mergeDraftName(plan.tip)}\`.
+Follow the "Rebase, merge, or undo for the user" section of the modify-stella skill, the "changes from another computer diverged" case. Name the draft \`${remoteMergeDraftName(plan.tip)}\`.
 
 ${reason(plan, gateOutput, "a change from another computer")}
 

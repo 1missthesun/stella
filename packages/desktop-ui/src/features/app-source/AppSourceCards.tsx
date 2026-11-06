@@ -168,7 +168,9 @@ export const addOffer = (offer: AppSourceWaiting) => {
   if (offer.kind === "version") {
     return offer.draft ? api.apply(offer.draft) : api.applyUpstream();
   }
-  if (offer.kind === "other-computer") return api.applyRemote();
+  if (offer.kind === "other-computer") {
+    return offer.draft ? api.apply(offer.draft) : api.applyRemote();
+  }
   return api.apply(offer.name);
 };
 

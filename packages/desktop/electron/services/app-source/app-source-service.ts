@@ -53,6 +53,7 @@ import {
 import {
   mergeDraftName,
   remoteMergeBrief,
+  remoteMergeDraftName,
   staleDraftBrief,
   undoBrief,
   upstreamMergeBrief,
@@ -78,8 +79,11 @@ type AppSourceServiceOptions = {
   launcherPreparesOnRelaunch?: boolean;
   reportPrepared?: (prepared: { lockHash?: string; head?: string }) => void;
   updateScratchDir: string;
-  dispatchAgentBrief?: (brief: AgentBrief) => Promise<void>;
+  dispatchAgentBrief?: (brief: AgentBrief) => Promise<DispatchedAgent>;
+  agentRunning?: (agent: DispatchedAgent) => Promise<boolean | null>;
 };
+
+export type DispatchedAgent = { conversationId: string; threadId: string };
 
 type TakeSource = {
   kind: "upstream" | "remote" | "draft";
@@ -108,6 +112,7 @@ type SourceAccess = { fork: ForkAccess | null; upstream: AppSourceRemote };
 
 const STATE_POLL_MS = 10_000;
 const UPDATE_MERGE_WAIT_MS = 60 * 60_000;
+const MERGE_START_GRACE_MS = 2 * 60_000;
 const LAUNCH_SYNC_DELAY_MS = 5_000;
 const SYNC_RETRY_MS = 30_000;
 const SYNC_RETRY_MAX_MS = 10 * 60_000;
@@ -211,9 +216,13 @@ export class AppSourceService {
   private forkUnrelated = false;
   private upstreamTracked = false;
   private upstreamUnrelated = false;
-  private updateState:
-    | { state: "merging"; name: string; since: number; from: TakeSource["kind"] }
-    | null = null;
+  private updateState: {
+    state: "merging";
+    name: string;
+    since: number;
+    from: TakeSource["kind"];
+    agent: DispatchedAgent | null;
+  } | null = null;
   private offers = new Map<string, Offer>();
   private catchingUp = false;
   private caughtUp = new Set<string>();
@@ -449,7 +458,7 @@ export class AppSourceService {
         trustIdenticalTree: false,
         brief: (plan, head, gateOutput) =>
           remoteMergeBrief(plan, head, ref, gateOutput),
-        pendingDraft: mergeDraftName(tip),
+        pendingDraft: remoteMergeDraftName(tip),
         pendingDraftExists: false,
       });
     });
@@ -561,8 +570,15 @@ export class AppSourceService {
       throw new Error("Stella isn't ready to make that change yet.");
     }
     const name = source.pendingDraft;
-    if (!(await this.draftUnderWay(cwd, name, !source.pendingDraftExists))) {
-      await dispatch(brief);
+    let draft = await this.draftOf(cwd, name);
+    if (draft === "stale" && !source.pendingDraftExists) {
+      await git(cwd, ["branch", "-D", `draft/${name}`]);
+      this.options.log("app-source.leftover-draft-dropped", { draft: name });
+      draft = "none";
+    }
+    let agent: DispatchedAgent | null = null;
+    if (draft !== "worktree" && (source.pendingDraftExists || draft === "none")) {
+      agent = await dispatch(brief);
       this.options.log("app-source.brief-dispatched", {
         from: source.kind,
         draft: name,
@@ -573,24 +589,24 @@ export class AppSourceService {
       name,
       since: Date.now(),
       from: source.kind,
+      agent,
     };
     return { background: true };
   }
 
-  private async draftUnderWay(
+  private async draftOf(
     cwd: string,
     name: string,
-    branchCounts: boolean,
-  ) {
+  ): Promise<"worktree" | "ready" | "stale" | "none"> {
     const ref = `${DRAFT_REF_PREFIX}${name}`;
     if ((await listWorktrees(cwd)).some((tree) => tree.branch === ref)) {
-      return true;
+      return "worktree";
     }
-    if (!branchCounts) return false;
-    return (
-      (await gitRaw(cwd, ["rev-parse", "--verify", "--quiet", `${ref}^{commit}`]))
-        .code === 0
-    );
+    const tip = (
+      await gitRaw(cwd, ["rev-parse", "--verify", "--quiet", `${ref}^{commit}`])
+    ).stdout.trim();
+    if (!tip) return "none";
+    return (await isAncestor(cwd, "HEAD", tip)) ? "ready" : "stale";
   }
 
   private async dispatchUndo(
@@ -619,15 +635,32 @@ export class AppSourceService {
   }
 
 
-  private settleFinishedMerge(state: Omit<AppSourceState, "busy">) {
+  private async settleFinishedMerge(state: Omit<AppSourceState, "busy">) {
     const pending = this.updateState;
-    if (pending?.state !== "merging") return;
-    if (
-      Date.now() - pending.since > UPDATE_MERGE_WAIT_MS ||
-      state.ready.some((draft) => draft.name === pending.name)
-    ) {
-      this.updateState = null;
+    if (pending?.state !== "merging") return false;
+    const age = Date.now() - pending.since;
+    let done =
+      age > UPDATE_MERGE_WAIT_MS ||
+      state.ready.some((draft) => draft.name === pending.name);
+    if (!done) {
+      const cwd = this.options.stellaAppDir;
+      const draft = await this.draftOf(cwd, pending.name);
+      const running =
+        pending.agent && this.options.agentRunning
+          ? await this.options.agentRunning(pending.agent).catch(() => null)
+          : null;
+      done =
+        draft !== "ready" &&
+        running !== true &&
+        (running === false ||
+          (draft !== "worktree" &&
+            ((draft === "stale" && pending.from !== "draft") ||
+              age > MERGE_START_GRACE_MS)));
     }
+    if (!done || this.updateState !== pending) return false;
+    this.options.log("app-source.merge-settled", { draft: pending.name, ms: age });
+    this.updateState = null;
+    return true;
   }
 
   private exclusive(
@@ -840,7 +873,7 @@ export class AppSourceService {
         try {
           const next = await this.readState();
           this.publish({ ...next, busy: this.busy });
-          this.settleFinishedMerge(next);
+          if (await this.settleFinishedMerge(next)) this.refreshAgain = true;
         } catch (error) {
           this.options.log("app-source.refresh-failed", {
             message: errorMessage(error),
@@ -977,11 +1010,16 @@ export class AppSourceService {
     const merging =
       this.updateState?.state === "merging" ? this.updateState.from : null;
     const offered: AppSourceWaiting[] = [];
-    const updateDraft = readyShown.find((draft) => isUpdateDraft(draft.name));
-    if ((upstreamOffer?.real && upstreamShown) || updateDraft) {
+    const versionTip = upstreamOffer?.real && upstreamShown ? upstreamOffer.tip : null;
+    const updateDraft = readyShown.find((draft) =>
+      versionTip
+        ? draft.name === mergeDraftName(versionTip)
+        : isUpdateDraft(draft.name),
+    );
+    if (versionTip || updateDraft) {
       offered.push({
         kind: "version",
-        key: `version:${upstreamOffer?.real && upstreamShown ? upstreamOffer.tip : updateDraft!.sha}`,
+        key: `version:${versionTip ?? updateDraft!.sha}`,
         adding: merging === "upstream",
         ...(updateDraft ? { draft: updateDraft.name } : {}),
       });
@@ -991,12 +1029,16 @@ export class AppSourceService {
         this.forkSummary(cwd, head, forkOffer.tip),
         this.forkDevice(cwd),
       ]);
+      const forkDraft = readyShown.find(
+        (draft) => draft.name === remoteMergeDraftName(forkOffer.tip),
+      );
       offered.push({
         kind: "other-computer",
         key: `other:${forkOffer.tip}`,
         adding: merging === "remote",
         device,
         summary,
+        ...(forkDraft ? { draft: forkDraft.name } : {}),
       });
     }
     for (const draft of [...readyShown, ...staleShown]) {

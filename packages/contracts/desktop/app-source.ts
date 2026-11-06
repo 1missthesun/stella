@@ -26,12 +26,16 @@ export type AppSourceWaiting =
       adding: boolean;
       device: string;
       summary: string;
+      draft?: string;
     }
   | { kind: "draft"; key: string; adding: boolean; name: string; summary: string };
 
-export const isUpdateDraft = (name: string) => name.startsWith("update-");
+export const isUpdateDraft = (name: string) => /^update-[0-9a-f]{12}$/.test(name);
 
-export const isStellaDraft = isUpdateDraft;
+export const isRemoteMergeDraft = (name: string) => /^merge-[0-9a-f]{12}$/.test(name);
+
+export const isStellaDraft = (name: string) =>
+  isUpdateDraft(name) || isRemoteMergeDraft(name);
 
 export type AppSourceState = {
   ready: AppSourceDraft[];

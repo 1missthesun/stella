@@ -424,7 +424,7 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
         const appSourceService = new AppSourceService({
             stellaAppDir: state.stellaAppDir ?? config.stellaAppDir,
             broadcast: (next) => {
-                if (next.ready.length > 0 ||
+                if (next.waiting.some((offer) => offer.kind === "draft" && !offer.stale) ||
                     next.remote.status === "ahead" ||
                     next.upstream.status === "ahead") {
                     updateTransition.prewarm();
@@ -453,12 +453,20 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
                 if (!runner || !conversationId) {
                     throw new Error("Stella isn't ready to install this update yet.");
                 }
-                await runner.createBackgroundAgent({
+                const { threadId } = await runner.createBackgroundAgent({
                     conversationId,
                     description: brief.description,
                     prompt: brief.prompt,
                     agentType: "general",
                 });
+                return { conversationId, threadId };
+            },
+            agentRunning: async ({ conversationId, threadId }) => {
+                const runner = lifecycle.getRunner();
+                if (!runner) return null;
+                const { agents } = await runner.piChat({ op: "agents", conversationId });
+                const agent = agents.find((entry) => entry.threadId === threadId);
+                return agent ? agent.status === "running" : null;
             },
             hasConnectedAccount: () => services.authService.getHostHasConnectedAccount(),
             getBackendUrl: () => services.authService.getBackendUrl(),

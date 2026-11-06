@@ -2,7 +2,6 @@ import { memo } from "react";
 import { Download } from "@/ui/icons";
 import { useT } from "@/shared/i18n";
 import {
-  updateProgress,
   useAppSourceState,
   versionOffer,
 } from "@/features/app-source/app-source-store";
@@ -21,7 +20,7 @@ export const ShellTopBarUpdatePill = memo(function ShellTopBarUpdatePill() {
   const updating =
     offer.adding ||
     pending === offer.key ||
-    updateProgress(state)?.state === "merging";
+    state.merging !== undefined;
   const label = updating
     ? t("shell.appSource.updating")
     : t("shell.appSource.update");

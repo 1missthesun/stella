@@ -166,8 +166,6 @@ export class UpdatePreparer {
     const startedAt = Date.now();
     const cwd = this.cwd;
     const dir = path.join(this.root, dirName(job.head, job.tip));
-    await fs.rm(dir, { recursive: true, force: true });
-    await fs.mkdir(dir, { recursive: true });
     const options = { background: true, signal };
     const record = (fields: Partial<PreparedUpdate>): PreparedUpdate => ({
       head: job.head,
@@ -181,6 +179,8 @@ export class UpdatePreparer {
       ...fields,
     });
     try {
+      await fs.rm(dir, { recursive: true, force: true });
+      await fs.mkdir(dir, { recursive: true });
       const plan = await classifyUpdate(cwd, job.head, job.ref);
       if (plan.kind === "none" || plan.tip !== job.tip) {
         throw new Error("The version changed while it was being prepared.");

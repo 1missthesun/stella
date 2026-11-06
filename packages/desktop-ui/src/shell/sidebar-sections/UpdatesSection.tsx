@@ -5,7 +5,6 @@ import type {
 import { useLocale, useT } from "@/shared/i18n";
 import {
   appSourceApi,
-  updateProgress,
   useAppSourceState,
 } from "@/features/app-source/app-source-store";
 import {
@@ -189,7 +188,7 @@ export function UpdatesSection() {
     );
   }
   const blocked =
-    state.busy || pending !== null || updateProgress(state)?.state === "merging";
+    state.busy || pending !== null || state.merging !== undefined;
   return (
     <div className="updates-section sidebar-section__scroll" data-testid="updates-section">
       <h2 className="updates-section__heading">{t("shell.appSource.updates.waiting")}</h2>

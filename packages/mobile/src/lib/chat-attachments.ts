@@ -1,13 +1,14 @@
 import type { BackendClient } from "@stella/contracts/backend/client";
 import { fetch as expoFetch, type FetchRequestInit } from "expo/fetch";
 import { putSignedUpload } from "@stella/contracts/request-deadline";
+import {
+  CHAT_ATTACHMENT_FOLDERS,
+  chatAttachmentDrivePath,
+  chatAttachmentFileName,
+} from "@stella/contracts/chat-attachments";
 import { attachmentContentType } from "./image-attachments";
 
 export const CHAT_ATTACHMENT_MAX_COUNT = 4;
-
-const CHAT_ATTACHMENT_DRIVE_PREFIX = "uploads";
-
-const MAX_SEGMENT_LENGTH = 255;
 
 export type ChatAttachmentKind = "image" | "file";
 
@@ -45,19 +46,8 @@ export const appendAttachments = <T>(
   };
 };
 
-export const driveFileNameFor = (name: string, kind: ChatAttachmentKind) => {
-  const cleaned = name
-    .replaceAll("\\", "/")
-    .split("/")
-    .pop()!
-    // eslint-disable-next-line no-control-regex
-    .replace(/[\u0000-\u001f\u007f]/g, "")
-    .trim();
-  if (!cleaned || cleaned === "." || cleaned === "..") {
-    return kind === "image" ? "photo.jpg" : "file";
-  }
-  return cleaned.slice(-MAX_SEGMENT_LENGTH);
-};
+export const driveFileNameFor = (name: string, kind: ChatAttachmentKind) =>
+  chatAttachmentFileName(name, kind === "image" ? "photo.jpg" : "file");
 
 const EXTENSION_BY_MIME_TYPE: Record<string, string> = {
   "image/jpeg": ".jpg",
@@ -82,44 +72,14 @@ export const driveAttachmentPath = (args: {
   now: Date;
   taken: ReadonlySet<string>;
   uniquePrefix?: string;
-}): string => {
-  const day = args.now.toISOString().slice(0, 10);
-  const fileName = `${args.uniquePrefix ? `${args.uniquePrefix}-` : ""}${driveFileNameFor(args.name, args.kind)}`.slice(-MAX_SEGMENT_LENGTH);
-  const dot = fileName.lastIndexOf(".");
-  const stem = dot > 0 ? fileName.slice(0, dot) : fileName;
-  const extension = dot > 0 ? fileName.slice(dot) : "";
-  for (let attempt = 1; ; attempt += 1) {
-    const candidate = `${CHAT_ATTACHMENT_DRIVE_PREFIX}/${day}/${
-      attempt === 1 ? fileName : `${stem}-${attempt}${extension}`
-    }`;
-    if (!args.taken.has(candidate)) return candidate;
-  }
-};
-
-export const withAttachmentPreamble = (
-  prompt: string,
-  paths: readonly string[],
-): string => {
-  if (!paths.length) return prompt;
-  const lines = paths.map((path) => `- ${path}`).join("\n");
-  return `${prompt}\n\nAttached in my drive:\n${lines}`;
-};
-
-const ATTACHMENT_PREAMBLE = /(?:^|\n\n)Attached in my drive:\n((?:- [^\n]+(?:\n|$))+)$/;
-
-/** Splits the Drive file list that `withAttachmentPreamble` appended off a prompt. */
-export const splitAttachmentPreamble = (
-  text: string,
-): { text: string; paths: string[] } => {
-  const match = ATTACHMENT_PREAMBLE.exec(text);
-  if (!match) return { text, paths: [] };
-  const paths = match[1]!
-    .split("\n")
-    .filter((line) => line.startsWith("- "))
-    .map((line) => line.slice(2).trim())
-    .filter((path) => path.length > 0 && path.length <= 400);
-  return { text: text.slice(0, match.index), paths };
-};
+}): string =>
+  chatAttachmentDrivePath({
+    folder: CHAT_ATTACHMENT_FOLDERS.mobile,
+    name: driveFileNameFor(args.name, args.kind),
+    now: args.now,
+    taken: args.taken,
+    ...(args.uniquePrefix ? { prefix: args.uniquePrefix } : {}),
+  });
 
 export type AttachmentUploadDeps = {
   client: Pick<BackendClient, "call">;

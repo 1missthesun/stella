@@ -2,7 +2,7 @@ import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
 import { parseCloudModelSelection } from "./cloud-model-selection";
 import type { ChatMessage } from "../types";
 import type { AutomaticExecutionTarget } from "./execution-placement";
-import { withAttachmentPreamble } from "./chat-attachments";
+import { withAttachmentPreamble } from "@stella/contracts/chat-attachments";
 
 export type DesktopChatOutboxAttachment = {
   path: string;

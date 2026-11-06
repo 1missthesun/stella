@@ -13,7 +13,10 @@ import {
   bareToolName,
 } from "@stella/contracts/conversation-agent-activity";
 import { groupEventsIntoMessages } from "@/features/chat/lib/group-events-into-messages";
-import { splitAttachmentPreamble } from "./cloud-composer-store";
+import {
+  journalUserMessage,
+  type JournalUserMessage,
+} from "@stella/contracts/journal-user-message";
 import { driveAttachmentRef } from "./drive-attachment-previews";
 import {
   messageText,
@@ -175,128 +178,22 @@ const contentBlocks = (
         .filter((entry): entry is Record<string, unknown> => entry !== null)
     : [];
 
-const userAttachments = (
-  payload: AgentMessagePayload,
-  listedPaths: readonly string[],
-): Attachment[] => {
-  const images = contentBlocks(payload).flatMap((block): Attachment[] =>
-    block.type === "image" &&
-    typeof block.data === "string" &&
-    typeof block.mimeType === "string"
-      ? [
-          {
-            url: `data:${block.mimeType};base64,${block.data}`,
-            mimeType: block.mimeType,
-          },
-        ]
-      : [],
-  );
-  const declared = (payload as { attachments?: unknown }).attachments;
-  const files = (Array.isArray(declared) ? declared : []).flatMap(
-    (entry): Attachment[] => {
-      const record = asRecord(entry);
-      if (record?.kind !== "file") return [];
-      const path =
-        typeof record.path === "string"
-          ? record.path
-          : typeof record.sourcePath === "string"
-            ? record.sourcePath
-            : undefined;
-      return [
-        {
-          kind: "file",
-          ...(typeof record.name === "string" ? { name: record.name } : {}),
-          ...(typeof record.mimeType === "string"
-            ? { mimeType: record.mimeType }
-            : {}),
-          ...(typeof record.size === "number" ? { size: record.size } : {}),
-          ...(path ? { path, url: path } : {}),
-        },
-      ];
-    },
-  );
-  return [
-    ...images,
-    ...files,
-    ...[...new Set([...providerAttachmentPaths(payload), ...listedPaths])].map(
-      driveAttachmentRef,
-    ),
-  ];
-};
-
-const providerAttachmentPaths = (payload: AgentMessagePayload): string[] => {
-  const raw = asRecord(payload.providerContext)?.attachments;
-  return Array.isArray(raw)
-    ? [
-        ...new Set(
-          raw.filter(
-            (path): path is string =>
-              typeof path === "string" && path.length > 0 && path.length <= 400,
-          ),
-        ),
-      ]
-    : [];
-};
-
-const nonEmptyStrings = (value: unknown): string[] =>
-  Array.isArray(value)
-    ? value.filter(
-        (entry): entry is string =>
-          typeof entry === "string" && entry.trim().length > 0,
-      )
-    : [];
-
-const userDisplayContext = (
-  payload: AgentMessagePayload,
-): Record<string, unknown> | undefined => {
-  const context = asRecord(
-    asRecord((payload as { metadata?: unknown }).metadata)?.context,
-  );
-  if (!context) return undefined;
-  const pastedTexts = (
-    Array.isArray(context.pastedTexts) ? context.pastedTexts : []
-  ).flatMap((entry) => {
-    const descriptor = asRecord(entry);
-    if (
-      !descriptor ||
-      typeof descriptor.lines !== "number" ||
-      typeof descriptor.chars !== "number"
-    ) {
-      return [];
-    }
-    return [
-      {
-        lines: descriptor.lines,
-        chars: descriptor.chars,
-        ...(typeof descriptor.text === "string"
-          ? { text: descriptor.text }
-          : {}),
-      },
-    ];
-  });
-  const appSelectionLabels = nonEmptyStrings(context.appSelectionLabels);
-  const text = (key: string): string | undefined =>
-    typeof context[key] === "string" && (context[key] as string).trim()
-      ? (context[key] as string)
-      : undefined;
-  const appSelectionLabel = text("appSelectionLabel");
-  const activityLabel = text("activityLabel");
-  const quotedText = text("quotedText");
-  const result = {
-    ...(pastedTexts.length > 0 ? { pastedTexts } : {}),
-    ...(appSelectionLabels.length > 0 ? { appSelectionLabels } : {}),
-    ...(appSelectionLabel ? { appSelectionLabel } : {}),
-    ...(activityLabel ? { activityLabel } : {}),
-    ...(quotedText ? { quotedText } : {}),
-  };
-  return Object.keys(result).length > 0 ? result : undefined;
-};
-
-const userDisplayText = (payload: AgentMessagePayload): string | undefined => {
-  const displayText = asRecord((payload as { metadata?: unknown }).metadata)
-    ?.displayText;
-  return typeof displayText === "string" ? displayText : undefined;
-};
+const userAttachments = (message: JournalUserMessage): Attachment[] => [
+  ...message.inlineImages.map((image) => ({
+    url: `data:${image.mimeType};base64,${image.data}`,
+    mimeType: image.mimeType,
+  })),
+  ...message.declaredFiles.map(
+    (file): Attachment => ({
+      kind: "file",
+      ...(file.name ? { name: file.name } : {}),
+      ...(file.mimeType ? { mimeType: file.mimeType } : {}),
+      ...(file.size !== undefined ? { size: file.size } : {}),
+      ...(file.path ? { path: file.path, url: file.path } : {}),
+    }),
+  ),
+  ...message.drivePaths.map(driveAttachmentRef),
+];
 
 const textPayload = (
   record: Extract<JournalRecord, { kind: "message" }>,
@@ -308,7 +205,9 @@ const textPayload = (
   const voiceSession = asRecord(record.payload.voiceSession);
   const reminder = asRecord(record.payload.reminder);
   const displayContext =
-    record.role === "user" ? userDisplayContext(record.payload) : undefined;
+    record.role === "user"
+      ? journalUserMessage(record.payload).displayContext
+      : undefined;
   const metadata = {
     ...(record.hidden ? { ui: { visibility: "hidden" as const } } : {}),
     ...(displayContext ? { context: displayContext } : {}),
@@ -446,18 +345,14 @@ export const journalRecordsToMessageRecords = (
         turnUserRecord = record;
         userMessageId =
           record.clientMsgId ?? `cloud:${turnId}:message:${record.seq}`;
-        const prompt = splitAttachmentPreamble(messageText(record.payload));
-        const userText = userDisplayText(record.payload) ?? prompt.text;
-        const attachments = userAttachments(record.payload, prompt.paths);
+        const message = journalUserMessage(record.payload);
+        const userText = message.text;
+        const attachments = userAttachments(message);
         // A prompt with nothing to show (older desktop turns mirrored their
         // lifecycle wake as an empty, unflagged user record) renders like a
         // hidden one: no bubble, no slot. So does one an agent sent (a note
         // stored before it was flagged), whose reply still shows.
-        const blank =
-          !userText.trim() &&
-          attachments.length === 0 &&
-          !userDisplayContext(record.payload) &&
-          !contentBlocks(record.payload).some((block) => block.type !== "text");
+        const blank = message.blank;
         const unshown = blank || isPiAgentText(userText);
         const reaction = reactions.get(record.seq);
         events.push({

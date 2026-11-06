@@ -22,13 +22,15 @@ import { isMapRouteArtifact } from "@stella/contracts/map-artifact";
 import { isPiAgentText } from "@stella/contracts/pi-chat";
 import type { ToolStep } from "./tool-activity";
 import {
-  messageText,
   type JournalMessageRecord,
   type JournalRecord,
 } from "@stella/contracts/conversation-protocol";
 import type { LiveTurn } from "./cloud-conversation-store";
-import { splitAttachmentPreamble } from "./chat-attachments";
-import { chatAttachmentDisplayName } from "@stella/contracts/chat-attachment-name";
+import { chatAttachmentDisplayName } from "@stella/contracts/chat-attachments";
+import {
+  journalUserMessage,
+  type JournalUserMessage,
+} from "@stella/contracts/journal-user-message";
 import type { SentMessageAnchors } from "@stella/contracts/sent-message-anchors";
 import { replaceEqualDeep } from "./structural-sharing";
 
@@ -43,98 +45,40 @@ const projectedMessageId = (record: JournalMessageRecord): string => {
     record.clientMsgId || `cloud:${record.turnId}:message:${record.seq}`;
 };
 
-const isBlankUserRecord = (
-  record: Extract<JournalRecord, { kind: "message" }>,
-): boolean => {
-  if (record.role !== "user") return false;
-  const content = record.payload.content;
-  if (typeof content === "string") return content.trim().length === 0;
-  if (!Array.isArray(content)) return true;
-  return content.every(
-    (block) =>
-      block &&
-      typeof block === "object" &&
-      (block as { type?: unknown }).type === "text" &&
-      !String((block as { text?: unknown }).text ?? "").trim(),
+const INLINE_IMAGE_MAX_BASE64 = 2 * 1024 * 1024;
+
+const userPresentation = (message: JournalUserMessage) => {
+  const { drivePaths } = message;
+  const thumbnailUris = drivePaths.length
+    ? []
+    : message.inlineImages.flatMap((image) =>
+        image.data.length <= INLINE_IMAGE_MAX_BASE64 &&
+        image.mimeType.toLowerCase().startsWith("image/")
+          ? [`data:${image.mimeType};base64,${image.data}`]
+          : [],
+      );
+  const documentNames = drivePaths.length
+    ? []
+    : message.declaredFiles.flatMap((file) => {
+        const name = file.name?.trim() || file.path?.split(/[\\/]/).at(-1) || "";
+        return name ? [name] : [];
+      });
+  const pastedTexts = (message.displayContext?.pastedTexts ?? []).map(
+    ({ lines, chars }) => ({ lines, chars }),
   );
-};
-
-const userDisplayContext = (payload: Record<string, unknown>) => {
-  const metadata = asRecord(payload.metadata);
-  const context = asRecord(metadata?.context);
-  const pastedTexts = (Array.isArray(context?.pastedTexts) ? context.pastedTexts : [])
-    .flatMap((entry) => {
-      const descriptor = asRecord(entry);
-      return descriptor &&
-        typeof descriptor.lines === "number" &&
-        typeof descriptor.chars === "number"
-        ? [{ lines: descriptor.lines, chars: descriptor.chars }]
-        : [];
-    });
-  const quotedText =
-    typeof context?.quotedText === "string" && context.quotedText.trim()
-      ? context.quotedText
-      : undefined;
-  const displayText =
-    typeof metadata?.displayText === "string" ? metadata.displayText : undefined;
-  return { pastedTexts, quotedText, displayText };
-};
-
-const userAttachmentPresentation = (payload: Record<string, unknown>) => {
-  const raw = asRecord(payload.providerContext)?.attachments;
-  const prompt = splitAttachmentPreamble(messageText(payload));
-  const attachmentPaths = [
-    ...new Set([
-      ...(Array.isArray(raw)
-        ? raw.filter((path): path is string => typeof path === "string" && path.length > 0 && path.length <= 400)
-        : []),
-      ...prompt.paths,
-    ]),
-  ];
-  const thumbnailUris = attachmentPaths.length ? [] : inlineImageUris(payload);
-  const documentNames = attachmentPaths.length ? [] : declaredFileNames(payload);
+  const quotedText = message.displayContext?.quotedText;
   return {
-    text: prompt.text,
-    ...(attachmentPaths.length ? {
-      attachmentPaths,
-      attachmentPreviews: attachmentPaths.map(path => ({ path, name: chatAttachmentDisplayName(path) })),
+    text: message.text,
+    ...(drivePaths.length ? {
+      attachmentPaths: drivePaths,
+      attachmentPreviews: drivePaths.map(path => ({ path, name: chatAttachmentDisplayName(path) })),
     } : {}),
     ...(thumbnailUris.length ? { thumbnailUris, hasImage: true } : {}),
     ...(documentNames.length ? { documentNames } : {}),
+    ...(pastedTexts.length ? { pastedTexts } : {}),
+    ...(quotedText ? { quotedText } : {}),
   };
 };
-
-const INLINE_IMAGE_MAX_BASE64 = 2 * 1024 * 1024;
-
-const inlineImageUris = (payload: Record<string, unknown>): string[] =>
-  Array.isArray(payload.content)
-    ? payload.content.flatMap((value) => {
-        const block = asRecord(value);
-        return block?.type === "image" &&
-          typeof block.data === "string" &&
-          block.data.length > 0 &&
-          block.data.length <= INLINE_IMAGE_MAX_BASE64 &&
-          typeof block.mimeType === "string" &&
-          block.mimeType.toLowerCase().startsWith("image/")
-          ? [`data:${block.mimeType};base64,${block.data}`]
-          : [];
-      })
-    : [];
-
-const declaredFileNames = (payload: Record<string, unknown>): string[] =>
-  Array.isArray(payload.attachments)
-    ? payload.attachments.flatMap((value) => {
-        const entry = asRecord(value);
-        if (entry?.kind !== "file") return [];
-        const name =
-          typeof entry.name === "string" && entry.name.trim()
-            ? entry.name.trim()
-            : typeof entry.path === "string"
-              ? entry.path.split(/[\\/]/).at(-1) ?? ""
-              : "";
-        return name ? [name] : [];
-      })
-    : [];
 
 const toolCalls = (
   record: JournalMessageRecord,
@@ -375,30 +319,16 @@ const projectTurn = (
     if (record.role === "user") {
       turnUserRecord = record;
       userMessageId = projectedMessageId(record);
-      const display = userDisplayContext(record.payload);
-      const hasDisplayContext =
-        display.pastedTexts.length > 0 || Boolean(display.quotedText);
-      if (
-        record.hidden ||
-        (isBlankUserRecord(record) && !hasDisplayContext) ||
-        isPiAgentText(display.displayText ?? messageText(record.payload))
-      ) {
+      const message = journalUserMessage(record.payload);
+      if (record.hidden || message.blank || isPiAgentText(message.text)) {
         continue;
       }
-      const presentation = userAttachmentPresentation(record.payload);
       const reaction = reactions.get(record.seq);
       out.push({
         id: userMessageId,
         canonicalId: `cloud:${turnId}:message:${record.seq}`,
         role: "user",
-        ...presentation,
-        ...(display.displayText !== undefined
-          ? { text: display.displayText }
-          : {}),
-        ...(display.pastedTexts.length > 0
-          ? { pastedTexts: display.pastedTexts }
-          : {}),
-        ...(display.quotedText ? { quotedText: display.quotedText } : {}),
+        ...userPresentation(message),
         ...(reaction ? { reaction: reaction.emoji, reactionAt: reaction.at } : {}),
         createdAt,
         canonicalCreatedAt: record.createdAtMs,

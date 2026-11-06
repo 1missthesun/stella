@@ -1,3 +1,4 @@
+import { withAttachmentPreamble } from "@stella/contracts/chat-attachments";
 import { putSignedUpload } from "@stella/contracts/request-deadline";
 import { promises as fs } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -268,7 +269,7 @@ export const cloudJournalFor = (
       const attachments = uploaded.slice(0, TURN_ATTACHMENTS_MAX).map((upload) => upload.path);
       const listed = message.prompt ? uploaded.slice(TURN_ATTACHMENTS_MAX) : uploaded;
       const prompt = listed.length
-        ? `${message.prompt}\n\nAttached in my drive:\n${listed.map((upload) => `- ${upload.path}`).join("\n")}`
+        ? withAttachmentPreamble(message.prompt, listed.map((upload) => upload.path))
         : message.prompt;
       const context = relayContext(message.context);
       const body: CloudTurnStartRequest = {

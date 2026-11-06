@@ -32,7 +32,6 @@ import {
   cloudAttachmentsStore,
   isWebShell,
   type CloudAttachment,
-  withAttachmentPreamble,
 } from "./cloud-composer-store";
 import {
   activeCloudUserMessageIds,
@@ -59,6 +58,7 @@ import {
   type CloudConversationView,
 } from "./use-conversation";
 import "./cloud-chat-status.css";
+import { withAttachmentPreamble } from "@stella/contracts/chat-attachments";
 import {
   browserAttachmentUploads,
   hasUnsentBrowserAttachments,
@@ -344,7 +344,10 @@ export function useCloudChatBridge({
   const isPrivate = useChatStorageMode() === "local";
   const decoratePrompt = useCallback(
     (prompt: string, attachments: readonly CloudAttachment[]) =>
-      withAttachmentPreamble(prompt, attachments),
+      withAttachmentPreamble(
+        prompt,
+        attachments.map((attachment) => attachment.path),
+      ),
     [],
   );
   const onSent = useCallback(

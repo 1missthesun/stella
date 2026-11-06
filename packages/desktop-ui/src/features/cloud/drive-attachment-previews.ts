@@ -4,7 +4,7 @@ import {
   attachmentContentType,
   isGenericContentType,
 } from "@stella/contracts/attachment-content-type";
-import { chatAttachmentDisplayName } from "@stella/contracts/chat-attachment-name";
+import { chatAttachmentDisplayName } from "@stella/contracts/chat-attachments";
 import {
   backendClient,
   readBackendAccountEpoch,

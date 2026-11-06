@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AppState } from "react-native";
 import type { DriveFileUrl as DrivePreview } from "@stella/contracts/backend/drive";
 import { attachmentContentType } from "@stella/contracts/attachment-content-type";
-import { chatAttachmentDisplayName } from "@stella/contracts/chat-attachment-name";
+import { chatAttachmentDisplayName } from "@stella/contracts/chat-attachments";
 import type { ChatMessage } from "../types";
 import { getBackendClient } from "./backend";
 

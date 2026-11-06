@@ -1,4 +1,8 @@
 import { useSyncExternalStore } from "react";
+import {
+  CHAT_ATTACHMENT_FOLDERS,
+  chatAttachmentDrivePath,
+} from "@stella/contracts/chat-attachments";
 import { attachmentContentType } from "@stella/contracts/attachment-content-type";
 import {
   CHAT_IMAGE_MAX_BYTES,
@@ -134,27 +138,17 @@ export const waitForAttachmentUploads = async (
 const rejectReason = (file: File): string | null =>
   file.size <= 0 ? "This file is empty." : null;
 
-const safeName = (name: string): string => {
-  const boundedCharacters = Array.from(name.normalize("NFKC"), (character) => {
-    const code = character.charCodeAt(0);
-    return character === "/" || character === "\\" || code < 32 || code === 127
-      ? "-"
-      : character;
-  }).join("");
-  const cleaned = boundedCharacters
-    .replace(/-+/g, "-")
-    .replace(/\.{2,}/g, ".")
-    .replace(/^[.-]+/g, "")
-    .trim();
-  return (cleaned || "attachment").slice(0, 180);
-};
-
 export const browserAttachmentDrivePath = (
   file: Pick<File, "name">,
   id: string,
   now = new Date(),
 ): string =>
-  `Chat Attachments/${now.toISOString().slice(0, 10)}/${id.slice(-8)}-${safeName(file.name)}`;
+  chatAttachmentDrivePath({
+    folder: CHAT_ATTACHMENT_FOLDERS.web,
+    name: file.name,
+    now,
+    prefix: id.slice(-8),
+  });
 
 const UPLOAD_LABEL = "Uploading to Stella's Drive";
 

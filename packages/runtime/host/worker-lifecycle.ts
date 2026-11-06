@@ -134,6 +134,7 @@ export class RuntimeWorkerLifecycleController {
   private startupPromise: Promise<void> | null = null;
   private stopPromise: Promise<boolean> | null = null;
   private readonly intentionalStops = new WeakSet<WorkerConnection>();
+  private retired = false;
   private state: WorkerLifecycleState = "idle";
   private inFlightWorkerRequests = 0;
   private inFlightDrainLatch: Deferred.Deferred<void> | null = null;
@@ -257,6 +258,9 @@ export class RuntimeWorkerLifecycleController {
         "Stella runtime host is not started.",
       );
     }
+    if (this.retired) {
+      throw createRuntimeUnavailableError("Stella runtime is restarting.");
+    }
     if (this.state === "running" && this.getLivePeer()) return;
     if (this.state === "stopping" && this.stopPromise) {
       await this.stopPromise;
@@ -284,11 +288,12 @@ export class RuntimeWorkerLifecycleController {
   /**
    * Stops the current worker. `stillIdle` is asked after new requests are held
    * (state `stopping`) and in-flight ones have drained, right before the kill;
-   * returning false keeps the worker running and resolves `false`.
+   * returning false keeps the worker running and resolves `false`. `retire`
+   * refuses every later start (the process itself is about to restart).
    */
   async stop(
     reason: "idle" | "restart" | "stopped",
-    options: { stillIdle?: () => Promise<boolean> } = {},
+    options: { stillIdle?: () => Promise<boolean>; retire?: boolean } = {},
   ): Promise<boolean> {
     while (this.stopPromise) {
       await this.stopPromise;
@@ -312,7 +317,7 @@ export class RuntimeWorkerLifecycleController {
     connection: WorkerConnection,
     reason: "idle" | "restart" | "stopped",
     resumeState: WorkerLifecycleState,
-    options: { stillIdle?: () => Promise<boolean> },
+    options: { stillIdle?: () => Promise<boolean>; retire?: boolean },
   ): Promise<boolean> {
     if (reason !== "idle") {
       await this.waitForInFlightWorkerRequestsToDrain();
@@ -327,6 +332,7 @@ export class RuntimeWorkerLifecycleController {
       return false;
     }
     this.intentionalStops.add(connection);
+    if (options.retire) this.retired = true;
     const shouldKill = this.options.killWorkerOnStop?.(reason) ?? true;
     const killWorker = this.options.killWorker;
     const stopCore: Effect.Effect<void, unknown> = shouldKill

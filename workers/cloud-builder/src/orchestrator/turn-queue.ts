@@ -317,6 +317,7 @@ export abstract class OrchestratorTurnQueue extends OrchestratorTurnLifecycle {
       };
       await this.ctx.storage.put({ terminal: true, terminalOwed: owed });
       await execution?.interrupt(new Error("The chat turn was stopped."));
+      await this.releaseClaudeUsageLimitHold(exactTurn);
       await this.journalStoppedPrompt(exactTurn);
       this.recordTerminal(exactTurn, "canceled", TERMINAL_NOTICE.canceled);
       try {

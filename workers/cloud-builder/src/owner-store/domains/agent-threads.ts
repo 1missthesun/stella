@@ -3522,6 +3522,20 @@ const holdConversationForUsageLimit = (ctx: OwnerContext, raw: unknown): { resum
   return { resumeAt };
 };
 
+const releaseConversationHold = (ctx: OwnerContext, raw: unknown): { released: boolean } => {
+  const args = object({ conversationId: string(), ownerGeneration: string() })(raw);
+  const held = ctx.db.one<{ conversation_id: string }>(
+    "SELECT conversation_id FROM usage_limit_pauses WHERE conversation_id = ? AND hold_key = '' AND device_id IS NULL",
+    args.conversationId,
+  );
+  ctx.db.run(
+    "DELETE FROM usage_limit_pauses WHERE conversation_id = ? AND hold_key = '' AND device_id IS NULL",
+    args.conversationId,
+  );
+  ctx.jobs.cancel(`usage-limit:conversation:${args.conversationId}`);
+  return { released: held !== null };
+};
+
 const resumeConversationAfterUsageLimit = async (ctx: OwnerContext, raw: unknown): Promise<void> => {
   const payload = raw as { conversationId?: unknown; ownerGeneration?: unknown; resumeAt?: unknown } | null;
   if (typeof payload?.conversationId !== "string" || typeof payload.ownerGeneration !== "string") return;
@@ -4472,6 +4486,7 @@ export const agentThreadsDomain = {
   },
   internal: {
     "agentThreads.holdForUsageLimit": holdConversationForUsageLimit,
+    "agentThreads.releaseUsageLimitHold": releaseConversationHold,
     "agentThreads.spawnOnDevice": spawnOnDeviceForCloud,
     "agentThreads.deviceThread": deviceThreadForCloud,
     "agentThreads.continueOnDevice": continueDeviceForCloud,

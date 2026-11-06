@@ -43,7 +43,7 @@ export const sniffImageMimeType = (bytes: Uint8Array): string | null => {
     const brand = ascii(bytes, 8, 4).toLowerCase();
     if (ISO_BMFF_AVIF_BRANDS.has(brand)) return "image/avif";
     if (ISO_BMFF_HEIC_BRANDS.has(brand)) return "image/heic";
-    return "image/heif";
+    return null;
   }
   if (
     bytes.length >= 4 &&

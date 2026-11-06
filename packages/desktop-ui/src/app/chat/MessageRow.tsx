@@ -37,6 +37,11 @@ import { FilePills } from "@/app/chat/FilePills";
 import type { ConversationFileEntry } from "@/features/workspace-display/derive-conversation-files";
 import { MessageAttachments } from "@/app/chat/evidence/MessageAttachments";
 import {
+  isBrowserUploadId,
+  SendFailedMark,
+  UploadFailedMark,
+} from "@/app/chat/SendFailureMarks";
+import {
   dropAttachmentOnlyLines,
   extractFileLinkTargets,
 } from "@stella/contracts/local-file-links";
@@ -424,28 +429,37 @@ export const UserMessageRow = memo(
     attachments.forEach((attachment, index) => {
       const safeUrl = sanitizeAttachmentImageUrl(attachment.url);
       const key = attachment.id ?? `attachment-${index}`;
+      const withUploadMark = (node: ReactNode) =>
+        isBrowserUploadId(attachment.id) ? (
+          <span className="upload-failed-host">
+            {node}
+            <UploadFailedMark uploadId={attachment.id} />
+          </span>
+        ) : (
+          node
+        );
       if (safeUrl && isImageAttachment(attachment, safeUrl)) {
         imageTiles.push({
           key,
-          node: (
+          node: withUploadMark(
             <AttachmentImage
               attachment={attachment}
               index={index}
               safeUrl={safeUrl}
-            />
+            />,
           ),
         });
         return;
       }
       fileTiles.push({
         key,
-        node: (
+        node: withUploadMark(
           <FileAttachmentChip
             name={getFileAttachmentName(attachment, t)}
             size={attachment.size}
             mimeType={attachment.mimeType}
             path={attachment.path}
-          />
+          />,
         ),
       });
     });
@@ -569,6 +583,9 @@ export const UserMessageRow = memo(
             ) : null}
           </div>
         )}
+        {row.sendFailed ? (
+          <SendFailedMark clientMsgId={row.id} reason={row.sendFailed} />
+        ) : null}
       </div>
     );
   },

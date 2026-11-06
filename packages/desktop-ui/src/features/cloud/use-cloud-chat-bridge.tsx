@@ -20,7 +20,7 @@ import {
   type ReactNode,
 } from "react";
 import type { EventRecord, MessageRecord } from "@stella/contracts/local-chat";
-import type { TaskItem } from "@/features/chat/lib/event-transforms";
+import type { Attachment, TaskItem } from "@/features/chat/lib/event-transforms";
 import type { SendMessageArgs } from "@/features/chat/streaming/chat-types";
 import { toPastedTextDescriptor } from "@/features/chat/lib/paste-context";
 import {
@@ -53,13 +53,17 @@ import {
   useCloudConversationActivity,
 } from "./use-cloud-activity";
 import type { JournalRecord } from "@stella/contracts/conversation-protocol";
-import type { PendingPrompt } from "./conversation-outbox";
+import { pendingPrompts, type PendingPrompt } from "./conversation-outbox";
 import {
   useConversation,
   type CloudConversationView,
 } from "./use-conversation";
 import "./cloud-chat-status.css";
-import { browserAttachmentUploads } from "./browser-chat-attachments";
+import {
+  browserAttachmentUploads,
+  useBrowserAttachmentUploads,
+} from "./browser-chat-attachments";
+import { provideCloudSendRecovery } from "./cloud-send-recovery";
 import { isPendingCloudConversation } from "./cloud-conversation-selection";
 import { useCloudConversationSession } from "@/global/auth/hooks/use-cloud-conversation-session";
 
@@ -68,15 +72,45 @@ const EMPTY_MESSAGES: MessageRecord[] = [];
 const EMPTY_TASKS: TaskItem[] = [];
 export const LOCAL_CLOUD_TASK_OVERLAY_TTL_MS = 10 * 60_000;
 
+const pendingAttachments = (entry: PendingPrompt): Attachment[] => [
+  ...entry.submission.attachments.map((attachment) => ({
+    id: attachment.path,
+    path: attachment.path,
+    name: attachment.name,
+    size: attachment.sizeBytes,
+    ...(attachment.contentType ? { mimeType: attachment.contentType } : {}),
+  })),
+  ...(entry.submission.uploadIds ?? []).flatMap((id): Attachment[] => {
+    const upload = browserAttachmentUploads.find(id);
+    if (!upload) return [];
+    return [
+      {
+        id,
+        name: upload.name,
+        size: upload.sizeBytes,
+        mimeType: upload.poster ? "image/jpeg" : upload.file.type,
+        ...(upload.previewUrl ? { url: upload.previewUrl } : {}),
+      },
+    ];
+  }),
+];
+
 export const cloudPendingPromptsToEvents = (
   pending: readonly PendingPrompt[],
 ): EventRecord[] =>
-  pending.map((entry) => ({
-    _id: entry.clientMsgId,
-    timestamp: entry.createdAtMs,
-    type: "user_message",
-    payload: { text: entry.text },
-  }));
+  pending.map((entry) => {
+    const attachments = pendingAttachments(entry);
+    return {
+      _id: entry.clientMsgId,
+      timestamp: entry.createdAtMs,
+      type: "user_message",
+      payload: {
+        text: entry.text,
+        ...(attachments.length ? { attachments } : {}),
+        ...(entry.error ? { sendFailed: entry.error } : {}),
+      },
+    };
+  });
 
 export const latestInFlightCloudUserMessageId = (
   pending: readonly PendingPrompt[],
@@ -198,14 +232,12 @@ function CloudConversationStatusTail({
 }: {
   conversation: CloudConversationView;
 }) {
-  const { state, pending, retryConnection, retrySend, dismissSend } =
-    conversation;
-  const failed = pending.filter((entry) => Boolean(entry.error));
+  const { state, retryConnection } = conversation;
   const sustainedOffline = useSustainedCloudOffline(state.status);
   const showConnection =
     state.status === "blocked" ||
     (state.status === "offline" && sustainedOffline);
-  if (!showConnection && failed.length === 0 && !state.olderNotice) {
+  if (!showConnection && !state.olderNotice) {
     return null;
   }
   return (
@@ -231,29 +263,6 @@ function CloudConversationStatusTail({
           {state.olderNotice}
         </div>
       ) : null}
-      {failed.map((entry) => (
-        <div
-          className="cloud-chat-status-tail__notice cloud-chat-status-tail__notice--error"
-          key={entry.clientMsgId}
-          role="alert"
-        >
-          <span>{entry.error}</span>
-          <span className="cloud-chat-status-tail__actions">
-            <button
-              type="button"
-              onClick={() => void retrySend(entry.clientMsgId)}
-            >
-              Retry
-            </button>
-            <button
-              type="button"
-              onClick={() => dismissSend(entry.clientMsgId)}
-            >
-              Discard
-            </button>
-          </span>
-        </div>
-      ))}
     </div>
   );
 }
@@ -337,9 +346,6 @@ export function useCloudChatBridge({
   const onSent = useCallback(
     (submittedAttachments: readonly CloudAttachment[]) => {
       cloudAttachmentsStore.clearIfCurrent(submittedAttachments);
-      browserAttachmentUploads.clearReady(
-        new Set(submittedAttachments.map((attachment) => attachment.path)),
-      );
     },
     [],
   );
@@ -476,13 +482,35 @@ export function useCloudChatBridge({
       overlayNowMs,
     ],
   );
+  const uploads = useBrowserAttachmentUploads();
   const optimisticEvents = useMemo(
     () =>
       enabled && webShell
         ? cloudPendingPromptsToEvents(conversation.pending)
         : EMPTY_EVENTS,
-    [conversation.pending, enabled, webShell],
+    // Upload previews (a video's poster frame) can arrive after the send.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [conversation.pending, enabled, uploads, webShell],
   );
+  useEffect(() => {
+    const live = new Set(
+      pendingPrompts.getSnapshot().map((entry) => entry.clientMsgId),
+    );
+    const finished = uploads.filter(
+      (upload) => upload.sentWith !== null && !live.has(upload.sentWith),
+    );
+    if (finished.length) {
+      browserAttachmentUploads.release(finished.map((upload) => upload.id));
+    }
+  }, [conversation.pending, uploads]);
+  const { retrySend, dismissSend } = conversation;
+  useEffect(() => {
+    if (!enabled || !webShell) return;
+    return provideCloudSendRecovery({
+      retry: (clientMsgId) => void retrySend(clientMsgId),
+      dismiss: dismissSend,
+    });
+  }, [dismissSend, enabled, retrySend, webShell]);
   const pendingInFlight = conversation.pending.filter((entry) => !entry.error);
   const isStreaming = Boolean(
     enabled && (conversation.state.live || (webShell && pendingInFlight.length)),
@@ -491,13 +519,6 @@ export function useCloudChatBridge({
   const sendMessage = useCallback(
     async (args: SendMessageArgs): Promise<boolean> => {
       if (!enabled || !webShell || !conversationId) return false;
-      if (
-        conversation.pending.some(
-          (entry) => entry.turnId === null && !entry.error,
-        )
-      ) {
-        return false;
-      }
       const { prompt, context } = cloudSendFromSendArgs(args);
       if (!prompt) return false;
       if (context?.text && context.text.length > TURN_CONTEXT_TEXT_MAX_CHARS) {

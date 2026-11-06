@@ -1,0 +1,67 @@
+.upload-failed-host {
+  position: relative;
+  display: inline-flex;
+}
+
+.upload-failed-mark {
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 1.5px solid #fff;
+  border-radius: 999px;
+  background: var(--destructive);
+  color: #fff;
+  font: 600 10px/1 var(--font-sans, system-ui);
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.25);
+}
+
+.send-failed-mark {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.send-failed-mark__dot {
+  display: grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: var(--destructive);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.send-failed-mark button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.send-failed-mark button:hover {
+  color: var(--foreground);
+}
+
+.browser-attachment-chip .upload-failed-mark {
+  position: absolute;
+  left: 12px;
+  bottom: 10px;
+  font-size: 10px;
+}

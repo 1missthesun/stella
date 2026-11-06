@@ -58,6 +58,14 @@ import {
   type AgentResponseTarget,
 } from "@/features/chat/streaming/streaming-types";
 
+const sendFailureOf = (payload: unknown): string | undefined => {
+  const value =
+    payload && typeof payload === "object"
+      ? Reflect.get(payload, "sendFailed")
+      : undefined;
+  return typeof value === "string" && value ? value : undefined;
+};
+
 const getMessagePayload = (
   event?: EventRecord | MessageRecord,
 ): MessagePayload | null => {
@@ -689,6 +697,9 @@ export function useEventRows(opts: UseEventRowsOptions): UseEventRowsResult {
             ? { reaction: messageReaction.emoji, reactionAt: messageReaction.at }
             : {}),
           attachments: getAttachments(message),
+          ...(sendFailureOf(message.payload)
+            ? { sendFailed: sendFailureOf(message.payload)! }
+            : {}),
           ...(getChannelEnvelope(message)
             ? { channelEnvelope: getChannelEnvelope(message) }
             : {}),

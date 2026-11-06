@@ -9,6 +9,26 @@ export type DesktopChatOutboxAttachment = {
   name: string;
   kind: "image" | "file";
   previewUri?: string;
+  /** Present while the file may still be uploading from this phone. */
+  upload?: { id: string; uri: string; mimeType: string; sizeBytes: number };
+};
+
+const parseUpload = (
+  value: unknown,
+): DesktopChatOutboxAttachment["upload"] | undefined => {
+  if (!value || typeof value !== "object") return undefined;
+  const record = value as Record<string, unknown>;
+  const id = typeof record.id === "string" ? record.id : "";
+  const uri = typeof record.uri === "string" ? record.uri : "";
+  const mimeType = typeof record.mimeType === "string" ? record.mimeType : "";
+  const sizeBytes = finiteNumber(record.sizeBytes) ?? 0;
+  if (!id || !uri || id.length > 2_000 || uri.length > 4_000) return undefined;
+  return {
+    id,
+    uri,
+    mimeType: mimeType || "application/octet-stream",
+    sizeBytes,
+  };
 };
 
 export type DesktopChatOutboxAuthority = {
@@ -116,11 +136,13 @@ const parseAttachment = (
   const kind = record.kind === "image" ? "image" : "file";
   const previewUri =
     typeof record.previewUri === "string" ? record.previewUri.trim() : "";
+  const upload = parseUpload(record.upload);
   return {
     path,
     name,
     kind,
     ...(previewUri ? { previewUri } : {}),
+    ...(upload ? { upload } : {}),
   };
 };
 
@@ -315,6 +337,7 @@ export const restoreOutboxMessages = (
         attachmentPreviews: record.attachments.map(entry => ({
           path: entry.path, name: entry.name,
           ...(entry.previewUri ? { imageUri: entry.previewUri } : {}),
+          ...(entry.upload ? { uploadId: entry.upload.id } : {}),
         })),
       } : {}),
       ...(preview.hasImage ? { hasImage: true } : {}),

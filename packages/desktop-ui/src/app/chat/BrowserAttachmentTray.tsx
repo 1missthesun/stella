@@ -4,6 +4,7 @@ import {
   useBrowserAttachmentUploads,
 } from "@/features/cloud/browser-chat-attachments";
 import { platformCapabilities } from "@/platform/capabilities";
+import { UploadFailedMark } from "./SendFailureMarks";
 
 const formatSize = (bytes: number) =>
   bytes >= 1024 * 1024
@@ -11,14 +12,15 @@ const formatSize = (bytes: number) =>
     : `${Math.max(1, Math.round(bytes / 1024))} KB`;
 
 export const BrowserAttachmentTray = memo(function BrowserAttachmentTray() {
-  const uploads = useBrowserAttachmentUploads();
+  const uploads = useBrowserAttachmentUploads().filter(
+    (upload) => upload.sentWith === null,
+  );
   if (!platformCapabilities.browserUploads || uploads.length === 0) return null;
   return (
     <div className="browser-attachment-tray" aria-label="Attachments">
       {uploads.map((upload) => (
         <div
           className="browser-attachment-chip"
-          data-status={upload.status}
           data-image={upload.previewUrl ? "true" : undefined}
           key={upload.id}
         >
@@ -31,20 +33,9 @@ export const BrowserAttachmentTray = memo(function BrowserAttachmentTray() {
           ) : null}
           <div className="browser-attachment-chip__copy">
             <strong title={upload.name}>{upload.name}</strong>
-            <small>
-              {upload.status === "error"
-                ? upload.error
-                : formatSize(upload.sizeBytes)}
-            </small>
+            <small>{formatSize(upload.sizeBytes)}</small>
           </div>
-          {upload.status === "error" ? (
-            <button
-              type="button"
-              onClick={() => browserAttachmentUploads.retry(upload.id)}
-            >
-              Retry
-            </button>
-          ) : null}
+          <UploadFailedMark uploadId={upload.id} />
           <button
             type="button"
             aria-label={`Remove ${upload.name}`}

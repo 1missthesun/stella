@@ -31,6 +31,8 @@ export type UserRowViewModel = {
   reaction?: string;
   reactionAt?: number;
   attachments: Attachment[];
+  /** Why a message from this device didn't send; the row offers retry. */
+  sendFailed?: string;
   channelEnvelope?: ChannelEnvelope;
   hidden?: boolean;
   spawnedThreadIds?: string[];

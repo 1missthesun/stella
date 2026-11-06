@@ -236,11 +236,18 @@ export type ChatMessage = {
   hasImage?: boolean;
   thumbnailUris?: string[];
   attachmentPaths?: string[];
-  attachmentPreviews?: { path: string; name: string; imageUri?: string }[];
+  attachmentPreviews?: {
+    path: string;
+    name: string;
+    imageUri?: string;
+    uploadId?: string;
+  }[];
   documentNames?: string[];
   quotedText?: string;
   pastedTexts?: { lines: number; chars: number; text?: string }[];
   queued?: boolean;
+  /** A local send that did not go through; the row offers retry or remove. */
+  sendFailed?: true;
   sentWhileBusy?: boolean;
   stopped?: boolean;
   /**

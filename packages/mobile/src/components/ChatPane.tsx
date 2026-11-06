@@ -50,6 +50,7 @@ import * as DocumentPicker from "expo-document-picker";
 import {
   CHAT_ATTACHMENT_MAX_COUNT,
   driveFileNameFor,
+  withMimeExtension,
   type ComposerAttachment,
   type PickedAttachment,
 } from "../lib/chat-attachments";
@@ -1193,14 +1194,31 @@ export function ChatPane({
   );
 
   const imagePickAsAttachment = useCallback(
-    (asset: ImagePicker.ImagePickerAsset): PickedAttachment => ({
-      id: asset.assetId ?? asset.uri,
-      uri: asset.uri,
-      name: driveFileNameFor(asset.fileName ?? asset.uri, "image"),
-      mimeType: asset.mimeType ?? "image/jpeg",
-      sizeBytes: asset.fileSize ?? 0,
-      kind: "image",
-    }),
+    (asset: ImagePicker.ImagePickerAsset): PickedAttachment =>
+      asset.type === "video"
+        ? {
+            id: asset.assetId ?? asset.uri,
+            uri: asset.uri,
+            name: withMimeExtension(
+              driveFileNameFor(asset.fileName ?? asset.uri, "file"),
+              asset.mimeType ?? "video/quicktime",
+            ),
+            mimeType: asset.mimeType ?? "video/quicktime",
+            sizeBytes: asset.fileSize ?? 0,
+            kind: "file",
+            video: true,
+          }
+        : {
+            id: asset.assetId ?? asset.uri,
+            uri: asset.uri,
+            name: withMimeExtension(
+              driveFileNameFor(asset.fileName ?? asset.uri, "image"),
+              asset.mimeType ?? "image/jpeg",
+            ),
+            mimeType: asset.mimeType ?? "image/jpeg",
+            sizeBytes: asset.fileSize ?? 0,
+            kind: "image",
+          },
     [],
   );
 
@@ -1215,7 +1233,7 @@ export function ChatPane({
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
+      mediaTypes: ["images", "videos"],
       allowsMultipleSelection: true,
       quality: 0.75,
       selectionLimit: attachmentLimit,
@@ -1283,6 +1301,7 @@ export function ChatPane({
           mimeType,
           sizeBytes: asset.size ?? 0,
           kind,
+          ...(mimeType.startsWith("video/") ? { video: true as const } : {}),
         };
       }),
     );

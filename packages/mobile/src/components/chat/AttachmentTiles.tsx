@@ -294,3 +294,71 @@ export function AttachmentTileRow({
     </View>
   );
 }
+
+const markStyles = StyleSheet.create({
+  failed: {
+    alignItems: "center",
+    borderColor: "#ffffff",
+    borderRadius: 9,
+    borderWidth: 1.5,
+    bottom: 4,
+    height: 18,
+    justifyContent: "center",
+    left: 4,
+    position: "absolute",
+    width: 18,
+  },
+  failedGlyph: {
+    color: "#ffffff",
+    fontFamily: fonts.sans.semiBold,
+    fontSize: 11,
+    lineHeight: 13,
+  },
+  play: {
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.45)",
+    borderRadius: 11,
+    height: 22,
+    justifyContent: "center",
+    left: "50%",
+    marginLeft: -11,
+    marginTop: -11,
+    position: "absolute",
+    top: "50%",
+    width: 22,
+  },
+});
+
+/** The only upload state a tile ever shows: a small red mark that retries on tap. */
+export function AttachmentFailedMark({
+  colors,
+  label,
+  onPress,
+}: {
+  colors: Colors;
+  label: string;
+  onPress?: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={!onPress}
+      hitSlop={8}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={[markStyles.failed, { backgroundColor: colors.danger }]}
+    >
+      <Text style={markStyles.failedGlyph} maxFontSizeMultiplier={1}>
+        !
+      </Text>
+    </Pressable>
+  );
+}
+
+export function VideoPlayBadge() {
+  return (
+    <View style={markStyles.play} pointerEvents="none">
+      <Icon name="play" size={11} color="#ffffff" weight="bold" />
+    </View>
+  );
+}

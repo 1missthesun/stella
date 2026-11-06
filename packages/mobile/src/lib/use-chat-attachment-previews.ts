@@ -121,7 +121,9 @@ export function useChatAttachmentPreviews(
           path,
           name: preview.name,
           ...(preview.contentType.toLowerCase().startsWith("image/")
-            ? { imageUri: preview.url } : {}),
+            ? { imageUri: preview.url }
+            : existing?.imageUri ? { imageUri: existing.imageUri } : {}),
+          ...(existing?.uploadId ? { uploadId: existing.uploadId } : {}),
         };
       });
       if (!resolved.length) return { ...message, attachmentPreviews };

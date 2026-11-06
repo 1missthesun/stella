@@ -10,7 +10,6 @@ import {
   useState,
 } from "react";
 import {
-  ActivityIndicator,
   Animated,
   LayoutAnimation,
   type LayoutChangeEvent,
@@ -23,7 +22,10 @@ import {
 } from "react-native";
 import { Text } from "../Text";
 import { useT } from "../../i18n";
-import { type ComposerAttachment } from "../../lib/chat-attachments";
+import {
+  attachmentPreviewUri,
+  type ComposerAttachment,
+} from "../../lib/chat-attachments";
 import { useChatDraft, type ChatDraftStore } from "../../lib/chat-draft-store";
 import { resolveComposerExpanded } from "../../lib/composer-model-layout";
 import type { DictationStatus } from "../../lib/dictation";
@@ -38,7 +40,13 @@ import { GlassSurface } from "../glass";
 import { Icon } from "../Icon";
 import { useServerFeatures } from "../../lib/server-features";
 import { AskSlotContext, type AskSlot } from "./ask-slot";
-import { AttachmentTileRow, FileTile, ImageTile } from "./AttachmentTiles";
+import {
+  AttachmentFailedMark,
+  AttachmentTileRow,
+  FileTile,
+  ImageTile,
+  VideoPlayBadge,
+} from "./AttachmentTiles";
 import { fileDisplayName } from "@stella/contracts/file-display-name";
 
 export const CHAT_HORIZONTAL_INSET = 12;
@@ -473,35 +481,23 @@ export const Composer = memo(function Composer({
                 key: attachment.id,
                 node: (
                 <View key={attachment.id} style={styles.attachmentThumb}>
-                  {attachment.kind === "image" ? (
-                    <ImageTile uri={attachment.uri} name={attachment.name} colors={colors} />
+                  {attachmentPreviewUri(attachment) ? (
+                    <ImageTile
+                      uri={attachmentPreviewUri(attachment)!}
+                      name={attachment.name}
+                      colors={colors}
+                    />
                   ) : (
                     <FileTile name={fileDisplayName(attachment.name)} colors={colors} />
                   )}
-                  {attachment.status !== "ready" && (
-                    <Pressable
-                      style={styles.attachmentStatusScrim}
-                      disabled={attachment.status === "uploading"}
-                      accessibilityRole="button"
-                      accessibilityLabel={
-                        attachment.status === "uploading"
-                          ? t("chat.attachments.uploading")
-                          : t("chat.attachments.retryUpload")
-                      }
+                  {attachment.video ? <VideoPlayBadge /> : null}
+                  {attachment.failed ? (
+                    <AttachmentFailedMark
+                      colors={colors}
+                      label={t("chat.attachments.retryUpload")}
                       onPress={() => onRetryAttachment?.(attachment.id)}
-                    >
-                      {attachment.status === "uploading" ? (
-                        <ActivityIndicator size="small" color="#ffffff" />
-                      ) : (
-                        <Icon
-                          name="refresh-cw"
-                          size={16}
-                          color="#ffffff"
-                          weight="bold"
-                        />
-                      )}
-                    </Pressable>
-                  )}
+                    />
+                  ) : null}
                   <Pressable
                     style={styles.attachmentRemove}
                     accessibilityLabel={t("chat.attachments.remove")}
@@ -720,17 +716,6 @@ const makeComposerStyles = (colors: Colors) =>
       height: 64,
       overflow: "hidden",
       position: "relative",
-    },
-    attachmentStatusScrim: {
-      alignItems: "center",
-      backgroundColor: "rgba(0,0,0,0.45)",
-      borderRadius: 12,
-      bottom: 0,
-      justifyContent: "center",
-      left: 0,
-      position: "absolute",
-      right: 0,
-      top: 0,
     },
     attachmentRemove: {
       alignItems: "center",

@@ -57,10 +57,12 @@ import {
 } from "./conversation-outbox";
 import type { SocketStatus } from "./conversation-socket";
 import { reportCloudReadiness } from "./cloud-readiness-timing";
-import { showToast } from "@/ui/toast";
 import { presentCloudUsageLimit } from "./usage-limit-notice";
 import { getExecutionTargetSnapshot } from "../execution-placement/execution-target-store";
-import { waitForCloudAttachmentUploads } from "./browser-chat-attachments";
+import {
+  browserAttachmentUploads,
+  waitForAttachmentUploads,
+} from "./browser-chat-attachments";
 
 export type CloudRealtimeConfig = {
   socketBaseUrl: string | null;
@@ -266,6 +268,38 @@ const reportRenderedAcceptanceAuthority = (
     });
 };
 
+const imagePathsOf = (attachments: readonly CloudAttachment[]): string[] =>
+  attachments
+    .filter(
+      (entry) =>
+        entry.contentType?.toLowerCase().startsWith("image/") ||
+        /\.(png|jpe?g|gif|webp)$/i.test(entry.path),
+    )
+    .slice(0, 4)
+    .map((entry) => entry.path);
+
+const admissionTails = new Map<string, Promise<void>>();
+
+/**
+ * Turns are admitted in the order they were sent, so a message waiting on its
+ * uploads holds back the ones sent after it instead of being overtaken.
+ */
+const admissionOrder = (authorityKey: string) => {
+  const previous = admissionTails.get(authorityKey) ?? Promise.resolve();
+  let release!: () => void;
+  const admitted = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const tail = previous.then(() => admitted);
+  admissionTails.set(authorityKey, tail);
+  void tail.then(() => {
+    if (admissionTails.get(authorityKey) === tail) {
+      admissionTails.delete(authorityKey);
+    }
+  });
+  return { previous, release };
+};
+
 export const useConversation = (
   conversationId: string | null,
   decoratePrompt: (
@@ -295,7 +329,6 @@ export const useConversation = (
   activeAuthorityKeyRef.current = activeAuthorityKey;
   const activatedAuthorityKeyRef = useRef<string | null>(null);
   const dispatchByTurnRef = useRef(new Map<string, string>());
-  const preparingAttachmentSendRef = useRef(false);
   const cloudEngine = useCloudEngines(isCloudConversationReady);
   const cloudSelection = cloudEngine?.selection ?? cloudEngine?.execution;
   const localExecution = useSyncExternalStore(
@@ -381,12 +414,33 @@ export const useConversation = (
       };
       const sendAuthorityKey = `${entry.accountScope}\u0000${entry.ownerGeneration}`;
       const clientMsgId = entry.clientMsgId;
-      const submission = entry.submission;
       if (!pendingPrompts.claimDispatch(sendAuthority, clientMsgId)) return;
       const isCurrentAuthority = () =>
         activeAuthorityKeyRef.current === sendAuthorityKey;
+      const turnOrder = admissionOrder(sendAuthorityKey);
+      let submission = entry.submission;
       try {
         if (!isCurrentAuthority()) return;
+        if (submission.uploadIds?.length) {
+          for (const id of submission.uploadIds) browserAttachmentUploads.retry(id);
+          const uploaded = await waitForAttachmentUploads(submission.uploadIds);
+          const attachments = [...submission.attachments, ...uploaded];
+          submission = {
+            ...submission,
+            prompt: decoratePrompt(submission.prompt, attachments),
+            imagePaths: imagePathsOf(attachments),
+            attachments,
+          };
+        }
+        await turnOrder.previous;
+        if (!isCurrentAuthority()) return;
+        if (
+          !entry.dispatchId &&
+          pendingPrompts.find(sendAuthority, clientMsgId)?.cancelRequested
+        ) {
+          pendingPrompts.drop(sendAuthority, clientMsgId);
+          return;
+        }
         if (!webShell) {
           const targetConversationId = submission.requestedConversationId;
           if (!targetConversationId) {
@@ -423,6 +477,7 @@ export const useConversation = (
             result.conversationId,
             result.turnId,
           );
+          turnOrder.release();
           onSent(submission.attachments);
           return;
         }
@@ -495,6 +550,7 @@ export const useConversation = (
           clientMsgId,
           result.dispatchId,
         );
+        turnOrder.release();
         onSent(submission.attachments);
 
         const current = pendingPrompts.find(sendAuthority, clientMsgId);
@@ -578,10 +634,11 @@ export const useConversation = (
           entry.conversationId ?? submission.requestedConversationId ?? null,
         );
       } finally {
+        turnOrder.release();
         pendingPrompts.releaseDispatch(sendAuthority, clientMsgId);
       }
     },
-    [config.httpOrigin, onSent, webShell],
+    [config.httpOrigin, decoratePrompt, onSent, webShell],
   );
 
   useEffect(() => {
@@ -610,23 +667,6 @@ export const useConversation = (
 
   const send = useCallback(
     async (prompt: string, context?: CloudTurnContext): Promise<void> => {
-      if (webShell) {
-        if (preparingAttachmentSendRef.current) return;
-        preparingAttachmentSendRef.current = true;
-        try {
-          await waitForCloudAttachmentUploads();
-        } catch (error) {
-          showToast({
-            title: "An attachment couldn’t be sent",
-            description:
-              error instanceof Error ? error.message : "Try the upload again.",
-            variant: "error",
-          });
-          return;
-        } finally {
-          preparingAttachmentSendRef.current = false;
-        }
-      }
       const text = prompt.trim();
       if (!text) return;
       const clientMsgId = newClientMsgId();
@@ -634,20 +674,17 @@ export const useConversation = (
       const selectedExecution =
         getCloudExecutionSelectionSnapshot() ?? cloudSelection ?? null;
       if (!authority) return;
+      const uploadIds = webShell
+        ? browserAttachmentUploads.takeForMessage(clientMsgId)
+        : [];
       const requestedConversationId =
         conversationId ?? (webShell ? null : newCloudConversationId());
       const submission: PendingCloudTurnSubmission = {
         requestedConversationId,
-        prompt: decoratePrompt(text, attachments),
-        imagePaths: attachments
-          .filter(
-            (entry) =>
-              entry.contentType?.toLowerCase().startsWith("image/") ||
-              /\.(png|jpe?g|gif|webp)$/i.test(entry.path),
-          )
-          .slice(0, 4)
-          .map((entry) => entry.path),
+        prompt: uploadIds.length ? text : decoratePrompt(text, attachments),
+        imagePaths: imagePathsOf(attachments),
         attachments,
+        ...(uploadIds.length ? { uploadIds } : {}),
         ...(context ? { context } : {}),
         locale: locale !== "en" ? locale : null,
         execution: selectedExecution ? { ...selectedExecution } : null,

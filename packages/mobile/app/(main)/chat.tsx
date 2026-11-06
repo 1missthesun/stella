@@ -53,7 +53,6 @@ import {
   REASONING_OPTIONS,
   type ReasoningEffort,
 } from "../../src/lib/stella-model-catalog";
-import { attachmentsSettled } from "../../src/lib/chat-attachments";
 import { useIsOffline } from "../../src/lib/use-network-status";
 import {
   publishActivityHub,
@@ -482,7 +481,6 @@ function ChatSurface(props: {
   ]);
 
   const sendReady =
-    attachmentsSettled(thread.attachments) &&
     !offline &&
     thread.storageLoaded &&
     thread.authorityReady !== false;

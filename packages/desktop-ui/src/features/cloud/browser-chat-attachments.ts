@@ -6,14 +6,13 @@ import {
   CHAT_IMAGE_PASSTHROUGH_TYPES,
 } from "@stella/contracts/chat-image-limits";
 import { backendClient } from "@/platform/backend/backend-client";
-import { cloudAttachmentsStore } from "./cloud-composer-store";
+import type { CloudAttachment } from "./cloud-composer-store";
 import {
   RequestTimeoutError,
   retryIdempotent,
   transferBudgetMs,
 } from "@stella/contracts/request-deadline";
 
-export const BROWSER_ATTACHMENT_MAX_BYTES = 20 * 1024 * 1024;
 export const BROWSER_ATTACHMENT_MAX_FILES = 10;
 const BROWSER_IMAGE_SOURCE_MAX_BYTES = 100 * 1024 * 1024;
 
@@ -27,6 +26,11 @@ export type BrowserAttachmentUpload = {
   progress: number;
   status: "pending" | "uploading" | "finalizing" | "ready" | "error";
   error: string | null;
+  /** The pending message this upload was sent with; null while it is in the composer. */
+  sentWith: string | null;
+  retryable: boolean;
+  /** The preview is a video's first frame. */
+  poster?: true;
 };
 
 let uploads: readonly BrowserAttachmentUpload[] = [];
@@ -44,11 +48,39 @@ const revokePreview = (entry: BrowserAttachmentUpload): void => {
   if (entry.previewUrl) URL.revokeObjectURL(entry.previewUrl);
 };
 
-const IN_FLIGHT: ReadonlySet<BrowserAttachmentUpload["status"]> = new Set([
-  "pending",
-  "uploading",
-  "finalizing",
-]);
+const videoPosterUrl = (file: File): Promise<string | null> =>
+  new Promise((resolve) => {
+    const source = URL.createObjectURL(file);
+    const video = document.createElement("video");
+    const finish = (url: string | null) => {
+      URL.revokeObjectURL(source);
+      video.removeAttribute("src");
+      video.load();
+      resolve(url);
+    };
+    video.muted = true;
+    video.preload = "metadata";
+    video.playsInline = true;
+    video.onerror = () => finish(null);
+    video.onloadeddata = () => {
+      video.currentTime = Math.min(0.1, video.duration || 0);
+    };
+    video.onseeked = () => {
+      const scale = Math.min(1, 320 / Math.max(video.videoWidth, video.videoHeight, 1));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+      canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+      const context = canvas.getContext("2d");
+      if (!context) return finish(null);
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(
+        (blob) => finish(blob ? URL.createObjectURL(blob) : null),
+        "image/jpeg",
+        0.8,
+      );
+    };
+    video.src = source;
+  });
 
 const waitForUploadChange = (): Promise<void> =>
   new Promise((resolve) => {
@@ -59,29 +91,48 @@ const waitForUploadChange = (): Promise<void> =>
     listeners.add(listener);
   });
 
-export const waitForCloudAttachmentUploads = async (): Promise<void> => {
-  while (uploads.some((entry) => IN_FLIGHT.has(entry.status))) {
+export class AttachmentUploadFailedError extends Error {
+  constructor(name: string, detail: string | null) {
+    super(detail || `Couldn’t upload ${name}.`);
+    this.name = "AttachmentUploadFailedError";
+  }
+}
+
+/**
+ * The finished Drive files for these uploads, in order, once every one has
+ * landed. Rejects as soon as one has failed past its automatic retries.
+ */
+export const waitForAttachmentUploads = async (
+  ids: readonly string[],
+): Promise<CloudAttachment[]> => {
+  for (;;) {
+    const entries = ids.map((id) => uploads.find((entry) => entry.id === id));
+    const missing = ids.findIndex((_, index) => !entries[index]);
+    if (missing >= 0) {
+      throw new AttachmentUploadFailedError(
+        "an attachment",
+        "This attachment is no longer available. Attach it again.",
+      );
+    }
+    const failed = entries.find((entry) => entry!.status === "error");
+    if (failed) throw new AttachmentUploadFailedError(failed.name, failed.error);
+    if (entries.every((entry) => entry!.status === "ready")) {
+      return entries.map((entry) => ({
+        path: entry!.path!,
+        name: entry!.name,
+        sizeBytes: entry!.sizeBytes,
+        contentType: attachmentContentType({
+          declared: entry!.file.type,
+          name: entry!.name,
+        }),
+      }));
+    }
     await waitForUploadChange();
   }
-  const failed = uploads.find((entry) => entry.status === "error");
-  if (failed)
-    throw new Error(failed.error || `Couldn’t upload ${failed.name}.`);
 };
 
-const rejectReason = (file: File): string | null => {
-  if (file.size <= 0) return "This file is empty.";
-  const isImage = attachmentContentType({
-    declared: file.type,
-    name: file.name,
-  }).startsWith("image/");
-  if (isImage && file.size > BROWSER_IMAGE_SOURCE_MAX_BYTES) {
-    return "This image is too large to resize safely in the browser.";
-  }
-  if (!isImage && file.size > BROWSER_ATTACHMENT_MAX_BYTES) {
-    return "This file is larger than 20 MB.";
-  }
-  return null;
-};
+const rejectReason = (file: File): string | null =>
+  file.size <= 0 ? "This file is empty." : null;
 
 const safeName = (name: string): string => {
   const boundedCharacters = Array.from(name.normalize("NFKC"), (character) => {
@@ -192,27 +243,23 @@ const imageFile = (blob: Blob, source: File): File => {
  * budget in `chat-image-limits`) as soon as it is attached, so the upload is
  * small and the cloud sends it as it is. One already within the limits, in a
  * type every provider takes, uploads untouched (a screenshot stays lossless,
- * a GIF animated). An image the browser can't decode (HEIC outside Safari)
+ * a GIF animated). An image the browser can't decode (HEIC outside Safari),
+ * or one too large to decode safely here,
  * uploads as it is and the cloud fits it instead.
  */
 export const fitBrowserChatImage = async (file: File): Promise<File> => {
   const type = attachmentContentType({ declared: file.type, name: file.name });
-  if (!type.startsWith("image/") || type === "image/svg+xml") {
-    if (file.size > BROWSER_ATTACHMENT_MAX_BYTES) {
-      throw new Error("This file is larger than 20 MB.");
-    }
+  if (
+    !type.startsWith("image/") ||
+    type === "image/svg+xml" ||
+    file.size > BROWSER_IMAGE_SOURCE_MAX_BYTES
+  ) {
     return file;
-  }
-  if (file.size > BROWSER_IMAGE_SOURCE_MAX_BYTES) {
-    throw new Error("This image is too large to resize safely in the browser.");
   }
   let bitmap: ImageBitmap;
   try {
     bitmap = await createImageBitmap(file);
   } catch {
-    if (file.size > BROWSER_ATTACHMENT_MAX_BYTES) {
-      throw new Error("This image is larger than 20 MB.");
-    }
     return file;
   }
   try {
@@ -256,7 +303,10 @@ export const fitBrowserChatImage = async (file: File): Promise<File> => {
   }
 };
 
-const uploadOne = async (upload: BrowserAttachmentUpload): Promise<void> => {
+const uploadOne = async (
+  upload: BrowserAttachmentUpload,
+  attempt = 0,
+): Promise<void> => {
   try {
     const file = await fitBrowserChatImage(upload.file);
     const path = browserAttachmentDrivePath(file, upload.id);
@@ -291,12 +341,6 @@ const uploadOne = async (upload: BrowserAttachmentUpload): Promise<void> => {
       contentType,
       source: "web-chat",
     });
-    cloudAttachmentsStore.add({
-      path: finalized.path,
-      name: finalized.name,
-      sizeBytes: finalized.sizeBytes,
-      contentType: finalized.contentType,
-    });
     replace(upload.id, {
       status: "ready",
       path: finalized.path,
@@ -304,12 +348,50 @@ const uploadOne = async (upload: BrowserAttachmentUpload): Promise<void> => {
       error: null,
     });
   } catch (error) {
+    if (!uploads.some((entry) => entry.id === upload.id)) return;
+    const retryable = isRetryableUploadError(error);
+    if (retryable && attempt + 1 < AUTOMATIC_UPLOAD_ATTEMPTS) {
+      await untilOnline();
+      await new Promise((resolve) =>
+        setTimeout(resolve, 1_000 * 2 ** attempt),
+      );
+      if (!uploads.some((entry) => entry.id === upload.id)) return;
+      return uploadOne(upload, attempt + 1);
+    }
     replace(upload.id, {
       status: "error",
+      retryable,
       error: error instanceof Error ? error.message : "Upload failed.",
     });
   }
 };
+
+const AUTOMATIC_UPLOAD_ATTEMPTS = 5;
+
+const isRetryableUploadError = (error: unknown): boolean => {
+  if (error instanceof Error && error.name === "AbortError") return false;
+  const flagged =
+    error && typeof error === "object" ? Reflect.get(error, "retryable") : undefined;
+  if (typeof flagged === "boolean") return flagged;
+  return !(error instanceof Error && /too large|larger than|empty|couldn’t be made small/i.test(error.message));
+};
+
+const untilOnline = (): Promise<void> =>
+  typeof navigator === "undefined" || navigator.onLine
+    ? Promise.resolve()
+    : new Promise((resolve) =>
+        window.addEventListener("online", () => resolve(), { once: true }),
+      );
+
+if (typeof window !== "undefined") {
+  window.addEventListener("online", () => {
+    for (const entry of uploads) {
+      if (entry.status === "error" && entry.retryable) {
+        void uploadOne(entry);
+      }
+    }
+  });
+}
 
 export const browserAttachmentUploads = {
   subscribe(listener: () => void) {
@@ -318,7 +400,11 @@ export const browserAttachmentUploads = {
   },
   getSnapshot: () => uploads,
   add(files: readonly File[]) {
-    const room = Math.max(0, BROWSER_ATTACHMENT_MAX_FILES - uploads.length);
+    const room = Math.max(
+      0,
+      BROWSER_ATTACHMENT_MAX_FILES -
+        uploads.filter((entry) => entry.sentWith === null).length,
+    );
     for (const file of files.slice(0, room)) {
       const id = `upload-${crypto.randomUUID()}`;
       const error = rejectReason(file);
@@ -337,37 +423,70 @@ export const browserAttachmentUploads = {
         progress: 0,
         status: error ? "error" : "pending",
         error,
+        sentWith: null,
+        retryable: false,
       };
       uploads = [...uploads, entry];
       notify();
       if (entry.status === "pending") void uploadOne(entry);
+      if (
+        attachmentContentType({ declared: file.type, name: file.name }).startsWith(
+          "video/",
+        )
+      ) {
+        void videoPosterUrl(file).then((previewUrl) => {
+          if (!previewUrl) return;
+          if (!uploads.some((upload) => upload.id === id)) {
+            URL.revokeObjectURL(previewUrl);
+            return;
+          }
+          replace(id, { previewUrl, poster: true });
+        });
+      }
     }
   },
   retry(id: string) {
     const entry = uploads.find((upload) => upload.id === id);
-    if (entry?.status === "error") void uploadOne(entry);
+    if (entry?.status !== "error" || rejectReason(entry.file)) return;
+    replace(id, { status: "pending", error: null });
+    void uploadOne(entry);
   },
+  /** The composer's uploads, handed to a message that was just sent; they keep uploading. */
+  takeForMessage(clientMsgId: string): string[] {
+    const taken = uploads.filter((entry) => entry.sentWith === null);
+    if (taken.length === 0) return [];
+    for (const entry of taken) {
+      if (entry.status === "error" && !rejectReason(entry.file)) {
+        replace(entry.id, { status: "pending", error: null });
+        void uploadOne(entry);
+      }
+    }
+    uploads = uploads.map((entry) =>
+      entry.sentWith === null ? { ...entry, sentWith: clientMsgId } : entry,
+    );
+    notify();
+    return taken.map((entry) => entry.id);
+  },
+  find: (id: string) => uploads.find((entry) => entry.id === id) ?? null,
   remove(id: string) {
     const entry = uploads.find((upload) => upload.id === id);
     activeRequests.get(id)?.abort();
-    if (entry?.path) cloudAttachmentsStore.remove(entry.path);
     if (entry) revokePreview(entry);
     uploads = uploads.filter((upload) => upload.id !== id);
     notify();
   },
-  clearReady(paths: ReadonlySet<string>) {
-    for (const entry of uploads) {
-      if (entry.path && paths.has(entry.path) && entry.status === "ready") {
-        revokePreview(entry);
-      }
-    }
-    uploads = uploads.filter(
-      (entry) =>
-        !(entry.path && paths.has(entry.path) && entry.status === "ready"),
-    );
+  /** Forget a sent message's uploads once the cloud has its own copy of the message. */
+  release(ids: readonly string[]) {
+    const released = new Set(ids);
+    const gone = uploads.filter((entry) => released.has(entry.id));
+    if (gone.length === 0) return;
+    uploads = uploads.filter((entry) => !released.has(entry.id));
     notify();
+    setTimeout(() => gone.forEach(revokePreview), PREVIEW_RELEASE_DELAY_MS);
   },
 };
+
+const PREVIEW_RELEASE_DELAY_MS = 60_000;
 
 const EMPTY: readonly BrowserAttachmentUpload[] = [];
 export const useBrowserAttachmentUploads = () =>

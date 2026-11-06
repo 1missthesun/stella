@@ -258,10 +258,6 @@
   background: color-mix(in oklch, var(--background) 88%, transparent);
 }
 
-.browser-attachment-chip[data-status="error"] {
-  border-color: color-mix(in oklch, var(--destructive) 55%, var(--border));
-}
-
 .browser-attachment-chip__thumbnail {
   width: 44px;
   height: 44px;

@@ -17,6 +17,11 @@ export type PendingCloudTurnSubmission = {
   imagePaths: readonly string[];
   context?: CloudTurnContext;
   attachments: readonly CloudAttachment[];
+  /**
+   * Browser uploads still landing when the message was sent. The turn is
+   * dispatched once they finish, with their files added to `attachments`.
+   */
+  uploadIds?: readonly string[];
   locale: string | null;
   execution: CloudExecutionSelection | null;
   executionTarget?: DesktopExecutionTarget;
@@ -139,6 +144,10 @@ const isSubmission = (value: unknown): value is PendingCloudTurnSubmission => {
     Array.isArray(candidate.attachments) &&
     candidate.attachments.length <= 32 &&
     candidate.attachments.every(isAttachment) &&
+    (candidate.uploadIds === undefined ||
+      (Array.isArray(candidate.uploadIds) &&
+        candidate.uploadIds.length <= 32 &&
+        candidate.uploadIds.every((id) => isBoundedString(id, 128)))) &&
     isNullableBoundedString(candidate.locale, 64) &&
     (candidate.execution === null || isExecution(candidate.execution)) &&
     (candidate.executionTarget === undefined ||
@@ -465,6 +474,9 @@ const frozenSubmission = (
         Object.freeze({ ...attachment }),
       ),
     ),
+    ...(submission.uploadIds?.length
+      ? { uploadIds: Object.freeze([...submission.uploadIds]) }
+      : {}),
     locale: submission.locale,
     execution: submission.execution
       ? Object.freeze({ ...submission.execution })

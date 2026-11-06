@@ -22,17 +22,21 @@ import {
 } from "./desktop-chat-outbox-state";
 import {
   appendAttachments,
-  attachmentsSettled,
-  isAttachmentReady,
-  uploadChatAttachment,
-  withAttachmentStatus,
+  attachmentPreviewUri,
   CHAT_ATTACHMENT_MAX_COUNT,
   type ComposerAttachment,
   type PickedAttachment,
 } from "./chat-attachments";
-import { getBackendClient } from "./backend";
-import { File } from "expo-file-system";
-import { useT } from "../i18n/I18nProvider";
+import {
+  attachmentUploadState,
+  awaitAttachmentUpload,
+  discardAttachmentUpload,
+  retryAttachmentUpload,
+  startAttachmentUpload,
+  useAttachmentUploadsVersion,
+} from "./attachment-uploads";
+import { videoPosterUri } from "./video-poster";
+import { clearFailedSend, registerFailedSend } from "./failed-sends";
 import { hasAiConsent, requestAiConsent } from "./ai-consent";
 import {
   getPreferredPhoneAccess,
@@ -72,6 +76,7 @@ import { admitSend } from "./send-admission";
 import { userFacingError } from "./user-facing-error";
 import { createChatDraftStore, type ChatDraftStore } from "./chat-draft-store";
 import {
+  classifyComposerNotice,
   clearComposerNotices,
   showComposerNotice,
   showComposerNoticeForError,
@@ -93,6 +98,42 @@ class SendNotDeliveredError extends Error {
     this.name = "SendNotDeliveredError";
   }
 }
+class AttachmentUploadFailedError extends Error {
+  constructor() {
+    super("An attachment didn't upload.");
+    this.name = "AttachmentUploadFailedError";
+  }
+}
+
+const resolveAttachmentUploads = async (
+  attachments: readonly DesktopChatOutboxAttachment[],
+  signal: AbortSignal,
+): Promise<{ path: string; kind: "image" | "file" }[]> => {
+  const settled = await Promise.allSettled(
+    attachments.map(async (entry) =>
+      entry.upload
+        ? await awaitAttachmentUpload(
+            { ...entry.upload, name: entry.name, kind: entry.kind },
+            entry.path,
+          )
+        : entry.path,
+    ),
+  );
+  if (signal.aborted) throw new AutomaticExecutionWaitAbortedError();
+  if (settled.some((result) => result.status === "rejected")) {
+    throw new AttachmentUploadFailedError();
+  }
+  return settled.map((result, index) => ({
+    path: (result as PromiseFulfilledResult<string>).value,
+    kind: attachments[index]!.kind,
+  }));
+};
+
+const composerNoticeHandlesError = (error: unknown) =>
+  classifyComposerNotice(
+    error instanceof Error ? error.message : typeof error === "string" ? error : "",
+  ) !== null;
+
 const waitForAutomaticRetry = (signal?: AbortSignal) =>
   new Promise<void>((resolve, reject) => {
     if (signal?.aborted) {
@@ -290,71 +331,51 @@ export function useChatThread(opts: {
   const historyPageGenerationRef = useRef(0);
   const [draftStore] = useState(createChatDraftStore);
   const setDraft = draftStore.set;
-  const t = useT();
-  const [attachments, setAttachments] = useState<ComposerAttachment[]>([]);
-  const attachmentsRef = useRef(attachments);
-  attachmentsRef.current = attachments;
-  const startAttachmentUpload = useCallback(
-    (picked: PickedAttachment) => {
-      const taken = new Set(
-        attachmentsRef.current
-          .map((entry) => (entry.status === "ready" ? entry.drivePath : ""))
-          .filter(Boolean),
-      );
-      void uploadChatAttachment(picked, taken, {
-        client: getBackendClient(),
-        readFile: async (uri) => await new File(uri).bytes(),
-      })
-        .then((drivePath) => {
-          setAttachments((current) =>
-            withAttachmentStatus(current, picked.id, {
-              status: "ready",
-              drivePath,
-            }),
-          );
-        })
-        .catch((error: unknown) => {
-          setAttachments((current) =>
-            withAttachmentStatus(current, picked.id, {
-              status: "failed",
-              message:
-                error instanceof Error && error.message
-                  ? error.message
-                  : t("chat.attachments.uploadFailed"),
-            }),
-          );
-        });
-    },
-    [t],
+  const [pickedAttachments, setAttachments] = useState<ComposerAttachment[]>([]);
+  const uploadsVersion = useAttachmentUploadsVersion();
+  const attachments = useMemo<ComposerAttachment[]>(
+    () =>
+      pickedAttachments.map((entry) => {
+        const state = attachmentUploadState(entry.id);
+        return state?.status === "failed"
+          ? { ...entry, failed: { message: state.message } }
+          : entry;
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [pickedAttachments, uploadsVersion],
   );
+  const attachmentsRef = useRef(pickedAttachments);
+  attachmentsRef.current = pickedAttachments;
   const addAttachments = useCallback(
     (picked: readonly PickedAttachment[]): { rejected: number } => {
-      const pending: ComposerAttachment[] = picked.map((entry) => ({
+      const known = new Set(attachmentsRef.current.map((entry) => entry.id));
+      const fresh = picked.filter((entry) => !known.has(entry.id));
+      const merged = appendAttachments(attachmentsRef.current, fresh);
+      const accepted = merged.attachments.slice(attachmentsRef.current.length);
+      const started: ComposerAttachment[] = accepted.map((entry) => ({
         ...entry,
-        status: "uploading",
+        drivePath: startAttachmentUpload(entry),
       }));
-      const merged = appendAttachments(attachmentsRef.current, pending);
-      const accepted = merged.attachments.filter((entry) =>
-        pending.some((candidate) => candidate.id === entry.id),
-      );
-      setAttachments(merged.attachments);
-      for (const entry of accepted) startAttachmentUpload(entry);
+      setAttachments((current) => [...current, ...started]);
+      for (const entry of started.filter((candidate) => candidate.video)) {
+        void videoPosterUri(entry.uri).then((posterUri) => {
+          if (!posterUri) return;
+          setAttachments((current) =>
+            current.map((candidate) =>
+              candidate.id === entry.id ? { ...candidate, posterUri } : candidate,
+            ),
+          );
+        });
+      }
       return { rejected: merged.rejected };
     },
-    [startAttachmentUpload],
+    [],
   );
-  const retryAttachment = useCallback(
-    (id: string) => {
-      const target = attachmentsRef.current.find((entry) => entry.id === id);
-      if (!target || target.status !== "failed") return;
-      setAttachments((current) =>
-        withAttachmentStatus(current, id, { status: "uploading" }),
-      );
-      startAttachmentUpload(target);
-    },
-    [startAttachmentUpload],
-  );
+  const retryAttachment = useCallback((id: string) => {
+    retryAttachmentUpload(id);
+  }, []);
   const removeAttachment = useCallback((id: string) => {
+    discardAttachmentUpload(id);
     setAttachments((current) => current.filter((entry) => entry.id !== id));
   }, []);
   const [quotes, setQuotes] = useState<ComposerQuote[]>([]);
@@ -409,6 +430,9 @@ export function useChatThread(opts: {
   const dispatchGenerationRef = useRef(0);
   const retryFailedSendRef = useRef<
     ((item: QueuedSend, replyId: string) => void) | null
+  >(null);
+  const markSendFailedRef = useRef<
+    ((item: QueuedSend, replyId: string, keepOutbox: boolean) => void) | null
   >(null);
   const pendingEnqueueRef = useRef<Set<string>>(new Set());
   const drainQueueRef = useRef<(() => void) | null>(null);
@@ -640,13 +664,13 @@ export function useChatThread(opts: {
         );
       };
 
-      const placementAttachments = item.attachments.map((entry) => ({
-        path: entry.path,
-        kind: entry.kind,
-      }));
-
       let admittedDispatchId: string | null = null;
       try {
+        assertAuthorityLease();
+        const placementAttachments = await resolveAttachmentUploads(
+          item.attachments,
+          abort.signal,
+        );
         assertAuthorityLease();
         let admitted: AutomaticExecutionDispatch | null = null;
         let placementConversationId = canonicalConversationId ?? "";
@@ -828,6 +852,21 @@ export function useChatThread(opts: {
         ) {
           return;
         }
+        if (
+          !admittedDispatchId &&
+          isCurrent() &&
+          (error instanceof AttachmentUploadFailedError ||
+            (isPermanentAutomaticAdmissionError(error) &&
+              !composerNoticeHandlesError(error)))
+        ) {
+          const uploadFailed = error instanceof AttachmentUploadFailedError;
+          if (!uploadFailed) {
+            acknowledgeDesktopSendIds([item.dispatchId, item.userMessageId]);
+          }
+          markSendFailedRef.current?.(item, replyId, uploadFailed);
+          finishDispatch(replyId);
+          return;
+        }
         const message = userFacingError(error);
         renderReply(message);
         const permanent = isPermanentAutomaticAdmissionError(error);
@@ -955,6 +994,67 @@ export function useChatThread(opts: {
     retryFailedSendRef.current = retryFailedSend;
   }, [retryFailedSend]);
 
+  const markSendFailed = useCallback(
+    (item: QueuedSend, replyId: string, keepOutbox: boolean) => {
+      const setFailed = (failed: boolean) =>
+        updateMessages((current) =>
+          current
+            .filter((message) => message.id !== replyId)
+            .map((message) => {
+              if (message.id !== item.userMessageId) return message;
+              const { sendFailed: _previous, ...rest } = message;
+              return failed
+                ? { ...rest, queued: false, sendFailed: true as const }
+                : rest;
+            }),
+        );
+      setFailed(true);
+      registerFailedSend(item.userMessageId, {
+        retry: () => {
+          clearFailedSend(item.userMessageId);
+          if (!canonicalAuthorityLeaseCurrent(item.canonicalAuthorityLease)) {
+            return;
+          }
+          setFailed(false);
+          if (!keepOutbox) {
+            retryFailedSendRef.current?.(item, replyId);
+            return;
+          }
+          for (const entry of item.attachments) {
+            if (entry.upload) retryAttachmentUpload(entry.upload.id);
+          }
+          parkQueuedSend(item);
+          if (!sendingRef.current && admissionEnabledRef.current) {
+            drainQueueRef.current?.();
+          }
+        },
+        remove: () => {
+          clearFailedSend(item.userMessageId);
+          for (const entry of item.attachments) {
+            if (entry.upload) discardAttachmentUpload(entry.upload.id);
+          }
+          acknowledgeDesktopSendIds([item.dispatchId, item.userMessageId]);
+          updateMessages((current) =>
+            current.filter(
+              (message) =>
+                message.id !== item.userMessageId && message.id !== replyId,
+            ),
+          );
+        },
+      });
+    },
+    [
+      acknowledgeDesktopSendIds,
+      canonicalAuthorityLeaseCurrent,
+      parkQueuedSend,
+      updateMessages,
+    ],
+  );
+
+  useEffect(() => {
+    markSendFailedRef.current = markSendFailed;
+  }, [markSendFailed]);
+
   const dispatch = useCallback(
     async (item: QueuedSend) => {
       if (!canonicalAuthorityLeaseCurrent(item.canonicalAuthorityLease)) {
@@ -1054,16 +1154,32 @@ export function useChatThread(opts: {
       const promptText = decoupleQuotes ? typed : text;
       const composerAttachments = supplied ? [] : attachments;
       if (!text && composerAttachments.length === 0) return null;
-      if (!attachmentsSettled(composerAttachments)) return null;
-      const picked = composerAttachments.filter(isAttachmentReady);
+      const picked = composerAttachments;
       const sendAttachments: DesktopChatOutboxAttachment[] = picked.map(
-        (entry) => ({
-          path: entry.drivePath,
-          name: entry.name,
-          kind: entry.kind,
-          ...(entry.kind === "image" ? { previewUri: entry.uri } : {}),
-        }),
+        (entry) => {
+          const state = attachmentUploadState(entry.id);
+          const previewUri = attachmentPreviewUri(entry);
+          return {
+            path: state?.status === "ready" ? state.drivePath : entry.drivePath,
+            name: entry.name,
+            kind: entry.kind,
+            ...(previewUri ? { previewUri } : {}),
+            ...(state?.status === "ready"
+              ? {}
+              : {
+                  upload: {
+                    id: entry.id,
+                    uri: entry.uri,
+                    mimeType: entry.mimeType,
+                    sizeBytes: entry.sizeBytes,
+                  },
+                }),
+          };
+        },
       );
+      for (const entry of picked) {
+        if (entry.failed) retryAttachmentUpload(entry.id);
+      }
 
       if (!hasAiConsent()) {
         requestAiConsent();
@@ -1107,6 +1223,7 @@ export function useChatThread(opts: {
           attachmentPreviews: sendAttachments.map(entry => ({
             path: entry.path, name: entry.name,
             ...(entry.previewUri ? { imageUri: entry.previewUri } : {}),
+            ...(entry.upload ? { uploadId: entry.upload.id } : {}),
           })),
         } : {}),
         ...(thumbs.length > 0 ? { thumbnailUris: thumbs } : {}),

@@ -18,37 +18,20 @@ export type PickedAttachment = {
   mimeType: string;
   sizeBytes: number;
   kind: ChatAttachmentKind;
+  video?: true;
+  posterUri?: string;
 };
 
-export type AttachmentStatus =
-  | { status: "uploading" }
-  | { status: "ready"; drivePath: string }
-  | { status: "failed"; message: string };
-
-export type ComposerAttachment = PickedAttachment & AttachmentStatus;
-
-export type ReadyAttachment = PickedAttachment & {
-  status: "ready";
+export type ComposerAttachment = PickedAttachment & {
   drivePath: string;
+  failed?: { message: string };
 };
 
-export const withAttachmentStatus = (
-  attachments: readonly ComposerAttachment[],
-  id: string,
-  status: AttachmentStatus,
-): ComposerAttachment[] =>
-  attachments.map((entry) =>
-    entry.id === id ? { ...entry, ...status } : entry,
-  );
-
-export const isAttachmentReady = (
-  attachment: ComposerAttachment,
-): attachment is ReadyAttachment => attachment.status === "ready";
-
-export const attachmentsSettled = (
-  attachments: readonly ComposerAttachment[],
-): attachments is readonly ReadyAttachment[] =>
-  attachments.every(isAttachmentReady);
+/** The local image a tile shows: the photo itself, or a video's poster frame. */
+export const attachmentPreviewUri = (
+  attachment: Pick<PickedAttachment, "kind" | "uri" | "posterUri">,
+): string | undefined =>
+  attachment.kind === "image" ? attachment.uri : attachment.posterUri;
 
 export const appendAttachments = <T>(
   current: readonly T[],
@@ -76,14 +59,32 @@ export const driveFileNameFor = (name: string, kind: ChatAttachmentKind) => {
   return cleaned.slice(-MAX_SEGMENT_LENGTH);
 };
 
+const EXTENSION_BY_MIME_TYPE: Record<string, string> = {
+  "image/jpeg": ".jpg",
+  "image/png": ".png",
+  "image/heic": ".heic",
+  "image/gif": ".gif",
+  "image/webp": ".webp",
+  "video/quicktime": ".mov",
+  "video/mp4": ".mp4",
+  "video/x-m4v": ".m4v",
+};
+
+/** Picker names can lack an extension (videos especially); the agent needs one to know the type. */
+export const withMimeExtension = (name: string, mimeType: string): string => {
+  if (/\.[A-Za-z0-9]{2,5}$/.test(name)) return name;
+  return `${name}${EXTENSION_BY_MIME_TYPE[mimeType.toLowerCase()] ?? ""}`;
+};
+
 export const driveAttachmentPath = (args: {
   name: string;
   kind: ChatAttachmentKind;
   now: Date;
   taken: ReadonlySet<string>;
+  uniquePrefix?: string;
 }): string => {
   const day = args.now.toISOString().slice(0, 10);
-  const fileName = driveFileNameFor(args.name, args.kind);
+  const fileName = `${args.uniquePrefix ? `${args.uniquePrefix}-` : ""}${driveFileNameFor(args.name, args.kind)}`.slice(-MAX_SEGMENT_LENGTH);
   const dot = fileName.lastIndexOf(".");
   const stem = dot > 0 ? fileName.slice(0, dot) : fileName;
   const extension = dot > 0 ? fileName.slice(dot) : "";
@@ -108,6 +109,7 @@ export type AttachmentUploadDeps = {
   client: Pick<BackendClient, "call">;
   readFile: (uri: string) => Promise<Uint8Array<ArrayBuffer>>;
   now?: () => Date;
+  path?: string;
 };
 
 const uploadFetch = async (url: string, init: RequestInit): Promise<Response> =>
@@ -118,7 +120,7 @@ export const uploadChatAttachment = async (
   taken: ReadonlySet<string>,
   deps: AttachmentUploadDeps,
 ): Promise<string> => {
-  const path = driveAttachmentPath({
+  const path = deps.path ?? driveAttachmentPath({
     name: attachment.name,
     kind: attachment.kind,
     now: deps.now?.() ?? new Date(),

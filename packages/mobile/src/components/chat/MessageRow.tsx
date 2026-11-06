@@ -10,6 +10,7 @@ import {
 import { fileDisplayName } from "@stella/contracts/file-display-name";
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   Easing,
   LayoutChangeEvent,
@@ -48,12 +49,19 @@ import { assistantBubbleNeedsBoundedWidth } from "../../lib/assistant-bubble-lay
 import { presentAssistantText } from "@stella/contracts/assistant-internal-text";
 import { artifactAttachmentTarget } from "../../lib/mobile-artifacts";
 import {
+  AttachmentFailedMark,
   AttachmentTileRow,
   FileTile,
   ImageTile,
   PastedTextTile,
+  VideoPlayBadge,
   type AttachmentTileItem,
 } from "./AttachmentTiles";
+import {
+  retryAttachmentUpload,
+  useFailedAttachmentUploads,
+} from "../../lib/attachment-uploads";
+import { useFailedSend, type FailedSendActions } from "../../lib/failed-sends";
 import {
   resolveCloudDriveFileUri,
   useCloudDriveFileUri,
@@ -105,6 +113,45 @@ export type MessageRowActions = {
 
 const MESSAGE_HOLD_MS = 180;
 const MESSAGE_LONG_PRESS_MS = 420;
+const NO_UPLOAD_IDS: readonly string[] = [];
+
+function SendFailedMark({
+  actions,
+  colors,
+  styles,
+}: {
+  actions: FailedSendActions;
+  colors: Colors;
+  styles: MessageRowStyles;
+}) {
+  const open = () =>
+    Alert.alert("Not sent", undefined, [
+      { text: "Retry", onPress: actions.retry },
+      { text: "Remove", style: "destructive", onPress: actions.remove },
+      { text: "Cancel", style: "cancel" },
+    ]);
+  return (
+    <Pressable
+      onPress={open}
+      hitSlop={8}
+      accessibilityRole="button"
+      accessibilityLabel="Not sent. Retry or remove"
+      style={styles.sendFailedRow}
+    >
+      <View style={[styles.sendFailedDot, { backgroundColor: colors.danger }]}>
+        <Text style={styles.sendFailedGlyph} maxFontSizeMultiplier={1}>
+          !
+        </Text>
+      </View>
+      <Text
+        style={styles.sendFailedText}
+        maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
+      >
+        Not sent
+      </Text>
+    </Pressable>
+  );
+}
 export const ASSISTANT_ROW_PAD_VERTICAL = 2;
 
 export function MessageEntry({
@@ -665,6 +712,14 @@ export const ChatMessageRow = memo(function ChatMessageRow({
   quotesForwarded?: boolean;
   hideAgentChips?: boolean;
 }) {
+  const failedSend = useFailedSend(item.id);
+  const failedUploads = useFailedAttachmentUploads(
+    item.role === "user"
+      ? (item.attachmentPreviews ?? []).flatMap((preview) =>
+          preview.uploadId ? [preview.uploadId] : [],
+        )
+      : NO_UPLOAD_IDS,
+  );
   const pressScale = useRef(new Animated.Value(1)).current;
   const bubbleRef = useRef<View>(null);
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -790,20 +845,46 @@ export const ChatMessageRow = memo(function ChatMessageRow({
     const showText = item.text.trim().length > 0;
     const quotedText = item.quotedText?.trim();
     const pastedTexts = item.pastedTexts ?? [];
-    const imageUris: { key: string; uri: string; name?: string; path?: string }[] =
+    const imageUris: {
+      key: string;
+      uri: string;
+      name?: string;
+      path?: string;
+      uploadId?: string;
+    }[] =
       attachmentPreviews.length > 0
         ? attachmentPreviews.flatMap((preview) =>
             preview.imageUri
-              ? [{ key: preview.path, uri: preview.imageUri, name: preview.name, path: preview.path }]
+              ? [{
+                  key: preview.path,
+                  uri: preview.imageUri,
+                  name: preview.name,
+                  path: preview.path,
+                  ...(preview.uploadId ? { uploadId: preview.uploadId } : {}),
+                }]
               : [],
           )
         : thumbs.map((uri) => ({ key: uri, uri }));
-    const fileEntries: { name: string; path?: string }[] =
+    const fileEntries: { name: string; path?: string; uploadId?: string }[] =
       attachmentPreviews.length > 0
         ? attachmentPreviews
             .filter((preview) => !preview.imageUri)
-            .map((preview) => ({ name: preview.name, path: preview.path }))
+            .map((preview) => ({
+              name: preview.name,
+              path: preview.path,
+              ...(preview.uploadId ? { uploadId: preview.uploadId } : {}),
+            }))
         : documentNames.map((name) => ({ name }));
+    const isVideoName = (name?: string) =>
+      /\.(?:mov|mp4|m4v|webm|3gp|avi|mkv)$/i.test(name ?? "");
+    const failedMark = (uploadId?: string) =>
+      uploadId && failedUploads.has(uploadId) ? (
+        <AttachmentFailedMark
+          colors={colors}
+          label="Retry upload"
+          onPress={() => retryAttachmentUpload(uploadId)}
+        />
+      ) : null;
     const fileNames = fileEntries.map((entry) => entry.name);
     const attachmentLink = (path: string) =>
       driveLinkPath(path) || /^(?:[/~]|[A-Za-z]:[\\/]|[a-z]+:)/i.test(path)
@@ -825,30 +906,37 @@ export const ChatMessageRow = memo(function ChatMessageRow({
       ...imageUris.map((image) => ({
         key: `image-${image.key}`,
         node: (
-          <ImageTile
-            uri={image.uri}
-            name={image.name}
-            colors={colors}
-            onPress={
-              image.path && onOpenStellaFile
-                ? () => onOpenStellaFile(attachmentLink(image.path!), imageGallery)
-                : undefined
-            }
-          />
+          <View>
+            <ImageTile
+              uri={image.uri}
+              name={image.name}
+              colors={colors}
+              onPress={
+                image.path && onOpenStellaFile && !image.uploadId
+                  ? () => onOpenStellaFile(attachmentLink(image.path!), imageGallery)
+                  : undefined
+              }
+            />
+            {isVideoName(image.name) ? <VideoPlayBadge /> : null}
+            {failedMark(image.uploadId)}
+          </View>
         ),
       })),
       ...fileEntries.map((entry, index) => ({
         key: `file-${index}-${entry.name}`,
         node: (
-          <FileTile
-            name={fileDisplayName(entry.name)}
-            colors={colors}
-            onPress={
-              entry.path && onOpenStellaFile
-                ? () => onOpenStellaFile(attachmentLink(entry.path!))
-                : undefined
-            }
-          />
+          <View>
+            <FileTile
+              name={fileDisplayName(entry.name)}
+              colors={colors}
+              onPress={
+                entry.path && onOpenStellaFile && !entry.uploadId
+                  ? () => onOpenStellaFile(attachmentLink(entry.path!))
+                  : undefined
+              }
+            />
+            {failedMark(entry.uploadId)}
+          </View>
         ),
       })),
       ...pastedTexts.map((pasted, index) => ({
@@ -955,6 +1043,13 @@ export const ChatMessageRow = memo(function ChatMessageRow({
               >
                 {receiptLabel}
               </Text>
+            ) : null}
+            {item.sendFailed && failedSend ? (
+              <SendFailedMark
+                actions={failedSend}
+                colors={colors}
+                styles={styles}
+              />
             ) : null}
             {item.stopped ? (
               <Text
@@ -1202,6 +1297,34 @@ export const makeMessageRowStyles = (colors: Colors) =>
       letterSpacing: -0.1,
       marginRight: 6,
       marginTop: 4,
+    },
+    sendFailedRow: {
+      alignItems: "center",
+      alignSelf: "flex-end",
+      flexDirection: "row",
+      gap: 5,
+      marginRight: 4,
+      marginTop: 5,
+    },
+    sendFailedDot: {
+      alignItems: "center",
+      backgroundColor: colors.danger,
+      borderRadius: 7,
+      height: 14,
+      justifyContent: "center",
+      width: 14,
+    },
+    sendFailedGlyph: {
+      color: "#ffffff",
+      fontFamily: fonts.sans.semiBold,
+      fontSize: 9,
+      lineHeight: 11,
+    },
+    sendFailedText: {
+      color: colors.textMuted,
+      fontFamily: fonts.sans.medium,
+      fontSize: 12,
+      letterSpacing: -0.1,
     },
     stoppedTag: {
       color: colors.textMuted,

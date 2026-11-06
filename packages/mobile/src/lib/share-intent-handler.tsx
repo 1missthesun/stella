@@ -36,6 +36,7 @@ export function ShareIntentHandler() {
             mimeType,
             sizeBytes: new File(uri).size ?? 0,
             kind,
+            ...(mimeType.startsWith("video/") ? { video: true as const } : {}),
           });
         } catch {
           // Skip unreadable files rather than dropping the whole share.

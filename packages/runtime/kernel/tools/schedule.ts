@@ -9,7 +9,10 @@ import {
 import type { ScheduleToolApi, ToolContext, ToolResult } from "./types.js";
 import {
   formatScheduleList,
+  resolveScheduleTarget,
+  scheduleTargetLabel,
   type ScheduleListRow,
+  type ScheduleTarget,
 } from "./defs/schedule-manage-def.js";
 
 const requireScheduleApi = (scheduleApi?: ScheduleToolApi): ScheduleToolApi => {
@@ -30,6 +33,9 @@ const getConversationId = (
 
 const asTrimmedString = (value: unknown): string =>
   typeof value === "string" ? value.trim() : "";
+
+const callerThreadId = (context: ToolContext): string | undefined =>
+  context.agentType !== "orchestrator" && context.agentId ? context.agentId : undefined;
 
 const cronDetails = (
   change: "added" | "updated" | "removed",
@@ -141,9 +147,11 @@ const summarizeJob = (record: LocalCronJobRecord): ScheduleListRow => {
     payload.scriptPath
       ? { scriptPath: payload.scriptPath }
       : {}),
-    ...(payload.kind === "task" || payload.kind === "watch"
-      ? { deliverTo: payload.route ?? "orchestrator" }
-      : {}),
+    ...((payload.kind === "task" || payload.kind === "watch") && payload.threadId
+      ? { deliverTo: "thread", threadId: payload.threadId }
+      : payload.kind === "task" || payload.kind === "watch"
+        ? { deliverTo: payload.route ?? "orchestrator" }
+        : {}),
     ...(payload.kind === "watch" && payload.once ? { once: true as const } : {}),
     ...(payload.kind === "watch" && record.lastOutputPreview
       ? { lastFinding: record.lastOutputPreview }
@@ -158,6 +166,7 @@ const summarizeJob = (record: LocalCronJobRecord): ScheduleListRow => {
 
 const buildPayloadForAdd = (
   args: Record<string, unknown>,
+  context: ToolContext,
 ): LocalCronPayload => {
   const kind = asTrimmedString(args.kind);
   if (kind === "reminder") {
@@ -165,23 +174,33 @@ const buildPayloadForAdd = (
     if (!message) {
       throw new Error('kind="reminder" requires message.');
     }
+    if (asTrimmedString(args.threadId) || args.deliverTo === "thread") {
+      throw new Error("A reminder goes to the user as written. To wake an agent thread, add a task with deliverTo 'thread'.");
+    }
     return { kind: "notify", text: message };
   }
+  const target = resolveScheduleTarget(args, { threadId: callerThreadId(context) }, "add");
   if (kind === "task") {
     const prompt = asTrimmedString(args.prompt);
     if (!prompt) {
       throw new Error('kind="task" requires prompt.');
     }
-    return { kind: "task", prompt, route: args.deliverTo === "orchestrator" ? "orchestrator" : "agent" };
+    return {
+      kind: "task",
+      prompt,
+      route: target?.kind === "orchestrator" ? "orchestrator" : "agent",
+      ...(target?.kind === "thread" ? { threadId: target.threadId } : {}),
+    };
   }
   if (kind === "watch") {
     const instructions = asTrimmedString(args.prompt);
     const watchOptions = {
       ...(instructions ? { instructions } : {}),
-      ...(args.deliverTo === "agent" ? { route: "agent" as const } : {}),
+      ...(target?.kind === "agent" ? { route: "agent" as const } : {}),
+      ...(target?.kind === "thread" ? { threadId: target.threadId } : {}),
       ...(args.once === true ? { once: true } : {}),
     };
-    if (args.deliverTo === "agent" && !instructions) {
+    if (target?.kind === "agent" && !instructions) {
       throw new Error('deliverTo="agent" needs prompt: the action the user approved.');
     }
     if (args.runsOn === "computer") {
@@ -204,31 +223,43 @@ const buildPayloadForAdd = (
   throw new Error('kind must be "reminder", "task", or "watch".');
 };
 
+const retarget = <P extends Extract<LocalCronPayload, { kind: "task" | "watch" }>>(
+  payload: P,
+  target: ScheduleTarget,
+): P => {
+  const { threadId: _previous, ...rest } = payload;
+  if (target.kind === "thread") return { ...rest, threadId: target.threadId } as P;
+  return { ...rest, route: target.kind } as P;
+};
+
 const buildPayloadPatch = (
   current: LocalCronPayload,
   args: Record<string, unknown>,
+  context: ToolContext,
 ): LocalCronPayload | null => {
   const message = asTrimmedString(args.message);
   const prompt = asTrimmedString(args.prompt);
   const scriptPath = asTrimmedString(args.scriptPath);
   const script = typeof args.script === "string" ? args.script.trim() : "";
+  const target =
+    current.kind === "task" || current.kind === "watch"
+      ? resolveScheduleTarget(args, { threadId: callerThreadId(context) }, "update")
+      : undefined;
   if (current.kind === "watch") {
-    const deliverTo = args.deliverTo === "agent" || args.deliverTo === "orchestrator" ? args.deliverTo : undefined;
     const once = typeof args.once === "boolean" ? args.once : undefined;
-    if (!prompt && !scriptPath && !script && deliverTo === undefined && once === undefined) return null;
+    if (!prompt && !scriptPath && !script && target === undefined && once === undefined) return null;
     if (scriptPath && !current.scriptPath) throw new Error("This watch runs in the cloud: replace its script, not a scriptPath.");
     if (script && current.scriptPath) throw new Error("This watch runs on this computer: replace its scriptPath, not a script.");
-    return {
+    const next = {
       ...current,
       ...(scriptPath ? { scriptPath } : {}),
       ...(script ? { script } : {}),
       ...(prompt ? { instructions: prompt } : {}),
-      ...(deliverTo ? { route: deliverTo } : {}),
       ...(once !== undefined ? { once } : {}),
     };
+    return target ? retarget(next, target) : next;
   }
-  const deliverTo = args.deliverTo === "agent" || args.deliverTo === "orchestrator" ? args.deliverTo : undefined;
-  if (!message && !prompt && !scriptPath && !(current.kind === "task" && deliverTo)) return null;
+  if (!message && !prompt && !scriptPath && !(current.kind === "task" && target)) return null;
 
   if (message) {
     if (current.kind !== "notify") {
@@ -238,8 +269,9 @@ const buildPayloadPatch = (
     }
     return { kind: "notify", text: message };
   }
-  if (current.kind === "task" && (prompt || deliverTo)) {
-    return { ...current, ...(prompt ? { prompt } : {}), ...(deliverTo ? { route: deliverTo } : {}) };
+  if (current.kind === "task" && (prompt || target)) {
+    const next = { ...current, ...(prompt ? { prompt } : {}) };
+    return target ? retarget(next, target) : next;
   }
   if (prompt) {
     if (current.kind === "agent") return { ...current, prompt };
@@ -259,7 +291,7 @@ export const handleScheduleAdd = async (
   context: ToolContext,
 ): Promise<ToolResult> => {
   const api = requireScheduleApi(scheduleApi);
-  const payload = buildPayloadForAdd(args);
+  const payload = buildPayloadForAdd(args, context);
   const record = await api.addCronJob({
     name: asTrimmedString(args.name),
     schedule: args.schedule as LocalCronSchedule,
@@ -274,10 +306,15 @@ export const handleScheduleAdd = async (
       : {}),
   });
   return {
-    result: `Added ${getCronTriggerKind(record.payload)} "${record.name}" (${record.id}), ${describeSchedule(record.schedule)}; next fire ${new Date(record.nextRunAtMs).toISOString()}.${watchCheckNote(record)}${whereNote(record)}`,
+    result: `Added ${getCronTriggerKind(record.payload)} "${record.name}" (${record.id}), ${describeSchedule(record.schedule)}; next fire ${new Date(record.nextRunAtMs).toISOString()}.${targetNote(record, context)}${watchCheckNote(record)}${whereNote(record)}`,
     details: cronDetails("added", record),
   };
 };
+
+const targetNote = (record: LocalCronJobRecord, context: ToolContext): string =>
+  record.payload.kind === "task" || record.payload.kind === "watch"
+    ? scheduleTargetLabel(record.payload.threadId, callerThreadId(context))
+    : "";
 
 /** Where its runs happen, when that is only this computer. */
 const whereNote = (record: LocalCronJobRecord): string => {
@@ -356,6 +393,7 @@ const updateHeartbeat = async (
 export const handleScheduleUpdate = async (
   scheduleApi: ScheduleToolApi | undefined,
   args: Record<string, unknown>,
+  context: ToolContext,
 ): Promise<ToolResult> => {
   const api = requireScheduleApi(scheduleApi);
   const jobId = asTrimmedString(args.jobId);
@@ -370,7 +408,7 @@ export const handleScheduleUpdate = async (
     }
     return { error: `No schedule entry found with jobId ${jobId}.` };
   }
-  const payloadPatch = buildPayloadPatch(existing.payload, args);
+  const payloadPatch = buildPayloadPatch(existing.payload, args, context);
   const record = await api.updateCronJob(jobId, {
     ...(asTrimmedString(args.name) ? { name: asTrimmedString(args.name) } : {}),
     ...(args.schedule !== undefined
@@ -389,7 +427,7 @@ export const handleScheduleUpdate = async (
     return { error: `No schedule entry found with jobId ${jobId}.` };
   }
   return {
-    result: `Updated ${getCronTriggerKind(record.payload)} "${record.name}" (${record.id}), ${describeSchedule(record.schedule)}; next fire ${new Date(record.nextRunAtMs).toISOString()}.${payloadPatch?.kind === "watch" && payloadPatch.script ? watchCheckNote(record) : ""}`,
+    result: `Updated ${getCronTriggerKind(record.payload)} "${record.name}" (${record.id}), ${describeSchedule(record.schedule)}; next fire ${new Date(record.nextRunAtMs).toISOString()}.${payloadPatch ? targetNote(record, context) : ""}${payloadPatch?.kind === "watch" && payloadPatch.script ? watchCheckNote(record) : ""}`,
     details: cronDetails("updated", record),
   };
 };

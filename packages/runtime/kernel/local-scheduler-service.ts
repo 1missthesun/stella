@@ -21,6 +21,12 @@ import {
   scheduleScriptsDir,
 } from './shared/schedule-scripts.js'
 import type { StellaHostRunnerTarget } from './lifecycle-targets.js'
+import {
+  SCHEDULE_THREAD_ID_MAX_CHARS,
+  scheduledThreadFallbackNote,
+  scheduledThreadMessage,
+  type ScheduledThreadFire,
+} from '@stella/contracts/schedule-thread'
 import type {
   LocalCronJobCreateInput,
   LocalCronJobRecord,
@@ -248,16 +254,19 @@ const assertValidPayload = (
     if (!prompt) {
       throw new Error('payload.kind="task" requires prompt.')
     }
-    return { kind: 'task', prompt }
+    const threadId = normalizeThreadId(record.threadId)
+    return { kind: 'task', prompt, ...(threadId ? { threadId } : {}) }
   }
   if (kind === 'watch') {
     const scriptPath = assertValidScriptPath(record.scriptPath, scriptsDir)
     const instructions = asTrimmedString(record.instructions)
+    const threadId = normalizeThreadId(record.threadId)
     return {
       kind: 'watch',
       scriptPath,
       ...(instructions ? { instructions } : {}),
       ...(record.route === 'agent' ? { route: 'agent' as const } : {}),
+      ...(threadId ? { threadId } : {}),
       ...(record.once === true ? { once: true } : {}),
     }
   }
@@ -280,6 +289,15 @@ const assertValidPayload = (
   throw new Error(
     'payload.kind must be "notify", "task", "watch", "script", or "agent".',
   )
+}
+
+const normalizeThreadId = (value: unknown): string | undefined => {
+  const threadId = asTrimmedString(value)
+  if (!threadId) return undefined
+  if (threadId.length > SCHEDULE_THREAD_ID_MAX_CHARS) {
+    throw new Error('threadId is too long.')
+  }
+  return threadId
 }
 
 const computeNextRunAtMs = (schedule: LocalCronSchedule, nowMs: number) => {
@@ -1467,16 +1485,95 @@ export class LocalSchedulerService {
     return 'done'
   }
 
+  /**
+   * A task or watch with a target thread messages that agent, which resumes
+   * with its own context and reports where it always does. A thread this
+   * computer no longer has falls back to an orchestrator turn with a note.
+   */
+  private async deliverToThread(
+    active: LocalCronJobRecord,
+    runner: NonNullable<LocalSchedulerRunner>,
+    firedAtMs: number,
+    fire: ScheduledThreadFire,
+  ): Promise<
+    | { status: 'none' }
+    | { status: 'delivered'; outcome: string }
+    | { status: 'fallback'; note: string }
+  > {
+    const payload = active.payload
+    const threadId =
+      payload.kind === 'task' || payload.kind === 'watch' ? payload.threadId : undefined
+    if (!threadId) return { status: 'none' }
+    if (!runner.messageAgent) {
+      return {
+        status: 'fallback',
+        note: scheduledThreadFallbackNote(threadId, 'this computer cannot reach right now'),
+      }
+    }
+    try {
+      const outcome = await runner.messageAgent({
+        threadId,
+        messageId: `schedule:${active.id}:${firedAtMs}`,
+        text: scheduledThreadMessage({ scheduleId: active.id, name: active.name }, fire),
+      })
+      if (outcome === 'not_found' || outcome === 'refused') {
+        return {
+          status: 'fallback',
+          note: scheduledThreadFallbackNote(
+            threadId,
+            outcome === 'not_found' ? 'no longer exists on this computer' : 'did not accept the message',
+          ),
+        }
+      }
+      return { status: 'delivered', outcome }
+    } catch (error) {
+      return {
+        status: 'fallback',
+        note: scheduledThreadFallbackNote(
+          threadId,
+          `could not be reached (${error instanceof Error ? error.message : String(error)})`,
+        ),
+      }
+    }
+  }
+
+  private finishThreadDelivery(
+    active: LocalCronJobRecord,
+    startedAt: number,
+    outcome: string,
+  ): void {
+    const finishedAt = Date.now()
+    active.runningAtMs = undefined
+    active.lastRunAtMs = finishedAt
+    active.lastDurationMs = finishedAt - startedAt
+    active.updatedAt = finishedAt
+    active.lastStatus = `thread-${outcome}`
+    active.lastError = undefined
+    this.advanceCronAfterRun(active, finishedAt, false)
+    this.persistState()
+    this.emitChange()
+  }
+
   private async executeCronTask(
     active: LocalCronJobRecord,
     runner: NonNullable<LocalSchedulerRunner>,
     startedAt: number,
   ): Promise<'done' | 'busy'> {
     if (active.payload.kind !== 'task') return 'done'
+    const taskPrompt = active.payload.prompt
+
+    const delivered = await this.deliverToThread(active, runner, startedAt, {
+      kind: 'task',
+      prompt: taskPrompt,
+    })
+    if (delivered.status === 'delivered') {
+      this.finishThreadDelivery(active, startedAt, delivered.outcome)
+      return 'done'
+    }
 
     const runResult = await runner.runAutomationTurn({
       conversationId: active.conversationId,
-      userPrompt: buildTaskFirePrompt(active.name, active.payload.prompt),
+      userPrompt: `${delivered.status === 'fallback' ? `${delivered.note}\n\n` : ''}${buildTaskFirePrompt(active.name, taskPrompt)}`,
       agentType: 'orchestrator',
     })
 
@@ -1615,7 +1712,43 @@ export class LocalSchedulerService {
       }
     }
 
+    const delivered = await this.deliverToThread(
+      active,
+      runner,
+      escalation.atMs,
+      escalation.reason === 'change'
+        ? {
+            kind: 'finding',
+            found: escalation.summary,
+            instructions: watch.instructions ?? 'Tell the user what it found.',
+            once: watch.once === true,
+          }
+        : {
+            kind: 'failure',
+            error: escalation.summary,
+            instructions: watch.instructions ?? 'Tell the user what it found.',
+            repair: `Its check script is ${scriptPath} (baseline state: ${scriptPath}.state.json). Repair it: find out what changed, fix the script, dry-run it, and update the schedule (${active.id}) if needed. If the watch is no longer viable, say so and remove it.`,
+          },
+    )
+    if (delivered.status === 'delivered') {
+      active.pendingEscalation = undefined
+      this.finishThreadDelivery(active, startedAt, delivered.outcome)
+      if (escalation.reason === 'change' && watch.once === true) {
+        active.enabled = false
+        active.lastStatus = 'done'
+      } else if (escalation.reason === 'sensor-error') {
+        active.lastStatus = 'sensor-error'
+        active.lastError = escalation.summary
+      }
+      this.persistState()
+      this.emitChange()
+      return 'done'
+    }
+    const fallbackNote =
+      delivered.status === 'fallback' ? `${delivered.note}\n\n` : ''
+
     const toAgent =
+      !watch.threadId &&
       escalation.reason === 'change' &&
       watch.route === 'agent' &&
       Boolean(watch.instructions) &&
@@ -1641,7 +1774,7 @@ export class LocalSchedulerService {
           )
         : await runner.runAutomationTurn({
             conversationId: active.conversationId,
-            userPrompt:
+            userPrompt: `${fallbackNote}${
               escalation.reason === 'change'
                 ? buildWatchChangePrompt(
                     active.name,
@@ -1649,7 +1782,8 @@ export class LocalSchedulerService {
                     watch.instructions,
                     watch.once === true,
                   )
-                : buildWatchFailurePrompt(active.name, scriptPath, escalation.summary),
+                : buildWatchFailurePrompt(active.name, scriptPath, escalation.summary)
+            }`,
             agentType: 'orchestrator',
           })
 

@@ -23,6 +23,8 @@ export type LocalCronPayload =
       kind: 'task'
       prompt: string
       route?: 'orchestrator' | 'agent'
+      /** Deliver each fire as a message to this existing agent thread, which resumes with its own context. */
+      threadId?: string
     }
   | {
       kind: 'watch'
@@ -30,6 +32,8 @@ export type LocalCronPayload =
       script?: string
       instructions?: string
       route?: 'orchestrator' | 'agent'
+      /** Deliver a finding (or a failed check) as a message to this existing agent thread. */
+      threadId?: string
       once?: boolean
     }
   | {

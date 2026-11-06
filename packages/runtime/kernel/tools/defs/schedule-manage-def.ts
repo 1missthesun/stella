@@ -69,7 +69,7 @@ export const SCHEDULE_ADD_TOOL_DESCRIPTOR: ScheduleToolDescriptor = {
   label: "Add schedule",
   workingText: "Adding schedule",
   description:
-    "Create a reminder (message, delivered as written with no AI), a task (an agent runs prompt at each fire and reports back) or a watch (an AI-free check script on a repeating schedule, in the cloud or with runsOn 'computer' here; only a finding or failure wakes AI). Limits: repeats at least 15 minutes apart (watches 5), at most 25 schedules, and a daily budget of scheduled runs. A cloud watch script is run once before saving and the first result is returned. On a computer signed out of Stella, or one keeping chats only on itself (cloud sync off), every schedule lives only on that computer (a watch then needs runsOn 'computer'). On a plan without cloud runs (Free), tasks and a watch's findings run only on the user's computer: if it is off or asleep when one is due, the user is told and it runs once the computer is back.",
+    "Create a reminder (message, delivered as written with no AI), a task (an agent runs prompt at each fire and reports back, or an existing agent thread is messaged with it) or a watch (an AI-free check script on a repeating schedule, in the cloud or with runsOn 'computer' here; only a finding or failure wakes AI). Limits: repeats at least 15 minutes apart (watches 5), at most 25 schedules, and a daily budget of scheduled runs. A cloud watch script is run once before saving and the first result is returned. On a computer signed out of Stella, or one keeping chats only on itself (cloud sync off), every schedule lives only on that computer (a watch then needs runsOn 'computer'). On a plan without cloud runs (Free), tasks and a watch's findings run only on the user's computer: if it is off or asleep when one is due, the user is told and it runs once the computer is back. An agent that schedules a task or watch gets it on its own thread by default: at fire time it resumes with its whole context, and its report goes where its reports always go, without waking Stella first.",
   parameters: {
     type: "object",
     properties: {
@@ -91,7 +91,7 @@ export const SCHEDULE_ADD_TOOL_DESCRIPTOR: ScheduleToolDescriptor = {
       prompt: {
         type: "string",
         description:
-          "kind='task': the work, as the brief an agent gets at fire time (or you, with deliverTo 'orchestrator'). kind='watch': what to do with a finding, as the user put it (tell them, ask them, or act; with deliverTo 'agent', the approved action itself). Make it self-contained.",
+          "kind='task': the work, as the brief an agent gets at fire time (or you, with deliverTo 'orchestrator'; or the message the target thread gets, with deliverTo 'thread'). kind='watch': what to do with a finding, as the user put it (tell them, ask them, or act; with deliverTo 'agent', the approved action itself). Make it self-contained.",
       },
       script: {
         type: "string",
@@ -111,9 +111,14 @@ export const SCHEDULE_ADD_TOOL_DESCRIPTOR: ScheduleToolDescriptor = {
       },
       deliverTo: {
         type: "string",
-        enum: ["orchestrator", "agent"],
+        enum: ["orchestrator", "agent", "thread"],
         description:
-          "kind='task': 'agent' (default) runs it as an agent; 'orchestrator' only when it needs your judgment at fire time. kind='watch': who handles a finding; 'orchestrator' (default) wakes you to tell, ask or act as prompt says, 'agent' starts an agent on prompt right away, for an action the user already approved (\"book it when it opens\").",
+          "kind='task': 'agent' (default for Stella) starts a new agent on prompt; 'orchestrator' only when it needs Stella's judgment at fire time; 'thread' messages an existing agent thread (threadId) with prompt, which resumes it with its own context. kind='watch': who handles a finding; 'orchestrator' (default for Stella) wakes Stella to tell, ask or act as prompt says, 'agent' starts an agent on prompt right away, for an action the user already approved (\"book it when it opens\"), 'thread' hands the finding to an existing agent thread. An agent calling this gets 'thread' on its own thread by default; pass 'orchestrator' or 'agent' to wake Stella or start a fresh agent instead.",
+      },
+      threadId: {
+        type: "string",
+        description:
+          "kind='task' or 'watch' with deliverTo 'thread': the thread_id of an existing agent (from agent_status or spawn_agent) to message at fire time. Use it to have the agent already doing that work pick up its own follow-up (\"check the deploy in 2 hours\") instead of a fresh agent. Defaults to the calling agent's own thread. If that thread is gone when it fires, Stella gets it instead, with a note.",
       },
       once: {
         type: "boolean",
@@ -180,8 +185,12 @@ export const SCHEDULE_UPDATE_TOOL_DESCRIPTOR: ScheduleToolDescriptor = {
       },
       deliverTo: {
         type: "string",
-        enum: ["orchestrator", "agent"],
-        description: "Task entries: who runs it at fire time. Watch entries: who handles a finding.",
+        enum: ["orchestrator", "agent", "thread"],
+        description: "Task entries: who runs it at fire time. Watch entries: who handles a finding. 'thread' with threadId (default: your own thread) targets an existing agent; 'orchestrator' or 'agent' drops the target thread.",
+      },
+      threadId: {
+        type: "string",
+        description: "Task and watch entries: deliver to this existing agent thread from now on.",
       },
       once: {
         type: "boolean",
@@ -212,6 +221,53 @@ export const SCHEDULE_REMOVE_TOOL_DESCRIPTOR: ScheduleToolDescriptor = {
 };
 
 
+export type ScheduleTarget =
+  | { kind: "orchestrator" }
+  | { kind: "agent" }
+  | { kind: "thread"; threadId: string };
+
+const STELLA_TARGET = "stella";
+
+const threadTarget = (threadId: string): ScheduleTarget => {
+  if (threadId.toLowerCase() === STELLA_TARGET) {
+    throw new Error("To have Stella handle it, use deliverTo 'orchestrator' instead of a threadId.");
+  }
+  return { kind: "thread", threadId };
+};
+
+/**
+ * Who a task's fire or a watch's finding goes to. An agent's own schedule
+ * defaults to its own thread; Stella's keeps each kind's default (undefined).
+ * On update, undefined means unchanged.
+ */
+export const resolveScheduleTarget = (
+  args: Record<string, unknown>,
+  caller: { threadId?: string },
+  mode: "add" | "update",
+): ScheduleTarget | undefined => {
+  const deliverTo = typeof args.deliverTo === "string" ? args.deliverTo.trim() : "";
+  const threadId = typeof args.threadId === "string" ? args.threadId.trim() : "";
+  if (deliverTo && deliverTo !== "orchestrator" && deliverTo !== "agent" && deliverTo !== "thread") {
+    throw new Error("deliverTo must be 'orchestrator', 'agent' or 'thread'.");
+  }
+  if (deliverTo === "orchestrator" || deliverTo === "agent") {
+    if (threadId) throw new Error(`threadId goes with deliverTo 'thread', not '${deliverTo}'.`);
+    return { kind: deliverTo };
+  }
+  if (threadId) return threadTarget(threadId);
+  if (deliverTo === "thread") {
+    if (!caller.threadId) {
+      throw new Error("deliverTo 'thread' needs threadId: the thread_id of the agent to message when it fires.");
+    }
+    return threadTarget(caller.threadId);
+  }
+  return mode === "add" && caller.threadId ? threadTarget(caller.threadId) : undefined;
+};
+
+export const scheduleTargetLabel = (threadId: string | undefined, self?: string): string =>
+  threadId ? (threadId === self ? " It messages your own thread when it fires." : ` It messages agent ${threadId} when it fires.`) : "";
+
+
 export type ScheduleListRow = {
   jobId: string;
   name: string;
@@ -223,6 +279,7 @@ export type ScheduleListRow = {
   prompt?: string;
   scriptPath?: string;
   deliverTo?: string;
+  threadId?: string;
   once?: true;
   lastFinding?: string;
   lastError?: string;

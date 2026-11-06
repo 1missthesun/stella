@@ -2125,6 +2125,16 @@ export class StellaRuntimeHost {
               description,
               prompt,
             }),
+          messageAgent: async ({ threadId, messageId, text }) => {
+            const result = await this.requestWorker<{
+              outcome?: AgentMessageDeviceOutcome;
+            } | null>(
+              METHOD_NAMES.INTERNAL_WORKER_DELIVER_AGENT_MESSAGE,
+              { threadId, text, messageId, ownerGeneration: "" },
+              { ensureWorker: true, recordActivity: true },
+            );
+            return result?.outcome ?? "refused";
+          },
         }),
       },
       ...(showNotificationHandler

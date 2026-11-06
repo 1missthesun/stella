@@ -57,9 +57,9 @@ export const createScheduleManageTools = (
     replay: "unsafe",
     agentTypes: SCHEDULE_AGENT_TYPES,
     demoted: { searchTerms: SCHEDULE_SEARCH_TERMS },
-    execute: async (args) => {
+    execute: async (args, context) => {
       try {
-        return await handleScheduleUpdate(options.scheduleApi, args);
+        return await handleScheduleUpdate(options.scheduleApi, args, context);
       } catch (error) {
         return { error: (error as Error).message };
       }

@@ -78,6 +78,7 @@ import type { CloudBrowserClient } from "../cloud-browser.js";
 import { createCloudWebTool } from "../cloud-web-tool.js";
 import { createCloudImageGenTool } from "../cloud-image-gen-tool.js";
 import { createCloudVideoGenTool } from "../cloud-video-gen-tool.js";
+import { createCloudScheduleTools } from "../cloud-schedule-tools.js";
 import { unwrapRpc } from "../owner-store/errors.js";
 import { sha256Hex } from "../hash.js";
 import {
@@ -1900,9 +1901,18 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
         ? {}
         : { mcp: ownerMcpSource(ownerInternal) }),
     });
+    const schedules = isSlackConversationId(authority.conversationId)
+      ? []
+      : createCloudScheduleTools({
+          ownerId: authority.ownerId,
+          ownerGeneration: authority.ownerGeneration,
+          conversationId: authority.conversationId,
+          ownerInternal,
+          ...(delivery?.threadId ? { threadId: delivery.threadId } : {}),
+        });
     const code = await createCloudCodeAgentTool({
       loader: this.env.LOADER,
-      tools: [web],
+      tools: [web, ...schedules],
       executionScope: `${authority.ownerGeneration}:${authority.conversationId}:pi-agents`,
       connect: createCloudConnectClient(connectors),
       ...(browser ? { browser } : {}),
@@ -1923,7 +1933,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
         await delivery.deliver(files);
       },
     };
-    return [code, web, createCloudImageGenTool(media), createCloudVideoGenTool(media)];
+    return [code, web, createCloudImageGenTool(media), createCloudVideoGenTool(media), ...schedules];
   }
 
   protected async awaitPiBrowserHandoff(

@@ -20,6 +20,8 @@ export type ScheduleRow = {
   scheduleId: string;
   kind: ScheduleKind;
   route: ScheduleRoute;
+  /** A task's fire or a watch's finding goes as a message to this existing agent thread instead of `route`. */
+  targetThreadId?: string;
   once?: boolean;
   lastCheckAt?: number;
   lastFinding?: string;
@@ -62,6 +64,7 @@ export type ScheduleCalls = {
       conversationId?: string;
       targetDeviceId?: string;
       route?: ScheduleRoute;
+      targetThreadId?: string;
       script?: string;
       once?: boolean;
     };
@@ -76,6 +79,8 @@ export type ScheduleCalls = {
       description?: string;
       status?: "active" | "paused";
       route?: ScheduleRoute;
+      /** Without it, a `route` change clears the target thread. */
+      targetThreadId?: string;
       script?: string;
       once?: boolean;
     };

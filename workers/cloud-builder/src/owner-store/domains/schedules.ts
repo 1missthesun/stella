@@ -38,6 +38,12 @@ import type { OwnerContext, OwnerDb, OwnerDbReader, OwnerDomain } from "../regis
 import { ScheduledTurnError } from "../scheduled-turn.js";
 import { billingAccess, cloudSandboxAccess } from "./billing.js";
 import { livePushTokens, sendPushMessages } from "./devices.js";
+import { deliverScheduledMessage, scheduleTargetThread } from "./agent-threads.js";
+import {
+  scheduledThreadFallbackNote,
+  scheduledThreadMessage,
+  type ScheduledThreadFire,
+} from "@stella/contracts/schedule-thread";
 import { runWatchCheck } from "../watch-runner.js";
 import { log } from "../../build-session/shared/keys.js";
 import {
@@ -186,10 +192,16 @@ export const SCHEDULES_RUN_STATE_MIGRATION = {
   ],
 };
 
+export const SCHEDULES_TARGET_THREAD_MIGRATION = {
+  id: "schedules.10-target-thread",
+  statements: [`ALTER TABLE schedules ADD COLUMN target_thread_id TEXT`],
+};
+
 type Row = {
   schedule_id: string;
   kind: string;
   route: string;
+  target_thread_id: string | null;
   once: number;
   script: string | null;
   state_json: string | null;
@@ -278,6 +290,7 @@ const toScheduleRow = (row: Row, ownerZone?: string, computerOnly = false): Sche
   scheduleId: row.schedule_id,
   kind: toScheduleKind(row.kind),
   route: toRoute(row.route),
+  ...(row.target_thread_id ? { targetThreadId: row.target_thread_id } : {}),
   ...(row.once ? { once: true } : {}),
   ...(row.last_check_at !== null ? { lastCheckAt: row.last_check_at } : {}),
   ...(row.last_finding ? { lastFinding: row.last_finding } : {}),
@@ -669,8 +682,21 @@ type CreateInput = {
   conversationId?: string;
   targetDeviceId?: string;
   route?: ScheduleRoute;
+  targetThreadId?: string;
   script?: string;
   once?: boolean;
+};
+
+/** A schedule may target only an agent the ledger knows; its canonical thread id. */
+const targetThreadOf = (ctx: OwnerContext, kind: ScheduleKind, threadId: string | undefined): string | null => {
+  const wanted = threadId?.trim();
+  if (!wanted) return null;
+  if (kind === "reminder") bad("A reminder goes to the user as written; a task or watch can target an agent thread.");
+  const thread = scheduleTargetThread(ctx.db, wanted);
+  if (!thread) {
+    bad(`No agent has the thread_id ${wanted}. agent_status lists the agents you can reach.`);
+  }
+  return thread!.thread_id;
 };
 
 const createSchedule = async (
@@ -687,7 +713,19 @@ const createSchedule = async (
   const script = kind === "watch" ? cleanScript(input.script) : null;
   const once = kind === "watch" && input.once === true;
   const requestId = input.requestId.trim();
-  const intent = { kind, prompt, schedule, description, conversationId, targetDeviceId, route, script, once };
+  const targetThreadId = targetThreadOf(ctx, kind, input.targetThreadId);
+  const intent = {
+    kind,
+    prompt,
+    schedule,
+    description,
+    conversationId,
+    targetDeviceId,
+    route,
+    script,
+    once,
+    ...(targetThreadId ? { targetThreadId } : {}),
+  };
   const scheduleId = `sch-${crypto.randomUUID().slice(0, 18)}`;
   const replay = ctx.db.one<{ request_id: string }>(
     "SELECT request_id FROM schedule_receipts WHERE request_id = ?",
@@ -725,6 +763,7 @@ const createSchedule = async (
         schedule_id: scheduleId,
         kind,
         route,
+        target_thread_id: targetThreadId,
         once: once ? 1 : 0,
         script,
         state_json: first?.stateJson ?? null,
@@ -774,6 +813,7 @@ type UpdateInput = {
   description?: string;
   status?: "active" | "paused";
   route?: ScheduleRoute;
+  targetThreadId?: string;
   script?: string;
   once?: boolean;
 };
@@ -794,6 +834,10 @@ const updateSchedule = async (
     "SELECT request_id FROM schedule_receipts WHERE request_id = ?",
     requestId,
   );
+  const targetThreadId =
+    input.targetThreadId === undefined || !existing || replay
+      ? input.targetThreadId?.trim()
+      : (targetThreadOf(ctx, toScheduleKind(existing.kind), input.targetThreadId) ?? undefined);
   const first = script !== undefined && existing && !replay ? await firstCheck(ctx, existing.schedule_id, script) : null;
   return withReceipt(
     ctx.db,
@@ -809,6 +853,7 @@ const updateSchedule = async (
       route: input.route ?? null,
       script: script ?? null,
       once: input.once ?? null,
+      ...(targetThreadId ? { targetThreadId } : {}),
     },
     (): ScheduleRow & { check?: WatchCheckResult } => {
       const row = readRow(ctx.db, input.scheduleId);
@@ -839,6 +884,14 @@ const updateSchedule = async (
         description:
           input.description === undefined ? row.description : cleanDescription(input.description, nextPrompt),
         route: kind === "reminder" ? row.route : (input.route ?? row.route),
+        target_thread_id:
+          kind === "reminder"
+            ? null
+            : targetThreadId
+              ? targetThreadId
+              : input.route !== undefined
+                ? null
+                : row.target_thread_id,
         once: kind === "watch" && input.once !== undefined ? (input.once ? 1 : 0) : row.once,
         waiting_since: schedule || input.status === "paused" ? null : row.waiting_since,
         ...(first
@@ -858,7 +911,7 @@ const updateSchedule = async (
       };
       ctx.db.run(
         `UPDATE schedules SET prompt = ?, schedule_json = ?, next_run_at = ?, status = ?,
-                description = ?, route = ?, once = ?, script = ?, state_json = ?, pending_finding = ?,
+                description = ?, route = ?, target_thread_id = ?, once = ?, script = ?, state_json = ?, pending_finding = ?,
                 last_check_at = ?, last_finding = ?, failing_since = ?, repair_sent_at = ?, last_error = ?,
                 last_error_at = ?, waiting_since = ?, updated_at = ? WHERE schedule_id = ?`,
         next.prompt,
@@ -867,6 +920,7 @@ const updateSchedule = async (
         next.status,
         next.description,
         next.route,
+        next.target_thread_id,
         next.once,
         next.script,
         next.state_json,
@@ -887,6 +941,7 @@ const updateSchedule = async (
         next.schedule_json !== row.schedule_json ||
         next.description !== row.description ||
         next.route !== row.route ||
+        next.target_thread_id !== row.target_thread_id ||
         next.once !== row.once ||
         next.script !== row.script;
       if (edited) queueNotice(ctx, next, "updated");
@@ -936,6 +991,7 @@ const toolParser = object({
   action: literal("list", "create", "update", "remove"),
   kind: optional(literal("reminder", "task", "watch")),
   route: optional(literal("orchestrator", "agent")),
+  targetThreadId: optional(string({ max: 128, pattern: ID_PATTERN })),
   script: optional(string({ max: WATCH_SCRIPT_MAX_CHARS + 1_000 })),
   once: optional(boolean()),
   requestId: optional(string({ max: 128 })),
@@ -966,6 +1022,7 @@ const scheduleTool = async (ctx: OwnerContext, raw: unknown): Promise<ScheduleTo
         ...(args.description !== undefined ? { description: args.description } : {}),
         ...(args.conversationId !== undefined ? { conversationId: args.conversationId } : {}),
         ...(args.route !== undefined ? { route: args.route } : {}),
+        ...(args.targetThreadId !== undefined ? { targetThreadId: args.targetThreadId } : {}),
         ...(args.script !== undefined ? { script: args.script } : {}),
         ...(args.once !== undefined ? { once: args.once } : {}),
       },
@@ -991,6 +1048,7 @@ const scheduleTool = async (ctx: OwnerContext, raw: unknown): Promise<ScheduleTo
         ...(args.description !== undefined ? { description: args.description } : {}),
         ...(args.status !== undefined ? { status: args.status } : {}),
         ...(args.route !== undefined ? { route: args.route } : {}),
+        ...(args.targetThreadId !== undefined ? { targetThreadId: args.targetThreadId } : {}),
         ...(args.script !== undefined ? { script: args.script } : {}),
         ...(args.once !== undefined ? { once: args.once } : {}),
       },
@@ -1353,20 +1411,39 @@ const runFire = async (
     await fireWatch(ctx, row, fireId, retrying, snapshot.ownerGeneration);
     return;
   }
+  const late = retrying ? "" : lateNote(row.waiting_since ?? row.next_run_at, ctx.now);
+  let spent = retrying;
+  let fallback = "";
+  if (row.target_thread_id) {
+    if (!spent && !spendRun(ctx, scheduleId, fireId)) return;
+    spent = true;
+    const sent = await sendToThread(ctx, row, fireId, snapshot.ownerGeneration, {
+      kind: "task",
+      prompt: row.prompt,
+      ...(late ? { note: late.trim() } : {}),
+    });
+    if (sent.kind !== "fallback") {
+      finishFire(ctx, scheduleId, fireId, sent.kind === "retry" ? { error: sent.error, retry: { sameFire: true } } : {});
+      return;
+    }
+    fallback = `${sent.note}\n\n`;
+  }
   const placement = await placementOf(ctx, row);
   if (placement.away) {
     await waitForComputer(ctx, row, fireId, placement.device);
     return;
   }
-  if (!retrying && !spendRun(ctx, scheduleId, fireId)) return;
+  if (!spent && !spendRun(ctx, scheduleId, fireId)) return;
   const started = await startRun(
     ctx,
     row,
     fireId,
     snapshot.ownerGeneration,
     {
-      prompt: `${row.prompt}${retrying ? "" : lateNote(row.waiting_since ?? row.next_run_at, ctx.now)}`,
-      ...(toRoute(row.route) === "agent" ? { agent: { description: row.description } } : {}),
+      prompt: `${fallback}${row.prompt}${late}`,
+      ...(toRoute(row.route) === "agent" && !row.target_thread_id
+        ? { agent: { description: row.description } }
+        : {}),
     },
     placement,
   );
@@ -1561,6 +1638,55 @@ const startRun = async (
   return { ok: true };
 };
 
+type ThreadSend =
+  | { kind: "delivered" }
+  | { kind: "retry"; error: string }
+  | { kind: "fallback"; note: string };
+
+/**
+ * Hands a fire to the schedule's target thread. A thread that is gone, or
+ * whose computer refuses it, falls back to Stella with a note; a thread
+ * that is only between runs is retried.
+ */
+const sendToThread = async (
+  ctx: OwnerContext,
+  row: Row,
+  fireId: string,
+  ownerGeneration: string,
+  fire: ScheduledThreadFire,
+): Promise<ThreadSend> => {
+  const threadId = row.target_thread_id!;
+  try {
+    const result = await deliverScheduledMessage(ctx, {
+      scheduleId: row.schedule_id,
+      name: row.description,
+      fireId,
+      ownerGeneration,
+      threadId,
+      text: scheduledThreadMessage({ scheduleId: row.schedule_id, name: row.description }, fire),
+    });
+    log("info", "schedule_thread_delivered", {
+      scheduleId: row.schedule_id,
+      fireId,
+      threadId,
+      outcome: result.outcome,
+    });
+    return { kind: "delivered" };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    log("info", "schedule_thread_undelivered", { scheduleId: row.schedule_id, fireId, threadId, message });
+    if (error instanceof RpcError && error.retryable) return { kind: "retry", error: message.slice(0, MAX_ERROR_CHARS) };
+    if (!(error instanceof RpcError)) return { kind: "retry", error: message.slice(0, MAX_ERROR_CHARS) };
+    return {
+      kind: "fallback",
+      note: scheduledThreadFallbackNote(
+        threadId,
+        error.code === "NOT_FOUND" ? "no longer exists" : `could not take it (${message})`,
+      ),
+    };
+  }
+};
+
 const watchFoundPrompt = (row: Row, found: string): string =>
   [
     `[Watch "${row.description}" found something] (${row.schedule_id})`,
@@ -1647,33 +1773,60 @@ const fireWatch = async (
       failure = run.error;
     }
   }
-  const placement = await placementOf(ctx, row);
-  if (placement.away) {
-    await waitForComputer(ctx, row, fireId, placement.device);
-    return;
+  let spent = retrying;
+  let fallback = "";
+  if (row.target_thread_id) {
+    if (!spent && !spendRun(ctx, scheduleId, fireId)) return;
+    spent = true;
+    const sent = await sendToThread(
+      ctx,
+      row,
+      fireId,
+      ownerGeneration,
+      found
+        ? { kind: "finding", found, instructions: row.prompt, once: row.once === 1 }
+        : {
+            kind: "failure",
+            error: failure,
+            instructions: row.prompt,
+            repair: `It keeps trying on its schedule. Repair it: find out what changed, rewrite the check script and replace it with schedule_update({ jobId: "${scheduleId}", script }), which checks it once before saving. Tell the user only if it can't be fixed.`,
+          },
+    );
+    if (sent.kind === "retry") {
+      finishFire(ctx, scheduleId, fireId, { error: sent.error, retry: { sameFire: true } });
+      return;
+    }
+    if (sent.kind === "fallback") fallback = `${sent.note}\n\n`;
   }
-  if (!retrying && !spendRun(ctx, scheduleId, fireId)) return;
-  const toAgent = Boolean(found) && toRoute(row.route) === "agent";
-  const started = await startRun(
-    ctx,
-    row,
-    fireId,
-    ownerGeneration,
-    found
-      ? {
-          prompt: toAgent ? watchAgentPrompt(row, found) : watchFoundPrompt(row, found),
-          ...(toAgent ? { agent: { description: row.description } } : {}),
-        }
-      : { prompt: watchFailedPrompt(row, failure) },
-    placement,
-  );
-  if (!started.ok && started.computerAway) {
-    await waitForComputer(ctx, row, fireId, placement.device);
-    return;
-  }
-  if (!started.ok) {
-    finishFire(ctx, scheduleId, fireId, started.outcome);
-    return;
+  if (!row.target_thread_id || fallback) {
+    const placement = await placementOf(ctx, row);
+    if (placement.away) {
+      await waitForComputer(ctx, row, fireId, placement.device);
+      return;
+    }
+    if (!spent && !spendRun(ctx, scheduleId, fireId)) return;
+    const toAgent = Boolean(found) && toRoute(row.route) === "agent" && !row.target_thread_id;
+    const started = await startRun(
+      ctx,
+      row,
+      fireId,
+      ownerGeneration,
+      found
+        ? {
+            prompt: `${fallback}${toAgent ? watchAgentPrompt(row, found) : watchFoundPrompt(row, found)}`,
+            ...(toAgent ? { agent: { description: row.description } } : {}),
+          }
+        : { prompt: `${fallback}${watchFailedPrompt(row, failure)}` },
+      placement,
+    );
+    if (!started.ok && started.computerAway) {
+      await waitForComputer(ctx, row, fireId, placement.device);
+      return;
+    }
+    if (!started.ok) {
+      finishFire(ctx, scheduleId, fireId, started.outcome);
+      return;
+    }
   }
   if (found) {
     ctx.db.run("UPDATE schedules SET pending_finding = NULL WHERE schedule_id = ?", scheduleId);
@@ -1696,6 +1849,7 @@ const createArgs = object({
   conversationId: optional(string({ max: 128 })),
   targetDeviceId: optional(string({ max: 256 })),
   route: optional(literal("orchestrator", "agent")),
+  targetThreadId: optional(string({ max: 128, pattern: ID_PATTERN })),
   script: optional(string({ max: WATCH_SCRIPT_MAX_CHARS + 1_000 })),
   once: optional(boolean()),
 });
@@ -1708,6 +1862,7 @@ const updateArgs = object({
   description: optional(string({ max: 1_000 })),
   status: optional(literal("active", "paused")),
   route: optional(literal("orchestrator", "agent")),
+  targetThreadId: optional(string({ max: 128, pattern: ID_PATTERN })),
   script: optional(string({ max: WATCH_SCRIPT_MAX_CHARS + 1_000 })),
   once: optional(boolean()),
 });
@@ -1729,6 +1884,7 @@ export const schedulesDomain = {
     SCHEDULES_WATCH_REPAIR_MIGRATION,
     SCHEDULES_WAITING_MIGRATION,
     SCHEDULES_RUN_STATE_MIGRATION,
+    SCHEDULES_TARGET_THREAD_MIGRATION,
   ],
   views: {
     "schedules.list": {

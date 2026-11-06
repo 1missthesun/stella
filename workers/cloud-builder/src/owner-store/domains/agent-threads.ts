@@ -1746,6 +1746,32 @@ const deliverAgentMessage = async (
   ).result;
 };
 
+/** The ledger's id for an agent thread a schedule may target, or null when it has none. */
+export const scheduleTargetThread = (db: OwnerDbReader, threadId: string): ThreadRow | null => {
+  const id = isPlacementThreadId(threadId) ? (placementAliasThreadId(db, threadId) ?? threadId) : threadId;
+  return readThread(db, id);
+};
+
+/**
+ * A schedule's fire, as a message to an existing agent thread: it routes like
+ * send_message (steers, resumes, or is held for an offline computer), and the
+ * agent's report goes where its reports always go.
+ */
+export const deliverScheduledMessage = async (
+  ctx: OwnerContext,
+  args: { scheduleId: string; name: string; fireId: string; ownerGeneration: string; threadId: string; text: string },
+): Promise<AgentControlResult> =>
+  await deliverAgentMessage(ctx, {
+    ownerGeneration: args.ownerGeneration,
+    commandId: `schedule:${args.fireId}`,
+    to: args.threadId,
+    text: args.text,
+    framed: true,
+    from: { threadId: args.scheduleId, label: `schedule "${args.name}"` },
+    kind: "message",
+    source: `schedule:${args.scheduleId}`,
+  });
+
 type ControlKind = AgentControlCommand["kind"];
 
 type CommandRow = {

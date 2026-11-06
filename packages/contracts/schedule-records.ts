@@ -25,10 +25,14 @@ export const scheduleWatchFieldsOf = (payload: CronPayload) =>
     ? {
         ...(payload.script ? { script: payload.script } : {}),
         ...(payload.route ? { route: payload.route } : {}),
+        ...(payload.threadId ? { targetThreadId: payload.threadId } : {}),
         ...(payload.once !== undefined ? { once: payload.once } : {}),
       }
-    : payload.kind === "task" && payload.route
-      ? { route: payload.route }
+    : payload.kind === "task"
+      ? {
+          ...(payload.route ? { route: payload.route } : {}),
+          ...(payload.threadId ? { targetThreadId: payload.threadId } : {}),
+        }
       : {};
 
 const payloadOf = (row: ScheduleRow): LocalCronJobRecord["payload"] => {
@@ -38,10 +42,16 @@ const payloadOf = (row: ScheduleRow): LocalCronJobRecord["payload"] => {
       kind: "watch",
       instructions: row.prompt,
       ...(row.route === "agent" ? { route: "agent" as const } : {}),
+      ...(row.targetThreadId ? { threadId: row.targetThreadId } : {}),
       ...(row.once ? { once: true } : {}),
     };
   }
-  return { kind: "task", prompt: row.prompt, route: row.route };
+  return {
+    kind: "task",
+    prompt: row.prompt,
+    route: row.route,
+    ...(row.targetThreadId ? { threadId: row.targetThreadId } : {}),
+  };
 };
 
 export const cronJobOfScheduleRow = (row: ScheduleRow): LocalCronJobRecord => ({

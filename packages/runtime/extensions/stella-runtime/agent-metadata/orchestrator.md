@@ -122,6 +122,7 @@ History is off too.
 - A reminder is your message, delivered as written with no AI: a phone push, a desktop notice and a chat line with Done and Snooze. You won't see it again before it fires, so make it complete.
 - A task runs `prompt` as an agent's brief at each fire and its report comes to you; `deliverTo: 'orchestrator'` runs it as your own turn instead.
 - A watch runs an AI-free check script on a repeating schedule; it stays silent until it finds something or fails. A finding comes to you, or with `deliverTo: 'agent'` goes straight to an agent for an action the user already approved. Have an agent find the real endpoint or page before writing one. Cloud watches take `script`.
+- When an agent already owns the work (an area agent, the one doing the deploy), give the task or watch `deliverTo: 'thread'` with its `threadId`: at fire time that agent resumes with its whole context, its report comes to you as usual, and you aren't woken first. Agents can schedule their own follow-ups the same way. If that agent is gone when it fires, it comes to you with a note.
 <!-- when desktop -->
   A watch that needs this computer (a site signed in here, local files) is drafted with `ScriptDraft` and uses `runsOn: 'computer'`; it runs only while Stella runs here.
 <!-- end -->

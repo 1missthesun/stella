@@ -7,6 +7,8 @@ import {
   SCHEDULE_SEARCH_TERMS,
   SCHEDULE_UPDATE_TOOL_DESCRIPTOR,
   formatScheduleList,
+  resolveScheduleTarget,
+  scheduleTargetLabel,
   type ScheduleListRow,
   type ScheduleToolDescriptor,
 } from "@stella/runtime/kernel/tools/defs/schedule-manage-def.js";
@@ -21,6 +23,8 @@ export type CloudScheduleToolContext = Readonly<{
   ownerGeneration: string;
   conversationId: string;
   ownerInternal: OwnerInternalCall;
+  /** Set for an agent: its own thread, which its schedules target by default. */
+  threadId?: string;
 }>;
 
 export const CLOUD_SCHEDULE_MIN_EVERY_MS = 15 * 60_000;
@@ -29,6 +33,7 @@ type ScheduleRow = {
   scheduleId: string;
   kind?: string;
   route?: string;
+  targetThreadId?: string;
   once?: boolean;
   lastFinding?: string;
   lastCheckAt?: number;
@@ -90,9 +95,11 @@ const listRow = (row: ScheduleRow): ScheduleListRow => {
     enabled: row.status === "active",
     ...(iso(row.nextRunAt) ? { next: iso(row.nextRunAt) } : {}),
     ...(message !== undefined ? { message } : { prompt: row.prompt }),
-    ...(row.kind === "task" || watch
-      ? { deliverTo: row.route === "agent" ? "agent" : "orchestrator" }
-      : {}),
+    ...((row.kind === "task" || watch) && row.targetThreadId
+      ? { deliverTo: "thread", threadId: row.targetThreadId }
+      : row.kind === "task" || watch
+        ? { deliverTo: row.route === "agent" ? "agent" : "orchestrator" }
+        : {}),
     ...(watch && row.once ? { once: true as const } : {}),
     ...(watch && row.lastFinding ? { lastFinding: row.lastFinding } : {}),
     ...(row.lastError ? { lastError: row.lastError } : {}),
@@ -101,6 +108,9 @@ const listRow = (row: ScheduleRow): ScheduleListRow => {
   };
 };
 
+const deliverToOf = (row: ScheduleRow): string =>
+  row.targetThreadId ? "thread" : row.route === "agent" ? "agent" : "orchestrator";
+
 const summarizeRow = (row: ScheduleRow): Record<string, unknown> => {
   const message = row.kind === "reminder" ? row.prompt : null;
   const watch = row.kind === "watch";
@@ -108,11 +118,12 @@ const summarizeRow = (row: ScheduleRow): Record<string, unknown> => {
     jobId: row.scheduleId,
     name: row.description || (message ?? row.prompt).slice(0, 60),
     triggerKind: message !== null ? "reminder" : watch ? "watch" : "task",
-    ...(row.kind === "task" ? { deliverTo: row.route === "agent" ? "agent" : "orchestrator" } : {}),
+    ...(row.kind === "task" ? { deliverTo: deliverToOf(row) } : {}),
+    ...(row.targetThreadId ? { threadId: row.targetThreadId } : {}),
     ...(watch
       ? {
           runsOn: "cloud",
-          deliverTo: row.route === "agent" ? "agent" : "orchestrator",
+          deliverTo: deliverToOf(row),
           ...(row.once ? { once: true } : {}),
           ...(row.lastFinding ? { lastFinding: row.lastFinding } : {}),
           ...(iso(row.lastCheckAt) ? { lastCheckAt: iso(row.lastCheckAt) } : {}),
@@ -267,13 +278,20 @@ export const createCloudScheduleTools = (
         const kind = asTrimmedString(args.kind);
         let prompt: string;
         let watch: Record<string, unknown> = {};
+        const self = context.threadId ? { threadId: context.threadId } : {};
+        const target =
+          kind === "task" || kind === "watch" ? resolveScheduleTarget(args, self, "add") : undefined;
+        const targetFields = target?.kind === "thread" ? { targetThreadId: target.threadId } : {};
         if (kind === "reminder") {
           prompt = asTrimmedString(args.message);
           if (!prompt) throw new Error('kind="reminder" requires message.');
+          if (asTrimmedString(args.threadId) || args.deliverTo === "thread") {
+            throw new Error("A reminder goes to the user as written. To wake an agent thread, add a task with deliverTo 'thread'.");
+          }
         } else if (kind === "task") {
           prompt = asTrimmedString(args.prompt);
           if (!prompt) throw new Error('kind="task" requires prompt.');
-          watch = { route: args.deliverTo === "orchestrator" ? "orchestrator" : "agent" };
+          watch = { route: target?.kind === "orchestrator" ? "orchestrator" : "agent", ...targetFields };
         } else if (kind === "watch") {
           if (args.runsOn === "computer" || asTrimmedString(args.scriptPath)) {
             throw new Error(
@@ -287,12 +305,13 @@ export const createCloudScheduleTools = (
             );
           }
           prompt = asTrimmedString(args.prompt) || "Tell the user what it found.";
-          if (args.deliverTo === "agent" && !asTrimmedString(args.prompt)) {
+          if (target?.kind === "agent" && !asTrimmedString(args.prompt)) {
             throw new Error('deliverTo="agent" needs prompt: the action the user approved.');
           }
           watch = {
             script,
-            ...(args.deliverTo === "agent" ? { route: "agent" } : {}),
+            ...(target?.kind === "agent" ? { route: "agent" } : {}),
+            ...targetFields,
             ...(args.once === true ? { once: true } : {}),
           };
         } else {
@@ -323,7 +342,7 @@ export const createCloudScheduleTools = (
             ? (receiptRow as unknown as ScheduleRow)
             : undefined);
         return result(
-          `Added ${kind} "${name}" (${jobId}), ${describeSchedule(schedule)}; next fire ${iso(record?.nextRunAt) ?? "pending"}.${firstCheckNote(payload)}${computerOnlyNote(record)}`,
+          `Added ${kind} "${name}" (${jobId}), ${describeSchedule(schedule)}; next fire ${iso(record?.nextRunAt) ?? "pending"}.${scheduleTargetLabel(record?.targetThreadId, context.threadId)}${firstCheckNote(payload)}${computerOnlyNote(record)}`,
           {
             action: "added",
             jobId,
@@ -366,9 +385,11 @@ export const createCloudScheduleTools = (
         const prompt = asTrimmedString(args.prompt);
         const nextPrompt = message || prompt || undefined;
         const script = typeof args.script === "string" ? args.script.trim() : "";
+        const target = resolveScheduleTarget(args, context.threadId ? { threadId: context.threadId } : {}, "update");
         const watch = {
           ...(script ? { script } : {}),
-          ...(args.deliverTo === "agent" || args.deliverTo === "orchestrator" ? { route: args.deliverTo } : {}),
+          ...(target?.kind === "agent" || target?.kind === "orchestrator" ? { route: target.kind } : {}),
+          ...(target?.kind === "thread" ? { targetThreadId: target.threadId } : {}),
           ...(typeof args.once === "boolean" ? { once: args.once } : {}),
         };
         const description =
@@ -383,7 +404,7 @@ export const createCloudScheduleTools = (
           args.schedule === undefined ? undefined : scheduleFromArgs(args.schedule);
         if (!nextPrompt && !description && !status && !schedule && Object.keys(watch).length === 0) {
           throw new Error(
-            "Pass at least one field to change: name, schedule, message/prompt, script, deliverTo, once, description, or enabled.",
+            "Pass at least one field to change: name, schedule, message/prompt, script, deliverTo, threadId, once, description, or enabled.",
           );
         }
         const payload = await post(
@@ -404,7 +425,7 @@ export const createCloudScheduleTools = (
           return failure(`No schedule entry found with jobId ${jobId}.`);
         }
         return result(
-          `Updated "${record.description || jobId}" (${jobId}); next fire ${iso(record.nextRunAt) ?? "pending"}.${firstCheckNote(payload)}`,
+          `Updated "${record.description || jobId}" (${jobId}); next fire ${iso(record.nextRunAt) ?? "pending"}.${target ? scheduleTargetLabel(record.targetThreadId, context.threadId) : ""}${firstCheckNote(payload)}`,
           { action: "updated", jobId, ...summarizeRow(record) },
         );
       } catch (error) {

@@ -7,6 +7,8 @@ export const AGENT_MESSAGE_MAX_CHARS = 8_000;
 
 export const AGENT_MESSAGE_STARTER_RELATION = "started you";
 
+export const AGENT_MESSAGE_SCHEDULE_RELATION = "scheduled";
+
 export const AGENT_ROSTER_ACTIVE_LIMIT = 200;
 export const AGENT_ROSTER_SLOTS = 16;
 
@@ -235,11 +237,13 @@ const escapeAttribute = (value: string) =>
 export const formatAgentMessage = (
   from: AgentMessageSender,
   text: string,
-  options?: { starter?: boolean },
-): string =>
-  `<agent-message from="${escapeAttribute(from.label)}" thread_id="${escapeAttribute(from.threadId)}"${
-    options?.starter ? ` relation="${AGENT_MESSAGE_STARTER_RELATION}"` : ""
+  options?: { starter?: boolean; relation?: string },
+): string => {
+  const relation = options?.relation ?? (options?.starter ? AGENT_MESSAGE_STARTER_RELATION : undefined);
+  return `<agent-message from="${escapeAttribute(from.label)}" thread_id="${escapeAttribute(from.threadId)}"${
+    relation ? ` relation="${escapeAttribute(relation)}"` : ""
   }>\n${text.trim()}\n</agent-message>`;
+};
 
 const FRAMED_AGENT_MESSAGE_RE =
   /^<agent-message from="[^"\n]*" thread_id="[^"\n]*"(?: relation="[^"\n]*")?>\n[\s\S]*\n<\/agent-message>$/u;

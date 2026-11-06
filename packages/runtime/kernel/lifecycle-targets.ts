@@ -28,6 +28,11 @@ export type StellaHostRunnerTarget = {
       description: string;
       prompt: string;
     }) => Promise<unknown>;
+    messageAgent?: (payload: {
+      threadId: string;
+      messageId: string;
+      text: string;
+    }) => Promise<"steered" | "resumed" | "queued" | "not_found" | "refused">;
   } | null;
 };
 

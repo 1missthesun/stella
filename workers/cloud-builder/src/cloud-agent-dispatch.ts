@@ -1,4 +1,5 @@
 import { MAX_AGENT_DEPTH, type AgentLineage } from "@stella/contracts/agent-depth";
+import { storedAgentStatusOf, type StoredAgentStatus } from "@stella/contracts/agent-status";
 import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
 import type { ManagedModelAudience } from "@stella/contracts/gateway/capability";
 import {
@@ -22,30 +23,9 @@ import { CloudAgentCapError, checkContainerCaps } from "./container-cap.js";
 export const CLOUD_AGENT_DEPTH_LIMIT_ERROR =
   `Task depth limit reached (${MAX_AGENT_DEPTH}). Complete work in the current task instead of creating another subtask.`;
 
-export type CloudAgentControlStatus =
-  | "running"
-  | "waiting_for_user"
-  | "resuming"
-  | "completed"
-  | "failed"
-  | "canceled";
+export type CloudAgentControlStatus = StoredAgentStatus;
 
-const CLOUD_AGENT_CONTROL_STATUSES: readonly CloudAgentControlStatus[] = [
-  "running",
-  "waiting_for_user",
-  "resuming",
-  "completed",
-  "failed",
-  "canceled",
-];
-
-/** A receipt's status, where builds before `stop_agent` wrote a stop as `paused`. */
-const controlStatusOf = (status: unknown): CloudAgentControlStatus | null =>
-  status === "paused"
-    ? "canceled"
-    : CLOUD_AGENT_CONTROL_STATUSES.includes(status as CloudAgentControlStatus)
-      ? (status as CloudAgentControlStatus)
-      : null;
+const controlStatusOf = storedAgentStatusOf;
 
 export type CloudAgentControlReceipt = {
   lifecycleReport?: string;
@@ -92,7 +72,7 @@ export const cloudAgentToolOutcomeKey = (
 
 export const isCloudAgentControlActive = (
   status: CloudAgentControlStatus,
-): boolean => status === "running" || status === "resuming";
+): boolean => status === "running";
 
 export const normalizeCloudAgentControlReceipt = (
   value: unknown,
@@ -181,9 +161,6 @@ export const advanceCloudAgentControlReceipt = (
   if (!existingTerminal && receiptTerminal) return merged(receipt);
   if (existingTerminal && !receiptTerminal) return existing;
   if (existingTerminal && receiptTerminal) {
-    if (receipt.status !== existing.status) {
-      throw new Error("A terminal cloud agent attempt cannot be rewritten.");
-    }
     return receipt.threadUpdatedAt > existing.threadUpdatedAt
       ? merged(receipt)
       : existing;

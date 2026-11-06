@@ -38,6 +38,9 @@ export const AGENT_EVENT_KINDS = [
   "report_failed",
   "report_missing",
   "result_replaced",
+  "terminal_ignored",
+  "usage_limit_held",
+  "usage_limit_released",
 ] as const;
 
 export type AgentEventKind = (typeof AGENT_EVENT_KINDS)[number];

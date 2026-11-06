@@ -8,7 +8,9 @@ import {
   AGENT_STOPPED_ERROR_CODE,
   AGENT_STOP_WIRE_REASON,
   AGENT_STOPPED_REASON,
+  LIVE_STORED_AGENT_STATUSES,
   agentAttemptOutcomeOf,
+  agentStatusSqlList,
   agentStatusOf,
   isAgentStopReason,
   isLiveAgentStatus,
@@ -111,9 +113,13 @@ type ThreadRow = {
   status: string;
   result_json: string | null;
   error_message: string | null;
+  hold_reason: HoldReason | null;
+  hold_until: number | null;
   created_at: number;
   updated_at: number;
 };
+
+type HoldReason = "usage_limit" | "usage_limit_monthly";
 
 type TurnRow = {
   turn_id: string;
@@ -209,7 +215,7 @@ const COMMAND_WAIT_MS: Record<AgentControlCommand["kind"], number> = {
 };
 const COMMAND_TTL_MS = 8 * 24 * 60 * 60_000;
 /** `paused` is a stopped attempt from builds before `stop_agent`, which the migration renames. */
-const TERMINAL_STATUSES = new Set(["completed", "failed", "canceled", "paused"]);
+const TERMINAL_STATUSES = new Set(["completed", "failed", "canceled"]);
 type TerminalStatus = "completed" | "failed" | "canceled";
 
 const endedError = (
@@ -218,7 +224,7 @@ const endedError = (
   reported.status === "paused" || reported.errorCode === AGENT_STOPPED_ERROR_CODE || isAgentStopReason(reported.errorMessage)
     ? AGENT_STOPPED_REASON
     : (reported.errorMessage ?? null);
-const ACTIVE_STATUSES = new Set(["running", "resuming"]);
+const ACTIVE_STATUSES = new Set(["running"]);
 
 export const AGENT_THREADS_DEVICE_EXECUTOR_MIGRATION = {
   id: "agent-threads.4-device-executor",
@@ -467,7 +473,7 @@ const failAttempt = (db: OwnerDb, job: DispatchJob, message: string, now: number
     { threadId: job.threadId, turnId: job.turnId, kind: endedKind, source: "owner:dispatch", now },
     () => {
       db.run(
-        "UPDATE agent_turns SET status = 'failed', updated_at = ? WHERE turn_id = ? AND status IN ('running', 'resuming')",
+        "UPDATE agent_turns SET status = 'failed', updated_at = ? WHERE turn_id = ? AND status = 'running'",
         now,
         job.turnId,
       );
@@ -1023,7 +1029,7 @@ const stopDeviceAttempt = async (
       );
       ctx.db.run(
         `UPDATE agent_threads SET status = 'canceled', error_message = ?, updated_at = ?
-          WHERE thread_id = ? AND attempt_generation = ? AND status IN ('running', 'resuming')`,
+          WHERE thread_id = ? AND attempt_generation = ? AND status = 'running'`,
         AGENT_STOPPED_REASON,
         ctx.now,
         thread.thread_id,
@@ -1461,7 +1467,7 @@ const handoffThread = async (ctx: OwnerContext, args: HandoffArgs): Promise<Hand
 
 const DIRECTORY_AGENTS_RECENT = 50;
 const DIRECTORY_SESSIONS_RECENT = 20;
-const LIVE_STATUSES_SQL = "('running', 'resuming', 'waiting_for_user')";
+const LIVE_STATUSES_SQL = agentStatusSqlList(LIVE_STORED_AGENT_STATUSES);
 export const DIRECTORY_THREAD_IDS_MAX = 200;
 const DIRECTORY_THREAD_IDS_PER_QUERY = 50;
 const AGENT_MESSAGE_RECEIPT_TTL_MS = 24 * 60 * 60_000;
@@ -1522,7 +1528,6 @@ const agentDirectory = async (
   const devices = [...rows.values()].some((row) => threadDeviceId(row) !== null)
     ? await devicePresence(ctx)
     : new Map<string, DeviceDestination>();
-  const pausedOnComputers = computerPausedThreads(ctx.db, [...rows.keys()]);
   const agents = [...rows.values()].map((row): AgentDirectoryAgentRow => {
     const deviceId = threadDeviceId(row);
     const device = deviceId ? devices.get(resolveCurrentDeviceId(ctx.db, deviceId)) : undefined;
@@ -1540,7 +1545,7 @@ const agentDirectory = async (
         ? { offline: device?.lastSeenAt !== undefined ? { lastSeenAt: device.lastSeenAt } : {} }
         : {}),
       ...(live && device?.online && device.remoteExecution !== "enabled" ? { awaitingConsent: true as const } : {}),
-      ...(live && (heldByUsageLimit(row) || pausedOnComputers.has(row.thread_id)) ? { pausedBy: "usage-limit" as const } : {}),
+      ...(live && row.hold_reason !== null ? { pausedBy: "usage-limit" as const } : {}),
     };
   });
   const sessions = (isSlackConversationId(args.conversationId)
@@ -2158,7 +2163,7 @@ const routeStop = async (
   if (!ACTIVE_STATUSES.has(thread.status)) {
     return {
       outcome: "not_running",
-      note: `It had already ${thread.status === "canceled" || thread.status === "paused" ? "stopped" : thread.status}; nothing was running.`,
+      note: `It had already ${thread.status === "canceled" ? "stopped" : thread.status}; nothing was running.`,
     };
   }
   switch (executor.kind) {
@@ -2458,7 +2463,7 @@ type StopResult = AgentThreadCalls["agentThreads.stop"]["result"];
 const runningTurn = (db: OwnerDbReader, thread: ThreadRow): TurnRow | null =>
   db.one<TurnRow>(
     `SELECT * FROM agent_turns WHERE thread_id = ? AND attempt_generation = ?
-       AND status IN ('running', 'resuming') ORDER BY created_at DESC LIMIT 1`,
+       AND status = 'running' ORDER BY created_at DESC LIMIT 1`,
     thread.thread_id,
     thread.attempt_generation,
   );
@@ -2509,7 +2514,7 @@ const stopCloudAttempt = async (
       );
       ctx.db.run(
         `UPDATE agent_threads SET status = 'canceled', error_message = ?, updated_at = ?
-          WHERE thread_id = ? AND attempt_generation = ? AND status IN ('running', 'resuming')`,
+          WHERE thread_id = ? AND attempt_generation = ? AND status = 'running'`,
         AGENT_STOPPED_REASON,
         now,
         thread.thread_id,
@@ -2528,6 +2533,7 @@ const settleCloudAttempt = async (
   ctx: OwnerContext,
   thread: ThreadRow,
   input: {
+    from?: readonly string[];
     status: TerminalStatus;
     errorMessage: string | null;
     finalText?: string;
@@ -2551,7 +2557,7 @@ const settleCloudAttempt = async (
       if (
         !current ||
         current.attempt_generation !== thread.attempt_generation ||
-        !ACTIVE_STATUSES.has(current.status)
+        !(input.from ? input.from.includes(current.status) : ACTIVE_STATUSES.has(current.status))
       ) {
         return;
       }
@@ -2566,7 +2572,7 @@ const settleCloudAttempt = async (
       );
       ctx.db.run(
         `UPDATE agent_turns SET status = ?, updated_at = ?
-          WHERE thread_id = ? AND attempt_generation = ? AND status IN ('running', 'resuming', 'waiting_for_user')`,
+          WHERE thread_id = ? AND attempt_generation = ? AND status IN ('running', 'waiting_for_user')`,
         input.status,
         ctx.now,
         thread.thread_id,
@@ -2721,7 +2727,7 @@ const markLocalThreadStopped = async (
     () =>
       ctx.db.run(
         `UPDATE agent_threads SET status = 'canceled', error_message = ?, updated_at = ?
-          WHERE thread_id = ? AND attempt_generation = ? AND status IN ('running', 'resuming')`,
+          WHERE thread_id = ? AND attempt_generation = ? AND status = 'running'`,
         AGENT_STOPPED_REASON,
         ctx.now,
         thread.thread_id,
@@ -2803,7 +2809,7 @@ const runningDescendants = (db: OwnerDbReader, threadId: string): ThreadRow[] =>
      )
      SELECT t.* FROM agent_threads t
        JOIN (SELECT thread_id, MAX(depth) AS depth FROM tree GROUP BY thread_id) below ON below.thread_id = t.thread_id
-      WHERE t.status IN ('running', 'resuming', 'waiting_for_user')
+      WHERE t.status IN ${LIVE_STATUSES_SQL}
       ORDER BY below.depth DESC`,
     threadId,
     threadId,
@@ -3317,6 +3323,9 @@ export const USAGE_LIMIT_CONVERSATION_JOB = "agentThreads.usageLimitResumeConver
 const USAGE_LIMIT_UNKNOWN_RESET_HOLD_MS = 30 * 60_000;
 const USAGE_LIMIT_RESET_MARGIN_MS = 30_000;
 const USAGE_LIMIT_HOLD_PREFIX = "Waiting for the Claude usage limit to reset";
+const USAGE_LIMIT_MONTHLY_HOLD_MS = 3 * 24 * 60 * 60_000;
+const USAGE_LIMIT_RESUME_RETRY_MS = 10 * 60_000;
+const USAGE_LIMIT_RESUME_GIVE_UP_MS = 6 * 60 * 60_000;
 
 const USAGE_LIMIT_MIN_HOLD_MS = 5 * 60_000;
 const USAGE_LIMIT_MAX_MIN_HOLD_MS = 2 * 60 * 60_000;
@@ -3352,7 +3361,7 @@ const usageLimitResumeAt = (
 
 const usageLimitHoldMessage = (limit: ClaudeUsageLimit): string =>
   limit.monthly
-    ? `${USAGE_LIMIT_HOLD_PREFIX}: Claude's monthly spend limit is reached; it continues when Resume is pressed on the chat's card.`
+    ? `${USAGE_LIMIT_HOLD_PREFIX}: Claude's monthly spend limit is reached; it continues when Resume is pressed on the chat's card, within three days.`
     : limit.resetsAt !== undefined
     ? `${USAGE_LIMIT_HOLD_PREFIX} at ${new Date(limit.resetsAt).toISOString()}; it continues automatically then.`
     : `${USAGE_LIMIT_HOLD_PREFIX}; it continues automatically once it does.`;
@@ -3364,19 +3373,18 @@ const holdAgentForUsageLimit = (
   thread: ThreadRow,
   limit: ClaudeUsageLimit,
   now: number,
-): void => {
-  if (limit.monthly) {
-    jobs.cancel(`usage-limit:agent:${thread.thread_id}`);
-  } else {
-    jobs.schedule(
-      USAGE_LIMIT_AGENT_JOB,
-      usageLimitResumeAt(db, `agent:${thread.thread_id}`, limit, now),
-      { threadId: thread.thread_id, attemptGeneration: thread.attempt_generation },
-      { id: `usage-limit:agent:${thread.thread_id}` },
-    );
-  }
+): { reason: HoldReason; until: number } => {
+  const hold = limit.monthly
+    ? { reason: "usage_limit_monthly" as const, until: now + USAGE_LIMIT_MONTHLY_HOLD_MS }
+    : { reason: "usage_limit" as const, until: usageLimitResumeAt(db, `agent:${thread.thread_id}`, limit, now) };
+  jobs.schedule(
+    USAGE_LIMIT_AGENT_JOB,
+    hold.until,
+    { threadId: thread.thread_id, attemptGeneration: thread.attempt_generation },
+    { id: `usage-limit:agent:${thread.thread_id}` },
+  );
   const conversationId = thread.parent_thread_id === null ? journalConversationOf(db, thread) : null;
-  if (!conversationId || !thread.owner_generation) return;
+  if (!conversationId || !thread.owner_generation) return hold;
   effects.cards.push({
     conversationId,
     ownerGeneration: thread.owner_generation,
@@ -3389,6 +3397,7 @@ const holdAgentForUsageLimit = (
       ...(limit.monthly ? { monthly: true as const } : {}),
     } satisfies ClaudeUsageLimitCard,
   });
+  return hold;
 };
 
 const postUsageLimitResumed = async (
@@ -3407,19 +3416,7 @@ const postUsageLimitResumed = async (
   });
 };
 
-const resumeAgentAfterUsageLimit = async (ctx: OwnerContext, raw: unknown): Promise<void> => {
-  const payload = raw as { threadId?: unknown; attemptGeneration?: unknown } | null;
-  if (typeof payload?.threadId !== "string" || typeof payload.attemptGeneration !== "number") return;
-  const thread = readThread(ctx.db, payload.threadId);
-  if (
-    !thread ||
-    thread.status !== "waiting_for_user" ||
-    thread.attempt_generation !== payload.attemptGeneration ||
-    !thread.error_message?.startsWith(USAGE_LIMIT_HOLD_PREFIX) ||
-    !thread.owner_generation
-  ) {
-    return;
-  }
+const resumeHeldAgent = async (ctx: OwnerContext, thread: ThreadRow & { owner_generation: string }): Promise<void> => {
   const commandId = `ulr-${(await sha256Hex(`${thread.thread_id}:${thread.attempt_generation}`)).slice(0, 40)}`;
   await controlAgent(ctx, {
     commandId,
@@ -3442,6 +3439,54 @@ const resumeAgentAfterUsageLimit = async (ctx: OwnerContext, raw: unknown): Prom
   }
 };
 
+/**
+ * The held agent's timer: at the reset it resumes the agent; a monthly hold
+ * (or a resume that keeps failing) ends it failed instead of holding forever.
+ */
+const resumeAgentAfterUsageLimit = async (ctx: OwnerContext, raw: unknown): Promise<void> => {
+  const payload = raw as { threadId?: unknown; attemptGeneration?: unknown } | null;
+  if (typeof payload?.threadId !== "string" || typeof payload.attemptGeneration !== "number") return;
+  const thread = readThread(ctx.db, payload.threadId);
+  if (
+    !thread ||
+    thread.status !== "waiting_for_user" ||
+    thread.attempt_generation !== payload.attemptGeneration ||
+    thread.hold_reason === null ||
+    !thread.owner_generation
+  ) {
+    return;
+  }
+  const end = async (errorMessage: string, detail: Record<string, unknown>) =>
+    await settleCloudAttempt(ctx, thread, {
+      from: ["waiting_for_user"],
+      status: "failed",
+      errorMessage,
+      source: "owner:usage-limit",
+      detail,
+    });
+  if (thread.hold_reason === "usage_limit_monthly") {
+    await end(
+      "Claude's monthly spend limit was still reached after three days, so this agent stopped. send_message continues it once the limit is raised.",
+      { hold: thread.hold_reason, expired: true },
+    );
+    return;
+  }
+  try {
+    await resumeHeldAgent(ctx, { ...thread, owner_generation: thread.owner_generation });
+  } catch (error) {
+    if (ctx.now < (thread.hold_until ?? ctx.now) + USAGE_LIMIT_RESUME_GIVE_UP_MS) {
+      ctx.jobs.schedule(USAGE_LIMIT_AGENT_JOB, ctx.now + USAGE_LIMIT_RESUME_RETRY_MS, payload, {
+        id: `usage-limit:agent:${thread.thread_id}`,
+      });
+      return;
+    }
+    await end(`It could not continue after the Claude usage limit reset: ${clip(errorReason(error), 500)}`, {
+      hold: thread.hold_reason,
+      resumeFailed: errorReason(error),
+    });
+  }
+};
+
 const holdConversationForUsageLimit = (ctx: OwnerContext, raw: unknown): { resumeAt: number | null } => {
   const args = object({
     conversationId: string(),
@@ -3452,7 +3497,6 @@ const holdConversationForUsageLimit = (ctx: OwnerContext, raw: unknown): { resum
   notePause(ctx.db, {
     conversationId: args.conversationId,
     key: "",
-    threadId: null,
     deviceId: null,
     ownerGeneration: args.ownerGeneration,
     until: args.resetsAt ?? null,
@@ -3509,7 +3553,6 @@ const notePause = (
   pause: {
     conversationId: string;
     key: string;
-    threadId: string | null;
     deviceId: string | null;
     ownerGeneration: string;
     until: number | null;
@@ -3527,7 +3570,7 @@ const notePause = (
        monthly = excluded.monthly, created_at = excluded.created_at`,
     pause.conversationId,
     pause.key,
-    pause.threadId,
+    null,
     pause.deviceId,
     pause.ownerGeneration,
     pause.until,
@@ -3536,36 +3579,37 @@ const notePause = (
   );
 };
 
-/** Threads a usage limit holds on a computer right now (their computer said so). */
-const computerPausedThreads = (db: OwnerDbReader, threadIds: readonly string[]): Set<string> => {
-  const paused = new Set<string>();
-  for (let at = 0; at < threadIds.length; at += DIRECTORY_THREAD_IDS_PER_QUERY) {
-    const chunk = threadIds.slice(at, at + DIRECTORY_THREAD_IDS_PER_QUERY);
-    for (const row of db.all<{ thread_id: string }>(
-      `SELECT thread_id FROM usage_limit_pauses
-        WHERE device_id IS NOT NULL AND thread_id IN (${chunk.map(() => "?").join(", ")})`,
-      ...chunk,
-    )) {
-      paused.add(row.thread_id);
-    }
-  }
-  return paused;
-};
-
-const heldByUsageLimit = (row: Pick<ThreadRow, "status" | "error_message">): boolean =>
-  row.status === "waiting_for_user" && (row.error_message?.startsWith(USAGE_LIMIT_HOLD_PREFIX) ?? false);
-
 const noteUsageLimit = async (
   ctx: OwnerContext,
   args: AgentThreadCalls["usageLimits.note"]["args"],
 ): Promise<AgentThreadCalls["usageLimits.note"]["result"]> => {
   await assertGeneration(ctx, args.ownerGeneration);
-  const key = args.threadId ?? "";
-  if (args.state === "held") {
+  if (args.threadId) {
+    const threadId = args.threadId;
+    const held = args.state === "held";
+    recordAgentChange(
+      ctx.db,
+      {
+        threadId,
+        kind: held ? "usage_limit_held" : "usage_limit_released",
+        source: `device:${args.originDeviceId}`,
+        detail: { holdId: args.holdId },
+        now: ctx.now,
+      },
+      () =>
+        ctx.db.run(
+          `UPDATE agent_threads SET hold_reason = ?, hold_until = ?
+            WHERE thread_id = ? AND status = 'running' AND (? = 1 OR hold_reason IS NOT NULL)`,
+          held ? (args.monthly ? "usage_limit_monthly" : "usage_limit") : null,
+          held ? (args.until ?? null) : null,
+          threadId,
+          held ? 1 : 0,
+        ),
+    );
+  } else if (args.state === "held") {
     notePause(ctx.db, {
       conversationId: args.conversationId,
-      key,
-      threadId: args.threadId ?? null,
+      key: "",
       deviceId: args.originDeviceId,
       ownerGeneration: args.ownerGeneration,
       until: args.until ?? null,
@@ -3574,9 +3618,8 @@ const noteUsageLimit = async (
     });
   } else {
     ctx.db.run(
-      "DELETE FROM usage_limit_pauses WHERE conversation_id = ? AND hold_key = ? AND device_id = ?",
+      "DELETE FROM usage_limit_pauses WHERE conversation_id = ? AND hold_key = '' AND device_id = ?",
       args.conversationId,
-      key,
       args.originDeviceId,
     );
   }
@@ -3613,17 +3656,14 @@ const resumeUsageLimit = async (
   let cloud = 0;
   const held = ctx.db.all<ThreadRow>(
     `SELECT * FROM agent_threads
-      WHERE (conversation_id = ? OR origin_conversation_id = ?) AND status = 'waiting_for_user'`,
+      WHERE (conversation_id = ? OR origin_conversation_id = ?) AND status = 'waiting_for_user' AND hold_reason IS NOT NULL`,
     args.conversationId,
     args.conversationId,
   );
   for (const thread of held) {
-    if (!heldByUsageLimit(thread)) continue;
+    if (!thread.owner_generation) continue;
     ctx.jobs.cancel(`usage-limit:agent:${thread.thread_id}`);
-    await resumeAgentAfterUsageLimit(ctx, {
-      threadId: thread.thread_id,
-      attemptGeneration: thread.attempt_generation,
-    });
+    await resumeHeldAgent(ctx, { ...thread, owner_generation: thread.owner_generation });
     cloud += 1;
   }
   const reply = ctx.db.one<{ owner_generation: string }>(
@@ -3641,6 +3681,12 @@ const resumeUsageLimit = async (
     cloud += 1;
   }
   ctx.db.run("DELETE FROM usage_limit_pauses WHERE conversation_id = ? AND device_id IS NOT NULL", args.conversationId);
+  ctx.db.run(
+    `UPDATE agent_threads SET hold_reason = NULL, hold_until = NULL
+      WHERE (conversation_id = ? OR origin_conversation_id = ?) AND status = 'running' AND hold_reason IS NOT NULL`,
+    args.conversationId,
+    args.conversationId,
+  );
   await ctx.host.postConversationCard({
     conversationId: args.conversationId,
     ownerGeneration,
@@ -3756,7 +3802,7 @@ export const applyAgentThreadEvent = (
           },
           () =>
             db.run(
-              "UPDATE agent_turns SET status = ?, updated_at = ? WHERE turn_id = ? AND status IN ('running', 'resuming', 'waiting_for_user')",
+              "UPDATE agent_turns SET status = ?, updated_at = ? WHERE turn_id = ? AND status IN ('running', 'waiting_for_user')",
               event.terminalStatus ?? "failed",
               event.createdAt,
               turn.turn_id,
@@ -3886,9 +3932,10 @@ export const applyAgentThreadEvent = (
         : status === "canceled"
           ? endedError({ status: event.status, errorMessage: event.errorMessage ?? null })
           : event.errorMessage;
-      if (limit && jobs) {
-        holdAgentForUsageLimit(db, jobs, effects, { ...thread, attempt_generation: event.attemptGeneration }, limit, event.completedAt);
-      }
+      const hold =
+        limit && jobs
+          ? holdAgentForUsageLimit(db, jobs, effects, { ...thread, attempt_generation: event.attemptGeneration }, limit, event.completedAt)
+          : null;
       recordAgentChange(
         db,
         {
@@ -3903,12 +3950,14 @@ export const applyAgentThreadEvent = (
         () =>
           db.run(
             `UPDATE agent_threads SET status = ?, attempt_generation = ?, result_json = ?, error_message = ?,
-               updated_at = MAX(updated_at + 1, ?)
+               hold_reason = ?, hold_until = ?, updated_at = MAX(updated_at + 1, ?)
              WHERE thread_id = ?`,
             status,
             event.attemptGeneration,
             event.resultJson ?? null,
             status === "completed" ? null : (errorMessage ?? null),
+            hold?.reason ?? null,
+            hold?.until ?? null,
             event.completedAt,
             thread.thread_id,
           ),
@@ -4172,7 +4221,40 @@ export const agentThreadsDomain = {
          SELECT 'liveness:' || thread_id, '${LIVENESS_JOB}', CAST(strftime('%s', 'now') AS INTEGER) * 1000,
                 json_object('threadId', thread_id, 'attemptGeneration', attempt_generation), 0
            FROM agent_threads
-          WHERE status IN ('running', 'resuming') AND executor_device_id IS NULL AND placement <> 'computer'`,
+          WHERE status = 'running' AND executor_device_id IS NULL AND placement <> 'computer'`,
+      ],
+    },
+    {
+      id: "agent-threads.16-holds",
+      statements: [
+        "UPDATE agent_threads SET status = 'running' WHERE status = 'resuming'",
+        "ALTER TABLE agent_threads ADD COLUMN hold_reason TEXT CHECK (hold_reason IN ('usage_limit', 'usage_limit_monthly'))",
+        "ALTER TABLE agent_threads ADD COLUMN hold_until INTEGER",
+        `UPDATE agent_threads
+            SET hold_reason = CASE WHEN error_message LIKE '%monthly spend limit%' THEN 'usage_limit_monthly' ELSE 'usage_limit' END,
+                hold_until = COALESCE(
+                  (SELECT run_at FROM owner_jobs WHERE id = 'usage-limit:agent:' || agent_threads.thread_id),
+                  CAST(strftime('%s', 'now') AS INTEGER) * 1000 + ${USAGE_LIMIT_MONTHLY_HOLD_MS})
+          WHERE status = 'waiting_for_user' AND error_message LIKE '${USAGE_LIMIT_HOLD_PREFIX}%'`,
+        `INSERT OR IGNORE INTO owner_jobs (id, kind, run_at, payload, attempts)
+         SELECT 'usage-limit:agent:' || thread_id, '${USAGE_LIMIT_AGENT_JOB}',
+                CASE hold_reason WHEN 'usage_limit_monthly' THEN hold_until ELSE CAST(strftime('%s', 'now') AS INTEGER) * 1000 END,
+                json_object('threadId', thread_id, 'attemptGeneration', attempt_generation), 0
+           FROM agent_threads WHERE hold_reason IS NOT NULL AND status = 'waiting_for_user'`,
+        `UPDATE agent_threads
+            SET hold_reason = (SELECT CASE WHEN p.monthly = 1 THEN 'usage_limit_monthly' ELSE 'usage_limit' END
+                                 FROM usage_limit_pauses p WHERE p.thread_id = agent_threads.thread_id AND p.device_id IS NOT NULL),
+                hold_until = (SELECT p.until FROM usage_limit_pauses p
+                               WHERE p.thread_id = agent_threads.thread_id AND p.device_id IS NOT NULL)
+          WHERE status = 'running'
+            AND thread_id IN (SELECT thread_id FROM usage_limit_pauses WHERE thread_id IS NOT NULL AND device_id IS NOT NULL)`,
+        "DELETE FROM usage_limit_pauses WHERE hold_key <> ''",
+        `CREATE TRIGGER agent_threads_hold_ends AFTER UPDATE OF status, attempt_generation ON agent_threads
+           WHEN OLD.hold_reason IS NOT NULL AND NEW.hold_reason IS OLD.hold_reason
+             AND (NEW.status IS NOT OLD.status OR NEW.attempt_generation IS NOT OLD.attempt_generation)
+         BEGIN
+           UPDATE agent_threads SET hold_reason = NULL, hold_until = NULL WHERE thread_id = NEW.thread_id;
+         END`,
       ],
     },
   ],

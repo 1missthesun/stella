@@ -1,6 +1,7 @@
 import { isAccountProviderId } from "@stella/contracts/backend/providers";
 import { normalizeReasoningEffortLevel } from "@stella/contracts/reasoning-effort";
 import { MAX_AGENT_DEPTH } from "@stella/contracts/agent-depth";
+import { storedAgentStatusOf } from "@stella/contracts/agent-status";
 import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
 import {
   isOrchestratorCliThreadId,
@@ -51,14 +52,6 @@ const SOURCES: readonly CloudTurnSource[] = [
   "slack",
 ];
 const CLIENT_SOURCES: readonly CloudTurnSource[] = ["desktop", "web", "mobile"];
-const THREAD_STATUSES: readonly CloudAgentThreadControl["status"][] = [
-  "running",
-  "waiting_for_user",
-  "resuming",
-  "completed",
-  "failed",
-  "canceled",
-];
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
@@ -98,14 +91,15 @@ export const parseAgentThreadControl = (
   if (!isRecord(value)) return null;
   const threadId =
     typeof value.threadId === "string" ? value.threadId.trim() : "";
+  const status = storedAgentStatusOf(value.status);
   if (
+    !status ||
     !threadId ||
     threadId.length > MAX_THREAD_ID_CHARS ||
     !Number.isSafeInteger(value.attemptGeneration) ||
     (value.attemptGeneration as number) < 1 ||
     !Number.isSafeInteger(value.threadUpdatedAt) ||
-    (value.threadUpdatedAt as number) < 0 ||
-    !THREAD_STATUSES.includes(value.status as CloudAgentThreadControl["status"])
+    (value.threadUpdatedAt as number) < 0
   ) {
     return null;
   }
@@ -121,7 +115,7 @@ export const parseAgentThreadControl = (
     threadId,
     attemptGeneration: value.attemptGeneration as number,
     threadUpdatedAt: value.threadUpdatedAt as number,
-    status: value.status as CloudAgentThreadControl["status"],
+    status,
   };
 };
 

@@ -7,7 +7,12 @@ import {
   AGENT_REPORT_MAX_CHARS,
   silentRunReport,
 } from "@stella/contracts/backend/agent-reports";
-import { AGENT_STOPPED_REASON, isAgentStopReason } from "@stella/contracts/agent-status";
+import {
+  AGENT_STOPPED_REASON,
+  LIVE_STORED_AGENT_STATUSES,
+  agentStatusSqlList,
+  isAgentStopReason,
+} from "@stella/contracts/agent-status";
 import { agentChangeHooks, appendAgentEvent } from "./agent-events.js";
 import { deliverReportToAgent } from "./agent-threads.js";
 import { resolveCurrentDeviceId } from "./devices.js";
@@ -26,16 +31,8 @@ const REPORT_AUDIT_FIRST_MS = 3 * 60_000;
 const REPORT_AUDIT_MAX_MS = 60 * 60_000;
 const REPORT_AUDIT_CHECKS_MAX = 12;
 
-const LIVE_STATUSES = new Set([
-  "queued",
-  "pending",
-  "running",
-  "resuming",
-  "waiting_for_helpers",
-  "waiting_for_user",
-]);
-const WORKING_STATUSES_SQL =
-  "('queued', 'pending', 'running', 'resuming', 'waiting_for_helpers')";
+const LIVE_STATUSES = new Set<string>(LIVE_STORED_AGENT_STATUSES);
+const WORKING_STATUSES_SQL = agentStatusSqlList(["running"]);
 const REPORTABLE = new Set<string>(["completed", "failed", "canceled"]);
 const REPORT_TEXT_MAX_CHARS = AGENT_REPORT_MAX_CHARS;
 

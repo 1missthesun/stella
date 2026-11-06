@@ -2145,11 +2145,6 @@ export class StellaRuntimeHost {
           }
         : {}),
     });
-    // Reminders and tasks moved to the backend; the local copies are dropped
-    // rather than migrated. Watches keep running here.
-    for (const job of scheduler.listCronJobs()) {
-      if (job.payload.kind !== "watch") scheduler.removeCronJob(job.id);
-    }
     scheduler.start();
     this.schedulerService = scheduler;
     this.schedulerSubscription = scheduler.subscribe(() => {

@@ -303,6 +303,14 @@ export class OwnerGate extends OwnerGateCloudDispatch {
         event.ownerId === ownerId &&
         (generation === null || event.ownerGeneration === generation),
     );
+    if (current.length < events.length) {
+      log("error", "owner_events_refused", {
+        events: events
+          .filter((event) => !current.includes(event))
+          .map((event) => `${event.kind}:${event.key}`),
+        ownerGeneration: generation,
+      });
+    }
     const store = this.ownerStore();
     const effects = applyOwnerEventsToStore(store.context(null), current);
     store.flush();

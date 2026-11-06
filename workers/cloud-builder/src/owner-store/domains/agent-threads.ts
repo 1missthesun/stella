@@ -60,6 +60,7 @@ import {
 import { isPlacementThreadId, placementRemoteThreadAgentId } from "@stella/contracts/placement-thread-id";
 import { OWNER_GENERATION_STALE } from "@stella/contracts/backend/protocol";
 import type { AgentLineage } from "@stella/contracts/agent-depth";
+import type { CloudAgentAttemptState } from "../../cloud-agent-dispatch.js";
 import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
 import type { CloudAgentLifecycleCard } from "@stella/contracts/cloud-agent-lifecycle";
 import type {
@@ -71,7 +72,7 @@ import type {
 import { TURN_ATTACHMENTS_MAX, type AgentWorkspaceSize } from "@stella/contracts/turn-plane/turn-start";
 import { parseCloudExecutionSelection } from "../../turn-start-request.js";
 import { normalizeDrivePath } from "./drive.js";
-import { endedKind, recordAgentChange, startedKind } from "./agent-events.js";
+import { appendAgentEvent, endedKind, recordAgentChange, startedKind } from "./agent-events.js";
 import { boundReportText, queueStellaNote, reportHeldForHelpers } from "./agent-reports.js";
 import { resolveCurrentDeviceId } from "./devices.js";
 import { setAgentLogHolder } from "./agent-logs.js";
@@ -514,10 +515,10 @@ const runDispatch = async (ctx: OwnerContext, job: DispatchJob): Promise<void> =
     );
     return;
   }
-  const execution = thread.execution_json
-    ? (JSON.parse(thread.execution_json) as CloudExecutionSelection)
-    : (await ctx.host.snapshot()).execution;
   try {
+    const execution = thread.execution_json
+      ? (JSON.parse(thread.execution_json) as CloudExecutionSelection)
+      : (await ctx.host.snapshot()).execution;
     await ctx.host.dispatchAgentTurn({
       ownerGeneration: thread.owner_generation ?? "",
       conversationId: thread.conversation_id,
@@ -1136,6 +1137,7 @@ const startAttempt = (
     } satisfies DispatchJob,
     { id: `dispatch:${input.turnId}` },
   );
+  armLiveness(ctx.jobs, input.thread, ctx.now + LIVENESS_EVERY_MS);
 };
 
 const replayAttempt = (
@@ -2172,10 +2174,13 @@ const routeStop = async (
         kind: "stop",
       });
       if (outcome === "stopped") return { outcome: "stopped" };
-      if (outcome === "not_running") {
-        return { outcome: "not_running", note: "Its conversation's Stella reports it is not running now." };
-      }
-      throw harnessAgentGone(thread.thread_id);
+      await settleCloudAttempt(ctx, thread, {
+        status: "canceled",
+        errorMessage: AGENT_STOPPED_REASON,
+        source: input.source,
+        detail: { commandId: input.commandId, stopped: true, executorGone: outcome },
+      });
+      return { outcome: "not_running", note: "Its conversation's Stella reports it is not running now, so it is recorded as stopped." };
     }
     case "dispatch":
       await stopDeviceAttempt(ctx, thread, input.commandId, input.source);
@@ -2522,7 +2527,13 @@ const stopCloudAttempt = async (
 const settleCloudAttempt = async (
   ctx: OwnerContext,
   thread: ThreadRow,
-  input: { status: "canceled" | "failed"; errorMessage: string; source: string; detail: Record<string, unknown> },
+  input: {
+    status: TerminalStatus;
+    errorMessage: string | null;
+    finalText?: string;
+    source: string;
+    detail: Record<string, unknown>;
+  },
 ): Promise<boolean> => {
   let settled = false;
   recordAgentChange(
@@ -2545,9 +2556,10 @@ const settleCloudAttempt = async (
         return;
       }
       ctx.db.run(
-        `UPDATE agent_threads SET status = ?, error_message = ?, updated_at = MAX(updated_at + 1, ?)
+        `UPDATE agent_threads SET status = ?, result_json = ?, error_message = ?, updated_at = MAX(updated_at + 1, ?)
           WHERE thread_id = ?`,
         input.status,
+        input.finalText !== undefined ? JSON.stringify({ finalText: input.finalText }) : null,
         input.errorMessage,
         ctx.now,
         thread.thread_id,
@@ -2572,8 +2584,122 @@ const settleCloudAttempt = async (
     ctx.jobs.cancel(`dispatch:${turn.turn_id}`);
   }
   const ended = readThread(ctx.db, thread.thread_id);
-  if (ended) await postAgentLifecycleCard(ctx, ended, { kind: input.status, text: input.errorMessage });
+  if (ended) {
+    await postAgentLifecycleCard(ctx, ended, {
+      kind: input.status,
+      text: input.status === "completed" ? (input.finalText ?? null) : input.errorMessage,
+    });
+  }
   return true;
+};
+
+const LIVENESS_JOB = "agentThreads.liveness";
+const LIVENESS_EVERY_MS = 10 * 60_000;
+const LIVENESS_RECHECK_MS = 3 * 60_000;
+const LIVENESS_GONE_CHECKS = 2;
+const LIVENESS_PATIENT_CHECKS = 20;
+const LIVENESS_STARTING_MS = 30 * 60_000;
+const livenessJobId = (threadId: string): string => `liveness:${threadId}`;
+
+type LivenessJob = { threadId: string; attemptGeneration: number; gone?: number; finishing?: number; silent?: number };
+
+const LIVENESS_SETTLED: Record<"gone" | "finishing" | "silent", string> = {
+  gone: "Stella lost track of this agent: it is no longer running in Stella's cloud, and its result never arrived. send_message starts it again.",
+  finishing: "This agent finished, but its result never reached Stella. send_message starts it again.",
+  silent: "Stella could not reach this agent for over an hour. send_message starts it again.",
+};
+
+const watchedByLiveness = (thread: ThreadRow): boolean => {
+  const kind = threadExecutor(thread).kind;
+  return kind === "cloud" || kind === "harness";
+};
+
+const armLiveness = (jobs: OwnerJobs, thread: ThreadRow, at: number): void => {
+  if (!watchedByLiveness(thread)) return;
+  jobs.schedule(
+    LIVENESS_JOB,
+    at,
+    { threadId: thread.thread_id, attemptGeneration: thread.attempt_generation } satisfies LivenessJob,
+    { id: livenessJobId(thread.thread_id) },
+  );
+};
+
+/**
+ * Asks the executor of a cloud attempt the owner still lists as running
+ * whether it still has it, and settles it failed once it has been gone (or
+ * silent, or finished without delivering) for longer than a delivery can take.
+ */
+const checkLiveness = async (ctx: OwnerContext, raw: unknown): Promise<void> => {
+  const job = raw as Partial<LivenessJob> | null;
+  if (typeof job?.threadId !== "string") return;
+  const thread = readThread(ctx.db, job.threadId);
+  if (!thread || !ACTIVE_STATUSES.has(thread.status) || !watchedByLiveness(thread) || !thread.owner_generation) return;
+  const counts =
+    job.attemptGeneration === thread.attempt_generation
+      ? { gone: job.gone ?? 0, finishing: job.finishing ?? 0, silent: job.silent ?? 0 }
+      : { gone: 0, finishing: 0, silent: 0 };
+  const again = (delay: number, next: typeof counts) =>
+    ctx.jobs.schedule(
+      LIVENESS_JOB,
+      ctx.now + delay,
+      { threadId: thread.thread_id, attemptGeneration: thread.attempt_generation, ...next } satisfies LivenessJob,
+      { id: livenessJobId(thread.thread_id) },
+    );
+  const turn = ctx.db.one<TurnRow>(
+    "SELECT * FROM agent_turns WHERE thread_id = ? AND attempt_generation = ? ORDER BY created_at DESC LIMIT 1",
+    thread.thread_id,
+    thread.attempt_generation,
+  );
+  const starting =
+    turn !== null &&
+    ctx.now - turn.created_at < LIVENESS_STARTING_MS &&
+    ctx.db.one<{ turn_id: string }>("SELECT turn_id FROM agent_dispatch_prompts WHERE turn_id = ?", turn.turn_id) !== null;
+  if (starting) {
+    again(LIVENESS_RECHECK_MS, counts);
+    return;
+  }
+  let state: CloudAgentAttemptState | "silent";
+  try {
+    state = await ctx.host.agentAttemptState({
+      threadId: thread.thread_id,
+      conversationId: thread.conversation_id,
+      ...(turn ? { turnId: turn.turn_id } : {}),
+      attemptGeneration: thread.attempt_generation,
+      ownerGeneration: thread.owner_generation,
+      harness: threadExecutor(thread).kind === "harness",
+      execution: thread.execution_json ? parseCloudExecutionSelection(JSON.parse(thread.execution_json)) : null,
+    });
+  } catch {
+    state = "silent";
+  }
+  if (state === "running") {
+    again(LIVENESS_EVERY_MS, { gone: 0, finishing: 0, silent: 0 });
+    return;
+  }
+  const verdict = typeof state === "object" ? "gone" : state;
+  const next = { ...counts, [verdict]: counts[verdict] + 1 };
+  if (next[verdict] < (verdict === "gone" ? LIVENESS_GONE_CHECKS : LIVENESS_PATIENT_CHECKS)) {
+    again(LIVENESS_RECHECK_MS, next);
+    return;
+  }
+  await settleCloudAttempt(
+    ctx,
+    thread,
+    typeof state === "object"
+      ? {
+          status: state.ended,
+          errorMessage: state.ended === "completed" ? null : clip(state.text || LIVENESS_SETTLED.finishing, 2_000),
+          ...(state.ended === "completed" ? { finalText: state.text } : {}),
+          source: "owner:liveness",
+          detail: { liveness: "ended", ...next },
+        }
+      : {
+          status: "failed",
+          errorMessage: LIVENESS_SETTLED[verdict],
+          source: "owner:liveness",
+          detail: { liveness: verdict, ...next },
+        },
+  );
 };
 
 const markLocalThreadStopped = async (
@@ -3636,6 +3762,10 @@ export const applyAgentThreadEvent = (
               turn.turn_id,
             ),
         );
+        const thread = readThread(db, turn.thread_id);
+        if (jobs && thread && ACTIVE_STATUSES.has(thread.status) && thread.attempt_generation === turn.attempt_generation) {
+          armLiveness(jobs, thread, event.createdAt + LIVENESS_RECHECK_MS);
+        }
       }
       return;
     }
@@ -3670,6 +3800,8 @@ export const applyAgentThreadEvent = (
             event.createdAt,
           ),
         );
+        const spawned = readThread(db, event.threadId);
+        if (jobs && spawned) armLiveness(jobs, spawned, event.createdAt + LIVENESS_EVERY_MS);
         return;
       }
       if (
@@ -3703,14 +3835,36 @@ export const applyAgentThreadEvent = (
           thread.thread_id,
         ),
       );
+      if (jobs) armLiveness(jobs, { ...thread, attempt_generation: event.attemptGeneration }, event.createdAt + LIVENESS_EVERY_MS);
       return;
     }
     case "thread.completed": {
       const thread = readThread(db, event.threadId);
       if (!thread) return;
-      if (event.conversationId !== undefined && thread.conversation_id !== event.conversationId) return;
-      if (thread.owner_generation !== null && thread.owner_generation !== event.ownerGeneration) return;
-      if (event.attemptGeneration < thread.attempt_generation) return;
+      const refused =
+        event.conversationId !== undefined && thread.conversation_id !== event.conversationId
+          ? "conversation"
+          : thread.owner_generation !== null && thread.owner_generation !== event.ownerGeneration
+            ? "owner_generation"
+            : event.attemptGeneration < thread.attempt_generation
+              ? "superseded_attempt"
+              : null;
+      if (refused) {
+        appendAgentEvent(db, {
+          key: `terminal_ignored:${ownerEventKey(event)}`,
+          kind: "terminal_ignored",
+          source: `${thread.harness ?? "cloud"}:${event.conversationId ?? thread.conversation_id}`,
+          threadId: thread.thread_id,
+          conversationId: thread.conversation_id,
+          turnId: event.turnId,
+          attemptGeneration: event.attemptGeneration,
+          status: thread.status,
+          outcome: agentAttemptOutcomeOf({ status: event.status }),
+          detail: { reason: refused, threadAttemptGeneration: thread.attempt_generation },
+          createdAt: event.completedAt,
+        });
+        return;
+      }
       if (
         event.attemptGeneration === thread.attempt_generation &&
         !ACTIVE_STATUSES.has(thread.status) &&
@@ -4011,6 +4165,16 @@ export const agentThreadsDomain = {
         "CREATE INDEX usage_limit_pauses_thread ON usage_limit_pauses (thread_id) WHERE thread_id IS NOT NULL",
       ],
     },
+    {
+      id: "agent-threads.15-liveness",
+      statements: [
+        `INSERT OR IGNORE INTO owner_jobs (id, kind, run_at, payload, attempts)
+         SELECT 'liveness:' || thread_id, '${LIVENESS_JOB}', CAST(strftime('%s', 'now') AS INTEGER) * 1000,
+                json_object('threadId', thread_id, 'attemptGeneration', attempt_generation), 0
+           FROM agent_threads
+          WHERE status IN ('running', 'resuming') AND executor_device_id IS NULL AND placement <> 'computer'`,
+      ],
+    },
   ],
   calls: {
     "agentThreads.directory": {
@@ -4303,6 +4467,10 @@ export const agentThreadsDomain = {
     [COMMAND_JOB]: {
       maxAttempts: 3,
       run: async (ctx, payload) => await runCommand(ctx, payload as { messageId?: unknown }),
+    },
+    [LIVENESS_JOB]: {
+      maxAttempts: 20,
+      run: async (ctx, payload) => await checkLiveness(ctx, payload),
     },
     [USAGE_LIMIT_AGENT_JOB]: {
       maxAttempts: 10,

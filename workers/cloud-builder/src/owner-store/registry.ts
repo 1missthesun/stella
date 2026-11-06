@@ -92,6 +92,15 @@ export type OwnerHost = {
     ownerGeneration: string;
     cancelRequestId: string;
   }): Promise<"canceled" | "changed">;
+  agentAttemptState(input: {
+    threadId: string;
+    conversationId: string;
+    turnId?: string;
+    attemptGeneration: number;
+    ownerGeneration: string;
+    harness: boolean;
+    execution: import("@stella/contracts/agent-engine").CloudExecutionSelection | null;
+  }): Promise<import("../cloud-agent-dispatch.js").CloudAgentAttemptState>;
   postConversationCard(input: {
     conversationId: string;
     ownerGeneration: string;

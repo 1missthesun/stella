@@ -323,7 +323,17 @@ export const applyConversationEvent = (
       }
       if (row.deleted_at !== null) return;
       if (event.epoch < row.epoch) return;
-      if (event.force !== true && event.epoch === row.epoch && event.lastSeq <= row.last_seq) return;
+      if (
+        event.force !== true &&
+        event.epoch === row.epoch &&
+        (event.lastSeq < row.last_seq ||
+          (event.lastSeq === row.last_seq &&
+            (event.activity === undefined ||
+              event.activity === row.activity ||
+              event.updatedAt < row.updated_at)))
+      ) {
+        return;
+      }
       db.run(
         `UPDATE conversations SET
            epoch = ?, last_seq = ?, updated_at = MAX(updated_at, ?),

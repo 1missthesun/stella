@@ -31,6 +31,10 @@ export type IndexFlushDeps = {
 
 export class ConversationIndex {
   private inFlight: Promise<IndexFlushResult> | null = null;
+  private next: {
+    options: IndexFlushOptions;
+    result: Promise<IndexFlushResult>;
+  } | null = null;
 
   constructor(
     private readonly journal: Journal,
@@ -45,7 +49,26 @@ export class ConversationIndex {
   }
 
   flush(options: IndexFlushOptions): Promise<IndexFlushResult> {
-    if (this.inFlight) return this.inFlight;
+    if (this.next) {
+      this.next.options = options;
+      return this.next.result;
+    }
+    if (!this.inFlight) return this.start(options);
+    const after = this.inFlight;
+    const next: NonNullable<ConversationIndex["next"]> = {
+      options,
+      result: after
+        .catch(() => undefined)
+        .then(() => {
+          if (this.next === next) this.next = null;
+          return this.start(next.options);
+        }),
+    };
+    this.next = next;
+    return next.result;
+  }
+
+  private start(options: IndexFlushOptions): Promise<IndexFlushResult> {
     const tracked = this.run(options).finally(() => {
       if (this.inFlight === tracked) this.inFlight = null;
     });

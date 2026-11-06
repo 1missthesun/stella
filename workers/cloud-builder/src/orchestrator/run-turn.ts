@@ -288,7 +288,7 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
     if (localLease) {
       const retirementAt = localTurnRetirementDeadline(localLease);
       if (retirementAt <= Date.now()) {
-        if (localLease.cancelRequested) {
+        if (localLease.phase.s === "cancel_pending") {
           await this.cancelLocalTurn(localLease, true);
         } else {
           await this.expireLocalLease(localLease, false);

@@ -79,18 +79,10 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
     const localLease =
       await this.ctx.storage.get<LocalTurnLease>(LOCAL_TURN_LEASE_KEY);
     if (localLease) {
-      if (localLease.cancelRequested) {
-        const deadline = localLease.cancelDeadlineAt;
-        if (!Number.isFinite(deadline) || deadline! <= 0) {
-          // Migration/failure-safe path for a cancellation written before the
-          // deadline field existed: grant a full fresh grace, never release now.
-          localLease.cancelDeadlineAt = Date.now() + LOCAL_TURN_CANCEL_GRACE_MS;
-          await this.ctx.storage.put(LOCAL_TURN_LEASE_KEY, localLease);
-          await this.ctx.storage.setAlarm(localLease.cancelDeadlineAt);
-          return;
-        }
-        if (Date.now() < deadline!) {
-          await this.ctx.storage.setAlarm(deadline!);
+      if (localLease.phase.s === "cancel_pending") {
+        const deadline = localLease.phase.deadlineAt;
+        if (Date.now() < deadline) {
+          await this.ctx.storage.setAlarm(deadline);
           return;
         }
         await this.cancelLocalTurn(localLease, true);

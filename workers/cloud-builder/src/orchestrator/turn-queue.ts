@@ -436,17 +436,24 @@ export abstract class OrchestratorTurnQueue extends OrchestratorTurnLifecycle {
       partialText: "",
       tools: [],
     };
-    if (
-      lease.cancelRequested &&
-      (!Number.isFinite(lease.cancelDeadlineAt) || lease.cancelDeadlineAt! <= 0)
-    ) {
-      lease.cancelDeadlineAt = Date.now() + LOCAL_TURN_CANCEL_GRACE_MS;
+    if (!lease.phase) {
+      lease.phase = lease.cancelRequested
+        ? {
+            s: "cancel_pending",
+            deadlineAt:
+              Number.isFinite(lease.cancelDeadlineAt) && lease.cancelDeadlineAt! > 0
+                ? lease.cancelDeadlineAt!
+                : Date.now() + LOCAL_TURN_CANCEL_GRACE_MS,
+          }
+        : { s: "leased" };
+      delete lease.cancelRequested;
+      delete lease.cancelDeadlineAt;
       await this.ctx.storage.put(LOCAL_TURN_LEASE_KEY, lease);
     }
     const retirementAt = localTurnRetirementDeadline(lease);
     const alarmAt = await this.ctx.storage.getAlarm();
     if (
-      lease.cancelRequested
+      lease.phase.s === "cancel_pending"
         ? alarmAt !== retirementAt
         : alarmAt === null || alarmAt > retirementAt
     ) {
@@ -496,15 +503,14 @@ export abstract class OrchestratorTurnQueue extends OrchestratorTurnLifecycle {
         return;
       }
       const state = this.journal.turnState(current.turnId);
-      const wasExternallyCanceled = current.cancelRequested === true;
-      current.cancelRequested = true;
-      if (
-        !Number.isFinite(current.cancelDeadlineAt) ||
-        current.cancelDeadlineAt! <= 0
-      ) {
-        current.cancelDeadlineAt = Date.now() + LOCAL_TURN_CANCEL_GRACE_MS;
+      const wasExternallyCanceled = current.phase.s === "cancel_pending";
+      if (current.phase.s !== "cancel_pending") {
+        current.phase = {
+          s: "cancel_pending",
+          deadlineAt: Date.now() + LOCAL_TURN_CANCEL_GRACE_MS,
+        };
       }
-      const cancelDeadlineAt = current.cancelDeadlineAt!;
+      const cancelDeadlineAt = current.phase.deadlineAt;
       await this.ctx.storage.put(LOCAL_TURN_LEASE_KEY, current);
       // Replace (rather than retain) an earlier watchdog. alarm() must never
       // interpret an unrelated/old alarm as the end of the desktop ACK grace.

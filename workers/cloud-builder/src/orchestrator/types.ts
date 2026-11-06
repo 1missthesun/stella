@@ -144,10 +144,16 @@ export type LocalTurnLease = OwnerFencedTurn & {
   expiresAt: number;
   beginFingerprint: string;
   finishFingerprint?: string;
+  phase: LocalTurnLeasePhase;
+  /** Pre-phase leases only; `restoreLocalLease` migrates them at wake. */
   cancelRequested?: boolean;
   cancelDeadlineAt?: number;
   clientMsgId?: string;
 };
+
+export type LocalTurnLeasePhase =
+  | { s: "leased" }
+  | { s: "cancel_pending"; deadlineAt: number };
 
 export type LocalTurnFinishReceipt = {
   ownerGeneration: string;

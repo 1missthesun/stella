@@ -1434,7 +1434,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
       previousEpoch: prior.epoch,
     });
     try {
-      if (lease.cancelRequested) await this.cancelLocalTurn(lease, true);
+      if (lease.phase.s === "cancel_pending") await this.cancelLocalTurn(lease, true);
       else
         await this.expireLocalLease(
           lease,
@@ -1493,7 +1493,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     return Boolean(
       lease &&
         lease.deviceId === deviceId &&
-        !lease.cancelRequested &&
+        lease.phase.s !== "cancel_pending" &&
         lease.expiresAt > Date.now(),
     );
   }

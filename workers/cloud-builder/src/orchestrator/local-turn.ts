@@ -402,7 +402,7 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
       !current ||
       current.turnId !== lease.turnId ||
       current.leaseToken !== lease.leaseToken ||
-      current.cancelRequested ||
+      current.phase.s === "cancel_pending" ||
       this.journal.turnState(lease.turnId)?.state === "terminal"
     ) {
       throw new Error("Local turn lease is no longer active.");
@@ -436,7 +436,7 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
       admitted.turnId !== lease.turnId ||
       admitted.leaseToken !== lease.leaseToken ||
       admitted.ownerGeneration !== lease.ownerGeneration ||
-      admitted.cancelRequested
+      admitted.phase.s === "cancel_pending"
     ) {
       throw new OwnerPurgeFenceError();
     }
@@ -539,15 +539,15 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
       return staleOwnerGenerationResponse();
     }
     if (localTurnRetirementDeadline(existing) <= Date.now()) {
-      if (existing.cancelRequested) {
+      if (existing.phase.s === "cancel_pending") {
         await this.cancelLocalTurn(existing, true);
       } else {
         await this.expireLocalLease(existing, true);
       }
       return json(
         {
-          code: existing.cancelRequested ? "turn_finished" : "turn_expired",
-          message: existing.cancelRequested
+          code: existing.phase.s === "cancel_pending" ? "turn_finished" : "turn_expired",
+          message: existing.phase.s === "cancel_pending"
             ? "That local turn was canceled."
             : "That local turn lease expired.",
           turnId: existing.turnId,
@@ -583,7 +583,7 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
         current.ownerId !== ownerId ||
         current.ownerGeneration !== expectedOwnerGeneration ||
         current.leaseToken !== leaseToken ||
-        current.cancelRequested ||
+        current.phase.s === "cancel_pending" ||
         current.expiresAt <= Date.now() ||
         this.journal.turnState(turnId)?.state === "terminal"
       ) {
@@ -841,7 +841,7 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
         return staleOwnerGenerationResponse();
       }
       if (localTurnRetirementDeadline(existing) <= Date.now()) {
-        if (existing.cancelRequested) {
+        if (existing.phase.s === "cancel_pending") {
           await this.cancelLocalTurn(existing, true);
         } else {
           await this.expireLocalLease(existing, true);
@@ -849,8 +849,8 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
         if (existing.turnId === turnId) {
           return json(
             {
-              code: existing.cancelRequested ? "turn_finished" : "turn_expired",
-              message: existing.cancelRequested
+              code: existing.phase.s === "cancel_pending" ? "turn_finished" : "turn_expired",
+              message: existing.phase.s === "cancel_pending"
                 ? "That local turn was canceled."
                 : "That local turn lease expired.",
               turnId: existing.turnId,
@@ -893,7 +893,7 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
           current.ownerGeneration !== expectedOwnerGeneration ||
           current.leaseToken !== existing.leaseToken ||
           current.beginFingerprint !== beginFingerprint ||
-          current.cancelRequested ||
+          current.phase.s === "cancel_pending" ||
           current.expiresAt <= Date.now() ||
           this.journal.turnState(turnId)?.state === "terminal"
         ) {
@@ -938,7 +938,7 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
           finalLease.turnId !== renewed.turnId ||
           finalLease.leaseToken !== renewed.leaseToken ||
           finalLease.ownerGeneration !== expectedOwnerGeneration ||
-          finalLease.cancelRequested
+          finalLease.phase.s === "cancel_pending"
         ) {
           throw new OwnerPurgeFenceError();
         }
@@ -989,6 +989,7 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
         crypto.randomUUID().replaceAll("-", "") +
         crypto.randomUUID().replaceAll("-", ""),
       expiresAt: Date.now() + LOCAL_TURN_LEASE_MS,
+      phase: { s: "leased" },
       beginFingerprint,
       ...(clientMsgId ? { clientMsgId } : {}),
     };
@@ -1153,7 +1154,7 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
         finalLease.turnId !== lease.turnId ||
         finalLease.leaseToken !== lease.leaseToken ||
         finalLease.ownerGeneration !== expectedOwnerGeneration ||
-        finalLease.cancelRequested
+        finalLease.phase.s === "cancel_pending"
       ) {
         throw new OwnerPurgeFenceError();
       }
@@ -1397,15 +1398,15 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
       );
     }
     if (localTurnRetirementDeadline(lease) <= Date.now()) {
-      if (lease.cancelRequested) {
+      if (lease.phase.s === "cancel_pending") {
         await this.cancelLocalTurn(lease, true);
       } else {
         await this.expireLocalLease(lease, true);
       }
       return json(
         {
-          code: lease.cancelRequested ? "turn_finished" : "turn_expired",
-          message: lease.cancelRequested
+          code: lease.phase.s === "cancel_pending" ? "turn_finished" : "turn_expired",
+          message: lease.phase.s === "cancel_pending"
             ? "That local turn was canceled."
             : "That local turn lease expired.",
           turnId,
@@ -1427,7 +1428,7 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
         current.localTurnId !== localTurnId ||
         current.leaseToken !== leaseToken ||
         current.expiresAt <= Date.now() ||
-        current.cancelRequested
+        current.phase.s === "cancel_pending"
       ) {
         return;
       }
@@ -1503,7 +1504,7 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
       current.turnId !== turnId ||
       current.leaseToken !== leaseToken ||
       current.ownerGeneration !== expectedOwnerGeneration ||
-      current.cancelRequested ||
+      current.phase.s === "cancel_pending" ||
       current.finishFingerprint !== finishFingerprint
     ) {
       return json(

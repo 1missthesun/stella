@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AppState } from "react-native";
+import { File } from "expo-file-system";
 import type { DriveFileUrl as DrivePreview } from "@stella/contracts/backend/drive";
 import { attachmentContentType } from "@stella/contracts/attachment-content-type";
 import { chatAttachmentDisplayName } from "@stella/contracts/chat-attachments";
@@ -7,6 +8,16 @@ import type { ChatMessage } from "../types";
 import { getBackendClient } from "./backend";
 
 const REFRESH_MARGIN_MS = 30_000;
+
+/** A preview still on this phone: shown at once, unlike the full-size Drive copy. */
+const localFileUri = (uri: string | undefined): string | undefined => {
+  if (!uri?.startsWith("file:")) return undefined;
+  try {
+    return new File(uri).exists ? uri : undefined;
+  } catch {
+    return undefined;
+  }
+};
 const RETRY_MS = 30_000;
 
 export function useChatAttachmentPreviews(
@@ -121,9 +132,11 @@ export function useChatAttachmentPreviews(
         return {
           path,
           name: chatAttachmentDisplayName(path, preview.name),
-          ...(preview.contentType.toLowerCase().startsWith("image/")
-            ? { imageUri: preview.url }
-            : existing?.imageUri ? { imageUri: existing.imageUri } : {}),
+          ...(localFileUri(existing?.imageUri)
+            ? { imageUri: existing!.imageUri }
+            : preview.contentType.toLowerCase().startsWith("image/")
+              ? { imageUri: preview.url }
+              : existing?.imageUri ? { imageUri: existing.imageUri } : {}),
           ...(existing?.uploadId ? { uploadId: existing.uploadId } : {}),
         };
       });

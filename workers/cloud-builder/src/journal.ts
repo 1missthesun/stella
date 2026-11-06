@@ -1414,6 +1414,24 @@ export class Journal {
 
   appendTurn(input: AppendTurnInput): AppendResult {
     this.assertWritable();
+    if (
+      input.phase === "completed" ||
+      input.phase === "failed" ||
+      input.phase === "canceled" ||
+      input.phase === "timeout"
+    ) {
+      const decided = this.selectRows(
+        `WHERE turn_id = ? AND kind = 'turn' AND phase IN ('completed','failed','canceled','timeout') ORDER BY seq ASC LIMIT 1`,
+        input.turnId,
+      )[0];
+      if (decided) {
+        return {
+          seq: decided.seq,
+          inserted: false,
+          record: this.rowToRecord(decided),
+        };
+      }
+    }
     const createdAt = input.createdAt ?? Date.now();
     const detail: Record<string, unknown> = {};
     if (input.promptSeq !== undefined) detail.promptSeq = input.promptSeq;
@@ -2193,7 +2211,9 @@ export class Journal {
       `INSERT INTO turns (turn_id, session_id, owner_id, lane, source, client_msg_id,
                           state, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-       ON CONFLICT(turn_id) DO UPDATE SET state = excluded.state, updated_at = excluded.updated_at`,
+       ON CONFLICT(turn_id) DO UPDATE SET
+         state = CASE WHEN turns.state = 'terminal' THEN 'terminal' ELSE excluded.state END,
+         updated_at = excluded.updated_at`,
       input.turnId,
       input.sessionId,
       input.ownerId,
@@ -2226,7 +2246,7 @@ export class Journal {
 
   setTurnTerminal(turnId: string, kind: TurnPhase, now: number): void {
     this.sql.exec(
-      `UPDATE turns SET state = 'terminal', terminal_kind = ?, updated_at = ? WHERE turn_id = ?`,
+      `UPDATE turns SET state = 'terminal', terminal_kind = ?, updated_at = ? WHERE turn_id = ? AND (state <> 'terminal' OR terminal_kind IS NULL)`,
       kind,
       now,
       turnId,

@@ -2,7 +2,7 @@ import { app, BrowserWindow } from "electron";
 import { randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
 import path from "node:path";
-import { getDictationSoundEffectsEnabled, loadLocalPreferences, saveLocalPreferences, } from "@stella/runtime/kernel/preferences/local-preferences";
+import { getDictationSoundEffectsEnabled, loadLocalPreferences, updateLocalPreferences, } from "@stella/runtime/kernel/preferences/local-preferences";
 import { runNativeHelper } from "../native-helper.js";
 import { hasOpenRouterDictationKey, transcribeWithOpenRouter, } from "../services/dictation-openrouter.js";
 import { applyShortcutRegistration, } from "./shortcut-registration.js";
@@ -256,9 +256,7 @@ export const registerDictationHandlers = (options) => {
         const stellaDataDir = options.getStellaDataDir();
         if (!stellaDataDir)
             return;
-        const prefs = loadLocalPreferences(stellaDataDir);
-        prefs.dictationShortcut = shortcut;
-        saveLocalPreferences(stellaDataDir, prefs);
+        updateLocalPreferences(stellaDataDir, { dictationShortcut: shortcut });
     };
     const initial = applyDictationShortcutRegistration(loadConfiguredShortcut());
     if (!initial.ok) {
@@ -317,9 +315,7 @@ export const registerDictationHandlers = (options) => {
         const nextEnabled = enabled === true;
         const stellaDataDir = options.getStellaDataDir();
         if (stellaDataDir) {
-            const prefs = loadLocalPreferences(stellaDataDir);
-            prefs.dictationSoundEffectsEnabled = nextEnabled;
-            saveLocalPreferences(stellaDataDir, prefs);
+            updateLocalPreferences(stellaDataDir, { dictationSoundEffectsEnabled: nextEnabled });
         }
         return { enabled: nextEnabled };
     });

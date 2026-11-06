@@ -324,20 +324,96 @@ const sameFileKey = (a: FileKey | null, b: FileKey): boolean =>
   a.size === b.size &&
   a.ino === b.ino;
 
+export type PreferencesPatch = Partial<LocalPreferences>;
+export type PreferencesUpdate =
+  | PreferencesPatch
+  | ((current: LocalPreferences) => PreferencesPatch | null);
+
+class UnreadablePreferencesError extends Error {}
+
+const LOCK_WAIT_MS = 2_000;
+const LOCK_POLL_MS = 5;
+const UNREADABLE_RETRIES = 3;
+const sleepSync = (ms: number) =>
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+
+const withFileLock = <A>(filePath: string, run: () => A): A => {
+  const lockPath = `${filePath}.lock`;
+  const deadline = Date.now() + LOCK_WAIT_MS;
+  let fd: number | null = null;
+  while (fd === null) {
+    try {
+      fd = fs.openSync(lockPath, "wx", 0o600);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+      if (Date.now() >= deadline) {
+        fs.rmSync(lockPath, { force: true });
+        continue;
+      }
+      sleepSync(LOCK_POLL_MS);
+    }
+  }
+  try {
+    return run();
+  } finally {
+    fs.closeSync(fd);
+    fs.rmSync(lockPath, { force: true });
+  }
+};
+
+const readEntry = (filePath: string): CacheEntry | null => {
+  const observedAtMs = Date.now();
+  let stat: fs.Stats;
+  try {
+    stat = fs.statSync(filePath);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw new UnreadablePreferencesError(String(error));
+  }
+  try {
+    const parsed = JSON.parse(fs.readFileSync(filePath, "utf-8"));
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      throw new Error("not an object");
+    }
+    return {
+      prefs: normalizeStoredPreferences(parsed as Partial<LocalPreferences>),
+      key: fileKeyOf(filePath, stat),
+      observedAtMs,
+    };
+  } catch (error) {
+    throw new UnreadablePreferencesError(String(error));
+  }
+};
+
+const writeAtomicSync = (filePath: string, prefs: LocalPreferences) => {
+  const dir = path.dirname(filePath);
+  if (!fs.existsSync(dir)) ensurePrivateDirSync(dir);
+  const tmpPath = `${filePath}.${process.pid}.${Math.random()
+    .toString(36)
+    .slice(2)}.tmp`;
+  writePrivateFileSync(tmpPath, JSON.stringify(prefs, null, 2));
+  try {
+    fs.renameSync(tmpPath, filePath);
+  } catch (error) {
+    fs.rmSync(tmpPath, { force: true });
+    throw error;
+  }
+};
+
 /**
- * The effectful core: stat-keyed cached load and private-file save.
- * Everything else in this module is a pure projection over these two
- * operations. Exported so sibling kernel services can compose the layer
- * directly instead of round-tripping through the sync facade. The cache is
- * keyed on (path, mtimeMs, size, ino), so multiple runtimes holding their own
- * cache entry converge on the file's content.
+ * Electron main, the runtime worker and the `stella-computer` CLI all write
+ * this file. Every write takes the sibling `.lock`, re-reads the file, applies
+ * only the patched keys and replaces the file by rename, so a reader never
+ * sees a torn file and one process can't drop another's change. An unreadable
+ * file is never overwritten with defaults: reads fall back to the last good
+ * copy, and a write moves the file aside first.
  */
 export interface Interface {
   readonly load: (stellaDataDir: string) => Effect.Effect<LocalPreferences>;
-  readonly save: (
+  readonly update: (
     stellaDataDir: string,
-    prefs: LocalPreferences,
-  ) => Effect.Effect<void, unknown>;
+    update: PreferencesUpdate,
+  ) => Effect.Effect<LocalPreferences, unknown>;
 }
 
 export class Service extends Context.Service<Service, Interface>()(
@@ -348,6 +424,7 @@ export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const cache = yield* Ref.make<CacheEntry | null>(null);
+    const lastGood = yield* Ref.make<LocalPreferences | null>(null);
 
     const load = Effect.fn("LocalPreferences.load")(function* (
       stellaDataDir: string,
@@ -355,60 +432,85 @@ export const layer = Layer.effect(
       const filePath = prefsPath(stellaDataDir);
       const cached = yield* Ref.get(cache);
       const loaded = yield* Effect.try({
-        try: (): CacheEntry => {
-          const observedAtMs = Date.now();
-          const key = fileKeyOf(filePath, fs.statSync(filePath));
-          if (isTrustedHit(cached, key)) {
-            return cached;
-          }
-          const raw = fs.readFileSync(filePath, "utf-8");
-          const parsed = JSON.parse(raw) as Partial<LocalPreferences>;
-          return {
-            prefs: normalizeStoredPreferences(parsed),
-            key,
-            observedAtMs,
-          };
+        try: (): CacheEntry | null => {
+          const stat = fs.statSync(filePath);
+          if (isTrustedHit(cached, fileKeyOf(filePath, stat))) return cached;
+          return readEntry(filePath);
         },
         catch: (error) => error,
       }).pipe(
-        Effect.catch(() => Effect.succeed<CacheEntry | null>(null)),
+        Effect.catch((error) =>
+          Effect.sync(() => {
+            if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+              return null;
+            }
+            return "unreadable" as const;
+          }),
+        ),
       );
+      if (loaded === "unreadable") {
+        const good = yield* Ref.get(lastGood);
+        return good ? { ...good } : { ...DEFAULT_PREFERENCES };
+      }
       if (loaded === null) {
         return { ...DEFAULT_PREFERENCES };
       }
       if (loaded !== cached) {
         yield* Ref.set(cache, loaded);
+        yield* Ref.set(lastGood, loaded.prefs);
       }
       return loaded.prefs;
     });
 
-    const save = Effect.fn("LocalPreferences.save")(function* (
+    const update = Effect.fn("LocalPreferences.update")(function* (
       stellaDataDir: string,
-      prefs: LocalPreferences,
+      change: PreferencesUpdate,
     ) {
       const filePath = prefsPath(stellaDataDir);
-      yield* Effect.try({
-        try: () => {
-          const dir = path.dirname(filePath);
-          if (!fs.existsSync(dir)) {
-            ensurePrivateDirSync(dir);
-          }
-          writePrivateFileSync(filePath, JSON.stringify(prefs, null, 2));
-        },
+      const good = yield* Ref.get(lastGood);
+      const written = yield* Effect.try({
+        try: () =>
+          withFileLock(filePath, (): CacheEntry | null => {
+            let current: LocalPreferences | null = null;
+            for (let attempt = 0; current === null; attempt += 1) {
+              try {
+                current = readEntry(filePath)?.prefs ?? {
+                  ...DEFAULT_PREFERENCES,
+                };
+              } catch (error) {
+                if (!(error instanceof UnreadablePreferencesError)) throw error;
+                if (attempt + 1 < UNREADABLE_RETRIES) {
+                  sleepSync(20);
+                  continue;
+                }
+                const asidePath = `${filePath}.unreadable-${Date.now()}`;
+                fs.renameSync(filePath, asidePath);
+                console.warn(
+                  `[preferences] ${filePath} was unreadable (${error.message}); moved it to ${asidePath}.`,
+                );
+                current = good ? { ...good } : { ...DEFAULT_PREFERENCES };
+              }
+            }
+            const patch =
+              typeof change === "function" ? change(current) : change;
+            if (patch === null) return null;
+            const prefs = normalizeStoredPreferences({ ...current, ...patch });
+            writeAtomicSync(filePath, prefs);
+            return {
+              prefs,
+              key: fileKeyOf(filePath, fs.statSync(filePath)),
+              observedAtMs: Date.now(),
+            };
+          }),
         catch: (error) => error,
       });
-      const observedAtMs = Date.now();
-      const key = yield* Effect.sync(() => {
-        try {
-          return fileKeyOf(filePath, fs.statSync(filePath));
-        } catch {
-          return null;
-        }
-      });
-      yield* Ref.set(cache, { prefs, key, observedAtMs });
+      if (written === null) return yield* load(stellaDataDir);
+      yield* Ref.set(cache, written);
+      yield* Ref.set(lastGood, written.prefs);
+      return written.prefs;
     });
 
-    return { load, save };
+    return { load, update };
   }),
 );
 
@@ -432,17 +534,16 @@ export const loadLocalPreferences = (
     }),
   );
 
-export const saveLocalPreferences = (
+export const updateLocalPreferences = (
   stellaDataDir: string,
-  prefs: LocalPreferences,
-): void => {
+  update: PreferencesUpdate,
+): LocalPreferences =>
   runPreferences(
     Effect.gen(function* () {
       const service = yield* Service;
-      yield* service.save(stellaDataDir, prefs);
+      return yield* service.update(stellaDataDir, update);
     }),
   );
-};
 
 export const getModelOverride = (
   stellaDataDir: string,
@@ -526,9 +627,7 @@ export const updateLocalModelPreferences = (
   stellaDataDir: string,
   patch: Partial<LocalModelPreferencesSnapshot>,
 ): LocalModelPreferencesSnapshot => {
-  const prefs = loadLocalPreferences(stellaDataDir);
-  const next: LocalPreferences = {
-    ...prefs,
+  updateLocalPreferences(stellaDataDir, (prefs) => ({
     defaultModels:
       patch.defaultModels === undefined
         ? prefs.defaultModels
@@ -607,8 +706,7 @@ export const updateLocalModelPreferences = (
         : typeof patch.memoryChoice === "boolean"
           ? patch.memoryChoice
           : null,
-  };
-  saveLocalPreferences(stellaDataDir, next);
+  }));
   return getLocalModelPreferences(stellaDataDir);
 };
 
@@ -652,17 +750,19 @@ export const setTelemetryEnabled = (
   enabled: boolean,
   options: { accountOffPending?: boolean; mirrorAccount?: boolean } = {},
 ): TelemetryState => {
-  const prefs = loadLocalPreferences(stellaDataDir);
-  if (options.mirrorAccount && enabled && prefs.telemetryAccountOffPending) {
-    return { enabled: false, accountOffPending: true };
-  }
   const accountOffPending = !enabled && options.accountOffPending === true;
-  saveLocalPreferences(stellaDataDir, {
-    ...prefs,
-    telemetryEnabled: enabled,
-    telemetryAccountOffPending: accountOffPending,
-  });
-  return { enabled, accountOffPending };
+  const prefs = updateLocalPreferences(stellaDataDir, (current) =>
+    options.mirrorAccount && enabled && current.telemetryAccountOffPending
+      ? null
+      : {
+          telemetryEnabled: enabled,
+          telemetryAccountOffPending: accountOffPending,
+        },
+  );
+  return {
+    enabled: prefs.telemetryEnabled,
+    accountOffPending: prefs.telemetryAccountOffPending,
+  };
 };
 
 export const getDictationSoundEffectsEnabled = (
@@ -694,9 +794,8 @@ export const setCompanionEnabled = (
   stellaDataDir: string,
   enabled: boolean,
 ): void => {
-  const prefs = loadLocalPreferences(stellaDataDir);
-  if (prefs.companionEnabled === enabled) return;
-  saveLocalPreferences(stellaDataDir, { ...prefs, companionEnabled: enabled });
+  if (loadLocalPreferences(stellaDataDir).companionEnabled === enabled) return;
+  updateLocalPreferences(stellaDataDir, { companionEnabled: enabled });
 };
 
 export const getCompanionAnchor = (
@@ -708,9 +807,7 @@ export const setCompanionAnchor = (
   stellaDataDir: string,
   anchor: { x: number; y: number } | null,
 ): void => {
-  const prefs = loadLocalPreferences(stellaDataDir);
-  saveLocalPreferences(stellaDataDir, {
-    ...prefs,
+  updateLocalPreferences(stellaDataDir, {
     companionAnchor: normalizeCompanionAnchor(anchor),
   });
 };
@@ -727,8 +824,7 @@ export const setUserAskEscalationPolicy = (
   input: unknown,
 ): UserAskEscalationPolicy => {
   const userAskEscalationPolicy = normalizeUserAskEscalationPolicy(input);
-  const prefs = loadLocalPreferences(stellaDataDir);
-  saveLocalPreferences(stellaDataDir, { ...prefs, userAskEscalationPolicy });
+  updateLocalPreferences(stellaDataDir, { userAskEscalationPolicy });
   return userAskEscalationPolicy;
 };
 
@@ -740,8 +836,7 @@ export const setReadAloudEnabled = (
   stellaDataDir: string,
   enabled: boolean,
 ): void => {
-  const prefs = loadLocalPreferences(stellaDataDir);
-  saveLocalPreferences(stellaDataDir, { ...prefs, readAloudEnabled: enabled });
+  updateLocalPreferences(stellaDataDir, { readAloudEnabled: enabled });
 };
 
 export const getPromptPresetSelections = (
@@ -761,15 +856,13 @@ export const setPromptPresetSelection = (
   agentId: string,
   presetId: string,
 ): void => {
-  const prefs = loadLocalPreferences(stellaDataDir);
-  const selections = {
-    ...normalizePromptPresetSelections(prefs.promptPresetSelections),
-  };
-  if (!presetId || presetId === "default") delete selections[agentId];
-  else selections[agentId] = presetId;
-  saveLocalPreferences(stellaDataDir, {
-    ...prefs,
-    promptPresetSelections: selections,
+  updateLocalPreferences(stellaDataDir, (prefs) => {
+    const selections = {
+      ...normalizePromptPresetSelections(prefs.promptPresetSelections),
+    };
+    if (!presetId || presetId === "default") delete selections[agentId];
+    else selections[agentId] = presetId;
+    return { promptPresetSelections: selections };
   });
 };
 
@@ -780,11 +873,7 @@ export const setOnboardingCompleted = (
   stellaDataDir: string,
   completed: boolean,
 ): void => {
-  const prefs = loadLocalPreferences(stellaDataDir);
-  saveLocalPreferences(stellaDataDir, {
-    ...prefs,
-    onboardingCompleted: completed,
-  });
+  updateLocalPreferences(stellaDataDir, { onboardingCompleted: completed });
 };
 
 const normalizeEngine = (value: unknown): AgentEngine => {

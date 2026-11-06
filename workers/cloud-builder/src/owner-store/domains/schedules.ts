@@ -1074,7 +1074,13 @@ const setReminderState = (
   next: { state: "done" } | { state: "snoozed"; minutes: number },
 ): ReminderFire => {
   enforceOwnerRateLimit(ctx.db, ctx.now, "schedules.reminder", { count: 60, windowMs: 60_000 }, "Slow down a moment and try again.");
-  const row = readFire(ctx.db, fireId);
+  let row = readFire(ctx.db, fireId);
+  while (row?.state === "snoozed" && row.snoozed_until !== null && row.snoozed_until <= ctx.now) {
+    const returned = readFire(ctx.db, returnedFireId(row));
+    if (!returned) break;
+    row = returned;
+    fireId = returned.fire_id;
+  }
   if (!row) throw new RpcError("NOT_FOUND", "That reminder is gone.");
   const snoozedUntil = next.state === "snoozed" ? ctx.now + Math.round(next.minutes) * 60_000 : null;
   ctx.db.run(
@@ -1092,6 +1098,9 @@ const setReminderState = (
   return toReminderFire(readFire(ctx.db, fireId)!);
 };
 
+const returnedFireId = (snoozed: FireRow): string =>
+  `${snoozed.fire_id.slice(0, 64)}.${(snoozed.snoozed_until ?? 0).toString(36)}`;
+
 const reminderReturn = async (ctx: OwnerContext, payload: unknown): Promise<void> => {
   const { fireId } = object({ fireId: string({ max: 128 }) })(payload);
   const old = readFire(ctx.db, fireId);
@@ -1103,7 +1112,7 @@ const reminderReturn = async (ctx: OwnerContext, payload: unknown): Promise<void
   const snapshot = await ctx.host.snapshot();
   if (!snapshot.writable) return;
   const fresh = recordFire(ctx, {
-    fireId: `${old.fire_id.slice(0, 64)}.${old.snoozed_until.toString(36)}`,
+    fireId: returnedFireId(old),
     scheduleId: old.schedule_id,
     conversationId: old.conversation_id,
     text: old.text,

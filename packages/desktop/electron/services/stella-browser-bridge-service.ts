@@ -640,11 +640,14 @@ export class StellaBrowserBridgeService {
       await this.applyExtensionRouting();
       await Promise.all(
         Array.from(this.agentBackends.values(), (backend) =>
-          this.registerAgentExtensionDelegate(backend),
+          this.registerAgentExtensionDelegate(backend).catch(() =>
+            this.stopAgentBackend(backend),
+          ),
         ),
       );
     } catch (error) {
       await this.killDaemonProcess();
+      this.daemonProcess = null;
       throw error;
     } finally {
       this.isLaunching = false;
@@ -815,6 +818,7 @@ export class StellaBrowserBridgeService {
 
       this.daemonProcess = null;
       this.resetCdpRouting();
+      this.agentBackendGeneration += 1;
 
       if (this.stopped || this.isLaunching) {
         return;
@@ -832,6 +836,7 @@ export class StellaBrowserBridgeService {
       }
       this.daemonProcess = null;
       this.resetCdpRouting();
+      this.agentBackendGeneration += 1;
       if (this.stopped || this.isLaunching) {
         return;
       }

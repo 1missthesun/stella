@@ -51,7 +51,12 @@ import {
   CLOUD_CHAT_READER_PREPARE_TIMEOUT_MS,
   CLOUD_CHAT_READER_PREPARE_CACHE_MAX,
 } from "./constants.js";
-import { DDL } from "./schema.js";
+import {
+  DDL,
+  DISPATCH_STATE_CHECK,
+  dispatchesCopySql,
+  dispatchesTableDdl,
+} from "./schema.js";
 import { withTimeout, ownerFenceRequest, log } from "./support.js";
 
 export abstract class OwnerGateBase extends DurableObject<OwnerGateEnv> {
@@ -388,12 +393,49 @@ export abstract class OwnerGateBase extends DurableObject<OwnerGateEnv> {
         "ALTER TABLE dispatches ADD COLUMN result_json TEXT",
       );
     }
+    this.migrateDispatchStateCheck();
     this.schemaReady = true;
     const schemaMs = Math.round(performance.now() - startedAt);
     log("info", "owner_gate_wake_timing", {
       schemaMs,
       totalMs: schemaMs,
     });
+  }
+
+  private migrateDispatchStateCheck(): void {
+    const sql = this.ctx.storage.sql;
+    const created =
+      sql
+        .exec<{ sql: string }>(
+          "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'dispatches'",
+        )
+        .toArray()[0]?.sql ?? "";
+    if (created.includes(DISPATCH_STATE_CHECK)) return;
+    const columnsOf = (table: string) =>
+      sql
+        .exec<{ name: string }>(`PRAGMA table_info(${table})`)
+        .toArray()
+        .map((column) => column.name);
+    let rows = 0;
+    this.ctx.storage.transactionSync(() => {
+      sql.exec("DROP TABLE IF EXISTS dispatches_next");
+      sql.exec(dispatchesTableDdl("dispatches_next"));
+      const kept = new Set(columnsOf("dispatches"));
+      sql.exec(
+        dispatchesCopySql(
+          "dispatches",
+          "dispatches_next",
+          columnsOf("dispatches_next").filter((column) => kept.has(column)),
+        ),
+      );
+      rows = sql
+        .exec<{ count: number }>("SELECT COUNT(*) AS count FROM dispatches_next")
+        .one().count;
+      sql.exec("DROP TABLE dispatches");
+      sql.exec("ALTER TABLE dispatches_next RENAME TO dispatches");
+      for (const statement of DDL) sql.exec(statement);
+    });
+    log("info", "owner_gate_dispatch_state_check_added", { rows });
   }
 
   protected turnTimeoutMs(): number {

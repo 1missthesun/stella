@@ -33,6 +33,11 @@ import { useHasUnsentBrowserAttachments } from "@/features/cloud/browser-chat-at
 import { usePiChat } from "@/features/chat/pi/use-pi-chat";
 import { remoteTurnRunning } from "@/features/chat/pi/remote-turn-running";
 import {
+  turnActivity,
+  turnActivityBusy,
+  turnActivityRun,
+} from "@stella/contracts/turn-activity";
+import {
   journaledPiTurns,
   piAgentActivityEvents,
   piPendingLogRows,
@@ -297,12 +302,15 @@ export function useFullShellChat({
   useEffect(() => {
     acknowledgeLocalMessages(persistedMessages);
   }, [acknowledgeLocalMessages, persistedMessages, localOptimisticEvents]);
-  const awaitingMessageAdmission = useMemo(() => {
+  const awaitingLocalAdmission = useMemo(() => {
     const persistedIds = acceptedUserMessageIds(persistedMessages);
     return localOptimisticEvents.some(
       (event) => event.type === "user_message" && !persistedIds.has(event._id),
     );
   }, [localOptimisticEvents, persistedMessages]);
+  const awaitingMessageAdmission = cloudChat.isWebShell
+    ? cloudChat.awaitingAdmission
+    : awaitingLocalAdmission;
   const piAgentEvents = useMemo(
     () => piAgentActivityEvents(threadActivityRecords),
     [threadActivityRecords],
@@ -342,35 +350,52 @@ export function useFullShellChat({
         records: cloudChat.records,
         polled: piChat.remoteTurns,
         ownDeviceId,
+        deviceless: cloudChat.isWebShell,
       }),
     [
       cloudChat.conversation.state.live,
       cloudChat.conversation.state.status,
+      cloudChat.isWebShell,
       cloudChat.records,
       cloudFeaturesEnabled,
       ownDeviceId,
       piChat.remoteTurns,
     ],
   );
-  const turnRunning = piChat.isRunningHere || runningElsewhere;
-  const remoteToolName =
-    runningElsewhere && !piChat.isRunningHere ? cloudChat.activeToolName : null;
-  const activeToolCallId = remoteToolName
-    ? cloudChat.activeToolCallId
-    : piChat.activeToolCallId;
-  const activeToolName = remoteToolName ?? piChat.activeToolName;
-  const hasToolActivity = piChat.hasToolActivity || Boolean(remoteToolName);
-  const isToolActive = piChat.isToolActive || Boolean(remoteToolName);
   const awaitingTurnHandoff = useTurnHandoff({
     conversationId: activeConversationId,
-    optimisticEvents: localOptimisticEvents,
+    optimisticEvents,
     persistedMessages,
     awaitingAdmission: awaitingMessageAdmission,
-    turnRunning,
+    turnRunning: piChat.isRunningHere || runningElsewhere,
   });
-  const isStreaming =
-    turnRunning || awaitingMessageAdmission || awaitingTurnHandoff;
-  const answerLanded = !awaitingMessageAdmission && piChat.answerLanded;
+  const activity = turnActivity({
+    admitting: awaitingMessageAdmission,
+    handingOff: awaitingTurnHandoff,
+    here: piChat.isRunningHere
+      ? {
+          tool: piChat.activeToolName
+            ? { name: piChat.activeToolName, callId: piChat.activeToolCallId }
+            : null,
+          answerLanded: piChat.answerLanded,
+        }
+      : null,
+    elsewhere: runningElsewhere
+      ? {
+          tool: cloudChat.activeToolName
+            ? { name: cloudChat.activeToolName, callId: cloudChat.activeToolCallId }
+            : null,
+          answerLanded: cloudChat.answerLanded,
+        }
+      : null,
+  });
+  const run = turnActivityRun(activity);
+  const isStreaming = turnActivityBusy(activity);
+  const answerLanded = run?.answerLanded ?? false;
+  const activeToolName = run?.tool?.name ?? null;
+  const activeToolCallId = run?.tool?.callId ?? null;
+  const isToolActive = activeToolName !== null;
+  const hasToolActivity = piChat.hasToolActivity || isToolActive;
   const pendingUserMessageId = cloudChat.isWebShell
     ? cloudChat.pendingUserMessageId
     : localPendingUserMessageId;
@@ -383,7 +408,9 @@ export function useFullShellChat({
   const sendMessage = cloudChat.isWebShell
     ? cloudChat.sendMessage
     : localSendMessage;
-  const cancelCurrentStream = piChat.cancelCurrentStream;
+  const cancelCurrentStream = cloudChat.isWebShell
+    ? cloudChat.cancelCurrentStream
+    : piChat.cancelCurrentStream;
   const hasOlderMessages = isPrivateChat
     ? localMessageFeed.hasOlderMessages
     : cloudChat.conversation.state.hasOlder;

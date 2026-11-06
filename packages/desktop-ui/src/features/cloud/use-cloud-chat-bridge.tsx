@@ -314,8 +314,7 @@ export type CloudChatBridge = {
   loadOlderActivity: () => void;
   optimisticEvents: EventRecord[];
   isWebShell: boolean;
-  isStreaming: boolean;
-  runtimeStatusText: string | null;
+  awaitingAdmission: boolean;
   activeToolName: string | null;
   activeToolCallId: string | null;
   answerLanded: boolean;
@@ -518,10 +517,8 @@ export function useCloudChatBridge({
       dismiss: dismissSend,
     });
   }, [dismissSend, enabled, retrySend, webShell]);
-  const pendingInFlight = conversation.pending.filter((entry) => !entry.error);
-  const isStreaming = Boolean(
-    enabled && (conversation.state.live || (webShell && pendingInFlight.length)),
-  );
+  const awaitingAdmission =
+    enabled && webShell && conversation.pending.some((entry) => !entry.error);
 
   const sendMessage = useCallback(
     async (args: SendMessageArgs): Promise<boolean> => {
@@ -625,12 +622,7 @@ export function useCloudChatBridge({
     loadOlderActivity: cloudActivity.loadOlder,
     optimisticEvents,
     isWebShell: webShell,
-    isStreaming,
-    runtimeStatusText: activeToolName
-      ? (conversation.state.live?.toolLabel ?? `Running ${activeToolName}…`)
-      : isStreaming
-        ? "Thinking…"
-        : null,
+    awaitingAdmission,
     activeToolName,
     activeToolCallId,
     answerLanded: activity.answerLanded,

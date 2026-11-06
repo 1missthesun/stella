@@ -11,6 +11,7 @@ import {
   agentCompletionPromptText,
   agentLifecycleReport,
   cancelCloudAgentAttempt,
+  cloudAgentAttemptState,
   CloudAgentDispatchRefused,
   dispatchCloudAgentTurn,
   steerCloudAgent,
@@ -334,6 +335,22 @@ export const createGateHost = (deps: GateHostDependencies): OwnerHost => ({
       attemptGeneration: input.attemptGeneration,
       cancelRequestId: input.cancelRequestId,
       reason: AGENT_STOP_WIRE_REASON,
+    });
+  },
+
+  async agentAttemptState(input) {
+    return await cloudAgentAttemptState({
+      env: deps.env,
+      conversationId: input.conversationId,
+      harness: input.harness,
+      execution: input.execution,
+      probe: {
+        ownerId: deps.ownerId(),
+        ownerGeneration: input.ownerGeneration,
+        threadId: input.threadId,
+        ...(input.turnId ? { turnId: input.turnId } : {}),
+        attemptGeneration: input.attemptGeneration,
+      },
     });
   },
 

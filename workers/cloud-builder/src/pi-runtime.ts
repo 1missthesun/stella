@@ -2021,6 +2021,29 @@ export class PiConversationRuntime {
     return running ? "steered" : "resumed";
   }
 
+  async threadAgentRunning(threadId: string, context: Context): Promise<boolean> {
+    const { agents } = await this.open();
+    return (await agents.agentStanding(threadId, context))?.status === "running";
+  }
+
+  async harnessAgentAttemptState(
+    input: { ownerId: string; ownerGeneration: string; threadId: string; attemptGeneration: number },
+    context: Context,
+  ): Promise<import("./cloud-agent-dispatch.js").CloudAgentAttemptState> {
+    const kept = this.#state ?? (await this.#options.storage.get<PiAgentState>(PI_AGENT_STATE_KEY));
+    if (!kept || kept.authority.ownerId !== input.ownerId || kept.authority.ownerGeneration !== input.ownerGeneration) {
+      return "gone";
+    }
+    const { agents } = await this.open();
+    const standing = await agents.agentStanding(input.threadId, context);
+    if (!standing || standing.attempt > input.attemptGeneration) return "gone";
+    if (standing.status === "running") return "running";
+    const ended = standing.agentStatus;
+    return ended === "completed" || ended === "failed" || ended === "canceled"
+      ? { ended, text: standing.lastText ?? "" }
+      : "finishing";
+  }
+
   async #threadAttemptOf(requestId: string, context: Context): Promise<number | undefined> {
     const reporter = Number(/^agent-report:(\d+)$/.exec(requestId)?.[1]);
     if (!Number.isSafeInteger(reporter)) return undefined;

@@ -873,9 +873,7 @@ export function desktopChats(options: DesktopChatsOptions) {
         }),
       message: async ({ key, threadId, message, framed }) => {
         const description = await descriptionOf(threadId);
-        if ((await engine.message({ key, threadId, description, message, ...(framed ? { framed } : {}) })) === "steered") {
-          await settle(threadId, `steered:${key}`);
-        }
+        await engine.message({ key, threadId, description, message, ...(framed ? { framed } : {}) });
       },
       stop: async (threadId) => {
         const result = await engine.stop(threadId);
@@ -931,9 +929,7 @@ export function desktopChats(options: DesktopChatsOptions) {
       },
       message: async ({ key, threadId, message, framed }) => {
         const description = await descriptionOf(threadId);
-        if ((await agents.message({ key, threadId, description, message, ...(framed ? { framed } : {}) })) === "steered") {
-          await settle(threadId, `steered:${key}`);
-        }
+        await agents.message({ key, threadId, description, message, ...(framed ? { framed } : {}) });
       },
       stop: async (threadId) => {
         const result = await agents.stop(threadId);

@@ -122,6 +122,7 @@ import {
   deliverExecutorLossTerminal,
   deliverTerminal,
   expireCurrentAgentTurn,
+  handleAgentAttemptState,
   handleOrchestratorTurnStatus,
 } from "../build-session/terminal-delivery.js";
 import {
@@ -811,6 +812,9 @@ export class BuildSessionObject extends DurableObject<Env> {
     }
     if (url.pathname === "/expire-agent-turn") {
       return await this.expireCurrentAgentTurn(request);
+    }
+    if (url.pathname === "/attempt-state") {
+      return await handleAgentAttemptState(this.self, request);
     }
     if (url.pathname === "/orchestrator-turn/status") {
       return await handleOrchestratorTurnStatus(this.self, request);

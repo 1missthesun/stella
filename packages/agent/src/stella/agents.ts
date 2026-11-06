@@ -68,11 +68,12 @@ type AgentRecord = {
   placement: { kind: "local" | "cloud" | "device"; deviceId?: string };
   reported: number[];
   remote?: true;
-  engine?: string;
-  startedAt?: number;
+  remoteRun?: RemoteRun;
   answered?: string[];
   outcome?: AgentAttemptOutcome;
   failed?: true;
+  engine?: string;
+  startedAt?: number;
   origin?: AgentOrigin;
   held?: string[];
   stopped?: true;
@@ -87,6 +88,73 @@ type AgentRecord = {
 
 export type AgentOrigin = { agentThread: true };
 
+/**
+ * An agent that runs elsewhere (another computer, the cloud, an engine): its
+ * last known state there. `seen` holds the report and stop ids applied and
+ * `calls` the messages it had been given. Older builds read and write only
+ * `remote`/`answered`/`outcome`/`failed`, so every change mirrors them, and a run
+ * those builds changed since (other calls or answers) is derived again from them.
+ */
+type RemoteRun =
+  | { phase: "running"; seen: string[]; calls: number }
+  | { phase: "settled"; outcome: AgentAttemptOutcome; seen: string[]; calls: number };
+
+type RemoteEvent =
+  | { kind: "started"; seen?: string[] }
+  | { kind: "messaged" }
+  | { kind: "reported"; requestId: string; outcome: AgentAttemptOutcome }
+  | { kind: "stopped"; requestId: string };
+
+const REMOTE_SEEN_MAX = 64;
+
+const advanceRemote = (run: RemoteRun, event: RemoteEvent, calls: number): RemoteRun => {
+  const { seen } = run;
+  switch (event.kind) {
+    case "started":
+      return { phase: "running", seen: [...new Set([...seen, ...(event.seen ?? [])])], calls };
+    case "messaged":
+      return { phase: "running", seen, calls };
+    case "reported":
+      if (seen.includes(event.requestId)) return { ...run, calls };
+      return { phase: "settled", outcome: event.outcome, seen: [...seen, event.requestId].slice(-REMOTE_SEEN_MAX), calls };
+    case "stopped":
+      return run.phase === "settled"
+        ? { ...run, calls }
+        : { phase: "settled", outcome: "canceled", seen: [...seen, event.requestId].slice(-REMOTE_SEEN_MAX), calls };
+  }
+};
+
+const callsFor = (state: StellaAgents, threadId: string): number =>
+  Object.values(state.calls).filter((call) => call.threadId === threadId).length;
+
+const remoteRunOf = (agent: AgentRecord, calls: number): RemoteRun => {
+  const run = agent.remoteRun;
+  const answered = agent.answered ?? [];
+  if (run && run.calls === calls && answered.length === run.seen.length && answered.every((id) => run.seen.includes(id))) {
+    return run;
+  }
+  if (answered.length < calls) return { phase: "running", seen: answered, calls };
+  return { phase: "settled", outcome: agent.outcome ?? (agent.failed ? "failed" : "completed"), seen: answered, calls };
+};
+
+const noteRemote = (state: StellaAgents, threadId: string, event: RemoteEvent): void => {
+  const agent = state.agents[threadId];
+  if (!agent) return;
+  const calls = callsFor(state, threadId);
+  const run = advanceRemote(
+    event.kind === "started" && !agent.remote ? { phase: "running", seen: agent.answered ?? [], calls } : remoteRunOf(agent, calls),
+    event,
+    calls,
+  );
+  agent.remote = true;
+  agent.remoteRun = run;
+  agent.answered = run.seen;
+  if (run.phase === "settled") {
+    agent.outcome = run.outcome;
+    delete agent.failed;
+  }
+};
+
 export type StellaAgentRecord = {
   threadId: string;
   description: string;
@@ -100,10 +168,12 @@ export type StellaAgentRecord = {
   agentStatus: AgentStatus;
 };
 
-export const StellaAgentsDoc = defineDoc<{
+type StellaAgents = {
   agents: Record<string, AgentRecord>;
   calls: Record<string, { threadId: string; reporter: number }>;
-}>({
+};
+
+export const StellaAgentsDoc = defineDoc<StellaAgents>({
   kind: "stella.agents",
   version: 1,
   scope: "conversation",
@@ -188,16 +258,13 @@ export const noteRemoteReport = async (
   conversationId: ConversationId,
   report: { threadId: string; requestId: string; text?: string; status?: AgentAttemptOutcome },
 ): Promise<boolean> => {
-  const agent = (await tx.doc(StellaAgentsDoc, conversationId)).agents[report.threadId];
-  if (!agent?.remote) return false;
-  if (agent.answered?.includes(report.requestId)) return true;
-  agent.answered = [...(agent.answered ?? []), report.requestId];
+  const state = await tx.doc(StellaAgentsDoc, conversationId);
+  if (!state.agents[report.threadId]?.remote) return false;
   if (report.text === undefined) {
-    if (report.status === "canceled") agent.outcome = "canceled";
+    if (report.status === "canceled") noteRemote(state, report.threadId, { kind: "stopped", requestId: report.requestId });
     return true;
   }
-  agent.outcome = reportStatusOf(report);
-  delete agent.failed;
+  noteRemote(state, report.threadId, { kind: "reported", requestId: report.requestId, outcome: reportStatusOf(report) });
   return true;
 };
 
@@ -221,7 +288,6 @@ export const remoteAgentHome = async (
   return await visit(root, 1);
 };
 
-const remoteOutcome = (agent: AgentRecord): AgentAttemptOutcome => agent.outcome ?? (agent.failed ? "failed" : "completed");
 
 export const PLACED_AGENT_STOPPED = "placed-agent-stopped";
 
@@ -701,12 +767,11 @@ export function stellaAgents(host: StellaAgentsHost) {
               if (agent && !agent.reported.includes(answered)) agent.reported.push(answered);
               if (agent && "moved" in move) {
                 const given = Object.entries(state.calls).filter(([, call]) => call.threadId === threadId).map(([key]) => `moved:${key}`);
-                agent.remote = true;
+                noteRemote(state, threadId, { kind: "started", seen: given.slice(0, -1) });
                 agent.moved = true;
                 agent.away = true;
                 agent.placement = move.deviceId === AGENT_MOVE_CLOUD ? { kind: "cloud" } : { kind: "device", deviceId: move.deviceId };
                 agent.startedAt ??= Date.now();
-                agent.answered = [...new Set([...(agent.answered ?? []), ...given.slice(0, -1)])];
               }
               if ("failed" in move) {
                 await tx.createTask(
@@ -929,6 +994,7 @@ export function stellaAgents(host: StellaAgentsHost) {
 
   const runsHereAgain = (record: AgentRecord): void => {
     delete record.remote;
+    delete record.remoteRun;
     const placement = host.rootPlacement;
     record.placement = { kind: placement.kind, ...(placement.kind === "device" ? { deviceId: placement.deviceId } : {}) };
   };
@@ -1127,11 +1193,11 @@ export function stellaAgents(host: StellaAgentsHost) {
             description,
             placement: { kind: placement.kind, ...(placement.kind === "device" ? { deviceId: placement.deviceId } : {}) },
             reported: [],
-            remote: true,
             ...(engine ? { engine } : {}),
             startedAt: Date.now(),
           };
           state.calls[callKey] = { threadId, reporter: -1 };
+          noteRemote(state, threadId, { kind: "started" });
         }, context);
         await api.details({ thread_id: threadId }, context);
         const standing =
@@ -1415,7 +1481,9 @@ export function stellaAgents(host: StellaAgentsHost) {
   ) =>
     on.commit(async (tx) => {
       const state = await tx.doc(StellaAgentsDoc, conversationId);
-      state.calls[callKey] ??= { threadId, reporter: -1 };
+      if (state.calls[callKey]) return;
+      state.calls[callKey] = { threadId, reporter: -1 };
+      if (state.agents[threadId]?.remote) noteRemote(state, threadId, { kind: "messaged" });
     }, context);
 
   const remoteHostOf = (agent: AgentRecord): RemoteAgentHost | undefined => {
@@ -1534,8 +1602,8 @@ export function stellaAgents(host: StellaAgentsHost) {
         };
       }
       const computer = await computerOf(record, context, seen);
-      const done = (record.answered?.length ?? 0) >= agent.given;
-      const status = done ? remoteOutcome(record) : "running";
+      const run = remoteRunOf(record, agent.given);
+      const status = run.phase === "settled" ? run.outcome : "running";
       return {
         ...row,
         status,
@@ -1579,7 +1647,11 @@ export function stellaAgents(host: StellaAgentsHost) {
     const conversationId = (await host.directory?.conversationId(context).catch(() => undefined)) ?? STELLA_MESSAGE_TARGET;
     const tree = root === undefined ? [] : await agentTree(api, root, context);
     const threadIds = tree
-      .filter((agent) => agent.record.remote && (agent.record.answered?.length ?? 0) < agent.given)
+      .filter((agent) => agent.record.remote)
+      .sort(
+        (a, b) =>
+          Number(remoteRunOf(a.record, a.given).phase === "settled") - Number(remoteRunOf(b.record, b.given).phase === "settled"),
+      )
       .map((agent) => agent.threadId)
       .slice(0, DIRECTORY_THREAD_IDS_MAX);
     const elsewhere = await host.directory
@@ -1901,10 +1973,9 @@ export function stellaAgents(host: StellaAgentsHost) {
     if (!found) return undefined;
     const attempt = Math.max(1, found.given);
     if (found.record.remote) {
-      const done = (found.record.answered?.length ?? 0) >= found.given;
-      const outcome = remoteOutcome(found.record);
-      return done
-        ? { status: outcome === "failed" ? "error" : "completed", agentStatus: outcome, attempt }
+      const run = remoteRunOf(found.record, found.given);
+      return run.phase === "settled"
+        ? { status: run.outcome === "failed" ? "error" : "completed", agentStatus: run.outcome, attempt }
         : { status: "running", agentStatus: "running", attempt };
     }
     const conversationId = found.record.conversationId as ConversationId;
@@ -1944,7 +2015,7 @@ export function stellaAgents(host: StellaAgentsHost) {
             .map((entry) => ({ entry, text: messageText(entry.model?.[0]) }))
             .filter(({ text }) => /^\[(Agent completed|Task failed|Task canceled)\]/.test(text.trimStart()));
     for (const [threadId, agent] of remoteAgents) {
-      const given = Object.values(state?.calls ?? {}).filter((call) => call.threadId === threadId).length;
+      const run = remoteRunOf(agent, callsFor(state!, threadId));
       const back = reports.filter(({ text }) => text.includes(`\nthread_id: ${threadId}\n`));
       const at = (back[0]?.entry.model?.[0] as { timestamp?: number } | undefined)?.timestamp;
       const said = back
@@ -1956,15 +2027,12 @@ export function stellaAgents(host: StellaAgentsHost) {
         threadId,
         description: agent.description,
         placement: agent.placement,
-        ...((agent.answered?.length ?? 0) >= given
-          ? (() => {
-              const outcome = remoteOutcome(agent);
-              return outcome === "completed"
-                ? { status: "completed" as const, agentStatus: outcome }
-                : outcome === "failed"
-                  ? { status: "error" as const, agentStatus: outcome }
-                  : { status: "completed" as const, stopped: true as const, agentStatus: outcome };
-            })()
+        ...(run.phase === "settled"
+          ? run.outcome === "completed"
+            ? { status: "completed" as const, agentStatus: run.outcome }
+            : run.outcome === "failed"
+              ? { status: "error" as const, agentStatus: run.outcome }
+              : { status: "completed" as const, stopped: true as const, agentStatus: run.outcome }
           : { status: "running" as const, agentStatus: "running" as const }),
         startedAt: agent.startedAt ?? at ?? Date.now(),
         updatedAt: at ?? agent.startedAt ?? Date.now(),

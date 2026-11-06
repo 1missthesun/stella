@@ -1,3 +1,4 @@
+import { storedAgentStatusOf } from "@stella/contracts/agent-status";
 import type {
   AgentMessageDelivery,
   AgentThreadControl,
@@ -15,21 +16,7 @@ export type DeviceAgentCaller = Readonly<{
   parentThreadId?: string;
 }>;
 
-const STATUSES: readonly CloudAgentControlStatus[] = [
-  "running",
-  "waiting_for_user",
-  "resuming",
-  "completed",
-  "failed",
-  "canceled",
-];
-
-const receiptStatus = (status: string): CloudAgentControlStatus =>
-  status === "paused"
-    ? "canceled"
-    : STATUSES.includes(status as CloudAgentControlStatus)
-      ? (status as CloudAgentControlStatus)
-      : "failed";
+const receiptStatus = (status: string): CloudAgentControlStatus => storedAgentStatusOf(status) ?? "failed";
 
 const receiptOf = (
   control: AgentThreadControl,

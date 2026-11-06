@@ -186,6 +186,22 @@ export const ownerEventBase = (
   } as const;
 };
 
+const finishesAttempt = (event: OwnerEvent): boolean =>
+  event.kind === "thread.completed" || (event.kind === "turn.event" && event.terminal === true);
+
+/** Drops the oldest progress events past the cap; an attempt's finish is never dropped. */
+const capOwnerEventDebt = (events: OwnerEvent[]): OwnerEvent[] => {
+  let excess = events.length - OWNER_EVENT_DEBT_MAX;
+  if (excess <= 0) return events;
+  const kept = events.filter((event) => {
+    if (excess <= 0 || finishesAttempt(event)) return true;
+    excess -= 1;
+    return false;
+  });
+  log("error", "owner_event_debt_trimmed", { dropped: events.length - kept.length, kept: kept.length });
+  return kept;
+};
+
 export const deliverOwnerEventsDurable = async (
   host: SessionCoreHost,
   events: OwnerEvent[],
@@ -203,10 +219,7 @@ export const deliverOwnerEventsDurable = async (
   await host.ctx.blockConcurrencyWhile(async () => {
     const debt =
       (await host.ctx.storage.get<OwnerEvent[]>(OWNER_EVENT_DEBT_KEY)) ?? [];
-    await host.ctx.storage.put(
-      OWNER_EVENT_DEBT_KEY,
-      [...debt, ...events].slice(-OWNER_EVENT_DEBT_MAX),
-    );
+    await host.ctx.storage.put(OWNER_EVENT_DEBT_KEY, capOwnerEventDebt([...debt, ...events]));
     const retryAt = Date.now() + OWNER_EVENT_DEBT_RETRY_MS;
     const current = await host.ctx.storage.getAlarm();
     if (current === null || current > retryAt) {

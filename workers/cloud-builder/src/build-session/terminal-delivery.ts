@@ -368,6 +368,39 @@ export const handleOrchestratorTurnStatus = async (
   return json({ state: "unknown" });
 };
 
+export const handleAgentAttemptState = async (
+  host: TerminalDeliveryHost,
+  request: Request,
+): Promise<Response> => {
+  const raw = (await request.json().catch(() => null)) as Record<string, unknown> | null;
+  const attemptGeneration = raw?.attemptGeneration;
+  if (
+    typeof raw?.ownerId !== "string" ||
+    typeof raw.ownerGeneration !== "string" ||
+    typeof attemptGeneration !== "number" ||
+    !Number.isSafeInteger(attemptGeneration)
+  ) {
+    return json({ error: "ownerId, ownerGeneration and attemptGeneration are required." }, 400);
+  }
+  const [stored, terminal, delivered] = await Promise.all([
+    host.ctx.storage.get<TurnRequest>("turn"),
+    host.ctx.storage.get<boolean>("terminal"),
+    host.ctx.storage.get<boolean>("terminalDelivered"),
+  ]);
+  if (
+    !stored ||
+    stored.kind !== "agent" ||
+    stored.ownerId !== raw.ownerId ||
+    stored.ownerGeneration !== raw.ownerGeneration ||
+    stored.attemptGeneration !== attemptGeneration ||
+    (typeof raw.turnId === "string" && stored.turnId !== raw.turnId) ||
+    delivered === true
+  ) {
+    return json({ state: "gone" });
+  }
+  return json({ state: terminal === true ? "finishing" : "running" });
+};
+
 export const deliverExecutorLossTerminal = async (
   host: TerminalDeliveryHost,
   turn: TurnRequest,

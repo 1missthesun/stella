@@ -10,6 +10,34 @@ export const AGENT_STATUSES = [
 
 export type AgentStatus = (typeof AGENT_STATUSES)[number];
 
+/**
+ * What the owner stores for an agent (`agent_threads.status`), the one
+ * authority every other copy of an agent's status is read from.
+ * `waiting_for_user` covers a usage-limit hold, told apart by the row's hold.
+ */
+export const STORED_AGENT_STATUSES = ["running", "waiting_for_user", "completed", "failed", "canceled"] as const;
+
+export type StoredAgentStatus = (typeof STORED_AGENT_STATUSES)[number];
+
+/** Stored statuses of an agent that has not ended. */
+export const LIVE_STORED_AGENT_STATUSES: readonly StoredAgentStatus[] = ["running", "waiting_for_user"];
+
+export const storedAgentStatusOf = (value: unknown): StoredAgentStatus | null =>
+  value === "resuming"
+    ? "running"
+    : value === "paused"
+      ? "canceled"
+      : (STORED_AGENT_STATUSES as readonly unknown[]).includes(value)
+        ? (value as StoredAgentStatus)
+        : null;
+
+export const isLiveStoredAgentStatus = (value: unknown): boolean =>
+  (LIVE_STORED_AGENT_STATUSES as readonly unknown[]).includes(value);
+
+/** A SQL `IN` list of statuses, for the owner's queries. */
+export const agentStatusSqlList = (statuses: readonly StoredAgentStatus[]): string =>
+  `(${statuses.map((status) => `'${status}'`).join(", ")})`;
+
 export type AgentAttemptOutcome = "completed" | "failed" | "canceled";
 
 export const AGENT_ATTEMPT_OUTCOMES: readonly AgentAttemptOutcome[] = [

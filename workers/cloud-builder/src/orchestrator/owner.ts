@@ -1,3 +1,4 @@
+import type { RpcResponse } from "@stella/contracts/backend/protocol";
 import type { OwnerHomeContext } from "../owner-home-context.js";
 import {
   OWNER_EVENT_VERSION,
@@ -730,6 +731,23 @@ export abstract class OrchestratorOwner extends OrchestratorSessionCore {
       skillCatalog: metadata.skills,
       timings,
     };
+  }
+
+  protected async releaseClaudeUsageLimitHold(turn: Pick<ChatTurnRequest, "ownerId" | "ownerGeneration" | "conversationId" | "turnId">): Promise<void> {
+    try {
+      const response = (await ownerGateStub(this.env.OWNER_GATES, turn.ownerId).ownerInternal({
+        name: "agentThreads.releaseUsageLimitHold",
+        args: { conversationId: turn.conversationId, ownerGeneration: turn.ownerGeneration },
+        ownerGeneration: turn.ownerGeneration,
+      })) as RpcResponse;
+      if (!response.ok) throw new Error(response.error.message);
+    } catch (error) {
+      log("error", "claude_usage_limit_release_failed", {
+        turnId: turn.turnId,
+        conversationId: turn.conversationId,
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
   protected cloudAgentHome(turn: ChatTurnRequest): AgentHome {

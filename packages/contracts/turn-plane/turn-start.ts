@@ -59,13 +59,7 @@ export type CloudAgentThreadControl = {
   threadId: string;
   attemptGeneration: number;
   threadUpdatedAt: number;
-  status:
-    | "running"
-    | "waiting_for_user"
-    | "resuming"
-    | "completed"
-    | "failed"
-    | "canceled";
+  status: import("../agent-status.js").StoredAgentStatus;
 };
 
 export type CloudAgentRuntime = "pi";

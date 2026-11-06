@@ -5,6 +5,8 @@ import type {
   CloudChatPreparation,
 } from "./cloud-chat-admission.js";
 import type {
+  CloudAgentAttemptProbe,
+  CloudAgentAttemptState,
   PiHarnessAgentControl,
   PiHarnessAgentControlResult,
   PiThreadStop,
@@ -80,6 +82,14 @@ export class OrchestratorSession extends DurableObject<Env> {
 
   async stopPiThread(input: PiThreadStop): Promise<PiThreadStopResult> {
     return await (await this.loadImplementation()).stopPiThread(input);
+  }
+
+  async piThreadAttemptState(input: CloudAgentAttemptProbe): Promise<CloudAgentAttemptState> {
+    return await (await this.loadImplementation()).piThreadAttemptState(input);
+  }
+
+  async harnessAgentAttemptState(input: CloudAgentAttemptProbe): Promise<CloudAgentAttemptState> {
+    return await (await this.loadImplementation()).harnessAgentAttemptState(input);
   }
 
   async controlPiHarnessAgent(

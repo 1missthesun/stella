@@ -59,6 +59,8 @@ import {
   isCloudAgentControlActive,
   steerContainerAgent,
   toolScopedId,
+  type CloudAgentAttemptProbe,
+  type CloudAgentAttemptState,
   type CloudAgentControlReceipt,
   type PiHarnessAgentControl,
   type PiHarnessAgentControlResult,
@@ -1148,6 +1150,39 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     const { contextFor } = await import("../pi-runtime.js");
     await runtime.stopThreadAgent(input.threadId, contextFor());
     return "stopped";
+  }
+
+  async piThreadAttemptState(input: CloudAgentAttemptProbe): Promise<CloudAgentAttemptState> {
+    const record = await this.ctx.storage.get<PiThreadRecord>(piThreadKey(input.threadId));
+    if (
+      !record ||
+      record.ownerId !== input.ownerId ||
+      record.ownerGeneration !== input.ownerGeneration ||
+      input.attemptGeneration <= record.settledThrough
+    ) {
+      return "gone";
+    }
+    const attempt = record.attempts.find((entry) => entry.attemptGeneration === input.attemptGeneration);
+    if (!attempt || record.attempts.some((entry) => entry.attemptGeneration > input.attemptGeneration)) {
+      return "gone";
+    }
+    if (attempt.terminal || !attempt.handedOff) return "finishing";
+    const runtime = await this.openPiRuntime(this.piGatewayOrigin());
+    const { contextFor } = await import("../pi-runtime.js");
+    return (await runtime.threadAgentRunning(input.threadId, contextFor())) ? "running" : "finishing";
+  }
+
+  async harnessAgentAttemptState(input: CloudAgentAttemptProbe): Promise<CloudAgentAttemptState> {
+    if (
+      !this.piRuntime &&
+      (await this.ctx.storage.get<string>(AGENT_RUNTIME_KEY)) !== "pi" &&
+      !(await this.ctx.storage.get<boolean>(PI_LIVE_KEY))
+    ) {
+      return "gone";
+    }
+    const runtime = await this.openPiRuntime(this.piGatewayOrigin());
+    const { contextFor } = await import("../pi-runtime.js");
+    return await runtime.harnessAgentAttemptState(input, contextFor());
   }
 
   async controlPiHarnessAgent(

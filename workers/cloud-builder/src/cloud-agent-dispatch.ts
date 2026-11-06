@@ -1,4 +1,5 @@
 import { MAX_AGENT_DEPTH, type AgentLineage } from "@stella/contracts/agent-depth";
+import { storedAgentStatusOf, type StoredAgentStatus } from "@stella/contracts/agent-status";
 import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
 import type { ManagedModelAudience } from "@stella/contracts/gateway/capability";
 import {
@@ -22,30 +23,9 @@ import { CloudAgentCapError, checkContainerCaps } from "./container-cap.js";
 export const CLOUD_AGENT_DEPTH_LIMIT_ERROR =
   `Task depth limit reached (${MAX_AGENT_DEPTH}). Complete work in the current task instead of creating another subtask.`;
 
-export type CloudAgentControlStatus =
-  | "running"
-  | "waiting_for_user"
-  | "resuming"
-  | "completed"
-  | "failed"
-  | "canceled";
+export type CloudAgentControlStatus = StoredAgentStatus;
 
-const CLOUD_AGENT_CONTROL_STATUSES: readonly CloudAgentControlStatus[] = [
-  "running",
-  "waiting_for_user",
-  "resuming",
-  "completed",
-  "failed",
-  "canceled",
-];
-
-/** A receipt's status, where builds before `stop_agent` wrote a stop as `paused`. */
-const controlStatusOf = (status: unknown): CloudAgentControlStatus | null =>
-  status === "paused"
-    ? "canceled"
-    : CLOUD_AGENT_CONTROL_STATUSES.includes(status as CloudAgentControlStatus)
-      ? (status as CloudAgentControlStatus)
-      : null;
+const controlStatusOf = storedAgentStatusOf;
 
 export type CloudAgentControlReceipt = {
   lifecycleReport?: string;
@@ -92,7 +72,7 @@ export const cloudAgentToolOutcomeKey = (
 
 export const isCloudAgentControlActive = (
   status: CloudAgentControlStatus,
-): boolean => status === "running" || status === "resuming";
+): boolean => status === "running";
 
 export const normalizeCloudAgentControlReceipt = (
   value: unknown,
@@ -181,9 +161,6 @@ export const advanceCloudAgentControlReceipt = (
   if (!existingTerminal && receiptTerminal) return merged(receipt);
   if (existingTerminal && !receiptTerminal) return existing;
   if (existingTerminal && receiptTerminal) {
-    if (receipt.status !== existing.status) {
-      throw new Error("A terminal cloud agent attempt cannot be rewritten.");
-    }
     return receipt.threadUpdatedAt > existing.threadUpdatedAt
       ? merged(receipt)
       : existing;
@@ -638,6 +615,25 @@ export type PiThreadStop = Readonly<{
 
 export type PiThreadStopResult = "stopped" | "terminal" | "changed" | "unknown";
 
+/**
+ * What an executor knows of one cloud agent attempt the owner still lists as
+ * running: still running it, decided its outcome but has not delivered it yet,
+ * or no longer has it at all.
+ */
+export type CloudAgentAttemptState =
+  | "running"
+  | "finishing"
+  | "gone"
+  | { ended: "completed" | "failed" | "canceled"; text: string };
+
+export type CloudAgentAttemptProbe = Readonly<{
+  ownerId: string;
+  ownerGeneration: string;
+  threadId: string;
+  turnId?: string;
+  attemptGeneration: number;
+}>;
+
 export type PiHarnessAgentControl = Readonly<{
   ownerId: string;
   ownerGeneration: string;
@@ -752,6 +748,37 @@ export const cancelCloudAgentAttempt = async (args: {
     throw new Error(`Stopping the agent failed (${response.status}).`);
   }
   return "canceled";
+};
+
+export const cloudAgentAttemptState = async (args: {
+  env: Pick<Cloudflare.Env, "BUILD_SESSIONS" | "ORCHESTRATOR_SESSIONS">;
+  conversationId: string;
+  harness: boolean;
+  execution: CloudExecutionSelection | null;
+  probe: CloudAgentAttemptProbe;
+}): Promise<CloudAgentAttemptState> => {
+  const session = args.env.ORCHESTRATOR_SESSIONS.getByName(args.conversationId);
+  if (args.harness) return await session.harnessAgentAttemptState(args.probe);
+  if (!args.execution || runsAsPiAgent(args.execution)) {
+    return await session.piThreadAttemptState(args.probe);
+  }
+  const response = await args.env.BUILD_SESSIONS.getByName(args.probe.threadId).fetch(
+    "https://build-session/attempt-state",
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(args.probe),
+    },
+  );
+  if (!response.ok) {
+    await response.body?.cancel().catch(() => undefined);
+    throw new Error(`Asking the agent's container session failed (${response.status}).`);
+  }
+  const { state } = (await response.json()) as { state?: unknown };
+  if (state !== "running" && state !== "finishing" && state !== "gone") {
+    throw new Error("The agent's container session answered without a state.");
+  }
+  return state;
 };
 
 export const agentLifecycleReport = (completion: {

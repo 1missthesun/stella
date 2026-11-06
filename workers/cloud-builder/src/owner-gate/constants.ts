@@ -18,6 +18,7 @@ export const HOSTING_BUDGET_MESSAGE =
   "Its owner's Stella budget for this period is used up. It will be back when the budget resets or the owner adds credit.";
 export const HOSTING_CAP_MESSAGE =
   "It served more requests today than Stella allows for one account. It will be back tomorrow.";
+export const DISPATCH_RECONCILE_MAX_MS = 3_600_000;
 export const DISPATCH_CLOUD_RETRY_DELAY_MS = 1_000;
 export const DISPATCH_CLOUD_MAX_ATTEMPTS = 2;
 export const DEFAULT_TURN_TIMEOUT_MS = 900_000;

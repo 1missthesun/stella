@@ -3,6 +3,7 @@ export const EXACT_TURN_CANCELLATIONS_KEY =
 
 const MAX_PENDING_EXACT_TURN_CANCELLATIONS = 128;
 const MAX_ACKNOWLEDGED_EXACT_TURN_CANCELLATIONS = 128;
+const PENDING_EXACT_TURN_CANCELLATION_TTL_MS = 3_600_000;
 
 export type ExactTurnCancellationRequest = {
   turnId: string;
@@ -92,8 +93,13 @@ const normalizeLedger = (value: unknown): ExactTurnCancellation[] => {
 
 const boundedLedger = (
   entries: readonly ExactTurnCancellation[],
+  now: number,
 ): ExactTurnCancellation[] => {
-  const pending = entries.filter((entry) => entry.state === "pending");
+  const pending = entries.filter(
+    (entry) =>
+      entry.state === "pending" &&
+      entry.persistedAt > now - PENDING_EXACT_TURN_CANCELLATION_TTL_MS,
+  );
   const acknowledged = entries
     .filter((entry) => entry.state === "acknowledged")
     .sort(
@@ -118,7 +124,7 @@ export class ExactTurnCancellationLedger {
     request: ExactTurnCancellationRequest,
     now = Date.now(),
   ): Promise<StageExactTurnCancellationResult> {
-    const entries = await this.read();
+    const entries = boundedLedger(await this.read(), now);
     const existing = entries.find((entry) => entry.turnId === request.turnId);
     if (existing) {
       return sameCancellation(existing, request)
@@ -142,7 +148,7 @@ export class ExactTurnCancellationLedger {
     };
     await this.storage.put(
       EXACT_TURN_CANCELLATIONS_KEY,
-      boundedLedger([...entries, cancellation]),
+      boundedLedger([...entries, cancellation], now),
     );
     return { status: "staged", cancellation };
   }
@@ -177,7 +183,10 @@ export class ExactTurnCancellationLedger {
       state: "acknowledged",
       acknowledgedAt: now,
     };
-    await this.storage.put(EXACT_TURN_CANCELLATIONS_KEY, boundedLedger(entries));
+    await this.storage.put(
+      EXACT_TURN_CANCELLATIONS_KEY,
+      boundedLedger(entries, now),
+    );
     return true;
   }
 

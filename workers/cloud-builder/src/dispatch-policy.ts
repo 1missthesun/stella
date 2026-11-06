@@ -158,6 +158,57 @@ export const cloudUnsupportedCapabilities = (
 export const isTerminalDispatchState = (state: DispatchState): boolean =>
   TERMINAL_DISPATCH_STATES.includes(state);
 
+const ENDED: readonly DispatchState[] = ["completed", "failed", "canceled"];
+
+/** Every legal state change of a dispatch row; a write that keeps the state is always legal. */
+export const DISPATCH_TRANSITIONS: Readonly<
+  Record<DispatchState, readonly DispatchState[]>
+> = {
+  offering: ["computer_claimed", "cloud_committed", "blocked", "canceled"],
+  computer_claimed: [
+    "offering",
+    "computer_accepted",
+    "cloud_committed",
+    "blocked",
+    "canceled",
+  ],
+  computer_accepted: [
+    "computer_running",
+    "cancel_pending",
+    "reconciliation_required",
+    ...ENDED,
+  ],
+  computer_running: ["cancel_pending", "reconciliation_required", ...ENDED],
+  cloud_committed: [
+    "cloud_running",
+    "cancel_pending",
+    "reconciliation_required",
+    ...ENDED,
+  ],
+  cloud_running: ["cancel_pending", ...ENDED],
+  cancel_pending: ["reconciliation_required", ...ENDED],
+  reconciliation_required: [
+    "computer_accepted",
+    "computer_running",
+    "cloud_running",
+    "cancel_pending",
+    ...ENDED,
+  ],
+  blocked: [],
+  completed: [],
+  failed: [],
+  canceled: [],
+};
+
+export const DISPATCH_STATES = Object.keys(
+  DISPATCH_TRANSITIONS,
+) as DispatchState[];
+
+export const isDispatchTransition = (
+  from: DispatchState,
+  to: DispatchState,
+): boolean => from === to || DISPATCH_TRANSITIONS[from].includes(to);
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 

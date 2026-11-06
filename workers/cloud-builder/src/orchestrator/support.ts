@@ -151,10 +151,9 @@ export const isDurableChatTurnAdmissionIntent = (
   Number.isFinite(receipt.updatedAt);
 
 export const localTurnRetirementDeadline = (lease: LocalTurnLease): number => {
-  if (!lease.cancelRequested) return lease.expiresAt;
-  return Number.isFinite(lease.cancelDeadlineAt) && lease.cancelDeadlineAt! > 0
-    ? lease.cancelDeadlineAt!
-    : Number.POSITIVE_INFINITY;
+  return lease.phase.s === "cancel_pending"
+    ? lease.phase.deadlineAt
+    : lease.expiresAt;
 };
 
 export const json = (body: unknown, status = 200): Response =>

@@ -15,7 +15,6 @@ import type {
   ChatTurnRequest,
   LocalTurnLease,
   LocalTurnFinishReceipt,
-  ChatTurnResumeRecord,
   OwedTerminal,
 } from "./types.js";
 import {
@@ -23,8 +22,7 @@ import {
   CHAT_RESUME_MAX,
   CHAT_RESUME_MAX_AGE_MS,
   CHAT_RESUME_DEADLINE_MARGIN_MS,
-  CHAT_TURN_RESUME_KEY,
-  CHAT_TURN_STARTED_AT_KEY,
+  CHAT_TURN_PHASE_KEY,
   LOCAL_TURN_CANCEL_GRACE_MS,
   LOCAL_TURN_LEASE_KEY,
   localTurnReceiptKey,
@@ -60,6 +58,12 @@ export abstract class OrchestratorTurnQueue extends OrchestratorTurnLifecycle {
       ownerId: target.ownerId,
       ownerGeneration: target.ownerGeneration,
     });
+    if (response.status === 409) {
+      const refusal = (await response.json().catch(() => null)) as {
+        reason?: string;
+      } | null;
+      if (refusal?.reason === "terminal_already_decided") return;
+    }
     if (!response.ok) {
       throw new Error(
         `Exact turn cancellation failed with ${response.status}.`,
@@ -76,7 +80,7 @@ export abstract class OrchestratorTurnQueue extends OrchestratorTurnLifecycle {
     const preceding = this.queue;
     const enqueuedAt = performance.now();
     const admission =
-      freshAdmission && this.turnExecutions.size === 0 && !this.activeTurnId
+      freshAdmission && this.turnExecutions.size === 0 && !this.current
         ? {
             leaseId: turn.ownerPurgeLeaseId,
             generation: turn.ownerPurgeGeneration,
@@ -96,7 +100,7 @@ export abstract class OrchestratorTurnQueue extends OrchestratorTurnLifecycle {
           ),
         ),
       onInterrupt: () => {
-        if (this.activeTurnId === turn.turnId) this.currentPiRun?.abort();
+        if (this.current?.turnId === turn.turnId) this.currentPiRun?.abort();
       },
     });
     this.turnExecutions.set(turn.turnId, execution);
@@ -152,19 +156,12 @@ export abstract class OrchestratorTurnQueue extends OrchestratorTurnLifecycle {
         }
 
         let terminalKind: string | undefined;
-        if (
-          current?.turnId === request.turnId &&
-          (await this.ctx.storage.get<boolean>("terminal"))
-        ) {
-          const owed = await this.ctx.storage.get<OwedTerminal | null>(
-            "terminalOwed",
-          );
-          const journalState = this.journal.turnState(request.turnId);
-          terminalKind =
-            owed?.kind ??
-            (journalState?.state === "terminal"
-              ? (journalState.terminal_kind ?? undefined)
-              : undefined);
+        const decided =
+          current?.turnId === request.turnId
+            ? await this.owedTerminal(current)
+            : null;
+        if (decided) {
+          terminalKind = decided.kind;
           if (terminalKind !== "canceled") {
             return {
               response: json(
@@ -239,17 +236,7 @@ export abstract class OrchestratorTurnQueue extends OrchestratorTurnLifecycle {
       );
     }
     if (target.terminalKind === "canceled") {
-      const execution = this.turnExecutions.get(request.turnId);
-      if (this.activeTurnId === request.turnId && !execution) {
-        return json(
-          {
-            canceled: false,
-            reason: "exact_turn_join_unavailable",
-            turnId: request.turnId,
-          },
-          503,
-        );
-      }
+      const execution = this.liveExecution(request.turnId);
       if (execution) await execution.join();
       await this.acknowledgeExactTurnCancellation(request);
       return json({
@@ -274,17 +261,7 @@ export abstract class OrchestratorTurnQueue extends OrchestratorTurnLifecycle {
     turn: ChatTurnRequest,
     request: ExactTurnCancellationRequest,
   ): Promise<Response> {
-    const execution = this.turnExecutions.get(turn.turnId);
-    if (this.activeTurnId === turn.turnId && !execution) {
-      return json(
-        {
-          canceled: false,
-          reason: "exact_turn_join_unavailable",
-          turnId: turn.turnId,
-        },
-        503,
-      );
-    }
+    const execution = this.liveExecution(turn.turnId);
     const stored = await this.ctx.storage.get<ChatTurnRequest>("turn");
     if (
       !stored ||
@@ -315,25 +292,31 @@ export abstract class OrchestratorTurnQueue extends OrchestratorTurnLifecycle {
         message: TERMINAL_NOTICE.canceled,
         eventSeq: await this.nextTurnEventSeq(exactTurn.turnId),
       };
-      await this.ctx.storage.put({ terminal: true, terminalOwed: owed });
+      const decided = await this.claimTerminal(exactTurn.turnId, owed);
+      if (decided !== owed) {
+        if (decided.kind !== "canceled") {
+          return json(
+            {
+              canceled: false,
+              reason: "terminal_already_decided",
+              turnId: request.turnId,
+            },
+            409,
+          );
+        }
+        if (execution) await execution.join();
+        await this.acknowledgeExactTurnCancellation(request);
+        return json({
+          canceled: true,
+          turnId: request.turnId,
+          replayed: true,
+          joined: true,
+        });
+      }
       await execution?.interrupt(new Error("The chat turn was stopped."));
       await this.journalStoppedPrompt(exactTurn);
       this.recordTerminal(exactTurn, "canceled", TERMINAL_NOTICE.canceled);
-      try {
-        await this.emitTurnEvent(
-          exactTurn,
-          "canceled",
-          { message: TERMINAL_NOTICE.canceled },
-          {
-            terminal: true,
-            eventSeq: owed.eventSeq,
-            errorMessage: TERMINAL_NOTICE.canceled,
-          },
-        );
-        await this.ctx.storage.put("terminalDelivered", true);
-      } catch {
-        await this.ctx.storage.setAlarm(Date.now() + 30_000);
-      }
+      await this.deliverTerminal(exactTurn, owed);
       await this.finalizeTerminalTurn(exactTurn);
       if (execution) await execution.join();
       if (!(await this.acknowledgeExactTurnCancellation(request))) {
@@ -361,39 +344,34 @@ export abstract class OrchestratorTurnQueue extends OrchestratorTurnLifecycle {
     }
   }
 
+  protected liveExecution(turnId: string) {
+    return this.current?.turnId === turnId
+      ? this.current.execution
+      : this.turnExecutions.get(turnId);
+  }
+
   protected async claimOrphanedTurnResume(): Promise<{
     turn: ChatTurnRequest;
     resume: boolean;
   } | null> {
     const turn = await this.getTurnState<ChatTurnRequest>("turn");
     if (!turn) return null;
-    const [terminal, delivered, watchdogAt, startedAt, record, queued] =
-      await Promise.all([
-        this.getTurnState<boolean>("terminal"),
-        this.getTurnState<boolean>("terminalDelivered"),
-        this.getTurnState<number>("turnWatchdogAt"),
-        this.getTurnState<number>(CHAT_TURN_STARTED_AT_KEY),
-        this.getTurnState<ChatTurnResumeRecord | null>(CHAT_TURN_RESUME_KEY),
-        this.getTurnState<ChatTurnRequest>(`queued:${turn.turnId}`),
-      ]);
-    if (terminal || delivered || queued) return null;
+    const [phase, queued] = await Promise.all([
+      this.turnPhase(),
+      this.getTurnState<ChatTurnRequest>(`queued:${turn.turnId}`),
+    ]);
+    if (phase?.s !== "running" || phase.turnId !== turn.turnId || queued) {
+      return null;
+    }
     if (this.journal.turnState(turn.turnId)?.state === "terminal") return null;
     const now = Date.now();
-    const resumeCount = record?.turnId === turn.turnId ? record.count : 0;
-    const claimedAt =
-      startedAt ??
-      (typeof watchdogAt === "number"
-        ? watchdogAt - Math.max(1_000, turn.watchdogMs ?? CHAT_WATCHDOG_MS)
-        : undefined);
-    const ageMs =
-      claimedAt === undefined ? Number.POSITIVE_INFINITY : now - claimedAt;
+    const ageMs = now - phase.startedAt;
     const refusal =
-      resumeCount >= CHAT_RESUME_MAX
+      phase.resumes >= CHAT_RESUME_MAX
         ? "resume_cap"
         : ageMs >= CHAT_RESUME_MAX_AGE_MS
           ? "too_old"
-          : typeof watchdogAt !== "number" ||
-              watchdogAt - now <= CHAT_RESUME_DEADLINE_MARGIN_MS
+          : phase.watchdogAt - now <= CHAT_RESUME_DEADLINE_MARGIN_MS
             ? "watchdog"
             : undefined;
     if (refusal) {
@@ -401,17 +379,18 @@ export abstract class OrchestratorTurnQueue extends OrchestratorTurnLifecycle {
         turnId: turn.turnId,
         conversationId: turn.conversationId,
         reason: refusal,
-        resumeCount,
-        ageMs: Number.isFinite(ageMs) ? ageMs : null,
+        resumeCount: phase.resumes,
+        ageMs,
       });
+      await this.putTurnState({
+        [CHAT_TURN_PHASE_KEY]: { ...phase, watchdogAt: now },
+      });
+      await this.ctx.storage.setAlarm(now);
       return null;
     }
-    const count = resumeCount + 1;
+    const count = phase.resumes + 1;
     await this.putTurnState({
-      [CHAT_TURN_RESUME_KEY]: {
-        turnId: turn.turnId,
-        count,
-      } satisfies ChatTurnResumeRecord,
+      [CHAT_TURN_PHASE_KEY]: { ...phase, resumes: count },
     });
     const promptJournaled = this.journal.hasRow(`turn:${turn.turnId}:prompt`);
     log("info", "chat_turn_resumed", {
@@ -457,17 +436,24 @@ export abstract class OrchestratorTurnQueue extends OrchestratorTurnLifecycle {
       partialText: "",
       tools: [],
     };
-    if (
-      lease.cancelRequested &&
-      (!Number.isFinite(lease.cancelDeadlineAt) || lease.cancelDeadlineAt! <= 0)
-    ) {
-      lease.cancelDeadlineAt = Date.now() + LOCAL_TURN_CANCEL_GRACE_MS;
+    if (!lease.phase) {
+      lease.phase = lease.cancelRequested
+        ? {
+            s: "cancel_pending",
+            deadlineAt:
+              Number.isFinite(lease.cancelDeadlineAt) && lease.cancelDeadlineAt! > 0
+                ? lease.cancelDeadlineAt!
+                : Date.now() + LOCAL_TURN_CANCEL_GRACE_MS,
+          }
+        : { s: "leased" };
+      delete lease.cancelRequested;
+      delete lease.cancelDeadlineAt;
       await this.ctx.storage.put(LOCAL_TURN_LEASE_KEY, lease);
     }
     const retirementAt = localTurnRetirementDeadline(lease);
     const alarmAt = await this.ctx.storage.getAlarm();
     if (
-      lease.cancelRequested
+      lease.phase.s === "cancel_pending"
         ? alarmAt !== retirementAt
         : alarmAt === null || alarmAt > retirementAt
     ) {
@@ -517,15 +503,14 @@ export abstract class OrchestratorTurnQueue extends OrchestratorTurnLifecycle {
         return;
       }
       const state = this.journal.turnState(current.turnId);
-      const wasExternallyCanceled = current.cancelRequested === true;
-      current.cancelRequested = true;
-      if (
-        !Number.isFinite(current.cancelDeadlineAt) ||
-        current.cancelDeadlineAt! <= 0
-      ) {
-        current.cancelDeadlineAt = Date.now() + LOCAL_TURN_CANCEL_GRACE_MS;
+      const wasExternallyCanceled = current.phase.s === "cancel_pending";
+      if (current.phase.s !== "cancel_pending") {
+        current.phase = {
+          s: "cancel_pending",
+          deadlineAt: Date.now() + LOCAL_TURN_CANCEL_GRACE_MS,
+        };
       }
-      const cancelDeadlineAt = current.cancelDeadlineAt!;
+      const cancelDeadlineAt = current.phase.deadlineAt;
       await this.ctx.storage.put(LOCAL_TURN_LEASE_KEY, current);
       // Replace (rather than retain) an earlier watchdog. alarm() must never
       // interpret an unrelated/old alarm as the end of the desktop ACK grace.

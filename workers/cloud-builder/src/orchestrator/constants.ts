@@ -47,8 +47,17 @@ export const CHAT_TURN_HEARTBEAT_MS = 15_000;
 export const CHAT_RESUME_MAX = 2;
 export const CHAT_RESUME_MAX_AGE_MS = 15 * 60_000;
 export const CHAT_RESUME_DEADLINE_MARGIN_MS = 30_000;
-export const CHAT_TURN_RESUME_KEY = "turnResume";
-export const CHAT_TURN_STARTED_AT_KEY = "turnStartedAt";
+export const CHAT_TURN_PHASE_KEY = "turnPhase";
+export const TERMINAL_DELIVERY_ATTEMPTS = 5;
+export const LEGACY_CHAT_TURN_PHASE_KEYS = [
+  "terminal",
+  "terminalOwed",
+  "terminalDelivered",
+  "alarmAttempts",
+  "turnWatchdogAt",
+  "turnStartedAt",
+  "turnResume",
+] as const;
 export const CHAT_TURN_MODEL_CAPABILITY_KEY = "turnModelCapability";
 
 export const OWNER_PURGE_STALE_LEASE_GRACE_MS = 35_000;
@@ -104,6 +113,7 @@ export const TERMINAL_NOTICE = {
   timeout: "This took longer than expected, so Stella stopped. Try again.",
   canceled: "Stopped.",
   failed: "Stella hit a problem answering this. Try again.",
+  interrupted: "Stella was interrupted answering this. Try again.",
 } as const;
 
 export const CLOUD_CONTEXT_NOTICE =

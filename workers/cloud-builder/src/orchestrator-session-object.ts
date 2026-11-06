@@ -22,6 +22,7 @@ import type {
   OwnerFenceLeaseReceipt,
   LocalTurnLease,
   LocalTurnFinishReceipt,
+  OwedTerminal,
 } from "./orchestrator/types.js";
 import {
   AGENT_RUNTIME_KEY,
@@ -78,18 +79,10 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
     const localLease =
       await this.ctx.storage.get<LocalTurnLease>(LOCAL_TURN_LEASE_KEY);
     if (localLease) {
-      if (localLease.cancelRequested) {
-        const deadline = localLease.cancelDeadlineAt;
-        if (!Number.isFinite(deadline) || deadline! <= 0) {
-          // Migration/failure-safe path for a cancellation written before the
-          // deadline field existed: grant a full fresh grace, never release now.
-          localLease.cancelDeadlineAt = Date.now() + LOCAL_TURN_CANCEL_GRACE_MS;
-          await this.ctx.storage.put(LOCAL_TURN_LEASE_KEY, localLease);
-          await this.ctx.storage.setAlarm(localLease.cancelDeadlineAt);
-          return;
-        }
-        if (Date.now() < deadline!) {
-          await this.ctx.storage.setAlarm(deadline!);
+      if (localLease.phase.s === "cancel_pending") {
+        const deadline = localLease.phase.deadlineAt;
+        if (Date.now() < deadline) {
+          await this.ctx.storage.setAlarm(deadline);
           return;
         }
         await this.cancelLocalTurn(localLease, true);
@@ -101,19 +94,20 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
       return;
     }
     const turn = await this.ctx.storage.get<ChatTurnRequest>("turn");
-    if (!turn || (await this.ctx.storage.get<boolean>("terminalDelivered"))) {
+    const phase = await this.turnPhase();
+    if (
+      !turn ||
+      phase?.turnId !== turn.turnId ||
+      (phase.s === "terminal" && phase.delivered)
+    ) {
       await this.ensureQueueAlarm();
       return;
     }
-    if (this.turnExecutions.has(turn.turnId)) {
-      const [owed, watchdogAt] = await Promise.all([
-        this.owedTerminal(turn),
-        this.getTurnState<number>("turnWatchdogAt"),
-      ]);
+    if (phase.s === "running" && this.liveExecution(turn.turnId)) {
       const now = Date.now();
-      if (!owed && watchdogAt !== undefined && now < watchdogAt) {
+      if (now < phase.watchdogAt) {
         await this.armAlarmNoLaterThan(
-          Math.min(watchdogAt, now + CHAT_TURN_HEARTBEAT_MS),
+          Math.min(phase.watchdogAt, now + CHAT_TURN_HEARTBEAT_MS),
         );
         return;
       }
@@ -139,68 +133,43 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
   }
 
   private async runAlarm(turn: ChatTurnRequest): Promise<void> {
-    // The alarm is two jobs sharing one wake-up: the watchdog, and the retry
-    // ladder every other terminal path re-arms when its owner delivery fails.
-    // Only the first job may terminate a turn. Running the timeout path over a
-    // turn that is already canceled or failed writes a SECOND terminal row —
-    // `recordTerminal` keys on the phase, so it is a distinct row, not a
-    // replay — and the clients group on the last row per turn, so the user who
-    // pressed Stop is told the turn timed out instead.
-    let owed = await this.owedTerminal(turn);
-    if (!owed) {
-      const watchdogAt = await this.ctx.storage.get<number>("turnWatchdogAt");
-      if (watchdogAt !== undefined && Date.now() < watchdogAt) {
+    const phase = await this.turnPhase();
+    if (phase?.turnId !== turn.turnId) return;
+    let owed: OwedTerminal;
+    if (phase.s === "running") {
+      const live = this.liveExecution(turn.turnId) !== undefined;
+      if (Date.now() < phase.watchdogAt) {
         await this.armAlarmNoLaterThan(
-          this.turnExecutions.has(turn.turnId)
-            ? Math.min(watchdogAt, Date.now() + CHAT_TURN_HEARTBEAT_MS)
-            : watchdogAt,
+          live
+            ? Math.min(phase.watchdogAt, Date.now() + CHAT_TURN_HEARTBEAT_MS)
+            : phase.watchdogAt,
         );
         return;
       }
-      await this.ctx.storage.put("terminal", true);
-      this.currentTurnCancellation?.abort();
-      this.currentPiRun?.abort();
-      if (!this.currentPiRun) {
-        await this.abortPiConversation().catch((error: unknown) => {
-          log("error", "pi_conversation_abort_failed", {
-            turnId: turn.turnId,
-            message: errorMessage(error),
+      const expired: OwedTerminal = live
+        ? { kind: "timeout", message: TERMINAL_NOTICE.timeout }
+        : { kind: "failed", message: TERMINAL_NOTICE.interrupted };
+      owed = await this.claimTerminal(turn.turnId, expired);
+      if (owed === expired) {
+        this.currentTurnCancellation?.abort();
+        this.currentPiRun?.abort();
+        if (!this.currentPiRun) {
+          await this.abortPiConversation().catch((error: unknown) => {
+            log("error", "pi_conversation_abort_failed", {
+              turnId: turn.turnId,
+              message: errorMessage(error),
+            });
           });
-        });
-      }
-      log("error", "chat_turn_timed_out", {
-        turnId: turn.turnId,
-        conversationId: turn.conversationId,
-      });
-      this.recordTerminal(turn, "timeout", TERMINAL_NOTICE.timeout);
-      owed = { kind: "timeout", message: TERMINAL_NOTICE.timeout };
-      await this.ctx.storage.put("terminalOwed", owed);
-    }
-    try {
-      await this.emitTurnEvent(
-        turn,
-        owed.kind,
-        owed.payload ?? { message: owed.message },
-        {
-          terminal: true,
-          eventSeq: await this.terminalEventSeq(turn, owed),
-          ...(owed.kind !== "completed" ? { errorMessage: owed.message } : {}),
-        },
-      );
-      await this.ctx.storage.put("terminalDelivered", true);
-    } catch (error) {
-      const attempts =
-        ((await this.ctx.storage.get<number>("alarmAttempts")) ?? 0) + 1;
-      if (attempts <= 5) {
-        await this.ctx.storage.put("alarmAttempts", attempts);
-        await this.ctx.storage.setAlarm(Date.now() + 30_000);
-      } else {
-        await this.ctx.storage.put("terminalDelivered", true);
-        log("error", "terminal_delivery_abandoned", {
+        }
+        log("error", live ? "chat_turn_timed_out" : "chat_turn_interrupted", {
           turnId: turn.turnId,
-          message: errorMessage(error),
+          conversationId: turn.conversationId,
         });
+        this.recordTerminal(turn, expired.kind, expired.message);
       }
+      await this.deliverTerminal(turn, owed);
+    } else {
+      await this.deliverTerminal(turn, phase.owed, { retry: true });
     }
     await this.releaseOwnerGate(turn);
     // Before the projection work, not after it. Every exit above has now
@@ -594,12 +563,15 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
       }
 
       if (currentMatches) {
-        await this.ctx.storage.put("terminal", true);
+        await this.claimTerminal(turnId, {
+          kind: "failed",
+          message: TERMINAL_NOTICE.failed,
+        });
         this.currentTurnCancellation?.abort();
         this.currentPiRun?.abort();
       }
       const execution = currentMatches
-        ? this.turnExecutions.get(turnId)
+        ? this.liveExecution(turnId)
         : undefined;
       if (execution) {
         try {
@@ -616,7 +588,7 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
           return json({ error: "Owner turn is still unwinding." }, 409);
         }
       }
-      if (this.activeTurnId === turnId) {
+      if (this.current?.turnId === turnId) {
         return json({ error: "Owner turn is still unwinding." }, 409);
       }
       if (!execution) {

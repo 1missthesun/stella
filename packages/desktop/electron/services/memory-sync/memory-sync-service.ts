@@ -559,6 +559,7 @@ export class MemorySyncService {
     try {
       try {
         for (const action of actions) {
+        if (this.heldForChoice) throw new PassStopped("HELD");
         try {
           if (!(await this.apply(action, context))) settled = false;
         } catch (error) {

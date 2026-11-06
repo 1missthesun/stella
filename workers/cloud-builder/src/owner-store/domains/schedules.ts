@@ -39,6 +39,7 @@ import { ScheduledTurnError } from "../scheduled-turn.js";
 import { billingAccess, cloudSandboxAccess } from "./billing.js";
 import { livePushTokens, sendPushMessages } from "./devices.js";
 import { runWatchCheck } from "../watch-runner.js";
+import { log } from "../../build-session/shared/keys.js";
 import {
   isUsableTimeZone,
   zoneReportDecides,
@@ -177,6 +178,14 @@ export const SCHEDULES_WAITING_MIGRATION = {
   statements: [`ALTER TABLE schedules ADD COLUMN waiting_since INTEGER`],
 };
 
+export const SCHEDULES_RUN_STATE_MIGRATION = {
+  id: "schedules.9-run-state",
+  statements: [
+    `ALTER TABLE schedules ADD COLUMN run_state TEXT NOT NULL DEFAULT 'armed' CHECK (run_state IN ('armed', 'firing'))`,
+    `ALTER TABLE schedules ADD COLUMN fire_started_at INTEGER`,
+  ],
+};
+
 type Row = {
   schedule_id: string;
   kind: string;
@@ -202,8 +211,62 @@ type Row = {
   last_error_at: number | null;
   failure_count: number;
   active_fire_id: string | null;
+  run_state: string;
+  fire_started_at: number | null;
   created_at: number;
   updated_at: number;
+};
+
+/**
+ * Where a schedule's current run is. `armed` waits for `next_run_at`; with a
+ * fire id it is a retry of that run. `firing` holds the run while it starts;
+ * its job stays armed for the lease end, so a run cut off by an eviction or a
+ * throw is resumed or recorded failed, never dropped.
+ */
+type RunState =
+  | { kind: "armed"; retryFireId: string | null }
+  | { kind: "firing"; fireId: string; startedAt: number };
+
+const FIRE_LEASE_MS = 5 * 60_000;
+
+const runStateOf = (row: Pick<Row, "run_state" | "active_fire_id" | "fire_started_at">): RunState =>
+  row.run_state === "firing" && row.active_fire_id
+    ? { kind: "firing", fireId: row.active_fire_id, startedAt: row.fire_started_at ?? 0 }
+    : { kind: "armed", retryFireId: row.active_fire_id };
+
+const sameRun = (a: RunState, b: RunState): boolean =>
+  a.kind === "firing"
+    ? b.kind === "firing" && a.fireId === b.fireId && a.startedAt === b.startedAt
+    : b.kind === "armed" && a.retryFireId === b.retryFireId;
+
+/** The one way a run moves. False when the row has moved on: that caller lost. */
+const transitionRun = (
+  ctx: OwnerContext,
+  scheduleId: string,
+  from: RunState,
+  to: RunState,
+  fields: Partial<
+    Pick<Row, "status" | "next_run_at" | "last_run_at" | "last_error" | "last_error_at" | "failure_count" | "waiting_since">
+  > = {},
+): boolean => {
+  const current = readRow(ctx.db, scheduleId);
+  if (!current || !sameRun(runStateOf(current), from)) return false;
+  const entries = Object.entries(fields);
+  ctx.db.run(
+    `UPDATE schedules SET run_state = ?, active_fire_id = ?, fire_started_at = ?,
+            ${entries.map(([column]) => `${column} = ?, `).join("")}updated_at = ?
+      WHERE schedule_id = ? AND run_state = ? AND active_fire_id IS ?`,
+    to.kind,
+    to.kind === "firing" ? to.fireId : to.retryFireId,
+    to.kind === "firing" ? to.startedAt : null,
+    ...entries.map(([, value]) => value as string | number | null),
+    ctx.now,
+    scheduleId,
+    current.run_state,
+    current.active_fire_id,
+  );
+  arm(ctx, scheduleId);
+  return true;
 };
 
 const toScheduleKind = (value: string): ScheduleKind =>
@@ -457,7 +520,7 @@ const retimeFollowing = (ctx: OwnerContext, zone: string): void => {
       ctx.now,
       row.schedule_id,
     );
-    arm(ctx, { ...row, next_run_at: nextRunAt });
+    arm(ctx, row.schedule_id);
   }
 };
 
@@ -545,17 +608,20 @@ const parseStored = (json: string): LocalCronSchedule => {
   }
 };
 
-const arm = (ctx: OwnerContext, row: Pick<Row, "schedule_id" | "status" | "next_run_at">, fireId?: string): void => {
-  if (row.status === "active") {
-    ctx.jobs.schedule(
-      SCHEDULE_FIRE_JOB,
-      row.next_run_at,
-      { scheduleId: row.schedule_id, ...(fireId ? { fireId } : {}) },
-      { id: scheduleJobId(row.schedule_id) },
-    );
-  } else {
-    ctx.jobs.cancel(scheduleJobId(row.schedule_id));
+const arm = (ctx: OwnerContext, scheduleId: string): void => {
+  const row = readRow(ctx.db, scheduleId);
+  const run = row ? runStateOf(row) : null;
+  if (!row || !run || (run.kind === "armed" && row.status !== "active")) {
+    ctx.jobs.cancel(scheduleJobId(scheduleId));
+    return;
   }
+  const fireId = run.kind === "firing" ? run.fireId : run.retryFireId;
+  ctx.jobs.schedule(
+    SCHEDULE_FIRE_JOB,
+    run.kind === "firing" ? run.startedAt + FIRE_LEASE_MS : row.next_run_at,
+    { scheduleId, ...(fireId ? { fireId } : {}) },
+    { id: scheduleJobId(scheduleId) },
+  );
 };
 
 type Action = "create" | "update" | "remove";
@@ -680,6 +746,8 @@ const createSchedule = async (
         last_error_at: null,
         failure_count: 0,
         active_fire_id: null,
+        run_state: "armed",
+        fire_started_at: null,
         created_at: ctx.now,
         updated_at: ctx.now,
       };
@@ -688,7 +756,7 @@ const createSchedule = async (
         `INSERT INTO schedules (${columns.join(", ")}) VALUES (${columns.map(() => "?").join(", ")})`,
         ...columns.map((column) => row[column]),
       );
-      arm(ctx, row);
+      arm(ctx, row.schedule_id);
       queueNotice(ctx, row, "created");
       return {
         ...toScheduleRow(row, ownerZone(ctx.db), computerOnly(ctx)),
@@ -754,7 +822,12 @@ const updateSchedule = async (
         scheduleJson = JSON.stringify(schedule);
         nextRunAt = computeNextRunAt(schedule, ctx.now, ownerZone(ctx.db));
       }
-      if (input.status === "active" && row.status !== "active") {
+      const ran = row.status === "done";
+      if (ran && input.status !== undefined && !schedule) {
+        bad("This one already ran. Give it a new time to run it again.");
+      }
+      const status = input.status ?? (ran && schedule ? "active" : row.status);
+      if (status === "active" && row.status === "paused") {
         nextRunAt = computeNextRunAt(parseStored(scheduleJson), ctx.now, ownerZone(ctx.db));
       }
       const next: Row = {
@@ -762,7 +835,7 @@ const updateSchedule = async (
         prompt: nextPrompt,
         schedule_json: scheduleJson,
         next_run_at: nextRunAt,
-        status: input.status ?? row.status,
+        status,
         description:
           input.description === undefined ? row.description : cleanDescription(input.description, nextPrompt),
         route: kind === "reminder" ? row.route : (input.route ?? row.route),
@@ -808,7 +881,7 @@ const updateSchedule = async (
         next.updated_at,
         next.schedule_id,
       );
-      if (next.status !== row.status || next.next_run_at !== row.next_run_at) arm(ctx, next);
+      if (next.status !== row.status || next.next_run_at !== row.next_run_at) arm(ctx, next.schedule_id);
       const edited =
         next.prompt !== row.prompt ||
         next.schedule_json !== row.schedule_json ||
@@ -848,13 +921,14 @@ const runNow = (ctx: OwnerContext, scheduleId: string): null => {
   if (!row || row.status !== "active") {
     throw new RpcError("NOT_FOUND", `No active schedule with id ${scheduleId}.`);
   }
+  if (runStateOf(row).kind === "firing") throw new RpcError("CONFLICT", "It's running right now.");
   ctx.db.run(
     "UPDATE schedules SET next_run_at = ?, updated_at = ? WHERE schedule_id = ?",
     ctx.now,
     ctx.now,
     scheduleId,
   );
-  arm(ctx, { ...row, next_run_at: ctx.now });
+  arm(ctx, scheduleId);
   return null;
 };
 
@@ -1074,7 +1148,13 @@ const setReminderState = (
   next: { state: "done" } | { state: "snoozed"; minutes: number },
 ): ReminderFire => {
   enforceOwnerRateLimit(ctx.db, ctx.now, "schedules.reminder", { count: 60, windowMs: 60_000 }, "Slow down a moment and try again.");
-  const row = readFire(ctx.db, fireId);
+  let row = readFire(ctx.db, fireId);
+  while (row?.state === "snoozed" && row.snoozed_until !== null && row.snoozed_until <= ctx.now) {
+    const returned = readFire(ctx.db, returnedFireId(row));
+    if (!returned) break;
+    row = returned;
+    fireId = returned.fire_id;
+  }
   if (!row) throw new RpcError("NOT_FOUND", "That reminder is gone.");
   const snoozedUntil = next.state === "snoozed" ? ctx.now + Math.round(next.minutes) * 60_000 : null;
   ctx.db.run(
@@ -1092,6 +1172,9 @@ const setReminderState = (
   return toReminderFire(readFire(ctx.db, fireId)!);
 };
 
+const returnedFireId = (snoozed: FireRow): string =>
+  `${snoozed.fire_id.slice(0, 64)}.${(snoozed.snoozed_until ?? 0).toString(36)}`;
+
 const reminderReturn = async (ctx: OwnerContext, payload: unknown): Promise<void> => {
   const { fireId } = object({ fireId: string({ max: 128 }) })(payload);
   const old = readFire(ctx.db, fireId);
@@ -1103,7 +1186,7 @@ const reminderReturn = async (ctx: OwnerContext, payload: unknown): Promise<void
   const snapshot = await ctx.host.snapshot();
   if (!snapshot.writable) return;
   const fresh = recordFire(ctx, {
-    fireId: `${old.fire_id.slice(0, 64)}.${old.snoozed_until.toString(36)}`,
+    fireId: returnedFireId(old),
     scheduleId: old.schedule_id,
     conversationId: old.conversation_id,
     text: old.text,
@@ -1128,92 +1211,124 @@ const dailyFires = (ctx: OwnerContext): { plan: string; count: number } => {
 
 
 
-const finishFire = (
-  ctx: OwnerContext,
-  scheduleId: string,
-  fireId: string,
-  outcome: { error?: string; retry?: { sameFire: boolean }; pause?: boolean; oneShot?: boolean },
-): void => {
+type FireOutcome = {
+  error?: string;
+  retry?: { sameFire: boolean };
+  pause?: boolean;
+  /** The schedule's last run (a watch that stops once it finds something). */
+  last?: boolean;
+};
+
+/** Settles a run: back to armed for the next occurrence or a retry, or done. */
+const finishFire = (ctx: OwnerContext, scheduleId: string, fireId: string, outcome: FireOutcome): void => {
   const row = readRow(ctx.db, scheduleId);
-  if (!row || row.active_fire_id !== fireId) return;
-  if (!outcome.error) {
-    ctx.db.run(
-      `UPDATE schedules SET active_fire_id = NULL, last_error = NULL, last_error_at = NULL,
-              failure_count = 0, waiting_since = NULL, updated_at = ? WHERE schedule_id = ?`,
-      ctx.now,
-      scheduleId,
-    );
-    arm(ctx, row);
+  if (!row) return;
+  const run = runStateOf(row);
+  if (run.kind !== "firing" || run.fireId !== fireId) return;
+  let upcoming = row.next_run_at;
+  let last = Boolean(outcome.last);
+  let error = outcome.error;
+  let pause = Boolean(outcome.pause);
+  try {
+    const schedule = parseStored(row.schedule_json);
+    last ||= schedule.kind === "at";
+    if (!last) upcoming = computeNextRunAt(schedule, ctx.now + 1_000, ownerZone(ctx.db));
+  } catch (parseError) {
+    error ??= parseError instanceof Error ? parseError.message : String(parseError);
+    pause = true;
+  }
+  const armed = (retryFireId: string | null): RunState => ({ kind: "armed", retryFireId });
+  if (!error) {
+    transitionRun(ctx, scheduleId, run, armed(null), {
+      status: last ? "done" : row.status,
+      next_run_at: upcoming,
+      last_error: null,
+      last_error_at: null,
+      failure_count: 0,
+      waiting_since: null,
+    });
     return;
   }
   const failureCount = row.failure_count + 1;
   const retryAt = ctx.now + FIRE_RETRY_DELAY_MS;
   const retry =
-    !outcome.pause &&
-    outcome.retry !== undefined &&
-    failureCount <= MAX_FIRE_RETRIES &&
-    (outcome.oneShot ? row.status === "done" : retryAt < row.next_run_at);
-  const status = outcome.pause ? "paused" : retry && outcome.oneShot ? "active" : row.status;
-  const nextRunAt = retry ? retryAt : row.next_run_at;
-  ctx.db.run(
-    `UPDATE schedules SET active_fire_id = ?, last_error = ?, last_error_at = ?, failure_count = ?,
-            status = ?, next_run_at = ?, updated_at = ? WHERE schedule_id = ?`,
-    retry && outcome.retry?.sameFire ? fireId : null,
-    outcome.error.slice(0, MAX_ERROR_CHARS),
-    ctx.now,
-    failureCount,
-    status,
-    nextRunAt,
-    ctx.now,
-    scheduleId,
-  );
-  arm(
-    ctx,
-    { schedule_id: scheduleId, status, next_run_at: nextRunAt },
-    retry && outcome.retry?.sameFire ? fireId : undefined,
-  );
+    !pause && outcome.retry !== undefined && failureCount <= MAX_FIRE_RETRIES && (last || retryAt < upcoming);
+  transitionRun(ctx, scheduleId, run, armed(retry && outcome.retry?.sameFire ? fireId : null), {
+    status: pause ? "paused" : retry || !last ? row.status : "done",
+    next_run_at: retry ? retryAt : upcoming,
+    last_error: error.slice(0, MAX_ERROR_CHARS),
+    last_error_at: ctx.now,
+    failure_count: failureCount,
+  });
+};
+
+const INTERRUPTED_RUN = "This run was cut off before it finished starting.";
+
+/**
+ * Picks the run this job fire owns: a due armed schedule starts a new run
+ * (or its pending retry), a firing one past its lease was cut off and is
+ * resumed under the same fire id. Null when there is nothing to run now.
+ */
+const claimRun = (
+  ctx: OwnerContext,
+  row: Row,
+  payloadFireId: string | undefined,
+): { fireId: string; retrying: boolean } | null => {
+  const run = runStateOf(row);
+  if (run.kind === "firing") {
+    if (run.startedAt + FIRE_LEASE_MS > ctx.now) {
+      arm(ctx, row.schedule_id);
+      return null;
+    }
+    log("error", "schedule_fire_interrupted", { scheduleId: row.schedule_id, fireId: run.fireId });
+    if (row.status !== "active" || row.failure_count + 1 > MAX_FIRE_RETRIES) {
+      finishFire(ctx, row.schedule_id, run.fireId, { error: INTERRUPTED_RUN });
+      return null;
+    }
+    const resumed: RunState = { kind: "firing", fireId: run.fireId, startedAt: ctx.now };
+    if (!transitionRun(ctx, row.schedule_id, run, resumed, { failure_count: row.failure_count + 1 })) return null;
+    return { fireId: run.fireId, retrying: true };
+  }
+  if (row.status !== "active") return null;
+  if (row.next_run_at > ctx.now) {
+    arm(ctx, row.schedule_id);
+    return null;
+  }
+  const retrying = payloadFireId !== undefined && payloadFireId === run.retryFireId;
+  const fireId = retrying ? payloadFireId : crypto.randomUUID();
+  const firing: RunState = { kind: "firing", fireId, startedAt: ctx.now };
+  if (!transitionRun(ctx, row.schedule_id, run, firing, { last_run_at: ctx.now })) return null;
+  return { fireId, retrying };
 };
 
 const fire = async (ctx: OwnerContext, payload: unknown): Promise<void> => {
-  const { scheduleId, fireId: retryFireId } = firePayload(payload);
+  const { scheduleId, fireId: payloadFireId } = firePayload(payload);
   const snapshot = await ctx.host.snapshot();
   const row = readRow(ctx.db, scheduleId);
-  if (!row || row.status !== "active") return;
-  if (row.next_run_at > ctx.now) {
-    arm(ctx, row);
-    return;
-  }
-  const retrying = retryFireId !== undefined && retryFireId === row.active_fire_id;
-  const fireId = retrying ? retryFireId : crypto.randomUUID();
-  let schedule: LocalCronSchedule;
-  let oneShot = false;
-  let nextRunAt = row.next_run_at;
+  if (!row) return;
+  const claimed = claimRun(ctx, row, payloadFireId);
+  if (!claimed) return;
+  const { fireId, retrying } = claimed;
   try {
-    schedule = parseStored(row.schedule_json);
-    oneShot = schedule.kind === "at";
-    if (!oneShot) nextRunAt = computeNextRunAt(schedule, ctx.now + 1_000, ownerZone(ctx.db));
+    await runFire(ctx, row, fireId, retrying, snapshot);
   } catch (error) {
-    ctx.db.run("UPDATE schedules SET active_fire_id = ? WHERE schedule_id = ?", fireId, scheduleId);
-    finishFire(ctx, scheduleId, fireId, {
-      error: error instanceof Error ? error.message : String(error),
-      pause: true,
-    });
-    return;
+    const message = error instanceof Error ? error.message : String(error);
+    log("error", "schedule_fire_failed", { scheduleId, fireId, message });
+    finishFire(ctx, scheduleId, fireId, { error: message.slice(0, MAX_ERROR_CHARS), retry: { sameFire: true } });
   }
-  ctx.db.run(
-    `UPDATE schedules SET active_fire_id = ?, last_run_at = ?, next_run_at = ?, status = ?,
-            updated_at = ? WHERE schedule_id = ?`,
-    fireId,
-    ctx.now,
-    nextRunAt,
-    oneShot ? "done" : "active",
-    ctx.now,
-    scheduleId,
-  );
+};
+
+const runFire = async (
+  ctx: OwnerContext,
+  row: Row,
+  fireId: string,
+  retrying: boolean,
+  snapshot: { writable: boolean; ownerGeneration: string },
+): Promise<void> => {
+  const scheduleId = row.schedule_id;
   if (!snapshot.writable) {
     finishFire(ctx, scheduleId, fireId, {
       error: "This run was skipped: your cloud account isn't accepting work right now.",
-      oneShot,
     });
     return;
   }
@@ -1230,7 +1345,7 @@ const fire = async (ctx: OwnerContext, payload: unknown): Promise<void> => {
       ctx,
       scheduleId,
       fireId,
-      delivered ? {} : { error: "The reminder could not be delivered everywhere yet.", oneShot, retry: { sameFire: true } },
+      delivered ? {} : { error: "The reminder could not be delivered everywhere yet.", retry: { sameFire: true } },
     );
     return;
   }
@@ -1240,10 +1355,10 @@ const fire = async (ctx: OwnerContext, payload: unknown): Promise<void> => {
   }
   const placement = await placementOf(ctx, row);
   if (placement.away) {
-    await waitForComputer(ctx, row, fireId, oneShot, placement.device);
+    await waitForComputer(ctx, row, fireId, placement.device);
     return;
   }
-  if (!retrying && !spendRun(ctx, scheduleId, fireId, oneShot)) return;
+  if (!retrying && !spendRun(ctx, scheduleId, fireId)) return;
   const started = await startRun(
     ctx,
     row,
@@ -1256,10 +1371,10 @@ const fire = async (ctx: OwnerContext, payload: unknown): Promise<void> => {
     placement,
   );
   if (!started.ok && started.computerAway) {
-    await waitForComputer(ctx, row, fireId, oneShot, placement.device);
+    await waitForComputer(ctx, row, fireId, placement.device);
     return;
   }
-  finishFire(ctx, scheduleId, fireId, started.ok ? {} : { ...started.outcome, oneShot });
+  finishFire(ctx, scheduleId, fireId, started.ok ? {} : started.outcome);
 };
 
 /** Where a scheduled run goes: anywhere (today's routing), or only to a computer. */
@@ -1301,25 +1416,31 @@ const waitForComputer = async (
   ctx: OwnerContext,
   row: Row,
   fireId: string,
-  oneShot: boolean,
   device: DeviceDestination | undefined,
 ): Promise<void> => {
   const current = readRow(ctx.db, row.schedule_id);
-  if (!current || current.active_fire_id !== fireId) return;
+  if (!current) return;
+  const run = runStateOf(current);
+  if (run.kind !== "firing" || run.fireId !== fireId) return;
   const dueAt = row.waiting_since ?? row.next_run_at;
-  const recheckAt = ctx.now + WAIT_RECHECK_MS;
-  const nextRunAt = oneShot ? recheckAt : Math.min(current.next_run_at, recheckAt);
-  ctx.db.run(
-    `UPDATE schedules SET active_fire_id = NULL, waiting_since = ?, status = 'active', next_run_at = ?,
-            last_error = NULL, last_error_at = NULL, failure_count = 0, updated_at = ? WHERE schedule_id = ?`,
-    dueAt,
-    nextRunAt,
-    ctx.now,
-    row.schedule_id,
-  );
-  arm(ctx, { schedule_id: row.schedule_id, status: "active", next_run_at: nextRunAt });
-  if (row.waiting_since !== null) return;
-  const waiting: Row = { ...current, status: "active", next_run_at: nextRunAt, waiting_since: dueAt };
+  let nextRunAt = ctx.now + WAIT_RECHECK_MS;
+  try {
+    const schedule = parseStored(current.schedule_json);
+    if (schedule.kind !== "at") {
+      nextRunAt = Math.min(nextRunAt, computeNextRunAt(schedule, ctx.now + 1_000, ownerZone(ctx.db)));
+    }
+  } catch {
+    // An unreadable schedule is paused by its next fire.
+  }
+  const waited = transitionRun(ctx, row.schedule_id, run, { kind: "armed", retryFireId: null }, {
+    waiting_since: dueAt,
+    next_run_at: nextRunAt,
+    last_error: null,
+    last_error_at: null,
+    failure_count: 0,
+  });
+  if (!waited || row.waiting_since !== null) return;
+  const waiting: Row = { ...current, next_run_at: nextRunAt, waiting_since: dueAt };
   queueNotice(ctx, waiting, "waiting");
   const tokens = livePushTokens(ctx);
   const computer = device?.label?.trim() || "your computer";
@@ -1348,13 +1469,13 @@ const computerBack = (ctx: OwnerContext, raw: unknown): { woke: number } => {
   const { deviceId } = object({ deviceId: string({ max: 256 }) })(raw);
   const rows = ctx.db.all<Row>(
     `SELECT * FROM schedules WHERE status = 'active' AND waiting_since IS NOT NULL
-        AND active_fire_id IS NULL AND (target_device_id = ? OR target_device_id IS NULL)`,
+        AND run_state = 'armed' AND active_fire_id IS NULL AND (target_device_id = ? OR target_device_id IS NULL)`,
     deviceId,
   );
   for (const row of rows) {
     if (row.next_run_at <= ctx.now) continue;
     ctx.db.run("UPDATE schedules SET next_run_at = ?, updated_at = ? WHERE schedule_id = ?", ctx.now, ctx.now, row.schedule_id);
-    arm(ctx, { ...row, next_run_at: ctx.now });
+    arm(ctx, row.schedule_id);
   }
   return { woke: rows.length };
 };
@@ -1364,7 +1485,7 @@ const lateNote = (dueAt: number, now: number): string =>
     ? `\n\n(This was due at ${new Date(dueAt).toISOString()} and runs now instead, once, in place of any runs it missed.)`
     : "";
 
-const spendRun = (ctx: OwnerContext, scheduleId: string, fireId: string, oneShot: boolean): boolean => {
+const spendRun = (ctx: OwnerContext, scheduleId: string, fireId: string): boolean => {
   const budget = dailyFires(ctx);
   try {
     enforceOwnerRateLimit(
@@ -1379,7 +1500,6 @@ const spendRun = (ctx: OwnerContext, scheduleId: string, fireId: string, oneShot
     if (!(error instanceof RpcError) || error.code !== "RATE_LIMITED") throw error;
     finishFire(ctx, scheduleId, fireId, {
       error: `This run was skipped: today's ${budget.count} scheduled runs on the ${planLabel(budget.plan)} plan are used up.`,
-      oneShot,
     });
     return false;
   }
@@ -1529,10 +1649,10 @@ const fireWatch = async (
   }
   const placement = await placementOf(ctx, row);
   if (placement.away) {
-    await waitForComputer(ctx, row, fireId, false, placement.device);
+    await waitForComputer(ctx, row, fireId, placement.device);
     return;
   }
-  if (!retrying && !spendRun(ctx, scheduleId, fireId, false)) return;
+  if (!retrying && !spendRun(ctx, scheduleId, fireId)) return;
   const toAgent = Boolean(found) && toRoute(row.route) === "agent";
   const started = await startRun(
     ctx,
@@ -1548,7 +1668,7 @@ const fireWatch = async (
     placement,
   );
   if (!started.ok && started.computerAway) {
-    await waitForComputer(ctx, row, fireId, false, placement.device);
+    await waitForComputer(ctx, row, fireId, placement.device);
     return;
   }
   if (!started.ok) {
@@ -1556,11 +1676,7 @@ const fireWatch = async (
     return;
   }
   if (found) {
-    ctx.db.run(
-      `UPDATE schedules SET pending_finding = NULL, status = CASE WHEN once = 1 THEN 'done' ELSE status END
-        WHERE schedule_id = ?`,
-      scheduleId,
-    );
+    ctx.db.run("UPDATE schedules SET pending_finding = NULL WHERE schedule_id = ?", scheduleId);
   } else {
     ctx.db.run(
       "UPDATE schedules SET repair_sent_at = ? WHERE schedule_id = ? AND failing_since IS NOT NULL",
@@ -1568,7 +1684,7 @@ const fireWatch = async (
       scheduleId,
     );
   }
-  finishFire(ctx, scheduleId, fireId, failure ? { error: failure } : {});
+  finishFire(ctx, scheduleId, fireId, failure ? { error: failure } : { last: Boolean(found) && row.once === 1 });
 };
 
 const createArgs = object({
@@ -1612,6 +1728,7 @@ export const schedulesDomain = {
     SCHEDULES_ZONE_SOURCE_MIGRATION,
     SCHEDULES_WATCH_REPAIR_MIGRATION,
     SCHEDULES_WAITING_MIGRATION,
+    SCHEDULES_RUN_STATE_MIGRATION,
   ],
   views: {
     "schedules.list": {

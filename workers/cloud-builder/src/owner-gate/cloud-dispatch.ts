@@ -13,6 +13,7 @@ import {
   turnStartErrorResponse,
 } from "../turn-start-request.js";
 import {
+  cancelCloudAgentAttempt,
   type PiAgentExecution,
   runsAsPiAgent,
 } from "../cloud-agent-dispatch.js";
@@ -61,6 +62,41 @@ export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
     } catch {
       return null;
     }
+  }
+
+  /** A started cloud run may still become this dispatch's execution. */
+  protected cloudStartStillWanted(dispatchId: string): DispatchRow | null {
+    const current = this.dispatchRow(dispatchId);
+    return current &&
+      (current.state === "cloud_committed" ||
+        (current.state === "reconciliation_required" &&
+          !current.cancel_request_id))
+      ? current
+      : null;
+  }
+
+  protected async stopUnwantedCloudAgent(
+    row: DispatchRow,
+    threadId: string,
+    turnId: string,
+  ): Promise<void> {
+    await cancelCloudAgentAttempt({
+      env: this.env as unknown as Cloudflare.Env,
+      conversationId: row.conversation_id,
+      threadId,
+      ownerId: this.ownerId(),
+      ownerGeneration: row.owner_generation,
+      turnId,
+      attemptGeneration: 1,
+      cancelRequestId: row.cancel_request_id ?? `dispatch-ended:${row.dispatch_id}`,
+      reason: row.cancel_reason ?? "The turn was stopped.",
+    }).catch((error: unknown) => {
+      log("error", "dispatch_unwanted_cloud_agent_stop_failed", {
+        dispatchId: row.dispatch_id,
+        threadId,
+        message: error instanceof Error ? error.message : String(error),
+      });
+    });
   }
 
   protected async runCloudBranch(
@@ -397,10 +433,10 @@ export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
       started.turnId !== handoff.authority.turnId
     )
       throw new Error("Cloud admission response identity changed.");
-    const current = this.dispatchRow(row.dispatch_id);
-    if (current && current.state !== "cloud_committed") return current;
+    const current = this.cloudStartStillWanted(row.dispatch_id);
+    if (!current) return this.dispatchRow(row.dispatch_id) ?? row;
     return await this.patchDispatch(
-      row,
+      current,
       {
         state: "cloud_running",
         placement: "cloud",
@@ -479,7 +515,9 @@ export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
         },
         now,
       );
-      await this.recordPlacedAgent(row, request, now);
+      if (started.state === "cloud_running") {
+        await this.recordPlacedAgent(started, request, now);
+      }
       return started;
     }
     const response = await sessions
@@ -494,13 +532,23 @@ export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
       });
     if (!response.ok) return await this.cloudRefusal(row, response, now);
     const started = (await response.json()) as CloudAgentTurnStartResponse;
+    const current = this.cloudStartStillWanted(row.dispatch_id);
+    if (!current) {
+      const ended = this.dispatchRow(row.dispatch_id) ?? row;
+      await this.stopUnwantedCloudAgent(
+        ended,
+        started.threadId ?? threadId,
+        started.turnId ?? row.dispatch_id,
+      );
+      return ended;
+    }
     await this.recordPlacedAgent(
-      row,
+      current,
       { ...request, threadId: started.threadId ?? threadId },
       now,
     );
     return await this.patchDispatch(
-      row,
+      current,
       {
         state: "cloud_running",
         placement: "cloud",
@@ -541,9 +589,16 @@ export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
         lineage: { depth: 1 },
       },
     });
-    await this.releaseGate(row);
+    const current = this.cloudStartStillWanted(row.dispatch_id);
+    if (!current) {
+      const ended = this.dispatchRow(row.dispatch_id) ?? row;
+      await this.stopUnwantedCloudAgent(ended, request.threadId, row.dispatch_id);
+      await this.releaseGate(ended);
+      return ended;
+    }
+    await this.releaseGate(current);
     return await this.patchDispatch(
-      row,
+      current,
       {
         state: "cloud_running",
         placement: "cloud",

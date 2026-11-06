@@ -480,10 +480,7 @@ function ChatSurface(props: {
     composerModelPinned,
   ]);
 
-  const sendReady =
-    !offline &&
-    thread.storageLoaded &&
-    thread.authorityReady !== false;
+  const sendReady = thread.composerGate.kind === "ready";
   const handoffSentRef = useRef(false);
   useEffect(() => {
     if (!handoffDraft?.send || handoffSentRef.current || !sendReady) return;

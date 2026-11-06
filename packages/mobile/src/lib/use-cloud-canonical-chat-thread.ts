@@ -64,6 +64,7 @@ import {
   AUTOMATIC_EXECUTION_TARGET,
   cancelAutomaticExecution,
   getAutomaticExecutionStatus,
+  readMainConversationId,
   type AutomaticExecutionTarget,
 } from "./execution-placement";
 import { createActivityHubArtifacts } from "./activity-hub-model";
@@ -324,6 +325,7 @@ const useSustainedCloudOffline = (status: CloudSocketStatus): boolean => {
 
 const STOP_CONFIRM_MS = 15_000;
 const SETTLED_SEND_RELEASE_MS = 10_000;
+const PLACEMENT_RECHECK_MS = 10_000;
 const STOP_UNREACHABLE_MESSAGE =
   "Couldn’t stop this reply. Stella isn’t connected right now.";
 const STOP_UNCONFIRMED_MESSAGE =
@@ -377,6 +379,29 @@ export const useCloudCanonicalChatThread = (
     },
     [authority.conversationId],
   );
+  useEffect(() => {
+    if (!placementIssue) return;
+    let active = true;
+    const check = () => {
+      void readMainConversationId().then(
+        (mainConversationId) => {
+          if (!active) return;
+          if (mainConversationId === authority.conversationId) {
+            setPlacementIssue(null);
+          } else {
+            reloadAuthority?.();
+          }
+        },
+        () => undefined,
+      );
+    };
+    const timer = setInterval(check, PLACEMENT_RECHECK_MS);
+    check();
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [authority.conversationId, placementIssue, reloadAuthority]);
   const store = useMemo(
     () =>
       conversationStore(
@@ -793,17 +818,23 @@ export const useCloudCanonicalChatThread = (
     sustainedOffline,
   ]);
   const issue =
-    placementIssue ??
+    (placementIssue ? { ...placementIssue, blocksSending: true } : null) ??
     (stopIssue && stopIssue.turnId === activeTurnId
-      ? { message: stopIssue.message, retryable: true, retry: retryStop }
+      ? {
+          message: stopIssue.message,
+          retryable: true,
+          blocksSending: false,
+          retry: retryStop,
+        }
       : null) ??
     (local.authorityIssue
       ? {
           message: local.authorityIssue.message,
           retryable: local.authorityIssue.retryable,
+          blocksSending: true,
         }
       : null) ??
-    socketIssue;
+    (socketIssue ? { ...socketIssue, blocksSending: true } : null);
   const retryAuthority = useCallback(() => {
     setPlacementIssue(null);
     local.authorityIssue?.retry();
@@ -813,7 +844,7 @@ export const useCloudCanonicalChatThread = (
   const authorityIssue: ChatThread["authorityIssue"] = issue
     ? {
         ...issue,
-        retry: "retry" in issue ? issue.retry : retryAuthority,
+        retry: ("retry" in issue ? issue.retry : undefined) ?? retryAuthority,
       }
     : null;
   const storageLoaded = display.shown && !local.authorityIssue;
@@ -897,7 +928,7 @@ export const useCloudCanonicalChatThread = (
     if (
       !localActiveSendId ||
       !localSendSettled ||
-      state.activity === "running" ||
+      turnRunning ||
       !releaseSettledSend
     ) {
       return;
@@ -907,7 +938,7 @@ export const useCloudCanonicalChatThread = (
       SETTLED_SEND_RELEASE_MS,
     );
     return () => clearTimeout(timer);
-  }, [localActiveSendId, localSendSettled, releaseSettledSend, state.activity]);
+  }, [localActiveSendId, localSendSettled, releaseSettledSend, turnRunning]);
   const [activityHubArtifacts] = useState(createActivityHubArtifacts);
   const conversationArtifacts = useMemo(
     () => activityHubArtifacts(messages),

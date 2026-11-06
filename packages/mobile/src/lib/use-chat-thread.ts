@@ -268,7 +268,13 @@ export type ChatComposerThread = {
   releaseSettledSend?: (userMessageId: string) => void;
 };
 
-export type ChatThread = ChatComposerThread & {
+export type ChatThread = Omit<ChatComposerThread, "authorityIssue"> & {
+  authorityIssue: {
+    message: string;
+    retryable: boolean;
+    blocksSending: boolean;
+    retry: () => void;
+  } | null;
   conversationId?: string | null;
   authorityReady?: boolean;
   hasOlderMessages: boolean;
@@ -751,7 +757,7 @@ export function useChatThread(opts: {
         transport.onAdmission?.({
           localMessageId: item.userMessageId,
           dispatchId: admitted.dispatchId,
-          conversationId: placementConversationId,
+          conversationId: admitted.conversationId || placementConversationId,
         });
         if (active?.replyId === replyId) {
           active.automaticControl = bindAutomaticExecutionAdmission(
@@ -978,7 +984,12 @@ export function useChatThread(opts: {
             drainQueueRef.current?.();
           }
         },
-        () => undefined,
+        () => {
+          if (!canonicalAuthorityLeaseCurrent(item.canonicalAuthorityLease)) {
+            return;
+          }
+          markSendFailedRef.current?.(retryItem, replyId, false);
+        },
       );
     },
     [
@@ -1312,13 +1323,7 @@ export function useChatThread(opts: {
           }
           if (stoppedDispatchIdsRef.current.has(item.dispatchId)) return;
           if (admission === "dispatch") markSending(false);
-          updateMessages((current) =>
-            current.map((message) =>
-              message.id === userMessageId
-                ? { ...message, queued: true }
-                : message,
-            ),
-          );
+          markSendFailedRef.current?.(item, createId(), false);
         });
       return { userMessageId };
     },

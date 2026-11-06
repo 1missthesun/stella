@@ -10,6 +10,7 @@ import { Icon } from "./Icon";
 export type ChatIssue = {
   message: string;
   retryable: boolean;
+  blocksSending: boolean;
   retry: () => void;
 };
 
@@ -24,7 +25,9 @@ export function ChatIssueNotice({ issue }: { issue: ChatIssue | null }) {
     if (message === null) setDismissed(null);
   }, [message]);
 
-  if (!issue || dismissed === issue.message) return null;
+  if (!issue || (!issue.blocksSending && dismissed === issue.message)) {
+    return null;
+  }
 
   return (
     <View
@@ -36,17 +39,19 @@ export function ChatIssueNotice({ issue }: { issue: ChatIssue | null }) {
         <Icon name="alert-circle" size={17} color={colors.text} />
       </View>
       <Text style={styles.message}>{issue.message}</Text>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={t("common.close")}
-        hitSlop={8}
-        onPress={() => setDismissed(issue.message)}
-        style={styles.dismiss}
-        testID="chat-issue-dismiss"
-      >
-        <Icon name="x" size={14} color={colors.textMuted} />
-      </Pressable>
-      {issue.retryable ? (
+      {issue.blocksSending ? null : (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t("common.close")}
+          hitSlop={8}
+          onPress={() => setDismissed(issue.message)}
+          style={styles.dismiss}
+          testID="chat-issue-dismiss"
+        >
+          <Icon name="x" size={14} color={colors.textMuted} />
+        </Pressable>
+      )}
+      {issue.retryable || issue.blocksSending ? (
         <View style={styles.actions}>
           <Pressable
             accessibilityRole="button"

@@ -825,8 +825,12 @@ export class PiConversationRuntime {
                 call.threadId ? this.#ownHistory(call.threadId) : undefined,
                 call.threadId ? this.#fileDelivery(call.threadId) : undefined,
               );
-        const tool = tools.find((candidate) => candidate.name === call.name);
-        if (!tool) throw new Error(`${call.name} is not available here.`);
+        const found = tools.find((candidate) => candidate.name === call.name);
+        if (!found) throw new Error(`${call.name} is not available here.`);
+        const tool =
+          call.withheld?.length && "without" in found && typeof found.without === "function"
+            ? (found.without as (names: readonly string[]) => CloudCodeSourceAgentTool)(call.withheld)
+            : found;
         const started = Date.now();
         const fields = { role: call.role, tool: call.name, callId: call.callId };
         try {

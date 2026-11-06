@@ -3,13 +3,25 @@ import { withAbortSignal, withoutAbortSignal } from "@earendil-works/chord/conte
 import type { ImageContent, TextContent, TSchema } from "@earendil-works/pi-ai";
 import { validateToolArguments } from "@earendil-works/pi-ai/utils/validation";
 import path from "node:path";
-import { defineExtension, type Extension, type ToolRegistration, type Wrap } from "@earendil-works/pi-durable";
+import { AgentDoc, defineExtension, type Extension, type ToolRegistration, type Wrap } from "@earendil-works/pi-durable";
 import {
   needsProviderToolSchemaNormalization,
   normalizeProviderToolInputSchema,
 } from "@stella/runtime/kernel/tools/provider-tool-schema";
 import { watchToolCallAbandonment } from "../engine/abandoned-calls.ts";
 import { StellaAgentDoc } from "./agent-doc.ts";
+import { CLAUDE_CODE_PROVIDER_ID } from "../engine/selection.ts";
+import { CHATGPT_PROVIDER_ID } from "../provider/chatgpt.ts";
+
+/**
+ * Stella tools a subscription engine replaces with its own, kept out of
+ * `code` too: Claude Code and ChatGPT plans search and fetch the web on the
+ * user's plan, not on Stella's paid `web`.
+ */
+const WITHHELD_BY_PROVIDER: Readonly<Record<string, readonly string[]>> = {
+  [CLAUDE_CODE_PROVIDER_ID]: ["web"],
+  [CHATGPT_PROVIDER_ID]: ["web"],
+};
 
 export const STELLA_ORCHESTRATOR_TOOLS = "stella-tools-orchestrator";
 export const STELLA_AGENT_TOOLS = "stella-tools-agent";
@@ -50,6 +62,8 @@ export type StellaToolCall = {
   threadId?: string;
   /** Where the caller's Bash runs; relative paths in tool arguments resolve here. */
   cwd?: string;
+  /** Tools the caller's engine replaces with its own; out of reach inside `code`. */
+  withheld?: readonly string[];
 };
 
 export type StellaToolOutcome = {
@@ -106,6 +120,11 @@ const register = (role: StellaToolRole, spec: StellaToolSpec, host: StellaToolHo
   replay: spec.replay === "safe" || spec.replay === "keyed" ? "safe" : "unsafe",
   async execute(args, api, context) {
     const agent = role === "general" ? await api.snapshot(StellaAgentDoc, api.conversationId, context) : undefined;
+    const provider =
+      spec.name === STELLA_CODE_TOOL_NAME
+        ? (await api.snapshot(AgentDoc, api.conversationId, context).catch(() => undefined))?.model?.provider
+        : undefined;
+    const withheld = provider ? WITHHELD_BY_PROVIDER[provider] : undefined;
     // pi-durable cancels a call's context when the call ends. Work a tool
     // leaves running (a code cell that yielded) must outlive the call, so the
     // host's signal follows the context only while the call is in flight.
@@ -136,6 +155,7 @@ const register = (role: StellaToolRole, spec: StellaToolSpec, host: StellaToolHo
           args: (args ?? {}) as Record<string, unknown>,
           ...(agent?.threadId ? { threadId: agent.threadId } : {}),
           ...(api.env?.cwd ? { cwd: api.env.cwd } : {}),
+          ...(withheld ? { withheld } : {}),
         },
         withAbortSignal(controller.signal, withoutAbortSignal(context)),
       );

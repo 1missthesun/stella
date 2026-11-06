@@ -339,6 +339,7 @@ export const piChatsFor = (
             conversationId,
             ...(call.threadId ? { agentId: call.threadId } : {}),
             ...(call.cwd ? { cwd: call.cwd } : {}),
+            ...(call.withheld ? { withheld: call.withheld } : {}),
             ...(context.abortSignal ? { signal: context.abortSignal } : {}),
           });
           return {

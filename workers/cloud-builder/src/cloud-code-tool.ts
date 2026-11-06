@@ -530,16 +530,35 @@ const browserIntrinsic =
     return await client.call(method, args, context.signal);
   };
 
+export type CloudCodeAgentTool = AgentTool & {
+  /** The same tool with these nested tools out of its reach. */
+  without(names: readonly string[]): AgentTool;
+};
+
 export const createCloudCodeAgentTool = async (
   options: CreateCloudCodeAgentToolOptions,
-): Promise<AgentTool> => {
+): Promise<CloudCodeAgentTool> => {
   const sourceTools = options.tools.filter(isCloudCodeReachableTool);
   const value = await loadTypeBoxValue();
   const liftedMaps = new Map<string, MapRouteArtifact[]>();
   const liftedScreenshots = new Map<string, LiftedScreenshot[]>();
-  const prepared = await prepareCloudCodeTools(
-    sourceTools.map((tool) => definitionForAgentTool(tool, value, liftedMaps)),
+  const definitions = sourceTools.map((tool) =>
+    definitionForAgentTool(tool, value, liftedMaps),
   );
+  const prepared = await prepareCloudCodeTools(definitions);
+  const preparedWithout = new Map<string, ReturnType<typeof prepareCloudCodeTools>>();
+  const toolsWithout = (withheld: ReadonlySet<string>) => {
+    if (withheld.size === 0) return Promise.resolve(prepared);
+    const key = [...withheld].sort().join("\0");
+    let next = preparedWithout.get(key);
+    if (!next) {
+      next = prepareCloudCodeTools(
+        definitions.filter((definition) => !withheld.has(definition.rawName)),
+      );
+      preparedWithout.set(key, next);
+    }
+    return next;
+  };
   const catalog = sourceTools.map(catalogEntryForTool);
   const demoted = catalog.filter((entry) => entry.demoted !== undefined);
   const reservedNames: ReadonlySet<string> = new Set(
@@ -565,13 +584,9 @@ export const createCloudCodeAgentTool = async (
   };
   const executeCode = options.executeCode ?? executeCloudCode;
 
-  return {
-    name: CODE_TOOL_NAME,
-    label: "Code",
-    workingText: "Running code",
-    description: `${cloudCodeToolDescription(Boolean(options.browser))}${buildDemotedCodeSuffix(demoted)}`,
-    parameters: CLOUD_CODE_PARAMETERS as unknown as TSchema,
-    execute: async (toolCallId, params, signal) => {
+  const executeWithout =
+    (withheld: ReadonlySet<string>): AgentTool["execute"] =>
+    async (toolCallId, params, signal) => {
       const args = params as CloudCodeParameters;
       const executionId = `code:${await sha256Hex(
         `${options.executionScope}\0${toolCallId}`,
@@ -583,13 +598,16 @@ export const createCloudCodeAgentTool = async (
       const connectorTools = connect
         ? await connect.tools(reservedNames).catch(() => [])
         : [];
-      const liveCatalog = [...catalog, ...connectorTools];
+      const liveCatalog = [
+        ...catalog.filter((entry) => !withheld.has(entry.name)),
+        ...connectorTools,
+      ];
       let result: CloudCodeExecutionResult;
       try {
         result = await executeCode({
           loader: options.loader,
           code: args.code,
-          tools: prepared,
+          tools: await toolsWithout(withheld),
           executionId,
           intrinsics: {
             ...intrinsics,
@@ -644,6 +662,17 @@ export const createCloudCodeAgentTool = async (
         },
         isError: !result.ok,
       };
-    },
+    };
+  const tool: AgentTool = {
+    name: CODE_TOOL_NAME,
+    label: "Code",
+    workingText: "Running code",
+    description: `${cloudCodeToolDescription(Boolean(options.browser))}${buildDemotedCodeSuffix(demoted)}`,
+    parameters: CLOUD_CODE_PARAMETERS as unknown as TSchema,
+    execute: executeWithout(new Set()),
+  };
+  return {
+    ...tool,
+    without: (names) => ({ ...tool, execute: executeWithout(new Set(names)) }),
   };
 };

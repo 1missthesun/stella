@@ -47,6 +47,8 @@ export type PiToolCall = {
   conversationId: string;
   agentId?: string;
   cwd?: string;
+  /** Tools the caller's engine replaces with its own; `code` can't reach them. */
+  withheld?: readonly string[];
   signal?: AbortSignal;
 };
 
@@ -159,7 +161,9 @@ export const createRunnerPiTools = (context: RunnerContext): RunnerPiTools => ({
         toolExecutor: async (toolName, toolArgs, toolContext, signal, onUpdate) =>
           await context.toolHost.executeTool(toolName, toolArgs, toolContext, signal, onUpdate),
         hookEmitter: context.hookEmitter,
-        allowedToolNames: offered.map((tool) => tool.name),
+        allowedToolNames: offered
+          .map((tool) => tool.name)
+          .filter((name) => !call.withheld?.includes(name)),
         ...(model
           ? { imageCapTarget: { provider: model.provider, api: model.api, modelId: model.id } }
           : {}),

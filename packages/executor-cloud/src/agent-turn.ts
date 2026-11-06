@@ -554,7 +554,7 @@ export const runAgentTurn = (
         workspaceRoot,
         workspaceStateDir,
         toolHome,
-        allowedToolNames: cloudGeneralToolNames(),
+        allowedToolNames: cloudGeneralToolNames().filter((name) => name !== "web"),
       });
 
       const catalog = [

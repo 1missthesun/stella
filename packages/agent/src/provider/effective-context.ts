@@ -3,9 +3,10 @@ import type { MutableModels, Provider } from "@earendil-works/pi-ai/models";
 import { effectiveContextWindow } from "@stella/contracts/model-context";
 
 const capped = <M>(model: M): M => {
-  const entry = model as { id?: unknown; contextWindow?: unknown };
+  const entry = model as { id?: unknown; contextWindow?: unknown; provider?: unknown };
   if (typeof entry.id !== "string" || typeof entry.contextWindow !== "number") return model;
-  const window = effectiveContextWindow(entry.id, entry.contextWindow);
+  const provider = typeof entry.provider === "string" ? entry.provider : undefined;
+  const window = effectiveContextWindow(entry.id, entry.contextWindow, provider);
   return window === entry.contextWindow ? model : { ...model, contextWindow: window };
 };
 

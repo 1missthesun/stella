@@ -32,11 +32,23 @@ const familyOf = (modelId: string): string =>
     .replace(/(-pro|-fast|-decisions)+$/, "");
 
 /**
- * The window to compact a model against: its family's effective window when
- * that is smaller than what the provider advertises, otherwise the advertised
- * one.
+ * OpenAI's default window for a model on a ChatGPT plan, where subscription
+ * usage has no long-context surcharge ("GPT-6.1 Sol uses a default context
+ * window of 500K tokens in Codex and ChatGPT Work"). Keyed by provider id.
  */
-export const effectiveContextWindow = (modelId: string, advertised: number): number => {
-  const effective = EFFECTIVE_CONTEXT_WINDOWS[familyOf(modelId)];
+const PLAN_CONTEXT_WINDOWS: Readonly<Record<string, Readonly<Record<string, number>>>> = {
+  chatgpt: { "gpt-6.1-sol": 500_000 },
+};
+
+/**
+ * The window to compact a model against: the plan default where OpenAI sets
+ * one, else its family's effective window when that is smaller than what the
+ * provider advertises, else the advertised one.
+ */
+export const effectiveContextWindow = (modelId: string, advertised: number, provider?: string): number => {
+  const family = familyOf(modelId);
+  const plan = provider === undefined ? undefined : PLAN_CONTEXT_WINDOWS[provider]?.[family];
+  if (plan !== undefined) return plan;
+  const effective = EFFECTIVE_CONTEXT_WINDOWS[family];
   return effective !== undefined && effective < advertised ? effective : advertised;
 };

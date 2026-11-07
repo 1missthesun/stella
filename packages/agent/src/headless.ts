@@ -9,6 +9,7 @@ import { openStellaHarness, orchestratorAgent, stellaModelRef } from "./harness.
 import { desktopAgentsHost, desktopEnvironments } from "./host/desktop-agents.ts";
 import { desktopContextSources } from "./host/desktop-sources.ts";
 import { desktopGatewayAccess, resolveStellaModels } from "./host/desktop-gateway.ts";
+import { effectiveContextModels } from "./provider/effective-context.ts";
 import { stellaProvider } from "./provider/stella.ts";
 import { openBunSqliteStorage } from "./storage/bun-sqlite.ts";
 
@@ -100,7 +101,7 @@ async function main() {
   if (!gatewayOrigin) throw new Error("The backend's model catalog names no gateway origin.");
   const access = desktopGatewayAccess({ gatewayOrigin, getAuthToken: () => token, getDeviceSigner: () => signer });
   const specs = await resolveStellaModels(access, gatewayOrigin, "stella/default", ["orchestrator", "general"]);
-  const models = createModels();
+  const models = effectiveContextModels(createModels());
   models.setProvider(stellaProvider({ access, models: specs }));
 
   const database = path.join(dataDir!, "agent", `${values.conversation}.sqlite`);

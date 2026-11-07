@@ -108,6 +108,7 @@ import {
   type StellaCredentialAccess,
 } from "../provider/byok.ts";
 import { CHATGPT_PROVIDER_ID } from "../provider/chatgpt.ts";
+import { effectiveContextModels } from "../provider/effective-context.ts";
 import {
   accountByokProvider,
   accountProviderModel,
@@ -529,10 +530,12 @@ export function desktopChats(options: DesktopChatsOptions) {
   };
   const elsewhere = (placement: Extract<PiChatBrainResult, { here: false }>) =>
     `Stella for this chat runs ${placement.target.mode === "cloud" ? "in the cloud" : `on ${placement.label ?? placement.target.deviceId}`} now, so this computer does not answer it.`;
-  const models = createModels(
-    options.credentials
-      ? { credentials: stellaCredentialStore(options.credentials), authContext: storeOnlyAuthContext }
-      : {},
+  const models = effectiveContextModels(
+    createModels(
+      options.credentials
+        ? { credentials: stellaCredentialStore(options.credentials), authContext: storeOnlyAuthContext }
+        : {},
+    ),
   );
   const byok = byokModels(models, options.resolveDirectModel);
   // What a usage limit has paused in each chat: this computer's own held

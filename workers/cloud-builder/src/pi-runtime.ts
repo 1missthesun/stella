@@ -38,6 +38,7 @@ import {
   type ClaudeCodeTransport,
 } from "@stella/agent/engine/claude-code";
 import { accountByokProvider, accountProviderModel } from "@stella/agent/provider/account-byok";
+import { effectiveContextModels } from "@stella/agent/provider/effective-context";
 import {
   STELLA_PROVIDER_ID,
   stellaModelId,
@@ -523,7 +524,7 @@ export type JournalRecordLike = {
 
 export class PiConversationRuntime {
   readonly #options: PiRuntimeOptions;
-  readonly #models = createModels();
+  readonly #models = effectiveContextModels(createModels());
   readonly #claudeCode: ClaudeCodeEngine | undefined;
   #opening: Promise<Opened> | undefined;
   #binding: PiTurnBinding | undefined;

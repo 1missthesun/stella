@@ -4,6 +4,7 @@ import {
   type ManagedProtocol,
 } from "./managed-gateway";
 import type { ManagedModelAudience } from "@stella/contracts/gateway/capability";
+import { effectiveContextWindow } from "@stella/contracts/model-context";
 export type {
   ManagedGatewayProvider,
   ManagedProtocol,
@@ -182,12 +183,6 @@ const GEMINI_3_8_FLASH_OFFLINE_RESPONDER_CONFIG: ModelConfig = {
 };
 
 /**
- * Prompts above this many input tokens bill GPT-6 Luna at 2x input and 1.5x
- * output for the whole request.
- */
-export const GPT_6_LUNA_PRICE_TIER_INPUT_TOKENS = 272_000;
-
-/**
  * Input context window each managed upstream is compacted against, as its
  * route serves it. DeepSeek is pinned to OpenRouter's inference-net endpoint,
  * which serves 1,040,000 of the model's 1,048,576. GPT-6 Luna serves
@@ -197,7 +192,7 @@ export const GPT_6_LUNA_PRICE_TIER_INPUT_TOKENS = 272_000;
  * OpenAI, Google and OpenRouter.
  */
 export const MANAGED_MODEL_CONTEXT_WINDOWS: Readonly<Record<string, number>> = {
-  [GPT_6_LUNA_MODEL]: GPT_6_LUNA_PRICE_TIER_INPUT_TOKENS,
+  [GPT_6_LUNA_MODEL]: effectiveContextWindow(GPT_6_LUNA_MODEL, 1_050_000),
   [DEEPSEEK_V4_1_FLASH_MODEL]: 1_040_000,
   [GEMINI_3_8_FLASH_OFFLINE_RESPONDER_MODEL]: 1_048_576,
   [GEMINI_3_1_FLASH_LITE_MODEL]: 1_048_576,

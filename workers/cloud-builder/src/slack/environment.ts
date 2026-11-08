@@ -19,6 +19,7 @@ import { slackTry } from "./api.js";
 import { decryptToken, encryptToken } from "./crypto.js";
 import { loadInstallation } from "./store.js";
 import { resolveConversationRepo } from "./repos.js";
+import { AS_SLACK_TOOL_USER, SLACK_TOOL_UID } from "./workspace.js";
 
 export const LIMITED_HOSTS: readonly string[] = [
   "github.com",
@@ -81,7 +82,7 @@ const ENGINE_HOSTS: readonly string[] = ["*.anthropic.com", "claude.ai", "*.clau
 const SECRET_PLACEHOLDER = "stella-network-secret";
 const CONTAINERS_CA = "/etc/cloudflare/certs/cloudflare-containers-ca.crt";
 const SYSTEM_BUNDLE = "/etc/ssl/certs/ca-certificates.crt";
-const TOOL_UID = 42424;
+const SAVED_ENV_BYTES = 1_048_576;
 const SETUP_DIR = "/opt/stella-env";
 const SETUP_LOCK = "/opt/stella-env.lock";
 const SETUP_TIMEOUT_S = 600;
@@ -737,13 +738,13 @@ cd ${shellQuote(cwd)} 2>/dev/null || cd ${shellQuote(WORLD_ROOT)}
     "fi",
     "set -e",
     `rm -rf ${SETUP_DIR} && mkdir -p ${out}`,
-    `chmod 0755 ${SETUP_DIR} && chown ${TOOL_UID}:${TOOL_UID} ${out} && chmod 0700 ${out}`,
+    `chmod 0755 ${SETUP_DIR} && chown ${SLACK_TOOL_UID}:${SLACK_TOOL_UID} ${out} && chmod 0700 ${out}`,
     writeFile(`${SETUP_DIR}/setup.sh`, script, "0644"),
     writeFile(`${SETUP_DIR}/run.sh`, runner, "0755"),
     "set +e",
-    `env -i ${envArgs} timeout -k 10 ${SETUP_TIMEOUT_S}s /usr/bin/setpriv --reuid=${TOOL_UID} --regid=${TOOL_UID} --clear-groups --no-new-privs --bounding-set=-all --inh-caps=-all --ambient-caps=-all -- /bin/bash ${SETUP_DIR}/run.sh > ${SETUP_DIR}/log 2>&1 < /dev/null`,
+    `env -i ${envArgs} timeout -k 10 ${SETUP_TIMEOUT_S}s ${AS_SLACK_TOOL_USER} /bin/bash ${SETUP_DIR}/run.sh > ${SETUP_DIR}/log 2>&1 < /dev/null`,
     "code=$?",
-    `if [ "$code" = 0 ]; then install -m 0600 ${out}/env ${savedEnv} 2>/dev/null || : > ${savedEnv}; fi`,
+    `if [ "$code" = 0 ]; then (umask 077 && timeout -k 5 20s ${AS_SLACK_TOOL_USER} head -c ${SAVED_ENV_BYTES} -- ${out}/env > ${savedEnv} 2>/dev/null < /dev/null) || : > ${savedEnv}; fi`,
     `printf '%s\\n%s\\n' "$boot" "$code" > ${ran}`,
     ...report,
   ].join("\n");

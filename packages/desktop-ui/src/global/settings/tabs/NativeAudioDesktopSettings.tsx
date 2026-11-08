@@ -2,7 +2,10 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Switch } from "@/ui/switch";
 import { useMicrophoneRecovery } from "@/global/permissions/use-microphone-recovery";
 import { useT } from "@/shared/i18n";
-import { useRealtimeVoiceVisible } from "@/shared/lib/realtime-voice-visibility";
+import {
+  loadRealtimeVoiceVisible,
+  useRealtimeVoiceVisible,
+} from "@/shared/lib/realtime-voice-visibility";
 
 export async function darwinMicrophoneIsDenied(): Promise<boolean> {
   if (window.electronAPI?.platform !== "darwin") return false;
@@ -102,13 +105,18 @@ export function NativeWakeWordRow({ micEnabled }: { micEnabled: boolean }) {
 
   useEffect(() => {
     if (voiceVisible) return;
-    void window.electronAPI?.system
-      ?.getWakeWordEnabled?.()
-      .then((enabled) => {
-        if (!enabled) return;
-        void window.electronAPI?.system?.setWakeWordEnabled?.(false);
+    let cancelled = false;
+    void loadRealtimeVoiceVisible()
+      .then(async (visible) => {
+        if (cancelled || visible) return;
+        const enabled = await window.electronAPI?.system?.getWakeWordEnabled?.();
+        if (cancelled || !enabled) return;
+        await window.electronAPI?.system?.setWakeWordEnabled?.(false);
       })
       .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
   }, [voiceVisible]);
 
   useEffect(() => {
@@ -158,6 +166,7 @@ export function NativeWakeWordRow({ micEnabled }: { micEnabled: boolean }) {
         <Switch
           checked={wakeWordEnabled}
           onCheckedChange={handleWakeWordToggle}
+          label={t("settings.audio.wakeWord.label")}
           hideLabel
         />
       </div>

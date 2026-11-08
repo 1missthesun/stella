@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useUiState } from "@/context/ui-state";
 import { type VoiceSessionState } from "@/features/voice/services/realtime-voice";
 import { VoiceSessionManager } from "@/features/voice/hooks/use-realtime-voice";
+import { playVoiceCue } from "@/features/voice/services/voice-cues";
 import {
   acquireSharedMicrophone,
   type SharedMicrophoneLease,
@@ -138,7 +139,11 @@ export function VoiceRuntimeRoot() {
   }, [bootConversationId, state.conversationId, sessionShouldRun]);
 
   useEffect(() => {
+    const wasActive = inputActiveRef.current;
     inputActiveRef.current = state.isVoiceRtcActive;
+    if (wasActive !== state.isVoiceRtcActive) {
+      playVoiceCue(state.isVoiceRtcActive ? "start" : "end");
+    }
   }, [state.isVoiceRtcActive]);
 
   useEffect(() => {
@@ -246,7 +251,8 @@ export function VoiceRuntimeRoot() {
           const message = failure?.message ?? "";
           window.electronAPI?.voice.reportSessionErrorState?.(message);
           if (
-            failure?.action &&
+            failure &&
+            (failure.action || inputActiveRef.current) &&
             message.trim() &&
             lastVoiceErrorToastRef.current !== message
           ) {
@@ -279,6 +285,11 @@ export function VoiceRuntimeRoot() {
       onUserSpeakingChange: (isUserSpeaking) => {
         userSpeakingRef.current = isUserSpeaking;
         publishRuntimeState({ isUserSpeaking });
+      },
+      onActiveVoiceEnded: () => {
+        void window.electronAPI?.ui
+          .setState({ isVoiceRtcActive: false })
+          .catch(() => undefined);
       },
     });
 

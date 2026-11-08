@@ -41,6 +41,9 @@ type WakewordOptions = {
 
 const RESTART_BACKOFF_MS = 5000;
 const MAX_CONSECUTIVE_START_FAILURES = 5;
+// wakeword_listener exits with this code when its input device went away or
+// the system default input changed; it is respawned at once on the new device.
+const INPUT_CHANGED_EXIT_CODE = 75;
 
 // Windows refuses to start a process whose imports can't be resolved and
 // reports it only as an exit status, with nothing on stderr. These are the
@@ -108,6 +111,14 @@ export class WakewordService {
   dispose(): void {
     this.disposed = true;
     this.stopChild();
+  }
+
+  restart(): void {
+    if (this.disposed || !this.enabled) return;
+    this.stopChild();
+    this.consecutiveStartFailures = 0;
+    this.unavailableReported = false;
+    this.spawnIfIdle();
   }
 
   private spawnIfIdle(): void {
@@ -201,10 +212,16 @@ export class WakewordService {
       }
     });
     child.on("exit", (code, signal) => {
-      if (this.child === child) {
-        this.child = null;
-      }
+      if (this.child !== child) return;
+      this.child = null;
       if (this.disposed) return;
+      if (code === INPUT_CHANGED_EXIT_CODE) {
+        getFileLogger()?.process("native.wakeword.input-changed", {
+          stderr: this.lastStderrLine || undefined,
+        });
+        this.spawnIfIdle();
+        return;
+      }
       if (code === 0 && signal === null) return;
       const detail = {
         code,

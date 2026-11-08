@@ -7,7 +7,10 @@ import {
   presentUsageLimitResumed,
   usageLimitCardId,
 } from "@/features/chat/usage-limit-card";
-import { clearComposerNotices } from "@/features/chat/composer-notice-store";
+import {
+  clearComposerNotices,
+  VOICE_FAILURE_NOTICE_ID,
+} from "@/features/chat/composer-notice-store";
 import {
   emptyPiChat,
   reducePiChat,
@@ -69,9 +72,18 @@ const attach = (conversationId: string, entry: Watched) => {
   );
 };
 
-const clearStaleNotices = (conversationId: string) => {
+const clearStaleNotices = (
+  conversationId: string,
+  options: { keepVoiceFailure?: boolean } = {},
+) => {
   const usageLimit = usageLimitCardId(conversationId);
-  clearComposerNotices(conversationId, (notice) => notice.id === usageLimit);
+  clearComposerNotices(
+    conversationId,
+    (notice) =>
+      notice.id === usageLimit ||
+      (options.keepVoiceFailure === true &&
+        notice.id === VOICE_FAILURE_NOTICE_ID),
+  );
 };
 
 const resumeUsageLimit = async (conversationId: string) => {
@@ -116,7 +128,7 @@ const presentEvents = (conversationId: string, events: readonly PiChatEvent[]) =
     if (message.stopReason === "error") {
       presentStellaProviderError(message.errorMessage ?? null, { conversationId });
     } else if (message.stopReason !== "aborted") {
-      clearStaleNotices(conversationId);
+      clearStaleNotices(conversationId, { keepVoiceFailure: true });
     }
   }
 };

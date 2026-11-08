@@ -29,6 +29,6 @@ export const voiceFailureToast = (
         action: OPEN_SETTINGS_TOAST_ACTION,
       };
     case null:
-      return null;
+      return { description: message, variant: "error", duration: 8000 };
   }
 };

@@ -13,7 +13,7 @@ import { registerHomeHandlers } from "../ipc/home-handlers.js";
 import { registerLocalChatHandlers } from "../ipc/local-chat-handlers.js";
 import { registerNativeIntegrationHandlers } from "../ipc/native-integration-handlers.js";
 import { registerOnboardingHandlers } from "../ipc/onboarding-handlers.js";
-import { app, BrowserWindow, shell } from "electron";
+import { app, BrowserWindow, powerMonitor, shell } from "electron";
 import { toggleRealtimeVoice, } from "../services/realtime-voice-control.js";
 import { WakewordService } from "../services/wakeword-service.js";
 import { loadLocalPreferences, updateLocalPreferences, } from "@stella/runtime/kernel/preferences/local-preferences";
@@ -557,7 +557,10 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
         syncWakewordPause();
         wakeword.setEnabled(wakePrefs.wakeWordEnabled);
     }, 0);
+    const restartWakewordAfterResume = () => wakeword?.restart();
+    powerMonitor.on("resume", restartWakewordAfterResume);
     state.processRuntime.registerCleanup("will-quit", "wakeword-service", () => {
+        powerMonitor.removeListener("resume", restartWakewordAfterResume);
         wakeword?.dispose();
     });
     handleIpc(IPC_PREFERENCES_GET_WAKE_WORD, (event) => {

@@ -48,6 +48,13 @@ if (typeof window !== "undefined" && platformCapabilities.realtimeVoice) {
   });
 }
 
+export const loadRealtimeVoiceVisible = (): Promise<boolean> =>
+  platformCapabilities.realtimeVoice
+    ? loaded
+      ? Promise.resolve(cachedEnabled)
+      : readFromDisk()
+    : Promise.resolve(false);
+
 export const realtimeVoiceVisible = (): boolean =>
   platformCapabilities.realtimeVoice && cachedEnabled;
 

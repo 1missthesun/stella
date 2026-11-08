@@ -251,6 +251,10 @@ export class RealtimeVoiceSession {
     return this._state;
   }
 
+  get isDelegating(): boolean {
+    return this.delegation?.isBusy ?? false;
+  }
+
   setConversationId(conversationId: string) {
     this.conversationId = conversationId;
   }

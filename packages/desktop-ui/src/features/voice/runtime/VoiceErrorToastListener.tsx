@@ -1,6 +1,10 @@
 import { useEffect } from "react";
 import { voiceFailureToast } from "@/features/voice/runtime/voice-error-toast";
-import { presentComposerNotice } from "@/features/chat/composer-notice-store";
+import {
+  dismissComposerNotice,
+  presentComposerNotice,
+  VOICE_FAILURE_NOTICE_ID,
+} from "@/features/chat/composer-notice-store";
 import { SIGN_IN_TOAST_ACTION } from "@/shared/lib/auth-cta";
 import { useT } from "@/shared/i18n";
 
@@ -12,6 +16,7 @@ export function VoiceErrorToastListener() {
       if (toast) {
         presentComposerNotice(
           {
+            id: VOICE_FAILURE_NOTICE_ID,
             conversationId: null,
             kind:
               toast.action === SIGN_IN_TOAST_ACTION ? "sign-in" : "provider",
@@ -24,8 +29,14 @@ export function VoiceErrorToastListener() {
         );
       }
     });
+    const offState = window.electronAPI?.voice?.onSessionErrorState?.(
+      (message) => {
+        if (!message) dismissComposerNotice(VOICE_FAILURE_NOTICE_ID);
+      },
+    );
     return () => {
       off?.();
+      offState?.();
     };
   }, [t]);
 

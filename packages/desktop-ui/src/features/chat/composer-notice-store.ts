@@ -23,6 +23,8 @@ export type ComposerNoticeInput = Omit<ComposerNotice, "id"> & {
   id?: string;
 };
 
+export const VOICE_FAILURE_NOTICE_ID = "voice-session-failure";
+
 let notices: ComposerNotice[] = [];
 const listeners = new Set<() => void>();
 let mountedSurfaces = 0;

@@ -10,6 +10,10 @@ const SESSION_ROTATE_MS = 55 * 60 * 1000;
 const SESSION_ROTATE_IDLE_WAIT_MS = 30_000;
 const RETRY_BASE_MS = 5_000;
 const RETRY_MAX_MS = 60_000;
+const ACTIVE_VOICE_QUIET_END_MS = 30_000;
+const QUIET_CHECK_INTERVAL_MS = 1_000;
+
+export type ActiveVoiceEndReason = "quiet" | "lost";
 
 export const shouldPersistVoiceTranscriptToHistory = (
   event: VoiceSessionEvent,
@@ -40,6 +44,7 @@ interface VoiceSessionManagerDeps {
   ) => void;
   onSpeakingChange: (isSpeaking: boolean) => void;
   onUserSpeakingChange: (isUserSpeaking: boolean) => void;
+  onActiveVoiceEnded: (reason: ActiveVoiceEndReason) => void;
 }
 
 export class VoiceSessionManager {
@@ -65,6 +70,8 @@ export class VoiceSessionManager {
   private restartRequested = false;
   private restartInFlight = false;
   private activeVoiceStartedAt: number | null = null;
+  private lastActivityAt = Date.now();
+  private quietTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(deps: VoiceSessionManagerDeps) {
     this.deps = deps;
@@ -75,11 +82,18 @@ export class VoiceSessionManager {
     if (this.deps.inputActiveRef.current) {
       this.beginVisibleVoiceSession();
     }
+    this.lastActivityAt = Date.now();
+    this.stopQuietTimer();
+    this.quietTimer = setInterval(
+      () => this.endActiveVoiceIfQuiet(),
+      QUIET_CHECK_INTERVAL_MS,
+    );
     void this.startSession();
   }
 
   stop(): void {
     this.aborted = true;
+    this.stopQuietTimer();
     this.startInFlight = false;
     this.restartRequested = false;
     this.endVisibleVoiceSession();
@@ -95,6 +109,9 @@ export class VoiceSessionManager {
 
   updateSession(conversationId: string, inputActive: boolean): void {
     const session = this.sessionRef.current;
+    if (inputActive && this.activeVoiceStartedAt === null) {
+      this.lastActivityAt = Date.now();
+    }
     this.syncVisibleVoiceSessionState(inputActive);
     if (!session) return;
     session.setConversationId(conversationId);
@@ -122,6 +139,42 @@ export class VoiceSessionManager {
 
   getOutputAnalyser(): AnalyserNode | null {
     return this.sessionRef.current?.getOutputAnalyser() ?? null;
+  }
+
+  private stopQuietTimer(): void {
+    if (this.quietTimer) {
+      clearInterval(this.quietTimer);
+      this.quietTimer = null;
+    }
+  }
+
+  private endActiveVoice(reason: ActiveVoiceEndReason): void {
+    if (this.aborted || !this.deps.inputActiveRef.current) return;
+    this.lastActivityAt = Date.now();
+    this.deps.onActiveVoiceEnded(reason);
+  }
+
+  /**
+   * Stella's managed voice bills every connected second and the backend ends
+   * a session after five minutes. An active conversation that has gone quiet
+   * ends here so it neither runs to that cap nor keeps the wake word paused.
+   */
+  private endActiveVoiceIfQuiet(): void {
+    if (!this.deps.inputActiveRef.current) return;
+    const session = this.sessionRef.current;
+    if (
+      !session ||
+      session.state !== "connected" ||
+      this.assistantSpeaking ||
+      this.userSpeaking ||
+      session.isDelegating
+    ) {
+      this.lastActivityAt = Date.now();
+      return;
+    }
+    if (Date.now() - this.lastActivityAt >= ACTIVE_VOICE_QUIET_END_MS) {
+      this.endActiveVoice("quiet");
+    }
   }
 
   private clearRetryTimer(): void {
@@ -311,6 +364,7 @@ export class VoiceSessionManager {
       if (this.aborted) return;
       if (this.sessionRef.current !== session) return;
 
+      this.lastActivityAt = Date.now();
       this.deps.analyserRef.current = session.getAnalyser();
       this.deps.outputAnalyserRef.current = session.getOutputAnalyser();
 
@@ -326,6 +380,7 @@ export class VoiceSessionManager {
             message: event.error ?? "",
             action: null,
           });
+          this.endActiveVoice("lost");
           this.scheduleRetry();
         } else {
           this.deps.onStateChange(event.state);
@@ -437,6 +492,7 @@ export class VoiceSessionManager {
       );
       if (!previousSession) {
         this.deps.onStateChange("error", voiceSessionFailureOf(err));
+        this.endActiveVoice("lost");
       }
       this.scheduleRetry();
     } finally {

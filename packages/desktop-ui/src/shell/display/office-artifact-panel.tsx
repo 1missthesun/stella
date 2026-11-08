@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   Copy,
   Download,
@@ -156,6 +156,7 @@ export function OfficeArtifactPanel({
   const tPlural = useTPlural();
   const snapshot = useOfficePreview(previewRef.sessionId);
   const [zoomPercent, setZoomPercent] = useState(100);
+  const frameRef = useRef<HTMLIFrameElement | null>(null);
   const format = snapshot?.format ?? formatFromPath(previewRef.sourcePath);
   const kind = kindForFormat(format);
   const title = titleForPreview(previewRef, snapshot);
@@ -281,7 +282,8 @@ export function OfficeArtifactPanel({
               kind: t(labelKeyForKind(kind)),
               title,
             })}
-            sandbox=""
+            ref={frameRef}
+            sandbox="allow-same-origin"
             srcDoc={srcDoc}
           />
         ) : (

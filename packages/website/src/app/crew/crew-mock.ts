@@ -12,6 +12,7 @@ import type {
   SlackGithubConnectResponse,
   SlackGithubFinishResponse,
   SlackGithubReposResponse,
+  SlackInstallFinishResponse,
   SlackInstallStartResponse,
   SlackWorkspace,
   SlackWorkspaceGithub,
@@ -263,8 +264,13 @@ export const mockSlackApi = {
   install(returnTo: string): Promise<SlackInstallStartResponse> {
     const url = new URL(returnTo);
     url.searchParams.set("slack", "installed");
+    url.searchParams.set("team", "TMOCK");
+    url.searchParams.set("claim", "mock-claim");
     url.searchParams.set("mock", "connected");
     return wait({ url: url.toString() });
+  },
+  finishInstall(teamId: string): Promise<SlackInstallFinishResponse> {
+    return wait({ teamId });
   },
   connectGithub(returnTo: string): Promise<SlackGithubConnectResponse> {
     const url = new URL(returnTo);

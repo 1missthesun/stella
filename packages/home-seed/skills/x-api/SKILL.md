@@ -25,12 +25,15 @@ If X is not connected, generate a Stella connect URL:
 stella-x-api connect
 ```
 
-Open the returned URL for the user, or give it to the user to approve in their browser. After approval, rerun:
+Open the returned URL for the user, or give it to the user to approve in their browser. After approval, X's page shows a one-time code. Ask the user for it, then finish and check:
 
 ```bash
+stella-x-api finish ABCD-EFGH-JKLM
 stella-x-api status
 stella-x-api whoami --json
 ```
+
+The code works once, only in the Stella account that started the connection, and expires after 10 minutes. If it fails, run `stella-x-api connect` again.
 
 ## Common Commands
 
@@ -55,7 +58,7 @@ stella-x-api request /2/users/me --query '{"user.fields":"id,name,username,descr
 stella-x-api request /2/tweets --method POST --body '{"text":"Hello from Stella"}'
 ```
 
-All command responses are JSON except `status` and `connect` without `--json`.
+All command responses are JSON except `status`, `connect` and `finish` without `--json`.
 
 ## Raw API Rules
 

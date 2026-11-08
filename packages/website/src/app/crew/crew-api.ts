@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  SLACK_INSTALL_FINISH_PATH,
   SLACK_INSTALL_START_PATH,
   SLACK_WORKSPACES_PATH,
   slackGithubPath,
@@ -17,6 +18,8 @@ import {
   type SlackGithubFinishRequest,
   type SlackGithubFinishResponse,
   type SlackGithubReposResponse,
+  type SlackInstallFinishRequest,
+  type SlackInstallFinishResponse,
   type SlackInstallStartRequest,
   type SlackInstallStartResponse,
   type SlackWorkspaceUpdate,
@@ -113,6 +116,12 @@ export function startSlackInstall(returnTo: string): Promise<SlackInstallStartRe
   if (readMockMode()) return mockSlackApi.install(returnTo);
   const body: SlackInstallStartRequest = { returnTo };
   return request<SlackInstallStartResponse>(SLACK_INSTALL_START_PATH, { method: "POST", body });
+}
+
+export function finishSlackInstall(teamId: string, claim: string): Promise<SlackInstallFinishResponse> {
+  if (readMockMode()) return mockSlackApi.finishInstall(teamId);
+  const body: SlackInstallFinishRequest = { teamId, claim };
+  return request<SlackInstallFinishResponse>(SLACK_INSTALL_FINISH_PATH, { method: "POST", body });
 }
 
 export function connectGithub(teamId: string, returnTo: string): Promise<SlackGithubConnectResponse> {

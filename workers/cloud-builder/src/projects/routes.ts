@@ -1,10 +1,7 @@
 import type { RpcResponse } from "@stella/contracts/backend/protocol";
 import { signOAuthState, verifyOAuthState } from "../oauth-state.js";
-import {
-  formatConnectCode,
-  GITHUB_INSTALL_STATE_KIND,
-  GITHUB_VERIFY_STATE_KIND,
-} from "../owner-store/domains/projects.js";
+import { GITHUB_INSTALL_STATE_KIND, GITHUB_VERIFY_STATE_KIND } from "../owner-store/domains/projects.js";
+import { formatConnectCode } from "../owner-store/oauth-claims.js";
 import {
   EMPTY_ACCOUNT,
   exchangeUserCode,

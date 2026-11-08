@@ -1,5 +1,5 @@
 import { rpcErrorStatus, type RpcResponse } from "@stella/contracts/backend/protocol";
-import { X_OAUTH_CALLBACK_PATH } from "@stella/contracts/backend/integrations";
+import { X_FINISH_CONNECT_PATH, X_OAUTH_CALLBACK_PATH } from "@stella/contracts/backend/integrations";
 import { PROVIDER_OAUTH_CALLBACK_PATH } from "@stella/contracts/backend/providers";
 import { verifyOAuthState } from "../oauth-state.js";
 import { RpcError } from "../owner-store/errors.js";
@@ -11,6 +11,7 @@ import { verifyServiceBearerRequest } from "../service-bearer.js";
 import { listIntegrationActions, listIntegrationCatalog, publishIntegration } from "./catalog.js";
 import { exchangeNativeOAuthToken, listNativeOAuthProviders } from "./native-oauth.js";
 import { X_STATE_KIND, xResultPage } from "./x.js";
+import { formatConnectCode } from "../owner-store/oauth-claims.js";
 import { ownerGateStub } from "../rpc-release.js";
 import { adminAccessDenied } from "../admin/access.js";
 
@@ -205,8 +206,13 @@ const xCallback = async (request: Request, env: RouteEnv): Promise<Response> => 
   if (!response.ok) {
     return xResultPage(false, response.error.message, rpcErrorStatus(response.error.code));
   }
-  const { username } = response.value as { username: string };
-  return xResultPage(true, `Connected @${username} to Stella. You can close this tab.`, 200);
+  const { username, connectCode } = response.value as { username: string; connectCode: string };
+  return xResultPage(
+    true,
+    `Give this code to Stella to finish connecting @${username}. It works once, only in the Stella account that started this connection, and expires in 10 minutes. Don't share it with anyone else.`,
+    200,
+    formatConnectCode(connectCode),
+  );
 };
 
 const methodNotAllowed = () => fail(405, "Method not allowed.");
@@ -247,6 +253,10 @@ export const handleIntegrationsRoute = async (request: Request, env: RouteEnv): 
       return method === "POST" ? await nativeOAuthToken(request, env) : methodNotAllowed();
     case "/api/x/connect-url":
       return method === "GET" ? await ownerCall(request, env, "x.connectUrl", () => ({})) : methodNotAllowed();
+    case X_FINISH_CONNECT_PATH:
+      return method === "POST"
+        ? await ownerCall(request, env, "x.finishConnect", (body) => ({ connectCode: body?.connectCode }))
+        : methodNotAllowed();
     case "/api/x/connections":
       return method === "GET" ? await ownerCall(request, env, "x.connections", () => ({})) : methodNotAllowed();
     case "/api/x/request":

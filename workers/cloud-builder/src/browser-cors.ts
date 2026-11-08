@@ -1,5 +1,9 @@
 import { SOCKET_TICKET_PATH } from "@stella/contracts/socket-ticket";
-import { SLACK_INSTALL_START_PATH, SLACK_WORKSPACES_PATH } from "@stella/contracts/slack-workspace";
+import {
+  SLACK_INSTALL_FINISH_PATH,
+  SLACK_INSTALL_START_PATH,
+  SLACK_WORKSPACES_PATH,
+} from "@stella/contracts/slack-workspace";
 import { browserClientOrigins } from "./auth/auth.js";
 const ALLOWED_HEADERS = new Set([
   "authorization",
@@ -24,7 +28,8 @@ const isBrowserRoute = (path: string): boolean =>
   path.startsWith("/api/dictation/") ||
   isUserAsksRoute(path) ||
   path.startsWith(SLACK_WORKSPACES_PATH) ||
-  path === SLACK_INSTALL_START_PATH;
+  path === SLACK_INSTALL_START_PATH ||
+  path === SLACK_INSTALL_FINISH_PATH;
 
 const isBrowserClientOrigin = (env: unknown, origin: string): boolean =>
   browserClientOrigins(env).some((trusted) => {
@@ -54,7 +59,8 @@ export async function withBrowserCors(
   path.startsWith("/api/dictation/") ||
   isUserAsksRoute(path) ||
   path.startsWith(SLACK_WORKSPACES_PATH) ||
-  path === SLACK_INSTALL_START_PATH;
+  path === SLACK_INSTALL_START_PATH ||
+  path === SLACK_INSTALL_FINISH_PATH;
   // Packaged Electron has an opaque file origin; isolated dev runs use random
   // loopback ports. These routes require a bearer JWT and never use cookies.
   const allowed =

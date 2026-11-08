@@ -1,4 +1,4 @@
-import { rpcErrorStatus } from "@stella/contracts/backend/protocol";
+import { rpcErrorStatus, type RpcResponse } from "@stella/contracts/backend/protocol";
 import type { ManagedModelAudience } from "@stella/contracts/gateway/capability";
 import {
   type SlackGithubAction,
@@ -9,7 +9,10 @@ import {
   type SlackRepoAdd,
   type SlackRepoUpdate,
   type SlackWorkspaceRepo,
+  SLACK_INSTALL_FINISH_PATH,
   SLACK_INSTALL_START_PATH,
+  type SlackInstallFinishRequest,
+  type SlackInstallFinishResponse,
   SLACK_MEMORY_MAX_CHARS,
   SLACK_REPO_RULES_MAX_CHARS,
   SLACK_REPOS_MAX,
@@ -74,7 +77,7 @@ import {
   validateEnvironmentUpdate,
   type EnvironmentPatch,
 } from "./environment.js";
-import { loadInstallation, type SlackInstallation } from "./store.js";
+import { linkIdentity, loadInstallation, setInstallationOwner, type SlackInstallation } from "./store.js";
 import { rulesPath, workspaceNotesPath } from "./workspace.js";
 
 const d1 = (env: Cloudflare.Env): D1Database => {
@@ -468,7 +471,7 @@ const readReturnTo = async (request: Request, env: Cloudflare.Env): Promise<URL 
   try {
     const body = (await request.json()) as { returnTo?: unknown };
     const url = new URL(String(body.returnTo ?? ""));
-    return allowedReturnOrigins(env).has(url.origin) ? url : null;
+    return allowedReturnOrigins(env).has(url.origin) && /^\/crew\/?$/u.test(url.pathname) && !url.hash ? url : null;
   } catch {
     return null;
   }
@@ -500,7 +503,7 @@ const githubAction = async (
   try {
     if (action === "connect" && request.method === "POST") {
       const returnTo = await readReturnTo(request, env);
-      if (!returnTo) return fail(400, "returnTo must be a URL on the Stella website.");
+      if (!returnTo) return fail(400, "returnTo must be the Crew page on the Stella website.");
       const url = await startGithubConnect(env, request, {
         ownerId: caller.ownerId,
         teamId,
@@ -550,7 +553,7 @@ const installStart = async (request: Request, env: Cloudflare.Env, caller: Owner
   const clientId = slackSecret(env, "SLACK_CLIENT_ID");
   if (!clientId || !slackConfigured(env)) return fail(503, "Slack isn't set up on this deployment.");
   const returnTo = await readReturnTo(request, env);
-  if (!returnTo) return fail(400, "returnTo must be a URL on the Stella website.");
+  if (!returnTo) return fail(400, "returnTo must be the Crew page on the Stella website.");
   const url = new URL("https://slack.com/oauth/v2/authorize");
   url.searchParams.set("client_id", clientId);
   url.searchParams.set("scope", SLACK_BOT_SCOPES.join(","));
@@ -562,17 +565,42 @@ const installStart = async (request: Request, env: Cloudflare.Env, caller: Owner
   return ok({ url: url.toString() });
 };
 
+const installFinish = async (request: Request, env: Cloudflare.Env, caller: OwnerCaller): Promise<Response> => {
+  const input = await readJson<Partial<SlackInstallFinishRequest>>(request);
+  const teamId = String(input?.teamId ?? "");
+  const redeemed = (await ownerGateStub(env.OWNER_GATES, caller.ownerId).ownerRpc({
+    name: "slack.redeemInstallClaim",
+    args: { code: String(input?.claim ?? "") },
+    caller,
+  })) as RpcResponse;
+  if (!redeemed.ok) return fail(rpcErrorStatus(redeemed.error.code), redeemed.error.message);
+  const claim = redeemed.value as { teamId: string; installer: string } | null;
+  const install = claim && claim.teamId === teamId ? await loadInstallation(env, teamId) : null;
+  if (!claim || !install || install.installedBy !== claim.installer) {
+    return fail(
+      409,
+      "This Slack install link expired or was started from a different Stella account. Add Stella to Slack again from this account.",
+    );
+  }
+  if (claim.installer) await linkIdentity(env, teamId, claim.installer, caller.ownerId);
+  await setInstallationOwner(env, teamId, caller.ownerId);
+  console.log(JSON.stringify({ event: "slack_install_claimed", teamId }));
+  return ok({ teamId } satisfies SlackInstallFinishResponse);
+};
+
 export const handleSlackWorkspaceApi = async (request: Request, env: Cloudflare.Env): Promise<Response | null> => {
   const { pathname } = new URL(request.url);
   const isList = pathname === SLACK_WORKSPACES_PATH;
   const isOne = pathname.startsWith(`${SLACK_WORKSPACES_PATH}/`);
   const isInstall = pathname === SLACK_INSTALL_START_PATH;
-  if (!isList && !isOne && !isInstall) return null;
+  const isInstallFinish = pathname === SLACK_INSTALL_FINISH_PATH;
+  if (!isList && !isOne && !isInstall && !isInstallFinish) return null;
   const verified = await requireCaller(request, env);
   if (!verified.ok) return fail(rpcErrorStatus(verified.error.code), verified.error.message);
   const { caller } = verified;
   if (isList && request.method === "GET") return await list(env, caller);
   if (isInstall && request.method === "POST") return await installStart(request, env, caller);
+  if (isInstallFinish && request.method === "POST") return await installFinish(request, env, caller);
   if (isOne) {
     const [rawTeam, section, action, ...rest] = pathname.slice(SLACK_WORKSPACES_PATH.length + 1).split("/");
     const teamId = decodeURIComponent(rawTeam ?? "");

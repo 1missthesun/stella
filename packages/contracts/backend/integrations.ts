@@ -5,6 +5,7 @@ import type {
 } from "../cloud-connector-connect.js";
 
 export const X_OAUTH_CALLBACK_PATH = "/api/x/oauth_callback";
+export const X_FINISH_CONNECT_PATH = "/api/x/finish";
 
 export type IntegrationConnector = {
   type: "composio";
@@ -97,6 +98,14 @@ export type IntegrationCalls = {
   "x.connectUrl": {
     args: Record<string, never>;
     result: { url: string; expiresAt: number };
+  };
+  "x.finishConnect": {
+    args: { connectCode: string };
+    result: { username: string };
+  };
+  "slack.redeemInstallClaim": {
+    args: { code: string };
+    result: { teamId: string; installer: string } | null;
   };
   "x.connections": {
     args: Record<string, never>;

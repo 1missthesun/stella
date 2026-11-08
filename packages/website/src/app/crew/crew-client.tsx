@@ -17,6 +17,7 @@ import type { ReasoningEffortLevel } from "@stella/contracts/reasoning-effort";
 import {
   SLACK_GITHUB_ERROR_PARAM,
   SLACK_GITHUB_RESULT_PARAM,
+  SLACK_INSTALL_CLAIM_PARAM,
   SLACK_INSTALL_RESULT_PARAM,
   SLACK_ENV_NAME_MAX_CHARS,
   SLACK_ENV_VARS_MAX_CHARS,
@@ -52,6 +53,7 @@ import {
   connectGithub,
   disconnectGithub,
   finishGithub,
+  finishSlackInstall,
   listGithubBranches,
   listGithubRepos,
   listSlackWorkspaces,
@@ -96,11 +98,24 @@ const errorText = (error: unknown): string =>
 
 type GithubReturn = { teamId: string; code: string | null; error: string | null };
 
-type Boot = { mock: SlackMockMode | null; result: SlackInstallResult | null; github: GithubReturn | null };
+type InstallClaim = { teamId: string; claim: string };
+
+type Boot = {
+  mock: SlackMockMode | null;
+  result: SlackInstallResult | null;
+  claim: InstallClaim | null;
+  github: GithubReturn | null;
+};
 
 let bootSnapshot: Boot | null = null;
 
-const RETURN_PARAMS = [SLACK_INSTALL_RESULT_PARAM, SLACK_GITHUB_RESULT_PARAM, SLACK_GITHUB_ERROR_PARAM, "team"];
+const RETURN_PARAMS = [
+  SLACK_INSTALL_RESULT_PARAM,
+  SLACK_INSTALL_CLAIM_PARAM,
+  SLACK_GITHUB_RESULT_PARAM,
+  SLACK_GITHUB_ERROR_PARAM,
+  "team",
+];
 
 const readBoot = (): Boot => {
   if (!bootSnapshot) {
@@ -109,9 +124,11 @@ const readBoot = (): Boot => {
     const code = params.get(SLACK_GITHUB_RESULT_PARAM);
     const error = params.get(SLACK_GITHUB_ERROR_PARAM);
     const teamId = params.get("team");
+    const claim = params.get(SLACK_INSTALL_CLAIM_PARAM);
     bootSnapshot = {
       mock: readMockMode(),
       result: isInstallResult(raw) ? raw : null,
+      claim: raw === "installed" && teamId && claim ? { teamId, claim } : null,
       github: teamId && (code || error) ? { teamId, code, error } : null,
     };
   }
@@ -132,7 +149,7 @@ export function CrewClient() {
   }, []);
 
   if (boot === null) return <Loading />;
-  if (boot.mock) return <Account installResult={boot.result} githubReturn={boot.github} />;
+  if (boot.mock) return <Account installResult={boot.result} installClaim={boot.claim} githubReturn={boot.github} />;
   if (!isBackendConfigured()) {
     return (
       <Shell>
@@ -140,7 +157,7 @@ export function CrewClient() {
       </Shell>
     );
   }
-  return <SessionGate installResult={boot.result} githubReturn={boot.github} />;
+  return <SessionGate installResult={boot.result} installClaim={boot.claim} githubReturn={boot.github} />;
 }
 
 function Shell({ action, children }: { action?: React.ReactNode; children: React.ReactNode }) {
@@ -181,16 +198,25 @@ function Notice({ title, children, action }: { title: string; children: React.Re
 
 function SessionGate({
   installResult,
+  installClaim,
   githubReturn,
 }: {
   installResult: SlackInstallResult | null;
+  installClaim: InstallClaim | null;
   githubReturn: GithubReturn | null;
 }) {
   const session = authClient.useSession();
   if (session.isPending) return <Loading />;
   const user = (session.data as { user?: { id?: string; isAnonymous?: boolean | null } } | null)?.user;
   if (!user || user.isAnonymous) return <SignedOut installResult={installResult} />;
-  return <Account key={user.id ?? "user"} installResult={installResult} githubReturn={githubReturn} />;
+  return (
+    <Account
+      key={user.id ?? "user"}
+      installResult={installResult}
+      installClaim={installClaim}
+      githubReturn={githubReturn}
+    />
+  );
 }
 
 function SignedOut({ installResult }: { installResult: SlackInstallResult | null }) {
@@ -230,15 +256,26 @@ function InstallBanner({ result }: { result: SlackInstallResult }) {
   );
 }
 
+let installClaimRun: Promise<string | null> | null = null;
+
+const finishInstallOnce = (claim: InstallClaim): Promise<string | null> =>
+  (installClaimRun ??= finishSlackInstall(claim.teamId, claim.claim).then(
+    () => null,
+    (error: unknown) => errorText(error),
+  ));
+
 function Account({
   installResult,
+  installClaim,
   githubReturn,
 }: {
   installResult: SlackInstallResult | null;
+  installClaim: InstallClaim | null;
   githubReturn: GithubReturn | null;
 }) {
   const [data, setData] = useState<SlackWorkspacesResponse | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [claimError, setClaimError] = useState<string | null>(null);
   const [installing, setInstalling] = useState(false);
   const [installError, setInstallError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(githubReturn?.teamId ?? null);
@@ -254,18 +291,23 @@ function Account({
 
   useEffect(() => {
     let cancelled = false;
-    listSlackWorkspaces().then(
-      (value) => {
-        if (!cancelled) setData(value);
-      },
-      (error) => {
-        if (!cancelled) setLoadError(errorText(error));
-      },
-    );
+    (installClaim ? finishInstallOnce(installClaim) : Promise.resolve(null))
+      .then((error) => {
+        if (!cancelled && error) setClaimError(error);
+        return listSlackWorkspaces();
+      })
+      .then(
+        (value) => {
+          if (!cancelled) setData(value);
+        },
+        (error) => {
+          if (!cancelled) setLoadError(errorText(error));
+        },
+      );
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [installClaim]);
 
   const install = useCallback(async () => {
     setInstalling(true);
@@ -293,7 +335,13 @@ function Account({
     );
   }, []);
 
-  const banner = installResult ? <InstallBanner result={installResult} /> : null;
+  const banner = claimError ? (
+    <p className={`${s.banner} ${s.banner_error}`} role="status">
+      {claimError}
+    </p>
+  ) : installResult ? (
+    <InstallBanner result={installResult} />
+  ) : null;
 
   if (loadError) {
     return (

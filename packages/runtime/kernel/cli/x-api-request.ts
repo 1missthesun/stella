@@ -1,6 +1,8 @@
+import { X_FINISH_CONNECT_PATH } from "@stella/contracts/backend/integrations";
 import { fetchWithDeadline, REQUEST_BUDGET_MS } from "@stella/contracts/request-deadline";
 export type XApiOperation =
   | { op: "connectUrl" }
+  | { op: "finishConnect"; connectCode: string }
   | { op: "connections" }
   | {
       op: "request";
@@ -53,13 +55,17 @@ export const sendXApiRequest = async (
             ...(operation.body !== undefined ? { body: operation.body } : {}),
           }),
         }
-      : { method: "GET", headers };
+      : operation.op === "finishConnect"
+        ? { method: "POST", headers, body: JSON.stringify({ connectCode: operation.connectCode }) }
+        : { method: "GET", headers };
   const pathname =
     operation.op === "request"
       ? "/api/x/request"
       : operation.op === "connectUrl"
         ? "/api/x/connect-url"
-        : "/api/x/connections";
+        : operation.op === "finishConnect"
+          ? X_FINISH_CONNECT_PATH
+          : "/api/x/connections";
   const response = await fetchWithDeadline(fetch, stellaUrl(auth.baseUrl, pathname).toString(), init, {
     label: "X request",
     timeoutMs: operation.op === "request" ? REQUEST_BUDGET_MS.slow : REQUEST_BUDGET_MS.lookup,

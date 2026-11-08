@@ -15,6 +15,7 @@ import {
 } from "../../projects/github.js";
 import { array, boolean, empty, literal, number, object, optional, string } from "../args.js";
 import { RpcError } from "../errors.js";
+import { CONNECT_CODE_LENGTH, normalizeConnectCode, randomConnectCode } from "../oauth-claims.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
 import type { OwnerContext, OwnerDbReader, OwnerDomain } from "../registry.js";
 
@@ -29,8 +30,6 @@ const MAX_PROJECTS = 25;
 const INSTALL_STATE_TTL_MS = 15 * 60_000;
 const VERIFY_STATE_TTL_MS = 10 * 60_000;
 const CLAIM_TTL_MS = 10 * 60_000;
-const CONNECT_CODE_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
-const CONNECT_CODE_LENGTH = 12;
 
 export const PROJECTS_MIGRATION = {
   id: "projects.1-init",
@@ -186,21 +185,6 @@ const randomHex = (bytes: number): string =>
   [...crypto.getRandomValues(new Uint8Array(bytes))]
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
-
-const randomConnectCode = (): string =>
-  [...crypto.getRandomValues(new Uint8Array(CONNECT_CODE_LENGTH))]
-    .map((byte) => CONNECT_CODE_ALPHABET[byte & 31])
-    .join("");
-
-const normalizeConnectCode = (input: string): string =>
-  input
-    .trim()
-    .toUpperCase()
-    .replace(/[^0-9A-Z]/g, "")
-    .replace(/[IL]/g, "1")
-    .replace(/O/g, "0");
-
-export const formatConnectCode = (code: string): string => code.match(/.{1,4}/g)?.join("-") ?? code;
 
 const listProjects = (db: OwnerDbReader): CloudProject[] =>
   db

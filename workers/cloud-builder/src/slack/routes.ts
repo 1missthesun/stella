@@ -62,7 +62,9 @@ import {
   workspaceOptions,
 } from "./settings.js";
 import { ownerGateStub } from "../rpc-release.js";
+import type { RpcResponse } from "@stella/contracts/backend/protocol";
 import {
+  SLACK_INSTALL_CLAIM_PARAM,
   SLACK_INSTALL_RESULT_PARAM,
   type SlackInstallResult,
 } from "@stella/contracts/slack-workspace";
@@ -166,11 +168,12 @@ const oauthCallback = async (
 ): Promise<Response> => {
   const url = new URL(request.url);
   const from = await verifyInstallState(env, url.searchParams.get("state") ?? "");
-  const back = (result: SlackInstallResult, teamId?: string): Response | null => {
+  const back = (result: SlackInstallResult, teamId?: string, claim?: string): Response | null => {
     if (!from?.returnTo) return null;
     const target = new URL(from.returnTo);
     target.searchParams.set(SLACK_INSTALL_RESULT_PARAM, result);
     if (teamId) target.searchParams.set("team", teamId);
+    if (claim) target.searchParams.set(SLACK_INSTALL_CLAIM_PARAM, claim);
     return Response.redirect(target.toString(), 302);
   };
   if (url.searchParams.get("error")) {
@@ -233,15 +236,23 @@ const oauthCallback = async (
   });
   console.log(JSON.stringify({ event: "slack_installed", teamId }));
   const installer = access.authed_user?.id ?? "";
-  if (from.ownerId) {
-    if (installer) await linkIdentity(env, teamId, installer, from.ownerId);
-    await setInstallationOwner(env, teamId, from.ownerId);
-    return back("installed", teamId)!;
-  }
   const installerOwner = installer
     ? await linkedOwner(env, teamId, installer)
     : null;
   if (installerOwner) await setInstallationOwner(env, teamId, installerOwner);
+  if (from.ownerId) {
+    const gate = ownerGateStub(env.OWNER_GATES, from.ownerId);
+    const claimed = (await gate.ownerInternal({
+      name: "slack.installClaim",
+      args: { teamId, installer },
+      ownerGeneration: (await gate.snapshot()).ownerGeneration,
+    })) as RpcResponse;
+    if (!claimed.ok) {
+      logError("slack_install_claim_failed", claimed.error.message);
+      return back("failed", teamId)!;
+    }
+    return back("installed", teamId, (claimed.value as { code: string }).code)!;
+  }
   const open = `slack://app?team=${encodeURIComponent(teamId)}&id=${encodeURIComponent(access.app_id)}`;
   const usage = `<p>Stella is now the whole workspace's shared assistant. Mention <b>@Stella</b> in a channel (invite her first with <code>/invite @Stella</code>) or send her a direct message. Nobody else needs a Stella account.</p>`;
   if (installerOwner || !installer) {

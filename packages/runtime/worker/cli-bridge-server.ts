@@ -192,6 +192,7 @@ const mediaRequestParamsSchema = z.discriminatedUnion("op", [
 
 const xApiRequestParamsSchema = z.discriminatedUnion("op", [
   z.strictObject({ op: z.literal("connectUrl") }),
+  z.strictObject({ op: z.literal("finishConnect"), connectCode: z.string().trim().min(1).max(64) }),
   z.strictObject({ op: z.literal("connections") }),
   z.strictObject({
     op: z.literal("request"),

@@ -198,11 +198,14 @@ const callback = async (request: Request, env: Cloudflare.Env): Promise<Response
     if (choices.length === 0) {
       return back(row, SLACK_GITHUB_ERROR_PARAM, "GitHub wouldn't list the repositories you can reach. Try again.");
     }
+    // Whoever started the connection can read the state's nonce, so only the
+    // browser that finished it gets the code that lets the owner finish.
+    const claim = randomNonce();
     await d1(env)
-      .prepare("UPDATE slack_github_connects SET installations = ? WHERE nonce = ?")
-      .bind(JSON.stringify(choices), row.nonce)
+      .prepare("UPDATE slack_github_connects SET nonce = ?, installations = ? WHERE nonce = ?")
+      .bind(claim, JSON.stringify(choices), row.nonce)
       .run();
-    return back(row, SLACK_GITHUB_RESULT_PARAM, row.nonce);
+    return back(row, SLACK_GITHUB_RESULT_PARAM, claim);
   } catch (error) {
     if (!(error instanceof GithubError)) {
       console.error(

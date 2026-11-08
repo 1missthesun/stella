@@ -26,6 +26,7 @@ const usage = `stella-x-api - use X (Twitter) through Stella's connected account
 
 Usage:
   stella-x-api connect [--json]
+  stella-x-api finish <code> [--json]
   stella-x-api status [--json]
   stella-x-api whoami [--json]
   stella-x-api request <x-api-v2-path> [--method GET|POST|PUT|PATCH|DELETE] [--query '{}'] [--body '{}']
@@ -182,6 +183,16 @@ const connect = async (options: CliOptions) => {
   process.stdout.write(`${payload.url}\n`);
 };
 
+const finish = async (options: CliOptions) => {
+  const connectCode = options.path || fail("Usage: stella-x-api finish <code>");
+  const payload = (await callX({ op: "finishConnect", connectCode })) as { username: string };
+  if (options.json) {
+    printJson(payload);
+    return;
+  }
+  process.stdout.write(`Connected @${payload.username}\n`);
+};
+
 const status = async (options: CliOptions) => {
   const payload = await callX({ op: "connections" });
   if (options.json) {
@@ -274,6 +285,9 @@ const main = async () => {
   switch (options.command) {
     case "connect":
       await connect(options);
+      break;
+    case "finish":
+      await finish(options);
       break;
     case "status":
       await status(options);

@@ -45,6 +45,7 @@ import {
 } from "../../integrations/x.js";
 import { GMAIL_INTEGRATION_ID } from "../../integrations/gmail-digest.js";
 import { signOAuthState } from "../../oauth-state.js";
+import { issueOAuthClaim, redeemOAuthClaim } from "../oauth-claims.js";
 import {
   empty,
   json,
@@ -580,7 +581,7 @@ const parseCompleteOAuth = object({
   error: optional(string({ max: 512 })),
 });
 
-const completeXOAuth = async (ctx: OwnerContext, raw: unknown): Promise<{ username: string }> => {
+const completeXOAuth = async (ctx: OwnerContext, raw: unknown): Promise<{ username: string; connectCode: string }> => {
   const args = parseCompleteOAuth(raw);
   const nonce = ctx.db.one<{ data: string | null; expires_at: number }>(
     "SELECT data, expires_at FROM oauth_nonces WHERE nonce = ? AND kind = ?",
@@ -622,8 +623,38 @@ const completeXOAuth = async (ctx: OwnerContext, raw: unknown): Promise<{ userna
     console.error(JSON.stringify({ event: "x_profile_lookup_failed", status: me.status }));
     throw new RpcError("BAD_REQUEST", "Could not read the connected X account.");
   }
-  const now = Date.now();
   const scopes = parseXScope(token.body.scope);
+  const connectCode = issueOAuthClaim(ctx, "x", {
+    xUserId,
+    username,
+    name: readTokenString(profile.data?.name),
+    accessToken,
+    refreshToken: readTokenString(token.body.refresh_token),
+    scopes: scopes.length > 0 ? scopes : [...X_OAUTH_SCOPES],
+    accessTokenExpiresAt: expiresAtOf(token.body, Date.now()),
+  });
+  return { username, connectCode };
+};
+
+const xFinishConnect = (ctx: OwnerContext, args: { connectCode: string }): { username: string } => {
+  enforceOwnerRateLimit(
+    ctx.db,
+    ctx.now,
+    "x.finishConnect",
+    { count: 20, windowMs: 60 * 60_000 },
+    "Too many X connect attempts. Wait a few minutes and try again.",
+  );
+  const claim = redeemOAuthClaim(ctx, "x", args.connectCode);
+  const xUserId = readTokenString(claim?.xUserId);
+  const username = readTokenString(claim?.username);
+  const accessToken = readTokenString(claim?.accessToken);
+  if (!claim || !xUserId || !username || !accessToken) {
+    throw new RpcError(
+      "CONFLICT",
+      "That X connect code has expired, was already used, or belongs to another Stella account. Start the X connection again from this account.",
+    );
+  }
+  const expiresAt = claim.accessTokenExpiresAt;
   ctx.db.run(
     `INSERT INTO x_tokens (id, x_user_id, username, name, access_token, refresh_token, scopes,
        access_token_expires_at, updated_at)
@@ -634,14 +665,34 @@ const completeXOAuth = async (ctx: OwnerContext, raw: unknown): Promise<{ userna
        access_token_expires_at = excluded.access_token_expires_at, updated_at = excluded.updated_at`,
     xUserId,
     username,
-    readTokenString(profile.data?.name),
+    readTokenString(claim.name),
     accessToken,
-    readTokenString(token.body.refresh_token),
-    JSON.stringify(scopes.length > 0 ? scopes : [...X_OAUTH_SCOPES]),
-    expiresAtOf(token.body, now),
-    now,
+    readTokenString(claim.refreshToken),
+    JSON.stringify(claim.scopes),
+    typeof expiresAt === "number" ? expiresAt : null,
+    ctx.now,
   );
   return { username };
+};
+
+const parseSlackInstallClaim = object({
+  teamId: string({ min: 1, max: 32 }),
+  installer: string({ max: 32 }),
+});
+
+const redeemSlackInstallClaim = (
+  ctx: OwnerContext,
+  args: { code: string },
+): { teamId: string; installer: string } | null => {
+  enforceOwnerRateLimit(
+    ctx.db,
+    ctx.now,
+    "slack.redeemInstallClaim",
+    { count: 20, windowMs: 60 * 60_000 },
+    "Too many Slack install attempts. Wait a few minutes and try again.",
+  );
+  const claim = redeemOAuthClaim(ctx, "slack_install", args.code);
+  return claim ? parseSlackInstallClaim(claim) : null;
 };
 
 const xConnections = (db: OwnerDbReader): { connections: XConnection[] } => {
@@ -870,6 +921,16 @@ export const integrationsDomain = {
       parse: empty(),
       handler: xConnectUrl,
     },
+    "x.finishConnect": {
+      scope: "owner",
+      parse: object({ connectCode: string({ min: 1, max: 64 }) }),
+      handler: xFinishConnect,
+    },
+    "slack.redeemInstallClaim": {
+      scope: "owner",
+      parse: object({ code: string({ min: 1, max: 64 }) }),
+      handler: redeemSlackInstallClaim,
+    },
     "x.connections": {
       scope: "owner",
       parse: empty(),
@@ -907,6 +968,9 @@ export const integrationsDomain = {
     "integrations.connections": (ctx) => listConnections(ctx),
     "integrations.run": (ctx, raw) => runAction(ctx, parseRun(raw)),
     "x.completeOAuth": completeXOAuth,
+    "slack.installClaim": (ctx, raw) => ({
+      code: issueOAuthClaim(ctx, "slack_install", parseSlackInstallClaim(raw)),
+    }),
   },
   purge: purgeIntegrations,
 } satisfies OwnerDomain;

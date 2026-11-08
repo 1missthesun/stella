@@ -92,8 +92,8 @@ const escapeHtml = (value: string): string =>
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
 
-export const xResultPage = (success: boolean, message: string, status: number): Response => {
-  const title = success ? "X Connected" : "X Connection Failed";
+export const xResultPage = (success: boolean, message: string, status: number, code?: string): Response => {
+  const title = success ? (code ? "One step left" : "X Connected") : "X Connection Failed";
   const color = success ? "#22c55e" : "#ef4444";
   const icon = success ? "&#10003;" : "&#10007;";
   return new Response(
@@ -106,9 +106,10 @@ export const xResultPage = (success: boolean, message: string, status: number): 
   .icon { font-size: 4rem; color: ${color}; margin-bottom: 1rem; }
   h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
   p { color: #a3a3a3; line-height: 1.6; }
+  .code { font: 600 1.6rem/1.3 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .12em; color: #e5e5e5; user-select: all; }
 </style>
 </head>
-<body><div class="card"><div class="icon">${icon}</div><h1>${title}</h1><p>${escapeHtml(message)}</p></div></body>
+<body><div class="card"><div class="icon">${icon}</div><h1>${title}</h1><p>${escapeHtml(message)}</p>${code ? `<p class="code">${escapeHtml(code)}</p>` : ""}</div></body>
 </html>`,
     { status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } },
   );

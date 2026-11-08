@@ -2,6 +2,7 @@ import type { ReasoningEffortLevel } from "./reasoning-effort.js";
 
 export const SLACK_WORKSPACES_PATH = "/api/slack/workspaces";
 export const SLACK_INSTALL_START_PATH = "/api/slack/install/start";
+export const SLACK_INSTALL_FINISH_PATH = "/api/slack/install/finish";
 
 export const slackWorkspacePath = (teamId: string): string =>
   `${SLACK_WORKSPACES_PATH}/${encodeURIComponent(teamId)}`;
@@ -148,6 +149,9 @@ export type SlackInstallStartRequest = {
 };
 export type SlackInstallStartResponse = { url: string };
 
+export type SlackInstallFinishRequest = { teamId: string; claim: string };
+export type SlackInstallFinishResponse = { teamId: string };
+
 export type SlackWorkspaceUpdate = {
   engine?: SlackWorkspaceEngine;
   model?: string;
@@ -215,4 +219,5 @@ export type SlackGithubBranchesResponse = {
 };
 
 export const SLACK_INSTALL_RESULT_PARAM = "slack";
+export const SLACK_INSTALL_CLAIM_PARAM = "claim";
 export type SlackInstallResult = "installed" | "canceled" | "failed";

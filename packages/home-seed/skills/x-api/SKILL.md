@@ -25,7 +25,7 @@ If X is not connected, generate a Stella connect URL:
 stella-x-api connect
 ```
 
-Open the returned URL for the user, or give it to the user to approve in their browser. After approval, X's page shows a one-time code. Ask the user for it, then finish and check:
+Open the returned URL for the user, or give it to the user to approve in their browser. After they approve, the page shows a one-time code. Ask them to paste it into the chat, then finish and check:
 
 ```bash
 stella-x-api finish ABCD-EFGH-JKLM

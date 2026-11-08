@@ -10,7 +10,7 @@ import type { OwnerCaller } from "../owner-store/registry.js";
 import { verifyServiceBearerRequest } from "../service-bearer.js";
 import { listIntegrationActions, listIntegrationCatalog, publishIntegration } from "./catalog.js";
 import { exchangeNativeOAuthToken, listNativeOAuthProviders } from "./native-oauth.js";
-import { X_STATE_KIND, xResultPage } from "./x.js";
+import { X_STATE_KIND, xConnectCodePage, xResultPage } from "./x.js";
 import { formatConnectCode } from "../owner-store/oauth-claims.js";
 import { ownerGateStub } from "../rpc-release.js";
 import { adminAccessDenied } from "../admin/access.js";
@@ -208,12 +208,7 @@ const xCallback = async (request: Request, env: RouteEnv): Promise<Response> => 
     return xResultPage(false, response.error.message, rpcErrorStatus(response.error.code));
   }
   const { username, connectCode } = response.value as { username: string; connectCode: string };
-  return xResultPage(
-    true,
-    `Give this code to Stella to finish connecting @${username}. It works once, only in the Stella account that started this connection, and expires in 10 minutes. Don't share it with anyone else.`,
-    200,
-    formatConnectCode(connectCode),
-  );
+  return xConnectCodePage(username, formatConnectCode(connectCode));
 };
 
 const methodNotAllowed = () => fail(405, "Method not allowed.");

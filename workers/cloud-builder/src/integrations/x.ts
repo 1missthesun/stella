@@ -92,25 +92,70 @@ const escapeHtml = (value: string): string =>
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
 
-export const xResultPage = (success: boolean, message: string, status: number, code?: string): Response => {
-  const title = success ? (code ? "One step left" : "X Connected") : "X Connection Failed";
-  const color = success ? "#22c55e" : "#ef4444";
-  const icon = success ? "&#10003;" : "&#10007;";
+export const xResultPage = (success: boolean, message: string, status: number): Response =>
+  xPage(success ? "X connected" : "X connection failed", message, status, success ? "ok" : "error");
+
+/**
+ * The callback page for a connection waiting on its one-time code. The code
+ * goes back to the Stella that started the connection, the same way a CLI
+ * sign-in shows a code to paste into the terminal.
+ */
+export const xConnectCodePage = (username: string, code: string): Response =>
+  xPage(
+    "Almost done",
+    `Paste this code into your Stella chat to finish connecting @${username}.`,
+    200,
+    "pending",
+    code,
+  );
+
+const xPage = (
+  title: string,
+  message: string,
+  status: number,
+  tone: "ok" | "error" | "pending",
+  code?: string,
+): Response => {
+  const color = tone === "ok" ? "#22c55e" : tone === "error" ? "#ef4444" : "#e5e5e5";
+  const icon = tone === "ok" ? "&#10003;" : tone === "error" ? "&#10007;" : "";
+  const codeBlock = code
+    ? `<div class="code" id="code">${escapeHtml(code)}</div>
+<button type="button" id="copy">Copy code</button>
+<p class="note">Works for 10 minutes. Only paste it into your own Stella.</p>
+<script>
+document.getElementById("copy").addEventListener("click", function () {
+  var button = this;
+  navigator.clipboard.writeText(document.getElementById("code").textContent).then(function () {
+    button.textContent = "Copied";
+  });
+});
+</script>`
+    : "";
   return new Response(
     `<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"><title>${title}</title>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escapeHtml(title)}</title>
 <style>
-  body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background: #0a0a0a; color: #e5e5e5; }
-  .card { text-align: center; padding: 3rem; max-width: 420px; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background: #0a0a0a; color: #e5e5e5; }
+  .card { text-align: center; padding: 3rem 1.5rem; max-width: 420px; }
   .icon { font-size: 4rem; color: ${color}; margin-bottom: 1rem; }
   h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
-  p { color: #a3a3a3; line-height: 1.6; }
-  .code { font: 600 1.6rem/1.3 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .12em; color: #e5e5e5; user-select: all; }
+  p { color: #a3a3a3; line-height: 1.6; margin: 0 0 1.5rem; }
+  .code { font: 600 1.6rem/1.3 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .12em; color: #e5e5e5; user-select: all; margin-bottom: 1.25rem; }
+  button { padding: .7rem 1.6rem; border: 0; border-radius: 999px; background: #e5e5e5; color: #0a0a0a; font-family: inherit; font-size: .95rem; font-weight: 600; cursor: pointer; }
+  .note { font-size: .85rem; margin-top: 1.25rem; }
 </style>
 </head>
-<body><div class="card"><div class="icon">${icon}</div><h1>${title}</h1><p>${escapeHtml(message)}</p>${code ? `<p class="code">${escapeHtml(code)}</p>` : ""}</div></body>
+<body><div class="card">${icon ? `<div class="icon">${icon}</div>` : ""}<h1>${escapeHtml(title)}</h1><p>${escapeHtml(message)}</p>${codeBlock}</div></body>
 </html>`,
-    { status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } },
+    {
+      status,
+      headers: {
+        "content-type": "text/html; charset=utf-8",
+        "cache-control": "no-store",
+        "referrer-policy": "no-referrer",
+        "x-frame-options": "DENY",
+      },
+    },
   );
 };

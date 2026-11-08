@@ -188,7 +188,7 @@ function doConnect(generation) {
       return;
     }
 
-    if (msg.type === "command" && commandHandler) {
+    if (msg.type === "command" && welcomed && commandHandler) {
       try {
         const response = await commandHandler(msg);
         if (generation === connectionGeneration && nativePort === port) {

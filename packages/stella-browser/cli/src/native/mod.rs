@@ -2,6 +2,7 @@
 pub mod actions;
 #[allow(dead_code)]
 pub mod auth;
+pub mod bridge_auth;
 #[allow(dead_code)]
 pub mod browser;
 #[allow(dead_code)]

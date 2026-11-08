@@ -215,10 +215,8 @@ pub fn ensure_daemon(session: &str) -> Result<DaemonResult, String> {
     cleanup_stale_files(session);
 
     let socket_dir = get_socket_dir();
-    if !socket_dir.exists() {
-        fs::create_dir_all(&socket_dir)
-            .map_err(|e| format!("Failed to create socket directory: {}", e))?;
-    }
+    crate::native::bridge_auth::create_private_dir(&socket_dir)
+        .map_err(|e| format!("Failed to create socket directory: {}", e))?;
 
     #[cfg(unix)]
     {

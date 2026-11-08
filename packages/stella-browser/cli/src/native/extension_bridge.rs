@@ -1,6 +1,7 @@
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, HashMap, HashSet};
 
+use super::bridge_auth::{self, create_private_dir, write_private_file};
 use super::extension_clients::{
     find_profile_with_marker, probe_marker, read_profile_identity, ActivityRanker, ClientInfo,
 };
@@ -278,13 +279,11 @@ impl ExtensionBridge {
                 .unwrap_or(DEFAULT_EXT_PORT)
         });
 
-        let token = match token {
-            Some(t) => t.trim().to_string(),
-            None => env::var("STELLA_BROWSER_EXT_TOKEN")
-                .ok()
-                .map(|t| t.trim().to_string())
-                .unwrap_or_else(|| Uuid::new_v4().to_string()),
-        };
+        let token = token
+            .or_else(|| env::var("STELLA_BROWSER_EXT_TOKEN").ok())
+            .map(|t| t.trim().to_string())
+            .filter(|t| !t.is_empty())
+            .unwrap_or_else(|| Uuid::new_v4().to_string());
 
         let events_tx = broadcast::channel(EVENT_BROADCAST_CAPACITY).0;
         Self {
@@ -314,47 +313,46 @@ impl ExtensionBridge {
 
     pub async fn start(&mut self, session: &str) -> Result<(), String> {
         let socket_dir = get_socket_dir();
-        if !socket_dir.exists() {
-            let _ = fs::create_dir_all(&socket_dir);
-        }
+        let _ = create_private_dir(&socket_dir);
 
         let token_file = socket_dir.join(format!("{}.ext-token", session));
         let port_file = socket_dir.join(format!("{}.ext-port", session));
 
-        fs::write(&token_file, &self.token)
-            .map_err(|e| format!("Failed to write token file: {}", e))?;
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            let _ = fs::set_permissions(&token_file, fs::Permissions::from_mode(0o600));
-        }
-
-        fs::write(&port_file, self.port.to_string())
-            .map_err(|e| format!("Failed to write port file: {}", e))?;
-
         let listener = match bind_reuse(self.port) {
-            Ok(l) => l,
+            Ok(l) => Some(l),
             Err(_) => {
                 kill_stale_stella_browser_on_port(self.port);
                 let mut bound = None;
                 for _ in 0..20 {
                     tokio::time::sleep(Duration::from_millis(250)).await;
-                    match bind_reuse(self.port) {
-                        Ok(l) => {
-                            bound = Some(l);
-                            break;
-                        }
-                        Err(_) => continue,
+                    if let Ok(l) = bind_reuse(self.port) {
+                        bound = Some(l);
+                        break;
                     }
                 }
-                bound.ok_or_else(|| {
-                    format!(
-                        "Failed to bind extension bridge on port {}: it is held by another process",
-                        self.port
-                    )
-                })?
+                bound
             }
         };
+        let Some(listener) = listener else {
+            let _ = fs::remove_file(&token_file);
+            let _ = fs::remove_file(&port_file);
+            return Err(format!(
+                "Failed to bind extension bridge on port {}: it is held by another process",
+                self.port
+            ));
+        };
+
+        let published = write_private_file(&token_file, &self.token)
+            .map_err(|e| format!("Failed to write token file: {}", e))
+            .and_then(|_| {
+                write_private_file(&port_file, &self.port.to_string())
+                    .map_err(|e| format!("Failed to write port file: {}", e))
+            });
+        if let Err(error) = published {
+            let _ = fs::remove_file(&token_file);
+            let _ = fs::remove_file(&port_file);
+            return Err(error);
+        }
 
         let (shutdown_tx, mut shutdown_rx) = mpsc::channel::<()>(1);
         self.shutdown_tx = Some(shutdown_tx);
@@ -362,6 +360,7 @@ impl ExtensionBridge {
         let inner = self.inner.clone();
         let connected_notify = self.connected_notify.clone();
         let token = self.token.clone();
+        let port = self.port;
         let session_str = session.to_string();
         let events_tx = self.events_tx.clone();
 
@@ -388,6 +387,7 @@ impl ExtensionBridge {
                                         inner,
                                         notify,
                                         token,
+                                        port,
                                         session,
                                         events,
                                     ).await;
@@ -1403,6 +1403,7 @@ async fn handle_extension_connection(
     inner: Arc<Mutex<BridgeInner>>,
     connected_notify: Arc<Notify>,
     expected_token: String,
+    port: u16,
     session: String,
     events_tx: broadcast::Sender<String>,
 ) {
@@ -1420,6 +1421,7 @@ async fn handle_extension_connection(
     }
 
     let mut authenticated = false;
+    let mut nonces: Option<(String, String)> = None;
     let mut connection_generation = None;
     let (cmd_tx, mut cmd_rx) = mpsc::channel::<String>(256);
 
@@ -1495,10 +1497,40 @@ async fn handle_extension_connection(
         let msg_type = parsed.get("type").and_then(|v| v.as_str()).unwrap_or("");
 
         match msg_type {
+            bridge_auth::AUTH_REQUEST => {
+                if authenticated || nonces.is_some() {
+                    break;
+                }
+                let client_nonce = parsed
+                    .get("clientNonce")
+                    .and_then(Value::as_str)
+                    .unwrap_or("");
+                if !bridge_auth::valid_nonce(client_nonce) {
+                    break;
+                }
+                let Ok(server_nonce) = bridge_auth::new_nonce() else {
+                    break;
+                };
+                let challenge = json!({
+                    "type": bridge_auth::AUTH_CHALLENGE,
+                    "serverNonce": server_nonce,
+                    "serverProof": bridge_auth::server_proof(&expected_token, port, client_nonce, &server_nonce),
+                });
+                let _ = cmd_tx.send(serde_json::to_string(&challenge).unwrap()).await;
+                nonces = Some((client_nonce.to_string(), server_nonce));
+            }
             "hello" => {
                 if authenticated {
                     continue;
                 }
+                let Some((client_nonce, server_nonce)) = nonces.as_ref() else {
+                    let err = json!({
+                        "type": "auth_error",
+                        "error": "This browser connector is out of date. Restart Stella to update it.",
+                    });
+                    let _ = cmd_tx.send(serde_json::to_string(&err).unwrap()).await;
+                    break;
+                };
 
                 let extension_version = match validate_extension_hello(&parsed) {
                     Ok(version) => version,
@@ -1516,10 +1548,14 @@ async fn handle_extension_connection(
                         break;
                     }
                 };
-                let token = parsed.get("token").and_then(|v| v.as_str()).unwrap_or("");
-                let token_matches = token == expected_token;
-
-                if token_matches || expected_token.is_empty() {
+                let proof = parsed.get("proof").and_then(Value::as_str).unwrap_or("");
+                if bridge_auth::verify_client_proof(
+                    &expected_token,
+                    port,
+                    client_nonce,
+                    server_nonce,
+                    proof,
+                ) {
                     authenticated = true;
                     let info = ClientInfo::from_hello(&parsed, &extension_version);
                     let generation = activate_connection(&inner, cmd_tx.clone(), info).await;
@@ -1530,7 +1566,6 @@ async fn handle_extension_connection(
                     let welcome = json!({
                         "type": "welcome",
                         "session": session,
-                        "sessionToken": expected_token,
                         "extensionVersion": extension_version,
                         "protocolVersion": EXTENSION_PROTOCOL_VERSION,
                     });
@@ -1597,7 +1632,14 @@ async fn handle_extension_connection(
         }
     }
 
-    write_handle.abort();
+    drop(cmd_tx);
+    let mut write_handle = write_handle;
+    if tokio::time::timeout(Duration::from_millis(500), &mut write_handle)
+        .await
+        .is_err()
+    {
+        write_handle.abort();
+    }
 }
 
 fn normalize_extension_command_response(id: &str, parsed: &Value) -> Value {

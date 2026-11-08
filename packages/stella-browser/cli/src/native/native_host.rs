@@ -5,6 +5,7 @@ use std::net::{SocketAddr, TcpStream};
 use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::time::Duration;
 
+use super::bridge_auth;
 use crate::connection::get_socket_dir;
 
 const DEFAULT_SESSION: &str = "stella-app-bridge";
@@ -13,6 +14,10 @@ const DAEMON_CONNECT_ATTEMPTS: u32 = 5;
 const DAEMON_CONNECT_RETRY_DELAY: Duration = Duration::from_millis(400);
 const DAEMON_CONNECT_TIMEOUT: Duration = Duration::from_millis(500);
 const BRIDGE_IDLE_TICK: Duration = Duration::from_millis(500);
+const DAEMON_AUTH_TIMEOUT: Duration = Duration::from_secs(5);
+const MAX_HANDSHAKE_LINE: u64 = 4096;
+const UNVERIFIED_DAEMON: &str =
+    "The process on the Stella browser bridge port could not prove it is Stella. Nothing was sent to it.";
 
 fn read_bridge_token(session: &str) -> Option<String> {
     let token_path = get_socket_dir().join(format!("{}.ext-token", session));
@@ -105,23 +110,18 @@ fn client_identity() -> Value {
     })
 }
 
-fn inject_token_if_needed(payload: &mut Value, token: &str) {
-    if let Some(obj) = payload.as_object_mut() {
-        if obj.get("type").and_then(|v| v.as_str()) != Some("hello") {
-            return;
-        }
-        if !obj.contains_key("client") {
-            obj.insert("client".to_string(), client_identity());
-        }
-        let current = obj
-            .get("token")
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .trim();
-        if current.is_empty() && !token.is_empty() {
-            obj.insert("token".to_string(), json!(token));
-        }
+fn authenticated_hello(hello: &[u8], proof: &str) -> Option<Vec<u8>> {
+    let mut value: Value = serde_json::from_slice(hello).ok()?;
+    let obj = value.as_object_mut()?;
+    if obj.get("type").and_then(Value::as_str) != Some("hello") {
+        return None;
     }
+    obj.remove("token");
+    obj.insert("proof".to_string(), json!(proof));
+    if !obj.contains_key("client") {
+        obj.insert("client".to_string(), client_identity());
+    }
+    serde_json::to_vec(&value).ok()
 }
 
 /// Chrome allows up to 64 MiB for extension → host messages.
@@ -166,33 +166,72 @@ fn set_tcp_keepalive(stream: &TcpStream) {
     );
 }
 
-fn send_frame_to_tcp(tcp: &mut TcpStream, buf: &[u8], bridge_token: &str) -> bool {
-    let needs_injection = buf.windows(b"\"hello\"".len()).any(|w| w == b"\"hello\"");
-
-    let written = if needs_injection {
-        let mut value: Value = match serde_json::from_slice(buf) {
-            Ok(v) => v,
-            Err(_) => return true,
-        };
-        inject_token_if_needed(&mut value, bridge_token);
-        let mut line = match serde_json::to_string(&value) {
-            Ok(l) => l,
-            Err(_) => return true,
-        };
-        line.push('\n');
-        tcp.write_all(line.as_bytes())
-    } else {
-        tcp.write_all(buf).and_then(|_| tcp.write_all(b"\n"))
-    };
-
-    written.and_then(|_| tcp.flush()).is_ok()
+fn send_line(tcp: &mut TcpStream, line: &[u8]) -> bool {
+    tcp.write_all(line)
+        .and_then(|_| tcp.write_all(b"\n"))
+        .and_then(|_| tcp.flush())
+        .is_ok()
 }
 
-fn connect_to_daemon(session: &str) -> Option<TcpStream> {
-    let addr = SocketAddr::from(([127, 0, 0, 1], read_bridge_port(session)));
+/// Proves the listener holds the bridge token before anything else crosses:
+/// no token, extension hello or command is exchanged with an unproven peer.
+fn authenticate_daemon(
+    tcp: &mut TcpStream,
+    reader: &mut io::BufReader<TcpStream>,
+    session: &str,
+    port: u16,
+    hello: &[u8],
+) -> Result<(), String> {
+    let client_nonce = bridge_auth::new_nonce()?;
+    let request = json!({ "type": bridge_auth::AUTH_REQUEST, "clientNonce": client_nonce });
+    if !send_line(tcp, request.to_string().as_bytes()) {
+        return Err("Stella browser bridge closed during handshake.".to_string());
+    }
+
+    tcp.set_read_timeout(Some(DAEMON_AUTH_TIMEOUT))
+        .map_err(|e| e.to_string())?;
+    let mut line = String::new();
+    let read = reader
+        .by_ref()
+        .take(MAX_HANDSHAKE_LINE)
+        .read_line(&mut line);
+    tcp.set_read_timeout(None).map_err(|e| e.to_string())?;
+    if !matches!(read, Ok(n) if n > 0 && line.ends_with('\n')) {
+        return Err(UNVERIFIED_DAEMON.to_string());
+    }
+    let challenge: Value = serde_json::from_str(line.trim()).map_err(|_| UNVERIFIED_DAEMON)?;
+    if challenge.get("type").and_then(Value::as_str) != Some(bridge_auth::AUTH_CHALLENGE) {
+        return Err(UNVERIFIED_DAEMON.to_string());
+    }
+    let server_nonce = challenge
+        .get("serverNonce")
+        .and_then(Value::as_str)
+        .filter(|nonce| bridge_auth::valid_nonce(nonce))
+        .ok_or(UNVERIFIED_DAEMON)?;
+    let server_proof = challenge
+        .get("serverProof")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    let token = read_bridge_token(session).unwrap_or_default();
+    if !bridge_auth::verify_server_proof(&token, port, &client_nonce, server_nonce, server_proof) {
+        return Err(UNVERIFIED_DAEMON.to_string());
+    }
+
+    let proof = bridge_auth::client_proof(&token, port, &client_nonce, server_nonce);
+    let hello = authenticated_hello(hello, &proof)
+        .ok_or_else(|| "The extension's first message was not a hello.".to_string())?;
+    if !send_line(tcp, &hello) {
+        return Err("Stella browser bridge closed during handshake.".to_string());
+    }
+    Ok(())
+}
+
+fn connect_to_daemon(session: &str) -> Option<(TcpStream, u16)> {
+    let port = read_bridge_port(session);
+    let addr = SocketAddr::from(([127, 0, 0, 1], port));
     for attempt in 0..DAEMON_CONNECT_ATTEMPTS {
         if let Ok(tcp) = TcpStream::connect_timeout(&addr, DAEMON_CONNECT_TIMEOUT) {
-            return Some(tcp);
+            return Some((tcp, port));
         }
         if attempt + 1 < DAEMON_CONNECT_ATTEMPTS {
             std::thread::sleep(DAEMON_CONNECT_RETRY_DELAY);
@@ -201,17 +240,12 @@ fn connect_to_daemon(session: &str) -> Option<TcpStream> {
     None
 }
 
-fn bridge(tcp: TcpStream, bridge_token: &str, frame_rx: &Receiver<Vec<u8>>) {
-    let tcp_read = match tcp.try_clone() {
-        Ok(t) => t,
-        Err(_) => return,
-    };
+fn bridge(tcp: TcpStream, mut reader: io::BufReader<TcpStream>, frame_rx: &Receiver<Vec<u8>>) {
     let mut tcp_write = tcp;
 
     let tcp_to_chrome = std::thread::spawn(move || {
         let stdout = io::stdout();
         let mut stdout = stdout.lock();
-        let mut reader = io::BufReader::new(tcp_read);
         let mut line = String::new();
         loop {
             line.clear();
@@ -244,7 +278,7 @@ fn bridge(tcp: TcpStream, bridge_token: &str, frame_rx: &Receiver<Vec<u8>>) {
         }
         match frame_rx.recv_timeout(BRIDGE_IDLE_TICK) {
             Ok(buf) => {
-                if !send_frame_to_tcp(&mut tcp_write, &buf, bridge_token) {
+                if !send_line(&mut tcp_write, &buf) {
                     break;
                 }
             }
@@ -282,18 +316,21 @@ pub fn run_native_host() -> Result<(), String> {
         Err(_) => return Ok(()),
     };
 
-    let mut tcp = match connect_to_daemon(&session) {
-        Some(tcp) => tcp,
+    let (mut tcp, port) = match connect_to_daemon(&session) {
+        Some(connected) => connected,
         None => return Err("Stella browser bridge is not running. Open Stella first.".to_string()),
     };
 
     set_tcp_keepalive(&tcp);
 
-    let bridge_token = read_bridge_token(&session).unwrap_or_default();
-    if !send_frame_to_tcp(&mut tcp, &hello, &bridge_token) {
-        return Err("Stella browser bridge closed during handshake.".to_string());
+    let mut reader = io::BufReader::new(tcp.try_clone().map_err(|e| e.to_string())?);
+    if let Err(error) = authenticate_daemon(&mut tcp, &mut reader, &session, port, &hello) {
+        let _ = tcp.shutdown(std::net::Shutdown::Both);
+        let notice = json!({ "type": "auth_error", "error": error }).to_string();
+        let _ = write_chrome_frame(&mut io::stdout().lock(), notice.as_bytes());
+        return Err(error);
     }
 
-    bridge(tcp, &bridge_token, &frame_rx);
+    bridge(tcp, reader, &frame_rx);
     Ok(())
 }

@@ -540,9 +540,7 @@ fn replay_key(cmd: &Value) -> Result<Option<(ReplayKey, u64)>, Value> {
 
 pub async fn run_daemon(session: &str) {
     let socket_dir = get_daemon_socket_dir();
-    if !socket_dir.exists() {
-        let _ = fs::create_dir_all(&socket_dir);
-    }
+    let _ = super::bridge_auth::create_private_dir(&socket_dir);
 
     let pid_path = socket_dir.join(format!("{}.pid", session));
     let _ = fs::write(&pid_path, process::id().to_string());

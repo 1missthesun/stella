@@ -1926,9 +1926,13 @@ static StrList electron_environment(void) {
     return env;
 }
 
-static int download(const char *url, const char *dest, const char *sha256) {
+/* One fetch of url into dest, checked against sha256. curl retries timeouts
+ * and 408/429/5xx itself; a transfer slower than 1 KB/s for a minute is
+ * abandoned rather than left hanging. */
+static int download_once(const char *url, const char *dest, const char *sha256) {
     char *staging = xasprintf("%s.download", dest);
-    char *argv[] = {"curl", "-fsSL", "--retry", "3", "--connect-timeout", "30", "-o", staging, (char *)url, NULL};
+    char *argv[] = {"curl", "-fsSL", "--retry", "4", "--retry-max-time", "120", "--connect-timeout", "30",
+                    "--speed-limit", "1024", "--speed-time", "60", "-o", staging, (char *)url, NULL};
     StrList env = base_environment();
     CmdResult r;
     char *actual;
@@ -1963,6 +1967,40 @@ static int download(const char *url, const char *dest, const char *sha256) {
     rename(staging, dest);
     free(staging);
     return 0;
+}
+
+#define GITHUB_PREFIX "https://github.com/"
+
+/* GitHub release downloads answer 502/504 or time out for minutes at a time,
+ * so a GitHub asset is fetched from Stella's mirror of it first
+ * (scripts/mirror-runtimes.mjs), then from GitHub, for a few rounds with a
+ * growing pause. The checksum makes either source equally trustworthy. */
+static int download(const char *url, const char *dest, const char *sha256) {
+    static const unsigned pauses[] = {0, 10, 30};
+    char *mirror = NULL;
+    const char *sources[2];
+    int count = 0;
+    size_t round;
+    if (!strncmp(url, GITHUB_PREFIX, strlen(GITHUB_PREFIX)))
+        mirror = xasprintf("%s/runtimes/github/%s", RELEASES_URL, url + strlen(GITHUB_PREFIX));
+    if (mirror) sources[count++] = mirror;
+    sources[count++] = url;
+    for (round = 0; round < sizeof(pauses) / sizeof(pauses[0]); round++) {
+        int i;
+        if (pauses[round]) {
+            LOG("install: download failed (%s); trying again in %us", last_error(), pauses[round]);
+            sleep(pauses[round]);
+        }
+        for (i = 0; i < count; i++) {
+            if (download_once(sources[i], dest, sha256) == 0) {
+                free(mirror);
+                return 0;
+            }
+            LOG("install: %s: %s", sources[i], last_error());
+        }
+    }
+    free(mirror);
+    return -1;
 }
 
 static int extract_zip(const char *archive, const char *dir) {

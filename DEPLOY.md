@@ -585,6 +585,15 @@ applies until the user clicks Update.
    `LINUX_LAUNCHER_SIGNING_KEY` secret (Ed25519; Linux launchers refuse an
    update without it), and uploads them with `VERSION` to `launcher/stable/`.
    Installed launchers update themselves from `VERSION`.
+   **Runtime mirror:** GitHub release downloads (Bun, PortableGit, Electron)
+   answer 502/504 or time out for minutes at a time, which failed every
+   self-test on 2026-11-08. Launchers and `ensure-electron-binary.mjs` fetch
+   each GitHub asset from `<releases>/runtimes/github/<github path>` first,
+   then from GitHub, retrying for about a minute; the pinned sha256 checks
+   either copy. After changing a pinned Bun or PortableGit URL in `launcher/`,
+   or the Electron version, run
+   `env -u CLOUDFLARE_API_TOKEN node scripts/mirror-runtimes.mjs` (skips what
+   is already mirrored). A missing mirror only costs the GitHub fallback.
 3. **Electron version bump**: the push of `package.json` runs
    `build-electron-identity.yml`, which publishes the Developer ID-signed
    `Stella.app` for that Electron version. Let it finish before publishing app

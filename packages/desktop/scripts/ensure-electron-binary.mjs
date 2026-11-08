@@ -93,6 +93,34 @@ export function isElectronBinaryHealthy() {
   }
 }
 
+const DEFAULT_RELEASES_URL = "https://pub-a319aaada8144dc9be5a83625033769c.r2.dev";
+const ELECTRON_GITHUB = "https://github.com/electron/electron/releases/download/";
+
+// GitHub release downloads answer 502/504 or time out for minutes at a time,
+// so Electron comes from Stella's mirror of that release path first
+// (scripts/mirror-runtimes.mjs), then from GitHub, for a few rounds with a
+// growing pause. checksums.json verifies the zip from either source.
+async function downloadElectronZip(downloadArtifact, details) {
+  const releases = (process.env.STELLA_RELEASES_URL || DEFAULT_RELEASES_URL).replace(/\/+$/, "");
+  const mirrors = [`${releases}/runtimes/github/electron/electron/releases/download/`, ELECTRON_GITHUB];
+  let lastError;
+  for (const pauseSeconds of [0, 5, 15, 30]) {
+    if (pauseSeconds) {
+      log(`Electron download failed (${lastError?.message ?? lastError}); trying again in ${pauseSeconds}s`);
+      await new Promise((resolve) => setTimeout(resolve, pauseSeconds * 1000));
+    }
+    for (const mirror of mirrors) {
+      try {
+        return await downloadArtifact({ ...details, mirrorOptions: { mirror } });
+      } catch (error) {
+        lastError = error;
+        log(`Electron download from ${mirror} failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+  }
+  throw lastError;
+}
+
 function resolveDownloadArch() {
   let arch =
     process.env.ELECTRON_INSTALL_ARCH ||
@@ -250,7 +278,7 @@ export async function ensureElectronBinary() {
     checksums = undefined;
   }
 
-  const zipPath = await downloadArtifact({
+  const zipPath = await downloadElectronZip(downloadArtifact, {
     version,
     artifactName: "electron",
     force: false,

@@ -293,7 +293,37 @@ enum Net {
         return try result.get()
     }
 
+    /// GitHub release downloads answer 502/504 or time out for minutes at a
+    /// time, so a GitHub asset is fetched from Stella's mirror of it first
+    /// (scripts/mirror-runtimes.mjs), then from GitHub, for a few rounds with a
+    /// growing pause. The checksum makes either source equally trustworthy.
     static func download(_ url: URL, to destination: URL, sha256 expected: String) throws {
+        let github = "https://github.com/"
+        var sources = [url]
+        if url.absoluteString.hasPrefix(github),
+           let mirror = URL(string: "\(Deployment.releasesURL)/runtimes/github/" + url.absoluteString.dropFirst(github.count)) {
+            sources.insert(mirror, at: 0)
+        }
+        var lastError: Error = LauncherError("Download of \(url.absoluteString) failed.")
+        for pause in [0, 5, 15, 30] as [UInt32] {
+            if pause > 0 {
+                log("install: download failed (\(lastError)); trying again in \(pause)s")
+                sleep(pause)
+            }
+            for source in sources {
+                do {
+                    try downloadOnce(source, to: destination, sha256: expected)
+                    return
+                } catch {
+                    lastError = error
+                    log("install: \(source.absoluteString): \(error)")
+                }
+            }
+        }
+        throw lastError
+    }
+
+    private static func downloadOnce(_ url: URL, to destination: URL, sha256 expected: String) throws {
         let semaphore = DispatchSemaphore(value: 0)
         let staging = destination.appendingPathExtension("download")
         try? FileManager.default.removeItem(at: staging)

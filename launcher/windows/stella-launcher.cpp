@@ -1091,7 +1091,7 @@ static HttpResponse http(const wstring &url, const wchar_t *method, const string
     return response;
 }
 
-static void download(const string &url, const wstring &dest, const string &sha256) {
+static void downloadOnce(const string &url, const wstring &dest, const string &sha256) {
     wstring staging = dest + L".download";
     DeleteFileW(staging.c_str());
     HttpResponse r = http(wide(url), L"GET", string(), staging);
@@ -1105,6 +1105,36 @@ static void download(const string &url, const wstring &dest, const string &sha25
         fail("Checksum mismatch for " + url + ": expected " + sha256 + ", got " + actual + ".");
     }
     MoveFileExW(staging.c_str(), dest.c_str(), MOVEFILE_REPLACE_EXISTING);
+}
+
+// GitHub release downloads answer 502/504 or time out (error 12002) for
+// minutes at a time, so a GitHub asset is fetched from Stella's mirror of it
+// first (scripts/mirror-runtimes.mjs), then from GitHub, for a few rounds with
+// a growing pause. The checksum makes either source equally trustworthy.
+static void download(const string &url, const wstring &dest, const string &sha256) {
+    static const string kGitHub = "https://github.com/";
+    vector<string> sources;
+    if (url.compare(0, kGitHub.size(), kGitHub) == 0)
+        sources.push_back(string(STELLA_RELEASES_URL) + "/runtimes/github/" + url.substr(kGitHub.size()));
+    sources.push_back(url);
+    static const DWORD kPauseSeconds[] = {0, 5, 15, 30};
+    string lastError;
+    for (DWORD pause : kPauseSeconds) {
+        if (pause) {
+            logLine(format("install: download failed (%s); trying again in %lus", lastError.c_str(), pause));
+            Sleep(pause * 1000);
+        }
+        for (const string &source : sources) {
+            try {
+                downloadOnce(source, dest, sha256);
+                return;
+            } catch (const LauncherError &e) {
+                lastError = e.message;
+                logLine("install: " + e.message);
+            }
+        }
+    }
+    fail(lastError);
 }
 
 static Env baseEnvironment();
